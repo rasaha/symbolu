@@ -66,6 +66,10 @@ class Damping:
         Returns:
             DampingResult with damping factor and internal state.
         """
+        # Guard against negative or non-finite variance
+        metric_variance = max(0.0, metric_variance) if math.isfinite(metric_variance) else 0.0
+        coherence_instability = max(0.0, coherence_instability) if math.isfinite(coherence_instability) else 0.0
+
         # Initialize baseline from first observation
         # Matches minimal_controller.py lines 338-341
         if not self._baseline_initialized:

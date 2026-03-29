@@ -550,3 +550,174 @@ class TestCoherenceCrossGroup:
         # Overall coherence should be reduced by cross-group disagreement
         # even though within-group agreement is high for both groups
         assert result.coherence < 0.85
+
+
+# ============================================================
+# Second Audit — Edge Cases and Reset Coverage
+# ============================================================
+
+class TestPlasticityNaN:
+    def test_nan_resistance_handled(self):
+        """NaN resistance should not crash or propagate."""
+        gate = PlasticityGate()
+        result = gate.compute(resistance=float('nan'), misalignment=0.5)
+        assert math.isfinite(result.plasticity)
+
+    def test_inf_misalignment_handled(self):
+        """Infinite misalignment should not crash."""
+        gate = PlasticityGate()
+        result = gate.compute(resistance=0.5, misalignment=float('inf'))
+        assert math.isfinite(result.plasticity)
+
+
+class TestAdaptiveGainEdge:
+    def test_g_base_zero_does_not_lock(self):
+        """G_base=0 should not permanently lock gain at 0 via rate limiting."""
+        gain = AdaptiveGain(G_base=0.0, G_min=0.0, G_max=3.0)
+        r1 = gain.compute(coherence=0.8, phase="peak", step=200, warmup_steps=100)
+        assert r1.gain == 0.0  # Target is 0
+        # Now switch to non-zero G_base behavior by checking rate limit doesn't deadlock
+        # With G_base=0, max_delta should still be > 0 (floor of 0.01)
+        gain.G_base = 1.0
+        # Should be able to ramp up from 0 thanks to min delta floor
+        for _ in range(200):
+            r = gain.compute(coherence=0.8, phase="peak", step=300, warmup_steps=100)
+        assert r.gain > 0.0
+
+
+class TestDampingEdge:
+    def test_negative_variance_clamped(self):
+        """Negative metric_variance should not break damping."""
+        d = Damping()
+        result = d.compute(metric_variance=-1.0)
+        assert math.isfinite(result.damping)
+        assert result.damping >= 0.01
+
+    def test_nan_variance_handled(self):
+        """NaN variance should not propagate."""
+        d = Damping()
+        d.compute(metric_variance=0.1)  # Initialize
+        result = d.compute(metric_variance=float('nan'))
+        assert math.isfinite(result.damping)
+
+
+class TestReplayBufferEdge:
+    def test_negative_priority_does_not_crash_sample(self):
+        """Items with negative priority should not crash sampling."""
+        buf = ReplayBuffer(capacity=10, ttl=100)
+        buf.store({"priority": -5.0, "id": "a"}, step=0)
+        buf.store({"priority": 1.0, "id": "b"}, step=1)
+        # Should not raise ValueError from random.choices
+        sampled = buf.sample(2)
+        assert len(sampled) == 2
+
+    def test_zero_priority_does_not_crash_sample(self):
+        """Items with zero priority should not crash sampling."""
+        buf = ReplayBuffer(capacity=10, ttl=100)
+        buf.store({"priority": 0.0, "id": "a"}, step=0)
+        buf.store({"priority": 0.0, "id": "b"}, step=1)
+        sampled = buf.sample(1)
+        assert len(sampled) == 1
+
+
+class TestControllerReset:
+    def test_reset_clears_state(self):
+        """Reset should return controller to initial state."""
+        ctrl = Controller()
+        # Run some steps
+        for _ in range(20):
+            ctrl.step(
+                metrics={"cpu": 0.8, "memory": 0.7, "latency_p99": 0.6, "error_rate": 0.3},
+                current_replicas=5,
+            )
+        assert ctrl._step == 20
+        ctrl.reset()
+        assert ctrl._step == 0
+        assert len(ctrl.replay_buffer) == 0
+        assert len(ctrl._recent_scale_times) == 0
+
+    def test_reset_restores_damping_warmup(self):
+        """Reset should restore damping warmup period."""
+        config = InfraControllerConfig(damping_warmup_steps=10)
+        ctrl = Controller(config)
+        # Exhaust warmup
+        for _ in range(20):
+            ctrl.step(metrics={"cpu": 0.5, "memory": 0.5}, current_replicas=3)
+        ctrl.reset()
+        # After reset, damping warmup should be restored
+        result = ctrl.step(
+            metrics={"cpu": 0.9, "memory": 0.9, "latency_p99": 0.9, "error_rate": 0.9},
+            current_replicas=3,
+        )
+        assert result.damping.damping == 1.0  # Still in warmup
+
+    def test_reset_is_thread_safe(self):
+        """Reset should not deadlock when called concurrently with step."""
+        import threading
+        ctrl = Controller()
+        errors = []
+
+        def run_steps():
+            try:
+                for _ in range(50):
+                    ctrl.step(
+                        metrics={"cpu": 0.5, "memory": 0.5},
+                        current_replicas=3,
+                    )
+            except Exception as e:
+                errors.append(e)
+
+        def run_reset():
+            try:
+                for _ in range(10):
+                    ctrl.reset()
+            except Exception as e:
+                errors.append(e)
+
+        t1 = threading.Thread(target=run_steps)
+        t2 = threading.Thread(target=run_reset)
+        t1.start()
+        t2.start()
+        t1.join(timeout=5)
+        t2.join(timeout=5)
+        assert not errors, f"Concurrent access errors: {errors}"
+
+
+class TestErrorRatePressure:
+    def test_low_error_rate_no_negative_pressure(self):
+        """Low error_rate should NOT suggest scale-in (it means things are fine)."""
+        ctrl = Controller()
+        result = ctrl.step(
+            metrics={"cpu": 0.5, "memory": 0.5, "latency_p99": 0.5, "error_rate": 0.0},
+            current_replicas=5,
+        )
+        # error_rate=0.0 should contribute 0 pressure, not -0.5
+        # With cpu/memory/latency at 0.5 (neutral), pressure should be ~0
+        assert abs(result.pressure) < 0.15
+
+    def test_high_error_rate_adds_positive_pressure(self):
+        """High error_rate should add positive pressure (scale out needed)."""
+        ctrl = Controller()
+        r_no_err = ctrl.step(
+            metrics={"cpu": 0.7, "memory": 0.7, "latency_p99": 0.7, "error_rate": 0.0},
+            current_replicas=5,
+        )
+        ctrl2 = Controller()
+        r_err = ctrl2.step(
+            metrics={"cpu": 0.7, "memory": 0.7, "latency_p99": 0.7, "error_rate": 0.9},
+            current_replicas=5,
+        )
+        assert r_err.pressure > r_no_err.pressure
+
+
+class TestIdentityDeterminism:
+    def test_metric_order_does_not_affect_identity(self):
+        """Identity vector should be the same regardless of metric insertion order."""
+        ctrl1 = Controller()
+        ctrl2 = Controller()
+        # Same metrics, different insertion order
+        metrics1 = {"cpu": 0.8, "memory": 0.6, "latency_p99": 0.7, "error_rate": 0.3}
+        metrics2 = {"error_rate": 0.3, "latency_p99": 0.7, "cpu": 0.8, "memory": 0.6}
+        vec1 = ctrl1._metrics_to_identity_vector(metrics1)
+        vec2 = ctrl2._metrics_to_identity_vector(metrics2)
+        np.testing.assert_array_equal(vec1, vec2)

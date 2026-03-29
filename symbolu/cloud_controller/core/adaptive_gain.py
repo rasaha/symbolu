@@ -93,11 +93,11 @@ class AdaptiveGain:
             self.G_base * f_phase * f_coh,
         ))
 
-        # Rate limiting: max 10% of G_base per cycle
+        # Rate limiting: max 10% of G_base per cycle (min 0.01 to prevent deadlock when G_base=0)
         # Matches minimal_controller.py lines 296-299
         rate_limited = False
         if self._prev_gain is not None:
-            max_delta = self.G_base * 0.1
+            max_delta = max(self.G_base * 0.1, 0.01)
             clamped = max(
                 self._prev_gain - max_delta,
                 min(self._prev_gain + max_delta, target),

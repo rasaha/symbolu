@@ -311,12 +311,31 @@ class Controller:
         return pressure
 
     @staticmethod
-    def _group_pressure(metrics: Dict[str, float], keys: list) -> float:
-        """Average pressure from a signal group. Values above 0.5 = positive pressure."""
-        values = [metrics[k] for k in keys if k in metrics]
+    def _group_pressure(
+        metrics: Dict[str, float],
+        keys: list,
+        invert_keys: tuple = ("error_rate",),
+    ) -> float:
+        """Average pressure from a signal group. Values above 0.5 = positive pressure.
+
+        For inverted metrics (like error_rate), high values mean BAD, but low
+        values should NOT create negative pressure (suggesting scale-in).
+        error_rate=0.0 means "everything is fine", not "over-provisioned".
+        """
+        values = []
+        for k in keys:
+            if k not in metrics:
+                continue
+            v = metrics[k]
+            if k in invert_keys:
+                # Inverted: only contributes positive pressure (bad is high),
+                # but 0.0 means fine — not over-provisioned
+                values.append(max(0.0, v - 0.5))
+            else:
+                values.append(v - 0.5)
         if not values:
             return 0.0
-        return sum(v - 0.5 for v in values) / len(values)  # Centered at 0
+        return sum(values) / len(values)
 
     def _compute_resistance(
         self,
@@ -364,9 +383,11 @@ class Controller:
     def _metrics_to_identity_vector(self, metrics: Dict[str, float]) -> np.ndarray:
         """Convert metrics dict to fixed-dimension identity vector.
 
+        Keys are sorted for deterministic ordering — dict iteration order
+        depends on insertion order, which may vary between calls.
         Pads or truncates to identity_dim.
         """
-        values = list(metrics.values())
+        values = [metrics[k] for k in sorted(metrics.keys())]
         vec = np.zeros(self.config.identity_dim)
         n = min(len(values), self.config.identity_dim)
         vec[:n] = values[:n]
@@ -417,14 +438,15 @@ class Controller:
             return "no_action", 0
 
     def reset(self) -> None:
-        """Reset all internal state."""
-        self.plasticity_gate.reset()
-        self.adaptive_gain.reset()
-        self.damping.reset()
-        self.identity.reset()
-        self.replay_buffer = ReplayBuffer(
-            capacity=self.config.replay_buffer_size,
-            ttl=self.config.replay_ttl,
-        )
-        self._step = 0
-        self._recent_scale_times = []
+        """Reset all internal state. Thread-safe."""
+        with self._lock:
+            self.plasticity_gate.reset()
+            self.adaptive_gain.reset()
+            self.damping.reset(warmup_steps=self.config.damping_warmup_steps)
+            self.identity.reset()
+            self.replay_buffer = ReplayBuffer(
+                capacity=self.config.replay_buffer_size,
+                ttl=self.config.replay_ttl,
+            )
+            self._step = 0
+            self._recent_scale_times = []

@@ -55,6 +55,12 @@ class PlasticityGate:
         Returns:
             PlasticityResult with gate value, smoothed resistance, misalignment.
         """
+        # Guard against NaN/infinity propagation
+        if not math.isfinite(resistance):
+            resistance = 0.5
+        if not math.isfinite(misalignment):
+            misalignment = 0.0
+
         # First smoothing: fast EMA against persistent state
         # Matches minimal_controller.py line 231
         r_smoothed = 0.9 * self._persistent_resistance + 0.1 * resistance

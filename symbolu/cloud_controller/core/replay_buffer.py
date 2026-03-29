@@ -57,7 +57,7 @@ class ReplayBuffer:
         if not self.buffer:
             return []
         k = min(k, len(self.buffer))
-        priorities = [item.get("priority", 0.01) for item in self.buffer]
+        priorities = [max(item.get("priority", 0.01), 1e-6) for item in self.buffer]
         indices = list(range(len(self.buffer)))
         result = []
         for _ in range(k):
