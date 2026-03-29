@@ -373,6 +373,10 @@ class MistralCGWrapper(nn.Module):
         # This forces the adapter to produce corrections driven by CG
         # phase information, not by learning Mistral feature shortcuts.
         adapter_output = self.phase_adapter(phase_expanded)  # [B, T, D]
+        # Ensure norm layer is on same device (needed when resuming old checkpoints
+        # that don't have adapter_output_norm weights — strict=False skips it)
+        if self.adapter_output_norm.weight.device != adapter_output.device:
+            self.adapter_output_norm = self.adapter_output_norm.to(adapter_output.device)
         adapter_output = self.adapter_output_norm(adapter_output)  # normalize magnitude
 
         # Gated residual
