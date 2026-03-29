@@ -7,6 +7,7 @@ Tests cover:
 - ShadowRunner: end-to-end with mocked Prometheus
 """
 
+import math
 import time
 import pytest
 from unittest.mock import MagicMock, patch
@@ -644,3 +645,339 @@ class TestShadowRunner:
         for d in divergences:
             if d.verdict != Verdict.PENDING:
                 assert d.verdict_reason != ""
+
+    def test_failed_cycles_tracked(self):
+        """Failed pipeline polls should increment failed_cycles counter."""
+        runner = ShadowRunner(ShadowConfig())
+        prom = MagicMock(spec=PrometheusClient)
+        # Pipeline returns no metrics → poll_once returns None
+        prom.query_metrics.return_value = {}
+        prom.query_k8s_state.return_value = {
+            "current_replicas": 5.0, "desired_replicas": 5.0, "pod_restarts": 0.0,
+        }
+        runner.pipeline.prometheus = prom
+        runner.hpa_watcher.prometheus = prom
+
+        result = runner.step()
+        # poll_once may return None on empty metrics
+        if result is None:
+            assert runner.failed_cycles >= 1
+
+    def test_run_async_and_stop(self):
+        """run_async should run in background and stop cleanly."""
+        config = ShadowConfig(
+            pipeline=PipelineConfig(poll_interval=0.01),
+        )
+        runner = ShadowRunner(config)
+        prom = _mock_prometheus_for_shadow()
+        runner.pipeline.prometheus = prom
+        runner.hpa_watcher.prometheus = prom
+
+        thread = runner.run_async(max_cycles=50)
+        assert thread.is_alive() or runner.cycle_count > 0
+        runner.stop()
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+
+
+# ============================================================
+# Audit Fix Tests — Verdict Edge Cases
+# ============================================================
+
+class TestVerdictEdgeCases:
+    """Tests for verdict evaluation edge cases from Stage 3 audit."""
+
+    def test_opposite_direction_improved(self):
+        """Opposite direction with metrics improved → INCONCLUSIVE."""
+        config = DivergenceConfig(verdict_lookback_seconds=0.01)
+        tracker = DivergenceTracker(config)
+
+        # Controller says scale out +2, HPA says scale in -2
+        action = _make_action_result(delta=2)
+        hpa = HPASnapshot(timestamp=time.time() - 1, current_replicas=5, desired_replicas=3)
+        record = tracker.compare(action, hpa, {"cpu": 0.9, "memory": 0.8})
+        record.timestamp = time.time() - 1
+
+        # Metrics improved
+        time.sleep(0.02)
+        evaluated = tracker.evaluate_pending({"cpu": 0.5, "memory": 0.4})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.INCONCLUSIVE
+        assert "unclear which direction" in evaluated[0].verdict_reason
+
+    def test_opposite_direction_degraded(self):
+        """Opposite direction with metrics degraded → INCONCLUSIVE."""
+        config = DivergenceConfig(verdict_lookback_seconds=0.01)
+        tracker = DivergenceTracker(config)
+
+        action = _make_action_result(delta=2)
+        hpa = HPASnapshot(timestamp=time.time() - 1, current_replicas=5, desired_replicas=3)
+        record = tracker.compare(action, hpa, {"cpu": 0.5, "memory": 0.4})
+        record.timestamp = time.time() - 1
+
+        # Metrics degraded
+        time.sleep(0.02)
+        evaluated = tracker.evaluate_pending({"cpu": 0.9, "memory": 0.8})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.INCONCLUSIVE
+
+    def test_opposite_direction_stable(self):
+        """Opposite direction with metrics stable → INCONCLUSIVE."""
+        config = DivergenceConfig(verdict_lookback_seconds=0.01)
+        tracker = DivergenceTracker(config)
+
+        action = _make_action_result(delta=2)
+        hpa = HPASnapshot(timestamp=time.time() - 1, current_replicas=5, desired_replicas=3)
+        record = tracker.compare(action, hpa, {"cpu": 0.5, "memory": 0.5})
+        record.timestamp = time.time() - 1
+
+        # Metrics stable
+        time.sleep(0.02)
+        evaluated = tracker.evaluate_pending({"cpu": 0.5, "memory": 0.5})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.INCONCLUSIVE
+
+    def test_magnitude_differs_verdict(self):
+        """Magnitude differs → BOTH_REASONABLE."""
+        config = DivergenceConfig(verdict_lookback_seconds=0.01)
+        tracker = DivergenceTracker(config)
+
+        # Both scale out but different amounts
+        action = _make_action_result(delta=1)
+        hpa = HPASnapshot(timestamp=time.time() - 1, current_replicas=5, desired_replicas=8)
+        record = tracker.compare(action, hpa, {"cpu": 0.8})
+        record.timestamp = time.time() - 1
+
+        time.sleep(0.02)
+        evaluated = tracker.evaluate_pending({"cpu": 0.6})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.BOTH_REASONABLE
+        assert "magnitude" in evaluated[0].verdict_reason
+
+    def test_no_overlapping_metrics_inconclusive(self):
+        """Verdict with zero metric overlap → INCONCLUSIVE."""
+        config = DivergenceConfig(verdict_lookback_seconds=0.01)
+        tracker = DivergenceTracker(config)
+
+        action = _make_action_result(delta=0)
+        hpa = HPASnapshot(timestamp=time.time() - 1, current_replicas=5, desired_replicas=8)
+        record = tracker.compare(action, hpa, {"cpu": 0.8})
+        record.timestamp = time.time() - 1
+
+        time.sleep(0.02)
+        evaluated = tracker.evaluate_pending({"totally_different_key": 0.5})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.INCONCLUSIVE
+        assert "No overlapping" in evaluated[0].verdict_reason
+
+    def test_nan_metrics_filtered_in_verdict(self):
+        """NaN/infinity metric values should be filtered during verdict evaluation."""
+        config = DivergenceConfig(verdict_lookback_seconds=0.01)
+        tracker = DivergenceTracker(config)
+
+        action = _make_action_result(delta=0)
+        hpa = HPASnapshot(timestamp=time.time() - 1, current_replicas=5, desired_replicas=8)
+        # Snapshot has NaN for one key
+        record = tracker.compare(action, hpa, {"cpu": float("nan"), "memory": 0.6})
+        record.timestamp = time.time() - 1
+
+        time.sleep(0.02)
+        # Current also has one NaN — only memory overlaps finitely
+        evaluated = tracker.evaluate_pending({"cpu": 0.5, "memory": 0.58})
+        assert len(evaluated) == 1
+        # Should still evaluate (memory is valid)
+        assert evaluated[0].verdict != Verdict.PENDING
+
+    def test_infinity_metrics_filtered_in_verdict(self):
+        """Infinity metric values should be filtered during verdict evaluation."""
+        config = DivergenceConfig(verdict_lookback_seconds=0.01)
+        tracker = DivergenceTracker(config)
+
+        action = _make_action_result(delta=0)
+        hpa = HPASnapshot(timestamp=time.time() - 1, current_replicas=5, desired_replicas=8)
+        record = tracker.compare(action, hpa, {"cpu": float("inf")})
+        record.timestamp = time.time() - 1
+
+        time.sleep(0.02)
+        evaluated = tracker.evaluate_pending({"cpu": 0.5})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.INCONCLUSIVE  # No valid overlapping metrics
+
+    def test_controller_scales_hpa_holds_both_reasonable(self):
+        """Controller recommended, HPA held, metrics stable → BOTH_REASONABLE."""
+        config = DivergenceConfig(verdict_lookback_seconds=0.01)
+        tracker = DivergenceTracker(config)
+
+        action = _make_action_result(delta=2, recommendation="scale_out_2")
+        hpa = HPASnapshot(timestamp=time.time() - 1, current_replicas=5, desired_replicas=5)
+        record = tracker.compare(action, hpa, {"cpu": 0.6, "memory": 0.5})
+        record.timestamp = time.time() - 1
+
+        # Metrics stable
+        time.sleep(0.02)
+        evaluated = tracker.evaluate_pending({"cpu": 0.58, "memory": 0.48})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.BOTH_REASONABLE
+
+
+class TestCostEstimation:
+    """Tests for cost estimation formula specifics."""
+
+    def test_controller_correct_cost_formula(self):
+        """Cost saved = pods_wasted × elapsed_min × cost_per_pod_minute."""
+        config = DivergenceConfig(
+            verdict_lookback_seconds=300.0,  # 5 minutes
+            cost_per_pod_minute=0.03,
+        )
+        tracker = DivergenceTracker(config)
+
+        # HPA wants +3 pods, controller holds
+        action = _make_action_result(delta=0)
+        hpa = HPASnapshot(timestamp=time.time() - 301, current_replicas=5, desired_replicas=8)
+        record = tracker.compare(action, hpa, {"cpu": 0.5, "memory": 0.5})
+        record.timestamp = time.time() - 301
+
+        # Metrics stable → CONTROLLER_CORRECT
+        evaluated = tracker.evaluate_pending({"cpu": 0.48, "memory": 0.48})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.CONTROLLER_CORRECT
+        # 3 pods × 5 min × $0.03 = $0.45
+        assert evaluated[0].estimated_cost_impact == pytest.approx(0.45, abs=0.01)
+
+    def test_hpa_correct_negative_cost(self):
+        """HPA correct should have negative cost impact (cost of inaction)."""
+        config = DivergenceConfig(
+            verdict_lookback_seconds=300.0,
+            cost_per_pod_minute=0.03,
+        )
+        tracker = DivergenceTracker(config)
+
+        # HPA wants +3 pods, controller holds
+        action = _make_action_result(delta=0)
+        hpa = HPASnapshot(timestamp=time.time() - 301, current_replicas=5, desired_replicas=8)
+        record = tracker.compare(action, hpa, {"cpu": 0.9, "memory": 0.8})
+        record.timestamp = time.time() - 301
+
+        # Metrics improved → HPA_CORRECT
+        evaluated = tracker.evaluate_pending({"cpu": 0.5, "memory": 0.4})
+        assert len(evaluated) == 1
+        assert evaluated[0].verdict == Verdict.HPA_CORRECT
+        # Negative cost = cost of controller being wrong
+        assert evaluated[0].estimated_cost_impact < 0
+        # 3 pods × 5 min × $0.03 = -$0.45
+        assert evaluated[0].estimated_cost_impact == pytest.approx(-0.45, abs=0.01)
+
+
+class TestFormatLogEdgeCases:
+    """Tests for format_log edge cases."""
+
+    def test_format_log_with_verdict(self):
+        """format_log should include verdict info when set."""
+        record = _make_divergence_record(
+            div_type=DivergenceType.HPA_SCALES_CONTROLLER_HOLDS,
+            verdict=Verdict.CONTROLLER_CORRECT,
+            cost=0.45,
+        )
+        record.verdict_timestamp = time.time()
+        record.verdict_reason = "Metrics stable"
+        log = record.format_log()
+        assert "CONTROLLER_CORRECT" in log or "controller_correct" in log
+        assert "Metrics stable" in log
+        assert "$0.45" in log
+
+    def test_format_log_with_none_verdict_timestamp(self):
+        """format_log should handle None verdict_timestamp gracefully."""
+        record = _make_divergence_record(
+            div_type=DivergenceType.HPA_SCALES_CONTROLLER_HOLDS,
+            verdict=Verdict.CONTROLLER_CORRECT,
+        )
+        record.verdict_timestamp = None
+        log = record.format_log()
+        assert "??:??:??" in log
+
+    def test_format_log_agreement(self):
+        """format_log for agreement should show AGREEMENT."""
+        record = _make_divergence_record(div_type=DivergenceType.AGREEMENT)
+        log = record.format_log()
+        assert "AGREEMENT" in log
+
+    def test_format_log_with_negative_cost(self):
+        """format_log should show 'cost' label for negative impact."""
+        record = _make_divergence_record(
+            div_type=DivergenceType.HPA_SCALES_CONTROLLER_HOLDS,
+            verdict=Verdict.HPA_CORRECT,
+            cost=-0.30,
+        )
+        record.verdict_timestamp = time.time()
+        record.verdict_reason = "HPA was right"
+        log = record.format_log()
+        assert "(cost)" in log
+        assert "$0.30" in log
+
+
+class TestHPAWatcherEdgeCases:
+    """Additional HPA watcher tests from audit."""
+
+    def test_oscillation_tracking(self):
+        """Rapid scale up/down oscillation should be tracked correctly."""
+        prom = _mock_prom_k8s(current=5.0, desired=5.0)
+        watcher = HPAWatcher(prom)
+        watcher.poll()
+
+        # Oscillate: 5 → 8 → 5 → 10 → 5
+        for desired in [8.0, 5.0, 10.0, 5.0]:
+            prom.query_k8s_state.return_value = {
+                "current_replicas": 5.0, "desired_replicas": desired, "pod_restarts": 0.0,
+            }
+            watcher.poll()
+
+        assert watcher.total_actions == 4
+        dirs = [a.direction for a in watcher.actions]
+        assert dirs == ["scale_out", "scale_in", "scale_out", "scale_in"]
+
+    def test_history_trimming(self):
+        """History should be trimmed to _max_history."""
+        prom = _mock_prom_k8s(current=5.0, desired=5.0)
+        watcher = HPAWatcher(prom)
+        watcher._max_history = 10  # Low threshold for testing
+
+        watcher.poll()  # Establish baseline
+        for i in range(20):
+            desired = 5.0 + (i % 3) + 1  # Varying to generate actions
+            prom.query_k8s_state.return_value = {
+                "current_replicas": 5.0, "desired_replicas": desired, "pod_restarts": 0.0,
+            }
+            watcher.poll()
+
+        assert len(watcher._snapshots) <= 10
+        assert len(watcher._actions) <= 10
+
+    def test_invalid_replica_values(self):
+        """Should return None for non-numeric replica values."""
+        prom = MagicMock(spec=PrometheusClient)
+        prom.query_k8s_state.return_value = {
+            "current_replicas": "not_a_number",
+            "desired_replicas": "also_bad",
+            "pod_restarts": 0.0,
+        }
+        watcher = HPAWatcher(prom)
+        snap = watcher.poll()
+        assert snap is None
+
+
+class TestCoherenceNullSafety:
+    """Test that divergence tracker handles None coherence safely."""
+
+    def test_null_coherence_defaults_to_zero(self):
+        """Divergence record should get 0.0 coherence when action.coherence is None."""
+        # We can't pass None coherence through action.explain(), so test the
+        # guard logic directly in DivergenceTracker.compare by mocking explain
+        tracker = DivergenceTracker()
+        action = _make_action_result(delta=0)
+        action.coherence = None  # Simulate missing coherence
+        # Patch explain to avoid the AttributeError in ActionResult.explain()
+        action.explain = lambda: "test explanation"
+
+        hpa = HPASnapshot(timestamp=time.time(), current_replicas=5, desired_replicas=8)
+        record = tracker.compare(action, hpa, {"cpu": 0.5})
+        assert record.controller_coherence == 0.0

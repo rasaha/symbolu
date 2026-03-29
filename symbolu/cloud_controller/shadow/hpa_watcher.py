@@ -112,6 +112,8 @@ class HPAWatcher:
         )
 
         # Detect scaling action: desired changed from previous snapshot
+        # NOTE: If HPA changes desired multiple times between polls,
+        # intermediate actions are lost — only the net change is captured.
         if self._prev_snapshot is not None:
             prev_desired = self._prev_snapshot.desired_replicas
             if desired != prev_desired:

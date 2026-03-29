@@ -88,6 +88,7 @@ class ShadowRunner:
         self.divergence_tracker = DivergenceTracker(self.config.divergence)
         self.reporter = ShadowReporter()
         self._cycle_count = 0
+        self._failed_cycles = 0
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
@@ -100,12 +101,16 @@ class ShadowRunner:
         # 1. Run pipeline (Prometheus → normalize → controller)
         cycle = self.pipeline.poll_once()
         if cycle is None:
+            self._failed_cycles += 1
+            logger.warning("Pipeline poll failed (total failures: %d)", self._failed_cycles)
             return None
 
         self._cycle_count += 1
 
         # 2. Poll HPA state
         hpa = self.hpa_watcher.poll()
+        if hpa is None:
+            logger.debug("HPA state unavailable this cycle")
 
         # 3. Compare if we have both controller result and HPA state
         divergence = None
@@ -228,14 +233,18 @@ class ShadowRunner:
         hpa_actions = self.hpa_watcher.total_actions
 
         logger.info(
-            "Shadow status: cycle=%d total_records=%d divergences=%d "
+            "Shadow status: cycle=%d failed=%d total_records=%d divergences=%d "
             "pending=%d hpa_actions=%d",
-            self._cycle_count, total, divs, pending, hpa_actions,
+            self._cycle_count, self._failed_cycles, total, divs, pending, hpa_actions,
         )
 
     @property
     def cycle_count(self) -> int:
         return self._cycle_count
+
+    @property
+    def failed_cycles(self) -> int:
+        return self._failed_cycles
 
     def reset(self) -> None:
         """Reset all internal state."""
@@ -244,6 +253,7 @@ class ShadowRunner:
         self.hpa_watcher.reset()
         self.divergence_tracker.reset()
         self._cycle_count = 0
+        self._failed_cycles = 0
 
     def close(self) -> None:
         """Stop and clean up."""

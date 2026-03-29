@@ -10,8 +10,17 @@ A divergence occurs when:
 
 Verdicts are assigned after a lookback window (default 5 minutes)
 by checking whether metrics improved, degraded, or stayed the same.
+
+IMPORTANT LIMITATION — Attribution Causality:
+Verdicts are based on *correlation*, not causation. When HPA scales
+and metrics stabilize, we cannot prove whether HPA prevented degradation
+or scaling was unnecessary. Similarly, metrics may improve or degrade
+for reasons entirely unrelated to scaling decisions (deploy, traffic
+shift, cache warm-up, etc.). Treat verdicts as directional signals
+for human review, not ground truth.
 """
 
+import math
 import time
 import logging
 from dataclasses import dataclass, field
@@ -96,7 +105,10 @@ class DivergenceRecord:
         ]
 
         if self.verdict != Verdict.PENDING:
-            vts = time.strftime("%H:%M:%S", time.localtime(self.verdict_timestamp or 0))
+            if self.verdict_timestamp is not None and self.verdict_timestamp > 0:
+                vts = time.strftime("%H:%M:%S", time.localtime(self.verdict_timestamp))
+            else:
+                vts = "??:??:??"
             lines.append(f"  Verdict [{vts}]:   {self.verdict.value}")
             if self.verdict_reason:
                 lines.append(f"  Reason:           {self.verdict_reason}")
@@ -158,6 +170,11 @@ class DivergenceTracker:
 
         divergence_type = self._classify(ctrl_delta, hpa_delta)
 
+        # Safely access coherence — may be None in edge cases
+        coherence_val = 0.0
+        if action.coherence is not None:
+            coherence_val = action.coherence.coherence
+
         record = DivergenceRecord(
             timestamp=time.time(),
             divergence_type=divergence_type,
@@ -165,7 +182,7 @@ class DivergenceTracker:
             controller_delta=ctrl_delta,
             controller_action_score=action.action_score,
             controller_pressure=action.pressure,
-            controller_coherence=action.coherence.coherence,
+            controller_coherence=coherence_val,
             controller_explanation=action.explain(),
             hpa_current=hpa.current_replicas,
             hpa_desired=hpa.desired_replicas,
@@ -260,12 +277,23 @@ class DivergenceTracker:
         """
         # Compute metric change: positive = metrics improved (went down),
         # negative = metrics degraded (went up)
+        # Filter NaN/infinity values from both sides
         changes = {}
         for key in record.metrics_snapshot:
             if key in current_metrics:
-                changes[key] = record.metrics_snapshot[key] - current_metrics[key]
+                old_val = record.metrics_snapshot[key]
+                new_val = current_metrics[key]
+                if math.isfinite(old_val) and math.isfinite(new_val):
+                    changes[key] = old_val - new_val
 
         if not changes:
+            logger.debug(
+                "No valid overlapping metrics for verdict at %s "
+                "(snapshot keys=%s, current keys=%s)",
+                time.strftime("%H:%M:%S", time.localtime(record.timestamp)),
+                list(record.metrics_snapshot.keys()),
+                list(current_metrics.keys()),
+            )
             return Verdict.INCONCLUSIVE, "No overlapping metrics for comparison", 0.0
 
         avg_change = sum(changes.values()) / len(changes)
@@ -279,10 +307,12 @@ class DivergenceTracker:
             # HPA scaled, controller said hold
             if improved:
                 # Metrics improved — HPA's scaling helped (or coincidence)
+                pods_extra = abs(record.hpa_delta)
+                cost_of_inaction = pods_extra * elapsed_min * self.config.cost_per_pod_minute
                 return (
                     Verdict.HPA_CORRECT,
                     "Metrics improved after HPA scaled",
-                    0.0,
+                    -cost_of_inaction,
                 )
             elif degraded:
                 # Metrics degraded despite HPA scaling — something else going on
@@ -331,6 +361,12 @@ class DivergenceTracker:
                 return (
                     Verdict.INCONCLUSIVE,
                     "Metrics improved — unclear which direction was correct",
+                    0.0,
+                )
+            elif degraded:
+                return (
+                    Verdict.INCONCLUSIVE,
+                    "Metrics degraded — unclear which direction was correct",
                     0.0,
                 )
             else:
