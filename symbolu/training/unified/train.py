@@ -5093,6 +5093,27 @@ def train(config: UnifiedTrainingConfig):
                                                 loss = loss + _prim_lam * _prim_loss
                                                 metrics[f'cg_{_prim_loss_key}'] = _prim_loss.item()
 
+                                # --- CG Primitive Loss Attribution ---
+                                # Track weighted contribution of each primitive to total CG loss.
+                                # This tells you which primitive is driving adapter weight changes.
+                                _cg_contribs = {}
+                                if 'cg_ont_loss' in metrics and config.lambda_ont > 0:
+                                    _cg_contribs['ont'] = config.lambda_ont * metrics['cg_ont_loss']
+                                if 'cg_kosha_routing_loss' in metrics and config.lambda_kosha_routing > 0:
+                                    _cg_contribs['kosha'] = config.lambda_kosha_routing * metrics['cg_kosha_routing_loss']
+                                if 'cg_bliss_loss' in metrics and config.lambda_bliss_token > 0:
+                                    _cg_contribs['bliss'] = config.lambda_bliss_token * metrics['cg_bliss_loss']
+                                for _pn in ('jepa', 'csr', 'vritti', 'guna'):
+                                    _pk = f'cg_L_{_pn}'
+                                    _lam = getattr(config, f'lambda_{_pn}_token', 0)
+                                    if _pk in metrics and _lam > 0:
+                                        _cg_contribs[_pn] = _lam * metrics[_pk]
+                                _cg_total_contrib = sum(_cg_contribs.values()) if _cg_contribs else 0.0
+                                if _cg_total_contrib > 0:
+                                    for _cn, _cv in _cg_contribs.items():
+                                        metrics[f'cg_attr_{_cn}'] = _cv / _cg_total_contrib
+                                    metrics['cg_total_aux_loss'] = _cg_total_contrib
+
                                 # Log Kosha routing diagnostics
                                 if global_step % config.log_every == 0 and global_step > 0:
                                     _cg_alpha_mean = _cg_alpha.mean(dim=(0, 1))
@@ -7945,6 +7966,39 @@ def train(config: UnifiedTrainingConfig):
                                 writer.add_scalar('experiential/resistance_std', _r_std, global_step)
                                 writer.add_scalar('experiential/identity_norm', _id_norm, global_step)
                                 writer.add_scalar('experiential/replay_buffer_size', _ec_replay_len, global_step)
+
+                        # --- CG Primitive Loss Attribution ---
+                        _cg_attr_keys = [k for k in metrics if k.startswith('cg_attr_')]
+                        if _cg_attr_keys:
+                            _cg_sections += 1
+                            _cg_total_aux = metrics.get('cg_total_aux_loss', 0)
+                            print(f"  CG Primitive Attribution (weighted loss %):")
+                            _attr_parts = []
+                            for _ak in sorted(_cg_attr_keys):
+                                _name = _ak.replace('cg_attr_', '')
+                                _pct = metrics[_ak] * 100
+                                _attr_parts.append(f"{_name}={_pct:.1f}%")
+                            print(f"    {' | '.join(_attr_parts)}")
+                            print(f"    total_aux_loss={_cg_total_aux:.4f}")
+                            # Identify dominant primitive
+                            _dom = max(_cg_attr_keys, key=lambda k: metrics[k])
+                            _dom_name = _dom.replace('cg_attr_', '')
+                            _dom_pct = metrics[_dom] * 100
+                            if _dom_pct > 60:
+                                print(f"    -> DOMINATED by {_dom_name} ({_dom_pct:.0f}%) — "
+                                      f"other primitives have weak influence")
+                            elif _dom_pct > 40:
+                                print(f"    -> LED by {_dom_name} ({_dom_pct:.0f}%)")
+                            else:
+                                print(f"    -> BALANCED: no single primitive dominates")
+                            # TensorBoard
+                            if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
+                                for _ak in _cg_attr_keys:
+                                    _name = _ak.replace('cg_attr_', '')
+                                    writer.add_scalar(f'cg_attribution/{_name}',
+                                                      metrics[_ak], global_step)
+                                writer.add_scalar('cg_attribution/total_aux_loss',
+                                                  _cg_total_aux, global_step)
 
                         # --- CG Adapter Influence Diagnostics ---
                         _cg_model = getattr(model, 'module', model)
