@@ -835,3 +835,172 @@ What gets bootstrapped:
 5. **Plasticity Gate** — Double-smoothed resistance warmed up
 
 For a truly fresh cluster with < 1 hour of Prometheus data, the controller falls back to conservative defaults (half-gain, neutral normalization) — safe but less precise than a bootstrapped instance.
+
+---
+
+## Implementation Status
+
+### What Is Built (Production-Ready)
+
+| Stage | Component | Files | Tests | Status |
+|-------|-----------|-------|-------|--------|
+| **Stage 1** | Core control library (12 parameters) | `controller.py`, `core/*.py`, `config.py` | 87 unit tests | **Complete** |
+| **Stage 2** | Prometheus integration + signal pipeline | `signals/prometheus.py`, `signals/normalizer.py`, `signals/pipeline.py` | 42 unit tests | **Complete** |
+| **Stage 3** | Shadow mode (proof of value) | `shadow/runner.py`, `shadow/divergence.py`, `shadow/reporter.py`, `shadow/hpa_watcher.py` | 38 unit tests | **Complete** |
+| **Stage 4** | Recommend mode (human-in-the-loop) | `recommend/engine.py`, `recommend/confidence.py`, `recommend/safety.py`, `recommend/approval.py`, `recommend/webhook.py` | 39+ unit tests | **Complete** |
+| **Bootstrap** | Learning phase elimination | `bootstrap()` on all modules | 22 unit tests | **Complete** |
+
+**Total:** 27 Python source files, 228+ unit tests, all passing.
+
+### What Is Planned (Not Yet Built)
+
+| Stage | Component | Prerequisite | Value |
+|-------|-----------|-------------|-------|
+| **Stage 5** | Active mode (bounded autonomous control) | Validated shadow mode results | Direct scaling without human approval |
+| **Stage 6** | Learning loop + multi-service | Active mode data | Auto-tune 12 parameters from outcome data. L6 → L4 feedback loop |
+| **Layer 3** | Prediction module | Replay buffer + historical data | Proactive scaling (compete with ScaleOps at L3) |
+| **Layer 2** | Cost optimization integration | Stage 5 active mode | Feed Cast AI / Kubecost constraints into decision equation |
+
+### The 12 Load-Bearing Parameters
+
+Every parameter is ablation-validated from the CG ExperientialController. Changing any one has a measurable effect on decision quality.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Parameter          │ Cloud Default │ Role                        │
+├────────────────────┼───────────────┼─────────────────────────────┤
+│ w_infra            │ 0.4           │ Infrastructure weight        │
+│ w_app              │ 0.4           │ Application weight           │
+│ w_business         │ 0.2           │ Business weight              │
+│ k_r                │ 2.0           │ Resistance → gate openness   │
+│ k_m                │ 2.0           │ Misalignment → gate closure  │
+│ b_p                │ -1.0          │ Gate floor (never fully shut)│
+│ G_base             │ 1.0           │ Base gain (conservative)     │
+│ G_min              │ 0.0           │ Min gain (allow "do nothing")│
+│ G_max              │ 3.0           │ Max gain (3x scaling factor) │
+│ k_dv               │ 1.0           │ Variance sensitivity         │
+│ k_dc               │ 0.5           │ Coherence instability sens.  │
+│ alpha_base         │ 0.01          │ Identity learning rate       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Source: `config.py:20-47`
+
+---
+
+## Deployment Strategy
+
+### Phase 1: Shadow Mode (Week 1-2)
+
+```
+Our Controller (read-only) ──→ logs recommendations
+                                  │
+HPA (active) ──────────────→ scales pods (as before)
+                                  │
+Shadow Runner ──────────────→ compares, assigns verdicts
+                                  │
+                              Weekly report: "controller prevented 89
+                              unnecessary scales, caught 43 early"
+```
+
+**Requirements:** Read-only access to Prometheus and K8s API. Zero write permissions.
+
+**Deliverable:** Shadow report proving value. This is the customer demo.
+
+### Phase 2: Recommend Mode (Week 3-4)
+
+```
+Our Controller ──→ ConfidenceScorer ──→ SafetyBounds ──→ Slack/PagerDuty
+                                                              │
+                                                    [Approve] [Dismiss]
+                                                              │
+                                                         K8s API (scale)
+```
+
+**Requirements:** Webhook URLs. Write access to K8s API only on approval.
+
+### Phase 3: Active Mode (Week 5+)
+
+```
+Our Controller ──→ SafetyBounds ──→ K8s API (direct scaling)
+                        │
+                   HPA as safety net (wide min/max bounds)
+```
+
+**Requirements:** Validated Phase 2 results. Customer trust established.
+
+---
+
+## Why This Architecture Is Novel
+
+### What exists today (every competitor)
+
+```
+Signal → Threshold/ML → Scale
+```
+
+One signal (or ML-correlated signals) crosses a boundary → act. No coherence check, no stability awareness, no identity baseline, no deployment gating.
+
+### What our controller does
+
+```
+Signals → Coherence Gate → Stability Gate → Gain Modulation → Damping → Bounded Action
+              │                  │                │              │
+              │                  │                │              └─ Is the system volatile?
+              │                  │                └─────────────── How aggressively?
+              │                  └──────────────────────────────── Is it safe to act?
+              └─────────────────────────────────────────────────── Do the signals agree?
+```
+
+Every step is:
+- **Continuous** (sigmoid, EMA, exp) — no binary branching
+- **Rate-limited** — no step can change faster than its budget per cycle
+- **Explainable** — every component exposed in `ActionResult`
+- **Self-calibrating** — baselines adapt to the specific system over time
+
+This is not a threshold system with more thresholds. It is a **control system** derived from the same consistency-constrained principles used in the CG ExperientialController — adapted from neural network training dynamics to cloud infrastructure scaling.
+
+The math is the moat.
+
+---
+
+## Appendix: File Index
+
+```
+symbolu/cloud_controller/
+├── __init__.py
+├── config.py                      # 12-parameter InfraControllerConfig
+├── controller.py                  # Main: sense → interpret → decide → act → learn
+│
+├── core/
+│   ├── plasticity_gate.py         # P_t = sigmoid(k_r·R - k_m·M + b_p)
+│   ├── adaptive_gain.py           # G_t with rate limiting + bootstrap
+│   ├── damping.py                 # d_t with asymmetric EMA + bootstrap
+│   ├── identity_ema.py            # Baseline learning + bootstrap
+│   ├── coherence.py               # Multi-signal agreement scoring
+│   └── replay_buffer.py           # Priority-weighted incident memory
+│
+├── signals/
+│   ├── prometheus.py              # Prometheus HTTP client (instant + range)
+│   ├── normalizer.py              # Raw → [0,1] + bootstrap
+│   └── pipeline.py                # Polling loop + bootstrap orchestrator
+│
+├── shadow/
+│   ├── runner.py                  # Shadow mode orchestrator
+│   ├── hpa_watcher.py             # K8s HPA observation
+│   ├── divergence.py              # Controller vs HPA comparison + verdicts
+│   └── reporter.py                # Proof-of-value report generation
+│
+├── recommend/
+│   ├── engine.py                  # Recommendation pipeline orchestrator
+│   ├── confidence.py              # Confidence scoring (NONE/LOW/MEDIUM/HIGH)
+│   ├── safety.py                  # Hard limits + cooldown
+│   ├── approval.py                # PENDING → APPROVED/DISMISSED/EXPIRED
+│   └── webhook.py                 # Slack/PagerDuty/OpsGenie dispatch
+│
+├── action/
+│   └── __init__.py                # K8s actuator (Stage 5, planned)
+│
+└── explain/
+    └── __init__.py                # Decision log formatting (Stage 5, planned)
+```
