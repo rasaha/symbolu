@@ -511,6 +511,14 @@ class RecommendEngine:
         if self.feedback is None:
             return None
 
+        # Validate controller has expected attributes before adjustment
+        for attr in ('adaptive_gain', 'damping', 'plasticity_gate'):
+            if not hasattr(controller, attr):
+                logger.warning(
+                    "Controller missing %s attribute, skipping feedback", attr,
+                )
+                return None
+
         result = self.feedback.process(
             controller=controller,
             outcomes=outcomes,

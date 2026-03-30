@@ -168,6 +168,7 @@ class FeedbackLoop:
 
         Args:
             controller: The Controller instance to adjust.
+                        Must have adaptive_gain, damping, and plasticity_gate.
             outcomes: Resolved OutcomeRecords from OutcomeTracker.
             rollbacks: Resolved RollbackWatches from RollbackMonitor.
             divergences: Resolved DivergenceRecords from DivergenceTracker.
@@ -179,37 +180,39 @@ class FeedbackLoop:
         if current_time is None:
             current_time = time.time()
 
-        # 1. Accumulate new verdicts
-        if outcomes:
-            self._recent_outcomes.extend(outcomes)
-        if rollbacks:
-            self._recent_rollbacks.extend(rollbacks)
-        if divergences:
-            self._recent_divergences.extend(
-                d for d in divergences if d.is_divergence
-            )
+        with self._lock:
+            # 1. Accumulate new verdicts
+            if outcomes:
+                self._recent_outcomes.extend(outcomes)
+            if rollbacks:
+                self._recent_rollbacks.extend(rollbacks)
+            if divergences:
+                self._recent_divergences.extend(
+                    d for d in divergences
+                    if hasattr(d, 'is_divergence') and d.is_divergence
+                )
 
-        # 2. Prune old verdicts outside the window
-        cutoff = current_time - self.config.verdict_window_seconds
-        self._recent_outcomes = [
-            o for o in self._recent_outcomes
-            if o.verdict_timestamp > cutoff
-        ]
-        self._recent_rollbacks = [
-            r for r in self._recent_rollbacks
-            if r.verdict_timestamp > cutoff
-        ]
-        self._recent_divergences = [
-            d for d in self._recent_divergences
-            if (d.verdict_timestamp or d.timestamp) > cutoff
-        ]
+            # 2. Prune old verdicts outside the window
+            cutoff = current_time - self.config.verdict_window_seconds
+            self._recent_outcomes = [
+                o for o in self._recent_outcomes
+                if o.verdict_timestamp > cutoff
+            ]
+            self._recent_rollbacks = [
+                r for r in self._recent_rollbacks
+                if r.verdict_timestamp > cutoff
+            ]
+            self._recent_divergences = [
+                d for d in self._recent_divergences
+                if (d.verdict_timestamp if d.verdict_timestamp else d.timestamp) > cutoff
+            ]
 
-        # 3. Count verdicts
-        counts = self._count_verdicts()
-        total = counts["total"]
+            # 3. Count verdicts
+            counts = self._count_verdicts()
+            total = counts["total"]
 
-        # 4. Determine signal direction
-        signal = self._compute_signal(counts)
+            # 4. Determine signal direction
+            signal = self._compute_signal(counts)
 
         result = FeedbackCycleResult(
             signal=signal,
@@ -303,11 +306,11 @@ class FeedbackLoop:
     def _compute_signal(self, counts: Dict[str, int]) -> FeedbackSignal:
         """Determine the overall feedback direction.
 
-        Scoring:
+        Scoring (design doc §5.15 — L6→L4 signal weights):
           +1 per POSITIVE, CONTROLLER_CORRECT, STABLE
           -1 per NEGATIVE, OVERRIDDEN, ROLLBACK
           -2 per OSCILLATION (strong dampen signal)
-          +0.5 per HPA_CORRECT (mild dampen — we were wrong but not dangerously)
+          -0.5 per HPA_CORRECT (mild dampen — we were wrong but not dangerously)
         """
         score = 0.0
         score += counts["positive"] * 1.0
@@ -486,12 +489,19 @@ class FeedbackLoop:
         Returns:
             FeedbackAdjustment if change was made, None if no change needed.
         """
-        old_value = getattr(module, attr)
+        old_value = getattr(module, attr, None)
+        if old_value is None:
+            logger.warning(
+                "Attribute %s not found on %s, skipping adjustment",
+                attr, type(module).__name__,
+            )
+            return None
 
-        # Rate limit: cap delta at max_adjustment_rate of current value
-        max_delta = abs(old_value) * self.config.max_adjustment_rate
-        if max_delta < 1e-6:
-            max_delta = 0.01  # Minimum step for near-zero values
+        # Rate limit: cap delta at max_adjustment_rate of current value,
+        # but use 1% of the bounds range as a floor to prevent stall near zero
+        bounds_range = bounds[1] - bounds[0]
+        min_step = bounds_range * 0.01
+        max_delta = max(abs(old_value) * self.config.max_adjustment_rate, min_step)
         clamped_delta = max(-max_delta, min(max_delta, delta))
 
         new_value = old_value + clamped_delta
@@ -561,6 +571,6 @@ class FeedbackLoop:
         with self._lock:
             self._history.clear()
             self._adjustment_history.clear()
-        self._recent_outcomes.clear()
-        self._recent_rollbacks.clear()
-        self._recent_divergences.clear()
+            self._recent_outcomes.clear()
+            self._recent_rollbacks.clear()
+            self._recent_divergences.clear()
