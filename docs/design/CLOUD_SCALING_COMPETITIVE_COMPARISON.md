@@ -429,3 +429,221 @@ Source: `recommend/approval.py`
 | Generic HTTP | Raw JSON payload | `recommend/webhook.py` |
 
 **What competitors have:** Cast AI has auto vs manual modes. Karpenter is always autonomous. ScaleOps has a recommendation dashboard. None provides the graduated Observe → Approve → Autonomous path with confidence-gated notification filtering.
+
+---
+
+## Competitor Deep Dives
+
+### Cast AI
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ CAST AI                                                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Architecture:                                                   │
+│  Node Agent → Cast AI Cloud → K8s API                           │
+│                                                                  │
+│  Decision model:                                                 │
+│  IF cpu > threshold → recommend resize/add node                  │
+│  IF memory > threshold → recommend resize/add node               │
+│  IF OOM kill detected → recommend bigger instance type           │
+│  IF cost(current) > cost(optimal) → recommend rebalance          │
+│                                                                  │
+│  Cooldown: fixed timer per cluster                               │
+│                                                                  │
+│  Primary value: cost optimization (30-50% savings reported)      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**What Cast AI does well:**
+
+1. **Immediate action** — Fixed SLO thresholds require no learning. CPU > 80% → act. No warmup.
+2. **Cost optimization** — Deep integration with AWS/GCP/Azure pricing APIs. Finds cheaper instance types that match workload.
+3. **OOM kill response** — Detects container OOM kills and recommends memory limit increases.
+4. **Node-level scaling** — Adds/removes entire nodes, not just pods.
+
+**What Cast AI cannot do:**
+
+| Limitation | Why It Matters | Our Controller's Answer |
+|------------|---------------|------------------------|
+| No multi-signal coherence | CPU spike from batch job? Scales anyway. CPU + flat latency + flat errors = false alarm | Coherence model (`core/coherence.py`) requires signals to agree before acting |
+| No deployment awareness | Scales during broken rollouts, making the problem worse | Plasticity gate closes when `deploy_active=True` (resistance drops 40%) |
+| No identity baseline | Every cluster uses the same thresholds. A cluster that normally runs at 70% CPU gets the same threshold as one at 30% | Identity EMA (`core/identity_ema.py`) learns per-cluster "normal" |
+| Fixed cooldown | 300s regardless of signal behavior. Too long during real incidents, too short during noise | Damping is signal-aware: `d_t = exp(-k_dv·V_excess)`. High variance = more damping. Low variance = fast recovery |
+| No explainability | "Scaled because CPU > 80%" — no deeper reasoning | `result.explain()` decomposes every decision into 7 components |
+| No shadow mode | Cannot prove value before taking control | Shadow runner with divergence tracking and weekly reports |
+
+**Layer coverage:**
+
+| Layer | Cast AI | Notes |
+|-------|---------|-------|
+| L0 Sensing | Proprietary agent | Per-node kubelet polling |
+| L1 Provisioning | Yes | Node add/remove/resize |
+| L2 Cost Optimization | **Yes (core strength)** | Instance type selection, spot, reserved |
+| L3 Prediction | No | Reactive only |
+| L4 Decision Quality | No | Fixed thresholds, no coherence |
+| L5 Safety Bounds | Basic | Max nodes, cooldown timers |
+| L6 Observability | Partial | Cost dashboards, no counterfactual |
+| L7 Business Policy | Partial | Auto vs manual mode |
+
+**Complementary use:** Cast AI at L2 (cost) + our controller at L4 (decision quality). Cast AI picks the cheapest instance type; our controller decides whether scaling is needed at all.
+
+---
+
+### ScaleOps
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ SCALEOPS                                                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Architecture:                                                   │
+│  Prometheus/Datadog → ScaleOps Cloud → ML Model → HPA Override  │
+│                                                                  │
+│  Decision model:                                                 │
+│  predicted_load = ML_model(                                      │
+│      historical_traffic,                                         │
+│      time_of_day,                                                │
+│      seasonality,                                                │
+│      recent_deploys                                              │
+│  )                                                               │
+│  target_replicas = ceil(predicted_load / per_pod_capacity)       │
+│  IF target != current → recommend change                         │
+│                                                                  │
+│  Primary value: predictive scaling (pre-scale before traffic)    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**What ScaleOps does well:**
+
+1. **Predictive scaling** — ML model learns daily/weekly traffic patterns. Scales before the spike.
+2. **Resource right-sizing** — Recommends CPU/memory request/limit adjustments per pod.
+3. **Multi-metric correlation** — ML model correlates across metrics (though opaquely).
+4. **Reduced latency impact** — Pre-scaling means pods are warm before traffic arrives.
+
+**What ScaleOps cannot do:**
+
+| Limitation | Why It Matters | Our Controller's Answer |
+|------------|---------------|------------------------|
+| Black-box ML model | Cannot explain why it scaled. "The model said so" is not acceptable in regulated environments | Full component breakdown: pressure, coherence, plasticity, gain, damping |
+| Requires training data | Needs 2+ weeks of historical data before model is accurate. New clusters/services are blind | Bootstrap from 1 hour of Prometheus history. Accurate from cycle 1 |
+| No deployment awareness | ML model doesn't know a rollout is in progress. Predicts based on traffic, not system state | Plasticity gate + resistance computation factor in deploy status and pod restarts |
+| No coherence gating | If the ML model says "scale up" but only CPU is elevated and everything else is fine, it scales anyway | Coherence model requires signal agreement. Incoherent pressure suppressed |
+| SaaS dependency | Metrics stream to ScaleOps cloud for processing. Network outage = no scaling decisions | Fully self-contained. Runs in-cluster with zero external dependencies |
+| No shadow mode | Cannot prove superiority over HPA without taking control | Shadow divergence tracking with per-decision verdicts |
+
+**Layer coverage:**
+
+| Layer | ScaleOps | Notes |
+|-------|----------|-------|
+| L0 Sensing | Prometheus integration | Streams to their cloud |
+| L1 Provisioning | No | Adjusts HPA targets only |
+| L2 Cost Optimization | Partial | Resource right-sizing |
+| L3 Prediction | **Yes (core strength)** | ML-based traffic forecasting |
+| L4 Decision Quality | No | ML correlation, no coherence gating |
+| L5 Safety Bounds | Basic | Max/min replicas |
+| L6 Observability | Partial | Prediction accuracy dashboards |
+| L7 Business Policy | Partial | Recommendation dashboard |
+
+**Complementary use:** ScaleOps at L3 (prediction) feeding into our controller at L4 (decision quality). ScaleOps says "traffic will increase in 30 minutes"; our controller decides whether the system is stable enough to act on that prediction now.
+
+---
+
+### Karpenter
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ KARPENTER (AWS/Open Source)                                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Architecture:                                                   │
+│  K8s Scheduler → Pending Pods → Karpenter → EC2 Fleet API       │
+│                                                                  │
+│  Decision model:                                                 │
+│  IF pending_pods > 0:                                            │
+│      constraints = pod_requirements + nodepool_limits             │
+│      instance_type = cheapest_that_fits(constraints)              │
+│      launch(instance_type)                                       │
+│  IF node_utilization < threshold FOR consolidation_ttl:           │
+│      drain(node)                                                  │
+│      terminate(node)                                              │
+│                                                                  │
+│  Primary value: fast, efficient node provisioning                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**What Karpenter does well:**
+
+1. **Fast provisioning** — Launches nodes in seconds via EC2 Fleet API. No ASG warmup.
+2. **Bin-packing** — Finds the cheapest instance type that fits pod requirements.
+3. **Spot management** — Handles spot interruptions with graceful draining.
+4. **Consolidation** — Automatically defragments by moving pods to fewer, fuller nodes.
+5. **Multi-architecture** — Can mix ARM and x86 nodes based on workload.
+
+**What Karpenter cannot do:**
+
+| Limitation | Why It Matters | Our Controller's Answer |
+|------------|---------------|------------------------|
+| Reactive only | Waits for pods to be pending — the problem has already occurred | Detects pressure before pods go pending (latency rising, queue growing) |
+| Single-signal trigger | Only signal is "pods can't be scheduled." No latency, error rate, coherence | 5+ signals across 3 groups, coherence-gated |
+| Node-level only | Cannot scale pods. Needs HPA or KEDA for pod scaling | Pod-level scaling decisions with per-service granularity |
+| No deployment awareness | Provisions nodes during bad rollouts | Plasticity gate suppresses scaling during unstable periods |
+| No decision intelligence | Binary: pending pods = add node. No nuance | Full control equation with damping, coherence, stability |
+| No explainability | "Added node because pods were pending" — no deeper analysis | Component-level decision decomposition |
+
+**Layer coverage:**
+
+| Layer | Karpenter | Notes |
+|-------|-----------|-------|
+| L0 Sensing | Minimal | Watches K8s scheduler events only |
+| L1 Provisioning | **Yes (core strength)** | Fast node launch, bin-packing, spot |
+| L2 Cost Optimization | Partial | Cheapest instance selection |
+| L3 Prediction | No | Purely reactive |
+| L4 Decision Quality | No | Binary trigger (pending pods) |
+| L5 Safety Bounds | Basic | NodePool limits, maxPods |
+| L6 Observability | No | No counterfactual analysis |
+| L7 Business Policy | No | Always autonomous |
+
+**Complementary use:** Karpenter at L1 (provisioning) + our controller at L4 (decision quality). Our controller decides "scale out +2 pods"; Karpenter provisions the node to run them on (cheapest type, spot if possible).
+
+---
+
+### Kubernetes HPA (Baseline Comparator)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ KUBERNETES HPA (Horizontal Pod Autoscaler)                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Decision model:                                                 │
+│  desired = ceil(current * (current_metric / target_metric))      │
+│                                                                  │
+│  Example:                                                        │
+│  current=5, cpu=80%, target=50%                                  │
+│  desired = ceil(5 * 80/50) = 8                                   │
+│                                                                  │
+│  Cooldown:                                                       │
+│  - Scale up: 0s (immediate)                                      │
+│  - Scale down: 300s (fixed stabilization window)                 │
+│                                                                  │
+│  This is what our shadow mode compares against.                  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**HPA limitations that our controller addresses:**
+
+| HPA Behavior | Problem | Our Controller's Answer |
+|-------------|---------|------------------------|
+| `desired = ceil(current * metric/target)` | Proportional control only — no damping, no coherence | Full `A_t = d_t · G_t · P_t · S_t` with 4 control components |
+| Single metric (usually CPU) | Ignores latency, errors, queue depth | 5 metrics across 3 signal groups |
+| Fixed 300s scale-down delay | Too long during traffic drop, too short during noise | Signal-aware damping adapts to actual volatility |
+| No deployment awareness | Scales during rollouts | Plasticity gate + resistance computation |
+| No memory of past behavior | Each decision is independent | Identity EMA + replay buffer |
+| No explanation | Cannot tell you *why* it scaled | `result.explain()` with full breakdown |
+
+**This is the comparison our shadow mode tracks.** Every cycle, `shadow/divergence.py` compares our controller's recommendation against what HPA actually did, assigns verdicts after 5 minutes, and generates proof-of-value reports.
