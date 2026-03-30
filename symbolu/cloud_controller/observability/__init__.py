@@ -17,16 +17,26 @@ from symbolu.cloud_controller.observability.benchmark import (
     SweepVariant,
 )
 from symbolu.cloud_controller.observability.exporter import (
+    BuiltinHistogram,
     BuiltinMetric,
     ExporterConfig,
     ExporterMode,
     MetricsExporter,
+)
+from symbolu.cloud_controller.observability.metrics_server import (
+    MetricsServer,
+    MetricsServerConfig,
+)
+from symbolu.cloud_controller.observability.otel_exporter import (
+    OtelExporter,
+    OtelExporterConfig,
 )
 
 __all__ = [
     "BenchmarkConfig",
     "BenchmarkHarness",
     "BenchmarkReport",
+    "BuiltinHistogram",
     "BuiltinMetric",
     "DecisionLogEntry",
     "DecisionLogFormatter",
@@ -35,6 +45,10 @@ __all__ = [
     "ExporterMode",
     "HPASimulator",
     "MetricsExporter",
+    "MetricsServer",
+    "MetricsServerConfig",
+    "OtelExporter",
+    "OtelExporterConfig",
     "ParameterSweep",
     "PatternType",
     "ScenarioScore",

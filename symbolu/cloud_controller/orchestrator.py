@@ -59,6 +59,14 @@ from symbolu.cloud_controller.observability.decision_log import (
     DecisionLogFormatter,
     DecisionLogEntry,
 )
+from symbolu.cloud_controller.observability.metrics_server import (
+    MetricsServer,
+    MetricsServerConfig,
+)
+from symbolu.cloud_controller.observability.otel_exporter import (
+    OtelExporter,
+    OtelExporterConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +78,10 @@ class OrchestratorConfig:
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     recommend: RecommendConfig = field(default_factory=RecommendConfig)
     exporter: ExporterConfig = field(default_factory=ExporterConfig)
+    # OpenTelemetry exporter (None = disabled)
+    otel: Optional[OtelExporterConfig] = None
+    # HTTP metrics server (None = disabled)
+    metrics_server: Optional[MetricsServerConfig] = None
 
     # Auto-approval: if set, recommendations at or above this confidence
     # level are automatically approved without human intervention.
@@ -157,6 +169,12 @@ class ProductionOrchestrator:
             service=self.config.recommend.service,
             namespace=self.config.recommend.namespace,
         )
+        self.otel_exporter = (
+            OtelExporter(self.config.otel) if self.config.otel else OtelExporter()
+        )
+        self.metrics_server: Optional[MetricsServer] = None
+        if self.config.metrics_server is not None:
+            self.metrics_server = MetricsServer(self.exporter, self.config.metrics_server)
 
         # State
         self._cycle_count = 0
@@ -199,6 +217,8 @@ class ProductionOrchestrator:
                 self._failed_cycles += 1
             duration = time.time() - start
             logger.warning("Orchestrator cycle %d: pipeline poll failed", cycle_num)
+            self.exporter.record_pipeline_error()
+            self.otel_exporter.record_pipeline_error()
             return OrchestrationCycleResult(
                 timestamp=start,
                 cycle_number=cycle_num,
@@ -212,6 +232,10 @@ class ProductionOrchestrator:
             action=action,
             current_replicas=pipeline_result.current_replicas,
         )
+
+        # === L4b: Safety metrics ===
+        if recommend_result.safety is not None:
+            self.exporter.record_safety(recommend_result.safety)
 
         # === L5+L7: Rollback checks, Outcome evaluation, Feedback ===
         rollback_verdicts = self.recommend_engine.check_rollbacks(
@@ -290,19 +314,27 @@ class ProductionOrchestrator:
             current_replicas=pipeline_result.current_replicas,
             cycle_duration=duration,
         )
+        self.otel_exporter.record_cycle(
+            action,
+            current_replicas=pipeline_result.current_replicas,
+            cycle_duration=duration,
+        )
 
         # Export execution/rollback/feedback events
         if auto_approved and approved_rec is not None:
             exec_result = approved_rec.execution_result
             if exec_result is not None:
                 self.exporter.record_execution(exec_result.success)
+                self.otel_exporter.record_execution(exec_result.success)
 
         for rv in rollback_verdicts:
             if hasattr(rv, 'verdict') and rv.verdict.value in ("degraded", "rolled_back"):
                 self.exporter.record_rollback()
+                self.otel_exporter.record_rollback()
 
         if feedback_result and feedback_result.get("adjustments", 0) > 0:
             self.exporter.record_feedback(feedback_result["adjustments"])
+            self.otel_exporter.record_feedback(feedback_result["adjustments"])
 
         # Periodic status
         if (
@@ -340,6 +372,10 @@ class ProductionOrchestrator:
         # Bootstrap on first run if configured
         if self.config.bootstrap_on_start and not self._bootstrapped:
             self.bootstrap()
+
+        # Start HTTP metrics server if configured
+        if self.metrics_server is not None and not self.metrics_server.is_running:
+            self.metrics_server.start()
 
         self._running = True
         cycle = 0
@@ -466,6 +502,7 @@ class ProductionOrchestrator:
         self.pipeline.normalizer.reset()
         self.recommend_engine.reset()
         self.exporter.reset()
+        # OTel exporter has no reset — counters are cumulative by design
         with self._lock:
             self._cycle_count = 0
             self._failed_cycles = 0
@@ -475,6 +512,9 @@ class ProductionOrchestrator:
         """Stop and release resources."""
         self.stop()
         self.pipeline.prometheus.close()
+        self.otel_exporter.shutdown()
+        if self.metrics_server is not None and self.metrics_server.is_running:
+            self.metrics_server.stop()
 
     def __enter__(self):
         return self

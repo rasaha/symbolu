@@ -4,23 +4,27 @@ Publishes controller decision metrics back to Prometheus so operators can
 visualize the full control loop in Grafana:
 
   - action_score, pressure, coherence, plasticity, gain, damping
+  - per-input metric gauges (cpu, memory, latency_p99, error_rate, queue_depth)
+  - action_score distribution histogram
   - recommendation counts by type (hold, scale_out, scale_in, observe)
   - execution success/failure, rollback count
+  - safety bounds state (clamped, cooldown)
+  - divergence counts by type
+  - approval state tracking (pending, approved, dismissed, expired)
   - feedback loop adjustments
-  - pipeline cycle timing
+  - pipeline cycle timing and error rate
 
-Two export modes:
-  1. Push Gateway — POST metrics to a Prometheus Pushgateway (for batch jobs)
-  2. HTTP Exposition — expose /metrics endpoint for Prometheus to scrape
+Three export modes:
+  1. Builtin     — lightweight zero-dependency text exposition
+  2. Prom Client — full prometheus_client library integration
+  3. Disabled    — no-op for testing
 
-When the `prometheus_client` library is unavailable, falls back to a
-lightweight built-in exposition format that produces valid Prometheus
-text exposition without any external dependencies.
+Push gateway support via push() for batch/cron deployments.
 """
 
-import time
 import logging
 import threading
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
@@ -62,7 +66,14 @@ class ExporterConfig:
     # Service/namespace for job-level labels
     service: str = ""
     namespace: str = ""
+    # Push gateway settings
+    push_gateway_url: str = ""
+    push_gateway_job: str = "ncc"
 
+
+# ---------------------------------------------------------------------------
+# Built-in metric types (zero dependencies)
+# ---------------------------------------------------------------------------
 
 class BuiltinMetric:
     """A single metric in Prometheus text exposition format."""
@@ -124,6 +135,72 @@ class BuiltinMetric:
             self._labels_values.clear()
 
 
+class BuiltinHistogram:
+    """Histogram with bucket counting for Prometheus text exposition.
+
+    Produces standard _bucket{le="..."}, _count, _sum lines.
+    """
+
+    DEFAULT_BUCKETS = (0.0, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0)
+
+    def __init__(
+        self,
+        name: str,
+        help_text: str,
+        buckets: Optional[tuple] = None,
+    ):
+        self.name = name
+        self.help_text = help_text
+        self._buckets = buckets or self.DEFAULT_BUCKETS
+        self._bucket_counts: List[int] = [0] * len(self._buckets)
+        self._inf_count: int = 0  # +Inf bucket
+        self._sum: float = 0.0
+        self._count: int = 0
+        self._lock = threading.Lock()
+
+    def observe(self, value: float) -> None:
+        """Record an observation."""
+        with self._lock:
+            self._sum += value
+            self._count += 1
+            placed = False
+            for i, bound in enumerate(self._buckets):
+                if value <= bound:
+                    self._bucket_counts[i] += 1
+                    placed = True
+                    break
+            if not placed:
+                self._inf_count += 1
+
+    def expose(self) -> str:
+        """Render in Prometheus text exposition format."""
+        lines = [
+            f"# HELP {self.name} {self.help_text}",
+            f"# TYPE {self.name} histogram",
+        ]
+        with self._lock:
+            cumulative = 0
+            for i, bound in enumerate(self._buckets):
+                cumulative += self._bucket_counts[i]
+                lines.append(f'{self.name}_bucket{{le="{bound}"}} {cumulative}')
+            cumulative += self._inf_count
+            lines.append(f'{self.name}_bucket{{le="+Inf"}} {cumulative}')
+            lines.append(f"{self.name}_count {self._count}")
+            lines.append(f"{self.name}_sum {self._sum}")
+        return "\n".join(lines)
+
+    def reset(self) -> None:
+        with self._lock:
+            self._bucket_counts = [0] * len(self._buckets)
+            self._inf_count = 0
+            self._sum = 0.0
+            self._count = 0
+
+
+# ---------------------------------------------------------------------------
+# MetricsExporter
+# ---------------------------------------------------------------------------
+
 class MetricsExporter:
     """Exports controller metrics for Prometheus/Grafana.
 
@@ -137,6 +214,11 @@ class MetricsExporter:
         exporter = MetricsExporter(ExporterConfig(mode=ExporterMode.PROM_CLIENT))
         exporter.record_cycle(action_result, cycle_duration=0.15)
         # Use prometheus_client's built-in WSGI app or generate_latest()
+
+    Usage — push gateway:
+        exporter = MetricsExporter(ExporterConfig())
+        exporter.record_cycle(action_result)
+        exporter.push("http://pushgateway:9091")
     """
 
     def __init__(self, config: Optional[ExporterConfig] = None):
@@ -155,11 +237,16 @@ class MetricsExporter:
             self._mode = ExporterMode.DISABLED
             self._registry = None
 
+    # ------------------------------------------------------------------
+    # Builtin initialization
+    # ------------------------------------------------------------------
+
     def _init_builtin(self, p: str) -> None:
         """Initialize built-in metrics."""
         self._metrics: Dict[str, BuiltinMetric] = {}
+        self._histograms: Dict[str, BuiltinHistogram] = {}
 
-        # Controller state gauges
+        # --- Controller state gauges ---
         for name, help_text in [
             ("action_score", "Current action score A_t"),
             ("pressure", "Demand pressure signal S_t"),
@@ -173,7 +260,14 @@ class MetricsExporter:
                 f"{p}_{name}", help_text, "gauge",
             )
 
-        # Counters
+        # --- Per-input metric gauges ---
+        self._metrics["input_metric"] = BuiltinMetric(
+            f"{p}_input_metric_value",
+            "Raw input metric value by name",
+            "gauge",
+        )
+
+        # --- Counters ---
         self._metrics["cycles_total"] = BuiltinMetric(
             f"{p}_cycles_total", "Total control cycles executed", "counter",
         )
@@ -197,15 +291,49 @@ class MetricsExporter:
             "Feedback loop parameter adjustments",
             "counter",
         )
+        self._metrics["divergences_total"] = BuiltinMetric(
+            f"{p}_divergences_total",
+            "Divergences between controller and HPA by type",
+            "counter",
+        )
+        self._metrics["pipeline_errors_total"] = BuiltinMetric(
+            f"{p}_pipeline_errors_total",
+            "Pipeline polling failures",
+            "counter",
+        )
 
-        # Timing
+        # --- Safety / cooldown ---
+        self._metrics["safety_clamped_total"] = BuiltinMetric(
+            f"{p}_safety_clamped_total",
+            "Times safety bounds clamped a proposed delta",
+            "counter",
+        )
+        self._metrics["cooldown_active"] = BuiltinMetric(
+            f"{p}_cooldown_active",
+            "Whether cooldown is currently active (0 or 1)",
+            "gauge",
+        )
+        self._metrics["cooldown_remaining_seconds"] = BuiltinMetric(
+            f"{p}_cooldown_remaining_seconds",
+            "Seconds remaining in cooldown period",
+            "gauge",
+        )
+
+        # --- Approval state ---
+        self._metrics["approvals_by_state"] = BuiltinMetric(
+            f"{p}_approvals_by_state",
+            "Current approval counts by state",
+            "gauge",
+        )
+
+        # --- Timing ---
         self._metrics["cycle_duration_seconds"] = BuiltinMetric(
             f"{p}_cycle_duration_seconds",
             "Time to complete one control cycle",
             "gauge",
         )
 
-        # Replica state
+        # --- Replica state ---
         self._metrics["current_replicas"] = BuiltinMetric(
             f"{p}_current_replicas", "Current replica count", "gauge",
         )
@@ -213,10 +341,27 @@ class MetricsExporter:
             f"{p}_target_replicas", "Target replica count after decision", "gauge",
         )
 
+        # --- Histograms ---
+        self._histograms["action_score_distribution"] = BuiltinHistogram(
+            f"{p}_action_score_distribution",
+            "Distribution of action scores across cycles",
+            buckets=(0.0, 0.05, 0.1, 0.2, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0),
+        )
+        self._histograms["cycle_duration_histogram"] = BuiltinHistogram(
+            f"{p}_cycle_duration_histogram_seconds",
+            "Distribution of control cycle durations",
+            buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
+        )
+
+    # ------------------------------------------------------------------
+    # prometheus_client initialization
+    # ------------------------------------------------------------------
+
     def _init_prom_client(self, p: str) -> None:
         """Initialize prometheus_client metrics."""
         reg = self._registry
 
+        # Controller state
         self._pc_action_score = Gauge(
             f"{p}_action_score", "Current action score A_t", registry=reg,
         )
@@ -238,6 +383,14 @@ class MetricsExporter:
         self._pc_identity_deviation = Gauge(
             f"{p}_identity_deviation", "Identity drift from baseline", registry=reg,
         )
+
+        # Per-input metric gauges
+        self._pc_input_metric = Gauge(
+            f"{p}_input_metric_value", "Raw input metric value by name",
+            ["metric_name"], registry=reg,
+        )
+
+        # Counters
         self._pc_cycles = Counter(
             f"{p}_cycles_total", "Total control cycles executed", registry=reg,
         )
@@ -256,18 +409,60 @@ class MetricsExporter:
             f"{p}_feedback_adjustments_total",
             "Feedback loop parameter adjustments", registry=reg,
         )
+        self._pc_divergences = Counter(
+            f"{p}_divergences_total",
+            "Divergences between controller and HPA by type",
+            ["divergence_type"], registry=reg,
+        )
+        self._pc_pipeline_errors = Counter(
+            f"{p}_pipeline_errors_total", "Pipeline polling failures", registry=reg,
+        )
+        self._pc_safety_clamped = Counter(
+            f"{p}_safety_clamped_total",
+            "Times safety bounds clamped a proposed delta", registry=reg,
+        )
+
+        # Safety / cooldown gauges
+        self._pc_cooldown_active = Gauge(
+            f"{p}_cooldown_active",
+            "Whether cooldown is currently active (0 or 1)", registry=reg,
+        )
+        self._pc_cooldown_remaining = Gauge(
+            f"{p}_cooldown_remaining_seconds",
+            "Seconds remaining in cooldown period", registry=reg,
+        )
+
+        # Approval state
+        self._pc_approvals = Gauge(
+            f"{p}_approvals_by_state", "Current approval counts by state",
+            ["state"], registry=reg,
+        )
+
+        # Timing / histograms
         self._pc_cycle_duration = Histogram(
             f"{p}_cycle_duration_seconds",
             "Time to complete one control cycle",
             buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
             registry=reg,
         )
+        self._pc_action_score_dist = Histogram(
+            f"{p}_action_score_distribution",
+            "Distribution of action scores across cycles",
+            buckets=[0.0, 0.05, 0.1, 0.2, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0],
+            registry=reg,
+        )
+
+        # Replica state
         self._pc_current_replicas = Gauge(
             f"{p}_current_replicas", "Current replica count", registry=reg,
         )
         self._pc_target_replicas = Gauge(
             f"{p}_target_replicas", "Target replica count after decision", registry=reg,
         )
+
+    # ------------------------------------------------------------------
+    # Recording methods
+    # ------------------------------------------------------------------
 
     def record_cycle(
         self,
@@ -309,6 +504,17 @@ class MetricsExporter:
             m["current_replicas"].set(current_replicas)
             m["target_replicas"].set(current_replicas + action.replica_delta)
 
+        # Per-input metric gauges
+        for metric_name, value in action.metrics_snapshot.items():
+            m["input_metric"].set(value, labels={"metric_name": metric_name})
+
+        # Histograms
+        self._histograms["action_score_distribution"].observe(
+            abs(action.action_score),
+        )
+        if duration > 0:
+            self._histograms["cycle_duration_histogram"].observe(duration)
+
     def _record_prom_client(self, action, current_replicas: int, duration: float) -> None:
         """Record using prometheus_client."""
         self._pc_action_score.set(action.action_score)
@@ -321,9 +527,14 @@ class MetricsExporter:
         self._pc_cycles.inc()
         self._pc_recommendations.labels(recommendation=action.recommendation).inc()
         self._pc_cycle_duration.observe(duration)
+        self._pc_action_score_dist.observe(abs(action.action_score))
         if current_replicas > 0:
             self._pc_current_replicas.set(current_replicas)
             self._pc_target_replicas.set(current_replicas + action.replica_delta)
+
+        # Per-input metric gauges
+        for metric_name, value in action.metrics_snapshot.items():
+            self._pc_input_metric.labels(metric_name=metric_name).set(value)
 
     def record_execution(self, success: bool) -> None:
         """Record a scaling execution result."""
@@ -353,6 +564,72 @@ class MetricsExporter:
         else:
             self._pc_feedback.inc(adjustment_count)
 
+    def record_safety(self, safety_result) -> None:
+        """Record safety bounds state from a SafetyResult.
+
+        Args:
+            safety_result: A SafetyResult with was_clamped, in_cooldown,
+                          cooldown_remaining fields.
+        """
+        if self._mode == ExporterMode.DISABLED:
+            return
+
+        if self._mode == ExporterMode.BUILTIN:
+            m = self._metrics
+            if safety_result.was_clamped:
+                m["safety_clamped_total"].inc()
+            m["cooldown_active"].set(1.0 if safety_result.in_cooldown else 0.0)
+            m["cooldown_remaining_seconds"].set(safety_result.cooldown_remaining)
+        else:
+            if safety_result.was_clamped:
+                self._pc_safety_clamped.inc()
+            self._pc_cooldown_active.set(1.0 if safety_result.in_cooldown else 0.0)
+            self._pc_cooldown_remaining.set(safety_result.cooldown_remaining)
+
+    def record_divergence(self, divergence_type: str) -> None:
+        """Record a divergence event between controller and HPA.
+
+        Args:
+            divergence_type: The DivergenceType value string.
+        """
+        if self._mode == ExporterMode.DISABLED:
+            return
+        if self._mode == ExporterMode.BUILTIN:
+            self._metrics["divergences_total"].inc(
+                labels={"divergence_type": divergence_type},
+            )
+        else:
+            self._pc_divergences.labels(divergence_type=divergence_type).inc()
+
+    def record_pipeline_error(self) -> None:
+        """Record a pipeline polling failure."""
+        if self._mode == ExporterMode.DISABLED:
+            return
+        if self._mode == ExporterMode.BUILTIN:
+            self._metrics["pipeline_errors_total"].inc()
+        else:
+            self._pc_pipeline_errors.inc()
+
+    def record_approval_state(self, state: str, count: int) -> None:
+        """Record current approval counts by state.
+
+        Args:
+            state: Approval state ("pending", "approved", "dismissed", "expired").
+            count: Current count for that state.
+        """
+        if self._mode == ExporterMode.DISABLED:
+            return
+        if self._mode == ExporterMode.BUILTIN:
+            self._metrics["approvals_by_state"].set(
+                float(count), labels={"state": state},
+            )
+        else:
+            self._pc_approvals.labels(state=state).set(float(count))
+
+    # ------------------------------------------------------------------
+    # Exposition
+    # ------------------------------------------------------------------
+
     def expose(self) -> str:
         """Generate Prometheus text exposition format.
 
@@ -369,7 +646,76 @@ class MetricsExporter:
         sections = []
         for metric in self._metrics.values():
             sections.append(metric.expose())
+        for histogram in self._histograms.values():
+            sections.append(histogram.expose())
         return "\n\n".join(sections) + "\n"
+
+    # ------------------------------------------------------------------
+    # Push gateway
+    # ------------------------------------------------------------------
+
+    def push(self, gateway_url: str = "", job: str = "") -> bool:
+        """Push metrics to a Prometheus Pushgateway.
+
+        Uses prometheus_client.push_to_gateway if available, otherwise
+        falls back to urllib POST of text exposition.
+
+        Args:
+            gateway_url: Pushgateway URL (e.g. "http://pushgateway:9091").
+                        Defaults to config.push_gateway_url.
+            job: Job label. Defaults to config.push_gateway_job.
+
+        Returns:
+            True if push succeeded, False on failure.
+        """
+        if self._mode == ExporterMode.DISABLED:
+            return False
+
+        url = gateway_url or self.config.push_gateway_url
+        job_name = job or self.config.push_gateway_job
+        if not url:
+            logger.warning("Push gateway URL not configured")
+            return False
+
+        # Try prometheus_client push_to_gateway first
+        if self._mode == ExporterMode.PROM_CLIENT and PROM_CLIENT_AVAILABLE:
+            try:
+                from prometheus_client import push_to_gateway
+                push_to_gateway(url, job_name, self._registry)
+                logger.debug("Pushed metrics via prometheus_client to %s", url)
+                return True
+            except Exception as e:
+                logger.warning("prometheus_client push failed: %s", e)
+                return False
+
+        # Fallback: urllib POST of text exposition
+        try:
+            import urllib.request
+            import urllib.error
+
+            text = self.expose()
+            push_url = f"{url.rstrip('/')}/metrics/job/{job_name}"
+            data = text.encode("utf-8")
+
+            req = urllib.request.Request(
+                push_url,
+                data=data,
+                headers={"Content-Type": "text/plain; version=0.0.4; charset=utf-8"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status < 300:
+                    logger.debug("Pushed metrics to %s (status %d)", push_url, resp.status)
+                    return True
+                logger.warning("Push gateway returned %d", resp.status)
+                return False
+        except Exception as e:
+            logger.warning("Push gateway request failed: %s", e)
+            return False
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
 
     @property
     def mode(self) -> ExporterMode:
@@ -380,3 +726,5 @@ class MetricsExporter:
         if self._mode == ExporterMode.BUILTIN:
             for metric in self._metrics.values():
                 metric.reset()
+            for histogram in self._histograms.values():
+                histogram.reset()
