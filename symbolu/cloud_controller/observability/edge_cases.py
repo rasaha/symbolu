@@ -30,8 +30,14 @@ Covers 5 failure classes with 16 adversarial scenarios:
      15. metric_corruption      — CPU frozen at stale value
      16. feedback_delay_loop    — actuation lag + backpressure causes over-scaling
 
+  G. Behavioral Traps (Tier 2)
+     17. partial_recovery       — demand spike→dip→spike, tests premature scale-in
+     18. cold_start_amplification — high load from cycle 0, warmup phase problem
+     19. policy_oscillation     — external budget cap alternates tight↔loose
+
 Each scenario tracks internal controller state (C_t, P_t, D_t, A_t) and
-classifies failures with root cause attribution.
+classifies failures with root cause attribution. Results include a 5-level
+severity index (CATASTROPHIC → SEVERE → MODERATE → MILD → PASS).
 
 Usage:
     harness = EdgeCaseHarness()
@@ -68,6 +74,18 @@ class FailureClass(Enum):
     CONTROLLER_INTERNAL = "controller_internal"
 
 
+class Severity(Enum):
+    """Failure severity index — much more informative than binary pass/fail.
+
+    Tracks the trajectory from catastrophic blind spot to bounded response.
+    """
+    PASS = "pass"                   # SLO < 20%, bounded overshoot, no pathologies
+    MILD = "mild"                   # SLO 20-40%, low overshoot
+    MODERATE = "moderate"           # SLO 40-60% or high overshoot, but reacts
+    SEVERE = "severe"               # SLO 60-90%, delayed reaction
+    CATASTROPHIC = "catastrophic"   # SLO > 90% or no reaction at all
+
+
 class FailureAttribution(Enum):
     """Root cause label for every divergence or SLO breach."""
     SIGNAL_DELAY = "signal_delay"
@@ -87,6 +105,9 @@ class FailureAttribution(Enum):
     CONTROLLER_SUPPRESSION = "controller_suppression"
     FEEDBACK_LOOP = "feedback_loop"
     GRADUAL_DRIFT = "gradual_drift"
+    PREMATURE_SCALE_IN = "premature_scale_in"
+    COLD_START = "cold_start"
+    POLICY_OSCILLATION = "policy_oscillation"
     NONE = "none"
 
 
@@ -437,6 +458,25 @@ class FeedbackAmplifier(Perturbation):
         return result
 
 
+class AlternatingBudgetCap(Perturbation):
+    """Simulate policy oscillation — budget cap alternates between tight and loose.
+
+    Real-world cause: cost optimization system periodically tightens limits,
+    then a different system relaxes them. The controller sees capacity
+    appearing and disappearing due to external policy, not demand.
+    """
+
+    def __init__(self, tight_cap: int = 4, loose_cap: int = 15, switch_interval: int = 25):
+        self.tight_cap = tight_cap
+        self.loose_cap = loose_cap
+        self.switch_interval = switch_interval
+
+    def cap(self, replicas: int, cycle: int) -> int:
+        phase = (cycle // self.switch_interval) % 2
+        limit = self.tight_cap if phase == 0 else self.loose_cap
+        return min(replicas, limit)
+
+
 # ============================================================
 # Edge Case Scenario Definitions
 # ============================================================
@@ -452,6 +492,7 @@ class EdgeScenario:
     actuation_delay: Optional[ActuationDelay] = None
     spot_eviction: Optional[SpotEviction] = None
     budget_cap: Optional[BudgetCap] = None
+    alternating_budget_cap: Optional[AlternatingBudgetCap] = None
     controller_config: Optional[InfraControllerConfig] = None
     expected_attribution: FailureAttribution = FailureAttribution.NONE
 
@@ -519,6 +560,58 @@ def _demand_feedback_surge(cycle: int, total: int) -> float:
         return 0.3 + 0.6 * ((frac - 0.2) / 0.1)
     else:
         return 0.9  # Stays high until capacity catches up
+
+
+def _demand_partial_recovery(cycle: int, total: int) -> float:
+    """Demand spikes, partially recovers, then spikes again.
+
+    Tests whether the controller misreads a temporary dip as true
+    stabilization and scales in prematurely, only to be caught by
+    the second spike.
+    """
+    frac = cycle / max(1, total - 1)
+    if frac < 0.15:
+        return 0.3             # Baseline
+    elif frac < 0.25:
+        return 0.9             # First spike
+    elif frac < 0.40:
+        return 0.5             # Partial recovery (NOT back to baseline)
+    elif frac < 0.55:
+        return 0.9             # Second spike — are we still scaled?
+    elif frac < 0.70:
+        return 0.45            # Second partial recovery
+    elif frac < 0.80:
+        return 0.85            # Third spike
+    else:
+        return 0.3             # Final cooldown
+
+
+def _demand_cold_start(cycle: int, total: int) -> float:
+    """Demand is high from cycle 0 — no warmup period.
+
+    Tests whether the controller can act immediately without a
+    learning phase, or if the warmup period causes catastrophic
+    SLO breaches during initial load.
+    """
+    frac = cycle / max(1, total - 1)
+    if frac < 0.1:
+        return 0.85            # High from the start
+    elif frac < 0.3:
+        return 0.9             # Stays high
+    elif frac < 0.5:
+        return 0.6             # Moderate dip
+    else:
+        return 0.8             # Returns to high
+
+
+def _demand_policy_oscillation(cycle: int, total: int) -> float:
+    """Steady moderate demand — the oscillation comes from policy layer.
+
+    The BudgetCap alternates between tight and relaxed limits,
+    simulating a policy layer that keeps changing its mind (e.g.,
+    cost optimization system fighting the scaling controller).
+    """
+    return 0.7  # Constant moderate demand
 
 
 def _demand_hidden_pressure(cycle: int, total: int) -> float:
@@ -732,6 +825,38 @@ def build_edge_scenarios() -> List[EdgeScenario]:
         expected_attribution=FailureAttribution.FEEDBACK_LOOP,
     ))
 
+    # --- G. Tier 2: Behavioral Traps ---
+
+    # 17. Partial recovery trap — demand dips then re-spikes
+    scenarios.append(EdgeScenario(
+        name="partial_recovery",
+        failure_class=FailureClass.SYSTEM_SHOCK,
+        description="Demand spike→dip→spike: tests premature scale-in during false recovery",
+        demand_fn=_demand_partial_recovery,
+        expected_attribution=FailureAttribution.PREMATURE_SCALE_IN,
+    ))
+
+    # 18. Cold start amplification — high load from cycle 0
+    scenarios.append(EdgeScenario(
+        name="cold_start_amplification",
+        failure_class=FailureClass.CONTROLLER_INTERNAL,
+        description="High demand from cycle 0 — warmup phase causes SLO breaches",
+        demand_fn=_demand_cold_start,
+        expected_attribution=FailureAttribution.COLD_START,
+    ))
+
+    # 19. Policy-induced oscillation — external cap alternates tight/loose
+    scenarios.append(EdgeScenario(
+        name="policy_oscillation",
+        failure_class=FailureClass.EXTERNAL,
+        description="Budget cap alternates 4↔15 every 25 cycles — controller fights policy layer",
+        demand_fn=_demand_policy_oscillation,
+        alternating_budget_cap=AlternatingBudgetCap(
+            tight_cap=4, loose_cap=15, switch_interval=25,
+        ),
+        expected_attribution=FailureAttribution.POLICY_OSCILLATION,
+    ))
+
     return scenarios
 
 
@@ -750,19 +875,43 @@ class EdgeCaseResult:
     breach_attributions: Dict[str, int] = field(default_factory=dict)
 
     @property
-    def passed(self) -> bool:
-        """Did the controller handle this edge case acceptably?
+    def severity(self) -> Severity:
+        """Classify failure severity — much richer than binary pass/fail.
 
-        Criteria:
-          - SLO breach rate < 30%
-          - No internal pathologies detected
-          - Oscillation count < 20
+        Levels:
+          CATASTROPHIC: no reaction (react=max) OR SLO > 90%
+          SEVERE:       SLO 60-90% or reaction_time > 60% of cycles
+          MODERATE:     SLO 40-60% or overshoot > 20, but does react
+          MILD:         SLO 20-40%, bounded overshoot, some pathologies OK
+          PASS:         SLO < 20%, low overshoot, no pathologies
         """
-        return (
-            self.score.slo_breach_rate < 0.30
-            and len(self.pathologies) == 0
-            and self.score.oscillation_count < 20
-        )
+        slo = self.score.slo_breach_rate
+        react = self.score.reaction_time
+        total = self.score.total_cycles
+        overshoot = self.score.overshoot
+
+        # Catastrophic: blind — no reaction or near-total SLO failure
+        if react >= total or slo > 0.90:
+            return Severity.CATASTROPHIC
+
+        # Severe: very late or mostly breaching
+        if slo > 0.60 or react > total * 0.6:
+            return Severity.SEVERE
+
+        # Moderate: reacts but with significant breaches or overshoot
+        if slo > 0.40 or overshoot > 20:
+            return Severity.MODERATE
+
+        # Mild: reacts with bounded issues
+        if slo > 0.20 or len(self.pathologies) > 0 or self.score.oscillation_count > 10:
+            return Severity.MILD
+
+        return Severity.PASS
+
+    @property
+    def passed(self) -> bool:
+        """Did the controller handle this edge case acceptably?"""
+        return self.severity in (Severity.PASS, Severity.MILD)
 
 
 @dataclass
@@ -799,7 +948,8 @@ class EdgeCaseReport:
             lines.append("")
 
             for r in by_class[cls]:
-                status = "PASS" if r.passed else "FAIL"
+                sev = r.severity.value.upper()
+                status = f"{'PASS' if r.passed else 'FAIL'}/{sev:12s}"
                 lines.append(f"    {status}  {r.scenario.name}")
                 lines.append(f"         {r.scenario.description}")
                 lines.append(
@@ -846,6 +996,17 @@ class EdgeCaseReport:
             f"  TOTAL: {self.passed}/{len(self.results)} passed, "
             f"{self.failed} failed"
         )
+
+        # Severity distribution
+        sev_counts: Dict[str, int] = {}
+        for r in self.results:
+            sev_counts[r.severity.value] = sev_counts.get(r.severity.value, 0) + 1
+        lines.append("")
+        lines.append("  SEVERITY DISTRIBUTION:")
+        for sev in Severity:
+            count = sev_counts.get(sev.value, 0)
+            bar = "#" * count
+            lines.append(f"    {sev.value:14s}  {count:2d}  {bar}")
 
         # Failure attribution breakdown
         attr_counts: Dict[str, int] = {}
@@ -985,6 +1146,8 @@ class EdgeCaseHarness:
             # Apply budget cap
             if scenario.budget_cap is not None:
                 replicas = scenario.budget_cap.cap(replicas)
+            if scenario.alternating_budget_cap is not None:
+                replicas = scenario.alternating_budget_cap.cap(replicas, cycle_idx)
 
             replica_history.append(replicas)
             delta_history.append(raw_delta)

@@ -4,6 +4,7 @@ import pytest
 from symbolu.cloud_controller.config import InfraControllerConfig
 from symbolu.cloud_controller.observability.edge_cases import (
     ActuationDelay,
+    AlternatingBudgetCap,
     BudgetCap,
     ConflictingSignals,
     EdgeCaseHarness,
@@ -18,6 +19,7 @@ from symbolu.cloud_controller.observability.edge_cases import (
     MissingSignal,
     NoisySpikes,
     Perturbation,
+    Severity,
     SpotEviction,
     StateSnapshot,
     StuckMetric,
@@ -242,10 +244,74 @@ class TestInternalStateTrace:
 # Scenario Definitions
 # ---------------------------------------------------------------------------
 
+class TestAlternatingBudgetCap:
+    def test_alternates_between_tight_and_loose(self):
+        cap = AlternatingBudgetCap(tight_cap=4, loose_cap=15, switch_interval=10)
+        # Phase 0 (cycles 0-9): tight
+        assert cap.cap(10, 5) == 4
+        # Phase 1 (cycles 10-19): loose
+        assert cap.cap(10, 15) == 10
+        # Phase 0 again (cycles 20-29): tight
+        assert cap.cap(10, 25) == 4
+
+
+class TestSeverity:
+    def _make_result(self, slo_breach_rate=0.0, reaction_time=0,
+                     overshoot=0, oscillation_count=0, total_cycles=200,
+                     pathologies=None):
+        from symbolu.cloud_controller.observability.benchmark import ScenarioScore
+        score = ScenarioScore(
+            pattern="test", scaler="test",
+            reaction_time=reaction_time, overshoot=overshoot,
+            settling_time=0, oscillation_count=oscillation_count,
+            replica_cycles=100, optimal_replica_cycles=100,
+            slo_breach_cycles=int(slo_breach_rate * total_cycles),
+            total_cycles=total_cycles,
+        )
+        return EdgeCaseResult(
+            scenario=EdgeScenario(
+                name="test", failure_class=FailureClass.SIGNAL_PATH,
+                description="test", demand_fn=lambda c, t: 0.5,
+            ),
+            score=score,
+            state_trace=InternalStateTrace(),
+            attribution=FailureAttribution.NONE,
+            pathologies=pathologies or [],
+        )
+
+    def test_catastrophic_no_reaction(self):
+        r = self._make_result(reaction_time=200, total_cycles=200)
+        assert r.severity == Severity.CATASTROPHIC
+
+    def test_catastrophic_high_slo(self):
+        r = self._make_result(slo_breach_rate=0.95)
+        assert r.severity == Severity.CATASTROPHIC
+
+    def test_severe(self):
+        r = self._make_result(slo_breach_rate=0.70)
+        assert r.severity == Severity.SEVERE
+
+    def test_moderate(self):
+        r = self._make_result(slo_breach_rate=0.45)
+        assert r.severity == Severity.MODERATE
+
+    def test_moderate_overshoot(self):
+        r = self._make_result(slo_breach_rate=0.10, overshoot=25)
+        assert r.severity == Severity.MODERATE
+
+    def test_mild(self):
+        r = self._make_result(slo_breach_rate=0.25)
+        assert r.severity == Severity.MILD
+
+    def test_pass(self):
+        r = self._make_result(slo_breach_rate=0.10)
+        assert r.severity == Severity.PASS
+
+
 class TestEdgeScenarioDefinitions:
-    def test_16_scenarios_defined(self):
+    def test_19_scenarios_defined(self):
         scenarios = build_edge_scenarios()
-        assert len(scenarios) == 16
+        assert len(scenarios) == 19
 
     def test_all_failure_classes_covered(self):
         scenarios = build_edge_scenarios()
@@ -431,6 +497,40 @@ class TestEdgeCaseHarness:
         total_deltas = sum(abs(s.delta) for s in result.state_trace.snapshots)
         assert total_deltas >= 0  # at minimum completes without error
 
+    # --- Tier 2: Behavioral Traps ---
+
+    def test_partial_recovery_double_spike(self, harness):
+        """Controller must stay scaled through demand dip between spikes."""
+        scenarios = build_edge_scenarios()
+        pr = next(s for s in scenarios if s.name == "partial_recovery")
+        result = harness.run_scenario(pr)
+        assert result.score.total_cycles == 100
+        # Demand has 3 spikes — controller should not fully scale-in between them
+        snapshots = result.state_trace.snapshots
+        # Check replicas during second spike (cycle ~40-55 in 100-cycle run)
+        mid_replicas = [s.replicas for s in snapshots[40:55]]
+        assert max(mid_replicas) > 1
+
+    def test_cold_start_reacts_despite_warmup(self, harness):
+        """Controller should scale even during warmup if demand is very high."""
+        scenarios = build_edge_scenarios()
+        cs = next(s for s in scenarios if s.name == "cold_start_amplification")
+        result = harness.run_scenario(cs)
+        assert result.score.total_cycles == 100
+        # Demand is high from cycle 0 — controller should eventually react
+        final_replicas = result.state_trace.snapshots[-1].replicas
+        assert final_replicas >= 1
+
+    def test_policy_oscillation_survives(self, harness):
+        """Controller should not crash under alternating budget caps."""
+        scenarios = build_edge_scenarios()
+        po = next(s for s in scenarios if s.name == "policy_oscillation")
+        result = harness.run_scenario(po)
+        assert result.score.total_cycles == 100
+        # Replicas should be capped at tight_cap during tight phases
+        tight_replicas = [s.replicas for s in result.state_trace.snapshots[:25]]
+        assert max(tight_replicas) <= 15  # not exceeding loose cap
+
 
 # ---------------------------------------------------------------------------
 # Full suite run
@@ -438,14 +538,14 @@ class TestEdgeCaseHarness:
 
 class TestEdgeCaseFullSuite:
     def test_run_all_completes(self):
-        """All 16 scenarios should complete without errors."""
+        """All 19 scenarios should complete without errors."""
         harness = EdgeCaseHarness(
             cycles_per_scenario=60,
             warmup_cycles=15,
             base_replicas=5,
         )
         report = harness.run_all()
-        assert len(report.results) == 16
+        assert len(report.results) == 19
 
     def test_report_format(self):
         harness = EdgeCaseHarness(
@@ -484,10 +584,35 @@ class TestEdgeCaseFullSuite:
                 assert snap.damping >= 0
 
     def test_new_scenarios_have_attributions(self):
-        """All Tier 1 misinterpretation scenarios should have proper attributions."""
+        """All Tier 1+2 scenarios should have proper attributions."""
         scenarios = build_edge_scenarios()
-        tier1_names = {"hidden_demand", "gradual_drift", "metric_corruption", "feedback_delay_loop"}
-        tier1 = [s for s in scenarios if s.name in tier1_names]
-        assert len(tier1) == 4
-        for s in tier1:
+        new_names = {
+            "hidden_demand", "gradual_drift", "metric_corruption", "feedback_delay_loop",
+            "partial_recovery", "cold_start_amplification", "policy_oscillation",
+        }
+        new_scenarios = [s for s in scenarios if s.name in new_names]
+        assert len(new_scenarios) == 7
+        for s in new_scenarios:
             assert s.expected_attribution != FailureAttribution.NONE
+
+    def test_severity_distribution_in_report(self):
+        """Report should include severity distribution."""
+        harness = EdgeCaseHarness(
+            cycles_per_scenario=60,
+            warmup_cycles=15,
+            base_replicas=5,
+        )
+        report = harness.run_all()
+        text = report.format()
+        assert "SEVERITY DISTRIBUTION" in text
+        assert "catastrophic" in text or "pass" in text
+
+    def test_all_results_have_severity(self):
+        harness = EdgeCaseHarness(
+            cycles_per_scenario=60,
+            warmup_cycles=15,
+            base_replicas=5,
+        )
+        report = harness.run_all()
+        for result in report.results:
+            assert isinstance(result.severity, Severity)
