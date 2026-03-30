@@ -339,3 +339,5 @@ class RecommendEngine:
         """Reset all internal state."""
         self.approvals.reset()
         self.safety.reset()
+        if self.actuator is not None:
+            self.actuator.reset()

@@ -510,6 +510,34 @@ class TestEngineActuatorIntegration:
         assert rec.execution_result.mode == "scale_patch"
         mock_api.patch_namespaced_deployment_scale.assert_called_once()
 
+    def test_engine_reset_clears_actuator(self):
+        """Engine reset should also reset actuator history and client state."""
+        engine = RecommendEngine(RecommendConfig(
+            service="api-gw",
+            namespace="prod",
+            confidence=ConfidenceConfig(
+                action_threshold=0.1,
+                coherence_threshold=0.1,
+            ),
+            actuator=ActuatorConfig(mode=ActuatorMode.DRY_RUN),
+        ))
+        # Execute a scaling action
+        action = _make_action(delta=2, score=0.8, coherence=0.9)
+        cycle = engine.evaluate(action, current_replicas=5)
+        engine.approve(cycle.recommendation.id, by="test")
+        assert len(engine.actuator.history) == 1
+
+        # Reset should clear actuator history
+        engine.reset()
+        assert len(engine.actuator.history) == 0
+        assert engine.actuator._initialized is False
+
+    def test_engine_reset_without_actuator(self):
+        """Engine reset should work fine when no actuator configured."""
+        engine = RecommendEngine(RecommendConfig(service="svc"))
+        engine.reset()  # Should not raise
+        assert engine.actuator is None
+
     def test_approve_cooldown_regardless_of_execution(self):
         """Cooldown should start even if actuator execution fails."""
         engine = RecommendEngine(RecommendConfig(
