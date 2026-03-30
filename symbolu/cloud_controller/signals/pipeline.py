@@ -58,6 +58,10 @@ class PipelineConfig:
         1: "off_peak", 2: "off_peak", 3: "off_peak",
         4: "off_peak", 5: "off_peak", 6: "off_peak",
     })
+    # Bootstrap: seconds of historical data to fetch on startup (0 = disabled)
+    bootstrap_window_seconds: int = 3600  # Default: 1 hour of history
+    # Bootstrap query resolution step
+    bootstrap_step: str = "15s"
 
 
 @dataclass
@@ -104,6 +108,82 @@ class SignalPipeline:
         self.controller = controller or Controller(self.config.controller)
         self._running = False
         self._thread: Optional[threading.Thread] = None
+
+    def bootstrap(self) -> bool:
+        """Fetch historical data from Prometheus and pre-learn all baselines.
+
+        Queries the last `bootstrap_window_seconds` of metric history, then
+        replays it through the normalizer and controller so both are calibrated
+        from cycle 1. This eliminates the learning phase.
+
+        Returns:
+            True if bootstrap succeeded (enough historical data), False otherwise.
+        """
+        window = self.config.bootstrap_window_seconds
+        if window <= 0:
+            logger.info("Bootstrap disabled (bootstrap_window_seconds=0)")
+            return False
+
+        now = time.time()
+        start = now - window
+
+        logger.info(
+            "Bootstrapping from %d seconds of history (step=%s)...",
+            window,
+            self.config.bootstrap_step,
+        )
+
+        # 1. Fetch historical time series for each metric
+        historical_metrics: Dict[str, list] = {}
+        timestamps: Optional[list] = None
+
+        for name, promql, _ in DEFAULT_QUERIES:
+            series = self.prometheus.range_query(
+                promql,
+                start=start,
+                end=now,
+                step=self.config.bootstrap_step,
+            )
+            if series:
+                if timestamps is None:
+                    timestamps = [ts for ts, _ in series]
+                historical_metrics[name] = [v for _, v in series]
+                logger.debug(
+                    "Bootstrap: %s — %d samples", name, len(series),
+                )
+            else:
+                logger.warning("Bootstrap: no data for %s", name)
+
+        if not historical_metrics:
+            logger.warning("Bootstrap failed — no historical data available")
+            return False
+
+        # 2. Pre-seed the normalizer's rolling windows
+        self.normalizer.bootstrap(historical_metrics, timestamps)
+
+        # 3. Build normalized snapshots for the controller
+        #    Re-normalize each historical timestep through the (now pre-seeded) normalizer
+        n_samples = min(len(v) for v in historical_metrics.values())
+        normalized_snapshots = []
+        for i in range(n_samples):
+            raw = {}
+            for name, values in historical_metrics.items():
+                if i < len(values):
+                    raw[name] = values[i]
+            ts = timestamps[i] if timestamps and i < len(timestamps) else now
+            normalized = self.normalizer.normalize(raw, timestamp=ts)
+            if normalized:
+                normalized_snapshots.append(normalized)
+
+        # 4. Bootstrap the controller with normalized snapshots
+        self.controller.bootstrap(normalized_snapshots)
+
+        logger.info(
+            "Bootstrap complete: %d metrics, %d samples, controller ready",
+            len(historical_metrics),
+            len(normalized_snapshots),
+        )
+        return True
 
     def poll_once(self) -> Optional[CycleResult]:
         """Execute one complete polling cycle.

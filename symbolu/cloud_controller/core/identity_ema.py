@@ -160,6 +160,46 @@ class IdentityEMA:
         cos_sim = float(np.dot(current_state, self.baseline) / (c_norm * b_norm))
         return 1.0 - max(0.0, (cos_sim + 1.0) / 2.0)
 
+    def bootstrap(self, historical_vectors: list) -> None:
+        """Pre-seed baseline from historical metric vectors.
+
+        Sets the baseline directly from the mean of historical data rather
+        than relying on the slow conditional EMA update. This is safe because
+        historical data is trusted — it represents what "normal" actually was.
+
+        Args:
+            historical_vectors: List of numpy arrays (each of length `dim`).
+                Typically from Prometheus range query over the last 1-2 hours.
+        """
+        if not historical_vectors:
+            return
+
+        # Filter to valid vectors only
+        valid = [v for v in historical_vectors if len(v) == self.dim]
+        if not valid:
+            return
+
+        # Set baseline directly from the mean of historical data.
+        # The slow EMA consolidation is designed for online learning where
+        # we can't trust any single sample. For bootstrap, the full history
+        # IS the ground truth — compute the mean and normalize it.
+        mean_vec = np.mean(valid, axis=0)
+        norm = np.linalg.norm(mean_vec)
+        if norm > 1e-8:
+            self.baseline = (mean_vec / norm) * np.sqrt(self.dim)
+        else:
+            self.baseline = mean_vec
+
+        # Reset accumulator (clean slate for online learning)
+        self.accumulator = np.zeros(self.dim)
+        self.count = 0
+        self.consolidation_count += 1  # Mark as having consolidated
+
+    @property
+    def bootstrapped(self) -> bool:
+        """Whether this identity has been through at least one consolidation."""
+        return self.consolidation_count > 0
+
     def reset(self) -> None:
         self.baseline = np.random.randn(self.dim) * 0.01
         self.baseline = self.baseline / (np.linalg.norm(self.baseline) + 1e-8) * np.sqrt(self.dim)
