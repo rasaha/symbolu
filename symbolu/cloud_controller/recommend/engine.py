@@ -2,7 +2,7 @@
 
 Wires together:
     Controller decision → Confidence check → Safety bounds →
-    Webhook notification → Approval tracking
+    Webhook notification → Approval tracking → Action execution
 
 Each cycle:
 1. Receive ActionResult from the controller (via shadow runner or pipeline)
@@ -13,16 +13,18 @@ Each cycle:
 6. Send webhook notifications (with real recommendation ID)
 7. Expire stale recommendations
 
-The engine does NOT execute actions — that's Stage 5.
+On approval, the engine executes the scaling action via the K8s actuator
+(if configured). The actuator runs in DRY_RUN mode by default — set
+actuator_config to enable live scaling.
 
 NOTE — Cooldown timing:
-Cooldown starts when a recommendation is *approved*, not when the
-scaling action is actually *executed* by the action layer (Stage 5).
-This is intentionally conservative — Stage 5 should extend cooldown
-if execution is delayed. See SafetyBounds.record_action().
+Cooldown starts when a recommendation is *approved* and *executed*.
+If execution fails, cooldown is still started to prevent rapid retries.
+See SafetyBounds.record_action().
 """
 
 import logging
+import time
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -47,6 +49,31 @@ from symbolu.cloud_controller.recommend.approval import (
     ApprovalState,
     Recommendation,
 )
+from symbolu.cloud_controller.action.k8s_actuator import (
+    ActuatorConfig,
+    ExecutionResult,
+    K8sActuator,
+)
+from symbolu.cloud_controller.action.policy import (
+    PolicyConfig,
+    PolicyEngine,
+)
+from symbolu.cloud_controller.action.rollback import (
+    RollbackConfig,
+    RollbackMonitor,
+)
+from symbolu.cloud_controller.action.outcome import (
+    OutcomeConfig,
+    OutcomeTracker,
+)
+from symbolu.cloud_controller.action.readiness import (
+    ReadinessChecker,
+    ReadinessConfig,
+)
+from symbolu.cloud_controller.action.feedback import (
+    FeedbackConfig,
+    FeedbackLoop,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +91,18 @@ class RecommendConfig:
     webhooks: List[WebhookConfig] = field(default_factory=list)
     # Approval TTL (seconds)
     approval_ttl_seconds: float = 600.0
+    # Actuator config (None = no execution on approval, dry_run by default)
+    actuator: Optional[ActuatorConfig] = None
+    # Policy engine config (None = no policy checks)
+    policy: Optional[PolicyConfig] = None
+    # Rollback monitor config (None = no rollback monitoring)
+    rollback: Optional[RollbackConfig] = None
+    # Outcome tracker config (None = no outcome tracking)
+    outcome: Optional[OutcomeConfig] = None
+    # Readiness checker config (None = no readiness endpoint)
+    readiness: Optional[ReadinessConfig] = None
+    # Feedback loop config (None = no L6→L4 feedback)
+    feedback: Optional[FeedbackConfig] = None
 
 
 @dataclass
@@ -120,6 +159,15 @@ class RecommendEngine:
         self.approvals = ApprovalManager(
             ttl_seconds=self.config.approval_ttl_seconds,
         )
+        self.actuator = K8sActuator(self.config.actuator) if self.config.actuator else None
+        self.policy = PolicyEngine(self.config.policy) if self.config.policy else None
+        self.rollback = RollbackMonitor(
+            self.config.rollback,
+            rollback_fn=self.actuator.scale if self.actuator else None,
+        ) if self.config.rollback else None
+        self.outcome = OutcomeTracker(self.config.outcome) if self.config.outcome else None
+        self.readiness = ReadinessChecker(self.config.readiness) if self.config.readiness else None
+        self.feedback = FeedbackLoop(self.config.feedback) if self.config.feedback else None
         self._eval_lock = threading.Lock()
 
     def evaluate(
@@ -269,18 +317,108 @@ class RecommendEngine:
         recommendation_id: str,
         by: str = "",
         reason: str = "",
+        metrics_snapshot: Optional[Dict[str, float]] = None,
     ) -> Optional[Recommendation]:
-        """Approve a pending recommendation.
+        """Approve a pending recommendation and execute the scaling action.
 
-        Records the action in safety bounds (starts cooldown).
+        Pipeline: Policy check → Actuator execution → Rollback watch → Outcome tracking
+
+        If an actuator is configured, executes the scaling action via K8s API.
+        Records the action in safety bounds (starts cooldown) regardless of
+        execution success to prevent rapid retries.
+
+        Args:
+            recommendation_id: ID of the recommendation to approve.
+            by: Who approved (operator ID).
+            reason: Optional note from operator.
+            metrics_snapshot: Current metrics for rollback/outcome baselines.
+                              If None, uses the recommendation's action snapshot.
 
         Returns:
             The approved Recommendation, or None if not found/not pending.
         """
         rec = self.approvals.approve(recommendation_id, by=by, reason=reason)
-        if rec is not None:
-            # Start cooldown period
-            self.safety.record_action()
+        if rec is None:
+            return None
+
+        # Use recommendation's action metrics if no snapshot provided
+        if metrics_snapshot is None:
+            metrics_snapshot = rec.action.metrics_snapshot
+
+        # 1. Policy check — block if policy denies
+        if self.policy is not None:
+            policy_result = self.policy.check(
+                deployment=rec.service,
+                namespace=rec.namespace,
+                current_replicas=rec.current_replicas,
+                target_replicas=rec.target_replicas,
+            )
+            if not policy_result.allowed:
+                logger.warning(
+                    "Policy blocked execution for %s: %s",
+                    rec.id, policy_result.reason,
+                )
+                rec.execution_result = ExecutionResult(
+                    success=False,
+                    mode="policy_blocked",
+                    deployment=rec.service,
+                    namespace=rec.namespace,
+                    previous_replicas=rec.current_replicas,
+                    target_replicas=rec.target_replicas,
+                    delta=rec.clamped_delta,
+                    timestamp=time.time(),
+                    error=f"Policy denied: {policy_result.reason}",
+                    recommendation_id=rec.id,
+                )
+                self.safety.record_action()
+                return rec
+
+        # 2. Execute via actuator if configured
+        execution: Optional[ExecutionResult] = None
+        if self.actuator is not None:
+            execution = self.actuator.scale(
+                deployment=rec.service,
+                namespace=rec.namespace,
+                current_replicas=rec.current_replicas,
+                target_replicas=rec.target_replicas,
+                recommendation_id=rec.id,
+            )
+            rec.execution_result = execution
+            if execution.success:
+                logger.info(
+                    "Executed scaling for %s: %s",
+                    rec.id, execution.format_log(),
+                )
+                # 3. Start rollback watch if configured
+                if self.rollback is not None:
+                    self.rollback.start_watch(
+                        recommendation_id=rec.id,
+                        deployment=rec.service,
+                        namespace=rec.namespace,
+                        pre_action_replicas=rec.current_replicas,
+                        post_action_replicas=rec.target_replicas,
+                        pre_action_metrics=metrics_snapshot,
+                    )
+                # 4. Record for outcome tracking if configured
+                if self.outcome is not None:
+                    self.outcome.record_action(
+                        recommendation_id=rec.id,
+                        deployment=rec.service,
+                        namespace=rec.namespace,
+                        delta=rec.clamped_delta,
+                        pre_action_metrics=metrics_snapshot,
+                    )
+                # 5. Record action for policy rate limiting
+                if self.policy is not None:
+                    self.policy.record_action(rec.service, rec.namespace)
+            else:
+                logger.error(
+                    "Scaling execution FAILED for %s: %s",
+                    rec.id, execution.error,
+                )
+
+        # Start cooldown regardless of execution result
+        self.safety.record_action()
         return rec
 
     def dismiss(
@@ -300,7 +438,119 @@ class RecommendEngine:
     def pending_count(self) -> int:
         return self.approvals.pending_count
 
+    def check_rollbacks(
+        self,
+        current_metrics: Dict[str, float],
+    ) -> list:
+        """Check active rollback watches against current metrics.
+
+        Call this each polling cycle when rollback monitoring is enabled.
+
+        Returns:
+            List of resolved RollbackWatch objects.
+        """
+        if self.rollback is None:
+            return []
+        return self.rollback.check(current_metrics)
+
+    def evaluate_outcomes(
+        self,
+        current_metrics: Dict[str, float],
+    ) -> list:
+        """Evaluate pending outcome records against current metrics.
+
+        Call this each polling cycle when outcome tracking is enabled.
+
+        Returns:
+            List of resolved OutcomeRecord objects.
+        """
+        if self.outcome is None:
+            return []
+        return self.outcome.evaluate(current_metrics)
+
+    def check_readiness(
+        self,
+        plasticity: float,
+        stability: float,
+    ) -> Optional[dict]:
+        """Check system readiness for deployments (ArgoCD pre-hook).
+
+        Returns:
+            Readiness result dict, or None if readiness checker not configured.
+        """
+        if self.readiness is None:
+            return None
+        return self.readiness.check(
+            plasticity=plasticity,
+            stability=stability,
+            last_action_time=self.safety.last_action_time,
+            active_rollback_watches=self.rollback.active_count if self.rollback else 0,
+        ).to_dict()
+
+    def process_feedback(
+        self,
+        controller,
+        outcomes: Optional[list] = None,
+        rollbacks: Optional[list] = None,
+        divergences: Optional[list] = None,
+    ) -> Optional[dict]:
+        """Run L6 → L4 feedback loop to adjust controller parameters.
+
+        Call this each polling cycle with resolved verdicts from
+        check_rollbacks(), evaluate_outcomes(), and divergence tracker.
+
+        Args:
+            controller: The Controller instance whose parameters to adjust.
+            outcomes: Resolved OutcomeRecords from evaluate_outcomes().
+            rollbacks: Resolved RollbackWatches from check_rollbacks().
+            divergences: Resolved DivergenceRecords from divergence tracker.
+
+        Returns:
+            FeedbackCycleResult summary dict, or None if feedback not configured.
+        """
+        if self.feedback is None:
+            return None
+
+        # Validate controller has expected attributes before adjustment
+        for attr in ('adaptive_gain', 'damping', 'plasticity_gate'):
+            if not hasattr(controller, attr):
+                logger.warning(
+                    "Controller missing %s attribute, skipping feedback", attr,
+                )
+                return None
+
+        result = self.feedback.process(
+            controller=controller,
+            outcomes=outcomes,
+            rollbacks=rollbacks,
+            divergences=divergences,
+        )
+
+        # Feed high-value outcomes to replay buffer
+        if outcomes and hasattr(controller, 'replay_buffer'):
+            entries = self.feedback.to_replay_entries(outcomes)
+            for entry in entries:
+                controller.replay_buffer.store(entry, step=getattr(controller, '_step', 0))
+
+        return {
+            "signal": result.signal.value,
+            "adjustments": len(result.adjustments),
+            "applied": result.applied,
+            "total_verdicts": result.total_verdicts,
+            "skip_reason": result.skip_reason,
+        }
+
     def reset(self) -> None:
         """Reset all internal state."""
         self.approvals.reset()
         self.safety.reset()
+        if self.actuator is not None:
+            self.actuator.reset()
+        if self.policy is not None:
+            self.policy.reset()
+        if self.rollback is not None:
+            self.rollback.reset()
+        if self.outcome is not None:
+            self.outcome.reset()
+        if self.feedback is not None:
+            self.feedback.reset()

@@ -1,0 +1,79 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ncc-loadgen
+  namespace: default
+  labels:
+    app: ncc-loadgen
+spec:
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: ncc-loadgen
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: loadgen
+          image: busybox:1.36
+          command: ["/bin/sh"]
+          args:
+            - "-c"
+            - |
+              echo "=== NCC Load Generator ==="
+              echo "Generating HTTP traffic against demo-app..."
+              echo "Pattern: ramp-up -> sustained -> spike -> cooldown"
+              echo ""
+
+              TARGET="http://demo-app.default.svc"
+
+              # Phase 1: Ramp-up (2 min, increasing concurrency)
+              echo "[Phase 1/4] Ramp-up — gradual increase"
+              for i in $(seq 1 120); do
+                for j in $(seq 1 $((i / 10 + 1))); do
+                  wget -q -O /dev/null -T 2 "$TARGET/" 2>/dev/null &
+                done
+                sleep 1
+              done
+              wait
+
+              # Phase 2: Sustained high load (3 min)
+              echo "[Phase 2/4] Sustained — steady high load"
+              for i in $(seq 1 180); do
+                for j in $(seq 1 15); do
+                  wget -q -O /dev/null -T 2 "$TARGET/" 2>/dev/null &
+                done
+                sleep 1
+              done
+              wait
+
+              # Phase 3: Spike (1 min, burst)
+              echo "[Phase 3/4] Spike — burst traffic"
+              for i in $(seq 1 60); do
+                for j in $(seq 1 30); do
+                  wget -q -O /dev/null -T 2 "$TARGET/" 2>/dev/null &
+                done
+                sleep 1
+              done
+              wait
+
+              # Phase 4: Cooldown (2 min, decreasing)
+              echo "[Phase 4/4] Cooldown — tapering off"
+              for i in $(seq 120 -1 1); do
+                for j in $(seq 1 $((i / 10 + 1))); do
+                  wget -q -O /dev/null -T 2 "$TARGET/" 2>/dev/null &
+                done
+                sleep 1
+              done
+              wait
+
+              echo ""
+              echo "Load generation complete."
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+  backoffLimit: 0
