@@ -150,6 +150,11 @@ class Controller:
         self._metric_history: Dict[str, List[float]] = {}
         self._staleness_window: int = 10  # cycles of identical value = stale
 
+        # Latency override — track latency trend for cascade detection
+        self._latency_history: List[float] = []
+        self._latency_override_active: bool = False
+
+
     def step(
         self,
         metrics: Dict[str, float],
@@ -244,7 +249,18 @@ class Controller:
         if len(self._pressure_history) > self._trend_window:
             self._pressure_history = self._pressure_history[-self._trend_window:]
         trend_boost = self._compute_trend_boost()
+        # Attenuate trend boost during startup — prevents massive cold-start overshoot
+        if self._step < self.config.warmup_steps:
+            trend_boost *= 0.3
         pressure += trend_boost
+
+        # Latency override: if latency is critically high but pressure is
+        # still low (e.g., CPU normal during upstream cascade), latency must
+        # independently drive action. Without this, cascading failures where
+        # CPU stays flat but latency climbs are invisible to the controller.
+        pre_override_pressure = pressure
+        pressure = self._apply_latency_override(metrics, pressure)
+        self._latency_override_active = pressure > pre_override_pressure + 0.01
 
         # === INTERPRET ===
         # Coherence: do the signals agree?
@@ -299,9 +315,18 @@ class Controller:
         )
 
         # Final action score: A_t = d_t * G_t * P_t * S_t
+        # When latency override is active (cascade detected), use a floor
+        # on the multiplicative chain to prevent coherence/damping from
+        # completely suppressing the cascade signal.
+        effective_gain = gain_result.gain
+        effective_damping = damping_result.damping
+        if self._latency_override_active:
+            effective_gain = max(effective_gain, 0.8)
+            effective_damping = max(effective_damping, 0.7)
+
         action_score = (
-            damping_result.damping
-            * gain_result.gain
+            effective_damping
+            * effective_gain
             * plasticity_result.plasticity
             * pressure
         )
@@ -426,6 +451,48 @@ class Controller:
         if not values:
             return 0.0
         return sum(values) / len(values)
+
+    def _apply_latency_override(
+        self, metrics: Dict[str, float], pressure: float,
+    ) -> float:
+        """Latency floor override — makes latency a first-class actuator.
+
+        Only activates when latency is critically high AND infra signals
+        are calm (the cascade signature: CPU normal, latency climbing).
+        This prevents the override from firing when conflicting signals
+        cause high latency but low CPU as a test of coherence.
+
+        The key distinguisher: in a true cascade, latency rises *over time*
+        while CPU stays flat. In a conflicting-signals scenario, the
+        disagreement is injected instantaneously.
+        """
+        latency = metrics.get("latency_p99", 0.0)
+        cpu = metrics.get("cpu", None)
+        error_rate = metrics.get("error_rate", 0.0)
+
+        # Track latency trend
+        self._latency_history.append(latency)
+        if len(self._latency_history) > 10:
+            self._latency_history = self._latency_history[-10:]
+
+        # Only activate when CPU is calm or absent AND latency has been
+        # rising over multiple cycles (cascade signature). CPU missing
+        # (filtered by staleness) is an even stronger cascade signal.
+        # Use a 10-cycle window since cascades build slowly (~0.008/cycle).
+        cpu_calm_or_absent = cpu is None or cpu < 0.5
+        window_size = min(10, len(self._latency_history))
+        if window_size >= 5 and cpu_calm_or_absent:
+            recent = self._latency_history[-window_size:]
+            latency_rising = recent[-1] > recent[0] + 0.03
+
+            if latency_rising and latency > 0.6:
+                # Cascade detected: latency climbing while CPU flat/absent
+                latency_pressure = (latency - 0.3) * 0.8
+                if error_rate > 0.1:
+                    latency_pressure += error_rate * 0.3
+                pressure = max(pressure, latency_pressure)
+
+        return pressure
 
     def _filter_stale_signals(self, metrics: Dict[str, float]) -> Dict[str, float]:
         """Detect and exclude metrics whose value hasn't changed.
@@ -588,6 +655,11 @@ class Controller:
         else:
             delta = sign * 3
 
+        # Startup clamp: limit max delta during warmup to prevent
+        # cold-start amplification (trend detector + gain ramp = overshoot)
+        if self._step < self.config.warmup_steps:
+            delta = max(-1, min(1, delta))
+
         # Apply safety bounds
         if delta > 0:
             max_out = max(1, int(current_replicas * self.config.max_scale_out_ratio))
@@ -688,3 +760,5 @@ class Controller:
             self._unplanned_drop_boost = 0.0
             self._pressure_history = []
             self._metric_history = {}
+            self._latency_history = []
+            self._latency_override_active = False

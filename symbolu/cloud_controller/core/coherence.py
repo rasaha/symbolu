@@ -53,12 +53,14 @@ class CoherenceModel:
         w_business: float = 0.2,
         elevation_threshold: float = 0.5,
         hysteresis_band: float = 0.05,
+        ema_beta: float = 0.7,
     ):
         self.w_infra = w_infra
         self.w_app = w_app
         self.w_business = w_business
         self.elevation_threshold = elevation_threshold
         self.hysteresis_band = hysteresis_band
+        self.ema_beta = ema_beta  # Temporal smoothing factor (0=no smoothing, 1=frozen)
         self._prev_coherence: Optional[float] = None
 
     def compute(
@@ -123,6 +125,12 @@ class CoherenceModel:
 
         # Apply signal health degradation — missing signals reduce confidence
         coherence *= signal_health
+
+        # Temporal EMA smoothing — prevents noisy coherence from causing
+        # decision paralysis. Smooths out rapid oscillations while still
+        # tracking genuine regime changes.
+        if self._prev_coherence is not None and self.ema_beta > 0:
+            coherence = self.ema_beta * self._prev_coherence + (1.0 - self.ema_beta) * coherence
 
         # Hysteresis: if coherence is within the dead-band of the previous
         # value, hold the previous value to prevent flicker.
