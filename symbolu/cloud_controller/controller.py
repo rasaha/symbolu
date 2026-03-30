@@ -154,6 +154,12 @@ class Controller:
         self._latency_history: List[float] = []
         self._latency_override_active: bool = False
 
+        # Demand upshift detector — when pressure transitions from negative
+        # to positive while replicas are near the floor, the controller is
+        # recovering from a trough. Boost positive pressure temporarily so
+        # the weak initial positive signal can cross the action threshold.
+        self._recovery_cycles: int = 0
+
 
     def step(
         self,
@@ -259,6 +265,22 @@ class Controller:
         if self._step < self.config.warmup_steps:
             trend_boost *= 0.3
         pressure += trend_boost
+
+        # Demand upshift detection: when pressure crosses zero going positive
+        # and replicas are near the floor, the controller is recovering from
+        # a trough. Boost positive pressure so the weak initial signal can
+        # cross the action threshold. Without this, ultra-gradual demand ramps
+        # spend 30+ cycles in a dead zone where pressure is positive but A_t
+        # is too low for any action. Only fires when at low replica count to
+        # avoid amplifying overshoot in oscillatory scenarios.
+        if (len(self._pressure_history) >= 2
+                and self._pressure_history[-2] < 0
+                and pressure >= 0
+                and current_replicas <= 2):
+            self._recovery_cycles = 20
+        if self._recovery_cycles > 0 and pressure > 0 and current_replicas <= 3:
+            pressure *= 2.5  # amplify weak positive pressure during recovery
+            self._recovery_cycles -= 1
 
         # Latency override: if latency is critically high but pressure is
         # still low (e.g., CPU normal during upstream cascade), latency must
@@ -652,13 +674,22 @@ class Controller:
         sign = 1 if action_score >= 0 else -1
         direction = "out" if sign > 0 else "in"
 
-        if abs_score < thresholds.get("no_action", 0.05):
+        # Asymmetric scale-in: require 2x the action score to scale in.
+        # This prevents aggressive scale-in during low-demand phases,
+        # keeping more replicas available as a hedge against demand spikes.
+        # Scale-out thresholds are unchanged — react quickly to load.
+        if sign < 0:
+            scale_in_factor = 2.0
+        else:
+            scale_in_factor = 1.0
+
+        if abs_score < thresholds.get("no_action", 0.05) * scale_in_factor:
             return "no_action", 0
-        elif abs_score < thresholds.get("recommend", 0.2):
+        elif abs_score < thresholds.get("recommend", 0.2) * scale_in_factor:
             return f"observe_{direction}", 0
-        elif abs_score < thresholds.get("scale_1", 0.5):
+        elif abs_score < thresholds.get("scale_1", 0.5) * scale_in_factor:
             delta = sign * 1
-        elif abs_score < thresholds.get("scale_2", 1.0):
+        elif abs_score < thresholds.get("scale_2", 1.0) * scale_in_factor:
             delta = sign * 2
         else:
             delta = sign * 3
@@ -770,3 +801,4 @@ class Controller:
             self._metric_history = {}
             self._latency_history = []
             self._latency_override_active = False
+            self._recovery_cycles = 0
