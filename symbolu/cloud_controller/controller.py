@@ -128,6 +128,13 @@ class Controller:
         self._recent_scale_times: List[int] = []
         self._lock = threading.Lock()
 
+        # Baseline-memory floor — remember recent capacity needs so the
+        # controller doesn't collapse replicas to 1 immediately after a
+        # high-demand period. Rises instantly, decays slowly (asymmetric).
+        # Used only as a scale-in floor — never touches scale-out authority.
+        self._recent_required_floor: float = 1.0
+        self._floor_ratio: float = 0.8  # scale-in floor = 80% of recent peak
+
         # Pending replica tracking — detect actuation lag
         # Each entry: (step_issued, delta) — persists across cycles until realized or TTL expires
         self._pending_deltas: List[tuple] = []
@@ -289,6 +296,25 @@ class Controller:
         pre_override_pressure = pressure
         pressure = self._apply_latency_override(metrics, pressure)
         self._latency_override_active = pressure > pre_override_pressure + 0.01
+
+        # === BASELINE MEMORY ===
+        # Update the capacity floor — tracks what the system recently needed.
+        # Always tracks current replica count (the system WAS running at this
+        # level for a reason). Rises instantly, decays slowly. Faster decay
+        # when pressure is strongly negative (clearly over-provisioned) to
+        # avoid holding unnecessary buffer in truly idle periods.
+        needed_now = float(current_replicas)
+        if pressure < -0.1:
+            decay = 0.95  # faster decay in strongly low-demand periods
+        else:
+            decay = 0.98  # slow decay normally
+        if needed_now > self._recent_required_floor:
+            self._recent_required_floor = needed_now  # rise immediately
+        else:
+            self._recent_required_floor = (
+                decay * self._recent_required_floor
+                + (1.0 - decay) * needed_now
+            )
 
         # === INTERPRET ===
         # Coherence: do the signals agree?
@@ -706,9 +732,23 @@ class Controller:
         elif delta < 0:
             max_in = max(1, int(current_replicas * self.config.max_scale_in_ratio))
             delta = max(delta, -max_in)
+            # Scale-in step cap: limit to -1 per cycle. Scale-out can add
+            # +1, +2, +3 but scale-in is always gradual. This prevents
+            # rapid capacity collapse while allowing steady cost recovery.
+            delta = max(delta, -1)
             # Never go below minimum
             if current_replicas + delta < self.config.min_replicas:
                 delta = self.config.min_replicas - current_replicas
+            # Baseline-memory floor: don't scale in below a fraction of
+            # what the system recently needed. Prevents collapsing to 1
+            # replica immediately after a high-demand period.
+            scale_in_floor = max(1, int(round(
+                self._recent_required_floor * self._floor_ratio
+            )))
+            if current_replicas + delta < scale_in_floor:
+                delta = scale_in_floor - current_replicas
+                if delta >= 0:
+                    delta = 0  # floor reached — don't scale in further
 
         if delta > 0:
             return f"scale_out_{delta}", delta
@@ -802,3 +842,4 @@ class Controller:
             self._latency_history = []
             self._latency_override_active = False
             self._recovery_cycles = 0
+            self._recent_required_floor = 1.0
