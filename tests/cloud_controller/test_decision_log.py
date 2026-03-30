@@ -103,6 +103,56 @@ class TestDecisionLogEntry:
         assert d["execution_success"] is True
         assert d["execution_mode"] == "scale_patch"
 
+    def test_to_dict_preserves_execution_success_false(self):
+        """Critical: execution_success=False must not be dropped."""
+        entry = DecisionLogEntry(
+            phase=DecisionPhase.EXECUTE,
+            timestamp=time.time(),
+            service="api-gw",
+            namespace="prod",
+            execution_success=False,
+            execution_error="403 Forbidden",
+        )
+        d = entry.to_dict()
+        assert d["execution_success"] is False
+        assert d["execution_error"] == "403 Forbidden"
+
+    def test_to_dict_preserves_feedback_applied_false(self):
+        """feedback_applied=False must not be dropped."""
+        entry = DecisionLogEntry(
+            phase=DecisionPhase.FEEDBACK,
+            timestamp=time.time(),
+            service="svc",
+            namespace="ns",
+            feedback_applied=False,
+            feedback_signal="neutral",
+        )
+        d = entry.to_dict()
+        assert d["feedback_applied"] is False
+
+    def test_to_dict_preserves_suppressed_false(self):
+        """suppressed=False is a meaningful explicit value."""
+        entry = DecisionLogEntry(
+            phase=DecisionPhase.RECOMMEND,
+            timestamp=time.time(),
+            service="svc",
+            namespace="ns",
+            suppressed=False,
+        )
+        d = entry.to_dict()
+        assert d["suppressed"] is False
+
+    def test_to_dict_omits_execution_success_none(self):
+        """execution_success=None (not set) should be omitted."""
+        entry = DecisionLogEntry(
+            phase=DecisionPhase.RECOMMEND,
+            timestamp=time.time(),
+            service="svc",
+            namespace="ns",
+        )
+        d = entry.to_dict()
+        assert "execution_success" not in d
+
     def test_to_json_is_valid_json(self):
         entry = DecisionLogEntry(
             phase=DecisionPhase.OUTCOME,
@@ -133,7 +183,9 @@ class TestDecisionLogEntry:
             namespace="prod",
             recommendation="scale_out_2",
             replica_delta=2,
+            action_score=0.65,
             confidence_level="high",
+            step=42,
         )
         text = entry.to_text()
         assert "RECOMMEND" in text
@@ -141,6 +193,8 @@ class TestDecisionLogEntry:
         assert "scale_out_2" in text
         assert "delta=+2" in text
         assert "conf=high" in text
+        assert "step=42" in text
+        assert "A_t=0.650" in text
 
     def test_to_text_suppressed(self):
         entry = DecisionLogEntry(
@@ -176,6 +230,32 @@ class TestDecisionLogEntry:
         )
         assert "OK" in entry.to_text()
 
+    def test_to_text_divergence(self):
+        entry = DecisionLogEntry(
+            phase=DecisionPhase.DIVERGENCE,
+            timestamp=time.time(),
+            service="api-gw",
+            namespace="prod",
+            divergence_type="controller_scales_hpa_holds",
+            verdict="controller_correct",
+        )
+        text = entry.to_text()
+        assert "DIVERGENCE" in text
+        assert "divergence=controller_scales_hpa_holds" in text
+        assert "verdict=controller_correct" in text
+
+    def test_to_text_approval_state(self):
+        entry = DecisionLogEntry(
+            phase=DecisionPhase.APPROVE,
+            timestamp=time.time(),
+            service="api-gw",
+            namespace="prod",
+            approval_state="dismissed",
+        )
+        text = entry.to_text()
+        assert "APPROVE" in text
+        assert "state=dismissed" in text
+
     def test_floats_rounded_in_dict(self):
         entry = DecisionLogEntry(
             phase=DecisionPhase.RECOMMEND,
@@ -186,6 +266,29 @@ class TestDecisionLogEntry:
         )
         d = entry.to_dict()
         assert d["action_score"] == 0.1235  # 4 decimal places
+
+    def test_metrics_dict_values_rounded(self):
+        entry = DecisionLogEntry(
+            phase=DecisionPhase.RECOMMEND,
+            timestamp=time.time(),
+            service="svc",
+            namespace="ns",
+            metrics={"cpu": 0.123456789, "memory": 0.987654321},
+        )
+        d = entry.to_dict()
+        assert d["metrics"]["cpu"] == 0.1235
+        assert d["metrics"]["memory"] == 0.9877
+
+    def test_timestamp_zero_preserved(self):
+        """timestamp=0.0 should be used, not replaced by time.time()."""
+        entry = DecisionLogEntry(
+            phase=DecisionPhase.RECOMMEND,
+            timestamp=0.0,
+            service="svc",
+            namespace="ns",
+        )
+        d = entry.to_dict()
+        assert "1970" in d["ts"]  # epoch 0 = 1970
 
 
 # ============================================================
@@ -259,6 +362,14 @@ class TestFromCycle:
         assert entry.damping > 0
         assert entry.step == action.step
 
+    def test_cycle_timestamp_zero(self):
+        """timestamp=0.0 should be respected, not replaced."""
+        fmt = DecisionLogFormatter(service="svc")
+        action = _make_action()
+        confidence = _make_confidence()
+        entry = fmt.from_cycle(action=action, confidence=confidence, timestamp=0.0)
+        assert entry.timestamp == 0.0
+
 
 # ============================================================
 # DecisionLogFormatter — from_approval
@@ -268,6 +379,46 @@ class TestFromApproval:
     def test_approval_entry(self):
         fmt = DecisionLogFormatter(service="api-gw", namespace="prod")
         entry = fmt.from_approval(
+            recommendation_id="rec-xyz",
+            state="approved",
+            by="ops-team",
+            current_replicas=5,
+            target_replicas=7,
+        )
+
+        assert entry.phase == DecisionPhase.APPROVE
+        assert entry.decision_id == "rec-xyz"
+        assert entry.approved_by == "ops-team"
+        assert entry.approval_state == "approved"
+        assert entry.replica_delta == 2
+
+    def test_dismissal_entry(self):
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_approval(
+            recommendation_id="rec-456",
+            state="dismissed",
+            by="ops",
+        )
+        assert entry.phase == DecisionPhase.APPROVE
+        assert entry.approval_state == "dismissed"
+
+    def test_expiry_entry(self):
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_approval(
+            recommendation_id="rec-789",
+            state="expired",
+        )
+        assert entry.approval_state == "expired"
+
+
+# ============================================================
+# DecisionLogFormatter — from_execution
+# ============================================================
+
+class TestFromExecution:
+    def test_execution_success(self):
+        fmt = DecisionLogFormatter(service="api-gw", namespace="prod")
+        entry = fmt.from_execution(
             recommendation_id="rec-xyz",
             approved_by="ops-team",
             current_replicas=5,
@@ -282,9 +433,9 @@ class TestFromApproval:
         assert entry.replica_delta == 2
         assert entry.execution_success is True
 
-    def test_approval_failure(self):
+    def test_execution_failure(self):
         fmt = DecisionLogFormatter(service="api-gw")
-        entry = fmt.from_approval(
+        entry = fmt.from_execution(
             recommendation_id="rec-fail",
             approved_by="ops",
             current_replicas=5,
@@ -294,6 +445,20 @@ class TestFromApproval:
         )
         assert entry.execution_success is False
         assert entry.execution_error == "Timeout"
+
+    def test_execution_failure_in_dict(self):
+        """execution_success=False must survive to_dict() serialization."""
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_execution(
+            recommendation_id="rec-fail",
+            approved_by="ops",
+            current_replicas=5,
+            target_replicas=7,
+            execution_success=False,
+            execution_error="Timeout",
+        )
+        d = entry.to_dict()
+        assert d["execution_success"] is False
 
 
 # ============================================================
@@ -323,6 +488,108 @@ class TestFromOutcome:
             deployment="worker-svc",
         )
         assert entry.service == "worker-svc"
+
+
+# ============================================================
+# DecisionLogFormatter — from_rollback
+# ============================================================
+
+class TestFromRollback:
+    def test_rollback_stable(self):
+        fmt = DecisionLogFormatter(service="api-gw", namespace="prod")
+        entry = fmt.from_rollback(
+            recommendation_id="rec-abc",
+            verdict="stable",
+            pre_replicas=5,
+            post_replicas=7,
+            verdict_reason="Metrics within threshold",
+        )
+        assert entry.phase == DecisionPhase.ROLLBACK
+        assert entry.verdict == "stable"
+        assert entry.current_replicas == 5
+        assert entry.target_replicas == 7
+        assert entry.replica_delta == 2
+
+    def test_rollback_rolled_back(self):
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_rollback(
+            recommendation_id="rec-xyz",
+            verdict="rolled_back",
+            deployment="worker-svc",
+            pre_replicas=5,
+            post_replicas=7,
+            verdict_reason="Latency degraded 40%",
+        )
+        assert entry.verdict == "rolled_back"
+        assert entry.service == "worker-svc"
+        assert entry.verdict_reason == "Latency degraded 40%"
+
+    def test_rollback_in_json(self):
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_rollback(
+            recommendation_id="rec-1",
+            verdict="degraded",
+        )
+        parsed = json.loads(entry.to_json())
+        assert parsed["phase"] == "rollback"
+        assert parsed["verdict"] == "degraded"
+
+
+# ============================================================
+# DecisionLogFormatter — from_divergence
+# ============================================================
+
+class TestFromDivergence:
+    def test_divergence_controller_correct(self):
+        fmt = DecisionLogFormatter(service="api-gw", namespace="prod")
+        entry = fmt.from_divergence(
+            divergence_type="controller_scales_hpa_holds",
+            verdict="controller_correct",
+            controller_delta=2,
+            hpa_delta=0,
+            verdict_reason="Latency improved after scale-out",
+            metrics={"cpu": 0.8, "latency_p99": 0.6},
+        )
+        assert entry.phase == DecisionPhase.DIVERGENCE
+        assert entry.divergence_type == "controller_scales_hpa_holds"
+        assert entry.verdict == "controller_correct"
+        assert entry.controller_delta == 2
+        assert entry.hpa_delta == 0
+        assert "cpu" in entry.metrics
+
+    def test_divergence_hpa_correct(self):
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_divergence(
+            divergence_type="hpa_scales_controller_holds",
+            verdict="hpa_correct",
+            controller_delta=0,
+            hpa_delta=3,
+        )
+        assert entry.verdict == "hpa_correct"
+        assert entry.hpa_delta == 3
+
+    def test_divergence_in_dict(self):
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_divergence(
+            divergence_type="opposite_direction",
+            verdict="inconclusive",
+            controller_delta=2,
+            hpa_delta=-1,
+        )
+        d = entry.to_dict()
+        assert d["divergence_type"] == "opposite_direction"
+        assert d["controller_delta"] == 2
+        assert d["hpa_delta"] == -1
+
+    def test_divergence_in_text(self):
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_divergence(
+            divergence_type="magnitude_differs",
+            verdict="both_reasonable",
+        )
+        text = entry.to_text()
+        assert "DIVERGENCE" in text
+        assert "divergence=magnitude_differs" in text
 
 
 # ============================================================
@@ -356,6 +623,17 @@ class TestFromFeedback:
         assert entry.feedback_applied is False
         assert entry.suppress_reason == "Insufficient verdicts"
 
+    def test_feedback_not_applied_in_dict(self):
+        """feedback_applied=False must survive to_dict()."""
+        fmt = DecisionLogFormatter(service="api-gw")
+        entry = fmt.from_feedback(
+            signal="neutral",
+            applied=False,
+            adjustments=0,
+        )
+        d = entry.to_dict()
+        assert d["feedback_applied"] is False
+
 
 # ============================================================
 # End-to-end: full lifecycle JSON
@@ -375,15 +653,33 @@ class TestEndToEnd:
             ),
             fmt.from_approval(
                 recommendation_id="rec-001",
+                state="approved",
+                by="ops",
+                current_replicas=5,
+                target_replicas=7,
+            ),
+            fmt.from_execution(
+                recommendation_id="rec-001",
                 approved_by="ops",
                 current_replicas=5,
                 target_replicas=7,
                 execution_mode="scale_patch",
                 execution_success=True,
             ),
+            fmt.from_rollback(
+                recommendation_id="rec-001",
+                verdict="stable",
+                pre_replicas=5,
+                post_replicas=7,
+            ),
             fmt.from_outcome(
                 recommendation_id="rec-001",
                 verdict="positive",
+            ),
+            fmt.from_divergence(
+                divergence_type="controller_scales_hpa_holds",
+                verdict="controller_correct",
+                controller_delta=2,
             ),
             fmt.from_feedback(
                 signal="boost",
@@ -393,9 +689,17 @@ class TestEndToEnd:
             ),
         ]
 
+        phases_seen = set()
         for entry in entries:
             raw = entry.to_json()
             parsed = json.loads(raw)
             assert "ts" in parsed
             assert "phase" in parsed
             assert "service" in parsed
+            phases_seen.add(parsed["phase"])
+
+        # All 7 phases exercised
+        assert phases_seen == {
+            "recommend", "approve", "execute", "rollback",
+            "outcome", "divergence", "feedback",
+        }
