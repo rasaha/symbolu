@@ -47,6 +47,13 @@ from symbolu.cloud_controller.action.outcome import (
     OutcomeTracker,
     OutcomeVerdict,
 )
+from symbolu.cloud_controller.action.feedback import (
+    FeedbackAdjustment,
+    FeedbackConfig,
+    FeedbackCycleResult,
+    FeedbackLoop,
+    FeedbackSignal,
+)
 
 __all__ = [
     # K8s Actuator
@@ -81,4 +88,10 @@ __all__ = [
     "OutcomeRecord",
     "OutcomeTracker",
     "OutcomeVerdict",
+    # Feedback
+    "FeedbackAdjustment",
+    "FeedbackConfig",
+    "FeedbackCycleResult",
+    "FeedbackLoop",
+    "FeedbackSignal",
 ]

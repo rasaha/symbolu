@@ -70,6 +70,10 @@ from symbolu.cloud_controller.action.readiness import (
     ReadinessChecker,
     ReadinessConfig,
 )
+from symbolu.cloud_controller.action.feedback import (
+    FeedbackConfig,
+    FeedbackLoop,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +101,8 @@ class RecommendConfig:
     outcome: Optional[OutcomeConfig] = None
     # Readiness checker config (None = no readiness endpoint)
     readiness: Optional[ReadinessConfig] = None
+    # Feedback loop config (None = no L6→L4 feedback)
+    feedback: Optional[FeedbackConfig] = None
 
 
 @dataclass
@@ -161,6 +167,7 @@ class RecommendEngine:
         ) if self.config.rollback else None
         self.outcome = OutcomeTracker(self.config.outcome) if self.config.outcome else None
         self.readiness = ReadinessChecker(self.config.readiness) if self.config.readiness else None
+        self.feedback = FeedbackLoop(self.config.feedback) if self.config.feedback else None
         self._eval_lock = threading.Lock()
 
     def evaluate(
@@ -480,6 +487,51 @@ class RecommendEngine:
             active_rollback_watches=self.rollback.active_count if self.rollback else 0,
         ).to_dict()
 
+    def process_feedback(
+        self,
+        controller,
+        outcomes: Optional[list] = None,
+        rollbacks: Optional[list] = None,
+        divergences: Optional[list] = None,
+    ) -> Optional[dict]:
+        """Run L6 → L4 feedback loop to adjust controller parameters.
+
+        Call this each polling cycle with resolved verdicts from
+        check_rollbacks(), evaluate_outcomes(), and divergence tracker.
+
+        Args:
+            controller: The Controller instance whose parameters to adjust.
+            outcomes: Resolved OutcomeRecords from evaluate_outcomes().
+            rollbacks: Resolved RollbackWatches from check_rollbacks().
+            divergences: Resolved DivergenceRecords from divergence tracker.
+
+        Returns:
+            FeedbackCycleResult summary dict, or None if feedback not configured.
+        """
+        if self.feedback is None:
+            return None
+
+        result = self.feedback.process(
+            controller=controller,
+            outcomes=outcomes,
+            rollbacks=rollbacks,
+            divergences=divergences,
+        )
+
+        # Feed high-value outcomes to replay buffer
+        if outcomes and hasattr(controller, 'replay_buffer'):
+            entries = self.feedback.to_replay_entries(outcomes)
+            for entry in entries:
+                controller.replay_buffer.store(entry, step=getattr(controller, '_step', 0))
+
+        return {
+            "signal": result.signal.value,
+            "adjustments": len(result.adjustments),
+            "applied": result.applied,
+            "total_verdicts": result.total_verdicts,
+            "skip_reason": result.skip_reason,
+        }
+
     def reset(self) -> None:
         """Reset all internal state."""
         self.approvals.reset()
@@ -492,3 +544,5 @@ class RecommendEngine:
             self.rollback.reset()
         if self.outcome is not None:
             self.outcome.reset()
+        if self.feedback is not None:
+            self.feedback.reset()
