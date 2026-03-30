@@ -30,6 +30,8 @@ class CoherenceResult:
     c_cross: float          # Cross-group agreement (infra vs app vs business)
     instability: float      # 1 - coherence (for damping input)
     elevated_count: int     # How many signals are above baseline
+    missing_signal_count: int = 0  # How many expected signals are absent
+    signal_health: float = 1.0     # 1.0 = all present, degrades with missing
 
 
 class CoherenceModel:
@@ -81,6 +83,13 @@ class CoherenceModel:
         c_app = self._group_agreement(metrics, app_keys)
         c_business = self._group_agreement(metrics, business_keys)
 
+        # Signal health: count missing signals from primary groups
+        expected_count = len(infra_keys) + len(app_keys)
+        present_count = sum(1 for k in (*infra_keys, *app_keys) if k in metrics)
+        missing_signal_count = expected_count - present_count
+        # Each missing signal degrades health by 15% — partial observability penalty
+        signal_health = max(0.3, 1.0 - 0.15 * missing_signal_count)
+
         # Cross-group coherence: do infra and app signals agree in direction?
         # E.g., if infra says high load but app says latency is fine, cross-group
         # coherence is low — signals are contradicting across layers.
@@ -112,6 +121,9 @@ class CoherenceModel:
         # Blend within-group (70%) and cross-group (30%) for final coherence
         coherence = 0.7 * within_coherence + 0.3 * c_cross
 
+        # Apply signal health degradation — missing signals reduce confidence
+        coherence *= signal_health
+
         # Hysteresis: if coherence is within the dead-band of the previous
         # value, hold the previous value to prevent flicker.
         if self._prev_coherence is not None and self.hysteresis_band > 0:
@@ -134,6 +146,8 @@ class CoherenceModel:
             c_cross=c_cross,
             instability=1.0 - coherence,
             elevated_count=elevated,
+            missing_signal_count=missing_signal_count,
+            signal_health=signal_health,
         )
 
     def _group_agreement(

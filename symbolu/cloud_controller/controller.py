@@ -129,11 +129,26 @@ class Controller:
         self._lock = threading.Lock()
 
         # Pending replica tracking — detect actuation lag
-        self._pending_deltas: List[int] = []  # deltas issued but not yet realized
+        # Each entry: (step_issued, delta) — persists across cycles until realized or TTL expires
+        self._pending_deltas: List[tuple] = []
+        self._pending_ttl: int = 15  # max cycles to wait for delta to land
         self._last_replicas: Optional[int] = None  # previous cycle's replica count
 
         # Replica-drop detection — detect unplanned loss (spot eviction, OOM)
         self._unplanned_drop_boost: float = 0.0  # pressure boost after detected drop
+
+        # Pressure trend detector — catch gradual drift that never crosses
+        # a sharp threshold. Tracks a rolling window of pressure values and
+        # computes monotonic-increase ratio. When pressure is steadily rising,
+        # the trend boost nudges action_score above the decision threshold.
+        self._pressure_history: List[float] = []
+        self._trend_window: int = 20  # cycles to look back
+
+        # Signal staleness detector — track per-metric values to detect
+        # stuck/frozen signals (e.g., stale exporter cache, counter reset missed).
+        # If a metric hasn't changed in N cycles, exclude it from pressure.
+        self._metric_history: Dict[str, List[float]] = {}
+        self._staleness_window: int = 10  # cycles of identical value = stale
 
     def step(
         self,
@@ -182,23 +197,54 @@ class Controller:
         # Detect unplanned replica loss (spot eviction, OOM kill, node failure)
         # If replicas dropped without the controller issuing a scale-in,
         # something external killed pods — boost pressure to compensate.
+        pending_sum = sum(d for _, d in self._pending_deltas)
         if self._last_replicas is not None:
-            expected_replicas = self._last_replicas + sum(self._pending_deltas)
+            expected_replicas = self._last_replicas + pending_sum
             actual_drop = expected_replicas - current_replicas
-            if actual_drop > 0 and not any(d < 0 for d in self._pending_deltas):
+            if actual_drop > 0 and not any(d < 0 for _, d in self._pending_deltas):
                 # Replicas decreased without any pending scale-in → unplanned loss
                 self._unplanned_drop_boost = min(0.3, actual_drop * 0.1)
             else:
                 # Decay the boost
                 self._unplanned_drop_boost *= 0.7
+
+        # Age out realized pending deltas: if actual replicas changed in the
+        # direction of a pending delta, consider it landed. Keep entries for
+        # up to _pending_ttl cycles, then expire them.
+        if self._last_replicas is not None:
+            realized = current_replicas - self._last_replicas
+            remaining: List[tuple] = []
+            for issued_step, d in self._pending_deltas:
+                age = self._step - issued_step
+                if age > self._pending_ttl:
+                    continue  # expired — assume it landed or was lost
+                if realized != 0 and ((d > 0 and realized > 0) or (d < 0 and realized < 0)):
+                    # This delta likely just landed — consume it
+                    realized -= d
+                    continue
+                remaining.append((issued_step, d))
+            self._pending_deltas = remaining
+
         self._last_replicas = current_replicas
-        self._pending_deltas.clear()
+
+        # Signal staleness: detect and exclude metrics stuck at the same value
+        # (stale exporter cache, frozen counter). Must happen before pressure
+        # computation so stale CPU=0.3 doesn't pull infra_pressure negative.
+        metrics = self._filter_stale_signals(metrics)
 
         # Compute pressure signal (weighted normalized demand)
         pressure = self._compute_pressure(metrics)
 
         # Add unplanned-drop boost to pressure (compensates for lost capacity)
         pressure += self._unplanned_drop_boost
+
+        # Trend detection: if pressure is monotonically rising over N cycles,
+        # boost it slightly so gradual drift crosses the action threshold.
+        self._pressure_history.append(pressure)
+        if len(self._pressure_history) > self._trend_window:
+            self._pressure_history = self._pressure_history[-self._trend_window:]
+        trend_boost = self._compute_trend_boost()
+        pressure += trend_boost
 
         # === INTERPRET ===
         # Coherence: do the signals agree?
@@ -260,6 +306,15 @@ class Controller:
             * pressure
         )
 
+        # Pending capacity suppression: if there are unrealized scale-out
+        # deltas in flight, suppress additional scale-out to prevent the
+        # feedback delay loop from compounding overshoot.
+        pending_out = sum(d for _, d in self._pending_deltas if d > 0)
+        if pending_out > 0 and action_score > 0:
+            # Dampen action score proportionally to pending capacity
+            suppression = min(0.8, pending_out * 0.15)
+            action_score *= (1.0 - suppression)
+
         # Map to recommendation
         recommendation, replica_delta = self._score_to_action(
             action_score, current_replicas,
@@ -288,7 +343,7 @@ class Controller:
         # Track scaling actions for resistance calculation
         if abs(replica_delta) > 0:
             self._recent_scale_times.append(self._step)
-            self._pending_deltas.append(replica_delta)
+            self._pending_deltas.append((self._step, replica_delta))
         # Keep only last 20 scale events
         self._recent_scale_times = self._recent_scale_times[-20:]
 
@@ -311,26 +366,39 @@ class Controller:
 
         Pressure is positive when system needs more resources,
         negative when over-provisioned.
+
+        When a signal group has no data (all keys missing), its weight
+        is redistributed to groups that do have data. This prevents
+        partial observability (e.g., CPU metric gone) from suppressing
+        pressure to zero when remaining signals clearly show load.
         """
+        infra_has_data = any(k in metrics for k in INFRA_KEYS)
+        app_has_data = any(k in metrics for k in APP_KEYS)
+        business_has_data = any(k in metrics for k in BUSINESS_KEYS)
+
         infra_pressure = self._group_pressure(metrics, INFRA_KEYS)
         app_pressure = self._group_pressure(metrics, APP_KEYS)
         business_pressure = self._group_pressure(metrics, BUSINESS_KEYS)
 
-        total_weight = self.config.w_infra + self.config.w_app
-        if any(k in metrics for k in BUSINESS_KEYS):
-            total_weight += self.config.w_business
-            pressure = (
-                self.config.w_infra * infra_pressure
-                + self.config.w_app * app_pressure
-                + self.config.w_business * business_pressure
-            ) / total_weight
-        else:
-            pressure = (
-                self.config.w_infra * infra_pressure
-                + self.config.w_app * app_pressure
-            ) / total_weight
+        # Build weighted sum only from groups that have data,
+        # redistributing missing-group weight proportionally.
+        weighted_sum = 0.0
+        total_weight = 0.0
 
-        return pressure
+        if infra_has_data:
+            weighted_sum += self.config.w_infra * infra_pressure
+            total_weight += self.config.w_infra
+        if app_has_data:
+            weighted_sum += self.config.w_app * app_pressure
+            total_weight += self.config.w_app
+        if business_has_data:
+            weighted_sum += self.config.w_business * business_pressure
+            total_weight += self.config.w_business
+
+        if total_weight == 0:
+            return 0.0
+
+        return weighted_sum / total_weight
 
     @staticmethod
     def _group_pressure(
@@ -358,6 +426,85 @@ class Controller:
         if not values:
             return 0.0
         return sum(values) / len(values)
+
+    def _filter_stale_signals(self, metrics: Dict[str, float]) -> Dict[str, float]:
+        """Detect and exclude metrics whose value hasn't changed.
+
+        If a metric has reported the same value (within tolerance) for
+        _staleness_window consecutive cycles while other metrics are
+        changing, it's likely stale (frozen exporter, missed counter
+        reset). Exclude it from pressure computation to prevent a
+        stale low value from actively counteracting real pressure.
+        """
+        # Update history
+        for key, value in metrics.items():
+            if key not in self._metric_history:
+                self._metric_history[key] = []
+            self._metric_history[key].append(value)
+            if len(self._metric_history[key]) > self._staleness_window:
+                self._metric_history[key] = self._metric_history[key][-self._staleness_window:]
+
+        if self._step < self._staleness_window:
+            return metrics  # Not enough history yet
+
+        # Check each metric for staleness
+        stale_keys = set()
+        for key, history in self._metric_history.items():
+            if len(history) < self._staleness_window:
+                continue
+            # All values within 0.01 of each other = stuck
+            if max(history) - min(history) < 0.01:
+                stale_keys.add(key)
+
+        if not stale_keys:
+            return metrics
+
+        # Only exclude stale metrics if other metrics ARE changing
+        # (if everything is stable, nothing is "stale" — the system is just idle)
+        non_stale_changing = False
+        for key, history in self._metric_history.items():
+            if key not in stale_keys and len(history) >= self._staleness_window:
+                if max(history) - min(history) > 0.02:
+                    non_stale_changing = True
+                    break
+
+        if not non_stale_changing:
+            return metrics  # System is genuinely idle
+
+        return {k: v for k, v in metrics.items() if k not in stale_keys}
+
+    def _compute_trend_boost(self) -> float:
+        """Detect monotonically rising pressure and return a small boost.
+
+        If the last N pressure readings are mostly increasing (>70% of
+        consecutive pairs are non-decreasing), the system is under slow
+        but steady load growth. Return a boost proportional to the
+        total rise, capped at 0.1 to prevent runaway.
+
+        This catches the "frog in boiling water" pattern where demand
+        creeps up 0.003/cycle and never triggers a sharp threshold.
+        """
+        history = self._pressure_history
+        if len(history) < 10:
+            return 0.0
+
+        # Count increasing pairs
+        increases = sum(
+            1 for i in range(1, len(history))
+            if history[i] >= history[i - 1] - 0.005  # small tolerance for noise
+        )
+        ratio = increases / (len(history) - 1)
+
+        if ratio < 0.7:
+            return 0.0
+
+        # Total rise over the window
+        total_rise = history[-1] - history[0]
+        if total_rise <= 0:
+            return 0.0
+
+        # Boost proportional to rise, capped
+        return min(0.1, total_rise * 0.5)
 
     def _compute_resistance(
         self,
@@ -539,3 +686,5 @@ class Controller:
             self._pending_deltas = []
             self._last_replicas = None
             self._unplanned_drop_boost = 0.0
+            self._pressure_history = []
+            self._metric_history = {}
