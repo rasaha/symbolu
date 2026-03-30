@@ -18,6 +18,7 @@ from typing import Dict, List, Optional
 from symbolu.cloud_controller.controller import ActionResult
 from symbolu.cloud_controller.recommend.confidence import ConfidenceResult
 from symbolu.cloud_controller.recommend.safety import SafetyResult
+from symbolu.cloud_controller.action.k8s_actuator import ExecutionResult
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,9 @@ class Recommendation:
 
     # Webhook tracking
     webhooks_sent: int = 0
+
+    # Execution result (set after approval triggers actuator)
+    execution_result: Optional[ExecutionResult] = None
 
     @property
     def is_pending(self) -> bool:
