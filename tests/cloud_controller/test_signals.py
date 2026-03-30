@@ -620,3 +620,155 @@ class TestPipelineRunAsyncGuard:
                 pipeline.run_async(max_cycles=100)
         finally:
             pipeline.stop()
+
+
+# ============================================================
+# Bootstrap — Scaling Learning Phase Elimination
+# ============================================================
+
+class TestNormalizerBootstrap:
+    def test_bootstrap_fills_window(self):
+        """After bootstrap, z-score normalization should work immediately."""
+        normalizer = SignalNormalizer(config=NormalizerConfig(min_samples=10))
+        # Without bootstrap, first normalize returns 0.5 (no data)
+        result_cold = normalizer.normalize({"cpu": 0.9})
+        assert abs(result_cold["cpu"] - 0.5) < 0.01  # No data -> midpoint
+
+        # Now bootstrap with history
+        normalizer.reset()
+        normalizer.bootstrap({"cpu": [0.3] * 50})
+        # After bootstrap, a spike should normalize high
+        result_warm = normalizer.normalize({"cpu": 0.9})
+        assert result_warm["cpu"] > 0.7  # Spike relative to baseline
+
+    def test_bootstrap_multiple_metrics(self):
+        """Bootstrap should work for multiple metrics simultaneously."""
+        normalizer = SignalNormalizer(config=NormalizerConfig(min_samples=5))
+        normalizer.bootstrap({
+            "cpu": [0.3] * 30,
+            "latency_p99": [0.1] * 30,
+            "queue_depth": [50.0] * 30,
+        })
+        # All metrics should have populated windows
+        assert normalizer.get_window_stats("cpu") is not None
+        assert normalizer.get_window_stats("cpu")["count"] == 30
+        assert normalizer.get_window_stats("latency_p99") is not None
+        assert normalizer.get_window_stats("queue_depth") is not None
+
+    def test_bootstrap_empty_is_noop(self):
+        """Empty bootstrap should not crash."""
+        normalizer = SignalNormalizer()
+        normalizer.bootstrap({})
+        assert normalizer.get_window_stats("cpu") is None
+
+    def test_bootstrap_nan_filtered(self):
+        """NaN values in bootstrap data should be skipped."""
+        normalizer = SignalNormalizer()
+        normalizer.bootstrap({"cpu": [0.3, float('nan'), 0.4, 0.35]})
+        stats = normalizer.get_window_stats("cpu")
+        assert stats is not None
+        assert stats["count"] == 3  # NaN skipped
+
+
+def _make_mock_prom_with_history(
+    instant_metrics=None,
+    k8s_state=None,
+    range_data=None,
+):
+    """Create a PrometheusClient mock that supports both instant and range queries."""
+    if instant_metrics is None:
+        instant_metrics = {
+            "cpu": 0.78,
+            "memory": 0.42,
+            "latency_p99": 0.340,
+            "error_rate": 0.08,
+            "queue_depth": 247.0,
+        }
+    if k8s_state is None:
+        k8s_state = {
+            "pod_restarts": 0.0,
+            "current_replicas": 5.0,
+            "desired_replicas": 5.0,
+        }
+    if range_data is None:
+        # 100 samples of steady-state data
+        now = time.time()
+        range_data = {
+            "cpu": [(now - (100 - i) * 15, 0.35 + i * 0.001) for i in range(100)],
+            "memory": [(now - (100 - i) * 15, 0.40) for i in range(100)],
+            "latency_p99": [(now - (100 - i) * 15, 0.12) for i in range(100)],
+            "error_rate": [(now - (100 - i) * 15, 0.02) for i in range(100)],
+            "queue_depth": [(now - (100 - i) * 15, 55.0) for i in range(100)],
+        }
+
+    mock = MagicMock(spec=PrometheusClient)
+    mock.query_metrics.return_value = instant_metrics
+    mock.query_k8s_state.return_value = k8s_state
+
+    # range_query returns data based on the query name embedded in the call
+    def range_side_effect(query, start, end, step="15s"):
+        for name, series in range_data.items():
+            if name in query:
+                return series
+        return None
+    mock.range_query.side_effect = range_side_effect
+
+    return mock
+
+
+class TestPipelineBootstrap:
+    def test_bootstrap_succeeds_with_history(self):
+        """Pipeline bootstrap should succeed when Prometheus has history."""
+        pipeline = SignalPipeline(PipelineConfig(bootstrap_window_seconds=3600))
+        pipeline.prometheus = _make_mock_prom_with_history()
+
+        result = pipeline.bootstrap()
+        assert result is True
+        assert pipeline.controller.bootstrapped
+
+    def test_bootstrap_disabled_when_zero(self):
+        """bootstrap_window_seconds=0 should skip bootstrap."""
+        pipeline = SignalPipeline(PipelineConfig(bootstrap_window_seconds=0))
+        pipeline.prometheus = _make_mock_prom_with_history()
+
+        result = pipeline.bootstrap()
+        assert result is False
+
+    def test_bootstrap_fails_gracefully_no_data(self):
+        """When Prometheus has no history, bootstrap should return False."""
+        pipeline = SignalPipeline(PipelineConfig(bootstrap_window_seconds=3600))
+        mock = MagicMock(spec=PrometheusClient)
+        mock.range_query.return_value = None
+        pipeline.prometheus = mock
+
+        result = pipeline.bootstrap()
+        assert result is False
+
+    def test_bootstrap_then_poll_works(self):
+        """Full flow: bootstrap then poll should produce accurate results."""
+        pipeline = SignalPipeline(PipelineConfig(bootstrap_window_seconds=3600))
+        mock = _make_mock_prom_with_history()
+        pipeline.prometheus = mock
+
+        # Bootstrap
+        assert pipeline.bootstrap() is True
+
+        # Now poll — should work and controller should be past warmup
+        result = pipeline.poll_once()
+        assert result is not None
+        assert result.action.step > 100  # Past warmup
+
+    def test_bootstrap_seeds_normalizer(self):
+        """After bootstrap, normalizer should have populated windows."""
+        pipeline = SignalPipeline(PipelineConfig(
+            bootstrap_window_seconds=3600,
+            normalizer=NormalizerConfig(min_samples=10),
+        ))
+        pipeline.prometheus = _make_mock_prom_with_history()
+
+        pipeline.bootstrap()
+
+        # Normalizer should have data for CPU
+        stats = pipeline.normalizer.get_window_stats("cpu")
+        assert stats is not None
+        assert stats["count"] > 10

@@ -306,6 +306,38 @@ class SignalNormalizer:
             "count": len(values),
         }
 
+    def bootstrap(
+        self,
+        historical_metrics: Dict[str, list],
+        timestamps: Optional[list] = None,
+    ) -> None:
+        """Pre-seed rolling windows from historical data.
+
+        Fills the z-score windows so normalization is accurate from cycle 1
+        instead of returning 0.5 for the first `min_samples` cycles.
+
+        Args:
+            historical_metrics: Dict of metric_name -> list of raw values.
+                Each list is a time series from oldest to newest.
+            timestamps: Optional list of timestamps (same length as value lists).
+                If None, synthetic timestamps are generated at 15s intervals.
+        """
+        if not historical_metrics:
+            return
+
+        # Determine the longest series length for timestamp generation
+        max_len = max(len(v) for v in historical_metrics.values())
+        if timestamps is None:
+            now = time.time()
+            timestamps = [now - (max_len - i) * 15.0 for i in range(max_len)]
+
+        for name, values in historical_metrics.items():
+            for i, value in enumerate(values):
+                if not math.isfinite(value):
+                    continue
+                ts = timestamps[i] if i < len(timestamps) else time.time()
+                self._add_sample(name, ts, value)
+
     def reset(self, name: Optional[str] = None) -> None:
         """Reset rolling windows.
 

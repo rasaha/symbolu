@@ -53,6 +53,7 @@ class AdaptiveGain:
         self.G_min = G_min
         self.G_max = G_max
         self._prev_gain: Optional[float] = None
+        self._bootstrapped = False
 
     def compute(
         self,
@@ -74,8 +75,12 @@ class AdaptiveGain:
         """
         # f_phase: ramp from 0.5 to phase target over warmup
         # Matches minimal_controller.py line 282
+        # When bootstrapped, skip warmup ramp (system already characterized)
         phase_target = PHASE_MULTIPLIERS.get(phase, 0.8)
-        warmup_factor = min(1.0, 0.5 + 0.5 * step / max(warmup_steps, 1))
+        if self.bootstrapped:
+            warmup_factor = 1.0
+        else:
+            warmup_factor = min(1.0, 0.5 + 0.5 * step / max(warmup_steps, 1))
         f_phase = phase_target * warmup_factor
 
         # f_coh: sigmoid-based coherence factor centered at 0.5
@@ -118,5 +123,19 @@ class AdaptiveGain:
             rate_limited=rate_limited,
         )
 
+    def bootstrap(self) -> None:
+        """Mark gain as bootstrapped so warmup ramp starts at 100%.
+
+        When historical data has been replayed, the controller doesn't
+        need a conservative ramp — it already knows the system.
+        """
+        self._bootstrapped = True
+        self._prev_gain = None
+
+    @property
+    def bootstrapped(self) -> bool:
+        return getattr(self, '_bootstrapped', False)
+
     def reset(self) -> None:
         self._prev_gain = None
+        self._bootstrapped = False

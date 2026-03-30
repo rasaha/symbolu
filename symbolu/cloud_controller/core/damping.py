@@ -140,6 +140,38 @@ class Damping:
             rate_limited=rate_limited,
         )
 
+    def bootstrap(self, variance_history: list) -> None:
+        """Pre-seed variance baselines from historical data.
+
+        Replays historical variance values to establish V_ema and V_baseline
+        so damping responds accurately from cycle 1 (no blind warmup needed).
+
+        Args:
+            variance_history: List of float variance values from historical metrics.
+        """
+        if not variance_history:
+            return
+
+        # Initialize from first sample
+        self._V_baseline = variance_history[0]
+        self._V_ema = variance_history[0]
+        self._baseline_initialized = True
+
+        # Replay the rest through the EMA logic (without rate-limiting d_t)
+        for v in variance_history[1:]:
+            v = max(0.0, v) if math.isfinite(v) else 0.0
+            # Asymmetric EMA
+            if v > self._V_ema:
+                self._V_ema = 0.90 * self._V_ema + 0.10 * v
+            else:
+                self._V_ema = 0.80 * self._V_ema + 0.20 * v
+            # Slow baseline
+            self._V_baseline = 0.999 * self._V_baseline + 0.001 * v
+
+        # Skip remaining warmup — baselines are now calibrated
+        self._warmup_remaining = 0
+        self._prev_d_t = None  # Let first real cycle establish d_t without rate limit
+
     def reset(self, warmup_steps: int = 0) -> None:
         self._V_ema = 0.0
         self._U_ema = 0.0

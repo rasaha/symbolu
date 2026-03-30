@@ -433,6 +433,70 @@ class Controller:
         else:
             return "no_action", 0
 
+    def bootstrap(self, historical_snapshots: List[Dict[str, float]]) -> None:
+        """Pre-learn baselines from historical metrics so the controller acts from cycle 1.
+
+        Replays historical metric snapshots through all internal modules:
+        - Identity EMA learns what "normal" looks like
+        - Damping calibrates its variance baseline
+        - Adaptive gain skips the warmup ramp
+        - Plasticity gate's double-smoothed resistance stabilizes
+
+        This eliminates the learning phase — the controller is ready to make
+        coherence-gated decisions immediately, like Cast AI's fixed thresholds
+        but with the full adaptive control equation.
+
+        Args:
+            historical_snapshots: List of metric dicts (oldest first), each with
+                keys like "cpu", "memory", "latency_p99", etc. Values in [0, 1].
+                Typically 100-500 snapshots covering 30min-2hr of history.
+        """
+        if not historical_snapshots:
+            return
+
+        with self._lock:
+            self._bootstrap_inner(historical_snapshots)
+
+    def _bootstrap_inner(self, historical_snapshots: List[Dict[str, float]]) -> None:
+        """Bootstrap logic, called under lock."""
+        # 1. Bootstrap Identity EMA — replay vectors to learn baseline
+        identity_vectors = []
+        for snap in historical_snapshots:
+            if snap:
+                vec = self._metrics_to_identity_vector(snap)
+                identity_vectors.append(vec)
+        self.identity.bootstrap(identity_vectors)
+
+        # 2. Bootstrap Damping — compute variance history from snapshots
+        variance_history = []
+        for snap in historical_snapshots:
+            values = list(snap.values())
+            if len(values) >= 2:
+                variance_history.append(float(np.var(values)))
+            elif values:
+                variance_history.append(0.0)
+        self.damping.bootstrap(variance_history)
+
+        # 3. Bootstrap Adaptive Gain — skip warmup ramp
+        self.adaptive_gain.bootstrap()
+
+        # 4. Warm up plasticity gate's double-smoothed resistance by replaying
+        #    a subset of snapshots through the resistance computation
+        for snap in historical_snapshots[-50:]:
+            snap_clamped = {k: max(0.0, min(1.0, v)) for k, v in snap.items()}
+            resistance = self._compute_resistance(
+                snap_clamped, deploy_active=False, recent_pod_restarts=0,
+            )
+            self.plasticity_gate.compute(resistance=resistance, misalignment=0.1)
+
+        # 5. Set step counter so warmup_steps are considered elapsed
+        self._step = max(self._step, self.config.warmup_steps)
+
+    @property
+    def bootstrapped(self) -> bool:
+        """Whether the controller has been bootstrapped with historical data."""
+        return self.adaptive_gain.bootstrapped and self.identity.bootstrapped
+
     def reset(self) -> None:
         """Reset all internal state. Thread-safe."""
         with self._lock:
