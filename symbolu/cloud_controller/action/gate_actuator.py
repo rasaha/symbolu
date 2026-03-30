@@ -101,6 +101,9 @@ class GateActuator:
         self._lock = threading.Lock()
         self._history: List[GateResult] = []
         self._max_history = 1000
+        # Admission webhook policy store — persists decisions for the
+        # webhook server to read. Key: "namespace/application"
+        self._admission_policies: Dict[str, GateResult] = {}
 
     def execute(
         self,
@@ -286,16 +289,13 @@ class GateActuator:
         timestamp: float,
         recommendation_id: str,
     ) -> GateResult:
-        """Record admission policy decision.
+        """Record admission policy decision and persist for webhook server.
 
-        The actual admission webhook server reads this state to make
-        allow/deny decisions. This method just updates the policy.
+        The admission webhook server calls get_admission_policy() to read
+        the current policy decision for a given application. This method
+        updates the persisted policy state.
         """
-        logger.info(
-            "Admission policy set: %s for %s/%s (rec=%s)",
-            action.value, namespace, application, recommendation_id,
-        )
-        return GateResult(
+        result = GateResult(
             success=True,
             mode="admission_webhook",
             action=action.value,
@@ -304,6 +304,41 @@ class GateActuator:
             timestamp=timestamp,
             recommendation_id=recommendation_id,
         )
+
+        # Persist the policy for the webhook server to read
+        key = f"{namespace}/{application}"
+        with self._lock:
+            self._admission_policies[key] = result
+
+        logger.info(
+            "Admission policy set: %s for %s (rec=%s)",
+            action.value, key, recommendation_id,
+        )
+        return result
+
+    def get_admission_policy(
+        self, application: str, namespace: str,
+    ) -> Optional[GateResult]:
+        """Get the current admission policy for an application.
+
+        Called by the admission webhook server to decide allow/deny.
+
+        Args:
+            application: K8s deployment/application name.
+            namespace: K8s namespace.
+
+        Returns:
+            The most recent GateResult, or None if no policy is set.
+        """
+        key = f"{namespace}/{application}"
+        with self._lock:
+            return self._admission_policies.get(key)
+
+    @property
+    def admission_policies(self) -> Dict[str, GateResult]:
+        """All current admission policies (key: "namespace/application")."""
+        with self._lock:
+            return dict(self._admission_policies)
 
     def _record(self, result: GateResult) -> None:
         """Record gate result for audit trail."""
@@ -318,6 +353,7 @@ class GateActuator:
             return list(self._history)
 
     def reset(self) -> None:
-        """Clear history."""
+        """Clear history and admission policies."""
         with self._lock:
             self._history.clear()
+            self._admission_policies.clear()
