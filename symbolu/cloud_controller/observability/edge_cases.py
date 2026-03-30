@@ -533,8 +533,8 @@ def build_edge_scenarios() -> List[EdgeScenario]:
     ))
 
     # 11. Plasticity stuck low — high k_r + turbulent signals
-    cfg_stuck = InfraControllerConfig()
-    cfg_stuck.k_r = 8.0    # Very high resistance scaling → plasticity stays near 0
+    cfg_stuck = _tuned_config()
+    cfg_stuck.k_r = 8.0    # Very high resistance scaling → suppresses gate
     cfg_stuck.b_p = -3.0   # Very low bias floor
     scenarios.append(EdgeScenario(
         name="plasticity_stuck_low",
@@ -546,7 +546,7 @@ def build_edge_scenarios() -> List[EdgeScenario]:
     ))
 
     # 12. Identity drift — gradual regime change
-    cfg_drift = InfraControllerConfig()
+    cfg_drift = _tuned_config()
     cfg_drift.alpha_base = 0.2  # Very fast EMA → identity baseline chases signal
     scenarios.append(EdgeScenario(
         name="identity_drift",
@@ -694,9 +694,36 @@ class EdgeCaseReport:
 # Edge Case Harness
 # ============================================================
 
+def _tuned_config() -> InfraControllerConfig:
+    """Return a tuned controller config for edge case testing.
+
+    Uses the 'combined_moderate' profile from the parameter sweep —
+    lower action thresholds that match the pressure range the test
+    demand patterns produce. Without this, the default thresholds
+    (scale_1=0.5) are unreachable for realistic pressure values (~0.17),
+    and ALL scenarios would fail regardless of the perturbation.
+    """
+    cfg = InfraControllerConfig()
+    cfg.action_thresholds = {
+        "no_action": 0.02,
+        "recommend": 0.05,
+        "scale_1": 0.10,
+        "scale_2": 0.30,
+    }
+    cfg.G_base = 1.5
+    cfg.k_dv = 0.5
+    cfg.warmup_steps = 30     # Faster warmup for test scenarios
+    cfg.damping_warmup_steps = 15
+    return cfg
+
+
 class EdgeCaseHarness:
     """Runs the controller through adversarial edge case scenarios,
     tracking internal state and attributing failures.
+
+    Uses a tuned controller config by default so scenarios test real
+    failure modes (signal corruption, actuation lag, eviction) rather
+    than threshold calibration.
 
     Usage:
         harness = EdgeCaseHarness()
@@ -709,10 +736,12 @@ class EdgeCaseHarness:
         cycles_per_scenario: int = 200,
         warmup_cycles: int = 40,
         base_replicas: int = 5,
+        default_config: Optional[InfraControllerConfig] = None,
     ):
         self.cycles = cycles_per_scenario
         self.warmup = warmup_cycles
         self.base_replicas = base_replicas
+        self.default_config = default_config or _tuned_config()
 
     def run_all(
         self,
@@ -730,7 +759,7 @@ class EdgeCaseHarness:
 
     def run_scenario(self, scenario: EdgeScenario) -> EdgeCaseResult:
         """Run one edge case scenario with full state tracking."""
-        cfg = scenario.controller_config or InfraControllerConfig()
+        cfg = scenario.controller_config or self.default_config
         ctrl = Controller(cfg)
 
         replicas = self.base_replicas

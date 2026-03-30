@@ -128,6 +128,13 @@ class Controller:
         self._recent_scale_times: List[int] = []
         self._lock = threading.Lock()
 
+        # Pending replica tracking — detect actuation lag
+        self._pending_deltas: List[int] = []  # deltas issued but not yet realized
+        self._last_replicas: Optional[int] = None  # previous cycle's replica count
+
+        # Replica-drop detection — detect unplanned loss (spot eviction, OOM)
+        self._unplanned_drop_boost: float = 0.0  # pressure boost after detected drop
+
     def step(
         self,
         metrics: Dict[str, float],
@@ -172,8 +179,26 @@ class Controller:
         self._step += 1
 
         # === SENSE ===
+        # Detect unplanned replica loss (spot eviction, OOM kill, node failure)
+        # If replicas dropped without the controller issuing a scale-in,
+        # something external killed pods — boost pressure to compensate.
+        if self._last_replicas is not None:
+            expected_replicas = self._last_replicas + sum(self._pending_deltas)
+            actual_drop = expected_replicas - current_replicas
+            if actual_drop > 0 and not any(d < 0 for d in self._pending_deltas):
+                # Replicas decreased without any pending scale-in → unplanned loss
+                self._unplanned_drop_boost = min(0.3, actual_drop * 0.1)
+            else:
+                # Decay the boost
+                self._unplanned_drop_boost *= 0.7
+        self._last_replicas = current_replicas
+        self._pending_deltas.clear()
+
         # Compute pressure signal (weighted normalized demand)
         pressure = self._compute_pressure(metrics)
+
+        # Add unplanned-drop boost to pressure (compensates for lost capacity)
+        pressure += self._unplanned_drop_boost
 
         # === INTERPRET ===
         # Coherence: do the signals agree?
@@ -263,6 +288,7 @@ class Controller:
         # Track scaling actions for resistance calculation
         if abs(replica_delta) > 0:
             self._recent_scale_times.append(self._step)
+            self._pending_deltas.append(replica_delta)
         # Keep only last 20 scale events
         self._recent_scale_times = self._recent_scale_times[-20:]
 
@@ -510,3 +536,6 @@ class Controller:
             )
             self._step = 0
             self._recent_scale_times = []
+            self._pending_deltas = []
+            self._last_replicas = None
+            self._unplanned_drop_boost = 0.0

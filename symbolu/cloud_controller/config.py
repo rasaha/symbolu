@@ -6,7 +6,7 @@ Gain defaults reduced for conservative cloud scaling.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 
 # Canonical metric group definitions — shared between controller, coherence,
@@ -69,3 +69,66 @@ class InfraControllerConfig:
     max_scale_out_ratio: float = 0.5   # Max +50% replicas per action
     max_scale_in_ratio: float = 0.25   # Max -25% replicas per action
     min_replicas: int = 1              # Never scale below this
+
+    def validate(self) -> List[str]:
+        """Check parameter ranges and return warnings for risky values.
+
+        Returns:
+            List of warning strings. Empty if all parameters are within
+            safe ranges.
+        """
+        warnings = []
+
+        # Plasticity gate — extreme k_r can paralyze the controller
+        if self.k_r > 5.0:
+            warnings.append(
+                f"k_r={self.k_r} is very high (>5.0); plasticity gate may "
+                f"become insensitive to resistance changes"
+            )
+        if self.b_p < -2.0:
+            warnings.append(
+                f"b_p={self.b_p} is very low (<-2.0); sigmoid floor drops "
+                f"below 0.12, controller may be overly suppressed"
+            )
+
+        # Identity — fast EMA causes baseline to chase signal
+        if self.alpha_base > 0.05:
+            warnings.append(
+                f"alpha_base={self.alpha_base} is very high (>0.05); identity "
+                f"baseline will chase demand and suppress deviation signal"
+            )
+
+        # Damping — high k_dv over-suppresses action in noisy environments
+        if self.k_dv > 3.0:
+            warnings.append(
+                f"k_dv={self.k_dv} is very high (>3.0); damping will "
+                f"heavily suppress action during any metric variance"
+            )
+
+        # Gain — zero G_base means no action ever
+        if self.G_base <= 0.0:
+            warnings.append(
+                f"G_base={self.G_base} is zero or negative; controller "
+                f"will never produce a scaling action"
+            )
+        if self.G_max < self.G_base:
+            warnings.append(
+                f"G_max={self.G_max} < G_base={self.G_base}; gain will "
+                f"be clamped below its base value"
+            )
+
+        # Signal weights — should sum to ~1.0
+        total_w = self.w_infra + self.w_app + self.w_business
+        if total_w < 0.5 or total_w > 2.0:
+            warnings.append(
+                f"Signal weights sum to {total_w:.2f}; expected ~1.0"
+            )
+
+        # Warmup — too short means controller acts on uncalibrated data
+        if self.warmup_steps < 10:
+            warnings.append(
+                f"warmup_steps={self.warmup_steps} is very short (<10); "
+                f"controller will act before EMAs stabilize"
+            )
+
+        return warnings

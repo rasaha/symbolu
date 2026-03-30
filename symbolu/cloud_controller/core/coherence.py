@@ -16,7 +16,7 @@ Three signal groups:
 
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from symbolu.cloud_controller.config import INFRA_KEYS, APP_KEYS, BUSINESS_KEYS
 
@@ -38,6 +38,10 @@ class CoherenceModel:
     V1: Rule-based agreement scoring.
     A signal is "elevated" if it's above a threshold (default 0.5 on normalized [0,1]).
     Coherence is high when elevated signals agree across groups.
+
+    V2: Hysteresis band prevents oscillation when coherence hovers near
+    a decision threshold. Uses a small dead-band around the previous value
+    so minor fluctuations don't cause the output to flicker.
     """
 
     def __init__(
@@ -46,11 +50,14 @@ class CoherenceModel:
         w_app: float = 0.4,
         w_business: float = 0.2,
         elevation_threshold: float = 0.5,
+        hysteresis_band: float = 0.05,
     ):
         self.w_infra = w_infra
         self.w_app = w_app
         self.w_business = w_business
         self.elevation_threshold = elevation_threshold
+        self.hysteresis_band = hysteresis_band
+        self._prev_coherence: Optional[float] = None
 
     def compute(
         self,
@@ -104,6 +111,14 @@ class CoherenceModel:
 
         # Blend within-group (70%) and cross-group (30%) for final coherence
         coherence = 0.7 * within_coherence + 0.3 * c_cross
+
+        # Hysteresis: if coherence is within the dead-band of the previous
+        # value, hold the previous value to prevent flicker.
+        if self._prev_coherence is not None and self.hysteresis_band > 0:
+            delta = coherence - self._prev_coherence
+            if abs(delta) < self.hysteresis_band:
+                coherence = self._prev_coherence
+        self._prev_coherence = coherence
 
         # Count elevated signals
         elevated = sum(
