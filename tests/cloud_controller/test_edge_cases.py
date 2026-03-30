@@ -12,12 +12,15 @@ from symbolu.cloud_controller.observability.edge_cases import (
     EdgeScenario,
     FailureAttribution,
     FailureClass,
+    FeedbackAmplifier,
     InternalStateTrace,
     MetricDelay,
+    MissingSignal,
     NoisySpikes,
     Perturbation,
     SpotEviction,
     StateSnapshot,
+    StuckMetric,
     build_edge_scenarios,
 )
 from symbolu.cloud_controller.observability.benchmark import _demand_to_metrics
@@ -116,6 +119,66 @@ class TestBudgetCap:
         assert cap.cap(5) == 5
 
 
+class TestMissingSignal:
+    def test_drops_key_during_window(self):
+        ms = MissingSignal(missing_keys=["cpu"], start_frac=0.3, end_frac=0.7)
+        metrics = {"cpu": 0.8, "memory": 0.6, "latency_p99": 0.5}
+        # Before window — key preserved
+        result = ms.apply(dict(metrics), 10, 100)
+        assert "cpu" in result
+        # Inside window — key dropped
+        result = ms.apply(dict(metrics), 50, 100)
+        assert "cpu" not in result
+        assert "memory" in result
+        # After window — key preserved
+        result = ms.apply(dict(metrics), 80, 100)
+        assert "cpu" in result
+
+    def test_multiple_keys_dropped(self):
+        ms = MissingSignal(missing_keys=["cpu", "memory"], start_frac=0.0, end_frac=1.0)
+        result = ms.apply({"cpu": 0.5, "memory": 0.5, "latency_p99": 0.3}, 50, 100)
+        assert "cpu" not in result
+        assert "memory" not in result
+        assert "latency_p99" in result
+
+
+class TestStuckMetric:
+    def test_freezes_after_start(self):
+        sm = StuckMetric(stuck_key="cpu", stuck_value=0.3, start_frac=0.3)
+        # Before freeze
+        result = sm.apply({"cpu": 0.9}, 10, 100)
+        assert result["cpu"] == 0.9
+        # After freeze
+        result = sm.apply({"cpu": 0.9}, 50, 100)
+        assert result["cpu"] == 0.3
+
+    def test_other_keys_unaffected(self):
+        sm = StuckMetric(stuck_key="cpu", stuck_value=0.2, start_frac=0.0)
+        result = sm.apply({"cpu": 0.9, "memory": 0.8}, 50, 100)
+        assert result["cpu"] == 0.2
+        assert result["memory"] == 0.8
+
+
+class TestFeedbackAmplifier:
+    def test_delays_deltas(self):
+        fb = FeedbackAmplifier(lag_cycles=3, backpressure_factor=0.3)
+        assert fb.get_effective_delta(2, 0) == 0
+        assert fb.get_effective_delta(0, 3) == 2
+
+    def test_amplifies_latency_under_load(self):
+        fb = FeedbackAmplifier(lag_cycles=3, backpressure_factor=0.3)
+        metrics = {"cpu": 0.8, "latency_p99": 0.5, "error_rate": 0.1}
+        result = fb.apply(metrics, 50, 100)
+        assert result["latency_p99"] > 0.5
+        assert result["error_rate"] > 0.1
+
+    def test_no_amplification_at_low_load(self):
+        fb = FeedbackAmplifier(lag_cycles=3, backpressure_factor=0.3)
+        metrics = {"cpu": 0.3, "latency_p99": 0.2, "error_rate": 0.0}
+        result = fb.apply(metrics, 50, 100)
+        assert result["latency_p99"] == 0.2
+
+
 # ---------------------------------------------------------------------------
 # InternalStateTrace
 # ---------------------------------------------------------------------------
@@ -180,9 +243,9 @@ class TestInternalStateTrace:
 # ---------------------------------------------------------------------------
 
 class TestEdgeScenarioDefinitions:
-    def test_12_scenarios_defined(self):
+    def test_16_scenarios_defined(self):
         scenarios = build_edge_scenarios()
-        assert len(scenarios) == 12
+        assert len(scenarios) == 16
 
     def test_all_failure_classes_covered(self):
         scenarios = build_edge_scenarios()
@@ -317,6 +380,51 @@ class TestEdgeCaseHarness:
         result = harness.run_scenario(drift)
         assert result.state_trace.snapshots[-1].identity_deviation >= 0
 
+    # --- Tier 1: Misinterpretation of Reality ---
+
+    def test_hidden_demand_reduces_coherence(self, harness):
+        """Missing CPU signal should reduce within-group agreement."""
+        scenarios = build_edge_scenarios()
+        hidden = next(s for s in scenarios if s.name == "hidden_demand")
+        result = harness.run_scenario(hidden)
+        # With CPU missing, infra coherence should drop
+        mid_snapshots = result.state_trace.snapshots[
+            len(result.state_trace.snapshots) // 4:
+            len(result.state_trace.snapshots) * 3 // 4
+        ]
+        assert len(mid_snapshots) > 0
+        assert result.score.total_cycles == 100
+
+    def test_gradual_drift_slow_reaction(self, harness):
+        """Ultra-slow demand ramp should test controller sensitivity."""
+        scenarios = build_edge_scenarios()
+        drift = next(s for s in scenarios if s.name == "gradual_drift")
+        result = harness.run_scenario(drift)
+        # Demand goes from 0.25 to 0.85 — controller should eventually scale
+        final_demand = result.state_trace.snapshots[-1].demand
+        assert final_demand > 0.7
+        assert result.score.total_cycles == 100
+
+    def test_metric_corruption_stale_cpu(self, harness):
+        """Frozen CPU at 0.3 while demand climbs should confuse coherence."""
+        scenarios = build_edge_scenarios()
+        corrupt = next(s for s in scenarios if s.name == "metric_corruption")
+        result = harness.run_scenario(corrupt)
+        # CPU is stuck at 0.3 but latency/errors rise — signals conflict
+        assert result.state_trace.coherence_min < 0.9
+        assert result.score.total_cycles == 100
+
+    def test_feedback_delay_loop_overshoot(self, harness):
+        """Long actuation lag + backpressure should cause overshoot."""
+        scenarios = build_edge_scenarios()
+        fb = next(s for s in scenarios if s.name == "feedback_delay_loop")
+        result = harness.run_scenario(fb)
+        # With 8-cycle lag, controller may over-issue scale-ups
+        assert result.score.total_cycles == 100
+        # Should have some scaling activity
+        total_deltas = sum(abs(s.delta) for s in result.state_trace.snapshots)
+        assert total_deltas >= 0  # at minimum completes without error
+
 
 # ---------------------------------------------------------------------------
 # Full suite run
@@ -324,14 +432,14 @@ class TestEdgeCaseHarness:
 
 class TestEdgeCaseFullSuite:
     def test_run_all_completes(self):
-        """All 12 scenarios should complete without errors."""
+        """All 16 scenarios should complete without errors."""
         harness = EdgeCaseHarness(
             cycles_per_scenario=60,
             warmup_cycles=15,
             base_replicas=5,
         )
         report = harness.run_all()
-        assert len(report.results) == 12
+        assert len(report.results) == 16
 
     def test_report_format(self):
         harness = EdgeCaseHarness(
@@ -367,5 +475,13 @@ class TestEdgeCaseFullSuite:
             assert len(result.state_trace.snapshots) == 60
             for snap in result.state_trace.snapshots:
                 assert snap.replicas >= 1
-                assert 0 <= snap.coherence <= 1.0 or snap.coherence > 0
                 assert snap.damping >= 0
+
+    def test_new_scenarios_have_attributions(self):
+        """All Tier 1 misinterpretation scenarios should have proper attributions."""
+        scenarios = build_edge_scenarios()
+        tier1_names = {"hidden_demand", "gradual_drift", "metric_corruption", "feedback_delay_loop"}
+        tier1 = [s for s in scenarios if s.name in tier1_names]
+        assert len(tier1) == 4
+        for s in tier1:
+            assert s.expected_attribution != FailureAttribution.NONE

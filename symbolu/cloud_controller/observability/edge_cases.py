@@ -1,6 +1,6 @@
 """Edge Case Harness — systematic failure surface discovery for the scaling controller.
 
-Covers 5 failure classes with 12 high-impact scenarios:
+Covers 5 failure classes with 16 adversarial scenarios:
 
   A. Signal Path Failures (L0)
      1. delayed_metrics       — 60s metric lag
@@ -23,6 +23,12 @@ Covers 5 failure classes with 12 high-impact scenarios:
      10. coherence_oscillation  — coherence flickers near threshold
      11. plasticity_stuck_low   — gate stays closed
      12. identity_drift         — baseline drifts incorrectly
+
+  F. Misinterpretation of Reality (Tier 1)
+     13. hidden_demand          — CPU metric missing, partial observability
+     14. gradual_drift          — ultra-slow demand ramp, never a sharp threshold
+     15. metric_corruption      — CPU frozen at stale value
+     16. feedback_delay_loop    — actuation lag + backpressure causes over-scaling
 
 Each scenario tracks internal controller state (C_t, P_t, D_t, A_t) and
 classifies failures with root cause attribution.
@@ -67,6 +73,8 @@ class FailureAttribution(Enum):
     SIGNAL_DELAY = "signal_delay"
     SIGNAL_NOISE = "signal_noise"
     SIGNAL_CONFLICT = "signal_conflict"
+    SIGNAL_MISSING = "signal_missing"
+    SIGNAL_CORRUPTION = "signal_corruption"
     ACTUATION_LAG = "actuation_lag"
     CAPACITY_EXHAUSTED = "capacity_exhausted"
     DEMAND_SHOCK = "demand_shock"
@@ -77,6 +85,8 @@ class FailureAttribution(Enum):
     PLASTICITY_SUPPRESSION = "plasticity_suppression"
     IDENTITY_DRIFT = "identity_drift"
     CONTROLLER_SUPPRESSION = "controller_suppression"
+    FEEDBACK_LOOP = "feedback_loop"
+    GRADUAL_DRIFT = "gradual_drift"
     NONE = "none"
 
 
@@ -348,6 +358,85 @@ class BudgetCap(Perturbation):
         return min(replicas, self.max_replicas)
 
 
+class MissingSignal(Perturbation):
+    """Drop one or more metric keys entirely — simulates partial observability.
+
+    Real-world cause: exporter crash, metric rename, network partition to
+    a specific scrape target. The controller sees a subset of signals and
+    must decide whether to act on incomplete information.
+    """
+
+    def __init__(self, missing_keys: List[str], start_frac: float = 0.2, end_frac: float = 0.8):
+        self.missing_keys = missing_keys
+        self.start_frac = start_frac
+        self.end_frac = end_frac
+
+    def apply(self, metrics, cycle, total):
+        result = dict(metrics)
+        frac = cycle / max(1, total - 1)
+        if self.start_frac <= frac <= self.end_frac:
+            for key in self.missing_keys:
+                result.pop(key, None)
+        return result
+
+
+class StuckMetric(Perturbation):
+    """Freeze a metric at a stale value — simulates metric corruption.
+
+    Real-world cause: counter reset missed, exporter caching stale value,
+    Prometheus staleness not triggering. The controller sees a plausible
+    but wrong value and may base decisions on it.
+    """
+
+    def __init__(self, stuck_key: str, stuck_value: float, start_frac: float = 0.3):
+        self.stuck_key = stuck_key
+        self.stuck_value = stuck_value
+        self.start_frac = start_frac
+
+    def apply(self, metrics, cycle, total):
+        result = dict(metrics)
+        frac = cycle / max(1, total - 1)
+        if frac >= self.start_frac and self.stuck_key in result:
+            result[self.stuck_key] = self.stuck_value
+        return result
+
+
+class FeedbackAmplifier(Perturbation):
+    """Simulate feedback delay loop — scaling actions take effect late,
+    causing the controller to issue duplicate scale-ups.
+
+    Combines actuation delay with a demand pattern that reacts to replica
+    count: when replicas are insufficient, demand metrics stay elevated
+    (backpressure), causing the controller to keep scaling even after
+    sufficient capacity was already requested.
+    """
+
+    def __init__(self, lag_cycles: int = 8, backpressure_factor: float = 0.3):
+        self.lag_cycles = lag_cycles
+        self.backpressure_factor = backpressure_factor
+        self._actuation = ActuationDelay(lag_cycles=lag_cycles)
+
+    def get_effective_delta(self, raw_delta: int, cycle: int) -> int:
+        return self._actuation.get_effective_delta(raw_delta, cycle)
+
+    def apply(self, metrics, cycle, total):
+        """Add backpressure: if demand is high, latency stays elevated
+        regardless of what the controller has decided (because capacity
+        hasn't arrived yet)."""
+        result = dict(metrics)
+        # Amplify latency by backpressure factor during high demand
+        if result.get("cpu", 0) > 0.6:
+            result["latency_p99"] = min(
+                1.0,
+                result.get("latency_p99", 0.5) + self.backpressure_factor,
+            )
+            result["error_rate"] = min(
+                1.0,
+                result.get("error_rate", 0.0) + self.backpressure_factor * 0.5,
+            )
+        return result
+
+
 # ============================================================
 # Edge Case Scenario Definitions
 # ============================================================
@@ -400,6 +489,49 @@ def _demand_ramp_sustained(cycle: int, total: int) -> float:
     elif frac < 0.5:
         # Ramp from 0.3 to 0.8
         return 0.3 + 0.5 * ((frac - 0.3) / 0.2)
+    else:
+        return 0.8
+
+
+def _demand_gradual_drift(cycle: int, total: int) -> float:
+    """Ultra-slow linear ramp — 0.25 to 0.85 over the full run.
+
+    The rate of change per cycle is so small (~0.003) that it never
+    crosses a sharp threshold. Tests whether the controller detects
+    slow drift or boils like a frog.
+    """
+    frac = cycle / max(1, total - 1)
+    return 0.25 + 0.6 * frac
+
+
+def _demand_feedback_surge(cycle: int, total: int) -> float:
+    """Demand pattern for feedback delay loop scenario.
+
+    Stable baseline, then a sharp rise that stays elevated — the
+    controller should scale once, but with long actuation delay it
+    may over-issue scale-ups before previous ones land.
+    """
+    frac = cycle / max(1, total - 1)
+    if frac < 0.2:
+        return 0.3
+    elif frac < 0.3:
+        # Sharp ramp
+        return 0.3 + 0.6 * ((frac - 0.2) / 0.1)
+    else:
+        return 0.9  # Stays high until capacity catches up
+
+
+def _demand_hidden_pressure(cycle: int, total: int) -> float:
+    """Demand rises while key metric (CPU) is invisible.
+
+    Latency and queue depth climb but CPU signal is missing — the
+    controller must decide without its primary infrastructure signal.
+    """
+    frac = cycle / max(1, total - 1)
+    if frac < 0.25:
+        return 0.3
+    elif frac < 0.5:
+        return 0.3 + 0.5 * ((frac - 0.25) / 0.25)
     else:
         return 0.8
 
@@ -555,6 +687,49 @@ def build_edge_scenarios() -> List[EdgeScenario]:
         demand_fn=_demand_ramp_sustained,
         controller_config=cfg_drift,
         expected_attribution=FailureAttribution.IDENTITY_DRIFT,
+    ))
+
+    # --- F. Misinterpretation of Reality (Tier 1) ---
+
+    # 13. Hidden demand / missing signal — CPU metric disappears
+    scenarios.append(EdgeScenario(
+        name="hidden_demand",
+        failure_class=FailureClass.SIGNAL_PATH,
+        description="CPU metric missing — controller sees latency/errors but not root cause",
+        demand_fn=_demand_hidden_pressure,
+        perturbations=[MissingSignal(missing_keys=["cpu"], start_frac=0.2, end_frac=0.8)],
+        expected_attribution=FailureAttribution.SIGNAL_MISSING,
+    ))
+
+    # 14. Gradual drift — demand creeps up below detection threshold
+    scenarios.append(EdgeScenario(
+        name="gradual_drift",
+        failure_class=FailureClass.SIGNAL_PATH,
+        description="Ultra-slow demand ramp — 0.003/cycle, never a sharp threshold cross",
+        demand_fn=_demand_gradual_drift,
+        expected_attribution=FailureAttribution.GRADUAL_DRIFT,
+    ))
+
+    # 15. Metric corruption — CPU frozen at stale 0.3 while real demand is 0.9
+    scenarios.append(EdgeScenario(
+        name="metric_corruption",
+        failure_class=FailureClass.SIGNAL_PATH,
+        description="CPU metric frozen at 0.3 while real demand climbs — stale exporter cache",
+        demand_fn=_demand_ramp_sustained,
+        perturbations=[StuckMetric(stuck_key="cpu", stuck_value=0.3, start_frac=0.3)],
+        expected_attribution=FailureAttribution.SIGNAL_CORRUPTION,
+    ))
+
+    # 16. Feedback delay loop — long actuation lag causes over-scaling
+    fb = FeedbackAmplifier(lag_cycles=8, backpressure_factor=0.3)
+    scenarios.append(EdgeScenario(
+        name="feedback_delay_loop",
+        failure_class=FailureClass.ACTUATION,
+        description="8-cycle actuation lag + backpressure amplification — controller over-issues",
+        demand_fn=_demand_feedback_surge,
+        perturbations=[fb],
+        actuation_delay=fb._actuation,  # share the same delay queue
+        expected_attribution=FailureAttribution.FEEDBACK_LOOP,
     ))
 
     return scenarios
