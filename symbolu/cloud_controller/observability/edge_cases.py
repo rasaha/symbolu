@@ -1116,8 +1116,23 @@ class EdgeCaseHarness:
 
         # Run scenario
         for cycle_idx, demand in enumerate(demand_trace):
-            # Generate base metrics from demand
-            metrics = _demand_to_metrics(demand)
+            # Generate base metrics from demand, adjusted for provisioning.
+            # In reality, adding replicas reduces per-replica load. Without
+            # this feedback, the controller sees perpetually high metrics
+            # even at 260 replicas (for demand that needs 8), causing
+            # infinite scale-out. The adjustment only kicks in when grossly
+            # over-provisioned (>3x optimal) to avoid destabilizing scenarios
+            # that oscillate near optimal. Blends smoothly from 3x to 6x.
+            optimal = _optimal_replicas(demand, self.base_replicas)
+            if replicas > optimal * 5 and optimal > 0:
+                over_ratio = replicas / optimal
+                # Blend: 0 at 5x, 1.0 at 10x+
+                blend = min(1.0, (over_ratio - 5.0) / 5.0)
+                provisioning_ratio = optimal / replicas
+                effective_demand = demand * (1.0 - blend + blend * provisioning_ratio)
+            else:
+                effective_demand = demand
+            metrics = _demand_to_metrics(effective_demand)
 
             # Apply perturbations
             for perturb in scenario.perturbations:
