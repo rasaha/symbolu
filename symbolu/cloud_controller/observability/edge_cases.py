@@ -909,6 +909,46 @@ class EdgeCaseResult:
         return Severity.PASS
 
     @property
+    def breach_split(self) -> Dict[str, int]:
+        """Three-way breach attribution: controller vs environment vs policy.
+
+        For each SLO-breaching cycle (replicas < optimal), classify as:
+          controller_limited: controller did NOT try to scale out (A_t <= 0.02)
+          environment_limited: controller tried but couldn't realize (constraint/lag)
+          policy_limited: external cap actively blocked scaling
+
+        This separates true controller quality from external constraint floors.
+        """
+        snaps = self.state_trace.snapshots
+        controller_limited = 0
+        environment_limited = 0
+        policy_limited = 0
+
+        has_hard_cap = (self.scenario.budget_cap is not None
+                        or self.scenario.alternating_budget_cap is not None)
+        has_actuation_constraint = (self.scenario.actuation_delay is not None
+                                    or self.scenario.spot_eviction is not None)
+
+        for s in snaps:
+            if s.replicas >= s.optimal_replicas:
+                continue  # not a breach
+            if has_hard_cap and s.action_score > 0.02 and s.delta >= 0:
+                # Controller wanted to scale but hard cap blocked it
+                policy_limited += 1
+            elif s.action_score > 0.02:
+                # Controller tried but environment couldn't realize it
+                environment_limited += 1
+            else:
+                # Controller didn't even try — this is controller quality
+                controller_limited += 1
+
+        return {
+            "controller": controller_limited,
+            "environment": environment_limited,
+            "policy": policy_limited,
+        }
+
+    @property
     def passed(self) -> bool:
         """Did the controller handle this edge case acceptably?"""
         return self.severity in (Severity.PASS, Severity.MILD)
@@ -983,6 +1023,16 @@ class EdgeCaseReport:
                     f"         attribution: {r.attribution.value}"
                 )
 
+                # Breach source split
+                split = r.breach_split
+                total_b = split["controller"] + split["environment"] + split["policy"]
+                if total_b > 0:
+                    lines.append(
+                        f"         breaches: ctrl={split['controller']} "
+                        f"env={split['environment']} "
+                        f"policy={split['policy']}"
+                    )
+
                 # Pathologies
                 if r.pathologies:
                     for p in r.pathologies:
@@ -1020,6 +1070,43 @@ class EdgeCaseReport:
             lines.append("  FAILURE ATTRIBUTION:")
             for attr, count in sorted(attr_counts.items(), key=lambda x: -x[1]):
                 lines.append(f"    {attr:30s}  {count}")
+
+        # Breach source split: controller vs environment vs policy
+        lines.append("")
+        lines.append("  BREACH SOURCE ATTRIBUTION:")
+        lines.append(f"    {'Scenario':<30s} {'SLO%':>6s} {'Controller':>12s} {'Environment':>12s} {'Policy':>10s}")
+        lines.append("    " + "-" * 72)
+        total_ctrl = total_env = total_pol = 0
+        for r in sorted(self.results, key=lambda r: -r.score.slo_breach_rate):
+            split = r.breach_split
+            slo = r.score.slo_breach_rate * 100
+            total = split["controller"] + split["environment"] + split["policy"]
+            if total == 0:
+                continue
+            total_ctrl += split["controller"]
+            total_env += split["environment"]
+            total_pol += split["policy"]
+            lines.append(
+                f"    {r.scenario.name:<30s} {slo:5.1f}% "
+                f"{split['controller']:10d}  "
+                f"{split['environment']:10d}  "
+                f"{split['policy']:10d}"
+            )
+        lines.append("    " + "-" * 72)
+        grand_total = total_ctrl + total_env + total_pol
+        if grand_total > 0:
+            lines.append(
+                f"    {'TOTAL':<30s}       "
+                f"{total_ctrl:10d}  "
+                f"{total_env:10d}  "
+                f"{total_pol:10d}"
+            )
+            lines.append(
+                f"    {'PERCENT':<30s}       "
+                f"{total_ctrl/grand_total*100:9.1f}%  "
+                f"{total_env/grand_total*100:9.1f}%  "
+                f"{total_pol/grand_total*100:9.1f}%"
+            )
 
         lines.append("")
         lines.append("=" * 90)
