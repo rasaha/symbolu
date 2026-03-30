@@ -514,3 +514,232 @@ class BenchmarkHarness:
             replica_history, delta_history, demand_trace,
             cfg.base_replicas,
         )
+
+
+# ============================================================
+# Parameter Sweep
+# ============================================================
+
+@dataclass
+class SweepVariant:
+    """A named controller configuration variant for parameter sweeps."""
+    name: str
+    config: InfraControllerConfig
+
+    def __repr__(self) -> str:
+        return f"SweepVariant({self.name!r})"
+
+
+@dataclass
+class SweepResult:
+    """Aggregated scores for one variant across all patterns."""
+    variant_name: str
+    scores: List[ScenarioScore] = field(default_factory=list)
+
+    @property
+    def avg_reaction(self) -> float:
+        return sum(s.reaction_time for s in self.scores) / max(1, len(self.scores))
+
+    @property
+    def avg_cost(self) -> float:
+        return sum(s.cost_efficiency for s in self.scores) / max(1, len(self.scores))
+
+    @property
+    def total_oscillations(self) -> int:
+        return sum(s.oscillation_count for s in self.scores)
+
+    @property
+    def total_slo_breaches(self) -> int:
+        return sum(s.slo_breach_cycles for s in self.scores)
+
+    @property
+    def max_overshoot(self) -> int:
+        return max((s.overshoot for s in self.scores), default=0)
+
+    @property
+    def avg_settling(self) -> float:
+        return sum(s.settling_time for s in self.scores) / max(1, len(self.scores))
+
+
+@dataclass
+class SweepReport:
+    """Complete parameter sweep results."""
+    results: List[SweepResult] = field(default_factory=list)
+    hpa_baseline: Optional[SweepResult] = None
+
+    def format(self) -> str:
+        lines = [
+            "=" * 90,
+            "PARAMETER SWEEP RESULTS",
+            "=" * 90,
+            "",
+            f"  {'variant':>20s} | {'react':>5s} {'settle':>6s} "
+            f"{'over':>5s} {'osc':>4s} {'cost':>6s} {'slo':>5s}",
+            "  " + "-" * 68,
+        ]
+
+        all_results = list(self.results)
+        if self.hpa_baseline:
+            all_results.append(self.hpa_baseline)
+
+        for r in all_results:
+            lines.append(
+                f"  {r.variant_name:>20s} | "
+                f"react={r.avg_reaction:5.1f} "
+                f"settle={r.avg_settling:5.1f} "
+                f"overshoot={r.max_overshoot:+d} "
+                f"osc={r.total_oscillations:2d} "
+                f"cost={r.avg_cost:.2f}x "
+                f"slo={r.total_slo_breaches:4d}"
+            )
+
+        # Find best variant (lowest composite grade)
+        if self.results:
+            lines.append("")
+            lines.append("  RANKING (lower = better)")
+            lines.append("  " + "-" * 50)
+
+            ranked = []
+            for r in all_results:
+                grade = (
+                    r.avg_reaction * 1.0
+                    + r.avg_settling * 0.5
+                    + r.total_oscillations * 20.0
+                    + r.total_slo_breaches * 2.0
+                    + (r.avg_cost - 1.0) * 100.0  # penalize over-provisioning
+                    + r.max_overshoot * 5.0
+                )
+                ranked.append((grade, r.variant_name))
+            ranked.sort()
+
+            for i, (grade, name) in enumerate(ranked):
+                marker = " <-- BEST" if i == 0 else ""
+                lines.append(f"  {i+1}. {name:>20s}  grade={grade:.0f}{marker}")
+
+        lines.append("")
+        lines.append("=" * 90)
+        return "\n".join(lines)
+
+
+def build_sweep_variants() -> List[SweepVariant]:
+    """Build the standard parameter sweep variants.
+
+    Sweeps three axes independently, then tests a combined profile:
+      1. Threshold sweep: lower action thresholds
+      2. Gain sweep: increase G_base
+      3. Damping sweep: reduce k_dv
+      4. Combined: best of each axis
+    """
+    variants = []
+
+    # Baseline (defaults)
+    variants.append(SweepVariant("defaults", InfraControllerConfig()))
+
+    # Sweep 1: Lower action thresholds
+    for recommend_thresh in [0.10, 0.05]:
+        cfg = InfraControllerConfig()
+        cfg.action_thresholds = {
+            "no_action": 0.03,
+            "recommend": recommend_thresh,
+            "scale_1": 0.20,
+            "scale_2": 0.60,
+        }
+        variants.append(SweepVariant(f"thresh_r{recommend_thresh}", cfg))
+
+    # Sweep 2: Increase G_base
+    for g_base in [1.5, 2.0, 2.5]:
+        cfg = InfraControllerConfig()
+        cfg.G_base = g_base
+        variants.append(SweepVariant(f"G_base={g_base}", cfg))
+
+    # Sweep 3: Reduce k_dv (damping sensitivity)
+    for k_dv in [0.5, 0.3]:
+        cfg = InfraControllerConfig()
+        cfg.k_dv = k_dv
+        variants.append(SweepVariant(f"k_dv={k_dv}", cfg))
+
+    # Sweep 4: Combined conservative tuning
+    cfg = InfraControllerConfig()
+    cfg.action_thresholds = {
+        "no_action": 0.03,
+        "recommend": 0.08,
+        "scale_1": 0.20,
+        "scale_2": 0.60,
+    }
+    cfg.G_base = 1.5
+    cfg.k_dv = 0.5
+    variants.append(SweepVariant("combined_conservative", cfg))
+
+    # Sweep 4b: Combined moderate tuning
+    cfg = InfraControllerConfig()
+    cfg.action_thresholds = {
+        "no_action": 0.03,
+        "recommend": 0.05,
+        "scale_1": 0.15,
+        "scale_2": 0.50,
+    }
+    cfg.G_base = 2.0
+    cfg.k_dv = 0.3
+    variants.append(SweepVariant("combined_moderate", cfg))
+
+    return variants
+
+
+class ParameterSweep:
+    """Runs the benchmark across multiple controller configurations
+    to find the optimal tuning profile.
+
+    Usage:
+        sweep = ParameterSweep()
+        report = sweep.run()
+        print(report.format())
+    """
+
+    def __init__(
+        self,
+        cycles_per_pattern: int = 200,
+        warmup_cycles: int = 60,
+        base_replicas: int = 5,
+        variants: Optional[List[SweepVariant]] = None,
+        patterns: Optional[List[PatternType]] = None,
+    ):
+        self.cycles = cycles_per_pattern
+        self.warmup = warmup_cycles
+        self.base_replicas = base_replicas
+        self.variants = variants or build_sweep_variants()
+        self.patterns = patterns or list(PatternType)
+
+    def run(self) -> SweepReport:
+        """Run all variants across all patterns."""
+        report = SweepReport()
+
+        # Run each variant
+        for variant in self.variants:
+            harness = BenchmarkHarness(BenchmarkConfig(
+                cycles_per_pattern=self.cycles,
+                warmup_cycles=self.warmup,
+                base_replicas=self.base_replicas,
+                controller_config=variant.config,
+            ))
+
+            sweep_result = SweepResult(variant_name=variant.name)
+            for pattern in self.patterns:
+                ctrl_score, _ = harness.run_pattern(pattern)
+                ctrl_score.scaler = variant.name
+                sweep_result.scores.append(ctrl_score)
+
+            report.results.append(sweep_result)
+
+        # Run HPA baseline once
+        harness = BenchmarkHarness(BenchmarkConfig(
+            cycles_per_pattern=self.cycles,
+            warmup_cycles=self.warmup,
+            base_replicas=self.base_replicas,
+        ))
+        hpa_result = SweepResult(variant_name="hpa_baseline")
+        for pattern in self.patterns:
+            _, hpa_score = harness.run_pattern(pattern)
+            hpa_result.scores.append(hpa_score)
+        report.hpa_baseline = hpa_result
+
+        return report

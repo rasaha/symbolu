@@ -10,8 +10,11 @@ from symbolu.cloud_controller.observability.benchmark import (
     BenchmarkHarness,
     BenchmarkReport,
     HPASimulator,
+    ParameterSweep,
     PatternType,
     ScenarioScore,
+    SweepReport,
+    SweepVariant,
 )
 
 __all__ = [
@@ -22,6 +25,9 @@ __all__ = [
     "DecisionLogFormatter",
     "DecisionPhase",
     "HPASimulator",
+    "ParameterSweep",
     "PatternType",
     "ScenarioScore",
+    "SweepReport",
+    "SweepVariant",
 ]

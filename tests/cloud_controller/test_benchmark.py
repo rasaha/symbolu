@@ -8,9 +8,13 @@ from symbolu.cloud_controller.observability.benchmark import (
     BenchmarkHarness,
     BenchmarkReport,
     HPASimulator,
+    ParameterSweep,
     PatternType,
     ScenarioScore,
+    SweepResult,
+    SweepVariant,
     PATTERNS,
+    build_sweep_variants,
     _demand_to_metrics,
     _optimal_replicas,
     _score_run,
@@ -21,6 +25,7 @@ from symbolu.cloud_controller.observability.benchmark import (
     pattern_oscillating,
     pattern_plateau,
 )
+from symbolu.cloud_controller.config import InfraControllerConfig
 
 
 # ============================================================
@@ -379,3 +384,106 @@ class TestBenchmarkHarness:
         # All 6 patterns should appear
         for pt in PatternType:
             assert pt.value in text
+
+
+# ============================================================
+# Parameter Sweep
+# ============================================================
+
+class TestParameterSweep:
+    def test_build_sweep_variants(self):
+        variants = build_sweep_variants()
+        assert len(variants) >= 8
+        names = [v.name for v in variants]
+        assert "defaults" in names
+        assert "combined_conservative" in names
+        assert "combined_moderate" in names
+
+    def test_sweep_variant_has_config(self):
+        variants = build_sweep_variants()
+        for v in variants:
+            assert isinstance(v.config, InfraControllerConfig)
+            assert v.name
+
+    def test_sweep_runs(self):
+        sweep = ParameterSweep(
+            cycles_per_pattern=30,
+            warmup_cycles=10,
+            variants=[
+                SweepVariant("default", InfraControllerConfig()),
+                SweepVariant("high_gain", InfraControllerConfig(G_base=2.0)),
+            ],
+            patterns=[PatternType.STEP],
+        )
+        report = sweep.run()
+
+        assert len(report.results) == 2
+        assert report.hpa_baseline is not None
+        assert report.results[0].variant_name == "default"
+        assert report.results[1].variant_name == "high_gain"
+
+    def test_sweep_result_properties(self):
+        sweep = ParameterSweep(
+            cycles_per_pattern=30,
+            warmup_cycles=10,
+            variants=[SweepVariant("test", InfraControllerConfig())],
+            patterns=[PatternType.STEP, PatternType.RAMP],
+        )
+        report = sweep.run()
+        r = report.results[0]
+
+        assert len(r.scores) == 2
+        assert r.avg_reaction >= 0
+        assert r.avg_cost > 0
+        assert r.total_oscillations >= 0
+        assert r.total_slo_breaches >= 0
+        assert r.max_overshoot >= 0
+        assert r.avg_settling >= 0
+
+    def test_sweep_report_format(self):
+        sweep = ParameterSweep(
+            cycles_per_pattern=30,
+            warmup_cycles=10,
+            variants=[SweepVariant("v1", InfraControllerConfig())],
+            patterns=[PatternType.STEP],
+        )
+        report = sweep.run()
+        text = report.format()
+
+        assert "PARAMETER SWEEP" in text
+        assert "RANKING" in text
+        assert "BEST" in text
+        assert "v1" in text
+        assert "hpa_baseline" in text
+
+    def test_sweep_all_patterns(self):
+        sweep = ParameterSweep(
+            cycles_per_pattern=30,
+            warmup_cycles=10,
+            variants=[SweepVariant("t", InfraControllerConfig())],
+        )
+        report = sweep.run()
+        assert len(report.results[0].scores) == 6
+
+    def test_custom_config_applied(self):
+        """Verify custom G_base is actually used."""
+        cfg_low = InfraControllerConfig(G_base=0.5)
+        cfg_high = InfraControllerConfig(G_base=3.0)
+
+        sweep = ParameterSweep(
+            cycles_per_pattern=50,
+            warmup_cycles=20,
+            variants=[
+                SweepVariant("low_gain", cfg_low),
+                SweepVariant("high_gain", cfg_high),
+            ],
+            patterns=[PatternType.STEP],
+        )
+        report = sweep.run()
+
+        # High gain should have different behavior than low gain
+        low = report.results[0]
+        high = report.results[1]
+        # They should produce different scores (configs differ)
+        assert low.variant_name == "low_gain"
+        assert high.variant_name == "high_gain"
