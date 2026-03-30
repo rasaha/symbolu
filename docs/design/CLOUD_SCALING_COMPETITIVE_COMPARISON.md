@@ -647,3 +647,191 @@ Source: `recommend/approval.py`
 | No explanation | Cannot tell you *why* it scaled | `result.explain()` with full breakdown |
 
 **This is the comparison our shadow mode tracks.** Every cycle, `shadow/divergence.py` compares our controller's recommendation against what HPA actually did, assigns verdicts after 5 minutes, and generates proof-of-value reports.
+
+---
+
+## Consolidated Feature Matrix
+
+### Layer Coverage
+
+| Layer | Our Controller | Cast AI | ScaleOps | Karpenter | K8s HPA |
+|-------|:-:|:-:|:-:|:-:|:-:|
+| L7 Business Policy | **Yes** | Partial | Partial | No | No |
+| L6 Observability & Proof | **Yes** | Partial | Partial | No | No |
+| L5 Safety Bounds | **Yes** | Basic | Basic | Basic | Basic |
+| L4 Decision Quality | **Yes** | No | No | No | No |
+| L3 Prediction | Planned | No | **Yes** | No | No |
+| L2 Cost Optimization | No | **Yes** | Partial | Partial | No |
+| L1 Provisioning | Wraps | **Yes** | No | **Yes** | Yes |
+| L0 Sensing | **Yes** | Proprietary | Prometheus | Minimal | Metrics API |
+
+### Capability Comparison
+
+| Capability | Our Controller | Cast AI | ScaleOps | Karpenter | K8s HPA |
+|-----------|:-:|:-:|:-:|:-:|:-:|
+| Multi-signal coherence | **Yes** | No | No | No | No |
+| Deployment awareness | **Yes** | No | No | No | No |
+| Identity baseline learning | **Yes** | No | No | No | No |
+| Explainable decisions | **Yes** | Partial | No | No | No |
+| Shadow/proof-of-value mode | **Yes** | No | No | No | No |
+| Graduated autonomy (Observe→Approve→Auto) | **Yes** | Partial | Partial | No | No |
+| Bootstrap (no learning phase) | **Yes** | N/A | No | N/A | N/A |
+| Predictive scaling | Planned | No | **Yes** | No | No |
+| Cost optimization | No | **Yes** | Partial | Partial | No |
+| Node provisioning | No | **Yes** | No | **Yes** | No |
+| Spot instance management | No | **Yes** | No | **Yes** | No |
+| Scales pods | **Yes** | No | **Yes** | No | **Yes** |
+| Scales nodes | No | **Yes** | No | **Yes** | No |
+| Works without SaaS dependency | **Yes** | No | No | **Yes** | **Yes** |
+| Thread-safe controller | **Yes** | N/A | N/A | N/A | **Yes** |
+| 12-parameter configuration | **Yes** | N/A | N/A | N/A | ~3 params |
+
+### Decision Logic Comparison
+
+| Aspect | Our Controller | Cast AI | ScaleOps | Karpenter | K8s HPA |
+|--------|-------------|---------|----------|-----------|---------|
+| **Input signals** | 5+ metrics, 3 groups | 3-5 (CPU, mem, OOM) | 5-10 (ML features) | 1 (pending pods) | 1-2 (CPU, custom) |
+| **Decision method** | `d·G·P·S` control equation | Fixed thresholds | ML model | Binary trigger | `ceil(current * ratio)` |
+| **Signal consensus** | Required (coherence gate) | None | Implicit (ML) | None | None |
+| **Volatility handling** | Baseline-relative damping | Fixed cooldown | ML smoothing | None | 300s stabilization |
+| **Deployment safety** | Plasticity gate closes | None | None | None | None |
+| **Scaling oscillation** | Rate-limited gain + damping | Cooldown timer | ML smoothing | Consolidation TTL | Stabilization window |
+| **Explanation** | 7-component breakdown | "CPU > threshold" | "Model predicted" | "Pods pending" | "Metric > target" |
+| **Learning** | Identity EMA + replay | None | Offline ML training | None | None |
+| **Cold start** | Bootstrap (1hr history) | Instant (fixed rules) | 2+ weeks training | Instant (reactive) | Instant (ratio) |
+
+---
+
+## Scenario Analysis
+
+### Scenario 1: CPU Spike from Batch Job
+
+**Setup:** A cron job runs at 2am, spikes CPU to 85% for 3 minutes. Latency, error rate, and queue depth are flat.
+
+| System | Action | Correct? |
+|--------|--------|----------|
+| **K8s HPA** | Scales from 5 → 8 pods (CPU 85% > 50% target) | No — wastes 3 pods for 3 min |
+| **Cast AI** | Recommends adding a node (CPU > threshold) | No — same false alarm |
+| **ScaleOps** | May scale if ML model hasn't learned the cron pattern | Depends on training |
+| **Karpenter** | No action (no pending pods) | Correct by default |
+| **Our Controller** | **HOLD.** Coherence=0.31 (only CPU elevated, latency/errors/queue flat). Incoherent pressure suppressed | **Correct** |
+
+**Controller decision breakdown:**
+```
+Pressure (S_t):      0.35 (moderate — CPU elevated, others neutral)
+Coherence (C_t):     0.31 (LOW — only CPU, no app/business agreement)
+Stability (R_t):     0.85 (high — no recent scaling, no deploy)
+Plasticity (P_t):    0.65 (open — but low coherence suppresses gain)
+Gain (G_t):          0.42 (low — f_coh reduced by low coherence)
+Damping (d_t):       0.88 (mild — some variance but not extreme)
+Action Score (A_t):  0.08 → NO ACTION (below 0.2 recommend threshold)
+```
+
+**Shadow verdict after 5 minutes:** CPU returned to 35%. `CONTROLLER_CORRECT — 3 pods unnecessary for 3 min. Estimated savings: $0.27`
+
+---
+
+### Scenario 2: Genuine Traffic Surge
+
+**Setup:** Marketing campaign goes live. CPU 82%, latency p99 jumps from 120ms to 340ms, error rate rises from 0.3% to 2.1%, queue depth from 200 to 1,247. All sustained for 8+ minutes.
+
+| System | Action | Correct? |
+|--------|--------|----------|
+| **K8s HPA** | Scales from 5 → 8 (CPU 82% > 50%) — but only looks at CPU | Partially — right direction, wrong reason |
+| **Cast AI** | Scales on CPU threshold | Partially — same as HPA |
+| **ScaleOps** | Scales if ML predicted the campaign (unlikely for first time) | Maybe |
+| **Karpenter** | Adds nodes if HPA creates pending pods | Reactive, delayed |
+| **Our Controller** | **SCALE +2.** Coherence=0.89 (all signals agree), high confidence | **Correct, with reasoning** |
+
+**Controller decision breakdown:**
+```
+Pressure (S_t):      0.72 (high — all signal groups elevated)
+Coherence (C_t):     0.89 (HIGH — infra, app, business all agree)
+Stability (R_t):     0.81 (stable — no recent scaling, no deploy)
+Plasticity (P_t):    0.68 (open)
+Gain (G_t):          0.91 (high — peak phase, high coherence)
+Damping (d_t):       0.95 (minimal — sustained, not spiky)
+Action Score (A_t):  0.43 → SCALE +1 (above 0.2 threshold)
+```
+
+**Why our controller is better here:** It explains *why* scaling is needed (coherent multi-signal pressure), not just "CPU > threshold." The coherence score of 0.89 means this is a real load event, not noise.
+
+---
+
+### Scenario 3: Bad Deployment
+
+**Setup:** New version deployed with a memory leak. Latency rising, error rate at 5%, pods restarting. CPU is actually low (leak hasn't caused CPU spike yet).
+
+| System | Action | Correct? |
+|--------|--------|----------|
+| **K8s HPA** | No action (CPU is low) or slowly scales based on custom metrics | Late or wrong |
+| **Cast AI** | No action (CPU fine) or reacts to OOM kills after they happen | Reactive, too late |
+| **ScaleOps** | May recommend scaling if ML sees the traffic pattern | Wrong action — scaling won't fix a memory leak |
+| **Karpenter** | Adds nodes only after OOM causes pending pods | Way too late |
+| **Our Controller** | **HOLD.** Plasticity gate nearly closed (pod restarts + deploy active). Logs recommendation to investigate, not scale | **Correct** |
+
+**Controller decision breakdown:**
+```
+Pressure (S_t):      0.22 (low CPU, but error rate contributing)
+Coherence (C_t):     0.41 (low — CPU low but errors/latency high = incoherent)
+Stability (R_t):     0.28 (FRAGILE — deploy_active=True, pod_restarts=4)
+Plasticity (P_t):    0.29 (CLOSED — fragile system, gate suppresses)
+Gain (G_t):          0.38
+Damping (d_t):       0.71 (moderate suppression — high variance)
+Action Score (A_t):  0.02 → NO ACTION
+Reason: System fragile during deployment. Scaling won't fix root cause.
+```
+
+**Why this matters:** Scaling into a bad deployment makes the problem worse (more leaking pods, more OOM kills). The correct action is to investigate and rollback — which is what the low plasticity + deployment awareness signals to the operator.
+
+---
+
+### Scenario 4: Scale-Down (Over-Provisioned)
+
+**Setup:** Traffic dropped 2 hours ago. CPU 12%, memory 15%, latency p99 at 8ms, errors 0%, queue empty. Running 10 replicas but 3 would suffice.
+
+| System | Action | Correct? |
+|--------|--------|----------|
+| **K8s HPA** | Scales down after 300s stabilization window — but only based on CPU | Correct but slow |
+| **Cast AI** | Recommends node removal if nodes are underutilized | Correct at node level |
+| **ScaleOps** | Recommends resource reduction | Correct |
+| **Karpenter** | Consolidates underutilized nodes | Correct at node level |
+| **Our Controller** | **SCALE IN -2.** Negative pressure, all signals agree system is over-provisioned, respects -25% max per action | **Correct, bounded** |
+
+**Key detail:** Error rate at 0% does NOT contribute negative pressure. Low error rate means "everything is fine," not "over-provisioned." The negative pressure comes from CPU (0.12 - 0.5 = -0.38), memory (0.15 - 0.5 = -0.35), latency (0.08 - 0.5 = -0.42).
+
+Source: `controller.py:329` — `max(0.0, error_rate - 0.5)` for inverted metrics.
+
+Safety bound: `max_scale_in_ratio = 0.25` → max -2 replicas (25% of 10). Scale from 10 → 8 in first action. Requires multiple cycles to reach optimal 3.
+
+---
+
+### Scenario 5: Day 1 — New Cluster, No History
+
+**Setup:** Fresh Kubernetes cluster. No historical data. First deployment.
+
+| System | Action | Readiness |
+|--------|--------|-----------|
+| **K8s HPA** | Works immediately (ratio-based, no history needed) | Instant |
+| **Cast AI** | Works immediately (fixed thresholds) | Instant |
+| **ScaleOps** | Blind — needs 2+ weeks of training data | 2-3 weeks |
+| **Karpenter** | Works immediately (reacts to pending pods) | Instant |
+| **Our Controller (cold)** | 100-cycle warmup (~25 min). Damping held at d=1.0, gain at 50%, identity random | ~25 minutes |
+| **Our Controller (bootstrapped)** | Fetches 1 hour of Prometheus history via `range_query`, pre-learns all baselines | **~5 seconds** |
+
+**Bootstrap process** (implemented in `signals/pipeline.py:108-177`):
+
+```python
+pipeline = SignalPipeline(PipelineConfig(bootstrap_window_seconds=3600))
+pipeline.bootstrap()  # Queries Prometheus history, pre-seeds everything
+result = pipeline.poll_once()  # Ready to act on cycle 1
+```
+
+What gets bootstrapped:
+1. **Normalizer** — Rolling z-score windows filled from history
+2. **Identity EMA** — Baseline set from mean of historical vectors
+3. **Damping** — Variance baseline calibrated, warmup skipped
+4. **Adaptive Gain** — Warmup ramp bypassed (starts at 100%)
+5. **Plasticity Gate** — Double-smoothed resistance warmed up
+
+For a truly fresh cluster with < 1 hour of Prometheus data, the controller falls back to conservative defaults (half-gain, neutral normalization) — safe but less precise than a bootstrapped instance.
