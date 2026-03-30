@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ncc-config
+  namespace: ncc
+data:
+  controller.yaml: |
+    # Neural Cloud Controller — GKE configuration
+    #
+    # Target workload to watch and scale
+    target:
+      namespace: default
+      deployment: demo-app
+
+    # Prometheus endpoint (kube-prometheus-stack default)
+    prometheus:
+      url: "http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090"
+      timeout_seconds: 10
+
+    # Controller tuning
+    controller:
+      G_base: 1.0
+      G_min: 0.0
+      G_max: 3.0
+      k_dv: 1.0
+      k_dc: 0.5
+      cycle_interval_seconds: 15.0
+      warmup_steps: 20          # Lower for quick tests (default: 100)
+
+    # Safety bounds
+    safety:
+      max_scale_out_fraction: 0.50
+      max_scale_in_fraction: 0.25
+      min_replicas: 1
+      cooldown_seconds: 60      # Lower for testing (default: 120)
+
+    # Actuator mode: dry_run | scale_patch | hpa_metric
+    actuator:
+      mode: dry_run             # Start safe; change to scale_patch for live scaling
+
+    # Auto-approval: null | low | medium | high
+    # Set to "high" for autonomous scaling, null for manual approve
+    auto_approve_threshold: null
+
+    # Metrics server — Prometheus scrapes this
+    metrics_server:
+      port: 8080
+      metrics_path: "/metrics"
+      health_path: "/healthz"
+
+    # Observability
+    exporter:
+      mode: builtin
+      prefix: ncc
+
+    # Feedback loop
+    feedback:
+      enabled: true
+      max_adjustment_rate: 0.10

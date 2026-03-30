@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ncc-controller
+  namespace: ncc
+  labels:
+    app: ncc-controller
+    app.kubernetes.io/part-of: neural-cloud-controller
+spec:
+  selector:
+    app: ncc-controller
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+      protocol: TCP
+  type: ClusterIP
+---
+# ServiceMonitor for Prometheus Operator (kube-prometheus-stack)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ncc-controller
+  namespace: ncc
+  labels:
+    app: ncc-controller
+    release: prometheus       # Match your kube-prometheus-stack release name
+spec:
+  selector:
+    matchLabels:
+      app: ncc-controller
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
