@@ -227,6 +227,12 @@ class Controller:
                     # This delta likely just landed — consume it
                     realized -= d
                     continue
+                # Blocked detection: if delta is >= 3 cycles old and replicas
+                # haven't moved at all, the delta was likely blocked by an
+                # external constraint (budget cap, resource quota). Don't let
+                # blocked deltas suppress future scaling decisions.
+                if age >= 3 and realized == 0:
+                    continue  # blocked — expire early
                 remaining.append((issued_step, d))
             self._pending_deltas = remaining
 
@@ -570,8 +576,10 @@ class Controller:
         if total_rise <= 0:
             return 0.0
 
-        # Boost proportional to rise, capped
-        return min(0.1, total_rise * 0.5)
+        # Boost proportional to rise, scaled by how sustained the trend is
+        # (longer sustained monotonic rise = more confidence it's real drift)
+        sustained_factor = min(2.0, ratio / 0.7)  # 1.0 at threshold, up to 2.0
+        return min(0.15, total_rise * 0.7 * sustained_factor)
 
     def _compute_resistance(
         self,
