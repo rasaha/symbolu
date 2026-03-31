@@ -781,6 +781,15 @@ class Controller:
                 delta = min(delta, 1)  # cap at +1 after 15 futile consecutive
             if self._consecutive_scale_out > 25:
                 delta = 0  # stop scaling entirely after 25 futile consecutive
+            # High-replica weak-signal gate: at very high replica counts,
+            # weak +1 scale-outs add marginal capacity but compound cost.
+            # Only blocks when A_t is weak (< 0.15) — strong demand signals
+            # still trigger scale-out even at high counts. Reset the futility
+            # counter when gating fires — the controller isn't futilely
+            # scaling, it's being deliberately suppressed.
+            if delta == 1 and current_replicas >= 20 and abs_score < 0.15:
+                delta = 0
+                self._consecutive_scale_out = 0
         else:
             self._consecutive_scale_out = 0
 
@@ -815,6 +824,25 @@ class Controller:
         elif delta < 0:
             return f"scale_in_{abs(delta)}", delta
         else:
+            # Weak-signal forced scale-in: when the threshold check says
+            # no_action/observe but A_t is negative (controller agrees
+            # system is over-provisioned), replicas are high (>10), and
+            # pressure has been consistently negative (sustained calm),
+            # force -1 scale-in. This catches the pattern where A_t is
+            # too weak to cross the 2x asymmetric threshold at high
+            # replica counts, leaving the controller stuck at 64 replicas
+            # when optimal is 4. The baseline-memory floor still prevents
+            # collapsing below what the system recently needed.
+            if (action_score < -0.005
+                    and current_replicas > 10
+                    and self._sustained_calm_cycles > 15):
+                forced_delta = -1
+                # Respect the floor
+                scale_in_floor = max(1, int(round(
+                    self._recent_required_floor * self._floor_ratio
+                )))
+                if current_replicas + forced_delta >= scale_in_floor:
+                    return "scale_in_1", forced_delta
             return "no_action", 0
 
     def bootstrap(self, historical_snapshots: List[Dict[str, float]]) -> None:
