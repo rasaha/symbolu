@@ -1,0 +1,33 @@
+# Ignore everything except what the controller needs
+*
+!symbolu/
+!symbolu/**
+!deploy/gke/requirements-controller.txt
+
+# Re-exclude non-controller symbolu subpackages to keep image small
+symbolu/experimental/
+symbolu/mechanical/
+symbolu/core/
+symbolu/robotics/
+symbolu/__pycache__/
+**/__pycache__/
+**/*.pyc
+*.egg-info/
+
+# Dev/CI files
+.git/
+.github/
+tests/
+scripts/
+docs/
+benchmarks/
+artifacts/
+results/
+configs/
+data/
+frontend/
+examples/
+*.md
+*.json
+*.jsonl
+Procfile

@@ -1,0 +1,44 @@
+steps:
+  # Build the controller image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/ncc-controller:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/ncc-controller:latest'
+      - '-f'
+      - 'deploy/gke/Dockerfile'
+      - '.'
+
+  # Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/ncc-controller'
+
+  # Update the deployment image tag
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/ncc-controller'
+      - 'controller=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/ncc-controller:${SHORT_SHA}'
+      - '-n'
+      - 'ncc'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER}'
+
+substitutions:
+  _REGION: us-central1
+  _ZONE: us-central1-a
+  _CLUSTER: ncc-test
+  _REPO: ncc
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/ncc-controller'
