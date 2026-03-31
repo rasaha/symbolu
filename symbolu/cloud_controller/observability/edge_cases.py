@@ -57,6 +57,7 @@ from symbolu.cloud_controller.observability.efficiency_estimator import (
     EfficiencyEstimator,
     EfficiencyState,
     EfficiencySummary,
+    GuardSummary,
     ScaleOutFutilityGuard,
 )
 from symbolu.cloud_controller.observability.benchmark import (
@@ -926,6 +927,7 @@ class EdgeCaseResult:
     pathologies: List[str] = field(default_factory=list)
     breach_attributions: Dict[str, int] = field(default_factory=dict)
     efficiency_summary: Optional[EfficiencySummary] = None
+    guard_summary: Optional[GuardSummary] = None
 
     @property
     def severity(self) -> Severity:
@@ -1449,6 +1451,86 @@ class EdgeCaseReport:
                     "optimization opportunities exist."
                 )
 
+        # Futility Guard Effectiveness
+        lines.append("")
+        lines.append("  FUTILITY GUARD EFFECTIVENESS:")
+        lines.append(
+            f"    {'Scenario':<30s} {'ScaleOuts':>9s} "
+            f"{'Blocked':>8s} {'%Blocked':>9s} "
+            f"{'AvgConf':>8s} {'Reason':>26s}"
+        )
+        lines.append("    " + "-" * 94)
+
+        grand_guard_so = 0
+        grand_guard_blocked = 0
+
+        for r in sorted(self.results, key=lambda r: -r.score.cost_efficiency):
+            gs = r.guard_summary
+            es = r.efficiency_summary
+            if gs is None or es is None or es.total_scale_outs == 0:
+                continue
+
+            grand_guard_so += es.total_scale_outs
+            grand_guard_blocked += gs.blocked_events
+            pct_blocked = (
+                gs.blocked_events / es.total_scale_outs * 100
+                if es.total_scale_outs > 0 else 0.0
+            )
+            avg_c = gs.avg_confidence_at_block if gs.blocked_events > 0 else 0.0
+            reason = gs.activation_reason or "n/a"
+
+            lines.append(
+                f"    {r.scenario.name:<30s} "
+                f"{es.total_scale_outs:9d} "
+                f"{gs.blocked_events:8d} "
+                f"{pct_blocked:8.1f}% "
+                f"{avg_c:7.2f} "
+                f"{reason:>26s}"
+            )
+
+        lines.append("    " + "-" * 94)
+        if grand_guard_so > 0:
+            lines.append(
+                f"    {'TOTAL':<30s} "
+                f"{grand_guard_so:9d} "
+                f"{grand_guard_blocked:8d} "
+                f"{grand_guard_blocked/grand_guard_so*100:8.1f}%"
+            )
+
+        # Confidence Analysis
+        lines.append("")
+        lines.append("  CONFIDENCE ANALYSIS:")
+        helping_confs: List[float] = []
+        not_helping_confs: List[float] = []
+        for r in self.results:
+            if r.efficiency_summary is None:
+                continue
+            # Gather from estimator cycle log via the summary
+            # We use the guard summary confidence stats as a proxy
+            es = r.efficiency_summary
+            gs = r.guard_summary
+            if gs is None:
+                continue
+            # For per-state confidence, we need the cycle log.
+            # Use a lightweight approach: check if the result has the data.
+            # Since we only have summary stats, show per-scenario confidence.
+
+        # Show per-scenario confidence stats from guard
+        lines.append(
+            f"    {'Scenario':<30s} {'ConfMean':>9s} {'ConfMin':>8s} {'ConfMax':>8s}"
+        )
+        lines.append("    " + "-" * 58)
+        for r in sorted(self.results, key=lambda r: -r.score.cost_efficiency):
+            gs = r.guard_summary
+            if gs is None:
+                continue
+            lines.append(
+                f"    {r.scenario.name:<30s} "
+                f"{gs.confidence_mean:8.3f} "
+                f"{gs.confidence_min:8.3f} "
+                f"{gs.confidence_max:8.3f}"
+            )
+
         lines.append("")
         lines.append("=" * 90)
         return "\n".join(lines)
@@ -1588,7 +1670,7 @@ class EdgeCaseHarness:
 
             # Futility guard: block scale-out when provably ineffective
             # Applied AFTER controller decides, BEFORE actuation
-            futility_guard.update(eff_entry.state)
+            futility_guard.update(eff_entry.state, eff_entry.confidence)
             guarded_delta = futility_guard.filter_delta(raw_delta, replicas)
 
             # Apply actuation delay if present
@@ -1657,6 +1739,23 @@ class EdgeCaseHarness:
         ]
         eff_summary = estimator.summary(excess_cycles=excess_cycles)
 
+        # Guard summary
+        conf_stats = futility_guard.confidence_stats
+        blog = futility_guard.block_log
+        avg_conf_at_block = 0.0
+        if blog:
+            avg_conf_at_block = sum(b["avg_confidence"] for b in blog) / len(blog)
+        g_summary = GuardSummary(
+            total_evaluated=futility_guard.total_evaluated,
+            blocked_events=futility_guard.blocked_scale_out_events,
+            block_log=blog,
+            avg_confidence_at_block=avg_conf_at_block,
+            confidence_mean=conf_stats["mean"],
+            confidence_min=conf_stats["min"],
+            confidence_max=conf_stats["max"],
+            activation_reason=futility_guard.activation_reason,
+        )
+
         return EdgeCaseResult(
             scenario=scenario,
             score=score,
@@ -1664,6 +1763,7 @@ class EdgeCaseHarness:
             attribution=attribution,
             pathologies=pathologies,
             efficiency_summary=eff_summary,
+            guard_summary=g_summary,
         )
 
     def _attribute_failure(

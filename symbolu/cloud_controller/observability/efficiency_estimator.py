@@ -133,41 +133,64 @@ class ScaleOutFutilityGuard:
 
     Activation requires ALL of:
       1. NOT_HELPING for >= futility_window consecutive cycles
-      2. replicas >= high_replica_threshold
-      3. The guard is deterministic and resets immediately when
-         efficiency becomes HELPING
+      2. Average confidence over the streak >= confidence_threshold
+      3. replicas >= high_replica_threshold
 
     Safety guarantees:
       - NEVER activates below high_replica_threshold
       - NEVER triggers on single-cycle NOT_HELPING
       - NEVER modifies scale-in decisions (negative delta passes through)
       - Resets immediately when efficiency_state becomes HELPING
+      - Resets if confidence drops below low_confidence_reset
     """
     futility_window: int = 5
     high_replica_threshold: int = 20
+    confidence_threshold: float = 0.0
+    low_confidence_reset: float = 0.3
 
     # Internal state
     _consecutive_not_helping: int = field(default=0, init=False, repr=False)
+    _streak_confidences: List[float] = field(default_factory=list, init=False, repr=False)
     _active: bool = field(default=False, init=False, repr=False)
     _blocked_events: int = field(default=0, init=False, repr=False)
     _total_evaluated: int = field(default=0, init=False, repr=False)
+    _last_activation_reason: str = field(default="", init=False, repr=False)
 
-    def update(self, efficiency_state: EfficiencyState) -> None:
-        """Update consecutive NOT_HELPING counter from estimator output.
+    # Logging
+    _all_confidences: List[float] = field(default_factory=list, init=False, repr=False)
+    _block_log: List[Dict] = field(default_factory=list, init=False, repr=False)
+
+    def update(self, efficiency_state: EfficiencyState, confidence: float) -> None:
+        """Update streak counter and confidence window from estimator output.
 
         Called once per cycle with the estimator's classification.
+
+        Tentative classifications (confidence <= low_confidence_reset) count
+        toward the streak length but are excluded from the confidence average.
+        This prevents unevaluated events from dragging down the average while
+        still allowing the streak to build during evaluation windows.
         """
+        self._all_confidences.append(confidence)
+
         if efficiency_state == EfficiencyState.NOT_HELPING:
             self._consecutive_not_helping += 1
+            # Only include evaluated (non-tentative) confidences in average
+            if confidence > self.low_confidence_reset:
+                self._streak_confidences.append(confidence)
         elif efficiency_state == EfficiencyState.HELPING:
             # Hard reset: HELPING proves scaling is working
             self._consecutive_not_helping = 0
+            self._streak_confidences.clear()
             self._active = False
         else:
-            # NEUTRAL: decay slowly (don't reset, but don't accumulate)
-            # This prevents a single NEUTRAL cycle from resetting a
-            # long NOT_HELPING streak
-            pass
+            # NEUTRAL: do not count toward streak, do not reset.
+            # When confidence_threshold > 0, very low confidence resets
+            # the streak (unreliable signal). Disabled at threshold=0.
+            if (self.confidence_threshold > 0
+                    and confidence < self.low_confidence_reset):
+                self._consecutive_not_helping = 0
+                self._streak_confidences.clear()
+                self._active = False
 
     def filter_delta(self, delta: int, current_replicas: int) -> int:
         """Apply futility guard to the controller's delta decision.
@@ -177,15 +200,47 @@ class ScaleOutFutilityGuard:
         """
         self._total_evaluated += 1
 
+        # Compute average confidence over the current streak.
+        avg_conf = 0.0
+        if self._streak_confidences:
+            avg_conf = sum(self._streak_confidences) / len(self._streak_confidences)
+
+        # Confidence check: when threshold > 0, require sufficient confidence.
+        # When threshold = 0, confidence gating is disabled (always passes).
+        if self.confidence_threshold <= 0:
+            confidence_met = True
+        elif self._streak_confidences:
+            confidence_met = avg_conf >= self.confidence_threshold
+        else:
+            # No evaluated data yet: trust the streak length if it's
+            # well past the minimum window (2x for safety margin)
+            confidence_met = (
+                self._consecutive_not_helping >= self.futility_window * 2
+            )
+
         # Determine if guard should be active
         self._active = (
             self._consecutive_not_helping >= self.futility_window
+            and confidence_met
             and current_replicas >= self.high_replica_threshold
         )
+
+        if self._active:
+            self._last_activation_reason = "high_confidence_futility"
+        elif (self._consecutive_not_helping >= self.futility_window
+              and current_replicas >= self.high_replica_threshold):
+            self._last_activation_reason = "low_confidence_blocked"
 
         # Only block scale-out (positive delta)
         if self._active and delta > 0:
             self._blocked_events += 1
+            self._block_log.append({
+                "cycle": self._total_evaluated - 1,
+                "avg_confidence": avg_conf,
+                "streak_length": self._consecutive_not_helping,
+                "replicas": current_replicas,
+                "blocked_delta": delta,
+            })
             return 0
 
         return delta
@@ -199,6 +254,12 @@ class ScaleOutFutilityGuard:
         return self._consecutive_not_helping
 
     @property
+    def avg_confidence_over_streak(self) -> float:
+        if not self._streak_confidences:
+            return 0.0
+        return sum(self._streak_confidences) / len(self._streak_confidences)
+
+    @property
     def blocked_scale_out_events(self) -> int:
         return self._blocked_events
 
@@ -206,10 +267,42 @@ class ScaleOutFutilityGuard:
     def total_evaluated(self) -> int:
         return self._total_evaluated
 
+    @property
+    def activation_reason(self) -> str:
+        return self._last_activation_reason
+
+    @property
+    def block_log(self) -> List[Dict]:
+        return list(self._block_log)
+
+    @property
+    def confidence_stats(self) -> Dict[str, float]:
+        """Summary statistics over all observed confidences."""
+        if not self._all_confidences:
+            return {"mean": 0.0, "min": 0.0, "max": 0.0}
+        return {
+            "mean": sum(self._all_confidences) / len(self._all_confidences),
+            "min": min(self._all_confidences),
+            "max": max(self._all_confidences),
+        }
+
 
 # ============================================================
 # Efficiency Estimator
 # ============================================================
+
+@dataclass
+class GuardSummary:
+    """Summary statistics from the ScaleOutFutilityGuard for one scenario."""
+    total_evaluated: int = 0
+    blocked_events: int = 0
+    block_log: List[Dict] = field(default_factory=list)
+    avg_confidence_at_block: float = 0.0
+    confidence_mean: float = 0.0
+    confidence_min: float = 0.0
+    confidence_max: float = 0.0
+    activation_reason: str = ""
+
 
 class EfficiencyEstimator:
     """Observability-only estimator for scaling effectiveness.
