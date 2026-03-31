@@ -1,0 +1,5 @@
+# Cloud controller runtime dependencies (minimal — no ML/LLM packages)
+numpy>=1.24.0,<2.0.0
+pyyaml>=6.0,<7.0
+kubernetes>=28.0,<31.0
+requests>=2.31,<3.0

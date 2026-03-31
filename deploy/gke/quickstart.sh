@@ -35,22 +35,28 @@ PREEMPTIBLE="${GKE_PREEMPTIBLE:-true}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+AR_REPO="${GKE_AR_REPO:-ncc}"
+IMAGE_TAG="${GKE_IMAGE_TAG:-latest}"
 
 # Flags
 TEARDOWN=false
 DEPLOY_ONLY=false
 LIVE_MODE=false
 SHADOW_MODE=false
+SKIP_BUILD=false
 
 for arg in "$@"; do
     case "$arg" in
-        --teardown)   TEARDOWN=true ;;
+        --teardown)    TEARDOWN=true ;;
         --deploy-only) DEPLOY_ONLY=true ;;
-        --live)       LIVE_MODE=true ;;
-        --shadow)     SHADOW_MODE=true ;;
+        --live)        LIVE_MODE=true ;;
+        --shadow)      SHADOW_MODE=true ;;
+        --skip-build)  SKIP_BUILD=true ;;
         *) echo "Unknown argument: $arg"; exit 1 ;;
     esac
 done
+
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${AR_REPO}/ncc-controller:${IMAGE_TAG}"
 
 # Colors
 RED='\033[0;31m'
@@ -158,6 +164,43 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 2b. Build and push controller image
+# ---------------------------------------------------------------------------
+if ! $SKIP_BUILD; then
+    step "2b/6 Building and pushing controller image"
+
+    # Create Artifact Registry repo if needed
+    if ! gcloud artifacts repositories describe "$AR_REPO" \
+        --project="$PROJECT" --location="$REGION" &>/dev/null; then
+        log "Creating Artifact Registry repository '$AR_REPO'..."
+        gcloud artifacts repositories create "$AR_REPO" \
+            --repository-format=docker \
+            --location="$REGION" \
+            --project="$PROJECT" \
+            --description="Neural Cloud Controller images"
+    else
+        log "Artifact Registry repo '$AR_REPO' already exists"
+    fi
+
+    # Configure Docker auth for Artifact Registry
+    gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+    # Build the image
+    log "Building image: $IMAGE"
+    docker build \
+        -t "$IMAGE" \
+        -f "$SCRIPT_DIR/Dockerfile" \
+        "$REPO_ROOT"
+
+    # Push to Artifact Registry
+    log "Pushing image..."
+    docker push "$IMAGE"
+    log "Image pushed: $IMAGE"
+else
+    log "Skipping image build (--skip-build)"
+fi
+
+# ---------------------------------------------------------------------------
 # 3. Deploy demo workload
 # ---------------------------------------------------------------------------
 step "3/6 Deploying demo workload"
@@ -186,7 +229,9 @@ else
     kubectl apply -f "$SCRIPT_DIR/configmap.yaml"
 fi
 
-kubectl apply -f "$SCRIPT_DIR/deployment.yaml"
+# Patch deployment with the correct image path
+sed "s|us-central1-docker.pkg.dev/PROJECT_ID/ncc/ncc-controller:latest|${IMAGE}|" \
+    "$SCRIPT_DIR/deployment.yaml" | kubectl apply -f -
 kubectl apply -f "$SCRIPT_DIR/service.yaml"
 
 kubectl rollout status deployment/ncc-controller -n ncc --timeout=120s

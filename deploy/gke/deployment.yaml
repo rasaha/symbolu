@@ -24,8 +24,9 @@ spec:
       serviceAccountName: ncc-controller
       containers:
         - name: controller
-          image: python:3.11-slim
-          command: ["python", "-m", "symbolu.cloud_controller.main"]
+          # Replace REGION/PROJECT_ID/REPO with your values, or use quickstart.sh
+          # which patches this automatically after Cloud Build.
+          image: us-central1-docker.pkg.dev/PROJECT_ID/ncc/ncc-controller:latest
           args:
             - "--config=/etc/ncc/controller.yaml"
           ports:
