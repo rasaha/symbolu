@@ -86,6 +86,19 @@ class Severity(Enum):
     CATASTROPHIC = "catastrophic"   # SLO > 90% or no reaction at all
 
 
+class ConstraintLevel(Enum):
+    """How much of a scenario's outcome is externally constrained.
+
+    Used to separate true controller quality from external constraint
+    floors in reporting. This makes the benchmark more credible —
+    a 53% SLO in policy_oscillation (irreducible) is fundamentally
+    different from a 38% SLO in gradual_drift (controller-improvable).
+    """
+    UNCONSTRAINED = "unconstrained"                   # purely controller quality
+    PARTIALLY_CONSTRAINED = "partially_constrained"   # some external, some controller
+    FULLY_CONSTRAINED = "fully_constrained"           # dominated by external limits
+
+
 class FailureAttribution(Enum):
     """Root cause label for every divergence or SLO breach."""
     SIGNAL_DELAY = "signal_delay"
@@ -495,6 +508,7 @@ class EdgeScenario:
     alternating_budget_cap: Optional[AlternatingBudgetCap] = None
     controller_config: Optional[InfraControllerConfig] = None
     expected_attribution: FailureAttribution = FailureAttribution.NONE
+    constraint_level: ConstraintLevel = ConstraintLevel.UNCONSTRAINED
 
 
 def _demand_plateau_then_spike(cycle: int, total: int) -> float:
@@ -690,6 +704,7 @@ def build_edge_scenarios() -> List[EdgeScenario]:
         demand_fn=_demand_plateau_then_spike,
         actuation_delay=ActuationDelay(lag_cycles=5),
         expected_attribution=FailureAttribution.ACTUATION_LAG,
+        constraint_level=ConstraintLevel.PARTIALLY_CONSTRAINED,
     ))
 
     # 5. Pod scheduling delay — 3 cycle delay
@@ -700,6 +715,7 @@ def build_edge_scenarios() -> List[EdgeScenario]:
         demand_fn=_demand_ramp_sustained,
         actuation_delay=ActuationDelay(lag_cycles=3),
         expected_attribution=FailureAttribution.ACTUATION_LAG,
+        constraint_level=ConstraintLevel.PARTIALLY_CONSTRAINED,
     ))
 
     # --- C. System Shock Events ---
@@ -733,6 +749,7 @@ def build_edge_scenarios() -> List[EdgeScenario]:
         demand_fn=_demand_ramp_sustained,
         spot_eviction=SpotEviction(eviction_probability=0.05, max_evicted=2),
         expected_attribution=FailureAttribution.RESOURCE_EVICTION,
+        constraint_level=ConstraintLevel.PARTIALLY_CONSTRAINED,
     ))
 
     # 9. Budget cap — hard ceiling
@@ -743,6 +760,7 @@ def build_edge_scenarios() -> List[EdgeScenario]:
         demand_fn=_demand_plateau_then_spike,
         budget_cap=BudgetCap(max_replicas=8),
         expected_attribution=FailureAttribution.BUDGET_CONSTRAINT,
+        constraint_level=ConstraintLevel.FULLY_CONSTRAINED,
     ))
 
     # --- E. Controller Internal Pathologies ---
@@ -823,6 +841,7 @@ def build_edge_scenarios() -> List[EdgeScenario]:
         perturbations=[fb],
         actuation_delay=fb._actuation,  # share the same delay queue
         expected_attribution=FailureAttribution.FEEDBACK_LOOP,
+        constraint_level=ConstraintLevel.PARTIALLY_CONSTRAINED,
     ))
 
     # --- G. Tier 2: Behavioral Traps ---
@@ -843,6 +862,7 @@ def build_edge_scenarios() -> List[EdgeScenario]:
         description="High demand from cycle 0 — warmup phase causes SLO breaches",
         demand_fn=_demand_cold_start,
         expected_attribution=FailureAttribution.COLD_START,
+        constraint_level=ConstraintLevel.PARTIALLY_CONSTRAINED,
     ))
 
     # 19. Policy-induced oscillation — external cap alternates tight/loose
@@ -855,6 +875,7 @@ def build_edge_scenarios() -> List[EdgeScenario]:
             tight_cap=4, loose_cap=15, switch_interval=25,
         ),
         expected_attribution=FailureAttribution.POLICY_OSCILLATION,
+        constraint_level=ConstraintLevel.FULLY_CONSTRAINED,
     ))
 
     return scenarios
@@ -989,8 +1010,13 @@ class EdgeCaseReport:
 
             for r in by_class[cls]:
                 sev = r.severity.value.upper()
+                constraint_tag = ""
+                if r.scenario.constraint_level == ConstraintLevel.FULLY_CONSTRAINED:
+                    constraint_tag = " [EXTERNALLY CONSTRAINED]"
+                elif r.scenario.constraint_level == ConstraintLevel.PARTIALLY_CONSTRAINED:
+                    constraint_tag = " [PARTIALLY CONSTRAINED]"
                 status = f"{'PASS' if r.passed else 'FAIL'}/{sev:12s}"
-                lines.append(f"    {status}  {r.scenario.name}")
+                lines.append(f"    {status}  {r.scenario.name}{constraint_tag}")
                 lines.append(f"         {r.scenario.description}")
                 lines.append(
                     f"         react={r.score.reaction_time:3d} "
@@ -1047,16 +1073,39 @@ class EdgeCaseReport:
             f"{self.failed} failed"
         )
 
-        # Severity distribution
+        # Severity distribution — split by constraint level
         sev_counts: Dict[str, int] = {}
+        ctrl_sev: Dict[str, int] = {}   # controller-quality (unconstrained)
+        ext_sev: Dict[str, int] = {}    # externally constrained (partial + full)
         for r in self.results:
             sev_counts[r.severity.value] = sev_counts.get(r.severity.value, 0) + 1
+            if r.scenario.constraint_level == ConstraintLevel.UNCONSTRAINED:
+                ctrl_sev[r.severity.value] = ctrl_sev.get(r.severity.value, 0) + 1
+            else:
+                ext_sev[r.severity.value] = ext_sev.get(r.severity.value, 0) + 1
         lines.append("")
-        lines.append("  SEVERITY DISTRIBUTION:")
+        lines.append("  SEVERITY DISTRIBUTION (ALL):")
         for sev in Severity:
             count = sev_counts.get(sev.value, 0)
             bar = "#" * count
             lines.append(f"    {sev.value:14s}  {count:2d}  {bar}")
+
+        ctrl_total = sum(ctrl_sev.values())
+        ext_total = sum(ext_sev.values())
+        if ctrl_total > 0:
+            lines.append("")
+            lines.append(f"  CONTROLLER QUALITY ({ctrl_total} unconstrained scenarios):")
+            for sev in Severity:
+                count = ctrl_sev.get(sev.value, 0)
+                bar = "#" * count
+                lines.append(f"    {sev.value:14s}  {count:2d}  {bar}")
+        if ext_total > 0:
+            lines.append("")
+            lines.append(f"  EXTERNALLY CONSTRAINED ({ext_total} scenarios — partial or full):")
+            for sev in Severity:
+                count = ext_sev.get(sev.value, 0)
+                bar = "#" * count
+                lines.append(f"    {sev.value:14s}  {count:2d}  {bar}")
 
         # Failure attribution breakdown
         attr_counts: Dict[str, int] = {}
@@ -1074,9 +1123,10 @@ class EdgeCaseReport:
         # Breach source split: controller vs environment vs policy
         lines.append("")
         lines.append("  BREACH SOURCE ATTRIBUTION:")
-        lines.append(f"    {'Scenario':<30s} {'SLO%':>6s} {'Controller':>12s} {'Environment':>12s} {'Policy':>10s}")
-        lines.append("    " + "-" * 72)
+        lines.append(f"    {'Scenario':<30s} {'Constraint':<8s} {'SLO%':>6s} {'Controller':>12s} {'Environment':>12s} {'Policy':>10s}")
+        lines.append("    " + "-" * 82)
         total_ctrl = total_env = total_pol = 0
+        ctrl_only_ctrl = ctrl_only_env = 0  # controller-quality scenarios only
         for r in sorted(self.results, key=lambda r: -r.score.slo_breach_rate):
             split = r.breach_split
             slo = r.score.slo_breach_rate * 100
@@ -1086,26 +1136,44 @@ class EdgeCaseReport:
             total_ctrl += split["controller"]
             total_env += split["environment"]
             total_pol += split["policy"]
+            if r.scenario.constraint_level == ConstraintLevel.UNCONSTRAINED:
+                ctrl_only_ctrl += split["controller"]
+                ctrl_only_env += split["environment"]
+            cl = r.scenario.constraint_level.value
+            tag = {"unconstrained": "  --", "partially_constrained": "partial", "fully_constrained": " FULL"}[cl]
             lines.append(
-                f"    {r.scenario.name:<30s} {slo:5.1f}% "
+                f"    {r.scenario.name:<30s} {tag:<8s} {slo:5.1f}% "
                 f"{split['controller']:10d}  "
                 f"{split['environment']:10d}  "
                 f"{split['policy']:10d}"
             )
-        lines.append("    " + "-" * 72)
+        lines.append("    " + "-" * 82)
         grand_total = total_ctrl + total_env + total_pol
         if grand_total > 0:
             lines.append(
-                f"    {'TOTAL':<30s}       "
+                f"    {'TOTAL':<30s}          "
                 f"{total_ctrl:10d}  "
                 f"{total_env:10d}  "
                 f"{total_pol:10d}"
             )
             lines.append(
-                f"    {'PERCENT':<30s}       "
+                f"    {'PERCENT':<30s}          "
                 f"{total_ctrl/grand_total*100:9.1f}%  "
                 f"{total_env/grand_total*100:9.1f}%  "
                 f"{total_pol/grand_total*100:9.1f}%"
+            )
+        # Controller-quality summary: only unconstrained scenarios
+        ctrl_only_total = ctrl_only_ctrl + ctrl_only_env
+        if ctrl_only_total > 0:
+            lines.append("")
+            lines.append("  CONTROLLER-QUALITY BREACHES (unconstrained scenarios only):")
+            lines.append(
+                f"    Controller didn't try:  {ctrl_only_ctrl:4d} "
+                f"({ctrl_only_ctrl/ctrl_only_total*100:.1f}%)"
+            )
+            lines.append(
+                f"    Controller tried:       {ctrl_only_env:4d} "
+                f"({ctrl_only_env/ctrl_only_total*100:.1f}%)"
             )
 
         lines.append("")

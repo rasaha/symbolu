@@ -167,6 +167,13 @@ class Controller:
         # the weak initial positive signal can cross the action threshold.
         self._recovery_cycles: int = 0
 
+        # Scale-out futility detector — if the controller keeps issuing
+        # scale-out deltas but metrics aren't improving (replicas keep
+        # rising without convergence), taper the delta to prevent runaway
+        # overshoot. This catches cascade scenarios where perturbations
+        # inject high latency regardless of replica count.
+        self._consecutive_scale_out: int = 0
+
 
     def step(
         self,
@@ -388,9 +395,19 @@ class Controller:
         # Pending capacity suppression: if there are unrealized scale-out
         # deltas in flight, suppress additional scale-out to prevent the
         # feedback delay loop from compounding overshoot.
-        pending_out = sum(d for _, d in self._pending_deltas if d > 0)
+        # Decay suppression for old pending deltas — if capacity has been
+        # requested but hasn't arrived after several cycles, the controller
+        # should be allowed to issue follow-up requests rather than waiting
+        # indefinitely. This improves convergence in slow_provisioning and
+        # feedback_delay_loop scenarios.
+        pending_out = 0.0
+        for issued_step, d in self._pending_deltas:
+            if d > 0:
+                age = self._step - issued_step
+                # Fresh deltas suppress fully, old ones decay
+                freshness = max(0.2, 1.0 - age * 0.15)
+                pending_out += d * freshness
         if pending_out > 0 and action_score > 0:
-            # Dampen action score proportionally to pending capacity
             suppression = min(0.8, pending_out * 0.15)
             action_score *= (1.0 - suppression)
 
@@ -729,7 +746,27 @@ class Controller:
         if delta > 0:
             max_out = max(1, int(current_replicas * self.config.max_scale_out_ratio))
             delta = min(delta, max_out)
-        elif delta < 0:
+            # Scale-out futility: if we've been scaling out for many
+            # consecutive cycles without pressure improving, taper delta.
+            # This catches runaway overshoot in cascade/perturbation
+            # scenarios where injected metrics don't respond to capacity.
+            # Key: only count futile scale-outs — if pressure is declining,
+            # the scaling IS working and we should not interfere.
+            self._consecutive_scale_out += 1
+            pressure_declining = (
+                len(self._pressure_history) >= 5
+                and self._pressure_history[-1] < self._pressure_history[-5] - 0.01
+            )
+            if pressure_declining:
+                self._consecutive_scale_out = 0  # scaling is working
+            if self._consecutive_scale_out > 15:
+                delta = min(delta, 1)  # cap at +1 after 15 futile consecutive
+            if self._consecutive_scale_out > 25:
+                delta = 0  # stop scaling entirely after 25 futile consecutive
+        else:
+            self._consecutive_scale_out = 0
+
+        if delta < 0:
             max_in = max(1, int(current_replicas * self.config.max_scale_in_ratio))
             delta = max(delta, -max_in)
             # Scale-in step cap: limit to -1 per cycle. Scale-out can add
@@ -843,3 +880,4 @@ class Controller:
             self._latency_override_active = False
             self._recovery_cycles = 0
             self._recent_required_floor = 1.0
+            self._consecutive_scale_out = 0
