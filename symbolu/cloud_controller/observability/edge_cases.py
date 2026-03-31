@@ -99,6 +99,31 @@ class ConstraintLevel(Enum):
     FULLY_CONSTRAINED = "fully_constrained"           # dominated by external limits
 
 
+class CostCategory(Enum):
+    """Per-cycle cost classification for excess-cost cycles.
+
+    Every cycle where replicas > optimal_replicas (excess cost) is
+    classified into exactly one of these three categories:
+
+      controller_limited: Controller doesn't signal scale-in strongly
+          enough. A_t is near-zero or positive despite over-provisioning.
+          This is true inefficiency — the controller could do better.
+
+      safety_buffer_limited: Controller's A_t signals scale-in, but
+          safety mechanisms (asymmetric threshold, step cap, baseline-
+          memory floor, weak-signal gate) limit actual delta. This is
+          intentional cost from protective guardrails.
+
+      constraint_limited: External factors block convergence — actuation
+          delay means previous scale-ups haven't landed yet, budget/policy
+          caps interact with replica count, spot evictions force recovery
+          over-provisioning.
+    """
+    CONTROLLER_LIMITED = "controller_limited"
+    SAFETY_BUFFER_LIMITED = "safety_buffer_limited"
+    CONSTRAINT_LIMITED = "constraint_limited"
+
+
 class FailureAttribution(Enum):
     """Root cause label for every divergence or SLO breach."""
     SIGNAL_DELAY = "signal_delay"
@@ -970,6 +995,95 @@ class EdgeCaseResult:
         }
 
     @property
+    def cost_classification(self) -> Dict[CostCategory, List[int]]:
+        """Classify every excess-cost cycle into exactly one category.
+
+        Returns a dict mapping each CostCategory to the list of cycle
+        indices that belong to it. Only cycles where replicas > optimal
+        are classified (non-excess cycles are excluded).
+
+        Classification logic:
+          1. constraint_limited: scenario has external constraints
+             (actuation delay, spot eviction, budget cap, alternating cap)
+             AND controller is trying to scale in (A_t < -0.02).
+          2. safety_buffer_limited: no external constraint blocking, but
+             controller wants to scale in (A_t < -0.02) and delta >= 0
+             (safety mechanisms held it back), OR delta is negative but
+             less than the excess (step cap limited).
+          3. controller_limited: A_t >= -0.02 — controller doesn't even
+             see the need to reduce replicas. True inefficiency.
+        """
+        snaps = self.state_trace.snapshots
+        result: Dict[CostCategory, List[int]] = {
+            CostCategory.CONTROLLER_LIMITED: [],
+            CostCategory.SAFETY_BUFFER_LIMITED: [],
+            CostCategory.CONSTRAINT_LIMITED: [],
+        }
+
+        has_external = (
+            self.scenario.actuation_delay is not None
+            or self.scenario.spot_eviction is not None
+            or self.scenario.budget_cap is not None
+            or self.scenario.alternating_budget_cap is not None
+        )
+
+        for s in snaps:
+            if s.replicas <= s.optimal_replicas:
+                continue  # not an excess-cost cycle
+
+            excess = s.replicas - s.optimal_replicas
+            wants_scale_in = s.action_score < -0.02
+
+            if has_external and wants_scale_in:
+                # Controller is trying but external factors block convergence
+                result[CostCategory.CONSTRAINT_LIMITED].append(s.cycle)
+            elif wants_scale_in:
+                # Controller wants to scale in but safety mechanisms limit it
+                result[CostCategory.SAFETY_BUFFER_LIMITED].append(s.cycle)
+            else:
+                # Controller doesn't see the need — true inefficiency
+                result[CostCategory.CONTROLLER_LIMITED].append(s.cycle)
+
+        return result
+
+    @property
+    def cost_classification_summary(self) -> Dict[str, float]:
+        """Aggregate cost classification: % cycles and % excess cost per category.
+
+        Returns dict with keys like 'controller_limited_pct_cycles',
+        'controller_limited_pct_cost', etc.
+        """
+        cc = self.cost_classification
+        snaps = self.state_trace.snapshots
+        snap_by_cycle = {s.cycle: s for s in snaps}
+
+        total_excess_cycles = sum(len(v) for v in cc.values())
+        total_excess_cost = 0.0
+        cost_by_cat: Dict[CostCategory, float] = {cat: 0.0 for cat in CostCategory}
+
+        for cat, cycles in cc.items():
+            for c in cycles:
+                s = snap_by_cycle[c]
+                excess = s.replicas - s.optimal_replicas
+                cost_by_cat[cat] += excess
+                total_excess_cost += excess
+
+        summary: Dict[str, float] = {}
+        for cat in CostCategory:
+            n_cycles = len(cc[cat])
+            cat_cost = cost_by_cat[cat]
+            pct_cycles = (n_cycles / total_excess_cycles * 100) if total_excess_cycles > 0 else 0.0
+            pct_cost = (cat_cost / total_excess_cost * 100) if total_excess_cost > 0 else 0.0
+            summary[f"{cat.value}_pct_cycles"] = pct_cycles
+            summary[f"{cat.value}_pct_cost"] = pct_cost
+            summary[f"{cat.value}_cycles"] = float(n_cycles)
+            summary[f"{cat.value}_excess"] = cat_cost
+
+        summary["total_excess_cycles"] = float(total_excess_cycles)
+        summary["total_excess_cost"] = total_excess_cost
+        return summary
+
+    @property
     def passed(self) -> bool:
         """Did the controller handle this edge case acceptably?"""
         return self.severity in (Severity.PASS, Severity.MILD)
@@ -1175,6 +1289,87 @@ class EdgeCaseReport:
                 f"    Controller tried:       {ctrl_only_env:4d} "
                 f"({ctrl_only_env/ctrl_only_total*100:.1f}%)"
             )
+
+        # Cost classification: controller vs safety-buffer vs constraint
+        lines.append("")
+        lines.append("  EXCESS COST ATTRIBUTION:")
+        lines.append(
+            f"    {'Scenario':<30s} {'Cost':>5s} "
+            f"{'Controller%':>12s} {'SafetyBuf%':>11s} {'Constraint%':>12s} "
+            f"{'ExcCycles':>10s}"
+        )
+        lines.append("    " + "-" * 84)
+
+        grand_ctrl_cost = 0.0
+        grand_safety_cost = 0.0
+        grand_constraint_cost = 0.0
+        grand_total_cost = 0.0
+
+        for r in sorted(self.results, key=lambda r: -r.score.cost_efficiency):
+            cs = r.cost_classification_summary
+            total_exc = cs["total_excess_cost"]
+            if total_exc == 0:
+                continue
+
+            ctrl_pct = cs["controller_limited_pct_cost"]
+            safety_pct = cs["safety_buffer_limited_pct_cost"]
+            constraint_pct = cs["constraint_limited_pct_cost"]
+            exc_cycles = int(cs["total_excess_cycles"])
+
+            grand_ctrl_cost += cs["controller_limited_excess"]
+            grand_safety_cost += cs["safety_buffer_limited_excess"]
+            grand_constraint_cost += cs["constraint_limited_excess"]
+            grand_total_cost += total_exc
+
+            lines.append(
+                f"    {r.scenario.name:<30s} "
+                f"{r.score.cost_efficiency:4.2f}x "
+                f"{ctrl_pct:10.1f}%  "
+                f"{safety_pct:9.1f}%  "
+                f"{constraint_pct:10.1f}%  "
+                f"{exc_cycles:9d}"
+            )
+
+        lines.append("    " + "-" * 84)
+        if grand_total_cost > 0:
+            lines.append(
+                f"    {'AGGREGATE':<30s}       "
+                f"{grand_ctrl_cost/grand_total_cost*100:10.1f}%  "
+                f"{grand_safety_cost/grand_total_cost*100:9.1f}%  "
+                f"{grand_constraint_cost/grand_total_cost*100:10.1f}%"
+            )
+
+        # Key insight: what fraction of total excess cost is true controller inefficiency?
+        lines.append("")
+        if grand_total_cost > 0:
+            ctrl_frac = grand_ctrl_cost / grand_total_cost * 100
+            safety_frac = grand_safety_cost / grand_total_cost * 100
+            constraint_frac = grand_constraint_cost / grand_total_cost * 100
+            lines.append("  COST INSIGHT:")
+            lines.append(
+                f"    Controller inefficiency:  {ctrl_frac:5.1f}% of excess cost"
+            )
+            lines.append(
+                f"    Safety buffer overhead:   {safety_frac:5.1f}% of excess cost"
+            )
+            lines.append(
+                f"    External constraints:     {constraint_frac:5.1f}% of excess cost"
+            )
+            if ctrl_frac < 20:
+                lines.append(
+                    "    → Excess cost is dominated by intentional safety margins "
+                    "and external constraints, not controller inefficiency."
+                )
+            elif ctrl_frac < 50:
+                lines.append(
+                    "    → Mixed: some controller inefficiency, but safety and "
+                    "constraints are significant contributors."
+                )
+            else:
+                lines.append(
+                    "    → Controller inefficiency is the primary cost driver — "
+                    "optimization opportunities exist."
+                )
 
         lines.append("")
         lines.append("=" * 90)
