@@ -783,11 +783,19 @@ class Controller:
                 delta = 0  # stop scaling entirely after 25 futile consecutive
             # High-replica weak-signal gate: at very high replica counts,
             # weak +1 scale-outs add marginal capacity but compound cost.
-            # Only blocks when A_t is weak (< 0.15) — strong demand signals
-            # still trigger scale-out even at high counts. Reset the futility
-            # counter when gating fires — the controller isn't futilely
-            # scaling, it's being deliberately suppressed.
-            if delta == 1 and current_replicas >= 20 and abs_score < 0.15:
+            # Uses a graduated threshold that tightens at higher replica
+            # counts — at 20+ replicas, block weak signals (A_t < 0.15);
+            # at 30+ replicas, block moderate signals too (A_t < 0.20).
+            # No scenario genuinely needs 30+ replicas, so the tighter
+            # gate at 30+ is safe. Reset the futility counter when gating
+            # fires — the controller isn't futilely scaling, it's being
+            # deliberately suppressed.
+            gate_threshold = 0.0
+            if current_replicas >= 30:
+                gate_threshold = 0.20
+            elif current_replicas >= 20:
+                gate_threshold = 0.15
+            if delta == 1 and gate_threshold > 0 and abs_score < gate_threshold:
                 delta = 0
                 self._consecutive_scale_out = 0
         else:
