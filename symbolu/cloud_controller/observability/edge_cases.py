@@ -53,6 +53,11 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from symbolu.cloud_controller.controller import Controller, ActionResult
 from symbolu.cloud_controller.config import InfraControllerConfig
+from symbolu.cloud_controller.observability.efficiency_estimator import (
+    EfficiencyEstimator,
+    EfficiencyState,
+    EfficiencySummary,
+)
 from symbolu.cloud_controller.observability.benchmark import (
     _demand_to_metrics,
     _optimal_replicas,
@@ -919,6 +924,7 @@ class EdgeCaseResult:
     attribution: FailureAttribution
     pathologies: List[str] = field(default_factory=list)
     breach_attributions: Dict[str, int] = field(default_factory=dict)
+    efficiency_summary: Optional[EfficiencySummary] = None
 
     @property
     def severity(self) -> Severity:
@@ -1339,6 +1345,77 @@ class EdgeCaseReport:
                 f"{grand_constraint_cost/grand_total_cost*100:10.1f}%"
             )
 
+        # Scaling Effectiveness Analysis (from EfficiencyEstimator)
+        lines.append("")
+        lines.append("  SCALING EFFECTIVENESS ANALYSIS:")
+        lines.append(
+            f"    {'Scenario':<30s} {'ScaleOuts':>9s} "
+            f"{'Helping':>8s} {'Neutral':>8s} {'NotHelp':>8s} "
+            f"{'%NotHelp':>9s} {'ExcOverlap':>11s}"
+        )
+        lines.append("    " + "-" * 87)
+
+        grand_so = 0
+        grand_helping = 0
+        grand_neutral = 0
+        grand_not_helping = 0
+        grand_overlap = 0
+        grand_excess = 0
+
+        for r in sorted(self.results, key=lambda r: -r.score.cost_efficiency):
+            es = r.efficiency_summary
+            if es is None or es.total_scale_outs == 0:
+                continue
+            grand_so += es.total_scale_outs
+            grand_helping += es.helping_count
+            grand_neutral += es.neutral_count
+            grand_not_helping += es.not_helping_count
+            grand_overlap += es.not_helping_during_excess
+            grand_excess += es.total_excess_cycles
+
+            overlap_str = (
+                f"{es.excess_overlap_pct:5.1f}%"
+                if es.total_excess_cycles > 0 else "  n/a"
+            )
+            lines.append(
+                f"    {r.scenario.name:<30s} "
+                f"{es.total_scale_outs:9d} "
+                f"{es.helping_count:8d} "
+                f"{es.neutral_count:8d} "
+                f"{es.not_helping_count:8d} "
+                f"{es.pct_not_helping:8.1f}% "
+                f"{overlap_str:>11s}"
+            )
+
+        lines.append("    " + "-" * 87)
+        if grand_so > 0:
+            lines.append(
+                f"    {'TOTAL':<30s} "
+                f"{grand_so:9d} "
+                f"{grand_helping:8d} "
+                f"{grand_neutral:8d} "
+                f"{grand_not_helping:8d} "
+                f"{grand_not_helping/grand_so*100:8.1f}% "
+                f"{grand_overlap/max(1,grand_excess)*100:10.1f}%"
+            )
+
+        lines.append("")
+        if grand_so > 0:
+            lines.append("  EFFECTIVENESS INSIGHT:")
+            nh_pct = grand_not_helping / grand_so * 100
+            h_pct = grand_helping / grand_so * 100
+            lines.append(
+                f"    {h_pct:.0f}% of scale-outs improved metrics (HELPING)"
+            )
+            lines.append(
+                f"    {nh_pct:.0f}% of scale-outs had no positive effect (NOT_HELPING)"
+            )
+            if grand_excess > 0:
+                lines.append(
+                    f"    {grand_overlap/grand_excess*100:.0f}% of excess-cost cycles "
+                    f"overlap with NOT_HELPING windows"
+                )
+
         # Key insight: what fraction of total excess cost is true controller inefficiency?
         lines.append("")
         if grand_total_cost > 0:
@@ -1453,6 +1530,7 @@ class EdgeCaseHarness:
         delta_history: List[int] = []
         demand_trace: List[float] = []
         state_trace = InternalStateTrace()
+        estimator = EfficiencyEstimator()
 
         # Generate demand trace
         for i in range(self.cycles):
@@ -1535,6 +1613,15 @@ class EdgeCaseHarness:
                 recommendation=result.recommendation,
             ))
 
+            # Efficiency estimator: observe (no control impact)
+            estimator.observe(
+                cycle=cycle_idx,
+                metrics=metrics,
+                replicas=replicas,
+                delta=raw_delta,
+                optimal_replicas=optimal,
+            )
+
         # Score
         score = _score_run(
             scenario.name, "controller",
@@ -1548,12 +1635,20 @@ class EdgeCaseHarness:
         # Attribute root cause
         attribution = self._attribute_failure(scenario, score, state_trace)
 
+        # Efficiency estimator summary (with excess cycle overlap)
+        excess_cycles = [
+            s.cycle for s in state_trace.snapshots
+            if s.replicas > s.optimal_replicas
+        ]
+        eff_summary = estimator.summary(excess_cycles=excess_cycles)
+
         return EdgeCaseResult(
             scenario=scenario,
             score=score,
             state_trace=state_trace,
             attribution=attribution,
             pathologies=pathologies,
+            efficiency_summary=eff_summary,
         )
 
     def _attribute_failure(
