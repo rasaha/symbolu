@@ -57,6 +57,7 @@ from symbolu.cloud_controller.observability.efficiency_estimator import (
     EfficiencyEstimator,
     EfficiencyState,
     EfficiencySummary,
+    ScaleOutFutilityGuard,
 )
 from symbolu.cloud_controller.observability.benchmark import (
     _demand_to_metrics,
@@ -1531,6 +1532,10 @@ class EdgeCaseHarness:
         demand_trace: List[float] = []
         state_trace = InternalStateTrace()
         estimator = EfficiencyEstimator()
+        futility_guard = ScaleOutFutilityGuard(
+            futility_window=5,
+            high_replica_threshold=20,
+        )
 
         # Generate demand trace
         for i in range(self.cycles):
@@ -1570,13 +1575,29 @@ class EdgeCaseHarness:
             result = ctrl.step(metrics=metrics, current_replicas=replicas)
             raw_delta = result.replica_delta
 
+            # Efficiency estimator: observe BEFORE delta application
+            # so the guard can use the current efficiency state
+            optimal = _optimal_replicas(demand, self.base_replicas)
+            eff_entry = estimator.observe(
+                cycle=cycle_idx,
+                metrics=metrics,
+                replicas=replicas,
+                delta=raw_delta,
+                optimal_replicas=optimal,
+            )
+
+            # Futility guard: block scale-out when provably ineffective
+            # Applied AFTER controller decides, BEFORE actuation
+            futility_guard.update(eff_entry.state)
+            guarded_delta = futility_guard.filter_delta(raw_delta, replicas)
+
             # Apply actuation delay if present
             if scenario.actuation_delay is not None:
                 effective_delta = scenario.actuation_delay.get_effective_delta(
-                    raw_delta, cycle_idx,
+                    guarded_delta, cycle_idx,
                 )
             else:
-                effective_delta = raw_delta
+                effective_delta = guarded_delta
 
             # Apply spot eviction
             if scenario.spot_eviction is not None:
@@ -1593,10 +1614,13 @@ class EdgeCaseHarness:
                 replicas = scenario.alternating_budget_cap.cap(replicas, cycle_idx)
 
             replica_history.append(replicas)
+            # Record raw_delta for scoring (measures controller quality).
+            # guarded_delta only affects actuation — the scorer should see
+            # whether the controller TRIED to react, not whether the guard
+            # allowed it.
             delta_history.append(raw_delta)
 
             # Record internal state
-            optimal = _optimal_replicas(demand, self.base_replicas)
             state_trace.snapshots.append(StateSnapshot(
                 cycle=cycle_idx,
                 demand=demand,
@@ -1612,15 +1636,6 @@ class EdgeCaseHarness:
                 delta=raw_delta,
                 recommendation=result.recommendation,
             ))
-
-            # Efficiency estimator: observe (no control impact)
-            estimator.observe(
-                cycle=cycle_idx,
-                metrics=metrics,
-                replicas=replicas,
-                delta=raw_delta,
-                optimal_replicas=optimal,
-            )
 
         # Score
         score = _score_run(

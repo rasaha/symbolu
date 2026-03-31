@@ -120,36 +120,91 @@ class EfficiencySummary:
 
 
 # ============================================================
-# Future Hook Placeholder (NOT ACTIVATED)
+# Scale-Out Futility Guard
 # ============================================================
 
 @dataclass
-class FutureScaleOutCapHook:
-    """Placeholder for future control integration.
+class ScaleOutFutilityGuard:
+    """Blocks scale-out when scaling is provably ineffective.
 
-    When activated (NOT NOW), this would cap scale-out when the
-    estimator detects sustained NOT_HELPING state at high replica
-    counts.
+    Operates as a safe delta override layer between the controller's
+    decision and actuation. Only caps positive delta (scale-out) — never
+    forces scale-in or modifies negative delta.
 
-    DO NOT connect this to controller logic. This exists only to
-    document the intended integration point for future work.
+    Activation requires ALL of:
+      1. NOT_HELPING for >= futility_window consecutive cycles
+      2. replicas >= high_replica_threshold
+      3. The guard is deterministic and resets immediately when
+         efficiency becomes HELPING
+
+    Safety guarantees:
+      - NEVER activates below high_replica_threshold
+      - NEVER triggers on single-cycle NOT_HELPING
+      - NEVER modifies scale-in decisions (negative delta passes through)
+      - Resets immediately when efficiency_state becomes HELPING
     """
-    consecutive_not_helping_threshold: int = 10
-    high_replica_threshold: int = 15
-    enabled: bool = False  # MUST remain False
+    futility_window: int = 5
+    high_replica_threshold: int = 20
 
-    def should_cap(
-        self,
-        consecutive_not_helping: int,
-        current_replicas: int,
-    ) -> bool:
-        """Would this hook recommend capping? (Never active.)"""
-        if not self.enabled:
-            return False
-        return (
-            consecutive_not_helping >= self.consecutive_not_helping_threshold
+    # Internal state
+    _consecutive_not_helping: int = field(default=0, init=False, repr=False)
+    _active: bool = field(default=False, init=False, repr=False)
+    _blocked_events: int = field(default=0, init=False, repr=False)
+    _total_evaluated: int = field(default=0, init=False, repr=False)
+
+    def update(self, efficiency_state: EfficiencyState) -> None:
+        """Update consecutive NOT_HELPING counter from estimator output.
+
+        Called once per cycle with the estimator's classification.
+        """
+        if efficiency_state == EfficiencyState.NOT_HELPING:
+            self._consecutive_not_helping += 1
+        elif efficiency_state == EfficiencyState.HELPING:
+            # Hard reset: HELPING proves scaling is working
+            self._consecutive_not_helping = 0
+            self._active = False
+        else:
+            # NEUTRAL: decay slowly (don't reset, but don't accumulate)
+            # This prevents a single NEUTRAL cycle from resetting a
+            # long NOT_HELPING streak
+            pass
+
+    def filter_delta(self, delta: int, current_replicas: int) -> int:
+        """Apply futility guard to the controller's delta decision.
+
+        Returns the (possibly modified) delta. Only caps positive delta.
+        Negative delta always passes through unchanged.
+        """
+        self._total_evaluated += 1
+
+        # Determine if guard should be active
+        self._active = (
+            self._consecutive_not_helping >= self.futility_window
             and current_replicas >= self.high_replica_threshold
         )
+
+        # Only block scale-out (positive delta)
+        if self._active and delta > 0:
+            self._blocked_events += 1
+            return 0
+
+        return delta
+
+    @property
+    def is_active(self) -> bool:
+        return self._active
+
+    @property
+    def consecutive_not_helping(self) -> int:
+        return self._consecutive_not_helping
+
+    @property
+    def blocked_scale_out_events(self) -> int:
+        return self._blocked_events
+
+    @property
+    def total_evaluated(self) -> int:
+        return self._total_evaluated
 
 
 # ============================================================
@@ -189,8 +244,6 @@ class EfficiencyEstimator:
         self._current_state: EfficiencyState = EfficiencyState.NEUTRAL
         self._consecutive_not_helping: int = 0
 
-        # Future hook (not activated)
-        self._future_hook = FutureScaleOutCapHook(enabled=False)
 
     def observe(
         self,
@@ -268,11 +321,6 @@ class EfficiencyEstimator:
             self._consecutive_not_helping += 1
         else:
             self._consecutive_not_helping = 0
-
-        # Future hook check (observational only — logs but never acts)
-        _ = self._future_hook.should_cap(
-            self._consecutive_not_helping, replicas,
-        )
 
         entry = CycleEfficiency(
             cycle=cycle,
