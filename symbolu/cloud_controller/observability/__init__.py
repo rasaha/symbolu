@@ -31,6 +31,16 @@ from symbolu.cloud_controller.observability.otel_exporter import (
     OtelExporter,
     OtelExporterConfig,
 )
+from symbolu.cloud_controller.observability.edge_cases import (
+    EdgeCaseHarness,
+    EdgeCaseReport,
+    EdgeCaseResult,
+    EdgeScenario,
+    FailureAttribution,
+    FailureClass,
+    InternalStateTrace,
+    StateSnapshot,
+)
 
 __all__ = [
     "BenchmarkConfig",
@@ -38,6 +48,14 @@ __all__ = [
     "BenchmarkReport",
     "BuiltinHistogram",
     "BuiltinMetric",
+    "EdgeCaseHarness",
+    "EdgeCaseReport",
+    "EdgeCaseResult",
+    "EdgeScenario",
+    "FailureAttribution",
+    "FailureClass",
+    "InternalStateTrace",
+    "StateSnapshot",
     "DecisionLogEntry",
     "DecisionLogFormatter",
     "DecisionPhase",

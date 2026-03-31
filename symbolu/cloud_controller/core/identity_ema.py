@@ -39,15 +39,23 @@ class IdentityEMA:
     system is stable and signal agrees with existing identity).
     """
 
-    def __init__(self, dim: int = 16, alpha_base: float = 0.01, ema_decay: float = 0.99):
+    def __init__(
+        self,
+        dim: int = 16,
+        alpha_base: float = 0.01,
+        ema_decay: float = 0.99,
+        alpha_max: float = 0.05,
+    ):
         self.dim = dim
         self.alpha_base = alpha_base
         self.ema_decay = ema_decay
+        self.alpha_max = alpha_max  # Hard ceiling prevents baseline from chasing signal
         self.baseline = np.random.randn(dim) * 0.01
         self.baseline = self.baseline / (np.linalg.norm(self.baseline) + 1e-8) * np.sqrt(dim)
         self.accumulator = np.zeros(dim)
         self.count = 0
         self.consolidation_count = 0
+        self._prev_baseline: Optional[np.ndarray] = None  # For regime-change detection
 
     def accumulate(self, signal: np.ndarray, salience: float = 0.5) -> None:
         """Fast loop: accumulate an infrastructure state snapshot.
@@ -116,12 +124,16 @@ class IdentityEMA:
         accumulator_var = float(np.var(self.accumulator))
         stability = 1.0 / (1.0 + accumulator_var)
 
-        # Effective alpha: base * stability * agreement, floored
-        # Matches identity_layer.py line 206
+        # Effective alpha: base * stability * agreement, floored and capped
+        # Floor: never zero. Ceiling: prevents baseline from chasing signal.
         alpha_eff = max(
             self.alpha_base * stability * agreement,
             self.alpha_base * 0.1,
         )
+        alpha_eff = min(alpha_eff, self.alpha_max)
+
+        # Save previous baseline for regime-change detection
+        self._prev_baseline = self.baseline.copy()
 
         # I_t = (1 - alpha_eff) * I_{t-1} + alpha_eff * A_normalized
         # Matches identity_layer.py line 209
@@ -196,6 +208,22 @@ class IdentityEMA:
         self.consolidation_count += 1  # Mark as having consolidated
 
     @property
+    def baseline_shift(self) -> float:
+        """Cosine distance between current and previous baseline.
+
+        Returns 0.0 if no previous baseline exists. High values (> 0.3)
+        indicate a regime change — the system's "normal" is shifting.
+        """
+        if self._prev_baseline is None:
+            return 0.0
+        b_norm = np.linalg.norm(self.baseline)
+        p_norm = np.linalg.norm(self._prev_baseline)
+        if b_norm < 1e-8 or p_norm < 1e-8:
+            return 1.0
+        cos_sim = float(np.dot(self.baseline, self._prev_baseline) / (b_norm * p_norm))
+        return 1.0 - max(0.0, (cos_sim + 1.0) / 2.0)
+
+    @property
     def bootstrapped(self) -> bool:
         """Whether this identity has been through at least one consolidation."""
         return self.consolidation_count > 0
@@ -206,3 +234,4 @@ class IdentityEMA:
         self.accumulator = np.zeros(self.dim)
         self.count = 0
         self.consolidation_count = 0
+        self._prev_baseline = None
