@@ -8,6 +8,7 @@ Supported providers:
 - OpenAI (GPT-4, GPT-3.5)
 - Anthropic (Claude)
 - Google (Gemini)
+- MistralCG (local Mistral + Conscious Generation)
 - Mock (for testing)
 
 Usage:
@@ -209,6 +210,237 @@ class AnthropicAdapter(BaseLLMAdapter):
             if hasattr(first_block, "text"):
                 return first_block.text
         return str(content)
+
+
+class MistralCGAdapter(BaseLLMAdapter):
+    """
+    Adapter for local MistralCGWrapper (Conscious Generation) model.
+
+    Bridges the PyTorch nn.Module (tensor in/out) to the BaseLLMAdapter
+    interface (string in/out) so MistralCGWrapper can serve as the llm_client
+    for AgenticLLMWrapper.
+
+    After each call(), CG metadata (state, delta_S, delta_bhava, intent_phase)
+    is stored in self.last_cg_metadata and can be fed to the Sovereign Bridge
+    for ConfidenceGate / SafetyContract integration.
+
+    Requires: torch, transformers (+ optional bitsandbytes for quantized models)
+
+    Usage:
+        from symbolu.agentic_framework.llm_adapters import MistralCGAdapter
+
+        adapter = MistralCGAdapter(model_name="mistralai/Mistral-7B-v0.3")
+        response = adapter.call("What is consciousness?")
+
+        # Access CG metadata for sovereign bridge
+        from symbolu.agentic_framework.sovereign_bridge import (
+            signals_from_sovereign_state,
+        )
+        signals = signals_from_sovereign_state(
+            adapter.last_cg_metadata['state'],
+            adapter.last_cg_metadata['delta_S'],
+        )
+    """
+
+    def __init__(
+        self,
+        model_name: str = "mistralai/Mistral-7B-v0.3",
+        quantize: Optional[str] = None,
+        max_new_tokens: int = 512,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        top_k: int = 50,
+        repetition_penalty: float = 1.1,
+        device_map: str = "auto",
+        trust_remote_code: bool = False,
+        pretrained_model: Optional[Any] = None,
+        pretrained_tokenizer: Optional[Any] = None,
+        **kwargs: Any,
+    ):
+        """
+        Initialize MistralCG adapter.
+
+        Args:
+            model_name: HuggingFace model identifier
+            quantize: Quantization mode (None, "4bit", "8bit")
+            max_new_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (0 = greedy)
+            top_p: Nucleus sampling threshold
+            top_k: Top-k sampling
+            repetition_penalty: Penalty for repeated tokens
+            device_map: Device placement strategy
+            trust_remote_code: Trust remote code in model hub
+            pretrained_model: Pre-loaded nn.Module (skips loading)
+            pretrained_tokenizer: Pre-loaded tokenizer (skips loading)
+            **kwargs: Additional kwargs for MistralCGWrapper
+        """
+        self.max_new_tokens = max_new_tokens
+        self.temperature = temperature
+        self.top_p = top_p
+        self.top_k = top_k
+        self.repetition_penalty = repetition_penalty
+
+        # CG metadata from most recent call — consumed by sovereign_bridge
+        self.last_cg_metadata: Dict[str, Any] = {}
+        self.call_history: List[str] = []
+
+        # Import and build model
+        try:
+            import torch  # noqa: F811
+
+            self._torch = torch
+        except ImportError:
+            raise ImportError("torch required. Install with: pip install torch")
+
+        try:
+            from symbolu.training.unified.mistral_wrapper import (
+                MistralCGWrapper,
+            )
+
+            self.model = MistralCGWrapper(
+                model_name=model_name,
+                quantize=quantize,
+                device_map=device_map,
+                trust_remote_code=trust_remote_code,
+                pretrained_model=pretrained_model,
+                pretrained_tokenizer=pretrained_tokenizer,
+                **kwargs,
+            )
+            self.model.eval()
+            self.tokenizer = self.model.tokenizer
+        except ImportError:
+            raise ImportError(
+                "symbolu.training.unified.mistral_wrapper required. "
+                "Ensure the symbolu package is installed."
+            )
+
+        if self.tokenizer is None:
+            raise ValueError(
+                "Tokenizer not available. Provide pretrained_tokenizer or "
+                "ensure model_name can be loaded from HuggingFace."
+            )
+
+        # Ensure pad token is set
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+    def call(self, prompt: str) -> str:
+        """
+        Generate text from prompt using MistralCGWrapper.
+
+        Tokenizes input, runs autoregressive generation through the CG model,
+        decodes output, and stores CG metadata for sovereign bridge consumption.
+        """
+        self.call_history.append(prompt)
+        torch = self._torch
+
+        # Tokenize
+        inputs = self.tokenizer(
+            prompt,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        device = next(self.model.parameters()).device
+        input_ids = inputs["input_ids"].to(device)
+        attention_mask = inputs.get("attention_mask")
+        if attention_mask is not None:
+            attention_mask = attention_mask.to(device)
+
+        # Run a single forward pass to capture CG metadata
+        with torch.no_grad():
+            cg_outputs = self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                reset_state=True,
+            )
+
+        # Store CG metadata for sovereign bridge
+        self.last_cg_metadata = {
+            'state': cg_outputs.get('state'),
+            'delta_S': cg_outputs.get('delta_S'),
+            'delta_bhava': cg_outputs.get('delta_bhava'),
+            'intent_phase': cg_outputs.get('intent_phase'),
+            'adapter_gate': cg_outputs.get('adapter_gate'),
+        }
+
+        # Autoregressive generation
+        generated_ids = input_ids.clone()
+        past_mask = attention_mask
+
+        for _ in range(self.max_new_tokens):
+            with torch.no_grad():
+                outputs = self.model(
+                    input_ids=generated_ids,
+                    attention_mask=past_mask,
+                )
+            logits = outputs['logits']  # [B, T, V]
+            next_token_logits = logits[:, -1, :]  # [B, V]
+
+            # Apply repetition penalty
+            if self.repetition_penalty != 1.0:
+                for token_id in set(generated_ids[0].tolist()):
+                    if next_token_logits[0, token_id] > 0:
+                        next_token_logits[0, token_id] /= self.repetition_penalty
+                    else:
+                        next_token_logits[0, token_id] *= self.repetition_penalty
+
+            # Apply temperature
+            if self.temperature > 0:
+                next_token_logits = next_token_logits / self.temperature
+
+                # Top-k filtering
+                if self.top_k > 0:
+                    top_k_vals, _ = torch.topk(next_token_logits, self.top_k)
+                    min_top_k = top_k_vals[:, -1].unsqueeze(-1)
+                    next_token_logits = torch.where(
+                        next_token_logits < min_top_k,
+                        torch.full_like(next_token_logits, float('-inf')),
+                        next_token_logits,
+                    )
+
+                # Top-p (nucleus) filtering
+                if self.top_p < 1.0:
+                    sorted_logits, sorted_indices = torch.sort(
+                        next_token_logits, descending=True
+                    )
+                    cumulative_probs = torch.cumsum(
+                        torch.softmax(sorted_logits, dim=-1), dim=-1
+                    )
+                    sorted_mask = cumulative_probs - torch.softmax(
+                        sorted_logits, dim=-1
+                    ) >= self.top_p
+                    sorted_logits[sorted_mask] = float('-inf')
+                    # Unsort
+                    next_token_logits = sorted_logits.scatter(
+                        1, sorted_indices, sorted_logits
+                    )
+
+                probs = torch.softmax(next_token_logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+            else:
+                # Greedy decoding
+                next_token = next_token_logits.argmax(dim=-1, keepdim=True)
+
+            # Check for EOS
+            if next_token.item() == self.tokenizer.eos_token_id:
+                break
+
+            generated_ids = torch.cat([generated_ids, next_token], dim=-1)
+            if past_mask is not None:
+                past_mask = torch.cat(
+                    [past_mask, torch.ones(1, 1, device=device, dtype=past_mask.dtype)],
+                    dim=-1,
+                )
+
+        # Decode only the new tokens
+        new_token_ids = generated_ids[0, input_ids.shape[1]:]
+        response = self.tokenizer.decode(new_token_ids, skip_special_tokens=True)
+        return response.strip()
+
+    def get_cg_metadata(self) -> Dict[str, Any]:
+        """Return CG metadata from the most recent call."""
+        return self.last_cg_metadata
 
 
 class GeminiAdapter(BaseLLMAdapter):
@@ -474,6 +706,8 @@ def create_adapter(
         return AnthropicAdapter(api_key=api_key, **kwargs)
     elif provider_lower in ("gemini", "google"):
         return GeminiAdapter(api_key=api_key, **kwargs)
+    elif provider_lower in ("mistral_cg", "mistralcg"):
+        return MistralCGAdapter(**kwargs)
     elif provider_lower == "mock":
         return MockLLMAdapter(**kwargs)
     else:
