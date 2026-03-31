@@ -174,6 +174,11 @@ class Controller:
         # inject high latency regardless of replica count.
         self._consecutive_scale_out: int = 0
 
+        # Sustained calm detector — counts consecutive cycles where
+        # pressure is negative (over-provisioned). Used to accelerate
+        # scale-in after long confirmed calm periods.
+        self._sustained_calm_cycles: int = 0
+
 
     def step(
         self,
@@ -310,6 +315,12 @@ class Controller:
         # level for a reason). Rises instantly, decays slowly. Faster decay
         # when pressure is strongly negative (clearly over-provisioned) to
         # avoid holding unnecessary buffer in truly idle periods.
+        # Track sustained calm for scale-in optimization
+        if pressure < -0.02:
+            self._sustained_calm_cycles += 1
+        else:
+            self._sustained_calm_cycles = 0
+
         needed_now = float(current_replicas)
         if pressure < -0.1:
             decay = 0.95  # faster decay in strongly low-demand periods
@@ -721,6 +732,7 @@ class Controller:
         # This prevents aggressive scale-in during low-demand phases,
         # keeping more replicas available as a hedge against demand spikes.
         # Scale-out thresholds are unchanged — react quickly to load.
+        #
         if sign < 0:
             scale_in_factor = 2.0
         else:
@@ -746,6 +758,12 @@ class Controller:
         if delta > 0:
             max_out = max(1, int(current_replicas * self.config.max_scale_out_ratio))
             delta = min(delta, max_out)
+            # Replica-count-aware delta capping: as replica count grows,
+            # the marginal value of each additional replica decreases.
+            # At high counts (+10), +2/+3 jumps cause proportionally
+            # larger overshoot. Cap to +1 when already at scale.
+            if current_replicas >= 10:
+                delta = min(delta, 1)
             # Scale-out futility: if we've been scaling out for many
             # consecutive cycles without pressure improving, taper delta.
             # This catches runaway overshoot in cascade/perturbation
@@ -769,10 +787,15 @@ class Controller:
         if delta < 0:
             max_in = max(1, int(current_replicas * self.config.max_scale_in_ratio))
             delta = max(delta, -max_in)
-            # Scale-in step cap: limit to -1 per cycle. Scale-out can add
-            # +1, +2, +3 but scale-in is always gradual. This prevents
-            # rapid capacity collapse while allowing steady cost recovery.
-            delta = max(delta, -1)
+            # Scale-in step cap: normally -1 per cycle. Scale-out can add
+            # +1, +2, +3 but scale-in is gradual. After sustained calm
+            # (30+ consecutive negative-pressure cycles), allow -2 to
+            # accelerate cost recovery. The baseline-memory floor still
+            # prevents collapsing below what the system recently needed.
+            if self._sustained_calm_cycles > 30:
+                delta = max(delta, -2)  # faster settling when clearly stable
+            else:
+                delta = max(delta, -1)
             # Never go below minimum
             if current_replicas + delta < self.config.min_replicas:
                 delta = self.config.min_replicas - current_replicas
@@ -881,3 +904,4 @@ class Controller:
             self._recovery_cycles = 0
             self._recent_required_floor = 1.0
             self._consecutive_scale_out = 0
+            self._sustained_calm_cycles = 0
