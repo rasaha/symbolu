@@ -120,6 +120,7 @@ from symbolu.agentic_framework.proactive_scheduler import (
     create_task,
 )
 from symbolu.agentic_framework.llm_adapters import (
+    MistralAdapter,
     MistralCGAdapter,
 )
 from symbolu.agentic_framework.adaptive_prompts import (
@@ -226,7 +227,8 @@ __all__ = [
     "ScheduleType",
     "create_proactive_scheduler",
     "create_task",
-    # LLM Adapters (MistralCG — local Conscious Generation)
+    # LLM Adapters (Mistral API + local MistralCG)
+    "MistralAdapter",
     "MistralCGAdapter",
     # Adaptive Prompts (automated AI reasoning)
     "AutoReasoningPipeline",

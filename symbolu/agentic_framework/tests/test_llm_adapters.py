@@ -15,6 +15,7 @@ import pytest
 
 from symbolu.agentic_framework.llm_adapters import (
     BaseLLMAdapter,
+    MistralAdapter,
     MistralCGAdapter,
     MockLLMAdapter,
     SequentialMockAdapter,
@@ -271,6 +272,15 @@ class TestCreateAdapterFactory:
             adapter = create_adapter("google", api_key="test")
             assert adapter is not None
         except ImportError:
+            pass
+
+    def test_create_mistral_adapter(self):
+        """Test 'mistral' provider is recognized."""
+        try:
+            adapter = create_adapter("mistral", api_key="test")
+            assert isinstance(adapter, MistralAdapter)
+        except ImportError:
+            # Expected if mistralai not installed
             pass
 
 

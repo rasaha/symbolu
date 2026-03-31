@@ -8,6 +8,7 @@ Supported providers:
 - OpenAI (GPT-4, GPT-3.5)
 - Anthropic (Claude)
 - Google (Gemini)
+- Mistral (mistral-large, mistral-medium via API)
 - MistralCG (local Mistral + Conscious Generation)
 - Mock (for testing)
 
@@ -210,6 +211,75 @@ class AnthropicAdapter(BaseLLMAdapter):
             if hasattr(first_block, "text"):
                 return first_block.text
         return str(content)
+
+
+class MistralAdapter(BaseLLMAdapter):
+    """
+    Adapter for Mistral API (mistral-large, mistral-medium, etc.).
+
+    Requires: mistralai package
+
+    Usage:
+        adapter = MistralAdapter(api_key="...")
+        response = adapter.call("Hello!")
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: str = "mistral-large-latest",
+        temperature: float = 0.7,
+        max_tokens: int = 1024,
+        **kwargs: Any,
+    ):
+        """
+        Initialize Mistral adapter.
+
+        Args:
+            api_key: Mistral API key (uses MISTRAL_API_KEY env var if not provided)
+            model: Model name (default: mistral-large-latest)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens in response
+            **kwargs: Additional parameters for API calls
+        """
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.kwargs = kwargs
+
+        try:
+            from mistralai import Mistral  # type: ignore
+
+            self.client = Mistral(api_key=api_key)
+        except ImportError:
+            raise ImportError(
+                "mistralai package required. Install with: pip install mistralai"
+            )
+
+    def call(self, prompt: str) -> str:
+        """Call Mistral API with prompt."""
+        response = self.client.chat.complete(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            **self.kwargs,
+        )
+        return response.choices[0].message.content or ""
+
+    def call_with_messages(
+        self,
+        messages: List[Dict[str, str]],
+    ) -> str:
+        """Call Mistral API with message history."""
+        response = self.client.chat.complete(
+            model=self.model,
+            messages=messages,  # type: ignore
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            **self.kwargs,
+        )
+        return response.choices[0].message.content or ""
 
 
 class MistralCGAdapter(BaseLLMAdapter):
@@ -706,6 +776,8 @@ def create_adapter(
         return AnthropicAdapter(api_key=api_key, **kwargs)
     elif provider_lower in ("gemini", "google"):
         return GeminiAdapter(api_key=api_key, **kwargs)
+    elif provider_lower == "mistral":
+        return MistralAdapter(api_key=api_key, **kwargs)
     elif provider_lower in ("mistral_cg", "mistralcg"):
         return MistralCGAdapter(**kwargs)
     elif provider_lower == "mock":
