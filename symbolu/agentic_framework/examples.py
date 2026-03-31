@@ -8,6 +8,8 @@ Examples:
 1. Basic usage with OpenAI
 2. Basic usage with Claude
 3. Basic usage with Gemini
+3b. Basic usage with Mistral
+3c. Multi-turn with Mistral + Memory
 4. Custom critic configuration
 5. Multi-turn conversation
 6. Handling safety blocks
@@ -118,6 +120,84 @@ def example_gemini_basic():
     result = agent.run("Write a haiku about programming.")
 
     print(f"Response: {result.response}")
+
+
+# =============================================================================
+# Example 3b: Basic Usage with Mistral
+# =============================================================================
+
+def example_mistral_basic():
+    """
+    Basic example using Mistral API.
+
+    Prerequisites:
+        pip install mistralai
+        export MISTRAL_API_KEY="..."
+    """
+    from symbolu.agentic_framework import AgenticLLMWrapper
+    from symbolu.agentic_framework.llm_adapters import MistralAdapter
+
+    # Create Mistral adapter
+    llm = MistralAdapter(
+        model="mistral-large-latest",
+        temperature=0.7,
+        max_tokens=1024,
+    )
+
+    # Create agent
+    agent = AgenticLLMWrapper(llm)
+    agent.new_session()
+
+    # Run a query
+    result = agent.run("What are the key differences between TCP and UDP?")
+
+    print(f"Response: {result.response[:200]}...")
+    print(f"Quality: {result.quality_score:.2f}")
+    print(f"Revisions: {result.revision_count}")
+    print(f"Coherence: {result.coherence['overall']:.2f}")
+
+
+# =============================================================================
+# Example 3c: Multi-Turn with Mistral + Memory
+# =============================================================================
+
+def example_mistral_multi_turn():
+    """
+    Multi-turn conversation using Mistral, demonstrating memory and coherence.
+
+    Prerequisites:
+        pip install mistralai
+        export MISTRAL_API_KEY="..."
+    """
+    from symbolu.agentic_framework import AgenticLLMWrapper
+    from symbolu.agentic_framework.llm_adapters import MistralAdapter
+
+    llm = MistralAdapter(model="mistral-large-latest")
+    agent = AgenticLLMWrapper(
+        llm,
+        max_revisions=2,
+        quality_threshold=0.70,
+        memory_window=20,
+    )
+    agent.new_session("mistral-demo")
+
+    turns = [
+        "Explain how transformers work in neural networks.",
+        "What is the attention mechanism you just described?",
+        "How does this compare to RNNs?",
+    ]
+
+    for msg in turns:
+        result = agent.run(msg)
+        print(f"\nUser:      {msg}")
+        print(f"Response:  {result.response[:150]}...")
+        print(f"Quality:   {result.quality_score:.2f}  "
+              f"Coherence: {result.coherence['overall']:.2f}")
+
+    # Session summary
+    summary = agent.get_session_summary()
+    print(f"\nSession: {summary['turn_count']} turns, "
+          f"avg quality: {summary['average_quality']:.2f}")
 
 
 # =============================================================================
