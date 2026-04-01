@@ -4971,6 +4971,22 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_T = _cg_tet_result['T']              # (B, T, K, 6)
                                 _cg_cand_ids = _cg_tet_result['candidate_ids']  # (B, T, K)
 
+                                # Build domain signal from Gyroscope detection
+                                # Soft mapping: LANG/MATH/CODE → 8-dim distribution
+                                _cg_domain = None
+                                try:
+                                    from symbolu.training.conscious_generation.governance.domain_bridge import map_gyro_to_domain
+                                    _cg_domain_label = metrics.get('gyroscope_domain_label', 'LANG')
+                                    _cg_domain = map_gyro_to_domain(
+                                        domain_label=_cg_domain_label,
+                                        batch_size=_cg_hidden.shape[0],
+                                        seq_len=_cg_hidden.shape[1] if _cg_hidden.dim() == 3 else None,
+                                        device=_cg_hidden.device,
+                                        dtype=_cg_hidden.dtype,
+                                    )
+                                except ImportError:
+                                    pass
+
                                 # Run IntegratedTokenScorer (Kosha + Bliss)
                                 # Phase 3: Detach hidden/o_ctx (router trains its MLP
                                 #   only, no backbone gradients from governance).
@@ -4981,6 +4997,7 @@ def train(config: UnifiedTrainingConfig):
                                         T=_cg_T,
                                         hidden=_cg_hidden,
                                         o_ctx=_cg_sov_state,
+                                        domain=_cg_domain,
                                         candidate_ids=_cg_cand_ids,
                                     )
                                 else:
@@ -4988,6 +5005,7 @@ def train(config: UnifiedTrainingConfig):
                                         T=_cg_T,
                                         hidden=_cg_hidden.detach(),
                                         o_ctx=_cg_sov_state.detach(),
+                                        domain=_cg_domain,
                                         candidate_ids=_cg_cand_ids,
                                     )
                                 _cg_alpha = _cg_integ_result['alpha']    # (B, T, 6)
@@ -5125,6 +5143,12 @@ def train(config: UnifiedTrainingConfig):
                                     ).sum(dim=-1).mean().item()
                                     metrics['cg_bliss_mean'] = _cg_B.mean().item()
                                     metrics['cg_disagree_mean'] = _cg_D.mean().item()
+                                    if _cg_domain is not None:
+                                        metrics['cg_domain_label'] = metrics.get('gyroscope_domain_label', 'LANG')
+                                        _cg_domain_ent = -(
+                                            _cg_domain[0] * (_cg_domain[0] + 1e-8).log()
+                                        ).sum(dim=-1).mean().item()
+                                        metrics['cg_domain_entropy'] = _cg_domain_ent
 
                                 # Phase 5: Update governance diagnostics tracker
                                 if cg_governance_diag is not None:
@@ -5144,6 +5168,7 @@ def train(config: UnifiedTrainingConfig):
                                         router=model.conscious_gen.get('kosha_router'),
                                         hidden=_cg_hidden.detach(),
                                         o_ctx=_cg_sov_state.detach(),
+                                        domain=_cg_domain,
                                     )
 
                         # Log diagnostics periodically

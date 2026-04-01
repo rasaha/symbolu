@@ -34,8 +34,9 @@ class GovernanceDiagnostics:
             (adds ~2 extra forward passes per step through the router).
     """
 
-    PRIMITIVE_NAMES = ["base", "ont", "jepa", "csr", "vritti", "guna"]
+    PRIMITIVE_NAMES = ["base", "ont", "plausibility", "csr", "vritti", "guna"]
     KOSHA_NAMES = ["material", "vital", "mental", "intellectual", "blissful"]
+    DOMAIN_NAMES = ["code", "math", "factual", "chat", "emotional", "narrative", "planning", "retrieval"]
 
     def __init__(self, window_size: int = 100, enable_sensitivity_probes: bool = True):
         self.window_size = window_size
@@ -69,6 +70,11 @@ class GovernanceDiagnostics:
         self._delta_alpha_kosha: List[float] = []
         self._delta_alpha_domain: List[float] = []
         self._delta_alpha_interaction: List[float] = []
+
+        # Domain signal tracking
+        self._domain_means: List[List[float]] = []
+        self._domain_entropies: List[float] = []
+        self._domain_routing_corrs: List[float] = []  # correlation: domain change → alpha change
 
         # Residual baseline divergence
         self._alpha_baseline: Optional[torch.Tensor] = None  # Cached from residual-only run
@@ -161,6 +167,13 @@ class GovernanceDiagnostics:
                 self._kosha_means.append(k_mean)
                 k_ent = -(k * (k + 1e-8).log()).sum(dim=-1).mean().item()
                 self._kosha_entropies.append(k_ent)
+
+            # B3b. Domain signal statistics
+            if domain is not None:
+                d_mean = domain.mean(dim=tuple(range(domain.dim() - 1))).tolist()
+                self._domain_means.append(d_mean)
+                d_ent = -(domain * (domain + 1e-8).log()).sum(dim=-1).mean().item()
+                self._domain_entropies.append(d_ent)
 
             # B4. Interaction contribution (isolated kd_logits)
             if router_result is not None:
@@ -364,6 +377,7 @@ class GovernanceDiagnostics:
             self._kosha_means, self._kosha_entropies,
             self._lambda_effs, self._lambda_eff_stds, self._bliss_lambda_corrs,
             self._policy_scales, self._route_temps,
+            self._domain_means, self._domain_entropies, self._domain_routing_corrs,
             self._delta_alpha_kosha, self._delta_alpha_domain,
             self._delta_alpha_interaction, self._alpha_divergences,
         ]
@@ -421,6 +435,17 @@ class GovernanceDiagnostics:
                     sum(k[i] for k in self._kosha_means) / n
                 )
         self._avg_into(result, "cg_gov_kosha_entropy", self._kosha_entropies)
+
+        # B3b. Domain signal
+        if self._domain_means:
+            n = len(self._domain_means)
+            for i, name in enumerate(self.DOMAIN_NAMES):
+                if i < len(self._domain_means[0]):
+                    result[f"cg_gov_domain_{name}"] = (
+                        sum(d[i] for d in self._domain_means) / n
+                    )
+        self._avg_into(result, "cg_gov_domain_entropy", self._domain_entropies)
+        self._avg_into(result, "cg_gov_domain_routing_corr", self._domain_routing_corrs)
 
         # B4. Interaction contribution
         self._avg_into(result, "cg_gov_interaction_norm", self._interaction_norms)
