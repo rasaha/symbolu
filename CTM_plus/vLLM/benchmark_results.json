@@ -1,0 +1,569 @@
+{
+  "compression_quality": {
+    "2-bit (aggressive)": {
+      "bits_per_element": 3.109375,
+      "compression_ratio": 5.1457286432160805,
+      "avg_mse": 0.016145447419232097,
+      "avg_cosine": 0.8577389689310354,
+      "avg_dot_error": 2.3298262469032576
+    },
+    "3-bit (standard)": {
+      "bits_per_element": 4.1015625,
+      "compression_ratio": 3.900952380952381,
+      "avg_mse": 0.0039813047246244305,
+      "avg_cosine": 0.9646704198068737,
+      "avg_dot_error": 1.25098941106844
+    },
+    "4-bit (high-quality)": {
+      "bits_per_element": 5.09375,
+      "compression_ratio": 3.1411042944785277,
+      "avg_mse": 0.0009817431329328507,
+      "avg_cosine": 0.9912047262061386,
+      "avg_dot_error": 0.9299898940360425
+    },
+    "3-bit no QJL": {
+      "bits_per_element": 3.1015625,
+      "compression_ratio": 5.158690176322418,
+      "avg_mse": 0.003755354137012613,
+      "avg_cosine": 0.9647904490820713,
+      "avg_dot_error": 1.1248979264462315
+    }
+  },
+  "memory_capacity": {
+    "Llama-3.1-8B": {
+      "fp16_tokens": 8192,
+      "memory_gb": 4.0
+    },
+    "Gemma-2-27B": {
+      "fp16_tokens": 22795,
+      "memory_gb": 8.0
+    },
+    "Llama-3.1-70B": {
+      "fp16_tokens": 6553,
+      "memory_gb": 16.0
+    }
+  },
+  "hit_rates": {
+    "sequential": {
+      "LRU (FP16)": {
+        "hits": 20910,
+        "misses": 503890,
+        "evictions": 503686,
+        "total_accesses": 524800,
+        "hit_rate": 0.03984375,
+        "cache_size": 204,
+        "max_tokens": 204,
+        "policy": "lru",
+        "elapsed_seconds": 0.4829327940001349,
+        "accesses_per_second": 1086693.6487230011
+      },
+      "CTM+ (FP16)": {
+        "hits": 151705,
+        "misses": 373095,
+        "evictions": 372891,
+        "total_accesses": 524800,
+        "hit_rate": 0.2890720274390244,
+        "cache_size": 204,
+        "max_tokens": 204,
+        "policy": "ctm_plus",
+        "elapsed_seconds": 93.41229165899995,
+        "accesses_per_second": 5618.10432738096
+      },
+      "TQ-4bit + LRU": {
+        "hits": 315163,
+        "misses": 209637,
+        "evictions": 208997,
+        "total_accesses": 524800,
+        "compression_mse_sum": 108.39363646087894,
+        "compression_cosine_sum": 207791.6175775255,
+        "tokens_compressed": 209637,
+        "hit_rate": 0.6005392530487805,
+        "cache_size": 640,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 640,
+        "compression_ratio": 3.1411042944785277,
+        "bits_per_element": 5.09375,
+        "avg_compression_mse": 0.000517053938287988,
+        "avg_compression_cosine": 0.9911972484700959,
+        "capacity_multiplier": "3.1x",
+        "elapsed_seconds": 165.4331558509998,
+        "accesses_per_second": 3172.2782370945642
+      },
+      "TQ-3bit + LRU": {
+        "hits": 443892,
+        "misses": 80908,
+        "evictions": 80113,
+        "total_accesses": 524800,
+        "compression_mse_sum": 167.17425874430123,
+        "compression_cosine_sum": 78065.57449054634,
+        "tokens_compressed": 80908,
+        "hit_rate": 0.8458307926829268,
+        "cache_size": 795,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 795,
+        "compression_ratio": 3.900952380952381,
+        "bits_per_element": 4.1015625,
+        "avg_compression_mse": 0.002066226562815806,
+        "avg_compression_cosine": 0.9648684245135999,
+        "capacity_multiplier": "3.9x",
+        "elapsed_seconds": 75.94765688400003,
+        "accesses_per_second": 6910.022264433548
+      },
+      "TQ-4bit + CTM+ (capacity)": {
+        "hits": 426041,
+        "misses": 98759,
+        "evictions": 98119,
+        "total_accesses": 524800,
+        "compression_mse_sum": 51.00056999828103,
+        "compression_cosine_sum": 97889.13991400183,
+        "tokens_compressed": 98759,
+        "hit_rate": 0.8118159298780487,
+        "cache_size": 640,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 640,
+        "compression_ratio": 3.1411042944785277,
+        "bits_per_element": 5.09375,
+        "avg_compression_mse": 0.0005164144027205726,
+        "avg_compression_cosine": 0.9911920930143261,
+        "capacity_multiplier": "3.1x",
+        "elapsed_seconds": 82.91975438100008,
+        "accesses_per_second": 6329.010546614098
+      },
+      "TQ-3bit + CTM+ (quality-aware)": {
+        "hits": 482846,
+        "misses": 41954,
+        "evictions": 41159,
+        "total_accesses": 524800,
+        "compression_mse_sum": 86.51882116340485,
+        "compression_cosine_sum": 40481.644265002134,
+        "tokens_compressed": 41954,
+        "hit_rate": 0.9200571646341463,
+        "cache_size": 795,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 795,
+        "compression_ratio": 3.900952380952381,
+        "bits_per_element": 4.1015625,
+        "avg_compression_mse": 0.002062230565939001,
+        "avg_compression_cosine": 0.9649054742098998,
+        "capacity_multiplier": "3.9x",
+        "elapsed_seconds": 41.30586282100012,
+        "accesses_per_second": 12705.218198061437
+      }
+    },
+    "multi_turn": {
+      "LRU (FP16)": {
+        "hits": 20910,
+        "misses": 110418,
+        "evictions": 110214,
+        "total_accesses": 131328,
+        "hit_rate": 0.15921966374269006,
+        "cache_size": 204,
+        "max_tokens": 204,
+        "policy": "lru",
+        "elapsed_seconds": 0.11270364799975141,
+        "accesses_per_second": 1165250.6580824223
+      },
+      "CTM+ (FP16)": {
+        "hits": 71405,
+        "misses": 59923,
+        "evictions": 59719,
+        "total_accesses": 131328,
+        "hit_rate": 0.5437149731968811,
+        "cache_size": 204,
+        "max_tokens": 204,
+        "policy": "ctm_plus",
+        "elapsed_seconds": 14.105627816999913,
+        "accesses_per_second": 9310.32646712295
+      },
+      "TQ-4bit + LRU": {
+        "hits": 130816,
+        "misses": 512,
+        "evictions": 0,
+        "total_accesses": 131328,
+        "compression_mse_sum": 0.2655741177643486,
+        "compression_cosine_sum": 507.46664128611735,
+        "tokens_compressed": 512,
+        "hit_rate": 0.9961013645224172,
+        "cache_size": 512,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 640,
+        "compression_ratio": 3.1411042944785277,
+        "bits_per_element": 5.09375,
+        "avg_compression_mse": 0.0005186994487584933,
+        "avg_compression_cosine": 0.991145783761948,
+        "capacity_multiplier": "3.1x",
+        "elapsed_seconds": 0.21248673900026915,
+        "accesses_per_second": 618052.6870424306
+      },
+      "TQ-3bit + LRU": {
+        "hits": 130816,
+        "misses": 512,
+        "evictions": 0,
+        "total_accesses": 131328,
+        "compression_mse_sum": 1.0492386145771537,
+        "compression_cosine_sum": 494.0152375464048,
+        "tokens_compressed": 512,
+        "hit_rate": 0.9961013645224172,
+        "cache_size": 512,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 795,
+        "compression_ratio": 3.900952380952381,
+        "bits_per_element": 4.1015625,
+        "avg_compression_mse": 0.0020492941690960034,
+        "avg_compression_cosine": 0.9648735108328219,
+        "capacity_multiplier": "3.9x",
+        "elapsed_seconds": 0.21026783600018462,
+        "accesses_per_second": 624574.8398717752
+      },
+      "TQ-4bit + CTM+ (capacity)": {
+        "hits": 130816,
+        "misses": 512,
+        "evictions": 0,
+        "total_accesses": 131328,
+        "compression_mse_sum": 0.2655741177643486,
+        "compression_cosine_sum": 507.46664128611735,
+        "tokens_compressed": 512,
+        "hit_rate": 0.9961013645224172,
+        "cache_size": 512,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 640,
+        "compression_ratio": 3.1411042944785277,
+        "bits_per_element": 5.09375,
+        "avg_compression_mse": 0.0005186994487584933,
+        "avg_compression_cosine": 0.991145783761948,
+        "capacity_multiplier": "3.1x",
+        "elapsed_seconds": 0.21285956000019723,
+        "accesses_per_second": 616970.1750763664
+      },
+      "TQ-3bit + CTM+ (quality-aware)": {
+        "hits": 130816,
+        "misses": 512,
+        "evictions": 0,
+        "total_accesses": 131328,
+        "compression_mse_sum": 1.0492386145771537,
+        "compression_cosine_sum": 494.0152375464048,
+        "tokens_compressed": 512,
+        "hit_rate": 0.9961013645224172,
+        "cache_size": 512,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 795,
+        "compression_ratio": 3.900952380952381,
+        "bits_per_element": 4.1015625,
+        "avg_compression_mse": 0.0020492941690960034,
+        "avg_compression_cosine": 0.9648735108328219,
+        "capacity_multiplier": "3.9x",
+        "elapsed_seconds": 0.21935442499989222,
+        "accesses_per_second": 598702.3056410397
+      }
+    },
+    "document_qa": {
+      "LRU (FP16)": {
+        "hits": 0,
+        "misses": 56762,
+        "evictions": 56558,
+        "total_accesses": 56762,
+        "hit_rate": 0.0,
+        "cache_size": 204,
+        "max_tokens": 204,
+        "policy": "lru",
+        "elapsed_seconds": 0.05257758100015053,
+        "accesses_per_second": 1079585.6127317362
+      },
+      "CTM+ (FP16)": {
+        "hits": 12740,
+        "misses": 44022,
+        "evictions": 43818,
+        "total_accesses": 56762,
+        "hit_rate": 0.22444593213769776,
+        "cache_size": 204,
+        "max_tokens": 204,
+        "policy": "ctm_plus",
+        "elapsed_seconds": 9.894850995999604,
+        "accesses_per_second": 5736.518925140797
+      },
+      "TQ-4bit + LRU": {
+        "hits": 56150,
+        "misses": 612,
+        "evictions": 0,
+        "total_accesses": 56762,
+        "compression_mse_sum": 0.3167293511346969,
+        "compression_cosine_sum": 606.6033790253572,
+        "tokens_compressed": 612,
+        "hit_rate": 0.9892181388957401,
+        "cache_size": 612,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 640,
+        "compression_ratio": 3.1411042944785277,
+        "bits_per_element": 5.09375,
+        "avg_compression_mse": 0.0005175316195011388,
+        "avg_compression_cosine": 0.9911819918714987,
+        "capacity_multiplier": "3.1x",
+        "elapsed_seconds": 0.15201857199963342,
+        "accesses_per_second": 373388.58833733073
+      },
+      "TQ-3bit + LRU": {
+        "hits": 56150,
+        "misses": 612,
+        "evictions": 0,
+        "total_accesses": 56762,
+        "compression_mse_sum": 1.2625975632004913,
+        "compression_cosine_sum": 590.5096714940004,
+        "tokens_compressed": 612,
+        "hit_rate": 0.9892181388957401,
+        "cache_size": 612,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 795,
+        "compression_ratio": 3.900952380952381,
+        "bits_per_element": 4.1015625,
+        "avg_compression_mse": 0.002063067913726293,
+        "avg_compression_cosine": 0.9648850841405234,
+        "capacity_multiplier": "3.9x",
+        "elapsed_seconds": 0.15128284299998995,
+        "accesses_per_second": 375204.47708669625
+      },
+      "TQ-4bit + CTM+ (capacity)": {
+        "hits": 56150,
+        "misses": 612,
+        "evictions": 0,
+        "total_accesses": 56762,
+        "compression_mse_sum": 0.3167293511346969,
+        "compression_cosine_sum": 606.6033790253572,
+        "tokens_compressed": 612,
+        "hit_rate": 0.9892181388957401,
+        "cache_size": 612,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 640,
+        "compression_ratio": 3.1411042944785277,
+        "bits_per_element": 5.09375,
+        "avg_compression_mse": 0.0005175316195011388,
+        "avg_compression_cosine": 0.9911819918714987,
+        "capacity_multiplier": "3.1x",
+        "elapsed_seconds": 0.26675532599983853,
+        "accesses_per_second": 212786.75425597446
+      },
+      "TQ-3bit + CTM+ (quality-aware)": {
+        "hits": 56150,
+        "misses": 612,
+        "evictions": 0,
+        "total_accesses": 56762,
+        "compression_mse_sum": 1.2625975632004913,
+        "compression_cosine_sum": 590.5096714940004,
+        "tokens_compressed": 612,
+        "hit_rate": 0.9892181388957401,
+        "cache_size": 612,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 795,
+        "compression_ratio": 3.900952380952381,
+        "bits_per_element": 4.1015625,
+        "avg_compression_mse": 0.002063067913726293,
+        "avg_compression_cosine": 0.9648850841405234,
+        "capacity_multiplier": "3.9x",
+        "elapsed_seconds": 0.16566444299996874,
+        "accesses_per_second": 342632.36559465394
+      }
+    },
+    "zipfian": {
+      "LRU (FP16)": {
+        "hits": 3761,
+        "misses": 2383,
+        "evictions": 2179,
+        "total_accesses": 6144,
+        "hit_rate": 0.6121419270833334,
+        "cache_size": 204,
+        "max_tokens": 204,
+        "policy": "lru",
+        "elapsed_seconds": 0.012395881999964331,
+        "accesses_per_second": 495648.47422859294
+      },
+      "CTM+ (FP16)": {
+        "hits": 3928,
+        "misses": 2216,
+        "evictions": 2012,
+        "total_accesses": 6144,
+        "hit_rate": 0.6393229166666666,
+        "cache_size": 204,
+        "max_tokens": 204,
+        "policy": "ctm_plus",
+        "elapsed_seconds": 0.41500444199982667,
+        "accesses_per_second": 14804.660813733088
+      },
+      "TQ-4bit + LRU": {
+        "hits": 4763,
+        "misses": 1381,
+        "evictions": 741,
+        "total_accesses": 6144,
+        "compression_mse_sum": 0.7377402509451269,
+        "compression_cosine_sum": 1368.8643930987419,
+        "tokens_compressed": 1381,
+        "hit_rate": 0.7752278645833334,
+        "cache_size": 640,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 640,
+        "compression_ratio": 3.1411042944785277,
+        "bits_per_element": 5.09375,
+        "avg_compression_mse": 0.0005342072780196429,
+        "avg_compression_cosine": 0.9912124497456494,
+        "capacity_multiplier": "3.1x",
+        "elapsed_seconds": 0.7097591520000606,
+        "accesses_per_second": 8656.457592250217
+      },
+      "TQ-3bit + LRU": {
+        "hits": 4858,
+        "misses": 1286,
+        "evictions": 491,
+        "total_accesses": 6144,
+        "compression_mse_sum": 2.7319009274301873,
+        "compression_cosine_sum": 1240.8844702386634,
+        "tokens_compressed": 1286,
+        "hit_rate": 0.7906901041666666,
+        "cache_size": 795,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 795,
+        "compression_ratio": 3.900952380952381,
+        "bits_per_element": 4.1015625,
+        "avg_compression_mse": 0.0021243397569441582,
+        "avg_compression_cosine": 0.9649179395323977,
+        "capacity_multiplier": "3.9x",
+        "elapsed_seconds": 0.6089598560001832,
+        "accesses_per_second": 10089.335018494472
+      },
+      "TQ-4bit + CTM+ (capacity)": {
+        "hits": 4773,
+        "misses": 1371,
+        "evictions": 731,
+        "total_accesses": 6144,
+        "compression_mse_sum": 0.7329530693122267,
+        "compression_cosine_sum": 1358.948127655032,
+        "tokens_compressed": 1371,
+        "hit_rate": 0.77685546875,
+        "cache_size": 640,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 640,
+        "compression_ratio": 3.1411042944785277,
+        "bits_per_element": 5.09375,
+        "avg_compression_mse": 0.0005346120126274447,
+        "avg_compression_cosine": 0.9912094293618031,
+        "capacity_multiplier": "3.1x",
+        "elapsed_seconds": 0.6998077210000702,
+        "accesses_per_second": 8779.554462788477
+      },
+      "TQ-3bit + CTM+ (quality-aware)": {
+        "hits": 4855,
+        "misses": 1289,
+        "evictions": 494,
+        "total_accesses": 6144,
+        "compression_mse_sum": 2.732960260063696,
+        "compression_cosine_sum": 1243.7102303597512,
+        "tokens_compressed": 1289,
+        "hit_rate": 0.7902018229166666,
+        "cache_size": 795,
+        "base_max_tokens": 204,
+        "effective_max_tokens": 795,
+        "compression_ratio": 3.900952380952381,
+        "bits_per_element": 4.1015625,
+        "avg_compression_mse": 0.002120217424409384,
+        "avg_compression_cosine": 0.9648644145537247,
+        "capacity_multiplier": "3.9x",
+        "elapsed_seconds": 0.6123853940002846,
+        "accesses_per_second": 10032.897682071667
+      }
+    }
+  },
+  "quality_preservation": {
+    "ratio_0.1": {
+      "LRU (FP16)": {
+        "retention_rate": 0.09433962264150944,
+        "retained_important": 10,
+        "total_important": 106,
+        "effective_cache_size": 102
+      },
+      "CTM+ (FP16)": {
+        "retention_rate": 0.8962264150943396,
+        "retained_important": 95,
+        "total_important": 106,
+        "effective_cache_size": 102
+      },
+      "TQ-3bit + CTM+": {
+        "retention_rate": 1.0,
+        "retained_important": 106,
+        "total_important": 106,
+        "effective_cache_size": 397
+      },
+      "TQ-4bit + CTM+": {
+        "retention_rate": 1.0,
+        "retained_important": 106,
+        "total_important": 106,
+        "effective_cache_size": 320
+      }
+    },
+    "ratio_0.25": {
+      "LRU (FP16)": {
+        "retention_rate": 0.2358490566037736,
+        "retained_important": 25,
+        "total_important": 106,
+        "effective_cache_size": 256
+      },
+      "CTM+ (FP16)": {
+        "retention_rate": 0.9716981132075472,
+        "retained_important": 103,
+        "total_important": 106,
+        "effective_cache_size": 256
+      },
+      "TQ-3bit + CTM+": {
+        "retention_rate": 1.0,
+        "retained_important": 106,
+        "total_important": 106,
+        "effective_cache_size": 998
+      },
+      "TQ-4bit + CTM+": {
+        "retention_rate": 1.0,
+        "retained_important": 106,
+        "total_important": 106,
+        "effective_cache_size": 804
+      }
+    },
+    "ratio_0.5": {
+      "LRU (FP16)": {
+        "retention_rate": 0.4716981132075472,
+        "retained_important": 50,
+        "total_important": 106,
+        "effective_cache_size": 512
+      },
+      "CTM+ (FP16)": {
+        "retention_rate": 1.0,
+        "retained_important": 106,
+        "total_important": 106,
+        "effective_cache_size": 512
+      },
+      "TQ-3bit + CTM+": {
+        "retention_rate": 1.0,
+        "retained_important": 106,
+        "total_important": 106,
+        "effective_cache_size": 1997
+      },
+      "TQ-4bit + CTM+": {
+        "retention_rate": 1.0,
+        "retained_important": 106,
+        "total_important": 106,
+        "effective_cache_size": 1608
+      }
+    }
+  },
+  "scaling": {
+    "256": {
+      "base_cache": 25
+    },
+    "512": {
+      "base_cache": 51
+    },
+    "1024": {
+      "base_cache": 102
+    },
+    "2048": {
+      "base_cache": 204
+    },
+    "4096": {
+      "base_cache": 409
+    }
+  }
+}
