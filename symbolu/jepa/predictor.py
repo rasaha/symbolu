@@ -6,12 +6,13 @@ using phase-space dynamics. This is NOT Meta's VL-JEPA — it is a custom
 latent-space predictor inspired by the JEPA principle of predicting in
 representation space without reconstruction.
 
-The predictor operates across the five planes of the 32D Sovereign State:
-    - Ontological Plane [0:12]:  12 Bhavas (identity, phase rotation)
-    - Depth Plane [12:17]:       5 Koshas (processing depth)
-    - Intellectual Plane [17:22]: 5 Vrittis (cognitive reliability)
-    - Dynamics Plane [22:28]:    6 Gunas (energy/system dynamics)
-    - Learning Plane [28:32]:    4 Reserved (goal encoding/feedback)
+The predictor operates across the five planes of the 32D Sovereign State
+(mapped to Pancha Kosha):
+    - Annamaya / Physical [0:12]:      12 Bhavas (ontological identity)
+    - Pranamaya / Governance [12:17]:  5 Koshas (control/depth routing)
+    - Vijnanamaya / Intellectual [17:22]: 5 Vrittis (cognitive reliability)
+    - Anandamaya / Abstract [22:28]:   6 Gunas (abstract dynamics)
+    - Learning Plane [28:32]:          4 Reserved (goal encoding/feedback)
 
 The VrittiValidatedPredictor uses the Intellectual Plane (Vrittis) as an
 epistemological gate — rejecting predictions where Viparyaya (error) or

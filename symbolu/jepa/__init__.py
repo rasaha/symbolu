@@ -9,14 +9,15 @@ NOT Meta's VL-JEPA or I-JEPA. This is a custom architecture inspired by
 the JEPA principle of predicting in latent space without reconstruction,
 but applied to a domain-specific ontological state representation.
 
-32D Sovereign State Planes:
-    - Ontological Plane [0:12]:  12 Bhavas — identity/phase rotation (softmax)
-    - Depth Plane [12:17]:       5 Koshas  — processing depth (sigmoid)
-    - Intellectual Plane [17:22]: 5 Vrittis — cognitive reliability (softmax)
+32D Sovereign State Planes (mapped to Pancha Kosha):
+    - Annamaya / Physical Plane [0:12]:     12 Bhavas — ontological identity (softmax)
+    - Pranamaya / Governance Plane [12:17]:  5 Koshas — control/depth routing (sigmoid)
+    - Manomaya / Mental Plane:               CSR — phonemic/resonance processing
+    - Vijnanamaya / Intellectual Plane [17:22]: 5 Vrittis — cognitive reliability (softmax)
         Pramana (valid cognition), Viparyaya (error), Vikalpa (imagination),
         Nidra (void), Smriti (memory)
-    - Dynamics Plane [22:28]:    6 Gunas   — energy/system dynamics (sigmoid)
-    - Learning Plane [28:32]:    4 Reserved — goal encoding/feedback (tanh)
+    - Anandamaya / Abstract Plane [22:28]:   6 Gunas — abstract dynamics (sigmoid)
+    - Learning Plane [28:32]:                4 Reserved — goal encoding/feedback (tanh)
 
 Components:
     - PhaseJEPAPredictor: Core predictor using phase-space dynamics

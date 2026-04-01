@@ -2,13 +2,16 @@
 Sovereign State Projector for the Ontological State Predictor.
 
 Projects hidden representations to the 32D Sovereign State space with
-component-wise normalization constraints per plane:
+component-wise normalization constraints per plane (Pancha Kosha mapping):
 
-    - Ontological Plane [0:12]:  12 Bhavas — identity/phase rotation (softmax)
-    - Depth Plane [12:17]:       5 Koshas  — processing depth (sigmoid)
-    - Intellectual Plane [17:22]: 5 Vrittis — cognitive reliability (softmax)
-    - Dynamics Plane [22:28]:    6 Gunas   — energy/system dynamics (sigmoid)
-    - Learning Plane [28:32]:    4 Reserved — goal encoding/feedback (tanh)
+    - Annamaya / Physical Plane [0:12]:      12 Bhavas — ontological identity (softmax)
+    - Pranamaya / Governance Plane [12:17]:   5 Koshas — control/depth routing (sigmoid)
+    - Vijnanamaya / Intellectual Plane [17:22]: 5 Vrittis — cognitive reliability (softmax)
+    - Anandamaya / Abstract Plane [22:28]:    6 Gunas — abstract dynamics (sigmoid)
+    - Learning Plane [28:32]:                 4 Reserved — goal encoding/feedback (tanh)
+
+    Note: Manomaya (Mental Plane) is handled by CSR (phonemic/resonance),
+    which operates outside the 32D state as a separate scoring primitive.
 
 References:
     - HYBRID_PHASE_JEPA_DESIGN.md §3.2
@@ -41,14 +44,17 @@ class SovereignStateProjector(nn.Module):
     """
     Projects hidden states to 32D Sovereign State with MLP architecture.
 
-    Five Planes (32D):
-        Ontological Plane [0:12]  - 12 Bhavas (identity/phase rotation) - softmax
-        Depth Plane [12:17]       - 5 Koshas (processing depth)         - sigmoid/softmax
-        Intellectual Plane [17:22] - 5 Vrittis (cognitive reliability)   - softmax
+    Five Planes (32D, mapped to Pancha Kosha):
+        Annamaya / Physical [0:12]      - 12 Bhavas (ontological identity)   - softmax
+        Pranamaya / Governance [12:17]  - 5 Koshas (control/depth routing)   - sigmoid/softmax
+        Vijnanamaya / Intellectual [17:22] - 5 Vrittis (cognitive reliability) - softmax
             Pramana (valid cognition), Viparyaya (error), Vikalpa (imagination),
             Nidra (void), Smriti (memory)
-        Dynamics Plane [22:28]    - 6 Gunas (energy/system dynamics)     - sigmoid
-        Learning Plane [28:32]    - 4 Reserved (goal encoding/feedback)  - tanh
+        Anandamaya / Abstract [22:28]   - 6 Gunas (abstract dynamics)        - sigmoid
+        Learning Plane [28:32]          - 4 Reserved (goal encoding/feedback) - tanh
+
+    Note: Manomaya (Mental Plane) is handled by CSR (phonemic/resonance),
+    operating outside the 32D state as a separate scoring primitive.
 
     v2.2.5 Geometric Expansion Mode:
         When kosha_mode='sigmoid', Koshas are treated as INDEPENDENT sheaths
@@ -161,13 +167,13 @@ class SovereignStateProjector(nn.Module):
 
     def _apply_constraints(self, raw: torch.Tensor) -> torch.Tensor:
         """
-        Apply normalization constraints per plane.
+        Apply normalization constraints per plane (Pancha Kosha).
 
-        Ontological Plane:   Bhavas  → softmax (one dominant identity)
-        Depth Plane:         Koshas  → sigmoid (independent sheaths) or softmax (legacy)
-        Intellectual Plane:  Vrittis → softmax (one dominant cognitive mode)
-        Dynamics Plane:      Gunas   → sigmoid (independent energy activations [0,1])
-        Learning Plane:      Reserved → tanh (bounded feedback [-1,1])
+        Annamaya (Physical):      Bhavas  → softmax (one dominant identity)
+        Pranamaya (Governance):   Koshas  → sigmoid (independent) or softmax (legacy)
+        Vijnanamaya (Intellectual): Vrittis → softmax (one dominant cognitive mode)
+        Anandamaya (Abstract):    Gunas   → sigmoid (independent activations [0,1])
+        Learning:                 Reserved → tanh (bounded feedback [-1,1])
         """
         # Extract component ranges
         bhava = raw[..., 0:12]

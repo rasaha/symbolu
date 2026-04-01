@@ -4,10 +4,10 @@ Loss Functions for the Ontological State Predictor.
 Implements loss functions for latent-space state prediction training,
 including VICReg regularization and per-plane weighted alignment.
 
-Loss weights reflect the five-plane structure:
-    - Ontological Plane (Bhavas): Critical identity — high weight
-    - Depth Plane (Koshas) + Intellectual Plane (Vrittis): Semantic — medium weight
-    - Dynamics Plane (Gunas) + Learning Plane (Reserved): Loose coupling — low weight
+Loss weights reflect the Pancha Kosha plane structure:
+    - Annamaya / Physical (Bhavas): Ontological identity — high weight
+    - Pranamaya (Koshas) + Vijnanamaya (Vrittis): Governance + intellectual — medium weight
+    - Anandamaya (Gunas) + Learning (Reserved): Abstract dynamics — low weight
 
 References:
     - Bardes et al., "VICReg: Variance-Invariance-Covariance Regularization"
@@ -122,15 +122,15 @@ class WeightedAlignmentLoss(nn.Module):
     """
     Per-plane weighted MSE for Phase 3 (Union) training.
 
-    Enforces cross-modal state alignment with different weights per plane:
-        - High weight on Ontological Plane [0:12]  — Bhavas (critical identity)
-        - Medium weight on Depth + Intellectual Plane [12:22] — Koshas + Vrittis
-        - Low weight on Dynamics + Learning Plane [22:32] — Gunas + Reserved
+    Enforces cross-modal state alignment with different weights per Kosha plane:
+        - High weight on Annamaya [0:12]  — Bhavas (ontological identity must align)
+        - Medium weight on Pranamaya + Vijnanamaya [12:22] — Koshas + Vrittis
+        - Low weight on Anandamaya + Learning [22:32] — Gunas + Reserved
 
     Rationale:
-        Cross-modal inputs must share ontological identity (Bhava), but
-        their dynamics (Gunas) and cognitive mode (Vrittis) may legitimately
-        differ. Enforcing tight alignment on all planes would over-constrain.
+        Cross-modal inputs must share ontological identity (Annamaya/Bhava),
+        but their abstract dynamics (Anandamaya/Gunas) and cognitive mode
+        (Vijnanamaya/Vrittis) may legitimately differ across modalities.
 
     Args:
         bhava_weight: Weight for Bhava dimensions [0:12]
