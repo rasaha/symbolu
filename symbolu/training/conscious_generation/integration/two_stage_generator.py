@@ -52,6 +52,7 @@ class TwoStageGenerator(nn.Module):
         hidden: torch.Tensor,
         o_ctx: torch.Tensor,
         cache: Optional[object] = None,
+        domain: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """
         Run the two-stage generation pipeline.
@@ -61,6 +62,8 @@ class TwoStageGenerator(nn.Module):
             hidden: Transformer hidden states (..., embed_dim).
             o_ctx: Context ontological state (..., state_dim).
             cache: TokenPrimitiveCache instance (for TET).
+            domain: Domain distribution (..., num_domains). Optional;
+                    when provided, enables governance-plane routing.
 
         Returns:
             Dict with keys:
@@ -83,11 +86,12 @@ class TwoStageGenerator(nn.Module):
         T = tet_result['T']                        # (..., K, 6)
         candidate_ids = tet_result['candidate_ids']  # (..., K)
 
-        # Stage 2: Integrated scoring (Kosha routing + Bliss gating)
+        # Stage 2: Integrated scoring (governance-plane routing + Bliss gating)
         integ_result = self.integrated_scorer(
             T=T,
             hidden=hidden,
             o_ctx=o_ctx,
+            domain=domain,
             candidate_ids=candidate_ids,
         )
         Z_star = integ_result['Z_star']  # (..., K)

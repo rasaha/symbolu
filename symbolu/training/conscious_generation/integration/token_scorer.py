@@ -1,28 +1,32 @@
 """
 IntegratedTokenScorer: Combines Kosha routing and Bliss gating into Z*(w).
 
-Z(w)  = Σ_f α_f S_f(w)          — Kosha-weighted score
-Z*(w) = B(w) · Z(w)              — Bliss-gated integrated score
+Z(w)  = Sum_f alpha_f S_f(w)          -- Kosha-weighted score
+Z*(w) = B(w) * Z(w)                   -- Bliss-gated integrated score
 
-This module orchestrates the full governance pipeline:
-  1. KoshaPrimitiveRouter produces α_t
-  2. BlissTokenGate produces B(w), D(w), μ(w)
+Governance pipeline:
+  1. KoshaDomainRouter produces alpha_t from Kosha [12:17] x Domain
+  2. BlissTokenGate produces B(w) with lambda modulated by BLISSFUL Kosha
   3. IntegratedTokenScorer combines them into Z*(w)
+
+The governance plane (Pranamaya) actively controls both:
+  - WHICH primitives matter (via Kosha x Domain routing)
+  - HOW strict coherence is (via BLISSFUL Kosha → BlissGate lambda)
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Appendix D Phase 3
 """
 
 import torch
 import torch.nn as nn
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 
 
 class IntegratedTokenScorer(nn.Module):
     """
-    Produces integrated token scores Z*(w) via Kosha routing + Bliss gating.
+    Produces integrated token scores Z*(w) via governance-plane routing + gating.
 
     Args:
-        kosha_router: KoshaPrimitiveRouter instance
+        kosha_router: KoshaDomainRouter instance
         bliss_gate: BlissTokenGate instance
     """
 
@@ -40,16 +44,19 @@ class IntegratedTokenScorer(nn.Module):
         T: torch.Tensor,
         hidden: torch.Tensor,
         o_ctx: torch.Tensor,
+        domain: Optional[torch.Tensor] = None,
         candidate_ids: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """
         Compute integrated scores Z*(w) for candidate tokens.
 
         Args:
-            T: Token Evaluation Tensor (..., K, 6) — primitive scores
+            T: Token Evaluation Tensor (..., K, 6) -- primitive scores
             hidden: Transformer hidden states (..., embed_dim)
             o_ctx: Context ontological state (..., state_dim)
-            candidate_ids: Token indices (..., K) — passed through for convenience
+            domain: Domain distribution (..., num_domains). Optional;
+                    when absent, router falls back to residual-only.
+            candidate_ids: Token indices (..., K) -- passed through
 
         Returns:
             Dict with keys:
@@ -58,16 +65,20 @@ class IntegratedTokenScorer(nn.Module):
                 'alpha': Kosha routing weights (..., 6)
                 'B': Bliss coherence values (..., K)
                 'D': Disagreement values (..., K)
+                'kosha': Extracted Kosha distribution (..., 5)
+                'lambda_eff': Effective Bliss gate lambda
                 'candidate_ids': Token indices (passthrough)
         """
-        # Step 1: Kosha routing weights
-        alpha = self.kosha_router(hidden, o_ctx)  # (..., 6)
+        # Step 1: Governance-plane routing (Kosha x Domain → alpha)
+        router_result = self.kosha_router(hidden, o_ctx, domain=domain)
+        alpha = router_result["alpha"]   # (..., 6)
+        kosha = router_result["kosha"]   # (..., 5)
 
-        # Step 2: Bliss gating
-        bliss_result = self.bliss_gate(T, alpha)
+        # Step 2: Bliss gating (with BLISSFUL Kosha modulating lambda)
+        bliss_result = self.bliss_gate(T, alpha, kosha=kosha)
         B = bliss_result["B"]       # (..., K)
         D = bliss_result["D"]       # (..., K)
-        Z = bliss_result["mu"]      # (..., K) — this IS Z(w) = Σ_f α_f S_f(w)
+        Z = bliss_result["mu"]      # (..., K) -- this IS Z(w) = Sum_f alpha_f S_f(w)
 
         # Step 3: Gated score
         Z_star = B * Z  # (..., K)
@@ -78,6 +89,9 @@ class IntegratedTokenScorer(nn.Module):
             "alpha": alpha,
             "B": B,
             "D": D,
+            "kosha": kosha,
+            "lambda_eff": bliss_result["lambda_eff"],
+            "router_result": router_result,
         }
         if candidate_ids is not None:
             result["candidate_ids"] = candidate_ids
