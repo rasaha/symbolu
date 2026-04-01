@@ -94,6 +94,9 @@ class IntegratedConfig:
     mode: IntegrationMode = IntegrationMode.QUALITY_AWARE
     # Weight for compression quality in scoring (quality-aware mode)
     weight_compression_quality: float = 0.05
+    # Skip actual PolarQuant compression (use statistical model instead)
+    # Much faster for large-scale benchmarks where hit rate is the metric
+    fast_mode: bool = False
 
     @classmethod
     def three_bit_chatbot(cls) -> "IntegratedConfig":
@@ -236,11 +239,39 @@ class TurboQuantCTMSimulator:
 
     def _simulate_compression(self, token_type: str) -> dict:
         """Simulate TurboQuant compression quality for a token's KV vector."""
+        importance = self.TOKEN_IMPORTANCE.get(token_type, 0.4)
+
+        # Fast mode: use statistical model based on benchmark data
+        # (avg cosine ~0.965 at 3-bit, ~0.991 at 4-bit from Section 1)
+        if self.config.fast_mode:
+            bits = self.config.tq_config.angle_bits
+            if bits <= 2:
+                cosine = 0.858 + self.rng.uniform(-0.02, 0.02)
+                mse = 0.016 + self.rng.uniform(-0.002, 0.002)
+            elif bits == 3:
+                cosine = 0.965 + self.rng.uniform(-0.01, 0.01)
+                mse = 0.004 + self.rng.uniform(-0.001, 0.001)
+            else:
+                cosine = 0.991 + self.rng.uniform(-0.005, 0.005)
+                mse = 0.001 + self.rng.uniform(-0.0005, 0.0005)
+            # Important tokens compress slightly worse
+            if importance > 0.7:
+                cosine -= 0.005
+                mse += 0.001
+            base_norm = 1.0 + importance * 2.0
+            self.stats["tokens_compressed"] += 1
+            self.stats["compression_mse_sum"] += mse
+            self.stats["compression_cosine_sum"] += cosine
+            return {
+                "mse": mse,
+                "cosine_similarity": min(1.0, cosine),
+                "original_norm": base_norm,
+            }
+
         d = self.config.tq_config.head_dim
 
         # Generate a realistic KV vector based on token type
         # Important tokens tend to have higher-norm, more structured vectors
-        importance = self.TOKEN_IMPORTANCE.get(token_type, 0.4)
         base_norm = 1.0 + importance * 2.0
 
         vector = self.rng.randn(d).astype(np.float32)
