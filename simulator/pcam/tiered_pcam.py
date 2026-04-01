@@ -173,6 +173,28 @@ class CXLEdgePool:
         """Current number of entries in pool."""
         return len(self._entries)
 
+    def get_host_usage(self, host_id: int) -> int:
+        """Get number of entries host_id has in the pool."""
+        return len(self._host_entries.get(host_id, set()))
+
+    def get_host_share(self, host_id: int) -> float:
+        """Get host's fraction of pool capacity."""
+        if self.capacity == 0:
+            return 0.0
+        return self.get_host_usage(host_id) / self.capacity
+
+    def can_admit(self, host_id: int) -> bool:
+        """Check if host can admit another entry (capacity + quota)."""
+        if not self.config.enabled:
+            return False
+        if len(self._entries) >= self.capacity:
+            return False
+        # Per-host max share check (multi-GPU fairness)
+        if (self.config.num_hosts > 1
+                and self.get_host_share(host_id) >= self.config.per_host_max_share):
+            return False
+        return True
+
     def admit(
         self,
         entry: CompressedBlockEntry,
@@ -180,6 +202,7 @@ class CXLEdgePool:
     ) -> bool:
         """Admit a compressed entry to the CXL pool.
 
+        Enforces per-host quota bounds in multi-GPU mode.
         Returns True if admitted, False if pool is full and victim
         selection failed.
         """
@@ -194,6 +217,11 @@ class CXLEdgePool:
         if len(self._entries) >= self.capacity:
             if not self._evict_one(host_id):
                 return False
+
+        # Check per-host quota (after potential eviction freed space)
+        if (self.config.num_hosts > 1
+                and self.get_host_share(host_id) >= self.config.per_host_max_share):
+            return False
 
         self._entries[key] = entry
         self._host_entries[host_id].add(key)
@@ -250,6 +278,7 @@ class CXLEdgePool:
 
         Uses score + access recency for victim selection.
         Penalizes shared entries (more costly to evict).
+        Prefers evicting entries from over-quota hosts.
         """
         if not self._entries:
             return False
@@ -264,11 +293,18 @@ class CXLEdgePool:
             # Penalty for shared entries (harder to invalidate)
             num_sharers = len(self._sharers.get(key, set()))
             if num_sharers > 1:
-                eviction_score *= (1.0 + 0.2 * num_sharers)
+                penalty = self.config.shared_entry_penalty * num_sharers
+                eviction_score *= (1.0 + penalty)
 
             # Boost for recently accessed entries (don't evict)
             if entry.cxl_access_count > 0:
                 eviction_score *= (1.0 + 0.1 * min(entry.cxl_access_count, 10))
+
+            # Prefer evicting from over-quota hosts (multi-GPU fairness)
+            if self.config.num_hosts > 1:
+                owner_share = self.get_host_share(entry.owner_host)
+                if owner_share > self.config.per_host_max_share * 0.9:
+                    eviction_score *= 0.7  # Make it easier to evict
 
             if eviction_score < best_victim_score:
                 best_victim_score = eviction_score
@@ -295,6 +331,10 @@ class CXLEdgePool:
 
     def get_stats(self) -> Dict:
         """Get pool statistics."""
+        host_usage = {
+            h: len(entries) for h, entries in self._host_entries.items()
+            if entries
+        }
         return {
             **self.stats,
             "size": len(self._entries),
@@ -303,6 +343,7 @@ class CXLEdgePool:
             "num_shared_entries": sum(
                 1 for s in self._sharers.values() if len(s) > 1
             ),
+            "host_usage": host_usage,
         }
 
 

@@ -66,14 +66,28 @@ class CXLPoolConfig:
     num_hosts: int = 1          # Number of GPUs sharing the pool
     max_sharers_per_entry: int = 4  # CXL.cache sharer limit
 
+    # Per-host quota management
+    per_host_min_share: float = 0.1   # Minimum guaranteed pool share per host [0, 1]
+    per_host_max_share: float = 0.8   # Maximum pool share any single host can use
+
     # Coherence costs
     invalidation_latency_ns: float = 500.0
     invalidation_batch_size: int = 8
+
+    # Eviction scoring for shared entries
+    shared_entry_penalty: float = 0.2   # Penalty multiplier for evicting shared entries
+    remote_entry_boost: float = 0.1     # Boost for keeping frequently-shared entries
 
     # Dynamic capacity
     expansion_threshold: float = 0.85   # Utilization to trigger expansion
     contraction_threshold: float = 0.30  # Utilization to trigger contraction
     rebalance_interval: int = 500       # Accesses between rebalance checks
+    capacity_step: int = 100            # Entries added/removed per expansion/contraction
+
+    # Cross-host edge discovery
+    discovery_enabled: bool = True       # Allow GPUs to discover edges from other GPUs
+    discovery_min_score: float = 0.05    # Minimum score for cross-host edge discovery
+    discovery_boost: float = 0.15        # Score boost for cross-host validated edges
 
 
 @dataclass
