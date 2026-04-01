@@ -1009,6 +1009,17 @@ class UnifiedTrainingConfig:
     bliss_lambda_B: float = 1.0                    # λ_B temperature for Bliss gate
     kosha_routing_init: str = "uniform"            # "uniform" or "base_dominant"
 
+    # Phase 3+: Governance plane (Pranamaya) — Domain × Kosha routing
+    kosha_num_domains: int = 8                     # Number of domain categories
+    kosha_interaction_rank: int = 16               # Low-rank dim for k ⊗ d interaction
+    kosha_initial_policy_scale: float = 0.10       # Starting policy blend strength (ramps up)
+    kosha_bliss_scale: float = 2.0                 # How much BLISSFUL Kosha increases gate lambda
+    kosha_use_kosha: bool = True                   # Ablation: explicit Kosha slice contribution
+    kosha_use_domain: bool = True                  # Ablation: domain contribution
+    kosha_use_interaction: bool = True             # Ablation: k ⊗ d interaction term
+    kosha_use_dynamic_bliss: bool = True           # Ablation: BLISSFUL Kosha → gate lambda
+    enable_governance_probes: bool = False          # Enable sensitivity probes (extra router passes)
+
     # Phase 4: Field-Integrated Generation
     use_field_integrated_softmax: bool = False      # Replace standard logits with Z*(w) for L_LM
     field_softmax_temperature: float = 1.0          # Temperature scaling for integrated softmax

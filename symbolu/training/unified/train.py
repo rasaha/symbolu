@@ -2425,8 +2425,11 @@ def train(config: UnifiedTrainingConfig):
                       f"FieldIntegrated={cg_stage_manager._field_integrated_active}")
 
             if config.enable_cg_diagnostics:
-                cg_governance_diag = GovernanceDiagnostics(window_size=100)
-                print(f"    Governance diagnostics: ENABLED")
+                cg_governance_diag = GovernanceDiagnostics(
+                    window_size=100,
+                    enable_sensitivity_probes=getattr(config, 'enable_governance_probes', False),
+                )
+                print(f"    Governance diagnostics: ENABLED (probes={'ON' if getattr(config, 'enable_governance_probes', False) else 'OFF'})")
         except ImportError as e:
             print(f"  [Conscious Gen Phase 5] Curriculum import failed: {e}")
 
@@ -5045,7 +5048,7 @@ def train(config: UnifiedTrainingConfig):
                                 if config.lambda_kosha_routing > 0 and 'kosha_routing_loss' in model.conscious_gen:
                                     _cg_kr_fn = model.conscious_gen['kosha_routing_loss']
                                     _cg_kr_result = _cg_kr_fn(
-                                        alpha=_cg_alpha,
+                                        router_result=_cg_integ_result.get('router_result', {'alpha': _cg_alpha, 'policy_logits': torch.zeros_like(_cg_alpha)}),
                                         T=_cg_T,
                                         target_ids=y,
                                         candidate_ids=_cg_cand_ids,
@@ -5134,6 +5137,13 @@ def train(config: UnifiedTrainingConfig):
                                         target_ids=y,
                                         candidate_ids=_cg_cand_ids,
                                         base_logits=logits.detach(),
+                                        # Governance causality signals
+                                        router_result=_cg_integ_result.get('router_result'),
+                                        lambda_eff=_cg_integ_result.get('lambda_eff'),
+                                        kosha=_cg_integ_result.get('kosha'),
+                                        router=model.conscious_gen.get('kosha_router'),
+                                        hidden=_cg_hidden.detach(),
+                                        o_ctx=_cg_sov_state.detach(),
                                     )
 
                         # Log diagnostics periodically
@@ -9876,6 +9886,34 @@ def main():
                        choices=["uniform", "base_dominant"],
                        help="Kosha router initialization mode")
 
+    # Conscious Generation Phase 3+: Governance plane (Pranamaya) — Domain × Kosha
+    parser.add_argument("--kosha_num_domains", type=int, default=8,
+                       help="Number of domain categories for governance routing")
+    parser.add_argument("--kosha_interaction_rank", type=int, default=16,
+                       help="Low-rank dimension for k ⊗ d interaction term")
+    parser.add_argument("--kosha_initial_policy_scale", type=float, default=0.10,
+                       help="Starting policy blend strength (structured vs residual)")
+    parser.add_argument("--kosha_bliss_scale", type=float, default=2.0,
+                       help="How much BLISSFUL Kosha activation increases gate lambda")
+    parser.add_argument("--kosha_use_kosha", action="store_true", default=True,
+                       help="Enable Kosha slice contribution (disable for ablation)")
+    parser.add_argument("--kosha_no_kosha", action="store_true",
+                       help="Ablation: disable Kosha slice contribution")
+    parser.add_argument("--kosha_use_domain", action="store_true", default=True,
+                       help="Enable domain contribution (disable for ablation)")
+    parser.add_argument("--kosha_no_domain", action="store_true",
+                       help="Ablation: disable domain contribution")
+    parser.add_argument("--kosha_use_interaction", action="store_true", default=True,
+                       help="Enable k ⊗ d interaction term (disable for ablation)")
+    parser.add_argument("--kosha_no_interaction", action="store_true",
+                       help="Ablation: disable k ⊗ d interaction term")
+    parser.add_argument("--kosha_use_dynamic_bliss", action="store_true", default=True,
+                       help="Enable BLISSFUL Kosha → gate lambda modulation")
+    parser.add_argument("--kosha_no_dynamic_bliss", action="store_true",
+                       help="Ablation: disable dynamic Bliss gate lambda")
+    parser.add_argument("--enable_governance_probes", action="store_true",
+                       help="Enable sensitivity probes in governance diagnostics")
+
     # Conscious Generation Phase 4: Field-Integrated Generation
     parser.add_argument("--use_field_integrated_softmax", action="store_true",
                        help="Replace standard logits with Z*(w) for L_LM")
@@ -10740,6 +10778,16 @@ def main():
         lambda_guna_token=args.lambda_guna_token,
         bliss_lambda_B=args.bliss_lambda_B,
         kosha_routing_init=args.kosha_routing_init,
+        # Conscious Generation (Phase 3+): Governance plane
+        kosha_num_domains=args.kosha_num_domains,
+        kosha_interaction_rank=args.kosha_interaction_rank,
+        kosha_initial_policy_scale=args.kosha_initial_policy_scale,
+        kosha_bliss_scale=args.kosha_bliss_scale,
+        kosha_use_kosha=not args.kosha_no_kosha,
+        kosha_use_domain=not args.kosha_no_domain,
+        kosha_use_interaction=not args.kosha_no_interaction,
+        kosha_use_dynamic_bliss=not args.kosha_no_dynamic_bliss,
+        enable_governance_probes=args.enable_governance_probes,
         # Conscious Generation (Phase 4)
         use_field_integrated_softmax=args.use_field_integrated_softmax,
         field_softmax_temperature=args.field_softmax_temperature,

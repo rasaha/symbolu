@@ -738,15 +738,23 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"    GunaTokenScorer: 3 classes (bilinear G)")
         print(f"    TokenEvaluationTensor: K={config.primitive_shortlist_k}, 6 primitives")
 
-        # Phase 3: Governance Integration
+        # Phase 3: Governance Integration (Pranamaya plane — Domain × Kosha)
         kosha_router = KoshaPrimitiveRouter(
             embed_dim=embed_dim,
             state_dim=config.token_ontology_dim,
+            num_domains=getattr(config, 'kosha_num_domains', 8),
+            rank=getattr(config, 'kosha_interaction_rank', 16),
             init_mode=config.kosha_routing_init,
+            initial_policy_scale=getattr(config, 'kosha_initial_policy_scale', 0.10),
+            use_kosha=getattr(config, 'kosha_use_kosha', True),
+            use_domain=getattr(config, 'kosha_use_domain', True),
+            use_interaction=getattr(config, 'kosha_use_interaction', True),
         )
 
         bliss_gate = BlissTokenGate(
             lambda_B=config.bliss_lambda_B,
+            bliss_scale=getattr(config, 'kosha_bliss_scale', 2.0),
+            use_dynamic_bliss=getattr(config, 'kosha_use_dynamic_bliss', True),
         )
 
         integrated_scorer = IntegratedTokenScorer(
