@@ -992,7 +992,8 @@ class UnifiedTrainingConfig:
     ontology_scorer_rank: int = 8                  # Rank for low-rank factorization
 
     # Phase 2: Primitive Scoring Heads
-    jepa_token_dim: int = 16                       # d_j for JEPA token representations
+    plausibility_token_dim: int = 16               # d_j for plausibility token representations
+    jepa_token_dim: int = None                     # Backward-compatible alias for plausibility_token_dim
     csr_token_dim: int = 16                        # d_c for CSR token representations
     primitive_shortlist_k: int = 128               # Top-K base logits for primitive evaluation
     use_low_rank_primitives: bool = True           # Low-rank M_f = A_f B_f^T (reduces params)
@@ -1002,12 +1003,24 @@ class UnifiedTrainingConfig:
     # Phase 3: Governance Integration
     lambda_kosha_routing: float = 0.0              # Kosha routing loss weight
     lambda_bliss_token: float = 0.0                # Bliss token-level coherence loss weight
-    lambda_jepa_token: float = 0.0                 # JEPA token-level plausibility loss
+    lambda_plausibility_token: float = 0.0          # Plausibility token-level loss
+    lambda_jepa_token: float = None                # Backward-compatible alias for lambda_plausibility_token
     lambda_csr_token: float = 0.0                  # CSR token-level resonance loss
     lambda_vritti_token: float = 0.0               # Vritti token-level cognitive mode loss
     lambda_guna_token: float = 0.0                 # Guna token-level energetic loss
     bliss_lambda_B: float = 1.0                    # λ_B temperature for Bliss gate
     kosha_routing_init: str = "uniform"            # "uniform" or "base_dominant"
+
+    # Phase 3+: Governance plane (Pranamaya) — Domain × Kosha routing
+    kosha_num_domains: int = 8                     # Number of domain categories
+    kosha_interaction_rank: int = 16               # Low-rank dim for k ⊗ d interaction
+    kosha_initial_policy_scale: float = 0.10       # Starting policy blend strength (ramps up)
+    kosha_bliss_scale: float = 2.0                 # How much BLISSFUL Kosha increases gate lambda
+    kosha_use_kosha: bool = True                   # Ablation: explicit Kosha slice contribution
+    kosha_use_domain: bool = True                  # Ablation: domain contribution
+    kosha_use_interaction: bool = True             # Ablation: k ⊗ d interaction term
+    kosha_use_dynamic_bliss: bool = True           # Ablation: BLISSFUL Kosha → gate lambda
+    enable_governance_probes: bool = False          # Enable sensitivity probes (extra router passes)
 
     # Phase 4: Field-Integrated Generation
     use_field_integrated_softmax: bool = False      # Replace standard logits with Z*(w) for L_LM
@@ -1143,6 +1156,18 @@ class UnifiedTrainingConfig:
     #   3. Write temperature scales with slot count (already in V19).
     #   4. Gate targets and coherence floors are dimensionless — keep fixed.
     # =========================================================================
+
+    def __post_init__(self):
+        """Resolve backward-compatible aliases."""
+        # jepa_token_dim → plausibility_token_dim
+        if self.jepa_token_dim is not None:
+            self.plausibility_token_dim = self.jepa_token_dim
+        self.jepa_token_dim = self.plausibility_token_dim
+
+        # lambda_jepa_token → lambda_plausibility_token
+        if self.lambda_jepa_token is not None:
+            self.lambda_plausibility_token = self.lambda_jepa_token
+        self.lambda_jepa_token = self.lambda_plausibility_token
 
     def compute_slot_scaling(self) -> dict:
         """

@@ -71,7 +71,7 @@ SMOKE_TEST=0
 LAMBDA_ONT=0.01
 LAMBDA_KOSHA=0.01
 LAMBDA_BLISS=0.01
-LAMBDA_JEPA=0.005
+LAMBDA_PLAUSIBILITY=0.005
 LAMBDA_CSR=0.005
 LAMBDA_VRITTI=0.005
 LAMBDA_GUNA=0.005
@@ -225,7 +225,7 @@ python train_unified_llm.py \
     --lambda_ont "$LAMBDA_ONT" \
     --lambda_kosha_routing "$LAMBDA_KOSHA" \
     --lambda_bliss_token "$LAMBDA_BLISS" \
-    --lambda_jepa_token "$LAMBDA_JEPA" \
+    --lambda_plausibility_token "$LAMBDA_PLAUSIBILITY" \
     --lambda_csr_token "$LAMBDA_CSR" \
     --lambda_vritti_token "$LAMBDA_VRITTI" \
     --lambda_guna_token "$LAMBDA_GUNA" \

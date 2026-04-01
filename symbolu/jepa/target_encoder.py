@@ -1,12 +1,14 @@
 """
-Target Encoder with Exponential Moving Average (EMA) for Phase-JEPA.
+Target Encoder with Exponential Moving Average (EMA) for the Ontological State Predictor.
 
 The Target Encoder provides slowly-moving targets for the predictor,
 preventing representation collapse without requiring negative samples.
 
+Inspired by the EMA target encoder from JEPA (LeCun, 2022) and
+BYOL (Grill et al., 2020), adapted for 32D Sovereign State prediction.
+
 References:
     - HYBRID_PHASE_JEPA_DESIGN.md §3.3
-    - Meta AI I-JEPA paper
 """
 
 import copy
@@ -186,8 +188,8 @@ class TargetEncoderWrapper(nn.Module):
     """
     Wrapper that manages both context and target encoders together.
 
-    Provides a clean interface for JEPA training with automatic
-    EMA updates.
+    Provides a clean interface for ontological state prediction training
+    with automatic EMA updates.
 
     Args:
         encoder_class: Class to instantiate for context encoder

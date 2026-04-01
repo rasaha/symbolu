@@ -1,8 +1,17 @@
 """
-Sovereign State Projector for Phase-JEPA.
+Sovereign State Projector for the Ontological State Predictor.
 
 Projects hidden representations to the 32D Sovereign State space with
-component-wise normalization constraints.
+component-wise normalization constraints per plane (Pancha Kosha mapping):
+
+    - Annamaya / Physical Plane [0:12]:      12 Bhavas — ontological identity (softmax)
+    - Pranamaya / Governance Plane [12:17]:   5 Koshas — control/depth routing (sigmoid)
+    - Vijnanamaya / Intellectual Plane [17:22]: 5 Vrittis — cognitive reliability (softmax)
+    - Anandamaya / Abstract Plane [22:28]:    6 Gunas — abstract dynamics (sigmoid)
+    - Learning Plane [28:32]:                 4 Reserved — goal encoding/feedback (tanh)
+
+    Note: Manomaya (Mental Plane) is handled by CSR (phonemic/resonance),
+    which operates outside the 32D state as a separate scoring primitive.
 
 References:
     - HYBRID_PHASE_JEPA_DESIGN.md §3.2
@@ -35,27 +44,23 @@ class SovereignStateProjector(nn.Module):
     """
     Projects hidden states to 32D Sovereign State with MLP architecture.
 
-    V11.0.0: Still projects full 32D. Consumers separate into planes:
-      Phase Plane:    [0:12]  Bhavas → ΔBhava → phase rotation (12D)
-      Control Plane:  [12:28] Koshas + Vrittis + Gunas → CTM+/Sentinel (16D)
-      Learning Plane: [28:32] Reserved → training feedback (4D)
+    Five Planes (32D, mapped to Pancha Kosha):
+        Annamaya / Physical [0:12]      - 12 Bhavas (ontological identity)   - softmax
+        Pranamaya / Governance [12:17]  - 5 Koshas (control/depth routing)   - sigmoid/softmax
+        Vijnanamaya / Intellectual [17:22] - 5 Vrittis (cognitive reliability) - softmax
+            Pramana (valid cognition), Viparyaya (error), Vikalpa (imagination),
+            Nidra (void), Smriti (memory)
+        Anandamaya / Abstract [22:28]   - 6 Gunas (abstract dynamics)        - sigmoid
+        Learning Plane [28:32]          - 4 Reserved (goal encoding/feedback) - tanh
 
-    Structure (32D):
-        [0:12]  - 12 Bhavas (Ontological Aspects) - Softmax normalized
-        [12:17] - 5 Koshas (Consciousness Sheaths) - Softmax OR Sigmoid (v2.2.5)
-        [17:22] - 5 Vrittis (Mental Modifications) - Softmax normalized
-        [22:28] - 6 Gunas/Dynamics (Energy States) - Sigmoid independent
-        [28:32] - 4 Reserved (Toroidal Feedback) - Tanh bounded
+    Note: Manomaya (Mental Plane) is handled by CSR (phonemic/resonance),
+    operating outside the 32D state as a separate scoring primitive.
 
     v2.2.5 Geometric Expansion Mode:
         When kosha_mode='sigmoid', Koshas are treated as INDEPENDENT sheaths
         (not mutually exclusive classes). This allows the model to be:
         - HIGH Physical AND HIGH Intellectual simultaneously
         - Proper ontological modeling (sheaths coexist, not compete)
-        - Compatible with Gemini's v2.2.4 threshold design (0.75 trap_threshold)
-
-    This MLP architecture provides higher capacity than simple linear projection,
-    matching the JEPA design specification for unified projector architecture.
 
     Args:
         hidden_dim: Input hidden dimension (e.g., 768 for transformer)
@@ -162,19 +167,13 @@ class SovereignStateProjector(nn.Module):
 
     def _apply_constraints(self, raw: torch.Tensor) -> torch.Tensor:
         """
-        Apply normalization constraints per component group.
+        Apply normalization constraints per plane (Pancha Kosha).
 
-        - Bhavas: Softmax (probability distribution)
-        - Koshas: Sigmoid (v2.2.5 independent) or Softmax (legacy zero-sum)
-        - Vrittis: Softmax (probability distribution)
-        - Gunas: Sigmoid (independent activations [0, 1])
-        - Reserved: Tanh (bounded [-1, 1])
-
-        v2.2.5 Geometric Expansion:
-            When kosha_mode='sigmoid', Koshas become independent [0,1] activations.
-            This allows "Full-Spectrum" awareness where model can be:
-            - HIGH Physical AND HIGH Intellectual simultaneously
-            - Enables Gemini's v2.2.4 threshold design (trap=0.75, gate=0.30)
+        Annamaya (Physical):      Bhavas  → softmax (one dominant identity)
+        Pranamaya (Governance):   Koshas  → sigmoid (independent) or softmax (legacy)
+        Vijnanamaya (Intellectual): Vrittis → softmax (one dominant cognitive mode)
+        Anandamaya (Abstract):    Gunas   → sigmoid (independent activations [0,1])
+        Learning:                 Reserved → tanh (bounded feedback [-1,1])
         """
         # Extract component ranges
         bhava = raw[..., 0:12]

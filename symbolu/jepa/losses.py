@@ -1,8 +1,13 @@
 """
-JEPA Loss Functions for Phase-JEPA Training.
+Loss Functions for the Ontological State Predictor.
 
-This module implements loss functions for Joint Embedding Predictive Architecture
-training, including VICReg regularization and alignment losses.
+Implements loss functions for latent-space state prediction training,
+including VICReg regularization and per-plane weighted alignment.
+
+Loss weights reflect the Pancha Kosha plane structure:
+    - Annamaya / Physical (Bhavas): Ontological identity — high weight
+    - Pranamaya (Koshas) + Vijnanamaya (Vrittis): Governance + intellectual — medium weight
+    - Anandamaya (Gunas) + Learning (Reserved): Abstract dynamics — low weight
 
 References:
     - Bardes et al., "VICReg: Variance-Invariance-Covariance Regularization"
@@ -19,7 +24,7 @@ class VICRegLoss(nn.Module):
     """
     Variance-Invariance-Covariance Regularization.
 
-    Prevents representation collapse in JEPA training without negative samples.
+    Prevents representation collapse in ontological state prediction without negative samples.
 
     Components:
         - Invariance: MSE between predicted and target representations
@@ -115,17 +120,17 @@ class VICRegLoss(nn.Module):
 
 class WeightedAlignmentLoss(nn.Module):
     """
-    Per-component weighted MSE for Phase 3 (Union) training.
+    Per-plane weighted MSE for Phase 3 (Union) training.
 
-    Enforces S_visual ≈ S_text with different weights per component:
-        - High weight on Bhavas [0:12] - Critical Identity
-        - Medium weight on Kosha/Vritti [12:22] - Standard semantic
-        - Low weight on Guna/Reserved [22:32] - Loose coupling
+    Enforces cross-modal state alignment with different weights per Kosha plane:
+        - High weight on Annamaya [0:12]  — Bhavas (ontological identity must align)
+        - Medium weight on Pranamaya + Vijnanamaya [12:22] — Koshas + Vrittis
+        - Low weight on Anandamaya + Learning [22:32] — Gunas + Reserved
 
     Rationale:
-        "Dog" (Vision) and "Dog" (Text) must share Identity (Bhava),
-        but images are often Tamasic (static) while words like "Run!"
-        are Rajasic (active). Enforcing Guna alignment would confuse the model.
+        Cross-modal inputs must share ontological identity (Annamaya/Bhava),
+        but their abstract dynamics (Anandamaya/Gunas) and cognitive mode
+        (Vijnanamaya/Vrittis) may legitimately differ across modalities.
 
     Args:
         bhava_weight: Weight for Bhava dimensions [0:12]
@@ -186,12 +191,12 @@ class WeightedAlignmentLoss(nn.Module):
 
 class JEPAPredictionLoss(nn.Module):
     """
-    Main JEPA prediction loss with optional regularization.
+    Main ontological state prediction loss with optional regularization.
 
     Combines:
-        - MSE prediction loss (predicted vs target state)
-        - Optional VICReg regularization
-        - Optional orthogonality constraint
+        - MSE prediction loss (predicted vs target state in 32D space)
+        - Optional VICReg regularization (collapse prevention)
+        - Optional orthogonality constraint (information preservation)
 
     Args:
         vicreg_weight: Weight for VICReg loss (0 to disable)
@@ -284,9 +289,9 @@ class JEPAPredictionLoss(nn.Module):
 
 class CompositeJEPALoss(nn.Module):
     """
-    Complete loss function combining JEPA, VICReg, and Patent losses.
+    Complete loss function combining prediction, VICReg, and alignment losses.
 
-    L_total = λ_jepa * L_JEPA + λ_vicreg * L_VICReg + λ_patent * L_Patent
+    L_total = λ_pred * L_prediction + λ_vicreg * L_VICReg + λ_align * L_alignment
 
     Supports curriculum-based weight scheduling via training phase.
 

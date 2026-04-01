@@ -2399,7 +2399,7 @@ def train(config: UnifiedTrainingConfig):
                 "lambda_ont": config.lambda_ont,
                 "lambda_kosha_routing": config.lambda_kosha_routing,
                 "lambda_bliss_token": config.lambda_bliss_token,
-                "lambda_jepa_token": config.lambda_jepa_token,
+                "lambda_plausibility_token": config.lambda_plausibility_token,
                 "lambda_csr_token": config.lambda_csr_token,
                 "lambda_vritti_token": config.lambda_vritti_token,
                 "lambda_guna_token": config.lambda_guna_token,
@@ -2425,8 +2425,11 @@ def train(config: UnifiedTrainingConfig):
                       f"FieldIntegrated={cg_stage_manager._field_integrated_active}")
 
             if config.enable_cg_diagnostics:
-                cg_governance_diag = GovernanceDiagnostics(window_size=100)
-                print(f"    Governance diagnostics: ENABLED")
+                cg_governance_diag = GovernanceDiagnostics(
+                    window_size=100,
+                    enable_sensitivity_probes=getattr(config, 'enable_governance_probes', False),
+                )
+                print(f"    Governance diagnostics: ENABLED (probes={'ON' if getattr(config, 'enable_governance_probes', False) else 'OFF'})")
         except ImportError as e:
             print(f"  [Conscious Gen Phase 5] Curriculum import failed: {e}")
 
@@ -4929,7 +4932,7 @@ def train(config: UnifiedTrainingConfig):
                         _cg_has_p3 = 'integrated_scorer' in model.conscious_gen
                         _cg_any_p3_loss = (config.lambda_kosha_routing > 0
                                           or config.lambda_bliss_token > 0
-                                          or config.lambda_jepa_token > 0
+                                          or config.lambda_plausibility_token > 0
                                           or config.lambda_csr_token > 0
                                           or config.lambda_vritti_token > 0
                                           or config.lambda_guna_token > 0)
@@ -4968,6 +4971,22 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_T = _cg_tet_result['T']              # (B, T, K, 6)
                                 _cg_cand_ids = _cg_tet_result['candidate_ids']  # (B, T, K)
 
+                                # Build domain signal from Gyroscope detection
+                                # Soft mapping: LANG/MATH/CODE → 8-dim distribution
+                                _cg_domain = None
+                                try:
+                                    from symbolu.training.conscious_generation.governance.domain_bridge import map_gyro_to_domain
+                                    _cg_domain_label = metrics.get('gyroscope_domain_label', 'LANG')
+                                    _cg_domain = map_gyro_to_domain(
+                                        domain_label=_cg_domain_label,
+                                        batch_size=_cg_hidden.shape[0],
+                                        seq_len=_cg_hidden.shape[1] if _cg_hidden.dim() == 3 else None,
+                                        device=_cg_hidden.device,
+                                        dtype=_cg_hidden.dtype,
+                                    )
+                                except ImportError:
+                                    pass
+
                                 # Run IntegratedTokenScorer (Kosha + Bliss)
                                 # Phase 3: Detach hidden/o_ctx (router trains its MLP
                                 #   only, no backbone gradients from governance).
@@ -4978,6 +4997,7 @@ def train(config: UnifiedTrainingConfig):
                                         T=_cg_T,
                                         hidden=_cg_hidden,
                                         o_ctx=_cg_sov_state,
+                                        domain=_cg_domain,
                                         candidate_ids=_cg_cand_ids,
                                     )
                                 else:
@@ -4985,6 +5005,7 @@ def train(config: UnifiedTrainingConfig):
                                         T=_cg_T,
                                         hidden=_cg_hidden.detach(),
                                         o_ctx=_cg_sov_state.detach(),
+                                        domain=_cg_domain,
                                         candidate_ids=_cg_cand_ids,
                                     )
                                 _cg_alpha = _cg_integ_result['alpha']    # (B, T, 6)
@@ -5045,7 +5066,7 @@ def train(config: UnifiedTrainingConfig):
                                 if config.lambda_kosha_routing > 0 and 'kosha_routing_loss' in model.conscious_gen:
                                     _cg_kr_fn = model.conscious_gen['kosha_routing_loss']
                                     _cg_kr_result = _cg_kr_fn(
-                                        alpha=_cg_alpha,
+                                        router_result=_cg_integ_result.get('router_result', {'alpha': _cg_alpha, 'policy_logits': torch.zeros_like(_cg_alpha)}),
                                         T=_cg_T,
                                         target_ids=y,
                                         candidate_ids=_cg_cand_ids,
@@ -5073,7 +5094,7 @@ def train(config: UnifiedTrainingConfig):
 
                                 # Primitive auxiliary losses
                                 _cg_prim_lambdas = {
-                                    'jepa': config.lambda_jepa_token,
+                                    'jepa': config.lambda_plausibility_token,
                                     'csr': config.lambda_csr_token,
                                     'vritti': config.lambda_vritti_token,
                                     'guna': config.lambda_guna_token,
@@ -5122,6 +5143,12 @@ def train(config: UnifiedTrainingConfig):
                                     ).sum(dim=-1).mean().item()
                                     metrics['cg_bliss_mean'] = _cg_B.mean().item()
                                     metrics['cg_disagree_mean'] = _cg_D.mean().item()
+                                    if _cg_domain is not None:
+                                        metrics['cg_domain_label'] = metrics.get('gyroscope_domain_label', 'LANG')
+                                        _cg_domain_ent = -(
+                                            _cg_domain[0] * (_cg_domain[0] + 1e-8).log()
+                                        ).sum(dim=-1).mean().item()
+                                        metrics['cg_domain_entropy'] = _cg_domain_ent
 
                                 # Phase 5: Update governance diagnostics tracker
                                 if cg_governance_diag is not None:
@@ -5134,6 +5161,14 @@ def train(config: UnifiedTrainingConfig):
                                         target_ids=y,
                                         candidate_ids=_cg_cand_ids,
                                         base_logits=logits.detach(),
+                                        # Governance causality signals
+                                        router_result=_cg_integ_result.get('router_result'),
+                                        lambda_eff=_cg_integ_result.get('lambda_eff'),
+                                        kosha=_cg_integ_result.get('kosha'),
+                                        router=model.conscious_gen.get('kosha_router'),
+                                        hidden=_cg_hidden.detach(),
+                                        o_ctx=_cg_sov_state.detach(),
+                                        domain=_cg_domain,
                                     )
 
                         # Log diagnostics periodically
@@ -9844,8 +9879,10 @@ def main():
                        help="Rank for low-rank bilinear factorization")
 
     # Conscious Generation Phase 2: Primitive Scoring Heads
-    parser.add_argument("--jepa_token_dim", type=int, default=16,
-                       help="JEPA token representation dimension (d_j)")
+    parser.add_argument("--plausibility_token_dim", type=int, default=16,
+                       help="Plausibility token representation dimension (d_j)")
+    parser.add_argument("--jepa_token_dim", type=int, default=None,
+                       help="(Deprecated) Alias for --plausibility_token_dim")
     parser.add_argument("--csr_token_dim", type=int, default=16,
                        help="CSR token representation dimension (d_c)")
     parser.add_argument("--primitive_shortlist_k", type=int, default=128,
@@ -9862,8 +9899,10 @@ def main():
                        help="Kosha routing loss weight")
     parser.add_argument("--lambda_bliss_token", type=float, default=0.0,
                        help="Bliss token-level coherence loss weight")
-    parser.add_argument("--lambda_jepa_token", type=float, default=0.0,
-                       help="JEPA token-level plausibility loss")
+    parser.add_argument("--lambda_plausibility_token", type=float, default=0.0,
+                       help="Plausibility token-level loss")
+    parser.add_argument("--lambda_jepa_token", type=float, default=None,
+                       help="(Deprecated) Alias for --lambda_plausibility_token")
     parser.add_argument("--lambda_csr_token", type=float, default=0.0,
                        help="CSR token-level resonance loss")
     parser.add_argument("--lambda_vritti_token", type=float, default=0.0,
@@ -9875,6 +9914,34 @@ def main():
     parser.add_argument("--kosha_routing_init", type=str, default="uniform",
                        choices=["uniform", "base_dominant"],
                        help="Kosha router initialization mode")
+
+    # Conscious Generation Phase 3+: Governance plane (Pranamaya) — Domain × Kosha
+    parser.add_argument("--kosha_num_domains", type=int, default=8,
+                       help="Number of domain categories for governance routing")
+    parser.add_argument("--kosha_interaction_rank", type=int, default=16,
+                       help="Low-rank dimension for k ⊗ d interaction term")
+    parser.add_argument("--kosha_initial_policy_scale", type=float, default=0.10,
+                       help="Starting policy blend strength (structured vs residual)")
+    parser.add_argument("--kosha_bliss_scale", type=float, default=2.0,
+                       help="How much BLISSFUL Kosha activation increases gate lambda")
+    parser.add_argument("--kosha_use_kosha", action="store_true", default=True,
+                       help="Enable Kosha slice contribution (disable for ablation)")
+    parser.add_argument("--kosha_no_kosha", action="store_true",
+                       help="Ablation: disable Kosha slice contribution")
+    parser.add_argument("--kosha_use_domain", action="store_true", default=True,
+                       help="Enable domain contribution (disable for ablation)")
+    parser.add_argument("--kosha_no_domain", action="store_true",
+                       help="Ablation: disable domain contribution")
+    parser.add_argument("--kosha_use_interaction", action="store_true", default=True,
+                       help="Enable k ⊗ d interaction term (disable for ablation)")
+    parser.add_argument("--kosha_no_interaction", action="store_true",
+                       help="Ablation: disable k ⊗ d interaction term")
+    parser.add_argument("--kosha_use_dynamic_bliss", action="store_true", default=True,
+                       help="Enable BLISSFUL Kosha → gate lambda modulation")
+    parser.add_argument("--kosha_no_dynamic_bliss", action="store_true",
+                       help="Ablation: disable dynamic Bliss gate lambda")
+    parser.add_argument("--enable_governance_probes", action="store_true",
+                       help="Enable sensitivity probes in governance diagnostics")
 
     # Conscious Generation Phase 4: Field-Integrated Generation
     parser.add_argument("--use_field_integrated_softmax", action="store_true",
@@ -10725,6 +10792,7 @@ def main():
         ontology_scorer_use_low_rank=args.ontology_scorer_use_low_rank,
         ontology_scorer_rank=args.ontology_scorer_rank,
         # Conscious Generation (Phase 2)
+        plausibility_token_dim=args.plausibility_token_dim if args.jepa_token_dim is None else args.jepa_token_dim,
         jepa_token_dim=args.jepa_token_dim,
         csr_token_dim=args.csr_token_dim,
         primitive_shortlist_k=args.primitive_shortlist_k,
@@ -10734,12 +10802,23 @@ def main():
         # Conscious Generation (Phase 3)
         lambda_kosha_routing=args.lambda_kosha_routing,
         lambda_bliss_token=args.lambda_bliss_token,
+        lambda_plausibility_token=args.lambda_plausibility_token if args.lambda_jepa_token is None else args.lambda_jepa_token,
         lambda_jepa_token=args.lambda_jepa_token,
         lambda_csr_token=args.lambda_csr_token,
         lambda_vritti_token=args.lambda_vritti_token,
         lambda_guna_token=args.lambda_guna_token,
         bliss_lambda_B=args.bliss_lambda_B,
         kosha_routing_init=args.kosha_routing_init,
+        # Conscious Generation (Phase 3+): Governance plane
+        kosha_num_domains=args.kosha_num_domains,
+        kosha_interaction_rank=args.kosha_interaction_rank,
+        kosha_initial_policy_scale=args.kosha_initial_policy_scale,
+        kosha_bliss_scale=args.kosha_bliss_scale,
+        kosha_use_kosha=not args.kosha_no_kosha,
+        kosha_use_domain=not args.kosha_no_domain,
+        kosha_use_interaction=not args.kosha_no_interaction,
+        kosha_use_dynamic_bliss=not args.kosha_no_dynamic_bliss,
+        enable_governance_probes=args.enable_governance_probes,
         # Conscious Generation (Phase 4)
         use_field_integrated_softmax=args.use_field_integrated_softmax,
         field_softmax_temperature=args.field_softmax_temperature,

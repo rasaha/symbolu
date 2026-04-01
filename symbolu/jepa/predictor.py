@@ -1,13 +1,28 @@
 """
-Phase-JEPA Predictor for State-Delta Prediction.
+Ontological State Predictor — Phase-Space Delta Prediction.
 
-The predictor uses phase-space dynamics to forecast state transitions,
-operating in the 32D Sovereign State space rather than token space.
+Predicts state transitions (deltas) in the 32D Sovereign State space
+using phase-space dynamics. This is NOT Meta's VL-JEPA — it is a custom
+latent-space predictor inspired by the JEPA principle of predicting in
+representation space without reconstruction.
+
+The predictor operates across the five planes of the 32D Sovereign State
+(mapped to Pancha Kosha):
+    - Annamaya / Physical [0:12]:      12 Bhavas (ontological identity)
+    - Pranamaya / Governance [12:17]:  5 Koshas (control/depth routing)
+    - Vijnanamaya / Intellectual [17:22]: 5 Vrittis (cognitive reliability)
+    - Anandamaya / Abstract [22:28]:   6 Gunas (abstract dynamics)
+    - Learning Plane [28:32]:          4 Reserved (goal encoding/feedback)
+
+The VrittiValidatedPredictor uses the Intellectual Plane (Vrittis) as an
+epistemological gate — rejecting predictions where Viparyaya (error) or
+Vikalpa (imagination) spike beyond threshold for factual tasks.
 
 Key Innovation:
     - Intent-guided phase rotation
     - O(n) complexity via cumulative sums
     - Multi-step autoregressive prediction
+    - Vritti-based intellectual validation
 
 References:
     - HYBRID_PHASE_JEPA_DESIGN.md §4
@@ -27,16 +42,16 @@ except ImportError:
 
 class PhaseJEPAPredictor(nn.Module):
     """
-    Predicts state deltas using phase-space dynamics.
+    Ontological State Predictor using phase-space dynamics.
 
-    The predictor operates in complex phasor space, using the same
-    Phase Attention mechanism as the main transformer but applied
-    to state prediction rather than token prediction.
+    Predicts state deltas across all five planes of the 32D Sovereign State
+    using complex phasor attention. Operates in latent state space, not
+    token or pixel space.
 
     Architecture:
         1. Phase-Amplitude Decomposition of input state
         2. Intent-guided Phase Rotation
-        3. Phasor Prediction via complex cumsum
+        3. Phasor Prediction via complex cumsum (O(n))
         4. Multi-step autoregressive rollout
 
     Args:
@@ -288,10 +303,12 @@ class PhaseJEPAPredictor(nn.Module):
 
 class VrittiValidatedPredictor(PhaseJEPAPredictor):
     """
-    Phase-JEPA Predictor with Vritti Gate validation.
+    Ontological State Predictor with Intellectual Plane (Vritti) validation.
 
-    Rejects predictions that would cause Viparyaya (error) spikes
-    or excessive Vikalpa (imagination) for factual tasks.
+    Uses the Intellectual Plane [17:22] as an epistemological gate to
+    reject predictions where cognitive reliability is compromised:
+    - Viparyaya (error/misconception) exceeds threshold
+    - Vikalpa (imagination/fantasy) exceeds threshold for factual tasks
 
     Args:
         viparyaya_threshold: Max error before damping (default 0.4)

@@ -1,12 +1,15 @@
 """
-Phase-JEPA Training Curriculum Orchestrator.
+Ontological State Predictor — Training Curriculum Orchestrator.
 
-Manages the three-phase training curriculum:
+Manages the three-phase micro-curriculum for state prediction:
 - DHYANA (Meditation): State foundation, 1-step prediction
 - SAMVADA (Dialogue): Prediction expansion, k-step lookahead
 - KRTI (Action): Full integration with token generation
 
-Also manages the Body→Soul→Union macro-curriculum when paired with SRK.
+And the Body→Soul→Union macro-curriculum when paired with SRK:
+- BODY: Ontological state learning (Dhyana + Samvada)
+- SOUL: Reasoning via language modeling (SRK)
+- UNION: Joint alignment across all five planes
 
 References:
     - HYBRID_PHASE_JEPA_DESIGN.md §5.1 Three-Phase Curriculum
