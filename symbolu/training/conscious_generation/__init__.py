@@ -9,7 +9,7 @@ Phase 1: Token-side ontological foundation
 
 Phase 2: Primitive scoring heads
   - BaseScorer: S_base(w) from transformer logits
-  - JEPATokenScorer: S_jepa(w) physical plausibility
+  - PlausibilityTokenScorer: S_plausibility(w) contextual plausibility
   - CSRTokenScorer: S_csr(w) phonemic resonance
   - VrittiTokenScorer: S_vritti(w) cognitive mode compatibility
   - GunaTokenScorer: S_guna(w) energetic compatibility
@@ -36,7 +36,8 @@ from symbolu.training.conscious_generation.losses.ontological_structure import (
 )
 from symbolu.training.conscious_generation.primitives import (
     BaseScorer,
-    JEPATokenScorer,
+    PlausibilityTokenScorer,
+    JEPATokenScorer,  # backward-compatible alias
     CSRTokenScorer,
     VrittiTokenScorer,
     GunaTokenScorer,
@@ -67,7 +68,8 @@ __all__ = [
     "OntologyCompatibilityScorer",
     "OntologicalStructureLoss",
     "BaseScorer",
-    "JEPATokenScorer",
+    "PlausibilityTokenScorer",
+    "JEPATokenScorer",  # backward-compatible alias
     "CSRTokenScorer",
     "VrittiTokenScorer",
     "GunaTokenScorer",

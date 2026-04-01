@@ -20,7 +20,7 @@ from .weight_scheduler import PrimitiveLambdaScheduler
 LAMBDA_ONT = "lambda_ont"
 LAMBDA_KOSHA = "lambda_kosha_routing"
 LAMBDA_BLISS = "lambda_bliss_token"
-LAMBDA_JEPA = "lambda_jepa_token"
+LAMBDA_JEPA = "lambda_plausibility_token"
 LAMBDA_CSR = "lambda_csr_token"
 LAMBDA_VRITTI = "lambda_vritti_token"
 LAMBDA_GUNA = "lambda_guna_token"

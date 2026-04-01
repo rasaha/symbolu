@@ -72,7 +72,7 @@ try:
     )
     from symbolu.training.conscious_generation.primitives import (
         BaseScorer,
-        JEPATokenScorer,
+        PlausibilityTokenScorer,
         CSRTokenScorer,
         VrittiTokenScorer,
         GunaTokenScorer,
@@ -632,7 +632,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             vocab_size=config.vocab_size,
             state_dim=config.token_ontology_dim,
             refresh_interval=config.ontology_cache_refresh_interval,
-            jepa_dim=config.jepa_token_dim,
+            jepa_dim=config.plausibility_token_dim,
             csr_dim=config.csr_token_dim,
         )
 
@@ -651,10 +651,10 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         # Phase 2: Primitive Scoring Heads
         base_scorer = BaseScorer()
 
-        jepa_scorer = JEPATokenScorer(
+        plausibility_scorer = PlausibilityTokenScorer(
             embed_dim=embed_dim,
             state_dim=config.token_ontology_dim,
-            jepa_dim=config.jepa_token_dim,
+            jepa_dim=config.plausibility_token_dim,
             use_low_rank=config.use_low_rank_primitives,
             rank=config.primitive_rank,
         )
@@ -680,7 +680,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         token_eval_tensor = TokenEvaluationTensor(
             base_scorer=base_scorer,
             ontology_scorer=ontology_scorer,
-            jepa_scorer=jepa_scorer,
+            jepa_scorer=plausibility_scorer,
             csr_scorer=csr_scorer,
             vritti_scorer=vritti_scorer,
             guna_scorer=guna_scorer,
@@ -689,7 +689,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
 
         # Register Phase 2 scorers with cache for refresh
         token_cache.set_scorers(
-            jepa_scorer=jepa_scorer,
+            jepa_scorer=plausibility_scorer,
             csr_scorer=csr_scorer,
             vritti_scorer=vritti_scorer,
             guna_scorer=guna_scorer,
@@ -700,7 +700,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             "token_cache": token_cache,
             "ontology_scorer": ontology_scorer,
             "base_scorer": base_scorer,
-            "jepa_scorer": jepa_scorer,
+            "plausibility_scorer": plausibility_scorer,
             "csr_scorer": csr_scorer,
             "vritti_scorer": vritti_scorer,
             "guna_scorer": guna_scorer,
@@ -713,7 +713,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             "token_cache": token_cache,
             "ontology_scorer": ontology_scorer,
             "base_scorer": base_scorer,
-            "jepa_scorer": jepa_scorer,
+            "plausibility_scorer": plausibility_scorer,
             "csr_scorer": csr_scorer,
             "vritti_scorer": vritti_scorer,
             "guna_scorer": guna_scorer,
@@ -732,7 +732,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             print(f"    OntologicalStructureLoss: DISABLED (lambda_ont=0)")
 
         print(f"  [Conscious Gen Phase 2] Primitive Scoring Heads")
-        print(f"    JEPATokenScorer: d_j={config.jepa_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
+        print(f"    PlausibilityTokenScorer: d_j={config.plausibility_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
         print(f"    CSRTokenScorer: d_c={config.csr_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
         print(f"    VrittiTokenScorer: 5 classes (dot-product)")
         print(f"    GunaTokenScorer: 3 classes (bilinear G)")
@@ -769,7 +769,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         # Phase 3 losses: instantiate when lambda > 0 OR when curriculum is enabled
         # (curriculum starts lambdas at 0 and ramps them up later)
         _cg_curriculum = getattr(config, 'enable_cg_curriculum', False)
-        _any_prim_loss = (_cg_curriculum or config.lambda_jepa_token > 0
+        _any_prim_loss = (_cg_curriculum or config.lambda_plausibility_token > 0
                          or config.lambda_csr_token > 0
                          or config.lambda_vritti_token > 0
                          or config.lambda_guna_token > 0)
@@ -793,8 +793,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             _p3_losses.append(f"L_kosha={config.lambda_kosha_routing}")
         if config.lambda_bliss_token > 0:
             _p3_losses.append(f"L_bliss={config.lambda_bliss_token}")
-        if config.lambda_jepa_token > 0:
-            _p3_losses.append(f"L_jepa={config.lambda_jepa_token}")
+        if config.lambda_plausibility_token > 0:
+            _p3_losses.append(f"L_plausibility={config.lambda_plausibility_token}")
         if config.lambda_csr_token > 0:
             _p3_losses.append(f"L_csr={config.lambda_csr_token}")
         if config.lambda_vritti_token > 0:

@@ -239,7 +239,7 @@ class EmbeddingDiagnostics:
         if hasattr(model, 'intent_projector'):
             cg_modules['intent_projector'] = model.intent_projector
         if hasattr(model, 'conscious_gen'):
-            for name in ('token_projector', 'ontology_scorer', 'jepa_scorer',
+            for name in ('token_projector', 'ontology_scorer', 'plausibility_scorer',
                          'csr_scorer', 'vritti_scorer', 'guna_scorer',
                          'kosha_router', 'bliss_gate'):
                 if name in model.conscious_gen:

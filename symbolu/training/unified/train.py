@@ -2399,7 +2399,7 @@ def train(config: UnifiedTrainingConfig):
                 "lambda_ont": config.lambda_ont,
                 "lambda_kosha_routing": config.lambda_kosha_routing,
                 "lambda_bliss_token": config.lambda_bliss_token,
-                "lambda_jepa_token": config.lambda_jepa_token,
+                "lambda_plausibility_token": config.lambda_plausibility_token,
                 "lambda_csr_token": config.lambda_csr_token,
                 "lambda_vritti_token": config.lambda_vritti_token,
                 "lambda_guna_token": config.lambda_guna_token,
@@ -4932,7 +4932,7 @@ def train(config: UnifiedTrainingConfig):
                         _cg_has_p3 = 'integrated_scorer' in model.conscious_gen
                         _cg_any_p3_loss = (config.lambda_kosha_routing > 0
                                           or config.lambda_bliss_token > 0
-                                          or config.lambda_jepa_token > 0
+                                          or config.lambda_plausibility_token > 0
                                           or config.lambda_csr_token > 0
                                           or config.lambda_vritti_token > 0
                                           or config.lambda_guna_token > 0)
@@ -5076,7 +5076,7 @@ def train(config: UnifiedTrainingConfig):
 
                                 # Primitive auxiliary losses
                                 _cg_prim_lambdas = {
-                                    'jepa': config.lambda_jepa_token,
+                                    'jepa': config.lambda_plausibility_token,
                                     'csr': config.lambda_csr_token,
                                     'vritti': config.lambda_vritti_token,
                                     'guna': config.lambda_guna_token,
@@ -9854,8 +9854,10 @@ def main():
                        help="Rank for low-rank bilinear factorization")
 
     # Conscious Generation Phase 2: Primitive Scoring Heads
-    parser.add_argument("--jepa_token_dim", type=int, default=16,
-                       help="JEPA token representation dimension (d_j)")
+    parser.add_argument("--plausibility_token_dim", type=int, default=16,
+                       help="Plausibility token representation dimension (d_j)")
+    parser.add_argument("--jepa_token_dim", type=int, default=None,
+                       help="(Deprecated) Alias for --plausibility_token_dim")
     parser.add_argument("--csr_token_dim", type=int, default=16,
                        help="CSR token representation dimension (d_c)")
     parser.add_argument("--primitive_shortlist_k", type=int, default=128,
@@ -9872,8 +9874,10 @@ def main():
                        help="Kosha routing loss weight")
     parser.add_argument("--lambda_bliss_token", type=float, default=0.0,
                        help="Bliss token-level coherence loss weight")
-    parser.add_argument("--lambda_jepa_token", type=float, default=0.0,
-                       help="JEPA token-level plausibility loss")
+    parser.add_argument("--lambda_plausibility_token", type=float, default=0.0,
+                       help="Plausibility token-level loss")
+    parser.add_argument("--lambda_jepa_token", type=float, default=None,
+                       help="(Deprecated) Alias for --lambda_plausibility_token")
     parser.add_argument("--lambda_csr_token", type=float, default=0.0,
                        help="CSR token-level resonance loss")
     parser.add_argument("--lambda_vritti_token", type=float, default=0.0,
@@ -10763,6 +10767,7 @@ def main():
         ontology_scorer_use_low_rank=args.ontology_scorer_use_low_rank,
         ontology_scorer_rank=args.ontology_scorer_rank,
         # Conscious Generation (Phase 2)
+        plausibility_token_dim=args.plausibility_token_dim if args.jepa_token_dim is None else args.jepa_token_dim,
         jepa_token_dim=args.jepa_token_dim,
         csr_token_dim=args.csr_token_dim,
         primitive_shortlist_k=args.primitive_shortlist_k,
@@ -10772,6 +10777,7 @@ def main():
         # Conscious Generation (Phase 3)
         lambda_kosha_routing=args.lambda_kosha_routing,
         lambda_bliss_token=args.lambda_bliss_token,
+        lambda_plausibility_token=args.lambda_plausibility_token if args.lambda_jepa_token is None else args.lambda_jepa_token,
         lambda_jepa_token=args.lambda_jepa_token,
         lambda_csr_token=args.lambda_csr_token,
         lambda_vritti_token=args.lambda_vritti_token,

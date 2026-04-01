@@ -5,7 +5,7 @@ Phase 1 buffer:
   O_tok (V, 32)  — ontological codes via TokenOntologyProjector
 
 Phase 2 buffers:
-  P_tok (V, d_j) — JEPA plausibility representations
+  P_tok (V, d_j) — plausibility representations
   R_tok (V, d_c) — CSR phonemic resonance representations
   V_tok (V, 5)   — Vritti cognitive mode profiles
   G_tok (V, 3)   — Guna energetic profiles
@@ -78,7 +78,7 @@ class TokenPrimitiveCache(nn.Module):
         self._is_initialized = False
 
         # Phase 2 scorer references — set via set_scorers() after construction
-        self._jepa_scorer = None
+        self._plausibility_scorer = None
         self._csr_scorer = None
         self._vritti_scorer = None
         self._guna_scorer = None
@@ -93,7 +93,7 @@ class TokenPrimitiveCache(nn.Module):
         csr_affinity_fn: Optional[Any] = None,
     ) -> None:
         """Register Phase 2 scorer modules for cache refresh."""
-        self._jepa_scorer = jepa_scorer
+        self._plausibility_scorer = jepa_scorer
         self._csr_scorer = csr_scorer
         self._vritti_scorer = vritti_scorer
         self._guna_scorer = guna_scorer
@@ -135,9 +135,9 @@ class TokenPrimitiveCache(nn.Module):
             o_chunk = self.projector(chunk_emb)
             self.O_tok[start:end] = o_chunk
 
-            # Phase 2: JEPA — needs [e_w; o_w]
-            if self._jepa_scorer is not None:
-                self.P_tok[start:end] = self._jepa_scorer.compute_token_repr(
+            # Phase 2: Plausibility — needs [e_w; o_w]
+            if self._plausibility_scorer is not None:
+                self.P_tok[start:end] = self._plausibility_scorer.compute_token_repr(
                     chunk_emb, o_chunk
                 )
 

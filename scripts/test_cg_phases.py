@@ -38,7 +38,7 @@ def make_config(args):
         "lambda_ont": 0.01,
         "lambda_kosha_routing": 0.01,
         "lambda_bliss_token": 0.01,
-        "lambda_jepa_token": 0.01,
+        "lambda_plausibility_token": 0.01,
         "lambda_csr_token": 0.01,
         "lambda_vritti_token": 0.01,
         "lambda_guna_token": 0.01,
@@ -81,7 +81,7 @@ def make_config(args):
         ontology_scorer_use_low_rank=True,
         ontology_scorer_rank=4,
         # Phase 2
-        jepa_token_dim=8,
+        plausibility_token_dim=8,
         csr_token_dim=8,
         primitive_shortlist_k=64,
         use_low_rank_primitives=True,
@@ -160,7 +160,7 @@ def test_phase2(config, model, device):
     checks = []
     B, S, K = 2, 16, config.primitive_shortlist_k
 
-    for name in ["base_scorer", "jepa_scorer", "csr_scorer", "vritti_scorer", "guna_scorer"]:
+    for name in ["base_scorer", "plausibility_scorer", "csr_scorer", "vritti_scorer", "guna_scorer"]:
         assert name in model.conscious_gen, f"{name} missing"
     checks.append(("All scorers instantiated", True))
 
@@ -322,7 +322,7 @@ def test_phase5(config):
         "lambda_ont": 0.01,
         "lambda_kosha_routing": 0.01,
         "lambda_bliss_token": 0.01,
-        "lambda_jepa_token": 0.01,
+        "lambda_plausibility_token": 0.01,
         "lambda_csr_token": 0.01,
         "lambda_vritti_token": 0.01,
         "lambda_guna_token": 0.01,

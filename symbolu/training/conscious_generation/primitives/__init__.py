@@ -2,7 +2,7 @@
 Primitive scoring heads for Conscious Generation.
 
 Phase 1: OntologyCompatibilityScorer
-Phase 2: BaseScorer, JEPATokenScorer, CSRTokenScorer, VrittiTokenScorer,
+Phase 2: BaseScorer, PlausibilityTokenScorer, CSRTokenScorer, VrittiTokenScorer,
          GunaTokenScorer, TokenEvaluationTensor (orchestrator)
 """
 
@@ -10,7 +10,10 @@ from symbolu.training.conscious_generation.primitives.ontology_scorer import (
     OntologyCompatibilityScorer,
 )
 from symbolu.training.conscious_generation.primitives.base_scorer import BaseScorer
-from symbolu.training.conscious_generation.primitives.jepa_scorer import JEPATokenScorer
+from symbolu.training.conscious_generation.primitives.jepa_scorer import (
+    PlausibilityTokenScorer,
+    JEPATokenScorer,  # backward-compatible alias
+)
 from symbolu.training.conscious_generation.primitives.csr_scorer import CSRTokenScorer
 from symbolu.training.conscious_generation.primitives.vritti_scorer import VrittiTokenScorer
 from symbolu.training.conscious_generation.primitives.guna_scorer import GunaTokenScorer
@@ -29,15 +32,15 @@ class TokenEvaluationTensor(nn.Module):
       1. Extract top-K candidates from base logits
       2. Gather cached token-side representations for the K candidates
       3. Compute context-side representations from (hidden, o_ctx)
-      4. Score each primitive: base, ontology, JEPA, CSR, Vritti, Guna
+      4. Score each primitive: base, ontology, plausibility, CSR, Vritti, Guna
       5. Stack into T_t ∈ ℝ^{K×6}
 
-    Column order: [S_base, S_ont, S_jepa, S_csr, S_vritti, S_guna]
+    Column order: [S_base, S_ont, S_plausibility, S_csr, S_vritti, S_guna]
 
     Args:
         base_scorer: BaseScorer instance
         ontology_scorer: OntologyCompatibilityScorer instance
-        jepa_scorer: JEPATokenScorer instance
+        jepa_scorer: PlausibilityTokenScorer instance
         csr_scorer: CSRTokenScorer instance
         vritti_scorer: VrittiTokenScorer instance
         guna_scorer: GunaTokenScorer instance
@@ -51,7 +54,7 @@ class TokenEvaluationTensor(nn.Module):
         self,
         base_scorer: BaseScorer,
         ontology_scorer: OntologyCompatibilityScorer,
-        jepa_scorer: JEPATokenScorer,
+        jepa_scorer: PlausibilityTokenScorer,
         csr_scorer: CSRTokenScorer,
         vritti_scorer: VrittiTokenScorer,
         guna_scorer: GunaTokenScorer,
@@ -221,7 +224,8 @@ class TokenEvaluationTensor(nn.Module):
 __all__ = [
     "OntologyCompatibilityScorer",
     "BaseScorer",
-    "JEPATokenScorer",
+    "PlausibilityTokenScorer",
+    "JEPATokenScorer",  # backward-compatible alias
     "CSRTokenScorer",
     "VrittiTokenScorer",
     "GunaTokenScorer",
