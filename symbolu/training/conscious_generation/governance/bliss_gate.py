@@ -41,6 +41,8 @@ class BlissTokenGate(nn.Module):
         lambda_B: Base temperature controlling gate sharpness.
         min_bliss: Minimum Bliss value to prevent complete zeroing.
         bliss_scale: How much BLISSFUL Kosha activation increases lambda.
+        use_dynamic_bliss: Ablation switch — if False, uses fixed lambda_B
+                           regardless of Kosha input.
     """
 
     def __init__(
@@ -48,11 +50,13 @@ class BlissTokenGate(nn.Module):
         lambda_B: float = 1.0,
         min_bliss: float = 0.01,
         bliss_scale: float = 2.0,
+        use_dynamic_bliss: bool = True,
     ):
         super().__init__()
         self.lambda_B = lambda_B
         self.min_bliss = min_bliss
         self.bliss_scale = bliss_scale
+        self.use_dynamic_bliss = use_dynamic_bliss
 
     def forward(
         self,
@@ -87,7 +91,7 @@ class BlissTokenGate(nn.Module):
         D = (alpha_expanded * deviations_sq).sum(dim=-1)  # (..., K)
 
         # Compute effective lambda (governance-modulated)
-        if kosha is not None:
+        if kosha is not None and self.use_dynamic_bliss:
             blissful = kosha[..., KOSHA_BLISSFUL_IDX]  # (...,)
             lambda_eff = self.lambda_B + self.bliss_scale * blissful
             # Expand for broadcasting with D (..., K)

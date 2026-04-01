@@ -1,18 +1,24 @@
 """
-GovernanceDiagnostics: Training-time diagnostic tracker for conscious generation
-governance signals.
+GovernanceDiagnostics: Causality-aware diagnostic tracker for governance plane.
 
-Tracks per-step:
-  - Kosha routing entropy and per-primitive weight distribution
-  - Bliss coherence vs accuracy correlation
-  - Primitive contribution analysis (which primitive most influences correct predictions)
-  - Rank shift: position of correct token in base logits vs integrated scores
+Tracks two categories of signals:
 
-Reference: CONSCIOUS_GENERATION_DESIGN.md, Appendix D Phase 5 (D.7.2), Section 9.6
+A. Summary statistics (existing):
+   - Routing entropy, per-primitive weights, bliss, disagreement, rank shift
+
+B. Causality signals (new — answers "is governance causal or decorative?"):
+   - Policy vs residual influence (norm ratio)
+   - Routing sensitivity probes (delta-alpha under Kosha/domain perturbation)
+   - Interaction term contribution (isolated kd_logits magnitude)
+   - Bliss governance (lambda_eff distribution, correlation with blissful Kosha)
+   - Kosha statistics (per-dimension mean, entropy)
+
+Reference: CONSCIOUS_GENERATION_DESIGN.md, Appendix D Phase 5 (D.7.2)
 """
 
+import math
 import torch
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 
 class GovernanceDiagnostics:
@@ -24,17 +30,46 @@ class GovernanceDiagnostics:
 
     Args:
         window_size: Number of steps to keep in sliding window.
+        enable_sensitivity_probes: Whether to run perturbation probes
+            (adds ~2 extra forward passes per step through the router).
     """
 
-    def __init__(self, window_size: int = 100):
+    PRIMITIVE_NAMES = ["base", "ont", "jepa", "csr", "vritti", "guna"]
+    KOSHA_NAMES = ["material", "vital", "mental", "intellectual", "blissful"]
+
+    def __init__(self, window_size: int = 100, enable_sensitivity_probes: bool = True):
         self.window_size = window_size
-        self._alpha_entropies: list = []
-        self._alpha_means: list = []
-        self._bliss_means: list = []
-        self._disagree_means: list = []
-        self._shortlist_coverages: list = []
-        self._rank_shifts: list = []
-        self._primitive_contributions: list = []
+        self.enable_sensitivity_probes = enable_sensitivity_probes
+
+        # --- A. Summary statistics buffers ---
+        self._alpha_entropies: List[float] = []
+        self._alpha_means: List[List[float]] = []
+        self._alpha_top1_probs: List[float] = []
+        self._bliss_means: List[float] = []
+        self._disagree_means: List[float] = []
+        self._shortlist_coverages: List[float] = []
+        self._rank_shifts: List[float] = []
+        self._primitive_contributions: List[List[float]] = []
+
+        # --- B. Causality signal buffers ---
+        self._policy_norms: List[float] = []
+        self._residual_norms: List[float] = []
+        self._policy_residual_ratios: List[float] = []
+        self._interaction_norms: List[float] = []
+        self._interaction_ratios: List[float] = []
+        self._kosha_means: List[List[float]] = []
+        self._kosha_entropies: List[float] = []
+        self._lambda_effs: List[float] = []
+        self._lambda_eff_stds: List[float] = []
+        self._bliss_lambda_corrs: List[float] = []
+        self._policy_scales: List[float] = []
+        self._route_temps: List[float] = []
+
+        # Sensitivity probes
+        self._delta_alpha_kosha: List[float] = []
+        self._delta_alpha_domain: List[float] = []
+        self._delta_alpha_interaction: List[float] = []
+
         self._step_count = 0
 
     def update(
@@ -47,47 +82,184 @@ class GovernanceDiagnostics:
         target_ids: Optional[torch.Tensor] = None,
         candidate_ids: Optional[torch.Tensor] = None,
         base_logits: Optional[torch.Tensor] = None,
+        # New: governance causality signals
+        router_result: Optional[Dict[str, torch.Tensor]] = None,
+        lambda_eff: Optional[torch.Tensor] = None,
+        kosha: Optional[torch.Tensor] = None,
+        # For sensitivity probes
+        router: Optional[object] = None,
+        hidden: Optional[torch.Tensor] = None,
+        o_ctx: Optional[torch.Tensor] = None,
+        domain: Optional[torch.Tensor] = None,
     ):
         """
         Update diagnostics with current step's governance tensors.
 
         All arguments are optional — only available tensors are tracked.
+
+        New args for causality tracking:
+            router_result: Full dict from KoshaDomainRouter.forward()
+            lambda_eff: Effective bliss lambda from BlissTokenGate
+            kosha: Kosha distribution (..., 5) from router
+            router: KoshaDomainRouter instance (for sensitivity probes)
+            hidden, o_ctx, domain: Inputs (for sensitivity probes)
         """
         self._step_count += 1
 
         with torch.no_grad():
-            # Kosha routing entropy
+            # === A. Summary statistics ===
             if alpha is not None:
                 entropy = -(alpha * (alpha + 1e-8).log()).sum(dim=-1).mean().item()
                 self._alpha_entropies.append(entropy)
-                self._alpha_means.append(alpha.mean(dim=tuple(range(alpha.dim() - 1))).tolist())
+                self._alpha_means.append(
+                    alpha.mean(dim=tuple(range(alpha.dim() - 1))).tolist()
+                )
+                top1 = alpha.max(dim=-1).values.mean().item()
+                self._alpha_top1_probs.append(top1)
 
-            # Bliss statistics
             if B is not None:
                 self._bliss_means.append(B.mean().item())
             if D is not None:
                 self._disagree_means.append(D.mean().item())
 
-            # Shortlist coverage (fraction of targets in top-K)
             if target_ids is not None and candidate_ids is not None:
                 in_shortlist = (candidate_ids == target_ids.unsqueeze(-1)).any(dim=-1)
                 self._shortlist_coverages.append(in_shortlist.float().mean().item())
 
-            # Rank shift: how much does re-ranking move the correct token?
             if (base_logits is not None and Z_star is not None
                     and target_ids is not None and candidate_ids is not None):
                 self._compute_rank_shift(base_logits, Z_star, target_ids, candidate_ids)
 
-            # Primitive contribution: which primitive most aligns with correct token?
             if T is not None and target_ids is not None and candidate_ids is not None:
                 self._compute_primitive_contribution(T, target_ids, candidate_ids)
 
-        # Trim windows
-        for buf in [self._alpha_entropies, self._alpha_means, self._bliss_means,
-                     self._disagree_means, self._shortlist_coverages,
-                     self._rank_shifts, self._primitive_contributions]:
-            if len(buf) > self.window_size:
-                del buf[:-self.window_size]
+            # === B. Causality signals ===
+
+            # B1. Policy vs residual influence
+            if router_result is not None:
+                pol = router_result.get("policy_logits")
+                res = router_result.get("residual_logits")
+                if pol is not None and res is not None:
+                    pol_norm = pol.norm(dim=-1).mean().item()
+                    res_norm = res.norm(dim=-1).mean().item()
+                    self._policy_norms.append(pol_norm)
+                    self._residual_norms.append(res_norm)
+                    self._policy_residual_ratios.append(
+                        pol_norm / (res_norm + 1e-6)
+                    )
+
+            # B3. Kosha statistics
+            k = kosha if kosha is not None else (
+                router_result.get("kosha") if router_result else None
+            )
+            if k is not None:
+                k_mean = k.mean(dim=tuple(range(k.dim() - 1))).tolist()
+                self._kosha_means.append(k_mean)
+                k_ent = -(k * (k + 1e-8).log()).sum(dim=-1).mean().item()
+                self._kosha_entropies.append(k_ent)
+
+            # B4. Interaction contribution (isolated kd_logits)
+            if router_result is not None:
+                kd = router_result.get("kd_logits")
+                pol = router_result.get("policy_logits")
+                if kd is not None:
+                    kd_norm = kd.norm(dim=-1).mean().item()
+                    self._interaction_norms.append(kd_norm)
+                    if pol is not None:
+                        pol_norm = pol.norm(dim=-1).mean().item()
+                        self._interaction_ratios.append(
+                            kd_norm / (pol_norm + 1e-6)
+                        )
+
+            # B5. Bliss governance
+            if lambda_eff is not None:
+                if lambda_eff.dim() > 0:
+                    self._lambda_effs.append(lambda_eff.mean().item())
+                    self._lambda_eff_stds.append(lambda_eff.std().item())
+
+                    # Correlation: blissful Kosha vs lambda_eff
+                    if k is not None:
+                        blissful = k[..., 4]  # BLISSFUL index
+                        # Flatten both to 1D for correlation
+                        b_flat = blissful.reshape(-1)
+                        l_flat = lambda_eff.reshape(-1)
+                        if b_flat.numel() > 1:
+                            corr = self._pearson_corr(b_flat, l_flat)
+                            self._bliss_lambda_corrs.append(corr)
+                else:
+                    self._lambda_effs.append(lambda_eff.item())
+
+            # B6. Router control parameters
+            if router is not None:
+                if hasattr(router, 'policy_scale'):
+                    self._policy_scales.append(router.policy_scale.item())
+                if hasattr(router, 'route_temp'):
+                    self._route_temps.append(router.route_temp.item())
+
+            # === C. Sensitivity probes ===
+            if (self.enable_sensitivity_probes and router is not None
+                    and hidden is not None and o_ctx is not None):
+                self._run_sensitivity_probes(router, hidden, o_ctx, domain)
+
+        # Trim all buffers
+        self._trim_buffers()
+
+    def _run_sensitivity_probes(
+        self,
+        router,
+        hidden: torch.Tensor,
+        o_ctx: torch.Tensor,
+        domain: Optional[torch.Tensor],
+    ):
+        """
+        Measure routing sensitivity to Kosha, domain, and interaction perturbations.
+
+        Runs 2-3 extra forward passes through the router with perturbed inputs.
+        Uses a small batch slice (first 4 samples) to keep cost low.
+        """
+        # Use small slice to limit compute
+        max_probe = min(4, hidden.shape[0])
+        h = hidden[:max_probe].detach()
+        o = o_ctx[:max_probe].detach()
+        d = domain[:max_probe].detach() if domain is not None else None
+
+        # Baseline routing
+        base_result = router(h, o, domain=d)
+        alpha_base = base_result["alpha"]
+
+        # Probe 1: Perturb Kosha (shuffle dims 12:17 in o_ctx)
+        o_perturbed = o.clone()
+        k_slice = o_perturbed[..., 12:17]
+        # Reverse the Kosha dimensions to create a meaningful perturbation
+        o_perturbed[..., 12:17] = k_slice.flip(-1)
+        perturbed_result = router(h, o_perturbed, domain=d)
+        delta_k = (perturbed_result["alpha"] - alpha_base).abs().sum(dim=-1).mean().item()
+        self._delta_alpha_kosha.append(delta_k)
+
+        # Probe 2: Perturb domain (if available)
+        if d is not None:
+            d_perturbed = d.flip(-1)  # Reverse domain distribution
+            perturbed_result = router(h, o, domain=d_perturbed)
+            delta_d = (perturbed_result["alpha"] - alpha_base).abs().sum(dim=-1).mean().item()
+            self._delta_alpha_domain.append(delta_d)
+
+            # Probe 3: Isolate interaction — perturb both k and d together
+            # vs perturbing each alone. Interaction effect = joint - sum of marginals
+            both_result = router(h, o_perturbed, domain=d_perturbed)
+            delta_both = (both_result["alpha"] - alpha_base).abs().sum(dim=-1).mean().item()
+            interaction_effect = delta_both - (delta_k + delta_d)
+            self._delta_alpha_interaction.append(abs(interaction_effect))
+
+    @staticmethod
+    def _pearson_corr(x: torch.Tensor, y: torch.Tensor) -> float:
+        """Compute Pearson correlation between two 1D tensors."""
+        x_centered = x - x.mean()
+        y_centered = y - y.mean()
+        num = (x_centered * y_centered).sum()
+        den = (x_centered.pow(2).sum() * y_centered.pow(2).sum()).sqrt()
+        if den.item() < 1e-8:
+            return 0.0
+        return (num / den).item()
 
     def _compute_rank_shift(
         self,
@@ -97,12 +269,10 @@ class GovernanceDiagnostics:
         candidate_ids: torch.Tensor,
     ):
         """Compute how much re-ranking shifts the correct token's position."""
-        # Base rank: position of target in base logit ordering (lower = better)
         base_ranks = (base_logits.unsqueeze(-1) >= base_logits.gather(
             -1, target_ids.unsqueeze(-1))).sum(dim=-1).float().mean().item()
 
-        # Integrated rank: position of target in Z_star ordering
-        target_mask = (candidate_ids == target_ids.unsqueeze(-1))  # (..., K)
+        target_mask = (candidate_ids == target_ids.unsqueeze(-1))
         if target_mask.any():
             target_z = (Z_star * target_mask.float()).amax(dim=-1)
             integrated_ranks = (Z_star >= target_z.unsqueeze(-1)).sum(dim=-1).float().mean().item()
@@ -116,16 +286,13 @@ class GovernanceDiagnostics:
         candidate_ids: torch.Tensor,
     ):
         """Track which primitive scores highest for the correct token."""
-        target_mask = (candidate_ids == target_ids.unsqueeze(-1))  # (..., K)
-        has_target = target_mask.any(dim=-1)  # (...)
+        target_mask = (candidate_ids == target_ids.unsqueeze(-1))
+        has_target = target_mask.any(dim=-1)
         if not has_target.any():
             return
-        # For positions with target in shortlist, get the primitive scores
-        # T: (..., K, 6), target_mask: (..., K) -> target primitive scores: (..., 6)
-        target_scores = (T * target_mask.unsqueeze(-1).float()).sum(dim=-2)  # (..., 6)
-        valid_scores = target_scores[has_target]  # (N, 6)
-        # Which primitive has highest score for correct token?
-        top_primitive = valid_scores.argmax(dim=-1)  # (N,)
+        target_scores = (T * target_mask.unsqueeze(-1).float()).sum(dim=-2)
+        valid_scores = target_scores[has_target]
+        top_primitive = valid_scores.argmax(dim=-1)
         counts = torch.zeros(6, device=T.device)
         for p in range(6):
             counts[p] = (top_primitive == p).float().sum()
@@ -133,55 +300,97 @@ class GovernanceDiagnostics:
         if total > 0:
             self._primitive_contributions.append((counts / total).tolist())
 
+    def _trim_buffers(self):
+        """Trim all sliding window buffers."""
+        buffers = [
+            self._alpha_entropies, self._alpha_means, self._alpha_top1_probs,
+            self._bliss_means, self._disagree_means, self._shortlist_coverages,
+            self._rank_shifts, self._primitive_contributions,
+            self._policy_norms, self._residual_norms, self._policy_residual_ratios,
+            self._interaction_norms, self._interaction_ratios,
+            self._kosha_means, self._kosha_entropies,
+            self._lambda_effs, self._lambda_eff_stds, self._bliss_lambda_corrs,
+            self._policy_scales, self._route_temps,
+            self._delta_alpha_kosha, self._delta_alpha_domain,
+            self._delta_alpha_interaction,
+        ]
+        for buf in buffers:
+            if len(buf) > self.window_size:
+                del buf[:-self.window_size]
+
     def get_summary(self) -> Dict[str, float]:
         """
         Get aggregated diagnostics over the sliding window.
 
         Returns:
-            Dict of diagnostic metrics suitable for logging.
+            Dict of diagnostic metrics, organized by category:
+            - cg_diag_alpha_*: Routing distribution stats
+            - cg_gov_*: Governance causality signals
+            - cg_probe_*: Sensitivity probe results
         """
-        result = {}
+        result: Dict[str, float] = {}
 
-        if self._alpha_entropies:
-            result["cg_diag_alpha_entropy"] = (
-                sum(self._alpha_entropies) / len(self._alpha_entropies)
-            )
+        # === A. Summary statistics ===
+        self._avg_into(result, "cg_diag_alpha_entropy", self._alpha_entropies)
+        self._avg_into(result, "cg_diag_alpha_top1", self._alpha_top1_probs)
 
         if self._alpha_means:
-            # Average per-primitive weights
             n = len(self._alpha_means)
-            avg = [sum(a[i] for a in self._alpha_means) / n
-                   for i in range(len(self._alpha_means[0]))]
-            names = ["base", "ont", "jepa", "csr", "vritti", "guna"]
-            for name, val in zip(names, avg):
-                result[f"cg_diag_alpha_{name}"] = val
+            for i, name in enumerate(self.PRIMITIVE_NAMES):
+                result[f"cg_diag_alpha_{name}"] = (
+                    sum(a[i] for a in self._alpha_means) / n
+                )
 
-        if self._bliss_means:
-            result["cg_diag_bliss_mean"] = (
-                sum(self._bliss_means) / len(self._bliss_means)
-            )
-
-        if self._disagree_means:
-            result["cg_diag_disagree_mean"] = (
-                sum(self._disagree_means) / len(self._disagree_means)
-            )
-
-        if self._shortlist_coverages:
-            result["cg_diag_shortlist_coverage"] = (
-                sum(self._shortlist_coverages) / len(self._shortlist_coverages)
-            )
-
-        if self._rank_shifts:
-            result["cg_diag_rank_shift"] = (
-                sum(self._rank_shifts) / len(self._rank_shifts)
-            )
+        self._avg_into(result, "cg_diag_bliss_mean", self._bliss_means)
+        self._avg_into(result, "cg_diag_disagree_mean", self._disagree_means)
+        self._avg_into(result, "cg_diag_shortlist_coverage", self._shortlist_coverages)
+        self._avg_into(result, "cg_diag_rank_shift", self._rank_shifts)
 
         if self._primitive_contributions:
             n = len(self._primitive_contributions)
-            avg = [sum(c[i] for c in self._primitive_contributions) / n
-                   for i in range(6)]
-            names = ["base", "ont", "jepa", "csr", "vritti", "guna"]
-            for name, val in zip(names, avg):
-                result[f"cg_diag_contrib_{name}"] = val
+            for i, name in enumerate(self.PRIMITIVE_NAMES):
+                result[f"cg_diag_contrib_{name}"] = (
+                    sum(c[i] for c in self._primitive_contributions) / n
+                )
+
+        # === B. Governance causality signals ===
+
+        # B1. Policy vs residual influence
+        self._avg_into(result, "cg_gov_policy_norm", self._policy_norms)
+        self._avg_into(result, "cg_gov_residual_norm", self._residual_norms)
+        self._avg_into(result, "cg_gov_policy_residual_ratio", self._policy_residual_ratios)
+
+        # B3. Kosha statistics
+        if self._kosha_means:
+            n = len(self._kosha_means)
+            for i, name in enumerate(self.KOSHA_NAMES):
+                result[f"cg_gov_kosha_{name}"] = (
+                    sum(k[i] for k in self._kosha_means) / n
+                )
+        self._avg_into(result, "cg_gov_kosha_entropy", self._kosha_entropies)
+
+        # B4. Interaction contribution
+        self._avg_into(result, "cg_gov_interaction_norm", self._interaction_norms)
+        self._avg_into(result, "cg_gov_interaction_ratio", self._interaction_ratios)
+
+        # B5. Bliss governance
+        self._avg_into(result, "cg_gov_lambda_eff_mean", self._lambda_effs)
+        self._avg_into(result, "cg_gov_lambda_eff_std", self._lambda_eff_stds)
+        self._avg_into(result, "cg_gov_bliss_lambda_corr", self._bliss_lambda_corrs)
+
+        # B6. Router control parameters
+        self._avg_into(result, "cg_gov_policy_scale", self._policy_scales)
+        self._avg_into(result, "cg_gov_route_temp", self._route_temps)
+
+        # === C. Sensitivity probes ===
+        self._avg_into(result, "cg_probe_delta_alpha_kosha", self._delta_alpha_kosha)
+        self._avg_into(result, "cg_probe_delta_alpha_domain", self._delta_alpha_domain)
+        self._avg_into(result, "cg_probe_delta_alpha_interaction", self._delta_alpha_interaction)
 
         return result
+
+    @staticmethod
+    def _avg_into(result: dict, key: str, buf: list):
+        """Average a buffer into the result dict if non-empty."""
+        if buf:
+            result[key] = sum(buf) / len(buf)

@@ -58,6 +58,9 @@ class KoshaDomainRouter(nn.Module):
         rank: Low-rank dimension for k ⊗ d interaction
         init_mode: "uniform" or "base_dominant"
         initial_policy_scale: Starting strength of structured policy (ramps up)
+        use_kosha: Ablation switch — if False, zeros Kosha contribution
+        use_domain: Ablation switch — if False, zeros domain contribution
+        use_interaction: Ablation switch — if False, zeros k⊗d term
     """
 
     def __init__(
@@ -70,11 +73,19 @@ class KoshaDomainRouter(nn.Module):
         rank: int = 16,
         init_mode: str = "uniform",
         initial_policy_scale: float = 0.10,
+        use_kosha: bool = True,
+        use_domain: bool = True,
+        use_interaction: bool = True,
     ):
         super().__init__()
         self.num_primitives = num_primitives
         self.num_domains = num_domains
         self.init_mode = init_mode
+
+        # Ablation switches (zero logits, keep shapes)
+        self.use_kosha = use_kosha
+        self.use_domain = use_domain
+        self.use_interaction = use_interaction
 
         hidden = hidden_dim or (embed_dim // 4)
 
@@ -155,21 +166,26 @@ class KoshaDomainRouter(nn.Module):
         k_raw = o_ctx[..., KOSHA_START:KOSHA_END]
         k = F.softmax(k_raw, dim=-1)  # (..., 5)
 
+        # Build policy logits from active components (ablation-aware)
+        # Each component produces (..., P) logits; disabled components contribute zero.
+        k_logits = self.k_proj(k) if self.use_kosha else torch.zeros_like(residual_logits)
+
         if domain is not None:
-            # First-order: Kosha bias + Domain bias
-            k_logits = self.k_proj(k)       # (..., P)
-            d_logits = self.d_proj(domain)  # (..., P)
+            d_logits = self.d_proj(domain) if self.use_domain else torch.zeros_like(residual_logits)
 
             # Interaction: low-rank (U_k·k) ⊙ (U_d·d)
-            u = self.k_latent(k)       # (..., rank)
-            v = self.d_latent(domain)  # (..., rank)
-            z = u * v                  # (..., rank)
-            kd_logits = self.kd_proj(z)  # (..., P)
+            if self.use_interaction and self.use_kosha and self.use_domain:
+                u = self.k_latent(k)       # (..., rank)
+                v = self.d_latent(domain)  # (..., rank)
+                z = u * v                  # (..., rank)
+                kd_logits = self.kd_proj(z)  # (..., P)
+            else:
+                kd_logits = torch.zeros_like(residual_logits)
 
             policy_logits = k_logits + d_logits + kd_logits
         else:
-            # No domain signal: Kosha-only policy (still better than nothing)
-            policy_logits = self.k_proj(k)
+            # No domain signal: Kosha-only policy
+            policy_logits = k_logits
 
         # Combine: residual + scaled policy
         logits = residual_logits + self.policy_scale * policy_logits
@@ -181,6 +197,8 @@ class KoshaDomainRouter(nn.Module):
             "logits": logits,
             "residual_logits": residual_logits,
             "policy_logits": policy_logits,
+            "k_logits": k_logits,
+            "kd_logits": kd_logits if domain is not None else torch.zeros_like(residual_logits),
             "kosha": k,
         }
 
