@@ -1,8 +1,16 @@
 """
-Phase-JEPA Transformer Wrapper.
+Ontological State Predictor — Transformer Wrapper.
 
-Integrates all JEPA components into a unified transformer-like interface
+Integrates all components into a unified transformer-like interface
 for use with the existing training infrastructure.
+
+This is NOT Meta's VL-JEPA. It is a custom latent-space state predictor
+that operates on the 32D Sovereign State across five planes:
+    - Ontological Plane [0:12]:   12 Bhavas (identity/phase rotation)
+    - Depth Plane [12:17]:        5 Koshas (processing depth)
+    - Intellectual Plane [17:22]: 5 Vrittis (cognitive reliability)
+    - Dynamics Plane [22:28]:     6 Gunas (energy/system dynamics)
+    - Learning Plane [28:32]:     4 Reserved / Sankalpa (goal encoding)
 
 Components:
     - Context Encoder (trainable): Processes input sequences
@@ -12,7 +20,7 @@ Components:
     - GoalGenerator: Autonomous goal generation from curiosity (Sankalpa)
     - SovereignJEPA: Self-motivated wrapper with autonomous cycle
 
-Sovereign State Reserved Dimensions (Sankalpa Vector) [28:32]:
+Learning Plane / Sankalpa Vector [28:32]:
     - Dim 28: Goal Valence (positive/negative intent)
     - Dim 29: Goal Urgency (priority level)
     - Dim 30: Goal Complexity (task difficulty estimate)
