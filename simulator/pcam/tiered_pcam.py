@@ -49,6 +49,7 @@ class CompressedBlockEntry:
     - Access count capped to 8 bits (0-255)
     - Query source count instead of full set
     - Optional: top-N edges by weight
+    - Optional: TQ-compressed attention profile (PolarQuant + QJL)
     """
     block_id: int
     sequence_id: int
@@ -62,6 +63,10 @@ class CompressedBlockEntry:
 
     # Optional compressed edges: (key_block_id, quantized_weight)
     compressed_edges: List[Tuple[int, int]] = field(default_factory=list)
+
+    # TQ-compressed attention profile (PolarQuant + QJL)
+    # None when profile compression is disabled
+    compressed_profile: Optional[Dict] = None
 
     # Tier metadata
     demotion_step: int = 0        # When this was demoted from BRAM
@@ -78,6 +83,11 @@ class CompressedBlockEntry:
     def score(self, value: float) -> None:
         """Compress float score to Q4.4."""
         self.quantized_score = max(0, min(255, int(value * 16.0)))
+
+    @property
+    def has_profile(self) -> bool:
+        """Whether this entry has a TQ-compressed attention profile."""
+        return self.compressed_profile is not None
 
     def to_block_score(self) -> BlockScore:
         """Decompress back to full BlockScore (lossy)."""
@@ -96,8 +106,14 @@ def compress_block_score(
     edges: Dict[Tuple[int, int], float],
     config: TurboQuantEdgeConfig,
     host_id: int = 0,
+    profile_compressor: Optional["EdgeProfileCompressor"] = None,
+    max_query_block: int = 0,
 ) -> CompressedBlockEntry:
-    """Compress a full BlockScore into a CXL-tier entry."""
+    """Compress a full BlockScore into a CXL-tier entry.
+
+    If profile_compressor is provided and config.enable_profile_compression
+    is True, also builds and TQ-compresses the block's attention profile.
+    """
     entry = CompressedBlockEntry(
         block_id=bs.block_id,
         sequence_id=sequence_id,
@@ -121,6 +137,18 @@ def compress_block_score(
         for key_id, weight in block_edges[:config.max_edges_per_block_cxl]:
             q_weight = max(0, min(255, int(weight * 16.0)))
             entry.compressed_edges.append((key_id, q_weight))
+
+    # TQ-compress attention profile (PolarQuant + QJL)
+    if (config.enable_profile_compression
+            and profile_compressor is not None
+            and edges):
+        profile = profile_compressor.build_profile(
+            block_id=bs.block_id,
+            attention_edges=edges,
+            max_query_block=max_query_block,
+        )
+        if profile.num_updates > 0:
+            entry.compressed_profile = profile_compressor.compress(profile)
 
     return entry
 
@@ -380,6 +408,17 @@ class TieredSequenceState:
         self._demotions: int = 0
         self._promotions: int = 0
 
+        # TQ edge profile compressor (lazy init)
+        self._profile_compressor: Optional["EdgeProfileCompressor"] = None
+        if config.tq.enable_profile_compression:
+            from .tq_edge_compressor import EdgeProfileCompressor
+            self._profile_compressor = EdgeProfileCompressor(
+                profile_dim=config.tq.profile_dim,
+                angle_bits=config.tq.profile_angle_bits,
+                enable_qjl=config.tq.profile_enable_qjl,
+                seed=config.tq.profile_seed,
+            )
+
     @property
     def bram_count(self) -> int:
         """Number of blocks currently in BRAM."""
@@ -428,6 +467,9 @@ class TieredSequenceState:
         cutoff = int(len(self.seq.block_scores) * policy.demotion_score_percentile)
         to_demote = min(count, cutoff, len(candidates))
 
+        # Defer BRAM removal so edges remain available for profile building
+        blocks_to_remove: List[int] = []
+
         for i in range(to_demote):
             score, block_id = candidates[i]
             bs = self.seq.block_scores.get(block_id)
@@ -437,26 +479,35 @@ class TieredSequenceState:
             # Check minimum score for CXL admission
             if bs.score < self.config.tq.min_score_for_cxl:
                 # Too low even for CXL — just evict
-                self._remove_from_bram(block_id)
+                blocks_to_remove.append(block_id)
                 self._block_tier[block_id] = TierType.EVICTED
                 continue
 
-            # Compress and admit to CXL pool
+            # Compress and admit to CXL pool (with TQ profile if enabled)
+            max_query = max(
+                (q for (q, _) in self.seq.attention_edges), default=0,
+            )
             compressed = compress_block_score(
                 bs=bs,
                 sequence_id=self.sequence_id,
                 edges=self.seq.attention_edges,
                 config=self.config.tq,
                 host_id=self.host_id,
+                profile_compressor=self._profile_compressor,
+                max_query_block=max_query,
             )
             compressed.demotion_step = current_step
 
             if self.cxl_pool.admit(compressed, self.host_id):
-                self._remove_from_bram(block_id)
+                blocks_to_remove.append(block_id)
                 self._block_tier[block_id] = TierType.CXL_POOL
                 demoted += 1
             else:
                 break  # Pool is full and can't evict
+
+        # Now remove all demoted/evicted blocks from BRAM
+        for block_id in blocks_to_remove:
+            self._remove_from_bram(block_id)
 
         self._demotions += demoted
         self._last_demotion_step = current_step
@@ -510,12 +561,36 @@ class TieredSequenceState:
         """Get candidate blocks from CXL tier for ATTEND augmentation.
 
         Scans the CXL pool for blocks belonging to this sequence
-        that might be relevant to the current query.
+        that might be relevant to the current query. When TQ-compressed
+        profiles are available, uses query-conditioned scoring for
+        better relevance estimation.
 
         Returns list of (block_id, score) from CXL tier.
         """
         if not self.config.cxl.enabled:
             return []
+
+        # Compute query bucket for TQ profile scoring
+        query_bucket = None
+        if self._profile_compressor is not None:
+            max_query = max(
+                (q for (q, _) in self.seq.attention_edges), default=0
+            ) if self.seq.attention_edges else query_block_id
+            bucket_size = max(
+                1, (max_query + 1 + self._profile_compressor.profile_dim - 1)
+                // self._profile_compressor.profile_dim,
+            )
+            query_bucket = min(
+                query_block_id // bucket_size,
+                self._profile_compressor.profile_dim - 1,
+            )
+            # Also compute nearby buckets for broader relevance
+            nearby_buckets = [
+                b for b in range(
+                    max(0, query_bucket - 1),
+                    min(self._profile_compressor.profile_dim, query_bucket + 2),
+                )
+            ]
 
         cxl_candidates = []
 
@@ -524,11 +599,30 @@ class TieredSequenceState:
             if seq_id != self.sequence_id:
                 continue
 
-            # Score with recency decay from CXL
+            # Base score with recency decay from CXL
             base_score = entry.score
             idle_in_cxl = current_step - entry.last_access_step
             decay = 0.99 ** (idle_in_cxl / 100.0)
             effective_score = base_score * decay
+
+            # TQ profile-conditioned scoring: use compressed profile
+            # to estimate relevance for the current query position
+            if (entry.has_profile
+                    and self._profile_compressor is not None
+                    and query_bucket is not None):
+                profile_relevance = (
+                    self._profile_compressor.estimate_total_relevance(
+                        entry.compressed_profile, nearby_buckets,
+                    )
+                )
+                # Blend profile relevance with scalar score
+                # Profile provides query-specific signal; scalar score
+                # provides aggregate importance. Weight profile higher
+                # when it has strong signal.
+                if profile_relevance > 0:
+                    effective_score = (
+                        0.4 * effective_score + 0.6 * profile_relevance
+                    )
 
             # Boost for cross-host shared entries (validated by multiple GPUs)
             if len(entry.sharer_hosts) > 1:
@@ -567,13 +661,18 @@ class TieredSequenceState:
             1 for t in self._block_tier.values() if t == TierType.EVICTED
         )
 
-        return {
+        stats = {
             "bram_blocks": bram_blocks,
             "cxl_blocks": cxl_blocks,
             "evicted_blocks": evicted_blocks,
             "total_demotions": self._demotions,
             "total_promotions": self._promotions,
         }
+
+        if self._profile_compressor is not None:
+            stats["profile_compressor"] = self._profile_compressor.get_stats()
+
+        return stats
 
 
 # ---------------------------------------------------------------------------

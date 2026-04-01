@@ -47,6 +47,22 @@ class TurboQuantEdgeConfig:
     # Max edges per block in CXL tier (limit to save space)
     max_edges_per_block_cxl: int = 16
 
+    # --- TQ Profile Compression (PolarQuant + QJL) ---
+    # Enable TQ-compressed attention profiles for CXL entries
+    enable_profile_compression: bool = True
+
+    # Dimension of attention profile vectors (query buckets)
+    profile_dim: int = 32
+
+    # PolarQuant angle quantization bits (3-bit ≈ 5.3x compression)
+    profile_angle_bits: int = 3
+
+    # Enable QJL residual correction for attention profiles
+    profile_enable_qjl: bool = True
+
+    # Random seed for compression matrices
+    profile_seed: int = 42
+
 
 @dataclass
 class CXLPoolConfig:
