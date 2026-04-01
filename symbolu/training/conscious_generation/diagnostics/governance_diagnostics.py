@@ -70,6 +70,10 @@ class GovernanceDiagnostics:
         self._delta_alpha_domain: List[float] = []
         self._delta_alpha_interaction: List[float] = []
 
+        # Residual baseline divergence
+        self._alpha_baseline: Optional[torch.Tensor] = None  # Cached from residual-only run
+        self._alpha_divergences: List[float] = []
+
         self._step_count = 0
 
     def update(
@@ -201,8 +205,57 @@ class GovernanceDiagnostics:
                     and hidden is not None and o_ctx is not None):
                 self._run_sensitivity_probes(router, hidden, o_ctx, domain)
 
+            # === D. Alpha divergence from residual baseline ===
+            if alpha is not None and self._alpha_baseline is not None:
+                # KL(alpha || alpha_baseline) — how much has governance changed routing?
+                baseline = self._alpha_baseline.to(alpha.device)
+                # Broadcast baseline to match batch dims
+                kl = (alpha * ((alpha + 1e-8).log() - (baseline + 1e-8).log())).sum(dim=-1)
+                self._alpha_divergences.append(kl.mean().item())
+
         # Trim all buffers
         self._trim_buffers()
+
+    def cache_residual_baseline(
+        self,
+        router,
+        hidden: torch.Tensor,
+        o_ctx: torch.Tensor,
+    ):
+        """
+        Cache the residual-only routing distribution as baseline.
+
+        Run this ONCE before evaluation begins, with ablation switches
+        set to use_kosha=False, use_domain=False, use_interaction=False.
+        The cached baseline is used to compute alpha divergence: how much
+        governance actually changes routing vs the original MLP-only system.
+
+        Args:
+            router: KoshaDomainRouter instance
+            hidden: Sample hidden states [B, embed_dim]
+            o_ctx: Sample ontological states [B, 32]
+        """
+        with torch.no_grad():
+            # Save current ablation state
+            orig_k = router.use_kosha
+            orig_d = router.use_domain
+            orig_i = router.use_interaction
+
+            # Temporarily disable all structured policy
+            router.use_kosha = False
+            router.use_domain = False
+            router.use_interaction = False
+
+            result = router(hidden, o_ctx, domain=None)
+            # Average over batch to get a single baseline distribution
+            self._alpha_baseline = result["alpha"].mean(
+                dim=tuple(range(result["alpha"].dim() - 1))
+            ).detach().cpu()
+
+            # Restore ablation state
+            router.use_kosha = orig_k
+            router.use_domain = orig_d
+            router.use_interaction = orig_i
 
     def _run_sensitivity_probes(
         self,
@@ -312,7 +365,7 @@ class GovernanceDiagnostics:
             self._lambda_effs, self._lambda_eff_stds, self._bliss_lambda_corrs,
             self._policy_scales, self._route_temps,
             self._delta_alpha_kosha, self._delta_alpha_domain,
-            self._delta_alpha_interaction,
+            self._delta_alpha_interaction, self._alpha_divergences,
         ]
         for buf in buffers:
             if len(buf) > self.window_size:
@@ -386,6 +439,9 @@ class GovernanceDiagnostics:
         self._avg_into(result, "cg_probe_delta_alpha_kosha", self._delta_alpha_kosha)
         self._avg_into(result, "cg_probe_delta_alpha_domain", self._delta_alpha_domain)
         self._avg_into(result, "cg_probe_delta_alpha_interaction", self._delta_alpha_interaction)
+
+        # === D. Alpha divergence from residual baseline ===
+        self._avg_into(result, "cg_gov_alpha_divergence", self._alpha_divergences)
 
         return result
 
