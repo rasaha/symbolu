@@ -120,7 +120,7 @@ class LongContextWorkloadGenerator:
                     accesses.append((pos, token_type, 0.02))
 
             # Occasional random long-range access (non-sleeper)
-            if self.rng.random() < 0.01 and current_pos > cfg.recent_window:
+            if self.rng.random() < 0.01 and current_pos > cfg.recent_window and window_start > cfg.sink_tokens:
                 far_pos = self.rng.randint(cfg.sink_tokens, window_start)
                 accesses.append((far_pos, "regular", 0.005))
 
@@ -416,10 +416,10 @@ class LongContextWorkloadGenerator:
                     # Reference a random early turn
                     early_turn = self.rng.randint(0, min(turn // 2, len(turn_starts) - 1))
                     early_start = turn_starts[early_turn]
-                    early_pos = early_start + self.rng.randint(
-                        0, min(tokens_per_turn, seq_len - early_start) - 1
-                    )
-                    accesses.append((early_pos, "entity", 0.08))
+                    max_offset = min(tokens_per_turn, seq_len - early_start) - 1
+                    if max_offset > 0:
+                        early_pos = early_start + self.rng.randint(0, max_offset)
+                        accesses.append((early_pos, "entity", 0.08))
 
                 # Self token
                 accesses.append((pos, token_type, 0.01))

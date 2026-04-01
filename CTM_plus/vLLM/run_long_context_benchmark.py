@@ -32,6 +32,7 @@ import time
 import random
 import sys
 import os
+from collections import deque
 
 import numpy as np
 
@@ -142,11 +143,11 @@ class CXLTieredSimulator:
             m = self.tier0[position]
             m.update(meta_update)
             m["access_count"] = m.get("access_count", 0) + 1
-            attn_hist = m.get("attention_weights", [])
+            attn_hist = m.get("attention_weights")
+            if attn_hist is None:
+                attn_hist = deque(maxlen=100)
+                m["attention_weights"] = attn_hist
             attn_hist.append(attention_weight)
-            if len(attn_hist) > 100:
-                attn_hist = attn_hist[-100:]
-            m["attention_weights"] = attn_hist
             return "tier0"
 
         # Check CXL pool (compressed warm tier)
@@ -159,11 +160,11 @@ class CXLTieredSimulator:
             m = self.cxl_pool.pop(position)
             m.update(meta_update)
             m["access_count"] = m.get("access_count", 0) + 1
-            attn_hist = m.get("attention_weights", [])
+            attn_hist = m.get("attention_weights")
+            if attn_hist is None:
+                attn_hist = deque(maxlen=100)
+                m["attention_weights"] = attn_hist
             attn_hist.append(attention_weight)
-            if len(attn_hist) > 100:
-                attn_hist = attn_hist[-100:]
-            m["attention_weights"] = attn_hist
             self._admit_to_tier0(position, m)
             return "cxl"
 
@@ -178,7 +179,7 @@ class CXLTieredSimulator:
                 "position": position,
                 "access_count": 1,
                 "created_time": self.current_time,
-                "attention_weights": [attention_weight],
+                "attention_weights": deque([attention_weight], maxlen=100),
                 **meta_update,
             }
             self._admit_to_tier0(position, m)
@@ -192,7 +193,7 @@ class CXLTieredSimulator:
             "position": position,
             "access_count": 1,
             "created_time": self.current_time,
-            "attention_weights": [attention_weight],
+            "attention_weights": deque([attention_weight], maxlen=100),
             **meta_update,
         }
         self._admit_to_tier0(position, m)
@@ -212,10 +213,14 @@ class CXLTieredSimulator:
 
         self.stats["tier0_evictions"] += 1
 
+        # Pre-compute max_pos once (was O(n) per candidate via max(keys()))
+        max_pos = max(self.tier0.keys()) + 1
+
         # CTM+ multi-signal scoring
-        sample_size = min(64, len(self.tier0))
-        candidates = random.sample(list(self.tier0.keys()), sample_size)
-        scores = [(pos, self._score(pos, self.tier0)) for pos in candidates]
+        tier0_keys = list(self.tier0.keys())
+        sample_size = min(64, len(tier0_keys))
+        candidates = random.sample(tier0_keys, sample_size)
+        scores = [(pos, self._score(pos, self.tier0, max_pos)) for pos in candidates]
         scores.sort(key=lambda x: x[1])
         victim_pos = scores[0][0]
 
@@ -257,8 +262,8 @@ class CXLTieredSimulator:
             self.cxl_pool.pop(worst_pos)
             self.tier1_ghost.add(worst_pos)
 
-    def _score(self, position: int, tier: dict) -> float:
-        """CTM+ multi-signal scoring for eviction."""
+    def _score(self, position: int, tier: dict, max_pos: int) -> float:
+        """CTM+ multi-signal scoring for eviction. max_pos is pre-computed."""
         meta = tier[position]
         cfg = self.ctm_config
         score = 0.0
@@ -288,8 +293,7 @@ class CXLTieredSimulator:
         importance = self.TOKEN_IMPORTANCE.get(meta.get("token_type", "regular"), 0.4)
         score += cfg.weight_token_importance * importance
 
-        # Position (sinks + recent)
-        max_pos = max(self.tier0.keys()) + 1 if self.tier0 else 1
+        # Position (sinks + recent) — max_pos passed in to avoid O(n) per call
         position_score = 0.3
         if position < cfg.attention_sink_tokens:
             position_score = 1.0
@@ -404,7 +408,7 @@ def run_single_workload(
             hr = sim.hit_rate
             eff = sim.tier0_capacity + sim.cxl_effective_capacity
         elif config_type == "lru":
-            sim = KVCacheSimulator(base_tokens, EvictionPolicy.LRU, CTMKVConfig())
+            sim = KVCacheSimulator(base_tokens, EvictionPolicy.LRU, CTMKVConfig(attention_sink_tokens=8))
             for pos, tt, attn in workload:
                 sim.access(pos, tt, attn)
             stats = sim.get_stats()
@@ -496,6 +500,7 @@ def run_single_workload(
                 weight_token_importance=0.0,
                 weight_position=0.0,
                 weight_sequence_priority=0.0,
+                attention_sink_tokens=8,
             )
             sim = CXLTieredSimulator(
                 tier0_tokens=base_tokens,
