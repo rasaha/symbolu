@@ -126,20 +126,23 @@ Streaming conversation is strongly recency-dominated. LRU and StreamingLLM perfo
 
 ## Workload 5: Code Generation
 
-*(131K results pending — code_gen benchmark still running)*
+**Cross-file dependencies and long-range imports.** Simulates coding with module imports, function references, and documentation lookups across large codebases. Strong structured reference patterns.
 
-### Hit Rate by Context Length (partial)
+### Hit Rate by Context Length
 
-| Config | 4K | 16K | 32K |
-|--------|-----|------|------|
-| LRU (FP16) | 33.57% | 27.44% | 28.37% |
-| H2O | 33.53% | 28.25% | 28.56% |
-| StreamingLLM | 33.57% | 25.42% | 26.93% |
-| TOVA | 33.46% | 28.30% | 28.51% |
-| **TQ+CTM++CXL** | **61.01%** | **50.00%** | **50.00%** |
+| Config | 4K | 16K | 32K | 65K | 131K |
+|--------|-----|------|------|------|-------|
+| LRU (FP16) | 33.57% | 27.44% | 28.37% | 28.89% | 28.91% |
+| H2O | 33.53% | 28.25% | 28.56% | 28.96% | -- |
+| StreamingLLM | 33.57% | 25.42% | 26.93% | 28.09% | 28.52% |
+| TOVA | 33.46% | 28.30% | 28.51% | 28.94% | -- |
+| CTM+ (FP16) | 33.49% | 28.08% | 28.52% | 28.95% | -- |
+| **TQ+CTM++CXL** | **61.01%** | **50.00%** | **50.00%** | **50.00%** | **50.00%** |
 
 ### Key Insight
-Code generation shows a massive TQ+CTM++CXL advantage (+27.44% at 4K, +21.63% at 32K). Code workloads have strong cross-file dependencies — importing a module at position 500 creates a long-range reference needed at position 30K. The CXL warm tier captures 14,110 hits at 32K, demonstrating its value for structured, reference-heavy workloads.
+Code generation shows the **largest and most sustained advantage** of any workload: **+21.09% at 131K**. The CXL pool caught **55,021 hits** at 131K — by far the most of any workload — because code has highly structured cross-file reference patterns (imports, function calls, documentation). These references are long-range but predictable, making them ideal candidates for the warm CXL tier.
+
+StreamingLLM underperforms LRU here because its strict FIFO window discards module imports from earlier in the context. H2O/TOVA full-scan was too slow at 131K (262K accesses × 13K cache = O(n²)) and was skipped.
 
 ---
 
@@ -152,28 +155,28 @@ Code generation shows a massive TQ+CTM++CXL advantage (+27.44% at 4K, +21.63% at
 ```
 Sleeping Tokens:    +33.95% (4K) → +13.42% (16K) → +3.31% (32K) → +2.29% (65K) → +1.77% (131K)
 Needle-in-Haystack: +20.88% (4K) → +12.29% (16K) → +6.76% (32K) → +6.62% (65K) → +6.64% (131K)
+Code Generation:   +27.44% (4K) → +22.56% (16K) → +21.63% (32K) → +21.11% (65K) → +21.09% (131K)
 Multi-Doc QA:       +17.73% (4K) → +2.29% (16K) → +0.40% (32K) → +0.18% (65K) → +0.09% (131K)
 Streaming Conv:     +5.90% (4K) → +0.04% (16K) → +0.01% (32K) → +0.00% (65K) → +0.00% (131K)
-Code Gen:          +27.44% (4K) → +22.56% (16K) → +21.63% (32K) → TBD → TBD
 ```
 
-**Needle-in-haystack** shows the most sustained advantage — **+6.64% at 131K** — because needle retrieval creates a persistent long-range access pattern that the CXL warm tier serves efficiently.
+**Code generation** shows the largest and most sustained advantage — **+21.09% at 131K** — because structured cross-file references (imports, function calls) create persistent long-range access patterns. The CXL warm tier caught **55,021 hits** at 131K.
 
-**Code generation** shows the largest raw advantage, likely because code has the most structured cross-file reference patterns.
+**Needle-in-haystack** also sustains well — **+6.64% at 131K** — because needle retrieval creates persistent long-range patterns the CXL tier serves efficiently.
 
 **Multi-doc QA and streaming** converge quickly because their working sets grow linearly while cache grows proportionally.
 
 ### CXL Pool Impact by Workload
 
-| Workload | 4K CXL Saves | 32K CXL Saves | 131K CXL Saves |
+| Workload | 4K CXL Hits | 32K CXL Hits | 131K CXL Hits |
 |----------|-------------|--------------|---------------|
-| Sleeping Tokens | 5,595 (40.4%) | 15,339 (15.5%) | 9,009 (2.3%) |
-| Needle-in-Haystack | 1,257 (23.3%) | 6,032 (15.5%) | 12,787 (8.9%) |
-| Multi-Doc QA | 860 (17.3%) | 559 (1.7%) | 54 (0.0%) |
-| Streaming Conv | 500 (40.4%) | 11 (0.3%) | 0 (0.0%) |
-| Code Gen | 4,173 (34.2%) | 14,110 (21.5%) | TBD |
+| Sleeping Tokens | 5,595 | 15,339 | 9,009 |
+| Needle-in-Haystack | 1,257 | 6,032 | 12,787 |
+| Code Generation | 4,173 | 14,110 | **55,021** |
+| Multi-Doc QA | 860 | 559 | 54 |
+| Streaming Conv | 500 | 11 | 0 |
 
-The CXL pool is most valuable for **needle** and **code** workloads where long-range references persist through the entire context.
+The CXL pool is most valuable for **code generation** (55K hits at 131K) and **needle** (12.8K hits at 131K) where long-range references persist through the entire context. It provides minimal benefit for streaming conversation (recency-dominated) and multi-doc QA (working set exceeds pool capacity).
 
 ---
 
