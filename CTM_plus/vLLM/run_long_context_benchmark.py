@@ -462,7 +462,6 @@ def run_single_workload(
             sim = H2OSimulator(
                 max_tokens=base_tokens,
                 sink_tokens=8,
-                heavy_hitter_ratio=0.5,
             )
             for pos, tt, attn in workload:
                 sim.access(pos, tt, attn)
