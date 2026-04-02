@@ -25,8 +25,9 @@ from .attention_evictor import (
     classify_block_importance,
 )
 from .config import KVCachePolicyConfig
+from .vllm_adapter import CTMBlockSpaceManager, CTMvLLMConfig
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "KVCachePolicy",
     "KVCachePolicyConfig",
@@ -34,4 +35,6 @@ __all__ = [
     "PositionClass",
     "compute_adaptive_threshold",
     "classify_block_importance",
+    "CTMBlockSpaceManager",
+    "CTMvLLMConfig",
 ]
