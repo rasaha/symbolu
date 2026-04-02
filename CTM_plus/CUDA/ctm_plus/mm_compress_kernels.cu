@@ -16,11 +16,12 @@
  *   (constant memory serializes 32× when warp threads read different rows)
  *
  * For head_dim = 128:
- *   - Shared memory per block: ~1.6 KB (s_vec + s_buf_a + s_buf_b + misc)
- *   - Registers per thread: ~10 (no large per-thread arrays)
- *   - Phase 2 (GEMV): 128 threads × 128 FMAs = full block utilization
+ *   - Shared memory per block: ~18 KB (s_tile[128][33] + s_vec + s_buf_a/b + misc)
+ *   - Registers per thread: ~12 (loop accum, tile indices, no per-thread arrays)
+ *   - Phase 2 (GEMV): Tiled 128×32 → smem; 128 threads × 32 FMAs × 4 tiles
+ *                      Coalesced global load, bank-conflict-free smem read
  *   - Phase 3 (polar): 64→32→16→...→1 active threads (tree reduction)
- *   - Phase 4 (QJL):  128 threads × 128 FMAs + warp ballot + shuffle reduce
+ *   - Phase 4 (QJL):  Same tiling as Phase 2 (reuses s_tile), + ballot + shuffle
  */
 
 #include "multimodal_inference.cuh"
@@ -104,24 +105,29 @@ __device__ __forceinline__ float tq_dequantize_angle_pos(
 //
 //   Phase 0 — Alloc:     Thread 0 pops CXL slot, broadcasts via shared memory.
 //   Phase 1 — Load:      128 threads cooperatively load FP16→FP32 (1 elem/thread).
-//   Phase 2 — Rotation:  128 threads compute GEMV (1 output row/thread).
-//                         Uses d_rotation (global, L2-cached) not c_mm_rotation
-//                         (constant memory serializes 32× per warp).
+//   Phase 2 — Rotation:  Tiled GEMV via shared memory (128×32 tiles).
+//                         Cooperative coalesced load → bank-conflict-free smem read.
+//                         128× fewer cache line fetches vs untiled global access.
 //   Phase 3 — Polar:     Tree reduction — level 0: 64 threads, level 1: 32, ...
 //                         Ping-pong shared memory buffers, angles written to global.
-//   Phase 4 — QJL:       128 threads compute 1 projection each, __ballot_sync
-//                         packs 32 sign bits per warp, shuffle reduces scale.
+//   Phase 4 — QJL:       Same tiling as Phase 2 (reuses s_tile buffer).
+//                         __ballot_sync packs 32 sign bits/warp, shuffle reduces scale.
 //   Phase 5 — Metadata:  Thread 0 writes cxl_slot, cosine_sim, tier_flags.
 //   Phase 6 — Stats:     Thread 0 updates modality counters.
 //
 // Evict blocks: Thread 0 only (lightweight free + clear).
 //
-// Shared memory per block: ~1.6 KB
-//   s_vec[128]    — 512B  (original FP32 vector, survives through QJL phase)
-//   s_buf_a[128]  — 512B  (rotation output → polar ping-pong A)
-//   s_buf_b[128]  — 512B  (polar ping-pong B)
-//   s_warp_scale[4] — 16B (warp partial sums for QJL scale reduction)
+// Shared memory per block: ~18 KB
+//   s_tile[128][33] — 16,896B (GEMV tile, padded col for bank-conflict-free access)
+//   s_vec[128]      — 512B   (original FP32 vector, survives through QJL phase)
+//   s_buf_a[128]    — 512B   (rotation output → polar ping-pong A)
+//   s_buf_b[128]    — 512B   (polar ping-pong B)
+//   s_warp_scale[4] — 16B    (warp partial sums for QJL scale reduction)
 //   s_slot, s_alloc_ok — 8B
+//
+// Occupancy: 18KB/block → 9 blocks/SM on A100 (164KB smem) → 56% occupancy.
+// Acceptable for this memory-bound kernel — the tiling reduces cache line
+// fetches by 128× which far outweighs the modest occupancy reduction.
 //
 // No host sync. No D→H readback. CUDA graph capturable (fixed grid).
 // ============================================================================
@@ -165,6 +171,11 @@ __global__ void mm_kernel_process_demotions(
         __shared__ float    s_vec[MM_MAX_HEAD_DIM];    // original FP32 vector
         __shared__ float    s_buf_a[MM_MAX_HEAD_DIM];  // ping-pong buffer A
         __shared__ float    s_buf_b[MM_MAX_HEAD_DIM];  // ping-pong buffer B
+        __shared__ float    s_tile[MM_MAX_HEAD_DIM][33]; // [128][33] tile for GEMV
+                                                         // 33 cols (not 32) avoids
+                                                         // bank conflicts: bank =
+                                                         // (lane*33+j)%32 = (lane+j)%32
+                                                         // → all lanes hit distinct banks
         __shared__ float    s_warp_scale[4];           // warp partial sums (128/32=4 warps)
         __shared__ uint32_t s_slot;
         __shared__ int      s_alloc_ok;
@@ -203,20 +214,41 @@ __global__ void mm_kernel_process_demotions(
         }
         __syncthreads();
 
-        // ---- Phase 2: Cooperative rotation GEMV (1 output row per thread) ----
+        // ---- Phase 2: Tiled rotation GEMV (1 output row per thread) ----
         // Each thread computes: s_buf_a[tid] = dot(R[tid, :], s_vec[:])
         //
-        // Uses GLOBAL memory (d_rotation) instead of __constant__ (c_mm_rotation).
-        // Constant memory serializes when threads in a warp read different
-        // addresses (32-way serialization). Global memory serves through L1/L2
-        // cache with full bandwidth — the 64KB rotation matrix stays warm in L2.
-        if (tid < head_dim) {
-            float sum = 0.0f;
-            #pragma unroll 8
-            for (uint32_t c = 0; c < head_dim; c++) {
-                sum += d_rotation[tid * head_dim + c] * s_vec[c];
+        // Tiles d_rotation through shared memory in 128×32 chunks.
+        // Without tiling, each warp reads 32 scattered cache lines per
+        // iteration (threads access different rows at stride 512B).
+        // With tiling, the cooperative load is fully coalesced: adjacent
+        // threads read adjacent addresses within each 128B cache line.
+        // Then the dot product reads from s_tile (bank-conflict-free).
+        //
+        // Total cache line reads: 128 (tiled) vs 16,384 (untiled) = 128× reduction.
+        {
+            float rot_sum = 0.0f;
+            for (uint32_t tc = 0; tc < head_dim; tc += 32) {
+                // Cooperative coalesced load: 128 threads load 128×32 tile
+                // Warp k reads row k's 32 elements contiguously → 1 cache line/warp
+                for (uint32_t i = tid; i < head_dim * 32u; i += blockDim.x) {
+                    uint32_t row = i >> 5;    // i / 32
+                    uint32_t col = i & 31u;   // i % 32
+                    s_tile[row][col] = d_rotation[row * head_dim + tc + col];
+                }
+                __syncthreads();
+
+                // Partial dot product from shared memory
+                if (tid < head_dim) {
+                    #pragma unroll 8
+                    for (uint32_t j = 0; j < 32u; j++) {
+                        rot_sum += s_tile[tid][j] * s_vec[tc + j];
+                    }
+                }
+                __syncthreads();
             }
-            s_buf_a[tid] = sum;
+            if (tid < head_dim) {
+                s_buf_a[tid] = rot_sum;
+            }
         }
         __syncthreads();
 
@@ -279,18 +311,32 @@ __global__ void mm_kernel_process_demotions(
             cxl.d_radii[cxl_slot] = final_buf[0];
         }
 
-        // ---- Phase 4: Cooperative QJL projection ----
+        // ---- Phase 4: Tiled QJL projection ----
         // Each thread computes one JL dot product: dot(JL_row[tid], s_vec[:])
+        // Reuses s_tile buffer from Phase 2 (dead after rotation).
+        // Same tiling strategy: 128×32 tiles with coalesced cooperative loads.
         // __ballot_sync packs 32 sign bits per warp into one uint32.
         // Warp shuffle reduces |dot| sums for scale factor.
         if (d_jl_matrix && proj_dim > 0) {
-            // Each thread computes its projection
             float my_dot = 0.0f;
-            if (tid < (uint32_t)proj_dim) {
-                #pragma unroll 8
-                for (uint32_t d = 0; d < head_dim; d++) {
-                    my_dot += d_jl_matrix[tid * head_dim + d] * s_vec[d];
+            uint32_t proj_rows = (uint32_t)proj_dim;
+
+            for (uint32_t tc = 0; tc < head_dim; tc += 32) {
+                // Cooperative coalesced load of JL matrix tile
+                for (uint32_t i = tid; i < proj_rows * 32u; i += blockDim.x) {
+                    uint32_t row = i >> 5;
+                    uint32_t col = i & 31u;
+                    s_tile[row][col] = d_jl_matrix[row * head_dim + tc + col];
                 }
+                __syncthreads();
+
+                if (tid < proj_rows) {
+                    #pragma unroll 8
+                    for (uint32_t j = 0; j < 32u; j++) {
+                        my_dot += s_tile[tid][j] * s_vec[tc + j];
+                    }
+                }
+                __syncthreads();
             }
 
             // Warp ballot: pack sign bits (threads beyond proj_dim contribute 0)

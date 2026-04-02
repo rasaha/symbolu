@@ -400,7 +400,7 @@ class CTMTransformerSetup:
 
     def _init_vllm(self) -> None:
         """Initialize vLLM block manager with CTM+ eviction."""
-        from CTM_plus.vLLM.ctm_plus_vllm import CTMBlockSpaceManager, CTMvLLMConfig
+        from CTM_plus.KVPolicy.kv_policy import CTMBlockSpaceManager, CTMvLLMConfig
 
         if self.config.workload == WorkloadType.STREAMING:
             vllm_config = CTMvLLMConfig.for_streaming()
@@ -428,7 +428,7 @@ class CTMTransformerSetup:
 
     def _init_database(self) -> None:
         """Initialize Database backend for checkpoint caching."""
-        from CTM_plus.Database.ctm_plus_db import GenericKVCache, CTMDBConfig
+        from CTM_plus.KVSimulator.kv_simulator import GenericKVCache, CTMDBConfig
 
         db_config = CTMDBConfig.for_mixed()
         db_config.victim_sample_size = self.config.victim_sample_size

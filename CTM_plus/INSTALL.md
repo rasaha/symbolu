@@ -73,8 +73,8 @@ cd symbolu
 
 ```bash
 pip install -e CTM_plus/DeepSpeed/
-pip install -e CTM_plus/vLLM/
-pip install -e CTM_plus/Database/
+pip install -e CTM_plus/KVPolicy/
+pip install -e CTM_plus/KVSimulator/
 ```
 
 ### With optional dependencies
@@ -84,15 +84,15 @@ pip install -e CTM_plus/Database/
 pip install -e "CTM_plus/DeepSpeed/[deepspeed]"
 
 # vLLM package + actual vLLM runtime
-pip install -e "CTM_plus/vLLM/[vllm]"
+pip install -e "CTM_plus/KVPolicy/[vllm]"
 
 # Database package + PostgreSQL + Redis clients
-pip install -e "CTM_plus/Database/[postgres,redis]"
+pip install -e "CTM_plus/KVSimulator/[postgres,redis]"
 
 # Dev dependencies (tests)
 pip install -e "CTM_plus/DeepSpeed/[dev]"
-pip install -e "CTM_plus/vLLM/[dev]"
-pip install -e "CTM_plus/Database/[dev]"
+pip install -e "CTM_plus/KVPolicy/[dev]"
+pip install -e "CTM_plus/KVSimulator/[dev]"
 ```
 
 ### Set Python path for unified setup module
@@ -188,16 +188,16 @@ Run these commands to confirm all packages are correctly installed:
 ```bash
 # Individual packages
 python -c "from ctm_plus_deepspeed import CTMOffloadManager, CTMDeepSpeedConfig; print('DeepSpeed integration: OK')"
-python -c "from ctm_plus_vllm import CTMBlockSpaceManager, CTMvLLMConfig; print('vLLM integration: OK')"
-python -c "from ctm_plus_db import CTMBufferPool, CTMDBConfig; print('Database integration: OK')"
+python -c "from kv_policy import CTMBlockSpaceManager, CTMvLLMConfig; print('vLLM integration: OK')"
+python -c "from kv_simulator import CTMBufferPool, CTMDBConfig; print('Database integration: OK')"
 
 # Unified transformer setup
 python -c "from CTM_plus.transformer_setup import CTMTransformerSetup; print('Transformer setup: OK')"
 
 # Run package examples
 python -m ctm_plus_deepspeed.example
-python -m ctm_plus_vllm.example
-python -m ctm_plus_db.example
+python -m kv_policy.example
+python -m kv_simulator.example
 
 # Run tests
 python -m pytest tests/test_ctm_transformer_setup.py -q
@@ -399,7 +399,7 @@ def generate(prompt_tokens, max_new_tokens=128):
 ### Method B: Direct vLLM KV cache management
 
 ```python
-from ctm_plus_vllm import CTMBlockSpaceManager, CTMvLLMConfig
+from kv_policy import CTMBlockSpaceManager, CTMvLLMConfig
 
 # Choose preset for your workload
 config = CTMvLLMConfig.for_llm_inference()      # Chat/completion
@@ -427,7 +427,7 @@ print(f"GPU Hit Rate: {manager.get_stats()['gpu_hit_rate']:.2%}")
 
 ```python
 from vllm import LLM
-from ctm_plus_vllm import CTMBlockSpaceManager, CTMvLLMConfig
+from kv_policy import CTMBlockSpaceManager, CTMvLLMConfig
 
 original_init = LLM.__init__
 
@@ -548,7 +548,7 @@ data = cache.get("checkpoint_step_1000")
 ### PostgreSQL buffer pool
 
 ```python
-from ctm_plus_db import PostgresCTMExtension, CTMDBConfig
+from kv_simulator import PostgresCTMExtension, CTMDBConfig
 
 pg = PostgresCTMExtension(
     shared_buffers=8192,
@@ -559,7 +559,7 @@ pg = PostgresCTMExtension(
 ### Redis-style cache
 
 ```python
-from ctm_plus_db import RedisCTMCache, CTMDBConfig
+from kv_simulator import RedisCTMCache, CTMDBConfig
 
 cache = RedisCTMCache(
     maxmemory=1024 * 1024 * 1024,   # 1GB
@@ -641,13 +641,13 @@ config = CTMDeepSpeedConfig(
 
 ```bash
 # vLLM KV cache benchmark
-python -m ctm_plus_vllm.benchmark_cli compare --seq-len 4096 --cache-ratio 0.5
+python -m kv_policy.benchmark_cli compare --seq-len 4096 --cache-ratio 0.5
 
 # DeepSpeed offload simulation
 python -m ctm_plus_deepspeed.example
 
 # Database buffer pool benchmark
-python -m ctm_plus_db.example
+python -m kv_simulator.example
 
 # Run all CTM+ tests
 python -m pytest tests/test_ctm_transformer_setup.py -v
@@ -829,22 +829,17 @@ CTM_plus/
 │       ├── zero_integration.py   # ZeRO-Offload support
 │       ├── inference.py          # Inference weight offload
 │       └── example.py            # Usage example
-├── vLLM/
+├── KVPolicy/
 │   ├── setup.py                  # pip install -e .
-│   └── ctm_plus_vllm/            # Python package
-│       ├── config.py             # CTMvLLMConfig
-│       ├── evictor.py            # Eviction policy
-│       ├── block_manager.py      # KV cache block manager
-│       └── example.py            # Usage example
-└── Database/
+│   └── kv_policy/                # Python package
+│       ├── config.py             # KVCachePolicyConfig
+│       ├── attention_evictor.py  # KV cache eviction policy
+│       └── kv_cache_simulator.py # Standalone benchmark
+└── KVSimulator/
     ├── setup.py                  # pip install -e .
-    └── ctm_plus_db/              # Python package
-        ├── config.py             # CTMDBConfig
-        ├── buffer_pool.py        # Buffer pool manager
-        ├── postgres.py           # PostgreSQL integration
-        ├── redis_cache.py        # Redis-style cache
-        ├── generic.py            # Generic KV cache
-        └── example.py            # Usage example
+    └── kv_simulator/             # Python package
+        ├── config.py             # SimulationConfig
+        └── buffer_pool.py        # KV cache simulator
 ```
 
 ---

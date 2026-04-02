@@ -33,7 +33,7 @@ CTM+ today operates on **4KB memory pages** moving between DRAM (Tier-0) and NAN
 
 ### 1.3 Gaps in KV-Cache Specific Design
 
-The existing `CTM_plus/vLLM/` code has a structural problem: it treats KV cache blocks identically to storage pages. LLM KV-cache has unique properties:
+The existing `CTM_plus/KVPolicy/` code has a structural problem: it treats KV cache blocks identically to storage pages. LLM KV-cache has unique properties:
 
 | KV-Cache Property | Current CTM+ Handling | What's Needed |
 |---|---|---|
@@ -154,7 +154,7 @@ Integration points with existing training:
 
 ### Phase 1: Attention-Aware KV-Cache Evictor
 
-New file: `CTM_plus/vLLM/ctm_plus_vllm/attention_evictor.py`
+New file: `CTM_plus/KVPolicy/kv_policy/attention_evictor.py`
 
 This replaces the generic `evictor.py` with KV-cache-specific intelligence:
 - AttentionAccumulator for per-token attention tracking

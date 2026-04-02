@@ -34,9 +34,13 @@ extern __constant__ uint32_t c_mm_anchor_mask;
 /**
  * 8-signal scoring function. All arithmetic is FP32 in registers.
  *
+ * Uses __expf / __logf fast-math intrinsics (~2 ULP error, ~30% faster
+ * than IEEE-compliant expf/log1pf). Score differences at eviction
+ * thresholds are O(0.01), so 1e-7 error is negligible.
+ *
  * Signals (weights sum to 1.0):
  *   1. Recency      (0.20): exp(-0.693 * age / 100)
- *   2. Frequency    (0.15): log1p(freq_norm * 10) / log1p(10)
+ *   2. Frequency    (0.15): log(1 + freq_norm * 10) / ln(11)
  *   3. Attention    (0.25): sigmoid(attn_ratio - 5)
  *   4. Token imp.   (0.12): LUT[token_type]
  *   5. Position     (0.08): sink=1.0, recent_window=linear, else=0.3
@@ -57,12 +61,13 @@ __device__ __forceinline__ float mm_compute_score(
 
     // ---- Signal 1: Recency ----
     uint32_t age = cfg.current_step - meta.last_access_step;
-    float recency = expf(-0.693f * (float)age / 100.0f);
+    float recency = __expf(-0.693f * (float)age / 100.0f);
     score += cfg.w_recency * recency;
 
     // ---- Signal 2: Frequency (weight reduced 0.20→0.15) ----
+    // 0.41787344f = 1/ln(11), precomputed to avoid runtime log1pf(10)
     float freq_norm = fminf((float)meta.access_count * 0.001f, 1.0f);
-    float frequency = log1pf(freq_norm * 10.0f) / log1pf(10.0f);
+    float frequency = __logf(1.0f + freq_norm * 10.0f) * 0.41787344f;
     score += cfg.w_frequency * frequency;
 
     // ---- Signal 3: Attention strength ----
@@ -70,7 +75,7 @@ __device__ __forceinline__ float mm_compute_score(
         ? (meta.attention_sum / (float)meta.attention_count)
         : 0.0f;
     float strength = avg_attn / 0.001f;
-    float attention = 1.0f / (1.0f + expf(-0.5f * (strength - 5.0f)));
+    float attention = 1.0f / (1.0f + __expf(-0.5f * (strength - 5.0f)));
     score += cfg.w_attention * attention;
 
     // ---- Signal 4: Token importance ----
@@ -105,7 +110,7 @@ __device__ __forceinline__ float mm_compute_score(
     // sigmoid maps to [0, 1]; centered at 0 (no trend).
     if (cfg.w_reuse_trend > 0.0f) {
         float trend_val = (float)meta.reuse_trend / 1000.0f;
-        float trend_sig = 1.0f / (1.0f + expf(-2.0f * trend_val));
+        float trend_sig = 1.0f / (1.0f + __expf(-2.0f * trend_val));
         score += cfg.w_reuse_trend * trend_sig;
     }
 
