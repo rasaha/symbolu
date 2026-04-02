@@ -48,6 +48,15 @@ class CTMDeepSpeedConfig:
     adaptive_p_learning_rate: float = 0.1
     initial_p: float = 0.5
 
+    # TurboQuant compression (gradient / optimizer-state offload)
+    enable_turboquant: bool = False
+    turboquant_angle_bits: int = 3
+    turboquant_enable_qjl: bool = True
+    turboquant_segment_dim: int = 128
+    turboquant_compress_gradients: bool = True
+    turboquant_compress_optimizer_states: bool = True
+    turboquant_min_compress_elements: int = 512
+
     # Scoring weights
     weight_recency: float = 0.35
     weight_frequency: float = 0.30
@@ -57,7 +66,7 @@ class CTMDeepSpeedConfig:
 
     @classmethod
     def for_training(cls) -> "CTMDeepSpeedConfig":
-        """Optimized for training (frequent param/grad access)."""
+        """Optimized for training (frequent param/grad access). TurboQuant on."""
         return cls(
             victim_sample_size=64,
             promotion_threshold=0.25,
@@ -70,6 +79,10 @@ class CTMDeepSpeedConfig:
             weight_size=0.15,
             weight_compute=0.15,
             weight_gradient=0.15,
+            enable_turboquant=True,
+            turboquant_angle_bits=3,
+            turboquant_compress_gradients=True,
+            turboquant_compress_optimizer_states=True,
         )
 
     @classmethod
@@ -91,7 +104,7 @@ class CTMDeepSpeedConfig:
 
     @classmethod
     def for_zero_offload(cls) -> "CTMDeepSpeedConfig":
-        """Optimized for ZeRO-Offload (optimizer states on CPU)."""
+        """Optimized for ZeRO-Offload (optimizer states on CPU). TurboQuant on."""
         return cls(
             victim_sample_size=48,
             promotion_threshold=0.30,
@@ -104,11 +117,15 @@ class CTMDeepSpeedConfig:
             weight_size=0.15,
             weight_compute=0.10,
             weight_gradient=0.10,
+            enable_turboquant=True,
+            turboquant_angle_bits=3,
+            turboquant_compress_gradients=True,
+            turboquant_compress_optimizer_states=True,
         )
 
     @classmethod
     def for_large_model(cls) -> "CTMDeepSpeedConfig":
-        """Optimized for large models (aggressive offloading)."""
+        """Optimized for large models (aggressive offloading). TurboQuant on."""
         return cls(
             victim_sample_size=96,
             promotion_threshold=0.40,
@@ -122,4 +139,9 @@ class CTMDeepSpeedConfig:
             weight_size=0.25,  # Penalize large tensors more
             weight_compute=0.10,
             weight_gradient=0.10,
+            enable_turboquant=True,
+            turboquant_angle_bits=3,
+            turboquant_segment_dim=128,
+            turboquant_compress_gradients=True,
+            turboquant_compress_optimizer_states=True,
         )
