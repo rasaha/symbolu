@@ -727,6 +727,180 @@ def run_workload(
     return metrics
 
 
+ATTENTION_PATTERNS = [
+    sink_and_recent_attention,
+    entity_focused_attention,
+    uniform_attention,
+    mixed_multihead_attention,
+]
+
+
+def run_continuous_batching(
+    max_blocks: int,
+    block_size: int,
+    total_steps: int,
+    policy_type: PolicyType,
+    seed: int = 42,
+    sink_tokens: int = 4,
+    recent_window: int = 128,
+    kv_policy=None,
+    arrival_rate: float = 0.15,
+    completion_rate: float = 0.05,
+    max_concurrent: int = 16,
+    length_distribution: Optional[List[Tuple[float, int, int]]] = None,
+) -> Dict:
+    """
+    Run a continuous-batching workload with staggered arrivals and departures.
+
+    Simulates realistic serving: sequences arrive over time, run prefill + decode,
+    and complete at variable points. Memory pressure fluctuates naturally.
+
+    Args:
+        total_steps: Number of simulation steps to run.
+        arrival_rate: Probability of a new sequence arriving each step.
+        completion_rate: Probability of completing a decoding sequence each step.
+        max_concurrent: Maximum concurrent sequences.
+        length_distribution: List of (weight, min_len, max_len) for context lengths.
+            Defaults to a realistic mix of short/medium/long/extreme.
+    """
+    if length_distribution is None:
+        length_distribution = [
+            (0.30, 128, 512),      # short (chat turns)
+            (0.40, 1024, 4096),    # medium (general)
+            (0.20, 4096, 16384),   # long (documents)
+            (0.10, 16384, 32768),  # extreme (full context)
+        ]
+
+    rng = random.Random(seed)
+    next_seq_id = 0
+
+    sim = KVCacheSimulator(
+        max_blocks=max_blocks, block_size=block_size,
+        policy_type=policy_type, seed=seed,
+        sink_tokens=sink_tokens, recent_window=recent_window,
+        kv_policy=kv_policy,
+    )
+
+    # Per-sequence attention pattern assignment
+    seq_attention_fns: Dict[int, callable] = {}
+    utilization_trace: List[float] = []
+    sequences_completed = 0
+    decode_steps_run = 0
+
+    def _sample_context_length() -> int:
+        r = rng.random()
+        cumulative = 0.0
+        for weight, lo, hi in length_distribution:
+            cumulative += weight
+            if r < cumulative:
+                return rng.randint(lo, hi)
+        _, lo, hi = length_distribution[-1]
+        return rng.randint(lo, hi)
+
+    for step in range(total_steps):
+        # --- Arrivals ---
+        if len(sim.sequences) < max_concurrent and rng.random() < arrival_rate:
+            ctx_len = _sample_context_length()
+            sid = next_seq_id
+            next_seq_id += 1
+            sim.add_sequence(sid, ctx_len)
+            sim.prefill_sequence(sid)
+            # Assign random attention pattern
+            seq_attention_fns[sid] = rng.choice(ATTENTION_PATTERNS)
+
+        # --- Decode active sequences ---
+        active = [sid for sid, s in sim.sequences.items() if s.prefill_done]
+        for sid in active:
+            # Temporarily swap attention_fn for this sequence's pattern
+            orig_fn = sim.attention_fn
+            sim.attention_fn = seq_attention_fns.get(sid, sink_and_recent_attention)
+            sim.decode_step(sid)
+            sim.attention_fn = orig_fn
+            decode_steps_run += 1
+
+        # --- Completions ---
+        if active and rng.random() < completion_rate:
+            victim_sid = rng.choice(active)
+            sim.remove_sequence(victim_sid)
+            seq_attention_fns.pop(victim_sid, None)
+            sequences_completed += 1
+
+        # --- Track utilization ---
+        utilization_trace.append(len(sim.blocks) / max(1, max_blocks))
+
+    # Complete remaining sequences
+    for sid in list(sim.sequences):
+        sim.remove_sequence(sid)
+        sequences_completed += 1
+
+    metrics = sim.get_metrics()
+    metrics["policy"] = policy_type.value
+    metrics["sequences_completed"] = sequences_completed
+    metrics["decode_steps_run"] = decode_steps_run
+    metrics["total_steps"] = total_steps
+
+    # Utilization summary
+    if utilization_trace:
+        metrics["avg_utilization"] = sum(utilization_trace) / len(utilization_trace)
+        metrics["peak_utilization"] = max(utilization_trace)
+        # Time spent in pressure zones
+        high = sum(1 for u in utilization_trace if u >= 0.9)
+        med = sum(1 for u in utilization_trace if 0.7 <= u < 0.9)
+        low = sum(1 for u in utilization_trace if u < 0.7)
+        n = len(utilization_trace)
+        metrics["pct_high_pressure"] = high / n
+        metrics["pct_med_pressure"] = med / n
+        metrics["pct_low_pressure"] = low / n
+    else:
+        metrics["avg_utilization"] = 0.0
+        metrics["peak_utilization"] = 0.0
+        metrics["pct_high_pressure"] = 0.0
+        metrics["pct_med_pressure"] = 0.0
+        metrics["pct_low_pressure"] = 0.0
+
+    return metrics
+
+
+def compare_continuous_batching(
+    max_blocks: int = 256,
+    block_size: int = 16,
+    total_steps: int = 500,
+    seed: int = 42,
+    include_kv_policy: bool = True,
+    **kwargs,
+) -> Dict[str, Dict]:
+    """Run continuous-batching workload under all policies."""
+    results = {}
+
+    for policy in PolicyType:
+        if policy == PolicyType.KV_POLICY:
+            if not include_kv_policy:
+                continue
+            try:
+                from CTM_plus.KVPolicy.kv_policy.attention_evictor import KVCachePolicy
+            except ImportError:
+                continue
+            kv_pol = KVCachePolicy(
+                max_blocks=max_blocks, block_size=block_size,
+                sink_tokens=kwargs.get("sink_tokens", 4),
+                recent_window=kwargs.get("recent_window", 128),
+            )
+        else:
+            kv_pol = None
+
+        start = time.perf_counter()
+        metrics = run_continuous_batching(
+            max_blocks=max_blocks, block_size=block_size,
+            total_steps=total_steps, policy_type=policy,
+            seed=seed, kv_policy=kv_pol, **kwargs,
+        )
+        elapsed = time.perf_counter() - start
+        metrics["elapsed_seconds"] = round(elapsed, 4)
+        results[policy.value] = metrics
+
+    return results
+
+
 def compare_policies(
     max_blocks: int = 256,
     block_size: int = 16,
