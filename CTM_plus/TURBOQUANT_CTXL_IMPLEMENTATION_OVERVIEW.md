@@ -1,6 +1,84 @@
 # TurboQuant + CTXL Integration: Cross-Layer Implementation Overview
 
-## Architecture Summary
+## What This Project Does (Plain English)
+
+Modern AI models (like ChatGPT, Claude, and similar large language models) have
+a fundamental memory problem: they need to remember every word in the
+conversation to generate the next word, and that memory — called the **KV cache**
+— grows linearly with conversation length. A 128K-token conversation on a
+70-billion-parameter model can consume over 40 GB of the GPU's fastest memory
+(HBM). Most GPUs only have 80 GB total, and the model weights already take up
+most of that.
+
+This project solves that problem with two complementary ideas:
+
+### 1. Smart Compression (TurboQuant)
+
+Instead of storing every remembered word at full precision (16 bits per number),
+we mathematically compress them down to just 3 bits — a **5.3x size reduction**
+— while preserving over 96% of the original information. The technique is called
+TurboQuant and works by converting vectors into polar coordinates and quantizing
+the angles onto a fixed grid. A secondary correction step (QJL) adds 1 bit per
+dimension to remove bias in the compressed representation.
+
+Think of it like JPEG compression for images: you lose a tiny bit of quality,
+but you can fit 5x more images in the same space.
+
+### 2. Smart Eviction (CTM+)
+
+Even with compression, you eventually run out of memory. When that happens,
+you need to decide which remembered words to throw away. Most systems use a
+simple rule: throw away the oldest one (LRU). CTM+ is smarter — it scores every
+token based on 6 signals:
+
+- **Recency**: Was it accessed recently?
+- **Frequency**: Has it been accessed many times?
+- **Attention strength**: Does the model pay a lot of attention to it?
+- **Token importance**: Is it a named entity, number, or instruction (vs punctuation)?
+- **Position**: Is it at the very beginning (attention sink) or very end (recent context)?
+- **Compression quality**: Did it compress well? (If not, evicting it costs more.)
+
+The lowest-scoring token gets evicted first.
+
+### 3. Tiered Memory (CTXL)
+
+Rather than just "keep" or "throw away," we add a middle tier — like how your
+computer has fast RAM and a slower hard drive. Our 3-tier hierarchy is:
+
+```
+  Fast (HBM)          Warm (CXL)              Cold (NVMe)
+  Full precision  -->  Compressed (3-bit)  -->  Evicted
+  ~4K tokens          ~21K tokens              overflow
+```
+
+**CXL** (Compute Express Link) is a new hardware standard that lets servers
+attach additional DRAM via a PCIe-like bus. It is slower than HBM but much
+faster than NVMe, making it perfect for a warm compression tier.
+
+The combined system delivers an **8.8x effective capacity increase** — meaning
+a GPU that previously handled 4K tokens can now serve 35K+ tokens without
+losing important context.
+
+### Why Four Implementations?
+
+The same algorithm runs at four different levels of the system stack because
+each level manages different data in different hardware:
+
+| Layer | What It Does | Analogy |
+|-------|-------------|---------|
+| **vLLM (Python)** | Tests the algorithm in simulation — no GPU needed | A flight simulator before flying the real plane |
+| **DeepSpeed** | Compresses model training data (optimizer states, gradients) | Compressing luggage to fit more in your car trunk |
+| **CUDA** | Compresses inference KV cache on the GPU in real time | The actual autopilot running during the flight |
+| **Kernel** | Places memory pages in the right physical hardware tier | Air traffic control deciding which runway to use |
+
+They are **not redundant** — each handles different data at a different phase.
+You would use the Python simulation to tune parameters, the CUDA layer during
+production inference, DeepSpeed during training, and the kernel module to manage
+the server's physical memory across all applications.
+
+---
+
+## Architecture Summary (Technical)
 
 CTM+ implements a unified memory tiering algorithm across four execution layers.
 Each layer targets a different runtime environment and manages different physical
