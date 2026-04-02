@@ -33,6 +33,12 @@ import numpy as np
 
 from .config import CTMDeepSpeedConfig
 from .offload_manager import CTMOffloadManager, TensorLocation
+from .turboquant_numba import (
+    _compress_polar_numba,
+    _decompress_polar_numba,
+    build_level_structure,
+    is_numba_available,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +170,10 @@ class PolarQuant:
         self._cos_grid_pos  = np.cos(self._angle_grid_pos).astype(np.float32)
         self._sin_grid_pos  = np.sin(self._angle_grid_pos).astype(np.float32)
 
+        # Level structure for the Numba kernels (precomputed once at init).
+        self._level_pairs, self._level_carries = build_level_structure(d)
+        self._use_numba = is_numba_available()
+
     def _generate_rotation(self, d: int) -> np.ndarray:
         """Generate random orthogonal rotation matrix via QR decomposition.
 
@@ -293,8 +303,20 @@ class PolarQuant:
 
         # Rotate all segments: float32 × float32 BLAS SGEMM, ~0.45ms for (4608,128)@(128,128).
         # _rotation_T is pre-stored as a C-contiguous float32 array to ensure SGEMM path.
-        current = segs @ self._rotation_T   # (n_segs, d)
+        rotated = segs @ self._rotation_T   # (n_segs, d)
 
+        if self._use_numba:
+            # Numba path: all 7 levels fused in one prange kernel.
+            # Eliminates Python dispatch between levels and intermediate allocations.
+            return _compress_polar_numba(
+                rotated,
+                self._n_levels,
+                self._lut_scale_full,
+                self._lut_scale_pos,
+            )
+
+        # Numpy fallback (always correct, used when numba unavailable)
+        current = rotated
         level_idx = 0
         all_angle_cols: List[np.ndarray] = []
 
@@ -303,29 +325,26 @@ class PolarQuant:
             n_pairs = n_cur // 2
             has_carry = (n_cur % 2 == 1)
 
-            x = current[:, 0:2 * n_pairs:2]   # (n_segs, n_pairs)
-            y = current[:, 1:2 * n_pairs:2]   # (n_segs, n_pairs)
+            x = current[:, 0:2 * n_pairs:2]
+            y = current[:, 1:2 * n_pairs:2]
+            r     = np.sqrt(x * x + y * y)
+            theta = np.arctan2(y, x)
 
-            r     = np.sqrt(x * x + y * y)    # (n_segs, n_pairs)
-            theta = np.arctan2(y, x)           # (n_segs, n_pairs) — ufunc, SIMD
-
-            # LUT quantization: analytical floor — O(n·pairs), no 3-D broadcast.
             if level_idx == 0:
                 k = np.floor((theta + math.pi) * self._lut_scale_full)
             else:
                 k = np.floor(theta * self._lut_scale_pos)
-            indices = np.clip(k, 0, self._n_levels - 1).astype(np.uint8)  # (n_segs, n_pairs)
+            indices = np.clip(k, 0, self._n_levels - 1).astype(np.uint8)
             all_angle_cols.append(indices)
 
             if has_carry:
                 current = np.concatenate([r, current[:, -1:]], axis=1)
             else:
                 current = r
-
             level_idx += 1
 
-        final_radii = current[:, 0].astype(np.float32)                  # (n_segs,)
-        all_indices = np.concatenate(all_angle_cols, axis=1)            # (n_segs, d-1)
+        final_radii = current[:, 0].astype(np.float32)
+        all_indices = np.concatenate(all_angle_cols, axis=1)
         return final_radii, all_indices
 
     def decompress_batch(
@@ -369,33 +388,47 @@ class PolarQuant:
         # Reverse through levels
         current = radii[:, None].astype(np.float32)   # (n_segs, 1)
 
-        for rev_idx, (q_idx, has_carry) in enumerate(
-                zip(reversed(level_indices), reversed(carries))):
-            real_level = len(level_sizes) - 1 - rev_idx
-            # Lookup precomputed cos/sin — no transcendental calls, pure indexing.
-            idx = q_idx.astype(np.intp)             # (n_segs, n_pairs)
-            if real_level == 0:
-                cos_vals = self._cos_grid_full[idx]
-                sin_vals = self._sin_grid_full[idx]
-            else:
-                cos_vals = self._cos_grid_pos[idx]
-                sin_vals = self._sin_grid_pos[idx]
+        if self._use_numba:
+            # Numba path: all levels fused, cos/sin lookup tables, prange parallel.
+            reconstructed = _decompress_polar_numba(
+                radii,
+                all_indices,
+                self._level_pairs,
+                self._level_carries,
+                self._cos_grid_full,
+                self._sin_grid_full,
+                self._cos_grid_pos,
+                self._sin_grid_pos,
+            )
+        else:
+            # Numpy fallback
+            for rev_idx, (q_idx, has_carry) in enumerate(
+                    zip(reversed(level_indices), reversed(carries))):
+                real_level = len(level_sizes) - 1 - rev_idx
+                idx = q_idx.astype(np.intp)
+                if real_level == 0:
+                    cos_vals = self._cos_grid_full[idx]
+                    sin_vals = self._sin_grid_full[idx]
+                else:
+                    cos_vals = self._cos_grid_pos[idx]
+                    sin_vals = self._sin_grid_pos[idx]
 
-            n_pairs = cos_vals.shape[1]
-            r_pairs = current[:, :n_pairs]          # (n_segs, n_pairs)
+                n_pairs = cos_vals.shape[1]
+                r_pairs = current[:, :n_pairs]
 
-            # Expand: (r, θ) → (r·cos θ, r·sin θ)
-            expanded = np.empty((len(radii), 2 * n_pairs), dtype=np.float32)
-            expanded[:, 0::2] = r_pairs * cos_vals
-            expanded[:, 1::2] = r_pairs * sin_vals
+                expanded = np.empty((len(radii), 2 * n_pairs), dtype=np.float32)
+                expanded[:, 0::2] = r_pairs * cos_vals
+                expanded[:, 1::2] = r_pairs * sin_vals
 
-            if has_carry:
-                current = np.concatenate([expanded, current[:, -1:]], axis=1)
-            else:
-                current = expanded
+                if has_carry:
+                    current = np.concatenate([expanded, current[:, -1:]], axis=1)
+                else:
+                    current = expanded
+
+            reconstructed = current
 
         # Inverse rotation: float32 × float32 BLAS SGEMM
-        return (current @ self._rotation).astype(np.float32)
+        return (reconstructed @ self._rotation).astype(np.float32)
 
 
 # ---------------------------------------------------------------------------
