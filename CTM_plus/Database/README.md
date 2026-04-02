@@ -1,52 +1,74 @@
-# CTM+ Adaptive Eviction Policy
+# CTM+ KV Cache Policy Simulator
 
-A sampled multi-signal eviction policy for research and benchmarking.
+A lightweight simulator that models LLM inference access patterns and
+evaluates eviction policies. Research tool, not production code.
 
-**This is NOT a database buffer pool or storage system.** It makes eviction
-decisions only — it does not manage memory, I/O, or actual page data.
+## Simulation Model
 
-## Algorithm
+**Prefill phase:** Sequence writes KV blocks sequentially (bulk allocation,
+no reuse). Large bursts that can flood the cache.
 
-Sampled ARC variant with 4-signal weighted scoring:
+**Decode phase:** Each new token attends to all prior tokens. Attention
+follows observed LLM patterns:
+- ~15% on first few positions (attention sinks)
+- ~55% on recent window
+- ~30% spread across middle positions
 
-1. **Recency** (0.40) — normalized time since last access
-2. **Frequency** (0.35) — saturated access count
-3. **Correlation** (0.15) — transition affinity with buffered pages
-4. **Page type** (0.10) — bonus for index pages, penalty for dirty pages
+Block statistics (cumulative attention, access count, recency) are updated
+based on the attention distribution.
 
-ARC-style dual ghost caches (B1/B2) adaptively shift the recency/frequency
-balance based on which evicted pages get re-requested.
+**Eviction:** When KV cache exceeds memory budget, the policy selects
+victim blocks. Sink blocks are pinned and never evicted.
+
+## Policies
+
+| Policy | Algorithm |
+|--------|-----------|
+| LRU | Evict least recently accessed block |
+| FIFO | Evict oldest admitted block |
+| Random | Evict uniformly at random |
+| **CTM+** | Attention-aware: 4-signal weighted scoring (attention 0.35, position 0.30, recency 0.25, frequency 0.10) with sampled victim selection |
 
 ## Usage
 
 ```python
-from ctm_plus_db import AdaptiveEvictionPolicy, EvictionConfig
+from ctm_plus_db import KVCacheSimulator, PolicyType, compare_policies
 
-policy = AdaptiveEvictionPolicy(
-    capacity=10000,
-    config=EvictionConfig.for_random_access(),
+# Single simulation
+sim = KVCacheSimulator(max_blocks=256, policy_type=PolicyType.CTM_PLUS)
+sim.add_sequence(seq_id=0, context_length=512)
+sim.prefill_sequence(0)
+for _ in range(128):
+    sim.decode_step(0)
+print(sim.get_metrics())
+
+# Compare all policies on same workload
+results = compare_policies(
+    max_blocks=256,
+    num_sequences=4,
+    context_length=512,
+    decode_steps=128,
 )
-
-# Record accesses
-is_hit, prefetch_hints = policy.access(page_id=42)
-
-# Get eviction victim
-victim = policy.select_victim()
-
-# Pin/unpin, dirty tracking
-policy.pin(page_id=42)
-policy.mark_dirty(page_id=42)
-
-# Statistics
-stats = policy.get_stats()
-print(f"Hit rate: {stats['hit_rate']:.2%}")
+for policy, metrics in results.items():
+    print(f"{policy}: eviction_accuracy={metrics['eviction_accuracy']:.2%}")
 ```
 
-## Configuration Presets
+## Metrics
 
-| Preset | Use case |
-|--------|----------|
-| `EvictionConfig()` | Default balanced weights |
-| `EvictionConfig.for_random_access()` | Random point lookups |
-| `EvictionConfig.for_sequential()` | Sequential scans |
-| `EvictionConfig.for_mixed()` | Mixed access patterns |
+| Metric | Description |
+|--------|-------------|
+| `eviction_accuracy` | Fraction of evictions that targeted low-value (filler) blocks |
+| `important_evictions` | Count of evicted sink/entity blocks (lower is better) |
+| `retention_rate` | Fraction of allocated blocks still in cache |
+| `block_type_distribution` | Current cache composition (sink/entity/recent/filler) |
+| `recompute_cost` | Tokens in evicted blocks that were later needed |
+
+## Configuration
+
+```python
+from ctm_plus_db import SimulationConfig
+
+config = SimulationConfig.for_long_context()  # 8K-32K+ sequences
+config = SimulationConfig.for_short_context() # chatbot turns
+config = SimulationConfig.for_batch()         # many concurrent sequences
+```

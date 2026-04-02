@@ -1,24 +1,41 @@
 """
-CTM+ Adaptive Eviction Policy.
+CTM+ KV Cache Policy Simulator.
 
-A sampled multi-signal eviction policy for research and benchmarking.
-This is NOT a database buffer pool or storage system — it only makes
-eviction decisions based on page access metadata.
+A lightweight simulator that models LLM inference access patterns
+and evaluates eviction policies. Research tool, not production code.
 
 Usage:
-    from ctm_plus_db import AdaptiveEvictionPolicy, EvictionConfig
+    from ctm_plus_db import KVCacheSimulator, PolicyType, compare_policies
 
-    policy = AdaptiveEvictionPolicy(capacity=10000)
-    is_hit, prefetch = policy.access(page_id=42)
-    victim = policy.select_victim()
+    # Single run
+    sim = KVCacheSimulator(max_blocks=256, policy_type=PolicyType.CTM_PLUS)
+    sim.add_sequence(seq_id=0, context_length=512)
+    sim.prefill_sequence(0)
+    for _ in range(128):
+        sim.decode_step(0)
+    print(sim.get_metrics())
+
+    # Compare all policies
+    results = compare_policies(max_blocks=256, num_sequences=4)
 """
 
-from .buffer_pool import AdaptiveEvictionPolicy, PageType
-from .config import EvictionConfig
+from .buffer_pool import (
+    KVCacheSimulator,
+    PolicyType,
+    BlockType,
+    Phase,
+    compare_policies,
+    run_workload,
+)
+from .config import SimulationConfig
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
-    "AdaptiveEvictionPolicy",
-    "EvictionConfig",
-    "PageType",
+    "KVCacheSimulator",
+    "PolicyType",
+    "BlockType",
+    "Phase",
+    "SimulationConfig",
+    "compare_policies",
+    "run_workload",
 ]

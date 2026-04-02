@@ -1,86 +1,51 @@
 """
-Configuration for the adaptive eviction policy.
+Configuration for KV cache eviction simulation.
 
-Scoring weights control victim selection. They should sum to 1.0.
-Signals: recency, frequency, correlation, page_type.
+Parameters control the simulated LLM inference workload and
+attention-aware eviction policy behavior.
 """
 
 from dataclasses import dataclass
 
 
 @dataclass
-class EvictionConfig:
+class SimulationConfig:
     """
-    Configuration for AdaptiveEvictionPolicy.
+    Parameters for KVCacheSimulator.
 
-    Weights control how the 4 scoring signals contribute to eviction decisions.
-    Higher weight = more influence on which pages are kept.
+    Structural:
+        block_size: Tokens per KV block.
+        sink_tokens: Number of initial positions treated as attention sinks.
+        recent_window: Number of recent positions protected from eviction.
+
+    Policy (CTM+ only):
+        victim_sample_size: Blocks sampled for victim selection.
+        entity_attention_threshold: Cumulative attention above which
+            a block is classified as ENTITY (protected).
     """
 
-    # Victim selection
+    block_size: int = 16
+    sink_tokens: int = 4
+    recent_window: int = 128
     victim_sample_size: int = 48
-    enable_smart_victim: bool = True
-
-    # Shadow tier (ghost cache) size
-    shadow_size: int = 2048
-
-    # Access pattern tracking
-    neighbor_window: int = 32
-
-    # Page type modifiers (added to page_type signal, not standalone weights)
-    dirty_page_penalty: float = 0.3
-    index_page_bonus: float = 0.2
-
-    # ARC adaptation
-    adaptive_p_learning_rate: float = 0.1
-    initial_p: float = 0.5
-
-    # Scoring weights (must sum to 1.0)
-    weight_recency: float = 0.40
-    weight_frequency: float = 0.35
-    weight_correlation: float = 0.15
-    weight_page_type: float = 0.10
-
-    # Prefetching
-    prefetch_enabled: bool = True
-    prefetch_distance: int = 8
-    sequential_threshold: int = 4
-
-    # Write-back hint
-    lazy_write_threshold: float = 0.8
+    entity_attention_threshold: float = 0.02
 
     @classmethod
-    def for_random_access(cls) -> "EvictionConfig":
-        """Tuned for random access patterns (e.g. OLTP-like index lookups)."""
+    def for_short_context(cls) -> "SimulationConfig":
+        """Short sequences (≤2K tokens), e.g. chatbot turns."""
+        return cls(recent_window=64, victim_sample_size=32)
+
+    @classmethod
+    def for_long_context(cls) -> "SimulationConfig":
+        """Long sequences (8K–32K+), entity-heavy documents."""
         return cls(
+            sink_tokens=8,
+            recent_window=512,
             victim_sample_size=64,
-            weight_recency=0.45,
-            weight_frequency=0.35,
-            weight_correlation=0.10,
-            weight_page_type=0.10,
-            prefetch_enabled=False,
-            dirty_page_penalty=0.4,
+            entity_attention_threshold=0.01,
         )
 
     @classmethod
-    def for_sequential(cls) -> "EvictionConfig":
-        """Tuned for sequential scan patterns (e.g. OLAP-like full scans)."""
-        return cls(
-            victim_sample_size=32,
-            weight_recency=0.30,
-            weight_frequency=0.30,
-            weight_correlation=0.25,
-            weight_page_type=0.15,
-            prefetch_enabled=True,
-            prefetch_distance=16,
-            sequential_threshold=2,
-        )
-
-    @classmethod
-    def for_mixed(cls) -> "EvictionConfig":
-        """Balanced for mixed access patterns."""
-        return cls(
-            victim_sample_size=48,
-            prefetch_enabled=True,
-            prefetch_distance=4,
-        )
+    def for_batch(cls) -> "SimulationConfig":
+        """High-throughput batch inference with many concurrent sequences."""
+        return cls(recent_window=256, victim_sample_size=64)
