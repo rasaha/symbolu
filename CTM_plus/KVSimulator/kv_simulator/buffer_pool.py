@@ -85,7 +85,8 @@ class Sequence:
     context_length: int                 # total tokens to process
     generated_tokens: int = 0           # tokens generated so far
     phase: Phase = Phase.PREFILL
-    block_ids: List[int] = field(default_factory=list)
+    block_ids: Set[int] = field(default_factory=set)
+    last_block_id: int = -1             # most recently appended block
     prefill_done: bool = False
     evicted_positions: int = 0          # token positions lost to eviction
 
@@ -208,10 +209,10 @@ class EvictionPolicy:
         pass
     def on_block_attention(
         self, block_id: int, block: KVBlock,
-        position_attention: Dict[int, float],
+        attention_sum: float,
         sequence_id: int, seq_len: int,
     ) -> None:
-        """Called with per-position attention weights each decode step."""
+        """Called with block-level attention sum each decode step."""
         self.on_access(block_id, block)
     def on_sequence_register(self, seq_id: int, context_length: int) -> None:
         pass
@@ -330,8 +331,8 @@ class KVPolicyAdapter(EvictionPolicy):
     Adapter that bridges KVCachePolicy (from KVPolicy module) to the
     simulator's EvictionPolicy interface.
 
-    Aggregates per-position attention to block-level sum before forwarding
-    to KVCachePolicy. Maps select_victim() to select_victims(count=1).
+    Forwards block-level attention sum directly to KVCachePolicy.
+    Maps select_victim() to select_victims(count=1).
     """
 
     def __init__(self, kv_policy):
@@ -344,8 +345,7 @@ class KVPolicyAdapter(EvictionPolicy):
     def on_admit(self, block_id, block):
         self._policy.ensure_block(block_id, block.sequence_id, block.token_positions)
 
-    def on_block_attention(self, block_id, block, position_attention, sequence_id, seq_len):
-        attention_sum = sum(position_attention.values())
+    def on_block_attention(self, block_id, block, attention_sum, sequence_id, seq_len):
         self._policy.on_block_attention(
             block_id=block_id,
             attention_sum=attention_sum,
@@ -445,6 +445,8 @@ class KVCacheSimulator:
         self.sequences: Dict[int, Sequence] = {}
         self._next_block_id = 0
         self._step = 0
+        self._attn_sum = 0.0          # running sum of avg_attention across updates
+        self._attn_count = 0          # number of attention updates
 
         # Metrics
         self.stats = {
@@ -502,7 +504,8 @@ class KVCacheSimulator:
                 self._evict()
 
             bid = self._allocate_block(seq_id, positions)
-            seq.block_ids.append(bid)
+            seq.block_ids.add(bid)
+            seq.last_block_id = bid
 
             # Classify block type
             block = self.blocks[bid]
@@ -547,27 +550,28 @@ class KVCacheSimulator:
                     seq.evicted_positions += self.block_size
                     self._evicted_block_ids.discard(bid)
                 # Remove from sequence to avoid re-counting
-                seq.block_ids.remove(bid)
+                seq.block_ids.discard(bid)
                 continue
 
             # Block is present — cache hit
             self.stats["decode_block_hits"] += 1
             block = self.blocks[bid]
 
-            # Compute per-position attention for this block
-            pos_attn = {
-                p: attention[p]
-                for p in block.token_positions
-                if p < len(attention) and attention[p] > 0
-            }
-            block_attn = sum(pos_attn.values())
+            # Block-level attention: sum over block's position range
+            attn_len = len(attention)
+            block_attn = 0.0
+            for p in block.token_positions:
+                if p < attn_len:
+                    block_attn += attention[p]
             if block_attn > 0:
                 block.cumulative_attention += block_attn
                 block.access_count += 1
                 block.last_access_step = self._step
                 self.stats["attention_events"] += 1
+                self._attn_sum += block.avg_attention
+                self._attn_count += 1
                 self.policy.on_block_attention(
-                    bid, block, pos_attn, seq_id, current_len,
+                    bid, block, block_attn, seq_id, current_len,
                 )
 
                 # Reclassify based on attention
@@ -580,8 +584,7 @@ class KVCacheSimulator:
         )
         if not needs_new_block:
             # Check if last block was evicted — need a new block instead
-            last_bid = seq.block_ids[-1]
-            if last_bid not in self.blocks:
+            if seq.last_block_id not in self.blocks:
                 needs_new_block = True
 
         if needs_new_block:
@@ -589,11 +592,19 @@ class KVCacheSimulator:
             while len(self.blocks) >= self.max_blocks:
                 self._evict()
             bid = self._allocate_block(seq_id, [new_position])
-            seq.block_ids.append(bid)
+            seq.block_ids.add(bid)
+            seq.last_block_id = bid
         else:
             # Append position to the last block
-            last_bid = seq.block_ids[-1]
-            self.blocks[last_bid].token_positions.append(new_position)
+            self.blocks[seq.last_block_id].token_positions.append(new_position)
+
+    @property
+    def _entity_threshold(self) -> float:
+        """Adaptive entity threshold: global_mean * 2.0, with floor of 0.02."""
+        if self._attn_count > 0:
+            global_mean = self._attn_sum / self._attn_count
+            return max(0.02, global_mean * 2.0)
+        return 0.02
 
     # ---- Internal ----
 
@@ -638,7 +649,7 @@ class KVCacheSimulator:
             self.pinned.add(block.block_id)
         elif min_pos >= seq_len - self.recent_window:
             block.block_type = BlockType.RECENT
-        elif block.avg_attention > 0.02:
+        elif block.avg_attention > self._entity_threshold:
             block.block_type = BlockType.ENTITY
         else:
             block.block_type = BlockType.FILLER

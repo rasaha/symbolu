@@ -179,6 +179,9 @@ class KVCachePolicy:
         self.pinned_blocks: Set[int] = set()
 
         self._step = 0
+        self._ema_sum = 0.0       # running sum of block.attention_ema values
+        self._ema_count = 0       # number of attention updates
+        self._entity_k = 2.0     # entity = ema > global_mean * k
 
         self.stats = {
             "evictions": 0,
@@ -243,6 +246,10 @@ class KVCachePolicy:
         block.access_count += 1
         block.last_access_step = self._step
 
+        # Track global attention mean for adaptive entity threshold
+        self._ema_sum += block.attention_ema
+        self._ema_count += 1
+
         # Pin sinks
         if position < self.sink_tokens:
             block.is_sink = True
@@ -288,6 +295,10 @@ class KVCachePolicy:
         )
         block.access_count += 1
         block.last_access_step = self._step
+
+        # Track global attention mean for adaptive entity threshold
+        self._ema_sum += block.attention_ema
+        self._ema_count += 1
 
         # Sequence tracking
         if sequence_id in self.sequences:
@@ -360,7 +371,7 @@ class KVCachePolicy:
         )
 
         # Entity bonus — protect high-attention non-sink blocks
-        if not block.is_sink and block.attention_ema > self.entity_threshold:
+        if not block.is_sink and block.attention_ema > self._adaptive_threshold:
             score += 0.5
 
         return score
@@ -417,6 +428,14 @@ class KVCachePolicy:
 
     # ---- Internal helpers ----
 
+    @property
+    def _adaptive_threshold(self) -> float:
+        """Adaptive entity threshold: global_mean * k, with floor."""
+        if self._ema_count > 0:
+            global_mean = self._ema_sum / self._ema_count
+            return max(self.entity_threshold, global_mean * self._entity_k)
+        return self.entity_threshold
+
     def _classify_block(self, block: BlockState) -> float:
         """
         Classify block as sink/entity/filler. Returns importance [0, 1].
@@ -424,7 +443,7 @@ class KVCachePolicy:
         """
         if block.is_sink:
             return 1.0
-        if block.attention_ema > self.entity_threshold:
+        if block.attention_ema > self._adaptive_threshold:
             return 0.8
         return 0.1
 
@@ -435,7 +454,7 @@ class KVCachePolicy:
             return False
         if block.is_sink:
             return False
-        return block.attention_ema <= self.entity_threshold
+        return block.attention_ema <= self._adaptive_threshold
 
     def get_stats(self) -> Dict[str, Any]:
         return {
