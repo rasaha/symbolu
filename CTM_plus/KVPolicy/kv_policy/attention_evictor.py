@@ -6,8 +6,8 @@ It does NOT manage memory, I/O, or block allocation — those are handled
 by the serving engine (e.g. vLLM's BlockSpaceManager).
 
 Signals used for scoring:
-  1. Attention value — cumulative attention received by tokens in the block
-  2. Position importance — sink/entity/recent/filler classification
+  1. Attention — EMA of attention weights at block level
+  2. Block importance — sink/entity/filler classification
   3. Frequency — Count-Min Sketch for O(1) approximate block access count
   4. Recency — exponential decay of time since last access
 
@@ -100,32 +100,17 @@ class InferencePhase(Enum):
 @dataclass
 class BlockState:
     """
-    Per-block metadata. Stores per-position attention (up to block_size
-    entries, typically 16) instead of per-token objects.
+    Per-block metadata. Pure block-level aggregates — no per-position storage.
     """
     block_id: int
     sequence_id: int
-    token_attention: Dict[int, float] = field(default_factory=dict)
+    attention_sum: float = 0.0
+    attention_ema: float = 0.0
+    token_count: int = 0
     created_step: int = 0
     last_access_step: int = 0
     access_count: int = 0
-
-    @property
-    def positions(self) -> list:
-        return list(self.token_attention.keys())
-
-    @property
-    def num_tokens(self) -> int:
-        return len(self.token_attention)
-
-    @property
-    def total_attention(self) -> float:
-        return sum(self.token_attention.values())
-
-    @property
-    def avg_attention(self) -> float:
-        n = len(self.token_attention)
-        return sum(self.token_attention.values()) / n if n else 0.0
+    is_sink: bool = False
 
 
 @dataclass
@@ -165,9 +150,9 @@ class KVCachePolicy:
       - score_block(block_id) -> float   (lower = evict first)
       - select_victims(count) -> list    (returns block_ids to evict)
 
-    Tracks per-block state incrementally. Each block stores per-position
-    attention (up to block_size entries, typically 16). No per-token dict,
-    no periodic recomputation — scores are always current.
+    Tracks per-block state incrementally via block-level aggregates
+    (attention_sum, attention_ema, token_count). No per-token or
+    per-position storage — scores are always current and O(1).
     """
 
     def __init__(
@@ -233,9 +218,8 @@ class KVCachePolicy:
         """
         Record an attention event for a token.
 
-        Aggregates directly into BlockState. The token_id parameter is
-        accepted for API compatibility but not stored — tracking is
-        by (block_id, position).
+        Aggregates into block-level sums. The token_id and position
+        parameters are accepted for API compatibility.
         """
         self._step += 1
 
@@ -249,19 +233,19 @@ class KVCachePolicy:
             )
             self.blocks[block_id] = block
 
-        # Update per-position attention (EMA)
-        prev = block.token_attention.get(position, 0.0)
-        block.token_attention[position] = (
+        # Block-level aggregates
+        block.attention_sum += attention_weight
+        block.attention_ema = (
             self.ema_alpha * attention_weight +
-            (1 - self.ema_alpha) * prev
+            (1 - self.ema_alpha) * block.attention_ema
         )
-
-        # Update block-level stats
+        block.token_count += 1
         block.access_count += 1
         block.last_access_step = self._step
 
         # Pin sinks
         if position < self.sink_tokens:
+            block.is_sink = True
             self.pinned_blocks.add(block_id)
 
         # Sequence tracking
@@ -282,9 +266,8 @@ class KVCachePolicy:
         """
         Record attention for an entire block in one call.
 
-        Equivalent to calling on_token_access for each position, but
-        with O(1) overhead for step/freq/sequence bookkeeping instead
-        of O(block_size).
+        Aggregates position_attention into block-level sums.
+        O(1) bookkeeping per call (EMA uses mean of incoming weights).
         """
         self._step += 1
 
@@ -298,19 +281,23 @@ class KVCachePolicy:
             )
             self.blocks[block_id] = block
 
-        # Bulk EMA update for all positions
-        alpha = self.ema_alpha
-        one_minus_alpha = 1 - alpha
-        for pos, attn in position_attention.items():
-            prev = block.token_attention.get(pos, 0.0)
-            block.token_attention[pos] = alpha * attn + one_minus_alpha * prev
+        # Block-level aggregates from position map
+        total = sum(position_attention.values())
+        n = len(position_attention)
+        mean_attn = total / n if n else 0.0
 
-        # Block-level stats — once per block, not per position
+        block.attention_sum += total
+        block.attention_ema = (
+            self.ema_alpha * mean_attn +
+            (1 - self.ema_alpha) * block.attention_ema
+        )
+        block.token_count = max(block.token_count, n)
         block.access_count += 1
         block.last_access_step = self._step
 
         # Pin if any position is a sink
         if any(pos < self.sink_tokens for pos in position_attention):
+            block.is_sink = True
             self.pinned_blocks.add(block_id)
 
         # Sequence tracking
@@ -328,17 +315,17 @@ class KVCachePolicy:
         """
         if block_id not in self.blocks:
             self._step += 1
+            is_sink = any(pos < self.sink_tokens for pos in positions)
             block = BlockState(
                 block_id=block_id,
                 sequence_id=sequence_id,
                 created_step=self._step,
+                token_count=len(positions),
+                is_sink=is_sink,
             )
-            # Seed positions with zero attention
-            for pos in positions:
-                block.token_attention[pos] = 0.0
             self.blocks[block_id] = block
 
-            if any(pos < self.sink_tokens for pos in positions):
+            if is_sink:
                 self.pinned_blocks.add(block_id)
 
             if sequence_id in self.sequences:
@@ -351,7 +338,7 @@ class KVCachePolicy:
     def score_block(self, block_id: int) -> float:
         """
         Score a single block for eviction. Lower = evict first.
-        Reads directly from BlockState — always current.
+        O(1) — uses only block-level aggregates.
         """
         block = self.blocks.get(block_id)
         if not block:
@@ -364,19 +351,17 @@ class KVCachePolicy:
         if not w:
             return -1.0
 
-        seq_len = len(seq.block_ids) * self.block_size if seq else 0
-
         # Signal 1: Recency — exponential decay
         recency = math.exp(-0.01 * (self._step - block.last_access_step))
 
         # Signal 2: Frequency — Count-Min Sketch
         frequency = min(1.0, self.freq_sketch.estimate(block_id) / 10.0)
 
-        # Signal 3: Attention — average per-position attention
-        attention = block.avg_attention
+        # Signal 3: Attention — EMA of attention weights
+        attention = block.attention_ema
 
-        # Signal 4: Position importance — classify each position in block
-        importance = self._block_importance(block, seq_len)
+        # Signal 4: Block importance — sink/entity/filler classification
+        importance = self._classify_block(block)
 
         score = (
             w.recency * recency +
@@ -385,13 +370,9 @@ class KVCachePolicy:
             w.position * importance
         )
 
-        # Entity bonus — protect blocks with high-attention positions
-        entity_count = sum(
-            1 for pos, attn in block.token_attention.items()
-            if pos >= self.sink_tokens and attn > self.entity_threshold
-        )
-        if entity_count > 0:
-            score += 0.5 * (entity_count / max(1, block.num_tokens))
+        # Entity bonus — protect high-attention non-sink blocks
+        if not block.is_sink and block.attention_ema > self.entity_threshold:
+            score += 0.5
 
         return score
 
@@ -447,43 +428,25 @@ class KVCachePolicy:
 
     # ---- Internal helpers ----
 
-    def _classify_position(self, position: int, seq_len: int, attention: float) -> PositionClass:
-        if position < self.sink_tokens:
-            return PositionClass.SINK
-        if seq_len > 0 and position >= seq_len - self.recent_window:
-            return PositionClass.RECENT
-        if attention > self.entity_threshold:
-            return PositionClass.ENTITY
-        return PositionClass.FILLER
-
-    def _block_importance(self, block: BlockState, seq_len: int) -> float:
-        """Classify each position in the block, return weighted importance [0, 1]."""
-        if not block.token_attention:
-            return 0.0
-        weights = {
-            PositionClass.SINK: 1.0,
-            PositionClass.ENTITY: 0.8,
-            PositionClass.RECENT: 0.6,
-            PositionClass.FILLER: 0.1,
-        }
-        total = 0.0
-        for pos, attn in block.token_attention.items():
-            cls = self._classify_position(pos, seq_len, attn)
-            total += weights[cls]
-        return total / len(block.token_attention)
+    def _classify_block(self, block: BlockState) -> float:
+        """
+        Classify block as sink/entity/filler. Returns importance [0, 1].
+        O(1) — no per-position iteration.
+        """
+        if block.is_sink:
+            return 1.0
+        if block.attention_ema > self.entity_threshold:
+            return 0.8
+        return 0.1
 
     def _is_all_filler(self, block_id: int) -> bool:
-        """Check if every position in the block is FILLER."""
+        """Check if block is filler (not sink, low attention)."""
         block = self.blocks.get(block_id)
-        if not block or not block.token_attention:
+        if not block:
             return False
-        seq = self.sequences.get(block.sequence_id)
-        seq_len = len(seq.block_ids) * self.block_size if seq else 0
-        for pos, attn in block.token_attention.items():
-            cls = self._classify_position(pos, seq_len, attn)
-            if cls != PositionClass.FILLER:
-                return False
-        return True
+        if block.is_sink:
+            return False
+        return block.attention_ema <= self.entity_threshold
 
     def get_stats(self) -> Dict[str, Any]:
         return {
