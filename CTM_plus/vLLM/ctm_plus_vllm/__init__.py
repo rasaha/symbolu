@@ -1,46 +1,29 @@
 """
-CTM+ Integration for vLLM.
+CTM+ KV Cache Eviction Policy.
 
-Provides intelligent KV cache block eviction for PagedAttention,
-optimizing memory usage for LLM inference workloads.
+A scoring-only eviction policy for LLM KV cache blocks.
+This module does NOT manage memory, I/O, or block allocation — it only
+decides which blocks to evict based on attention, position, frequency,
+recency, and sequence priority signals.
+
+Integration point: vLLM's Evictor abstract base class.
 
 Usage:
-    from ctm_plus_vllm import CTMBlockSpaceManager, CTMEvictionPolicy
+    from ctm_plus_vllm import KVCachePolicy
 
-    # Replace vLLM's default block manager
-    block_manager = CTMBlockSpaceManager(
-        block_size=16,
-        num_gpu_blocks=1000,
-        num_cpu_blocks=10000,
-    )
-
-Benchmarking:
-    python -m ctm_plus_vllm.benchmark_cli compare --seq-len 4096 --cache-ratio 0.5
+    policy = KVCachePolicy(max_blocks=2048)
+    policy.register_sequence(seq_id=1)
+    policy.on_token_access(token_id=0, position=0, sequence_id=1, block_id=0)
+    victims = policy.select_victims(count=4)
 """
 
-from .evictor import CTMEvictionPolicy
-from .block_manager import CTMBlockSpaceManager
-from .config import CTMvLLMConfig
-from .kv_cache_simulator import (
-    KVCacheSimulator,
-    CTMKVConfig,
-    EvictionPolicy,
-    WorkloadGenerator,
-    AttentionPatternGenerator,
-    run_benchmark,
-    quality_preservation_test,
-)
+from .attention_evictor import KVCachePolicy, InferencePhase, PositionClass
+from .config import KVCachePolicyConfig
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
-    "CTMEvictionPolicy",
-    "CTMBlockSpaceManager",
-    "CTMvLLMConfig",
-    "KVCacheSimulator",
-    "CTMKVConfig",
-    "EvictionPolicy",
-    "WorkloadGenerator",
-    "AttentionPatternGenerator",
-    "run_benchmark",
-    "quality_preservation_test",
+    "KVCachePolicy",
+    "KVCachePolicyConfig",
+    "InferencePhase",
+    "PositionClass",
 ]
