@@ -398,16 +398,16 @@ __global__ void mm_kernel_fused_score_collect(
  * Cooperative threading (demote blocks — ALL 128 threads participate):
  *   Phase 0: Thread 0 pops CXL slot, broadcasts via shared memory
  *   Phase 1: 128 threads load FP16→FP32 cooperatively (1 elem/thread)
- *   Phase 2: 128 threads compute rotation GEMV (1 output row/thread)
- *            via d_rotation (global/L2), not __constant__ (avoids 32× serialization)
+ *   Phase 2: Tiled rotation GEMV — 128×32 tiles loaded cooperatively into
+ *            shared memory (coalesced), then dot products from smem (no bank conflicts)
  *   Phase 3: Tree-parallel polar transform (64→32→16→...→1 active threads)
  *            Ping-pong shared memory buffers, angles written to CXL global
- *   Phase 4: 128 threads compute QJL projections (1 dot/thread),
+ *   Phase 4: Tiled QJL projection (reuses s_tile from Phase 2),
  *            __ballot_sync packs sign bits, __shfl_down_sync reduces scale
  *   Phase 5: Thread 0 writes metadata (cxl_slot, cosine_sim, tier_flags)
  *   Phase 6: Thread 0 updates modality stats
  *
- * Shared memory: ~1.6 KB (s_vec[128] + s_buf_a[128] + s_buf_b[128] + misc)
+ * Shared memory: ~18 KB (s_tile[128][33] + s_vec[128] + s_buf_a/b[128] + misc)
  *
  * Reads d_demote_count / d_evict_count from DEVICE memory (written by kernel 2).
  * No host sync, no D→H readback. CUDA graph capturable (fixed grid).

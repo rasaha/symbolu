@@ -261,9 +261,9 @@ int MultimodalInferenceController::on_decode_step(
     // ========================================================================
     uint32_t n_tokens = n_tier0_tokens_;
 
-    // Zero atomic counters (async memset, no sync)
-    cudaMemset(d_demote_count_, 0, sizeof(uint32_t));
-    cudaMemset(d_evict_count_, 0, sizeof(uint32_t));
+    // Zero atomic counters (async, no host blocking)
+    cudaMemsetAsync(d_demote_count_, 0, sizeof(uint32_t));
+    cudaMemsetAsync(d_evict_count_, 0, sizeof(uint32_t));
 
     {
         uint32_t grid = (n_tokens + MM_SCORE_BLOCK_SIZE - 1) / MM_SCORE_BLOCK_SIZE;
