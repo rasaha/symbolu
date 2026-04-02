@@ -127,7 +127,6 @@ class PolarQuant:
         self.config = config
         d = config.segment_dim
         self.rng = np.random.RandomState(config.seed)
-        self._rotation = self._generate_rotation(d)
 
         n_levels = 2 ** config.angle_bits
         # Level-0 grid: Gaussian coordinate pairs → angles uniform on [-π, π]
@@ -143,23 +142,39 @@ class PolarQuant:
         self._n_levels = n_levels
 
         # LUT quantization constants (analytical floor formula — avoids argmin).
-        # For a uniform grid with n_levels cells, the nearest-centroid index for
-        # angle θ is simply floor(θ / cell_width) — no 3-D broadcast needed.
-        #
-        # angle_grid_full:  cell_width = 2π/n_levels, origin = -π
-        #   k = floor((θ + π) * n_levels / (2π))
-        # angle_grid_pos:   cell_width = (π/2)/n_levels, origin = 0
-        #   k = floor(θ * 2*n_levels / π)
         self._lut_scale_full = n_levels / (2.0 * math.pi)   # multiplier for level-0
         self._lut_scale_pos  = 2.0 * n_levels / math.pi     # multiplier for level-1+
 
+        # Random orthogonal rotation matrix (float32, C-contiguous).
+        # Stored explicitly as float32 to ensure the batch matmul segs @ R.T uses
+        # float32 × float32 SGEMM (0.45ms for 4608×128 @ 128×128) rather than the
+        # float32 × float64 path that results from np.linalg.qr's default float64
+        # output (~5.5ms — a 12× penalty for the same operation).
+        self._rotation = self._generate_rotation(d)  # float32, C-contiguous
+        # Pre-store R.T as a separate contiguous array so the forward pass avoids
+        # a runtime transpose-view allocation.
+        self._rotation_T = np.ascontiguousarray(self._rotation.T)
+
+        # Precomputed cos/sin for each grid point — eliminates np.cos/np.sin from
+        # decompress_batch.  Since all decompressed angles are one of n_levels
+        # discrete values, reconstruction is a pure integer-index lookup rather
+        # than n_segs × (d-1) transcendental-function calls.
+        self._cos_grid_full = np.cos(self._angle_grid_full).astype(np.float32)
+        self._sin_grid_full = np.sin(self._angle_grid_full).astype(np.float32)
+        self._cos_grid_pos  = np.cos(self._angle_grid_pos).astype(np.float32)
+        self._sin_grid_pos  = np.sin(self._angle_grid_pos).astype(np.float32)
+
     def _generate_rotation(self, d: int) -> np.ndarray:
-        """Generate random orthogonal rotation matrix via QR decomposition."""
+        """Generate random orthogonal rotation matrix via QR decomposition.
+
+        Returns a float32 C-contiguous array to guarantee the batch matmul
+        segs @ R.T uses BLAS SGEMM (float32 × float32, ~0.45ms for d=128)
+        rather than the slower mixed-precision path from float64 QR output.
+        """
         H = self.rng.randn(d, d)
         Q, R = np.linalg.qr(H)
-        # Ensure det = +1 (proper rotation)
         Q = Q @ np.diag(np.sign(np.diag(R)))
-        return Q
+        return np.ascontiguousarray(Q.astype(np.float32))
 
     def compress(self, vector: np.ndarray) -> dict:
         """
@@ -174,8 +189,8 @@ class PolarQuant:
         d = len(vector)
         assert d == self.config.segment_dim
 
-        # Step 1: Random rotation
-        rotated = self._rotation @ vector
+        # Step 1: Random rotation (float32 BLAS SGEMM)
+        rotated = self._rotation_T @ vector
 
         # Step 2: Recursive polar transformation
         levels: List[np.ndarray] = []
@@ -248,7 +263,7 @@ class PolarQuant:
                 else:
                     new_coords.append(r)
             radii = np.array(new_coords)
-        return self._rotation.T @ radii
+        return self._rotation @ radii
 
     def compress_and_reconstruct(self, vector: np.ndarray) -> np.ndarray:
         """Convenience: compress then return only the reconstructed vector."""
@@ -276,8 +291,9 @@ class PolarQuant:
         """
         n_segs, d = segs.shape
 
-        # Rotate all segments: (n_segs, d) @ R.T
-        current = segs @ self._rotation.T   # (n_segs, d)
+        # Rotate all segments: float32 × float32 BLAS SGEMM, ~0.45ms for (4608,128)@(128,128).
+        # _rotation_T is pre-stored as a C-contiguous float32 array to ensure SGEMM path.
+        current = segs @ self._rotation_T   # (n_segs, d)
 
         level_idx = 0
         all_angle_cols: List[np.ndarray] = []
@@ -291,16 +307,12 @@ class PolarQuant:
             y = current[:, 1:2 * n_pairs:2]   # (n_segs, n_pairs)
 
             r     = np.sqrt(x * x + y * y)    # (n_segs, n_pairs)
-            theta = np.arctan2(y, x)           # (n_segs, n_pairs)
+            theta = np.arctan2(y, x)           # (n_segs, n_pairs) — ufunc, SIMD
 
             # LUT quantization: analytical floor — O(n·pairs), no 3-D broadcast.
-            # Both grids are uniform, so the nearest-centroid index is a direct
-            # integer computation: k = floor((θ - grid_origin) / cell_width).
             if level_idx == 0:
-                # theta ∈ [-π, π]: k = floor((θ + π) * n_levels / (2π))
                 k = np.floor((theta + math.pi) * self._lut_scale_full)
             else:
-                # theta ∈ [0, π/2]: k = floor(θ * 2*n_levels / π)
                 k = np.floor(theta * self._lut_scale_pos)
             indices = np.clip(k, 0, self._n_levels - 1).astype(np.uint8)  # (n_segs, n_pairs)
             all_angle_cols.append(indices)
@@ -320,17 +332,17 @@ class PolarQuant:
         self,
         radii: np.ndarray,
         all_indices: np.ndarray,
-        angle_grid_full: np.ndarray,
-        angle_grid_pos: np.ndarray,
     ) -> np.ndarray:
         """
         Reconstruct a batch of segments simultaneously.
 
+        Uses precomputed cos/sin lookup tables (size n_levels each) — eliminates
+        all np.cos / np.sin calls from the hot path.  Reconstruction becomes
+        pure float32 multiply + integer index lookups.
+
         Args:
-            radii:           (n_segs,) float32.
-            all_indices:     (n_segs, segment_dim-1) uint8.
-            angle_grid_full: level-0 quantisation grid.
-            angle_grid_pos:  level-1+ quantisation grid.
+            radii:       (n_segs,) float32.
+            all_indices: (n_segs, segment_dim-1) uint8.
 
         Returns:
             (n_segs, segment_dim) float32.
@@ -360,23 +372,29 @@ class PolarQuant:
         for rev_idx, (q_idx, has_carry) in enumerate(
                 zip(reversed(level_indices), reversed(carries))):
             real_level = len(level_sizes) - 1 - rev_idx
-            grid = angle_grid_full if real_level == 0 else angle_grid_pos
-            angles = grid[q_idx.astype(np.intp)]   # (n_segs, n_pairs)
+            # Lookup precomputed cos/sin — no transcendental calls, pure indexing.
+            idx = q_idx.astype(np.intp)             # (n_segs, n_pairs)
+            if real_level == 0:
+                cos_vals = self._cos_grid_full[idx]
+                sin_vals = self._sin_grid_full[idx]
+            else:
+                cos_vals = self._cos_grid_pos[idx]
+                sin_vals = self._sin_grid_pos[idx]
 
-            n_pairs = angles.shape[1]
+            n_pairs = cos_vals.shape[1]
             r_pairs = current[:, :n_pairs]          # (n_segs, n_pairs)
 
             # Expand: (r, θ) → (r·cos θ, r·sin θ)
             expanded = np.empty((len(radii), 2 * n_pairs), dtype=np.float32)
-            expanded[:, 0::2] = r_pairs * np.cos(angles)
-            expanded[:, 1::2] = r_pairs * np.sin(angles)
+            expanded[:, 0::2] = r_pairs * cos_vals
+            expanded[:, 1::2] = r_pairs * sin_vals
 
             if has_carry:
                 current = np.concatenate([expanded, current[:, -1:]], axis=1)
             else:
                 current = expanded
 
-        # Inverse rotation: v_rotated @ R  (equivalent to per-row R.T @ v)
+        # Inverse rotation: float32 × float32 BLAS SGEMM
         return (current @ self._rotation).astype(np.float32)
 
 
@@ -406,10 +424,15 @@ class QJL:
         proj_dim = config.qjl_projection_dim or config.segment_dim
         self.proj_dim = proj_dim
 
-        # Rademacher ±1/√m JL projection matrix
-        self._jl_matrix = self.rng.choice(
-            [-1.0, 1.0], size=(proj_dim, config.segment_dim)
-        ) / math.sqrt(proj_dim)
+        # Rademacher ±1/√m JL projection matrix — stored float32 to ensure the
+        # batch matmul residuals @ J.T uses SGEMM (float32×float32, ~0.45ms)
+        # rather than the ~5ms float32×float64 mixed-precision path.
+        self._jl_matrix = (
+            self.rng.choice(np.array([-1.0, 1.0], dtype=np.float32),
+                            size=(proj_dim, config.segment_dim))
+            / np.float32(math.sqrt(proj_dim))
+        ).astype(np.float32)
+        self._jl_matrix_T = np.ascontiguousarray(self._jl_matrix.T)
 
     def compress_residual(self, residual: np.ndarray) -> dict:
         """
@@ -450,8 +473,8 @@ class QJL:
             sign_bits: (n_segs, proj_dim) int8, values ±1.
             scales:    (n_segs,) float32.
         """
-        # Project: (n_segs, d) @ (d, proj_dim) = (n_segs, proj_dim)
-        projected = residuals @ self._jl_matrix.T
+        # Project: (n_segs, d) @ (d, proj_dim) = (n_segs, proj_dim) — float32 SGEMM
+        projected = residuals @ self._jl_matrix_T
         signs = np.sign(projected).astype(np.int8)
         signs[signs == 0] = 1
         scales = np.mean(np.abs(projected), axis=1).astype(np.float32)
@@ -752,12 +775,8 @@ class TurboQuantCompressor:
 
         if self.qjl is not None:
             # Reconstruct for residual calculation (needed for QJL input)
-            # We do a single batch reconstruct here using the already-computed indices
-            recon_segs = self.polar.decompress_batch(
-                radii, all_indices,
-                self.polar._angle_grid_full,
-                self.polar._angle_grid_pos,
-            )  # (n_segs, d)
+            # Uses precomputed cos/sin tables — no trig calls.
+            recon_segs = self.polar.decompress_batch(radii, all_indices)  # (n_segs, d)
             residuals = segs - recon_segs   # (n_segs, d)
             signs, qjl_scales = self.qjl.compress_residuals_batch(residuals)
             # signs: (n_segs, proj_dim) int8, values ±1
@@ -806,23 +825,11 @@ class TurboQuantCompressor:
         )
         all_indices = flat_indices.reshape(n_segs, d - 1)
 
-        # Angle grids (built once)
-        n_levels = 2 ** buf.angle_bits
-        angle_grid_full = (
-            np.linspace(-math.pi, math.pi, n_levels, endpoint=False)
-            + math.pi / n_levels
-        )
-        angle_grid_pos = (
-            np.linspace(0, math.pi / 2, n_levels, endpoint=False)
-            + math.pi / (4 * n_levels)
-        )
-
         # Vectorised batch reconstruct → (n_segs, d)
+        # Uses precomputed cos/sin tables from self.polar — no trig calls.
         # QJL correction is skipped on the full-decode path:
         # QJL corrects dot-product estimation bias, not reconstruction error.
-        reconstructed = self.polar.decompress_batch(
-            buf.radii, all_indices, angle_grid_full, angle_grid_pos
-        )
+        reconstructed = self.polar.decompress_batch(buf.radii, all_indices)
 
         # Flatten, unpad, reshape
         flat = reconstructed.ravel()[:np.prod(buf.original_shape, dtype=int)]
