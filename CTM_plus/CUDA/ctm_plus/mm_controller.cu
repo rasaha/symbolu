@@ -1,24 +1,22 @@
 /**
  * mm_controller.cu — Host-side MultimodalInferenceController
  *
- * True 3-kernel pipeline per decode step (no mid-step host sync):
+ * TRUE 3-kernel pipeline per decode step (no host sync, no extra kernels):
  *
- *   Kernel 1: mm_kernel_update_on_access           — update metadata + reuse trend
- *   Kernel 2: mm_kernel_fused_score_collect        — score + decide + warp-compact
- *   Kernel 3: mm_kernel_fused_alloc_free_finalize  — alloc CXL + free evicted + stats
+ *   Kernel 1: mm_kernel_update_on_access      — update metadata + reuse trend
+ *   Kernel 2: mm_kernel_fused_score_collect   — score + decide + warp-compact
+ *   Kernel 3: mm_kernel_process_demotions     — alloc + TQ compress + CXL write
+ *                                               + metadata + free evicted + stats
  *
- * Optional Kernel 4 (when vLLM provides KV vector pointer):
- *   mm_kernel_compress_to_cxl — TQ compression + cosine_sim writeback + TQ_COMPRESSED flag
- *
- * Kernels 1-3 have fixed grid dimensions → CUDA graph capturable.
- * Kernel 3 reads demote/evict counts from device memory (set by kernel 2),
- * so there is NO cudaDeviceSynchronize or D→H readback between them.
+ * There is NO optional kernel 4. Compression happens INSIDE kernel 3.
+ * All 3 kernels have fixed grid dimensions → CUDA graph capturable.
+ * Kernel 3 reads demote/evict counts from device memory (written by kernel 2).
  *
  * Per-step GPU operations (over capacity):
  *   1 cudaMemcpy H→D  (32B new TokenMeta)
  *   2 cudaMemset       (zero atomic counters)
- *   3 kernel launches  (update, score+collect, alloc+free+stats)
- *   Total: 6 GPU ops, 0 syncs
+ *   3 kernel launches  (no sync between them)
+ *   Total: 6 GPU ops, 0 host syncs
  */
 
 #include "multimodal_inference.cuh"
@@ -207,6 +205,7 @@ void MultimodalInferenceController::init_cxl_storage() {
 // ============================================================================
 
 int MultimodalInferenceController::on_decode_step(
+    const __half*   d_kv_vectors,
     uint32_t new_position,
     uint8_t  token_type,
     const uint32_t* d_attended_positions,
@@ -229,7 +228,7 @@ int MultimodalInferenceController::on_decode_step(
     new_meta.tier_flags        = MM_FLAG_IN_TIER0 | (is_sink ? MM_FLAG_ANCHOR : 0);
     new_meta.attention_sum     = 0.0f;
     new_meta.attention_count   = 0;
-    new_meta.cosine_sim        = 1.0f;  // not compressed yet
+    new_meta.cosine_sim        = 1.0f;  // uncompressed
     new_meta.reuse_trend       = 0;
     new_meta._reserved         = 0;
     new_meta.cxl_slot          = MM_CXL_SLOT_INVALID;
@@ -249,7 +248,7 @@ int MultimodalInferenceController::on_decode_step(
         );
     }
 
-    // Skip eviction if under capacity — only kernel 1 was needed
+    // Under capacity — kernel 1 was sufficient, no eviction needed
     if (n_tier0_tokens_ <= scoring_config_.tier0_capacity) {
         return 0;
     }
@@ -257,12 +256,12 @@ int MultimodalInferenceController::on_decode_step(
     // ========================================================================
     // KERNEL 2: Fused score + decide + collect (warp-ballot compaction)
     //
-    // Writes d_demote_count, d_evict_count, d_demote_list, d_evict_list
-    // to device memory. Kernel 3 reads them — no host readback needed.
+    // Writes d_demote_list, d_demote_count, d_evict_list, d_evict_count
+    // to device memory. Kernel 3 reads them directly — no host readback.
     // ========================================================================
     uint32_t n_tokens = n_tier0_tokens_;
 
-    // Zero atomic counters before kernel 2 (2 cudaMemset = 2 async memset ops)
+    // Zero atomic counters (async memset, no sync)
     cudaMemset(d_demote_count_, 0, sizeof(uint32_t));
     cudaMemset(d_evict_count_, 0, sizeof(uint32_t));
 
@@ -277,50 +276,39 @@ int MultimodalInferenceController::on_decode_step(
     }
 
     // ========================================================================
-    // KERNEL 3: Fused alloc + free + finalize
+    // KERNEL 3: Process demotions + evictions (fully fused)
     //
-    // Reads d_demote_count / d_evict_count from device memory (written by
-    // kernel 2). No cudaDeviceSynchronize, no D→H readback.
+    // Reads d_demote_count / d_evict_count from device (set by kernel 2).
+    // No cudaDeviceSynchronize. No D→H readback.
     //
-    // Fixed grid size = conservative upper bound. Threads past the actual
-    // count exit immediately. CUDA graph capturable.
+    // For each demote: alloc CXL slot → TQ compress → write CXL → metadata
+    // For each evict:  free CXL slot → clear metadata
+    // All with modality stats updates.
     //
-    // Side effects:
-    //   - Alloc: d_meta[].cxl_slot assigned, tier_flags Tier0→CXL
-    //   - Free:  d_meta[].cxl_slot cleared, tier_flags cleared
-    //   - Stats: d_modality_stats atomically updated
-    //   - d_actions[]: DEMOTE→EVICT if CXL full
+    // Fixed grid = MM_MAX_VICTIMS blocks. Blocks beyond actual work exit
+    // immediately after reading the device-side counts.
     // ========================================================================
     {
-        uint32_t max_items = MM_MAX_VICTIMS * 2;  // demotions + evictions
-        uint32_t grid = (max_items + 127) / 128;
-        mm_kernel_fused_alloc_free_finalize<<<grid, 128>>>(
+        int n_grid = tq_config_.n_grid();
+        int proj_dim = tq_config_.qjl_proj_dim > 0
+                     ? tq_config_.qjl_proj_dim : tq_config_.head_dim;
+
+        mm_kernel_process_demotions<<<MM_MAX_VICTIMS, MM_COMPRESS_BLOCK_SIZE>>>(
+            d_kv_vectors,
             d_meta_,
             d_demote_list_, d_demote_count_,
             d_evict_list_,  d_evict_count_,
-            cxl_, d_actions_, d_modality_stats_
+            cxl_,
+            d_actions_,
+            d_modality_stats_,
+            (uint32_t)tq_config_.head_dim,
+            n_grid,
+            d_jl_matrix_,
+            proj_dim
         );
     }
 
-    // ========================================================================
-    // COMPRESS (optional kernel 4 — requires KV vector pointer from caller)
-    //
-    // The controller does not own the KV cache; the vLLM integration layer
-    // calls compress_to_cxl() after on_decode_step() with the actual KV ptr.
-    //
-    // After compress runs, it must:
-    //   1. Write quantized data to cxl.d_indices, d_radii, d_qjl_bits, d_qjl_scales
-    //   2. Set MM_FLAG_TQ_COMPRESSED in d_meta[].tier_flags
-    //   3. Write cosine_sim to d_meta[] (enables quality-aware scoring signal 6)
-    //
-    // Until compress runs, the CXL slot is reserved but empty. The
-    // MM_FLAG_TQ_COMPRESSED bit is intentionally NOT set by kernel 3 to avoid
-    // the "phantom compression" bug (flag claims compressed, slot is zeros).
-    // ========================================================================
-
-    // Return: eviction was triggered. Exact counts available via get_stats().
-    // No sync here — caller can query stats lazily or call cudaDeviceSynchronize
-    // explicitly if needed.
+    // No sync. No readback. 3 kernels total. Done.
     return 1;
 }
 

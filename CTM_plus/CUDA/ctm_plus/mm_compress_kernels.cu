@@ -1,22 +1,23 @@
 /**
  * mm_compress_kernels.cu — TurboQuant compression/decompression for CXL tier
  *
- * Fused kernels that compress Tier0 FP16 KV vectors into CXL storage
- * and decompress them back on promotion.
+ * Contains:
+ *   1. mm_kernel_process_demotions — TRUE Kernel 3 of the 3-kernel pipeline.
+ *      Fully fused: alloc + compress + CXL write + metadata + free + stats.
+ *      1 CUDA block = 1 work item (demote or evict).
+ *   2. mm_kernel_compress_to_cxl   — LEGACY standalone compress (retained)
+ *   3. mm_kernel_decompress_from_cxl — Decompression for promotion path
  *
  * Architecture:
  *   1 CUDA block = 1 token's KV vector
- *   Block size = min(head_dim, 128) threads
- *   Shared memory = head_dim * head_dim * sizeof(float) for rotation matrix
- *
- * The rotation matrix tile is loaded cooperatively by all threads in the block,
- * then each thread computes the full polar transform for its assigned vector.
+ *   Block size = MM_COMPRESS_BLOCK_SIZE (128)
+ *   Rotation matrix in __constant__ memory (no shared memory needed)
  *
  * For head_dim = 128:
- *   - Shared memory: 64 KB (at the hardware limit, uses 1 SM)
- *   - Registers per thread: ~100 (radii array lives in registers)
- *   - Global reads: 256B (FP16 vector) + 64KB (rotation, cached in smem)
+ *   - Registers per thread 0: ~200 (vec[128] + radii[128] + rotated[128])
+ *   - Global reads:  256B (FP16 vector) + const mem broadcast (rotation)
  *   - Global writes: 127B (indices) + 4B (radius) + 16B (QJL) + 4B (scale)
+ *                   + 32B (TokenMeta update)
  */
 
 #include "multimodal_inference.cuh"
@@ -86,23 +87,252 @@ __device__ __forceinline__ float tq_dequantize_angle_pos(
 }
 
 // ============================================================================
-// Kernel: Compress demoted tokens to CXL (fused rotate + polar + QJL)
+// TRUE Kernel 3: mm_kernel_process_demotions
+//
+// Fully fused: alloc + compress + CXL write + metadata + free + stats.
+// This is the ONLY kernel needed after scoring. No separate alloc, compress,
+// or free kernels are launched in the steady-state pipeline.
+//
+// Grid:  MM_MAX_VICTIMS blocks (fixed — reads actual counts from device)
+// Block: MM_COMPRESS_BLOCK_SIZE (128)
+//
+// Block mapping:
+//   blocks [0, *d_demote_count):
+//     Thread 0: atomic pop CXL slot from freelist
+//     Thread 0: TQ compress (rotation + polar + QJL) — serial per vector
+//     Thread 0: write compressed payload to CXL storage
+//     Thread 0: write cosine_sim + TQ_COMPRESSED + cxl_slot to d_meta
+//     Thread 0: update modality stats
+//
+//   blocks [*d_demote_count, *d_demote_count + *d_evict_count):
+//     Thread 0: free CXL slot if token was in CXL tier
+//     Thread 0: clear tier_flags + cxl_slot
+//     Thread 0: update eviction stats
+//
+//   blocks beyond: early exit
+//
+// Memory flow:
+//   READ:  d_kv_vectors[pos*head_dim..+head_dim] (256B FP16 per demote)
+//   READ:  c_mm_rotation[] (__constant__, broadcast)
+//   READ:  d_jl_matrix[] (global, per JL projection row)
+//   WRITE: cxl.d_indices[slot*total_angles..+total_angles] (127B per demote)
+//   WRITE: cxl.d_radii[slot] (4B per demote)
+//   WRITE: cxl.d_qjl_bits[slot*words..+words] (16B per demote)
+//   WRITE: cxl.d_qjl_scales[slot] (4B per demote)
+//   WRITE: d_meta[token].{cxl_slot, tier_flags, cosine_sim} (12B per item)
+//   WRITE: d_modality_stats (atomicAdd, 4B per item)
+//   WRITE: cxl.d_freelist_top (atomicSub/Add, 4B per item)
+//
+// No host sync. No D→H readback. CUDA graph capturable (fixed grid).
+// ============================================================================
+
+__global__ void mm_kernel_process_demotions(
+    const __half*        __restrict__ d_kv_vectors,     // [max_tokens, head_dim]
+    TokenMeta*           __restrict__ d_meta,
+    const uint32_t*      __restrict__ d_demote_list,
+    const uint32_t*      __restrict__ d_demote_count,   // device-side
+    const uint32_t*      __restrict__ d_evict_list,
+    const uint32_t*      __restrict__ d_evict_count,    // device-side
+    CXLStorageLayout     cxl,
+    EvictionAction*      __restrict__ d_actions,
+    ModalityStats*       __restrict__ d_modality_stats,
+    uint32_t             head_dim,
+    int                  n_grid,
+    const float*         __restrict__ d_jl_matrix,      // [proj_dim, head_dim]
+    int                  proj_dim
+) {
+    uint32_t bid = blockIdx.x;
+    uint32_t tid = threadIdx.x;
+
+    // Read work counts from device memory.
+    // Kernel 2 wrote these; same-stream ordering guarantees visibility.
+    uint32_t n_demote = *d_demote_count;
+    uint32_t n_evict  = *d_evict_count;
+    if (n_demote > MM_MAX_VICTIMS) n_demote = MM_MAX_VICTIMS;
+    if (n_evict  > MM_MAX_VICTIMS) n_evict  = MM_MAX_VICTIMS;
+    uint32_t total = n_demote + n_evict;
+
+    if (bid >= total) return;
+
+    // ====================================================================
+    // DEMOTION PATH: alloc + compress + write + metadata + stats
+    // ====================================================================
+    if (bid < n_demote) {
+        uint32_t token_idx = d_demote_list[bid];
+
+        // ---- Step 0: Thread 0 allocates CXL slot ----
+        __shared__ uint32_t s_slot;
+        __shared__ int      s_alloc_ok;
+
+        if (tid == 0) {
+            int old_top = (int)atomicSub(cxl.d_freelist_top, 1u);
+            if (old_top - 1 < 0) {
+                // CXL full — revert, upgrade to EVICT
+                atomicAdd(cxl.d_freelist_top, 1u);
+                s_alloc_ok = 0;
+            } else {
+                s_slot = cxl.d_freelist[old_top - 1];
+                s_alloc_ok = 1;
+            }
+        }
+        __syncthreads();  // broadcast alloc result to all threads
+
+        if (!s_alloc_ok) {
+            // Alloc failed — mark as evict, update stats, exit
+            if (tid == 0) {
+                d_actions[token_idx] = ACTION_EVICT;
+                d_meta[token_idx].tier_flags &= ~MM_FLAG_IN_TIER0;
+                if (d_modality_stats) {
+                    ModalityGroup mod = MM_UNPACK_MODALITY(d_meta[token_idx].type_flags);
+                    atomicAdd(&d_modality_stats->evicted_count[mod], 1u);
+                }
+            }
+            return;
+        }
+
+        uint32_t cxl_slot = s_slot;
+
+        // ---- Steps 1-6: Thread 0 does full TQ compression ----
+        if (tid == 0) {
+            uint32_t pos = d_meta[token_idx].position;
+
+            // Step 1: Load FP16 KV vector → FP32
+            float vec[MM_MAX_HEAD_DIM];
+            for (uint32_t i = 0; i < head_dim; i++) {
+                vec[i] = __half2float(d_kv_vectors[pos * head_dim + i]);
+            }
+
+            // Step 2: Apply rotation v' = R @ v (from __constant__ memory)
+            float rotated[MM_MAX_HEAD_DIM];
+            for (uint32_t r = 0; r < head_dim; r++) {
+                float sum = 0.0f;
+                for (uint32_t c = 0; c < head_dim; c++) {
+                    sum += c_mm_rotation[r * head_dim + c] * vec[c];
+                }
+                rotated[r] = sum;
+            }
+
+            // Step 3: Recursive polar transform → quantized angle indices
+            uint32_t angle_idx = 0;
+            uint8_t* out_indices = &cxl.d_indices[cxl_slot * cxl.total_angles];
+
+            float radii[MM_MAX_HEAD_DIM];
+            uint32_t n_radii = head_dim;
+            for (uint32_t i = 0; i < head_dim; i++) radii[i] = rotated[i];
+
+            int level = 0;
+            while (n_radii > 1) {
+                float new_radii[MM_MAX_HEAD_DIM / 2];
+                uint32_t n_new = 0;
+
+                for (uint32_t i = 0; i < n_radii; i += 2) {
+                    if (i + 1 < n_radii) {
+                        float x = radii[i];
+                        float y = radii[i + 1];
+                        float r = sqrtf(x * x + y * y);
+                        float theta = atan2f(y, x);
+
+                        uint8_t qi = (level == 0)
+                            ? tq_quantize_angle_full(theta, n_grid)
+                            : tq_quantize_angle_pos(theta, n_grid);
+                        out_indices[angle_idx++] = qi;
+                        new_radii[n_new++] = r;
+                    } else {
+                        new_radii[n_new++] = radii[i];
+                    }
+                }
+                n_radii = n_new;
+                for (uint32_t i = 0; i < n_radii; i++) radii[i] = new_radii[i];
+                level++;
+            }
+
+            // Write final radius to CXL storage
+            cxl.d_radii[cxl_slot] = radii[0];
+
+            // Step 4: Cosine similarity proxy (bit-width dependent)
+            float cosine_est;
+            if (n_grid <= 4)       cosine_est = 0.86f;   // 2-bit
+            else if (n_grid <= 8)  cosine_est = 0.965f;  // 3-bit
+            else                   cosine_est = 0.991f;  // 4-bit
+
+            // Step 5: QJL sign bits
+            if (d_jl_matrix && proj_dim > 0) {
+                uint32_t qjl_words_per = (proj_dim + 31) / 32;
+                uint32_t* out_qjl = &cxl.d_qjl_bits[cxl_slot * qjl_words_per];
+                float scale_sum = 0.0f;
+
+                for (uint32_t w = 0; w < qjl_words_per; w++) {
+                    uint32_t bits = 0;
+                    for (int b = 0; b < 32 && (w * 32 + b) < (uint32_t)proj_dim; b++) {
+                        int proj_idx = w * 32 + b;
+                        float dot = 0.0f;
+                        for (uint32_t d = 0; d < head_dim; d++) {
+                            dot += d_jl_matrix[proj_idx * head_dim + d] * vec[d];
+                        }
+                        if (dot >= 0.0f) bits |= (1u << b);
+                        scale_sum += fabsf(dot);
+                    }
+                    out_qjl[w] = bits;
+                }
+                cxl.d_qjl_scales[cxl_slot] = scale_sum / (float)proj_dim;
+            }
+
+            // Step 6: Write metadata — slot, flags, cosine_sim
+            // TQ_COMPRESSED is set HERE, after data is physically in CXL.
+            d_meta[token_idx].cxl_slot   = cxl_slot;
+            d_meta[token_idx].cosine_sim = cosine_est;
+            d_meta[token_idx].tier_flags =
+                (d_meta[token_idx].tier_flags & ~MM_FLAG_IN_TIER0)
+                | MM_FLAG_IN_CXL
+                | MM_FLAG_TQ_COMPRESSED;
+
+            // Step 7: Modality stats
+            if (d_modality_stats) {
+                ModalityGroup mod = MM_UNPACK_MODALITY(d_meta[token_idx].type_flags);
+                atomicAdd(&d_modality_stats->cxl_count[mod], 1u);
+            }
+        }
+        return;
+    }
+
+    // ====================================================================
+    // EVICTION PATH: free CXL slot + clear metadata + stats
+    // ====================================================================
+    if (tid != 0) return;  // only thread 0 needed for lightweight free
+
+    uint32_t evict_idx = bid - n_demote;
+    uint32_t token_idx = d_evict_list[evict_idx];
+    TokenMeta* meta = &d_meta[token_idx];
+
+    // Free CXL slot if token was in CXL tier
+    if (meta->tier_flags & MM_FLAG_IN_CXL) {
+        uint32_t slot = meta->cxl_slot;
+        if (slot != MM_CXL_SLOT_INVALID) {
+            uint32_t push_pos = atomicAdd(cxl.d_freelist_top, 1u);
+            if (push_pos < cxl.capacity) {
+                cxl.d_freelist[push_pos] = slot;
+            }
+        }
+    }
+
+    // Modality eviction stats
+    if (d_modality_stats) {
+        ModalityGroup mod = MM_UNPACK_MODALITY(meta->type_flags);
+        atomicAdd(&d_modality_stats->evicted_count[mod], 1u);
+    }
+
+    // Clear token metadata
+    meta->tier_flags = 0;
+    meta->cxl_slot = MM_CXL_SLOT_INVALID;
+}
+
+// ============================================================================
+// LEGACY: Standalone compress kernel (retained for backward compatibility)
+// Prefer mm_kernel_process_demotions which fuses alloc+compress+free.
 // ============================================================================
 
 /**
- * 1 block = 1 token.  Each block:
- *   1. Load FP16 KV vector → FP32 in registers
- *   2. Cooperatively load rotation matrix tile into shared memory
- *   3. Apply rotation: v' = v @ R^T (matrix-vector in registers)
- *   4. Recursive polar transform (7 levels for dim=128)
- *      - All radii/angles live in registers (no intermediate storage)
- *      - Quantize angles via LUT floor
- *   5. Write quantized indices + final radius to CXL storage
- *   6. Compute residual and QJL sign bits
- *   7. Update TokenMeta with compression quality
- *
- * Thread 0 does the actual polar walk (serial per vector).
- * Other threads help with rotation matrix loading and QJL projection.
+ * 1 block = 1 token.  Thread 0 does serial polar walk.
  */
 __global__ void mm_kernel_compress_to_cxl(
     const __half*        __restrict__ d_kv_vectors,

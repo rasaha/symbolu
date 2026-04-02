@@ -389,47 +389,36 @@ __global__ void mm_kernel_fused_score_collect(
 );
 
 /**
- * Allocate CXL slots for demoted tokens (lock-free stack pop).
- * LEGACY — prefer mm_kernel_fused_alloc_free_finalize.
+ * TRUE Kernel 3: Process Demotions + Evictions (fully fused).
  *
- * Grid:  ceil(n_demote / 128)
- * Block: 128
+ * Single kernel that performs ALL post-scoring work:
+ *   Demote blocks: alloc CXL slot + TQ compress + CXL write + metadata + stats
+ *   Evict blocks:  free CXL slot + clear metadata + stats
+ *
+ * Reads d_demote_count / d_evict_count from DEVICE memory (written by kernel 2).
+ * No host sync, no D→H readback. CUDA graph capturable (fixed grid).
+ *
+ * Grid:  MM_MAX_VICTIMS blocks (fixed)
+ * Block: MM_COMPRESS_BLOCK_SIZE (128)
+ *
+ * Block mapping:
+ *   [0, *d_demote_count):             alloc + compress + write + finalize
+ *   [*d_demote_count, total):         free CXL slot + clear + evict stats
+ *   [total, MM_MAX_VICTIMS):          early exit
+ *
+ * Side effects per demote block:
+ *   - cxl.d_freelist_top atomically decremented (slot pop)
+ *   - cxl.d_indices/d_radii/d_qjl_bits/d_qjl_scales written
+ *   - d_meta[].{cxl_slot, tier_flags, cosine_sim} updated
+ *   - d_modality_stats->cxl_count atomically incremented
+ *
+ * Side effects per evict block:
+ *   - cxl.d_freelist_top atomically incremented (slot push)
+ *   - d_meta[].{tier_flags, cxl_slot} cleared
+ *   - d_modality_stats->evicted_count atomically incremented
  */
-__global__ void mm_kernel_alloc_cxl_slots(
-    TokenMeta*           __restrict__ d_meta,
-    const uint32_t*      __restrict__ d_demote_list,
-    uint32_t             n_demote,
-    CXLStorageLayout     cxl,
-    EvictionAction*      __restrict__ d_actions  // may upgrade DEMOTE→EVICT
-);
-
-/**
- * FUSED Kernel 3: Alloc + Free + Finalize.
- *
- * Replaces separate mm_kernel_alloc_cxl_slots + mm_kernel_free_cxl_slots
- * in a single launch. Reads d_demote_count / d_evict_count from DEVICE
- * memory (written by kernel 2), eliminating the host sync + D→H readback.
- *
- * Thread mapping (1 thread per item):
- *   [0, *d_demote_count)             → alloc CXL slot, update tier flags, update stats
- *   [*d_demote_count, total)         → free CXL slot, clear meta, update eviction stats
- *   [total, grid_size)               → early exit
- *
- * Grid: (MM_MAX_VICTIMS * 2 + 127) / 128  (fixed, CUDA graph safe)
- * Block: 128
- *
- * Side effects:
- *   - d_meta[].cxl_slot assigned (alloc) or cleared (free)
- *   - d_meta[].tier_flags: IN_TIER0 cleared, IN_CXL set (alloc) or cleared (free)
- *   - d_actions[]: DEMOTE → EVICT if CXL full
- *   - cxl.d_freelist_top atomically updated
- *   - d_modality_stats atomically updated
- *
- * Note: Does NOT set MM_FLAG_TQ_COMPRESSED. That flag is set by the compress
- * kernel after actual data is written to CXL storage. This prevents the
- * "phantom compression" bug where flags claim compressed but storage is empty.
- */
-__global__ void mm_kernel_fused_alloc_free_finalize(
+__global__ void mm_kernel_process_demotions(
+    const __half*        __restrict__ d_kv_vectors,     // [max_tokens, head_dim]
     TokenMeta*           __restrict__ d_meta,
     const uint32_t*      __restrict__ d_demote_list,
     const uint32_t*      __restrict__ d_demote_count,   // device-side count
@@ -437,35 +426,46 @@ __global__ void mm_kernel_fused_alloc_free_finalize(
     const uint32_t*      __restrict__ d_evict_count,    // device-side count
     CXLStorageLayout     cxl,
     EvictionAction*      __restrict__ d_actions,
+    ModalityStats*       __restrict__ d_modality_stats,
+    uint32_t             head_dim,
+    int                  n_grid,
+    const float*         __restrict__ d_jl_matrix,      // [proj_dim, head_dim]
+    int                  proj_dim
+);
+
+// ---- LEGACY kernels (retained for standalone use / testing) ----
+
+__global__ void mm_kernel_alloc_cxl_slots(
+    TokenMeta*           __restrict__ d_meta,
+    const uint32_t*      __restrict__ d_demote_list,
+    uint32_t             n_demote,
+    CXLStorageLayout     cxl,
+    EvictionAction*      __restrict__ d_actions
+);
+
+__global__ void mm_kernel_fused_alloc_free_finalize(
+    TokenMeta*           __restrict__ d_meta,
+    const uint32_t*      __restrict__ d_demote_list,
+    const uint32_t*      __restrict__ d_demote_count,
+    const uint32_t*      __restrict__ d_evict_list,
+    const uint32_t*      __restrict__ d_evict_count,
+    CXLStorageLayout     cxl,
+    EvictionAction*      __restrict__ d_actions,
     ModalityStats*       __restrict__ d_modality_stats
 );
 
-/**
- * Compress demoted tokens' KV vectors into CXL storage.
- *
- * Uses TurboQuant fused compression (PolarQuant + QJL).
- * 1 block = 1 token (needs shared memory for rotation matrix).
- *
- * Grid:  n_demote
- * Block: MM_COMPRESS_BLOCK_SIZE (128 — matches head_dim)
- *
- * Input:  d_kv_fp16[token_pos * head_dim] — FP16 KV vectors in HBM
- * Output: CXL storage arrays indexed by cxl_slot
- */
 __global__ void mm_kernel_compress_to_cxl(
-    const __half*        __restrict__ d_kv_vectors,   // [max_tokens, head_dim]
-    TokenMeta*           __restrict__ d_meta,          // writable: sets cosine_sim + TQ_COMPRESSED
+    const __half*        __restrict__ d_kv_vectors,
+    TokenMeta*           __restrict__ d_meta,
     const uint32_t*      __restrict__ d_demote_list,
     uint32_t             n_demote,
     uint32_t             head_dim,
     CXLStorageLayout     cxl,
-    // TurboQuant precomputed tables
-    const float*         __restrict__ d_rotation_matrix,  // [head_dim, head_dim]
-    const float*         __restrict__ d_angle_grid_full,  // [n_grid]
-    const float*         __restrict__ d_angle_grid_pos,   // [n_grid]
+    const float*         __restrict__ d_rotation_matrix,
+    const float*         __restrict__ d_angle_grid_full,
+    const float*         __restrict__ d_angle_grid_pos,
     int                  n_grid,
-    // QJL
-    const float*         __restrict__ d_jl_matrix,        // [proj_dim, head_dim]
+    const float*         __restrict__ d_jl_matrix,
     int                  proj_dim
 );
 
@@ -543,17 +543,22 @@ public:
 
     /**
      * Called when a new token is generated.
-     * 1. Append token metadata
-     * 2. Update attention stats for attended positions
-     * 3. Score all Tier0 tokens
-     * 4. Execute demotions / evictions
      *
-     * Returns number of tokens demoted to CXL.
+     * 3-kernel pipeline (no host sync in steady state):
+     *   Kernel 1: mm_kernel_update_on_access
+     *   Kernel 2: mm_kernel_fused_score_collect
+     *   Kernel 3: mm_kernel_process_demotions
+     *
+     * @param d_kv_vectors  Device ptr to FP16 KV cache [max_tokens, head_dim].
+     *                      Required for TQ compression. Must not be null when
+     *                      Tier0 is over capacity.
+     * @return 1 if eviction was triggered, 0 otherwise.
+     *         Exact counts available via get_stats().
      */
     int on_decode_step(
+        const __half*   d_kv_vectors,
         uint32_t new_position,
         uint8_t  token_type,
-        // Attention info from this step
         const uint32_t* d_attended_positions,
         const float*    d_attention_weights,
         uint32_t        n_attended
