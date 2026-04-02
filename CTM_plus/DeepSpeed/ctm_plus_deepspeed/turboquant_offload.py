@@ -66,18 +66,22 @@ class TurboQuantTrainingConfig:
 
     @property
     def total_bits_per_element(self) -> float:
-        """Effective bits per element after compression."""
+        """Theoretical bits per element assuming bit-packed storage.
+
+        Formula: (1 FP32 radius + (d-1) angle indices) / d + QJL overhead.
+        The radius is 32 bits (FP32), matching the training tensor dtype.
+        """
         d = self.segment_dim
-        polar_bits = ((d - 1) * self.angle_bits + 16) / d
+        polar_bits = ((d - 1) * self.angle_bits + 32) / d  # 32-bit FP32 radius
         if self.enable_qjl:
             proj_dim = self.qjl_projection_dim or d
-            qjl_bits = proj_dim / d
+            qjl_bits = proj_dim / d  # 1 sign bit per projected dim
             return polar_bits + qjl_bits
         return polar_bits
 
     @property
     def compression_ratio(self) -> float:
-        """Compression ratio vs FP32 (32 bits per element)."""
+        """Theoretical compression ratio vs FP32, assuming bit-packed storage."""
         return 32.0 / self.total_bits_per_element
 
     @classmethod
@@ -185,7 +189,6 @@ class PolarQuant:
         # Step 3: Quantize angles per level using level-appropriate grids
         q_levels: List[np.ndarray] = []
         all_q_indices: List[np.ndarray] = []
-        all_q_angles: List[np.ndarray] = []
 
         for lvl_idx, level_angles in enumerate(levels):
             if len(level_angles) == 0:
@@ -196,7 +199,6 @@ class PolarQuant:
             indices = np.argmin(np.abs(la[:, None] - grid[None, :]), axis=1)
             quantized = grid[indices]
             q_levels.append(quantized)
-            all_q_angles.append(quantized)
             all_q_indices.append(indices.astype(np.uint8))
 
         angle_indices = (
@@ -346,19 +348,50 @@ class CompressedTensorBuffer:
         return len(self.segment_radii)
 
     @property
-    def compressed_bytes(self) -> int:
-        """Estimate actual storage bytes."""
+    def theoretical_packed_bytes(self) -> int:
+        """Bytes required if angle indices were bit-packed (the compression target).
+
+        Assumes:
+          - 1 FP32 radius per segment (32 bits)
+          - angle_bits per angle index, packed
+          - 1 sign bit per QJL projected dimension + 1 FP32 scale per segment
+        """
         d = self.segment_dim
-        # Each segment: 4 bytes (FP32 radius) + ceil((d-1)*angle_bits/8) for angles
         bits_per_seg = 32 + (d - 1) * self.angle_bits
         if self.segment_qjl_signs is not None and self.segment_qjl_signs:
             proj_dim = len(self.segment_qjl_signs[0])
-            bits_per_seg += proj_dim + 32  # 1 bit/dim sign + FP32 scale
+            bits_per_seg += proj_dim + 32  # sign bits + FP32 scale
         return max(1, (bits_per_seg * self.n_segments + 7) // 8)
 
     @property
+    def actual_stored_bytes(self) -> int:
+        """Actual bytes used by the numpy arrays in this buffer (no bit-packing).
+
+        Angle indices are stored as uint8 (1 byte each, not angle_bits/8).
+        QJL signs are stored as int8 (1 byte each).
+        This is what the Python process actually allocates.
+        """
+        n = self.n_segments
+        d = self.segment_dim
+        # n floats (Python float = 8 bytes) for radii
+        radii_bytes = n * 8
+        # (d-1) uint8 per segment for angle indices
+        angle_bytes = n * (d - 1)
+        if self.segment_qjl_signs is not None and self.segment_qjl_signs:
+            proj_dim = len(self.segment_qjl_signs[0])
+            signs_bytes = n * proj_dim       # int8, 1 byte each
+            scales_bytes = n * 8             # Python float
+            return radii_bytes + angle_bytes + signs_bytes + scales_bytes
+        return radii_bytes + angle_bytes
+
+    @property
+    def compressed_bytes(self) -> int:
+        """Alias for actual_stored_bytes — real heap usage of this buffer."""
+        return self.actual_stored_bytes
+
+    @property
     def original_bytes(self) -> int:
-        """Bytes in original FP32 tensor."""
+        """Bytes in the original FP32 tensor (before padding)."""
         return self.n_padded_elements * 4
 
 
@@ -390,7 +423,8 @@ class TurboQuantCompressor:
             "tensors_decompressed": 0,
             "total_segments": 0,
             "total_original_bytes": 0,
-            "total_compressed_bytes": 0,
+            "total_actual_stored_bytes": 0,    # real heap usage (no bit-packing)
+            "total_theoretical_packed_bytes": 0,  # if bit-packed (the compression goal)
         }
 
     def compress(self, data: np.ndarray) -> CompressedTensorBuffer:
@@ -448,7 +482,8 @@ class TurboQuantCompressor:
         self.stats["tensors_compressed"] += 1
         self.stats["total_segments"] += n_segs
         self.stats["total_original_bytes"] += data.nbytes
-        self.stats["total_compressed_bytes"] += buf.compressed_bytes
+        self.stats["total_actual_stored_bytes"] += buf.actual_stored_bytes
+        self.stats["total_theoretical_packed_bytes"] += buf.theoretical_packed_bytes
 
         return buf
 
@@ -463,20 +498,21 @@ class TurboQuantCompressor:
         n_segs = buf.n_segments
         reconstructed_flat = np.empty(buf.n_padded_elements, dtype=np.float32)
 
+        # Build angle grids once — reusing the same grids as the compressor.
+        # Previously these were recomputed per-segment (O(n_segs) linspace calls).
+        n_levels = 2 ** buf.angle_bits
+        angle_grid_full = (
+            np.linspace(-math.pi, math.pi, n_levels, endpoint=False)
+            + math.pi / n_levels
+        )
+        angle_grid_pos = (
+            np.linspace(0, math.pi / 2, n_levels, endpoint=False)
+            + math.pi / (4 * n_levels)
+        )
+
         for i in range(n_segs):
             radius = buf.segment_radii[i]
             angle_indices = buf.segment_angle_indices[i]
-
-            # Rebuild quantized angles from stored indices
-            n_levels = 2 ** buf.angle_bits
-            angle_grid_full = (
-                np.linspace(-math.pi, math.pi, n_levels, endpoint=False)
-                + math.pi / n_levels
-            )
-            angle_grid_pos = (
-                np.linspace(0, math.pi / 2, n_levels, endpoint=False)
-                + math.pi / (4 * n_levels)
-            )
 
             # Reconstruct level angles: level 0 uses full grid, rest use pos grid
             # Determine level sizes from d:  level k has d >> (k+1) angles
@@ -520,16 +556,21 @@ class TurboQuantCompressor:
         return max(1, (bits_per_seg * n_segs + 7) // 8)
 
     def get_stats(self) -> dict:
-        """Return compression statistics."""
-        n_c = self.stats["tensors_compressed"]
+        """Return compression statistics.
+
+        Reports two ratios:
+          actual_compression_ratio     — original / actual_stored (real heap savings)
+          theoretical_compression_ratio — original / theoretical_packed (bit-pack target)
+        """
         orig = self.stats["total_original_bytes"]
-        comp = self.stats["total_compressed_bytes"]
+        actual = self.stats["total_actual_stored_bytes"]
+        packed = self.stats["total_theoretical_packed_bytes"]
         return {
             **self.stats,
-            "effective_compression_ratio": orig / max(1, comp),
-            "theoretical_compression_ratio": self.config.compression_ratio,
+            "actual_compression_ratio": orig / max(1, actual),
+            "theoretical_compression_ratio": orig / max(1, packed),
+            "config_compression_ratio": self.config.compression_ratio,
             "bits_per_element": self.config.total_bits_per_element,
-            "memory_reduction": f"{self.config.compression_ratio:.1f}x",
         }
 
 
@@ -653,15 +694,19 @@ class TurboQuantOffloadManager:
     # -------------------------------------------------------------------------
 
     def _should_compress(self, tensor_id: str) -> bool:
-        """Return True if this tensor type is eligible for TurboQuant."""
-        state = self.ctm.tensors.get(tensor_id)
-        if state is None:
-            return False
-        if state.is_gradient and self.tq_config.compress_gradients:
-            return True
-        if state.is_optimizer_state and self.tq_config.compress_optimizer_states:
-            return True
-        return False
+        """Return True if this tensor type is eligible for TurboQuant.
+
+        Acquires ctm._lock to safely read TensorState flags that may be
+        written concurrently by register_tensor / unregister_tensor.
+        """
+        with self.ctm._lock:
+            state = self.ctm.tensors.get(tensor_id)
+            if state is None:
+                return False
+            return (
+                (state.is_gradient and self.tq_config.compress_gradients)
+                or (state.is_optimizer_state and self.tq_config.compress_optimizer_states)
+            )
 
     def offload(self, tensor_id: str, data: np.ndarray) -> int:
         """
@@ -781,10 +826,8 @@ class TurboQuantOffloadManager:
         self.ctm.reset_stats()
         for k in self.stats:
             self.stats[k] = 0
-        for k in ("tensors_compressed", "tensors_decompressed", "total_segments"):
+        for k in self.compressor.stats:
             self.compressor.stats[k] = 0
-        self.compressor.stats["total_original_bytes"] = 0
-        self.compressor.stats["total_compressed_bytes"] = 0
 
     # -------------------------------------------------------------------------
     # Factory
@@ -817,12 +860,24 @@ class TurboQuantOffloadManager:
                 cpu_memory_bytes=256 * 1024**3,  # 256 GB CPU
             )
         """
-        ctm = CTMOffloadManager(
-            gpu_memory_bytes,
-            cpu_memory_bytes,
-            ctm_config or CTMDeepSpeedConfig.for_training(),
+        resolved_ctm_config = ctm_config or CTMDeepSpeedConfig.for_training()
+        ctm = CTMOffloadManager(gpu_memory_bytes, cpu_memory_bytes, resolved_ctm_config)
+
+        # If tq_config was not explicitly provided, derive it from the ctm_config's
+        # turboquant_* fields.  This means setting turboquant_angle_bits=4 on
+        # CTMDeepSpeedConfig is sufficient — no need for a separate TQ config object.
+        # When enable_turboquant=False, to_turboquant_config() returns None and
+        # _should_compress() will always return False (no eligible tensor types).
+        resolved_tq_config = (
+            tq_config
+            if tq_config is not None
+            else resolved_ctm_config.to_turboquant_config()
+                 or TurboQuantTrainingConfig(
+                     compress_gradients=False,
+                     compress_optimizer_states=False,
+                 )
         )
-        return cls(ctm, tq_config or TurboQuantTrainingConfig.three_bit())
+        return cls(ctm, resolved_tq_config)
 
 
 # ---------------------------------------------------------------------------
@@ -860,10 +915,11 @@ def create_turboquant_offload_manager(
         "4bit": TurboQuantTrainingConfig.four_bit(),
         "lossless_4bit": TurboQuantTrainingConfig.lossless_4bit(),
     }
-    tq_config = _presets.get(tq_mode, TurboQuantTrainingConfig.three_bit())
+    # tq_mode takes precedence; if not recognised fall back to ctm_config bridge
+    explicit_tq = _presets.get(tq_mode)
     return TurboQuantOffloadManager.create(
         gpu_memory_bytes=int(gpu_memory_gb * 1024 ** 3),
         cpu_memory_bytes=int(cpu_memory_gb * 1024 ** 3),
         ctm_config=ctm_config,
-        tq_config=tq_config,
+        tq_config=explicit_tq,  # None → bridge from ctm_config
     )
