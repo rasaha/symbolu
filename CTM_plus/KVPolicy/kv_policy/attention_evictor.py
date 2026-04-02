@@ -29,7 +29,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Dict, List, Optional, Set, Any
 
 
 # =============================================================================
@@ -100,43 +100,38 @@ class InferencePhase(Enum):
 
 
 # =============================================================================
-# Per-Token and Per-Block State
+# Block State (replaces per-token tracking)
 # =============================================================================
 
 @dataclass
-class TokenState:
-    position: int
-    sequence_id: int
+class BlockState:
+    """
+    Per-block metadata. Stores per-position attention (up to block_size
+    entries, typically 16) instead of per-token objects.
+    """
     block_id: int
+    sequence_id: int
+    token_attention: Dict[int, float] = field(default_factory=dict)
     created_step: int = 0
     last_access_step: int = 0
-    cumulative_attention: float = 0.0
-    position_class: PositionClass = PositionClass.FILLER
-
-
-@dataclass
-class BlockScore:
-    """Cached aggregate scores for a KV block."""
-    block_id: int
-    avg_attention: float = 0.0
-    sink_count: int = 0
-    entity_count: int = 0
-    recent_count: int = 0
-    filler_count: int = 0
-    total_tokens: int = 0
-    frequency: int = 0
+    access_count: int = 0
 
     @property
-    def importance(self) -> float:
-        if self.total_tokens == 0:
-            return 0.0
-        weighted = (
-            1.0 * self.sink_count +
-            0.8 * self.entity_count +
-            0.6 * self.recent_count +
-            0.1 * self.filler_count
-        )
-        return weighted / self.total_tokens
+    def positions(self) -> list:
+        return list(self.token_attention.keys())
+
+    @property
+    def num_tokens(self) -> int:
+        return len(self.token_attention)
+
+    @property
+    def total_attention(self) -> float:
+        return sum(self.token_attention.values())
+
+    @property
+    def avg_attention(self) -> float:
+        n = len(self.token_attention)
+        return sum(self.token_attention.values()) / n if n else 0.0
 
 
 @dataclass
@@ -265,7 +260,6 @@ class PhaseWeights:
 PHASE_WEIGHTS = {
     InferencePhase.PREFILL: PhaseWeights(0.15, 0.15, 0.30, 0.25, 0.15),
     InferencePhase.DECODE:  PhaseWeights(0.25, 0.20, 0.25, 0.15, 0.15),
-    InferencePhase.COMPLETE: PhaseWeights(0, 0, 0, 0, 0),
 }
 
 
@@ -281,8 +275,9 @@ class KVCachePolicy:
       - score_block(block_id) -> float   (lower = evict first)
       - select_victims(count) -> list    (returns block_ids to evict)
 
-    This class tracks token-level attention and computes block-level
-    eviction scores. It does NOT manage actual block memory.
+    Tracks per-block state incrementally. Each block stores per-position
+    attention (up to block_size entries, typically 16). No per-token dict,
+    no periodic recomputation — scores are always current.
     """
 
     def __init__(
@@ -304,19 +299,15 @@ class KVCachePolicy:
         self.freq_sketch = FrequencySketch(max_blocks * 4)
         self.fifo = S3FIFOQueue(max_blocks)
 
-        self.tokens: Dict[int, TokenState] = {}
-        self.blocks: Dict[int, Set[int]] = {}       # block_id -> {token_ids}
-        self.block_scores: Dict[int, BlockScore] = {}
+        self.blocks: Dict[int, BlockState] = {}
         self.sequences: Dict[int, SequenceState] = {}
         self.gpu_blocks: Set[int] = set()
         self.pinned_blocks: Set[int] = set()
 
         self._step = 0
-        self._score_interval = 100
 
         self.stats = {
             "evictions": 0,
-            "sink_protections": 0,
             "filler_evictions": 0,
         }
 
@@ -352,35 +343,41 @@ class KVCachePolicy:
         attention_weight: float = 0.0,
         seq_len: int = 0,
     ):
+        """
+        Record an attention event for a token.
+
+        Aggregates directly into BlockState. The token_id parameter is
+        accepted for API compatibility but not stored — tracking is
+        by (block_id, position).
+        """
         self._step += 1
 
-        if token_id in self.tokens:
-            ts = self.tokens[token_id]
-            ts.last_access_step = self._step
-            ts.cumulative_attention = (
-                self.ema_alpha * attention_weight +
-                (1 - self.ema_alpha) * ts.cumulative_attention
+        # Get or create block
+        block = self.blocks.get(block_id)
+        if block is None:
+            block = BlockState(
+                block_id=block_id,
+                sequence_id=sequence_id,
+                created_step=self._step,
             )
-        else:
-            ts = TokenState(
-                position=position, sequence_id=sequence_id, block_id=block_id,
-                created_step=self._step, last_access_step=self._step,
-                cumulative_attention=attention_weight,
-            )
-            self.tokens[token_id] = ts
+            self.blocks[block_id] = block
 
-        # Classify position
-        ts.position_class = self._classify(position, seq_len, ts.cumulative_attention)
+        # Update per-position attention (EMA)
+        prev = block.token_attention.get(position, 0.0)
+        block.token_attention[position] = (
+            self.ema_alpha * attention_weight +
+            (1 - self.ema_alpha) * prev
+        )
+
+        # Update block-level stats
+        block.access_count += 1
+        block.last_access_step = self._step
 
         # Pin sinks
-        if ts.position_class == PositionClass.SINK:
+        if position < self.sink_tokens:
             self.pinned_blocks.add(block_id)
 
-        # Track block membership
-        if block_id not in self.blocks:
-            self.blocks[block_id] = set()
-        self.blocks[block_id].add(token_id)
-
+        # Sequence tracking
         if sequence_id in self.sequences:
             self.sequences[sequence_id].block_ids.add(block_id)
 
@@ -398,50 +395,55 @@ class KVCachePolicy:
     def score_block(self, block_id: int) -> float:
         """
         Score a single block for eviction. Lower = evict first.
+        Reads directly from BlockState — always current.
         """
-        phase = self._block_phase(block_id)
+        block = self.blocks.get(block_id)
+        if not block:
+            return -1.0
+
+        seq = self.sequences.get(block.sequence_id)
+        phase = seq.phase if seq else InferencePhase.DECODE
         if phase == InferencePhase.COMPLETE:
             return -1.0
 
-        w = PHASE_WEIGHTS[phase]
-        bs = self.block_scores.get(block_id)
+        w = PHASE_WEIGHTS.get(phase)
+        if not w:
+            return -1.0
 
-        # Recency
-        recency = 0.0
-        tids = self.blocks.get(block_id, set())
-        if tids:
-            max_step = max(
-                (self.tokens[t].last_access_step for t in tids if t in self.tokens),
-                default=0,
-            )
-            recency = math.exp(-0.01 * (self._step - max_step))
+        seq_len = seq.total_tokens if seq else 0
 
-        # Frequency
+        # Signal 1: Recency — exponential decay
+        recency = math.exp(-0.01 * (self._step - block.last_access_step))
+
+        # Signal 2: Frequency — Count-Min Sketch
         frequency = min(1.0, self.freq_sketch.estimate(block_id) / 10.0)
 
-        # Attention value
-        attention = bs.avg_attention if bs else 0.0
+        # Signal 3: Attention — average per-position attention
+        attention = block.avg_attention
 
-        # Position importance
-        position = bs.importance if bs else 0.0
+        # Signal 4: Position importance — classify each position in block
+        importance = self._block_importance(block, seq_len)
 
-        # Sequence priority
-        seq_priority = self._block_priority(block_id)
+        # Signal 5: Sequence priority
+        seq_priority = 0.5
+        if seq:
+            seq_priority = seq.priority * (0.5 + 0.5 * seq.invested_compute)
 
         score = (
             w.recency * recency +
             w.frequency * frequency +
             w.attention * attention +
-            w.position * position +
+            w.position * importance +
             w.seq_priority * seq_priority
         )
 
-        # Hard protection for sink-containing blocks
-        if bs and bs.sink_count > 0:
-            score += 10.0
-            self.stats["sink_protections"] += 1
-        if bs and bs.entity_count > 0:
-            score += 0.5 * (bs.entity_count / max(1, bs.total_tokens))
+        # Entity bonus — protect blocks with high-attention positions
+        entity_count = sum(
+            1 for pos, attn in block.token_attention.items()
+            if pos >= self.sink_tokens and attn > self.entity_threshold
+        )
+        if entity_count > 0:
+            score += 0.5 * (entity_count / max(1, block.num_tokens))
 
         return score
 
@@ -453,20 +455,14 @@ class KVCachePolicy:
         if not self.gpu_blocks:
             return []
 
-        # Refresh scores if stale
-        if self._step % self._score_interval == 0:
-            self._recompute_scores()
-
         available = self.gpu_blocks - self.pinned_blocks
         if not available:
             return []
 
-        # Fast path: filler-only blocks
+        # Fast path: all-filler blocks (no sink/entity/recent positions)
         filler_blocks = [
             bid for bid in available
-            if bid in self.block_scores
-            and self.block_scores[bid].filler_count == self.block_scores[bid].total_tokens
-            and self.block_scores[bid].total_tokens > 0
+            if self._is_all_filler(bid)
         ]
         if len(filler_blocks) >= count:
             filler_blocks.sort(key=lambda b: self.freq_sketch.estimate(b))
@@ -497,18 +493,14 @@ class KVCachePolicy:
         self.pinned_blocks.discard(block_id)
 
     def _free_block(self, block_id: int):
-        if block_id in self.blocks:
-            for tid in self.blocks[block_id]:
-                self.tokens.pop(tid, None)
-            del self.blocks[block_id]
+        self.blocks.pop(block_id, None)
         self.gpu_blocks.discard(block_id)
         self.pinned_blocks.discard(block_id)
-        self.block_scores.pop(block_id, None)
         self.fifo.remove(block_id)
 
     # ---- Internal helpers ----
 
-    def _classify(self, position: int, seq_len: int, attention: float) -> PositionClass:
+    def _classify_position(self, position: int, seq_len: int, attention: float) -> PositionClass:
         if position < self.sink_tokens:
             return PositionClass.SINK
         if seq_len > 0 and position >= seq_len - self.recent_window:
@@ -517,58 +509,41 @@ class KVCachePolicy:
             return PositionClass.ENTITY
         return PositionClass.FILLER
 
-    def _block_phase(self, block_id: int) -> InferencePhase:
-        tids = self.blocks.get(block_id, set())
-        counts: Dict[InferencePhase, int] = {}
-        for tid in tids:
-            ts = self.tokens.get(tid)
-            if ts and ts.sequence_id in self.sequences:
-                p = self.sequences[ts.sequence_id].phase
-                counts[p] = counts.get(p, 0) + 1
-        return max(counts, key=counts.get) if counts else InferencePhase.DECODE
+    def _block_importance(self, block: BlockState, seq_len: int) -> float:
+        """Classify each position in the block, return weighted importance [0, 1]."""
+        if not block.token_attention:
+            return 0.0
+        weights = {
+            PositionClass.SINK: 1.0,
+            PositionClass.ENTITY: 0.8,
+            PositionClass.RECENT: 0.6,
+            PositionClass.FILLER: 0.1,
+        }
+        total = 0.0
+        for pos, attn in block.token_attention.items():
+            cls = self._classify_position(pos, seq_len, attn)
+            total += weights[cls]
+        return total / len(block.token_attention)
 
-    def _block_priority(self, block_id: int) -> float:
-        tids = self.blocks.get(block_id, set())
-        priorities = []
-        for tid in tids:
-            ts = self.tokens.get(tid)
-            if ts and ts.sequence_id in self.sequences:
-                seq = self.sequences[ts.sequence_id]
-                priorities.append(seq.priority * (0.5 + 0.5 * seq.invested_compute))
-        return sum(priorities) / len(priorities) if priorities else 0.5
-
-    def _recompute_scores(self):
-        for block_id, token_ids in self.blocks.items():
-            bs = BlockScore(block_id=block_id)
-            total_attn = 0.0
-            for tid in token_ids:
-                ts = self.tokens.get(tid)
-                if not ts:
-                    continue
-                bs.total_tokens += 1
-                total_attn += ts.cumulative_attention
-                if ts.position_class == PositionClass.SINK:
-                    bs.sink_count += 1
-                elif ts.position_class == PositionClass.ENTITY:
-                    bs.entity_count += 1
-                elif ts.position_class == PositionClass.RECENT:
-                    bs.recent_count += 1
-                else:
-                    bs.filler_count += 1
-            bs.avg_attention = total_attn / bs.total_tokens if bs.total_tokens > 0 else 0.0
-            bs.frequency = self.freq_sketch.estimate(block_id)
-            self.block_scores[block_id] = bs
+    def _is_all_filler(self, block_id: int) -> bool:
+        """Check if every position in the block is FILLER."""
+        block = self.blocks.get(block_id)
+        if not block or not block.token_attention:
+            return False
+        seq = self.sequences.get(block.sequence_id)
+        seq_len = seq.total_tokens if seq else 0
+        for pos, attn in block.token_attention.items():
+            cls = self._classify_position(pos, seq_len, attn)
+            if cls != PositionClass.FILLER:
+                return False
+        return True
 
     def get_stats(self) -> Dict[str, Any]:
-        position_dist = {"sink": 0, "recent": 0, "entity": 0, "filler": 0}
-        for ts in self.tokens.values():
-            position_dist[ts.position_class.name.lower()] += 1
         return {
             **self.stats,
-            "total_tokens": len(self.tokens),
+            "total_blocks": len(self.blocks),
             "gpu_blocks": len(self.gpu_blocks),
             "pinned_blocks": len(self.pinned_blocks),
             "active_sequences": len(self.sequences),
-            "position_distribution": position_dist,
             "step": self._step,
         }

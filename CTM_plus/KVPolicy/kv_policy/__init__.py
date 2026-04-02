@@ -13,7 +13,7 @@ Usage:
 
     policy = KVCachePolicy(max_blocks=2048)
     policy.register_sequence(seq_id=1)
-    policy.on_token_access(token_id=0, position=0, sequence_id=1, block_id=0)
+    policy.on_token_access(token_id=0, position=0, sequence_id=1, block_id=0, attention_weight=0.1)
     victims = policy.select_victims(count=4)
 """
 
