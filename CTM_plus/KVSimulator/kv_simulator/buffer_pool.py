@@ -85,6 +85,7 @@ class Sequence:
     phase: Phase = Phase.PREFILL
     block_ids: List[int] = field(default_factory=list)
     prefill_done: bool = False
+    evicted_positions: int = 0          # token positions lost to eviction
 
 
 # =============================================================================
@@ -293,7 +294,8 @@ class KVCacheSimulator:
             "important_evictions": 0,     # evicted blocks with high attention
             "recompute_cost": 0,          # sum of tokens in evicted blocks later needed
         }
-        self._evicted_blocks: Dict[int, KVBlock] = {}  # for recompute tracking
+        self._evicted_blocks: Dict[int, KVBlock] = {}  # bounded: cleared per sequence on detection
+        self._max_evicted_tracking = max_blocks * 4
 
     # ---- Sequence lifecycle ----
 
@@ -313,6 +315,8 @@ class KVCacheSimulator:
                 del self.blocks[bid]
                 self.pinned.discard(bid)
                 freed.append(bid)
+            # Clean up eviction tracking for this sequence
+            self._evicted_blocks.pop(bid, None)
         return freed
 
     # ---- Prefill phase ----
@@ -361,15 +365,24 @@ class KVCacheSimulator:
         self._step += 1
         seq.generated_tokens += 1
         current_len = seq.generated_tokens
+        new_position = current_len - 1
 
         # Generate attention distribution
         attention = sink_and_recent_attention(
             current_len, self.sink_tokens, self.recent_window,
         )
 
-        # Distribute attention to blocks
-        for bid in seq.block_ids:
+        # Distribute attention to blocks and detect recompute cost
+        for bid in list(seq.block_ids):
             if bid not in self.blocks:
+                # Block was evicted — its tokens need recomputation
+                evicted = self._evicted_blocks.get(bid)
+                if evicted:
+                    recompute_tokens = len(evicted.token_positions)
+                    self.stats["recompute_cost"] += recompute_tokens
+                    seq.evicted_positions += recompute_tokens
+                    # Remove from sequence to avoid re-counting
+                    seq.block_ids.remove(bid)
                 continue
             block = self.blocks[bid]
             block_attn = sum(
@@ -385,14 +398,23 @@ class KVCacheSimulator:
                 # Reclassify based on attention
                 self._classify_block(block, current_len)
 
-        # Allocate new block if needed (new token may start a new block)
-        if current_len % self.block_size == 1 or not seq.block_ids:
+        # Place new token into a block
+        needs_new_block = (
+            not seq.block_ids
+            or new_position % self.block_size == 0
+        )
+
+        if needs_new_block:
+            # Allocate a fresh block for this token
             while len(self.blocks) >= self.max_blocks:
                 self._evict()
-            start_pos = (current_len - 1) // self.block_size * self.block_size
-            positions = [current_len - 1]
-            bid = self._allocate_block(seq_id, positions)
+            bid = self._allocate_block(seq_id, [new_position])
             seq.block_ids.append(bid)
+        else:
+            # Append position to the last block
+            last_bid = seq.block_ids[-1]
+            if last_bid in self.blocks:
+                self.blocks[last_bid].token_positions.append(new_position)
 
     # ---- Internal ----
 
@@ -418,14 +440,15 @@ class KVCacheSimulator:
         if block.block_type in (BlockType.SINK, BlockType.ENTITY):
             self.stats["important_evictions"] += 1
 
-        # Save for recompute cost tracking
+        # Save for recompute cost tracking (bounded)
+        if len(self._evicted_blocks) >= self._max_evicted_tracking:
+            # Drop oldest entries
+            oldest = next(iter(self._evicted_blocks))
+            del self._evicted_blocks[oldest]
         self._evicted_blocks[victim] = block
 
-        # Remove from owning sequence
-        if block.sequence_id in self.sequences:
-            seq = self.sequences[block.sequence_id]
-            if victim in seq.block_ids:
-                seq.block_ids.remove(victim)
+        # Note: block stays in seq.block_ids so decode_step() can detect
+        # the missing block and count recompute cost on next access.
 
         self.policy.on_evict(victim)
         self.pinned.discard(victim)
