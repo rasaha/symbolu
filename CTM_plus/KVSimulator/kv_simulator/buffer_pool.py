@@ -272,24 +272,34 @@ class KVPolicyAdapter(EvictionPolicy):
         self._policy = kv_policy
 
     def on_admit(self, block_id, block):
-        # Register initial positions with zero attention
-        for pos in block.token_positions:
-            self._policy.on_token_access(
-                token_id=pos, position=pos,
-                sequence_id=block.sequence_id,
-                block_id=block_id,
-                attention_weight=0.0, seq_len=0,
-            )
+        if hasattr(self._policy, 'ensure_block'):
+            self._policy.ensure_block(block_id, block.sequence_id, block.token_positions)
+        else:
+            for pos in block.token_positions:
+                self._policy.on_token_access(
+                    token_id=pos, position=pos,
+                    sequence_id=block.sequence_id,
+                    block_id=block_id,
+                    attention_weight=0.0, seq_len=0,
+                )
 
     def on_block_attention(self, block_id, block, position_attention, sequence_id, seq_len):
-        for pos, attn in position_attention.items():
-            self._policy.on_token_access(
-                token_id=pos, position=pos,
-                sequence_id=sequence_id,
+        if hasattr(self._policy, 'on_block_attention'):
+            self._policy.on_block_attention(
                 block_id=block_id,
-                attention_weight=attn,
+                position_attention=position_attention,
+                sequence_id=sequence_id,
                 seq_len=seq_len,
             )
+        else:
+            for pos, attn in position_attention.items():
+                self._policy.on_token_access(
+                    token_id=pos, position=pos,
+                    sequence_id=sequence_id,
+                    block_id=block_id,
+                    attention_weight=attn,
+                    seq_len=seq_len,
+                )
 
     def on_evict(self, block_id):
         self._policy.evict_block(block_id)

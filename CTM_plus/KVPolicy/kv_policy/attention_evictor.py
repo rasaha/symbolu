@@ -272,6 +272,80 @@ class KVCachePolicy:
 
         self.gpu_blocks.add(block_id)
 
+    def on_block_attention(
+        self,
+        block_id: int,
+        position_attention: Dict[int, float],
+        sequence_id: int,
+        seq_len: int = 0,
+    ):
+        """
+        Record attention for an entire block in one call.
+
+        Equivalent to calling on_token_access for each position, but
+        with O(1) overhead for step/freq/sequence bookkeeping instead
+        of O(block_size).
+        """
+        self._step += 1
+
+        # Get or create block
+        block = self.blocks.get(block_id)
+        if block is None:
+            block = BlockState(
+                block_id=block_id,
+                sequence_id=sequence_id,
+                created_step=self._step,
+            )
+            self.blocks[block_id] = block
+
+        # Bulk EMA update for all positions
+        alpha = self.ema_alpha
+        one_minus_alpha = 1 - alpha
+        for pos, attn in position_attention.items():
+            prev = block.token_attention.get(pos, 0.0)
+            block.token_attention[pos] = alpha * attn + one_minus_alpha * prev
+
+        # Block-level stats — once per block, not per position
+        block.access_count += 1
+        block.last_access_step = self._step
+
+        # Pin if any position is a sink
+        if any(pos < self.sink_tokens for pos in position_attention):
+            self.pinned_blocks.add(block_id)
+
+        # Sequence tracking
+        if sequence_id in self.sequences:
+            self.sequences[sequence_id].block_ids.add(block_id)
+
+        self.freq_sketch.increment(block_id)
+
+        self.gpu_blocks.add(block_id)
+
+    def ensure_block(self, block_id: int, sequence_id: int, positions: List[int]):
+        """
+        Lightweight block registration. Creates block metadata without
+        recording any attention — used on admission.
+        """
+        if block_id not in self.blocks:
+            self._step += 1
+            block = BlockState(
+                block_id=block_id,
+                sequence_id=sequence_id,
+                created_step=self._step,
+            )
+            # Seed positions with zero attention
+            for pos in positions:
+                block.token_attention[pos] = 0.0
+            self.blocks[block_id] = block
+
+            if any(pos < self.sink_tokens for pos in positions):
+                self.pinned_blocks.add(block_id)
+
+            if sequence_id in self.sequences:
+                self.sequences[sequence_id].block_ids.add(block_id)
+
+            self.gpu_blocks.add(block_id)
+
     # ---- Scoring interface ----
 
     def score_block(self, block_id: int) -> float:
