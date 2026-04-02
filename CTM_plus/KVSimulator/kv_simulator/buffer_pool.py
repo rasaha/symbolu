@@ -295,7 +295,7 @@ class KVPolicyAdapter(EvictionPolicy):
         self._policy.evict_block(block_id)
 
     def on_sequence_register(self, seq_id, context_length):
-        self._policy.register_sequence(seq_id, max_tokens=context_length)
+        self._policy.register_sequence(seq_id)
 
     def on_phase_change(self, seq_id, phase):
         from CTM_plus.KVPolicy.kv_policy.attention_evictor import InferencePhase

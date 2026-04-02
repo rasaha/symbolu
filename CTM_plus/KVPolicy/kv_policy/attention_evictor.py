@@ -5,16 +5,13 @@ This module provides scoring logic for KV cache block eviction decisions.
 It does NOT manage memory, I/O, or block allocation — those are handled
 by the serving engine (e.g. vLLM's BlockSpaceManager).
 
-LLM-specific signals used for scoring:
+Signals used for scoring:
   1. Attention value — cumulative attention received by tokens in the block
   2. Position importance — sink/entity/recent/filler classification
   3. Frequency — Count-Min Sketch for O(1) approximate block access count
   4. Recency — exponential decay of time since last access
-  5. Sequence priority — user-set priority weighted by invested compute
 
 Phase-aware: scoring weights differ between prefill and decode phases.
-Scan-resistant: S3-FIFO admission prevents prefill floods from evicting
-useful decode blocks.
 
 Integration point: vLLM's Evictor abstract base class.
     class Evictor(ABC):
@@ -25,11 +22,9 @@ Not thread-safe. Callers must synchronize externally.
 
 import math
 import random
-import time
-from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Dict, List, Optional, Set, Any
+from typing import Dict, List, Set, Any
 
 
 # =============================================================================
@@ -96,7 +91,6 @@ class PositionClass(Enum):
 class InferencePhase(Enum):
     PREFILL = auto()
     DECODE = auto()
-    COMPLETE = auto()
 
 
 # =============================================================================
@@ -138,110 +132,7 @@ class BlockState:
 class SequenceState:
     sequence_id: int
     phase: InferencePhase = InferencePhase.PREFILL
-    priority: float = 1.0
-    total_tokens: int = 0
-    generated_tokens: int = 0
-    max_tokens: int = 4096
     block_ids: Set[int] = field(default_factory=set)
-
-    @property
-    def invested_compute(self) -> float:
-        return min(1.0, self.total_tokens / 4096.0)
-
-
-# =============================================================================
-# S3-FIFO Queue (scan-resistant admission)
-# =============================================================================
-
-class S3FIFOQueue:
-    """
-    Three-queue FIFO inspired by S3-FIFO (SOSP'23).
-    - Small (10%): new blocks enter here
-    - Main (90%): promoted on second access
-    - Ghost: metadata-only, tracks recently evicted
-
-    One-hit-wonders evict from Small without polluting Main.
-    """
-
-    def __init__(self, capacity: int, small_ratio: float = 0.10):
-        self.small_cap = max(1, int(capacity * small_ratio))
-        self.main_cap = capacity - self.small_cap
-        self.ghost_cap = capacity
-
-        self.small: OrderedDict[int, bool] = OrderedDict()
-        self.main: OrderedDict[int, bool] = OrderedDict()
-        self.ghost: OrderedDict[int, float] = OrderedDict()
-        self._loc: Dict[int, str] = {}
-
-    def admit(self, block_id: int, now: float) -> Optional[int]:
-        if block_id in self.ghost:
-            del self.ghost[block_id]
-            return self._to_main(block_id, now)
-        return self._to_small(block_id, now)
-
-    def access(self, block_id: int) -> None:
-        if block_id in self.small:
-            self.small[block_id] = True
-        elif block_id in self.main:
-            self.main[block_id] = True
-
-    def contains(self, block_id: int) -> bool:
-        return block_id in self._loc
-
-    def remove(self, block_id: int) -> None:
-        self.small.pop(block_id, None)
-        self.main.pop(block_id, None)
-        self._loc.pop(block_id, None)
-        self.ghost.pop(block_id, None)
-
-    def _to_small(self, block_id: int, now: float) -> Optional[int]:
-        evicted = None
-        while len(self.small) >= self.small_cap:
-            evicted = self._evict_small(now)
-        self.small[block_id] = False
-        self._loc[block_id] = 'small'
-        return evicted
-
-    def _to_main(self, block_id: int, now: float) -> Optional[int]:
-        evicted = None
-        while len(self.main) >= self.main_cap:
-            evicted = self._evict_main(now)
-        self.main[block_id] = False
-        self._loc[block_id] = 'main'
-        return evicted
-
-    def _evict_small(self, now: float) -> Optional[int]:
-        while self.small:
-            bid, visited = self.small.popitem(last=False)
-            del self._loc[bid]
-            if visited:
-                self._to_main(bid, now)
-                continue
-            self._to_ghost(bid, now)
-            return bid
-        return None
-
-    def _evict_main(self, now: float) -> Optional[int]:
-        for _ in range(len(self.main)):
-            if not self.main:
-                return None
-            bid, visited = self.main.popitem(last=False)
-            if visited:
-                self.main[bid] = False
-                continue
-            del self._loc[bid]
-            self._to_ghost(bid, now)
-            return bid
-        return None
-
-    def _to_ghost(self, block_id: int, now: float) -> None:
-        if len(self.ghost) >= self.ghost_cap:
-            self.ghost.popitem(last=False)
-        self.ghost[block_id] = now
-
-    @property
-    def size(self) -> int:
-        return len(self.small) + len(self.main)
 
 
 # =============================================================================
@@ -254,12 +145,11 @@ class PhaseWeights:
     frequency: float
     attention: float
     position: float
-    seq_priority: float
 
 
 PHASE_WEIGHTS = {
-    InferencePhase.PREFILL: PhaseWeights(0.15, 0.15, 0.30, 0.25, 0.15),
-    InferencePhase.DECODE:  PhaseWeights(0.25, 0.20, 0.25, 0.15, 0.15),
+    InferencePhase.PREFILL: PhaseWeights(0.15, 0.20, 0.35, 0.30),
+    InferencePhase.DECODE:  PhaseWeights(0.30, 0.20, 0.30, 0.20),
 }
 
 
@@ -297,7 +187,6 @@ class KVCachePolicy:
         self.ema_alpha = attention_ema_alpha
 
         self.freq_sketch = FrequencySketch(max_blocks * 4)
-        self.fifo = S3FIFOQueue(max_blocks)
 
         self.blocks: Dict[int, BlockState] = {}
         self.sequences: Dict[int, SequenceState] = {}
@@ -313,10 +202,8 @@ class KVCachePolicy:
 
     # ---- Sequence lifecycle ----
 
-    def register_sequence(self, seq_id: int, priority: float = 1.0, max_tokens: int = 4096):
-        self.sequences[seq_id] = SequenceState(
-            sequence_id=seq_id, priority=priority, max_tokens=max_tokens,
-        )
+    def register_sequence(self, seq_id: int):
+        self.sequences[seq_id] = SequenceState(sequence_id=seq_id)
 
     def set_phase(self, seq_id: int, phase: InferencePhase):
         if seq_id in self.sequences:
@@ -383,11 +270,6 @@ class KVCachePolicy:
 
         self.freq_sketch.increment(block_id)
 
-        if self.fifo.contains(block_id):
-            self.fifo.access(block_id)
-        else:
-            self.fifo.admit(block_id, time.monotonic())
-
         self.gpu_blocks.add(block_id)
 
     # ---- Scoring interface ----
@@ -403,14 +285,12 @@ class KVCachePolicy:
 
         seq = self.sequences.get(block.sequence_id)
         phase = seq.phase if seq else InferencePhase.DECODE
-        if phase == InferencePhase.COMPLETE:
-            return -1.0
 
         w = PHASE_WEIGHTS.get(phase)
         if not w:
             return -1.0
 
-        seq_len = seq.total_tokens if seq else 0
+        seq_len = len(seq.block_ids) * self.block_size if seq else 0
 
         # Signal 1: Recency — exponential decay
         recency = math.exp(-0.01 * (self._step - block.last_access_step))
@@ -424,17 +304,11 @@ class KVCachePolicy:
         # Signal 4: Position importance — classify each position in block
         importance = self._block_importance(block, seq_len)
 
-        # Signal 5: Sequence priority
-        seq_priority = 0.5
-        if seq:
-            seq_priority = seq.priority * (0.5 + 0.5 * seq.invested_compute)
-
         score = (
             w.recency * recency +
             w.frequency * frequency +
             w.attention * attention +
-            w.position * importance +
-            w.seq_priority * seq_priority
+            w.position * importance
         )
 
         # Entity bonus — protect blocks with high-attention positions
@@ -496,7 +370,6 @@ class KVCachePolicy:
         self.blocks.pop(block_id, None)
         self.gpu_blocks.discard(block_id)
         self.pinned_blocks.discard(block_id)
-        self.fifo.remove(block_id)
 
     # ---- Internal helpers ----
 
@@ -531,7 +404,7 @@ class KVCachePolicy:
         if not block or not block.token_attention:
             return False
         seq = self.sequences.get(block.sequence_id)
-        seq_len = seq.total_tokens if seq else 0
+        seq_len = len(seq.block_ids) * self.block_size if seq else 0
         for pos, attn in block.token_attention.items():
             cls = self._classify_position(pos, seq_len, attn)
             if cls != PositionClass.FILLER:
