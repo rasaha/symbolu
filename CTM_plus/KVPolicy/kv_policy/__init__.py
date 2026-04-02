@@ -17,7 +17,13 @@ Usage:
     victims = policy.select_victims(count=4)
 """
 
-from .attention_evictor import KVCachePolicy, InferencePhase, PositionClass
+from .attention_evictor import (
+    KVCachePolicy,
+    InferencePhase,
+    PositionClass,
+    compute_adaptive_threshold,
+    classify_block_importance,
+)
 from .config import KVCachePolicyConfig
 
 __version__ = "0.2.0"
@@ -26,4 +32,6 @@ __all__ = [
     "KVCachePolicyConfig",
     "InferencePhase",
     "PositionClass",
+    "compute_adaptive_threshold",
+    "classify_block_importance",
 ]

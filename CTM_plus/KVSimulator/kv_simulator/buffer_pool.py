@@ -188,6 +188,135 @@ def mixed_multihead_attention(seq_len: int, sink_tokens: int = 4,
 
 
 # =============================================================================
+# Block-Level Attention (O(1) per block)
+# =============================================================================
+
+def _block_attn_sink_recent(start: int, n: int, seq_len: int,
+                            sink_tokens: int, recent_window: int) -> float:
+    """O(1) block attention for sink+recent pattern."""
+    if seq_len == 0 or n == 0:
+        return 0.0
+    end = start + n
+    st = min(sink_tokens, seq_len)
+    rw = min(recent_window, max(0, seq_len - st))
+    recent_start_pos = seq_len - rw
+    middle_count = max(1, seq_len - st - rw)
+
+    # Sink contribution (unnormalized)
+    sink_n = max(0, min(end, st) - max(start, 0))
+    raw_sink = sink_n * 0.15 / max(1, st)
+
+    # Middle contribution (unnormalized)
+    mid_lo = max(start, st)
+    mid_hi = min(end, recent_start_pos)
+    mid_n = max(0, mid_hi - mid_lo)
+    raw_middle = mid_n * 0.30 / middle_count
+
+    # Recent contribution (unnormalized, recency-weighted)
+    rec_lo = max(start, recent_start_pos)
+    rec_hi = min(end, seq_len)
+    raw_recent = 0.0
+    if rec_hi > rec_lo and rw > 0 and seq_len > st:
+        base = seq_len - recent_window
+        lo_off = rec_lo - base
+        hi_off = rec_hi - base
+        j_sum = (hi_off * (hi_off - 1) - lo_off * (lo_off - 1)) / 2.0
+        raw_recent = 0.55 * j_sum / (max(1, recent_window) * max(1, rw))
+
+    block_raw = raw_sink + raw_middle + raw_recent
+
+    # Normalization factor (total across all positions)
+    total_sink = 0.15 if st > 0 else 0.0
+    total_middle = 0.30 * max(0, seq_len - st - rw) / middle_count
+    total_recent = 0.0
+    if rw > 0 and seq_len > st:
+        base = seq_len - recent_window
+        t_lo = recent_start_pos - base
+        t_hi = seq_len - base
+        t_sum = (t_hi * (t_hi - 1) - t_lo * (t_lo - 1)) / 2.0
+        total_recent = 0.55 * t_sum / (max(1, recent_window) * max(1, rw))
+
+    total_raw = total_sink + total_middle + total_recent
+    return block_raw / total_raw if total_raw > 0 else 0.0
+
+
+def _block_attn_entity_focused(start: int, n: int, seq_len: int,
+                               sink_tokens: int, recent_window: int) -> float:
+    """O(1) block attention for entity-focused pattern."""
+    if seq_len == 0 or n == 0:
+        return 0.0
+    end = start + n
+    st = min(sink_tokens, seq_len)
+
+    # Sink contribution
+    sink_n = max(0, min(end, st) - max(start, 0))
+    raw_sink = sink_n * 0.15 / max(1, st)
+
+    # Entity position parameters
+    middle_start = st
+    middle_len = max(1, seq_len - st)
+    num_entities = max(1, middle_len // 20)
+    entity_step = max(1, middle_len // (num_entities + 1))
+
+    # Count entity positions in [start, end) ∩ [middle_start, seq_len)
+    entity_in_block = 0
+    total_entities = 0
+    if entity_step > 0 and middle_start + entity_step < seq_len:
+        total_entities = min(num_entities, (seq_len - 1 - middle_start) // entity_step)
+        lo = max(start, middle_start)
+        hi = min(end, seq_len)
+        if hi > lo:
+            e_lo = max(1, math.ceil((lo - middle_start) / entity_step))
+            e_hi = min(total_entities, (hi - 1 - middle_start) // entity_step)
+            if e_lo <= e_hi:
+                entity_in_block = e_hi - e_lo + 1
+
+    # Non-sink positions in block
+    non_sink_n = max(0, min(end, seq_len) - max(start, st))
+    filler_in_block = non_sink_n - entity_in_block
+    total_filler = max(1, max(0, seq_len - st) - total_entities)
+
+    entity_share = 0.50 / max(1, total_entities)
+    filler_share = 0.35 / max(1, total_filler)
+
+    # Raw weights sum to ~1.0, normalization is near-identity
+    raw = raw_sink + entity_in_block * entity_share + filler_in_block * filler_share
+    norm = (0.15 if st > 0 else 0.0) + total_entities * entity_share + total_filler * filler_share
+    return raw / norm if norm > 0 else 0.0
+
+
+def _block_attn_uniform(start: int, n: int, seq_len: int,
+                        sink_tokens: int, recent_window: int) -> float:
+    """O(1) block attention for uniform pattern."""
+    if seq_len == 0 or n == 0:
+        return 0.0
+    end = start + n
+    st = min(sink_tokens, seq_len)
+    sink_n = max(0, min(end, st) - max(start, 0))
+    rest_n = max(0, min(end, seq_len) - max(start, st))
+    # Raw weights sum to 1.0, normalization is identity
+    return sink_n * 0.15 / max(1, st) + rest_n * 0.85 / max(1, seq_len - st)
+
+
+def _block_attn_mixed(start: int, n: int, seq_len: int,
+                      sink_tokens: int, recent_window: int) -> float:
+    """O(1) block attention for mixed multi-head pattern (average of three)."""
+    a = _block_attn_sink_recent(start, n, seq_len, sink_tokens, recent_window)
+    b = _block_attn_entity_focused(start, n, seq_len, sink_tokens, recent_window)
+    c = _block_attn_uniform(start, n, seq_len, sink_tokens, recent_window)
+    return (a + b + c) / 3.0
+
+
+# Map per-position attention functions to O(1) block-level equivalents
+_BLOCK_ATTN_FNS = {
+    sink_and_recent_attention: _block_attn_sink_recent,
+    entity_focused_attention: _block_attn_entity_focused,
+    uniform_attention: _block_attn_uniform,
+    mixed_multihead_attention: _block_attn_mixed,
+}
+
+
+# =============================================================================
 # Eviction Policies
 # =============================================================================
 
@@ -526,7 +655,8 @@ class KVCacheSimulator:
     def decode_step(self, seq_id: int) -> None:
         """
         Simulate one decode step: new token attends to all prior tokens.
-        Attention follows sink+recent distribution.
+        Uses O(1) block-level attention when available, else falls back to
+        per-position computation.
         """
         seq = self.sequences[seq_id]
         self._step += 1
@@ -534,10 +664,10 @@ class KVCacheSimulator:
         current_len = seq.generated_tokens
         new_position = current_len - 1
 
-        # Generate attention distribution
-        attention = self.attention_fn(
-            current_len, self.sink_tokens, self.recent_window,
-        )
+        # Resolve block-level attention function (O(1) per block)
+        block_attn_fn = _BLOCK_ATTN_FNS.get(self.attention_fn)
+        # Lazy fallback: only generate full attention vector if needed
+        _attn_cache = None
 
         # Distribute attention to blocks and detect recompute cost
         for bid in list(seq.block_ids):
@@ -557,12 +687,27 @@ class KVCacheSimulator:
             self.stats["decode_block_hits"] += 1
             block = self.blocks[bid]
 
-            # Block-level attention: sum over block's position range
-            attn_len = len(attention)
-            block_attn = 0.0
-            for p in block.token_positions:
-                if p < attn_len:
-                    block_attn += attention[p]
+            # Compute block attention
+            if block_attn_fn is not None:
+                # O(1) analytical block-level attention
+                start_pos = block.token_positions[0] if block.token_positions else 0
+                n_tokens = len(block.token_positions)
+                block_attn = block_attn_fn(
+                    start_pos, n_tokens, current_len,
+                    self.sink_tokens, self.recent_window,
+                )
+            else:
+                # Fallback: per-position summation for custom attention fns
+                if _attn_cache is None:
+                    _attn_cache = self.attention_fn(
+                        current_len, self.sink_tokens, self.recent_window,
+                    )
+                attn_len = len(_attn_cache)
+                block_attn = 0.0
+                for p in block.token_positions:
+                    if p < attn_len:
+                        block_attn += _attn_cache[p]
+
             if block_attn > 0:
                 block.cumulative_attention += block_attn
                 block.access_count += 1
@@ -600,11 +745,9 @@ class KVCacheSimulator:
 
     @property
     def _entity_threshold(self) -> float:
-        """Adaptive entity threshold: global_mean * 2.0, with floor of 0.02."""
-        if self._attn_count > 0:
-            global_mean = self._attn_sum / self._attn_count
-            return max(0.02, global_mean * 2.0)
-        return 0.02
+        """Adaptive entity threshold that scales with sequence length."""
+        from CTM_plus.KVPolicy.kv_policy.attention_evictor import compute_adaptive_threshold
+        return compute_adaptive_threshold(self._attn_sum, self._attn_count)
 
     # ---- Internal ----
 
@@ -702,17 +845,20 @@ def run_workload(
     recent_window: int = 128,
     kv_policy=None,
     attention_fn=None,
+    staggered: bool = False,
+    arrival_interval: int = 0,
 ) -> Dict:
     """
     Run a complete workload and return metrics.
-
-    Simulates continuous batching: prefill all sequences, then interleaved
-    decode steps.
 
     Args:
         kv_policy: A KVCachePolicy instance. Required when
             policy_type=PolicyType.KV_POLICY.
         attention_fn: Optional attention pattern function override.
+        staggered: If True, admit sequences at intervals during decode
+            instead of prefilling all upfront.
+        arrival_interval: Steps between sequence arrivals when staggered.
+            0 = auto (spread evenly across decode_steps_per_seq).
     """
     sim = KVCacheSimulator(
         max_blocks=max_blocks, block_size=block_size,
@@ -721,17 +867,42 @@ def run_workload(
         kv_policy=kv_policy, attention_fn=attention_fn,
     )
 
-    # Prefill all sequences
-    for seq_id, ctx_len in sequences:
-        sim.add_sequence(seq_id, ctx_len)
-        sim.prefill_sequence(seq_id)
+    if not staggered:
+        # Original: prefill all, then interleaved decode
+        for seq_id, ctx_len in sequences:
+            sim.add_sequence(seq_id, ctx_len)
+            sim.prefill_sequence(seq_id)
 
-    # Interleaved decode
-    active_ids = [sid for sid, _ in sequences]
-    for step in range(decode_steps_per_seq):
-        for sid in active_ids:
-            if sid in sim.sequences:
-                sim.decode_step(sid)
+        active_ids = [sid for sid, _ in sequences]
+        for step in range(decode_steps_per_seq):
+            for sid in active_ids:
+                if sid in sim.sequences:
+                    sim.decode_step(sid)
+    else:
+        # Staggered: admit sequences at intervals during decode
+        interval = arrival_interval if arrival_interval > 0 else max(
+            1, decode_steps_per_seq // max(1, len(sequences)),
+        )
+        pending = list(sequences)
+        active_ids: List[int] = []
+
+        for step in range(decode_steps_per_seq):
+            # Admit next pending sequence at interval
+            while pending and step >= len(active_ids) * interval:
+                sid, ctx_len = pending.pop(0)
+                sim.add_sequence(sid, ctx_len)
+                sim.prefill_sequence(sid)
+                active_ids.append(sid)
+
+            # Decode all active
+            for sid in active_ids:
+                if sid in sim.sequences:
+                    sim.decode_step(sid)
+
+        # Admit any remaining (if decode_steps too short for all arrivals)
+        for sid, ctx_len in pending:
+            sim.add_sequence(sid, ctx_len)
+            sim.prefill_sequence(sid)
 
     metrics = sim.get_metrics()
     metrics["policy"] = policy_type.value
@@ -922,6 +1093,8 @@ def compare_policies(
     include_kv_policy: bool = True,
     attention_fn=None,
     sequences: Optional[List[Tuple[int, int]]] = None,
+    staggered: bool = False,
+    arrival_interval: int = 0,
 ) -> Dict[str, Dict]:
     """
     Run the same workload under all policies and return comparison.
@@ -931,6 +1104,8 @@ def compare_policies(
         attention_fn: Optional attention pattern function override.
         sequences: Optional explicit sequence list [(seq_id, context_length), ...].
             Overrides num_sequences/context_length when provided.
+        staggered: If True, admit sequences at intervals during decode.
+        arrival_interval: Steps between arrivals (0 = auto).
     """
     if sequences is None:
         sequences = [(i, context_length) for i in range(num_sequences)]
@@ -957,6 +1132,7 @@ def compare_policies(
             sequences=sequences, decode_steps_per_seq=decode_steps,
             policy_type=policy, seed=seed,
             kv_policy=kv_pol, attention_fn=attention_fn,
+            staggered=staggered, arrival_interval=arrival_interval,
         )
         elapsed = time.perf_counter() - start
         metrics["elapsed_seconds"] = round(elapsed, 4)

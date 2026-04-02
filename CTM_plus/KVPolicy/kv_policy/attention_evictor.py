@@ -28,6 +28,41 @@ from typing import Dict, List, Set, Any
 
 
 # =============================================================================
+# Shared Classification Utilities
+# =============================================================================
+
+def compute_adaptive_threshold(attn_sum: float, attn_count: int,
+                               k: float = 2.0, floor: float = 0.02) -> float:
+    """
+    Compute adaptive entity threshold from running attention statistics.
+
+    Returns global_mean * k once enough samples exist, otherwise falls back
+    to `floor`. This scales correctly across sequence lengths: long sequences
+    produce smaller per-block attention values, so the threshold scales down.
+    """
+    if attn_count >= 10:
+        return (attn_sum / attn_count) * k
+    return floor
+
+
+def classify_block_importance(is_sink: bool, attention: float,
+                              threshold: float) -> float:
+    """
+    Classify a block's importance for eviction scoring.
+
+    Returns:
+        1.0 for sink blocks (never evict),
+        0.8 for entity blocks (high attention, protect),
+        0.1 for filler blocks (low attention, evict first).
+    """
+    if is_sink:
+        return 1.0
+    if attention > threshold:
+        return 0.8
+    return 0.1
+
+
+# =============================================================================
 # Frequency Sketch (Count-Min Sketch, 4-bit counters)
 # =============================================================================
 
@@ -430,31 +465,29 @@ class KVCachePolicy:
 
     @property
     def _adaptive_threshold(self) -> float:
-        """Adaptive entity threshold: global_mean * k, with floor."""
-        if self._ema_count > 0:
-            global_mean = self._ema_sum / self._ema_count
-            return max(self.entity_threshold, global_mean * self._entity_k)
-        return self.entity_threshold
+        """Adaptive entity threshold that scales with sequence length."""
+        return compute_adaptive_threshold(
+            self._ema_sum, self._ema_count,
+            k=self._entity_k, floor=self.entity_threshold,
+        )
 
     def _classify_block(self, block: BlockState) -> float:
         """
         Classify block as sink/entity/filler. Returns importance [0, 1].
         O(1) — no per-position iteration.
         """
-        if block.is_sink:
-            return 1.0
-        if block.attention_ema > self._adaptive_threshold:
-            return 0.8
-        return 0.1
+        return classify_block_importance(
+            block.is_sink, block.attention_ema, self._adaptive_threshold,
+        )
 
     def _is_all_filler(self, block_id: int) -> bool:
         """Check if block is filler (not sink, low attention)."""
         block = self.blocks.get(block_id)
         if not block:
             return False
-        if block.is_sink:
-            return False
-        return block.attention_ema <= self._adaptive_threshold
+        return classify_block_importance(
+            block.is_sink, block.attention_ema, self._adaptive_threshold,
+        ) < 0.5
 
     def get_stats(self) -> Dict[str, Any]:
         return {
