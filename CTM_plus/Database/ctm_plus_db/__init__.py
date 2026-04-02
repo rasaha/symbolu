@@ -1,38 +1,24 @@
 """
-CTM+ Integration for Database Systems.
+CTM+ Adaptive Eviction Policy.
 
-Provides intelligent buffer pool management for database systems
-including PostgreSQL, MySQL, Redis, and generic key-value stores.
+A sampled multi-signal eviction policy for research and benchmarking.
+This is NOT a database buffer pool or storage system — it only makes
+eviction decisions based on page access metadata.
 
 Usage:
-    from ctm_plus_db import CTMBufferPool, CTMDBConfig
+    from ctm_plus_db import AdaptiveEvictionPolicy, EvictionConfig
 
-    # Create buffer pool with CTM+
-    pool = CTMBufferPool(
-        pool_size_pages=10000,
-        page_size_bytes=8192,
-    )
-
-    # Access pages
-    pool.access(page_id=12345, is_write=False)
-
-    # Get eviction victim
-    victim = pool.select_victim()
+    policy = AdaptiveEvictionPolicy(capacity=10000)
+    is_hit, prefetch = policy.access(page_id=42)
+    victim = policy.select_victim()
 """
 
-from .buffer_pool import CTMBufferPool
-from .page_cache import CTMPageCache
-from .config import CTMDBConfig
-from .postgres import PostgresCTMExtension
-from .redis_cache import RedisCTMCache
-from .generic import GenericKVCache
+from .buffer_pool import AdaptiveEvictionPolicy, PageType
+from .config import EvictionConfig
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
-    "CTMBufferPool",
-    "CTMPageCache",
-    "CTMDBConfig",
-    "PostgresCTMExtension",
-    "RedisCTMCache",
-    "GenericKVCache",
+    "AdaptiveEvictionPolicy",
+    "EvictionConfig",
+    "PageType",
 ]
