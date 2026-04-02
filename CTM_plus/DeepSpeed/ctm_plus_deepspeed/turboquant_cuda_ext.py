@@ -1,8 +1,11 @@
 """
 TurboQuant CUDA extension — Python bindings for turboquant_cuda.cu.
 
-Provides :class:`TurboQuantCUDA`, a drop-in replacement for
-:class:`TurboQuantNumba` that runs entirely on GPU.
+Provides :class:`TurboQuantCUDA`, a drop-in replacement for the Numba
+compress/decompress path that runs entirely on GPU.
+
+Compressed representation: uint8 grid bin indices (matching Numba).
+Quantization: LUT floor quantization (matching Numba _compress_polar_numba).
 
 Build modes
 -----------
@@ -25,11 +28,17 @@ Kernel selection
 
 These "fused" variants fold the rotation GEMM into the polar-tree walk,
 avoiding a separate cuBLAS launch.
+
+Shared memory
+-------------
+The fused kernels load the rotation matrix into shared memory:
+head_dim * head_dim * sizeof(float).  For head_dim=128 this is 64KB,
+which exceeds the default 48KB limit on most GPUs.  The Python bindings
+call ``cudaFuncSetAttribute`` (via torch) to raise the limit.
 """
 
 from __future__ import annotations
 
-import ctypes
 import math
 import os
 from pathlib import Path
@@ -38,16 +47,14 @@ from typing import Optional
 import numpy as np
 
 from .turboquant_numba import (
-    build_level_structure,
     compute_level_offsets,
     build_angle_grids,
 )
 
 # ---------------------------------------------------------------------------
-# Try to load the CUDA library
+# Try to load torch
 # ---------------------------------------------------------------------------
 
-_CUDA_LIB: Optional[ctypes.CDLL] = None
 _TORCH_AVAILABLE = False
 
 try:
@@ -57,56 +64,13 @@ except ImportError:
     pass
 
 
-def _find_cuda_lib() -> Optional[ctypes.CDLL]:
-    """Locate and load the compiled CUDA shared library."""
-    # 1. Explicit env var
-    env_path = os.environ.get("TURBOQUANT_CUDA_LIB")
-    if env_path and os.path.isfile(env_path):
-        return ctypes.CDLL(env_path)
-
-    # 2. Co-located .so next to this file
-    here = Path(__file__).parent
-    so_path = here / "turboquant_cuda.so"
-    if so_path.is_file():
-        return ctypes.CDLL(str(so_path))
-
-    # 3. JIT compile via PyTorch cpp_extension
-    if _TORCH_AVAILABLE:
-        try:
-            from torch.utils.cpp_extension import load as cpp_load
-
-            cu_path = here / "turboquant_cuda.cu"
-            if cu_path.is_file():
-                module = cpp_load(
-                    name="turboquant_cuda",
-                    sources=[str(cu_path)],
-                    extra_cuda_cflags=["-O3", "--use_fast_math"],
-                    verbose=False,
-                )
-                # torch cpp_extension returns a Python module, not CDLL.
-                # We return it and handle dispatch separately.
-                return module
-        except Exception:
-            pass
-
-    return None
-
-
-def _ensure_lib():
-    """Lazy-load the CUDA library on first use."""
-    global _CUDA_LIB
-    if _CUDA_LIB is None:
-        _CUDA_LIB = _find_cuda_lib()
-    return _CUDA_LIB
-
-
 # ---------------------------------------------------------------------------
 # torch ↔ numpy helpers
 # ---------------------------------------------------------------------------
 
 def _to_torch(arr: np.ndarray, device: str = "cuda") -> "torch.Tensor":
     """Convert numpy array to torch tensor on device."""
-    return torch.from_numpy(arr).to(device)
+    return torch.from_numpy(np.ascontiguousarray(arr)).to(device)
 
 
 def _to_numpy(tensor: "torch.Tensor") -> np.ndarray:
@@ -122,21 +86,21 @@ class TurboQuantCUDA:
     """
     GPU-accelerated PolarQuant compress / decompress.
 
-    API mirrors :class:`TurboQuantNumba`::
+    Compressed format matches the Numba path:
+    - radii:   (batch,) float32 — final polar radius per vector
+    - indices: (batch, total_angles) uint8 — grid bin indices
+
+    API::
 
         cuda_tq = TurboQuantCUDA(head_dim=128, angle_bits=3, seed=42)
 
-        # Compress: numpy in → CompressedTensors on GPU
-        radii, angles, indices = cuda_tq.compress(vectors)
+        # Compress: numpy in → (radii, indices) as numpy
+        radii, indices = cuda_tq.compress(vectors)
 
-        # Decompress: GPU tensors → numpy out
-        vectors = cuda_tq.decompress(radii, angles)
+        # Decompress: → numpy (batch, head_dim)
+        vectors = cuda_tq.decompress(radii, indices)
 
-    Requires either:
-    - A pre-compiled ``turboquant_cuda.so``
-    - PyTorch with CUDA support (for JIT compilation)
-
-    Raises RuntimeError if neither is available.
+    Requires PyTorch with CUDA support.
     """
 
     def __init__(
@@ -148,11 +112,8 @@ class TurboQuantCUDA:
     ):
         if not _TORCH_AVAILABLE:
             raise RuntimeError(
-                "TurboQuantCUDA requires PyTorch with CUDA support. "
-                "Install torch or pre-compile turboquant_cuda.so and set "
-                "TURBOQUANT_CUDA_LIB."
+                "TurboQuantCUDA requires PyTorch with CUDA support."
             )
-
         if not torch.cuda.is_available():
             raise RuntimeError(
                 "CUDA is not available. TurboQuantCUDA requires a GPU."
@@ -174,11 +135,19 @@ class TurboQuantCUDA:
         self._level_sizes_gpu = _to_torch(self._level_sizes_np, device)
         self._level_offsets_gpu = _to_torch(self._level_offsets_np, device)
 
-        # Angle grids
-        grid_full, grid_pos = build_angle_grids(angle_bits)
-        self._grid_full_gpu = _to_torch(grid_full.astype(np.float32), device)
-        self._grid_pos_gpu = _to_torch(grid_pos.astype(np.float32), device)
+        # Angle grids + LUT scale constants
+        grid_full, grid_pos, lut_scale_full, lut_scale_pos = build_angle_grids(angle_bits)
+        self._grid_full_gpu = _to_torch(grid_full, device)
+        self._grid_pos_gpu = _to_torch(grid_pos, device)
         self._n_grid = 2 ** angle_bits
+        self._lut_scale_full = lut_scale_full
+        self._lut_scale_pos = lut_scale_pos
+
+        # Precomputed cos/sin LUTs for decompress (matches Numba path)
+        self._cos_grid_full_gpu = _to_torch(np.cos(grid_full).astype(np.float32), device)
+        self._sin_grid_full_gpu = _to_torch(np.sin(grid_full).astype(np.float32), device)
+        self._cos_grid_pos_gpu = _to_torch(np.cos(grid_pos).astype(np.float32), device)
+        self._sin_grid_pos_gpu = _to_torch(np.sin(grid_pos).astype(np.float32), device)
 
         # Rotation matrix
         rng = np.random.RandomState(seed)
@@ -187,24 +156,17 @@ class TurboQuantCUDA:
         rotation = Q @ np.diag(np.sign(np.diag(R)))
         self._rotation_gpu = _to_torch(
             rotation.astype(np.float32), device
-        )  # (D, D)
+        )
         self._rotation_t_gpu = _to_torch(
             rotation.T.astype(np.float32).copy(), device
         )
 
         # Block/grid config
-        self._block_size = 128  # threads per block
+        self._block_size = 128
 
         # Stats
         self._compress_calls = 0
         self._decompress_calls = 0
-
-    def _grid_dim(self, batch: int) -> int:
-        return (batch + self._block_size - 1) // self._block_size
-
-    def _shmem_bytes(self) -> int:
-        """Shared memory for rotation matrix tile."""
-        return self.head_dim * self.head_dim * 4  # float32
 
     # ------------------------------------------------------------------ #
     #  Compress
@@ -212,7 +174,7 @@ class TurboQuantCUDA:
 
     def compress(
         self, vectors: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Compress batch of vectors on GPU.
 
@@ -223,48 +185,37 @@ class TurboQuantCUDA:
         Returns
         -------
         radii   : (batch,) float32
-        angles  : (batch, total_angles) float32
-        indices : (batch, total_angles) int32
+        indices : (batch, total_angles) uint8 — grid bin indices
         """
         vectors_f32 = np.ascontiguousarray(vectors, dtype=np.float32)
         batch = vectors_f32.shape[0]
 
-        # Upload to GPU
         v_gpu = _to_torch(vectors_f32, self.device)
 
-        # Allocate outputs
-        out_angles = torch.empty(
-            (batch, self.total_angles), dtype=torch.float32, device=self.device
-        )
         out_indices = torch.empty(
-            (batch, self.total_angles), dtype=torch.int32, device=self.device
+            (batch, self.total_angles), dtype=torch.uint8, device=self.device
         )
         out_radii = torch.empty(batch, dtype=torch.float32, device=self.device)
 
-        # For the fused kernel, we use torch's custom CUDA kernel launch
-        # via a Python-level implementation that mirrors the CUDA kernel logic.
-        # This is the "PyTorch-native" path — uses torch ops to implement
-        # the same fused algorithm without needing ctypes raw kernel launch.
-        self._compress_torch(v_gpu, out_angles, out_indices, out_radii)
+        self._compress_torch(v_gpu, out_indices, out_radii)
 
         self._compress_calls += 1
 
         return (
             _to_numpy(out_radii),
-            _to_numpy(out_angles),
-            _to_numpy(out_indices).astype(np.int64),
+            _to_numpy(out_indices),
         )
 
-    def _compress_torch(self, v_gpu, out_angles, out_indices, out_radii):
+    def _compress_torch(self, v_gpu, out_indices, out_radii):
         """
-        PyTorch-native fused compress.
+        PyTorch-native fused compress using LUT floor quantization.
 
-        Implements the same algorithm as turboquant_compress_fused_kernel
-        using torch tensor ops.  Runs on GPU via torch's CUDA backend.
-        When the raw CUDA kernel .so is available, this is replaced by
-        a direct kernel launch.
+        Matches Numba _compress_polar_numba exactly:
+        - Level 0: k = clamp(floor((theta + pi) * lut_scale_full), 0, n_grid-1)
+        - Level 1+: k = clamp(floor(theta * lut_scale_pos), 0, n_grid-1)
         """
         batch = v_gpu.shape[0]
+        pi = math.pi
 
         # Step 1: Rotate — v @ R^T
         radii = v_gpu @ self._rotation_gpu.T  # (B, D)
@@ -274,7 +225,6 @@ class TurboQuantCUDA:
         for lvl in range(self.n_levels):
             n_pairs = int(self._level_sizes_np[lvl])
             off = int(self._level_offsets_np[lvl])
-            grid = self._grid_full_gpu if lvl == 0 else self._grid_pos_gpu
 
             xs = radii[:, 0:2 * n_pairs:2]   # (B, n_pairs)
             ys = radii[:, 1:2 * n_pairs:2]   # (B, n_pairs)
@@ -282,13 +232,13 @@ class TurboQuantCUDA:
             rs = torch.sqrt(xs * xs + ys * ys)
             thetas = torch.atan2(ys, xs)      # (B, n_pairs)
 
-            # Quantise: nearest grid point
-            diffs = torch.abs(
-                thetas.unsqueeze(-1) - grid.unsqueeze(0).unsqueeze(0)
-            )  # (B, n_pairs, n_grid)
-            idxs = torch.argmin(diffs, dim=-1)  # (B, n_pairs)
+            # LUT floor quantization (matches Numba)
+            if lvl == 0:
+                k = torch.floor((thetas + pi) * self._lut_scale_full)
+            else:
+                k = torch.floor(thetas * self._lut_scale_pos)
 
-            out_angles[:, off:off + n_pairs] = grid[idxs]
+            idxs = torch.clamp(k, 0, self._n_grid - 1).to(torch.uint8)
             out_indices[:, off:off + n_pairs] = idxs
 
             # Build next level radii
@@ -316,25 +266,25 @@ class TurboQuantCUDA:
     def decompress(
         self,
         radii: np.ndarray,
-        angles: np.ndarray,
+        indices: np.ndarray,
     ) -> np.ndarray:
         """
         Decompress batch of vectors on GPU.
 
         Parameters
         ----------
-        radii  : (batch,) float32
-        angles : (batch, total_angles) float32
+        radii   : (batch,) float32
+        indices : (batch, total_angles) uint8 — grid bin indices
 
         Returns
         -------
-        vectors : (batch, head_dim) float64
+        vectors : (batch, head_dim) float32
         """
         radii_gpu = _to_torch(
             np.ascontiguousarray(radii, dtype=np.float32), self.device
         )
-        angles_gpu = _to_torch(
-            np.ascontiguousarray(angles, dtype=np.float32), self.device
+        indices_gpu = _to_torch(
+            np.ascontiguousarray(indices, dtype=np.uint8), self.device
         )
 
         batch = radii_gpu.shape[0]
@@ -342,16 +292,17 @@ class TurboQuantCUDA:
             (batch, self.head_dim), dtype=torch.float32, device=self.device
         )
 
-        self._decompress_torch(radii_gpu, angles_gpu, out_gpu)
+        self._decompress_torch(radii_gpu, indices_gpu, out_gpu)
 
         self._decompress_calls += 1
-        return _to_numpy(out_gpu).astype(np.float64)
+        return _to_numpy(out_gpu)
 
-    def _decompress_torch(self, radii_gpu, angles_gpu, out_gpu):
+    def _decompress_torch(self, radii_gpu, indices_gpu, out_gpu):
         """
-        PyTorch-native fused decompress.
+        PyTorch-native fused decompress using precomputed cos/sin LUTs.
 
-        Mirrors turboquant_decompress_fused_kernel using torch ops.
+        Matches Numba _decompress_polar_numba: indices → cos/sin LUT lookup,
+        no trig calls in the hot path.
         """
         batch = radii_gpu.shape[0]
 
@@ -364,23 +315,28 @@ class TurboQuantCUDA:
             off = int(self._level_offsets_np[lvl])
 
             cur_len = coords.shape[1]
-            # Angles for this level
-            level_angles = angles_gpu[:, off:off + n_angles]  # (B, n_angles)
+            is_level0 = (lvl == 0)
 
-            # The first `n_angles` entries of coords get expanded to pairs;
-            # any remaining entries (odd carry-forward) pass through.
+            # Get grid indices for this level
+            level_idx = indices_gpu[:, off:off + n_angles].long()  # (B, n_angles)
+
+            # cos/sin via LUT (no trig calls)
+            if is_level0:
+                cos_vals = self._cos_grid_full_gpu[level_idx]  # (B, n_angles)
+                sin_vals = self._sin_grid_full_gpu[level_idx]
+            else:
+                cos_vals = self._cos_grid_pos_gpu[level_idx]
+                sin_vals = self._sin_grid_pos_gpu[level_idx]
+
+            # Expand: first n_angles coords → pairs
             n_expand = min(n_angles, cur_len)
-            r_expand = coords[:, :n_expand]           # (B, n_expand)
-            theta_expand = level_angles[:, :n_expand]  # (B, n_expand)
+            r_expand = coords[:, :n_expand]
 
-            cos_vals = torch.cos(theta_expand)
-            sin_vals = torch.sin(theta_expand)
-
-            # Interleave: (r*cos, r*sin) for each pair
             expanded = torch.stack(
-                [r_expand * cos_vals, r_expand * sin_vals], dim=-1
+                [r_expand * cos_vals[:, :n_expand],
+                 r_expand * sin_vals[:, :n_expand]], dim=-1
             )  # (B, n_expand, 2)
-            expanded = expanded.reshape(batch, n_expand * 2)  # (B, 2*n_expand)
+            expanded = expanded.reshape(batch, n_expand * 2)
 
             # Append carry-forward elements
             if cur_len > n_expand:
