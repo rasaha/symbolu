@@ -399,6 +399,7 @@ __global__ void mm_kernel_fused_score_collect(
  *   Phase 0: Thread 0 pops CXL slot, broadcasts via shared memory
  *   Phase 1: 128 threads load FP16→FP32 cooperatively (1 elem/thread)
  *   Phase 2: 128 threads compute rotation GEMV (1 output row/thread)
+ *            via d_rotation (global/L2), not __constant__ (avoids 32× serialization)
  *   Phase 3: Tree-parallel polar transform (64→32→16→...→1 active threads)
  *            Ping-pong shared memory buffers, angles written to CXL global
  *   Phase 4: 128 threads compute QJL projections (1 dot/thread),
@@ -432,7 +433,8 @@ __global__ void mm_kernel_process_demotions(
     uint32_t             head_dim,
     int                  n_grid,
     const float*         __restrict__ d_jl_matrix,      // [proj_dim, head_dim]
-    int                  proj_dim
+    int                  proj_dim,
+    const float*         __restrict__ d_rotation        // [head_dim, head_dim] — global mem
 );
 
 // ---- LEGACY kernels (retained for standalone use / testing) ----

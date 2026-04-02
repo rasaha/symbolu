@@ -233,8 +233,8 @@ int MultimodalInferenceController::on_decode_step(
     new_meta._reserved         = 0;
     new_meta.cxl_slot          = MM_CXL_SLOT_INVALID;
 
-    cudaMemcpy(&d_meta_[new_position], &new_meta, sizeof(TokenMeta),
-               cudaMemcpyHostToDevice);
+    cudaMemcpyAsync(&d_meta_[new_position], &new_meta, sizeof(TokenMeta),
+                    cudaMemcpyHostToDevice);
     n_tier0_tokens_ = new_position + 1;
 
     // ========================================================================
@@ -304,7 +304,8 @@ int MultimodalInferenceController::on_decode_step(
             (uint32_t)tq_config_.head_dim,
             n_grid,
             d_jl_matrix_,
-            proj_dim
+            proj_dim,
+            d_rotation_
         );
     }
 

@@ -12,7 +12,8 @@
  *   1 CUDA block = 1 token's KV vector
  *   Block size = MM_COMPRESS_BLOCK_SIZE (128)
  *   Cooperative threading: all 128 threads participate in compression
- *   Rotation matrix in __constant__ memory (broadcast-efficient)
+ *   Rotation matrix via global memory (L2-cached) — NOT constant memory
+ *   (constant memory serializes 32× when warp threads read different rows)
  *
  * For head_dim = 128:
  *   - Shared memory per block: ~1.6 KB (s_vec + s_buf_a + s_buf_b + misc)
@@ -104,6 +105,8 @@ __device__ __forceinline__ float tq_dequantize_angle_pos(
 //   Phase 0 — Alloc:     Thread 0 pops CXL slot, broadcasts via shared memory.
 //   Phase 1 — Load:      128 threads cooperatively load FP16→FP32 (1 elem/thread).
 //   Phase 2 — Rotation:  128 threads compute GEMV (1 output row/thread).
+//                         Uses d_rotation (global, L2-cached) not c_mm_rotation
+//                         (constant memory serializes 32× per warp).
 //   Phase 3 — Polar:     Tree reduction — level 0: 64 threads, level 1: 32, ...
 //                         Ping-pong shared memory buffers, angles written to global.
 //   Phase 4 — QJL:       128 threads compute 1 projection each, __ballot_sync
@@ -136,7 +139,8 @@ __global__ void mm_kernel_process_demotions(
     uint32_t             head_dim,
     int                  n_grid,
     const float*         __restrict__ d_jl_matrix,      // [proj_dim, head_dim]
-    int                  proj_dim
+    int                  proj_dim,
+    const float*         __restrict__ d_rotation        // [head_dim, head_dim] — global mem
 ) {
     uint32_t bid = blockIdx.x;
     uint32_t tid = threadIdx.x;
@@ -201,12 +205,16 @@ __global__ void mm_kernel_process_demotions(
 
         // ---- Phase 2: Cooperative rotation GEMV (1 output row per thread) ----
         // Each thread computes: s_buf_a[tid] = dot(R[tid, :], s_vec[:])
-        // c_mm_rotation is in __constant__ memory — all threads reading the
-        // same column index get a single broadcast transaction.
+        //
+        // Uses GLOBAL memory (d_rotation) instead of __constant__ (c_mm_rotation).
+        // Constant memory serializes when threads in a warp read different
+        // addresses (32-way serialization). Global memory serves through L1/L2
+        // cache with full bandwidth — the 64KB rotation matrix stays warm in L2.
         if (tid < head_dim) {
             float sum = 0.0f;
+            #pragma unroll 8
             for (uint32_t c = 0; c < head_dim; c++) {
-                sum += c_mm_rotation[tid * head_dim + c] * s_vec[c];
+                sum += d_rotation[tid * head_dim + c] * s_vec[c];
             }
             s_buf_a[tid] = sum;
         }
@@ -249,10 +257,18 @@ __global__ void mm_kernel_process_demotions(
             if (has_odd && tid == n_pairs) {
                 dst[tid] = src[n_radii - 1];
             }
-            __syncthreads();
+
+            // When all active threads fit in warp 0, use lightweight
+            // warp sync instead of stalling the entire block.
+            uint32_t next_n = n_pairs + has_odd;
+            if (next_n <= 32) {
+                __syncwarp();
+            } else {
+                __syncthreads();
+            }
 
             angle_offset += n_pairs;
-            n_radii = n_pairs + has_odd;
+            n_radii = next_n;
             which ^= 1;
             level++;
         }
@@ -271,6 +287,7 @@ __global__ void mm_kernel_process_demotions(
             // Each thread computes its projection
             float my_dot = 0.0f;
             if (tid < (uint32_t)proj_dim) {
+                #pragma unroll 8
                 for (uint32_t d = 0; d < head_dim; d++) {
                     my_dot += d_jl_matrix[tid * head_dim + d] * s_vec[d];
                 }
