@@ -140,6 +140,18 @@ class PolarQuant:
             np.linspace(0, math.pi / 2, n_levels, endpoint=False)
             + math.pi / (4 * n_levels)
         )
+        self._n_levels = n_levels
+
+        # LUT quantization constants (analytical floor formula — avoids argmin).
+        # For a uniform grid with n_levels cells, the nearest-centroid index for
+        # angle θ is simply floor(θ / cell_width) — no 3-D broadcast needed.
+        #
+        # angle_grid_full:  cell_width = 2π/n_levels, origin = -π
+        #   k = floor((θ + π) * n_levels / (2π))
+        # angle_grid_pos:   cell_width = (π/2)/n_levels, origin = 0
+        #   k = floor(θ * 2*n_levels / π)
+        self._lut_scale_full = n_levels / (2.0 * math.pi)   # multiplier for level-0
+        self._lut_scale_pos  = 2.0 * n_levels / math.pi     # multiplier for level-1+
 
     def _generate_rotation(self, d: int) -> np.ndarray:
         """Generate random orthogonal rotation matrix via QR decomposition."""
@@ -196,7 +208,12 @@ class PolarQuant:
                 continue
             grid = self._angle_grid_full if lvl_idx == 0 else self._angle_grid_pos
             la = np.array(level_angles)
-            indices = np.argmin(np.abs(la[:, None] - grid[None, :]), axis=1)
+            # LUT quantization: same analytical floor as compress_batch
+            if lvl_idx == 0:
+                k = np.floor((la + math.pi) * self._lut_scale_full)
+            else:
+                k = np.floor(la * self._lut_scale_pos)
+            indices = np.clip(k, 0, self._n_levels - 1).astype(np.intp)
             quantized = grid[indices]
             q_levels.append(quantized)
             all_q_indices.append(indices.astype(np.uint8))
@@ -276,11 +293,16 @@ class PolarQuant:
             r     = np.sqrt(x * x + y * y)    # (n_segs, n_pairs)
             theta = np.arctan2(y, x)           # (n_segs, n_pairs)
 
-            # Quantize: find nearest grid point for each angle
-            grid = self._angle_grid_full if level_idx == 0 else self._angle_grid_pos
-            # Broadcast: (n_segs, n_pairs, 1) vs (1, 1, n_levels)
-            diffs   = np.abs(theta[:, :, None] - grid[None, None, :])
-            indices = np.argmin(diffs, axis=2).astype(np.uint8)  # (n_segs, n_pairs)
+            # LUT quantization: analytical floor — O(n·pairs), no 3-D broadcast.
+            # Both grids are uniform, so the nearest-centroid index is a direct
+            # integer computation: k = floor((θ - grid_origin) / cell_width).
+            if level_idx == 0:
+                # theta ∈ [-π, π]: k = floor((θ + π) * n_levels / (2π))
+                k = np.floor((theta + math.pi) * self._lut_scale_full)
+            else:
+                # theta ∈ [0, π/2]: k = floor(θ * 2*n_levels / π)
+                k = np.floor(theta * self._lut_scale_pos)
+            indices = np.clip(k, 0, self._n_levels - 1).astype(np.uint8)  # (n_segs, n_pairs)
             all_angle_cols.append(indices)
 
             if has_carry:
@@ -447,7 +469,13 @@ def _pack_angle_indices(indices: np.ndarray, bits: int) -> np.ndarray:
     Each index value is in [0, 2**bits - 1].  Values are packed LSB-first:
     index i occupies bits [i*bits, (i+1)*bits - 1] of the output stream.
 
-    Pure-numpy O(n) implementation using scatter-add on uint32 output buffer.
+    Uses aligned group packing for bits ∈ {2, 3, 4} (the only values used
+    in practice) — avoids scatter-add entirely, fully vectorised:
+      - 2-bit: 4 indices → 1 byte
+      - 3-bit: 8 indices → 3 bytes  (lcm(3,8)/3 period)
+      - 4-bit: 2 indices → 1 byte
+
+    Falls back to a general scatter-add for other bit widths.
 
     Args:
         indices: flat uint8 array, shape (n,).
@@ -461,25 +489,48 @@ def _pack_angle_indices(indices: np.ndarray, bits: int) -> np.ndarray:
         return np.array([], dtype=np.uint8)
 
     total_bytes = (n * bits + 7) // 8
-    out = np.zeros(total_bytes + 1, dtype=np.uint32)   # +1 for overflow headroom
 
-    bit_pos   = np.arange(n, dtype=np.uint32) * bits
-    byte_idx  = bit_pos >> 3                           # bit_pos // 8
-    bit_off   = (bit_pos & 7).astype(np.uint32)        # bit_pos % 8
+    if bits == 4:
+        # 2 indices per byte: [i0 | i1<<4]
+        rem = n % 2
+        idx = np.append(indices, 0).astype(np.uint8) if rem else indices.astype(np.uint8)
+        out = (idx[0::2] & 0xF) | ((idx[1::2] & 0xF) << 4)
+        return out[:total_bytes].astype(np.uint8)
 
+    if bits == 2:
+        # 4 indices per byte: [i0 | i1<<2 | i2<<4 | i3<<6]
+        rem = (-n) % 4
+        idx = np.append(indices, np.zeros(rem, np.uint8)).astype(np.uint8) if rem else indices.astype(np.uint8)
+        out = (idx[0::4] & 3) | ((idx[1::4] & 3) << 2) | ((idx[2::4] & 3) << 4) | ((idx[3::4] & 3) << 6)
+        return out[:total_bytes].astype(np.uint8)
+
+    if bits == 3:
+        # 8 indices → 3 bytes (24 bits).  Layout LSB-first:
+        #   byte0: i0[0:3] | i1[0:3]<<3 | i2[0:2]<<6
+        #   byte1: i2[2]   | i3[0:3]<<1 | i4[0:3]<<4 | i5[0]<<7
+        #   byte2: i5[1:3] | i6[0:3]<<2 | i7[0:3]<<5
+        rem = (-n) % 8
+        idx = np.append(indices, np.zeros(rem, np.uint8)).astype(np.uint32) if rem else indices.astype(np.uint32)
+        g = idx.reshape(-1, 8)  # (n_groups, 8)
+        b0 = (g[:, 0]) | (g[:, 1] << 3) | (g[:, 2] << 6)
+        b1 = (g[:, 2] >> 2) | (g[:, 3] << 1) | (g[:, 4] << 4) | (g[:, 5] << 7)
+        b2 = (g[:, 5] >> 1) | (g[:, 6] << 2) | (g[:, 7] << 5)
+        out = np.stack([b0 & 0xFF, b1 & 0xFF, b2 & 0xFF], axis=1).ravel().astype(np.uint8)
+        return out[:total_bytes]
+
+    # General fallback (not used for standard configs)
+    total_bytes = (n * bits + 7) // 8
+    buf = np.zeros(total_bytes + 1, dtype=np.uint32)
+    bit_pos  = np.arange(n, dtype=np.uint32) * bits
+    byte_idx = bit_pos >> 3
+    bit_off  = (bit_pos & 7).astype(np.uint32)
     vals = indices.astype(np.uint32)
-
-    # Low bits land in byte_idx
-    np.add.at(out, byte_idx, vals << bit_off)
-
-    # High bits that overflow into byte_idx + 1
+    np.add.at(buf, byte_idx, vals << bit_off)
     overflow = bit_off + bits
     spill_mask = overflow > 8
     if spill_mask.any():
-        spill_shift = 8 - bit_off[spill_mask]
-        np.add.at(out, byte_idx[spill_mask] + 1, vals[spill_mask] >> spill_shift)
-
-    return (out[:total_bytes] & 0xFF).astype(np.uint8)
+        np.add.at(buf, byte_idx[spill_mask] + 1, vals[spill_mask] >> (8 - bit_off[spill_mask]))
+    return (buf[:total_bytes] & 0xFF).astype(np.uint8)
 
 
 def _unpack_angle_indices(packed: np.ndarray, bits: int, n: int) -> np.ndarray:
@@ -497,17 +548,39 @@ def _unpack_angle_indices(packed: np.ndarray, bits: int, n: int) -> np.ndarray:
     if n == 0:
         return np.array([], dtype=np.uint8)
 
-    mask = np.uint32((1 << bits) - 1)
+    if bits == 4:
+        b = packed.astype(np.uint8)
+        out = np.stack([b & 0xF, (b >> 4) & 0xF], axis=1).ravel()
+        return out[:n].astype(np.uint8)
 
+    if bits == 2:
+        b = packed.astype(np.uint8)
+        out = np.stack([b & 3, (b >> 2) & 3, (b >> 4) & 3, (b >> 6) & 3], axis=1).ravel()
+        return out[:n].astype(np.uint8)
+
+    if bits == 3:
+        # Pad packed to multiple of 3 bytes
+        rem = (-len(packed)) % 3
+        b = np.append(packed, np.zeros(rem, np.uint8)).astype(np.uint32).reshape(-1, 3)
+        i0 = b[:, 0] & 7
+        i1 = (b[:, 0] >> 3) & 7
+        i2 = ((b[:, 0] >> 6) & 3) | ((b[:, 1] & 1) << 2)
+        i3 = (b[:, 1] >> 1) & 7
+        i4 = (b[:, 1] >> 4) & 7
+        i5 = ((b[:, 1] >> 7) & 1) | ((b[:, 2] & 3) << 1)
+        i6 = (b[:, 2] >> 2) & 7
+        i7 = (b[:, 2] >> 5) & 7
+        out = np.stack([i0, i1, i2, i3, i4, i5, i6, i7], axis=1).ravel().astype(np.uint8)
+        return out[:n]
+
+    # General fallback
+    mask = np.uint32((1 << bits) - 1)
     bit_pos  = np.arange(n, dtype=np.uint32) * bits
     byte_idx = bit_pos >> 3
     bit_off  = (bit_pos & 7).astype(np.uint32)
-
-    # Extend by one byte so byte_idx+1 is always valid
     packed_ext = np.empty(len(packed) + 1, dtype=np.uint32)
     packed_ext[:len(packed)] = packed
     packed_ext[-1] = 0
-
     vals = ((packed_ext[byte_idx] | (packed_ext[byte_idx + 1] << 8)) >> bit_off) & mask
     return vals.astype(np.uint8)
 
