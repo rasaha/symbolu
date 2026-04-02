@@ -259,15 +259,14 @@ class KVCachePolicy:
     def on_block_attention(
         self,
         block_id: int,
-        position_attention: Dict[int, float],
+        attention_sum: float,
         sequence_id: int,
         seq_len: int = 0,
     ):
         """
         Record attention for an entire block in one call.
 
-        Aggregates position_attention into block-level sums.
-        O(1) bookkeeping per call (EMA uses mean of incoming weights).
+        Accepts pre-aggregated attention_sum (float). O(1) per call.
         """
         self._step += 1
 
@@ -281,24 +280,14 @@ class KVCachePolicy:
             )
             self.blocks[block_id] = block
 
-        # Block-level aggregates from position map
-        total = sum(position_attention.values())
-        n = len(position_attention)
-        mean_attn = total / n if n else 0.0
-
-        block.attention_sum += total
+        # Block-level aggregates
+        block.attention_sum += attention_sum
         block.attention_ema = (
-            self.ema_alpha * mean_attn +
+            self.ema_alpha * attention_sum +
             (1 - self.ema_alpha) * block.attention_ema
         )
-        block.token_count = max(block.token_count, n)
         block.access_count += 1
         block.last_access_step = self._step
-
-        # Pin if any position is a sink
-        if any(pos < self.sink_tokens for pos in position_attention):
-            block.is_sink = True
-            self.pinned_blocks.add(block_id)
 
         # Sequence tracking
         if sequence_id in self.sequences:

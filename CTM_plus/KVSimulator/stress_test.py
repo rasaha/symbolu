@@ -47,7 +47,7 @@ def print_table(title, results, extra_fields=None):
     for name, m in results.items():
         evictions = m["blocks_evicted"]
         important = m["important_evictions"]
-        accuracy = 1.0 - (important / max(1, evictions))
+        accuracy = m["accuracy"]
         row = f"  {name:<12}{m['recompute_cost']:<10d}{evictions:<8d}{accuracy:<9.2%}{important:<10d}"
         if extra_fields:
             for fname, fw, ffmt in extra_fields:

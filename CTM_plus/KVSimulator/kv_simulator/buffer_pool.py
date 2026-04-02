@@ -330,8 +330,8 @@ class KVPolicyAdapter(EvictionPolicy):
     Adapter that bridges KVCachePolicy (from KVPolicy module) to the
     simulator's EvictionPolicy interface.
 
-    Forwards per-position attention from the simulator into KVCachePolicy's
-    on_token_access(), and maps select_victim() to select_victims(count=1).
+    Aggregates per-position attention to block-level sum before forwarding
+    to KVCachePolicy. Maps select_victim() to select_victims(count=1).
     """
 
     def __init__(self, kv_policy):
@@ -342,34 +342,16 @@ class KVPolicyAdapter(EvictionPolicy):
         self._policy = kv_policy
 
     def on_admit(self, block_id, block):
-        if hasattr(self._policy, 'ensure_block'):
-            self._policy.ensure_block(block_id, block.sequence_id, block.token_positions)
-        else:
-            for pos in block.token_positions:
-                self._policy.on_token_access(
-                    token_id=pos, position=pos,
-                    sequence_id=block.sequence_id,
-                    block_id=block_id,
-                    attention_weight=0.0, seq_len=0,
-                )
+        self._policy.ensure_block(block_id, block.sequence_id, block.token_positions)
 
     def on_block_attention(self, block_id, block, position_attention, sequence_id, seq_len):
-        if hasattr(self._policy, 'on_block_attention'):
-            self._policy.on_block_attention(
-                block_id=block_id,
-                position_attention=position_attention,
-                sequence_id=sequence_id,
-                seq_len=seq_len,
-            )
-        else:
-            for pos, attn in position_attention.items():
-                self._policy.on_token_access(
-                    token_id=pos, position=pos,
-                    sequence_id=sequence_id,
-                    block_id=block_id,
-                    attention_weight=attn,
-                    seq_len=seq_len,
-                )
+        attention_sum = sum(position_attention.values())
+        self._policy.on_block_attention(
+            block_id=block_id,
+            attention_sum=attention_sum,
+            sequence_id=sequence_id,
+            seq_len=seq_len,
+        )
 
     def on_evict(self, block_id):
         self._policy.evict_block(block_id)
@@ -471,10 +453,11 @@ class KVCacheSimulator:
             "attention_events": 0,
             "sink_blocks_protected": 0,
             "important_evictions": 0,     # evicted blocks with high attention
-            "recompute_cost": 0,          # sum of tokens in evicted blocks later needed
+            "recompute_cost": 0,          # tokens in evicted blocks re-accessed during decode
+            "decode_block_accesses": 0,   # total block accesses during decode
+            "decode_block_hits": 0,       # accesses where block was still in cache
         }
-        self._evicted_blocks: Dict[int, KVBlock] = {}  # bounded: cleared per sequence on detection
-        self._max_evicted_tracking = max_blocks * 4
+        self._evicted_block_ids: Set[int] = set()  # block IDs that have been evicted
 
     # ---- Sequence lifecycle ----
 
@@ -496,8 +479,7 @@ class KVCacheSimulator:
                 del self.blocks[bid]
                 self.pinned.discard(bid)
                 freed.append(bid)
-            # Clean up eviction tracking for this sequence
-            self._evicted_blocks.pop(bid, None)
+            self._evicted_block_ids.discard(bid)
         return freed
 
     # ---- Prefill phase ----
@@ -556,20 +538,22 @@ class KVCacheSimulator:
 
         # Distribute attention to blocks and detect recompute cost
         for bid in list(seq.block_ids):
+            self.stats["decode_block_accesses"] += 1
+
             if bid not in self.blocks:
-                # Block was evicted — its tokens need recomputation
-                evicted = self._evicted_blocks.get(bid)
-                if evicted:
-                    recompute_tokens = len(evicted.token_positions)
-                    self.stats["recompute_cost"] += recompute_tokens
-                    seq.evicted_positions += recompute_tokens
-                    # Remove from sequence to avoid re-counting
-                    seq.block_ids.remove(bid)
+                # Block was evicted — count recompute only on first re-access
+                if bid in self._evicted_block_ids:
+                    self.stats["recompute_cost"] += self.block_size
+                    seq.evicted_positions += self.block_size
+                    self._evicted_block_ids.discard(bid)
+                # Remove from sequence to avoid re-counting
+                seq.block_ids.remove(bid)
                 continue
+
+            # Block is present — cache hit
+            self.stats["decode_block_hits"] += 1
             block = self.blocks[bid]
-            block_attn = sum(
-                attention[p] for p in block.token_positions if p < len(attention)
-            )
+
             # Compute per-position attention for this block
             pos_attn = {
                 p: attention[p]
@@ -594,6 +578,11 @@ class KVCacheSimulator:
             not seq.block_ids
             or new_position % self.block_size == 0
         )
+        if not needs_new_block:
+            # Check if last block was evicted — need a new block instead
+            last_bid = seq.block_ids[-1]
+            if last_bid not in self.blocks:
+                needs_new_block = True
 
         if needs_new_block:
             # Allocate a fresh block for this token
@@ -604,8 +593,7 @@ class KVCacheSimulator:
         else:
             # Append position to the last block
             last_bid = seq.block_ids[-1]
-            if last_bid in self.blocks:
-                self.blocks[last_bid].token_positions.append(new_position)
+            self.blocks[last_bid].token_positions.append(new_position)
 
     # ---- Internal ----
 
@@ -631,15 +619,9 @@ class KVCacheSimulator:
         if block.block_type in (BlockType.SINK, BlockType.ENTITY):
             self.stats["important_evictions"] += 1
 
-        # Save for recompute cost tracking (bounded)
-        if len(self._evicted_blocks) >= self._max_evicted_tracking:
-            # Drop oldest entries
-            oldest = next(iter(self._evicted_blocks))
-            del self._evicted_blocks[oldest]
-        self._evicted_blocks[victim] = block
-
-        # Note: block stays in seq.block_ids so decode_step() can detect
-        # the missing block and count recompute cost on next access.
+        # Mark as evicted for recompute detection on next decode access.
+        # Block stays in seq.block_ids so decode_step() can detect the miss.
+        self._evicted_block_ids.add(victim)
 
         self.policy.on_evict(victim)
         self.pinned.discard(victim)
@@ -666,6 +648,8 @@ class KVCacheSimulator:
         total_blocks = self.stats["blocks_allocated"]
         evictions = self.stats["blocks_evicted"]
         important = self.stats["important_evictions"]
+        accesses = self.stats["decode_block_accesses"]
+        hits = self.stats["decode_block_hits"]
 
         # Block type distribution in current cache
         type_dist = {"sink": 0, "entity": 0, "recent": 0, "filler": 0}
@@ -675,8 +659,9 @@ class KVCacheSimulator:
         # Retention rate: fraction of allocated blocks still in cache
         retention = len(self.blocks) / max(1, total_blocks)
 
-        # Eviction accuracy: fraction of evictions that were filler blocks
-        eviction_accuracy = 1.0 - (important / max(1, evictions))
+        # Accuracy: of blocks accessed during decode, how many were retained?
+        # Measures: "did the policy keep the blocks that were actually needed?"
+        accuracy = hits / max(1, accesses)
 
         return {
             **self.stats,
@@ -684,7 +669,7 @@ class KVCacheSimulator:
             "max_blocks": self.max_blocks,
             "utilization": len(self.blocks) / self.max_blocks,
             "retention_rate": retention,
-            "eviction_accuracy": eviction_accuracy,
+            "accuracy": accuracy,
             "block_type_distribution": type_dist,
             "active_sequences": len(self.sequences),
             "step": self._step,
