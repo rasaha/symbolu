@@ -19,10 +19,11 @@ Simulation model:
     Eviction: When KV cache exceeds memory budget, policy selects victims.
 
 Policies:
-    LRU     — evict least recently accessed block
-    FIFO    — evict oldest admitted block
-    Random  — evict uniformly at random
-    CTM+    — evict lowest-scoring block (attention + position + recency)
+    LRU        — evict least recently accessed block
+    FIFO       — evict oldest admitted block
+    Random     — evict uniformly at random
+    CTM+       — evict lowest-scoring block (attention + position + recency)
+    KV_POLICY  — adapter for KVCachePolicy from the KVPolicy module
 """
 
 import math
@@ -53,6 +54,7 @@ class PolicyType(Enum):
     FIFO = "fifo"
     RANDOM = "random"
     CTM_PLUS = "ctm_plus"
+    KV_POLICY = "kv_policy"
 
 
 # =============================================================================
@@ -119,12 +121,33 @@ def sink_and_recent_attention(seq_len: int, sink_tokens: int = 4,
 # =============================================================================
 
 class EvictionPolicy:
-    """Base class for eviction policies."""
+    """
+    Base class for eviction policies.
+
+    Lifecycle hooks (no-op by default):
+      on_sequence_register / on_phase_change / on_sequence_complete
+    Per-step hooks:
+      on_block_attention — receives per-position attention weights.
+        Default delegates to on_access for backward compatibility.
+    """
     def on_access(self, block_id: int, block: KVBlock) -> None:
         pass
     def on_admit(self, block_id: int, block: KVBlock) -> None:
         pass
     def on_evict(self, block_id: int) -> None:
+        pass
+    def on_block_attention(
+        self, block_id: int, block: KVBlock,
+        position_attention: Dict[int, float],
+        sequence_id: int, seq_len: int,
+    ) -> None:
+        """Called with per-position attention weights each decode step."""
+        self.on_access(block_id, block)
+    def on_sequence_register(self, seq_id: int, context_length: int) -> None:
+        pass
+    def on_phase_change(self, seq_id: int, phase: Phase) -> None:
+        pass
+    def on_sequence_complete(self, seq_id: int) -> None:
         pass
     def select_victim(self, blocks: Dict[int, KVBlock], pinned: Set[int]) -> Optional[int]:
         raise NotImplementedError
@@ -232,6 +255,64 @@ class AttentionAwarePolicy(EvictionPolicy):
         return 0.35 * attn + 0.30 * position + 0.25 * recency + 0.10 * frequency
 
 
+class KVPolicyAdapter(EvictionPolicy):
+    """
+    Adapter that bridges KVCachePolicy (from KVPolicy module) to the
+    simulator's EvictionPolicy interface.
+
+    Forwards per-position attention from the simulator into KVCachePolicy's
+    on_token_access(), and maps select_victim() to select_victims(count=1).
+    """
+
+    def __init__(self, kv_policy):
+        """
+        Args:
+            kv_policy: A KVCachePolicy instance (from kv_policy.attention_evictor).
+        """
+        self._policy = kv_policy
+
+    def on_admit(self, block_id, block):
+        # Register initial positions with zero attention
+        for pos in block.token_positions:
+            self._policy.on_token_access(
+                token_id=pos, position=pos,
+                sequence_id=block.sequence_id,
+                block_id=block_id,
+                attention_weight=0.0, seq_len=0,
+            )
+
+    def on_block_attention(self, block_id, block, position_attention, sequence_id, seq_len):
+        for pos, attn in position_attention.items():
+            self._policy.on_token_access(
+                token_id=pos, position=pos,
+                sequence_id=sequence_id,
+                block_id=block_id,
+                attention_weight=attn,
+                seq_len=seq_len,
+            )
+
+    def on_evict(self, block_id):
+        self._policy.evict_block(block_id)
+
+    def on_sequence_register(self, seq_id, context_length):
+        self._policy.register_sequence(seq_id, max_tokens=context_length)
+
+    def on_phase_change(self, seq_id, phase):
+        from CTM_plus.KVPolicy.kv_policy.attention_evictor import InferencePhase
+        phase_map = {
+            Phase.PREFILL: InferencePhase.PREFILL,
+            Phase.DECODE: InferencePhase.DECODE,
+        }
+        self._policy.set_phase(seq_id, phase_map.get(phase, InferencePhase.DECODE))
+
+    def on_sequence_complete(self, seq_id):
+        self._policy.complete_sequence(seq_id)
+
+    def select_victim(self, blocks, pinned):
+        victims = self._policy.select_victims(count=1)
+        return victims[0] if victims else None
+
+
 def make_policy(policy_type: PolicyType, **kwargs) -> EvictionPolicy:
     if policy_type == PolicyType.LRU:
         return LRUPolicy()
@@ -241,6 +322,11 @@ def make_policy(policy_type: PolicyType, **kwargs) -> EvictionPolicy:
         return RandomPolicy()
     elif policy_type == PolicyType.CTM_PLUS:
         return AttentionAwarePolicy(**kwargs)
+    elif policy_type == PolicyType.KV_POLICY:
+        kv_policy = kwargs.pop("kv_policy", None)
+        if kv_policy is None:
+            raise ValueError("PolicyType.KV_POLICY requires kv_policy= argument")
+        return KVPolicyAdapter(kv_policy)
     raise ValueError(f"Unknown policy: {policy_type}")
 
 
@@ -267,7 +353,13 @@ class KVCacheSimulator:
         sink_tokens: int = 4,
         recent_window: int = 128,
         seed: int = 42,
+        kv_policy=None,
     ):
+        """
+        Args:
+            kv_policy: A KVCachePolicy instance. Required when
+                policy_type=PolicyType.KV_POLICY; ignored otherwise.
+        """
         self.max_blocks = max_blocks
         self.block_size = block_size
         self.sink_tokens = sink_tokens
@@ -275,6 +367,9 @@ class KVCacheSimulator:
         self.rng = random.Random(seed)
 
         self.policy = make_policy(
+            policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
+            kv_policy=kv_policy,
+        ) if policy_type == PolicyType.KV_POLICY else make_policy(
             policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
         )
 
@@ -302,11 +397,13 @@ class KVCacheSimulator:
     def add_sequence(self, seq_id: int, context_length: int) -> Sequence:
         seq = Sequence(sequence_id=seq_id, context_length=context_length)
         self.sequences[seq_id] = seq
+        self.policy.on_sequence_register(seq_id, context_length)
         return seq
 
     def remove_sequence(self, seq_id: int) -> List[int]:
         if seq_id not in self.sequences:
             return []
+        self.policy.on_sequence_complete(seq_id)
         seq = self.sequences.pop(seq_id)
         freed = []
         for bid in seq.block_ids:
@@ -352,6 +449,7 @@ class KVCacheSimulator:
         seq.phase = Phase.DECODE
         seq.prefill_done = True
         seq.generated_tokens = seq.context_length
+        self.policy.on_phase_change(seq_id, Phase.DECODE)
         return allocated
 
     # ---- Decode phase ----
@@ -388,12 +486,21 @@ class KVCacheSimulator:
             block_attn = sum(
                 attention[p] for p in block.token_positions if p < len(attention)
             )
+            # Compute per-position attention for this block
+            pos_attn = {
+                p: attention[p]
+                for p in block.token_positions
+                if p < len(attention) and attention[p] > 0
+            }
+            block_attn = sum(pos_attn.values())
             if block_attn > 0:
                 block.cumulative_attention += block_attn
                 block.access_count += 1
                 block.last_access_step = self._step
                 self.stats["attention_events"] += 1
-                self.policy.on_access(bid, block)
+                self.policy.on_block_attention(
+                    bid, block, pos_attn, seq_id, current_len,
+                )
 
                 # Reclassify based on attention
                 self._classify_block(block, current_len)
@@ -513,17 +620,23 @@ def run_workload(
     seed: int = 42,
     sink_tokens: int = 4,
     recent_window: int = 128,
+    kv_policy=None,
 ) -> Dict:
     """
     Run a complete workload and return metrics.
 
     Simulates continuous batching: prefill all sequences, then interleaved
     decode steps.
+
+    Args:
+        kv_policy: A KVCachePolicy instance. Required when
+            policy_type=PolicyType.KV_POLICY.
     """
     sim = KVCacheSimulator(
         max_blocks=max_blocks, block_size=block_size,
         policy_type=policy_type, seed=seed,
         sink_tokens=sink_tokens, recent_window=recent_window,
+        kv_policy=kv_policy,
     )
 
     # Prefill all sequences
@@ -550,19 +663,37 @@ def compare_policies(
     context_length: int = 512,
     decode_steps: int = 128,
     seed: int = 42,
+    include_kv_policy: bool = True,
 ) -> Dict[str, Dict]:
     """
     Run the same workload under all policies and return comparison.
+
+    Set include_kv_policy=False to skip KV_POLICY (requires KVPolicy module).
     """
     sequences = [(i, context_length) for i in range(num_sequences)]
     results = {}
 
     for policy in PolicyType:
+        if policy == PolicyType.KV_POLICY:
+            if not include_kv_policy:
+                continue
+            try:
+                from CTM_plus.KVPolicy.kv_policy.attention_evictor import KVCachePolicy
+            except ImportError:
+                continue
+            kv_pol = KVCachePolicy(
+                max_blocks=max_blocks, block_size=block_size,
+                sink_tokens=4, recent_window=128,
+            )
+        else:
+            kv_pol = None
+
         start = time.perf_counter()
         metrics = run_workload(
             max_blocks=max_blocks, block_size=block_size,
             sequences=sequences, decode_steps_per_seq=decode_steps,
             policy_type=policy, seed=seed,
+            kv_policy=kv_pol,
         )
         elapsed = time.perf_counter() - start
         metrics["elapsed_seconds"] = round(elapsed, 4)

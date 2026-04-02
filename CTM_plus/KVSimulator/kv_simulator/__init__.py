@@ -24,17 +24,19 @@ from .buffer_pool import (
     PolicyType,
     BlockType,
     Phase,
+    KVPolicyAdapter,
     compare_policies,
     run_workload,
 )
 from .config import SimulationConfig
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = [
     "KVCacheSimulator",
     "PolicyType",
     "BlockType",
     "Phase",
+    "KVPolicyAdapter",
     "SimulationConfig",
     "compare_policies",
     "run_workload",
