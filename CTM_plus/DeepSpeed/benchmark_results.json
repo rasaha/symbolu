@@ -3,250 +3,250 @@
     "2-bit (aggressive)|gradient": {
       "bits_per_element": 3.234375,
       "compression_ratio": 9.893719806763285,
-      "avg_mse": 2.733065262873424e-05,
-      "avg_cosine": 0.8603574681282044,
-      "avg_snr_db": 5.570108360239617
+      "avg_mse": 2.7330652374075724e-05,
+      "avg_cosine": 0.8603574860095978,
+      "avg_snr_db": 5.570108409133663
     },
     "2-bit (aggressive)|adam_momentum": {
       "bits_per_element": 3.234375,
       "compression_ratio": 9.893719806763285,
-      "avg_mse": 0.002756132164504379,
-      "avg_cosine": 0.8606652200222016,
-      "avg_snr_db": 5.581379038686619
+      "avg_mse": 0.0027561321831308305,
+      "avg_cosine": 0.860665214061737,
+      "avg_snr_db": 5.581379022857046
     },
     "2-bit (aggressive)|adam_variance": {
       "bits_per_element": 3.234375,
       "compression_ratio": 9.893719806763285,
-      "avg_mse": 2.781551472708088e-07,
-      "avg_cosine": 0.8573592495918274,
-      "avg_snr_db": 5.47484772459142
+      "avg_mse": 2.78155147839243e-07,
+      "avg_cosine": 0.8573592412471771,
+      "avg_snr_db": 5.4748477346769935
     },
     "3-bit (standard)|gradient": {
       "bits_per_element": 4.2265625,
       "compression_ratio": 7.5711645101663585,
-      "avg_mse": 6.966370037844172e-06,
-      "avg_cosine": 0.9646890485286712,
-      "avg_snr_db": 11.540846642469905
+      "avg_mse": 6.966370183363324e-06,
+      "avg_cosine": 0.9646890473365783,
+      "avg_snr_db": 11.540846577859337
     },
     "3-bit (standard)|adam_momentum": {
       "bits_per_element": 4.2265625,
       "compression_ratio": 7.5711645101663585,
-      "avg_mse": 0.0007091643766034395,
-      "avg_cosine": 0.9651668584346771,
-      "avg_snr_db": 11.608969910428277
+      "avg_mse": 0.0007091643853345885,
+      "avg_cosine": 0.9651668453216553,
+      "avg_snr_db": 11.608969819219379
     },
     "3-bit (standard)|adam_variance": {
       "bits_per_element": 4.2265625,
       "compression_ratio": 7.5711645101663585,
-      "avg_mse": 7.058124573688929e-08,
-      "avg_cosine": 0.9649311482906342,
-      "avg_snr_db": 11.566582425656806
+      "avg_mse": 7.058124616321493e-08,
+      "avg_cosine": 0.9649311602115631,
+      "avg_snr_db": 11.566582414292784
     },
     "4-bit (high-qual)|gradient": {
       "bits_per_element": 5.21875,
       "compression_ratio": 6.131736526946108,
-      "avg_mse": 1.7356650096189697e-06,
-      "avg_cosine": 0.991217964887619,
-      "avg_snr_db": 17.595699657133224
+      "avg_mse": 1.7356650118927064e-06,
+      "avg_cosine": 0.9912179636955262,
+      "avg_snr_db": 17.595699668642848
     },
     "4-bit (high-qual)|adam_momentum": {
       "bits_per_element": 5.21875,
       "compression_ratio": 6.131736526946108,
-      "avg_mse": 0.00017516107443952934,
-      "avg_cosine": 0.9912623345851899,
-      "avg_snr_db": 17.60899210489549
+      "avg_mse": 0.00017516107807750815,
+      "avg_cosine": 0.9912623381614685,
+      "avg_snr_db": 17.60899202355772
     },
     "4-bit (high-qual)|adam_variance": {
       "bits_per_element": 5.21875,
       "compression_ratio": 6.131736526946108,
-      "avg_mse": 1.796894876449073e-08,
-      "avg_cosine": 0.991115790605545,
-      "avg_snr_db": 17.541419802846956
+      "avg_mse": 1.7968948728963596e-08,
+      "avg_cosine": 0.9911158037185669,
+      "avg_snr_db": 17.541419800632774
     },
     "4-bit lossless|gradient": {
       "bits_per_element": 5.109375,
       "compression_ratio": 6.2629969418960245,
-      "avg_mse": 8.656277429963666e-07,
-      "avg_cosine": 0.9954465675354004,
-      "avg_snr_db": 20.43864039457892
+      "avg_mse": 8.656277520913136e-07,
+      "avg_cosine": 0.9954465794563293,
+      "avg_snr_db": 20.43864033470169
     },
     "4-bit lossless|adam_momentum": {
       "bits_per_element": 5.109375,
       "compression_ratio": 6.2629969418960245,
-      "avg_mse": 9.151222096988932e-05,
-      "avg_cosine": 0.9954710805416107,
-      "avg_snr_db": 20.484054656934404
+      "avg_mse": 9.151222155196593e-05,
+      "avg_cosine": 0.9954710829257966,
+      "avg_snr_db": 20.484054624898246
     },
     "4-bit lossless|adam_variance": {
       "bits_per_element": 5.109375,
       "compression_ratio": 6.2629969418960245,
-      "avg_mse": 9.03937524832088e-09,
-      "avg_cosine": 0.9954204094409943,
-      "avg_snr_db": 20.42525418181274
+      "avg_mse": 9.039375195030174e-09,
+      "avg_cosine": 0.9954204249382019,
+      "avg_snr_db": 20.42525421866948
     },
     "3-bit no QJL|gradient": {
       "bits_per_element": 3.2265625,
       "compression_ratio": 9.91767554479419,
-      "avg_mse": 6.800213541282574e-06,
-      "avg_cosine": 0.9664591217041015,
-      "avg_snr_db": 11.76628804305827
+      "avg_mse": 6.800213623137097e-06,
+      "avg_cosine": 0.966459127664566,
+      "avg_snr_db": 11.766288001016873
     },
     "3-bit no QJL|adam_momentum": {
       "bits_per_element": 3.2265625,
       "compression_ratio": 9.91767554479419,
-      "avg_mse": 0.0007188830024097114,
-      "avg_cosine": 0.9639206039905548,
-      "avg_snr_db": 11.452706443476654
+      "avg_mse": 0.0007188830070663243,
+      "avg_cosine": 0.9639206147193908,
+      "avg_snr_db": 11.452706433217566
     },
     "3-bit no QJL|adam_variance": {
       "bits_per_element": 3.2265625,
       "compression_ratio": 9.91767554479419,
-      "avg_mse": 7.229007714215641e-08,
-      "avg_cosine": 0.9642880284786224,
-      "avg_snr_db": 11.494183095833728
+      "avg_mse": 7.229007664477649e-08,
+      "avg_cosine": 0.9642880260944366,
+      "avg_snr_db": 11.494183118961942
     }
   },
   "throughput": {
     "small_linear (768\u00d7768)|3-bit": {
       "size_mb": 2.25,
       "n_elements": 589824,
-      "compress_gbs": 0.002516475643274171,
-      "decompress_gbs": 0.008124251164310701
+      "compress_gbs": 0.030789360919884316,
+      "decompress_gbs": 0.09309095316822777
     },
     "small_linear (768\u00d7768)|4-bit": {
       "size_mb": 2.25,
       "n_elements": 589824,
-      "compress_gbs": 0.0023934976654870293,
-      "decompress_gbs": 0.007945800779124138
+      "compress_gbs": 0.020098664479687042,
+      "decompress_gbs": 0.0855522008735571
     },
     "medium_linear (2048\u00d72048)|3-bit": {
       "size_mb": 16.0,
       "n_elements": 4194304,
-      "compress_gbs": 0.0026505492729221748,
-      "decompress_gbs": 0.007822106267994953
+      "compress_gbs": 0.019978489480071422,
+      "decompress_gbs": 0.06716253465604775
     },
     "medium_linear (2048\u00d72048)|4-bit": {
       "size_mb": 16.0,
       "n_elements": 4194304,
-      "compress_gbs": 0.002491963387492475,
-      "decompress_gbs": 0.0076831281384460905
+      "compress_gbs": 0.01450527965020707,
+      "decompress_gbs": 0.06962520920198378
     }
   },
   "memory_ratios": {
     "small_linear (768\u00d7768)|2-bit": {
       "fp32_mb": 2.25,
-      "actual_mb": 1.19091796875,
+      "actual_mb": 0.2449951171875,
       "theory_mb": 0.2449951171875,
-      "actual_ratio": 1.8892988929889298,
+      "actual_ratio": 9.183856502242152,
       "theory_ratio": 9.183856502242152
     },
     "small_linear (768\u00d7768)|3-bit": {
       "fp32_mb": 2.25,
-      "actual_mb": 1.19091796875,
+      "actual_mb": 0.31475830078125,
       "theory_mb": 0.31475830078125,
-      "actual_ratio": 1.8892988929889298,
+      "actual_ratio": 7.148342059336824,
       "theory_ratio": 7.148342059336824
     },
     "small_linear (768\u00d7768)|4-bit": {
       "fp32_mb": 2.25,
-      "actual_mb": 1.19091796875,
+      "actual_mb": 0.384521484375,
       "theory_mb": 0.384521484375,
-      "actual_ratio": 1.8892988929889298,
+      "actual_ratio": 5.851428571428571,
       "theory_ratio": 5.851428571428571
     },
     "medium_linear (2048\u00d72048)|2-bit": {
       "fp32_mb": 16.0,
-      "actual_mb": 8.46875,
+      "actual_mb": 1.7421875,
       "theory_mb": 1.7421875,
-      "actual_ratio": 1.8892988929889298,
+      "actual_ratio": 9.183856502242152,
       "theory_ratio": 9.183856502242152
     },
     "medium_linear (2048\u00d72048)|3-bit": {
       "fp32_mb": 16.0,
-      "actual_mb": 8.46875,
+      "actual_mb": 2.23828125,
       "theory_mb": 2.23828125,
-      "actual_ratio": 1.8892988929889298,
+      "actual_ratio": 7.148342059336824,
       "theory_ratio": 7.148342059336824
     },
     "medium_linear (2048\u00d72048)|4-bit": {
       "fp32_mb": 16.0,
-      "actual_mb": 8.46875,
+      "actual_mb": 2.734375,
       "theory_mb": 2.734375,
-      "actual_ratio": 1.8892988929889298,
+      "actual_ratio": 5.851428571428571,
       "theory_ratio": 5.851428571428571
     }
   },
   "offload_pipeline": {
     "small_linear (768\u00d7768)|3-bit TQ": {
-      "offload_ms": 905.307164333332,
-      "fetch_ms": 296.5080060000105,
-      "total_ms": 1201.8151703333424,
-      "bandwidth_gbs": 0.003926221033381717
+      "offload_ms": 81.36444233340019,
+      "fetch_ms": 30.328068000017083,
+      "total_ms": 111.69251033341727,
+      "bandwidth_gbs": 0.04224627046087838
     },
     "small_linear (768\u00d7768)|4-bit TQ": {
-      "offload_ms": 902.2194759999896,
-      "fetch_ms": 289.9628626666697,
-      "total_ms": 1192.1823386666592,
-      "bandwidth_gbs": 0.0039579448939641975
+      "offload_ms": 113.49925099996956,
+      "fetch_ms": 23.6686753334349,
+      "total_ms": 137.16792633340447,
+      "bandwidth_gbs": 0.03440011179093609
     },
     "small_linear (768\u00d7768)|No TQ (raw)": {
-      "offload_ms": 0.26887800000470935,
-      "fetch_ms": 0.005990999994764934,
-      "total_ms": 0.2748689999994743,
-      "bandwidth_gbs": 17.166693952424698
+      "offload_ms": 0.19954466673273905,
+      "fetch_ms": 0.003276999981001912,
+      "total_ms": 0.20282166671374097,
+      "bandwidth_gbs": 23.26473338107284
     },
     "medium_linear (2048\u00d72048)|3-bit TQ": {
-      "offload_ms": 6584.806187666666,
-      "fetch_ms": 2166.216005666674,
-      "total_ms": 8751.02219333334,
-      "bandwidth_gbs": 0.0038343442924373195
+      "offload_ms": 782.8250159999849,
+      "fetch_ms": 201.79924666664797,
+      "total_ms": 984.6242626666328,
+      "bandwidth_gbs": 0.03407841272276329
     },
     "medium_linear (2048\u00d72048)|4-bit TQ": {
-      "offload_ms": 6416.828726000004,
-      "fetch_ms": 2082.058452666672,
-      "total_ms": 8498.887178666677,
-      "bandwidth_gbs": 0.003948097120788477
+      "offload_ms": 1175.473155999877,
+      "fetch_ms": 253.89446933331783,
+      "total_ms": 1429.3676253331948,
+      "bandwidth_gbs": 0.023475018886186295
     },
     "medium_linear (2048\u00d72048)|No TQ (raw)": {
-      "offload_ms": 3.841166999999738,
-      "fetch_ms": 0.0059966666678216525,
-      "total_ms": 3.8471636666675595,
-      "bandwidth_gbs": 8.721862365960918
+      "offload_ms": 1.7075893332882213,
+      "fetch_ms": 0.005570333314608433,
+      "total_ms": 1.7131596666028297,
+      "bandwidth_gbs": 19.586284135755978
     }
   },
   "training_simulation": {
     "No compression (raw)": {
-      "total_offload_ms": 8.94118299999036,
-      "total_fetch_ms": 0.06022799993843364,
+      "total_offload_ms": 8.077509000031569,
+      "total_fetch_ms": 0.04188500065538392,
       "offload_count": 24,
       "fetch_count": 24,
-      "avg_offload_ms": 0.372549291666265,
-      "avg_fetch_ms": 0.002509499997434735,
+      "avg_offload_ms": 0.3365628750013154,
+      "avg_fetch_ms": 0.0017452083606409967,
       "actual_compression_ratio": 0.0,
       "theoretical_compression_ratio": 0.0,
       "offloads_compressed": 0,
       "offloads_raw": 24
     },
     "3-bit TurboQuant": {
-      "total_offload_ms": 39031.17329499998,
-      "total_fetch_ms": 12841.049236000003,
+      "total_offload_ms": 3646.791352000264,
+      "total_fetch_ms": 1037.6098749998164,
       "offload_count": 24,
       "fetch_count": 24,
-      "avg_offload_ms": 1626.2988872916658,
-      "avg_fetch_ms": 535.0437181666667,
-      "actual_compression_ratio": 1.8892988929889298,
+      "avg_offload_ms": 151.94963966667765,
+      "avg_fetch_ms": 43.233744791659014,
+      "actual_compression_ratio": 7.148342059336824,
       "theoretical_compression_ratio": 7.148342059336824,
       "offloads_compressed": 24,
       "offloads_raw": 0
     },
     "4-bit TurboQuant": {
-      "total_offload_ms": 40383.79076899998,
-      "total_fetch_ms": 12957.643958000004,
+      "total_offload_ms": 5400.552151000056,
+      "total_fetch_ms": 994.9742160001733,
       "offload_count": 24,
       "fetch_count": 24,
-      "avg_offload_ms": 1682.6579487083325,
-      "avg_fetch_ms": 539.9018315833335,
-      "actual_compression_ratio": 1.8892988929889298,
+      "avg_offload_ms": 225.02300629166902,
+      "avg_fetch_ms": 41.45725900000722,
+      "actual_compression_ratio": 5.851428571428571,
       "theoretical_compression_ratio": 5.851428571428571,
       "offloads_compressed": 24,
       "offloads_raw": 0

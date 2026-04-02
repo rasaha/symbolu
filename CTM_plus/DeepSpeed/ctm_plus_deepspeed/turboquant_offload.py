@@ -237,6 +237,126 @@ class PolarQuant:
         """Convenience: compress then return only the reconstructed vector."""
         return self.compress(vector)["reconstructed"]
 
+    # -------------------------------------------------------------------------
+    # Vectorised batch API (used by TurboQuantCompressor for production speed)
+    # -------------------------------------------------------------------------
+
+    def compress_batch(self, segs: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compress a batch of segments simultaneously using matrix operations.
+
+        Processes all n_segs segments in parallel, eliminating the Python-level
+        per-segment loop. The rotation and angular quantization are fully
+        vectorised as 2-D numpy ops.
+
+        Args:
+            segs: shape (n_segs, segment_dim), float32.
+
+        Returns:
+            radii:      (n_segs,) float32 — final scalar radius per segment.
+            all_indices:(n_segs, segment_dim-1) uint8 — angle indices, all
+                        levels concatenated in compress order.
+        """
+        n_segs, d = segs.shape
+
+        # Rotate all segments: (n_segs, d) @ R.T
+        current = segs @ self._rotation.T   # (n_segs, d)
+
+        level_idx = 0
+        all_angle_cols: List[np.ndarray] = []
+
+        while current.shape[1] > 1:
+            n_cur = current.shape[1]
+            n_pairs = n_cur // 2
+            has_carry = (n_cur % 2 == 1)
+
+            x = current[:, 0:2 * n_pairs:2]   # (n_segs, n_pairs)
+            y = current[:, 1:2 * n_pairs:2]   # (n_segs, n_pairs)
+
+            r     = np.sqrt(x * x + y * y)    # (n_segs, n_pairs)
+            theta = np.arctan2(y, x)           # (n_segs, n_pairs)
+
+            # Quantize: find nearest grid point for each angle
+            grid = self._angle_grid_full if level_idx == 0 else self._angle_grid_pos
+            # Broadcast: (n_segs, n_pairs, 1) vs (1, 1, n_levels)
+            diffs   = np.abs(theta[:, :, None] - grid[None, None, :])
+            indices = np.argmin(diffs, axis=2).astype(np.uint8)  # (n_segs, n_pairs)
+            all_angle_cols.append(indices)
+
+            if has_carry:
+                current = np.concatenate([r, current[:, -1:]], axis=1)
+            else:
+                current = r
+
+            level_idx += 1
+
+        final_radii = current[:, 0].astype(np.float32)                  # (n_segs,)
+        all_indices = np.concatenate(all_angle_cols, axis=1)            # (n_segs, d-1)
+        return final_radii, all_indices
+
+    def decompress_batch(
+        self,
+        radii: np.ndarray,
+        all_indices: np.ndarray,
+        angle_grid_full: np.ndarray,
+        angle_grid_pos: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Reconstruct a batch of segments simultaneously.
+
+        Args:
+            radii:           (n_segs,) float32.
+            all_indices:     (n_segs, segment_dim-1) uint8.
+            angle_grid_full: level-0 quantisation grid.
+            angle_grid_pos:  level-1+ quantisation grid.
+
+        Returns:
+            (n_segs, segment_dim) float32.
+        """
+        d = self.config.segment_dim
+
+        # Pre-compute level structure (mirrors compress)
+        level_sizes: List[int] = []
+        carries: List[bool] = []
+        cur = d
+        while cur > 1:
+            n_pairs = cur // 2
+            level_sizes.append(n_pairs)
+            carries.append(cur % 2 == 1)
+            cur = n_pairs + (cur % 2)
+
+        # Split all_indices into per-level slices
+        level_indices: List[np.ndarray] = []
+        start = 0
+        for sz in level_sizes:
+            level_indices.append(all_indices[:, start:start + sz])
+            start += sz
+
+        # Reverse through levels
+        current = radii[:, None].astype(np.float32)   # (n_segs, 1)
+
+        for rev_idx, (q_idx, has_carry) in enumerate(
+                zip(reversed(level_indices), reversed(carries))):
+            real_level = len(level_sizes) - 1 - rev_idx
+            grid = angle_grid_full if real_level == 0 else angle_grid_pos
+            angles = grid[q_idx.astype(np.intp)]   # (n_segs, n_pairs)
+
+            n_pairs = angles.shape[1]
+            r_pairs = current[:, :n_pairs]          # (n_segs, n_pairs)
+
+            # Expand: (r, θ) → (r·cos θ, r·sin θ)
+            expanded = np.empty((len(radii), 2 * n_pairs), dtype=np.float32)
+            expanded[:, 0::2] = r_pairs * np.cos(angles)
+            expanded[:, 1::2] = r_pairs * np.sin(angles)
+
+            if has_carry:
+                current = np.concatenate([expanded, current[:, -1:]], axis=1)
+            else:
+                current = expanded
+
+        # Inverse rotation: v_rotated @ R  (equivalent to per-row R.T @ v)
+        return (current @ self._rotation).astype(np.float32)
+
 
 # ---------------------------------------------------------------------------
 # QJL: Quantized Johnson-Lindenstrauss Residual Correction
@@ -295,6 +415,102 @@ class QJL:
         scale = compressed_residual["scale"]
         return float(np.dot(query_projected, sign_bits)) * scale
 
+    def compress_residuals_batch(
+        self, residuals: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Vectorised QJL residual compression for a batch of segments.
+
+        Args:
+            residuals: (n_segs, segment_dim) float32.
+
+        Returns:
+            sign_bits: (n_segs, proj_dim) int8, values ±1.
+            scales:    (n_segs,) float32.
+        """
+        # Project: (n_segs, d) @ (d, proj_dim) = (n_segs, proj_dim)
+        projected = residuals @ self._jl_matrix.T
+        signs = np.sign(projected).astype(np.int8)
+        signs[signs == 0] = 1
+        scales = np.mean(np.abs(projected), axis=1).astype(np.float32)
+        return signs, scales
+
+
+# ---------------------------------------------------------------------------
+# Bit-packing helpers
+# ---------------------------------------------------------------------------
+
+def _pack_angle_indices(indices: np.ndarray, bits: int) -> np.ndarray:
+    """
+    Pack a flat uint8 array of angle indices into a bit-packed byte array.
+
+    Each index value is in [0, 2**bits - 1].  Values are packed LSB-first:
+    index i occupies bits [i*bits, (i+1)*bits - 1] of the output stream.
+
+    Pure-numpy O(n) implementation using scatter-add on uint32 output buffer.
+
+    Args:
+        indices: flat uint8 array, shape (n,).
+        bits:    bits per index (2, 3, or 4).
+
+    Returns:
+        uint8 byte array of length ceil(n * bits / 8).
+    """
+    n = len(indices)
+    if n == 0:
+        return np.array([], dtype=np.uint8)
+
+    total_bytes = (n * bits + 7) // 8
+    out = np.zeros(total_bytes + 1, dtype=np.uint32)   # +1 for overflow headroom
+
+    bit_pos   = np.arange(n, dtype=np.uint32) * bits
+    byte_idx  = bit_pos >> 3                           # bit_pos // 8
+    bit_off   = (bit_pos & 7).astype(np.uint32)        # bit_pos % 8
+
+    vals = indices.astype(np.uint32)
+
+    # Low bits land in byte_idx
+    np.add.at(out, byte_idx, vals << bit_off)
+
+    # High bits that overflow into byte_idx + 1
+    overflow = bit_off + bits
+    spill_mask = overflow > 8
+    if spill_mask.any():
+        spill_shift = 8 - bit_off[spill_mask]
+        np.add.at(out, byte_idx[spill_mask] + 1, vals[spill_mask] >> spill_shift)
+
+    return (out[:total_bytes] & 0xFF).astype(np.uint8)
+
+
+def _unpack_angle_indices(packed: np.ndarray, bits: int, n: int) -> np.ndarray:
+    """
+    Reverse of _pack_angle_indices.
+
+    Args:
+        packed: uint8 byte array.
+        bits:   bits per index.
+        n:      number of original indices to extract.
+
+    Returns:
+        uint8 array of shape (n,) with values in [0, 2**bits - 1].
+    """
+    if n == 0:
+        return np.array([], dtype=np.uint8)
+
+    mask = np.uint32((1 << bits) - 1)
+
+    bit_pos  = np.arange(n, dtype=np.uint32) * bits
+    byte_idx = bit_pos >> 3
+    bit_off  = (bit_pos & 7).astype(np.uint32)
+
+    # Extend by one byte so byte_idx+1 is always valid
+    packed_ext = np.empty(len(packed) + 1, dtype=np.uint32)
+    packed_ext[:len(packed)] = packed
+    packed_ext[-1] = 0
+
+    vals = ((packed_ext[byte_idx] | (packed_ext[byte_idx + 1] << 8)) >> bit_off) & mask
+    return vals.astype(np.uint8)
+
 
 # ---------------------------------------------------------------------------
 # CompressedTensorBuffer: per-tensor compressed storage
@@ -306,92 +522,85 @@ class CompressedTensorBuffer:
     Stores the compressed representation of a single tensor on the CPU.
 
     A tensor is flattened, padded to a multiple of segment_dim, then
-    split into n_segments chunks. Each chunk is stored as:
-      - one FP32 radius (final magnitude after recursive polar transform)
-      - (segment_dim - 1) quantized angle indices (uint8)
-      - optionally: proj_dim sign bits (int8) + one FP32 scale for QJL
+    all n_segments chunks are compressed together using vectorised batch
+    operations.  Angle indices are bit-packed; QJL sign bits are
+    packed with np.packbits.
 
-    Properties
-    ----------
+    Fields
+    ------
     original_shape : tuple
-        Shape of the original tensor before flatten/pad.
     original_dtype : str
-        NumPy dtype string of the original tensor (e.g. 'float32').
     n_padded_elements : int
-        Total elements after padding to multiple of segment_dim.
     segment_dim : int
-        Length of each compressed segment.
-    segment_radii : List[float]
-        Final radius per segment.
-    segment_angle_indices : List[np.ndarray]
-        Angle indices per segment, dtype uint8, shape (segment_dim-1,).
-    segment_qjl_signs : Optional[List[np.ndarray]]
-        QJL sign bits per segment, dtype int8. None when QJL disabled.
-    segment_qjl_scales : Optional[List[float]]
-        QJL scale per segment. None when QJL disabled.
     angle_bits : int
-        Bits per angle index (used for byte-size estimation).
+    radii : np.ndarray
+        Shape (n_segs,), float32.  Final scalar radius per segment.
+    packed_angle_bytes : np.ndarray
+        Shape (packed_bytes,), uint8.  All (n_segs × (d-1)) angle indices
+        bit-packed into a flat byte array (angle_bits bits per index, LSB-first).
+    n_angle_indices : int
+        Total number of angle indices = n_segs × (segment_dim - 1).
+        Required to correctly unpack packed_angle_bytes.
+    qjl_sign_bytes : Optional[np.ndarray]
+        Shape (n_segs, ceil(proj_dim/8)), uint8.  QJL sign bits packed
+        with np.packbits(bitorder='little').  None when QJL disabled.
+    qjl_scales : Optional[np.ndarray]
+        Shape (n_segs,), float32.  QJL scale per segment.
+    qjl_proj_dim : int
+        Projection dimension used for QJL (0 = QJL disabled).
     """
 
     original_shape: tuple
     original_dtype: str
     n_padded_elements: int
     segment_dim: int
-    segment_radii: List[float]
-    segment_angle_indices: List[np.ndarray]
-    segment_qjl_signs: Optional[List[np.ndarray]]
-    segment_qjl_scales: Optional[List[float]]
     angle_bits: int
+
+    # Core compressed data (contiguous numpy arrays — no Python lists)
+    radii: np.ndarray                          # (n_segs,) float32
+    packed_angle_bytes: np.ndarray             # (packed_bytes,) uint8
+    n_angle_indices: int                       # n_segs * (segment_dim - 1)
+
+    # QJL (None when disabled)
+    qjl_sign_bytes: Optional[np.ndarray]       # (n_segs, ceil(proj_dim/8)) uint8
+    qjl_scales: Optional[np.ndarray]           # (n_segs,) float32
+    qjl_proj_dim: int = 0                      # 0 → QJL disabled
 
     @property
     def n_segments(self) -> int:
-        return len(self.segment_radii)
-
-    @property
-    def theoretical_packed_bytes(self) -> int:
-        """Bytes required if angle indices were bit-packed (the compression target).
-
-        Assumes:
-          - 1 FP32 radius per segment (32 bits)
-          - angle_bits per angle index, packed
-          - 1 sign bit per QJL projected dimension + 1 FP32 scale per segment
-        """
-        d = self.segment_dim
-        bits_per_seg = 32 + (d - 1) * self.angle_bits
-        if self.segment_qjl_signs is not None and self.segment_qjl_signs:
-            proj_dim = len(self.segment_qjl_signs[0])
-            bits_per_seg += proj_dim + 32  # sign bits + FP32 scale
-        return max(1, (bits_per_seg * self.n_segments + 7) // 8)
+        return len(self.radii)
 
     @property
     def actual_stored_bytes(self) -> int:
-        """Actual bytes used by the numpy arrays in this buffer (no bit-packing).
+        """Real heap bytes used by this buffer (bit-packed storage)."""
+        b = self.radii.nbytes + self.packed_angle_bytes.nbytes
+        if self.qjl_sign_bytes is not None:
+            b += self.qjl_sign_bytes.nbytes + self.qjl_scales.nbytes
+        return b
 
-        Angle indices are stored as uint8 (1 byte each, not angle_bits/8).
-        QJL signs are stored as int8 (1 byte each).
-        This is what the Python process actually allocates.
+    @property
+    def theoretical_packed_bytes(self) -> int:
+        """Ideal byte count if the FP32 radius were also compressed to fewer bits.
+
+        Currently the radius is stored as-is in float32; this property exists to
+        express the algorithm's theoretical ceiling and is identical to
+        actual_stored_bytes except for the radius storage.
         """
-        n = self.n_segments
         d = self.segment_dim
-        # n floats (Python float = 8 bytes) for radii
-        radii_bytes = n * 8
-        # (d-1) uint8 per segment for angle indices
-        angle_bytes = n * (d - 1)
-        if self.segment_qjl_signs is not None and self.segment_qjl_signs:
-            proj_dim = len(self.segment_qjl_signs[0])
-            signs_bytes = n * proj_dim       # int8, 1 byte each
-            scales_bytes = n * 8             # Python float
-            return radii_bytes + angle_bytes + signs_bytes + scales_bytes
-        return radii_bytes + angle_bytes
+        n = self.n_segments
+        bits_per_seg = 32 + (d - 1) * self.angle_bits
+        if self.qjl_proj_dim:
+            bits_per_seg += self.qjl_proj_dim + 32
+        return max(1, (bits_per_seg * n + 7) // 8)
 
     @property
     def compressed_bytes(self) -> int:
-        """Alias for actual_stored_bytes — real heap usage of this buffer."""
+        """Alias for actual_stored_bytes."""
         return self.actual_stored_bytes
 
     @property
     def original_bytes(self) -> int:
-        """Bytes in the original FP32 tensor (before padding)."""
+        """Bytes in original FP32 tensor (before padding)."""
         return self.n_padded_elements * 4
 
 
@@ -431,11 +640,14 @@ class TurboQuantCompressor:
         """
         Compress an arbitrary numpy array.
 
+        Internally uses fully-vectorised batch operations (no Python loop over
+        segments) and bit-packs the angle indices to angle_bits bits per index.
+
         Args:
             data: Any shape, any float dtype.
 
         Returns:
-            CompressedTensorBuffer holding all segment data.
+            CompressedTensorBuffer with bit-packed storage.
         """
         original_shape = data.shape
         original_dtype = str(data.dtype)
@@ -449,34 +661,50 @@ class TurboQuantCompressor:
         n_padded = len(flat)
         n_segs = n_padded // d
 
-        radii: List[float] = []
-        angle_indices_list: List[np.ndarray] = []
-        qjl_signs_list: Optional[List[np.ndarray]] = [] if self.qjl else None
-        qjl_scales_list: Optional[List[float]] = [] if self.qjl else None
+        # Reshape to (n_segs, d) for batch processing
+        segs = flat.reshape(n_segs, d)
 
-        for i in range(n_segs):
-            seg = flat[i * d: (i + 1) * d]
-            polar_result = self.polar.compress(seg)
+        # --- Vectorised PolarQuant ---
+        radii, all_indices = self.polar.compress_batch(segs)
+        # all_indices: (n_segs, d-1) uint8
 
-            radii.append(polar_result["radius"])
-            angle_indices_list.append(polar_result["angle_indices"])
+        # Bit-pack all angle indices into a flat byte array
+        flat_indices = all_indices.ravel()   # (n_segs * (d-1),) uint8
+        packed_angle_bytes = _pack_angle_indices(flat_indices, self.config.angle_bits)
 
-            if self.qjl is not None:
-                residual = seg - polar_result["reconstructed"]
-                qjl_result = self.qjl.compress_residual(residual)
-                qjl_signs_list.append(qjl_result["sign_bits"])
-                qjl_scales_list.append(qjl_result["scale"])
+        # --- Vectorised QJL (optional) ---
+        qjl_sign_bytes: Optional[np.ndarray] = None
+        qjl_scales: Optional[np.ndarray] = None
+        qjl_proj_dim = 0
+
+        if self.qjl is not None:
+            # Reconstruct for residual calculation (needed for QJL input)
+            # We do a single batch reconstruct here using the already-computed indices
+            recon_segs = self.polar.decompress_batch(
+                radii, all_indices,
+                self.polar._angle_grid_full,
+                self.polar._angle_grid_pos,
+            )  # (n_segs, d)
+            residuals = segs - recon_segs   # (n_segs, d)
+            signs, qjl_scales = self.qjl.compress_residuals_batch(residuals)
+            # signs: (n_segs, proj_dim) int8, values ±1
+            # Pack sign bits: convert ±1 → 0/1, then np.packbits along proj axis
+            bool_signs = ((signs + 1) // 2).astype(np.uint8)  # (n_segs, proj_dim)
+            qjl_sign_bytes = np.packbits(bool_signs, axis=1, bitorder="little")
+            qjl_proj_dim = signs.shape[1]
 
         buf = CompressedTensorBuffer(
             original_shape=original_shape,
             original_dtype=original_dtype,
             n_padded_elements=n_padded,
             segment_dim=d,
-            segment_radii=radii,
-            segment_angle_indices=angle_indices_list,
-            segment_qjl_signs=qjl_signs_list,
-            segment_qjl_scales=qjl_scales_list,
             angle_bits=self.config.angle_bits,
+            radii=radii,
+            packed_angle_bytes=packed_angle_bytes,
+            n_angle_indices=n_segs * (d - 1),
+            qjl_sign_bytes=qjl_sign_bytes,
+            qjl_scales=qjl_scales,
+            qjl_proj_dim=qjl_proj_dim,
         )
 
         self.stats["tensors_compressed"] += 1
@@ -491,15 +719,21 @@ class TurboQuantCompressor:
         """
         Decompress a CompressedTensorBuffer back to a numpy array.
 
+        Uses fully-vectorised batch reconstruction (no Python loop over segments).
+
         Returns:
             Array with buf.original_shape and buf.original_dtype.
         """
         d = buf.segment_dim
         n_segs = buf.n_segments
-        reconstructed_flat = np.empty(buf.n_padded_elements, dtype=np.float32)
 
-        # Build angle grids once — reusing the same grids as the compressor.
-        # Previously these were recomputed per-segment (O(n_segs) linspace calls).
+        # Unpack bit-packed angle indices → (n_segs, d-1) uint8
+        flat_indices = _unpack_angle_indices(
+            buf.packed_angle_bytes, buf.angle_bits, buf.n_angle_indices
+        )
+        all_indices = flat_indices.reshape(n_segs, d - 1)
+
+        # Angle grids (built once)
         n_levels = 2 ** buf.angle_bits
         angle_grid_full = (
             np.linspace(-math.pi, math.pi, n_levels, endpoint=False)
@@ -510,36 +744,15 @@ class TurboQuantCompressor:
             + math.pi / (4 * n_levels)
         )
 
-        for i in range(n_segs):
-            radius = buf.segment_radii[i]
-            angle_indices = buf.segment_angle_indices[i]
+        # Vectorised batch reconstruct → (n_segs, d)
+        # QJL correction is skipped on the full-decode path:
+        # QJL corrects dot-product estimation bias, not reconstruction error.
+        reconstructed = self.polar.decompress_batch(
+            buf.radii, all_indices, angle_grid_full, angle_grid_pos
+        )
 
-            # Reconstruct level angles: level 0 uses full grid, rest use pos grid
-            # Determine level sizes from d:  level k has d >> (k+1) angles
-            q_levels: List[np.ndarray] = []
-            idx = 0
-            cur_len = d
-            while cur_len > 1:
-                n_pairs = cur_len // 2
-                lvl_indices = angle_indices[idx: idx + n_pairs]
-                grid = angle_grid_full if len(q_levels) == 0 else angle_grid_pos
-                q_levels.append(grid[lvl_indices.astype(int)])
-                idx += n_pairs
-                cur_len = n_pairs + (cur_len % 2)
-
-            seg_reconstructed = self.polar._reconstruct(radius, q_levels)
-
-            # Apply QJL correction is skipped on decompress path —
-            # the reconstruction from PolarQuant alone is used (standard practice).
-            # QJL is only used for asymmetric dot-product estimation, not full decode.
-
-            reconstructed_flat[i * d: (i + 1) * d] = seg_reconstructed
-
-        # Unpad and reshape
-        n_original = 1
-        for s in buf.original_shape:
-            n_original *= s
-        flat = reconstructed_flat[:n_original]
+        # Flatten, unpad, reshape
+        flat = reconstructed.ravel()[:np.prod(buf.original_shape, dtype=int)]
         result = flat.reshape(buf.original_shape).astype(buf.original_dtype)
 
         self.stats["tensors_decompressed"] += 1
