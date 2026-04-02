@@ -11,13 +11,15 @@
  * Architecture:
  *   1 CUDA block = 1 token's KV vector
  *   Block size = MM_COMPRESS_BLOCK_SIZE (128)
- *   Rotation matrix in __constant__ memory (no shared memory needed)
+ *   Cooperative threading: all 128 threads participate in compression
+ *   Rotation matrix in __constant__ memory (broadcast-efficient)
  *
  * For head_dim = 128:
- *   - Registers per thread 0: ~200 (vec[128] + radii[128] + rotated[128])
- *   - Global reads:  256B (FP16 vector) + const mem broadcast (rotation)
- *   - Global writes: 127B (indices) + 4B (radius) + 16B (QJL) + 4B (scale)
- *                   + 32B (TokenMeta update)
+ *   - Shared memory per block: ~1.6 KB (s_vec + s_buf_a + s_buf_b + misc)
+ *   - Registers per thread: ~10 (no large per-thread arrays)
+ *   - Phase 2 (GEMV): 128 threads × 128 FMAs = full block utilization
+ *   - Phase 3 (polar): 64→32→16→...→1 active threads (tree reduction)
+ *   - Phase 4 (QJL):  128 threads × 128 FMAs + warp ballot + shuffle reduce
  */
 
 #include "multimodal_inference.cuh"
@@ -96,32 +98,27 @@ __device__ __forceinline__ float tq_dequantize_angle_pos(
 // Grid:  MM_MAX_VICTIMS blocks (fixed — reads actual counts from device)
 // Block: MM_COMPRESS_BLOCK_SIZE (128)
 //
-// Block mapping:
-//   blocks [0, *d_demote_count):
-//     Thread 0: atomic pop CXL slot from freelist
-//     Thread 0: TQ compress (rotation + polar + QJL) — serial per vector
-//     Thread 0: write compressed payload to CXL storage
-//     Thread 0: write cosine_sim + TQ_COMPRESSED + cxl_slot to d_meta
-//     Thread 0: update modality stats
+// Cooperative threading model (demote blocks):
+//   ALL 128 threads participate in compression. No thread-0-only bottleneck.
 //
-//   blocks [*d_demote_count, *d_demote_count + *d_evict_count):
-//     Thread 0: free CXL slot if token was in CXL tier
-//     Thread 0: clear tier_flags + cxl_slot
-//     Thread 0: update eviction stats
+//   Phase 0 — Alloc:     Thread 0 pops CXL slot, broadcasts via shared memory.
+//   Phase 1 — Load:      128 threads cooperatively load FP16→FP32 (1 elem/thread).
+//   Phase 2 — Rotation:  128 threads compute GEMV (1 output row/thread).
+//   Phase 3 — Polar:     Tree reduction — level 0: 64 threads, level 1: 32, ...
+//                         Ping-pong shared memory buffers, angles written to global.
+//   Phase 4 — QJL:       128 threads compute 1 projection each, __ballot_sync
+//                         packs 32 sign bits per warp, shuffle reduces scale.
+//   Phase 5 — Metadata:  Thread 0 writes cxl_slot, cosine_sim, tier_flags.
+//   Phase 6 — Stats:     Thread 0 updates modality counters.
 //
-//   blocks beyond: early exit
+// Evict blocks: Thread 0 only (lightweight free + clear).
 //
-// Memory flow:
-//   READ:  d_kv_vectors[pos*head_dim..+head_dim] (256B FP16 per demote)
-//   READ:  c_mm_rotation[] (__constant__, broadcast)
-//   READ:  d_jl_matrix[] (global, per JL projection row)
-//   WRITE: cxl.d_indices[slot*total_angles..+total_angles] (127B per demote)
-//   WRITE: cxl.d_radii[slot] (4B per demote)
-//   WRITE: cxl.d_qjl_bits[slot*words..+words] (16B per demote)
-//   WRITE: cxl.d_qjl_scales[slot] (4B per demote)
-//   WRITE: d_meta[token].{cxl_slot, tier_flags, cosine_sim} (12B per item)
-//   WRITE: d_modality_stats (atomicAdd, 4B per item)
-//   WRITE: cxl.d_freelist_top (atomicSub/Add, 4B per item)
+// Shared memory per block: ~1.6 KB
+//   s_vec[128]    — 512B  (original FP32 vector, survives through QJL phase)
+//   s_buf_a[128]  — 512B  (rotation output → polar ping-pong A)
+//   s_buf_b[128]  — 512B  (polar ping-pong B)
+//   s_warp_scale[4] — 16B (warp partial sums for QJL scale reduction)
+//   s_slot, s_alloc_ok — 8B
 //
 // No host sync. No D→H readback. CUDA graph capturable (fixed grid).
 // ============================================================================
@@ -155,19 +152,23 @@ __global__ void mm_kernel_process_demotions(
     if (bid >= total) return;
 
     // ====================================================================
-    // DEMOTION PATH: alloc + compress + write + metadata + stats
+    // DEMOTION PATH: cooperative alloc + compress + write + metadata + stats
     // ====================================================================
     if (bid < n_demote) {
         uint32_t token_idx = d_demote_list[bid];
 
-        // ---- Step 0: Thread 0 allocates CXL slot ----
+        // Shared memory for cooperative compression
+        __shared__ float    s_vec[MM_MAX_HEAD_DIM];    // original FP32 vector
+        __shared__ float    s_buf_a[MM_MAX_HEAD_DIM];  // ping-pong buffer A
+        __shared__ float    s_buf_b[MM_MAX_HEAD_DIM];  // ping-pong buffer B
+        __shared__ float    s_warp_scale[4];           // warp partial sums (128/32=4 warps)
         __shared__ uint32_t s_slot;
         __shared__ int      s_alloc_ok;
 
+        // ---- Phase 0: Thread 0 allocates CXL slot ----
         if (tid == 0) {
             int old_top = (int)atomicSub(cxl.d_freelist_top, 1u);
             if (old_top - 1 < 0) {
-                // CXL full — revert, upgrade to EVICT
                 atomicAdd(cxl.d_freelist_top, 1u);
                 s_alloc_ok = 0;
             } else {
@@ -175,10 +176,9 @@ __global__ void mm_kernel_process_demotions(
                 s_alloc_ok = 1;
             }
         }
-        __syncthreads();  // broadcast alloc result to all threads
+        __syncthreads();
 
         if (!s_alloc_ok) {
-            // Alloc failed — mark as evict, update stats, exit
             if (tid == 0) {
                 d_actions[token_idx] = ACTION_EVICT;
                 d_meta[token_idx].tier_flags &= ~MM_FLAG_IN_TIER0;
@@ -191,106 +191,145 @@ __global__ void mm_kernel_process_demotions(
         }
 
         uint32_t cxl_slot = s_slot;
+        uint32_t pos = d_meta[token_idx].position;
 
-        // ---- Steps 1-6: Thread 0 does full TQ compression ----
+        // ---- Phase 1: Cooperative FP16 → FP32 load (1 element per thread) ----
+        if (tid < head_dim) {
+            s_vec[tid] = __half2float(d_kv_vectors[pos * head_dim + tid]);
+        }
+        __syncthreads();
+
+        // ---- Phase 2: Cooperative rotation GEMV (1 output row per thread) ----
+        // Each thread computes: s_buf_a[tid] = dot(R[tid, :], s_vec[:])
+        // c_mm_rotation is in __constant__ memory — all threads reading the
+        // same column index get a single broadcast transaction.
+        if (tid < head_dim) {
+            float sum = 0.0f;
+            for (uint32_t c = 0; c < head_dim; c++) {
+                sum += c_mm_rotation[tid * head_dim + c] * s_vec[c];
+            }
+            s_buf_a[tid] = sum;
+        }
+        __syncthreads();
+
+        // ---- Phase 3: Cooperative polar transform (tree reduction) ----
+        // Each level halves the radii count. At level k, n_pairs = head_dim/2^(k+1)
+        // threads each process one pair independently.
+        //
+        // Ping-pong: even levels read s_buf_a → write s_buf_b,
+        //            odd levels read s_buf_b → write s_buf_a.
+        // Angles are written directly to CXL global memory.
+
+        uint8_t* out_indices = &cxl.d_indices[cxl_slot * cxl.total_angles];
+        uint32_t n_radii = head_dim;
+        uint32_t angle_offset = 0;
+        int level = 0;
+        int which = 0;  // 0 = read from s_buf_a, 1 = read from s_buf_b
+
+        while (n_radii > 1) {
+            uint32_t n_pairs = n_radii / 2;
+            uint32_t has_odd = n_radii & 1;
+
+            float* src = (which == 0) ? s_buf_a : s_buf_b;
+            float* dst = (which == 0) ? s_buf_b : s_buf_a;
+
+            if (tid < n_pairs) {
+                float x = src[tid * 2];
+                float y = src[tid * 2 + 1];
+                float r = sqrtf(x * x + y * y);
+                float theta = atan2f(y, x);
+
+                uint8_t qi = (level == 0)
+                    ? tq_quantize_angle_full(theta, n_grid)
+                    : tq_quantize_angle_pos(theta, n_grid);
+                out_indices[angle_offset + tid] = qi;
+                dst[tid] = r;
+            }
+            // Carry forward odd element (only 1 thread needed)
+            if (has_odd && tid == n_pairs) {
+                dst[tid] = src[n_radii - 1];
+            }
+            __syncthreads();
+
+            angle_offset += n_pairs;
+            n_radii = n_pairs + has_odd;
+            which ^= 1;
+            level++;
+        }
+
+        // Final radius is in the last-written buffer at index 0
+        float* final_buf = (which == 0) ? s_buf_a : s_buf_b;
         if (tid == 0) {
-            uint32_t pos = d_meta[token_idx].position;
+            cxl.d_radii[cxl_slot] = final_buf[0];
+        }
 
-            // Step 1: Load FP16 KV vector → FP32
-            float vec[MM_MAX_HEAD_DIM];
-            for (uint32_t i = 0; i < head_dim; i++) {
-                vec[i] = __half2float(d_kv_vectors[pos * head_dim + i]);
-            }
-
-            // Step 2: Apply rotation v' = R @ v (from __constant__ memory)
-            float rotated[MM_MAX_HEAD_DIM];
-            for (uint32_t r = 0; r < head_dim; r++) {
-                float sum = 0.0f;
-                for (uint32_t c = 0; c < head_dim; c++) {
-                    sum += c_mm_rotation[r * head_dim + c] * vec[c];
+        // ---- Phase 4: Cooperative QJL projection ----
+        // Each thread computes one JL dot product: dot(JL_row[tid], s_vec[:])
+        // __ballot_sync packs 32 sign bits per warp into one uint32.
+        // Warp shuffle reduces |dot| sums for scale factor.
+        if (d_jl_matrix && proj_dim > 0) {
+            // Each thread computes its projection
+            float my_dot = 0.0f;
+            if (tid < (uint32_t)proj_dim) {
+                for (uint32_t d = 0; d < head_dim; d++) {
+                    my_dot += d_jl_matrix[tid * head_dim + d] * s_vec[d];
                 }
-                rotated[r] = sum;
             }
 
-            // Step 3: Recursive polar transform → quantized angle indices
-            uint32_t angle_idx = 0;
-            uint8_t* out_indices = &cxl.d_indices[cxl_slot * cxl.total_angles];
+            // Warp ballot: pack sign bits (threads beyond proj_dim contribute 0)
+            uint32_t sign_bit = (tid < (uint32_t)proj_dim && my_dot >= 0.0f) ? 1u : 0u;
+            uint32_t packed = __ballot_sync(0xFFFFFFFF, sign_bit);
 
-            float radii[MM_MAX_HEAD_DIM];
-            uint32_t n_radii = head_dim;
-            for (uint32_t i = 0; i < head_dim; i++) radii[i] = rotated[i];
+            uint32_t warp_id = tid / 32;
+            uint32_t lane    = tid % 32;
+            uint32_t qjl_words_per = (proj_dim + 31) / 32;
 
-            int level = 0;
-            while (n_radii > 1) {
-                float new_radii[MM_MAX_HEAD_DIM / 2];
-                uint32_t n_new = 0;
+            // Lane 0 of each warp writes the packed 32-bit word
+            if (lane == 0 && warp_id < qjl_words_per) {
+                cxl.d_qjl_bits[cxl_slot * qjl_words_per + warp_id] = packed;
+            }
 
-                for (uint32_t i = 0; i < n_radii; i += 2) {
-                    if (i + 1 < n_radii) {
-                        float x = radii[i];
-                        float y = radii[i + 1];
-                        float r = sqrtf(x * x + y * y);
-                        float theta = atan2f(y, x);
+            // Warp shuffle reduction for |dot| → scale factor
+            float abs_dot = (tid < (uint32_t)proj_dim) ? fabsf(my_dot) : 0.0f;
+            for (int offset = 16; offset > 0; offset >>= 1) {
+                abs_dot += __shfl_down_sync(0xFFFFFFFF, abs_dot, offset);
+            }
+            // Lane 0 of each warp stores its partial sum
+            if (lane == 0) {
+                s_warp_scale[warp_id] = abs_dot;
+            }
+            __syncthreads();
 
-                        uint8_t qi = (level == 0)
-                            ? tq_quantize_angle_full(theta, n_grid)
-                            : tq_quantize_angle_pos(theta, n_grid);
-                        out_indices[angle_idx++] = qi;
-                        new_radii[n_new++] = r;
-                    } else {
-                        new_radii[n_new++] = radii[i];
-                    }
+            // Thread 0 accumulates warp partial sums and writes final scale
+            if (tid == 0) {
+                float total_scale = 0.0f;
+                uint32_t n_warps = (proj_dim + 31) / 32;
+                for (uint32_t w = 0; w < n_warps; w++) {
+                    total_scale += s_warp_scale[w];
                 }
-                n_radii = n_new;
-                for (uint32_t i = 0; i < n_radii; i++) radii[i] = new_radii[i];
-                level++;
+                cxl.d_qjl_scales[cxl_slot] = total_scale / (float)proj_dim;
             }
+        }
 
-            // Write final radius to CXL storage
-            cxl.d_radii[cxl_slot] = radii[0];
-
-            // Step 4: Cosine similarity proxy (bit-width dependent)
+        // ---- Phase 5: Metadata (thread 0 only, AFTER all CXL writes) ----
+        if (tid == 0) {
             float cosine_est;
             if (n_grid <= 4)       cosine_est = 0.86f;   // 2-bit
             else if (n_grid <= 8)  cosine_est = 0.965f;  // 3-bit
             else                   cosine_est = 0.991f;  // 4-bit
 
-            // Step 5: QJL sign bits
-            if (d_jl_matrix && proj_dim > 0) {
-                uint32_t qjl_words_per = (proj_dim + 31) / 32;
-                uint32_t* out_qjl = &cxl.d_qjl_bits[cxl_slot * qjl_words_per];
-                float scale_sum = 0.0f;
-
-                for (uint32_t w = 0; w < qjl_words_per; w++) {
-                    uint32_t bits = 0;
-                    for (int b = 0; b < 32 && (w * 32 + b) < (uint32_t)proj_dim; b++) {
-                        int proj_idx = w * 32 + b;
-                        float dot = 0.0f;
-                        for (uint32_t d = 0; d < head_dim; d++) {
-                            dot += d_jl_matrix[proj_idx * head_dim + d] * vec[d];
-                        }
-                        if (dot >= 0.0f) bits |= (1u << b);
-                        scale_sum += fabsf(dot);
-                    }
-                    out_qjl[w] = bits;
-                }
-                cxl.d_qjl_scales[cxl_slot] = scale_sum / (float)proj_dim;
-            }
-
-            // Step 6: Write metadata — slot, flags, cosine_sim
-            // TQ_COMPRESSED is set HERE, after data is physically in CXL.
             d_meta[token_idx].cxl_slot   = cxl_slot;
             d_meta[token_idx].cosine_sim = cosine_est;
             d_meta[token_idx].tier_flags =
                 (d_meta[token_idx].tier_flags & ~MM_FLAG_IN_TIER0)
                 | MM_FLAG_IN_CXL
                 | MM_FLAG_TQ_COMPRESSED;
+        }
 
-            // Step 7: Modality stats
-            if (d_modality_stats) {
-                ModalityGroup mod = MM_UNPACK_MODALITY(d_meta[token_idx].type_flags);
-                atomicAdd(&d_modality_stats->cxl_count[mod], 1u);
-            }
+        // ---- Phase 6: Modality stats (thread 0 only) ----
+        if (tid == 0 && d_modality_stats) {
+            ModalityGroup mod = MM_UNPACK_MODALITY(d_meta[token_idx].type_flags);
+            atomicAdd(&d_modality_stats->cxl_count[mod], 1u);
         }
         return;
     }

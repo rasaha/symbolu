@@ -389,11 +389,24 @@ __global__ void mm_kernel_fused_score_collect(
 );
 
 /**
- * TRUE Kernel 3: Process Demotions + Evictions (fully fused).
+ * TRUE Kernel 3: Process Demotions + Evictions (fully fused, cooperative).
  *
  * Single kernel that performs ALL post-scoring work:
  *   Demote blocks: alloc CXL slot + TQ compress + CXL write + metadata + stats
  *   Evict blocks:  free CXL slot + clear metadata + stats
+ *
+ * Cooperative threading (demote blocks — ALL 128 threads participate):
+ *   Phase 0: Thread 0 pops CXL slot, broadcasts via shared memory
+ *   Phase 1: 128 threads load FP16→FP32 cooperatively (1 elem/thread)
+ *   Phase 2: 128 threads compute rotation GEMV (1 output row/thread)
+ *   Phase 3: Tree-parallel polar transform (64→32→16→...→1 active threads)
+ *            Ping-pong shared memory buffers, angles written to CXL global
+ *   Phase 4: 128 threads compute QJL projections (1 dot/thread),
+ *            __ballot_sync packs sign bits, __shfl_down_sync reduces scale
+ *   Phase 5: Thread 0 writes metadata (cxl_slot, cosine_sim, tier_flags)
+ *   Phase 6: Thread 0 updates modality stats
+ *
+ * Shared memory: ~1.6 KB (s_vec[128] + s_buf_a[128] + s_buf_b[128] + misc)
  *
  * Reads d_demote_count / d_evict_count from DEVICE memory (written by kernel 2).
  * No host sync, no D→H readback. CUDA graph capturable (fixed grid).
@@ -405,17 +418,6 @@ __global__ void mm_kernel_fused_score_collect(
  *   [0, *d_demote_count):             alloc + compress + write + finalize
  *   [*d_demote_count, total):         free CXL slot + clear + evict stats
  *   [total, MM_MAX_VICTIMS):          early exit
- *
- * Side effects per demote block:
- *   - cxl.d_freelist_top atomically decremented (slot pop)
- *   - cxl.d_indices/d_radii/d_qjl_bits/d_qjl_scales written
- *   - d_meta[].{cxl_slot, tier_flags, cosine_sim} updated
- *   - d_modality_stats->cxl_count atomically incremented
- *
- * Side effects per evict block:
- *   - cxl.d_freelist_top atomically incremented (slot push)
- *   - d_meta[].{tier_flags, cxl_slot} cleared
- *   - d_modality_stats->evicted_count atomically incremented
  */
 __global__ void mm_kernel_process_demotions(
     const __half*        __restrict__ d_kv_vectors,     // [max_tokens, head_dim]
