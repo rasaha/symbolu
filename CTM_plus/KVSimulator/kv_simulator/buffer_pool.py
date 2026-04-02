@@ -116,6 +116,76 @@ def sink_and_recent_attention(seq_len: int, sink_tokens: int = 4,
     return [w / total for w in weights] if total > 0 else [1.0 / seq_len] * seq_len
 
 
+def entity_focused_attention(seq_len: int, sink_tokens: int = 4,
+                              recent_window: int = 128) -> List[float]:
+    """
+    Entity-focused pattern: a few positions receive very high attention.
+    ~15% sinks, ~50% on ~5% of middle positions (entities), ~35% spread.
+    """
+    if seq_len == 0:
+        return []
+    weights = [0.0] * seq_len
+    # Sinks
+    for i in range(min(sink_tokens, seq_len)):
+        weights[i] = 0.15 / max(1, sink_tokens)
+    # Entity positions: ~5% of middle, evenly spaced
+    middle_start = sink_tokens
+    middle_end = seq_len
+    middle_len = max(1, middle_end - middle_start)
+    num_entities = max(1, middle_len // 20)  # ~5%
+    entity_step = max(1, middle_len // (num_entities + 1))
+    entity_positions = set()
+    for e in range(1, num_entities + 1):
+        pos = middle_start + e * entity_step
+        if pos < seq_len:
+            entity_positions.add(pos)
+    # Distribute
+    entity_share = 0.50 / max(1, len(entity_positions))
+    filler_count = middle_len - len(entity_positions)
+    filler_share = 0.35 / max(1, filler_count)
+    for i in range(middle_start, seq_len):
+        if i in entity_positions:
+            weights[i] = entity_share
+        else:
+            weights[i] = filler_share
+    total = sum(weights)
+    return [w / total for w in weights] if total > 0 else [1.0 / seq_len] * seq_len
+
+
+def uniform_attention(seq_len: int, sink_tokens: int = 4,
+                       recent_window: int = 128) -> List[float]:
+    """
+    Uniform / diffuse pattern: attention spread nearly evenly.
+    ~15% sinks, ~85% uniform across all other positions.
+    """
+    if seq_len == 0:
+        return []
+    weights = [0.0] * seq_len
+    for i in range(min(sink_tokens, seq_len)):
+        weights[i] = 0.15 / max(1, sink_tokens)
+    rest = max(1, seq_len - sink_tokens)
+    for i in range(sink_tokens, seq_len):
+        weights[i] = 0.85 / rest
+    total = sum(weights)
+    return [w / total for w in weights] if total > 0 else [1.0 / seq_len] * seq_len
+
+
+def mixed_multihead_attention(seq_len: int, sink_tokens: int = 4,
+                                recent_window: int = 128) -> List[float]:
+    """
+    Mixed multi-head pattern: averages sink+recent, entity, and uniform
+    to simulate different attention heads attending to different patterns.
+    """
+    if seq_len == 0:
+        return []
+    w1 = sink_and_recent_attention(seq_len, sink_tokens, recent_window)
+    w2 = entity_focused_attention(seq_len, sink_tokens, recent_window)
+    w3 = uniform_attention(seq_len, sink_tokens, recent_window)
+    combined = [(a + b + c) / 3.0 for a, b, c in zip(w1, w2, w3)]
+    total = sum(combined)
+    return [w / total for w in combined] if total > 0 else [1.0 / seq_len] * seq_len
+
+
 # =============================================================================
 # Eviction Policies
 # =============================================================================
@@ -364,17 +434,21 @@ class KVCacheSimulator:
         recent_window: int = 128,
         seed: int = 42,
         kv_policy=None,
+        attention_fn=None,
     ):
         """
         Args:
             kv_policy: A KVCachePolicy instance. Required when
                 policy_type=PolicyType.KV_POLICY; ignored otherwise.
+            attention_fn: Callable(seq_len, sink_tokens, recent_window) -> List[float].
+                Defaults to sink_and_recent_attention.
         """
         self.max_blocks = max_blocks
         self.block_size = block_size
         self.sink_tokens = sink_tokens
         self.recent_window = recent_window
         self.rng = random.Random(seed)
+        self.attention_fn = attention_fn or sink_and_recent_attention
 
         self.policy = make_policy(
             policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
@@ -476,7 +550,7 @@ class KVCacheSimulator:
         new_position = current_len - 1
 
         # Generate attention distribution
-        attention = sink_and_recent_attention(
+        attention = self.attention_fn(
             current_len, self.sink_tokens, self.recent_window,
         )
 
@@ -631,6 +705,7 @@ def run_workload(
     sink_tokens: int = 4,
     recent_window: int = 128,
     kv_policy=None,
+    attention_fn=None,
 ) -> Dict:
     """
     Run a complete workload and return metrics.
@@ -641,12 +716,13 @@ def run_workload(
     Args:
         kv_policy: A KVCachePolicy instance. Required when
             policy_type=PolicyType.KV_POLICY.
+        attention_fn: Optional attention pattern function override.
     """
     sim = KVCacheSimulator(
         max_blocks=max_blocks, block_size=block_size,
         policy_type=policy_type, seed=seed,
         sink_tokens=sink_tokens, recent_window=recent_window,
-        kv_policy=kv_policy,
+        kv_policy=kv_policy, attention_fn=attention_fn,
     )
 
     # Prefill all sequences
@@ -674,13 +750,20 @@ def compare_policies(
     decode_steps: int = 128,
     seed: int = 42,
     include_kv_policy: bool = True,
+    attention_fn=None,
+    sequences: Optional[List[Tuple[int, int]]] = None,
 ) -> Dict[str, Dict]:
     """
     Run the same workload under all policies and return comparison.
 
-    Set include_kv_policy=False to skip KV_POLICY (requires KVPolicy module).
+    Args:
+        include_kv_policy: Set False to skip KV_POLICY (requires KVPolicy module).
+        attention_fn: Optional attention pattern function override.
+        sequences: Optional explicit sequence list [(seq_id, context_length), ...].
+            Overrides num_sequences/context_length when provided.
     """
-    sequences = [(i, context_length) for i in range(num_sequences)]
+    if sequences is None:
+        sequences = [(i, context_length) for i in range(num_sequences)]
     results = {}
 
     for policy in PolicyType:
@@ -703,7 +786,7 @@ def compare_policies(
             max_blocks=max_blocks, block_size=block_size,
             sequences=sequences, decode_steps_per_seq=decode_steps,
             policy_type=policy, seed=seed,
-            kv_policy=kv_pol,
+            kv_policy=kv_pol, attention_fn=attention_fn,
         )
         elapsed = time.perf_counter() - start
         metrics["elapsed_seconds"] = round(elapsed, 4)
