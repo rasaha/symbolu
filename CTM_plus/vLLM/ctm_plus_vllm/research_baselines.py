@@ -39,16 +39,22 @@ class H2OSimulator:
         self.stats = {
             "hits": 0, "misses": 0, "evictions": 0,
             "total_accesses": 0, "total_latency_ns": 0,
+            "entity_hits": 0, "entity_accesses": 0,
         }
 
     def access(self, position: int, token_type: str = "regular",
                attention_weight: float = 0.01) -> bool:
         self.current_time += 1
         self.stats["total_accesses"] += 1
+        is_entity = token_type == "entity"
+        if is_entity:
+            self.stats["entity_accesses"] += 1
 
         if position in self.cache:
             self.stats["hits"] += 1
             self.stats["total_latency_ns"] += 100
+            if is_entity:
+                self.stats["entity_hits"] += 1
             m = self.cache[position]
             m["last_access_time"] = self.current_time
             m["access_count"] = m.get("access_count", 0) + 1
@@ -101,7 +107,10 @@ class H2OSimulator:
         return (self.stats["hits"] / t) if t > 0 else 0.0
 
     def get_stats(self) -> dict:
+        ea = self.stats["entity_accesses"]
         return {**self.stats, "hit_rate": self.hit_rate,
+                "entity_hit_rate": self.stats["entity_hits"] / ea if ea > 0 else 0.0,
+                "avg_latency_ns": self.stats["total_latency_ns"] / max(1, self.stats["total_accesses"]),
                 "cache_size": len(self.cache), "max_tokens": self.max_tokens}
 
 
@@ -125,16 +134,22 @@ class StreamingLLMSimulator:
         self.stats = {
             "hits": 0, "misses": 0, "evictions": 0,
             "total_accesses": 0, "total_latency_ns": 0,
+            "entity_hits": 0, "entity_accesses": 0,
         }
 
     def access(self, position: int, token_type: str = "regular",
                attention_weight: float = 0.01) -> bool:
         self.current_time += 1
         self.stats["total_accesses"] += 1
+        is_entity = token_type == "entity"
+        if is_entity:
+            self.stats["entity_accesses"] += 1
 
         if position in self.cache:
             self.stats["hits"] += 1
             self.stats["total_latency_ns"] += 100
+            if is_entity:
+                self.stats["entity_hits"] += 1
             m = self.cache[position]
             m["last_access_time"] = self.current_time
             m["access_count"] = m.get("access_count", 0) + 1
@@ -185,7 +200,10 @@ class StreamingLLMSimulator:
         return (self.stats["hits"] / t) if t > 0 else 0.0
 
     def get_stats(self) -> dict:
+        ea = self.stats["entity_accesses"]
         return {**self.stats, "hit_rate": self.hit_rate,
+                "entity_hit_rate": self.stats["entity_hits"] / ea if ea > 0 else 0.0,
+                "avg_latency_ns": self.stats["total_latency_ns"] / max(1, self.stats["total_accesses"]),
                 "cache_size": len(self.cache), "max_tokens": self.max_tokens}
 
 
@@ -207,16 +225,22 @@ class TOVASimulator:
         self.stats = {
             "hits": 0, "misses": 0, "evictions": 0,
             "total_accesses": 0, "total_latency_ns": 0,
+            "entity_hits": 0, "entity_accesses": 0,
         }
 
     def access(self, position: int, token_type: str = "regular",
                attention_weight: float = 0.01) -> bool:
         self.current_time += 1
         self.stats["total_accesses"] += 1
+        is_entity = token_type == "entity"
+        if is_entity:
+            self.stats["entity_accesses"] += 1
 
         if position in self.cache:
             self.stats["hits"] += 1
             self.stats["total_latency_ns"] += 100
+            if is_entity:
+                self.stats["entity_hits"] += 1
             m = self.cache[position]
             m["last_access_time"] = self.current_time
             m["access_count"] = m.get("access_count", 0) + 1
@@ -269,5 +293,8 @@ class TOVASimulator:
         return (self.stats["hits"] / t) if t > 0 else 0.0
 
     def get_stats(self) -> dict:
+        ea = self.stats["entity_accesses"]
         return {**self.stats, "hit_rate": self.hit_rate,
+                "entity_hit_rate": self.stats["entity_hits"] / ea if ea > 0 else 0.0,
+                "avg_latency_ns": self.stats["total_latency_ns"] / max(1, self.stats["total_accesses"]),
                 "cache_size": len(self.cache), "max_tokens": self.max_tokens}

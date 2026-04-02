@@ -118,6 +118,7 @@ class CXLTieredSimulator:
             "tier0_evictions": 0, "cxl_evictions": 0,
             "promotions_from_cxl": 0, "promotions_from_tier1": 0,
             "total_latency_ns": 0,
+            "entity_hits": 0, "entity_accesses": 0,
         }
 
     def access(
@@ -129,6 +130,9 @@ class CXLTieredSimulator:
         """Access a token. Returns tier that served it."""
         self.current_time += 1
         self.stats["total_accesses"] += 1
+        is_entity = token_type == "entity"
+        if is_entity:
+            self.stats["entity_accesses"] += 1
 
         meta_update = {
             "last_access_time": self.current_time,
@@ -140,6 +144,8 @@ class CXLTieredSimulator:
         if position in self.tier0:
             self.stats["tier0_hits"] += 1
             self.stats["total_latency_ns"] += 100
+            if is_entity:
+                self.stats["entity_hits"] += 1
             m = self.tier0[position]
             m.update(meta_update)
             m["access_count"] = m.get("access_count", 0) + 1
@@ -155,6 +161,8 @@ class CXLTieredSimulator:
             self.stats["cxl_hits"] += 1
             self.stats["promotions_from_cxl"] += 1
             self.stats["total_latency_ns"] += 300  # Decompress + DRAM
+            if is_entity:
+                self.stats["entity_hits"] += 1
 
             # Promote to Tier0
             m = self.cxl_pool.pop(position)
@@ -329,11 +337,13 @@ class CXLTieredSimulator:
         return self.stats["total_latency_ns"] / t if t > 0 else 0.0
 
     def get_stats(self) -> dict:
+        ea = self.stats["entity_accesses"]
         return {
             **self.stats,
             "hit_rate": self.hit_rate,
             "combined_hit_rate": self.combined_hit_rate,
             "avg_latency_ns": self.avg_latency_ns,
+            "entity_hit_rate": self.stats["entity_hits"] / ea if ea > 0 else 0.0,
             "tier0_size": len(self.tier0),
             "cxl_size": len(self.cxl_pool),
             "tier0_capacity": self.tier0_capacity,
@@ -364,12 +374,22 @@ def run_single_workload(
     use_flat_tq = seq_len <= 16384
     use_flat_baseline = seq_len <= 65536
 
+    # Compute TQ+CXL effective capacity upfront (deterministic from config).
+    # Used for the cap-match ablation config.
+    tq_cfg_ref = TurboQuantConfig.three_bit(head_dim)
+    cxl_eff_capacity = base_tokens + int(base_tokens * 2 * tq_cfg_ref.compression_ratio)
+
     configs = []
 
     # Baselines (flat) — skip at very large scales due to O(n) deque
     if use_flat_baseline:
         configs.append(("LRU (FP16)", "lru"))
         configs.append(("CTM+ (FP16)", "ctm"))
+
+    # Capacity-matched ablation: CTM+ with same token budget as TQ+CXL.
+    # Uses CXLTieredSimulator (O(1)) so runs at all scales.
+    # Isolates how much gain comes from capacity vs smarter eviction.
+    configs.append(("CTM+ FP16 (cap-match)", "ctm_cap_match"))
 
     # Research baselines — always run (dict-based, O(1))
     configs.append(("H2O", "h2o"))
@@ -423,6 +443,22 @@ def run_single_workload(
             stats = sim.get_stats()
             hr = sim.hit_rate
             eff = base_tokens
+        elif config_type == "ctm_cap_match":
+            # Same CTM+ policy, but with capacity equal to TQ+CXL effective tokens.
+            # Uses CXLTieredSimulator (dict-based, O(1)) to stay fast at all scales.
+            # Answers: how much gain is purely from larger capacity?
+            tq_cfg = TurboQuantConfig.three_bit(head_dim)
+            sim = CXLTieredSimulator(
+                tier0_tokens=cxl_eff_capacity,
+                cxl_budget_tokens=0,  # No CXL compression — pure FP16 capacity
+                tq_config=tq_cfg,
+                ctm_config=CTMKVConfig.for_long_context(),
+            )
+            for pos, tt, attn in workload:
+                sim.access(pos, tt, attn)
+            stats = sim.get_stats()
+            hr = sim.hit_rate
+            eff = cxl_eff_capacity
         elif config_type == "tq_lru":
             tq_cfg = TurboQuantConfig.three_bit(head_dim)
             int_config = IntegratedConfig(
@@ -520,6 +556,13 @@ def run_single_workload(
         if config_type in ("lru", "lru_equiv"):
             lru_hr = hr
 
+        # Compute avg_latency_ns for flat simulators (KVCacheSimulator) that
+        # don't track it natively: all hits = 100ns, misses = 10,000ns.
+        if "avg_latency_ns" not in stats:
+            h = stats.get("hits", 0)
+            m = stats.get("misses", 0)
+            stats["avg_latency_ns"] = (h * 100 + m * 10000) / max(1, h + m)
+
         results[name] = {
             "hit_rate": hr,
             "vs_lru": hr - lru_hr,
@@ -531,6 +574,7 @@ def run_single_workload(
                 "tier0_evictions", "cxl_evictions",
                 "promotions_from_cxl", "promotions_from_tier1",
                 "avg_latency_ns", "combined_hit_rate",
+                "entity_hit_rate",
             )},
         }
 
@@ -687,6 +731,149 @@ def print_cxl_tier_analysis(all_workload_results: dict, seq_lengths: list):
     print("=" * 90)
 
 
+def print_effective_access_cost(all_workload_results: dict, seq_lengths: list):
+    """Print average access latency (ns) per config, breaking down tier contributions.
+
+    For TQ+CXL: cost = (T0*100 + CXL*300 + T1*10000 + miss*10000) / total
+    For flat baselines: cost = (hits*100 + misses*10000) / total
+
+    This prevents 'gaming' the hit-rate metric by counting slow warm hits the
+    same as fast hot hits.
+    """
+    TIER0_NS  = 100
+    CXL_NS    = 300
+    NVME_NS   = 10_000
+
+    configs_to_show = [
+        "LRU (FP16)", "LRU-equiv (FP16)", "H2O", "StreamingLLM", "TOVA",
+        "CTM+ (FP16)", "CTM+ FP16 (cap-match)", "TQ-3bit + CTM+ + CXL",
+    ]
+
+    print(f"\n{'='*90}")
+    print("  EFFECTIVE ACCESS COST (avg latency ns) — lower is better")
+    print(f"  Tier0={TIER0_NS}ns  CXL={CXL_NS}ns  NVMe/miss={NVME_NS:,}ns")
+    print("=" * 90)
+
+    for wl_name, wl_results in all_workload_results.items():
+        print(f"\n  [{wl_name}]")
+        header = f"  {'Seq Len':>10}"
+        for cfg in configs_to_show:
+            short = cfg.replace("TQ-3bit + CTM+ + CXL", "TQ+CXL").replace("CTM+ FP16 (cap-match)", "CTM+(cap)")
+            header += f"  {short:>12}"
+        print(header)
+        print(f"  {'-' * (10 + 14 * len(configs_to_show))}")
+
+        for sl in seq_lengths:
+            if sl not in wl_results:
+                continue
+            row = f"  {sl:>10,}"
+            for cfg in configs_to_show:
+                r = wl_results[sl].get(cfg)
+                if r is None:
+                    row += f"  {'N/A':>12}"
+                    continue
+                lat = r.get("avg_latency_ns")
+                if lat is None:
+                    t0 = r.get("tier0_hits", r.get("hits", 0))
+                    cx = r.get("cxl_hits", 0)
+                    t1 = r.get("tier1_hits", 0)
+                    ms = r.get("misses", 0)
+                    tot = t0 + cx + t1 + ms
+                    lat = (t0 * TIER0_NS + cx * CXL_NS + (t1 + ms) * NVME_NS) / max(1, tot)
+                row += f"  {lat:>9.0f}ns"
+            print(row)
+
+    print("=" * 90)
+
+
+def print_capacity_ablation(all_workload_results: dict, seq_lengths: list):
+    """Decompose TQ+CXL improvement into 'capacity effect' vs 'policy effect'.
+
+    capacity_effect = CTM+(cap-match) - CTM+(base)   # pure capacity gain
+    policy_effect   = TQ+CXL - CTM+(cap-match)       # smarter eviction on top
+    """
+    print(f"\n{'='*90}")
+    print("  CAPACITY vs POLICY ABLATION")
+    print("  capacity_effect = CTM+(cap-match) minus CTM+(base)")
+    print("  policy_effect   = TQ+CXL minus CTM+(cap-match)")
+    print("=" * 90)
+
+    for wl_name, wl_results in all_workload_results.items():
+        print(f"\n  [{wl_name}]")
+        print(f"  {'Seq Len':>10}  {'CTM+ base':>11}  {'CTM+ cap':>10}"
+              f"  {'TQ+CXL':>10}  {'cap effect':>12}  {'policy effect':>14}")
+        print(f"  {'-'*74}")
+
+        for sl in seq_lengths:
+            if sl not in wl_results:
+                continue
+            r = wl_results[sl]
+            base_hr  = r.get("CTM+ (FP16)", {}).get("hit_rate")
+            cap_hr   = r.get("CTM+ FP16 (cap-match)", {}).get("hit_rate")
+            tqcxl_hr = r.get("TQ-3bit + CTM+ + CXL", {}).get("hit_rate")
+
+            if base_hr is None or cap_hr is None or tqcxl_hr is None:
+                continue
+
+            cap_effect    = cap_hr  - base_hr
+            policy_effect = tqcxl_hr - cap_hr
+
+            print(
+                f"  {sl:>10,}  {base_hr:>10.2%}  {cap_hr:>10.2%}"
+                f"  {tqcxl_hr:>10.2%}  {cap_effect:>+11.2%}  {policy_effect:>+13.2%}"
+            )
+
+    print("=" * 90)
+
+
+def print_end_task_proxy(all_workload_results: dict, seq_lengths: list):
+    """Report entity-token hit rate as an end-task proxy metric.
+
+    'entity' tokens represent named facts, variables, function names — the
+    tokens most likely to be queried in retrieval tasks.  A policy that
+    achieves a high entity_hit_rate protects the tokens that matter most for
+    downstream accuracy, not just tokens in aggregate.
+
+    This answers: 'is the improvement uniform, or concentrated on important tokens?'
+    """
+    configs_to_show = [
+        "LRU (FP16)", "LRU-equiv (FP16)", "H2O", "StreamingLLM", "TOVA",
+        "CTM+ (FP16)", "CTM+ FP16 (cap-match)", "TQ-3bit + CTM+ + CXL",
+    ]
+
+    print(f"\n{'='*90}")
+    print("  ENTITY TOKEN HIT RATE (end-task proxy: retrieval / needle accuracy)")
+    print("  'entity' = named facts, entities, variables — tokens most likely queried")
+    print("=" * 90)
+
+    for wl_name, wl_results in all_workload_results.items():
+        print(f"\n  [{wl_name}]")
+        header = f"  {'Seq Len':>10}"
+        for cfg in configs_to_show:
+            short = cfg.replace("TQ-3bit + CTM+ + CXL", "TQ+CXL").replace("CTM+ FP16 (cap-match)", "CTM+(cap)")
+            header += f"  {short:>11}"
+        print(header)
+        print(f"  {'-' * (10 + 13 * len(configs_to_show))}")
+
+        for sl in seq_lengths:
+            if sl not in wl_results:
+                continue
+            row = f"  {sl:>10,}"
+            for cfg in configs_to_show:
+                r = wl_results[sl].get(cfg)
+                if r is None:
+                    row += f"  {'N/A':>11}"
+                    continue
+                ehr = r.get("entity_hit_rate")
+                if ehr is None:
+                    row += f"  {'N/A':>11}"
+                else:
+                    row += f"  {ehr:>10.2%}"
+            print(row)
+
+    print("=" * 90)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -757,6 +944,9 @@ def main():
     if verbose:
         print_scaling_summary(all_results, seq_lengths)
         print_cxl_tier_analysis(all_results, seq_lengths)
+        print_effective_access_cost(all_results, seq_lengths)
+        print_capacity_ablation(all_results, seq_lengths)
+        print_end_task_proxy(all_results, seq_lengths)
 
         elapsed = time.time() - overall_start
         print(f"\n  Total benchmark time: {elapsed:.1f}s")
