@@ -1,7 +1,7 @@
 # Agentic AI Governance Fit Analysis — Symbolu
 
 **Date:** 2026-04-02
-**Scope:** Full codebase and architecture document review
+**Scope:** Primary focus on `symbolu/agentic_framework/` (18 modules, 15 test files, 6 design docs). Supporting evidence from pipeline phases P51–P55 and `symbolu/safety/` where they directly integrate with the agentic framework.
 **Method:** Code inspection, not marketing inference
 
 ---
@@ -254,3 +254,112 @@ Replace or augment the procedural `policy_engine.py` with a rule-based evaluatio
 
 ### 3. Persistent audit trail with integrity verification
 Move `AuditEntry` from in-memory list to an append-only persistent store with hash chaining. This is table stakes for any enterprise governance claim. The `LedgerReplayVerifier`'s hash-stable design already proves you can do this — just persist it externally.
+
+---
+
+# Appendix A: Agentic Framework Module-by-Module Breakdown
+
+This section scopes the analysis strictly to `symbolu/agentic_framework/` — the 18 Python modules, 15 test files, and 6 design documents that constitute the agentic wrapper.
+
+## Module Inventory and Classification
+
+| Module | Lines | Classification | Governance Role |
+|---|---|---|---|
+| `safety_contract.py` | 429 | **Governance: Safety Layer** | Fail-closed pre-execution authorization. `eligible=False` default. 6 preconditions. Frozen immutable dataclass. Zero-LLM. 25 tests. |
+| `mcp_gateway.py` | 1044 | **Governance: Tool Mediation** | MCP tool call interception with 5-level risk classification, confidence-gated execution, forbidden capability blocking, human escalation, full audit trail. 48 tests. |
+| `confidence_gate.py` | 1110 | **Governance: Control Plane** | Behavioral confidence that gates execution (FULL/CAUTIOUS/CONFIRM/BLOCKED), controls escalation (NONE/NOTIFY/CONFIRM/HALT), allocates compute budgets, weights memory retention. 74 tests. This IS governance behavior — it prevents action when confidence is low. |
+| `adaptive_policy.py` | ~500 | **Governance-Adjacent: Policy** | `ToolPermission` enum (FULL/STANDARD/RESTRICTED/BLOCKED) with coherence-trajectory-based access gating. Session trajectory classification feeds permission decisions. The tool permission mechanism is governance; the trajectory classification is reasoning infrastructure. 39 tests. |
+| `proactive_scheduler.py` | ~600 | **Governance-Adjacent: Orchestration** | Cron-based autonomous task execution. Default=OFF. min_confidence=0.7 enforced. Routes all execution through MCP Gateway (inheriting all safety gates). 43 tests. The safety constraints are governance; the scheduling is orchestration. |
+| `reflective_loop.py` | ~300 | **Not Governance: Reasoning** | Generate → critique → revise loop. Evaluates output *quality* (coherence, correctness, completeness, relevance), not *action safety* or *policy compliance*. 25 tests. |
+| `agent.py` | ~400 | **Orchestration** | Main `AgenticLLMWrapper` orchestrating all components. Pipeline: Goal Decomposition → Memory → Generation → Coherence → SafetyContract → Action Execution → Persistence. The pipeline structure integrates governance (step 5–6), but the orchestrator itself is not governance. 28 tests. |
+| `coherence_tracker.py` | ~350 | **Not Governance: Measurement** | Observation-only coherence metrics (consistency, reversal risk, volatility, goal alignment, identity stability, drift). Explicitly "never modifies LLM behavior" (INV-COH-1). Feeds signals into ConfidenceGate and SafetyContract but is itself a measurement system. 21 tests. |
+| `goal_decomposition.py` | ~300 | **Not Governance: Reasoning** | Extracts structured intent (purpose, strategy, agency level, actions) from user input. Maps to ontological layers O8/O7/O6/O3. The `agency_level` (FULL/CONFIRM/INFORM) feeds SafetyContract precondition 6, making it governance-relevant input, but the module itself is intent parsing. 28 tests. |
+| `memory_store.py` | ~300 | **Not Governance: Infrastructure** | Append-only session memory with sliding window. Semantic retrieval via embeddings. Supports audit (append-only history), but primary purpose is context management. 22 tests. |
+| `local_critic.py` | ~250 | **Not Governance: Reasoning** | Cost-optimized quality critic (rule-based, avoids LLM calls). Evaluates response quality metrics. 33 tests. |
+| `llm_adapters.py` | ~200 | **Not Governance: Integration** | Adapters for OpenAI, Anthropic, Google LLM APIs. Pure integration plumbing. 35 tests. |
+| `sovereign_bridge.py` | ~200 | **Governance-Adjacent: Bridge** | Converts 32D tensor-level Sovereign State (Kosha/Vritti/Guna signals) into `ConfidenceSignals` and `CoherenceState` that feed ConfidenceGate and SafetyContract. This is the bridge that makes neural-level signals actionable for governance decisions. |
+| `reasoning_workflows.py` | ~200 | **Not Governance: Reasoning** | Structured reasoning patterns (chain-of-thought, decompose, etc.). |
+| `adaptive_prompts.py` | ~150 | **Not Governance: Reasoning** | Dynamic prompt construction based on context. |
+| `benchmark_critics.py` | ~150 | **Not Governance: Evaluation** | Benchmark evaluation critics. |
+| `examples.py` | ~100 | **Not Governance: Documentation** | Usage examples. |
+| `validate.py` | ~50 | **Not Governance: Tooling** | Validation utilities. |
+
+## Governance Control Flow Within the Agentic Framework
+
+The `agent.py:AgenticLLMWrapper.run()` method (L212–298) implements a 7-step pipeline where governance is steps 5–6:
+
+```
+1. Goal Decomposition    → GoalState (extracts agency_level: FULL/CONFIRM/INFORM)
+2. Memory Enrichment     → Context from session history
+3. Reflective Generation → Response + quality score (self-critique loop)
+4. Coherence Tracking    → CoherenceState (consistency, stability, drift metrics)
+5. Safety Contract       → SafetyGate.check(coherence_state, goal_state, action_types)
+   │                        ↓ Returns (SafetyContract, allowed_actions)
+   │                        ↓ SafetyContract.eligible must be True
+   │                        ↓ All 6 preconditions must pass
+   │                        ↓ Action types checked against forbidden list
+6. Action Execution      → Only if contract.eligible == True
+   │                        ↓ Only allowed_actions executed
+   │                        ↓ Forbidden capabilities always blocked
+7. Memory Persistence    → Append-only history update
+```
+
+When MCP tools are involved (via `SafeMCPGateway`), a second governance layer activates:
+
+```
+SafeMCPGateway.call_tool():
+  1. ToolRiskClassifier.classify()     → ToolRiskLevel (READ_ONLY..PRIVILEGED)
+  2. Build ConfidenceSignals            → From quality + coherence + risk context
+  3. ConfidenceGate.evaluate()          → ExecutionMode + EscalationLevel
+  4. Check forbidden_capabilities       → Hard block on data_exfiltration, etc.
+  5. Check min_confidence per risk      → 0.30 (read) to 0.95 (privileged)
+  6. EscalationHandler (if required)    → Human confirmation with timeout
+  7. Execute tool call with timeout     → Only if all checks pass
+  8. Audit log result                   → AuditEntry with full context
+```
+
+## What Makes This Framework Governance-Grade (Not Just Safety Features)
+
+Three things distinguish this from typical "we added safety checks" approaches:
+
+1. **Fail-closed is the default, not fail-open.** `SafetyContract.eligible=False`. `EscalationHandler.request_confirmation()` returns `False` by default. Unknown tools classified as WRITE (not READ_ONLY). DESTRUCTIVE/PRIVILEGED always require confirmation. This is deny-by-default architecture.
+
+2. **Confidence gates behavior, not annotation.** `ConfidenceGate` doesn't just display a number — it produces `ExecutionMode.BLOCKED`, throttles compute budgets, refuses memory storage, and escalates to humans. The `BudgetController` allocates more revisions when confidence is low. The `MemoryController` refuses to store low-confidence outputs. These are behavioral controls.
+
+3. **Two independent authorization layers.** `SafetyContract` (precondition-based) and `SafeMCPGateway` (risk+confidence-based) are independent enforcement points. A tool call must pass BOTH to execute. This is defense-in-depth, not single-point-of-failure safety.
+
+## What Prevents It From Being a Standalone Governance Product
+
+1. **Self-governing only.** The framework governs its own tool calls and actions. It cannot govern a LangChain agent, a CrewAI workflow, or any external agent. No API endpoint for external authorization requests.
+
+2. **No declarative policies.** All rules are procedural Python. No policy language, no policy store, no per-tenant/per-user policy configuration. Adding a new rule means writing code, not config.
+
+3. **In-memory audit only.** `self.audit_log: List[AuditEntry]` is an in-memory list. No persistence, no tamper-evidence, no external compliance reporting.
+
+4. **No approval workflow.** Human escalation is synchronous in-process callbacks. No approval queue, no multi-stakeholder review, no approval persistence.
+
+5. **No policy simulation.** Cannot test "what would happen if..." without executing the full pipeline.
+
+## Sentinel Score Context
+
+Per `docs/SENTINEL_SCORE.md`, the framework self-assesses at **7.5–8/10** with this breakdown:
+- Core Quality: 7/10 (reflective loop, coherence, critics)
+- Safety: 8.5/10 (MCP + proactive risk gating)
+- Tool Ecosystem: 7/10 (MCP Gateway)
+- Automation: 7/10 (ProactiveScheduler)
+- Differentiation: 8/10 (confidence-gated proactivity)
+
+This self-assessment is fair. The safety score (8.5) is the strongest component and the most governance-relevant. The path to 9–10 requires Skill Registry Phase 2, production deployment, and multi-agent coordination — all of which would strengthen the governance story.
+
+## Test Coverage for Governance Components
+
+| Governance Module | Tests | Coverage Focus |
+|---|---|---|
+| `test_safety_contract.py` | 25 | Precondition evaluation, fail-closed default, forbidden capabilities, strict/permissive evaluators |
+| `test_mcp_gateway.py` | 48 | Risk classification, gating logic, escalation flows, forbidden capability blocking, audit logging, timeout handling |
+| `test_confidence_gate.py` | 74 | Confidence aggregation, escalation levels, budget allocation, memory weighting, execution modes, quick_check |
+| `test_adaptive_policy.py` | 39 | Trajectory classification, tool permissions, parameter tuning |
+| `test_proactive_scheduler.py` | 43 | Cron parsing, task management, min_confidence enforcement, human review flows |
+| **Total governance-related** | **229** | Out of 421 total framework tests = **54% of tests are governance-related** |
+
+This test distribution confirms governance is not a side feature — it's structurally central to the framework.
