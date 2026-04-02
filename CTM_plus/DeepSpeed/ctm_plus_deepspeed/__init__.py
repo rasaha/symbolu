@@ -21,6 +21,8 @@ from .offload_manager import CTMOffloadManager
 from .zero_integration import CTMZeROOffload, get_deepspeed_config_with_ctm
 from .inference import CTMInferenceManager
 from .config import CTMDeepSpeedConfig
+from .turboquant_numba import TurboQuantNumba, numba_available
+from .turboquant_offload import TurboQuantOffloadEngine, CompressedKV
 
 __version__ = "0.1.0"
 __all__ = [
@@ -29,4 +31,8 @@ __all__ = [
     "CTMInferenceManager",
     "CTMDeepSpeedConfig",
     "get_deepspeed_config_with_ctm",
+    "TurboQuantNumba",
+    "TurboQuantOffloadEngine",
+    "CompressedKV",
+    "numba_available",
 ]
