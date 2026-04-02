@@ -37,7 +37,11 @@ from typing import Optional
 
 import numpy as np
 
-from .turboquant_numba import compute_level_structure, build_angle_grids
+from .turboquant_numba import (
+    build_level_structure,
+    compute_level_offsets,
+    build_angle_grids,
+)
 
 # ---------------------------------------------------------------------------
 # Try to load the CUDA library
@@ -160,11 +164,11 @@ class TurboQuantCUDA:
         self.device = device
 
         # Level geometry
-        ls = compute_level_structure(head_dim)
-        self.n_levels = ls["n_levels"]
-        self.total_angles = ls["total_angles"]
-        self._level_sizes_np = np.array(ls["level_sizes"], dtype=np.int32)
-        self._level_offsets_np = np.array(ls["level_offsets"], dtype=np.int32)
+        level_sizes_np, level_offsets_np = compute_level_offsets(head_dim)
+        self.n_levels = len(level_sizes_np)
+        self.total_angles = int(level_offsets_np[-1])
+        self._level_sizes_np = level_sizes_np
+        self._level_offsets_np = level_offsets_np
 
         # GPU-resident constants
         self._level_sizes_gpu = _to_torch(self._level_sizes_np, device)
