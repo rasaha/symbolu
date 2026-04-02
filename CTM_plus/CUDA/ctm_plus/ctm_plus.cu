@@ -58,6 +58,36 @@ __device__ __forceinline__ float compute_victim_score(
     return score;
 }
 
+/**
+ * Quality-aware victim scoring for TurboQuant + CTM+ integration.
+ *
+ * Extends the base CTM+ scoring with a compression quality signal:
+ * tokens that compressed poorly get a small boost (higher score =
+ * less likely evicted) because evicting them loses more information.
+ *
+ * Matches the vLLM turboquant_integration.py scoring model.
+ */
+__device__ __forceinline__ float compute_victim_score_quality_aware(
+    const PageState& page,
+    uint64_t min_time,
+    uint64_t time_range,
+    float adaptive_p,
+    float neighbor_hotness,
+    float weight_compression_quality
+) {
+    float base_score = compute_victim_score(
+        page, min_time, time_range, adaptive_p, neighbor_hotness);
+
+    // Quality-aware: tokens that compressed poorly are more valuable
+    // to keep (eviction = more information loss)
+    if (page.flags & CTM_PAGE_TQ_COMPRESSED) {
+        float quality_penalty = 1.0f - page.cosine_similarity;
+        base_score += weight_compression_quality * quality_penalty;
+    }
+
+    return base_score;
+}
+
 /* ========== CUDA Kernels ========== */
 
 __global__ void kernel_init_rng(curandState* states, uint64_t seed, uint32_t n) {
@@ -121,15 +151,37 @@ __global__ void kernel_on_access(
     promotions[idx] = false;
     demotions[idx] = false;
 
+    bool in_cxl = (page->flags & CTM_PAGE_IN_CXL) != 0;
+
     if (in_tier0) {
-        // Hit in tier0
+        // Hit in tier0 (HBM, FP16)
         atomicAdd((unsigned long long*)&stats->tier0_hits, 1);
+    } else if (in_cxl) {
+        // Hit in CXL tier (TQ-compressed) — check for promotion to tier0
+        atomicAdd((unsigned long long*)&stats->cxl_hits, 1);
+
+        float reuse = page->reuse_score;
+        float neighbor_hot = page->coherence;
+
+        // CXL -> Tier0 promotion: decompress and move to HBM
+        bool should_promote = false;
+        float combined = 0.5f * reuse + 0.3f * page->coherence + 0.2f * neighbor_hot;
+        if (combined > config.promotion_threshold || page->access_count > 3) {
+            should_promote = true;
+        }
+
+        if (should_promote) {
+            page->flags &= ~CTM_PAGE_IN_CXL;
+            page->flags |= CTM_PAGE_IN_TIER0;
+            atomicAdd((unsigned long long*)&stats->cxl_promotions, 1);
+            atomicAdd((unsigned long long*)&stats->tq_decompressions, 1);
+            promotions[idx] = true;
+        }
     } else if (in_tier1) {
-        // Hit in tier1 - check for promotion
+        // Hit in tier1 (NVMe) - check for promotion
         atomicAdd((unsigned long long*)&stats->tier1_hits, 1);
 
         float reuse = page->reuse_score;
-        // Compute neighbor hotness from page coherence as proxy
         float neighbor_hot = page->coherence;
 
         bool should_promote = false;
@@ -143,7 +195,14 @@ __global__ void kernel_on_access(
 
         if (should_promote) {
             page->flags &= ~CTM_PAGE_IN_TIER1;
-            page->flags |= CTM_PAGE_IN_TIER0;
+            // If CXL tier is enabled, promote to CXL first (compressed)
+            if (config.enable_cxl_tier) {
+                page->flags |= CTM_PAGE_IN_CXL;
+                page->flags |= CTM_PAGE_TQ_COMPRESSED;
+                atomicAdd((unsigned long long*)&stats->tq_compressions, 1);
+            } else {
+                page->flags |= CTM_PAGE_IN_TIER0;
+            }
             atomicAdd((unsigned long long*)&stats->promotions, 1);
             promotions[idx] = true;
         }
@@ -202,6 +261,68 @@ __global__ void kernel_select_victims(
     }
 
     victim_ids[idx] = best_victim;
+    rng_states[idx] = local_state;
+}
+
+/**
+ * Quality-aware victim selection kernel for TurboQuant + CTM+ integration.
+ *
+ * Uses compression quality metrics in scoring, so tokens that compressed
+ * poorly are protected from eviction (evicting them loses more information).
+ */
+__global__ void kernel_select_victims_quality_aware(
+    const PageState* pages,
+    const uint64_t* tier0_lru,
+    uint32_t tier0_size,
+    uint32_t sample_size,
+    float adaptive_p,
+    float weight_compression_quality,
+    uint64_t* victim_ids,
+    uint32_t num_victims,
+    curandState* rng_states,
+    bool* demote_to_cxl  // Output: whether victim should go to CXL instead of evict
+) {
+    uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_victims) return;
+
+    curandState local_state = rng_states[idx];
+
+    uint64_t min_time = UINT64_MAX, max_time = 0;
+    uint32_t scan_limit = min(tier0_size, sample_size);
+    for (uint32_t i = 0; i < scan_limit; i++) {
+        uint64_t pid = tier0_lru[i];
+        uint32_t hash = hash_page_id(pid, CTM_HASH_BITS);
+        const PageState& p = pages[hash];
+        if (p.last_access_time < min_time) min_time = p.last_access_time;
+        if (p.last_access_time > max_time) max_time = p.last_access_time;
+    }
+    uint64_t time_range = max_time - min_time;
+
+    float best_score = 1e30f;
+    uint64_t best_victim = 0;
+    float best_cosine = 1.0f;
+
+    uint32_t samples = min(sample_size, tier0_size);
+    for (uint32_t s = 0; s < samples; s++) {
+        uint32_t rand_idx = curand(&local_state) % tier0_size;
+        uint64_t pid = tier0_lru[rand_idx];
+        uint32_t hash = hash_page_id(pid, CTM_HASH_BITS);
+        const PageState& page = pages[hash];
+
+        float score = compute_victim_score_quality_aware(
+            page, min_time, time_range, adaptive_p,
+            page.coherence, weight_compression_quality);
+
+        if (score < best_score) {
+            best_score = score;
+            best_victim = pid;
+            best_cosine = page.cosine_similarity;
+        }
+    }
+
+    victim_ids[idx] = best_victim;
+    // Demote to CXL if the token compresses well (high cosine similarity)
+    demote_to_cxl[idx] = (best_cosine > 0.9f);
     rng_states[idx] = local_state;
 }
 

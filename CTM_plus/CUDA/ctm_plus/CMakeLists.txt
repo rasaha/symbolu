@@ -18,10 +18,14 @@ endif()
 # Library sources
 set(CTM_SOURCES
     ctm_plus.cu
+    turboquant.cu
+    turboquant_ctxl_integration.cu
 )
 
 set(CTM_HEADERS
     ctm_plus.cuh
+    turboquant.cuh
+    turboquant_ctxl_integration.cuh
 )
 
 # Build shared library
@@ -57,6 +61,10 @@ target_link_libraries(ctm_example ctm_plus_cuda)
 # Benchmark executable
 add_executable(ctm_benchmark benchmark.cu)
 target_link_libraries(ctm_benchmark ctm_plus_cuda)
+
+# TurboQuant + CTXL integrated benchmark
+add_executable(turboquant_benchmark turboquant_benchmark.cu)
+target_link_libraries(turboquant_benchmark ctm_plus_cuda)
 
 # Installation
 install(TARGETS ctm_plus_cuda ctm_plus_cuda_static

@@ -30,17 +30,18 @@ NVCC_FLAGS += -g -G -DDEBUG
 endif
 
 # Source files
-LIB_SRC := ctm_plus.cu
-LIB_HDR := ctm_plus.cuh
+LIB_SRC := ctm_plus.cu turboquant.cu turboquant_ctxl_integration.cu
+LIB_HDR := ctm_plus.cuh turboquant.cuh turboquant_ctxl_integration.cuh
 
 # Output
 LIB_SHARED := libctm_plus_cuda.so
 LIB_STATIC := libctm_plus_cuda.a
 EXAMPLE := example
 BENCHMARK := benchmark
+TQ_BENCHMARK := turboquant_benchmark
 
 # Default target
-all: lib $(EXAMPLE) $(BENCHMARK)
+all: lib $(EXAMPLE) $(BENCHMARK) $(TQ_BENCHMARK)
 
 # Shared library
 lib: $(LIB_SHARED) $(LIB_STATIC)
@@ -48,11 +49,19 @@ lib: $(LIB_SHARED) $(LIB_STATIC)
 $(LIB_SHARED): $(LIB_SRC) $(LIB_HDR)
 	$(NVCC) $(NVCC_FLAGS) -shared -Xcompiler -fPIC -o $@ $(LIB_SRC) $(LDFLAGS)
 
-$(LIB_STATIC): ctm_plus.o
-	ar rcs $@ $<
+LIB_OBJS := ctm_plus.o turboquant.o turboquant_ctxl_integration.o
 
-ctm_plus.o: $(LIB_SRC) $(LIB_HDR)
-	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ $(LIB_SRC)
+$(LIB_STATIC): $(LIB_OBJS)
+	ar rcs $@ $^
+
+ctm_plus.o: ctm_plus.cu $(LIB_HDR)
+	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ ctm_plus.cu
+
+turboquant.o: turboquant.cu turboquant.cuh
+	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ turboquant.cu
+
+turboquant_ctxl_integration.o: turboquant_ctxl_integration.cu turboquant_ctxl_integration.cuh turboquant.cuh ctm_plus.cuh
+	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ turboquant_ctxl_integration.cu
 
 # Example
 $(EXAMPLE): example.cu $(LIB_SHARED)
@@ -66,9 +75,17 @@ example_standalone: example.cu $(LIB_SRC) $(LIB_HDR)
 $(BENCHMARK): benchmark.cu $(LIB_SHARED)
 	$(NVCC) $(NVCC_FLAGS) -o $@ benchmark.cu -L. -lctm_plus_cuda $(LDFLAGS) -Wl,-rpath,.
 
+# TurboQuant + CTXL integrated benchmark
+$(TQ_BENCHMARK): turboquant_benchmark.cu $(LIB_SHARED)
+	$(NVCC) $(NVCC_FLAGS) -o $@ turboquant_benchmark.cu -L. -lctm_plus_cuda $(LDFLAGS) -Wl,-rpath,.
+
 # Standalone benchmark (no library)
 benchmark_standalone: benchmark.cu $(LIB_SRC) $(LIB_HDR)
 	$(NVCC) $(NVCC_FLAGS) -o $@ benchmark.cu $(LIB_SRC) $(LDFLAGS)
+
+# Standalone TurboQuant benchmark
+tq_benchmark_standalone: turboquant_benchmark.cu $(LIB_SRC) $(LIB_HDR)
+	$(NVCC) $(NVCC_FLAGS) -o $@ turboquant_benchmark.cu $(LIB_SRC) $(LDFLAGS)
 
 # Install
 PREFIX ?= /usr/local
@@ -88,8 +105,8 @@ uninstall:
 
 # Clean
 clean:
-	rm -f $(LIB_SHARED) $(LIB_STATIC) *.o $(EXAMPLE) $(BENCHMARK)
-	rm -f example_standalone benchmark_standalone
+	rm -f $(LIB_SHARED) $(LIB_STATIC) *.o $(EXAMPLE) $(BENCHMARK) $(TQ_BENCHMARK)
+	rm -f example_standalone benchmark_standalone tq_benchmark_standalone
 
 # Run
 run_example: $(EXAMPLE)
@@ -97,6 +114,9 @@ run_example: $(EXAMPLE)
 
 run_benchmark: $(BENCHMARK)
 	LD_LIBRARY_PATH=. ./$(BENCHMARK)
+
+run_tq_benchmark: $(TQ_BENCHMARK)
+	LD_LIBRARY_PATH=. ./$(TQ_BENCHMARK)
 
 # Help
 help:
