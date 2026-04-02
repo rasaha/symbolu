@@ -29,8 +29,16 @@ from .turboquant_offload import (
     CompressedTensorBuffer,
     create_turboquant_offload_manager,
 )
+from .multimodal_types import (
+    ModalityType,
+    ComponentRole,
+    MultimodalTensorInfo,
+    classify_tensor_name,
+)
+from .multimodal_offload import MultimodalOffloadManager
+from .multimodal_inference import MultimodalInferenceManager
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "CTMOffloadManager",
     "CTMZeROOffload",
@@ -44,4 +52,11 @@ __all__ = [
     "CompressedTensorBuffer",
     "create_turboquant_offload_manager",
     "is_numba_available",
+    # Multimodal integration
+    "ModalityType",
+    "ComponentRole",
+    "MultimodalTensorInfo",
+    "MultimodalOffloadManager",
+    "MultimodalInferenceManager",
+    "classify_tensor_name",
 ]
