@@ -26,7 +26,7 @@ without polluting the main queue.
 ## Usage
 
 ```python
-from ctm_plus_vllm import KVCachePolicy, InferencePhase
+from kv_policy import KVCachePolicy, InferencePhase
 
 policy = KVCachePolicy(max_blocks=2048)
 policy.register_sequence(seq_id=1)
@@ -47,7 +47,7 @@ for block_id in victims:
 ## Configuration
 
 ```python
-from ctm_plus_vllm import KVCachePolicyConfig
+from kv_policy import KVCachePolicyConfig
 
 # Structural parameters only — phase weights are built-in
 config = KVCachePolicyConfig.for_long_context()

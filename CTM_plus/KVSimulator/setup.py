@@ -2,7 +2,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="ctm-plus-kv-simulator",
+    name="kv-simulator",
     version="0.3.0",
     description="KV cache eviction policy simulator for LLM inference (research tool)",
     packages=find_packages(),

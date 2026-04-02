@@ -9,7 +9,7 @@ recency, and sequence priority signals.
 Integration point: vLLM's Evictor abstract base class.
 
 Usage:
-    from ctm_plus_vllm import KVCachePolicy
+    from kv_policy import KVCachePolicy
 
     policy = KVCachePolicy(max_blocks=2048)
     policy.register_sequence(seq_id=1)

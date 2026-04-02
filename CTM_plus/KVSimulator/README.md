@@ -32,7 +32,7 @@ victim blocks. Sink blocks are pinned and never evicted.
 ## Usage
 
 ```python
-from ctm_plus_db import KVCacheSimulator, PolicyType, compare_policies
+from kv_simulator import KVCacheSimulator, PolicyType, compare_policies
 
 # Single simulation
 sim = KVCacheSimulator(max_blocks=256, policy_type=PolicyType.CTM_PLUS)
@@ -66,7 +66,7 @@ for policy, metrics in results.items():
 ## Configuration
 
 ```python
-from ctm_plus_db import SimulationConfig
+from kv_simulator import SimulationConfig
 
 config = SimulationConfig.for_long_context()  # 8K-32K+ sequences
 config = SimulationConfig.for_short_context() # chatbot turns

@@ -35,8 +35,8 @@ It ships in **5 deployment targets:**
 | Target | Location | Purpose |
 |---|---|---|
 | **Simulator** | `simulator/ctm_plus/` | Core algorithm + validation harness |
-| **vLLM** | `CTM_plus/vLLM/` | KV cache eviction for LLM inference |
-| **Database** | `CTM_plus/Database/` | Buffer pool management (Postgres, Redis) |
+| **KVPolicy** | `CTM_plus/KVPolicy/` | KV cache eviction policy for LLM inference |
+| **KVSimulator** | `CTM_plus/KVSimulator/` | KV cache eviction policy simulator |
 | **CUDA** | `CTM_plus/CUDA/` | GPU-native implementation |
 | **Kernel** | `CTM_plus/Kernel/` | Linux kernel module (sysfs interface) |
 | **DeepSpeed** | `CTM_plus/DeepSpeed/` | ZeRO offload + inference memory management |

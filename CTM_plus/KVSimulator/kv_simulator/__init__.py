@@ -5,7 +5,7 @@ A lightweight simulator that models LLM inference access patterns
 and evaluates eviction policies. Research tool, not production code.
 
 Usage:
-    from ctm_plus_db import KVCacheSimulator, PolicyType, compare_policies
+    from kv_simulator import KVCacheSimulator, PolicyType, compare_policies
 
     # Single run
     sim = KVCacheSimulator(max_blocks=256, policy_type=PolicyType.CTM_PLUS)

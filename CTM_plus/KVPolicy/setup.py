@@ -2,7 +2,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="ctm-plus-vllm",
+    name="kv-policy",
     version="0.2.0",
     description="Scoring-only KV cache eviction policy for LLM inference (research prototype)",
     packages=find_packages(),

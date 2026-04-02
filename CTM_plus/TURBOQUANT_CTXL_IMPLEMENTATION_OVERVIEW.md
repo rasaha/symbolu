@@ -110,7 +110,7 @@ memory, making them **complementary, not redundant**.
 
 ## Layer 1: vLLM (Python Simulation)
 
-**Path:** `CTM_plus/vLLM/ctm_plus_vllm/`
+**Path:** `CTM_plus/KVPolicy/kv_policy/`
 
 **Purpose:** Algorithm design, numerical validation, and benchmark metric collection.
 No real GPU hardware required — pure NumPy simulation.

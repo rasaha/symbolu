@@ -44,15 +44,13 @@ CTM_plus/
 │       ├── benchmark.cu     # Performance benchmark
 │       ├── CMakeLists.txt   # CMake build system
 │       └── Makefile         # Make build system
-├── vLLM/
+├── KVPolicy/
 │   ├── setup.py             # Package installer
-│   ├── README.md            # vLLM integration docs
-│   └── ctm_plus_vllm/       # Python package
+│   ├── README.md            # KV policy docs
+│   └── kv_policy/           # Python package
 │       ├── __init__.py      # Package init
 │       ├── config.py        # Configuration
-│       ├── evictor.py       # CTM+ eviction policy
-│       ├── block_manager.py # Block space manager
-│       └── example.py       # Usage example
+│       └── attention_evictor.py # KV cache eviction policy
 ├── DeepSpeed/
 │   ├── setup.py             # Package installer
 │   ├── README.md            # DeepSpeed integration docs
@@ -63,18 +61,13 @@ CTM_plus/
 │       ├── zero_integration.py # ZeRO-Offload support
 │       ├── inference.py     # Inference manager
 │       └── example.py       # Usage example
-├── Database/
+├── KVSimulator/
 │   ├── setup.py             # Package installer
-│   ├── README.md            # Database integration docs
-│   └── ctm_plus_db/         # Python package
+│   ├── README.md            # KV simulator docs
+│   └── kv_simulator/        # Python package
 │       ├── __init__.py      # Package init
 │       ├── config.py        # Configuration
-│       ├── buffer_pool.py   # CTM+ buffer pool
-│       ├── page_cache.py    # Generic page cache
-│       ├── postgres.py      # PostgreSQL integration
-│       ├── redis_cache.py   # Redis-style cache
-│       ├── generic.py       # Generic KV cache
-│       └── example.py       # Usage example
+│       └── buffer_pool.py   # KV cache simulator
 └── ../simulator/
     └── ctm_plus/            # Python simulator
         ├── controllers/
@@ -178,43 +171,23 @@ int main() {
 }
 ```
 
-### vLLM Integration
+### KV Cache Eviction Policy
 
 ```bash
 # Install
-cd CTM_plus/vLLM
+cd CTM_plus/KVPolicy
 pip install -e .
-
-# Run example
-python -m ctm_plus_vllm.example
 ```
 
-**Using in your vLLM application:**
+**Scoring-only eviction policy for LLM KV cache blocks:**
 
 ```python
-from ctm_plus_vllm import CTMBlockSpaceManager, CTMvLLMConfig
+from kv_policy import KVCachePolicy
 
-# Create block manager with CTM+
-config = CTMvLLMConfig.for_llm_inference()
-manager = CTMBlockSpaceManager(
-    block_size=16,
-    num_gpu_blocks=1000,
-    num_cpu_blocks=10000,
-    ctm_config=config,
-)
-
-# Allocate blocks for a sequence
-blocks = manager.allocate(sequence_id=1, num_blocks=10)
-
-# Access blocks (triggers CTM+ tracking)
-manager.access(sequence_id=1, block_indices=[0, 1, 2])
-
-# Free blocks when done
-manager.free(sequence_id=1)
-
-# Get statistics
-stats = manager.get_stats()
-print(f"GPU Hit Rate: {stats['gpu_hit_rate']:.2%}")
+policy = KVCachePolicy(max_blocks=2048)
+policy.register_sequence(seq_id=1)
+policy.on_token_access(token_id=0, position=0, sequence_id=1, block_id=0)
+victims = policy.select_victims(count=4)
 ```
 
 ### DeepSpeed Integration
@@ -259,49 +232,29 @@ print(f"GPU Hit Rate: {stats['gpu_hit_rate']:.2%}")
 print(f"Offloads: {stats['offloads']}")
 ```
 
-### Database Integration
+### KV Cache Simulator
 
 ```bash
 # Install
-cd CTM_plus/Database
+cd CTM_plus/KVSimulator
 pip install -e .
-
-# Run example
-python -m ctm_plus_db.example
 ```
 
-**Using for buffer pool management:**
+**Simulates LLM KV cache access patterns and evaluates eviction policies:**
 
 ```python
-from ctm_plus_db import CTMBufferPool, CTMDBConfig
+from kv_simulator import KVCacheSimulator, PolicyType, compare_policies
 
-# Create buffer pool
-config = CTMDBConfig.for_oltp()
-pool = CTMBufferPool(
-    pool_size_pages=10000,
-    page_size_bytes=8192,
-    config=config,
-)
+# Single simulation
+sim = KVCacheSimulator(max_blocks=256, policy_type=PolicyType.CTM_PLUS)
+sim.add_sequence(seq_id=0, context_length=512)
+sim.prefill_sequence(0)
+for _ in range(128):
+    sim.decode_step(0)
+print(sim.get_metrics())
 
-# Access pages
-is_hit, prefetch_list = pool.access(page_id=12345, is_write=False)
-
-# Get eviction victim
-victim = pool.select_victim()
-
-# Get statistics
-stats = pool.get_stats()
-print(f"Hit Rate: {stats['hit_rate']:.2%}")
-```
-
-**Redis-style caching:**
-
-```python
-from ctm_plus_db import RedisCTMCache, CTMDBConfig
-
-cache = RedisCTMCache(
-    maxmemory=1024 * 1024 * 1024,  # 1GB
-    config=CTMDBConfig.for_redis(),
+# Compare all policies
+results = compare_policies(max_blocks=256, num_sequences=4)
 )
 
 cache.set("key", "value", ex=3600)  # 1 hour TTL
@@ -473,36 +426,26 @@ for (int gpu = 0; gpu < num_gpus; gpu++) {
 
 ## Integration
 
-### With vLLM (PagedAttention)
+### KV Cache Eviction Policy (for vLLM integration)
 
-CTM+ provides a drop-in block manager for vLLM:
+CTM+ provides a scoring-only eviction policy for LLM KV cache blocks:
 
 ```python
-from ctm_plus_vllm import CTMBlockSpaceManager, CTMvLLMConfig
+from kv_policy import KVCachePolicy, KVCachePolicyConfig
 
-# Preset configs for different use cases
-config = CTMvLLMConfig.for_llm_inference()    # Chat/completion
-config = CTMvLLMConfig.for_batch_inference()  # Batch processing
-config = CTMvLLMConfig.for_streaming()        # Continuous generation
-
-# Create block manager
-manager = CTMBlockSpaceManager(
-    block_size=16,
-    num_gpu_blocks=1000,
-    num_cpu_blocks=10000,
-    ctm_config=config,
+config = KVCachePolicyConfig.for_long_context()
+policy = KVCachePolicy(
+    max_blocks=2048,
+    sink_tokens=config.sink_tokens,
+    recent_window=config.recent_window,
 )
 
-# Pin important sequences to prevent eviction
-manager.pin_sequence(sequence_id=1)
-
-# Monitor performance
-stats = manager.get_stats()
-print(f"GPU Hit Rate: {stats['gpu_hit_rate']:.2%}")
-print(f"Adaptive p: {stats['adaptive_p']:.3f}")
+policy.register_sequence(seq_id=1)
+policy.on_token_access(token_id=0, position=0, sequence_id=1, block_id=0)
+victims = policy.select_victims(count=4)
 ```
 
-See `CTM_plus/vLLM/README.md` for full integration instructions.
+See `CTM_plus/KVPolicy/README.md` for full integration instructions.
 
 ### With DeepSpeed (ZeRO-Offload)
 
@@ -538,35 +481,20 @@ for batch in dataloader:
 
 See `CTM_plus/DeepSpeed/README.md` for full integration instructions.
 
-### With Databases (PostgreSQL, Redis)
+### KV Cache Simulator (Research)
 
-CTM+ provides buffer pool management for database systems:
+CTM+ provides a simulator for evaluating eviction policies on LLM workloads:
 
 ```python
-from ctm_plus_db import CTMBufferPool, PostgresCTMExtension, RedisCTMCache
-from ctm_plus_db import CTMDBConfig
+from kv_simulator import KVCacheSimulator, PolicyType, compare_policies
 
-# PostgreSQL buffer pool
-pg = PostgresCTMExtension(
-    shared_buffers=8192,
-    config=CTMDBConfig.for_postgres(),
-)
-
-# Redis-style caching
-redis = RedisCTMCache(
-    maxmemory=1024 * 1024 * 1024,
-    config=CTMDBConfig.for_redis(),
-)
-redis.set("session:123", session_data)
-
-# Generic buffer pool
-pool = CTMBufferPool(
-    pool_size_pages=10000,
-    config=CTMDBConfig.for_oltp(),
-)
+# Compare all policies
+results = compare_policies(max_blocks=256, num_sequences=4, context_length=512)
+for policy, metrics in results.items():
+    print(f"{policy}: eviction_accuracy={metrics['eviction_accuracy']:.2%}")
 ```
 
-See `CTM_plus/Database/README.md` for full integration instructions.
+See `CTM_plus/KVSimulator/README.md` for full documentation.
 
 ### With Linux Memory Tiering
 
