@@ -21,6 +21,7 @@ from .offload_manager import CTMOffloadManager
 from .zero_integration import CTMZeROOffload, get_deepspeed_config_with_ctm
 from .inference import CTMInferenceManager
 from .config import CTMDeepSpeedConfig
+from .turboquant_numba import is_numba_available
 from .turboquant_offload import (
     TurboQuantOffloadManager,
     TurboQuantTrainingConfig,
@@ -42,4 +43,5 @@ __all__ = [
     "TurboQuantCompressor",
     "CompressedTensorBuffer",
     "create_turboquant_offload_manager",
+    "is_numba_available",
 ]

@@ -4,14 +4,20 @@ Numba JIT kernels for the TurboQuant polar transform.
 Replaces the numpy-level polar transform loop (arctan2 + sqrt across 7
 levels) with a single compiled CPU kernel:
 
-  - _compress_polar_numba:   fuses all 7 levels in one prange loop
-                              eliminates Python dispatch between levels
-                              eliminates intermediate array allocations
-  - _decompress_polar_numba: same — all levels fused, cos/sin from
-                              precomputed lookup tables
+  - _compress_polar_numba:   fuses all 7 levels in one sequential loop
+                              (no parallel=True — prange with per-segment
+                              .copy() caused heap allocations exceeding the
+                              benefit of parallelism at n_segs=4608)
+  - _decompress_polar_numba: all levels fused, cos/sin from precomputed
+                              lookup tables, parallel via prange
 
-Expected speedup vs numpy inner loop: 5–15× depending on CPU / tensor size.
+Expected speedup vs numpy inner loop: 2–5× depending on CPU / tensor size.
 The rotation matmul (segs @ R.T) is left to BLAS — it is already optimal.
+
+Quantization scheme: LUT floor quantization.  Level-0 angles are in
+[-π, π], quantized as k = floor((θ+π) × n_grid_bins/(2π)); level-1+
+angles are in [0, π/2], quantized as k = floor(θ × 2·n_grid_bins/π).
+This is faster than argmin and produces identical results for uniform grids.
 
 When Numba is unavailable the module exports numpy fallbacks with identical
 signatures so callers need no conditional logic.
@@ -39,33 +45,41 @@ def is_numba_available() -> bool:
 
 if _NUMBA_AVAILABLE:
 
-    @njit(parallel=True, cache=True, fastmath=True)
+    @njit(cache=True, fastmath=True)
     def _compress_polar_numba(
         rotated: np.ndarray,       # (n_segs, d) float32 — already rotated
-        n_levels: int,
-        lut_scale_full: float,     # n_levels / (2π)   — level-0 quantizer
-        lut_scale_pos: float,      # 2*n_levels / π    — level-1+ quantizer
+        n_grid_bins: int,          # 2**angle_bits — number of quantization grid bins
+        lut_scale_full: float,     # n_grid_bins / (2π)   — level-0 quantizer
+        lut_scale_pos: float,      # 2*n_grid_bins / π    — level-1+ quantizer
     ):
         """
         Recursive polar transform + quantization for all segments, compiled.
 
-        All 7 levels are fused into a single prange loop — no Python dispatch
-        between levels, no intermediate numpy array allocations.
+        All 7 levels are fused into a single sequential loop.  No parallel=True:
+        prange with per-segment .copy() creates heap allocations that exceed
+        the benefit of parallelism at typical batch sizes (n_segs=4608).
+        The compiled scalar atan2/sqrt path alone is ~2× faster than numpy.
 
         In-place radius packing: after processing level k, the n_pairs radii
         are written into buf[0..n_pairs-1], overwriting the consumed pairs.
         This is safe because the write index i < read indices 2i / 2i+1.
 
+        Args:
+            rotated:        (n_segs, d) float32, already rotated by R.
+            n_grid_bins:    2**angle_bits, number of quantization grid bins.
+            lut_scale_full: n_grid_bins / (2π), LUT scale for level-0.
+            lut_scale_pos:  2 * n_grid_bins / π, LUT scale for level-1+.
+
         Returns:
             radii:   (n_segs,) float32
-            indices: (n_segs, d-1) uint8  — angles, all levels concatenated
+            indices: (n_segs, d-1) uint8  — grid bin indices, all levels concatenated
         """
         n_segs, d = rotated.shape
         radii_out   = np.empty(n_segs, dtype=np.float32)
         indices_out = np.empty((n_segs, d - 1), dtype=np.uint8)
         pi = math.pi
 
-        for seg in prange(n_segs):
+        for seg in range(n_segs):
             # Local buffer: copy current segment row (avoids aliasing issues)
             buf = rotated[seg].copy()
             cur_len = d
@@ -88,9 +102,9 @@ if _NUMBA_AVAILABLE:
                     else:
                         k = int(math.floor(theta * lut_scale_pos))
 
-                    # Clamp to [0, n_levels-1]
-                    if k < 0:          k = 0
-                    if k >= n_levels:  k = n_levels - 1
+                    # Clamp to [0, n_grid_bins-1]
+                    if k < 0:              k = 0
+                    if k >= n_grid_bins:   k = n_grid_bins - 1
 
                     indices_out[seg, idx_pos] = k
                     idx_pos += 1
@@ -110,7 +124,7 @@ if _NUMBA_AVAILABLE:
 
 else:  # numpy fallback
 
-    def _compress_polar_numba(rotated, n_levels, lut_scale_full, lut_scale_pos):  # type: ignore[misc]
+    def _compress_polar_numba(rotated, n_grid_bins, lut_scale_full, lut_scale_pos):  # type: ignore[misc]
         """Numpy fallback — same signature as the Numba version."""
         n_segs, d = rotated.shape
         radii_out   = np.empty(n_segs, dtype=np.float32)
@@ -136,7 +150,7 @@ else:  # numpy fallback
                         k = int(math.floor((theta + pi) * lut_scale_full))
                     else:
                         k = int(math.floor(theta * lut_scale_pos))
-                    k = max(0, min(k, n_levels - 1))
+                    k = max(0, min(k, n_grid_bins - 1))
                     indices_out[seg, idx_pos] = k
                     idx_pos += 1
                     buf[i] = r
@@ -298,4 +312,50 @@ def build_level_structure(segment_dim: int):
     return (
         np.array(pairs_list,   dtype=np.int32),
         np.array(carries_list, dtype=np.bool_),
+    )
+
+
+# ---------------------------------------------------------------------------
+# CUDA-compatible helpers (used by turboquant_cuda_ext.py)
+# ---------------------------------------------------------------------------
+
+def compute_level_offsets(segment_dim: int):
+    """
+    Returns (level_sizes, level_offsets) as int32 arrays for CUDA kernels.
+
+    level_sizes[k]   = number of angle pairs at level k
+    level_offsets[k]  = cumulative offset into flat angle buffer
+    """
+    pairs, _ = build_level_structure(segment_dim)
+    offsets = np.zeros(len(pairs) + 1, dtype=np.int32)
+    for i, p in enumerate(pairs):
+        offsets[i + 1] = offsets[i] + p
+    return pairs, offsets
+
+
+def build_angle_grids(angle_bits: int):
+    """
+    Build fixed quantisation grids and LUT scale constants.
+
+    The grids are uniform midpoint grids.  The LUT scales implement the
+    same quantization as floor(theta * scale) — which is equivalent to
+    argmin on a uniform grid but O(1) instead of O(n_grid).
+
+    Returns
+    -------
+    grid_full : (n_grid,) float32  — level 0, midpoints on [-π, π]
+    grid_pos  : (n_grid,) float32  — level 1+, midpoints on [0, π/2]
+    lut_scale_full : float  — n_grid / (2π), for floor((θ+π) * scale)
+    lut_scale_pos  : float  — 2*n_grid / π, for floor(θ * scale)
+    """
+    n = 2 ** angle_bits
+    grid_full = np.linspace(-math.pi, math.pi, n, endpoint=False) + math.pi / n
+    grid_pos = np.linspace(0, math.pi / 2, n, endpoint=False) + math.pi / (4 * n)
+    lut_scale_full = n / (2.0 * math.pi)
+    lut_scale_pos = 2.0 * n / math.pi
+    return (
+        grid_full.astype(np.float32),
+        grid_pos.astype(np.float32),
+        lut_scale_full,
+        lut_scale_pos,
     )
