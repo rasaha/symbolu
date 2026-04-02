@@ -37,10 +37,69 @@ Usage:
     freed_pages = manager.complete_sequence(seq_id=1)
 """
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from .attention_evictor import KVCachePolicy, InferencePhase
+
+
+logger = logging.getLogger("ctm_plus.vllm_adapter")
+
+
+# =============================================================================
+# Instrumentation
+# =============================================================================
+
+class EventLogger:
+    """
+    Lightweight structured event logger for KV cache instrumentation.
+
+    Disabled by default. When enabled, emits structured dicts to either
+    a Python logger or a user-supplied callback. Samples periodic events
+    (attention snapshots, pressure) at configurable intervals.
+
+    Usage:
+        mgr = CTMBlockSpaceManager(..., enable_logging=True)
+        mgr.event_logger.snapshot_interval = 20  # every 20 steps
+        mgr.event_logger.callback = my_handler   # optional
+    """
+
+    __slots__ = (
+        "enabled", "snapshot_interval", "top_k", "callback",
+        "_event_counts", "_step",
+    )
+
+    def __init__(self, enabled: bool = False, snapshot_interval: int = 10,
+                 top_k: int = 5):
+        self.enabled = enabled
+        self.snapshot_interval = snapshot_interval
+        self.top_k = top_k
+        self.callback: Optional[Callable[[str, Dict[str, Any]], None]] = None
+        self._event_counts: Dict[str, int] = {}
+        self._step = 0
+
+    def emit(self, event_type: str, data: Dict[str, Any]) -> None:
+        """Emit a structured event."""
+        if not self.enabled:
+            return
+        self._event_counts[event_type] = self._event_counts.get(event_type, 0) + 1
+        if self.callback is not None:
+            self.callback(event_type, data)
+        else:
+            logger.info("%s %s", event_type, data)
+
+    def tick(self) -> int:
+        """Advance step counter. Returns current step."""
+        self._step += 1
+        return self._step
+
+    def should_snapshot(self) -> bool:
+        """True if it's time for a periodic snapshot."""
+        return self.enabled and self._step % self.snapshot_interval == 0
+
+    def get_event_counts(self) -> Dict[str, int]:
+        return dict(self._event_counts)
 
 
 # =============================================================================
@@ -100,6 +159,7 @@ class CTMBlockSpaceManager:
         num_cpu_blocks: int = 10000,
         watermark: float = 0.1,
         ctm_config: Optional[CTMvLLMConfig] = None,
+        enable_logging: bool = False,
     ):
         self.block_size = block_size
         self.num_gpu_blocks = num_gpu_blocks
@@ -130,6 +190,40 @@ class CTMBlockSpaceManager:
 
         # Track which pages belong to which sequence
         self._seq_pages: Dict[int, Set[int]] = {}
+
+        # Instrumentation
+        self.event_logger = EventLogger(enabled=enable_logging)
+        self._recompute_total: int = 0
+        self._recompute_important: int = 0
+        self._recompute_filler: int = 0
+        self._evicted_blocks: Dict[int, Dict[str, Any]] = {}  # block_id → metadata at eviction time
+
+    # ---- Instrumentation helpers ----
+
+    def _block_importance(self, block_id: int) -> str:
+        """Classify a block as sink/entity/filler from policy state."""
+        block = self._policy.blocks.get(block_id)
+        if block is None:
+            return "unknown"
+        if block.is_sink:
+            return "sink"
+        if block.attention_ema > self._policy._adaptive_threshold:
+            return "entity"
+        return "filler"
+
+    def _block_meta(self, block_id: int) -> Dict[str, Any]:
+        """Snapshot of block metadata for logging."""
+        block = self._policy.blocks.get(block_id)
+        if block is None:
+            return {"block_id": block_id}
+        return {
+            "block_id": block_id,
+            "seq_id": block.sequence_id,
+            "importance": self._block_importance(block_id),
+            "attention_ema": round(block.attention_ema, 6),
+            "access_count": block.access_count,
+            "step": self._policy._step,
+        }
 
     # ---- Task 7: Block Mapping ----
 
@@ -197,6 +291,8 @@ class CTMBlockSpaceManager:
         Called once per block per decode step with the sum of attention
         weights for all tokens in the block. No per-token calls.
 
+        If the page was previously evicted, records a recompute event.
+
         Args:
             page_id: Physical page ID.
             attention_sum: Sum of attention weights across tokens in block.
@@ -205,6 +301,22 @@ class CTMBlockSpaceManager:
         """
         block_id = self._page_to_block.get(page_id)
         if block_id is None:
+            # Recompute: page was accessed but not present (evicted earlier)
+            evict_meta = self._evicted_blocks.pop(page_id, None)
+            if evict_meta is not None:
+                importance = evict_meta.get("importance", "filler")
+                self._recompute_total += 1
+                if importance in ("sink", "entity"):
+                    self._recompute_important += 1
+                else:
+                    self._recompute_filler += 1
+                self.event_logger.emit("recompute", {
+                    "page_id": page_id,
+                    "seq_id": seq_id,
+                    "importance": importance,
+                    "recompute_cost": self.block_size,
+                    "recompute_total": self._recompute_total,
+                })
             return
         self._policy.on_block_attention(
             block_id=block_id,
@@ -212,6 +324,12 @@ class CTMBlockSpaceManager:
             sequence_id=seq_id,
             seq_len=seq_len,
         )
+
+        # Sampled attention snapshot + cache pressure
+        self.event_logger.tick()
+        if self.event_logger.should_snapshot():
+            self._emit_attention_snapshot()
+            self._emit_pressure()
 
     def on_attention_batch(
         self,
@@ -256,6 +374,12 @@ class CTMBlockSpaceManager:
         if page_id is None:
             return None
 
+        # Log eviction before clearing state
+        meta = self._block_meta(block_id)
+        meta["page_id"] = page_id
+        self.event_logger.emit("eviction", meta)
+        self._evicted_blocks[page_id] = meta
+
         # Notify policy of eviction
         self._policy.evict_block(block_id)
         self._gpu_pages.discard(page_id)
@@ -281,6 +405,12 @@ class CTMBlockSpaceManager:
             page_id = self._block_to_page.get(block_id)
             if page_id is None:
                 continue
+
+            meta = self._block_meta(block_id)
+            meta["page_id"] = page_id
+            self.event_logger.emit("eviction", meta)
+            self._evicted_blocks[page_id] = meta
+
             self._policy.evict_block(block_id)
             self._gpu_pages.discard(page_id)
             self._pinned_pages.discard(page_id)
@@ -360,8 +490,49 @@ class CTMBlockSpaceManager:
             return -1.0
         return self._policy.score_block(block_id)
 
+    # ---- Instrumentation snapshots ----
+
+    def _emit_attention_snapshot(self) -> None:
+        """Emit top-k blocks by attention_ema (sampled, not every step)."""
+        blocks = self._policy.blocks
+        if not blocks:
+            return
+        top = sorted(
+            blocks.values(),
+            key=lambda b: b.attention_ema,
+            reverse=True,
+        )[:self.event_logger.top_k]
+        self.event_logger.emit("attention_snapshot", {
+            "step": self._policy._step,
+            "top_blocks": [
+                {
+                    "block_id": b.block_id,
+                    "page_id": self._block_to_page.get(b.block_id),
+                    "seq_id": b.sequence_id,
+                    "attention_ema": round(b.attention_ema, 6),
+                    "importance": self._block_importance(b.block_id),
+                }
+                for b in top
+            ],
+        })
+
+    def _emit_pressure(self) -> None:
+        """Emit cache pressure metrics."""
+        self.event_logger.emit("cache_pressure", {
+            "step": self._policy._step,
+            "active_blocks": len(self._gpu_pages),
+            "capacity": self.num_gpu_blocks,
+            "utilization_pct": round(self.gpu_utilization * 100, 1),
+            "pinned": len(self._pinned_pages),
+            "free": self.num_free_gpu_blocks,
+            "watermark_blocks": self._watermark_blocks,
+            "needs_eviction": self.needs_eviction(),
+        })
+
+    # ---- Stats ----
+
     def get_stats(self) -> Dict:
-        """Return combined stats from policy and manager."""
+        """Return combined stats from policy, manager, and instrumentation."""
         policy_stats = self._policy.get_stats()
         return {
             **policy_stats,
@@ -371,4 +542,8 @@ class CTMBlockSpaceManager:
             "pinned_pages": len(self._pinned_pages),
             "page_mappings": len(self._page_to_block),
             "active_sequences": len(self._seq_pages),
+            "recompute_total": self._recompute_total,
+            "recompute_important": self._recompute_important,
+            "recompute_filler": self._recompute_filler,
+            "event_counts": self.event_logger.get_event_counts(),
         }

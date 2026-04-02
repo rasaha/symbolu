@@ -299,6 +299,181 @@ def test_transformer_setup_import():
     print("  PASS: import path matches transformer_setup expectations")
 
 
+def test_eviction_logging():
+    """Eviction events are captured with correct metadata."""
+    events = []
+    mgr = CTMBlockSpaceManager(
+        block_size=16, num_gpu_blocks=4, watermark=0.0,
+        enable_logging=True,
+    )
+    mgr.event_logger.callback = lambda etype, data: events.append((etype, data))
+
+    mgr.register_sequence(0)
+    for i in range(4):
+        mgr.allocate_block(seq_id=0, page_id=i, positions=list(range(i * 16, (i + 1) * 16)))
+        mgr.on_attention(page_id=i, attention_sum=0.01, seq_id=0, seq_len=64)
+
+    victim = mgr.evict()
+    assert victim is not None
+
+    eviction_events = [(t, d) for t, d in events if t == "eviction"]
+    assert len(eviction_events) == 1, f"Expected 1 eviction event, got {len(eviction_events)}"
+    _, data = eviction_events[0]
+    assert "block_id" in data
+    assert "seq_id" in data
+    assert data["importance"] in ("sink", "entity", "filler")
+    assert "attention_ema" in data
+    assert "step" in data
+    assert data["page_id"] == victim
+    print("  PASS: eviction logging captures correct metadata")
+
+
+def test_recompute_tracking():
+    """Recompute events are counted and logged when evicted blocks are re-accessed."""
+    events = []
+    mgr = CTMBlockSpaceManager(
+        block_size=16, num_gpu_blocks=4, watermark=0.0,
+        enable_logging=True,
+    )
+    mgr.event_logger.callback = lambda etype, data: events.append((etype, data))
+
+    mgr.register_sequence(0)
+    for i in range(4):
+        mgr.allocate_block(seq_id=0, page_id=i, positions=list(range(i * 16, (i + 1) * 16)))
+        for _ in range(3):
+            mgr.on_attention(page_id=i, attention_sum=0.01, seq_id=0, seq_len=64)
+
+    victim = mgr.evict()
+    assert victim is not None
+
+    # Access the evicted page — should trigger recompute
+    mgr.on_attention(page_id=victim, attention_sum=0.05, seq_id=0, seq_len=64)
+
+    assert mgr._recompute_total == 1, f"Expected 1 recompute, got {mgr._recompute_total}"
+    assert mgr._recompute_filler >= 0
+    recompute_events = [(t, d) for t, d in events if t == "recompute"]
+    assert len(recompute_events) == 1
+    _, data = recompute_events[0]
+    assert data["page_id"] == victim
+    assert data["recompute_cost"] == 16  # block_size
+
+    # Second access of same page should NOT double-count
+    mgr.on_attention(page_id=victim, attention_sum=0.05, seq_id=0, seq_len=64)
+    assert mgr._recompute_total == 1, "Recompute should only count once"
+
+    stats = mgr.get_stats()
+    assert stats["recompute_total"] == 1
+    print("  PASS: recompute tracking counts once per evicted block")
+
+
+def test_attention_snapshot_sampled():
+    """Attention snapshots fire at intervals, not every step."""
+    events = []
+    mgr = CTMBlockSpaceManager(
+        block_size=16, num_gpu_blocks=16, watermark=0.0,
+        enable_logging=True,
+    )
+    mgr.event_logger.snapshot_interval = 5
+    mgr.event_logger.callback = lambda etype, data: events.append((etype, data))
+
+    mgr.register_sequence(0)
+    for i in range(4):
+        mgr.allocate_block(seq_id=0, page_id=i, positions=list(range(i * 16, (i + 1) * 16)))
+
+    # Run 20 attention updates (on page 0, which ticks the step counter)
+    for _ in range(20):
+        mgr.on_attention(page_id=0, attention_sum=0.1, seq_id=0, seq_len=64)
+
+    snapshots = [d for t, d in events if t == "attention_snapshot"]
+    pressure = [d for t, d in events if t == "cache_pressure"]
+
+    # With interval=5 and 20 steps, expect 4 snapshots (steps 5, 10, 15, 20)
+    assert len(snapshots) == 4, f"Expected 4 snapshots, got {len(snapshots)}"
+    assert len(pressure) == 4, f"Expected 4 pressure events, got {len(pressure)}"
+
+    # Verify snapshot structure
+    assert "top_blocks" in snapshots[0]
+    assert len(snapshots[0]["top_blocks"]) > 0
+    top_block = snapshots[0]["top_blocks"][0]
+    assert "attention_ema" in top_block
+    assert "importance" in top_block
+    print("  PASS: attention snapshots fire at sampled intervals")
+
+
+def test_cache_pressure_metrics():
+    """Cache pressure events contain utilization data."""
+    events = []
+    mgr = CTMBlockSpaceManager(
+        block_size=16, num_gpu_blocks=8, watermark=0.1,
+        enable_logging=True,
+    )
+    mgr.event_logger.snapshot_interval = 1  # every step for this test
+    mgr.event_logger.callback = lambda etype, data: events.append((etype, data))
+
+    mgr.register_sequence(0)
+    for i in range(6):
+        mgr.allocate_block(seq_id=0, page_id=i, positions=list(range(i * 16, (i + 1) * 16)))
+
+    mgr.on_attention(page_id=0, attention_sum=0.1, seq_id=0, seq_len=96)
+
+    pressure = [d for t, d in events if t == "cache_pressure"]
+    assert len(pressure) >= 1
+    p = pressure[0]
+    assert p["active_blocks"] == 6
+    assert p["capacity"] == 8
+    assert p["utilization_pct"] == 75.0
+    assert p["free"] == 2
+    assert isinstance(p["needs_eviction"], bool)
+    print("  PASS: cache pressure metrics correct")
+
+
+def test_logging_disabled_no_overhead():
+    """With logging disabled, no events are emitted and overhead is negligible."""
+    import time
+
+    mgr = CTMBlockSpaceManager(
+        block_size=16, num_gpu_blocks=1000, watermark=0.0,
+        enable_logging=False,
+    )
+    mgr.register_sequence(0)
+    for i in range(500):
+        mgr.allocate_block(seq_id=0, page_id=i, positions=list(range(i * 16, (i + 1) * 16)))
+
+    t0 = time.perf_counter()
+    for step in range(2):
+        for i in range(500):
+            mgr.on_attention(page_id=i, attention_sum=0.01, seq_id=0, seq_len=8000)
+    elapsed = time.perf_counter() - t0
+
+    # No events should have been captured
+    assert mgr.event_logger.get_event_counts() == {}
+    # Overhead should be similar to baseline (< 200ms for 1000 calls)
+    assert elapsed < 0.2, f"Disabled logging overhead too high: {elapsed*1000:.1f}ms"
+    print(f"  PASS: logging disabled has negligible overhead ({elapsed*1000:.1f}ms/1000)")
+
+
+def test_event_counts_in_stats():
+    """get_stats() includes event counts and recompute counters."""
+    mgr = CTMBlockSpaceManager(
+        block_size=16, num_gpu_blocks=4, watermark=0.0,
+        enable_logging=True,
+    )
+    mgr.register_sequence(0)
+    for i in range(4):
+        mgr.allocate_block(seq_id=0, page_id=i, positions=list(range(i * 16, (i + 1) * 16)))
+        mgr.on_attention(page_id=i, attention_sum=0.01, seq_id=0, seq_len=64)
+
+    mgr.evict()
+
+    stats = mgr.get_stats()
+    assert "recompute_total" in stats
+    assert "recompute_important" in stats
+    assert "recompute_filler" in stats
+    assert "event_counts" in stats
+    assert stats["event_counts"].get("eviction", 0) == 1
+    print("  PASS: event counts and recompute in get_stats()")
+
+
 def run_all_tests():
     print("Running vLLM adapter validation tests...")
     test_eviction_from_policy()
@@ -311,7 +486,14 @@ def run_all_tests():
     test_watermark()
     test_overhead_minimal()
     test_transformer_setup_import()
-    print("\nAll 10 tests passed.")
+    # Instrumentation tests
+    test_eviction_logging()
+    test_recompute_tracking()
+    test_attention_snapshot_sampled()
+    test_cache_pressure_metrics()
+    test_logging_disabled_no_overhead()
+    test_event_counts_in_stats()
+    print("\nAll 16 tests passed.")
 
 
 if __name__ == "__main__":
