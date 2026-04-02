@@ -139,6 +139,8 @@ class KVCacheSimulator:
             "misses": 0,
             "evictions": 0,
             "total_accesses": 0,
+            "entity_hits": 0,
+            "entity_accesses": 0,
         }
 
     def reset(self):
@@ -152,6 +154,8 @@ class KVCacheSimulator:
             "misses": 0,
             "evictions": 0,
             "total_accesses": 0,
+            "entity_hits": 0,
+            "entity_accesses": 0,
         }
 
     def access(
@@ -166,10 +170,15 @@ class KVCacheSimulator:
         """
         self.current_time += 1
         self.stats["total_accesses"] += 1
+        is_entity = token_type == "entity"
+        if is_entity:
+            self.stats["entity_accesses"] += 1
 
         if position in self.cache:
             # Cache hit
             self.stats["hits"] += 1
+            if is_entity:
+                self.stats["entity_hits"] += 1
             meta = self.cache[position]
             meta.last_access_time = self.current_time
             meta.access_count += 1
@@ -307,9 +316,14 @@ class KVCacheSimulator:
 
     def get_stats(self) -> dict:
         """Get detailed statistics."""
+        h = self.stats["hits"]
+        m = self.stats["misses"]
+        ea = self.stats["entity_accesses"]
         return {
             **self.stats,
             "hit_rate": self.hit_rate,
+            "entity_hit_rate": self.stats["entity_hits"] / ea if ea > 0 else 0.0,
+            "avg_latency_ns": (h * 100 + m * 10000) / max(1, h + m),
             "cache_size": len(self.cache),
             "max_tokens": self.max_tokens,
             "policy": self.policy.value,

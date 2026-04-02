@@ -21,12 +21,25 @@ from .offload_manager import CTMOffloadManager
 from .zero_integration import CTMZeROOffload, get_deepspeed_config_with_ctm
 from .inference import CTMInferenceManager
 from .config import CTMDeepSpeedConfig
+from .turboquant_offload import (
+    TurboQuantOffloadManager,
+    TurboQuantTrainingConfig,
+    TurboQuantCompressor,
+    CompressedTensorBuffer,
+    create_turboquant_offload_manager,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "CTMOffloadManager",
     "CTMZeROOffload",
     "CTMInferenceManager",
     "CTMDeepSpeedConfig",
     "get_deepspeed_config_with_ctm",
+    # TurboQuant integration
+    "TurboQuantOffloadManager",
+    "TurboQuantTrainingConfig",
+    "TurboQuantCompressor",
+    "CompressedTensorBuffer",
+    "create_turboquant_offload_manager",
 ]
