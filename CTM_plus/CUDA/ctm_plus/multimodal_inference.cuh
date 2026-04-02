@@ -390,13 +390,10 @@ __global__ void mm_kernel_fused_score_collect(
 
 /**
  * Allocate CXL slots for demoted tokens (lock-free stack pop).
+ * LEGACY — prefer mm_kernel_fused_alloc_free_finalize.
  *
  * Grid:  ceil(n_demote / 128)
  * Block: 128
- *
- * Each thread atomically decrements freelist_top and reads a slot.
- * On success, writes slot ID into d_meta[token].cxl_slot and updates flags.
- * On failure (CXL full), marks token as ACTION_EVICT instead.
  */
 __global__ void mm_kernel_alloc_cxl_slots(
     TokenMeta*           __restrict__ d_meta,
@@ -404,6 +401,43 @@ __global__ void mm_kernel_alloc_cxl_slots(
     uint32_t             n_demote,
     CXLStorageLayout     cxl,
     EvictionAction*      __restrict__ d_actions  // may upgrade DEMOTE→EVICT
+);
+
+/**
+ * FUSED Kernel 3: Alloc + Free + Finalize.
+ *
+ * Replaces separate mm_kernel_alloc_cxl_slots + mm_kernel_free_cxl_slots
+ * in a single launch. Reads d_demote_count / d_evict_count from DEVICE
+ * memory (written by kernel 2), eliminating the host sync + D→H readback.
+ *
+ * Thread mapping (1 thread per item):
+ *   [0, *d_demote_count)             → alloc CXL slot, update tier flags, update stats
+ *   [*d_demote_count, total)         → free CXL slot, clear meta, update eviction stats
+ *   [total, grid_size)               → early exit
+ *
+ * Grid: (MM_MAX_VICTIMS * 2 + 127) / 128  (fixed, CUDA graph safe)
+ * Block: 128
+ *
+ * Side effects:
+ *   - d_meta[].cxl_slot assigned (alloc) or cleared (free)
+ *   - d_meta[].tier_flags: IN_TIER0 cleared, IN_CXL set (alloc) or cleared (free)
+ *   - d_actions[]: DEMOTE → EVICT if CXL full
+ *   - cxl.d_freelist_top atomically updated
+ *   - d_modality_stats atomically updated
+ *
+ * Note: Does NOT set MM_FLAG_TQ_COMPRESSED. That flag is set by the compress
+ * kernel after actual data is written to CXL storage. This prevents the
+ * "phantom compression" bug where flags claim compressed but storage is empty.
+ */
+__global__ void mm_kernel_fused_alloc_free_finalize(
+    TokenMeta*           __restrict__ d_meta,
+    const uint32_t*      __restrict__ d_demote_list,
+    const uint32_t*      __restrict__ d_demote_count,   // device-side count
+    const uint32_t*      __restrict__ d_evict_list,
+    const uint32_t*      __restrict__ d_evict_count,    // device-side count
+    CXLStorageLayout     cxl,
+    EvictionAction*      __restrict__ d_actions,
+    ModalityStats*       __restrict__ d_modality_stats
 );
 
 /**
@@ -420,7 +454,7 @@ __global__ void mm_kernel_alloc_cxl_slots(
  */
 __global__ void mm_kernel_compress_to_cxl(
     const __half*        __restrict__ d_kv_vectors,   // [max_tokens, head_dim]
-    const TokenMeta*     __restrict__ d_meta,
+    TokenMeta*           __restrict__ d_meta,          // writable: sets cosine_sim + TQ_COMPRESSED
     const uint32_t*      __restrict__ d_demote_list,
     uint32_t             n_demote,
     uint32_t             head_dim,

@@ -106,7 +106,7 @@ __device__ __forceinline__ float tq_dequantize_angle_pos(
  */
 __global__ void mm_kernel_compress_to_cxl(
     const __half*        __restrict__ d_kv_vectors,
-    const TokenMeta*     __restrict__ d_meta,
+    TokenMeta*           __restrict__ d_meta,
     const uint32_t*      __restrict__ d_demote_list,
     uint32_t             n_demote,
     uint32_t             head_dim,
@@ -243,15 +243,16 @@ __global__ void mm_kernel_compress_to_cxl(
             cxl.d_qjl_scales[cxl_slot] = scale_sum / (float)proj_dim;
         }
 
-        // ---- Step 6: Store compression metadata ----
-        // Note: We write to a copy; the caller merges into d_meta
-        // For now, store in the CXL radii slot's neighbor as a side-channel
-        // (In production, this would update d_meta atomically)
-
-        // Quality metrics stored via separate kernel or host update
-        // The cosine_est is written to meta by the controller after this kernel
-        (void)cosine_est;
-        (void)orig_norm;
+        // ---- Step 6: Write compression metadata to TokenMeta ----
+        // Update cosine_sim so quality-aware scoring signal 6 is live.
+        // Set TQ_COMPRESSED flag only NOW — after data is actually in CXL.
+        // This prevents the "phantom compression" bug (flag set, slot empty).
+        //
+        // NOTE: d_meta is __restrict__ on this kernel's parameter, but we're
+        // writing to the same token index that only this block touches, so
+        // there's no aliasing hazard.
+        d_meta[token_idx].cosine_sim  = cosine_est;
+        d_meta[token_idx].tier_flags |= MM_FLAG_TQ_COMPRESSED;
     }
 }
 
