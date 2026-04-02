@@ -397,9 +397,12 @@ class FIFOPolicy(EvictionPolicy):
 
 
 class RandomPolicy(EvictionPolicy):
+    def __init__(self, rng: random.Random = None):
+        self._rng = rng or random.Random(42)
+
     def select_victim(self, blocks, pinned):
         candidates = [b for b in blocks if b not in pinned]
-        return random.choice(candidates) if candidates else None
+        return self._rng.choice(candidates) if candidates else None
 
 
 class AttentionAwarePolicy(EvictionPolicy):
@@ -414,11 +417,13 @@ class AttentionAwarePolicy(EvictionPolicy):
     """
     SAMPLE_SIZE = 48
 
-    def __init__(self, sink_tokens: int = 4, recent_window: int = 128):
+    def __init__(self, sink_tokens: int = 4, recent_window: int = 128,
+                 rng: random.Random = None):
         self.sink_tokens = sink_tokens
         self.recent_window = recent_window
         self._step = 0
         self._max_attention = 1e-9  # running max for normalization
+        self._rng = rng or random.Random(42)
 
     def on_access(self, block_id, block):
         self._step = max(self._step, block.last_access_step)
@@ -429,7 +434,7 @@ class AttentionAwarePolicy(EvictionPolicy):
         candidates = [b for b in blocks if b not in pinned]
         if not candidates:
             return None
-        sample = random.sample(candidates, min(self.SAMPLE_SIZE, len(candidates)))
+        sample = self._rng.sample(candidates, min(self.SAMPLE_SIZE, len(candidates)))
         return min(sample, key=lambda bid: self._score(blocks[bid]))
 
     def _score(self, block: KVBlock) -> float:
@@ -505,14 +510,15 @@ class KVPolicyAdapter(EvictionPolicy):
 
 
 def make_policy(policy_type: PolicyType, **kwargs) -> EvictionPolicy:
+    rng = kwargs.pop("rng", None)
     if policy_type == PolicyType.LRU:
         return LRUPolicy()
     elif policy_type == PolicyType.FIFO:
         return FIFOPolicy()
     elif policy_type == PolicyType.RANDOM:
-        return RandomPolicy()
+        return RandomPolicy(rng=rng)
     elif policy_type == PolicyType.CTM_PLUS:
-        return AttentionAwarePolicy(**kwargs)
+        return AttentionAwarePolicy(rng=rng, **kwargs)
     elif policy_type == PolicyType.KV_POLICY:
         kv_policy = kwargs.pop("kv_policy", None)
         if kv_policy is None:
@@ -561,12 +567,22 @@ class KVCacheSimulator:
         self.rng = random.Random(seed)
         self.attention_fn = attention_fn or sink_and_recent_attention
 
-        self.policy = make_policy(
-            policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
-            kv_policy=kv_policy,
-        ) if policy_type == PolicyType.KV_POLICY else make_policy(
-            policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
-        )
+        # Create a child RNG for the policy so simulator and policy
+        # random streams don't interfere with each other.
+        policy_rng = random.Random(self.rng.randint(0, 2**32 - 1))
+
+        if policy_type == PolicyType.KV_POLICY:
+            if kv_policy is not None:
+                kv_policy.set_rng(policy_rng)
+            self.policy = make_policy(
+                policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
+                kv_policy=kv_policy, rng=policy_rng,
+            )
+        else:
+            self.policy = make_policy(
+                policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
+                rng=policy_rng,
+            )
 
         # State
         self.blocks: Dict[int, KVBlock] = {}

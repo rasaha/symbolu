@@ -207,6 +207,7 @@ class KVCachePolicy:
         self.ema_alpha = attention_ema_alpha
 
         self.freq_sketch = FrequencySketch(max_blocks * 4)
+        self._rng = random.Random(42)
 
         self.blocks: Dict[int, BlockState] = {}
         self.sequences: Dict[int, SequenceState] = {}
@@ -222,6 +223,10 @@ class KVCachePolicy:
             "evictions": 0,
             "filler_evictions": 0,
         }
+
+    def set_rng(self, rng: random.Random) -> None:
+        """Set the RNG instance for reproducible victim selection."""
+        self._rng = rng
 
     # ---- Sequence lifecycle ----
 
@@ -435,7 +440,7 @@ class KVCachePolicy:
 
         # Sample and score
         sample_size = min(48, len(available))
-        candidates = random.sample(list(available), sample_size)
+        candidates = self._rng.sample(list(available), sample_size)
 
         scored = [(bid, self.score_block(bid)) for bid in candidates]
         scored.sort(key=lambda x: x[1])

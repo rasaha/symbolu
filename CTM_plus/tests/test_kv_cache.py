@@ -320,9 +320,7 @@ def test_continuous_batching_reproducible():
     r2 = compare_continuous_batching(
         max_blocks=64, block_size=16, total_steps=50, seed=42,
     )
-    # Only check deterministic policies (LRU, FIFO). Random, CTM+, and
-    # KV_POLICY use unseeded random.sample/random.choice internally.
-    for policy in ("lru", "fifo"):
+    for policy in r1:
         assert r1[policy]["recompute_cost"] == r2[policy]["recompute_cost"], (
             f"{policy}: continuous batching not reproducible"
         )
