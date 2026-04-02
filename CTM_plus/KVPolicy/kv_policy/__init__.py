@@ -26,6 +26,7 @@ from .attention_evictor import (
 )
 from .config import KVCachePolicyConfig
 from .vllm_adapter import CTMBlockSpaceManager, CTMvLLMConfig
+from .vllm_evictor import CTMEvictor, patch_vllm_engine
 
 __version__ = "0.3.0"
 __all__ = [
@@ -37,4 +38,6 @@ __all__ = [
     "classify_block_importance",
     "CTMBlockSpaceManager",
     "CTMvLLMConfig",
+    "CTMEvictor",
+    "patch_vllm_engine",
 ]
