@@ -23,6 +23,25 @@
 #include <cuda_fp16.h>
 
 // ============================================================================
+// __constant__ memory for rotation matrices (broadcast-efficient)
+//
+// For head_dim=128: 128*128*4 = 64KB = exactly fits constant memory limit.
+// All threads reading the same rotation entry → single memory transaction,
+// vs shared memory which requires cooperative load + __syncthreads().
+// ============================================================================
+
+__constant__ float c_mm_rotation[MM_ROTATION_SIZE];     // R (compression)
+__constant__ float c_mm_rotation_t[MM_ROTATION_SIZE];   // R^T (decompression)
+
+// Host-callable: upload rotation matrices to __constant__ memory
+void mm_upload_rotation_matrices(const float* h_rotation, const float* h_rotation_t,
+                                  int head_dim) {
+    size_t sz = (size_t)head_dim * head_dim * sizeof(float);
+    cudaMemcpyToSymbol(c_mm_rotation, h_rotation, sz);
+    cudaMemcpyToSymbol(c_mm_rotation_t, h_rotation_t, sz);
+}
+
+// ============================================================================
 // Device helpers
 // ============================================================================
 
@@ -92,7 +111,7 @@ __global__ void mm_kernel_compress_to_cxl(
     uint32_t             n_demote,
     uint32_t             head_dim,
     CXLStorageLayout     cxl,
-    const float*         __restrict__ d_rotation_matrix,
+    const float*         __restrict__ d_rotation_matrix,  // unused, kept for API compat
     const float*         __restrict__ d_angle_grid_full,
     const float*         __restrict__ d_angle_grid_pos,
     int                  n_grid,
@@ -108,15 +127,9 @@ __global__ void mm_kernel_compress_to_cxl(
 
     uint32_t tid = threadIdx.x;
 
-    // ---- Shared memory for rotation matrix tile ----
-    extern __shared__ float s_rotation[];  // [head_dim * head_dim]
-
-    // Cooperative load of rotation matrix into shared memory
-    uint32_t total_elements = head_dim * head_dim;
-    for (uint32_t i = tid; i < total_elements; i += blockDim.x) {
-        s_rotation[i] = d_rotation_matrix[i];
-    }
-    __syncthreads();
+    // Rotation matrix now in __constant__ memory (c_mm_rotation).
+    // No shared memory load, no __syncthreads() needed.
+    // All threads reading same rotation row → single broadcast transaction.
 
     // Thread 0 does the full compression for this token
     if (tid == 0) {
@@ -136,7 +149,7 @@ __global__ void mm_kernel_compress_to_cxl(
         for (uint32_t r = 0; r < head_dim; r++) {
             float sum = 0.0f;
             for (uint32_t c = 0; c < head_dim; c++) {
-                sum += s_rotation[r * head_dim + c] * vec[c];
+                sum += c_mm_rotation[r * head_dim + c] * vec[c];
             }
             rotated[r] = sum;
         }
@@ -279,14 +292,8 @@ __global__ void mm_kernel_decompress_from_cxl(
 
     uint32_t tid = threadIdx.x;
 
-    // ---- Shared memory for rotation^T ----
-    extern __shared__ float s_rotation_t[];
-
-    uint32_t total_elements = head_dim * head_dim;
-    for (uint32_t i = tid; i < total_elements; i += blockDim.x) {
-        s_rotation_t[i] = d_rotation_t[i];
-    }
-    __syncthreads();
+    // Rotation^T now in __constant__ memory (c_mm_rotation_t).
+    // No shared memory needed, no sync barrier.
 
     if (tid == 0) {
         uint32_t pos = d_meta[token_idx].position;
@@ -375,7 +382,7 @@ __global__ void mm_kernel_decompress_from_cxl(
             for (uint32_t r = 0; r < head_dim; r++) {
                 float sum = 0.0f;
                 for (uint32_t c = 0; c < head_dim; c++) {
-                    sum += s_rotation_t[r * head_dim + c] * radii[c];
+                    sum += c_mm_rotation_t[r * head_dim + c] * radii[c];
                 }
                 // Write FP16 output
                 d_kv_vectors[pos * head_dim + r] = __float2half(sum);

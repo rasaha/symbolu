@@ -8,7 +8,7 @@
  *   4. Compact per-token metadata for GPU-resident cache
  *
  * Design goals:
- *   - Single kernel launch per decode step (score + decide)
+ *   - 3-kernel pipeline per decode step (CUDA graph ready)
  *   - No intermediate allocations on hot path
  *   - Coalesced reads, warp-uniform branches
  *   - ≤ 5 µs per 4K-token cache at scoring
@@ -47,6 +47,10 @@
 #define MM_MAX_VICTIMS          256
 // CXL slot allocation granularity
 #define MM_CXL_SLOT_INVALID     0xFFFFFFFF
+// Maximum head_dim for __constant__ rotation matrix (128*128*4 = 64KB fits constant mem)
+#define MM_MAX_HEAD_DIM         128
+// __constant__ rotation matrix capacity in floats
+#define MM_ROTATION_SIZE        (MM_MAX_HEAD_DIM * MM_MAX_HEAD_DIM)
 
 // ============================================================================
 // Multimodal Token Types  (extends the 8 text-only TokenType enum)
@@ -130,40 +134,54 @@ __host__ __device__ inline ModalityGroup mm_token_modality(uint8_t token_type) {
 
 /**
  * Compact metadata stored per token in the KV cache.
- * Designed for coalesced GPU reads: 32 B aligned, no padding waste.
+ * Designed for coalesced GPU reads: 32 B aligned, minimal padding waste.
  *
- * Layout (32 bytes):
+ * Packed layout (32 bytes):
  *   [0:3]   position         — token position in sequence
  *   [4:7]   last_access_step — last decode step that touched this token
  *   [8:9]   access_count     — saturating counter (max 65535)
- *   [10]    token_type       — MultimodalTokenType enum
- *   [11]    flags            — tier/state bits
+ *   [10]    type_flags       — packed: token_type(5b) | modality(2b) | pinned(1b)
+ *   [11]    tier_flags       — tier/state bits
  *   [12:15] attention_sum    — cumulative attention weight (EMA proxy)
  *   [16:19] attention_count  — number of attention observations
  *   [20:23] cosine_sim       — TQ compression quality (FP32, 1.0 = perfect)
- *   [24:27] original_norm    — L2 norm of original KV vector
+ *   [24:25] reuse_trend      — FP16: delta of recent attention (predictive signal)
+ *   [26:27] _reserved        — padding for alignment
  *   [28:31] cxl_slot         — index into CXL compressed storage (or INVALID)
+ *
+ * Bitfield packing for type_flags:
+ *   bits [0:4]  = token_type (0-19, 5 bits sufficient)
+ *   bits [5:6]  = modality group (0-3, 2 bits)
+ *   bit  [7]    = pinned flag
  */
 struct __align__(32) TokenMeta {
     uint32_t position;
     uint32_t last_access_step;
     uint16_t access_count;
-    uint8_t  token_type;        // MultimodalTokenType
-    uint8_t  flags;
+    uint8_t  type_flags;        // packed: token_type(5b) | modality(2b) | pinned(1b)
+    uint8_t  tier_flags;        // MM_FLAG_IN_TIER0, IN_CXL, IN_TIER1, TQ_COMPRESSED, ANCHOR
     float    attention_sum;
     uint32_t attention_count;
     float    cosine_sim;
-    float    original_norm;
+    int16_t  reuse_trend;       // FP16-as-int: delta of recent avg attention (predictive)
+    uint16_t _reserved;
     uint32_t cxl_slot;
 };
 
-// Flag bits for TokenMeta.flags
+// type_flags accessors
+#define MM_PACK_TYPE_FLAGS(token_type, modality, pinned) \
+    ((uint8_t)(((token_type) & 0x1F) | (((modality) & 0x3) << 5) | (((pinned) ? 1u : 0u) << 7)))
+#define MM_UNPACK_TOKEN_TYPE(tf)   ((uint8_t)((tf) & 0x1F))
+#define MM_UNPACK_MODALITY(tf)     ((ModalityGroup)(((tf) >> 5) & 0x3))
+#define MM_UNPACK_PINNED(tf)       (((tf) >> 7) & 1u)
+
+// Flag bits for TokenMeta.tier_flags
 #define MM_FLAG_IN_TIER0      (1u << 0)
 #define MM_FLAG_IN_CXL        (1u << 1)
 #define MM_FLAG_IN_TIER1      (1u << 2)
-#define MM_FLAG_PINNED        (1u << 3)
-#define MM_FLAG_TQ_COMPRESSED (1u << 4)
-#define MM_FLAG_ANCHOR        (1u << 5)  // protected anchor (sink, etc.)
+#define MM_FLAG_TQ_COMPRESSED (1u << 3)
+#define MM_FLAG_ANCHOR        (1u << 4)  // protected anchor (sink, etc.)
+// Note: PINNED moved to type_flags bit 7 via MM_UNPACK_PINNED()
 
 // ============================================================================
 // Eviction Decision
@@ -180,14 +198,17 @@ enum EvictionAction : uint8_t {
 // ============================================================================
 
 struct ScoringConfig {
-    // Signal weights (should sum to ~1.0)
+    // Signal weights (sum to 1.0)
+    // 8 signals: recency, frequency, attention, token_importance, position,
+    //            compression_quality, modality_anchor, reuse_trend
     float w_recency;                // 0.20
-    float w_frequency;              // 0.20
+    float w_frequency;              // 0.15  (reduced from 0.20)
     float w_attention;              // 0.25
-    float w_token_importance;       // 0.15
-    float w_position;               // 0.10
+    float w_token_importance;       // 0.12
+    float w_position;               // 0.08
     float w_compression_quality;    // 0.05
-    float w_modality_anchor;        // 0.05
+    float w_modality_anchor;        // 0.10  (raised from 0.05)
+    float w_reuse_trend;            // 0.05  (NEW: predictive signal)
 
     // Thresholds
     uint32_t attention_sink_tokens; // First N positions always kept
@@ -205,13 +226,17 @@ struct ScoringConfig {
 
     static ScoringConfig defaults() {
         ScoringConfig c{};
+        // Rebalanced: modality_anchor 0.05→0.10, frequency 0.20→0.15,
+        // token_importance 0.15→0.12, position 0.10→0.08, +reuse_trend 0.05
+        // Total: 0.20+0.15+0.25+0.12+0.08+0.05+0.10+0.05 = 1.00
         c.w_recency              = 0.20f;
-        c.w_frequency            = 0.20f;
+        c.w_frequency            = 0.15f;
         c.w_attention            = 0.25f;
-        c.w_token_importance     = 0.15f;
-        c.w_position             = 0.10f;
+        c.w_token_importance     = 0.12f;
+        c.w_position             = 0.08f;
         c.w_compression_quality  = 0.05f;
-        c.w_modality_anchor      = 0.05f;
+        c.w_modality_anchor      = 0.10f;
+        c.w_reuse_trend          = 0.05f;
         c.attention_sink_tokens  = 4;
         c.recent_window_size     = 256;
         c.demotion_threshold     = 0.25f;
@@ -225,9 +250,16 @@ struct ScoringConfig {
 
     static ScoringConfig for_long_context() {
         ScoringConfig c = defaults();
-        c.w_recency              = 0.15f;
+        // Long context: boost attention + token_importance, reduce recency
+        // 0.10+0.12+0.30+0.15+0.08+0.05+0.13+0.07 = 1.00
+        c.w_recency              = 0.10f;
+        c.w_frequency            = 0.12f;
         c.w_attention            = 0.30f;
-        c.w_token_importance     = 0.20f;
+        c.w_token_importance     = 0.15f;
+        c.w_position             = 0.08f;
+        c.w_compression_quality  = 0.05f;
+        c.w_modality_anchor      = 0.13f;
+        c.w_reuse_trend          = 0.07f;
         c.attention_sink_tokens  = 8;
         c.recent_window_size     = 1024;
         c.tier0_capacity         = 8192;
@@ -293,7 +325,7 @@ struct ModalityStats {
  * Fused scoring + eviction decision kernel.
  *
  * ONE launch per decode step. For each Tier0 token:
- *   1. Compute 7-signal importance score
+ *   1. Compute 8-signal importance score (including reuse trend)
  *   2. Compare against thresholds
  *   3. Write ACTION_KEEP / ACTION_DEMOTE / ACTION_EVICT
  *
@@ -302,7 +334,7 @@ struct ModalityStats {
  * Block: MM_SCORE_BLOCK_SIZE (256)
  *
  * Reads: d_meta[] (coalesced 32B per thread)
- * Writes: d_actions[] (1 byte per token), d_scores[] (4 bytes, optional)
+ * Writes: d_actions[] (1B), d_scores[] (4B, optional)
  *
  * Expected latency: ~3 µs for 4K tokens on A100.
  */
@@ -316,7 +348,7 @@ __global__ void mm_kernel_score_and_decide(
 
 /**
  * Collect demotion candidates: compact tokens with ACTION_DEMOTE
- * into a contiguous list using warp-level prefix sum.
+ * into a contiguous list via atomicAdd.
  *
  * Grid:  ceil(n_tokens / MM_SCORE_BLOCK_SIZE)
  * Block: MM_SCORE_BLOCK_SIZE
@@ -328,6 +360,32 @@ __global__ void mm_kernel_collect_demotions(
     uint32_t              n_tokens,
     uint32_t*             __restrict__ d_demote_list,   // [MM_MAX_VICTIMS]
     uint32_t*             __restrict__ d_demote_count   // atomic counter
+);
+
+/**
+ * FUSED Kernel 1: Score + Decide + Collect (replaces 3 separate launches).
+ *
+ * Single kernel that computes scores, makes eviction decisions, AND
+ * stream-compacts demotion candidates using warp-level ballot + prefix sum.
+ *
+ * Pipeline reduction: replaces mm_kernel_score_and_decide + mm_kernel_collect_demotions
+ * as a single launch for CUDA graph capture.
+ *
+ * Grid:  ceil(n_tokens / MM_SCORE_BLOCK_SIZE)
+ * Block: MM_SCORE_BLOCK_SIZE (256)
+ *
+ * Uses __shared__ block-level compaction buffer + atomicAdd for global output.
+ */
+__global__ void mm_kernel_fused_score_collect(
+    const TokenMeta*     __restrict__ d_meta,
+    const ScoringConfig  config,
+    uint32_t             n_tokens,
+    EvictionAction*      __restrict__ d_actions,       // [n_tokens]
+    float*               __restrict__ d_scores,        // [n_tokens] (NULL = skip)
+    uint32_t*            __restrict__ d_demote_list,   // [MM_MAX_VICTIMS]
+    uint32_t*            __restrict__ d_demote_count,  // atomic counter (init to 0)
+    uint32_t*            __restrict__ d_evict_list,    // [MM_MAX_VICTIMS]
+    uint32_t*            __restrict__ d_evict_count    // atomic counter (init to 0)
 );
 
 /**
@@ -421,7 +479,7 @@ __global__ void mm_kernel_free_cxl_slots(
  * Update token metadata after a new token is appended
  * (called once per decode step for all attending tokens).
  *
- * Updates: last_access_step, access_count, attention_sum.
+ * Updates: last_access_step, access_count, attention_sum, reuse_trend.
  * Lightweight: 1 thread per token in the attention window.
  *
  * Grid:  ceil(n_attending / 256)

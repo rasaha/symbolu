@@ -64,9 +64,9 @@ __global__ void mm_kernel_alloc_cxl_slots(
 
     // Update token metadata
     d_meta[token_idx].cxl_slot = slot;
-    d_meta[token_idx].flags = (d_meta[token_idx].flags & ~MM_FLAG_IN_TIER0)
-                             | MM_FLAG_IN_CXL
-                             | MM_FLAG_TQ_COMPRESSED;
+    d_meta[token_idx].tier_flags = (d_meta[token_idx].tier_flags & ~MM_FLAG_IN_TIER0)
+                                  | MM_FLAG_IN_CXL
+                                  | MM_FLAG_TQ_COMPRESSED;
 }
 
 // ============================================================================
@@ -91,7 +91,7 @@ __global__ void mm_kernel_free_cxl_slots(
     TokenMeta* meta = &d_meta[token_idx];
 
     // If this token was in CXL, free its slot
-    if (meta->flags & MM_FLAG_IN_CXL) {
+    if (meta->tier_flags & MM_FLAG_IN_CXL) {
         uint32_t slot = meta->cxl_slot;
         if (slot != MM_CXL_SLOT_INVALID) {
             // Push slot back onto freelist
@@ -104,12 +104,12 @@ __global__ void mm_kernel_free_cxl_slots(
 
     // Update modality stats
     if (d_modality_stats) {
-        ModalityGroup mod = mm_token_modality(meta->token_type);
+        ModalityGroup mod = MM_UNPACK_MODALITY(meta->type_flags);
         atomicAdd(&d_modality_stats->evicted_count[mod], 1u);
     }
 
     // Clear token metadata
-    meta->flags = 0;
+    meta->tier_flags = 0;
     meta->cxl_slot = MM_CXL_SLOT_INVALID;
 }
 

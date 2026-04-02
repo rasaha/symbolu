@@ -1,17 +1,13 @@
 /**
  * mm_controller.cu — Host-side MultimodalInferenceController
  *
- * Orchestrates the per-step pipeline:
- *   1. Append new token metadata
- *   2. Update attention stats for attended positions
- *   3. Score all Tier0 tokens (fused kernel)
- *   4. Collect demotions
- *   5. Allocate CXL slots
- *   6. Compress demoted tokens to CXL
- *   7. Free slots for evicted tokens
+ * Optimized 3-launch pipeline per decode step:
+ *   Launch 1: mm_kernel_update_on_access      — update metadata + reuse trend
+ *   Launch 2: mm_kernel_fused_score_collect   — score + decide + compact (warp ballot)
+ *   Launch 3: mm_kernel_alloc_cxl_slots       — allocate CXL slots
+ *   + compress/free as needed (production path with real KV data)
  *
- * Total kernel launches per decode step: 5-7
- * (can be reduced to 3 with CUDA graphs in production)
+ * CUDA Graph ready: the 3 core launches have fixed grid/block dims per step.
  */
 
 #include "multimodal_inference.cuh"
@@ -114,12 +110,9 @@ void MultimodalInferenceController::init_tq_tables() {
     int n_grid = tq_config_.n_grid();
     int proj_dim = tq_config_.qjl_proj_dim > 0 ? tq_config_.qjl_proj_dim : d;
 
-    // ---- Rotation matrix ----
+    // ---- Rotation matrix → __constant__ memory ----
     float* h_rotation = new float[d * d];
     host_generate_orthogonal(h_rotation, d, tq_config_.seed);
-
-    cudaMalloc(&d_rotation_, d * d * sizeof(float));
-    cudaMemcpy(d_rotation_, h_rotation, d * d * sizeof(float), cudaMemcpyHostToDevice);
 
     // Transpose for decompression
     float* h_rotation_t = new float[d * d];
@@ -127,6 +120,13 @@ void MultimodalInferenceController::init_tq_tables() {
         for (int c = 0; c < d; c++)
             h_rotation_t[r * d + c] = h_rotation[c * d + r];
 
+    // Upload to __constant__ memory (broadcast-efficient, no shared mem needed)
+    extern void mm_upload_rotation_matrices(const float*, const float*, int);
+    mm_upload_rotation_matrices(h_rotation, h_rotation_t, d);
+
+    // Also keep in global memory for backward compatibility
+    cudaMalloc(&d_rotation_, d * d * sizeof(float));
+    cudaMemcpy(d_rotation_, h_rotation, d * d * sizeof(float), cudaMemcpyHostToDevice);
     cudaMalloc(&d_rotation_t_, d * d * sizeof(float));
     cudaMemcpy(d_rotation_t_, h_rotation_t, d * d * sizeof(float), cudaMemcpyHostToDevice);
     delete[] h_rotation;
@@ -207,28 +207,27 @@ int MultimodalInferenceController::on_decode_step(
     scoring_config_.seq_len = new_position + 1;
 
     // ---- 1. Append new token metadata (host-side init, single cudaMemcpy) ----
+    ModalityGroup mod = mm_token_modality(token_type);
+    bool is_sink = (new_position < scoring_config_.attention_sink_tokens);
+
     TokenMeta new_meta{};
     new_meta.position          = new_position;
     new_meta.last_access_step  = current_step_;
     new_meta.access_count      = 1;
-    new_meta.token_type        = token_type;
-    new_meta.flags             = MM_FLAG_IN_TIER0;
+    new_meta.type_flags        = MM_PACK_TYPE_FLAGS(token_type, mod, is_sink);
+    new_meta.tier_flags        = MM_FLAG_IN_TIER0 | (is_sink ? MM_FLAG_ANCHOR : 0);
     new_meta.attention_sum     = 0.0f;
     new_meta.attention_count   = 0;
     new_meta.cosine_sim        = 1.0f;  // not compressed yet
-    new_meta.original_norm     = 0.0f;
+    new_meta.reuse_trend       = 0;     // no trend yet
+    new_meta._reserved         = 0;
     new_meta.cxl_slot          = MM_CXL_SLOT_INVALID;
-
-    // Pin attention sink tokens
-    if (new_position < scoring_config_.attention_sink_tokens) {
-        new_meta.flags |= MM_FLAG_PINNED | MM_FLAG_ANCHOR;
-    }
 
     cudaMemcpy(&d_meta_[new_position], &new_meta, sizeof(TokenMeta),
                cudaMemcpyHostToDevice);
     n_tier0_tokens_ = new_position + 1;
 
-    // ---- 2. Update attention stats ----
+    // ---- Launch 1: Update attention stats + reuse trend ----
     if (n_attended > 0 && d_attended_positions && d_attention_weights) {
         uint32_t grid = (n_attended + 255) / 256;
         mm_kernel_update_on_access<<<grid, 256>>>(
@@ -237,27 +236,22 @@ int MultimodalInferenceController::on_decode_step(
         );
     }
 
-    // ---- 3. Score all tokens ----
-    uint32_t n_tokens = n_tier0_tokens_;
-    {
-        uint32_t grid = (n_tokens + MM_SCORE_BLOCK_SIZE - 1) / MM_SCORE_BLOCK_SIZE;
-        mm_kernel_score_and_decide<<<grid, MM_SCORE_BLOCK_SIZE>>>(
-            d_meta_, scoring_config_, n_tokens, d_actions_, d_scores_
-        );
-    }
-
-    // ---- 4. Check if we need to evict (capacity exceeded) ----
     // Skip eviction if under capacity
     if (n_tier0_tokens_ <= scoring_config_.tier0_capacity) {
         return 0;
     }
 
-    // ---- 5. Collect demotions ----
+    // ---- Launch 2: FUSED score + decide + collect (single kernel) ----
+    uint32_t n_tokens = n_tier0_tokens_;
     cudaMemset(d_demote_count_, 0, sizeof(uint32_t));
+    cudaMemset(d_evict_count_, 0, sizeof(uint32_t));
     {
         uint32_t grid = (n_tokens + MM_SCORE_BLOCK_SIZE - 1) / MM_SCORE_BLOCK_SIZE;
-        mm_kernel_collect_demotions<<<grid, MM_SCORE_BLOCK_SIZE>>>(
-            d_actions_, n_tokens, d_demote_list_, d_demote_count_
+        mm_kernel_fused_score_collect<<<grid, MM_SCORE_BLOCK_SIZE>>>(
+            d_meta_, scoring_config_, n_tokens,
+            d_actions_, d_scores_,
+            d_demote_list_, d_demote_count_,
+            d_evict_list_, d_evict_count_
         );
     }
     cudaDeviceSynchronize();
@@ -268,7 +262,7 @@ int MultimodalInferenceController::on_decode_step(
 
     if (n_demote == 0) return 0;
 
-    // ---- 6. Allocate CXL slots ----
+    // ---- Launch 3: Allocate CXL slots ----
     {
         uint32_t grid = (n_demote + 127) / 128;
         mm_kernel_alloc_cxl_slots<<<grid, 128>>>(
@@ -276,20 +270,15 @@ int MultimodalInferenceController::on_decode_step(
         );
     }
 
-    // ---- 7. Compress demoted tokens to CXL ----
-    // Note: In a real system, d_kv_vectors would be the actual KV cache.
-    // Here we pass nullptr since we don't have the real KV data in this controller.
-    // The kernel is designed to be called by the vLLM integration layer which
-    // provides the actual KV cache pointer.
-
-    // mm_kernel_compress_to_cxl<<<n_demote, MM_COMPRESS_BLOCK_SIZE,
-    //     tq_config_.head_dim * tq_config_.head_dim * sizeof(float)>>>(
+    // ---- Compress (when KV vectors available, called by vLLM integration) ----
+    // mm_kernel_compress_to_cxl<<<n_demote, MM_COMPRESS_BLOCK_SIZE>>>(
     //     d_kv_vectors, d_meta_, d_demote_list_, n_demote,
     //     tq_config_.head_dim, cxl_,
     //     d_rotation_, d_angle_grid_full_, d_angle_grid_pos_,
     //     tq_config_.n_grid(), d_jl_matrix_,
     //     tq_config_.qjl_proj_dim > 0 ? tq_config_.qjl_proj_dim : tq_config_.head_dim
     // );
+    // Note: no shared memory allocation needed — rotation now in __constant__.
 
     return (int)n_demote;
 }
@@ -299,13 +288,13 @@ bool MultimodalInferenceController::promote_from_cxl(uint32_t position) {
     TokenMeta meta;
     cudaMemcpy(&meta, &d_meta_[position], sizeof(TokenMeta), cudaMemcpyDeviceToHost);
 
-    if (!(meta.flags & MM_FLAG_IN_CXL)) return false;
+    if (!(meta.tier_flags & MM_FLAG_IN_CXL)) return false;
     if (meta.cxl_slot == MM_CXL_SLOT_INVALID) return false;
 
     // In production: launch mm_kernel_decompress_from_cxl for this token
     // Then update flags: clear IN_CXL, set IN_TIER0, free CXL slot.
 
-    meta.flags = (meta.flags & ~(MM_FLAG_IN_CXL | MM_FLAG_TQ_COMPRESSED)) | MM_FLAG_IN_TIER0;
+    meta.tier_flags = (meta.tier_flags & ~(MM_FLAG_IN_CXL | MM_FLAG_TQ_COMPRESSED)) | MM_FLAG_IN_TIER0;
     uint32_t old_slot = meta.cxl_slot;
     meta.cxl_slot = MM_CXL_SLOT_INVALID;
     meta.last_access_step = current_step_;
