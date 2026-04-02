@@ -23,7 +23,7 @@
 #include <linux/mmu_notifier.h>
 #include "ctm_plus.h"
 
-#define CTM_VERSION "1.0.0"
+#define CTM_VERSION "2.0.0"
 
 /* Module parameters */
 static unsigned int tier0_pages = 1000;
@@ -34,9 +34,17 @@ static unsigned int tier1_pages = 100000;
 module_param(tier1_pages, uint, 0444);
 MODULE_PARM_DESC(tier1_pages, "Number of pages in slow tier (default: 100000)");
 
+static unsigned int cxl_pages = 0;
+module_param(cxl_pages, uint, 0444);
+MODULE_PARM_DESC(cxl_pages, "Number of pages in CXL warm tier (0=disabled, default: 0)");
+
 static bool smart_victim = true;
 module_param(smart_victim, bool, 0644);
 MODULE_PARM_DESC(smart_victim, "Enable smart victim selection (default: true)");
+
+static bool compression_hints = false;
+module_param(compression_hints, bool, 0644);
+MODULE_PARM_DESC(compression_hints, "Enable GPU compression quality hints (default: false)");
 
 /* Global controller instance */
 static struct ctm_controller *ctm_ctrl;
@@ -48,9 +56,10 @@ static ssize_t stats_show(struct kobject *kobj, struct kobj_attribute *attr,
                           char *buf)
 {
     struct ctm_stats stats;
-    unsigned int tier0_size, tier0_cap, tier1_size, tier1_cap, adaptive_p;
+    unsigned int tier0_size, tier0_cap, cxl_size, cxl_cap;
+    unsigned int tier1_size, tier1_cap, adaptive_p;
     unsigned long flags;
-    u64 total_accesses, hit_rate;
+    u64 total_hits, total_accesses, hit_rate;
 
     ctm_get_stats(ctm_ctrl, &stats);
 
@@ -58,37 +67,49 @@ static ssize_t stats_show(struct kobject *kobj, struct kobj_attribute *attr,
     spin_lock_irqsave(&ctm_ctrl->lock, flags);
     tier0_size = ctm_ctrl->tier0_size;
     tier0_cap = ctm_ctrl->tier0_capacity;
+    cxl_size = ctm_ctrl->cxl_size;
+    cxl_cap = ctm_ctrl->cxl_capacity;
     tier1_size = ctm_ctrl->tier1_size;
     tier1_cap = ctm_ctrl->tier1_capacity;
     adaptive_p = ctm_ctrl->adaptive_p;
     spin_unlock_irqrestore(&ctm_ctrl->lock, flags);
 
-    total_accesses = stats.tier0_hits + stats.tier1_hits + stats.misses;
+    total_hits = stats.tier0_hits + stats.cxl_hits + stats.tier1_hits;
+    total_accesses = total_hits + stats.misses;
     hit_rate = total_accesses ?
-               div64_u64((stats.tier0_hits + stats.tier1_hits) * 10000,
-                         total_accesses) : 0;
+               div64_u64(total_hits * 10000, total_accesses) : 0;
 
     return sysfs_emit(buf,
         "version: %s\n"
         "tier0_hits: %llu\n"
+        "cxl_hits: %llu\n"
         "tier1_hits: %llu\n"
         "misses: %llu\n"
         "hit_rate: %llu.%02llu%%\n"
         "promotions: %llu\n"
         "demotions: %llu\n"
+        "cxl_promotions: %llu\n"
+        "cxl_demotions: %llu\n"
         "smart_selections: %llu\n"
+        "compression_hint_updates: %llu\n"
         "tier0_size: %u/%u\n"
+        "cxl_size: %u/%u\n"
         "tier1_size: %u/%u\n"
         "adaptive_p: %u\n",
         CTM_VERSION,
         stats.tier0_hits,
+        stats.cxl_hits,
         stats.tier1_hits,
         stats.misses,
         hit_rate / 100, hit_rate % 100,
         stats.promotions,
         stats.demotions,
+        stats.cxl_promotions,
+        stats.cxl_demotions,
         stats.smart_victim_selections,
+        stats.compression_hint_updates,
         tier0_size, tier0_cap,
+        cxl_size, cxl_cap,
         tier1_size, tier1_cap,
         adaptive_p);
 }
@@ -171,16 +192,101 @@ static ssize_t smart_victim_store(struct kobject *kobj,
     return count;
 }
 
+/* CXL tier enable */
+static ssize_t cxl_enabled_show(struct kobject *kobj,
+                                struct kobj_attribute *attr, char *buf)
+{
+    struct ctm_config config;
+    ctm_get_config(ctm_ctrl, &config);
+    return sysfs_emit(buf, "%d\n", config.enable_cxl_tier);
+}
+
+static ssize_t cxl_enabled_store(struct kobject *kobj,
+                                 struct kobj_attribute *attr,
+                                 const char *buf, size_t count)
+{
+    bool val;
+    struct ctm_config config;
+    if (kstrtobool(buf, &val) < 0)
+        return -EINVAL;
+    ctm_get_config(ctm_ctrl, &config);
+    config.enable_cxl_tier = val;
+    ctm_set_config(ctm_ctrl, &config);
+    return count;
+}
+
+/* Compression hints enable */
+static ssize_t compression_hints_enabled_show(struct kobject *kobj,
+                                              struct kobj_attribute *attr, char *buf)
+{
+    struct ctm_config config;
+    ctm_get_config(ctm_ctrl, &config);
+    return sysfs_emit(buf, "%d\n", config.enable_compression_hints);
+}
+
+static ssize_t compression_hints_enabled_store(struct kobject *kobj,
+                                               struct kobj_attribute *attr,
+                                               const char *buf, size_t count)
+{
+    bool val;
+    struct ctm_config config;
+    if (kstrtobool(buf, &val) < 0)
+        return -EINVAL;
+    ctm_get_config(ctm_ctrl, &config);
+    config.enable_compression_hints = val;
+    ctm_set_config(ctm_ctrl, &config);
+    return count;
+}
+
+/**
+ * compression_hint sysfs interface.
+ *
+ * Write format: "pfn quality bits"
+ *   pfn:     page frame number (hex or decimal)
+ *   quality: compression quality 0-100 (cosine_similarity * 100)
+ *   bits:    TurboQuant bit-width (2/3/4, or 0 for uncompressed)
+ *
+ * Example:
+ *   echo "0x1a2b3c 96 3" > /sys/kernel/ctm_plus/compression_hint
+ *
+ * This sets page 0x1a2b3c as having 96% compression quality at 3-bit.
+ */
+static ssize_t compression_hint_store(struct kobject *kobj,
+                                      struct kobj_attribute *attr,
+                                      const char *buf, size_t count)
+{
+    unsigned long pfn;
+    unsigned int quality;
+    unsigned int bits;
+    int ret;
+
+    ret = sscanf(buf, "%li %u %u", &pfn, &quality, &bits);
+    if (ret != 3)
+        return -EINVAL;
+
+    ret = ctm_set_compression_hint(ctm_ctrl, pfn, quality, (u8)bits);
+    if (ret)
+        return ret;
+
+    return count;
+}
+
 static struct kobj_attribute stats_attr = __ATTR_RW(stats);
 static struct kobj_attribute victim_sample_size_attr = __ATTR_RW(victim_sample_size);
 static struct kobj_attribute promotion_threshold_attr = __ATTR_RW(promotion_threshold);
 static struct kobj_attribute smart_victim_attr = __ATTR_RW(smart_victim);
+static struct kobj_attribute cxl_enabled_attr = __ATTR_RW(cxl_enabled);
+static struct kobj_attribute compression_hints_enabled_attr = __ATTR_RW(compression_hints_enabled);
+static struct kobj_attribute compression_hint_attr = __ATTR_WO(compression_hint);
 
 static struct attribute *ctm_attrs[] = {
     &stats_attr.attr,
     &victim_sample_size_attr.attr,
     &promotion_threshold_attr.attr,
     &smart_victim_attr.attr,
+    &cxl_enabled_attr.attr,
+    &compression_hints_enabled_attr.attr,
+    &compression_hint_attr.attr,
     NULL,
 };
 
@@ -232,8 +338,10 @@ static int __init ctm_plus_init(void)
     int ret;
 
     pr_info("CTM+ v%s: Initializing memory tiering controller\n", CTM_VERSION);
-    pr_info("CTM+: tier0=%u pages, tier1=%u pages, smart_victim=%d\n",
-            tier0_pages, tier1_pages, smart_victim);
+    pr_info("CTM+: tier0=%u pages, cxl=%u pages, tier1=%u pages\n",
+            tier0_pages, cxl_pages, tier1_pages);
+    pr_info("CTM+: smart_victim=%d, compression_hints=%d\n",
+            smart_victim, compression_hints);
 
     /* Allocate controller */
     ctm_ctrl = kzalloc(sizeof(*ctm_ctrl), GFP_KERNEL);
@@ -249,6 +357,14 @@ static int __init ctm_plus_init(void)
     }
 
     ctm_ctrl->config.enable_smart_victim = smart_victim;
+    ctm_ctrl->config.enable_compression_hints = compression_hints;
+
+    /* Configure CXL warm tier */
+    if (cxl_pages > 0) {
+        ctm_ctrl->config.enable_cxl_tier = true;
+        ctm_ctrl->cxl_capacity = cxl_pages;
+        pr_info("CTM+: CXL warm tier enabled (%u pages)\n", cxl_pages);
+    }
 
     /* Create sysfs interface */
     ctm_kobj = kobject_create_and_add("ctm_plus", kernel_kobj);
@@ -282,9 +398,13 @@ static void __exit ctm_plus_exit(void)
 
     pr_info("CTM+: Unloading module\n");
     pr_info("CTM+: Final stats - promotions=%llu, demotions=%llu, "
-            "tier0_hits=%llu, tier1_hits=%llu, misses=%llu\n",
+            "tier0_hits=%llu, cxl_hits=%llu, tier1_hits=%llu, misses=%llu\n",
             stats.promotions, stats.demotions,
-            stats.tier0_hits, stats.tier1_hits, stats.misses);
+            stats.tier0_hits, stats.cxl_hits,
+            stats.tier1_hits, stats.misses);
+    if (stats.compression_hint_updates)
+        pr_info("CTM+: Compression hints applied: %llu\n",
+                stats.compression_hint_updates);
 
     sysfs_remove_group(ctm_kobj, &ctm_attr_group);
     kobject_put(ctm_kobj);

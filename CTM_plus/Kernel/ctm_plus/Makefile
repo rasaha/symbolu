@@ -41,9 +41,13 @@ clean:
 install: modules_install
 	depmod -a
 
-# Load module with default parameters
+# Load module with default parameters (2-tier)
 load:
 	sudo insmod ctm_plus.ko tier0_pages=1000 tier1_pages=100000
+
+# Load module with CXL warm tier enabled (3-tier)
+load_cxl:
+	sudo insmod ctm_plus.ko tier0_pages=1000 cxl_pages=5000 tier1_pages=100000 compression_hints=1
 
 # Unload module
 unload:
@@ -73,4 +77,4 @@ sysfs:
 checkpatch:
 	$(KDIR)/scripts/checkpatch.pl --no-tree -f *.c *.h
 
-.PHONY: all modules modules_install clean install load unload reload info log sysfs checkpatch
+.PHONY: all modules modules_install clean install load load_cxl unload reload info log sysfs checkpatch

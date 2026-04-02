@@ -35,6 +35,8 @@
 #define CTM_PAGE_IN_TIER1   BIT(1)
 #define CTM_PAGE_HOT        BIT(2)
 #define CTM_PAGE_PINNED     BIT(3)
+#define CTM_PAGE_IN_CXL     BIT(4)  /* Page is in CXL warm tier */
+#define CTM_PAGE_GPU_COMPRESSED BIT(5) /* GPU data on this page is TQ-compressed */
 
 /**
  * struct ctm_page_state - Per-page tracking state
@@ -48,6 +50,8 @@
  * @amplitude: Access amplitude (fixed-point)
  * @coherence: Coherence score (fixed-point)
  * @reuse_score: Predicted reuse probability (fixed-point)
+ * @compression_quality: GPU compression quality hint (0-100, 100=perfect)
+ * @compression_bits: Bit-width used by GPU TurboQuant (0=uncompressed)
  */
 struct ctm_page_state {
     struct rb_node node;
@@ -60,6 +64,8 @@ struct ctm_page_state {
     u32 amplitude;      /* Fixed-point: value * 100 */
     u32 coherence;      /* Fixed-point: value * 100 */
     u32 reuse_score;    /* Fixed-point: value * 100 */
+    u32 compression_quality; /* Fixed-point: cosine_sim * 100 (0-100, from GPU) */
+    u8  compression_bits;    /* TurboQuant bits (0=none, 2/3/4) */
 };
 
 /**
@@ -106,6 +112,10 @@ struct ctm_transition_tracker {
  * @loop_pin_reuse_thresh: Reuse threshold for loop pinning
  * @loop_pin_neighbor_thresh: Neighbor threshold for loop pinning
  * @enable_smart_victim: Use smart victim selection vs LRU
+ * @enable_cxl_tier: Enable CXL warm tier between tier0 and tier1
+ * @enable_compression_hints: Use GPU compression quality in victim scoring
+ * @weight_compression_quality: Victim score weight for compression quality (0-100)
+ * @cxl_promotion_threshold: Min score to promote from CXL to tier0 (scaled by 100)
  */
 struct ctm_config {
     unsigned int victim_sample_size;
@@ -113,6 +123,10 @@ struct ctm_config {
     unsigned int loop_pin_reuse_thresh;
     unsigned int loop_pin_neighbor_thresh;
     bool enable_smart_victim;
+    bool enable_cxl_tier;
+    bool enable_compression_hints;
+    unsigned int weight_compression_quality; /* Scaled by 100, default 5 */
+    unsigned int cxl_promotion_threshold;    /* Scaled by 100, default 40 */
 };
 
 /**
@@ -120,17 +134,25 @@ struct ctm_config {
  * @promotions: Total promotions from tier1 to tier0
  * @demotions: Total demotions from tier0 to tier1
  * @tier0_hits: Hits in tier0
+ * @cxl_hits: Hits in CXL warm tier
  * @tier1_hits: Hits in tier1
  * @misses: Total misses
  * @smart_victim_selections: Times smart victim was used
+ * @cxl_promotions: CXL -> tier0 promotions
+ * @cxl_demotions: tier0 -> CXL demotions
+ * @compression_hint_updates: Times GPU compression hints were applied
  */
 struct ctm_stats {
     atomic64_t promotions;
     atomic64_t demotions;
     atomic64_t tier0_hits;
+    atomic64_t cxl_hits;
     atomic64_t tier1_hits;
     atomic64_t misses;
     atomic64_t smart_victim_selections;
+    atomic64_t cxl_promotions;
+    atomic64_t cxl_demotions;
+    atomic64_t compression_hint_updates;
 };
 
 /**
@@ -157,6 +179,7 @@ struct ctm_controller {
     spinlock_t lock;
     struct rb_root page_tree;
     struct list_head tier0_lru;
+    struct list_head cxl_lru;    /* CXL warm tier LRU */
     struct list_head tier1_lru;
     struct list_head shadow_b1;
     struct list_head shadow_b2;
@@ -168,6 +191,8 @@ struct ctm_controller {
     struct ctm_stats stats;
     unsigned int tier0_size;
     unsigned int tier0_capacity;
+    unsigned int cxl_size;       /* Current CXL tier occupancy */
+    unsigned int cxl_capacity;   /* Max CXL tier capacity */
     unsigned int tier1_size;
     unsigned int tier1_capacity;
     unsigned int adaptive_p;  /* Scaled by 100, range [0, 100] */
@@ -198,6 +223,25 @@ void ctm_reset_stats(struct ctm_controller *ctrl);
 
 /* Victim selection (for external memory managers) */
 unsigned long ctm_select_victim(struct ctm_controller *ctrl);
+
+/* CXL tier management */
+int ctm_get_cxl_tier(struct ctm_controller *ctrl, unsigned long pfn);
+unsigned int ctm_get_cxl_size(struct ctm_controller *ctrl);
+
+/**
+ * ctm_set_compression_hint - Set GPU compression quality hint for a page
+ * @ctrl: CTM+ controller
+ * @pfn: Page frame number
+ * @quality: Compression quality (0-100, 100=perfect, from GPU cosine_sim*100)
+ * @bits: TurboQuant bit-width used (2, 3, or 4; 0=uncompressed)
+ *
+ * Called by GPU driver / userspace via sysfs to inform the kernel module
+ * about how well the GPU data on this page compressed. Pages with low
+ * quality scores (poor compression) are more sensitive to eviction and
+ * should be kept in faster memory tiers.
+ */
+int ctm_set_compression_hint(struct ctm_controller *ctrl, unsigned long pfn,
+                             unsigned int quality, u8 bits);
 
 /* sysfs interface */
 extern struct attribute_group ctm_attr_group;

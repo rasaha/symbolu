@@ -27,15 +27,17 @@ constexpr float CTM_LOOP_PIN_REUSE_THRESH = 0.4f;
 constexpr float CTM_LOOP_PIN_NEIGHBOR_THRESH = 0.3f;
 
 /* Page state flags */
-constexpr uint32_t CTM_PAGE_IN_TIER0 = 1 << 0;
-constexpr uint32_t CTM_PAGE_IN_TIER1 = 1 << 1;
+constexpr uint32_t CTM_PAGE_IN_TIER0 = 1 << 0;   // HBM (FP16)
+constexpr uint32_t CTM_PAGE_IN_TIER1 = 1 << 1;   // NVMe / slow tier
 constexpr uint32_t CTM_PAGE_HOT = 1 << 2;
 constexpr uint32_t CTM_PAGE_PINNED = 1 << 3;
+constexpr uint32_t CTM_PAGE_IN_CXL = 1 << 4;     // CXL tier (TQ-compressed)
+constexpr uint32_t CTM_PAGE_TQ_COMPRESSED = 1 << 5; // Has TurboQuant compressed data
 
 /**
  * Per-page state (GPU-resident)
  */
-struct __align__(32) PageState {
+struct __align__(64) PageState {
     uint64_t page_id;
     uint32_t flags;
     uint32_t access_count;
@@ -44,6 +46,12 @@ struct __align__(32) PageState {
     float amplitude;
     float coherence;
     float reuse_score;
+
+    // TurboQuant compression quality (for quality-aware eviction)
+    float compression_mse;        // MSE between original and reconstructed
+    float cosine_similarity;      // 1.0 = perfect compression
+    float original_norm;          // L2 norm of original KV vector
+    uint8_t compression_bits;     // Bit-width used (2/3/4)
 };
 
 /**
@@ -64,6 +72,12 @@ struct Config {
     float loop_pin_reuse_thresh = CTM_LOOP_PIN_REUSE_THRESH;
     float loop_pin_neighbor_thresh = CTM_LOOP_PIN_NEIGHBOR_THRESH;
     bool enable_smart_victim = true;
+
+    // TurboQuant + CTXL integration
+    bool enable_quality_aware_eviction = false;
+    float weight_compression_quality = 0.05f;  // Weight for compression quality in scoring
+    bool enable_cxl_tier = false;              // Enable CXL (CTXL) warm tier
+    uint32_t cxl_capacity = 0;                 // CXL tier capacity (pages)
 };
 
 /**
@@ -72,10 +86,15 @@ struct Config {
 struct Stats {
     uint64_t tier0_hits;
     uint64_t tier1_hits;
+    uint64_t cxl_hits;           // CXL tier hits
     uint64_t misses;
     uint64_t promotions;
     uint64_t demotions;
+    uint64_t cxl_promotions;     // CXL -> Tier0 promotions
+    uint64_t cxl_demotions;      // Tier0 -> CXL demotions
     uint64_t smart_selections;
+    uint64_t tq_compressions;    // TurboQuant compressions performed
+    uint64_t tq_decompressions;  // TurboQuant decompressions performed
 };
 
 /**
@@ -208,6 +227,22 @@ __global__ void kernel_update_shadow(
     uint64_t evicted_page_id,
     bool from_tier0,
     uint64_t current_time
+);
+
+/**
+ * Kernel: Quality-aware victim selection (TurboQuant + CTM+ integration)
+ */
+__global__ void kernel_select_victims_quality_aware(
+    const PageState* pages,
+    const uint64_t* tier0_lru,
+    uint32_t tier0_size,
+    uint32_t sample_size,
+    float adaptive_p,
+    float weight_compression_quality,
+    uint64_t* victim_ids,
+    uint32_t num_victims,
+    curandState* rng_states,
+    bool* demote_to_cxl
 );
 
 /* ========== Utility Functions ========== */
