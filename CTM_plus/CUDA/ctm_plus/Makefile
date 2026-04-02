@@ -31,7 +31,8 @@ endif
 
 # Source files
 LIB_SRC := ctm_plus.cu turboquant.cu turboquant_ctxl_integration.cu
-LIB_HDR := ctm_plus.cuh turboquant.cuh turboquant_ctxl_integration.cuh
+MM_SRC  := mm_importance_lut.cu mm_scoring_kernel.cu mm_cxl_kernels.cu mm_compress_kernels.cu mm_controller.cu
+LIB_HDR := ctm_plus.cuh turboquant.cuh turboquant_ctxl_integration.cuh multimodal_inference.cuh
 
 # Output
 LIB_SHARED := libctm_plus_cuda.so
@@ -46,10 +47,12 @@ all: lib $(EXAMPLE) $(BENCHMARK) $(TQ_BENCHMARK)
 # Shared library
 lib: $(LIB_SHARED) $(LIB_STATIC)
 
-$(LIB_SHARED): $(LIB_SRC) $(LIB_HDR)
-	$(NVCC) $(NVCC_FLAGS) -shared -Xcompiler -fPIC -o $@ $(LIB_SRC) $(LDFLAGS)
+$(LIB_SHARED): $(LIB_SRC) $(MM_SRC) $(LIB_HDR)
+	$(NVCC) $(NVCC_FLAGS) -shared -Xcompiler -fPIC -o $@ $(LIB_SRC) $(MM_SRC) $(LDFLAGS)
 
-LIB_OBJS := ctm_plus.o turboquant.o turboquant_ctxl_integration.o
+LIB_OBJS := ctm_plus.o turboquant.o turboquant_ctxl_integration.o \
+            mm_importance_lut.o mm_scoring_kernel.o mm_cxl_kernels.o \
+            mm_compress_kernels.o mm_controller.o
 
 $(LIB_STATIC): $(LIB_OBJS)
 	ar rcs $@ $^
@@ -62,6 +65,24 @@ turboquant.o: turboquant.cu turboquant.cuh
 
 turboquant_ctxl_integration.o: turboquant_ctxl_integration.cu turboquant_ctxl_integration.cuh turboquant.cuh ctm_plus.cuh
 	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ turboquant_ctxl_integration.cu
+
+# Multimodal inference kernels
+MM_DEPS := multimodal_inference.cuh turboquant.cuh turboquant_ctxl_integration.cuh
+
+mm_importance_lut.o: mm_importance_lut.cu $(MM_DEPS)
+	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ mm_importance_lut.cu
+
+mm_scoring_kernel.o: mm_scoring_kernel.cu $(MM_DEPS)
+	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ mm_scoring_kernel.cu
+
+mm_cxl_kernels.o: mm_cxl_kernels.cu $(MM_DEPS)
+	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ mm_cxl_kernels.cu
+
+mm_compress_kernels.o: mm_compress_kernels.cu $(MM_DEPS)
+	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ mm_compress_kernels.cu
+
+mm_controller.o: mm_controller.cu $(MM_DEPS)
+	$(NVCC) $(NVCC_FLAGS) -c -Xcompiler -fPIC -o $@ mm_controller.cu
 
 # Example
 $(EXAMPLE): example.cu $(LIB_SHARED)

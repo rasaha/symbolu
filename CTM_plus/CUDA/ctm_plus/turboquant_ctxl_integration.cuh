@@ -359,7 +359,7 @@ private:
     uint64_t access_counter_;
 
     void init_device_memory();
-    void select_and_demote_victims();
+    void select_and_demote_victims(uint32_t num_victims = 16);
 };
 
 } // namespace ctm

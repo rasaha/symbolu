@@ -475,25 +475,115 @@ void IntegratedController::decompress_from_cxl(
     int batch,
     float* d_vectors
 ) {
-    // In a full implementation, we would look up the compressed data
-    // for each page_id in the CXL storage and decompress.
-    // Here we demonstrate the decompression path using the TQ engine.
+    int total_angles = config_.tq_config.total_angles();
 
     // Allocate temporary compressed buffers
-    int total_angles = config_.tq_config.total_angles();
     unsigned char* d_indices;
     float* d_radii;
     cudaMalloc(&d_indices, (size_t)batch * total_angles * sizeof(unsigned char));
     cudaMalloc(&d_radii, batch * sizeof(float));
 
-    // In production: copy from CXL storage indexed by page_ids
-    // d_cxl_indices_[page_slot * total_angles ...] -> d_indices
-    // d_cxl_radii_[page_slot] -> d_radii
+    // Look up CXL storage slot for each page via its hash.
+    // For each page_id, find its PageState → read cxl_slot_ index,
+    // then gather from d_cxl_indices_ and d_cxl_radii_.
+    //
+    // This requires a gather kernel that:
+    //   1. For each page_id, hash → PageState → slot index
+    //   2. Copy d_cxl_indices_[slot * total_angles .. +total_angles] → d_indices[i*ta..]
+    //   3. Copy d_cxl_radii_[slot] → d_radii[i]
+    //
+    // For now we use host-side gathering via cudaMemcpy per page.
+    // In production, replace with a single gather kernel.
+    {
+        uint64_t* h_page_ids = new uint64_t[batch];
+        cudaMemcpy(h_page_ids, d_page_ids, batch * sizeof(uint64_t),
+                   cudaMemcpyDeviceToHost);
+
+        uint32_t hash_mask = (1u << CTM_HASH_BITS) - 1;
+        for (int i = 0; i < batch; i++) {
+            uint32_t hash = hash_page_id(h_page_ids[i], CTM_HASH_BITS);
+
+            // Read the page slot.  In the current design the CXL slot is
+            // simply the page's hash index (1-to-1 mapping).  A production
+            // allocator would use a freelist like MultimodalInferenceController.
+            uint32_t cxl_slot = hash & hash_mask;
+            if (cxl_slot < config_.effective_cxl_capacity()) {
+                cudaMemcpy(d_indices + (size_t)i * total_angles,
+                           d_cxl_indices_ + (size_t)cxl_slot * total_angles,
+                           total_angles * sizeof(unsigned char),
+                           cudaMemcpyDeviceToDevice);
+                cudaMemcpy(d_radii + i,
+                           d_cxl_radii_ + cxl_slot,
+                           sizeof(float),
+                           cudaMemcpyDeviceToDevice);
+            }
+        }
+        delete[] h_page_ids;
+    }
 
     tq_engine_->decompress_batch(d_radii, d_indices, batch, d_vectors);
 
     cudaFree(d_indices);
     cudaFree(d_radii);
+}
+
+void IntegratedController::select_and_demote_victims(uint32_t num_victims) {
+    if (tier0_size_ == 0 || num_victims == 0) return;
+
+    num_victims = min(num_victims, tier0_size_);
+
+    // Allocate victim IDs on device
+    uint64_t* d_victim_ids;
+    cudaMalloc(&d_victim_ids, num_victims * sizeof(uint64_t));
+
+    // Launch victim selection kernel
+    uint32_t block_size = 256;
+    uint32_t num_blocks = (num_victims + block_size - 1) / block_size;
+
+    kernel_integrated_select_victims<<<num_blocks, block_size, 0, stream_>>>(
+        d_pages_,
+        d_tier0_pages_,
+        tier0_size_,
+        config_,
+        access_counter_,
+        d_victim_ids,
+        num_victims,
+        d_rng_states_
+    );
+
+    // For each victim: compress to CXL, update tier tracking
+    // Read victim page IDs to host for orchestration
+    uint64_t* h_victims = new uint64_t[num_victims];
+    cudaMemcpyAsync(h_victims, d_victim_ids, num_victims * sizeof(uint64_t),
+                    cudaMemcpyDeviceToHost, stream_);
+    cudaStreamSynchronize(stream_);
+
+    // Batch compress victims to CXL
+    // In production: allocate CXL slots, compress vectors, update flags.
+    // Here we update the page flags to mark as CXL-resident.
+    uint32_t hash_mask = (1u << CTM_HASH_BITS) - 1;
+    for (uint32_t i = 0; i < num_victims; i++) {
+        uint32_t hash = hash_page_id(h_victims[i], CTM_HASH_BITS);
+        uint32_t slot = hash & hash_mask;
+
+        // Update page flags: clear TIER0, set CXL
+        PageState h_page;
+        cudaMemcpy(&h_page, &d_pages_[slot], sizeof(PageState),
+                   cudaMemcpyDeviceToHost);
+
+        if (h_page.page_id == h_victims[i] &&
+            (h_page.flags & CTM_PAGE_IN_TIER0)) {
+            h_page.flags &= ~CTM_PAGE_IN_TIER0;
+            h_page.flags |= CTM_PAGE_IN_CXL | CTM_PAGE_TQ_COMPRESSED;
+            cudaMemcpy(&d_pages_[slot], &h_page, sizeof(PageState),
+                       cudaMemcpyHostToDevice);
+            cxl_size_++;
+            if (tier0_size_ > 0) tier0_size_--;
+        }
+    }
+
+    delete[] h_victims;
+    cudaFree(d_victim_ids);
 }
 
 IntegratedStats IntegratedController::get_stats() {

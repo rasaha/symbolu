@@ -20,12 +20,19 @@ set(CTM_SOURCES
     ctm_plus.cu
     turboquant.cu
     turboquant_ctxl_integration.cu
+    # Multimodal inference pipeline
+    mm_importance_lut.cu
+    mm_scoring_kernel.cu
+    mm_cxl_kernels.cu
+    mm_compress_kernels.cu
+    mm_controller.cu
 )
 
 set(CTM_HEADERS
     ctm_plus.cuh
     turboquant.cuh
     turboquant_ctxl_integration.cuh
+    multimodal_inference.cuh
 )
 
 # Build shared library
