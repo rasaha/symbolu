@@ -20,14 +20,23 @@ Bridges the patent-exact 12-layer ontological model:
     O11 INTEGRATION (resolution, consolidation)
     O12 ABSOLVING   (dissolution, termination, release)
 
-The upper 6 layers map directly to agentic governance modules:
+All 12 layers connect to agentic governance:
 
-    O7  REASONING    →  safety/      (admissibility, guards P15/P16)
-    O8  PURPOSE      →  policy/      (constraint alignment, P53 binding)
-    O9  WITNESSES    →  posture/     (observation, readiness P51)
-    O10 UNIFYING     →  agentic_fw/  (confidence gate, coherence integration)
-    O11 INTEGRATION  →  ledger/      (audit consolidation, P54 records)
-    O12 ABSOLVING    →  safety/      (execution boundary P55, output gate)
+  Lower 6 — Execution layers (governance ACTS ON these):
+    O1  POTENTIAL    →  policy/      What capabilities may activate?
+    O2  IDENTITY     →  safety/      Is identity classification safe?
+    O3  EXECUTION    →  safety/      Is action authorized? (P55)
+    O4  STRUCTURE    →  safety/      Does form comply with contracts? (P16)
+    O5  COGNITION    →  agentic_fw/  Are perceptions trustworthy? (confidence gate)
+    O6  AGENCY       →  policy/      Is direction policy-aligned? (P53)
+
+  Upper 6 — Governance layers (these PERFORM governance):
+    O7  REASONING    →  safety/      Admissibility checks (P15/P16)
+    O8  PURPOSE      →  policy/      Constraint alignment (P53 binding)
+    O9  WITNESSES    →  posture/     Meta-observation (P51 readiness)
+    O10 UNIFYING     →  agentic_fw/  Coherence integration (confidence gate)
+    O11 INTEGRATION  →  ledger/      Audit consolidation (P54 records)
+    O12 ABSOLVING    →  safety/      Termination boundary (P55, output gate)
 
 Usage:
     from agentic.agentic_framework.olm_bridge import (
@@ -75,14 +84,29 @@ GOVERNANCE_LAYERS: Tuple[str, ...] = (
 
 ALL_12_LAYERS: Tuple[str, ...] = EXECUTION_LAYERS + GOVERNANCE_LAYERS
 
-# Mapping: 12-layer → agentic governance module
+# Mapping: ALL 12 layers → agentic governance module
+#
+# Lower 6 (Execution) — governance ACTS ON these layers:
+#   Each execution layer has a governance concern that constrains it.
+#
+# Upper 6 (Governance) — these layers PERFORM governance:
+#   Each governance layer maps to an agentic module that implements it.
+#
 LAYER_TO_GOVERNANCE_MODULE: Dict[str, str] = {
-    "O7_REASONING":    "safety",           # Admissibility guards (P15/P16)
-    "O8_PURPOSE":      "policy",           # Constraint alignment (P53)
-    "O9_WITNESSES":    "posture",          # Observation / readiness (P51)
-    "O10_UNIFYING":    "agentic_framework",  # Confidence gate / coherence
-    "O11_INTEGRATION": "ledger",           # Audit consolidation (P54)
-    "O12_ABSOLVING":   "safety",           # Execution boundary (P55) / output gate
+    # Lower 6 — Execution layers governed BY agentic modules
+    "O1_POTENTIAL":    "policy",            # Capability gating: what may activate?
+    "O2_IDENTITY":     "safety",            # Identity guards: safe to act on?
+    "O3_EXECUTION":    "safety",            # Execution boundary (P55): authorized?
+    "O4_STRUCTURE":    "safety",            # Regression guard (P16): contract-compliant?
+    "O5_COGNITION":    "agentic_framework", # Confidence gate: perceptions trustworthy?
+    "O6_AGENCY":       "policy",            # Governance binding (P53): direction aligned?
+    # Upper 6 — Governance layers implemented IN agentic modules
+    "O7_REASONING":    "safety",            # Admissibility guards (P15/P16)
+    "O8_PURPOSE":      "policy",            # Constraint alignment (P53)
+    "O9_WITNESSES":    "posture",           # Observation / readiness (P51)
+    "O10_UNIFYING":    "agentic_framework", # Confidence gate / coherence
+    "O11_INTEGRATION": "ledger",            # Audit consolidation (P54)
+    "O12_ABSOLVING":   "safety",            # Execution boundary (P55) / output gate
 }
 
 # Mapping: OLM v1.0 (10-layer) → 12-layer (for backwards compatibility)
@@ -106,38 +130,65 @@ OLM_V1_TO_V2: Dict[str, str] = {
 
 @dataclass(frozen=True)
 class OLMGovernanceSignals:
-    """Governance signals extracted from a 12-layer ontological map.
+    """Governance signals extracted from all 12 ontological layers.
+
+    All 12 layers participate in governance:
+    - Lower 6 (O1-O6): Execution layers that governance CONSTRAINS.
+      Each has a governance concern (capability gating, identity safety,
+      execution authorization, structural compliance, perceptual trust,
+      directional alignment).
+    - Upper 6 (O7-O12): Governance layers that PERFORM constraint,
+      observation, coherence, audit, and boundary enforcement.
 
     Attributes:
-        governance_strength: Overall governance layer activation [0, 1].
-            Sum of O7-O12 weights. Higher = more governance capacity.
-        execution_strength: Overall execution layer activation [0, 1].
-            Sum of O1-O6 weights. Higher = more execution pressure.
+        governance_strength: Upper 6 layer activation [0, 1].
+        execution_strength: Lower 6 layer activation [0, 1].
         layer_balance: Execution vs governance ratio [0, 1].
             0.0 = pure governance, 0.5 = balanced, 1.0 = pure execution.
+
+        Lower 6 — Execution layers (governance acts on these):
+        potential_weight: O1 — latent capability pressure.
+        identity_weight: O2 — classification / role assignment pressure.
+        execution_weight: O3 — somatic initiation / action pressure.
+        structure_weight: O4 — structural shaping pressure.
+        cognition_weight: O5 — perceptual / attentional pressure.
+        agency_weight: O6 — directional control pressure.
+
+        Upper 6 — Governance layers (these perform governance):
         reasoning_weight: O7 — admissibility checking capacity.
         purpose_weight: O8 — constraint alignment capacity.
         witness_weight: O9 — self-observation / damping capacity.
         unifying_weight: O10 — coherence integration capacity.
         integration_weight: O11 — audit consolidation capacity.
         absolving_weight: O12 — boundary enforcement capacity.
+
         tension_zones: Structural tensions detected by OLM.
-        governance_gaps: Specific governance weaknesses identified.
+        governance_gaps: Governance weaknesses (layer below threshold).
+        execution_risks: Execution layers active without governance cover.
     """
     governance_strength: float
     execution_strength: float
     layer_balance: float
 
-    # Individual governance layer weights
-    reasoning_weight: float     # O7
-    purpose_weight: float       # O8
-    witness_weight: float       # O9
-    unifying_weight: float      # O10
-    integration_weight: float   # O11
-    absolving_weight: float     # O12
+    # Lower 6 — Execution layer weights (governance acts on these)
+    potential_weight: float     # O1 — capability pressure
+    identity_weight: float     # O2 — classification pressure
+    execution_weight: float    # O3 — action pressure
+    structure_weight: float    # O4 — structural pressure
+    cognition_weight: float    # O5 — perceptual pressure
+    agency_weight: float       # O6 — directional pressure
+
+    # Upper 6 — Governance layer weights (these perform governance)
+    reasoning_weight: float     # O7 — admissibility
+    purpose_weight: float       # O8 — alignment
+    witness_weight: float       # O9 — observation
+    unifying_weight: float      # O10 — coherence
+    integration_weight: float   # O11 — audit
+    absolving_weight: float     # O12 — boundary
 
     tension_zones: Tuple[str, ...] = ()
     governance_gaps: Tuple[str, ...] = ()
+    execution_risks: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -239,7 +290,13 @@ def signals_from_olm(
     else:
         raise ValueError("Either olm_output or layer_weights must be provided")
 
-    # Governance layer values
+    # All 12 layer values
+    o1 = weights["O1_POTENTIAL"]
+    o2 = weights["O2_IDENTITY"]
+    o3 = weights["O3_EXECUTION"]
+    o4 = weights["O4_STRUCTURE"]
+    o5 = weights["O5_COGNITION"]
+    o6 = weights["O6_AGENCY"]
     o7 = weights["O7_REASONING"]
     o8 = weights["O8_PURPOSE"]
     o9 = weights["O9_WITNESSES"]
@@ -247,20 +304,43 @@ def signals_from_olm(
     o11 = weights["O11_INTEGRATION"]
     o12 = weights["O12_ABSOLVING"]
 
-    # Execution aggregate
+    # Aggregates
     exec_sum = sum(weights[l] for l in EXECUTION_LAYERS)
     gov_sum = sum(weights[l] for l in GOVERNANCE_LAYERS)
     total = exec_sum + gov_sum
     balance = exec_sum / total if total > 0 else 0.5
 
+    # Map all 12 layers into 7 confidence dimensions:
+    #
+    # quality_score: O7 (admissibility) + O4 (structural integrity)
+    #   → higher when reasoning checks AND structure are sound
+    #
+    # coherence_score: O10 (unifying) + O11 (integration) + O2 (identity consistency)
+    #   → higher when field coherence, consolidation, and identity are aligned
+    #
+    # internal_consistency: O9 (witnesses) + O5 (cognition)
+    #   → higher when self-observation AND perceptual clarity are active
+    #
+    # goal_alignment: O8 (purpose) + O6 (agency)
+    #   → higher when teleological orientation AND directional control align
+    #
+    # trajectory_confidence: governance vs execution balance
+    #   → higher governance strength = more confident trajectory
+    #
+    # action_complexity: O3 (execution) + O1 (potential) + O6 (agency)
+    #   → higher when action pressure, latent activation, and control are active
+    #
+    # action_reversibility: O12 (absolving) + O11 (integration)
+    #   → higher when termination boundary AND consolidation are available
+    #
     return ConfidenceSignals(
-        quality_score=_clamp(0.5 * o7 + 0.5 * o10),
-        coherence_score=_clamp(0.5 * o10 + 0.5 * o11),
-        internal_consistency=_clamp(o9),
-        goal_alignment=_clamp(o8),
+        quality_score=_clamp(0.4 * o7 + 0.3 * o10 + 0.3 * o4),
+        coherence_score=_clamp(0.4 * o10 + 0.3 * o11 + 0.3 * o2),
+        internal_consistency=_clamp(0.6 * o9 + 0.4 * o5),
+        goal_alignment=_clamp(0.6 * o8 + 0.4 * o6),
         trajectory_confidence=_clamp(1.0 - balance),
-        action_complexity=_clamp(exec_sum),
-        action_reversibility=_clamp(o12),
+        action_complexity=_clamp(0.4 * o3 + 0.3 * o1 + 0.3 * o6),
+        action_reversibility=_clamp(0.6 * o12 + 0.4 * o11),
     )
 
 
@@ -303,16 +383,46 @@ def governance_signals_from_olm(
     total = exec_sum + gov_sum
     balance = exec_sum / total if total > 0 else 0.5
 
-    # Identify governance gaps
+    # Identify governance gaps (upper 6 below threshold)
     gaps = []
     for layer in GOVERNANCE_LAYERS:
         if weights[layer] < LAYER_GAP_THRESHOLD:
             gaps.append(f"{layer}_suppressed")
 
+    # Identify execution risks: execution layers active without
+    # their corresponding governance cover
+    exec_risks = []
+    # O1 POTENTIAL active without O8 PURPOSE (capability without alignment)
+    if weights["O1_POTENTIAL"] > GOVERNANCE_ACTIVE_THRESHOLD and weights["O8_PURPOSE"] < LAYER_GAP_THRESHOLD:
+        exec_risks.append("O1_ungoverned_potential")
+    # O2 IDENTITY active without O7 REASONING (classification without admissibility)
+    if weights["O2_IDENTITY"] > GOVERNANCE_ACTIVE_THRESHOLD and weights["O7_REASONING"] < LAYER_GAP_THRESHOLD:
+        exec_risks.append("O2_unverified_identity")
+    # O3 EXECUTION active without O12 ABSOLVING (action without termination boundary)
+    if weights["O3_EXECUTION"] > GOVERNANCE_ACTIVE_THRESHOLD and weights["O12_ABSOLVING"] < LAYER_GAP_THRESHOLD:
+        exec_risks.append("O3_unbounded_execution")
+    # O4 STRUCTURE active without O7 REASONING (form without compliance check)
+    if weights["O4_STRUCTURE"] > GOVERNANCE_ACTIVE_THRESHOLD and weights["O7_REASONING"] < LAYER_GAP_THRESHOLD:
+        exec_risks.append("O4_unchecked_structure")
+    # O5 COGNITION active without O9 WITNESSES (perception without observation)
+    if weights["O5_COGNITION"] > GOVERNANCE_ACTIVE_THRESHOLD and weights["O9_WITNESSES"] < LAYER_GAP_THRESHOLD:
+        exec_risks.append("O5_unwitnessed_cognition")
+    # O6 AGENCY active without O8 PURPOSE (direction without alignment)
+    if weights["O6_AGENCY"] > GOVERNANCE_ACTIVE_THRESHOLD and weights["O8_PURPOSE"] < LAYER_GAP_THRESHOLD:
+        exec_risks.append("O6_misaligned_agency")
+
     return OLMGovernanceSignals(
         governance_strength=gov_sum,
         execution_strength=exec_sum,
         layer_balance=balance,
+        # Lower 6
+        potential_weight=weights["O1_POTENTIAL"],
+        identity_weight=weights["O2_IDENTITY"],
+        execution_weight=weights["O3_EXECUTION"],
+        structure_weight=weights["O4_STRUCTURE"],
+        cognition_weight=weights["O5_COGNITION"],
+        agency_weight=weights["O6_AGENCY"],
+        # Upper 6
         reasoning_weight=weights["O7_REASONING"],
         purpose_weight=weights["O8_PURPOSE"],
         witness_weight=weights["O9_WITNESSES"],
@@ -321,6 +431,7 @@ def governance_signals_from_olm(
         absolving_weight=weights["O12_ABSOLVING"],
         tension_zones=tensions,
         governance_gaps=tuple(gaps),
+        execution_risks=tuple(exec_risks),
     )
 
 
@@ -371,13 +482,23 @@ def governance_risk_from_olm(
             f"Execution-dominant balance ({signals.layer_balance:.2f})"
         )
 
-    # Check specific critical gaps
+    # Check specific critical gaps in upper 6 (governance performers)
     if signals.witness_weight < LAYER_GAP_THRESHOLD:
         risk_factors.append("O9_WITNESSES suppressed — no self-observation")
     if signals.absolving_weight < LAYER_GAP_THRESHOLD:
         risk_factors.append("O12_ABSOLVING suppressed — no termination boundary")
     if signals.reasoning_weight < LAYER_GAP_THRESHOLD:
         risk_factors.append("O7_REASONING suppressed — no admissibility checking")
+    if signals.unifying_weight < LAYER_GAP_THRESHOLD:
+        risk_factors.append("O10_UNIFYING suppressed — no coherence integration")
+    if signals.integration_weight < LAYER_GAP_THRESHOLD:
+        risk_factors.append("O11_INTEGRATION suppressed — no audit consolidation")
+    if signals.purpose_weight < LAYER_GAP_THRESHOLD:
+        risk_factors.append("O8_PURPOSE suppressed — no constraint alignment")
+
+    # Check execution risks: lower 6 active without governance cover
+    for exec_risk in signals.execution_risks:
+        risk_factors.append(f"Execution risk: {exec_risk}")
 
     # Check tension zones
     for tension in signals.tension_zones:
@@ -389,7 +510,8 @@ def governance_risk_from_olm(
             risk_factors.append(f"Tension: {tension}")
 
     # Determine risk level
-    gap_count = len(weak_layers)
+    gov_gap_count = len(weak_layers)
+    exec_risk_count = len(signals.execution_risks)
     has_exec_gap = "execution_governance_gap" in signals.tension_zones
 
     if (
@@ -401,19 +523,24 @@ def governance_risk_from_olm(
         confidence_adj = -0.30
     elif (
         signals.governance_strength < GOVERNANCE_WEAK_THRESHOLD
-        or gap_count >= 3
+        or gov_gap_count >= 3
+        or exec_risk_count >= 3
         or has_exec_gap
     ):
         risk_level = "HIGH"
         recommended = "DEFER — require human confirmation before execution"
         confidence_adj = -0.20
-    elif gap_count >= 1 or signals.layer_balance > EXECUTION_DOMINANT_THRESHOLD:
+    elif (
+        gov_gap_count >= 1
+        or exec_risk_count >= 1
+        or signals.layer_balance > EXECUTION_DOMINANT_THRESHOLD
+    ):
         risk_level = "MODERATE"
         recommended = "CAUTIOUS — proceed with elevated monitoring"
         confidence_adj = -0.10
     else:
         risk_level = "LOW"
-        recommended = "ALLOW — governance layers adequately active"
+        recommended = "ALLOW — all 12 layers adequately governed"
         confidence_adj = 0.0
 
     return OLMGovernanceRisk(
@@ -465,6 +592,14 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 def _layer_to_attr(layer: str) -> str:
     """Convert layer name to OLMGovernanceSignals attribute name."""
     mapping = {
+        # Lower 6
+        "O1_POTENTIAL": "potential_weight",
+        "O2_IDENTITY": "identity_weight",
+        "O3_EXECUTION": "execution_weight",
+        "O4_STRUCTURE": "structure_weight",
+        "O5_COGNITION": "cognition_weight",
+        "O6_AGENCY": "agency_weight",
+        # Upper 6
         "O7_REASONING": "reasoning_weight",
         "O8_PURPOSE": "purpose_weight",
         "O9_WITNESSES": "witness_weight",
