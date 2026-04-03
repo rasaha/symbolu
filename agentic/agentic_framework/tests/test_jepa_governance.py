@@ -355,7 +355,7 @@ class TestRegimeBehavior:
         )
         # Severe misalignment → HALT or CONFIRM
         assert result.recommended_action in ("HALT", "CONFIRM")
-        assert result.execution_mode_override in ("BLOCKED", "CONFIRM")
+        assert result.execution_mode_override in ("BLOCKED", "CONFIRM_REQUIRED")
 
     def test_unknown_halts(self):
         result = jepa_governance_check(
@@ -607,11 +607,15 @@ class TestThresholdBoundaries:
     """Test regime classification around boundary thresholds."""
 
     def test_alignment_at_critical_boundary(self):
-        """Alignment just below 0.20 → should trigger DUAL_ANOMALY or SEMANTIC_SHIFT."""
+        """Alignment just below 0.60 → should trigger DUAL_ANOMALY or SEMANTIC_SHIFT.
+
+        Alignment is on [0, 1] where 0.5 = orthogonal (cosine 0),
+        0.0 = anti-correlated, 1.0 = aligned.
+        """
         from agentic.agentic_framework.jepa_governance import _classify_regime
-        # alignment=0.19, with low action coherence → DUAL_ANOMALY
+        # alignment=0.59, with low action coherence → DUAL_ANOMALY
         regime = _classify_regime(
-            alignment=0.19,
+            alignment=0.59,
             semantic_consistency=0.6,
             action_state_coherence=0.4,
             residual_magnitude=0.5,
@@ -620,10 +624,10 @@ class TestThresholdBoundaries:
         assert regime == GovernanceRegime.DUAL_ANOMALY
 
     def test_alignment_at_low_boundary(self):
-        """Alignment just below 0.40 → SEMANTIC_SHIFT."""
+        """Alignment just below 0.70 → SEMANTIC_SHIFT."""
         from agentic.agentic_framework.jepa_governance import _classify_regime
         regime = _classify_regime(
-            alignment=0.39,
+            alignment=0.69,
             semantic_consistency=0.8,
             action_state_coherence=0.8,
             residual_magnitude=0.3,
@@ -632,10 +636,10 @@ class TestThresholdBoundaries:
         assert regime == GovernanceRegime.SEMANTIC_SHIFT
 
     def test_alignment_just_above_low_boundary(self):
-        """Alignment at 0.41 with good coherence → not SEMANTIC_SHIFT."""
+        """Alignment at 0.71 with good coherence → not SEMANTIC_SHIFT."""
         from agentic.agentic_framework.jepa_governance import _classify_regime
         regime = _classify_regime(
-            alignment=0.41,
+            alignment=0.71,
             semantic_consistency=0.8,
             action_state_coherence=0.8,
             residual_magnitude=0.2,
@@ -647,7 +651,7 @@ class TestThresholdBoundaries:
         """Action coherence just below 0.50 → PROCESS_DRIFT."""
         from agentic.agentic_framework.jepa_governance import _classify_regime
         regime = _classify_regime(
-            alignment=0.6,
+            alignment=0.80,  # above _ALIGNMENT_LOW (0.70)
             semantic_consistency=0.8,
             action_state_coherence=0.49,
             residual_magnitude=0.3,
@@ -659,7 +663,7 @@ class TestThresholdBoundaries:
         """Residual magnitude above 0.40 → PROCESS_DRIFT."""
         from agentic.agentic_framework.jepa_governance import _classify_regime
         regime = _classify_regime(
-            alignment=0.6,
+            alignment=0.80,  # above _ALIGNMENT_LOW (0.70)
             semantic_consistency=0.6,
             action_state_coherence=0.6,
             residual_magnitude=0.41,
