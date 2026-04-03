@@ -40,6 +40,11 @@ from .logit_modulation import LogitModulationConfig, LogitModulator
 from .retrieval_scorer import RetrievalScorer, RetrievalScorerConfig
 from .penalty_scorer import PenaltyScorer, PenaltyScorerConfig
 
+# Phase 4: Sovereign ↔ inference reconciliation
+from .signal_reconciliation import reconcile_signals, ReconciliationResult
+from .diagnostic_hooks import InferenceDiagnosticHooks, DiagnosticHooksConfig
+from .coherence_aware_decoder import CoherenceAwareDecoder, CoherenceDecoderConfig
+
 
 class InferenceMode(Enum):
     """Inference mode presets."""
@@ -81,6 +86,14 @@ class InferenceManagerConfig:
     logit_modulation_config: Optional[LogitModulationConfig] = None
     retrieval_scorer_config: Optional[RetrievalScorerConfig] = None
     penalty_scorer_config: Optional[PenaltyScorerConfig] = None
+
+    # Phase 4: Sovereign ↔ inference reconciliation
+    enable_signal_reconciliation: bool = False   # Vritti/guna cross-source checks
+    enable_sovereign_bridge_signals: bool = False  # Wire sovereign bridge into generate()
+    enable_diagnostic_hooks: bool = False         # MirrorBalance/CausalLayer diagnostics
+    diagnostic_hooks_config: Optional[DiagnosticHooksConfig] = None
+    # Appendix F Stage 1: Coherence-aware decoding (policy adjustment only)
+    enable_coherence_decoder: bool = False
 
 
 class InferenceManager:
@@ -186,6 +199,22 @@ class InferenceManager:
                 self.config.penalty_scorer_config
             )
 
+        # Phase 4: Coherence-aware decoder (Appendix F Stage 1)
+        self.coherence_decoder: Optional[CoherenceAwareDecoder] = None
+        if self.config.enable_coherence_decoder:
+            self.coherence_decoder = CoherenceAwareDecoder()
+
+        # Phase 4: Diagnostic hooks and reconciliation state
+        self.diagnostic_hooks: Optional[InferenceDiagnosticHooks] = None
+        if self.config.enable_diagnostic_hooks:
+            self.diagnostic_hooks = InferenceDiagnosticHooks(
+                self.config.diagnostic_hooks_config or DiagnosticHooksConfig(
+                    enable_mirror_balance=True,
+                    enable_causal_attribution=True,
+                )
+            )
+        self._last_reconciliation: Optional[ReconciliationResult] = None
+
         # Generation state
         self._generation_count: int = 0
         self._total_tokens_generated: int = 0
@@ -273,6 +302,11 @@ class InferenceManager:
             self.config.enable_scoring = True
             self.config.abort_on_low_coherence = True
             self.config.auto_adjust_params = True
+            # Phase 4: Enable sovereign reconciliation and diagnostics
+            self.config.enable_signal_reconciliation = True
+            self.config.enable_sovereign_bridge_signals = True
+            self.config.enable_diagnostic_hooks = True
+            self.config.enable_coherence_decoder = True
 
     @classmethod
     def from_checkpoint(
@@ -451,6 +485,17 @@ class InferenceManager:
                 if self.gunas is not None:
                     effective_temp = self.gunas.get_temperature_modifier(effective_temp)
 
+                # Phase 4 (Appendix F Stage 1): Coherence-aware decoding policy
+                if self.coherence_decoder is not None and self.metacognition is not None:
+                    coh_score = self.metacognition.coherence_history[-1] if self.metacognition.coherence_history else 0.5
+                    coh_policy = self.coherence_decoder.adjust_policy(
+                        coherence=coh_score,
+                        base_temperature=effective_temp,
+                        base_top_p=effective_top_p,
+                    )
+                    effective_temp = coh_policy['temperature']
+                    effective_top_p = coh_policy['top_p']
+
                 # Forward pass
                 outputs = self.model(generated_ids, **kwargs)
 
@@ -576,6 +621,45 @@ class InferenceManager:
                     )
                     step_meta['gunas'] = {'sattva': sattva, 'rajas': rajas, 'tamas': tamas}
 
+                # Phase 4: Signal reconciliation (SOVEREIGN mode)
+                if self.config.enable_signal_reconciliation and self.gunas is not None:
+                    inference_guna = (self.gunas.sattva, self.gunas.rajas, self.gunas.tamas)
+                    # Extract sovereign guna from state monitor if available
+                    sovereign_guna = None
+                    sovereign_vritti = None
+                    if (self.state_monitor is not None and
+                            self.state_monitor._metrics_history):
+                        latest = self.state_monitor._metrics_history[-1]
+                        sovereign_guna = (latest.lucidity, latest.turbulence, latest.stability)
+                        sovereign_vritti = latest.vritti_profile
+                    recon = reconcile_signals(
+                        inference_guna=inference_guna,
+                        sovereign_guna=sovereign_guna,
+                        sovereign_vritti_profile=sovereign_vritti,
+                    )
+                    self._last_reconciliation = recon
+                    step_meta['signal_reconciliation'] = {
+                        'guna_divergence': recon.guna_divergence,
+                        'vritti_agreement': recon.vritti_agreement,
+                        'reconciled_dominant': recon.reconciled_guna.dominant,
+                    }
+                    if recon.divergence_warnings:
+                        step_meta['reconciliation_warnings'] = list(recon.divergence_warnings)
+
+                # Phase 4: Diagnostic hooks (SOVEREIGN mode)
+                if self.diagnostic_hooks is not None and self.diagnostic_hooks.enabled:
+                    guna_s = self.gunas.sattva if self.gunas else 0.33
+                    guna_r = self.gunas.rajas if self.gunas else 0.33
+                    guna_t = self.gunas.tamas if self.gunas else 0.34
+                    coh = step_meta.get('coherence', 0.5)
+                    self.diagnostic_hooks.record_step(
+                        step=step,
+                        sattva=guna_s,
+                        rajas=guna_r,
+                        tamas=guna_t,
+                        coherence_score=coh,
+                    )
+
                 # Callback
                 if on_token_callback is not None:
                     on_token_callback(next_token.item(), step_meta)
@@ -628,6 +712,12 @@ class InferenceManager:
 
         if return_hidden_states:
             result['hidden_states'] = hidden_states_list
+
+        # Phase 4: Append reconciliation and diagnostic metadata
+        if self._last_reconciliation is not None:
+            result['signal_reconciliation'] = self._last_reconciliation.to_dict()
+        if self.diagnostic_hooks is not None and self.diagnostic_hooks.enabled:
+            result['diagnostic_summary'] = self.diagnostic_hooks.get_summary()
 
         return result
 
@@ -849,6 +939,11 @@ class InferenceManager:
 
         if self.state_monitor is not None:
             self.state_monitor.clear()
+
+        # Phase 4: Clear reconciliation and diagnostics
+        self._last_reconciliation = None
+        if self.diagnostic_hooks is not None:
+            self.diagnostic_hooks.clear()
 
     def save_state(self, path: Union[str, Path]) -> None:
         """
