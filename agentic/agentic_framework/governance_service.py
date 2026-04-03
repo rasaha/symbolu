@@ -73,6 +73,8 @@ from agentic.agentic_framework.jepa_governance import (
     jepa_governance_check,
     safe_jepa_governance_check,
     apply_jepa_override,
+    approximate_layer_weights,
+    approximate_vritti,
 )
 
 import logging as _logging
@@ -306,31 +308,17 @@ def _approximate_layer_weights(
 ) -> Dict[str, float]:
     """Approximate OLM layer weights from available request signals.
 
-    In a full integration, the OLMGovernanceSignals would be passed directly.
-    Here we derive a reasonable approximation from the confidence signals
-    so the JEPA check can run without the full OLM engine.
+    Delegates to the shared canonical implementation in jepa_governance
+    so that GovernanceService and MCP produce identical composites.
     """
-    q = getattr(request, "quality_score", 0.5)
-    c = getattr(request, "coherence_score", 0.5)
-    ic = getattr(request, "internal_consistency", 0.5)
-    ga = getattr(request, "goal_alignment", 0.5)
-    tc = getattr(request, "trajectory_confidence", 0.5)
-    overall = gate_decision.confidence.overall
-
-    return {
-        "O1_POTENTIAL": 0.3,
-        "O2_IDENTITY": ic * 0.8,
-        "O3_EXECUTION": overall * 0.7,
-        "O4_STRUCTURE": c * 0.6,
-        "O5_COGNITION": q * 0.8,
-        "O6_AGENCY": ga * 0.7,
-        "O7_REASONING": q * 0.9,
-        "O8_PURPOSE": ga * 0.8,
-        "O9_WITNESSES": tc * 0.6,
-        "O10_UNIFYING": c * 0.7,
-        "O11_INTEGRATION": overall * 0.5,
-        "O12_ABSOLVING": tc * 0.4,
-    }
+    return approximate_layer_weights(
+        quality=getattr(request, "quality_score", 0.5),
+        coherence=getattr(request, "coherence_score", 0.5),
+        internal_consistency=getattr(request, "internal_consistency", 0.5),
+        goal_alignment=getattr(request, "goal_alignment", 0.5),
+        trajectory_confidence=getattr(request, "trajectory_confidence", 0.5),
+        overall_confidence=gate_decision.confidence.overall,
+    )
 
 
 def _approximate_vritti(
@@ -339,37 +327,13 @@ def _approximate_vritti(
 ) -> Dict[str, float]:
     """Approximate vritti distribution from available request signals.
 
-    In a full integration, ChittaVrittiResult would be passed directly.
-    Here we derive a reasonable approximation: high quality/coherence
-    → pramana; low quality → viparyaya; low coherence → vikalpa.
+    Delegates to the shared canonical implementation in jepa_governance.
     """
-    q = getattr(request, "quality_score", 0.5)
-    c = getattr(request, "coherence_score", 0.5)
-    overall = gate_decision.confidence.overall
-
-    # Pramana rises with quality and coherence
-    pramana = min(1.0, q * 0.6 + c * 0.4)
-    # Viparyaya rises when quality is low
-    viparyaya = max(0.0, 0.5 - q * 0.8)
-    # Vikalpa rises when coherence is low but quality is moderate
-    vikalpa = max(0.0, 0.4 - c * 0.5) * min(1.0, q + 0.3)
-    # Smrti is a baseline
-    smrti = 0.1
-    # Nidra rises when overall confidence is very low
-    nidra = max(0.0, 0.3 - overall * 0.5)
-
-    # Normalize
-    total = pramana + viparyaya + vikalpa + smrti + nidra
-    if total <= 0:
-        return {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
-                "smrti": 0.0, "nidra": 1.0}
-    return {
-        "pramana": pramana / total,
-        "viparyaya": viparyaya / total,
-        "vikalpa": vikalpa / total,
-        "smrti": smrti / total,
-        "nidra": nidra / total,
-    }
+    return approximate_vritti(
+        quality=getattr(request, "quality_score", 0.5),
+        coherence=getattr(request, "coherence_score", 0.5),
+        overall_confidence=gate_decision.confidence.overall,
+    )
 
 
 
@@ -580,7 +544,7 @@ class GovernanceService:
         #   never None. JEPA failure produces UNKNOWN regime.
         baseline_decision = governance_decision
         jepa_assessment = self._run_jepa_check(
-            request, risk_level, gate_decision, governance_decision,
+            request, risk_level, gate_decision,
         )
 
         # Use the shared override function from jepa_governance
@@ -823,7 +787,6 @@ class GovernanceService:
         request: AuthorizationRequest,
         risk_level: "ToolRiskLevel",
         gate_decision: "ConfidenceGateDecision",
-        governance_decision: "APIGovernanceDecision",
     ) -> JEPAGovernanceAssessment:
         """Run JEPA residual governance check. Always returns an assessment.
 

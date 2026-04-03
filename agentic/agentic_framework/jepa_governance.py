@@ -40,29 +40,6 @@ from agentic.chitta_vritti.coupling import get_aspect_weights as _get_aspect_wei
 
 
 # =========================================================================
-# Startup validation: ensure coupling matrix is importable and functional
-# =========================================================================
-
-def _validate_coupling_import() -> None:
-    """Validate that the R[v,a] coupling matrix is available at startup.
-
-    Fail-fast: if the coupling module is missing or broken, the governance
-    system cannot compute JEPA composites and should not start silently.
-    """
-    test_dist = {"pramana": 1.0, "viparyaya": 0.0, "vikalpa": 0.0,
-                 "smrti": 0.0, "nidra": 0.0}
-    result = _get_aspect_weights(test_dist)
-    if not isinstance(result, dict) or len(result) != 12:
-        raise ImportError(
-            "chitta_vritti.coupling.get_aspect_weights returned invalid result: "
-            f"expected dict with 12 keys, got {type(result).__name__} "
-            f"with {len(result) if isinstance(result, dict) else '?'} keys"
-        )
-
-_validate_coupling_import()
-
-
-# =========================================================================
 # Constants
 # =========================================================================
 
@@ -92,6 +69,38 @@ EXECUTION_ONTOLOGY = frozenset({
     "O1_POTENTIAL", "O2_IDENTITY", "O3_EXECUTION",
     "O4_STRUCTURE", "O5_COGNITION", "O6_AGENCY",
 })
+
+
+# =========================================================================
+# Startup validation: ensure coupling matrix is importable and functional
+# =========================================================================
+
+def _validate_coupling_import() -> None:
+    """Validate that the R[v,a] coupling matrix is available at startup.
+
+    Fail-fast: if the coupling module is missing or broken, the governance
+    system cannot compute JEPA composites and should not start silently.
+    Checks both the count AND exact key names match ONTOLOGY_LAYERS.
+    """
+    test_dist = {"pramana": 1.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                 "smrti": 0.0, "nidra": 0.0}
+    result = _get_aspect_weights(test_dist)
+    if not isinstance(result, dict):
+        raise ImportError(
+            "chitta_vritti.coupling.get_aspect_weights returned invalid result: "
+            f"expected dict, got {type(result).__name__}"
+        )
+    expected_keys = set(ONTOLOGY_LAYERS)
+    actual_keys = set(result.keys())
+    if actual_keys != expected_keys:
+        missing = expected_keys - actual_keys
+        extra = actual_keys - expected_keys
+        raise ImportError(
+            "chitta_vritti.coupling.get_aspect_weights returned wrong keys: "
+            f"missing={missing or 'none'}, extra={extra or 'none'}"
+        )
+
+_validate_coupling_import()
 
 
 # =========================================================================
@@ -1160,6 +1169,7 @@ def apply_jepa_override(
     elif recommended in ("DEGRADE", "CONFIRM"):
         if baseline_decision == "ALLOW":
             new_decision = "DEFER"
+            new_eligible = False
     else:
         # Fallback: use execution_mode_override / escalation_override
         if assessment.execution_mode_override == "BLOCKED":
@@ -1168,6 +1178,12 @@ def apply_jepa_override(
         elif assessment.escalation_override == "HALT":
             new_decision = "DENY"
             new_eligible = False
+
+    # Invariant: decision != ALLOW => eligible must be False.
+    # This covers the case where baseline was already DENY/DEFER
+    # but baseline_eligible was True (shouldn't happen, but enforce).
+    if new_decision != "ALLOW":
+        new_eligible = False
 
     return {
         "decision": new_decision,
@@ -1272,6 +1288,77 @@ def _build_explanation(
 
 
 # =========================================================================
+# Shared signal approximation (used by GovernanceService and MCP Gateway)
+# =========================================================================
+
+
+def approximate_layer_weights(
+    *,
+    quality: float = 0.5,
+    coherence: float = 0.5,
+    internal_consistency: float = 0.5,
+    goal_alignment: float = 0.5,
+    trajectory_confidence: float = 0.5,
+    overall_confidence: float = 0.5,
+) -> Dict[str, float]:
+    """Approximate OLM layer weights from available governance signals.
+
+    Canonical shared implementation used by both GovernanceService and
+    SafeMCPGateway so that equivalent inputs produce identical JEPA
+    composites across enforcement points.
+    """
+    return {
+        "O1_POTENTIAL": 0.3,
+        "O2_IDENTITY": internal_consistency * 0.8,
+        "O3_EXECUTION": overall_confidence * 0.7,
+        "O4_STRUCTURE": coherence * 0.6,
+        "O5_COGNITION": quality * 0.8,
+        "O6_AGENCY": goal_alignment * 0.7,
+        "O7_REASONING": quality * 0.9,
+        "O8_PURPOSE": goal_alignment * 0.8,
+        "O9_WITNESSES": trajectory_confidence * 0.6,
+        "O10_UNIFYING": coherence * 0.7,
+        "O11_INTEGRATION": overall_confidence * 0.5,
+        "O12_ABSOLVING": trajectory_confidence * 0.4,
+    }
+
+
+def approximate_vritti(
+    *,
+    quality: float = 0.5,
+    coherence: float = 0.5,
+    overall_confidence: float = 0.5,
+) -> Dict[str, float]:
+    """Approximate vritti distribution from available governance signals.
+
+    Canonical shared implementation. The distribution is always
+    normalizable because at least one component (pramana or nidra)
+    is positive for any non-negative inputs.  If all inputs are 0.0,
+    nidra = 0.3 dominates, producing a valid dormancy distribution.
+    """
+    pramana = min(1.0, quality * 0.6 + coherence * 0.4)
+    viparyaya = max(0.0, 0.5 - quality * 0.8)
+    vikalpa = max(0.0, 0.4 - coherence * 0.5) * min(1.0, quality + 0.3)
+    nidra = max(0.0, 0.3 - overall_confidence * 0.5)
+
+    total = pramana + viparyaya + vikalpa + nidra
+    if total <= 0:
+        # All signals exactly zero (mathematically unlikely but possible
+        # with quality=coherence=overall_confidence=0.0 → pramana=0,
+        # viparyaya=0.5, vikalpa=0.12, nidra=0.3 → total>0).
+        # Defensive: treat as full dormancy.
+        return {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                "smrti": 0.0, "nidra": 1.0}
+    return {
+        "pramana": pramana / total,
+        "viparyaya": viparyaya / total,
+        "vikalpa": vikalpa / total,
+        "smrti": 0.0,
+        "nidra": nidra / total,
+    }
+
+
+# =========================================================================
 # Exports
 # =========================================================================
 
@@ -1298,4 +1385,7 @@ __all__ = [
     # Safe wrappers (canonical entry points for enforcement)
     "safe_jepa_governance_check",
     "apply_jepa_override",
+    # Shared signal approximation
+    "approximate_layer_weights",
+    "approximate_vritti",
 ]

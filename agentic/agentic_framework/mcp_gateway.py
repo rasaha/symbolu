@@ -69,6 +69,8 @@ from agentic.agentic_framework.jepa_governance import (
     jepa_governance_check,
     safe_jepa_governance_check,
     apply_jepa_override,
+    approximate_layer_weights,
+    approximate_vritti,
 )
 
 logger = logging.getLogger(__name__)
@@ -700,36 +702,34 @@ class SafeMCPGateway:
         None — the caller always gets a full assessment object.
 
         JEPA can only make decisions stricter, never more permissive.
+
+        Signal approximation uses the shared canonical functions from
+        jepa_governance (approximate_layer_weights / approximate_vritti)
+        so that MCP and GovernanceService produce identical composites
+        from equivalent inputs.  MCP has limited signals (quality,
+        coherence) so goal_alignment and trajectory_confidence default
+        to coherence and overall_confidence respectively.
         """
-        # Approximate vritti from confidence signals
         q = tool_call.quality_score
         c = tool_call.coherence_score
         overall = gate_decision.confidence.overall
-        pramana = min(1.0, q * 0.6 + c * 0.4)
-        viparyaya = max(0.0, 0.5 - q * 0.8)
-        vikalpa = max(0.0, 0.4 - c * 0.5)
-        nidra = max(0.0, 0.3 - overall * 0.5)
-        smrti = 0.1
-        total = pramana + viparyaya + vikalpa + smrti + nidra
-        if total <= 0:
-            vritti_dist = {"pramana": 0.0, "viparyaya": 0.0,
-                           "vikalpa": 0.0, "smrti": 0.0, "nidra": 1.0}
-        else:
-            vritti_dist = {
-                "pramana": pramana / total, "viparyaya": viparyaya / total,
-                "vikalpa": vikalpa / total, "smrti": smrti / total,
-                "nidra": nidra / total,
-            }
+
+        layer_weights = approximate_layer_weights(
+            quality=q,
+            coherence=c,
+            internal_consistency=c,
+            goal_alignment=c,
+            trajectory_confidence=overall,
+            overall_confidence=overall,
+        )
+        vritti_dist = approximate_vritti(
+            quality=q,
+            coherence=c,
+            overall_confidence=overall,
+        )
 
         return safe_jepa_governance_check(
-            layer_weights={
-                "O1_POTENTIAL": 0.3, "O2_IDENTITY": c * 0.8,
-                "O3_EXECUTION": overall * 0.7, "O4_STRUCTURE": c * 0.6,
-                "O5_COGNITION": q * 0.8, "O6_AGENCY": q * 0.7,
-                "O7_REASONING": q * 0.9, "O8_PURPOSE": q * 0.8,
-                "O9_WITNESSES": overall * 0.6, "O10_UNIFYING": c * 0.7,
-                "O11_INTEGRATION": overall * 0.5, "O12_ABSOLVING": overall * 0.4,
-            },
+            layer_weights=layer_weights,
             vritti_distribution=vritti_dist,
             coherence=c,
             score=overall,
@@ -812,6 +812,13 @@ class SafeMCPGateway:
                 success=entry.success,
                 error=entry.error,
                 human_confirmed=entry.human_confirmed,
+                jepa_regime=entry.jepa_regime,
+                jepa_recommended_action=entry.jepa_recommended_action,
+                jepa_reason_codes=entry.jepa_reason_codes,
+                jepa_confidence_adjustment=entry.jepa_confidence_adjustment,
+                jepa_execution_mode_override=entry.jepa_execution_mode_override,
+                jepa_escalation_override=entry.jepa_escalation_override,
+                jepa_overrode=entry.jepa_overrode,
             )
             try:
                 self._audit_store.append(canonical_event)
@@ -878,6 +885,21 @@ class SafeMCPGateway:
         jepa_assessment = self._jepa_check(tool_call, tool_def, gate_decision)
         regime = jepa_assessment.regime
 
+        # Compute JEPA-adjusted confidence and escalation (stricter-only).
+        # These are used in all MCPToolResult construction below so that
+        # MCP results reflect JEPA overrides, matching GovernanceService.
+        effective_confidence = max(
+            0.0,
+            gate_decision.confidence.overall + jepa_assessment.confidence_adjustment,
+        )
+        effective_escalation = gate_decision.escalation.level
+        if jepa_assessment.escalation_override is not None:
+            jepa_esc = jepa_assessment.escalation_override.lower()
+            gate_esc = gate_decision.escalation.level.value
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            if _ESC_SEVERITY.get(jepa_esc, 0) > _ESC_SEVERITY.get(gate_esc, 0):
+                effective_escalation = EscalationLevel(jepa_esc)
+
         if regime != GovernanceRegime.NORMAL:
             # Use shared override to determine action
             jepa_override = apply_jepa_override(
@@ -899,8 +921,8 @@ class SafeMCPGateway:
                     tool_name=tool_call.tool_name,
                     decision=GatewayDecision.BLOCKED,
                     success=False,
-                    confidence=gate_decision.confidence.overall,
-                    escalation_level=gate_decision.escalation.level,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
                     blocked_reason=reason,
                     risk_level=tool_def.risk_level,
                     execution_time_ms=(time.time() - start_time) * 1000,
@@ -925,8 +947,8 @@ class SafeMCPGateway:
                         tool_name=tool_call.tool_name,
                         decision=GatewayDecision.BLOCKED,
                         success=False,
-                        confidence=gate_decision.confidence.overall,
-                        escalation_level=gate_decision.escalation.level,
+                        confidence=effective_confidence,
+                        escalation_level=effective_escalation,
                         blocked_reason=reason,
                         risk_level=tool_def.risk_level,
                         execution_time_ms=(time.time() - start_time) * 1000,
@@ -943,8 +965,8 @@ class SafeMCPGateway:
                         tool_name=tool_call.tool_name,
                         decision=GatewayDecision.ESCALATE,
                         success=False,
-                        confidence=gate_decision.confidence.overall,
-                        escalation_level=gate_decision.escalation.level,
+                        confidence=effective_confidence,
+                        escalation_level=effective_escalation,
                         blocked_reason=(
                             f"JEPA {regime.value}: read-only tool escalated. "
                             f"{jepa_assessment.rationale}"
@@ -961,17 +983,17 @@ class SafeMCPGateway:
             logger.debug("MCP JEPA OK: %s on %s — regime NORMAL",
                          jepa_assessment.regime.value, tool_call.tool_name)
 
-        # Check minimum confidence for risk level
-        if gate_decision.confidence.overall < tool_def.min_confidence:
+        # Check minimum confidence for risk level (use JEPA-adjusted)
+        if effective_confidence < tool_def.min_confidence:
             result = MCPToolResult(
                 request_id=tool_call.request_id,
                 tool_name=tool_call.tool_name,
                 decision=GatewayDecision.BLOCKED,
                 success=False,
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
+                confidence=effective_confidence,
+                escalation_level=effective_escalation,
                 blocked_reason=(
-                    f"Confidence {gate_decision.confidence.overall:.2f} below "
+                    f"Confidence {effective_confidence:.2f} below "
                     f"minimum {tool_def.min_confidence:.2f} for {tool_def.risk_level.value} tool"
                 ),
                 risk_level=tool_def.risk_level,
@@ -996,8 +1018,8 @@ class SafeMCPGateway:
                         tool_name=tool_call.tool_name,
                         decision=GatewayDecision.ESCALATE,
                         success=False,
-                        confidence=gate_decision.confidence.overall,
-                        escalation_level=gate_decision.escalation.level,
+                        confidence=effective_confidence,
+                        escalation_level=effective_escalation,
                         blocked_reason="Human confirmation denied or timed out",
                         risk_level=tool_def.risk_level,
                         human_confirmed=False,
@@ -1012,8 +1034,8 @@ class SafeMCPGateway:
                     tool_name=tool_call.tool_name,
                     decision=GatewayDecision.BLOCKED,
                     success=False,
-                    confidence=gate_decision.confidence.overall,
-                    escalation_level=gate_decision.escalation.level,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
                     blocked_reason=f"Execution blocked: {gate_decision.execution.mode.value}",
                     risk_level=tool_def.risk_level,
                     execution_time_ms=(time.time() - start_time) * 1000,
@@ -1038,8 +1060,8 @@ class SafeMCPGateway:
                     tool_name=tool_call.tool_name,
                     decision=GatewayDecision.ESCALATE,
                     success=False,
-                    confidence=gate_decision.confidence.overall,
-                    escalation_level=gate_decision.escalation.level,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
                     blocked_reason="Required confirmation denied",
                     risk_level=tool_def.risk_level,
                     human_confirmed=False,
@@ -1064,8 +1086,8 @@ class SafeMCPGateway:
                 decision=GatewayDecision.ALLOWED,
                 success=True,
                 result=tool_result,
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
+                confidence=effective_confidence,
+                escalation_level=effective_escalation,
                 risk_level=tool_def.risk_level,
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
@@ -1081,8 +1103,8 @@ class SafeMCPGateway:
                 decision=GatewayDecision.TIMEOUT,
                 success=False,
                 error=f"Execution timed out after {tool_def.timeout_seconds}s",
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
+                confidence=effective_confidence,
+                escalation_level=effective_escalation,
                 risk_level=tool_def.risk_level,
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
@@ -1098,8 +1120,8 @@ class SafeMCPGateway:
                 decision=GatewayDecision.ERROR,
                 success=False,
                 error=str(e),
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
+                confidence=effective_confidence,
+                escalation_level=effective_escalation,
                 risk_level=tool_def.risk_level,
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
