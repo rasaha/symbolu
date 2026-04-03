@@ -327,3 +327,56 @@ def _compute_guna_modulation(
             "guna_output_intensity": None,
             "guna_vector": None,
         }
+
+
+# =========================================================================
+# Strategy 2: Bounded confidence adjustment from E
+# =========================================================================
+
+# Threshold constants for the E → confidence adjustment transform
+_E_LOW_THRESHOLD = 0.4    # Below this, E causes a cautionary penalty
+_E_HIGH_THRESHOLD = 0.7   # Above this, E provides modest uplift
+_E_MAX_PENALTY = -0.10    # Maximum downside at E=0.0
+_E_MAX_UPLIFT = 0.03      # Maximum upside at E=1.0
+
+
+def compute_modulation_confidence_adjustment(
+    guna_E: Optional[float],
+) -> float:
+    """Compute a bounded confidence adjustment derived from E = G × P × T.
+
+    Design principles:
+        - Low E (< 0.4) → cautionary penalty, up to -0.10
+        - Neutral E (0.4 to 0.7) → no adjustment (dead zone)
+        - High E (> 0.7) → modest uplift, up to +0.03
+        - Asymmetric: downside penalty 3× larger than upside uplift
+        - Missing/None E → 0.0 (neutral, no effect)
+
+    The transform is:
+        E < 0.4:  adjustment = -0.10 × (1 - E/0.4)     linear, ∈ [-0.10, 0]
+        0.4 ≤ E ≤ 0.7:  adjustment = 0.0               dead zone
+        E > 0.7:  adjustment = +0.03 × (E - 0.7)/0.3   linear, ∈ [0, +0.03]
+
+    Bounds: [-0.10, +0.03]
+    Deterministic and documented.
+
+    Args:
+        guna_E: The E = G × P × T modulation factor, or None if unavailable.
+
+    Returns:
+        Bounded confidence adjustment in [-0.10, +0.03].
+    """
+    if guna_E is None:
+        return 0.0
+
+    # Clamp E to [0, 1] defensively
+    E = max(0.0, min(1.0, float(guna_E)))
+
+    if E < _E_LOW_THRESHOLD:
+        # Linear penalty: 0 at E=0.4, -0.10 at E=0.0
+        return _E_MAX_PENALTY * (1.0 - E / _E_LOW_THRESHOLD)
+    elif E > _E_HIGH_THRESHOLD:
+        # Linear uplift: 0 at E=0.7, +0.03 at E=1.0
+        return _E_MAX_UPLIFT * (E - _E_HIGH_THRESHOLD) / (1.0 - _E_HIGH_THRESHOLD)
+    else:
+        return 0.0

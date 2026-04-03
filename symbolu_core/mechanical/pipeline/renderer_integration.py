@@ -403,6 +403,13 @@ def run_integrated_renderer(
             output_meta["guna_modulation_E"] = output_mod.get("guna_E")
             output_meta["guna_output_intensity"] = output_mod.get("guna_output_intensity")
             output_meta["entropy_gate"] = output_mod.get("entropy_gate")
+        # Strategy 2: Surface delivery confidence derived from E
+        modulation_adj = ctx.dha.adaptation_notes.get("modulation_confidence_adjustment")
+        if modulation_adj is not None:
+            output_meta["modulation_confidence_adjustment"] = modulation_adj
+            output_meta["delivery_confidence"] = ctx.dha.adaptation_notes.get("delivery_confidence")
+            output_meta["delivery_confidence_base"] = ctx.dha.adaptation_notes.get("delivery_confidence_base")
+            output_meta["modulation_confidence_E_raw"] = ctx.dha.adaptation_notes.get("modulation_confidence_E_raw")
 
     # Get mapper summary
     mapper_summary = None

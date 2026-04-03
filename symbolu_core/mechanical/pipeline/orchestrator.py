@@ -1011,6 +1011,30 @@ class SymbolUPipeline:
                         entropy_combined=entropy_vals.get("normalized_entropy"),
                     )
                     ctx.dha.adaptation_notes["output_modulation"] = modulation_resolution.to_dict()
+
+                    # Strategy 2: Wire E into delivery confidence posture.
+                    # Compute bounded confidence adjustment from E and store
+                    # as delivery_confidence metadata for downstream consumers.
+                    try:
+                        from agentic.agentic_framework.signal_adapters.output_modulation_adapter import (
+                            compute_modulation_confidence_adjustment,
+                        )
+                        guna_E = modulation_resolution.guna_E
+                        modulation_adj = compute_modulation_confidence_adjustment(guna_E)
+                        ctx.dha.adaptation_notes["modulation_confidence_adjustment"] = modulation_adj
+                        ctx.dha.adaptation_notes["modulation_confidence_E_raw"] = guna_E
+
+                        # Compute effective delivery confidence: base confidence
+                        # adjusted by E-derived modifier. This becomes the
+                        # behavioral posture signal for output/renderer.
+                        base_delivery_confidence = coherence_score  # Best available proxy
+                        delivery_confidence = max(0.0, min(1.0,
+                            base_delivery_confidence + modulation_adj,
+                        ))
+                        ctx.dha.adaptation_notes["delivery_confidence"] = delivery_confidence
+                        ctx.dha.adaptation_notes["delivery_confidence_base"] = base_delivery_confidence
+                    except Exception:
+                        pass  # Confidence adjustment is best-effort
                 except Exception:
                     pass  # Output modulation is diagnostic-only
         except Exception:

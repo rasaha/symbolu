@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from symbolu.mechanical.renderer.fusion_renderer import (
+from symbolu_core.mechanical.renderer.fusion_renderer import (
     FusionRenderer,
     FusionOutput,
     RenderMode,
@@ -49,7 +49,7 @@ from symbolu.mechanical.renderer.fusion_renderer import (
     RenderedOutput as FusionRenderedOutput,
 )
 
-from symbolu.mechanical.renderer.varna_hybrid_renderer import (
+from symbolu_core.mechanical.renderer.varna_hybrid_renderer import (
     VarnaHybridRenderer,
     HybridRenderMode,
     VarnaAnalysisResult,
@@ -57,10 +57,10 @@ from symbolu.mechanical.renderer.varna_hybrid_renderer import (
 )
 
 if TYPE_CHECKING:
-    from symbolu.mechanical.pipeline.models import PipelineContext
-    from symbolu.mechanical.hrm import HighResolutionMap
-    from symbolu.mechanical.lam import LongArcMap
-    from symbolu.mechanical.lcm import LowContextMap
+    from symbolu_core.mechanical.pipeline.models import PipelineContext
+    from symbolu_core.mechanical.hrm import HighResolutionMap
+    from symbolu_core.mechanical.lam import LongArcMap
+    from symbolu_core.mechanical.lcm import LowContextMap
 
 
 # =============================================================================
@@ -403,6 +403,13 @@ def run_integrated_renderer(
             output_meta["guna_modulation_E"] = output_mod.get("guna_E")
             output_meta["guna_output_intensity"] = output_mod.get("guna_output_intensity")
             output_meta["entropy_gate"] = output_mod.get("entropy_gate")
+        # Strategy 2: Surface delivery confidence derived from E
+        modulation_adj = ctx.dha.adaptation_notes.get("modulation_confidence_adjustment")
+        if modulation_adj is not None:
+            output_meta["modulation_confidence_adjustment"] = modulation_adj
+            output_meta["delivery_confidence"] = ctx.dha.adaptation_notes.get("delivery_confidence")
+            output_meta["delivery_confidence_base"] = ctx.dha.adaptation_notes.get("delivery_confidence_base")
+            output_meta["modulation_confidence_E_raw"] = ctx.dha.adaptation_notes.get("modulation_confidence_E_raw")
 
     # Get mapper summary
     mapper_summary = None

@@ -107,6 +107,12 @@ class ConfidenceSignals:
     temporal_stability: float = 0.5     # 0=tense/volatile, 1=stable/recovering
     session_enrichment_adjustment: float = 0.0  # Bounded penalty from adapter (<=0)
 
+    # Strategy 2: Output modulation → confidence adjustment
+    # Bounded adjustment derived from E = G × P × T (guna modulation intensity).
+    # Low E → cautionary penalty (up to -0.10); high E → modest uplift (up to +0.03).
+    # Missing/unavailable E → 0.0 (neutral, no effect).
+    output_modulation_adjustment: float = 0.0  # Bounded [-0.10, +0.03]
+
     def to_dict(self) -> Dict[str, float]:
         return {
             "quality_score": self.quality_score,
@@ -126,6 +132,7 @@ class ConfidenceSignals:
             "motivation_stability": self.motivation_stability,
             "temporal_stability": self.temporal_stability,
             "session_enrichment_adjustment": self.session_enrichment_adjustment,
+            "output_modulation_adjustment": self.output_modulation_adjustment,
         }
 
 
@@ -404,6 +411,11 @@ class ConfidenceAggregator:
         # This is stricter-only: penalty can only reduce confidence, never raise it.
         overall += signals.session_enrichment_adjustment
 
+        # Strategy 2: Apply bounded output modulation adjustment.
+        # Derived from E = G × P × T. Asymmetric: larger downside than upside.
+        # Bounds: [-0.10, +0.03]. Missing E → 0.0 (neutral).
+        overall += signals.output_modulation_adjustment
+
         # Clamp to [0, 1]
         overall = max(0.0, min(1.0, overall))
 
@@ -413,6 +425,8 @@ class ConfidenceAggregator:
         ]
         if signals.session_enrichment_adjustment != 0.0:
             signals_used.append("session_enrichment_adjustment")
+        if signals.output_modulation_adjustment != 0.0:
+            signals_used.append("output_modulation_adjustment")
 
         return UnifiedConfidence(
             overall=overall,
