@@ -539,6 +539,79 @@ class MockMCPClient(MCPClientInterface):
 # =============================================================================
 
 
+def _make_fail_closed_assessment(
+    tool_call: "MCPToolCall",
+    tool_def: "MCPToolDefinition",
+    error: Exception,
+) -> "JEPAGovernanceAssessment":
+    """Build a synthetic UNKNOWN-regime assessment when JEPA raises.
+
+    This ensures the MCP gateway treats JEPA failures the same way the
+    GovernanceService does: as an UNKNOWN regime with HALT/DENY behavior.
+    """
+    from agentic.agentic_framework.jepa_governance import (
+        JEPAGovernanceAssessment,
+        JEPACompositeSignal,
+        OntologySignal,
+        VrittiSignal,
+        RuntimeProcessState,
+        RuntimeActionCategory,
+        ResidualSignal,
+        GovernanceRegime,
+        ONTOLOGY_LAYERS,
+    )
+
+    zero_weights = {l: 0.0 for l in ONTOLOGY_LAYERS}
+    zero_dist = {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                 "smrti": 0.0, "nidra": 1.0}
+    ontology = OntologySignal(
+        layer_weights=zero_weights, primary_layer="O1_POTENTIAL",
+        governance_strength=0.0, execution_strength=0.0,
+        confidence=0.0, evidence="JEPA unavailable",
+    )
+    vritti = VrittiSignal(
+        distribution=zero_dist, primary_vritti="nidra",
+        coherence=0.0, score=0.0, confidence=0.0,
+        evidence="JEPA unavailable",
+    )
+    composite = JEPACompositeSignal(
+        ontology=ontology, vritti=vritti,
+        expected_ontology=zero_weights, actual_ontology=zero_weights,
+        ontology_vritti_alignment=0.0, integrated_confidence=0.0,
+        stability=0.0, summary="JEPA UNAVAILABLE",
+        coupling_evidence=("JEPA_ERROR",),
+    )
+    runtime = RuntimeProcessState(
+        action_type="call_tool", tool_name=tool_call.tool_name,
+        action_category=RuntimeActionCategory.UNKNOWN,
+        risk_level=tool_def.risk_level.value,
+        confidence_score=0.0, agency_level="FULL",
+        requires_confirmation=True, execution_mode="BLOCKED",
+        escalation_level="HALT", session_id=tool_call.session_id or "",
+        actor_id="", declared_capabilities=tuple(tool_def.capabilities),
+        is_side_effecting=True,
+    )
+    residual = ResidualSignal(
+        residual_magnitude=1.0, semantic_consistency=0.0,
+        action_state_coherence=0.0, regime=GovernanceRegime.UNKNOWN,
+        risk_factors=(f"JEPA raised {type(error).__name__}: {error}",),
+        reason_codes=("JEPA_UNAVAILABLE", "UNKNOWN_REGIME"),
+        explanation=f"JEPA check failed: {error}. Fail-closed.",
+    )
+    return JEPAGovernanceAssessment(
+        regime=GovernanceRegime.UNKNOWN,
+        recommended_action="HALT",
+        execution_mode_override="BLOCKED",
+        escalation_override="HALT",
+        confidence_adjustment=-0.50,
+        reason_codes=("JEPA_UNAVAILABLE", "UNKNOWN_REGIME"),
+        rationale=f"JEPA unavailable ({type(error).__name__}). Fail-closed to HALT.",
+        jepa_composite=composite,
+        runtime_state=runtime,
+        residual=residual,
+    )
+
+
 class SafeMCPGateway:
     """
     Safe gateway for MCP tool calls.
@@ -681,14 +754,19 @@ class SafeMCPGateway:
         tool_call: MCPToolCall,
         tool_def: MCPToolDefinition,
         gate_decision: ConfidenceGateDecision,
-    ) -> Optional[str]:
-        """Run JEPA residual check. Returns block reason or None if OK.
+    ) -> Optional["JEPAGovernanceAssessment"]:
+        """Run JEPA residual check. Returns assessment or raises on failure.
 
-        JEPA can only block; it cannot make a blocked call allowed.
-        Returns None for NORMAL regime, a blocking reason string for
-        DUAL_ANOMALY or UNKNOWN, and None (pass-through) for PROCESS_DRIFT
-        and SEMANTIC_SHIFT on read-only tools.
+        JEPA can only make decisions stricter, never more permissive.
+        The caller uses the assessment to decide blocking/escalation.
+
+        Returns None ONLY for NORMAL regime. For all other regimes,
+        returns the full assessment so the caller can act on
+        recommended_action, execution_mode_override, escalation_override,
+        and confidence_adjustment — matching GovernanceService behavior.
         """
+        from agentic.agentic_framework.jepa_governance import JEPAGovernanceAssessment
+
         try:
             # Approximate vritti from confidence signals
             q = tool_call.quality_score
@@ -726,35 +804,26 @@ class SafeMCPGateway:
                 tool_name=tool_call.tool_name,
                 risk_level=tool_def.risk_level.value,
                 confidence_score=overall,
+                agency_level="FULL",
+                execution_mode=gate_decision.execution.mode.value
+                    if hasattr(gate_decision.execution.mode, "value")
+                    else str(gate_decision.execution.mode),
+                escalation_level=gate_decision.escalation.level.value
+                    if hasattr(gate_decision.escalation.level, "value")
+                    else str(gate_decision.escalation.level),
                 session_id=tool_call.session_id or "",
+                actor_id="",
+                capabilities=list(tool_def.capabilities),
             )
 
-            if assessment.regime in (GovernanceRegime.DUAL_ANOMALY,
-                                     GovernanceRegime.UNKNOWN):
-                return (
-                    f"JEPA residual governor: {assessment.regime.value} — "
-                    f"{assessment.rationale}"
-                )
+            if assessment.regime == GovernanceRegime.NORMAL:
+                return None  # Aligned — no override needed
 
-            # PROCESS_DRIFT and SEMANTIC_SHIFT block destructive/privileged tools
-            if assessment.regime in (GovernanceRegime.PROCESS_DRIFT,
-                                     GovernanceRegime.SEMANTIC_SHIFT):
-                if tool_def.risk_level in (ToolRiskLevel.DESTRUCTIVE,
-                                           ToolRiskLevel.PRIVILEGED):
-                    return (
-                        f"JEPA residual governor: {assessment.regime.value} — "
-                        f"blocking {tool_def.risk_level.value} tool. "
-                        f"{assessment.rationale}"
-                    )
-
-            return None  # No block
+            return assessment
 
         except Exception as e:
             logger.error("JEPA check failed in MCP gateway (fail-closed): %s", e)
-            return (
-                f"JEPA residual governor: UNAVAILABLE — "
-                f"JEPA check raised {type(e).__name__}: {e}. Fail-closed."
-            )
+            return _make_fail_closed_assessment(tool_call, tool_def, e)
 
     def _audit(
         self,
@@ -858,21 +927,81 @@ class SafeMCPGateway:
         gate_decision = self.gate.evaluate(signals, tool_call.tool_name)
 
         # JEPA residual governance check
-        jepa_block = self._jepa_check(tool_call, tool_def, gate_decision)
-        if jepa_block is not None:
-            result = MCPToolResult(
-                request_id=tool_call.request_id,
-                tool_name=tool_call.tool_name,
-                decision=GatewayDecision.BLOCKED,
-                success=False,
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
-                blocked_reason=jepa_block,
-                risk_level=tool_def.risk_level,
-                execution_time_ms=(time.time() - start_time) * 1000,
-            )
-            self._audit(tool_call, tool_def, result, gate_decision)
-            return result
+        # Returns None for NORMAL regime, full assessment otherwise.
+        # Matches GovernanceService behavior: use recommended_action,
+        # execution_mode_override, escalation_override, confidence_adjustment.
+        jepa_assessment = self._jepa_check(tool_call, tool_def, gate_decision)
+        if jepa_assessment is not None:
+            regime = jepa_assessment.regime
+
+            # DUAL_ANOMALY / UNKNOWN → hard block (HALT)
+            if regime in (GovernanceRegime.DUAL_ANOMALY,
+                          GovernanceRegime.UNKNOWN):
+                reason = (
+                    f"JEPA residual governor: {regime.value} — "
+                    f"{jepa_assessment.rationale}"
+                )
+                logger.warning("MCP JEPA BLOCK: %s on %s — %s",
+                               regime.value, tool_call.tool_name, reason)
+                result = MCPToolResult(
+                    request_id=tool_call.request_id,
+                    tool_name=tool_call.tool_name,
+                    decision=GatewayDecision.BLOCKED,
+                    success=False,
+                    confidence=gate_decision.confidence.overall,
+                    escalation_level=gate_decision.escalation.level,
+                    blocked_reason=reason,
+                    risk_level=tool_def.risk_level,
+                    execution_time_ms=(time.time() - start_time) * 1000,
+                )
+                self._audit(tool_call, tool_def, result, gate_decision)
+                return result
+
+            # PROCESS_DRIFT / SEMANTIC_SHIFT → block non-read-only tools,
+            # escalate read-only (consistent with GovernanceService DEFER)
+            if regime in (GovernanceRegime.PROCESS_DRIFT,
+                          GovernanceRegime.SEMANTIC_SHIFT):
+                if tool_def.risk_level != ToolRiskLevel.READ_ONLY:
+                    reason = (
+                        f"JEPA residual governor: {regime.value} — "
+                        f"blocking {tool_def.risk_level.value} tool. "
+                        f"{jepa_assessment.rationale}"
+                    )
+                    logger.warning("MCP JEPA BLOCK: %s on %s — %s",
+                                   regime.value, tool_call.tool_name, reason)
+                    result = MCPToolResult(
+                        request_id=tool_call.request_id,
+                        tool_name=tool_call.tool_name,
+                        decision=GatewayDecision.BLOCKED,
+                        success=False,
+                        confidence=gate_decision.confidence.overall,
+                        escalation_level=gate_decision.escalation.level,
+                        blocked_reason=reason,
+                        risk_level=tool_def.risk_level,
+                        execution_time_ms=(time.time() - start_time) * 1000,
+                    )
+                    self._audit(tool_call, tool_def, result, gate_decision)
+                    return result
+                else:
+                    # Read-only during drift/shift → escalate (match DEFER)
+                    logger.info("MCP JEPA ESCALATE: %s on read-only %s",
+                                regime.value, tool_call.tool_name)
+                    result = MCPToolResult(
+                        request_id=tool_call.request_id,
+                        tool_name=tool_call.tool_name,
+                        decision=GatewayDecision.ESCALATE,
+                        success=False,
+                        confidence=gate_decision.confidence.overall,
+                        escalation_level=gate_decision.escalation.level,
+                        blocked_reason=(
+                            f"JEPA {regime.value}: read-only tool escalated. "
+                            f"{jepa_assessment.rationale}"
+                        ),
+                        risk_level=tool_def.risk_level,
+                        execution_time_ms=(time.time() - start_time) * 1000,
+                    )
+                    self._audit(tool_call, tool_def, result, gate_decision)
+                    return result
 
         # Check minimum confidence for risk level
         if gate_decision.confidence.overall < tool_def.min_confidence:

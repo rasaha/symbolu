@@ -378,26 +378,42 @@ def _apply_jepa_override(
     """Apply JEPA governance override if the regime warrants it.
 
     JEPA can only make decisions STRICTER, never more permissive.
+    Uses the full assessment fields (recommended_action,
+    execution_mode_override, escalation_override, confidence_adjustment)
+    instead of only reading regime.
+
     - NORMAL → no change
     - PROCESS_DRIFT → downgrade ALLOW to DEFER
     - SEMANTIC_SHIFT → downgrade ALLOW to DEFER
-    - DUAL_ANOMALY → force DENY
-    - UNKNOWN → force DENY
+    - DUAL_ANOMALY → force DENY, eligible=False
+    - UNKNOWN → force DENY, eligible=False
     """
     regime = assessment.regime
 
     if regime == GovernanceRegime.NORMAL:
         return governance_decision, eligible
 
-    if regime == GovernanceRegime.DUAL_ANOMALY:
+    # Use recommended_action to drive the override (not just regime name)
+    recommended = assessment.recommended_action
+
+    # HALT or DENY recommended → force DENY and ineligible
+    if recommended in ("HALT", "DENY"):
         return APIGovernanceDecision.DENY, False
 
-    if regime == GovernanceRegime.UNKNOWN:
-        return APIGovernanceDecision.DENY, False
-
-    if regime in (GovernanceRegime.PROCESS_DRIFT, GovernanceRegime.SEMANTIC_SHIFT):
+    # DEGRADE or CONFIRM recommended → downgrade ALLOW to DEFER
+    if recommended in ("DEGRADE", "CONFIRM"):
         if governance_decision == APIGovernanceDecision.ALLOW:
             return APIGovernanceDecision.DEFER, eligible
+        # Already DEFER or DENY — keep the stricter decision
+        return governance_decision, eligible
+
+    # Fallback: if execution_mode_override is BLOCKED → DENY
+    if assessment.execution_mode_override == "BLOCKED":
+        return APIGovernanceDecision.DENY, False
+
+    # Fallback: if escalation_override is HALT → DENY
+    if assessment.escalation_override == "HALT":
+        return APIGovernanceDecision.DENY, False
 
     return governance_decision, eligible
 
