@@ -379,6 +379,8 @@ def _build_rationale_codes(
     risk_level: ToolRiskLevel,
     forbidden_cap: Optional[str],
     governance_decision: APIGovernanceDecision,
+    jepa_assessment: Optional["JEPAGovernanceAssessment"] = None,
+    jepa_overrode: bool = False,
 ) -> List[str]:
     """Build machine-readable rationale codes."""
     codes: List[str] = []
@@ -395,6 +397,14 @@ def _build_rationale_codes(
     if not gate_decision.execution.can_execute:
         codes.append(f"EXECUTION_BLOCKED:{gate_decision.execution.mode.value}")
 
+    # JEPA rationale codes
+    if jepa_assessment is not None:
+        codes.append(f"JEPA_REGIME:{jepa_assessment.regime.value}")
+        if jepa_overrode:
+            codes.append(f"JEPA_OVERRIDE:{jepa_assessment.recommended_action}")
+        for rc in jepa_assessment.reason_codes:
+            codes.append(f"JEPA:{rc}")
+
     codes.append(f"RISK_LEVEL:{risk_level.value}")
     codes.append(f"DECISION:{governance_decision.value}")
 
@@ -407,6 +417,8 @@ def _build_rationale_string(
     gate_decision: ConfidenceGateDecision,
     risk_level: ToolRiskLevel,
     forbidden_cap: Optional[str],
+    jepa_assessment: Optional["JEPAGovernanceAssessment"] = None,
+    jepa_overrode: bool = False,
 ) -> str:
     """Build human-readable rationale string."""
     parts: List[str] = []
@@ -429,6 +441,19 @@ def _build_rationale_string(
         parts.append(
             f"Human approval required "
             f"(escalation={gate_decision.escalation.level.value})."
+        )
+
+    # JEPA rationale
+    if jepa_assessment is not None and jepa_overrode:
+        parts.append(
+            f"JEPA governance override: regime={jepa_assessment.regime.value}, "
+            f"action={jepa_assessment.recommended_action}, "
+            f"confidence_adj={jepa_assessment.confidence_adjustment:+.2f}."
+        )
+    elif jepa_assessment is not None and jepa_assessment.regime.value != "normal":
+        parts.append(
+            f"JEPA regime: {jepa_assessment.regime.value} "
+            f"(no override applied)."
         )
 
     if governance_decision == APIGovernanceDecision.ALLOW:
@@ -568,24 +593,58 @@ class GovernanceService:
         eligible = jepa_result["eligible"]
         jepa_overrode = jepa_result["overrode"]
 
-        # Step 6: Build rationale
-        rationale_codes = _build_rationale_codes(
-            safety_summary, gate_decision, risk_level, forbidden_cap, governance_decision,
-        )
-        rationale = _build_rationale_string(
-            governance_decision, safety_summary, gate_decision, risk_level, forbidden_cap,
+        # Step 5c: Apply JEPA override fields to confidence, execution
+        # mode, and escalation level. These modify the gate decision's
+        # effective output — JEPA can only make things stricter.
+        effective_confidence = max(
+            0.0,
+            gate_decision.confidence.overall + jepa_assessment.confidence_adjustment,
         )
 
-        # Step 7: Build confidence gate summary
+        effective_exec_mode = gate_decision.execution.mode
+        if jepa_assessment.execution_mode_override is not None:
+            jepa_exec = jepa_assessment.execution_mode_override.lower()
+            gate_exec = gate_decision.execution.mode.value
+            # Only apply if JEPA is stricter (BLOCKED > CONFIRM > CAUTIOUS > FULL)
+            _EXEC_SEVERITY = {"full": 0, "cautious": 1, "confirm": 2,
+                              "confirm_required": 2, "blocked": 3}
+            if _EXEC_SEVERITY.get(jepa_exec, 0) > _EXEC_SEVERITY.get(gate_exec, 0):
+                effective_exec_mode = ExecutionMode(jepa_exec
+                    if jepa_exec != "confirm_required" else "confirm")
+
+        effective_esc_level = gate_decision.escalation.level
+        if jepa_assessment.escalation_override is not None:
+            jepa_esc = jepa_assessment.escalation_override.lower()
+            gate_esc = gate_decision.escalation.level.value
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            if _ESC_SEVERITY.get(jepa_esc, 0) > _ESC_SEVERITY.get(gate_esc, 0):
+                effective_esc_level = EscalationLevel(jepa_esc)
+
+        effective_requires_human = (
+            gate_decision.escalation.requires_human
+            or effective_esc_level in (EscalationLevel.CONFIRM, EscalationLevel.HALT)
+        )
+
+        # Step 6: Build rationale (includes JEPA information)
+        rationale_codes = _build_rationale_codes(
+            safety_summary, gate_decision, risk_level, forbidden_cap,
+            governance_decision, jepa_assessment, jepa_overrode,
+        )
+        rationale = _build_rationale_string(
+            governance_decision, safety_summary, gate_decision, risk_level,
+            forbidden_cap, jepa_assessment, jepa_overrode,
+        )
+
+        # Step 7: Build confidence gate summary (with JEPA adjustments)
         confidence_summary = ConfidenceGateSummary(
-            overall_confidence=gate_decision.confidence.overall,
+            overall_confidence=effective_confidence,
             quality_component=gate_decision.confidence.quality_component,
             coherence_component=gate_decision.confidence.coherence_component,
             stability_component=gate_decision.confidence.stability_component,
             action_component=gate_decision.confidence.action_component,
-            execution_mode=_map_execution_mode(gate_decision.execution.mode),
-            escalation_level=_map_escalation_level(gate_decision.escalation.level),
-            requires_human=gate_decision.escalation.requires_human,
+            execution_mode=_map_execution_mode(effective_exec_mode),
+            escalation_level=_map_escalation_level(effective_esc_level),
+            requires_human=effective_requires_human,
             revision_budget=gate_decision.budget.revision_budget,
             reasoning=gate_decision.reasoning,
         )
@@ -600,9 +659,9 @@ class GovernanceService:
             decision=governance_decision,
             risk_level=_map_risk_level(risk_level),
             eligible=eligible,
-            confidence=gate_decision.confidence.overall,
-            execution_mode=_map_execution_mode(gate_decision.execution.mode),
-            escalation_level=_map_escalation_level(gate_decision.escalation.level),
+            confidence=effective_confidence,
+            execution_mode=_map_execution_mode(effective_exec_mode),
+            escalation_level=_map_escalation_level(effective_esc_level),
             blocked_reasons=safety_summary.blocking_reasons,
             request_snapshot={
                 "actor_id": request.actor_id,
@@ -624,15 +683,15 @@ class GovernanceService:
         )
         self._persist_audit_event(audit_event)
 
-        # Step 9: Assemble response
+        # Step 9: Assemble response (uses JEPA-adjusted fields)
         return AuthorizationResponse(
             governance_decision=governance_decision,
             eligible=eligible,
-            execution_mode=_map_execution_mode(gate_decision.execution.mode),
-            escalation_level=_map_escalation_level(gate_decision.escalation.level),
-            requires_human_approval=gate_decision.escalation.requires_human,
+            execution_mode=_map_execution_mode(effective_exec_mode),
+            escalation_level=_map_escalation_level(effective_esc_level),
+            requires_human_approval=effective_requires_human,
             risk_level=_map_risk_level(risk_level),
-            confidence_score=gate_decision.confidence.overall,
+            confidence_score=effective_confidence,
             allowed_actions=gate_decision.execution.allowed_actions,
             blocked_reasons=safety_summary.blocking_reasons,
             rationale_codes=rationale_codes,

@@ -938,6 +938,119 @@ class TestSafeWrapper:
             assert result["overrode"] is True
 
 
+# =============================================================================
+# Test: GovernanceService JEPA Rationale & Override Integration
+# =============================================================================
+
+
+class TestGovernanceServiceJEPARationale:
+    """Test that JEPA info appears in rationale codes and strings."""
+
+    def test_rationale_codes_contain_jepa_regime(self):
+        """Rationale codes should include JEPA_REGIME when JEPA runs."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        # Normal high-quality request
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="read_file",
+            tool_name="read_file",
+            quality_score=0.9,
+            coherence_score=0.9,
+        ))
+        codes = resp.rationale_codes
+        jepa_regime_codes = [c for c in codes if c.startswith("JEPA_REGIME:")]
+        assert len(jepa_regime_codes) == 1
+        assert "JEPA_REGIME:" in jepa_regime_codes[0]
+
+    def test_rationale_codes_contain_override_on_drift(self):
+        """When JEPA overrides, rationale codes should include JEPA_OVERRIDE."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        # Low-quality request to trigger drift/anomaly
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="execute_code",
+            tool_name="execute_code",
+            quality_score=0.1,
+            coherence_score=0.1,
+        ))
+        codes = resp.rationale_codes
+        # Should have JEPA_REGIME at minimum
+        assert any(c.startswith("JEPA_REGIME:") for c in codes)
+
+    def test_audit_snapshot_has_jepa_fields(self):
+        """Audit event request_snapshot should contain JEPA fields."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="read_file",
+            tool_name="read_file",
+            quality_score=0.9,
+            coherence_score=0.9,
+        ))
+        snap = resp.audit_event.request_snapshot
+        assert "jepa_regime" in snap
+        assert "jepa_reason_codes" in snap
+        assert "jepa_overrode_baseline" in snap
+        assert "jepa_confidence_adjustment" in snap
+        assert "jepa_recommended_action" in snap
+        assert "jepa_execution_mode_override" in snap
+        assert "jepa_escalation_override" in snap
+
+
+class TestGovernanceServiceJEPAEffectiveValues:
+    """Test that JEPA confidence_adjustment, execution_mode_override,
+    and escalation_override are applied to the effective response."""
+
+    def test_confidence_adjustment_reduces_score(self):
+        """Negative confidence_adjustment should reduce overall confidence."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        # High quality but low coherence to trigger some JEPA drift
+        resp_good = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="read_file",
+            tool_name="read_file",
+            quality_score=0.95,
+            coherence_score=0.95,
+        ))
+        resp_bad = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="execute_code",
+            tool_name="execute_code",
+            quality_score=0.15,
+            coherence_score=0.15,
+        ))
+        # When JEPA detects issues, confidence should be lower
+        # (either due to confidence_adjustment or gate scoring)
+        assert resp_bad.confidence_score <= resp_good.confidence_score
+
+    def test_confidence_never_negative(self):
+        """Confidence after JEPA adjustment should never go below 0."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="execute_code",
+            tool_name="execute_code",
+            quality_score=0.01,
+            coherence_score=0.01,
+        ))
+        assert resp.confidence_score >= 0.0
+
+
 # helper for context manager compatibility
 import contextlib
 

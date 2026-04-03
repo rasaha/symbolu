@@ -207,6 +207,15 @@ class AuditEntry:
     error: Optional[str]
     human_confirmed: bool
 
+    # JEPA governance fields (populated when JEPA check runs)
+    jepa_regime: Optional[str] = None
+    jepa_recommended_action: Optional[str] = None
+    jepa_reason_codes: Optional[List[str]] = None
+    jepa_confidence_adjustment: Optional[float] = None
+    jepa_execution_mode_override: Optional[str] = None
+    jepa_escalation_override: Optional[str] = None
+    jepa_overrode: bool = False
+
 
 # =============================================================================
 # Tool Risk Classification
@@ -746,6 +755,8 @@ class SafeMCPGateway:
         tool_def: MCPToolDefinition,
         result: MCPToolResult,
         gate_decision: ConfidenceGateDecision,
+        jepa_assessment: Optional[Any] = None,
+        jepa_overrode: bool = False,
     ) -> None:
         """Log audit entry to in-memory cache and durable store."""
         if not self.audit_enabled:
@@ -764,6 +775,25 @@ class SafeMCPGateway:
             success=result.success,
             error=result.error,
             human_confirmed=result.human_confirmed,
+            jepa_regime=(
+                jepa_assessment.regime.value if jepa_assessment else None
+            ),
+            jepa_recommended_action=(
+                jepa_assessment.recommended_action if jepa_assessment else None
+            ),
+            jepa_reason_codes=(
+                list(jepa_assessment.reason_codes) if jepa_assessment else None
+            ),
+            jepa_confidence_adjustment=(
+                jepa_assessment.confidence_adjustment if jepa_assessment else None
+            ),
+            jepa_execution_mode_override=(
+                jepa_assessment.execution_mode_override if jepa_assessment else None
+            ),
+            jepa_escalation_override=(
+                jepa_assessment.escalation_override if jepa_assessment else None
+            ),
+            jepa_overrode=jepa_overrode,
         )
         self.audit_log.append(entry)
 
@@ -875,7 +905,8 @@ class SafeMCPGateway:
                     risk_level=tool_def.risk_level,
                     execution_time_ms=(time.time() - start_time) * 1000,
                 )
-                self._audit(tool_call, tool_def, result, gate_decision)
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment, jepa_overrode=True)
                 return result
 
             if jepa_override["decision"] == "DEFER":
@@ -900,7 +931,8 @@ class SafeMCPGateway:
                         risk_level=tool_def.risk_level,
                         execution_time_ms=(time.time() - start_time) * 1000,
                     )
-                    self._audit(tool_call, tool_def, result, gate_decision)
+                    self._audit(tool_call, tool_def, result, gate_decision,
+                                jepa_assessment, jepa_overrode=True)
                     return result
                 else:
                     # Read-only during drift/shift → escalate (match DEFER)
@@ -920,8 +952,14 @@ class SafeMCPGateway:
                         risk_level=tool_def.risk_level,
                         execution_time_ms=(time.time() - start_time) * 1000,
                     )
-                    self._audit(tool_call, tool_def, result, gate_decision)
+                    self._audit(tool_call, tool_def, result, gate_decision,
+                                jepa_assessment, jepa_overrode=True)
                     return result
+
+        # JEPA NORMAL — log success and proceed
+        if regime == GovernanceRegime.NORMAL:
+            logger.debug("MCP JEPA OK: %s on %s — regime NORMAL",
+                         jepa_assessment.regime.value, tool_call.tool_name)
 
         # Check minimum confidence for risk level
         if gate_decision.confidence.overall < tool_def.min_confidence:
@@ -939,7 +977,8 @@ class SafeMCPGateway:
                 risk_level=tool_def.risk_level,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
-            self._audit(tool_call, tool_def, result, gate_decision)
+            self._audit(tool_call, tool_def, result, gate_decision,
+                        jepa_assessment)
             return result
 
         # Check execution permission
@@ -964,7 +1003,8 @@ class SafeMCPGateway:
                         human_confirmed=False,
                         execution_time_ms=(time.time() - start_time) * 1000,
                     )
-                    self._audit(tool_call, tool_def, result, gate_decision)
+                    self._audit(tool_call, tool_def, result, gate_decision,
+                                jepa_assessment)
                     return result
             else:
                 result = MCPToolResult(
@@ -978,7 +1018,8 @@ class SafeMCPGateway:
                     risk_level=tool_def.risk_level,
                     execution_time_ms=(time.time() - start_time) * 1000,
                 )
-                self._audit(tool_call, tool_def, result, gate_decision)
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment)
                 return result
 
         # Handle notification escalation
@@ -1004,7 +1045,8 @@ class SafeMCPGateway:
                     human_confirmed=False,
                     execution_time_ms=(time.time() - start_time) * 1000,
                 )
-                self._audit(tool_call, tool_def, result, gate_decision)
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment)
                 return result
             human_confirmed = True
 
@@ -1028,7 +1070,8 @@ class SafeMCPGateway:
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
-            self._audit(tool_call, tool_def, result, gate_decision)
+            self._audit(tool_call, tool_def, result, gate_decision,
+                        jepa_assessment)
             return result
 
         except asyncio.TimeoutError:
@@ -1044,7 +1087,8 @@ class SafeMCPGateway:
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
-            self._audit(tool_call, tool_def, result, gate_decision)
+            self._audit(tool_call, tool_def, result, gate_decision,
+                        jepa_assessment)
             return result
 
         except Exception as e:
@@ -1060,7 +1104,8 @@ class SafeMCPGateway:
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
-            self._audit(tool_call, tool_def, result, gate_decision)
+            self._audit(tool_call, tool_def, result, gate_decision,
+                        jepa_assessment)
             return result
 
     async def call_tool_simple(
