@@ -67,6 +67,17 @@ from agentic.ledger.governance_audit_store import (
 from agentic.agentic_framework.jepa_governance import (
     GovernanceRegime,
     jepa_governance_check,
+    safe_jepa_governance_check,
+    apply_jepa_override,
+    approximate_layer_weights,
+    approximate_vritti,
+)
+from agentic.agentic_framework.domain_policy import (
+    DomainActionMode,
+    DomainPolicyResult,
+    DomainRegistry,
+    resolve_domain_policy,
+    fail_closed_result as _domain_fail_closed,
 )
 
 logger = logging.getLogger(__name__)
@@ -204,6 +215,19 @@ class AuditEntry:
     success: bool
     error: Optional[str]
     human_confirmed: bool
+
+    # JEPA governance fields (populated when JEPA check runs)
+    jepa_regime: Optional[str] = None
+    jepa_recommended_action: Optional[str] = None
+    jepa_reason_codes: Optional[List[str]] = None
+    jepa_confidence_adjustment: Optional[float] = None
+    jepa_execution_mode_override: Optional[str] = None
+    jepa_escalation_override: Optional[str] = None
+    jepa_overrode: bool = False
+
+    # Domain policy fields (populated when domain policy check runs)
+    domain_policy: Optional[Dict[str, Any]] = None
+    domain_overrode: bool = False
 
 
 # =============================================================================
@@ -580,6 +604,8 @@ class SafeMCPGateway:
         audit_enabled: bool = True,
         forbidden_capabilities: Optional[set] = None,
         audit_store: Optional[GovernanceAuditStore] = None,
+        domain_registry: Optional[DomainRegistry] = None,
+        domain_id: Optional[str] = None,
     ):
         """
         Initialize Safe MCP Gateway.
@@ -595,6 +621,8 @@ class SafeMCPGateway:
             audit_store: Durable audit store for persistence (default: None,
                          in-memory only).  When provided, every audit entry is
                          persisted to the store in addition to the in-memory log.
+            domain_registry: Optional DomainRegistry for domain-specific policy.
+            domain_id: Which domain profile to use from the registry.
         """
         self.mcp_client = mcp_client
         self.gate = confidence_gate or create_confidence_gate()
@@ -609,6 +637,10 @@ class SafeMCPGateway:
 
         # Durable persistent audit store (source of truth when present)
         self._audit_store: Optional[GovernanceAuditStore] = audit_store
+
+        # Domain Semantic Policy Layer
+        self._domain_registry: Optional[DomainRegistry] = domain_registry
+        self._domain_id: Optional[str] = domain_id
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
@@ -681,77 +713,60 @@ class SafeMCPGateway:
         tool_call: MCPToolCall,
         tool_def: MCPToolDefinition,
         gate_decision: ConfidenceGateDecision,
-    ) -> Optional[str]:
-        """Run JEPA residual check. Returns block reason or None if OK.
+    ) -> "JEPAGovernanceAssessment":
+        """Run JEPA residual check. Always returns an assessment.
 
-        JEPA can only block; it cannot make a blocked call allowed.
-        Returns None for NORMAL regime, a blocking reason string for
-        DUAL_ANOMALY or UNKNOWN, and None (pass-through) for PROCESS_DRIFT
-        and SEMANTIC_SHIFT on read-only tools.
+        Uses safe_jepa_governance_check which catches internal errors
+        and returns an explicit UNKNOWN-regime assessment. Never returns
+        None — the caller always gets a full assessment object.
+
+        JEPA can only make decisions stricter, never more permissive.
+
+        Signal approximation uses the shared canonical functions from
+        jepa_governance (approximate_layer_weights / approximate_vritti)
+        so that MCP and GovernanceService produce identical composites
+        from equivalent inputs.  MCP has limited signals (quality,
+        coherence) so goal_alignment and trajectory_confidence default
+        to coherence and overall_confidence respectively.
         """
-        try:
-            # Approximate vritti from confidence signals
-            q = tool_call.quality_score
-            c = tool_call.coherence_score
-            overall = gate_decision.confidence.overall
-            pramana = min(1.0, q * 0.6 + c * 0.4)
-            viparyaya = max(0.0, 0.5 - q * 0.8)
-            vikalpa = max(0.0, 0.4 - c * 0.5)
-            nidra = max(0.0, 0.3 - overall * 0.5)
-            smrti = 0.1
-            total = pramana + viparyaya + vikalpa + smrti + nidra
-            if total <= 0:
-                vritti_dist = {"pramana": 0.0, "viparyaya": 0.0,
-                               "vikalpa": 0.0, "smrti": 0.0, "nidra": 1.0}
-            else:
-                vritti_dist = {
-                    "pramana": pramana / total, "viparyaya": viparyaya / total,
-                    "vikalpa": vikalpa / total, "smrti": smrti / total,
-                    "nidra": nidra / total,
-                }
+        q = tool_call.quality_score
+        c = tool_call.coherence_score
+        overall = gate_decision.confidence.overall
 
-            assessment = jepa_governance_check(
-                layer_weights={
-                    "O1_POTENTIAL": 0.3, "O2_IDENTITY": c * 0.8,
-                    "O3_EXECUTION": overall * 0.7, "O4_STRUCTURE": c * 0.6,
-                    "O5_COGNITION": q * 0.8, "O6_AGENCY": q * 0.7,
-                    "O7_REASONING": q * 0.9, "O8_PURPOSE": q * 0.8,
-                    "O9_WITNESSES": overall * 0.6, "O10_UNIFYING": c * 0.7,
-                    "O11_INTEGRATION": overall * 0.5, "O12_ABSOLVING": overall * 0.4,
-                },
-                vritti_distribution=vritti_dist,
-                coherence=c,
-                score=overall,
-                action_type="call_tool",
-                tool_name=tool_call.tool_name,
-                risk_level=tool_def.risk_level.value,
-                confidence_score=overall,
-                session_id=tool_call.session_id or "",
-            )
+        layer_weights = approximate_layer_weights(
+            quality=q,
+            coherence=c,
+            internal_consistency=c,
+            goal_alignment=c,
+            trajectory_confidence=overall,
+            overall_confidence=overall,
+        )
+        vritti_dist = approximate_vritti(
+            quality=q,
+            coherence=c,
+            overall_confidence=overall,
+        )
 
-            if assessment.regime in (GovernanceRegime.DUAL_ANOMALY,
-                                     GovernanceRegime.UNKNOWN):
-                return (
-                    f"JEPA residual governor: {assessment.regime.value} — "
-                    f"{assessment.rationale}"
-                )
-
-            # PROCESS_DRIFT and SEMANTIC_SHIFT block destructive/privileged tools
-            if assessment.regime in (GovernanceRegime.PROCESS_DRIFT,
-                                     GovernanceRegime.SEMANTIC_SHIFT):
-                if tool_def.risk_level in (ToolRiskLevel.DESTRUCTIVE,
-                                           ToolRiskLevel.PRIVILEGED):
-                    return (
-                        f"JEPA residual governor: {assessment.regime.value} — "
-                        f"blocking {tool_def.risk_level.value} tool. "
-                        f"{assessment.rationale}"
-                    )
-
-            return None  # No block
-
-        except Exception as e:
-            logger.warning("JEPA check failed in MCP gateway: %s", e)
-            return None  # Fail-open on JEPA failure (other gates still apply)
+        return safe_jepa_governance_check(
+            layer_weights=layer_weights,
+            vritti_distribution=vritti_dist,
+            coherence=c,
+            score=overall,
+            action_type="call_tool",
+            tool_name=tool_call.tool_name,
+            risk_level=tool_def.risk_level.value,
+            confidence_score=overall,
+            agency_level="FULL",
+            execution_mode=gate_decision.execution.mode.value
+                if hasattr(gate_decision.execution.mode, "value")
+                else str(gate_decision.execution.mode),
+            escalation_level=gate_decision.escalation.level.value
+                if hasattr(gate_decision.escalation.level, "value")
+                else str(gate_decision.escalation.level),
+            session_id=tool_call.session_id or "",
+            actor_id="",
+            capabilities=list(tool_def.capabilities),
+        )
 
     def _audit(
         self,
@@ -759,10 +774,20 @@ class SafeMCPGateway:
         tool_def: MCPToolDefinition,
         result: MCPToolResult,
         gate_decision: ConfidenceGateDecision,
+        jepa_assessment: Optional[Any] = None,
+        jepa_overrode: bool = False,
+        domain_result: Optional[Any] = None,
+        domain_overrode: bool = False,
     ) -> None:
         """Log audit entry to in-memory cache and durable store."""
         if not self.audit_enabled:
             return
+
+        domain_audit = (
+            domain_result.to_audit_dict()
+            if domain_result is not None and hasattr(domain_result, "to_audit_dict")
+            else None
+        )
 
         entry = AuditEntry(
             timestamp=datetime.now().isoformat(),
@@ -777,6 +802,27 @@ class SafeMCPGateway:
             success=result.success,
             error=result.error,
             human_confirmed=result.human_confirmed,
+            jepa_regime=(
+                jepa_assessment.regime.value if jepa_assessment else None
+            ),
+            jepa_recommended_action=(
+                jepa_assessment.recommended_action if jepa_assessment else None
+            ),
+            jepa_reason_codes=(
+                list(jepa_assessment.reason_codes) if jepa_assessment else None
+            ),
+            jepa_confidence_adjustment=(
+                jepa_assessment.confidence_adjustment if jepa_assessment else None
+            ),
+            jepa_execution_mode_override=(
+                jepa_assessment.execution_mode_override if jepa_assessment else None
+            ),
+            jepa_escalation_override=(
+                jepa_assessment.escalation_override if jepa_assessment else None
+            ),
+            jepa_overrode=jepa_overrode,
+            domain_policy=domain_audit,
+            domain_overrode=domain_overrode,
         )
         self.audit_log.append(entry)
 
@@ -795,6 +841,15 @@ class SafeMCPGateway:
                 success=entry.success,
                 error=entry.error,
                 human_confirmed=entry.human_confirmed,
+                jepa_regime=entry.jepa_regime,
+                jepa_recommended_action=entry.jepa_recommended_action,
+                jepa_reason_codes=entry.jepa_reason_codes,
+                jepa_confidence_adjustment=entry.jepa_confidence_adjustment,
+                jepa_execution_mode_override=entry.jepa_execution_mode_override,
+                jepa_escalation_override=entry.jepa_escalation_override,
+                jepa_overrode=entry.jepa_overrode,
+                domain_policy=entry.domain_policy,
+                domain_overrode=entry.domain_overrode,
             )
             try:
                 self._audit_store.append(canonical_event)
@@ -855,39 +910,248 @@ class SafeMCPGateway:
         gate_decision = self.gate.evaluate(signals, tool_call.tool_name)
 
         # JEPA residual governance check
-        jepa_block = self._jepa_check(tool_call, tool_def, gate_decision)
-        if jepa_block is not None:
-            result = MCPToolResult(
-                request_id=tool_call.request_id,
-                tool_name=tool_call.tool_name,
-                decision=GatewayDecision.BLOCKED,
-                success=False,
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
-                blocked_reason=jepa_block,
-                risk_level=tool_def.risk_level,
-                execution_time_ms=(time.time() - start_time) * 1000,
-            )
-            self._audit(tool_call, tool_def, result, gate_decision)
-            return result
+        # Always returns a full assessment (never None). Uses
+        # safe_jepa_governance_check which catches errors and returns
+        # explicit UNKNOWN-regime assessment on failure.
+        jepa_assessment = self._jepa_check(tool_call, tool_def, gate_decision)
+        regime = jepa_assessment.regime
 
-        # Check minimum confidence for risk level
-        if gate_decision.confidence.overall < tool_def.min_confidence:
+        # Compute JEPA-adjusted confidence and escalation (stricter-only).
+        # These are used in all MCPToolResult construction below so that
+        # MCP results reflect JEPA overrides, matching GovernanceService.
+        effective_confidence = max(
+            0.0,
+            gate_decision.confidence.overall + jepa_assessment.confidence_adjustment,
+        )
+        effective_escalation = gate_decision.escalation.level
+        if jepa_assessment.escalation_override is not None:
+            jepa_esc = jepa_assessment.escalation_override.lower()
+            gate_esc = gate_decision.escalation.level.value
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            if _ESC_SEVERITY.get(jepa_esc, 0) > _ESC_SEVERITY.get(gate_esc, 0):
+                effective_escalation = EscalationLevel(jepa_esc)
+
+        # Domain Semantic Policy Layer check.
+        # Computed BEFORE JEPA regime handling so that domain policy
+        # is always evaluated and always present in audit — even when
+        # JEPA returns early for non-NORMAL regimes (fixes F3).
+        domain_result: Optional["DomainPolicyResult"] = None
+        domain_overrode = False
+        if self._domain_registry is not None and self._domain_id is not None:
+            domain_result = resolve_domain_policy(
+                jepa_assessment,
+                self._domain_registry,
+                self._domain_id,
+                tool_name=tool_call.tool_name,
+            )
+
+        if regime != GovernanceRegime.NORMAL:
+            # Use shared override to determine action
+            jepa_override = apply_jepa_override(
+                baseline_decision="ALLOW",  # MCP baseline is "proceed"
+                baseline_eligible=True,
+                assessment=jepa_assessment,
+            )
+
+            # Merge domain result with JEPA override (stricter wins).
+            # If domain says BLOCKED but JEPA only says DEFER, upgrade.
+            merged_decision = jepa_override["decision"]
+            if domain_result is not None:
+                if domain_result.mode == DomainActionMode.BLOCKED:
+                    merged_decision = "DENY"
+                    domain_overrode = True
+                elif (domain_result.mode.severity
+                      >= DomainActionMode.CONFIRM_REQUIRED.severity
+                      and merged_decision == "ALLOW"):
+                    merged_decision = "DEFER"
+                    domain_overrode = True
+
+            if merged_decision == "DENY":
+                # DUAL_ANOMALY / UNKNOWN / HALT / domain BLOCKED → hard block
+                reason = (
+                    f"JEPA residual governor: {regime.value} — "
+                    f"{jepa_assessment.rationale}"
+                )
+                if domain_overrode and domain_result is not None:
+                    reason += f" | Domain '{self._domain_id}': {domain_result.rationale}"
+                logger.warning("MCP JEPA BLOCK: %s on %s — %s",
+                               regime.value, tool_call.tool_name, reason)
+                result = MCPToolResult(
+                    request_id=tool_call.request_id,
+                    tool_name=tool_call.tool_name,
+                    decision=GatewayDecision.BLOCKED,
+                    success=False,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
+                    blocked_reason=reason,
+                    risk_level=tool_def.risk_level,
+                    execution_time_ms=(time.time() - start_time) * 1000,
+                )
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment, jepa_overrode=True,
+                            domain_result=domain_result,
+                            domain_overrode=domain_overrode)
+                return result
+
+            if merged_decision == "DEFER":
+                # PROCESS_DRIFT / SEMANTIC_SHIFT → block non-read-only,
+                # escalate read-only (consistent with GovernanceService)
+                if tool_def.risk_level != ToolRiskLevel.READ_ONLY:
+                    reason = (
+                        f"JEPA residual governor: {regime.value} — "
+                        f"blocking {tool_def.risk_level.value} tool. "
+                        f"{jepa_assessment.rationale}"
+                    )
+                    logger.warning("MCP JEPA BLOCK: %s on %s — %s",
+                                   regime.value, tool_call.tool_name, reason)
+                    result = MCPToolResult(
+                        request_id=tool_call.request_id,
+                        tool_name=tool_call.tool_name,
+                        decision=GatewayDecision.BLOCKED,
+                        success=False,
+                        confidence=effective_confidence,
+                        escalation_level=effective_escalation,
+                        blocked_reason=reason,
+                        risk_level=tool_def.risk_level,
+                        execution_time_ms=(time.time() - start_time) * 1000,
+                    )
+                    self._audit(tool_call, tool_def, result, gate_decision,
+                                jepa_assessment, jepa_overrode=True,
+                                domain_result=domain_result,
+                                domain_overrode=domain_overrode)
+                    return result
+                else:
+                    # Read-only during drift/shift → escalate (match DEFER)
+                    logger.info("MCP JEPA ESCALATE: %s on read-only %s",
+                                regime.value, tool_call.tool_name)
+                    result = MCPToolResult(
+                        request_id=tool_call.request_id,
+                        tool_name=tool_call.tool_name,
+                        decision=GatewayDecision.ESCALATE,
+                        success=False,
+                        confidence=effective_confidence,
+                        escalation_level=effective_escalation,
+                        blocked_reason=(
+                            f"JEPA {regime.value}: read-only tool escalated. "
+                            f"{jepa_assessment.rationale}"
+                        ),
+                        risk_level=tool_def.risk_level,
+                        execution_time_ms=(time.time() - start_time) * 1000,
+                    )
+                    self._audit(tool_call, tool_def, result, gate_decision,
+                                jepa_assessment, jepa_overrode=True,
+                                domain_result=domain_result,
+                                domain_overrode=domain_overrode)
+                    return result
+
+        # JEPA NORMAL — log success and proceed
+        if regime == GovernanceRegime.NORMAL:
+            logger.debug("MCP JEPA OK: %s on %s — regime NORMAL",
+                         jepa_assessment.regime.value, tool_call.tool_name)
+
+        # Domain enforcement for NORMAL regime (domain_result already computed).
+        if domain_result is not None:
+            if domain_result.mode == DomainActionMode.BLOCKED:
+                reason = (
+                    f"Domain policy '{self._domain_id}': BLOCKED — "
+                    f"{domain_result.rationale}"
+                )
+                logger.warning("MCP DOMAIN BLOCK: %s on %s — %s",
+                               self._domain_id, tool_call.tool_name, reason)
+                result = MCPToolResult(
+                    request_id=tool_call.request_id,
+                    tool_name=tool_call.tool_name,
+                    decision=GatewayDecision.BLOCKED,
+                    success=False,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
+                    blocked_reason=reason,
+                    risk_level=tool_def.risk_level,
+                    execution_time_ms=(time.time() - start_time) * 1000,
+                )
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment, jepa_overrode=False,
+                            domain_result=domain_result, domain_overrode=True)
+                return result
+            elif domain_result.mode in (
+                DomainActionMode.CONFIRM_REQUIRED,
+                DomainActionMode.SANDBOX_ONLY,
+                DomainActionMode.MEMORY_WRITE_DENIED,
+            ):
+                # Escalate: require human confirmation
+                logger.info("MCP DOMAIN ESCALATE: %s on %s — mode=%s",
+                            self._domain_id, tool_call.tool_name,
+                            domain_result.mode.value)
+                result = MCPToolResult(
+                    request_id=tool_call.request_id,
+                    tool_name=tool_call.tool_name,
+                    decision=GatewayDecision.ESCALATE,
+                    success=False,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
+                    blocked_reason=(
+                        f"Domain policy '{self._domain_id}': "
+                        f"{domain_result.mode.value} — "
+                        f"{domain_result.rationale}"
+                    ),
+                    risk_level=tool_def.risk_level,
+                    execution_time_ms=(time.time() - start_time) * 1000,
+                )
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment, jepa_overrode=False,
+                            domain_result=domain_result, domain_overrode=True)
+                return result
+            elif domain_result.mode in (
+                DomainActionMode.READ_ONLY,
+                DomainActionMode.DRAFT_ONLY,
+            ):
+                # Block non-read-only tools
+                if tool_def.risk_level != ToolRiskLevel.READ_ONLY:
+                    reason = (
+                        f"Domain policy '{self._domain_id}': "
+                        f"{domain_result.mode.value} — blocking "
+                        f"{tool_def.risk_level.value} tool. "
+                        f"{domain_result.rationale}"
+                    )
+                    logger.warning("MCP DOMAIN BLOCK: %s on %s — %s",
+                                   self._domain_id, tool_call.tool_name,
+                                   reason)
+                    result = MCPToolResult(
+                        request_id=tool_call.request_id,
+                        tool_name=tool_call.tool_name,
+                        decision=GatewayDecision.BLOCKED,
+                        success=False,
+                        confidence=effective_confidence,
+                        escalation_level=effective_escalation,
+                        blocked_reason=reason,
+                        risk_level=tool_def.risk_level,
+                        execution_time_ms=(time.time() - start_time) * 1000,
+                    )
+                    self._audit(tool_call, tool_def, result, gate_decision,
+                                jepa_assessment, jepa_overrode=False,
+                                domain_result=domain_result,
+                                domain_overrode=True)
+                    return result
+
+        # Check minimum confidence for risk level (use JEPA-adjusted)
+        if effective_confidence < tool_def.min_confidence:
             result = MCPToolResult(
                 request_id=tool_call.request_id,
                 tool_name=tool_call.tool_name,
                 decision=GatewayDecision.BLOCKED,
                 success=False,
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
+                confidence=effective_confidence,
+                escalation_level=effective_escalation,
                 blocked_reason=(
-                    f"Confidence {gate_decision.confidence.overall:.2f} below "
+                    f"Confidence {effective_confidence:.2f} below "
                     f"minimum {tool_def.min_confidence:.2f} for {tool_def.risk_level.value} tool"
                 ),
                 risk_level=tool_def.risk_level,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
-            self._audit(tool_call, tool_def, result, gate_decision)
+            self._audit(tool_call, tool_def, result, gate_decision,
+                        jepa_assessment,
+                        domain_result=domain_result)
             return result
 
         # Check execution permission
@@ -905,14 +1169,16 @@ class SafeMCPGateway:
                         tool_name=tool_call.tool_name,
                         decision=GatewayDecision.ESCALATE,
                         success=False,
-                        confidence=gate_decision.confidence.overall,
-                        escalation_level=gate_decision.escalation.level,
+                        confidence=effective_confidence,
+                        escalation_level=effective_escalation,
                         blocked_reason="Human confirmation denied or timed out",
                         risk_level=tool_def.risk_level,
                         human_confirmed=False,
                         execution_time_ms=(time.time() - start_time) * 1000,
                     )
-                    self._audit(tool_call, tool_def, result, gate_decision)
+                    self._audit(tool_call, tool_def, result, gate_decision,
+                                jepa_assessment,
+                                domain_result=domain_result)
                     return result
             else:
                 result = MCPToolResult(
@@ -920,13 +1186,15 @@ class SafeMCPGateway:
                     tool_name=tool_call.tool_name,
                     decision=GatewayDecision.BLOCKED,
                     success=False,
-                    confidence=gate_decision.confidence.overall,
-                    escalation_level=gate_decision.escalation.level,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
                     blocked_reason=f"Execution blocked: {gate_decision.execution.mode.value}",
                     risk_level=tool_def.risk_level,
                     execution_time_ms=(time.time() - start_time) * 1000,
                 )
-                self._audit(tool_call, tool_def, result, gate_decision)
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment,
+                            domain_result=domain_result)
                 return result
 
         # Handle notification escalation
@@ -945,14 +1213,16 @@ class SafeMCPGateway:
                     tool_name=tool_call.tool_name,
                     decision=GatewayDecision.ESCALATE,
                     success=False,
-                    confidence=gate_decision.confidence.overall,
-                    escalation_level=gate_decision.escalation.level,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
                     blocked_reason="Required confirmation denied",
                     risk_level=tool_def.risk_level,
                     human_confirmed=False,
                     execution_time_ms=(time.time() - start_time) * 1000,
                 )
-                self._audit(tool_call, tool_def, result, gate_decision)
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment,
+                            domain_result=domain_result)
                 return result
             human_confirmed = True
 
@@ -970,13 +1240,15 @@ class SafeMCPGateway:
                 decision=GatewayDecision.ALLOWED,
                 success=True,
                 result=tool_result,
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
+                confidence=effective_confidence,
+                escalation_level=effective_escalation,
                 risk_level=tool_def.risk_level,
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
-            self._audit(tool_call, tool_def, result, gate_decision)
+            self._audit(tool_call, tool_def, result, gate_decision,
+                        jepa_assessment,
+                        domain_result=domain_result)
             return result
 
         except asyncio.TimeoutError:
@@ -986,13 +1258,15 @@ class SafeMCPGateway:
                 decision=GatewayDecision.TIMEOUT,
                 success=False,
                 error=f"Execution timed out after {tool_def.timeout_seconds}s",
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
+                confidence=effective_confidence,
+                escalation_level=effective_escalation,
                 risk_level=tool_def.risk_level,
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
-            self._audit(tool_call, tool_def, result, gate_decision)
+            self._audit(tool_call, tool_def, result, gate_decision,
+                        jepa_assessment,
+                        domain_result=domain_result)
             return result
 
         except Exception as e:
@@ -1002,13 +1276,15 @@ class SafeMCPGateway:
                 decision=GatewayDecision.ERROR,
                 success=False,
                 error=str(e),
-                confidence=gate_decision.confidence.overall,
-                escalation_level=gate_decision.escalation.level,
+                confidence=effective_confidence,
+                escalation_level=effective_escalation,
                 risk_level=tool_def.risk_level,
                 human_confirmed=human_confirmed,
                 execution_time_ms=(time.time() - start_time) * 1000,
             )
-            self._audit(tool_call, tool_def, result, gate_decision)
+            self._audit(tool_call, tool_def, result, gate_decision,
+                        jepa_assessment,
+                        domain_result=domain_result)
             return result
 
     async def call_tool_simple(

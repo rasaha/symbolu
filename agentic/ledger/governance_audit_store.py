@@ -638,15 +638,42 @@ def event_from_mcp_audit(
     success: bool = True,
     error: Optional[str] = None,
     human_confirmed: bool = False,
+    jepa_regime: Optional[str] = None,
+    jepa_recommended_action: Optional[str] = None,
+    jepa_reason_codes: Optional[List[str]] = None,
+    jepa_confidence_adjustment: Optional[float] = None,
+    jepa_execution_mode_override: Optional[str] = None,
+    jepa_escalation_override: Optional[str] = None,
+    jepa_overrode: bool = False,
+    domain_policy: Optional[Dict[str, Any]] = None,
+    domain_overrode: bool = False,
 ) -> GovernanceAuditEvent:
     """Create a GovernanceAuditEvent from MCP gateway audit data.
 
     Maps the existing AuditEntry fields to the canonical event model.
+    JEPA governance fields are persisted into request_snapshot so they
+    survive into the durable audit store.
     """
     blocked = []
     if decision in ("BLOCKED", "ERROR"):
         if error:
             blocked.append(error)
+
+    snapshot: Dict[str, Any] = _deep_sort(parameters) if parameters else {}
+    # Embed JEPA governance data in the snapshot for durable persistence
+    if jepa_regime is not None:
+        snapshot["jepa_regime"] = jepa_regime
+        snapshot["jepa_recommended_action"] = jepa_recommended_action
+        snapshot["jepa_reason_codes"] = jepa_reason_codes or []
+        snapshot["jepa_confidence_adjustment"] = jepa_confidence_adjustment
+        snapshot["jepa_execution_mode_override"] = jepa_execution_mode_override
+        snapshot["jepa_escalation_override"] = jepa_escalation_override
+        snapshot["jepa_overrode"] = jepa_overrode
+
+    # Embed domain policy data in the snapshot for durable persistence
+    if domain_policy is not None:
+        snapshot["domain_policy"] = domain_policy
+        snapshot["domain_overrode"] = domain_overrode
 
     return GovernanceAuditEvent(
         event_id=request_id or create_event_id(),
@@ -665,7 +692,7 @@ def event_from_mcp_audit(
         escalation_level="",
         blocked_reasons=tuple(blocked),
         rationale="",
-        request_snapshot=_deep_sort(parameters) if parameters else {},
+        request_snapshot=snapshot,
         execution_result={
             "execution_time_ms": round(execution_time_ms, 3),
             "success": success,

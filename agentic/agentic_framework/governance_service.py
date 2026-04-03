@@ -71,6 +71,17 @@ from agentic.agentic_framework.jepa_governance import (
     JEPAGovernanceAssessment,
     GovernanceRegime,
     jepa_governance_check,
+    safe_jepa_governance_check,
+    apply_jepa_override,
+    approximate_layer_weights,
+    approximate_vritti,
+)
+from agentic.agentic_framework.domain_policy import (
+    DomainActionMode,
+    DomainPolicyResult,
+    DomainRegistry,
+    resolve_domain_policy,
+    fail_closed_result,
 )
 
 import logging as _logging
@@ -304,31 +315,17 @@ def _approximate_layer_weights(
 ) -> Dict[str, float]:
     """Approximate OLM layer weights from available request signals.
 
-    In a full integration, the OLMGovernanceSignals would be passed directly.
-    Here we derive a reasonable approximation from the confidence signals
-    so the JEPA check can run without the full OLM engine.
+    Delegates to the shared canonical implementation in jepa_governance
+    so that GovernanceService and MCP produce identical composites.
     """
-    q = getattr(request, "quality_score", 0.5)
-    c = getattr(request, "coherence_score", 0.5)
-    ic = getattr(request, "internal_consistency", 0.5)
-    ga = getattr(request, "goal_alignment", 0.5)
-    tc = getattr(request, "trajectory_confidence", 0.5)
-    overall = gate_decision.confidence.overall
-
-    return {
-        "O1_POTENTIAL": 0.3,
-        "O2_IDENTITY": ic * 0.8,
-        "O3_EXECUTION": overall * 0.7,
-        "O4_STRUCTURE": c * 0.6,
-        "O5_COGNITION": q * 0.8,
-        "O6_AGENCY": ga * 0.7,
-        "O7_REASONING": q * 0.9,
-        "O8_PURPOSE": ga * 0.8,
-        "O9_WITNESSES": tc * 0.6,
-        "O10_UNIFYING": c * 0.7,
-        "O11_INTEGRATION": overall * 0.5,
-        "O12_ABSOLVING": tc * 0.4,
-    }
+    return approximate_layer_weights(
+        quality=getattr(request, "quality_score", 0.5),
+        coherence=getattr(request, "coherence_score", 0.5),
+        internal_consistency=getattr(request, "internal_consistency", 0.5),
+        goal_alignment=getattr(request, "goal_alignment", 0.5),
+        trajectory_confidence=getattr(request, "trajectory_confidence", 0.5),
+        overall_confidence=gate_decision.confidence.overall,
+    )
 
 
 def _approximate_vritti(
@@ -337,69 +334,14 @@ def _approximate_vritti(
 ) -> Dict[str, float]:
     """Approximate vritti distribution from available request signals.
 
-    In a full integration, ChittaVrittiResult would be passed directly.
-    Here we derive a reasonable approximation: high quality/coherence
-    → pramana; low quality → viparyaya; low coherence → vikalpa.
+    Delegates to the shared canonical implementation in jepa_governance.
     """
-    q = getattr(request, "quality_score", 0.5)
-    c = getattr(request, "coherence_score", 0.5)
-    overall = gate_decision.confidence.overall
+    return approximate_vritti(
+        quality=getattr(request, "quality_score", 0.5),
+        coherence=getattr(request, "coherence_score", 0.5),
+        overall_confidence=gate_decision.confidence.overall,
+    )
 
-    # Pramana rises with quality and coherence
-    pramana = min(1.0, q * 0.6 + c * 0.4)
-    # Viparyaya rises when quality is low
-    viparyaya = max(0.0, 0.5 - q * 0.8)
-    # Vikalpa rises when coherence is low but quality is moderate
-    vikalpa = max(0.0, 0.4 - c * 0.5) * min(1.0, q + 0.3)
-    # Smrti is a baseline
-    smrti = 0.1
-    # Nidra rises when overall confidence is very low
-    nidra = max(0.0, 0.3 - overall * 0.5)
-
-    # Normalize
-    total = pramana + viparyaya + vikalpa + smrti + nidra
-    if total <= 0:
-        return {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
-                "smrti": 0.0, "nidra": 1.0}
-    return {
-        "pramana": pramana / total,
-        "viparyaya": viparyaya / total,
-        "vikalpa": vikalpa / total,
-        "smrti": smrti / total,
-        "nidra": nidra / total,
-    }
-
-
-def _apply_jepa_override(
-    governance_decision: APIGovernanceDecision,
-    eligible: bool,
-    assessment: "JEPAGovernanceAssessment",
-) -> Tuple[APIGovernanceDecision, bool]:
-    """Apply JEPA governance override if the regime warrants it.
-
-    JEPA can only make decisions STRICTER, never more permissive.
-    - NORMAL → no change
-    - PROCESS_DRIFT → downgrade ALLOW to DEFER
-    - SEMANTIC_SHIFT → downgrade ALLOW to DEFER
-    - DUAL_ANOMALY → force DENY
-    - UNKNOWN → force DENY
-    """
-    regime = assessment.regime
-
-    if regime == GovernanceRegime.NORMAL:
-        return governance_decision, eligible
-
-    if regime == GovernanceRegime.DUAL_ANOMALY:
-        return APIGovernanceDecision.DENY, False
-
-    if regime == GovernanceRegime.UNKNOWN:
-        return APIGovernanceDecision.DENY, False
-
-    if regime in (GovernanceRegime.PROCESS_DRIFT, GovernanceRegime.SEMANTIC_SHIFT):
-        if governance_decision == APIGovernanceDecision.ALLOW:
-            return APIGovernanceDecision.DEFER, eligible
-
-    return governance_decision, eligible
 
 
 def _build_rationale_codes(
@@ -408,6 +350,9 @@ def _build_rationale_codes(
     risk_level: ToolRiskLevel,
     forbidden_cap: Optional[str],
     governance_decision: APIGovernanceDecision,
+    jepa_assessment: Optional["JEPAGovernanceAssessment"] = None,
+    jepa_overrode: bool = False,
+    domain_result: Optional["DomainPolicyResult"] = None,
 ) -> List[str]:
     """Build machine-readable rationale codes."""
     codes: List[str] = []
@@ -424,6 +369,20 @@ def _build_rationale_codes(
     if not gate_decision.execution.can_execute:
         codes.append(f"EXECUTION_BLOCKED:{gate_decision.execution.mode.value}")
 
+    # JEPA rationale codes
+    if jepa_assessment is not None:
+        codes.append(f"JEPA_REGIME:{jepa_assessment.regime.value}")
+        if jepa_overrode:
+            codes.append(f"JEPA_OVERRIDE:{jepa_assessment.recommended_action}")
+        for rc in jepa_assessment.reason_codes:
+            codes.append(f"JEPA:{rc}")
+
+    # Domain policy rationale codes
+    if domain_result is not None:
+        codes.append(f"DOMAIN:{domain_result.domain_id}:{domain_result.mode.value}")
+        for rc in domain_result.reason_codes:
+            codes.append(f"DOMAIN_DETAIL:{rc}")
+
     codes.append(f"RISK_LEVEL:{risk_level.value}")
     codes.append(f"DECISION:{governance_decision.value}")
 
@@ -436,6 +395,9 @@ def _build_rationale_string(
     gate_decision: ConfidenceGateDecision,
     risk_level: ToolRiskLevel,
     forbidden_cap: Optional[str],
+    jepa_assessment: Optional["JEPAGovernanceAssessment"] = None,
+    jepa_overrode: bool = False,
+    domain_result: Optional["DomainPolicyResult"] = None,
 ) -> str:
     """Build human-readable rationale string."""
     parts: List[str] = []
@@ -458,6 +420,26 @@ def _build_rationale_string(
         parts.append(
             f"Human approval required "
             f"(escalation={gate_decision.escalation.level.value})."
+        )
+
+    # JEPA rationale
+    if jepa_assessment is not None and jepa_overrode:
+        parts.append(
+            f"JEPA governance override: regime={jepa_assessment.regime.value}, "
+            f"action={jepa_assessment.recommended_action}, "
+            f"confidence_adj={jepa_assessment.confidence_adjustment:+.2f}."
+        )
+    elif jepa_assessment is not None and jepa_assessment.regime.value != "normal":
+        parts.append(
+            f"JEPA regime: {jepa_assessment.regime.value} "
+            f"(no override applied)."
+        )
+
+    # Domain policy rationale
+    if domain_result is not None and domain_result.mode != DomainActionMode.ALLOW:
+        parts.append(
+            f"Domain policy '{domain_result.domain_id}': "
+            f"mode={domain_result.mode.value}. {domain_result.rationale}"
         )
 
     if governance_decision == APIGovernanceDecision.ALLOW:
@@ -499,6 +481,8 @@ class GovernanceService:
         risk_classifier: Optional[ToolRiskClassifier] = None,
         strict: bool = False,
         audit_store: Optional[GovernanceAuditStore] = None,
+        domain_registry: Optional[DomainRegistry] = None,
+        domain_id: Optional[str] = None,
     ):
         """
         Initialize governance service.
@@ -510,6 +494,11 @@ class GovernanceService:
             audit_store: Durable audit store for persistence (default: None,
                          in-memory only).  When provided, every audit event is
                          persisted to the store in addition to the in-memory log.
+            domain_registry: Optional DomainRegistry for domain-specific policy.
+                When provided with domain_id, the Domain Semantic Policy Layer
+                translates JEPA assessments into domain-specific action modes.
+            domain_id: Which domain profile to use from the registry.
+                Ignored if domain_registry is None.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -525,6 +514,10 @@ class GovernanceService:
 
         # Durable persistent audit store (source of truth when present)
         self._audit_store: Optional[GovernanceAuditStore] = audit_store
+
+        # Domain Semantic Policy Layer
+        self._domain_registry: Optional[DomainRegistry] = domain_registry
+        self._domain_id: Optional[str] = domain_id
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -580,32 +573,113 @@ class GovernanceService:
         #   Compares the JEPA composite latent state (ontology + vritti)
         #   against the runtime process state to detect drift, anomaly,
         #   or semantic shift. May override governance decision.
+        #   Uses safe_jepa_governance_check — always returns an assessment,
+        #   never None. JEPA failure produces UNKNOWN regime.
+        baseline_decision = governance_decision
         jepa_assessment = self._run_jepa_check(
-            request, risk_level, gate_decision, governance_decision,
+            request, risk_level, gate_decision,
         )
-        if jepa_assessment is not None:
-            governance_decision, eligible = _apply_jepa_override(
-                governance_decision, eligible, jepa_assessment,
-            )
 
-        # Step 6: Build rationale
+        # Use the shared override function from jepa_governance
+        jepa_result = apply_jepa_override(
+            baseline_decision=governance_decision.value,
+            baseline_eligible=eligible,
+            assessment=jepa_assessment,
+        )
+        governance_decision = APIGovernanceDecision(jepa_result["decision"])
+        eligible = jepa_result["eligible"]
+        jepa_overrode = jepa_result["overrode"]
+
+        # Step 5c: Apply JEPA override fields to confidence, execution
+        # mode, and escalation level. These modify the gate decision's
+        # effective output — JEPA can only make things stricter.
+        effective_confidence = max(
+            0.0,
+            gate_decision.confidence.overall + jepa_assessment.confidence_adjustment,
+        )
+
+        effective_exec_mode = gate_decision.execution.mode
+        if jepa_assessment.execution_mode_override is not None:
+            jepa_exec = jepa_assessment.execution_mode_override.lower()
+            gate_exec = gate_decision.execution.mode.value
+            # Only apply if JEPA is stricter (BLOCKED > CONFIRM > CAUTIOUS > FULL)
+            _EXEC_SEVERITY = {"full": 0, "cautious": 1, "confirm": 2,
+                              "confirm_required": 2, "blocked": 3}
+            if _EXEC_SEVERITY.get(jepa_exec, 0) > _EXEC_SEVERITY.get(gate_exec, 0):
+                effective_exec_mode = ExecutionMode(jepa_exec
+                    if jepa_exec != "confirm_required" else "confirm")
+
+        effective_esc_level = gate_decision.escalation.level
+        if jepa_assessment.escalation_override is not None:
+            jepa_esc = jepa_assessment.escalation_override.lower()
+            gate_esc = gate_decision.escalation.level.value
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            if _ESC_SEVERITY.get(jepa_esc, 0) > _ESC_SEVERITY.get(gate_esc, 0):
+                effective_esc_level = EscalationLevel(jepa_esc)
+
+        effective_requires_human = (
+            gate_decision.escalation.requires_human
+            or effective_esc_level in (EscalationLevel.CONFIRM, EscalationLevel.HALT)
+        )
+
+        # Step 5d: Domain Semantic Policy Layer
+        #   Translates the JEPA assessment into domain-specific action mode.
+        #   Domain policy can only make things STRICTER, never relax.
+        #   If no domain is configured, this step is a no-op.
+        domain_result: Optional[DomainPolicyResult] = None
+        if self._domain_registry is not None and self._domain_id is not None:
+            domain_result = resolve_domain_policy(
+                jepa_assessment,
+                self._domain_registry,
+                self._domain_id,
+                tool_name=request.tool_name or "",
+            )
+            # Apply domain mode as stricter-only override
+            if domain_result.mode == DomainActionMode.BLOCKED:
+                governance_decision = APIGovernanceDecision.DENY
+                eligible = False
+            elif domain_result.mode in (
+                DomainActionMode.CONFIRM_REQUIRED,
+                DomainActionMode.SANDBOX_ONLY,
+                DomainActionMode.MEMORY_WRITE_DENIED,
+            ):
+                if governance_decision == APIGovernanceDecision.ALLOW:
+                    governance_decision = APIGovernanceDecision.DEFER
+                    eligible = False
+                # Only set requires_human when the decision is not already
+                # DENY — a denied request needs no human confirmation.
+                if governance_decision != APIGovernanceDecision.DENY:
+                    effective_requires_human = True
+            elif domain_result.mode in (
+                DomainActionMode.READ_ONLY,
+                DomainActionMode.DRAFT_ONLY,
+            ):
+                if governance_decision == APIGovernanceDecision.ALLOW:
+                    governance_decision = APIGovernanceDecision.DEFER
+                    eligible = False
+
+        # Step 6: Build rationale (includes JEPA and domain information)
         rationale_codes = _build_rationale_codes(
-            safety_summary, gate_decision, risk_level, forbidden_cap, governance_decision,
+            safety_summary, gate_decision, risk_level, forbidden_cap,
+            governance_decision, jepa_assessment, jepa_overrode,
+            domain_result,
         )
         rationale = _build_rationale_string(
-            governance_decision, safety_summary, gate_decision, risk_level, forbidden_cap,
+            governance_decision, safety_summary, gate_decision, risk_level,
+            forbidden_cap, jepa_assessment, jepa_overrode,
+            domain_result,
         )
 
-        # Step 7: Build confidence gate summary
+        # Step 7: Build confidence gate summary (with JEPA adjustments)
         confidence_summary = ConfidenceGateSummary(
-            overall_confidence=gate_decision.confidence.overall,
+            overall_confidence=effective_confidence,
             quality_component=gate_decision.confidence.quality_component,
             coherence_component=gate_decision.confidence.coherence_component,
             stability_component=gate_decision.confidence.stability_component,
             action_component=gate_decision.confidence.action_component,
-            execution_mode=_map_execution_mode(gate_decision.execution.mode),
-            escalation_level=_map_escalation_level(gate_decision.escalation.level),
-            requires_human=gate_decision.escalation.requires_human,
+            execution_mode=_map_execution_mode(effective_exec_mode),
+            escalation_level=_map_escalation_level(effective_esc_level),
+            requires_human=effective_requires_human,
             revision_budget=gate_decision.budget.revision_budget,
             reasoning=gate_decision.reasoning,
         )
@@ -620,9 +694,9 @@ class GovernanceService:
             decision=governance_decision,
             risk_level=_map_risk_level(risk_level),
             eligible=eligible,
-            confidence=gate_decision.confidence.overall,
-            execution_mode=_map_execution_mode(gate_decision.execution.mode),
-            escalation_level=_map_escalation_level(gate_decision.escalation.level),
+            confidence=effective_confidence,
+            execution_mode=_map_execution_mode(effective_exec_mode),
+            escalation_level=_map_escalation_level(effective_esc_level),
             blocked_reasons=safety_summary.blocking_reasons,
             request_snapshot={
                 "actor_id": request.actor_id,
@@ -632,19 +706,30 @@ class GovernanceService:
                 "capabilities": request.capabilities,
                 "quality_score": request.quality_score,
                 "coherence_score": request.coherence_score,
+                "jepa_regime": jepa_assessment.regime.value,
+                "jepa_reason_codes": list(jepa_assessment.reason_codes),
+                "jepa_overrode_baseline": jepa_overrode,
+                "jepa_baseline_decision": baseline_decision.value,
+                "jepa_confidence_adjustment": jepa_assessment.confidence_adjustment,
+                "jepa_recommended_action": jepa_assessment.recommended_action,
+                "jepa_execution_mode_override": jepa_assessment.execution_mode_override,
+                "jepa_escalation_override": jepa_assessment.escalation_override,
+                "domain_policy": (
+                    domain_result.to_audit_dict() if domain_result else None
+                ),
             },
         )
         self._persist_audit_event(audit_event)
 
-        # Step 9: Assemble response
+        # Step 9: Assemble response (uses JEPA-adjusted fields)
         return AuthorizationResponse(
             governance_decision=governance_decision,
             eligible=eligible,
-            execution_mode=_map_execution_mode(gate_decision.execution.mode),
-            escalation_level=_map_escalation_level(gate_decision.escalation.level),
-            requires_human_approval=gate_decision.escalation.requires_human,
+            execution_mode=_map_execution_mode(effective_exec_mode),
+            escalation_level=_map_escalation_level(effective_esc_level),
+            requires_human_approval=effective_requires_human,
             risk_level=_map_risk_level(risk_level),
-            confidence_score=gate_decision.confidence.overall,
+            confidence_score=effective_confidence,
             allowed_actions=gate_decision.execution.allowed_actions,
             blocked_reasons=safety_summary.blocking_reasons,
             rationale_codes=rationale_codes,
@@ -776,49 +861,36 @@ class GovernanceService:
         request: AuthorizationRequest,
         risk_level: "ToolRiskLevel",
         gate_decision: "ConfidenceGateDecision",
-        governance_decision: "APIGovernanceDecision",
-    ) -> Optional[JEPAGovernanceAssessment]:
-        """Run JEPA residual governance check if signals are available.
+    ) -> JEPAGovernanceAssessment:
+        """Run JEPA residual governance check. Always returns an assessment.
 
-        Returns None if JEPA cannot be computed (missing classifiers).
-        The JEPA check is best-effort: if neither ontology nor vritti
-        signals are available, it returns None and the existing decision
-        stands. If signals are partially available, JEPA still runs
-        with fail-closed defaults on the missing side.
+        Uses safe_jepa_governance_check which catches internal errors
+        and returns an explicit UNKNOWN-regime assessment. Never returns
+        None — JEPA failure is itself a governance condition.
         """
-        # Build layer weights from request quality/coherence scores.
-        # In a full integration, these would come from OLMGovernanceSignals
-        # or the sovereign bridge. Here we approximate from available signals.
         layer_weights = _approximate_layer_weights(request, gate_decision)
-
-        # Build vritti distribution from request signals.
-        # In a full integration, these would come from ChittaVrittiEngine.
         vritti_dist = _approximate_vritti(request, gate_decision)
 
-        try:
-            return jepa_governance_check(
-                layer_weights=layer_weights,
-                vritti_distribution=vritti_dist,
-                coherence=getattr(request, "coherence_score", 0.5),
-                score=gate_decision.confidence.overall,
-                action_type=request.action_type,
-                tool_name=request.tool_name or "",
-                risk_level=risk_level.value if hasattr(risk_level, "value") else str(risk_level),
-                confidence_score=gate_decision.confidence.overall,
-                agency_level=request.agency_level or "FULL",
-                execution_mode=gate_decision.execution.mode.value
-                    if hasattr(gate_decision.execution.mode, "value")
-                    else str(gate_decision.execution.mode),
-                escalation_level=gate_decision.escalation.level.value
-                    if hasattr(gate_decision.escalation.level, "value")
-                    else str(gate_decision.escalation.level),
-                session_id=getattr(request, "session_id", ""),
-                actor_id=request.actor_id,
-                capabilities=request.capabilities or [],
-            )
-        except Exception as e:
-            _logger.warning("JEPA governance check failed: %s", e)
-            return None
+        return safe_jepa_governance_check(
+            layer_weights=layer_weights,
+            vritti_distribution=vritti_dist,
+            coherence=getattr(request, "coherence_score", 0.5),
+            score=gate_decision.confidence.overall,
+            action_type=request.action_type,
+            tool_name=request.tool_name or "",
+            risk_level=risk_level.value if hasattr(risk_level, "value") else str(risk_level),
+            confidence_score=gate_decision.confidence.overall,
+            agency_level=request.agency_level or "FULL",
+            execution_mode=gate_decision.execution.mode.value
+                if hasattr(gate_decision.execution.mode, "value")
+                else str(gate_decision.execution.mode),
+            escalation_level=gate_decision.escalation.level.value
+                if hasattr(gate_decision.escalation.level, "value")
+                else str(gate_decision.escalation.level),
+            session_id=getattr(request, "session_id", ""),
+            actor_id=request.actor_id,
+            capabilities=request.capabilities or [],
+        )
 
     def get_audit_log(self, limit: int = 100) -> List[AuditEvent]:
         """Get recent audit events (from in-memory cache)."""

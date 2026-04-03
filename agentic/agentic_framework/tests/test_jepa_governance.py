@@ -355,7 +355,7 @@ class TestRegimeBehavior:
         )
         # Severe misalignment → HALT or CONFIRM
         assert result.recommended_action in ("HALT", "CONFIRM")
-        assert result.execution_mode_override in ("BLOCKED", "CONFIRM")
+        assert result.execution_mode_override in ("BLOCKED", "CONFIRM_REQUIRED")
 
     def test_unknown_halts(self):
         result = jepa_governance_check(
@@ -475,3 +475,1003 @@ class TestReasonCodes:
         # With balanced ontology the regime may stay NORMAL, but the risk
         # factor and reason code must still be present.
         assert "IMAGINATIVE_DESTRUCTIVE" in result.reason_codes
+
+
+# =============================================================================
+# Test: Direct compute_residual() intermediate values (Test C1)
+# =============================================================================
+
+class TestComputeResidualIntermediates:
+    """Directly test compute_residual() to verify intermediate values."""
+
+    def test_read_only_always_semantically_consistent(self):
+        """Read-only actions should have semantic_consistency=1.0."""
+        ontology = build_ontology_signal(
+            layer_weights={l: 0.9 for l in ONTOLOGY_LAYERS}
+        )
+        vritti = build_vritti_signal(
+            vritti_distribution=_pramana_vritti(), coherence=0.8,
+        )
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            tool_name="search", risk_level="read_only",
+        )
+        residual = compute_residual(jepa, runtime)
+        assert residual.semantic_consistency == 1.0
+        assert residual.action_state_coherence == 1.0
+
+    def test_destructive_weak_execution_reduces_consistency(self):
+        """Destructive action with weak O3_EXECUTION → lower semantic consistency."""
+        weights = {l: 0.5 for l in ONTOLOGY_LAYERS}
+        weights["O3_EXECUTION"] = 0.1  # Weak execution ontology
+        # Make governance dominant
+        weights["O7_REASONING"] = 0.9
+        weights["O8_PURPOSE"] = 0.9
+        ontology = build_ontology_signal(layer_weights=weights)
+        vritti = build_vritti_signal(
+            vritti_distribution=_pramana_vritti(), coherence=0.8,
+        )
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            tool_name="drop_table", risk_level="destructive",
+        )
+        residual = compute_residual(jepa, runtime)
+        # Should have reduced semantic consistency due to:
+        # 1. governance-dominant ontology executing side effects
+        # 2. weak O3_EXECUTION for destructive action
+        assert residual.semantic_consistency < 0.5
+        assert "DESTRUCTIVE_WITHOUT_EXECUTION_ONTOLOGY" in residual.reason_codes
+
+    def test_observation_mode_side_effect_reduces_coherence(self):
+        """Side-effecting action during observation vritti reduces coherence."""
+        ontology = build_ontology_signal(layer_weights=_balanced_ontology())
+        vritti = build_vritti_signal(
+            vritti_distribution=_nidra_vritti(), coherence=0.5,
+        )
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            tool_name="write_file", risk_level="write",
+        )
+        residual = compute_residual(jepa, runtime)
+        assert residual.action_state_coherence < 0.6
+        assert "SIDE_EFFECT_IN_OBSERVATION_MODE" in residual.reason_codes
+
+    def test_residual_magnitude_is_weighted_blend(self):
+        """Residual magnitude = 0.35*align + 0.30*semantic + 0.35*action."""
+        ontology = build_ontology_signal(layer_weights=_balanced_ontology())
+        vritti = build_vritti_signal(
+            vritti_distribution=_pramana_vritti(), coherence=0.9, score=0.9,
+        )
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            tool_name="read_log", risk_level="read_only",
+        )
+        residual = compute_residual(jepa, runtime)
+        expected = (
+            0.35 * (1.0 - jepa.ontology_vritti_alignment)
+            + 0.30 * (1.0 - residual.semantic_consistency)
+            + 0.35 * (1.0 - residual.action_state_coherence)
+        )
+        assert abs(residual.residual_magnitude - min(1.0, expected)) < 0.01
+
+
+# =============================================================================
+# Test: PRIVILEGED path coverage (Test C2)
+# =============================================================================
+
+class TestPrivilegedPath:
+    """Test PRIVILEGED action category in residual computation."""
+
+    def test_privileged_weak_agency_flagged(self):
+        """Privileged action with weak O6_AGENCY → flagged."""
+        weights = {l: 0.5 for l in ONTOLOGY_LAYERS}
+        weights["O6_AGENCY"] = 0.1  # Weak agency
+        result = jepa_governance_check(
+            layer_weights=weights,
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            tool_name="admin_grant",
+            risk_level="privileged",
+        )
+        assert "PRIVILEGED_WITHOUT_AGENCY_ONTOLOGY" in result.reason_codes
+
+    def test_privileged_strong_agency_ok(self):
+        """Privileged action with strong O6_AGENCY → no agency flag."""
+        weights = _balanced_ontology()
+        weights["O6_AGENCY"] = 0.8
+        result = jepa_governance_check(
+            layer_weights=weights,
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            tool_name="admin_grant",
+            risk_level="privileged",
+        )
+        assert "PRIVILEGED_WITHOUT_AGENCY_ONTOLOGY" not in result.reason_codes
+
+    def test_privileged_is_side_effecting(self):
+        """Privileged actions must be classified as side-effecting."""
+        rt = build_runtime_process_state(
+            tool_name="sudo_cmd", risk_level="privileged",
+        )
+        assert rt.action_category == RuntimeActionCategory.PRIVILEGED
+        assert rt.is_side_effecting
+
+
+# =============================================================================
+# Test: Boundary tests for thresholds 0.20 / 0.40 / 0.50
+# =============================================================================
+
+class TestThresholdBoundaries:
+    """Test regime classification around boundary thresholds."""
+
+    def test_alignment_at_critical_boundary(self):
+        """Alignment just below 0.60 → should trigger DUAL_ANOMALY or SEMANTIC_SHIFT.
+
+        Alignment is on [0, 1] where 0.5 = orthogonal (cosine 0),
+        0.0 = anti-correlated, 1.0 = aligned.
+        """
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        # alignment=0.59, with low action coherence → DUAL_ANOMALY
+        regime = _classify_regime(
+            alignment=0.59,
+            semantic_consistency=0.6,
+            action_state_coherence=0.4,
+            residual_magnitude=0.5,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.DUAL_ANOMALY
+
+    def test_alignment_at_low_boundary(self):
+        """Alignment just below 0.70 → SEMANTIC_SHIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.69,
+            semantic_consistency=0.8,
+            action_state_coherence=0.8,
+            residual_magnitude=0.3,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.SEMANTIC_SHIFT
+
+    def test_alignment_just_above_low_boundary(self):
+        """Alignment at 0.71 with good coherence → not SEMANTIC_SHIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.71,
+            semantic_consistency=0.8,
+            action_state_coherence=0.8,
+            residual_magnitude=0.2,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.NORMAL
+
+    def test_action_coherence_at_050_boundary(self):
+        """Action coherence just below 0.50 → PROCESS_DRIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.80,  # above _ALIGNMENT_LOW (0.70)
+            semantic_consistency=0.8,
+            action_state_coherence=0.49,
+            residual_magnitude=0.3,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.PROCESS_DRIFT
+
+    def test_residual_magnitude_above_040(self):
+        """Residual magnitude above 0.40 → PROCESS_DRIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.80,  # above _ALIGNMENT_LOW (0.70)
+            semantic_consistency=0.6,
+            action_state_coherence=0.6,
+            residual_magnitude=0.41,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.PROCESS_DRIFT
+
+    def test_integrated_confidence_below_005_unknown(self):
+        """Integrated confidence < 0.05 → UNKNOWN regardless of other signals."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.9,
+            semantic_consistency=0.9,
+            action_state_coherence=0.9,
+            residual_magnitude=0.1,
+            integrated_confidence=0.04,
+        )
+        assert regime == GovernanceRegime.UNKNOWN
+
+
+# =============================================================================
+# Test: All-zero vritti fail-closed
+# =============================================================================
+
+class TestAllZeroVritti:
+    """All-zero vritti distribution must fail-closed to nidra."""
+
+    def test_all_zero_vritti_becomes_nidra(self):
+        """All-zero vritti distribution → nidra (dormancy)."""
+        sig = build_vritti_signal(
+            vritti_distribution={"pramana": 0.0, "viparyaya": 0.0,
+                                  "vikalpa": 0.0, "smrti": 0.0, "nidra": 0.0},
+        )
+        assert sig.primary_vritti == "nidra"
+        assert sig.distribution["nidra"] == 1.0
+        assert sig.coherence == 0.0
+        assert sig.confidence == 0.0
+
+    def test_all_zero_vritti_with_execution_triggers_drift(self):
+        """All-zero vritti + execute action → not NORMAL."""
+        result = jepa_governance_check(
+            layer_weights=_balanced_ontology(),
+            vritti_distribution={"pramana": 0.0, "viparyaya": 0.0,
+                                  "vikalpa": 0.0, "smrti": 0.0, "nidra": 0.0},
+            coherence=0.5,
+            score=0.5,
+            tool_name="run_code",
+            risk_level="execute",
+        )
+        assert result.regime != GovernanceRegime.NORMAL
+
+
+# =============================================================================
+# Test: Override propagation in GovernanceService
+# =============================================================================
+
+class TestOverridePropagation:
+    """Test that JEPA overrides propagate correctly through GovernanceService."""
+
+    def test_jepa_override_recorded_in_audit(self):
+        """JEPA override details must appear in audit event."""
+        from agentic.agentic_framework.governance_service import GovernanceService
+        from agentic.agentic_framework.governance_models import AuthorizationRequest
+
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="search_files",
+            tool_name="search_files",
+            quality_score=0.9,
+            coherence_score=0.9,
+            internal_consistency=0.9,
+            goal_alignment=0.9,
+            trajectory_confidence=0.9,
+            agency_level="FULL",
+        ))
+        snapshot = resp.audit_event.request_snapshot
+        assert "jepa_regime" in snapshot
+        assert "jepa_reason_codes" in snapshot
+        assert "jepa_overrode_baseline" in snapshot
+        assert "jepa_baseline_decision" in snapshot
+        assert "jepa_confidence_adjustment" in snapshot
+
+    def test_jepa_deny_override_shows_in_audit(self):
+        """When JEPA causes DENY, audit should show the override."""
+        from agentic.agentic_framework.governance_service import GovernanceService
+        from agentic.agentic_framework.governance_models import AuthorizationRequest
+
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="delete_everything",
+            tool_name="rm_rf",
+            quality_score=0.05,
+            coherence_score=0.05,
+            internal_consistency=0.05,
+            goal_alignment=0.05,
+            trajectory_confidence=0.05,
+            agency_level="FULL",
+        ))
+        # With very low signals, the decision should be DENY
+        assert resp.governance_decision.value in ("DENY", "DEFER")
+        snapshot = resp.audit_event.request_snapshot
+        assert isinstance(snapshot["jepa_reason_codes"], list)
+
+    def test_audit_has_all_jepa_fields(self):
+        """Audit snapshot must contain all JEPA override detail fields."""
+        from agentic.agentic_framework.governance_service import GovernanceService
+        from agentic.agentic_framework.governance_models import AuthorizationRequest
+
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="search_files",
+            tool_name="search",
+            quality_score=0.9,
+            coherence_score=0.9,
+            agency_level="FULL",
+        ))
+        snapshot = resp.audit_event.request_snapshot
+        required_keys = {
+            "jepa_regime", "jepa_reason_codes", "jepa_overrode_baseline",
+            "jepa_baseline_decision", "jepa_confidence_adjustment",
+            "jepa_recommended_action", "jepa_execution_mode_override",
+            "jepa_escalation_override",
+        }
+        assert required_keys.issubset(set(snapshot.keys())), (
+            f"Missing keys: {required_keys - set(snapshot.keys())}"
+        )
+
+
+# =============================================================================
+# Test: Invalid key validation
+# =============================================================================
+
+class TestInputValidation:
+    """Validate that unknown keys in layer_weights and vritti_distribution are handled."""
+
+    def test_unknown_layer_weights_keys_handled(self):
+        """Unknown layer_weights keys should not crash, just warn."""
+        sig = build_ontology_signal(
+            layer_weights={
+                "O7_REASONING": 0.9,
+                "UNKNOWN_LAYER": 0.5,  # Should be ignored
+            }
+        )
+        # Should still work — unknown key ignored, canonical layers used
+        assert sig.primary_layer == "O7_REASONING"
+        assert len(sig.layer_weights) == 12
+        assert "UNKNOWN_LAYER" not in sig.layer_weights
+
+    def test_unknown_vritti_keys_handled(self):
+        """Unknown vritti_distribution keys should not crash."""
+        sig = build_vritti_signal(
+            vritti_distribution={
+                "pramana": 0.8,
+                "unknown_mode": 0.2,  # Should be ignored
+            },
+            coherence=0.7,
+        )
+        assert sig.primary_vritti == "pramana"
+        assert "unknown_mode" not in sig.distribution
+
+    def test_missing_vritti_keys_default_to_zero(self):
+        """Missing vritti keys should default to 0.0."""
+        sig = build_vritti_signal(
+            vritti_distribution={"pramana": 1.0},  # Others missing
+            coherence=0.8,
+        )
+        assert sig.distribution["viparyaya"] == 0.0
+        assert sig.distribution["vikalpa"] == 0.0
+
+    def test_missing_layer_keys_default_to_zero(self):
+        """Missing layer keys should default to 0.0."""
+        sig = build_ontology_signal(
+            layer_weights={"O7_REASONING": 0.9},  # Others missing
+        )
+        assert sig.layer_weights["O1_POTENTIAL"] == 0.0
+        assert sig.layer_weights["O12_ABSOLVING"] == 0.0
+
+
+# =============================================================================
+# Test: Shared safe wrapper and override function
+# =============================================================================
+
+class TestSafeWrapper:
+    """Test safe_jepa_governance_check and apply_jepa_override."""
+
+    def test_safe_wrapper_returns_assessment_on_success(self):
+        """Safe wrapper should return normal assessment when JEPA works."""
+        from agentic.agentic_framework.jepa_governance import safe_jepa_governance_check
+        result = safe_jepa_governance_check(
+            layer_weights=_balanced_ontology() | {"O7_REASONING": 0.9},
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            risk_level="read_only",
+        )
+        assert result.regime == GovernanceRegime.NORMAL
+        assert result.recommended_action == "ALLOW"
+
+    def test_safe_wrapper_returns_unknown_on_error(self):
+        """Safe wrapper should return UNKNOWN assessment on internal error."""
+        from agentic.agentic_framework.jepa_governance import safe_jepa_governance_check
+        # Pass invalid layer_weights type to trigger error inside jepa_governance_check
+        result = safe_jepa_governance_check(
+            layer_weights=None,  # Will cause ValueError
+            olm_signals=None,    # Also None → ValueError
+        )
+        assert result.regime == GovernanceRegime.UNKNOWN
+        assert result.recommended_action == "HALT"
+        assert "JEPA_UNAVAILABLE" in result.reason_codes
+
+    def test_shared_override_normal_no_change(self):
+        """apply_jepa_override with NORMAL regime should not change decision."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology() | {"O7_REASONING": 0.9},
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            risk_level="read_only",
+        )
+        result = apply_jepa_override("ALLOW", True, assessment)
+        assert result["decision"] == "ALLOW"
+        assert result["eligible"] is True
+        assert result["overrode"] is False
+
+    def test_shared_override_halt_forces_deny(self):
+        """apply_jepa_override with HALT action should force DENY."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        # Create an assessment with UNKNOWN regime (HALT)
+        assessment = jepa_governance_check(
+            layer_weights={l: 0.0 for l in ONTOLOGY_LAYERS},
+        )
+        assert assessment.recommended_action == "HALT"
+        result = apply_jepa_override("ALLOW", True, assessment)
+        assert result["decision"] == "DENY"
+        assert result["eligible"] is False
+        assert result["overrode"] is True
+
+    def test_shared_override_never_weakens_deny(self):
+        """apply_jepa_override must never upgrade DENY to ALLOW."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology() | {"O7_REASONING": 0.9},
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            risk_level="read_only",
+        )
+        # Even with NORMAL regime, DENY baseline must stay DENY
+        result = apply_jepa_override("DENY", False, assessment)
+        assert result["decision"] == "DENY"
+        assert result["eligible"] is False
+
+    def test_shared_override_degrade_downgrades_allow(self):
+        """DEGRADE recommended_action should downgrade ALLOW to DEFER."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        # Use nidra + balanced ontology to get PROCESS_DRIFT (DEGRADE)
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology(),
+            vritti_distribution=_nidra_vritti(),
+            coherence=0.5,
+            score=0.3,
+            tool_name="write_file",
+            risk_level="write",
+        )
+        if assessment.recommended_action == "DEGRADE":
+            result = apply_jepa_override("ALLOW", True, assessment)
+            assert result["decision"] == "DEFER"
+            assert result["overrode"] is True
+
+
+# =============================================================================
+# Test: GovernanceService JEPA Rationale & Override Integration
+# =============================================================================
+
+
+class TestGovernanceServiceJEPARationale:
+    """Test that JEPA info appears in rationale codes and strings."""
+
+    def test_rationale_codes_contain_jepa_regime(self):
+        """Rationale codes should include JEPA_REGIME when JEPA runs."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="read_file",
+            tool_name="read_file",
+            quality_score=0.9,
+            coherence_score=0.9,
+        ))
+        codes = resp.rationale_codes
+        jepa_regime_codes = [c for c in codes if c.startswith("JEPA_REGIME:")]
+        assert len(jepa_regime_codes) == 1
+
+    def test_rationale_codes_contain_jepa_override_when_overriding(self):
+        """JEPA_OVERRIDE: must appear when JEPA actually changes the decision."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        # Force a HALT assessment (UNKNOWN regime)
+        assessment = jepa_governance_check(
+            layer_weights={l: 0.0 for l in ONTOLOGY_LAYERS},
+        )
+        assert assessment.recommended_action == "HALT"
+        result = apply_jepa_override("ALLOW", True, assessment)
+        assert result["overrode"] is True
+
+        # Now verify via GovernanceService with very low signals
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="execute_code",
+            tool_name="execute_code",
+            quality_score=0.05,
+            coherence_score=0.05,
+        ))
+        codes = resp.rationale_codes
+        # Must have JEPA_REGIME
+        assert any(c.startswith("JEPA_REGIME:") for c in codes)
+        # If JEPA overrode, must have JEPA_OVERRIDE
+        snap = resp.audit_event.request_snapshot
+        if snap["jepa_overrode_baseline"]:
+            assert any(c.startswith("JEPA_OVERRIDE:") for c in codes)
+
+    def test_audit_snapshot_has_jepa_fields(self):
+        """Audit event request_snapshot should contain JEPA fields."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="read_file",
+            tool_name="read_file",
+            quality_score=0.9,
+            coherence_score=0.9,
+        ))
+        snap = resp.audit_event.request_snapshot
+        required = {
+            "jepa_regime", "jepa_reason_codes", "jepa_overrode_baseline",
+            "jepa_confidence_adjustment", "jepa_recommended_action",
+            "jepa_execution_mode_override", "jepa_escalation_override",
+        }
+        assert required.issubset(set(snap.keys()))
+
+
+class TestGovernanceServiceJEPAEffectiveValues:
+    """Test that JEPA confidence_adjustment, execution_mode_override,
+    and escalation_override are applied to the effective response."""
+
+    def test_confidence_adjustment_isolated(self):
+        """JEPA confidence_adjustment must reduce confidence_score below raw gate value.
+
+        We directly compute what the gate would produce, then verify the
+        response confidence is lower by the JEPA adjustment amount.
+        """
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest, _build_confidence_signals,
+        )
+        from agentic.agentic_framework.mcp_gateway import ToolRiskLevel
+        svc = GovernanceService()
+        req = AuthorizationRequest(
+            actor_id="test",
+            action_type="read_file",
+            tool_name="read_file",
+            quality_score=0.9,
+            coherence_score=0.9,
+        )
+        resp = svc.authorize(req)
+        # Get the raw gate confidence
+        risk = svc.classifier.classify(req.tool_name or req.action_type)
+        signals = _build_confidence_signals(req, risk)
+        gate = svc.gate.evaluate(signals, req.tool_name or req.action_type)
+        raw_confidence = gate.confidence.overall
+        jepa_adj = resp.audit_event.request_snapshot["jepa_confidence_adjustment"]
+        expected = max(0.0, raw_confidence + jepa_adj)
+        assert abs(resp.confidence_score - expected) < 0.001
+
+    def test_confidence_never_negative(self):
+        """Confidence after JEPA adjustment should never go below 0."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="execute_code",
+            tool_name="execute_code",
+            quality_score=0.01,
+            coherence_score=0.01,
+        ))
+        assert resp.confidence_score >= 0.0
+
+    def test_execution_mode_override_applied(self):
+        """When JEPA overrides execution_mode, response must reflect the stricter mode."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        # Very low signals to trigger non-NORMAL regime with exec override
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="execute_code",
+            tool_name="execute_code",
+            quality_score=0.05,
+            coherence_score=0.05,
+        ))
+        snap = resp.audit_event.request_snapshot
+        jepa_exec_override = snap["jepa_execution_mode_override"]
+        if jepa_exec_override is not None:
+            # JEPA wanted to override → response execution_mode should be at
+            # least as strict as the override
+            _EXEC_SEVERITY = {"full": 0, "cautious": 1, "confirm": 2,
+                              "confirm_required": 2, "blocked": 3}
+            resp_sev = _EXEC_SEVERITY.get(resp.execution_mode.value, 0)
+            jepa_sev = _EXEC_SEVERITY.get(jepa_exec_override.lower(), 0)
+            assert resp_sev >= jepa_sev
+
+    def test_escalation_override_applied(self):
+        """When JEPA overrides escalation, response must reflect the stricter level."""
+        from agentic.agentic_framework.governance_service import (
+            GovernanceService, AuthorizationRequest,
+        )
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="execute_code",
+            tool_name="execute_code",
+            quality_score=0.05,
+            coherence_score=0.05,
+        ))
+        snap = resp.audit_event.request_snapshot
+        jepa_esc_override = snap["jepa_escalation_override"]
+        if jepa_esc_override is not None:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            resp_sev = _ESC_SEVERITY.get(resp.escalation_level.value, 0)
+            jepa_sev = _ESC_SEVERITY.get(jepa_esc_override.lower(), 0)
+            assert resp_sev >= jepa_sev
+
+
+# =============================================================================
+# Test: apply_jepa_override edge cases
+# =============================================================================
+
+
+class TestApplyJepaOverrideEdgeCases:
+    """Edge cases for the shared override function."""
+
+    def test_eligible_false_when_decision_deny(self):
+        """eligible must be False whenever decision is DENY."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        # Baseline is DENY but eligible is True (shouldn't happen, but enforce)
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology() | {"O7_REASONING": 0.9},
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            risk_level="read_only",
+        )
+        # NORMAL regime → no change, but baseline was DENY
+        result = apply_jepa_override("DENY", True, assessment)
+        assert result["decision"] == "DENY"
+        assert result["eligible"] is False
+
+    def test_eligible_false_when_decision_defer(self):
+        """eligible must be False whenever decision is DEFER."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology(),
+            vritti_distribution=_nidra_vritti(),
+            coherence=0.5,
+            score=0.3,
+            tool_name="write_file",
+            risk_level="write",
+        )
+        if assessment.recommended_action == "DEGRADE":
+            result = apply_jepa_override("ALLOW", True, assessment)
+            assert result["decision"] == "DEFER"
+            assert result["eligible"] is False
+
+    def test_baseline_defer_with_halt(self):
+        """Baseline DEFER + HALT recommended → DENY."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        assessment = jepa_governance_check(
+            layer_weights={l: 0.0 for l in ONTOLOGY_LAYERS},
+        )
+        assert assessment.recommended_action == "HALT"
+        result = apply_jepa_override("DEFER", True, assessment)
+        assert result["decision"] == "DENY"
+        assert result["eligible"] is False
+
+    def test_baseline_defer_with_degrade(self):
+        """Baseline DEFER + DEGRADE → stays DEFER (already degraded)."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology(),
+            vritti_distribution=_nidra_vritti(),
+            coherence=0.5,
+            score=0.3,
+            tool_name="write_file",
+            risk_level="write",
+        )
+        if assessment.recommended_action == "DEGRADE":
+            result = apply_jepa_override("DEFER", True, assessment)
+            # DEGRADE only downgrades ALLOW→DEFER, not DEFER→DENY
+            assert result["decision"] == "DEFER"
+            assert result["eligible"] is False
+
+    def test_degrade_forced_not_vacuous(self):
+        """Ensure DEGRADE path is actually exercised (non-vacuous test)."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        # Construct nidra+balanced with specific params that produce PROCESS_DRIFT
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology(),
+            vritti_distribution=_nidra_vritti(),
+            coherence=0.5,
+            score=0.3,
+            tool_name="write_file",
+            risk_level="write",
+        )
+        # The test must actually exercise the DEGRADE path
+        assert assessment.regime in (
+            GovernanceRegime.PROCESS_DRIFT,
+            GovernanceRegime.SEMANTIC_SHIFT,
+            GovernanceRegime.DUAL_ANOMALY,
+        ), f"Expected non-NORMAL regime, got {assessment.regime}"
+        result = apply_jepa_override("ALLOW", True, assessment)
+        assert result["decision"] in ("DEFER", "DENY")
+        assert result["overrode"] is True
+
+
+# =============================================================================
+# Test: _make_unavailable_assessment fields
+# =============================================================================
+
+
+class TestMakeUnavailableAssessment:
+    """Directly test _make_unavailable_assessment output fields."""
+
+    def test_unavailable_assessment_fields(self):
+        from agentic.agentic_framework.jepa_governance import _make_unavailable_assessment
+        assessment = _make_unavailable_assessment("test error", {"tool_name": "foo"})
+        assert assessment.regime == GovernanceRegime.UNKNOWN
+        assert assessment.recommended_action == "HALT"
+        assert assessment.confidence_adjustment == -0.50
+        assert assessment.execution_mode_override == "BLOCKED"
+        assert assessment.escalation_override == "HALT"
+        assert "JEPA_UNAVAILABLE" in assessment.reason_codes
+        assert "UNKNOWN_REGIME" in assessment.reason_codes
+        assert assessment.residual.residual_magnitude == 1.0
+        assert assessment.residual.semantic_consistency == 0.0
+
+
+# =============================================================================
+# Test: Coupling validation failure
+# =============================================================================
+
+
+class TestCouplingValidation:
+    """Test that _validate_coupling_import checks exact key names."""
+
+    def test_validation_rejects_wrong_keys(self):
+        from agentic.agentic_framework.jepa_governance import _validate_coupling_import
+        from unittest.mock import patch
+        # Mock get_aspect_weights to return wrong key names
+        bad_result = {f"WRONG_{i}": 0.1 for i in range(12)}
+        with patch("agentic.agentic_framework.jepa_governance._get_aspect_weights",
+                    return_value=bad_result):
+            with pytest.raises(ImportError, match="wrong keys"):
+                _validate_coupling_import()
+
+    def test_validation_rejects_non_dict(self):
+        from agentic.agentic_framework.jepa_governance import _validate_coupling_import
+        from unittest.mock import patch
+        with patch("agentic.agentic_framework.jepa_governance._get_aspect_weights",
+                    return_value=[0.1] * 12):
+            with pytest.raises(ImportError, match="expected dict"):
+                _validate_coupling_import()
+
+
+# =============================================================================
+# Test: Shared signal approximation
+# =============================================================================
+
+
+class TestSharedApproximation:
+    """Test that the shared approximation functions are used by both paths."""
+
+    def test_approximate_layer_weights_uses_goal_alignment_for_agency(self):
+        """O6_AGENCY must use goal_alignment, not quality."""
+        from agentic.agentic_framework.jepa_governance import approximate_layer_weights
+        # goal_alignment=0.9, quality=0.1 → O6_AGENCY = 0.9*0.7 = 0.63
+        w = approximate_layer_weights(
+            quality=0.1, coherence=0.5, goal_alignment=0.9,
+            overall_confidence=0.5,
+        )
+        assert abs(w["O6_AGENCY"] - 0.9 * 0.7) < 0.001
+        assert abs(w["O8_PURPOSE"] - 0.9 * 0.8) < 0.001
+
+    def test_approximate_vritti_no_smrti(self):
+        """Shared vritti approximation must NOT include hardcoded smrti."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        dist = approximate_vritti(quality=0.5, coherence=0.5, overall_confidence=0.5)
+        assert dist["smrti"] == 0.0
+        assert abs(sum(dist.values()) - 1.0) < 0.01
+
+    def test_approximate_vritti_all_zero_inputs(self):
+        """All-zero inputs produce a valid normalized distribution."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        dist = approximate_vritti(quality=0.0, coherence=0.0, overall_confidence=0.0)
+        assert abs(sum(dist.values()) - 1.0) < 0.01
+        # Should have nidra and/or viparyaya dominant (dormancy/misperception)
+        assert dist["pramana"] == 0.0 or dist["nidra"] > 0 or dist["viparyaya"] > 0
+
+
+# =============================================================================
+# Test: MCP Gateway integration
+# =============================================================================
+
+
+class TestMCPGatewayIntegration:
+    """End-to-end MCP gateway tests with JEPA integration."""
+
+    @pytest.fixture
+    def gateway(self):
+        """Create a SafeMCPGateway with a mock client."""
+        from agentic.agentic_framework.mcp_gateway import (
+            SafeMCPGateway, MockMCPClient, ToolRiskLevel,
+        )
+        client = MockMCPClient()
+        client.register_tool(
+            "read_data",
+            lambda params: {"data": "ok"},
+            ToolRiskLevel.READ_ONLY,
+        )
+        client.register_tool(
+            "write_data",
+            lambda params: {"written": True},
+            ToolRiskLevel.WRITE,
+        )
+        return SafeMCPGateway(mcp_client=client)
+
+    @pytest.mark.asyncio
+    async def test_call_tool_success_has_jepa_audit(self, gateway):
+        """Successful call_tool must record JEPA fields in audit."""
+        from agentic.agentic_framework.mcp_gateway import MCPToolCall
+        result = await gateway.call_tool(MCPToolCall(
+            tool_name="read_data",
+            parameters={"key": "val"},
+            quality_score=0.9,
+            coherence_score=0.9,
+        ))
+        assert result.success
+        assert len(gateway.audit_log) == 1
+        entry = gateway.audit_log[0]
+        assert entry.jepa_regime is not None
+        assert entry.jepa_recommended_action is not None
+        assert entry.jepa_reason_codes is not None
+        assert entry.jepa_confidence_adjustment is not None
+
+    @pytest.mark.asyncio
+    async def test_call_tool_jepa_adjusted_confidence(self, gateway):
+        """MCPToolResult.confidence must reflect JEPA adjustment."""
+        from agentic.agentic_framework.mcp_gateway import MCPToolCall
+        result = await gateway.call_tool(MCPToolCall(
+            tool_name="read_data",
+            parameters={},
+            quality_score=0.9,
+            coherence_score=0.9,
+        ))
+        entry = gateway.audit_log[0]
+        adj = entry.jepa_confidence_adjustment
+        # Result confidence = max(0, raw + adj)
+        # Since raw is what the gate produced, result should have the adjustment
+        # We can verify: result.confidence <= raw_confidence (adj <= 0 always)
+        assert adj is not None
+        if adj < 0:
+            # Confidence in result should be less than raw gate confidence
+            assert result.confidence < entry.confidence - adj + 0.001
+
+    @pytest.mark.asyncio
+    async def test_call_tool_forbidden_no_jepa(self, gateway):
+        """Forbidden capability early exit should have no JEPA in audit."""
+        from agentic.agentic_framework.mcp_gateway import (
+            MCPToolCall, MCPToolDefinition, ToolRiskLevel, GatewayDecision,
+        )
+        # Register a tool with forbidden capability
+        gateway.register_tool(MCPToolDefinition(
+            name="evil_tool",
+            description="bad",
+            risk_level=ToolRiskLevel.PRIVILEGED,
+            capabilities=["credential_access"],
+        ))
+        result = await gateway.call_tool(MCPToolCall(
+            tool_name="evil_tool",
+            parameters={},
+        ))
+        assert result.decision == GatewayDecision.BLOCKED
+        entry = gateway.audit_log[0]
+        # JEPA didn't run on this path
+        assert entry.jepa_regime is None
+
+    @pytest.mark.asyncio
+    async def test_call_tool_jepa_escalation_override(self, gateway):
+        """MCPToolResult.escalation_level must reflect JEPA override."""
+        from agentic.agentic_framework.mcp_gateway import MCPToolCall
+        # Low signals to trigger JEPA escalation override
+        result = await gateway.call_tool(MCPToolCall(
+            tool_name="read_data",
+            parameters={},
+            quality_score=0.1,
+            coherence_score=0.1,
+        ))
+        entry = gateway.audit_log[0]
+        if entry.jepa_escalation_override is not None:
+            from agentic.agentic_framework.confidence_gate import EscalationLevel
+            _ESC_SEV = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            result_sev = _ESC_SEV.get(result.escalation_level.value, 0)
+            jepa_sev = _ESC_SEV.get(entry.jepa_escalation_override.lower(), 0)
+            assert result_sev >= jepa_sev
+
+
+# =============================================================================
+# Test: MCP _jepa_check directly
+# =============================================================================
+
+
+class TestMCPJepaCheck:
+    """Direct test of MCP _jepa_check signal approximation."""
+
+    def test_jepa_check_uses_shared_approximation(self):
+        """MCP _jepa_check must use approximate_layer_weights/approximate_vritti."""
+        from agentic.agentic_framework.mcp_gateway import (
+            SafeMCPGateway, MockMCPClient, MCPToolCall, MCPToolDefinition,
+            ToolRiskLevel,
+        )
+        from agentic.agentic_framework.confidence_gate import create_confidence_gate
+        client = MockMCPClient()
+        gw = SafeMCPGateway(mcp_client=client)
+        tool_def = gw._get_tool_definition("test_tool")
+        call = MCPToolCall(
+            tool_name="test_tool",
+            parameters={},
+            quality_score=0.7,
+            coherence_score=0.7,
+        )
+        signals = gw._build_signals(call, tool_def)
+        gate_decision = gw.gate.evaluate(signals, "test_tool")
+        assessment = gw._jepa_check(call, tool_def, gate_decision)
+        # Must return a full assessment, never None
+        assert assessment is not None
+        assert assessment.regime is not None
+        assert hasattr(assessment, "confidence_adjustment")
+
+
+# =============================================================================
+# Test: Durable audit persistence of JEPA fields
+# =============================================================================
+
+
+class TestDurableAuditJEPAPersistence:
+    """Test that JEPA fields survive into the durable audit store."""
+
+    def test_event_from_mcp_audit_with_jepa(self):
+        """event_from_mcp_audit must embed JEPA fields in request_snapshot."""
+        from agentic.ledger.governance_audit_store import event_from_mcp_audit
+        event = event_from_mcp_audit(
+            timestamp="2024-01-01T00:00:00Z",
+            request_id="test-123",
+            tool_name="test_tool",
+            parameters={"key": "val"},
+            decision="BLOCKED",
+            confidence=0.5,
+            risk_level="write",
+            jepa_regime="dual_anomaly",
+            jepa_recommended_action="HALT",
+            jepa_reason_codes=["SIDE_EFFECT_IN_OBSERVATION_MODE", "REGIME_DUAL_ANOMALY"],
+            jepa_confidence_adjustment=-0.40,
+            jepa_execution_mode_override="BLOCKED",
+            jepa_escalation_override="HALT",
+            jepa_overrode=True,
+        )
+        snap = event.request_snapshot
+        assert snap["jepa_regime"] == "dual_anomaly"
+        assert snap["jepa_recommended_action"] == "HALT"
+        assert "SIDE_EFFECT_IN_OBSERVATION_MODE" in snap["jepa_reason_codes"]
+        assert snap["jepa_confidence_adjustment"] == -0.40
+        assert snap["jepa_execution_mode_override"] == "BLOCKED"
+        assert snap["jepa_escalation_override"] == "HALT"
+        assert snap["jepa_overrode"] is True
+
+    def test_event_from_mcp_audit_without_jepa(self):
+        """event_from_mcp_audit without JEPA args should have no JEPA in snapshot."""
+        from agentic.ledger.governance_audit_store import event_from_mcp_audit
+        event = event_from_mcp_audit(
+            timestamp="2024-01-01T00:00:00Z",
+            request_id="test-456",
+            tool_name="test_tool",
+            parameters={"key": "val"},
+            decision="ALLOWED",
+            confidence=0.8,
+            risk_level="read_only",
+        )
+        snap = event.request_snapshot
+        assert "jepa_regime" not in snap

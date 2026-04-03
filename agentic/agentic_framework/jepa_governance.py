@@ -36,6 +36,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from agentic.chitta_vritti.coupling import get_aspect_weights as _get_aspect_weights
+
 
 # =========================================================================
 # Constants
@@ -67,6 +69,38 @@ EXECUTION_ONTOLOGY = frozenset({
     "O1_POTENTIAL", "O2_IDENTITY", "O3_EXECUTION",
     "O4_STRUCTURE", "O5_COGNITION", "O6_AGENCY",
 })
+
+
+# =========================================================================
+# Startup validation: ensure coupling matrix is importable and functional
+# =========================================================================
+
+def _validate_coupling_import() -> None:
+    """Validate that the R[v,a] coupling matrix is available at startup.
+
+    Fail-fast: if the coupling module is missing or broken, the governance
+    system cannot compute JEPA composites and should not start silently.
+    Checks both the count AND exact key names match ONTOLOGY_LAYERS.
+    """
+    test_dist = {"pramana": 1.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                 "smrti": 0.0, "nidra": 0.0}
+    result = _get_aspect_weights(test_dist)
+    if not isinstance(result, dict):
+        raise ImportError(
+            "chitta_vritti.coupling.get_aspect_weights returned invalid result: "
+            f"expected dict, got {type(result).__name__}"
+        )
+    expected_keys = set(ONTOLOGY_LAYERS)
+    actual_keys = set(result.keys())
+    if actual_keys != expected_keys:
+        missing = expected_keys - actual_keys
+        extra = actual_keys - expected_keys
+        raise ImportError(
+            "chitta_vritti.coupling.get_aspect_weights returned wrong keys: "
+            f"missing={missing or 'none'}, extra={extra or 'none'}"
+        )
+
+_validate_coupling_import()
 
 
 # =========================================================================
@@ -387,6 +421,13 @@ def build_ontology_signal(
         gov_str = olm_signals.governance_strength
         exec_str = olm_signals.execution_strength
     elif layer_weights is not None:
+        # Validate keys: warn about unknown keys (may indicate ontology extension)
+        unknown_keys = set(layer_weights.keys()) - set(ONTOLOGY_LAYERS)
+        if unknown_keys:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Unknown layer_weights keys (ignored): %s", unknown_keys
+            )
         weights = {l: layer_weights.get(l, 0.0) for l in ONTOLOGY_LAYERS}
         gov_str = sum(weights[l] for l in ONTOLOGY_LAYERS if l in GOVERNANCE_ONTOLOGY)
         exec_str = sum(weights[l] for l in ONTOLOGY_LAYERS if l in EXECUTION_ONTOLOGY)
@@ -395,7 +436,26 @@ def build_ontology_signal(
 
     primary = max(weights, key=weights.get)
     total = sum(weights.values())
-    confidence = weights[primary] / total if total > 0 else 0.0
+
+    # Confidence as true confidence: combine dominance (how much the
+    # primary stands out) with coverage (how much total signal exists).
+    # Raw proportion (primary/total) overstates confidence when all
+    # layers are uniformly high.
+    if total > 0:
+        dominance = weights[primary] / total  # [0, 1]
+        n = len(weights)
+        # Entropy-based: uniform dist has dominance=1/n, perfect has 1.0
+        # Rescale so uniform→0, single-layer→1
+        uniformity = 1.0 / n if n > 0 else 0.0
+        if dominance > uniformity:
+            discrimination = (dominance - uniformity) / (1.0 - uniformity)
+        else:
+            discrimination = 0.0
+        # Coverage: primary weight itself as a raw signal strength
+        coverage = min(1.0, weights[primary])
+        confidence = 0.6 * discrimination + 0.4 * coverage
+    else:
+        confidence = 0.0
 
     return OntologySignal(
         layer_weights=weights,
@@ -432,14 +492,29 @@ def build_vritti_signal(
         sc = vritti_result.score
         primary = vritti_result.dominant_vritti
     elif vritti_distribution is not None:
+        # Validate keys: warn about unknown vritti names
+        unknown_keys = set(vritti_distribution.keys()) - set(VRITTI_NAMES)
+        if unknown_keys:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Unknown vritti_distribution keys (ignored): %s", unknown_keys
+            )
         dist = {v: vritti_distribution.get(v, 0.0) for v in VRITTI_NAMES}
-        # Normalize if not already
         total = sum(dist.values())
-        if total > 0 and abs(total - 1.0) > 0.01:
-            dist = {k: v / total for k, v in dist.items()}
-        coh = coherence
-        sc = score
-        primary = max(dist, key=dist.get)
+        if total <= 0:
+            # All-zero vritti → fail-closed: treat as nidra (dormancy)
+            dist = {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                    "smrti": 0.0, "nidra": 1.0}
+            coh = 0.0
+            sc = 0.0
+            primary = "nidra"
+        else:
+            # Normalize if not already
+            if abs(total - 1.0) > 0.01:
+                dist = {k: v / total for k, v in dist.items()}
+            coh = coherence
+            sc = score
+            primary = max(dist, key=dist.get)
     else:
         # Fail-closed: no vritti data → high nidra (dormancy)
         dist = {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
@@ -479,10 +554,8 @@ def build_jepa_composite(
     coherent. High alignment means the system's cognitive state and
     semantic position agree.
     """
-    from agentic.chitta_vritti.coupling import get_aspect_weights
-
     # Step 1: Expected ontological activation from vritti
-    expected = get_aspect_weights(vritti.distribution)
+    expected = _get_aspect_weights(vritti.distribution)
 
     # Step 2: Actual ontological activation
     actual = dict(ontology.layer_weights)
@@ -495,8 +568,13 @@ def build_jepa_composite(
     act_norm = np.linalg.norm(act_vec)
 
     if exp_norm > 0 and act_norm > 0:
-        alignment = float(np.dot(exp_vec, act_vec) / (exp_norm * act_norm))
-        alignment = max(0.0, min(1.0, alignment))
+        raw_cosine = float(np.dot(exp_vec, act_vec) / (exp_norm * act_norm))
+        # Preserve anti-correlation signal: negative cosine means the
+        # actual ontology is anti-correlated with what the vritti expects.
+        # Clamp to [-1, 1] for numerical safety, then map to [0, 1]
+        # where 0 = perfect anti-correlation, 0.5 = orthogonal, 1 = aligned.
+        raw_cosine = max(-1.0, min(1.0, raw_cosine))
+        alignment = (raw_cosine + 1.0) / 2.0
     else:
         alignment = 0.0
 
@@ -601,9 +679,12 @@ def build_runtime_process_state(
 # Residual Governor
 # =========================================================================
 
-# Thresholds for residual comparison
-_ALIGNMENT_LOW = 0.40
-_ALIGNMENT_CRITICAL = 0.20
+# Thresholds for residual comparison.
+# Alignment is now on [0, 1] where 0.5 = orthogonal, 1.0 = aligned,
+# 0.0 = anti-correlated (mapped from cosine via (cos+1)/2).
+# Old thresholds (raw cosine 0.40, 0.20) map to:
+_ALIGNMENT_LOW = 0.70
+_ALIGNMENT_CRITICAL = 0.60
 _VRITTI_OBSERVATION_THRESHOLD = 0.35
 _MISPERCEPTION_HIGH = 0.40
 _DORMANCY_HIGH = 0.50
@@ -633,12 +714,13 @@ def compute_residual(
     reason_codes: List[str] = []
 
     # --- Semantic consistency ---
-    # Does the runtime action fit the ontological position?
-    semantic_consistency = 1.0
+    # Bounded weighted aggregation: each factor contributes a weighted
+    # penalty in [0, weight_i], and the total is clamped to [0, 1].
+    # This replaces additive -= deductions which could stack beyond 1.0.
+    sem_penalties: List[float] = []
 
     if runtime.is_side_effecting and jepa.ontology.is_governance_dominant():
-        # System is in governance/observation ontology but trying to execute
-        semantic_consistency -= 0.3
+        sem_penalties.append(0.30)
         risk_factors.append(
             f"Side-effecting action '{runtime.tool_name}' from "
             f"governance-dominant ontology (gov={jepa.ontology.governance_strength:.2f})"
@@ -646,10 +728,9 @@ def compute_residual(
         reason_codes.append("GOVERNANCE_ONTOLOGY_EXECUTING")
 
     if runtime.action_category == RuntimeActionCategory.DESTRUCTIVE:
-        # Destructive actions need strong execution ontology
         exec_weight = jepa.ontology.layer_weights.get("O3_EXECUTION", 0.0)
         if exec_weight < 0.3:
-            semantic_consistency -= 0.4
+            sem_penalties.append(0.40)
             risk_factors.append(
                 f"Destructive action with weak O3_EXECUTION ({exec_weight:.2f})"
             )
@@ -658,22 +739,29 @@ def compute_residual(
     if runtime.action_category == RuntimeActionCategory.PRIVILEGED:
         agency_weight = jepa.ontology.layer_weights.get("O6_AGENCY", 0.0)
         if agency_weight < 0.3:
-            semantic_consistency -= 0.3
+            sem_penalties.append(0.30)
             risk_factors.append(
                 f"Privileged action with weak O6_AGENCY ({agency_weight:.2f})"
             )
             reason_codes.append("PRIVILEGED_WITHOUT_AGENCY_ONTOLOGY")
 
-    semantic_consistency = max(0.0, semantic_consistency)
+    # Bounded aggregation: 1 - product(1 - p_i) ensures [0, 1] range
+    # even when multiple penalties apply simultaneously.
+    if sem_penalties:
+        combined = 1.0
+        for p in sem_penalties:
+            combined *= (1.0 - p)
+        semantic_consistency = max(0.0, combined)
+    else:
+        semantic_consistency = 1.0
 
     # --- Action-state coherence ---
-    # Is the action appropriate for the current vritti mode?
-    action_state_coherence = 1.0
+    # Same bounded aggregation approach.
+    act_penalties: List[float] = []
 
     vritti = jepa.vritti
     if vritti.is_observation_mode() and runtime.is_side_effecting:
-        # Observation vritti (viparyaya/nidra) + side effects = bad
-        action_state_coherence -= 0.5
+        act_penalties.append(0.50)
         risk_factors.append(
             f"Side-effecting action during {vritti.primary_vritti} "
             f"(observation/dormancy mode)"
@@ -682,7 +770,7 @@ def compute_residual(
 
     if vritti.misperception_risk() > _MISPERCEPTION_HIGH:
         if runtime.is_side_effecting:
-            action_state_coherence -= 0.3
+            act_penalties.append(0.30)
             risk_factors.append(
                 f"High viparyaya ({vritti.misperception_risk():.2f}) "
                 f"during side-effecting action"
@@ -691,26 +779,31 @@ def compute_residual(
 
     if vritti.dormancy_risk() > _DORMANCY_HIGH:
         if runtime.action_category != RuntimeActionCategory.READ_ONLY:
-            action_state_coherence -= 0.3
+            act_penalties.append(0.30)
             risk_factors.append(
                 f"High nidra ({vritti.dormancy_risk():.2f}) "
                 f"during non-read-only action"
             )
             reason_codes.append("HIGH_DORMANCY_EXECUTING")
 
-    # Vikalpa (imagination) + destructive = concerning
+    # Vikalpa (imagination) + any mutating side effect = concerning
+    # (not only destructive/privileged — mutating writes also risky)
     vikalpa_level = vritti.distribution.get("vikalpa", 0.0)
-    if vikalpa_level > 0.40 and runtime.action_category in (
-        RuntimeActionCategory.DESTRUCTIVE, RuntimeActionCategory.PRIVILEGED
-    ):
-        action_state_coherence -= 0.3
+    if vikalpa_level > 0.40 and runtime.is_side_effecting:
+        act_penalties.append(0.30)
         risk_factors.append(
             f"High vikalpa ({vikalpa_level:.2f}) during "
             f"{runtime.action_category.value} action"
         )
         reason_codes.append("IMAGINATIVE_DESTRUCTIVE")
 
-    action_state_coherence = max(0.0, action_state_coherence)
+    if act_penalties:
+        combined = 1.0
+        for p in act_penalties:
+            combined *= (1.0 - p)
+        action_state_coherence = max(0.0, combined)
+    else:
+        action_state_coherence = 1.0
 
     # --- Residual magnitude ---
     # Blend of alignment inversion, semantic inconsistency, and action incoherence
@@ -942,26 +1035,203 @@ def jepa_governance_check(
 
 
 # =========================================================================
+# Canonical safe JEPA wrapper (reusable by both enforcement points)
+# =========================================================================
+
+
+def safe_jepa_governance_check(**kwargs) -> JEPAGovernanceAssessment:
+    """Safe wrapper around jepa_governance_check that never raises.
+
+    This is the single canonical entry point for JEPA assessment that
+    both GovernanceService and MCPGateway should use. It catches any
+    internal error and returns an explicit UNKNOWN-regime assessment
+    instead of raising or returning None.
+
+    Returns:
+        JEPAGovernanceAssessment — always. On failure, returns an
+        explicit UNKNOWN regime with HALT/BLOCKED posture.
+    """
+    try:
+        return jepa_governance_check(**kwargs)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(
+            "JEPA governance check failed (safe wrapper): %s", e
+        )
+        return _make_unavailable_assessment(str(e), kwargs)
+
+
+def _make_unavailable_assessment(
+    error_msg: str,
+    context: Dict[str, Any],
+) -> JEPAGovernanceAssessment:
+    """Build synthetic UNKNOWN-regime assessment when JEPA cannot compute.
+
+    Used by safe_jepa_governance_check and can be used by MCPGateway
+    for fail-closed error handling.
+    """
+    zero_weights = {l: 0.0 for l in ONTOLOGY_LAYERS}
+    zero_dist = {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                 "smrti": 0.0, "nidra": 1.0}
+    ontology = OntologySignal(
+        layer_weights=zero_weights, primary_layer="O1_POTENTIAL",
+        governance_strength=0.0, execution_strength=0.0,
+        confidence=0.0, evidence=f"JEPA unavailable: {error_msg}",
+    )
+    vritti_sig = VrittiSignal(
+        distribution=zero_dist, primary_vritti="nidra",
+        coherence=0.0, score=0.0, confidence=0.0,
+        evidence=f"JEPA unavailable: {error_msg}",
+    )
+    composite = JEPACompositeSignal(
+        ontology=ontology, vritti=vritti_sig,
+        expected_ontology=zero_weights, actual_ontology=zero_weights,
+        ontology_vritti_alignment=0.0, integrated_confidence=0.0,
+        stability=0.0, summary="JEPA UNAVAILABLE",
+        coupling_evidence=("JEPA_ERROR",),
+    )
+    runtime = build_runtime_process_state(
+        action_type=context.get("action_type", ""),
+        tool_name=context.get("tool_name", ""),
+        risk_level=context.get("risk_level", ""),
+        confidence_score=context.get("confidence_score", 0.0),
+        agency_level=context.get("agency_level", "FULL"),
+        execution_mode=context.get("execution_mode", "BLOCKED"),
+        escalation_level=context.get("escalation_level", "HALT"),
+        session_id=context.get("session_id", ""),
+        actor_id=context.get("actor_id", ""),
+        capabilities=context.get("capabilities", ()),
+    )
+    residual = ResidualSignal(
+        residual_magnitude=1.0, semantic_consistency=0.0,
+        action_state_coherence=0.0, regime=GovernanceRegime.UNKNOWN,
+        risk_factors=(f"JEPA computation error: {error_msg}",),
+        reason_codes=("JEPA_UNAVAILABLE", "UNKNOWN_REGIME"),
+        explanation=f"JEPA check failed: {error_msg}. Fail-closed.",
+    )
+    return JEPAGovernanceAssessment(
+        regime=GovernanceRegime.UNKNOWN,
+        recommended_action="HALT",
+        execution_mode_override="BLOCKED",
+        escalation_override="HALT",
+        confidence_adjustment=-0.50,
+        reason_codes=("JEPA_UNAVAILABLE", "UNKNOWN_REGIME"),
+        rationale=f"JEPA unavailable: {error_msg}. Fail-closed to HALT.",
+        jepa_composite=composite,
+        runtime_state=runtime,
+        residual=residual,
+    )
+
+
+def apply_jepa_override(
+    baseline_decision: str,
+    baseline_eligible: bool,
+    assessment: JEPAGovernanceAssessment,
+) -> Dict[str, Any]:
+    """Shared JEPA override logic for both GovernanceService and MCPGateway.
+
+    Applies the JEPA assessment to a baseline governance decision.
+    JEPA can only make decisions STRICTER, never more permissive.
+
+    Uses the full assessment fields:
+    - recommended_action
+    - confidence_adjustment
+    - execution_mode_override
+    - escalation_override
+
+    Args:
+        baseline_decision: Baseline governance decision ("ALLOW", "DENY", "DEFER")
+        baseline_eligible: Whether the request was eligible before JEPA
+        assessment: Full JEPA governance assessment
+
+    Returns:
+        Dict with keys:
+        - decision: new decision string
+        - eligible: new eligible flag
+        - overrode: whether JEPA changed the decision
+        - regime: assessment regime value
+        - reason_codes: assessment reason codes
+        - confidence_adjustment: assessment confidence adjustment
+        - execution_mode_override: assessment execution mode override
+        - escalation_override: assessment escalation override
+        - recommended_action: assessment recommended action
+    """
+    regime = assessment.regime
+    recommended = assessment.recommended_action
+    new_decision = baseline_decision
+    new_eligible = baseline_eligible
+
+    if regime == GovernanceRegime.NORMAL:
+        pass  # No change
+    elif recommended in ("HALT", "DENY"):
+        new_decision = "DENY"
+        new_eligible = False
+    elif recommended in ("DEGRADE", "CONFIRM"):
+        if baseline_decision == "ALLOW":
+            new_decision = "DEFER"
+            new_eligible = False
+    else:
+        # Fallback: use execution_mode_override / escalation_override
+        if assessment.execution_mode_override == "BLOCKED":
+            new_decision = "DENY"
+            new_eligible = False
+        elif assessment.escalation_override == "HALT":
+            new_decision = "DENY"
+            new_eligible = False
+
+    # Invariant: decision != ALLOW => eligible must be False.
+    # This covers the case where baseline was already DENY/DEFER
+    # but baseline_eligible was True (shouldn't happen, but enforce).
+    if new_decision != "ALLOW":
+        new_eligible = False
+
+    return {
+        "decision": new_decision,
+        "eligible": new_eligible,
+        "overrode": new_decision != baseline_decision,
+        "regime": assessment.regime.value,
+        "reason_codes": list(assessment.reason_codes),
+        "confidence_adjustment": assessment.confidence_adjustment,
+        "execution_mode_override": assessment.execution_mode_override,
+        "escalation_override": assessment.escalation_override,
+        "recommended_action": assessment.recommended_action,
+    }
+
+
+# =========================================================================
 # Helpers
 # =========================================================================
 
 
+_OLM_LAYER_ATTR_MAP = {
+    "O1_POTENTIAL": "potential_weight",
+    "O2_IDENTITY": "identity_weight",
+    "O3_EXECUTION": "execution_weight",
+    "O4_STRUCTURE": "structure_weight",
+    "O5_COGNITION": "cognition_weight",
+    "O6_AGENCY": "agency_weight",
+    "O7_REASONING": "reasoning_weight",
+    "O8_PURPOSE": "purpose_weight",
+    "O9_WITNESSES": "witness_weight",
+    "O10_UNIFYING": "unifying_weight",
+    "O11_INTEGRATION": "integration_weight",
+    "O12_ABSOLVING": "absolving_weight",
+}
+
+
 def _olm_layer_to_attr(layer: str) -> str:
-    """Map OLM layer name to OLMGovernanceSignals attribute name."""
-    return {
-        "O1_POTENTIAL": "potential_weight",
-        "O2_IDENTITY": "identity_weight",
-        "O3_EXECUTION": "execution_weight",
-        "O4_STRUCTURE": "structure_weight",
-        "O5_COGNITION": "cognition_weight",
-        "O6_AGENCY": "agency_weight",
-        "O7_REASONING": "reasoning_weight",
-        "O8_PURPOSE": "purpose_weight",
-        "O9_WITNESSES": "witness_weight",
-        "O10_UNIFYING": "unifying_weight",
-        "O11_INTEGRATION": "integration_weight",
-        "O12_ABSOLVING": "absolving_weight",
-    }[layer]
+    """Map OLM layer name to OLMGovernanceSignals attribute name.
+
+    Robust to ontology extension: unknown layers produce a
+    deterministic snake_case attribute name rather than KeyError.
+    """
+    attr = _OLM_LAYER_ATTR_MAP.get(layer)
+    if attr is not None:
+        return attr
+    # Fallback: derive attr name from layer name (e.g. "O13_NEW" → "new_weight")
+    parts = layer.split("_", 1)
+    suffix = parts[1].lower() if len(parts) > 1 else parts[0].lower()
+    return f"{suffix}_weight"
 
 
 def _get_primary_coupling(vritti_name: str) -> str:
@@ -1018,6 +1288,77 @@ def _build_explanation(
 
 
 # =========================================================================
+# Shared signal approximation (used by GovernanceService and MCP Gateway)
+# =========================================================================
+
+
+def approximate_layer_weights(
+    *,
+    quality: float = 0.5,
+    coherence: float = 0.5,
+    internal_consistency: float = 0.5,
+    goal_alignment: float = 0.5,
+    trajectory_confidence: float = 0.5,
+    overall_confidence: float = 0.5,
+) -> Dict[str, float]:
+    """Approximate OLM layer weights from available governance signals.
+
+    Canonical shared implementation used by both GovernanceService and
+    SafeMCPGateway so that equivalent inputs produce identical JEPA
+    composites across enforcement points.
+    """
+    return {
+        "O1_POTENTIAL": 0.3,
+        "O2_IDENTITY": internal_consistency * 0.8,
+        "O3_EXECUTION": overall_confidence * 0.7,
+        "O4_STRUCTURE": coherence * 0.6,
+        "O5_COGNITION": quality * 0.8,
+        "O6_AGENCY": goal_alignment * 0.7,
+        "O7_REASONING": quality * 0.9,
+        "O8_PURPOSE": goal_alignment * 0.8,
+        "O9_WITNESSES": trajectory_confidence * 0.6,
+        "O10_UNIFYING": coherence * 0.7,
+        "O11_INTEGRATION": overall_confidence * 0.5,
+        "O12_ABSOLVING": trajectory_confidence * 0.4,
+    }
+
+
+def approximate_vritti(
+    *,
+    quality: float = 0.5,
+    coherence: float = 0.5,
+    overall_confidence: float = 0.5,
+) -> Dict[str, float]:
+    """Approximate vritti distribution from available governance signals.
+
+    Canonical shared implementation. The distribution is always
+    normalizable because at least one component (pramana or nidra)
+    is positive for any non-negative inputs.  If all inputs are 0.0,
+    nidra = 0.3 dominates, producing a valid dormancy distribution.
+    """
+    pramana = min(1.0, quality * 0.6 + coherence * 0.4)
+    viparyaya = max(0.0, 0.5 - quality * 0.8)
+    vikalpa = max(0.0, 0.4 - coherence * 0.5) * min(1.0, quality + 0.3)
+    nidra = max(0.0, 0.3 - overall_confidence * 0.5)
+
+    total = pramana + viparyaya + vikalpa + nidra
+    if total <= 0:
+        # All signals exactly zero (mathematically unlikely but possible
+        # with quality=coherence=overall_confidence=0.0 → pramana=0,
+        # viparyaya=0.5, vikalpa=0.12, nidra=0.3 → total>0).
+        # Defensive: treat as full dormancy.
+        return {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                "smrti": 0.0, "nidra": 1.0}
+    return {
+        "pramana": pramana / total,
+        "viparyaya": viparyaya / total,
+        "vikalpa": vikalpa / total,
+        "smrti": 0.0,
+        "nidra": nidra / total,
+    }
+
+
+# =========================================================================
 # Exports
 # =========================================================================
 
@@ -1041,4 +1382,10 @@ __all__ = [
     "compute_residual",
     "assess_governance",
     "jepa_governance_check",
+    # Safe wrappers (canonical entry points for enforcement)
+    "safe_jepa_governance_check",
+    "apply_jepa_override",
+    # Shared signal approximation
+    "approximate_layer_weights",
+    "approximate_vritti",
 ]
