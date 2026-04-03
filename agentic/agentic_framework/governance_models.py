@@ -336,8 +336,9 @@ class AuthorizationResponse(BaseModel):
     # Approval Workflow Layer
     approval_required: bool = Field(
         False,
-        description="Whether this decision requires an approval workflow. "
-                    "True when governance_decision is DEFER and requires_human_approval.",
+        description="Whether a durable approval request was created for this decision. "
+                    "True only when an ApprovalRequest was successfully persisted. "
+                    "When True, approval_id will be non-None.",
     )
     approval_id: Optional[str] = Field(
         None,

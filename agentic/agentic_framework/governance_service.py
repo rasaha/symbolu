@@ -893,17 +893,22 @@ class GovernanceService:
         self._persist_audit_event(audit_event)
 
         # Step 9: Create approval request if needed
-        approval_required = (
+        #   approval_required is only True when an approval object is actually
+        #   created.  If no store is configured, the response signals
+        #   requires_human_approval but does not claim a durable approval exists.
+        approval_required = False
+        approval_id = None
+        approval_summary = None
+
+        _needs_approval = (
             effective_requires_human
             and governance_decision in (
                 APIGovernanceDecision.DEFER,
                 APIGovernanceDecision.DENY,
             )
         )
-        approval_id = None
-        approval_summary = None
 
-        if approval_required and self._approval_store is not None:
+        if _needs_approval and self._approval_store is not None:
             # Map escalation level to approval level
             _esc_to_approval = {
                 "halt": ApprovalLevel.HALT,
@@ -943,8 +948,10 @@ class GovernanceService:
                 )
                 approval_id = approval_req.approval_id
                 approval_summary = approval_req.to_summary_dict()
+                approval_required = True
             except ApprovalStoreError:
                 # FAIL-CLOSED: approval creation failed → DENY
+                # approval_required stays False — no durable approval exists
                 _logger.error(
                     "APPROVAL STORE FAILURE for decision %s — "
                     "failing closed to DENY",
@@ -954,6 +961,14 @@ class GovernanceService:
                 governance_decision = APIGovernanceDecision.DENY
                 eligible = False
                 rationale_codes.append("APPROVAL_STORE_FAILURE")
+
+        # Step 9b: Record approval_id in the in-memory audit event snapshot.
+        # The durable audit store was written before approval creation (it
+        # provides the decision_id that the approval context references).
+        # Bidirectional linkage: audit→approval via this snapshot field,
+        # approval→audit via ApprovalContext.governance_decision_id.
+        if approval_id is not None:
+            audit_event.request_snapshot["approval_id"] = approval_id
 
         # Step 10: Assemble response (uses JEPA-adjusted fields)
         return AuthorizationResponse(

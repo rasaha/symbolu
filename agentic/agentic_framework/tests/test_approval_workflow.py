@@ -300,48 +300,46 @@ class TestExpireStale:
 class TestGovernanceIntegration:
 
     def test_defer_creates_approval_request(self):
-        """When governance defers with requires_human, an approval is created."""
+        """When governance produces requires_human, a durable approval is created.
+
+        Uses strict mode with borderline scores to reliably trigger the
+        requires_human_approval + DENY/DEFER path.
+        """
         approval_store = ApprovalStore(":memory:")
-
-        # Use strict finance policy with borderline scores → DEFER or DENY
-        resolution = resolve_effective_policy(
-            DEFAULT_GLOBAL_POLICY,
-            overrides=[FINANCE_TENANT_OVERRIDE],
-            tenant_id="finance-corp",
-        )
         service = GovernanceService(
-            policy_resolution=resolution,
             approval_store=approval_store,
+            strict=True,
         )
 
-        # Borderline scores under strict thresholds
         request = AuthorizationRequest(
             actor_id="test-actor",
             action_type="file_write",
             tool_name="file_writer",
             agency_level="FULL",
-            quality_score=0.65,
-            coherence_score=0.65,
-            internal_consistency=0.65,
-            goal_alignment=0.65,
-            trajectory_confidence=0.65,
+            quality_score=0.60,
+            coherence_score=0.60,
+            internal_consistency=0.60,
+            goal_alignment=0.60,
+            trajectory_confidence=0.60,
         )
         response = service.authorize(request)
 
-        # Should be DEFER or DENY (not ALLOW) with these scores
-        assert response.governance_decision.value in ("DEFER", "DENY")
+        # With strict thresholds and 0.60 scores: DENY with requires_human
+        assert response.governance_decision.value in ("DENY", "DEFER")
+        assert response.requires_human_approval is True
+        # Approval was actually created
+        assert response.approval_required is True
+        assert response.approval_id is not None
+        assert response.approval_summary is not None
+        assert response.approval_summary["status"] == "pending"
 
-        if response.requires_human_approval:
-            # Approval should be created
-            assert response.approval_required is True
-            assert response.approval_id is not None
-            assert response.approval_summary is not None
-            assert response.approval_summary["status"] == "pending"
-
-            # Verify it's in the store
-            stored = approval_store.get(response.approval_id)
-            assert stored.status == ApprovalStatus.PENDING
-            assert stored.context.governance_decision_id == response.audit_reference
+        # Verify it's durably in the store
+        stored = approval_store.get(response.approval_id)
+        assert stored.status == ApprovalStatus.PENDING
+        assert stored.context.governance_decision_id == response.audit_reference
+        assert stored.context.actor_id == "test-actor"
+        assert stored.context.action_type == "file_write"
+        assert approval_store.count() == 1
 
     def test_allow_does_not_create_approval(self):
         """When governance allows, no approval is created."""
@@ -365,27 +363,28 @@ class TestGovernanceIntegration:
         assert response.approval_id is None
         assert approval_store.count() == 0
 
-    def test_no_approval_store_backward_compatible(self):
-        """GovernanceService without approval_store still works."""
-        service = GovernanceService()
+    def test_no_approval_store_does_not_set_approval_required(self):
+        """GovernanceService without approval_store: approval_required stays False."""
+        service = GovernanceService(strict=True)
         request = AuthorizationRequest(
             actor_id="test-actor",
-            action_type="file_read",
+            action_type="file_write",
+            tool_name="file_writer",
             agency_level="FULL",
-            quality_score=0.95,
-            coherence_score=0.95,
-            internal_consistency=0.95,
-            goal_alignment=0.95,
-            trajectory_confidence=0.95,
+            quality_score=0.60,
+            coherence_score=0.60,
+            internal_consistency=0.60,
+            goal_alignment=0.60,
+            trajectory_confidence=0.60,
         )
         response = service.authorize(request)
 
-        assert response.governance_decision is not None
+        # Even if requires_human is True, without a store no approval is created
         assert response.approval_required is False
         assert response.approval_id is None
 
     def test_approval_context_carries_policy_metadata(self):
-        """Approval context includes policy ID and version."""
+        """Approval context includes policy ID and version — non-vacuous."""
         approval_store = ApprovalStore(":memory:")
         resolution = resolve_effective_policy(
             DEFAULT_GLOBAL_POLICY,
@@ -395,6 +394,7 @@ class TestGovernanceIntegration:
         service = GovernanceService(
             policy_resolution=resolution,
             approval_store=approval_store,
+            strict=True,
         )
 
         request = AuthorizationRequest(
@@ -402,18 +402,46 @@ class TestGovernanceIntegration:
             action_type="file_write",
             tool_name="file_writer",
             agency_level="FULL",
-            quality_score=0.65,
-            coherence_score=0.65,
-            internal_consistency=0.65,
-            goal_alignment=0.65,
-            trajectory_confidence=0.65,
+            quality_score=0.60,
+            coherence_score=0.60,
+            internal_consistency=0.60,
+            goal_alignment=0.60,
+            trajectory_confidence=0.60,
         )
         response = service.authorize(request)
 
-        if response.approval_id is not None:
-            stored = approval_store.get(response.approval_id)
-            assert stored.context.policy_id is not None
-            assert stored.context.policy_version is not None
+        # Must have created an approval
+        assert response.approval_required is True
+        assert response.approval_id is not None
+
+        stored = approval_store.get(response.approval_id)
+        assert stored.context.policy_id is not None
+        assert stored.context.policy_version is not None
+
+    def test_approval_required_and_approval_id_always_consistent(self):
+        """approval_required=True implies approval_id is not None, and vice versa."""
+        approval_store = ApprovalStore(":memory:")
+        service = GovernanceService(approval_store=approval_store, strict=True)
+
+        # Case 1: ALLOW path — neither set
+        resp_allow = service.authorize(AuthorizationRequest(
+            actor_id="a", action_type="file_read", agency_level="FULL",
+            quality_score=0.95, coherence_score=0.95, internal_consistency=0.95,
+            goal_alignment=0.95, trajectory_confidence=0.95,
+        ))
+        assert resp_allow.approval_required is False
+        assert resp_allow.approval_id is None
+
+        # Case 2: DENY/DEFER path — both set
+        resp_deny = service.authorize(AuthorizationRequest(
+            actor_id="a", action_type="file_write", tool_name="w",
+            agency_level="FULL", quality_score=0.60, coherence_score=0.60,
+            internal_consistency=0.60, goal_alignment=0.60, trajectory_confidence=0.60,
+        ))
+        if resp_deny.approval_required:
+            assert resp_deny.approval_id is not None
+        if resp_deny.approval_id is not None:
+            assert resp_deny.approval_required is True
 
 
 # =========================================================================
@@ -424,13 +452,18 @@ class TestGovernanceIntegration:
 class TestFailClosed:
 
     def test_approval_store_failure_fails_closed(self):
-        """If approval store raises, governance fails closed to DENY."""
+        """If approval store raises, governance fails closed to DENY.
+
+        Non-vacuous: uses strict mode with scores that reliably trigger
+        the requires_human path, then verifies the broken store produces
+        DENY with APPROVAL_STORE_FAILURE and approval_required=False.
+        """
         broken_store = MagicMock(spec=ApprovalStore)
         broken_store.create_request.side_effect = ApprovalStoreError("DB down")
 
         service = GovernanceService(
             approval_store=broken_store,
-            strict=True,  # Strict mode to force DEFER on borderline
+            strict=True,
         )
 
         request = AuthorizationRequest(
@@ -438,15 +471,99 @@ class TestFailClosed:
             action_type="file_write",
             tool_name="file_writer",
             agency_level="FULL",
-            quality_score=0.55,
-            coherence_score=0.55,
-            internal_consistency=0.55,
-            goal_alignment=0.55,
-            trajectory_confidence=0.55,
+            quality_score=0.60,
+            coherence_score=0.60,
+            internal_consistency=0.60,
+            goal_alignment=0.60,
+            trajectory_confidence=0.60,
         )
         response = service.authorize(request)
 
-        # If approval was required and store failed, decision should be DENY
-        if response.approval_required or "APPROVAL_STORE_FAILURE" in response.rationale_codes:
-            assert response.governance_decision.value == "DENY"
-            assert "APPROVAL_STORE_FAILURE" in response.rationale_codes
+        # The store was called (the path was triggered)
+        broken_store.create_request.assert_called_once()
+        # Fail-closed: DENY, no approval created
+        assert response.governance_decision.value == "DENY"
+        assert "APPROVAL_STORE_FAILURE" in response.rationale_codes
+        # approval_required must be False since no approval was durably created
+        assert response.approval_required is False
+        assert response.approval_id is None
+
+
+# =========================================================================
+# Test: Double Transitions (A13)
+# =========================================================================
+
+
+class TestDoubleTransitions:
+
+    def test_cannot_approve_after_approve(self):
+        store = ApprovalStore(":memory:")
+        req = store.create_request(_make_context())
+        store.approve(req.approval_id, decided_by="admin")
+        with pytest.raises(ApprovalTransitionError, match="terminal state"):
+            store.approve(req.approval_id, decided_by="admin2")
+
+    def test_cannot_deny_after_deny(self):
+        store = ApprovalStore(":memory:")
+        req = store.create_request(_make_context())
+        store.deny(req.approval_id, decided_by="reviewer")
+        with pytest.raises(ApprovalTransitionError, match="terminal state"):
+            store.deny(req.approval_id, decided_by="reviewer2")
+
+    def test_cannot_cancel_after_cancel(self):
+        store = ApprovalStore(":memory:")
+        req = store.create_request(_make_context())
+        store.cancel(req.approval_id, canceled_by="actor")
+        with pytest.raises(ApprovalTransitionError, match="terminal state"):
+            store.cancel(req.approval_id, canceled_by="actor")
+
+
+# =========================================================================
+# Test: Audit Linkage (A12)
+# =========================================================================
+
+
+class TestAuditLinkage:
+
+    def test_approval_id_in_audit_event_snapshot(self):
+        """After approval creation, the audit event carries approval_id."""
+        approval_store = ApprovalStore(":memory:")
+        service = GovernanceService(approval_store=approval_store, strict=True)
+
+        request = AuthorizationRequest(
+            actor_id="test-actor",
+            action_type="file_write",
+            tool_name="file_writer",
+            agency_level="FULL",
+            quality_score=0.60,
+            coherence_score=0.60,
+            internal_consistency=0.60,
+            goal_alignment=0.60,
+            trajectory_confidence=0.60,
+        )
+        response = service.authorize(request)
+
+        if response.approval_required:
+            assert response.audit_event.request_snapshot.get("approval_id") == response.approval_id
+
+    def test_approval_context_links_to_governance_decision(self):
+        """ApprovalContext.governance_decision_id matches audit_reference."""
+        approval_store = ApprovalStore(":memory:")
+        service = GovernanceService(approval_store=approval_store, strict=True)
+
+        request = AuthorizationRequest(
+            actor_id="test-actor",
+            action_type="file_write",
+            tool_name="file_writer",
+            agency_level="FULL",
+            quality_score=0.60,
+            coherence_score=0.60,
+            internal_consistency=0.60,
+            goal_alignment=0.60,
+            trajectory_confidence=0.60,
+        )
+        response = service.authorize(request)
+
+        if response.approval_required:
+            stored = approval_store.get(response.approval_id)
+            assert stored.context.governance_decision_id == response.audit_reference
