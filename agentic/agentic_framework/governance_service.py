@@ -92,6 +92,9 @@ from agentic.agentic_framework.shadow_ai import (
     safe_resolve_shadow_policy,
     shadow_containment_to_governance,
 )
+from agentic.agentic_framework.policy_bundle import (
+    PolicyResolution,
+)
 
 import logging as _logging
 
@@ -142,10 +145,14 @@ def _generate_decision_id(request: AuthorizationRequest) -> str:
     return hashlib.sha256(content.encode()).hexdigest()[:24]
 
 
-def _check_forbidden_capabilities(capabilities: List[str]) -> Optional[str]:
+def _check_forbidden_capabilities(
+    capabilities: List[str],
+    forbidden: Optional[frozenset] = None,
+) -> Optional[str]:
     """Check if any capability is forbidden. Returns first match or None."""
+    effective = forbidden if forbidden is not None else FORBIDDEN_CAPABILITIES
     for cap in capabilities:
-        if cap in FORBIDDEN_CAPABILITIES:
+        if cap in effective:
             return cap
     return None
 
@@ -153,22 +160,42 @@ def _check_forbidden_capabilities(capabilities: List[str]) -> Optional[str]:
 def _build_confidence_signals(
     request: AuthorizationRequest,
     risk_level: ToolRiskLevel,
+    policy_resolution: Optional[PolicyResolution] = None,
 ) -> ConfidenceSignals:
     """Build ConfidenceSignals from external request + risk classification."""
-    complexity_map = {
-        ToolRiskLevel.READ_ONLY: 0.1,
-        ToolRiskLevel.WRITE: 0.4,
-        ToolRiskLevel.EXECUTE: 0.7,
-        ToolRiskLevel.DESTRUCTIVE: 0.9,
-        ToolRiskLevel.PRIVILEGED: 0.95,
-    }
-    reversibility_map = {
-        ToolRiskLevel.READ_ONLY: 1.0,
-        ToolRiskLevel.WRITE: 0.7,
-        ToolRiskLevel.EXECUTE: 0.5,
-        ToolRiskLevel.DESTRUCTIVE: 0.0,
-        ToolRiskLevel.PRIVILEGED: 0.2,
-    }
+    if policy_resolution is not None:
+        risk_policy = policy_resolution.effective_policy.risk
+        # Map ToolRiskLevel enum names to policy risk keys
+        _level_to_key = {
+            ToolRiskLevel.READ_ONLY: "read_only",
+            ToolRiskLevel.WRITE: "write",
+            ToolRiskLevel.EXECUTE: "execute",
+            ToolRiskLevel.DESTRUCTIVE: "destructive",
+            ToolRiskLevel.PRIVILEGED: "privileged",
+        }
+        complexity_map = {
+            lvl: risk_policy.complexity_map.get(key, 0.5)
+            for lvl, key in _level_to_key.items()
+        }
+        reversibility_map = {
+            lvl: risk_policy.reversibility_map.get(key, 0.5)
+            for lvl, key in _level_to_key.items()
+        }
+    else:
+        complexity_map = {
+            ToolRiskLevel.READ_ONLY: 0.1,
+            ToolRiskLevel.WRITE: 0.4,
+            ToolRiskLevel.EXECUTE: 0.7,
+            ToolRiskLevel.DESTRUCTIVE: 0.9,
+            ToolRiskLevel.PRIVILEGED: 0.95,
+        }
+        reversibility_map = {
+            ToolRiskLevel.READ_ONLY: 1.0,
+            ToolRiskLevel.WRITE: 0.7,
+            ToolRiskLevel.EXECUTE: 0.5,
+            ToolRiskLevel.DESTRUCTIVE: 0.0,
+            ToolRiskLevel.PRIVILEGED: 0.2,
+        }
 
     return ConfidenceSignals(
         quality_score=request.quality_score,
@@ -192,6 +219,7 @@ def _build_safety_contract_summary(
     risk_level: ToolRiskLevel,
     forbidden_cap: Optional[str],
     gate_decision: ConfidenceGateDecision,
+    policy_resolution: Optional[PolicyResolution] = None,
 ) -> Tuple[SafetyContractSummary, bool]:
     """
     Evaluate safety contract preconditions.
@@ -199,17 +227,27 @@ def _build_safety_contract_summary(
     Replicates SafetyContractEvaluator logic without requiring
     CoherenceState/GoalState objects. Uses request signals directly.
 
+    When policy_resolution is provided, thresholds are sourced from the
+    resolved SafetyPolicy section. Otherwise uses hardcoded defaults.
+
     Returns (summary, eligible).
     """
     satisfied: List[str] = []
     violated: List[str] = []
     blocking_reasons: List[str] = []
 
-    # Thresholds (match SafetyContractEvaluator defaults)
-    consistency_threshold = 0.60
-    alignment_threshold = 0.60
-    reversal_risk_threshold = 0.40
-    stability_threshold = 0.60
+    # Thresholds — from resolved policy or hardcoded defaults
+    if policy_resolution is not None:
+        sp = policy_resolution.effective_policy.safety
+        consistency_threshold = sp.internal_consistency_threshold
+        alignment_threshold = sp.goal_alignment_threshold
+        reversal_risk_threshold = sp.reversal_risk_threshold
+        stability_threshold = sp.identity_stability_threshold
+    else:
+        consistency_threshold = 0.60
+        alignment_threshold = 0.60
+        reversal_risk_threshold = 0.40
+        stability_threshold = 0.60
 
     # Precondition 1: Internal consistency
     if request.internal_consistency >= consistency_threshold:
@@ -493,6 +531,7 @@ class GovernanceService:
         domain_registry: Optional[DomainRegistry] = None,
         domain_id: Optional[str] = None,
         shadow_registry: Optional[ShadowRegistry] = None,
+        policy_resolution: Optional[PolicyResolution] = None,
     ):
         """
         Initialize governance service.
@@ -512,6 +551,10 @@ class GovernanceService:
             shadow_registry: Optional ShadowRegistry for shadow AI control.
                 When provided, the Shadow AI Control Layer evaluates asset
                 provenance and sanctionedness before final enforcement.
+            policy_resolution: Resolved policy bundle from the Policy
+                Externalization Layer.  When provided, safety thresholds,
+                forbidden capabilities, and risk mappings are sourced from
+                the resolved policy instead of hardcoded defaults.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -534,6 +577,9 @@ class GovernanceService:
 
         # Shadow AI Control Layer
         self._shadow_registry: Optional[ShadowRegistry] = shadow_registry
+
+        # Policy Externalization Layer
+        self._policy_resolution: Optional[PolicyResolution] = policy_resolution
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -568,16 +614,26 @@ class GovernanceService:
         tool_name = request.tool_name or request.action_type
         risk_level = self.classifier.classify(tool_name)
 
-        # Step 2: Check forbidden capabilities
-        forbidden_cap = _check_forbidden_capabilities(request.capabilities)
+        # Step 2: Check forbidden capabilities (from policy or hardcoded)
+        policy_forbidden = None
+        if self._policy_resolution is not None:
+            policy_forbidden = frozenset(
+                self._policy_resolution.effective_policy.safety.forbidden_capabilities
+            )
+        forbidden_cap = _check_forbidden_capabilities(
+            request.capabilities, forbidden=policy_forbidden,
+        )
 
         # Step 3: Build confidence signals and evaluate gate
-        signals = _build_confidence_signals(request, risk_level)
+        signals = _build_confidence_signals(
+            request, risk_level, policy_resolution=self._policy_resolution,
+        )
         gate_decision = self.gate.evaluate(signals, tool_name)
 
         # Step 4: Evaluate safety contract preconditions
         safety_summary, eligible = _build_safety_contract_summary(
             request, risk_level, forbidden_cap, gate_decision,
+            policy_resolution=self._policy_resolution,
         )
 
         # Step 5: Compute governance decision
@@ -809,6 +865,10 @@ class GovernanceService:
                 "jepa_escalation_override": jepa_assessment.escalation_override,
                 "domain_policy": (
                     domain_result.to_audit_dict() if domain_result else None
+                ),
+                "policy_bundle": (
+                    self._policy_resolution.effective_policy.to_audit_dict()
+                    if self._policy_resolution is not None else None
                 ),
             },
             shadow_assessment=shadow_audit,
