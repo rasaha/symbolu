@@ -969,3 +969,158 @@ This isn't blocking but makes wiring fragile. Every new integration requires def
 - 32D vritti slice validated against chitta_vritti output
 - MirrorBalance reports visible in coherence dashboard
 - CausalLayer attribution available via debug flag
+
+---
+
+## 5. Recommended Immediate Next 3 Implementation Moves
+
+These are the three things to do first, in order, with concrete file-level instructions.
+
+### Move 1: Delete Dead Core Facades + Core Entropy Stub
+
+**Why first:** Zero-risk cleanup that removes architectural confusion. Takes <30 minutes. Unblocks accurate understanding of what `core/` actually is.
+
+**Exact steps:**
+1. Delete `agentic/core/interface.py`
+2. Delete `agentic/core/pipeline.py`
+3. Delete `agentic/core/entropy/` directory (entire dead stub)
+4. Update `agentic/core/__init__.py`:
+   - Remove exports of `CoreInterface`, `CorePipeline`
+   - Add exports of real engines: `CoherenceEngine`, `SMIEngine`, `StitchingEngine`, `BhavaGeometry`
+5. Grep for any imports of `CoreInterface` or `CorePipeline` — expect zero hits
+6. Grep for imports from `agentic.core.entropy` — expect zero hits (if any exist, redirect to `agentic.entropy`)
+7. Run tests
+
+**Risk:** Near zero. These are dead code paths with no callers.
+
+### Move 2: Create Vritti Signal Adapter for Governance
+
+**Why second:** Highest leverage single wiring action. Replaces the crudest approximation in the governance system with a real signal, using graceful degradation.
+
+**Exact steps:**
+1. Create `agentic/agentic_framework/signal_adapters/__init__.py`
+2. Create `agentic/agentic_framework/signal_adapters/vritti_adapter.py`:
+   ```python
+   def get_vritti_distribution(ctx) -> Dict[str, float]:
+       """Return real vritti distribution if available, else approximate."""
+       if hasattr(ctx, 'chitta_vritti_result') and ctx.chitta_vritti_result:
+           result = ctx.chitta_vritti_result
+           return {
+               "pramana": result.pramana,
+               "viparyaya": result.viparyaya,
+               "vikalpa": result.vikalpa,
+               "smrti": result.smrti,
+               "nidra": result.nidra,
+           }
+       # Fallback to existing approximation
+       return approximate_vritti(
+           ctx.quality_score, ctx.coherence_score, ctx.confidence
+       )
+   ```
+3. In `agentic_framework/jepa_governance.py`, replace `approximate_vritti()` call with `vritti_adapter.get_vritti_distribution(ctx)`
+4. The existing `get_aspect_weights()` call (R[v,a] coupling matrix from `chitta_vritti/coupling.py`) now receives real data instead of fake data — no changes needed downstream
+5. Add integration test: verify governance produces identical results with approximation (no CV result) and improved results with real CV result
+6. Run tests
+
+**Risk:** Low — graceful degradation means existing behavior is preserved when CV result unavailable.
+
+### Move 3: Enable DHA Tier 1 Diagnostic by Default
+
+**Why third:** DHA is fully implemented, fully tested, and already lazy-loaded. Enabling diagnostic mode means every request gets tone/intensity computation without any behavioral change. Provides immediate observability into what DHA would do.
+
+**Exact steps:**
+1. In orchestrator pipeline config, change `dha_formula_enabled` default from `False` to `True`
+2. In `dha/config.py`, ensure Tier 1 config has `diagnostic_only=True` (compute but don't modify output)
+3. Verify `IntegratedRenderedOutput` or `UnifiedOutput` includes DHA diagnostic data in its output
+4. Add DHA diagnostic fields to `api/unified_api.py` `build_unified_output()` if not already present
+5. Monitor: DHA computation latency, tone distribution, delivery factor range
+6. Run tests
+
+**Risk:** Low — diagnostic mode is non-invasive. DHA is lazy-loaded (`@lru_cache`), so first-call cost is ~10ms, subsequent calls cached.
+
+---
+
+## 6. Modules That Should Wait
+
+| Module | Why Wait | Wait For What | When to Revisit |
+|--------|----------|---------------|-----------------|
+| `guna_modulation/MirrorBalance` (1,941 LOC) | Sophisticated but has zero consumers. No observability path to surface its output. | Phase 2 complete (output path wired). Need a dashboard or coherence report field to display balance metrics. | After renderer consumes DHA/guna signals and there's a visible place to show asymmetry detection. |
+| `guna_modulation/CausalLayer` (888 LOC) | Do-calculus on pipeline DAG is an audit/debugging tool, not a runtime gate. No debug UI exists to consume it. | Pipeline observability infrastructure. A debug endpoint or dashboard that can display causal attribution. | When a compliance or debugging use case demands "why did the pipeline produce this output?" |
+| `guna_modulation/ExperimentalReasoning` (841 LOC) | Explicitly marked "No learning. Exploration only." DPO, ToT, MCTS are research patterns, not runtime features. | A concrete use case that requires tree search or preference optimization at inference time. | May never be wired. Keep as research reference. |
+| `guna_modulation/RecursiveSelfImprovement` (908 LOC) | Observational tracking only — records utility observations but produces no actionable output. | A feedback loop that consumes its observations to adjust behavior. Currently no such loop exists. | When the system has a learning/adaptation layer that can consume performance observations. |
+| `guna_modulation/ConceptReadiness` (836 LOC) | Concept detection monitors coherence/entropy/drift but nothing acts on "concept ready" signals. | A downstream consumer that adjusts behavior based on concept readiness (e.g., deepen exploration when concept is forming). | After DHA tone modulation is live — concept readiness could modulate tone from "metaphor" to "practical" when concept crystallizes. |
+| `inference/` Appendix F (7 files, stages 0-7F) | Mixed maturity — some are 100-line stubs. CoherenceAwareDecoder (111 LOC) is minimal. | Individual stage maturation. Each needs >300 LOC of real logic and integration tests. | Review each stage individually after InferenceManager is wired (Phase 4.2). Promote mature stages one at a time. |
+| `sovereign/` training infrastructure (inoculation, validation, stress test) | These are training-time tools (15K+ LOC each). They don't need runtime wiring — they're already wired into the training loop. | Nothing — they're correctly placed. | Only revisit if training loop changes require updates to inoculation/validation harnesses. |
+
+---
+
+## 7. Modules to Consolidate or Deprioritize
+
+### Consolidation Targets
+
+| What | Into What | Why |
+|------|-----------|-----|
+| `core/smi/vritti_mapping.py` (independent VrittiMapper) | Delegate to `chitta_vritti/vritti.py` | Vritti should have one canonical computation. VrittiMapper can keep its interface but delegate internally. |
+| `inference/guna_inference.py` (guna approximation) | Import from `guna_modulation/guna_derivation.py` | Inference-time guna should use the same derivation as runtime, not an independent approximation. |
+| `sovereign/vritti.py` + `sovereign/guna.py` | Sync formulas with `chitta_vritti/` and `guna_modulation/` | Training versions need PyTorch gradients so can't directly import. But formula constants should be shared via a `_shared_constants.py` or equivalent. |
+| `identity/` + `motivation/` (engine patterns) | Consider shared base class | Both are 847/865 LOC rule-based classifiers with identical structure: 7 rule groups, confidence scoring, deterministic tiebreaking. A `SessionClassifierEngine` base could reduce duplication. **Low priority** — they work correctly as-is. |
+
+### Deprioritize
+
+| What | Why | Recommendation |
+|------|-----|----------------|
+| `core/interface.py` + `core/pipeline.py` | Dead code — all methods raise NotImplementedError. Never instantiated. | **Delete.** Not worth maintaining, documenting, or explaining. |
+| `core/entropy/` stub | Dead stub that creates naming confusion with real `entropy/` module. | **Delete.** |
+| `guna_modulation/ExperimentalReasoning` | Research-only (DPO, ToT, MCTS). Explicitly non-runtime. | **Keep as reference. Do not wire.** |
+| `guna_modulation/RecursiveSelfImprovement` | Pure observation tracker with no consumers. | **Keep. Do not wire until feedback loop exists.** |
+| `posture/_guna_mapping.py` | Deliberately private. Used only within posture/. Not a duplication problem — it's an intentional encapsulation. | **Leave alone.** |
+
+---
+
+## Roadmap Summary Diagram
+
+```
+PHASE 0 (Prerequisite)                    PHASE 1 (Highest Leverage)
+─────────────────────                    ──────────────────────────
+Delete core/ dead facades               Replace approximate_vritti() with
+Delete core/entropy/ stub                 real chitta_vritti/ output
+Consolidate vritti → chitta_vritti/      Add entropy to ConfidenceSignals
+Consolidate guna → guna_modulation/      Wire entropy gate into governance
+         │                                        │
+         └──────────────┬─────────────────────────┘
+                        │
+                        v
+              PHASE 2 (Output Path)
+              ─────────────────────
+              Enable DHA by default
+              Wire tone weights → renderer
+              Enable formula DHA (E=G×P×T)
+              Wire intensity → renderer
+              Add entropy output annotation
+                        │
+                        v
+              PHASE 3 (Session → Governance)
+              ──────────────────────────────
+              Identity + motivation → ConfidenceSignals
+              Identity → Shadow AI mismatch
+              Session signals → ApprovalContext
+              Temporal bhava → JEPA composite
+              Temporal always-on (lightweight)
+              Domain-specific identity/motivation policy
+                        │
+                        v
+              PHASE 4 (Advanced)
+              ─────────────────
+              Sovereign 128D → 32D bridge
+              InferenceManager → generation
+              MirrorBalance → observability
+              CausalLayer → debug audit
+              Appendix F stage evaluation
+```
+
+**Estimated effort:**
+- Phase 0: 1-2 days (cleanup)
+- Phase 1: 3-5 days (signal adapters + governance integration + testing)
+- Phase 2: 3-5 days (renderer changes + DHA enablement + testing)
+- Phase 3: 5-8 days (governance enrichment + policy bundle extensions + temporal changes)
+- Phase 4: 8-15 days (bridge architecture + InferenceManager integration + advanced modules)
