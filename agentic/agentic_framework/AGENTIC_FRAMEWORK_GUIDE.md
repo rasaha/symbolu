@@ -800,6 +800,59 @@ print(f"Enabled tasks: {stats['enabled_tasks']}")
 
 ---
 
+## Beyond the Ten Components: Semantic Governance
+
+The ten core components above describe the *interaction-level* framework.
+Underneath them, the governance stack has evolved into a layered architecture
+with deeper semantic awareness. This section provides a brief overview; see
+`docs/governance/AGENTIC_ARCHITECTURE.md` for the full technical specification.
+
+### Semantic State Layer (JEPA Governance)
+
+The system derives a composite semantic-cognitive state by integrating:
+
+- **Ontology signal** — Where in the 12-layer structural hierarchy the system
+  is operating (from low-level execution to high-level reasoning).
+- **Vritti signal** — What cognitive mode the system is in (valid knowledge,
+  misperception, conceptual reasoning, memory recall, or dormancy).
+- **JEPA composite** — An integrated signal combining ontology + vritti with
+  alignment and confidence scores.
+
+This composite is compared against what the system is *actually doing* (the
+runtime process state) to detect mismatches. If the system's semantic state
+disagrees with its runtime behavior — say, it claims high confidence but is
+attempting a destructive action with low alignment — the governance layer
+detects this as a "residual" and classifies the situation into a governance
+regime: NORMAL, PROCESS_DRIFT, SEMANTIC_SHIFT, DUAL_ANOMALY, or UNKNOWN.
+
+Non-NORMAL regimes trigger stricter governance: blocking writes, escalating
+reads, or hard-blocking everything.
+
+### Domain Semantic Policy Layer
+
+Different domains need different behavioral rules. A financial system should
+block all writes during process drift. A devops system might only require
+draft-mode writes. The Domain Semantic Policy Layer translates the general
+governance regime into domain-specific action postures:
+
+- **Finance**: Destructive always blocked. Drift blocks all writes.
+  Misperception (viparyaya) blocks everything.
+- **DevOps**: Reads and writes OK in normal. Destructive goes to sandbox.
+  Deploy blocked during drift.
+- **Research**: Read-heavy. Writes go to draft. No destructive/privileged ever.
+
+Domain profiles are declarative data, not code. They can only *restrict*
+governance decisions, never relax them.
+
+### What's Coming Next: Shadow AI Control
+
+The next planned layer will govern AI asset provenance and sanctionedness —
+tracking which models, tools, and plugins are approved, and detecting when
+approved assets operate outside their sanctioned boundaries. See the architecture
+document for details.
+
+---
+
 ## Design Decisions: What We Don't Include
 
 ### Tool Use With Rollback
