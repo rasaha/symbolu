@@ -1,23 +1,17 @@
 """
 Symbol-U Core v3.0 - Core Engine Tests
 ======================================
-Unit tests for the high-level Core engine and interfaces:
-- CoreInterface (facade for Symbol-U intelligence)
-- CorePipeline (main processing pipeline)
-- Data models (SMIResult, BhavaState, EntropyState, AnalysisResult, etc.)
+Unit tests for core data models and active module imports.
 
-Note: Core module contains placeholder implementations that raise NotImplementedError.
-These tests verify the interface contracts, model structures, and error handling.
+Phase 0 Cleanup: CoreInterface and CorePipeline facade tests have been removed
+because the facades themselves were removed (all methods were NotImplementedError).
+See test_phase0_cleanup.py for Phase 0 verification tests.
 """
 
 import pytest
 from typing import Any, Dict, List, Optional
 
-# Import core interfaces and pipeline
-from symbolu.core.interface import CoreInterface
-from symbolu.core.pipeline import CorePipeline
-
-# Import data models
+# Import data models (still active)
 from symbolu.core.models import (
     SMIResult,
     BhavaState,
@@ -29,221 +23,6 @@ from symbolu.core.models import (
     SyllableAnalysis,
     DeliveryMode,
 )
-
-
-# =============================================================================
-# Fixtures
-# =============================================================================
-
-
-@pytest.fixture
-def core_interface() -> CoreInterface:
-    """Create a CoreInterface instance."""
-    return CoreInterface()
-
-
-@pytest.fixture
-def core_pipeline() -> CorePipeline:
-    """Create a CorePipeline instance."""
-    return CorePipeline()
-
-
-@pytest.fixture
-def sample_text() -> str:
-    """Sample text for testing."""
-    return "Hello world, this is a test."
-
-
-@pytest.fixture
-def sample_context() -> Dict[str, Any]:
-    """Sample context dictionary for testing."""
-    return {
-        "user_intent": "exploration",
-        "session_id": "test-session-001",
-        "preferences": {"verbosity": "low"},
-    }
-
-
-# =============================================================================
-# CoreInterface Tests
-# =============================================================================
-
-
-class TestCoreInterfaceInstantiation:
-    """Tests for CoreInterface instantiation."""
-
-    def test_interface_instantiation(self) -> None:
-        """Test that CoreInterface can be instantiated."""
-        interface = CoreInterface()
-        assert interface is not None
-        assert isinstance(interface, CoreInterface)
-
-    def test_interface_instantiation_deterministic(self) -> None:
-        """Test that multiple instantiations create valid objects."""
-        interface1 = CoreInterface()
-        interface2 = CoreInterface()
-        assert interface1 is not None
-        assert interface2 is not None
-        assert interface1 is not interface2
-
-
-class TestCoreInterfaceComputeSMI:
-    """Tests for CoreInterface.compute_smi method."""
-
-    def test_compute_smi_raises_not_implemented(
-        self, core_interface: CoreInterface, sample_text: str
-    ) -> None:
-        """Test that compute_smi raises NotImplementedError (placeholder)."""
-        with pytest.raises(NotImplementedError):
-            core_interface.compute_smi(sample_text)
-
-    def test_compute_smi_with_empty_string_raises_not_implemented(
-        self, core_interface: CoreInterface
-    ) -> None:
-        """Test compute_smi with empty string raises NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            core_interface.compute_smi("")
-
-
-class TestCoreInterfaceComputeStitching:
-    """Tests for CoreInterface.compute_stitching method."""
-
-    def test_compute_stitching_raises_not_implemented(
-        self, core_interface: CoreInterface
-    ) -> None:
-        """Test that compute_stitching raises NotImplementedError (placeholder)."""
-        candidates = [CandidateResponse(text="Test")]
-        with pytest.raises(NotImplementedError):
-            core_interface.compute_stitching(candidates)
-
-    def test_compute_stitching_with_context_raises_not_implemented(
-        self, core_interface: CoreInterface, sample_context: Dict[str, Any]
-    ) -> None:
-        """Test compute_stitching with context raises NotImplementedError."""
-        candidates = [CandidateResponse(text="Test")]
-        with pytest.raises(NotImplementedError):
-            core_interface.compute_stitching(candidates, context=sample_context)
-
-
-class TestCoreInterfaceComputeBhava:
-    """Tests for CoreInterface.compute_bhava method."""
-
-    def test_compute_bhava_raises_not_implemented(
-        self, core_interface: CoreInterface, sample_context: Dict[str, Any]
-    ) -> None:
-        """Test that compute_bhava raises NotImplementedError (placeholder)."""
-        with pytest.raises(NotImplementedError):
-            core_interface.compute_bhava(sample_context)
-
-
-class TestCoreInterfaceComputeEntropy:
-    """Tests for CoreInterface.compute_entropy method."""
-
-    def test_compute_entropy_raises_not_implemented(
-        self, core_interface: CoreInterface, sample_text: str
-    ) -> None:
-        """Test that compute_entropy raises NotImplementedError (placeholder)."""
-        with pytest.raises(NotImplementedError):
-            core_interface.compute_entropy(sample_text)
-
-
-class TestCoreInterfaceApplyRegulators:
-    """Tests for CoreInterface.apply_regulators method."""
-
-    def test_apply_regulators_raises_not_implemented(
-        self, core_interface: CoreInterface
-    ) -> None:
-        """Test that apply_regulators raises NotImplementedError (placeholder)."""
-        draft = "Test draft text"
-        bhava = BhavaState()
-        with pytest.raises(NotImplementedError):
-            core_interface.apply_regulators(draft, bhava)
-
-
-class TestCoreInterfaceDecomposeSyllables:
-    """Tests for CoreInterface.decompose_syllables method."""
-
-    def test_decompose_syllables_raises_not_implemented(
-        self, core_interface: CoreInterface
-    ) -> None:
-        """Test that decompose_syllables raises NotImplementedError (placeholder)."""
-        with pytest.raises(NotImplementedError):
-            core_interface.decompose_syllables("word")
-
-
-class TestCoreInterfaceMapConsonantToKosha:
-    """Tests for CoreInterface.map_consonant_to_kosha method."""
-
-    def test_map_consonant_to_kosha_raises_not_implemented(
-        self, core_interface: CoreInterface
-    ) -> None:
-        """Test that map_consonant_to_kosha raises NotImplementedError (placeholder)."""
-        with pytest.raises(NotImplementedError):
-            core_interface.map_consonant_to_kosha("k")
-
-
-class TestCoreInterfaceMapWordToOntology:
-    """Tests for CoreInterface.map_word_to_ontology method."""
-
-    def test_map_word_to_ontology_raises_not_implemented(
-        self, core_interface: CoreInterface
-    ) -> None:
-        """Test that map_word_to_ontology raises NotImplementedError (placeholder)."""
-        with pytest.raises(NotImplementedError):
-            core_interface.map_word_to_ontology("test")
-
-
-# =============================================================================
-# CorePipeline Tests
-# =============================================================================
-
-
-class TestCorePipelineInstantiation:
-    """Tests for CorePipeline instantiation."""
-
-    def test_pipeline_instantiation_default(self) -> None:
-        """Test that CorePipeline can be instantiated with defaults."""
-        pipeline = CorePipeline()
-        assert pipeline is not None
-        assert isinstance(pipeline, CorePipeline)
-
-    def test_pipeline_instantiation_with_core_interface(self) -> None:
-        """Test CorePipeline instantiation with custom CoreInterface."""
-        interface = CoreInterface()
-        pipeline = CorePipeline(core=interface)
-        assert pipeline is not None
-        assert isinstance(pipeline, CorePipeline)
-
-
-class TestCorePipelineAnalyze:
-    """Tests for CorePipeline.analyze method."""
-
-    def test_analyze_raises_not_implemented(
-        self, core_pipeline: CorePipeline, sample_text: str
-    ) -> None:
-        """Test that analyze raises NotImplementedError (placeholder)."""
-        with pytest.raises(NotImplementedError):
-            core_pipeline.analyze(sample_text)
-
-    def test_analyze_with_context_raises_not_implemented(
-        self, core_pipeline: CorePipeline, sample_text: str, sample_context: Dict[str, Any]
-    ) -> None:
-        """Test analyze with context raises NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            core_pipeline.analyze(sample_text, context=sample_context)
-
-
-class TestCorePipelineAnalyzeStreaming:
-    """Tests for CorePipeline.analyze_streaming method."""
-
-    def test_analyze_streaming_raises_not_implemented(
-        self, core_pipeline: CorePipeline, sample_text: str
-    ) -> None:
-        """Test that analyze_streaming raises NotImplementedError (placeholder)."""
-        with pytest.raises(NotImplementedError):
-            # Attempt to get first result from generator
-            gen = core_pipeline.analyze_streaming(sample_text)
-            next(gen)
 
 
 # =============================================================================
@@ -478,18 +257,6 @@ class TestCoreModuleImports:
         from symbolu import core
         assert core is not None
 
-    def test_core_interface_import(self) -> None:
-        """Test that core.interface can be imported."""
-        from symbolu.core import interface
-        assert interface is not None
-        assert hasattr(interface, 'CoreInterface')
-
-    def test_core_pipeline_import(self) -> None:
-        """Test that core.pipeline can be imported."""
-        from symbolu.core import pipeline
-        assert pipeline is not None
-        assert hasattr(pipeline, 'CorePipeline')
-
     def test_core_models_import(self) -> None:
         """Test that core.models can be imported."""
         from symbolu.core import models
@@ -504,3 +271,9 @@ class TestCoreModuleImports:
         """Test that core.stitching package can be imported."""
         from symbolu.core import stitching
         assert stitching is not None
+
+    def test_core_no_longer_exports_facades(self) -> None:
+        """Test that core no longer exports dead facades."""
+        from symbolu import core
+        assert not hasattr(core, 'CoreInterface')
+        assert not hasattr(core, 'CorePipeline')

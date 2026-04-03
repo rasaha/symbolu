@@ -3,6 +3,24 @@
 Inference Gunas
 ================
 
+TOKEN-LEVEL INFERENCE GUNA (complementary to canonical runtime guna)
+====================================================================
+This module computes guna approximations at the token generation level,
+using token probabilities and repetition patterns (PyTorch, stateful).
+
+This is NOT the canonical runtime guna authority for pipeline-level derivation.
+The canonical runtime guna authority is: agentic/guna_modulation/guna_derivation.py
+(derive_guna_vector computes guna from pipeline signals C_s, M, H using
+closed-form deterministic formulas.)
+
+This module is complementary — it provides token-level guna signals during
+active generation. Both sources are valid at their respective abstraction levels.
+
+Training-time note:
+- sovereign/guna.py may maintain a separate PyTorch-differentiable guna
+  implementation for gradient requirements. That is intentional divergence
+  for training, not runtime duplication.
+
 Inference-time approximation of Sattva/Rajas/Tamas cognitive states.
 
 Without gradients, we approximate:

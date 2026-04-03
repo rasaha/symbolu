@@ -72,6 +72,15 @@ from agentic.agentic_framework.jepa_governance import (
     approximate_layer_weights,
     approximate_vritti,
 )
+from agentic.agentic_framework.signal_adapters.vritti_adapter import (
+    resolve_vritti_signal,
+    VrittiResolution,
+    VrittiSignalSource,
+)
+from agentic.agentic_framework.signal_adapters.entropy_adapter import (
+    resolve_entropy_signal,
+    EntropyResolution,
+)
 from agentic.agentic_framework.domain_policy import (
     DomainActionMode,
     DomainPolicyResult,
@@ -241,6 +250,26 @@ class AuditEntry:
     # Shadow AI Control Layer fields
     shadow_assessment: Optional[Dict[str, Any]] = None
     shadow_overrode: bool = False
+
+    # Phase 1: Signal source provenance
+    vritti_signal_source: Optional[str] = None
+    vritti_signal_degraded: Optional[bool] = None
+    vritti_signal_detail: Optional[str] = None
+    entropy_available: Optional[bool] = None
+    entropy_combined: Optional[float] = None
+    entropy_confidence_penalty: Optional[float] = None
+    entropy_gate: Optional[str] = None
+    entropy_detail: Optional[str] = None
+
+    # Phase 3: Session enrichment provenance
+    session_identity_type: Optional[str] = None
+    session_identity_unstable: Optional[bool] = None
+    session_motivation_type: Optional[str] = None
+    session_motivation_risk: Optional[bool] = None
+    session_temporal_state: Optional[str] = None
+    session_temporal_tense: Optional[bool] = None
+    session_confidence_adjustment: Optional[float] = None
+    session_enrichment_detail: Optional[str] = None
 
 
 # =============================================================================
@@ -731,7 +760,7 @@ class SafeMCPGateway:
         tool_call: MCPToolCall,
         tool_def: MCPToolDefinition,
         gate_decision: ConfidenceGateDecision,
-    ) -> "JEPAGovernanceAssessment":
+    ) -> tuple:
         """Run JEPA residual check. Always returns an assessment.
 
         Uses safe_jepa_governance_check which catches internal errors
@@ -740,12 +769,11 @@ class SafeMCPGateway:
 
         JEPA can only make decisions stricter, never more permissive.
 
-        Signal approximation uses the shared canonical functions from
-        jepa_governance (approximate_layer_weights / approximate_vritti)
-        so that MCP and GovernanceService produce identical composites
-        from equivalent inputs.  MCP has limited signals (quality,
-        coherence) so goal_alignment and trajectory_confidence default
-        to coherence and overall_confidence respectively.
+        Phase 1: Now uses vritti signal adapter (prefers real chitta_vritti)
+        and resolves entropy for governance context.
+
+        Returns:
+            Tuple of (JEPAGovernanceAssessment, VrittiResolution, EntropyResolution).
         """
         q = tool_call.quality_score
         c = tool_call.coherence_score
@@ -759,17 +787,30 @@ class SafeMCPGateway:
             trajectory_confidence=overall,
             overall_confidence=overall,
         )
-        vritti_dist = approximate_vritti(
+
+        # Phase 1: Resolve vritti via adapter (real > approximation)
+        vritti_result = getattr(tool_call, "vritti_result", None)
+        vritti_resolution = resolve_vritti_signal(
+            vritti_result=vritti_result,
             quality=q,
             coherence=c,
             overall_confidence=overall,
         )
+        vritti_dist = vritti_resolution.distribution
 
-        return safe_jepa_governance_check(
+        # Phase 1: Resolve entropy for governance context
+        entropy_result = getattr(tool_call, "entropy_result", None)
+        combined_entropy = getattr(tool_call, "combined_entropy", None)
+        entropy_resolution = resolve_entropy_signal(
+            entropy_result=entropy_result,
+            combined_entropy=combined_entropy,
+        )
+
+        assessment = safe_jepa_governance_check(
             layer_weights=layer_weights,
             vritti_distribution=vritti_dist,
-            coherence=c,
-            score=overall,
+            coherence=vritti_resolution.coherence,
+            score=vritti_resolution.score,
             action_type="call_tool",
             tool_name=tool_call.tool_name,
             risk_level=tool_def.risk_level.value,
@@ -786,6 +827,8 @@ class SafeMCPGateway:
             capabilities=list(tool_def.capabilities),
         )
 
+        return assessment, vritti_resolution, entropy_resolution
+
     def _audit(
         self,
         tool_call: MCPToolCall,
@@ -798,6 +841,9 @@ class SafeMCPGateway:
         domain_overrode: bool = False,
         shadow_assessment: Optional[ShadowAssessment] = None,
         shadow_overrode: bool = False,
+        vritti_resolution: Optional[VrittiResolution] = None,
+        entropy_resolution: Optional[EntropyResolution] = None,
+        session_enrichment: Optional[Any] = None,
     ) -> None:
         """Log audit entry to in-memory cache and durable store."""
         if not self.audit_enabled:
@@ -850,6 +896,56 @@ class SafeMCPGateway:
             domain_overrode=domain_overrode,
             shadow_assessment=shadow_audit,
             shadow_overrode=shadow_overrode,
+            # Phase 1: Signal source provenance
+            vritti_signal_source=(
+                vritti_resolution.source.value if vritti_resolution else None
+            ),
+            vritti_signal_degraded=(
+                vritti_resolution.degraded if vritti_resolution else None
+            ),
+            vritti_signal_detail=(
+                vritti_resolution.source_detail if vritti_resolution else None
+            ),
+            entropy_available=(
+                entropy_resolution.available if entropy_resolution else None
+            ),
+            entropy_combined=(
+                entropy_resolution.combined_entropy if entropy_resolution else None
+            ),
+            entropy_confidence_penalty=(
+                entropy_resolution.confidence_penalty if entropy_resolution else None
+            ),
+            entropy_gate=(
+                entropy_resolution.gate if entropy_resolution else None
+            ),
+            entropy_detail=(
+                entropy_resolution.source_detail if entropy_resolution else None
+            ),
+            # Phase 3: Session enrichment provenance
+            session_identity_type=(
+                session_enrichment.identity_type if session_enrichment else None
+            ),
+            session_identity_unstable=(
+                session_enrichment.identity_unstable if session_enrichment else None
+            ),
+            session_motivation_type=(
+                session_enrichment.motivation_type if session_enrichment else None
+            ),
+            session_motivation_risk=(
+                session_enrichment.motivation_risk_relevant if session_enrichment else None
+            ),
+            session_temporal_state=(
+                session_enrichment.temporal_state if session_enrichment else None
+            ),
+            session_temporal_tense=(
+                session_enrichment.temporal_tense if session_enrichment else None
+            ),
+            session_confidence_adjustment=(
+                session_enrichment.confidence_adjustment if session_enrichment else None
+            ),
+            session_enrichment_detail=(
+                session_enrichment.source_detail if session_enrichment else None
+            ),
         )
         self.audit_log.append(entry)
 
@@ -942,15 +1038,20 @@ class SafeMCPGateway:
         # Always returns a full assessment (never None). Uses
         # safe_jepa_governance_check which catches errors and returns
         # explicit UNKNOWN-regime assessment on failure.
-        jepa_assessment = self._jepa_check(tool_call, tool_def, gate_decision)
+        jepa_assessment, vritti_resolution, entropy_resolution = self._jepa_check(
+            tool_call, tool_def, gate_decision,
+        )
         regime = jepa_assessment.regime
 
         # Compute JEPA-adjusted confidence and escalation (stricter-only).
         # These are used in all MCPToolResult construction below so that
         # MCP results reflect JEPA overrides, matching GovernanceService.
+        # Phase 1: Also apply bounded entropy confidence penalty.
         effective_confidence = max(
             0.0,
-            gate_decision.confidence.overall + jepa_assessment.confidence_adjustment,
+            gate_decision.confidence.overall
+            + jepa_assessment.confidence_adjustment
+            - entropy_resolution.confidence_penalty,
         )
         effective_escalation = gate_decision.escalation.level
         if jepa_assessment.escalation_override is not None:
@@ -1019,7 +1120,9 @@ class SafeMCPGateway:
                 self._audit(tool_call, tool_def, result, gate_decision,
                             jepa_assessment, jepa_overrode=True,
                             domain_result=domain_result,
-                            domain_overrode=domain_overrode)
+                            domain_overrode=domain_overrode,
+                            vritti_resolution=vritti_resolution,
+                            entropy_resolution=entropy_resolution)
                 return result
 
             if merged_decision == "DEFER":
@@ -1100,7 +1203,9 @@ class SafeMCPGateway:
                 )
                 self._audit(tool_call, tool_def, result, gate_decision,
                             jepa_assessment, jepa_overrode=False,
-                            domain_result=domain_result, domain_overrode=True)
+                            domain_result=domain_result, domain_overrode=True,
+                            vritti_resolution=vritti_resolution,
+                            entropy_resolution=entropy_resolution)
                 return result
             elif domain_result.mode in (
                 DomainActionMode.CONFIRM_REQUIRED,
@@ -1128,7 +1233,9 @@ class SafeMCPGateway:
                 )
                 self._audit(tool_call, tool_def, result, gate_decision,
                             jepa_assessment, jepa_overrode=False,
-                            domain_result=domain_result, domain_overrode=True)
+                            domain_result=domain_result, domain_overrode=True,
+                            vritti_resolution=vritti_resolution,
+                            entropy_resolution=entropy_resolution)
                 return result
             elif domain_result.mode in (
                 DomainActionMode.READ_ONLY,
@@ -1159,7 +1266,9 @@ class SafeMCPGateway:
                     self._audit(tool_call, tool_def, result, gate_decision,
                                 jepa_assessment, jepa_overrode=False,
                                 domain_result=domain_result,
-                                domain_overrode=True)
+                                domain_overrode=True,
+                                vritti_resolution=vritti_resolution,
+                                entropy_resolution=entropy_resolution)
                     return result
 
         # Shadow AI Control Layer check
@@ -1233,7 +1342,9 @@ class SafeMCPGateway:
                             jepa_assessment, jepa_overrode=False,
                             domain_result=domain_result,
                             shadow_assessment=shadow_assessment,
-                            shadow_overrode=True)
+                            shadow_overrode=True,
+                            vritti_resolution=vritti_resolution,
+                            entropy_resolution=entropy_resolution)
                 return result
             elif shadow_gov == "DEFER":
                 shadow_overrode = True
@@ -1259,7 +1370,9 @@ class SafeMCPGateway:
                             jepa_assessment, jepa_overrode=False,
                             domain_result=domain_result,
                             shadow_assessment=shadow_assessment,
-                            shadow_overrode=True)
+                            shadow_overrode=True,
+                            vritti_resolution=vritti_resolution,
+                            entropy_resolution=entropy_resolution)
                 return result
 
         # Check minimum confidence for risk level (use JEPA-adjusted)
@@ -1282,7 +1395,9 @@ class SafeMCPGateway:
                         jepa_assessment,
                         domain_result=domain_result,
                         shadow_assessment=shadow_assessment,
-                        shadow_overrode=shadow_overrode)
+                        shadow_overrode=shadow_overrode,
+                        vritti_resolution=vritti_resolution,
+                        entropy_resolution=entropy_resolution)
             return result
 
         # Check execution permission
@@ -1311,7 +1426,9 @@ class SafeMCPGateway:
                                 jepa_assessment,
                                 domain_result=domain_result,
                                 shadow_assessment=shadow_assessment,
-                                shadow_overrode=shadow_overrode)
+                                shadow_overrode=shadow_overrode,
+                                vritti_resolution=vritti_resolution,
+                                entropy_resolution=entropy_resolution)
                     return result
             else:
                 result = MCPToolResult(
@@ -1329,7 +1446,9 @@ class SafeMCPGateway:
                             jepa_assessment,
                             domain_result=domain_result,
                             shadow_assessment=shadow_assessment,
-                            shadow_overrode=shadow_overrode)
+                            shadow_overrode=shadow_overrode,
+                            vritti_resolution=vritti_resolution,
+                            entropy_resolution=entropy_resolution)
                 return result
 
         # Handle notification escalation
@@ -1359,7 +1478,9 @@ class SafeMCPGateway:
                             jepa_assessment,
                             domain_result=domain_result,
                             shadow_assessment=shadow_assessment,
-                            shadow_overrode=shadow_overrode)
+                            shadow_overrode=shadow_overrode,
+                            vritti_resolution=vritti_resolution,
+                            entropy_resolution=entropy_resolution)
                 return result
             human_confirmed = True
 
@@ -1387,7 +1508,9 @@ class SafeMCPGateway:
                         jepa_assessment,
                         domain_result=domain_result,
                         shadow_assessment=shadow_assessment,
-                        shadow_overrode=shadow_overrode)
+                        shadow_overrode=shadow_overrode,
+                        vritti_resolution=vritti_resolution,
+                        entropy_resolution=entropy_resolution)
             return result
 
         except asyncio.TimeoutError:
@@ -1407,7 +1530,9 @@ class SafeMCPGateway:
                         jepa_assessment,
                         domain_result=domain_result,
                         shadow_assessment=shadow_assessment,
-                        shadow_overrode=shadow_overrode)
+                        shadow_overrode=shadow_overrode,
+                        vritti_resolution=vritti_resolution,
+                        entropy_resolution=entropy_resolution)
             return result
 
         except Exception as e:
@@ -1427,7 +1552,9 @@ class SafeMCPGateway:
                         jepa_assessment,
                         domain_result=domain_result,
                         shadow_assessment=shadow_assessment,
-                        shadow_overrode=shadow_overrode)
+                        shadow_overrode=shadow_overrode,
+                        vritti_resolution=vritti_resolution,
+                        entropy_resolution=entropy_resolution)
             return result
 
     async def call_tool_simple(

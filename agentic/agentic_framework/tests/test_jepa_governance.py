@@ -1418,11 +1418,18 @@ class TestMCPJepaCheck:
         )
         signals = gw._build_signals(call, tool_def)
         gate_decision = gw.gate.evaluate(signals, "test_tool")
-        assessment = gw._jepa_check(call, tool_def, gate_decision)
+        # Phase 1: _jepa_check now returns (assessment, vritti_resolution, entropy_resolution)
+        assessment, vritti_resolution, entropy_resolution = gw._jepa_check(
+            call, tool_def, gate_decision,
+        )
         # Must return a full assessment, never None
         assert assessment is not None
         assert assessment.regime is not None
         assert hasattr(assessment, "confidence_adjustment")
+        # Phase 1: Verify signal provenance metadata
+        assert vritti_resolution is not None
+        assert vritti_resolution.source is not None
+        assert entropy_resolution is not None
 
 
 # =============================================================================

@@ -16,6 +16,7 @@ Author: Sovereign-1 Training Initiative
 Date: January 2026
 """
 
+import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,6 +24,8 @@ from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass
 from pathlib import Path
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 from .evolutionary_inference import EvolutionaryInferenceEngine, EvolutionaryConfig
 from .csr_inference import CSRInferenceGuard, CSRGuardConfig
@@ -39,6 +42,11 @@ from .sovereign_state_monitor import SovereignStateMonitor
 from .logit_modulation import LogitModulationConfig, LogitModulator
 from .retrieval_scorer import RetrievalScorer, RetrievalScorerConfig
 from .penalty_scorer import PenaltyScorer, PenaltyScorerConfig
+
+# Phase 4: Sovereign ↔ inference reconciliation
+from .signal_reconciliation import reconcile_signals, ReconciliationResult
+from .diagnostic_hooks import InferenceDiagnosticHooks, DiagnosticHooksConfig
+from .coherence_aware_decoder import CoherenceAwareDecoder, CoherenceDecoderConfig
 
 
 class InferenceMode(Enum):
@@ -81,6 +89,14 @@ class InferenceManagerConfig:
     logit_modulation_config: Optional[LogitModulationConfig] = None
     retrieval_scorer_config: Optional[RetrievalScorerConfig] = None
     penalty_scorer_config: Optional[PenaltyScorerConfig] = None
+
+    # Phase 4: Sovereign ↔ inference reconciliation
+    enable_signal_reconciliation: bool = False   # Vritti/guna cross-source checks
+    enable_sovereign_bridge_signals: bool = False  # Wire sovereign bridge into generate()
+    enable_diagnostic_hooks: bool = False         # MirrorBalance/CausalLayer diagnostics
+    diagnostic_hooks_config: Optional[DiagnosticHooksConfig] = None
+    # Appendix F Stage 1: Coherence-aware decoding (policy adjustment only)
+    enable_coherence_decoder: bool = False
 
 
 class InferenceManager:
@@ -186,6 +202,22 @@ class InferenceManager:
                 self.config.penalty_scorer_config
             )
 
+        # Phase 4: Coherence-aware decoder (Appendix F Stage 1)
+        self.coherence_decoder: Optional[CoherenceAwareDecoder] = None
+        if self.config.enable_coherence_decoder:
+            self.coherence_decoder = CoherenceAwareDecoder()
+
+        # Phase 4: Diagnostic hooks and reconciliation state
+        self.diagnostic_hooks: Optional[InferenceDiagnosticHooks] = None
+        if self.config.enable_diagnostic_hooks:
+            self.diagnostic_hooks = InferenceDiagnosticHooks(
+                self.config.diagnostic_hooks_config or DiagnosticHooksConfig(
+                    enable_mirror_balance=True,
+                    enable_causal_attribution=True,
+                )
+            )
+        self._last_reconciliation: Optional[ReconciliationResult] = None
+
         # Generation state
         self._generation_count: int = 0
         self._total_tokens_generated: int = 0
@@ -256,6 +288,17 @@ class InferenceManager:
             self.config.enable_gunas = False
             self.config.enable_scoring = False
 
+        elif self.config.mode == InferenceMode.FULL:
+            self.config.enable_karma = True
+            self.config.enable_csr_guard = True
+            self.config.enable_metacognition = True
+            self.config.enable_gunas = True
+            self.config.enable_scoring = True
+            # Phase 4: Enable reconciliation and bridge in FULL mode
+            self.config.enable_signal_reconciliation = True
+            self.config.enable_sovereign_bridge_signals = True
+            self.config.enable_diagnostic_hooks = True
+
         elif self.config.mode == InferenceMode.SAFE:
             self.config.enable_karma = True
             self.config.enable_csr_guard = True
@@ -263,6 +306,10 @@ class InferenceManager:
             self.config.enable_gunas = True
             self.config.enable_scoring = True
             self.config.abort_on_low_coherence = True
+            # Phase 4: Enable reconciliation and bridge in SAFE mode
+            self.config.enable_signal_reconciliation = True
+            self.config.enable_sovereign_bridge_signals = True
+            self.config.enable_diagnostic_hooks = True
 
         elif self.config.mode == InferenceMode.SOVEREIGN:
             # Full metabolic loop with all cognitive components
@@ -273,6 +320,11 @@ class InferenceManager:
             self.config.enable_scoring = True
             self.config.abort_on_low_coherence = True
             self.config.auto_adjust_params = True
+            # Phase 4: Enable sovereign reconciliation and diagnostics
+            self.config.enable_signal_reconciliation = True
+            self.config.enable_sovereign_bridge_signals = True
+            self.config.enable_diagnostic_hooks = True
+            self.config.enable_coherence_decoder = True
 
     @classmethod
     def from_checkpoint(
@@ -451,6 +503,17 @@ class InferenceManager:
                 if self.gunas is not None:
                     effective_temp = self.gunas.get_temperature_modifier(effective_temp)
 
+                # Phase 4 (Appendix F Stage 1): Coherence-aware decoding policy
+                if self.coherence_decoder is not None and self.metacognition is not None:
+                    coh_score = self.metacognition.coherence_history[-1] if self.metacognition.coherence_history else 0.5
+                    coh_policy = self.coherence_decoder.adjust_policy(
+                        coherence=coh_score,
+                        base_temperature=effective_temp,
+                        base_top_p=effective_top_p,
+                    )
+                    effective_temp = coh_policy['temperature']
+                    effective_top_p = coh_policy['top_p']
+
                 # Forward pass
                 outputs = self.model(generated_ids, **kwargs)
 
@@ -576,6 +639,57 @@ class InferenceManager:
                     )
                     step_meta['gunas'] = {'sattva': sattva, 'rajas': rajas, 'tamas': tamas}
 
+                # Phase 4: Signal reconciliation (SOVEREIGN mode)
+                if self.config.enable_signal_reconciliation and self.gunas is not None:
+                    inference_guna = (self.gunas.sattva, self.gunas.rajas, self.gunas.tamas)
+                    # Extract sovereign guna from state monitor if available
+                    sovereign_guna = None
+                    sovereign_vritti = None
+                    if (self.state_monitor is not None and
+                            self.state_monitor._metrics_history):
+                        latest = self.state_monitor._metrics_history[-1]
+                        sovereign_guna = (latest.lucidity, latest.turbulence, latest.stability)
+                        sovereign_vritti = latest.vritti_profile
+                    recon = reconcile_signals(
+                        inference_guna=inference_guna,
+                        sovereign_guna=sovereign_guna,
+                        sovereign_vritti_profile=sovereign_vritti,
+                    )
+                    self._last_reconciliation = recon
+                    step_meta['signal_reconciliation'] = {
+                        'guna_divergence': recon.guna_divergence,
+                        'vritti_agreement': recon.vritti_agreement,
+                        'reconciled_dominant': recon.reconciled_guna.dominant,
+                    }
+                    if recon.divergence_warnings:
+                        step_meta['reconciliation_warnings'] = list(recon.divergence_warnings)
+
+                # Phase 4: Sovereign bridge signals (32-D → ConfidenceSignals)
+                if (self.config.enable_sovereign_bridge_signals and
+                        self.state_monitor is not None and
+                        self.state_monitor._metrics_history):
+                    try:
+                        bridge_signals = self._extract_bridge_signals()
+                        if bridge_signals is not None:
+                            step_meta['bridge_signals'] = bridge_signals
+                    except Exception as exc:
+                        logger.debug("Bridge signal extraction failed at step %d: %s", step, exc)
+                        step_meta['bridge_signal_error'] = str(exc)
+
+                # Phase 4: Diagnostic hooks (SOVEREIGN mode)
+                if self.diagnostic_hooks is not None and self.diagnostic_hooks.enabled:
+                    guna_s = self.gunas.sattva if self.gunas else 0.33
+                    guna_r = self.gunas.rajas if self.gunas else 0.33
+                    guna_t = self.gunas.tamas if self.gunas else 0.34
+                    coh = step_meta.get('coherence', 0.5)
+                    self.diagnostic_hooks.record_step(
+                        step=step,
+                        sattva=guna_s,
+                        rajas=guna_r,
+                        tamas=guna_t,
+                        coherence_score=coh,
+                    )
+
                 # Callback
                 if on_token_callback is not None:
                     on_token_callback(next_token.item(), step_meta)
@@ -628,6 +742,41 @@ class InferenceManager:
 
         if return_hidden_states:
             result['hidden_states'] = hidden_states_list
+
+        # Phase 4: Append reconciliation, bridge signals, and diagnostic metadata
+        if self._last_reconciliation is not None:
+            result['signal_reconciliation'] = self._last_reconciliation.to_dict()
+        if self.config.enable_sovereign_bridge_signals:
+            try:
+                bridge = self._extract_bridge_signals()
+                if bridge is not None:
+                    result['bridge_signals'] = bridge
+            except Exception as exc:
+                logger.debug("Post-generation bridge signal extraction failed: %s", exc)
+                result['bridge_signal_error'] = str(exc)
+        if self.diagnostic_hooks is not None and self.diagnostic_hooks.enabled:
+            result['diagnostic_summary'] = self.diagnostic_hooks.get_summary()
+
+        # Phase 4: Audit metadata — makes it obvious when Phase 4 was active
+        result['phase4_status'] = {
+            'mode': self.config.mode.value,
+            'signal_reconciliation_enabled': self.config.enable_signal_reconciliation,
+            'signal_reconciliation_ran': self._last_reconciliation is not None,
+            'sovereign_bridge_enabled': self.config.enable_sovereign_bridge_signals,
+            'sovereign_bridge_ran': 'bridge_signals' in result,
+            'diagnostic_hooks_enabled': self.config.enable_diagnostic_hooks,
+            'diagnostic_hooks_ran': (
+                self.diagnostic_hooks is not None
+                and self.diagnostic_hooks.enabled
+                and 'diagnostic_summary' in result
+            ),
+            'coherence_decoder_enabled': self.config.enable_coherence_decoder,
+            'reconciliation_warnings': (
+                list(self._last_reconciliation.divergence_warnings)
+                if self._last_reconciliation is not None
+                else []
+            ),
+        }
 
         return result
 
@@ -808,6 +957,21 @@ class InferenceManager:
         if self.state_monitor is not None:
             lines.append(f"  {self.state_monitor.get_status_line()}")
 
+        # Phase 4 status
+        p4_parts = []
+        if self.config.enable_signal_reconciliation:
+            p4_parts.append("reconciliation")
+        if self.config.enable_sovereign_bridge_signals:
+            p4_parts.append("bridge")
+        if self.config.enable_diagnostic_hooks:
+            p4_parts.append("diagnostics")
+        if self.config.enable_coherence_decoder:
+            p4_parts.append("coherence_decoder")
+        if p4_parts:
+            lines.append(f"  Phase 4: {', '.join(p4_parts)}")
+        else:
+            lines.append("  Phase 4: inactive")
+
         return "\n".join(lines)
 
     def get_status_line(self) -> str:
@@ -849,6 +1013,127 @@ class InferenceManager:
 
         if self.state_monitor is not None:
             self.state_monitor.clear()
+
+        # Phase 4: Clear reconciliation and diagnostics
+        self._last_reconciliation = None
+        if self.diagnostic_hooks is not None:
+            self.diagnostic_hooks.clear()
+
+    # =========================================================================
+    # Phase 4: Sovereign bridge integration
+    # =========================================================================
+
+    def _extract_bridge_signals(self) -> Optional[Dict[str, float]]:
+        """Extract ConfidenceSignals from 32-D state via sovereign_bridge.
+
+        Lazy-imports sovereign_bridge to avoid hard dependency on the
+        agentic_framework package at module load time.
+
+        Returns:
+            Dict of bridge signal values, or None if unavailable.
+        """
+        if self.state_monitor is None or not self.state_monitor._metrics_history:
+            return None
+
+        latest = self.state_monitor._metrics_history[-1]
+
+        # Build a 32-element list from the latest metrics
+        state_32 = list(latest.bhava_activations.values()) if hasattr(latest, 'bhava_activations') else [0.0] * 12
+        if len(state_32) < 12:
+            state_32.extend([0.0] * (12 - len(state_32)))
+        state_32 = state_32[:12]
+
+        # Kosha profile
+        kosha = list(latest.kosha_profile) if latest.kosha_profile else [0.0] * 5
+        state_32.extend(kosha[:5])
+
+        # Vritti profile
+        vritti = list(latest.vritti_profile) if latest.vritti_profile else [0.0] * 5
+        state_32.extend(vritti[:5])
+
+        # Guna: lucidity, turbulence(activity), stability, velocity, acceleration, stable
+        guna = [
+            latest.lucidity,
+            latest.turbulence,
+            latest.stability,
+            getattr(latest, 'velocity', 0.0),
+            getattr(latest, 'acceleration', 0.0),
+            getattr(latest, 'stability', 0.5),  # stable ≈ stability
+        ]
+        state_32.extend(guna[:6])
+
+        # Reserved
+        state_32.extend([0.0] * 4)
+
+        try:
+            from agentic.agentic_framework.sovereign_bridge import signals_from_sovereign_state
+            signals = signals_from_sovereign_state(state_32)
+            # Convert ConfidenceSignals to plain dict for serialization
+            return {
+                'quality_score': signals.quality_score,
+                'correctness_score': signals.correctness_score,
+                'coherence_score': signals.coherence_score,
+                'prediction_reversal_risk': signals.prediction_reversal_risk,
+                'action_complexity': signals.action_complexity,
+                'completeness_score': signals.completeness_score,
+                'volatility_index': signals.volatility_index,
+                'session_stability': signals.session_stability,
+                'trajectory_confidence': signals.trajectory_confidence,
+                'internal_consistency': signals.internal_consistency,
+            }
+        except (ImportError, Exception):
+            return None
+
+    def initialize_from_training_state(
+        self,
+        sovereign_state_128d: Any,
+        state_delta_128d: Any = None,
+    ) -> Dict[str, Any]:
+        """Project a 128-D training sovereign state into the inference runtime.
+
+        This bridges the training → inference gap by:
+        1. Projecting 128-D state to 32-D via inference_bridge
+        2. Using the projected guna as initial signal reconciliation source
+        3. Returning full projection metadata for audit
+
+        Use this when initializing from a training checkpoint that carries
+        the full 128-D sovereign state.
+
+        Args:
+            sovereign_state_128d: 128-element sequence (list, tuple, or tensor).
+            state_delta_128d: Optional 128-element state delta.
+
+        Returns:
+            Dict with projection result, including inference_state (32 floats),
+            metadata, and any warnings about information loss.
+        """
+        from agentic.sovereign.inference_bridge import project_sovereign_to_inference
+
+        result = project_sovereign_to_inference(
+            sovereign_state_128d,
+            state_delta_128d,
+        )
+
+        # Feed projected guna into reconciliation if enabled
+        if self.config.enable_signal_reconciliation:
+            gs = result.guna_summary
+            projected_guna = (gs['lucidity'], gs['activity'], gs['stability'])
+            # Normalize to sum ≈ 1
+            total = sum(projected_guna) + 1e-9
+            projected_guna = tuple(v / total for v in projected_guna)
+
+            inference_guna = None
+            if self.gunas is not None:
+                inference_guna = (self.gunas.sattva, self.gunas.rajas, self.gunas.tamas)
+
+            recon = reconcile_signals(
+                inference_guna=inference_guna,
+                sovereign_guna=projected_guna,
+                sovereign_vritti_profile=result.vritti_profile,
+            )
+            self._last_reconciliation = recon
+
+        return result.to_dict()
 
     def save_state(self, path: Union[str, Path]) -> None:
         """

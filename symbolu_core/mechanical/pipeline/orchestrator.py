@@ -957,12 +957,14 @@ class SymbolUPipeline:
         # =======================================================================
         # Formula-only DHA (Delivery Harmonization Algorithm)
         # Deterministic, zero-parameter, closed-form delivery modulation
-        # Disabled by default - enable via dha_formula_enabled in request metadata
-        # Authority: OBSERVATIONAL (provides delivery profile, does not modify text)
+        # Enabled by default (Phase 2 signal wiring)
+        # Authority: DELIVERY SHAPING — affects renderer layer weights via
+        #   DHA tone modulation, and confidence posture via Strategy 2.
+        # Set dha_formula_enabled=False in request metadata to disable
         # =======================================================================
         try:
-            # Check if formula DHA is enabled via request metadata
-            formula_dha_enabled = ctx.request.metadata.get("dha_formula_enabled", False)
+            # Enabled by default (diagnostic mode) — override with metadata flag
+            formula_dha_enabled = ctx.request.metadata.get("dha_formula_enabled", True)
             if formula_dha_enabled:
                 dha_module = _get_formula_dha()
                 DHAConfig = dha_module["DHAConfig"]
@@ -979,6 +981,83 @@ class SymbolUPipeline:
                     ctx.dha.adaptation_notes["formula_dha"] = formula_dha_result
                     ctx.dha.adaptation_notes["formula_dha_D"] = formula_dha_result.get("D")
                     ctx.dha.adaptation_notes["formula_dha_tone"] = formula_dha_result.get("tone_weights", {})
+
+                # ---------------------------------------------------------------
+                # Output modulation adapter (Phase 2): resolve DHA + guna + entropy.
+                # Feeds into:
+                #   1. Strategy 2: E → confidence/escalation adjustment
+                #   2. Renderer: tone → layer weight modulation
+                # ---------------------------------------------------------------
+                try:
+                    from agentic.agentic_framework.signal_adapters.output_modulation_adapter import (
+                        resolve_output_modulation,
+                    )
+                    explain_log = ctx.mlcr.explain_log if ctx.mlcr else {}
+                    entropy_vals = explain_log.get("entropy", {})
+                    H_G = entropy_vals.get("H_G", 0.0)
+                    # Normalize H_G to [0,1] using ln(3) ≈ 1.0986
+                    import math
+                    H_norm = min(1.0, max(0.0, H_G / math.log(3))) if H_G > 0 else 0.0
+
+                    coherence_score = 0.5
+                    if hasattr(ctx, 'coherence_state') and ctx.coherence_state:
+                        coherence_score = getattr(ctx.coherence_state, 'coherence_score', 0.5)
+
+                    # Motion (M): The canonical guna formula uses M for Rajas
+                    # derivation (R_raw = M * (1 - |H - H_mid|)). At this call
+                    # site, no trustworthy motion signal is available — the
+                    # pipeline does not track inter-turn content velocity.
+                    # Explicit fallback: M=0.0 collapses Rajas contribution,
+                    # which is conservative (Rajas≈0 → less dynamism bias).
+                    motion_M = 0.0
+
+                    modulation_resolution = resolve_output_modulation(
+                        dha_result=formula_dha_result,
+                        C_s=coherence_score,
+                        M=motion_M,
+                        H=H_norm,
+                        tier=tier,
+                        base_intensity=1.0,
+                        entropy_gate=ctx.request.metadata.get("entropy_gate"),
+                        entropy_combined=entropy_vals.get("normalized_entropy"),
+                    )
+                    mod_dict = modulation_resolution.to_dict()
+                    mod_dict["motion_fallback"] = True  # Explicit: M was not measured
+                    ctx.dha.adaptation_notes["output_modulation"] = mod_dict
+
+                    # Strategy 2: Wire E into delivery confidence posture.
+                    # Compute bounded confidence adjustment from E and store
+                    # as delivery_confidence metadata for downstream consumers.
+                    try:
+                        from agentic.agentic_framework.signal_adapters.output_modulation_adapter import (
+                            compute_modulation_confidence_adjustment,
+                        )
+                        guna_E = modulation_resolution.guna_E
+                        modulation_adj = compute_modulation_confidence_adjustment(guna_E)
+                        ctx.dha.adaptation_notes["modulation_confidence_adjustment"] = modulation_adj
+                        ctx.dha.adaptation_notes["modulation_confidence_E_raw"] = guna_E
+
+                        # Compute effective delivery confidence: base confidence
+                        # adjusted by E-derived modifier. This becomes the
+                        # behavioral posture signal for output/renderer.
+                        base_delivery_confidence = coherence_score  # Best available proxy
+                        delivery_confidence = max(0.0, min(1.0,
+                            base_delivery_confidence + modulation_adj,
+                        ))
+                        ctx.dha.adaptation_notes["delivery_confidence"] = delivery_confidence
+                        ctx.dha.adaptation_notes["delivery_confidence_base"] = base_delivery_confidence
+                    except Exception as exc:
+                        import logging as _logging
+                        _logging.getLogger(__name__).debug(
+                            "Strategy 2 confidence adjustment failed: %s", exc,
+                        )
+                        ctx.dha.adaptation_notes["modulation_confidence_error"] = str(exc)
+                except Exception as exc:
+                    import logging as _logging
+                    _logging.getLogger(__name__).debug(
+                        "Output modulation resolution failed: %s", exc,
+                    )
+                    ctx.dha.adaptation_notes["output_modulation_error"] = str(exc)
         except Exception:
             # Formula DHA is optional - continue if it fails
             pass

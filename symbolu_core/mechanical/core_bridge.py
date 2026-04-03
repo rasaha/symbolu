@@ -1,52 +1,57 @@
 """
-Core Bridge
-============
+Core Bridge — DEPRECATED
+=========================
 
-Bridge between mechanical layer and Symbol-U core.
-Delegates all core computations to CoreInterface.
+Phase 0 Cleanup: CoreInterface facade has been removed (all methods were
+NotImplementedError stubs). This bridge previously delegated to that dead
+facade.
+
+CoreBridge is retained as a deprecation shim so that existing try/except
+imports in mechanical/__init__.py do not break. All methods now raise
+NotImplementedError with a clear migration message.
+
+Migration path:
+- For SMI computation: use agentic.core.smi.SMIEngine directly
+- For analysis: compose from active engines (smi, stitching, coherence, etc.)
 """
 
+import warnings
 from typing import Dict, Any, Optional, List
-from agentic.core.interface import CoreInterface
+
 from agentic.core.models import AnalysisResult
 
 
 class CoreBridge:
     """
-    Bridge providing mechanical layer access to core intelligence.
-    
-    All core operations are delegated to CoreInterface.
+    DEPRECATED: CoreInterface facade has been removed.
+
+    This shim exists only for import compatibility. All methods raise
+    NotImplementedError with migration guidance.
     """
-    
+
     def __init__(self):
-        self._core = CoreInterface()
-    
+        warnings.warn(
+            "CoreBridge is deprecated. CoreInterface facade was removed in Phase 0. "
+            "Use agentic.core.smi.SMIEngine or other active engines directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     def analyze(
         self,
         text: str,
         context: Optional[List[str]] = None,
-        **kwargs
+        **kwargs,
     ) -> AnalysisResult:
-        """
-        Analyze text using core intelligence.
-        
-        Delegates to CoreInterface.analyze_complete()
-        """
-        return self._core.analyze_complete(text, context, **kwargs)
-    
+        """DEPRECATED: Use active engines directly."""
+        raise NotImplementedError(
+            "CoreBridge.analyze() is deprecated. "
+            "Compose from active engines (smi, stitching, coherence, etc.) directly."
+        )
+
     def get_smi(self, text: str) -> List[Dict[str, Any]]:
-        """
-        Get SMI results for text.
-        
-        Delegates to CoreInterface.compute_smi()
-        """
-        results = self._core.compute_smi(text)
-        return [
-            {
-                "word": r.word,
-                "smi": r.smi_value,
-                "level": r.level,
-                "components": r.components
-            }
-            for r in results
-        ]
+        """DEPRECATED: Use agentic.core.smi.SMIEngine.compute() directly."""
+        raise NotImplementedError(
+            "CoreBridge.get_smi() is deprecated. "
+            "Use agentic.core.smi.SMIEngine directly."
+        )

@@ -134,6 +134,19 @@ from .phase_coherence_signal import (
     PhaseCoherenceConfig,
 )
 
+# Phase 4: Sovereign ↔ Inference Reconciliation
+from .signal_reconciliation import (
+    reconcile_signals,
+    ReconciliationResult,
+    GunaSnapshot,
+    VrittiSnapshot,
+)
+from .diagnostic_hooks import (
+    InferenceDiagnosticHooks,
+    DiagnosticHooksConfig,
+    DiagnosticSnapshot,
+)
+
 __all__ = [
     # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
@@ -226,6 +239,15 @@ __all__ = [
     "PhaseCoherenceAggregator",
     "PhaseCoherenceProjection",
     "PhaseCoherenceConfig",
+
+    # Phase 4: Sovereign ↔ Inference Reconciliation
+    "reconcile_signals",
+    "ReconciliationResult",
+    "GunaSnapshot",
+    "VrittiSnapshot",
+    "InferenceDiagnosticHooks",
+    "DiagnosticHooksConfig",
+    "DiagnosticSnapshot",
 ]
 
 __version__ = "2.0.0"
