@@ -1,0 +1,42 @@
+{
+  "deep_therapy_high_entropy": {
+    "allow_metaphor": true,
+    "flow_mode": "inner_priority",
+    "preferred_engine_family": "dha",
+    "regulated_mode": false,
+    "tier": "upper",
+    "use_hrm": true,
+    "use_lam": true,
+    "use_lcm": false
+  },
+  "generic_low_complexity_chat": {
+    "allow_metaphor": false,
+    "flow_mode": "outer_only",
+    "preferred_engine_family": "persona",
+    "regulated_mode": false,
+    "tier": "lower",
+    "use_hrm": false,
+    "use_lam": false,
+    "use_lcm": false
+  },
+  "long_arc_high_tension": {
+    "allow_metaphor": true,
+    "flow_mode": "inner_priority",
+    "preferred_engine_family": "dha",
+    "regulated_mode": false,
+    "tier": "upper",
+    "use_hrm": true,
+    "use_lam": true,
+    "use_lcm": false
+  },
+  "simple_task_low_entropy": {
+    "allow_metaphor": false,
+    "flow_mode": "outer_only",
+    "preferred_engine_family": "persona",
+    "regulated_mode": false,
+    "tier": "lower",
+    "use_hrm": false,
+    "use_lam": false,
+    "use_lcm": false
+  }
+}

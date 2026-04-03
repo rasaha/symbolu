@@ -363,9 +363,14 @@ class MistralCGAdapter(BaseLLMAdapter):
             raise ImportError("torch required. Install with: pip install torch")
 
         try:
-            from symbolu.training.unified.mistral_wrapper import (
-                MistralCGWrapper,
-            )
+            try:
+                from symbolu_training.training.unified.mistral_wrapper import (
+                    MistralCGWrapper,
+                )
+            except ImportError:
+                from symbolu.training.unified.mistral_wrapper import (
+                    MistralCGWrapper,
+                )
 
             self.model = MistralCGWrapper(
                 model_name=model_name,

@@ -1,0 +1,55 @@
+{
+  "baseline": {
+    "summary_stats": {
+      "total_outputs": 200,
+      "avg_brokenness": 0.18076295863373062,
+      "high_brokenness_count": 0,
+      "high_brokenness_percent": 0.0
+    },
+    "correlations": {
+      "sibilant_ratio": -0.9800658424961477,
+      "stop_ratio": 0.9910165530418399,
+      "nasal_ratio": -0.9981779390687581,
+      "fricative_ratio": -0.8449767502790737,
+      "stop_ending_ratio": 0.9945266348665466
+    },
+    "effect_sizes": {
+      "sibilant_ratio": 0.0,
+      "stop_ratio": 11.352665116965731,
+      "nasal_ratio": 0.0,
+      "fricative_ratio": 0.0,
+      "stop_ending_ratio": 76.25244936949959
+    }
+  },
+  "reranked": {
+    "summary_stats": {
+      "total_outputs": 200,
+      "avg_brokenness": 0.16312041332931135,
+      "high_brokenness_count": 0,
+      "high_brokenness_percent": 0.0
+    },
+    "correlations": {
+      "sibilant_ratio": -0.999884950792953,
+      "stop_ratio": 0.9988762941185995,
+      "nasal_ratio": -0.9726708155831614,
+      "fricative_ratio": -0.937079271270428,
+      "stop_ending_ratio": 0.9581446364360051
+    },
+    "effect_sizes": {
+      "sibilant_ratio": 0.0,
+      "stop_ratio": 11.209701713267235,
+      "nasal_ratio": 0.0,
+      "fricative_ratio": 0.0,
+      "stop_ending_ratio": 77.54139888538964
+    }
+  },
+  "deltas": {
+    "avg_brokenness": -0.017642545304419277,
+    "high_brokenness_percent": 0.0
+  },
+  "verdict": {
+    "max_correlation": 0.9981779390687581,
+    "shows_improvement": false,
+    "hypothesis_supported": true
+  }
+}

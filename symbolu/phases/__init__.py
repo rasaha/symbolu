@@ -1,11 +1,11 @@
-"""
-Symbolu Phases
+"""Backwards-compatibility stub — module moved to symbolu_extensions/."""
+import importlib
+import sys
 
-This module contains the phase implementations for the Symbolu pipeline.
-"""
-
-from .phase7_targeted_generation import execute_phase7
-
-__all__ = [
-    "execute_phase7",
-]
+_new_name = __name__.replace("symbolu.", "symbolu_extensions.", 1)
+try:
+    _mod = importlib.import_module(_new_name)
+    sys.modules[__name__] = _mod
+    globals().update({k: v for k, v in _mod.__dict__.items() if not k.startswith("_")})
+except ImportError:
+    pass

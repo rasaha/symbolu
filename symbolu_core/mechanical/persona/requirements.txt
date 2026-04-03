@@ -1,0 +1,13 @@
+# Persona Engine v2.8.2 Dependencies
+
+# Core dependencies
+pydantic>=2.0.0
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Optional dependencies for enhanced functionality
+# (not required for core Persona Engine)
+# fastapi>=0.100.0  # For API deployment
+# uvicorn>=0.20.0   # For API server

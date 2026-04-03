@@ -71,10 +71,14 @@ except ImportError:
 
 # V9.6.8: Import SovereignStateProjector for proper 32D state normalization
 try:
-    from symbolu.jepa.state_projector import SovereignStateProjector
+    from symbolu_training.jepa.state_projector import SovereignStateProjector
     SOVEREIGN_PROJECTOR_AVAILABLE = True
 except ImportError:
-    SOVEREIGN_PROJECTOR_AVAILABLE = False
+    try:
+        from symbolu.jepa.state_projector import SovereignStateProjector
+        SOVEREIGN_PROJECTOR_AVAILABLE = True
+    except ImportError:
+        SOVEREIGN_PROJECTOR_AVAILABLE = False
 
 
 # =============================================================================

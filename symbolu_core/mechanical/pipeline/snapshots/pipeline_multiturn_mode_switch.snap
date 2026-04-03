@@ -1,0 +1,85 @@
+======================================================================
+PIPELINE MULTI-TURN CONVERSATION SNAPSHOT
+======================================================================
+
+Total Turns: 4
+
+--------------------------------------------------
+TURN 1
+--------------------------------------------------
+
+Input: I need quick advice.
+
+Output:
+You might find that To clarify: I need quick advice.
+
+You're doing meaningful work here.
+
+Metadata:
+  Mode: minimal
+  Persona: neutral
+  MLCR Tier: N/A
+  MLCR Intent: N/A
+  DHA Tone: SWEET_RESONANCE
+  DHA Readiness: HIGH
+
+--------------------------------------------------
+TURN 2
+--------------------------------------------------
+
+Input: Now I want to explore deeper.
+
+Output:
+It seems that To clarify: Now I want to explore deeper.
+
+You're doing meaningful work here.
+
+Metadata:
+  Mode: standard
+  Persona: neutral
+  MLCR Tier: N/A
+  MLCR Intent: N/A
+  DHA Tone: SWEET_RESONANCE
+  DHA Readiness: HIGH
+
+--------------------------------------------------
+TURN 3
+--------------------------------------------------
+
+Input: What does this mean symbolically?
+
+Output:
+Perhaps To clarify: What does this mean symbolically?
+
+You're doing meaningful work here.
+
+Metadata:
+  Mode: enhanced
+  Persona: neutral
+  MLCR Tier: N/A
+  MLCR Intent: N/A
+  DHA Tone: SWEET_RESONANCE
+  DHA Readiness: HIGH
+
+--------------------------------------------------
+TURN 4
+--------------------------------------------------
+
+Input: Give me the summary.
+
+Output:
+You might find that To clarify: Give me the summary.
+
+You're doing meaningful work here.
+
+Metadata:
+  Mode: minimal
+  Persona: neutral
+  MLCR Tier: N/A
+  MLCR Intent: N/A
+  DHA Tone: SWEET_RESONANCE
+  DHA Readiness: HIGH
+
+======================================================================
+END OF CONVERSATION
+======================================================================

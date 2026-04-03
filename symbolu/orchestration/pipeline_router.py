@@ -121,7 +121,10 @@ class PipelineADeterministic(PipelineInterface):
 
     def __init__(self):
         # Import Phase-7 components
-        from symbolu.phases.phase7_targeted_generation import execute_phase7
+        try:
+            from symbolu_extensions.phases.phase7_targeted_generation import execute_phase7
+        except ImportError:
+            from symbolu.phases.phase7_targeted_generation import execute_phase7
         self._execute_phase7 = execute_phase7
 
     def execute(self, request: UnifiedRequest) -> UnifiedResponse:

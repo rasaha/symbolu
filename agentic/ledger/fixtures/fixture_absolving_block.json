@@ -1,0 +1,20 @@
+{
+  "entries": [
+    {
+      "artifact_hash": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "artifact_id": "artifact_absolving_001",
+      "entry_hash": "a3c05b3422c60e85",
+      "ledger_index": 0,
+      "phase_id": "9",
+      "projected_layers": ["ABSOLVING"],
+      "router_version": "R1.0",
+      "span_id": "42aecee3c2a6ea77"
+    }
+  ],
+  "metadata": {
+    "description": "ABSOLVING attempt without allowlist - must fail verification",
+    "fixture_type": "absolving_block",
+    "expected_failure": true,
+    "notes": "This fixture contains an invalid entry that claims ABSOLVING projection without opt-in. Verification should fail with LAYER_MISMATCH."
+  }
+}

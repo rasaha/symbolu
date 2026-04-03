@@ -1,39 +1,11 @@
-"""
-Symbol-U Training Module
-========================
+"""Backwards-compatibility stub — module moved to symbolu_training/."""
+import importlib
+import sys
 
-Training infrastructure for consumer providers.
-Includes data generation, validation, and training scripts.
-
-Directory Structure:
-    training/
-    ├── data/           # Training datasets
-    │   ├── raw/        # Raw generated data
-    │   └── processed/  # Validated, processed data
-    ├── scripts/        # Training scripts
-    └── config/         # Training configurations
-"""
-
-from symbolu.training.schemas import (
-    QueryIntentPair,
-    ParaphrasePair,
-    TrainingDataset,
-    IntentLabel,
-)
-from symbolu.training.text_utils import (
-    clean_wikitext_artifacts,
-    clean_generated_text,
-    estimate_token_quality,
-)
-from symbolu.training.trainers.gradient_throttle import GradientNormThrottle
-
-__all__ = [
-    "QueryIntentPair",
-    "ParaphrasePair",
-    "TrainingDataset",
-    "IntentLabel",
-    "clean_wikitext_artifacts",
-    "clean_generated_text",
-    "estimate_token_quality",
-    "GradientNormThrottle",
-]
+_new_name = __name__.replace("symbolu.", "symbolu_training.", 1)
+try:
+    _mod = importlib.import_module(_new_name)
+    sys.modules[__name__] = _mod
+    globals().update({k: v for k, v in _mod.__dict__.items() if not k.startswith("_")})
+except ImportError:
+    pass  # symbolu_training not installed; fail silently for partial installs
