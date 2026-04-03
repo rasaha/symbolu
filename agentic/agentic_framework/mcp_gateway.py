@@ -83,6 +83,8 @@ from agentic.agentic_framework.shadow_ai import (
     ShadowAssessment,
     ShadowContainmentMode,
     ShadowRegistry,
+    is_memory_write_intent,
+    resolve_shadow_asset_id,
     resolve_shadow_policy,
     shadow_containment_to_governance,
 )
@@ -1184,14 +1186,19 @@ class SafeMCPGateway:
             if domain_result is not None and domain_result.mode != DomainActionMode.ALLOW:
                 _dom_mismatch = domain_result.mode.severity / 6.0
 
+            _shadow_asset_id = resolve_shadow_asset_id(
+                tool_name=tool_call.tool_name,
+            )
             shadow_assessment = resolve_shadow_policy(
-                asset_id=tool_call.tool_name,
+                asset_id=_shadow_asset_id,
                 tool_name=tool_call.tool_name,
                 registry=self._shadow_registry,
                 action_category=action_cat,
                 risk_level=tool_def.risk_level.value,
                 domain_id=self._domain_id or "",
-                memory_write_intent="memory" in tool_call.tool_name.lower(),
+                memory_write_intent=is_memory_write_intent(
+                    tool_name=tool_call.tool_name,
+                ),
                 mutation_intent=mutation,
                 jepa_regime=regime.value,
                 semantic_mismatch=_sem_mismatch,

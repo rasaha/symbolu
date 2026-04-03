@@ -28,9 +28,13 @@ from agentic.agentic_framework.shadow_ai import (
     ShadowAssessment,
     ShadowRegistry,
     ShadowPolicyRule,
+    ShadowGovernanceMapping,
     DEFAULT_SHADOW_RULES,
+    is_memory_write_intent,
+    resolve_shadow_asset_id,
     resolve_shadow_policy,
     shadow_containment_to_governance,
+    shadow_containment_to_governance_mapping,
     _stricter_containment,
 )
 
@@ -771,10 +775,11 @@ class TestDurableAuditPersistence:
     """Shadow assessment must survive durable persistence."""
 
     def test_durable_audit_store_shadow_fields(self, basic_registry: ShadowRegistry):
-        """Shadow fields persisted through GovernanceAuditStore."""
+        """Shadow fields persisted through GovernanceAuditStore in durable store."""
         from agentic.ledger.governance_audit_store import GovernanceAuditStore
         from agentic.agentic_framework.governance_service import GovernanceService
         from agentic.agentic_framework.governance_models import AuthorizationRequest
+        import json
 
         store = GovernanceAuditStore(":memory:")
         service = GovernanceService(
@@ -793,19 +798,22 @@ class TestDurableAuditPersistence:
         )
         response = service.authorize(request)
 
-        # Verify persisted in durable store
-        events = store.list_recent(limit=1)
-        assert len(events) == 1
-        # Shadow assessment is embedded in request_snapshot
-        snapshot = events[0].get("request_snapshot", {})
-        # The snapshot is stored as JSON string in the store
-        import json
-        if isinstance(snapshot, str):
-            snapshot = json.loads(snapshot)
-        # The GovernanceService embeds shadow in audit_event.shadow_assessment
-        # which is separate from request_snapshot — verify via response
+        # Verify in-memory audit event
         assert response.audit_event.shadow_assessment is not None
         assert response.audit_event.shadow_assessment["provenance_status"] == "approved"
+
+        # Verify DURABLE store actually contains shadow data
+        events = store.list_recent(limit=1)
+        assert len(events) == 1
+        snapshot = events[0].get("request_snapshot", {})
+        if isinstance(snapshot, str):
+            snapshot = json.loads(snapshot)
+        # Shadow assessment must be embedded in request_snapshot for durable persistence
+        assert "shadow_assessment" in snapshot, (
+            "Shadow assessment missing from durable store request_snapshot"
+        )
+        assert snapshot["shadow_assessment"]["provenance_status"] == "approved"
+        assert "shadow_overrode" in snapshot
 
     def test_durable_audit_count_increments(self, basic_registry: ShadowRegistry):
         """Audit store count should reflect persisted events."""
@@ -1073,3 +1081,198 @@ class TestExampleScenarios:
             mutation_intent=True,
         )
         assert result.containment_mode.severity >= ShadowContainmentMode.MEMORY_WRITE_DENIED.severity
+
+
+# =========================================================================
+# Test: Shared helpers (resolve_shadow_asset_id, is_memory_write_intent)
+# =========================================================================
+
+
+class TestSharedHelpers:
+    """Tests for shared helper functions used by both GovernanceService and MCP."""
+
+    def test_resolve_asset_id_prefers_tool_name(self):
+        assert resolve_shadow_asset_id(tool_name="my-tool", actor_id="my-agent") == "my-tool"
+
+    def test_resolve_asset_id_falls_back_to_actor(self):
+        assert resolve_shadow_asset_id(tool_name="", actor_id="my-agent") == "my-agent"
+
+    def test_resolve_asset_id_empty(self):
+        assert resolve_shadow_asset_id() == ""
+
+    def test_resolve_asset_id_strips_whitespace(self):
+        assert resolve_shadow_asset_id(tool_name="  ", actor_id="  agent  ") == "agent"
+
+    def test_memory_write_intent_in_action_type(self):
+        assert is_memory_write_intent(action_type="memory_store") is True
+
+    def test_memory_write_intent_in_tool_name(self):
+        assert is_memory_write_intent(tool_name="write_memory") is True
+
+    def test_memory_write_intent_combined(self):
+        assert is_memory_write_intent(action_type="file_read", tool_name="memory_tool") is True
+
+    def test_no_memory_write_intent(self):
+        assert is_memory_write_intent(action_type="file_read", tool_name="calculator") is False
+
+
+# =========================================================================
+# Test: Governance mapping with metadata
+# =========================================================================
+
+
+class TestGovernanceMappingMetadata:
+    """Tests for shadow_containment_to_governance_mapping()."""
+
+    def test_allow_mapping(self):
+        m = shadow_containment_to_governance_mapping(ShadowContainmentMode.ALLOW)
+        assert m.decision == "ALLOW"
+        assert m.containment_severity == 0
+
+    def test_blocked_mapping(self):
+        m = shadow_containment_to_governance_mapping(ShadowContainmentMode.BLOCKED)
+        assert m.decision == "DENY"
+        assert m.containment_severity == 8
+
+    def test_intermediate_modes_have_distinct_hints(self):
+        """All intermediate DEFER modes should produce distinct constraint hints."""
+        intermediate = [
+            ShadowContainmentMode.OBSERVE_ONLY,
+            ShadowContainmentMode.READ_ONLY,
+            ShadowContainmentMode.DRAFT_ONLY,
+            ShadowContainmentMode.SANDBOX_ONLY,
+            ShadowContainmentMode.MEMORY_WRITE_DENIED,
+            ShadowContainmentMode.REQUIRE_CONFIRMATION,
+        ]
+        hints = set()
+        for mode in intermediate:
+            m = shadow_containment_to_governance_mapping(mode)
+            assert m.decision == "DEFER"
+            assert m.containment_mode == mode
+            hints.add(m.constraint_hint)
+        # All hints should be distinct
+        assert len(hints) == len(intermediate)
+
+    def test_severity_ordering_preserved(self):
+        m1 = shadow_containment_to_governance_mapping(ShadowContainmentMode.OBSERVE_ONLY)
+        m2 = shadow_containment_to_governance_mapping(ShadowContainmentMode.REQUIRE_CONFIRMATION)
+        assert m2.containment_severity > m1.containment_severity
+
+
+# =========================================================================
+# Test: max_risk_level enforcement
+# =========================================================================
+
+
+class TestMaxRiskLevelEnforcement:
+    """max_risk_level should escalate containment, not just log."""
+
+    def test_exceeds_max_risk_destructive_blocked(self):
+        """Destructive action beyond max_risk_level → BLOCKED."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="safe-tool",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.APPROVED,
+                trust_level=ShadowTrustLevel.TRUSTED,
+                max_risk_level="write",
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="safe-tool",
+            tool_name="safe-tool",
+            registry=registry,
+            action_category="destructive",
+            risk_level="destructive",
+            mutation_intent=True,
+        )
+        assert result.containment_mode == ShadowContainmentMode.BLOCKED
+        assert any("EXCEEDS_MAX_RISK" in rc for rc in result.reason_codes)
+
+    def test_exceeds_max_risk_non_destructive_confirm(self):
+        """Non-destructive action beyond max_risk_level → REQUIRE_CONFIRMATION."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="read-tool",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.APPROVED,
+                trust_level=ShadowTrustLevel.TRUSTED,
+                max_risk_level="read_only",
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="read-tool",
+            tool_name="read-tool",
+            registry=registry,
+            action_category="mutating",
+            risk_level="write",
+            mutation_intent=True,
+        )
+        assert result.containment_mode.severity >= ShadowContainmentMode.REQUIRE_CONFIRMATION.severity
+        assert any("EXCEEDS_MAX_RISK" in rc for rc in result.reason_codes)
+
+    def test_within_max_risk_no_escalation(self):
+        """Action within max_risk_level → no max_risk escalation."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="write-tool",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.APPROVED,
+                trust_level=ShadowTrustLevel.TRUSTED,
+                max_risk_level="execute",
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="write-tool",
+            tool_name="write-tool",
+            registry=registry,
+            action_category="mutating",
+            risk_level="write",
+            mutation_intent=True,
+        )
+        assert not any("EXCEEDS_MAX_RISK" in rc for rc in result.reason_codes)
+
+
+# =========================================================================
+# Test: Durable persistence of shadow data via event_from_governance_decision
+# =========================================================================
+
+
+class TestDurableEventFromGovernanceDecision:
+    """event_from_governance_decision must persist shadow assessment."""
+
+    def test_shadow_assessment_embedded_in_snapshot(self):
+        from agentic.ledger.governance_audit_store import event_from_governance_decision
+        shadow_data = {"provenance_status": "shadow", "containment_mode": "blocked"}
+        event = event_from_governance_decision(
+            decision_id="test-001",
+            timestamp="2026-01-01T00:00:00Z",
+            actor_id="test-actor",
+            action_type="test_action",
+            decision="DENY",
+            risk_level="write",
+            eligible=False,
+            confidence=0.5,
+            execution_mode="blocked",
+            escalation_level="halt",
+            shadow_assessment=shadow_data,
+            shadow_overrode=True,
+        )
+        assert event.request_snapshot["shadow_assessment"] == shadow_data
+        assert event.request_snapshot["shadow_overrode"] is True
+
+    def test_no_shadow_assessment_clean_snapshot(self):
+        from agentic.ledger.governance_audit_store import event_from_governance_decision
+        event = event_from_governance_decision(
+            decision_id="test-002",
+            timestamp="2026-01-01T00:00:00Z",
+            actor_id="test-actor",
+            action_type="test_action",
+            decision="ALLOW",
+            risk_level="read_only",
+            eligible=True,
+            confidence=0.9,
+            execution_mode="full",
+            escalation_level="none",
+        )
+        assert "shadow_assessment" not in event.request_snapshot

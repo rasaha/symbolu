@@ -87,6 +87,8 @@ from agentic.agentic_framework.shadow_ai import (
     ShadowAssessment,
     ShadowContainmentMode,
     ShadowRegistry,
+    is_memory_write_intent,
+    resolve_shadow_asset_id,
     resolve_shadow_policy,
     shadow_containment_to_governance,
 )
@@ -702,15 +704,22 @@ class GovernanceService:
             if domain_result is not None and domain_result.mode != DomainActionMode.ALLOW:
                 _dom_mismatch = domain_result.mode.severity / 6.0
 
+            _shadow_asset_id = resolve_shadow_asset_id(
+                tool_name=request.tool_name or "",
+                actor_id=request.actor_id,
+            )
             shadow_assessment = resolve_shadow_policy(
-                asset_id=request.actor_id,
+                asset_id=_shadow_asset_id,
                 tool_name=request.tool_name or "",
                 provider=getattr(request, "provider", ""),
                 registry=self._shadow_registry,
                 action_category=action_cat,
                 risk_level=risk_level.value,
                 domain_id=self._domain_id or "",
-                memory_write_intent="memory" in (request.action_type or "").lower(),
+                memory_write_intent=is_memory_write_intent(
+                    action_type=request.action_type or "",
+                    tool_name=request.tool_name or "",
+                ),
                 mutation_intent=mutation,
                 jepa_regime=jepa_assessment.regime.value,
                 semantic_mismatch=_sem_mismatch,
@@ -930,6 +939,8 @@ class GovernanceService:
                     else str(audit_event.escalation_level),
                 blocked_reasons=audit_event.blocked_reasons,
                 request_snapshot=audit_event.request_snapshot,
+                shadow_assessment=audit_event.shadow_assessment,
+                shadow_overrode=bool(audit_event.shadow_assessment),
             )
             try:
                 self._audit_store.append(canonical_event)

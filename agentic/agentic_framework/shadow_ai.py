@@ -685,7 +685,8 @@ def resolve_shadow_policy(
                     f"BLOCKED_CAPABILITY:{action_category}"
                 )
 
-        # Check max risk level
+        # Check max risk level — record for enforcement after containment init
+        _max_risk_escalation: Optional[ShadowContainmentMode] = None
         if registry_entry.max_risk_level is not None:
             _RISK_ORDER = {
                 "read_only": 0, "write": 1, "execute": 2,
@@ -696,12 +697,19 @@ def resolve_shadow_policy(
                 reason_codes.append(
                     f"EXCEEDS_MAX_RISK:{risk_level}>{registry_entry.max_risk_level}"
                 )
+                # Escalate: destructive/privileged beyond max → BLOCKED,
+                # otherwise → REQUIRE_CONFIRMATION (stricter-only)
+                if risk_level in ("destructive", "privileged"):
+                    _max_risk_escalation = ShadowContainmentMode.BLOCKED
+                else:
+                    _max_risk_escalation = ShadowContainmentMode.REQUIRE_CONFIRMATION
     else:
         # Unknown asset — fail-closed classification
         asset_type, provenance, trust_level = _classify_unknown_asset(
             asset_id, tool_name, provider,
         )
         reason_codes.append(f"UNKNOWN_ASSET:{lookup_key or 'empty'}")
+        _max_risk_escalation = None
 
     # --- Step 3: Compute risk factors ---
     risk_factors = ShadowRiskFactors(
@@ -745,6 +753,11 @@ def resolve_shadow_policy(
             fired_rules.append(rule.name)
             reason_codes.append(f"RULE:{rule.name}:{rule.result_mode.value}")
             containment = _stricter_containment(containment, rule.result_mode)
+
+    # --- Step 4b: Apply max_risk_level escalation (deferred from Step 2) ---
+    if _max_risk_escalation is not None:
+        containment = _stricter_containment(containment, _max_risk_escalation)
+        fired_rules.append("_max_risk_level_enforcement")
 
     # --- Step 5: Semantic-governance mismatch escalation ---
     # An approved asset behaving incoherently may be shadow AI
@@ -820,12 +833,66 @@ def resolve_shadow_policy(
 # =========================================================================
 
 
+def resolve_shadow_asset_id(
+    tool_name: str = "",
+    actor_id: str = "",
+) -> str:
+    """Resolve the canonical asset ID for shadow registry lookup.
+
+    Prefers tool_name (specific) over actor_id (general) to ensure
+    consistent identity resolution across GovernanceService and MCP.
+    """
+    return tool_name.strip() or actor_id.strip() or ""
+
+
+def is_memory_write_intent(
+    action_type: str = "",
+    tool_name: str = "",
+) -> bool:
+    """Detect memory-write intent from action type or tool name.
+
+    Shared heuristic used by both GovernanceService and MCP gateway
+    to ensure consistent shadow AI classification.
+    """
+    combined = f"{action_type} {tool_name}".lower()
+    return "memory" in combined
+
+
+@dataclass(frozen=True)
+class ShadowGovernanceMapping:
+    """Result of mapping shadow containment to a governance decision.
+
+    Preserves the original containment mode so downstream consumers
+    can differentiate between intermediate DEFER modes (e.g.,
+    OBSERVE_ONLY vs REQUIRE_CONFIRMATION have different operational
+    implications even though both map to DEFER).
+    """
+    decision: str  # "ALLOW", "DENY", or "DEFER"
+    containment_mode: ShadowContainmentMode
+    containment_severity: int
+    constraint_hint: str  # Human-readable operational hint
+
+
+_CONTAINMENT_HINTS: Dict[ShadowContainmentMode, str] = {
+    ShadowContainmentMode.ALLOW: "No shadow restrictions",
+    ShadowContainmentMode.OBSERVE_ONLY: "Allow but log all outputs for review",
+    ShadowContainmentMode.READ_ONLY: "Permit read operations only",
+    ShadowContainmentMode.DRAFT_ONLY: "Output treated as draft, not committed",
+    ShadowContainmentMode.SANDBOX_ONLY: "Execute in isolated sandbox environment",
+    ShadowContainmentMode.MEMORY_WRITE_DENIED: "Block all memory/state persistence",
+    ShadowContainmentMode.REQUIRE_CONFIRMATION: "Require human confirmation before proceeding",
+    ShadowContainmentMode.QUARANTINED: "Asset quarantined — block all actions",
+    ShadowContainmentMode.BLOCKED: "Asset blocked — deny all actions",
+}
+
+
 def shadow_containment_to_governance(
     containment: ShadowContainmentMode,
 ) -> str:
     """Map shadow containment mode to APIGovernanceDecision value.
 
     Returns "ALLOW", "DENY", or "DEFER".
+    For richer metadata, use shadow_containment_to_governance_mapping().
     """
     if containment == ShadowContainmentMode.ALLOW:
         return "ALLOW"
@@ -836,3 +903,22 @@ def shadow_containment_to_governance(
         return "DENY"
     # All intermediate modes map to DEFER (require human / escalate)
     return "DEFER"
+
+
+def shadow_containment_to_governance_mapping(
+    containment: ShadowContainmentMode,
+) -> ShadowGovernanceMapping:
+    """Map shadow containment to governance decision with full metadata.
+
+    Unlike shadow_containment_to_governance() which only returns the
+    decision string, this returns the original containment mode and
+    operational constraint hint so callers can differentiate between
+    the 6 intermediate DEFER modes.
+    """
+    decision = shadow_containment_to_governance(containment)
+    return ShadowGovernanceMapping(
+        decision=decision,
+        containment_mode=containment,
+        containment_severity=containment.severity,
+        constraint_hint=_CONTAINMENT_HINTS.get(containment, "Unknown containment mode"),
+    )
