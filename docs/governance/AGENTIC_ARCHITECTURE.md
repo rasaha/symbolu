@@ -1,6 +1,6 @@
 # Agentic Governance Architecture
 
-> **Version:** 2.0.0 | **Updated:** 2026-04-03
+> **Version:** 3.0.0 | **Updated:** 2026-04-03
 >
 > This document describes the governance architecture **as currently built**.
 > Components marked **(planned)** are design-only and not yet implemented.
@@ -9,7 +9,7 @@
 
 ## Layered Architecture Overview
 
-The governance system is organized into four built layers plus one planned:
+The governance system is organized into five built layers:
 
 ```
   ┌─────────────────────────────────────────────────────────────────┐
@@ -45,14 +45,25 @@ The governance system is organized into four built layers plus one planned:
                              │
                              ▼
   ┌─────────────────────────────────────────────────────────────────┐
-  │  LAYER 2.5: SHADOW AI CONTROL  (planned — not yet built)        │
-  │  Governs provenance, sanctionedness, and trust state             │
-  │  See "Next Phase: Shadow AI Control Layer" below                 │
+  │  LAYER 3: SHADOW AI CONTROL                                     │
+  │  Governs provenance, sanctionedness, and containment posture     │
+  │                                                                  │
+  │  ProvenanceStatus (APPROVED / UNVERIFIED / SHADOW /              │
+  │                    QUARANTINED / REVOKED)                         │
+  │  ShadowRegistry (asset lookup, pattern match, provider index)    │
+  │  ShadowRiskFactors (13 visible factors + composite score)        │
+  │  ShadowContainmentMode (9 modes: ALLOW → … → BLOCKED)           │
+  │  ShadowPolicyRule (10 declarative rules, stricter-only)          │
+  │  safe_resolve_shadow_policy() (fail-closed wrapper)              │
+  │  Stricter-only: shadow can restrict, never relax governance      │
+  │                                                                  │
+  │  Module: shadow_ai.py                                            │
+  │  Shared helpers: resolve_shadow_asset_id(), is_memory_write_intent() │
   └──────────────────────────┬──────────────────────────────────────┘
                              │
                              ▼
   ┌─────────────────────────────────────────────────────────────────┐
-  │  LAYER 3: CORE GOVERNANCE / ENFORCEMENT                         │
+  │  LAYER 4: CORE GOVERNANCE / ENFORCEMENT                         │
   │  Makes and enforces ALLOW / DENY / DEFER decisions               │
   │                                                                  │
   │  GovernanceService (authorization engine)                        │
@@ -68,7 +79,7 @@ The governance system is organized into four built layers plus one planned:
                              │
                              ▼
   ┌─────────────────────────────────────────────────────────────────┐
-  │  LAYER 4: EXECUTION / RUNTIME                                   │
+  │  LAYER 5: EXECUTION / RUNTIME                                   │
   │  Tool calls, memory writes, external actions, audit persistence  │
   │                                                                  │
   │  MCP client execution, timeout/error handling                    │
@@ -91,6 +102,7 @@ agentic/
 │   ├── safety_contract.py         7-precondition safety contract
 │   ├── jepa_governance.py         JEPA composite signal & regime classification
 │   ├── domain_policy.py           Domain Semantic Policy Layer
+│   ├── shadow_ai.py               Shadow AI Control Layer (provenance, containment)
 │   ├── governance_models.py       Shared data models (request/response/audit)
 │   ├── governance_adapter.py      P52 governance request assembly (facade → symbolu_core)
 │   ├── sovereign_bridge.py        128D sovereign tensor → confidence signals
@@ -286,9 +298,47 @@ agentic/
 │  │  No domain configured → no-op (step skipped)              │    │
 │  └────────────────────┬─────────────────────────────────────┘    │
 │                       ▼                                          │
-│  Steps 6-9: Build rationale (includes JEPA + domain codes) →     │
-│             confidence summary → audit event (includes JEPA +    │
-│             domain snapshot) → assemble AuthorizationResponse    │
+│  ┌──────────────────────────────────────────────────────────┐    │
+│  │ Step 5e: SHADOW AI CONTROL LAYER                         │    │
+│  │          (shadow_ai.py)                                   │    │
+│  │                                                           │    │
+│  │  safe_resolve_shadow_policy():                            │    │
+│  │    1. Registry lookup (exact → pattern → provider)        │    │
+│  │    2. Provenance classification:                          │    │
+│  │       APPROVED / UNVERIFIED / SHADOW /                    │    │
+│  │       QUARANTINED / REVOKED                               │    │
+│  │    3. Risk factor computation (13 visible factors)        │    │
+│  │    4. Policy rule evaluation (10 declarative rules)       │    │
+│  │    4b. max_risk_level enforcement                         │    │
+│  │    4c. blocked_capabilities enforcement                   │    │
+│  │    5. Semantic mismatch escalation                        │    │
+│  │       (approved asset behaving incoherently)              │    │
+│  │    6. JEPA regime escalation                              │    │
+│  │       (dual_anomaly/unknown → QUARANTINED)                │    │
+│  │    7. Fail-closed defaults per provenance:                │    │
+│  │       SHADOW/REVOKED → BLOCKED (mutating) or READ_ONLY    │    │
+│  │       QUARANTINED → BLOCKED (mutating) or QUARANTINED     │    │
+│  │       UNVERIFIED → BLOCKED (destructive) or CONFIRM       │    │
+│  │    8. Rationale & audit assembly                          │    │
+│  │                                                           │    │
+│  │  → ShadowContainmentMode (9 modes):                       │    │
+│  │      ALLOW / OBSERVE_ONLY / READ_ONLY / DRAFT_ONLY /      │    │
+│  │      SANDBOX_ONLY / MEMORY_WRITE_DENIED /                 │    │
+│  │      REQUIRE_CONFIRMATION / QUARANTINED / BLOCKED         │    │
+│  │                                                           │    │
+│  │  Shadow can only restrict, never relax:                   │    │
+│  │    BLOCKED/QUARANTINED → DENY                             │    │
+│  │    Intermediate modes → DEFER (if was ALLOW)              │    │
+│  │    ALLOW → no change                                      │    │
+│  │                                                           │    │
+│  │  Fail-closed: resolver exception → BLOCKED + error audit  │    │
+│  │  No shadow registry → no-op (step skipped)                │    │
+│  └────────────────────┬─────────────────────────────────────┘    │
+│                       ▼                                          │
+│  Steps 6-9: Build rationale (includes JEPA + domain + shadow     │
+│             codes) → confidence summary → audit event (includes  │
+│             JEPA + domain + shadow snapshot) → assemble           │
+│             AuthorizationResponse                                │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐    │
 │  │ FAIL-CLOSED: Any exception in Steps 1-9                  │    │
@@ -584,6 +634,17 @@ Maps the patent-exact 12-layer Ontological Layer Model to governance modules.
   │    ALLOW → proceed                             │
   └──────────┬───────────────────────────────────┘
              ▼
+  ┌─ Step 6b: Shadow AI Control ─────────────────┐
+  │  safe_resolve_shadow_policy()                  │
+  │  Uses tool_name as asset identity              │
+  │  → ShadowContainmentMode                      │
+  │    BLOCKED/QUARANTINED → BLOCKED (early return)│
+  │    Intermediate modes → ESCALATE (early return)│
+  │    ALLOW → proceed                             │
+  │  Shadow audit fields in AuditEntry             │
+  │  No shadow registry → skip                     │
+  └──────────┬───────────────────────────────────┘
+             ▼
   ┌─ Step 7: Min confidence ────▶ BLOCKED ───────┐
   └──────────┬───────────────────────────────────┘
              ▼
@@ -598,9 +659,11 @@ Maps the patent-exact 12-layer Ontological Layer Model to governance modules.
   └──────────┬───────────────────────────────────┘
              ▼
   ┌─ Step 10: Audit ───────────────────────────┐
-  │  AuditEntry (JEPA + domain fields)          │
+  │  AuditEntry (JEPA + domain + shadow fields) │
   │  → in-memory audit_log                      │
   │  → GovernanceAuditStore (durable)           │
+  │  Shadow assessment embedded in              │
+  │  request_snapshot for durable persistence   │
   └─────────────────────────────────────────────┘
 ```
 
@@ -622,6 +685,9 @@ Maps the patent-exact 12-layer Ontological Layer Model to governance modules.
 | 6c | JEPA override | stricter-only adjustment to decision, confidence, escalation | jepa_governance.py |
 | 6d | Domain policy evaluation | DomainActionMode (7 modes) | domain_policy.py |
 | 6e | Domain override | stricter-only: BLOCKED→DENY, CONFIRM→DEFER, etc. | domain_policy.py |
+| 6f | Shadow provenance classification | APPROVED / UNVERIFIED / SHADOW / QUARANTINED / REVOKED | shadow_ai.py |
+| 6g | Shadow containment mode | 9 modes: ALLOW → … → BLOCKED | shadow_ai.py |
+| 6h | Shadow override | stricter-only: BLOCKED/QUARANTINED→DENY, intermediate→DEFER | shadow_ai.py |
 | 7 | P53 Binding | bound=True/False | policy/ |
 | 8 | P15 Authority guard | pass / violation | safety/ |
 | 9 | P16 Regression guard | pass / violation | safety/ |
@@ -656,9 +722,9 @@ Maps the patent-exact 12-layer Ontological Layer Model to governance modules.
 
 | Location | Type | Persistence |
 |----------|------|-------------|
-| GovernanceService._audit_log | Per-decision events (JEPA + domain snapshot) | In-memory |
-| GovernanceAuditStore | Canonical governance events | Durable (persistent) |
-| SafeMCPGateway.audit_log | Per-tool-call entries (JEPA + domain fields) | In-memory |
+| GovernanceService._audit_log | Per-decision events (JEPA + domain + shadow snapshot) | In-memory |
+| GovernanceAuditStore | Canonical governance events (shadow in request_snapshot) | Durable (persistent) |
+| SafeMCPGateway.audit_log | Per-tool-call entries (JEPA + domain + shadow fields) | In-memory |
 | LedgerEntryStore | Hash-chained append-only | Persistent |
 | P54 ComplianceAuditRecord | Determinism-hashed records | Per-pipeline-run |
 | Posture audit | Posture application records | Per-modulation |
@@ -668,8 +734,10 @@ Maps the patent-exact 12-layer Ontological Layer Model to governance modules.
 
 Both GovernanceService and SafeMCPGateway persist to `GovernanceAuditStore` when
 configured, via `event_from_governance_decision()` and `event_from_mcp_audit()`
-respectively. Audit events include full JEPA regime data and domain policy
-snapshots in `request_snapshot` for durable forensic analysis.
+respectively. Audit events include full JEPA regime data, domain policy
+snapshots, and shadow AI assessment data in `request_snapshot` for durable
+forensic analysis. Shadow assessment is embedded via `shadow_assessment` and
+`shadow_overrode` fields in `request_snapshot`.
 
 ---
 
@@ -684,14 +752,18 @@ snapshots in `request_snapshot` for durable forensic analysis.
                     │           ├──→ jepa_governance.py
                     │           │        (ontology + vritti → composite → regime)
                     │           │
-                    │           └──→ domain_policy.py
-                    │                    (JEPA assessment → domain mode)
+                    │           ├──→ domain_policy.py
+                    │           │        (JEPA assessment → domain mode)
+                    │           │
+                    │           └──→ shadow_ai.py
+                    │                    (provenance + containment → shadow assessment)
                     │
                     ▼           
                  mcp_gateway.py ──→ governance_audit_store.py
                     │
                     ├──→ jepa_governance.py
-                    └──→ domain_policy.py
+                    ├──→ domain_policy.py
+                    └──→ shadow_ai.py
                     
             confidence_gate  (used by both service and gateway)
             safety_contract  (standalone)
@@ -717,6 +789,13 @@ snapshots in `request_snapshot` for durable forensic analysis.
       Uses: JEPAGovernanceAssessment, GovernanceRegime
       Produces: DomainPolicyResult, DomainActionMode
       Profiles: FINANCE_PROFILE, DEVOPS_PROFILE, RESEARCH_PROFILE
+
+  SHADOW AI PATH:
+    shadow_ai.py  (standalone — no external deps)
+      Uses: ProvenanceStatus, ShadowRegistry, ShadowPolicyRule
+      Produces: ShadowAssessment, ShadowContainmentMode
+      Shared: resolve_shadow_asset_id(), is_memory_write_intent()
+      Wrapper: safe_resolve_shadow_policy() (fail-closed)
 
   LEGACY POLICY PATH:
     policy_engine.py → domain_profiles, interaction_modes
@@ -926,69 +1005,162 @@ below.
 
 ---
 
-## Next Phase: Shadow AI Control Layer (Planned)
+## Shadow AI Control Layer
 
-> **Status:** Design phase. Not yet implemented.
+**Module:** `agentic_framework/shadow_ai.py`
 
-### Why Shadow AI Matters
+### What Shadow AI Means
 
 In agentic systems, not all AI assets (models, tools, plugins, memory stores)
 are equally trustworthy. Some are sanctioned and registry-verified. Others are
 unverified, experimental, or operating outside their approved semantic-governance
 boundary. The distinction between "approved" and "shadow" is not just an
-inventory question — it is a governance state.
+inventory question — it is a **governance state**.
 
 An approved model operating outside its sanctioned domain, or a registered tool
 producing outputs inconsistent with its declared capability, behaves like shadow
-AI even if it appears in the registry.
+AI even if it appears in the registry. The Shadow AI Control Layer treats both
+provenance problems AND semantic mismatch as shadow AI signals.
 
 ### Architectural Position
 
-The Shadow AI Control Layer will sit between the Domain Semantic Policy Layer
-and the Core Governance/Enforcement Layer (Layer 2.5 in the stack). It consumes:
+The Shadow AI Control Layer sits between the Domain Semantic Policy Layer and
+the Core Governance/Enforcement Layer (Layer 3 in the stack). It consumes:
 
-- JEPA composite signal (ontology, vritti, residual, regime)
-- Domain policy result (domain mode, fired rules)
-- Asset provenance metadata (registry status, trust level, version)
+- JEPA governance regime (for semantic mismatch scoring)
+- Domain policy result (for domain mismatch scoring)
+- Asset identity (tool name, actor ID, provider)
+- Runtime context (action category, risk level, mutation/memory intent)
 
 It produces:
 
-- Shadow risk assessment (sanctioned / unverified / shadow)
-- Containment posture (proceed / quarantine / deny)
-- Shadow-specific reason codes for audit
+- `ShadowAssessment` with full provenance, risk, containment, and audit data
+- `ShadowContainmentMode` (one of 9 modes)
+- Reason codes for audit (prefixed `SHADOW:`)
+- Shadow audit dict embedded in `request_snapshot` for durable persistence
 
-### Planned Capabilities
+### Provenance Model (5 States)
 
-| Capability | Description |
-|------------|-------------|
-| **Provenance status** | First-class attribute: SANCTIONED / UNVERIFIED / SHADOW / REVOKED |
-| **Trust level** | Numeric trust score from registry + behavioral history |
-| **Asset registry** | Central registry of approved AI assets with version, capability declarations |
-| **Containment posture** | PROCEED / SANDBOX / QUARANTINE / MEMORY_WRITE_DENIED / BLOCKED |
-| **Semantic-governance mismatch** | Approved assets flagged as shadow when operating outside their sanctioned boundary |
-| **Shadow-specific audit** | Dedicated reason codes, audit fields, and durable persistence |
+| Status | Meaning | Default Posture |
+|--------|---------|-----------------|
+| APPROVED | Sanctioned, registry-verified, active | ALLOW (unless semantic mismatch) |
+| UNVERIFIED | Not in registry, identity unknown | CONFIRM (mutating) or ALLOW (read-only) |
+| SHADOW | Known unsanctioned or domain-violated | BLOCKED (mutating) or READ_ONLY |
+| QUARANTINED | Actively flagged, under investigation | BLOCKED (mutating) or QUARANTINED (read-only) |
+| REVOKED | Previously approved, now revoked | BLOCKED (always) |
 
-### Integration Plan
+### Trust Levels
 
-The Shadow AI Control Layer will integrate with:
+| Level | Severity | Meaning |
+|-------|----------|---------|
+| TRUSTED | 0 | Fully trusted, sanctioned |
+| LIMITED | 1 | Partially trusted, some restrictions |
+| UNTRUSTED | 2 | Not trusted, significant restrictions |
+| BLOCKED | 3 | Blocked, no trust |
 
-- **JEPA governance**: shadow state as an additional residual dimension
-- **Domain Semantic Policy Layer**: domain profiles may declare shadow-specific rules
-- **GovernanceService**: shadow assessment as a new override step (Step 5e)
-- **SafeMCPGateway**: shadow check before tool execution
-- **GovernanceAuditStore**: shadow fields in audit events
+### Containment Modes (9 Modes, 3 Governance Tiers)
 
-### What It Will NOT Be
+| Mode | Severity | Governance Tier |
+|------|----------|-----------------|
+| ALLOW | 0 | Tier A: proceed |
+| OBSERVE_ONLY | 1 | Tier B: DEFER |
+| READ_ONLY | 2 | Tier B: DEFER |
+| DRAFT_ONLY | 3 | Tier B: DEFER |
+| SANDBOX_ONLY | 4 | Tier B: DEFER |
+| MEMORY_WRITE_DENIED | 5 | Tier B: DEFER |
+| REQUIRE_CONFIRMATION | 6 | Tier B: DEFER |
+| QUARANTINED | 7 | Tier C: DENY |
+| BLOCKED | 8 | Tier C: DENY |
+
+Within Tier B, the 6 intermediate modes produce identical enforcement (DEFER)
+but carry distinct semantic labels preserved in audit for human review. The
+`ShadowGovernanceMapping` dataclass provides full metadata including the
+original containment mode and operational constraint hint.
+
+### Registry Model
+
+`ShadowRegistry` maintains sanctioned AI asset entries (`ShadowRegistryEntry`):
+
+- Exact-match and glob-pattern lookup
+- Provider-based lookup
+- Per-entry: provenance, trust level, asset type, allowed domains,
+  allowed/blocked capabilities, max risk level
+- Immutable entries (frozen dataclass), dict copy on init
+- Unknown assets return `None`, triggering fail-closed classification
+
+### Risk Factors (13 Visible)
+
+Each `ShadowRiskFactors` instance exposes 13 individually auditable factors:
+
+`provenance_risk`, `identity_confidence`, `domain_mismatch`, `action_risk`,
+`tool_risk`, `semantic_governance_mismatch`, `domain_policy_mismatch`,
+`hidden_intelligence_path`, `memory_write_risk`, `external_side_effects`,
+`execution_privilege`, `unexpected_usage`, `behavioral_anomaly`
+
+These are combined into a weighted `composite_score` but never collapsed
+before audit — each factor is individually visible.
+
+### Policy Rules (10 Built-in)
+
+Declarative `ShadowPolicyRule` instances. Conditions left empty are wildcards.
+All matching rules fire (stricter-only merge). Built-in rules cover:
+
+1. Unverified/shadow + privileged/destructive → BLOCKED
+2. Unapproved MCP server/tool → QUARANTINED
+3. Untrusted memory write → MEMORY_WRITE_DENIED
+4. Unverified + mutation → REQUIRE_CONFIRMATION
+5. Shadow browser AI + finance + mutation → BLOCKED
+6. Revoked → BLOCKED (always)
+7. Approved + high semantic mismatch → QUARANTINED
+8. Unverified + research → READ_ONLY
+9. Shadow/unverified + sensitive domain (finance/healthcare/legal) + mutation → BLOCKED
+10. Blocked trust level → BLOCKED (always)
+
+### Fail-Closed Behavior
+
+- **Unknown assets:** Classified as SHADOW/UNTRUSTED via heuristic
+  (`_classify_unknown_asset()`). Mutating → BLOCKED, read-only → READ_ONLY.
+- **QUARANTINED assets:** Mutating → BLOCKED, read-only → QUARANTINED (DENY).
+- **Resolver exceptions:** `safe_resolve_shadow_policy()` catches all exceptions
+  and returns BLOCKED with `SHADOW_RESOLVER_ERROR` reason code.
+
+### Integration Points
+
+- **GovernanceService** (Step 5e): After domain policy. Uses
+  `safe_resolve_shadow_policy()`. Shadow DENY overrides to DENY. Shadow DEFER
+  overrides ALLOW to DEFER. Shadow reason codes prefixed `SHADOW:` in rationale.
+  Shadow audit dict in `request_snapshot`.
+
+- **SafeMCPGateway** (Step 6b): After domain/JEPA merge. Uses
+  `safe_resolve_shadow_policy()`. BLOCKED/QUARANTINED → early return BLOCKED.
+  Intermediate modes → early return ESCALATE. Shadow audit in `AuditEntry`.
+
+- **GovernanceAuditStore**: Both `event_from_governance_decision()` and
+  `event_from_mcp_audit()` embed shadow assessment and `shadow_overrode` flag
+  in `request_snapshot` for durable persistence.
+
+### Shared Helpers
+
+| Function | Purpose |
+|----------|---------|
+| `resolve_shadow_asset_id(tool_name, actor_id)` | Canonical asset ID resolution (prefers tool_name) |
+| `is_memory_write_intent(action_type, tool_name)` | Unified memory-write detection heuristic |
+| `safe_resolve_shadow_policy(**kwargs)` | Fail-closed wrapper around `resolve_shadow_policy()` |
+| `shadow_containment_to_governance(mode)` | Map containment → ALLOW/DENY/DEFER string |
+| `shadow_containment_to_governance_mapping(mode)` | Rich mapping with containment metadata |
+
+### What Shadow AI Is NOT
 
 - Not a marketplace or plugin store
 - Not a binary allow/deny list — it is a governance state with graduated posture
 - Not purely inventory-based — behavioral mismatch matters, not just registration
+- Not an ML detector — it is declarative-first (registry + rules)
 
 ---
 
-## Three-Level Governance Logic (Summary)
+## Four-Level Governance Logic (Summary)
 
-This section summarizes the three-level governance architecture as a quick
+This section summarizes the four-level governance architecture as a quick
 reference.
 
 ### Level 1: Semantic State (what state are we in?)
@@ -1013,7 +1185,19 @@ reference.
   Vritti guard           → block unsafe vritti for writes
 ```
 
-### Level 3: Enforcement (what do we do about it?)
+### Level 3: Shadow AI Control (is this asset trustworthy?)
+
+```
+  Provenance status      → APPROVED / UNVERIFIED / SHADOW / QUARANTINED / REVOKED
+  Trust level            → TRUSTED / LIMITED / UNTRUSTED / BLOCKED
+  Asset registry         → sanctioned lookup with pattern matching
+  Risk factors           → 13 individually auditable factors
+  Policy rules           → 10 declarative rules (stricter-only merge)
+  Containment mode       → 9 graduated modes (ALLOW → … → BLOCKED)
+  Semantic mismatch      → approved assets behaving outside boundary
+```
+
+### Level 4: Enforcement (what do we do about it?)
 
 ```
   GovernanceService      → ALLOW / DENY / DEFER
@@ -1046,14 +1230,100 @@ not bugs.
    non-read tools). The semantic distinctions are preserved in audit and
    rationale for human review.
 
-3. **Shadow AI Control Layer is planned, not built.** The architecture diagram
-   shows Layer 2.5 as planned. No shadow risk scoring, provenance checking, or
-   containment logic exists in the current codebase.
+3. **Shadow containment modes partially collapse at governance.** The 9
+   `ShadowContainmentMode` values map to 3 governance tiers: ALLOW (1 mode),
+   DENY (2 modes), DEFER (6 modes). The 6 intermediate DEFER modes
+   (`OBSERVE_ONLY` through `REQUIRE_CONFIRMATION`) produce identical
+   governance enforcement but carry distinct semantic labels for audit.
+   `ShadowGovernanceMapping` provides richer metadata for consumers that
+   need to differentiate.
 
-4. **Domain profiles are built-in, not dynamically loadable.** The three
-   profiles (finance, devops, research) are defined in `domain_policy.py`.
-   There is no runtime profile loading, versioning, or hot-reload capability.
+4. **Domain and shadow profiles are built-in, not dynamically loadable.** The
+   three domain profiles (finance, devops, research) are defined in
+   `domain_policy.py`. Shadow registry entries and policy rules are
+   configured in code. There is no runtime profile loading, versioning,
+   or hot-reload capability. See "Next Productization Layers" below.
 
 5. **GovernanceAuditStore is optional.** When not configured, audit events
    exist only in-memory (`_audit_log` / `audit_log`). Durable persistence
    requires explicit `audit_store` injection at construction time.
+
+6. **Shadow AI is declarative, not ML-based.** The Shadow AI Control Layer
+   uses registry lookup and declarative policy rules, not machine learning
+   or behavioral analysis. Semantic mismatch detection relies on JEPA
+   regime signals, not trained anomaly detectors.
+
+---
+
+## Next Productization Layers (Planned)
+
+> **Status:** Design phase. None of the following layers are implemented.
+
+The following layers represent the next planned productization steps beyond
+the current built governance stack. They are listed here for architectural
+context and roadmap clarity, not as claims of current capability.
+
+### Layer 6: Policy Control Plane
+
+**Purpose:** Externalize governance policy from code into versioned,
+deployable policy bundles.
+
+| Capability | Description |
+|------------|-------------|
+| **Versioned policy bundles** | Domain profiles, shadow rules, and risk thresholds as versioned configuration artifacts |
+| **Scoped overrides** | Per-tenant, per-environment, or per-domain policy overrides without code changes |
+| **Policy hot-reload** | Runtime policy updates without service restart |
+| **Policy audit trail** | Who changed what policy, when, and why |
+| **Policy validation** | Pre-deployment validation that policy changes preserve stricter-only invariants |
+
+**Why it matters:** Currently, domain profiles and shadow rules are defined
+in Python source (`domain_policy.py`, `shadow_ai.py`). Productization requires
+non-developer policy owners to manage governance posture without code deploys.
+
+### Layer 7: Simulation / Replay Plane
+
+**Purpose:** Enable policy impact analysis before deployment and forensic
+replay of past governance decisions.
+
+| Capability | Description |
+|------------|-------------|
+| **Policy replay** | Replay historical audit events against a new policy bundle to see how decisions would change |
+| **What-if analysis** | Simulate a proposed action under current or hypothetical policy to predict the governance outcome |
+| **Diff reporting** | Compare governance outcomes between two policy versions across a corpus of historical events |
+| **Regression detection** | Flag policy changes that would have changed past DENY → ALLOW (safety regression) |
+
+**Why it matters:** The current `GovernanceAuditStore` and
+`LedgerReplayVerifier` provide the data foundation for replay. The simulation
+plane adds the interpretation layer that transforms audit data into actionable
+policy intelligence.
+
+### Layer 8: Approval Workflow Plane
+
+**Purpose:** Provide durable, structured human-in-the-loop decision
+lifecycle for DEFER outcomes.
+
+| Capability | Description |
+|------------|-------------|
+| **Durable approval requests** | DEFER outcomes persisted as structured approval requests with full context |
+| **Human decision lifecycle** | PENDING → APPROVED / DENIED / EXPIRED with who/when/why audit |
+| **Delegation & escalation** | Approval routing based on domain, risk level, or asset type |
+| **TTL & auto-expiry** | Unanswered approvals expire to DENY (fail-closed) |
+| **Approval audit trail** | Full lifecycle captured in GovernanceAuditStore |
+
+**Why it matters:** Currently, DEFER outcomes signal that human confirmation
+is needed, but the actual approval workflow (how a human responds, tracks,
+and records their decision) is not implemented beyond the `ApprovalManager`
+in `governance_patterns/`, which is a standalone in-memory prototype.
+
+### Dependency Order
+
+```
+  Layer 6 (Policy Control Plane)
+    ↓  enables
+  Layer 7 (Simulation / Replay)
+    ↓  enables
+  Layer 8 (Approval Workflow)
+```
+
+Layer 6 is the prerequisite: externalized policy is required before policy
+replay or structured approval workflows become meaningful.
