@@ -76,6 +76,13 @@ from agentic.agentic_framework.jepa_governance import (
     approximate_layer_weights,
     approximate_vritti,
 )
+from agentic.agentic_framework.domain_policy import (
+    DomainActionMode,
+    DomainPolicyResult,
+    DomainRegistry,
+    resolve_domain_policy,
+    fail_closed_result,
+)
 
 import logging as _logging
 
@@ -459,6 +466,8 @@ class GovernanceService:
         risk_classifier: Optional[ToolRiskClassifier] = None,
         strict: bool = False,
         audit_store: Optional[GovernanceAuditStore] = None,
+        domain_registry: Optional[DomainRegistry] = None,
+        domain_id: Optional[str] = None,
     ):
         """
         Initialize governance service.
@@ -470,6 +479,11 @@ class GovernanceService:
             audit_store: Durable audit store for persistence (default: None,
                          in-memory only).  When provided, every audit event is
                          persisted to the store in addition to the in-memory log.
+            domain_registry: Optional DomainRegistry for domain-specific policy.
+                When provided with domain_id, the Domain Semantic Policy Layer
+                translates JEPA assessments into domain-specific action modes.
+            domain_id: Which domain profile to use from the registry.
+                Ignored if domain_registry is None.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -485,6 +499,10 @@ class GovernanceService:
 
         # Durable persistent audit store (source of truth when present)
         self._audit_store: Optional[GovernanceAuditStore] = audit_store
+
+        # Domain Semantic Policy Layer
+        self._domain_registry: Optional[DomainRegistry] = domain_registry
+        self._domain_id: Optional[str] = domain_id
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -589,6 +607,39 @@ class GovernanceService:
             or effective_esc_level in (EscalationLevel.CONFIRM, EscalationLevel.HALT)
         )
 
+        # Step 5d: Domain Semantic Policy Layer
+        #   Translates the JEPA assessment into domain-specific action mode.
+        #   Domain policy can only make things STRICTER, never relax.
+        #   If no domain is configured, this step is a no-op.
+        domain_result: Optional[DomainPolicyResult] = None
+        if self._domain_registry is not None and self._domain_id is not None:
+            domain_result = resolve_domain_policy(
+                jepa_assessment,
+                self._domain_registry,
+                self._domain_id,
+                tool_name=request.tool_name or "",
+            )
+            # Apply domain mode as stricter-only override
+            if domain_result.mode == DomainActionMode.BLOCKED:
+                governance_decision = APIGovernanceDecision.DENY
+                eligible = False
+            elif domain_result.mode in (
+                DomainActionMode.CONFIRM_REQUIRED,
+                DomainActionMode.SANDBOX_ONLY,
+                DomainActionMode.MEMORY_WRITE_DENIED,
+            ):
+                if governance_decision == APIGovernanceDecision.ALLOW:
+                    governance_decision = APIGovernanceDecision.DEFER
+                    eligible = False
+                effective_requires_human = True
+            elif domain_result.mode in (
+                DomainActionMode.READ_ONLY,
+                DomainActionMode.DRAFT_ONLY,
+            ):
+                if governance_decision == APIGovernanceDecision.ALLOW:
+                    governance_decision = APIGovernanceDecision.DEFER
+                    eligible = False
+
         # Step 6: Build rationale (includes JEPA information)
         rationale_codes = _build_rationale_codes(
             safety_summary, gate_decision, risk_level, forbidden_cap,
@@ -643,6 +694,9 @@ class GovernanceService:
                 "jepa_recommended_action": jepa_assessment.recommended_action,
                 "jepa_execution_mode_override": jepa_assessment.execution_mode_override,
                 "jepa_escalation_override": jepa_assessment.escalation_override,
+                "domain_policy": (
+                    domain_result.to_audit_dict() if domain_result else None
+                ),
             },
         )
         self._persist_audit_event(audit_event)
