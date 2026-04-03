@@ -1,15 +1,20 @@
 # Agentic Governance Architecture
 
-> **Version:** 3.0.0 | **Updated:** 2026-04-03
+> **Version:** 4.0.0 | **Updated:** 2026-04-03
 >
-> This document describes the governance architecture **as currently built**.
+> This document describes the governance architecture **as currently built**
+> after Phases 0–4 (signal cleanup, governance rewiring, output modulation,
+> session enrichment, sovereign/inference reconciliation).
+>
 > Components marked **(planned)** are design-only and not yet implemented.
+> Components marked **(mode-gated)** are built but only active in specific
+> runtime modes or when upstream signals are available.
 
 ---
 
 ## Layered Architecture Overview
 
-The governance system is organized into five built layers:
+The governance system is organized into eight built layers:
 
 ```
   ┌─────────────────────────────────────────────────────────────────┐
@@ -22,6 +27,12 @@ The governance system is organized into five built layers:
   │  Residual signal (semantic–runtime mismatch)                     │
   │  Governance regime (NORMAL / PROCESS_DRIFT / SEMANTIC_SHIFT /    │
   │                      DUAL_ANOMALY / UNKNOWN)                     │
+  │                                                                  │
+  │  Canonical authorities (Phase 0):                                │
+  │    Runtime vritti  = chitta_vritti/                               │
+  │    Runtime guna    = guna_modulation/guna_derivation.py           │
+  │    core/ facades removed/neutralized                             │
+  │    core/entropy/ no longer competing authority                   │
   │                                                                  │
   │  Modules: jepa_governance.py, olm_bridge.py, sovereign_bridge.py │
   │  Signals: chitta_vritti/, sovereign/                              │
@@ -73,19 +84,86 @@ The governance system is organized into five built layers:
   │  Escalation / human-in-the-loop                                  │
   │  Pipeline guards (P15, P16, P55)                                 │
   │                                                                  │
+  │  Phase 1: Governance now prefers real vritti signals when         │
+  │  available; approximation is fallback only. Entropy is a real     │
+  │  governance input. Audit distinguishes real vs fallback source.   │
+  │                                                                  │
+  │  Phase 2 (Strategy 2): E = G × P × T modulation adjustment      │
+  │  feeds ConfidenceSignals.output_modulation_adjustment, shifting   │
+  │  overall confidence by [-0.10, +0.03] (asymmetric, cautionary).  │
+  │                                                                  │
   │  Modules: governance_service.py, mcp_gateway.py,                 │
   │           confidence_gate.py, safety_contract.py                 │
   └──────────────────────────┬──────────────────────────────────────┘
                              │
                              ▼
   ┌─────────────────────────────────────────────────────────────────┐
-  │  LAYER 5: EXECUTION / RUNTIME                                   │
+  │  LAYER 5: SESSION ENRICHMENT  (Phase 3)                         │
+  │  Enriches governance context with session-level signals          │
+  │                                                                  │
+  │  Identity signal    → identity/            Classification        │
+  │  Motivation signal  → motivation/          Driver classification  │
+  │  Temporal signal    → temporal/             Session trajectory    │
+  │                                                                  │
+  │  These enter governance as bounded enrichments:                   │
+  │    → confidence adjustment (additive, clamped)                   │
+  │    → risk factor enrichment                                      │
+  │    → audit metadata                                              │
+  │  They are NOT aggressive hard blockers.                          │
+  │  Availability depends on upstream session metadata being present. │
+  │                                                                  │
+  │  Module: signal_adapters/session_enrichment_adapter.py            │
+  └──────────────────────────┬──────────────────────────────────────┘
+                             │
+                             ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  LAYER 6: OUTPUT MODULATION  (Phase 2)                          │
+  │  Delivery-time signal resolution and renderer shaping            │
+  │                                                                  │
+  │  DHA formula (tone weights, intensity, restraint, D factor)      │
+  │  Canonical intensity E = G × P × T (guna modulation)             │
+  │  Entropy/output modulation visibility                            │
+  │                                                                  │
+  │  Two complementary paths:                                        │
+  │    Strategy 2 (indirect): E → confidence adjustment              │
+  │      [-0.10, +0.03] → ConfidenceGate → escalation posture       │
+  │    Direct renderer modulation: DHA tone weights → layer weights   │
+  │      sweet→symbolic, jolt→practical, metaphor→mirror             │
+  │      Gated by delivery factor D, bounded ±0.15                   │
+  │                                                                  │
+  │  Module: signal_adapters/output_modulation_adapter.py             │
+  │  Integration: renderer_integration.py, orchestrator.py           │
+  └──────────────────────────┬──────────────────────────────────────┘
+                             │
+                             ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  LAYER 7: SOVEREIGN / INFERENCE RECONCILIATION  (Phase 4)       │
+  │  Bridges training-time sovereign state to inference runtime      │
+  │                                                                  │
+  │  Sovereign → inference bridge (128D → 32D projection)            │
+  │  Signal reconciliation (multi-source vritti/guna validation)     │
+  │  Diagnostic hooks (MirrorBalance, CausalLayer — audit only)      │
+  │  Coherence-aware decoder (Appendix F Stage 1 — SOVEREIGN only)   │
+  │                                                                  │
+  │  Mode gating:                                                    │
+  │    FULL / SAFE: reconciliation + bridge + diagnostics enabled    │
+  │    SOVEREIGN: all above + coherence decoder                      │
+  │    STANDARD / FAST: Phase 4 disabled                             │
+  │                                                                  │
+  │  Modules: inference/manager.py, inference/signal_reconciliation.py│
+  │           inference/diagnostic_hooks.py, sovereign/inference_bridge│
+  └──────────────────────────┬──────────────────────────────────────┘
+                             │
+                             ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  LAYER 8: EXECUTION / RUNTIME                                   │
   │  Tool calls, memory writes, external actions, audit persistence  │
   │                                                                  │
   │  MCP client execution, timeout/error handling                    │
   │  GovernanceAuditStore (durable event persistence)                │
   │  LedgerEntryStore (hash-chained append-only ledger)              │
   │  Posture modulation / output gating                              │
+  │  FusionRenderer (layer-weight driven output composition)         │
   └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -98,6 +176,8 @@ agentic/
 ├── agentic_framework/    CORE   Governance orchestration hub
 │   ├── governance_service.py      Authorization engine (Steps 1-9)
 │   ├── confidence_gate.py         Confidence evaluation & gating
+│   │                              + output_modulation_adjustment (Phase 2)
+│   │                              + session_enrichment_adjustment (Phase 3)
 │   ├── mcp_gateway.py             Safe MCP tool execution gateway
 │   ├── safety_contract.py         7-precondition safety contract
 │   ├── jepa_governance.py         JEPA composite signal & regime classification
@@ -105,9 +185,13 @@ agentic/
 │   ├── shadow_ai.py               Shadow AI Control Layer (provenance, containment)
 │   ├── governance_models.py       Shared data models (request/response/audit)
 │   ├── governance_adapter.py      P52 governance request assembly (facade → symbolu_core)
-│   ├── sovereign_bridge.py        128D sovereign tensor → confidence signals
+│   ├── sovereign_bridge.py        32D sovereign state → confidence signals
 │   ├── olm_bridge.py              12-layer OLM → governance signals & risk
-│   └── governance_api.py          API entry point for authorization
+│   ├── governance_api.py          API entry point for authorization
+│   │
+│   └── signal_adapters/           Phase 2-3 signal integration (Phase 0+)
+│       ├── output_modulation_adapter.py   DHA/guna → E = G×P×T + layer weights
+│       └── session_enrichment_adapter.py  Identity/motivation/temporal → confidence
 │
 ├── safety/               CORE   Hard safety constraints & guards
 │   ├── pipeline_guards/           P15 authority, P16 regression, P55 execution boundary
@@ -138,14 +222,24 @@ agentic/
 │   └── ledger_replay_verifier.py  Deterministic replay verification
 │
 ├── entropy/              INTEGRATE  Cross-domain coherence regulation
-├── core/                 INTEGRATE  Intelligence engine (SMI, stitching, bhava)
-├── identity/             INTEGRATE  Identity signature classification
-├── motivation/           INTEGRATE  Motivational driver classification
+│                                    (Phase 0: no longer competing authority;
+│                                     canonical authority = guna_modulation/)
+├── core/                 NEUTRALIZED  Intelligence engine facades
+│                                    (Phase 0: dead facades removed/neutralized;
+│                                     core/entropy/ no longer authority source)
+├── identity/             INTEGRATE  Identity signature classification (Phase 3)
+├── motivation/           INTEGRATE  Motivational driver classification (Phase 3)
 ├── sovereign/            INTEGRATE  Cognitive state management (128D tensor)
-├── inference/            INTEGRATE  Inference-time bridge (CSR guard, metacog)
-├── chitta_vritti/        INTEGRATE  5-element vritti distribution
+│   └── inference_bridge.py          128D → 32D projection (Phase 4)
+├── inference/            INTEGRATE  Inference-time orchestration
+│   ├── manager.py                   InferenceManager (Phase 4 mode-gated)
+│   ├── signal_reconciliation.py     Multi-source vritti/guna validation
+│   └── diagnostic_hooks.py          MirrorBalance/CausalLayer audit hooks
+├── chitta_vritti/        AUTHORITY  5-element vritti distribution
+│                                    (Phase 0: canonical runtime vritti authority)
 ├── temporal/             INTEGRATE  Temporal bhava & cross-domain patterns
-├── guna_modulation/      INTEGRATE  Guna-aware entropy modulation
+├── guna_modulation/      AUTHORITY  Guna-aware entropy modulation
+│   └── guna_derivation.py           (Phase 0: canonical runtime guna authority)
 ├── dha/                  INTEGRATE  Delivery harmonization (tone/restraint)
 ├── llm/                  INTEGRATE  One-way LLM authority boundary
 └── api/                  INTEGRATE  External observability API
@@ -1158,23 +1252,25 @@ All matching rules fire (stricter-only merge). Built-in rules cover:
 
 ---
 
-## Four-Level Governance Logic (Summary)
+## Eight-Layer Governance Logic (Summary)
 
-This section summarizes the four-level governance architecture as a quick
-reference.
+This section summarizes the eight-layer governance architecture as a quick
+reference. Layers 1-4 are the core governance stack (pre-Phase 0). Layers 5-8
+were added in Phases 0-4.
 
-### Level 1: Semantic State (what state are we in?)
+### Layer 1: Semantic State (what state are we in?)
 
 ```
   Ontology signal        → 12-layer structural position
   Vritti signal          → 5-mode cognitive quality
+    (Phase 0: canonical authority = chitta_vritti/)
   JEPA composite         → integrated confidence + alignment
   Residual signal        → semantic–runtime mismatch
   Governance regime      → NORMAL / PROCESS_DRIFT / SEMANTIC_SHIFT /
                            DUAL_ANOMALY / UNKNOWN
 ```
 
-### Level 2: Domain Translation (what does that state mean here?)
+### Layer 2: Domain Translation (what does that state mean here?)
 
 ```
   Domain profiles        → declarative posture per domain
@@ -1185,7 +1281,7 @@ reference.
   Vritti guard           → block unsafe vritti for writes
 ```
 
-### Level 3: Shadow AI Control (is this asset trustworthy?)
+### Layer 3: Shadow AI Control (is this asset trustworthy?)
 
 ```
   Provenance status      → APPROVED / UNVERIFIED / SHADOW / QUARANTINED / REVOKED
@@ -1197,16 +1293,288 @@ reference.
   Semantic mismatch      → approved assets behaving outside boundary
 ```
 
-### Level 4: Enforcement (what do we do about it?)
+### Layer 4: Enforcement (what do we do about it?)
 
 ```
   GovernanceService      → ALLOW / DENY / DEFER
   SafeMCPGateway         → ALLOWED / BLOCKED / ESCALATE
   SafetyContract         → eligible = True/False
   ConfidenceGate         → ExecutionMode + EscalationLevel
+    + output_modulation_adjustment (Phase 2, [-0.10, +0.03])
+    + session_enrichment_adjustment (Phase 3)
   Escalation             → human-in-the-loop confirmation
   Audit                  → durable + in-memory event persistence
 ```
+
+### Layer 5: Session Enrichment (what is the session context?)
+
+```
+  Identity signal        → identity classification → confidence adjustment
+  Motivation signal      → motivational driver → risk enrichment
+  Temporal signal        → session trajectory → bounded enrichment
+  All enrichments are additive and clamped — not hard blockers.
+  Availability depends on upstream session metadata being present.
+```
+
+### Layer 6: Output Modulation (how is delivery shaped?)
+
+```
+  DHA formula            → tone weights, intensity, restraint, D factor
+  E = G × P × T          → canonical guna modulation intensity
+  Strategy 2 (indirect)  → E → confidence adjustment (Layer 4)
+  Renderer modulation    → DHA tone → FusionRenderer layer weights
+                           sweet→symbolic, jolt→practical, metaphor→mirror
+                           Gated by D, bounded ±0.15
+```
+
+### Layer 7: Sovereign/Inference Reconciliation (are signals consistent?)
+
+```
+  128D → 32D bridge      → project training state to inference state
+  Signal reconciliation  → multi-source vritti/guna consistency check
+  Diagnostic hooks       → MirrorBalance, CausalLayer (audit-only)
+  Coherence decoder      → Appendix F Stage 1 (SOVEREIGN mode only)
+
+  Mode gating:
+    FULL / SAFE      → reconciliation + bridge + diagnostics
+    SOVEREIGN        → all above + coherence decoder
+    STANDARD / FAST  → Phase 4 disabled
+```
+
+### Layer 8: Execution/Runtime (what happens?)
+
+```
+  MCP client execution   → tool calls with timeout/error handling
+  FusionRenderer         → layer-weight driven output composition
+  GovernanceAuditStore   → durable event persistence
+  LedgerEntryStore       → hash-chained append-only ledger
+  Posture modulation     → output gating
+```
+
+---
+
+## Phase 0–1: Signal Consolidation & Governance Rewiring
+
+### Phase 0: Canonical Signal Authorities
+
+Phase 0 established which modules are the canonical runtime authorities for
+key signals, eliminating ambiguity from competing code paths.
+
+| Signal | Canonical Authority | Former Competitor | Resolution |
+|--------|-------------------|-------------------|------------|
+| Runtime vritti (5-mode) | `chitta_vritti/` | `core/` facades | `core/` facades neutralized |
+| Runtime guna (S/R/T) | `guna_modulation/guna_derivation.py` | `core/entropy/` | `core/entropy/` no longer authority |
+| Sovereign state (128D) | `sovereign/` | — | Unchanged |
+| OLM weights (12-layer) | `olm_bridge.py` | — | Unchanged |
+
+**What changed:**
+- Dead `core/` facades removed or neutralized — they no longer provide signals
+  that compete with the canonical authorities listed above
+- `core/entropy/` is no longer a competing authority for guna derivation
+- Training-time sovereign variants may still exist separately in
+  `symbolu_training/` for different reasons (training loss, curriculum) — these
+  are distinct from the runtime authorities
+
+**Float precision fix:** Guna derivation float precision was stabilized to
+prevent accumulation drift across the pipeline.
+
+### Phase 1: Governance Signal Rewiring
+
+Phase 1 rewired the governance decision path to prefer real signals over
+approximations.
+
+**What changed:**
+- `jepa_governance.py` now prefers real vritti signals from `chitta_vritti/`
+  when available, using approximation as fallback only
+- Entropy is now a real governance input (not merely metadata)
+- Audit metadata distinguishes `signal_source: "real"` vs `signal_source: "fallback"`
+  so it is visible whether a decision was made from canonical signals or approximations
+
+**Conditionality:** Actual availability of real vritti/guna signals depends on
+whether the upstream pipeline stages (Phase 0 canonical modules) have been
+executed and populated the pipeline context. If the pipeline runs in a mode
+where `chitta_vritti/` does not execute, governance falls back to approximation
+and records this in audit.
+
+---
+
+## Phase 2: Output Modulation Path
+
+Phase 2 wired DHA and guna modulation signals into the output/rendering path,
+making them behaviorally real rather than metadata-only.
+
+### E = G × P × T: Canonical Guna Modulation Intensity
+
+The formula `E = G × P × T` computes a canonical output modulation intensity:
+
+| Variable | Meaning | Source |
+|----------|---------|--------|
+| G | Weighted guna blend: `w_S·S + w_R·R + w_T·T` | `guna_modulation/guna_derivation.py` |
+| P | Policy scalar: `clamp(1 - r_risk - r_escalation, 0, 1)` | Governance risk/escalation state |
+| T | Tier scalar: `1.0` (sovereign), `0.9` (standard), `0.85` (fast) | Pipeline tier |
+| E | Output intensity `[0, 1]` | Computed in `orchestrator.py` |
+
+### Strategy 2: E → Confidence/Escalation Path (Indirect)
+
+E feeds `compute_modulation_confidence_adjustment(E)` which produces a bounded
+additive adjustment to `ConfidenceSignals.output_modulation_adjustment`:
+
+```
+  E < 0.4 (low threshold)   → linear penalty up to -0.10
+  0.4 ≤ E ≤ 0.7 (dead zone) → 0.0 (no adjustment)
+  E > 0.7 (high threshold)  → linear uplift up to +0.03
+```
+
+This is **asymmetric** (penalty 3× larger than uplift) — cautionary-first.
+The adjustment enters `ConfidenceAggregator.aggregate()` additively, after
+session enrichment, before final clamp to [0, 1].
+
+### Direct Renderer Modulation: DHA Tone → Layer Weights
+
+DHA tone weights directly shape FusionRenderer layer emphasis:
+
+```
+  sweet    → symbolic layer weight ↑
+  jolt     → practical layer weight ↑
+  metaphor → mirror layer weight ↑
+```
+
+Each tone's deviation from uniform (1/3) drives a proportional shift, gated by
+delivery factor D (`D = I × R`, where I=intensity, R=restraint). Individual
+shifts are clamped to ±`_MAX_WEIGHT_SHIFT` (0.15). Weights are renormalized to
+sum to 1.0.
+
+**Module:** `signal_adapters/output_modulation_adapter.py`
+**Integration:** `renderer_integration.py` applies adjustments before
+`FusionRenderer.render()`.
+
+### Motion M
+
+No trustworthy motion signal is currently available at inference time. Motion
+is set to `M = 0.0` with an explicit `motion_fallback: True` metadata flag.
+This is an honest declaration, not a hidden default.
+
+---
+
+## Phase 3: Session Enrichment Integration
+
+Phase 3 wired identity, motivation, and temporal/session signals into the
+governance context as bounded enrichments.
+
+### What It Does
+
+| Signal | Source Module | Governance Effect |
+|--------|-------------|-------------------|
+| Identity | `identity/` | Classification → confidence adjustment |
+| Motivation | `motivation/` | Driver classification → risk enrichment |
+| Temporal | `temporal/` | Session trajectory → bounded confidence adjustment |
+
+These signals enter governance through
+`signal_adapters/session_enrichment_adapter.py`, which produces a single
+`session_enrichment_adjustment` value stored in
+`ConfidenceSignals.session_enrichment_adjustment`.
+
+### Design Constraints
+
+- **Bounded enrichments, not hard blockers.** Session signals adjust confidence
+  additively (clamped), never directly DENY or override governance decisions.
+- **Explainable.** Each enrichment source is individually visible in audit
+  metadata (`signals_used` list, enrichment breakdown dict).
+- **Fail-safe.** Missing session metadata → zero adjustment (no effect on
+  governance). The enrichment path never crashes the pipeline.
+- **Upstream dependency.** Actual signal availability depends on whether
+  upstream session context has been populated. Without session metadata,
+  enrichments are neutral.
+
+**Module:** `signal_adapters/session_enrichment_adapter.py`
+**Integration:** `confidence_gate.py` (`ConfidenceAggregator.aggregate()`)
+
+---
+
+## Phase 4: Sovereign ↔ Inference Reconciliation
+
+Phase 4 bridges the training-time sovereign state representation (128D) to the
+inference runtime (32D) and enables multi-source signal reconciliation.
+
+### Sovereign → Inference Bridge
+
+**Module:** `sovereign/inference_bridge.py`
+
+Projects 128-D training sovereign state to 32-D inference control-plane state:
+
+```
+  R-Signal (48D) → Bhava activations (12D)  [average-pool per bhava]
+  Guna (16D)     → Guna summary (6D)        [S/R/T pool + velocity/accel/stable]
+  Kosha          → Kosha profile (5D)        [derived from bhava]
+  Vritti         → Vritti profile (5D)       [derived from bhava→vritti mapping]
+  Reserved       → zeroed (4D)              [no JEPA feedback at inference]
+  S-Signal, C-Signal → dropped with warnings
+```
+
+The bridge preserves projection metadata (what was available, what was dropped,
+warnings about information loss) for audit.
+
+### Signal Reconciliation
+
+**Module:** `inference/signal_reconciliation.py`
+
+Validates consistency between guna/vritti signals from multiple sources:
+
+| Source | Weight | Origin |
+|--------|--------|--------|
+| Inference guna | 0.3 | `InferenceGunas` (token-probability approximation) |
+| Sovereign guna | 0.5 | 32-D state monitor guna slice |
+| Canonical guna | 0.2 | `guna_derivation.py` (if available) |
+
+Produces `ReconciliationResult` with:
+- Weighted-blend reconciled guna (sum ≈ 1.0)
+- Maximum pairwise L1 divergence
+- Vritti agreement flag
+- Divergence warnings (threshold: L1 > 0.3)
+- Full diagnostic dict for audit
+
+### Diagnostic Hooks
+
+**Module:** `inference/diagnostic_hooks.py`
+
+MirrorBalance and CausalLayer diagnostics record per-step guna/coherence
+snapshots. These are **observation-only** — they never modify generation
+behavior. Failed hooks are caught and logged, never propagated.
+
+### InferenceManager Mode Gating
+
+Phase 4 components are enabled via `InferenceManagerConfig` flags, which are
+set automatically by `_apply_mode_preset()`:
+
+| Mode | Reconciliation | Bridge | Diagnostics | Coherence Decoder |
+|------|---------------|--------|-------------|-------------------|
+| FAST | — | — | — | — |
+| STANDARD | — | — | — | — |
+| **FULL** | **enabled** | **enabled** | **enabled** | — |
+| **SAFE** | **enabled** | **enabled** | **enabled** | — |
+| **SOVEREIGN** | **enabled** | **enabled** | **enabled** | **enabled** |
+
+The coherence-aware decoder (Appendix F Stage 1) remains SOVEREIGN-only. It
+adjusts sampling temperature/top_p based on coherence but never modifies logits.
+
+### Runtime Audit Visibility
+
+Every `generate()` call returns a `phase4_status` dict:
+```python
+{
+    "mode": "full",
+    "signal_reconciliation_enabled": True,
+    "signal_reconciliation_ran": True,
+    "sovereign_bridge_enabled": True,
+    "sovereign_bridge_ran": False,   # no state_monitor data yet
+    "diagnostic_hooks_enabled": True,
+    "diagnostic_hooks_ran": True,
+    "coherence_decoder_enabled": False,
+    "reconciliation_warnings": [],
+}
+```
+
+`get_status()` also shows Phase 4 component listing.
 
 ---
 
@@ -1253,6 +1621,45 @@ not bugs.
    or behavioral analysis. Semantic mismatch detection relies on JEPA
    regime signals, not trained anomaly detectors.
 
+7. **Real vritti/guna signals require upstream pipeline execution (Phase 1).**
+   Governance prefers real signals from `chitta_vritti/` and
+   `guna_modulation/guna_derivation.py`, but these are only available if the
+   upstream pipeline stages executed and populated the context. In lightweight
+   or partial pipeline modes, governance falls back to approximation. Audit
+   records which source was used.
+
+8. **Session enrichment depends on upstream session metadata (Phase 3).**
+   Identity, motivation, and temporal enrichments are only active when the
+   upstream session context provides the relevant metadata. Without session
+   data, enrichments are zero (neutral). This is by design — enrichments are
+   additive, never mandatory.
+
+9. **Output modulation is bounded and partially conditional (Phase 2).**
+   Strategy 2 (E → confidence) is always computed when guna modulation runs,
+   but direct renderer modulation (DHA tone → layer weights) only applies when
+   DHA signals are available in the pipeline context. Motion M is a documented
+   explicit fallback (`M = 0.0`) — no trustworthy motion signal exists at
+   inference time.
+
+10. **Phase 4 inference reconciliation is mode-gated.** Signal reconciliation,
+    sovereign bridge signals, and diagnostic hooks are enabled in FULL, SAFE,
+    and SOVEREIGN modes but disabled in STANDARD and FAST modes. The
+    coherence-aware decoder (Appendix F Stage 1) is SOVEREIGN-only. Phase 4
+    components degrade safely when sovereign state data is unavailable (zero
+    projection, single-source reconciliation).
+
+11. **Training-time and runtime representations remain distinct.** The 128-D
+    training sovereign state and 32-D inference state are structurally
+    different representations. The `inference_bridge.py` projection is lossy
+    by design (S-Signal and C-Signal are dropped with explicit warnings).
+    Projection metadata tracks what was available and what was lost.
+
+12. **Not every advanced module is default-on.** Experimental Appendix F
+    stages beyond Stage 1 (coherence decoder) are not activated by any mode
+    preset. Semantic coherence integration, experiential state, and other
+    advanced inference modules exist as infrastructure but are not on any
+    automatic runtime path.
+
 ---
 
 ## Next Productization Layers (Planned)
@@ -1260,10 +1667,11 @@ not bugs.
 > **Status:** Design phase. None of the following layers are implemented.
 
 The following layers represent the next planned productization steps beyond
-the current built governance stack. They are listed here for architectural
-context and roadmap clarity, not as claims of current capability.
+the current eight-layer governance stack (Layers 1-8 are built; Layers 9-11
+below are planned). They are listed here for architectural context and roadmap
+clarity, not as claims of current capability.
 
-### Layer 6: Policy Control Plane
+### Layer 9: Policy Control Plane
 
 **Purpose:** Externalize governance policy from code into versioned,
 deployable policy bundles.
@@ -1280,7 +1688,7 @@ deployable policy bundles.
 in Python source (`domain_policy.py`, `shadow_ai.py`). Productization requires
 non-developer policy owners to manage governance posture without code deploys.
 
-### Layer 7: Simulation / Replay Plane
+### Layer 10: Simulation / Replay Plane
 
 **Purpose:** Enable policy impact analysis before deployment and forensic
 replay of past governance decisions.
@@ -1297,7 +1705,7 @@ replay of past governance decisions.
 plane adds the interpretation layer that transforms audit data into actionable
 policy intelligence.
 
-### Layer 8: Approval Workflow Plane
+### Layer 11: Approval Workflow Plane
 
 **Purpose:** Provide durable, structured human-in-the-loop decision
 lifecycle for DEFER outcomes.
@@ -1318,12 +1726,12 @@ in `governance_patterns/`, which is a standalone in-memory prototype.
 ### Dependency Order
 
 ```
-  Layer 6 (Policy Control Plane)
+  Layer 9  (Policy Control Plane)
     ↓  enables
-  Layer 7 (Simulation / Replay)
+  Layer 10 (Simulation / Replay)
     ↓  enables
-  Layer 8 (Approval Workflow)
+  Layer 11 (Approval Workflow)
 ```
 
-Layer 6 is the prerequisite: externalized policy is required before policy
+Layer 9 is the prerequisite: externalized policy is required before policy
 replay or structured approval workflows become meaningful.
