@@ -475,3 +475,292 @@ class TestReasonCodes:
         # With balanced ontology the regime may stay NORMAL, but the risk
         # factor and reason code must still be present.
         assert "IMAGINATIVE_DESTRUCTIVE" in result.reason_codes
+
+
+# =============================================================================
+# Test: Direct compute_residual() intermediate values (Test C1)
+# =============================================================================
+
+class TestComputeResidualIntermediates:
+    """Directly test compute_residual() to verify intermediate values."""
+
+    def test_read_only_always_semantically_consistent(self):
+        """Read-only actions should have semantic_consistency=1.0."""
+        ontology = build_ontology_signal(
+            layer_weights={l: 0.9 for l in ONTOLOGY_LAYERS}
+        )
+        vritti = build_vritti_signal(
+            vritti_distribution=_pramana_vritti(), coherence=0.8,
+        )
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            tool_name="search", risk_level="read_only",
+        )
+        residual = compute_residual(jepa, runtime)
+        assert residual.semantic_consistency == 1.0
+        assert residual.action_state_coherence == 1.0
+
+    def test_destructive_weak_execution_reduces_consistency(self):
+        """Destructive action with weak O3_EXECUTION → lower semantic consistency."""
+        weights = {l: 0.5 for l in ONTOLOGY_LAYERS}
+        weights["O3_EXECUTION"] = 0.1  # Weak execution ontology
+        # Make governance dominant
+        weights["O7_REASONING"] = 0.9
+        weights["O8_PURPOSE"] = 0.9
+        ontology = build_ontology_signal(layer_weights=weights)
+        vritti = build_vritti_signal(
+            vritti_distribution=_pramana_vritti(), coherence=0.8,
+        )
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            tool_name="drop_table", risk_level="destructive",
+        )
+        residual = compute_residual(jepa, runtime)
+        # Should have reduced semantic consistency due to:
+        # 1. governance-dominant ontology executing side effects
+        # 2. weak O3_EXECUTION for destructive action
+        assert residual.semantic_consistency < 0.5
+        assert "DESTRUCTIVE_WITHOUT_EXECUTION_ONTOLOGY" in residual.reason_codes
+
+    def test_observation_mode_side_effect_reduces_coherence(self):
+        """Side-effecting action during observation vritti reduces coherence."""
+        ontology = build_ontology_signal(layer_weights=_balanced_ontology())
+        vritti = build_vritti_signal(
+            vritti_distribution=_nidra_vritti(), coherence=0.5,
+        )
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            tool_name="write_file", risk_level="write",
+        )
+        residual = compute_residual(jepa, runtime)
+        assert residual.action_state_coherence < 0.6
+        assert "SIDE_EFFECT_IN_OBSERVATION_MODE" in residual.reason_codes
+
+    def test_residual_magnitude_is_weighted_blend(self):
+        """Residual magnitude = 0.35*align + 0.30*semantic + 0.35*action."""
+        ontology = build_ontology_signal(layer_weights=_balanced_ontology())
+        vritti = build_vritti_signal(
+            vritti_distribution=_pramana_vritti(), coherence=0.9, score=0.9,
+        )
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            tool_name="read_log", risk_level="read_only",
+        )
+        residual = compute_residual(jepa, runtime)
+        expected = (
+            0.35 * (1.0 - jepa.ontology_vritti_alignment)
+            + 0.30 * (1.0 - residual.semantic_consistency)
+            + 0.35 * (1.0 - residual.action_state_coherence)
+        )
+        assert abs(residual.residual_magnitude - min(1.0, expected)) < 0.01
+
+
+# =============================================================================
+# Test: PRIVILEGED path coverage (Test C2)
+# =============================================================================
+
+class TestPrivilegedPath:
+    """Test PRIVILEGED action category in residual computation."""
+
+    def test_privileged_weak_agency_flagged(self):
+        """Privileged action with weak O6_AGENCY → flagged."""
+        weights = {l: 0.5 for l in ONTOLOGY_LAYERS}
+        weights["O6_AGENCY"] = 0.1  # Weak agency
+        result = jepa_governance_check(
+            layer_weights=weights,
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            tool_name="admin_grant",
+            risk_level="privileged",
+        )
+        assert "PRIVILEGED_WITHOUT_AGENCY_ONTOLOGY" in result.reason_codes
+
+    def test_privileged_strong_agency_ok(self):
+        """Privileged action with strong O6_AGENCY → no agency flag."""
+        weights = _balanced_ontology()
+        weights["O6_AGENCY"] = 0.8
+        result = jepa_governance_check(
+            layer_weights=weights,
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            tool_name="admin_grant",
+            risk_level="privileged",
+        )
+        assert "PRIVILEGED_WITHOUT_AGENCY_ONTOLOGY" not in result.reason_codes
+
+    def test_privileged_is_side_effecting(self):
+        """Privileged actions must be classified as side-effecting."""
+        rt = build_runtime_process_state(
+            tool_name="sudo_cmd", risk_level="privileged",
+        )
+        assert rt.action_category == RuntimeActionCategory.PRIVILEGED
+        assert rt.is_side_effecting
+
+
+# =============================================================================
+# Test: Boundary tests for thresholds 0.20 / 0.40 / 0.50
+# =============================================================================
+
+class TestThresholdBoundaries:
+    """Test regime classification around boundary thresholds."""
+
+    def test_alignment_at_critical_boundary(self):
+        """Alignment just below 0.20 → should trigger DUAL_ANOMALY or SEMANTIC_SHIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        # alignment=0.19, with low action coherence → DUAL_ANOMALY
+        regime = _classify_regime(
+            alignment=0.19,
+            semantic_consistency=0.6,
+            action_state_coherence=0.4,
+            residual_magnitude=0.5,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.DUAL_ANOMALY
+
+    def test_alignment_at_low_boundary(self):
+        """Alignment just below 0.40 → SEMANTIC_SHIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.39,
+            semantic_consistency=0.8,
+            action_state_coherence=0.8,
+            residual_magnitude=0.3,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.SEMANTIC_SHIFT
+
+    def test_alignment_just_above_low_boundary(self):
+        """Alignment at 0.41 with good coherence → not SEMANTIC_SHIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.41,
+            semantic_consistency=0.8,
+            action_state_coherence=0.8,
+            residual_magnitude=0.2,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.NORMAL
+
+    def test_action_coherence_at_050_boundary(self):
+        """Action coherence just below 0.50 → PROCESS_DRIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.6,
+            semantic_consistency=0.8,
+            action_state_coherence=0.49,
+            residual_magnitude=0.3,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.PROCESS_DRIFT
+
+    def test_residual_magnitude_above_040(self):
+        """Residual magnitude above 0.40 → PROCESS_DRIFT."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.6,
+            semantic_consistency=0.6,
+            action_state_coherence=0.6,
+            residual_magnitude=0.41,
+            integrated_confidence=0.3,
+        )
+        assert regime == GovernanceRegime.PROCESS_DRIFT
+
+    def test_integrated_confidence_below_005_unknown(self):
+        """Integrated confidence < 0.05 → UNKNOWN regardless of other signals."""
+        from agentic.agentic_framework.jepa_governance import _classify_regime
+        regime = _classify_regime(
+            alignment=0.9,
+            semantic_consistency=0.9,
+            action_state_coherence=0.9,
+            residual_magnitude=0.1,
+            integrated_confidence=0.04,
+        )
+        assert regime == GovernanceRegime.UNKNOWN
+
+
+# =============================================================================
+# Test: All-zero vritti fail-closed
+# =============================================================================
+
+class TestAllZeroVritti:
+    """All-zero vritti distribution must fail-closed to nidra."""
+
+    def test_all_zero_vritti_becomes_nidra(self):
+        """All-zero vritti distribution → nidra (dormancy)."""
+        sig = build_vritti_signal(
+            vritti_distribution={"pramana": 0.0, "viparyaya": 0.0,
+                                  "vikalpa": 0.0, "smrti": 0.0, "nidra": 0.0},
+        )
+        assert sig.primary_vritti == "nidra"
+        assert sig.distribution["nidra"] == 1.0
+        assert sig.coherence == 0.0
+        assert sig.confidence == 0.0
+
+    def test_all_zero_vritti_with_execution_triggers_drift(self):
+        """All-zero vritti + execute action → not NORMAL."""
+        result = jepa_governance_check(
+            layer_weights=_balanced_ontology(),
+            vritti_distribution={"pramana": 0.0, "viparyaya": 0.0,
+                                  "vikalpa": 0.0, "smrti": 0.0, "nidra": 0.0},
+            coherence=0.5,
+            score=0.5,
+            tool_name="run_code",
+            risk_level="execute",
+        )
+        assert result.regime != GovernanceRegime.NORMAL
+
+
+# =============================================================================
+# Test: Override propagation in GovernanceService
+# =============================================================================
+
+class TestOverridePropagation:
+    """Test that JEPA overrides propagate correctly through GovernanceService."""
+
+    def test_jepa_override_recorded_in_audit(self):
+        """JEPA override details must appear in audit event."""
+        from agentic.agentic_framework.governance_service import GovernanceService
+        from agentic.agentic_framework.governance_models import AuthorizationRequest
+
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="search_files",
+            tool_name="search_files",
+            quality_score=0.9,
+            coherence_score=0.9,
+            internal_consistency=0.9,
+            goal_alignment=0.9,
+            trajectory_confidence=0.9,
+            agency_level="FULL",
+        ))
+        snapshot = resp.audit_event.request_snapshot
+        assert "jepa_regime" in snapshot
+        assert "jepa_reason_codes" in snapshot
+        assert "jepa_overrode_baseline" in snapshot
+        assert "jepa_baseline_decision" in snapshot
+        assert "jepa_confidence_adjustment" in snapshot
+
+    def test_jepa_deny_override_shows_in_audit(self):
+        """When JEPA causes DENY, audit should show the override."""
+        from agentic.agentic_framework.governance_service import GovernanceService
+        from agentic.agentic_framework.governance_models import AuthorizationRequest
+
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="delete_everything",
+            tool_name="rm_rf",
+            quality_score=0.05,
+            coherence_score=0.05,
+            internal_consistency=0.05,
+            goal_alignment=0.05,
+            trajectory_confidence=0.05,
+            agency_level="FULL",
+        ))
+        # With very low signals, the decision should be DENY
+        assert resp.governance_decision.value in ("DENY", "DEFER")
+        snapshot = resp.audit_event.request_snapshot
+        assert isinstance(snapshot["jepa_reason_codes"], list)

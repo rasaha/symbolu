@@ -596,13 +596,16 @@ class GovernanceService:
         #   Compares the JEPA composite latent state (ontology + vritti)
         #   against the runtime process state to detect drift, anomaly,
         #   or semantic shift. May override governance decision.
+        baseline_decision = governance_decision
         jepa_assessment = self._run_jepa_check(
             request, risk_level, gate_decision, governance_decision,
         )
+        jepa_overrode = False
         if jepa_assessment is not None:
             governance_decision, eligible = _apply_jepa_override(
                 governance_decision, eligible, jepa_assessment,
             )
+            jepa_overrode = (governance_decision != baseline_decision)
         else:
             # JEPA unavailable — fail-closed: force DENY
             _logger.warning(
@@ -612,6 +615,7 @@ class GovernanceService:
             )
             governance_decision = APIGovernanceDecision.DENY
             eligible = False
+            jepa_overrode = (governance_decision != baseline_decision)
 
         # Step 6: Build rationale
         rationale_codes = _build_rationale_codes(
@@ -657,6 +661,17 @@ class GovernanceService:
                 "capabilities": request.capabilities,
                 "quality_score": request.quality_score,
                 "coherence_score": request.coherence_score,
+                "jepa_regime": (
+                    jepa_assessment.regime.value if jepa_assessment else "unavailable"
+                ),
+                "jepa_reason_codes": (
+                    list(jepa_assessment.reason_codes) if jepa_assessment else []
+                ),
+                "jepa_overrode_baseline": jepa_overrode,
+                "jepa_baseline_decision": baseline_decision.value,
+                "jepa_confidence_adjustment": (
+                    jepa_assessment.confidence_adjustment if jepa_assessment else -0.50
+                ),
             },
         )
         self._persist_audit_event(audit_event)
