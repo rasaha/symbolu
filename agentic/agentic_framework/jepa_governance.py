@@ -1026,6 +1026,163 @@ def jepa_governance_check(
 
 
 # =========================================================================
+# Canonical safe JEPA wrapper (reusable by both enforcement points)
+# =========================================================================
+
+
+def safe_jepa_governance_check(**kwargs) -> JEPAGovernanceAssessment:
+    """Safe wrapper around jepa_governance_check that never raises.
+
+    This is the single canonical entry point for JEPA assessment that
+    both GovernanceService and MCPGateway should use. It catches any
+    internal error and returns an explicit UNKNOWN-regime assessment
+    instead of raising or returning None.
+
+    Returns:
+        JEPAGovernanceAssessment — always. On failure, returns an
+        explicit UNKNOWN regime with HALT/BLOCKED posture.
+    """
+    try:
+        return jepa_governance_check(**kwargs)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(
+            "JEPA governance check failed (safe wrapper): %s", e
+        )
+        return _make_unavailable_assessment(str(e), kwargs)
+
+
+def _make_unavailable_assessment(
+    error_msg: str,
+    context: Dict[str, Any],
+) -> JEPAGovernanceAssessment:
+    """Build synthetic UNKNOWN-regime assessment when JEPA cannot compute.
+
+    Used by safe_jepa_governance_check and can be used by MCPGateway
+    for fail-closed error handling.
+    """
+    zero_weights = {l: 0.0 for l in ONTOLOGY_LAYERS}
+    zero_dist = {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                 "smrti": 0.0, "nidra": 1.0}
+    ontology = OntologySignal(
+        layer_weights=zero_weights, primary_layer="O1_POTENTIAL",
+        governance_strength=0.0, execution_strength=0.0,
+        confidence=0.0, evidence=f"JEPA unavailable: {error_msg}",
+    )
+    vritti_sig = VrittiSignal(
+        distribution=zero_dist, primary_vritti="nidra",
+        coherence=0.0, score=0.0, confidence=0.0,
+        evidence=f"JEPA unavailable: {error_msg}",
+    )
+    composite = JEPACompositeSignal(
+        ontology=ontology, vritti=vritti_sig,
+        expected_ontology=zero_weights, actual_ontology=zero_weights,
+        ontology_vritti_alignment=0.0, integrated_confidence=0.0,
+        stability=0.0, summary="JEPA UNAVAILABLE",
+        coupling_evidence=("JEPA_ERROR",),
+    )
+    runtime = build_runtime_process_state(
+        action_type=context.get("action_type", ""),
+        tool_name=context.get("tool_name", ""),
+        risk_level=context.get("risk_level", ""),
+        confidence_score=context.get("confidence_score", 0.0),
+        agency_level=context.get("agency_level", "FULL"),
+        execution_mode=context.get("execution_mode", "BLOCKED"),
+        escalation_level=context.get("escalation_level", "HALT"),
+        session_id=context.get("session_id", ""),
+        actor_id=context.get("actor_id", ""),
+        capabilities=context.get("capabilities", ()),
+    )
+    residual = ResidualSignal(
+        residual_magnitude=1.0, semantic_consistency=0.0,
+        action_state_coherence=0.0, regime=GovernanceRegime.UNKNOWN,
+        risk_factors=(f"JEPA computation error: {error_msg}",),
+        reason_codes=("JEPA_UNAVAILABLE", "UNKNOWN_REGIME"),
+        explanation=f"JEPA check failed: {error_msg}. Fail-closed.",
+    )
+    return JEPAGovernanceAssessment(
+        regime=GovernanceRegime.UNKNOWN,
+        recommended_action="HALT",
+        execution_mode_override="BLOCKED",
+        escalation_override="HALT",
+        confidence_adjustment=-0.50,
+        reason_codes=("JEPA_UNAVAILABLE", "UNKNOWN_REGIME"),
+        rationale=f"JEPA unavailable: {error_msg}. Fail-closed to HALT.",
+        jepa_composite=composite,
+        runtime_state=runtime,
+        residual=residual,
+    )
+
+
+def apply_jepa_override(
+    baseline_decision: str,
+    baseline_eligible: bool,
+    assessment: JEPAGovernanceAssessment,
+) -> Dict[str, Any]:
+    """Shared JEPA override logic for both GovernanceService and MCPGateway.
+
+    Applies the JEPA assessment to a baseline governance decision.
+    JEPA can only make decisions STRICTER, never more permissive.
+
+    Uses the full assessment fields:
+    - recommended_action
+    - confidence_adjustment
+    - execution_mode_override
+    - escalation_override
+
+    Args:
+        baseline_decision: Baseline governance decision ("ALLOW", "DENY", "DEFER")
+        baseline_eligible: Whether the request was eligible before JEPA
+        assessment: Full JEPA governance assessment
+
+    Returns:
+        Dict with keys:
+        - decision: new decision string
+        - eligible: new eligible flag
+        - overrode: whether JEPA changed the decision
+        - regime: assessment regime value
+        - reason_codes: assessment reason codes
+        - confidence_adjustment: assessment confidence adjustment
+        - execution_mode_override: assessment execution mode override
+        - escalation_override: assessment escalation override
+        - recommended_action: assessment recommended action
+    """
+    regime = assessment.regime
+    recommended = assessment.recommended_action
+    new_decision = baseline_decision
+    new_eligible = baseline_eligible
+
+    if regime == GovernanceRegime.NORMAL:
+        pass  # No change
+    elif recommended in ("HALT", "DENY"):
+        new_decision = "DENY"
+        new_eligible = False
+    elif recommended in ("DEGRADE", "CONFIRM"):
+        if baseline_decision == "ALLOW":
+            new_decision = "DEFER"
+    else:
+        # Fallback: use execution_mode_override / escalation_override
+        if assessment.execution_mode_override == "BLOCKED":
+            new_decision = "DENY"
+            new_eligible = False
+        elif assessment.escalation_override == "HALT":
+            new_decision = "DENY"
+            new_eligible = False
+
+    return {
+        "decision": new_decision,
+        "eligible": new_eligible,
+        "overrode": new_decision != baseline_decision,
+        "regime": assessment.regime.value,
+        "reason_codes": list(assessment.reason_codes),
+        "confidence_adjustment": assessment.confidence_adjustment,
+        "execution_mode_override": assessment.execution_mode_override,
+        "escalation_override": assessment.escalation_override,
+        "recommended_action": assessment.recommended_action,
+    }
+
+
+# =========================================================================
 # Helpers
 # =========================================================================
 
@@ -1138,4 +1295,7 @@ __all__ = [
     "compute_residual",
     "assess_governance",
     "jepa_governance_check",
+    # Safe wrappers (canonical entry points for enforcement)
+    "safe_jepa_governance_check",
+    "apply_jepa_override",
 ]

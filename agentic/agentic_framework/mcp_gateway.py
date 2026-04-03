@@ -67,6 +67,8 @@ from agentic.ledger.governance_audit_store import (
 from agentic.agentic_framework.jepa_governance import (
     GovernanceRegime,
     jepa_governance_check,
+    safe_jepa_governance_check,
+    apply_jepa_override,
 )
 
 logger = logging.getLogger(__name__)
@@ -539,79 +541,6 @@ class MockMCPClient(MCPClientInterface):
 # =============================================================================
 
 
-def _make_fail_closed_assessment(
-    tool_call: "MCPToolCall",
-    tool_def: "MCPToolDefinition",
-    error: Exception,
-) -> "JEPAGovernanceAssessment":
-    """Build a synthetic UNKNOWN-regime assessment when JEPA raises.
-
-    This ensures the MCP gateway treats JEPA failures the same way the
-    GovernanceService does: as an UNKNOWN regime with HALT/DENY behavior.
-    """
-    from agentic.agentic_framework.jepa_governance import (
-        JEPAGovernanceAssessment,
-        JEPACompositeSignal,
-        OntologySignal,
-        VrittiSignal,
-        RuntimeProcessState,
-        RuntimeActionCategory,
-        ResidualSignal,
-        GovernanceRegime,
-        ONTOLOGY_LAYERS,
-    )
-
-    zero_weights = {l: 0.0 for l in ONTOLOGY_LAYERS}
-    zero_dist = {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
-                 "smrti": 0.0, "nidra": 1.0}
-    ontology = OntologySignal(
-        layer_weights=zero_weights, primary_layer="O1_POTENTIAL",
-        governance_strength=0.0, execution_strength=0.0,
-        confidence=0.0, evidence="JEPA unavailable",
-    )
-    vritti = VrittiSignal(
-        distribution=zero_dist, primary_vritti="nidra",
-        coherence=0.0, score=0.0, confidence=0.0,
-        evidence="JEPA unavailable",
-    )
-    composite = JEPACompositeSignal(
-        ontology=ontology, vritti=vritti,
-        expected_ontology=zero_weights, actual_ontology=zero_weights,
-        ontology_vritti_alignment=0.0, integrated_confidence=0.0,
-        stability=0.0, summary="JEPA UNAVAILABLE",
-        coupling_evidence=("JEPA_ERROR",),
-    )
-    runtime = RuntimeProcessState(
-        action_type="call_tool", tool_name=tool_call.tool_name,
-        action_category=RuntimeActionCategory.UNKNOWN,
-        risk_level=tool_def.risk_level.value,
-        confidence_score=0.0, agency_level="FULL",
-        requires_confirmation=True, execution_mode="BLOCKED",
-        escalation_level="HALT", session_id=tool_call.session_id or "",
-        actor_id="", declared_capabilities=tuple(tool_def.capabilities),
-        is_side_effecting=True,
-    )
-    residual = ResidualSignal(
-        residual_magnitude=1.0, semantic_consistency=0.0,
-        action_state_coherence=0.0, regime=GovernanceRegime.UNKNOWN,
-        risk_factors=(f"JEPA raised {type(error).__name__}: {error}",),
-        reason_codes=("JEPA_UNAVAILABLE", "UNKNOWN_REGIME"),
-        explanation=f"JEPA check failed: {error}. Fail-closed.",
-    )
-    return JEPAGovernanceAssessment(
-        regime=GovernanceRegime.UNKNOWN,
-        recommended_action="HALT",
-        execution_mode_override="BLOCKED",
-        escalation_override="HALT",
-        confidence_adjustment=-0.50,
-        reason_codes=("JEPA_UNAVAILABLE", "UNKNOWN_REGIME"),
-        rationale=f"JEPA unavailable ({type(error).__name__}). Fail-closed to HALT.",
-        jepa_composite=composite,
-        runtime_state=runtime,
-        residual=residual,
-    )
-
-
 class SafeMCPGateway:
     """
     Safe gateway for MCP tool calls.
@@ -754,76 +683,62 @@ class SafeMCPGateway:
         tool_call: MCPToolCall,
         tool_def: MCPToolDefinition,
         gate_decision: ConfidenceGateDecision,
-    ) -> Optional["JEPAGovernanceAssessment"]:
-        """Run JEPA residual check. Returns assessment or raises on failure.
+    ) -> "JEPAGovernanceAssessment":
+        """Run JEPA residual check. Always returns an assessment.
+
+        Uses safe_jepa_governance_check which catches internal errors
+        and returns an explicit UNKNOWN-regime assessment. Never returns
+        None — the caller always gets a full assessment object.
 
         JEPA can only make decisions stricter, never more permissive.
-        The caller uses the assessment to decide blocking/escalation.
-
-        Returns None ONLY for NORMAL regime. For all other regimes,
-        returns the full assessment so the caller can act on
-        recommended_action, execution_mode_override, escalation_override,
-        and confidence_adjustment — matching GovernanceService behavior.
         """
-        from agentic.agentic_framework.jepa_governance import JEPAGovernanceAssessment
+        # Approximate vritti from confidence signals
+        q = tool_call.quality_score
+        c = tool_call.coherence_score
+        overall = gate_decision.confidence.overall
+        pramana = min(1.0, q * 0.6 + c * 0.4)
+        viparyaya = max(0.0, 0.5 - q * 0.8)
+        vikalpa = max(0.0, 0.4 - c * 0.5)
+        nidra = max(0.0, 0.3 - overall * 0.5)
+        smrti = 0.1
+        total = pramana + viparyaya + vikalpa + smrti + nidra
+        if total <= 0:
+            vritti_dist = {"pramana": 0.0, "viparyaya": 0.0,
+                           "vikalpa": 0.0, "smrti": 0.0, "nidra": 1.0}
+        else:
+            vritti_dist = {
+                "pramana": pramana / total, "viparyaya": viparyaya / total,
+                "vikalpa": vikalpa / total, "smrti": smrti / total,
+                "nidra": nidra / total,
+            }
 
-        try:
-            # Approximate vritti from confidence signals
-            q = tool_call.quality_score
-            c = tool_call.coherence_score
-            overall = gate_decision.confidence.overall
-            pramana = min(1.0, q * 0.6 + c * 0.4)
-            viparyaya = max(0.0, 0.5 - q * 0.8)
-            vikalpa = max(0.0, 0.4 - c * 0.5)
-            nidra = max(0.0, 0.3 - overall * 0.5)
-            smrti = 0.1
-            total = pramana + viparyaya + vikalpa + smrti + nidra
-            if total <= 0:
-                vritti_dist = {"pramana": 0.0, "viparyaya": 0.0,
-                               "vikalpa": 0.0, "smrti": 0.0, "nidra": 1.0}
-            else:
-                vritti_dist = {
-                    "pramana": pramana / total, "viparyaya": viparyaya / total,
-                    "vikalpa": vikalpa / total, "smrti": smrti / total,
-                    "nidra": nidra / total,
-                }
-
-            assessment = jepa_governance_check(
-                layer_weights={
-                    "O1_POTENTIAL": 0.3, "O2_IDENTITY": c * 0.8,
-                    "O3_EXECUTION": overall * 0.7, "O4_STRUCTURE": c * 0.6,
-                    "O5_COGNITION": q * 0.8, "O6_AGENCY": q * 0.7,
-                    "O7_REASONING": q * 0.9, "O8_PURPOSE": q * 0.8,
-                    "O9_WITNESSES": overall * 0.6, "O10_UNIFYING": c * 0.7,
-                    "O11_INTEGRATION": overall * 0.5, "O12_ABSOLVING": overall * 0.4,
-                },
-                vritti_distribution=vritti_dist,
-                coherence=c,
-                score=overall,
-                action_type="call_tool",
-                tool_name=tool_call.tool_name,
-                risk_level=tool_def.risk_level.value,
-                confidence_score=overall,
-                agency_level="FULL",
-                execution_mode=gate_decision.execution.mode.value
-                    if hasattr(gate_decision.execution.mode, "value")
-                    else str(gate_decision.execution.mode),
-                escalation_level=gate_decision.escalation.level.value
-                    if hasattr(gate_decision.escalation.level, "value")
-                    else str(gate_decision.escalation.level),
-                session_id=tool_call.session_id or "",
-                actor_id="",
-                capabilities=list(tool_def.capabilities),
-            )
-
-            if assessment.regime == GovernanceRegime.NORMAL:
-                return None  # Aligned — no override needed
-
-            return assessment
-
-        except Exception as e:
-            logger.error("JEPA check failed in MCP gateway (fail-closed): %s", e)
-            return _make_fail_closed_assessment(tool_call, tool_def, e)
+        return safe_jepa_governance_check(
+            layer_weights={
+                "O1_POTENTIAL": 0.3, "O2_IDENTITY": c * 0.8,
+                "O3_EXECUTION": overall * 0.7, "O4_STRUCTURE": c * 0.6,
+                "O5_COGNITION": q * 0.8, "O6_AGENCY": q * 0.7,
+                "O7_REASONING": q * 0.9, "O8_PURPOSE": q * 0.8,
+                "O9_WITNESSES": overall * 0.6, "O10_UNIFYING": c * 0.7,
+                "O11_INTEGRATION": overall * 0.5, "O12_ABSOLVING": overall * 0.4,
+            },
+            vritti_distribution=vritti_dist,
+            coherence=c,
+            score=overall,
+            action_type="call_tool",
+            tool_name=tool_call.tool_name,
+            risk_level=tool_def.risk_level.value,
+            confidence_score=overall,
+            agency_level="FULL",
+            execution_mode=gate_decision.execution.mode.value
+                if hasattr(gate_decision.execution.mode, "value")
+                else str(gate_decision.execution.mode),
+            escalation_level=gate_decision.escalation.level.value
+                if hasattr(gate_decision.escalation.level, "value")
+                else str(gate_decision.escalation.level),
+            session_id=tool_call.session_id or "",
+            actor_id="",
+            capabilities=list(tool_def.capabilities),
+        )
 
     def _audit(
         self,
@@ -927,16 +842,22 @@ class SafeMCPGateway:
         gate_decision = self.gate.evaluate(signals, tool_call.tool_name)
 
         # JEPA residual governance check
-        # Returns None for NORMAL regime, full assessment otherwise.
-        # Matches GovernanceService behavior: use recommended_action,
-        # execution_mode_override, escalation_override, confidence_adjustment.
+        # Always returns a full assessment (never None). Uses
+        # safe_jepa_governance_check which catches errors and returns
+        # explicit UNKNOWN-regime assessment on failure.
         jepa_assessment = self._jepa_check(tool_call, tool_def, gate_decision)
-        if jepa_assessment is not None:
-            regime = jepa_assessment.regime
+        regime = jepa_assessment.regime
 
-            # DUAL_ANOMALY / UNKNOWN → hard block (HALT)
-            if regime in (GovernanceRegime.DUAL_ANOMALY,
-                          GovernanceRegime.UNKNOWN):
+        if regime != GovernanceRegime.NORMAL:
+            # Use shared override to determine action
+            jepa_override = apply_jepa_override(
+                baseline_decision="ALLOW",  # MCP baseline is "proceed"
+                baseline_eligible=True,
+                assessment=jepa_assessment,
+            )
+
+            if jepa_override["decision"] == "DENY":
+                # DUAL_ANOMALY / UNKNOWN / HALT → hard block
                 reason = (
                     f"JEPA residual governor: {regime.value} — "
                     f"{jepa_assessment.rationale}"
@@ -957,10 +878,9 @@ class SafeMCPGateway:
                 self._audit(tool_call, tool_def, result, gate_decision)
                 return result
 
-            # PROCESS_DRIFT / SEMANTIC_SHIFT → block non-read-only tools,
-            # escalate read-only (consistent with GovernanceService DEFER)
-            if regime in (GovernanceRegime.PROCESS_DRIFT,
-                          GovernanceRegime.SEMANTIC_SHIFT):
+            if jepa_override["decision"] == "DEFER":
+                # PROCESS_DRIFT / SEMANTIC_SHIFT → block non-read-only,
+                # escalate read-only (consistent with GovernanceService)
                 if tool_def.risk_level != ToolRiskLevel.READ_ONLY:
                     reason = (
                         f"JEPA residual governor: {regime.value} — "

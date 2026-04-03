@@ -71,6 +71,8 @@ from agentic.agentic_framework.jepa_governance import (
     JEPAGovernanceAssessment,
     GovernanceRegime,
     jepa_governance_check,
+    safe_jepa_governance_check,
+    apply_jepa_override,
 )
 
 import logging as _logging
@@ -370,53 +372,6 @@ def _approximate_vritti(
     }
 
 
-def _apply_jepa_override(
-    governance_decision: APIGovernanceDecision,
-    eligible: bool,
-    assessment: "JEPAGovernanceAssessment",
-) -> Tuple[APIGovernanceDecision, bool]:
-    """Apply JEPA governance override if the regime warrants it.
-
-    JEPA can only make decisions STRICTER, never more permissive.
-    Uses the full assessment fields (recommended_action,
-    execution_mode_override, escalation_override, confidence_adjustment)
-    instead of only reading regime.
-
-    - NORMAL → no change
-    - PROCESS_DRIFT → downgrade ALLOW to DEFER
-    - SEMANTIC_SHIFT → downgrade ALLOW to DEFER
-    - DUAL_ANOMALY → force DENY, eligible=False
-    - UNKNOWN → force DENY, eligible=False
-    """
-    regime = assessment.regime
-
-    if regime == GovernanceRegime.NORMAL:
-        return governance_decision, eligible
-
-    # Use recommended_action to drive the override (not just regime name)
-    recommended = assessment.recommended_action
-
-    # HALT or DENY recommended → force DENY and ineligible
-    if recommended in ("HALT", "DENY"):
-        return APIGovernanceDecision.DENY, False
-
-    # DEGRADE or CONFIRM recommended → downgrade ALLOW to DEFER
-    if recommended in ("DEGRADE", "CONFIRM"):
-        if governance_decision == APIGovernanceDecision.ALLOW:
-            return APIGovernanceDecision.DEFER, eligible
-        # Already DEFER or DENY — keep the stricter decision
-        return governance_decision, eligible
-
-    # Fallback: if execution_mode_override is BLOCKED → DENY
-    if assessment.execution_mode_override == "BLOCKED":
-        return APIGovernanceDecision.DENY, False
-
-    # Fallback: if escalation_override is HALT → DENY
-    if assessment.escalation_override == "HALT":
-        return APIGovernanceDecision.DENY, False
-
-    return governance_decision, eligible
-
 
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
@@ -596,26 +551,22 @@ class GovernanceService:
         #   Compares the JEPA composite latent state (ontology + vritti)
         #   against the runtime process state to detect drift, anomaly,
         #   or semantic shift. May override governance decision.
+        #   Uses safe_jepa_governance_check — always returns an assessment,
+        #   never None. JEPA failure produces UNKNOWN regime.
         baseline_decision = governance_decision
         jepa_assessment = self._run_jepa_check(
             request, risk_level, gate_decision, governance_decision,
         )
-        jepa_overrode = False
-        if jepa_assessment is not None:
-            governance_decision, eligible = _apply_jepa_override(
-                governance_decision, eligible, jepa_assessment,
-            )
-            jepa_overrode = (governance_decision != baseline_decision)
-        else:
-            # JEPA unavailable — fail-closed: force DENY
-            _logger.warning(
-                "JEPA governance check returned None (unavailable) — "
-                "fail-closed to DENY for decision %s",
-                decision_id,
-            )
-            governance_decision = APIGovernanceDecision.DENY
-            eligible = False
-            jepa_overrode = (governance_decision != baseline_decision)
+
+        # Use the shared override function from jepa_governance
+        jepa_result = apply_jepa_override(
+            baseline_decision=governance_decision.value,
+            baseline_eligible=eligible,
+            assessment=jepa_assessment,
+        )
+        governance_decision = APIGovernanceDecision(jepa_result["decision"])
+        eligible = jepa_result["eligible"]
+        jepa_overrode = jepa_result["overrode"]
 
         # Step 6: Build rationale
         rationale_codes = _build_rationale_codes(
@@ -661,17 +612,14 @@ class GovernanceService:
                 "capabilities": request.capabilities,
                 "quality_score": request.quality_score,
                 "coherence_score": request.coherence_score,
-                "jepa_regime": (
-                    jepa_assessment.regime.value if jepa_assessment else "unavailable"
-                ),
-                "jepa_reason_codes": (
-                    list(jepa_assessment.reason_codes) if jepa_assessment else []
-                ),
+                "jepa_regime": jepa_assessment.regime.value,
+                "jepa_reason_codes": list(jepa_assessment.reason_codes),
                 "jepa_overrode_baseline": jepa_overrode,
                 "jepa_baseline_decision": baseline_decision.value,
-                "jepa_confidence_adjustment": (
-                    jepa_assessment.confidence_adjustment if jepa_assessment else -0.50
-                ),
+                "jepa_confidence_adjustment": jepa_assessment.confidence_adjustment,
+                "jepa_recommended_action": jepa_assessment.recommended_action,
+                "jepa_execution_mode_override": jepa_assessment.execution_mode_override,
+                "jepa_escalation_override": jepa_assessment.escalation_override,
             },
         )
         self._persist_audit_event(audit_event)
@@ -817,48 +765,36 @@ class GovernanceService:
         risk_level: "ToolRiskLevel",
         gate_decision: "ConfidenceGateDecision",
         governance_decision: "APIGovernanceDecision",
-    ) -> Optional[JEPAGovernanceAssessment]:
-        """Run JEPA residual governance check if signals are available.
+    ) -> JEPAGovernanceAssessment:
+        """Run JEPA residual governance check. Always returns an assessment.
 
-        Returns None if JEPA cannot be computed (missing classifiers).
-        The JEPA check is best-effort: if neither ontology nor vritti
-        signals are available, it returns None and the existing decision
-        stands. If signals are partially available, JEPA still runs
-        with fail-closed defaults on the missing side.
+        Uses safe_jepa_governance_check which catches internal errors
+        and returns an explicit UNKNOWN-regime assessment. Never returns
+        None — JEPA failure is itself a governance condition.
         """
-        # Build layer weights from request quality/coherence scores.
-        # In a full integration, these would come from OLMGovernanceSignals
-        # or the sovereign bridge. Here we approximate from available signals.
         layer_weights = _approximate_layer_weights(request, gate_decision)
-
-        # Build vritti distribution from request signals.
-        # In a full integration, these would come from ChittaVrittiEngine.
         vritti_dist = _approximate_vritti(request, gate_decision)
 
-        try:
-            return jepa_governance_check(
-                layer_weights=layer_weights,
-                vritti_distribution=vritti_dist,
-                coherence=getattr(request, "coherence_score", 0.5),
-                score=gate_decision.confidence.overall,
-                action_type=request.action_type,
-                tool_name=request.tool_name or "",
-                risk_level=risk_level.value if hasattr(risk_level, "value") else str(risk_level),
-                confidence_score=gate_decision.confidence.overall,
-                agency_level=request.agency_level or "FULL",
-                execution_mode=gate_decision.execution.mode.value
-                    if hasattr(gate_decision.execution.mode, "value")
-                    else str(gate_decision.execution.mode),
-                escalation_level=gate_decision.escalation.level.value
-                    if hasattr(gate_decision.escalation.level, "value")
-                    else str(gate_decision.escalation.level),
-                session_id=getattr(request, "session_id", ""),
-                actor_id=request.actor_id,
-                capabilities=request.capabilities or [],
-            )
-        except Exception as e:
-            _logger.warning("JEPA governance check failed: %s", e)
-            return None
+        return safe_jepa_governance_check(
+            layer_weights=layer_weights,
+            vritti_distribution=vritti_dist,
+            coherence=getattr(request, "coherence_score", 0.5),
+            score=gate_decision.confidence.overall,
+            action_type=request.action_type,
+            tool_name=request.tool_name or "",
+            risk_level=risk_level.value if hasattr(risk_level, "value") else str(risk_level),
+            confidence_score=gate_decision.confidence.overall,
+            agency_level=request.agency_level or "FULL",
+            execution_mode=gate_decision.execution.mode.value
+                if hasattr(gate_decision.execution.mode, "value")
+                else str(gate_decision.execution.mode),
+            escalation_level=gate_decision.escalation.level.value
+                if hasattr(gate_decision.escalation.level, "value")
+                else str(gate_decision.escalation.level),
+            session_id=getattr(request, "session_id", ""),
+            actor_id=request.actor_id,
+            capabilities=request.capabilities or [],
+        )
 
     def get_audit_log(self, limit: int = 100) -> List[AuditEvent]:
         """Get recent audit events (from in-memory cache)."""

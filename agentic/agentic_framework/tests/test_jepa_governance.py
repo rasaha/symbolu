@@ -768,3 +768,179 @@ class TestOverridePropagation:
         assert resp.governance_decision.value in ("DENY", "DEFER")
         snapshot = resp.audit_event.request_snapshot
         assert isinstance(snapshot["jepa_reason_codes"], list)
+
+    def test_audit_has_all_jepa_fields(self):
+        """Audit snapshot must contain all JEPA override detail fields."""
+        from agentic.agentic_framework.governance_service import GovernanceService
+        from agentic.agentic_framework.governance_models import AuthorizationRequest
+
+        svc = GovernanceService()
+        resp = svc.authorize(AuthorizationRequest(
+            actor_id="test",
+            action_type="search_files",
+            tool_name="search",
+            quality_score=0.9,
+            coherence_score=0.9,
+            agency_level="FULL",
+        ))
+        snapshot = resp.audit_event.request_snapshot
+        required_keys = {
+            "jepa_regime", "jepa_reason_codes", "jepa_overrode_baseline",
+            "jepa_baseline_decision", "jepa_confidence_adjustment",
+            "jepa_recommended_action", "jepa_execution_mode_override",
+            "jepa_escalation_override",
+        }
+        assert required_keys.issubset(set(snapshot.keys())), (
+            f"Missing keys: {required_keys - set(snapshot.keys())}"
+        )
+
+
+# =============================================================================
+# Test: Invalid key validation
+# =============================================================================
+
+class TestInputValidation:
+    """Validate that unknown keys in layer_weights and vritti_distribution are handled."""
+
+    def test_unknown_layer_weights_keys_handled(self):
+        """Unknown layer_weights keys should not crash, just warn."""
+        sig = build_ontology_signal(
+            layer_weights={
+                "O7_REASONING": 0.9,
+                "UNKNOWN_LAYER": 0.5,  # Should be ignored
+            }
+        )
+        # Should still work — unknown key ignored, canonical layers used
+        assert sig.primary_layer == "O7_REASONING"
+        assert len(sig.layer_weights) == 12
+        assert "UNKNOWN_LAYER" not in sig.layer_weights
+
+    def test_unknown_vritti_keys_handled(self):
+        """Unknown vritti_distribution keys should not crash."""
+        sig = build_vritti_signal(
+            vritti_distribution={
+                "pramana": 0.8,
+                "unknown_mode": 0.2,  # Should be ignored
+            },
+            coherence=0.7,
+        )
+        assert sig.primary_vritti == "pramana"
+        assert "unknown_mode" not in sig.distribution
+
+    def test_missing_vritti_keys_default_to_zero(self):
+        """Missing vritti keys should default to 0.0."""
+        sig = build_vritti_signal(
+            vritti_distribution={"pramana": 1.0},  # Others missing
+            coherence=0.8,
+        )
+        assert sig.distribution["viparyaya"] == 0.0
+        assert sig.distribution["vikalpa"] == 0.0
+
+    def test_missing_layer_keys_default_to_zero(self):
+        """Missing layer keys should default to 0.0."""
+        sig = build_ontology_signal(
+            layer_weights={"O7_REASONING": 0.9},  # Others missing
+        )
+        assert sig.layer_weights["O1_POTENTIAL"] == 0.0
+        assert sig.layer_weights["O12_ABSOLVING"] == 0.0
+
+
+# =============================================================================
+# Test: Shared safe wrapper and override function
+# =============================================================================
+
+class TestSafeWrapper:
+    """Test safe_jepa_governance_check and apply_jepa_override."""
+
+    def test_safe_wrapper_returns_assessment_on_success(self):
+        """Safe wrapper should return normal assessment when JEPA works."""
+        from agentic.agentic_framework.jepa_governance import safe_jepa_governance_check
+        result = safe_jepa_governance_check(
+            layer_weights=_balanced_ontology() | {"O7_REASONING": 0.9},
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            risk_level="read_only",
+        )
+        assert result.regime == GovernanceRegime.NORMAL
+        assert result.recommended_action == "ALLOW"
+
+    def test_safe_wrapper_returns_unknown_on_error(self):
+        """Safe wrapper should return UNKNOWN assessment on internal error."""
+        from agentic.agentic_framework.jepa_governance import safe_jepa_governance_check
+        # Pass invalid layer_weights type to trigger error inside jepa_governance_check
+        result = safe_jepa_governance_check(
+            layer_weights=None,  # Will cause ValueError
+            olm_signals=None,    # Also None → ValueError
+        )
+        assert result.regime == GovernanceRegime.UNKNOWN
+        assert result.recommended_action == "HALT"
+        assert "JEPA_UNAVAILABLE" in result.reason_codes
+
+    def test_shared_override_normal_no_change(self):
+        """apply_jepa_override with NORMAL regime should not change decision."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology() | {"O7_REASONING": 0.9},
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            risk_level="read_only",
+        )
+        result = apply_jepa_override("ALLOW", True, assessment)
+        assert result["decision"] == "ALLOW"
+        assert result["eligible"] is True
+        assert result["overrode"] is False
+
+    def test_shared_override_halt_forces_deny(self):
+        """apply_jepa_override with HALT action should force DENY."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        # Create an assessment with UNKNOWN regime (HALT)
+        assessment = jepa_governance_check(
+            layer_weights={l: 0.0 for l in ONTOLOGY_LAYERS},
+        )
+        assert assessment.recommended_action == "HALT"
+        result = apply_jepa_override("ALLOW", True, assessment)
+        assert result["decision"] == "DENY"
+        assert result["eligible"] is False
+        assert result["overrode"] is True
+
+    def test_shared_override_never_weakens_deny(self):
+        """apply_jepa_override must never upgrade DENY to ALLOW."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology() | {"O7_REASONING": 0.9},
+            vritti_distribution=_pramana_vritti(),
+            coherence=0.8,
+            score=0.8,
+            risk_level="read_only",
+        )
+        # Even with NORMAL regime, DENY baseline must stay DENY
+        result = apply_jepa_override("DENY", False, assessment)
+        assert result["decision"] == "DENY"
+        assert result["eligible"] is False
+
+    def test_shared_override_degrade_downgrades_allow(self):
+        """DEGRADE recommended_action should downgrade ALLOW to DEFER."""
+        from agentic.agentic_framework.jepa_governance import apply_jepa_override
+        # Use nidra + balanced ontology to get PROCESS_DRIFT (DEGRADE)
+        assessment = jepa_governance_check(
+            layer_weights=_balanced_ontology(),
+            vritti_distribution=_nidra_vritti(),
+            coherence=0.5,
+            score=0.3,
+            tool_name="write_file",
+            risk_level="write",
+        )
+        if assessment.recommended_action == "DEGRADE":
+            result = apply_jepa_override("ALLOW", True, assessment)
+            assert result["decision"] == "DEFER"
+            assert result["overrode"] is True
+
+
+# helper for context manager compatibility
+import contextlib
+
+@contextlib.contextmanager
+def _noop_context():
+    yield
