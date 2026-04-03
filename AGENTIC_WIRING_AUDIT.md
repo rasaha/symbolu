@@ -803,3 +803,169 @@ This isn't blocking but makes wiring fragile. Every new integration requires def
 | `core/` | **Merge/deprecate** (facades only) | Infrastructure layer | Delete dead facades. Redirect core/entropy/ to entropy/. Consolidate core/smi/vritti_mapping into chitta_vritti/. Real subdirectory engines stay. |
 | `llm/` | **No action needed** | Infrastructure layer | Fully wired boundary layer. Functioning correctly. |
 | `api/` | **No action needed** | Infrastructure layer | Fully wired observability. Functioning correctly. |
+
+---
+
+## 4. Phased Wiring Roadmap
+
+### Phase 0: Prerequisite Cleanup (Remove Dead Code, Consolidate Duplicates)
+
+**Goal:** Eliminate confusion from dead code and establish canonical authorities for vritti and guna before wiring real signals into governance.
+
+**Folders in scope:** `core/`, `chitta_vritti/`, `sovereign/`, `inference/`, `guna_modulation/`
+
+**Actions:**
+
+| # | Action | Files | Why First |
+|---|--------|-------|-----------|
+| 0.1 | Delete `core/interface.py` and `core/pipeline.py` (dead facades) | `core/interface.py`, `core/pipeline.py`, `core/__init__.py` | Dead code creates false architectural impression. No imports exist. Safe to delete. |
+| 0.2 | Delete or redirect `core/entropy/` stub to `entropy/` | `core/entropy/` directory | Dead stub (all NotImplementedError). Collides with real `entropy/` module. |
+| 0.3 | Update `core/__init__.py` to export real engines | `core/__init__.py` | Currently exports only dead facades. Should export CoherenceEngine, SMIEngine, etc. |
+| 0.4 | Make `chitta_vritti/` the canonical vritti authority | `core/smi/vritti_mapping.py` | Replace VrittiMapper's independent computation with delegation to `chitta_vritti/vritti.py`. Keep interface, change implementation. |
+| 0.5 | Sync vritti formulas in `sovereign/vritti.py` | `sovereign/vritti.py` | Training-time vritti must use same formulas as runtime. Import from `chitta_vritti/` or explicitly document why formulas differ (gradient requirements). |
+| 0.6 | Make `guna_modulation/guna_derivation.py` the canonical guna authority | `inference/guna_inference.py` | Replace independent guna approximation with import from canonical module. `sovereign/guna.py` stays separate (needs nn.Module for gradients) but formulas should be synced. |
+
+**Prerequisites:** None — this is the foundation.
+
+**Risks:**
+- `sovereign/vritti.py` and `sovereign/guna.py` may need training-time gradients through their computations. If so, they cannot simply import from non-PyTorch modules. **Mitigation:** Keep sovereign/ versions but extract shared formula constants into a `_shared_formulas.py` that both consume.
+- `core/smi/vritti_mapping.py` may be called in performance-critical path. **Mitigation:** Profile before changing; `chitta_vritti/` has fast-path optimization already.
+
+**Success Criteria:**
+- `core/__init__.py` exports only active engines
+- `core/entropy/` directory removed
+- Only 2 vritti implementations remain: `chitta_vritti/` (runtime canonical) and `sovereign/` (training, synced formulas)
+- Only 2 guna implementations remain: `guna_modulation/` (runtime canonical) and `sovereign/` (training, synced formulas)
+- All tests pass
+
+---
+
+### Phase 1: Replace Governance Approximations with Real Signals (Highest Leverage)
+
+**Goal:** Replace `approximate_vritti()` and `approximate_layer_weights()` in JEPA governance with real module outputs. This is the single highest-leverage wiring change — it makes governance decisions based on actual semantic state instead of proxy signals.
+
+**Folders in scope:** `chitta_vritti/`, `entropy/`, `agentic_framework/`
+
+**Actions:**
+
+| # | Action | Files | Detail |
+|---|--------|-------|--------|
+| 1.1 | Create vritti signal adapter for governance | New: `agentic_framework/signal_adapters/vritti_adapter.py` | Extract stable interface: `get_vritti_distribution(ctx) -> Dict[str, float]`. If `ctx` has `chitta_vritti_result`, use real distribution. Else fall back to current `approximate_vritti()`. Graceful degradation preserves existing behavior. |
+| 1.2 | Replace `approximate_vritti()` call in `jepa_governance.py` | `agentic_framework/jepa_governance.py` ~line 150 | Replace `vritti_dist = approximate_vritti(quality, coherence, confidence)` with `vritti_dist = vritti_adapter.get_vritti_distribution(ctx)`. The R[v,a] coupling matrix call (`get_aspect_weights()`) already exists and is already imported — it just needs real input. |
+| 1.3 | Add entropy signal to ConfidenceSignals | `agentic_framework/confidence_gate.py` | Add `entropy_normalized: float` field to ConfidenceSignals. Populate from `entropy/EntropyEngine.evaluate()` result. Use in confidence aggregation (currently weighted 0.0 — increment to 0.05-0.10). |
+| 1.4 | Add entropy gate result to governance context | `agentic_framework/governance_service.py` | After JEPA check, add entropy gate check: if `EntropyGate.BLOCK`, escalate authorization to DENIED regardless of other signals. Only active for Tier 3 configs. |
+| 1.5 | Wire ChittaVrittiResult into PipelineContext for governance | `symbolu_core/mechanical/pipeline/models.py` | Ensure `ctx.chitta_vritti_result` is populated before governance check runs. Currently CV runs in session processing (after governance). **Must reorder or compute CV earlier in pipeline.** |
+
+**Prerequisites:** Phase 0 complete (canonical vritti authority established).
+
+**Risks:**
+- **Pipeline ordering conflict (1.5)**: ChittaVrittiEngine currently runs in session processing (post-governance). To feed governance, it must run earlier — either in MLCR phase or as a pre-governance signal computation. **Mitigation:** Add a lightweight `compute_vritti_preview()` that runs on available signals before governance, with full CV computation still happening in session processing. Governance gets a preview; session processing gets the full result.
+- **Entropy Tier 3 blocking (1.4)**: Could unexpectedly block requests in high-entropy cross-domain scenarios. **Mitigation:** Deploy as Tier 1 (diagnostic only) first. Monitor entropy gate decisions for 2 weeks. Upgrade to Tier 2/3 after validation.
+
+**Success Criteria:**
+- `jepa_governance_check()` receives real 5-vritti distribution when available
+- JEPA regime classification accuracy improves (testable via existing JEPA test suite)
+- Entropy gate result appears in governance audit trail
+- No latency regression (vritti preview adds <5ms)
+- Fallback to approximation works when CV result unavailable
+
+---
+
+### Phase 2: Wire Output Modulation Path (DHA + Guna + Entropy → Renderer)
+
+**Goal:** Make the renderer actually apply DHA tone weights, guna-derived intensity, and entropy-based modulation instead of ignoring them.
+
+**Folders in scope:** `dha/`, `guna_modulation/`, `entropy/`
+
+**Actions:**
+
+| # | Action | Files | Detail |
+|---|--------|-------|--------|
+| 2.1 | Enable DHA by default (Tier 1 diagnostic) | `dha/config.py`, orchestrator pipeline config | Change `enabled=False` to `enabled=True` for Tier 1. DHA computes and records tone/intensity/restraint but does not modify output in diagnostic mode. |
+| 2.2 | Add `delivery_factor` field to `IntegratedRenderedOutput` | `symbolu_core/mechanical/pipeline/renderer_integration.py` ~line 71 | Add `delivery_factor: float = 1.0` and `tone_profile: Optional[Dict[str, float]] = None`. Renderer populates from `ctx.dha`. |
+| 2.3 | Wire DHA tone weights into FusionRenderer | `symbolu_core/mechanical/pipeline/renderer_integration.py` ~line 336 | Pass `ctx.dha.tone_weights` to FusionRenderer. Use to bias layer prominence: `sweet` → higher `practical_bias`, `jolt` → higher `symbolic_bias`, `metaphor` → higher `mirror_truth_bias`. |
+| 2.4 | Enable formula DHA (guna_modulation E=G×P×T) by default | Orchestrator, `guna_modulation/pipeline_integration.py` | Change `dha_formula_enabled` default from `False` to `True`. Formula DHA runs alongside structural DHA — computes `E = G×P×T` for principled intensity scaling. |
+| 2.5 | Wire E=G×P×T intensity into renderer | `renderer_integration.py` | Read `ctx.dha.adaptation_notes["formula_dha"]["E"]` (or `ctx.dha.adaptation_notes["formula_dha"]["D"]`). Apply as intensity multiplier to output prominence. `D < 0.5` → reduce output intensity (more restrained). `D > 0.8` → full intensity. |
+| 2.6 | Add entropy-driven output annotation | `renderer_integration.py` or output processing | Attach entropy gate result (ALLOW/MODULATE/BLOCK) to output metadata. If MODULATE: add caution signal to output. If BLOCK (Tier 3 only): suppress output. |
+
+**Prerequisites:** Phase 0 (guna consolidation); Phase 1 not strictly required but recommended.
+
+**Risks:**
+- **DHA tone weights may not improve output quality (2.3)**: Tone-to-bias mapping is a design decision, not a formula. **Mitigation:** Start with small bias adjustments (±0.05). A/B test with and without. chitta_vritti evaluation framework can measure coherence impact.
+- **Formula DHA may produce unexpected intensity values (2.5)**: If `E = G×P×T` produces values outside renderer expectations. **Mitigation:** Clamp to [0.3, 1.0] — never fully suppress, never amplify beyond 1.0.
+- **Enabling DHA by default may add latency (2.1)**: DHA is lazy-loaded via `@lru_cache`. **Mitigation:** First invocation pays ~10ms init cost; subsequent calls are cached. Measure in staging.
+
+**Success Criteria:**
+- DHA runs on every request (Tier 1 diagnostic minimum)
+- `IntegratedRenderedOutput` carries `delivery_factor` and `tone_profile`
+- Formula DHA (E=G×P×T) computes on every request
+- Renderer layer bias is influenced by tone weights
+- Output metadata includes entropy gate annotation
+- No latency regression >15ms p99
+
+---
+
+### Phase 3: Connect Session Enrichments to Governance (Identity, Motivation, Temporal)
+
+**Goal:** Make governance decisions aware of session-level signals (identity signature, motivation flow, temporal trajectory) that are currently computed but never consulted for authorization.
+
+**Folders in scope:** `identity/`, `motivation/`, `temporal/`
+
+**Actions:**
+
+| # | Action | Files | Detail |
+|---|--------|-------|--------|
+| 3.1 | Add identity + motivation to ConfidenceSignals | `agentic_framework/confidence_gate.py` | Add fields: `identity_classification: Optional[str]`, `motivation_state: Optional[str]`, `identity_confidence: Optional[float]`, `motivation_confidence: Optional[float]`. Populate from `ctx.identity_signature` and `ctx.motivation_profile`. |
+| 3.2 | Use identity/motivation in ShadowAI semantic mismatch | `agentic_framework/shadow_ai.py` | Shadow AI has 13 risk factors including `identity_confidence`. Wire real `identity_signature.confidence` instead of default. If identity shows `self_fragmentation` with high confidence, escalate shadow containment. |
+| 3.3 | Enrich ApprovalContext with session signals | `agentic_framework/approval_workflow.py` | Include `identity_signature`, `motivation_profile` in ApprovalContext snapshot. Enables approval routing logic: "fragmented identity + fear-driven motivation → require senior approval." |
+| 3.4 | Add temporal bhava to JEPA composite | `agentic_framework/jepa_governance.py` | When `ctx.lam_map` exists (temporal active), extract `temporal_state` (TENSE/RECOVERING/STABLE) and `pattern_tracker_report`. Use temporal state to modulate JEPA regime: TENSE + SEMANTIC_SHIFT → escalate to DUAL_ANOMALY. |
+| 3.5 | Wire temporal always-on (remove tension > 0.4 gate) | Orchestrator LAM stage | Currently `maybe_run_lam()` runs only when `use_lam=True` or `long_arc_tension > 0.4`. Change to always run `TemporalBhavaTracker.add_entry()` for state tracking (lightweight). Full CDI + pattern tracking still gated by tension threshold. |
+| 3.6 | Add identity/motivation policy sections to PolicyBundle | `agentic_framework/policy_bundle.py` | Add `IdentityPolicy` section (identity drift tolerance per domain) and `MotivationPolicy` section (motivation state constraints). Enables per-domain rules like "in finance domain, self_fragmentation → block high-risk actions." |
+
+**Prerequisites:** Phase 1 (governance consuming real vritti/entropy). Phase 0 not strictly required but recommended.
+
+**Risks:**
+- **Identity/motivation signals are session-level, not turn-level (3.1)**: These classify multi-turn patterns. First turn of a session has `neutral_identity` / `ambiguous_motivation`. **Mitigation:** Only use for enrichment (soft signal), not hard gating, until 3+ turns of session context exist.
+- **Temporal always-on may add latency (3.5)**: `TemporalBhavaTracker.add_entry()` does sliding-window tracking. **Mitigation:** Profile; tracker is O(window_size) which is bounded. Skip CDI + pattern tracking when tension is low.
+- **Over-constraining governance (3.2, 3.6)**: Adding too many signals to governance may create unexpected interaction effects. **Mitigation:** Deploy as observational enrichments first (logged but not gating). Graduate to gating after calibration.
+
+**Success Criteria:**
+- ConfidenceSignals carries identity + motivation when available
+- Shadow AI risk assessment uses real identity confidence
+- ApprovalContext includes session-level classification
+- Temporal tracker runs on every request (lightweight mode)
+- PolicyBundle supports domain-specific identity/motivation rules
+- No false-positive authorization denials from new signals
+
+---
+
+### Phase 4: Sovereign-Inference Bridge and Advanced Modules
+
+**Goal:** Unify training-time and inference-time state representations. Wire advanced guna_modulation modules. Mature inference/ Appendix F stages.
+
+**Folders in scope:** `sovereign/`, `inference/`, `guna_modulation/` (advanced modules)
+
+**Actions:**
+
+| # | Action | Files | Detail |
+|---|--------|-------|--------|
+| 4.1 | Build sovereign 128D → inference 32D state projection | New: `sovereign/inference_bridge.py` | Define canonical projection: 128D [16D Guna \| 32D S-Signal \| 48D R-Signal \| 32D C-Signal] → 32D [Bhava 0:12 \| Kosha 12:17 \| Vritti 17:22 \| Guna 22:28]. Add to checkpoint export so inference/ loads projected state. |
+| 4.2 | Connect InferenceManager to generation path | `symbolu_core/ontological/symbolu12_llm.py`, `inference/manager.py` | Wire InferenceManager as optional orchestrator around model.generate(). Start with FAST mode (minimal overhead). CSRInferenceGuard provides safety layer. |
+| 4.3 | Reconcile inference 32D vritti [17:22] with chitta_vritti/ | `inference/sovereign_state_monitor.py` | Sovereign state monitor's vritti slice should be validated against `chitta_vritti/` output. Add consistency check: if drift > threshold, log warning. |
+| 4.4 | Wire MirrorBalance as observability diagnostic | `guna_modulation/mirror_balance.py` | Add to pipeline observability (not gating). Detect guna/entropy/motion asymmetry. Report in coherence_report. |
+| 4.5 | Wire CausalLayer for pipeline audit trail | `guna_modulation/causal_layer.py` | Add do-calculus attribution to pipeline debug output. Enable via `causal_audit_enabled` flag. Not on default path. |
+| 4.6 | Evaluate Appendix F stages for maturation | `inference/` Appendix F files | Review each stage (0-7F). Promote stages with >200 LOC and real logic to "candidate for wiring." Leave stubs (e.g., CoherenceAwareDecoder at 111 LOC) as experimental. |
+
+**Prerequisites:** Phase 0 (consolidation), Phase 1 (governance signals), Phase 2 (output path).
+
+**Risks:**
+- **Sovereign bridge projection may lose information (4.1)**: 128D → 32D is lossy. **Mitigation:** Use learned projection (linear layer trained alongside sovereign loss) rather than hard slicing. Validate reconstruction error.
+- **InferenceManager latency (4.2)**: Orchestrating 6 sub-engines adds overhead. **Mitigation:** FAST mode skips metacognition, sovereign scoring, and binding cache. Measure before enabling STANDARD/FULL modes.
+- **Appendix F maturity (4.6)**: Some stages are research-grade with TODOs. **Mitigation:** Don't wire anything from Appendix F into production without individual review. Keep behind explicit flags.
+
+**Success Criteria:**
+- Checkpoint export includes 32D projected state
+- InferenceManager orchestrates generation in FAST mode without latency regression
+- 32D vritti slice validated against chitta_vritti output
+- MirrorBalance reports visible in coherence dashboard
+- CausalLayer attribution available via debug flag
