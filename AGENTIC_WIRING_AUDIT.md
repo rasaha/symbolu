@@ -227,3 +227,153 @@ Compute 5 cognitive mode distributions (pramana, viparyaya, vikalpa, smrti, nidr
 
 **Priority:** CORE RUNTIME CRITICAL
 **Action:** Wire now — establish chitta_vritti/ as the canonical vritti authority; refactor duplicates in sovereign/, inference/, core/smi/ to consume from here
+
+---
+
+### 3.5 `identity/` — Identity Signature Classification
+
+**Intended Role:**
+Classify session-level identity signatures from multi-turn session context. Detects 8 identity types (self_anchoring, self_expansion, self_fragmentation, self_suppression, self_integration, self_dissonance, self_discovery, neutral_identity) via rule-based feature extraction.
+
+**Actual Implementation Status:** PRODUCTION-GRADE (847 LOC across 2 files)
+- `compute_identity_signature()`: Main entry — extracts real metrics from session_summary
+- 7 rule groups (A-G), each with multi-condition detection:
+  - `_detect_self_anchoring()`: coherence >= 0.65, persona_drift <= 0.40, rising_coherence
+  - `_detect_self_integration()`: breakthrough + stabilization events, HRM+LAM synergy (highest priority, confidence 0.85-0.95)
+  - `_detect_self_fragmentation()`: persona_drift > 0.55, oscillating coherence via sign-change counting
+- Deterministic tiebreaking by confidence then priority order
+- Real feature extraction: coherence_timeline, mapper_sets, events, temporal arcs
+- Confidence is NOT constant — scaled by feature magnitudes (e.g., `0.70 + min(current_coherence * 0.15, 0.15)`)
+
+**Runtime Wiring Status:** FULLY ACTIVE
+- Called from `symbolu_core/mechanical/pipeline/session_processing.py` → `_process_identity_signature()`
+- Lazy-loaded: `from agentic.identity.identity_signature_engine import compute_identity_signature`
+- Sets `ctx.identity_signature` for downstream consumption
+- Consumed by: trading guardrail engine, motivation flow engine
+- Wrapped in fail-safe try/except — pipeline continues if identity processing fails
+
+**Key Dependencies:**
+- Depends on: standard library only (fully self-contained)
+- Depended on by: session_processing pipeline, motivation/ (uses identity_signature as input), trading guardrails
+- Sequential dependency: must run BEFORE motivation/
+
+**Main Gaps:**
+- No tier-specific configuration variants (unlike chitta_vritti which has Consumer/Enterprise)
+- Only 2 external import sites — could be consumed more broadly
+- No evaluation framework (unlike chitta_vritti's extensive evaluation/)
+
+**Priority:** CORE RUNTIME CRITICAL
+**Action:** Document only — fully wired and functioning; consider adding tier configs and evaluation harness in future
+
+---
+
+### 3.6 `motivation/` — Motivation Flow Classification
+
+**Intended Role:**
+Classify session-level motivation flow from multi-turn context + identity signature. Detects 8 motivation types (hope_driven, fear_driven, avoidance_driven, expansion_driven, stabilization_driven, overcorrection, assertion_driven, ambiguous_motivation).
+
+**Actual Implementation Status:** PRODUCTION-GRADE (865 LOC across 2 files)
+- `compute_motivation_flow()`: Main entry — structurally parallel to identity engine
+- 7 rule groups (A-G) with multi-condition detection:
+  - `_detect_hope_driven()`: coherence_delta > 0.12, breakthrough_events, low_volatility < 0.45
+  - `_detect_fear_driven()`: fragmentation_events, high_volatility > 0.55, defensive_patterns (LCM > 40% without LAM)
+  - `_detect_overcorrection()`: sharp_oscillations >= 2 sign changes, rapid_mapper_flips >= 2
+- Same deterministic tiebreaking pattern as identity/
+- Takes `identity_signature` as input feature — couples the two engines
+
+**Runtime Wiring Status:** FULLY ACTIVE
+- Called from `session_processing.py` → `_process_motivation_flow()`
+- Runs AFTER identity classification (sequential dependency)
+- Sets `ctx.motivation_profile` in pipeline context
+- Consumed by: trading guardrails for formula-aware safety checks
+- Fail-safe try/except wrapper
+
+**Key Dependencies:**
+- Depends on: standard library, identity/ (receives identity_signature)
+- Depended on by: trading guardrails, session context
+- No circular dependencies
+
+**Main Gaps:**
+- Same limitations as identity/ — no tier configs, no evaluation framework
+- Structurally very similar to identity/ — potential for shared base class or engine pattern
+- Only consumed by trading guardrails — could inform more downstream decisions
+
+**Priority:** CORE RUNTIME CRITICAL
+**Action:** Document only — fully wired and functioning; consider shared engine abstraction with identity/ in future
+
+---
+
+### 3.7 `temporal/` — Temporal Tracking & Cross-Domain Intelligence
+
+**Intended Role:**
+Sliding-window temporal tracking of consciousness state evolution, cross-domain pattern detection (13 universal patterns), and stateful pattern lifecycle management (P38). Provides temporal trend analysis, state classification, and pattern sequence matching.
+
+**Actual Implementation Status:** SUBSTANTIAL (2,328 LOC across 6 files)
+- `TemporalBhavaTracker` (841 LOC): Sliding-window tracking with SMI, bhava_id, kosha, ontology. Linear regression trends. State classification (TENSE/RECOVERING/STABLE). Recovery pattern detection.
+- `CrossDomainIntelligence` (538 LOC): 13 universal patterns across 6 domains (finance, medicine, psychology, education, legal, corporate). Weighted rule-based scoring from SMI, bhava, kosha, ontology + temporal trends.
+- `CrossDomainPatternTracker` (P38, 674 LOC): Stateful wrapper — pattern onset/sustain/exit/recurrence lifecycle. 8 hand-curated sequences (escalation/entrenchment/resolution). Full/partial sequence matching. 10D aspect vector derivation.
+- `PatternSequenceRules` (149 LOC): 8 locked sequences — frozen, no inference
+- `PatternAspectDerivation` (128 LOC): 10-dimensional aspect vector (ENTROPY, CAUSALITY, AGENCY, BALANCE, FLOW, CONSTRAINT, EMERGENCE, FEEDBACK, HIERARCHY, THRESHOLD)
+
+**Runtime Wiring Status:** ACTIVE (conditional)
+- Integrated into LAM pipeline via `symbolu_core/mechanical/lam/` shim
+- Singleton instances: `TemporalBhavaTracker`, `CrossDomainIntelligence`
+- Called by `maybe_run_lam()` when `use_lam=True` or tension > 0.4
+- Outputs stored in `ctx.lam_map`
+- Depends on `symbolu_core.formulas.*` (external: SMI, bhava_gap, tension_corridor, vritti_momentum)
+
+**Key Dependencies:**
+- Depends on: `symbolu_core.formulas.*` (resonance, TTOR, SMI, phase 14 extensions)
+- Depended on by: LAM pipeline, 20+ test files
+- No circular dependencies
+
+**Main Gaps:**
+- Temporal is distributed across multiple modules (temporal/, core/coherence/temporal_arc_tracer.py, core/bhava/temporal_bhava.py) — NOT duplication but progressive layering that could benefit from clearer hierarchy
+- Pattern sequences are hand-curated and frozen — no mechanism to learn new sequences
+- CDI pattern scoring uses weighted rules — no feedback on accuracy
+
+**Priority:** CORE RUNTIME CRITICAL (when LAM enabled)
+**Action:** Wire now — consider always-on temporal tracking (not just when tension > 0.4); unify temporal hierarchy documentation
+
+---
+
+### 3.8 `guna_modulation/` — Entropy Modulation & State Evolution
+
+**Intended Role:**
+Compute output intensity modulation via canonical equation `OUTPUT = BASE × E` where `E = G × P × T` (Guna coefficient × Policy scalar × Tier scalar). Also provides bounded state evolution (v2.7), mirror balance detection, causal layer analysis, concept readiness monitoring, and experimental reasoning (DPO, Tree-of-Thoughts, MCTS).
+
+**Actual Implementation Status:** VERY EXTENSIVE (14,678 LOC across 25 files)
+- **Core (production):**
+  - `EntropyModulationEngine` (541 LOC): Canonical E = G×P×T with tier configs
+  - `StateEvolutionEngine` (948 LOC): v2.7 bounded θ_t update with 3 modes (IMMEDIATE, LOW_PASS_FILTER, BAYESIAN)
+  - `SignalWiring` (758 LOC): Operator-configurable entropy (GUNA/DIMENSIONAL/KOSHA) and motion (SEMANTIC/STRUCTURAL/EXPERIENTIAL/COMPOSITE) signals
+  - `GunaDerviation` (309 LOC): Sattva/Rajas/Tamas vector computation
+  - `PipelineIntegration` (475 LOC): Pipeline integration layer
+- **Advanced (v2.7+):**
+  - `MirrorBalance` (1,941 LOC): Self-referential balance detection via signal mirrors
+  - `RecursiveSelfImprovement` (908 LOC): Belief tracking + failure pattern detection (NOT learning)
+  - `CausalLayer` (888 LOC): Do-calculus on fixed pipeline DAG (SIGNAL→SEMANTIC→GUNA→FUSION→STATE→CALIBRATION→OUTPUT)
+  - `ConceptReadiness` (836 LOC): Coherence/entropy/drift monitoring for safe concept detection
+  - `ExperimentalReasoning` (841 LOC): DPO, ToT, MCTS — explicitly marked "No learning. Exploration only."
+
+**Runtime Wiring Status:** OPTIONALLY WIRED (feature-flagged)
+- Activated via `v2_7_enabled` flag
+- NOT wired into main pipeline by default
+- Can run in DISABLED mode (identity/no-op operation)
+- Only 1 external import found: `symbolu_training/training/unified/training_state.py` (VarianceConfidence)
+- Standard library only — fully self-contained, no ML/LLM dependencies
+
+**Key Dependencies:**
+- Depends on: standard library only (dataclasses, typing, enum, math)
+- Depended on by: training_state (optional), pipeline when v2_7 enabled
+- All formulas hand-specified, deterministic, invertible
+
+**Main Gaps:**
+- **HIGH**: Guna derivation duplicated in `sovereign/guna.py` (training) and `inference/guna_inference.py` (inference) — three independent guna implementations
+- `posture/_guna_mapping.py` is a 4th guna variant (deliberately hidden/private)
+- MirrorBalance, CausalLayer, ConceptReadiness are sophisticated but have zero external consumers
+- ExperimentalReasoning (DPO/ToT/MCTS) is exploration-only with no runtime path
+- v2.7 state evolution could replace heuristic approaches elsewhere but isn't connected
+
+**Priority:** IMPORTANT BUT UNDERWIRED
+**Action:** Wire now (core E=G×P×T) / refactor first (consolidate guna derivation) / wire later (advanced modules)
