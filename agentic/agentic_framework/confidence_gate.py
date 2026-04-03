@@ -101,6 +101,12 @@ class ConfidenceSignals:
     action_complexity: float = 0.5      # How complex is the requested action
     action_reversibility: float = 1.0   # Can it be undone? (1.0 = fully reversible)
 
+    # Phase 3: Session enrichment signals
+    identity_stability: float = 0.5     # 0=fragile/unstable, 1=stable/anchored
+    motivation_stability: float = 0.5   # 0=fear/avoidance/overcorrection, 1=hope/stable
+    temporal_stability: float = 0.5     # 0=tense/volatile, 1=stable/recovering
+    session_enrichment_adjustment: float = 0.0  # Bounded penalty from adapter (<=0)
+
     def to_dict(self) -> Dict[str, float]:
         return {
             "quality_score": self.quality_score,
@@ -116,6 +122,10 @@ class ConfidenceSignals:
             "session_stability": self.session_stability,
             "action_complexity": self.action_complexity,
             "action_reversibility": self.action_reversibility,
+            "identity_stability": self.identity_stability,
+            "motivation_stability": self.motivation_stability,
+            "temporal_stability": self.temporal_stability,
+            "session_enrichment_adjustment": self.session_enrichment_adjustment,
         }
 
 
@@ -390,8 +400,19 @@ class ConfidenceAggregator:
             self.weights.action * action_component
         )
 
+        # Phase 3: Apply bounded session enrichment penalty (additive, <=0).
+        # This is stricter-only: penalty can only reduce confidence, never raise it.
+        overall += signals.session_enrichment_adjustment
+
         # Clamp to [0, 1]
         overall = max(0.0, min(1.0, overall))
+
+        signals_used = [
+            "quality_score", "coherence_score", "internal_consistency",
+            "trajectory_confidence", "volatility_index", "action_reversibility",
+        ]
+        if signals.session_enrichment_adjustment != 0.0:
+            signals_used.append("session_enrichment_adjustment")
 
         return UnifiedConfidence(
             overall=overall,
@@ -399,10 +420,7 @@ class ConfidenceAggregator:
             coherence_component=coherence_component,
             stability_component=stability_component,
             action_component=action_component,
-            signals_used=[
-                "quality_score", "coherence_score", "internal_consistency",
-                "trajectory_confidence", "volatility_index", "action_reversibility",
-            ],
+            signals_used=signals_used,
             weights_applied={
                 "quality": self.weights.quality,
                 "coherence": self.weights.coherence,

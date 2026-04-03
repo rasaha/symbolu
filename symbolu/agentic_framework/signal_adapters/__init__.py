@@ -2,11 +2,13 @@
 Signal Adapters — Governance-time and output-time signal resolution.
 
 These adapters bridge runtime signal modules (chitta_vritti, entropy,
-DHA, guna_modulation) into the governance and output paths, with
-graceful fallback when real signals are unavailable.
+DHA, guna_modulation, identity, motivation, temporal) into the
+governance and output paths, with graceful fallback when real signals
+are unavailable.
 
 Phase 1: Governance signal rewiring.
 Phase 2: Output modulation path wiring.
+Phase 3: Session enrichment → governance integration.
 """
 
 from agentic.agentic_framework.signal_adapters.vritti_adapter import (
@@ -22,6 +24,10 @@ from agentic.agentic_framework.signal_adapters.output_modulation_adapter import 
     resolve_output_modulation,
     OutputModulationResolution,
 )
+from agentic.agentic_framework.signal_adapters.session_enrichment_adapter import (
+    resolve_session_enrichment,
+    SessionEnrichmentResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -31,4 +37,6 @@ __all__ = [
     "EntropyResolution",
     "resolve_output_modulation",
     "OutputModulationResolution",
+    "resolve_session_enrichment",
+    "SessionEnrichmentResolution",
 ]

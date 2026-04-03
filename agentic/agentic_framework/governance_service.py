@@ -85,6 +85,10 @@ from agentic.agentic_framework.signal_adapters.entropy_adapter import (
     resolve_entropy_signal,
     EntropyResolution,
 )
+from agentic.agentic_framework.signal_adapters.session_enrichment_adapter import (
+    resolve_session_enrichment,
+    SessionEnrichmentResolution,
+)
 from agentic.agentic_framework.domain_policy import (
     DomainActionMode,
     DomainPolicyResult,
@@ -176,6 +180,7 @@ def _build_confidence_signals(
     request: AuthorizationRequest,
     risk_level: ToolRiskLevel,
     policy_resolution: Optional[PolicyResolution] = None,
+    session_enrichment: Optional[SessionEnrichmentResolution] = None,
 ) -> ConfidenceSignals:
     """Build ConfidenceSignals from external request + risk classification."""
     if policy_resolution is not None:
@@ -212,6 +217,30 @@ def _build_confidence_signals(
             ToolRiskLevel.PRIVILEGED: 0.2,
         }
 
+    # Phase 3: Compute session enrichment fields
+    identity_stability = 0.5
+    motivation_stability = 0.5
+    temporal_stability = 0.5
+    enrichment_adj = 0.0
+    if session_enrichment is not None:
+        # Identity: unstable → lower stability score
+        if session_enrichment.identity_unstable:
+            identity_stability = max(0.0, 1.0 - (session_enrichment.identity_confidence or 0.5))
+        elif session_enrichment.identity_type is not None:
+            identity_stability = min(1.0, 0.5 + (session_enrichment.identity_confidence or 0.0) * 0.5)
+        # Motivation: risk-relevant → lower stability score
+        if session_enrichment.motivation_risk_relevant:
+            motivation_stability = max(0.0, 1.0 - (session_enrichment.motivation_confidence or 0.5))
+        elif session_enrichment.motivation_type is not None:
+            motivation_stability = min(1.0, 0.5 + (session_enrichment.motivation_confidence or 0.0) * 0.5)
+        # Temporal: tense → lower stability score
+        if session_enrichment.temporal_tense:
+            ti = session_enrichment.temporal_tension_index
+            temporal_stability = max(0.0, 1.0 - (ti if ti is not None else 0.5))
+        elif session_enrichment.temporal_state is not None:
+            temporal_stability = 0.7  # non-tense known state
+        enrichment_adj = session_enrichment.confidence_adjustment
+
     return ConfidenceSignals(
         quality_score=request.quality_score,
         coherence_score=request.coherence_score,
@@ -226,6 +255,10 @@ def _build_confidence_signals(
         session_stability=0.5,
         action_complexity=complexity_map.get(risk_level, 0.5),
         action_reversibility=reversibility_map.get(risk_level, 0.5),
+        identity_stability=identity_stability,
+        motivation_stability=motivation_stability,
+        temporal_stability=temporal_stability,
+        session_enrichment_adjustment=enrichment_adj,
     )
 
 
@@ -443,6 +476,32 @@ def _resolve_entropy(
     )
 
 
+def _resolve_session_enrichment(
+    request: AuthorizationRequest,
+) -> SessionEnrichmentResolution:
+    """Resolve session enrichment signals for governance use.
+
+    Phase 3: Brings identity, motivation, and temporal signals into
+    the governance decision context as bounded confidence adjustments.
+
+    Signals are extracted from request.metadata with well-known keys.
+    Missing signals contribute zero penalty (fail-closed).
+
+    Args:
+        request: Authorization request (may carry session signals in .metadata).
+
+    Returns:
+        SessionEnrichmentResolution with all resolved signals.
+    """
+    metadata = getattr(request, "metadata", None) or {}
+    return resolve_session_enrichment(
+        identity_signature=metadata.get("identity_signature"),
+        identity_resonance_state=metadata.get("identity_resonance_state"),
+        motivation_profile=metadata.get("motivation_profile"),
+        temporal_summary=metadata.get("temporal_summary"),
+        coherence_state=metadata.get("coherence_state"),
+    )
+
 
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
@@ -453,6 +512,7 @@ def _build_rationale_codes(
     jepa_assessment: Optional["JEPAGovernanceAssessment"] = None,
     jepa_overrode: bool = False,
     domain_result: Optional["DomainPolicyResult"] = None,
+    session_enrichment: Optional[SessionEnrichmentResolution] = None,
 ) -> List[str]:
     """Build machine-readable rationale codes."""
     codes: List[str] = []
@@ -482,6 +542,11 @@ def _build_rationale_codes(
         codes.append(f"DOMAIN:{domain_result.domain_id}:{domain_result.mode.value}")
         for rc in domain_result.reason_codes:
             codes.append(f"DOMAIN_DETAIL:{rc}")
+
+    # Phase 3: Session enrichment reason codes
+    if session_enrichment is not None:
+        for rc in session_enrichment.reason_codes:
+            codes.append(rc)
 
     codes.append(f"RISK_LEVEL:{risk_level.value}")
     codes.append(f"DECISION:{governance_decision.value}")
@@ -684,9 +749,13 @@ class GovernanceService:
             request.capabilities, forbidden=policy_forbidden,
         )
 
+        # Step 2b: Resolve session enrichment signals (Phase 3)
+        session_enrichment = _resolve_session_enrichment(request)
+
         # Step 3: Build confidence signals and evaluate gate
         signals = _build_confidence_signals(
             request, risk_level, policy_resolution=self._policy_resolution,
+            session_enrichment=session_enrichment,
         )
         gate_decision = self.gate.evaluate(signals, tool_name)
 
@@ -867,7 +936,7 @@ class GovernanceService:
         rationale_codes = _build_rationale_codes(
             safety_summary, gate_decision, risk_level, forbidden_cap,
             governance_decision, jepa_assessment, jepa_overrode,
-            domain_result,
+            domain_result, session_enrichment,
         )
         # Add shadow reason codes
         if shadow_assessment is not None:
@@ -948,6 +1017,15 @@ class GovernanceService:
                     self._policy_resolution.effective_policy.to_audit_dict()
                     if self._policy_resolution is not None else None
                 ),
+                # Phase 3: Session enrichment provenance
+                "session_identity_type": session_enrichment.identity_type,
+                "session_identity_unstable": session_enrichment.identity_unstable,
+                "session_motivation_type": session_enrichment.motivation_type,
+                "session_motivation_risk": session_enrichment.motivation_risk_relevant,
+                "session_temporal_state": session_enrichment.temporal_state,
+                "session_temporal_tense": session_enrichment.temporal_tense,
+                "session_confidence_adjustment": session_enrichment.confidence_adjustment,
+                "session_enrichment_detail": session_enrichment.source_detail,
             },
             shadow_assessment=shadow_audit,
         )
@@ -1000,6 +1078,14 @@ class GovernanceService:
                 domain_id=self._domain_id,
                 tenant_id=getattr(request, "tenant_id", None),
                 session_id=getattr(request, "session_id", None),
+                # Phase 3: Session enrichment context
+                session_identity_type=session_enrichment.identity_type,
+                session_identity_unstable=session_enrichment.identity_unstable,
+                session_motivation_type=session_enrichment.motivation_type,
+                session_motivation_risk=session_enrichment.motivation_risk_relevant,
+                session_temporal_state=session_enrichment.temporal_state,
+                session_temporal_tense=session_enrichment.temporal_tense,
+                session_confidence_adjustment=session_enrichment.confidence_adjustment,
             )
 
             try:

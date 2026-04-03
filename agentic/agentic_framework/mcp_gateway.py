@@ -261,6 +261,16 @@ class AuditEntry:
     entropy_gate: Optional[str] = None
     entropy_detail: Optional[str] = None
 
+    # Phase 3: Session enrichment provenance
+    session_identity_type: Optional[str] = None
+    session_identity_unstable: Optional[bool] = None
+    session_motivation_type: Optional[str] = None
+    session_motivation_risk: Optional[bool] = None
+    session_temporal_state: Optional[str] = None
+    session_temporal_tense: Optional[bool] = None
+    session_confidence_adjustment: Optional[float] = None
+    session_enrichment_detail: Optional[str] = None
+
 
 # =============================================================================
 # Tool Risk Classification
@@ -833,6 +843,7 @@ class SafeMCPGateway:
         shadow_overrode: bool = False,
         vritti_resolution: Optional[VrittiResolution] = None,
         entropy_resolution: Optional[EntropyResolution] = None,
+        session_enrichment: Optional[Any] = None,
     ) -> None:
         """Log audit entry to in-memory cache and durable store."""
         if not self.audit_enabled:
@@ -909,6 +920,31 @@ class SafeMCPGateway:
             ),
             entropy_detail=(
                 entropy_resolution.source_detail if entropy_resolution else None
+            ),
+            # Phase 3: Session enrichment provenance
+            session_identity_type=(
+                session_enrichment.identity_type if session_enrichment else None
+            ),
+            session_identity_unstable=(
+                session_enrichment.identity_unstable if session_enrichment else None
+            ),
+            session_motivation_type=(
+                session_enrichment.motivation_type if session_enrichment else None
+            ),
+            session_motivation_risk=(
+                session_enrichment.motivation_risk_relevant if session_enrichment else None
+            ),
+            session_temporal_state=(
+                session_enrichment.temporal_state if session_enrichment else None
+            ),
+            session_temporal_tense=(
+                session_enrichment.temporal_tense if session_enrichment else None
+            ),
+            session_confidence_adjustment=(
+                session_enrichment.confidence_adjustment if session_enrichment else None
+            ),
+            session_enrichment_detail=(
+                session_enrichment.source_detail if session_enrichment else None
             ),
         )
         self.audit_log.append(entry)
