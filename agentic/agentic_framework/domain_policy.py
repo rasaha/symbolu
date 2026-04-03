@@ -51,6 +51,29 @@ class DomainActionMode(enum.Enum):
 
     Ordered from most permissive to most restrictive.
     The integer value encodes severity for comparison.
+
+    ENFORCEMENT TIERS — the 7 semantic modes collapse into 3 distinct
+    enforcement behaviors at the execution layer:
+
+    Tier A (ALLOW):
+        ALLOW              → proceed without restriction
+
+    Tier B (DEFER / ESCALATE):
+        READ_ONLY          → block non-read tools, escalate reads
+        DRAFT_ONLY         → block non-read tools, escalate reads
+        CONFIRM_REQUIRED   → escalate (require human confirmation)
+        SANDBOX_ONLY       → escalate (require human confirmation)
+        MEMORY_WRITE_DENIED→ escalate (require human confirmation)
+
+    Tier C (BLOCK):
+        BLOCKED            → hard block, no execution
+
+    Within Tier B, READ_ONLY and DRAFT_ONLY additionally gate on the
+    tool's risk level (only READ_ONLY tools may proceed); the other
+    three unconditionally escalate.  Despite the semantic distinction,
+    CONFIRM_REQUIRED / SANDBOX_ONLY / MEMORY_WRITE_DENIED produce
+    identical enforcement (escalate).  The semantic labels exist to
+    communicate *intent* to human reviewers and audit consumers.
     """
     ALLOW = "allow"                       # 0 - proceed without restriction
     READ_ONLY = "read_only"               # 1 - only reads permitted
@@ -480,19 +503,28 @@ class DomainPolicyInterpreter:
         tool_name: str,
         regime: GovernanceRegime,
     ) -> Optional[DomainActionMode]:
-        """Resolve tool permission for the given tool and regime."""
+        """Resolve tool permission for the given tool and regime.
+
+        Uses most-restrictive-match semantics: ALL matching patterns are
+        evaluated and the strictest result wins.  This prevents broad
+        patterns (e.g. ``file_*`` ALLOW) from shadowing narrow block
+        patterns (e.g. ``file_delete`` BLOCKED).
+        """
         if not tool_name:
             return None
+        result: Optional[DomainActionMode] = None
         for perm in self._tool_perms:
             if _tool_matches(perm.tool_pattern, tool_name):
-                # Check if blocked in this regime
+                # Determine mode for this matching permission
                 if regime in perm.blocked_in_regimes:
-                    return DomainActionMode.BLOCKED
-                # Check if regime is required but not present
-                if perm.requires_regime and regime not in perm.requires_regime:
-                    return DomainActionMode.BLOCKED
-                return perm.max_mode
-        return None
+                    mode = DomainActionMode.BLOCKED
+                elif perm.requires_regime and regime not in perm.requires_regime:
+                    mode = DomainActionMode.BLOCKED
+                else:
+                    mode = perm.max_mode
+                # Merge: strictest wins
+                result = _stricter(result, mode) if result is not None else mode
+        return result
 
     def _check_thresholds(
         self,

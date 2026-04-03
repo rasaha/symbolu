@@ -645,6 +645,8 @@ def event_from_mcp_audit(
     jepa_execution_mode_override: Optional[str] = None,
     jepa_escalation_override: Optional[str] = None,
     jepa_overrode: bool = False,
+    domain_policy: Optional[Dict[str, Any]] = None,
+    domain_overrode: bool = False,
 ) -> GovernanceAuditEvent:
     """Create a GovernanceAuditEvent from MCP gateway audit data.
 
@@ -667,6 +669,11 @@ def event_from_mcp_audit(
         snapshot["jepa_execution_mode_override"] = jepa_execution_mode_override
         snapshot["jepa_escalation_override"] = jepa_escalation_override
         snapshot["jepa_overrode"] = jepa_overrode
+
+    # Embed domain policy data in the snapshot for durable persistence
+    if domain_policy is not None:
+        snapshot["domain_policy"] = domain_policy
+        snapshot["domain_overrode"] = domain_overrode
 
     return GovernanceAuditEvent(
         event_id=request_id or create_event_id(),

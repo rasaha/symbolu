@@ -131,7 +131,7 @@ def _make_residual(regime=GovernanceRegime.NORMAL, magnitude=0.1,
         action_state_coherence=coherence,
         regime=regime,
         risk_factors=(),
-        reason_codes=("REGIME_NORMAL",),
+        reason_codes=(f"REGIME_{regime.value.upper()}",),
         explanation="test",
     )
 
@@ -154,13 +154,21 @@ def _make_assessment(
                                 alignment, confidence)
     runtime = _make_runtime(action_cat, tool_name)
     residual = _make_residual(regime, residual_magnitude)
+    # Use regime-appropriate reason codes (F19)
+    _REGIME_REASON = {
+        GovernanceRegime.NORMAL: ("REGIME_NORMAL",),
+        GovernanceRegime.PROCESS_DRIFT: ("REGIME_PROCESS_DRIFT",),
+        GovernanceRegime.SEMANTIC_SHIFT: ("REGIME_SEMANTIC_SHIFT",),
+        GovernanceRegime.DUAL_ANOMALY: ("REGIME_DUAL_ANOMALY",),
+        GovernanceRegime.UNKNOWN: ("REGIME_UNKNOWN",),
+    }
     return JEPAGovernanceAssessment(
         regime=regime,
         recommended_action=action,
         execution_mode_override=exec_override,
         escalation_override=esc_override,
         confidence_adjustment=conf_adj,
-        reason_codes=("REGIME_NORMAL",),
+        reason_codes=_REGIME_REASON.get(regime, (f"REGIME_{regime.value.upper()}",)),
         rationale="test",
         jepa_composite=composite,
         runtime_state=runtime,
@@ -714,9 +722,10 @@ class TestFinanceProfile:
         result = interp.interpret(_make_assessment(
             action_cat=RuntimeActionCategory.MUTATING,
         ))
-        # Finance blocks mutating via blocked_action_categories or matrix
-        # Matrix says CONFIRM_REQUIRED, but vritti guard may block if not pramana
-        assert result.mode.severity >= DomainActionMode.CONFIRM_REQUIRED.severity
+        # Finance matrix: (NORMAL, MUTATING) -> CONFIRM_REQUIRED
+        # finance_low_confidence_write fires (conf 0.9 >= 0.7) -> ALLOW
+        # Strictest wins -> CONFIRM_REQUIRED
+        assert result.mode == DomainActionMode.CONFIRM_REQUIRED
 
     def test_destructive_always_blocked(self):
         interp = DomainPolicyInterpreter(FINANCE_PROFILE)
@@ -785,8 +794,9 @@ class TestDevOpsProfile:
         result = interp.interpret(_make_assessment(
             action_cat=RuntimeActionCategory.DESTRUCTIVE,
         ))
-        # Matrix says CONFIRM_REQUIRED, rule says SANDBOX_ONLY
-        assert result.mode.severity >= DomainActionMode.CONFIRM_REQUIRED.severity
+        # Matrix: CONFIRM_REQUIRED (3), rule devops_sandbox_destructive: SANDBOX_ONLY (4)
+        # Strictest wins -> SANDBOX_ONLY
+        assert result.mode == DomainActionMode.SANDBOX_ONLY
 
     def test_drift_writes_draft_only(self):
         interp = DomainPolicyInterpreter(DEVOPS_PROFILE)
@@ -795,7 +805,8 @@ class TestDevOpsProfile:
             action="DEGRADE",
             action_cat=RuntimeActionCategory.MUTATING,
         ))
-        assert result.mode.severity >= DomainActionMode.DRAFT_ONLY.severity
+        # Matrix: (PROCESS_DRIFT, MUTATING) -> DRAFT_ONLY
+        assert result.mode == DomainActionMode.DRAFT_ONLY
 
     def test_deploy_blocked_in_drift(self):
         interp = DomainPolicyInterpreter(DEVOPS_PROFILE)
@@ -833,7 +844,8 @@ class TestResearchProfile:
         result = interp.interpret(_make_assessment(
             action_cat=RuntimeActionCategory.MUTATING,
         ))
-        assert result.mode.severity >= DomainActionMode.DRAFT_ONLY.severity
+        # Matrix: (NORMAL, MUTATING) -> DRAFT_ONLY; no stricter source fires
+        assert result.mode == DomainActionMode.DRAFT_ONLY
 
     def test_destructive_blocked(self):
         interp = DomainPolicyInterpreter(RESEARCH_PROFILE)
@@ -858,8 +870,9 @@ class TestResearchProfile:
             action="DEGRADE",
             action_cat=RuntimeActionCategory.READ_ONLY,
         ))
-        # research_memory_deny_on_drift rule fires
-        assert any("research_memory_deny_on_drift" in r for r in result.fired_rules)
+        # research_memory_deny_on_drift rule fires -> MEMORY_WRITE_DENIED
+        assert "research_memory_deny_on_drift" in result.fired_rules
+        assert result.mode == DomainActionMode.MEMORY_WRITE_DENIED
 
 
 # =========================================================================
@@ -1033,13 +1046,14 @@ class TestMCPGatewayDomainIntegration:
     @pytest.mark.asyncio
     async def test_gateway_without_domain_unchanged(self):
         """MCP gateway without domain registry works as before."""
+        from unittest.mock import AsyncMock
         from agentic.agentic_framework.mcp_gateway import (
             SafeMCPGateway, MCPToolCall, MCPToolDefinition,
-            ToolRiskLevel,
+            ToolRiskLevel, GatewayDecision,
         )
 
         mock_client = MagicMock()
-        mock_client.call_tool = MagicMock(return_value="result")
+        mock_client.call_tool = AsyncMock(return_value="result")
         gateway = SafeMCPGateway(mcp_client=mock_client)
         gateway.register_tool(MCPToolDefinition(
             name="file_read",
@@ -1053,8 +1067,14 @@ class TestMCPGatewayDomainIntegration:
             coherence_score=0.9,
         )
         result = await gateway.call_tool(tool_call)
-        # Should work without domain policy
-        assert result is not None
+        # Without domain policy, low-risk read should be ALLOWED
+        assert result.decision == GatewayDecision.ALLOWED
+        assert result.success is True
+        # Audit should have no domain info
+        if gateway.audit_log:
+            entry = gateway.audit_log[-1]
+            assert entry.domain_policy is None
+            assert entry.domain_overrode is False
 
 
 # =========================================================================
@@ -1140,3 +1160,287 @@ class TestResolveDomainPolicy:
         result = resolve_domain_policy(assessment, reg, "nonexistent")
         assert result.mode == DomainActionMode.BLOCKED
         assert "DOMAIN_UNAVAILABLE" in result.reason_codes
+
+    def test_resolve_domain_exception_fails_closed(self):
+        """When interpreter.interpret() raises, resolve_domain_policy returns BLOCKED."""
+        reg = MagicMock()
+        # get() returns a profile, but DomainPolicyInterpreter will fail
+        # because the profile is not a real DomainProfile
+        reg.get.return_value = MagicMock()
+        assessment = _make_assessment()
+        result = resolve_domain_policy(assessment, reg, "broken")
+        assert result.mode == DomainActionMode.BLOCKED
+        assert "DOMAIN_UNAVAILABLE" in result.reason_codes
+
+
+# =========================================================================
+# Test: Tool permission most-restrictive-match (F4/F15)
+# =========================================================================
+
+
+class TestToolPermissionPrecedence:
+
+    def test_specific_block_overrides_broad_allow(self):
+        """Narrow BLOCKED pattern must not be shadowed by broad ALLOW pattern."""
+        profile = DomainProfile(
+            domain_id="test", display_name="Test",
+            tool_permissions=(
+                DomainToolPermission(
+                    tool_pattern="file_*",
+                    max_mode=DomainActionMode.ALLOW,
+                ),
+                DomainToolPermission(
+                    tool_pattern="file_delete",
+                    max_mode=DomainActionMode.BLOCKED,
+                ),
+            ),
+        )
+        interp = DomainPolicyInterpreter(profile)
+        result = interp.interpret(_make_assessment(), tool_name="file_delete")
+        # Most-restrictive-match: BLOCKED wins over ALLOW
+        assert result.tool_mode == DomainActionMode.BLOCKED
+
+    def test_broad_block_overrides_specific_allow(self):
+        """Broad BLOCKED pattern wins over narrow ALLOW pattern."""
+        profile = DomainProfile(
+            domain_id="test", display_name="Test",
+            tool_permissions=(
+                DomainToolPermission(
+                    tool_pattern="deploy_staging",
+                    max_mode=DomainActionMode.ALLOW,
+                ),
+                DomainToolPermission(
+                    tool_pattern="deploy_*",
+                    max_mode=DomainActionMode.BLOCKED,
+                ),
+            ),
+        )
+        interp = DomainPolicyInterpreter(profile)
+        result = interp.interpret(_make_assessment(), tool_name="deploy_staging")
+        assert result.tool_mode == DomainActionMode.BLOCKED
+
+    def test_single_match_returns_that_mode(self):
+        """A single matching permission returns its max_mode directly."""
+        profile = DomainProfile(
+            domain_id="test", display_name="Test",
+            tool_permissions=(
+                DomainToolPermission(
+                    tool_pattern="git_*",
+                    max_mode=DomainActionMode.CONFIRM_REQUIRED,
+                ),
+            ),
+        )
+        interp = DomainPolicyInterpreter(profile)
+        result = interp.interpret(_make_assessment(), tool_name="git_push")
+        assert result.tool_mode == DomainActionMode.CONFIRM_REQUIRED
+
+    def test_no_match_returns_no_tool_mode(self):
+        """Non-matching tool returns None for tool_mode."""
+        profile = DomainProfile(
+            domain_id="test", display_name="Test",
+            tool_permissions=(
+                DomainToolPermission(
+                    tool_pattern="git_*",
+                    max_mode=DomainActionMode.ALLOW,
+                ),
+            ),
+        )
+        interp = DomainPolicyInterpreter(profile)
+        result = interp.interpret(_make_assessment(), tool_name="db_query")
+        assert result.tool_mode is None
+
+
+# =========================================================================
+# Test: GovernanceService domain rationale propagation (F6/F14)
+# =========================================================================
+
+
+class TestGovernanceServiceDomainRationale:
+
+    def _make_service(self, domain_id=None):
+        from agentic.agentic_framework.governance_service import GovernanceService
+        if domain_id:
+            registry = create_default_registry()
+            return GovernanceService(
+                domain_registry=registry,
+                domain_id=domain_id,
+            )
+        return GovernanceService()
+
+    def _make_request(self, **kwargs):
+        from agentic.agentic_framework.governance_models import AuthorizationRequest
+        tool = kwargs.pop("tool_name", "file_read")
+        defaults = dict(
+            actor_id="test",
+            action_type=kwargs.pop("action_type", tool),
+            tool_name=tool,
+            quality_score=0.9,
+            coherence_score=0.9,
+            internal_consistency=0.9,
+            goal_alignment=0.9,
+            trajectory_confidence=0.9,
+        )
+        defaults.update(kwargs)
+        return AuthorizationRequest(**defaults)
+
+    def test_rationale_codes_include_domain_when_configured(self):
+        """With domain, rationale_codes must include DOMAIN: prefix."""
+        service = self._make_service("finance")
+        request = self._make_request(tool_name="db_drop", action_type="database_delete")
+        response = service.authorize(request)
+        domain_codes = [c for c in response.rationale_codes if c.startswith("DOMAIN:")]
+        assert len(domain_codes) > 0, "Expected DOMAIN: rationale codes"
+
+    def test_rationale_codes_exclude_domain_when_unconfigured(self):
+        """Without domain, rationale_codes must not include DOMAIN: prefix."""
+        service = self._make_service()
+        request = self._make_request(tool_name="db_drop", action_type="database_delete")
+        response = service.authorize(request)
+        domain_codes = [c for c in response.rationale_codes if c.startswith("DOMAIN:")]
+        assert len(domain_codes) == 0, "Unexpected DOMAIN: rationale codes"
+
+    def test_rationale_string_includes_domain_when_active(self):
+        """With domain, rationale string should mention domain policy."""
+        service = self._make_service("finance")
+        request = self._make_request(tool_name="db_drop", action_type="database_delete")
+        response = service.authorize(request)
+        # Finance blocks destructive, so domain should appear in rationale
+        assert "Domain policy" in response.rationale or "finance" in response.rationale
+
+    def test_paired_with_without_domain(self):
+        """Same request with and without domain: domain version is never less restrictive."""
+        from agentic.agentic_framework.governance_models import APIGovernanceDecision
+        service_plain = self._make_service()
+        service_domain = self._make_service("finance")
+        request = self._make_request(tool_name="ledger_write")
+        resp_plain = service_plain.authorize(request)
+        resp_domain = service_domain.authorize(request)
+        # Domain can only restrict, not relax. Map to severity.
+        _DECISION_SEV = {"ALLOW": 0, "DEFER": 1, "DENY": 2}
+        plain_sev = _DECISION_SEV.get(resp_plain.governance_decision.value, 0)
+        domain_sev = _DECISION_SEV.get(resp_domain.governance_decision.value, 0)
+        assert domain_sev >= plain_sev, (
+            f"Domain version ({resp_domain.governance_decision.value}) "
+            f"is less restrictive than plain ({resp_plain.governance_decision.value})"
+        )
+
+
+# =========================================================================
+# Test: MCP audit captures domain policy (F1/F12)
+# =========================================================================
+
+
+class TestMCPAuditDomainFields:
+
+    @pytest.mark.asyncio
+    async def test_audit_entry_includes_domain_policy(self):
+        """MCP audit entry must include domain_policy dict when domain configured."""
+        from agentic.agentic_framework.mcp_gateway import (
+            SafeMCPGateway, MCPToolCall, MCPToolDefinition,
+            ToolRiskLevel,
+        )
+
+        mock_client = MagicMock()
+        mock_client.call_tool = MagicMock(return_value="result")
+        registry = create_default_registry()
+        gateway = SafeMCPGateway(
+            mcp_client=mock_client,
+            domain_registry=registry,
+            domain_id="finance",
+        )
+        gateway.register_tool(MCPToolDefinition(
+            name="ledger_write",
+            description="Write to ledger",
+            risk_level=ToolRiskLevel.WRITE,
+            capabilities=["ledger_write"],
+        ))
+        tool_call = MCPToolCall(
+            tool_name="ledger_write",
+            parameters={"entry": "test"},
+            quality_score=0.9,
+            coherence_score=0.9,
+        )
+        result = await gateway.call_tool(tool_call)
+        # Should have audit entries
+        assert len(gateway.audit_log) > 0
+        entry = gateway.audit_log[-1]
+        # Domain policy must be present in audit
+        assert entry.domain_policy is not None
+        assert entry.domain_policy["domain_id"] == "finance"
+        assert "mode" in entry.domain_policy
+
+    @pytest.mark.asyncio
+    async def test_audit_entry_no_domain_when_unconfigured(self):
+        """MCP audit entry must have domain_policy=None when no domain configured."""
+        from agentic.agentic_framework.mcp_gateway import (
+            SafeMCPGateway, MCPToolCall, MCPToolDefinition,
+            ToolRiskLevel,
+        )
+
+        mock_client = MagicMock()
+        mock_client.call_tool = MagicMock(return_value="result")
+        gateway = SafeMCPGateway(mcp_client=mock_client)
+        gateway.register_tool(MCPToolDefinition(
+            name="file_read",
+            description="Read file",
+            risk_level=ToolRiskLevel.READ_ONLY,
+        ))
+        tool_call = MCPToolCall(
+            tool_name="file_read",
+            parameters={"path": "/tmp/test"},
+            quality_score=0.9,
+            coherence_score=0.9,
+        )
+        result = await gateway.call_tool(tool_call)
+        assert len(gateway.audit_log) > 0
+        entry = gateway.audit_log[-1]
+        assert entry.domain_policy is None
+        assert entry.domain_overrode is False
+
+
+# =========================================================================
+# Test: MCP domain runs for non-NORMAL regimes (F3)
+# =========================================================================
+
+
+class TestMCPDomainNonNormalRegime:
+
+    @pytest.mark.asyncio
+    async def test_domain_present_in_audit_during_drift(self):
+        """Domain policy should appear in MCP audit even when JEPA blocks for non-NORMAL."""
+        from agentic.agentic_framework.mcp_gateway import (
+            SafeMCPGateway, MCPToolCall, MCPToolDefinition,
+            ToolRiskLevel, GatewayDecision,
+        )
+
+        mock_client = MagicMock()
+        registry = create_default_registry()
+        gateway = SafeMCPGateway(
+            mcp_client=mock_client,
+            domain_registry=registry,
+            domain_id="finance",
+        )
+        gateway.register_tool(MCPToolDefinition(
+            name="ledger_write",
+            description="Write to ledger",
+            risk_level=ToolRiskLevel.WRITE,
+            capabilities=["ledger_write"],
+        ))
+        tool_call = MCPToolCall(
+            tool_name="ledger_write",
+            parameters={"entry": "test"},
+            quality_score=0.3,  # Low quality → likely non-NORMAL regime
+            coherence_score=0.3,
+        )
+        result = await gateway.call_tool(tool_call)
+        # Should be blocked (either by JEPA or domain)
+        assert result.decision in (
+            GatewayDecision.BLOCKED,
+            GatewayDecision.ESCALATE,
+        )
+        # Audit should always include domain info
+        assert len(gateway.audit_log) > 0
+        entry = gateway.audit_log[-1]
+        assert entry.domain_policy is not None, (
+            "Domain policy missing from MCP audit during non-NORMAL regime"
+        )

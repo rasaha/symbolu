@@ -352,6 +352,7 @@ def _build_rationale_codes(
     governance_decision: APIGovernanceDecision,
     jepa_assessment: Optional["JEPAGovernanceAssessment"] = None,
     jepa_overrode: bool = False,
+    domain_result: Optional["DomainPolicyResult"] = None,
 ) -> List[str]:
     """Build machine-readable rationale codes."""
     codes: List[str] = []
@@ -376,6 +377,12 @@ def _build_rationale_codes(
         for rc in jepa_assessment.reason_codes:
             codes.append(f"JEPA:{rc}")
 
+    # Domain policy rationale codes
+    if domain_result is not None:
+        codes.append(f"DOMAIN:{domain_result.domain_id}:{domain_result.mode.value}")
+        for rc in domain_result.reason_codes:
+            codes.append(f"DOMAIN_DETAIL:{rc}")
+
     codes.append(f"RISK_LEVEL:{risk_level.value}")
     codes.append(f"DECISION:{governance_decision.value}")
 
@@ -390,6 +397,7 @@ def _build_rationale_string(
     forbidden_cap: Optional[str],
     jepa_assessment: Optional["JEPAGovernanceAssessment"] = None,
     jepa_overrode: bool = False,
+    domain_result: Optional["DomainPolicyResult"] = None,
 ) -> str:
     """Build human-readable rationale string."""
     parts: List[str] = []
@@ -425,6 +433,13 @@ def _build_rationale_string(
         parts.append(
             f"JEPA regime: {jepa_assessment.regime.value} "
             f"(no override applied)."
+        )
+
+    # Domain policy rationale
+    if domain_result is not None and domain_result.mode != DomainActionMode.ALLOW:
+        parts.append(
+            f"Domain policy '{domain_result.domain_id}': "
+            f"mode={domain_result.mode.value}. {domain_result.rationale}"
         )
 
     if governance_decision == APIGovernanceDecision.ALLOW:
@@ -631,7 +646,10 @@ class GovernanceService:
                 if governance_decision == APIGovernanceDecision.ALLOW:
                     governance_decision = APIGovernanceDecision.DEFER
                     eligible = False
-                effective_requires_human = True
+                # Only set requires_human when the decision is not already
+                # DENY — a denied request needs no human confirmation.
+                if governance_decision != APIGovernanceDecision.DENY:
+                    effective_requires_human = True
             elif domain_result.mode in (
                 DomainActionMode.READ_ONLY,
                 DomainActionMode.DRAFT_ONLY,
@@ -640,14 +658,16 @@ class GovernanceService:
                     governance_decision = APIGovernanceDecision.DEFER
                     eligible = False
 
-        # Step 6: Build rationale (includes JEPA information)
+        # Step 6: Build rationale (includes JEPA and domain information)
         rationale_codes = _build_rationale_codes(
             safety_summary, gate_decision, risk_level, forbidden_cap,
             governance_decision, jepa_assessment, jepa_overrode,
+            domain_result,
         )
         rationale = _build_rationale_string(
             governance_decision, safety_summary, gate_decision, risk_level,
             forbidden_cap, jepa_assessment, jepa_overrode,
+            domain_result,
         )
 
         # Step 7: Build confidence gate summary (with JEPA adjustments)
