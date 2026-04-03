@@ -333,6 +333,21 @@ class AuthorizationResponse(BaseModel):
                     "Present when shadow policy evaluation ran.",
     )
 
+    # Approval Workflow Layer
+    approval_required: bool = Field(
+        False,
+        description="Whether this decision requires an approval workflow. "
+                    "True when governance_decision is DEFER and requires_human_approval.",
+    )
+    approval_id: Optional[str] = Field(
+        None,
+        description="ID of the created ApprovalRequest, if approval_required is True.",
+    )
+    approval_summary: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Summary of the approval request (status, level, expiry).",
+    )
+
     # Control flags
     dry_run: bool = Field(
         False, description="Whether this was a dry-run evaluation",

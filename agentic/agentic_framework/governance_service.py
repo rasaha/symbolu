@@ -95,6 +95,12 @@ from agentic.agentic_framework.shadow_ai import (
 from agentic.agentic_framework.policy_bundle import (
     PolicyResolution,
 )
+from agentic.agentic_framework.approval_workflow import (
+    ApprovalContext,
+    ApprovalLevel,
+    ApprovalStore,
+    ApprovalStoreError,
+)
 
 import logging as _logging
 
@@ -532,6 +538,7 @@ class GovernanceService:
         domain_id: Optional[str] = None,
         shadow_registry: Optional[ShadowRegistry] = None,
         policy_resolution: Optional[PolicyResolution] = None,
+        approval_store: Optional[ApprovalStore] = None,
     ):
         """
         Initialize governance service.
@@ -555,6 +562,9 @@ class GovernanceService:
                 Externalization Layer.  When provided, safety thresholds,
                 forbidden capabilities, and risk mappings are sourced from
                 the resolved policy instead of hardcoded defaults.
+            approval_store: Optional ApprovalStore for durable approval workflow.
+                When provided, DEFER+requires_human decisions create persistent
+                approval requests with auditable state transitions.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -580,6 +590,9 @@ class GovernanceService:
 
         # Policy Externalization Layer
         self._policy_resolution: Optional[PolicyResolution] = policy_resolution
+
+        # Approval Workflow Layer
+        self._approval_store: Optional[ApprovalStore] = approval_store
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -879,7 +892,70 @@ class GovernanceService:
         )
         self._persist_audit_event(audit_event)
 
-        # Step 9: Assemble response (uses JEPA-adjusted fields)
+        # Step 9: Create approval request if needed
+        approval_required = (
+            effective_requires_human
+            and governance_decision in (
+                APIGovernanceDecision.DEFER,
+                APIGovernanceDecision.DENY,
+            )
+        )
+        approval_id = None
+        approval_summary = None
+
+        if approval_required and self._approval_store is not None:
+            # Map escalation level to approval level
+            _esc_to_approval = {
+                "halt": ApprovalLevel.HALT,
+                "confirm": ApprovalLevel.CONFIRM,
+            }
+            approval_level = _esc_to_approval.get(
+                effective_esc_level.value, ApprovalLevel.CONFIRM,
+            )
+
+            approval_context = ApprovalContext(
+                governance_decision_id=decision_id,
+                action_type=request.action_type,
+                tool_name=request.tool_name or "",
+                actor_id=request.actor_id,
+                risk_level=risk_level.value,
+                confidence_score=effective_confidence,
+                escalation_level=effective_esc_level.value,
+                execution_mode=effective_exec_mode.value,
+                reason_codes=tuple(rationale_codes),
+                policy_id=(
+                    self._policy_resolution.effective_policy.metadata.policy_id
+                    if self._policy_resolution else None
+                ),
+                policy_version=(
+                    self._policy_resolution.effective_policy.metadata.version
+                    if self._policy_resolution else None
+                ),
+                domain_id=self._domain_id,
+                tenant_id=getattr(request, "tenant_id", None),
+                session_id=getattr(request, "session_id", None),
+            )
+
+            try:
+                approval_req = self._approval_store.create_request(
+                    context=approval_context,
+                    approval_level=approval_level,
+                )
+                approval_id = approval_req.approval_id
+                approval_summary = approval_req.to_summary_dict()
+            except ApprovalStoreError:
+                # FAIL-CLOSED: approval creation failed → DENY
+                _logger.error(
+                    "APPROVAL STORE FAILURE for decision %s — "
+                    "failing closed to DENY",
+                    decision_id,
+                    exc_info=True,
+                )
+                governance_decision = APIGovernanceDecision.DENY
+                eligible = False
+                rationale_codes.append("APPROVAL_STORE_FAILURE")
+
+        # Step 10: Assemble response (uses JEPA-adjusted fields)
         return AuthorizationResponse(
             governance_decision=governance_decision,
             eligible=eligible,
@@ -897,6 +973,9 @@ class GovernanceService:
             confidence_gate=confidence_summary,
             audit_event=audit_event,
             shadow_assessment=shadow_audit,
+            approval_required=approval_required,
+            approval_id=approval_id,
+            approval_summary=approval_summary,
             dry_run=request.dry_run,
             service_version=SERVICE_VERSION,
             decision_timestamp=timestamp,
