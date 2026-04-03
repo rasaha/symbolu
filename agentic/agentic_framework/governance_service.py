@@ -26,7 +26,7 @@ WHAT THIS MODULE DOES NOT DO:
     - Execute tools or actions
     - Call LLMs
     - Modify agent state
-    - Persist data (audit events returned in response, not stored)
+    - Persist data to durable audit store (GovernanceAuditStore)
 """
 
 from __future__ import annotations
@@ -62,6 +62,15 @@ from agentic.agentic_framework.governance_models import (
     ConfidenceGateSummary,
     SafetyContractSummary,
 )
+from agentic.ledger.governance_audit_store import (
+    GovernanceAuditStore,
+    GovernanceAuditError,
+    event_from_governance_decision,
+)
+
+import logging as _logging
+
+_logger = _logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -380,6 +389,7 @@ class GovernanceService:
         confidence_gate: Optional[ConfidenceGate] = None,
         risk_classifier: Optional[ToolRiskClassifier] = None,
         strict: bool = False,
+        audit_store: Optional[GovernanceAuditStore] = None,
     ):
         """
         Initialize governance service.
@@ -388,6 +398,9 @@ class GovernanceService:
             confidence_gate: Custom ConfidenceGate (default: standard or strict)
             risk_classifier: Custom ToolRiskClassifier (default: standard)
             strict: Use strict thresholds if no custom gate provided
+            audit_store: Durable audit store for persistence (default: None,
+                         in-memory only).  When provided, every audit event is
+                         persisted to the store in addition to the in-memory log.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -398,8 +411,11 @@ class GovernanceService:
 
         self.classifier = risk_classifier or ToolRiskClassifier()
 
-        # In-memory audit log (structured for future persistence)
+        # In-memory audit log (cache / view — still available for callers)
         self._audit_log: List[AuditEvent] = []
+
+        # Durable persistent audit store (source of truth when present)
+        self._audit_store: Optional[GovernanceAuditStore] = audit_store
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -497,7 +513,7 @@ class GovernanceService:
                 "coherence_score": request.coherence_score,
             },
         )
-        self._audit_log.append(audit_event)
+        self._persist_audit_event(audit_event)
 
         # Step 9: Assemble response
         return AuthorizationResponse(
@@ -566,7 +582,7 @@ class GovernanceService:
             blocked_reasons=[f"Internal error: {error}"],
             request_snapshot={"actor_id": request.actor_id, "action_type": request.action_type},
         )
-        self._audit_log.append(audit_event)
+        self._persist_audit_event(audit_event)
 
         return AuthorizationResponse(
             governance_decision=APIGovernanceDecision.DENY,
@@ -589,10 +605,57 @@ class GovernanceService:
             decision_timestamp=timestamp,
         )
 
+    def _persist_audit_event(self, audit_event: AuditEvent) -> None:
+        """Append to in-memory log and persist to durable store if available.
+
+        FAIL-CLOSED: If the durable store raises GovernanceAuditError, the
+        error propagates.  The in-memory append happens first so that callers
+        always see the event even if persistence fails (fail-closed decisions
+        are still recorded in the response object).
+        """
+        self._audit_log.append(audit_event)
+
+        if self._audit_store is not None:
+            canonical_event = event_from_governance_decision(
+                decision_id=audit_event.decision_id,
+                timestamp=audit_event.timestamp,
+                actor_id=audit_event.actor_id,
+                action_type=audit_event.action_type,
+                tool_name=audit_event.tool_name or "",
+                decision=audit_event.decision.value
+                    if hasattr(audit_event.decision, "value")
+                    else str(audit_event.decision),
+                risk_level=audit_event.risk_level.value
+                    if hasattr(audit_event.risk_level, "value")
+                    else str(audit_event.risk_level),
+                eligible=audit_event.eligible,
+                confidence=audit_event.confidence,
+                execution_mode=audit_event.execution_mode.value
+                    if hasattr(audit_event.execution_mode, "value")
+                    else str(audit_event.execution_mode),
+                escalation_level=audit_event.escalation_level.value
+                    if hasattr(audit_event.escalation_level, "value")
+                    else str(audit_event.escalation_level),
+                blocked_reasons=audit_event.blocked_reasons,
+                request_snapshot=audit_event.request_snapshot,
+            )
+            try:
+                self._audit_store.append(canonical_event)
+            except GovernanceAuditError:
+                _logger.error(
+                    "GOVERNANCE AUDIT PERSISTENCE FAILURE for decision %s — "
+                    "event recorded in-memory but NOT persisted durably",
+                    audit_event.decision_id,
+                    exc_info=True,
+                )
+                raise
+
     def get_audit_log(self, limit: int = 100) -> List[AuditEvent]:
-        """Get recent audit events."""
+        """Get recent audit events (from in-memory cache)."""
         return self._audit_log[-limit:]
 
     def get_audit_count(self) -> int:
         """Get total number of audit events."""
+        if self._audit_store is not None:
+            return self._audit_store.count()
         return len(self._audit_log)

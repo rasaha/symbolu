@@ -59,6 +59,11 @@ from agentic.agentic_framework.confidence_gate import (
     ExecutionMode,
     create_confidence_gate,
 )
+from agentic.ledger.governance_audit_store import (
+    GovernanceAuditStore,
+    GovernanceAuditError,
+    event_from_mcp_audit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -570,6 +575,7 @@ class SafeMCPGateway:
         tool_definitions: Optional[Dict[str, MCPToolDefinition]] = None,
         audit_enabled: bool = True,
         forbidden_capabilities: Optional[set] = None,
+        audit_store: Optional[GovernanceAuditStore] = None,
     ):
         """
         Initialize Safe MCP Gateway.
@@ -582,6 +588,9 @@ class SafeMCPGateway:
             tool_definitions: Explicit tool definitions (overrides auto-classification)
             audit_enabled: Whether to log all operations
             forbidden_capabilities: Capabilities to always block
+            audit_store: Durable audit store for persistence (default: None,
+                         in-memory only).  When provided, every audit entry is
+                         persisted to the store in addition to the in-memory log.
         """
         self.mcp_client = mcp_client
         self.gate = confidence_gate or create_confidence_gate()
@@ -591,8 +600,11 @@ class SafeMCPGateway:
         self.audit_enabled = audit_enabled
         self.forbidden_capabilities = forbidden_capabilities or ToolRiskClassifier.FORBIDDEN_CAPABILITIES
 
-        # Audit log
+        # In-memory audit log (cache / view)
         self.audit_log: List[AuditEntry] = []
+
+        # Durable persistent audit store (source of truth when present)
+        self._audit_store: Optional[GovernanceAuditStore] = audit_store
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
@@ -667,7 +679,7 @@ class SafeMCPGateway:
         result: MCPToolResult,
         gate_decision: ConfidenceGateDecision,
     ) -> None:
-        """Log audit entry."""
+        """Log audit entry to in-memory cache and durable store."""
         if not self.audit_enabled:
             return
 
@@ -686,6 +698,34 @@ class SafeMCPGateway:
             human_confirmed=result.human_confirmed,
         )
         self.audit_log.append(entry)
+
+        # Persist to durable store
+        if self._audit_store is not None:
+            canonical_event = event_from_mcp_audit(
+                timestamp=entry.timestamp,
+                request_id=entry.request_id,
+                tool_name=entry.tool_name,
+                parameters=entry.parameters,
+                decision=entry.decision.value,
+                confidence=entry.confidence,
+                risk_level=entry.risk_level.value,
+                session_id=entry.session_id or "",
+                execution_time_ms=entry.execution_time_ms,
+                success=entry.success,
+                error=entry.error,
+                human_confirmed=entry.human_confirmed,
+            )
+            try:
+                self._audit_store.append(canonical_event)
+            except GovernanceAuditError:
+                logger.error(
+                    "GOVERNANCE AUDIT PERSISTENCE FAILURE for MCP call %s/%s — "
+                    "event recorded in-memory but NOT persisted durably",
+                    entry.request_id,
+                    entry.tool_name,
+                    exc_info=True,
+                )
+                raise
 
         logger.debug(
             f"MCP Audit: {tool_call.tool_name} "
