@@ -1,5 +1,21 @@
 """Chitta-Vṛtti Module: Cross-Layer Coherence and Cognitive Mode Analysis.
 
+CANONICAL RUNTIME VRITTI AUTHORITY (cross-layer coherence level)
+================================================================
+This module is the canonical source of runtime vṛtti computation at the
+cross-layer coherence level. All runtime consumers needing coherence-derived
+vṛtti distributions should use this module.
+
+Complementary vritti source:
+- symbolu/core/smi/vritti_mapping.py computes phonemic/syllable-level vritti
+  (syllable → consonant → kosha → vritti). That is a different abstraction
+  level and is NOT a duplicate — it is complementary.
+
+Training-time note:
+- sovereign/vritti.py may maintain a separate PyTorch-differentiable vritti
+  implementation for gradient requirements. That is intentional divergence
+  for training, not runtime duplication.
+
 This module computes the 5-element vṛtti distribution p_v[v] from cross-layer
 representational coherence. This distribution feeds the core aspect resonance
 formula via the R[v,a] coupling matrix.

@@ -2,6 +2,20 @@
 Vritti Mapping - Syllable to Vritti Distribution
 ================================================
 
+PHONEMIC/SYLLABLE-LEVEL VRITTI (complementary to canonical runtime vritti)
+=========================================================================
+This module computes vritti distributions at the phonemic level:
+syllable → consonant → kosha → vritti tendency.
+
+This is NOT the canonical runtime vritti authority for cross-layer coherence.
+The canonical runtime vritti authority is: agentic/chitta_vritti/
+(ChittaVrittiEngine computes vritti from cross-layer representational coherence.)
+
+This module is complementary — it provides syllable-level vritti tendencies
+that feed into SMI computation. Both sources are valid at their respective
+abstraction levels.
+
+Original description:
 Maps syllables to their corresponding vṛtti probability distributions
 based on the consonant → kosha → vritti tendency chain.
 

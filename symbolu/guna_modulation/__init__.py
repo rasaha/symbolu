@@ -2,6 +2,23 @@
 Guna Entropy Modulation Module
 ==============================
 
+CANONICAL RUNTIME GUNA AUTHORITY (pipeline-level, deterministic)
+================================================================
+This module — specifically guna_derivation.py — is the canonical source of
+runtime guna derivation at the pipeline level. All runtime consumers needing
+(S, R, T) guna vectors from pipeline signals (C_s, M, H) should use
+derive_guna_vector() or derive_guna_from_values() from this module.
+
+Complementary guna source:
+- symbolu/inference/guna_inference.py computes token-level guna approximations
+  during active generation (PyTorch, stateful). That is a different abstraction
+  level and is NOT a duplicate — it is complementary.
+
+Training-time note:
+- sovereign/guna.py may maintain a separate PyTorch-differentiable guna
+  implementation for gradient requirements. That is intentional divergence
+  for training, not runtime duplication.
+
 Symbol-U v2.6 - Deterministic, Zero-Parameter, Non-Learning System
 
 This module implements a Guna-aware entropy modulation layer that operates

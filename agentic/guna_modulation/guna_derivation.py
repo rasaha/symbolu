@@ -2,6 +2,12 @@
 Guna Derivation Formulas
 ========================
 
+CANONICAL RUNTIME GUNA DERIVATION
+===================================
+This is the canonical source for runtime pipeline-level guna computation.
+All runtime paths needing (S, R, T) from (C_s, M, H) should call
+derive_guna_vector() or derive_guna_from_values() from this module.
+
 Symbol-U v2.6 - Deterministic, Zero-Parameter, Non-Learning System
 
 This module implements the MANDATORY Guna derivation formulas.
