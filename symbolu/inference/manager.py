@@ -16,6 +16,7 @@ Author: Sovereign-1 Training Initiative
 Date: January 2026
 """
 
+import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,6 +24,8 @@ from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass
 from pathlib import Path
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 from .evolutionary_inference import EvolutionaryInferenceEngine, EvolutionaryConfig
 from .csr_inference import CSRInferenceGuard, CSRGuardConfig
@@ -285,6 +288,17 @@ class InferenceManager:
             self.config.enable_gunas = False
             self.config.enable_scoring = False
 
+        elif self.config.mode == InferenceMode.FULL:
+            self.config.enable_karma = True
+            self.config.enable_csr_guard = True
+            self.config.enable_metacognition = True
+            self.config.enable_gunas = True
+            self.config.enable_scoring = True
+            # Phase 4: Enable reconciliation and bridge in FULL mode
+            self.config.enable_signal_reconciliation = True
+            self.config.enable_sovereign_bridge_signals = True
+            self.config.enable_diagnostic_hooks = True
+
         elif self.config.mode == InferenceMode.SAFE:
             self.config.enable_karma = True
             self.config.enable_csr_guard = True
@@ -292,6 +306,10 @@ class InferenceManager:
             self.config.enable_gunas = True
             self.config.enable_scoring = True
             self.config.abort_on_low_coherence = True
+            # Phase 4: Enable reconciliation and bridge in SAFE mode
+            self.config.enable_signal_reconciliation = True
+            self.config.enable_sovereign_bridge_signals = True
+            self.config.enable_diagnostic_hooks = True
 
         elif self.config.mode == InferenceMode.SOVEREIGN:
             # Full metabolic loop with all cognitive components
@@ -654,8 +672,9 @@ class InferenceManager:
                         bridge_signals = self._extract_bridge_signals()
                         if bridge_signals is not None:
                             step_meta['bridge_signals'] = bridge_signals
-                    except Exception:
-                        pass  # Bridge signals are observational; never crash generation
+                    except Exception as exc:
+                        logger.debug("Bridge signal extraction failed at step %d: %s", step, exc)
+                        step_meta['bridge_signal_error'] = str(exc)
 
                 # Phase 4: Diagnostic hooks (SOVEREIGN mode)
                 if self.diagnostic_hooks is not None and self.diagnostic_hooks.enabled:
@@ -732,10 +751,32 @@ class InferenceManager:
                 bridge = self._extract_bridge_signals()
                 if bridge is not None:
                     result['bridge_signals'] = bridge
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Post-generation bridge signal extraction failed: %s", exc)
+                result['bridge_signal_error'] = str(exc)
         if self.diagnostic_hooks is not None and self.diagnostic_hooks.enabled:
             result['diagnostic_summary'] = self.diagnostic_hooks.get_summary()
+
+        # Phase 4: Audit metadata — makes it obvious when Phase 4 was active
+        result['phase4_status'] = {
+            'mode': self.config.mode.value,
+            'signal_reconciliation_enabled': self.config.enable_signal_reconciliation,
+            'signal_reconciliation_ran': self._last_reconciliation is not None,
+            'sovereign_bridge_enabled': self.config.enable_sovereign_bridge_signals,
+            'sovereign_bridge_ran': 'bridge_signals' in result,
+            'diagnostic_hooks_enabled': self.config.enable_diagnostic_hooks,
+            'diagnostic_hooks_ran': (
+                self.diagnostic_hooks is not None
+                and self.diagnostic_hooks.enabled
+                and 'diagnostic_summary' in result
+            ),
+            'coherence_decoder_enabled': self.config.enable_coherence_decoder,
+            'reconciliation_warnings': (
+                list(self._last_reconciliation.divergence_warnings)
+                if self._last_reconciliation is not None
+                else []
+            ),
+        }
 
         return result
 
@@ -915,6 +956,21 @@ class InferenceManager:
 
         if self.state_monitor is not None:
             lines.append(f"  {self.state_monitor.get_status_line()}")
+
+        # Phase 4 status
+        p4_parts = []
+        if self.config.enable_signal_reconciliation:
+            p4_parts.append("reconciliation")
+        if self.config.enable_sovereign_bridge_signals:
+            p4_parts.append("bridge")
+        if self.config.enable_diagnostic_hooks:
+            p4_parts.append("diagnostics")
+        if self.config.enable_coherence_decoder:
+            p4_parts.append("coherence_decoder")
+        if p4_parts:
+            lines.append(f"  Phase 4: {', '.join(p4_parts)}")
+        else:
+            lines.append("  Phase 4: inactive")
 
         return "\n".join(lines)
 

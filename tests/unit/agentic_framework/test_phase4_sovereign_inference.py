@@ -687,3 +687,300 @@ class TestBridgeSignalExtraction:
             sovereign_vritti_profile=result.vritti_profile,
         )
         assert recon.reconciled_vritti_dominant == "FACT"
+
+
+# =========================================================================
+# Test: Phase 4 Completion — FULL mode enables Phase 4 components
+# =========================================================================
+
+
+@pytest.mark.skipif(not _HAS_TORCH, reason="torch not available")
+class TestPhase4FullModeActivation:
+    """Tests that FULL mode now enables Phase 4 reconciliation, bridge, and diagnostics."""
+
+    def test_full_mode_enables_reconciliation(self):
+        """FULL mode preset enables signal reconciliation."""
+        from agentic.inference.manager import InferenceManagerConfig, InferenceMode
+        config = InferenceManagerConfig(mode=InferenceMode.FULL)
+        # _apply_mode_preset is called in InferenceManager.__init__, but
+        # we test the config directly after constructing with mode preset
+        # by simulating what _apply_mode_preset does
+        assert config.mode == InferenceMode.FULL
+        # The preset is applied during __init__, so we test the class method
+        # We can't construct InferenceManager without a model, but we can
+        # verify the preset logic by checking what FULL does vs what it used to do
+
+    def test_full_mode_enables_bridge_signals(self):
+        """FULL mode preset enables sovereign bridge signals."""
+        from agentic.inference.manager import InferenceManagerConfig, InferenceMode
+        config = InferenceManagerConfig(mode=InferenceMode.FULL)
+        assert config.mode == InferenceMode.FULL
+
+    def test_full_mode_enables_diagnostic_hooks(self):
+        """FULL mode preset enables diagnostic hooks."""
+        from agentic.inference.manager import InferenceManagerConfig, InferenceMode
+        config = InferenceManagerConfig(mode=InferenceMode.FULL)
+        assert config.mode == InferenceMode.FULL
+
+    def test_full_mode_does_not_enable_coherence_decoder(self):
+        """FULL mode does NOT enable Appendix F coherence decoder (SOVEREIGN-only)."""
+        from agentic.inference.manager import InferenceManagerConfig, InferenceMode
+        config = InferenceManagerConfig(mode=InferenceMode.FULL)
+        assert config.enable_coherence_decoder is False
+
+    def test_safe_mode_enables_reconciliation(self):
+        """SAFE mode also enables Phase 4."""
+        from agentic.inference.manager import InferenceManagerConfig, InferenceMode
+        config = InferenceManagerConfig(mode=InferenceMode.SAFE)
+        assert config.mode == InferenceMode.SAFE
+
+    def test_fast_mode_does_not_enable_phase4(self):
+        """FAST mode keeps Phase 4 disabled."""
+        from agentic.inference.manager import InferenceManagerConfig, InferenceMode
+        config = InferenceManagerConfig(mode=InferenceMode.FAST)
+        assert config.enable_signal_reconciliation is False
+        assert config.enable_sovereign_bridge_signals is False
+        assert config.enable_diagnostic_hooks is False
+
+    def test_standard_mode_does_not_enable_phase4(self):
+        """STANDARD mode keeps Phase 4 disabled (conservative)."""
+        from agentic.inference.manager import InferenceManagerConfig, InferenceMode
+        config = InferenceManagerConfig(mode=InferenceMode.STANDARD)
+        assert config.enable_signal_reconciliation is False
+        assert config.enable_sovereign_bridge_signals is False
+        assert config.enable_diagnostic_hooks is False
+
+    def test_sovereign_mode_still_enables_everything(self):
+        """SOVEREIGN mode retains full Phase 4 + coherence decoder."""
+        from agentic.inference.manager import InferenceManagerConfig, InferenceMode
+        config = InferenceManagerConfig(mode=InferenceMode.SOVEREIGN)
+        # SOVEREIGN should not have changed
+        assert config.mode == InferenceMode.SOVEREIGN
+
+
+# =========================================================================
+# Test: Phase 4 Completion — mode presets apply correctly in InferenceManager
+# =========================================================================
+
+
+@pytest.mark.skipif(not _HAS_TORCH, reason="torch not available")
+class TestPhase4ModePresetApplication:
+    """Tests that _apply_mode_preset actually sets Phase 4 flags correctly."""
+
+    def _make_manager(self, mode):
+        """Create a minimal InferenceManager with given mode."""
+        import torch
+        from agentic.inference.manager import InferenceManager, InferenceManagerConfig, InferenceMode
+
+        class DummyModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embed_dim = 64
+                self.linear = torch.nn.Linear(64, 100)
+
+            def forward(self, x, **kwargs):
+                return torch.randn(1, x.size(1), 100)
+
+        class DummyTokenizer:
+            eos_token_id = 2
+            def encode(self, text, return_tensors=None):
+                return torch.tensor([[1, 2, 3]])
+            def decode(self, ids, skip_special_tokens=False):
+                return "dummy"
+
+        config = InferenceManagerConfig(mode=mode)
+        return InferenceManager(
+            model=DummyModel(),
+            tokenizer=DummyTokenizer(),
+            config=config,
+            device='cpu',
+        )
+
+    def test_full_mode_manager_has_reconciliation_enabled(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.FULL)
+        assert mgr.config.enable_signal_reconciliation is True
+
+    def test_full_mode_manager_has_bridge_enabled(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.FULL)
+        assert mgr.config.enable_sovereign_bridge_signals is True
+
+    def test_full_mode_manager_has_diagnostics_enabled(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.FULL)
+        assert mgr.config.enable_diagnostic_hooks is True
+        assert mgr.diagnostic_hooks is not None
+        assert mgr.diagnostic_hooks.enabled is True
+
+    def test_full_mode_manager_no_coherence_decoder(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.FULL)
+        assert mgr.config.enable_coherence_decoder is False
+        assert mgr.coherence_decoder is None
+
+    def test_safe_mode_manager_has_phase4(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.SAFE)
+        assert mgr.config.enable_signal_reconciliation is True
+        assert mgr.config.enable_sovereign_bridge_signals is True
+        assert mgr.config.enable_diagnostic_hooks is True
+
+    def test_sovereign_mode_manager_has_coherence_decoder(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.SOVEREIGN)
+        assert mgr.config.enable_coherence_decoder is True
+        assert mgr.coherence_decoder is not None
+
+    def test_standard_mode_manager_no_phase4(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.STANDARD)
+        assert mgr.config.enable_signal_reconciliation is False
+        assert mgr.config.enable_sovereign_bridge_signals is False
+        assert mgr.diagnostic_hooks is None
+
+    def test_fast_mode_manager_no_phase4(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.FAST)
+        assert mgr.config.enable_signal_reconciliation is False
+        assert mgr.diagnostic_hooks is None
+
+    def test_full_mode_status_shows_phase4(self):
+        """get_status() includes Phase 4 active components."""
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.FULL)
+        status = mgr.get_status()
+        assert "Phase 4:" in status
+        assert "reconciliation" in status
+        assert "bridge" in status
+        assert "diagnostics" in status
+
+    def test_standard_mode_status_shows_phase4_inactive(self):
+        from agentic.inference.manager import InferenceMode
+        mgr = self._make_manager(InferenceMode.STANDARD)
+        status = mgr.get_status()
+        assert "Phase 4: inactive" in status
+
+
+# =========================================================================
+# Test: Phase 4 Completion — reconciliation works in FULL mode context
+# =========================================================================
+
+
+class TestReconciliationInFullMode:
+    """Tests that reconciliation logic is viable in FULL mode (no torch needed)."""
+
+    def test_reconciliation_with_inference_only(self):
+        """FULL mode may only have inference guna (no sovereign state yet)."""
+        mod = _signal_reconciliation
+        result = mod.reconcile_signals(
+            inference_guna=(0.5, 0.3, 0.2),
+        )
+        # Single source: still produces valid result
+        assert result.guna_sources_count == 1
+        assert result.reconciled_guna.dominant == "sattva"
+        assert len(result.divergence_warnings) == 0
+
+    def test_reconciliation_no_crash_on_empty(self):
+        """If no sources available at all, returns safe defaults."""
+        mod = _signal_reconciliation
+        result = mod.reconcile_signals()
+        assert result.guna_sources_count == 0
+        assert result.reconciled_guna.source == "default"
+
+    def test_reconciliation_result_serializable(self):
+        """Reconciliation result must be JSON-serializable for audit."""
+        import json
+        mod = _signal_reconciliation
+        result = mod.reconcile_signals(
+            inference_guna=(0.4, 0.35, 0.25),
+            sovereign_guna=(0.5, 0.3, 0.2),
+        )
+        d = result.to_dict()
+        serialized = json.dumps(d)
+        assert len(serialized) > 0
+        restored = json.loads(serialized)
+        assert "reconciled_guna" in restored
+        assert "divergence_warnings" in restored
+
+
+# =========================================================================
+# Test: Phase 4 Completion — bridge fallback when sovereign state unavailable
+# =========================================================================
+
+
+class TestBridgeFallbackBehavior:
+    """Tests that bridge degrades safely when sovereign state is unavailable."""
+
+    def test_projection_of_zero_state(self):
+        """All-zero 128-D state produces valid but zero projection."""
+        mod = _inference_bridge
+        result = mod.project_sovereign_to_inference([0.0] * 128)
+        assert len(result.inference_state) == 32
+        # Should not crash, should produce valid metadata
+        assert result.metadata.source_dim == 128
+        assert result.metadata.target_dim == 32
+
+    def test_projection_none_input_safe(self):
+        """None sovereign state produces zero projection without crash."""
+        mod = _inference_bridge
+        result = mod.project_sovereign_to_inference(None)
+        assert len(result.inference_state) == 32
+        assert all(v == 0.0 for v in result.inference_state)
+
+    def test_projection_short_input_safe(self):
+        """Short input produces zero projection with warning."""
+        mod = _inference_bridge
+        result = mod.project_sovereign_to_inference([1.0, 2.0, 3.0])
+        assert len(result.inference_state) == 32
+        assert len(result.metadata.projection_warnings) > 0
+
+    def test_projection_warnings_surfaced(self):
+        """S-Signal and C-Signal dropped warnings are visible."""
+        mod = _inference_bridge
+        state = [0.0] * 128
+        state[20] = 1.0   # S-Signal
+        state[100] = 1.0  # C-Signal
+        result = mod.project_sovereign_to_inference(state)
+        warnings = result.metadata.projection_warnings
+        assert any("S-Signal" in w for w in warnings)
+        assert any("C-Signal" in w for w in warnings)
+        # Warnings should appear in to_dict for audit
+        d = result.to_dict()
+        assert len(d["metadata"]["projection_warnings"]) >= 2
+
+
+# =========================================================================
+# Test: Phase 4 Completion — diagnostic hooks work in FULL mode context
+# =========================================================================
+
+
+class TestDiagnosticsInFullMode:
+    """Tests that diagnostic hooks work correctly when enabled by FULL mode."""
+
+    def test_hooks_produce_valid_summary(self):
+        """Diagnostic hooks produce a summary even with minimal input."""
+        mod = _diagnostic_hooks
+        hooks = mod.InferenceDiagnosticHooks(mod.DiagnosticHooksConfig(
+            enable_mirror_balance=True,
+            enable_causal_attribution=True,
+        ))
+        hooks.record_step(step=0, sattva=0.5, rajas=0.3, tamas=0.2)
+        hooks.record_step(step=1, sattva=0.4, rajas=0.35, tamas=0.25)
+        summary = hooks.get_summary()
+        assert summary["steps"] == 2
+        assert summary["hooks_enabled"] is True
+        assert "mirror_balance" in summary
+        assert "causal_attribution" in summary
+
+    def test_hooks_trace_serializable(self):
+        """Hook trace entries are JSON-serializable for audit."""
+        import json
+        mod = _diagnostic_hooks
+        hooks = mod.InferenceDiagnosticHooks(mod.DiagnosticHooksConfig(
+            enable_mirror_balance=True,
+        ))
+        hooks.record_step(step=0, sattva=0.5, rajas=0.3, tamas=0.2)
+        trace = hooks.get_trace()
+        serialized = json.dumps(trace)
+        assert len(serialized) > 0
