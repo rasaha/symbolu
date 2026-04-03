@@ -33,7 +33,8 @@ _ROUTING = {
     "mechanical": "symbolu_core",
     "hybrid": "symbolu_core",
     "engine": "symbolu_core",
-    "cloud_controller": "symbolu_core",
+    # STANDALONE PRODUCT → top-level package (same name)
+    "cloud_controller": "",  # empty = top-level, no prefix needed
     "phase_transformer": "symbolu_core",
     "config": "symbolu_core",
     "inference_rag": "symbolu_core",
@@ -101,8 +102,12 @@ class _SymboluFinder:
 
         # Build the target module name
         # symbolu.X.Y.Z -> target_pkg.X.Y.Z
+        # If target_pkg is empty, the module is top-level: symbolu.X.Y -> X.Y
         remainder = ".".join(parts[1:])
-        target_name = f"{target_pkg}.{remainder}"
+        if target_pkg:
+            target_name = f"{target_pkg}.{remainder}"
+        else:
+            target_name = remainder
 
         # Import the real module
         real_module = importlib.import_module(target_name)
