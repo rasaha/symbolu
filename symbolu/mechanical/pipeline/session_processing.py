@@ -139,7 +139,10 @@ def _process_intent_arc(
 ) -> None:
     """Process intent arc classification."""
     try:
-        from symbolu.intent.intent_arc_engine import compute_intent_arc
+        try:
+            from symbolu_extensions.intent.intent_arc_engine import compute_intent_arc
+        except ImportError:
+            from symbolu.intent.intent_arc_engine import compute_intent_arc
 
         if session_summary:
             ctx.intent_arc = compute_intent_arc(

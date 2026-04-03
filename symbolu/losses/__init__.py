@@ -1,40 +1,11 @@
-"""
-Losses Module: Custom Loss Functions for Sovereign AI Training
+"""Backwards-compatibility stub — module moved to symbolu_training/."""
+import importlib
+import sys
 
-This module provides specialized loss functions that implement
-Vedic-inspired self-regulation mechanisms.
-
-Available Loss Functions:
-- KoshaGyroscopicLoss: Homeostatic balance loss with Vijnana Gate
-- InvertedCurriculumController: Manages Instructor -> Self-Learning transition
-"""
-
-from symbolu.losses.kosha_gyroscope import (
-    KoshaGyroscopicLoss,
-    KoshaGyroscopeConfig,
-    InvertedCurriculumController,
-    VrittiResonanceLoss,
-    VrittiResonanceConfig,
-    # Inference-time guardrails (v2.4.0)
-    KoshaPhaseCorrector,
-    KoshaPhaseCorrectorConfig,
-    InferenceGuardrail,
-    # 32D State Regularization (v2.3.3)
-    SovereignStateRegularizer,
-    SovereignStateRegularizerConfig,
-)
-
-__all__ = [
-    'KoshaGyroscopicLoss',
-    'KoshaGyroscopeConfig',
-    'InvertedCurriculumController',
-    'VrittiResonanceLoss',
-    'VrittiResonanceConfig',
-    # Inference-time guardrails (v2.4.0)
-    'KoshaPhaseCorrector',
-    'KoshaPhaseCorrectorConfig',
-    'InferenceGuardrail',
-    # 32D State Regularization (v2.3.3)
-    'SovereignStateRegularizer',
-    'SovereignStateRegularizerConfig',
-]
+_new_name = __name__.replace("symbolu.", "symbolu_training.", 1)
+try:
+    _mod = importlib.import_module(_new_name)
+    sys.modules[__name__] = _mod
+    globals().update({k: v for k, v in _mod.__dict__.items() if not k.startswith("_")})
+except ImportError:
+    pass  # symbolu_training not installed; fail silently for partial installs

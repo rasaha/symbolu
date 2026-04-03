@@ -1,32 +1,11 @@
-"""
-Diagnostics Module: Analysis Tools for Sovereign AI Training (v2.2.3.1)
+"""Backwards-compatibility stub — module moved to symbolu_training/."""
+import importlib
+import sys
 
-This module provides diagnostic utilities for analyzing model behavior
-during training, particularly around Kosha state transitions.
-
-Available Diagnostics:
-- SovereignDiagnosticLogger: Captures "Reality Rips" and "Fluidity Events"
-- StressTestRunner: Runs the Kosha Gyroscope Stress Test Suite
-- RipEvent: Data class for individual rip events (legacy hard threshold)
-- RipStatistics: Aggregate statistics over rips (legacy)
-- FluidityEvent: Data class for soft saturation events (v2.2.3.1)
-- FluidityStatistics: Aggregate statistics over fluidity events (v2.2.3.1)
-"""
-
-from symbolu.diagnostics.rip_logger import (
-    SovereignDiagnosticLogger,
-    StressTestRunner,
-    RipEvent,
-    RipStatistics,
-    FluidityEvent,
-    FluidityStatistics,
-)
-
-__all__ = [
-    'SovereignDiagnosticLogger',
-    'StressTestRunner',
-    'RipEvent',
-    'RipStatistics',
-    'FluidityEvent',
-    'FluidityStatistics',
-]
+_new_name = __name__.replace("symbolu.", "symbolu_training.", 1)
+try:
+    _mod = importlib.import_module(_new_name)
+    sys.modules[__name__] = _mod
+    globals().update({k: v for k, v in _mod.__dict__.items() if not k.startswith("_")})
+except ImportError:
+    pass  # symbolu_training not installed; fail silently for partial installs
