@@ -18,6 +18,8 @@ Covers:
 import pytest
 from typing import Dict, Optional
 
+from unittest.mock import patch
+
 from agentic.agentic_framework.shadow_ai import (
     ProvenanceStatus,
     ShadowAssetType,
@@ -33,6 +35,7 @@ from agentic.agentic_framework.shadow_ai import (
     is_memory_write_intent,
     resolve_shadow_asset_id,
     resolve_shadow_policy,
+    safe_resolve_shadow_policy,
     shadow_containment_to_governance,
     shadow_containment_to_governance_mapping,
     _stricter_containment,
@@ -1276,3 +1279,310 @@ class TestDurableEventFromGovernanceDecision:
             escalation_level="none",
         )
         assert "shadow_assessment" not in event.request_snapshot
+
+
+# =========================================================================
+# Test: QUARANTINED fail-closed handling (S2)
+# =========================================================================
+
+
+class TestQuarantinedFailClosed:
+    """QUARANTINED provenance must have explicit fail-closed behavior."""
+
+    def test_quarantined_read_only_action(self):
+        """QUARANTINED + read-only action → QUARANTINED containment (DENY)."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="quarantined-tool",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.QUARANTINED,
+                trust_level=ShadowTrustLevel.UNTRUSTED,
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="quarantined-tool",
+            registry=registry,
+            action_category="read_only",
+            risk_level="read_only",
+        )
+        assert result.provenance_status == ProvenanceStatus.QUARANTINED
+        # Must be at QUARANTINED containment level (severity 7), not ALLOW
+        assert result.containment_mode == ShadowContainmentMode.QUARANTINED
+        assert any("FAIL_CLOSED:quarantined_default" in rc for rc in result.reason_codes)
+        # Maps to DENY at governance level
+        assert shadow_containment_to_governance(result.containment_mode) == "DENY"
+
+    def test_quarantined_mutating_action(self):
+        """QUARANTINED + mutating action → BLOCKED containment."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="quarantined-agent",
+                asset_type=ShadowAssetType.AGENT,
+                provenance=ProvenanceStatus.QUARANTINED,
+                trust_level=ShadowTrustLevel.UNTRUSTED,
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="quarantined-agent",
+            registry=registry,
+            action_category="mutating",
+            risk_level="write",
+            mutation_intent=True,
+        )
+        assert result.containment_mode == ShadowContainmentMode.BLOCKED
+        assert any("FAIL_CLOSED:quarantined_mutating" in rc for rc in result.reason_codes)
+
+    def test_quarantined_destructive_action(self):
+        """QUARANTINED + destructive action → BLOCKED containment."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="quarantined-plugin",
+                asset_type=ShadowAssetType.PLUGIN,
+                provenance=ProvenanceStatus.QUARANTINED,
+                trust_level=ShadowTrustLevel.UNTRUSTED,
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="quarantined-plugin",
+            registry=registry,
+            action_category="destructive",
+            risk_level="destructive",
+            mutation_intent=True,
+        )
+        assert result.containment_mode == ShadowContainmentMode.BLOCKED
+        assert any("FAIL_CLOSED:quarantined_mutating" in rc for rc in result.reason_codes)
+
+    def test_quarantined_distinct_from_shadow_and_revoked(self):
+        """QUARANTINED reason codes must be distinguishable from SHADOW/REVOKED."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="q-tool",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.QUARANTINED,
+                trust_level=ShadowTrustLevel.UNTRUSTED,
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="q-tool",
+            registry=registry,
+            action_category="read_only",
+            risk_level="read_only",
+        )
+        # Must have "quarantined" in reason codes, not "shadow" or "revoked"
+        fail_closed_codes = [rc for rc in result.reason_codes if rc.startswith("FAIL_CLOSED:")]
+        assert len(fail_closed_codes) == 1
+        assert "quarantined" in fail_closed_codes[0]
+        assert "shadow" not in fail_closed_codes[0]
+        assert "revoked" not in fail_closed_codes[0]
+
+
+# =========================================================================
+# Test: blocked_capabilities enforcement (S3)
+# =========================================================================
+
+
+class TestBlockedCapabilitiesEnforcement:
+    """blocked_capabilities must escalate containment, not just log."""
+
+    def test_blocked_capability_mutating_action(self):
+        """Blocked capability + mutating action → BLOCKED containment."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="restricted-tool",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.APPROVED,
+                trust_level=ShadowTrustLevel.TRUSTED,
+                blocked_capabilities=frozenset({"mutating"}),
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="restricted-tool",
+            registry=registry,
+            action_category="mutating",
+            risk_level="write",
+            mutation_intent=True,
+        )
+        assert result.containment_mode == ShadowContainmentMode.BLOCKED
+        assert any("BLOCKED_CAPABILITY:mutating" in rc for rc in result.reason_codes)
+
+    def test_blocked_capability_read_only_action(self):
+        """Blocked capability + read_only action → REQUIRE_CONFIRMATION."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="restricted-reader",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.APPROVED,
+                trust_level=ShadowTrustLevel.TRUSTED,
+                blocked_capabilities=frozenset({"read_only"}),
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="restricted-reader",
+            registry=registry,
+            action_category="read_only",
+            risk_level="read_only",
+        )
+        assert result.containment_mode == ShadowContainmentMode.REQUIRE_CONFIRMATION
+        assert any("BLOCKED_CAPABILITY:read_only" in rc for rc in result.reason_codes)
+
+    def test_blocked_capability_destructive_action(self):
+        """Blocked capability + destructive action → BLOCKED."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="locked-tool",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.APPROVED,
+                trust_level=ShadowTrustLevel.TRUSTED,
+                blocked_capabilities=frozenset({"destructive"}),
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="locked-tool",
+            registry=registry,
+            action_category="destructive",
+            risk_level="destructive",
+            mutation_intent=True,
+        )
+        assert result.containment_mode == ShadowContainmentMode.BLOCKED
+        assert any("BLOCKED_CAPABILITY:destructive" in rc for rc in result.reason_codes)
+
+    def test_non_blocked_capability_no_escalation(self):
+        """Capability not in blocked set → no escalation."""
+        registry = ShadowRegistry(entries=[
+            ShadowRegistryEntry(
+                asset_id="partial-tool",
+                asset_type=ShadowAssetType.TOOL,
+                provenance=ProvenanceStatus.APPROVED,
+                trust_level=ShadowTrustLevel.TRUSTED,
+                blocked_capabilities=frozenset({"destructive"}),
+            ),
+        ])
+        result = resolve_shadow_policy(
+            asset_id="partial-tool",
+            registry=registry,
+            action_category="read_only",
+            risk_level="read_only",
+        )
+        assert result.containment_mode == ShadowContainmentMode.ALLOW
+        assert not any("BLOCKED_CAPABILITY" in rc for rc in result.reason_codes)
+
+
+# =========================================================================
+# Test: Resolver fail-closed wrapper (S6/G1/T1)
+# =========================================================================
+
+
+class TestSafeResolverWrapper:
+    """safe_resolve_shadow_policy must fail-closed on resolver exceptions."""
+
+    def test_resolver_exception_returns_blocked(self):
+        """When resolve_shadow_policy raises, safe wrapper returns BLOCKED."""
+        with patch(
+            "agentic.agentic_framework.shadow_ai.resolve_shadow_policy",
+            side_effect=RuntimeError("simulated resolver failure"),
+        ):
+            result = safe_resolve_shadow_policy(
+                asset_id="test-asset",
+                tool_name="test-tool",
+            )
+        assert result.containment_mode == ShadowContainmentMode.BLOCKED
+        assert result.provenance_status == ProvenanceStatus.SHADOW
+        assert result.trust_level == ShadowTrustLevel.BLOCKED
+        assert result.shadow_overrode_baseline is True
+        assert any("SHADOW_RESOLVER_ERROR" in rc for rc in result.reason_codes)
+        assert "RuntimeError" in result.reason_codes[0]
+
+    def test_resolver_exception_preserves_asset_identity(self):
+        """Fail-closed assessment should preserve the asset identity for audit."""
+        with patch(
+            "agentic.agentic_framework.shadow_ai.resolve_shadow_policy",
+            side_effect=ValueError("bad input"),
+        ):
+            result = safe_resolve_shadow_policy(
+                asset_id="my-agent",
+                tool_name="my-tool",
+            )
+        assert result.asset_identity_summary == "my-agent"
+        assert "ValueError" in result.rationale
+
+    def test_normal_call_passes_through(self):
+        """When resolver succeeds, safe wrapper returns normal result."""
+        result = safe_resolve_shadow_policy(
+            asset_id="some-tool",
+            action_category="read_only",
+            risk_level="read_only",
+        )
+        # Should return a valid assessment, not a fail-closed one
+        assert "SHADOW_RESOLVER_ERROR" not in str(result.reason_codes)
+
+    def test_governance_service_uses_safe_wrapper(self, basic_registry: ShadowRegistry):
+        """GovernanceService should use safe_resolve and fail-closed on exception."""
+        from agentic.agentic_framework.governance_service import GovernanceService
+        from agentic.agentic_framework.governance_models import (
+            AuthorizationRequest,
+            APIGovernanceDecision,
+        )
+
+        service = GovernanceService(shadow_registry=basic_registry)
+        request = AuthorizationRequest(
+            actor_id="internal-model-v1",
+            action_type="file_read",
+            agency_level="FULL",
+            quality_score=0.9,
+            coherence_score=0.9,
+            internal_consistency=0.9,
+            goal_alignment=0.9,
+            trajectory_confidence=0.9,
+        )
+
+        # Patch the safe wrapper to raise (simulating a deep failure)
+        with patch(
+            "agentic.agentic_framework.governance_service.safe_resolve_shadow_policy",
+            side_effect=RuntimeError("deep failure"),
+        ):
+            # GovernanceService has an outer try/except that catches all errors
+            # and returns DENY — this is the expected fail-closed behavior
+            response = service.authorize(request)
+            assert response.governance_decision == APIGovernanceDecision.DENY
+
+    @pytest.mark.asyncio
+    async def test_mcp_gateway_uses_safe_wrapper(self, basic_registry: ShadowRegistry):
+        """MCP gateway should use safe_resolve and fail-closed on exception."""
+        from agentic.agentic_framework.mcp_gateway import (
+            SafeMCPGateway,
+            MockMCPClient,
+            MCPToolCall,
+            GatewayDecision,
+        )
+
+        client = MockMCPClient()
+        client.register_tool("test-tool", lambda p: "result")
+
+        gateway = SafeMCPGateway(
+            mcp_client=client,
+            shadow_registry=basic_registry,
+        )
+
+        # Patch the safe wrapper to return a BLOCKED assessment
+        blocked_assessment = ShadowAssessment(
+            provenance_status=ProvenanceStatus.SHADOW,
+            asset_type=ShadowAssetType.UNKNOWN,
+            trust_level=ShadowTrustLevel.BLOCKED,
+            containment_mode=ShadowContainmentMode.BLOCKED,
+            risk_factors=ShadowRiskFactors(),
+            reason_codes=("SHADOW_RESOLVER_ERROR:RuntimeError:test",),
+            rationale="Fail-closed test",
+            shadow_overrode_baseline=True,
+            asset_identity_summary="test-tool",
+        )
+        with patch(
+            "agentic.agentic_framework.mcp_gateway.safe_resolve_shadow_policy",
+            return_value=blocked_assessment,
+        ):
+            result = await gateway.call_tool(MCPToolCall(
+                tool_name="test-tool",
+                parameters={},
+                quality_score=0.9,
+                coherence_score=0.9,
+            ))
+            assert result.decision == GatewayDecision.BLOCKED

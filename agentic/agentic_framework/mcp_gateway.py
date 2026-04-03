@@ -85,7 +85,7 @@ from agentic.agentic_framework.shadow_ai import (
     ShadowRegistry,
     is_memory_write_intent,
     resolve_shadow_asset_id,
-    resolve_shadow_policy,
+    safe_resolve_shadow_policy,
     shadow_containment_to_governance,
 )
 
@@ -1189,7 +1189,7 @@ class SafeMCPGateway:
             _shadow_asset_id = resolve_shadow_asset_id(
                 tool_name=tool_call.tool_name,
             )
-            shadow_assessment = resolve_shadow_policy(
+            shadow_assessment = safe_resolve_shadow_policy(
                 asset_id=_shadow_asset_id,
                 tool_name=tool_call.tool_name,
                 registry=self._shadow_registry,

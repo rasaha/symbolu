@@ -677,13 +677,20 @@ def resolve_shadow_policy(
                 f"{sorted(registry_entry.allowed_domains)}"
             )
 
-        # Check capability restrictions
+        # Check capability restrictions — record for enforcement after containment init
+        _blocked_cap_escalation: Optional[ShadowContainmentMode] = None
         if registry_entry.blocked_capabilities:
             if any(cap in registry_entry.blocked_capabilities
                    for cap in (action_category,)):
                 reason_codes.append(
                     f"BLOCKED_CAPABILITY:{action_category}"
                 )
+                # Escalate: mutating/destructive/privileged → BLOCKED,
+                # lower-risk → REQUIRE_CONFIRMATION (stricter-only)
+                if action_category in ("mutating", "destructive", "privileged"):
+                    _blocked_cap_escalation = ShadowContainmentMode.BLOCKED
+                else:
+                    _blocked_cap_escalation = ShadowContainmentMode.REQUIRE_CONFIRMATION
 
         # Check max risk level — record for enforcement after containment init
         _max_risk_escalation: Optional[ShadowContainmentMode] = None
@@ -710,6 +717,7 @@ def resolve_shadow_policy(
         )
         reason_codes.append(f"UNKNOWN_ASSET:{lookup_key or 'empty'}")
         _max_risk_escalation = None
+        _blocked_cap_escalation = None
 
     # --- Step 3: Compute risk factors ---
     risk_factors = ShadowRiskFactors(
@@ -759,6 +767,11 @@ def resolve_shadow_policy(
         containment = _stricter_containment(containment, _max_risk_escalation)
         fired_rules.append("_max_risk_level_enforcement")
 
+    # --- Step 4c: Apply blocked_capabilities escalation (deferred from Step 2) ---
+    if _blocked_cap_escalation is not None:
+        containment = _stricter_containment(containment, _blocked_cap_escalation)
+        fired_rules.append("_blocked_capability_enforcement")
+
     # --- Step 5: Semantic-governance mismatch escalation ---
     # An approved asset behaving incoherently may be shadow AI
     if (provenance == ProvenanceStatus.APPROVED
@@ -787,6 +800,16 @@ def resolve_shadow_policy(
         else:
             containment = ShadowContainmentMode.READ_ONLY
             reason_codes.append("FAIL_CLOSED:shadow_default_read_only")
+
+    if (provenance == ProvenanceStatus.QUARANTINED
+            and containment == ShadowContainmentMode.ALLOW):
+        # Quarantined = actively flagged, stricter than shadow/unverified
+        if action_category in ("mutating", "destructive", "privileged"):
+            containment = ShadowContainmentMode.BLOCKED
+            reason_codes.append("FAIL_CLOSED:quarantined_mutating")
+        else:
+            containment = ShadowContainmentMode.QUARANTINED
+            reason_codes.append("FAIL_CLOSED:quarantined_default")
 
     if (provenance == ProvenanceStatus.UNVERIFIED
             and containment == ShadowContainmentMode.ALLOW):
@@ -826,6 +849,45 @@ def resolve_shadow_policy(
         shadow_overrode_baseline=shadow_overrode,
         asset_identity_summary=lookup_key or "(unknown)",
     )
+
+
+def safe_resolve_shadow_policy(**kwargs: Any) -> ShadowAssessment:
+    """Fail-closed wrapper around resolve_shadow_policy().
+
+    If the resolver raises any exception, returns a BLOCKED assessment
+    with SHADOW_RESOLVER_ERROR reason code. This ensures shadow policy
+    failures never silently degrade to permissive behavior.
+
+    Accepts the same keyword arguments as resolve_shadow_policy().
+    """
+    try:
+        return resolve_shadow_policy(**kwargs)
+    except Exception as exc:
+        _logger.error(
+            "SHADOW RESOLVER ERROR — fail-closed to BLOCKED: %s",
+            exc,
+            exc_info=True,
+        )
+        asset_id = kwargs.get("asset_id", "")
+        tool_name = kwargs.get("tool_name", "")
+        lookup_key = asset_id or tool_name or "(unknown)"
+        return ShadowAssessment(
+            provenance_status=ProvenanceStatus.SHADOW,
+            asset_type=ShadowAssetType.UNKNOWN,
+            trust_level=ShadowTrustLevel.BLOCKED,
+            containment_mode=ShadowContainmentMode.BLOCKED,
+            risk_factors=ShadowRiskFactors(),
+            reason_codes=(
+                f"SHADOW_RESOLVER_ERROR:{type(exc).__name__}:{exc}",
+            ),
+            rationale=(
+                f"Shadow policy resolver failed for '{lookup_key}': "
+                f"{type(exc).__name__}: {exc}. Fail-closed to BLOCKED."
+            ),
+            registry_entry_id=None,
+            shadow_overrode_baseline=True,
+            asset_identity_summary=lookup_key,
+        )
 
 
 # =========================================================================
