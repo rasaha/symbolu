@@ -520,3 +520,158 @@ Central computation engine for the Symbol-U pipeline. Intended as the canonical 
 
 **Priority:** CORE RUNTIME CRITICAL (subdirectory engines) / NEEDS CONSOLIDATION (facades)
 **Action:** Refactor first — remove dead facades (interface.py, pipeline.py); remove or redirect core/entropy/; update __init__.py to export real engines; consolidate vritti_mapping into chitta_vritti/
+
+---
+
+## 4. Cross-Cutting Observations
+
+### 4.1 Duplicated Logic
+
+| Concept | Locations | Canonical Module | Duplicates |
+|---------|-----------|-----------------|------------|
+| **Vritti (5 cognitive modes)** | 5 modules | `chitta_vritti/` | `core/smi/vritti_mapping.py`, `sovereign/vritti.py`, `sovereign/reasoning_kernel.py` (VrittiGate), `inference/sovereign_state_monitor.py` (32D slice [17:22]) |
+| **Guna (S/R/T)** | 4 modules | `guna_modulation/guna_derivation.py` | `sovereign/guna.py` (16D training), `inference/guna_inference.py` (approximation), `posture/_guna_mapping.py` (private, deliberate) |
+| **Entropy computation** | 3 modules | `entropy/entropy_engine.py` | `core/entropy/` (dead stub), `guna_modulation/entropy_modulation_engine.py` (complementary — modulation intensity, not gating) |
+| **Temporal state** | 3 locations | `temporal/temporal_bhava_tracker.py` | `core/coherence/temporal_arc_tracer.py` (arc scoring), `core/bhava/temporal_bhava.py` (state abstraction) — progressive layering, not true duplication |
+
+**Verdict:** Vritti and Guna duplication are the most damaging. Each independent implementation can drift, producing inconsistent state across training, inference, and runtime layers.
+
+### 4.2 Approximations Replacing Intended Modules
+
+| Intended Module | What's Actually Used Instead | Where |
+|----------------|------------------------------|-------|
+| `inference/InferenceManager` | Direct model.generate() calls without orchestration | Generation paths bypass the fully-built manager |
+| `entropy/` Tier 3 blocking | No blocking gate exists on output path | Pipeline has no entropy-based output blocking |
+| `guna_modulation/` E=G×P×T | Heuristic intensity scaling in renderer | Renderer uses approximate intensity without canonical formula |
+| `guna_modulation/MirrorBalance` | No mirror balance detection at runtime | Asymmetry goes undetected |
+| `guna_modulation/CausalLayer` | No causal attribution in pipeline | Debugging uses log-tracing instead of do-calculus |
+
+### 4.3 Architecture Drift
+
+1. **Sovereign state split**: Training produces 128D state; inference monitors 32D state. No explicit projection/bridge exists. These evolved independently and now represent different abstractions of "sovereign state."
+
+2. **Core facade abandoned**: `core/interface.py` and `core/pipeline.py` were intended as the unified API for all core engines, but real engines bypassed them and are imported directly from subdirectories. The facade became dead code.
+
+3. **Entropy authority fragmented**: The architecture intends `entropy/` as the entropy authority, but `core/entropy/` exists as a confusing dead stub, and `guna_modulation/` has its own entropy modulation path. The boundaries between "entropy gating" and "entropy-based modulation" are clear in code but not in architecture docs.
+
+4. **Inference orphaned from pipeline**: `inference/` was designed as the inference-time counterpart to `sovereign/` (training), but the main pipeline never adopted `InferenceManager`. Instead, generation happens through direct model calls, leaving the orchestrator unused.
+
+### 4.4 Integration Bottlenecks
+
+1. **Session processing is the main integration point** — identity, motivation, and chitta_vritti all wire through `session_processing.py`. Adding more modules here requires careful ordering and fail-safe wrapping.
+
+2. **Feature flags gate too much** — dha, guna_modulation, and temporal are all behind flags. This means the "full architecture" is rarely exercised as a complete system. Integration testing of the full stack requires all flags enabled.
+
+3. **No unified state bus** — modules pass state via pipeline context (`ctx`) attributes set independently. There's no schema or contract for what `ctx` must contain after each phase, making it fragile to reordering.
+
+---
+
+## 5. Top 5 Wiring Opportunities
+
+### Opportunity 1: CONNECT InferenceManager to Generation Path
+**Module:** `inference/`
+**Current state:** Fully built orchestrator (1,290 LOC, 5 modes) that nothing calls
+**Wire to:** Model generation path in symbolu_core
+**Impact:** Enables sovereign scoring, CSR safety guards, metacognitive monitoring, and binding cache during inference — all currently bypassed
+**Prerequisite:** Verify InferenceManager's 5 modes (FAST/STANDARD/FULL/SAFE/SOVEREIGN) don't degrade generation latency
+**Priority:** P0 — this is the single largest wiring gap
+
+### Opportunity 2: BRIDGE Sovereign 128D → Inference 32D State
+**Module:** `sovereign/` → `inference/`
+**Current state:** Training produces 128D state; inference monitors 32D state; no projection exists
+**Wire to:** Create explicit state projection layer (128D → 32D) as part of checkpoint export
+**Impact:** Unifies training and inference representations; enables inference/ modules to consume real trained state instead of approximations
+**Prerequisite:** Define canonical 32D slice semantics relative to 128D decomposition [16D Guna | 32D S-Signal | 48D R-Signal | 32D C-Signal]
+**Priority:** P0 — foundational for inference/ to be meaningful
+
+### Opportunity 3: ENABLE DHA and Entropy Gating by Default
+**Module:** `dha/`, `entropy/`
+**Current state:** Both fully implemented but disabled by default
+**Wire to:** Enable DHA in diagnostic mode (Tier 1) by default; enable entropy gating on output path
+**Impact:** Every request gets tone/delivery modulation and coherence gating without opt-in. Currently, most users get no DHA/entropy benefit.
+**Prerequisite:** Validate that diagnostic-mode DHA adds negligible latency; ensure entropy Tier 1 (diagnostic only) has no behavioral side effects
+**Priority:** P1 — low risk, high observability gain
+
+### Opportunity 4: CONSOLIDATE Vritti to Single Authority
+**Module:** `chitta_vritti/` (canonical) vs 4 duplicates
+**Current state:** 5 independent vritti implementations
+**Wire to:** Make `chitta_vritti/` the single computation source; `sovereign/`, `inference/`, `core/smi/` consume its output
+**Impact:** Eliminates state inconsistency across layers; simplifies maintenance; ensures runtime vritti matches training vritti
+**Prerequisite:** Audit whether sovereign/reasoning_kernel.py VrittiGate needs training-time gradients through vritti (if so, keep sovereign/ version but sync formulas)
+**Priority:** P1 — architectural hygiene with real consistency benefits
+
+### Opportunity 5: WIRE guna_modulation E=G×P×T into Renderer
+**Module:** `guna_modulation/`
+**Current state:** Canonical intensity formula exists but renderer uses heuristic scaling
+**Wire to:** Replace heuristic intensity in renderer with `EntropyModulationEngine.compute_output_intensity()`
+**Impact:** Principled, tier-aware, policy-scaled output intensity instead of ad-hoc scaling
+**Prerequisite:** Ensure E=G×P×T produces values compatible with current renderer expectations; add integration test
+**Priority:** P1 — replaces heuristic with designed formula
+
+---
+
+## 6. Concrete Next-Step Recommendations
+
+### Immediate (Wire Now)
+
+| # | Action | Files to Modify | Estimated Scope |
+|---|--------|----------------|-----------------|
+| 1 | Connect `InferenceManager` to generation path | `symbolu_core/ontological/symbolu12_llm.py`, `inference/manager.py` | Medium — wire existing orchestrator, add config flag |
+| 2 | Enable DHA in Tier 1 diagnostic mode by default | `dha/config.py`, orchestrator pipeline config | Small — flip default flag |
+| 3 | Enable entropy gating on output path | `entropy/entropy_engine.py`, pipeline output stage | Small — add gating check at output boundary |
+| 4 | Wire `guna_modulation/` E=G×P×T into renderer | Renderer intensity path, `guna_modulation/pipeline_integration.py` | Medium — replace heuristic with formula call |
+
+### Refactor First
+
+| # | Action | Files to Modify | Estimated Scope |
+|---|--------|----------------|-----------------|
+| 5 | Build sovereign 128D → inference 32D state bridge | New: `sovereign/inference_bridge.py`, checkpoint export | Medium — define projection, add to training export |
+| 6 | Consolidate vritti to `chitta_vritti/` as canonical | `core/smi/vritti_mapping.py`, `sovereign/vritti.py`, `inference/sovereign_state_monitor.py` | Medium — redirect imports, deprecate independent computations |
+| 7 | Consolidate guna to `guna_modulation/guna_derivation.py` as canonical | `sovereign/guna.py`, `inference/guna_inference.py` | Medium — same pattern as vritti consolidation |
+| 8 | Clean up `core/` facades | `core/__init__.py`, `core/interface.py`, `core/pipeline.py` | Small — remove dead code, update exports |
+| 9 | Remove or redirect `core/entropy/` | `core/entropy/` | Small — delete dead stub |
+
+### Wire Later
+
+| # | Action | Rationale |
+|---|--------|-----------|
+| 10 | `guna_modulation/MirrorBalance` | Sophisticated (1,941 LOC) but needs consumer; wire after core E=G×P×T is live |
+| 11 | `guna_modulation/CausalLayer` | Do-calculus auditing; wire after pipeline observability is improved |
+| 12 | `inference/` Appendix F stages | Research-grade; mature individual stages before wiring |
+| 13 | `temporal/` always-on mode | Currently tension-gated; consider enabling baseline temporal tracking for all requests |
+
+### Document Only (No Wiring Change)
+
+| # | Module | Reason |
+|---|--------|--------|
+| 14 | `identity/` | Fully wired, functioning correctly |
+| 15 | `motivation/` | Fully wired, functioning correctly |
+| 16 | `llm/` | Fully wired, functioning as boundary layer |
+| 17 | `api/` | Fully wired, functioning as observability layer |
+
+### Not Worth Wiring Now
+
+| # | Module/Component | Reason |
+|---|-----------------|--------|
+| 18 | `guna_modulation/ExperimentalReasoning` | Explicitly marked "No learning. Exploration only." — research tool, not runtime |
+| 19 | `guna_modulation/RecursiveSelfImprovement` | Observational tracking only — no actionable output |
+| 20 | `core/interface.py` + `core/pipeline.py` | Dead facades — delete rather than wire |
+
+---
+
+## Summary Classification Table
+
+| Folder | Priority | Status | Action |
+|--------|----------|--------|--------|
+| `chitta_vritti/` | CORE RUNTIME CRITICAL | Fully active | Wire now (make canonical vritti authority) |
+| `identity/` | CORE RUNTIME CRITICAL | Fully active | Document only |
+| `motivation/` | CORE RUNTIME CRITICAL | Fully active | Document only |
+| `llm/` | CORE RUNTIME CRITICAL | Fully active | Document only |
+| `api/` | CORE RUNTIME CRITICAL | Fully active | Document only |
+| `core/` | CORE RUNTIME CRITICAL / NEEDS CONSOLIDATION | Active engines + dead facades | Refactor first |
+| `temporal/` | CORE RUNTIME CRITICAL (when LAM) | Conditionally active | Wire now (consider always-on) |
+| `sovereign/` | CORE RUNTIME CRITICAL (training) | Training-active | Refactor first (build inference bridge) |
+| `entropy/` | IMPORTANT BUT UNDERWIRED | Active but limited | Wire now (output gating) |
+| `dha/` | IMPORTANT BUT UNDERWIRED | Implemented, disabled | Wire now (enable default) |
+| `inference/` | IMPORTANT BUT UNDERWIRED | Built but orphaned | Wire now (core) / wire later (Appendix F) |
+| `guna_modulation/` | IMPORTANT BUT UNDERWIRED | Optional, feature-flagged | Wire now (E=G×P×T) / wire later (advanced) |
