@@ -189,6 +189,18 @@ def build_unified_output(text: str, ctx: Any) -> UnifiedOutput:
             'adaptation_notes': ctx.dha.adaptation_notes,
             'adapted_message': ctx.dha.guarded_text,
         }
+        # Phase 2: Surface output modulation signals at top level for easy access
+        output_mod = ctx.dha.adaptation_notes.get("output_modulation")
+        if output_mod and isinstance(output_mod, dict):
+            dha_insights['formula_dha_tone_weights'] = output_mod.get('dha_tone_weights')
+            dha_insights['formula_dha_intensity'] = output_mod.get('dha_intensity')
+            dha_insights['formula_dha_delivery_factor'] = output_mod.get('dha_delivery_factor')
+            dha_insights['formula_dha_dominant_tone'] = output_mod.get('dha_dominant_tone')
+            dha_insights['guna_modulation_E'] = output_mod.get('guna_E')
+            dha_insights['guna_modulation_vector'] = output_mod.get('guna_vector')
+            dha_insights['guna_output_intensity'] = output_mod.get('guna_output_intensity')
+            dha_insights['entropy_gate'] = output_mod.get('entropy_gate')
+            dha_insights['entropy_combined'] = output_mod.get('entropy_combined')
 
     # Extract routing plan from MLCR/TTOR
     routing_plan = {}
@@ -1498,6 +1510,11 @@ def get_public_response(ctx: Any) -> Dict[str, Any]:
         'dha': {
             'delivery_profile': unified.get('dha', {}).get('delivery_profile', 'unknown'),
             'readiness_level': unified.get('dha', {}).get('readiness_level', 'unknown'),
+            # Phase 2: formula DHA + guna modulation (diagnostic)
+            'formula_dha_dominant_tone': unified.get('dha', {}).get('formula_dha_dominant_tone'),
+            'formula_dha_delivery_factor': unified.get('dha', {}).get('formula_dha_delivery_factor'),
+            'guna_modulation_E': unified.get('dha', {}).get('guna_modulation_E'),
+            'entropy_gate': unified.get('dha', {}).get('entropy_gate'),
         },
         'coherence': coherence_summary,
         'mappers': unified.get('mappers', {}),

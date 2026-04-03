@@ -393,6 +393,17 @@ def run_integrated_renderer(
         output_meta["mlcr_tier"] = explain_log.get("meta", {}).get("tier")
         output_meta["mlcr_intent"] = explain_log.get("meta", {}).get("intent")
 
+    # Phase 2: Surface formula DHA and guna modulation in renderer metadata
+    if hasattr(ctx, 'dha') and ctx.dha and hasattr(ctx.dha, 'adaptation_notes'):
+        output_mod = ctx.dha.adaptation_notes.get("output_modulation")
+        if output_mod and isinstance(output_mod, dict):
+            output_meta["formula_dha_tone_weights"] = output_mod.get("dha_tone_weights")
+            output_meta["formula_dha_delivery_factor"] = output_mod.get("dha_delivery_factor")
+            output_meta["formula_dha_dominant_tone"] = output_mod.get("dha_dominant_tone")
+            output_meta["guna_modulation_E"] = output_mod.get("guna_E")
+            output_meta["guna_output_intensity"] = output_mod.get("guna_output_intensity")
+            output_meta["entropy_gate"] = output_mod.get("entropy_gate")
+
     # Get mapper summary
     mapper_summary = None
     if hasattr(ctx, 'mapper_summary'):

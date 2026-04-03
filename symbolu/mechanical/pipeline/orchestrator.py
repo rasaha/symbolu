@@ -957,12 +957,13 @@ class SymbolUPipeline:
         # =======================================================================
         # Formula-only DHA (Delivery Harmonization Algorithm)
         # Deterministic, zero-parameter, closed-form delivery modulation
-        # Disabled by default - enable via dha_formula_enabled in request metadata
+        # Enabled by default in diagnostic mode (Phase 2 signal wiring)
         # Authority: OBSERVATIONAL (provides delivery profile, does not modify text)
+        # Set dha_formula_enabled=False in request metadata to disable
         # =======================================================================
         try:
-            # Check if formula DHA is enabled via request metadata
-            formula_dha_enabled = ctx.request.metadata.get("dha_formula_enabled", False)
+            # Enabled by default (diagnostic mode) — override with metadata flag
+            formula_dha_enabled = ctx.request.metadata.get("dha_formula_enabled", True)
             if formula_dha_enabled:
                 dha_module = _get_formula_dha()
                 DHAConfig = dha_module["DHAConfig"]
@@ -979,6 +980,39 @@ class SymbolUPipeline:
                     ctx.dha.adaptation_notes["formula_dha"] = formula_dha_result
                     ctx.dha.adaptation_notes["formula_dha_D"] = formula_dha_result.get("D")
                     ctx.dha.adaptation_notes["formula_dha_tone"] = formula_dha_result.get("tone_weights", {})
+
+                # ---------------------------------------------------------------
+                # Output modulation adapter (Phase 2): resolve DHA + guna + entropy
+                # for unified output metadata. Observation-only, no text mutation.
+                # ---------------------------------------------------------------
+                try:
+                    from agentic.agentic_framework.signal_adapters.output_modulation_adapter import (
+                        resolve_output_modulation,
+                    )
+                    explain_log = ctx.mlcr.explain_log if ctx.mlcr else {}
+                    entropy_vals = explain_log.get("entropy", {})
+                    H_G = entropy_vals.get("H_G", 0.0)
+                    # Normalize H_G to [0,1] using ln(3) ≈ 1.0986
+                    import math
+                    H_norm = min(1.0, max(0.0, H_G / math.log(3))) if H_G > 0 else 0.0
+
+                    coherence_score = 0.5
+                    if hasattr(ctx, 'coherence_state') and ctx.coherence_state:
+                        coherence_score = getattr(ctx.coherence_state, 'coherence_score', 0.5)
+
+                    modulation_resolution = resolve_output_modulation(
+                        dha_result=formula_dha_result,
+                        C_s=coherence_score,
+                        M=0.0,  # Motion not readily available here
+                        H=H_norm,
+                        tier=tier,
+                        base_intensity=1.0,
+                        entropy_gate=ctx.request.metadata.get("entropy_gate"),
+                        entropy_combined=entropy_vals.get("normalized_entropy"),
+                    )
+                    ctx.dha.adaptation_notes["output_modulation"] = modulation_resolution.to_dict()
+                except Exception:
+                    pass  # Output modulation is diagnostic-only
         except Exception:
             # Formula DHA is optional - continue if it fails
             pass
