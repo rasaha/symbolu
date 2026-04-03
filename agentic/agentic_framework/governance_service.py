@@ -76,6 +76,15 @@ from agentic.agentic_framework.jepa_governance import (
     approximate_layer_weights,
     approximate_vritti,
 )
+from agentic.agentic_framework.signal_adapters.vritti_adapter import (
+    resolve_vritti_signal,
+    VrittiResolution,
+    VrittiSignalSource,
+)
+from agentic.agentic_framework.signal_adapters.entropy_adapter import (
+    resolve_entropy_signal,
+    EntropyResolution,
+)
 from agentic.agentic_framework.domain_policy import (
     DomainActionMode,
     DomainPolicyResult,
@@ -381,18 +390,56 @@ def _approximate_layer_weights(
     )
 
 
-def _approximate_vritti(
+def _resolve_vritti(
     request: AuthorizationRequest,
     gate_decision: ConfidenceGateDecision,
-) -> Dict[str, float]:
-    """Approximate vritti distribution from available request signals.
+    vritti_result: Any = None,
+) -> VrittiResolution:
+    """Resolve vritti signal: prefer real chitta_vritti, fall back to approx.
 
-    Delegates to the shared canonical implementation in jepa_governance.
+    Phase 1: Uses the vritti signal adapter to prefer real ChittaVrittiResult
+    when available on the request, otherwise falls back to the canonical
+    approximate_vritti() heuristic.
+
+    Args:
+        request: Authorization request (may carry .vritti_result).
+        gate_decision: Confidence gate output (provides overall confidence).
+        vritti_result: Optional explicit ChittaVrittiResult override.
+
+    Returns:
+        VrittiResolution with distribution, provenance, and degradation flag.
     """
-    return approximate_vritti(
+    cv_result = vritti_result or getattr(request, "vritti_result", None)
+    return resolve_vritti_signal(
+        vritti_result=cv_result,
         quality=getattr(request, "quality_score", 0.5),
         coherence=getattr(request, "coherence_score", 0.5),
         overall_confidence=gate_decision.confidence.overall,
+    )
+
+
+def _resolve_entropy(
+    request: AuthorizationRequest,
+    entropy_result: object = None,
+) -> EntropyResolution:
+    """Resolve entropy signal for governance use.
+
+    Phase 1: Wires entropy into the governance decision context.
+    If no entropy data is available, returns a non-influential placeholder.
+
+    Args:
+        request: Authorization request (may carry .entropy_result or
+            .combined_entropy).
+        entropy_result: Optional explicit EntropyResult override.
+
+    Returns:
+        EntropyResolution with metrics and bounded confidence penalty.
+    """
+    ent_result = entropy_result or getattr(request, "entropy_result", None)
+    combined = getattr(request, "combined_entropy", None)
+    return resolve_entropy_signal(
+        entropy_result=ent_result,
+        combined_entropy=combined,
     )
 
 
@@ -661,7 +708,7 @@ class GovernanceService:
         #   Uses safe_jepa_governance_check — always returns an assessment,
         #   never None. JEPA failure produces UNKNOWN regime.
         baseline_decision = governance_decision
-        jepa_assessment = self._run_jepa_check(
+        jepa_assessment, vritti_resolution, entropy_resolution = self._run_jepa_check(
             request, risk_level, gate_decision,
         )
 
@@ -678,9 +725,14 @@ class GovernanceService:
         # Step 5c: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
+        #
+        # Phase 1: Also apply bounded entropy confidence penalty.
+        # Entropy penalty is always non-positive (stricter-only).
         effective_confidence = max(
             0.0,
-            gate_decision.confidence.overall + jepa_assessment.confidence_adjustment,
+            gate_decision.confidence.overall
+            + jepa_assessment.confidence_adjustment
+            - entropy_resolution.confidence_penalty,
         )
 
         effective_exec_mode = gate_decision.execution.mode
@@ -880,6 +932,15 @@ class GovernanceService:
                 "jepa_recommended_action": jepa_assessment.recommended_action,
                 "jepa_execution_mode_override": jepa_assessment.execution_mode_override,
                 "jepa_escalation_override": jepa_assessment.escalation_override,
+                # Phase 1: Signal source provenance
+                "vritti_signal_source": vritti_resolution.source.value,
+                "vritti_signal_degraded": vritti_resolution.degraded,
+                "vritti_signal_detail": vritti_resolution.source_detail,
+                "entropy_available": entropy_resolution.available,
+                "entropy_combined": entropy_resolution.combined_entropy,
+                "entropy_confidence_penalty": entropy_resolution.confidence_penalty,
+                "entropy_gate": entropy_resolution.gate,
+                "entropy_detail": entropy_resolution.source_detail,
                 "domain_policy": (
                     domain_result.to_audit_dict() if domain_result else None
                 ),
@@ -1116,21 +1177,33 @@ class GovernanceService:
         request: AuthorizationRequest,
         risk_level: "ToolRiskLevel",
         gate_decision: "ConfidenceGateDecision",
-    ) -> JEPAGovernanceAssessment:
+    ) -> Tuple[JEPAGovernanceAssessment, VrittiResolution, EntropyResolution]:
         """Run JEPA residual governance check. Always returns an assessment.
 
         Uses safe_jepa_governance_check which catches internal errors
         and returns an explicit UNKNOWN-regime assessment. Never returns
         None — JEPA failure is itself a governance condition.
+
+        Phase 1: Now uses vritti signal adapter (prefers real chitta_vritti)
+        and resolves entropy for governance context.
+
+        Returns:
+            Tuple of (JEPAGovernanceAssessment, VrittiResolution, EntropyResolution).
         """
         layer_weights = _approximate_layer_weights(request, gate_decision)
-        vritti_dist = _approximate_vritti(request, gate_decision)
 
-        return safe_jepa_governance_check(
+        # Phase 1: Resolve vritti via adapter (real > approximation)
+        vritti_resolution = _resolve_vritti(request, gate_decision)
+        vritti_dist = vritti_resolution.distribution
+
+        # Phase 1: Resolve entropy for governance context
+        entropy_resolution = _resolve_entropy(request)
+
+        assessment = safe_jepa_governance_check(
             layer_weights=layer_weights,
             vritti_distribution=vritti_dist,
-            coherence=getattr(request, "coherence_score", 0.5),
-            score=gate_decision.confidence.overall,
+            coherence=vritti_resolution.coherence,
+            score=vritti_resolution.score,
             action_type=request.action_type,
             tool_name=request.tool_name or "",
             risk_level=risk_level.value if hasattr(risk_level, "value") else str(risk_level),
@@ -1146,6 +1219,8 @@ class GovernanceService:
             actor_id=request.actor_id,
             capabilities=request.capabilities or [],
         )
+
+        return assessment, vritti_resolution, entropy_resolution
 
     def get_audit_log(self, limit: int = 100) -> List[AuditEvent]:
         """Get recent audit events (from in-memory cache)."""
