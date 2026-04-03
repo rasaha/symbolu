@@ -38,6 +38,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+import logging
+
 from symbolu_core.mechanical.renderer.fusion_renderer import (
     FusionRenderer,
     FusionOutput,
@@ -47,7 +49,10 @@ from symbolu_core.mechanical.renderer.fusion_renderer import (
     PracticalLayer,
     MirrorTruthLayer,
     RenderedOutput as FusionRenderedOutput,
+    MODE_WEIGHTS,
 )
+
+logger = logging.getLogger(__name__)
 
 from symbolu_core.mechanical.renderer.varna_hybrid_renderer import (
     VarnaHybridRenderer,
@@ -327,10 +332,46 @@ def run_integrated_renderer(
     # ==========================================================================
     # STAGE 1: FusionRenderer - Structured Layers
     # ==========================================================================
+    render_mode = get_render_mode(render_mode_str)
     fusion_renderer = FusionRenderer(
-        mode=get_render_mode(render_mode_str),
+        mode=render_mode,
         domain=get_domain(domain_str),
     )
+
+    # Phase 2 completion: Apply DHA tone modulation to layer weights.
+    # This is the direct output-path effect (complementary to Strategy 2's
+    # confidence/escalation path). DHA tone weights shift emphasis between
+    # symbolic/practical/mirror layers, gated by delivery factor D.
+    layer_weight_adjustment = None
+    if hasattr(ctx, 'dha') and ctx.dha and hasattr(ctx.dha, 'adaptation_notes'):
+        try:
+            from agentic.agentic_framework.signal_adapters.output_modulation_adapter import (
+                compute_layer_weight_adjustments,
+            )
+            output_mod = ctx.dha.adaptation_notes.get("output_modulation", {})
+            if isinstance(output_mod, dict) and output_mod.get("guna_modulation_available"):
+                tone_weights = output_mod.get("dha_tone_weights")
+                delivery_factor = output_mod.get("dha_delivery_factor")
+                base_weights = dict(MODE_WEIGHTS.get(render_mode, MODE_WEIGHTS[RenderMode.STANDARD]))
+
+                layer_weight_adjustment = compute_layer_weight_adjustments(
+                    base_weights=base_weights,
+                    tone_weights=tone_weights,
+                    delivery_factor=delivery_factor,
+                    output_intensity=output_mod.get("guna_output_intensity"),
+                )
+
+                if layer_weight_adjustment.applied:
+                    fusion_renderer.layer_weights = layer_weight_adjustment.adjusted_weights
+                    logger.debug(
+                        "Phase 2: Applied DHA tone modulation to layer weights "
+                        "(D=%.3f, shift=%.4f): %s",
+                        layer_weight_adjustment.delivery_factor,
+                        layer_weight_adjustment.shift_magnitude,
+                        layer_weight_adjustment.adjusted_weights,
+                    )
+        except Exception as exc:
+            logger.debug("Phase 2: Layer weight modulation failed: %s", exc)
 
     try:
         fusion_result = fusion_renderer.render(fusion_output)
@@ -410,6 +451,11 @@ def run_integrated_renderer(
             output_meta["delivery_confidence"] = ctx.dha.adaptation_notes.get("delivery_confidence")
             output_meta["delivery_confidence_base"] = ctx.dha.adaptation_notes.get("delivery_confidence_base")
             output_meta["modulation_confidence_E_raw"] = ctx.dha.adaptation_notes.get("modulation_confidence_E_raw")
+
+    # Phase 2 completion: Surface layer weight adjustment metadata
+    if layer_weight_adjustment is not None:
+        output_meta["layer_weight_modulation"] = layer_weight_adjustment.to_dict()
+        output_meta["layer_weight_modulation_applied"] = layer_weight_adjustment.applied
 
     # Get mapper summary
     mapper_summary = None

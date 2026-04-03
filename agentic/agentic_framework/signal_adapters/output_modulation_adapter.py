@@ -380,3 +380,158 @@ def compute_modulation_confidence_adjustment(
         return _E_MAX_UPLIFT * (E - _E_HIGH_THRESHOLD) / (1.0 - _E_HIGH_THRESHOLD)
     else:
         return 0.0
+
+
+# =========================================================================
+# Phase 2 completion: DHA tone → renderer layer weight adjustments
+# =========================================================================
+
+# Maximum per-weight shift from DHA tone modulation.
+# Keeps STANDARD {0.33, 0.34, 0.33} within a bounded envelope.
+_MAX_WEIGHT_SHIFT = 0.15
+
+# Tone-to-layer mapping:
+#   sweet    → symbolic  (the "why" / warmth / metaphorical framing)
+#   jolt     → practical (the "what/how" / directness / assertiveness)
+#   metaphor → mirror    (reflective synthesis / tension surfacing)
+_TONE_LAYER_MAP = {
+    "sweet": "symbolic",
+    "jolt": "practical",
+    "metaphor": "mirror",
+}
+
+
+@dataclass(frozen=True)
+class LayerWeightAdjustment:
+    """Result of applying DHA tone modulation to renderer layer weights.
+
+    Attributes:
+        adjusted_weights: Dict with symbolic/practical/mirror weights (sum ≈ 1.0).
+        base_weights: The original weights before adjustment.
+        applied: Whether any adjustment was actually applied.
+        delivery_factor: The D value that gated the adjustment magnitude.
+        tone_weights: The raw DHA tone weights used.
+        shift_magnitude: L1 norm of weight shifts applied.
+    """
+    adjusted_weights: Dict[str, float]
+    base_weights: Dict[str, float]
+    applied: bool
+    delivery_factor: float
+    tone_weights: Optional[Dict[str, float]]
+    shift_magnitude: float
+
+    def to_dict(self) -> Dict:
+        return {
+            "adjusted_weights": self.adjusted_weights,
+            "base_weights": self.base_weights,
+            "applied": self.applied,
+            "delivery_factor": self.delivery_factor,
+            "tone_weights": self.tone_weights,
+            "shift_magnitude": round(self.shift_magnitude, 6),
+        }
+
+
+def compute_layer_weight_adjustments(
+    base_weights: Dict[str, float],
+    tone_weights: Optional[Dict[str, float]],
+    delivery_factor: Optional[float],
+    output_intensity: Optional[float] = None,
+) -> LayerWeightAdjustment:
+    """Compute bounded renderer layer weight adjustments from DHA tone modulation.
+
+    Maps DHA tone weights to renderer layer emphasis shifts, gated by
+    the delivery factor D. This is the direct output-path effect of
+    Phase 2 modulation (complementary to Strategy 2's confidence path).
+
+    Mapping:
+        sweet    → +symbolic  weight, -practical weight
+        jolt     → +practical weight, -symbolic weight
+        metaphor → +mirror    weight, -(symbolic+practical) weight
+
+    Gating:
+        Each tone's raw shift is multiplied by D (delivery factor [0,1]).
+        D=0 → no shift. D=1 → full shift (still capped by _MAX_WEIGHT_SHIFT).
+
+    Bounds:
+        Per-weight shift capped at ±_MAX_WEIGHT_SHIFT (0.15).
+        Weights renormalized to sum to 1.0 after adjustment.
+
+    Args:
+        base_weights: Current layer weights {"symbolic": ..., "practical": ..., "mirror": ...}.
+        tone_weights: DHA tone weights {"sweet": ..., "jolt": ..., "metaphor": ...}, or None.
+        delivery_factor: D = I × R from DHA [0, 1], or None.
+        output_intensity: Optional guna output intensity (E × base) for audit.
+
+    Returns:
+        LayerWeightAdjustment with bounded adjusted weights and audit metadata.
+    """
+    # Default: no adjustment
+    if tone_weights is None or delivery_factor is None:
+        return LayerWeightAdjustment(
+            adjusted_weights=dict(base_weights),
+            base_weights=dict(base_weights),
+            applied=False,
+            delivery_factor=delivery_factor or 0.0,
+            tone_weights=tone_weights,
+            shift_magnitude=0.0,
+        )
+
+    D = max(0.0, min(1.0, float(delivery_factor)))
+    if D < 1e-6:
+        return LayerWeightAdjustment(
+            adjusted_weights=dict(base_weights),
+            base_weights=dict(base_weights),
+            applied=False,
+            delivery_factor=D,
+            tone_weights=tone_weights,
+            shift_magnitude=0.0,
+        )
+
+    # Compute dominant tone and its excess over uniform (1/3)
+    tw_sweet = float(tone_weights.get("sweet", 0.33))
+    tw_jolt = float(tone_weights.get("jolt", 0.33))
+    tw_metaphor = float(tone_weights.get("metaphor", 0.34))
+    tw_total = tw_sweet + tw_jolt + tw_metaphor
+    if tw_total > 1e-9:
+        tw_sweet /= tw_total
+        tw_jolt /= tw_total
+        tw_metaphor /= tw_total
+
+    # Each tone's deviation from uniform drives a proportional shift
+    # toward its corresponding layer, scaled by D.
+    uniform = 1.0 / 3.0
+    raw_shifts = {
+        "symbolic": (tw_sweet - uniform) * D,
+        "practical": (tw_jolt - uniform) * D,
+        "mirror": (tw_metaphor - uniform) * D,
+    }
+
+    # Clamp each shift to bounded range
+    clamped_shifts = {
+        k: max(-_MAX_WEIGHT_SHIFT, min(_MAX_WEIGHT_SHIFT, v))
+        for k, v in raw_shifts.items()
+    }
+
+    # Apply shifts to base weights
+    adjusted = {
+        k: max(0.0, base_weights.get(k, uniform) + clamped_shifts.get(k, 0.0))
+        for k in ("symbolic", "practical", "mirror")
+    }
+
+    # Renormalize to sum to 1.0
+    total = sum(adjusted.values())
+    if total > 1e-9:
+        adjusted = {k: v / total for k, v in adjusted.items()}
+    else:
+        adjusted = {"symbolic": 0.33, "practical": 0.34, "mirror": 0.33}
+
+    shift_magnitude = sum(abs(v) for v in clamped_shifts.values())
+
+    return LayerWeightAdjustment(
+        adjusted_weights=adjusted,
+        base_weights=dict(base_weights),
+        applied=shift_magnitude > 1e-6,
+        delivery_factor=D,
+        tone_weights=tone_weights,
+        shift_magnitude=shift_magnitude,
+    )
