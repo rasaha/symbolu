@@ -67,6 +67,11 @@ from agentic.ledger.governance_audit_store import (
     GovernanceAuditError,
     event_from_governance_decision,
 )
+from agentic.agentic_framework.jepa_governance import (
+    JEPAGovernanceAssessment,
+    GovernanceRegime,
+    jepa_governance_check,
+)
 
 import logging as _logging
 
@@ -293,6 +298,110 @@ def _compute_governance_decision(
     return APIGovernanceDecision.ALLOW
 
 
+def _approximate_layer_weights(
+    request: AuthorizationRequest,
+    gate_decision: ConfidenceGateDecision,
+) -> Dict[str, float]:
+    """Approximate OLM layer weights from available request signals.
+
+    In a full integration, the OLMGovernanceSignals would be passed directly.
+    Here we derive a reasonable approximation from the confidence signals
+    so the JEPA check can run without the full OLM engine.
+    """
+    q = getattr(request, "quality_score", 0.5)
+    c = getattr(request, "coherence_score", 0.5)
+    ic = getattr(request, "internal_consistency", 0.5)
+    ga = getattr(request, "goal_alignment", 0.5)
+    tc = getattr(request, "trajectory_confidence", 0.5)
+    overall = gate_decision.confidence.overall
+
+    return {
+        "O1_POTENTIAL": 0.3,
+        "O2_IDENTITY": ic * 0.8,
+        "O3_EXECUTION": overall * 0.7,
+        "O4_STRUCTURE": c * 0.6,
+        "O5_COGNITION": q * 0.8,
+        "O6_AGENCY": ga * 0.7,
+        "O7_REASONING": q * 0.9,
+        "O8_PURPOSE": ga * 0.8,
+        "O9_WITNESSES": tc * 0.6,
+        "O10_UNIFYING": c * 0.7,
+        "O11_INTEGRATION": overall * 0.5,
+        "O12_ABSOLVING": tc * 0.4,
+    }
+
+
+def _approximate_vritti(
+    request: AuthorizationRequest,
+    gate_decision: ConfidenceGateDecision,
+) -> Dict[str, float]:
+    """Approximate vritti distribution from available request signals.
+
+    In a full integration, ChittaVrittiResult would be passed directly.
+    Here we derive a reasonable approximation: high quality/coherence
+    → pramana; low quality → viparyaya; low coherence → vikalpa.
+    """
+    q = getattr(request, "quality_score", 0.5)
+    c = getattr(request, "coherence_score", 0.5)
+    overall = gate_decision.confidence.overall
+
+    # Pramana rises with quality and coherence
+    pramana = min(1.0, q * 0.6 + c * 0.4)
+    # Viparyaya rises when quality is low
+    viparyaya = max(0.0, 0.5 - q * 0.8)
+    # Vikalpa rises when coherence is low but quality is moderate
+    vikalpa = max(0.0, 0.4 - c * 0.5) * min(1.0, q + 0.3)
+    # Smrti is a baseline
+    smrti = 0.1
+    # Nidra rises when overall confidence is very low
+    nidra = max(0.0, 0.3 - overall * 0.5)
+
+    # Normalize
+    total = pramana + viparyaya + vikalpa + smrti + nidra
+    if total <= 0:
+        return {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                "smrti": 0.0, "nidra": 1.0}
+    return {
+        "pramana": pramana / total,
+        "viparyaya": viparyaya / total,
+        "vikalpa": vikalpa / total,
+        "smrti": smrti / total,
+        "nidra": nidra / total,
+    }
+
+
+def _apply_jepa_override(
+    governance_decision: APIGovernanceDecision,
+    eligible: bool,
+    assessment: "JEPAGovernanceAssessment",
+) -> Tuple[APIGovernanceDecision, bool]:
+    """Apply JEPA governance override if the regime warrants it.
+
+    JEPA can only make decisions STRICTER, never more permissive.
+    - NORMAL → no change
+    - PROCESS_DRIFT → downgrade ALLOW to DEFER
+    - SEMANTIC_SHIFT → downgrade ALLOW to DEFER
+    - DUAL_ANOMALY → force DENY
+    - UNKNOWN → force DENY
+    """
+    regime = assessment.regime
+
+    if regime == GovernanceRegime.NORMAL:
+        return governance_decision, eligible
+
+    if regime == GovernanceRegime.DUAL_ANOMALY:
+        return APIGovernanceDecision.DENY, False
+
+    if regime == GovernanceRegime.UNKNOWN:
+        return APIGovernanceDecision.DENY, False
+
+    if regime in (GovernanceRegime.PROCESS_DRIFT, GovernanceRegime.SEMANTIC_SHIFT):
+        if governance_decision == APIGovernanceDecision.ALLOW:
+            return APIGovernanceDecision.DEFER, eligible
+
+    return governance_decision, eligible
+
+
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
     gate_decision: ConfidenceGateDecision,
@@ -466,6 +575,18 @@ class GovernanceService:
         governance_decision = _compute_governance_decision(
             eligible, gate_decision, forbidden_cap,
         )
+
+        # Step 5b: JEPA residual governance check
+        #   Compares the JEPA composite latent state (ontology + vritti)
+        #   against the runtime process state to detect drift, anomaly,
+        #   or semantic shift. May override governance decision.
+        jepa_assessment = self._run_jepa_check(
+            request, risk_level, gate_decision, governance_decision,
+        )
+        if jepa_assessment is not None:
+            governance_decision, eligible = _apply_jepa_override(
+                governance_decision, eligible, jepa_assessment,
+            )
 
         # Step 6: Build rationale
         rationale_codes = _build_rationale_codes(
@@ -649,6 +770,55 @@ class GovernanceService:
                     exc_info=True,
                 )
                 raise
+
+    def _run_jepa_check(
+        self,
+        request: AuthorizationRequest,
+        risk_level: "ToolRiskLevel",
+        gate_decision: "ConfidenceGateDecision",
+        governance_decision: "APIGovernanceDecision",
+    ) -> Optional[JEPAGovernanceAssessment]:
+        """Run JEPA residual governance check if signals are available.
+
+        Returns None if JEPA cannot be computed (missing classifiers).
+        The JEPA check is best-effort: if neither ontology nor vritti
+        signals are available, it returns None and the existing decision
+        stands. If signals are partially available, JEPA still runs
+        with fail-closed defaults on the missing side.
+        """
+        # Build layer weights from request quality/coherence scores.
+        # In a full integration, these would come from OLMGovernanceSignals
+        # or the sovereign bridge. Here we approximate from available signals.
+        layer_weights = _approximate_layer_weights(request, gate_decision)
+
+        # Build vritti distribution from request signals.
+        # In a full integration, these would come from ChittaVrittiEngine.
+        vritti_dist = _approximate_vritti(request, gate_decision)
+
+        try:
+            return jepa_governance_check(
+                layer_weights=layer_weights,
+                vritti_distribution=vritti_dist,
+                coherence=getattr(request, "coherence_score", 0.5),
+                score=gate_decision.confidence.overall,
+                action_type=request.action_type,
+                tool_name=request.tool_name or "",
+                risk_level=risk_level.value if hasattr(risk_level, "value") else str(risk_level),
+                confidence_score=gate_decision.confidence.overall,
+                agency_level=request.agency_level or "FULL",
+                execution_mode=gate_decision.execution.mode.value
+                    if hasattr(gate_decision.execution.mode, "value")
+                    else str(gate_decision.execution.mode),
+                escalation_level=gate_decision.escalation.level.value
+                    if hasattr(gate_decision.escalation.level, "value")
+                    else str(gate_decision.escalation.level),
+                session_id=getattr(request, "session_id", ""),
+                actor_id=request.actor_id,
+                capabilities=request.capabilities or [],
+            )
+        except Exception as e:
+            _logger.warning("JEPA governance check failed: %s", e)
+            return None
 
     def get_audit_log(self, limit: int = 100) -> List[AuditEvent]:
         """Get recent audit events (from in-memory cache)."""

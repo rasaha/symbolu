@@ -64,6 +64,10 @@ from agentic.ledger.governance_audit_store import (
     GovernanceAuditError,
     event_from_mcp_audit,
 )
+from agentic.agentic_framework.jepa_governance import (
+    GovernanceRegime,
+    jepa_governance_check,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -672,6 +676,83 @@ class SafeMCPGateway:
                 return cap
         return None
 
+    def _jepa_check(
+        self,
+        tool_call: MCPToolCall,
+        tool_def: MCPToolDefinition,
+        gate_decision: ConfidenceGateDecision,
+    ) -> Optional[str]:
+        """Run JEPA residual check. Returns block reason or None if OK.
+
+        JEPA can only block; it cannot make a blocked call allowed.
+        Returns None for NORMAL regime, a blocking reason string for
+        DUAL_ANOMALY or UNKNOWN, and None (pass-through) for PROCESS_DRIFT
+        and SEMANTIC_SHIFT on read-only tools.
+        """
+        try:
+            # Approximate vritti from confidence signals
+            q = tool_call.quality_score
+            c = tool_call.coherence_score
+            overall = gate_decision.confidence.overall
+            pramana = min(1.0, q * 0.6 + c * 0.4)
+            viparyaya = max(0.0, 0.5 - q * 0.8)
+            vikalpa = max(0.0, 0.4 - c * 0.5)
+            nidra = max(0.0, 0.3 - overall * 0.5)
+            smrti = 0.1
+            total = pramana + viparyaya + vikalpa + smrti + nidra
+            if total <= 0:
+                vritti_dist = {"pramana": 0.0, "viparyaya": 0.0,
+                               "vikalpa": 0.0, "smrti": 0.0, "nidra": 1.0}
+            else:
+                vritti_dist = {
+                    "pramana": pramana / total, "viparyaya": viparyaya / total,
+                    "vikalpa": vikalpa / total, "smrti": smrti / total,
+                    "nidra": nidra / total,
+                }
+
+            assessment = jepa_governance_check(
+                layer_weights={
+                    "O1_POTENTIAL": 0.3, "O2_IDENTITY": c * 0.8,
+                    "O3_EXECUTION": overall * 0.7, "O4_STRUCTURE": c * 0.6,
+                    "O5_COGNITION": q * 0.8, "O6_AGENCY": q * 0.7,
+                    "O7_REASONING": q * 0.9, "O8_PURPOSE": q * 0.8,
+                    "O9_WITNESSES": overall * 0.6, "O10_UNIFYING": c * 0.7,
+                    "O11_INTEGRATION": overall * 0.5, "O12_ABSOLVING": overall * 0.4,
+                },
+                vritti_distribution=vritti_dist,
+                coherence=c,
+                score=overall,
+                action_type="call_tool",
+                tool_name=tool_call.tool_name,
+                risk_level=tool_def.risk_level.value,
+                confidence_score=overall,
+                session_id=tool_call.session_id or "",
+            )
+
+            if assessment.regime in (GovernanceRegime.DUAL_ANOMALY,
+                                     GovernanceRegime.UNKNOWN):
+                return (
+                    f"JEPA residual governor: {assessment.regime.value} — "
+                    f"{assessment.rationale}"
+                )
+
+            # PROCESS_DRIFT and SEMANTIC_SHIFT block destructive/privileged tools
+            if assessment.regime in (GovernanceRegime.PROCESS_DRIFT,
+                                     GovernanceRegime.SEMANTIC_SHIFT):
+                if tool_def.risk_level in (ToolRiskLevel.DESTRUCTIVE,
+                                           ToolRiskLevel.PRIVILEGED):
+                    return (
+                        f"JEPA residual governor: {assessment.regime.value} — "
+                        f"blocking {tool_def.risk_level.value} tool. "
+                        f"{assessment.rationale}"
+                    )
+
+            return None  # No block
+
+        except Exception as e:
+            logger.warning("JEPA check failed in MCP gateway: %s", e)
+            return None  # Fail-open on JEPA failure (other gates still apply)
+
     def _audit(
         self,
         tool_call: MCPToolCall,
@@ -772,6 +853,23 @@ class SafeMCPGateway:
 
         # Gate the call
         gate_decision = self.gate.evaluate(signals, tool_call.tool_name)
+
+        # JEPA residual governance check
+        jepa_block = self._jepa_check(tool_call, tool_def, gate_decision)
+        if jepa_block is not None:
+            result = MCPToolResult(
+                request_id=tool_call.request_id,
+                tool_name=tool_call.tool_name,
+                decision=GatewayDecision.BLOCKED,
+                success=False,
+                confidence=gate_decision.confidence.overall,
+                escalation_level=gate_decision.escalation.level,
+                blocked_reason=jepa_block,
+                risk_level=tool_def.risk_level,
+                execution_time_ms=(time.time() - start_time) * 1000,
+            )
+            self._audit(tool_call, tool_def, result, gate_decision)
+            return result
 
         # Check minimum confidence for risk level
         if gate_decision.confidence.overall < tool_def.min_confidence:
