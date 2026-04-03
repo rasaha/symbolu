@@ -675,3 +675,131 @@ Central computation engine for the Symbol-U pipeline. Intended as the canonical 
 | `dha/` | IMPORTANT BUT UNDERWIRED | Implemented, disabled | Wire now (enable default) |
 | `inference/` | IMPORTANT BUT UNDERWIRED | Built but orphaned | Wire now (core) / wire later (Appendix F) |
 | `guna_modulation/` | IMPORTANT BUT UNDERWIRED | Optional, feature-flagged | Wire now (E=G×P×T) / wire later (advanced) |
+
+---
+---
+
+# Phased Wiring Roadmap
+
+**Date:** 2026-04-03
+**Purpose:** Action-oriented integration plan to turn partially-connected modules into a coherent runtime architecture
+**Method:** Grounded in code inspection of governance control plane, pipeline orchestrator, renderer path, and session processing
+
+---
+
+## 1. Executive Summary
+
+The agentic architecture has **two critical wiring deficits**:
+
+1. **The governance control plane uses crude approximations** where real modules exist. GovernanceService, SafeMCPGateway, and JEPA governance construct fake vritti distributions from 2-3 scalar signals (`approximate_vritti()`) and fake OLM layer weights from 6 scalars (`approximate_layer_weights()`). Meanwhile, `chitta_vritti/` computes production-grade 5-mode distributions and `sovereign/` manages a 128D consciousness tensor — neither feeds governance.
+
+2. **The output modulation path is structurally incomplete.** DHA computes tone weights but the renderer never applies them. `guna_modulation/` has a canonical intensity formula (`E = G×P×T`) but the renderer uses no intensity scaling at all. Entropy signals are computed by MLCR but never gate or modulate output.
+
+**The governance plane is leaving ~60% of available signal capacity unused.** The output path has formulas that produce values nothing consumes.
+
+### What This Roadmap Does
+
+Sequences 20 concrete wiring actions across 5 phases:
+- **Phase 0**: Remove dead code and consolidate duplicated logic (prerequisite cleanup)
+- **Phase 1**: Replace governance approximations with real signal bridges (highest leverage)
+- **Phase 2**: Wire output modulation path (DHA + guna_modulation + entropy into renderer)
+- **Phase 3**: Connect session-level enrichments to governance (identity, motivation, temporal)
+- **Phase 4**: Advanced modules and experimental integration (MirrorBalance, CausalLayer, Appendix F)
+
+---
+
+## 2. Current Architectural Bottlenecks
+
+### Bottleneck 1: Governance Runs on Approximations
+
+**Where:** `agentic_framework/jepa_governance.py` lines ~120-180
+
+GovernanceService calls `jepa_governance_check()` which constructs:
+- `approximate_layer_weights(quality, coherence, consistency, alignment)` → fake 12-layer OLM weights from 4 scalars
+- `approximate_vritti(quality, coherence, confidence)` → fake 5-vritti distribution from 3 scalars
+
+These approximations drive:
+- JEPA regime classification (NORMAL / PROCESS_DRIFT / SEMANTIC_SHIFT / DUAL_ANOMALY)
+- Domain policy evaluation (vritti × ontology × regime → action mode)
+- Shadow AI semantic mismatch escalation
+
+**Impact:** Governance decisions are made on proxy signals while real signals exist but are disconnected.
+
+**What exists but isn't consumed:**
+| Real Module | Signal It Produces | Currently Used Instead |
+|-------------|-------------------|----------------------|
+| `chitta_vritti/` | 5-vritti distribution (pramana, viparyaya, vikalpa, smrti, nidra) | `approximate_vritti()` from 3 scalars |
+| `sovereign/` | 128D consciousness tensor [16D Guna \| 32D S-Signal \| 48D R-Signal \| 32D C-Signal] | `approximate_layer_weights()` from 4 scalars |
+| `entropy/` | Cross-domain entropy with tier gating (ALLOW/MODULATE/BLOCK) | Raw `coherence_score` only |
+| `identity/` | 8-type identity classification with confidence | Not consumed by governance at all |
+| `motivation/` | 8-type motivation classification | Not consumed by governance at all |
+
+### Bottleneck 2: Output Path Has No Intensity Modulation
+
+**Where:** `symbolu_core/mechanical/pipeline/orchestrator.py` Stage 4 (DHA) → Stage 5 (Renderer)
+
+Pipeline stage ordering:
+```
+MLCR → HRM/LCM/LAM → Persona → Fusion → DHA → Renderer → Output
+```
+
+DHA (Stage 4) computes `DHAResult` with:
+- `D` (delivery factor), `tone_weights` (sweet/jolt/metaphor), `intensity`, `restraint`
+
+But the Renderer (Stage 5) **never reads these values**:
+- `FusionRenderer.render()` has no `intensity` parameter
+- `VarnaHybridRenderer` has no entropy-driven scaling
+- `IntegratedRenderedOutput` has no `delivery_factor` field
+- Formula DHA (guna_modulation E=G×P×T) is disabled by default and its output is stored in `adaptation_notes` — a dead-letter field
+
+**Impact:** DHA computes delivery modulation that nothing applies. The renderer produces output with no principled intensity/tone control.
+
+### Bottleneck 3: Vritti Duplication Prevents Canonical Authority
+
+**Where:** 5 independent vritti implementations
+
+| Location | What It Computes | Used By |
+|----------|-----------------|---------|
+| `chitta_vritti/vritti.py` | Full 5-mode with real math (coherence × entropy × motion) | Presentation, hybrid router |
+| `core/smi/vritti_mapping.py` | Independent VrittiMapper | SMI engine |
+| `sovereign/vritti.py` | Training-time vritti state | Sovereign loss |
+| `sovereign/reasoning_kernel.py` | VrittiGate in SRK | Training (SRK) |
+| `inference/sovereign_state_monitor.py` | 32D slice [17:22] | Inference state (orphaned) |
+
+No module trusts another's vritti output. Each computes its own. This means governance could use `chitta_vritti/` output, but `sovereign/` and `inference/` would still diverge.
+
+### Bottleneck 4: No Pipeline Context Contract
+
+**Where:** `PipelineContext` dataclass in `symbolu_core/mechanical/pipeline/models.py`
+
+Modules set `ctx` attributes independently:
+- `ctx.identity_signature` set by session_processing
+- `ctx.motivation_profile` set by session_processing
+- `ctx.dha` set by DHA stage
+- `ctx.coherence_state` set by coherence observer
+
+But there's no schema defining what must be present after each phase. Adding new module outputs (entropy gate result, guna modulation state) to `ctx` requires:
+1. Adding the field to PipelineContext
+2. Setting it in the right pipeline stage
+3. Ensuring downstream consumers handle `None` (not yet computed)
+
+This isn't blocking but makes wiring fragile. Every new integration requires defensive `Optional` handling.
+
+---
+
+## 3. Folder-by-Folder Action Classification
+
+| Folder | Action | Category | Rationale |
+|--------|--------|----------|-----------|
+| `chitta_vritti/` | **Wire immediately** | Semantic-state core | Replace `approximate_vritti()` in JEPA governance with real CV output. Coupling matrix already imported but fed fake data. |
+| `entropy/` | **Wire immediately** | Governance control support | Tier-aware gating logic (ALLOW/MODULATE/BLOCK) is fully built. Add to ConfidenceSignals and output gate. |
+| `dha/` | **Wire immediately** | Delivery/output modulation | Tone weights and delivery factor computed but never consumed by renderer. Flip default to enabled. |
+| `guna_modulation/` | **Wire immediately** (core E=G×P×T) | Delivery/output modulation | Replace heuristic intensity with canonical formula. Advanced modules (MirrorBalance, CausalLayer) wait. |
+| `identity/` | **Prepare interfaces now, wire later** | Governance control support | Fully active in session processing but governance doesn't consume it. Add to ConfidenceSignals as enrichment. |
+| `motivation/` | **Prepare interfaces now, wire later** | Governance control support | Same as identity/ — computed but governance-blind. Wire after identity/ proves the pattern. |
+| `temporal/` | **Prepare interfaces now, wire later** | Semantic-state core | Active in LAM but governance doesn't consume temporal signals. Wire after JEPA gets real vritti/OLM. |
+| `sovereign/` | **Refactor then wire** | Semantic-state core | 128D state should project to inference 32D. Vritti/guna duplicates must consolidate first. |
+| `inference/` | **Refactor then wire** | Runtime execution support | InferenceManager is built but orphaned. Needs sovereign bridge (128D→32D) before it's meaningful. |
+| `core/` | **Merge/deprecate** (facades only) | Infrastructure layer | Delete dead facades. Redirect core/entropy/ to entropy/. Consolidate core/smi/vritti_mapping into chitta_vritti/. Real subdirectory engines stay. |
+| `llm/` | **No action needed** | Infrastructure layer | Fully wired boundary layer. Functioning correctly. |
+| `api/` | **No action needed** | Infrastructure layer | Fully wired observability. Functioning correctly. |
