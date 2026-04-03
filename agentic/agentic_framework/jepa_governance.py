@@ -36,6 +36,31 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from agentic.chitta_vritti.coupling import get_aspect_weights as _get_aspect_weights
+
+
+# =========================================================================
+# Startup validation: ensure coupling matrix is importable and functional
+# =========================================================================
+
+def _validate_coupling_import() -> None:
+    """Validate that the R[v,a] coupling matrix is available at startup.
+
+    Fail-fast: if the coupling module is missing or broken, the governance
+    system cannot compute JEPA composites and should not start silently.
+    """
+    test_dist = {"pramana": 1.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                 "smrti": 0.0, "nidra": 0.0}
+    result = _get_aspect_weights(test_dist)
+    if not isinstance(result, dict) or len(result) != 12:
+        raise ImportError(
+            "chitta_vritti.coupling.get_aspect_weights returned invalid result: "
+            f"expected dict with 12 keys, got {type(result).__name__} "
+            f"with {len(result) if isinstance(result, dict) else '?'} keys"
+        )
+
+_validate_coupling_import()
+
 
 # =========================================================================
 # Constants
@@ -433,13 +458,21 @@ def build_vritti_signal(
         primary = vritti_result.dominant_vritti
     elif vritti_distribution is not None:
         dist = {v: vritti_distribution.get(v, 0.0) for v in VRITTI_NAMES}
-        # Normalize if not already
         total = sum(dist.values())
-        if total > 0 and abs(total - 1.0) > 0.01:
-            dist = {k: v / total for k, v in dist.items()}
-        coh = coherence
-        sc = score
-        primary = max(dist, key=dist.get)
+        if total <= 0:
+            # All-zero vritti → fail-closed: treat as nidra (dormancy)
+            dist = {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
+                    "smrti": 0.0, "nidra": 1.0}
+            coh = 0.0
+            sc = 0.0
+            primary = "nidra"
+        else:
+            # Normalize if not already
+            if abs(total - 1.0) > 0.01:
+                dist = {k: v / total for k, v in dist.items()}
+            coh = coherence
+            sc = score
+            primary = max(dist, key=dist.get)
     else:
         # Fail-closed: no vritti data → high nidra (dormancy)
         dist = {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
@@ -479,10 +512,8 @@ def build_jepa_composite(
     coherent. High alignment means the system's cognitive state and
     semantic position agree.
     """
-    from agentic.chitta_vritti.coupling import get_aspect_weights
-
     # Step 1: Expected ontological activation from vritti
-    expected = get_aspect_weights(vritti.distribution)
+    expected = _get_aspect_weights(vritti.distribution)
 
     # Step 2: Actual ontological activation
     actual = dict(ontology.layer_weights)

@@ -750,8 +750,11 @@ class SafeMCPGateway:
             return None  # No block
 
         except Exception as e:
-            logger.warning("JEPA check failed in MCP gateway: %s", e)
-            return None  # Fail-open on JEPA failure (other gates still apply)
+            logger.error("JEPA check failed in MCP gateway (fail-closed): %s", e)
+            return (
+                f"JEPA residual governor: UNAVAILABLE — "
+                f"JEPA check raised {type(e).__name__}: {e}. Fail-closed."
+            )
 
     def _audit(
         self,

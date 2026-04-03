@@ -587,6 +587,15 @@ class GovernanceService:
             governance_decision, eligible = _apply_jepa_override(
                 governance_decision, eligible, jepa_assessment,
             )
+        else:
+            # JEPA unavailable — fail-closed: force DENY
+            _logger.warning(
+                "JEPA governance check returned None (unavailable) — "
+                "fail-closed to DENY for decision %s",
+                decision_id,
+            )
+            governance_decision = APIGovernanceDecision.DENY
+            eligible = False
 
         # Step 6: Build rationale
         rationale_codes = _build_rationale_codes(
