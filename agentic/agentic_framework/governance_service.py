@@ -83,6 +83,24 @@ from agentic.agentic_framework.domain_policy import (
     resolve_domain_policy,
     fail_closed_result,
 )
+from agentic.agentic_framework.shadow_ai import (
+    ShadowAssessment,
+    ShadowContainmentMode,
+    ShadowRegistry,
+    is_memory_write_intent,
+    resolve_shadow_asset_id,
+    safe_resolve_shadow_policy,
+    shadow_containment_to_governance,
+)
+from agentic.agentic_framework.policy_bundle import (
+    PolicyResolution,
+)
+from agentic.agentic_framework.approval_workflow import (
+    ApprovalContext,
+    ApprovalLevel,
+    ApprovalStore,
+    ApprovalStoreError,
+)
 
 import logging as _logging
 
@@ -133,10 +151,14 @@ def _generate_decision_id(request: AuthorizationRequest) -> str:
     return hashlib.sha256(content.encode()).hexdigest()[:24]
 
 
-def _check_forbidden_capabilities(capabilities: List[str]) -> Optional[str]:
+def _check_forbidden_capabilities(
+    capabilities: List[str],
+    forbidden: Optional[frozenset] = None,
+) -> Optional[str]:
     """Check if any capability is forbidden. Returns first match or None."""
+    effective = forbidden if forbidden is not None else FORBIDDEN_CAPABILITIES
     for cap in capabilities:
-        if cap in FORBIDDEN_CAPABILITIES:
+        if cap in effective:
             return cap
     return None
 
@@ -144,22 +166,42 @@ def _check_forbidden_capabilities(capabilities: List[str]) -> Optional[str]:
 def _build_confidence_signals(
     request: AuthorizationRequest,
     risk_level: ToolRiskLevel,
+    policy_resolution: Optional[PolicyResolution] = None,
 ) -> ConfidenceSignals:
     """Build ConfidenceSignals from external request + risk classification."""
-    complexity_map = {
-        ToolRiskLevel.READ_ONLY: 0.1,
-        ToolRiskLevel.WRITE: 0.4,
-        ToolRiskLevel.EXECUTE: 0.7,
-        ToolRiskLevel.DESTRUCTIVE: 0.9,
-        ToolRiskLevel.PRIVILEGED: 0.95,
-    }
-    reversibility_map = {
-        ToolRiskLevel.READ_ONLY: 1.0,
-        ToolRiskLevel.WRITE: 0.7,
-        ToolRiskLevel.EXECUTE: 0.5,
-        ToolRiskLevel.DESTRUCTIVE: 0.0,
-        ToolRiskLevel.PRIVILEGED: 0.2,
-    }
+    if policy_resolution is not None:
+        risk_policy = policy_resolution.effective_policy.risk
+        # Map ToolRiskLevel enum names to policy risk keys
+        _level_to_key = {
+            ToolRiskLevel.READ_ONLY: "read_only",
+            ToolRiskLevel.WRITE: "write",
+            ToolRiskLevel.EXECUTE: "execute",
+            ToolRiskLevel.DESTRUCTIVE: "destructive",
+            ToolRiskLevel.PRIVILEGED: "privileged",
+        }
+        complexity_map = {
+            lvl: risk_policy.complexity_map.get(key, 0.5)
+            for lvl, key in _level_to_key.items()
+        }
+        reversibility_map = {
+            lvl: risk_policy.reversibility_map.get(key, 0.5)
+            for lvl, key in _level_to_key.items()
+        }
+    else:
+        complexity_map = {
+            ToolRiskLevel.READ_ONLY: 0.1,
+            ToolRiskLevel.WRITE: 0.4,
+            ToolRiskLevel.EXECUTE: 0.7,
+            ToolRiskLevel.DESTRUCTIVE: 0.9,
+            ToolRiskLevel.PRIVILEGED: 0.95,
+        }
+        reversibility_map = {
+            ToolRiskLevel.READ_ONLY: 1.0,
+            ToolRiskLevel.WRITE: 0.7,
+            ToolRiskLevel.EXECUTE: 0.5,
+            ToolRiskLevel.DESTRUCTIVE: 0.0,
+            ToolRiskLevel.PRIVILEGED: 0.2,
+        }
 
     return ConfidenceSignals(
         quality_score=request.quality_score,
@@ -183,6 +225,7 @@ def _build_safety_contract_summary(
     risk_level: ToolRiskLevel,
     forbidden_cap: Optional[str],
     gate_decision: ConfidenceGateDecision,
+    policy_resolution: Optional[PolicyResolution] = None,
 ) -> Tuple[SafetyContractSummary, bool]:
     """
     Evaluate safety contract preconditions.
@@ -190,17 +233,27 @@ def _build_safety_contract_summary(
     Replicates SafetyContractEvaluator logic without requiring
     CoherenceState/GoalState objects. Uses request signals directly.
 
+    When policy_resolution is provided, thresholds are sourced from the
+    resolved SafetyPolicy section. Otherwise uses hardcoded defaults.
+
     Returns (summary, eligible).
     """
     satisfied: List[str] = []
     violated: List[str] = []
     blocking_reasons: List[str] = []
 
-    # Thresholds (match SafetyContractEvaluator defaults)
-    consistency_threshold = 0.60
-    alignment_threshold = 0.60
-    reversal_risk_threshold = 0.40
-    stability_threshold = 0.60
+    # Thresholds — from resolved policy or hardcoded defaults
+    if policy_resolution is not None:
+        sp = policy_resolution.effective_policy.safety
+        consistency_threshold = sp.internal_consistency_threshold
+        alignment_threshold = sp.goal_alignment_threshold
+        reversal_risk_threshold = sp.reversal_risk_threshold
+        stability_threshold = sp.identity_stability_threshold
+    else:
+        consistency_threshold = 0.60
+        alignment_threshold = 0.60
+        reversal_risk_threshold = 0.40
+        stability_threshold = 0.60
 
     # Precondition 1: Internal consistency
     if request.internal_consistency >= consistency_threshold:
@@ -483,6 +536,9 @@ class GovernanceService:
         audit_store: Optional[GovernanceAuditStore] = None,
         domain_registry: Optional[DomainRegistry] = None,
         domain_id: Optional[str] = None,
+        shadow_registry: Optional[ShadowRegistry] = None,
+        policy_resolution: Optional[PolicyResolution] = None,
+        approval_store: Optional[ApprovalStore] = None,
     ):
         """
         Initialize governance service.
@@ -499,6 +555,16 @@ class GovernanceService:
                 translates JEPA assessments into domain-specific action modes.
             domain_id: Which domain profile to use from the registry.
                 Ignored if domain_registry is None.
+            shadow_registry: Optional ShadowRegistry for shadow AI control.
+                When provided, the Shadow AI Control Layer evaluates asset
+                provenance and sanctionedness before final enforcement.
+            policy_resolution: Resolved policy bundle from the Policy
+                Externalization Layer.  When provided, safety thresholds,
+                forbidden capabilities, and risk mappings are sourced from
+                the resolved policy instead of hardcoded defaults.
+            approval_store: Optional ApprovalStore for durable approval workflow.
+                When provided, DEFER+requires_human decisions create persistent
+                approval requests with auditable state transitions.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -518,6 +584,15 @@ class GovernanceService:
         # Domain Semantic Policy Layer
         self._domain_registry: Optional[DomainRegistry] = domain_registry
         self._domain_id: Optional[str] = domain_id
+
+        # Shadow AI Control Layer
+        self._shadow_registry: Optional[ShadowRegistry] = shadow_registry
+
+        # Policy Externalization Layer
+        self._policy_resolution: Optional[PolicyResolution] = policy_resolution
+
+        # Approval Workflow Layer
+        self._approval_store: Optional[ApprovalStore] = approval_store
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -552,16 +627,26 @@ class GovernanceService:
         tool_name = request.tool_name or request.action_type
         risk_level = self.classifier.classify(tool_name)
 
-        # Step 2: Check forbidden capabilities
-        forbidden_cap = _check_forbidden_capabilities(request.capabilities)
+        # Step 2: Check forbidden capabilities (from policy or hardcoded)
+        policy_forbidden = None
+        if self._policy_resolution is not None:
+            policy_forbidden = frozenset(
+                self._policy_resolution.effective_policy.safety.forbidden_capabilities
+            )
+        forbidden_cap = _check_forbidden_capabilities(
+            request.capabilities, forbidden=policy_forbidden,
+        )
 
         # Step 3: Build confidence signals and evaluate gate
-        signals = _build_confidence_signals(request, risk_level)
+        signals = _build_confidence_signals(
+            request, risk_level, policy_resolution=self._policy_resolution,
+        )
         gate_decision = self.gate.evaluate(signals, tool_name)
 
         # Step 4: Evaluate safety contract preconditions
         safety_summary, eligible = _build_safety_contract_summary(
             request, risk_level, forbidden_cap, gate_decision,
+            policy_resolution=self._policy_resolution,
         )
 
         # Step 5: Compute governance decision
@@ -658,17 +743,94 @@ class GovernanceService:
                     governance_decision = APIGovernanceDecision.DEFER
                     eligible = False
 
+        # Step 5e: Shadow AI Control Layer
+        #   Evaluates asset provenance, sanctionedness, and containment.
+        #   Shadow policy can only make things STRICTER, never relax.
+        #   Runs after domain policy so both signals are available.
+        shadow_assessment: Optional[ShadowAssessment] = None
+        shadow_audit: Optional[Dict[str, Any]] = None
+        if self._shadow_registry is not None:
+            # Determine action category from risk level
+            _risk_to_action = {
+                ToolRiskLevel.READ_ONLY: "read_only",
+                ToolRiskLevel.WRITE: "mutating",
+                ToolRiskLevel.EXECUTE: "mutating",
+                ToolRiskLevel.DESTRUCTIVE: "destructive",
+                ToolRiskLevel.PRIVILEGED: "privileged",
+            }
+            action_cat = _risk_to_action.get(risk_level, "unknown")
+            mutation = action_cat in ("mutating", "destructive", "privileged")
+
+            # Compute semantic mismatch from JEPA
+            _sem_mismatch = 0.0
+            if jepa_assessment.regime.value in ("process_drift", "semantic_shift"):
+                _sem_mismatch = 0.5
+            elif jepa_assessment.regime.value in ("dual_anomaly", "unknown"):
+                _sem_mismatch = 0.8
+
+            # Domain policy mismatch
+            _dom_mismatch = 0.0
+            if domain_result is not None and domain_result.mode != DomainActionMode.ALLOW:
+                _dom_mismatch = domain_result.mode.severity / 6.0
+
+            _shadow_asset_id = resolve_shadow_asset_id(
+                tool_name=request.tool_name or "",
+                actor_id=request.actor_id,
+            )
+            shadow_assessment = safe_resolve_shadow_policy(
+                asset_id=_shadow_asset_id,
+                tool_name=request.tool_name or "",
+                provider=getattr(request, "provider", ""),
+                registry=self._shadow_registry,
+                action_category=action_cat,
+                risk_level=risk_level.value,
+                domain_id=self._domain_id or "",
+                memory_write_intent=is_memory_write_intent(
+                    action_type=request.action_type or "",
+                    tool_name=request.tool_name or "",
+                ),
+                mutation_intent=mutation,
+                jepa_regime=jepa_assessment.regime.value,
+                semantic_mismatch=_sem_mismatch,
+                domain_policy_mismatch=_dom_mismatch,
+                confidence=effective_confidence,
+            )
+            shadow_audit = shadow_assessment.to_audit_dict()
+
+            # Apply shadow containment as stricter-only override
+            shadow_gov = shadow_containment_to_governance(
+                shadow_assessment.containment_mode,
+            )
+            if shadow_gov == "DENY":
+                governance_decision = APIGovernanceDecision.DENY
+                eligible = False
+            elif shadow_gov == "DEFER":
+                if governance_decision == APIGovernanceDecision.ALLOW:
+                    governance_decision = APIGovernanceDecision.DEFER
+                    eligible = False
+                if governance_decision != APIGovernanceDecision.DENY:
+                    effective_requires_human = True
+
         # Step 6: Build rationale (includes JEPA and domain information)
         rationale_codes = _build_rationale_codes(
             safety_summary, gate_decision, risk_level, forbidden_cap,
             governance_decision, jepa_assessment, jepa_overrode,
             domain_result,
         )
+        # Add shadow reason codes
+        if shadow_assessment is not None:
+            for rc in shadow_assessment.reason_codes:
+                rationale_codes.append(f"SHADOW:{rc}")
         rationale = _build_rationale_string(
             governance_decision, safety_summary, gate_decision, risk_level,
             forbidden_cap, jepa_assessment, jepa_overrode,
             domain_result,
         )
+        if shadow_assessment is not None and shadow_assessment.shadow_overrode_baseline:
+            rationale += (
+                f" Shadow AI policy: {shadow_assessment.containment_mode.value}. "
+                f"{shadow_assessment.rationale}"
+            )
 
         # Step 7: Build confidence gate summary (with JEPA adjustments)
         confidence_summary = ConfidenceGateSummary(
@@ -706,6 +868,10 @@ class GovernanceService:
                 "capabilities": request.capabilities,
                 "quality_score": request.quality_score,
                 "coherence_score": request.coherence_score,
+                "internal_consistency": request.internal_consistency,
+                "goal_alignment": request.goal_alignment,
+                "trajectory_confidence": request.trajectory_confidence,
+                "blocking_factors": request.blocking_factors,
                 "jepa_regime": jepa_assessment.regime.value,
                 "jepa_reason_codes": list(jepa_assessment.reason_codes),
                 "jepa_overrode_baseline": jepa_overrode,
@@ -717,11 +883,94 @@ class GovernanceService:
                 "domain_policy": (
                     domain_result.to_audit_dict() if domain_result else None
                 ),
+                "policy_bundle": (
+                    self._policy_resolution.effective_policy.to_audit_dict()
+                    if self._policy_resolution is not None else None
+                ),
             },
+            shadow_assessment=shadow_audit,
         )
         self._persist_audit_event(audit_event)
 
-        # Step 9: Assemble response (uses JEPA-adjusted fields)
+        # Step 9: Create approval request if needed
+        #   approval_required is only True when an approval object is actually
+        #   created.  If no store is configured, the response signals
+        #   requires_human_approval but does not claim a durable approval exists.
+        approval_required = False
+        approval_id = None
+        approval_summary = None
+
+        _needs_approval = (
+            effective_requires_human
+            and governance_decision in (
+                APIGovernanceDecision.DEFER,
+                APIGovernanceDecision.DENY,
+            )
+        )
+
+        if _needs_approval and self._approval_store is not None:
+            # Map escalation level to approval level
+            _esc_to_approval = {
+                "halt": ApprovalLevel.HALT,
+                "confirm": ApprovalLevel.CONFIRM,
+            }
+            approval_level = _esc_to_approval.get(
+                effective_esc_level.value, ApprovalLevel.CONFIRM,
+            )
+
+            approval_context = ApprovalContext(
+                governance_decision_id=decision_id,
+                action_type=request.action_type,
+                tool_name=request.tool_name or "",
+                actor_id=request.actor_id,
+                risk_level=risk_level.value,
+                confidence_score=effective_confidence,
+                escalation_level=effective_esc_level.value,
+                execution_mode=effective_exec_mode.value,
+                reason_codes=tuple(rationale_codes),
+                policy_id=(
+                    self._policy_resolution.effective_policy.metadata.policy_id
+                    if self._policy_resolution else None
+                ),
+                policy_version=(
+                    self._policy_resolution.effective_policy.metadata.version
+                    if self._policy_resolution else None
+                ),
+                domain_id=self._domain_id,
+                tenant_id=getattr(request, "tenant_id", None),
+                session_id=getattr(request, "session_id", None),
+            )
+
+            try:
+                approval_req = self._approval_store.create_request(
+                    context=approval_context,
+                    approval_level=approval_level,
+                )
+                approval_id = approval_req.approval_id
+                approval_summary = approval_req.to_summary_dict()
+                approval_required = True
+            except ApprovalStoreError:
+                # FAIL-CLOSED: approval creation failed → DENY
+                # approval_required stays False — no durable approval exists
+                _logger.error(
+                    "APPROVAL STORE FAILURE for decision %s — "
+                    "failing closed to DENY",
+                    decision_id,
+                    exc_info=True,
+                )
+                governance_decision = APIGovernanceDecision.DENY
+                eligible = False
+                rationale_codes.append("APPROVAL_STORE_FAILURE")
+
+        # Step 9b: Record approval_id in the in-memory audit event snapshot.
+        # The durable audit store was written before approval creation (it
+        # provides the decision_id that the approval context references).
+        # Bidirectional linkage: audit→approval via this snapshot field,
+        # approval→audit via ApprovalContext.governance_decision_id.
+        if approval_id is not None:
+            audit_event.request_snapshot["approval_id"] = approval_id
+
+        # Step 10: Assemble response (uses JEPA-adjusted fields)
         return AuthorizationResponse(
             governance_decision=governance_decision,
             eligible=eligible,
@@ -738,6 +987,10 @@ class GovernanceService:
             safety_contract=safety_summary,
             confidence_gate=confidence_summary,
             audit_event=audit_event,
+            shadow_assessment=shadow_audit,
+            approval_required=approval_required,
+            approval_id=approval_id,
+            approval_summary=approval_summary,
             dry_run=request.dry_run,
             service_version=SERVICE_VERSION,
             decision_timestamp=timestamp,
@@ -844,6 +1097,8 @@ class GovernanceService:
                     else str(audit_event.escalation_level),
                 blocked_reasons=audit_event.blocked_reasons,
                 request_snapshot=audit_event.request_snapshot,
+                shadow_assessment=audit_event.shadow_assessment,
+                shadow_overrode=bool(audit_event.shadow_assessment),
             )
             try:
                 self._audit_store.append(canonical_event)

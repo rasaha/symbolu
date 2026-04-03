@@ -596,11 +596,22 @@ def event_from_governance_decision(
     rationale: str = "",
     request_snapshot: Optional[Dict[str, Any]] = None,
     session_id: str = "",
+    shadow_assessment: Optional[Dict[str, Any]] = None,
+    shadow_overrode: bool = False,
 ) -> GovernanceAuditEvent:
     """Create a GovernanceAuditEvent from GovernanceService decision data.
 
     Maps the existing AuditEvent fields to the canonical event model.
+    Shadow AI assessment data is embedded in request_snapshot for durable
+    persistence, mirroring the approach used in event_from_mcp_audit().
     """
+    snapshot = dict(request_snapshot) if request_snapshot else {}
+
+    # Embed shadow AI assessment in the snapshot for durable persistence
+    if shadow_assessment is not None:
+        snapshot["shadow_assessment"] = shadow_assessment
+        snapshot["shadow_overrode"] = shadow_overrode
+
     return GovernanceAuditEvent(
         event_id=decision_id,
         timestamp=timestamp,
@@ -618,7 +629,7 @@ def event_from_governance_decision(
         escalation_level=escalation_level,
         blocked_reasons=tuple(blocked_reasons),
         rationale=rationale,
-        request_snapshot=request_snapshot or {},
+        request_snapshot=snapshot,
         execution_result={},
         schema_version=SCHEMA_VERSION,
     )
@@ -647,6 +658,8 @@ def event_from_mcp_audit(
     jepa_overrode: bool = False,
     domain_policy: Optional[Dict[str, Any]] = None,
     domain_overrode: bool = False,
+    shadow_assessment: Optional[Dict[str, Any]] = None,
+    shadow_overrode: bool = False,
 ) -> GovernanceAuditEvent:
     """Create a GovernanceAuditEvent from MCP gateway audit data.
 
@@ -674,6 +687,11 @@ def event_from_mcp_audit(
     if domain_policy is not None:
         snapshot["domain_policy"] = domain_policy
         snapshot["domain_overrode"] = domain_overrode
+
+    # Embed shadow AI assessment in the snapshot for durable persistence
+    if shadow_assessment is not None:
+        snapshot["shadow_assessment"] = shadow_assessment
+        snapshot["shadow_overrode"] = shadow_overrode
 
     return GovernanceAuditEvent(
         event_id=request_id or create_event_id(),

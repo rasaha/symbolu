@@ -246,6 +246,11 @@ class AuditEvent(BaseModel):
     blocked_reasons: List[str]
     request_snapshot: Dict[str, Any]
 
+    # Shadow AI Control Layer fields (populated when shadow policy runs)
+    shadow_assessment: Optional[Dict[str, Any]] = Field(
+        None, description="Full shadow AI assessment (serialized ShadowAssessment)",
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """
@@ -320,6 +325,29 @@ class AuthorizationResponse(BaseModel):
 
     # Audit
     audit_event: AuditEvent
+
+    # Shadow AI Control Layer
+    shadow_assessment: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Shadow AI assessment (serialized ShadowAssessment). "
+                    "Present when shadow policy evaluation ran.",
+    )
+
+    # Approval Workflow Layer
+    approval_required: bool = Field(
+        False,
+        description="Whether a durable approval request was created for this decision. "
+                    "True only when an ApprovalRequest was successfully persisted. "
+                    "When True, approval_id will be non-None.",
+    )
+    approval_id: Optional[str] = Field(
+        None,
+        description="ID of the created ApprovalRequest, if approval_required is True.",
+    )
+    approval_summary: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Summary of the approval request (status, level, expiry).",
+    )
 
     # Control flags
     dry_run: bool = Field(
