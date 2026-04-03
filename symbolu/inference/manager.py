@@ -646,6 +646,17 @@ class InferenceManager:
                     if recon.divergence_warnings:
                         step_meta['reconciliation_warnings'] = list(recon.divergence_warnings)
 
+                # Phase 4: Sovereign bridge signals (32-D → ConfidenceSignals)
+                if (self.config.enable_sovereign_bridge_signals and
+                        self.state_monitor is not None and
+                        self.state_monitor._metrics_history):
+                    try:
+                        bridge_signals = self._extract_bridge_signals()
+                        if bridge_signals is not None:
+                            step_meta['bridge_signals'] = bridge_signals
+                    except Exception:
+                        pass  # Bridge signals are observational; never crash generation
+
                 # Phase 4: Diagnostic hooks (SOVEREIGN mode)
                 if self.diagnostic_hooks is not None and self.diagnostic_hooks.enabled:
                     guna_s = self.gunas.sattva if self.gunas else 0.33
@@ -713,9 +724,16 @@ class InferenceManager:
         if return_hidden_states:
             result['hidden_states'] = hidden_states_list
 
-        # Phase 4: Append reconciliation and diagnostic metadata
+        # Phase 4: Append reconciliation, bridge signals, and diagnostic metadata
         if self._last_reconciliation is not None:
             result['signal_reconciliation'] = self._last_reconciliation.to_dict()
+        if self.config.enable_sovereign_bridge_signals:
+            try:
+                bridge = self._extract_bridge_signals()
+                if bridge is not None:
+                    result['bridge_signals'] = bridge
+            except Exception:
+                pass
         if self.diagnostic_hooks is not None and self.diagnostic_hooks.enabled:
             result['diagnostic_summary'] = self.diagnostic_hooks.get_summary()
 
@@ -944,6 +962,122 @@ class InferenceManager:
         self._last_reconciliation = None
         if self.diagnostic_hooks is not None:
             self.diagnostic_hooks.clear()
+
+    # =========================================================================
+    # Phase 4: Sovereign bridge integration
+    # =========================================================================
+
+    def _extract_bridge_signals(self) -> Optional[Dict[str, float]]:
+        """Extract ConfidenceSignals from 32-D state via sovereign_bridge.
+
+        Lazy-imports sovereign_bridge to avoid hard dependency on the
+        agentic_framework package at module load time.
+
+        Returns:
+            Dict of bridge signal values, or None if unavailable.
+        """
+        if self.state_monitor is None or not self.state_monitor._metrics_history:
+            return None
+
+        latest = self.state_monitor._metrics_history[-1]
+
+        # Build a 32-element list from the latest metrics
+        state_32 = list(latest.bhava_activations.values()) if hasattr(latest, 'bhava_activations') else [0.0] * 12
+        if len(state_32) < 12:
+            state_32.extend([0.0] * (12 - len(state_32)))
+        state_32 = state_32[:12]
+
+        # Kosha profile
+        kosha = list(latest.kosha_profile) if latest.kosha_profile else [0.0] * 5
+        state_32.extend(kosha[:5])
+
+        # Vritti profile
+        vritti = list(latest.vritti_profile) if latest.vritti_profile else [0.0] * 5
+        state_32.extend(vritti[:5])
+
+        # Guna: lucidity, turbulence(activity), stability, velocity, acceleration, stable
+        guna = [
+            latest.lucidity,
+            latest.turbulence,
+            latest.stability,
+            getattr(latest, 'velocity', 0.0),
+            getattr(latest, 'acceleration', 0.0),
+            getattr(latest, 'stability', 0.5),  # stable ≈ stability
+        ]
+        state_32.extend(guna[:6])
+
+        # Reserved
+        state_32.extend([0.0] * 4)
+
+        try:
+            from agentic.agentic_framework.sovereign_bridge import signals_from_sovereign_state
+            signals = signals_from_sovereign_state(state_32)
+            # Convert ConfidenceSignals to plain dict for serialization
+            return {
+                'quality_score': signals.quality_score,
+                'correctness_score': signals.correctness_score,
+                'coherence_score': signals.coherence_score,
+                'prediction_reversal_risk': signals.prediction_reversal_risk,
+                'action_complexity': signals.action_complexity,
+                'completeness_score': signals.completeness_score,
+                'volatility_index': signals.volatility_index,
+                'session_stability': signals.session_stability,
+                'trajectory_confidence': signals.trajectory_confidence,
+                'internal_consistency': signals.internal_consistency,
+            }
+        except (ImportError, Exception):
+            return None
+
+    def initialize_from_training_state(
+        self,
+        sovereign_state_128d: Any,
+        state_delta_128d: Any = None,
+    ) -> Dict[str, Any]:
+        """Project a 128-D training sovereign state into the inference runtime.
+
+        This bridges the training → inference gap by:
+        1. Projecting 128-D state to 32-D via inference_bridge
+        2. Using the projected guna as initial signal reconciliation source
+        3. Returning full projection metadata for audit
+
+        Use this when initializing from a training checkpoint that carries
+        the full 128-D sovereign state.
+
+        Args:
+            sovereign_state_128d: 128-element sequence (list, tuple, or tensor).
+            state_delta_128d: Optional 128-element state delta.
+
+        Returns:
+            Dict with projection result, including inference_state (32 floats),
+            metadata, and any warnings about information loss.
+        """
+        from agentic.sovereign.inference_bridge import project_sovereign_to_inference
+
+        result = project_sovereign_to_inference(
+            sovereign_state_128d,
+            state_delta_128d,
+        )
+
+        # Feed projected guna into reconciliation if enabled
+        if self.config.enable_signal_reconciliation:
+            gs = result.guna_summary
+            projected_guna = (gs['lucidity'], gs['activity'], gs['stability'])
+            # Normalize to sum ≈ 1
+            total = sum(projected_guna) + 1e-9
+            projected_guna = tuple(v / total for v in projected_guna)
+
+            inference_guna = None
+            if self.gunas is not None:
+                inference_guna = (self.gunas.sattva, self.gunas.rajas, self.gunas.tamas)
+
+            recon = reconcile_signals(
+                inference_guna=inference_guna,
+                sovereign_guna=projected_guna,
+                sovereign_vritti_profile=result.vritti_profile,
+            )
+            self._last_reconciliation = recon
+
+        return result.to_dict()
 
     def save_state(self, path: Union[str, Path]) -> None:
         """
