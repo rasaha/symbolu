@@ -50,7 +50,7 @@ Architecture Integration:
 
 Usage:
 ------
-    from symbolu.experimental.phase_alignment import (
+    from symbolu_extensions.experimental.phase_alignment import (
         OrthogonalityLoss,
         DualRMatrices,
         PhaseLockConstraint,

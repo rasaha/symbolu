@@ -24,7 +24,7 @@ Where:
 
 Usage:
 ------
-    from symbolu.image_gen.coherence_monitor import CoherenceMonitor
+    from symbolu_extensions.image_gen.coherence_monitor import CoherenceMonitor
 
     monitor = CoherenceMonitor()
 
@@ -66,7 +66,7 @@ except ImportError:
 
 import numpy as np
 
-from symbolu.image_gen.config import (
+from symbolu_extensions.image_gen.config import (
     CoherenceConfig,
     BCVFImageConfig,
     USEImageConfig,
@@ -74,9 +74,9 @@ from symbolu.image_gen.config import (
     CoherenceMatrixConfig,
     GenerationMode,
 )
-from symbolu.image_gen.bcvf_image import BCVFImageEngine, BCVFImageScore
-from symbolu.image_gen.use_image import USEImageEngine, PhaseSyncResult
-from symbolu.image_gen.scc_image import (
+from symbolu_extensions.image_gen.bcvf_image import BCVFImageEngine, BCVFImageScore
+from symbolu_extensions.image_gen.use_image import USEImageEngine, PhaseSyncResult
+from symbolu_extensions.image_gen.scc_image import (
     SCCImageEngine,
     GlobalCoherenceResult,
     CoherenceIssue,

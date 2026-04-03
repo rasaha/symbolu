@@ -380,7 +380,7 @@ class EmbeddingDiagnostics:
             return None
 
         try:
-            from symbolu.training.conscious_generation.diagnostics.adaptive_diagnostic_controller import (
+            from symbolu_training.training.conscious_generation.diagnostics.adaptive_diagnostic_controller import (
                 DiagnosticSignals,
             )
         except ImportError:

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 import random
 
-from symbolu.training.schemas import ParaphrasePair
+from symbolu_training.training.schemas import ParaphrasePair
 
 
 @dataclass

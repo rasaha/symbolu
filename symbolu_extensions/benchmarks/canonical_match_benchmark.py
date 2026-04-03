@@ -17,8 +17,8 @@ from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass, asdict
 from collections import defaultdict
 
-from symbolu.providers import get_match_provider, get_filter_provider
-from symbolu.providers.interfaces import MatchMode
+from symbolu_core.providers import get_match_provider, get_filter_provider
+from symbolu_core.providers.interfaces import MatchMode
 
 
 # =============================================================================

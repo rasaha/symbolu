@@ -22,7 +22,7 @@ import torch
 import torch.nn as nn
 from typing import Optional, Dict, Any
 
-from symbolu.training.conscious_generation.token_ontology import TokenOntologyProjector
+from symbolu_training.training.conscious_generation.token_ontology import TokenOntologyProjector
 
 
 class TokenPrimitiveCache(nn.Module):

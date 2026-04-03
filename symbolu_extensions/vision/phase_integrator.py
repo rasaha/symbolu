@@ -19,9 +19,9 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.contracts import assert_control_shape
-from symbolu.vision.controls import PhaseControl, PatchMeta
-from symbolu.vision.scan_manager import ScanManager2D, get_scan_manager
+from symbolu_extensions.vision.contracts import assert_control_shape
+from symbolu_extensions.vision.controls import PhaseControl, PatchMeta
+from symbolu_extensions.vision.scan_manager import ScanManager2D, get_scan_manager
 
 
 def parallel_ema_scan_complex(

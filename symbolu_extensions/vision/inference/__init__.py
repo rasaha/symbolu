@@ -5,17 +5,17 @@ This module provides the full inference pipeline for generating
 actual images from text prompts.
 """
 
-from symbolu.vision.inference.pipeline import (
+from symbolu_extensions.vision.inference.pipeline import (
     PhaseQuadInferencePipeline,
     GenerationConfig,
     GenerationResult,
 )
-from symbolu.vision.inference.samplers import (
+from symbolu_extensions.vision.inference.samplers import (
     DDPMSampler,
     DDIMSampler,
     get_sampler,
 )
-from symbolu.vision.inference.pretrained import (
+from symbolu_extensions.vision.inference.pretrained import (
     PretrainedVAE,
     PretrainedCLIP,
     PretrainedSDXLTextEncoder,

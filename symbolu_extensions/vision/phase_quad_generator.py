@@ -16,16 +16,16 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.config import PhaseQuadVisionConfig
-from symbolu.vision.controls import (
+from symbolu_extensions.vision.config import PhaseQuadVisionConfig
+from symbolu_extensions.vision.controls import (
     BlockControl,
     GeneratorControl,
     PatchMeta,
 )
-from symbolu.vision.patch_embed import PatchEmbed2D, TimestepEmbedding, TextProjection
-from symbolu.vision.cognade_vision_block import CognadeVisionBlock
-from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlock
-from symbolu.vision.diagnostics import (
+from symbolu_extensions.vision.patch_embed import PatchEmbed2D, TimestepEmbedding, TextProjection
+from symbolu_extensions.vision.cognade_vision_block import CognadeVisionBlock
+from symbolu_extensions.vision.phase_quad_dit_block import PhaseQuadDiTBlock
+from symbolu_extensions.vision.diagnostics import (
     ModelDiagnostics,
     BlockDiagnostics,
     QuadUtilizationMetrics,

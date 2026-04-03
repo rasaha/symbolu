@@ -40,7 +40,7 @@ Components:
 
 Usage:
 ------
-    from symbolu.experimental import (
+    from symbolu_extensions.experimental import (
         CognitiveState,
         StateDelta,
         StateProjector,

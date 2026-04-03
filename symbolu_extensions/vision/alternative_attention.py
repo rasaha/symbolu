@@ -28,7 +28,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from symbolu.vision.attention_normalizations import (
+from symbolu_extensions.vision.attention_normalizations import (
     AttentionNormType,
     sparsemax,
     entmax,
@@ -354,7 +354,7 @@ class PhaseQuadAttentionVariant(nn.Module):
     ):
         super().__init__()
 
-        from symbolu.vision.bcvf_weighter import BCVFQuadWeighter
+        from symbolu_extensions.vision.bcvf_weighter import BCVFQuadWeighter
 
         bcvf_config = bcvf_config or {}
         self.bcvf = BCVFQuadWeighter(**bcvf_config)

@@ -1,0 +1,218 @@
+[
+  {
+    "id": "case_01",
+    "description": "All zeros, first turn (no previous SMI/bhava)",
+    "inputs": {
+      "dimensional_resonance": 0.0,
+      "vrtti_intensity": 0.0,
+      "bhava_position": 0.0,
+      "previous_smi": null,
+      "current_bhava": 0,
+      "previous_bhava": null
+    },
+    "outputs": {
+      "smi": 0.0,
+      "delta_smi": 0.0,
+      "bhava_gap": 0.0,
+      "tension_corridor": 0.0
+    }
+  },
+  {
+    "id": "case_02",
+    "description": "All ones, max bhava gap (6 steps)",
+    "inputs": {
+      "dimensional_resonance": 1.0,
+      "vrtti_intensity": 1.0,
+      "bhava_position": 1.0,
+      "previous_smi": 0.5,
+      "current_bhava": 6,
+      "previous_bhava": 0
+    },
+    "outputs": {
+      "smi": 1.0,
+      "delta_smi": 0.5,
+      "bhava_gap": 1.0,
+      "tension_corridor": 0.7
+    }
+  },
+  {
+    "id": "case_03",
+    "description": "All mid values (0.5), same bhava",
+    "inputs": {
+      "dimensional_resonance": 0.5,
+      "vrtti_intensity": 0.5,
+      "bhava_position": 0.5,
+      "previous_smi": 0.4,
+      "current_bhava": 5,
+      "previous_bhava": 5
+    },
+    "outputs": {
+      "smi": 0.5,
+      "delta_smi": 0.1,
+      "bhava_gap": 0.0,
+      "tension_corridor": 0.06
+    }
+  },
+  {
+    "id": "case_04",
+    "description": "Low dim_res, high vrtti, bhava gap = 1",
+    "inputs": {
+      "dimensional_resonance": 0.1,
+      "vrtti_intensity": 0.9,
+      "bhava_position": 0.0,
+      "previous_smi": 0.6,
+      "current_bhava": 3,
+      "previous_bhava": 4
+    },
+    "outputs": {
+      "smi": 0.32,
+      "delta_smi": -0.28,
+      "bhava_gap": 0.166667,
+      "tension_corridor": 0.234667
+    }
+  },
+  {
+    "id": "case_05",
+    "description": "High dim_res, low vrtti, bhava gap = 2",
+    "inputs": {
+      "dimensional_resonance": 0.9,
+      "vrtti_intensity": 0.1,
+      "bhava_position": 0.5,
+      "previous_smi": 0.3,
+      "current_bhava": 7,
+      "previous_bhava": 9
+    },
+    "outputs": {
+      "smi": 0.58,
+      "delta_smi": 0.28,
+      "bhava_gap": 0.333333,
+      "tension_corridor": 0.301333
+    }
+  },
+  {
+    "id": "case_06",
+    "description": "Mid values, high bhava_pos, bhava gap = 3",
+    "inputs": {
+      "dimensional_resonance": 0.5,
+      "vrtti_intensity": 0.5,
+      "bhava_position": 1.0,
+      "previous_smi": 0.8,
+      "current_bhava": 10,
+      "previous_bhava": 7
+    },
+    "outputs": {
+      "smi": 0.6,
+      "delta_smi": -0.2,
+      "bhava_gap": 0.5,
+      "tension_corridor": 0.32
+    }
+  },
+  {
+    "id": "case_07",
+    "description": "Low values, bhava wrap-around 11->0 (gap=1)",
+    "inputs": {
+      "dimensional_resonance": 0.1,
+      "vrtti_intensity": 0.1,
+      "bhava_position": 0.0,
+      "previous_smi": 0.1,
+      "current_bhava": 0,
+      "previous_bhava": 11
+    },
+    "outputs": {
+      "smi": 0.08,
+      "delta_smi": -0.02,
+      "bhava_gap": 0.166667,
+      "tension_corridor": 0.078667
+    }
+  },
+  {
+    "id": "case_08",
+    "description": "High dim_res, bhava wrap-around 0->11 (gap=1)",
+    "inputs": {
+      "dimensional_resonance": 0.9,
+      "vrtti_intensity": 0.5,
+      "bhava_position": 0.0,
+      "previous_smi": 0.7,
+      "current_bhava": 11,
+      "previous_bhava": 0
+    },
+    "outputs": {
+      "smi": 0.6,
+      "delta_smi": -0.1,
+      "bhava_gap": 0.166667,
+      "tension_corridor": 0.126667
+    }
+  },
+  {
+    "id": "case_09",
+    "description": "Mixed values, bhava gap = 4",
+    "inputs": {
+      "dimensional_resonance": 0.3,
+      "vrtti_intensity": 0.7,
+      "bhava_position": 0.5,
+      "previous_smi": 0.2,
+      "current_bhava": 2,
+      "previous_bhava": 6
+    },
+    "outputs": {
+      "smi": 0.46,
+      "delta_smi": 0.26,
+      "bhava_gap": 0.666667,
+      "tension_corridor": 0.422667
+    }
+  },
+  {
+    "id": "case_10",
+    "description": "Mixed values, bhava gap = 5",
+    "inputs": {
+      "dimensional_resonance": 0.6,
+      "vrtti_intensity": 0.4,
+      "bhava_position": 0.8,
+      "previous_smi": 0.9,
+      "current_bhava": 1,
+      "previous_bhava": 6
+    },
+    "outputs": {
+      "smi": 0.58,
+      "delta_smi": -0.32,
+      "bhava_gap": 0.833333,
+      "tension_corridor": 0.525333
+    }
+  },
+  {
+    "id": "case_11",
+    "description": "Very low values, SMI decrease",
+    "inputs": {
+      "dimensional_resonance": 0.1,
+      "vrtti_intensity": 0.2,
+      "bhava_position": 0.1,
+      "previous_smi": 0.5,
+      "current_bhava": 4,
+      "previous_bhava": 2
+    },
+    "outputs": {
+      "smi": 0.13,
+      "delta_smi": -0.37,
+      "bhava_gap": 0.333333,
+      "tension_corridor": 0.355333
+    }
+  },
+  {
+    "id": "case_12",
+    "description": "High values, SMI increase",
+    "inputs": {
+      "dimensional_resonance": 0.8,
+      "vrtti_intensity": 0.9,
+      "bhava_position": 0.9,
+      "previous_smi": 0.4,
+      "current_bhava": 8,
+      "previous_bhava": 11
+    },
+    "outputs": {
+      "smi": 0.85,
+      "delta_smi": 0.45,
+      "bhava_gap": 0.5,
+      "tension_corridor": 0.47
+    }
+  }
+]

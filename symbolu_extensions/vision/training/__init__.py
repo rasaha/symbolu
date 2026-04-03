@@ -9,27 +9,27 @@ This package contains:
 - Dataset utilities: Loading image-text pairs for training
 """
 
-from symbolu.vision.training.temperature_schedule import (
+from symbolu_extensions.vision.training.temperature_schedule import (
     TemperatureSchedule,
     LinearSchedule,
     CosineSchedule,
 )
-from symbolu.vision.training.diffusion_trainer import (
+from symbolu_extensions.vision.training.diffusion_trainer import (
     PhaseQuadDiffusionTrainer,
     TrainingStep,
 )
-from symbolu.vision.training.replaceability_tester import (
+from symbolu_extensions.vision.training.replaceability_tester import (
     ReplaceabilityTester,
     AblationResult,
 )
-from symbolu.vision.training.dataset import (
+from symbolu_extensions.vision.training.dataset import (
     LocalImageTextDataset,
     HuggingFaceDataset,
     SyntheticDataset,
     create_dataloader,
     get_dataset,
 )
-from symbolu.vision.training.train import (
+from symbolu_extensions.vision.training.train import (
     DiffusionTrainer,
     train,
 )

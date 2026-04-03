@@ -9,13 +9,13 @@ Contract: docs/contracts/PHASE_8A_RENDERING_CONTRACT.md Section 7
 
 from typing import FrozenSet
 
-from symbolu.phases.phase8a_rendering.types import (
+from symbolu_extensions.phases.phase8a_rendering.types import (
     RenderInput,
     RenderModality,
     RendererConfig,
     SymbolicArtifact,
 )
-from symbolu.phases.phase8a_rendering.renderer import Renderer
+from symbolu_extensions.phases.phase8a_rendering.renderer import Renderer
 
 
 # Deterministic token → symbol mapping (from contract Section 7)

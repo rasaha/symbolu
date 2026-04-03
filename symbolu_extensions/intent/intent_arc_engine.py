@@ -27,7 +27,7 @@ Arc Types:
     - chaotic_arc: High mapper volatility + incoherent patterns
 
 Usage:
-    from symbolu.intent.intent_arc_engine import compute_intent_arc
+    from symbolu_extensions.intent.intent_arc_engine import compute_intent_arc
 
     # Compute intent arc from session components
     intent_arc = compute_intent_arc(

@@ -18,8 +18,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from symbolu.vision.controls import QuadControl, PatchMeta
-from symbolu.vision.rope_2d import RotaryPositionEmbedding2D, apply_2d_rope
+from symbolu_extensions.vision.controls import QuadControl, PatchMeta
+from symbolu_extensions.vision.rope_2d import RotaryPositionEmbedding2D, apply_2d_rope
 
 
 class QuadRetriever2D(nn.Module):

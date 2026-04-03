@@ -25,7 +25,7 @@ Architecture:
     └─────────────────────────────────────────────────────────────────┘
 
 Quick Start:
-    from symbolu.voice import VoiceAgentApp
+    from symbolu_extensions.voice import VoiceAgentApp
 
     app = VoiceAgentApp(
         sentinel_config={

@@ -9,7 +9,7 @@ Available Monitors:
 - LogFileGraduationMonitor: Parses log files for graduation detection
 """
 
-from symbolu.monitors.graduation_monitor import (
+from symbolu_training.monitors.graduation_monitor import (
     GraduationMonitor,
     GraduationConfig,
     GraduationState,

@@ -7,7 +7,7 @@ Deterministic, non-semantic, non-selective rendering.
 Contract: docs/contracts/PHASE_8A_RENDERING_CONTRACT.md
 """
 
-from symbolu.phases.phase8a_rendering.types import (
+from symbolu_extensions.phases.phase8a_rendering.types import (
     RenderModality,
     RenderErrorType,
     RendererConfig,
@@ -25,8 +25,8 @@ from symbolu.phases.phase8a_rendering.types import (
     compute_input_hash,
 )
 
-from symbolu.phases.phase8a_rendering.renderer import Renderer
-from symbolu.phases.phase8a_rendering.symbolic_renderer import SymbolicRenderer
+from symbolu_extensions.phases.phase8a_rendering.renderer import Renderer
+from symbolu_extensions.phases.phase8a_rendering.symbolic_renderer import SymbolicRenderer
 
 __all__ = [
     # Enums

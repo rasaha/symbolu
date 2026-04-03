@@ -12,8 +12,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.contracts import assert_control_shape
-from symbolu.vision.controls import GateControl
+from symbolu_extensions.vision.contracts import assert_control_shape
+from symbolu_extensions.vision.controls import GateControl
 
 
 class GateMixer(nn.Module):

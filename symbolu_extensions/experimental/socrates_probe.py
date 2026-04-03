@@ -26,7 +26,7 @@ FAC Metrics Tracked:
 
 Usage:
 ------
-    from symbolu.experimental.socrates_probe import SocratesProbeRunner
+    from symbolu_extensions.experimental.socrates_probe import SocratesProbeRunner
 
     runner = SocratesProbeRunner(model, tokenizer)
     report = runner.run_all_probes()

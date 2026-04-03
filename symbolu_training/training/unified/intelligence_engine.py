@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List, Optional, Any, Tuple
 
-from symbolu.training.unified.ontological_flow import (
+from symbolu_training.training.unified.ontological_flow import (
     EvolutionaryFlowNetwork,
     EvolutionaryFlowLoss,
 )

@@ -53,7 +53,7 @@ def run_benchmark(
     width: int = 32,
     seed: int = 42,
 ) -> GradientSafetyResult:
-    from symbolu.vision.video.fscsv_wrapper import (
+    from symbolu_extensions.vision.video.fscsv_wrapper import (
         GradientSafetyBound, FSCSVModule, FSCSVConfig,
     )
 

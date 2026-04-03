@@ -5,16 +5,16 @@ Training Infrastructure
 Trainers for consumer provider models.
 """
 
-from symbolu.training.trainers.embedding_trainer import (
+from symbolu_training.training.trainers.embedding_trainer import (
     EmbeddingTrainer,
     EmbeddingTrainerConfig,
     TrainingMetrics,
 )
-from symbolu.training.trainers.router_trainer import (
+from symbolu_training.training.trainers.router_trainer import (
     RouterTrainer,
     RouterTrainerConfig,
 )
-from symbolu.training.trainers.gradient_throttle import GradientNormThrottle
+from symbolu_training.training.trainers.gradient_throttle import GradientNormThrottle
 
 __all__ = [
     "EmbeddingTrainer",

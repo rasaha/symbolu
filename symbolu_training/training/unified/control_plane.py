@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from symbolu.phase_transformer import (
+from symbolu_core.phase_transformer import (
     ControlShapeViolation,
     validate_control_signals,
 )

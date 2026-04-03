@@ -17,8 +17,8 @@ from collections import Counter
 from typing import List, Tuple, Dict
 import time
 
-from symbolu.providers import get_router_provider, get_embedding_provider
-from symbolu.resonance import analyze_phrase, analyze_word, LAYER_NAMES
+from symbolu_core.providers import get_router_provider, get_embedding_provider
+from symbolu_core.resonance import analyze_phrase, analyze_word, LAYER_NAMES
 
 
 # Test queries grouped by expected intent

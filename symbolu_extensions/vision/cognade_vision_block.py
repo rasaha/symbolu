@@ -18,17 +18,17 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.controls import (
+from symbolu_extensions.vision.controls import (
     BlockControl,
     PhaseControl,
     QuadControl,
     GateControl,
     PatchMeta,
 )
-from symbolu.vision.local_mixer import LocalMixer
-from symbolu.vision.phase_integrator import PhaseIntegrator2D
-from symbolu.vision.quad_retriever import QuadRetriever2D
-from symbolu.vision.gate_mixer import GateMixer
+from symbolu_extensions.vision.local_mixer import LocalMixer
+from symbolu_extensions.vision.phase_integrator import PhaseIntegrator2D
+from symbolu_extensions.vision.quad_retriever import QuadRetriever2D
+from symbolu_extensions.vision.gate_mixer import GateMixer
 
 
 class CognadeVisionBlock(nn.Module):

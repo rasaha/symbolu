@@ -57,7 +57,7 @@ def run_benchmark(
     distill_steps: int = 200,
     seed: int = 42,
 ) -> ProxyEncoderResult:
-    from symbolu.vision.video.fscsv_wrapper import (
+    from symbolu_extensions.vision.video.fscsv_wrapper import (
         ProxyEncoder,
         compute_phase_correlation,
         compute_semantic_similarity,

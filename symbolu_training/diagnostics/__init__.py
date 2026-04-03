@@ -13,7 +13,7 @@ Available Diagnostics:
 - FluidityStatistics: Aggregate statistics over fluidity events (v2.2.3.1)
 """
 
-from symbolu.diagnostics.rip_logger import (
+from symbolu_training.diagnostics.rip_logger import (
     SovereignDiagnosticLogger,
     StressTestRunner,
     RipEvent,

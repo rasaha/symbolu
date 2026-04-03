@@ -311,7 +311,7 @@ class HybridBCVFCrossAttention(nn.Module):
     ):
         super().__init__()
 
-        from symbolu.vision.cross_attention_proposals import CrossAttentionToProposals
+        from symbolu_extensions.vision.cross_attention_proposals import CrossAttentionToProposals
 
         bcvf_config = bcvf_config or {}
         self.bcvf = BCVFQuadWeighter(**bcvf_config)

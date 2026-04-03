@@ -11,13 +11,13 @@ from typing import Dict, List, Optional, Any, Tuple
 
 # Import SOVEREIGN_STATE_DIM for default config values
 try:
-    from symbolu.phase_transformer import SOVEREIGN_STATE_DIM
+    from symbolu_core.phase_transformer import SOVEREIGN_STATE_DIM
 except ImportError:
     SOVEREIGN_STATE_DIM = 32  # Fallback
 
 # SRK imports (conditional)
 try:
-    from symbolu.sovereign import SRKConfig, SRKLossConfig
+    from agentic.sovereign import SRKConfig, SRKLossConfig
     SRK_AVAILABLE = True
 except ImportError:
     SRK_AVAILABLE = False

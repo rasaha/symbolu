@@ -11,16 +11,16 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-from symbolu.training.schemas import TrainingDataset, QueryIntentPair, ParaphrasePair
-from symbolu.training.trainers.embedding_trainer import (
+from symbolu_training.training.schemas import TrainingDataset, QueryIntentPair, ParaphrasePair
+from symbolu_training.training.trainers.embedding_trainer import (
     EmbeddingTrainer,
     EmbeddingTrainerConfig,
 )
-from symbolu.training.trainers.router_trainer import (
+from symbolu_training.training.trainers.router_trainer import (
     RouterTrainer,
     RouterTrainerConfig,
 )
-from symbolu.training.scripts.validate import DataValidator
+from symbolu_training.training.scripts.validate import DataValidator
 
 
 def load_intent_pairs(path: str) -> list:
@@ -29,7 +29,7 @@ def load_intent_pairs(path: str) -> list:
     with open(path, "r") as f:
         for line in f:
             data = json.loads(line)
-            from symbolu.training.schemas import IntentLabel
+            from symbolu_training.training.schemas import IntentLabel
             pairs.append(QueryIntentPair(
                 query=data["query"],
                 intent=IntentLabel(data["intent"]),

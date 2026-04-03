@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List, Optional, Any, Tuple
 
-from symbolu.training.unified.utilities import (
+from symbolu_training.training.unified.utilities import (
     SOVEREIGN_R_MATRIX,
     VRTTI_NAMES,
     get_layer_vrtti_weights,

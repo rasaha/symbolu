@@ -18,7 +18,7 @@ Usage:
     streamlit run pratyaksha.py
 
     Or programmatically:
-    from symbolu.experimental.dashboard import PratyakshaDashboard
+    from symbolu_extensions.experimental.dashboard import PratyakshaDashboard
     dashboard = PratyakshaDashboard()
     dashboard.run()
 """

@@ -44,7 +44,7 @@ from torch import Tensor
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-from symbolu.vision.video.fscsv_wrapper import ProxyEncoder
+from symbolu_extensions.vision.video.fscsv_wrapper import ProxyEncoder
 
 
 @dataclass
@@ -408,7 +408,7 @@ def train(
     # Dataset
     dataloader = None
     if data_dir and not synthetic:
-        from symbolu.vision.video.dataset import get_video_dataset, create_video_dataloader
+        from symbolu_extensions.vision.video.dataset import get_video_dataset, create_video_dataloader
         dataset = get_video_dataset("local", data_dir=data_dir, num_frames=num_frames, image_size=image_size)
         dataloader = create_video_dataloader(dataset, batch_size=batch_size)
         print(f"Dataset: {len(dataset)} videos")

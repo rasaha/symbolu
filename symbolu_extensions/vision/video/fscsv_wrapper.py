@@ -18,13 +18,13 @@ Patent formulas implemented:
   V4: Three-band semantic hierarchy
 
 Usage with PhaseQuadVideoPipeline:
-    >>> from symbolu.vision.video.fscsv_wrapper import FSCSVModule, FSCSVConfig, make_fscsv_callback
+    >>> from symbolu_extensions.vision.video.fscsv_wrapper import FSCSVModule, FSCSVConfig, make_fscsv_callback
     >>> fscsv = FSCSVModule(FSCSVConfig(lambda_max=0.1))
     >>> callback = make_fscsv_callback(fscsv)
     >>> result = pipeline.generate("A cat playing", coherence_callback=callback)
 
 Usage with FSCSVPipeline (convenience wrapper):
-    >>> from symbolu.vision.video.fscsv_wrapper import FSCSVPipeline, FSCSVConfig
+    >>> from symbolu_extensions.vision.video.fscsv_wrapper import FSCSVPipeline, FSCSVConfig
     >>> pipeline = FSCSVPipeline.create_mock(fscsv_config=FSCSVConfig())
     >>> result = pipeline.generate("A cat playing")
 """
@@ -872,7 +872,7 @@ class FSCSVPipeline:
         fscsv_config: Optional[FSCSVConfig] = None,
     ) -> "FSCSVPipeline":
         """Create pipeline with mock components for testing."""
-        from symbolu.vision.video.pipeline import PhaseQuadVideoPipeline
+        from symbolu_extensions.vision.video.pipeline import PhaseQuadVideoPipeline
 
         base = PhaseQuadVideoPipeline.create_mock(model_size=model_size, device=device)
         return cls(base, fscsv_config=fscsv_config)
@@ -896,7 +896,7 @@ class FSCSVPipeline:
         fscsv_config: Optional[FSCSVConfig] = None,
     ) -> "FSCSVPipeline":
         """Create pipeline with pretrained components plus FSCS-V."""
-        from symbolu.vision.video.pipeline import PhaseQuadVideoPipeline
+        from symbolu_extensions.vision.video.pipeline import PhaseQuadVideoPipeline
 
         base = PhaseQuadVideoPipeline.from_pretrained(
             checkpoint_path=checkpoint_path,

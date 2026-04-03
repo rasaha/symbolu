@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Literal
 from enum import Enum
 
-from symbolu.vision.config import (
+from symbolu_extensions.vision.config import (
     PhaseConfig,
     QuadConfig,
     GateConfig,

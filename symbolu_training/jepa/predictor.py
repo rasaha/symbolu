@@ -35,7 +35,7 @@ import torch.nn as nn
 from typing import List, Tuple, Optional, Dict
 
 try:
-    from symbolu.sovereign.reasoning_kernel import SOVEREIGN_STATE_DIM
+    from agentic.sovereign.reasoning_kernel import SOVEREIGN_STATE_DIM
 except ImportError:
     SOVEREIGN_STATE_DIM = 32
 

@@ -13,16 +13,16 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
-from symbolu.vision.config import PhaseQuadVisionConfig
-from symbolu.vision.controls import (
+from symbolu_extensions.vision.phase_quad_generator import PhaseQuadImageGenerator
+from symbolu_extensions.vision.config import PhaseQuadVisionConfig
+from symbolu_extensions.vision.controls import (
     GeneratorControl,
     BlockControl,
     PhaseControl,
     QuadControl,
     CreativityControl,
 )
-from symbolu.vision.inference.samplers import (
+from symbolu_extensions.vision.inference.samplers import (
     NoiseSchedule,
     DDPMSampler,
     DDIMSampler,
@@ -342,7 +342,7 @@ class PhaseQuadInferencePipeline:
             >>> # Without checkpoint (for testing pretrained components)
             >>> pipeline = PhaseQuadInferencePipeline.from_pretrained()
         """
-        from symbolu.vision.inference.pretrained import (
+        from symbolu_extensions.vision.inference.pretrained import (
             PretrainedVAE,
             PretrainedCLIP,
         )

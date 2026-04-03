@@ -92,7 +92,7 @@ def quick_test():
     print("(No pretrained models will be downloaded)")
     print()
 
-    from symbolu.vision.training.train import train
+    from symbolu_extensions.vision.training.train import train
 
     train(
         model_size="tiny",
@@ -123,7 +123,7 @@ def train_pokemon():
 
     input("Press Enter to continue or Ctrl+C to cancel...")
 
-    from symbolu.vision.training.train import train
+    from symbolu_extensions.vision.training.train import train
 
     train(
         model_size="small",
@@ -153,7 +153,7 @@ def train_full():
     print("  python -m symbolu.vision.training.train --hf-dataset laion/laion2B-en")
     print()
 
-    from symbolu.vision.training.train import train
+    from symbolu_extensions.vision.training.train import train
 
     # Default to synthetic for demo
     train(
@@ -181,7 +181,7 @@ def demo_inference_with_pretrained():
     print("(Model is untrained, so output will be random)")
     print()
 
-    from symbolu.vision.inference import PhaseQuadInferencePipeline, GenerationConfig
+    from symbolu_extensions.vision.inference import PhaseQuadInferencePipeline, GenerationConfig
 
     print("Creating pipeline with pretrained components...")
     pipeline = PhaseQuadInferencePipeline.from_pretrained(

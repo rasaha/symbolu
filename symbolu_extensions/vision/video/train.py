@@ -41,14 +41,14 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.cuda.amp import autocast, GradScaler
 
-from symbolu.vision.video.generator import PhaseQuadVideoGenerator
-from symbolu.vision.video.config import PhaseQuadVideoConfig
-from symbolu.vision.video.dataset import (
+from symbolu_extensions.vision.video.generator import PhaseQuadVideoGenerator
+from symbolu_extensions.vision.video.config import PhaseQuadVideoConfig
+from symbolu_extensions.vision.video.dataset import (
     get_video_dataset,
     create_video_dataloader,
     SyntheticVideoDataset,
 )
-from symbolu.vision.inference.samplers import NoiseSchedule
+from symbolu_extensions.vision.inference.samplers import NoiseSchedule
 
 
 class VideoMockVAE(nn.Module):
@@ -561,8 +561,8 @@ def train(
     if use_pretrained:
         print("\nLoading pretrained VAE and text encoder...")
         try:
-            from symbolu.vision.video.vae import PretrainedVideoVAE
-            from symbolu.vision.inference.pretrained import PretrainedCLIP
+            from symbolu_extensions.vision.video.vae import PretrainedVideoVAE
+            from symbolu_extensions.vision.inference.pretrained import PretrainedCLIP
             vae = PretrainedVideoVAE(device=device)
             text_encoder = PretrainedCLIP(device=device)
         except Exception as e:

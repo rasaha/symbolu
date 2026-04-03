@@ -58,7 +58,7 @@ def run_benchmark(
     width: int = 32,
     seed: int = 42,
 ) -> BandAblationResult:
-    from symbolu.vision.video.fscsv_wrapper import (
+    from symbolu_extensions.vision.video.fscsv_wrapper import (
         FSCSVModule, FSCSVConfig, ThreeBandDecomposer,
         compute_phase_correlation, compute_semantic_similarity,
     )

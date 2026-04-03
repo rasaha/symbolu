@@ -24,7 +24,7 @@ Usage:
     streamlit run -m symbolu.experimental.dashboard.pratyaksha
 
     # Or programmatically
-    from symbolu.experimental.dashboard import (
+    from symbolu_extensions.experimental.dashboard import (
         PratyakshaDashboard,
         get_dashboard_stream,
         StateSnapshotBuilder,

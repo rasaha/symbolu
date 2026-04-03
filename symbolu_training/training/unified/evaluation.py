@@ -15,14 +15,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from symbolu.training.entropy_control import (
+from symbolu_training.training.entropy_control import (
     EntropyControlConfig,
     AdaptiveEntropyController,
 )
 
 # Import clean_wikitext_artifacts (optional dependency)
 try:
-    from symbolu.training import clean_wikitext_artifacts
+    from symbolu_training.training import clean_wikitext_artifacts
     _CLEAN_WIKITEXT_AVAILABLE = True
 except ImportError:
     _CLEAN_WIKITEXT_AVAILABLE = False
@@ -883,7 +883,7 @@ def run_quality_samples(
             # A/B comparison: generate without CG if model supports ablation
             if hasattr(model, 'set_ablation_config') and hasattr(model, 'ablation_config'):
                 try:
-                    from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig
+                    from symbolu_training.training.conscious_generation.ablation.config import AttentionAblationConfig
                     _saved_abl = model.ablation_config
                     model.set_ablation_config(AttentionAblationConfig.all_off())
                     generated_no_cg = generate_sample(
@@ -1266,7 +1266,7 @@ def run_factual_eval(
     _can_ablate = hasattr(model, 'set_ablation_config') and hasattr(model, 'ablation_config')
     if _can_ablate:
         try:
-            from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig
+            from symbolu_training.training.conscious_generation.ablation.config import AttentionAblationConfig
             _saved_abl = model.ablation_config
             model.set_ablation_config(AttentionAblationConfig.all_off())
 

@@ -14,12 +14,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from symbolu.training.unified.config import UnifiedTrainingConfig
+from symbolu_training.training.unified.config import UnifiedTrainingConfig
 
 # Import Sovereign-1 components
 try:
-    from symbolu.sovereign import SovereignLoss, SovereignObserver
-    from symbolu.sovereign.loss import LegacyLossAdapter
+    from agentic.sovereign import SovereignLoss, SovereignObserver
+    from agentic.sovereign.loss import LegacyLossAdapter
     SOVEREIGN_AVAILABLE = True
 except ImportError:
     SOVEREIGN_AVAILABLE = False

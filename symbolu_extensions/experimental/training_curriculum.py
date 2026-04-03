@@ -46,7 +46,7 @@ Curriculum Design:
 
 Usage:
 ------
-    from symbolu.experimental.training_curriculum import (
+    from symbolu_extensions.experimental.training_curriculum import (
         TrainingCurriculum,
         CurriculumConfig,
         CurriculumPhase,

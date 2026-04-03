@@ -294,7 +294,7 @@ def load_reference_videos(
     videos = []
 
     if reference_dir:
-        from symbolu.vision.video.dataset import get_video_dataset
+        from symbolu_extensions.vision.video.dataset import get_video_dataset
         dataset = get_video_dataset(
             "local",
             data_dir=reference_dir,
@@ -309,7 +309,7 @@ def load_reference_videos(
             videos.append(video.to(device))
 
     elif hf_dataset:
-        from symbolu.vision.video.dataset import get_video_dataset
+        from symbolu_extensions.vision.video.dataset import get_video_dataset
         dataset = get_video_dataset(
             "huggingface",
             dataset_name=hf_dataset,

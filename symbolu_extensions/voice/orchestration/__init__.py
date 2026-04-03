@@ -10,7 +10,7 @@ managing the complete voice interaction flow with support for:
 - Integration with Sentinel framework
 
 Usage:
-    from symbolu.voice.orchestration import (
+    from symbolu_extensions.voice.orchestration import (
         VoiceOrchestrator,
         VoiceSession,
         VoiceRequest,

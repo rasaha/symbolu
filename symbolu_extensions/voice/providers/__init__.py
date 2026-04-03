@@ -9,7 +9,7 @@ voice services (STT and TTS) with support for multiple providers:
 - ElevenLabs (TTS only)
 
 Usage:
-    from symbolu.voice.providers import (
+    from symbolu_extensions.voice.providers import (
         ProviderRegistry,
         CartesiaAdapter,
         DeepgramAdapter,

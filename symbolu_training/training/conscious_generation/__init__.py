@@ -26,15 +26,15 @@ Phase 3: Governance integration
 Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D
 """
 
-from symbolu.training.conscious_generation.token_ontology import TokenOntologyProjector
-from symbolu.training.conscious_generation.token_cache import TokenPrimitiveCache
-from symbolu.training.conscious_generation.primitives.ontology_scorer import (
+from symbolu_training.training.conscious_generation.token_ontology import TokenOntologyProjector
+from symbolu_training.training.conscious_generation.token_cache import TokenPrimitiveCache
+from symbolu_training.training.conscious_generation.primitives.ontology_scorer import (
     OntologyCompatibilityScorer,
 )
-from symbolu.training.conscious_generation.losses.ontological_structure import (
+from symbolu_training.training.conscious_generation.losses.ontological_structure import (
     OntologicalStructureLoss,
 )
-from symbolu.training.conscious_generation.primitives import (
+from symbolu_training.training.conscious_generation.primitives import (
     BaseScorer,
     PlausibilityTokenScorer,
     JEPATokenScorer,  # backward-compatible alias
@@ -43,22 +43,22 @@ from symbolu.training.conscious_generation.primitives import (
     GunaTokenScorer,
     TokenEvaluationTensor,
 )
-from symbolu.training.conscious_generation.governance.kosha_router import (
+from symbolu_training.training.conscious_generation.governance.kosha_router import (
     KoshaPrimitiveRouter,
 )
-from symbolu.training.conscious_generation.governance.bliss_gate import (
+from symbolu_training.training.conscious_generation.governance.bliss_gate import (
     BlissTokenGate,
 )
-from symbolu.training.conscious_generation.integration.token_scorer import (
+from symbolu_training.training.conscious_generation.integration.token_scorer import (
     IntegratedTokenScorer,
 )
-from symbolu.training.conscious_generation.losses.kosha_routing import (
+from symbolu_training.training.conscious_generation.losses.kosha_routing import (
     KoshaRoutingLoss,
 )
-from symbolu.training.conscious_generation.losses.primitive_auxiliary import (
+from symbolu_training.training.conscious_generation.losses.primitive_auxiliary import (
     PrimitiveAuxiliaryLosses,
 )
-from symbolu.training.conscious_generation.losses.bliss_coherence import (
+from symbolu_training.training.conscious_generation.losses.bliss_coherence import (
     BlissCoherenceLoss,
 )
 

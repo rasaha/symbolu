@@ -15,7 +15,7 @@ Key Components:
 
 Quick Start:
 ------------
-    from symbolu.image_gen import generate
+    from symbolu_extensions.image_gen import generate
 
     # Quick generation
     result = generate("A beautiful sunset over mountains")
@@ -26,7 +26,7 @@ Quick Start:
 
 Advanced Usage:
 ---------------
-    from symbolu.image_gen import (
+    from symbolu_extensions.image_gen import (
         SymbolUFluxPipeline,
         ImageGenConfig,
         GenerationMode,
@@ -59,7 +59,7 @@ __version__ = "0.1.0"
 # CONFIGURATION
 # =============================================================================
 
-from symbolu.image_gen.config import (
+from symbolu_extensions.image_gen.config import (
     # Enums
     FluxVariant,
     GenerationMode,
@@ -83,7 +83,7 @@ from symbolu.image_gen.config import (
 # LAYER MAPPING
 # =============================================================================
 
-from symbolu.image_gen.layer_mapper import (
+from symbolu_extensions.image_gen.layer_mapper import (
     OntologicalLayer,
     LayerMapper,
     LayerBlockMapping,
@@ -99,7 +99,7 @@ from symbolu.image_gen.layer_mapper import (
 # =============================================================================
 
 # BCVF - Bidirectional Consistency Verification
-from symbolu.image_gen.bcvf_image import (
+from symbolu_extensions.image_gen.bcvf_image import (
     BCVFImageEngine,
     BCVFImageScore,
     ForwardImageScorer,
@@ -109,7 +109,7 @@ from symbolu.image_gen.bcvf_image import (
 )
 
 # USE - Universal Synchronization Engine
-from symbolu.image_gen.use_image import (
+from symbolu_extensions.image_gen.use_image import (
     USEImageEngine,
     PhaseExtractor,
     PhaseCorrelation,
@@ -120,7 +120,7 @@ from symbolu.image_gen.use_image import (
 )
 
 # SCC - Semantic Coherence Controller
-from symbolu.image_gen.scc_image import (
+from symbolu_extensions.image_gen.scc_image import (
     SCCImageEngine,
     LayerCoherenceComputer,
     GlobalCoherenceComputer,
@@ -148,7 +148,7 @@ from symbolu.image_gen.scc_image import (
 # MONITORING
 # =============================================================================
 
-from symbolu.image_gen.coherence_monitor import (
+from symbolu_extensions.image_gen.coherence_monitor import (
     CoherenceMonitor,
     TimestepMetrics,
     CoherenceHistory,
@@ -162,7 +162,7 @@ from symbolu.image_gen.coherence_monitor import (
 # FLUX INTEGRATION
 # =============================================================================
 
-from symbolu.image_gen.flux_integration import (
+from symbolu_extensions.image_gen.flux_integration import (
     SymbolUFluxWrapper,
     FluxLayerCapture,
     FluxGenerationState,
@@ -176,7 +176,7 @@ from symbolu.image_gen.flux_integration import (
 # PIPELINE
 # =============================================================================
 
-from symbolu.image_gen.pipeline import (
+from symbolu_extensions.image_gen.pipeline import (
     SymbolUFluxPipeline,
     PipelineResult,
     generate,
@@ -346,7 +346,7 @@ Dependencies:
   - PIL: {'OK' if deps['PIL'] else 'MISSING'}
 
 Quick Start:
-  from symbolu.image_gen import generate
+  from symbolu_extensions.image_gen import generate
   result = generate("A beautiful sunset")
   result.image.save("output.png")
 

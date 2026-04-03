@@ -11,10 +11,10 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-from symbolu.training.schemas import TrainingDataset
-from symbolu.training.generators.intent_generator import IntentPairGenerator
-from symbolu.training.generators.paraphrase_generator import ParaphrasePairGenerator
-from symbolu.training.scripts.validate import DataValidator, validate_training_data
+from symbolu_training.training.schemas import TrainingDataset
+from symbolu_training.training.generators.intent_generator import IntentPairGenerator
+from symbolu_training.training.generators.paraphrase_generator import ParaphrasePairGenerator
+from symbolu_training.training.scripts.validate import DataValidator, validate_training_data
 
 
 def generate_training_data(

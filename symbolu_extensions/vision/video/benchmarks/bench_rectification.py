@@ -66,7 +66,7 @@ def compute_rectified_coherence(
     features_a: torch.Tensor, features_b: torch.Tensor
 ) -> torch.Tensor:
     """Rectified C+ * S+ per patent D1-D3."""
-    from symbolu.vision.video.fscsv_wrapper import (
+    from symbolu_extensions.vision.video.fscsv_wrapper import (
         compute_phase_correlation,
         compute_semantic_similarity,
     )

@@ -1,0 +1,235 @@
+"""
+10D Ontological Backbone
+========================
+
+Universal 10-dimensional encoding system for cross-domain reasoning.
+
+Each dimension maps cognitive/philosophical concepts to mathematical structures,
+enabling structural similarity detection across any domain (history, science,
+literature, finance, etc.).
+
+Dimensions:
+    1D Action      → Linear algebra (addition/subtraction, progression)
+    2D Identification → Ratios/polarities (multiplication/division)
+    3D Body        → Geometry (form, shape, space)
+    4D Mind        → Recursion/flow (time, process, memory)
+    5D Ego         → Logic/computation (choices, branching, Boolean)
+    6D Intellect   → Set theory (laws, universals, categories)
+    7D Soul        → Topology (continuity across domains)
+    8D Witness     → Probability (superposition, all possible paths)
+    9D Singularity → Unification (unity of concepts)
+    10D Absolute   → Symbolic infinity (transcendence, pure potential)
+
+Usage:
+    from agentic.ontology.backbone import encode_10d, compute_similarity
+
+    vec1 = encode_10d("The Civil War divided the nation")
+    vec2 = encode_10d("Grapes of Wrath depicts family division")
+
+    similarity = compute_similarity(vec1, vec2)
+    # Returns structural similarity based on 10D encoding
+"""
+
+from .encoder import (
+    Dimension,
+    DimensionalVector,
+    encode_10d,
+    encode_batch,
+)
+from .similarity import (
+    compute_similarity,
+    find_similar,
+    SimilarityResult,
+)
+from .extractors import (
+    DimensionExtractor,
+    get_extractor,
+    ProjectionDirection,
+)
+from .experiential import (
+    ExperientialObject,
+    ExperientialStore,
+    PatternType,
+    create_experiential,
+    get_experiential_store,
+)
+from .reasoning_extractor import (
+    extract_reasoning,
+    extract_and_create_experiential,
+)
+from .user_inclination import (
+    UserInclinationProfile,
+    UserInclinationStore,
+    ReasoningStyle,
+    get_user_store,
+)
+from .reasoning_synthesizer import (
+    ReasoningSynthesizer,
+    SynthesisResult,
+    synthesize_for_problem,
+)
+from .mirror_pairs import (
+    MirrorPair,
+    MIRROR_MAP,
+    compute_balance,
+    propagate_to_mirror,
+    encode_with_events,
+    tag_events,
+    EventType,
+    BalanceReport,
+    is_transferable_insight,
+    explain_balance,
+)
+from .persona_tracker import (
+    PersonaProfile,
+    PersonaStore,
+    get_persona_store,
+    track_query,
+    get_persona_insights,
+)
+from .phoneme_validator import (
+    ValidationResult,
+    PhonemeAlignment,
+    ValidationReport,
+    validate_event,
+    validate_experiential_before_store,
+    validate_batch,
+    filter_universal,
+    # Semantic contradiction check
+    SemanticCheck,
+    check_semantic_contradiction,
+    SEMANTIC_OPPOSITES,
+    # Word-pair entropy validation
+    WordPairHarmony,
+    validate_word_pair,
+    validate_phrase_harmony,
+)
+from .learning_pipeline import (
+    # Learning outcomes
+    LearningOutcome,
+    LearningResult,
+    MatchType,
+    RetrievalResult,
+    BatchLearningResult,
+    # Learning functions
+    learn_from_event,
+    learn_batch,
+    # Retrieval functions
+    retrieve_similar,
+)
+from .cross_domain_config import (
+    # Admin-level config
+    DomainPairPolicy,
+    DomainPairConfig,
+    CrossDomainCounters,
+    CrossDomainConfig,
+    # Config functions
+    get_cross_domain_config,
+    reload_config,
+    get_counters_report,
+)
+from .insight_suggester import (
+    # User control
+    InsightMode,
+    # Types
+    InsightType,
+    PersonalInsight,
+    StructuralMatch,
+    # Core functions
+    generate_insights,
+    generate_insight_for_display,
+    explain_insight,
+)
+
+__all__ = [
+    # Core types
+    "Dimension",
+    "DimensionalVector",
+    # Encoding
+    "encode_10d",
+    "encode_batch",
+    # Similarity
+    "compute_similarity",
+    "find_similar",
+    "SimilarityResult",
+    # Extractors
+    "DimensionExtractor",
+    "get_extractor",
+    "ProjectionDirection",
+    # Experiential Objects
+    "ExperientialObject",
+    "ExperientialStore",
+    "PatternType",
+    "create_experiential",
+    "get_experiential_store",
+    # Reasoning Extraction
+    "extract_reasoning",
+    "extract_and_create_experiential",
+    # User Inclination
+    "UserInclinationProfile",
+    "UserInclinationStore",
+    "ReasoningStyle",
+    "get_user_store",
+    # Synthesis
+    "ReasoningSynthesizer",
+    "SynthesisResult",
+    "synthesize_for_problem",
+    # Mirror Pairs
+    "MirrorPair",
+    "MIRROR_MAP",
+    "compute_balance",
+    "propagate_to_mirror",
+    "encode_with_events",
+    "tag_events",
+    "EventType",
+    "BalanceReport",
+    "is_transferable_insight",
+    "explain_balance",
+    # Persona Tracking
+    "PersonaProfile",
+    "PersonaStore",
+    "get_persona_store",
+    "track_query",
+    "get_persona_insights",
+    # Phoneme Validation (Ground Truth)
+    "ValidationResult",
+    "PhonemeAlignment",
+    "ValidationReport",
+    "validate_event",
+    "validate_experiential_before_store",
+    "validate_batch",
+    "filter_universal",
+    # Semantic Contradiction Check
+    "SemanticCheck",
+    "check_semantic_contradiction",
+    "SEMANTIC_OPPOSITES",
+    # Word-Pair Entropy Validation
+    "WordPairHarmony",
+    "validate_word_pair",
+    "validate_phrase_harmony",
+    # Event Learning Pipeline
+    "LearningOutcome",
+    "LearningResult",
+    "MatchType",
+    "RetrievalResult",
+    "BatchLearningResult",
+    "learn_from_event",
+    "learn_batch",
+    "retrieve_similar",
+    # Cross-Domain Config (Admin-Level)
+    "DomainPairPolicy",
+    "DomainPairConfig",
+    "CrossDomainCounters",
+    "CrossDomainConfig",
+    "get_cross_domain_config",
+    "reload_config",
+    "get_counters_report",
+    # Personal Insight Suggester (User-Controlled)
+    "InsightMode",
+    "InsightType",
+    "PersonalInsight",
+    "StructuralMatch",
+    "generate_insights",
+    "generate_insight_for_display",
+    "explain_insight",
+]

@@ -15,14 +15,14 @@ from torch import Tensor
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-from symbolu.vision.config import PhaseQuadVisionConfig, TrainingConfig
-from symbolu.vision.controls import BlockControl, GeneratorControl
-from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
-from symbolu.vision.training.temperature_schedule import (
+from symbolu_extensions.vision.config import PhaseQuadVisionConfig, TrainingConfig
+from symbolu_extensions.vision.controls import BlockControl, GeneratorControl
+from symbolu_extensions.vision.phase_quad_generator import PhaseQuadImageGenerator
+from symbolu_extensions.vision.training.temperature_schedule import (
     TemperatureSchedule,
     get_temperature_schedule,
 )
-from symbolu.vision.diagnostics import ModelDiagnostics
+from symbolu_extensions.vision.diagnostics import ModelDiagnostics
 
 
 @dataclass

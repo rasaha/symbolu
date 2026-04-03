@@ -11,7 +11,7 @@ Key features:
 - SSML generation for enhanced prosody control
 
 Usage:
-    from symbolu.voice.prosody import (
+    from symbolu_extensions.voice.prosody import (
         P10ProsodyMapper,
         AcousticRegime,
     )

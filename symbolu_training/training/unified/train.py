@@ -60,7 +60,7 @@ except ImportError:
     TENSORBOARD_AVAILABLE = False
 
 # Entropy-based logit scale control
-from symbolu.training.entropy_control import (
+from symbolu_training.training.entropy_control import (
     EntropyControlConfig,
     LogitScaleModule,
     AdaptiveEntropyController,
@@ -71,7 +71,7 @@ from symbolu.training.entropy_control import (
 
 # BCVF Contrastive Structural Pressure on Representations
 try:
-    from symbolu.ontological.bcvf_contrastive import (
+    from symbolu_core.ontological.bcvf_contrastive import (
         BCVFContrastiveConfig,
         BCVFContrastiveHead,
         BCVFNegativeSampler,
@@ -86,7 +86,7 @@ except ImportError:
 
 # BCVF Logit-Margin + Entropy Band (perplexity-aligned)
 try:
-    from symbolu.ontological.bcvf_logit_margin import (
+    from symbolu_core.ontological.bcvf_logit_margin import (
         LogitMarginConfig,
         compute_logit_margin_loss,
         log_logit_margin_diagnostics,
@@ -97,7 +97,7 @@ except ImportError:
 
 # Kosha-Vritti Structured Supervision (Static Compatibility Version)
 try:
-    from symbolu.training.kosha_vritti_supervision import (
+    from symbolu_training.training.kosha_vritti_supervision import (
         KoshaVrittiSupervisionConfig,
         KoshaVrittiSupervisor,
         log_kv_metrics,
@@ -109,7 +109,7 @@ except ImportError as e:
 
 # State-Conditional Logit Scale ("Confidence Knob") + Entropy Band Control
 try:
-    from symbolu.training.confidence_scaler import (
+    from symbolu_training.training.confidence_scaler import (
         ConfidenceScalerConfig,
         ConfidenceScaler,
         EntropyBandLoss,
@@ -127,7 +127,7 @@ except ImportError as e:
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from symbolu.phase_transformer import (
+from symbolu_core.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
     StandardTransformer,  # V9.6.9: O(n²) baseline for comparison
@@ -176,12 +176,12 @@ from symbolu.phase_transformer import (
 
 # Import ontological models
 try:
-    from symbolu.ontological.symbolu12_bhava import (
+    from symbolu_core.ontological.symbolu12_bhava import (
         SymbolU12LLMWithBhava,
         SymbolU12OptimizedWithBhava,
         SymbolU12BhavaConfig,
     )
-    from symbolu.ontological.bhava_relationships import (
+    from symbolu_core.ontological.bhava_relationships import (
         BHAVA_SIGNIFICANCES,
         get_relationship_meaning,
     )
@@ -192,8 +192,8 @@ except ImportError as e:
 
 # Import Sovereign-1 components
 try:
-    from symbolu.sovereign import SovereignLoss, SovereignObserver
-    from symbolu.sovereign.loss import LegacyLossAdapter
+    from agentic.sovereign import SovereignLoss, SovereignObserver
+    from agentic.sovereign.loss import LegacyLossAdapter
     SOVEREIGN_AVAILABLE = True
 except ImportError as e:
     SOVEREIGN_AVAILABLE = False
@@ -201,7 +201,7 @@ except ImportError as e:
 
 # Import GradientNormThrottle for training stability
 try:
-    from symbolu.training import GradientNormThrottle, clean_wikitext_artifacts
+    from symbolu_training.training import GradientNormThrottle, clean_wikitext_artifacts
     GRADIENT_THROTTLE_AVAILABLE = True
 except ImportError as e:
     GRADIENT_THROTTLE_AVAILABLE = False
@@ -209,7 +209,7 @@ except ImportError as e:
 
 # Import V9.8.0: Sovereign Reasoning Kernel (SRK)
 try:
-    from symbolu.sovereign import (
+    from agentic.sovereign import (
         SRKConfig,
         SovereignReasoningKernel,
         SovereignEmbedding,
@@ -226,7 +226,7 @@ except ImportError as e:
 
 # Phase-JEPA: Joint Embedding Predictive Architecture
 try:
-    from symbolu.jepa import (
+    from symbolu_training.jepa import (
         PhaseJEPATransformer,
         PhaseJEPAConfig,
         create_phase_jepa_transformer,
@@ -245,7 +245,7 @@ except ImportError as e:
 
 # Import Gen 2 models (Hierarchical Complex Bhava)
 try:
-    from symbolu.ontological.symbolu12_gen2 import (
+    from symbolu_core.ontological.symbolu12_gen2 import (
         SymbolU12Gen2,
         SymbolU12Gen2Config,
         create_symbolu12_gen2_small,
@@ -279,7 +279,7 @@ except ImportError as e:
 # Note: Main classes (HierarchicalGradientScaler, DynamicRelaxationController) are
 # defined locally below for direct integration with training loop
 try:
-    from symbolu.sovereign.hierarchical_gradient_scaler import compute_s_drift
+    from agentic.sovereign.hierarchical_gradient_scaler import compute_s_drift
     COMPUTE_S_DRIFT_AVAILABLE = True
 except ImportError:
     COMPUTE_S_DRIFT_AVAILABLE = False
@@ -287,7 +287,7 @@ except ImportError:
 
 # Import Kosha Gyroscope (v2.2.1) and Vritti Resonance (v2.3.0) - Homeostatic Self-Regulation
 try:
-    from symbolu.losses import (
+    from symbolu_training.losses import (
         KoshaGyroscopicLoss,
         KoshaGyroscopeConfig,
         InvertedCurriculumController,
@@ -296,11 +296,11 @@ try:
         SovereignStateRegularizer,
         SovereignStateRegularizerConfig,
     )
-    from symbolu.monitors import (
+    from symbolu_training.monitors import (
         GraduationMonitor,
         GraduationConfig,
     )
-    from symbolu.diagnostics import (
+    from symbolu_training.diagnostics import (
         SovereignDiagnosticLogger,
         RipEvent,
     )
@@ -311,8 +311,8 @@ except ImportError as e:
 
 # SGP (Stochastic Gradient Persistence) and Sattvic Controller
 try:
-    from symbolu.resonance.sgp import SGPController, SGPConfig
-    from symbolu.resonance.controller import SattvicConfig, SattvicController
+    from symbolu_core.resonance.sgp import SGPController, SGPConfig
+    from symbolu_core.resonance.controller import SattvicConfig, SattvicController
     SGP_AVAILABLE = True
 except ImportError as e:
     SGP_AVAILABLE = False
@@ -342,7 +342,7 @@ except ImportError as e:
 
 
 # =============================================================================
-# Modular imports from symbolu.training.unified
+# Modular imports from symbolu_training.training.unified
 #
 # All classes and functions previously defined inline (~13,000 lines) have been
 # extracted to symbolu/training/unified/ for better organization. Importing
@@ -350,7 +350,7 @@ except ImportError as e:
 #   from train_unified_llm import SomeClass  # still works
 # =============================================================================
 
-from symbolu.training.unified import (
+from symbolu_training.training.unified import (
     # utilities
     _SimpleByteTokenizer,
     CSR_STOPWORDS,
@@ -458,7 +458,7 @@ from symbolu.training.unified import (
 
 # Appendix G: Bliss Coherence Functional & Monitoring (Phase 1)
 # Imported directly to avoid __init__.py circular dependency
-from symbolu.training.unified.bliss_coherence import (
+from symbolu_training.training.unified.bliss_coherence import (
     BlissConfig,
     BlissCoherenceFunctional,
     OntologyHealthMonitor,
@@ -542,7 +542,7 @@ def train(config: UnifiedTrainingConfig):
     if (config.ablation_disable_phase_sync or config.ablation_disable_vritti
             or config.ablation_disable_guna_bias or config.ablation_enable_dual_channel_intent
             or config.ablation_log_mechanism_strength_every > 0):
-        from symbolu.training.conscious_generation.ablation.config import AttentionAblationConfig
+        from symbolu_training.training.conscious_generation.ablation.config import AttentionAblationConfig
         _ablation_cfg = AttentionAblationConfig(
             use_phase_sync=not config.ablation_disable_phase_sync,
             use_vritti_modulation=not config.ablation_disable_vritti,
@@ -575,7 +575,7 @@ def train(config: UnifiedTrainingConfig):
             print(f"  [Distillation] WARNING: distill_from_mistral with model_type={config.model_type} "
                   "is redundant — Mistral is already the backbone. Skipping teacher.")
         else:
-            from symbolu.training.unified.mistral_teacher import MistralTeacher
+            from symbolu_training.training.unified.mistral_teacher import MistralTeacher
             quantize = config.mistral_quantize if config.mistral_quantize != "none" else None
             mistral_teacher = MistralTeacher(
                 model_name=config.mistral_model_name,
@@ -759,7 +759,7 @@ def train(config: UnifiedTrainingConfig):
     # Initialize Sovereign-1 loss if available and enabled
     sovereign_loss = None
     if config.use_sovereign_loss and SOVEREIGN_AVAILABLE:
-        from symbolu.sovereign.loss import SovereignLoss, SovereignLossConfig
+        from agentic.sovereign.loss import SovereignLoss, SovereignLossConfig
         sov_config = SovereignLossConfig(
             weight_guna=config.sovereign_weight_guna,
             weight_s=config.sovereign_weight_s,
@@ -775,7 +775,7 @@ def train(config: UnifiedTrainingConfig):
     sovereign_engine = None
     stability_state = None
     if config.enable_sovereign_loss:
-        from symbolu.sovereign.metrics import SovereignEngine, SovereignLossConfig as SovEngineConfig, StabilityState
+        from agentic.sovereign.metrics import SovereignEngine, SovereignLossConfig as SovEngineConfig, StabilityState
         sov_engine_config = SovEngineConfig(
             lambda_b1=config.b1_lambda,
             mu_s3=config.mu_s3,
@@ -792,7 +792,7 @@ def train(config: UnifiedTrainingConfig):
     # Initialize Sovereign Alert Monitor for auto-pivot logic
     alert_monitor = None
     if config.enable_sovereign_loss or config.use_9_3_split:
-        from symbolu.sovereign.metrics import SovereignAlertMonitor, AlertConfig
+        from agentic.sovereign.metrics import SovereignAlertMonitor, AlertConfig
         alert_config = AlertConfig(
             sa_ratio_danger=0.55,
             gc_danger=0.25,
@@ -805,7 +805,7 @@ def train(config: UnifiedTrainingConfig):
     # Initialize S8 Stability Hook for entropy monitoring
     s8_hook = None
     if config.enable_sovereign_loss or config.enable_stability_constraint:
-        from symbolu.sovereign.metrics import S8StabilityHook, compute_semantic_entropy, format_sovereign_dashboard
+        from agentic.sovereign.metrics import S8StabilityHook, compute_semantic_entropy, format_sovereign_dashboard
         s8_hook = S8StabilityHook(
             window_size=5,
             brake_sensitivity=5.0,
@@ -2384,8 +2384,8 @@ def train(config: UnifiedTrainingConfig):
     cg_governance_diag = None
     if config.enable_conscious_generation and config.enable_cg_curriculum:
         try:
-            from symbolu.training.conscious_generation.curriculum.stages import CurriculumStageManager
-            from symbolu.training.conscious_generation.diagnostics.governance_diagnostics import GovernanceDiagnostics
+            from symbolu_training.training.conscious_generation.curriculum.stages import CurriculumStageManager
+            from symbolu_training.training.conscious_generation.diagnostics.governance_diagnostics import GovernanceDiagnostics
 
             _cg_stage_proportions = tuple(
                 float(x) for x in config.cg_curriculum_stage_proportions.split(",")
@@ -2437,7 +2437,7 @@ def train(config: UnifiedTrainingConfig):
     cg_embedding_diag = None
     if config.enable_conscious_generation and config.enable_embedding_diagnostics:
         try:
-            from symbolu.training.conscious_generation.diagnostics.embedding_diagnostics import EmbeddingDiagnostics
+            from symbolu_training.training.conscious_generation.diagnostics.embedding_diagnostics import EmbeddingDiagnostics
             cg_embedding_diag = EmbeddingDiagnostics(
                 interval=config.embedding_diag_interval,
                 vocab_sample_size=config.embedding_diag_vocab_sample,
@@ -2461,7 +2461,7 @@ def train(config: UnifiedTrainingConfig):
     cg_adaptive_diag_controller = None
     if cg_embedding_diag is not None:
         try:
-            from symbolu.training.conscious_generation.diagnostics.adaptive_diagnostic_controller import (
+            from symbolu_training.training.conscious_generation.diagnostics.adaptive_diagnostic_controller import (
                 AdaptiveDiagnosticController,
             )
             cg_adaptive_diag_controller = AdaptiveDiagnosticController()
@@ -2473,7 +2473,7 @@ def train(config: UnifiedTrainingConfig):
     cg_factual_eval = None
     if config.enable_conscious_generation and config.enable_factual_eval:
         try:
-            from symbolu.training.conscious_generation.diagnostics.factual_eval import FactualEval
+            from symbolu_training.training.conscious_generation.diagnostics.factual_eval import FactualEval
             cg_factual_eval = FactualEval(
                 interval=config.factual_eval_interval,
                 num_probes=config.factual_eval_probes,
@@ -2493,7 +2493,7 @@ def train(config: UnifiedTrainingConfig):
         config.enable_binding_cache_tracer or config.enable_ctm_plus_tracer
     ):
         try:
-            from symbolu.inference.generation_tracer import MistralCGGenerationTracer
+            from agentic.inference.generation_tracer import MistralCGGenerationTracer
             generation_tracer = MistralCGGenerationTracer(
                 model=model,
                 binding_cache_top_k=config.binding_cache_top_k,
@@ -2515,7 +2515,7 @@ def train(config: UnifiedTrainingConfig):
     experiential_controller = None
     if config.enable_experiential_controller:
         try:
-            from symbolu.training.conscious_generation.experiential.minimal_controller import (
+            from symbolu_training.training.conscious_generation.experiential.minimal_controller import (
                 ExperientialController,
                 ExperientialControllerConfig,
             )
@@ -3116,7 +3116,7 @@ def train(config: UnifiedTrainingConfig):
                         and not tbptt_backward_done
                         and logits is not None
                         and global_step >= config.distill_warmup_steps):
-                    from symbolu.training.unified.mistral_teacher import compute_distillation_loss
+                    from symbolu_training.training.unified.mistral_teacher import compute_distillation_loss
                     # Re-tokenize with Mistral's tokenizer if vocabs differ
                     # For simplicity: use same input_ids if tokenizers match,
                     # otherwise decode + re-encode (slow but correct)
@@ -4975,7 +4975,7 @@ def train(config: UnifiedTrainingConfig):
                                 # Soft mapping: LANG/MATH/CODE → 8-dim distribution
                                 _cg_domain = None
                                 try:
-                                    from symbolu.training.conscious_generation.governance.domain_bridge import map_gyro_to_domain
+                                    from symbolu_training.training.conscious_generation.governance.domain_bridge import map_gyro_to_domain
                                     _cg_domain_label = metrics.get('gyroscope_domain_label', 'LANG')
                                     _cg_domain = map_gyro_to_domain(
                                         domain_label=_cg_domain_label,
@@ -5308,7 +5308,7 @@ def train(config: UnifiedTrainingConfig):
                                     and _ablation_cfg.log_mechanism_strength_every > 0
                                     and global_step % _ablation_cfg.log_mechanism_strength_every == 0
                                     and global_step > 0):
-                                from symbolu.training.conscious_generation.ablation.metrics import (
+                                from symbolu_training.training.conscious_generation.ablation.metrics import (
                                     collect_mechanism_strength_log, collect_gradient_norms,
                                 )
                                 _mech_log = collect_mechanism_strength_log(model)
@@ -7499,7 +7499,7 @@ def train(config: UnifiedTrainingConfig):
 
                     # Log S8 status (always log when brake active or entropy high)
                     if brake_intensity < 0.99 or semantic_ent > 0.60:
-                        from symbolu.sovereign.metrics import get_entropy_status
+                        from agentic.sovereign.metrics import get_entropy_status
                         ent_icon, ent_status = get_entropy_status(semantic_ent)
                         print(f"  --> [S8] Ent:{semantic_ent:.2f}{ent_icon} | {s8_hook.format_log()}")
 

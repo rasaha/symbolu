@@ -63,7 +63,7 @@ Example:
 
 Usage:
 ------
-    from symbolu.experimental import HybridRAGEngine
+    from symbolu_extensions.experimental import HybridRAGEngine
 
     engine = HybridRAGEngine()
 

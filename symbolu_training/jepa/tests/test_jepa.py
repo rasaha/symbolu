@@ -26,7 +26,7 @@ class TestSovereignStateProjector:
 
     @pytest.fixture
     def projector(self):
-        from symbolu.jepa.state_projector import SovereignStateProjector
+        from symbolu_training.jepa.state_projector import SovereignStateProjector
         return SovereignStateProjector(hidden_dim=768, state_dim=32)
 
     def test_output_shape(self, projector):
@@ -106,7 +106,7 @@ class TestPhaseJEPAPredictor:
 
     @pytest.fixture
     def predictor(self):
-        from symbolu.jepa.predictor import PhaseJEPAPredictor
+        from symbolu_training.jepa.predictor import PhaseJEPAPredictor
         return PhaseJEPAPredictor(
             state_dim=32,
             hidden_dim=128,
@@ -160,7 +160,7 @@ class TestPhaseJEPAPredictor:
 
     def test_cosine_modes(self):
         """Test different cosine modes work."""
-        from symbolu.jepa.predictor import PhaseJEPAPredictor
+        from symbolu_training.jepa.predictor import PhaseJEPAPredictor
 
         for mode in ['standard', 'shifted', 'complex']:
             pred = PhaseJEPAPredictor(cosine_mode=mode)
@@ -178,7 +178,7 @@ class TestTargetEncoder:
 
     @pytest.fixture
     def encoder_pair(self):
-        from symbolu.jepa.target_encoder import TargetEncoder
+        from symbolu_training.jepa.target_encoder import TargetEncoder
 
         # Simple encoder for testing
         context_encoder = nn.Sequential(
@@ -228,7 +228,7 @@ class TestTargetEncoder:
 
     def test_momentum_schedule(self):
         """Test momentum scheduling."""
-        from symbolu.jepa.target_encoder import (
+        from symbolu_training.jepa.target_encoder import (
             TargetEncoder, cosine_momentum_schedule
         )
 
@@ -254,7 +254,7 @@ class TestVICRegLoss:
 
     @pytest.fixture
     def vicreg(self):
-        from symbolu.jepa.losses import VICRegLoss
+        from symbolu_training.jepa.losses import VICRegLoss
         return VICRegLoss(sim_coeff=1.0, std_coeff=1.0, cov_coeff=1.0)
 
     def test_identical_inputs(self, vicreg):
@@ -297,7 +297,7 @@ class TestWeightedAlignmentLoss:
 
     @pytest.fixture
     def align_loss(self):
-        from symbolu.jepa.losses import WeightedAlignmentLoss
+        from symbolu_training.jepa.losses import WeightedAlignmentLoss
         return WeightedAlignmentLoss(
             bhava_weight=10.0,
             semantic_weight=1.0,
@@ -349,7 +349,7 @@ class TestDualSourcePhaseProjector:
 
     @pytest.fixture
     def dual_proj(self):
-        from symbolu.common.projectors import DualSourcePhaseProjector
+        from symbolu_core.common.projectors import DualSourcePhaseProjector
         return DualSourcePhaseProjector(
             text_dim=512,
             state_dim=32,
@@ -417,7 +417,7 @@ class TestOPBMergeExternal:
 
     @pytest.fixture
     def opb(self):
-        from symbolu.sovereign.reasoning_kernel import OPBDimensionLock
+        from agentic.sovereign.reasoning_kernel import OPBDimensionLock
         return OPBDimensionLock(state_dim=32)
 
     def test_unlocked_accepts_observation(self, opb):
@@ -475,7 +475,7 @@ class TestJEPAIntegration:
 
     def test_full_forward_pass(self):
         """Test full JEPA forward pass."""
-        from symbolu.jepa import (
+        from symbolu_training.jepa import (
             SovereignStateProjector,
             PhaseJEPAPredictor,
             VICRegLoss,
@@ -505,7 +505,7 @@ class TestJEPAIntegration:
 
     def test_gradient_flow(self):
         """Test gradients flow through entire pipeline."""
-        from symbolu.jepa import (
+        from symbolu_training.jepa import (
             SovereignStateProjector,
             PhaseJEPAPredictor,
             JEPAPredictionLoss,
@@ -538,7 +538,7 @@ class TestCurriculumOrchestrator:
 
     @pytest.fixture
     def orchestrator(self):
-        from symbolu.jepa.curriculum import TrainingCurriculumOrchestrator
+        from symbolu_training.jepa.curriculum import TrainingCurriculumOrchestrator
         return TrainingCurriculumOrchestrator(
             total_steps=1000,
             body_steps=200,
@@ -548,12 +548,12 @@ class TestCurriculumOrchestrator:
 
     def test_initial_phase(self, orchestrator):
         """Test initial phase is BODY."""
-        from symbolu.jepa.curriculum import MacroPhase
+        from symbolu_training.jepa.curriculum import MacroPhase
         assert orchestrator.state.macro_phase == MacroPhase.BODY
 
     def test_phase_transition_body_to_soul(self, orchestrator):
         """Test automatic transition from BODY to SOUL."""
-        from symbolu.jepa.curriculum import MacroPhase
+        from symbolu_training.jepa.curriculum import MacroPhase
 
         # Advance past body_steps (200)
         for _ in range(201):
@@ -563,7 +563,7 @@ class TestCurriculumOrchestrator:
 
     def test_phase_transition_soul_to_union(self, orchestrator):
         """Test automatic transition from SOUL to UNION."""
-        from symbolu.jepa.curriculum import MacroPhase
+        from symbolu_training.jepa.curriculum import MacroPhase
 
         # Advance past soul_end (200 + 500 = 700)
         for _ in range(701):
@@ -580,7 +580,7 @@ class TestCurriculumOrchestrator:
 
     def test_k_steps_by_phase(self, orchestrator):
         """Test k_steps changes with JEPA micro-phase."""
-        from symbolu.jepa.curriculum import JEPAPhase
+        from symbolu_training.jepa.curriculum import JEPAPhase
 
         # Initially in DHYANA phase (k=1)
         assert orchestrator.state.jepa_phase == JEPAPhase.DHYANA
@@ -606,7 +606,7 @@ class TestCurriculumOrchestrator:
         state_dict = orchestrator.state_dict()
 
         # Create new orchestrator
-        from symbolu.jepa.curriculum import TrainingCurriculumOrchestrator
+        from symbolu_training.jepa.curriculum import TrainingCurriculumOrchestrator
         new_orchestrator = TrainingCurriculumOrchestrator(
             total_steps=1000,
             body_steps=200,
@@ -621,7 +621,7 @@ class TestCurriculumOrchestrator:
 
     def test_force_phase_transition(self, orchestrator):
         """Test manual phase transition."""
-        from symbolu.jepa.curriculum import MacroPhase
+        from symbolu_training.jepa.curriculum import MacroPhase
 
         changed, new_phase = orchestrator.step(force_phase='union')
         assert changed
@@ -638,7 +638,7 @@ class TestLossScheduler:
 
     def test_smooth_transition(self):
         """Test smooth weight transition during phase change."""
-        from symbolu.jepa.curriculum import (
+        from symbolu_training.jepa.curriculum import (
             TrainingCurriculumOrchestrator,
             LossScheduler,
         )
@@ -672,7 +672,7 @@ class TestPhaseJEPATransformerBasic:
 
     def test_config_creation(self):
         """Test PhaseJEPAConfig creation."""
-        from symbolu.jepa.transformer import PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPAConfig
 
         config = PhaseJEPAConfig(
             embed_dim=512,
@@ -685,7 +685,7 @@ class TestPhaseJEPATransformerBasic:
 
     def test_transformer_with_mock_encoder(self):
         """Test PhaseJEPATransformer with mock encoder."""
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
 
         # Create mock encoder
         class MockEncoder(nn.Module):
@@ -722,7 +722,7 @@ class TestPhaseJEPATransformerBasic:
 
     def test_target_encoder_update(self):
         """Test target encoder EMA update."""
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
 
         class MockEncoder(nn.Module):
             def __init__(self):
@@ -758,8 +758,8 @@ class TestPhaseJEPATransformerBasic:
 
     def test_curriculum_integration(self):
         """Test curriculum integration with transformer."""
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
-        from symbolu.jepa.curriculum import TrainingCurriculumOrchestrator
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.curriculum import TrainingCurriculumOrchestrator
 
         class MockEncoder(nn.Module):
             def __init__(self):
@@ -802,7 +802,7 @@ class TestPhase3GradientBridge:
 
     def test_intent_phase_projector_gradient_flow(self):
         """Test gradients flow through intent_phase_projector."""
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
 
         class MockEncoder(nn.Module):
             def __init__(self, embed_dim=64, vocab_size=100):
@@ -843,7 +843,7 @@ class TestPhase3GradientBridge:
 
     def test_phase_modulation_gradient_flow(self):
         """Test gradients flow through _apply_phase_modulation."""
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
 
         class MockEncoder(nn.Module):
             def __init__(self):
@@ -886,7 +886,7 @@ class TestPhase3GradientBridge:
         This tests the full gradient path:
         L_nll → logits → h_modulated → θ → s_pred → predictor → s_context → encoder
         """
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
 
         class MockEncoderWithHead(nn.Module):
             def __init__(self, embed_dim=64, vocab_size=100):
@@ -960,7 +960,7 @@ class TestPhase3GradientBridge:
 
     def test_no_detach_in_phase3_path(self):
         """Verify s_pred is NOT detached in Phase 3 forward."""
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
 
         class MockEncoder(nn.Module):
             def __init__(self):
@@ -1005,7 +1005,7 @@ class TestPhase3GradientBridge:
 
     def test_phase3_mode_toggle(self):
         """Test set_phase3_mode properly toggles routing."""
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
 
         class MockEncoder(nn.Module):
             def __init__(self):
@@ -1035,7 +1035,7 @@ class TestSelfMotivation:
 
     def test_goal_generator_output_shape(self):
         """Test GoalGenerator produces correct output shape."""
-        from symbolu.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
+        from symbolu_training.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
 
         goal_gen = GoalGenerator(state_dim=SOVEREIGN_STATE_DIM)
         batch_size = 4
@@ -1057,7 +1057,7 @@ class TestSelfMotivation:
 
     def test_goal_generator_output_ranges(self):
         """Test GoalGenerator outputs are in expected ranges."""
-        from symbolu.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
+        from symbolu_training.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
 
         goal_gen = GoalGenerator(state_dim=SOVEREIGN_STATE_DIM)
         batch_size = 16
@@ -1085,7 +1085,7 @@ class TestSelfMotivation:
 
     def test_curiosity_driven_goal_source(self):
         """Test get_curiosity_driven_goal forces source=1.0."""
-        from symbolu.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
+        from symbolu_training.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
 
         goal_gen = GoalGenerator(state_dim=SOVEREIGN_STATE_DIM)
         state = torch.randn(4, SOVEREIGN_STATE_DIM)
@@ -1099,7 +1099,7 @@ class TestSelfMotivation:
 
     def test_curiosity_signal_computation(self):
         """Test compute_curiosity_signal produces correct values."""
-        from symbolu.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
+        from symbolu_training.jepa.transformer import PhaseJEPATransformer, PhaseJEPAConfig
 
         class MockEncoder(nn.Module):
             def __init__(self):
@@ -1127,7 +1127,7 @@ class TestSelfMotivation:
 
     def test_sankalpa_injection_extraction(self):
         """Test inject_sankalpa and extract_sankalpa are inverses."""
-        from symbolu.jepa.transformer import (
+        from symbolu_training.jepa.transformer import (
             PhaseJEPATransformer, PhaseJEPAConfig,
             SANKALPA_START_DIM, SANKALPA_END_DIM,
         )
@@ -1161,7 +1161,7 @@ class TestSelfMotivation:
 
     def test_sovereign_jepa_autonomous_step(self):
         """Test SovereignJEPA.autonomous_step produces expected outputs."""
-        from symbolu.jepa.transformer import (
+        from symbolu_training.jepa.transformer import (
             SovereignJEPA, SovereignJEPAConfig, PhaseJEPAConfig,
             PhaseJEPATransformer,
         )
@@ -1210,7 +1210,7 @@ class TestSelfMotivation:
 
     def test_sovereign_jepa_goal_persistence(self):
         """Test goal persists across multiple autonomous steps."""
-        from symbolu.jepa.transformer import (
+        from symbolu_training.jepa.transformer import (
             SovereignJEPA, SovereignJEPAConfig, PhaseJEPAConfig,
             PhaseJEPATransformer,
         )
@@ -1259,7 +1259,7 @@ class TestSelfMotivation:
 
     def test_autonomous_state_tracking(self):
         """Test get_autonomous_state returns valid state."""
-        from symbolu.jepa.transformer import (
+        from symbolu_training.jepa.transformer import (
             SovereignJEPA, SovereignJEPAConfig, PhaseJEPAConfig,
             PhaseJEPATransformer,
         )
@@ -1299,7 +1299,7 @@ class TestSelfMotivation:
 
     def test_goal_generator_gradient_flow(self):
         """Test gradients flow through goal generator."""
-        from symbolu.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
+        from symbolu_training.jepa.transformer import GoalGenerator, SOVEREIGN_STATE_DIM
 
         goal_gen = GoalGenerator(state_dim=SOVEREIGN_STATE_DIM)
 
@@ -1317,7 +1317,7 @@ class TestSelfMotivation:
 
     def test_describe_action_categories(self):
         """Test _describe_action produces valid action descriptions."""
-        from symbolu.jepa.transformer import (
+        from symbolu_training.jepa.transformer import (
             SovereignJEPA, SovereignJEPAConfig, PhaseJEPAConfig,
             PhaseJEPATransformer,
         )

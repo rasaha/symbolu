@@ -6,7 +6,7 @@ Phase-7 receives a mechanical target specification and produces ranked varna
 sequences whose Phase-6 simulation results satisfy the target constraints.
 
 Usage:
-    from symbolu.phases.phase7_targeted_generation import execute_phase7
+    from symbolu_extensions.phases.phase7_targeted_generation import execute_phase7
 
     result = execute_phase7(
         target={"final_magnitude": ">= 1.3", "len(steps)": "<= 5"},

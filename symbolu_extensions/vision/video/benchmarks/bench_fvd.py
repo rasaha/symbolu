@@ -124,7 +124,7 @@ def run_benchmark(
     feature_dim: int = 64,
     seed: int = 42,
 ) -> FVDResult:
-    from symbolu.vision.video.fscsv_wrapper import FSCSVModule, FSCSVConfig
+    from symbolu_extensions.vision.video.fscsv_wrapper import FSCSVModule, FSCSVConfig
 
     torch.manual_seed(seed)
     np.random.seed(seed)

@@ -36,7 +36,7 @@ Architecture:
 
 Usage:
 ------
-    from symbolu.experimental import StateTrajectoryIndex
+    from symbolu_extensions.experimental import StateTrajectoryIndex
 
     # Create index
     index = StateTrajectoryIndex()

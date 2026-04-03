@@ -77,7 +77,7 @@ class PhaseControl:
         if not self.strict_contract:
             return
 
-        from symbolu.vision.contracts import assert_control_shape
+        from symbolu_extensions.vision.contracts import assert_control_shape
         assert_control_shape(self.intent_phase, "intent_phase", num_heads, batch_size)
         assert_control_shape(self.phase_gain, "phase_gain", num_heads, batch_size)
 
@@ -118,7 +118,7 @@ class GateControl:
 
     def validate(self, num_heads: int, batch_size: Optional[int] = None) -> None:
         """Validate all control signals against no-write contract."""
-        from symbolu.vision.contracts import assert_control_shape
+        from symbolu_extensions.vision.contracts import assert_control_shape
         assert_control_shape(self.s_align, "s_align", num_heads, batch_size)
 
 

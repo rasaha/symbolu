@@ -6,17 +6,17 @@ Phase 2: BaseScorer, PlausibilityTokenScorer, CSRTokenScorer, VrittiTokenScorer,
          GunaTokenScorer, TokenEvaluationTensor (orchestrator)
 """
 
-from symbolu.training.conscious_generation.primitives.ontology_scorer import (
+from symbolu_training.training.conscious_generation.primitives.ontology_scorer import (
     OntologyCompatibilityScorer,
 )
-from symbolu.training.conscious_generation.primitives.base_scorer import BaseScorer
-from symbolu.training.conscious_generation.primitives.jepa_scorer import (
+from symbolu_training.training.conscious_generation.primitives.base_scorer import BaseScorer
+from symbolu_training.training.conscious_generation.primitives.jepa_scorer import (
     PlausibilityTokenScorer,
     JEPATokenScorer,  # backward-compatible alias
 )
-from symbolu.training.conscious_generation.primitives.csr_scorer import CSRTokenScorer
-from symbolu.training.conscious_generation.primitives.vritti_scorer import VrittiTokenScorer
-from symbolu.training.conscious_generation.primitives.guna_scorer import GunaTokenScorer
+from symbolu_training.training.conscious_generation.primitives.csr_scorer import CSRTokenScorer
+from symbolu_training.training.conscious_generation.primitives.vritti_scorer import VrittiTokenScorer
+from symbolu_training.training.conscious_generation.primitives.guna_scorer import GunaTokenScorer
 
 import torch
 import torch.nn as nn

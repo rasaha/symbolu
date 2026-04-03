@@ -20,7 +20,7 @@ Key Features:
 
 Usage:
 ------
-    from symbolu.image_gen.bcvf_image import BCVFImageEngine
+    from symbolu_extensions.image_gen.bcvf_image import BCVFImageEngine
 
     engine = BCVFImageEngine()
 
@@ -54,7 +54,7 @@ except ImportError:
 
 import numpy as np
 
-from symbolu.image_gen.config import BCVFImageConfig
+from symbolu_extensions.image_gen.config import BCVFImageConfig
 
 
 # =============================================================================

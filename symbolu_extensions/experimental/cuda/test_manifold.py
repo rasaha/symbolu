@@ -17,7 +17,7 @@ import sys
 
 def test_manifold_initialization():
     """Test manifold initialization."""
-    from symbolu.experimental.cuda import SymbolU12Manifold
+    from symbolu_extensions.experimental.cuda import SymbolU12Manifold
 
     print("=" * 60)
     print("TEST: Manifold Initialization")
@@ -42,7 +42,7 @@ def test_manifold_initialization():
 
 def test_step_evolution():
     """Test single step evolution."""
-    from symbolu.experimental.cuda import SymbolU12Manifold
+    from symbolu_extensions.experimental.cuda import SymbolU12Manifold
 
     print("\n" + "=" * 60)
     print("TEST: Step Evolution")
@@ -72,7 +72,7 @@ def test_step_evolution():
 
 def test_ghost_buffer():
     """Test Ghost Buffer (S_prev) motion tracking."""
-    from symbolu.experimental.cuda import SymbolU12Manifold
+    from symbolu_extensions.experimental.cuda import SymbolU12Manifold
 
     print("\n" + "=" * 60)
     print("TEST: Ghost Buffer Motion Tracking")
@@ -105,7 +105,7 @@ def test_ghost_buffer():
 
 def test_sattvic_seal():
     """Test Sattvic Seal generation."""
-    from symbolu.experimental.cuda import SymbolU12Manifold
+    from symbolu_extensions.experimental.cuda import SymbolU12Manifold
 
     print("\n" + "=" * 60)
     print("TEST: Sattvic Seal Generation")
@@ -138,7 +138,7 @@ def test_sattvic_seal():
 
 def test_integrity_flags():
     """Test integrity flag detection."""
-    from symbolu.experimental.cuda import SymbolU12Manifold, IntegrityFlag
+    from symbolu_extensions.experimental.cuda import SymbolU12Manifold, IntegrityFlag
 
     print("\n" + "=" * 60)
     print("TEST: Integrity Flag Detection")
@@ -172,7 +172,7 @@ def test_integrity_flags():
 
 def test_cpu_gpu_parity():
     """Test CPU/GPU parity (if CUDA available)."""
-    from symbolu.experimental.cuda import SymbolU12Manifold, is_cuda_available
+    from symbolu_extensions.experimental.cuda import SymbolU12Manifold, is_cuda_available
 
     print("\n" + "=" * 60)
     print("TEST: CPU/GPU Parity")
@@ -223,7 +223,7 @@ def run_all_tests():
     print("SymbolU12 Manifold Test Suite")
     print("=" * 60)
 
-    from symbolu.experimental.cuda import get_device_info
+    from symbolu_extensions.experimental.cuda import get_device_info
 
     info = get_device_info()
     print(f"\nDevice Info:")

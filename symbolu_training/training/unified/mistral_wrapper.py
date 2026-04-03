@@ -36,7 +36,7 @@ from typing import Dict, List, Optional, Tuple
 import torch
 import torch.nn as nn
 
-from symbolu.phase_transformer import (
+from symbolu_core.phase_transformer import (
     IntentPhaseProjector,
     SOVEREIGN_STATE_DIM,
     PHASE_STATE_DIM,
@@ -46,7 +46,7 @@ from symbolu.phase_transformer import (
     GUNA_SLICE,
     RESERVED_SLICE,
 )
-from symbolu.jepa.state_projector import SovereignStateProjector
+from symbolu_training.jepa.state_projector import SovereignStateProjector
 
 
 class MistralCGWrapper(nn.Module):

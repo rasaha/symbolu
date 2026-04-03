@@ -24,7 +24,7 @@ This package provides the core training infrastructure organized into focused mo
 """
 
 # --- utilities ---
-from symbolu.training.unified.utilities import (
+from symbolu_training.training.unified.utilities import (
     _SimpleByteTokenizer,
     CSR_STOPWORDS,
     WholeWordCSRHelper,
@@ -39,7 +39,7 @@ from symbolu.training.unified.utilities import (
 )
 
 # --- config ---
-from symbolu.training.unified.config import (
+from symbolu_training.training.unified.config import (
     UnifiedTrainingConfig,
     MODEL_PRESETS,
     build_srk_config_from_legacy,
@@ -47,7 +47,7 @@ from symbolu.training.unified.config import (
 )
 
 # --- data ---
-from symbolu.training.unified.data import (
+from symbolu_training.training.unified.data import (
     TextDataset,
     FineWebStreamingDataset,
     cache_validation_batches,
@@ -55,13 +55,13 @@ from symbolu.training.unified.data import (
 )
 
 # --- vram_manager ---
-from symbolu.training.unified.vram_manager import (
+from symbolu_training.training.unified.vram_manager import (
     VRAMGovernor,
     AutoBatchSizer,
 )
 
 # --- diagnostics ---
-from symbolu.training.unified.diagnostics import (
+from symbolu_training.training.unified.diagnostics import (
     compute_layer_gradient_norm,
     apply_kosha_phase_steering,
     compute_kosha_steering_stats,
@@ -76,7 +76,7 @@ from symbolu.training.unified.diagnostics import (
 )
 
 # --- ontological_flow ---
-from symbolu.training.unified.ontological_flow import (
+from symbolu_training.training.unified.ontological_flow import (
     OntologicalBridge,
     create_ontological_bridge,
     compute_rmatrix_loss_weight,
@@ -88,20 +88,20 @@ from symbolu.training.unified.ontological_flow import (
 )
 
 # --- intelligence_engine ---
-from symbolu.training.unified.intelligence_engine import (
+from symbolu_training.training.unified.intelligence_engine import (
     MetacognitiveTracker,
     HiddenStateExtractor,
     EvolutionaryIntelligenceEngine,
 )
 
 # --- gradient_control ---
-from symbolu.training.unified.gradient_control import (
+from symbolu_training.training.unified.gradient_control import (
     HierarchicalGradientScaler,
     WeightTransfer,
 )
 
 # --- training_state ---
-from symbolu.training.unified.training_state import (
+from symbolu_training.training.unified.training_state import (
     TrainingStateTracker,
     GradNormEMA,
     TrainingGunas,
@@ -109,14 +109,14 @@ from symbolu.training.unified.training_state import (
 )
 
 # --- phase_controllers ---
-from symbolu.training.unified.phase_controllers import (
+from symbolu_training.training.unified.phase_controllers import (
     SovereignPhaseController,
     AdaptiveTrainingController,
     AdaptiveSlotLRController,
 )
 
 # --- scheduling ---
-from symbolu.training.unified.scheduling import (
+from symbolu_training.training.unified.scheduling import (
     DynamicWindowScheduler,
     AdaptiveWarmupScheduler,
     PPLAlphaCurriculum,
@@ -125,7 +125,7 @@ from symbolu.training.unified.scheduling import (
 )
 
 # --- curriculum ---
-from symbolu.training.unified.curriculum import (
+from symbolu_training.training.unified.curriculum import (
     CurriculumController,
     SequenceLengthCurriculum,
     dampen_layer_momentum,
@@ -136,12 +136,12 @@ from symbolu.training.unified.curriculum import (
 )
 
 # --- relaxation ---
-from symbolu.training.unified.relaxation import (
+from symbolu_training.training.unified.relaxation import (
     DynamicRelaxationController,
 )
 
 # --- evaluation ---
-from symbolu.training.unified.evaluation import (
+from symbolu_training.training.unified.evaluation import (
     LRAValidator,
     run_phase_rotation_test,
     print_phase_rotation_results,
@@ -153,7 +153,7 @@ from symbolu.training.unified.evaluation import (
 )
 
 # --- losses ---
-from symbolu.training.unified.losses import (
+from symbolu_training.training.unified.losses import (
     compute_ontological_loss,
     _build_sovereign_state,
     forward_chunked,
@@ -161,7 +161,7 @@ from symbolu.training.unified.losses import (
 )
 
 # --- control_plane ---
-from symbolu.training.unified.control_plane import (
+from symbolu_training.training.unified.control_plane import (
     ArchitectureHealthReport,
     run_architecture_health_check,
     check_quad_utilization,
@@ -169,20 +169,20 @@ from symbolu.training.unified.control_plane import (
 )
 
 # --- checkpointing ---
-from symbolu.training.unified.checkpointing import (
+from symbolu_training.training.unified.checkpointing import (
     save_checkpoint,
     load_checkpoint,
 )
 
 # --- model_factory ---
-from symbolu.training.unified.model_factory import (
+from symbolu_training.training.unified.model_factory import (
     create_model,
     PerLayerPhaseController,
 )
 
 # Mistral CG wrapper (optional — requires transformers)
 try:
-    from symbolu.training.unified.mistral_wrapper import MistralCGWrapper
+    from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
 except ImportError:
     pass
 
@@ -293,5 +293,5 @@ __all__ = [
     # model_factory (cont.)
     # Note: train(), evaluate(), main() are in symbolu.training.unified.train
     # They are NOT imported here to avoid circular imports (train.py imports from this package).
-    # Use: from symbolu.training.unified.train import train, evaluate, main
+    # Use: from symbolu_training.training.unified.train import train, evaluate, main
 ]

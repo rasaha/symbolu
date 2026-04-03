@@ -112,7 +112,7 @@ def demo_basic_generation(args):
     This creates a mock pipeline (no pretrained weights needed)
     and generates an image from a text prompt.
     """
-    from symbolu.vision.inference import (
+    from symbolu_extensions.vision.inference import (
         PhaseQuadInferencePipeline,
         GenerationConfig,
     )
@@ -205,7 +205,7 @@ def demo_basic_generation(args):
 
 def demo_batch_generation(args):
     """Demonstrate batch generation with multiple prompts."""
-    from symbolu.vision.inference import (
+    from symbolu_extensions.vision.inference import (
         PhaseQuadInferencePipeline,
         GenerationConfig,
     )
@@ -247,11 +247,11 @@ def demo_batch_generation(args):
 
 def demo_ablation(args):
     """Demonstrate ablation modes (disabling components)."""
-    from symbolu.vision.inference import (
+    from symbolu_extensions.vision.inference import (
         PhaseQuadInferencePipeline,
         GenerationConfig,
     )
-    from symbolu.vision.controls import GeneratorControl
+    from symbolu_extensions.vision.controls import GeneratorControl
 
     print("Ablation Demo - Testing Component Contributions")
     print("-" * 50)

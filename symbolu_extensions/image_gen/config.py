@@ -13,7 +13,7 @@ This module provides configuration for:
 
 Usage:
 ------
-    from symbolu.image_gen.config import ImageGenConfig, FluxConfig
+    from symbolu_extensions.image_gen.config import ImageGenConfig, FluxConfig
 
     # Use defaults
     config = ImageGenConfig()

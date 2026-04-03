@@ -1,20 +1,20 @@
 """Loss functions for Conscious Generation training."""
 
-from symbolu.training.conscious_generation.losses.ontological_structure import (
+from symbolu_training.training.conscious_generation.losses.ontological_structure import (
     OntologicalStructureLoss,
 )
-from symbolu.training.conscious_generation.losses.kosha_routing import (
+from symbolu_training.training.conscious_generation.losses.kosha_routing import (
     KoshaRoutingLoss,
 )
-from symbolu.training.conscious_generation.losses.primitive_auxiliary import (
+from symbolu_training.training.conscious_generation.losses.primitive_auxiliary import (
     PrimitiveAuxiliaryLosses,
 )
-from symbolu.training.conscious_generation.losses.bliss_coherence import (
+from symbolu_training.training.conscious_generation.losses.bliss_coherence import (
     BlissCoherenceLoss,
 )
 
 # Appendix F Stage 5: Auxiliary Loss Supervision
-from symbolu.training.conscious_generation.losses.auxiliary_loss_supervisor import (
+from symbolu_training.training.conscious_generation.losses.auxiliary_loss_supervisor import (
     AuxiliaryLossSupervisor,
     AuxiliaryLossConfig,
     TokenOntologyProjection,

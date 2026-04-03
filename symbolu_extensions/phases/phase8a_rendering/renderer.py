@@ -14,7 +14,7 @@ Contract: docs/contracts/PHASE_8A_RENDERING_CONTRACT.md
 from abc import ABC, abstractmethod
 from typing import FrozenSet
 
-from symbolu.phases.phase8a_rendering.types import (
+from symbolu_extensions.phases.phase8a_rendering.types import (
     RenderInput,
     RenderOutput,
     RenderModality,

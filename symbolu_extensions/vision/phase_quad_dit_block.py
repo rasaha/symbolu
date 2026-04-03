@@ -17,24 +17,24 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.adaln_zero import AdaLNZero, FinalLayer
-from symbolu.vision.alternative_attention import (
+from symbolu_extensions.vision.adaln_zero import AdaLNZero, FinalLayer
+from symbolu_extensions.vision.alternative_attention import (
     AlternativeAttentionToProposals,
     PhaseQuadAttentionVariant,
 )
-from symbolu.vision.attention_normalizations import AttentionNormType
-from symbolu.vision.cross_attention_proposals import CrossAttentionToProposals
-from symbolu.vision.bcvf_weighter import BCVFQuadWeighter, HybridBCVFCrossAttention
-from symbolu.vision.config import AlternativeAttentionConfig
-from symbolu.vision.controls import (
+from symbolu_extensions.vision.attention_normalizations import AttentionNormType
+from symbolu_extensions.vision.cross_attention_proposals import CrossAttentionToProposals
+from symbolu_extensions.vision.bcvf_weighter import BCVFQuadWeighter, HybridBCVFCrossAttention
+from symbolu_extensions.vision.config import AlternativeAttentionConfig
+from symbolu_extensions.vision.controls import (
     BlockControl,
     PhaseControl,
     QuadControl,
     PatchMeta,
 )
-from symbolu.vision.local_mixer import LocalMixer
-from symbolu.vision.phase_integrator import PhaseIntegrator2D
-from symbolu.vision.quad_retriever import QuadRetriever2D
+from symbolu_extensions.vision.local_mixer import LocalMixer
+from symbolu_extensions.vision.phase_integrator import PhaseIntegrator2D
+from symbolu_extensions.vision.quad_retriever import QuadRetriever2D
 
 
 def compute_phase_strength(

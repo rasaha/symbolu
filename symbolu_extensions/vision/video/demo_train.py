@@ -103,7 +103,7 @@ def quick_test():
     print("(No pretrained models will be downloaded)")
     print()
 
-    from symbolu.vision.video.train import train
+    from symbolu_extensions.vision.video.train import train
 
     train(
         model_size="tiny",
@@ -155,7 +155,7 @@ def train_progressive():
 
     input("\nPress Enter to continue or Ctrl+C to cancel...")
 
-    from symbolu.vision.video.train import train
+    from symbolu_extensions.vision.video.train import train
 
     # Phase 1: Short videos (8 frames)
     print("\n" + "=" * 50)
@@ -215,7 +215,7 @@ def train_full():
     print("  python -m symbolu.vision.video.train --hf-dataset HuggingFaceM4/webvid")
     print()
 
-    from symbolu.vision.video.train import train
+    from symbolu_extensions.vision.video.train import train
 
     # Default to synthetic for demo
     train(
@@ -242,7 +242,7 @@ def demo_inference():
     print("(Output will be random noise)")
     print()
 
-    from symbolu.vision.video import (
+    from symbolu_extensions.vision.video import (
         PhaseQuadVideoPipeline,
         VideoGenerationConfig,
     )

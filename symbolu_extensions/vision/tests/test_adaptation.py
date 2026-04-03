@@ -8,7 +8,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from symbolu.vision.adaptation import (
+from symbolu_extensions.vision.adaptation import (
     IA3Gate,
     IA3BlockGates,
     IA3Config,
@@ -17,8 +17,8 @@ from symbolu.vision.adaptation import (
     AdaptationConfig,
     PhaseQuadAdaptationManager,
 )
-from symbolu.vision.controls import PatchMeta, BlockControl
-from symbolu.vision.phase_quad_dit_block import PhaseQuadDiTBlockStack
+from symbolu_extensions.vision.controls import PatchMeta, BlockControl
+from symbolu_extensions.vision.phase_quad_dit_block import PhaseQuadDiTBlockStack
 
 
 # Test constants

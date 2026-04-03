@@ -15,7 +15,7 @@ Architecture:
 
 Usage:
 ------
-    from symbolu.image_gen.flux_integration import SymbolUFluxWrapper
+    from symbolu_extensions.image_gen.flux_integration import SymbolUFluxWrapper
 
     # Wrap a FLUX pipeline
     wrapper = SymbolUFluxWrapper.from_pretrained("black-forest-labs/FLUX.1-dev")
@@ -47,8 +47,8 @@ except ImportError:
 
 import numpy as np
 
-from symbolu.image_gen.config import FluxConfig, ImageGenConfig, FluxVariant
-from symbolu.image_gen.layer_mapper import (
+from symbolu_extensions.image_gen.config import FluxConfig, ImageGenConfig, FluxVariant
+from symbolu_extensions.image_gen.layer_mapper import (
     LayerMapper,
     OntologicalLayer,
     LAYER_NAMES,

@@ -23,7 +23,7 @@ import torch.nn as nn
 from typing import Optional
 
 try:
-    from symbolu.phase_transformer import SOVEREIGN_STATE_DIM
+    from symbolu_core.phase_transformer import SOVEREIGN_STATE_DIM
 except ImportError:
     SOVEREIGN_STATE_DIM = 32
 

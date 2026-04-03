@@ -38,31 +38,31 @@ Time-scale separation:
 Reference: docs/design/EXPERIENTIAL_LEARNING_DESIGN.md
 """
 
-from symbolu.training.conscious_generation.experiential.experiential_loss import (
+from symbolu_training.training.conscious_generation.experiential.experiential_loss import (
     ExperientialLossSignal,
     ExperientialLossConfig,
 )
-from symbolu.training.conscious_generation.experiential.vritti_resistance_gate import (
+from symbolu_training.training.conscious_generation.experiential.vritti_resistance_gate import (
     VrittiResistanceGate,
     VrittiResistanceConfig,
 )
-from symbolu.training.conscious_generation.experiential.offline_consolidation import (
+from symbolu_training.training.conscious_generation.experiential.offline_consolidation import (
     OfflineConsolidationCycle,
     ConsolidationConfig,
 )
-from symbolu.training.conscious_generation.experiential.salience_weighter import (
+from symbolu_training.training.conscious_generation.experiential.salience_weighter import (
     SalienceWeighter,
     SalienceConfig,
 )
-from symbolu.training.conscious_generation.experiential.identity_layer import (
+from symbolu_training.training.conscious_generation.experiential.identity_layer import (
     IdentityLayer,
     IdentityLayerConfig,
 )
-from symbolu.training.conscious_generation.experiential.experiential_training_loop import (
+from symbolu_training.training.conscious_generation.experiential.experiential_training_loop import (
     ExperientialTrainingLoop,
     ExperientialTrainingConfig,
 )
-from symbolu.training.conscious_generation.experiential.minimal_controller import (
+from symbolu_training.training.conscious_generation.experiential.minimal_controller import (
     ExperientialController,
     ExperientialControllerConfig,
 )

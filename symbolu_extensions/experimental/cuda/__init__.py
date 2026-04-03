@@ -14,7 +14,7 @@ Features:
     - Sattvic Seal cryptographic proof
 
 Usage:
-    from symbolu.experimental.cuda import SymbolU12Manifold
+    from symbolu_extensions.experimental.cuda import SymbolU12Manifold
 
     # Initialize manifold
     manifold = SymbolU12Manifold(batch_size=1)

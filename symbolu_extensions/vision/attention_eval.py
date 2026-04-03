@@ -32,7 +32,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from symbolu.vision.attention_normalizations import (
+from symbolu_extensions.vision.attention_normalizations import (
     AttentionNormType,
     sparsemax,
     entmax,
@@ -40,7 +40,7 @@ from symbolu.vision.attention_normalizations import (
     top_m_softmax,
     attention_sparsity_metrics,
 )
-from symbolu.vision.alternative_attention import AlternativeAttentionToProposals
+from symbolu_extensions.vision.alternative_attention import AlternativeAttentionToProposals
 
 
 @dataclass

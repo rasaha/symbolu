@@ -20,7 +20,7 @@ Where:
 
 Usage:
 ------
-    from symbolu.image_gen.scc_image import SCCImageEngine
+    from symbolu_extensions.image_gen.scc_image import SCCImageEngine
 
     engine = SCCImageEngine()
 
@@ -51,8 +51,8 @@ except ImportError:
 
 import numpy as np
 
-from symbolu.image_gen.config import SCCImageConfig, CoherenceMatrixConfig
-from symbolu.image_gen.layer_mapper import LAYER_NAMES, LAYER_BHAVA
+from symbolu_extensions.image_gen.config import SCCImageConfig, CoherenceMatrixConfig
+from symbolu_extensions.image_gen.layer_mapper import LAYER_NAMES, LAYER_BHAVA
 
 
 # =============================================================================

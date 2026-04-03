@@ -36,7 +36,7 @@ def validate_imports() -> ValidationResult:
     """Validate all module imports work correctly."""
     start = time.time()
     try:
-        from symbolu.vision import (
+        from symbolu_extensions.vision import (
             PhaseQuadImageGenerator,
             PhaseQuadVisionConfig,
             CognadeVisionBlock,
@@ -49,7 +49,7 @@ def validate_imports() -> ValidationResult:
             ScanManager2D,
             RotaryPositionEmbedding2D,
         )
-        from symbolu.vision.controls import (
+        from symbolu_extensions.vision.controls import (
             PatchMeta,
             PhaseControl,
             QuadControl,
@@ -57,12 +57,12 @@ def validate_imports() -> ValidationResult:
             BlockControl,
             GeneratorControl,
         )
-        from symbolu.vision.diagnostics import (
+        from symbolu_extensions.vision.diagnostics import (
             compute_quad_utilization,
             compute_phase_health,
             compute_ghost_metrics,
         )
-        from symbolu.vision.contracts import (
+        from symbolu_extensions.vision.contracts import (
             ContractViolationError,
             assert_control_shape,
         )
@@ -87,7 +87,7 @@ def validate_contracts() -> ValidationResult:
     """Validate no-write contract enforcement."""
     start = time.time()
     try:
-        from symbolu.vision.contracts import (
+        from symbolu_extensions.vision.contracts import (
             ContractViolationError,
             assert_control_shape,
         )
@@ -133,7 +133,7 @@ def validate_scan_manager(device: torch.device) -> ValidationResult:
     """Validate 2D scan manager."""
     start = time.time()
     try:
-        from symbolu.vision.scan_manager import ScanManager2D
+        from symbolu_extensions.vision.scan_manager import ScanManager2D
 
         scan = ScanManager2D(8, 8).to(device)
 
@@ -172,7 +172,7 @@ def validate_patch_embed(device: torch.device) -> ValidationResult:
     """Validate patch embedding."""
     start = time.time()
     try:
-        from symbolu.vision.patch_embed import PatchEmbed2D, TimestepEmbedding
+        from symbolu_extensions.vision.patch_embed import PatchEmbed2D, TimestepEmbedding
 
         embed = PatchEmbed2D(
             in_channels=4,
@@ -216,8 +216,8 @@ def validate_phase_integrator(device: torch.device) -> ValidationResult:
     """Validate phase integrator (1D and 2D)."""
     start = time.time()
     try:
-        from symbolu.vision.phase_integrator import PhaseIntegrator1D, PhaseIntegrator2D
-        from symbolu.vision.controls import PatchMeta, PhaseControl
+        from symbolu_extensions.vision.phase_integrator import PhaseIntegrator1D, PhaseIntegrator2D
+        from symbolu_extensions.vision.controls import PatchMeta, PhaseControl
 
         # Test 1D
         phase1d = PhaseIntegrator1D(embed_dim=256, num_heads=8).to(device)
@@ -243,7 +243,7 @@ def validate_phase_integrator(device: torch.device) -> ValidationResult:
         invalid_control = PhaseControl(
             intent_phase=torch.randn(2, 64, device=device)  # Invalid!
         )
-        from symbolu.vision.contracts import ContractViolationError
+        from symbolu_extensions.vision.contracts import ContractViolationError
         try:
             phase1d(x, invalid_control)
             raise ValueError("Should have rejected invalid control")
@@ -271,8 +271,8 @@ def validate_quad_retriever(device: torch.device) -> ValidationResult:
     """Validate Quad retriever."""
     start = time.time()
     try:
-        from symbolu.vision.quad_retriever import QuadRetriever2D
-        from symbolu.vision.controls import PatchMeta, QuadControl
+        from symbolu_extensions.vision.quad_retriever import QuadRetriever2D
+        from symbolu_extensions.vision.controls import PatchMeta, QuadControl
 
         quad = QuadRetriever2D(
             embed_dim=256,
@@ -323,8 +323,8 @@ def validate_gate_mixer(device: torch.device) -> ValidationResult:
     """Validate gate mixer."""
     start = time.time()
     try:
-        from symbolu.vision.gate_mixer import GateMixer
-        from symbolu.vision.controls import GateControl
+        from symbolu_extensions.vision.gate_mixer import GateMixer
+        from symbolu_extensions.vision.controls import GateControl
 
         gate = GateMixer(embed_dim=256, num_heads=8).to(device)
 
@@ -370,8 +370,8 @@ def validate_cognade_block(device: torch.device) -> ValidationResult:
     """Validate full Cognade vision block."""
     start = time.time()
     try:
-        from symbolu.vision.cognade_vision_block import CognadeVisionBlock
-        from symbolu.vision.controls import PatchMeta, BlockControl
+        from symbolu_extensions.vision.cognade_vision_block import CognadeVisionBlock
+        from symbolu_extensions.vision.controls import PatchMeta, BlockControl
 
         block = CognadeVisionBlock(
             embed_dim=256,
@@ -421,8 +421,8 @@ def validate_full_generator(device: torch.device) -> ValidationResult:
     """Validate full Phase-Quad Image Generator."""
     start = time.time()
     try:
-        from symbolu.vision import PhaseQuadImageGenerator, PhaseQuadVisionConfig
-        from symbolu.vision.controls import GeneratorControl
+        from symbolu_extensions.vision import PhaseQuadImageGenerator, PhaseQuadVisionConfig
+        from symbolu_extensions.vision.controls import GeneratorControl
 
         # Create tiny model for fast validation
         config = PhaseQuadVisionConfig.tiny()
@@ -474,7 +474,7 @@ def validate_diagnostics(device: torch.device) -> ValidationResult:
     """Validate diagnostic metrics."""
     start = time.time()
     try:
-        from symbolu.vision.diagnostics import (
+        from symbolu_extensions.vision.diagnostics import (
             compute_quad_utilization,
             compute_phase_health,
             compute_ghost_metrics,
@@ -525,12 +525,12 @@ def validate_training_modules() -> ValidationResult:
     """Validate training infrastructure modules."""
     start = time.time()
     try:
-        from symbolu.vision.training import (
+        from symbolu_extensions.vision.training import (
             TemperatureSchedule,
             PhaseQuadDiffusionTrainer,
             ReplaceabilityTester,
         )
-        from symbolu.vision.training.temperature_schedule import (
+        from symbolu_extensions.vision.training.temperature_schedule import (
             LinearSchedule,
             CosineSchedule,
         )

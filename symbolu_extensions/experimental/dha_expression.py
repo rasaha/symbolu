@@ -24,7 +24,7 @@ This module reuses:
 
 Usage:
 ------
-    from symbolu.experimental import UserStateTracker, DHAExpressionModulator
+    from symbolu_extensions.experimental import UserStateTracker, DHAExpressionModulator
 
     # Track user state over conversation
     user_tracker = UserStateTracker(decay_rate=0.4)

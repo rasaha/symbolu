@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 import random
 
-from symbolu.training.schemas import QueryIntentPair, IntentLabel
-from symbolu.training.trainers.embedding_trainer import EmbeddingTrainer
+from symbolu_training.training.schemas import QueryIntentPair, IntentLabel
+from symbolu_training.training.trainers.embedding_trainer import EmbeddingTrainer
 
 
 @dataclass

@@ -24,8 +24,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.phase_integrator import PhaseIntegrator1D
-from symbolu.vision.controls import PhaseControl
+from symbolu_extensions.vision.phase_integrator import PhaseIntegrator1D
+from symbolu_extensions.vision.controls import PhaseControl
 
 
 class VideoMeta:

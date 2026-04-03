@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from symbolu.vision.controls import PatchMeta
+from symbolu_extensions.vision.controls import PatchMeta
 
 
 class PatchEmbed2D(nn.Module):

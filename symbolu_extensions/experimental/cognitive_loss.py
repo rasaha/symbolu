@@ -28,7 +28,7 @@ This allows the model to learn from human feedback by adjusting:
 
 Usage:
 ------
-    from symbolu.experimental import CognitiveLossFunction, DHAValidator
+    from symbolu_extensions.experimental import CognitiveLossFunction, DHAValidator
 
     # During training
     loss_fn = CognitiveLossFunction()

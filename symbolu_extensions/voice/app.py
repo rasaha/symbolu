@@ -174,7 +174,7 @@ class VoiceAgentApp:
         self._using_mock_sentinel = False
 
         try:
-            from symbolu.agentic_framework.agent import AgenticLLMWrapper
+            from agentic.agentic_framework.agent import AgenticLLMWrapper
 
             # Create LLM client adapter
             llm_client = self._create_llm_client()

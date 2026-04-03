@@ -547,7 +547,7 @@ def main():
 
     # Note: In practice, you'd load the base model and data loader here
     print("\nTo run training, use:")
-    print("  from symbolu.experimental.ontological_trainer import train_ontological")
+    print("  from symbolu_extensions.experimental.ontological_trainer import train_ontological")
     print("  train_ontological(base_model, train_loader, val_loader, config)")
 
 

@@ -269,11 +269,11 @@ class AblationRunner:
         Returns:
             Dictionary of aggregated metrics.
         """
-        from symbolu.vision.video.config import (
+        from symbolu_extensions.vision.video.config import (
             PhaseQuadVideoConfig,
             BCVFVideoConfig,
         )
-        from symbolu.vision.video.generator import PhaseQuadVideoGenerator
+        from symbolu_extensions.vision.video.generator import PhaseQuadVideoGenerator
 
         print(f"\n{'='*60}")
         print(f"Running experiment: {config.experiment_name}")

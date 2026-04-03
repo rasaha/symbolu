@@ -12,9 +12,9 @@ from typing import Optional, Dict, List, Any
 import torch
 import torch.nn as nn
 
-from symbolu.training.unified.config import UnifiedTrainingConfig, MODEL_PRESETS
+from symbolu_training.training.unified.config import UnifiedTrainingConfig, MODEL_PRESETS
 
-from symbolu.phase_transformer import (
+from symbolu_core.phase_transformer import (
     PhaseTransformer,
     HybridPhaseTransformer,
     StandardTransformer,
@@ -28,7 +28,7 @@ from symbolu.phase_transformer import (
 
 # Import ontological models (optional)
 try:
-    from symbolu.ontological.symbolu12_bhava import (
+    from symbolu_core.ontological.symbolu12_bhava import (
         SymbolU12LLMWithBhava,
         SymbolU12BhavaConfig,
     )
@@ -38,7 +38,7 @@ except ImportError:
 
 # Import Gen 2 models (optional)
 try:
-    from symbolu.ontological.symbolu12_gen2 import (
+    from symbolu_core.ontological.symbolu12_gen2 import (
         SymbolU12Gen2,
         SymbolU12Gen2Config,
     )
@@ -48,29 +48,29 @@ except ImportError:
 
 # Import Mistral CG wrapper (optional)
 try:
-    from symbolu.training.unified.mistral_wrapper import MistralCGWrapper
+    from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
     MISTRAL_CG_AVAILABLE = True
 except ImportError:
     MISTRAL_CG_AVAILABLE = False
 
 # Import Mistral Hybrid wrapper (optional)
 try:
-    from symbolu.training.unified.mistral_hybrid_wrapper import MistralHybridWrapper
+    from symbolu_training.training.unified.mistral_hybrid_wrapper import MistralHybridWrapper
     MISTRAL_HYBRID_AVAILABLE = True
 except ImportError:
     MISTRAL_HYBRID_AVAILABLE = False
 
 # Import Conscious Generation modules (optional)
 try:
-    from symbolu.training.conscious_generation.token_ontology import TokenOntologyProjector
-    from symbolu.training.conscious_generation.token_cache import TokenPrimitiveCache
-    from symbolu.training.conscious_generation.primitives.ontology_scorer import (
+    from symbolu_training.training.conscious_generation.token_ontology import TokenOntologyProjector
+    from symbolu_training.training.conscious_generation.token_cache import TokenPrimitiveCache
+    from symbolu_training.training.conscious_generation.primitives.ontology_scorer import (
         OntologyCompatibilityScorer,
     )
-    from symbolu.training.conscious_generation.losses.ontological_structure import (
+    from symbolu_training.training.conscious_generation.losses.ontological_structure import (
         OntologicalStructureLoss,
     )
-    from symbolu.training.conscious_generation.primitives import (
+    from symbolu_training.training.conscious_generation.primitives import (
         BaseScorer,
         PlausibilityTokenScorer,
         CSRTokenScorer,
@@ -78,28 +78,28 @@ try:
         GunaTokenScorer,
         TokenEvaluationTensor,
     )
-    from symbolu.training.conscious_generation.governance.kosha_router import (
+    from symbolu_training.training.conscious_generation.governance.kosha_router import (
         KoshaPrimitiveRouter,
     )
-    from symbolu.training.conscious_generation.governance.bliss_gate import (
+    from symbolu_training.training.conscious_generation.governance.bliss_gate import (
         BlissTokenGate,
     )
-    from symbolu.training.conscious_generation.integration.token_scorer import (
+    from symbolu_training.training.conscious_generation.integration.token_scorer import (
         IntegratedTokenScorer,
     )
-    from symbolu.training.conscious_generation.losses.kosha_routing import (
+    from symbolu_training.training.conscious_generation.losses.kosha_routing import (
         KoshaRoutingLoss,
     )
-    from symbolu.training.conscious_generation.losses.primitive_auxiliary import (
+    from symbolu_training.training.conscious_generation.losses.primitive_auxiliary import (
         PrimitiveAuxiliaryLosses,
     )
-    from symbolu.training.conscious_generation.losses.bliss_coherence import (
+    from symbolu_training.training.conscious_generation.losses.bliss_coherence import (
         BlissCoherenceLoss,
     )
-    from symbolu.training.conscious_generation.integration.field_softmax import (
+    from symbolu_training.training.conscious_generation.integration.field_softmax import (
         FieldIntegratedSoftmax,
     )
-    from symbolu.training.conscious_generation.integration.two_stage_generator import (
+    from symbolu_training.training.conscious_generation.integration.two_stage_generator import (
         TwoStageGenerator,
     )
     CONSCIOUS_GENERATION_AVAILABLE = True
@@ -834,7 +834,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
     # Representation conditioning before lm_head via gated residual.
     # =========================================================================
     if config.enable_conscious_generation and config.enable_perspective_synthesizer:
-        from symbolu.inference.perspective_synthesizer import (
+        from agentic.inference.perspective_synthesizer import (
             PerspectiveSynthesizer, PerspectiveSynthesizerConfig,
         )
         ps_config = PerspectiveSynthesizerConfig(

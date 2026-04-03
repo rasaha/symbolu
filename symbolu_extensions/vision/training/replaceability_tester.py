@@ -19,8 +19,8 @@ import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader
 
-from symbolu.vision.controls import GeneratorControl, BlockControl
-from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
+from symbolu_extensions.vision.controls import GeneratorControl, BlockControl
+from symbolu_extensions.vision.phase_quad_generator import PhaseQuadImageGenerator
 
 
 @dataclass
@@ -297,7 +297,7 @@ class ReplaceabilityTester:
         """
         # Import sampler for diffusion sampling
         try:
-            from symbolu.vision.inference.samplers import DDIMSampler, NoiseSchedule
+            from symbolu_extensions.vision.inference.samplers import DDIMSampler, NoiseSchedule
         except ImportError:
             # Fallback to MSE proxy if samplers not available
             return self._compute_mse_proxy(control)

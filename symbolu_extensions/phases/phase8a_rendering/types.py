@@ -14,7 +14,7 @@ import hashlib
 import json
 
 # Re-export Phase-7 types that we consume
-from symbolu.phases.phase7_targeted_generation.types import (
+from symbolu_extensions.phases.phase7_targeted_generation.types import (
     RankedResult,
     TrajectoryResult,
     TrajectoryStep,

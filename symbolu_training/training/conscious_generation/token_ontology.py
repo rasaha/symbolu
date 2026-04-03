@@ -21,7 +21,7 @@ import torch.nn as nn
 from typing import Optional
 
 try:
-    from symbolu.phase_transformer import (
+    from symbolu_core.phase_transformer import (
         SOVEREIGN_STATE_DIM,
         BHAVA_SLICE,
         KOSHA_SLICE,

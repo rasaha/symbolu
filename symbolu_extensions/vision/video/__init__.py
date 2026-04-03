@@ -13,7 +13,7 @@ Key components:
     - PhaseQuadVideoPipeline: Inference pipeline
 
 Example:
-    >>> from symbolu.vision.video import PhaseQuadVideoPipeline, VideoGenerationConfig
+    >>> from symbolu_extensions.vision.video import PhaseQuadVideoPipeline, VideoGenerationConfig
     >>>
     >>> # Create pipeline (mock for testing)
     >>> pipeline = PhaseQuadVideoPipeline.create_mock()
@@ -28,21 +28,21 @@ Example:
     >>> result.save("output.mp4")
 """
 
-from symbolu.vision.phase_integrator_3d import PhaseIntegrator3D, VideoMeta
-from symbolu.vision.video.vae import PretrainedVideoVAE, load_video_vae
-from symbolu.vision.video.config import PhaseQuadVideoConfig, BCVFVideoConfig
-from symbolu.vision.video.generator import PhaseQuadVideoGenerator
-from symbolu.vision.video.pipeline import (
+from symbolu_extensions.vision.phase_integrator_3d import PhaseIntegrator3D, VideoMeta
+from symbolu_extensions.vision.video.vae import PretrainedVideoVAE, load_video_vae
+from symbolu_extensions.vision.video.config import PhaseQuadVideoConfig, BCVFVideoConfig
+from symbolu_extensions.vision.video.generator import PhaseQuadVideoGenerator
+from symbolu_extensions.vision.video.pipeline import (
     PhaseQuadVideoPipeline,
     VideoGenerationConfig,
     VideoGenerationResult,
 )
-from symbolu.vision.video.bcvf_video import (
+from symbolu_extensions.vision.video.bcvf_video import (
     BCVFVideoQuadWeighter,
     AdaptiveBCVFVideoWeighter,
     compute_video_bcvf_metrics,
 )
-from symbolu.vision.video.fscsv_wrapper import (
+from symbolu_extensions.vision.video.fscsv_wrapper import (
     FSCSVConfig,
     FSCSVModule,
     FSCSVPipeline,

@@ -41,15 +41,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 try:
-    from symbolu.phase_transformer import HybridPhaseTransformer
+    from symbolu_core.phase_transformer import HybridPhaseTransformer
 except ImportError:
     HybridPhaseTransformer = None
 
-from symbolu.jepa.predictor import PhaseJEPAPredictor, VrittiValidatedPredictor
-from symbolu.jepa.state_projector import SovereignStateProjector, DeltaStateProjector, SOVEREIGN_STATE_DIM
-from symbolu.jepa.target_encoder import TargetEncoder, cosine_momentum_schedule
-from symbolu.jepa.losses import VICRegLoss, WeightedAlignmentLoss, JEPAPredictionLoss, CompositeJEPALoss
-from symbolu.jepa.curriculum import (
+from symbolu_training.jepa.predictor import PhaseJEPAPredictor, VrittiValidatedPredictor
+from symbolu_training.jepa.state_projector import SovereignStateProjector, DeltaStateProjector, SOVEREIGN_STATE_DIM
+from symbolu_training.jepa.target_encoder import TargetEncoder, cosine_momentum_schedule
+from symbolu_training.jepa.losses import VICRegLoss, WeightedAlignmentLoss, JEPAPredictionLoss, CompositeJEPALoss
+from symbolu_training.jepa.curriculum import (
     TrainingCurriculumOrchestrator,
     LossScheduler,
     create_curriculum_from_config,
@@ -58,7 +58,7 @@ from symbolu.jepa.curriculum import (
 )
 
 try:
-    from symbolu.common.projectors import DualSourcePhaseProjector, GatedKarmaProjector
+    from symbolu_core.common.projectors import DualSourcePhaseProjector, GatedKarmaProjector
 except ImportError:
     DualSourcePhaseProjector = None
     GatedKarmaProjector = None

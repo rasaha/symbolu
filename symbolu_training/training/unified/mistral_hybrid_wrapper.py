@@ -31,7 +31,7 @@ import torch
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint as torch_checkpoint
 
-from symbolu.phase_transformer import (
+from symbolu_core.phase_transformer import (
     TransformerConfig,
     HybridTransformerBlock,
     LocalTransformerBlock,

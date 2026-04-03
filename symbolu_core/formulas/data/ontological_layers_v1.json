@@ -1,0 +1,232 @@
+{
+  "meta": {
+    "version": "2.0",
+    "scope": "12D Ontological layer definitions (patent-exact sequence)",
+    "depends_on": [],
+    "rules": [
+      "Never let a higher file compensate for uncertainty in a lower file",
+      "No varna references",
+      "Layer definitions are substrate-agnostic",
+      "Each layer is valid independent of phonetic mapping"
+    ],
+    "migration_note": "Upgraded from 10D to 12D per patent-exact sequence (2024-12-24)"
+  },
+  "layers": {
+    "O1_POTENTIAL": {
+      "layer_id": "O1_POTENTIAL",
+      "experiential_role": "dormant capacity and latent possibility",
+      "kosha_anchor": "pre-annamaya",
+      "default_polarity_behavior": {
+        "tendency": "neutral",
+        "description": "holds unrealized possibility without activation"
+      },
+      "adjacency": {
+        "prev_layer": null,
+        "next_layer": "O2_IDENTITY"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "dormant-state-only"
+      ]
+    },
+    "O2_IDENTITY": {
+      "layer_id": "O2_IDENTITY",
+      "experiential_role": "classificatory marking and role assignment",
+      "kosha_anchor": "annamaya",
+      "default_polarity_behavior": {
+        "tendency": "neutral",
+        "description": "applies categorical markers and labels without valence"
+      },
+      "adjacency": {
+        "prev_layer": "O1_POTENTIAL",
+        "next_layer": "O3_EXECUTION"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "classification-only"
+      ]
+    },
+    "O3_EXECUTION": {
+      "layer_id": "O3_EXECUTION",
+      "experiential_role": "immediate somatic initiation and karma",
+      "kosha_anchor": "annamaya",
+      "default_polarity_behavior": {
+        "tendency": "constructive",
+        "description": "initiates physical response patterns and behavior"
+      },
+      "adjacency": {
+        "prev_layer": "O2_IDENTITY",
+        "next_layer": "O4_STRUCTURE"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "activation-state-only"
+      ]
+    },
+    "O4_STRUCTURE": {
+      "layer_id": "O4_STRUCTURE",
+      "experiential_role": "shaping force application and embodiment",
+      "kosha_anchor": "pranamaya",
+      "default_polarity_behavior": {
+        "tendency": "constructive",
+        "description": "gives shape to energetic impulse and form"
+      },
+      "adjacency": {
+        "prev_layer": "O3_EXECUTION",
+        "next_layer": "O5_COGNITION"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "morphological-shaping-only"
+      ]
+    },
+    "O5_COGNITION": {
+      "layer_id": "O5_COGNITION",
+      "experiential_role": "perception, attention, and emotional processing",
+      "kosha_anchor": "manomaya",
+      "default_polarity_behavior": {
+        "tendency": "transitional",
+        "description": "mediates between form and direction through mental patterns"
+      },
+      "adjacency": {
+        "prev_layer": "O4_STRUCTURE",
+        "next_layer": "O6_AGENCY"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "perception-emotion-only"
+      ]
+    },
+    "O6_AGENCY": {
+      "layer_id": "O6_AGENCY",
+      "experiential_role": "vector orientation, control, and intent",
+      "kosha_anchor": "manomaya",
+      "default_polarity_behavior": {
+        "tendency": "constructive",
+        "description": "establishes directional momentum and authorship"
+      },
+      "adjacency": {
+        "prev_layer": "O5_COGNITION",
+        "next_layer": "O7_REASONING"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "directional-vector-only"
+      ]
+    },
+    "O7_REASONING": {
+      "layer_id": "O7_REASONING",
+      "experiential_role": "sequential logic and discriminative analysis",
+      "kosha_anchor": "vijnanamaya",
+      "default_polarity_behavior": {
+        "tendency": "neutral",
+        "description": "chains operations through inference without inherent valence"
+      },
+      "adjacency": {
+        "prev_layer": "O6_AGENCY",
+        "next_layer": "O8_PURPOSE"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "sequencing-logic-only"
+      ]
+    },
+    "O8_PURPOSE": {
+      "layer_id": "O8_PURPOSE",
+      "experiential_role": "teleological orientation and meaning",
+      "kosha_anchor": "vijnanamaya",
+      "default_polarity_behavior": {
+        "tendency": "constructive",
+        "description": "establishes purposive end-state orientation and motivation"
+      },
+      "adjacency": {
+        "prev_layer": "O7_REASONING",
+        "next_layer": "O9_WITNESSES"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "orientation-vector-only"
+      ]
+    },
+    "O9_WITNESSES": {
+      "layer_id": "O9_WITNESSES",
+      "experiential_role": "pattern-level witness tracking and meta-observation",
+      "kosha_anchor": "anandamaya",
+      "default_polarity_behavior": {
+        "tendency": "neutral",
+        "description": "observes without modifying observed patterns"
+      },
+      "adjacency": {
+        "prev_layer": "O8_PURPOSE",
+        "next_layer": "O10_UNIFYING"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "observation-tracking-only"
+      ]
+    },
+    "O10_UNIFYING": {
+      "layer_id": "O10_UNIFYING",
+      "experiential_role": "field coherence and synthesis",
+      "kosha_anchor": "anandamaya",
+      "default_polarity_behavior": {
+        "tendency": "constructive",
+        "description": "integrates distributed patterns into coherent field"
+      },
+      "adjacency": {
+        "prev_layer": "O9_WITNESSES",
+        "next_layer": "O11_INTEGRATION"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "field-integration-only"
+      ]
+    },
+    "O11_INTEGRATION": {
+      "layer_id": "O11_INTEGRATION",
+      "experiential_role": "resolution and consolidation of parts",
+      "kosha_anchor": "anandamaya",
+      "default_polarity_behavior": {
+        "tendency": "constructive",
+        "description": "consolidates and completes partial processes"
+      },
+      "adjacency": {
+        "prev_layer": "O10_UNIFYING",
+        "next_layer": "O12_ABSOLVING"
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "resolution-consolidation-only"
+      ]
+    },
+    "O12_ABSOLVING": {
+      "layer_id": "O12_ABSOLVING",
+      "experiential_role": "terminal dissolution or transcendence",
+      "kosha_anchor": "bridge/none",
+      "default_polarity_behavior": {
+        "tendency": "degenerative",
+        "description": "dissolves pattern into ground state and release"
+      },
+      "adjacency": {
+        "prev_layer": "O11_INTEGRATION",
+        "next_layer": null
+      },
+      "constraints": [
+        "layer-valid-without-varnas",
+        "no-semantic-content",
+        "dissolution-termination-only"
+      ]
+    }
+  }
+}

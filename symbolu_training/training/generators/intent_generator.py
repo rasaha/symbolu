@@ -8,7 +8,7 @@ Uses templates and variations to create diverse training data.
 
 import random
 from typing import List, Dict, Tuple
-from symbolu.training.schemas import QueryIntentPair, IntentLabel
+from symbolu_training.training.schemas import QueryIntentPair, IntentLabel
 
 
 # Template-based query generation

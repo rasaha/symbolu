@@ -15,8 +15,8 @@ from typing import Dict, List, Any
 from dataclasses import dataclass, asdict
 from collections import defaultdict
 
-from symbolu.engine import create_engine, EngineTier
-from symbolu.entropy import (
+from symbolu_core.engine import create_engine, EngineTier
+from agentic.entropy import (
     EntropyEngine,
     GunaProfile,
     KoshaProfile,
@@ -26,7 +26,7 @@ from symbolu.entropy import (
     TIER_3_CONFIG,
     DIMENSION_NAMES,
 )
-from symbolu.posture import (
+from agentic.posture import (
     DecisionPostureProfile,
     PostureTier,
     PostureInfluenceScope,

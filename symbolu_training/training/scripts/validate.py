@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Set, Tuple
 from collections import Counter
 
-from symbolu.training.schemas import (
+from symbolu_training.training.schemas import (
     QueryIntentPair,
     ParaphrasePair,
     TrainingDataset,

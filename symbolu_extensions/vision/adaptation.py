@@ -455,8 +455,8 @@ class PhaseQuadAdaptationManager(nn.Module):
         Returns:
             x: Output tokens [B, N, D].
         """
-        from symbolu.vision.controls import QuadControl
-        from symbolu.vision.phase_quad_dit_block import compute_phase_strength
+        from symbolu_extensions.vision.controls import QuadControl
+        from symbolu_extensions.vision.phase_quad_dit_block import compute_phase_strength
 
         for block, gates in zip(self.block_stack.blocks, self.ia3_gates):
             x = self._adapted_block_forward(
@@ -486,8 +486,8 @@ class PhaseQuadAdaptationManager(nn.Module):
 
         If gates is None, falls back to the original forward.
         """
-        from symbolu.vision.controls import QuadControl
-        from symbolu.vision.phase_quad_dit_block import compute_phase_strength
+        from symbolu_extensions.vision.controls import QuadControl
+        from symbolu_extensions.vision.phase_quad_dit_block import compute_phase_strength
 
         if gates is None:
             return block(x, meta, time_embed, text_cond, timestep, control)

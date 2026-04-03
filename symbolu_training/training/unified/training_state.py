@@ -15,10 +15,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List, Optional, Any, Tuple
 
-from symbolu.training.unified.utilities import get_pramana_weights
+from symbolu_training.training.unified.utilities import get_pramana_weights
 
 try:
-    from symbolu.guna_modulation.variance_confidence import (
+    from agentic.guna_modulation.variance_confidence import (
         VarianceConfidence,
         VarianceConfidenceConfig,
     )

@@ -36,7 +36,7 @@ Hyperparameters (Google's recommendations):
     τ_critical = 0.30 (Epistemic death threshold)
 
 Usage:
-    from symbolu.experimental.training import (
+    from symbolu_extensions.experimental.training import (
         create_sattva1_trainer,
         Sattva1TrainingLoss,
         ParadoxSynthesizer,

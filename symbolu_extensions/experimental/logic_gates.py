@@ -54,7 +54,7 @@ Hetvābhāsa = Fallacious reason that appears valid but isn't
 
 Usage:
 ------
-    from symbolu.experimental.logic_gates import (
+    from symbolu_extensions.experimental.logic_gates import (
         AxiomChecker,
         VyaptiChecker,
         HetvabhasaDetector,

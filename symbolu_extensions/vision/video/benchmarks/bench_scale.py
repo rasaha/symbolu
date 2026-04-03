@@ -71,7 +71,7 @@ class MockSchedule:
 def benchmark_config(
     cfg: ScaleConfig, device: str
 ) -> Optional[ScaleResult]:
-    from symbolu.vision.video.fscsv_wrapper import FSCSVModule, FSCSVConfig
+    from symbolu_extensions.vision.video.fscsv_wrapper import FSCSVModule, FSCSVConfig
 
     fscsv_config = FSCSVConfig(
         lambda_max=0.1,

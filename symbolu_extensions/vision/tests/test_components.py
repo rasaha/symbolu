@@ -9,11 +9,11 @@ import pytest
 import torch
 import torch.nn as nn
 
-from symbolu.vision.contracts import (
+from symbolu_extensions.vision.contracts import (
     ContractViolationError,
     assert_control_shape,
 )
-from symbolu.vision.controls import (
+from symbolu_extensions.vision.controls import (
     PatchMeta,
     PhaseControl,
     QuadControl,
@@ -21,17 +21,17 @@ from symbolu.vision.controls import (
     BlockControl,
     GeneratorControl,
 )
-from symbolu.vision.config import PhaseQuadVisionConfig
-from symbolu.vision.scan_manager import ScanManager2D, get_scan_manager
-from symbolu.vision.rope_2d import RotaryPositionEmbedding2D
-from symbolu.vision.patch_embed import PatchEmbed2D, TimestepEmbedding
-from symbolu.vision.phase_integrator import PhaseIntegrator1D, PhaseIntegrator2D
-from symbolu.vision.quad_retriever import QuadRetriever2D
-from symbolu.vision.gate_mixer import GateMixer
-from symbolu.vision.local_mixer import LocalMixer
-from symbolu.vision.cognade_vision_block import CognadeVisionBlock
-from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
-from symbolu.vision.diagnostics import (
+from symbolu_extensions.vision.config import PhaseQuadVisionConfig
+from symbolu_extensions.vision.scan_manager import ScanManager2D, get_scan_manager
+from symbolu_extensions.vision.rope_2d import RotaryPositionEmbedding2D
+from symbolu_extensions.vision.patch_embed import PatchEmbed2D, TimestepEmbedding
+from symbolu_extensions.vision.phase_integrator import PhaseIntegrator1D, PhaseIntegrator2D
+from symbolu_extensions.vision.quad_retriever import QuadRetriever2D
+from symbolu_extensions.vision.gate_mixer import GateMixer
+from symbolu_extensions.vision.local_mixer import LocalMixer
+from symbolu_extensions.vision.cognade_vision_block import CognadeVisionBlock
+from symbolu_extensions.vision.phase_quad_generator import PhaseQuadImageGenerator
+from symbolu_extensions.vision.diagnostics import (
     compute_quad_utilization,
     compute_phase_health,
     compute_ghost_metrics,

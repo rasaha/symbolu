@@ -19,7 +19,7 @@ Key Features for Images:
 
 Usage:
 ------
-    from symbolu.image_gen.use_image import USEImageEngine
+    from symbolu_extensions.image_gen.use_image import USEImageEngine
 
     engine = USEImageEngine()
 
@@ -53,7 +53,7 @@ except ImportError:
 
 import numpy as np
 
-from symbolu.image_gen.config import USEImageConfig
+from symbolu_extensions.image_gen.config import USEImageConfig
 
 
 # =============================================================================

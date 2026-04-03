@@ -24,7 +24,7 @@ from typing import Optional, Dict, Tuple
 
 # Import from existing sovereign module for constants
 try:
-    from symbolu.sovereign.reasoning_kernel import (
+    from agentic.sovereign.reasoning_kernel import (
         SOVEREIGN_STATE_DIM,
         BHAVA_NAMES,
         KOSHA_NAMES,

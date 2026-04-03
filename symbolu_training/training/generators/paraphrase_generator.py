@@ -8,7 +8,7 @@ Uses semantic similarity to create positive and negative pairs.
 
 import random
 from typing import List, Dict, Tuple
-from symbolu.training.schemas import ParaphrasePair, QueryIntentPair, IntentLabel
+from symbolu_training.training.schemas import ParaphrasePair, QueryIntentPair, IntentLabel
 
 
 # Paraphrase templates - pairs of semantically equivalent queries

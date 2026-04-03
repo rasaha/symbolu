@@ -10,7 +10,7 @@ Features:
 - Escalation to human operators when needed
 
 Usage:
-    from symbolu.voice.safety import SafetyVoiceGate
+    from symbolu_extensions.voice.safety import SafetyVoiceGate
 
     gate = SafetyVoiceGate()
     gated_response = await gate.process(response)

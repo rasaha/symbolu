@@ -9,7 +9,7 @@ Available Loss Functions:
 - InvertedCurriculumController: Manages Instructor -> Self-Learning transition
 """
 
-from symbolu.losses.kosha_gyroscope import (
+from symbolu_training.losses.kosha_gyroscope import (
     KoshaGyroscopicLoss,
     KoshaGyroscopeConfig,
     InvertedCurriculumController,

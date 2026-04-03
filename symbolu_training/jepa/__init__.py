@@ -40,20 +40,20 @@ References:
 __version__ = '1.0.0'
 
 # Core predictor
-from symbolu.jepa.predictor import (
+from symbolu_training.jepa.predictor import (
     PhaseJEPAPredictor,
     VrittiValidatedPredictor,
 )
 
 # State projection
-from symbolu.jepa.state_projector import (
+from symbolu_training.jepa.state_projector import (
     SovereignStateProjector,
     DeltaStateProjector,
     SOVEREIGN_STATE_DIM,
 )
 
 # Target encoder
-from symbolu.jepa.target_encoder import (
+from symbolu_training.jepa.target_encoder import (
     TargetEncoder,
     TargetEncoderWrapper,
     cosine_momentum_schedule,
@@ -61,7 +61,7 @@ from symbolu.jepa.target_encoder import (
 )
 
 # Loss functions
-from symbolu.jepa.losses import (
+from symbolu_training.jepa.losses import (
     VICRegLoss,
     WeightedAlignmentLoss,
     JEPAPredictionLoss,
@@ -69,7 +69,7 @@ from symbolu.jepa.losses import (
 )
 
 # Curriculum orchestrator
-from symbolu.jepa.curriculum import (
+from symbolu_training.jepa.curriculum import (
     JEPAPhase,
     MacroPhase,
     PhaseConfig,
@@ -80,7 +80,7 @@ from symbolu.jepa.curriculum import (
 )
 
 # Transformer wrapper
-from symbolu.jepa.transformer import (
+from symbolu_training.jepa.transformer import (
     PhaseJEPAConfig,
     PhaseJEPATransformer,
     create_phase_jepa_transformer,

@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, List, Optional, Any, Tuple
 
-from symbolu.training.unified.utilities import SOVEREIGN_R_MATRIX
+from symbolu_training.training.unified.utilities import SOVEREIGN_R_MATRIX
 
 
 class HierarchicalGradientScaler:

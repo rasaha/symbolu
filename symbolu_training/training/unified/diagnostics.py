@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List, Optional, Any, Tuple
 
-from symbolu.phase_transformer import (
+from symbolu_core.phase_transformer import (
     BHAVA_NAMES,
     KOSHA_NAMES,
     BHAVA_SLICE,

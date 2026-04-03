@@ -18,7 +18,7 @@ Features:
 
 Usage:
 ------
-    from symbolu.image_gen.pipeline import SymbolUFluxPipeline
+    from symbolu_extensions.image_gen.pipeline import SymbolUFluxPipeline
 
     # Create pipeline
     pipeline = SymbolUFluxPipeline.from_pretrained()
@@ -51,7 +51,7 @@ except ImportError:
 
 import numpy as np
 
-from symbolu.image_gen.config import (
+from symbolu_extensions.image_gen.config import (
     ImageGenConfig,
     FluxConfig,
     CoherenceConfig,
@@ -60,15 +60,15 @@ from symbolu.image_gen.config import (
     ImageGenMetrics,
     ImageGenResult,
 )
-from symbolu.image_gen.layer_mapper import LayerMapper, LAYER_NAMES
-from symbolu.image_gen.bcvf_image import BCVFImageEngine
-from symbolu.image_gen.use_image import USEImageEngine
-from symbolu.image_gen.scc_image import SCCImageEngine
-from symbolu.image_gen.coherence_monitor import (
+from symbolu_extensions.image_gen.layer_mapper import LayerMapper, LAYER_NAMES
+from symbolu_extensions.image_gen.bcvf_image import BCVFImageEngine
+from symbolu_extensions.image_gen.use_image import USEImageEngine
+from symbolu_extensions.image_gen.scc_image import SCCImageEngine
+from symbolu_extensions.image_gen.coherence_monitor import (
     CoherenceMonitor,
     GenerationDecision,
 )
-from symbolu.image_gen.flux_integration import (
+from symbolu_extensions.image_gen.flux_integration import (
     SymbolUFluxWrapper,
     FluxGenerationResult,
 )

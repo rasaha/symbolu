@@ -14,18 +14,18 @@ Directory Structure:
     └── config/         # Training configurations
 """
 
-from symbolu.training.schemas import (
+from symbolu_training.training.schemas import (
     QueryIntentPair,
     ParaphrasePair,
     TrainingDataset,
     IntentLabel,
 )
-from symbolu.training.text_utils import (
+from symbolu_training.training.text_utils import (
     clean_wikitext_artifacts,
     clean_generated_text,
     estimate_token_quality,
 )
-from symbolu.training.trainers.gradient_throttle import GradientNormThrottle
+from symbolu_training.training.trainers.gradient_throttle import GradientNormThrottle
 
 __all__ = [
     "QueryIntentPair",

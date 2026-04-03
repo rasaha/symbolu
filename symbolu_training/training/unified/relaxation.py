@@ -13,7 +13,7 @@ from typing import Optional, Dict, List, Tuple, Any
 import torch
 import torch.nn as nn
 
-from symbolu.training.unified.gradient_control import HierarchicalGradientScaler, WeightTransfer
+from symbolu_training.training.unified.gradient_control import HierarchicalGradientScaler, WeightTransfer
 
 
 class DynamicRelaxationController:

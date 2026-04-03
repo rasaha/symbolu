@@ -26,7 +26,7 @@ FLUX Architecture:
 
 Usage:
 ------
-    from symbolu.image_gen.layer_mapper import LayerMapper, LAYER_CONFIG
+    from symbolu_extensions.image_gen.layer_mapper import LayerMapper, LAYER_CONFIG
 
     mapper = LayerMapper()
 
@@ -56,7 +56,7 @@ except ImportError:
 
 import numpy as np
 
-from symbolu.image_gen.config import LayerMappingConfig
+from symbolu_extensions.image_gen.config import LayerMappingConfig
 
 
 # =============================================================================

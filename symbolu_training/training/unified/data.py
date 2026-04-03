@@ -17,7 +17,7 @@ except ImportError:
     HF_AVAILABLE = False
 
 try:
-    from symbolu.training.text_utils import clean_wikitext_artifacts
+    from symbolu_training.training.text_utils import clean_wikitext_artifacts
     WIKITEXT_CLEANUP_AVAILABLE = True
 except ImportError:
     WIKITEXT_CLEANUP_AVAILABLE = False
@@ -424,7 +424,7 @@ def _build_source_dataset(
             cached_data = torch.load(cache_path, weights_only=True)
             tokens = cached_data['train' if split == 'train' else 'val']
         else:
-            from symbolu.training.scripts.generate_reasoning_dataset import generate_examples
+            from symbolu_training.training.scripts.generate_reasoning_dataset import generate_examples
             examples = generate_examples(50000, seed=42)
             split_idx = int(len(examples) * 0.95)
             separator = "\n\n"
@@ -776,7 +776,7 @@ def load_data(
         else:
             # Auto-generate if no cached file exists
             print(f"  No cached reasoning dataset at {cache_path}. Generating...")
-            from symbolu.training.scripts.generate_reasoning_dataset import generate_examples
+            from symbolu_training.training.scripts.generate_reasoning_dataset import generate_examples
             examples = generate_examples(50000, seed=42)
             split_idx = int(len(examples) * 0.95)
             separator = "\n\n"

@@ -38,11 +38,11 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.cuda.amp import autocast, GradScaler
 
-from symbolu.vision.phase_quad_generator import PhaseQuadImageGenerator
-from symbolu.vision.config import PhaseQuadVisionConfig
-from symbolu.vision.inference.samplers import NoiseSchedule
-from symbolu.vision.phase_coherence_loss import PhaseCoherenceLoss, SemanticEntropyMonitor
-from symbolu.vision.training.dataset import (
+from symbolu_extensions.vision.phase_quad_generator import PhaseQuadImageGenerator
+from symbolu_extensions.vision.config import PhaseQuadVisionConfig
+from symbolu_extensions.vision.inference.samplers import NoiseSchedule
+from symbolu_extensions.vision.phase_coherence_loss import PhaseCoherenceLoss, SemanticEntropyMonitor
+from symbolu_extensions.vision.training.dataset import (
     get_dataset,
     create_dataloader,
     SyntheticDataset,
@@ -235,7 +235,7 @@ class DiffusionTrainer:
         # High gamma_scale = nearly frozen Phase state (lets Quad learn structure first)
         control = None
         if self.global_step < self.phase_warmup_steps:
-            from symbolu.vision.controls import GeneratorControl, BlockControl, PhaseControl
+            from symbolu_extensions.vision.controls import GeneratorControl, BlockControl, PhaseControl
             # gamma_scale > 1.0 makes Phase more stable (less drift)
             warmup_gamma = 1.0 + (1.0 - self.global_step / self.phase_warmup_steps)  # 2.0 -> 1.0
             phase_control = PhaseControl(gamma_scale=warmup_gamma)
@@ -493,7 +493,7 @@ def train(
     # Load VAE and text encoder
     if use_pretrained:
         print("\nLoading pretrained VAE and text encoder...")
-        from symbolu.vision.inference.pretrained import (
+        from symbolu_extensions.vision.inference.pretrained import (
             PretrainedVAE,
             PretrainedCLIP,
         )
@@ -501,7 +501,7 @@ def train(
         text_encoder = PretrainedCLIP(device=device)
     else:
         print("\nUsing mock VAE and text encoder...")
-        from symbolu.vision.inference.pipeline import MockVAE, MockTextEncoder
+        from symbolu_extensions.vision.inference.pipeline import MockVAE, MockTextEncoder
         vae = MockVAE().to(device)
         text_encoder = MockTextEncoder(embed_dim=config.text_encoder.embed_dim).to(device)
 

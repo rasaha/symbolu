@@ -59,7 +59,7 @@ def run_benchmark(
     width: int = 16,
     seed: int = 42,
 ) -> IdentityLockResult:
-    from symbolu.vision.video.fscsv_wrapper import (
+    from symbolu_extensions.vision.video.fscsv_wrapper import (
         FSCSVModule, FSCSVConfig, IdentitySchedule, TweedieProjection,
     )
 

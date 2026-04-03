@@ -19,15 +19,15 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.video.generator import PhaseQuadVideoGenerator
-from symbolu.vision.video.config import PhaseQuadVideoConfig
-from symbolu.vision.video.vae import PretrainedVideoVAE, MockVideoVAE
-from symbolu.vision.controls import (
+from symbolu_extensions.vision.video.generator import PhaseQuadVideoGenerator
+from symbolu_extensions.vision.video.config import PhaseQuadVideoConfig
+from symbolu_extensions.vision.video.vae import PretrainedVideoVAE, MockVideoVAE
+from symbolu_extensions.vision.controls import (
     GeneratorControl,
     BlockControl,
     CreativityControl,
 )
-from symbolu.vision.inference.samplers import (
+from symbolu_extensions.vision.inference.samplers import (
     NoiseSchedule,
     DDIMSampler,
     get_sampler,
@@ -293,7 +293,7 @@ class PhaseQuadVideoPipeline:
         Returns:
             Pipeline with pretrained VAE.
         """
-        from symbolu.vision.inference.pretrained import PretrainedCLIP
+        from symbolu_extensions.vision.inference.pretrained import PretrainedCLIP
 
         device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

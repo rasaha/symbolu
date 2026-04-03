@@ -16,17 +16,17 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from symbolu.vision.video.config import PhaseQuadVideoConfig, BCVFVideoConfig
-from symbolu.vision.video.bcvf_video import BCVFVideoQuadWeighter
-from symbolu.vision.phase_integrator_3d import PhaseIntegrator3D, VideoMeta
-from symbolu.vision.controls import (
+from symbolu_extensions.vision.video.config import PhaseQuadVideoConfig, BCVFVideoConfig
+from symbolu_extensions.vision.video.bcvf_video import BCVFVideoQuadWeighter
+from symbolu_extensions.vision.phase_integrator_3d import PhaseIntegrator3D, VideoMeta
+from symbolu_extensions.vision.controls import (
     BlockControl,
     GeneratorControl,
     PhaseControl,
     QuadControl,
 )
-from symbolu.vision.quad_retriever import QuadRetriever
-from symbolu.vision.gate_mixer import GateMixer
+from symbolu_extensions.vision.quad_retriever import QuadRetriever
+from symbolu_extensions.vision.gate_mixer import GateMixer
 
 
 class PatchEmbed3D(nn.Module):
