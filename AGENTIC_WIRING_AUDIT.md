@@ -377,3 +377,146 @@ Compute output intensity modulation via canonical equation `OUTPUT = BASE × E` 
 
 **Priority:** IMPORTANT BUT UNDERWIRED
 **Action:** Wire now (core E=G×P×T) / refactor first (consolidate guna derivation) / wire later (advanced modules)
+
+---
+
+### 3.9 `dha/` — Delivery Harmonization Algorithm
+
+**Intended Role:**
+Compute delivery modulation `D = T × I × R` (Tier scalar × Intensity × Restraint). Determines tone weights (sweet/jolt/metaphor), intensity from coherence+motion, and restraint from contradiction signals. Sole authority for tone/delivery modulation.
+
+**Actual Implementation Status:** COMPLETE (2,727 LOC across 8 files)
+- `DHAEngine` (440 LOC): Core `D = T × I × R` with deterministic softmax tone logits
+- `SignalExtraction` (727 LOC): Priority-ordered signal mapping from 4 sources (MLCR → Observables → computed → defaults). Complete audit trail of signal sources.
+- `DHAMath` (499 LOC): All closed-form math — entropy normalization (3 modes), softmax3, intensity/restraint formulas
+- `DHAConfig` (351 LOC): Immutable tier configs (Enterprise T1: 1.0, T2: 0.9, Consumer: 0.85)
+- `Integration` (324 LOC): Pipeline integration stage with graceful no-op when disabled
+- Standard library only, no ML dependencies
+
+**Runtime Wiring Status:** INTEGRATED (optional, lazy-loaded)
+- Disabled by default (`enabled=False`)
+- Activated via `dha_formula_enabled` flag in request metadata
+- Called from orchestrator after Fusion, before Renderer
+- Lazy-loaded via `@lru_cache(maxsize=1)` in orchestrator
+- Tier-specific config selection based on request metadata
+- `posture/modulation.py` calls `maybe_run_dha()` internally
+
+**Key Dependencies:**
+- Depends on: standard library only (fully self-contained)
+- Depended on by: pipeline orchestrator, posture/modulation
+- No circular dependencies; clean separation from guna_modulation (DHA owns tone, guna_mod owns intensity)
+
+**Main Gaps:**
+- Disabled by default — most users never see DHA modulation
+- Signal extraction has graceful defaults for missing signals — could mask real signal gaps
+- No feedback loop to validate whether tone weights improve output quality
+
+**Priority:** IMPORTANT BUT UNDERWIRED
+**Action:** Wire now — consider enabling by default (at least Tier 1 diagnostic mode); validate signal extraction coverage
+
+---
+
+### 3.10 `llm/` — LLM Interface Boundary Layer
+
+**Intended Role:**
+One-way authority boundary between Symbol-U Core (deterministic) and LLM Layer (optional renderer). Enforces contract-driven interface with strict validation preventing the LLM from mutating governance state.
+
+**Actual Implementation Status:** SUBSTANTIAL (1,493 LOC across 4 files)
+- `types.py` (222 LOC): Frozen dataclasses — `RenderRequest` → `RenderResponse`. Forbidden access patterns: `{"score", "rank", "search_trace", "policy_internal"}`. 7 failure modes (FM-1 through FM-6).
+- `providers.py` (681 LOC): `LLMClient` with tier-based model selection (Consumer→Haiku/Flash, Power→Sonnet/Pro, Admin→Sonnet/Pro). Two async providers (Anthropic, Google). Lazy loading, graceful degradation if API keys missing.
+- `validator.py` (477 LOC): 8 independent validators (INV-1 through INV-7). Enforces: no new tokens, no new layers, no constraint mutation, no governance override. Pattern-based detection + hash integrity checks.
+
+**Runtime Wiring Status:** FULLY ACTIVE
+- Imported by `symbolu_core/renderer/render_entry.py` (core rendering path)
+- Imported by `agentic_framework/llm_adapters.py`
+- Imported by `api/unified_api.py`
+- Validator runs on every LLM response in the fusion rendering path
+
+**Key Dependencies:**
+- Depends on: anthropic SDK, google-generativeai SDK (both optional)
+- Depended on by: renderer, agentic_framework, api/
+- No circular dependencies
+
+**Main Gaps:**
+- Provider layer is straightforward but not pluggable (hardcoded Anthropic + Google)
+- No streaming support visible
+- Validator patterns are static — no mechanism to evolve validation rules
+
+**Priority:** CORE RUNTIME CRITICAL
+**Action:** Document only — fully wired, functioning as intended boundary layer
+
+---
+
+### 3.11 `api/` — External API & Observability Layer
+
+**Intended Role:**
+Zero-LLM, deterministic, rule-based API functions for coherence metrics and unified pipeline output. Presentation layer that observes but never modifies pipeline behavior.
+
+**Actual Implementation Status:** SUBSTANTIAL (2,120 LOC across 3 files)
+- `unified_api.py` (1,742 LOC): `UnifiedOutput` dataclass combining 50+ pipeline fields. `build_unified_output()` extracts from all layers: fusion (symbolic/practical/mirror), DHA insights, TTOR routing, MLCR activation, mapper profiles, entropy measures, coherence report, session memory, identity signature, motivation profile.
+- `coherence_api.py` (360 LOC): `get_coherence_report()` → JSON, `get_turn_summary()` (single-turn metadata), `get_multi_turn_overview()` (trend analysis + rule-based recommendations). Slope calculation for drift/temporal_arc/volatility.
+
+**Runtime Wiring Status:** FULLY ACTIVE
+- Imported by `symbolu_core/service/api_server.py` (HTTP endpoints)
+- Called on every pipeline execution for output serialization
+- Exposed via `/symbolu/analyze` endpoint
+- Dashboard-ready bands (stable/unstable, low/high drift) from Phase 20+
+
+**Key Dependencies:**
+- Depends on: llm/ types, pipeline context types
+- Depended on by: api_server (HTTP layer), pipeline output
+- No circular dependencies
+
+**Main Gaps:**
+- Purely observational — no ability to feed API insights back into pipeline decisions
+- `get_multi_turn_overview()` has rule-based recommendations that could inform session policy but don't
+
+**Priority:** CORE RUNTIME CRITICAL
+**Action:** Document only — fully wired; consider feedback path from multi-turn insights to session policy in future
+
+---
+
+### 3.12 `core/` — Core Computation Engine (Mixed: Facades + Real Engines)
+
+**Intended Role:**
+Central computation engine for the Symbol-U pipeline. Intended as the canonical home for coherence, entropy, SMI, stitching, bhava, consciousness, and predictive engines.
+
+**Actual Implementation Status:** MIXED — dead facades + real subdirectory engines
+- **DEAD FACADES (never called):**
+  - `interface.py`: All methods raise `NotImplementedError("Symbol-U formula to be added later.")`
+  - `pipeline.py`: All methods raise `NotImplementedError`
+  - `__init__.py`: Exports only CoreInterface + CorePipeline (the dead facades)
+- **REAL ENGINES (active):**
+  - `coherence/`: CoherenceEngine, CoherenceState, temporal_arc_tracer — ACTIVE in pipeline
+  - `smi/`: SMIEngine, aspect mapping, acoustic mapping — ACTIVE in pipeline
+  - `stitching/`: StitchingEngine for candidate scoring — ACTIVE in pipeline
+  - `bhava/`: BhavaGeometry, TemporalBhava — ACTIVE in pipeline
+  - `consciousness/`: UCFResolver, UCFFormula — ACTIVE
+  - `predictive/`: PredictivePersonaDriftReport, IdentityResonanceMemory — ACTIVE
+  - `regulators/`: Three-force decision framework — ACTIVE
+  - `energy/`: Energy word detection — SUPPORTING
+- **INFRASTRUCTURE:**
+  - `constants.py` (8 KB): Formula constants used across engines
+  - `models.py` (2.9 KB): Shared data types (SyllableAnalysis, WordAnalysis, EntropyState, BhavaState)
+  - `formula_drift_tests/`: 19 integration test files for formula regression
+  - `generation_gate.py`, `ledger_generation_attest.py`: Generation safety checks
+
+**Runtime Wiring Status:** SPLIT
+- Real engines (coherence/, smi/, stitching/, bhava/) are FULLY ACTIVE on main pipeline
+- Top-level facades (interface.py, pipeline.py) are DEAD CODE — never instantiated
+- `core/entropy/` is a DEAD STUB — replaced by `agentic/entropy/` in practice
+- `core/smi/vritti_mapping.py` contains duplicate vritti logic (should delegate to chitta_vritti/)
+
+**Key Dependencies:**
+- Depends on: standard library, symbolu_core.formulas
+- Depended on by: symbolu_core/mechanical/pipeline/*, agentic_framework/*, api/
+- `core/entropy/` creates confusion — imported nowhere but name collides with `agentic/entropy/`
+
+**Main Gaps:**
+- **MEDIUM**: Top-level facade is dead code creating false architectural impression
+- `core/entropy/` should be removed or redirected to `agentic/entropy/`
+- `core/smi/vritti_mapping.py` duplicates chitta_vritti/ logic
+- No unified export from core/ that reflects what's actually active vs dead
+
+**Priority:** CORE RUNTIME CRITICAL (subdirectory engines) / NEEDS CONSOLIDATION (facades)
+**Action:** Refactor first — remove dead facades (interface.py, pipeline.py); remove or redirect core/entropy/; update __init__.py to export real engines; consolidate vritti_mapping into chitta_vritti/
