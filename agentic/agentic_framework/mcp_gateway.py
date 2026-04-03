@@ -79,6 +79,13 @@ from agentic.agentic_framework.domain_policy import (
     resolve_domain_policy,
     fail_closed_result as _domain_fail_closed,
 )
+from agentic.agentic_framework.shadow_ai import (
+    ShadowAssessment,
+    ShadowContainmentMode,
+    ShadowRegistry,
+    resolve_shadow_policy,
+    shadow_containment_to_governance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +235,10 @@ class AuditEntry:
     # Domain policy fields (populated when domain policy check runs)
     domain_policy: Optional[Dict[str, Any]] = None
     domain_overrode: bool = False
+
+    # Shadow AI Control Layer fields
+    shadow_assessment: Optional[Dict[str, Any]] = None
+    shadow_overrode: bool = False
 
 
 # =============================================================================
@@ -606,6 +617,7 @@ class SafeMCPGateway:
         audit_store: Optional[GovernanceAuditStore] = None,
         domain_registry: Optional[DomainRegistry] = None,
         domain_id: Optional[str] = None,
+        shadow_registry: Optional[ShadowRegistry] = None,
     ):
         """
         Initialize Safe MCP Gateway.
@@ -623,6 +635,7 @@ class SafeMCPGateway:
                          persisted to the store in addition to the in-memory log.
             domain_registry: Optional DomainRegistry for domain-specific policy.
             domain_id: Which domain profile to use from the registry.
+            shadow_registry: Optional ShadowRegistry for shadow AI control.
         """
         self.mcp_client = mcp_client
         self.gate = confidence_gate or create_confidence_gate()
@@ -641,6 +654,9 @@ class SafeMCPGateway:
         # Domain Semantic Policy Layer
         self._domain_registry: Optional[DomainRegistry] = domain_registry
         self._domain_id: Optional[str] = domain_id
+
+        # Shadow AI Control Layer
+        self._shadow_registry: Optional[ShadowRegistry] = shadow_registry
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
@@ -778,6 +794,8 @@ class SafeMCPGateway:
         jepa_overrode: bool = False,
         domain_result: Optional[Any] = None,
         domain_overrode: bool = False,
+        shadow_assessment: Optional[ShadowAssessment] = None,
+        shadow_overrode: bool = False,
     ) -> None:
         """Log audit entry to in-memory cache and durable store."""
         if not self.audit_enabled:
@@ -786,6 +804,11 @@ class SafeMCPGateway:
         domain_audit = (
             domain_result.to_audit_dict()
             if domain_result is not None and hasattr(domain_result, "to_audit_dict")
+            else None
+        )
+        shadow_audit = (
+            shadow_assessment.to_audit_dict()
+            if shadow_assessment is not None
             else None
         )
 
@@ -823,6 +846,8 @@ class SafeMCPGateway:
             jepa_overrode=jepa_overrode,
             domain_policy=domain_audit,
             domain_overrode=domain_overrode,
+            shadow_assessment=shadow_audit,
+            shadow_overrode=shadow_overrode,
         )
         self.audit_log.append(entry)
 
@@ -850,6 +875,8 @@ class SafeMCPGateway:
                 jepa_overrode=entry.jepa_overrode,
                 domain_policy=entry.domain_policy,
                 domain_overrode=entry.domain_overrode,
+                shadow_assessment=entry.shadow_assessment,
+                shadow_overrode=entry.shadow_overrode,
             )
             try:
                 self._audit_store.append(canonical_event)
@@ -1133,6 +1160,101 @@ class SafeMCPGateway:
                                 domain_overrode=True)
                     return result
 
+        # Shadow AI Control Layer check
+        shadow_assessment: Optional[ShadowAssessment] = None
+        shadow_overrode = False
+        if self._shadow_registry is not None:
+            _risk_to_action = {
+                ToolRiskLevel.READ_ONLY: "read_only",
+                ToolRiskLevel.WRITE: "mutating",
+                ToolRiskLevel.EXECUTE: "mutating",
+                ToolRiskLevel.DESTRUCTIVE: "destructive",
+                ToolRiskLevel.PRIVILEGED: "privileged",
+            }
+            action_cat = _risk_to_action.get(tool_def.risk_level, "unknown")
+            mutation = action_cat in ("mutating", "destructive", "privileged")
+
+            _sem_mismatch = 0.0
+            if regime.value in ("process_drift", "semantic_shift"):
+                _sem_mismatch = 0.5
+            elif regime.value in ("dual_anomaly", "unknown"):
+                _sem_mismatch = 0.8
+
+            _dom_mismatch = 0.0
+            if domain_result is not None and domain_result.mode != DomainActionMode.ALLOW:
+                _dom_mismatch = domain_result.mode.severity / 6.0
+
+            shadow_assessment = resolve_shadow_policy(
+                asset_id=tool_call.tool_name,
+                tool_name=tool_call.tool_name,
+                registry=self._shadow_registry,
+                action_category=action_cat,
+                risk_level=tool_def.risk_level.value,
+                domain_id=self._domain_id or "",
+                memory_write_intent="memory" in tool_call.tool_name.lower(),
+                mutation_intent=mutation,
+                jepa_regime=regime.value,
+                semantic_mismatch=_sem_mismatch,
+                domain_policy_mismatch=_dom_mismatch,
+                confidence=effective_confidence,
+            )
+
+            shadow_gov = shadow_containment_to_governance(
+                shadow_assessment.containment_mode,
+            )
+            if shadow_gov == "DENY":
+                shadow_overrode = True
+                reason = (
+                    f"Shadow AI policy: {shadow_assessment.containment_mode.value} — "
+                    f"{shadow_assessment.rationale}"
+                )
+                logger.warning("MCP SHADOW BLOCK: %s on %s — %s",
+                               shadow_assessment.containment_mode.value,
+                               tool_call.tool_name, reason)
+                result = MCPToolResult(
+                    request_id=tool_call.request_id,
+                    tool_name=tool_call.tool_name,
+                    decision=GatewayDecision.BLOCKED,
+                    success=False,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
+                    blocked_reason=reason,
+                    risk_level=tool_def.risk_level,
+                    execution_time_ms=(time.time() - start_time) * 1000,
+                )
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment, jepa_overrode=False,
+                            domain_result=domain_result,
+                            shadow_assessment=shadow_assessment,
+                            shadow_overrode=True)
+                return result
+            elif shadow_gov == "DEFER":
+                shadow_overrode = True
+                reason = (
+                    f"Shadow AI policy: {shadow_assessment.containment_mode.value} — "
+                    f"{shadow_assessment.rationale}"
+                )
+                logger.info("MCP SHADOW ESCALATE: %s on %s — %s",
+                            shadow_assessment.containment_mode.value,
+                            tool_call.tool_name, reason)
+                result = MCPToolResult(
+                    request_id=tool_call.request_id,
+                    tool_name=tool_call.tool_name,
+                    decision=GatewayDecision.ESCALATE,
+                    success=False,
+                    confidence=effective_confidence,
+                    escalation_level=effective_escalation,
+                    blocked_reason=reason,
+                    risk_level=tool_def.risk_level,
+                    execution_time_ms=(time.time() - start_time) * 1000,
+                )
+                self._audit(tool_call, tool_def, result, gate_decision,
+                            jepa_assessment, jepa_overrode=False,
+                            domain_result=domain_result,
+                            shadow_assessment=shadow_assessment,
+                            shadow_overrode=True)
+                return result
+
         # Check minimum confidence for risk level (use JEPA-adjusted)
         if effective_confidence < tool_def.min_confidence:
             result = MCPToolResult(
@@ -1151,7 +1273,9 @@ class SafeMCPGateway:
             )
             self._audit(tool_call, tool_def, result, gate_decision,
                         jepa_assessment,
-                        domain_result=domain_result)
+                        domain_result=domain_result,
+                        shadow_assessment=shadow_assessment,
+                        shadow_overrode=shadow_overrode)
             return result
 
         # Check execution permission
@@ -1178,7 +1302,9 @@ class SafeMCPGateway:
                     )
                     self._audit(tool_call, tool_def, result, gate_decision,
                                 jepa_assessment,
-                                domain_result=domain_result)
+                                domain_result=domain_result,
+                                shadow_assessment=shadow_assessment,
+                                shadow_overrode=shadow_overrode)
                     return result
             else:
                 result = MCPToolResult(
@@ -1194,7 +1320,9 @@ class SafeMCPGateway:
                 )
                 self._audit(tool_call, tool_def, result, gate_decision,
                             jepa_assessment,
-                            domain_result=domain_result)
+                            domain_result=domain_result,
+                            shadow_assessment=shadow_assessment,
+                            shadow_overrode=shadow_overrode)
                 return result
 
         # Handle notification escalation
@@ -1222,7 +1350,9 @@ class SafeMCPGateway:
                 )
                 self._audit(tool_call, tool_def, result, gate_decision,
                             jepa_assessment,
-                            domain_result=domain_result)
+                            domain_result=domain_result,
+                            shadow_assessment=shadow_assessment,
+                            shadow_overrode=shadow_overrode)
                 return result
             human_confirmed = True
 
@@ -1248,7 +1378,9 @@ class SafeMCPGateway:
             )
             self._audit(tool_call, tool_def, result, gate_decision,
                         jepa_assessment,
-                        domain_result=domain_result)
+                        domain_result=domain_result,
+                        shadow_assessment=shadow_assessment,
+                        shadow_overrode=shadow_overrode)
             return result
 
         except asyncio.TimeoutError:
@@ -1266,7 +1398,9 @@ class SafeMCPGateway:
             )
             self._audit(tool_call, tool_def, result, gate_decision,
                         jepa_assessment,
-                        domain_result=domain_result)
+                        domain_result=domain_result,
+                        shadow_assessment=shadow_assessment,
+                        shadow_overrode=shadow_overrode)
             return result
 
         except Exception as e:
@@ -1284,7 +1418,9 @@ class SafeMCPGateway:
             )
             self._audit(tool_call, tool_def, result, gate_decision,
                         jepa_assessment,
-                        domain_result=domain_result)
+                        domain_result=domain_result,
+                        shadow_assessment=shadow_assessment,
+                        shadow_overrode=shadow_overrode)
             return result
 
     async def call_tool_simple(

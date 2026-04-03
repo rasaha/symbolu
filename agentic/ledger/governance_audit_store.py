@@ -647,6 +647,8 @@ def event_from_mcp_audit(
     jepa_overrode: bool = False,
     domain_policy: Optional[Dict[str, Any]] = None,
     domain_overrode: bool = False,
+    shadow_assessment: Optional[Dict[str, Any]] = None,
+    shadow_overrode: bool = False,
 ) -> GovernanceAuditEvent:
     """Create a GovernanceAuditEvent from MCP gateway audit data.
 
@@ -674,6 +676,11 @@ def event_from_mcp_audit(
     if domain_policy is not None:
         snapshot["domain_policy"] = domain_policy
         snapshot["domain_overrode"] = domain_overrode
+
+    # Embed shadow AI assessment in the snapshot for durable persistence
+    if shadow_assessment is not None:
+        snapshot["shadow_assessment"] = shadow_assessment
+        snapshot["shadow_overrode"] = shadow_overrode
 
     return GovernanceAuditEvent(
         event_id=request_id or create_event_id(),

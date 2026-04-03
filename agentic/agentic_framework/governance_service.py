@@ -83,6 +83,13 @@ from agentic.agentic_framework.domain_policy import (
     resolve_domain_policy,
     fail_closed_result,
 )
+from agentic.agentic_framework.shadow_ai import (
+    ShadowAssessment,
+    ShadowContainmentMode,
+    ShadowRegistry,
+    resolve_shadow_policy,
+    shadow_containment_to_governance,
+)
 
 import logging as _logging
 
@@ -483,6 +490,7 @@ class GovernanceService:
         audit_store: Optional[GovernanceAuditStore] = None,
         domain_registry: Optional[DomainRegistry] = None,
         domain_id: Optional[str] = None,
+        shadow_registry: Optional[ShadowRegistry] = None,
     ):
         """
         Initialize governance service.
@@ -499,6 +507,9 @@ class GovernanceService:
                 translates JEPA assessments into domain-specific action modes.
             domain_id: Which domain profile to use from the registry.
                 Ignored if domain_registry is None.
+            shadow_registry: Optional ShadowRegistry for shadow AI control.
+                When provided, the Shadow AI Control Layer evaluates asset
+                provenance and sanctionedness before final enforcement.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -518,6 +529,9 @@ class GovernanceService:
         # Domain Semantic Policy Layer
         self._domain_registry: Optional[DomainRegistry] = domain_registry
         self._domain_id: Optional[str] = domain_id
+
+        # Shadow AI Control Layer
+        self._shadow_registry: Optional[ShadowRegistry] = shadow_registry
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -658,17 +672,87 @@ class GovernanceService:
                     governance_decision = APIGovernanceDecision.DEFER
                     eligible = False
 
+        # Step 5e: Shadow AI Control Layer
+        #   Evaluates asset provenance, sanctionedness, and containment.
+        #   Shadow policy can only make things STRICTER, never relax.
+        #   Runs after domain policy so both signals are available.
+        shadow_assessment: Optional[ShadowAssessment] = None
+        shadow_audit: Optional[Dict[str, Any]] = None
+        if self._shadow_registry is not None:
+            # Determine action category from risk level
+            _risk_to_action = {
+                ToolRiskLevel.READ_ONLY: "read_only",
+                ToolRiskLevel.WRITE: "mutating",
+                ToolRiskLevel.EXECUTE: "mutating",
+                ToolRiskLevel.DESTRUCTIVE: "destructive",
+                ToolRiskLevel.PRIVILEGED: "privileged",
+            }
+            action_cat = _risk_to_action.get(risk_level, "unknown")
+            mutation = action_cat in ("mutating", "destructive", "privileged")
+
+            # Compute semantic mismatch from JEPA
+            _sem_mismatch = 0.0
+            if jepa_assessment.regime.value in ("process_drift", "semantic_shift"):
+                _sem_mismatch = 0.5
+            elif jepa_assessment.regime.value in ("dual_anomaly", "unknown"):
+                _sem_mismatch = 0.8
+
+            # Domain policy mismatch
+            _dom_mismatch = 0.0
+            if domain_result is not None and domain_result.mode != DomainActionMode.ALLOW:
+                _dom_mismatch = domain_result.mode.severity / 6.0
+
+            shadow_assessment = resolve_shadow_policy(
+                asset_id=request.actor_id,
+                tool_name=request.tool_name or "",
+                provider=getattr(request, "provider", ""),
+                registry=self._shadow_registry,
+                action_category=action_cat,
+                risk_level=risk_level.value,
+                domain_id=self._domain_id or "",
+                memory_write_intent="memory" in (request.action_type or "").lower(),
+                mutation_intent=mutation,
+                jepa_regime=jepa_assessment.regime.value,
+                semantic_mismatch=_sem_mismatch,
+                domain_policy_mismatch=_dom_mismatch,
+                confidence=effective_confidence,
+            )
+            shadow_audit = shadow_assessment.to_audit_dict()
+
+            # Apply shadow containment as stricter-only override
+            shadow_gov = shadow_containment_to_governance(
+                shadow_assessment.containment_mode,
+            )
+            if shadow_gov == "DENY":
+                governance_decision = APIGovernanceDecision.DENY
+                eligible = False
+            elif shadow_gov == "DEFER":
+                if governance_decision == APIGovernanceDecision.ALLOW:
+                    governance_decision = APIGovernanceDecision.DEFER
+                    eligible = False
+                if governance_decision != APIGovernanceDecision.DENY:
+                    effective_requires_human = True
+
         # Step 6: Build rationale (includes JEPA and domain information)
         rationale_codes = _build_rationale_codes(
             safety_summary, gate_decision, risk_level, forbidden_cap,
             governance_decision, jepa_assessment, jepa_overrode,
             domain_result,
         )
+        # Add shadow reason codes
+        if shadow_assessment is not None:
+            for rc in shadow_assessment.reason_codes:
+                rationale_codes.append(f"SHADOW:{rc}")
         rationale = _build_rationale_string(
             governance_decision, safety_summary, gate_decision, risk_level,
             forbidden_cap, jepa_assessment, jepa_overrode,
             domain_result,
         )
+        if shadow_assessment is not None and shadow_assessment.shadow_overrode_baseline:
+            rationale += (
+                f" Shadow AI policy: {shadow_assessment.containment_mode.value}. "
+                f"{shadow_assessment.rationale}"
+            )
 
         # Step 7: Build confidence gate summary (with JEPA adjustments)
         confidence_summary = ConfidenceGateSummary(
@@ -718,6 +802,7 @@ class GovernanceService:
                     domain_result.to_audit_dict() if domain_result else None
                 ),
             },
+            shadow_assessment=shadow_audit,
         )
         self._persist_audit_event(audit_event)
 
@@ -738,6 +823,7 @@ class GovernanceService:
             safety_contract=safety_summary,
             confidence_gate=confidence_summary,
             audit_event=audit_event,
+            shadow_assessment=shadow_audit,
             dry_run=request.dry_run,
             service_version=SERVICE_VERSION,
             decision_timestamp=timestamp,
