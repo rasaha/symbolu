@@ -46,35 +46,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import FrozenSet, Mapping, Optional, Tuple
 
-
-# =============================================================================
-# Core Types
-# =============================================================================
-
-class OntologicalLayer(Enum):
-    """
-    12 ontological layers for structural projection (patent-exact sequence).
-
-    Each layer represents a projection plane onto which Phase artifacts
-    can be mapped. Layers are structural containers, not semantic categories.
-
-    The ordering is fixed and immutable per the patent specification.
-    """
-    POTENTIAL = 1
-    IDENTITY = 2
-    EXECUTION = 3
-    STRUCTURE = 4
-    COGNITION = 5
-    AGENCY = 6
-    REASONING = 7
-    PURPOSE = 8
-    WITNESSES = 9
-    UNIFYING = 10
-    INTEGRATION = 11
-    ABSOLVING = 12  # GATED - requires explicit opt-in
-
-    def __repr__(self) -> str:
-        return f"OntologicalLayer.{self.name}"
+from agentic.ontology.layers.ontology_layer import OntologicalLayer  # canonical source
 
 
 # =============================================================================

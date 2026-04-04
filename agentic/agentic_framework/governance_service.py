@@ -121,6 +121,10 @@ from agentic.agentic_framework.signal_adapters.predictive_signals_adapter import
     resolve_predictive_signals,
     PredictiveSignalsResolution,
 )
+from agentic.agentic_framework.signal_adapters.ontology_adapter import (
+    resolve_ontology_balance,
+    OntologyBalanceResolution,
+)
 from agentic.core.generation_gate import (
     GenerationGate,
     GenerationMode,
@@ -863,6 +867,114 @@ def _resolve_insight_signal(
         return resolve_insight_signal()
 
 
+# =========================================================================
+# Phase O4: Ontology balance signal resolution
+# =========================================================================
+
+# Ontology balance penalty constants
+_ONTOLOGY_BALANCE_LOW_THRESHOLD = 0.35
+_ONTOLOGY_BALANCE_CRITICAL_THRESHOLD = 0.20
+_ONTOLOGY_BALANCE_MAX_PENALTY = 0.05
+
+
+@dataclass(frozen=True)
+class OntologyBalanceGovernanceSignal:
+    """
+    Governance-safe view of ontology balance for confidence/escalation.
+
+    Derived from OntologyBalanceResolution. Provides:
+    - bounded confidence_penalty [0.0, 0.05]
+    - escalation_bias when balance is critically low
+    - audit metadata
+
+    Fail-closed: available=False → zero penalty, no escalation.
+    """
+    available: bool
+    balance_score: float = 0.0
+    confidence_penalty: float = 0.0
+    escalation_bias: bool = False
+    dominant_state: str = ""
+    propagation_needed: int = 0
+    source_detail: str = "ontology_balance_governance"
+
+    def to_audit_dict(self) -> Dict[str, Any]:
+        return {
+            "available": self.available,
+            "balance_score": round(self.balance_score, 4),
+            "confidence_penalty": round(self.confidence_penalty, 4),
+            "escalation_bias": self.escalation_bias,
+            "dominant_state": self.dominant_state,
+            "propagation_needed": self.propagation_needed,
+            "source_detail": self.source_detail,
+        }
+
+
+_ONTOLOGY_BALANCE_UNAVAILABLE = OntologyBalanceGovernanceSignal(
+    available=False,
+    source_detail="ontology_balance_governance:unavailable",
+)
+
+
+def _resolve_ontology_balance_signal(
+    request: AuthorizationRequest,
+) -> OntologyBalanceGovernanceSignal:
+    """Resolve ontology balance signal from the authorization request.
+
+    Phase O4: Encodes the action description into a 10D ontological vector
+    and computes mirror-pair balance. Low structural balance indicates
+    the action context has high dimensional skew, warranting reduced
+    confidence.
+
+    Penalty logic:
+        - balance_score >= 0.35 → 0.0 penalty (normal)
+        - balance_score < 0.35  → linear penalty up to 0.05
+        - balance_score < 0.20  → escalation bias (bump one level)
+
+    Fail-closed: any error → available=False, zero penalty, no escalation.
+    """
+    try:
+        # Build content string from action description.
+        # This is the structural characterization of what governance is
+        # deciding about — deterministic, bounded, and always available.
+        action_type = getattr(request, "action_type", "") or ""
+        tool_name = getattr(request, "tool_name", "") or ""
+        content = f"{action_type} {tool_name}".strip()
+
+        if not content:
+            return _ONTOLOGY_BALANCE_UNAVAILABLE
+
+        resolution = resolve_ontology_balance(content)
+
+        if not resolution.available:
+            return _ONTOLOGY_BALANCE_UNAVAILABLE
+
+        balance = resolution.balance_score
+
+        # Compute bounded confidence penalty
+        if balance >= _ONTOLOGY_BALANCE_LOW_THRESHOLD:
+            penalty = 0.0
+        else:
+            # Linear interpolation: 0.35→0.0 penalty, 0.0→0.05 penalty
+            ratio = 1.0 - (balance / _ONTOLOGY_BALANCE_LOW_THRESHOLD)
+            penalty = min(_ONTOLOGY_BALANCE_MAX_PENALTY,
+                          _ONTOLOGY_BALANCE_MAX_PENALTY * ratio)
+
+        # Escalation bias for critically low balance
+        escalation_bias = balance < _ONTOLOGY_BALANCE_CRITICAL_THRESHOLD
+
+        return OntologyBalanceGovernanceSignal(
+            available=True,
+            balance_score=balance,
+            confidence_penalty=penalty,
+            escalation_bias=escalation_bias,
+            dominant_state=resolution.dominant_state,
+            propagation_needed=len(resolution.propagation_needed),
+        )
+
+    except Exception:
+        return _ONTOLOGY_BALANCE_UNAVAILABLE
+
+
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
     gate_decision: ConfidenceGateDecision,
@@ -1190,6 +1302,14 @@ class GovernanceService:
         #   P36 identity is audit-only (no penalty).
         predictive_resolution = _resolve_predictive_signals(request)
 
+        # Step 5c8: Resolve Phase O4 ontology balance signal.
+        #   Encodes the action context into a 10D ontological vector and
+        #   computes mirror-pair balance. Low structural balance indicates
+        #   dimensional skew in the action context, warranting reduced
+        #   confidence. Max penalty: 0.05. Escalation bias below 0.20.
+        #   Fail-closed: if resolution fails, zero penalty and no bias.
+        ontology_balance_signal = _resolve_ontology_balance_signal(request)
+
         # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
@@ -1217,7 +1337,8 @@ class GovernanceService:
             + guna_anomaly_resolution.confidence_penalty
             + core_coherence_resolution.confidence_penalty
             + ucf_resolution.confidence_penalty
-            + predictive_resolution.confidence_penalty,
+            + predictive_resolution.confidence_penalty
+            + ontology_balance_signal.confidence_penalty,
         )
         effective_confidence = max(
             0.0,
@@ -1309,6 +1430,16 @@ class GovernanceService:
         # Phase C4: Predictive drift escalation bias (stricter-only).
         # If P35 predicts HIGH drift risk, bump escalation by one level.
         if predictive_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase O4: Ontology balance escalation bias (stricter-only).
+        # If structural balance is critically low (< 0.20), bump escalation.
+        if ontology_balance_signal.escalation_bias:
             _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
             _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
             current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
@@ -1543,6 +1674,12 @@ class GovernanceService:
             if predictive_resolution.available else None
         )
 
+        # Step 7j: Build Phase O4 ontology balance audit dict
+        ontology_balance_dict = (
+            ontology_balance_signal.to_audit_dict()
+            if ontology_balance_signal.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1653,6 +1790,12 @@ class GovernanceService:
                 "predictive_identity_band": predictive_resolution.identity_stability_band,
                 "predictive_confidence_penalty": predictive_resolution.confidence_penalty,
                 "predictive_escalation_bias": predictive_resolution.escalation_bias,
+                # Phase O4: Ontology balance signal provenance
+                "ontology_balance_available": ontology_balance_signal.available,
+                "ontology_balance_score": ontology_balance_signal.balance_score,
+                "ontology_balance_confidence_penalty": ontology_balance_signal.confidence_penalty,
+                "ontology_balance_escalation_bias": ontology_balance_signal.escalation_bias,
+                "ontology_balance_dominant_state": ontology_balance_signal.dominant_state,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -1666,6 +1809,7 @@ class GovernanceService:
             ucf_signal=ucf_signal_dict,
             generation_gate=generation_gate_dict,
             predictive_signals=predictive_signals_dict,
+            ontology_balance=ontology_balance_dict,
         )
         self._persist_audit_event(audit_event)
 

@@ -1,6 +1,15 @@
 """
-Ontological Layer Enumeration
-=============================
+Ontological Layer Enumeration — CANONICAL SOURCE
+=================================================
+
+THIS IS THE SINGLE SOURCE OF TRUTH for OntologicalLayer within
+the symbolu package. The agentic.ontology.layers.ontology_layer module
+is the primary architecture-level canonical source; this symbolu mirror
+provides the same definition for symbolu-path consumers and tests.
+
+Canonical import paths:
+    from symbolu.ontology.layers.ontology_layer import OntologicalLayer
+    from symbolu.ontology.layers import OntologicalLayer
 
 Defines the 12 ontological layers from the patent-exact sequence.
 These layers represent structural projection planes, not semantic categories.

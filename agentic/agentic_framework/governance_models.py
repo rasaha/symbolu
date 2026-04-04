@@ -362,6 +362,17 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase O4: Ontology balance signal
+    ontology_balance: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Ontology 10D mirror-pair balance signal at decision time: "
+            "balance_score, confidence_penalty, escalation_bias, "
+            "dominant_state, propagation_needed. "
+            "Bridged via ontology_adapter (Phase O4)."
+        ),
+    )
+
     # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
     # NOTE: This field is INTENTIONALLY never populated by
     # GovernanceService.authorize(). It exists for downstream replay,

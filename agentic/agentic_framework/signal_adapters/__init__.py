@@ -57,6 +57,19 @@ from agentic.agentic_framework.signal_adapters.counterfactual_bridge import (
     create_standard_scenarios,
     CounterfactualBridgeResult,
 )
+from agentic.agentic_framework.signal_adapters.ontology_adapter import (
+    resolve_ontology_encoding,
+    resolve_ontology_similarity,
+    resolve_ontology_balance,
+    OntologyEncodingResolution,
+    OntologySimilarityResolution,
+    OntologyBalanceResolution,
+)
+from agentic.agentic_framework.signal_adapters.phase4a_adapter import (
+    resolve_varna_lookup,
+    resolve_varna_exists,
+    VarnaLookupResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -83,4 +96,15 @@ __all__ = [
     "run_counterfactual_simulation",
     "create_standard_scenarios",
     "CounterfactualBridgeResult",
+    # Ontology (O2)
+    "resolve_ontology_encoding",
+    "resolve_ontology_similarity",
+    "OntologyEncodingResolution",
+    "OntologySimilarityResolution",
+    # Ontology balance + Phase4a (O3)
+    "resolve_ontology_balance",
+    "OntologyBalanceResolution",
+    "resolve_varna_lookup",
+    "resolve_varna_exists",
+    "VarnaLookupResolution",
 ]
