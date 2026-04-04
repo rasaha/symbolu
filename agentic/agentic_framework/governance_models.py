@@ -320,6 +320,16 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase C2: Core pipeline coherence state signals
+    core_coherence: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Core pipeline CoherenceState signal view at decision time: "
+            "coherence, drift, UCF, continuity, identity, predictive signals. "
+            "Bridged via coherence_state_adapter (Phase C2)."
+        ),
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """

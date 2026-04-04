@@ -109,6 +109,10 @@ from agentic.agentic_framework.signal_adapters.session_enrichment_adapter import
     resolve_session_enrichment,
     SessionEnrichmentResolution,
 )
+from agentic.agentic_framework.signal_adapters.coherence_state_adapter import (
+    resolve_core_coherence,
+    CoreCoherenceResolution,
+)
 from agentic.agentic_framework.domain_policy import (
     DomainActionMode,
     DomainPolicyResult,
@@ -622,6 +626,24 @@ def _resolve_guna_anomaly_signal(
         return GunaAnomalyResolution()
 
 
+def _resolve_core_coherence_state(
+    request: Any,
+) -> CoreCoherenceResolution:
+    """Resolve core pipeline CoherenceState from request metadata.
+
+    Phase C2: Extracts pipeline-level coherence, drift, UCF, continuity,
+    and identity signals from the core CoherenceState object passed via
+    request.metadata["core_coherence_state"]. Returns a safe fallback
+    if the signal is absent or malformed.
+    """
+    try:
+        metadata = getattr(request, "metadata", None) or {}
+        core_state = metadata.get("core_coherence_state")
+        return resolve_core_coherence(core_coherence_state=core_state)
+    except Exception:
+        return resolve_core_coherence()
+
+
 def _resolve_s4_audit_metadata(
     jepa_assessment: "JEPAGovernanceAssessment",
     diagnostic_context: SovereignDiagnosticContext,
@@ -987,6 +1009,12 @@ class GovernanceService:
         # Step 5c3: Resolve Phase S4 Guna anomaly signals.
         guna_anomaly_resolution = _resolve_guna_anomaly_signal(jepa_assessment)
 
+        # Step 5c4: Resolve Phase C2 core pipeline coherence state.
+        #   Bridges the pipeline's rich CoherenceState (241+ fields) into
+        #   a bounded governance signal view. Fail-safe: if absent,
+        #   zero penalty and no escalation bias.
+        core_coherence_resolution = _resolve_core_coherence_state(request)
+
         # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
@@ -994,13 +1022,14 @@ class GovernanceService:
         # Phase 1: bounded entropy confidence penalty.
         # Phase S2: bounded insight confidence penalty + health awareness.
         # Phase S4: aggregate sovereign penalty cap (0.20) prevents
-        # entropy + insight + guna from stacking beyond 0.20.
+        # entropy + insight + guna + core coherence from stacking beyond 0.20.
         # All penalties are non-positive (stricter-only).
         sovereign_penalty = min(
             0.20,
             entropy_resolution.confidence_penalty
             + insight_resolution.confidence_penalty
-            + guna_anomaly_resolution.confidence_penalty,
+            + guna_anomaly_resolution.confidence_penalty
+            + core_coherence_resolution.confidence_penalty,
         )
         effective_confidence = max(
             0.0,
@@ -1061,6 +1090,17 @@ class GovernanceService:
         # Phase S4: Guna collapse escalation bias (stricter-only).
         # If Guna collapse detected, bump escalation by one level.
         if guna_anomaly_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase C2: Core coherence drift escalation bias (stricter-only).
+        # If critical/severe drift detected in pipeline CoherenceState,
+        # bump escalation by one level (cap at confirm, not halt).
+        if core_coherence_resolution.escalation_bias:
             _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
             _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
             current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
@@ -1263,6 +1303,12 @@ class GovernanceService:
             previous_bhava=None,  # Cross-call tracking not yet implemented
         )
 
+        # Step 7f: Build Phase C2 core coherence audit dict
+        core_coherence_dict = (
+            core_coherence_resolution.to_audit_dict()
+            if core_coherence_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1342,6 +1388,13 @@ class GovernanceService:
                 "sovereign_guna_stagnation": guna_anomaly_resolution.stagnation,
                 "sovereign_guna_confidence_penalty": guna_anomaly_resolution.confidence_penalty,
                 "sovereign_guna_escalation_bias": guna_anomaly_resolution.escalation_bias,
+                # Phase C2: Core pipeline coherence state provenance
+                "core_coherence_available": core_coherence_resolution.available,
+                "core_coherence_score": core_coherence_resolution.coherence_score,
+                "core_coherence_persona_drift": core_coherence_resolution.persona_drift,
+                "core_coherence_drift_risk_band": core_coherence_resolution.drift_risk_band,
+                "core_coherence_confidence_penalty": core_coherence_resolution.confidence_penalty,
+                "core_coherence_escalation_bias": core_coherence_resolution.escalation_bias,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -1351,6 +1404,7 @@ class GovernanceService:
             sovereign_guna_anomalies=sovereign_guna_anomalies_dict,
             sovereign_bhava_transition=bhava_transition_dict,
             sovereign_governor_telemetry=governor_telemetry_dict,
+            core_coherence=core_coherence_dict,
         )
         self._persist_audit_event(audit_event)
 

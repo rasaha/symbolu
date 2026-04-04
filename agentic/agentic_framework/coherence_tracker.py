@@ -1,5 +1,6 @@
 """
-Coherence Tracking Component
+Coherence Tracking Component — Governance-Native Turn-Level Tracker
+===================================================================
 
 Tracks conversation-level coherence metrics externally.
 Inspired by Symbolu Coherence Engine (37+ metrics, sliding window).
@@ -18,6 +19,35 @@ INVARIANTS:
 - INV-COH-2: Deterministic (same inputs -> same outputs)
 - INV-COH-3: Append-only (history never deleted)
 - INV-COH-4: Sliding window creates new state
+
+RELATIONSHIP TO CORE PIPELINE CoherenceState
+=============================================
+This module is the **governance-native** coherence tracker. It computes its
+own 7 metrics (internal_consistency, goal_alignment, volatility, etc.) from
+generation output at each turn. It runs entirely within the agentic framework,
+with no pipeline dependency.
+
+The pipeline has its own richer coherence state:
+``agentic.core.coherence.coherence_state.CoherenceState`` (241+ fields),
+which is bridged into governance via the dedicated adapter:
+``agentic.agentic_framework.signal_adapters.coherence_state_adapter``.
+
+These two systems are **complementary, not duplicates**:
+
+- **This module** (``coherence_tracker``):
+    Computes governance-level coherence from generation output.
+    Consumed by ``agent.py``, ``safety_contract.py``.
+    Owned by the governance layer.
+
+- **Core CoherenceState adapter** (``coherence_state_adapter``):
+    Reads pipeline-level coherence/drift/UCF/continuity signals.
+    Contributes bounded confidence penalty + escalation bias.
+    Provides audit enrichment from pipeline depth.
+
+Neither replaces the other. ``coherence_tracker`` answers "is this
+conversation coherent from the governance perspective?" while the core
+adapter answers "what does the pipeline's deeper analysis say about
+coherence, drift, and stability?"
 """
 
 from __future__ import annotations

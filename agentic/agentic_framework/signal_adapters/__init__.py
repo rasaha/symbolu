@@ -40,6 +40,10 @@ from agentic.agentic_framework.signal_adapters.guna_anomaly_adapter import (
     resolve_guna_anomaly,
     GunaAnomalyResolution,
 )
+from agentic.agentic_framework.signal_adapters.coherence_state_adapter import (
+    resolve_core_coherence,
+    CoreCoherenceResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -57,4 +61,6 @@ __all__ = [
     "SovereignHealthResolution",
     "resolve_guna_anomaly",
     "GunaAnomalyResolution",
+    "resolve_core_coherence",
+    "CoreCoherenceResolution",
 ]
