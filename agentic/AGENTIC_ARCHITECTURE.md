@@ -1,9 +1,10 @@
-# Sovereign & Core Integration Architecture
+# Agentic Architecture: Signal Integration & Policy Control Plane
 
-> **Version:** 2.0.0 | **Updated:** 2026-04-04
+> **Version:** 3.0.0 | **Updated:** 2026-04-04
 >
-> This document describes the two completed integration tracks that connect
-> external signal sources to the agentic governance runtime:
+> This document describes the three completed internal tracks that connect
+> external signal sources and policy infrastructure to the agentic governance
+> runtime:
 >
 > - **Sovereign track (S1–S4 + activation patch):** Bridges sovereign model
 >   signals (entropy, health, insight, diagnostics, guna anomalies, bhava
@@ -12,18 +13,27 @@
 >   (coherence state, UCF consciousness, generation gate, predictive drift,
 >   identity resonance, adaptive continuity, counterfactual sandbox) into
 >   governance.
+> - **Policy track (P0–P4 + closure patch):** Builds the profile-backed
+>   policy computation, simulation/comparison, lifecycle/deployment, and
+>   read-only backend control-plane layer that sits alongside governance.
 >
-> Both tracks follow the same **bridge-first, never-direct** architecture
-> principle and the same signal adapter pattern (frozen Resolution, pure
-> function, fail-closed, bounded penalty, stricter-only).
+> **Sovereign and Core** follow a **bridge-first, never-direct** architecture
+> and feed signals into the governance runtime decision path.
+>
+> **Policy** follows a **layered backend** architecture: typed profile
+> foundations → runtime policy engines → service wrapper → simulation →
+> lifecycle/deployment → read-only control-plane queries.
+>
+> All three tracks are **closed as internal layers**. None yet constitutes a
+> full external API product, dashboard UI, or tenant-scoped admin platform.
 >
 > For the full governance architecture (Layers 1–8, domain policy, shadow AI,
 > etc.), see [`docs/governance/AGENTIC_ARCHITECTURE.md`](../docs/governance/AGENTIC_ARCHITECTURE.md).
 >
-> This document focuses specifically on how sovereign and core pipeline signals
-> reach the agentic governance runtime, what is live, what is conditional,
-> what is audit-only, what is replay/simulation-only, and what remains future
-> work.
+> This document focuses on how sovereign signals, core pipeline signals, and
+> policy infrastructure reach the agentic governance runtime — what is live,
+> what is conditional, what is audit-only, what is simulation-only, what is
+> backend/control-plane-only, and what remains future work.
 
 ---
 
@@ -114,6 +124,51 @@ layered bridge architecture with two parallel input tracks:
   └─────────────────────────────────────────────────────────────────┘
 ```
 
+```
+  POLICY TRACK (P0–P4)
+  ====================
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  P0: PROFILE FOUNDATIONS                                     │
+  │    DomainProfile (frozen typed schema, 40+ fields)           │
+  │    ProfileRegistry (singleton, 4 builtins)                   │
+  │    domain_profiles.py (get_domain_profile() entry point)     │
+  │    layer_visibility_policy.py → governance_service.py        │
+  │    provisional facades (governance_binding, preferences,     │
+  │    licensing) — dormant by design                            │
+  └──────────────────────┬───────────────────────────────────────┘
+                         │
+                         ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  P1/P2: RUNTIME ENGINES + SIMULATION                         │
+  │    policy_engine.py → compute_policy_flags() [live runtime]  │
+  │    session_policy.py → compute_session_policy_flags()        │
+  │    trading_guardrail_engine.py → compute_trading_guardrails()│
+  │    interaction_modes.py → resolve_interaction_mode()         │
+  │    policy_simulation.py → simulate/compare [sim-only]        │
+  │    PolicyService → structured wrapper + audit                │
+  └──────────────────────┬───────────────────────────────────────┘
+                         │
+                         ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  P3: LIFECYCLE / DEPLOYMENT                                  │
+  │    PolicyLifecycleManager (in-memory state machine)          │
+  │    DRAFT → VALIDATED → ACTIVE → SUPERSEDED → ARCHIVED       │
+  │    stage / validate / activate / rollback                    │
+  │    approval-ready payload hooks (not full execution)         │
+  │    simulation_summary linked to deployment records           │
+  └──────────────────────┬───────────────────────────────────────┘
+                         │
+                         ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  P4: BACKEND CONTROL PLANE (read-only)                       │
+  │    PolicyControlPlane — operator query surface                │
+  │    system snapshot / domain status / health report            │
+  │    deployment history / approval history / simulation history │
+  │    tenant_id passthrough (preparation, not full scoping)     │
+  └──────────────────────────────────────────────────────────────┘
+```
+
 **Key boundaries:**
 
 1. **Sovereign boundary:** The `sovereign/` package (with its `__init__.py` that
@@ -133,6 +188,15 @@ layered bridge architecture with two parallel input tracks:
    (`counterfactual_bridge.py`) is NOT imported by `governance_service.py`. It
    exists solely for downstream replay, approval-workflow what-if analysis, and
    audit simulation tools.
+
+4. **Policy boundary:** The `policy/` package is a self-contained backend layer.
+   `governance_service.py` has two touchpoints: (a) `check_layer_visibility()`
+   uses `layer_visibility_policy.py` for RBAC, (b) `get_policy_service()` lazily
+   creates a `PolicyService` for audit retrieval. Policy engines
+   (`compute_policy_flags`, etc.) are also called directly by pipeline consumers
+   outside of `PolicyService`. Policy lifecycle (P3) and control-plane (P4)
+   have no production callers yet — they are ready for future API/dashboard
+   integration.
 
 ---
 
@@ -551,6 +615,165 @@ mocks. They prove that:
 
 ---
 
+## P0–P4 Policy Productization Phases
+
+The policy track builds the profile-backed policy computation, simulation,
+lifecycle, and backend control-plane layer. Unlike the sovereign/core tracks
+which feed signals into the governance decision path, the policy track provides
+**domain-specific policy computation, operational tooling, and backend
+queryability** as a self-contained internal layer.
+
+### Phase P0: Domain Profile Externalization Foundation
+
+**Scope:** Replace hardcoded dict-based domain profiles with a typed, versioned,
+registry-backed profile system. Wire layer visibility into governance. Clarify
+dormant facades.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `DomainProfile` | Frozen dataclass (40+ fields), dict-compatible backward access | Live, default-on |
+| `ProfileRegistry` | Singleton with 4 builtins (trading, therapy, identity, generic) | Live, default-on |
+| `domain_profiles.py` | `get_domain_profile()` public API over registry | Live, default-on |
+| `layer_visibility_policy.py` | Deterministic RBAC via `ExposureGate` | Live via `governance_service.py` |
+| `governance_binding.py` | Provisional facade, zero runtime consumers | Dormant (provisional) |
+| `preferences.py` | Provisional facade, bypassed by `policy_engine.py` | Dormant (provisional) |
+| `licensing/__init__.py` | Provisional facade, no license gates exist | Dormant (provisional) |
+
+**Key design:** `DomainProfile` supports both `profile.min_coherence` and
+`profile["min_coherence"]` access, preserving backward compatibility. All
+existing consumers continue to work without changes.
+
+### Phase P1: Policy Service / Runtime Exposure
+
+**Scope:** Wrap all policy engines in a structured, auditable service boundary.
+Expose interaction mode, session policy, and trading guardrails as
+governance-ready backend outputs.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `PolicyService` | Service wrapper with structured result envelopes | Service/backend |
+| `compute_policy()` | Wraps `compute_policy_flags()` with metadata + audit | Service/backend |
+| `resolve_interaction_mode()` | Interaction mode with override precedence | Service/backend |
+| `compute_session_policy()` | Session-level policy computation | Service/backend |
+| `compute_trading_guardrails()` | Trading risk guardrails | Service/backend |
+| In-memory audit log | Max 1000 entries, decision_id hashing, non-persistent | Service/backend |
+| `GovernanceService` integration | Lazy `get_policy_service()` + `get_policy_audit_log()` | Live (read-only) |
+
+**Caller reality:** `PolicyService.compute_policy()` wraps
+`compute_policy_flags()` with audit/metadata. Some pipeline consumers call
+`compute_policy_flags()` directly, bypassing the service wrapper. Both paths
+use the same `ProfileRegistry` and produce identical flags. The audit log is
+only populated when callers use the service wrapper.
+
+### Phase P2: Simulation-Friendly Parameterization
+
+**Scope:** Parameterize hardcoded policy thresholds, build simulation/comparison
+paths, make insight-window split operationally explicit.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| 19 parameterized thresholds | Moved from hardcoded to `DomainProfile` fields | Live runtime |
+| `policy_simulation.py` | `simulate_policy()`, `compare_policy()`, session/trading variants | Simulation-only |
+| Threshold extraction | `_extract_thresholds_from_profile()` for session/trading overrides | Simulation-only |
+| Insight-window status metadata | `INSIGHT_WINDOW_STATUS` on both dual paths | Documentation-only |
+
+**Parameterized thresholds (19 fields):**
+
+| Category | Count | Examples |
+|----------|-------|---------|
+| Policy engine rules | 9 | `deep_reflection_max_drift`, `stability_coherence_stable` |
+| Session policy | 7 | `session_coherence_stable`, `session_grounding_drift` |
+| Trading guardrails | 3 | `trading_resonance_floor`, `trading_coherence_floor` |
+
+**Still hardcoded (by design):** VMF/ATH presentation hints (non-critical),
+insight-window canonical v1.0 formula thresholds (locked).
+
+### Phase P3: Policy Lifecycle / Deployment Model
+
+**Scope:** Introduce explicit lifecycle state machine, activation/rollback,
+approval hooks, deployment records with simulation linkage.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `ProfileStatus` enum | DRAFT → VALIDATED → ACTIVE → SUPERSEDED → ARCHIVED | Lifecycle |
+| `DeploymentRecord` | Frozen dataclass with actor/rationale/approval/simulation metadata | Lifecycle |
+| `PolicyLifecycleManager` | `stage` / `validate` / `activate` / `rollback` | Lifecycle |
+| Builtin rollback | Synthetic SUPERSEDED records for builtins on first replacement | Lifecycle |
+| `request_activation_approval()` | Approval-ready payload (not full execution) | Lifecycle |
+| `simulation_summary` linkage | Flows from validate → activate, queryable | Lifecycle |
+
+**State is in-memory only.** All lifecycle history (deployment records,
+candidates) is lost on process restart. Durable persistence is future work.
+
+**Approval integration is payload/hook-ready.** `request_activation_approval()`
+produces structured payloads but does not create or track approvals. Integration
+with an external approval workflow is left to the caller.
+
+### Phase P4: Backend Control Plane (Read-Only)
+
+**Scope:** Expose operator-ready query surfaces for policy state, health,
+deployment/approval/simulation history.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `PolicyControlPlane` | Read-only query surface over registry + lifecycle + audit | Control-plane |
+| `get_system_snapshot()` | All-domains view with builtin/custom/fallback counts | Control-plane |
+| `get_domain_status()` | Per-domain active profile, candidate, deployment info | Control-plane |
+| `get_health_report()` | Stale candidate detection, fallback domain warnings | Control-plane |
+| `get_active_profiles_summary()` | Lightweight all-domains active profile view | Control-plane |
+| `get_deployment_history()` | Filtered deployment records | Control-plane |
+| `get_approval_history()` | Lifecycle audit entries (filtered by event type) | Control-plane |
+| `get_simulation_history()` | Records with attached simulation summaries | Control-plane |
+| `tenant_id` passthrough | All surfaces accept tenant_id (preparation only) | Future |
+
+**All P4 queries are read-only and audit-neutral** — they do not create audit
+entries or modify state.
+
+**Tenant_id is passthrough only.** The parameter exists on all query interfaces
+as preparation for future tenant-scoping, but no filtering or scoping logic is
+implemented.
+
+---
+
+## P Closure Patch: Audit Findings Resolution
+
+A strict post-integration audit of P0-P4 identified three gaps. All were
+resolved in a focused closure patch.
+
+### Finding 1: No End-to-End Lifecycle → Policy Output Proof
+
+**Problem:** Tests verified that activation changed the `ProfileRegistry` profile
+object, but no test proved that `compute_policy_flags()` actually produced
+different output after activation, or that rollback reverted the output.
+
+**Fix:** Three end-to-end tests in `TestLifecyclePolicyOutputProof`:
+1. Activate a lenient profile → verify `needs_grounding` changes from True to
+   False → rollback → verify it reverts to True
+2. Activate a strict profile → verify `stability_status` changes → rollback →
+   verify it reverts
+3. Same proof through `PolicyService.compute_policy()` (service path)
+
+### Finding 2: Fragile Builtin Profile Detection
+
+**Problem:** `PolicyControlPlane._is_builtin_profile()` used a hardcoded set
+`{"trading", "therapy", "identity", "generic"}` that could drift if builtins
+were added or renamed.
+
+**Fix:** Replaced with `_get_builtin_profiles()` which derives builtins from a
+fresh `ProfileRegistry()` snapshot (the authoritative source).
+
+### Finding 3: Weak Simulation/Comparison Assertions
+
+**Problem:** Several P2 tests only verified that `changed_flags` existed as a
+key, not that it contained the expected flags or that flag values differed in
+the expected direction.
+
+**Fix:** Strengthened comparison tests to verify actual flag values
+(`baseline.needs_grounding=True`, `candidate.needs_grounding=False`), verify
+specific changed flag names, and verify exact deployment counts.
+
+---
+
 ## Live vs Conditional: The Truth Table
 
 Not all signals are always active. The system has four activation tiers,
@@ -623,6 +846,48 @@ The counterfactual bridge (`counterfactual_bridge.py`) is not imported by
 | `previous_bhava` tracking | Cross-request bhava transition history | Hardcoded to `None` |
 | Deeper sovereign model internals | Per-layer attention weights, gradient norms, etc. | Intentionally excluded |
 | Live counterfactual analysis | Real-time what-if during authorize | Intentionally deferred |
+
+### Policy Track: Capability Classification
+
+The policy track capabilities span six distinct tiers — from live runtime
+through to future work. This table classifies every major policy capability.
+
+| Capability | Tier | Description |
+|------------|------|-------------|
+| `compute_policy_flags()` | **Live runtime** | Called by pipeline consumers on every policy evaluation |
+| `compute_session_policy_flags()` | **Live runtime** | Called with session summary data |
+| `compute_trading_guardrails()` | **Live runtime** | Called with trading context data |
+| `resolve_interaction_mode()` | **Live runtime** | Domain + override → active mode |
+| `get_domain_profile()` | **Live runtime** | Registry lookup (fallback to generic) |
+| `ExposureGate.evaluate()` | **Live runtime** | RBAC layer visibility, wired into governance |
+| `DomainProfile` threshold fields | **Live runtime** | 19 P2 thresholds used by policy engines |
+| `PolicyService.compute_policy()` | **Service/backend** | Structured wrapper with audit (optional caller path) |
+| `PolicyService` audit log | **Service/backend** | In-memory, max 1000 entries, non-persistent |
+| `GovernanceService.get_policy_audit_log()` | **Service/backend** | Read-only retrieval from attached PolicyService |
+| `simulate_policy()` | **Simulation-only** | Evaluate policy under alternate profile |
+| `compare_policy()` | **Simulation-only** | Side-by-side baseline vs candidate diff |
+| `simulate_session_policy()` | **Simulation-only** | Session policy with threshold overrides |
+| `simulate_trading_guardrails()` | **Simulation-only** | Trading guardrails with threshold overrides |
+| `PolicyLifecycleManager.stage_candidate()` | **Lifecycle** | Stage candidate profile (DRAFT) |
+| `PolicyLifecycleManager.validate_candidate()` | **Lifecycle** | Mark validated, attach simulation |
+| `PolicyLifecycleManager.activate()` | **Lifecycle** | Promote to registry, supersede previous |
+| `PolicyLifecycleManager.rollback()` | **Lifecycle** | Revert to previous active profile |
+| `request_activation_approval()` | **Lifecycle** | Approval-ready payload (not execution) |
+| `DeploymentRecord` history | **Lifecycle** | In-memory deployment event records |
+| `PolicyControlPlane.get_system_snapshot()` | **Control-plane** | All-domains policy state overview |
+| `PolicyControlPlane.get_domain_status()` | **Control-plane** | Per-domain status query |
+| `PolicyControlPlane.get_health_report()` | **Control-plane** | Stale candidates, fallback warnings |
+| `PolicyControlPlane.get_deployment_history()` | **Control-plane** | Filtered deployment records |
+| `PolicyControlPlane.get_approval_history()` | **Control-plane** | Lifecycle audit entries |
+| `PolicyControlPlane.get_simulation_history()` | **Control-plane** | Records with simulation summaries |
+| `tenant_id` on all P4 surfaces | **Future** | Passthrough parameter, no scoping logic |
+| Durable persistence for lifecycle state | **Future** | Currently in-memory only |
+| Full approval workflow execution | **Future** | Currently payload/hook-ready only |
+| External governance API / dashboard | **Future** | No HTTP endpoints, no UI |
+| Insight-window consolidation | **Future** | Two active paths, consolidation deferred |
+| `governance_binding.py` promotion | **Future** | Provisional facade, zero consumers |
+| `preferences.py` promotion | **Future** | Provisional facade, bypassed by policy_engine |
+| `licensing/__init__.py` promotion | **Future** | Provisional facade, no license gates |
 
 ---
 
@@ -876,6 +1141,63 @@ This is intentional: not every signal justifies governance authority.
 Promoting audit-only signals to behavior-affecting status would require
 rigorous justification and new bounded adapter logic.
 
+### Policy Track Limitations
+
+The policy track (P0–P4) is closed as an internal backend/control-plane layer,
+not as a full external product. The following limitations are known and
+intentional:
+
+| Limitation | Details | Status |
+|-----------|---------|--------|
+| **In-memory lifecycle state** | All `PolicyLifecycleManager` history and candidates are lost on process restart. No database or file persistence. | Future work |
+| **In-memory audit log** | `PolicyService` audit log is capped at 1000 entries with silent eviction. Not persistent. | Future work |
+| **Approval is payload-only** | `request_activation_approval()` produces structured payloads but does not execute or track approvals end-to-end. | Future work |
+| **No production P3/P4 callers** | Lifecycle management and control-plane queries are tested but have no production callers outside tests. Ready for API/dashboard integration. | Future work |
+| **Service-vs-direct compute** | `PolicyService.compute_policy()` wraps `compute_policy_flags()` with audit. Some consumers call `compute_policy_flags()` directly, bypassing audit. Both produce identical flags. | By design |
+| **Dual insight-window paths** | `insight_window_gating.py` (policy-engine path) and `insight_window/` (pipeline-native P32 path) coexist with different schemas. Both active, consolidation deferred. | Future work |
+| **Dormant provisional facades** | `governance_binding.py`, `preferences.py`, `licensing/__init__.py` are re-export facades with zero runtime consumers. Honestly marked "provisional." | By design (defer/remove later) |
+| **Tenant scoping** | `tenant_id` parameter exists on all P4 query surfaces as passthrough. No filtering, scoping, or tenant management logic. | Future work |
+| **No external API** | No HTTP endpoints, REST/GraphQL API, or dashboard UI. Policy layer is internal-only. | Future work |
+
+### How the Three Tracks Connect
+
+The sovereign, core, and policy tracks serve complementary roles in the broader
+governance architecture:
+
+```
+  SOVEREIGN TRACK (S1–S4)     CORE TRACK (C1–C4)        POLICY TRACK (P0–P4)
+  ─────────────────────       ──────────────────         ───────────────────
+  signal extraction +         signal extraction +        domain-specific policy
+  bounded governance          bounded governance         computation, simulation,
+  enrichments                 enrichments                lifecycle, control-plane
+
+        │                          │                           │
+        │ confidence penalties     │ confidence penalties      │ policy flags
+        │ escalation biases        │ generation gate           │ session policy
+        │ audit metadata           │ audit metadata            │ trading guardrails
+        │                          │                           │ interaction modes
+        ▼                          ▼                           │
+  ┌──────────────────────────────────────────┐                │
+  │  GovernanceService.authorize()           │                │
+  │  (live governance decision path)         │◀───────────────┘
+  │                                          │   layer visibility
+  │  Produces: ALLOW / DENY / ESCALATE       │   policy audit log
+  │  + enriched AuditEvent                   │
+  └──────────────────────────────────────────┘
+
+  The policy track also provides independent capabilities:
+  - Policy simulation/comparison (standalone, not via governance)
+  - Lifecycle management (stage/validate/activate/rollback)
+  - Backend control-plane queries (health, history, snapshots)
+```
+
+**Key distinction:** Sovereign and core tracks feed **signals into the
+governance decision path** (confidence adjustments, escalation biases,
+generation gate enforcement). The policy track provides **domain-specific
+policy computation and operational tooling** that sits alongside governance.
+Only `layer_visibility_policy.py` and the policy audit log directly connect
+to `governance_service.py`.
+
 ---
 
 ## Test Evidence
@@ -891,6 +1213,15 @@ rigorous justification and new bounded adapter logic.
 | `test_jepa_governance.py` | ~100+ | JEPA composite, regimes, governance service integration | Sovereign |
 | `test_phase_c4_predictive_and_counterfactual.py` | 45 | C4 adapter contracts, P35/P36/P37, counterfactual bridge | Core |
 | `test_closure_e2e_authorize.py` | 31 | E2E authorize proving C2/C3/C4, aggregate cap, generation gate | Core |
+| `test_policy_engine.py` | 31 | Policy engine rules, thresholds, boundary conditions | Policy |
+| `test_policy_p0.py` | 45 | Schema, registry, backward compat, layer visibility | Policy |
+| `test_policy_p1.py` | 49 | Service wrapper, audit logging, interaction mode | Policy |
+| `test_policy_p2.py` | 47 | Simulation paths, comparison, threshold parameterization | Policy |
+| `test_policy_p3.py` | 59 | Lifecycle transitions, activation/rollback, E2E output proof | Policy |
+| `test_policy_p4.py` | 58 | Control-plane queries, health report, tenant passthrough | Policy |
+| `test_session_policy.py` | 20 | Session stability, grounding, reflection | Policy |
+| `test_trading_formula_guardrails.py` | 22 | Trading risk thresholds, boundary conditions | Policy |
+| `test_phase15_interaction_modes.py` | 35 | Interaction mode resolution, override precedence | Policy |
 
 ### What the Sovereign E2E Tests Prove
 
@@ -951,6 +1282,51 @@ The `test_closure_e2e_authorize.py` tests prove C1-C4 signals are live:
 - No tests cover real core pipeline output objects (tests use duck-typed
   synthetic fixtures)
 
+### What the Policy Tests Prove
+
+The policy test suite (366 tests across 9 files) proves:
+
+1. **Profile foundation** — `DomainProfile` dict-compatible access, registry
+   CRUD, builtin fallback, JSON round-trip, immutability.
+
+2. **Runtime policy engines** — All 9 policy rules produce correct flags for
+   boundary conditions. Stability classification, grounding triggers, and
+   interaction mode resolution verified with exact value assertions.
+
+3. **Parameterization** — 19 thresholds produce identical behavior to pre-P2
+   hardcoded values when using defaults. Custom thresholds measurably change
+   policy output.
+
+4. **Simulation correctness** — `simulate_policy()` with custom profile changes
+   `needs_grounding`. `compare_policy()` produces correct `changed_flags` with
+   verified flag value directions (baseline `True`, candidate `False`).
+
+5. **Lifecycle state machine** — All valid/invalid transitions tested. Activation
+   updates registry. Rollback restores previous profile. Candidate cleared after
+   activation. Approval payload has correct structure and values.
+
+6. **End-to-end lifecycle → policy output proof** — Activating a custom profile
+   changes `compute_policy_flags()` output (verified on `needs_grounding` and
+   `stability_status`). Rolling back reverts the output to baseline. Proven both
+   through direct engine calls and through `PolicyService.compute_policy()`.
+
+7. **Control-plane queries** — System snapshot returns all domains. Health report
+   detects stale candidates and fallback domains. Deployment/approval/simulation
+   history queries work with filtered results. Tenant_id passes through.
+
+8. **Backward compatibility** — Each phase (P1-P4) includes regression tests
+   verifying prior phase exports, registry behavior, and policy engine output
+   remain unchanged.
+
+### What Is NOT Tested (Policy)
+
+- No tests verify lifecycle state persistence (state is in-memory only)
+- No tests verify approval workflow execution (payload-only)
+- No tests cover concurrent lifecycle operations (single-threaded only)
+- No boundary-condition tests at exact threshold values (e.g., 0.5499 vs 0.5500)
+- No tests verify that specific production callers use `PolicyService` vs direct
+  `compute_policy_flags()` (this depends on consumer code)
+
 ---
 
 ## File Reference
@@ -981,12 +1357,34 @@ The `test_closure_e2e_authorize.py` tests prove C1-C4 signals are live:
 | `agentic_framework/signal_adapters/predictive_signals_adapter.py` | C4 | No | P35+P36+P37 signals |
 | `agentic_framework/signal_adapters/counterfactual_bridge.py` | C4 | No | Replay/simulation bridge |
 
-### Shared Files (both tracks)
+### Policy Track Files (by phase)
+
+| File | Phase | Purpose |
+|------|-------|---------|
+| `policy/profile_schema.py` | P0 | `DomainProfile`, `ProfileRegistry`, singleton |
+| `policy/domain_profiles.py` | P0 | `get_domain_profile()` public API |
+| `policy/layer_visibility_policy.py` | P0 | RBAC `ExposureGate`, wired into governance |
+| `policy/governance_binding.py` | P0 | Provisional facade (dormant) |
+| `policy/preferences.py` | P0 | Provisional facade (dormant) |
+| `policy/licensing/__init__.py` | P0 | Provisional facade (dormant) |
+| `policy/policy_engine.py` | P0+P2 | `compute_policy_flags()` — 9 rules, parameterized thresholds |
+| `policy/interaction_modes.py` | P0 | `resolve_interaction_mode()` cascade |
+| `policy/session_policy.py` | P0+P2 | `compute_session_policy_flags()` — 4 rules, parameterized |
+| `policy/trading_guardrail_engine.py` | P0+P2 | `compute_trading_guardrails()` — 3 risk rules, parameterized |
+| `policy/insight_window_gating.py` | P0 | Insight window (policy-engine path), canonical v1.0 |
+| `policy/insight_window/__init__.py` | P0 | Insight window (pipeline-native P32 path) |
+| `policy/policy_service.py` | P1+P3+P4 | `PolicyService` — structured wrapper + audit + lifecycle + CP |
+| `policy/policy_simulation.py` | P2 | `simulate_policy()`, `compare_policy()`, session/trading variants |
+| `policy/policy_lifecycle.py` | P3 | `PolicyLifecycleManager`, `DeploymentRecord`, `ProfileStatus` |
+| `policy/policy_control_plane.py` | P4 | `PolicyControlPlane`, `PolicyHealthReport`, `PolicyDomainStatus` |
+| `policy/__init__.py` | P0–P4 | Public exports, version 1.5.0 |
+
+### Shared Files (all tracks)
 
 | File | Phases | Purpose |
 |------|--------|---------|
 | `agentic_framework/governance_models.py` | S1+patch, C4 | Request/response models, audit event fields |
-| `agentic_framework/governance_service.py` | S1–S4+patch, C1–C4+closure | Decision engine, penalty cap, all resolver wiring |
+| `agentic_framework/governance_service.py` | S1–S4+patch, C1–C4+closure, P0+P1 | Decision engine, penalty cap, layer visibility, policy audit |
 | `agentic_framework/signal_adapters/__init__.py` | S1–S4, C1–C4 | Adapter exports |
 
 ### Test Files
@@ -999,3 +1397,12 @@ The `test_closure_e2e_authorize.py` tests prove C1-C4 signals are live:
 | `tests/test_activation_e2e.py` | 8 | E2E sovereign activation proof | Sovereign |
 | `tests/unit/core/test_phase_c4_predictive_and_counterfactual.py` | 45 | C4 adapter + bridge contracts | Core |
 | `tests/unit/core/test_closure_e2e_authorize.py` | 31 | E2E core wiring + gate + cap | Core |
+| `tests/unit/policy/test_policy_engine.py` | ~70 | Policy engine rules, boundary conditions | Policy |
+| `tests/unit/policy/test_policy_p0.py` | ~35 | Schema, registry, layer visibility, facades | Policy |
+| `tests/unit/policy/test_policy_p1.py` | ~40 | Service wrapper, audit, interaction mode | Policy |
+| `tests/unit/policy/test_policy_p2.py` | ~50 | Simulation, comparison, parameterization | Policy |
+| `tests/unit/policy/test_policy_p3.py` | ~59 | Lifecycle, activation/rollback, E2E output proof | Policy |
+| `tests/unit/policy/test_policy_p4.py` | ~58 | Control-plane, health, tenant passthrough | Policy |
+| `tests/unit/policy/test_session_policy.py` | ~18 | Session stability, grounding | Policy |
+| `tests/unit/policy/test_trading_formula_guardrails.py` | ~22 | Trading risk thresholds | Policy |
+| `tests/unit/policy/test_phase15_interaction_modes.py` | ~24 | Interaction mode resolution | Policy |
