@@ -384,6 +384,17 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase S3-safety: Readiness checker signal
+    readiness_check: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Readiness checker signal at decision time: multi-criterion "
+            "readiness status (READY/NOT_READY/DEGRADED), plasticity, "
+            "stability, pending escalations, confidence_penalty, "
+            "escalation_bias. Bridged via readiness_adapter (Phase S3)."
+        ),
+    )
+
     # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
     # NOTE: This field is INTENTIONALLY never populated by
     # GovernanceService.authorize(). It exists for downstream replay,

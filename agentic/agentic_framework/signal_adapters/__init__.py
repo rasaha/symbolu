@@ -74,6 +74,10 @@ from agentic.agentic_framework.signal_adapters.plasticity_adapter import (
     resolve_plasticity_signal,
     PlasticityResolution,
 )
+from agentic.agentic_framework.signal_adapters.readiness_adapter import (
+    resolve_readiness_signal,
+    ReadinessResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -114,4 +118,7 @@ __all__ = [
     # Plasticity gate (S2)
     "resolve_plasticity_signal",
     "PlasticityResolution",
+    # Readiness checker (S3)
+    "resolve_readiness_signal",
+    "ReadinessResolution",
 ]

@@ -129,6 +129,10 @@ from agentic.agentic_framework.signal_adapters.plasticity_adapter import (
     resolve_plasticity_signal,
     PlasticityResolution,
 )
+from agentic.agentic_framework.signal_adapters.readiness_adapter import (
+    resolve_readiness_signal,
+    ReadinessResolution,
+)
 from agentic.core.generation_gate import (
     GenerationGate,
     GenerationMode,
@@ -1019,6 +1023,37 @@ def _resolve_plasticity_gate_signal(
         return resolve_plasticity_signal()  # fail-closed
 
 
+# =============================================================================
+# Readiness checker resolution (Phase S3-safety)
+# =============================================================================
+
+def _resolve_readiness_check_signal(
+    plasticity_resolution: PlasticityResolution,
+    core_coherence_resolution: CoreCoherenceResolution,
+    effective_esc_level_value: str,
+) -> ReadinessResolution:
+    """Resolve readiness signal from already-resolved S2/C2 signals.
+
+    Phase S3-safety: Evaluates multi-criterion readiness using:
+    - plasticity from S2 (primary gate criterion)
+    - stability from C2 core coherence
+    - escalation level as proxy for pending escalations
+
+    Fail-closed: if plasticity is unavailable, readiness cannot be
+    assessed → returns available=False with zero penalty.
+    """
+    try:
+        return resolve_readiness_signal(
+            plasticity=plasticity_resolution.plasticity,
+            coherence_score=core_coherence_resolution.coherence_score,
+            semantic_stability=core_coherence_resolution.semantic_stability,
+            escalation_level=effective_esc_level_value,
+        )
+
+    except Exception:
+        return resolve_readiness_signal()  # fail-closed
+
+
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
     gate_decision: ConfidenceGateDecision,
@@ -1518,6 +1553,45 @@ class GovernanceService:
             if bumped > current_severity:
                 effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
 
+        # Phase S3-safety: Readiness checker — multi-criterion readiness gate.
+        #   Evaluates whether the system is ready to act based on:
+        #   - Plasticity (from S2) — is the gate open enough?
+        #   - Stability (from C2) — is the system coherent?
+        #   - Pending escalations — are there blocking escalations?
+        #   NOT_READY → penalty 0.03 + escalation bias.
+        #   DEGRADED → penalty 0.02, no escalation.
+        #   READY → zero penalty.
+        #   Fail-closed: if plasticity unavailable, zero penalty.
+        readiness_resolution = _resolve_readiness_check_signal(
+            plasticity_resolution,
+            core_coherence_resolution,
+            effective_esc_level.value,
+        )
+
+        # Apply readiness penalty to sovereign aggregate
+        # (additive, bounded within existing 0.20 cap via re-capping)
+        if readiness_resolution.confidence_penalty > 0:
+            sovereign_penalty = min(
+                0.20,
+                sovereign_penalty + readiness_resolution.confidence_penalty,
+            )
+            effective_confidence = max(
+                0.0,
+                gate_decision.confidence.overall
+                + jepa_assessment.confidence_adjustment
+                - sovereign_penalty,
+            )
+
+        # Phase S3-safety: Readiness escalation bias (stricter-only).
+        # If NOT_READY, bump escalation by one level (cap at confirm).
+        if readiness_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
         # Phase C3: Generation gate enforcement (fail-closed).
         # If the action is generative and the gate blocks it, override
         # the governance decision to DENY. Non-generative actions are
@@ -1757,6 +1831,12 @@ class GovernanceService:
             if plasticity_resolution.available else None
         )
 
+        # Step 7l: Build Phase S3-safety readiness check audit dict
+        readiness_check_dict = (
+            readiness_resolution.to_audit_dict()
+            if readiness_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1878,6 +1958,12 @@ class GovernanceService:
                 "plasticity_value": plasticity_resolution.plasticity,
                 "plasticity_confidence_penalty": plasticity_resolution.confidence_penalty,
                 "plasticity_escalation_bias": plasticity_resolution.escalation_bias,
+                # Phase S3-safety: Readiness checker provenance
+                "readiness_available": readiness_resolution.available,
+                "readiness_status": readiness_resolution.status,
+                "readiness_ready": readiness_resolution.ready,
+                "readiness_confidence_penalty": readiness_resolution.confidence_penalty,
+                "readiness_escalation_bias": readiness_resolution.escalation_bias,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -1893,6 +1979,7 @@ class GovernanceService:
             predictive_signals=predictive_signals_dict,
             ontology_balance=ontology_balance_dict,
             plasticity_gate=plasticity_gate_dict,
+            readiness_check=readiness_check_dict,
         )
         self._persist_audit_event(audit_event)
 
