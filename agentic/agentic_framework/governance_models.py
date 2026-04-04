@@ -330,6 +330,26 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase C3: UCF consciousness stability signal
+    ucf_signal: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Unified Consciousness Formula signal at decision time: "
+            "ucf_score, stability_band, contributing_factors, confidence. "
+            "Bridged via ucf_adapter (Phase C3)."
+        ),
+    )
+
+    # Phase C3: Generation gate state at decision time
+    generation_gate: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Generation gate state at decision time: gate_status, "
+            "generation_mode, gate_affected_decision. "
+            "Integrated via generation gate check (Phase C3)."
+        ),
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """

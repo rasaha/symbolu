@@ -44,6 +44,10 @@ from agentic.agentic_framework.signal_adapters.coherence_state_adapter import (
     resolve_core_coherence,
     CoreCoherenceResolution,
 )
+from agentic.agentic_framework.signal_adapters.ucf_adapter import (
+    resolve_ucf_signal,
+    UCFResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -63,4 +67,6 @@ __all__ = [
     "GunaAnomalyResolution",
     "resolve_core_coherence",
     "CoreCoherenceResolution",
+    "resolve_ucf_signal",
+    "UCFResolution",
 ]
