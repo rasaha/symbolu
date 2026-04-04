@@ -1045,7 +1045,13 @@ class TestGovernanceServiceJEPAEffectiveValues:
         gate = svc.gate.evaluate(signals, req.tool_name or req.action_type)
         raw_confidence = gate.confidence.overall
         jepa_adj = resp.audit_event.request_snapshot["jepa_confidence_adjustment"]
-        expected = max(0.0, raw_confidence + jepa_adj)
+        entropy_penalty = resp.audit_event.request_snapshot.get(
+            "entropy_confidence_penalty", 0.0
+        ) or 0.0
+        insight_penalty = resp.audit_event.request_snapshot.get(
+            "sovereign_insight_confidence_penalty", 0.0
+        ) or 0.0
+        expected = max(0.0, raw_confidence + jepa_adj - entropy_penalty - insight_penalty)
         assert abs(resp.confidence_score - expected) < 0.001
 
     def test_confidence_never_negative(self):

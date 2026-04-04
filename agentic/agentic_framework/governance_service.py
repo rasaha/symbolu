@@ -85,6 +85,14 @@ from agentic.agentic_framework.signal_adapters.entropy_adapter import (
     resolve_entropy_signal,
     EntropyResolution,
 )
+from agentic.agentic_framework.signal_adapters.insight_adapter import (
+    resolve_insight_signal,
+    InsightResolution,
+)
+from agentic.agentic_framework.signal_adapters.sovereign_health_adapter import (
+    resolve_sovereign_health,
+    SovereignHealthResolution,
+)
 from agentic.agentic_framework.signal_adapters.session_enrichment_adapter import (
     resolve_session_enrichment,
     SessionEnrichmentResolution,
@@ -541,6 +549,56 @@ def _build_sovereign_telemetry(
         return None
 
 
+def _resolve_sovereign_health_signal(
+    jepa_assessment: "JEPAGovernanceAssessment",
+    entropy_resolution: EntropyResolution,
+) -> SovereignHealthResolution:
+    """Resolve sovereign health signals from JEPA and entropy data.
+
+    Phase S2: Extracts health context from existing governance signals.
+    Returns a safe fallback if signals are insufficient.
+    """
+    try:
+        entropy_val = entropy_resolution.combined_entropy
+        gc = jepa_assessment.jepa_composite.ontology.confidence
+        return resolve_sovereign_health(
+            entropy=entropy_val,
+            guna_coherence=gc,
+        )
+    except Exception:
+        return resolve_sovereign_health()
+
+
+def _resolve_insight_signal(
+    jepa_assessment: "JEPAGovernanceAssessment",
+) -> InsightResolution:
+    """Resolve insight gate signals from JEPA assessment data.
+
+    Phase S2: Extracts insight-relevant metrics from existing JEPA signals.
+    Returns a safe fallback if signals are insufficient.
+    """
+    try:
+        ontology = jepa_assessment.jepa_composite.ontology
+        vritti = jepa_assessment.jepa_composite.vritti
+        # Map vritti name to index for insight gate
+        _VRITTI_NAME_TO_IDX = {
+            "pramana": 0, "viparyaya": 1, "vikalpa": 2,
+            "smrti": 3, "nidra": 4,
+        }
+        vritti_idx = _VRITTI_NAME_TO_IDX.get(
+            vritti.primary_vritti.lower() if vritti.primary_vritti else "", 0
+        )
+        return resolve_insight_signal(
+            r_acc=ontology.confidence,
+            s_acc=ontology.confidence * 0.95,  # approximate S-acc from ontology
+            guna_coherence=ontology.confidence,
+            authority=jepa_assessment.jepa_composite.integrated_confidence,
+            vritti=vritti_idx,
+        )
+    except Exception:
+        return resolve_insight_signal()
+
+
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
     gate_decision: ConfidenceGateDecision,
@@ -829,17 +887,28 @@ class GovernanceService:
         eligible = jepa_result["eligible"]
         jepa_overrode = jepa_result["overrode"]
 
-        # Step 5c: Apply JEPA override fields to confidence, execution
+        # Step 5c: Resolve Phase S2 sovereign signals (health + insight).
+        #   These are resolved from existing JEPA/entropy data — no new
+        #   external inputs needed. Fail-safe: if resolution fails,
+        #   governance continues with zero penalty/zero bias.
+        sovereign_health_resolution = _resolve_sovereign_health_signal(
+            jepa_assessment, entropy_resolution,
+        )
+        insight_resolution = _resolve_insight_signal(jepa_assessment)
+
+        # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
         #
-        # Phase 1: Also apply bounded entropy confidence penalty.
-        # Entropy penalty is always non-positive (stricter-only).
+        # Phase 1: bounded entropy confidence penalty.
+        # Phase S2: bounded insight confidence penalty + health awareness.
+        # All penalties are non-positive (stricter-only).
         effective_confidence = max(
             0.0,
             gate_decision.confidence.overall
             + jepa_assessment.confidence_adjustment
-            - entropy_resolution.confidence_penalty,
+            - entropy_resolution.confidence_penalty
+            - insight_resolution.confidence_penalty,
         )
 
         effective_exec_mode = gate_decision.execution.mode
@@ -860,6 +929,26 @@ class GovernanceService:
             _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
             if _ESC_SEVERITY.get(jepa_esc, 0) > _ESC_SEVERITY.get(gate_esc, 0):
                 effective_esc_level = EscalationLevel(jepa_esc)
+
+        # Phase S2: Sovereign health escalation bias (stricter-only).
+        # If sovereign alert is LOCKDOWN_ACTIVE, bump escalation by one level.
+        if sovereign_health_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 3)
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase S2: Insight confirmation pressure (stricter-only).
+        # If insight gate is eligible but release blocked, bump escalation.
+        if insight_resolution.confirmation_pressure:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
 
         effective_requires_human = (
             gate_decision.escalation.requires_human
@@ -1012,6 +1101,34 @@ class GovernanceService:
             jepa_assessment, vritti_resolution,
         )
 
+        # Step 7c: Build Phase S2 audit dicts (health + insight)
+        sovereign_health_dict = (
+            {
+                "alert_state": sovereign_health_resolution.alert_state,
+                "lockdown_count": sovereign_health_resolution.lockdown_count,
+                "entropy_status": sovereign_health_resolution.entropy_status,
+                "inertial_brake_active": sovereign_health_resolution.inertial_brake_active,
+                "escalation_bias": sovereign_health_resolution.escalation_bias,
+                "caution_bias": sovereign_health_resolution.caution_bias,
+                "reason_codes": list(sovereign_health_resolution.reason_codes),
+                "source_detail": sovereign_health_resolution.source_detail,
+            }
+            if sovereign_health_resolution.available else None
+        )
+        sovereign_insight_dict = (
+            {
+                "eligible": insight_resolution.eligible,
+                "can_release": insight_resolution.can_release,
+                "stab_score": round(insight_resolution.stab_score, 4),
+                "risk_score": round(insight_resolution.risk_score, 4),
+                "confidence_penalty": insight_resolution.confidence_penalty,
+                "confirmation_pressure": insight_resolution.confirmation_pressure,
+                "reason_codes": list(insight_resolution.reason_codes),
+                "source_detail": insight_resolution.source_detail,
+            }
+            if insight_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1071,9 +1188,20 @@ class GovernanceService:
                 "session_temporal_tense": session_enrichment.temporal_tense,
                 "session_confidence_adjustment": session_enrichment.confidence_adjustment,
                 "session_enrichment_detail": session_enrichment.source_detail,
+                # Phase S2: Sovereign health + insight provenance
+                "sovereign_health_available": sovereign_health_resolution.available,
+                "sovereign_health_alert": sovereign_health_resolution.alert_state,
+                "sovereign_health_escalation_bias": sovereign_health_resolution.escalation_bias,
+                "sovereign_insight_available": insight_resolution.available,
+                "sovereign_insight_eligible": insight_resolution.eligible,
+                "sovereign_insight_can_release": insight_resolution.can_release,
+                "sovereign_insight_confidence_penalty": insight_resolution.confidence_penalty,
+                "sovereign_insight_confirmation_pressure": insight_resolution.confirmation_pressure,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
+            sovereign_health=sovereign_health_dict,
+            sovereign_insight=sovereign_insight_dict,
         )
         self._persist_audit_event(audit_event)
 

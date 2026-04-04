@@ -261,6 +261,22 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase S2: Sovereign health and insight gate signals
+    sovereign_health: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Sovereign health state at decision time: alert state, "
+            "entropy classification, inertial brake status."
+        ),
+    )
+    sovereign_insight: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Sovereign insight gate evaluation at decision time: "
+            "eligibility, release status, stability/risk scores."
+        ),
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """
