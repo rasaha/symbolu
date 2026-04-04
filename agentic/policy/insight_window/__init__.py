@@ -170,3 +170,21 @@ __version__ = P32_VERSION
 
 # Integration path marker — identifies which insight window system this is
 _INSIGHT_WINDOW_PATH = "pipeline_native"
+
+# Policy Phase P2: Canonical status metadata for operational clarity.
+# Queryable by tooling, simulation, and migration scripts.
+INSIGHT_WINDOW_STATUS = {
+    "path": "pipeline_native",
+    "canonical": True,
+    "schema": "InsightWindowEnvelope",
+    "caller": "p32_integration.py::maybe_run_p32",
+    "output_key": "PipelineContext.p32",
+    "status": "active",
+    "consolidation_target": True,
+    "version": "1.0",
+    "notes": (
+        "This is the pipeline-native insight window system (P32). "
+        "A parallel policy-engine-facing system exists in insight_window_gating.py. "
+        "Both are active; consolidation is planned for a future phase."
+    ),
+}

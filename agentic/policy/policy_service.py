@@ -153,9 +153,14 @@ class PolicyService:
             org_id=org_id,
         )
 
+        # P2: include profile identity for traceability
+        effective_profile = get_domain_profile(domain)
+
         result = {
             "flags": flags,
             "domain": domain,
+            "profile_id": effective_profile.profile_id,
+            "profile_version": effective_profile.profile_version,
             "version": P1_VERSION,
             "timestamp": ts.isoformat(),
         }
@@ -377,6 +382,103 @@ class PolicyService:
             "version": P1_VERSION,
             "timestamp": ts.isoformat(),
         }
+
+    # -----------------------------------------------------------------
+    # P2: Simulation support
+    # -----------------------------------------------------------------
+
+    def simulate_policy(
+        self,
+        unified: Dict[str, Any],
+        domain: str = "generic",
+        profile: Optional[Any] = None,
+        user_mode_override: Optional[str] = None,
+        admin_mode_override: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Simulate policy flag computation under an alternate profile.
+
+        Delegates to policy_simulation.simulate_policy().
+
+        Args:
+            unified: Unified output dict
+            domain: Domain identifier
+            profile: Optional DomainProfile override
+            user_mode_override: Optional mode override
+            admin_mode_override: Optional admin mode override
+
+        Returns:
+            Simulation result dict with flags, profile_id, etc.
+        """
+        from .policy_simulation import simulate_policy
+        return simulate_policy(
+            unified=unified,
+            domain=domain,
+            profile=profile,
+            user_mode_override=user_mode_override,
+            admin_mode_override=admin_mode_override,
+        )
+
+    def compare_policy(
+        self,
+        unified: Dict[str, Any],
+        domain: str,
+        candidate_profile: Any,
+        user_mode_override: Optional[str] = None,
+        admin_mode_override: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Compare policy outputs between default and candidate profiles.
+
+        Delegates to policy_simulation.compare_policy().
+
+        Returns:
+            Comparison result with baseline, candidate, changed_flags
+        """
+        from .policy_simulation import compare_policy
+        return compare_policy(
+            unified=unified,
+            domain=domain,
+            candidate_profile=candidate_profile,
+            user_mode_override=user_mode_override,
+            admin_mode_override=admin_mode_override,
+        )
+
+    def simulate_session_policy(
+        self,
+        session_summary: Any,
+        profile: Optional[Any] = None,
+        thresholds: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Simulate session policy under alternate thresholds.
+
+        Delegates to policy_simulation.simulate_session_policy().
+        """
+        from .policy_simulation import simulate_session_policy
+        return simulate_session_policy(
+            session_summary=session_summary,
+            profile=profile,
+            thresholds=thresholds,
+        )
+
+    def simulate_trading_guardrails(
+        self,
+        summary: Any,
+        profile: Optional[Any] = None,
+        thresholds: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Simulate trading guardrails under alternate thresholds.
+
+        Delegates to policy_simulation.simulate_trading_guardrails().
+        """
+        from .policy_simulation import simulate_trading_guardrails
+        return simulate_trading_guardrails(
+            summary=summary,
+            profile=profile,
+            thresholds=thresholds,
+        )
 
     # -----------------------------------------------------------------
     # P1-D: Audit log

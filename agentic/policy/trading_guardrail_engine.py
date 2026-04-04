@@ -91,6 +91,7 @@ def compute_trading_guardrails(
     motivation: Any,
     intent_arc: Any,
     identity_signature: Any,
+    thresholds: Optional[dict] = None,
 ) -> TradingGuardrailFlags:
     """
     Compute trading guardrails from session state and formula metrics.
@@ -149,6 +150,12 @@ def compute_trading_guardrails(
     max_negative_delta_smi = _safe_get_float(summary, "max_negative_delta_smi", 0.12)
     max_volatility_allowed = _safe_get_float(summary, "max_volatility_allowed", 0.60)
 
+    # Policy Phase P2: allow simulation overrides for secondary thresholds
+    t = thresholds or {}
+    resonance_floor = t.get("trading_resonance_floor", 0.45)
+    coherence_floor = t.get("trading_coherence_floor", 0.55)
+    drift_floor = t.get("trading_drift_floor", 0.45)
+
     # Initialize flags
     flags = TradingGuardrailFlags()
 
@@ -157,8 +164,8 @@ def compute_trading_guardrails(
     # ========================================================================
     # Trigger when BOTH:
     # - tension_corridor > max_tension_allowed
-    # - resonance_index < 0.45
-    if tension_corridor > max_tension_allowed and resonance_index < 0.45:
+    # - resonance_index < resonance_floor
+    if tension_corridor > max_tension_allowed and resonance_index < resonance_floor:
         flags.high_tension_risk = True
 
     # ========================================================================
@@ -166,8 +173,8 @@ def compute_trading_guardrails(
     # ========================================================================
     # Trigger when BOTH:
     # - delta_smi < -max_negative_delta_smi
-    # - coherence_score_v1 < 0.55
-    if delta_smi < -max_negative_delta_smi and coherence_score_v1 < 0.55:
+    # - coherence_score_v1 < coherence_floor
+    if delta_smi < -max_negative_delta_smi and coherence_score_v1 < coherence_floor:
         flags.negative_momentum_risk = True
 
     # ========================================================================
@@ -175,8 +182,8 @@ def compute_trading_guardrails(
     # ========================================================================
     # Trigger when BOTH:
     # - mapper_volatility_score > max_volatility_allowed
-    # - persona_drift_score > 0.45
-    if mapper_volatility_score > max_volatility_allowed and persona_drift_score > 0.45:
+    # - persona_drift_score > drift_floor
+    if mapper_volatility_score > max_volatility_allowed and persona_drift_score > drift_floor:
         flags.volatility_risk = True
 
     # ========================================================================

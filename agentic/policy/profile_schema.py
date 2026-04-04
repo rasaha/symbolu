@@ -119,6 +119,41 @@ class DomainProfile:
     interaction_mode_default: InteractionMode = InteractionMode.ANALYTICS_ONLY
 
     # ========================================================================
+    # Policy Engine Thresholds — Policy Phase P2
+    #
+    # Previously hardcoded in policy_engine.py, session_policy.py, and
+    # trading_guardrail_engine.py. Now profile-driven for simulation.
+    # Defaults match the original hardcoded values exactly.
+    # ========================================================================
+
+    # policy_engine.py thresholds
+    deep_reflection_max_drift: float = 0.65
+    concrete_coherence_ceiling: float = 0.65
+    concrete_entropy_ceiling: float = 0.60
+    arc_mode_max_drift: float = 0.55
+    coherence_warning_margin: float = 0.10
+
+    # _compute_stability_status thresholds
+    stability_coherence_stable: float = 0.65
+    stability_drift_stable: float = 0.40
+    stability_arc_recovering: float = 0.60
+    stability_drift_recovering: float = 0.55
+
+    # session_policy.py thresholds
+    session_coherence_stable: float = 0.70
+    session_coherence_recovering: float = 0.45
+    session_grounding_drift: float = 0.55
+    session_grounding_semantic: float = 0.45
+    session_reflection_arc: float = 0.55
+    session_reflection_volatility: float = 0.40
+    session_exploratory_arc: float = 0.45
+
+    # trading_guardrail_engine.py thresholds
+    trading_resonance_floor: float = 0.45
+    trading_coherence_floor: float = 0.55
+    trading_drift_floor: float = 0.45
+
+    # ========================================================================
     # Dict-compatible access (backward compatibility)
     # ========================================================================
 
@@ -352,14 +387,33 @@ class ProfileRegistry:
         normalized = domain.lower().strip() if domain else "generic"
         return self._profiles.get(normalized, self._profiles["generic"])
 
-    def register(self, profile: DomainProfile) -> None:
+    def register(
+        self, profile: DomainProfile, domain_id: Optional[str] = None,
+    ) -> None:
         """
         Register a profile in the registry.
 
         Args:
-            profile: DomainProfile to register (keyed by profile_id)
+            profile: DomainProfile to register
+            domain_id: Optional override key (default: profile.profile_id)
         """
-        self._profiles[profile.profile_id] = profile
+        key = domain_id if domain_id is not None else profile.profile_id
+        self._profiles[key] = profile
+
+    def unregister(self, domain_id: str) -> bool:
+        """
+        Remove a profile from the registry.
+
+        Args:
+            domain_id: Domain key to remove
+
+        Returns:
+            True if removed, False if not found
+        """
+        if domain_id in self._profiles:
+            del self._profiles[domain_id]
+            return True
+        return False
 
     def load_from_dict(self, profile_id: str, data: Dict[str, Any]) -> DomainProfile:
         """

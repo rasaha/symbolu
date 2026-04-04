@@ -544,7 +544,7 @@ def compute_policy_flags(
     allow_deep_reflection = (
         profile["allow_lam"] is True
         and coherence_score >= profile["min_coherence"]
-        and persona_drift_score <= 0.65
+        and persona_drift_score <= profile.get("deep_reflection_max_drift", 0.65)
     )
 
     # ========================================================================
@@ -553,8 +553,8 @@ def compute_policy_flags(
     # ========================================================================
     prefer_concrete = (
         "LCM" in profile["prefer_mappers"]
-        and coherence_score < 0.65
-        and normalized_entropy < 0.60
+        and coherence_score < profile.get("concrete_coherence_ceiling", 0.65)
+        and normalized_entropy < profile.get("concrete_entropy_ceiling", 0.60)
     )
 
     # ========================================================================
@@ -564,14 +564,14 @@ def compute_policy_flags(
     prefer_arc_mode = (
         "LAM" in profile["prefer_mappers"]
         and coherence_score >= profile["min_coherence"]
-        and persona_drift_score < 0.55
+        and persona_drift_score < profile.get("arc_mode_max_drift", 0.55)
     )
 
     # ========================================================================
     # RULE 5: coherence_warning
     # True if coherence is significantly below minimum threshold
     # ========================================================================
-    coherence_warning = coherence_score < (profile["min_coherence"] - 0.1)
+    coherence_warning = coherence_score < (profile["min_coherence"] - profile.get("coherence_warning_margin", 0.10))
 
     # ========================================================================
     # RULE 6: stability_status
@@ -581,6 +581,10 @@ def compute_policy_flags(
         coherence_score=coherence_score,
         persona_drift_score=persona_drift_score,
         temporal_arc_score=temporal_arc_score,
+        coherence_stable=profile.get("stability_coherence_stable", 0.65),
+        drift_stable=profile.get("stability_drift_stable", 0.40),
+        arc_recovering=profile.get("stability_arc_recovering", 0.60),
+        drift_recovering=profile.get("stability_drift_recovering", 0.55),
     )
 
     # ========================================================================
@@ -783,6 +787,10 @@ def _compute_stability_status(
     coherence_score: float,
     persona_drift_score: float,
     temporal_arc_score: float,
+    coherence_stable: float = 0.65,
+    drift_stable: float = 0.40,
+    arc_recovering: float = 0.60,
+    drift_recovering: float = 0.55,
 ) -> StabilityStatus:
     """
     Compute stability status from coherence metrics.
@@ -796,16 +804,20 @@ def _compute_stability_status(
         coherence_score: Current coherence score (0-1)
         persona_drift_score: Current persona drift (0-1)
         temporal_arc_score: Temporal arc coherence (0-1)
+        coherence_stable: Coherence threshold for "stable" (default 0.65)
+        drift_stable: Drift ceiling for "stable" (default 0.40)
+        arc_recovering: Arc threshold for "recovering" (default 0.60)
+        drift_recovering: Drift ceiling for "recovering" (default 0.55)
 
     Returns:
         Stability status: "stable", "recovering", or "fragmented"
     """
     # Stable: High coherence + low drift
-    if coherence_score >= 0.65 and persona_drift_score <= 0.40:
+    if coherence_score >= coherence_stable and persona_drift_score <= drift_stable:
         return "stable"
 
     # Recovering: Good temporal arc + moderate drift
-    if temporal_arc_score >= 0.60 and persona_drift_score <= 0.55:
+    if temporal_arc_score >= arc_recovering and persona_drift_score <= drift_recovering:
         return "recovering"
 
     # Fragmented: Everything else

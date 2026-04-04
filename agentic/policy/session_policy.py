@@ -85,7 +85,8 @@ class SessionPolicyFlags:
 
 
 def compute_session_policy_flags(
-    session_summary: Optional[SessionSummary]
+    session_summary: Optional[SessionSummary],
+    thresholds: Optional[dict] = None,
 ) -> Optional[SessionPolicyFlags]:
     """
     Compute trajectory-aware policy flags from SessionSummary.
@@ -147,6 +148,17 @@ def compute_session_policy_flags(
     if session_summary is None:
         return None
 
+    # Resolve thresholds: explicit overrides > defaults
+    # Policy Phase P2: allows simulation under different threshold configs
+    t = thresholds or {}
+    coherence_stable_t = t.get("session_coherence_stable", 0.70)
+    coherence_recovering_t = t.get("session_coherence_recovering", 0.45)
+    grounding_drift_t = t.get("session_grounding_drift", 0.55)
+    grounding_semantic_t = t.get("session_grounding_semantic", 0.45)
+    reflection_arc_t = t.get("session_reflection_arc", 0.55)
+    reflection_volatility_t = t.get("session_reflection_volatility", 0.40)
+    exploratory_arc_t = t.get("session_exploratory_arc", 0.45)
+
     # Extract metrics from summary (use property aliases for clarity)
     coherence_score = session_summary.coherence_score
     persona_drift_score = session_summary.persona_drift_score
@@ -161,9 +173,9 @@ def compute_session_policy_flags(
     recovering = False
     fragmented = False
 
-    if coherence_score >= 0.70:
+    if coherence_score >= coherence_stable_t:
         stable = True
-    elif coherence_score >= 0.45:
+    elif coherence_score >= coherence_recovering_t:
         recovering = True
     else:
         fragmented = True
@@ -173,8 +185,8 @@ def compute_session_policy_flags(
     # ========================================================================
     session_needs_grounding = (
         fragmented
-        or persona_drift_score > 0.55
-        or semantic_stability_score < 0.45
+        or persona_drift_score > grounding_drift_t
+        or semantic_stability_score < grounding_semantic_t
     )
 
     # ========================================================================
@@ -182,8 +194,8 @@ def compute_session_policy_flags(
     # ========================================================================
     session_allow_deep_reflection = (
         stable
-        and temporal_arc_score >= 0.55
-        and mapper_volatility_score <= 0.40
+        and temporal_arc_score >= reflection_arc_t
+        and mapper_volatility_score <= reflection_volatility_t
     )
 
     # ========================================================================
@@ -193,7 +205,7 @@ def compute_session_policy_flags(
         recommended_style = "grounded"
     elif session_allow_deep_reflection:
         recommended_style = "reflective"
-    elif recovering and temporal_arc_score > 0.45:
+    elif recovering and temporal_arc_score > exploratory_arc_t:
         recommended_style = "exploratory"
     else:
         recommended_style = "neutral"

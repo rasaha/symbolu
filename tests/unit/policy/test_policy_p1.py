@@ -549,10 +549,11 @@ class TestGovernanceServicePolicyIntegration(unittest.TestCase):
 class TestP0RegressionFromP1(unittest.TestCase):
     """Ensure P0 functionality is not broken by P1 additions."""
 
-    def test_version_bumped_to_1_2(self):
-        """Package version is 1.2.0 after P1."""
+    def test_version_at_least_1_2(self):
+        """Package version is at least 1.2.0 after P1."""
         from agentic.policy import __version__
-        self.assertEqual(__version__, "1.2.0")
+        major, minor, patch = (int(x) for x in __version__.split("."))
+        self.assertGreaterEqual((major, minor), (1, 2))
 
     def test_p0_exports_still_present(self):
         """P0 exports (DomainProfile, ProfileRegistry) still available."""

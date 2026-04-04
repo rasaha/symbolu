@@ -54,6 +54,14 @@ from .policy_service import (
 )
 from .session_policy import SessionPolicyFlags
 from .trading_guardrail_engine import TradingGuardrailFlags
+from .policy_simulation import (
+    simulate_policy,
+    simulate_session_policy,
+    simulate_trading_guardrails,
+    compare_policy,
+    compare_session_policy,
+    SIM_VERSION,
+)
 
 __all__ = [
     'get_domain_profile',
@@ -71,6 +79,13 @@ __all__ = [
     'P1_VERSION',
     'SessionPolicyFlags',
     'TradingGuardrailFlags',
+    # Policy Phase P2
+    'simulate_policy',
+    'simulate_session_policy',
+    'simulate_trading_guardrails',
+    'compare_policy',
+    'compare_session_policy',
+    'SIM_VERSION',
 ]
 
-__version__ = '1.2.0'
+__version__ = '1.3.0'

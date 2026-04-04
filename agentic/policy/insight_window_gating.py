@@ -70,6 +70,24 @@ Usage:
 # Integration path marker — identifies which insight window system this is
 _INSIGHT_WINDOW_PATH = "policy_engine"
 
+# Policy Phase P2: Canonical status metadata for operational clarity.
+# Queryable by tooling, simulation, and migration scripts.
+INSIGHT_WINDOW_STATUS = {
+    "path": "policy_engine",
+    "canonical": True,
+    "schema": "InsightWindowResult",
+    "caller": "policy_engine.py::compute_policy_flags",
+    "output_key": "insight_window",
+    "status": "active",
+    "consolidation_target": True,
+    "version": "1.1",
+    "notes": (
+        "This is the policy-engine-facing insight window system. "
+        "A parallel pipeline-native system exists in insight_window/. "
+        "Both are active; consolidation is planned for a future phase."
+    ),
+}
+
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
