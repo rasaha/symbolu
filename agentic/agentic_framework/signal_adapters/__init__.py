@@ -57,6 +57,12 @@ from agentic.agentic_framework.signal_adapters.counterfactual_bridge import (
     create_standard_scenarios,
     CounterfactualBridgeResult,
 )
+from agentic.agentic_framework.signal_adapters.ontology_adapter import (
+    resolve_ontology_encoding,
+    resolve_ontology_similarity,
+    OntologyEncodingResolution,
+    OntologySimilarityResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -83,4 +89,9 @@ __all__ = [
     "run_counterfactual_simulation",
     "create_standard_scenarios",
     "CounterfactualBridgeResult",
+    # Ontology (O2)
+    "resolve_ontology_encoding",
+    "resolve_ontology_similarity",
+    "OntologyEncodingResolution",
+    "OntologySimilarityResolution",
 ]
