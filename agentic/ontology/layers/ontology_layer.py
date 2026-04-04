@@ -1,6 +1,15 @@
 """
-Ontological Layer Enumeration
-=============================
+Ontological Layer Enumeration — CANONICAL SOURCE
+=================================================
+
+THIS IS THE SINGLE SOURCE OF TRUTH for OntologicalLayer.
+
+All other modules that need OntologicalLayer must import from here
+(or from the package-level re-export in agentic.ontology.layers).
+
+Canonical import paths:
+    from agentic.ontology.layers.ontology_layer import OntologicalLayer
+    from agentic.ontology.layers import OntologicalLayer
 
 Defines the 12 ontological layers from the patent-exact sequence.
 These layers represent structural projection planes, not semantic categories.

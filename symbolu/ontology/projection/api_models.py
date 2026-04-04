@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Tuple
 
+from symbolu.ontology.layers.ontology_layer import OntologicalLayer  # canonical source
+
 
 # =============================================================================
 # Enums
@@ -25,22 +27,6 @@ class InputRefKind(Enum):
     PHASE5_RESULT = "phase5_result"
     PHASE9_GRAPH = "phase9_graph"
     GENERIC = "generic"
-
-
-class OntologicalLayer(Enum):
-    """12 ontological layers for projection (patent-exact sequence)."""
-    POTENTIAL = 1
-    IDENTITY = 2
-    EXECUTION = 3
-    STRUCTURE = 4
-    COGNITION = 5
-    AGENCY = 6
-    REASONING = 7
-    PURPOSE = 8
-    WITNESSES = 9
-    UNIFYING = 10
-    INTEGRATION = 11
-    ABSOLVING = 12
 
 
 class ProjectionProfile(Enum):
