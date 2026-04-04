@@ -629,5 +629,182 @@ class TestP3BackwardCompat(unittest.TestCase):
         self.assertEqual(_INSIGHT_WINDOW_PATH, "policy_engine")
 
 
+# =============================================================================
+# P3-H: End-to-end lifecycle → policy output → rollback proof
+# =============================================================================
+
+
+class TestLifecyclePolicyOutputProof(unittest.TestCase):
+    """
+    The single most important integration proof for P3:
+
+    Verify that activating a custom profile changes real policy output
+    (compute_policy_flags), and that rolling back restores the original
+    policy behavior — not just the profile object, but the actual flags.
+    """
+
+    def setUp(self):
+        get_profile_registry().reset()
+        self.svc = PolicyService()
+
+    def tearDown(self):
+        get_profile_registry().reset()
+
+    def test_lifecycle_changes_and_reverts_policy_output(self):
+        """
+        Full end-to-end proof:
+        1. Compute baseline policy output for trading domain
+        2. Stage a custom profile with different min_coherence
+        3. Validate it
+        4. Activate it
+        5. Compute policy output again — verify it changed
+        6. Rollback
+        7. Compute policy output again — verify it reverted
+        """
+        from agentic.policy.policy_engine import compute_policy_flags
+
+        # A unified output where coherence is between trading builtin (0.55)
+        # and our custom profile (0.30). This means:
+        #   - Under builtin (min_coherence=0.55): 0.45 < 0.55 → needs_grounding=True
+        #   - Under custom (min_coherence=0.30): 0.45 >= 0.30 → needs_grounding=False
+        unified = _make_unified(coherence_score=0.45)
+
+        # Step 1: Baseline — builtin trading profile (min_coherence=0.55)
+        baseline_flags = compute_policy_flags(unified, domain="trading")
+        self.assertTrue(
+            baseline_flags["needs_grounding"],
+            "Baseline: coherence 0.45 < min_coherence 0.55 → needs_grounding=True",
+        )
+        baseline_stability = baseline_flags["stability_status"]
+
+        # Step 2-4: Stage → Validate → Activate a lenient profile
+        lenient = DomainProfile(
+            profile_id="trading_lenient",
+            profile_version="2.0.0",
+            min_coherence=0.30,
+            max_persona_drift=0.55,
+            max_mapper_volatility=0.55,
+            prefer_mappers=("LCM", "HRM"),
+            style="precise",
+            formula_guardrails_enabled=True,
+            interaction_mode_default=InteractionMode.ANALYTICS_ONLY,
+        )
+        self.svc.stage_candidate("trading", lenient, actor="admin")
+        self.svc.validate_candidate(
+            "trading", actor="admin", rationale="lower coherence floor",
+            simulation_summary={"changed_flags": ["needs_grounding"]},
+        )
+        self.svc.activate_profile(
+            "trading", actor="admin", rationale="deploy lenient thresholds",
+            require_validation=True,
+        )
+
+        # Step 5: Compute policy output — should now be different
+        activated_flags = compute_policy_flags(unified, domain="trading")
+        self.assertFalse(
+            activated_flags["needs_grounding"],
+            "After activation: coherence 0.45 >= min_coherence 0.30 → needs_grounding=False",
+        )
+
+        # Verify the flags actually differ on the key dimension
+        self.assertNotEqual(
+            baseline_flags["needs_grounding"],
+            activated_flags["needs_grounding"],
+            "Activation must change the actual policy output",
+        )
+
+        # Step 6: Rollback
+        self.svc.rollback_profile("trading", actor="ops", rationale="regression")
+
+        # Step 7: Compute policy output — should revert to baseline
+        reverted_flags = compute_policy_flags(unified, domain="trading")
+        self.assertTrue(
+            reverted_flags["needs_grounding"],
+            "After rollback: coherence 0.45 < min_coherence 0.55 → needs_grounding=True (reverted)",
+        )
+        self.assertEqual(
+            baseline_flags["needs_grounding"],
+            reverted_flags["needs_grounding"],
+            "Rollback must restore original policy output",
+        )
+        self.assertEqual(
+            baseline_stability,
+            reverted_flags["stability_status"],
+            "Rollback must restore original stability classification",
+        )
+
+    def test_lifecycle_changes_stability_status_via_threshold(self):
+        """
+        Secondary proof using stability thresholds (not just min_coherence).
+
+        Activate a profile with stricter stability_coherence_stable, verify
+        stability_status changes, then rollback and verify it reverts.
+        """
+        from agentic.policy.policy_engine import compute_policy_flags
+
+        # Coherence 0.70, drift 0.30 → under default thresholds (stable=0.65):
+        #   0.70 >= 0.65 and 0.30 <= 0.40 → stable
+        unified = _make_unified(coherence_score=0.70)
+        baseline = compute_policy_flags(unified, domain="generic")
+        self.assertEqual(baseline["stability_status"], "stable")
+
+        # Raise the stability threshold so 0.70 < 0.80 → not stable
+        strict = DomainProfile(
+            profile_id="strict_generic",
+            profile_version="2.0.0",
+            stability_coherence_stable=0.80,
+            stability_drift_stable=0.25,  # also tighter
+        )
+        self.svc.stage_candidate("generic", strict, actor="admin")
+        self.svc.activate_profile("generic", actor="admin")
+
+        activated = compute_policy_flags(unified, domain="generic")
+        self.assertNotEqual(
+            activated["stability_status"], "stable",
+            "Stricter thresholds should change stability classification",
+        )
+
+        # Rollback
+        self.svc.rollback_profile("generic", actor="ops", rationale="revert")
+        reverted = compute_policy_flags(unified, domain="generic")
+        self.assertEqual(
+            reverted["stability_status"], "stable",
+            "Rollback must restore original stability classification",
+        )
+
+    def test_lifecycle_through_service_compute_policy(self):
+        """
+        Verify that PolicyService.compute_policy() also reflects
+        lifecycle changes (not just direct compute_policy_flags calls).
+        """
+        unified = _make_unified(coherence_score=0.45)
+
+        baseline = self.svc.compute_policy(unified, domain="trading")
+        self.assertTrue(baseline["flags"]["needs_grounding"])
+        self.assertEqual(baseline["profile_id"], "trading")
+
+        lenient = DomainProfile(
+            profile_id="trading_v3",
+            profile_version="3.0.0",
+            min_coherence=0.30,
+            prefer_mappers=("LCM", "HRM"),
+            style="precise",
+            formula_guardrails_enabled=True,
+            interaction_mode_default=InteractionMode.ANALYTICS_ONLY,
+        )
+        self.svc.stage_candidate("trading", lenient, actor="admin")
+        self.svc.activate_profile("trading", actor="admin")
+
+        activated = self.svc.compute_policy(unified, domain="trading")
+        self.assertFalse(activated["flags"]["needs_grounding"])
+        self.assertEqual(activated["profile_id"], "trading_v3")
+        self.assertEqual(activated["profile_version"], "3.0.0")
+
+        self.svc.rollback_profile("trading", actor="ops", rationale="revert")
+        reverted = self.svc.compute_policy(unified, domain="trading")
+        self.assertTrue(reverted["flags"]["needs_grounding"])
+        self.assertEqual(reverted["profile_id"], "trading")
+
+
 if __name__ == "__main__":
     unittest.main()

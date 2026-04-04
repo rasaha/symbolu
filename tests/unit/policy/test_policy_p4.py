@@ -264,8 +264,11 @@ class TestHealthReport(unittest.TestCase):
             mgr.activate(domain, actor="test")
 
         report = cp.get_health_report()
-        # Each activation creates at least draft + superseded + active records
-        self.assertGreater(report["total_deployments"], 0)
+        # Each activation creates: draft + superseded(builtin) + active = 3 records
+        # Two domains = 6 records minimum
+        self.assertGreaterEqual(report["total_deployments"], 6)
+        # Verify custom_count reflects the activated profiles
+        self.assertEqual(report["custom_count"], 2)
 
 
 # =============================================================================

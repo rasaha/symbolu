@@ -411,7 +411,7 @@ class PolicyControlPlane:
         ts = datetime.now(timezone.utc)
         all_profiles = self._registry.all_profiles()
 
-        builtin_ids = {"trading", "therapy", "identity", "generic"}
+        builtin_snapshot = self._get_builtin_profiles()
         builtin_count = 0
         custom_count = 0
         fallback_domains: List[str] = []
@@ -422,7 +422,7 @@ class PolicyControlPlane:
 
         for domain_key, profile in all_profiles.items():
             # Classify builtin vs custom
-            is_builtin = self._is_builtin_profile(domain_key, profile, builtin_ids)
+            is_builtin = self._is_builtin_profile(domain_key, profile, builtin_snapshot)
             if is_builtin:
                 builtin_count += 1
             else:
@@ -501,12 +501,12 @@ class PolicyControlPlane:
             Dict with per-domain active profile info
         """
         all_profiles = self._registry.all_profiles()
-        builtin_ids = {"trading", "therapy", "identity", "generic"}
+        builtin_snapshot = self._get_builtin_profiles()
         profiles = {}
 
         for domain_key, profile in all_profiles.items():
             active_record = self._lifecycle.get_active_record(domain_key)
-            is_builtin = self._is_builtin_profile(domain_key, profile, builtin_ids)
+            is_builtin = self._is_builtin_profile(domain_key, profile, builtin_snapshot)
 
             profiles[domain_key] = {
                 "profile_id": profile.profile_id,
@@ -532,8 +532,8 @@ class PolicyControlPlane:
         self, domain: str, profile: Any,
     ) -> PolicyDomainStatus:
         """Build a PolicyDomainStatus for a domain."""
-        builtin_ids = {"trading", "therapy", "identity", "generic"}
-        is_builtin = self._is_builtin_profile(domain, profile, builtin_ids)
+        builtin_snapshot = self._get_builtin_profiles()
+        is_builtin = self._is_builtin_profile(domain, profile, builtin_snapshot)
 
         # Check for candidate
         candidate = self._lifecycle.get_candidate(domain)
@@ -574,14 +574,32 @@ class PolicyControlPlane:
         )
 
     @staticmethod
+    def _get_builtin_profiles() -> Dict[str, Any]:
+        """
+        Get the authoritative set of builtin profiles by constructing
+        a fresh ProfileRegistry (which loads only builtins).
+
+        This avoids a hardcoded set that could drift if builtins change.
+        """
+        from .profile_schema import ProfileRegistry
+        return ProfileRegistry().all_profiles()
+
+    @classmethod
     def _is_builtin_profile(
-        domain: str, profile: Any, builtin_ids: set,
+        cls, domain: str, profile: Any, builtin_snapshot: Dict[str, Any],
     ) -> bool:
-        """Check if a profile is a builtin default."""
+        """
+        Check if a profile matches its builtin default.
+
+        Compares against a snapshot from a fresh ProfileRegistry to avoid
+        relying on a fragile hardcoded set of builtin domain names.
+        """
+        builtin = builtin_snapshot.get(domain)
+        if builtin is None:
+            return False
         return (
-            domain in builtin_ids
-            and profile.profile_id == domain
-            and profile.profile_version == "1.0.0"
+            profile.profile_id == builtin.profile_id
+            and profile.profile_version == builtin.profile_version
         )
 
     @staticmethod

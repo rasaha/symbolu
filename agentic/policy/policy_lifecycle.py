@@ -155,6 +155,14 @@ class PolicyLifecycleManager:
     Works alongside ProfileRegistry: the registry holds the active
     profile; the lifecycle manager tracks the history and transitions.
 
+    Known Limitations:
+        - All state (history, candidates) is **in-memory only**. A process
+          restart loses all deployment history. Durable persistence is a
+          future concern — not yet implemented by design.
+        - Approval integration is **payload/hook-ready**: request_activation_approval()
+          produces structured payloads suitable for an external approval workflow,
+          but does not execute or track approvals end-to-end.
+
     Thread Safety:
         Append-only history. For concurrent mutation, callers should
         use external synchronization.

@@ -308,24 +308,36 @@ class TestComparePolicy(unittest.TestCase):
         self.assertEqual(result["changed_flags"], [])
 
     def test_different_profiles_show_changes(self):
-        """Different profile surfaces changed flags."""
+        """Different profile surfaces changed flags with correct direction."""
         candidate = DomainProfile(
             profile_id="lenient_trading",
             min_coherence=0.20,  # much more lenient than trading's 0.55
         )
+        # coherence 0.45: below trading min (0.55) but above candidate min (0.20)
         unified = _make_unified(coherence_score=0.45)
         result = compare_policy(unified, domain="trading", candidate_profile=candidate)
         self.assertFalse(result["is_identical"])
         self.assertIn("needs_grounding", result["changed_flags"])
+        # Verify the actual flag values differ in the expected direction
+        self.assertTrue(
+            result["baseline"]["flags"]["needs_grounding"],
+            "Baseline (min_coherence=0.55): 0.45 < 0.55 → needs_grounding=True",
+        )
+        self.assertFalse(
+            result["candidate"]["flags"]["needs_grounding"],
+            "Candidate (min_coherence=0.20): 0.45 >= 0.20 → needs_grounding=False",
+        )
 
-    def test_comparison_has_both_results(self):
-        """Comparison includes baseline and candidate."""
+    def test_comparison_has_both_results_with_real_flags(self):
+        """Comparison includes baseline and candidate with real policy flags."""
         candidate = DomainProfile(profile_id="alt")
         result = compare_policy(_make_unified(), domain="trading", candidate_profile=candidate)
         self.assertIn("baseline", result)
         self.assertIn("candidate", result)
-        self.assertIn("flags", result["baseline"])
-        self.assertIn("flags", result["candidate"])
+        # Verify both contain real policy flag keys, not empty dicts
+        for key in ("needs_grounding", "stability_status", "interaction_mode"):
+            self.assertIn(key, result["baseline"]["flags"])
+            self.assertIn(key, result["candidate"]["flags"])
 
     def test_comparison_serializable(self):
         """Comparison output is JSON-serializable."""
@@ -373,12 +385,19 @@ class TestPolicyServiceSimulation(unittest.TestCase):
         self.assertEqual(result["sim_version"], SIM_VERSION)
 
     def test_compare_policy_method(self):
-        """PolicyService.compare_policy() works."""
-        candidate = DomainProfile(profile_id="alt")
+        """PolicyService.compare_policy() returns structured comparison."""
+        candidate = DomainProfile(
+            profile_id="lenient",
+            min_coherence=0.20,
+        )
+        # coherence 0.45: triggers grounding under trading (0.55) but not lenient (0.20)
         result = self.svc.compare_policy(
-            _make_unified(), domain="trading", candidate_profile=candidate,
+            _make_unified(coherence_score=0.45),
+            domain="trading", candidate_profile=candidate,
         )
         self.assertIn("changed_flags", result)
+        self.assertIn("needs_grounding", result["changed_flags"])
+        self.assertFalse(result["is_identical"])
 
     def test_simulate_session_policy_method(self):
         """PolicyService.simulate_session_policy() works."""

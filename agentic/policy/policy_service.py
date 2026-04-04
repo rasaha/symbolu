@@ -94,11 +94,21 @@ class PolicyService:
     - Interaction mode resolution (resolve_interaction_mode)
     - Session policy computation (compute_session_policy_flags)
     - Trading guardrail computation (compute_trading_guardrails)
+    - Policy lifecycle management (P3: stage/validate/activate/rollback)
+    - Policy control-plane queries (P4: snapshots, health, history)
 
     Every call returns a structured dict with:
     - The computed result (flags, mode, etc.)
     - Metadata (version, timestamp, domain)
     - Audit trail entry (automatically collected)
+
+    Known Limitations:
+        - The audit log is in-memory only (max 1000 entries, no persistence).
+        - compute_policy() wraps compute_policy_flags() with audit/metadata;
+          some pipeline consumers may call compute_policy_flags() directly.
+          Both paths use the same ProfileRegistry and produce identical flags.
+        - Lifecycle state (P3) and control-plane queries (P4) are backed by
+          in-memory stores. See PolicyLifecycleManager for details.
 
     Thread Safety:
         The audit log is append-only. For concurrent access, callers
