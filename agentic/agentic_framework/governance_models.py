@@ -176,6 +176,16 @@ class AuthorizationRequest(BaseModel):
                     "Note: this service never executes actions regardless.",
     )
 
+    # Sovereign projection metadata (optional — from inference bridge)
+    sovereign_projection_metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Optional sovereign inference bridge projection metadata. "
+            "When present, carries reasoning diagnostics, guna anomalies, "
+            "and governor telemetry for S3/S4 governance signals."
+        ),
+    )
+
     # Metadata
     metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata for traceability",
@@ -249,6 +259,65 @@ class AuditEvent(BaseModel):
     # Shadow AI Control Layer fields (populated when shadow policy runs)
     shadow_assessment: Optional[Dict[str, Any]] = Field(
         None, description="Full shadow AI assessment (serialized ShadowAssessment)",
+    )
+
+    # Phase S1: Sovereign telemetry snapshot at decision time
+    sovereign_telemetry: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Sovereign state snapshot at decision time: nexus routing, "
+            "dominant ontological layer, cognitive mode. "
+            "Populated when JEPA assessment includes ontology signals."
+        ),
+    )
+
+    # Phase S2: Sovereign health and insight gate signals
+    sovereign_health: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Sovereign health state at decision time: alert state, "
+            "entropy classification, inertial brake status."
+        ),
+    )
+    sovereign_insight: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Sovereign insight gate evaluation at decision time: "
+            "eligibility, release status, stability/risk scores."
+        ),
+    )
+
+    # Phase S3: Reasoning kernel diagnostics
+    sovereign_diagnostics: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Sovereign reasoning-kernel diagnostics at decision time: "
+            "mauna/silence state, active intervention, logic template, "
+            "OPB lock state, vritti rejection, entropy delta."
+        ),
+    )
+
+    # Phase S4: Guna anomaly signals + advanced sovereign metadata
+    sovereign_guna_anomalies: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Guna anomaly state at decision time: collapse, oscillation, "
+            "stagnation detection, dominant guna, statistics."
+        ),
+    )
+    sovereign_bhava_transition: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Bhava transition audit at decision time: from/to bhava, "
+            "transition probability/penalty, unusual flag."
+        ),
+    )
+    sovereign_governor_telemetry: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "VrittiGovernor telemetry summary at decision time: "
+            "s_drift, coupling, tamas_ratio, brake_reason."
+        ),
     )
 
 

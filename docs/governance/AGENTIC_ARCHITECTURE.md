@@ -1,14 +1,19 @@
 # Agentic Governance Architecture
 
-> **Version:** 4.0.0 | **Updated:** 2026-04-03
+> **Version:** 5.0.0 | **Updated:** 2026-04-04
 >
 > This document describes the governance architecture **as currently built**
 > after Phases 0–4 (signal cleanup, governance rewiring, output modulation,
-> session enrichment, sovereign/inference reconciliation).
+> session enrichment, sovereign/inference reconciliation) and Sovereign
+> Integration Phases S1–S4 + activation patch.
 >
 > Components marked **(planned)** are design-only and not yet implemented.
 > Components marked **(mode-gated)** are built but only active in specific
 > runtime modes or when upstream signals are available.
+>
+> For the detailed sovereign integration architecture (S1–S4 phases, bridge
+> pipeline, activation patch, live-vs-conditional analysis), see
+> [`agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
 
 ---
 
@@ -137,13 +142,24 @@ The governance system is organized into eight built layers:
                              │
                              ▼
   ┌─────────────────────────────────────────────────────────────────┐
-  │  LAYER 7: SOVEREIGN / INFERENCE RECONCILIATION  (Phase 4)       │
+  │  LAYER 7: SOVEREIGN / INFERENCE RECONCILIATION  (Phase 4 + S1-S4)│
   │  Bridges training-time sovereign state to inference runtime      │
   │                                                                  │
   │  Sovereign → inference bridge (128D → 32D projection)            │
   │  Signal reconciliation (multi-source vritti/guna validation)     │
   │  Diagnostic hooks (MirrorBalance, CausalLayer — audit only)      │
   │  Coherence-aware decoder (Appendix F Stage 1 — SOVEREIGN only)   │
+  │                                                                  │
+  │  Sovereign Integration (S1–S4 + activation patch):               │
+  │    S1: shared constants, vritti/entropy adapters, telemetry      │
+  │    S2: sovereign health/insight adapters (bounded penalties)     │
+  │    S3: reasoning-kernel diagnostics via bridge metadata          │
+  │    S4: guna anomaly/bhava prior/governor telemetry integration  │
+  │    Activation: projection_metadata on JEPACompositeSignal,      │
+  │                aggregate penalty cap (0.20)                      │
+  │                                                                  │
+  │  S1/S2: always active (default-on)                               │
+  │  S3/S4: live when sovereign_projection_metadata is present       │
   │                                                                  │
   │  Mode gating:                                                    │
   │    FULL / SAFE: reconciliation + bridge + diagnostics enabled    │
@@ -152,6 +168,11 @@ The governance system is organized into eight built layers:
   │                                                                  │
   │  Modules: inference/manager.py, inference/signal_reconciliation.py│
   │           inference/diagnostic_hooks.py, sovereign/inference_bridge│
+  │           sovereign_bridge.py, signal_adapters/*_adapter.py      │
+  │           sovereign_diagnostics.py, sovereign_guna_anomaly.py    │
+  │           sovereign_bhava_priors.py                               │
+  │                                                                  │
+  │  See: agentic/AGENTIC_ARCHITECTURE.md for full S1–S4 details    │
   └──────────────────────────┬──────────────────────────────────────┘
                              │
                              ▼
@@ -189,9 +210,14 @@ agentic/
 │   ├── olm_bridge.py              12-layer OLM → governance signals & risk
 │   ├── governance_api.py          API entry point for authorization
 │   │
-│   └── signal_adapters/           Phase 2-3 signal integration (Phase 0+)
+│   └── signal_adapters/           Phase 2-3 + S1-S4 signal integration
 │       ├── output_modulation_adapter.py   DHA/guna → E = G×P×T + layer weights
-│       └── session_enrichment_adapter.py  Identity/motivation/temporal → confidence
+│       ├── session_enrichment_adapter.py  Identity/motivation/temporal → confidence
+│       ├── vritti_adapter.py              (S1) Vritti resolution (real > fallback)
+│       ├── entropy_adapter.py             (S1) Entropy resolution (bounded penalty)
+│       ├── sovereign_health_adapter.py    (S2) Sovereign health/entropy/alert
+│       ├── insight_adapter.py             (S2) Insight gate resolution
+│       └── guna_anomaly_adapter.py        (S4) Guna anomaly penalty + escalation
 │
 ├── safety/               CORE   Hard safety constraints & guards
 │   ├── pipeline_guards/           P15 authority, P16 regression, P55 execution boundary
@@ -230,7 +256,10 @@ agentic/
 ├── identity/             INTEGRATE  Identity signature classification (Phase 3)
 ├── motivation/           INTEGRATE  Motivational driver classification (Phase 3)
 ├── sovereign/            INTEGRATE  Cognitive state management (128D tensor)
-│   └── inference_bridge.py          128D → 32D projection (Phase 4)
+│   └── inference_bridge.py          128D → 32D projection + ProjectionMetadata
+├── sovereign_diagnostics.py  INTEGRATE  (S3) Pure-Python diagnostic normalization
+├── sovereign_guna_anomaly.py INTEGRATE  (S4) Pure-Python guna anomaly detection
+├── sovereign_bhava_priors.py INTEGRATE  (S4) Pure-Python bhava transition matrix
 ├── inference/            INTEGRATE  Inference-time orchestration
 │   ├── manager.py                   InferenceManager (Phase 4 mode-gated)
 │   ├── signal_reconciliation.py     Multi-source vritti/guna validation
@@ -358,10 +387,22 @@ agentic/
 │  └────────────────────┬─────────────────────────────────────┘    │
 │                       ▼                                          │
 │  ┌──────────────────────────────────────────────────────────┐    │
-│  │ Step 5c: JEPA OVERRIDE APPLICATION                       │    │
+│  │ Step 5c: JEPA OVERRIDE APPLICATION + SOVEREIGN SIGNALS    │    │
 │  │          Applies confidence adjustment, execution mode    │    │
 │  │          override, escalation override. Each only applied │    │
 │  │          if JEPA is stricter than gate decision.          │    │
+│  │                                                           │    │
+│  │  Sovereign signal resolution (S1–S4):                     │    │
+│  │    Entropy penalty       (S1, max 0.15, always active)    │    │
+│  │    Insight penalty       (S2, max 0.10, always active)    │    │
+│  │    Guna anomaly penalty  (S4, max 0.05, metadata-gated)   │    │
+│  │    Aggregate sovereign penalty = min(0.20, sum)           │    │
+│  │                                                           │    │
+│  │  S3/S4 diagnostics resolved from                          │    │
+│  │  composite.projection_metadata when present:              │    │
+│  │    → SovereignDiagnosticContext (S3)                       │    │
+│  │    → GunaAnomalyResolution (S4)                           │    │
+│  │    → bhava_transition, governor_telemetry (S4, audit-only)│    │
 │  └────────────────────┬─────────────────────────────────────┘    │
 │                       ▼                                          │
 │  ┌──────────────────────────────────────────────────────────┐    │
@@ -833,6 +874,12 @@ snapshots, and shadow AI assessment data in `request_snapshot` for durable
 forensic analysis. Shadow assessment is embedded via `shadow_assessment` and
 `shadow_overrode` fields in `request_snapshot`.
 
+Sovereign integration (S1–S4) adds additional audit fields to `AuditEvent`:
+`sovereign_telemetry` (S1), `sovereign_health` (S2), `sovereign_insight` (S2),
+`sovereign_diagnostics` (S3), `sovereign_guna_anomalies` (S4),
+`sovereign_bhava_transition` (S4), `sovereign_governor_telemetry` (S4).
+These are `None` when their respective signals are not available.
+
 ---
 
 ## Inter-Module Dependency Graph
@@ -863,9 +910,13 @@ forensic analysis. Shadow assessment is embedded via `shadow_assessment` and
             safety_contract  (standalone)
             
             sovereign_bridge → confidence_gate
-                 ▲
-                 │
+                 ▲               ↘ signal_adapters/*
+                 │                   (vritti, entropy, health,
+                 │                    insight, guna_anomaly)
             sovereign/  (128D cognitive state tensor)
+            sovereign_diagnostics.py  (S3, pure Python)
+            sovereign_guna_anomaly.py (S4, pure Python)
+            sovereign_bhava_priors.py (S4, pure Python)
 
             olm_bridge → confidence_gate
                  ▲
@@ -970,6 +1021,10 @@ These are combined into a `JEPACompositeSignal` with:
 - `ontology_vritti_alignment` — how well the structural and cognitive signals agree
 - `integrated_confidence` — joint confidence from both axes
 - `stability` — temporal stability of the composite
+- `projection_metadata` — optional sovereign projection metadata (S3/S4
+  activation patch). When present, enables downstream resolvers to extract
+  reasoning diagnostics, guna anomalies, and governor telemetry from the
+  composite signal
 
 ### What JEPA Does
 
@@ -1006,7 +1061,7 @@ a predicted future state.
 |------|---------|
 | `OntologySignal` | 12-layer weights + primary layer + governance/execution strength |
 | `VrittiSignal` | 5-mode distribution + primary vritti + coherence + score |
-| `JEPACompositeSignal` | Integrated ontology + vritti + alignment + confidence |
+| `JEPACompositeSignal` | Integrated ontology + vritti + alignment + confidence + projection_metadata |
 | `RuntimeProcessState` | What is actually happening (tool, action, risk, agency) |
 | `ResidualSignal` | Semantic–runtime mismatch magnitude + regime |
 | `JEPAGovernanceAssessment` | Full assessment: composite + runtime + residual + regime + overrides |
@@ -1335,6 +1390,12 @@ were added in Phases 0-4.
   Diagnostic hooks       → MirrorBalance, CausalLayer (audit-only)
   Coherence decoder      → Appendix F Stage 1 (SOVEREIGN mode only)
 
+  Sovereign Integration (S1–S4):
+    S1/S2: always-on  → vritti, entropy, health, insight adapters
+    S3/S4: metadata-gated → diagnostics, guna anomaly, bhava, telemetry
+    Aggregate penalty cap: min(0.20, sum_of_penalties)
+    See: agentic/AGENTIC_ARCHITECTURE.md for full details
+
   Mode gating:
     FULL / SAFE      → reconciliation + bridge + diagnostics
     SOVEREIGN        → all above + coherence decoder
@@ -1495,6 +1556,12 @@ These signals enter governance through
 
 Phase 4 bridges the training-time sovereign state representation (128D) to the
 inference runtime (32D) and enables multi-source signal reconciliation.
+
+> **Note:** Phase 4 describes the inference reconciliation path (bridge,
+> signal reconciliation, diagnostic hooks, mode gating). For the deeper
+> sovereign-to-governance integration (S1–S4 phases: shared constants,
+> bounded enrichments, reasoning diagnostics, anomaly detection, and the
+> activation patch), see [`agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
 
 ### Sovereign → Inference Bridge
 
@@ -1659,6 +1726,33 @@ not bugs.
     preset. Semantic coherence integration, experiential state, and other
     advanced inference modules exist as infrastructure but are not on any
     automatic runtime path.
+
+13. **S3/S4 sovereign signals require projection metadata (Sovereign S3/S4).**
+    Reasoning diagnostics (S3) and guna anomaly/bhava/governor signals (S4)
+    are live in the governance path but only activate when
+    `sovereign_projection_metadata` is present on `AuthorizationRequest`.
+    When absent, all S3/S4 resolvers return safe neutral defaults (zero
+    penalty, no escalation, None audit fields). S1/S2 signals (vritti,
+    entropy, health, insight) are always active regardless of metadata.
+    See `agentic/AGENTIC_ARCHITECTURE.md` for the full sovereign integration
+    architecture.
+
+14. **Sovereign-derived penalties have an aggregate cap (Activation Patch).**
+    Entropy (max 0.15) + insight (max 0.10) + guna anomaly (max 0.05)
+    penalties are capped at 0.20 in aggregate. This prevents pathological
+    stacking from multiple noisy sovereign signals. All sovereign effects
+    are stricter-only (penalties ≥ 0, escalation only bumps up).
+
+15. **`previous_bhava` not tracked across requests (Sovereign S4).** Bhava
+    transition priors currently use `previous_bhava=None` — cross-request
+    bhava history is not maintained. Bhava transition audit captures only
+    the current bhava state, not transition quality over time.
+
+16. **Governance does not import PyTorch-heavy sovereign internals.**
+    All sovereign integration is achieved through pure-Python runtime-safe
+    modules and bridge metadata. The `sovereign/` package `__init__.py`
+    eagerly imports torch modules; runtime-safe modules are placed as
+    siblings outside that package to avoid the import chain.
 
 ---
 

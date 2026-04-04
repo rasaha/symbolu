@@ -28,6 +28,18 @@ from agentic.agentic_framework.signal_adapters.session_enrichment_adapter import
     resolve_session_enrichment,
     SessionEnrichmentResolution,
 )
+from agentic.agentic_framework.signal_adapters.insight_adapter import (
+    resolve_insight_signal,
+    InsightResolution,
+)
+from agentic.agentic_framework.signal_adapters.sovereign_health_adapter import (
+    resolve_sovereign_health,
+    SovereignHealthResolution,
+)
+from agentic.agentic_framework.signal_adapters.guna_anomaly_adapter import (
+    resolve_guna_anomaly,
+    GunaAnomalyResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -39,4 +51,10 @@ __all__ = [
     "OutputModulationResolution",
     "resolve_session_enrichment",
     "SessionEnrichmentResolution",
+    "resolve_insight_signal",
+    "InsightResolution",
+    "resolve_sovereign_health",
+    "SovereignHealthResolution",
+    "resolve_guna_anomaly",
+    "GunaAnomalyResolution",
 ]

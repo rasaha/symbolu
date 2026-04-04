@@ -85,6 +85,26 @@ from agentic.agentic_framework.signal_adapters.entropy_adapter import (
     resolve_entropy_signal,
     EntropyResolution,
 )
+from agentic.agentic_framework.signal_adapters.insight_adapter import (
+    resolve_insight_signal,
+    InsightResolution,
+)
+from agentic.agentic_framework.signal_adapters.sovereign_health_adapter import (
+    resolve_sovereign_health,
+    SovereignHealthResolution,
+)
+from agentic.agentic_framework.sovereign_bridge import (
+    SovereignDiagnosticContext,
+    diagnostics_from_projection,
+    GunaAnomalyContext,
+    guna_anomalies_from_projection,
+    bhava_transition_from_diagnostics,
+    governor_telemetry_from_projection,
+)
+from agentic.agentic_framework.signal_adapters.guna_anomaly_adapter import (
+    resolve_guna_anomaly,
+    GunaAnomalyResolution,
+)
 from agentic.agentic_framework.signal_adapters.session_enrichment_adapter import (
     resolve_session_enrichment,
     SessionEnrichmentResolution,
@@ -503,6 +523,167 @@ def _resolve_session_enrichment(
     )
 
 
+def _build_sovereign_telemetry(
+    jepa_assessment: "JEPAGovernanceAssessment",
+    vritti_resolution: Any,
+) -> Optional[Dict[str, Any]]:
+    """Build a sovereign telemetry snapshot from JEPA/Vritti signals.
+
+    Phase S1: Extracts sovereign-relevant metadata from JEPA assessment
+    and formats it as a StateSnapshot-compatible dict. This runs entirely
+    in pure Python — no tensor or PyTorch dependency.
+
+    Returns None if the JEPA assessment lacks ontology signals.
+    """
+    try:
+        from agentic.sovereign.telemetry import StateSnapshot
+        from agentic.sovereign_constants import (
+            ONTOLOGY_TO_NEXUS,
+            NEXUS_MODE_DESCRIPTIONS,
+        )
+
+        ontology = jepa_assessment.jepa_composite.ontology
+        vritti = jepa_assessment.jepa_composite.vritti
+        primary_layer = ontology.primary_layer
+        nexus_pos = ONTOLOGY_TO_NEXUS.get(primary_layer, 6)
+
+        snapshot = StateSnapshot.from_runtime_signals(
+            authority=jepa_assessment.jepa_composite.integrated_confidence,
+            dominant_bhava=primary_layer,
+            bhava_confidence=ontology.confidence,
+            vritti=vritti.primary_vritti,
+            nexus_position=nexus_pos,
+            nexus_mode=NEXUS_MODE_DESCRIPTIONS.get(nexus_pos, "unknown"),
+        )
+        return snapshot.to_audit_dict()
+    except Exception:
+        # Fail-open: if telemetry construction fails, governance continues.
+        return None
+
+
+def _resolve_sovereign_health_signal(
+    jepa_assessment: "JEPAGovernanceAssessment",
+    entropy_resolution: EntropyResolution,
+) -> SovereignHealthResolution:
+    """Resolve sovereign health signals from JEPA and entropy data.
+
+    Phase S2: Extracts health context from existing governance signals.
+    Returns a safe fallback if signals are insufficient.
+    """
+    try:
+        entropy_val = entropy_resolution.combined_entropy
+        gc = jepa_assessment.jepa_composite.ontology.confidence
+        return resolve_sovereign_health(
+            entropy=entropy_val,
+            guna_coherence=gc,
+        )
+    except Exception:
+        return resolve_sovereign_health()
+
+
+def _resolve_diagnostic_context(
+    jepa_assessment: "JEPAGovernanceAssessment",
+) -> SovereignDiagnosticContext:
+    """Resolve sovereign reasoning diagnostics from JEPA assessment.
+
+    Phase S3: Extracts diagnostic context from JEPA composite metadata.
+    Returns a safe fallback if diagnostics are unavailable.
+    """
+    try:
+        composite = jepa_assessment.jepa_composite
+        # JEPA composite may carry projection metadata with diagnostics
+        metadata = getattr(composite, "projection_metadata", None)
+        if metadata is not None:
+            meta_dict = metadata.to_dict() if hasattr(metadata, "to_dict") else metadata
+            return diagnostics_from_projection(projection_metadata=meta_dict)
+        return SovereignDiagnosticContext()
+    except Exception:
+        return SovereignDiagnosticContext()
+
+
+def _resolve_guna_anomaly_signal(
+    jepa_assessment: "JEPAGovernanceAssessment",
+) -> GunaAnomalyResolution:
+    """Resolve Guna anomaly signals from JEPA assessment.
+
+    Phase S4: Extracts Guna anomaly data from JEPA composite metadata.
+    Returns safe fallback if data unavailable.
+    """
+    try:
+        composite = jepa_assessment.jepa_composite
+        metadata = getattr(composite, "projection_metadata", None)
+        if metadata is not None:
+            meta_dict = metadata.to_dict() if hasattr(metadata, "to_dict") else metadata
+            guna_ctx = guna_anomalies_from_projection(projection_metadata=meta_dict)
+            if guna_ctx.available:
+                return resolve_guna_anomaly(guna_ctx.to_audit_dict())
+        return GunaAnomalyResolution()
+    except Exception:
+        return GunaAnomalyResolution()
+
+
+def _resolve_s4_audit_metadata(
+    jepa_assessment: "JEPAGovernanceAssessment",
+    diagnostic_context: SovereignDiagnosticContext,
+    previous_bhava: Optional[str] = None,
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Resolve Phase S4 audit-only metadata.
+
+    Returns:
+        (bhava_transition_dict, governor_telemetry_dict) — both may be None.
+    """
+    # Bhava transition audit (uses previous + current dominant_bhava)
+    current_bhava = diagnostic_context.dominant_bhava if diagnostic_context.available else None
+    bhava_transition = None
+    try:
+        bhava_transition = bhava_transition_from_diagnostics(previous_bhava, current_bhava)
+    except Exception:
+        pass
+
+    # Governor telemetry (from projection metadata)
+    gov_telemetry = None
+    try:
+        composite = jepa_assessment.jepa_composite
+        metadata = getattr(composite, "projection_metadata", None)
+        if metadata is not None:
+            meta_dict = metadata.to_dict() if hasattr(metadata, "to_dict") else metadata
+            gov_telemetry = governor_telemetry_from_projection(meta_dict)
+    except Exception:
+        pass
+
+    return bhava_transition, gov_telemetry
+
+
+def _resolve_insight_signal(
+    jepa_assessment: "JEPAGovernanceAssessment",
+) -> InsightResolution:
+    """Resolve insight gate signals from JEPA assessment data.
+
+    Phase S2: Extracts insight-relevant metrics from existing JEPA signals.
+    Returns a safe fallback if signals are insufficient.
+    """
+    try:
+        ontology = jepa_assessment.jepa_composite.ontology
+        vritti = jepa_assessment.jepa_composite.vritti
+        # Map vritti name to index for insight gate
+        _VRITTI_NAME_TO_IDX = {
+            "pramana": 0, "viparyaya": 1, "vikalpa": 2,
+            "smrti": 3, "nidra": 4,
+        }
+        vritti_idx = _VRITTI_NAME_TO_IDX.get(
+            vritti.primary_vritti.lower() if vritti.primary_vritti else "", 0
+        )
+        return resolve_insight_signal(
+            r_acc=ontology.confidence,
+            s_acc=ontology.confidence * 0.95,  # approximate S-acc from ontology
+            guna_coherence=ontology.confidence,
+            authority=jepa_assessment.jepa_composite.integrated_confidence,
+            vritti=vritti_idx,
+        )
+    except Exception:
+        return resolve_insight_signal()
+
+
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
     gate_decision: ConfidenceGateDecision,
@@ -791,17 +972,41 @@ class GovernanceService:
         eligible = jepa_result["eligible"]
         jepa_overrode = jepa_result["overrode"]
 
-        # Step 5c: Apply JEPA override fields to confidence, execution
+        # Step 5c: Resolve Phase S2 sovereign signals (health + insight).
+        #   These are resolved from existing JEPA/entropy data — no new
+        #   external inputs needed. Fail-safe: if resolution fails,
+        #   governance continues with zero penalty/zero bias.
+        sovereign_health_resolution = _resolve_sovereign_health_signal(
+            jepa_assessment, entropy_resolution,
+        )
+        insight_resolution = _resolve_insight_signal(jepa_assessment)
+
+        # Step 5c2: Resolve Phase S3 reasoning diagnostics.
+        diagnostic_context = _resolve_diagnostic_context(jepa_assessment)
+
+        # Step 5c3: Resolve Phase S4 Guna anomaly signals.
+        guna_anomaly_resolution = _resolve_guna_anomaly_signal(jepa_assessment)
+
+        # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
         #
-        # Phase 1: Also apply bounded entropy confidence penalty.
-        # Entropy penalty is always non-positive (stricter-only).
+        # Phase 1: bounded entropy confidence penalty.
+        # Phase S2: bounded insight confidence penalty + health awareness.
+        # Phase S4: aggregate sovereign penalty cap (0.20) prevents
+        # entropy + insight + guna from stacking beyond 0.20.
+        # All penalties are non-positive (stricter-only).
+        sovereign_penalty = min(
+            0.20,
+            entropy_resolution.confidence_penalty
+            + insight_resolution.confidence_penalty
+            + guna_anomaly_resolution.confidence_penalty,
+        )
         effective_confidence = max(
             0.0,
             gate_decision.confidence.overall
             + jepa_assessment.confidence_adjustment
-            - entropy_resolution.confidence_penalty,
+            - sovereign_penalty,
         )
 
         effective_exec_mode = gate_decision.execution.mode
@@ -823,12 +1028,52 @@ class GovernanceService:
             if _ESC_SEVERITY.get(jepa_esc, 0) > _ESC_SEVERITY.get(gate_esc, 0):
                 effective_esc_level = EscalationLevel(jepa_esc)
 
+        # Phase S2: Sovereign health escalation bias (stricter-only).
+        # If sovereign alert is LOCKDOWN_ACTIVE, bump escalation by one level.
+        if sovereign_health_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 3)
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase S2: Insight confirmation pressure (stricter-only).
+        # If insight gate is eligible but release blocked, bump escalation.
+        if insight_resolution.confirmation_pressure:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase S3: Mauna (silence) protocol confirmation pressure (stricter-only).
+        # If the model is in a withholding state, bump escalation by one level.
+        if diagnostic_context.available and diagnostic_context.mauna_active:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase S4: Guna collapse escalation bias (stricter-only).
+        # If Guna collapse detected, bump escalation by one level.
+        if guna_anomaly_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
         effective_requires_human = (
             gate_decision.escalation.requires_human
             or effective_esc_level in (EscalationLevel.CONFIRM, EscalationLevel.HALT)
         )
 
-        # Step 5d: Domain Semantic Policy Layer
+        # Step 5e: Domain Semantic Policy Layer
         #   Translates the JEPA assessment into domain-specific action mode.
         #   Domain policy can only make things STRICTER, never relax.
         #   If no domain is configured, this step is a no-op.
@@ -967,6 +1212,57 @@ class GovernanceService:
             reasoning=gate_decision.reasoning,
         )
 
+        # Step 7b: Build sovereign telemetry snapshot (Phase S1)
+        #   Derives a lightweight state snapshot from JEPA assessment signals.
+        #   No tensor/PyTorch dependency — uses only float data from JEPA.
+        sovereign_telemetry_dict = _build_sovereign_telemetry(
+            jepa_assessment, vritti_resolution,
+        )
+
+        # Step 7c: Build Phase S2 audit dicts (health + insight)
+        sovereign_health_dict = (
+            {
+                "alert_state": sovereign_health_resolution.alert_state,
+                "lockdown_count": sovereign_health_resolution.lockdown_count,
+                "entropy_status": sovereign_health_resolution.entropy_status,
+                "inertial_brake_active": sovereign_health_resolution.inertial_brake_active,
+                "escalation_bias": sovereign_health_resolution.escalation_bias,
+                "caution_bias": sovereign_health_resolution.caution_bias,
+                "reason_codes": list(sovereign_health_resolution.reason_codes),
+                "source_detail": sovereign_health_resolution.source_detail,
+            }
+            if sovereign_health_resolution.available else None
+        )
+        sovereign_insight_dict = (
+            {
+                "eligible": insight_resolution.eligible,
+                "can_release": insight_resolution.can_release,
+                "stab_score": round(insight_resolution.stab_score, 4),
+                "risk_score": round(insight_resolution.risk_score, 4),
+                "confidence_penalty": insight_resolution.confidence_penalty,
+                "confirmation_pressure": insight_resolution.confirmation_pressure,
+                "reason_codes": list(insight_resolution.reason_codes),
+                "source_detail": insight_resolution.source_detail,
+            }
+            if insight_resolution.available else None
+        )
+
+        # Step 7d: Build Phase S3 diagnostic audit dict
+        sovereign_diagnostics_dict = (
+            diagnostic_context.to_audit_dict()
+            if diagnostic_context.available else None
+        )
+
+        # Step 7e: Build Phase S4 audit dicts (guna anomalies + bhava + governor)
+        sovereign_guna_anomalies_dict = (
+            guna_anomaly_resolution.to_audit_dict()
+            if guna_anomaly_resolution.available else None
+        )
+        bhava_transition_dict, governor_telemetry_dict = _resolve_s4_audit_metadata(
+            jepa_assessment, diagnostic_context,
+            previous_bhava=None,  # Cross-call tracking not yet implemented
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1026,8 +1322,35 @@ class GovernanceService:
                 "session_temporal_tense": session_enrichment.temporal_tense,
                 "session_confidence_adjustment": session_enrichment.confidence_adjustment,
                 "session_enrichment_detail": session_enrichment.source_detail,
+                # Phase S2: Sovereign health + insight provenance
+                "sovereign_health_available": sovereign_health_resolution.available,
+                "sovereign_health_alert": sovereign_health_resolution.alert_state,
+                "sovereign_health_escalation_bias": sovereign_health_resolution.escalation_bias,
+                "sovereign_insight_available": insight_resolution.available,
+                "sovereign_insight_eligible": insight_resolution.eligible,
+                "sovereign_insight_can_release": insight_resolution.can_release,
+                "sovereign_insight_confidence_penalty": insight_resolution.confidence_penalty,
+                "sovereign_insight_confirmation_pressure": insight_resolution.confirmation_pressure,
+                # Phase S3: Reasoning diagnostics provenance
+                "sovereign_diagnostics_available": diagnostic_context.available,
+                "sovereign_diagnostics_mauna_active": diagnostic_context.mauna_active,
+                "sovereign_diagnostics_source": diagnostic_context.source,
+                # Phase S4: Guna anomaly provenance
+                "sovereign_guna_anomaly_available": guna_anomaly_resolution.available,
+                "sovereign_guna_collapse": guna_anomaly_resolution.collapse,
+                "sovereign_guna_oscillation": guna_anomaly_resolution.oscillation,
+                "sovereign_guna_stagnation": guna_anomaly_resolution.stagnation,
+                "sovereign_guna_confidence_penalty": guna_anomaly_resolution.confidence_penalty,
+                "sovereign_guna_escalation_bias": guna_anomaly_resolution.escalation_bias,
             },
             shadow_assessment=shadow_audit,
+            sovereign_telemetry=sovereign_telemetry_dict,
+            sovereign_health=sovereign_health_dict,
+            sovereign_insight=sovereign_insight_dict,
+            sovereign_diagnostics=sovereign_diagnostics_dict,
+            sovereign_guna_anomalies=sovereign_guna_anomalies_dict,
+            sovereign_bhava_transition=bhava_transition_dict,
+            sovereign_governor_telemetry=governor_telemetry_dict,
         )
         self._persist_audit_event(audit_event)
 
@@ -1304,6 +1627,7 @@ class GovernanceService:
             session_id=getattr(request, "session_id", ""),
             actor_id=request.actor_id,
             capabilities=request.capabilities or [],
+            projection_metadata=getattr(request, "sovereign_projection_metadata", None),
         )
 
         return assessment, vritti_resolution, entropy_resolution

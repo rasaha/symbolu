@@ -46,40 +46,19 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from agentic.agentic_framework.confidence_gate import ConfidenceSignals
 
-
-# =============================================================================
-# Sovereign State Slice Indices
-# =============================================================================
-# These match phase_transformer.py constants but are duplicated here to avoid
-# importing torch in the agentic framework (which is pure Python).
-
-BHAVA_START, BHAVA_END = 0, 12
-KOSHA_START, KOSHA_END = 12, 17
-VRITTI_START, VRITTI_END = 17, 22
-GUNA_START, GUNA_END = 22, 28
-RESERVED_START, RESERVED_END = 28, 32
-
-# Vritti index names (within the 5D slice)
-VRITTI_FACT = 0        # Pramana — valid cognition
-VRITTI_ERROR = 1       # Viparyaya — misconception / hallucination
-VRITTI_IMAGINATION = 2  # Vikalpa — conceptualization
-VRITTI_VOID = 3        # Nidra — null state / absence
-VRITTI_MEMORY = 4      # Smriti — recall from weights
-
-# Guna index names (within the 6D slice)
-GUNA_LUCIDITY = 0      # Sattva — clarity
-GUNA_ACTIVITY = 1      # Rajas — dynamism / turbulence
-GUNA_STABILITY = 2     # Tamas — inertia / fixedness
-GUNA_VELOCITY = 3      # Rate of state change
-GUNA_ACCEL = 4         # Acceleration of change
-GUNA_STABLE = 5        # Stability measure
-
-# Kosha index names (within the 5D slice)
-KOSHA_MATERIAL = 0     # Annamaya — surface/syntax
-KOSHA_VITAL = 1        # Pranamaya — flow/energy
-KOSHA_MENTAL = 2       # Manomaya — semantics
-KOSHA_INTELLECTUAL = 3  # Vijnanamaya — wisdom/patterns
-KOSHA_BLISSFUL = 4     # Anandamaya — unity/integration
+# Shared sovereign constants (Phase S1 — single source of truth)
+from agentic.sovereign_constants import (
+    BHAVA_START, BHAVA_END,
+    KOSHA_START, KOSHA_END,
+    VRITTI_START, VRITTI_END,
+    GUNA_START, GUNA_END,
+    RESERVED_START, RESERVED_END,
+    VRITTI_FACT, VRITTI_ERROR, VRITTI_IMAGINATION, VRITTI_VOID, VRITTI_MEMORY,
+    GUNA_LUCIDITY, GUNA_ACTIVITY, GUNA_STABILITY,
+    GUNA_VELOCITY, GUNA_ACCEL, GUNA_STABLE,
+    KOSHA_MATERIAL, KOSHA_VITAL, KOSHA_MENTAL,
+    KOSHA_INTELLECTUAL, KOSHA_BLISSFUL,
+)
 
 
 # =============================================================================
@@ -495,3 +474,255 @@ def coherence_from_sovereign_state(
         prediction_reversal_risk=vritti_signals['prediction_reversal_risk'],
         identity_stability=guna_signals['identity_stability'],
     )
+
+
+# =============================================================================
+# Phase S3: Diagnostic context forwarding
+# =============================================================================
+
+@dataclass
+class SovereignDiagnosticContext:
+    """Forwarded reasoning-kernel diagnostics for governance consumption.
+
+    This is the governance-side view of sovereign reasoning diagnostics.
+    Populated from inference_bridge ProjectionMetadata or from direct
+    kernel diagnostic dicts. All fields are plain Python types.
+
+    Bounded governance effects:
+    - mauna_active → adds caution reason code + confirmation pressure
+    - opb_unstable → informational audit metadata
+    - vritti_rejection → informational audit metadata
+    - All other fields are audit/replay enrichment only
+    """
+    # Mauna / silence
+    mauna_active: bool = False
+
+    # Reasoning mode
+    active_intervention: Optional[str] = None
+    active_logic_template: Optional[str] = None
+
+    # State summary
+    dominant_bhava: Optional[str] = None
+    active_kosha: Optional[str] = None
+    vritti_state: Optional[str] = None
+    vritti_rejection: bool = False
+
+    # OPB stability
+    opb_active_locks: int = 0
+    opb_locked_dims: Tuple[str, ...] = ()
+    opb_unstable: bool = False  # True if dimension churn detected
+
+    # Entropy direction
+    entropy_delta: float = 0.0
+
+    # Provenance
+    source: str = "unknown"
+    available: bool = False
+
+    def to_audit_dict(self) -> Dict[str, Any]:
+        """Serialize for governance audit."""
+        return {
+            "mauna_active": self.mauna_active,
+            "active_intervention": self.active_intervention,
+            "active_logic_template": self.active_logic_template,
+            "dominant_bhava": self.dominant_bhava,
+            "active_kosha": self.active_kosha,
+            "vritti_state": self.vritti_state,
+            "vritti_rejection": self.vritti_rejection,
+            "opb_active_locks": self.opb_active_locks,
+            "opb_locked_dims": list(self.opb_locked_dims),
+            "opb_unstable": self.opb_unstable,
+            "entropy_delta": round(self.entropy_delta, 6),
+            "source": self.source,
+            "available": self.available,
+        }
+
+
+
+# =============================================================================
+# Phase S4: Guna Anomaly Context
+# =============================================================================
+
+@dataclass
+class GunaAnomalyContext:
+    """Forwarded Guna anomaly signals for governance consumption.
+
+    Populated from inference_bridge ProjectionMetadata.guna_anomalies
+    or from direct GunaMonitor output.
+
+    Bounded governance effects:
+    - collapse → confidence penalty (max 0.03) + escalation bias
+    - oscillation → confidence penalty (max 0.02)
+    - stagnation → informational audit metadata only
+    """
+    collapse: bool = False
+    oscillation: bool = False
+    stagnation: bool = False
+    dominant_guna: str = "unknown"
+    anomaly_count: int = 0
+    available: bool = False
+
+    def to_audit_dict(self) -> Dict[str, Any]:
+        """Serialize for governance audit."""
+        return {
+            "collapse": self.collapse,
+            "oscillation": self.oscillation,
+            "stagnation": self.stagnation,
+            "dominant_guna": self.dominant_guna,
+            "anomaly_count": self.anomaly_count,
+            "available": self.available,
+        }
+
+
+def guna_anomalies_from_projection(
+    projection_metadata: Optional[Dict[str, Any]] = None,
+    monitor_output: Optional[Dict[str, Any]] = None,
+) -> GunaAnomalyContext:
+    """Build GunaAnomalyContext from bridge metadata or monitor output.
+
+    Args:
+        projection_metadata: Dict from SovereignProjectionResult.metadata.to_dict()
+            which may contain embedded guna_anomalies.
+        monitor_output: Dict directly from GunaMonitor (check_anomalies + dominant).
+
+    Returns:
+        GunaAnomalyContext. If no data → available=False.
+    """
+    data = None
+
+    # Prefer direct monitor output
+    if monitor_output is not None:
+        data = monitor_output
+    elif projection_metadata is not None:
+        data = projection_metadata.get("guna_anomalies")
+
+    if data is None:
+        return GunaAnomalyContext()
+
+    try:
+        collapse = bool(data.get("collapse", False))
+        oscillation = bool(data.get("oscillation", False))
+        stagnation = bool(data.get("stagnation", False))
+        dominant = str(data.get("dominant_guna", "unknown"))
+        count = sum([collapse, oscillation, stagnation])
+
+        return GunaAnomalyContext(
+            collapse=collapse,
+            oscillation=oscillation,
+            stagnation=stagnation,
+            dominant_guna=dominant,
+            anomaly_count=count,
+            available=True,
+        )
+    except Exception:
+        return GunaAnomalyContext()
+
+
+# =============================================================================
+# Phase S4: Bhava Transition Audit Context
+# =============================================================================
+
+def bhava_transition_from_diagnostics(
+    previous_bhava: Optional[str],
+    current_bhava: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """Evaluate Bhava transition using pure-Python priors.
+
+    Returns audit dict if both bhavas are available, None otherwise.
+    This is audit-only metadata — no governance behavior change.
+    """
+    if previous_bhava is None or current_bhava is None:
+        return None
+
+    try:
+        from agentic.sovereign_bhava_priors import evaluate_bhava_transition
+        audit = evaluate_bhava_transition(previous_bhava, current_bhava)
+        if audit.available:
+            return audit.to_audit_dict()
+        return None
+    except Exception:
+        return None
+
+
+# =============================================================================
+# Phase S4: Governor Telemetry Context
+# =============================================================================
+
+def governor_telemetry_from_projection(
+    projection_metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Extract governor telemetry from bridge metadata.
+
+    Returns the governor telemetry dict if present, None otherwise.
+    This is audit-only metadata — no governance behavior change.
+    """
+    if projection_metadata is None:
+        return None
+    try:
+        telem = projection_metadata.get("governor_telemetry")
+        if telem is not None and isinstance(telem, dict):
+            return dict(telem)
+        return None
+    except Exception:
+        return None
+
+
+# =============================================================================
+# Phase S3: Diagnostic context forwarding (unchanged)
+# =============================================================================
+
+def diagnostics_from_projection(
+    projection_metadata: Optional[Dict[str, Any]] = None,
+    kernel_diagnostics: Optional[Dict[str, Any]] = None,
+    kernel_state: Optional[Dict[str, Any]] = None,
+) -> SovereignDiagnosticContext:
+    """Build SovereignDiagnosticContext from bridge projection or kernel output.
+
+    This is the main entry point for the governance layer to obtain
+    reasoning diagnostics. It accepts multiple source types for flexibility:
+
+    1. projection_metadata: Dict from SovereignProjectionResult.metadata.to_dict()
+       which may contain embedded reasoning_diagnostics.
+    2. kernel_diagnostics: Dict from SovereignReasoningKernel.intervene()['diagnostics'].
+    3. kernel_state: Dict from SovereignReasoningKernel.get_diagnostics().
+
+    If multiple sources are provided, they are merged (kernel > projection).
+
+    Returns:
+        SovereignDiagnosticContext with all available fields.
+        If no data → available=False, all defaults.
+    """
+    if projection_metadata is None and kernel_diagnostics is None and kernel_state is None:
+        return SovereignDiagnosticContext()
+
+    try:
+        from agentic.sovereign_diagnostics import (
+            diagnostics_from_kernel_output,
+            diagnostics_from_bridge_metadata,
+        )
+
+        # Prefer kernel output if available
+        if kernel_diagnostics is not None or kernel_state is not None:
+            diag = diagnostics_from_kernel_output(kernel_diagnostics, kernel_state)
+        elif projection_metadata is not None:
+            diag = diagnostics_from_bridge_metadata(projection_metadata)
+        else:
+            return SovereignDiagnosticContext()
+
+        return SovereignDiagnosticContext(
+            mauna_active=diag.mauna_active,
+            active_intervention=diag.active_intervention,
+            active_logic_template=diag.active_logic_template,
+            dominant_bhava=diag.dominant_bhava,
+            active_kosha=diag.active_kosha,
+            vritti_state=diag.vritti_state,
+            vritti_rejection=diag.vritti_rejection,
+            opb_active_locks=diag.opb_active_locks,
+            opb_locked_dims=diag.opb_locked_dims,
+            opb_unstable=diag.opb_is_unstable,
+            entropy_delta=diag.entropy_delta,
+            source=diag.source,
+            available=True,
+        )
+    except Exception:
+        return SovereignDiagnosticContext()
