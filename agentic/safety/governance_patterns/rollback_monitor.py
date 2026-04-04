@@ -13,6 +13,11 @@ OLM mapping: O12_ABSOLVING (termination boundary), O11_INTEGRATION (audit)
 
 Pattern extracted from cloud_controller.action.rollback.RollbackMonitor,
 rewritten for AI agent governance (no K8s dependencies).
+
+STATUS: ACTIVE — Consumed by rollback_adapter.py (Phase S5-safety).
+GovernanceService.authorize() captures pre-action signal snapshots via
+this monitor when configured. Post-action check() requires external
+caller — no execution lifecycle exists yet. Wired: 2026-04-04.
 """
 
 from __future__ import annotations

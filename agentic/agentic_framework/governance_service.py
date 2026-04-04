@@ -141,6 +141,13 @@ from agentic.safety.governance_patterns.policy_engine import (
     PolicyEngine,
     PolicyConfig,
 )
+from agentic.safety.governance_patterns.rollback_monitor import (
+    RollbackMonitor,
+)
+from agentic.agentic_framework.signal_adapters.rollback_adapter import (
+    resolve_rollback_snapshot,
+    RollbackSnapshotResolution,
+)
 from agentic.core.generation_gate import (
     GenerationGate,
     GenerationMode,
@@ -1211,6 +1218,7 @@ class GovernanceService:
         policy_resolution: Optional[PolicyResolution] = None,
         approval_store: Optional[ApprovalStore] = None,
         agent_policy_engine: Optional[PolicyEngine] = None,
+        rollback_monitor: Optional[RollbackMonitor] = None,
     ):
         """
         Initialize governance service.
@@ -1241,6 +1249,11 @@ class GovernanceService:
                 policy (Phase S4-safety). When provided, allow/deny/blackout/
                 rate-limit rules are evaluated before the governance decision.
                 Fail-safe: if not provided, all actions are allowed by default.
+            rollback_monitor: Optional RollbackMonitor for pre-action signal
+                snapshot capture (Phase S5-safety). When provided, a pre-action
+                signal snapshot is captured at authorize-time and a watch is
+                started. Post-action check() must be called by external caller.
+                Fail-safe: if not provided, no snapshot is captured.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -1272,6 +1285,9 @@ class GovernanceService:
 
         # Agent Policy Engine (Phase S4-safety)
         self._agent_policy_engine: Optional[PolicyEngine] = agent_policy_engine
+
+        # Rollback Monitor (Phase S5-safety)
+        self._rollback_monitor: Optional[RollbackMonitor] = rollback_monitor
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -1877,6 +1893,26 @@ class GovernanceService:
             if agent_policy_resolution.available else None
         )
 
+        # Step 7n: Phase S5-safety — Rollback monitor pre-action snapshot.
+        #   Captures governance signal values at decision time and registers
+        #   a RollbackWatch with the monitor. The watch can later be checked
+        #   by an external caller with post-action signals.
+        #   No confidence penalty, no escalation bias — purely observational.
+        #   Fail-safe: no monitor → no snapshot, no effect.
+        rollback_resolution = resolve_rollback_snapshot(
+            monitor=self._rollback_monitor,
+            decision_id=decision_id,
+            agent_id=request.actor_id,
+            action_type=request.action_type,
+            confidence=effective_confidence,
+            plasticity=plasticity_resolution.plasticity,
+            coherence=core_coherence_resolution.coherence_score,
+        )
+        rollback_watch_dict = (
+            rollback_resolution.to_audit_dict()
+            if rollback_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -2009,6 +2045,10 @@ class GovernanceService:
                 "agent_policy_allowed": agent_policy_resolution.allowed,
                 "agent_policy_hard_deny": agent_policy_resolution.hard_deny,
                 "agent_policy_violations": list(agent_policy_resolution.violations),
+                # Phase S5-safety: Rollback monitor provenance
+                "rollback_available": rollback_resolution.available,
+                "rollback_watch_started": rollback_resolution.watch_started,
+                "rollback_watch_id": rollback_resolution.watch_id,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -2026,6 +2066,7 @@ class GovernanceService:
             plasticity_gate=plasticity_gate_dict,
             readiness_check=readiness_check_dict,
             agent_policy=agent_policy_dict,
+            rollback_watch=rollback_watch_dict,
         )
         self._persist_audit_event(audit_event)
 

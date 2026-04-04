@@ -405,6 +405,17 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase S5-safety: Rollback monitor pre-action snapshot
+    rollback_watch: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Rollback monitor pre-action signal snapshot at decision time: "
+            "watch_started, pre_action_signals, watch_id. "
+            "Lifecycle-preparatory: post-action check() requires external "
+            "caller. Bridged via rollback_adapter (Phase S5)."
+        ),
+    )
+
     # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
     # NOTE: This field is INTENTIONALLY never populated by
     # GovernanceService.authorize(). It exists for downstream replay,

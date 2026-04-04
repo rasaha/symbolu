@@ -82,6 +82,10 @@ from agentic.agentic_framework.signal_adapters.policy_engine_adapter import (
     resolve_policy_check,
     AgentPolicyResolution,
 )
+from agentic.agentic_framework.signal_adapters.rollback_adapter import (
+    resolve_rollback_snapshot,
+    RollbackSnapshotResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -128,4 +132,7 @@ __all__ = [
     # Policy engine (S4)
     "resolve_policy_check",
     "AgentPolicyResolution",
+    # Rollback monitor (S5)
+    "resolve_rollback_snapshot",
+    "RollbackSnapshotResolution",
 ]
