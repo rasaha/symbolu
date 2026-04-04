@@ -1,6 +1,24 @@
 """
 Phase 32 - Insight Window Gating
 
+INTEGRATION PATH: ACTIVE / PIPELINE-NATIVE (Policy Phase P0)
+
+    This package is the ACTIVE insight window system used by the
+    P32 pipeline integration step (p32_integration.py → maybe_run_p32()).
+
+    It produces InsightWindowEnvelope, which is stored on PipelineContext.p32
+    and consumed by downstream pipeline observers.
+
+    A SEPARATE insight window system exists at the module level
+    (insight_window_gating.py → compute_insight_window()), which
+    serves the policy engine path (policy_engine.py). The two systems:
+    - Use different formulas and different schemas
+    - Serve different callers (pipeline P32 step vs policy engine)
+    - Are both actively used
+
+    Consolidation is planned for a future phase. Until then, this
+    package is the canonical pipeline-facing insight window system.
+
 Determines whether deeper insights may be surfaced, without triggering
 action, regime change, or delivery decisions.
 
@@ -149,3 +167,6 @@ __all__ = [
 ]
 
 __version__ = P32_VERSION
+
+# Integration path marker — identifies which insight window system this is
+_INSIGHT_WINDOW_PATH = "pipeline_native"

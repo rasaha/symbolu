@@ -1,6 +1,25 @@
 """
 Symbol-U Insight Window Gating System v1.0 (Phase 32)
 
+INTEGRATION PATH: ACTIVE / POLICY-ENGINE (Policy Phase P0)
+
+    This module is the ACTIVE insight window system used by the
+    policy engine (policy_engine.py → compute_policy_flags()).
+
+    It is called at runtime for every policy flag computation and
+    produces InsightWindowResult, which is embedded in the policy
+    flags output under the "insight_window" key.
+
+    A SEPARATE insight window system exists in the insight_window/
+    subpackage (InsightGatingEngine → InsightWindowEnvelope), which
+    serves the P32 pipeline integration path. The two systems:
+    - Use different formulas and different schemas
+    - Serve different callers (policy engine vs pipeline P32 step)
+    - Are both actively used
+
+    Consolidation is planned for a future phase. Until then, this
+    module is the canonical policy-engine-facing insight window system.
+
 Policy-layer deterministic gating system that uses Unified Consciousness Formula (UCF)
 metrics to softly refine UI-level policy flags for therapeutic and identity-focused personas.
 
@@ -47,6 +66,9 @@ Usage:
         acoustic_alignment=acoustic_report,  # Optional AcousticAlignmentReport
     )
 """
+
+# Integration path marker — identifies which insight window system this is
+_INSIGHT_WINDOW_PATH = "policy_engine"
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, TYPE_CHECKING

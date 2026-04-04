@@ -26,10 +26,12 @@ Usage:
     mode = resolve_interaction_mode(profile, user_override=None)
 
 Public API:
-    get_domain_profile(domain: str) -> Dict[str, Any]
+    get_domain_profile(domain: str) -> DomainProfile
     compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
     InteractionMode: Enum for interaction modes
     resolve_interaction_mode: Mode resolution function
+    DomainProfile: Typed, frozen domain profile (Policy Phase P0)
+    ProfileRegistry / get_profile_registry: Profile management
 """
 
 from .domain_profiles import get_domain_profile
@@ -40,6 +42,11 @@ from .interaction_modes import (
     get_mode_name,
     is_mode_valid,
 )
+from .profile_schema import (
+    DomainProfile,
+    ProfileRegistry,
+    get_profile_registry,
+)
 
 __all__ = [
     'get_domain_profile',
@@ -48,6 +55,9 @@ __all__ = [
     'resolve_interaction_mode',
     'get_mode_name',
     'is_mode_valid',
+    'DomainProfile',
+    'ProfileRegistry',
+    'get_profile_registry',
 ]
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'

@@ -1,18 +1,26 @@
 """
 License governance integration for the agentic layer.
 
-Copied from symbolu_core.licensing — these modules control whether
-governance features (audit logging, compliance APIs) are available
-per license tier. The agentic layer needs direct access to:
+STATUS: PROVISIONAL (Policy Phase P0)
 
-  - LicenseFeatures.audit_logging_enabled
-  - LicenseFeatures.compliance_apis_enabled
-  - require_license() enforcement gate
+    This module has ZERO runtime consumers as of Policy Phase P0.
+    No governance feature is currently license-gated. The canonical
+    licensing implementation lives in symbolu_core.licensing and is
+    not referenced through this facade anywhere in the codebase.
 
-The canonical implementation lives in symbolu_core.licensing.
-This copy exists so the governance layer can check license constraints
-without a cross-boundary import at runtime.
+    This facade will be promoted when license-gated governance
+    features (audit logging tiers, compliance API access) are
+    implemented, or deprecated if license checks are kept in
+    symbolu_core exclusively.
+
+    Do not add new logic here. Do not assume this module is active.
+
+Re-exports from symbolu_core.licensing — controls whether governance
+features are available per license tier.
 """
+
+# Facade status marker — checked by tests and audit tooling
+_FACADE_STATUS = "provisional"
 
 from symbolu_core.licensing.validator import (
     LicenseValidator,
@@ -36,4 +44,5 @@ __all__ = [
     "LicenseError",
     "get_available_features",
     "require_license",
+    "_FACADE_STATUS",
 ]
