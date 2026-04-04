@@ -938,6 +938,12 @@ Wiring target: Nowhere. Action: **Keep as test suite.** Priority: **P3.**
 
 **Why:** Provides `StateSnapshot` (pure dataclass) and `SovereignMonitor` (structured observability) — exactly what governance audit events need. Minimal PyTorch dependency (only tensor extraction that can be adapted to floats).
 
+**Gap without this:** The governance pipeline currently makes authorization decisions based on instantaneous 32D→ConfidenceSignals projections, but has **no structured history** of sovereign state. `GovernanceService` audit events record the decision but not the underlying cognitive state that drove it. This means:
+- **Replay verification is blind** — the ledger can replay the decision but cannot verify what the model's sovereign state was at the time. There is no state snapshot attached to audit events.
+- **Windowed statistics are missing** — governance can see "Vritti is currently FACT" but not "Vritti has been oscillating between FACT and ERROR for the last 20 steps." The `SovereignMonitor` tracks exactly this kind of rolling history.
+- **Anomaly detection is shallow** — without the monitor's history-based anomaly detection (guna collapse, oscillation, stagnation), the framework relies solely on single-step signal thresholds. Patterns that emerge over time (gradual drift, periodic instability) are invisible.
+- **Diagnostics for debugging governance decisions are absent** — when a governance decision seems wrong, there's no structured snapshot of sovereign state to inspect.
+
 **Where:**
 - `governance_service.py` → enrich `AuditEvent` with `StateSnapshot`
 - `sovereign_bridge.py` → optionally use `SovereignMonitor` for windowed statistics
@@ -952,6 +958,11 @@ Wiring target: Nowhere. Action: **Keep as test suite.** Priority: **P3.**
 
 **Why:** Pure Python, zero PyTorch. `ONTOLOGY_TO_NEXUS` mapping and `NexusMode` enum provide ontological routing that directly enriches domain policy and JEPA governance.
 
+**Gap without this:** The domain policy layer (`domain_policy.py`) and JEPA governance (`jepa_governance.py`) currently make decisions without knowing **what kind of cognitive task** the model is performing at the ontological level. Specifically:
+- **Domain policy treats all tasks equally** — a reasoning-heavy task (O7 Reasoning, O10 Integration) and a memory-recall task (O4 Structure, O5 Cognition) get the same domain action mode. But reasoning tasks should arguably have stricter governance (higher stakes, more likely to produce novel claims) while memory tasks are lower risk.
+- **JEPA governance has no ontological context** — the `ResidualGovernor` compares JEPA composite signals against runtime process state, but doesn't know whether the model is in logic-heavy mode (nexus 4/8) or memory-heavy mode (8/4). This means regime drift detection cannot distinguish between "the model shifted to deeper reasoning" (expected, benign) and "the model drifted to an unrelated cognitive mode" (suspicious).
+- **The mapping already exists and is pure data** — `ONTOLOGY_TO_NEXUS` maps all 12 ontological layers to 3 nexus modes. This is not speculative; it's the same routing the model uses internally. The governance layer simply doesn't have access to it.
+
 **Where:**
 - `domain_policy.py` → use `ONTOLOGY_TO_NEXUS` to inform domain action modes
 - `jepa_governance.py` → use nexus mode as additional regime signal
@@ -964,6 +975,11 @@ Wiring target: Nowhere. Action: **Keep as test suite.** Priority: **P3.**
 ### Rank 3: `metrics.py` (runtime portion) — Refactor First, Then Wire
 
 **Why:** `SovereignAlertMonitor` provides a regime state machine (STABLE→ALERT→LOCKDOWN→RECOVERING) that can validate/inform JEPA governance regimes. `compute_semantic_entropy()` enriches the entropy adapter.
+
+**Gap without this:** The governance pipeline has two independent regime/alert systems that don't talk to each other, and the entropy adapter lacks a sovereign-grounded entropy source:
+- **JEPA governance regime is unvalidated by sovereign health** — `jepa_governance.py` classifies regimes as NORMAL/PROCESS_DRIFT/SEMANTIC_SHIFT/DUAL_ANOMALY based on JEPA composite signals, but the sovereign layer has its own health assessment (STABLE/ALERT/LOCKDOWN/RECOVERING) based on 5-pillar monitoring (R-Acc, S-Acc, Guna Entropy, Semantic Drift, Guna Coherence). These two systems can **disagree silently**: JEPA might say NORMAL while sovereign health is in ALERT because Guna coherence is deteriorating. Without cross-validation, governance decisions can be over-permissive when the model is genuinely unstable.
+- **Entropy adapter uses only the canonical entropy engine** — `entropy_adapter.py` derives entropy from the `agentic/entropy/` module, which approximates incoherence from surface signals. The sovereign `compute_semantic_entropy()` computes Shannon entropy from the actual token distribution — a more direct measure of model uncertainty. Without this, the entropy penalty applied to confidence is an approximation when a ground-truth signal exists.
+- **No 5-pillar health view in governance** — The sovereign health metrics (R-Accuracy, S-Accuracy, Guna Entropy, Semantic Drift, Guna Coherence) provide a richer picture than the binary JEPA regime. The governance pipeline currently cannot say "R-Signal accuracy is dropping" — it can only say "regime drifted." The 5-pillar view enables more targeted governance responses.
 
 **Where:**
 - `SovereignAlertMonitor` → `jepa_governance.py` (regime cross-validation)
@@ -980,6 +996,12 @@ Wiring target: Nowhere. Action: **Keep as test suite.** Priority: **P3.**
 
 **Why:** Two-stage eligibility/release gate (Formula [259]) maps directly to ConfidenceGate → SafetyContract. The thresholds and Vritti whitelist logic are governance primitives.
 
+**Gap without this:** The ConfidenceGate and SafetyContract currently evaluate sovereign signals as **independent scalar thresholds**, but InsightGate implements a more sophisticated two-stage pattern that the governance pipeline is missing:
+- **No eligibility pre-check in governance** — ConfidenceGate evaluates signals and produces an execution mode, but doesn't have an explicit "is the system stable enough to even consider acting?" check. InsightGate's eligibility stage does exactly this: it checks system stability, R-Signal accuracy, S-Signal accuracy, AND Vritti mode (only Pramana/Smriti allowed) before even evaluating the action. The governance pipeline jumps straight to "what execution mode?" without this stability gate.
+- **No Vritti whitelist enforcement** — InsightGate explicitly blocks actions when the model is in Viparyaya (error) or Nidra (dormant) modes. The governance pipeline's `jepa_governance.py` has `OBSERVATION_VRITTIS` (viparyaya, nidra) marked as "should not execute," but this is advisory, not enforced as a hard pre-check. InsightGate makes it a fail-closed precondition.
+- **No disruption risk assessment** — InsightGate's release stage computes a disruption risk score (how much would this action perturb the current state?) and blocks if risk exceeds threshold. SafetyContract checks internal_consistency, goal_alignment, reversal_risk, and identity_stability — but not "how disruptive is the proposed action to current sovereign stability?" This is a distinct signal.
+- **The sovereign layer already has these thresholds tuned** — InsightGateConfig contains calibrated thresholds for stability (0.6), risk (0.4), accuracy minimums, and Guna coherence. Porting these to governance gives the framework empirically-grounded values rather than the current defaults.
+
 **Where:**
 - Eligibility signals → `confidence_gate.py` (precondition enrichment)
 - Release/risk signals → `safety_contract.py` (precondition enrichment)
@@ -994,6 +1016,12 @@ Wiring target: Nowhere. Action: **Keep as test suite.** Priority: **P3.**
 ### Rank 5: `reasoning_kernel.py` (diagnostic extraction) — Bridge First
 
 **Why:** The kernel's Mauna protocol, OPB dimension lock, and logic template selection provide signals not currently exposed through the 32D projection.
+
+**Gap without this:** The 32D→ConfidenceSignals projection captures Vritti, Kosha, and Guna — but **three critical reasoning-kernel signals are invisible** to the governance layer:
+- **Mauna (silence) protocol is lost** — The reasoning kernel has a `MaunaProtocol` that decides when the model should be silent (high uncertainty, ontological confusion). This is a hard "don't respond" signal that the governance pipeline doesn't receive. Currently, the ConfidenceGate might produce `CAUTIOUS` mode when the kernel actually wants `BLOCKED` (silence). The result is that the framework may allow responses when the model's own reasoning kernel has determined it should stay quiet.
+- **OPB dimension lock is collapsed into generic identity_stability** — The `OPBDimensionLock` tracks which specific ontological dimensions are active and carries them across domain switches with configurable decay. The `sovereign_bridge.py` maps Guna STABLE + low VELOCITY into a generic `identity_stability` score, but this misses the granular signal: "O7 Reasoning is locked at 0.85 activation and decaying at rate 0.02/step." This granular lock state would tell governance whether identity stability is driven by genuine ontological persistence or just low state velocity.
+- **Active logic template is unknown to governance** — The `IsomorphicMappingRouter` selects between 5 logic templates (DEDUCTION, INDUCTION, ABDUCTION, ANALOGY, SYNTHESIS) based on cross-domain bridge detection. The governance layer doesn't know which reasoning mode is active. This matters because deductive reasoning (high confidence, verifiable) warrants different governance than abductive reasoning (speculative, lower confidence). Currently, governance treats all reasoning modes identically.
+- **These signals exist but are discarded** — The inference_bridge projects 128D→32D and drops kernel diagnostics. Adding an optional diagnostics dict to the projection result is a non-breaking enrichment that makes existing information accessible.
 
 **Where:**
 - Mauna state → `sovereign_bridge.py` as "sovereign_silence" signal → ConfidenceGate
