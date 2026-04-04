@@ -10,6 +10,11 @@ OLM mapping: O1_POTENTIAL (capability gating), O6_AGENCY (directional policy)
 
 Pattern extracted from cloud_controller.action.policy.PolicyEngine,
 rewritten for AI agent governance (no K8s dependencies).
+
+STATUS: ACTIVE — Consumed by policy_engine_adapter.py (Phase S4-safety).
+GovernanceService.authorize() evaluates per-agent policy (allow/deny,
+blackout, rate-limit) via this engine when configured. Policy violations
+produce hard deny. Wired: 2026-04-04.
 """
 
 from __future__ import annotations

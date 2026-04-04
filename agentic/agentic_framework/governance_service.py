@@ -133,6 +133,14 @@ from agentic.agentic_framework.signal_adapters.readiness_adapter import (
     resolve_readiness_signal,
     ReadinessResolution,
 )
+from agentic.agentic_framework.signal_adapters.policy_engine_adapter import (
+    resolve_policy_check,
+    AgentPolicyResolution,
+)
+from agentic.safety.governance_patterns.policy_engine import (
+    PolicyEngine,
+    PolicyConfig,
+)
 from agentic.core.generation_gate import (
     GenerationGate,
     GenerationMode,
@@ -1202,6 +1210,7 @@ class GovernanceService:
         shadow_registry: Optional[ShadowRegistry] = None,
         policy_resolution: Optional[PolicyResolution] = None,
         approval_store: Optional[ApprovalStore] = None,
+        agent_policy_engine: Optional[PolicyEngine] = None,
     ):
         """
         Initialize governance service.
@@ -1228,6 +1237,10 @@ class GovernanceService:
             approval_store: Optional ApprovalStore for durable approval workflow.
                 When provided, DEFER+requires_human decisions create persistent
                 approval requests with auditable state transitions.
+            agent_policy_engine: Optional PolicyEngine for per-agent action
+                policy (Phase S4-safety). When provided, allow/deny/blackout/
+                rate-limit rules are evaluated before the governance decision.
+                Fail-safe: if not provided, all actions are allowed by default.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -1256,6 +1269,9 @@ class GovernanceService:
 
         # Approval Workflow Layer
         self._approval_store: Optional[ApprovalStore] = approval_store
+
+        # Agent Policy Engine (Phase S4-safety)
+        self._agent_policy_engine: Optional[PolicyEngine] = agent_policy_engine
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -1298,6 +1314,16 @@ class GovernanceService:
             )
         forbidden_cap = _check_forbidden_capabilities(
             request.capabilities, forbidden=policy_forbidden,
+        )
+
+        # Step 2a: Agent policy engine check (Phase S4-safety).
+        #   Evaluates per-agent allow/deny, blackout windows, and rate
+        #   limits. Policy violations produce hard deny.
+        #   Fail-safe: if no engine configured, all actions are allowed.
+        agent_policy_resolution = resolve_policy_check(
+            engine=self._agent_policy_engine,
+            agent_id=request.actor_id,
+            action_type=request.action_type,
         )
 
         # Step 2b: Resolve session enrichment signals (Phase 3)
@@ -1601,6 +1627,14 @@ class GovernanceService:
             governance_decision = APIGovernanceDecision.DENY
             eligible = False
 
+        # Phase S4-safety: Agent policy engine hard deny.
+        # If the policy engine explicitly denies the action, override
+        # the governance decision to DENY. This is a hard block,
+        # similar to forbidden capabilities.
+        if agent_policy_resolution.hard_deny:
+            governance_decision = APIGovernanceDecision.DENY
+            eligible = False
+
         effective_requires_human = (
             gate_decision.escalation.requires_human
             or effective_esc_level in (EscalationLevel.CONFIRM, EscalationLevel.HALT)
@@ -1837,6 +1871,12 @@ class GovernanceService:
             if readiness_resolution.available else None
         )
 
+        # Step 7m: Build Phase S4-safety agent policy audit dict
+        agent_policy_dict = (
+            agent_policy_resolution.to_audit_dict()
+            if agent_policy_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1964,6 +2004,11 @@ class GovernanceService:
                 "readiness_ready": readiness_resolution.ready,
                 "readiness_confidence_penalty": readiness_resolution.confidence_penalty,
                 "readiness_escalation_bias": readiness_resolution.escalation_bias,
+                # Phase S4-safety: Agent policy engine provenance
+                "agent_policy_available": agent_policy_resolution.available,
+                "agent_policy_allowed": agent_policy_resolution.allowed,
+                "agent_policy_hard_deny": agent_policy_resolution.hard_deny,
+                "agent_policy_violations": list(agent_policy_resolution.violations),
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -1980,6 +2025,7 @@ class GovernanceService:
             ontology_balance=ontology_balance_dict,
             plasticity_gate=plasticity_gate_dict,
             readiness_check=readiness_check_dict,
+            agent_policy=agent_policy_dict,
         )
         self._persist_audit_event(audit_event)
 

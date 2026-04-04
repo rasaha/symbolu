@@ -395,6 +395,16 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase S4-safety: Agent policy engine signal
+    agent_policy: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Agent policy engine evaluation at decision time: "
+            "allowed/denied status, violations, agent_id, action_type. "
+            "Bridged via policy_engine_adapter (Phase S4)."
+        ),
+    )
+
     # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
     # NOTE: This field is INTENTIONALLY never populated by
     # GovernanceService.authorize(). It exists for downstream replay,

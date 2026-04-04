@@ -78,6 +78,10 @@ from agentic.agentic_framework.signal_adapters.readiness_adapter import (
     resolve_readiness_signal,
     ReadinessResolution,
 )
+from agentic.agentic_framework.signal_adapters.policy_engine_adapter import (
+    resolve_policy_check,
+    AgentPolicyResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -121,4 +125,7 @@ __all__ = [
     # Readiness checker (S3)
     "resolve_readiness_signal",
     "ReadinessResolution",
+    # Policy engine (S4)
+    "resolve_policy_check",
+    "AgentPolicyResolution",
 ]
