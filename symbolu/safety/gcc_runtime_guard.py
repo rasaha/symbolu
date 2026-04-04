@@ -43,6 +43,9 @@ from typing import Any, FrozenSet, Mapping, Tuple, Union
 # Maximum allowed string length for invariant keys / enum names
 MAX_INVARIANT_KEY_LENGTH = 32
 
+# Maximum allowed length for opaque identifiers (artifact_id, span_id, etc.)
+MAX_OPAQUE_ID_LENGTH = 64
+
 # Hex string pattern (must match full string)
 _HEX_PATTERN = re.compile(r"^[0-9a-fA-F]+$")
 
@@ -174,6 +177,34 @@ def _is_phase_id(value: str) -> bool:
     return value in {"1b", "2", "3", "4", "5", "6", "7", "8", "9"}
 
 
+# Opaque identifier pattern: alphanumeric, hyphens, underscores, dots
+# Bounded length prevents free-form text smuggling
+_OPAQUE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
+
+
+def _is_opaque_id(value: str) -> bool:
+    """
+    Check if a string is a valid opaque identifier.
+
+    Opaque IDs are structural identifiers (artifact_id, span_id, etc.)
+    that are not free-form text. They:
+        - Contain only alphanumeric chars, hyphens, underscores, dots
+        - Are bounded to MAX_OPAQUE_ID_LENGTH characters
+        - Contain no spaces or special characters
+
+    Args:
+        value: The string to check.
+
+    Returns:
+        True if valid opaque identifier, False otherwise.
+    """
+    if not value:
+        return False
+    if len(value) > MAX_OPAQUE_ID_LENGTH:
+        return False
+    return bool(_OPAQUE_ID_PATTERN.match(value))
+
+
 def _is_valid_string(value: str) -> bool:
     """
     Check if a string is valid under GCC constraints.
@@ -183,6 +214,7 @@ def _is_valid_string(value: str) -> bool:
         - Invariant keys (enum names, fixed keys)
         - Phase IDs
         - Router version strings (e.g., "R1.0", "M1.0")
+        - Opaque identifiers (artifact_id, span_id — bounded, no free text)
 
     Args:
         value: The string to check.
@@ -208,6 +240,10 @@ def _is_valid_string(value: str) -> bool:
 
     # Check if version string (R1.x, M1.x format)
     if re.match(r"^[RM]\d+\.\d+$", value):
+        return True
+
+    # Check if opaque identifier (structural, bounded, no free text)
+    if _is_opaque_id(value):
         return True
 
     # Otherwise, it's a free-form string -> VIOLATION

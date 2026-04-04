@@ -19,6 +19,11 @@ Usage:
     decision = gate.evaluate(chain_result)
     if decision.should_block:
         return decision.fallback_response
+
+STATUS: UNUSED — Zero consumers found in agentic/ or symbolu_core/.
+Re-export facade only; no logic of its own. Import directly from
+symbolu_core.presentation.governed_gate if needed.
+Audited: 2026-04-04 (S0 truthfulness cleanup)
 """
 
 from symbolu_core.presentation.governed_gate import (

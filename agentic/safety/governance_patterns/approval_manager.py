@@ -11,6 +11,11 @@ OLM mapping: O8_PURPOSE (constraint alignment), O9_WITNESSES (observation)
 
 Pattern extracted from cloud_controller.recommend.approval.ApprovalManager,
 rewritten for AI agent governance (no K8s dependencies).
+
+DEPRECATED: Superseded by agentic.agentic_framework.approval_workflow which
+provides a more complete lifecycle (6 states vs 4), ApprovalStore, and
+richer ApprovalContext. Use approval_workflow.py for new integrations.
+Audited: 2026-04-04 (S0 truthfulness cleanup)
 """
 
 from __future__ import annotations

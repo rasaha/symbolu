@@ -13,6 +13,11 @@ Usage:
     async def authorize(request: Request):
         enforce_rate_limit(request)  # Raises 429 if exceeded
         ...
+
+STATUS: UNUSED — Zero consumers found in agentic/ or symbolu_core/.
+Re-export facade only; no logic of its own. Import directly from
+symbolu_core.service.security.rate_limiter if needed.
+Audited: 2026-04-04 (S0 truthfulness cleanup)
 """
 
 from symbolu_core.service.security.rate_limiter import (

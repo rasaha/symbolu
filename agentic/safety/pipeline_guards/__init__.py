@@ -12,6 +12,11 @@ Guards (active enforcement):
 Compliance:
   - RendererComplianceChecker: Validates renderers against P13 safety envelope
   - RendererInputContract: Non-negotiable pipeline-renderer contract
+
+STATUS: UNUSED — Zero consumers found in agentic/ or symbolu_core/.
+Re-export facade only; no logic of its own. Import directly from
+symbolu_core.mechanical.pipeline submodules if needed.
+Audited: 2026-04-04 (S0 truthfulness cleanup)
 """
 
 # PlannerGate — action filtering

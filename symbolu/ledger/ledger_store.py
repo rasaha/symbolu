@@ -36,6 +36,7 @@ from symbolu.ontology.router.ontological_router_r1 import (
     OntologicalLayerRouter,
     ProjectionRequest,
 )
+from symbolu.safety.gcc_ledger_invariant import assert_ledger_entry_valid
 
 
 class LedgerStore:
@@ -72,6 +73,9 @@ class LedgerStore:
             - ledger_index must be sequential
             - No gaps or duplicates allowed
         """
+        # GCC C-1: Validate ledger entry contains no semantic content (fail-closed)
+        assert_ledger_entry_valid(entry)
+
         expected_index = len(self._entries)
 
         if entry.ledger_index != expected_index:
@@ -204,6 +208,9 @@ class LedgerEntryStore:
             - prev_entry_id must match head's entry_id (or None for first)
             - No gaps or duplicates allowed
         """
+        # GCC C-1: Validate ledger entry contains no semantic content (fail-closed)
+        assert_ledger_entry_valid(entry)
+
         expected_seq = len(self._entries)
 
         if entry.seq != expected_seq:
