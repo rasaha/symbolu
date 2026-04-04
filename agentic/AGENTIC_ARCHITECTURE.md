@@ -1,102 +1,138 @@
-# Sovereign Integration Architecture
+# Sovereign & Core Integration Architecture
 
-> **Version:** 1.0.0 | **Updated:** 2026-04-04
+> **Version:** 2.0.0 | **Updated:** 2026-04-04
 >
-> This document describes the sovereign-to-governance integration as implemented
-> across phases S1–S4 and the activation patch.
+> This document describes the two completed integration tracks that connect
+> external signal sources to the agentic governance runtime:
+>
+> - **Sovereign track (S1–S4 + activation patch):** Bridges sovereign model
+>   signals (entropy, health, insight, diagnostics, guna anomalies, bhava
+>   priors, governor telemetry) into governance.
+> - **Core track (C1–C4 + closure patch):** Bridges core pipeline signals
+>   (coherence state, UCF consciousness, generation gate, predictive drift,
+>   identity resonance, adaptive continuity, counterfactual sandbox) into
+>   governance.
+>
+> Both tracks follow the same **bridge-first, never-direct** architecture
+> principle and the same signal adapter pattern (frozen Resolution, pure
+> function, fail-closed, bounded penalty, stricter-only).
 >
 > For the full governance architecture (Layers 1–8, domain policy, shadow AI,
 > etc.), see [`docs/governance/AGENTIC_ARCHITECTURE.md`](../docs/governance/AGENTIC_ARCHITECTURE.md).
 >
-> This document focuses specifically on how sovereign model signals reach the
-> agentic governance runtime, what is live, what is conditional, and what
-> remains future work.
+> This document focuses specifically on how sovereign and core pipeline signals
+> reach the agentic governance runtime, what is live, what is conditional,
+> what is audit-only, what is replay/simulation-only, and what remains future
+> work.
 
 ---
 
 ## Architecture Principle: Bridge-First, Never Direct
 
-Governance does **not** directly import PyTorch-heavy sovereign model internals.
-All sovereign signals reach governance through a layered bridge architecture:
+Governance does **not** directly import PyTorch-heavy sovereign model internals
+or numpy-heavy core pipeline engines. All signals reach governance through a
+layered bridge architecture with two parallel input tracks:
 
 ```
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  SOVEREIGN MODEL INTERNALS (PyTorch-heavy)                      │
-  │  sovereign/reasoning_kernel.py, observer.py, guna.py, etc.      │
-  │  ── These are NEVER imported by the governance runtime ──       │
-  └──────────────────────────┬──────────────────────────────────────┘
-                             │
-                             │  128D → 32D projection
-                             │  (sovereign/inference_bridge.py)
-                             ▼
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  INFERENCE BRIDGE LAYER                                         │
-  │  sovereign/inference_bridge.py                                  │
-  │                                                                 │
-  │  ProjectionMetadata (plain dict):                               │
-  │    reasoning_diagnostics  (S3)  — kernel diagnostic summary     │
-  │    guna_anomalies         (S4)  — temporal guna anomaly flags   │
-  │    governor_telemetry     (S4)  — PID governor telemetry        │
-  └──────────────────────────┬──────────────────────────────────────┘
-                             │
-                             │  ProjectionMetadata dict
-                             ▼
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  PURE-PYTHON RUNTIME-SAFE MODULES (no torch dependency)         │
-  │                                                                 │
-  │  sovereign_diagnostics.py   (S3)  — diagnostic normalization    │
-  │  sovereign_guna_anomaly.py  (S4)  — guna anomaly detection      │
-  │  sovereign_bhava_priors.py  (S4)  — bhava transition matrix     │
-  └──────────────────────────┬──────────────────────────────────────┘
-                             │
-                             ▼
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  SOVEREIGN BRIDGE (agentic_framework/sovereign_bridge.py)       │
-  │                                                                 │
-  │  Normalizes raw sovereign data into governance-typed structs:   │
-  │    SovereignDiagnosticContext  (S3)                              │
-  │    GunaAnomalyContext          (S4)                              │
-  │    governor_telemetry_from_projection()  (S4)                   │
-  │    bhava_transition_from_diagnostics()   (S4)                   │
-  │    signals_from_sovereign_state()        (S1)                   │
-  │    coherence_from_sovereign_state()      (S1)                   │
-  └──────────────────────────┬──────────────────────────────────────┘
-                             │
-                             ▼
+  SOVEREIGN TRACK (S1–S4)                  CORE PIPELINE TRACK (C1–C4)
+  ========================                 ===========================
+
+  ┌───────────────────────┐                ┌───────────────────────────┐
+  │ SOVEREIGN INTERNALS   │                │ CORE PIPELINE INTERNALS   │
+  │ (PyTorch-heavy)       │                │ (numpy-heavy)             │
+  │ reasoning_kernel.py   │                │ coherence_state.py        │
+  │ observer.py, guna.py  │                │ ucf.py                    │
+  │ ── NEVER imported ──  │                │ persona_drift.py          │
+  └─────────┬─────────────┘                │ identity_resonance.py     │
+            │                              │ adaptive_continuity.py    │
+            │ 128D → 32D projection        │ counterfactual_engine.py  │
+            │ (inference_bridge.py)         │ ── NEVER imported ──     │
+            ▼                              └─────────┬─────────────────┘
+  ┌───────────────────────┐                          │
+  │ INFERENCE BRIDGE      │                          │ duck-typed reports/states
+  │ ProjectionMetadata:   │                          │ via getattr() + None defaults
+  │  reasoning_diagnostics│                          │
+  │  guna_anomalies       │                          │
+  │  governor_telemetry   │                          │
+  └─────────┬─────────────┘                          │
+            │                                        │
+            ▼                                        │
+  ┌───────────────────────┐                          │
+  │ PURE-PYTHON MODULES   │                          │
+  │ sovereign_diagnostics │                          │
+  │ sovereign_guna_anomaly│                          │
+  │ sovereign_bhava_priors│                          │
+  └─────────┬─────────────┘                          │
+            │                                        │
+            ▼                                        │
+  ┌───────────────────────┐                          │
+  │ SOVEREIGN BRIDGE      │                          │
+  │ sovereign_bridge.py   │                          │
+  │ → typed structs       │                          │
+  └─────────┬─────────────┘                          │
+            │                                        │
+            ▼                                        ▼
   ┌─────────────────────────────────────────────────────────────────┐
   │  SIGNAL ADAPTERS (agentic_framework/signal_adapters/)           │
   │                                                                 │
-  │  Convert bridge outputs into bounded governance effects:        │
+  │  Sovereign adapters:                                            │
+  │    vritti_adapter.py             (S1) — vritti signal resolution │
+  │    entropy_adapter.py            (S1) — entropy resolution      │
   │    sovereign_health_adapter.py   (S2) — health/entropy signals  │
   │    insight_adapter.py            (S2) — insight gate resolution  │
   │    guna_anomaly_adapter.py       (S4) — anomaly penalty/bias    │
-  │    vritti_adapter.py             (S1) — vritti signal resolution │
-  │    entropy_adapter.py            (S1) — entropy resolution      │
+  │                                                                 │
+  │  Core adapters:                                                 │
+  │    coherence_state_adapter.py    (C2) — coherence/drift signals │
+  │    ucf_adapter.py                (C3) — UCF consciousness       │
+  │    predictive_signals_adapter.py (C4) — P35+P36+P37 signals     │
+  │                                                                 │
+  │  Core bridges (not adapters — isolated from live path):         │
+  │    counterfactual_bridge.py      (C4) — replay/simulation only  │
+  │                                                                 │
+  │  Core singletons:                                               │
+  │    generation_gate.py            (C3) — one-time seal at boot   │
   │                                                                 │
   │  Every adapter produces:                                        │
+  │    - frozen Resolution dataclass                                │
   │    - bounded confidence penalty (non-negative, capped)          │
   │    - optional escalation bias (stricter-only)                   │
   │    - reason codes for audit                                     │
-  │    - safe defaults on failure                                   │
+  │    - safe defaults on failure (fail-closed)                     │
   └──────────────────────────┬──────────────────────────────────────┘
                              │
                              ▼
   ┌─────────────────────────────────────────────────────────────────┐
   │  GOVERNANCE SERVICE (agentic_framework/governance_service.py)   │
   │                                                                 │
-  │  Consumes adapter outputs at decision time:                     │
-  │    - confidence adjustments (bounded, capped aggregate)         │
+  │  Consumes all adapter outputs at decision time:                 │
+  │    - confidence adjustments (bounded, aggregate cap = 0.20)     │
   │    - escalation overrides (stricter-only)                       │
-  │    - audit metadata enrichment                                  │
-  │    - fail-safe: all sovereign resolution wraps try/except       │
+  │    - generation gate check (C3, fail-closed)                    │
+  │    - audit metadata enrichment (all tracks)                     │
+  │    - fail-safe: all resolution wraps try/except                 │
   └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Key boundary:** The `sovereign/` package (with its `__init__.py` that eagerly
-imports torch-heavy modules) is never imported by anything in the governance
-runtime path. Pure-Python runtime-safe modules (`sovereign_diagnostics.py`,
-`sovereign_guna_anomaly.py`, `sovereign_bhava_priors.py`) live as siblings
-outside the `sovereign/` package to avoid the torch import chain.
+**Key boundaries:**
+
+1. **Sovereign boundary:** The `sovereign/` package (with its `__init__.py` that
+   eagerly imports torch-heavy modules) is never imported by anything in the
+   governance runtime path. Pure-Python runtime-safe modules
+   (`sovereign_diagnostics.py`, `sovereign_guna_anomaly.py`,
+   `sovereign_bhava_priors.py`) live as siblings outside the `sovereign/`
+   package to avoid the torch import chain.
+
+2. **Core pipeline boundary:** Core adapters use `importlib` to load their
+   modules directly (bypassing `signal_adapters/__init__.py` which transitively
+   imports numpy via `jepa_governance.py`). All core adapters consume duck-typed
+   inputs via `getattr()` with `None` defaults — they never import pipeline
+   engine classes.
+
+3. **Counterfactual isolation:** The counterfactual bridge
+   (`counterfactual_bridge.py`) is NOT imported by `governance_service.py`. It
+   exists solely for downstream replay, approval-workflow what-if analysis, and
+   audit simulation tools.
 
 ---
 
@@ -208,6 +244,198 @@ governor telemetry passthrough, bounded anomaly penalties.
 **Conditionality:** Same as S3 — requires `sovereign_projection_metadata`
 with a `guna_anomalies` sub-dict. When absent, all S4 fields default to
 safe neutral values.
+
+---
+
+## C1–C4 Core Integration Phases
+
+Core integration bridges the internal pipeline's coherence, consciousness,
+generation control, and predictive signals into governance. Like the sovereign
+track, each phase builds on prior phases while preserving all invariants.
+
+### Phase C1: Foundation — Generation Gate + Adapter Pattern
+
+**Scope:** Establish the signal adapter pattern, generation gate singleton,
+and the governance service's core signal resolution infrastructure.
+
+**What was implemented:**
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| Signal adapter pattern | Frozen Resolution + pure function + fail-closed convention | Live, default-on |
+| `generation_gate.py` | One-time seal singleton (ENABLED/DISABLED/UNSEALED) | Live, default-on |
+| Generation gate check in `authorize()` | Fail-closed: UNSEALED or DISABLED → deny generative actions | Live, default-on |
+| `_is_generative_action()` | Action-type classifier for gate applicability | Live, default-on |
+| Generation gate audit field | `AuditEvent.generation_gate` populated on every call | Live, default-on |
+
+**Governance effect:** The generation gate is always evaluated. If unsealed
+(boot incomplete) or disabled, generative actions are denied. The gate is
+a hard safety control, not a soft signal — it produces DENY decisions, not
+confidence penalties.
+
+**Key design:** The generation gate is a **singleton with one-time seal**.
+Once `seal(ENABLED)` or `seal(DISABLED)` is called at boot, the state is
+permanent for the process lifetime. `_reset()` exists only for test isolation.
+
+### Phase C2: Coherence State Signals
+
+**Scope:** Bridge core pipeline `CoherenceState` into governance as bounded
+signals covering coherence level, persona drift, identity stability, and
+continuity health.
+
+**What was implemented:**
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `coherence_state_adapter.py` | Pure-function adapter for CoherenceState | Live, default-on |
+| `CoherenceStateResolution` | Frozen governance-safe view of coherence | Live, default-on |
+| Coherence penalty | Low coherence → up to 0.05 penalty | Behavior-affecting |
+| Drift penalty | High persona drift → up to 0.05 penalty | Behavior-affecting |
+| Drift escalation | HIGH drift risk band → escalation bias | Behavior-affecting |
+| Identity/continuity signals | Identity stability, continuity health | Audit-only |
+| `AuditEvent.core_coherence` | Full coherence snapshot in audit trail | Live, default-on |
+
+**Governance effects (behavior-affecting):**
+
+| Signal | Confidence Penalty | Escalation Bias | Cap |
+|--------|-------------------|-----------------|-----|
+| Low coherence (< 0.3) | 0.05 | No | — |
+| Moderate coherence (0.3–0.5) | 0.02 | No | — |
+| High persona drift (> 0.7) | 0.05 | Yes (bump +1) | — |
+| Moderate persona drift (0.4–0.7) | 0.02 | No | — |
+| Combined max | — | — | 0.10 adapter cap |
+
+**Key design:** C2 penalizes on **current/stateful** drift posture from
+`CoherenceState` (persona_drift, drift_risk_band). This is distinct from
+C4's P35 which penalizes on **predictive/forecast** drift. Both may fire
+simultaneously — this is intentional and bounded by the aggregate cap.
+
+### Phase C3: UCF Consciousness + Generation Gate Enforcement
+
+**Scope:** Bridge the Unified Consciousness Formula (UCF) score into
+governance and wire generation gate enforcement into the authorize path.
+
+**What was implemented:**
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `ucf_adapter.py` | Pure-function adapter for UCF state | Live, default-on |
+| `UCFResolution` | Frozen governance-safe view of UCF | Live, default-on |
+| UCF penalty | Unstable UCF → up to 0.05 penalty | Behavior-affecting |
+| UCF escalation | Critical UCF band → escalation bias | Behavior-affecting |
+| `AuditEvent.ucf_signal` | UCF snapshot in audit trail | Live, default-on |
+| Generation gate wiring | `_check_generation_gate()` in authorize path | Live, default-on |
+| `AuditEvent.generation_gate` | Gate state in audit trail | Live, default-on |
+
+**Governance effects (behavior-affecting):**
+
+| Signal | Confidence Penalty | Escalation Bias | Cap |
+|--------|-------------------|-----------------|-----|
+| UCF critical (< 0.2) | 0.05 | Yes (bump +1) | — |
+| UCF unstable (0.2–0.4) | 0.03 | No | — |
+| UCF marginal (0.4–0.6) | 0.01 | No | — |
+| Adapter cap | — | — | 0.05 |
+
+### Phase C4: Predictive Signals + Counterfactual Bridge
+
+**Scope:** Bridge predictive persona drift (P35), identity resonance memory
+(P36), and adaptive continuity (P37) into governance. Provide a counterfactual
+sandbox bridge for replay/simulation (not live).
+
+**What was implemented:**
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `predictive_signals_adapter.py` | Combined P35+P36+P37 adapter | Live, default-on |
+| `PredictiveSignalsResolution` | Frozen governance-safe view | Live, default-on |
+| P35 drift penalty | Predicted HIGH risk → 0.03 penalty | Behavior-affecting |
+| P35 drift escalation | HIGH risk band → escalation bias | Behavior-affecting |
+| P37 continuity penalty | Fragmenting mode → 0.02 penalty | Light behavior |
+| P36 identity resonance | Resonance index, stability band | Audit-only |
+| `AuditEvent.predictive_signals` | Predictive snapshot in audit trail | Live, default-on |
+| `counterfactual_bridge.py` | P25 sandbox wrapper | Replay/simulation-only |
+| `AuditEvent.counterfactual` | Reserved field (intentionally empty) | Replay/simulation-only |
+
+**Governance effects (behavior-affecting):**
+
+| Signal | Confidence Penalty | Escalation Bias | Cap |
+|--------|-------------------|-----------------|-----|
+| P35 HIGH drift risk | 0.03 | Yes (bump +1) | — |
+| P35 moderate drift risk | 0.01 | No | — |
+| P37 fragmenting continuity | 0.02 | No | — |
+| P37 strained continuity | 0.005 | No | — |
+| P36 (any state) | 0.00 | No | — |
+| Combined P35+P37 max | — | — | 0.05 adapter cap |
+
+**Combined adapter rationale:** P35/P36/P37 form a dependency chain (P37
+depends on P35+P36 outputs). Grouping them in one adapter avoids redundant
+resolution and keeps governance wiring simple.
+
+**Counterfactual isolation:** The counterfactual bridge is NOT imported by
+`governance_service.py`. The `AuditEvent.counterfactual` field is
+**intentionally never populated** by `authorize()`. It exists for downstream
+replay, approval-workflow what-if analysis, and audit simulation tools that
+attach counterfactual results to audit events after the fact.
+
+**Signal classification within C4:**
+
+| Signal | Classification | Rationale |
+|--------|---------------|-----------|
+| P35 predictive drift | BEHAVIOR-AFFECTING | Forecast drift risk justifies bounded penalty |
+| P37 adaptive continuity | LIGHT BEHAVIOR | Fragmenting mode indicates instability |
+| P36 identity resonance | AUDIT-ONLY | Resonance is observational, not actionable |
+| P25 counterfactual | REPLAY/SIMULATION-ONLY | What-if analysis, never live |
+
+---
+
+## C Closure Patch: Audit Findings Resolution
+
+A strict post-integration audit of C1-C4 identified five gaps. All were
+resolved in a focused closure patch.
+
+### Finding 1: No E2E authorize() Tests for C2/C3/C4
+
+**Problem:** Core signal adapters had unit tests, but no tests called
+`GovernanceService.authorize()` end-to-end to prove signals flow through
+the full decision path.
+
+**Fix:** 31 E2E tests in `test_closure_e2e_authorize.py` across 7 test
+classes proving C2/C3/C4 signal wiring, combined stacking, aggregate cap,
+and generation gate behavior.
+
+### Finding 2: Dormant Counterfactual Field
+
+**Problem:** `AuditEvent.counterfactual` existed but was always `None`,
+without documentation explaining whether this was a bug or design intent.
+
+**Fix:** Explicit documentation on the field confirming it is intentionally
+never populated by `authorize()` — it exists for replay/simulation tools.
+
+### Finding 3: Aggregate Penalty Cap Not Tested With C2/C3/C4
+
+**Problem:** The aggregate cap test only covered sovereign adapters. With
+C2/C3/C4 adding penalties, the cap needed verification with all sources.
+
+**Fix:** Two dedicated tests verify the cap holds when all six penalty
+sources fire simultaneously (entropy + insight + guna + C2 + C3 + C4).
+
+### Finding 4: Generation Gate Tests Used Source-String Inspection
+
+**Problem:** Initial generation gate tests checked source code strings
+rather than testing actual behavior.
+
+**Fix:** 14 behavioral tests for `_is_generative_action()`,
+`_check_generation_gate()`, and full `authorize()` gate enforcement.
+
+### Finding 5: C2/C4 Drift Overlap Not Documented
+
+**Problem:** Both C2 and C4 penalize drift, risking confusion about
+double-counting.
+
+**Fix:** Inline DRIFT OVERLAP NOTE in `governance_service.py` and
+documentation in `predictive_signals_adapter.py` explaining that C2
+penalizes current/stateful drift while C4 penalizes predictive/forecast
+drift — complementary signals, not duplicates, bounded by aggregate cap.
 
 ---
 
@@ -325,25 +553,31 @@ mocks. They prove that:
 
 ## Live vs Conditional: The Truth Table
 
-Not all sovereign signals are always active. The system has three activation
-tiers, and the documentation must not conflate them.
+Not all signals are always active. The system has four activation tiers,
+and the documentation must not conflate them.
 
 ### Tier 1: Live and Default-On (Always Active)
 
 These signals are computed on every `GovernanceService.authorize()` call,
-regardless of whether sovereign projection metadata is present.
+regardless of whether upstream data is present. Adapters fall back to
+approximation or neutral defaults when upstream data is unavailable.
 
-| Signal | Phase | Effect |
-|--------|-------|--------|
-| Vritti resolution (real or fallback) | S1 | Governs JEPA composite vritti axis |
-| Entropy resolution | S1 | Bounded confidence penalty (max 0.15) |
-| Sovereign telemetry in audit | S1 | Audit enrichment |
-| Sovereign health resolution | S2 | Audit enrichment |
-| Insight gate resolution | S2 | Bounded confidence penalty (max 0.10) |
+| Signal | Track | Phase | Effect |
+|--------|-------|-------|--------|
+| Vritti resolution (real or fallback) | Sovereign | S1 | Governs JEPA composite vritti axis |
+| Entropy resolution | Sovereign | S1 | Bounded confidence penalty (max 0.15) |
+| Sovereign telemetry in audit | Sovereign | S1 | Audit enrichment |
+| Sovereign health resolution | Sovereign | S2 | Audit enrichment |
+| Insight gate resolution | Sovereign | S2 | Bounded confidence penalty (max 0.10) |
+| Generation gate check | Core | C1/C3 | Hard deny for generative actions when gate closed |
+| Coherence state resolution | Core | C2 | Bounded confidence penalty (max 0.10) |
+| UCF consciousness resolution | Core | C3 | Bounded confidence penalty (max 0.05) |
+| Predictive signals resolution | Core | C4 | Bounded confidence penalty (max 0.05) |
 
-When upstream signals are unavailable (no `chitta_vritti` data, no entropy
-source), these adapters fall back to approximation or neutral defaults.
-Audit metadata records whether real or fallback sources were used.
+**Note on core adapter defaults:** When no pipeline report/state is available
+(e.g., the caller didn't run the core pipeline), all core adapters resolve
+with `available=False`, zero penalty, no escalation. The system degrades
+gracefully — absent signals never weaken governance.
 
 ### Tier 2: Live When Sovereign Projection Metadata Is Present
 
@@ -368,21 +602,35 @@ Whether they *are* consumed depends on whether the caller's runtime path
 produces and passes `ProjectionMetadata`. Not every possible caller or
 pipeline mode necessarily does this.
 
-### Tier 3: Future / Not Yet Wired
+### Tier 3: Replay / Simulation Only (Never Live)
+
+These components exist for downstream analysis tools but are **never**
+invoked on the live `authorize()` path.
+
+| Signal | Track | Phase | Purpose |
+|--------|-------|-------|---------|
+| Counterfactual sandbox bridge | Core | C4 | What-if analysis for approval workflows |
+| `AuditEvent.counterfactual` field | Core | C4 | Attached post-hoc by replay tools |
+
+The counterfactual bridge (`counterfactual_bridge.py`) is not imported by
+`governance_service.py`. Its output is never attached during live decisions.
+
+### Tier 4: Future / Not Yet Wired
 
 | Signal | Description | Status |
 |--------|-------------|--------|
 | Temporal trajectory prediction | JEPA forecasting future semantic state | Not implemented |
 | `previous_bhava` tracking | Cross-request bhava transition history | Hardcoded to `None` |
 | Deeper sovereign model internals | Per-layer attention weights, gradient norms, etc. | Intentionally excluded |
+| Live counterfactual analysis | Real-time what-if during authorize | Intentionally deferred |
 
 ---
 
-## Behavior-Affecting vs Audit-Only
+## Signal Classification Hierarchy
 
-Sovereign signals have two distinct roles in governance. The documentation
-must not conflate signals that change decisions with signals that only
-enrich the audit trail.
+Signals have four distinct roles in governance, forming a strictness hierarchy.
+The documentation must not conflate signals that change decisions with signals
+that only enrich the audit trail.
 
 ### Behavior-Affecting Signals
 
@@ -390,70 +638,124 @@ These signals can change the governance decision (confidence, escalation,
 execution mode). All effects are **stricter-only** — they can only reduce
 confidence or increase escalation, never relax governance.
 
-| Signal | Effect | Bound | Phase |
-|--------|--------|-------|-------|
-| Entropy penalty | Reduces confidence | max 0.15 | S1 |
-| Insight penalty | Reduces confidence | max 0.10 | S2 |
-| Guna collapse penalty | Reduces confidence | 0.03 | S4 |
-| Guna oscillation penalty | Reduces confidence | 0.02 | S4 |
-| Guna collapse escalation | Bumps escalation +1 | Single step | S4 |
-| Mauna active | Adds caution reason code | Informational | S3 |
-| **Aggregate sovereign penalty** | **Caps total penalty** | **max 0.20** | Activation patch |
+| Signal | Effect | Bound | Track | Phase |
+|--------|--------|-------|-------|-------|
+| Entropy penalty | Reduces confidence | max 0.15 | Sovereign | S1 |
+| Insight penalty | Reduces confidence | max 0.10 | Sovereign | S2 |
+| Guna collapse penalty | Reduces confidence | 0.03 | Sovereign | S4 |
+| Guna oscillation penalty | Reduces confidence | 0.02 | Sovereign | S4 |
+| Guna collapse escalation | Bumps escalation +1 | Single step | Sovereign | S4 |
+| Mauna active | Adds caution reason code | Informational | Sovereign | S3 |
+| Generation gate (DENY) | Hard deny for generative actions | Binary | Core | C1/C3 |
+| C2 coherence penalty | Reduces confidence | max 0.05 | Core | C2 |
+| C2 drift penalty | Reduces confidence | max 0.05 | Core | C2 |
+| C2 drift escalation | Bumps escalation +1 | Single step | Core | C2 |
+| C3 UCF penalty | Reduces confidence | max 0.05 | Core | C3 |
+| C3 UCF escalation | Bumps escalation +1 | Single step | Core | C3 |
+| C4 P35 drift penalty | Reduces confidence | max 0.03 | Core | C4 |
+| C4 P35 drift escalation | Bumps escalation +1 | Single step | Core | C4 |
+| **Aggregate penalty cap** | **Caps total from all adapters** | **max 0.20** | Both | Patch |
+
+### Light Behavior Signals
+
+Small penalties that indicate instability but are not strong enough to
+justify escalation.
+
+| Signal | Effect | Bound | Track | Phase |
+|--------|--------|-------|-------|-------|
+| C4 P37 fragmenting | Reduces confidence | 0.02 | Core | C4 |
+| C4 P37 strained | Reduces confidence | 0.005 | Core | C4 |
 
 ### Audit-Only Signals
 
 These signals appear in `AuditEvent` fields for forensic analysis, replay,
 and human review. They do **not** change any governance decision.
 
-| Signal | Audit Field | Phase |
-|--------|-------------|-------|
-| Sovereign telemetry | `sovereign_telemetry` | S1 |
-| Sovereign health snapshot | `sovereign_health` | S2 |
-| Sovereign insight snapshot | `sovereign_insight` | S2 |
-| Reasoning diagnostic context | `sovereign_diagnostics` | S3 |
-| OPB lock/unlock tracking | within `sovereign_diagnostics` | S3 |
-| Vritti rejection flag | within `sovereign_diagnostics` | S3 |
-| Bhava transition audit | `sovereign_bhava_transition` | S4 |
-| Governor telemetry | `sovereign_governor_telemetry` | S4 |
-| Guna anomaly snapshot | `sovereign_guna_anomalies` | S4 |
+| Signal | Audit Field | Track | Phase |
+|--------|-------------|-------|-------|
+| Sovereign telemetry | `sovereign_telemetry` | Sovereign | S1 |
+| Sovereign health snapshot | `sovereign_health` | Sovereign | S2 |
+| Sovereign insight snapshot | `sovereign_insight` | Sovereign | S2 |
+| Reasoning diagnostic context | `sovereign_diagnostics` | Sovereign | S3 |
+| OPB lock/unlock tracking | within `sovereign_diagnostics` | Sovereign | S3 |
+| Vritti rejection flag | within `sovereign_diagnostics` | Sovereign | S3 |
+| Bhava transition audit | `sovereign_bhava_transition` | Sovereign | S4 |
+| Governor telemetry | `sovereign_governor_telemetry` | Sovereign | S4 |
+| Guna anomaly snapshot | `sovereign_guna_anomalies` | Sovereign | S4 |
+| C2 identity stability | within `core_coherence` | Core | C2 |
+| C2 continuity health | within `core_coherence` | Core | C2 |
+| C4 P36 identity resonance | within `predictive_signals` | Core | C4 |
 
-The distinction matters: audit-only signals provide observability without
-governance risk. A bug in audit-only data cannot change a decision.
-Behavior-affecting signals are more sensitive and are therefore bounded,
-capped, and wrapped in fail-safe try/except blocks.
+### Replay / Simulation-Only Signals
+
+These components are never invoked on the live path. They exist for
+downstream analysis, approval workflows, and audit replay tools.
+
+| Signal | Audit Field | Track | Phase |
+|--------|-------------|-------|-------|
+| Counterfactual sandbox | `counterfactual` (always None live) | Core | C4 |
+
+The classification hierarchy matters: behavior-affecting signals are bounded,
+capped, and wrapped in fail-safe try/except. Audit-only signals provide
+observability without governance risk — a bug in audit-only data cannot
+change a decision. Replay/simulation-only signals are fully isolated from
+the live path.
 
 ---
 
-## Sovereign Penalty Safety Model
+## Penalty Safety Model
 
-Sovereign-derived confidence penalties are layered with multiple safety
-boundaries to prevent over-penalization.
+All signal-derived confidence penalties (sovereign and core) are layered
+with multiple safety boundaries to prevent over-penalization.
 
 ### Per-Adapter Caps
 
 Each adapter independently caps its own penalty:
 
-| Adapter | Individual Cap | Rationale |
-|---------|---------------|-----------|
-| Entropy adapter | 0.15 | Entropy uncertainty is informational, not conclusive |
-| Insight adapter | 0.10 | Insight gate is heuristic, not proof |
-| Guna anomaly adapter | 0.05 | Temporal anomalies are noisy |
+| Adapter | Track | Individual Cap | Rationale |
+|---------|-------|---------------|-----------|
+| Entropy adapter | Sovereign | 0.15 | Entropy uncertainty is informational, not conclusive |
+| Insight adapter | Sovereign | 0.10 | Insight gate is heuristic, not proof |
+| Guna anomaly adapter | Sovereign | 0.05 | Temporal anomalies are noisy |
+| Coherence state adapter (C2) | Core | 0.10 | Coherence + drift combined |
+| UCF adapter (C3) | Core | 0.05 | Consciousness stability is heuristic |
+| Predictive signals adapter (C4) | Core | 0.05 | P35 + P37 combined |
 
-### Aggregate Cap (Activation Patch)
+### Aggregate Cap
 
-Even with individual caps, the raw sum could reach 0.30. The aggregate cap
-ensures the total sovereign-derived penalty never exceeds 0.20:
+The raw sum of all adapter penalties could theoretically reach 0.50. The
+aggregate cap ensures the total penalty from all sources never exceeds 0.20:
 
 ```python
-sovereign_penalty = min(0.20, sum_of_all_adapter_penalties)
+sovereign_penalty = min(
+    0.20,
+    entropy_resolution.confidence_penalty         # max 0.15 (S1)
+    + insight_resolution.confidence_penalty        # max 0.10 (S2)
+    + guna_anomaly_resolution.confidence_penalty   # max 0.05 (S4)
+    + core_coherence_resolution.confidence_penalty # max 0.10 (C2)
+    + ucf_resolution.confidence_penalty            # max 0.05 (C3)
+    + predictive_resolution.confidence_penalty,    # max 0.05 (C4)
+)
 ```
 
 This protects against pathological stacking where multiple noisy signals
 simultaneously fire, which could otherwise drop confidence unreasonably.
 
+### Drift Overlap: C2 vs C4 (Intentional)
+
+Both C2 and C4 include drift-related penalties:
+- **C2** penalizes on **current/stateful** drift posture from `CoherenceState`
+  (persona_drift, drift_risk_band) — up to 0.05 penalty
+- **C4 P35** penalizes on **predictive/forecast** drift risk from
+  `PredictivePersonaDriftReport` (predicted_drift_score) — up to 0.03 penalty
+
+Both may contribute simultaneously when both signals are present. This is
+**intentional**: current drift and predicted drift are complementary signals,
+not duplicates. The aggregate cap (0.20) bounds the combined effect.
+
 ### Fail-Safe Defaults
 
-Every sovereign resolver wraps its logic in `try/except`:
+Every resolver wraps its logic in `try/except`:
 
 ```python
 def _resolve_guna_anomaly_signal(jepa_assessment):
@@ -463,23 +765,24 @@ def _resolve_guna_anomaly_signal(jepa_assessment):
         return GunaAnomalyResolution()  # zero penalty, no escalation
 ```
 
-If any sovereign signal resolution fails, it returns a neutral default
-(zero penalty, no bias, available=False). This means sovereign integration
-cannot crash or corrupt the governance decision path.
+If any signal resolution fails, it returns a neutral default (zero penalty,
+no bias, available=False). Signal integration cannot crash or corrupt the
+governance decision path.
 
 ### Stricter-Only Invariant
 
-All sovereign effects are stricter-only:
+All signal effects are stricter-only:
 - Confidence penalties are non-negative (penalty ≥ 0)
 - Escalation bias only bumps up, never down
-- No sovereign signal can relax a governance decision
-- No sovereign signal can override a DENY to ALLOW
+- No signal can relax a governance decision
+- No signal can override a DENY to ALLOW
+- Generation gate produces hard DENY, never softens
 
 ---
 
 ## Current Limitations and Conditionality
 
-### Metadata Presence
+### Sovereign Metadata Presence
 
 S3/S4 signals require `sovereign_projection_metadata` on the
 `AuthorizationRequest`. This metadata must be explicitly provided by the
@@ -494,6 +797,27 @@ bridge (e.g., lightweight pipeline modes, or callers that don't have
 access to model internals), S3/S4 signals will be absent and the system
 operates with S1/S2 enrichments only.
 
+### Core Pipeline Data Availability
+
+Core adapters (C2/C3/C4) resolve against duck-typed pipeline
+report/state objects passed to the governance service's internal
+resolution helpers. When the core pipeline hasn't run (or hasn't
+produced reports), all core adapters resolve with `available=False`,
+zero penalty, no escalation. This is the expected degraded mode.
+
+The core adapters never import pipeline engine classes — they use
+`getattr()` with `None` defaults. This means any object with the
+expected attribute names will work, enabling both real pipeline outputs
+and synthetic test fixtures.
+
+### Generation Gate Boot Requirement
+
+The generation gate (`generation_gate.py`) must be sealed at boot time
+via `GenerationGate.seal(ENABLED)` or `GenerationGate.seal(DISABLED)`.
+If the gate is never sealed (UNSEALED state), all generative actions are
+denied. This is a deliberate fail-closed design — the system is safe
+by default even if boot is incomplete.
+
 ### `previous_bhava` Is Not Tracked
 
 Bhava transition priors (`sovereign_bhava_priors.py`) evaluate the
@@ -502,6 +826,15 @@ transition from `previous_bhava` to `current_bhava`. Currently,
 This means bhava transition audit data captures only the current bhava,
 not cross-request transition quality. Implementing cross-request bhava
 tracking would require session-level state.
+
+### Counterfactual Bridge Is Simulation-Only
+
+The counterfactual bridge (`counterfactual_bridge.py`) provides P25
+sandbox functionality but is deliberately excluded from the live
+`authorize()` path. The `AuditEvent.counterfactual` field is reserved
+for downstream replay and approval-workflow tools that attach results
+post-hoc. Promoting counterfactual analysis to the live path would
+require latency budgeting and governance authority justification.
 
 ### Sovereign-Side Constant Duplication
 
@@ -512,10 +845,9 @@ Governance runtime consumers now use shared constants from
 been fully deduplicated. This is a code hygiene issue, not a correctness
 issue — the governance side uses the right values.
 
-### Intentionally Excluded Sovereign Internals
+### Intentionally Excluded Internals
 
-The following sovereign model internals are **deliberately** not wired
-into governance:
+The following internals are **deliberately** not wired into governance:
 
 | Component | Why Excluded |
 |-----------|-------------|
@@ -524,18 +856,25 @@ into governance:
 | Raw 128D state vector | Governance doesn't need tensor-level detail |
 | `nn.Module` internals (observer, guna, vritti modules) | PyTorch dependency boundary |
 | PID governor internal state (beyond telemetry) | Telemetry passthrough is sufficient |
+| Live counterfactual analysis | Latency-prohibitive for real-time decisions |
+| Core pipeline engine classes | Numpy dependency boundary — duck-typed instead |
 
 These are excluded by design, not by oversight. The bridge architecture
 extracts semantically meaningful summaries and discards implementation
 detail.
 
-### Audit-Only Signals By Design
+### Audit-Only / Replay-Only Signals By Design
 
-Several S4 signals (bhava transition, governor telemetry) are audit-only
-by design — they provide observability but do not change governance
-decisions. This is intentional: not every signal justifies governance
-authority. Promoting audit-only signals to behavior-affecting status
-would require rigorous justification and new bounded adapter logic.
+Several signals are audit-only or replay-only by design — they provide
+observability but do not change governance decisions:
+
+- **Audit-only:** S4 bhava transition, governor telemetry; C2 identity
+  stability, continuity health; C4 P36 identity resonance
+- **Replay-only:** C4 counterfactual sandbox
+
+This is intentional: not every signal justifies governance authority.
+Promoting audit-only signals to behavior-affecting status would require
+rigorous justification and new bounded adapter logic.
 
 ---
 
@@ -543,15 +882,17 @@ would require rigorous justification and new bounded adapter logic.
 
 ### Coverage Summary
 
-| Test Suite | Tests | Focus |
-|------------|-------|-------|
-| `test_phase_s2_integration.py` | 54 | S2 adapters, bounded effects, backward compat |
-| `test_phase_s3_integration.py` | 32 | S3 diagnostics, bridge contracts, torch isolation |
-| `test_phase_s4_integration.py` | 67 | S4 anomaly/prior/telemetry, adapters, fallbacks |
-| `test_activation_e2e.py` | 8 | True E2E `authorize()` proving S3/S4 activation |
-| `test_jepa_governance.py` | ~100+ | JEPA composite, regimes, governance service integration |
+| Test Suite | Tests | Focus | Track |
+|------------|-------|-------|-------|
+| `test_phase_s2_integration.py` | 54 | S2 adapters, bounded effects, backward compat | Sovereign |
+| `test_phase_s3_integration.py` | 32 | S3 diagnostics, bridge contracts, torch isolation | Sovereign |
+| `test_phase_s4_integration.py` | 67 | S4 anomaly/prior/telemetry, adapters, fallbacks | Sovereign |
+| `test_activation_e2e.py` | 8 | True E2E `authorize()` proving S3/S4 activation | Sovereign |
+| `test_jepa_governance.py` | ~100+ | JEPA composite, regimes, governance service integration | Sovereign |
+| `test_phase_c4_predictive_and_counterfactual.py` | 45 | C4 adapter contracts, P35/P36/P37, counterfactual bridge | Core |
+| `test_closure_e2e_authorize.py` | 31 | E2E authorize proving C2/C3/C4, aggregate cap, generation gate | Core |
 
-### What the E2E Tests Prove
+### What the Sovereign E2E Tests Prove
 
 The `test_activation_e2e.py` tests are the definitive proof that S3/S4
 signals are no longer dormant:
@@ -569,6 +910,35 @@ signals are no longer dormant:
 4. **Absence is safe** — Without metadata, all fields default to None
    and governance proceeds normally.
 
+### What the Core E2E Tests Prove
+
+The `test_closure_e2e_authorize.py` tests prove C1-C4 signals are live:
+
+1. **C2 wiring** — `authorize()` populates `core_coherence` on the audit
+   event with coherence and drift data. Low coherence measurably reduces
+   confidence. High drift produces escalation bias.
+
+2. **C3 wiring** — `authorize()` populates `ucf_signal` on the audit event.
+   Critical UCF measurably reduces confidence with correct provenance.
+
+3. **C4 wiring** — `authorize()` populates `predictive_signals` on the
+   audit event. High drift risk measurably reduces confidence.
+
+4. **Combined stacking** — When C2+C3+C4 all fire, penalties stack correctly.
+   `counterfactual` is always None on live decisions.
+
+5. **Aggregate cap with all sources** — When all six penalty sources fire
+   (entropy + insight + guna + C2 + C3 + C4), the cap holds at 0.20 and
+   confidence never goes below 0.0.
+
+6. **Generation gate behavior** — 14 tests prove `_is_generative_action()`
+   classification, `_check_generation_gate()` logic for all three states
+   (ENABLED/DISABLED/UNSEALED), and full `authorize()` gate enforcement.
+
+7. **Drift overlap documentation** — Tests verify inline documentation
+   strings exist in both `governance_service.py` and
+   `predictive_signals_adapter.py`.
+
 ### What Is NOT Tested
 
 - No tests verify that a specific production caller always supplies
@@ -576,6 +946,10 @@ signals are no longer dormant:
 - No tests cover cross-request `previous_bhava` tracking (not implemented)
 - No tests cover the full model→bridge→governance path with live PyTorch
   model inference (tests use synthetic metadata dicts)
+- No tests invoke the counterfactual bridge during `authorize()` (by design
+  — it is replay/simulation-only)
+- No tests cover real core pipeline output objects (tests use duck-typed
+  synthetic fixtures)
 
 ---
 
@@ -596,14 +970,32 @@ signals are no longer dormant:
 | `agentic_framework/signal_adapters/insight_adapter.py` | S2 | No | Insight resolution |
 | `agentic_framework/signal_adapters/guna_anomaly_adapter.py` | S4 | No | Anomaly penalty/bias |
 | `agentic_framework/jepa_governance.py` | S1+patch | No | JEPA composite + regime + projection_metadata |
-| `agentic_framework/governance_models.py` | S1+patch | No | AuthorizationRequest.sovereign_projection_metadata |
-| `agentic_framework/governance_service.py` | S1–S4+patch | No | Decision engine, penalty cap, resolver wiring |
+
+### Core Integration Files (by phase)
+
+| File | Phase | numpy | Purpose |
+|------|-------|-------|---------|
+| `agentic_framework/signal_adapters/generation_gate.py` | C1/C3 | No | One-time seal singleton |
+| `agentic_framework/signal_adapters/coherence_state_adapter.py` | C2 | No | Coherence/drift signals |
+| `agentic_framework/signal_adapters/ucf_adapter.py` | C3 | No | UCF consciousness signals |
+| `agentic_framework/signal_adapters/predictive_signals_adapter.py` | C4 | No | P35+P36+P37 signals |
+| `agentic_framework/signal_adapters/counterfactual_bridge.py` | C4 | No | Replay/simulation bridge |
+
+### Shared Files (both tracks)
+
+| File | Phases | Purpose |
+|------|--------|---------|
+| `agentic_framework/governance_models.py` | S1+patch, C4 | Request/response models, audit event fields |
+| `agentic_framework/governance_service.py` | S1–S4+patch, C1–C4+closure | Decision engine, penalty cap, all resolver wiring |
+| `agentic_framework/signal_adapters/__init__.py` | S1–S4, C1–C4 | Adapter exports |
 
 ### Test Files
 
-| File | Tests | Focus |
-|------|-------|-------|
-| `tests/test_phase_s2_integration.py` | 54 | S2 unit + integration |
-| `tests/test_phase_s3_integration.py` | 32 | S3 unit + integration |
-| `tests/test_phase_s4_integration.py` | 67 | S4 unit + integration |
-| `tests/test_activation_e2e.py` | 8 | E2E sovereign activation proof |
+| File | Tests | Focus | Track |
+|------|-------|-------|-------|
+| `tests/test_phase_s2_integration.py` | 54 | S2 unit + integration | Sovereign |
+| `tests/test_phase_s3_integration.py` | 32 | S3 unit + integration | Sovereign |
+| `tests/test_phase_s4_integration.py` | 67 | S4 unit + integration | Sovereign |
+| `tests/test_activation_e2e.py` | 8 | E2E sovereign activation proof | Sovereign |
+| `tests/unit/core/test_phase_c4_predictive_and_counterfactual.py` | 45 | C4 adapter + bridge contracts | Core |
+| `tests/unit/core/test_closure_e2e_authorize.py` | 31 | E2E core wiring + gate + cap | Core |
