@@ -805,7 +805,9 @@ print(f"Enabled tasks: {stats['enabled_tasks']}")
 The ten core components above describe the *interaction-level* framework.
 Underneath them, the governance stack has evolved into a layered architecture
 with deeper semantic awareness. This section provides a brief overview; see
-`docs/governance/AGENTIC_ARCHITECTURE.md` for the full technical specification.
+`docs/governance/AGENTIC_ARCHITECTURE.md` for the full technical specification
+and `agentic/AGENTIC_ARCHITECTURE.md` for the sovereign integration
+architecture (S1–S4 phases + activation patch).
 
 ### Semantic State Layer (JEPA Governance)
 
@@ -844,9 +846,29 @@ governance regime into domain-specific action postures:
 Domain profiles are declarative data, not code. They can only *restrict*
 governance decisions, never relax them.
 
-### What's Coming Next: Shadow AI Control
+### Sovereign Integration (S1–S4)
 
-The next planned layer will govern AI asset provenance and sanctionedness —
+The governance stack now integrates sovereign model signals through a
+bridge-first architecture. Sovereign model internals (PyTorch-heavy) are
+never directly imported — instead, pure-Python runtime-safe modules and
+bridge metadata carry sovereign signals into governance.
+
+Key capabilities:
+- **S1/S2 (always active):** Vritti/entropy signal resolution, sovereign
+  health and insight gate, bounded confidence penalties
+- **S3/S4 (active when projection metadata is present):** Reasoning-kernel
+  diagnostics, guna anomaly detection (with bounded confidence penalty),
+  bhava transition priors, governor telemetry
+
+All sovereign effects are stricter-only (penalties ≥ 0, escalation only
+bumps up) with an aggregate cap of 0.20 on sovereign-derived penalties.
+
+See `agentic/AGENTIC_ARCHITECTURE.md` for the full sovereign integration
+architecture, including the activation patch that made S3/S4 live.
+
+### Shadow AI Control
+
+The Shadow AI Control Layer governs AI asset provenance and sanctionedness —
 tracking which models, tools, and plugins are approved, and detecting when
 approved assets operate outside their sanctioned boundaries. See the architecture
 document for details.
