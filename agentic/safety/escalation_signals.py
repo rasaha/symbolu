@@ -12,6 +12,11 @@ Usage:
     from agentic.safety.escalation_signals import PresentationDirective
     if directive.escalate_to_human:
         # Trigger human-in-the-loop
+
+STATUS: UNUSED — Zero consumers found in agentic/ or symbolu_core/.
+Re-export facade only; no logic of its own. Import directly from
+symbolu_core.presentation if needed.
+Audited: 2026-04-04 (S0 truthfulness cleanup)
 """
 
 from symbolu_core.presentation.types import PresentationDirective

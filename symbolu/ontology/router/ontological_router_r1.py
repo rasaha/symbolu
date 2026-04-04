@@ -47,6 +47,7 @@ from enum import Enum
 from typing import FrozenSet, Mapping, Optional, Tuple
 
 from symbolu.ontology.layers.ontology_layer import OntologicalLayer  # canonical source
+from symbolu.safety.gcc_runtime_guard import assert_non_expressive
 
 
 # =============================================================================
@@ -284,14 +285,19 @@ class OntologicalLayerRouter:
             projected_layers = default_layers
 
         # Step 4: (Validations occurred in _apply_hint if hint was provided)
-        # Step 5: Return response
-        return ProjectionResponse(
+        # Step 5: Build response
+        response = ProjectionResponse(
             artifact_id=request.artifact_id,
             artifact_hash=request.artifact_hash,
             phase_id=request.phase_id,
             projected_layers=projected_layers,
             router_version=self.ROUTER_VERSION,
         )
+
+        # GCC C-1: Assert return value is non-expressive (fail-closed)
+        assert_non_expressive(response, path="OntologicalLayerRouter.project:return")
+
+        return response
 
     def _apply_hint(
         self,
@@ -458,4 +464,5 @@ def route_projection(
     router = OntologicalLayerRouter(
         explicit_absolving_opt_in=explicit_absolving_opt_in
     )
+    # GCC guard applied inside router.project(); no double-check needed
     return router.project(request)

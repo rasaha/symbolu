@@ -29,6 +29,7 @@ from symbolu.ontology.layers.ontology_layer import (
     GATED_LAYERS,
     OntologicalLayer,
 )
+from symbolu.safety.gcc_runtime_guard import assert_non_expressive
 
 
 # =============================================================================
@@ -125,7 +126,12 @@ def get_layers_for_phase(
         layers = layers - GATED_LAYERS
 
     # Return in canonical order (sorted by enum value)
-    return tuple(sorted(layers, key=lambda l: l.value))
+    result = tuple(sorted(layers, key=lambda l: l.value))
+
+    # GCC C-1: Assert return value is non-expressive (fail-closed)
+    assert_non_expressive(result, path="get_layers_for_phase:return")
+
+    return result
 
 
 def is_valid_phase_id(phase_id: str) -> bool:

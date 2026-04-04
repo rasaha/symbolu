@@ -570,83 +570,104 @@ agentic/
 
 ---
 
-## Orthogonal Safety Layers (Always Active)
+## Orthogonal Safety Layers
+
+> **Updated 2026-04-04:** Safety integration track S0–S5 has been completed.
+> This section reflects the current activation status of each safety layer.
+> For the authoritative safety architecture description, see
+> [`agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  GCC RUNTIME GUARD  (safety/gcc_runtime_guard)                │
-│  Applied at every constrained phase exit (Phases 1b-9)        │
-│  Enforces: all intermediate outputs are non-expressive         │
+│  GCC RUNTIME GUARD  (safety/gcc_runtime_guard)     [ACTIVE]   │
+│  Enforced at real constrained boundaries (S1):                │
+│    - OntologicalLayerRouter.project() return value             │
+│    - get_layers_for_phase() return value                       │
+│    - Other constrained module outputs                          │
+│  Includes opaque ID support for structural identifiers         │
 │  Violation → GCCViolationError (immediate halt)                │
-│  Independent of governance flow — always active                │
 └──────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
-│  RATE LIMITER  (safety/rate_limiter)                           │
-│  API boundary: sliding-window, per-IP                          │
-│  60 requests/minute default → 429 on exceeded                  │
-│  Independent of governance flow — always active                │
+│  GCC LEDGER INVARIANT  (safety/gcc_ledger_invariant) [ACTIVE] │
+│  Enforced at real ledger write boundaries (S1):               │
+│    - LedgerStore.append()                                      │
+│    - LedgerEntryStore.append()                                 │
+│  Validates ledger entry structure before writes                │
+│  Includes opaque ID support for artifact/span IDs             │
 └──────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
-│  ESCALATION SIGNALS  (safety/escalation_signals)              │
-│  PresentationDirective.escalate_to_human                       │
-│  P6/P7 regime: HOLD / DE_ESCALATE / CLARIFY                   │
-│  Triggers human-in-the-loop when confidence insufficient       │
+│  RATE LIMITER  (safety/rate_limiter)               [UNUSED]   │
+│  STATUS: UNUSED (S0) — No runtime consumers.                  │
+│  Dead facade, explicitly marked.                              │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  ESCALATION SIGNALS  (safety/escalation_signals)   [UNUSED]   │
+│  STATUS: UNUSED (S0) — No runtime consumers.                  │
+│  Dead facade, explicitly marked.                              │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Governance Patterns Pipeline (safety/governance_patterns/)
+## Governance Patterns (safety/governance_patterns/)
 
-Six standalone governance primitives extracted from infrastructure governance
-and rewritten for AI agent governance.  No external dependencies — these are
-agentic-native implementations.
+Six governance primitives extracted from infrastructure governance and
+rewritten for AI agent governance. **After safety integration S0–S5,
+four are now actively consumed by `GovernanceService.authorize()`,
+one is deprecated, and one remains dormant.**
 
 ```
   ┌─────────────────────────────────────────────────────────────────────┐
-  │                    GOVERNANCE PATTERNS PIPELINE                     │
+  │              GOVERNANCE PATTERNS — ACTIVATION STATUS                 │
   │                                                                     │
-  │   ① PolicyEngine          Configurable allow/deny enforcement       │
-  │      policy_engine.py      • Action-type allowlists / denylists     │
-  │      OLM: O1, O6           • Blackout windows (time-based blocks)   │
-  │                             • Rate limiting (sliding window)         │
+  │   ① PolicyEngine          [ACTIVE — S4-safety]                      │
+  │      policy_engine.py      • Per-agent allow/deny enforcement       │
+  │      OLM: O1, O6           • Blackout windows, rate limiting        │
+  │                             • Hard deny on violation                 │
+  │      Consumer: GovernanceService.authorize()                        │
+  │      Adapter: policy_engine_adapter.py                              │
   │              │                                                       │
   │              ▼                                                       │
-  │   ② SafetyBounds           Hard non-negotiable action limits        │
-  │      safety_bounds.py      • Max action magnitude (clamping)        │
-  │      OLM: O3, O4           • Min action magnitude (noise floor)     │
-  │                             • Cooldown enforcement                   │
+  │   ② SafetyBounds           [DORMANT — no consumer]                  │
+  │      safety_bounds.py      • Max/min action magnitude (clamping)    │
+  │      OLM: O3, O4           • Cooldown enforcement                   │
+  │      Reason dormant: framework lacks action-magnitude payload model  │
   │              │                                                       │
   │              ▼                                                       │
-  │   ③ PlasticityGate         Sigmoid permission-to-act gate           │
-  │      plasticity_gate.py    • Double-EMA smoothing (no flicker)      │
-  │      OLM: O5, O10          • P_t = σ(k_r·R_t - k_m·M_t + b_p)     │
-  │                             • Output range [~0.27, 1.0]             │
+  │   ③ PlasticityGate         [ACTIVE — S2-safety]                     │
+  │      plasticity_gate.py    • Sigmoid permission-to-act gate         │
+  │      OLM: O5, O10          • Double-EMA smoothing                   │
+  │                             • Bounded confidence penalty + escalation│
+  │      Consumer: GovernanceService.authorize()                        │
+  │      Adapter: plasticity_adapter.py                                 │
   │              │                                                       │
   │              ▼                                                       │
-  │   ④ ReadinessChecker       Multi-criterion readiness gate           │
-  │      readiness_checker.py  • Plasticity ≥ min_plasticity            │
-  │      OLM: O9, O7           • Cooldown elapsed                       │
-  │                             • No pending escalations                 │
+  │   ④ ReadinessChecker       [ACTIVE — S3-safety]                     │
+  │      readiness_checker.py  • Multi-criterion readiness gate         │
+  │      OLM: O9, O7           • Plasticity, stability, escalations     │
+  │                             • Cooldown honestly disabled (no state)  │
+  │      Consumer: GovernanceService.authorize()                        │
+  │      Adapter: readiness_adapter.py                                  │
   │              │                                                       │
   │              ▼                                                       │
-  │   ⑤ ApprovalManager        Human-in-the-loop lifecycle              │
-  │      approval_manager.py   • PENDING → APPROVED / DISMISSED / EXPIRED│
-  │      OLM: O8, O9           • TTL auto-expiry                        │
-  │                             • Full audit trail (who, when, why)      │
+  │   ⑤ ApprovalManager        [DEPRECATED — S0]                       │
+  │      approval_manager.py   • Superseded by approval_workflow.py     │
+  │      OLM: O8, O9           • In agentic_framework/, not safety/     │
   │              │                                                       │
   │              ▼                                                       │
-  │        [ACTION EXECUTES]                                            │
+  │        [ACTION EXECUTES — no execution lifecycle exists yet]        │
   │              │                                                       │
   │              ▼                                                       │
-  │   ⑥ RollbackMonitor        Post-action degradation rollback         │
-  │      rollback_monitor.py   • Grace period → monitor window          │
-  │      OLM: O12, O11         • Signal degradation detection (>15%)    │
-  │                             • Auto-rollback + post-rollback cooldown │
-  │                             • Watched signals: confidence,           │
-  │                               governance_strength, coherence         │
+  │   ⑥ RollbackMonitor        [ACTIVE — S5-safety, lifecycle-prep]     │
+  │      rollback_monitor.py   • Pre-action signal snapshot capture     │
+  │      OLM: O12, O11         • Audit-visible rollback watch metadata  │
+  │                             • External check() for degradation      │
+  │                             • NOT automatic rollback execution       │
+  │      Consumer: GovernanceService.authorize()                        │
+  │      Adapter: rollback_adapter.py                                   │
   └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -831,16 +852,16 @@ Maps the patent-exact 12-layer Ontological Layer Model to governance modules.
 | 12 | Output gate | ALLOW / BLOCK / WARN | safety/ |
 | 13 | GCC runtime | pass / GCCViolationError | safety/ |
 
-### Governance Patterns Pipeline (6 decision points)
+### Governance Patterns Pipeline (6 primitives — activation status post-S0–S5)
 
-| # | Decision Point | Outcomes | Module |
-|---|---------------|----------|--------|
-| GP1 | Policy Engine | allowed=True/False + violations | safety/governance_patterns/ |
-| GP2 | Safety Bounds | clamped magnitude + cooldown | safety/governance_patterns/ |
-| GP3 | Plasticity Gate | plasticity [0.27, 1.0] | safety/governance_patterns/ |
-| GP4 | Readiness Checker | READY / NOT_READY / DEGRADED | safety/governance_patterns/ |
-| GP5 | Approval Manager | PENDING → APPROVED / DISMISSED / EXPIRED | safety/governance_patterns/ |
-| GP6 | Rollback Monitor | MONITORING → STABLE / DEGRADED / ROLLED_BACK | safety/governance_patterns/ |
+| # | Decision Point | Outcomes | Status | Consumer |
+|---|---------------|----------|--------|----------|
+| GP1 | Policy Engine | allowed=True/False + hard deny | **ACTIVE (S4)** | `GovernanceService.authorize()` |
+| GP2 | Safety Bounds | clamped magnitude + cooldown | **DORMANT** | No consumer (awaits payload model) |
+| GP3 | Plasticity Gate | plasticity → penalty + escalation | **ACTIVE (S2)** | `GovernanceService.authorize()` |
+| GP4 | Readiness Checker | READY / NOT_READY / DEGRADED → penalty + escalation | **ACTIVE (S3)** | `GovernanceService.authorize()` |
+| GP5 | Approval Manager | (lifecycle) | **DEPRECATED (S0)** | Superseded by `approval_workflow.py` |
+| GP6 | Rollback Monitor | pre-action snapshot + audit-visible watch | **ACTIVE (S5, lifecycle-prep)** | `GovernanceService.authorize()` |
 
 ### OLM Bridge (4 risk classifications)
 

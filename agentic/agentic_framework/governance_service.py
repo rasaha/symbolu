@@ -125,6 +125,29 @@ from agentic.agentic_framework.signal_adapters.ontology_adapter import (
     resolve_ontology_balance,
     OntologyBalanceResolution,
 )
+from agentic.agentic_framework.signal_adapters.plasticity_adapter import (
+    resolve_plasticity_signal,
+    PlasticityResolution,
+)
+from agentic.agentic_framework.signal_adapters.readiness_adapter import (
+    resolve_readiness_signal,
+    ReadinessResolution,
+)
+from agentic.agentic_framework.signal_adapters.policy_engine_adapter import (
+    resolve_policy_check,
+    AgentPolicyResolution,
+)
+from agentic.safety.governance_patterns.policy_engine import (
+    PolicyEngine,
+    PolicyConfig,
+)
+from agentic.safety.governance_patterns.rollback_monitor import (
+    RollbackMonitor,
+)
+from agentic.agentic_framework.signal_adapters.rollback_adapter import (
+    resolve_rollback_snapshot,
+    RollbackSnapshotResolution,
+)
 from agentic.core.generation_gate import (
     GenerationGate,
     GenerationMode,
@@ -529,6 +552,12 @@ def _resolve_session_enrichment(
 
     Signals are extracted from request.metadata with well-known keys.
     Missing signals contribute zero penalty (fail-closed).
+
+    BRIDGE STATUS: The mechanical pipeline produces identity_signature,
+    motivation_profile, and temporal data on ctx, but no pipeline →
+    AuthorizationRequest bridge exists yet. These metadata keys are
+    currently only populated if an external caller explicitly provides
+    them. See AGENTIC_ARCHITECTURE.md §Pipeline ↔ Governance for details.
 
     Args:
         request: Authorization request (may carry session signals in .metadata).
@@ -975,6 +1004,71 @@ def _resolve_ontology_balance_signal(
         return _ONTOLOGY_BALANCE_UNAVAILABLE
 
 
+# =============================================================================
+# Plasticity gate resolution (Phase S2-safety)
+# =============================================================================
+
+def _resolve_plasticity_gate_signal(
+    core_coherence_resolution: CoreCoherenceResolution,
+) -> PlasticityResolution:
+    """Resolve plasticity gate signal from already-resolved coherence state.
+
+    Phase S2-safety: Feeds the PlasticityGate with coherence/drift signals
+    already available from core_coherence_resolution (Step 5c4). No new
+    upstream dependencies.
+
+    Inputs:
+        resistance ← semantic_stability ?? coherence_score (from C2)
+        misalignment ← persona_drift (from C2)
+
+    Fail-closed: if core coherence is unavailable or computation fails,
+    returns available=False with zero penalty and no escalation bias.
+    """
+    try:
+        if not core_coherence_resolution.available:
+            return resolve_plasticity_signal()  # no inputs → unavailable
+
+        return resolve_plasticity_signal(
+            coherence_score=core_coherence_resolution.coherence_score,
+            semantic_stability=core_coherence_resolution.semantic_stability,
+            persona_drift=core_coherence_resolution.persona_drift,
+        )
+
+    except Exception:
+        return resolve_plasticity_signal()  # fail-closed
+
+
+# =============================================================================
+# Readiness checker resolution (Phase S3-safety)
+# =============================================================================
+
+def _resolve_readiness_check_signal(
+    plasticity_resolution: PlasticityResolution,
+    core_coherence_resolution: CoreCoherenceResolution,
+    effective_esc_level_value: str,
+) -> ReadinessResolution:
+    """Resolve readiness signal from already-resolved S2/C2 signals.
+
+    Phase S3-safety: Evaluates multi-criterion readiness using:
+    - plasticity from S2 (primary gate criterion)
+    - stability from C2 core coherence
+    - escalation level as proxy for pending escalations
+
+    Fail-closed: if plasticity is unavailable, readiness cannot be
+    assessed → returns available=False with zero penalty.
+    """
+    try:
+        return resolve_readiness_signal(
+            plasticity=plasticity_resolution.plasticity,
+            coherence_score=core_coherence_resolution.coherence_score,
+            semantic_stability=core_coherence_resolution.semantic_stability,
+            escalation_level=effective_esc_level_value,
+        )
+
+    except Exception:
+        return resolve_readiness_signal()  # fail-closed
+
+
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
     gate_decision: ConfidenceGateDecision,
@@ -1123,6 +1217,8 @@ class GovernanceService:
         shadow_registry: Optional[ShadowRegistry] = None,
         policy_resolution: Optional[PolicyResolution] = None,
         approval_store: Optional[ApprovalStore] = None,
+        agent_policy_engine: Optional[PolicyEngine] = None,
+        rollback_monitor: Optional[RollbackMonitor] = None,
     ):
         """
         Initialize governance service.
@@ -1149,6 +1245,15 @@ class GovernanceService:
             approval_store: Optional ApprovalStore for durable approval workflow.
                 When provided, DEFER+requires_human decisions create persistent
                 approval requests with auditable state transitions.
+            agent_policy_engine: Optional PolicyEngine for per-agent action
+                policy (Phase S4-safety). When provided, allow/deny/blackout/
+                rate-limit rules are evaluated before the governance decision.
+                Fail-safe: if not provided, all actions are allowed by default.
+            rollback_monitor: Optional RollbackMonitor for pre-action signal
+                snapshot capture (Phase S5-safety). When provided, a pre-action
+                signal snapshot is captured at authorize-time and a watch is
+                started. Post-action check() must be called by external caller.
+                Fail-safe: if not provided, no snapshot is captured.
         """
         if confidence_gate is not None:
             self.gate = confidence_gate
@@ -1177,6 +1282,12 @@ class GovernanceService:
 
         # Approval Workflow Layer
         self._approval_store: Optional[ApprovalStore] = approval_store
+
+        # Agent Policy Engine (Phase S4-safety)
+        self._agent_policy_engine: Optional[PolicyEngine] = agent_policy_engine
+
+        # Rollback Monitor (Phase S5-safety)
+        self._rollback_monitor: Optional[RollbackMonitor] = rollback_monitor
 
     def authorize(self, request: AuthorizationRequest) -> AuthorizationResponse:
         """
@@ -1219,6 +1330,16 @@ class GovernanceService:
             )
         forbidden_cap = _check_forbidden_capabilities(
             request.capabilities, forbidden=policy_forbidden,
+        )
+
+        # Step 2a: Agent policy engine check (Phase S4-safety).
+        #   Evaluates per-agent allow/deny, blackout windows, and rate
+        #   limits. Policy violations produce hard deny.
+        #   Fail-safe: if no engine configured, all actions are allowed.
+        agent_policy_resolution = resolve_policy_check(
+            engine=self._agent_policy_engine,
+            agent_id=request.actor_id,
+            action_type=request.action_type,
         )
 
         # Step 2b: Resolve session enrichment signals (Phase 3)
@@ -1310,6 +1431,16 @@ class GovernanceService:
         #   Fail-closed: if resolution fails, zero penalty and no bias.
         ontology_balance_signal = _resolve_ontology_balance_signal(request)
 
+        # Step 5c9: Resolve Phase S2-safety plasticity gate signal.
+        #   Computes a sigmoid permission-to-act value from core coherence
+        #   signals (stability → resistance, drift → misalignment).
+        #   Low plasticity = gate closing = system not ready to act.
+        #   Max penalty: 0.04. Escalation bias below 0.35.
+        #   Fail-closed: if coherence unavailable, zero penalty and no bias.
+        plasticity_resolution = _resolve_plasticity_gate_signal(
+            core_coherence_resolution,
+        )
+
         # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
@@ -1330,6 +1461,12 @@ class GovernanceService:
         # This is intentional: current drift and predicted drift are
         # complementary signals, not duplicates. The aggregate cap (0.20)
         # bounds the combined effect and prevents runaway stacking.
+        #
+        # PLASTICITY NOTE (S2-safety):
+        # Plasticity is derived FROM core_coherence (C2) inputs but is a
+        # distinct signal: it captures the sigmoid permission-to-act state,
+        # not the raw coherence/drift values. Its penalty (max 0.04) is
+        # additive and bounded within the aggregate cap.
         sovereign_penalty = min(
             0.20,
             entropy_resolution.confidence_penalty
@@ -1338,7 +1475,8 @@ class GovernanceService:
             + core_coherence_resolution.confidence_penalty
             + ucf_resolution.confidence_penalty
             + predictive_resolution.confidence_penalty
-            + ontology_balance_signal.confidence_penalty,
+            + ontology_balance_signal.confidence_penalty
+            + plasticity_resolution.confidence_penalty,
         )
         effective_confidence = max(
             0.0,
@@ -1447,12 +1585,69 @@ class GovernanceService:
             if bumped > current_severity:
                 effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
 
+        # Phase S2-safety: Plasticity gate escalation bias (stricter-only).
+        # If plasticity gate is nearly closed (< 0.35), bump escalation.
+        if plasticity_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase S3-safety: Readiness checker — multi-criterion readiness gate.
+        #   Evaluates whether the system is ready to act based on:
+        #   - Plasticity (from S2) — is the gate open enough?
+        #   - Stability (from C2) — is the system coherent?
+        #   - Pending escalations — are there blocking escalations?
+        #   NOT_READY → penalty 0.03 + escalation bias.
+        #   DEGRADED → penalty 0.02, no escalation.
+        #   READY → zero penalty.
+        #   Fail-closed: if plasticity unavailable, zero penalty.
+        readiness_resolution = _resolve_readiness_check_signal(
+            plasticity_resolution,
+            core_coherence_resolution,
+            effective_esc_level.value,
+        )
+
+        # Apply readiness penalty to sovereign aggregate
+        # (additive, bounded within existing 0.20 cap via re-capping)
+        if readiness_resolution.confidence_penalty > 0:
+            sovereign_penalty = min(
+                0.20,
+                sovereign_penalty + readiness_resolution.confidence_penalty,
+            )
+            effective_confidence = max(
+                0.0,
+                gate_decision.confidence.overall
+                + jepa_assessment.confidence_adjustment
+                - sovereign_penalty,
+            )
+
+        # Phase S3-safety: Readiness escalation bias (stricter-only).
+        # If NOT_READY, bump escalation by one level (cap at confirm).
+        if readiness_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
         # Phase C3: Generation gate enforcement (fail-closed).
         # If the action is generative and the gate blocks it, override
         # the governance decision to DENY. Non-generative actions are
         # never affected. This is the canonical governance-facing
         # integration of the generation gate.
         if generation_gate_result["gate_blocks"]:
+            governance_decision = APIGovernanceDecision.DENY
+            eligible = False
+
+        # Phase S4-safety: Agent policy engine hard deny.
+        # If the policy engine explicitly denies the action, override
+        # the governance decision to DENY. This is a hard block,
+        # similar to forbidden capabilities.
+        if agent_policy_resolution.hard_deny:
             governance_decision = APIGovernanceDecision.DENY
             eligible = False
 
@@ -1680,6 +1875,44 @@ class GovernanceService:
             if ontology_balance_signal.available else None
         )
 
+        # Step 7k: Build Phase S2-safety plasticity gate audit dict
+        plasticity_gate_dict = (
+            plasticity_resolution.to_audit_dict()
+            if plasticity_resolution.available else None
+        )
+
+        # Step 7l: Build Phase S3-safety readiness check audit dict
+        readiness_check_dict = (
+            readiness_resolution.to_audit_dict()
+            if readiness_resolution.available else None
+        )
+
+        # Step 7m: Build Phase S4-safety agent policy audit dict
+        agent_policy_dict = (
+            agent_policy_resolution.to_audit_dict()
+            if agent_policy_resolution.available else None
+        )
+
+        # Step 7n: Phase S5-safety — Rollback monitor pre-action snapshot.
+        #   Captures governance signal values at decision time and registers
+        #   a RollbackWatch with the monitor. The watch can later be checked
+        #   by an external caller with post-action signals.
+        #   No confidence penalty, no escalation bias — purely observational.
+        #   Fail-safe: no monitor → no snapshot, no effect.
+        rollback_resolution = resolve_rollback_snapshot(
+            monitor=self._rollback_monitor,
+            decision_id=decision_id,
+            agent_id=request.actor_id,
+            action_type=request.action_type,
+            confidence=effective_confidence,
+            plasticity=plasticity_resolution.plasticity,
+            coherence=core_coherence_resolution.coherence_score,
+        )
+        rollback_watch_dict = (
+            rollback_resolution.to_audit_dict()
+            if rollback_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1796,6 +2029,26 @@ class GovernanceService:
                 "ontology_balance_confidence_penalty": ontology_balance_signal.confidence_penalty,
                 "ontology_balance_escalation_bias": ontology_balance_signal.escalation_bias,
                 "ontology_balance_dominant_state": ontology_balance_signal.dominant_state,
+                # Phase S2-safety: Plasticity gate provenance
+                "plasticity_available": plasticity_resolution.available,
+                "plasticity_value": plasticity_resolution.plasticity,
+                "plasticity_confidence_penalty": plasticity_resolution.confidence_penalty,
+                "plasticity_escalation_bias": plasticity_resolution.escalation_bias,
+                # Phase S3-safety: Readiness checker provenance
+                "readiness_available": readiness_resolution.available,
+                "readiness_status": readiness_resolution.status,
+                "readiness_ready": readiness_resolution.ready,
+                "readiness_confidence_penalty": readiness_resolution.confidence_penalty,
+                "readiness_escalation_bias": readiness_resolution.escalation_bias,
+                # Phase S4-safety: Agent policy engine provenance
+                "agent_policy_available": agent_policy_resolution.available,
+                "agent_policy_allowed": agent_policy_resolution.allowed,
+                "agent_policy_hard_deny": agent_policy_resolution.hard_deny,
+                "agent_policy_violations": list(agent_policy_resolution.violations),
+                # Phase S5-safety: Rollback monitor provenance
+                "rollback_available": rollback_resolution.available,
+                "rollback_watch_started": rollback_resolution.watch_started,
+                "rollback_watch_id": rollback_resolution.watch_id,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -1810,6 +2063,10 @@ class GovernanceService:
             generation_gate=generation_gate_dict,
             predictive_signals=predictive_signals_dict,
             ontology_balance=ontology_balance_dict,
+            plasticity_gate=plasticity_gate_dict,
+            readiness_check=readiness_check_dict,
+            agent_policy=agent_policy_dict,
+            rollback_watch=rollback_watch_dict,
         )
         self._persist_audit_event(audit_event)
 

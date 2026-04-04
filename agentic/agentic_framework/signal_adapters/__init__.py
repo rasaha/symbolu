@@ -70,6 +70,22 @@ from agentic.agentic_framework.signal_adapters.phase4a_adapter import (
     resolve_varna_exists,
     VarnaLookupResolution,
 )
+from agentic.agentic_framework.signal_adapters.plasticity_adapter import (
+    resolve_plasticity_signal,
+    PlasticityResolution,
+)
+from agentic.agentic_framework.signal_adapters.readiness_adapter import (
+    resolve_readiness_signal,
+    ReadinessResolution,
+)
+from agentic.agentic_framework.signal_adapters.policy_engine_adapter import (
+    resolve_policy_check,
+    AgentPolicyResolution,
+)
+from agentic.agentic_framework.signal_adapters.rollback_adapter import (
+    resolve_rollback_snapshot,
+    RollbackSnapshotResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -107,4 +123,16 @@ __all__ = [
     "resolve_varna_lookup",
     "resolve_varna_exists",
     "VarnaLookupResolution",
+    # Plasticity gate (S2)
+    "resolve_plasticity_signal",
+    "PlasticityResolution",
+    # Readiness checker (S3)
+    "resolve_readiness_signal",
+    "ReadinessResolution",
+    # Policy engine (S4)
+    "resolve_policy_check",
+    "AgentPolicyResolution",
+    # Rollback monitor (S5)
+    "resolve_rollback_snapshot",
+    "RollbackSnapshotResolution",
 ]

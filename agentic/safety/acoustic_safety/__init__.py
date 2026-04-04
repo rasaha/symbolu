@@ -12,6 +12,11 @@ on acoustic parameters and detects:
   - Prosodic manipulation
 
 Any violation at CRITICAL level results in acoustic parameter clamping.
+
+STATUS: UNUSED — Zero consumers found in agentic/ or symbolu_core/.
+Re-export facade only; no logic of its own. Import directly from
+symbolu_core.mechanical.pipeline.p13_acoustic_safety if needed.
+Audited: 2026-04-04 (S0 truthfulness cleanup)
 """
 
 from symbolu_core.mechanical.pipeline.p13_acoustic_safety.p13_acoustic_safety_schema import (

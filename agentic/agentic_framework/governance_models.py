@@ -373,6 +373,49 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase S2-safety: Plasticity gate signal
+    plasticity_gate: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Plasticity gate signal at decision time: sigmoid "
+            "permission-to-act value, resistance/misalignment inputs, "
+            "confidence_penalty, escalation_bias. "
+            "Bridged via plasticity_adapter (Phase S2)."
+        ),
+    )
+
+    # Phase S3-safety: Readiness checker signal
+    readiness_check: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Readiness checker signal at decision time: multi-criterion "
+            "readiness status (READY/NOT_READY/DEGRADED), plasticity, "
+            "stability, pending escalations, confidence_penalty, "
+            "escalation_bias. Bridged via readiness_adapter (Phase S3)."
+        ),
+    )
+
+    # Phase S4-safety: Agent policy engine signal
+    agent_policy: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Agent policy engine evaluation at decision time: "
+            "allowed/denied status, violations, agent_id, action_type. "
+            "Bridged via policy_engine_adapter (Phase S4)."
+        ),
+    )
+
+    # Phase S5-safety: Rollback monitor pre-action snapshot
+    rollback_watch: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Rollback monitor pre-action signal snapshot at decision time: "
+            "watch_started, pre_action_signals, watch_id. "
+            "Lifecycle-preparatory: post-action check() requires external "
+            "caller. Bridged via rollback_adapter (Phase S5)."
+        ),
+    )
+
     # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
     # NOTE: This field is INTENTIONALLY never populated by
     # GovernanceService.authorize(). It exists for downstream replay,

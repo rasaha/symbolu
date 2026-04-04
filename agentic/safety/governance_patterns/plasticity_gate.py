@@ -14,6 +14,11 @@ OLM mapping: O5_COGNITION (perceptual trust), O10_UNIFYING (coherence)
 
 Pattern extracted from cloud_controller.core.plasticity_gate.PlasticityGate,
 rewritten for AI agent governance (no K8s dependencies).
+
+STATUS: ACTIVE — Consumed by plasticity_adapter.py (Phase S2-safety).
+GovernanceService.authorize() feeds coherence/drift signals into this gate
+and uses the resulting plasticity value for bounded confidence penalty and
+escalation bias. Wired: 2026-04-04.
 """
 
 from __future__ import annotations

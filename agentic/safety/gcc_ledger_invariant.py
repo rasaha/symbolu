@@ -162,6 +162,22 @@ def _is_version_string(value: str) -> bool:
     return bool(re.match(r"^[RM]\d+\.\d+$", value))
 
 
+# Maximum allowed length for opaque identifiers
+_MAX_OPAQUE_ID_LENGTH = 64
+
+# Opaque identifier pattern: alphanumeric, hyphens, underscores, dots
+_OPAQUE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
+
+
+def _is_opaque_id(value: str) -> bool:
+    """Check if string is a valid opaque identifier (artifact_id, span_id)."""
+    if not value:
+        return False
+    if len(value) > _MAX_OPAQUE_ID_LENGTH:
+        return False
+    return bool(_OPAQUE_ID_PATTERN.match(value))
+
+
 def _is_valid_ledger_string(value: str) -> bool:
     """
     Check if a string value is valid for ledger entries.
@@ -171,6 +187,7 @@ def _is_valid_ledger_string(value: str) -> bool:
         - Hex hashes
         - Phase IDs
         - Version strings
+        - Opaque identifiers (artifact_id, span_id — bounded, no free text)
 
     Args:
         value: The string to validate.
@@ -185,6 +202,8 @@ def _is_valid_ledger_string(value: str) -> bool:
     if _is_phase_id(value):
         return True
     if _is_version_string(value):
+        return True
+    if _is_opaque_id(value):
         return True
     return False
 

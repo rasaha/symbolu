@@ -12,6 +12,11 @@ OLM mapping: O9_WITNESSES (observation), O7_REASONING (admissibility)
 
 Pattern extracted from cloud_controller.action.readiness.ReadinessChecker,
 rewritten for AI agent governance (no K8s dependencies).
+
+STATUS: ACTIVE — Consumed by readiness_adapter.py (Phase S3-safety).
+GovernanceService.authorize() feeds plasticity (S2) and coherence/escalation
+signals into this checker and uses the readiness status for bounded
+confidence penalty and escalation bias. Wired: 2026-04-04.
 """
 
 from __future__ import annotations

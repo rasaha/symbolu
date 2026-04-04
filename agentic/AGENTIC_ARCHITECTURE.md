@@ -1,10 +1,10 @@
 # Agentic Architecture: Signal Integration & Policy Control Plane
 
-> **Version:** 4.0.0 | **Updated:** 2026-04-04
+> **Version:** 5.0.0 | **Updated:** 2026-04-04
 >
-> This document describes the four completed internal tracks that connect
-> external signal sources, ontological structure, and policy infrastructure
-> to the agentic governance runtime:
+> This document describes the five completed internal tracks that connect
+> external signal sources, ontological structure, policy infrastructure,
+> and safety enforcement to the agentic governance runtime:
 >
 > - **Sovereign track (S1–S4 + activation patch):** Bridges sovereign model
 >   signals (entropy, health, insight, diagnostics, guna anomalies, bhava
@@ -20,6 +20,12 @@
 > - **Policy track (P0–P4 + closure patch):** Builds the profile-backed
 >   policy computation, simulation/comparison, lifecycle/deployment, and
 >   read-only backend control-plane layer that sits alongside governance.
+> - **Safety track (S0–S5):** Promotes dormant safety governance-pattern
+>   primitives (`safety/governance_patterns/`) into live enforcement,
+>   governance-consumed signals, and lifecycle-preparatory monitoring.
+>   Progresses from truthfulness cleanup through runtime boundary
+>   enforcement, bounded governance signal activation, and pre-action
+>   rollback-watch capture.
 >
 > **Sovereign and Core** follow a **bridge-first, never-direct** architecture
 > and feed signals into the governance runtime decision path.
@@ -32,16 +38,22 @@
 > foundations → runtime policy engines → service wrapper → simulation →
 > lifecycle/deployment → read-only control-plane queries.
 >
-> All four tracks are **closed as internal layers**. None yet constitutes a
+> **Safety** follows an **honest-activation** architecture: truthfulness
+> cleanup → real boundary enforcement → bounded adapter activation →
+> lifecycle-preparatory monitoring. Each phase activates only what the
+> surrounding architecture genuinely supports; nothing is faked.
+>
+> All five tracks are **closed as internal layers**. None yet constitutes a
 > full external API product, dashboard UI, or tenant-scoped admin platform.
 >
 > For the full governance architecture (Layers 1–8, domain policy, shadow AI,
 > etc.), see [`docs/governance/AGENTIC_ARCHITECTURE.md`](../docs/governance/AGENTIC_ARCHITECTURE.md).
 >
 > This document focuses on how sovereign signals, core pipeline signals,
-> ontological structure signals, and policy infrastructure reach the agentic
-> governance runtime — what is live, what is conditional, what is audit-only,
-> what is simulation-only, what is backend/control-plane-only, and what
+> ontological structure signals, policy infrastructure, and safety
+> enforcement reach the agentic governance runtime — what is live, what is
+> conditional, what is audit-only, what is simulation-only, what is
+> backend/control-plane-only, what is lifecycle-preparatory, and what
 > remains future work.
 
 ---
@@ -116,6 +128,12 @@ layered bridge architecture with two parallel input tracks:
   │  Core singletons:                                               │
   │    generation_gate.py            (C3) — one-time seal at boot   │
   │                                                                 │
+  │  Safety adapters:                                                │
+  │    plasticity_adapter.py         (S2-safety) — sigmoid gate     │
+  │    readiness_adapter.py          (S3-safety) — multi-criterion  │
+  │    policy_engine_adapter.py      (S4-safety) — per-agent policy │
+  │    rollback_adapter.py           (S5-safety) — pre-action watch │
+  │                                                                 │
   │  Every adapter produces:                                        │
   │    - frozen Resolution dataclass                                │
   │    - bounded confidence penalty (non-negative, capped)          │
@@ -132,6 +150,8 @@ layered bridge architecture with two parallel input tracks:
   │    - confidence adjustments (bounded, aggregate cap = 0.20)     │
   │    - escalation overrides (stricter-only)                       │
   │    - generation gate check (C3, fail-closed)                    │
+  │    - agent policy check (S4-safety, hard deny on violation)     │
+  │    - rollback watch capture (S5-safety, audit-only)             │
   │    - audit metadata enrichment (all tracks)                     │
   │    - fail-safe: all resolution wraps try/except                 │
   └─────────────────────────────────────────────────────────────────┘
@@ -202,7 +222,16 @@ layered bridge architecture with two parallel input tracks:
    exists solely for downstream replay, approval-workflow what-if analysis, and
    audit simulation tools.
 
-4. **Policy boundary:** The `policy/` package is a self-contained backend layer.
+4. **Safety boundary:** The `safety/` package contains both enforcement
+   modules (GCC guards, ledger invariants) and governance-pattern primitives
+   (plasticity gate, readiness checker, policy engine, rollback monitor).
+   Enforcement modules are called directly at constrained boundaries.
+   Governance-pattern primitives are consumed through signal adapters in
+   `signal_adapters/`, following the same frozen-resolution pattern as
+   sovereign/core/ontology adapters. The `safety/` package never imports
+   PyTorch or numpy.
+
+5. **Policy boundary:** The `policy/` package is a self-contained backend layer.
    `governance_service.py` has two touchpoints: (a) `check_layer_visibility()`
    uses `layer_visibility_policy.py` for RBAC, (b) `get_policy_service()` lazily
    creates a `PolicyService` for audit retrieval. Policy engines
@@ -888,6 +917,250 @@ specific changed flag names, and verify exact deployment counts.
 
 ---
 
+## Safety Integration Track (S0–S5)
+
+The safety track promotes dormant governance-pattern primitives from
+`safety/governance_patterns/` into live enforcement, bounded governance
+signals, and lifecycle-preparatory monitoring. Unlike the sovereign/core
+tracks (which bridge heavy upstream engines), the safety track activates
+**pure-Python safety modules** that were structurally present but never
+consumed at runtime.
+
+### What Safety IS vs IS NOT
+
+| Safety IS | Safety IS NOT |
+|-----------|---------------|
+| Real boundary enforcement for GCC and ledger invariants (S1) | A broad fully automated rollback execution system |
+| Real governance consumption of plasticity/readiness/policy signals (S2–S4) | A complete post-action lifecycle engine |
+| Real rollback-watch capture in the most truthful form the architecture supports (S5) | A fully activated `safety_bounds.py` enforcement layer |
+| Honest deprecation/marking of dead facades (S0) | A full safety control-plane product |
+| Bounded, fail-safe signal integration following the adapter pattern | A replacement for policy/core/governance layers |
+| Progression from dormant code to live governance usage | A full external admin/operator safety product |
+
+### Safety Capability Truth Table
+
+| Module | Classification | Status | Consumed By |
+|--------|---------------|--------|-------------|
+| `safety/gcc_runtime_guard.py` | **Runtime boundary enforcement** | ACTIVE (S1) | Ontological router, phase layer map, constrained module boundaries |
+| `safety/gcc_ledger_invariant.py` | **Runtime boundary enforcement** | ACTIVE (S1) | `LedgerStore.append()`, `LedgerEntryStore.append()` |
+| `safety/gcc_static_scanner.py` | **CI/build-time enforcement** | ACTIVE (pre-S0) | CI pipeline, not runtime framework logic |
+| `safety/governance_patterns/plasticity_gate.py` | **Live governance signal** | ACTIVE (S2) | `GovernanceService.authorize()` via `plasticity_adapter.py` |
+| `safety/governance_patterns/readiness_checker.py` | **Live governance signal** | ACTIVE (S3) | `GovernanceService.authorize()` via `readiness_adapter.py` |
+| `safety/governance_patterns/policy_engine.py` | **Pre-authorize policy guard** | ACTIVE (S4) | `GovernanceService.authorize()` via `policy_engine_adapter.py` |
+| `safety/governance_patterns/rollback_monitor.py` | **Lifecycle-preparatory / audit-visible** | ACTIVE (S5) | `GovernanceService.authorize()` via `rollback_adapter.py` |
+| `safety/governance_patterns/safety_bounds.py` | **Future / dormant** | DORMANT | No consumer — awaits action-magnitude payload model |
+| `safety/governance_patterns/approval_manager.py` | **Deprecated** | DEPRECATED (S0) | Superseded by `agentic_framework/approval_workflow.py` |
+| `safety/escalation_signals.py` | **Facade / unused** | UNUSED (S0) | No runtime consumers; explicitly marked |
+| `safety/output_gate.py` | **Facade / unused** | UNUSED (S0) | No runtime consumers; explicitly marked |
+| `safety/rate_limiter.py` | **Facade / unused** | UNUSED (S0) | No runtime consumers; explicitly marked |
+| `safety/acoustic_safety/__init__.py` | **Facade / unused** | UNUSED (S0) | No runtime consumers; explicitly marked |
+| `safety/pipeline_guards/__init__.py` | **Facade / unused** | UNUSED (S0) | No runtime consumers; explicitly marked |
+
+### Safety Folder Role
+
+`agentic/safety/` is now a mix of:
+- **Real source-of-truth enforcement modules** — GCC runtime guard and
+  ledger invariant (S1), enforced at actual constrained boundaries
+- **Activated governance-pattern primitives** — plasticity gate (S2),
+  readiness checker (S3), policy engine (S4), rollback monitor (S5),
+  consumed by `GovernanceService.authorize()` through signal adapters
+- **Explicitly deprecated/unused surfaces** — approval manager (S0),
+  dead facades (S0), all honestly marked with STATUS headers
+- **One still-dormant primitive** — `safety_bounds.py`, awaiting the
+  framework-level action-magnitude payload model that would make it real
+
+`agentic/agentic_framework/` consumes selected safety capabilities through:
+- **Direct enforcement hooks** — GCC guards called at module boundaries
+- **Signal adapters** — `signal_adapters/plasticity_adapter.py`,
+  `readiness_adapter.py`, `policy_engine_adapter.py`, `rollback_adapter.py`
+- **Governance decision logic** — penalties, escalation biases, hard denies
+- **Audit metadata** — structured audit fields on `AuditEvent`
+
+### Safety Progression: S0 → S5
+
+The safety track moved from dormant code and facades into live
+governance/runtime usage through six phases:
+
+```
+  S0: Truthfulness       S1: GCC enforcement    S2: Plasticity gate
+  ──────────────────     ──────────────────     ──────────────────
+  Mark dead facades      gcc_runtime_guard      plasticity_gate.py
+  Deprecate approval_    enforced at real        → live governance
+  manager. Honest        boundaries.             signal (penalty
+  status markers.        gcc_ledger_invariant    + escalation).
+                         enforced at ledger      Fail-closed.
+                         writes. Opaque ID
+                         support added.
+
+  S3: Readiness gate     S4: Policy engine      S5: Rollback watch
+  ──────────────────     ──────────────────     ──────────────────
+  readiness_checker.py   policy_engine.py       rollback_monitor.py
+  → live governance      → early pre-authorize  → lifecycle-
+  signal (penalty        guard. Hard deny       preparatory. Pre-
+  + escalation).         on violation.          action snapshot.
+  Multi-criterion.       Fail-safe (no          Audit-visible.
+  Cooldown honestly      engine = allow).       No automatic
+  disabled.                                     rollback execution.
+```
+
+### Phase S0: Truthfulness Cleanup
+
+**Scope:** Mark dead safety facades as honestly unused. Deprecate the
+superseded approval manager.
+
+| Component | Change | Status |
+|-----------|--------|--------|
+| `safety/escalation_signals.py` | Added `STATUS: UNUSED` marker | Unused |
+| `safety/output_gate.py` | Added `STATUS: UNUSED` marker | Unused |
+| `safety/rate_limiter.py` | Added `STATUS: UNUSED` marker | Unused |
+| `safety/acoustic_safety/__init__.py` | Added `STATUS: UNUSED` marker | Unused |
+| `safety/pipeline_guards/__init__.py` | Added `STATUS: UNUSED` marker | Unused |
+| `safety/governance_patterns/approval_manager.py` | Added `DEPRECATED` marker | Deprecated |
+
+**Important truth:** These surfaces were structurally present but had zero
+runtime consumers. They were not real safety protections — they were facades.
+S0 makes this explicit rather than leaving readers to discover it.
+
+### Phase S1: Real GCC Enforcement
+
+**Scope:** Wire GCC (Generative Containment Constraint) guards at actual
+constrained module boundaries. Wire ledger invariant checks at actual
+ledger write boundaries. Add opaque identifier support so structural IDs
+(artifact IDs, span IDs) pass validation while free-form expressive content
+remains blocked.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `gcc_runtime_guard.py` | `assert_non_expressive()` now fires at real return boundaries | Runtime enforcement |
+| `gcc_ledger_invariant.py` | `assert_ledger_entry_valid()` now fires at real ledger writes | Runtime enforcement |
+| Opaque ID support | `_is_opaque_id()` — alphanumeric+hyphens+underscores+dots, ≤64 chars | Added to both guards |
+| `OntologicalLayerRouter.project()` | GCC guard on return value | Enforced |
+| `get_layers_for_phase()` | GCC guard on return value | Enforced |
+| `LedgerStore.append()` / `LedgerEntryStore.append()` | Ledger invariant guard before writes | Enforced |
+
+**Important truth:** Before S1, GCC was tested logic and CI-time scanning
+only. After S1, GCC materially guards real constrained outputs and ledger
+writes at runtime. This is a meaningful escalation from "tested" to
+"enforced."
+
+### Phase S2: PlasticityGate Activation
+
+**Scope:** Promote `plasticity_gate.py` from dormant to active governance
+signal. Create `plasticity_adapter.py`. Wire into `GovernanceService.authorize()`.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `plasticity_adapter.py` | `resolve_plasticity_signal()` — sigmoid gate evaluation | Live governance signal |
+| `PlasticityResolution` | Frozen dataclass: plasticity, resistance, misalignment, penalty, escalation | Live governance signal |
+| Confidence penalty | Low plasticity → max 0.04 penalty | Behavior-affecting |
+| Escalation bias | Critical plasticity (< 0.35) → +1 escalation | Behavior-affecting |
+| `AuditEvent.plasticity_gate` | Structured audit field | Live |
+
+**Governance effects:**
+
+| Signal | Trigger | Penalty | Escalation | Cap |
+|--------|---------|---------|------------|-----|
+| Low plasticity | < 0.50 | Linear up to 0.04 | No | 0.04 |
+| Critical plasticity | < 0.35 | 0.04 | Yes (+1 level) | 0.04 |
+
+**Inputs:** Resistance derived from `semantic_stability` or `coherence_score`
+(from C2). Misalignment derived from `persona_drift` (from C2). Fresh
+`PlasticityGate` per call (stateless). Fail-closed: if coherence unavailable,
+zero penalty and no bias.
+
+### Phase S3: ReadinessChecker Activation
+
+**Scope:** Promote `readiness_checker.py` from dormant to active governance
+signal. Create `readiness_adapter.py`. Wire into `GovernanceService.authorize()`.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `readiness_adapter.py` | `resolve_readiness_signal()` — multi-criterion gate | Live governance signal |
+| `ReadinessResolution` | Frozen dataclass: status, ready, plasticity, stability, penalty, escalation | Live governance signal |
+| Confidence penalty | NOT_READY → 0.03; DEGRADED → 0.02 | Behavior-affecting |
+| Escalation bias | NOT_READY → +1 escalation | Behavior-affecting |
+| `AuditEvent.readiness_check` | Structured audit field | Live |
+
+**Readiness criteria evaluated:**
+
+| Criterion | Source | Status |
+|-----------|--------|--------|
+| Plasticity ≥ min threshold (0.30) | S2 plasticity resolution | **Active** |
+| Stability / coherence level | C2 core coherence | **Active** |
+| No blocking escalations | Current escalation level | **Active** |
+| Cooldown since last action | Cross-request state | **Honestly disabled** (`min_time_since_action_seconds=0.0`) |
+
+**Important truth:** Cooldown is conceptually supported by `ReadinessChecker`
+but is honestly disabled because `GovernanceService` has no cross-request
+state. This is documented in the adapter, not hidden.
+
+### Phase S4: PolicyEngine Activation
+
+**Scope:** Promote `policy_engine.py` from dormant to active pre-authorize
+guard. Create `policy_engine_adapter.py`. Wire into
+`GovernanceService.authorize()` as an early step.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `policy_engine_adapter.py` | `resolve_policy_check()` — per-agent policy evaluation | Live pre-authorize guard |
+| `AgentPolicyResolution` | Frozen dataclass: allowed, hard_deny, violations, reason_codes | Live pre-authorize guard |
+| Hard deny | Policy violation → governance DENY, overrides all signals | Behavior-affecting |
+| `AuditEvent.agent_policy` | Structured audit field | Live |
+
+**Policy capabilities:**
+
+| Capability | Description | Effect |
+|-----------|-------------|--------|
+| Action denylist | Explicitly denied action types per agent | Hard deny |
+| Action allowlist | Only listed actions permitted | Hard deny for unlisted |
+| Blackout windows | Time-range blocking (hour/weekday) | Hard deny during window |
+| Rate limiting | Max actions per sliding window | Hard deny on exceeded |
+| Per-agent overrides | Agent-specific policy overriding defaults | Scoped rules |
+
+**Important truth:** This is an opt-in pre-authorize policy guard, not a
+global default-deny system. Fail-safe: absence of configured policy engine
+means all actions are allowed by default. This is deliberate — unlike other
+adapters which fail-closed (absent = neutral), the policy engine fails-safe
+(absent = permitted).
+
+### Phase S5: RollbackMonitor Activation (Lifecycle-Preparatory)
+
+**Scope:** Promote `rollback_monitor.py` from dormant to active in the
+most honest form the current architecture supports. Since
+`GovernanceService` is authorize-only with no post-action execution
+lifecycle, S5 provides lifecycle-preparatory monitoring, not full automatic
+rollback.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `rollback_adapter.py` | `resolve_rollback_snapshot()` — pre-action signal capture | Lifecycle-preparatory |
+| `RollbackSnapshotResolution` | Frozen dataclass: watch_started, pre_action_signals, watch_id | Lifecycle-preparatory |
+| Pre-action snapshot | Captures confidence, plasticity, coherence at decision time | Audit-visible |
+| `AuditEvent.rollback_watch` | Structured audit field with snapshot data | Audit-visible |
+| Monitor registration | `RollbackWatch` started, available for external `check()` | External caller required |
+
+**What S5 provides:**
+- Pre-action signal snapshot captured at authorize-time
+- Watch registered with `RollbackMonitor` (if configured)
+- Audit-visible rollback watch metadata in governance audit event
+- External callers can later call `monitor.check(current_signals)` to
+  detect degradation
+
+**What S5 does NOT provide:**
+- No automatic rollback execution (requires execution lifecycle)
+- No post-action signal re-evaluation on the authorize path
+- No background monitoring thread
+- No confidence penalty or escalation bias (purely observational)
+
+**Important truth:** `GovernanceService` is authorize-only. There is no
+execution callback, no post-action signal feedback loop, and no mechanism
+for automatic rollback. S5 captures the pre-action state honestly and
+leaves the post-action check to future infrastructure. Rollback monitoring
+is active in a preparatory and auditable sense, not as automatic rollback
+automation.
+
+---
+
 ## Live vs Conditional: The Truth Table
 
 Not all signals are always active. The system has four activation tiers,
@@ -911,6 +1184,10 @@ approximation or neutral defaults when upstream data is unavailable.
 | UCF consciousness resolution | Core | C3 | Bounded confidence penalty (max 0.05) |
 | Predictive signals resolution | Core | C4 | Bounded confidence penalty (max 0.05) |
 | Ontology balance resolution | Ontology | O4 | Bounded confidence penalty (max 0.05) |
+| Plasticity gate resolution | Safety | S2-safety | Bounded confidence penalty (max 0.04) |
+| Readiness check resolution | Safety | S3-safety | Bounded confidence penalty (max 0.03) |
+| Agent policy check | Safety | S4-safety | Hard deny on policy violation |
+| Rollback watch snapshot | Safety | S5-safety | Audit enrichment (no penalty) |
 
 **Note on core adapter defaults:** When no pipeline report/state is available
 (e.g., the caller didn't run the core pipeline), all core adapters resolve
@@ -957,6 +1234,9 @@ The counterfactual bridge (`counterfactual_bridge.py`) is not imported by
 
 | Signal | Description | Status |
 |--------|-------------|--------|
+| Session enrichment: identity signature | `session_enrichment_adapter._resolve_identity()` consumes `metadata["identity_signature"]` | Bridge-ready, not bridge-fed (see §Pipeline ↔ Governance below) |
+| Session enrichment: motivation profile | `session_enrichment_adapter._resolve_motivation()` consumes `metadata["motivation_profile"]` | Bridge-ready, not bridge-fed |
+| Session enrichment: temporal summary | `session_enrichment_adapter._resolve_temporal()` consumes `metadata["temporal_summary"]` | Bridge-ready, not bridge-fed |
 | Temporal trajectory prediction | JEPA forecasting future semantic state | Not implemented |
 | `previous_bhava` tracking | Cross-request bhava transition history | Hardcoded to `None` |
 | Deeper sovereign model internals | Per-layer attention weights, gradient norms, etc. | Intentionally excluded |
@@ -1036,6 +1316,12 @@ confidence or increase escalation, never relax governance.
 | C4 P35 drift escalation | Bumps escalation +1 | Single step | Core | C4 |
 | O4 balance penalty | Reduces confidence | max 0.05 | Ontology | O4 |
 | O4 balance escalation | Bumps escalation +1 | Single step | Ontology | O4 |
+| S2 plasticity penalty | Reduces confidence | max 0.04 | Safety | S2-safety |
+| S2 plasticity escalation | Bumps escalation +1 | Single step, < 0.35 | Safety | S2-safety |
+| S3 readiness penalty (NOT_READY) | Reduces confidence | 0.03 | Safety | S3-safety |
+| S3 readiness penalty (DEGRADED) | Reduces confidence | 0.02 | Safety | S3-safety |
+| S3 readiness escalation | Bumps escalation +1 | NOT_READY only | Safety | S3-safety |
+| S4 policy engine (DENY) | Hard deny for policy violations | Binary | Safety | S4-safety |
 | **Aggregate penalty cap** | **Caps total from all adapters** | **max 0.20** | All | Patch |
 
 ### Light Behavior Signals
@@ -1067,6 +1353,10 @@ and human review. They do **not** change any governance decision.
 | C2 identity stability | within `core_coherence` | Core | C2 |
 | C2 continuity health | within `core_coherence` | Core | C2 |
 | C4 P36 identity resonance | within `predictive_signals` | Core | C4 |
+| S2 plasticity gate snapshot | `plasticity_gate` | Safety | S2-safety |
+| S3 readiness check snapshot | `readiness_check` | Safety | S3-safety |
+| S4 agent policy snapshot | `agent_policy` | Safety | S4-safety |
+| S5 rollback watch snapshot | `rollback_watch` | Safety | S5-safety |
 
 ### Replay / Simulation-Only Signals
 
@@ -1103,10 +1393,12 @@ Each adapter independently caps its own penalty:
 | UCF adapter (C3) | Core | 0.05 | Consciousness stability is heuristic |
 | Predictive signals adapter (C4) | Core | 0.05 | P35 + P37 combined |
 | Ontology balance adapter (O4) | Ontology | 0.05 | Mirror-pair imbalance |
+| Plasticity adapter (S2-safety) | Safety | 0.04 | Sigmoid gate closing |
+| Readiness adapter (S3-safety) | Safety | 0.03 | Multi-criterion not-ready |
 
 ### Aggregate Cap
 
-The raw sum of all adapter penalties could theoretically reach 0.50. The
+The raw sum of all adapter penalties could theoretically reach 0.57+. The
 aggregate cap ensures the total penalty from all sources never exceeds 0.20:
 
 ```python
@@ -1118,9 +1410,16 @@ sovereign_penalty = min(
     + core_coherence_resolution.confidence_penalty # max 0.10 (C2)
     + ucf_resolution.confidence_penalty            # max 0.05 (C3)
     + predictive_resolution.confidence_penalty     # max 0.05 (C4)
-    + ontology_balance_signal.confidence_penalty,  # max 0.05 (O4)
+    + ontology_balance_signal.confidence_penalty   # max 0.05 (O4)
+    + plasticity_resolution.confidence_penalty,    # max 0.04 (S2-safety)
 )
+# Readiness penalty (S3-safety, max 0.03) is added incrementally
+# and re-capped at 0.20 after the initial aggregate.
 ```
+
+**Note:** The S4-safety policy engine does not contribute a confidence
+penalty — it produces a hard DENY override. The S5-safety rollback monitor
+does not contribute any penalty — it is purely observational/audit.
 
 This protects against pathological stacking where multiple noisy signals
 simultaneously fire, which could otherwise drop confidence unreasonably.
@@ -1260,6 +1559,19 @@ This is intentional: not every signal justifies governance authority.
 Promoting audit-only signals to behavior-affecting status would require
 rigorous justification and new bounded adapter logic.
 
+### Safety Track Limitations
+
+| Limitation | Details | Status |
+|-----------|---------|--------|
+| **`safety_bounds.py` remains dormant** | Requires an action-magnitude payload model that does not exist. The framework has no concept of action size/magnitude to clamp against. | Future work |
+| **Rollback is lifecycle-preparatory** | `GovernanceService` is authorize-only. No post-action execution callback, no automatic rollback execution. S5 captures pre-action snapshots; external callers must call `check()`. | By design (honest) |
+| **Readiness cooldown disabled** | `ReadinessChecker` supports cooldown between actions, but `GovernanceService` has no cross-request state. `min_time_since_action_seconds=0.0` (disabled, documented). | Future work |
+| **Dead facades still present** | S0 marked them as UNUSED but did not delete them. They remain as inert code with explicit status markers. | By design |
+| **No stateful safety tracking** | Safety signals (plasticity, readiness) are computed fresh per request. No cross-request trend tracking. | Future work |
+| **Policy engine is opt-in** | `PolicyEngine` must be explicitly passed to `GovernanceService`. No engine configured = all actions allowed (fail-safe). | By design |
+| **GCC opaque IDs are heuristic** | `_is_opaque_id()` uses a pattern-based check (alphanum+hyphens+underscores+dots, ≤64 chars). Edge cases could theoretically pass or fail incorrectly. | By design |
+| **Safety folder dual copies** | `symbolu/safety/` and `agentic/safety/` maintain parallel copies of GCC modules. No automated sync. | Code hygiene |
+
 ### Ontology Track Limitations
 
 | Limitation | Details | Status |
@@ -1289,48 +1601,172 @@ intentional:
 | **Tenant scoping** | `tenant_id` parameter exists on all P4 query surfaces as passthrough. No filtering, scoping, or tenant management logic. | Future work |
 | **No external API** | No HTTP endpoints, REST/GraphQL API, or dashboard UI. Policy layer is internal-only. | Future work |
 
-### How the Four Tracks Connect
+### How the Five Tracks Connect
 
-The sovereign, core, ontology, and policy tracks serve complementary roles
-in the broader governance architecture:
+The sovereign, core, ontology, policy, and safety tracks serve complementary
+roles in the broader governance architecture:
 
 ```
-  SOVEREIGN TRACK     CORE TRACK       ONTOLOGY TRACK     POLICY TRACK
-  (S1–S4)             (C1–C4)          (O1–O4)            (P0–P4)
-  ─────────────       ──────────       ──────────────     ───────────
-  signal extraction   signal extraction enum canonical-   domain-specific
-  + bounded gov.      + bounded gov.   ization + 10D     policy compute,
-  enrichments         enrichments      balance signal     simulation, CP
+  SOVEREIGN TRACK   CORE TRACK     ONTOLOGY TRACK  SAFETY TRACK     POLICY TRACK
+  (S1–S4)           (C1–C4)        (O1–O4)         (S0–S5)          (P0–P4)
+  ─────────────     ──────────     ──────────────  ──────────────   ───────────
+  signal extract    signal extract enum + 10D      boundary guard   policy compute
+  + bounded gov     + bounded gov  balance signal  + gov signals    simulation, CP
+  enrichments       enrichments                    + policy guard
+                                                   + rollback watch
 
-      │                    │                │                   │
-      │ confidence         │ confidence     │ confidence        │ policy flags
-      │ penalties          │ penalties      │ penalty           │ session policy
-      │ escalation         │ generation     │ escalation        │ trading guards
-      │ audit data         │ gate + audit   │ audit data        │ interaction modes
-      ▼                    ▼                ▼                   │
-  ┌──────────────────────────────────────────────┐             │
-  │  GovernanceService.authorize()               │             │
-  │  (live governance decision path)             │◀────────────┘
-  │                                              │ layer visibility
-  │  Produces: ALLOW / DENY / ESCALATE           │ policy audit log
-  │  + enriched AuditEvent                       │
-  └──────────────────────────────────────────────┘
+      │                  │              │               │                │
+      │ confidence       │ confidence   │ confidence    │ penalties      │ policy flags
+      │ penalties        │ penalties    │ penalty       │ hard deny      │ session policy
+      │ escalation       │ generation   │ escalation    │ escalation     │ trading guards
+      │ audit data       │ gate + audit │ audit data    │ audit data     │ interaction modes
+      ▼                  ▼              ▼               ▼                │
+  ┌───────────────────────────────────────────────────────────┐       │
+  │  GovernanceService.authorize()                            │       │
+  │  (live governance decision path)                          │◀──────┘
+  │                                                           │ layer visibility
+  │  Produces: ALLOW / DENY / ESCALATE                        │ policy audit log
+  │  + enriched AuditEvent with all track signals             │
+  └───────────────────────────────────────────────────────────┘
 
   The policy track also provides independent capabilities:
   - Policy simulation/comparison (standalone, not via governance)
   - Lifecycle management (stage/validate/activate/rollback)
   - Backend control-plane queries (health, history, snapshots)
+
+  The safety track also provides independent capabilities:
+  - GCC boundary enforcement at constrained module outputs (S1)
+  - Ledger invariant enforcement at write boundaries (S1)
+  - Rollback watch for external post-action monitoring (S5)
 ```
 
-**Key distinction:** Sovereign, core, and ontology tracks feed **signals
-into the governance decision path** (confidence adjustments, escalation
-biases, generation gate enforcement). The ontology track differs from
-sovereign/core in that it bridges rule-based pure-Python encoders (no
-PyTorch/numpy), but follows the same adapter→penalty→escalation pattern.
-The policy track provides **domain-specific policy computation and
-operational tooling** that sits alongside governance. Only
-`layer_visibility_policy.py` and the policy audit log directly connect
-to `governance_service.py`.
+**Key distinctions:**
+- **Sovereign, core, and ontology** tracks feed signals into the governance
+  decision path (confidence adjustments, escalation biases, generation gate).
+- **Safety** track provides both boundary enforcement (GCC/ledger, S1) and
+  governance signals (plasticity/readiness penalties, policy hard-deny,
+  rollback watch audit). It spans both runtime guard and adapter patterns.
+- **Policy** track provides domain-specific policy computation and
+  operational tooling alongside governance. Only `layer_visibility_policy.py`
+  and the policy audit log directly connect to `governance_service.py`.
+
+---
+
+## Pipeline ↔ Governance Authorization: Bridge Status
+
+The mechanical pipeline (`symbolu_core/mechanical/pipeline/orchestrator.py`)
+and the agentic governance authorization system (`GovernanceService.authorize()`)
+are **architecturally adjacent but operationally disconnected**. No bridge
+exists between them today.
+
+### What Each System Does
+
+**Mechanical pipeline** — synchronous in-process request processing:
+- PO1–PO5 pre-acoustic governance (grounding, intent, action constraints)
+- MLCR → HRM/LCM/LAM → Persona → Fusion → DHA → Renderer
+- Session processing (policy flags, memory, recap, intent arc,
+  identity signature, motivation profile, trading guardrails)
+- Output processing → unified API response
+
+**Governance authorization service** — tool/action authorization decisions:
+- Confidence gating with bounded signal penalties
+- Tool risk classification (READ_ONLY → PRIVILEGED)
+- Sovereign, core, ontology, and policy signal consumption
+- Safety contract preconditions
+- External-facing `POST /authorize` endpoint via FastAPI
+
+### Current Bridge State: Not Connected
+
+`GovernanceService.authorize()` has **zero production callers** from the
+mechanical pipeline:
+
+- `symbolu_core/mechanical/` has no imports of `GovernanceService` or
+  `AuthorizationRequest`
+- The orchestrator does not call any agentic governance function
+- The FastAPI `/authorize` endpoint (`governance_api.py`) exists but is
+  not started or called by any pipeline code
+- PO1–PO5 inside the pipeline are the pipeline's **own** pre-acoustic
+  governance — they are unrelated to `GovernanceService.authorize()`
+
+**P52 status:** Phase 52 (`p52_governance_adapter/`) defines a
+`GovernanceRequest` data contract as a future interface socket. However:
+- P52 is **never invoked** from the orchestrator
+- P52 explicitly "does NOT send [the request] anywhere"
+- P52's invariant states "When P52 is removed, system behavior is
+  bitwise identical"
+- P52's `GovernanceRequest` is a **different type** from
+  `AuthorizationRequest` (different fields, different schema)
+
+P52 is an interface definition, not a live bridge.
+
+### Identity Signature Engine: Live in Pipeline, Inactive in Governance
+
+The identity signature engine (`agentic/identity/identity_signature_engine.py`)
+is **live and useful** within the mechanical pipeline:
+
+| Consumer | Location | Status |
+|----------|----------|--------|
+| Session processing | `session_processing.py` → `ctx.identity_signature` | **Live** — computed on every session |
+| Motivation engine | `motivation_engine.py` | **Live** — uses identity signature as input |
+| Trading guardrail engine | `trading_guardrail_engine.py` | **Live** — reads `ctx.identity_signature` |
+| Unified API output | `unified_api.py` | **Live** — serialized to API response |
+
+On the governance side, `session_enrichment_adapter._resolve_identity()` is
+**structurally ready** to consume identity signatures:
+- Recognizes `self_fragmentation` and `self_dissonance` as instability types
+- Applies bounded confidence penalty (max 0.05)
+- Returns safe defaults when identity data is absent
+
+But this path reads from `AuthorizationRequest.metadata["identity_signature"]`,
+which is **never populated** because no code constructs an `AuthorizationRequest`
+from pipeline context.
+
+### Session Enrichment: Bridge-Ready, Not Bridge-Fed
+
+The governance service calls `_resolve_session_enrichment(request)` on every
+`authorize()` invocation (Step 2b in `_evaluate()`). This resolver reads five
+well-known keys from `request.metadata`:
+
+| Metadata Key | Governance Consumer | Pipeline Producer | Bridge Status |
+|-------------|-------------------|------------------|---------------|
+| `identity_signature` | `_resolve_identity()` → penalty for fragmentation/dissonance | `ctx.identity_signature` via `compute_identity_signature()` | **Not bridged** |
+| `identity_resonance_state` | `_resolve_identity()` → stability band | `ctx.identity_resonance_memory_snapshot` | **Not bridged** |
+| `motivation_profile` | `_resolve_motivation()` → penalty for risk-relevant types | `ctx.motivation_profile` via `compute_motivation_profile()` | **Not bridged** |
+| `temporal_summary` | `_resolve_temporal()` → penalty for temporal tension | Temporal tracker `get_pattern_summary()` | **Not bridged** |
+| `coherence_state` | `_resolve_temporal()` → tension index | `ctx.coherence_state` | **Not bridged** |
+
+All five signals are produced within the mechanical pipeline and have
+working governance-side consumers. None currently cross the boundary.
+
+### Why This Is Not a Simple Metadata Patch
+
+Connecting these systems requires more than adding a field to a dict:
+
+1. **No `AuthorizationRequest` is constructed anywhere in the pipeline.**
+   The pipeline produces `RenderedOutput`, not authorization requests.
+2. **The two systems serve different purposes.** The pipeline processes
+   natural language queries through cognitive mappers. Governance
+   authorization evaluates tool-use safety for external agents.
+3. **Calling `GovernanceService.authorize()` from the pipeline** would
+   require mapping pipeline concepts (intent, persona, mappers) to
+   authorization concepts (action_type, tool_name, agency_level).
+4. **Latency and blocking** — `authorize()` is designed for pre-action
+   decisions, not mid-pipeline enrichment.
+
+### Future Work
+
+Building this bridge is a deliberate architectural integration project:
+
+| Task | Scope | Prerequisite |
+|------|-------|-------------|
+| Define when/why the pipeline should invoke governance authorization | Architecture decision | Clarity on whether pipeline actions need tool-risk authorization |
+| Map pipeline context to `AuthorizationRequest` fields | Translation layer | Architecture decision above |
+| Thread session enrichment signals into metadata | Metadata bridge | Translation layer above |
+| Activate P52 as the live bridge (or replace with direct integration) | Orchestrator change | All of the above |
+
+Until this bridge is built, session enrichment adapters (identity,
+motivation, temporal) resolve with zero penalty and safe defaults —
+exactly as designed by fail-closed semantics.
 
 ---
 
@@ -1362,6 +1798,11 @@ to `governance_service.py`.
 | `tests/unit/ontology/test_phase4a_adapter.py` | 22 | O3 varna lookup adapter, fail-closed | Ontology |
 | `tests/unit/ontology/test_ontology_balance.py` | 21 | O3 balance adapter, resolution contract | Ontology |
 | `tests/unit/ontology/test_ontology_governance_consumer.py` | 30 | O4 E2E governance consumer, penalty, escalation | Ontology |
+| `tests/test_s1_gcc_boundary_enforcement.py` | 19 | S1 GCC guard at real boundaries, opaque IDs, ledger invariants | Safety |
+| `tests/test_s2_plasticity_gate_integration.py` | 28 | S2 plasticity adapter contract, bounded effects, E2E authorize | Safety |
+| `tests/test_s3_readiness_integration.py` | 31 | S3 readiness adapter, multi-criterion, cooldown truth, E2E authorize | Safety |
+| `tests/test_s4_policy_engine_integration.py` | 22 | S4 policy engine adapter, allow/deny, blackout, rate limit, E2E authorize | Safety |
+| `tests/test_s5_rollback_monitor_integration.py` | 27 | S5 rollback adapter, watch lifecycle, signal snapshot, E2E authorize | Safety |
 
 ### What the Sovereign E2E Tests Prove
 
@@ -1440,6 +1881,52 @@ The ontology test suite (144 tests across 6 files) proves:
    confidence, unavailable preserves baseline, critical balance triggers
    escalation, adapter crash survival.
 
+### What the Safety Tests Prove
+
+The safety test suite (127 tests across 5 files) proves:
+
+1. **S1 boundary enforcement** — GCC `assert_non_expressive()` fires at
+   real constrained boundaries (ontological router, phase layer map). Ledger
+   `assert_ledger_entry_valid()` fires at real write boundaries. Opaque IDs
+   (artifact IDs, span IDs) pass validation. Expressive content is still
+   blocked.
+
+2. **S2 plasticity as governance signal** — `resolve_plasticity_signal()`
+   returns frozen `PlasticityResolution` with bounded penalty (max 0.04).
+   Low plasticity reduces confidence. Critical plasticity triggers escalation.
+   Three E2E tests call `GovernanceService.authorize()` proving: penalty
+   measurably reduces confidence, audit fields populated, fail-closed on
+   absent coherence.
+
+3. **S3 readiness as governance signal** — `resolve_readiness_signal()`
+   returns frozen `ReadinessResolution` with bounded penalty (max 0.03).
+   NOT_READY status reduces confidence and triggers escalation. DEGRADED
+   reduces confidence without escalation. READY has zero penalty. Cooldown
+   is honestly disabled and tested. Four E2E tests through
+   `GovernanceService.authorize()`.
+
+4. **S4 policy engine as pre-authorize guard** — `resolve_policy_check()`
+   returns frozen `AgentPolicyResolution`. Denied actions produce hard deny
+   overriding governance decision. Allowlist blocks unlisted actions.
+   Blackout windows block by time. Rate limiting blocks after max. Per-agent
+   overrides work. Five E2E tests through `GovernanceService.authorize()`.
+
+5. **S5 rollback watch as lifecycle-preparatory** — `resolve_rollback_snapshot()`
+   returns frozen `RollbackSnapshotResolution`. Pre-action signals captured
+   correctly. Monitor registration creates active watches. External callers
+   can detect degradation via `check()`. Five E2E tests through
+   `GovernanceService.authorize()` proving: no-monitor baseline unchanged,
+   snapshot captured in audit, watches registered, governance decision
+   unaffected by monitor presence, full lifecycle (authorize → external check).
+
+6. **Fail-safe/fail-closed preserved** — All adapters return safe defaults
+   when their upstream dependencies are unavailable. No safety signal
+   crashes the governance path. Policy engine absence means all-allowed.
+   Rollback monitor absence means no snapshot.
+
+7. **Regression safety** — Each phase includes regression tests verifying
+   prior behavior is unchanged when the new safety signal is absent.
+
 ### What Is NOT Tested
 
 - No tests verify that a specific production caller always supplies
@@ -1456,6 +1943,16 @@ The ontology test suite (144 tests across 6 files) proves:
 - No tests cover balance trends across multiple requests (stateless)
 - No tests verify that the 10D regex patterns produce meaningful
   encodings for all possible action types (pattern coverage is untested)
+
+### What Is NOT Tested (Safety)
+
+- No tests verify full post-action rollback execution (no execution lifecycle)
+- No tests cover cross-request readiness cooldown (disabled by design)
+- No tests cover `safety_bounds.py` activation (dormant, awaiting payload model)
+- No tests verify GCC enforcement at every possible constrained boundary
+  (only the boundaries wired in S1 are tested)
+- No boundary-condition tests for opaque ID length exactly at 64 chars
+- No tests cover concurrent policy engine access (thread-safe by lock, untested)
 
 ### What the Policy Tests Prove
 
@@ -1569,13 +2066,31 @@ The policy test suite (366 tests across 9 files) proves:
 | `agentic_framework/signal_adapters/ontology_adapter.py` | O2+O3 | No | Encoding, similarity, balance adapters |
 | `agentic_framework/signal_adapters/phase4a_adapter.py` | O3 | No | Varna lookup adapter |
 
+### Safety Integration Files (by phase)
+
+| File | Phase | Purpose |
+|------|-------|---------|
+| `safety/gcc_runtime_guard.py` | S1 | Runtime GCC enforcement + opaque ID support |
+| `safety/gcc_ledger_invariant.py` | S1 | Runtime ledger invariant enforcement + opaque ID support |
+| `safety/gcc_static_scanner.py` | Pre-S0 | CI/build-time GCC enforcement (not runtime) |
+| `safety/governance_patterns/plasticity_gate.py` | S2 | Sigmoid permission-to-act gate |
+| `safety/governance_patterns/readiness_checker.py` | S3 | Multi-criterion readiness gate |
+| `safety/governance_patterns/policy_engine.py` | S4 | Per-agent action policy (allow/deny/blackout/rate-limit) |
+| `safety/governance_patterns/rollback_monitor.py` | S5 | Post-action signal degradation watcher |
+| `safety/governance_patterns/safety_bounds.py` | — | Dormant (awaits action-magnitude payload model) |
+| `safety/governance_patterns/approval_manager.py` | S0 | Deprecated (superseded by approval_workflow.py) |
+| `agentic_framework/signal_adapters/plasticity_adapter.py` | S2 | Plasticity → bounded governance signal |
+| `agentic_framework/signal_adapters/readiness_adapter.py` | S3 | Readiness → bounded governance signal |
+| `agentic_framework/signal_adapters/policy_engine_adapter.py` | S4 | Policy check → hard deny resolution |
+| `agentic_framework/signal_adapters/rollback_adapter.py` | S5 | Pre-action snapshot → audit-visible watch |
+
 ### Shared Files (all tracks)
 
 | File | Phases | Purpose |
 |------|--------|---------|
-| `agentic_framework/governance_models.py` | S1+patch, C4, O4 | Request/response models, audit event fields |
-| `agentic_framework/governance_service.py` | S1–S4+patch, C1–C4+closure, P0+P1, O4 | Decision engine, penalty cap, layer visibility, policy audit, ontology balance |
-| `agentic_framework/signal_adapters/__init__.py` | S1–S4, C1–C4, O2–O3 | Adapter exports |
+| `agentic_framework/governance_models.py` | S1+patch, C4, O4, S2–S5 safety | Request/response models, audit event fields |
+| `agentic_framework/governance_service.py` | S1–S4+patch, C1–C4+closure, P0+P1, O4, S2–S5 safety | Decision engine, penalty cap, layer visibility, policy audit, ontology balance, safety signals |
+| `agentic_framework/signal_adapters/__init__.py` | S1–S4, C1–C4, O2–O3, S2–S5 safety | Adapter exports |
 
 ### Test Files
 
@@ -1602,3 +2117,8 @@ The policy test suite (366 tests across 9 files) proves:
 | `tests/unit/ontology/test_phase4a_adapter.py` | 22 | O3 varna lookup adapter | Ontology |
 | `tests/unit/ontology/test_ontology_balance.py` | 21 | O3 balance adapter | Ontology |
 | `tests/unit/ontology/test_ontology_governance_consumer.py` | 30 | O4 E2E governance consumer | Ontology |
+| `tests/test_s1_gcc_boundary_enforcement.py` | 19 | S1 GCC+ledger enforcement | Safety |
+| `tests/test_s2_plasticity_gate_integration.py` | 28 | S2 plasticity integration | Safety |
+| `tests/test_s3_readiness_integration.py` | 31 | S3 readiness integration | Safety |
+| `tests/test_s4_policy_engine_integration.py` | 22 | S4 policy engine integration | Safety |
+| `tests/test_s5_rollback_monitor_integration.py` | 27 | S5 rollback monitor integration | Safety |
