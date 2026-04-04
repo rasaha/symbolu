@@ -1393,8 +1393,17 @@ were added in Phases 0-4.
   Sovereign Integration (S1–S4):
     S1/S2: always-on  → vritti, entropy, health, insight adapters
     S3/S4: metadata-gated → diagnostics, guna anomaly, bhava, telemetry
-    Aggregate penalty cap: min(0.20, sum_of_penalties)
-    See: agentic/AGENTIC_ARCHITECTURE.md for full details
+
+  Core Pipeline Integration (C1–C4):
+    C1: generation gate  → one-time seal singleton, fail-closed
+    C2: coherence state  → coherence/drift penalty + escalation (max 0.10)
+    C3: UCF + gate wiring → consciousness penalty + escalation (max 0.05)
+    C4: predictive signals → P35 drift + P37 continuity penalty (max 0.05)
+                           → P36 identity resonance (audit-only)
+                           → counterfactual bridge (replay/simulation-only)
+
+  Aggregate penalty cap: min(0.20, sum_of_all_adapter_penalties)
+  See: agentic/AGENTIC_ARCHITECTURE.md for full details
 
   Mode gating:
     FULL / SAFE      → reconciliation + bridge + diagnostics
@@ -1559,9 +1568,9 @@ inference runtime (32D) and enables multi-source signal reconciliation.
 
 > **Note:** Phase 4 describes the inference reconciliation path (bridge,
 > signal reconciliation, diagnostic hooks, mode gating). For the deeper
-> sovereign-to-governance integration (S1–S4 phases: shared constants,
-> bounded enrichments, reasoning diagnostics, anomaly detection, and the
-> activation patch), see [`agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
+> signal-to-governance integration covering both the sovereign track
+> (S1–S4 + activation patch) and the core pipeline track (C1–C4 + closure
+> patch), see [`agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
 
 ### Sovereign → Inference Bridge
 

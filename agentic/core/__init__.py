@@ -11,11 +11,18 @@ Active submodules:
 - continuity: Adaptive continuity engine (P37)
 - predictive: Identity memory and persona drift prediction
 
-Shared data:
+Shared data (cross-layer contract types):
 - models: Core data structures (SMIResult, BhavaState, EntropyState, etc.)
-- constants: Canonical kosha/ontology mappings
+         See ``models.GOVERNANCE_SAFE_TYPES`` for types safe for governance adapters.
+- constants: Canonical kosha/ontology mappings and thresholds
+         See ``constants.GOVERNANCE_SAFE_CONSTANTS`` for cross-layer constants.
 - generation_gate: Generation access control gate
 - ledger_generation_attest: Attestation blob generation
+
+Placeholder submodules (NOT IMPLEMENTED — retained for future formula work):
+- bhava: Consciousness state geometry (all methods raise NotImplementedError)
+- energy: Energy word detection (all methods raise NotImplementedError)
+- regulators: Three-force decision framework (all methods raise NotImplementedError)
 
 Phase 0 Cleanup Notes:
 - CoreInterface and CorePipeline facades removed (all methods were NotImplementedError)

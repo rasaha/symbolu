@@ -2,7 +2,31 @@
 SOULPI Core Data Models
 =======================
 
-Pydantic/dataclass models for core data structures.
+Pure-Python dataclass models used across the Symbol-U stack.
+
+SHARED CONTRACT STATUS
+======================
+These types are the canonical shared contract layer between the Symbol-U
+pipeline (``symbolu_core/``) and the agentic governance framework
+(``agentic/agentic_framework/``).
+
+All types in this module are:
+- Pure Python dataclasses (no PyTorch, no ML dependencies)
+- Importable without side effects
+- Safe for use in governance signal adapters, policy replay, and audit
+
+Governance-safe types (intended for cross-layer consumption):
+- ``EntropyState``   — entropy measurements (maps to entropy_adapter)
+- ``BhavaState``     — consciousness state snapshot (maps to vritti/session signals)
+- ``SMIResult``      — semantic mismatch index (maps to vritti_adapter)
+- ``AnalysisResult`` — complete pipeline analysis output
+- ``DeliveryMode``   — DHA delivery mode enum (maps to output_modulation)
+
+Pipeline-internal types (used by pipeline, not typically needed in governance):
+- ``SyllableAnalysis`` — phonemic decomposition detail
+- ``WordAnalysis``     — word-level SMI detail
+- ``RecursionState``   — iteration tracking for pipeline recursion
+- ``CandidateResponse`` — stitching/fusion candidate scoring
 """
 
 from dataclasses import dataclass, field
@@ -103,3 +127,33 @@ class AnalysisResult:
     delivery_mode: Optional[DeliveryMode] = None
     recommendations: List[str] = field(default_factory=list)
     diagnostics: Dict[str, Any] = field(default_factory=dict)
+
+
+# =============================================================================
+# EXPORT SURFACE
+# =============================================================================
+
+# Types safe for governance adapter / cross-layer consumption.
+# These can be imported by agentic_framework signal adapters without
+# pulling in pipeline internals.
+GOVERNANCE_SAFE_TYPES = (
+    "EntropyState",
+    "BhavaState",
+    "SMIResult",
+    "AnalysisResult",
+    "DeliveryMode",
+)
+
+# All types (includes pipeline-internal types).
+__all__ = [
+    "SyllableAnalysis",
+    "WordAnalysis",
+    "EntropyState",
+    "BhavaState",
+    "RecursionState",
+    "CandidateResponse",
+    "SMIResult",
+    "DeliveryMode",
+    "AnalysisResult",
+    "GOVERNANCE_SAFE_TYPES",
+]

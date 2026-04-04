@@ -109,6 +109,25 @@ from agentic.agentic_framework.signal_adapters.session_enrichment_adapter import
     resolve_session_enrichment,
     SessionEnrichmentResolution,
 )
+from agentic.agentic_framework.signal_adapters.coherence_state_adapter import (
+    resolve_core_coherence,
+    CoreCoherenceResolution,
+)
+from agentic.agentic_framework.signal_adapters.ucf_adapter import (
+    resolve_ucf_signal,
+    UCFResolution,
+)
+from agentic.agentic_framework.signal_adapters.predictive_signals_adapter import (
+    resolve_predictive_signals,
+    PredictiveSignalsResolution,
+)
+from agentic.core.generation_gate import (
+    GenerationGate,
+    GenerationMode,
+    GateStatus,
+    GateViolation,
+)
+from agentic.core.ledger_generation_attest import attest_generation_attempt
 from agentic.agentic_framework.domain_policy import (
     DomainActionMode,
     DomainPolicyResult,
@@ -622,6 +641,166 @@ def _resolve_guna_anomaly_signal(
         return GunaAnomalyResolution()
 
 
+def _resolve_core_coherence_state(
+    request: Any,
+) -> CoreCoherenceResolution:
+    """Resolve core pipeline CoherenceState from request metadata.
+
+    Phase C2: Extracts pipeline-level coherence, drift, UCF, continuity,
+    and identity signals from the core CoherenceState object passed via
+    request.metadata["core_coherence_state"]. Returns a safe fallback
+    if the signal is absent or malformed.
+    """
+    try:
+        metadata = getattr(request, "metadata", None) or {}
+        core_state = metadata.get("core_coherence_state")
+        return resolve_core_coherence(core_coherence_state=core_state)
+    except Exception:
+        return resolve_core_coherence()
+
+
+def _resolve_ucf_signal(
+    request: Any,
+    core_coherence_resolution: CoreCoherenceResolution,
+) -> UCFResolution:
+    """Resolve UCF consciousness stability signal for governance.
+
+    Phase C3: Tries pre-computed UCF state from metadata first,
+    then falls back to computing UCF from C2 coherence adapter signals.
+    """
+    try:
+        metadata = getattr(request, "metadata", None) or {}
+        ucf_state = metadata.get("ucf_state")
+
+        # If no pre-computed state, try computing from C2 signals
+        if ucf_state is None and core_coherence_resolution.available:
+            return resolve_ucf_signal(
+                coherence_v3_quality=core_coherence_resolution.coherence_v3_quality,
+                drift_fusion_index=core_coherence_resolution.drift_fusion_index,
+                entropy_volatility=core_coherence_resolution.temporal_entropy_vol,
+            )
+        return resolve_ucf_signal(ucf_state=ucf_state)
+    except Exception:
+        return resolve_ucf_signal()
+
+
+# Generative action patterns for generation gate classification.
+_GENERATIVE_ACTION_PATTERNS = frozenset({
+    "generate", "create_text", "write_content", "synthesis",
+    "compose", "draft", "render", "produce_output",
+    "llm_generate", "text_generation",
+})
+
+_GENERATIVE_TOOL_PATTERNS = frozenset({
+    "generate", "synthesis", "compose", "draft", "render",
+    "create_content", "write_text", "produce",
+})
+
+
+def _is_generative_action(request: Any) -> bool:
+    """Determine if the request involves generative output.
+
+    Uses action_type and tool_name pattern matching.
+    Conservative: only matches explicitly generative patterns.
+    """
+    action = (getattr(request, "action_type", None) or "").lower()
+    tool = (getattr(request, "tool_name", None) or "").lower()
+
+    for pattern in _GENERATIVE_ACTION_PATTERNS:
+        if pattern in action:
+            return True
+    for pattern in _GENERATIVE_TOOL_PATTERNS:
+        if pattern in tool:
+            return True
+
+    # Check explicit metadata flag if provided
+    metadata = getattr(request, "metadata", None) or {}
+    if metadata.get("is_generative"):
+        return True
+
+    return False
+
+
+def _check_generation_gate(
+    request: Any,
+) -> Dict[str, Any]:
+    """Check generation gate status for governance.
+
+    Phase C3: Queries the GenerationGate singleton safely.
+    Returns a dict with gate state and whether it affected the decision.
+
+    Fail-closed: If the gate is UNSEALED or SEALED_DISABLED and the
+    action is generative, this signals that the action should be blocked.
+    Non-generative actions are never affected.
+    """
+    is_gen = _is_generative_action(request)
+    try:
+        status = GenerationGate.gate_status()
+    except Exception:
+        status = GateStatus.UNSEALED
+
+    status_str = status.value if hasattr(status, "value") else str(status)
+
+    try:
+        mode_str = GenerationGate.mode().value
+    except (GateViolation, Exception):
+        mode_str = "UNSEALED"
+
+    # Determine if gate blocks this action
+    gate_blocks = False
+    block_reason = None
+    if is_gen:
+        if status == GateStatus.UNSEALED:
+            gate_blocks = True
+            block_reason = "generation_gate_unsealed"
+        elif status == GateStatus.SEALED_DISABLED:
+            gate_blocks = True
+            block_reason = "generation_disabled"
+
+    # Create attestation for generative actions
+    attestation = None
+    if is_gen:
+        try:
+            attestation = dict(attest_generation_attempt(
+                render_attempted=not gate_blocks,
+                render_outcome="blocked_by_governance" if gate_blocks else "permitted",
+            ))
+        except Exception:
+            pass
+
+    return {
+        "is_generative": is_gen,
+        "gate_status": status_str,
+        "generation_mode": mode_str,
+        "gate_blocks": gate_blocks,
+        "block_reason": block_reason,
+        "attestation": attestation,
+    }
+
+
+def _resolve_predictive_signals(
+    request: Any,
+) -> PredictiveSignalsResolution:
+    """Resolve P35+P36+P37 predictive signals from request metadata.
+
+    Phase C4: Extracts pre-computed drift report (P35), identity state (P36),
+    and continuity report (P37) from request.metadata. Returns a safe
+    fallback if signals are absent or malformed.
+    """
+    try:
+        metadata = getattr(request, "metadata", None) or {}
+        drift_report = metadata.get("predictive_drift_report")
+        identity_state = metadata.get("identity_resonance_state_p36")
+        continuity_report = metadata.get("continuity_report")
+        return resolve_predictive_signals(
+            drift_report=drift_report,
+            identity_state=identity_state,
+            continuity_report=continuity_report,
+        )
+    except Exception:
+        return resolve_predictive_signals()
+
+
 def _resolve_s4_audit_metadata(
     jepa_assessment: "JEPAGovernanceAssessment",
     diagnostic_context: SovereignDiagnosticContext,
@@ -987,20 +1166,58 @@ class GovernanceService:
         # Step 5c3: Resolve Phase S4 Guna anomaly signals.
         guna_anomaly_resolution = _resolve_guna_anomaly_signal(jepa_assessment)
 
+        # Step 5c4: Resolve Phase C2 core pipeline coherence state.
+        #   Bridges the pipeline's rich CoherenceState (241+ fields) into
+        #   a bounded governance signal view. Fail-safe: if absent,
+        #   zero penalty and no escalation bias.
+        core_coherence_resolution = _resolve_core_coherence_state(request)
+
+        # Step 5c5: Resolve Phase C3 UCF consciousness stability signal.
+        #   Computes or reads the Unified Consciousness Formula as a
+        #   governance-consumable stability metric. Uses pre-computed
+        #   pipeline state or computes from C2 coherence signals.
+        ucf_resolution = _resolve_ucf_signal(request, core_coherence_resolution)
+
+        # Step 5c6: Check Phase C3 generation gate status.
+        #   Queries the GenerationGate singleton to determine if
+        #   generative actions are permitted. Non-generative actions
+        #   are never affected. Fail-closed: unsealed or disabled = deny.
+        generation_gate_result = _check_generation_gate(request)
+
+        # Step 5c7: Resolve Phase C4 predictive signals (P35+P36+P37).
+        #   P35 drift is behavior-affecting (max 0.03 penalty + escalation).
+        #   P37 continuity is light behavior (max 0.02 penalty).
+        #   P36 identity is audit-only (no penalty).
+        predictive_resolution = _resolve_predictive_signals(request)
+
         # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
         #
         # Phase 1: bounded entropy confidence penalty.
         # Phase S2: bounded insight confidence penalty + health awareness.
-        # Phase S4: aggregate sovereign penalty cap (0.20) prevents
-        # entropy + insight + guna from stacking beyond 0.20.
+        # Phase S4 + C2 + C3 + C4: aggregate sovereign penalty cap (0.20)
+        # prevents entropy + insight + guna + core coherence + UCF +
+        # predictive signals from stacking beyond 0.20.
         # All penalties are non-positive (stricter-only).
+        #
+        # DRIFT OVERLAP NOTE (C2 + C4):
+        # C2 (core_coherence) penalizes on current/stateful drift posture
+        # from CoherenceState (persona_drift, drift_risk_band).
+        # C4 (predictive) penalizes on predictive/forecast drift risk
+        # from PredictivePersonaDriftReport (predicted_drift_score).
+        # Both may contribute simultaneously when both signals are present.
+        # This is intentional: current drift and predicted drift are
+        # complementary signals, not duplicates. The aggregate cap (0.20)
+        # bounds the combined effect and prevents runaway stacking.
         sovereign_penalty = min(
             0.20,
             entropy_resolution.confidence_penalty
             + insight_resolution.confidence_penalty
-            + guna_anomaly_resolution.confidence_penalty,
+            + guna_anomaly_resolution.confidence_penalty
+            + core_coherence_resolution.confidence_penalty
+            + ucf_resolution.confidence_penalty
+            + predictive_resolution.confidence_penalty,
         )
         effective_confidence = max(
             0.0,
@@ -1067,6 +1284,46 @@ class GovernanceService:
             bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
             if bumped > current_severity:
                 effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase C2: Core coherence drift escalation bias (stricter-only).
+        # If critical/severe drift detected in pipeline CoherenceState,
+        # bump escalation by one level (cap at confirm, not halt).
+        if core_coherence_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase C3: UCF instability escalation bias (stricter-only).
+        # If consciousness is in unstable band, bump escalation by one level.
+        if ucf_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase C4: Predictive drift escalation bias (stricter-only).
+        # If P35 predicts HIGH drift risk, bump escalation by one level.
+        if predictive_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase C3: Generation gate enforcement (fail-closed).
+        # If the action is generative and the gate blocks it, override
+        # the governance decision to DENY. Non-generative actions are
+        # never affected. This is the canonical governance-facing
+        # integration of the generation gate.
+        if generation_gate_result["gate_blocks"]:
+            governance_decision = APIGovernanceDecision.DENY
+            eligible = False
 
         effective_requires_human = (
             gate_decision.escalation.requires_human
@@ -1263,6 +1520,29 @@ class GovernanceService:
             previous_bhava=None,  # Cross-call tracking not yet implemented
         )
 
+        # Step 7f: Build Phase C2 core coherence audit dict
+        core_coherence_dict = (
+            core_coherence_resolution.to_audit_dict()
+            if core_coherence_resolution.available else None
+        )
+
+        # Step 7g: Build Phase C3 UCF audit dict
+        ucf_signal_dict = (
+            ucf_resolution.to_audit_dict()
+            if ucf_resolution.available else None
+        )
+
+        # Step 7h: Build Phase C3 generation gate audit dict
+        generation_gate_dict = (
+            generation_gate_result if generation_gate_result["is_generative"] else None
+        )
+
+        # Step 7i: Build Phase C4 predictive signals audit dict
+        predictive_signals_dict = (
+            predictive_resolution.to_audit_dict()
+            if predictive_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1342,6 +1622,37 @@ class GovernanceService:
                 "sovereign_guna_stagnation": guna_anomaly_resolution.stagnation,
                 "sovereign_guna_confidence_penalty": guna_anomaly_resolution.confidence_penalty,
                 "sovereign_guna_escalation_bias": guna_anomaly_resolution.escalation_bias,
+                # Phase C2: Core pipeline coherence state provenance
+                "core_coherence_available": core_coherence_resolution.available,
+                "core_coherence_score": core_coherence_resolution.coherence_score,
+                "core_coherence_persona_drift": core_coherence_resolution.persona_drift,
+                "core_coherence_drift_risk_band": core_coherence_resolution.drift_risk_band,
+                "core_coherence_confidence_penalty": core_coherence_resolution.confidence_penalty,
+                "core_coherence_escalation_bias": core_coherence_resolution.escalation_bias,
+                # Phase C3: UCF consciousness stability provenance
+                "ucf_available": ucf_resolution.available,
+                "ucf_score": ucf_resolution.ucf_score,
+                "ucf_stability_band": ucf_resolution.stability_band,
+                "ucf_confidence_penalty": ucf_resolution.confidence_penalty,
+                "ucf_escalation_bias": ucf_resolution.escalation_bias,
+                "ucf_computation_source": ucf_resolution.computation_source,
+                # Phase C3: Generation gate provenance
+                "generation_gate_is_generative": generation_gate_result["is_generative"],
+                "generation_gate_status": generation_gate_result["gate_status"],
+                "generation_gate_mode": generation_gate_result["generation_mode"],
+                "generation_gate_blocks": generation_gate_result["gate_blocks"],
+                "generation_gate_block_reason": generation_gate_result["block_reason"],
+                # Phase C4: Predictive signals provenance
+                "predictive_available": predictive_resolution.available,
+                "predictive_drift_score": predictive_resolution.predicted_drift_score,
+                "predictive_drift_risk_band": predictive_resolution.drift_risk_band,
+                "predictive_drift_trend": predictive_resolution.drift_trend,
+                "predictive_continuity_score": predictive_resolution.continuity_score,
+                "predictive_continuity_mode": predictive_resolution.continuity_mode,
+                "predictive_identity_resonance": predictive_resolution.identity_resonance_index,
+                "predictive_identity_band": predictive_resolution.identity_stability_band,
+                "predictive_confidence_penalty": predictive_resolution.confidence_penalty,
+                "predictive_escalation_bias": predictive_resolution.escalation_bias,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -1351,6 +1662,10 @@ class GovernanceService:
             sovereign_guna_anomalies=sovereign_guna_anomalies_dict,
             sovereign_bhava_transition=bhava_transition_dict,
             sovereign_governor_telemetry=governor_telemetry_dict,
+            core_coherence=core_coherence_dict,
+            ucf_signal=ucf_signal_dict,
+            generation_gate=generation_gate_dict,
+            predictive_signals=predictive_signals_dict,
         )
         self._persist_audit_event(audit_event)
 

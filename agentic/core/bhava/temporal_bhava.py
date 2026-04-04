@@ -2,6 +2,10 @@
 Temporal Bhava - Sliding Window State Tracking
 ==============================================
 
+STATUS: PLACEHOLDER — NOT IMPLEMENTED
+All methods raise ``NotImplementedError``.
+Retained for future Symbol-U formula integration.
+
 PATENT NOTICE: Symbol-U formula to be added later.
 """
 

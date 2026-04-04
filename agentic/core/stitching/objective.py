@@ -2,29 +2,44 @@
 Stitching Objective Function
 ============================
 
-Legacy wrapper for backwards compatibility.
-The actual scoring is now implemented in stitching_engine.py.
+STATUS: LEGACY COMPATIBILITY WRAPPER — DEPRECATED
+==================================================
+This module exists solely for backward compatibility.
+The canonical implementation lives in
+``agentic.core.stitching.stitching_engine.StitchingEngine``.
+
+New code should import ``StitchingEngine`` directly::
+
+    from agentic.core.stitching import StitchingEngine
+
+This wrapper delegates all work to ``StitchingEngine`` internally.
+It may be removed in a future release.
 
 Patent Reference:
     Claim [2] - Relevance scoring with resonance coupling
 """
 
+import warnings
 from typing import Dict, Any, Optional
 
 
 class StitchingObjective:
     """
-    Defines the objective function for stitching optimization.
+    .. deprecated::
+        Use ``StitchingEngine.score_candidates()`` directly instead.
 
-    This class provides backwards compatibility. The actual implementation
-    is in StitchingEngine.score_candidates().
-
-    The objective function is:
-        Score(c) = Relevance(c) - Redundancy(c) - DomainJumpPenalty(c)
+    Legacy backward-compatibility wrapper around
+    :class:`~agentic.core.stitching.stitching_engine.StitchingEngine`.
     """
 
     def __init__(self):
         """Initialize objective function."""
+        warnings.warn(
+            "StitchingObjective is deprecated. "
+            "Use StitchingEngine.score_candidates() directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # Import here to avoid circular imports
         from agentic.core.stitching.stitching_engine import StitchingEngine
         self._engine = StitchingEngine()

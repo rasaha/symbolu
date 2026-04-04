@@ -7,6 +7,33 @@ Source: Soulpi v2.7.1 Specification (November 28, 2025)
 Status: CANONICAL - Do not modify without authorization
 
 Copyright (c) 2025 Rakesh Mohan. All rights reserved.
+
+CROSS-LAYER / GOVERNANCE-RELEVANT CONSTANTS
+============================================
+The following constants are stable across the pipeline and governance
+layers, and are safe for use by agentic framework signal adapters:
+
+Thresholds:
+- ``SMI_THRESHOLDS``  — LOW/MODERATE/HIGH semantic mismatch bands
+                        (used by vritti_adapter, entropy_adapter)
+
+Tone/modulation:
+- ``DHA_TONES``       — delivery tone mappings
+                        (used by output_modulation_adapter)
+
+Structural mappings:
+- ``CANONICAL_KOSHA_LAYERS`` — 5-level consciousness depth axis
+- ``ONTOLOGICAL_LAYERS``     — 10-level manifestation breadth axis
+
+Pipeline-internal constants (not typically needed in governance):
+- ``CONSONANT_TO_KOSHA_MAP``, ``CONSONANT_VARIANTS``
+  (phonemic mapping detail for SMI engine)
+- ``CANONICAL_CONSONANT_TO_KOSHA``, ``KOSHA_DESCRIPTIONS``
+  (full kosha descriptions for SMI/acoustic pipeline)
+- ``V26_STITCHING_WEIGHTS``
+  (stitching-specific weights)
+- ``VOWEL_ASPECT_BRIDGES``
+  (vowel-to-aspect mapping for aspect mapper)
 """
 
 from typing import Dict, List, Any
@@ -208,3 +235,33 @@ SMI_THRESHOLDS = {
     "MODERATE": 0.5,
     "HIGH": 0.7,
 }
+
+
+# ==============================================================================
+# EXPORT SURFACE
+# ==============================================================================
+
+# Constants safe for governance / cross-layer consumption.
+GOVERNANCE_SAFE_CONSTANTS = (
+    "SMI_THRESHOLDS",
+    "DHA_TONES",
+    "CANONICAL_KOSHA_LAYERS",
+    "ONTOLOGICAL_LAYERS",
+)
+
+__all__ = [
+    # Governance-safe (cross-layer)
+    "SMI_THRESHOLDS",
+    "DHA_TONES",
+    "CANONICAL_KOSHA_LAYERS",
+    "ONTOLOGICAL_LAYERS",
+    # Pipeline-internal (full detail)
+    "KOSHA_DESCRIPTIONS",
+    "CANONICAL_CONSONANT_TO_KOSHA",
+    "CONSONANT_TO_KOSHA_MAP",
+    "CONSONANT_VARIANTS",
+    "V26_STITCHING_WEIGHTS",
+    "VOWEL_ASPECT_BRIDGES",
+    # Meta
+    "GOVERNANCE_SAFE_CONSTANTS",
+]

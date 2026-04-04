@@ -320,6 +320,65 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase C2: Core pipeline coherence state signals
+    core_coherence: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Core pipeline CoherenceState signal view at decision time: "
+            "coherence, drift, UCF, continuity, identity, predictive signals. "
+            "Bridged via coherence_state_adapter (Phase C2)."
+        ),
+    )
+
+    # Phase C3: UCF consciousness stability signal
+    ucf_signal: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Unified Consciousness Formula signal at decision time: "
+            "ucf_score, stability_band, contributing_factors, confidence. "
+            "Bridged via ucf_adapter (Phase C3)."
+        ),
+    )
+
+    # Phase C3: Generation gate state at decision time
+    generation_gate: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Generation gate state at decision time: gate_status, "
+            "generation_mode, gate_affected_decision. "
+            "Integrated via generation gate check (Phase C3)."
+        ),
+    )
+
+    # Phase C4: Predictive signals (P35 drift + P36 identity + P37 continuity)
+    predictive_signals: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Predictive pipeline signals at decision time: P35 persona drift "
+            "(predicted_drift_score, drift_risk_band, trend), P36 identity "
+            "resonance (resonance_index, stability_band), P37 adaptive "
+            "continuity (continuity_score, mode, pressure, oscillation). "
+            "Bridged via predictive_signals_adapter (Phase C4)."
+        ),
+    )
+
+    # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
+    # NOTE: This field is INTENTIONALLY never populated by
+    # GovernanceService.authorize(). It exists for downstream replay,
+    # approval-workflow what-if analysis, and audit simulation tools
+    # that attach counterfactual results to audit events after the fact.
+    # The counterfactual bridge (signal_adapters/counterfactual_bridge.py)
+    # is NOT imported or called on the live authorize path.
+    counterfactual: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Counterfactual sandbox simulation results (replay/simulation "
+            "only — NOT populated by GovernanceService.authorize()). "
+            "Reserved for approval workflows and audit replay tools that "
+            "attach what-if analysis to audit events post-hoc (Phase C4)."
+        ),
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """

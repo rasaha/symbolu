@@ -70,7 +70,7 @@ __all__ = [
     "is_cross_domain",
     "DOMAIN_DISTANCE_MATRIX",
     "UNIVERSAL_ASPECTS",
-    # Objective (legacy compatibility)
+    # Objective (DEPRECATED — legacy compatibility wrapper, use StitchingEngine directly)
     "StitchingObjective",
     # Contracts (spec v1.1)
     "RejectionReason",
