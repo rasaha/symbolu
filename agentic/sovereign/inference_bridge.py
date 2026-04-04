@@ -147,6 +147,9 @@ class ProjectionMetadata:
     projection_warnings: Tuple[str, ...] = ()
     # Phase S3: Optional reasoning-kernel diagnostics carried through bridge
     reasoning_diagnostics: Optional[Dict[str, Any]] = None
+    # Phase S4: Optional Guna anomaly snapshot and governor telemetry
+    guna_anomalies: Optional[Dict[str, Any]] = None
+    governor_telemetry: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = {
@@ -168,6 +171,10 @@ class ProjectionMetadata:
         }
         if self.reasoning_diagnostics is not None:
             d["reasoning_diagnostics"] = self.reasoning_diagnostics
+        if self.guna_anomalies is not None:
+            d["guna_anomalies"] = self.guna_anomalies
+        if self.governor_telemetry is not None:
+            d["governor_telemetry"] = self.governor_telemetry
         return d
 
 
@@ -212,6 +219,8 @@ def project_sovereign_to_inference(
     sovereign_state_128d: Any,
     state_delta_128d: Any = None,
     kernel_diagnostics: Optional[Dict[str, Any]] = None,
+    guna_anomalies: Optional[Dict[str, Any]] = None,
+    governor_telemetry: Optional[Dict[str, Any]] = None,
 ) -> SovereignProjectionResult:
     """Project 128-D training sovereign state to 32-D inference state.
 
@@ -338,6 +347,23 @@ def project_sovereign_to_inference(
         except Exception:
             serialized_diag = None
 
+    # Phase S4: Serialize Guna anomaly snapshot for bridge transport
+    serialized_guna = None
+    if guna_anomalies is not None:
+        try:
+            # Accept raw dict (from GunaMonitor) or pre-serialized snapshot
+            serialized_guna = dict(guna_anomalies)
+        except Exception:
+            serialized_guna = None
+
+    # Phase S4: Serialize governor telemetry for bridge transport
+    serialized_gov_telem = None
+    if governor_telemetry is not None:
+        try:
+            serialized_gov_telem = dict(governor_telemetry)
+        except Exception:
+            serialized_gov_telem = None
+
     metadata = ProjectionMetadata(
         had_guna=had_guna,
         had_r_signal=had_r,
@@ -353,6 +379,8 @@ def project_sovereign_to_inference(
         vritti_derived=True,
         projection_warnings=tuple(warnings),
         reasoning_diagnostics=serialized_diag,
+        guna_anomalies=serialized_guna,
+        governor_telemetry=serialized_gov_telem,
     )
 
     return SovereignProjectionResult(

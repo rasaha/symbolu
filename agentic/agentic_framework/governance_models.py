@@ -287,6 +287,29 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase S4: Guna anomaly signals + advanced sovereign metadata
+    sovereign_guna_anomalies: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Guna anomaly state at decision time: collapse, oscillation, "
+            "stagnation detection, dominant guna, statistics."
+        ),
+    )
+    sovereign_bhava_transition: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Bhava transition audit at decision time: from/to bhava, "
+            "transition probability/penalty, unusual flag."
+        ),
+    )
+    sovereign_governor_telemetry: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "VrittiGovernor telemetry summary at decision time: "
+            "s_drift, coupling, tamas_ratio, brake_reason."
+        ),
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """

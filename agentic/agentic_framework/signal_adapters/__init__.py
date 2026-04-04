@@ -36,6 +36,10 @@ from agentic.agentic_framework.signal_adapters.sovereign_health_adapter import (
     resolve_sovereign_health,
     SovereignHealthResolution,
 )
+from agentic.agentic_framework.signal_adapters.guna_anomaly_adapter import (
+    resolve_guna_anomaly,
+    GunaAnomalyResolution,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -51,4 +55,6 @@ __all__ = [
     "InsightResolution",
     "resolve_sovereign_health",
     "SovereignHealthResolution",
+    "resolve_guna_anomaly",
+    "GunaAnomalyResolution",
 ]

@@ -538,6 +538,139 @@ class SovereignDiagnosticContext:
         }
 
 
+
+# =============================================================================
+# Phase S4: Guna Anomaly Context
+# =============================================================================
+
+@dataclass
+class GunaAnomalyContext:
+    """Forwarded Guna anomaly signals for governance consumption.
+
+    Populated from inference_bridge ProjectionMetadata.guna_anomalies
+    or from direct GunaMonitor output.
+
+    Bounded governance effects:
+    - collapse → confidence penalty (max 0.03) + escalation bias
+    - oscillation → confidence penalty (max 0.02)
+    - stagnation → informational audit metadata only
+    """
+    collapse: bool = False
+    oscillation: bool = False
+    stagnation: bool = False
+    dominant_guna: str = "unknown"
+    anomaly_count: int = 0
+    available: bool = False
+
+    def to_audit_dict(self) -> Dict[str, Any]:
+        """Serialize for governance audit."""
+        return {
+            "collapse": self.collapse,
+            "oscillation": self.oscillation,
+            "stagnation": self.stagnation,
+            "dominant_guna": self.dominant_guna,
+            "anomaly_count": self.anomaly_count,
+            "available": self.available,
+        }
+
+
+def guna_anomalies_from_projection(
+    projection_metadata: Optional[Dict[str, Any]] = None,
+    monitor_output: Optional[Dict[str, Any]] = None,
+) -> GunaAnomalyContext:
+    """Build GunaAnomalyContext from bridge metadata or monitor output.
+
+    Args:
+        projection_metadata: Dict from SovereignProjectionResult.metadata.to_dict()
+            which may contain embedded guna_anomalies.
+        monitor_output: Dict directly from GunaMonitor (check_anomalies + dominant).
+
+    Returns:
+        GunaAnomalyContext. If no data → available=False.
+    """
+    data = None
+
+    # Prefer direct monitor output
+    if monitor_output is not None:
+        data = monitor_output
+    elif projection_metadata is not None:
+        data = projection_metadata.get("guna_anomalies")
+
+    if data is None:
+        return GunaAnomalyContext()
+
+    try:
+        collapse = bool(data.get("collapse", False))
+        oscillation = bool(data.get("oscillation", False))
+        stagnation = bool(data.get("stagnation", False))
+        dominant = str(data.get("dominant_guna", "unknown"))
+        count = sum([collapse, oscillation, stagnation])
+
+        return GunaAnomalyContext(
+            collapse=collapse,
+            oscillation=oscillation,
+            stagnation=stagnation,
+            dominant_guna=dominant,
+            anomaly_count=count,
+            available=True,
+        )
+    except Exception:
+        return GunaAnomalyContext()
+
+
+# =============================================================================
+# Phase S4: Bhava Transition Audit Context
+# =============================================================================
+
+def bhava_transition_from_diagnostics(
+    previous_bhava: Optional[str],
+    current_bhava: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """Evaluate Bhava transition using pure-Python priors.
+
+    Returns audit dict if both bhavas are available, None otherwise.
+    This is audit-only metadata — no governance behavior change.
+    """
+    if previous_bhava is None or current_bhava is None:
+        return None
+
+    try:
+        from agentic.sovereign_bhava_priors import evaluate_bhava_transition
+        audit = evaluate_bhava_transition(previous_bhava, current_bhava)
+        if audit.available:
+            return audit.to_audit_dict()
+        return None
+    except Exception:
+        return None
+
+
+# =============================================================================
+# Phase S4: Governor Telemetry Context
+# =============================================================================
+
+def governor_telemetry_from_projection(
+    projection_metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Extract governor telemetry from bridge metadata.
+
+    Returns the governor telemetry dict if present, None otherwise.
+    This is audit-only metadata — no governance behavior change.
+    """
+    if projection_metadata is None:
+        return None
+    try:
+        telem = projection_metadata.get("governor_telemetry")
+        if telem is not None and isinstance(telem, dict):
+            return dict(telem)
+        return None
+    except Exception:
+        return None
+
+
+# =============================================================================
+# Phase S3: Diagnostic context forwarding (unchanged)
+# =============================================================================
+
 def diagnostics_from_projection(
     projection_metadata: Optional[Dict[str, Any]] = None,
     kernel_diagnostics: Optional[Dict[str, Any]] = None,

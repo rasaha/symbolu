@@ -96,6 +96,14 @@ from agentic.agentic_framework.signal_adapters.sovereign_health_adapter import (
 from agentic.agentic_framework.sovereign_bridge import (
     SovereignDiagnosticContext,
     diagnostics_from_projection,
+    GunaAnomalyContext,
+    guna_anomalies_from_projection,
+    bhava_transition_from_diagnostics,
+    governor_telemetry_from_projection,
+)
+from agentic.agentic_framework.signal_adapters.guna_anomaly_adapter import (
+    resolve_guna_anomaly,
+    GunaAnomalyResolution,
 )
 from agentic.agentic_framework.signal_adapters.session_enrichment_adapter import (
     resolve_session_enrichment,
@@ -593,6 +601,59 @@ def _resolve_diagnostic_context(
         return SovereignDiagnosticContext()
 
 
+def _resolve_guna_anomaly_signal(
+    jepa_assessment: "JEPAGovernanceAssessment",
+) -> GunaAnomalyResolution:
+    """Resolve Guna anomaly signals from JEPA assessment.
+
+    Phase S4: Extracts Guna anomaly data from JEPA composite metadata.
+    Returns safe fallback if data unavailable.
+    """
+    try:
+        composite = jepa_assessment.jepa_composite
+        metadata = getattr(composite, "projection_metadata", None)
+        if metadata is not None:
+            meta_dict = metadata.to_dict() if hasattr(metadata, "to_dict") else metadata
+            guna_ctx = guna_anomalies_from_projection(projection_metadata=meta_dict)
+            if guna_ctx.available:
+                return resolve_guna_anomaly(guna_ctx.to_audit_dict())
+        return GunaAnomalyResolution()
+    except Exception:
+        return GunaAnomalyResolution()
+
+
+def _resolve_s4_audit_metadata(
+    jepa_assessment: "JEPAGovernanceAssessment",
+    diagnostic_context: SovereignDiagnosticContext,
+    previous_bhava: Optional[str] = None,
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Resolve Phase S4 audit-only metadata.
+
+    Returns:
+        (bhava_transition_dict, governor_telemetry_dict) — both may be None.
+    """
+    # Bhava transition audit (uses previous + current dominant_bhava)
+    current_bhava = diagnostic_context.dominant_bhava if diagnostic_context.available else None
+    bhava_transition = None
+    try:
+        bhava_transition = bhava_transition_from_diagnostics(previous_bhava, current_bhava)
+    except Exception:
+        pass
+
+    # Governor telemetry (from projection metadata)
+    gov_telemetry = None
+    try:
+        composite = jepa_assessment.jepa_composite
+        metadata = getattr(composite, "projection_metadata", None)
+        if metadata is not None:
+            meta_dict = metadata.to_dict() if hasattr(metadata, "to_dict") else metadata
+            gov_telemetry = governor_telemetry_from_projection(meta_dict)
+    except Exception:
+        pass
+
+    return bhava_transition, gov_telemetry
+
+
 def _resolve_insight_signal(
     jepa_assessment: "JEPAGovernanceAssessment",
 ) -> InsightResolution:
@@ -923,6 +984,9 @@ class GovernanceService:
         # Step 5c2: Resolve Phase S3 reasoning diagnostics.
         diagnostic_context = _resolve_diagnostic_context(jepa_assessment)
 
+        # Step 5c3: Resolve Phase S4 Guna anomaly signals.
+        guna_anomaly_resolution = _resolve_guna_anomaly_signal(jepa_assessment)
+
         # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
@@ -935,7 +999,8 @@ class GovernanceService:
             gate_decision.confidence.overall
             + jepa_assessment.confidence_adjustment
             - entropy_resolution.confidence_penalty
-            - insight_resolution.confidence_penalty,
+            - insight_resolution.confidence_penalty
+            - guna_anomaly_resolution.confidence_penalty,
         )
 
         effective_exec_mode = gate_decision.execution.mode
@@ -980,6 +1045,16 @@ class GovernanceService:
         # Phase S3: Mauna (silence) protocol confirmation pressure (stricter-only).
         # If the model is in a withholding state, bump escalation by one level.
         if diagnostic_context.available and diagnostic_context.mauna_active:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase S4: Guna collapse escalation bias (stricter-only).
+        # If Guna collapse detected, bump escalation by one level.
+        if guna_anomaly_resolution.escalation_bias:
             _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
             _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
             current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
@@ -1172,6 +1247,16 @@ class GovernanceService:
             if diagnostic_context.available else None
         )
 
+        # Step 7e: Build Phase S4 audit dicts (guna anomalies + bhava + governor)
+        sovereign_guna_anomalies_dict = (
+            guna_anomaly_resolution.to_audit_dict()
+            if guna_anomaly_resolution.available else None
+        )
+        bhava_transition_dict, governor_telemetry_dict = _resolve_s4_audit_metadata(
+            jepa_assessment, diagnostic_context,
+            previous_bhava=None,  # Cross-call tracking not yet implemented
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1244,12 +1329,22 @@ class GovernanceService:
                 "sovereign_diagnostics_available": diagnostic_context.available,
                 "sovereign_diagnostics_mauna_active": diagnostic_context.mauna_active,
                 "sovereign_diagnostics_source": diagnostic_context.source,
+                # Phase S4: Guna anomaly provenance
+                "sovereign_guna_anomaly_available": guna_anomaly_resolution.available,
+                "sovereign_guna_collapse": guna_anomaly_resolution.collapse,
+                "sovereign_guna_oscillation": guna_anomaly_resolution.oscillation,
+                "sovereign_guna_stagnation": guna_anomaly_resolution.stagnation,
+                "sovereign_guna_confidence_penalty": guna_anomaly_resolution.confidence_penalty,
+                "sovereign_guna_escalation_bias": guna_anomaly_resolution.escalation_bias,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
             sovereign_health=sovereign_health_dict,
             sovereign_insight=sovereign_insight_dict,
             sovereign_diagnostics=sovereign_diagnostics_dict,
+            sovereign_guna_anomalies=sovereign_guna_anomalies_dict,
+            sovereign_bhava_transition=bhava_transition_dict,
+            sovereign_governor_telemetry=governor_telemetry_dict,
         )
         self._persist_audit_event(audit_event)
 
