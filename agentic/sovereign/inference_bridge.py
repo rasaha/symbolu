@@ -145,9 +145,11 @@ class ProjectionMetadata:
     vritti_derived: bool = True          # Vritti was derived, not directly measured
     # Warnings
     projection_warnings: Tuple[str, ...] = ()
+    # Phase S3: Optional reasoning-kernel diagnostics carried through bridge
+    reasoning_diagnostics: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "source_dim": self.source_dim,
             "target_dim": self.target_dim,
             "had_guna": self.had_guna,
@@ -164,6 +166,9 @@ class ProjectionMetadata:
             "vritti_derived": self.vritti_derived,
             "projection_warnings": list(self.projection_warnings),
         }
+        if self.reasoning_diagnostics is not None:
+            d["reasoning_diagnostics"] = self.reasoning_diagnostics
+        return d
 
 
 @dataclass(frozen=True)
@@ -206,6 +211,7 @@ class SovereignProjectionResult:
 def project_sovereign_to_inference(
     sovereign_state_128d: Any,
     state_delta_128d: Any = None,
+    kernel_diagnostics: Optional[Dict[str, Any]] = None,
 ) -> SovereignProjectionResult:
     """Project 128-D training sovereign state to 32-D inference state.
 
@@ -322,6 +328,16 @@ def project_sovereign_to_inference(
     if had_c:
         warnings.append("C-Signal (32-D phonemic) dropped: no inference slot")
 
+    # Phase S3: Serialize kernel diagnostics for bridge transport
+    serialized_diag = None
+    if kernel_diagnostics is not None:
+        try:
+            from agentic.sovereign_diagnostics import diagnostics_from_kernel_output
+            diag = diagnostics_from_kernel_output(kernel_diagnostics=kernel_diagnostics)
+            serialized_diag = diag.to_audit_dict()
+        except Exception:
+            serialized_diag = None
+
     metadata = ProjectionMetadata(
         had_guna=had_guna,
         had_r_signal=had_r,
@@ -336,6 +352,7 @@ def project_sovereign_to_inference(
         kosha_derived=True,
         vritti_derived=True,
         projection_warnings=tuple(warnings),
+        reasoning_diagnostics=serialized_diag,
     )
 
     return SovereignProjectionResult(

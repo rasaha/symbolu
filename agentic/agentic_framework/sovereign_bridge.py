@@ -474,3 +474,122 @@ def coherence_from_sovereign_state(
         prediction_reversal_risk=vritti_signals['prediction_reversal_risk'],
         identity_stability=guna_signals['identity_stability'],
     )
+
+
+# =============================================================================
+# Phase S3: Diagnostic context forwarding
+# =============================================================================
+
+@dataclass
+class SovereignDiagnosticContext:
+    """Forwarded reasoning-kernel diagnostics for governance consumption.
+
+    This is the governance-side view of sovereign reasoning diagnostics.
+    Populated from inference_bridge ProjectionMetadata or from direct
+    kernel diagnostic dicts. All fields are plain Python types.
+
+    Bounded governance effects:
+    - mauna_active → adds caution reason code + confirmation pressure
+    - opb_unstable → informational audit metadata
+    - vritti_rejection → informational audit metadata
+    - All other fields are audit/replay enrichment only
+    """
+    # Mauna / silence
+    mauna_active: bool = False
+
+    # Reasoning mode
+    active_intervention: Optional[str] = None
+    active_logic_template: Optional[str] = None
+
+    # State summary
+    dominant_bhava: Optional[str] = None
+    active_kosha: Optional[str] = None
+    vritti_state: Optional[str] = None
+    vritti_rejection: bool = False
+
+    # OPB stability
+    opb_active_locks: int = 0
+    opb_locked_dims: Tuple[str, ...] = ()
+    opb_unstable: bool = False  # True if dimension churn detected
+
+    # Entropy direction
+    entropy_delta: float = 0.0
+
+    # Provenance
+    source: str = "unknown"
+    available: bool = False
+
+    def to_audit_dict(self) -> Dict[str, Any]:
+        """Serialize for governance audit."""
+        return {
+            "mauna_active": self.mauna_active,
+            "active_intervention": self.active_intervention,
+            "active_logic_template": self.active_logic_template,
+            "dominant_bhava": self.dominant_bhava,
+            "active_kosha": self.active_kosha,
+            "vritti_state": self.vritti_state,
+            "vritti_rejection": self.vritti_rejection,
+            "opb_active_locks": self.opb_active_locks,
+            "opb_locked_dims": list(self.opb_locked_dims),
+            "opb_unstable": self.opb_unstable,
+            "entropy_delta": round(self.entropy_delta, 6),
+            "source": self.source,
+            "available": self.available,
+        }
+
+
+def diagnostics_from_projection(
+    projection_metadata: Optional[Dict[str, Any]] = None,
+    kernel_diagnostics: Optional[Dict[str, Any]] = None,
+    kernel_state: Optional[Dict[str, Any]] = None,
+) -> SovereignDiagnosticContext:
+    """Build SovereignDiagnosticContext from bridge projection or kernel output.
+
+    This is the main entry point for the governance layer to obtain
+    reasoning diagnostics. It accepts multiple source types for flexibility:
+
+    1. projection_metadata: Dict from SovereignProjectionResult.metadata.to_dict()
+       which may contain embedded reasoning_diagnostics.
+    2. kernel_diagnostics: Dict from SovereignReasoningKernel.intervene()['diagnostics'].
+    3. kernel_state: Dict from SovereignReasoningKernel.get_diagnostics().
+
+    If multiple sources are provided, they are merged (kernel > projection).
+
+    Returns:
+        SovereignDiagnosticContext with all available fields.
+        If no data → available=False, all defaults.
+    """
+    if projection_metadata is None and kernel_diagnostics is None and kernel_state is None:
+        return SovereignDiagnosticContext()
+
+    try:
+        from agentic.sovereign_diagnostics import (
+            diagnostics_from_kernel_output,
+            diagnostics_from_bridge_metadata,
+        )
+
+        # Prefer kernel output if available
+        if kernel_diagnostics is not None or kernel_state is not None:
+            diag = diagnostics_from_kernel_output(kernel_diagnostics, kernel_state)
+        elif projection_metadata is not None:
+            diag = diagnostics_from_bridge_metadata(projection_metadata)
+        else:
+            return SovereignDiagnosticContext()
+
+        return SovereignDiagnosticContext(
+            mauna_active=diag.mauna_active,
+            active_intervention=diag.active_intervention,
+            active_logic_template=diag.active_logic_template,
+            dominant_bhava=diag.dominant_bhava,
+            active_kosha=diag.active_kosha,
+            vritti_state=diag.vritti_state,
+            vritti_rejection=diag.vritti_rejection,
+            opb_active_locks=diag.opb_active_locks,
+            opb_locked_dims=diag.opb_locked_dims,
+            opb_unstable=diag.opb_is_unstable,
+            entropy_delta=diag.entropy_delta,
+            source=diag.source,
+            available=True,
+        )
+    except Exception:
+        return SovereignDiagnosticContext()

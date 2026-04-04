@@ -277,6 +277,16 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase S3: Reasoning kernel diagnostics
+    sovereign_diagnostics: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Sovereign reasoning-kernel diagnostics at decision time: "
+            "mauna/silence state, active intervention, logic template, "
+            "OPB lock state, vritti rejection, entropy delta."
+        ),
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """
