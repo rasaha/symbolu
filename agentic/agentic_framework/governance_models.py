@@ -362,13 +362,20 @@ class AuditEvent(BaseModel):
         ),
     )
 
-    # Phase C4: Counterfactual sandbox (replay/simulation only, not live)
+    # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
+    # NOTE: This field is INTENTIONALLY never populated by
+    # GovernanceService.authorize(). It exists for downstream replay,
+    # approval-workflow what-if analysis, and audit simulation tools
+    # that attach counterfactual results to audit events after the fact.
+    # The counterfactual bridge (signal_adapters/counterfactual_bridge.py)
+    # is NOT imported or called on the live authorize path.
     counterfactual: Optional[Dict[str, Any]] = Field(
         None,
         description=(
-            "Counterfactual sandbox simulation results (replay only, NOT "
-            "live authorization). Present when simulation was requested "
-            "for approval workflow or audit replay (Phase C4)."
+            "Counterfactual sandbox simulation results (replay/simulation "
+            "only — NOT populated by GovernanceService.authorize()). "
+            "Reserved for approval workflows and audit replay tools that "
+            "attach what-if analysis to audit events post-hoc (Phase C4)."
         ),
     )
 

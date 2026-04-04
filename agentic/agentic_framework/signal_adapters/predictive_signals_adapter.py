@@ -17,6 +17,15 @@ Combined adapter rationale:
     governance wiring simple. The adapter resolves P35 first, then P36,
     then P37 (which consumes both).
 
+Drift overlap with C2 (coherence_state_adapter):
+    C2 penalizes on *current/stateful* drift posture from CoherenceState
+    (persona_drift, drift_risk_band — up to 0.05 penalty).
+    P35 penalizes on *predictive/forecast* drift risk from
+    PredictivePersonaDriftReport (predicted_drift_score — up to 0.03).
+    Both may contribute simultaneously. This is intentional: current
+    drift and predicted drift are complementary signals. The aggregate
+    sovereign penalty cap (0.20) bounds the combined effect.
+
 Design:
     Follows the signal adapter pattern (frozen Resolution, pure function,
     fail-closed, bounded penalty, stricter-only).

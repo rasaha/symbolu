@@ -1200,6 +1200,16 @@ class GovernanceService:
         # prevents entropy + insight + guna + core coherence + UCF +
         # predictive signals from stacking beyond 0.20.
         # All penalties are non-positive (stricter-only).
+        #
+        # DRIFT OVERLAP NOTE (C2 + C4):
+        # C2 (core_coherence) penalizes on current/stateful drift posture
+        # from CoherenceState (persona_drift, drift_risk_band).
+        # C4 (predictive) penalizes on predictive/forecast drift risk
+        # from PredictivePersonaDriftReport (predicted_drift_score).
+        # Both may contribute simultaneously when both signals are present.
+        # This is intentional: current drift and predicted drift are
+        # complementary signals, not duplicates. The aggregate cap (0.20)
+        # bounds the combined effect and prevents runaway stacking.
         sovereign_penalty = min(
             0.20,
             entropy_resolution.confidence_penalty
