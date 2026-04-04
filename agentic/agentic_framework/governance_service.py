@@ -1947,6 +1947,200 @@ class GovernanceService:
 
         return assessment, vritti_resolution, entropy_resolution
 
+    # =====================================================================
+    # Layer Visibility / RBAC — Policy Phase P0
+    # =====================================================================
+
+    def check_layer_visibility(
+        self,
+        role_id: str,
+        artifact_id: str,
+        span_id: str,
+        projected_layers: Tuple[Any, ...],
+        requested_layers: Optional[Tuple[Any, ...]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Check which ontological layers are visible to a role.
+
+        Uses the ExposureGate from agentic.policy.layer_visibility_policy
+        to enforce fail-closed RBAC on layer visibility.
+
+        This is the canonical governance-facing entry point for layer
+        visibility checks. It wraps the ExposureGate with:
+        - Role string → RoleId enum resolution
+        - Audit logging
+        - Fail-closed error handling
+        - Serialized result for API/dashboard consumption
+
+        Args:
+            role_id: Role identifier ("end_user", "developer", "auditor", "system")
+            artifact_id: Identifier of the artifact being accessed
+            span_id: Identifier of the ledger span
+            projected_layers: Tuple of OntologicalLayer values from projection
+            requested_layers: Optional specific layers to request (None = all allowed)
+
+        Returns:
+            Dict with:
+                allowed_layers: list of allowed layer names
+                denied_layers: list of denied layer names
+                effective_layers: list of effective (visible) layer names
+                decision_hash: deterministic hash of the decision
+                decision: "allowed" or "denied"
+                error: error message if evaluation failed (fail-closed)
+
+        Fail-Closed:
+            Any error during evaluation returns an empty-allowed result.
+        """
+        try:
+            from agentic.policy.layer_visibility_policy import (
+                ExposureGate,
+                ExposureRequest,
+                RoleId,
+                DEFAULT_POLICY,
+            )
+            from agentic.ontology.contracts.projection_contract import (
+                ProjectionResponse,
+            )
+
+            # Resolve role string to RoleId enum
+            role_enum = self._resolve_role_id(role_id)
+
+            # Build projection response (structural wrapper for the gate)
+            projection_response = ProjectionResponse(
+                layers=tuple(projected_layers),
+            )
+
+            # Build exposure request
+            exposure_request = ExposureRequest(
+                artifact_id=artifact_id,
+                span_id=span_id,
+                role_id=role_enum,
+                requested_layers=requested_layers,
+            )
+
+            # Evaluate through ExposureGate (fail-closed internally)
+            gate = ExposureGate(policy=DEFAULT_POLICY)
+            response = gate.evaluate(projection_response, exposure_request)
+
+            result = {
+                "allowed_layers": [l.name for l in response.allowed_layers],
+                "denied_layers": [l.name for l in response.denied_layers],
+                "effective_layers": [l.name for l in response.effective_layers],
+                "decision_hash": response.decision_hash,
+                "decision": "allowed" if len(response.effective_layers) > 0 else "denied",
+                "error": None,
+            }
+
+            # Audit logging (best-effort, must not break main flow)
+            try:
+                self._log_layer_visibility_check(
+                    role_id=role_id,
+                    artifact_id=artifact_id,
+                    result=result,
+                )
+            except Exception:
+                pass  # Audit failure must not affect the decision
+
+            return result
+
+        except Exception as e:
+            # Fail-closed: any error → deny all
+            result = {
+                "allowed_layers": [],
+                "denied_layers": [],
+                "effective_layers": [],
+                "decision_hash": "",
+                "decision": "denied",
+                "error": f"Layer visibility check failed: {str(e)}",
+            }
+            return result
+
+    @staticmethod
+    def _resolve_role_id(role_str: str) -> Any:
+        """
+        Resolve a role string to RoleId enum.
+
+        Args:
+            role_str: Role identifier string
+
+        Returns:
+            RoleId enum value
+
+        Raises:
+            ValueError: If role_str is not a recognized role
+        """
+        from agentic.policy.layer_visibility_policy import RoleId
+
+        _ROLE_MAP = {
+            "end_user": RoleId.END_USER,
+            "developer": RoleId.DEVELOPER,
+            "auditor": RoleId.AUDITOR,
+            "system": RoleId.SYSTEM,
+        }
+        normalized = role_str.lower().strip()
+        if normalized not in _ROLE_MAP:
+            raise ValueError(
+                f"Unknown role '{role_str}'. "
+                f"Valid roles: {list(_ROLE_MAP.keys())}"
+            )
+        return _ROLE_MAP[normalized]
+
+    def _log_layer_visibility_check(
+        self,
+        role_id: str,
+        artifact_id: str,
+        result: Dict[str, Any],
+    ) -> None:
+        """Log a layer visibility check to the audit trail.
+
+        Uses a lightweight dict entry instead of the full AuditEvent
+        model, since layer visibility checks have a different shape
+        than authorization decisions.
+        """
+        entry = {
+            "event_type": "layer_visibility_check",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "decision_id": f"lvp-{hashlib.sha256(f'{role_id}:{artifact_id}'.encode()).hexdigest()[:12]}",
+            "role_id": role_id,
+            "artifact_id": artifact_id,
+            "decision": result["decision"],
+            "effective_layers": result["effective_layers"],
+            "decision_hash": result["decision_hash"],
+        }
+        # Store in a separate visibility log (lightweight)
+        if not hasattr(self, "_visibility_log"):
+            self._visibility_log: List[Dict[str, Any]] = []
+        self._visibility_log.append(entry)
+
+    # =====================================================================
+    # Policy Service Integration — Policy Phase P1
+    # =====================================================================
+
+    def get_policy_service(self) -> Any:
+        """
+        Get a PolicyService instance attached to this GovernanceService.
+
+        Returns a lazily-created PolicyService whose audit log can be
+        retrieved alongside the governance audit log.
+
+        Returns:
+            PolicyService instance (from agentic.policy.policy_service)
+        """
+        if not hasattr(self, "_policy_service"):
+            from agentic.policy.policy_service import PolicyService
+            self._policy_service = PolicyService()
+        return self._policy_service
+
+    def get_policy_audit_log(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get recent policy audit entries from the attached PolicyService.
+
+        Returns an empty list if no PolicyService has been used yet.
+        """
+        if not hasattr(self, "_policy_service"):
+            return []
+        return self._policy_service.get_policy_audit_log(limit=limit)
+
     def get_audit_log(self, limit: int = 100) -> List[AuditEvent]:
         """Get recent audit events (from in-memory cache)."""
         return self._audit_log[-limit:]

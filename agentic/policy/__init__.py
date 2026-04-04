@@ -26,10 +26,12 @@ Usage:
     mode = resolve_interaction_mode(profile, user_override=None)
 
 Public API:
-    get_domain_profile(domain: str) -> Dict[str, Any]
+    get_domain_profile(domain: str) -> DomainProfile
     compute_policy_flags(unified: Dict[str, Any], domain: str) -> Dict[str, Any]
     InteractionMode: Enum for interaction modes
     resolve_interaction_mode: Mode resolution function
+    DomainProfile: Typed, frozen domain profile (Policy Phase P0)
+    ProfileRegistry / get_profile_registry: Profile management
 """
 
 from .domain_profiles import get_domain_profile
@@ -40,6 +42,38 @@ from .interaction_modes import (
     get_mode_name,
     is_mode_valid,
 )
+from .profile_schema import (
+    DomainProfile,
+    ProfileRegistry,
+    get_profile_registry,
+)
+from .policy_service import (
+    PolicyService,
+    get_policy_service,
+    P1_VERSION,
+)
+from .session_policy import SessionPolicyFlags
+from .trading_guardrail_engine import TradingGuardrailFlags
+from .policy_simulation import (
+    simulate_policy,
+    simulate_session_policy,
+    simulate_trading_guardrails,
+    compare_policy,
+    compare_session_policy,
+    SIM_VERSION,
+)
+from .policy_lifecycle import (
+    ProfileStatus,
+    DeploymentRecord,
+    PolicyLifecycleManager,
+    PolicyLifecycleError,
+)
+from .policy_control_plane import (
+    PolicyControlPlane,
+    PolicyDomainStatus,
+    PolicyHealthReport,
+    P4_VERSION,
+)
 
 __all__ = [
     'get_domain_profile',
@@ -48,6 +82,32 @@ __all__ = [
     'resolve_interaction_mode',
     'get_mode_name',
     'is_mode_valid',
+    'DomainProfile',
+    'ProfileRegistry',
+    'get_profile_registry',
+    # Policy Phase P1
+    'PolicyService',
+    'get_policy_service',
+    'P1_VERSION',
+    'SessionPolicyFlags',
+    'TradingGuardrailFlags',
+    # Policy Phase P2
+    'simulate_policy',
+    'simulate_session_policy',
+    'simulate_trading_guardrails',
+    'compare_policy',
+    'compare_session_policy',
+    'SIM_VERSION',
+    # Policy Phase P3
+    'ProfileStatus',
+    'DeploymentRecord',
+    'PolicyLifecycleManager',
+    'PolicyLifecycleError',
+    # Policy Phase P4
+    'PolicyControlPlane',
+    'PolicyDomainStatus',
+    'PolicyHealthReport',
+    'P4_VERSION',
 ]
 
-__version__ = '1.0.0'
+__version__ = '1.5.0'
