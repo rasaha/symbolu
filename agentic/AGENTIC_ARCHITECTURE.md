@@ -1,10 +1,10 @@
 # Agentic Architecture: Signal Integration & Policy Control Plane
 
-> **Version:** 3.0.0 | **Updated:** 2026-04-04
+> **Version:** 4.0.0 | **Updated:** 2026-04-04
 >
-> This document describes the three completed internal tracks that connect
-> external signal sources and policy infrastructure to the agentic governance
-> runtime:
+> This document describes the four completed internal tracks that connect
+> external signal sources, ontological structure, and policy infrastructure
+> to the agentic governance runtime:
 >
 > - **Sovereign track (S1–S4 + activation patch):** Bridges sovereign model
 >   signals (entropy, health, insight, diagnostics, guna anomalies, bhava
@@ -13,6 +13,10 @@
 >   (coherence state, UCF consciousness, generation gate, predictive drift,
 >   identity resonance, adaptive continuity, counterfactual sandbox) into
 >   governance.
+> - **Ontology track (O1–O4):** Canonicalizes the 12-layer ontological
+>   structure, extracts safety validators, builds signal adapters for 10D
+>   backbone encoding/similarity/balance, and wires the first ontology
+>   consumer (mirror-pair balance) into the governance decision path.
 > - **Policy track (P0–P4 + closure patch):** Builds the profile-backed
 >   policy computation, simulation/comparison, lifecycle/deployment, and
 >   read-only backend control-plane layer that sits alongside governance.
@@ -20,20 +24,25 @@
 > **Sovereign and Core** follow a **bridge-first, never-direct** architecture
 > and feed signals into the governance runtime decision path.
 >
+> **Ontology** follows an **adapter-first, fail-closed** architecture:
+> canonical enum source → portable safety validators → lazy-import signal
+> adapters → bounded governance consumer.
+>
 > **Policy** follows a **layered backend** architecture: typed profile
 > foundations → runtime policy engines → service wrapper → simulation →
 > lifecycle/deployment → read-only control-plane queries.
 >
-> All three tracks are **closed as internal layers**. None yet constitutes a
+> All four tracks are **closed as internal layers**. None yet constitutes a
 > full external API product, dashboard UI, or tenant-scoped admin platform.
 >
 > For the full governance architecture (Layers 1–8, domain policy, shadow AI,
 > etc.), see [`docs/governance/AGENTIC_ARCHITECTURE.md`](../docs/governance/AGENTIC_ARCHITECTURE.md).
 >
-> This document focuses on how sovereign signals, core pipeline signals, and
-> policy infrastructure reach the agentic governance runtime — what is live,
-> what is conditional, what is audit-only, what is simulation-only, what is
-> backend/control-plane-only, and what remains future work.
+> This document focuses on how sovereign signals, core pipeline signals,
+> ontological structure signals, and policy infrastructure reach the agentic
+> governance runtime — what is live, what is conditional, what is audit-only,
+> what is simulation-only, what is backend/control-plane-only, and what
+> remains future work.
 
 ---
 
@@ -96,6 +105,10 @@ layered bridge architecture with two parallel input tracks:
   │    coherence_state_adapter.py    (C2) — coherence/drift signals │
   │    ucf_adapter.py                (C3) — UCF consciousness       │
   │    predictive_signals_adapter.py (C4) — P35+P36+P37 signals     │
+  │                                                                 │
+  │  Ontology adapters:                                             │
+  │    ontology_adapter.py           (O4) — 10D balance signal      │
+  │    phase4a_adapter.py            (O3) — varna-layer lookup      │
   │                                                                 │
   │  Core bridges (not adapters — isolated from live path):         │
   │    counterfactual_bridge.py      (C4) — replay/simulation only  │
@@ -615,6 +628,107 @@ mocks. They prove that:
 
 ---
 
+## O1–O4 Ontology Integration Phases
+
+The ontology track canonicalizes the 12-layer ontological structure, extracts
+portable safety validators, builds fail-closed signal adapters for the 10D
+backbone, and wires the first real ontology consumer into governance.
+
+Unlike the sovereign and core tracks which bridge heavy upstream engines
+(PyTorch, numpy), the ontology track bridges **rule-based, pure-Python**
+backbone encoders (`encoder.py`, `similarity.py`, `mirror_pairs.py`) that
+have no heavy dependencies. The adapters still use lazy imports and
+fail-closed semantics to maintain the same isolation guarantees.
+
+### What Ontology IS vs IS NOT
+
+| Ontology IS | Ontology IS NOT |
+|-------------|-----------------|
+| 12-member enum (`OntologicalLayer`) with patent-exact values 1–12 | An ML model or learned embedding space |
+| Rule-based text → 10D vector encoding (regex patterns per dimension) | A neural encoder or transformer |
+| Deterministic mirror-pair balance (5 pairs, `balance_score` 0.0–1.0) | A probabilistic or stochastic signal |
+| Frozen varna-layer lookup against JSON substrate | A dynamic knowledge graph |
+| One governance consumer (balance → penalty + escalation) | A comprehensive ontology reasoning engine |
+| Adapter-first, fail-closed signal pipeline | A direct import into governance |
+
+### Phase O1: OntologicalLayer Canonicalization
+
+**Scope:** Eliminate duplicate `OntologicalLayer` enum definitions. Establish
+a single canonical source with all import paths resolving to the same class.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `ontology/layers/ontology_layer.py` | Canonical source: 12-member enum, `ALL_LAYERS`, `GATED_LAYERS` | Live, canonical |
+| `ontology/projection/api_models.py` | Removed local enum, imports from canonical source | Live, re-export |
+| `ontology/router/ontological_router_r1.py` | Removed local enum, imports from canonical source | Live, re-export |
+| `symbolu/ontology/` mirrors | Identical canonicalization applied to parallel mirror package | Live, mirror |
+
+**O1 invariant:** `OntologicalLayer` is defined in exactly one place
+(`layers/ontology_layer.py`). All other modules import from it. AST
+verification tests confirm no independent definitions exist.
+
+### Phase O2: Safety Validators + Signal Adapters
+
+**Scope:** Extract portable runtime safety validators from `projection/validators.py`.
+Build signal adapters for 10D backbone encoding and similarity.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `ontology/safety.py` | `check_no_forbidden_modules()`, `check_no_timestamp_words()` | Live, portable |
+| `signal_adapters/ontology_adapter.py` | `resolve_ontology_encoding()` — lazy 10D encode | Adapter, available |
+| `signal_adapters/ontology_adapter.py` | `resolve_ontology_similarity()` — lazy similarity | Adapter, available |
+
+**Key design:** Adapters use lazy imports inside `try/except`, returning
+frozen `Resolution` dataclasses with `available=False` on failure. The
+backbone modules (`encoder.py`, `similarity.py`) are never directly imported
+by governance code.
+
+### Phase O3: Phase4a Lookup + Mirror-Pair Balance Adapter
+
+**Scope:** Build fail-closed adapters for varna-layer lookups (phase4a) and
+10D mirror-pair balance signals.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `signal_adapters/phase4a_adapter.py` | `resolve_varna_lookup()`, `resolve_varna_exists()` | Adapter, available |
+| `signal_adapters/ontology_adapter.py` | `resolve_ontology_balance()` — lazy mirror-pair balance | Adapter, available |
+
+**Mirror-pair balance:** The 10D backbone has 5 mirror pairs
+(ACTION↔ABSOLUTE, IDENTITY↔TRANSCENDENCE, etc.). `compute_balance()`
+produces a `BalanceReport` with `balance_score` (0.0–1.0),
+`dominant_state`, and `propagation_needed` count. The adapter wraps this
+in a frozen `OntologyBalanceResolution` dataclass.
+
+### Phase O4: First Governance Consumer (Balance Signal)
+
+**Scope:** Wire `resolve_ontology_balance()` into `GovernanceService.authorize()`
+as the first real ontology consumer, following the exact same adapter→penalty→escalation
+pattern used by all existing signal adapters.
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| `OntologyBalanceGovernanceSignal` | Frozen dataclass in `governance_service.py` | Live |
+| `_resolve_ontology_balance_signal()` | Resolver: content → balance → penalty + escalation | Live |
+| `governance_models.py` | `AuditEvent.ontology_balance` field | Live |
+| `governance_service.py` | Wired into `_evaluate()` penalty aggregate + escalation + audit | Live |
+
+**Governance effects:**
+
+| Effect | Trigger | Bound |
+|--------|---------|-------|
+| Confidence penalty (linear) | `balance_score < 0.35` | max 0.05 |
+| Escalation bias (+1 level) | `balance_score < 0.20` | Single step, cap at confirm |
+
+**Content input:** `action_type + " " + tool_name` from the `AuthorizationRequest`.
+This is always available (no upstream dependency), deterministic, and produces
+a stable 10D encoding for the proposed action.
+
+**Fail-closed:** Any error in ontology resolution → `available=False`,
+zero penalty, no escalation bias. The governance decision proceeds as if
+the ontology track does not exist.
+
+---
+
 ## P0–P4 Policy Productization Phases
 
 The policy track builds the profile-backed policy computation, simulation,
@@ -796,6 +910,7 @@ approximation or neutral defaults when upstream data is unavailable.
 | Coherence state resolution | Core | C2 | Bounded confidence penalty (max 0.10) |
 | UCF consciousness resolution | Core | C3 | Bounded confidence penalty (max 0.05) |
 | Predictive signals resolution | Core | C4 | Bounded confidence penalty (max 0.05) |
+| Ontology balance resolution | Ontology | O4 | Bounded confidence penalty (max 0.05) |
 
 **Note on core adapter defaults:** When no pipeline report/state is available
 (e.g., the caller didn't run the core pipeline), all core adapters resolve
@@ -919,7 +1034,9 @@ confidence or increase escalation, never relax governance.
 | C3 UCF escalation | Bumps escalation +1 | Single step | Core | C3 |
 | C4 P35 drift penalty | Reduces confidence | max 0.03 | Core | C4 |
 | C4 P35 drift escalation | Bumps escalation +1 | Single step | Core | C4 |
-| **Aggregate penalty cap** | **Caps total from all adapters** | **max 0.20** | Both | Patch |
+| O4 balance penalty | Reduces confidence | max 0.05 | Ontology | O4 |
+| O4 balance escalation | Bumps escalation +1 | Single step | Ontology | O4 |
+| **Aggregate penalty cap** | **Caps total from all adapters** | **max 0.20** | All | Patch |
 
 ### Light Behavior Signals
 
@@ -985,6 +1102,7 @@ Each adapter independently caps its own penalty:
 | Coherence state adapter (C2) | Core | 0.10 | Coherence + drift combined |
 | UCF adapter (C3) | Core | 0.05 | Consciousness stability is heuristic |
 | Predictive signals adapter (C4) | Core | 0.05 | P35 + P37 combined |
+| Ontology balance adapter (O4) | Ontology | 0.05 | Mirror-pair imbalance |
 
 ### Aggregate Cap
 
@@ -999,7 +1117,8 @@ sovereign_penalty = min(
     + guna_anomaly_resolution.confidence_penalty   # max 0.05 (S4)
     + core_coherence_resolution.confidence_penalty # max 0.10 (C2)
     + ucf_resolution.confidence_penalty            # max 0.05 (C3)
-    + predictive_resolution.confidence_penalty,    # max 0.05 (C4)
+    + predictive_resolution.confidence_penalty     # max 0.05 (C4)
+    + ontology_balance_signal.confidence_penalty,  # max 0.05 (O4)
 )
 ```
 
@@ -1141,6 +1260,17 @@ This is intentional: not every signal justifies governance authority.
 Promoting audit-only signals to behavior-affecting status would require
 rigorous justification and new bounded adapter logic.
 
+### Ontology Track Limitations
+
+| Limitation | Details | Status |
+|-----------|---------|--------|
+| **Rule-based encoding** | 10D backbone uses regex patterns, not learned embeddings. Encoding quality depends on pattern coverage. | By design |
+| **Single consumer** | Only `resolve_ontology_balance()` is wired into governance (O4). Encoding and similarity adapters (O2) are available but have no governance consumer. | Future work |
+| **Content input is action labels** | Balance is computed from `action_type + tool_name`, not rich semantic content. This produces stable but coarse-grained signals. | By design |
+| **No cross-request state** | Each balance computation is stateless. No tracking of balance trends across requests. | Future work |
+| **Validator duplication** | `ontology/safety.py` (O2) duplicates constants from `projection/validators.py`. Both sources agree, but deduplication is incomplete. | Code hygiene |
+| **Mirror package sync** | `symbolu/ontology/` mirrors `agentic/ontology/` manually. No automated sync mechanism. | By design |
+
 ### Policy Track Limitations
 
 The policy track (P0–P4) is closed as an internal backend/control-plane layer,
@@ -1159,31 +1289,32 @@ intentional:
 | **Tenant scoping** | `tenant_id` parameter exists on all P4 query surfaces as passthrough. No filtering, scoping, or tenant management logic. | Future work |
 | **No external API** | No HTTP endpoints, REST/GraphQL API, or dashboard UI. Policy layer is internal-only. | Future work |
 
-### How the Three Tracks Connect
+### How the Four Tracks Connect
 
-The sovereign, core, and policy tracks serve complementary roles in the broader
-governance architecture:
+The sovereign, core, ontology, and policy tracks serve complementary roles
+in the broader governance architecture:
 
 ```
-  SOVEREIGN TRACK (S1–S4)     CORE TRACK (C1–C4)        POLICY TRACK (P0–P4)
-  ─────────────────────       ──────────────────         ───────────────────
-  signal extraction +         signal extraction +        domain-specific policy
-  bounded governance          bounded governance         computation, simulation,
-  enrichments                 enrichments                lifecycle, control-plane
+  SOVEREIGN TRACK     CORE TRACK       ONTOLOGY TRACK     POLICY TRACK
+  (S1–S4)             (C1–C4)          (O1–O4)            (P0–P4)
+  ─────────────       ──────────       ──────────────     ───────────
+  signal extraction   signal extraction enum canonical-   domain-specific
+  + bounded gov.      + bounded gov.   ization + 10D     policy compute,
+  enrichments         enrichments      balance signal     simulation, CP
 
-        │                          │                           │
-        │ confidence penalties     │ confidence penalties      │ policy flags
-        │ escalation biases        │ generation gate           │ session policy
-        │ audit metadata           │ audit metadata            │ trading guardrails
-        │                          │                           │ interaction modes
-        ▼                          ▼                           │
-  ┌──────────────────────────────────────────┐                │
-  │  GovernanceService.authorize()           │                │
-  │  (live governance decision path)         │◀───────────────┘
-  │                                          │   layer visibility
-  │  Produces: ALLOW / DENY / ESCALATE       │   policy audit log
-  │  + enriched AuditEvent                   │
-  └──────────────────────────────────────────┘
+      │                    │                │                   │
+      │ confidence         │ confidence     │ confidence        │ policy flags
+      │ penalties          │ penalties      │ penalty           │ session policy
+      │ escalation         │ generation     │ escalation        │ trading guards
+      │ audit data         │ gate + audit   │ audit data        │ interaction modes
+      ▼                    ▼                ▼                   │
+  ┌──────────────────────────────────────────────┐             │
+  │  GovernanceService.authorize()               │             │
+  │  (live governance decision path)             │◀────────────┘
+  │                                              │ layer visibility
+  │  Produces: ALLOW / DENY / ESCALATE           │ policy audit log
+  │  + enriched AuditEvent                       │
+  └──────────────────────────────────────────────┘
 
   The policy track also provides independent capabilities:
   - Policy simulation/comparison (standalone, not via governance)
@@ -1191,11 +1322,14 @@ governance architecture:
   - Backend control-plane queries (health, history, snapshots)
 ```
 
-**Key distinction:** Sovereign and core tracks feed **signals into the
-governance decision path** (confidence adjustments, escalation biases,
-generation gate enforcement). The policy track provides **domain-specific
-policy computation and operational tooling** that sits alongside governance.
-Only `layer_visibility_policy.py` and the policy audit log directly connect
+**Key distinction:** Sovereign, core, and ontology tracks feed **signals
+into the governance decision path** (confidence adjustments, escalation
+biases, generation gate enforcement). The ontology track differs from
+sovereign/core in that it bridges rule-based pure-Python encoders (no
+PyTorch/numpy), but follows the same adapter→penalty→escalation pattern.
+The policy track provides **domain-specific policy computation and
+operational tooling** that sits alongside governance. Only
+`layer_visibility_policy.py` and the policy audit log directly connect
 to `governance_service.py`.
 
 ---
@@ -1222,6 +1356,12 @@ to `governance_service.py`.
 | `test_session_policy.py` | 20 | Session stability, grounding, reflection | Policy |
 | `test_trading_formula_guardrails.py` | 22 | Trading risk thresholds, boundary conditions | Policy |
 | `test_phase15_interaction_modes.py` | 35 | Interaction mode resolution, override precedence | Policy |
+| `tests/ontology_router/test_ontological_layer_canonical.py` | 13 | O1 canonical enum, identity, AST, router compat | Ontology |
+| `tests/unit/ontology/test_ontology_safety.py` | 24 | O2 safety validators, boundary conditions | Ontology |
+| `tests/unit/ontology/test_ontology_adapter.py` | 34 | O2 encoding/similarity adapter contracts | Ontology |
+| `tests/unit/ontology/test_phase4a_adapter.py` | 22 | O3 varna lookup adapter, fail-closed | Ontology |
+| `tests/unit/ontology/test_ontology_balance.py` | 21 | O3 balance adapter, resolution contract | Ontology |
+| `tests/unit/ontology/test_ontology_governance_consumer.py` | 30 | O4 E2E governance consumer, penalty, escalation | Ontology |
 
 ### What the Sovereign E2E Tests Prove
 
@@ -1270,6 +1410,36 @@ The `test_closure_e2e_authorize.py` tests prove C1-C4 signals are live:
    strings exist in both `governance_service.py` and
    `predictive_signals_adapter.py`.
 
+### What the Ontology Tests Prove
+
+The ontology test suite (144 tests across 6 files) proves:
+
+1. **O1 canonical source** — `OntologicalLayer` is defined in exactly one
+   place. All import paths (`layers`, `projection`, `router`) resolve to
+   the same class object. AST verification confirms no independent
+   definitions. Router and projection behavior is unchanged.
+
+2. **O2 safety validators** — `check_no_forbidden_modules()` and
+   `check_no_timestamp_words()` correctly detect violations and pass
+   clean input. Boundary conditions tested.
+
+3. **O2/O3 adapter contracts** — All three adapter functions
+   (`resolve_ontology_encoding`, `resolve_ontology_similarity`,
+   `resolve_ontology_balance`) return frozen Resolution dataclasses with
+   `available`, `source_detail` provenance. Fail-closed on errors.
+
+4. **O3 varna lookup** — `resolve_varna_lookup()` returns correct
+   interaction data for valid varna-layer pairs. Returns
+   `available=False` for unknown pairs. Crash-safe.
+
+5. **O4 governance consumer** — `OntologyBalanceGovernanceSignal` is
+   frozen with correct defaults. `_resolve_ontology_balance_signal()`
+   produces bounded penalties (max 0.05), escalation bias below 0.20.
+   Six E2E tests call `GovernanceService().authorize()` proving: audit
+   provenance, audit event field populated, low balance reduces
+   confidence, unavailable preserves baseline, critical balance triggers
+   escalation, adapter crash survival.
+
 ### What Is NOT Tested
 
 - No tests verify that a specific production caller always supplies
@@ -1281,6 +1451,11 @@ The `test_closure_e2e_authorize.py` tests prove C1-C4 signals are live:
   — it is replay/simulation-only)
 - No tests cover real core pipeline output objects (tests use duck-typed
   synthetic fixtures)
+- No tests verify ontology encoding/similarity adapters as governance
+  consumers (O2 adapters are available but have no governance wiring)
+- No tests cover balance trends across multiple requests (stateless)
+- No tests verify that the 10D regex patterns produce meaningful
+  encodings for all possible action types (pattern coverage is untested)
 
 ### What the Policy Tests Prove
 
@@ -1379,13 +1554,28 @@ The policy test suite (366 tests across 9 files) proves:
 | `policy/policy_control_plane.py` | P4 | `PolicyControlPlane`, `PolicyHealthReport`, `PolicyDomainStatus` |
 | `policy/__init__.py` | P0–P4 | Public exports, version 1.5.0 |
 
+### Ontology Integration Files (by phase)
+
+| File | Phase | Heavy deps | Purpose |
+|------|-------|-----------|---------|
+| `ontology/layers/ontology_layer.py` | O1 | No | Canonical `OntologicalLayer` enum (12 members) |
+| `ontology/projection/api_models.py` | O1 | No | Re-exports canonical enum (local def removed) |
+| `ontology/router/ontological_router_r1.py` | O1 | No | Re-exports canonical enum (local def removed) |
+| `ontology/safety.py` | O2 | No | Portable safety validators |
+| `ontology/backbone/encoder.py` | O2 (upstream) | No | Rule-based text → 10D encoding |
+| `ontology/backbone/similarity.py` | O2 (upstream) | No | 10D vector similarity |
+| `ontology/backbone/mirror_pairs.py` | O3 (upstream) | No | 5 mirror pairs, `compute_balance()` |
+| `ontology/phase4a/lookup.py` | O3 (upstream) | No | Varna-layer lookup against JSON substrate |
+| `agentic_framework/signal_adapters/ontology_adapter.py` | O2+O3 | No | Encoding, similarity, balance adapters |
+| `agentic_framework/signal_adapters/phase4a_adapter.py` | O3 | No | Varna lookup adapter |
+
 ### Shared Files (all tracks)
 
 | File | Phases | Purpose |
 |------|--------|---------|
-| `agentic_framework/governance_models.py` | S1+patch, C4 | Request/response models, audit event fields |
-| `agentic_framework/governance_service.py` | S1–S4+patch, C1–C4+closure, P0+P1 | Decision engine, penalty cap, layer visibility, policy audit |
-| `agentic_framework/signal_adapters/__init__.py` | S1–S4, C1–C4 | Adapter exports |
+| `agentic_framework/governance_models.py` | S1+patch, C4, O4 | Request/response models, audit event fields |
+| `agentic_framework/governance_service.py` | S1–S4+patch, C1–C4+closure, P0+P1, O4 | Decision engine, penalty cap, layer visibility, policy audit, ontology balance |
+| `agentic_framework/signal_adapters/__init__.py` | S1–S4, C1–C4, O2–O3 | Adapter exports |
 
 ### Test Files
 
@@ -1406,3 +1596,9 @@ The policy test suite (366 tests across 9 files) proves:
 | `tests/unit/policy/test_session_policy.py` | ~18 | Session stability, grounding | Policy |
 | `tests/unit/policy/test_trading_formula_guardrails.py` | ~22 | Trading risk thresholds | Policy |
 | `tests/unit/policy/test_phase15_interaction_modes.py` | ~24 | Interaction mode resolution | Policy |
+| `tests/ontology_router/test_ontological_layer_canonical.py` | 13 | O1 canonical enum, identity, AST | Ontology |
+| `tests/unit/ontology/test_ontology_safety.py` | 24 | O2 safety validators | Ontology |
+| `tests/unit/ontology/test_ontology_adapter.py` | 34 | O2 encoding/similarity adapters | Ontology |
+| `tests/unit/ontology/test_phase4a_adapter.py` | 22 | O3 varna lookup adapter | Ontology |
+| `tests/unit/ontology/test_ontology_balance.py` | 21 | O3 balance adapter | Ontology |
+| `tests/unit/ontology/test_ontology_governance_consumer.py` | 30 | O4 E2E governance consumer | Ontology |
