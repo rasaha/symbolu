@@ -47,6 +47,13 @@ from .profile_schema import (
     ProfileRegistry,
     get_profile_registry,
 )
+from .policy_service import (
+    PolicyService,
+    get_policy_service,
+    P1_VERSION,
+)
+from .session_policy import SessionPolicyFlags
+from .trading_guardrail_engine import TradingGuardrailFlags
 
 __all__ = [
     'get_domain_profile',
@@ -58,6 +65,12 @@ __all__ = [
     'DomainProfile',
     'ProfileRegistry',
     'get_profile_registry',
+    # Policy Phase P1
+    'PolicyService',
+    'get_policy_service',
+    'P1_VERSION',
+    'SessionPolicyFlags',
+    'TradingGuardrailFlags',
 ]
 
-__version__ = '1.1.0'
+__version__ = '1.2.0'

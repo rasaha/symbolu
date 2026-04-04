@@ -2112,6 +2112,35 @@ class GovernanceService:
             self._visibility_log: List[Dict[str, Any]] = []
         self._visibility_log.append(entry)
 
+    # =====================================================================
+    # Policy Service Integration — Policy Phase P1
+    # =====================================================================
+
+    def get_policy_service(self) -> Any:
+        """
+        Get a PolicyService instance attached to this GovernanceService.
+
+        Returns a lazily-created PolicyService whose audit log can be
+        retrieved alongside the governance audit log.
+
+        Returns:
+            PolicyService instance (from agentic.policy.policy_service)
+        """
+        if not hasattr(self, "_policy_service"):
+            from agentic.policy.policy_service import PolicyService
+            self._policy_service = PolicyService()
+        return self._policy_service
+
+    def get_policy_audit_log(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get recent policy audit entries from the attached PolicyService.
+
+        Returns an empty list if no PolicyService has been used yet.
+        """
+        if not hasattr(self, "_policy_service"):
+            return []
+        return self._policy_service.get_policy_audit_log(limit=limit)
+
     def get_audit_log(self, limit: int = 100) -> List[AuditEvent]:
         """Get recent audit events (from in-memory cache)."""
         return self._audit_log[-limit:]
