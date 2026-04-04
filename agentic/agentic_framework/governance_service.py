@@ -993,14 +993,20 @@ class GovernanceService:
         #
         # Phase 1: bounded entropy confidence penalty.
         # Phase S2: bounded insight confidence penalty + health awareness.
+        # Phase S4: aggregate sovereign penalty cap (0.20) prevents
+        # entropy + insight + guna from stacking beyond 0.20.
         # All penalties are non-positive (stricter-only).
+        sovereign_penalty = min(
+            0.20,
+            entropy_resolution.confidence_penalty
+            + insight_resolution.confidence_penalty
+            + guna_anomaly_resolution.confidence_penalty,
+        )
         effective_confidence = max(
             0.0,
             gate_decision.confidence.overall
             + jepa_assessment.confidence_adjustment
-            - entropy_resolution.confidence_penalty
-            - insight_resolution.confidence_penalty
-            - guna_anomaly_resolution.confidence_penalty,
+            - sovereign_penalty,
         )
 
         effective_exec_mode = gate_decision.execution.mode
@@ -1621,6 +1627,7 @@ class GovernanceService:
             session_id=getattr(request, "session_id", ""),
             actor_id=request.actor_id,
             capabilities=request.capabilities or [],
+            projection_metadata=getattr(request, "sovereign_projection_metadata", None),
         )
 
         return assessment, vritti_resolution, entropy_resolution

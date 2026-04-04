@@ -1051,7 +1051,12 @@ class TestGovernanceServiceJEPAEffectiveValues:
         insight_penalty = resp.audit_event.request_snapshot.get(
             "sovereign_insight_confidence_penalty", 0.0
         ) or 0.0
-        expected = max(0.0, raw_confidence + jepa_adj - entropy_penalty - insight_penalty)
+        guna_penalty = resp.audit_event.request_snapshot.get(
+            "sovereign_guna_confidence_penalty", 0.0
+        ) or 0.0
+        # Phase S4: aggregate sovereign penalty is capped at 0.20
+        sovereign_penalty = min(0.20, entropy_penalty + insight_penalty + guna_penalty)
+        expected = max(0.0, raw_confidence + jepa_adj - sovereign_penalty)
         assert abs(resp.confidence_score - expected) < 0.001
 
     def test_confidence_never_negative(self):

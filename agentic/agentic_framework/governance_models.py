@@ -176,6 +176,16 @@ class AuthorizationRequest(BaseModel):
                     "Note: this service never executes actions regardless.",
     )
 
+    # Sovereign projection metadata (optional — from inference bridge)
+    sovereign_projection_metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Optional sovereign inference bridge projection metadata. "
+            "When present, carries reasoning diagnostics, guna anomalies, "
+            "and governor telemetry for S3/S4 governance signals."
+        ),
+    )
+
     # Metadata
     metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata for traceability",

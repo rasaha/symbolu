@@ -238,6 +238,10 @@ class JEPACompositeSignal:
     stability: float
     summary: str
     coupling_evidence: Tuple[str, ...]
+    # Phase S3/S4: Optional sovereign projection metadata for diagnostics.
+    # When present, carries reasoning_diagnostics, guna_anomalies, and
+    # governor_telemetry from the sovereign inference bridge.
+    projection_metadata: Optional[Any] = None
 
 
 # =========================================================================
@@ -528,6 +532,7 @@ def build_vritti_signal(
 def build_jepa_composite(
     ontology: OntologySignal,
     vritti: VrittiSignal,
+    projection_metadata: Optional[Any] = None,
 ) -> JEPACompositeSignal:
     """Build the JEPA composite signal from ontology + vritti.
 
@@ -608,6 +613,7 @@ def build_jepa_composite(
         stability=stability,
         summary=summary,
         coupling_evidence=tuple(evidence),
+        projection_metadata=projection_metadata,
     )
 
 
@@ -991,6 +997,7 @@ def jepa_governance_check(
     session_id: str = "",
     actor_id: str = "",
     capabilities: Sequence[str] = (),
+    projection_metadata: Optional[Any] = None,
 ) -> JEPAGovernanceAssessment:
     """One-call convenience for the full JEPA governance pipeline.
 
@@ -1006,7 +1013,7 @@ def jepa_governance_check(
         coherence=coherence,
         score=score,
     )
-    jepa = build_jepa_composite(ontology, vritti_sig)
+    jepa = build_jepa_composite(ontology, vritti_sig, projection_metadata=projection_metadata)
     runtime = build_runtime_process_state(
         action_type=action_type,
         tool_name=tool_name,
