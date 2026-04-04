@@ -34,7 +34,7 @@ Design constraints:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 # =========================================================================
@@ -256,3 +256,119 @@ def resolve_ontology_similarity(
 
     except Exception:
         return _SIMILARITY_UNAVAILABLE
+
+
+# =========================================================================
+# Balance Resolution (O3)
+# =========================================================================
+
+@dataclass(frozen=True)
+class OntologyBalanceResolution:
+    """
+    Governance-safe view of the 10D mirror-pair balance analysis.
+
+    The mirror-pair balance measures how well-balanced the five
+    structural mirror pairs are in a 10D encoding (e.g., ACTION↔ABSOLUTE,
+    IDENTIFICATION↔SINGULARITY). A high balance_score indicates
+    structural equilibrium; low scores indicate dimensional skew.
+
+    Attributes:
+        available: Whether balance computation succeeded.
+        balance_score: Overall balance [0.0, 1.0]. 1.0 = perfectly balanced.
+        total_imbalance: Sum of per-pair imbalances.
+        dominant_state: Most common pair state (e.g., "balanced", "grounded_only").
+        pair_details: Per-pair breakdown as tuples of
+                      (pair_name, lower_value, higher_value, imbalance, state).
+        propagation_needed: Names of mirror pairs that need propagation.
+        source_detail: Provenance string.
+    """
+    available: bool
+    balance_score: float = 0.0
+    total_imbalance: float = 0.0
+    dominant_state: str = ""
+    pair_details: Tuple[Tuple[str, float, float, float, str], ...] = ()
+    propagation_needed: Tuple[str, ...] = ()
+    source_detail: str = "ontology_backbone_mirror_balance"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "available": self.available,
+            "balance_score": self.balance_score,
+            "total_imbalance": self.total_imbalance,
+            "dominant_state": self.dominant_state,
+            "pair_details": [
+                {
+                    "pair": name,
+                    "lower_value": lo,
+                    "higher_value": hi,
+                    "imbalance": imb,
+                    "state": st,
+                }
+                for name, lo, hi, imb, st in self.pair_details
+            ],
+            "propagation_needed": list(self.propagation_needed),
+            "source_detail": self.source_detail,
+        }
+
+
+_BALANCE_UNAVAILABLE = OntologyBalanceResolution(
+    available=False,
+    source_detail="ontology_backbone_mirror_balance:unavailable",
+)
+
+
+def resolve_ontology_balance(content: str) -> OntologyBalanceResolution:
+    """
+    Compute the mirror-pair balance for a text's 10D encoding.
+
+    Encodes the text using the canonical backbone encoder, then runs
+    ``compute_balance`` from the mirror pairs module to produce a
+    governance-ready balance score.
+
+    This is fail-closed: any error returns an unavailable resolution.
+
+    Args:
+        content: Text to encode and analyze for balance.
+
+    Returns:
+        OntologyBalanceResolution with balance_score, per-pair details,
+        and propagation recommendations. available=False if analysis fails.
+
+    Example:
+        >>> res = resolve_ontology_balance("The king ruled wisely")
+        >>> res.available
+        True
+        >>> 0.0 <= res.balance_score <= 1.0
+        True
+    """
+    try:
+        from agentic.ontology.backbone.encoder import encode_10d
+        from agentic.ontology.backbone.mirror_pairs import compute_balance
+
+        vec = encode_10d(content)
+        report = compute_balance(vec)
+
+        pair_details = tuple(
+            (
+                mb.pair.name,
+                mb.lower_value,
+                mb.higher_value,
+                mb.imbalance,
+                mb.state,
+            )
+            for mb in report.pairs
+        )
+
+        propagation_needed = tuple(p.name for p in report.propagation_needed)
+
+        return OntologyBalanceResolution(
+            available=True,
+            balance_score=report.balance_score,
+            total_imbalance=report.total_imbalance,
+            dominant_state=report.dominant_state,
+            pair_details=pair_details,
+            propagation_needed=propagation_needed,
+        )
+
+    except Exception:
+        return _BALANCE_UNAVAILABLE
