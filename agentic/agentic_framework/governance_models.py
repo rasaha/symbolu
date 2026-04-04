@@ -350,6 +350,28 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase C4: Predictive signals (P35 drift + P36 identity + P37 continuity)
+    predictive_signals: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Predictive pipeline signals at decision time: P35 persona drift "
+            "(predicted_drift_score, drift_risk_band, trend), P36 identity "
+            "resonance (resonance_index, stability_band), P37 adaptive "
+            "continuity (continuity_score, mode, pressure, oscillation). "
+            "Bridged via predictive_signals_adapter (Phase C4)."
+        ),
+    )
+
+    # Phase C4: Counterfactual sandbox (replay/simulation only, not live)
+    counterfactual: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Counterfactual sandbox simulation results (replay only, NOT "
+            "live authorization). Present when simulation was requested "
+            "for approval workflow or audit replay (Phase C4)."
+        ),
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """

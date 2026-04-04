@@ -48,6 +48,15 @@ from agentic.agentic_framework.signal_adapters.ucf_adapter import (
     resolve_ucf_signal,
     UCFResolution,
 )
+from agentic.agentic_framework.signal_adapters.predictive_signals_adapter import (
+    resolve_predictive_signals,
+    PredictiveSignalsResolution,
+)
+from agentic.agentic_framework.signal_adapters.counterfactual_bridge import (
+    run_counterfactual_simulation,
+    create_standard_scenarios,
+    CounterfactualBridgeResult,
+)
 
 __all__ = [
     "resolve_vritti_signal",
@@ -69,4 +78,9 @@ __all__ = [
     "CoreCoherenceResolution",
     "resolve_ucf_signal",
     "UCFResolution",
+    "resolve_predictive_signals",
+    "PredictiveSignalsResolution",
+    "run_counterfactual_simulation",
+    "create_standard_scenarios",
+    "CounterfactualBridgeResult",
 ]

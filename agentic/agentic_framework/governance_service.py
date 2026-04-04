@@ -117,6 +117,10 @@ from agentic.agentic_framework.signal_adapters.ucf_adapter import (
     resolve_ucf_signal,
     UCFResolution,
 )
+from agentic.agentic_framework.signal_adapters.predictive_signals_adapter import (
+    resolve_predictive_signals,
+    PredictiveSignalsResolution,
+)
 from agentic.core.generation_gate import (
     GenerationGate,
     GenerationMode,
@@ -774,6 +778,29 @@ def _check_generation_gate(
     }
 
 
+def _resolve_predictive_signals(
+    request: Any,
+) -> PredictiveSignalsResolution:
+    """Resolve P35+P36+P37 predictive signals from request metadata.
+
+    Phase C4: Extracts pre-computed drift report (P35), identity state (P36),
+    and continuity report (P37) from request.metadata. Returns a safe
+    fallback if signals are absent or malformed.
+    """
+    try:
+        metadata = getattr(request, "metadata", None) or {}
+        drift_report = metadata.get("predictive_drift_report")
+        identity_state = metadata.get("identity_resonance_state_p36")
+        continuity_report = metadata.get("continuity_report")
+        return resolve_predictive_signals(
+            drift_report=drift_report,
+            identity_state=identity_state,
+            continuity_report=continuity_report,
+        )
+    except Exception:
+        return resolve_predictive_signals()
+
+
 def _resolve_s4_audit_metadata(
     jepa_assessment: "JEPAGovernanceAssessment",
     diagnostic_context: SovereignDiagnosticContext,
@@ -1157,22 +1184,30 @@ class GovernanceService:
         #   are never affected. Fail-closed: unsealed or disabled = deny.
         generation_gate_result = _check_generation_gate(request)
 
+        # Step 5c7: Resolve Phase C4 predictive signals (P35+P36+P37).
+        #   P35 drift is behavior-affecting (max 0.03 penalty + escalation).
+        #   P37 continuity is light behavior (max 0.02 penalty).
+        #   P36 identity is audit-only (no penalty).
+        predictive_resolution = _resolve_predictive_signals(request)
+
         # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
         #
         # Phase 1: bounded entropy confidence penalty.
         # Phase S2: bounded insight confidence penalty + health awareness.
-        # Phase S4 + C2 + C3: aggregate sovereign penalty cap (0.20) prevents
-        # entropy + insight + guna + core coherence + UCF from stacking
-        # beyond 0.20. All penalties are non-positive (stricter-only).
+        # Phase S4 + C2 + C3 + C4: aggregate sovereign penalty cap (0.20)
+        # prevents entropy + insight + guna + core coherence + UCF +
+        # predictive signals from stacking beyond 0.20.
+        # All penalties are non-positive (stricter-only).
         sovereign_penalty = min(
             0.20,
             entropy_resolution.confidence_penalty
             + insight_resolution.confidence_penalty
             + guna_anomaly_resolution.confidence_penalty
             + core_coherence_resolution.confidence_penalty
-            + ucf_resolution.confidence_penalty,
+            + ucf_resolution.confidence_penalty
+            + predictive_resolution.confidence_penalty,
         )
         effective_confidence = max(
             0.0,
@@ -1254,6 +1289,16 @@ class GovernanceService:
         # Phase C3: UCF instability escalation bias (stricter-only).
         # If consciousness is in unstable band, bump escalation by one level.
         if ucf_resolution.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase C4: Predictive drift escalation bias (stricter-only).
+        # If P35 predicts HIGH drift risk, bump escalation by one level.
+        if predictive_resolution.escalation_bias:
             _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
             _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
             current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
@@ -1482,6 +1527,12 @@ class GovernanceService:
             generation_gate_result if generation_gate_result["is_generative"] else None
         )
 
+        # Step 7i: Build Phase C4 predictive signals audit dict
+        predictive_signals_dict = (
+            predictive_resolution.to_audit_dict()
+            if predictive_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1581,6 +1632,17 @@ class GovernanceService:
                 "generation_gate_mode": generation_gate_result["generation_mode"],
                 "generation_gate_blocks": generation_gate_result["gate_blocks"],
                 "generation_gate_block_reason": generation_gate_result["block_reason"],
+                # Phase C4: Predictive signals provenance
+                "predictive_available": predictive_resolution.available,
+                "predictive_drift_score": predictive_resolution.predicted_drift_score,
+                "predictive_drift_risk_band": predictive_resolution.drift_risk_band,
+                "predictive_drift_trend": predictive_resolution.drift_trend,
+                "predictive_continuity_score": predictive_resolution.continuity_score,
+                "predictive_continuity_mode": predictive_resolution.continuity_mode,
+                "predictive_identity_resonance": predictive_resolution.identity_resonance_index,
+                "predictive_identity_band": predictive_resolution.identity_stability_band,
+                "predictive_confidence_penalty": predictive_resolution.confidence_penalty,
+                "predictive_escalation_bias": predictive_resolution.escalation_bias,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -1593,6 +1655,7 @@ class GovernanceService:
             core_coherence=core_coherence_dict,
             ucf_signal=ucf_signal_dict,
             generation_gate=generation_gate_dict,
+            predictive_signals=predictive_signals_dict,
         )
         self._persist_audit_event(audit_event)
 
