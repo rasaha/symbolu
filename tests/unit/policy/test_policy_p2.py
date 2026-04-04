@@ -477,9 +477,11 @@ class TestRegistryEnhancements(unittest.TestCase):
 class TestP2BackwardCompat(unittest.TestCase):
     """Ensure P0 and P1 functionality is not broken by P2."""
 
-    def test_version_bumped(self):
+    def test_version_at_least_1_3(self):
+        """Package version is at least 1.3.0 after P2."""
         from agentic.policy import __version__
-        self.assertEqual(__version__, "1.3.0")
+        major, minor, patch = (int(x) for x in __version__.split("."))
+        self.assertGreaterEqual((major, minor), (1, 3))
 
     def test_p0_exports_present(self):
         from agentic.policy import DomainProfile, ProfileRegistry, get_profile_registry

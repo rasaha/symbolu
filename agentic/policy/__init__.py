@@ -62,6 +62,12 @@ from .policy_simulation import (
     compare_session_policy,
     SIM_VERSION,
 )
+from .policy_lifecycle import (
+    ProfileStatus,
+    DeploymentRecord,
+    PolicyLifecycleManager,
+    PolicyLifecycleError,
+)
 
 __all__ = [
     'get_domain_profile',
@@ -86,6 +92,11 @@ __all__ = [
     'compare_policy',
     'compare_session_policy',
     'SIM_VERSION',
+    # Policy Phase P3
+    'ProfileStatus',
+    'DeploymentRecord',
+    'PolicyLifecycleManager',
+    'PolicyLifecycleError',
 ]
 
-__version__ = '1.3.0'
+__version__ = '1.4.0'

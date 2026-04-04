@@ -481,6 +481,203 @@ class PolicyService:
         )
 
     # -----------------------------------------------------------------
+    # P3: Policy lifecycle management
+    # -----------------------------------------------------------------
+
+    def get_lifecycle_manager(self) -> Any:
+        """
+        Get the PolicyLifecycleManager attached to this service.
+
+        Lazily created on first access. Uses the global ProfileRegistry.
+        """
+        if not hasattr(self, "_lifecycle_manager"):
+            from .policy_lifecycle import PolicyLifecycleManager
+            from .profile_schema import get_profile_registry
+            self._lifecycle_manager = PolicyLifecycleManager(get_profile_registry())
+        return self._lifecycle_manager
+
+    def stage_candidate(
+        self,
+        domain: str,
+        profile: Any,
+        actor: str,
+        rationale: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Stage a candidate profile for activation.
+
+        Args:
+            domain: Domain identifier
+            profile: DomainProfile to stage
+            actor: Who is staging
+            rationale: Why
+
+        Returns:
+            DeploymentRecord dict
+        """
+        ts = datetime.now(timezone.utc)
+        mgr = self.get_lifecycle_manager()
+        record = mgr.stage_candidate(domain, profile, actor, rationale)
+        self._append_audit_entry(
+            event_type="stage_candidate",
+            domain=domain,
+            timestamp=ts,
+            summary={
+                "profile_id": record.profile_id,
+                "profile_version": record.profile_version,
+                "status": record.status.value,
+                "actor": actor,
+            },
+        )
+        return record.to_dict()
+
+    def validate_candidate(
+        self,
+        domain: str,
+        actor: str,
+        rationale: str = "",
+        simulation_summary: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Validate a staged candidate, optionally with simulation results.
+
+        Returns:
+            DeploymentRecord dict
+        """
+        ts = datetime.now(timezone.utc)
+        mgr = self.get_lifecycle_manager()
+        record = mgr.validate_candidate(
+            domain, actor, rationale, simulation_summary,
+        )
+        self._append_audit_entry(
+            event_type="validate_candidate",
+            domain=domain,
+            timestamp=ts,
+            summary={
+                "profile_id": record.profile_id,
+                "profile_version": record.profile_version,
+                "status": record.status.value,
+                "has_simulation": simulation_summary is not None,
+            },
+        )
+        return record.to_dict()
+
+    def activate_profile(
+        self,
+        domain: str,
+        actor: str,
+        rationale: str = "",
+        approval_id: Optional[str] = None,
+        simulation_summary: Optional[Dict[str, Any]] = None,
+        require_validation: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Activate a staged candidate, promoting it into the registry.
+
+        Args:
+            domain: Domain identifier
+            actor: Who is activating
+            rationale: Why
+            approval_id: Optional approval ID from governance workflow
+            simulation_summary: Optional simulation results to attach
+            require_validation: If True, candidate must be validated first
+
+        Returns:
+            DeploymentRecord dict
+        """
+        ts = datetime.now(timezone.utc)
+        mgr = self.get_lifecycle_manager()
+        record = mgr.activate(
+            domain, actor, rationale, approval_id,
+            simulation_summary, require_validation,
+        )
+        self._append_audit_entry(
+            event_type="activate_profile",
+            domain=domain,
+            timestamp=ts,
+            summary={
+                "profile_id": record.profile_id,
+                "profile_version": record.profile_version,
+                "previous_profile_id": record.previous_profile_id,
+                "previous_version": record.previous_version,
+                "approval_id": approval_id,
+                "actor": actor,
+            },
+        )
+        return record.to_dict()
+
+    def rollback_profile(
+        self,
+        domain: str,
+        actor: str,
+        rationale: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Rollback to the previous active profile for a domain.
+
+        Returns:
+            DeploymentRecord dict (the restored profile)
+        """
+        ts = datetime.now(timezone.utc)
+        mgr = self.get_lifecycle_manager()
+        record = mgr.rollback(domain, actor, rationale)
+        self._append_audit_entry(
+            event_type="rollback_profile",
+            domain=domain,
+            timestamp=ts,
+            summary={
+                "restored_profile_id": record.profile_id,
+                "restored_version": record.profile_version,
+                "previous_profile_id": record.previous_profile_id,
+                "previous_version": record.previous_version,
+                "actor": actor,
+            },
+        )
+        return record.to_dict()
+
+    def request_activation_approval(
+        self,
+        domain: str,
+        actor: str,
+        rationale: str = "",
+        simulation_summary: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Produce an approval-ready payload for policy activation.
+
+        Does NOT create an approval in ApprovalStore. Returns a
+        structured dict suitable for integration with approval workflow.
+        """
+        ts = datetime.now(timezone.utc)
+        mgr = self.get_lifecycle_manager()
+        payload = mgr.request_activation_approval(
+            domain, actor, rationale, simulation_summary,
+        )
+        self._append_audit_entry(
+            event_type="request_activation_approval",
+            domain=domain,
+            timestamp=ts,
+            summary={
+                "candidate_profile_id": payload.get("candidate_profile_id"),
+                "candidate_profile_version": payload.get("candidate_profile_version"),
+                "actor": actor,
+            },
+        )
+        return payload
+
+    def get_deployment_history(
+        self, domain: str, limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Get deployment history for a domain (most recent first)."""
+        mgr = self.get_lifecycle_manager()
+        return mgr.get_deployment_history(domain, limit)
+
+    def get_active_deployment(self, domain: str) -> Optional[Dict[str, Any]]:
+        """Get the current active deployment record for a domain."""
+        mgr = self.get_lifecycle_manager()
+        return mgr.get_active_record(domain)
+
+    # -----------------------------------------------------------------
     # P1-D: Audit log
     # -----------------------------------------------------------------
 
