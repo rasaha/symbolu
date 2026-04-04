@@ -373,6 +373,17 @@ class AuditEvent(BaseModel):
         ),
     )
 
+    # Phase S2-safety: Plasticity gate signal
+    plasticity_gate: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Plasticity gate signal at decision time: sigmoid "
+            "permission-to-act value, resistance/misalignment inputs, "
+            "confidence_penalty, escalation_bias. "
+            "Bridged via plasticity_adapter (Phase S2)."
+        ),
+    )
+
     # Phase C4: Counterfactual sandbox (replay/simulation only, not live).
     # NOTE: This field is INTENTIONALLY never populated by
     # GovernanceService.authorize(). It exists for downstream replay,

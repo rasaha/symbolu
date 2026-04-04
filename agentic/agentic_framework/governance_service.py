@@ -125,6 +125,10 @@ from agentic.agentic_framework.signal_adapters.ontology_adapter import (
     resolve_ontology_balance,
     OntologyBalanceResolution,
 )
+from agentic.agentic_framework.signal_adapters.plasticity_adapter import (
+    resolve_plasticity_signal,
+    PlasticityResolution,
+)
 from agentic.core.generation_gate import (
     GenerationGate,
     GenerationMode,
@@ -981,6 +985,40 @@ def _resolve_ontology_balance_signal(
         return _ONTOLOGY_BALANCE_UNAVAILABLE
 
 
+# =============================================================================
+# Plasticity gate resolution (Phase S2-safety)
+# =============================================================================
+
+def _resolve_plasticity_gate_signal(
+    core_coherence_resolution: CoreCoherenceResolution,
+) -> PlasticityResolution:
+    """Resolve plasticity gate signal from already-resolved coherence state.
+
+    Phase S2-safety: Feeds the PlasticityGate with coherence/drift signals
+    already available from core_coherence_resolution (Step 5c4). No new
+    upstream dependencies.
+
+    Inputs:
+        resistance ← semantic_stability ?? coherence_score (from C2)
+        misalignment ← persona_drift (from C2)
+
+    Fail-closed: if core coherence is unavailable or computation fails,
+    returns available=False with zero penalty and no escalation bias.
+    """
+    try:
+        if not core_coherence_resolution.available:
+            return resolve_plasticity_signal()  # no inputs → unavailable
+
+        return resolve_plasticity_signal(
+            coherence_score=core_coherence_resolution.coherence_score,
+            semantic_stability=core_coherence_resolution.semantic_stability,
+            persona_drift=core_coherence_resolution.persona_drift,
+        )
+
+    except Exception:
+        return resolve_plasticity_signal()  # fail-closed
+
+
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
     gate_decision: ConfidenceGateDecision,
@@ -1316,6 +1354,16 @@ class GovernanceService:
         #   Fail-closed: if resolution fails, zero penalty and no bias.
         ontology_balance_signal = _resolve_ontology_balance_signal(request)
 
+        # Step 5c9: Resolve Phase S2-safety plasticity gate signal.
+        #   Computes a sigmoid permission-to-act value from core coherence
+        #   signals (stability → resistance, drift → misalignment).
+        #   Low plasticity = gate closing = system not ready to act.
+        #   Max penalty: 0.04. Escalation bias below 0.35.
+        #   Fail-closed: if coherence unavailable, zero penalty and no bias.
+        plasticity_resolution = _resolve_plasticity_gate_signal(
+            core_coherence_resolution,
+        )
+
         # Step 5d: Apply JEPA override fields to confidence, execution
         # mode, and escalation level. These modify the gate decision's
         # effective output — JEPA can only make things stricter.
@@ -1336,6 +1384,12 @@ class GovernanceService:
         # This is intentional: current drift and predicted drift are
         # complementary signals, not duplicates. The aggregate cap (0.20)
         # bounds the combined effect and prevents runaway stacking.
+        #
+        # PLASTICITY NOTE (S2-safety):
+        # Plasticity is derived FROM core_coherence (C2) inputs but is a
+        # distinct signal: it captures the sigmoid permission-to-act state,
+        # not the raw coherence/drift values. Its penalty (max 0.04) is
+        # additive and bounded within the aggregate cap.
         sovereign_penalty = min(
             0.20,
             entropy_resolution.confidence_penalty
@@ -1344,7 +1398,8 @@ class GovernanceService:
             + core_coherence_resolution.confidence_penalty
             + ucf_resolution.confidence_penalty
             + predictive_resolution.confidence_penalty
-            + ontology_balance_signal.confidence_penalty,
+            + ontology_balance_signal.confidence_penalty
+            + plasticity_resolution.confidence_penalty,
         )
         effective_confidence = max(
             0.0,
@@ -1446,6 +1501,16 @@ class GovernanceService:
         # Phase O4: Ontology balance escalation bias (stricter-only).
         # If structural balance is critically low (< 0.20), bump escalation.
         if ontology_balance_signal.escalation_bias:
+            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
+            _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
+            current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
+            bumped = min(current_severity + 1, 2)  # cap at confirm, not halt
+            if bumped > current_severity:
+                effective_esc_level = EscalationLevel(_ESC_FROM_SEVERITY[bumped])
+
+        # Phase S2-safety: Plasticity gate escalation bias (stricter-only).
+        # If plasticity gate is nearly closed (< 0.35), bump escalation.
+        if plasticity_resolution.escalation_bias:
             _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
             _ESC_FROM_SEVERITY = {0: "none", 1: "notify", 2: "confirm", 3: "halt"}
             current_severity = _ESC_SEVERITY.get(effective_esc_level.value, 0)
@@ -1686,6 +1751,12 @@ class GovernanceService:
             if ontology_balance_signal.available else None
         )
 
+        # Step 7k: Build Phase S2-safety plasticity gate audit dict
+        plasticity_gate_dict = (
+            plasticity_resolution.to_audit_dict()
+            if plasticity_resolution.available else None
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1802,6 +1873,11 @@ class GovernanceService:
                 "ontology_balance_confidence_penalty": ontology_balance_signal.confidence_penalty,
                 "ontology_balance_escalation_bias": ontology_balance_signal.escalation_bias,
                 "ontology_balance_dominant_state": ontology_balance_signal.dominant_state,
+                # Phase S2-safety: Plasticity gate provenance
+                "plasticity_available": plasticity_resolution.available,
+                "plasticity_value": plasticity_resolution.plasticity,
+                "plasticity_confidence_penalty": plasticity_resolution.confidence_penalty,
+                "plasticity_escalation_bias": plasticity_resolution.escalation_bias,
             },
             shadow_assessment=shadow_audit,
             sovereign_telemetry=sovereign_telemetry_dict,
@@ -1816,6 +1892,7 @@ class GovernanceService:
             generation_gate=generation_gate_dict,
             predictive_signals=predictive_signals_dict,
             ontology_balance=ontology_balance_dict,
+            plasticity_gate=plasticity_gate_dict,
         )
         self._persist_audit_event(audit_event)
 
