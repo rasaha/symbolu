@@ -530,6 +530,12 @@ def _resolve_session_enrichment(
     Signals are extracted from request.metadata with well-known keys.
     Missing signals contribute zero penalty (fail-closed).
 
+    BRIDGE STATUS: The mechanical pipeline produces identity_signature,
+    motivation_profile, and temporal data on ctx, but no pipeline →
+    AuthorizationRequest bridge exists yet. These metadata keys are
+    currently only populated if an external caller explicitly provides
+    them. See AGENTIC_ARCHITECTURE.md §Pipeline ↔ Governance for details.
+
     Args:
         request: Authorization request (may carry session signals in .metadata).
 

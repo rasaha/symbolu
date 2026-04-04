@@ -957,6 +957,9 @@ The counterfactual bridge (`counterfactual_bridge.py`) is not imported by
 
 | Signal | Description | Status |
 |--------|-------------|--------|
+| Session enrichment: identity signature | `session_enrichment_adapter._resolve_identity()` consumes `metadata["identity_signature"]` | Bridge-ready, not bridge-fed (see §Pipeline ↔ Governance below) |
+| Session enrichment: motivation profile | `session_enrichment_adapter._resolve_motivation()` consumes `metadata["motivation_profile"]` | Bridge-ready, not bridge-fed |
+| Session enrichment: temporal summary | `session_enrichment_adapter._resolve_temporal()` consumes `metadata["temporal_summary"]` | Bridge-ready, not bridge-fed |
 | Temporal trajectory prediction | JEPA forecasting future semantic state | Not implemented |
 | `previous_bhava` tracking | Cross-request bhava transition history | Hardcoded to `None` |
 | Deeper sovereign model internals | Per-layer attention weights, gradient norms, etc. | Intentionally excluded |
@@ -1331,6 +1334,124 @@ The policy track provides **domain-specific policy computation and
 operational tooling** that sits alongside governance. Only
 `layer_visibility_policy.py` and the policy audit log directly connect
 to `governance_service.py`.
+
+---
+
+## Pipeline ↔ Governance Authorization: Bridge Status
+
+The mechanical pipeline (`symbolu_core/mechanical/pipeline/orchestrator.py`)
+and the agentic governance authorization system (`GovernanceService.authorize()`)
+are **architecturally adjacent but operationally disconnected**. No bridge
+exists between them today.
+
+### What Each System Does
+
+**Mechanical pipeline** — synchronous in-process request processing:
+- PO1–PO5 pre-acoustic governance (grounding, intent, action constraints)
+- MLCR → HRM/LCM/LAM → Persona → Fusion → DHA → Renderer
+- Session processing (policy flags, memory, recap, intent arc,
+  identity signature, motivation profile, trading guardrails)
+- Output processing → unified API response
+
+**Governance authorization service** — tool/action authorization decisions:
+- Confidence gating with bounded signal penalties
+- Tool risk classification (READ_ONLY → PRIVILEGED)
+- Sovereign, core, ontology, and policy signal consumption
+- Safety contract preconditions
+- External-facing `POST /authorize` endpoint via FastAPI
+
+### Current Bridge State: Not Connected
+
+`GovernanceService.authorize()` has **zero production callers** from the
+mechanical pipeline:
+
+- `symbolu_core/mechanical/` has no imports of `GovernanceService` or
+  `AuthorizationRequest`
+- The orchestrator does not call any agentic governance function
+- The FastAPI `/authorize` endpoint (`governance_api.py`) exists but is
+  not started or called by any pipeline code
+- PO1–PO5 inside the pipeline are the pipeline's **own** pre-acoustic
+  governance — they are unrelated to `GovernanceService.authorize()`
+
+**P52 status:** Phase 52 (`p52_governance_adapter/`) defines a
+`GovernanceRequest` data contract as a future interface socket. However:
+- P52 is **never invoked** from the orchestrator
+- P52 explicitly "does NOT send [the request] anywhere"
+- P52's invariant states "When P52 is removed, system behavior is
+  bitwise identical"
+- P52's `GovernanceRequest` is a **different type** from
+  `AuthorizationRequest` (different fields, different schema)
+
+P52 is an interface definition, not a live bridge.
+
+### Identity Signature Engine: Live in Pipeline, Inactive in Governance
+
+The identity signature engine (`agentic/identity/identity_signature_engine.py`)
+is **live and useful** within the mechanical pipeline:
+
+| Consumer | Location | Status |
+|----------|----------|--------|
+| Session processing | `session_processing.py` → `ctx.identity_signature` | **Live** — computed on every session |
+| Motivation engine | `motivation_engine.py` | **Live** — uses identity signature as input |
+| Trading guardrail engine | `trading_guardrail_engine.py` | **Live** — reads `ctx.identity_signature` |
+| Unified API output | `unified_api.py` | **Live** — serialized to API response |
+
+On the governance side, `session_enrichment_adapter._resolve_identity()` is
+**structurally ready** to consume identity signatures:
+- Recognizes `self_fragmentation` and `self_dissonance` as instability types
+- Applies bounded confidence penalty (max 0.05)
+- Returns safe defaults when identity data is absent
+
+But this path reads from `AuthorizationRequest.metadata["identity_signature"]`,
+which is **never populated** because no code constructs an `AuthorizationRequest`
+from pipeline context.
+
+### Session Enrichment: Bridge-Ready, Not Bridge-Fed
+
+The governance service calls `_resolve_session_enrichment(request)` on every
+`authorize()` invocation (Step 2b in `_evaluate()`). This resolver reads five
+well-known keys from `request.metadata`:
+
+| Metadata Key | Governance Consumer | Pipeline Producer | Bridge Status |
+|-------------|-------------------|------------------|---------------|
+| `identity_signature` | `_resolve_identity()` → penalty for fragmentation/dissonance | `ctx.identity_signature` via `compute_identity_signature()` | **Not bridged** |
+| `identity_resonance_state` | `_resolve_identity()` → stability band | `ctx.identity_resonance_memory_snapshot` | **Not bridged** |
+| `motivation_profile` | `_resolve_motivation()` → penalty for risk-relevant types | `ctx.motivation_profile` via `compute_motivation_profile()` | **Not bridged** |
+| `temporal_summary` | `_resolve_temporal()` → penalty for temporal tension | Temporal tracker `get_pattern_summary()` | **Not bridged** |
+| `coherence_state` | `_resolve_temporal()` → tension index | `ctx.coherence_state` | **Not bridged** |
+
+All five signals are produced within the mechanical pipeline and have
+working governance-side consumers. None currently cross the boundary.
+
+### Why This Is Not a Simple Metadata Patch
+
+Connecting these systems requires more than adding a field to a dict:
+
+1. **No `AuthorizationRequest` is constructed anywhere in the pipeline.**
+   The pipeline produces `RenderedOutput`, not authorization requests.
+2. **The two systems serve different purposes.** The pipeline processes
+   natural language queries through cognitive mappers. Governance
+   authorization evaluates tool-use safety for external agents.
+3. **Calling `GovernanceService.authorize()` from the pipeline** would
+   require mapping pipeline concepts (intent, persona, mappers) to
+   authorization concepts (action_type, tool_name, agency_level).
+4. **Latency and blocking** — `authorize()` is designed for pre-action
+   decisions, not mid-pipeline enrichment.
+
+### Future Work
+
+Building this bridge is a deliberate architectural integration project:
+
+| Task | Scope | Prerequisite |
+|------|-------|-------------|
+| Define when/why the pipeline should invoke governance authorization | Architecture decision | Clarity on whether pipeline actions need tool-risk authorization |
+| Map pipeline context to `AuthorizationRequest` fields | Translation layer | Architecture decision above |
+| Thread session enrichment signals into metadata | Metadata bridge | Translation layer above |
+| Activate P52 as the live bridge (or replace with direct integration) | Orchestrator change | All of the above |
+
+Until this bridge is built, session enrichment adapters (identity,
+motivation, temporal) resolve with zero penalty and safe defaults —
+exactly as designed by fail-closed semantics.
 
 ---
 
