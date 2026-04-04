@@ -68,6 +68,12 @@ from .policy_lifecycle import (
     PolicyLifecycleManager,
     PolicyLifecycleError,
 )
+from .policy_control_plane import (
+    PolicyControlPlane,
+    PolicyDomainStatus,
+    PolicyHealthReport,
+    P4_VERSION,
+)
 
 __all__ = [
     'get_domain_profile',
@@ -97,6 +103,11 @@ __all__ = [
     'DeploymentRecord',
     'PolicyLifecycleManager',
     'PolicyLifecycleError',
+    # Policy Phase P4
+    'PolicyControlPlane',
+    'PolicyDomainStatus',
+    'PolicyHealthReport',
+    'P4_VERSION',
 ]
 
-__version__ = '1.4.0'
+__version__ = '1.5.0'

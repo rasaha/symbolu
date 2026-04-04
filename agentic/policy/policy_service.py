@@ -484,6 +484,11 @@ class PolicyService:
     # P3: Policy lifecycle management
     # -----------------------------------------------------------------
 
+    def _get_registry(self) -> Any:
+        """Get the ProfileRegistry used by this service."""
+        from .profile_schema import get_profile_registry
+        return get_profile_registry()
+
     def get_lifecycle_manager(self) -> Any:
         """
         Get the PolicyLifecycleManager attached to this service.
@@ -492,8 +497,7 @@ class PolicyService:
         """
         if not hasattr(self, "_lifecycle_manager"):
             from .policy_lifecycle import PolicyLifecycleManager
-            from .profile_schema import get_profile_registry
-            self._lifecycle_manager = PolicyLifecycleManager(get_profile_registry())
+            self._lifecycle_manager = PolicyLifecycleManager(self._get_registry())
         return self._lifecycle_manager
 
     def stage_candidate(
@@ -676,6 +680,117 @@ class PolicyService:
         """Get the current active deployment record for a domain."""
         mgr = self.get_lifecycle_manager()
         return mgr.get_active_record(domain)
+
+    # -----------------------------------------------------------------
+    # P4: Control-plane surfaces
+    # -----------------------------------------------------------------
+
+    def get_control_plane(self) -> Any:
+        """
+        Get the PolicyControlPlane attached to this service.
+
+        Lazily created on first access. Uses the same registry and
+        lifecycle manager as this service.
+        """
+        if not hasattr(self, "_control_plane"):
+            from .policy_control_plane import PolicyControlPlane
+            self._control_plane = PolicyControlPlane(
+                registry=self._get_registry(),
+                lifecycle_manager=self.get_lifecycle_manager(),
+                audit_log=self._policy_audit_log,
+            )
+        return self._control_plane
+
+    def get_system_snapshot(
+        self, tenant_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get a unified snapshot of all-domains policy state.
+
+        Delegates to PolicyControlPlane.get_system_snapshot().
+        """
+        return self.get_control_plane().get_system_snapshot(tenant_id=tenant_id)
+
+    def get_domain_status(
+        self, domain: str, tenant_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get full policy status for a single domain.
+
+        Delegates to PolicyControlPlane.get_domain_status().
+        """
+        return self.get_control_plane().get_domain_status(
+            domain=domain, tenant_id=tenant_id,
+        )
+
+    def get_health_report(
+        self, tenant_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Compute a policy health report.
+
+        Delegates to PolicyControlPlane.get_health_report().
+        """
+        return self.get_control_plane().get_health_report(tenant_id=tenant_id)
+
+    def get_active_profiles_summary(
+        self, tenant_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get a summary of active profiles for all domains.
+
+        Delegates to PolicyControlPlane.get_active_profiles_summary().
+        """
+        return self.get_control_plane().get_active_profiles_summary(
+            tenant_id=tenant_id,
+        )
+
+    def get_filtered_deployment_history(
+        self,
+        domain: str,
+        limit: int = 50,
+        status_filter: Optional[str] = None,
+        tenant_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get filtered deployment history with metadata envelope.
+
+        Delegates to PolicyControlPlane.get_deployment_history().
+        """
+        return self.get_control_plane().get_deployment_history(
+            domain=domain, limit=limit,
+            status_filter=status_filter, tenant_id=tenant_id,
+        )
+
+    def get_approval_history(
+        self,
+        domain: Optional[str] = None,
+        limit: int = 50,
+        tenant_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get audit entries related to approvals and activations.
+
+        Delegates to PolicyControlPlane.get_approval_history().
+        """
+        return self.get_control_plane().get_approval_history(
+            domain=domain, limit=limit, tenant_id=tenant_id,
+        )
+
+    def get_simulation_history(
+        self,
+        domain: Optional[str] = None,
+        limit: int = 50,
+        tenant_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get deployment records with attached simulation summaries.
+
+        Delegates to PolicyControlPlane.get_simulation_history().
+        """
+        return self.get_control_plane().get_simulation_history(
+            domain=domain, limit=limit, tenant_id=tenant_id,
+        )
 
     # -----------------------------------------------------------------
     # P1-D: Audit log

@@ -579,7 +579,8 @@ class TestP3BackwardCompat(unittest.TestCase):
 
     def test_version_bumped(self):
         from agentic.policy import __version__
-        self.assertEqual(__version__, "1.4.0")
+        major, minor = int(__version__.split(".")[0]), int(__version__.split(".")[1])
+        self.assertGreaterEqual((major, minor), (1, 4))
 
     def test_p0_exports_present(self):
         from agentic.policy import DomainProfile, ProfileRegistry, get_profile_registry
