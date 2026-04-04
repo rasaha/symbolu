@@ -46,40 +46,19 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from agentic.agentic_framework.confidence_gate import ConfidenceSignals
 
-
-# =============================================================================
-# Sovereign State Slice Indices
-# =============================================================================
-# These match phase_transformer.py constants but are duplicated here to avoid
-# importing torch in the agentic framework (which is pure Python).
-
-BHAVA_START, BHAVA_END = 0, 12
-KOSHA_START, KOSHA_END = 12, 17
-VRITTI_START, VRITTI_END = 17, 22
-GUNA_START, GUNA_END = 22, 28
-RESERVED_START, RESERVED_END = 28, 32
-
-# Vritti index names (within the 5D slice)
-VRITTI_FACT = 0        # Pramana — valid cognition
-VRITTI_ERROR = 1       # Viparyaya — misconception / hallucination
-VRITTI_IMAGINATION = 2  # Vikalpa — conceptualization
-VRITTI_VOID = 3        # Nidra — null state / absence
-VRITTI_MEMORY = 4      # Smriti — recall from weights
-
-# Guna index names (within the 6D slice)
-GUNA_LUCIDITY = 0      # Sattva — clarity
-GUNA_ACTIVITY = 1      # Rajas — dynamism / turbulence
-GUNA_STABILITY = 2     # Tamas — inertia / fixedness
-GUNA_VELOCITY = 3      # Rate of state change
-GUNA_ACCEL = 4         # Acceleration of change
-GUNA_STABLE = 5        # Stability measure
-
-# Kosha index names (within the 5D slice)
-KOSHA_MATERIAL = 0     # Annamaya — surface/syntax
-KOSHA_VITAL = 1        # Pranamaya — flow/energy
-KOSHA_MENTAL = 2       # Manomaya — semantics
-KOSHA_INTELLECTUAL = 3  # Vijnanamaya — wisdom/patterns
-KOSHA_BLISSFUL = 4     # Anandamaya — unity/integration
+# Shared sovereign constants (Phase S1 — single source of truth)
+from agentic.sovereign_constants import (
+    BHAVA_START, BHAVA_END,
+    KOSHA_START, KOSHA_END,
+    VRITTI_START, VRITTI_END,
+    GUNA_START, GUNA_END,
+    RESERVED_START, RESERVED_END,
+    VRITTI_FACT, VRITTI_ERROR, VRITTI_IMAGINATION, VRITTI_VOID, VRITTI_MEMORY,
+    GUNA_LUCIDITY, GUNA_ACTIVITY, GUNA_STABILITY,
+    GUNA_VELOCITY, GUNA_ACCEL, GUNA_STABLE,
+    KOSHA_MATERIAL, KOSHA_VITAL, KOSHA_MENTAL,
+    KOSHA_INTELLECTUAL, KOSHA_BLISSFUL,
+)
 
 
 # =============================================================================

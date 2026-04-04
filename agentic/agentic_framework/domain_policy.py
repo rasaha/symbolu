@@ -455,10 +455,18 @@ class DomainPolicyInterpreter:
             effective = self._profile.default_mode
             reason_codes.append(f"DEFAULT:{effective.value}")
 
+        # Phase S1: Nexus routing context (informational — does not change mode)
+        from agentic.sovereign_constants import (
+            ONTOLOGY_TO_NEXUS, NEXUS_MODE_DESCRIPTIONS,
+        )
+        nexus_pos = ONTOLOGY_TO_NEXUS.get(ontology, 6)
+        nexus_desc = NEXUS_MODE_DESCRIPTIONS.get(nexus_pos, "unknown")
+        reason_codes.append(f"NEXUS:{nexus_pos}:{nexus_desc}")
+
         rationale = (
             f"Domain '{self._profile.domain_id}': "
             f"regime={regime.value}, action={action_cat.value}, "
-            f"vritti={vritti}, ontology={ontology} -> "
+            f"vritti={vritti}, ontology={ontology}, nexus={nexus_desc} -> "
             f"mode={effective.value}. "
             f"Rules fired: {fired_rules or 'none'}."
         )

@@ -503,6 +503,44 @@ def _resolve_session_enrichment(
     )
 
 
+def _build_sovereign_telemetry(
+    jepa_assessment: "JEPAGovernanceAssessment",
+    vritti_resolution: Any,
+) -> Optional[Dict[str, Any]]:
+    """Build a sovereign telemetry snapshot from JEPA/Vritti signals.
+
+    Phase S1: Extracts sovereign-relevant metadata from JEPA assessment
+    and formats it as a StateSnapshot-compatible dict. This runs entirely
+    in pure Python — no tensor or PyTorch dependency.
+
+    Returns None if the JEPA assessment lacks ontology signals.
+    """
+    try:
+        from agentic.sovereign.telemetry import StateSnapshot
+        from agentic.sovereign_constants import (
+            ONTOLOGY_TO_NEXUS,
+            NEXUS_MODE_DESCRIPTIONS,
+        )
+
+        ontology = jepa_assessment.jepa_composite.ontology
+        vritti = jepa_assessment.jepa_composite.vritti
+        primary_layer = ontology.primary_layer
+        nexus_pos = ONTOLOGY_TO_NEXUS.get(primary_layer, 6)
+
+        snapshot = StateSnapshot.from_runtime_signals(
+            authority=jepa_assessment.jepa_composite.integrated_confidence,
+            dominant_bhava=primary_layer,
+            bhava_confidence=ontology.confidence,
+            vritti=vritti.primary_vritti,
+            nexus_position=nexus_pos,
+            nexus_mode=NEXUS_MODE_DESCRIPTIONS.get(nexus_pos, "unknown"),
+        )
+        return snapshot.to_audit_dict()
+    except Exception:
+        # Fail-open: if telemetry construction fails, governance continues.
+        return None
+
+
 def _build_rationale_codes(
     safety_summary: SafetyContractSummary,
     gate_decision: ConfidenceGateDecision,
@@ -967,6 +1005,13 @@ class GovernanceService:
             reasoning=gate_decision.reasoning,
         )
 
+        # Step 7b: Build sovereign telemetry snapshot (Phase S1)
+        #   Derives a lightweight state snapshot from JEPA assessment signals.
+        #   No tensor/PyTorch dependency — uses only float data from JEPA.
+        sovereign_telemetry_dict = _build_sovereign_telemetry(
+            jepa_assessment, vritti_resolution,
+        )
+
         # Step 8: Build audit event
         audit_event = AuditEvent(
             decision_id=decision_id,
@@ -1028,6 +1073,7 @@ class GovernanceService:
                 "session_enrichment_detail": session_enrichment.source_detail,
             },
             shadow_assessment=shadow_audit,
+            sovereign_telemetry=sovereign_telemetry_dict,
         )
         self._persist_audit_event(audit_event)
 

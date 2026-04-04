@@ -84,24 +84,95 @@ class StateSnapshot:
     is_emergency: bool = False
     anomaly_type: Optional[str] = None
 
+    # -----------------------------------------------------------------
+    # Phase S1: Float-friendly factory for governance/audit use
+    # -----------------------------------------------------------------
+    @classmethod
+    def from_runtime_signals(
+        cls,
+        *,
+        sattva: float = 0.0,
+        rajas: float = 0.0,
+        tamas: float = 0.0,
+        authority: float = 0.5,
+        dominant_bhava: str = "unknown",
+        bhava_confidence: float = 0.0,
+        vritti: str = "unknown",
+        nexus_position: int = 6,
+        nexus_mode: str = "6/6 (Balanced)",
+        dominant_referent: str = "unknown",
+        referent_confidence: float = 0.0,
+        step: int = 0,
+        is_emergency: bool = False,
+        anomaly_type: Optional[str] = None,
+    ) -> "StateSnapshot":
+        """Construct a StateSnapshot from pre-extracted float signals.
 
-# Referent class names for S-Signal interpretation
+        This factory avoids any tensor/PyTorch dependency so governance
+        code can create snapshots from :func:`signals_from_sovereign_state`
+        or from JEPA assessment metadata without importing torch.
+
+        All parameters are keyword-only with safe defaults.
+        """
+        from datetime import datetime, timezone
+        guna_vals = {"sattva": sattva, "rajas": rajas, "tamas": tamas}
+        dominant_guna = max(guna_vals, key=guna_vals.get).upper()
+        return cls(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            step=step,
+            sattva=sattva,
+            rajas=rajas,
+            tamas=tamas,
+            dominant_guna=dominant_guna,
+            authority=authority,
+            dominant_referent=dominant_referent,
+            referent_confidence=referent_confidence,
+            dominant_bhava=dominant_bhava,
+            bhava_confidence=bhava_confidence,
+            vritti=vritti,
+            nexus_position=nexus_position,
+            nexus_mode=nexus_mode,
+            is_emergency=is_emergency,
+            anomaly_type=anomaly_type,
+        )
+
+    def to_audit_dict(self) -> Dict[str, Any]:
+        """Serialize to a plain dict for governance audit events."""
+        return {
+            "timestamp": self.timestamp,
+            "step": self.step,
+            "sattva": self.sattva,
+            "rajas": self.rajas,
+            "tamas": self.tamas,
+            "dominant_guna": self.dominant_guna,
+            "authority": self.authority,
+            "dominant_bhava": self.dominant_bhava,
+            "bhava_confidence": self.bhava_confidence,
+            "vritti": self.vritti,
+            "nexus_position": self.nexus_position,
+            "nexus_mode": self.nexus_mode,
+            "is_emergency": self.is_emergency,
+            "anomaly_type": self.anomaly_type,
+        }
+
+
+# -------------------------------------------------------------------------
+# Local constants (shared constants imported from sovereign.constants where
+# possible; REFERENT_CLASSES stays local as it's telemetry-specific)
+# -------------------------------------------------------------------------
+from agentic.sovereign_constants import (  # noqa: E402
+    BHAVA_NAMES_FULL as BHAVA_NAMES,
+    VRITTI_NAMES,
+    NEXUS_MODE_DESCRIPTIONS,
+    ONTOLOGY_TO_NEXUS,
+)
+
 REFERENT_CLASSES = [
     "luminous", "biological", "role_bearer", "artifact",
     "natural_body", "substance", "process", "abstract",
     "signal", "temporal", "spatial", "emotional",
     "social", "energy_source", "phenomenon", "unknown"
 ]
-
-# Bhava names for R-Signal interpretation (12 ontological layers)
-BHAVA_NAMES = [
-    "O1_POTENTIAL", "O2_IDENTITY", "O3_EXECUTION", "O4_STRUCTURE",
-    "O5_COGNITION", "O6_AGENCY", "O7_REASONING", "O8_PURPOSE",
-    "O9_WITNESSES", "O10_UNIFYING", "O11_INTEGRATION", "O12_ABSOLVING"
-]
-
-# Vritti names for cognitive mode interpretation
-VRITTI_NAMES = ["pramana", "viparyaya", "vikalpa", "smrti", "nidra"]
 
 
 class SovereignMonitor:

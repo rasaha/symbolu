@@ -251,6 +251,16 @@ class AuditEvent(BaseModel):
         None, description="Full shadow AI assessment (serialized ShadowAssessment)",
     )
 
+    # Phase S1: Sovereign telemetry snapshot at decision time
+    sovereign_telemetry: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Sovereign state snapshot at decision time: nexus routing, "
+            "dominant ontological layer, cognitive mode. "
+            "Populated when JEPA assessment includes ontology signals."
+        ),
+    )
+
 
 class AuthorizationResponse(BaseModel):
     """

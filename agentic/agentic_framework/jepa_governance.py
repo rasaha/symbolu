@@ -40,35 +40,19 @@ from agentic.chitta_vritti.coupling import get_aspect_weights as _get_aspect_wei
 
 
 # =========================================================================
-# Constants
+# Constants (from shared sovereign constants — Phase S1)
 # =========================================================================
 
-VRITTI_NAMES = ("pramana", "viparyaya", "vikalpa", "smrti", "nidra")
-
-ONTOLOGY_LAYERS = (
-    "O1_POTENTIAL", "O2_IDENTITY", "O3_EXECUTION", "O4_STRUCTURE",
-    "O5_COGNITION", "O6_AGENCY", "O7_REASONING", "O8_PURPOSE",
-    "O9_WITNESSES", "O10_UNIFYING", "O11_INTEGRATION", "O12_ABSOLVING",
+from agentic.sovereign_constants import (
+    VRITTI_NAMES,
+    BHAVA_NAMES_FULL as ONTOLOGY_LAYERS,
+    OBSERVATION_VRITTIS,
+    EXECUTION_VRITTIS,
+    GOVERNANCE_ONTOLOGY,
+    EXECUTION_ONTOLOGY,
+    ONTOLOGY_TO_NEXUS,
+    NEXUS_MODE_DESCRIPTIONS,
 )
-
-# Vritti modes that indicate the system should NOT be executing actions
-# (it should be observing, verifying, or halting instead)
-OBSERVATION_VRITTIS = frozenset({"viparyaya", "nidra"})
-
-# Vritti modes compatible with active execution
-EXECUTION_VRITTIS = frozenset({"pramana", "smrti"})
-
-# Ontology layers primarily associated with observation/governance (upper 6)
-GOVERNANCE_ONTOLOGY = frozenset({
-    "O7_REASONING", "O8_PURPOSE", "O9_WITNESSES",
-    "O10_UNIFYING", "O11_INTEGRATION", "O12_ABSOLVING",
-})
-
-# Ontology layers primarily associated with execution (lower 6)
-EXECUTION_ONTOLOGY = frozenset({
-    "O1_POTENTIAL", "O2_IDENTITY", "O3_EXECUTION",
-    "O4_STRUCTURE", "O5_COGNITION", "O6_AGENCY",
-})
 
 
 # =========================================================================
@@ -368,6 +352,8 @@ class JEPAGovernanceAssessment:
 
     def to_audit_dict(self) -> Dict[str, Any]:
         """Serialize to audit-friendly dict for GovernanceAuditStore."""
+        primary_layer = self.jepa_composite.ontology.primary_layer
+        nexus_position = ONTOLOGY_TO_NEXUS.get(primary_layer, 6)
         return {
             "regime": self.regime.value,
             "recommended_action": self.recommended_action,
@@ -376,7 +362,7 @@ class JEPAGovernanceAssessment:
             "confidence_adjustment": self.confidence_adjustment,
             "reason_codes": list(self.reason_codes),
             "rationale": self.rationale,
-            "ontology_primary": self.jepa_composite.ontology.primary_layer,
+            "ontology_primary": primary_layer,
             "ontology_confidence": self.jepa_composite.ontology.confidence,
             "vritti_primary": self.jepa_composite.vritti.primary_vritti,
             "vritti_confidence": self.jepa_composite.vritti.confidence,
@@ -388,6 +374,9 @@ class JEPAGovernanceAssessment:
             "action_category": self.runtime_state.action_category.value,
             "tool_name": self.runtime_state.tool_name,
             "risk_level": self.runtime_state.risk_level,
+            # Phase S1: Sovereign nexus routing context
+            "nexus_position": nexus_position,
+            "nexus_mode": NEXUS_MODE_DESCRIPTIONS.get(nexus_position, "unknown"),
         }
 
 
