@@ -23,6 +23,7 @@ Usage:
     from agentic.agentic_framework.sovereign_bridge import (
         signals_from_sovereign_state,
         coherence_from_sovereign_state,
+        entropy_from_sovereign_state,
     )
 
     # In inference loop, after model forward pass:
@@ -33,16 +34,19 @@ Usage:
     # Convert to agentic signals
     signals = signals_from_sovereign_state(state, delta_S)
     coherence = coherence_from_sovereign_state(state, delta_S)
+    entropy_result = entropy_from_sovereign_state(state)
 
     # Feed into existing agentic pipeline
     decision = confidence_gate.evaluate(signals)
     contract = safety_evaluator.evaluate(coherence)
+    # entropy_result is attached to AuthorizationRequest/MCPToolCall by
+    # whichever caller builds the governance request.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from agentic.agentic_framework.confidence_gate import ConfidenceSignals
 
@@ -59,6 +63,9 @@ from agentic.sovereign_constants import (
     KOSHA_MATERIAL, KOSHA_VITAL, KOSHA_MENTAL,
     KOSHA_INTELLECTUAL, KOSHA_BLISSFUL,
 )
+
+if TYPE_CHECKING:
+    from agentic.entropy.types import EntropyResult, KoshaProfile
 
 
 # =============================================================================
@@ -474,6 +481,147 @@ def coherence_from_sovereign_state(
         prediction_reversal_risk=vritti_signals['prediction_reversal_risk'],
         identity_stability=guna_signals['identity_stability'],
     )
+
+
+# =============================================================================
+# Public API: entropy_from_sovereign_state
+# =============================================================================
+#
+# Translate 32D Sovereign State into a canonical EntropyResult from
+# agentic/entropy/EntropyEngine. Parallel to signals_from_sovereign_state()
+# and coherence_from_sovereign_state() — same input, different governance-side
+# representation.
+#
+# Mapping rationale (direct, no fabrication):
+#   Guna slice [22:28]:
+#     guna[GUNA_LUCIDITY]  = lucidity        → GunaProfile.sattva
+#     guna[GUNA_ACTIVITY]  = activity        → GunaProfile.rajas
+#     guna[GUNA_STABILITY] = stability_tamas → GunaProfile.tamas
+#     (velocity/accel/stable describe dynamics, not the 3-guna distribution,
+#      so they are deliberately NOT included in GunaProfile)
+#
+#   Kosha slice [12:17] → source KoshaProfile:
+#     kosha[KOSHA_MATERIAL]     → annamaya   (physical sheath)
+#     kosha[KOSHA_VITAL]        → pranamaya  (energy/vital sheath)
+#     kosha[KOSHA_MENTAL]       → manomaya   (mental sheath)
+#     kosha[KOSHA_INTELLECTUAL] → vijnanamaya (wisdom sheath)
+#     kosha[KOSHA_BLISSFUL]     → anandamaya  (bliss sheath)
+#
+# Target kosha is OPTIONAL:
+#   - If caller supplies target_kosha, full kosha entropy (source/target
+#     distance) is evaluated by the engine.
+#   - If target_kosha is None, kosha entropy is not computed — the engine
+#     naturally defaults to 0.0 for kosha when a target is absent. This is
+#     honest behavior: at single-state inference time we have only the
+#     current state's kosha and no natural target without extra context.
+#
+# Cross-domain entropy is never computed here — it requires source and
+# target DomainProfile structures that the 32D state does not carry.
+#
+# This helper is deterministic, side-effect-free, and uses the same
+# _extract_slices() indexing as the other bridge functions.
+#
+
+# Module-level cache of EntropyEngine instances by tier name.
+# EntropyEngine is a thin stateless wrapper around TierConfig; caching
+# avoids reconstructing it per call and keeps the function hot-path cheap.
+_ENTROPY_ENGINE_CACHE: Dict[str, Any] = {}
+
+
+def _get_entropy_engine(tier_name: str) -> Any:
+    """Get or create a cached EntropyEngine for the given tier name."""
+    engine = _ENTROPY_ENGINE_CACHE.get(tier_name)
+    if engine is None:
+        from agentic.entropy.entropy_engine import create_engine_for_tier
+        engine = create_engine_for_tier(tier_name)
+        _ENTROPY_ENGINE_CACHE[tier_name] = engine
+    return engine
+
+
+def entropy_from_sovereign_state(
+    state: Any,
+    delta_S: Any = None,
+    batch_idx: int = 0,
+    tier_name: str = "enterprise_chat",
+    target_kosha: Optional["KoshaProfile"] = None,
+) -> "EntropyResult":
+    """
+    Build EntropyResult from a 32D Sovereign State tensor.
+
+    Parallel to signals_from_sovereign_state() and
+    coherence_from_sovereign_state(). Uses the same state layout and the
+    same slice extraction — translates raw Kosha/Guna activations into
+    the canonical entropy engine input types and invokes
+    EntropyEngine.evaluate().
+
+    Mapping:
+        Guna  [22:28] first 3 dims → GunaProfile(sattva, rajas, tamas)
+        Kosha [12:17]              → source KoshaProfile
+
+    Args:
+        state: [B, 32] or [32] Sovereign State tensor, or list of 32 floats.
+        delta_S: Unused here (kept for signature parity with sibling
+            bridge functions; reserved for future velocity-aware entropy).
+        batch_idx: Which batch element to use when state is batched.
+        tier_name: Tier configuration selector ("enterprise_search",
+            "enterprise_chat", or "consumer"). Controls gate behavior
+            (DIAGNOSTIC_ONLY / MODULATION_ONLY / FULL_GATING) but does
+            not fabricate thresholds.
+        target_kosha: Optional target KoshaProfile. When supplied, the
+            engine evaluates source→target kosha distance. When absent,
+            kosha entropy is not computed (honest for single-state
+            inference where no natural target exists yet).
+
+    Returns:
+        EntropyResult carrying guna_entropy, kosha_entropy (zero when
+        target_kosha is None), combined_entropy, gate, mode, and trace.
+
+    Example:
+        >>> outputs = model(input_ids)
+        >>> entropy_result = entropy_from_sovereign_state(outputs['state'])
+        >>> request = AuthorizationRequest(
+        ...     actor_id="agent-1",
+        ...     action_type="file_read",
+        ...     entropy_result=entropy_result,
+        ... )
+    """
+    # Lazy import to keep module load cheap and avoid paying the entropy
+    # import cost on code paths that only need ConfidenceSignals.
+    from agentic.entropy.types import GunaProfile, KoshaProfile
+
+    kosha, _, guna = _extract_slices(state, batch_idx)
+
+    # Guna: first three dims of the 6D slice are the canonical 3-guna
+    # distribution (sattva/rajas/tamas). The remaining three dims
+    # (velocity/accel/stable) are dynamics descriptors and are deliberately
+    # not part of GunaProfile.
+    guna_profile = GunaProfile(
+        sattva=max(0.0, min(1.0, float(guna[GUNA_LUCIDITY]))),
+        rajas=max(0.0, min(1.0, float(guna[GUNA_ACTIVITY]))),
+        tamas=max(0.0, min(1.0, float(guna[GUNA_STABILITY]))),
+    )
+
+    # Kosha: 5D slice maps directly to the 5 sheaths in canonical order.
+    source_kosha = KoshaProfile(
+        annamaya=max(0.0, min(1.0, float(kosha[KOSHA_MATERIAL]))),
+        pranamaya=max(0.0, min(1.0, float(kosha[KOSHA_VITAL]))),
+        manomaya=max(0.0, min(1.0, float(kosha[KOSHA_MENTAL]))),
+        vijnanamaya=max(0.0, min(1.0, float(kosha[KOSHA_INTELLECTUAL]))),
+        anandamaya=max(0.0, min(1.0, float(kosha[KOSHA_BLISSFUL]))),
+    )
+
+    engine = _get_entropy_engine(tier_name)
+
+    # Only pass kosha_target when the caller supplied one. When None,
+    # the engine's evaluate() treats kosha entropy as not computed
+    # (natural default, no fabrication).
+    if target_kosha is not None:
+        return engine.evaluate(
+            guna_profile=guna_profile,
+            kosha_source=source_kosha,
+            kosha_target=target_kosha,
+        )
+    return engine.evaluate(guna_profile=guna_profile)
 
 
 # =============================================================================
