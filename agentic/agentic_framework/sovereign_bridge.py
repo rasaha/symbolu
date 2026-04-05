@@ -852,6 +852,125 @@ def vritti_from_sovereign_state(
 
 
 # =============================================================================
+# Public API: governance_inputs_from_cg_metadata
+# =============================================================================
+#
+# Translate MistralCGAdapter.last_cg_metadata into request-ready governance
+# kwargs. This is the thin seam between the CG-capable LLM adapter (which
+# already captures sovereign state on every generation) and the governance
+# request objects (MCPToolCall / AuthorizationRequest), both of which already
+# accept ``entropy_result`` and a duck-typed ``vritti_result``.
+#
+# This helper composes the two existing bridge helpers —
+# ``entropy_from_sovereign_state`` and ``vritti_from_sovereign_state`` —
+# and returns a dict with exactly the keys governance consumers read.
+# It does NOT construct a request, does NOT mutate the adapter, and does
+# NOT fabricate ``sovereign_projection_metadata``: that field requires a
+# real ``SovereignProjectionResult``, which the CG adapter does not hold.
+# Honest absence, per sovereign_bridge conventions.
+#
+
+def governance_inputs_from_cg_metadata(
+    cg_metadata: Dict[str, Any],
+    tier: str = "consumer",
+) -> Dict[str, Any]:
+    """
+    Translate ``MistralCGAdapter.last_cg_metadata`` into governance kwargs.
+
+    The CG adapter stores, after each generation::
+
+        {
+          "state":        <tensor or list, 32D sovereign state>,
+          "delta_S":      <optional tensor or list, state delta>,
+          "delta_bhava":  <optional>,
+          "intent_phase": <optional>,
+          ...
+        }
+
+    This helper reads ``state`` (required) and ``delta_S`` (optional)
+    and calls the already-built bridge helpers to produce canonical
+    ``EntropyResult`` and ``ChittaVrittiResult`` objects. The returned
+    dict is shaped to be splatted directly into a governance request::
+
+        req = AuthorizationRequest(
+            actor_id="agent-1",
+            action_type="file_read",
+            **governance_inputs_from_cg_metadata(adapter.last_cg_metadata),
+        )
+
+    Args:
+        cg_metadata: A mapping matching ``MistralCGAdapter.last_cg_metadata``.
+            Must be a non-None mapping with a non-None ``"state"`` entry.
+        tier: Governance tier selector. ``"consumer"`` maps to consumer
+            tier for both sibling engines. ``"enterprise"`` maps to
+            vritti ``"enterprise"`` and entropy ``"enterprise_chat"``
+            (the entropy engine's enterprise chat tier). Other strings
+            are passed through to both helpers unchanged — callers
+            using custom tier names must ensure both engines recognize
+            them.
+
+    Returns:
+        Dict with exactly two keys:
+            - ``"entropy_result"``: canonical ``EntropyResult``
+            - ``"vritti_result"``:  canonical ``ChittaVrittiResult``
+        ``"sovereign_projection_metadata"`` is deliberately omitted —
+        CG adapter metadata does not contain a
+        ``SovereignProjectionResult`` and this helper never fabricates
+        one.
+
+    Raises:
+        TypeError: if ``cg_metadata`` is not a mapping.
+        ValueError: if ``"state"`` is missing or None.
+    """
+    # Strict contract on cg_metadata: it is produced by the LLM adapter
+    # and callers pass it through unchanged. Fail loudly on shape errors
+    # rather than silently returning half-populated governance inputs.
+    if cg_metadata is None or not hasattr(cg_metadata, "get"):
+        raise TypeError(
+            f"cg_metadata must be a mapping, got {type(cg_metadata).__name__}"
+        )
+
+    state = cg_metadata.get("state")
+    if state is None:
+        raise ValueError(
+            "cg_metadata['state'] is required (None or missing); "
+            "CG adapter must have completed at least one generation"
+        )
+
+    # delta_S is legitimately optional. Sibling helpers treat None as
+    # "velocity unknown" — do not fabricate a zero vector here.
+    delta_S = cg_metadata.get("delta_S")
+
+    # Entropy engine's tier_name vocabulary is distinct from the vritti
+    # engine's tier vocabulary. Translate only the names we know; pass
+    # everything else through unchanged so callers with custom tiers
+    # aren't silently downgraded.
+    if tier == "enterprise":
+        entropy_tier_name = "enterprise_chat"
+    else:
+        entropy_tier_name = tier
+
+    entropy_result = entropy_from_sovereign_state(
+        state,
+        delta_S=delta_S,
+        tier_name=entropy_tier_name,
+    )
+    vritti_result = vritti_from_sovereign_state(
+        state,
+        delta_S=delta_S,
+        tier=tier,
+    )
+
+    # NOTE: no "sovereign_projection_metadata" key. The CG adapter does
+    # not hold a SovereignProjectionResult (it stores only raw 32D state
+    # + delta_S). Honest absence, not fabrication.
+    return {
+        "entropy_result": entropy_result,
+        "vritti_result": vritti_result,
+    }
+
+
+# =============================================================================
 # Public API: projection_metadata_from_sovereign_result
 # =============================================================================
 #

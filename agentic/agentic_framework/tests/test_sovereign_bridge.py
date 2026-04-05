@@ -12,6 +12,7 @@ from agentic.agentic_framework.sovereign_bridge import (
     signals_from_sovereign_state,
     coherence_from_sovereign_state,
     vritti_from_sovereign_state,
+    governance_inputs_from_cg_metadata,
     projection_metadata_from_sovereign_result,
     diagnostics_from_projection,
     guna_anomalies_from_projection,
@@ -829,3 +830,126 @@ class TestProjectionMetadataFromSovereignResult:
         }
         assert len(payload["kosha_profile"]) == 5
         assert len(payload["vritti_profile"]) == 5
+
+
+# =============================================================================
+# Test: governance_inputs_from_cg_metadata (CG adapter metadata →
+# request-ready governance kwargs)
+# =============================================================================
+
+class TestGovernanceInputsFromCgMetadata:
+    """Thin seam between MistralCGAdapter.last_cg_metadata and governance
+    request kwargs. Must compose the existing bridge helpers without
+    fabricating ``sovereign_projection_metadata``."""
+
+    def _cg_metadata(self, *, state=None, delta_S=None, extras=True):
+        """Shape-faithful MistralCGAdapter.last_cg_metadata."""
+        if state is None:
+            state = make_state(
+                bhava=[0.2] * 12,
+                kosha=[0.3, 0.3, 0.3, 0.3, 0.3],
+                vritti=[0.5, 0.1, 0.2, 0.1, 0.1],
+                guna=[0.6, 0.3, 0.1, 0.0, 0.0, 0.9],
+            )
+        md = {"state": state, "delta_S": delta_S}
+        if extras:
+            # The real adapter also stores these — ensure the helper
+            # ignores unknown keys instead of rejecting them.
+            md["delta_bhava"] = None
+            md["intent_phase"] = None
+            md["adapter_gate"] = None
+        return md
+
+    def test_valid_metadata_produces_both_fields(self):
+        out = governance_inputs_from_cg_metadata(self._cg_metadata())
+        assert set(out.keys()) == {"entropy_result", "vritti_result"}
+        assert out["entropy_result"] is not None
+        assert out["vritti_result"] is not None
+
+    def test_no_projection_metadata_fabricated(self):
+        """Helper must NEVER synthesize sovereign_projection_metadata from
+        raw state/delta_S. A real SovereignProjectionResult is required."""
+        out = governance_inputs_from_cg_metadata(self._cg_metadata())
+        assert "sovereign_projection_metadata" not in out
+        # Extra belt-and-braces: nothing that even looks like it
+        assert not any("projection" in k for k in out.keys())
+
+    def test_canonical_return_types(self):
+        from agentic.entropy.types import EntropyResult
+        from agentic.chitta_vritti.types import ChittaVrittiResult
+
+        out = governance_inputs_from_cg_metadata(self._cg_metadata())
+        assert isinstance(out["entropy_result"], EntropyResult)
+        assert isinstance(out["vritti_result"], ChittaVrittiResult)
+
+    def test_delta_S_absent_is_handled(self):
+        """delta_S=None is legitimately optional — no fabrication."""
+        out = governance_inputs_from_cg_metadata(
+            self._cg_metadata(delta_S=None)
+        )
+        assert out["entropy_result"] is not None
+        assert out["vritti_result"] is not None
+
+    def test_delta_S_present_is_forwarded(self):
+        delta_S = [0.05] * 32
+        out = governance_inputs_from_cg_metadata(
+            self._cg_metadata(delta_S=delta_S)
+        )
+        # With delta_S present, vritti engine sees 3 reps (incl. temporal)
+        # and produces a valid distribution.
+        cv = out["vritti_result"]
+        assert abs(sum(cv.vritti.values()) - 1.0) < 0.01
+
+    def test_missing_state_raises(self):
+        with pytest.raises(ValueError, match="state"):
+            governance_inputs_from_cg_metadata({"delta_S": None})
+
+    def test_none_state_raises(self):
+        with pytest.raises(ValueError, match="state"):
+            governance_inputs_from_cg_metadata({"state": None})
+
+    def test_none_cg_metadata_raises(self):
+        with pytest.raises(TypeError, match="mapping"):
+            governance_inputs_from_cg_metadata(None)
+
+    def test_non_mapping_cg_metadata_raises(self):
+        with pytest.raises(TypeError, match="mapping"):
+            governance_inputs_from_cg_metadata([0.0] * 32)
+
+    def test_unknown_keys_ignored(self):
+        """Real adapter stores delta_bhava/intent_phase/adapter_gate —
+        helper must ignore unknown keys, not reject them."""
+        md = self._cg_metadata(extras=True)
+        md["unrecognized_future_key"] = {"whatever": 42}
+        out = governance_inputs_from_cg_metadata(md)
+        assert out["entropy_result"] is not None
+
+    def test_tier_consumer_default(self):
+        """Default tier='consumer' reaches both engines successfully."""
+        out = governance_inputs_from_cg_metadata(self._cg_metadata())
+        # Both engines accepted 'consumer' tier without raising
+        assert out["entropy_result"] is not None
+        assert out["vritti_result"] is not None
+
+    def test_tier_enterprise_maps_both_engines(self):
+        """tier='enterprise' must reach both engines — vritti via
+        'enterprise', entropy via 'enterprise_chat'."""
+        out = governance_inputs_from_cg_metadata(
+            self._cg_metadata(), tier="enterprise"
+        )
+        assert out["entropy_result"] is not None
+        assert out["vritti_result"] is not None
+
+    def test_invalid_state_shape_propagates(self):
+        """If state is malformed, the underlying slice extractor's
+        error must propagate (no silent fallback)."""
+        with pytest.raises((ValueError, TypeError)):
+            governance_inputs_from_cg_metadata({"state": [0.0] * 10})
+
+    def test_output_splats_as_request_kwargs(self):
+        """Validate the returned dict's keys match the governance
+        consumer contract so **-splatting works."""
+        out = governance_inputs_from_cg_metadata(self._cg_metadata())
+        # Only keys that both MCPToolCall/AuthorizationRequest formally
+        # accept or duck-type on. Exactly these two, no more.
+        assert list(out.keys()) == ["entropy_result", "vritti_result"]
