@@ -24,6 +24,7 @@ Usage:
         signals_from_sovereign_state,
         coherence_from_sovereign_state,
         entropy_from_sovereign_state,
+        vritti_from_sovereign_state,
     )
 
     # In inference loop, after model forward pass:
@@ -66,6 +67,7 @@ from agentic.sovereign_constants import (
 
 if TYPE_CHECKING:
     from agentic.entropy.types import EntropyResult, KoshaProfile
+    from agentic.chitta_vritti.types import ChittaVrittiResult
 
 
 # =============================================================================
@@ -622,6 +624,462 @@ def entropy_from_sovereign_state(
             kosha_target=target_kosha,
         )
     return engine.evaluate(guna_profile=guna_profile)
+
+
+# =============================================================================
+# Public API: vritti_from_sovereign_state
+# =============================================================================
+#
+# Translate 32D Sovereign State into a canonical ChittaVrittiResult from
+# agentic/chitta_vritti/ChittaVrittiEngine. Parallel to the sibling helpers
+# above — same input, different governance-side representation.
+#
+# Mapping rationale (direct, no fabrication):
+#
+#   Representation layers (cross-layer coherence is what the engine checks):
+#     Bhava  [0:12]  → semantic_rep     (intent / meaning vector)
+#     Kosha  [12:17] → structural_rep   (processing-depth structure)
+#     ΔS Bhava slice → temporal_rep     (only when delta_S is supplied)
+#     phonemic_rep   → None             (sovereign state has no acoustic
+#                                        or surface-token signal; honest
+#                                        absence, not fabricated)
+#
+#   Scalar signals:
+#     entropy             ← normalized Shannon entropy of Vritti[17:22]
+#                           treated as a probability distribution (uniform
+#                           slice → entropy≈1, one-hot slice → entropy≈0)
+#     motion              ← min(1.0, ‖ΔS‖₂); 0.0 if delta_S absent
+#     confidence          ← quality_score from _vritti_to_confidence(vritti)
+#                           (reuses the existing sovereign-bridge mapping,
+#                           not a new heuristic)
+#     temporal_continuity ← 1.0 - motion
+#
+# Layer presence:
+#   - delta_S absent → 2 layers present (semantic + structural).
+#     count_missing_layers() == 2, so the engine runs full_computation
+#     on two layers (not nidra fast-path, which needs >=3 missing).
+#   - delta_S present → 3 layers present (+ temporal). Still full
+#     computation (phonemic alone missing, count_missing == 1).
+#   - Fast-path pramana requires all_layers_present(), so the bridge
+#     never triggers it — cross-layer coherence is always computed
+#     honestly from what sovereign state actually provides.
+#
+# Engine lifecycle:
+#   ChittaVrittiEngine holds per-session smriti state. Bridge calls
+#   describe independent inference snapshots, so we construct a fresh
+#   engine per call to avoid smriti bleed across unrelated requests.
+#   Callers who need turn-to-turn smriti should hold their own
+#   long-lived ChittaVrittiEngine and call .compute() directly rather
+#   than going through this bridge.
+#
+
+def _vritti_slice_entropy(vritti: List[float]) -> float:
+    """Normalized Shannon entropy of the 5D Vritti slice, in [0, 1].
+
+    Treats the slice as a probability distribution. Robust to the
+    shapes sovereign state may actually produce:
+
+      - All-zero slice         → 1.0 (max uncertainty, honest for void)
+      - Negative / noisy values → clipped to 0.0 before summing
+      - Near-zero mass (< eps) → 1.0 (skip normalization; would
+                                  otherwise amplify numerical noise)
+      - One-hot                 → 0.0
+      - Uniform                 → 1.0
+
+    Normalization is deferred until after non-negative clipping and
+    only performed when total mass exceeds a small epsilon, so we
+    never divide by an unstable denominator.
+    """
+    import math
+
+    clipped = [max(0.0, float(v)) for v in vritti]
+    total = sum(clipped)
+
+    # Epsilon floor: below this, any "distribution" we reconstruct
+    # is numerical noise. Return max uncertainty (honest) instead of
+    # normalizing and amplifying it.
+    _EPS = 1e-9
+    if total < _EPS:
+        return 1.0
+
+    probs = [v / total for v in clipped]
+    n = len(probs)
+    if n < 2:
+        return 1.0
+    log_n = math.log(n)
+
+    h = 0.0
+    for p in probs:
+        if p > 0.0:
+            h -= p * math.log(p)
+
+    return max(0.0, min(1.0, h / log_n))
+
+
+def vritti_from_sovereign_state(
+    state: Any,
+    delta_S: Any = None,
+    batch_idx: int = 0,
+    tier: str = "consumer",
+) -> "ChittaVrittiResult":
+    """
+    Build a ChittaVrittiResult from a 32D Sovereign State tensor.
+
+    Parallel to signals_from_sovereign_state(), coherence_from_sovereign_state(),
+    and entropy_from_sovereign_state(). Uses the same state layout and the
+    same slice extraction — translates raw Bhava/Kosha/Vritti/ΔS activations
+    into ChittaVrittiInputs and invokes ChittaVrittiEngine.compute().
+
+    Mapping:
+        Bhava  [0:12]  → semantic_rep
+        Kosha  [12:17] → structural_rep
+        ΔS Bhava[0:12] → temporal_rep (only if delta_S is provided)
+        Vritti [17:22] → entropy signal (Shannon entropy of the slice)
+        Vritti [17:22] → confidence signal (via _vritti_to_confidence)
+        ΔS norm        → motion signal
+        1 - motion     → temporal_continuity signal
+        phonemic_rep   → None (not derivable from sovereign state)
+
+    Args:
+        state: [B, 32] or [32] Sovereign State tensor, or list of 32 floats.
+        delta_S: Optional [B, 32] or [32] state delta. When present, its
+            Bhava slice becomes temporal_rep and its L2 norm drives motion.
+        batch_idx: Which batch element to use when state is batched.
+        tier: "consumer" or "enterprise" — selects ChittaVrittiEngine config
+            (threshold tightness, penalty weights, decay rate).
+
+    Returns:
+        ChittaVrittiResult carrying coherence, the 5-mode vritti distribution
+        (pramana/viparyaya/vikalpa/smrti/nidra), score, dominant_vritti,
+        fractures, primary_fracture, explanation, and fast_path_used.
+
+    Example:
+        >>> outputs = model(input_ids)
+        >>> cv_result = vritti_from_sovereign_state(
+        ...     outputs['state'], outputs['delta_S'],
+        ... )
+        >>> # Feed into the vritti signal adapter:
+        >>> from agentic.agentic_framework.signal_adapters.vritti_adapter \\
+        ...     import resolve_vritti_signal
+        >>> resolution = resolve_vritti_signal(vritti_result=cv_result)
+        >>> assert resolution.source.value == "real"
+    """
+    import numpy as np
+
+    # Lazy imports: keep module load cheap and avoid paying numpy /
+    # chitta_vritti import cost on code paths that only need
+    # ConfidenceSignals or entropy helpers.
+    from agentic.chitta_vritti.types import ChittaVrittiInputs
+    from agentic.chitta_vritti.engine import create_engine
+
+    # --- Extract 32D state → raw lists ---
+    # Reuse _extract_slices for kosha/vritti/guna, and pull Bhava inline
+    # (the existing helper doesn't surface Bhava since other bridges
+    # don't need it).
+    if hasattr(state, 'dim'):
+        if state.dim() == 2:
+            state_vec = state[batch_idx]
+        else:
+            state_vec = state
+        vals = state_vec.detach().cpu().tolist()
+    elif isinstance(state, (list, tuple)):
+        vals = [float(x) for x in state]
+    else:
+        raise TypeError(f"Expected tensor or list, got {type(state)}")
+
+    if len(vals) < GUNA_END:
+        raise ValueError(
+            f"State must have >= {GUNA_END} dims, got {len(vals)}"
+        )
+
+    bhava = vals[BHAVA_START:BHAVA_END]
+    kosha = vals[KOSHA_START:KOSHA_END]
+    vritti_slice = vals[VRITTI_START:VRITTI_END]
+
+    # --- Representation layers ---
+    semantic_rep = np.asarray(bhava, dtype=float)
+    structural_rep = np.asarray(kosha, dtype=float)
+
+    # --- Delta processing: temporal_rep + motion ---
+    temporal_rep = None
+    delta_norm = 0.0
+    if delta_S is not None:
+        # Extract delta values
+        if hasattr(delta_S, 'dim'):
+            if delta_S.dim() == 2:
+                delta_vec = delta_S[batch_idx]
+            else:
+                delta_vec = delta_S
+            delta_vals = delta_vec.detach().cpu().tolist()
+            if hasattr(delta_vec, 'norm'):
+                delta_norm = float(delta_vec.norm().item())
+            else:
+                delta_norm = sum(x ** 2 for x in delta_vals) ** 0.5
+        elif isinstance(delta_S, (list, tuple)):
+            delta_vals = [float(x) for x in delta_S]
+            delta_norm = sum(x ** 2 for x in delta_vals) ** 0.5
+        else:
+            raise TypeError(
+                f"delta_S must be tensor or list, got {type(delta_S)}"
+            )
+
+        if len(delta_vals) >= BHAVA_END:
+            temporal_rep = np.asarray(
+                delta_vals[BHAVA_START:BHAVA_END], dtype=float,
+            )
+
+    # --- Scalar signals (all clamped to [0, 1]) ---
+    entropy_signal = _vritti_slice_entropy(vritti_slice)
+    motion_signal = max(0.0, min(1.0, delta_norm))
+    vritti_conf = _vritti_to_confidence(vritti_slice)
+    confidence_signal = vritti_conf['quality_score']
+    temporal_continuity_signal = max(0.0, min(1.0, 1.0 - motion_signal))
+
+    inputs = ChittaVrittiInputs(
+        phonemic_rep=None,
+        semantic_rep=semantic_rep,
+        structural_rep=structural_rep,
+        temporal_rep=temporal_rep,
+        entropy=entropy_signal,
+        motion=motion_signal,
+        confidence=confidence_signal,
+        temporal_continuity=temporal_continuity_signal,
+    )
+
+    # Fresh engine per call — see module-level note on engine lifecycle.
+    engine = create_engine(tier=tier)
+    return engine.compute(inputs)
+
+
+# =============================================================================
+# Public API: governance_inputs_from_cg_metadata
+# =============================================================================
+#
+# Translate MistralCGAdapter.last_cg_metadata into request-ready governance
+# kwargs. This is the thin seam between the CG-capable LLM adapter (which
+# already captures sovereign state on every generation) and the governance
+# request objects (MCPToolCall / AuthorizationRequest), both of which already
+# accept ``entropy_result`` and a duck-typed ``vritti_result``.
+#
+# This helper composes the two existing bridge helpers —
+# ``entropy_from_sovereign_state`` and ``vritti_from_sovereign_state`` —
+# and returns a dict with exactly the keys governance consumers read.
+# It does NOT construct a request, does NOT mutate the adapter, and does
+# NOT fabricate ``sovereign_projection_metadata``: that field requires a
+# real ``SovereignProjectionResult``, which the CG adapter does not hold.
+# Honest absence, per sovereign_bridge conventions.
+#
+
+def governance_inputs_from_cg_metadata(
+    cg_metadata: Dict[str, Any],
+    tier: str = "consumer",
+) -> Dict[str, Any]:
+    """
+    Translate ``MistralCGAdapter.last_cg_metadata`` into governance kwargs.
+
+    The CG adapter stores, after each generation::
+
+        {
+          "state":        <tensor or list, 32D sovereign state>,
+          "delta_S":      <optional tensor or list, state delta>,
+          "delta_bhava":  <optional>,
+          "intent_phase": <optional>,
+          ...
+        }
+
+    This helper reads ``state`` (required) and ``delta_S`` (optional)
+    and calls the already-built bridge helpers to produce canonical
+    ``EntropyResult`` and ``ChittaVrittiResult`` objects. The returned
+    dict is shaped to be splatted directly into a governance request::
+
+        req = AuthorizationRequest(
+            actor_id="agent-1",
+            action_type="file_read",
+            **governance_inputs_from_cg_metadata(adapter.last_cg_metadata),
+        )
+
+    Args:
+        cg_metadata: A mapping matching ``MistralCGAdapter.last_cg_metadata``.
+            Must be a non-None mapping with a non-None ``"state"`` entry.
+        tier: Governance tier selector. ``"consumer"`` maps to consumer
+            tier for both sibling engines. ``"enterprise"`` maps to
+            vritti ``"enterprise"`` and entropy ``"enterprise_chat"``
+            (the entropy engine's enterprise chat tier). Other strings
+            are passed through to both helpers unchanged — callers
+            using custom tier names must ensure both engines recognize
+            them.
+
+    Returns:
+        Dict with exactly two keys:
+            - ``"entropy_result"``: canonical ``EntropyResult``
+            - ``"vritti_result"``:  canonical ``ChittaVrittiResult``
+        ``"sovereign_projection_metadata"`` is deliberately omitted —
+        CG adapter metadata does not contain a
+        ``SovereignProjectionResult`` and this helper never fabricates
+        one.
+
+    Raises:
+        TypeError: if ``cg_metadata`` is not a mapping.
+        ValueError: if ``"state"`` is missing or None.
+    """
+    # Strict contract on cg_metadata: it is produced by the LLM adapter
+    # and callers pass it through unchanged. Fail loudly on shape errors
+    # rather than silently returning half-populated governance inputs.
+    if cg_metadata is None or not hasattr(cg_metadata, "get"):
+        raise TypeError(
+            f"cg_metadata must be a mapping, got {type(cg_metadata).__name__}"
+        )
+
+    state = cg_metadata.get("state")
+    if state is None:
+        raise ValueError(
+            "cg_metadata['state'] is required (None or missing); "
+            "CG adapter must have completed at least one generation"
+        )
+
+    # delta_S is legitimately optional. Sibling helpers treat None as
+    # "velocity unknown" — do not fabricate a zero vector here.
+    delta_S = cg_metadata.get("delta_S")
+
+    # Entropy engine's tier_name vocabulary is distinct from the vritti
+    # engine's tier vocabulary. Translate only the names we know; pass
+    # everything else through unchanged so callers with custom tiers
+    # aren't silently downgraded.
+    if tier == "enterprise":
+        entropy_tier_name = "enterprise_chat"
+    else:
+        entropy_tier_name = tier
+
+    entropy_result = entropy_from_sovereign_state(
+        state,
+        delta_S=delta_S,
+        tier_name=entropy_tier_name,
+    )
+    vritti_result = vritti_from_sovereign_state(
+        state,
+        delta_S=delta_S,
+        tier=tier,
+    )
+
+    # NOTE: no "sovereign_projection_metadata" key. The CG adapter does
+    # not hold a SovereignProjectionResult (it stores only raw 32D state
+    # + delta_S). Honest absence, not fabrication.
+    return {
+        "entropy_result": entropy_result,
+        "vritti_result": vritti_result,
+    }
+
+
+# =============================================================================
+# Public API: projection_metadata_from_sovereign_result
+# =============================================================================
+#
+# Translate a full SovereignProjectionResult (from
+# sovereign/inference_bridge.project_sovereign_to_inference) into the
+# plain dict shape consumed by the AuthorizationRequest
+# .sovereign_projection_metadata field and by the S3/S4 consumers in
+# this module.
+#
+# Consumer contract (evidence-based, from this file):
+#   - diagnostics_from_projection(projection_metadata) reads the
+#     "reasoning_diagnostics" sub-dict.
+#   - guna_anomalies_from_projection(projection_metadata) reads the
+#     "guna_anomalies" sub-dict.
+#   - governor_telemetry_from_projection(projection_metadata) reads
+#     the "governor_telemetry" sub-dict.
+#
+# All three of those keys are already produced by
+# ProjectionMetadata.to_dict() (conditionally, when the upstream
+# pipeline threaded them into project_sovereign_to_inference).
+#
+# This adapter is a pure translator: no orchestration, no engine
+# construction, no request building. It simply exposes the full
+# SovereignProjectionResult as a governance-consumable dict,
+# preserving the outer-level projection fields (dominant_bhava,
+# guna_summary, etc.) that metadata.to_dict() alone does not carry
+# but which govern Bhava-transition auditing and future S5 signals.
+#
+
+def projection_metadata_from_sovereign_result(
+    result: Any,
+) -> Dict[str, Any]:
+    """
+    Translate a SovereignProjectionResult into a governance dict.
+
+    This is the pure adapter/helper seam between the sovereign
+    inference_bridge producer and the framework's
+    ``AuthorizationRequest.sovereign_projection_metadata`` consumer
+    contract. It performs no orchestration, does not build a request,
+    and does not mutate either side.
+
+    The returned dict is exactly compatible with the three existing
+    consumers in this module:
+        - ``diagnostics_from_projection(projection_metadata=...)``
+        - ``guna_anomalies_from_projection(projection_metadata=...)``
+        - ``governor_telemetry_from_projection(projection_metadata=...)``
+
+    Each consumer reads a single sub-key (``reasoning_diagnostics``,
+    ``guna_anomalies``, ``governor_telemetry``) which is already
+    emitted by ``ProjectionMetadata.to_dict()`` when the upstream
+    pipeline populated them. Consumers ignore unknown keys, so
+    the outer-level projection fields (``dominant_bhava``,
+    ``bhava_activations``, ``guna_summary``, ``kosha_profile``,
+    ``vritti_profile``) are preserved at the top level for future
+    S5+ consumers without affecting current ones.
+
+    Args:
+        result: A ``SovereignProjectionResult`` (from
+            ``agentic.sovereign.inference_bridge.project_sovereign_to_inference``).
+            Duck-typed on ``.metadata.to_dict()``, ``.dominant_bhava``,
+            ``.bhava_activations``, ``.guna_summary``, ``.kosha_profile``,
+            and ``.vritti_profile`` to avoid a torch-laden import.
+
+    Returns:
+        Dict[str, Any] ready to pass as
+        ``AuthorizationRequest(sovereign_projection_metadata=...)``.
+        Shape:
+          - all keys from ``ProjectionMetadata.to_dict()``
+            (source_dim, target_dim, had_guna, had_r_signal,
+             had_s_signal, had_c_signal, had_state_delta,
+             bhava_projection_norm, guna_projection_norm,
+             s_signal_dropped, c_signal_dropped, reserved_zeroed,
+             kosha_derived, vritti_derived, projection_warnings,
+             plus conditional: reasoning_diagnostics, guna_anomalies,
+             governor_telemetry)
+          - dominant_bhava: str
+          - bhava_activations: Dict[str, float]
+          - guna_summary: Dict[str, float]
+          - kosha_profile: List[float]  (length 5)
+          - vritti_profile: List[float] (length 5)
+
+    Example:
+        >>> from agentic.sovereign.inference_bridge import (
+        ...     project_sovereign_to_inference,
+        ... )
+        >>> result = project_sovereign_to_inference(state_128)
+        >>> metadata = projection_metadata_from_sovereign_result(result)
+        >>> request = AuthorizationRequest(
+        ...     actor_id="agent-1",
+        ...     action_type="file_read",
+        ...     sovereign_projection_metadata=metadata,
+        ... )
+    """
+    # Start from ProjectionMetadata.to_dict() — this already carries
+    # reasoning_diagnostics / guna_anomalies / governor_telemetry
+    # (conditionally) plus all fidelity flags.
+    metadata = result.metadata
+    payload: Dict[str, Any] = dict(metadata.to_dict())
+
+    # Promote outer SovereignProjectionResult fields so governance can
+    # read them without traversing a non-existent path. None of these
+    # keys collide with consumer-checked keys above.
+    payload["dominant_bhava"] = str(result.dominant_bhava)
+    payload["bhava_activations"] = dict(result.bhava_activations)
+    payload["guna_summary"] = dict(result.guna_summary)
+    payload["kosha_profile"] = list(result.kosha_profile)
+    payload["vritti_profile"] = list(result.vritti_profile)
+
+    return payload
 
 
 # =============================================================================

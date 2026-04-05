@@ -818,5 +818,160 @@ class TestEdgeCases:
         assert len(gateway.audit_log) == 0
 
 
+# =============================================================================
+# Test: call_tool_simple(cg_metadata=...) sovereign-bridge wiring
+# =============================================================================
+
+
+def _make_state(vritti=None, bhava=None, kosha=None, guna=None):
+    """Build a 32-float sovereign state."""
+    s = [0.0] * 32
+    if bhava:
+        for i, v in enumerate(bhava):
+            s[i] = v
+    if kosha:
+        for i, v in enumerate(kosha):
+            s[12 + i] = v
+    if vritti:
+        for i, v in enumerate(vritti):
+            s[17 + i] = v
+    if guna:
+        for i, v in enumerate(guna):
+            s[22 + i] = v
+    return s
+
+
+class TestCallToolSimpleCgMetadata:
+    """call_tool_simple(cg_metadata=...) must attach canonical
+    entropy_result + vritti_result and flow through the existing
+    gateway/governance path unchanged."""
+
+    def test_cg_metadata_none_preserves_behavior(self):
+        """Default path: cg_metadata=None is exactly the prior behavior."""
+        gateway = create_mock_mcp_gateway()
+
+        result = run_async(gateway.call_tool_simple(
+            "file_read", {"path": "/tmp/x"}, 0.9, 0.9,
+        ))
+
+        assert result.success is True
+        # Audit record must exist and must show entropy unavailable and
+        # vritti source = APPROXIMATED (real-signal path was NOT taken).
+        entry = gateway.audit_log[-1]
+        assert entry.vritti_signal_source == "approximated"
+        assert entry.entropy_available is False
+
+    def test_cg_metadata_attaches_entropy_and_vritti(self):
+        """Valid cg_metadata → both signals attached and consumed."""
+        from agentic.entropy.types import EntropyResult
+        from agentic.chitta_vritti.types import ChittaVrittiResult
+
+        gateway = create_mock_mcp_gateway()
+        cg_md = {
+            "state": _make_state(
+                bhava=[0.2] * 12,
+                kosha=[0.3, 0.3, 0.3, 0.3, 0.3],
+                vritti=[0.5, 0.1, 0.2, 0.1, 0.1],
+                guna=[0.6, 0.3, 0.1, 0.0, 0.0, 0.9],
+            ),
+            "delta_S": [0.05] * 32,
+            "delta_bhava": None,
+            "intent_phase": None,
+        }
+
+        # Capture the MCPToolCall actually dispatched so we can verify
+        # attribute attachment without probing gateway internals.
+        captured = {}
+        original = gateway.call_tool
+
+        async def _spy(tool_call):
+            captured["call"] = tool_call
+            return await original(tool_call)
+
+        gateway.call_tool = _spy  # type: ignore[method-assign]
+
+        result = run_async(gateway.call_tool_simple(
+            "file_read", {"path": "/tmp/y"}, 0.9, 0.9,
+            cg_metadata=cg_md,
+        ))
+
+        assert result.success is True
+        call = captured["call"]
+        assert isinstance(call.entropy_result, EntropyResult)
+        assert isinstance(
+            getattr(call, "vritti_result", None), ChittaVrittiResult
+        )
+
+    def test_gateway_consumes_attached_signals(self):
+        """The existing gateway/governance path reads attached signals
+        via its duck-typed getattr() contract — audit log must show
+        REAL vritti source and entropy available."""
+        gateway = create_mock_mcp_gateway()
+        cg_md = {
+            "state": _make_state(
+                bhava=[0.2] * 12,
+                kosha=[0.4, 0.2, 0.2, 0.1, 0.1],
+                vritti=[0.6, 0.1, 0.1, 0.1, 0.1],
+                guna=[0.7, 0.2, 0.1, 0.0, 0.0, 0.9],
+            ),
+        }
+
+        result = run_async(gateway.call_tool_simple(
+            "file_read", {"path": "/tmp/z"}, 0.9, 0.9,
+            cg_metadata=cg_md,
+        ))
+
+        assert result.success is True
+        entry = gateway.audit_log[-1]
+        assert entry.vritti_signal_source == "real"
+        assert entry.entropy_available is True
+
+    def test_tier_enterprise_passes_through(self):
+        """tier='enterprise' must reach both bridge engines without
+        raising, and the call must still succeed."""
+        gateway = create_mock_mcp_gateway()
+        cg_md = {
+            "state": _make_state(
+                bhava=[0.2] * 12,
+                kosha=[0.3] * 5,
+                vritti=[0.5, 0.1, 0.2, 0.1, 0.1],
+                guna=[0.6, 0.3, 0.1, 0.0, 0.0, 0.9],
+            ),
+        }
+        result = run_async(gateway.call_tool_simple(
+            "file_read", {"path": "/tmp/e"}, 0.9, 0.9,
+            cg_metadata=cg_md, tier="enterprise",
+        ))
+        assert result.success is True
+        entry = gateway.audit_log[-1]
+        assert entry.vritti_signal_source == "real"
+
+    def test_malformed_cg_metadata_raises(self):
+        """Bridge-helper errors propagate, not silently swallowed."""
+        gateway = create_mock_mcp_gateway()
+        with pytest.raises(ValueError):
+            run_async(gateway.call_tool_simple(
+                "file_read", {}, 0.9, 0.9,
+                cg_metadata={"state": None},
+            ))
+
+    def test_no_regression_to_simple_path(self):
+        """Every prior call_tool_simple(...) invocation without
+        cg_metadata must still succeed and audit identically."""
+        gateway = create_mock_mcp_gateway()
+        r1 = run_async(gateway.call_tool_simple(
+            "file_read", {}, 0.9, 0.9,
+        ))
+        r2 = run_async(gateway.call_tool_simple(
+            tool_name="file_read", parameters={},
+            quality_score=0.95, coherence_score=0.85,
+        ))
+        assert r1.success is True
+        assert r2.success is True
+        for entry in gateway.audit_log:
+            # No cg_metadata was passed — must not show REAL vritti
+            assert entry.vritti_signal_source == "approximated"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
