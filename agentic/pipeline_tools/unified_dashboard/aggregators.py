@@ -13,7 +13,7 @@ Design Principles:
 """
 
 from typing import Optional, List, Dict, Any
-from agentic.tools.unified_dashboard.models import (
+from agentic.pipeline_tools.unified_dashboard.models import (
     MetricSparkline,
     UnifiedSessionAnalytics,
 )

@@ -11,15 +11,15 @@ Design Principles:
     4. Non-invasive (does not modify session state)
 
 Usage:
-    from agentic.tools.unified_dashboard.cli import print_session_dashboard
+    from agentic.pipeline_tools.unified_dashboard.cli import print_session_dashboard
 
     # Print full dashboard for a session
     print_session_dashboard("abc123...")
 """
 
 from typing import Optional
-from agentic.tools.unified_dashboard.aggregators import build_unified_session_analytics
-from agentic.tools.unified_dashboard.renderers import (
+from agentic.pipeline_tools.unified_dashboard.aggregators import build_unified_session_analytics
+from agentic.pipeline_tools.unified_dashboard.renderers import (
     render_session_overview,
     render_risk_panel,
     render_timeline_panel,

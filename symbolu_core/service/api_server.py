@@ -606,7 +606,7 @@ def create_app() -> "FastAPI":
 
         try:
             # Import dashboard builder
-            from agentic.tools.unified_dashboard import build_unified_session_analytics
+            from agentic.pipeline_tools.unified_dashboard import build_unified_session_analytics
 
             # Build analytics
             analytics = build_unified_session_analytics(
@@ -682,13 +682,13 @@ def create_app() -> "FastAPI":
 
         try:
             # Import resonance simulator components
-            from agentic.tools.resonance_simulator import (
+            from agentic.pipeline_tools.resonance_simulator import (
                 is_valid_preset,
                 get_preset,
                 get_preset_names,
                 simulate_resonance_with_preset,
             )
-            from agentic.tools.resonance_simulator.cli import (
+            from agentic.pipeline_tools.resonance_simulator.cli import (
                 _extract_resonance_snapshot,
             )
 
@@ -811,13 +811,13 @@ def create_app() -> "FastAPI":
 
         try:
             # Import scenario simulator components
-            from agentic.tools.scenario_simulator import (
+            from agentic.pipeline_tools.scenario_simulator import (
                 is_valid_preset,
                 get_preset,
                 get_preset_names,
                 simulate_scenario_with_preset,
             )
-            from agentic.tools.scenario_simulator.cli import (
+            from agentic.pipeline_tools.scenario_simulator.cli import (
                 _extract_scenario_snapshot,
             )
 

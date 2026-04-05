@@ -15,7 +15,7 @@ Design Principles:
     5. CI-safe, fully tested
 
 Usage:
-    from agentic.tools.unified_dashboard import build_unified_session_analytics
+    from agentic.pipeline_tools.unified_dashboard import build_unified_session_analytics
 
     # Build analytics for a session
     analytics = build_unified_session_analytics(session_id)
@@ -24,23 +24,23 @@ Usage:
         print(render_session_overview(analytics))
 """
 
-from agentic.tools.unified_dashboard.models import (
+from agentic.pipeline_tools.unified_dashboard.models import (
     MetricSparkline,
     MetricBandStatus,
     UnifiedSessionAnalytics,
 )
 
-from agentic.tools.unified_dashboard.aggregators import (
+from agentic.pipeline_tools.unified_dashboard.aggregators import (
     build_unified_session_analytics,
 )
 
-from agentic.tools.unified_dashboard.renderers import (
+from agentic.pipeline_tools.unified_dashboard.renderers import (
     render_session_overview,
     render_risk_panel,
     render_timeline_panel,
 )
 
-from agentic.tools.unified_dashboard.cli import (
+from agentic.pipeline_tools.unified_dashboard.cli import (
     print_session_dashboard,
 )
 

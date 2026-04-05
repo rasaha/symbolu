@@ -1895,10 +1895,36 @@ surrounding flow stays identical.
 A smoke test (`tests/test_cg_tool_demo.py`) pins the demo's behavior
 as a regression guard for the full seam.
 
+### Owner component: `CGToolDispatcher`
+(`agentic/agentic_framework/cg_tool_dispatcher.py`)
+
+The smallest honest owner component that holds both an adapter and a
+gateway and composes them:
+
+```python
+from agentic.agentic_framework.cg_tool_dispatcher import CGToolDispatcher
+
+dispatcher = CGToolDispatcher(adapter, gateway, tier="consumer")
+result = await dispatcher.dispatch(
+    tool_name="file_read", parameters={"path": "/tmp/x"},
+)
+```
+
+`dispatch(...)` reads the adapter's **current** `last_cg_metadata`
+on every call and forwards it through `gateway.call_tool_simple`.
+When the adapter has not yet generated (`last_cg_metadata == {}`),
+the dispatcher calls the gateway with `cg_metadata=None`, preserving
+the pre-Phase-1 no-CG path exactly. The dispatcher adds no policy of
+its own — tier is pass-through, scores are pass-through.
+
+This component formalizes the ad-hoc composition the demo performs
+inline. A CG-capable production runtime can now hold a dispatcher
+instead of re-implementing the compose step.
+
 ### What this seam does NOT claim
 
-- Not a production orchestrator. No component today owns both
-  inference and governance invocation.
+- Not a reflective agent. `CGToolDispatcher` is a two-line compose
+  step, not a reasoning loop.
 - Not a pipeline bridge. Orthogonal to the Pipeline↔Authorize
   section above.
 - Not an `AuthorizationRequest` enrichment path. That half of the
