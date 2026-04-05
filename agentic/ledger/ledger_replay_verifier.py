@@ -1,4 +1,18 @@
 """
+DEPRECATED — Non-canonical duplicate (L0 cleanup, 2026-04)
+===========================================================
+
+The canonical ontological projection replay surface is in ``symbolu.ledger``.
+This file is a duplicate that has zero external consumers within the
+``agentic/`` tree. It is retained for reference only and is excluded from
+the ``agentic.ledger`` public API (__init__.py / __all__).
+
+Use ``symbolu.ledger.ledger_replay_verifier`` instead.
+
+Original docstring follows.
+
+---
+
 Ledger Replay Verifier (Stable-Experimental)
 =============================================
 

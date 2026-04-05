@@ -32,6 +32,16 @@ Public API:
     resolve_interaction_mode: Mode resolution function
     DomainProfile: Typed, frozen domain profile (Policy Phase P0)
     ProfileRegistry / get_profile_registry: Profile management
+
+DORMANT FACADES (NOT public API — Policy P0-cleanup, 2026-04):
+    The following submodules exist on disk but are DORMANT facades
+    with zero runtime consumers. They are deliberately excluded from
+    ``__all__`` and should not be imported in new code:
+        - agentic.policy.governance_binding  (re-exports P53 types)
+        - agentic.policy.preferences         (re-exports preference models)
+        - agentic.policy.licensing           (re-exports license validators)
+    Use the canonical symbolu_core sources directly instead. See each
+    module's docstring for the canonical import path.
 """
 
 from .domain_profiles import get_domain_profile

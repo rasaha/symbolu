@@ -442,17 +442,19 @@ class TestLayerVisibilityWiring(unittest.TestCase):
 class TestFacadeStatus(unittest.TestCase):
     """Test that facade modules have explicit status markers."""
 
-    def test_governance_binding_is_provisional(self):
+    def test_governance_binding_is_dormant(self):
+        # Upgraded from "provisional" -> "dormant" in Policy P0-cleanup
+        # (2026-04) after audit confirmed zero runtime consumers.
         from agentic.policy.governance_binding import _FACADE_STATUS
-        self.assertEqual(_FACADE_STATUS, "provisional")
+        self.assertEqual(_FACADE_STATUS, "dormant")
 
-    def test_preferences_is_provisional(self):
+    def test_preferences_is_dormant(self):
         from agentic.policy.preferences import _FACADE_STATUS
-        self.assertEqual(_FACADE_STATUS, "provisional")
+        self.assertEqual(_FACADE_STATUS, "dormant")
 
-    def test_licensing_is_provisional(self):
+    def test_licensing_is_dormant(self):
         from agentic.policy.licensing import _FACADE_STATUS
-        self.assertEqual(_FACADE_STATUS, "provisional")
+        self.assertEqual(_FACADE_STATUS, "dormant")
 
 
 # =============================================================================

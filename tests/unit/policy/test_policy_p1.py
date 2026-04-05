@@ -567,9 +567,9 @@ class TestP0RegressionFromP1(unittest.TestCase):
         self.assertIsNotNone(get_profile_registry)
 
     def test_facade_markers_unchanged(self):
-        """Facade status markers from P0 still present."""
+        """Facade status markers from P0 still present (now 'dormant' after P0-cleanup)."""
         from agentic.policy.governance_binding import _FACADE_STATUS
-        self.assertEqual(_FACADE_STATUS, "provisional")
+        self.assertEqual(_FACADE_STATUS, "dormant")
 
     def test_insight_window_markers_unchanged(self):
         """Insight window path markers from P0 still present."""

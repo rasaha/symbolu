@@ -519,8 +519,9 @@ class TestP2BackwardCompat(unittest.TestCase):
         self.assertIsNotNone(simulate_policy)
 
     def test_facade_markers_unchanged(self):
+        # Marker value upgraded to "dormant" in Policy P0-cleanup (2026-04).
         from agentic.policy.governance_binding import _FACADE_STATUS
-        self.assertEqual(_FACADE_STATUS, "provisional")
+        self.assertEqual(_FACADE_STATUS, "dormant")
 
     def test_insight_window_path_markers_unchanged(self):
         from agentic.policy.insight_window_gating import _INSIGHT_WINDOW_PATH
