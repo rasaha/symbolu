@@ -1940,6 +1940,248 @@ guidance, stub fallback, proved-vs-experimental status) see
 
 ---
 
+## Running the CG Runtime on GPU
+
+This section is the operational companion to
+`docs/CG_RUNTIME_RUNBOOK.md`. It shows the exact steps to stand up
+`inference_mistral.py --cg` against a **real** `MistralCGAdapter`
+(local inference through `MistralCGWrapper`) on a CUDA host, plus
+the canonical helper script `scripts/run_cg_gpu.sh`.
+
+Before this section: you already know the runtime wiring
+(`RUNTIME_MCP_PATH.md`) and the CLI flags (`CG_RUNTIME_RUNBOOK.md`).
+This section is just "how do I actually run it end-to-end on a GPU."
+
+### What this runs
+
+```
+user query
+    │
+    ▼
+python -m agentic.agentic_framework.inference_mistral --cg
+    │
+    ▼
+create_cg_agent(...)
+    │ torch+transformers+MistralCGWrapper available?
+    │   yes → MistralCGAdapter (real inference)
+    │   no  → (exit 1, unless --cg-allow-stub)
+    ▼
+build_cg_mcp_agent(adapter=..., allow_stub=False)
+    │
+    ▼
+AgenticLLMWrapper.run(query)
+    → SafetyGate → _execute_actions → CGToolDispatcher
+    → SafeMCPGateway (with live entropy_result + vritti_result)
+    → AgentResult
+```
+
+### Host requirements
+
+| Requirement                                  | Why                                                |
+|----------------------------------------------|----------------------------------------------------|
+| CUDA-capable GPU + working `nvidia-smi`      | `MistralCGWrapper` loads weights onto GPU.         |
+| VRAM: ~15 GB un-quantized / ~8 GB 8-bit / ~5 GB 4-bit | 7B-class checkpoint.                               |
+| Python ≥ 3.10                                | Match framework baseline.                          |
+| `torch`, `transformers>=4.40`, `accelerate`, `safetensors`, `sentencepiece` | Inference stack.          |
+| `bitsandbytes`                               | Only if `--cg-quantize {4bit,8bit}` is used.       |
+| `symbolu_training.training.unified.mistral_wrapper` importable | Supplies `MistralCGWrapper`.       |
+| HuggingFace token (if checkpoint is gated)   | e.g. `mistralai/*` models.                         |
+
+### Canonical helper: `scripts/run_cg_gpu.sh`
+
+Committed at `scripts/run_cg_gpu.sh`. It:
+
+1. verifies the GPU with `nvidia-smi`;
+2. installs the inference stack (plus `bitsandbytes` if quantizing);
+3. logs into HuggingFace using `HF_TOKEN` if set;
+4. runs the opt-in **wiring smoke** with the stub fallback
+   (`SYMBOLU_RUN_CG_SMOKE=1`) so you learn about wiring bugs
+   before the GPU load starts;
+5. invokes `inference_mistral.py --cg` against the real
+   `MistralCGAdapter` in REPL / demo / single-query mode.
+
+Full script listing:
+
+```bash
+#!/usr/bin/env bash
+# scripts/run_cg_gpu.sh
+set -euo pipefail
+
+: "${CG_MODEL:=mistralai/Mistral-7B-v0.3}"
+: "${CG_QUANTIZE:=4bit}"
+: "${CG_DEVICE:=auto}"
+: "${REPO_ROOT:=$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+: "${PY:=python}"
+
+cd "$REPO_ROOT"
+
+echo "== GPU =="
+nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv || {
+    echo "nvidia-smi not found — are you on a GPU host?"; exit 1;
+}
+
+echo "== Installing inference stack =="
+$PY -m pip install --quiet --upgrade pip
+$PY -m pip install --quiet \
+    "torch" "transformers>=4.40" "accelerate" \
+    "safetensors" "sentencepiece"
+if [[ "$CG_QUANTIZE" == "4bit" || "$CG_QUANTIZE" == "8bit" ]]; then
+    $PY -m pip install --quiet "bitsandbytes"
+fi
+
+if [[ -n "${HF_TOKEN:-}" ]]; then
+    $PY -c "from huggingface_hub import login; login('$HF_TOKEN')"
+fi
+
+echo "== Wiring smoke (stub, no GPU work) =="
+SYMBOLU_RUN_CG_SMOKE=1 $PY -m pytest -q \
+    agentic/agentic_framework/tests/test_inference_mistral_cg_smoke.py
+
+echo "== Real CG runtime: $CG_MODEL (quantize=${CG_QUANTIZE:-none}, device=$CG_DEVICE) =="
+QUANT_FLAG=()
+[[ -n "$CG_QUANTIZE" ]] && QUANT_FLAG=(--cg-quantize "$CG_QUANTIZE")
+
+MODE="${1:-}"
+case "$MODE" in
+    demo)
+        $PY -m agentic.agentic_framework.inference_mistral --cg \
+            --cg-model "$CG_MODEL" "${QUANT_FLAG[@]}" \
+            --cg-device "$CG_DEVICE" --demo --verbose ;;
+    ""|interactive)
+        $PY -m agentic.agentic_framework.inference_mistral --cg \
+            --cg-model "$CG_MODEL" "${QUANT_FLAG[@]}" \
+            --cg-device "$CG_DEVICE" --verbose ;;
+    *)
+        $PY -m agentic.agentic_framework.inference_mistral --cg \
+            --cg-model "$CG_MODEL" "${QUANT_FLAG[@]}" \
+            --cg-device "$CG_DEVICE" --verbose --query "$MODE" ;;
+esac
+```
+
+### Steps to run
+
+**1. Prepare the GPU host**
+
+```bash
+git clone <repo-url>
+cd symbolu
+git checkout claude/add-cg-metadata-enrichment-5J7il
+nvidia-smi            # confirm GPU + driver
+```
+
+**2. (Optional) Create a fresh Python env**
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+python -m pip install --upgrade pip
+```
+
+**3. Make sure `symbolu_training` is importable**
+
+The CG adapter depends on `MistralCGWrapper` from
+`symbolu_training.training.unified.mistral_wrapper`. Install the
+`symbolu` / `symbolu_training` package into the active env, or run
+from the repo root so it's on `PYTHONPATH`.
+
+**4. Set HuggingFace auth**
+
+```bash
+export HF_TOKEN=hf_xxx
+```
+
+Required only if the checkpoint is gated (Mistral's official
+checkpoints are).
+
+**5. Run the helper script**
+
+```bash
+chmod +x scripts/run_cg_gpu.sh
+
+# Interactive REPL, 4-bit quantized (default)
+./scripts/run_cg_gpu.sh
+
+# Multi-turn demo
+./scripts/run_cg_gpu.sh demo
+
+# Single query
+./scripts/run_cg_gpu.sh "Compare self-attention vs linear attention briefly."
+
+# 8-bit
+CG_QUANTIZE=8bit ./scripts/run_cg_gpu.sh demo
+
+# Un-quantized (needs ~15 GB VRAM)
+CG_QUANTIZE= ./scripts/run_cg_gpu.sh
+
+# Different checkpoint
+CG_MODEL=mistralai/Mistral-7B-Instruct-v0.3 ./scripts/run_cg_gpu.sh demo
+```
+
+**6. What you should see**
+
+- `== GPU ==` banner lists your card.
+- Dependency install completes quietly.
+- `== Wiring smoke (stub, no GPU work) ==` reports **1 passed**. If
+  this fails, stop — it is a code/wiring bug, not an environment
+  bug, and running the real model will not fix it.
+- `== Real CG runtime: … ==` banner, then `MistralCGWrapper` loads
+  the checkpoint (first run downloads weights, subsequent runs use
+  HF cache).
+- Each turn prints the `AgenticLLMWrapper` result with coherence
+  metrics and (with `--verbose`) the full pipeline details. Under
+  the hood every dispatched action type routes through
+  `CGToolDispatcher` → `SafeMCPGateway` with live CG-derived
+  `entropy_result` + `vritti_result`.
+
+### Running without the helper script
+
+The helper is only a convenience. You can run the CLI directly:
+
+```bash
+python -m agentic.agentic_framework.inference_mistral --cg \
+    --cg-model mistralai/Mistral-7B-v0.3 \
+    --cg-quantize 4bit \
+    --cg-device auto \
+    --verbose \
+    --query "Your question here."
+```
+
+### Troubleshooting
+
+| Symptom                                                     | Cause / fix                                                                              |
+|-------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| `nvidia-smi not found`                                      | Not a CUDA host. Use a GPU VM or fall back to `--cg-allow-stub` (dev only).              |
+| `ImportError: MistralCGWrapper`                             | `symbolu_training` not installed / not on `PYTHONPATH`.                                  |
+| `401 Unauthorized` from HuggingFace                         | Set `HF_TOKEN`; for gated models, accept the license on the HF model card first.         |
+| `OutOfMemoryError` at model load                            | Use `CG_QUANTIZE=4bit` (or `8bit`), or pick a smaller checkpoint.                        |
+| `bitsandbytes` install fails                                | Needs matching CUDA. Skip quantization (`CG_QUANTIZE=`) to bypass.                       |
+| Wiring smoke passes but real run fails                      | Environment issue (CUDA / checkpoint / token). Code path is fine.                        |
+| Wiring smoke fails                                          | Code bug on the branch. Do **not** proceed to real-inference run.                        |
+| Real run silently uses the stub                             | Can't happen without `--cg-allow-stub`. CLI exits with actionable error instead.         |
+
+### What this proves when it runs green
+
+- The full `inference_mistral.py --cg` path is runnable on real
+  hardware against a real CG-capable checkpoint.
+- `adapter.last_cg_metadata` is populated from live inference, not
+  a fixture — every MCP tool dispatched during the session carries
+  real CG-derived `entropy_result` + `vritti_result` into
+  governance.
+- The substitution seam from `build_cg_mcp_agent(...)` holds at the
+  boundary between stub and real adapters without any other wiring
+  change.
+
+### What this does NOT prove
+
+- Does not prove `sovereign_projection_metadata` attachment (still
+  deferred — no producer wired on this path).
+- Does not prove `AuthorizationRequest`-side enrichment (still
+  deferred — no honest caller).
+- Does not constitute a correctness evaluation of the governance
+  decisions themselves; it only pins the **wiring and data-flow**
+  end to end.
+
+---
+
 ## Test Evidence
 
 ### Coverage Summary
