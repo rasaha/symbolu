@@ -171,6 +171,12 @@ class MCPToolCall:
     quality_score: float = 0.5
     coherence_score: float = 0.5
 
+    # Entropy signal (optional — canonical producer: agentic/entropy/EntropyEngine)
+    # Duck-typed: must expose .combined_entropy, .guna_entropy, .kosha_entropy,
+    # .cross_domain_entropy, .gate. Absent entropy does not weaken governance
+    # posture (fail-closed). Consumed by _jepa_check() via entropy_adapter.
+    entropy_result: Optional[Any] = field(default=None)
+
     # Request metadata
     request_id: str = field(default_factory=lambda: f"mcp-{int(time.time() * 1000)}")
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
