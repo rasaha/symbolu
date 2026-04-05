@@ -12,6 +12,10 @@ from agentic.agentic_framework.sovereign_bridge import (
     signals_from_sovereign_state,
     coherence_from_sovereign_state,
     vritti_from_sovereign_state,
+    projection_metadata_from_sovereign_result,
+    diagnostics_from_projection,
+    guna_anomalies_from_projection,
+    governor_telemetry_from_projection,
     SovereignCoherenceState,
     _vritti_to_confidence,
     _kosha_to_budget,
@@ -556,3 +560,272 @@ class TestVrittiFromSovereignState:
         for r in (r_consumer, r_enterprise):
             assert 0.0 <= r.score <= 1.0
             assert abs(sum(r.vritti.values()) - 1.0) < 0.01
+
+
+# =============================================================================
+# Test: projection_metadata_from_sovereign_result (SovereignProjectionResult
+# → governance dict adapter)
+# =============================================================================
+
+def _make_fake_projection_result(
+    *,
+    reasoning_diagnostics=None,
+    guna_anomalies=None,
+    governor_telemetry=None,
+):
+    """Build a fake SovereignProjectionResult-shaped object.
+
+    Avoids importing agentic.sovereign.inference_bridge (which pulls
+    in torch via sovereign/__init__.py) by duck-typing the dataclass
+    contract the adapter actually reads.
+    """
+    from types import SimpleNamespace
+
+    # Replicate ProjectionMetadata.to_dict() output shape precisely.
+    metadata_dict = {
+        "source_dim": 128,
+        "target_dim": 32,
+        "had_guna": True,
+        "had_r_signal": True,
+        "had_s_signal": True,
+        "had_c_signal": False,
+        "had_state_delta": False,
+        "bhava_projection_norm": 0.5,
+        "guna_projection_norm": 0.4,
+        "s_signal_dropped": True,
+        "c_signal_dropped": False,
+        "reserved_zeroed": True,
+        "kosha_derived": True,
+        "vritti_derived": True,
+        "projection_warnings": ["S-Signal (32-D referent) dropped: no inference slot"],
+    }
+    if reasoning_diagnostics is not None:
+        metadata_dict["reasoning_diagnostics"] = reasoning_diagnostics
+    if guna_anomalies is not None:
+        metadata_dict["guna_anomalies"] = guna_anomalies
+    if governor_telemetry is not None:
+        metadata_dict["governor_telemetry"] = governor_telemetry
+
+    metadata = SimpleNamespace(to_dict=lambda: dict(metadata_dict))
+    return SimpleNamespace(
+        inference_state=tuple([0.0] * 32),
+        metadata=metadata,
+        bhava_activations={
+            "POT": 0.1, "IDN": 0.2, "EXE": 0.0, "STR": 0.3,
+            "COG": 0.1, "AGY": 0.0, "RSN": 0.5, "PRP": 0.0,
+            "WIT": 0.1, "UNI": 0.0, "INT": 0.0, "ABS": 0.0,
+        },
+        dominant_bhava="RSN",
+        guna_summary={
+            "lucidity": 0.7, "activity": 0.2, "stability": 0.1,
+            "velocity": 0.05, "acceleration": 0.02, "stable": 0.95,
+        },
+        kosha_profile=(0.1, 0.2, 0.4, 0.2, 0.1),
+        vritti_profile=(0.6, 0.1, 0.1, 0.1, 0.1),
+    )
+
+
+class TestProjectionMetadataFromSovereignResult:
+    """Adapter: SovereignProjectionResult → AuthorizationRequest dict."""
+
+    def test_returns_metadata_to_dict_keys(self):
+        """All ProjectionMetadata.to_dict() keys must be preserved."""
+        result = _make_fake_projection_result()
+        payload = projection_metadata_from_sovereign_result(result)
+
+        # Core metadata keys from ProjectionMetadata.to_dict()
+        for key in (
+            "source_dim", "target_dim",
+            "had_guna", "had_r_signal", "had_s_signal", "had_c_signal",
+            "had_state_delta",
+            "bhava_projection_norm", "guna_projection_norm",
+            "s_signal_dropped", "c_signal_dropped", "reserved_zeroed",
+            "kosha_derived", "vritti_derived", "projection_warnings",
+        ):
+            assert key in payload, f"missing metadata key: {key}"
+
+        assert payload["source_dim"] == 128
+        assert payload["target_dim"] == 32
+
+    def test_promotes_outer_projection_fields(self):
+        """Top-level SovereignProjectionResult fields must be promoted to
+        top level of the governance dict."""
+        result = _make_fake_projection_result()
+        payload = projection_metadata_from_sovereign_result(result)
+
+        assert payload["dominant_bhava"] == "RSN"
+        assert payload["bhava_activations"]["RSN"] == 0.5
+        assert payload["guna_summary"]["lucidity"] == 0.7
+        assert payload["kosha_profile"] == [0.1, 0.2, 0.4, 0.2, 0.1]
+        assert payload["vritti_profile"] == [0.6, 0.1, 0.1, 0.1, 0.1]
+        # List types for JSON-compatibility (not tuples)
+        assert isinstance(payload["kosha_profile"], list)
+        assert isinstance(payload["vritti_profile"], list)
+        assert isinstance(payload["bhava_activations"], dict)
+        assert isinstance(payload["guna_summary"], dict)
+
+    def test_diagnostics_consumer_accepts_output(self):
+        """diagnostics_from_projection must accept the adapter output
+        and extract reasoning_diagnostics."""
+        result = _make_fake_projection_result(
+            reasoning_diagnostics={
+                "mauna_active": True,
+                "active_intervention": "mauna_hold",
+                "dominant_bhava": "RSN",
+                "vritti_state": "pramana",
+                "entropy_delta": -0.01,
+                "source": "inference_bridge",
+                "available": True,
+            },
+        )
+        payload = projection_metadata_from_sovereign_result(result)
+
+        diag = diagnostics_from_projection(projection_metadata=payload)
+        assert diag.available is True
+        assert diag.mauna_active is True
+        assert diag.active_intervention == "mauna_hold"
+
+    def test_guna_anomalies_consumer_accepts_output(self):
+        """guna_anomalies_from_projection must accept the adapter output."""
+        result = _make_fake_projection_result(
+            guna_anomalies={
+                "collapse": True,
+                "oscillation": False,
+                "stagnation": False,
+                "dominant_guna": "tamas",
+            },
+        )
+        payload = projection_metadata_from_sovereign_result(result)
+
+        ctx = guna_anomalies_from_projection(projection_metadata=payload)
+        assert ctx.available is True
+        assert ctx.collapse is True
+        assert ctx.oscillation is False
+        assert ctx.dominant_guna == "tamas"
+        assert ctx.anomaly_count == 1
+
+    def test_governor_telemetry_consumer_accepts_output(self):
+        """governor_telemetry_from_projection must accept adapter output."""
+        telem = {"s_drift": 0.12, "coupling": 0.85, "brake_reason": "none"}
+        result = _make_fake_projection_result(governor_telemetry=telem)
+        payload = projection_metadata_from_sovereign_result(result)
+
+        out = governor_telemetry_from_projection(projection_metadata=payload)
+        assert out is not None
+        assert out["s_drift"] == 0.12
+        assert out["brake_reason"] == "none"
+
+    def test_all_three_sub_consumers_on_same_payload(self):
+        """A single adapter output must feed all three S3/S4 consumers."""
+        result = _make_fake_projection_result(
+            reasoning_diagnostics={
+                "mauna_active": False,
+                "source": "inference_bridge",
+                "available": True,
+            },
+            guna_anomalies={
+                "collapse": False,
+                "oscillation": True,
+                "stagnation": False,
+                "dominant_guna": "rajas",
+            },
+            governor_telemetry={"s_drift": 0.05},
+        )
+        payload = projection_metadata_from_sovereign_result(result)
+
+        diag = diagnostics_from_projection(projection_metadata=payload)
+        guna = guna_anomalies_from_projection(projection_metadata=payload)
+        telem = governor_telemetry_from_projection(projection_metadata=payload)
+
+        assert diag.available is True
+        assert guna.oscillation is True
+        assert guna.dominant_guna == "rajas"
+        assert telem == {"s_drift": 0.05}
+
+    def test_absent_subdicts_still_work(self):
+        """Adapter must work when reasoning_diagnostics/guna_anomalies/
+        governor_telemetry are not populated (common case — upstream
+        pipeline didn't thread them into project_sovereign_to_inference).
+
+        diagnostics_from_projection treats any non-None projection_metadata
+        as available (source='inference_bridge_partial' when the
+        reasoning_diagnostics sub-dict is missing). guna_anomalies and
+        governor_telemetry strictly require their sub-dicts.
+        """
+        result = _make_fake_projection_result()  # all three absent
+        payload = projection_metadata_from_sovereign_result(result)
+
+        # Consumer helpers must not crash
+        diag = diagnostics_from_projection(projection_metadata=payload)
+        guna = guna_anomalies_from_projection(projection_metadata=payload)
+        telem = governor_telemetry_from_projection(projection_metadata=payload)
+
+        # Diagnostics: "partial" source, top-level dominant_bhava extracted
+        assert diag.available is True
+        assert diag.source == "inference_bridge_partial"
+        assert diag.dominant_bhava == "RSN"
+        assert diag.mauna_active is False  # safe default
+
+        # Guna anomalies and governor telemetry strictly require sub-dicts
+        assert guna.available is False
+        assert telem is None
+
+    def test_payload_is_authorization_request_compatible(self):
+        """Adapter output drops cleanly into
+        AuthorizationRequest.sovereign_projection_metadata (a
+        Dict[str, Any] field) without Pydantic validation error."""
+        from agentic.agentic_framework.governance_models import (
+            AuthorizationRequest,
+        )
+
+        result = _make_fake_projection_result(
+            reasoning_diagnostics={"mauna_active": False, "available": True},
+        )
+        payload = projection_metadata_from_sovereign_result(result)
+
+        req = AuthorizationRequest(
+            actor_id="test-actor",
+            action_type="file_read",
+            sovereign_projection_metadata=payload,
+        )
+        assert req.sovereign_projection_metadata is not None
+        assert req.sovereign_projection_metadata["dominant_bhava"] == "RSN"
+        assert req.sovereign_projection_metadata["source_dim"] == 128
+
+    def test_real_sovereign_projection_result_if_importable(self):
+        """End-to-end with the real SovereignProjectionResult, if torch
+        is available. Skipped when sovereign.inference_bridge can't be
+        imported (torch chain)."""
+        pytest.importorskip("torch")
+        from agentic.sovereign.inference_bridge import (
+            project_sovereign_to_inference,
+        )
+
+        # Build a 128-D state with some R-signal and Guna content
+        state = [0.0] * 128
+        for i in range(16):
+            state[i] = 0.1 * (i % 3)  # some guna
+        for i in range(48, 96):
+            state[i] = 0.05  # uniform R-signal
+
+        result = project_sovereign_to_inference(state)
+        payload = projection_metadata_from_sovereign_result(result)
+
+        # Consumers still function on the real payload
+        diag = diagnostics_from_projection(projection_metadata=payload)
+        guna = guna_anomalies_from_projection(projection_metadata=payload)
+        telem = governor_telemetry_from_projection(projection_metadata=payload)
+
+        # No exceptions; all three contexts addressable
+        assert diag is not None
+        assert guna is not None
+        # telem is Optional[Dict] → None is fine
+        assert telem is None or isinstance(telem, dict)
+
+        # Outer-field promotion actually captured real values
+        assert payload["dominant_bhava"] in {
+            "POT", "IDN", "EXE", "STR", "COG", "AGY",
+            "RSN", "PRP", "WIT", "UNI", "INT", "ABS",
+        }
+        assert len(payload["kosha_profile"]) == 5
+        assert len(payload["vritti_profile"]) == 5

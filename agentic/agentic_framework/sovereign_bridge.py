@@ -852,6 +852,118 @@ def vritti_from_sovereign_state(
 
 
 # =============================================================================
+# Public API: projection_metadata_from_sovereign_result
+# =============================================================================
+#
+# Translate a full SovereignProjectionResult (from
+# sovereign/inference_bridge.project_sovereign_to_inference) into the
+# plain dict shape consumed by the AuthorizationRequest
+# .sovereign_projection_metadata field and by the S3/S4 consumers in
+# this module.
+#
+# Consumer contract (evidence-based, from this file):
+#   - diagnostics_from_projection(projection_metadata) reads the
+#     "reasoning_diagnostics" sub-dict.
+#   - guna_anomalies_from_projection(projection_metadata) reads the
+#     "guna_anomalies" sub-dict.
+#   - governor_telemetry_from_projection(projection_metadata) reads
+#     the "governor_telemetry" sub-dict.
+#
+# All three of those keys are already produced by
+# ProjectionMetadata.to_dict() (conditionally, when the upstream
+# pipeline threaded them into project_sovereign_to_inference).
+#
+# This adapter is a pure translator: no orchestration, no engine
+# construction, no request building. It simply exposes the full
+# SovereignProjectionResult as a governance-consumable dict,
+# preserving the outer-level projection fields (dominant_bhava,
+# guna_summary, etc.) that metadata.to_dict() alone does not carry
+# but which govern Bhava-transition auditing and future S5 signals.
+#
+
+def projection_metadata_from_sovereign_result(
+    result: Any,
+) -> Dict[str, Any]:
+    """
+    Translate a SovereignProjectionResult into a governance dict.
+
+    This is the pure adapter/helper seam between the sovereign
+    inference_bridge producer and the framework's
+    ``AuthorizationRequest.sovereign_projection_metadata`` consumer
+    contract. It performs no orchestration, does not build a request,
+    and does not mutate either side.
+
+    The returned dict is exactly compatible with the three existing
+    consumers in this module:
+        - ``diagnostics_from_projection(projection_metadata=...)``
+        - ``guna_anomalies_from_projection(projection_metadata=...)``
+        - ``governor_telemetry_from_projection(projection_metadata=...)``
+
+    Each consumer reads a single sub-key (``reasoning_diagnostics``,
+    ``guna_anomalies``, ``governor_telemetry``) which is already
+    emitted by ``ProjectionMetadata.to_dict()`` when the upstream
+    pipeline populated them. Consumers ignore unknown keys, so
+    the outer-level projection fields (``dominant_bhava``,
+    ``bhava_activations``, ``guna_summary``, ``kosha_profile``,
+    ``vritti_profile``) are preserved at the top level for future
+    S5+ consumers without affecting current ones.
+
+    Args:
+        result: A ``SovereignProjectionResult`` (from
+            ``agentic.sovereign.inference_bridge.project_sovereign_to_inference``).
+            Duck-typed on ``.metadata.to_dict()``, ``.dominant_bhava``,
+            ``.bhava_activations``, ``.guna_summary``, ``.kosha_profile``,
+            and ``.vritti_profile`` to avoid a torch-laden import.
+
+    Returns:
+        Dict[str, Any] ready to pass as
+        ``AuthorizationRequest(sovereign_projection_metadata=...)``.
+        Shape:
+          - all keys from ``ProjectionMetadata.to_dict()``
+            (source_dim, target_dim, had_guna, had_r_signal,
+             had_s_signal, had_c_signal, had_state_delta,
+             bhava_projection_norm, guna_projection_norm,
+             s_signal_dropped, c_signal_dropped, reserved_zeroed,
+             kosha_derived, vritti_derived, projection_warnings,
+             plus conditional: reasoning_diagnostics, guna_anomalies,
+             governor_telemetry)
+          - dominant_bhava: str
+          - bhava_activations: Dict[str, float]
+          - guna_summary: Dict[str, float]
+          - kosha_profile: List[float]  (length 5)
+          - vritti_profile: List[float] (length 5)
+
+    Example:
+        >>> from agentic.sovereign.inference_bridge import (
+        ...     project_sovereign_to_inference,
+        ... )
+        >>> result = project_sovereign_to_inference(state_128)
+        >>> metadata = projection_metadata_from_sovereign_result(result)
+        >>> request = AuthorizationRequest(
+        ...     actor_id="agent-1",
+        ...     action_type="file_read",
+        ...     sovereign_projection_metadata=metadata,
+        ... )
+    """
+    # Start from ProjectionMetadata.to_dict() — this already carries
+    # reasoning_diagnostics / guna_anomalies / governor_telemetry
+    # (conditionally) plus all fidelity flags.
+    metadata = result.metadata
+    payload: Dict[str, Any] = dict(metadata.to_dict())
+
+    # Promote outer SovereignProjectionResult fields so governance can
+    # read them without traversing a non-existent path. None of these
+    # keys collide with consumer-checked keys above.
+    payload["dominant_bhava"] = str(result.dominant_bhava)
+    payload["bhava_activations"] = dict(result.bhava_activations)
+    payload["guna_summary"] = dict(result.guna_summary)
+    payload["kosha_profile"] = list(result.kosha_profile)
+    payload["vritti_profile"] = list(result.vritti_profile)
+
+    return payload
+
+
+# =============================================================================
 # Phase S3: Diagnostic context forwarding
 # =============================================================================
 
