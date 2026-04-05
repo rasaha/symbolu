@@ -202,5 +202,8 @@ All five suites are part of the regression baseline for this path.
 - `agentic/agentic_framework/cg_tool_dispatcher.py` — dispatcher + factory.
 - `agentic/agentic_framework/request_enrichment.py` — request-boundary helper.
 - `agentic/agentic_framework/docs/REQUEST_BOUNDARY_CONVENTION.md` — attach/omit rules.
+- `agentic/agentic_framework/docs/CG_RUNTIME_RUNBOOK.md` — runbook for the
+  `inference_mistral.py --cg` CLI (real-inference requirements, stub
+  fallback, proved-vs-experimental status).
 - `agentic/AGENTIC_ARCHITECTURE.md` § "Inference CG Metadata ↔ MCP Gateway".
 - `examples/cg_tool_demo.py` — minimal end-to-end demo.

@@ -1924,7 +1924,10 @@ instead of re-implementing the compose step.
 For the **concrete end-to-end runtime path** — `AgenticLLMWrapper.run`
 → `SafetyGate` → `_execute_actions` → `CGToolDispatcher` →
 `SafeMCPGateway` with the stub-↔-real adapter substitution seam —
-see `agentic/agentic_framework/docs/RUNTIME_MCP_PATH.md`.
+see `agentic/agentic_framework/docs/RUNTIME_MCP_PATH.md`. For the
+runnable `inference_mistral.py --cg` CLI (requirements, checkpoint
+guidance, stub fallback, proved-vs-experimental status) see
+`agentic/agentic_framework/docs/CG_RUNTIME_RUNBOOK.md`.
 
 ### What this seam does NOT claim
 

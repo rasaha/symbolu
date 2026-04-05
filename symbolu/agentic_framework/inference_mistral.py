@@ -28,10 +28,19 @@ Usage:
     python -m symbolu.agentic_framework.inference_mistral --cg \\
         --cg-model mistralai/Mistral-7B-v0.3 --query "..."
 
+    # Opt-in CG-capable runtime with stub fallback (dev/test only — no torch)
+    python -m symbolu.agentic_framework.inference_mistral --cg \\
+        --cg-allow-stub --query "..."
+
 Environment:
-    MISTRAL_API_KEY  - Required for the default (API) path.
-    SYMBOLU_RUN_CG_SMOKE - When set to "1", opt-in CG smoke test is enabled
-                           (see tests/test_inference_mistral_cg_smoke.py).
+    MISTRAL_API_KEY        - Required for the default (API) path. Not required
+                             for --cg mode.
+    SYMBOLU_RUN_CG_SMOKE   - When set to "1", opt-in CG smoke test is enabled
+                             (see tests/test_inference_mistral_cg_smoke.py).
+
+See also:
+    agentic/agentic_framework/docs/CG_RUNTIME_RUNBOOK.md  — runbook for --cg
+    agentic/agentic_framework/docs/RUNTIME_MCP_PATH.md    — runtime wiring
 """
 
 from __future__ import annotations
@@ -398,10 +407,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --demo                                    # Multi-turn demo
-  %(prog)s --query "What is quantum computing?"      # Single query
-  %(prog)s                                           # Interactive REPL
+  %(prog)s --demo                                    # Multi-turn demo (API)
+  %(prog)s --query "What is quantum computing?"      # Single query (API)
+  %(prog)s                                           # Interactive REPL (API)
   %(prog)s --model mistral-medium-latest --verbose   # Custom model, verbose
+
+  # Opt-in CG runtime (real local inference; requires torch + checkpoint):
+  %(prog)s --cg --cg-model mistralai/Mistral-7B-v0.3 --query "..."
+
+  # Opt-in CG runtime with stub fallback (dev/test only — no real inference):
+  %(prog)s --cg --cg-allow-stub --query "..."
+
+See docs/CG_RUNTIME_RUNBOOK.md for --cg setup, checkpoint/device guidance,
+and proved-vs-experimental status.
 """,
     )
     parser.add_argument(
