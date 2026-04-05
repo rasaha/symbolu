@@ -14,6 +14,19 @@ This module enforces:
 - All violations are CI-detectable
 """
 
+# ---------------------------------------------------------------------------
+# MIGRATION MIRROR — DO NOT DRIFT
+# ---------------------------------------------------------------------------
+# This file is one half of an intentional migration mirror. An identical
+# (or namespace-identical) copy lives at the other root:
+#   symbolu/llm/*   <->   agentic/llm/*
+# Production runtime runs through `symbolu/llm/*` today (see nixpacks.toml
+# -> `symbolu.service.api_server:create_app`). The extraction target is
+# `agentic/llm/*` (see commit 654b3b8). Both copies must stay in sync
+# until the migration completes.
+# Drift guard: tests/test_llm_mirror_drift.py
+# ---------------------------------------------------------------------------
+
 from agentic.llm.types import (
     RenderMode,
     ContractViolationType,

@@ -13,7 +13,7 @@ Design Principles:
 """
 
 from typing import List
-from agentic.tools.unified_dashboard.models import UnifiedSessionAnalytics, MetricSparkline
+from agentic.pipeline_tools.unified_dashboard.models import UnifiedSessionAnalytics, MetricSparkline
 
 
 def render_session_overview(analytics: UnifiedSessionAnalytics) -> str:

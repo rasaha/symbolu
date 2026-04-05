@@ -20,33 +20,57 @@ V10.0 Phase 5 additions:
 
 See docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md for detailed gap analysis.
 
+Public API Policy
+-----------------
+``__all__`` reflects the **supported top-level API** — symbols with
+at least one confirmed ``from agentic.inference import X`` external
+caller. Additional symbols remain importable via the package (and
+via direct submodule imports) for backward compatibility, but they
+are not considered part of the stable top-level surface. Prefer
+submodule imports for those, e.g.::
+
+    from agentic.inference.generation_tracer import MistralCGGenerationTracer
+    from agentic.inference.logit_modulation import LogitModulator
+    from agentic.inference.perspective_synthesizer import PerspectiveSynthesizer
+
+This narrower ``__all__`` does not remove any names — everything
+previously accessible remains accessible. It only documents which
+symbols the package owner commits to maintaining as a top-level
+entry point.
+
 Author: Sovereign-1 Training Initiative
 Date: January 2026
-Version: 2.0.0 (Phase 5 - V10.0 Binding Cache Support)
+Version: 2.1.0 (Phase 5 - V10.0 Binding Cache Support; narrowed public API)
 """
 
+# =============================================================================
+# Top-level public API (in __all__)
+# =============================================================================
 from .evolutionary_inference import EvolutionaryInferenceEngine
 from .csr_inference import CSRInferenceGuard
 from .metacognitive_monitor import InferenceMetacognition
 from .guna_inference import InferenceGunas
-from .sovereign_scorer import SovereignInferenceScorer
 from .layer_config import LayerInferenceConfig, ArchitectureMode
-from .checkpoint_utils import load_inference_engine, InferenceCheckpointLoader
 from .manager import InferenceManager, InferenceMode, InferenceManagerConfig
+from .binding_cache_inference import BindingCacheInferenceEngine
+from .ontological_binding_cache_inference import OntologicalBindingCacheInferenceEngine
+from .sovereign_state_monitor import SovereignStateMonitor
 
-# V10.0 Phase 5 - Binding Cache Inference Engines
+# =============================================================================
+# Submodule-level public (kept importable here for backward compatibility,
+# but not listed in __all__; prefer direct submodule imports for these).
+# =============================================================================
+from .sovereign_scorer import SovereignInferenceScorer
+from .checkpoint_utils import load_inference_engine, InferenceCheckpointLoader
 from .binding_cache_inference import (
-    BindingCacheInferenceEngine,
     BindingCacheInferenceConfig,
     IntentPhaseInferenceModule,
     BindingSalienceController,
 )
 from .ontological_binding_cache_inference import (
-    OntologicalBindingCacheInferenceEngine,
     OntologicalBindingCacheInferenceConfig,
 )
 from .sovereign_state_monitor import (
-    SovereignStateMonitor,
     SovereignStateMetrics,
     DepthLevel,
     ReliabilityLevel,
@@ -57,8 +81,6 @@ from .sovereign_state_monitor import (
     GUNA_NAMES,
     get_sovereign_state_summary,
 )
-
-# Logit Modulation Decoding
 from .logit_modulation import (
     LogitModulationConfig,
     LogitModulator,
@@ -78,8 +100,6 @@ from .logit_modulation_benchmark import (
     BenchmarkMetrics,
     SweepResult,
 )
-
-# Appendix F Stage 0: Generation Tracer
 from .generation_tracer import (
     GenerationTracer,
     BindingCacheTracerMixin,
@@ -87,54 +107,38 @@ from .generation_tracer import (
     MistralCGGenerationTracer,
     BaselineStatisticsAnalyzer,
 )
-
-# Appendix F Stage 1: Coherence-Aware Decoder
 from .coherence_aware_decoder import (
     CoherenceAwareDecoder,
     CoherenceDecoderConfig,
 )
-
-# Appendix F Stage 2: Interpretive Conditioner
 from .interpretive_conditioner import (
     InterpretiveConditioner,
     InterpretiveConditionerConfig,
     InterpretiveStateBuilder,
     BhavaVectorCompressor,
 )
-
-# Appendix F Stage 4: Unified Coherence Controller
 from .unified_coherence_controller import (
     UnifiedCoherenceController,
     UnifiedCoherenceConfig,
 )
-
-# Appendix F Stage 7A: Semantic Coherence Integration
 from .semantic_coherence_integration import (
     SemanticCoherenceIntegration,
     SemanticCoherenceConfig,
 )
-
-# Appendix F Stage 7C: Experiential State (Dual-Space Architecture)
 from .experiential_state import (
     ExperientialStateModule,
     ExperientialStateConfig,
 )
-
-# Appendix F Stage 7D: Polarity Encoding (Varna Polarity Gates)
 from .polarity_encoding import (
     PolarityGate,
     PolarityEncodingConfig,
 )
-
-# Appendix F Stage 7F: Phase Coherence Signal
 from .phase_coherence_signal import (
     PhaseCoherenceExtractor,
     PhaseCoherenceAggregator,
     PhaseCoherenceProjection,
     PhaseCoherenceConfig,
 )
-
-# Phase 4: Sovereign ↔ Inference Reconciliation
 from .signal_reconciliation import (
     reconcile_signals,
     ReconciliationResult,
@@ -147,107 +151,27 @@ from .diagnostic_hooks import (
     DiagnosticSnapshot,
 )
 
+# =============================================================================
+# __all__ — narrowed to symbols with confirmed external top-level callers.
+# =============================================================================
 __all__ = [
-    # Core engines (Legacy)
+    # Core engines
     "EvolutionaryInferenceEngine",
     "CSRInferenceGuard",
     "InferenceManager",
     "InferenceMode",
     "InferenceManagerConfig",
-
-    # Monitoring (Legacy)
+    # Monitoring
     "InferenceMetacognition",
     "InferenceGunas",
-    "SovereignInferenceScorer",
-
     # Configuration
     "LayerInferenceConfig",
     "ArchitectureMode",
-
-    # Utilities
-    "load_inference_engine",
-    "InferenceCheckpointLoader",
-
     # V10.0 Binding Cache Engines (Phase 5)
     "BindingCacheInferenceEngine",
-    "BindingCacheInferenceConfig",
-    "IntentPhaseInferenceModule",
-    "BindingSalienceController",
     "OntologicalBindingCacheInferenceEngine",
-    "OntologicalBindingCacheInferenceConfig",
-
     # V10.0 Sovereign State Monitor (Phase 5)
     "SovereignStateMonitor",
-    "SovereignStateMetrics",
-    "DepthLevel",
-    "ReliabilityLevel",
-    "SOVEREIGN_STATE_DIM",
-    "BHAVA_NAMES",
-    "KOSHA_NAMES",
-    "VRITTI_NAMES",
-    "GUNA_NAMES",
-    "get_sovereign_state_summary",
-
-    # Logit Modulation Decoding
-    "LogitModulationConfig",
-    "LogitModulator",
-    "ModulationMode",
-    "RetrievalScorer",
-    "RetrievalScorerConfig",
-    "RetrievalStrategy",
-    "PenaltyScorer",
-    "PenaltyScorerConfig",
-    "LogitModulationBenchmark",
-    "BenchmarkMetrics",
-    "SweepResult",
-
-    # Appendix F Stage 0: Generation Tracer
-    "GenerationTracer",
-    "BindingCacheTracerMixin",
-    "CTMPlusTracerMixin",
-    "MistralCGGenerationTracer",
-    "BaselineStatisticsAnalyzer",
-
-    # Appendix F Stage 1: Coherence-Aware Decoder
-    "CoherenceAwareDecoder",
-    "CoherenceDecoderConfig",
-
-    # Appendix F Stage 2: Interpretive Conditioner
-    "InterpretiveConditioner",
-    "InterpretiveConditionerConfig",
-    "InterpretiveStateBuilder",
-    "BhavaVectorCompressor",
-
-    # Appendix F Stage 4: Unified Coherence Controller
-    "UnifiedCoherenceController",
-    "UnifiedCoherenceConfig",
-
-    # Appendix F Stage 7A: Semantic Coherence Integration
-    "SemanticCoherenceIntegration",
-    "SemanticCoherenceConfig",
-
-    # Appendix F Stage 7C: Experiential State
-    "ExperientialStateModule",
-    "ExperientialStateConfig",
-
-    # Appendix F Stage 7D: Polarity Encoding
-    "PolarityGate",
-    "PolarityEncodingConfig",
-
-    # Appendix F Stage 7F: Phase Coherence Signal
-    "PhaseCoherenceExtractor",
-    "PhaseCoherenceAggregator",
-    "PhaseCoherenceProjection",
-    "PhaseCoherenceConfig",
-
-    # Phase 4: Sovereign ↔ Inference Reconciliation
-    "reconcile_signals",
-    "ReconciliationResult",
-    "GunaSnapshot",
-    "VrittiSnapshot",
-    "InferenceDiagnosticHooks",
-    "DiagnosticHooksConfig",
-    "DiagnosticSnapshot",
 ]
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"

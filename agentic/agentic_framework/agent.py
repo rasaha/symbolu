@@ -148,6 +148,8 @@ class AgenticLLMWrapper:
         memory_window: int = 20,
         coherence_window: int = 10,
         use_llm_for_decomposition: bool = True,
+        dispatcher: Optional[Any] = None,
+        action_type_to_tool: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize agentic wrapper.
@@ -161,6 +163,18 @@ class AgenticLLMWrapper:
             memory_window: Memory sliding window size
             coherence_window: Coherence history window size
             use_llm_for_decomposition: Whether to use LLM for goal decomposition
+            dispatcher: Optional ``CGToolDispatcher`` for MCP-governed tool
+                execution. When provided together with an
+                ``action_type_to_tool`` entry for an action's type, that
+                action is routed through MCP governance (entropy/vritti/
+                confidence gating + real handler execution). When absent,
+                the existing placeholder execution path is preserved
+                unchanged. ``SafetyGate`` always runs first either way.
+            action_type_to_tool: Optional mapping from ``ActionItem.action_type``
+                strings (e.g. "search", "compute") to MCP tool names
+                registered on the dispatcher's gateway. Only action types
+                present in this mapping are routed through the dispatcher;
+                all others fall through to placeholder execution.
         """
         # LLM client (black-box)
         self.llm = llm_client
@@ -176,6 +190,12 @@ class AgenticLLMWrapper:
         )
         self.coherence_engine = CoherenceEngine(window=coherence_window)
         self.safety_gate = SafetyGate()
+
+        # Optional MCP tool dispatcher (layered BEHIND SafetyGate — see
+        # docs/REQUEST_BOUNDARY_CONVENTION.md and the architecture note
+        # on Inference CG Metadata <-> MCP Gateway).
+        self.dispatcher = dispatcher
+        self.action_type_to_tool: Dict[str, str] = dict(action_type_to_tool or {})
 
         # Configuration
         self.memory_window = memory_window
@@ -408,6 +428,37 @@ class AgenticLLMWrapper:
 
             # Execute based on action type
             try:
+                # Dispatcher routing (layered BEHIND SafetyGate). When a
+                # dispatcher is configured AND this action_type maps to a
+                # registered MCP tool, route the call through MCP
+                # governance. Actions without a mapping fall through to
+                # the existing placeholder branches unchanged.
+                if (
+                    self.dispatcher is not None
+                    and action.action_type in self.action_type_to_tool
+                ):
+                    tool_name = self.action_type_to_tool[action.action_type]
+                    mcp_result = self._dispatch_via_mcp(
+                        tool_name=tool_name,
+                        parameters=action.parameters or {},
+                    )
+                    if getattr(mcp_result, "success", False):
+                        action.status = "completed"
+                        action.result = getattr(mcp_result, "result", None)
+                        executed.append(action.description)
+                    else:
+                        action.status = "blocked"
+                        decision = getattr(mcp_result, "decision", None)
+                        decision_val = (
+                            decision.value if decision is not None
+                            and hasattr(decision, "value") else str(decision)
+                        )
+                        reason = getattr(mcp_result, "blocked_reason", None) \
+                            or getattr(mcp_result, "error", None) \
+                            or f"MCP decision={decision_val}"
+                        action.error = f"MCP: {reason}"
+                    continue
+
                 if action.action_type == "generate":
                     # Already handled by main generation
                     action.status = "completed"
@@ -436,6 +487,35 @@ class AgenticLLMWrapper:
                 action.error = str(e)
 
         return executed
+
+    def _dispatch_via_mcp(
+        self,
+        tool_name: str,
+        parameters: Dict[str, Any],
+    ) -> Any:
+        """
+        Run ``self.dispatcher.dispatch(...)`` synchronously by driving
+        the coroutine on a fresh event loop.
+
+        A fresh loop (rather than ``asyncio.run``) is used because this
+        method may be invoked from inside an outer event loop (e.g. a
+        FastAPI handler that calls ``AgenticLLMWrapper.run``). A fresh,
+        isolated loop is safe in both contexts. The loop is closed
+        after use; the caller receives the ``MCPToolResult`` directly.
+        """
+        import asyncio
+
+        assert self.dispatcher is not None, "dispatcher required"
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(
+                self.dispatcher.dispatch(
+                    tool_name=tool_name,
+                    parameters=parameters,
+                )
+            )
+        finally:
+            loop.close()
 
     # --- State Access Methods ---
 

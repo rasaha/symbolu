@@ -1601,22 +1601,25 @@ class SafeMCPGateway:
             quality_score=quality_score,
             coherence_score=coherence_score,
         )
-        if cg_metadata is not None:
-            # Lazy import: avoid paying the sovereign-bridge import cost
-            # (and its torch-adjacent transitive chain) on every
-            # call_tool_simple() invocation that does not use CG metadata.
-            from agentic.agentic_framework.sovereign_bridge import (
-                governance_inputs_from_cg_metadata,
-            )
-            inputs = governance_inputs_from_cg_metadata(
-                cg_metadata, tier=tier
-            )
-            call.entropy_result = inputs["entropy_result"]
+        # Request-boundary enrichment seam (Phase 2): a single helper
+        # standardizes the "CG metadata → governance kwargs" translation
+        # for every boundary caller (here today, AuthorizationRequest
+        # tomorrow). Neutral when cg_metadata is None (returns {}), so
+        # the default path stays exactly as before.
+        from agentic.agentic_framework.request_enrichment import (
+            build_governance_enrichment_kwargs,
+        )
+        enrichment = build_governance_enrichment_kwargs(
+            cg_metadata=cg_metadata, tier=tier,
+        )
+        if "entropy_result" in enrichment:
+            call.entropy_result = enrichment["entropy_result"]
+        if "vritti_result" in enrichment:
             # vritti_result is duck-typed on MCPToolCall (no formal
             # dataclass field) — the governance consumer reads it via
             # getattr(tool_call, "vritti_result", None). Attach by
             # setattr to honor that contract without widening the model.
-            call.vritti_result = inputs["vritti_result"]
+            call.vritti_result = enrichment["vritti_result"]
         return await self.call_tool(call)
 
     def get_audit_log(
@@ -1725,12 +1728,44 @@ def create_mock_mcp_gateway(
         lambda p: [f"Result for {p.get('query', '')}"],
         ToolRiskLevel.READ_ONLY,
     )
+    # Compute/validate tools added to support the
+    # DEFAULT_ACTION_TYPE_TO_TOOL mapping in cg_tool_dispatcher.py so
+    # AgenticLLMWrapper runtime wiring has concrete endpoints for the
+    # "compute" and "validate" action types produced by
+    # goal_decomposition without further caller configuration.
+    mock_client.register_tool(
+        "compute",
+        lambda p: {"result": "computed", "input": p},
+        ToolRiskLevel.READ_ONLY,
+    )
+    mock_client.register_tool(
+        "validate",
+        lambda p: {"valid": True, "input": p},
+        ToolRiskLevel.READ_ONLY,
+    )
 
-    return create_safe_mcp_gateway(
+    gateway = create_safe_mcp_gateway(
         mcp_client=mock_client,
         strict=strict,
         audit_enabled=audit_enabled,
     )
+    # Pin risk metadata for the compute/validate tools: their names
+    # do not match any READ_ONLY pattern in ``ToolRiskClassifier`` and
+    # would otherwise fall through to the WRITE default — blocking the
+    # DEFAULT_ACTION_TYPE_TO_TOOL path under JEPA drift regimes. The
+    # mock handlers are pure functions (no side effects), so READ_ONLY
+    # is the honest classification.
+    for _name in ("compute", "validate"):
+        gateway.register_tool(
+            MCPToolDefinition(
+                name=_name,
+                description=f"Mock {_name} tool (pure, read-only)",
+                risk_level=ToolRiskLevel.READ_ONLY,
+                min_confidence=0.3,
+                requires_confirmation=False,
+            )
+        )
+    return gateway
 
 
 # =============================================================================
