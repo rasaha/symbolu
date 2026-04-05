@@ -16,3 +16,11 @@ INTEGRATE modules:
   - entropy, core, identity, motivation, sovereign, inference,
     chitta_vritti, temporal, guna_modulation, dha, llm, api
 """
+
+from agentic.agentic_framework.agent import AgenticLLMWrapper
+from agentic.agentic_framework.cg_tool_dispatcher import CGToolDispatcher
+
+__all__ = [
+    "AgenticLLMWrapper",
+    "CGToolDispatcher",
+]
