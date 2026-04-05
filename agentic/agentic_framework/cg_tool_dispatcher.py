@@ -145,4 +145,22 @@ class CGToolDispatcher:
         )
 
 
-__all__ = ["CGToolDispatcher"]
+#: Default mapping from ``ActionItem.action_type`` strings (as produced
+#: by ``goal_decomposition``) to MCP tool names registered on the
+#: ``create_mock_mcp_gateway()`` gateway. This is the minimal honest
+#: wiring the ChatGPT checklist calls for: one concrete MCP endpoint
+#: per action type the agent can already emit.
+#:
+#: The mapping is deliberately small — "generate" and "execute" have
+#: no honest default tool, so callers must supply their own entries
+#: for those types. ``AgenticLLMWrapper`` routes only action types
+#: present in whatever mapping it is given; unmapped types fall
+#: through to the existing placeholder execution path.
+DEFAULT_ACTION_TYPE_TO_TOOL: Dict[str, str] = {
+    "search": "search",
+    "compute": "compute",
+    "validate": "validate",
+}
+
+
+__all__ = ["CGToolDispatcher", "DEFAULT_ACTION_TYPE_TO_TOOL"]

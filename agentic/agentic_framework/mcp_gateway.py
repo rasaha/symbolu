@@ -1728,12 +1728,44 @@ def create_mock_mcp_gateway(
         lambda p: [f"Result for {p.get('query', '')}"],
         ToolRiskLevel.READ_ONLY,
     )
+    # Compute/validate tools added to support the
+    # DEFAULT_ACTION_TYPE_TO_TOOL mapping in cg_tool_dispatcher.py so
+    # AgenticLLMWrapper runtime wiring has concrete endpoints for the
+    # "compute" and "validate" action types produced by
+    # goal_decomposition without further caller configuration.
+    mock_client.register_tool(
+        "compute",
+        lambda p: {"result": "computed", "input": p},
+        ToolRiskLevel.READ_ONLY,
+    )
+    mock_client.register_tool(
+        "validate",
+        lambda p: {"valid": True, "input": p},
+        ToolRiskLevel.READ_ONLY,
+    )
 
-    return create_safe_mcp_gateway(
+    gateway = create_safe_mcp_gateway(
         mcp_client=mock_client,
         strict=strict,
         audit_enabled=audit_enabled,
     )
+    # Pin risk metadata for the compute/validate tools: their names
+    # do not match any READ_ONLY pattern in ``ToolRiskClassifier`` and
+    # would otherwise fall through to the WRITE default — blocking the
+    # DEFAULT_ACTION_TYPE_TO_TOOL path under JEPA drift regimes. The
+    # mock handlers are pure functions (no side effects), so READ_ONLY
+    # is the honest classification.
+    for _name in ("compute", "validate"):
+        gateway.register_tool(
+            MCPToolDefinition(
+                name=_name,
+                description=f"Mock {_name} tool (pure, read-only)",
+                risk_level=ToolRiskLevel.READ_ONLY,
+                min_confidence=0.3,
+                requires_confirmation=False,
+            )
+        )
+    return gateway
 
 
 # =============================================================================

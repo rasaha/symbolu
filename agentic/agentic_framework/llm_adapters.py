@@ -615,6 +615,63 @@ class MockLLMAdapter(BaseLLMAdapter):
         self.call_history = []
 
 
+class StubCGLLMAdapter(MockLLMAdapter):
+    """
+    Lightweight CG-capable adapter for integration/runtime use.
+
+    Drop-in for ``MistralCGAdapter`` that satisfies the same wire
+    contract (``last_cg_metadata`` dict with ``state``/``delta_S``/
+    ``delta_bhava``/``intent_phase``) without requiring torch,
+    transformers, or any checkpoint.
+
+    This is the adapter to use when wiring ``CGToolDispatcher`` into
+    ``AgenticLLMWrapper`` for integration tests or early runtime
+    validation. Each ``call()`` refreshes ``last_cg_metadata`` with a
+    deterministic 32D sovereign state so the request-boundary
+    enrichment seam (see ``request_enrichment.py``) produces real —
+    not fabricated — ``entropy_result`` / ``vritti_result`` signals
+    on the next dispatcher call.
+
+    Not a substitute for a real MistralCG checkpoint in production;
+    the state vector is a hand-picked, sattva-leaning fixture.
+
+    Usage:
+        from agentic.agentic_framework.llm_adapters import StubCGLLMAdapter
+        from agentic.agentic_framework.cg_tool_dispatcher import CGToolDispatcher
+        from agentic.agentic_framework.mcp_gateway import create_mock_mcp_gateway
+
+        adapter = StubCGLLMAdapter(default_response="OK")
+        dispatcher = CGToolDispatcher(adapter, create_mock_mcp_gateway())
+        agent = AgenticLLMWrapper(
+            llm_client=adapter,
+            dispatcher=dispatcher,
+            action_type_to_tool=DEFAULT_ACTION_TYPE_TO_TOOL,
+        )
+    """
+
+    # Hand-picked fixture: vritti-region dominance + sattva-leaning guna.
+    # Kept as a class constant so tests can assert against it.
+    _STATE_FIXTURE: List[float] = (
+        [0.0] * 17
+        + [0.55, 0.15, 0.15, 0.10, 0.05]  # vritti region (indices 17-21)
+        + [0.65, 0.25]                     # sattva/rajas (indices 22-23)
+        + [0.0] * 3
+        + [0.9]                            # index 27
+        + [0.0] * 4
+    )
+
+    def call(self, prompt: str) -> str:
+        """Call mock LLM and refresh ``last_cg_metadata``."""
+        response = super().call(prompt)
+        self.last_cg_metadata: Dict[str, Any] = {
+            "state": list(self._STATE_FIXTURE),
+            "delta_S": [0.01] * 32,
+            "delta_bhava": None,
+            "intent_phase": None,
+        }
+        return response
+
+
 class SequentialMockAdapter(BaseLLMAdapter):
     """
     Mock adapter that returns responses in sequence.
