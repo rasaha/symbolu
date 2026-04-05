@@ -1770,6 +1770,142 @@ exactly as designed by fail-closed semantics.
 
 ---
 
+## Inference CG Metadata ↔ MCP Gateway: Enrichment Seam
+
+Separate from the pipeline↔authorize bridge above, a second bridge
+connects **CG-capable LLM adapters** to the **MCP gateway's governance
+path**. Unlike the pipeline bridge, this one is wired and production-
+ready on the MCP side.
+
+### What this seam does
+
+When a CG-capable LLM adapter (e.g. `MistralCGAdapter`) generates,
+it stores a snapshot of the 32D sovereign state in
+`adapter.last_cg_metadata`. That dict can be handed directly to
+`SafeMCPGateway.call_tool_simple()`, which attaches canonical
+governance signals derived from the sovereign state before the
+standard gateway/governance path runs.
+
+### Producer: `MistralCGAdapter.last_cg_metadata`
+
+After each `generate(...)` call, the adapter populates a dict with
+this wire contract:
+
+| Key | Type | Required | Notes |
+|-----|------|----------|-------|
+| `state` | 32-float sovereign state | **Yes** | Full 32D layout (bhava/kosha/vritti/guna) |
+| `delta_S` | 32-float state delta | No | `None` means "velocity unknown" (not fabricated) |
+| `delta_bhava` | optional | No | Adapter-specific extension slot |
+| `intent_phase` | optional | No | Adapter-specific extension slot |
+
+The demo (`examples/cg_tool_demo.py`) ships a zero-dependency
+`DemoCGAdapter` that produces exactly this wire shape for local
+validation without a real checkpoint.
+
+### Bridge helpers (`agentic/agentic_framework/sovereign_bridge.py`)
+
+Pure translation functions, no orchestration:
+
+- `entropy_from_sovereign_state(state, delta_S=..., tier_name=...)`
+  → canonical `EntropyResult`
+- `vritti_from_sovereign_state(state, delta_S=..., tier=...)`
+  → canonical `ChittaVrittiResult`
+- `governance_inputs_from_cg_metadata(cg_metadata, tier=...)`
+  → `{"entropy_result": ..., "vritti_result": ...}` (calls the two
+  helpers above)
+
+**What this seam does NOT produce:** no `sovereign_projection_metadata`
+is fabricated from CG metadata. `MistralCGAdapter` stores the raw 32D
+state, not a full `SovereignProjectionResult`. Honest absence, not
+invention.
+
+### Request-boundary seam
+(`agentic/agentic_framework/request_enrichment.py`)
+
+One reusable helper standardizes the translation for any request-
+boundary caller:
+
+```python
+build_governance_enrichment_kwargs(
+    *,
+    cg_metadata: Optional[Dict[str, Any]] = None,
+    tier: str = "consumer",
+) -> Dict[str, Any]
+```
+
+- Returns `{}` when `cg_metadata` is `None` (neutral-when-absent, so
+  callers can splat unconditionally).
+- Otherwise returns `{"entropy_result": ..., "vritti_result": ...}`
+  via `governance_inputs_from_cg_metadata`.
+- Lazy-imports the bridge so the default (unenriched) path stays
+  torch-free.
+
+Today this helper is consumed by `SafeMCPGateway.call_tool_simple()`.
+Tomorrow it will be splatted into `AuthorizationRequest(**...)` once
+a production caller exists for that path (see below).
+
+### Consumer: `SafeMCPGateway.call_tool_simple(...)`
+
+```python
+async def call_tool_simple(
+    self,
+    tool_name: str,
+    parameters: Dict[str, Any],
+    quality_score: float = 0.5,
+    coherence_score: float = 0.5,
+    *,
+    cg_metadata: Optional[Dict[str, Any]] = None,
+    tier: str = "consumer",
+) -> MCPToolResult
+```
+
+When `cg_metadata` is provided, the gateway calls the request-boundary
+seam, attaches `entropy_result` (formal `MCPToolCall` field) and
+`vritti_result` (duck-typed attribute, read via `getattr` by the
+governance consumer), and then runs the normal gateway path unchanged.
+The audit record reflects the real signal source
+(`vritti_signal_source="real"`, `entropy_available=True`) rather than
+the fallback approximation.
+
+### Current enrichment status
+
+| Side | Status |
+|------|--------|
+| **MCP gateway (`call_tool_simple`)** | **Wired and production-ready.** Accepts `cg_metadata`, attaches real signals, routes through the existing governance consumer path. |
+| **`AuthorizationRequest`** | **Seam ready, no honest production caller yet.** The replay harness (`policy_replay._event_to_request`) cannot be enriched without fidelity violation; the FastAPI `/authorize` endpoint receives requests from external callers and cannot synthesize `cg_metadata`. No component today simultaneously holds a `MistralCGAdapter` and constructs an `AuthorizationRequest`. |
+
+### Demo as executable proof: `examples/cg_tool_demo.py`
+
+This demo is **not a product runtime**. It is the smallest honest
+end-to-end exerciser of the seam. It proves the full path:
+
+```
+generation → adapter.last_cg_metadata → build_governance_enrichment_kwargs
+  → SafeMCPGateway.call_tool_simple(cg_metadata=...)
+  → governance evaluation → audit record
+```
+
+Running the demo prints an audit entry with
+`vritti_signal_source="real"` and `entropy_available=True`, proving
+the CG-derived signals were consumed by governance (not the
+approximation fallback). Swapping `DemoCGAdapter` for
+`create_adapter("mistral_cg", ...)` is a one-line change — the
+surrounding flow stays identical.
+
+A smoke test (`tests/test_cg_tool_demo.py`) pins the demo's behavior
+as a regression guard for the full seam.
+
+### What this seam does NOT claim
+
+- Not a production orchestrator. No component today owns both
+  inference and governance invocation.
+- Not a pipeline bridge. Orthogonal to the Pipeline↔Authorize
+  section above.
+- Not an `AuthorizationRequest` enrichment path. That half of the
+  seam is ready in code but has no honest production caller yet.
+
+---
+
 ## Test Evidence
 
 ### Coverage Summary

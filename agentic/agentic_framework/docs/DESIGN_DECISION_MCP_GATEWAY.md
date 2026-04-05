@@ -165,8 +165,18 @@ The MCP Gateway has comprehensive test coverage:
 # Gateway
 SafeMCPGateway(mcp_client, confidence_gate, classifier, ...)
   .call_tool(MCPToolCall) -> MCPToolResult
-  .call_tool_simple(tool_name, parameters, ...) -> MCPToolResult
+  .call_tool_simple(
+      tool_name, parameters,
+      quality_score=0.5, coherence_score=0.5,
+      *, cg_metadata=None, tier="consumer",
+  ) -> MCPToolResult
   .get_audit_log() -> List[AuditEntry]
+
+# When cg_metadata is provided (e.g. MistralCGAdapter.last_cg_metadata),
+# the gateway calls build_governance_enrichment_kwargs() and attaches
+# canonical entropy_result + vritti_result to the MCPToolCall before
+# the normal governance path runs. See
+# agentic/AGENTIC_ARCHITECTURE.md § "Inference CG Metadata ↔ MCP Gateway".
 
 # Data Classes
 MCPToolCall(tool_name, parameters, quality_score, coherence_score, ...)
