@@ -33,9 +33,12 @@ from __future__ import annotations
 
 import time
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+if TYPE_CHECKING:
+    from agentic.entropy.types import EntropyResult
 
 
 # =============================================================================
@@ -90,6 +93,8 @@ class AuthorizationRequest(BaseModel):
         - agency_level → SafetyContract precondition 6
         - capabilities → forbidden capability check
     """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Identity / traceability
     actor_id: str = Field(
@@ -183,6 +188,22 @@ class AuthorizationRequest(BaseModel):
             "Optional sovereign inference bridge projection metadata. "
             "When present, carries reasoning diagnostics, guna anomalies, "
             "and governor telemetry for S3/S4 governance signals."
+        ),
+    )
+
+    # Entropy signal (optional — canonical producer: agentic/entropy/EntropyEngine)
+    entropy_result: Optional[Any] = Field(
+        None,
+        exclude=True,
+        description=(
+            "Optional entropy result from agentic.entropy.EntropyEngine. "
+            "When present, provides structural coherence metrics (guna, kosha, "
+            "cross-domain entropy) for governance confidence penalty computation. "
+            "Duck-typed: must expose .combined_entropy, .guna_entropy, "
+            ".kosha_entropy, .cross_domain_entropy, .gate attributes. "
+            "Absent entropy does NOT weaken governance posture (fail-closed). "
+            "Excluded from model_dump(); entropy data is captured separately "
+            "via adapter output in audit events."
         ),
     )
 
