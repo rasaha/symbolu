@@ -144,7 +144,7 @@ identical.
 
 `StubCGLLMAdapter` emits a **deterministic fixture** for its 32D
 sovereign state, not a live inference signal (class-level
-`IS_STUB = True`, `STATE_PROVENANCE = "stub-fixture-deterministic"`).
+`IS_STUB = True`, `STATE_PROVENANCE = "deterministic_stub"`).
 It is legitimate for tests and dev loops, but silently wiring it
 into a runtime that looks like production is a known footgun.
 

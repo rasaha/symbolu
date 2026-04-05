@@ -62,7 +62,7 @@ class TestStubProvenanceMarkers:
         assert StubCGLLMAdapter.IS_STUB is True
 
     def test_stub_state_provenance_tag(self):
-        assert StubCGLLMAdapter.STATE_PROVENANCE == "stub-fixture-deterministic"
+        assert StubCGLLMAdapter.STATE_PROVENANCE == "deterministic_stub"
 
     def test_stub_populates_metadata_on_call(self):
         adapter = StubCGLLMAdapter(default_response="ok")

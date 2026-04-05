@@ -675,7 +675,7 @@ class StubCGLLMAdapter(MockLLMAdapter):
     #: Provenance tag for the 32D state fixture. Any audit consumer
     #: wanting to distinguish stub-sourced signals from real
     #: inference can read this off the adapter.
-    STATE_PROVENANCE: str = "stub-fixture-deterministic"
+    STATE_PROVENANCE: str = "deterministic_stub"
 
     # Hand-picked fixture: vritti-region dominance + sattva-leaning guna.
     # Kept as a class constant so tests can assert against it.
