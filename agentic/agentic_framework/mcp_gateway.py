@@ -1569,6 +1569,9 @@ class SafeMCPGateway:
         parameters: Dict[str, Any],
         quality_score: float = 0.5,
         coherence_score: float = 0.5,
+        *,
+        cg_metadata: Optional[Dict[str, Any]] = None,
+        tier: str = "consumer",
     ) -> MCPToolResult:
         """
         Simplified tool call with minimal parameters.
@@ -1578,16 +1581,43 @@ class SafeMCPGateway:
             parameters: Tool parameters
             quality_score: Quality score from context
             coherence_score: Coherence score from context
+            cg_metadata: Optional CG-capable LLM adapter metadata (e.g.
+                ``MistralCGAdapter.last_cg_metadata``) carrying the 32D
+                sovereign ``state`` and optional ``delta_S``. When
+                provided, the sovereign bridge derives a canonical
+                ``EntropyResult`` and ``ChittaVrittiResult`` and attaches
+                both to the ``MCPToolCall`` before governance evaluation.
+                Absent metadata preserves prior behavior exactly.
+            tier: Governance tier selector passed through to the bridge
+                helper (``"consumer"`` or ``"enterprise"``). Ignored when
+                ``cg_metadata`` is None.
 
         Returns:
             MCPToolResult
         """
-        return await self.call_tool(MCPToolCall(
+        call = MCPToolCall(
             tool_name=tool_name,
             parameters=parameters,
             quality_score=quality_score,
             coherence_score=coherence_score,
-        ))
+        )
+        if cg_metadata is not None:
+            # Lazy import: avoid paying the sovereign-bridge import cost
+            # (and its torch-adjacent transitive chain) on every
+            # call_tool_simple() invocation that does not use CG metadata.
+            from agentic.agentic_framework.sovereign_bridge import (
+                governance_inputs_from_cg_metadata,
+            )
+            inputs = governance_inputs_from_cg_metadata(
+                cg_metadata, tier=tier
+            )
+            call.entropy_result = inputs["entropy_result"]
+            # vritti_result is duck-typed on MCPToolCall (no formal
+            # dataclass field) — the governance consumer reads it via
+            # getattr(tool_call, "vritti_result", None). Attach by
+            # setattr to honor that contract without widening the model.
+            call.vritti_result = inputs["vritti_result"]
+        return await self.call_tool(call)
 
     def get_audit_log(
         self,
