@@ -42,7 +42,13 @@ See also
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+import logging
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from agentic.agentic_framework.agent import AgenticLLMWrapper
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -163,4 +169,119 @@ DEFAULT_ACTION_TYPE_TO_TOOL: Dict[str, str] = {
 }
 
 
-__all__ = ["CGToolDispatcher", "DEFAULT_ACTION_TYPE_TO_TOOL"]
+def build_cg_mcp_agent(
+    *,
+    adapter: _CGCapableAdapter,
+    gateway: Optional[Any] = None,
+    action_type_to_tool: Optional[Dict[str, str]] = None,
+    tier: str = "consumer",
+    allow_stub: bool = False,
+    gateway_factory: Optional[Callable[[], Any]] = None,
+    **agent_kwargs: Any,
+) -> "AgenticLLMWrapper":
+    """
+    Compose the full MCP/tool-use runtime path in one call.
+
+    This is the **substitution seam** for the runtime described in
+    ``docs/RUNTIME_MCP_PATH.md``. It assembles:
+
+        adapter  ->  CGToolDispatcher  ->  SafeMCPGateway
+                     |
+                     +->  AgenticLLMWrapper(dispatcher=..., ...)
+
+    and returns the wrapper ready to call ``.run(user_input)``. The
+    ``adapter`` argument is the single knob that switches between
+    the stub path and a real CG-capable inference path — everything
+    else stays identical.
+
+    Args:
+        adapter: Any object satisfying the ``_CGCapableAdapter``
+            protocol (exposes ``last_cg_metadata: dict``) AND the
+            ``LLMClient`` protocol (exposes ``call(prompt) -> str``).
+            ``MistralCGAdapter`` and ``StubCGLLMAdapter`` both
+            qualify. To move from stub to real inference, pass a
+            ``MistralCGAdapter(...)`` instance here — no other
+            wiring changes.
+        gateway: Optional pre-built ``SafeMCPGateway``. When absent,
+            ``gateway_factory()`` is called (or
+            ``create_mock_mcp_gateway()`` if no factory was given).
+        action_type_to_tool: Optional action-type → MCP-tool-name
+            mapping. Defaults to ``DEFAULT_ACTION_TYPE_TO_TOOL``.
+        tier: Governance tier passed through to the dispatcher.
+        allow_stub: When False (default), the factory logs a WARNING
+            if ``adapter.IS_STUB`` is truthy — stub adapters are
+            dev/test only. Set True to acknowledge stub usage
+            explicitly (tests, dev loops) and silence the warning.
+        gateway_factory: Optional zero-arg factory for building the
+            gateway lazily. Only used when ``gateway`` is None. Keeps
+            this composer free of a hard import on any specific
+            gateway constructor.
+        **agent_kwargs: Forwarded to ``AgenticLLMWrapper(...)``. Use
+            this to pass ``critic``, ``embedding_model``,
+            ``use_llm_for_decomposition``, etc.
+
+    Returns:
+        A fully wired ``AgenticLLMWrapper`` whose ``_execute_actions``
+        will route mapped action types through the dispatcher into
+        governance.
+
+    Stub-vs-real substitution:
+        >>> # Dev/test path (explicit acknowledgement)
+        >>> stub = StubCGLLMAdapter(default_response="OK")
+        >>> agent = build_cg_mcp_agent(adapter=stub, allow_stub=True)
+        >>>
+        >>> # Production path (no allow_stub needed)
+        >>> real = MistralCGAdapter(model_name="mistralai/Mistral-7B-v0.3")
+        >>> agent = build_cg_mcp_agent(adapter=real)
+    """
+    # Deferred import: AgenticLLMWrapper depends on a large transitive
+    # import graph (generator, coherence engine, safety gate, …).
+    # Importing it lazily keeps cg_tool_dispatcher.py cheap to import
+    # from contexts that only need the dispatcher + default mapping.
+    from agentic.agentic_framework.agent import AgenticLLMWrapper
+
+    # Stub-adapter guardrail. The stub path is a legitimate dev/test
+    # tool, but silently wiring it into a runtime that looks like
+    # production is a known footgun — hence the explicit acknowledge.
+    if getattr(adapter, "IS_STUB", False) and not allow_stub:
+        logger.warning(
+            "build_cg_mcp_agent: wiring a STUB adapter (%s) into the "
+            "CG/MCP runtime path. The stub emits a deterministic "
+            "fixture — suitable for tests/dev only. Pass "
+            "allow_stub=True to acknowledge, or supply a real "
+            "CG-capable adapter (e.g. MistralCGAdapter).",
+            type(adapter).__name__,
+        )
+
+    if gateway is None:
+        if gateway_factory is not None:
+            gateway = gateway_factory()
+        else:
+            # Import deferred to keep this module import-cheap and
+            # to avoid forcing callers who supply their own gateway
+            # to pay the MCP-gateway import cost.
+            from agentic.agentic_framework.mcp_gateway import (
+                create_mock_mcp_gateway,
+            )
+            gateway = create_mock_mcp_gateway()
+
+    dispatcher = CGToolDispatcher(adapter, gateway, tier=tier)
+    mapping = (
+        dict(action_type_to_tool)
+        if action_type_to_tool is not None
+        else dict(DEFAULT_ACTION_TYPE_TO_TOOL)
+    )
+
+    return AgenticLLMWrapper(
+        llm_client=adapter,
+        dispatcher=dispatcher,
+        action_type_to_tool=mapping,
+        **agent_kwargs,
+    )
+
+
+__all__ = [
+    "CGToolDispatcher",
+    "DEFAULT_ACTION_TYPE_TO_TOOL",
+    "build_cg_mcp_agent",
+]

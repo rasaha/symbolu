@@ -1921,6 +1921,11 @@ This component formalizes the ad-hoc composition the demo performs
 inline. A CG-capable production runtime can now hold a dispatcher
 instead of re-implementing the compose step.
 
+For the **concrete end-to-end runtime path** — `AgenticLLMWrapper.run`
+→ `SafetyGate` → `_execute_actions` → `CGToolDispatcher` →
+`SafeMCPGateway` with the stub-↔-real adapter substitution seam —
+see `agentic/agentic_framework/docs/RUNTIME_MCP_PATH.md`.
+
 ### What this seam does NOT claim
 
 - Not a reflective agent. `CGToolDispatcher` is a two-line compose

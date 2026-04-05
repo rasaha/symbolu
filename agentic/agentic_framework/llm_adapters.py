@@ -617,37 +617,65 @@ class MockLLMAdapter(BaseLLMAdapter):
 
 class StubCGLLMAdapter(MockLLMAdapter):
     """
-    Lightweight CG-capable adapter for integration/runtime use.
+    === DEV / TEST ONLY — lightweight CG-capable adapter ===
 
     Drop-in for ``MistralCGAdapter`` that satisfies the same wire
     contract (``last_cg_metadata`` dict with ``state``/``delta_S``/
-    ``delta_bhava``/``intent_phase``) without requiring torch,
-    transformers, or any checkpoint.
+    ``delta_bhava``/``intent_phase``) WITHOUT loading torch,
+    transformers, or any model checkpoint.
 
-    This is the adapter to use when wiring ``CGToolDispatcher`` into
-    ``AgenticLLMWrapper`` for integration tests or early runtime
-    validation. Each ``call()`` refreshes ``last_cg_metadata`` with a
-    deterministic 32D sovereign state so the request-boundary
-    enrichment seam (see ``request_enrichment.py``) produces real —
-    not fabricated — ``entropy_result`` / ``vritti_result`` signals
-    on the next dispatcher call.
+    **Intended use:** integration tests, developer loops, and early
+    wiring validation of the MCP/tool-use runtime path (see
+    ``docs/RUNTIME_MCP_PATH.md``). Not intended for production
+    inference — the 32D sovereign state is a **deterministic
+    hand-picked fixture** (sattva-leaning, vritti-region dominant),
+    not a live inference signal.
 
-    Not a substitute for a real MistralCG checkpoint in production;
-    the state vector is a hand-picked, sattva-leaning fixture.
+    **Provenance markers:**
 
-    Usage:
+    - ``IS_STUB = True`` lets runtime assemblers detect the stub
+      and warn / refuse / log when they see it in a non-test context.
+    - ``STATE_PROVENANCE = "stub-fixture-deterministic"`` is the
+      canonical provenance tag for the state vector.
+
+    The ``build_cg_mcp_agent`` factory in ``cg_tool_dispatcher.py``
+    checks ``IS_STUB`` and emits a warning if a stub adapter is
+    wired into a runtime agent without ``allow_stub=True``. That is
+    the substitution seam: swap in a ``MistralCGAdapter`` (or any
+    other adapter whose ``IS_STUB`` is absent/False) to move from
+    the stub path to a real-inference path without changing any
+    surrounding wiring.
+
+    Wire contract preserved exactly: ``last_cg_metadata`` is
+    refreshed on every ``call(prompt)``, so the request-boundary
+    enrichment seam (``request_enrichment.py``) still produces
+    real — not fabricated — ``entropy_result``/``vritti_result``
+    on the next ``CGToolDispatcher.dispatch`` call. The signals
+    *derived* from the fixture are honest (they really come from a
+    live adapter.last_cg_metadata); only the *fixture itself* is
+    synthetic.
+
+    Usage (test/dev):
         from agentic.agentic_framework.llm_adapters import StubCGLLMAdapter
-        from agentic.agentic_framework.cg_tool_dispatcher import CGToolDispatcher
-        from agentic.agentic_framework.mcp_gateway import create_mock_mcp_gateway
+        from agentic.agentic_framework.cg_tool_dispatcher import (
+            build_cg_mcp_agent,
+        )
 
         adapter = StubCGLLMAdapter(default_response="OK")
-        dispatcher = CGToolDispatcher(adapter, create_mock_mcp_gateway())
-        agent = AgenticLLMWrapper(
-            llm_client=adapter,
-            dispatcher=dispatcher,
-            action_type_to_tool=DEFAULT_ACTION_TYPE_TO_TOOL,
-        )
+        agent = build_cg_mcp_agent(adapter=adapter, allow_stub=True)
+        result = agent.run("please handle my request")
     """
+
+    #: Explicit marker: this adapter is a synthetic stub and its
+    #: ``last_cg_metadata`` is NOT derived from a real inference
+    #: step. Runtime assemblers MUST check this before wiring the
+    #: adapter into production.
+    IS_STUB: bool = True
+
+    #: Provenance tag for the 32D state fixture. Any audit consumer
+    #: wanting to distinguish stub-sourced signals from real
+    #: inference can read this off the adapter.
+    STATE_PROVENANCE: str = "stub-fixture-deterministic"
 
     # Hand-picked fixture: vritti-region dominance + sattva-leaning guna.
     # Kept as a class constant so tests can assert against it.
@@ -661,7 +689,9 @@ class StubCGLLMAdapter(MockLLMAdapter):
     )
 
     def call(self, prompt: str) -> str:
-        """Call mock LLM and refresh ``last_cg_metadata``."""
+        """Call mock LLM and refresh ``last_cg_metadata`` with the
+        deterministic stub fixture. Marked DEV/TEST ONLY at the
+        class level — see class docstring."""
         response = super().call(prompt)
         self.last_cg_metadata: Dict[str, Any] = {
             "state": list(self._STATE_FIXTURE),
