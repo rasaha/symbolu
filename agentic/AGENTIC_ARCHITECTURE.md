@@ -1810,9 +1810,14 @@ Pure translation functions, no orchestration:
   → canonical `EntropyResult`
 - `vritti_from_sovereign_state(state, delta_S=..., tier=...)`
   → canonical `ChittaVrittiResult`
+- `projection_metadata_from_sovereign_result(projection_result)`
+  → `sovereign_projection_metadata` dict (only when the caller
+  already holds a real `SovereignProjectionResult`; MCP/tool-use
+  path does not hold one today — see "What this seam does NOT
+  produce" below)
 - `governance_inputs_from_cg_metadata(cg_metadata, tier=...)`
   → `{"entropy_result": ..., "vritti_result": ...}` (calls the two
-  helpers above)
+  state helpers above; does **not** include projection metadata)
 
 **What this seam does NOT produce:** no `sovereign_projection_metadata`
 is fabricated from CG metadata. `MistralCGAdapter` stores the raw 32D
@@ -1839,6 +1844,21 @@ build_governance_enrichment_kwargs(
   via `governance_inputs_from_cg_metadata`.
 - Lazy-imports the bridge so the default (unenriched) path stays
   torch-free.
+
+**Request-boundary rules** (pinned by the helper; see
+`docs/REQUEST_BOUNDARY_CONVENTION.md`):
+
+1. Attach `entropy_result` and `vritti_result` when live CG metadata
+   is available.
+2. Return a neutral / no-op enrichment (`{}`) when CG metadata is
+   absent — callers splat unconditionally; governance falls back to
+   its pre-existing approximation path.
+3. **Never fabricate** `sovereign_projection_metadata`. A real
+   `SovereignProjectionResult` producer is required; the MCP/tool-use
+   path has none, so the field is intentionally omitted.
+4. Fail-closed behavior on the governance consumer side is
+   preserved — unenriched calls still go through the pre-Phase-1
+   approximation; enriched calls go through the real-signal branch.
 
 Today this helper is consumed by `SafeMCPGateway.call_tool_simple()`.
 Tomorrow it will be splatted into `AuthorizationRequest(**...)` once
@@ -1921,13 +1941,181 @@ This component formalizes the ad-hoc composition the demo performs
 inline. A CG-capable production runtime can now hold a dispatcher
 instead of re-implementing the compose step.
 
-For the **concrete end-to-end runtime path** — `AgenticLLMWrapper.run`
-→ `SafetyGate` → `_execute_actions` → `CGToolDispatcher` →
-`SafeMCPGateway` with the stub-↔-real adapter substitution seam —
-see `agentic/agentic_framework/docs/RUNTIME_MCP_PATH.md`. For the
-runnable `inference_mistral.py --cg` CLI (requirements, checkpoint
-guidance, stub fallback, proved-vs-experimental status) see
+### Composition factory: `build_cg_mcp_agent(...)`
+
+Thin, one-knob factory (same file) that composes the full runtime
+from a single adapter. It is a **composition helper, not a new
+orchestrator**:
+
+```python
+from agentic.agentic_framework.cg_tool_dispatcher import build_cg_mcp_agent
+
+agent = build_cg_mcp_agent(
+    adapter=adapter,                     # the only thing that changes
+    gateway=None,                        # default: mock MCP gateway
+    action_type_to_tool=None,            # default mapping (see below)
+    tier="consumer",
+    allow_stub=False,                    # warns if adapter.IS_STUB
+)
+```
+
+What it does:
+- builds (or accepts) a `SafeMCPGateway`;
+- builds a `CGToolDispatcher` around the adapter+gateway;
+- constructs an `AgenticLLMWrapper` with the dispatcher injected
+  and the action-type→tool mapping pinned;
+- logs a WARNING when the adapter reports `IS_STUB=True` and
+  `allow_stub=False`.
+
+The substitution seam: swap `adapter=` between
+`StubCGLLMAdapter` (dev/test) and `MistralCGAdapter` (real CG). No
+other wiring changes — same `SafetyGate`, same `_execute_actions`,
+same dispatcher, same gateway, same audit log.
+
+For the concrete end-to-end runtime diagram see
+`agentic/agentic_framework/docs/RUNTIME_MCP_PATH.md`. For the
+runnable `inference_mistral.py --cg` CLI see
 `agentic/agentic_framework/docs/CG_RUNTIME_RUNBOOK.md`.
+
+### Stub adapter vs real adapter
+
+Two concrete adapters currently satisfy the `_CGCapableAdapter`
+protocol (`last_cg_metadata: dict` refreshed per `call()` with at
+least a 32D `state`):
+
+| Adapter             | Provenance                       | Purpose                               |
+|---------------------|----------------------------------|---------------------------------------|
+| `StubCGLLMAdapter`  | deterministic fixture            | dev/test wiring proofs                |
+| `MistralCGAdapter`  | real local CG inference          | real runtime proof path               |
+
+`StubCGLLMAdapter` (`llm_adapters.py`) carries explicit class-level
+stub markers:
+
+```python
+class StubCGLLMAdapter(MockLLMAdapter):
+    IS_STUB: bool = True
+    STATE_PROVENANCE: str = "deterministic_stub"
+```
+
+These markers exist so the stub cannot silently pass for a real CG
+signal. `build_cg_mcp_agent(...)` reads `adapter.IS_STUB` and emits a
+WARNING unless `allow_stub=True` is explicit. `MistralCGAdapter` does
+**not** carry these markers, so on the real path the warning never
+fires.
+
+Semantically:
+- **stub path proves wiring** — dispatcher ownership, gateway
+  composition, `_execute_actions` routing, audit shape;
+- **real adapter path proves runtime shape under live inference**
+  but requires torch + transformers + a CG-capable checkpoint and
+  is operator-validated (not repo-validated — see "Runtime Proof
+  Status" below).
+
+### Agent-side wiring: `AgenticLLMWrapper` dispatcher hook
+
+`AgenticLLMWrapper` (`agent.py`) is the runtime host — not
+`ReflectiveGenerator`, which is an internal component of the
+wrapper. Dispatcher injection is:
+
+- **optional and default-off.** The wrapper accepts
+  `dispatcher=None` and an `action_type_to_tool=None` kwarg, and
+  constructs fine without either. Existing callers are unchanged.
+- **hooked at `_execute_actions`.** When a dispatcher IS injected,
+  `_execute_actions` routes each planned action through
+  `CGToolDispatcher.dispatch(...)` if and only if (a) the action's
+  type is in `action_type_to_tool`, and (b) `SafetyGate` marked
+  that action type as allowed this turn. Unmapped or disallowed
+  actions fall through to the pre-existing placeholder path.
+- **ordering-pinned.** `SafetyGate` always runs before
+  `_execute_actions`; if the turn-level contract is ineligible,
+  the dispatcher is never reached.
+
+This is the only change to the agent path. No orchestrator was
+added, no reasoning loop was moved, and the non-dispatcher path is
+byte-identical to before.
+
+### Default action-type → tool mapping
+
+`cg_tool_dispatcher.py` exposes:
+
+```python
+DEFAULT_ACTION_TYPE_TO_TOOL = {
+    "search":   "search",
+    "compute":  "compute",
+    "validate": "validate",
+}
+```
+
+This is **the minimal honest default**, not a universal ontology of
+all future actions/tools. It exists so `build_cg_mcp_agent(...)`
+has a non-None default the runtime can actually exercise, and so
+the mock gateway in `create_mock_mcp_gateway` has a matching set
+of registered tools. Callers with their own ontology pass their
+own mapping; nothing in the runtime hardcodes these three.
+
+### CLI path: `inference_mistral.py --cg`
+
+`agentic/agentic_framework/inference_mistral.py` now carries an
+opt-in CG-runtime path alongside the existing Mistral API path.
+
+| Flag                | Meaning                                                                        |
+|---------------------|--------------------------------------------------------------------------------|
+| `--cg`              | Opt into the CG runtime (MistralCGAdapter → dispatcher → gateway).             |
+| `--cg-model`        | HuggingFace checkpoint id for `MistralCGWrapper` (default `Mistral-7B-v0.3`).  |
+| `--cg-quantize`     | `4bit` / `8bit` (requires `bitsandbytes`).                                     |
+| `--cg-device`       | Device-map strategy for `MistralCGWrapper` (default `auto`).                   |
+| `--cg-allow-stub`   | **Dev/test only.** Falls back to `StubCGLLMAdapter` if the heavy stack is missing. Must not be described as real inference. |
+
+Rules:
+- default non-`--cg` behavior is **unchanged** — still uses
+  `MistralAdapter` against the hosted API;
+- `--cg` is the opt-in real runtime proof path; without
+  `--cg-allow-stub` it exits with an actionable error if the
+  inference stack is missing (no silent stub fallback);
+- the opt-in smoke test
+  (`tests/test_inference_mistral_cg_smoke.py`, gated on
+  `SYMBOLU_RUN_CG_SMOKE=1`) is a **wiring** proof using the stub
+  fallback; it is not a CI proof of local checkpoint inference.
+
+### Runtime Proof Status
+
+**Fully proved** (regression baseline on this branch):
+
+- MCP-side enrichment path (`build_governance_enrichment_kwargs`
+  → `call_tool_simple` → audit with `vritti_signal_source="real"`).
+- Dispatcher ownership and per-call metadata refresh
+  (`CGToolDispatcher`).
+- Agent runtime wiring (`AgenticLLMWrapper._execute_actions` →
+  dispatcher under `SafetyGate` ordering).
+- Stub-backed end-to-end execution of the full `run()` pipeline
+  into mock MCP.
+- Request-boundary enrichment seam (`request_enrichment.py`
+  attach/omit rules).
+- Runtime factory composition (`build_cg_mcp_agent(...)`) with
+  `IS_STUB` warning behavior.
+
+**Partially proved**:
+
+- `inference_mistral.py --cg` through a **real** local
+  `MistralCGAdapter`: the wiring, factory composition and CLI
+  dispatch are proved here; **real local inference** requires an
+  external torch + checkpoint + GPU environment and is
+  operator-validated, not repo-validated. See
+  `docs/CG_RUNTIME_RUNBOOK.md` and `scripts/run_cg_gpu.sh`.
+
+**Intentionally deferred**:
+
+- `AuthorizationRequest`-side runtime ownership (no production
+  caller holds both a `MistralCGAdapter` and an
+  `AuthorizationRequest`).
+- Live `SovereignProjectionResult` producer on the MCP path.
+- Attachment of `sovereign_projection_metadata` on any live
+  request-builder path.
+- Broader runtime adoption outside this CLI (voice and other
+  subsystems have not been migrated).
+- Mirror retirement: `symbolu/agentic_framework/` still mirrors
+  `agentic/agentic_framework/`; the final migration collapse has
+  not happened.
 
 ### What this seam does NOT claim
 
@@ -1937,6 +2125,9 @@ guidance, stub fallback, proved-vs-experimental status) see
   section above.
 - Not an `AuthorizationRequest` enrichment path. That half of the
   seam is ready in code but has no honest production caller yet.
+- Not a production-adopted runtime beyond the
+  `inference_mistral.py --cg` CLI. Other callers of
+  `AgenticLLMWrapper` exist in tests and demos only.
 
 ---
 
