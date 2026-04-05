@@ -24,8 +24,14 @@ Usage:
     # Verbose (show all pipeline metrics)
     python -m symbolu.agentic_framework.inference_mistral --verbose
 
+    # Opt-in CG-capable runtime (local MistralCGWrapper + MCP governance)
+    python -m symbolu.agentic_framework.inference_mistral --cg \\
+        --cg-model mistralai/Mistral-7B-v0.3 --query "..."
+
 Environment:
-    MISTRAL_API_KEY  - Required. Mistral API key.
+    MISTRAL_API_KEY  - Required for the default (API) path.
+    SYMBOLU_RUN_CG_SMOKE - When set to "1", opt-in CG smoke test is enabled
+                           (see tests/test_inference_mistral_cg_smoke.py).
 """
 
 from __future__ import annotations
@@ -33,7 +39,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 def _print_header(text: str) -> None:
@@ -113,19 +119,124 @@ def create_agent(
     return agent
 
 
+def create_cg_agent(
+    cg_model: str = "mistralai/Mistral-7B-v0.3",
+    cg_quantize: Optional[str] = None,
+    cg_device: str = "auto",
+    max_revisions: int = 2,
+    quality_threshold: float = 0.70,
+    use_llm_decomposition: bool = True,
+    allow_stub: bool = False,
+):
+    """
+    Create the CG-capable runtime: MistralCGAdapter + CGToolDispatcher +
+    SafeMCPGateway, composed through ``build_cg_mcp_agent(...)``.
+
+    This is the real-runtime proof path described in
+    ``docs/RUNTIME_MCP_PATH.md`` § "The substitution seam". The returned
+    wrapper is functionally identical to the one produced by
+    ``create_agent(...)`` except that it (a) uses a local CG-capable
+    adapter which populates ``last_cg_metadata`` per call, and (b)
+    routes mapped action types through the dispatcher into MCP
+    governance.
+
+    Args:
+        cg_model: HuggingFace model id for the underlying MistralCGWrapper.
+        cg_quantize: Quantization mode passed through to MistralCGWrapper
+            (None, "4bit", "8bit").
+        cg_device: Device-map strategy for MistralCGWrapper.
+        max_revisions, quality_threshold, use_llm_decomposition: Forwarded
+            to AgenticLLMWrapper.
+        allow_stub: When True, falls back to ``StubCGLLMAdapter`` if the
+            heavy inference stack (torch / transformers / MistralCGWrapper)
+            is unavailable. Off by default.
+
+    Returns:
+        Configured AgenticLLMWrapper wired through the CG/MCP runtime path.
+    """
+    from agentic.agentic_framework.cg_tool_dispatcher import (
+        build_cg_mcp_agent,
+    )
+
+    try:
+        from agentic.agentic_framework.llm_adapters import MistralCGAdapter
+        adapter = MistralCGAdapter(
+            model_name=cg_model,
+            quantize=cg_quantize,
+            device_map=cg_device,
+        )
+        using_stub = False
+    except Exception as exc:  # torch / transformers / wrapper missing
+        if not allow_stub:
+            print(
+                "Error: CG runtime requested but MistralCGAdapter could "
+                f"not be constructed: {exc}\n"
+                "Install the heavy inference stack (torch, transformers, "
+                "symbolu_training.training.unified.mistral_wrapper) or "
+                "pass --cg-allow-stub to fall back to StubCGLLMAdapter "
+                "(deterministic fixture — dev/test only)."
+            )
+            sys.exit(1)
+        print(
+            f"  [warn] MistralCGAdapter unavailable ({exc}); falling "
+            "back to StubCGLLMAdapter (deterministic fixture — dev/test "
+            "only)."
+        )
+        from agentic.agentic_framework.llm_adapters import StubCGLLMAdapter
+        adapter = StubCGLLMAdapter(
+            default_response="[stub CG response]",
+        )
+        using_stub = True
+
+    return build_cg_mcp_agent(
+        adapter=adapter,
+        allow_stub=using_stub or allow_stub,
+        max_revisions=max_revisions,
+        quality_threshold=quality_threshold,
+        memory_window=20,
+        coherence_window=10,
+        use_llm_for_decomposition=use_llm_decomposition,
+    )
+
+
+def _build_agent(
+    *,
+    cg: bool,
+    model: str,
+    api_key: Optional[str],
+    cg_config: Optional[Dict[str, Any]],
+):
+    """Dispatch to either the API-adapter path or the CG-runtime path.
+
+    Returns (agent, model_label) — `model_label` is what the CLI prints
+    to tell the user which backend they're actually on.
+    """
+    if cg:
+        cfg = dict(cg_config or {})
+        agent = create_cg_agent(**cfg)
+        label = f"[CG] {cfg.get('cg_model', 'mistralai/Mistral-7B-v0.3')}"
+        return agent, label
+    agent = create_agent(model=model, api_key=api_key)
+    return agent, model
+
+
 def run_single(
     query: str,
     model: str = "mistral-large-latest",
     api_key: Optional[str] = None,
     verbose: bool = False,
+    cg: bool = False,
+    cg_config: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Run a single query through the full agentic pipeline."""
     _print_header("MISTRAL AGENTIC INFERENCE")
 
-    agent = create_agent(model=model, api_key=api_key)
+    agent, model_label = _build_agent(
+        cg=cg, model=model, api_key=api_key, cg_config=cg_config,
+    )
     agent.new_session()
 
-    print(f"\n  Model: {model}")
+    print(f"\n  Model: {model_label}")
     print(f"  Query: {query}")
 
     result = agent.run(query)
@@ -146,6 +257,8 @@ def run_demo(
     model: str = "mistral-large-latest",
     api_key: Optional[str] = None,
     verbose: bool = False,
+    cg: bool = False,
+    cg_config: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Run a multi-turn demo exercising all pipeline features:
@@ -153,10 +266,12 @@ def run_demo(
     """
     _print_header("MISTRAL AGENTIC DEMO — Multi-Turn Pipeline")
 
-    agent = create_agent(model=model, api_key=api_key)
+    agent, model_label = _build_agent(
+        cg=cg, model=model, api_key=api_key, cg_config=cg_config,
+    )
     agent.new_session("mistral-demo")
 
-    print(f"\n  Model:   {model}")
+    print(f"\n  Model:   {model_label}")
     print(f"  Session: {agent.session_id}")
 
     turns = [
@@ -207,14 +322,18 @@ def run_interactive(
     model: str = "mistral-large-latest",
     api_key: Optional[str] = None,
     verbose: bool = False,
+    cg: bool = False,
+    cg_config: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Interactive REPL — type queries, see full pipeline output."""
     _print_header("MISTRAL AGENTIC INTERACTIVE")
 
-    agent = create_agent(model=model, api_key=api_key)
+    agent, model_label = _build_agent(
+        cg=cg, model=model, api_key=api_key, cg_config=cg_config,
+    )
     agent.new_session()
 
-    print(f"\n  Model:   {model}")
+    print(f"\n  Model:   {model_label}")
     print(f"  Session: {agent.session_id}")
     print(f"\n  Type a message to chat. Commands:")
     print(f"    /summary  — show session summary")
@@ -324,8 +443,58 @@ Examples:
         default=0.70,
         help="Quality threshold for accepting responses (default: 0.70)",
     )
+    # --- CG-runtime opt-in flags -------------------------------------
+    # When --cg is passed, the CLI constructs a MistralCGAdapter and
+    # routes the agent through build_cg_mcp_agent(...) — the real
+    # CG/MCP runtime path described in docs/RUNTIME_MCP_PATH.md.
+    # Without --cg, behavior is exactly as before.
+    parser.add_argument(
+        "--cg",
+        action="store_true",
+        help=(
+            "Opt-in: use local CG-capable runtime (MistralCGAdapter + "
+            "CGToolDispatcher + SafeMCPGateway) instead of the Mistral "
+            "API adapter."
+        ),
+    )
+    parser.add_argument(
+        "--cg-model",
+        type=str,
+        default="mistralai/Mistral-7B-v0.3",
+        help="HuggingFace model id for --cg mode.",
+    )
+    parser.add_argument(
+        "--cg-quantize",
+        type=str,
+        default=None,
+        choices=["4bit", "8bit"],
+        help="Quantization mode for --cg mode (default: none).",
+    )
+    parser.add_argument(
+        "--cg-device",
+        type=str,
+        default="auto",
+        help="Device-map strategy for --cg mode (default: auto).",
+    )
+    parser.add_argument(
+        "--cg-allow-stub",
+        action="store_true",
+        help=(
+            "In --cg mode, fall back to StubCGLLMAdapter if the heavy "
+            "inference stack is unavailable. Dev/test only."
+        ),
+    )
 
     args = parser.parse_args()
+
+    cg_config = {
+        "cg_model": args.cg_model,
+        "cg_quantize": args.cg_quantize,
+        "cg_device": args.cg_device,
+        "max_revisions": args.max_revisions,
+        "quality_threshold": args.quality_threshold,
+        "allow_stub": args.cg_allow_stub,
+    }
 
     if args.query:
         run_single(
@@ -333,18 +502,24 @@ Examples:
             model=args.model,
             api_key=args.api_key,
             verbose=args.verbose,
+            cg=args.cg,
+            cg_config=cg_config,
         )
     elif args.demo:
         run_demo(
             model=args.model,
             api_key=args.api_key,
             verbose=args.verbose,
+            cg=args.cg,
+            cg_config=cg_config,
         )
     else:
         run_interactive(
             model=args.model,
             api_key=args.api_key,
             verbose=args.verbose,
+            cg=args.cg,
+            cg_config=cg_config,
         )
 
 
