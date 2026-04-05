@@ -676,19 +676,37 @@ def entropy_from_sovereign_state(
 def _vritti_slice_entropy(vritti: List[float]) -> float:
     """Normalized Shannon entropy of the 5D Vritti slice, in [0, 1].
 
-    Treats the slice as a probability distribution (re-normalizing
-    defensively, since sovereign state may ship it softmax-normalized
-    or raw). Uniform → 1.0, one-hot → 0.0, all-zero → 1.0 (max
-    uncertainty, honest for an empty/void signal).
+    Treats the slice as a probability distribution. Robust to the
+    shapes sovereign state may actually produce:
+
+      - All-zero slice         → 1.0 (max uncertainty, honest for void)
+      - Negative / noisy values → clipped to 0.0 before summing
+      - Near-zero mass (< eps) → 1.0 (skip normalization; would
+                                  otherwise amplify numerical noise)
+      - One-hot                 → 0.0
+      - Uniform                 → 1.0
+
+    Normalization is deferred until after non-negative clipping and
+    only performed when total mass exceeds a small epsilon, so we
+    never divide by an unstable denominator.
     """
     import math
 
-    total = sum(max(0.0, v) for v in vritti)
-    if total <= 0.0:
+    clipped = [max(0.0, float(v)) for v in vritti]
+    total = sum(clipped)
+
+    # Epsilon floor: below this, any "distribution" we reconstruct
+    # is numerical noise. Return max uncertainty (honest) instead of
+    # normalizing and amplifying it.
+    _EPS = 1e-9
+    if total < _EPS:
         return 1.0
 
-    probs = [max(0.0, v) / total for v in vritti]
-    log_n = math.log(len(probs)) if len(probs) > 1 else 1.0
+    probs = [v / total for v in clipped]
+    n = len(probs)
+    if n < 2:
+        return 1.0
+    log_n = math.log(n)
 
     h = 0.0
     for p in probs:

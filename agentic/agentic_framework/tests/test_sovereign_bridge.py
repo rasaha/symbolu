@@ -456,6 +456,93 @@ class TestVrittiFromSovereignState:
         assert 0.0 <= r0.score <= 1.0
         assert 0.0 <= r1.score <= 1.0
 
+    def test_all_zero_vritti_slice_gives_max_entropy(self):
+        """All-zero Vritti slice must not crash and must yield max-uncertainty
+        entropy. The engine should still return a valid result."""
+        state = make_state(
+            bhava=[0.2] * 12,
+            kosha=[0.3, 0.3, 0.3, 0.3, 0.3],
+            vritti=[0.0, 0.0, 0.0, 0.0, 0.0],
+        )
+        result = vritti_from_sovereign_state(state)
+        assert 0.0 <= result.coherence <= 1.0
+        assert 0.0 <= result.score <= 1.0
+        assert abs(sum(result.vritti.values()) - 1.0) < 0.01
+
+    def test_negative_vritti_values_are_clipped(self):
+        """Negative values in Vritti slice must be safely clipped, not
+        propagate into entropy or confidence."""
+        state = make_state(
+            bhava=[0.2] * 12,
+            kosha=[0.3, 0.3, 0.3, 0.3, 0.3],
+            vritti=[-0.5, -0.2, 0.8, -0.1, 0.1],  # noisy / negative values
+        )
+        result = vritti_from_sovereign_state(state)
+        assert 0.0 <= result.coherence <= 1.0
+        assert 0.0 <= result.score <= 1.0
+
+    def test_entropy_guard_edge_cases(self):
+        """_vritti_slice_entropy direct edge-case coverage."""
+        from agentic.agentic_framework.sovereign_bridge import (
+            _vritti_slice_entropy,
+        )
+
+        # All-zero → max uncertainty
+        assert _vritti_slice_entropy([0.0] * 5) == 1.0
+        # Near-zero mass (below epsilon) → max uncertainty, not noise
+        assert _vritti_slice_entropy([1e-12, 1e-12, 0.0, 0.0, 0.0]) == 1.0
+        # All-negative → clipped to zero → max uncertainty
+        assert _vritti_slice_entropy([-0.5, -0.3, -0.2, -0.1, -0.9]) == 1.0
+        # Uniform → 1.0
+        uniform = _vritti_slice_entropy([0.2, 0.2, 0.2, 0.2, 0.2])
+        assert abs(uniform - 1.0) < 1e-9
+        # One-hot → 0.0
+        onehot = _vritti_slice_entropy([1.0, 0.0, 0.0, 0.0, 0.0])
+        assert onehot == 0.0
+        # Raw unnormalized input still produces bounded entropy in [0,1]
+        raw = _vritti_slice_entropy([3.0, 1.0, 1.0, 1.0, 1.0])
+        assert 0.0 <= raw <= 1.0
+
+    def test_temporal_rep_shape_matches_engine_expectations(self):
+        """temporal_rep must be a 1D np.ndarray with the same shape the
+        engine uses for cross-turn smriti tracking (vritti.py:175-177 does
+        shape-equality + elementwise subtraction)."""
+        import numpy as np
+        from agentic.chitta_vritti.types import ChittaVrittiInputs
+
+        state = make_state(
+            bhava=[0.2] * 12,
+            kosha=[0.3, 0.3, 0.3, 0.3, 0.3],
+            vritti=[0.4, 0.2, 0.2, 0.1, 0.1],
+        )
+        delta_S = [0.05] * 32
+        # Indirect check: reconstruct inputs via the same mapping the
+        # bridge uses, verify the shape contract ChittaVrittiInputs expects.
+        # The bridge's temporal_rep is delta_S[0:12] as 1D float array.
+        expected = np.asarray(delta_S[0:12], dtype=float)
+        assert expected.ndim == 1
+        assert expected.shape == (12,)
+
+        # Full bridge call must produce a valid ChittaVrittiResult with
+        # fractures that include the temporal layer (proves the engine
+        # accepted and projected temporal_rep without error).
+        result = vritti_from_sovereign_state(state, delta_S=delta_S)
+        temporal_pairs = [
+            p for p in result.fractures.keys() if "temporal" in p
+        ]
+        assert len(temporal_pairs) >= 1
+        # And the result itself is canonical
+        assert set(result.vritti.keys()) == {
+            "pramana", "viparyaya", "vikalpa", "smrti", "nidra",
+        }
+        # Confirm the inputs dataclass doesn't reject our shape
+        inputs = ChittaVrittiInputs(
+            temporal_rep=expected,
+            entropy=0.5, motion=0.1, confidence=0.7,
+            temporal_continuity=0.9,
+        )
+        assert inputs.temporal_rep.shape == (12,)
+
     def test_tier_selection(self):
         """tier='enterprise' uses stricter config; both tiers return
         valid canonical results."""
