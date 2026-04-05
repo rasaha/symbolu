@@ -24,6 +24,7 @@ Usage:
         signals_from_sovereign_state,
         coherence_from_sovereign_state,
         entropy_from_sovereign_state,
+        vritti_from_sovereign_state,
     )
 
     # In inference loop, after model forward pass:
@@ -66,6 +67,7 @@ from agentic.sovereign_constants import (
 
 if TYPE_CHECKING:
     from agentic.entropy.types import EntropyResult, KoshaProfile
+    from agentic.chitta_vritti.types import ChittaVrittiResult
 
 
 # =============================================================================
@@ -622,6 +624,213 @@ def entropy_from_sovereign_state(
             kosha_target=target_kosha,
         )
     return engine.evaluate(guna_profile=guna_profile)
+
+
+# =============================================================================
+# Public API: vritti_from_sovereign_state
+# =============================================================================
+#
+# Translate 32D Sovereign State into a canonical ChittaVrittiResult from
+# agentic/chitta_vritti/ChittaVrittiEngine. Parallel to the sibling helpers
+# above — same input, different governance-side representation.
+#
+# Mapping rationale (direct, no fabrication):
+#
+#   Representation layers (cross-layer coherence is what the engine checks):
+#     Bhava  [0:12]  → semantic_rep     (intent / meaning vector)
+#     Kosha  [12:17] → structural_rep   (processing-depth structure)
+#     ΔS Bhava slice → temporal_rep     (only when delta_S is supplied)
+#     phonemic_rep   → None             (sovereign state has no acoustic
+#                                        or surface-token signal; honest
+#                                        absence, not fabricated)
+#
+#   Scalar signals:
+#     entropy             ← normalized Shannon entropy of Vritti[17:22]
+#                           treated as a probability distribution (uniform
+#                           slice → entropy≈1, one-hot slice → entropy≈0)
+#     motion              ← min(1.0, ‖ΔS‖₂); 0.0 if delta_S absent
+#     confidence          ← quality_score from _vritti_to_confidence(vritti)
+#                           (reuses the existing sovereign-bridge mapping,
+#                           not a new heuristic)
+#     temporal_continuity ← 1.0 - motion
+#
+# Layer presence:
+#   - delta_S absent → 2 layers present (semantic + structural).
+#     count_missing_layers() == 2, so the engine runs full_computation
+#     on two layers (not nidra fast-path, which needs >=3 missing).
+#   - delta_S present → 3 layers present (+ temporal). Still full
+#     computation (phonemic alone missing, count_missing == 1).
+#   - Fast-path pramana requires all_layers_present(), so the bridge
+#     never triggers it — cross-layer coherence is always computed
+#     honestly from what sovereign state actually provides.
+#
+# Engine lifecycle:
+#   ChittaVrittiEngine holds per-session smriti state. Bridge calls
+#   describe independent inference snapshots, so we construct a fresh
+#   engine per call to avoid smriti bleed across unrelated requests.
+#   Callers who need turn-to-turn smriti should hold their own
+#   long-lived ChittaVrittiEngine and call .compute() directly rather
+#   than going through this bridge.
+#
+
+def _vritti_slice_entropy(vritti: List[float]) -> float:
+    """Normalized Shannon entropy of the 5D Vritti slice, in [0, 1].
+
+    Treats the slice as a probability distribution (re-normalizing
+    defensively, since sovereign state may ship it softmax-normalized
+    or raw). Uniform → 1.0, one-hot → 0.0, all-zero → 1.0 (max
+    uncertainty, honest for an empty/void signal).
+    """
+    import math
+
+    total = sum(max(0.0, v) for v in vritti)
+    if total <= 0.0:
+        return 1.0
+
+    probs = [max(0.0, v) / total for v in vritti]
+    log_n = math.log(len(probs)) if len(probs) > 1 else 1.0
+
+    h = 0.0
+    for p in probs:
+        if p > 0.0:
+            h -= p * math.log(p)
+
+    return max(0.0, min(1.0, h / log_n))
+
+
+def vritti_from_sovereign_state(
+    state: Any,
+    delta_S: Any = None,
+    batch_idx: int = 0,
+    tier: str = "consumer",
+) -> "ChittaVrittiResult":
+    """
+    Build a ChittaVrittiResult from a 32D Sovereign State tensor.
+
+    Parallel to signals_from_sovereign_state(), coherence_from_sovereign_state(),
+    and entropy_from_sovereign_state(). Uses the same state layout and the
+    same slice extraction — translates raw Bhava/Kosha/Vritti/ΔS activations
+    into ChittaVrittiInputs and invokes ChittaVrittiEngine.compute().
+
+    Mapping:
+        Bhava  [0:12]  → semantic_rep
+        Kosha  [12:17] → structural_rep
+        ΔS Bhava[0:12] → temporal_rep (only if delta_S is provided)
+        Vritti [17:22] → entropy signal (Shannon entropy of the slice)
+        Vritti [17:22] → confidence signal (via _vritti_to_confidence)
+        ΔS norm        → motion signal
+        1 - motion     → temporal_continuity signal
+        phonemic_rep   → None (not derivable from sovereign state)
+
+    Args:
+        state: [B, 32] or [32] Sovereign State tensor, or list of 32 floats.
+        delta_S: Optional [B, 32] or [32] state delta. When present, its
+            Bhava slice becomes temporal_rep and its L2 norm drives motion.
+        batch_idx: Which batch element to use when state is batched.
+        tier: "consumer" or "enterprise" — selects ChittaVrittiEngine config
+            (threshold tightness, penalty weights, decay rate).
+
+    Returns:
+        ChittaVrittiResult carrying coherence, the 5-mode vritti distribution
+        (pramana/viparyaya/vikalpa/smrti/nidra), score, dominant_vritti,
+        fractures, primary_fracture, explanation, and fast_path_used.
+
+    Example:
+        >>> outputs = model(input_ids)
+        >>> cv_result = vritti_from_sovereign_state(
+        ...     outputs['state'], outputs['delta_S'],
+        ... )
+        >>> # Feed into the vritti signal adapter:
+        >>> from agentic.agentic_framework.signal_adapters.vritti_adapter \\
+        ...     import resolve_vritti_signal
+        >>> resolution = resolve_vritti_signal(vritti_result=cv_result)
+        >>> assert resolution.source.value == "real"
+    """
+    import numpy as np
+
+    # Lazy imports: keep module load cheap and avoid paying numpy /
+    # chitta_vritti import cost on code paths that only need
+    # ConfidenceSignals or entropy helpers.
+    from agentic.chitta_vritti.types import ChittaVrittiInputs
+    from agentic.chitta_vritti.engine import create_engine
+
+    # --- Extract 32D state → raw lists ---
+    # Reuse _extract_slices for kosha/vritti/guna, and pull Bhava inline
+    # (the existing helper doesn't surface Bhava since other bridges
+    # don't need it).
+    if hasattr(state, 'dim'):
+        if state.dim() == 2:
+            state_vec = state[batch_idx]
+        else:
+            state_vec = state
+        vals = state_vec.detach().cpu().tolist()
+    elif isinstance(state, (list, tuple)):
+        vals = [float(x) for x in state]
+    else:
+        raise TypeError(f"Expected tensor or list, got {type(state)}")
+
+    if len(vals) < GUNA_END:
+        raise ValueError(
+            f"State must have >= {GUNA_END} dims, got {len(vals)}"
+        )
+
+    bhava = vals[BHAVA_START:BHAVA_END]
+    kosha = vals[KOSHA_START:KOSHA_END]
+    vritti_slice = vals[VRITTI_START:VRITTI_END]
+
+    # --- Representation layers ---
+    semantic_rep = np.asarray(bhava, dtype=float)
+    structural_rep = np.asarray(kosha, dtype=float)
+
+    # --- Delta processing: temporal_rep + motion ---
+    temporal_rep = None
+    delta_norm = 0.0
+    if delta_S is not None:
+        # Extract delta values
+        if hasattr(delta_S, 'dim'):
+            if delta_S.dim() == 2:
+                delta_vec = delta_S[batch_idx]
+            else:
+                delta_vec = delta_S
+            delta_vals = delta_vec.detach().cpu().tolist()
+            if hasattr(delta_vec, 'norm'):
+                delta_norm = float(delta_vec.norm().item())
+            else:
+                delta_norm = sum(x ** 2 for x in delta_vals) ** 0.5
+        elif isinstance(delta_S, (list, tuple)):
+            delta_vals = [float(x) for x in delta_S]
+            delta_norm = sum(x ** 2 for x in delta_vals) ** 0.5
+        else:
+            raise TypeError(
+                f"delta_S must be tensor or list, got {type(delta_S)}"
+            )
+
+        if len(delta_vals) >= BHAVA_END:
+            temporal_rep = np.asarray(
+                delta_vals[BHAVA_START:BHAVA_END], dtype=float,
+            )
+
+    # --- Scalar signals (all clamped to [0, 1]) ---
+    entropy_signal = _vritti_slice_entropy(vritti_slice)
+    motion_signal = max(0.0, min(1.0, delta_norm))
+    vritti_conf = _vritti_to_confidence(vritti_slice)
+    confidence_signal = vritti_conf['quality_score']
+    temporal_continuity_signal = max(0.0, min(1.0, 1.0 - motion_signal))
+
+    inputs = ChittaVrittiInputs(
+        phonemic_rep=None,
+        semantic_rep=semantic_rep,
+        structural_rep=structural_rep,
+        temporal_rep=temporal_rep,
+        entropy=entropy_signal,
+        motion=motion_signal,
+        confidence=confidence_signal,
+        temporal_continuity=temporal_continuity_signal,
+    )
+
+    # Fresh engine per call — see module-level note on engine lifecycle.
+    engine = create_engine(tier=tier)
+    return engine.compute(inputs)
 
 
 # =============================================================================

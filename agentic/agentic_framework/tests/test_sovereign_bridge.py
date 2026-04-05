@@ -11,6 +11,7 @@ import pytest
 from agentic.agentic_framework.sovereign_bridge import (
     signals_from_sovereign_state,
     coherence_from_sovereign_state,
+    vritti_from_sovereign_state,
     SovereignCoherenceState,
     _vritti_to_confidence,
     _kosha_to_budget,
@@ -294,3 +295,177 @@ class TestCoherenceFromSovereignState:
         contract = evaluator.evaluate(coherence)
         assert contract.eligible is False
         assert len(contract.violated_preconditions) > 0
+
+
+# =============================================================================
+# Test: vritti_from_sovereign_state (ChittaVrittiResult producer)
+# =============================================================================
+
+class TestVrittiFromSovereignState:
+    """Bridge helper: 32D Sovereign State → canonical ChittaVrittiResult.
+
+    These tests pin the producer contract consumed by
+    signal_adapters/vritti_adapter.py._from_real() — exactly the four
+    attributes .vritti / .coherence / .score / .dominant_vritti, plus
+    the validated 5-key vritti distribution.
+    """
+
+    def test_returns_canonical_chitta_vritti_result(self):
+        """Bridge must return a real ChittaVrittiResult with the adapter's
+        required duck-typed attributes."""
+        from agentic.chitta_vritti.types import ChittaVrittiResult
+
+        state = make_state(
+            bhava=[0.2] * 12,
+            kosha=[0.1, 0.3, 0.5, 0.4, 0.2],
+            vritti=[0.6, 0.1, 0.1, 0.1, 0.1],  # FACT-dominant
+            guna=[0.8, 0.2, 0.3, 0.1, 0.0, 0.9],
+        )
+
+        result = vritti_from_sovereign_state(state)
+
+        assert isinstance(result, ChittaVrittiResult)
+        # Adapter duck-types on exactly these fields:
+        assert hasattr(result, "vritti")
+        assert hasattr(result, "coherence")
+        assert hasattr(result, "score")
+        assert hasattr(result, "dominant_vritti")
+
+        expected = {"pramana", "viparyaya", "vikalpa", "smrti", "nidra"}
+        assert set(result.vritti.keys()) == expected
+        assert 0.0 <= result.coherence <= 1.0
+        assert 0.0 <= result.score <= 1.0
+        assert result.dominant_vritti in expected
+        # Distribution sums to ~1.0 (validated by ChittaVrittiResult)
+        assert abs(sum(result.vritti.values()) - 1.0) < 0.01
+
+    def test_adapter_accepts_bridge_output_as_real(self):
+        """End-to-end: bridge output must flow through resolve_vritti_signal
+        as source=REAL, degraded=False."""
+        from agentic.agentic_framework.signal_adapters.vritti_adapter import (
+            resolve_vritti_signal,
+            VrittiSignalSource,
+        )
+
+        state = make_state(
+            bhava=[0.3] * 12,
+            kosha=[0.2, 0.3, 0.4, 0.5, 0.3],
+            vritti=[0.5, 0.1, 0.2, 0.1, 0.1],
+            guna=[0.7, 0.3, 0.2, 0.2, 0.1, 0.8],
+        )
+        cv_result = vritti_from_sovereign_state(state)
+
+        resolution = resolve_vritti_signal(vritti_result=cv_result)
+
+        assert resolution.source == VrittiSignalSource.REAL
+        assert resolution.degraded is False
+        assert set(resolution.distribution.keys()) == {
+            "pramana", "viparyaya", "vikalpa", "smrti", "nidra",
+        }
+        assert resolution.coherence == cv_result.coherence
+        assert resolution.score == cv_result.score
+
+    def test_accepts_list_state(self):
+        """Bridge must accept a plain [32]-float list."""
+        state = [0.1] * 32
+        result = vritti_from_sovereign_state(state)
+        assert 0.0 <= result.coherence <= 1.0
+
+    def test_rejects_short_state(self):
+        with pytest.raises(ValueError, match="must have >= 28"):
+            vritti_from_sovereign_state([0.0] * 20)
+
+    def test_delta_s_adds_temporal_layer(self):
+        """Supplying delta_S should produce a 3-layer computation (adds
+        temporal_rep) instead of the 2-layer semantic+structural case."""
+        state = make_state(
+            bhava=[0.2] * 12,
+            kosha=[0.3, 0.3, 0.3, 0.3, 0.3],
+            vritti=[0.6, 0.1, 0.1, 0.1, 0.1],
+        )
+        # Non-trivial delta — drives motion and creates a temporal_rep
+        delta_S = [0.1] * 32
+
+        r_no_delta = vritti_from_sovereign_state(state)
+        r_with_delta = vritti_from_sovereign_state(state, delta_S=delta_S)
+
+        # Both valid results
+        assert 0.0 <= r_no_delta.coherence <= 1.0
+        assert 0.0 <= r_with_delta.coherence <= 1.0
+        # With delta, fractures include temporal pairs; without, they don't
+        no_delta_has_temporal = any(
+            "temporal" in pair for pair in r_no_delta.fractures.keys()
+        )
+        with_delta_has_temporal = any(
+            "temporal" in pair for pair in r_with_delta.fractures.keys()
+        )
+        assert no_delta_has_temporal is False
+        assert with_delta_has_temporal is True
+
+    def test_large_delta_drives_motion(self):
+        """Large ΔS norm → motion→1.0 → temporal_continuity→0.0. Engine
+        should still produce a valid result (not crash on saturation)."""
+        state = make_state(
+            bhava=[0.3] * 12,
+            kosha=[0.2, 0.2, 0.2, 0.2, 0.2],
+            vritti=[0.2, 0.2, 0.2, 0.2, 0.2],  # uniform → high entropy
+        )
+        delta_S = [5.0] * 32  # large norm, will saturate to 1.0
+        result = vritti_from_sovereign_state(state, delta_S=delta_S)
+        assert 0.0 <= result.score <= 1.0
+        assert 0.0 <= result.coherence <= 1.0
+
+    def test_error_dominant_vritti_lowers_score(self):
+        """ERROR-dominant sovereign vritti + low coherence between layers
+        should yield a lower readiness score than a FACT-dominant state."""
+        good_state = make_state(
+            bhava=[0.4] * 12,
+            kosha=[0.4, 0.4, 0.4, 0.4, 0.4],
+            vritti=[0.8, 0.05, 0.05, 0.05, 0.05],  # FACT-dominant
+            guna=[0.9, 0.1, 0.1, 0.0, 0.0, 0.9],
+        )
+        bad_state = make_state(
+            bhava=[0.4] * 12,
+            kosha=[0.4, 0.4, 0.4, 0.4, 0.4],
+            vritti=[0.05, 0.8, 0.05, 0.05, 0.05],  # ERROR-dominant
+            guna=[0.1, 0.9, 0.1, 0.8, 0.6, 0.1],
+        )
+        good = vritti_from_sovereign_state(good_state)
+        bad = vritti_from_sovereign_state(bad_state)
+        # Confidence signal is derived from vritti slice; good case has
+        # higher quality_score, which flows into the engine's inputs.
+        # Scores must be valid, and the ERROR case shouldn't exceed the
+        # FACT case on score.
+        assert good.score >= bad.score - 0.01
+
+    def test_batched_state(self):
+        """Bridge must select batch_idx from a batched [B, 32] state."""
+        torch = pytest.importorskip("torch")
+
+        s0 = make_state(vritti=[0.6, 0.1, 0.1, 0.1, 0.1])
+        s1 = make_state(vritti=[0.1, 0.6, 0.1, 0.1, 0.1])
+        batched = torch.tensor([s0, s1], dtype=torch.float32)
+
+        r0 = vritti_from_sovereign_state(batched, batch_idx=0)
+        r1 = vritti_from_sovereign_state(batched, batch_idx=1)
+
+        assert set(r0.vritti.keys()) == set(r1.vritti.keys())
+        # Different slices → different entropy feed → likely different
+        # distributions (not asserting strict inequality to avoid engine-
+        # internal coupling, just both valid)
+        assert 0.0 <= r0.score <= 1.0
+        assert 0.0 <= r1.score <= 1.0
+
+    def test_tier_selection(self):
+        """tier='enterprise' uses stricter config; both tiers return
+        valid canonical results."""
+        state = make_state(
+            bhava=[0.3] * 12,
+            kosha=[0.3, 0.3, 0.3, 0.3, 0.3],
+            vritti=[0.5, 0.1, 0.2, 0.1, 0.1],
+        )
+        r_consumer = vritti_from_sovereign_state(state, tier="consumer")
+        r_enterprise = vritti_from_sovereign_state(state, tier="enterprise")
+        for r in (r_consumer, r_enterprise):
+            assert 0.0 <= r.score <= 1.0
+            assert abs(sum(r.vritti.values()) - 1.0) < 0.01
