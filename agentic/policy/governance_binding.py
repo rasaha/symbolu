@@ -1,27 +1,36 @@
 """
-Governance Binding — Facade for P53 external policy binding.
+Governance Binding — Dormant facade for P53 external policy binding.
 
-STATUS: PROVISIONAL (Policy Phase P0)
+STATUS: DORMANT (Policy P0-cleanup, 2026-04)
 
-    This module has ZERO runtime consumers as of Policy Phase P0.
-    All P53 consumers (P54 audit trace, P55 execution boundary) import
-    directly from symbolu_core.mechanical.pipeline.p53_policy_binding.
+    This facade has ZERO runtime consumers anywhere in the codebase.
+    Every real consumer of P53 types (P54 audit trace, P55 execution
+    boundary, agentic_framework.governance_models) imports directly
+    from ``symbolu_core.mechanical.pipeline.p53_policy_binding`` or
+    ``symbolu.mechanical.pipeline.p53_policy_binding``.
 
-    This facade exists as a potential future convenience import path
-    for agentic-layer code that needs P53 types. It will be promoted
-    to active status when the external governance API needs a clean
-    agentic-layer import surface, or deprecated if the decision is
-    made to always import P53 types from symbolu_core directly.
+    This module is retained on disk as a reserved import path for
+    future use. It is deliberately excluded from the ``agentic.policy``
+    public API (``__init__.py`` / ``__all__``).
 
-    Do not add new logic here. Do not assume this module is active.
+    Do NOT add logic here.
+    Do NOT import from here in new code.
+    Use the canonical P53 source directly:
+        ``from symbolu_core.mechanical.pipeline.p53_policy_binding...``
+
+    This facade will either be promoted to active status (if the
+    external governance API needs a clean agentic-layer import surface)
+    or deleted entirely in a future cleanup phase.
 
 Re-exports P53 policy binding from symbolu_core.mechanical.pipeline.
 P53 binds external governance decisions (ALLOW/DENY/DEFER) into the
 pipeline without interpretation — "a plug, not a judge."
 """
 
-# Facade status marker — checked by tests and audit tooling
-_FACADE_STATUS = "provisional"
+# Facade status marker — checked by tests and audit tooling.
+# Values: "dormant" (zero consumers, kept for reference) |
+#         "provisional" (pre-cleanup) | "active" (real consumers)
+_FACADE_STATUS = "dormant"
 
 from symbolu_core.mechanical.pipeline.p53_policy_binding.p53_schema import (
     GovernanceBindingEnvelope,
