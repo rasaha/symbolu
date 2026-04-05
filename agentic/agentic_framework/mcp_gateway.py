@@ -1601,22 +1601,25 @@ class SafeMCPGateway:
             quality_score=quality_score,
             coherence_score=coherence_score,
         )
-        if cg_metadata is not None:
-            # Lazy import: avoid paying the sovereign-bridge import cost
-            # (and its torch-adjacent transitive chain) on every
-            # call_tool_simple() invocation that does not use CG metadata.
-            from agentic.agentic_framework.sovereign_bridge import (
-                governance_inputs_from_cg_metadata,
-            )
-            inputs = governance_inputs_from_cg_metadata(
-                cg_metadata, tier=tier
-            )
-            call.entropy_result = inputs["entropy_result"]
+        # Request-boundary enrichment seam (Phase 2): a single helper
+        # standardizes the "CG metadata → governance kwargs" translation
+        # for every boundary caller (here today, AuthorizationRequest
+        # tomorrow). Neutral when cg_metadata is None (returns {}), so
+        # the default path stays exactly as before.
+        from agentic.agentic_framework.request_enrichment import (
+            build_governance_enrichment_kwargs,
+        )
+        enrichment = build_governance_enrichment_kwargs(
+            cg_metadata=cg_metadata, tier=tier,
+        )
+        if "entropy_result" in enrichment:
+            call.entropy_result = enrichment["entropy_result"]
+        if "vritti_result" in enrichment:
             # vritti_result is duck-typed on MCPToolCall (no formal
             # dataclass field) — the governance consumer reads it via
             # getattr(tool_call, "vritti_result", None). Attach by
             # setattr to honor that contract without widening the model.
-            call.vritti_result = inputs["vritti_result"]
+            call.vritti_result = enrichment["vritti_result"]
         return await self.call_tool(call)
 
     def get_audit_log(
