@@ -1,10 +1,34 @@
 # Reflective Phase-Quad Architecture
 
-## Status: DESIGN DOCUMENT
+## Status: IMPLEMENTED
 
 **Author**: Claude (Architecture Design)
-**Date**: January 2026
+**Design Date**: January 2026
+**Implementation Date**: February 2026
 **Version**: 1.0
+
+### Implementation locations
+
+This document was originally a design; the design has since been
+realized in code. The components below map 1:1 to Python classes
+now shipped in the repo:
+
+| Design component                       | Implementation                                               |
+|----------------------------------------|--------------------------------------------------------------|
+| `ReflectivePhaseQuadConfig`            | `symbolu/reflective_phase_quad.py` (mirrored in `agentic/`)  |
+| `ReflectivePhaseState`                 | same file                                                    |
+| `ReflectiveCritic(nn.Module)`          | same file                                                    |
+| `DecisionGate(nn.Module)`              | same file                                                    |
+| `RevisionEncoder(nn.Module)`           | same file                                                    |
+| `ReflectivePhaseQuadBlock(nn.Module)`  | same file (full generator+critic+gate loop)                  |
+| `ReflectivePhaseQuadModel(nn.Module)`  | same file                                                    |
+| `ReflectivePhaseQuadBenchmark`         | same file (used by the benchmark protocol below)             |
+| Training / benchmark CLI integration   | `scripts/phase_probes/hard_probes/train_hard_probes.py`      |
+| Benchmark harness                      | `scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/reflective_phase_quad.py` |
+
+The sections that follow describe the design intent and the
+behavior/invariants the implementation carries (`INV-RPQ-1..4` are
+documented in the module docstring of `reflective_phase_quad.py`).
 
 ---
 
@@ -796,21 +820,33 @@ Target: < 2x for most inputs (most should pass on first attempt)
 
 ## CLI Flags (for train_hard_probes.py)
 
-```bash
-# Enable reflective mode
---reflective-mode
+Shipped flags (all use the `--rpq-*` prefix; names differ from the
+original design draft above):
 
-# Critic training
---train-critic
---critic-data PATH
+```bash
+# Run the Reflective Phase-Quad benchmark suite
+--test-reflective-phase-quad
 
 # Thresholds
---quality-threshold-high 0.85
---quality-threshold-low 0.5
---max-revisions 3
+--rpq-threshold-high   0.85    # default 0.85
+--rpq-threshold-low    0.50    # default 0.50
+--rpq-max-revisions    3       # default 3
 
-# Ablation
---reflective-ablation  # Compare single-pass vs reflective
+# Benchmark sizing
+--rpq-batch-size       4       # default 4
+--rpq-seq-len          64      # default 64
+
+# Ablation and calibration
+--rpq-ablation                 # compare single-pass vs reflective
+--rpq-adaptive-threshold       # adaptive threshold calibration
+```
+
+Example:
+
+```bash
+python train_hard_probes.py --test-reflective-phase-quad \
+    --rpq-threshold-high 0.9 --rpq-threshold-low 0.6 \
+    --rpq-max-revisions 5 --rpq-ablation
 ```
 
 ---
