@@ -2585,7 +2585,8 @@ callback is synchronous in the sync path, wrapped in
 | `build_schema_prompt(user_input, schema)` | Schema-aware prompt construction |
 | `extract_json(text)` | JSON extraction: fenced code blocks → bracket-matching parser → regex fallback |
 | `validate_and_construct(data, schema)` | Validates data against schema, constructs typed result |
-| `run_structured(...)` / `run_structured_with_trace(...)` | Agent-level structured execution paths |
+| `run_structured(...)` | Agent-level structured output via the non-streaming `run()` path; does not support cancellation, approval, or budget |
+| `run_structured_with_trace(...)` | Structured output via `run_stream()` — supports cancellation, approval, budget; returns `(StructuredRunResult, AgentRunTrace)` |
 | `STRUCTURED_VALIDATION` / `REVISION_STARTED` / `REVISION_COMPLETED` | Events for structured output lifecycle |
 
 Supports dataclass schemas, dict-of-types schemas, and Pydantic-style
@@ -2640,7 +2641,7 @@ Budget checkpoints occur after generation completes and before each action.
 |-----------|-------------|
 | `AgentRunTrace` | Immutable summary: session/turn IDs, status, event count, timestamps, safety/action/approval/budget counters, usage stats |
 | `TraceCollector` | Mutable event accumulator; `record()`, `build_trace()` |
-| `run_with_trace(...)` | Convenience wrapper that creates a collector and returns `(result, trace)` |
+| `run_with_trace(...)` | Convenience wrapper: creates a `TraceCollector`, consumes `run_stream()`, returns `AgentRunTrace`. Accepts `cancellation_token`, `approval_controller`, `budget_policy`. |
 
 Trace summary fields are derived from the event stream:
 - Usage stats from the last `USAGE_UPDATED` event
