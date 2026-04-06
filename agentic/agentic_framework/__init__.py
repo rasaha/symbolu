@@ -119,6 +119,7 @@ from agentic.agentic_framework.proactive_scheduler import (
     create_proactive_scheduler,
     create_task,
 )
+from agentic.agentic_framework.cancellation import CancellationToken
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
     make_event,
@@ -131,6 +132,7 @@ from agentic.agentic_framework.streaming_events import (
     ACTION_COMPLETED,
     RUN_COMPLETED,
     RUN_ERROR,
+    RUN_CANCELLED,
     REVISION_STARTED,
     REVISION_COMPLETED,
 )
@@ -242,7 +244,9 @@ __all__ = [
     "ScheduleType",
     "create_proactive_scheduler",
     "create_task",
-    # Streaming Events (R1)
+    # Cancellation (R2)
+    "CancellationToken",
+    # Streaming Events (R1) + Cancellation event (R2)
     "AgentRunEvent",
     "make_event",
     "RUN_STARTED",
@@ -254,6 +258,7 @@ __all__ = [
     "ACTION_COMPLETED",
     "RUN_COMPLETED",
     "RUN_ERROR",
+    "RUN_CANCELLED",
     "REVISION_STARTED",
     "REVISION_COMPLETED",
     # LLM Adapters (Mistral API + local MistralCG)

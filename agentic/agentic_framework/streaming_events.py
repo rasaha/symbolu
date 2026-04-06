@@ -31,6 +31,7 @@ ACTION_STARTED = "action_started"
 ACTION_COMPLETED = "action_completed"
 RUN_COMPLETED = "run_completed"
 RUN_ERROR = "run_error"
+RUN_CANCELLED = "run_cancelled"
 REVISION_STARTED = "revision_started"
 REVISION_COMPLETED = "revision_completed"
 

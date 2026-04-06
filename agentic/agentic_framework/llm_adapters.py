@@ -22,7 +22,7 @@ Usage:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, AsyncIterator, Dict, Iterator, List, Optional
 
 
 class BaseLLMAdapter(ABC):
@@ -54,6 +54,20 @@ class BaseLLMAdapter(ABC):
         support may override to yield incremental tokens.
         """
         yield self.call(prompt)
+
+    async def call_stream_async(self, prompt: str) -> AsyncIterator[str]:
+        """
+        Async streaming variant.
+
+        Default wraps the sync ``call_stream()`` via
+        ``asyncio.to_thread`` for each chunk.  Subclasses with native
+        async streaming (e.g. ``openai.AsyncOpenAI``) may override.
+        """
+        import asyncio
+
+        # Run sync call in a thread to avoid blocking the event loop.
+        result = await asyncio.to_thread(self.call, prompt)
+        yield result
 
     def call_with_messages(
         self,
