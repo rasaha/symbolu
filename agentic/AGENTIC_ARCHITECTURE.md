@@ -1,10 +1,16 @@
-# Agentic Architecture: Signal Integration & Policy Control Plane
+# Agentic Architecture: Governed Runtime & Signal Integration
 
-> **Version:** 5.0.0 | **Updated:** 2026-04-04
+> **Version:** 6.0.0 | **Updated:** 2026-04-06
 >
-> This document describes the five completed internal tracks that connect
-> external signal sources, ontological structure, policy infrastructure,
-> and safety enforcement to the agentic governance runtime:
+> This document describes the agentic governance runtime — a code-first
+> developer framework for building agentic applications with a differentiated
+> governance/execution layer. The framework is not a thin wrapper around an
+> LLM adapter; it provides governed tool execution, structured runtime
+> primitives, and layered signal integration. It is also not yet a full
+> multi-agent platform — remaining gaps are around broader platforming and
+> adoption, not the basic runtime contract.
+>
+> The architecture comprises six completed tracks:
 >
 > - **Sovereign track (S1–S4 + activation patch):** Bridges sovereign model
 >   signals (entropy, health, insight, diagnostics, guna anomalies, bhava
@@ -26,6 +32,11 @@
 >   Progresses from truthfulness cleanup through runtime boundary
 >   enforcement, bounded governance signal activation, and pre-action
 >   rollback-watch capture.
+> - **Runtime primitives track (R1–R11):** Builds the developer-facing
+>   runtime shell — streaming events, async/cancellation, human-in-the-loop
+>   approvals, structured outputs, MCP tool discovery, usage/budget tracking,
+>   and tracing/observability. These primitives materially improve the
+>   framework's runtime contract beyond governance signal integration.
 >
 > **Sovereign and Core** follow a **bridge-first, never-direct** architecture
 > and feed signals into the governance runtime decision path.
@@ -43,18 +54,24 @@
 > lifecycle-preparatory monitoring. Each phase activates only what the
 > surrounding architecture genuinely supports; nothing is faked.
 >
-> All five tracks are **closed as internal layers**. None yet constitutes a
+> **Runtime primitives** follow an **additive, backward-compatible**
+> architecture: each phase adds new opt-in parameters and event types to the
+> existing `run()` / `run_stream()` / `run_stream_async()` paths without
+> changing any existing call signatures or behavior.
+>
+> All tracks are **closed as internal layers**. None yet constitutes a
 > full external API product, dashboard UI, or tenant-scoped admin platform.
 >
 > For the full governance architecture (Layers 1–8, domain policy, shadow AI,
 > etc.), see [`docs/governance/AGENTIC_ARCHITECTURE.md`](../docs/governance/AGENTIC_ARCHITECTURE.md).
 >
-> This document focuses on how sovereign signals, core pipeline signals,
+> This document focuses on: (1) how sovereign signals, core pipeline signals,
 > ontological structure signals, policy infrastructure, and safety
-> enforcement reach the agentic governance runtime — what is live, what is
-> conditional, what is audit-only, what is simulation-only, what is
-> backend/control-plane-only, what is lifecycle-preparatory, and what
-> remains future work.
+> enforcement reach the agentic governance runtime; (2) the governed MCP
+> execution path; (3) the runtime primitives that form the developer-facing
+> shell — what is live, what is conditional, what is audit-only, what is
+> simulation-only, what is backend/control-plane-only, what is
+> lifecycle-preparatory, and what remains future work.
 
 ---
 
@@ -2373,6 +2390,368 @@ python -m agentic.agentic_framework.inference_mistral --cg \
 
 ---
 
+## Governed Execution Path
+
+The framework's primary end-to-end proved runtime path is:
+
+```
+AgenticLLMWrapper.run(user_input)
+    │
+    ▼
+Reflective generation / coherence path
+    │ LLM adapter generates text + planned actions
+    ▼
+SafetyGate (turn-level pre-gate)
+    │ evaluates safety contract: goal alignment, consistency,
+    │ reversal risk, stability — produces eligible action set
+    ▼
+_execute_actions (per eligible action)
+    │
+    ├── cancellation checkpoint (R2)
+    ├── budget checkpoint (R9)
+    ├── approval gate (R4)
+    │
+    ▼
+CGToolDispatcher.dispatch(tool_name, parameters)
+    │ reads adapter.last_cg_metadata on every call
+    ▼
+SafeMCPGateway.call_tool_simple(..., cg_metadata=..., tier=...)
+    │ request enrichment → MCP governance → audit / trace
+    ▼
+MCPToolResult → action result → AgentResult
+```
+
+**Key architectural properties:**
+
+- `SafetyGate` and MCP governance are **layered and complementary** —
+  SafetyGate operates at the turn level (pre-action filtering), while
+  MCP governance operates at the individual tool-call level (risk
+  classification, confidence gating, escalation).
+- Execution is governed at **both** turn level and tool-call level.
+- The ordering within the action loop is pinned: cancellation check →
+  budget check → approval gate → ACTION_STARTED → execute →
+  ACTION_COMPLETED.
+- This is the main end-to-end proved runtime path.
+
+### Streaming execution paths
+
+The same governed path is accessible through three calling conventions:
+
+| Method | Returns | Added in |
+|--------|---------|----------|
+| `run(user_input)` | `AgentResult` (original) | Baseline |
+| `run_stream(user_input, ...)` | `Iterator[AgentRunEvent]` | R1 |
+| `run_stream_async(user_input, ...)` | `AsyncIterator[AgentRunEvent]` | R2 |
+
+All three share the same internal loop; streaming adds lifecycle events
+(`run_started`, `generation_completed`, `action_started`, etc.) as
+`AgentRunEvent` dataclass instances. The `run()` path is unchanged and
+backward-compatible.
+
+### Request-boundary enrichment seam
+
+When a CG-capable LLM adapter generates, it stores a snapshot of 32D
+sovereign state in `adapter.last_cg_metadata`. Bridge helpers in
+`agentic_framework/sovereign_bridge.py` and
+`agentic_framework/request_enrichment.py` translate this into governance
+signals:
+
+| Helper | Purpose |
+|--------|---------|
+| `entropy_from_sovereign_state(state, delta_S, tier_name)` | Canonical `EntropyResult` from 32D state |
+| `vritti_from_sovereign_state(state, delta_S, tier)` | Canonical `ChittaVrittiResult` from 32D state |
+| `projection_metadata_from_sovereign_result(projection_result)` | `sovereign_projection_metadata` dict (only when caller holds a real `SovereignProjectionResult`) |
+| `governance_inputs_from_cg_metadata(cg_metadata, tier)` | `{"entropy_result": ..., "vritti_result": ...}` |
+| `build_governance_enrichment_kwargs(cg_metadata, tier)` | Reusable request-boundary helper; returns `{}` when absent |
+
+**Current enrichment status:**
+
+- The live MCP path attaches `entropy_result` and `vritti_result` when
+  CG metadata is available.
+- The live MCP path does **not** fabricate `sovereign_projection_metadata`.
+  `MistralCGAdapter` stores raw 32D state, not a full
+  `SovereignProjectionResult`. Honest absence, not invention.
+- `AuthorizationRequest`-side runtime ownership remains deferred — no
+  production caller simultaneously holds a `MistralCGAdapter` and
+  constructs an `AuthorizationRequest`.
+
+### Owner and composition layer
+
+| Component | Role |
+|-----------|------|
+| `CGToolDispatcher` (`cg_tool_dispatcher.py`) | Owner that composes adapter + gateway at runtime. Reads `adapter.last_cg_metadata` per call and forwards through `gateway.call_tool_simple`. |
+| `build_cg_mcp_agent(adapter, ...)` (`cg_tool_dispatcher.py`) | Thin composition helper — builds gateway + dispatcher + `AgenticLLMWrapper` from a single adapter. Not a new orchestrator. |
+
+The substitution seam: swap `adapter=` between `StubCGLLMAdapter`
+(dev/test) and `MistralCGAdapter` (real CG). No other wiring changes.
+
+### Adapter truthfulness
+
+| Adapter | Provenance | Purpose |
+|---------|-----------|---------|
+| `StubCGLLMAdapter` | Deterministic fixture | Dev/test wiring proofs. Carries `IS_STUB = True`, `STATE_PROVENANCE = "deterministic_stub"`. |
+| `MistralCGAdapter` | Real local CG inference | Real runtime proof path. Requires torch + checkpoint + operator environment. |
+
+The stub path proves wiring and runtime integration. The real adapter
+path exists, but real local inference requires torch/checkpoint/operator
+environment. Real checkpoint inference is **operator-validated, not
+repo-validated** — the repo proves wiring; the operator proves the
+inference stack.
+
+### CLI path: `inference_mistral.py --cg`
+
+| Flag | Meaning |
+|------|---------|
+| `--cg` | Opt into CG runtime (`MistralCGAdapter` → dispatcher → gateway) |
+| `--cg-model` | HuggingFace checkpoint ID (default `Mistral-7B-v0.3`) |
+| `--cg-quantize` | `4bit` / `8bit` (requires `bitsandbytes`) |
+| `--cg-device` | Device-map strategy (default `auto`) |
+| `--cg-allow-stub` | Dev/test fallback to `StubCGLLMAdapter`. Not real inference. |
+
+The default non-`--cg` path remains unchanged (uses `MistralAdapter`
+against the hosted API). `--cg` is the opt-in real-runtime proof path.
+
+---
+
+## R1–R11 Runtime Primitives Track
+
+The runtime primitives track builds the developer-facing runtime shell on
+top of the governed execution path. Each phase is additive and
+backward-compatible — `run()` is unchanged, and each new primitive is
+opt-in through new parameters on `run_stream()` / `run_stream_async()`.
+
+### Event model
+
+Events are the backbone for runtime progress and tracing. All runtime
+primitives emit `AgentRunEvent` instances through the streaming path.
+Tracing derives summary fields from the event stream. Runtime
+observability is local/in-memory for now — no OpenTelemetry or external
+telemetry backend.
+
+### R1 — Streaming Runtime Events
+
+**Files:** `streaming_events.py`, `agent.py`
+
+| Component | Description |
+|-----------|-------------|
+| `AgentRunEvent` | Frozen dataclass: `event_type`, `timestamp`, `turn_id`, `session_id`, `payload` |
+| `make_event()` | Factory function for constructing events |
+| `run_stream(user_input)` | Iterator-based streaming execution path |
+| Lifecycle events | `RUN_STARTED`, `GENERATION_STARTED`, `TEXT_CHUNK`, `GENERATION_COMPLETED`, `SAFETY_GATE_RESULT`, `ACTION_STARTED`, `ACTION_COMPLETED`, `RUN_COMPLETED`, `RUN_ERROR` |
+
+Compatibility fallback: non-streaming adapters produce events from the
+existing `run()` result without requiring adapter changes.
+
+### R2 — Async + Cancellation
+
+**Files:** `streaming_events.py`, `agent.py`
+
+| Component | Description |
+|-----------|-------------|
+| `CancellationToken` | Thread-safe boolean flag with `.cancel()` / `.is_cancelled` |
+| `run_stream_async(user_input, cancellation_token=...)` | Async iterator-based streaming execution path |
+| `RUN_CANCELLED` | Event emitted when cancellation is detected |
+| Cancellation checkpoints | Checked before each action in the action loop |
+
+Cancellation is non-preemptive at action boundaries — once an action/tool
+call is in progress, it completes before the token is checked.
+
+### R4 — Human Approval Interrupts
+
+**File:** `approval.py`
+
+| Component | Description |
+|-----------|-------------|
+| `ApprovalPolicy` | Frozen dataclass: `require_approval_for` (frozenset of action types), `require_all` (bool) |
+| `PendingApproval` | Frozen dataclass: `action_id`, `action_type`, `description`, `parameters`, `turn_id`, `session_id`, `reason` |
+| `ApprovalResponse` | Frozen dataclass: `approved` (bool), `reason` (optional) |
+| `ApprovalController` | Pairs policy + callback; `needs_approval()`, `request_approval()` |
+| `APPROVAL_REQUESTED` / `APPROVAL_RESOLVED` | Events emitted around approval gate |
+
+The approval gate sits between the cancellation/budget checkpoints and
+action execution. Pre-action only — no mid-tool interruption. The
+callback is synchronous in the sync path, wrapped in
+`asyncio.to_thread()` in the async path.
+
+### R6 — Structured Outputs
+
+**File:** `structured_output.py`
+
+| Component | Description |
+|-----------|-------------|
+| `SchemaTarget` / `OutputSchema` | `Union[Type[Any], Dict[str, type]]` — dataclass or dict schema |
+| `StructuredRunResult` | Dataclass: `success`, `raw_text`, `parsed_output`, `validation_error`, `schema_name`, `quality_score`, `revision_count` |
+| `schema_name(schema)` | Human-readable name from schema type |
+| `build_schema_prompt(user_input, schema)` | Schema-aware prompt construction |
+| `extract_json(text)` | JSON extraction: fenced code blocks → bracket-matching parser → regex fallback |
+| `validate_and_construct(data, schema)` | Validates data against schema, constructs typed result |
+| `run_structured(...)` / `run_structured_with_trace(...)` | Agent-level structured execution paths |
+| `STRUCTURED_VALIDATION` / `REVISION_STARTED` / `REVISION_COMPLETED` | Events for structured output lifecycle |
+
+Supports dataclass schemas, dict-of-types schemas, and Pydantic-style
+validation. JSON extraction uses bracket-matching for robustness against
+nested braces in LLM output.
+
+### R8 — MCP Discovery / Tool Introspection
+
+**File:** `tool_discovery.py`
+
+| Component | Description |
+|-----------|-------------|
+| `DiscoveredTool` | Dataclass: `name`, `description`, `risk_level`, `capabilities`, `requires_confirmation`, `min_confidence`, `timeout_seconds`, `input_schema` |
+| `ToolCatalog` | Read-only catalog: `from_gateway()`, `from_agent()`, `list_tools()`, `describe_tool()`, `find_tools()`, `to_dict()` |
+
+`ToolCatalog.from_gateway(gateway)` reads directly from
+`SafeMCPGateway.tool_definitions` — the existing dict of
+`MCPToolDefinition` is the single source of truth. `DiscoveredTool` is a
+JSON-safe snapshot; `MCPToolDefinition` remains the authoritative type.
+
+Filtering supports AND-semantics across: name substring (case-insensitive),
+`risk_level`, `capability`, `requires_confirmation`.
+
+Discovery is read-only introspection over existing registrations, not a
+second source of truth.
+
+### R9 — Usage and Budget Tracking
+
+**File:** `token_budget.py`
+
+| Component | Description |
+|-----------|-------------|
+| `UsageStats` | Mutable accumulator: `input_tokens`, `output_tokens`, `total_tokens`, `estimated_cost`, `model`, `accounting_mode` |
+| `BudgetPolicy` | Frozen dataclass: `max_total_tokens`, `max_input_tokens`, `max_output_tokens`, `max_cost` |
+| `estimate_tokens(text)` | Fallback heuristic: `max(1, len(text) // 4)` |
+| `USAGE_UPDATED` | Event emitted after each generation with usage stats |
+| `BUDGET_EXCEEDED` | Terminal event when budget policy is violated |
+
+Accounting modes: `exact` (adapter provides real token counts via
+`get_last_usage()`), `estimated` (fallback heuristic), `mixed` (some
+exact, some estimated), `none` (no generation recorded).
+
+Budget checkpoints occur after generation completes and before each action.
+`BaseLLMAdapter.get_last_usage()` returns `Optional[Dict]` with
+`input_tokens`, `output_tokens`, `cost`, `model`.
+
+### R11 — Tracing / Observability
+
+**File:** `tracing.py`
+
+| Component | Description |
+|-----------|-------------|
+| `AgentRunTrace` | Immutable summary: session/turn IDs, status, event count, timestamps, safety/action/approval/budget counters, usage stats |
+| `TraceCollector` | Mutable event accumulator; `record()`, `build_trace()` |
+| `run_with_trace(...)` | Convenience wrapper that creates a collector and returns `(result, trace)` |
+
+Trace summary fields are derived from the event stream:
+- Usage stats from the last `USAGE_UPDATED` event
+- `budget_exceeded` from `BUDGET_EXCEEDED` events
+- `approvals_requested` / `approvals_denied` from approval events
+- `actions_executed` from `ACTION_COMPLETED` events
+
+Tracing is optional — pass `trace_collector=None` (default) for no
+overhead. Runtime observability is local/in-memory; no external telemetry
+backend.
+
+### `run_stream` / `run_stream_async` Signature
+
+```python
+def run_stream(
+    self,
+    user_input: str,
+    cancellation_token: Optional[CancellationToken] = None,
+    trace_collector: Optional[TraceCollector] = None,
+    approval_controller: Optional[ApprovalController] = None,
+    budget_policy: Optional[BudgetPolicy] = None,
+) -> Iterator[AgentRunEvent]
+```
+
+All parameters are optional and default to `None`. The `run()` method is
+unchanged and does not accept these parameters.
+
+### Runtime Primitives Event Catalog
+
+| Event Type | Phase | Payload Contents |
+|-----------|-------|-----------------|
+| `run_started` | R1 | session_id, turn_id |
+| `generation_started` | R1 | turn_id |
+| `text_chunk` | R1 | text fragment |
+| `generation_completed` | R1 | full text |
+| `safety_gate_result` | R1 | eligible actions, scores |
+| `action_started` | R1 | action_type, parameters |
+| `action_completed` | R1 | action_type, result |
+| `run_completed` | R1 | final result summary |
+| `run_error` | R1 | error message, traceback |
+| `run_cancelled` | R2 | cancellation reason |
+| `approval_requested` | R4 | PendingApproval dict |
+| `approval_resolved` | R4 | ApprovalResponse dict |
+| `structured_validation` | R6 | validation result |
+| `revision_started` | R6 | revision count |
+| `revision_completed` | R6 | final structured result |
+| `usage_updated` | R9 | UsageStats dict |
+| `budget_exceeded` | R9 | violation reason |
+
+---
+
+## Runtime Maturity Status
+
+### Fully Proved / Implemented
+
+These capabilities are regression-tested, end-to-end proved, and
+committed on the current branch:
+
+| Capability | Evidence |
+|-----------|---------|
+| Governed MCP runtime path (SafetyGate → dispatcher → gateway → audit) | E2E tests in `test_agent.py`, `test_cg_tool_demo.py` |
+| Dispatcher/factory composition (`CGToolDispatcher`, `build_cg_mcp_agent`) | Unit + integration tests |
+| Request-boundary enrichment seam for entropy/vritti | `test_cg_tool_demo.py` proves `vritti_signal_source="real"` |
+| Streaming runtime events (R1) | 28 tests in `test_streaming_events.py` |
+| Async + cancellation (R2) | 31 tests in `test_async_cancellation.py` |
+| Human approval interrupts (R4) | 33 tests in `test_approval.py` |
+| Structured outputs (R6) | 44 tests in `test_structured_output.py` |
+| MCP discovery / tool introspection (R8) | 38 tests in `test_tool_discovery.py` |
+| Usage and budget tracking (R9) | 37 tests in `test_token_budget.py` |
+| Tracing / observability (R11) | 26 tests in `test_tracing.py` |
+| Stub-backed end-to-end runtime | Full `run()` pipeline into mock MCP |
+| All five signal integration tracks (S, C, O, P, Safety) | 1000+ tests across dedicated suites |
+
+### Partially Proved
+
+| Capability | Status |
+|-----------|--------|
+| Real local `MistralCGAdapter` inference via `--cg` | Wiring and factory composition proved in repo. Real local inference requires torch + checkpoint + GPU environment and is **operator-validated**, not repo-validated. |
+
+### Intentionally Deferred
+
+| Capability | Rationale |
+|-----------|-----------|
+| `AuthorizationRequest`-side runtime ownership | No production caller simultaneously holds adapter + request |
+| Live `SovereignProjectionResult` producer on MCP path | MCP path has 32D state, not full projection result |
+| Attaching `sovereign_projection_metadata` on live request-builder path | Requires a real producer, not fabrication |
+| Broad non-CLI runtime adoption | Other subsystems (voice, etc.) not migrated |
+| Multi-agent / handoffs | Out of scope for current framework |
+| Mirror retirement / final migration collapse | `symbolu/agentic_framework/` still mirrors `agentic/agentic_framework/` |
+| OpenTelemetry / external telemetry backend | Runtime observability is local/in-memory |
+| `AuthorizationRequest`-side enrichment path | Seam ready in code, no honest production caller |
+
+---
+
+## Package / Path Reference
+
+### `agentic/pipeline_tools/`
+
+Pipeline/dev/observability utilities. These are **not** agent-callable MCP
+tools — they are development and pipeline instrumentation helpers.
+
+### `agentic/llm/`
+
+Service-layer LLM renderer/validator. This is distinct from
+`agentic/agentic_framework/llm_adapters.py`, which provides the
+framework-layer adapter protocol (`BaseLLMAdapter`, `MockLLMAdapter`,
+`MistralAdapter`, `MistralCGAdapter`, `StubCGLLMAdapter`). The two paths
+are not merged.
+
+---
+
 ## Test Evidence
 
 ### Coverage Summary
@@ -2406,6 +2785,14 @@ python -m agentic.agentic_framework.inference_mistral --cg \
 | `tests/test_s3_readiness_integration.py` | 31 | S3 readiness adapter, multi-criterion, cooldown truth, E2E authorize | Safety |
 | `tests/test_s4_policy_engine_integration.py` | 22 | S4 policy engine adapter, allow/deny, blackout, rate limit, E2E authorize | Safety |
 | `tests/test_s5_rollback_monitor_integration.py` | 27 | S5 rollback adapter, watch lifecycle, signal snapshot, E2E authorize | Safety |
+| `tests/test_streaming_events.py` | 28 | R1 streaming events, lifecycle, event model | Runtime |
+| `tests/test_async_cancellation.py` | 31 | R2 async iteration, cancellation checkpoints | Runtime |
+| `tests/test_approval.py` | 33 | R4 approval policy, controller, action-loop integration | Runtime |
+| `tests/test_structured_output.py` | 44 | R6 schema prompt, JSON extraction, validation, structured run | Runtime |
+| `tests/test_tool_discovery.py` | 38 | R8 catalog, filtering, metadata, serialization | Runtime |
+| `tests/test_token_budget.py` | 37 | R9 usage accounting, budget enforcement, events | Runtime |
+| `tests/test_tracing.py` | 26 | R11 trace collector, trace summary derivation | Runtime |
+| `tests/test_agent.py` | 28 | Agent integration, run(), action dispatch | Runtime |
 
 ### What the Sovereign E2E Tests Prove
 
@@ -2529,6 +2916,54 @@ The safety test suite (127 tests across 5 files) proves:
 
 7. **Regression safety** — Each phase includes regression tests verifying
    prior behavior is unchanged when the new safety signal is absent.
+
+### What the Runtime Primitives Tests Prove
+
+The runtime primitives test suite (265 tests across 8 files) proves:
+
+1. **R1 streaming events** — `run_stream()` emits correctly ordered
+   lifecycle events. `AgentRunEvent` is frozen with correct fields.
+   Non-streaming adapters produce compatible events. All event type
+   constants are unique strings.
+
+2. **R2 async + cancellation** — `run_stream_async()` yields events
+   asynchronously. `CancellationToken.cancel()` causes `RUN_CANCELLED`
+   event at next checkpoint. Cancellation is non-preemptive at action
+   boundaries.
+
+3. **R4 human approval** — `ApprovalPolicy.requires_approval()` filters
+   by action type and `require_all`. `ApprovalController` pairs policy +
+   callback. Denied actions skip execution and emit `APPROVAL_RESOLVED`
+   with `approved=False`. Approved actions proceed normally. Approval gate
+   ordering is pinned after cancellation/budget checks.
+
+4. **R6 structured outputs** — Schema prompt construction includes field
+   types. `extract_json()` handles fenced blocks, bracket-matched objects,
+   and regex fallback. `validate_and_construct()` builds typed dataclass
+   and dict-schema results. `StructuredRunResult` serializes correctly.
+   Nested braces and escaped characters in JSON are handled.
+
+5. **R8 MCP discovery** — `ToolCatalog.from_gateway()` reflects registered
+   tools accurately. All metadata fields (risk_level, capabilities,
+   requires_confirmation, min_confidence, timeout_seconds, input_schema)
+   are surfaced. Filtering by capability, risk level, confirmation, and
+   name substring works with AND semantics. Serialization is JSON-safe
+   and round-trip stable. Catalog is a read-only snapshot.
+
+6. **R9 usage/budget** — `UsageStats.record_generation()` accumulates
+   exact and estimated token counts. `BudgetPolicy.is_exceeded()` checks
+   all four cap dimensions. Budget checkpoint ordering (after generation,
+   before actions) is verified. `BUDGET_EXCEEDED` is a terminal event.
+   Accounting mode derivation (exact/estimated/mixed/none) is correct.
+
+7. **R11 tracing** — `TraceCollector.record()` accumulates events.
+   `build_trace()` derives summary fields (actions, approvals, usage,
+   budget) from event stream. `AgentRunTrace.to_dict()` is JSON-safe.
+   `run_with_trace()` convenience wrapper works correctly.
+
+8. **Agent integration** — `run()` backward compatibility preserved.
+   Action dispatch through dispatcher with safety gate ordering.
+   Permissive safety evaluator enables action execution in tests.
 
 ### What Is NOT Tested
 
@@ -2687,6 +3122,20 @@ The policy test suite (366 tests across 9 files) proves:
 | `agentic_framework/signal_adapters/policy_engine_adapter.py` | S4 | Policy check → hard deny resolution |
 | `agentic_framework/signal_adapters/rollback_adapter.py` | S5 | Pre-action snapshot → audit-visible watch |
 
+### Runtime Primitives Files (by phase)
+
+| File | Phase | Purpose |
+|------|-------|---------|
+| `agentic_framework/streaming_events.py` | R1 | `AgentRunEvent`, `make_event()`, all event type constants |
+| `agentic_framework/agent.py` | R1–R9 | `run_stream()`, `run_stream_async()`, action loop with checkpoints |
+| `agentic_framework/approval.py` | R4 | `ApprovalPolicy`, `PendingApproval`, `ApprovalResponse`, `ApprovalController` |
+| `agentic_framework/structured_output.py` | R6 | `SchemaTarget`, `OutputSchema`, `StructuredRunResult`, JSON extraction, validation |
+| `agentic_framework/tool_discovery.py` | R8 | `DiscoveredTool`, `ToolCatalog` — read-only MCP tool introspection |
+| `agentic_framework/token_budget.py` | R9 | `UsageStats`, `BudgetPolicy`, `estimate_tokens()` |
+| `agentic_framework/tracing.py` | R11 | `AgentRunTrace`, `TraceCollector` |
+| `agentic_framework/llm_adapters.py` | R9 | `BaseLLMAdapter.get_last_usage()` hook |
+| `agentic_framework/__init__.py` | R1–R11 | Public exports for all runtime primitive symbols |
+
 ### Shared Files (all tracks)
 
 | File | Phases | Purpose |
@@ -2694,6 +3143,10 @@ The policy test suite (366 tests across 9 files) proves:
 | `agentic_framework/governance_models.py` | S1+patch, C4, O4, S2–S5 safety | Request/response models, audit event fields |
 | `agentic_framework/governance_service.py` | S1–S4+patch, C1–C4+closure, P0+P1, O4, S2–S5 safety | Decision engine, penalty cap, layer visibility, policy audit, ontology balance, safety signals |
 | `agentic_framework/signal_adapters/__init__.py` | S1–S4, C1–C4, O2–O3, S2–S5 safety | Adapter exports |
+| `agentic_framework/cg_tool_dispatcher.py` | CG runtime | `CGToolDispatcher`, `build_cg_mcp_agent()`, default action mapping |
+| `agentic_framework/request_enrichment.py` | CG runtime | `build_governance_enrichment_kwargs()` |
+| `agentic_framework/sovereign_bridge.py` | CG runtime | `entropy_from_sovereign_state()`, `vritti_from_sovereign_state()` |
+| `agentic_framework/inference_mistral.py` | CLI | `--cg` flags, CG runtime entry point |
 
 ### Test Files
 
@@ -2725,3 +3178,11 @@ The policy test suite (366 tests across 9 files) proves:
 | `tests/test_s3_readiness_integration.py` | 31 | S3 readiness integration | Safety |
 | `tests/test_s4_policy_engine_integration.py` | 22 | S4 policy engine integration | Safety |
 | `tests/test_s5_rollback_monitor_integration.py` | 27 | S5 rollback monitor integration | Safety |
+| `agentic_framework/tests/test_streaming_events.py` | 28 | R1 streaming events, lifecycle | Runtime |
+| `agentic_framework/tests/test_async_cancellation.py` | 31 | R2 async, cancellation | Runtime |
+| `agentic_framework/tests/test_approval.py` | 33 | R4 approval policy, controller | Runtime |
+| `agentic_framework/tests/test_structured_output.py` | 44 | R6 structured output pipeline | Runtime |
+| `agentic_framework/tests/test_tool_discovery.py` | 38 | R8 tool catalog, filtering | Runtime |
+| `agentic_framework/tests/test_token_budget.py` | 37 | R9 usage, budget enforcement | Runtime |
+| `agentic_framework/tests/test_tracing.py` | 26 | R11 trace collector, derivation | Runtime |
+| `agentic_framework/tests/test_agent.py` | 28 | Agent integration, run() | Runtime |
