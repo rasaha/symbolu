@@ -10,6 +10,7 @@ Runnable examples and the patterns they demonstrate.
 |--------|---------|------------------------|
 | [`examples/first_governed_agent.py`](../../../examples/first_governed_agent.py) | Minimal governed agent with stub adapter, streaming, and tracing | `build_cg_mcp_agent`, `run_stream`, `TraceCollector`, `ToolCatalog` |
 | [`examples/governed_agent_with_approval_and_budget.py`](../../../examples/governed_agent_with_approval_and_budget.py) | Approval gates + budget enforcement + structured output + trace | `ApprovalController`, `BudgetPolicy`, `run_structured_with_trace`, `run_with_trace` |
+| [`examples/pilot_research_assistant.py`](../../../examples/pilot_research_assistant.py) | **Pilot:** governed research assistant with custom tools, approval, budget, structured output, discovery, audit | `MockMCPClient`, `SafeMCPGateway`, `CGToolDispatcher`, `ApprovalController`, `BudgetPolicy`, `ToolCatalog`, `run_structured_with_trace` |
 | [`examples/cg_tool_demo.py`](../../../examples/cg_tool_demo.py) | CG metadata enrichment end-to-end (lower-level, pre-R-phase) | `SafeMCPGateway`, `build_governance_enrichment_kwargs`, audit log |
 
 ---
