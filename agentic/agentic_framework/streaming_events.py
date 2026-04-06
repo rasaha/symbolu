@@ -34,6 +34,7 @@ RUN_ERROR = "run_error"
 RUN_CANCELLED = "run_cancelled"
 REVISION_STARTED = "revision_started"
 REVISION_COMPLETED = "revision_completed"
+STRUCTURED_VALIDATION = "structured_validation"
 
 
 # ---------------------------------------------------------------------------

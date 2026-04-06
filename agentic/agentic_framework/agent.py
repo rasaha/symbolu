@@ -54,6 +54,13 @@ from agentic.agentic_framework.tracing import (
     TraceCollector,
     _build_trace,
 )
+from agentic.agentic_framework.structured_output import (
+    SchemaTarget,
+    StructuredRunResult,
+    build_schema_prompt,
+    extract_json,
+    validate_and_construct,
+)
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
     make_event,
@@ -69,6 +76,7 @@ from agentic.agentic_framework.streaming_events import (
     RUN_CANCELLED,
     REVISION_STARTED,
     REVISION_COMPLETED,
+    STRUCTURED_VALIDATION,
 )
 from agentic.agentic_framework.coherence_tracker import (
     CoherenceState,
@@ -411,6 +419,147 @@ class AgenticLLMWrapper:
         ):
             pass  # consume the generator; events are recorded by collector
         return collector.build_trace()
+
+    # ------------------------------------------------------------------
+    # Structured Output (R6)
+    # ------------------------------------------------------------------
+
+    def run_structured(
+        self,
+        user_input: str,
+        schema: SchemaTarget,
+    ) -> StructuredRunResult:
+        """
+        Run the agent pipeline with schema-enforced output.
+
+        The *user_input* is augmented with a schema instruction, the
+        response is parsed as JSON, and the result is validated against
+        *schema*.
+
+        Args:
+            user_input: User's input text.
+            schema: Target schema — a dataclass type, Pydantic model
+                class, or ``dict`` mapping field names to types.
+
+        Returns:
+            ``StructuredRunResult`` with ``success=True`` and a
+            populated ``parsed`` field on success, or
+            ``success=False`` with ``validation_error`` on failure.
+        """
+        augmented = build_schema_prompt(user_input, schema)
+        result = self.run(augmented)
+
+        raw_text = result.response
+        data = extract_json(raw_text)
+
+        if data is None:
+            return StructuredRunResult(
+                success=False,
+                raw_text=raw_text,
+                validation_error="Could not extract JSON from response",
+                quality_score=result.quality_score,
+                revision_count=result.revision_count,
+            )
+
+        try:
+            parsed = validate_and_construct(data, schema)
+        except (ValueError, TypeError, Exception) as exc:
+            return StructuredRunResult(
+                success=False,
+                raw_text=raw_text,
+                validation_error=str(exc),
+                quality_score=result.quality_score,
+                revision_count=result.revision_count,
+            )
+
+        return StructuredRunResult(
+            success=True,
+            raw_text=raw_text,
+            parsed=parsed,
+            quality_score=result.quality_score,
+            revision_count=result.revision_count,
+        )
+
+    def run_structured_with_trace(
+        self,
+        user_input: str,
+        schema: SchemaTarget,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> tuple[StructuredRunResult, AgentRunTrace]:
+        """
+        Like :meth:`run_structured` but also returns a full
+        ``AgentRunTrace`` including a ``structured_validation`` event.
+        """
+        augmented = build_schema_prompt(user_input, schema)
+
+        collector = TraceCollector()
+        for _evt in self.run_stream(
+            augmented,
+            cancellation_token=cancellation_token,
+            trace_collector=collector,
+        ):
+            pass
+
+        # Extract result from the run_completed event
+        raw_text = ""
+        quality_score = 0.0
+        revision_count = 0
+        for evt in collector.events:
+            if evt.event_type == RUN_COMPLETED and "result" in evt.payload:
+                rd = evt.payload["result"]
+                raw_text = rd.get("response", "")
+                quality_score = rd.get("quality_score", 0.0)
+                revision_count = rd.get("revision_count", 0)
+                break
+            if evt.event_type in (RUN_ERROR, RUN_CANCELLED):
+                raw_text = ""
+                break
+
+        # Parse and validate
+        data = extract_json(raw_text)
+        if data is None:
+            sr = StructuredRunResult(
+                success=False,
+                raw_text=raw_text,
+                validation_error="Could not extract JSON from response",
+                quality_score=quality_score,
+                revision_count=revision_count,
+            )
+        else:
+            try:
+                parsed = validate_and_construct(data, schema)
+                sr = StructuredRunResult(
+                    success=True,
+                    raw_text=raw_text,
+                    parsed=parsed,
+                    quality_score=quality_score,
+                    revision_count=revision_count,
+                )
+            except (ValueError, TypeError, Exception) as exc:
+                sr = StructuredRunResult(
+                    success=False,
+                    raw_text=raw_text,
+                    validation_error=str(exc),
+                    quality_score=quality_score,
+                    revision_count=revision_count,
+                )
+
+        # Record validation event in trace
+        session_id = self._memory.session_id if self._memory else ""
+        turn_id = (self._memory.get_turn_count() - 1) if self._memory else 0
+        validation_evt = make_event(
+            STRUCTURED_VALIDATION,
+            turn_id,
+            session_id,
+            {
+                "success": sr.success,
+                "validation_error": sr.validation_error,
+            },
+        )
+        collector.record(validation_evt)
+
+        trace = collector.build_trace()
+        return sr, trace
 
     # ------------------------------------------------------------------
     # Streaming API (R1) + Cancellation (R2) + Tracing (R11)

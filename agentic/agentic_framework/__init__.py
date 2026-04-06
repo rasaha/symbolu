@@ -120,6 +120,10 @@ from agentic.agentic_framework.proactive_scheduler import (
     create_task,
 )
 from agentic.agentic_framework.cancellation import CancellationToken
+from agentic.agentic_framework.structured_output import (
+    StructuredRunResult,
+    SchemaTarget,
+)
 from agentic.agentic_framework.tracing import (
     AgentRunTrace,
     TraceCollector,
@@ -135,6 +139,7 @@ from agentic.agentic_framework.streaming_events import (
     ACTION_STARTED,
     ACTION_COMPLETED,
     RUN_COMPLETED,
+    STRUCTURED_VALIDATION,
     RUN_ERROR,
     RUN_CANCELLED,
     REVISION_STARTED,
@@ -253,6 +258,9 @@ __all__ = [
     # Tracing (R11)
     "AgentRunTrace",
     "TraceCollector",
+    # Structured Output (R6)
+    "StructuredRunResult",
+    "SchemaTarget",
     # Streaming Events (R1) + Cancellation event (R2)
     "AgentRunEvent",
     "make_event",
@@ -268,6 +276,7 @@ __all__ = [
     "RUN_CANCELLED",
     "REVISION_STARTED",
     "REVISION_COMPLETED",
+    "STRUCTURED_VALIDATION",
     # LLM Adapters (Mistral API + local MistralCG)
     "MistralAdapter",
     "MistralCGAdapter",
