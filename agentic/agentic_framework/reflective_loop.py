@@ -28,7 +28,7 @@ import re
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, Iterator, List, Optional, Protocol, Union
 
 
 class LLMClient(Protocol):
@@ -605,4 +605,89 @@ completeness ({critique.completeness:.2f}), and relevance ({critique.relevance:.
             quality_trajectory=[critique.overall_score],
             generation_time_ms=generation_time_ms,
             token_count=len(response.split()),
+        )
+
+    def generate_stream(
+        self,
+        prompt: str,
+        context: Optional[str] = None,
+        goal_state: Optional[Any] = None,
+    ) -> Iterator[Union[str, GenerationResult]]:
+        """
+        Streaming variant of :meth:`generate`.
+
+        Yields a mixture of:
+        - ``str`` — incremental text chunks from the LLM
+        - ``("revision_started", int)`` — tuple marking revision *n*
+        - ``("revision_completed", int)`` — tuple marking revision *n* done
+        - ``GenerationResult`` — final result (always last item)
+
+        The adapter's ``call_stream()`` is used for the initial
+        generation.  Revisions use ``call()`` (non-streaming) and
+        their full text is yielded as a single chunk.
+        """
+        start_time = time.time()
+
+        full_prompt = self._build_prompt(prompt, context, goal_state)
+
+        # --- initial generation (streamed) ---
+        chunks: list[str] = []
+        call_stream = getattr(self.llm, "call_stream", None)
+        if callable(call_stream):
+            for chunk in call_stream(full_prompt):
+                chunks.append(chunk)
+                yield chunk
+        else:
+            # Adapter has no streaming support — fall back
+            text = self.llm.call(full_prompt)
+            chunks.append(text)
+            yield text
+
+        response = "".join(chunks)
+
+        quality_trajectory: list[float] = []
+        revision_count = 0
+        best_response = response
+        best_quality = 0.0
+
+        for revision in range(self.max_revisions + 1):
+            critique = self.critic.evaluate(prompt, response, goal_state)
+            quality = critique.overall_score
+            quality_trajectory.append(quality)
+
+            if quality > best_quality:
+                best_quality = quality
+                best_response = response
+
+            if quality >= self.threshold_high:
+                break
+            if revision >= self.max_revisions:
+                break
+            if not critique.revision_needed:
+                break
+
+            # --- revision (non-streaming) ---
+            revision_count += 1
+            yield ("revision_started", revision_count)
+
+            revision_prompt = self._build_revision_prompt(
+                original_prompt=prompt,
+                previous_response=response,
+                critique=critique,
+            )
+            response = self.llm.call(revision_prompt)
+            # Yield revised text as single chunk
+            yield response
+
+            yield ("revision_completed", revision_count)
+
+        generation_time_ms = (time.time() - start_time) * 1000
+
+        yield GenerationResult(
+            final_output=best_response,
+            quality_score=best_quality,
+            revision_count=revision_count,
+            quality_trajectory=quality_trajectory,
+            generation_time_ms=generation_time_ms,
+            token_count=len(best_response.split()),
         )

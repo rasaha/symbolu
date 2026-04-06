@@ -22,7 +22,7 @@ Usage:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 
 class BaseLLMAdapter(ABC):
@@ -44,6 +44,16 @@ class BaseLLMAdapter(ABC):
             Response string from LLM
         """
         pass
+
+    def call_stream(self, prompt: str) -> Iterator[str]:
+        """
+        Stream text chunks from the LLM.
+
+        Default implementation calls ``call()`` and yields the full
+        response as a single chunk.  Subclasses with native streaming
+        support may override to yield incremental tokens.
+        """
+        yield self.call(prompt)
 
     def call_with_messages(
         self,

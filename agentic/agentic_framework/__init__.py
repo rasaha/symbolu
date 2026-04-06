@@ -119,6 +119,21 @@ from agentic.agentic_framework.proactive_scheduler import (
     create_proactive_scheduler,
     create_task,
 )
+from agentic.agentic_framework.streaming_events import (
+    AgentRunEvent,
+    make_event,
+    RUN_STARTED,
+    GENERATION_STARTED,
+    TEXT_CHUNK,
+    GENERATION_COMPLETED,
+    SAFETY_GATE_RESULT,
+    ACTION_STARTED,
+    ACTION_COMPLETED,
+    RUN_COMPLETED,
+    RUN_ERROR,
+    REVISION_STARTED,
+    REVISION_COMPLETED,
+)
 from agentic.agentic_framework.llm_adapters import (
     MistralAdapter,
     MistralCGAdapter,
@@ -227,6 +242,20 @@ __all__ = [
     "ScheduleType",
     "create_proactive_scheduler",
     "create_task",
+    # Streaming Events (R1)
+    "AgentRunEvent",
+    "make_event",
+    "RUN_STARTED",
+    "GENERATION_STARTED",
+    "TEXT_CHUNK",
+    "GENERATION_COMPLETED",
+    "SAFETY_GATE_RESULT",
+    "ACTION_STARTED",
+    "ACTION_COMPLETED",
+    "RUN_COMPLETED",
+    "RUN_ERROR",
+    "REVISION_STARTED",
+    "REVISION_COMPLETED",
     # LLM Adapters (Mistral API + local MistralCG)
     "MistralAdapter",
     "MistralCGAdapter",

@@ -26,7 +26,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, Iterator, List, Optional, Protocol
 
 from agentic.agentic_framework.goal_decomposition import (
     GoalState,
@@ -46,6 +46,21 @@ from agentic.agentic_framework.reflective_loop import (
     QualityCritic,
     RuleBasedCritic,
     GenerationResult,
+)
+from agentic.agentic_framework.streaming_events import (
+    AgentRunEvent,
+    make_event,
+    RUN_STARTED,
+    GENERATION_STARTED,
+    TEXT_CHUNK,
+    GENERATION_COMPLETED,
+    SAFETY_GATE_RESULT,
+    ACTION_STARTED,
+    ACTION_COMPLETED,
+    RUN_COMPLETED,
+    RUN_ERROR,
+    REVISION_STARTED,
+    REVISION_COMPLETED,
 )
 from agentic.agentic_framework.coherence_tracker import (
     CoherenceState,
@@ -365,6 +380,245 @@ class AgenticLLMWrapper:
         """
         result = self.run(user_input)
         return result.response
+
+    # ------------------------------------------------------------------
+    # Streaming API (R1)
+    # ------------------------------------------------------------------
+
+    def run_stream(self, user_input: str) -> Iterator[AgentRunEvent]:
+        """
+        Streaming variant of :meth:`run`.
+
+        Yields ``AgentRunEvent`` instances as the agent progresses
+        through its pipeline.  The final event is always
+        ``run_completed`` (carrying the full ``AgentResult`` in its
+        payload) or ``run_error``.
+
+        The underlying ``run()`` contract is unchanged — this method
+        wraps the same pipeline stages and emits events around them.
+        """
+        # Ensure session exists
+        if self._memory is None:
+            self.new_session()
+
+        turn_id = self._memory.get_turn_count()
+        session_id = self._memory.session_id
+
+        def _evt(event_type: str, payload: dict | None = None) -> AgentRunEvent:
+            return make_event(event_type, turn_id, session_id, payload)
+
+        yield _evt(RUN_STARTED, {"user_input": user_input})
+
+        try:
+            # 1. Goal Decomposition
+            self._goal_state = self._decompose_goal(user_input)
+
+            # 2. Memory Enrichment
+            context = self._build_context(user_input)
+
+            # 3. Reflective Generation (streamed)
+            yield _evt(GENERATION_STARTED)
+
+            generation_result: GenerationResult | None = None
+
+            for item in self.generator.generate_stream(
+                prompt=user_input,
+                context=context,
+                goal_state=self._goal_state,
+            ):
+                if isinstance(item, GenerationResult):
+                    generation_result = item
+                elif isinstance(item, tuple):
+                    tag, rev_num = item
+                    if tag == "revision_started":
+                        yield _evt(REVISION_STARTED, {"revision": rev_num})
+                    elif tag == "revision_completed":
+                        yield _evt(REVISION_COMPLETED, {"revision": rev_num})
+                elif isinstance(item, str):
+                    yield _evt(TEXT_CHUNK, {"text": item})
+
+            assert generation_result is not None
+
+            yield _evt(
+                GENERATION_COMPLETED,
+                {
+                    "quality_score": generation_result.quality_score,
+                    "revision_count": generation_result.revision_count,
+                    "quality_trajectory": generation_result.quality_trajectory,
+                },
+            )
+
+            # 4. Create turn snapshot
+            turn = create_turn_snapshot(
+                turn_id=turn_id,
+                user_input=user_input,
+                assistant_output=generation_result.final_output,
+                quality_score=generation_result.quality_score,
+                revision_count=generation_result.revision_count,
+            )
+
+            # 5. Update Coherence
+            self._coherence_state = self.coherence_engine.update(
+                prev_state=self._coherence_state,
+                turn=turn,
+                goal_state=self._goal_state,
+            )
+
+            turn = TurnSnapshot(
+                turn_id=turn.turn_id,
+                timestamp=turn.timestamp,
+                user_input=turn.user_input,
+                assistant_output=turn.assistant_output,
+                goal_state=self._goal_state,
+                actions_taken=[],
+                quality_score=turn.quality_score,
+                revision_count=turn.revision_count,
+                coherence_metrics={
+                    "internal_consistency": self._coherence_state.current_metrics.internal_consistency,
+                    "goal_alignment": self._coherence_state.current_metrics.goal_alignment,
+                    "overall_coherence": self._coherence_state.current_metrics.overall_coherence,
+                },
+            )
+
+            # 6. Safety Contract Evaluation
+            action_types = [a.action_type for a in self._goal_state.actions] if self._goal_state else []
+            contract, allowed_actions = self.safety_gate.check(
+                coherence_state=self._coherence_state,
+                goal_state=self._goal_state,
+                action_types=action_types,
+            )
+
+            yield _evt(
+                SAFETY_GATE_RESULT,
+                {
+                    "eligible": contract.eligible,
+                    "blocking_reasons": list(contract.blocking_reasons),
+                },
+            )
+
+            # 7. Execute actions if eligible
+            actions_executed: List[str] = []
+            if contract.eligible and self._goal_state:
+                for action in self._goal_state.actions:
+                    if action.status != "pending":
+                        continue
+                    if action.action_type not in allowed_actions:
+                        action.status = "blocked"
+                        action.error = f"Action type '{action.action_type}' not allowed"
+                        continue
+
+                    yield _evt(ACTION_STARTED, {
+                        "action_id": action.action_id,
+                        "action_type": action.action_type,
+                        "description": action.description,
+                    })
+
+                    try:
+                        self._execute_single_action(action)
+                        if action.status == "completed":
+                            actions_executed.append(action.description)
+                    except Exception as exc:
+                        action.status = "failed"
+                        action.error = str(exc)
+
+                    yield _evt(ACTION_COMPLETED, {
+                        "action_id": action.action_id,
+                        "status": action.status,
+                        "error": action.error,
+                    })
+
+                # Update turn with executed actions
+                executed_items = [a for a in self._goal_state.actions if a.status == "completed"]
+                turn = TurnSnapshot(
+                    turn_id=turn.turn_id,
+                    timestamp=turn.timestamp,
+                    user_input=turn.user_input,
+                    assistant_output=turn.assistant_output,
+                    goal_state=turn.goal_state,
+                    actions_taken=executed_items,
+                    quality_score=turn.quality_score,
+                    revision_count=turn.revision_count,
+                    coherence_metrics=turn.coherence_metrics,
+                )
+
+            # 8. Update Memory
+            self._memory = self.memory_store.append_turn(self._memory, turn)
+
+            # 9. Check for intervention needs
+            should_intervene, reason = self.coherence_engine.should_intervene(
+                self._coherence_state
+            )
+
+            agent_result = AgentResult(
+                response=generation_result.final_output,
+                quality_score=generation_result.quality_score,
+                revision_count=generation_result.revision_count,
+                actions_executed=actions_executed,
+                actions_blocked=not contract.eligible,
+                blocking_reasons=list(contract.blocking_reasons),
+                coherence={
+                    "internal_consistency": self._coherence_state.current_metrics.internal_consistency,
+                    "goal_alignment": self._coherence_state.current_metrics.goal_alignment,
+                    "overall": self._coherence_state.current_metrics.overall_coherence,
+                    "drift_direction": self._coherence_state.current_metrics.drift_direction,
+                },
+                intervention_needed=should_intervene,
+                intervention_reason=reason,
+                session_id=self._memory.session_id,
+                turn_id=turn_id,
+                safety_contract=contract,
+            )
+
+            yield _evt(RUN_COMPLETED, {"result": agent_result.to_dict()})
+
+        except Exception as exc:
+            yield _evt(RUN_ERROR, {"error": str(exc), "error_type": type(exc).__name__})
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _execute_single_action(self, action: "ActionItem") -> None:
+        """Execute a single action (used by both run and run_stream)."""
+        if (
+            self.dispatcher is not None
+            and action.action_type in self.action_type_to_tool
+        ):
+            tool_name = self.action_type_to_tool[action.action_type]
+            mcp_result = self._dispatch_via_mcp(
+                tool_name=tool_name,
+                parameters=action.parameters or {},
+            )
+            if getattr(mcp_result, "success", False):
+                action.status = "completed"
+                action.result = getattr(mcp_result, "result", None)
+            else:
+                action.status = "blocked"
+                decision = getattr(mcp_result, "decision", None)
+                decision_val = (
+                    decision.value if decision is not None
+                    and hasattr(decision, "value") else str(decision)
+                )
+                reason = getattr(mcp_result, "blocked_reason", None) \
+                    or getattr(mcp_result, "error", None) \
+                    or f"MCP decision={decision_val}"
+                action.error = f"MCP: {reason}"
+            return
+
+        if action.action_type == "generate":
+            action.status = "completed"
+        elif action.action_type == "search":
+            action.status = "completed"
+            action.result = f"Search completed for: {action.parameters.get('query', '')}"
+        elif action.action_type == "compute":
+            action.status = "completed"
+            action.result = "Computation completed"
+        elif action.action_type == "validate":
+            action.status = "completed"
+            action.result = "Validation passed"
+        else:
+            action.status = "skipped"
+            action.error = f"Unknown action type: {action.action_type}"
 
     def _decompose_goal(self, user_input: str) -> GoalState:
         """Decompose user input into structured goal."""
