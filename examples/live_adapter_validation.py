@@ -7,6 +7,9 @@ with a live AnthropicAdapter backed by the actual Claude API.
 
 This script is NOT a mock.  It makes real API calls and reports
 concrete observed values from a live model.
+
+V2: Uses stock AnthropicAdapter with auth_token support (backported in
+Task 3 hardening pass).  No custom subclass needed.
 """
 
 from __future__ import annotations
@@ -17,47 +20,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-# ---- Build a live AnthropicAdapter using auth_token ----
-# The standard AnthropicAdapter only passes api_key to the Anthropic
-# client.  In this environment, we have an auth_token (session ingress
-# token) instead.  We subclass minimally to pass auth_token.
-
-from agentic.agentic_framework.llm_adapters import BaseLLMAdapter
-
-
-class LiveAnthropicAdapter(BaseLLMAdapter):
-    """AnthropicAdapter that uses auth_token instead of api_key."""
-
-    def __init__(self, auth_token: str, model: str = "claude-sonnet-4-20250514", max_tokens: int = 1024):
-        self.model = model
-        self.max_tokens = max_tokens
-        self._last_usage: Optional[Dict[str, Any]] = None
-
-        from anthropic import Anthropic
-        self.client = Anthropic(auth_token=auth_token)
-
-    def call(self, prompt: str) -> str:
-        message = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        # Capture real usage
-        self._last_usage = {
-            "input_tokens": message.usage.input_tokens,
-            "output_tokens": message.usage.output_tokens,
-            "model": message.model,
-        }
-        content = message.content
-        if isinstance(content, list) and len(content) > 0:
-            first = content[0]
-            if hasattr(first, "text"):
-                return first.text
-        return str(content)
-
-    def get_last_usage(self) -> Optional[Dict[str, Any]]:
-        return self._last_usage
-
+from agentic.agentic_framework.llm_adapters import AnthropicAdapter, BaseLLMAdapter
 
 # ---- Framework imports ----
 from agentic.agentic_framework.agent_builder import build_agent
@@ -109,17 +72,21 @@ TOOLS: Dict[str, ToolSpec] = {
     "send_update": ToolSpec(handler=send_update, description="Send status update", risk_level=ToolRiskLevel.WRITE, capabilities=["communication"]),
 }
 
-# Action mapping includes normalization aliases
+# Action mapping includes normalization aliases.
+# V2: removed static "execute" → "save_draft" override; context-aware
+# normalization in normalize_action_type() now routes "execute" to the
+# correct domain tool based on description keywords.
 ACTION_MAPPING = {
     "search": "search",
     "save_draft": "save_draft",
     "save": "save_draft",
     "send_update": "send_update",
     "send": "send_update",
-    # Normalization aliases: generic LLM types → domain tools
-    "execute": "save_draft",
-    "generate": "save_draft",
+    "escalate": "escalate",
+    # Generic LLM types that map unambiguously
     "compute": "search",       # LLM uses "compute" for analysis steps
+    # Note: "execute" and "generate" are NOT statically mapped here.
+    # Context-aware normalization handles them via _DESCRIPTION_SIGNALS.
 }
 
 
@@ -137,7 +104,7 @@ def approval_callback(pending: PendingApproval) -> ApprovalResponse:
 @dataclass
 class LiveEvidence:
     phase: str = ""
-    adapter: str = "LiveAnthropicAdapter (claude-sonnet-4-20250514)"
+    adapter: str = "AnthropicAdapter (claude-sonnet-4-20250514)"
     decomposition_parsed: Optional[bool] = None
     action_types_raw: List[str] = field(default_factory=list)
     action_types_after_normalization: List[str] = field(default_factory=list)
@@ -297,14 +264,17 @@ def main():
         return 1
 
     print("=" * 60)
-    print("  LIVE-ADAPTER VALIDATION: Internal Copilot")
+    print("  LIVE-ADAPTER VALIDATION: Internal Copilot (V2)")
     print("=" * 60)
-    print(f"  Adapter:     LiveAnthropicAdapter")
+    print(f"  Adapter:     AnthropicAdapter (stock)")
     print(f"  Model:       claude-sonnet-4-20250514")
     print(f"  Auth method: {auth_method}")
     print(f"  Max tokens:  512")
 
-    adapter = LiveAnthropicAdapter(auth_token=auth_token, max_tokens=512)
+    if auth_token:
+        adapter = AnthropicAdapter(auth_token=auth_token, max_tokens=512)
+    else:
+        adapter = AnthropicAdapter(api_key=api_key, max_tokens=512)
 
     # ---- Approval + budget setup ----
     approval_policy = ApprovalPolicy(
@@ -359,12 +329,11 @@ def main():
     # ---- A. Live adapter used ----
     print(f"""
 A. LIVE ADAPTER USED
-   Adapter:     LiveAnthropicAdapter
+   Adapter:     AnthropicAdapter (stock, with auth_token backport)
    Model:       claude-sonnet-4-20250514
    Auth method: {auth_method}
    Why chosen:  Only adapter with available credentials in this environment.
-                The anthropic SDK (v0.89.0) is installed and api.anthropic.com
-                is in the allowed egress hosts.
+                Uses stock AnthropicAdapter with auth_token support (Task 3).
    Env/config:  CLAUDE_SESSION_INGRESS_TOKEN_FILE (auth_token param)
 """)
 
@@ -433,11 +402,11 @@ A. LIVE ADAPTER USED
     print()
 
     # ---- E. Fixes made ----
-    print("E. FIXES MADE DURING THIS RUN")
-    print("   LiveAnthropicAdapter: minimal subclass of BaseLLMAdapter that")
-    print("   passes auth_token (not api_key) to the Anthropic client, and")
-    print("   implements get_last_usage() returning real API-reported token counts.")
-    print("   This is test scaffolding, not a framework change.")
+    print("E. FIXES MADE SINCE V1")
+    print("   1. Stock AnthropicAdapter now accepts auth_token (no subclass needed)")
+    print("   2. get_last_usage() on stock AnthropicAdapter and OpenAIAdapter")
+    print("   3. Context-aware normalization: execute/generate → domain tool via description")
+    print("   4. Static 'execute' → 'save_draft' override removed from ACTION_MAPPING")
     print()
 
     # ---- F. Final verdict ----
@@ -459,16 +428,15 @@ A. LIVE ADAPTER USED
         print("      - Trace capture end-to-end")
         print()
         print("   3. What parts are still brittle:")
-        print("      - get_last_usage() not on stock AnthropicAdapter (needed subclass)")
         print("      - DECOMPOSITION_PROMPT vocabulary gap (normalization covers it,")
         print("        but the prompt itself still asks for generic types)")
         print("      - Budget enforcement uses estimated tokens if adapter lacks usage")
         print("      - _extract_json() greedy regex (no live failure, but theoretical risk)")
         print()
         print("   4. Top 3 next hardening tasks:")
-        print("      1) Add get_last_usage() to stock AnthropicAdapter/OpenAIAdapter")
-        print("      2) Update DECOMPOSITION_PROMPT to accept domain action types")
-        print("      3) Replace greedy JSON regex with balanced-brace parser")
+        print("      1) Update DECOMPOSITION_PROMPT to accept domain action types")
+        print("      2) Replace greedy JSON regex with balanced-brace parser")
+        print("      3) Add multi-adapter live validation (OpenAI, Mistral)")
     else:
         print("   See failure points above for details.")
 

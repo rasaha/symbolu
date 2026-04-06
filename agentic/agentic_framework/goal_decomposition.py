@@ -189,23 +189,96 @@ Respond ONLY with valid JSON in this exact format:
 # to produce.  These are the *prompt-side* vocabulary.
 GENERIC_ACTION_TYPES = frozenset({"search", "compute", "generate", "validate", "execute"})
 
+# Description keywords that signal specific domain actions.
+# Used by context-aware normalization when a generic type (execute,
+# generate) could map to multiple domain tools.
+# Keys: signal words (lowercase).  Values: set of domain tool names
+# they indicate.  Only words with unambiguous signal are included.
+_DESCRIPTION_SIGNALS: Dict[str, str] = {
+    # send/notify signals
+    "send": "send_update",
+    "notify": "send_update",
+    "post": "send_update",
+    "broadcast": "send_update",
+    "channel": "send_update",
+    "slack": "send_update",
+    "message": "send_update",
+    "announce": "send_update",
+    "alert": "send_update",
+    # save/draft signals
+    "save": "save_draft",
+    "draft": "save_draft",
+    "store": "save_draft",
+    "persist": "save_draft",
+    "write": "save_draft",
+    "record": "save_draft",
+    # escalate signals
+    "escalate": "escalate",
+    "incident": "escalate",
+    "page": "escalate",
+    "on-call": "escalate",
+    "oncall": "escalate",
+    "urgent": "escalate",
+    "emergency": "escalate",
+}
+
+
+def _resolve_by_description(
+    description: str,
+    candidate_tools: set,
+) -> Optional[str]:
+    """Pick a domain tool from the description's keyword signals.
+
+    Only returns a tool name when exactly one candidate is signalled.
+    Returns ``None`` (ambiguous / no signal) otherwise.
+    """
+    if not description or not candidate_tools:
+        return None
+
+    desc_lower = description.lower()
+    # Split into words for matching
+    words = set(desc_lower.split())
+    # Also check for multi-word phrases by scanning the raw string
+    signalled: Dict[str, int] = {}  # tool_name → signal count
+    for keyword, tool_name in _DESCRIPTION_SIGNALS.items():
+        if tool_name not in candidate_tools:
+            continue
+        if keyword in words or keyword in desc_lower:
+            signalled[tool_name] = signalled.get(tool_name, 0) + 1
+
+    if len(signalled) == 1:
+        return next(iter(signalled))
+    if len(signalled) > 1:
+        # Multiple tools signalled — pick the one with the most signals
+        # but only if it has strictly more signals than the runner-up
+        ranked = sorted(signalled.items(), key=lambda x: x[1], reverse=True)
+        if ranked[0][1] > ranked[1][1]:
+            return ranked[0][0]
+        # Tied — ambiguous, return None
+        return None
+    return None
+
 
 def normalize_action_type(
     raw_type: str,
     action_type_aliases: Optional[Dict[str, str]] = None,
+    description: str = "",
 ) -> tuple:
     """Normalize a raw LLM action type into a canonical runtime type.
 
     Resolution order:
-    1. If ``raw_type`` is already a key in ``action_type_aliases`` (or
-       its values), return it unchanged — it's already canonical.
-    2. If ``action_type_aliases`` contains ``raw_type`` as a key,
-       return the mapped value.
-    3. If ``raw_type`` is one of the five generic prompt types
-       (search, compute, generate, validate, execute) AND is NOT
-       in the alias table, return it unchanged — it passes through
-       as a generic type that the runtime can handle via placeholders.
-    4. Otherwise, return the raw type unchanged with a warning flag.
+    1. If ``raw_type`` is already a canonical name (appears as a key
+       with identity mapping, or as an alias value), return unchanged.
+    2. If ``action_type_aliases`` contains ``raw_type`` as a key with
+       a non-identity mapping, return the mapped value.
+    3. **Context-aware resolution** (new): If ``raw_type`` is a generic
+       prompt type (execute, generate) AND no direct alias exists, use
+       the action ``description`` to pick among the domain tools
+       registered as alias values.  Only fires when description
+       keywords unambiguously signal a single domain tool.
+    4. If ``raw_type`` is one of the five generic prompt types and no
+       context resolution matched, return it unchanged.
+    5. Otherwise, return the raw type unchanged.
 
     Returns:
         ``(canonical_type, original_type_or_None)``.
@@ -228,6 +301,12 @@ def normalize_action_type(
     alias_values = set(action_type_aliases.values())
     if raw in alias_values:
         return raw, None
+
+    # Context-aware resolution for generic types
+    if raw in GENERIC_ACTION_TYPES and description and alias_values:
+        resolved = _resolve_by_description(description, alias_values)
+        if resolved is not None:
+            return resolved, raw
 
     # Generic prompt type that isn't aliased — pass through
     if raw in GENERIC_ACTION_TYPES:
@@ -277,11 +356,14 @@ def decompose_goal(
     actions = []
     for i, action_data in enumerate(parsed.get("actions", [])):
         raw_type = action_data.get("type", "generate")
-        canonical, original = normalize_action_type(raw_type, action_type_aliases)
+        desc = action_data.get("description", f"Action {i}")
+        canonical, original = normalize_action_type(
+            raw_type, action_type_aliases, description=desc,
+        )
         actions.append(
             ActionItem(
                 action_id=f"action_{i}",
-                description=action_data.get("description", f"Action {i}"),
+                description=desc,
                 action_type=canonical,
                 parameters=action_data.get("parameters", {}),
                 original_action_type=original,

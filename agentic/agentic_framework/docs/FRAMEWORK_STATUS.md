@@ -55,6 +55,7 @@ These capabilities are regression-tested (1550+ tests) and committed.
 | **Research assistant** | Custom tools, broad governance, require-all approval, budget, structured output, tool discovery, audit | `examples/pilot_research_assistant.py` |
 | **Internal copilot** | Per-action-type approval boundary, approve + deny paths, trace comparison, approval coverage | `examples/pilot_internal_copilot.py` |
 | **Real-LLM validation** | Parsing fragility (5 format variations), safety gate sensitivity, action vocabulary mismatch | `examples/pilot_internal_copilot_real_llm.py` |
+| **Live adapter validation (V2)** | Stock AnthropicAdapter with auth_token, context-aware normalization, exact usage accounting, 3-phase end-to-end | `examples/live_adapter_validation.py` |
 
 ### Action loop ordering (pinned by tests)
 
@@ -77,16 +78,16 @@ runtime contract.
 |-----------|--------------|
 | **Real local model inference** (`MistralCGAdapter` via `--cg`) | Wiring and factory composition are proved in repo. Real local inference requires torch + checkpoint + GPU environment and is **operator-validated** at first run, not repo-validated. |
 | **Async event loop** | `run_stream_async()` works but some test-harness edge cases around `asyncio.get_event_loop()` in Python 3.11+ are known. Not a runtime bug — a test infrastructure issue. |
-| **Real LLM adapter integration** | Realistic-mock validation passes (54/54 checks). Real API validation requires `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` — not yet tested against a live API. See [Pilot: Real-LLM Validation](PILOT_INTERNAL_COPILOT_REAL_LLM.md). |
+| **Real LLM adapter integration** | Realistic-mock validation passes (60/60 checks). Live API validation passes (3/3 phases) using stock `AnthropicAdapter` with `auth_token`. See [Pilot: Real-LLM Validation](PILOT_INTERNAL_COPILOT_REAL_LLM.md) and `examples/live_adapter_validation.py`. |
 
 ### Known fragility points (surfaced by real-LLM pilot)
 
 | ID | Issue | Status | Details |
 |----|-------|--------|---------|
 | FP1 | **Goal alignment safety gate** | **Resolved** | Hardened with normalized/stemmed tokens, user-input vocabulary, max-of-two-overlaps, raised baseline. |
-| FP2 | **Action type vocabulary mismatch** | **Resolved** | `normalize_action_type()` remaps generic LLM types via `action_type_to_tool` alias table. `ActionItem.original_action_type` for traceability. |
+| FP2 | **Action type vocabulary mismatch** | **Resolved** | `normalize_action_type()` remaps generic LLM types via `action_type_to_tool` alias table + context-aware description signals. `ActionItem.original_action_type` for traceability. |
 | FP3 | **Greedy JSON regex** | Deferred | `_extract_json()` regex is greedy. Works for all tested variations but could fail with multiple JSON objects. Low risk. |
-| FP4 | **Missing `get_last_usage()` in real adapters** | Deferred | Real adapters return `None`. Budget accounting uses estimated values only. Medium risk. |
+| FP4 | **Missing `get_last_usage()` in real adapters** | **Resolved** | Stock `AnthropicAdapter` and `OpenAIAdapter` now implement `get_last_usage()`. Live validation confirms `exact` accounting mode. |
 
 ---
 

@@ -410,5 +410,322 @@ class TestEndToEndNormalization(unittest.TestCase):
         self.assertIsNone(goal.actions[2].original_action_type)
 
 
+# =====================================================================
+# D. Context-aware normalization (live-validation hardening)
+# =====================================================================
+
+
+class TestContextAwareNormalization(unittest.TestCase):
+    """Tests for description-based action type resolution."""
+
+    ALIASES = {
+        "search": "search",
+        "save_draft": "save_draft",
+        "send_update": "send_update",
+        "escalate": "escalate",
+    }
+
+    def test_execute_send_description_routes_to_send_update(self):
+        canon, orig = normalize_action_type(
+            "execute", self.ALIASES,
+            description="Send status update to team channel",
+        )
+        self.assertEqual(canon, "send_update")
+        self.assertEqual(orig, "execute")
+
+    def test_execute_save_description_routes_to_save_draft(self):
+        canon, orig = normalize_action_type(
+            "execute", self.ALIASES,
+            description="Save the generated summary as a draft document",
+        )
+        self.assertEqual(canon, "save_draft")
+        self.assertEqual(orig, "execute")
+
+    def test_execute_escalate_description_routes_to_escalate(self):
+        canon, orig = normalize_action_type(
+            "execute", self.ALIASES,
+            description="Escalate incident to on-call team",
+        )
+        self.assertEqual(canon, "escalate")
+        self.assertEqual(orig, "execute")
+
+    def test_generate_draft_description_routes_to_save_draft(self):
+        canon, orig = normalize_action_type(
+            "generate", self.ALIASES,
+            description="Generate structured summary and save as draft",
+        )
+        self.assertEqual(canon, "save_draft")
+        self.assertEqual(orig, "generate")
+
+    def test_generate_message_description_routes_to_send_update(self):
+        canon, orig = normalize_action_type(
+            "generate", self.ALIASES,
+            description="Generate status update message for the channel",
+        )
+        self.assertEqual(canon, "send_update")
+        self.assertEqual(orig, "generate")
+
+    def test_execute_notify_routes_to_send_update(self):
+        canon, orig = normalize_action_type(
+            "execute", self.ALIASES,
+            description="Notify the team about the latency issue",
+        )
+        self.assertEqual(canon, "send_update")
+        self.assertEqual(orig, "execute")
+
+    def test_execute_post_routes_to_send_update(self):
+        canon, orig = normalize_action_type(
+            "execute", self.ALIASES,
+            description="Post update to #ops slack channel",
+        )
+        self.assertEqual(canon, "send_update")
+        self.assertEqual(orig, "execute")
+
+    def test_search_unchanged_even_with_description(self):
+        """Canonical types pass through regardless of description."""
+        canon, orig = normalize_action_type(
+            "search", self.ALIASES,
+            description="Search for data and save results",
+        )
+        self.assertEqual(canon, "search")
+        self.assertIsNone(orig)
+
+    def test_domain_type_unchanged(self):
+        """Domain types already canonical — not re-resolved."""
+        canon, orig = normalize_action_type(
+            "send_update", self.ALIASES,
+            description="Save this as a draft",  # conflicting description
+        )
+        self.assertEqual(canon, "send_update")
+        self.assertIsNone(orig)
+
+    def test_ambiguous_description_passes_through(self):
+        """When description signals multiple tools equally, pass through."""
+        canon, orig = normalize_action_type(
+            "execute", self.ALIASES,
+            description="Process the data",  # no signal words
+        )
+        # No signal words → no resolution → pass through as generic
+        self.assertEqual(canon, "execute")
+        self.assertIsNone(orig)
+
+    def test_no_description_passes_through(self):
+        """Without description, generic types pass through."""
+        canon, orig = normalize_action_type(
+            "execute", self.ALIASES,
+            description="",
+        )
+        self.assertEqual(canon, "execute")
+        self.assertIsNone(orig)
+
+    def test_original_type_preserved(self):
+        """original_action_type tracks the pre-normalization type."""
+        canon, orig = normalize_action_type(
+            "execute", self.ALIASES,
+            description="Send message to team",
+        )
+        self.assertEqual(orig, "execute")
+
+    def test_static_alias_takes_precedence_over_description(self):
+        """If a static alias exists for the type, description is not consulted."""
+        aliases = {
+            "execute": "save_draft",  # static alias
+            "save_draft": "save_draft",
+            "send_update": "send_update",
+        }
+        canon, orig = normalize_action_type(
+            "execute", aliases,
+            description="Send message to team channel",  # signals send_update
+        )
+        # Static alias wins — execute → save_draft
+        self.assertEqual(canon, "save_draft")
+        self.assertEqual(orig, "execute")
+
+
+class TestContextAwareDecomposeGoal(unittest.TestCase):
+    """End-to-end: context-aware normalization through decompose_goal."""
+
+    def test_send_action_resolved_via_description(self):
+        """Real scenario: LLM returns execute + send description → send_update."""
+        class MockLLM:
+            def call(self, prompt):
+                return json.dumps({
+                    "purpose": "Send status update",
+                    "purpose_type": "task",
+                    "reasoning_strategy": "Send update",
+                    "reasoning_steps": ["Send it"],
+                    "agency_level": "FULL",
+                    "actions": [
+                        {"description": "Search for data", "type": "search", "parameters": {}},
+                        {"description": "Send status update to team channel", "type": "execute", "parameters": {}},
+                    ],
+                    "complexity": 0.3,
+                })
+
+        aliases = {
+            "search": "search",
+            "save_draft": "save_draft",
+            "send_update": "send_update",
+        }
+        goal = decompose_goal("Send update", MockLLM(), action_type_aliases=aliases)
+        self.assertEqual(goal.actions[0].action_type, "search")
+        self.assertEqual(goal.actions[1].action_type, "send_update")
+        self.assertEqual(goal.actions[1].original_action_type, "execute")
+
+    def test_mixed_actions_resolved_correctly(self):
+        """Multiple generic types resolve to different domain tools."""
+        class MockLLM:
+            def call(self, prompt):
+                return json.dumps({
+                    "purpose": "Save and send",
+                    "purpose_type": "task",
+                    "reasoning_strategy": "Multi-step",
+                    "reasoning_steps": ["Save", "Send"],
+                    "agency_level": "FULL",
+                    "actions": [
+                        {"description": "Search for metrics", "type": "search", "parameters": {}},
+                        {"description": "Generate draft summary document", "type": "generate", "parameters": {}},
+                        {"description": "Send notification to slack channel", "type": "execute", "parameters": {}},
+                    ],
+                    "complexity": 0.5,
+                })
+
+        aliases = {
+            "search": "search",
+            "save_draft": "save_draft",
+            "send_update": "send_update",
+            "escalate": "escalate",
+        }
+        goal = decompose_goal("Save and send", MockLLM(), action_type_aliases=aliases)
+        self.assertEqual(goal.actions[0].action_type, "search")
+        self.assertIsNone(goal.actions[0].original_action_type)
+        self.assertEqual(goal.actions[1].action_type, "save_draft")
+        self.assertEqual(goal.actions[1].original_action_type, "generate")
+        self.assertEqual(goal.actions[2].action_type, "send_update")
+        self.assertEqual(goal.actions[2].original_action_type, "execute")
+
+
+# =====================================================================
+# E. Stock adapter improvements
+# =====================================================================
+
+
+class TestAnthropicAdapterAuthToken(unittest.TestCase):
+    """Tests for auth_token support on stock AnthropicAdapter."""
+
+    def test_constructor_accepts_auth_token(self):
+        """AnthropicAdapter should accept auth_token parameter without error.
+
+        Cannot actually call the API without valid credentials, but the
+        constructor should not raise.
+        """
+        try:
+            from agentic.agentic_framework.llm_adapters import AnthropicAdapter
+            # This will fail at SDK import if anthropic not installed,
+            # but should not fail on the auth_token parameter itself
+            adapter = AnthropicAdapter(auth_token="test-token-for-init")
+            self.assertTrue(hasattr(adapter, "client"))
+            self.assertTrue(hasattr(adapter, "_last_usage"))
+            self.assertIsNone(adapter._last_usage)
+        except ImportError:
+            self.skipTest("anthropic package not installed")
+
+    def test_constructor_accepts_api_key(self):
+        """Backward compatibility: api_key still works."""
+        try:
+            from agentic.agentic_framework.llm_adapters import AnthropicAdapter
+            adapter = AnthropicAdapter(api_key="test-key-for-init")
+            self.assertTrue(hasattr(adapter, "client"))
+        except ImportError:
+            self.skipTest("anthropic package not installed")
+
+    def test_get_last_usage_initially_none(self):
+        """get_last_usage() returns None before any call."""
+        try:
+            from agentic.agentic_framework.llm_adapters import AnthropicAdapter
+            adapter = AnthropicAdapter(auth_token="test")
+            self.assertIsNone(adapter.get_last_usage())
+        except ImportError:
+            self.skipTest("anthropic package not installed")
+
+
+class TestOpenAIAdapterUsage(unittest.TestCase):
+    """Tests for get_last_usage() on OpenAIAdapter."""
+
+    def test_get_last_usage_initially_none(self):
+        """get_last_usage() returns None before any call."""
+        try:
+            from agentic.agentic_framework.llm_adapters import OpenAIAdapter
+            adapter = OpenAIAdapter(api_key="test-key")
+            self.assertIsNone(adapter.get_last_usage())
+        except ImportError:
+            self.skipTest("openai package not installed")
+
+    def test_record_usage_from_mock_response(self):
+        """_record_usage extracts token counts from a response-like object."""
+        try:
+            from agentic.agentic_framework.llm_adapters import OpenAIAdapter
+            adapter = OpenAIAdapter(api_key="test-key")
+
+            # Simulate an OpenAI response object
+            class MockUsage:
+                prompt_tokens = 42
+                completion_tokens = 100
+            class MockResponse:
+                usage = MockUsage()
+                model = "gpt-4"
+
+            adapter._record_usage(MockResponse())
+            usage = adapter.get_last_usage()
+            self.assertIsNotNone(usage)
+            self.assertEqual(usage["input_tokens"], 42)
+            self.assertEqual(usage["output_tokens"], 100)
+            self.assertEqual(usage["model"], "gpt-4")
+        except ImportError:
+            self.skipTest("openai package not installed")
+
+
+class TestAnthropicAdapterUsage(unittest.TestCase):
+    """Tests for _record_usage on AnthropicAdapter."""
+
+    def test_record_usage_from_mock_response(self):
+        """_record_usage extracts token counts from a message-like object."""
+        try:
+            from agentic.agentic_framework.llm_adapters import AnthropicAdapter
+            adapter = AnthropicAdapter(auth_token="test")
+
+            # Simulate an Anthropic message response
+            class MockUsage:
+                input_tokens = 30
+                output_tokens = 200
+            class MockMessage:
+                usage = MockUsage()
+                model = "claude-sonnet-4-20250514"
+                content = []
+
+            adapter._record_usage(MockMessage())
+            usage = adapter.get_last_usage()
+            self.assertIsNotNone(usage)
+            self.assertEqual(usage["input_tokens"], 30)
+            self.assertEqual(usage["output_tokens"], 200)
+            self.assertEqual(usage["model"], "claude-sonnet-4-20250514")
+        except ImportError:
+            self.skipTest("anthropic package not installed")
+
+    def test_record_usage_none_when_no_usage_attr(self):
+        """_record_usage sets None when response has no usage."""
+        try:
+            from agentic.agentic_framework.llm_adapters import AnthropicAdapter
+            adapter = AnthropicAdapter(auth_token="test")
+
+            class MockMessage:
+                content = []
+
+            adapter._record_usage(MockMessage())
+            self.assertIsNone(adapter.get_last_usage())
+        except ImportError:
+            self.skipTest("anthropic package not installed")
+
+
 if __name__ == "__main__":
     unittest.main()
