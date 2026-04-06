@@ -54,6 +54,7 @@ These capabilities are regression-tested (1550+ tests) and committed.
 |-------|------------------|--------|
 | **Research assistant** | Custom tools, broad governance, require-all approval, budget, structured output, tool discovery, audit | `examples/pilot_research_assistant.py` |
 | **Internal copilot** | Per-action-type approval boundary, approve + deny paths, trace comparison, approval coverage | `examples/pilot_internal_copilot.py` |
+| **Real-LLM validation** | Parsing fragility (5 format variations), safety gate sensitivity, action vocabulary mismatch | `examples/pilot_internal_copilot_real_llm.py` |
 
 ### Action loop ordering (pinned by tests)
 
@@ -76,6 +77,16 @@ runtime contract.
 |-----------|--------------|
 | **Real local model inference** (`MistralCGAdapter` via `--cg`) | Wiring and factory composition are proved in repo. Real local inference requires torch + checkpoint + GPU environment and is **operator-validated** at first run, not repo-validated. |
 | **Async event loop** | `run_stream_async()` works but some test-harness edge cases around `asyncio.get_event_loop()` in Python 3.11+ are known. Not a runtime bug — a test infrastructure issue. |
+| **Real LLM adapter integration** | Realistic-mock validation passes (54/54 checks). Real API validation requires `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` — not yet tested against a live API. See [Pilot: Real-LLM Validation](PILOT_INTERNAL_COPILOT_REAL_LLM.md). |
+
+### Known fragility points (surfaced by real-LLM pilot)
+
+| ID | Issue | Severity | Details |
+|----|-------|----------|---------|
+| FP1 | **Goal alignment safety gate** | Critical | `_compute_goal_alignment()` uses keyword overlap between purpose and response. Vocabulary mismatch → safety gate blocks all actions. |
+| FP2 | **Action type vocabulary mismatch** | Critical | `DECOMPOSITION_PROMPT` asks for types "search\|compute\|generate\|validate\|execute" but domain tools use types like "save_draft", "send_update". Real LLM would return "execute", not "save_draft". |
+| FP3 | **Greedy JSON regex** | Low | `_extract_json()` regex `r"\{[\s\S]*\}"` is greedy. Works for all tested variations but could fail with multiple JSON objects. |
+| FP4 | **Missing `get_last_usage()` in real adapters** | Medium | Real adapters return `None` from `get_last_usage()`. Budget accounting uses estimated values only. |
 
 ---
 

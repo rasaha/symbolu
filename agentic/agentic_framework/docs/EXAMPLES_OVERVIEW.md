@@ -16,6 +16,7 @@ a governed agent with a custom tool.
 | [`examples/governed_agent_with_approval_and_budget.py`](../../../examples/governed_agent_with_approval_and_budget.py) | Approval gates + budget enforcement + structured output | `ApprovalController`, `BudgetPolicy`, `run_structured_with_trace` |
 | [`examples/pilot_research_assistant.py`](../../../examples/pilot_research_assistant.py) | **Pilot 1:** custom tools, approval, budget, structured output, discovery, audit | `build_agent`, `ToolSpec`, `ApprovalController`, `BudgetPolicy`, `ToolCatalog` |
 | [`examples/pilot_internal_copilot.py`](../../../examples/pilot_internal_copilot.py) | **Pilot 2:** approval-gated internal copilot with read/write boundary | `build_agent`, `ToolSpec`, `ApprovalPolicy`, `format_trace`, `ToolCatalog` |
+| [`examples/pilot_internal_copilot_real_llm.py`](../../../examples/pilot_internal_copilot_real_llm.py) | **Pilot 3:** real-LLM validation — parsing fragility, formatting variations | `AnthropicAdapter`/`OpenAIAdapter`, `RealisticMockAdapter`, validation instrumentation |
 | [`examples/cg_tool_demo.py`](../../../examples/cg_tool_demo.py) | CG metadata enrichment (lower-level, pre-R-phase) | `SafeMCPGateway`, `build_governance_enrichment_kwargs`, audit log |
 
 ---
@@ -27,6 +28,7 @@ a governed agent with a custom tool.
 3. **`governed_agent_with_approval_and_budget.py`** — approval, budget, structured output
 4. **`pilot_research_assistant.py`** — realistic multi-phase pilot with custom tools
 5. **`pilot_internal_copilot.py`** — per-action-type approval, approve + deny paths, trace comparison
+6. **`pilot_internal_copilot_real_llm.py`** — real-LLM validation, parsing fragility, formatting variations
 
 ---
 
@@ -109,6 +111,9 @@ python examples/pilot_research_assistant.py
 
 # Pilot 2 — approval-gated internal copilot (approve + deny paths)
 python examples/pilot_internal_copilot.py
+
+# Pilot 3 — real-LLM validation (works without API key)
+python examples/pilot_internal_copilot_real_llm.py
 
 # CG metadata enrichment demo (lower-level)
 python examples/cg_tool_demo.py
