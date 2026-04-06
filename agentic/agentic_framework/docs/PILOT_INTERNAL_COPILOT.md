@@ -101,8 +101,10 @@ are set, a developer-approved action gets blocked by the gateway.
 uses `ApprovalPolicy` (orchestration-level) and leaves
 `requires_confirmation=False` on the ToolSpecs.
 
-**Recommended fix:** Either pass R4 approval decisions through to
-the gateway, or document the two-layer model explicitly.
+**Resolution:** The two-layer model is now documented in
+`QUICKSTART.md` (§ "Two approval layers") with clear guidance on
+when to use each. The `describe_approval_coverage()` helper flags
+double-gated actions before the run starts.
 
 ### F2: Action mapping repetition
 
@@ -132,11 +134,9 @@ The "Approval-required tools" display from
 flag. The R4 `ApprovalPolicy` is a separate object. There is no
 single query that shows "which tools will trigger R4 approval?"
 
-**Workaround:** The pilot manually iterates
-`approval_policy.requires_approval(tool.name)` to show coverage.
-
-**Recommended fix:** Consider a helper that merges ToolCatalog
-and ApprovalPolicy into a unified "what needs approval?" view.
+**Resolution:** The `describe_approval_coverage()` helper now
+combines `ApprovalPolicy`, `ToolCatalog`, and action mapping into
+a single coverage report. The pilot uses it in Phase 1.
 
 ---
 

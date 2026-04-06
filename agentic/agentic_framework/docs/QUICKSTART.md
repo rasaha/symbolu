@@ -155,6 +155,7 @@ adapter  →  AgenticLLMWrapper  →  SafetyGate  →  action loop  →  trace
 | Add budget limits | Pass `budget_policy=...` to `run_stream` / `run_with_trace` |
 | Cancel a run | Pass `cancellation_token=...` to `run_stream` / `run_with_trace` |
 | Discover registered tools | `ToolCatalog.from_gateway(gateway)` or `ToolCatalog.from_agent(agent)` |
+| Preview approval coverage | `describe_approval_coverage(action_type_to_tool=..., approval_policy=..., catalog=...)` |
 
 ### Key types at a glance
 
@@ -200,6 +201,82 @@ output). The difference is in how governance signals are sourced:
   Requires a CG-capable adapter.
 
 **If you are not sure which to use, use `build_agent()`.**
+
+---
+
+## Two approval layers
+
+The framework has two independent approval mechanisms. They serve
+different purposes and operate at different levels:
+
+### Layer 1: R4 orchestration approval (`ApprovalPolicy`)
+
+- **Where:** Before the action starts, in the `run_stream()` action loop
+- **Scope:** Action-type oriented — you specify which action types
+  need approval (e.g. `"save"`, `"send"`, `"escalate"`)
+- **Control:** Your `ApprovalCallback` receives a `PendingApproval`
+  and returns approve/deny
+- **Use when:** You want explicit human-in-the-loop before selected
+  actions execute
+
+```python
+policy = ApprovalPolicy(require_approval_for=frozenset({"save", "send"}))
+ctrl = ApprovalController(policy=policy, callback=my_callback)
+agent.run_stream(prompt, approval_controller=ctrl)
+```
+
+### Layer 2: Gateway confirmation (`requires_confirmation`)
+
+- **Where:** Inside `SafeMCPGateway`, when the tool call executes
+- **Scope:** Tool-definition oriented — set on `ToolSpec` or
+  `MCPToolDefinition`
+- **Control:** The gateway's `EscalationHandler` decides (default
+  handler auto-denies; use `InteractiveEscalationHandler` for
+  custom logic)
+- **Use when:** A tool is inherently dangerous and should always
+  require confirmation at the gateway level, regardless of the
+  orchestration policy
+
+```python
+ToolSpec(
+    handler=delete_handler,
+    risk_level=ToolRiskLevel.DESTRUCTIVE,
+    requires_confirmation=True,  # gateway-level gate
+)
+```
+
+### Guidance
+
+| Scenario | Use |
+|----------|-----|
+| "I want human approval before saves/sends" | `ApprovalPolicy` (Layer 1) |
+| "This tool is always dangerous" | `requires_confirmation` (Layer 2) |
+| "I want both" | Set both — the action is gated twice (first R4, then gateway) |
+| "I'm not sure" | Use `ApprovalPolicy` — it is the simpler, more visible layer |
+
+**Do not set both casually.** If both are active for the same
+action/tool, the developer must approve via the R4 callback *and*
+the gateway's escalation handler must also confirm. The default
+escalation handler auto-denies, so the action would be blocked
+even after R4 approval.
+
+### Preview coverage before running
+
+Use `describe_approval_coverage()` to see which layers are active:
+
+```python
+from agentic.agentic_framework.approval_coverage import (
+    describe_approval_coverage,
+    format_approval_coverage,
+)
+
+coverage = describe_approval_coverage(
+    action_type_to_tool={"search": "search", "save": "save_draft"},
+    approval_policy=policy,
+    catalog=ToolCatalog.from_agent(agent),
+)
+print(format_approval_coverage(coverage))
+```
 
 ---
 

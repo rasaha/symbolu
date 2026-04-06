@@ -54,6 +54,10 @@ from agentic.agentic_framework.approval import (
     ApprovalResponse,
     PendingApproval,
 )
+from agentic.agentic_framework.approval_coverage import (
+    describe_approval_coverage,
+    format_approval_coverage,
+)
 from agentic.agentic_framework.llm_adapters import (
     MockLLMAdapter,
     SequentialMockAdapter,
@@ -203,6 +207,22 @@ COPILOT_TOOLS: Dict[str, ToolSpec] = {
         capabilities=["incident_management"],
         min_confidence=0.7,
     ),
+}
+
+
+# =====================================================================
+# Action mapping — shared across phases
+# =====================================================================
+
+ACTION_MAPPING: Dict[str, str] = {
+    "search": "search",
+    "analyze": "analyze",
+    "check_alerts": "check_alerts",
+    "save_draft": "save_draft",
+    "save": "save_draft",
+    "send_update": "send_update",
+    "send": "send_update",
+    "escalate": "escalate",
 }
 
 
@@ -397,16 +417,7 @@ def run_pilot():
         adapter=adapter,
         tools=COPILOT_TOOLS,
         allow_stub=True,
-        action_type_to_tool={
-            "search": "search",
-            "analyze": "analyze",
-            "check_alerts": "check_alerts",
-            "save_draft": "save_draft",
-            "save": "save_draft",
-            "send_update": "send_update",
-            "send": "send_update",
-            "escalate": "escalate",
-        },
+        action_type_to_tool=ACTION_MAPPING,
     )
     agent.new_session()
 
@@ -419,15 +430,16 @@ def run_pilot():
         print(f"      {tool.description}")
 
     read_tools = catalog.find_tools(risk_level="read_only")
-    write_tools = catalog.find_tools(requires_confirmation=True)
-    print(f"\n  Read-only tools:         {[t.name for t in read_tools]}")
-    print(f"  Approval-required tools: {[t.name for t in write_tools]}")
+    print(f"\n  Read-only tools: {[t.name for t in read_tools]}")
 
-    # Show approval policy coverage
-    print(f"\n  Approval policy coverage:")
-    for tool in catalog.list_tools():
-        needs = approval_policy.requires_approval(tool.name)
-        print(f"    {tool.name:<16} → {'APPROVAL REQUIRED' if needs else 'auto-execute'}")
+    # Show approval coverage using the helper
+    coverage = describe_approval_coverage(
+        action_type_to_tool=ACTION_MAPPING,
+        approval_policy=approval_policy,
+        catalog=catalog,
+    )
+    print()
+    print(format_approval_coverage(coverage))
 
     # -----------------------------------------------------------------
     # Phase 2: Free Read Path (no approval needed)
@@ -437,16 +449,7 @@ def run_pilot():
         adapter=adapter_search,
         tools=COPILOT_TOOLS,
         allow_stub=True,
-        action_type_to_tool={
-            "search": "search",
-            "analyze": "analyze",
-            "check_alerts": "check_alerts",
-            "save_draft": "save_draft",
-            "save": "save_draft",
-            "send_update": "send_update",
-            "send": "send_update",
-            "escalate": "escalate",
-        },
+        action_type_to_tool=ACTION_MAPPING,
     )
     agent_read.new_session()
 
@@ -466,16 +469,7 @@ def run_pilot():
         adapter=adapter_save,
         tools=COPILOT_TOOLS,
         allow_stub=True,
-        action_type_to_tool={
-            "search": "search",
-            "analyze": "analyze",
-            "check_alerts": "check_alerts",
-            "save_draft": "save_draft",
-            "save": "save_draft",
-            "send_update": "send_update",
-            "send": "send_update",
-            "escalate": "escalate",
-        },
+        action_type_to_tool=ACTION_MAPPING,
     )
     agent_save.new_session()
 
@@ -495,16 +489,7 @@ def run_pilot():
         adapter=adapter_send,
         tools=COPILOT_TOOLS,
         allow_stub=True,
-        action_type_to_tool={
-            "search": "search",
-            "analyze": "analyze",
-            "check_alerts": "check_alerts",
-            "save_draft": "save_draft",
-            "save": "save_draft",
-            "send_update": "send_update",
-            "send": "send_update",
-            "escalate": "escalate",
-        },
+        action_type_to_tool=ACTION_MAPPING,
     )
     agent_send.new_session()
 

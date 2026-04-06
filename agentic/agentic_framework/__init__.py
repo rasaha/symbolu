@@ -129,6 +129,11 @@ from agentic.agentic_framework.approval import (
     ApprovalResponse,
     PendingApproval,
 )
+from agentic.agentic_framework.approval_coverage import (
+    ApprovalCoverageEntry,
+    describe_approval_coverage,
+    format_approval_coverage,
+)
 from agentic.agentic_framework.token_budget import (
     BudgetPolicy,
     UsageStats,
@@ -327,6 +332,10 @@ __all__ = [
     "ApprovalPolicy",
     "ApprovalResponse",
     "PendingApproval",
+    # Approval coverage (R4 + gateway visibility)
+    "ApprovalCoverageEntry",
+    "describe_approval_coverage",
+    "format_approval_coverage",
     # MCP Discovery / Tool Introspection (R8)
     "DiscoveredTool",
     "ToolCatalog",
