@@ -50,18 +50,25 @@ print(f'Status: {trace.status}, Events: {trace.event_count}, Tokens: {trace.tota
 
 ---
 
-## Next step: governed agent with tool governance
+## Next step: governed agent with custom tools
 
 This adds the full governed path — SafetyGate (turn-level) +
-SafeMCPGateway (per-tool) — using the stub CG adapter:
+SafeMCPGateway (per-tool) — with custom tool handlers:
 
 ```python
-from agentic.agentic_framework.cg_tool_dispatcher import build_cg_mcp_agent
-from agentic.agentic_framework.llm_adapters import StubCGLLMAdapter
+from agentic.agentic_framework.agent_builder import build_agent
+from agentic.agentic_framework.mcp_gateway import ToolSpec, ToolRiskLevel
+from agentic.agentic_framework.llm_adapters import MockLLMAdapter
 
-agent = build_cg_mcp_agent(
-    adapter=StubCGLLMAdapter(default_response="Quantum computing uses qubits."),
-    allow_stub=True,
+agent = build_agent(
+    adapter=MockLLMAdapter(default_response="Quantum computing uses qubits."),
+    tools={
+        "search": ToolSpec(
+            handler=lambda p: [f"Result for {p.get('query', '')}"],
+            description="Search for papers",
+            risk_level=ToolRiskLevel.READ_ONLY,
+        ),
+    },
 )
 agent.new_session()
 
@@ -72,20 +79,25 @@ print(f"Actions: {trace.actions_executed}")
 print(f"Safety:  {'blocked' if trace.safety_blocked else 'passed'}")
 ```
 
-What `build_cg_mcp_agent` composes for you:
-- `StubCGLLMAdapter` — generates text + deterministic 32D state fixture
-- `CGToolDispatcher` — reads CG metadata, routes to gateway
+`build_agent()` composes the full governed stack for you:
+- `MockMCPClient` — hosts your custom tool handlers
 - `SafeMCPGateway` — per-tool risk classification + governance
+- `CGToolDispatcher` — routes tool calls through the gateway
 - `SafetyGate` — turn-level coherence gate (runs before any action)
+- `AgenticLLMWrapper` — orchestrates the pipeline
 
-To switch from stub to real inference, replace the adapter:
+`ToolSpec` bundles a handler with its governance metadata (risk
+level, capabilities, confirmation requirements) in one object —
+no more two-step registration.
+
+To switch to a real LLM, replace the adapter:
 ```python
-from agentic.agentic_framework.llm_adapters import MistralCGAdapter
-agent = build_cg_mcp_agent(
-    adapter=MistralCGAdapter(model_name="mistralai/Mistral-7B-v0.3"),
+from agentic.agentic_framework.llm_adapters import OpenAIAdapter
+agent = build_agent(
+    adapter=OpenAIAdapter(api_key="sk-...", model="gpt-4"),
+    tools={...},
 )
 ```
-Nothing else changes. Real inference requires torch + GPU.
 
 ---
 
@@ -133,6 +145,7 @@ adapter  →  AgenticLLMWrapper  →  SafetyGate  →  action loop  →  trace
 
 | What you want | Use this |
 |---------------|----------|
+| Build a governed agent | `build_agent(adapter=..., tools={...})` → `AgenticLLMWrapper` |
 | Run a query, get a result | `agent.run(prompt)` → `AgentResult` |
 | Stream lifecycle events | `agent.run_stream(prompt, ...)` → `Iterator[AgentRunEvent]` |
 | Get a complete trace | `agent.run_with_trace(prompt, ...)` → `AgentRunTrace` |
@@ -147,6 +160,8 @@ adapter  →  AgenticLLMWrapper  →  SafetyGate  →  action loop  →  trace
 
 | Type | Module | Purpose |
 |------|--------|---------|
+| `build_agent()` | `agent_builder.py` | High-level factory — adapter + tools → governed agent |
+| `ToolSpec` | `mcp_gateway.py` | Bundles a tool handler with its governance metadata |
 | `AgenticLLMWrapper` | `agent.py` | Main agent — orchestrates the full pipeline |
 | `AgentResult` | `agent.py` | Return value of `run()` — response, quality, actions, coherence |
 | `AgentRunEvent` | `streaming_events.py` | Single lifecycle event (17 types) |

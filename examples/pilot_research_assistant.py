@@ -46,14 +46,11 @@ from agentic.agentic_framework.approval import (
     ApprovalResponse,
     PendingApproval,
 )
-from agentic.agentic_framework.cg_tool_dispatcher import CGToolDispatcher
+from agentic.agentic_framework.agent_builder import build_agent
 from agentic.agentic_framework.llm_adapters import SequentialMockAdapter
 from agentic.agentic_framework.mcp_gateway import (
-    MCPToolDefinition,
-    MockMCPClient,
-    SafeMCPGateway,
+    ToolSpec,
     ToolRiskLevel,
-    create_safe_mcp_gateway,
 )
 from agentic.agentic_framework.streaming_events import (
     ACTION_COMPLETED,
@@ -158,58 +155,37 @@ def save_report(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # =====================================================================
-# Gateway factory — custom tools with appropriate risk classification
+# Research tools — ToolSpec bundles handler + governance metadata
 # =====================================================================
 
-def build_research_gateway() -> SafeMCPGateway:
-    """Build a gateway with research-specific tools and risk levels."""
-    client = MockMCPClient()
-
-    # Read-only research tools
-    client.register_tool("search", research_search, ToolRiskLevel.READ_ONLY)
-    client.register_tool("compute", research_compute, ToolRiskLevel.READ_ONLY)
-    client.register_tool("validate", research_validate, ToolRiskLevel.READ_ONLY)
-
-    # Write-risk tool (will require approval)
-    client.register_tool("save_report", save_report, ToolRiskLevel.WRITE)
-
-    gateway = create_safe_mcp_gateway(mcp_client=client, audit_enabled=True)
-
-    # Register detailed metadata for risk classification
-    gateway.register_tool(MCPToolDefinition(
-        name="search",
+RESEARCH_TOOLS: Dict[str, ToolSpec] = {
+    "search": ToolSpec(
+        handler=research_search,
         description="Search academic databases for research papers and findings",
         risk_level=ToolRiskLevel.READ_ONLY,
         capabilities=["research", "information_retrieval"],
-        min_confidence=0.3,
-        requires_confirmation=False,
-    ))
-    gateway.register_tool(MCPToolDefinition(
-        name="compute",
+    ),
+    "compute": ToolSpec(
+        handler=research_compute,
         description="Run statistical analysis on research data",
         risk_level=ToolRiskLevel.READ_ONLY,
         capabilities=["analysis", "computation"],
-        min_confidence=0.3,
-        requires_confirmation=False,
-    ))
-    gateway.register_tool(MCPToolDefinition(
-        name="validate",
+    ),
+    "validate": ToolSpec(
+        handler=research_validate,
         description="Cross-reference and validate research findings",
         risk_level=ToolRiskLevel.READ_ONLY,
         capabilities=["validation", "quality_check"],
-        min_confidence=0.3,
-        requires_confirmation=False,
-    ))
-    gateway.register_tool(MCPToolDefinition(
-        name="save_report",
+    ),
+    "save_report": ToolSpec(
+        handler=save_report,
         description="Save research report to persistent storage",
         risk_level=ToolRiskLevel.WRITE,
         capabilities=["persistence", "reporting"],
         min_confidence=0.5,
         requires_confirmation=True,
-    ))
-
-    return gateway
+    ),
+}
 
 
 # =====================================================================
@@ -323,8 +299,23 @@ def run_pilot():
     # Phase 1: Tool Discovery
     # -----------------------------------------------------------------
     print("\n--- Phase 1: Tool Discovery ---")
-    gateway = build_research_gateway()
-    catalog = ToolCatalog.from_gateway(gateway)
+
+    # build_agent composes the full governed stack from tools dict
+    adapter = build_research_adapter(question)
+    agent = build_agent(
+        adapter=adapter,
+        tools=RESEARCH_TOOLS,
+        allow_stub=True,
+        action_type_to_tool={
+            "search": "search",
+            "compute": "compute",
+            "validate": "validate",
+            "save": "save_report",
+        },
+    )
+    agent.new_session()
+
+    catalog = ToolCatalog.from_agent(agent)
 
     print(f"Available tools ({len(catalog)}):")
     for tool in catalog.list_tools():
@@ -346,22 +337,8 @@ def run_pilot():
     print(f"Budget:   max 10,000 tokens / $0.50")
     print(f"Approval: required for all actions")
 
-    adapter = build_research_adapter(question)
-    dispatcher = CGToolDispatcher(adapter, gateway, tier="consumer")
-
-    from agentic.agentic_framework.agent import AgenticLLMWrapper
-
-    agent = AgenticLLMWrapper(
-        llm_client=adapter,
-        dispatcher=dispatcher,
-        action_type_to_tool={
-            "search": "search",
-            "compute": "compute",
-            "validate": "validate",
-            "save": "save_report",
-        },
-    )
-    agent.new_session()
+    # Reuse the agent built in Phase 1 — it already has the
+    # full governed stack (tools, dispatcher, gateway, safety gate).
 
     policy = ApprovalPolicy(require_all=True)
     ctrl = ApprovalController(policy=policy, callback=research_approval_callback)
@@ -462,6 +439,8 @@ def run_pilot():
         ),
     })
 
+    from agentic.agentic_framework import AgenticLLMWrapper
+
     agent2 = AgenticLLMWrapper(
         llm_client=MockLLMAdapter(default_response=answer_json),
         use_llm_for_decomposition=False,
@@ -491,7 +470,7 @@ def run_pilot():
     # Phase 5: Audit Summary
     # -----------------------------------------------------------------
     print(f"\n--- Phase 5: Governance Audit ---")
-    audit = gateway.get_audit_log()
+    audit = agent.dispatcher.gateway.get_audit_log()
     print(f"  Audit entries: {len(audit)}")
     for entry in audit[:5]:
         print(f"    [{entry.decision.value}] {entry.tool_name}"

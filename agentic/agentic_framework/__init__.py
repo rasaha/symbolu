@@ -103,12 +103,14 @@ from agentic.agentic_framework.mcp_gateway import (
     MCPToolResult,
     ToolRiskLevel,
     ToolRiskClassifier,
+    ToolSpec,
     AuditEntry,
     MCPClientInterface,
     MockMCPClient,
     create_safe_mcp_gateway,
     create_mock_mcp_gateway,
 )
+from agentic.agentic_framework.agent_builder import build_agent
 from agentic.agentic_framework.proactive_scheduler import (
     ProactiveScheduler,
     ScheduledTask,
@@ -263,8 +265,11 @@ __all__ = [
     "AuditEntry",
     "MCPClientInterface",
     "MockMCPClient",
+    "ToolSpec",
     "create_safe_mcp_gateway",
     "create_mock_mcp_gateway",
+    # Agent builder
+    "build_agent",
     # Proactive Scheduler (autonomous task execution)
     "ProactiveScheduler",
     "ScheduledTask",
