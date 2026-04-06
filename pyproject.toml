@@ -12,10 +12,10 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10"
 
-# Top-level symbolu package containing all modules
+# Top-level packages containing all modules
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["symbolu*"]
+include = ["symbolu*", "agentic*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

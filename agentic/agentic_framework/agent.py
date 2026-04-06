@@ -18,7 +18,7 @@ Usage:
     agent.new_session()
 
     result = agent.run("What is the capital of France?")
-    print(result["response"])
+    print(result.response)
 """
 
 from __future__ import annotations

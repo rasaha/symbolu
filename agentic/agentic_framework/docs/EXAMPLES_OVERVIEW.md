@@ -32,11 +32,16 @@ Start here if you are new to the framework.
 **Script:** `examples/governed_agent_with_approval_and_budget.py`
 
 Shows runtime primitives working together:
-- `ApprovalPolicy(require_all=True)` with an auto-approve callback
-- `BudgetPolicy(max_total_tokens=5000)`
+- Approval gate with auto-approve callback (action executes)
+- Approval gate with auto-deny callback (action blocked)
+- `BudgetPolicy(max_total_tokens=5000)` with enforcement
 - `run_structured_with_trace()` with a dataclass schema
-- `run_with_trace()` with approval + budget
-- Prints trace summary including approval counts and budget status
+- Budget-exceeded terminal scenario
+- Prints trace summaries including approval counts and budget status
+
+Uses `SequentialMockAdapter` + `build_cg_mcp_agent` to produce a
+`"search"` action that maps to a real MCP tool, so the approval
+gate genuinely fires.
 
 Use this after the first example to see the richer execution
 controls.
@@ -73,17 +78,18 @@ standalone example scripts yet:
 
 ## Running examples
 
-All examples run from the repo root with `PYTHONPATH=.`:
+Install the repo first (`pip install -e .` from repo root), then
+run from the repo root:
 
 ```bash
 # First governed agent (stub, no dependencies)
-PYTHONPATH=. python examples/first_governed_agent.py
+python examples/first_governed_agent.py
 
 # Approval + budget + structured output
-PYTHONPATH=. python examples/governed_agent_with_approval_and_budget.py
+python examples/governed_agent_with_approval_and_budget.py
 
 # CG metadata enrichment demo
-PYTHONPATH=. python examples/cg_tool_demo.py
+python examples/cg_tool_demo.py
 ```
 
 No API keys or GPU required for the first two. They use stub/mock

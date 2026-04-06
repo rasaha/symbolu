@@ -28,7 +28,7 @@ Usage:
 
     # Run conversation
     result = agent.run("What is the capital of France?")
-    print(result["response"])
+    print(result.response)
 """
 
 from agentic.agentic_framework.agent import AgenticLLMWrapper

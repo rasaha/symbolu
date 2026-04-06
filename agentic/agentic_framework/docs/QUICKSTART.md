@@ -11,7 +11,7 @@ Gemini) and adds a structured execution path on top.
 ## Prerequisites
 
 - Python 3.10+
-- The `agentic` package on your Python path (this repo)
+- Install the repo in editable mode: `pip install -e .` from the repo root
 - For API-based adapters: an API key for your LLM provider
 - For the stub/dev path (no API key needed): nothing else
 
@@ -36,9 +36,9 @@ print(f"Actions: {trace.actions_executed}")
 print(f"Tokens:  {trace.total_tokens} ({trace.accounting_mode})")
 ```
 
-Run it (from the repo root):
+Run it:
 ```bash
-PYTHONPATH=. python -c "
+python -c "
 from agentic.agentic_framework import AgenticLLMWrapper
 from agentic.agentic_framework.llm_adapters import MockLLMAdapter
 agent = AgenticLLMWrapper(MockLLMAdapter(default_response='Paris.'))
