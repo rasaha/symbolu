@@ -143,6 +143,11 @@ from agentic.agentic_framework.tracing import (
     AgentRunTrace,
     TraceCollector,
 )
+from agentic.agentic_framework.trace_viewer import (
+    format_trace,
+    format_trace_summary,
+    format_trace_timeline,
+)
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
     make_event,
@@ -284,6 +289,10 @@ __all__ = [
     # Tracing (R11)
     "AgentRunTrace",
     "TraceCollector",
+    # Trace viewer (R11)
+    "format_trace",
+    "format_trace_summary",
+    "format_trace_timeline",
     # Structured Output (R6)
     "OutputSchema",
     "SchemaTarget",

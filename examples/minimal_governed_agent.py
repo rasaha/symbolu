@@ -10,6 +10,7 @@ What this shows:
     - build_agent() composes the full governed stack in one call
     - ToolSpec bundles a handler with its governance metadata
     - run_with_trace() returns a complete execution summary
+    - format_trace() renders the trace as readable text
     - No API key, no GPU, no configuration files
 
 Run:
@@ -19,6 +20,7 @@ Run:
 from agentic.agentic_framework.agent_builder import build_agent
 from agentic.agentic_framework.llm_adapters import MockLLMAdapter
 from agentic.agentic_framework.mcp_gateway import ToolSpec, ToolRiskLevel
+from agentic.agentic_framework.trace_viewer import format_trace
 
 
 def main():
@@ -43,10 +45,8 @@ def main():
     # Run and get a full trace
     trace = agent.run_with_trace("Tell me about Python")
 
-    print(f"Status:  {trace.status}")
-    print(f"Events:  {trace.event_count}")
-    print(f"Actions: {trace.actions_executed}")
-    print(f"Tokens:  {trace.total_tokens} ({trace.accounting_mode})")
+    # Print the formatted trace (summary + timeline)
+    print(format_trace(trace))
 
 
 if __name__ == "__main__":
