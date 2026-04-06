@@ -69,9 +69,11 @@ class UsageStats:
     model: str = ""
     accounting_mode: str = "none"  # exact | estimated | mixed | none
 
-    # Internal flags — not serialised
-    _input_exact: bool = field(default=False, repr=False)
-    _output_exact: bool = field(default=False, repr=False)
+    # Internal counters — not serialised.  Track how many exact vs
+    # estimated measurements have been recorded so the accounting mode
+    # reflects the true aggregate, not just the most recent call.
+    _exact_count: int = field(default=0, repr=False)
+    _estimated_count: int = field(default=0, repr=False)
 
     # ----- mutation helpers -----
 
@@ -91,17 +93,22 @@ class UsageStats:
         directly and ``accounting_mode`` reflects ``exact``.  Otherwise
         the values are estimated from text length.
         """
+        has_exact = False
+        has_estimated = False
+
         if exact_input is not None:
             self.input_tokens += exact_input
-            self._input_exact = True
+            has_exact = True
         else:
             self.input_tokens += estimate_tokens(prompt_text)
+            has_estimated = True
 
         if exact_output is not None:
             self.output_tokens += exact_output
-            self._output_exact = True
+            has_exact = True
         else:
             self.output_tokens += estimate_tokens(output_text)
+            has_estimated = True
 
         self.total_tokens = self.input_tokens + self.output_tokens
 
@@ -111,10 +118,15 @@ class UsageStats:
         if model:
             self.model = model
 
-        # Derive accounting mode
-        if self._input_exact and self._output_exact:
+        if has_exact:
+            self._exact_count += 1
+        if has_estimated:
+            self._estimated_count += 1
+
+        # Derive accounting mode from aggregate history
+        if self._exact_count > 0 and self._estimated_count == 0:
             self.accounting_mode = "exact"
-        elif self._input_exact or self._output_exact:
+        elif self._exact_count > 0 and self._estimated_count > 0:
             self.accounting_mode = "mixed"
         elif self.total_tokens > 0:
             self.accounting_mode = "estimated"

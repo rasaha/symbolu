@@ -22,7 +22,7 @@ Usage::
 
     result = agent.run_structured("Capital of France?", schema=City)
     if result.success:
-        print(result.parsed)  # City(name='Paris', ...)
+        print(result.parsed_output)  # City(name='Paris', ...)
 """
 
 from __future__ import annotations

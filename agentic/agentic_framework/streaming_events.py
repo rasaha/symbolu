@@ -1,14 +1,19 @@
 """
-Streaming Events — Runtime Event Model (R1)
+Streaming Events — Runtime Event Model (R1/R2/R4/R6/R9)
 
 Lightweight structured events emitted by ``AgenticLLMWrapper.run_stream()``
-to surface agent lifecycle progress to callers without breaking the existing
-``run()`` contract.
+and ``run_stream_async()`` to surface agent lifecycle progress to callers
+without breaking the existing ``run()`` contract.
 
 Event categories:
-    run_started, generation_started, text_chunk, generation_completed,
-    safety_gate_result, action_started, action_completed, run_completed,
-    run_error, revision_started, revision_completed
+    Lifecycle (R1):  run_started, generation_started, text_chunk,
+        generation_completed, safety_gate_result, action_started,
+        action_completed, run_completed, run_error
+    Revision (R1):   revision_started, revision_completed
+    Cancellation (R2): run_cancelled
+    Approval (R4):   approval_requested, approval_resolved
+    Structured (R6): structured_validation
+    Budget (R9):     usage_updated, budget_exceeded
 """
 
 from __future__ import annotations

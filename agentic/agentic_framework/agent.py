@@ -414,6 +414,8 @@ class AgenticLLMWrapper:
         self,
         user_input: str,
         cancellation_token: Optional[CancellationToken] = None,
+        approval_controller: Optional[ApprovalController] = None,
+        budget_policy: Optional[BudgetPolicy] = None,
     ) -> AgentRunTrace:
         """
         One-shot helper: run the full pipeline and return a complete
@@ -429,6 +431,8 @@ class AgenticLLMWrapper:
             user_input,
             cancellation_token=cancellation_token,
             trace_collector=collector,
+            approval_controller=approval_controller,
+            budget_policy=budget_policy,
         ):
             pass  # consume the generator; events are recorded by collector
         return collector.build_trace()
@@ -449,6 +453,14 @@ class AgenticLLMWrapper:
         response is parsed as JSON, and the result is validated against
         *schema*.
 
+        .. note::
+
+            This method uses the non-streaming ``run()`` path.
+            Cancellation, approval, budget enforcement, and tracing
+            are not available here.  Use
+            :meth:`run_structured_with_trace` for access to those
+            runtime primitives.
+
         Args:
             user_input: User's input text.
             schema: Target schema — a dataclass type, Pydantic model
@@ -456,7 +468,7 @@ class AgenticLLMWrapper:
 
         Returns:
             ``StructuredRunResult`` with ``success=True`` and a
-            populated ``parsed`` field on success, or
+            populated ``parsed_output`` field on success, or
             ``success=False`` with ``validation_error`` on failure.
         """
         augmented = build_schema_prompt(user_input, schema)
@@ -502,10 +514,16 @@ class AgenticLLMWrapper:
         user_input: str,
         schema: SchemaTarget,
         cancellation_token: Optional[CancellationToken] = None,
+        approval_controller: Optional[ApprovalController] = None,
+        budget_policy: Optional[BudgetPolicy] = None,
     ) -> tuple[StructuredRunResult, AgentRunTrace]:
         """
         Like :meth:`run_structured` but also returns a full
         ``AgentRunTrace`` including a ``structured_validation`` event.
+
+        Supports all streaming runtime primitives (cancellation,
+        approval, budget) because the underlying execution uses
+        :meth:`run_stream`.
         """
         augmented = build_schema_prompt(user_input, schema)
         sname = _schema_name(schema)
@@ -515,6 +533,8 @@ class AgenticLLMWrapper:
             augmented,
             cancellation_token=cancellation_token,
             trace_collector=collector,
+            approval_controller=approval_controller,
+            budget_policy=budget_policy,
         ):
             pass
 
@@ -529,7 +549,7 @@ class AgenticLLMWrapper:
                 quality_score = rd.get("quality_score", 0.0)
                 revision_count = rd.get("revision_count", 0)
                 break
-            if evt.event_type in (RUN_ERROR, RUN_CANCELLED):
+            if evt.event_type in (RUN_ERROR, RUN_CANCELLED, BUDGET_EXCEEDED):
                 raw_text = ""
                 break
 

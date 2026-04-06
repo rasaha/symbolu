@@ -336,4 +336,4 @@ __all__ = [
     "create_conservative_pipeline",
 ]
 
-__version__ = "1.7.0"  # V11.0.0: Sovereign State Bridge (tensor → agentic wiring)
+__version__ = "1.8.0"  # R1-R11 runtime primitives: streaming, cancellation, approval, structured, budget, tracing, discovery
