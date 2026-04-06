@@ -179,6 +179,10 @@ from agentic.agentic_framework.tool_discovery import (
     ToolCatalog,
 )
 from agentic.agentic_framework.llm_adapters import (
+    MockLLMAdapter,
+    SequentialMockAdapter,
+    OpenAIAdapter,
+    AnthropicAdapter,
     MistralAdapter,
     MistralCGAdapter,
 )
@@ -340,7 +344,11 @@ __all__ = [
     # MCP Discovery / Tool Introspection (R8)
     "DiscoveredTool",
     "ToolCatalog",
-    # LLM Adapters (Mistral API + local MistralCG)
+    # LLM Adapters
+    "MockLLMAdapter",
+    "SequentialMockAdapter",
+    "OpenAIAdapter",
+    "AnthropicAdapter",
     "MistralAdapter",
     "MistralCGAdapter",
     # Adaptive Prompts (automated AI reasoning)

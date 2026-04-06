@@ -22,8 +22,7 @@ Gemini) and adds a structured execution path on top.
 This runs entirely locally with no API key, using a mock adapter:
 
 ```python
-from agentic.agentic_framework import AgenticLLMWrapper
-from agentic.agentic_framework.llm_adapters import MockLLMAdapter
+from agentic.agentic_framework import AgenticLLMWrapper, MockLLMAdapter
 
 agent = AgenticLLMWrapper(MockLLMAdapter(default_response="Paris is the capital of France."))
 agent.new_session()
@@ -39,8 +38,7 @@ print(f"Tokens:  {trace.total_tokens} ({trace.accounting_mode})")
 Run it:
 ```bash
 python -c "
-from agentic.agentic_framework import AgenticLLMWrapper
-from agentic.agentic_framework.llm_adapters import MockLLMAdapter
+from agentic.agentic_framework import AgenticLLMWrapper, MockLLMAdapter
 agent = AgenticLLMWrapper(MockLLMAdapter(default_response='Paris.'))
 agent.new_session()
 trace = agent.run_with_trace('Capital of France?')
@@ -56,9 +54,9 @@ This adds the full governed path — SafetyGate (turn-level) +
 SafeMCPGateway (per-tool) — with custom tool handlers:
 
 ```python
-from agentic.agentic_framework.agent_builder import build_agent
-from agentic.agentic_framework.mcp_gateway import ToolSpec, ToolRiskLevel
-from agentic.agentic_framework.llm_adapters import MockLLMAdapter
+from agentic.agentic_framework import (
+    build_agent, ToolSpec, ToolRiskLevel, MockLLMAdapter,
+)
 
 agent = build_agent(
     adapter=MockLLMAdapter(default_response="Quantum computing uses qubits."),
@@ -98,6 +96,54 @@ agent = build_agent(
     tools={...},
 )
 ```
+
+---
+
+## How action types map to tools
+
+When the agent decomposes a prompt into actions, each action gets an
+`action_type` (e.g. `"search"`, `"execute"`, `"generate"`). The
+`action_type_to_tool` mapping tells the runtime which registered tool
+to invoke for each action type.
+
+**Default behavior:** When you pass `tools={"search": ToolSpec(...)}`,
+`build_agent()` creates an identity mapping: `{"search": "search"}`.
+This works when the LLM produces action types that exactly match your
+tool names.
+
+**When you need an explicit mapping:** Real LLMs often produce generic
+action types (`"search"`, `"execute"`, `"generate"`, `"compute"`,
+`"validate"`) from the decomposition prompt. If your tool names are
+domain-specific (like `"check_alerts"` or `"save_draft"`), you need
+to map them:
+
+```python
+agent = build_agent(
+    adapter=my_adapter,
+    tools={
+        "check_alerts": ToolSpec(handler=check_fn, ...),
+        "save_draft": ToolSpec(handler=save_fn, ...),
+    },
+    action_type_to_tool={
+        "check_alerts": "check_alerts",   # identity
+        "save_draft": "save_draft",       # identity
+        "search": "check_alerts",         # generic → domain
+        "execute": "save_draft",          # generic → domain
+    },
+)
+```
+
+The framework also has context-aware normalization: when a generic
+type like `"execute"` appears and the action description contains
+keywords like "send", "save", or "escalate", it can automatically
+route to the right domain tool. See `normalize_action_type()` for
+details.
+
+**With `MockLLMAdapter`:** The mock adapter returns a fixed string.
+If that string is valid JSON matching the decomposition format, the
+framework parses it and uses the action types from the JSON. If not,
+it falls back to rule-based extraction which produces generic types
+like `"generate"`.
 
 ---
 
