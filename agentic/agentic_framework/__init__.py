@@ -120,6 +120,10 @@ from agentic.agentic_framework.proactive_scheduler import (
     create_task,
 )
 from agentic.agentic_framework.cancellation import CancellationToken
+from agentic.agentic_framework.tracing import (
+    AgentRunTrace,
+    TraceCollector,
+)
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
     make_event,
@@ -246,6 +250,9 @@ __all__ = [
     "create_task",
     # Cancellation (R2)
     "CancellationToken",
+    # Tracing (R11)
+    "AgentRunTrace",
+    "TraceCollector",
     # Streaming Events (R1) + Cancellation event (R2)
     "AgentRunEvent",
     "make_event",
