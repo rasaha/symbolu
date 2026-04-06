@@ -127,6 +127,11 @@ from agentic.agentic_framework.approval import (
     ApprovalResponse,
     PendingApproval,
 )
+from agentic.agentic_framework.token_budget import (
+    BudgetPolicy,
+    UsageStats,
+    estimate_tokens,
+)
 from agentic.agentic_framework.structured_output import (
     OutputSchema,
     SchemaTarget,
@@ -154,6 +159,8 @@ from agentic.agentic_framework.streaming_events import (
     REVISION_COMPLETED,
     APPROVAL_REQUESTED,
     APPROVAL_RESOLVED,
+    USAGE_UPDATED,
+    BUDGET_EXCEEDED,
 )
 from agentic.agentic_framework.llm_adapters import (
     MistralAdapter,
@@ -290,6 +297,12 @@ __all__ = [
     "STRUCTURED_VALIDATION",
     "APPROVAL_REQUESTED",
     "APPROVAL_RESOLVED",
+    "USAGE_UPDATED",
+    "BUDGET_EXCEEDED",
+    # Token / Cost Budget (R9)
+    "BudgetPolicy",
+    "UsageStats",
+    "estimate_tokens",
     # Approval / Human-in-the-Loop (R4)
     "ApprovalCallback",
     "ApprovalController",

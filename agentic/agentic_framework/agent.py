@@ -66,6 +66,10 @@ from agentic.agentic_framework.approval import (
     ApprovalController,
     PendingApproval,
 )
+from agentic.agentic_framework.token_budget import (
+    BudgetPolicy,
+    UsageStats,
+)
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
     make_event,
@@ -84,6 +88,8 @@ from agentic.agentic_framework.streaming_events import (
     STRUCTURED_VALIDATION,
     APPROVAL_REQUESTED,
     APPROVAL_RESOLVED,
+    USAGE_UPDATED,
+    BUDGET_EXCEEDED,
 )
 from agentic.agentic_framework.coherence_tracker import (
     CoherenceState,
@@ -587,13 +593,15 @@ class AgenticLLMWrapper:
         cancellation_token: Optional[CancellationToken] = None,
         trace_collector: Optional[TraceCollector] = None,
         approval_controller: Optional[ApprovalController] = None,
+        budget_policy: Optional[BudgetPolicy] = None,
     ) -> Iterator[AgentRunEvent]:
         """
         Streaming variant of :meth:`run`.
 
         Yields ``AgentRunEvent`` instances as the agent progresses
         through its pipeline.  The final event is always
-        ``run_completed``, ``run_cancelled``, or ``run_error``.
+        ``run_completed``, ``run_cancelled``, ``run_error``, or
+        ``budget_exceeded``.
 
         Args:
             user_input: User's input text.
@@ -606,6 +614,10 @@ class AgenticLLMWrapper:
                 execution.  When supplied, actions matching the
                 controller's policy emit ``approval_requested`` events
                 and pause until the callback approves or denies.
+            budget_policy: Optional token/cost budget.  When supplied,
+                usage is checked after generation and before each
+                action.  Exceeding the budget emits ``budget_exceeded``
+                and stops the run.
         """
         # Ensure session exists
         if self._memory is None:
@@ -686,6 +698,35 @@ class AgenticLLMWrapper:
                 },
             ))
 
+            # --- usage tracking (R9) ---
+            _usage = UsageStats()
+            _adapter_usage = (
+                self.llm.get_last_usage()
+                if hasattr(self.llm, "get_last_usage")
+                else None
+            )
+            _usage.record_generation(
+                prompt_text=user_input,
+                output_text=generation_result.final_output,
+                exact_input=(_adapter_usage or {}).get("input_tokens"),
+                exact_output=(_adapter_usage or {}).get("output_tokens"),
+                cost=(_adapter_usage or {}).get("cost"),
+                model=(_adapter_usage or {}).get("model")
+                or getattr(self.llm, "model", ""),
+            )
+            yield _emit(_evt(USAGE_UPDATED, _usage.to_dict()))
+
+            # --- budget check: after generation ---
+            _bp = budget_policy
+            if _bp is not None:
+                _exceeded = _bp.is_exceeded(_usage)
+                if _exceeded:
+                    yield _emit(_evt(BUDGET_EXCEEDED, {
+                        "reason": _exceeded,
+                        **_usage.to_dict(),
+                    }))
+                    return
+
             # 4. Create turn snapshot
             turn = create_turn_snapshot(
                 turn_id=turn_id,
@@ -755,6 +796,16 @@ class AgenticLLMWrapper:
                     if token and token.is_cancelled:
                         yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
                         return
+
+                    # --- budget check: before each action (R9) ---
+                    if _bp is not None:
+                        _exceeded = _bp.is_exceeded(_usage)
+                        if _exceeded:
+                            yield _emit(_evt(BUDGET_EXCEEDED, {
+                                "reason": _exceeded,
+                                **_usage.to_dict(),
+                            }))
+                            return
 
                     # --- approval gate (R4) ---
                     if _ac and _ac.needs_approval(action.action_type):
@@ -877,15 +928,17 @@ class AgenticLLMWrapper:
         cancellation_token: Optional[CancellationToken] = None,
         trace_collector: Optional[TraceCollector] = None,
         approval_controller: Optional[ApprovalController] = None,
+        budget_policy: Optional[BudgetPolicy] = None,
     ) -> AsyncIterator[AgentRunEvent]:
         """
         Async streaming variant of :meth:`run_stream`.
 
         Yields ``AgentRunEvent`` asynchronously.  Accepts the same
         optional ``CancellationToken`` for cooperative cancellation,
-        an optional ``TraceCollector`` for in-memory tracing, and
+        an optional ``TraceCollector`` for in-memory tracing,
         an optional ``ApprovalController`` for human-in-the-loop
-        approval gating.
+        approval gating, and an optional ``BudgetPolicy`` for
+        token/cost budget enforcement.
         """
         if self._memory is None:
             self.new_session()
@@ -959,6 +1012,35 @@ class AgenticLLMWrapper:
                 },
             ))
 
+            # --- usage tracking (R9) ---
+            _usage = UsageStats()
+            _adapter_usage = (
+                self.llm.get_last_usage()
+                if hasattr(self.llm, "get_last_usage")
+                else None
+            )
+            _usage.record_generation(
+                prompt_text=user_input,
+                output_text=generation_result.final_output,
+                exact_input=(_adapter_usage or {}).get("input_tokens"),
+                exact_output=(_adapter_usage or {}).get("output_tokens"),
+                cost=(_adapter_usage or {}).get("cost"),
+                model=(_adapter_usage or {}).get("model")
+                or getattr(self.llm, "model", ""),
+            )
+            yield _emit(_evt(USAGE_UPDATED, _usage.to_dict()))
+
+            # --- budget check: after generation ---
+            _bp = budget_policy
+            if _bp is not None:
+                _exceeded = _bp.is_exceeded(_usage)
+                if _exceeded:
+                    yield _emit(_evt(BUDGET_EXCEEDED, {
+                        "reason": _exceeded,
+                        **_usage.to_dict(),
+                    }))
+                    return
+
             turn = create_turn_snapshot(
                 turn_id=turn_id,
                 user_input=user_input,
@@ -1022,6 +1104,16 @@ class AgenticLLMWrapper:
                     if token and token.is_cancelled:
                         yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
                         return
+
+                    # --- budget check: before each action (R9) ---
+                    if _bp is not None:
+                        _exceeded = _bp.is_exceeded(_usage)
+                        if _exceeded:
+                            yield _emit(_evt(BUDGET_EXCEEDED, {
+                                "reason": _exceeded,
+                                **_usage.to_dict(),
+                            }))
+                            return
 
                     # --- approval gate (R4) ---
                     if _ac and _ac.needs_approval(action.action_type):

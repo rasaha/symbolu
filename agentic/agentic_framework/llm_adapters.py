@@ -69,6 +69,21 @@ class BaseLLMAdapter(ABC):
         result = await asyncio.to_thread(self.call, prompt)
         yield result
 
+    def get_last_usage(self) -> Optional[Dict[str, Any]]:
+        """Return token-usage metadata from the most recent ``call()``.
+
+        Adapters that have access to provider-native usage data (e.g.
+        OpenAI ``response.usage``) should override this to return a dict
+        with any of::
+
+            {"input_tokens": int, "output_tokens": int, "cost": float,
+             "model": str}
+
+        The default returns ``None``, signalling that the runtime should
+        fall back to estimation.
+        """
+        return None
+
     def call_with_messages(
         self,
         messages: List[Dict[str, str]],

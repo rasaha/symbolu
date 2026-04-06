@@ -37,6 +37,8 @@ from agentic.agentic_framework.streaming_events import (
     TEXT_CHUNK,
     APPROVAL_REQUESTED,
     APPROVAL_RESOLVED,
+    USAGE_UPDATED,
+    BUDGET_EXCEEDED,
 )
 
 
@@ -74,6 +76,14 @@ class AgentRunTrace:
     approvals_requested: int = 0
     approvals_denied: int = 0
 
+    # --- usage / budget (R9) ---
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    estimated_cost: float = 0.0
+    budget_exceeded: bool = False
+    accounting_mode: str = "none"
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a JSON-safe dict."""
         return {
@@ -91,6 +101,12 @@ class AgentRunTrace:
             "text_chunks": self.text_chunks,
             "approvals_requested": self.approvals_requested,
             "approvals_denied": self.approvals_denied,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.total_tokens,
+            "estimated_cost": self.estimated_cost,
+            "budget_exceeded": self.budget_exceeded,
+            "accounting_mode": self.accounting_mode,
             "events": [e.to_dict() for e in self.events],
         }
 
@@ -160,6 +176,22 @@ def _build_trace(events: List[AgentRunEvent]) -> AgentRunTrace:
         if e.event_type == APPROVAL_RESOLVED
         and not e.payload.get("approved", True)
     )
+
+    # Usage / budget (R9) — take values from last USAGE_UPDATED event
+    for evt in reversed(events):
+        if evt.event_type == USAGE_UPDATED:
+            trace.input_tokens = evt.payload.get("input_tokens", 0)
+            trace.output_tokens = evt.payload.get("output_tokens", 0)
+            trace.total_tokens = evt.payload.get("total_tokens", 0)
+            trace.estimated_cost = evt.payload.get("estimated_cost", 0.0)
+            trace.accounting_mode = evt.payload.get("accounting_mode", "none")
+            break
+
+    trace.budget_exceeded = any(
+        e.event_type == BUDGET_EXCEEDED for e in events
+    )
+    if trace.budget_exceeded and trace.status == "unknown":
+        trace.status = "budget_exceeded"
 
     return trace
 
