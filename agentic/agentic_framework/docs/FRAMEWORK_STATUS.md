@@ -81,12 +81,12 @@ runtime contract.
 
 ### Known fragility points (surfaced by real-LLM pilot)
 
-| ID | Issue | Severity | Details |
-|----|-------|----------|---------|
-| FP1 | **Goal alignment safety gate** | Critical | `_compute_goal_alignment()` uses keyword overlap between purpose and response. Vocabulary mismatch → safety gate blocks all actions. |
-| FP2 | **Action type vocabulary mismatch** | Critical | `DECOMPOSITION_PROMPT` asks for types "search\|compute\|generate\|validate\|execute" but domain tools use types like "save_draft", "send_update". Real LLM would return "execute", not "save_draft". |
-| FP3 | **Greedy JSON regex** | Low | `_extract_json()` regex `r"\{[\s\S]*\}"` is greedy. Works for all tested variations but could fail with multiple JSON objects. |
-| FP4 | **Missing `get_last_usage()` in real adapters** | Medium | Real adapters return `None` from `get_last_usage()`. Budget accounting uses estimated values only. |
+| ID | Issue | Status | Details |
+|----|-------|--------|---------|
+| FP1 | **Goal alignment safety gate** | **Resolved** | Hardened with normalized/stemmed tokens, user-input vocabulary, max-of-two-overlaps, raised baseline. |
+| FP2 | **Action type vocabulary mismatch** | **Resolved** | `normalize_action_type()` remaps generic LLM types via `action_type_to_tool` alias table. `ActionItem.original_action_type` for traceability. |
+| FP3 | **Greedy JSON regex** | Deferred | `_extract_json()` regex is greedy. Works for all tested variations but could fail with multiple JSON objects. Low risk. |
+| FP4 | **Missing `get_last_usage()` in real adapters** | Deferred | Real adapters return `None`. Budget accounting uses estimated values only. Medium risk. |
 
 ---
 

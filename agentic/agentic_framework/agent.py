@@ -1283,13 +1283,32 @@ class AgenticLLMWrapper:
             action.result = "Validation passed"
         else:
             action.status = "skipped"
-            action.error = f"Unknown action type: {action.action_type}"
+            orig = getattr(action, "original_action_type", None)
+            if orig:
+                action.error = (
+                    f"Unmapped action type: '{action.action_type}' "
+                    f"(normalized from '{orig}'). "
+                    f"Add it to action_type_to_tool to route through MCP."
+                )
+            else:
+                action.error = (
+                    f"Unmapped action type: '{action.action_type}'. "
+                    f"Add it to action_type_to_tool to route through MCP."
+                )
 
     def _decompose_goal(self, user_input: str) -> GoalState:
-        """Decompose user input into structured goal."""
+        """Decompose user input into structured goal.
+
+        When ``action_type_to_tool`` is configured, it is passed to
+        ``decompose_goal()`` as the action-type alias table so that
+        generic LLM action labels (e.g. "execute") can be normalized
+        to the canonical runtime types the developer registered
+        (e.g. "save_draft").
+        """
+        aliases = self.action_type_to_tool if self.action_type_to_tool else None
         if self.use_llm_for_decomposition:
             try:
-                return decompose_goal(user_input, self.llm)
+                return decompose_goal(user_input, self.llm, action_type_aliases=aliases)
             except Exception:
                 # Fall back to simple decomposition
                 return decompose_goal_simple(user_input)

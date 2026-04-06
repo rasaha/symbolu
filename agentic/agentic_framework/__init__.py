@@ -32,7 +32,7 @@ Usage:
 """
 
 from agentic.agentic_framework.agent import AgenticLLMWrapper
-from agentic.agentic_framework.goal_decomposition import GoalState, ActionItem, decompose_goal
+from agentic.agentic_framework.goal_decomposition import GoalState, ActionItem, decompose_goal, normalize_action_type
 from agentic.agentic_framework.memory_store import AgentMemory, TurnSnapshot, MemoryStore
 from agentic.agentic_framework.reflective_loop import (
     ReflectiveGenerator,
@@ -206,6 +206,7 @@ __all__ = [
     "GoalState",
     "ActionItem",
     "decompose_goal",
+    "normalize_action_type",
     # Memory
     "AgentMemory",
     "TurnSnapshot",

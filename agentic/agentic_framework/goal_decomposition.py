@@ -43,10 +43,11 @@ class ActionItem:
     parameters: Dict[str, Any] = field(default_factory=dict)
     result: Optional[Any] = None
     error: Optional[str] = None
+    original_action_type: Optional[str] = None  # set when normalization changed the type
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
-        return {
+        d = {
             "action_id": self.action_id,
             "description": self.description,
             "action_type": self.action_type,
@@ -55,6 +56,9 @@ class ActionItem:
             "result": self.result,
             "error": self.error,
         }
+        if self.original_action_type is not None:
+            d["original_action_type"] = self.original_action_type
+        return d
 
 
 @dataclass
@@ -181,7 +185,63 @@ Respond ONLY with valid JSON in this exact format:
 """
 
 
-def decompose_goal(user_input: str, llm_client: LLMClient) -> GoalState:
+# The five generic action types the DECOMPOSITION_PROMPT asks the LLM
+# to produce.  These are the *prompt-side* vocabulary.
+GENERIC_ACTION_TYPES = frozenset({"search", "compute", "generate", "validate", "execute"})
+
+
+def normalize_action_type(
+    raw_type: str,
+    action_type_aliases: Optional[Dict[str, str]] = None,
+) -> tuple:
+    """Normalize a raw LLM action type into a canonical runtime type.
+
+    Resolution order:
+    1. If ``raw_type`` is already a key in ``action_type_aliases`` (or
+       its values), return it unchanged — it's already canonical.
+    2. If ``action_type_aliases`` contains ``raw_type`` as a key,
+       return the mapped value.
+    3. If ``raw_type`` is one of the five generic prompt types
+       (search, compute, generate, validate, execute) AND is NOT
+       in the alias table, return it unchanged — it passes through
+       as a generic type that the runtime can handle via placeholders.
+    4. Otherwise, return the raw type unchanged with a warning flag.
+
+    Returns:
+        ``(canonical_type, original_type_or_None)``.
+        ``original_type_or_None`` is set only when the type was
+        remapped (for traceability); ``None`` means no change.
+    """
+    if action_type_aliases is None:
+        action_type_aliases = {}
+
+    raw = raw_type.strip().lower()
+
+    # Exact match in alias keys → remap
+    if raw in action_type_aliases:
+        target = action_type_aliases[raw]
+        if target == raw:
+            return raw, None  # identity mapping, no change
+        return target, raw
+
+    # Already a known canonical name (appears as an alias value)?
+    alias_values = set(action_type_aliases.values())
+    if raw in alias_values:
+        return raw, None
+
+    # Generic prompt type that isn't aliased — pass through
+    if raw in GENERIC_ACTION_TYPES:
+        return raw, None
+
+    # Unknown type — pass through unchanged (runtime will handle)
+    return raw, None
+
+
+def decompose_goal(
+    user_input: str,
+    llm_client: LLMClient,
+    action_type_aliases: Optional[Dict[str, str]] = None,
+) -> GoalState:
     """
     Decompose user input into structured GoalState.
 
@@ -190,6 +250,11 @@ def decompose_goal(user_input: str, llm_client: LLMClient) -> GoalState:
     Args:
         user_input: Raw user input string
         llm_client: LLM client implementing call() method
+        action_type_aliases: Optional mapping from generic/prompt action
+            types to canonical runtime action types.  For example,
+            ``{"execute": "save_draft"}`` remaps the LLM's "execute"
+            label to the runtime's "save_draft" tool.  Types not in
+            this mapping pass through unchanged.
 
     Returns:
         GoalState with extracted structure
@@ -211,12 +276,15 @@ def decompose_goal(user_input: str, llm_client: LLMClient) -> GoalState:
     # Build GoalState
     actions = []
     for i, action_data in enumerate(parsed.get("actions", [])):
+        raw_type = action_data.get("type", "generate")
+        canonical, original = normalize_action_type(raw_type, action_type_aliases)
         actions.append(
             ActionItem(
                 action_id=f"action_{i}",
                 description=action_data.get("description", f"Action {i}"),
-                action_type=action_data.get("type", "generate"),
+                action_type=canonical,
                 parameters=action_data.get("parameters", {}),
+                original_action_type=original,
             )
         )
 

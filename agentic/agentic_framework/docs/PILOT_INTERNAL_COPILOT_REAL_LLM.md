@@ -52,6 +52,52 @@ real LLMs produce:
 
 ---
 
+## Framework fragility points discovered
+
+### FP1: Goal alignment safety gate — RESOLVED
+
+`CoherenceEngine._compute_goal_alignment()` previously used naive
+keyword overlap between `GoalState.purpose` and the response.
+Paraphrased but semantically aligned responses fell below the 0.60
+threshold, blocking all actions.
+
+**Fix applied:**
+- Normalized/stemmed tokens (strips punctuation, splits hyphens,
+  lightweight suffix stripping) for better paraphrase matching
+- User's original input words included as goal vocabulary
+- Purpose overlap and user-input overlap computed separately;
+  the stronger signal wins
+- Baseline raised from 0.3 → 0.4 (zero overlap still fails)
+- 38 new tests validate the fix
+
+### FP2: Action type vocabulary mismatch — RESOLVED
+
+The `DECOMPOSITION_PROMPT` asks for generic types (`search`,
+`compute`, `generate`, `validate`, `execute`), but domain tools
+use types like `save_draft`, `send_update`, `escalate`.
+
+**Fix applied:**
+- `normalize_action_type()` added to `goal_decomposition.py`
+- Uses the developer's `action_type_to_tool` dict as an alias
+  table — e.g. `{"execute": "save_draft"}` remaps generic to domain
+- `ActionItem.original_action_type` records the pre-normalization
+  type for traceability
+- Unmapped action types get explicit error messages in traces
+- Phase 6 validates "execute" → "save_draft" end-to-end
+
+### FP3: `_extract_json()` greedy regex — DEFERRED
+
+The regex `r"\{[\s\S]*\}"` uses greedy matching. It works for all
+5 tested formatting variations, but could fail with multiple JSON
+objects. Low risk; deferred.
+
+### FP4: Real adapters don't implement `get_last_usage()` — DEFERRED
+
+Real adapters return `None`, so budget accounting uses estimated
+values. Medium risk; deferred until live API validation.
+
+---
+
 ## Phases
 
 | Phase | What it tests | Expected outcome |
@@ -61,84 +107,20 @@ real LLMs produce:
 | P3 | Approved write (save_draft) | Approval triggered → approved |
 | P4 | Denied write (send_update) | Approval triggered → denied |
 | P5 | Denied escalation | Approval triggered → denied |
-
----
-
-## Framework fragility points discovered
-
-### FP1: Goal alignment safety gate (critical)
-
-`CoherenceEngine._compute_goal_alignment()` uses keyword overlap
-between `GoalState.purpose` and the assistant's response. If the
-LLM uses different vocabulary in the generation than the
-decomposition specified, `goal_alignment` drops below 0.60 and the
-safety gate blocks ALL actions — even perfectly valid ones.
-
-**Impact:** A real LLM that paraphrases (e.g., "service health"
-instead of "status") could have all actions blocked.
-
-**Recommendation:** Consider semantic similarity (embedding cosine)
-instead of keyword overlap, or lower the goal_alignment threshold
-for the first turn.
-
-### FP2: Action type vocabulary mismatch (critical)
-
-The `DECOMPOSITION_PROMPT` asks the LLM for action types from a
-fixed vocabulary: `"search|compute|generate|validate|execute"`. But
-the copilot's `action_type_to_tool` mapping uses domain-specific
-types like `save_draft`, `send_update`, `escalate`.
-
-A real LLM following the prompt's instructions would return
-`"execute"` for a save operation — which does NOT map to the
-`save_draft` tool.
-
-**Impact:** With a real LLM, most non-search actions would fall
-through to placeholder execution, bypassing MCP governance,
-approval gates, and tool handlers entirely.
-
-**Recommendation:** Either:
-1. Extend the decomposition prompt vocabulary to include
-   domain-specific types, or
-2. Add a secondary mapping layer from prompt vocabulary to tool
-   names (e.g., `"execute" + keywords → "save_draft"`).
-
-### FP3: `_extract_json()` greedy regex
-
-The regex `r"\{[\s\S]*\}"` uses greedy matching. It works for all
-5 tested formatting variations, but could fail if the LLM produces
-multiple JSON objects in one response (the regex would capture
-everything from the first `{` to the last `}`).
-
-**Impact:** Low risk with current LLMs, but fragile for edge cases.
-
-**Recommendation:** Consider matching the _first_ complete JSON
-object (balanced braces) rather than the largest span.
-
-### FP4: Real adapters don't implement `get_last_usage()`
-
-`AnthropicAdapter`, `OpenAIAdapter`, and `MistralAdapter` all
-inherit the base `get_last_usage()` which returns `None`. Token
-and cost accounting falls back to character-length estimation.
-
-**Impact:** Budget enforcement uses estimated values, not actual
-API-reported usage. Production budget caps may be inaccurate.
-
-**Recommendation:** Override `get_last_usage()` in each real
-adapter to return the usage data from the API response.
-
----
+| P6 | Normalization (execute → save_draft) | Generic type remapped, approval triggered → approved |
 
 ## Results
 
-With `RealisticMockAdapter` (no API key):
+With `RealisticMockAdapter` (no API key), after hardening pass:
 
 ```
-  Results: 54/54 checks passed
+  Results: 60/60 checks passed
 ```
 
 All 5 formatting variations parse correctly. Approval gates fire
 for write actions. Tool dispatch works through the full MCP path.
-Traces capture all events.
+Action type normalization remaps generic "execute" → "save_draft"
+correctly. Traces capture all events including original_action_type.
 
 ---
 
