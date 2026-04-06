@@ -22,7 +22,7 @@ Usage:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, Iterator, List, Optional
 
 
 class BaseLLMAdapter(ABC):
@@ -44,6 +44,45 @@ class BaseLLMAdapter(ABC):
             Response string from LLM
         """
         pass
+
+    def call_stream(self, prompt: str) -> Iterator[str]:
+        """
+        Stream text chunks from the LLM.
+
+        Default implementation calls ``call()`` and yields the full
+        response as a single chunk.  Subclasses with native streaming
+        support may override to yield incremental tokens.
+        """
+        yield self.call(prompt)
+
+    async def call_stream_async(self, prompt: str) -> AsyncIterator[str]:
+        """
+        Async streaming variant.
+
+        Default wraps the sync ``call_stream()`` via
+        ``asyncio.to_thread`` for each chunk.  Subclasses with native
+        async streaming (e.g. ``openai.AsyncOpenAI``) may override.
+        """
+        import asyncio
+
+        # Run sync call in a thread to avoid blocking the event loop.
+        result = await asyncio.to_thread(self.call, prompt)
+        yield result
+
+    def get_last_usage(self) -> Optional[Dict[str, Any]]:
+        """Return token-usage metadata from the most recent ``call()``.
+
+        Adapters that have access to provider-native usage data (e.g.
+        OpenAI ``response.usage``) should override this to return a dict
+        with any of::
+
+            {"input_tokens": int, "output_tokens": int, "cost": float,
+             "model": str}
+
+        The default returns ``None``, signalling that the runtime should
+        fall back to estimation.
+        """
+        return None
 
     def call_with_messages(
         self,

@@ -23,10 +23,11 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, AsyncIterator, Dict, Iterator, List, Optional, Protocol
 
 from agentic.agentic_framework.goal_decomposition import (
     GoalState,
@@ -46,6 +47,49 @@ from agentic.agentic_framework.reflective_loop import (
     QualityCritic,
     RuleBasedCritic,
     GenerationResult,
+)
+from agentic.agentic_framework.cancellation import CancellationToken
+from agentic.agentic_framework.tracing import (
+    AgentRunTrace,
+    TraceCollector,
+    _build_trace,
+)
+from agentic.agentic_framework.structured_output import (
+    SchemaTarget,
+    StructuredRunResult,
+    build_schema_prompt,
+    extract_json,
+    schema_name as _schema_name,
+    validate_and_construct,
+)
+from agentic.agentic_framework.approval import (
+    ApprovalController,
+    PendingApproval,
+)
+from agentic.agentic_framework.token_budget import (
+    BudgetPolicy,
+    UsageStats,
+)
+from agentic.agentic_framework.streaming_events import (
+    AgentRunEvent,
+    make_event,
+    RUN_STARTED,
+    GENERATION_STARTED,
+    TEXT_CHUNK,
+    GENERATION_COMPLETED,
+    SAFETY_GATE_RESULT,
+    ACTION_STARTED,
+    ACTION_COMPLETED,
+    RUN_COMPLETED,
+    RUN_ERROR,
+    RUN_CANCELLED,
+    REVISION_STARTED,
+    REVISION_COMPLETED,
+    STRUCTURED_VALIDATION,
+    APPROVAL_REQUESTED,
+    APPROVAL_RESOLVED,
+    USAGE_UPDATED,
+    BUDGET_EXCEEDED,
 )
 from agentic.agentic_framework.coherence_tracker import (
     CoherenceState,
@@ -365,6 +409,881 @@ class AgenticLLMWrapper:
         """
         result = self.run(user_input)
         return result.response
+
+    def run_with_trace(
+        self,
+        user_input: str,
+        cancellation_token: Optional[CancellationToken] = None,
+        approval_controller: Optional[ApprovalController] = None,
+        budget_policy: Optional[BudgetPolicy] = None,
+    ) -> AgentRunTrace:
+        """
+        One-shot helper: run the full pipeline and return a complete
+        ``AgentRunTrace`` containing every emitted event plus a
+        derived summary.
+
+        The ``run_completed`` event's payload contains the serialised
+        ``AgentResult``; use ``trace.get_events(RUN_COMPLETED)`` to
+        access it.
+        """
+        collector = TraceCollector()
+        for _evt in self.run_stream(
+            user_input,
+            cancellation_token=cancellation_token,
+            trace_collector=collector,
+            approval_controller=approval_controller,
+            budget_policy=budget_policy,
+        ):
+            pass  # consume the generator; events are recorded by collector
+        return collector.build_trace()
+
+    # ------------------------------------------------------------------
+    # Structured Output (R6)
+    # ------------------------------------------------------------------
+
+    def run_structured(
+        self,
+        user_input: str,
+        schema: SchemaTarget,
+    ) -> StructuredRunResult:
+        """
+        Run the agent pipeline with schema-enforced output.
+
+        The *user_input* is augmented with a schema instruction, the
+        response is parsed as JSON, and the result is validated against
+        *schema*.
+
+        .. note::
+
+            This method uses the non-streaming ``run()`` path.
+            Cancellation, approval, budget enforcement, and tracing
+            are not available here.  Use
+            :meth:`run_structured_with_trace` for access to those
+            runtime primitives.
+
+        Args:
+            user_input: User's input text.
+            schema: Target schema — a dataclass type, Pydantic model
+                class, or ``dict`` mapping field names to types.
+
+        Returns:
+            ``StructuredRunResult`` with ``success=True`` and a
+            populated ``parsed_output`` field on success, or
+            ``success=False`` with ``validation_error`` on failure.
+        """
+        augmented = build_schema_prompt(user_input, schema)
+        result = self.run(augmented)
+        sname = _schema_name(schema)
+
+        raw_text = result.response
+        data = extract_json(raw_text)
+
+        if data is None:
+            return StructuredRunResult(
+                success=False,
+                raw_text=raw_text,
+                validation_error="Could not extract JSON from response",
+                schema_name=sname,
+                quality_score=result.quality_score,
+                revision_count=result.revision_count,
+            )
+
+        try:
+            parsed = validate_and_construct(data, schema)
+        except (ValueError, TypeError, Exception) as exc:
+            return StructuredRunResult(
+                success=False,
+                raw_text=raw_text,
+                validation_error=str(exc),
+                schema_name=sname,
+                quality_score=result.quality_score,
+                revision_count=result.revision_count,
+            )
+
+        return StructuredRunResult(
+            success=True,
+            raw_text=raw_text,
+            parsed_output=parsed,
+            schema_name=sname,
+            quality_score=result.quality_score,
+            revision_count=result.revision_count,
+        )
+
+    def run_structured_with_trace(
+        self,
+        user_input: str,
+        schema: SchemaTarget,
+        cancellation_token: Optional[CancellationToken] = None,
+        approval_controller: Optional[ApprovalController] = None,
+        budget_policy: Optional[BudgetPolicy] = None,
+    ) -> tuple[StructuredRunResult, AgentRunTrace]:
+        """
+        Like :meth:`run_structured` but also returns a full
+        ``AgentRunTrace`` including a ``structured_validation`` event.
+
+        Supports all streaming runtime primitives (cancellation,
+        approval, budget) because the underlying execution uses
+        :meth:`run_stream`.
+        """
+        augmented = build_schema_prompt(user_input, schema)
+        sname = _schema_name(schema)
+
+        collector = TraceCollector()
+        for _evt in self.run_stream(
+            augmented,
+            cancellation_token=cancellation_token,
+            trace_collector=collector,
+            approval_controller=approval_controller,
+            budget_policy=budget_policy,
+        ):
+            pass
+
+        # Extract result from the run_completed event
+        raw_text = ""
+        quality_score = 0.0
+        revision_count = 0
+        for evt in collector.events:
+            if evt.event_type == RUN_COMPLETED and "result" in evt.payload:
+                rd = evt.payload["result"]
+                raw_text = rd.get("response", "")
+                quality_score = rd.get("quality_score", 0.0)
+                revision_count = rd.get("revision_count", 0)
+                break
+            if evt.event_type in (RUN_ERROR, RUN_CANCELLED, BUDGET_EXCEEDED):
+                raw_text = ""
+                break
+
+        # Parse and validate
+        data = extract_json(raw_text)
+        if data is None:
+            sr = StructuredRunResult(
+                success=False,
+                raw_text=raw_text,
+                validation_error="Could not extract JSON from response",
+                schema_name=sname,
+                quality_score=quality_score,
+                revision_count=revision_count,
+            )
+        else:
+            try:
+                parsed = validate_and_construct(data, schema)
+                sr = StructuredRunResult(
+                    success=True,
+                    raw_text=raw_text,
+                    parsed_output=parsed,
+                    schema_name=sname,
+                    quality_score=quality_score,
+                    revision_count=revision_count,
+                )
+            except (ValueError, TypeError, Exception) as exc:
+                sr = StructuredRunResult(
+                    success=False,
+                    raw_text=raw_text,
+                    validation_error=str(exc),
+                    schema_name=sname,
+                    quality_score=quality_score,
+                    revision_count=revision_count,
+                )
+
+        # Record validation event in trace
+        session_id = self._memory.session_id if self._memory else ""
+        turn_id = (self._memory.get_turn_count() - 1) if self._memory else 0
+        validation_evt = make_event(
+            STRUCTURED_VALIDATION,
+            turn_id,
+            session_id,
+            {
+                "success": sr.success,
+                "schema_name": sname,
+                "validation_error": sr.validation_error,
+            },
+        )
+        collector.record(validation_evt)
+
+        trace = collector.build_trace()
+        return sr, trace
+
+    # ------------------------------------------------------------------
+    # Streaming API (R1) + Cancellation (R2) + Tracing (R11)
+    # ------------------------------------------------------------------
+
+    def run_stream(
+        self,
+        user_input: str,
+        cancellation_token: Optional[CancellationToken] = None,
+        trace_collector: Optional[TraceCollector] = None,
+        approval_controller: Optional[ApprovalController] = None,
+        budget_policy: Optional[BudgetPolicy] = None,
+    ) -> Iterator[AgentRunEvent]:
+        """
+        Streaming variant of :meth:`run`.
+
+        Yields ``AgentRunEvent`` instances as the agent progresses
+        through its pipeline.  The final event is always
+        ``run_completed``, ``run_cancelled``, ``run_error``, or
+        ``budget_exceeded``.
+
+        Args:
+            user_input: User's input text.
+            cancellation_token: Optional token checked at each pipeline
+                boundary.  Call ``token.cancel()`` from any thread to
+                stop the run cooperatively.
+            trace_collector: Optional collector that records every
+                emitted event for post-run inspection.
+            approval_controller: Optional controller that gates action
+                execution.  When supplied, actions matching the
+                controller's policy emit ``approval_requested`` events
+                and pause until the callback approves or denies.
+            budget_policy: Optional token/cost budget.  When supplied,
+                usage is checked after generation and before each
+                action.  Exceeding the budget emits ``budget_exceeded``
+                and stops the run.
+        """
+        # Ensure session exists
+        if self._memory is None:
+            self.new_session()
+
+        turn_id = self._memory.get_turn_count()
+        session_id = self._memory.session_id
+        token = cancellation_token
+        _tc = trace_collector
+
+        def _evt(event_type: str, payload: dict | None = None) -> AgentRunEvent:
+            return make_event(event_type, turn_id, session_id, payload)
+
+        def _emit(event: AgentRunEvent) -> AgentRunEvent:
+            if _tc is not None:
+                _tc.record(event)
+            return event
+
+        def _cancelled_payload() -> dict:
+            return {"reason": token.reason if token else None}
+
+        yield _emit(_evt(RUN_STARTED, {"user_input": user_input}))
+
+        try:
+            # --- checkpoint: before goal decomposition ---
+            if token and token.is_cancelled:
+                yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                return
+
+            # 1. Goal Decomposition
+            self._goal_state = self._decompose_goal(user_input)
+
+            # 2. Memory Enrichment
+            context = self._build_context(user_input)
+
+            # --- checkpoint: before generation ---
+            if token and token.is_cancelled:
+                yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                return
+
+            # 3. Reflective Generation (streamed)
+            yield _emit(_evt(GENERATION_STARTED))
+
+            generation_result: GenerationResult | None = None
+
+            for item in self.generator.generate_stream(
+                prompt=user_input,
+                context=context,
+                goal_state=self._goal_state,
+            ):
+                if isinstance(item, GenerationResult):
+                    generation_result = item
+                elif isinstance(item, tuple):
+                    tag, rev_num = item
+                    if tag == "revision_started":
+                        # --- checkpoint: before revision ---
+                        if token and token.is_cancelled:
+                            yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                            return
+                        yield _emit(_evt(REVISION_STARTED, {"revision": rev_num}))
+                    elif tag == "revision_completed":
+                        yield _emit(_evt(REVISION_COMPLETED, {"revision": rev_num}))
+                elif isinstance(item, str):
+                    # --- checkpoint: between chunks ---
+                    if token and token.is_cancelled:
+                        yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                        return
+                    yield _emit(_evt(TEXT_CHUNK, {"text": item}))
+
+            assert generation_result is not None
+
+            yield _emit(_evt(
+                GENERATION_COMPLETED,
+                {
+                    "quality_score": generation_result.quality_score,
+                    "revision_count": generation_result.revision_count,
+                    "quality_trajectory": generation_result.quality_trajectory,
+                },
+            ))
+
+            # --- usage tracking (R9) ---
+            _usage = UsageStats()
+            _adapter_usage = (
+                self.llm.get_last_usage()
+                if hasattr(self.llm, "get_last_usage")
+                else None
+            )
+            _usage.record_generation(
+                prompt_text=user_input,
+                output_text=generation_result.final_output,
+                exact_input=(_adapter_usage or {}).get("input_tokens"),
+                exact_output=(_adapter_usage or {}).get("output_tokens"),
+                cost=(_adapter_usage or {}).get("cost"),
+                model=(_adapter_usage or {}).get("model")
+                or getattr(self.llm, "model", ""),
+            )
+            yield _emit(_evt(USAGE_UPDATED, _usage.to_dict()))
+
+            # --- budget check: after generation ---
+            _bp = budget_policy
+            if _bp is not None:
+                _exceeded = _bp.is_exceeded(_usage)
+                if _exceeded:
+                    yield _emit(_evt(BUDGET_EXCEEDED, {
+                        "reason": _exceeded,
+                        **_usage.to_dict(),
+                    }))
+                    return
+
+            # 4. Create turn snapshot
+            turn = create_turn_snapshot(
+                turn_id=turn_id,
+                user_input=user_input,
+                assistant_output=generation_result.final_output,
+                quality_score=generation_result.quality_score,
+                revision_count=generation_result.revision_count,
+            )
+
+            # 5. Update Coherence
+            self._coherence_state = self.coherence_engine.update(
+                prev_state=self._coherence_state,
+                turn=turn,
+                goal_state=self._goal_state,
+            )
+
+            turn = TurnSnapshot(
+                turn_id=turn.turn_id,
+                timestamp=turn.timestamp,
+                user_input=turn.user_input,
+                assistant_output=turn.assistant_output,
+                goal_state=self._goal_state,
+                actions_taken=[],
+                quality_score=turn.quality_score,
+                revision_count=turn.revision_count,
+                coherence_metrics={
+                    "internal_consistency": self._coherence_state.current_metrics.internal_consistency,
+                    "goal_alignment": self._coherence_state.current_metrics.goal_alignment,
+                    "overall_coherence": self._coherence_state.current_metrics.overall_coherence,
+                },
+            )
+
+            # --- checkpoint: before safety gate ---
+            if token and token.is_cancelled:
+                yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                return
+
+            # 6. Safety Contract Evaluation
+            action_types = [a.action_type for a in self._goal_state.actions] if self._goal_state else []
+            contract, allowed_actions = self.safety_gate.check(
+                coherence_state=self._coherence_state,
+                goal_state=self._goal_state,
+                action_types=action_types,
+            )
+
+            yield _emit(_evt(
+                SAFETY_GATE_RESULT,
+                {
+                    "eligible": contract.eligible,
+                    "blocking_reasons": list(contract.blocking_reasons),
+                },
+            ))
+
+            # 7. Execute actions if eligible
+            actions_executed: List[str] = []
+            _ac = approval_controller
+            if contract.eligible and self._goal_state:
+                for action in self._goal_state.actions:
+                    if action.status != "pending":
+                        continue
+                    if action.action_type not in allowed_actions:
+                        action.status = "blocked"
+                        action.error = f"Action type '{action.action_type}' not allowed"
+                        continue
+
+                    # --- checkpoint: before each action ---
+                    if token and token.is_cancelled:
+                        yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                        return
+
+                    # --- budget check: before each action (R9) ---
+                    if _bp is not None:
+                        _exceeded = _bp.is_exceeded(_usage)
+                        if _exceeded:
+                            yield _emit(_evt(BUDGET_EXCEEDED, {
+                                "reason": _exceeded,
+                                **_usage.to_dict(),
+                            }))
+                            return
+
+                    # --- approval gate (R4) ---
+                    if _ac and _ac.needs_approval(action.action_type):
+                        pending = PendingApproval(
+                            action_id=action.action_id,
+                            action_type=action.action_type,
+                            description=action.description,
+                            parameters=action.parameters or {},
+                            turn_id=turn_id,
+                            session_id=session_id,
+                            reason=f"Action type '{action.action_type}' requires approval",
+                        )
+                        yield _emit(_evt(APPROVAL_REQUESTED, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "description": action.description,
+                            "reason": pending.reason,
+                        }))
+                        response = _ac.request_approval(pending)
+                        yield _emit(_evt(APPROVAL_RESOLVED, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "approved": response.approved,
+                            "reason": response.reason,
+                        }))
+                        if not response.approved:
+                            action.status = "denied"
+                            action.error = response.reason or "Denied by human approval"
+                            yield _emit(_evt(ACTION_COMPLETED, {
+                                "action_id": action.action_id,
+                                "status": action.status,
+                                "error": action.error,
+                            }))
+                            continue
+
+                    yield _emit(_evt(ACTION_STARTED, {
+                        "action_id": action.action_id,
+                        "action_type": action.action_type,
+                        "description": action.description,
+                    }))
+
+                    try:
+                        # NOTE: once _execute_single_action begins, the
+                        # action runs to completion.  Cancellation does
+                        # NOT preempt an already-started action or MCP
+                        # tool handler — it only prevents the *next*
+                        # action from starting.
+                        self._execute_single_action(action)
+                        if action.status == "completed":
+                            actions_executed.append(action.description)
+                    except Exception as exc:
+                        action.status = "failed"
+                        action.error = str(exc)
+
+                    yield _emit(_evt(ACTION_COMPLETED, {
+                        "action_id": action.action_id,
+                        "status": action.status,
+                        "error": action.error,
+                    }))
+
+                # Update turn with executed actions
+                executed_items = [a for a in self._goal_state.actions if a.status == "completed"]
+                turn = TurnSnapshot(
+                    turn_id=turn.turn_id,
+                    timestamp=turn.timestamp,
+                    user_input=turn.user_input,
+                    assistant_output=turn.assistant_output,
+                    goal_state=turn.goal_state,
+                    actions_taken=executed_items,
+                    quality_score=turn.quality_score,
+                    revision_count=turn.revision_count,
+                    coherence_metrics=turn.coherence_metrics,
+                )
+
+            # --- checkpoint: before completion ---
+            if token and token.is_cancelled:
+                yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                return
+
+            # 8. Update Memory
+            self._memory = self.memory_store.append_turn(self._memory, turn)
+
+            # 9. Check for intervention needs
+            should_intervene, reason = self.coherence_engine.should_intervene(
+                self._coherence_state
+            )
+
+            agent_result = AgentResult(
+                response=generation_result.final_output,
+                quality_score=generation_result.quality_score,
+                revision_count=generation_result.revision_count,
+                actions_executed=actions_executed,
+                actions_blocked=not contract.eligible,
+                blocking_reasons=list(contract.blocking_reasons),
+                coherence={
+                    "internal_consistency": self._coherence_state.current_metrics.internal_consistency,
+                    "goal_alignment": self._coherence_state.current_metrics.goal_alignment,
+                    "overall": self._coherence_state.current_metrics.overall_coherence,
+                    "drift_direction": self._coherence_state.current_metrics.drift_direction,
+                },
+                intervention_needed=should_intervene,
+                intervention_reason=reason,
+                session_id=self._memory.session_id,
+                turn_id=turn_id,
+                safety_contract=contract,
+            )
+
+            yield _emit(_evt(RUN_COMPLETED, {"result": agent_result.to_dict()}))
+
+        except Exception as exc:
+            yield _emit(_evt(RUN_ERROR, {"error": str(exc), "error_type": type(exc).__name__}))
+
+    # ------------------------------------------------------------------
+    # Async Streaming API (R2) + Tracing (R11)
+    # ------------------------------------------------------------------
+
+    async def run_stream_async(
+        self,
+        user_input: str,
+        cancellation_token: Optional[CancellationToken] = None,
+        trace_collector: Optional[TraceCollector] = None,
+        approval_controller: Optional[ApprovalController] = None,
+        budget_policy: Optional[BudgetPolicy] = None,
+    ) -> AsyncIterator[AgentRunEvent]:
+        """
+        Async streaming variant of :meth:`run_stream`.
+
+        Yields ``AgentRunEvent`` asynchronously.  Accepts the same
+        optional ``CancellationToken`` for cooperative cancellation,
+        an optional ``TraceCollector`` for in-memory tracing,
+        an optional ``ApprovalController`` for human-in-the-loop
+        approval gating, and an optional ``BudgetPolicy`` for
+        token/cost budget enforcement.
+        """
+        if self._memory is None:
+            self.new_session()
+
+        turn_id = self._memory.get_turn_count()
+        session_id = self._memory.session_id
+        token = cancellation_token
+        _tc = trace_collector
+
+        def _evt(event_type: str, payload: dict | None = None) -> AgentRunEvent:
+            return make_event(event_type, turn_id, session_id, payload)
+
+        def _emit(event: AgentRunEvent) -> AgentRunEvent:
+            if _tc is not None:
+                _tc.record(event)
+            return event
+
+        def _cancelled_payload() -> dict:
+            return {"reason": token.reason if token else None}
+
+        yield _emit(_evt(RUN_STARTED, {"user_input": user_input}))
+
+        try:
+            if token and token.is_cancelled:
+                yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                return
+
+            self._goal_state = await asyncio.to_thread(
+                self._decompose_goal, user_input,
+            )
+            context = self._build_context(user_input)
+
+            if token and token.is_cancelled:
+                yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                return
+
+            yield _emit(_evt(GENERATION_STARTED))
+
+            generation_result: GenerationResult | None = None
+
+            async for item in self.generator.generate_stream_async(
+                prompt=user_input,
+                context=context,
+                goal_state=self._goal_state,
+            ):
+                if isinstance(item, GenerationResult):
+                    generation_result = item
+                elif isinstance(item, tuple):
+                    tag, rev_num = item
+                    if tag == "revision_started":
+                        if token and token.is_cancelled:
+                            yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                            return
+                        yield _emit(_evt(REVISION_STARTED, {"revision": rev_num}))
+                    elif tag == "revision_completed":
+                        yield _emit(_evt(REVISION_COMPLETED, {"revision": rev_num}))
+                elif isinstance(item, str):
+                    if token and token.is_cancelled:
+                        yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                        return
+                    yield _emit(_evt(TEXT_CHUNK, {"text": item}))
+
+            assert generation_result is not None
+
+            yield _emit(_evt(
+                GENERATION_COMPLETED,
+                {
+                    "quality_score": generation_result.quality_score,
+                    "revision_count": generation_result.revision_count,
+                    "quality_trajectory": generation_result.quality_trajectory,
+                },
+            ))
+
+            # --- usage tracking (R9) ---
+            _usage = UsageStats()
+            _adapter_usage = (
+                self.llm.get_last_usage()
+                if hasattr(self.llm, "get_last_usage")
+                else None
+            )
+            _usage.record_generation(
+                prompt_text=user_input,
+                output_text=generation_result.final_output,
+                exact_input=(_adapter_usage or {}).get("input_tokens"),
+                exact_output=(_adapter_usage or {}).get("output_tokens"),
+                cost=(_adapter_usage or {}).get("cost"),
+                model=(_adapter_usage or {}).get("model")
+                or getattr(self.llm, "model", ""),
+            )
+            yield _emit(_evt(USAGE_UPDATED, _usage.to_dict()))
+
+            # --- budget check: after generation ---
+            _bp = budget_policy
+            if _bp is not None:
+                _exceeded = _bp.is_exceeded(_usage)
+                if _exceeded:
+                    yield _emit(_evt(BUDGET_EXCEEDED, {
+                        "reason": _exceeded,
+                        **_usage.to_dict(),
+                    }))
+                    return
+
+            turn = create_turn_snapshot(
+                turn_id=turn_id,
+                user_input=user_input,
+                assistant_output=generation_result.final_output,
+                quality_score=generation_result.quality_score,
+                revision_count=generation_result.revision_count,
+            )
+
+            self._coherence_state = self.coherence_engine.update(
+                prev_state=self._coherence_state,
+                turn=turn,
+                goal_state=self._goal_state,
+            )
+
+            turn = TurnSnapshot(
+                turn_id=turn.turn_id,
+                timestamp=turn.timestamp,
+                user_input=turn.user_input,
+                assistant_output=turn.assistant_output,
+                goal_state=self._goal_state,
+                actions_taken=[],
+                quality_score=turn.quality_score,
+                revision_count=turn.revision_count,
+                coherence_metrics={
+                    "internal_consistency": self._coherence_state.current_metrics.internal_consistency,
+                    "goal_alignment": self._coherence_state.current_metrics.goal_alignment,
+                    "overall_coherence": self._coherence_state.current_metrics.overall_coherence,
+                },
+            )
+
+            if token and token.is_cancelled:
+                yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                return
+
+            action_types = [a.action_type for a in self._goal_state.actions] if self._goal_state else []
+            contract, allowed_actions = self.safety_gate.check(
+                coherence_state=self._coherence_state,
+                goal_state=self._goal_state,
+                action_types=action_types,
+            )
+
+            yield _emit(_evt(
+                SAFETY_GATE_RESULT,
+                {
+                    "eligible": contract.eligible,
+                    "blocking_reasons": list(contract.blocking_reasons),
+                },
+            ))
+
+            actions_executed: List[str] = []
+            _ac = approval_controller
+            if contract.eligible and self._goal_state:
+                for action in self._goal_state.actions:
+                    if action.status != "pending":
+                        continue
+                    if action.action_type not in allowed_actions:
+                        action.status = "blocked"
+                        action.error = f"Action type '{action.action_type}' not allowed"
+                        continue
+
+                    if token and token.is_cancelled:
+                        yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                        return
+
+                    # --- budget check: before each action (R9) ---
+                    if _bp is not None:
+                        _exceeded = _bp.is_exceeded(_usage)
+                        if _exceeded:
+                            yield _emit(_evt(BUDGET_EXCEEDED, {
+                                "reason": _exceeded,
+                                **_usage.to_dict(),
+                            }))
+                            return
+
+                    # --- approval gate (R4) ---
+                    if _ac and _ac.needs_approval(action.action_type):
+                        pending = PendingApproval(
+                            action_id=action.action_id,
+                            action_type=action.action_type,
+                            description=action.description,
+                            parameters=action.parameters or {},
+                            turn_id=turn_id,
+                            session_id=session_id,
+                            reason=f"Action type '{action.action_type}' requires approval",
+                        )
+                        yield _emit(_evt(APPROVAL_REQUESTED, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "description": action.description,
+                            "reason": pending.reason,
+                        }))
+                        response = await asyncio.to_thread(
+                            _ac.request_approval, pending,
+                        )
+                        yield _emit(_evt(APPROVAL_RESOLVED, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "approved": response.approved,
+                            "reason": response.reason,
+                        }))
+                        if not response.approved:
+                            action.status = "denied"
+                            action.error = response.reason or "Denied by human approval"
+                            yield _emit(_evt(ACTION_COMPLETED, {
+                                "action_id": action.action_id,
+                                "status": action.status,
+                                "error": action.error,
+                            }))
+                            continue
+
+                    yield _emit(_evt(ACTION_STARTED, {
+                        "action_id": action.action_id,
+                        "action_type": action.action_type,
+                        "description": action.description,
+                    }))
+
+                    try:
+                        await asyncio.to_thread(self._execute_single_action, action)
+                        if action.status == "completed":
+                            actions_executed.append(action.description)
+                    except Exception as exc:
+                        action.status = "failed"
+                        action.error = str(exc)
+
+                    yield _emit(_evt(ACTION_COMPLETED, {
+                        "action_id": action.action_id,
+                        "status": action.status,
+                        "error": action.error,
+                    }))
+
+                executed_items = [a for a in self._goal_state.actions if a.status == "completed"]
+                turn = TurnSnapshot(
+                    turn_id=turn.turn_id,
+                    timestamp=turn.timestamp,
+                    user_input=turn.user_input,
+                    assistant_output=turn.assistant_output,
+                    goal_state=turn.goal_state,
+                    actions_taken=executed_items,
+                    quality_score=turn.quality_score,
+                    revision_count=turn.revision_count,
+                    coherence_metrics=turn.coherence_metrics,
+                )
+
+            if token and token.is_cancelled:
+                yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
+                return
+
+            self._memory = self.memory_store.append_turn(self._memory, turn)
+
+            should_intervene, reason = self.coherence_engine.should_intervene(
+                self._coherence_state
+            )
+
+            agent_result = AgentResult(
+                response=generation_result.final_output,
+                quality_score=generation_result.quality_score,
+                revision_count=generation_result.revision_count,
+                actions_executed=actions_executed,
+                actions_blocked=not contract.eligible,
+                blocking_reasons=list(contract.blocking_reasons),
+                coherence={
+                    "internal_consistency": self._coherence_state.current_metrics.internal_consistency,
+                    "goal_alignment": self._coherence_state.current_metrics.goal_alignment,
+                    "overall": self._coherence_state.current_metrics.overall_coherence,
+                    "drift_direction": self._coherence_state.current_metrics.drift_direction,
+                },
+                intervention_needed=should_intervene,
+                intervention_reason=reason,
+                session_id=self._memory.session_id,
+                turn_id=turn_id,
+                safety_contract=contract,
+            )
+
+            yield _emit(_evt(RUN_COMPLETED, {"result": agent_result.to_dict()}))
+
+        except Exception as exc:
+            yield _emit(_evt(RUN_ERROR, {"error": str(exc), "error_type": type(exc).__name__}))
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _execute_single_action(self, action: "ActionItem") -> None:
+        """Execute a single action (used by both run and run_stream)."""
+        if (
+            self.dispatcher is not None
+            and action.action_type in self.action_type_to_tool
+        ):
+            tool_name = self.action_type_to_tool[action.action_type]
+            mcp_result = self._dispatch_via_mcp(
+                tool_name=tool_name,
+                parameters=action.parameters or {},
+            )
+            if getattr(mcp_result, "success", False):
+                action.status = "completed"
+                action.result = getattr(mcp_result, "result", None)
+            else:
+                action.status = "blocked"
+                decision = getattr(mcp_result, "decision", None)
+                decision_val = (
+                    decision.value if decision is not None
+                    and hasattr(decision, "value") else str(decision)
+                )
+                reason = getattr(mcp_result, "blocked_reason", None) \
+                    or getattr(mcp_result, "error", None) \
+                    or f"MCP decision={decision_val}"
+                action.error = f"MCP: {reason}"
+            return
+
+        if action.action_type == "generate":
+            action.status = "completed"
+        elif action.action_type == "search":
+            action.status = "completed"
+            action.result = f"Search completed for: {action.parameters.get('query', '')}"
+        elif action.action_type == "compute":
+            action.status = "completed"
+            action.result = "Computation completed"
+        elif action.action_type == "validate":
+            action.status = "completed"
+            action.result = "Validation passed"
+        else:
+            action.status = "skipped"
+            action.error = f"Unknown action type: {action.action_type}"
 
     def _decompose_goal(self, user_input: str) -> GoalState:
         """Decompose user input into structured goal."""

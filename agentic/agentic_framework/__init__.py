@@ -119,6 +119,53 @@ from agentic.agentic_framework.proactive_scheduler import (
     create_proactive_scheduler,
     create_task,
 )
+from agentic.agentic_framework.cancellation import CancellationToken
+from agentic.agentic_framework.approval import (
+    ApprovalCallback,
+    ApprovalController,
+    ApprovalPolicy,
+    ApprovalResponse,
+    PendingApproval,
+)
+from agentic.agentic_framework.token_budget import (
+    BudgetPolicy,
+    UsageStats,
+    estimate_tokens,
+)
+from agentic.agentic_framework.structured_output import (
+    OutputSchema,
+    SchemaTarget,
+    StructuredRunResult,
+)
+from agentic.agentic_framework.tracing import (
+    AgentRunTrace,
+    TraceCollector,
+)
+from agentic.agentic_framework.streaming_events import (
+    AgentRunEvent,
+    make_event,
+    RUN_STARTED,
+    GENERATION_STARTED,
+    TEXT_CHUNK,
+    GENERATION_COMPLETED,
+    SAFETY_GATE_RESULT,
+    ACTION_STARTED,
+    ACTION_COMPLETED,
+    RUN_COMPLETED,
+    STRUCTURED_VALIDATION,
+    RUN_ERROR,
+    RUN_CANCELLED,
+    REVISION_STARTED,
+    REVISION_COMPLETED,
+    APPROVAL_REQUESTED,
+    APPROVAL_RESOLVED,
+    USAGE_UPDATED,
+    BUDGET_EXCEEDED,
+)
+from agentic.agentic_framework.tool_discovery import (
+    DiscoveredTool,
+    ToolCatalog,
+)
 from agentic.agentic_framework.llm_adapters import (
     MistralAdapter,
     MistralCGAdapter,
@@ -227,6 +274,48 @@ __all__ = [
     "ScheduleType",
     "create_proactive_scheduler",
     "create_task",
+    # Cancellation (R2)
+    "CancellationToken",
+    # Tracing (R11)
+    "AgentRunTrace",
+    "TraceCollector",
+    # Structured Output (R6)
+    "OutputSchema",
+    "SchemaTarget",
+    "StructuredRunResult",
+    # Streaming Events (R1) + Cancellation event (R2)
+    "AgentRunEvent",
+    "make_event",
+    "RUN_STARTED",
+    "GENERATION_STARTED",
+    "TEXT_CHUNK",
+    "GENERATION_COMPLETED",
+    "SAFETY_GATE_RESULT",
+    "ACTION_STARTED",
+    "ACTION_COMPLETED",
+    "RUN_COMPLETED",
+    "RUN_ERROR",
+    "RUN_CANCELLED",
+    "REVISION_STARTED",
+    "REVISION_COMPLETED",
+    "STRUCTURED_VALIDATION",
+    "APPROVAL_REQUESTED",
+    "APPROVAL_RESOLVED",
+    "USAGE_UPDATED",
+    "BUDGET_EXCEEDED",
+    # Token / Cost Budget (R9)
+    "BudgetPolicy",
+    "UsageStats",
+    "estimate_tokens",
+    # Approval / Human-in-the-Loop (R4)
+    "ApprovalCallback",
+    "ApprovalController",
+    "ApprovalPolicy",
+    "ApprovalResponse",
+    "PendingApproval",
+    # MCP Discovery / Tool Introspection (R8)
+    "DiscoveredTool",
+    "ToolCatalog",
     # LLM Adapters (Mistral API + local MistralCG)
     "MistralAdapter",
     "MistralCGAdapter",
@@ -247,4 +336,4 @@ __all__ = [
     "create_conservative_pipeline",
 ]
 
-__version__ = "1.7.0"  # V11.0.0: Sovereign State Bridge (tensor → agentic wiring)
+__version__ = "1.8.0"  # R1-R11 runtime primitives: streaming, cancellation, approval, structured, budget, tracing, discovery
