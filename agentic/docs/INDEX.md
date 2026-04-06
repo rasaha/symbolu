@@ -40,6 +40,10 @@ All agentic framework documentation lives under `agentic/docs/`.
 | [Pilot: Internal Copilot](PILOT_INTERNAL_COPILOT.md) | Second pilot — approval boundary clarity |
 | [Pilot: Real-LLM Validation](PILOT_INTERNAL_COPILOT_REAL_LLM.md) | Third pilot — real LLM parsing, normalization, safety gate |
 | [Adoption Validation Report](ADOPTION_VALIDATION_REPORT.md) | Second-developer simulation, friction analysis, cold-start verification |
+| [External Developer Validation Guide](EXTERNAL_DEVELOPER_VALIDATION.md) | External trial guide — sequence, success criteria, reference links |
+| [External Developer Tasks](EXTERNAL_DEVELOPER_TASKS.md) | Three concrete trial tasks for external developers |
+| [External Developer Feedback Template](EXTERNAL_DEVELOPER_FEEDBACK_TEMPLATE.md) | Structured feedback form (10 sections) |
+| [External Validation Checklist](EXTERNAL_VALIDATION_CHECKLIST.md) | Internal tracking sheet for validation round |
 
 ## Design decisions and architecture
 

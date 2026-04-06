@@ -55,3 +55,4 @@ wiring changes needed.
 | Goal Decomposition & Action Mapping | [agentic/docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md](agentic/docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) |
 | Examples Overview | [agentic/docs/EXAMPLES_OVERVIEW.md](agentic/docs/EXAMPLES_OVERVIEW.md) |
 | Framework Status | [agentic/docs/FRAMEWORK_STATUS.md](agentic/docs/FRAMEWORK_STATUS.md) |
+| External Validation Guide | [agentic/docs/EXTERNAL_DEVELOPER_VALIDATION.md](agentic/docs/EXTERNAL_DEVELOPER_VALIDATION.md) |
