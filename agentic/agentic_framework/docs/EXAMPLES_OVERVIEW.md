@@ -14,7 +14,8 @@ a governed agent with a custom tool.
 | [`examples/minimal_governed_agent.py`](../../../examples/minimal_governed_agent.py) | **Start here.** Smallest useful governed agent | `build_agent`, `ToolSpec`, `run_with_trace` |
 | [`examples/first_governed_agent.py`](../../../examples/first_governed_agent.py) | Governed agent with streaming + tool discovery | `build_cg_mcp_agent`, `run_stream`, `TraceCollector`, `ToolCatalog` |
 | [`examples/governed_agent_with_approval_and_budget.py`](../../../examples/governed_agent_with_approval_and_budget.py) | Approval gates + budget enforcement + structured output | `ApprovalController`, `BudgetPolicy`, `run_structured_with_trace` |
-| [`examples/pilot_research_assistant.py`](../../../examples/pilot_research_assistant.py) | **Pilot:** custom tools, approval, budget, structured output, discovery, audit | `build_agent`, `ToolSpec`, `ApprovalController`, `BudgetPolicy`, `ToolCatalog` |
+| [`examples/pilot_research_assistant.py`](../../../examples/pilot_research_assistant.py) | **Pilot 1:** custom tools, approval, budget, structured output, discovery, audit | `build_agent`, `ToolSpec`, `ApprovalController`, `BudgetPolicy`, `ToolCatalog` |
+| [`examples/pilot_internal_copilot.py`](../../../examples/pilot_internal_copilot.py) | **Pilot 2:** approval-gated internal copilot with read/write boundary | `build_agent`, `ToolSpec`, `ApprovalPolicy`, `format_trace`, `ToolCatalog` |
 | [`examples/cg_tool_demo.py`](../../../examples/cg_tool_demo.py) | CG metadata enrichment (lower-level, pre-R-phase) | `SafeMCPGateway`, `build_governance_enrichment_kwargs`, audit log |
 
 ---
@@ -25,6 +26,7 @@ a governed agent with a custom tool.
 2. **`first_governed_agent.py`** — streaming events + tool discovery
 3. **`governed_agent_with_approval_and_budget.py`** — approval, budget, structured output
 4. **`pilot_research_assistant.py`** — realistic multi-phase pilot with custom tools
+5. **`pilot_internal_copilot.py`** — per-action-type approval, approve + deny paths, trace comparison
 
 ---
 
@@ -102,8 +104,11 @@ python examples/first_governed_agent.py
 # Approval + budget + structured output
 python examples/governed_agent_with_approval_and_budget.py
 
-# Full pilot — custom tools, approval, budget, structured output
+# Pilot 1 — custom tools, approval, budget, structured output
 python examples/pilot_research_assistant.py
+
+# Pilot 2 — approval-gated internal copilot (approve + deny paths)
+python examples/pilot_internal_copilot.py
 
 # CG metadata enrichment demo (lower-level)
 python examples/cg_tool_demo.py

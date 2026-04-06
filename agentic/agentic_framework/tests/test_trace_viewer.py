@@ -232,7 +232,7 @@ class TestTimelineFormat:
 
         assert "APPROVE?" in out
         assert "delete: Remove file" in out
-        assert "APPROVED" in out
+        assert "APPROVE:" in out
         assert "approved (user confirmed)" in out
 
     def test_denial_detail(self):
