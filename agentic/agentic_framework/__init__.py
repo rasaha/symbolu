@@ -162,6 +162,10 @@ from agentic.agentic_framework.streaming_events import (
     USAGE_UPDATED,
     BUDGET_EXCEEDED,
 )
+from agentic.agentic_framework.tool_discovery import (
+    DiscoveredTool,
+    ToolCatalog,
+)
 from agentic.agentic_framework.llm_adapters import (
     MistralAdapter,
     MistralCGAdapter,
@@ -309,6 +313,9 @@ __all__ = [
     "ApprovalPolicy",
     "ApprovalResponse",
     "PendingApproval",
+    # MCP Discovery / Tool Introspection (R8)
+    "DiscoveredTool",
+    "ToolCatalog",
     # LLM Adapters (Mistral API + local MistralCG)
     "MistralAdapter",
     "MistralCGAdapter",
