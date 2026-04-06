@@ -2627,7 +2627,9 @@ second source of truth.
 
 Accounting modes: `exact` (adapter provides real token counts via
 `get_last_usage()`), `estimated` (fallback heuristic), `mixed` (some
-exact, some estimated), `none` (no generation recorded).
+generations used exact counts, others used estimation), `none` (no
+generation recorded). Mode is derived from aggregate counters across
+all `record_generation()` calls, not from the most recent call alone.
 
 Budget checkpoints occur after generation completes and before each action.
 `BaseLLMAdapter.get_last_usage()` returns `Optional[Dict]` with
@@ -2712,6 +2714,7 @@ committed on the current branch:
 | MCP discovery / tool introspection (R8) | 38 tests in `test_tool_discovery.py` |
 | Usage and budget tracking (R9) | 37 tests in `test_token_budget.py` |
 | Tracing / observability (R11) | 26 tests in `test_tracing.py` |
+| Cross-feature hardening (R4+R9+R2+R11) | 23 tests in `test_audit_hardening.py` — approval+budget interaction, pre-action budget checkpoint, approval+cancellation, denied-approval traces, JSON extraction edge cases, adapter usage fallbacks, multi-generation accounting |
 | Stub-backed end-to-end runtime | Full `run()` pipeline into mock MCP |
 | All five signal integration tracks (S, C, O, P, Safety) | 1000+ tests across dedicated suites |
 
@@ -2955,14 +2958,23 @@ The runtime primitives test suite (265 tests across 8 files) proves:
    exact and estimated token counts. `BudgetPolicy.is_exceeded()` checks
    all four cap dimensions. Budget checkpoint ordering (after generation,
    before actions) is verified. `BUDGET_EXCEEDED` is a terminal event.
-   Accounting mode derivation (exact/estimated/mixed/none) is correct.
+   Accounting mode derivation (exact/estimated/mixed/none) uses aggregate
+   counters across multiple generations.
 
 7. **R11 tracing** — `TraceCollector.record()` accumulates events.
    `build_trace()` derives summary fields (actions, approvals, usage,
    budget) from event stream. `AgentRunTrace.to_dict()` is JSON-safe.
-   `run_with_trace()` convenience wrapper works correctly.
+   `run_with_trace()` forwards `approval_controller` and `budget_policy`
+   to `run_stream()`.
 
-8. **Agent integration** — `run()` backward compatibility preserved.
+8. **Cross-feature hardening** — Approval+budget ordering verified
+   (budget check runs before approval gate). Cancellation+approval
+   interaction tested. Denied approvals produce correct trace
+   (`actions_executed=0`, `status="completed"`). `BUDGET_EXCEEDED`
+   terminates `run_structured_with_trace`. Adapter `get_last_usage()`
+   returning `None` or `{}` falls back to estimation correctly.
+
+9. **Agent integration** — `run()` backward compatibility preserved.
    Action dispatch through dispatcher with safety gate ordering.
    Permissive safety evaluator enables action execution in tests.
 
