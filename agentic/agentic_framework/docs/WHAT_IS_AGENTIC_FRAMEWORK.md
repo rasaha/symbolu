@@ -77,8 +77,10 @@ This framework adds a **governed execution path**:
 
 ## See also
 
+- [README](../README.md) — entry point with quickstart code
 - [Why Agentic Is Different](WHY_AGENTIC_IS_DIFFERENT.md) —
   differentiator breakdown
+- [Quickstart](QUICKSTART.md) — setup, first code, API orientation
 - [First Governed Agent](FIRST_GOVERNED_AGENT.md) — build guide
 - [Framework Status](FRAMEWORK_STATUS.md) — what is proved, what
   is not

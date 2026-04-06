@@ -1,6 +1,6 @@
 # Framework Status
 
-Current status of the Agentic Framework as of version 1.8.0.
+Current status of the Agentic Framework as of version 1.9.0.
 
 This page separates what is fully implemented and tested from what
 is partially proved or intentionally deferred. It mirrors the
@@ -10,7 +10,9 @@ internal architecture truth in plain language.
 
 ## Fully implemented and tested
 
-These capabilities are regression-tested (1500+ tests) and committed.
+These capabilities are regression-tested (1550+ tests) and committed.
+
+### Core runtime
 
 | Capability | What it means | Test evidence |
 |-----------|--------------|---------------|
@@ -22,6 +24,11 @@ These capabilities are regression-tested (1500+ tests) and committed.
 | **MCP gateway (per-tool)** | Risk classification, confidence gating, audit logging per tool call | `test_mcp_gateway.py` |
 | **CG signal enrichment** | Entropy and coherence signals from model internal state enrich tool-call governance | `test_cg_tool_demo.py` |
 | **Dispatcher/factory composition** | `CGToolDispatcher` + `build_cg_mcp_agent()` compose the full runtime | Unit + integration tests |
+
+### Runtime primitives (R1–R11)
+
+| Capability | What it means | Test evidence |
+|-----------|--------------|---------------|
 | **Streaming events (R1)** | 17 structured event types covering the full agent lifecycle | 28 tests |
 | **Async + cancellation (R2)** | Async streaming and cancellation tokens that stop execution at checkpoints | 31 tests |
 | **Human approval interrupts (R4)** | Pre-action approval gates with configurable policy and callback | 33 tests |
@@ -30,6 +37,23 @@ These capabilities are regression-tested (1500+ tests) and committed.
 | **Usage and budget tracking (R9)** | Token/cost accounting with hard budget caps; budget exceedance is a terminal event | 37 tests |
 | **Tracing (R11)** | In-memory event recording and trace summary derivation | 26 tests |
 | **Cross-feature hardening** | Approval+budget ordering, cancellation+approval interaction, denied-approval traces, accounting mode correctness | 23 tests |
+
+### Developer ergonomics
+
+| Capability | What it means | Added in |
+|-----------|--------------|----------|
+| **`build_agent()` factory** | One-call composition: adapter + `ToolSpec` dict → full governed agent | 1.8.0 |
+| **`ToolSpec` dataclass** | Bundles handler + risk level + capabilities + confirmation in one object | 1.8.0 |
+| **`format_trace()` viewer** | Human-readable trace summary + event timeline for terminal output | 1.9.0 |
+| **`describe_approval_coverage()`** | Pre-run report showing which actions are gated by R4 policy, gateway confirmation, or both | 1.9.0 |
+| **Two approval layers documented** | Clear guidance on R4 (orchestration) vs gateway (confirmation) approval in QUICKSTART.md | 1.9.0 |
+
+### Adoption pilots
+
+| Pilot | What it validates | Script |
+|-------|------------------|--------|
+| **Research assistant** | Custom tools, broad governance, require-all approval, budget, structured output, tool discovery, audit | `examples/pilot_research_assistant.py` |
+| **Internal copilot** | Per-action-type approval boundary, approve + deny paths, trace comparison, approval coverage | `examples/pilot_internal_copilot.py` |
 
 ### Action loop ordering (pinned by tests)
 
@@ -55,6 +79,14 @@ runtime contract.
 
 ---
 
+## Designed but not yet built
+
+| Capability | Status |
+|-----------|--------|
+| **Low-code developer console** | Design spec complete ([LOWCODE_DEVELOPER_INTERFACE_SPEC.md](LOWCODE_DEVELOPER_INTERFACE_SPEC.md)). Recommended to build after one more adoption cycle. |
+
+---
+
 ## Intentionally deferred
 
 These are known gaps that are not planned for the current release.
@@ -75,14 +107,16 @@ These are known gaps that are not planned for the current release.
 
 | Version | Summary |
 |---------|---------|
+| 1.9.0 | Developer ergonomics (`build_agent`, `ToolSpec`), trace viewer, approval coverage helper, two adoption pilots, packaging/docs pass. |
 | 1.8.0 | R1–R11 runtime primitives complete. Streaming, cancellation, approvals, structured outputs, MCP discovery, usage/budget tracking, tracing, cross-feature hardening. |
 
 ---
 
 ## See also
 
-- [What Is Agentic Framework](WHAT_IS_AGENTIC_FRAMEWORK.md) —
-  overview
-- [Why Agentic Is Different](WHY_AGENTIC_IS_DIFFERENT.md) —
-  differentiator doc
+- [README](../README.md) — entry point
+- [What Is Agentic Framework](WHAT_IS_AGENTIC_FRAMEWORK.md) — overview
+- [Why Agentic Is Different](WHY_AGENTIC_IS_DIFFERENT.md) — differentiators
 - [First Governed Agent](FIRST_GOVERNED_AGENT.md) — build guide
+- [Quickstart](QUICKSTART.md) — setup + first code
+- [Examples Overview](EXAMPLES_OVERVIEW.md) — all runnable examples

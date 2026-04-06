@@ -359,4 +359,4 @@ __all__ = [
     "create_conservative_pipeline",
 ]
 
-__version__ = "1.8.0"  # R1-R11 runtime primitives: streaming, cancellation, approval, structured, budget, tracing, discovery
+__version__ = "1.9.0"  # R1-R11 runtime primitives, build_agent/ToolSpec ergonomics, trace viewer, approval coverage, two pilots

@@ -120,7 +120,8 @@ signals.
 
 ## See also
 
-- [What Is Agentic Framework](WHAT_IS_AGENTIC_FRAMEWORK.md) —
-  overview
+- [README](../README.md) — entry point with quickstart code
+- [What Is Agentic Framework](WHAT_IS_AGENTIC_FRAMEWORK.md) — overview
+- [Quickstart](QUICKSTART.md) — setup, first code, API orientation
 - [First Governed Agent](FIRST_GOVERNED_AGENT.md) — build guide
 - [Framework Status](FRAMEWORK_STATUS.md) — maturity status
