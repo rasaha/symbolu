@@ -335,6 +335,7 @@ print(format_approval_coverage(coverage))
 |------|-----|
 | Understand each feature in depth | [First Governed Agent](FIRST_GOVERNED_AGENT.md) |
 | Switch from mock to real LLM | [Mock → Real LLM](MOCK_TO_REAL_LLM.md) |
+| Understand action types and mapping | [Goal Decomposition & Action Mapping](GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) |
 | See what makes this different | [Why Agentic Is Different](WHY_AGENTIC_IS_DIFFERENT.md) |
 | Check what is proved / deferred | [Framework Status](FRAMEWORK_STATUS.md) |
 | See example scripts | [Examples Overview](EXAMPLES_OVERVIEW.md) |

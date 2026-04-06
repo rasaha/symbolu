@@ -158,6 +158,7 @@ All examples use stub/mock adapters — no API keys required.
 |-----|---------------|
 | [Quickstart](docs/QUICKSTART.md) | Prerequisites, first agent, API orientation, two approval layers |
 | [Mock → Real LLM](docs/MOCK_TO_REAL_LLM.md) | Switch from MockLLMAdapter to OpenAI/Anthropic — what changes, what stays |
+| [Goal Decomposition & Action Mapping](docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) | How prompts become governed actions — types, mapping, normalization |
 | [Examples Overview](docs/EXAMPLES_OVERVIEW.md) | All examples with recommended reading order |
 | [What Is Agentic Framework](docs/WHAT_IS_AGENTIC_FRAMEWORK.md) | Overview and positioning |
 | [Why Agentic Is Different](docs/WHY_AGENTIC_IS_DIFFERENT.md) | Table-stakes vs differentiators, execution path, signal enrichment |

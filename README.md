@@ -52,5 +52,6 @@ wiring changes needed.
 | Quickstart | [agentic/agentic_framework/docs/QUICKSTART.md](agentic/agentic_framework/docs/QUICKSTART.md) |
 | First Governed Agent | [agentic/agentic_framework/docs/FIRST_GOVERNED_AGENT.md](agentic/agentic_framework/docs/FIRST_GOVERNED_AGENT.md) |
 | Mock → Real LLM | [agentic/agentic_framework/docs/MOCK_TO_REAL_LLM.md](agentic/agentic_framework/docs/MOCK_TO_REAL_LLM.md) |
+| Goal Decomposition & Action Mapping | [agentic/agentic_framework/docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md](agentic/agentic_framework/docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) |
 | Examples Overview | [agentic/agentic_framework/docs/EXAMPLES_OVERVIEW.md](agentic/agentic_framework/docs/EXAMPLES_OVERVIEW.md) |
 | Framework Status | [agentic/agentic_framework/docs/FRAMEWORK_STATUS.md](agentic/agentic_framework/docs/FRAMEWORK_STATUS.md) |
