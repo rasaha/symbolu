@@ -59,6 +59,7 @@ from agentic.agentic_framework.structured_output import (
     StructuredRunResult,
     build_schema_prompt,
     extract_json,
+    schema_name as _schema_name,
     validate_and_construct,
 )
 from agentic.agentic_framework.streaming_events import (
@@ -448,6 +449,7 @@ class AgenticLLMWrapper:
         """
         augmented = build_schema_prompt(user_input, schema)
         result = self.run(augmented)
+        sname = _schema_name(schema)
 
         raw_text = result.response
         data = extract_json(raw_text)
@@ -457,6 +459,7 @@ class AgenticLLMWrapper:
                 success=False,
                 raw_text=raw_text,
                 validation_error="Could not extract JSON from response",
+                schema_name=sname,
                 quality_score=result.quality_score,
                 revision_count=result.revision_count,
             )
@@ -468,6 +471,7 @@ class AgenticLLMWrapper:
                 success=False,
                 raw_text=raw_text,
                 validation_error=str(exc),
+                schema_name=sname,
                 quality_score=result.quality_score,
                 revision_count=result.revision_count,
             )
@@ -475,7 +479,8 @@ class AgenticLLMWrapper:
         return StructuredRunResult(
             success=True,
             raw_text=raw_text,
-            parsed=parsed,
+            parsed_output=parsed,
+            schema_name=sname,
             quality_score=result.quality_score,
             revision_count=result.revision_count,
         )
@@ -491,6 +496,7 @@ class AgenticLLMWrapper:
         ``AgentRunTrace`` including a ``structured_validation`` event.
         """
         augmented = build_schema_prompt(user_input, schema)
+        sname = _schema_name(schema)
 
         collector = TraceCollector()
         for _evt in self.run_stream(
@@ -522,6 +528,7 @@ class AgenticLLMWrapper:
                 success=False,
                 raw_text=raw_text,
                 validation_error="Could not extract JSON from response",
+                schema_name=sname,
                 quality_score=quality_score,
                 revision_count=revision_count,
             )
@@ -531,7 +538,8 @@ class AgenticLLMWrapper:
                 sr = StructuredRunResult(
                     success=True,
                     raw_text=raw_text,
-                    parsed=parsed,
+                    parsed_output=parsed,
+                    schema_name=sname,
                     quality_score=quality_score,
                     revision_count=revision_count,
                 )
@@ -540,6 +548,7 @@ class AgenticLLMWrapper:
                     success=False,
                     raw_text=raw_text,
                     validation_error=str(exc),
+                    schema_name=sname,
                     quality_score=quality_score,
                     revision_count=revision_count,
                 )
@@ -553,6 +562,7 @@ class AgenticLLMWrapper:
             session_id,
             {
                 "success": sr.success,
+                "schema_name": sname,
                 "validation_error": sr.validation_error,
             },
         )

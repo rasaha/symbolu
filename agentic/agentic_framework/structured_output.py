@@ -42,6 +42,9 @@ from typing import Any, Dict, List, Optional, Type, Union
 # dict mapping field names to expected Python types.
 SchemaTarget = Union[Type[Any], Dict[str, type]]
 
+# Alias requested by R6 spec — use either name interchangeably.
+OutputSchema = SchemaTarget
+
 
 def _schema_description(schema: SchemaTarget) -> str:
     """Build a human-readable JSON schema hint for the LLM prompt."""
@@ -104,6 +107,13 @@ Respond ONLY with valid JSON matching this exact schema — no markdown fences, 
 """
 
 
+def schema_name(schema: SchemaTarget) -> str:
+    """Return a short human-readable name for *schema*."""
+    if isinstance(schema, dict):
+        return "dict_schema"
+    return getattr(schema, "__name__", str(schema))
+
+
 def build_schema_prompt(user_input: str, schema: SchemaTarget) -> str:
     """Augment *user_input* with a schema instruction suffix."""
     desc = _schema_description(schema)
@@ -118,10 +128,22 @@ def build_schema_prompt(user_input: str, schema: SchemaTarget) -> str:
 def extract_json(text: str) -> Optional[Dict[str, Any]]:
     """Best-effort extraction of a JSON object from LLM text.
 
-    Tries the full text first, then falls back to the first ``{...}``
-    block found (handles markdown fences, preamble, etc.).
+    Strategy (ordered):
+      a. Prefer fenced ``json`` blocks if present.
+      b. Locate the first valid JSON object substring via bracket-matching.
+      c. Regex fallback for the outermost ``{ ... }``.
     """
-    # Try full text
+    # --- (a) fenced json blocks ---
+    fence_match = re.search(r"```(?:json)?\s*\n?([\s\S]*?)```", text)
+    if fence_match:
+        try:
+            obj = json.loads(fence_match.group(1).strip())
+            if isinstance(obj, dict):
+                return obj
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Try full text as-is (covers bare JSON responses)
     try:
         obj = json.loads(text)
         if isinstance(obj, dict):
@@ -129,18 +151,13 @@ def extract_json(text: str) -> Optional[Dict[str, Any]]:
     except (json.JSONDecodeError, ValueError):
         pass
 
-    # Strip markdown code fences
-    stripped = re.sub(r"```(?:json)?\s*", "", text)
-    stripped = re.sub(r"```", "", stripped).strip()
-    try:
-        obj = json.loads(stripped)
-        if isinstance(obj, dict):
-            return obj
-    except (json.JSONDecodeError, ValueError):
-        pass
+    # --- (b) bracket-matching: find first balanced { ... } substring ---
+    result = _find_json_object(text)
+    if result is not None:
+        return result
 
-    # Regex for outermost { ... }
-    match = re.search(r"\{[\s\S]*\}", stripped)
+    # --- (c) regex fallback for outermost { ... } ---
+    match = re.search(r"\{[\s\S]*\}", text)
     if match:
         try:
             obj = json.loads(match.group())
@@ -149,6 +166,47 @@ def extract_json(text: str) -> Optional[Dict[str, Any]]:
         except (json.JSONDecodeError, ValueError):
             pass
 
+    return None
+
+
+def _find_json_object(text: str) -> Optional[Dict[str, Any]]:
+    """Scan *text* for the first balanced ``{…}`` substring and parse it.
+
+    Uses bracket counting rather than regex so it handles nested objects
+    and strings containing braces correctly.
+    """
+    i = text.find("{")
+    while i != -1:
+        depth = 0
+        in_string = False
+        escape = False
+        for j in range(i, len(text)):
+            ch = text[j]
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[i : j + 1]
+                    try:
+                        obj = json.loads(candidate)
+                        if isinstance(obj, dict):
+                            return obj
+                    except (json.JSONDecodeError, ValueError):
+                        break  # this opening brace didn't lead to valid JSON
+        # Try next opening brace
+        i = text.find("{", i + 1)
     return None
 
 
@@ -217,38 +275,41 @@ class StructuredRunResult:
     Fields:
         success: Whether parsing and validation succeeded.
         raw_text: The raw LLM response text (always present).
-        parsed: The validated/constructed output, or ``None`` on failure.
+        parsed_output: The validated/constructed output, or ``None`` on failure.
         validation_error: Human-readable error string on failure.
+        schema_name: Name of the target schema (for diagnostics/logging).
         quality_score: Quality score from the underlying generation.
         revision_count: Revision count from the underlying generation.
     """
 
     success: bool
     raw_text: str
-    parsed: Any = None
+    parsed_output: Any = None
     validation_error: Optional[str] = None
+    schema_name: Optional[str] = None
     quality_score: float = 0.0
     revision_count: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a JSON-safe dict.
 
-        ``parsed`` is converted via ``dataclasses.asdict`` if it is a
-        dataclass, or left as-is if it is already a dict.
+        ``parsed_output`` is converted via ``dataclasses.asdict`` if it
+        is a dataclass, or left as-is if it is already a dict.
         """
         parsed_serialised: Any = None
-        if self.parsed is not None:
-            if dataclasses.is_dataclass(self.parsed) and not isinstance(self.parsed, type):
-                parsed_serialised = dataclasses.asdict(self.parsed)
-            elif hasattr(self.parsed, "model_dump"):
-                parsed_serialised = self.parsed.model_dump()
+        if self.parsed_output is not None:
+            if dataclasses.is_dataclass(self.parsed_output) and not isinstance(self.parsed_output, type):
+                parsed_serialised = dataclasses.asdict(self.parsed_output)
+            elif hasattr(self.parsed_output, "model_dump"):
+                parsed_serialised = self.parsed_output.model_dump()
             else:
-                parsed_serialised = self.parsed
+                parsed_serialised = self.parsed_output
         return {
             "success": self.success,
             "raw_text": self.raw_text,
-            "parsed": parsed_serialised,
+            "parsed_output": parsed_serialised,
             "validation_error": self.validation_error,
+            "schema_name": self.schema_name,
             "quality_score": self.quality_score,
             "revision_count": self.revision_count,
         }

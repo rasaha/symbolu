@@ -121,8 +121,9 @@ from agentic.agentic_framework.proactive_scheduler import (
 )
 from agentic.agentic_framework.cancellation import CancellationToken
 from agentic.agentic_framework.structured_output import (
-    StructuredRunResult,
+    OutputSchema,
     SchemaTarget,
+    StructuredRunResult,
 )
 from agentic.agentic_framework.tracing import (
     AgentRunTrace,
@@ -259,8 +260,9 @@ __all__ = [
     "AgentRunTrace",
     "TraceCollector",
     # Structured Output (R6)
-    "StructuredRunResult",
+    "OutputSchema",
     "SchemaTarget",
+    "StructuredRunResult",
     # Streaming Events (R1) + Cancellation event (R2)
     "AgentRunEvent",
     "make_event",

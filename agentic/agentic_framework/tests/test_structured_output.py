@@ -24,9 +24,11 @@ from agentic.agentic_framework.streaming_events import (
     STRUCTURED_VALIDATION,
 )
 from agentic.agentic_framework.structured_output import (
+    OutputSchema,
     StructuredRunResult,
     build_schema_prompt,
     extract_json,
+    schema_name as get_schema_name,
     validate_and_construct,
     _schema_description,
 )
@@ -80,10 +82,10 @@ class TestSuccessfulParse:
         agent = _make_agent(resp)
         result = agent.run_structured("Capital of France?", schema=City)
         assert result.success is True
-        assert isinstance(result.parsed, City)
-        assert result.parsed.name == "Paris"
-        assert result.parsed.country == "France"
-        assert result.parsed.population == 2161000
+        assert isinstance(result.parsed_output, City)
+        assert result.parsed_output.name == "Paris"
+        assert result.parsed_output.country == "France"
+        assert result.parsed_output.population == 2161000
 
     def test_dict_schema(self):
         resp = '{"color": "blue", "count": 5}'
@@ -91,30 +93,30 @@ class TestSuccessfulParse:
         schema = {"color": str, "count": int}
         result = agent.run_structured("Pick a color", schema=schema)
         assert result.success is True
-        assert result.parsed["color"] == "blue"
-        assert result.parsed["count"] == 5
+        assert result.parsed_output["color"] == "blue"
+        assert result.parsed_output["count"] == 5
 
     def test_json_in_markdown_fences(self):
         resp = '```json\n{"name": "Tokyo", "country": "Japan", "population": 14000000}\n```'
         agent = _make_agent(resp)
         result = agent.run_structured("Capital of Japan?", schema=City)
         assert result.success is True
-        assert result.parsed.name == "Tokyo"
+        assert result.parsed_output.name == "Tokyo"
 
     def test_json_with_preamble(self):
         resp = 'Here is the answer:\n{"name": "Berlin", "country": "Germany", "population": 3600000}\nThat is all.'
         agent = _make_agent(resp)
         result = agent.run_structured("Capital of Germany?", schema=City)
         assert result.success is True
-        assert result.parsed.name == "Berlin"
+        assert result.parsed_output.name == "Berlin"
 
     def test_dataclass_with_defaults(self):
         resp = '{"required_field": "hello"}'
         agent = _make_agent(resp)
         result = agent.run_structured("test", schema=WithDefaults)
         assert result.success is True
-        assert result.parsed.required_field == "hello"
-        assert result.parsed.optional_field == "default_value"
+        assert result.parsed_output.required_field == "hello"
+        assert result.parsed_output.optional_field == "default_value"
 
     def test_quality_score_propagated(self):
         resp = '{"name": "Rome", "country": "Italy", "population": 2873000}'
@@ -303,7 +305,7 @@ class TestSerialization:
         d = result.to_dict()
         assert isinstance(d, dict)
         assert d["success"] is True
-        assert d["parsed"]["name"] == "Paris"
+        assert d["parsed_output"]["name"] == "Paris"
 
     def test_structured_result_json_serializable(self):
         resp = '{"name": "Paris", "country": "France", "population": 2161000}'
@@ -319,7 +321,7 @@ class TestSerialization:
         result = agent.run_structured("Hello", schema=City)
         d = result.to_dict()
         assert d["success"] is False
-        assert d["parsed"] is None
+        assert d["parsed_output"] is None
         assert d["validation_error"] is not None
 
     def test_dict_schema_result_serializable(self):
@@ -328,7 +330,7 @@ class TestSerialization:
         result = agent.run_structured("Numbers", schema={"x": int, "y": int})
         json_str = json.dumps(result.to_dict())
         parsed = json.loads(json_str)
-        assert parsed["parsed"]["x"] == 1
+        assert parsed["parsed_output"]["x"] == 1
 
 
 # ===================================================================
@@ -341,5 +343,83 @@ class TestExtraFields:
         agent = _make_agent(resp)
         result = agent.run_structured("Capital?", schema=City)
         assert result.success is True
-        assert result.parsed.name == "Paris"
-        assert not hasattr(result.parsed, "extra")
+        assert result.parsed_output.name == "Paris"
+        assert not hasattr(result.parsed_output, "extra")
+
+
+# ===================================================================
+# 9. schema_name populated correctly
+# ===================================================================
+
+class TestSchemaName:
+    def test_schema_name_dataclass(self):
+        resp = '{"name": "Paris", "country": "France", "population": 2161000}'
+        agent = _make_agent(resp)
+        result = agent.run_structured("Capital?", schema=City)
+        assert result.schema_name == "City"
+
+    def test_schema_name_dict(self):
+        resp = '{"color": "blue", "count": 5}'
+        agent = _make_agent(resp)
+        result = agent.run_structured("Pick", schema={"color": str, "count": int})
+        assert result.schema_name == "dict_schema"
+
+    def test_schema_name_on_failure(self):
+        agent = _make_agent("no json")
+        result = agent.run_structured("Hello", schema=City)
+        assert result.schema_name == "City"
+
+    def test_schema_name_in_trace_event(self):
+        resp = '{"name": "Paris", "country": "France", "population": 2161000}'
+        agent = _make_agent(resp)
+        _, trace = agent.run_structured_with_trace("Capital?", schema=City)
+        val_events = trace.get_events(STRUCTURED_VALIDATION)
+        assert val_events[0].payload["schema_name"] == "City"
+
+    def test_schema_name_in_to_dict(self):
+        resp = '{"name": "Paris", "country": "France", "population": 2161000}'
+        agent = _make_agent(resp)
+        result = agent.run_structured("Capital?", schema=City)
+        d = result.to_dict()
+        assert d["schema_name"] == "City"
+
+    def test_get_schema_name_helper(self):
+        assert get_schema_name(City) == "City"
+        assert get_schema_name({"x": int}) == "dict_schema"
+
+
+# ===================================================================
+# 10. OutputSchema alias
+# ===================================================================
+
+class TestOutputSchema:
+    def test_output_schema_is_schema_target(self):
+        from agentic.agentic_framework.structured_output import SchemaTarget
+        assert OutputSchema is SchemaTarget
+
+
+# ===================================================================
+# 11. JSON extraction: bracket-matching handles nested/tricky cases
+# ===================================================================
+
+class TestJsonExtractionAdvanced:
+    def test_nested_objects(self):
+        text = 'Here: {"a": {"b": 1}, "c": 2} done'
+        result = extract_json(text)
+        assert result == {"a": {"b": 1}, "c": 2}
+
+    def test_string_with_braces(self):
+        text = '{"msg": "use { and } carefully", "ok": true}'
+        result = extract_json(text)
+        assert result == {"msg": "use { and } carefully", "ok": True}
+
+    def test_json_after_long_preamble(self):
+        text = "Let me think about this.\nThe answer is:\n" + '{"name": "Paris", "country": "France", "population": 2161000}'
+        result = extract_json(text)
+        assert result["name"] == "Paris"
+
+    def test_fenced_preferred_over_inline(self):
+        # If fenced block exists, prefer it
+        text = 'Inline: {"a": 1}\n```json\n{"a": 2}\n```'
+        result = extract_json(text)
+        assert result == {"a": 2}  # fenced wins
