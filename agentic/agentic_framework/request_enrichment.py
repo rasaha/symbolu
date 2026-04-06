@@ -40,7 +40,7 @@ without branching twice on the absence case.
 
 See also
 --------
-``agentic/agentic_framework/docs/REQUEST_BOUNDARY_CONVENTION.md`` —
+``agentic/docs/REQUEST_BOUNDARY_CONVENTION.md`` —
 the production rule for which signals to attach, when to omit them,
 and why ``sovereign_projection_metadata`` is never fabricated from
 CG metadata alone.

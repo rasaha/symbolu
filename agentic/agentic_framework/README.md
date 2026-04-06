@@ -143,7 +143,7 @@ All examples use stub/mock adapters — no API keys required.
 - **Not a managed service.** A Python library, not a hosted
   platform.
 - **Not a no-code builder.** Developer-facing, code-first. A
-  low-code console is [designed](docs/LOWCODE_DEVELOPER_INTERFACE_SPEC.md)
+  low-code console is [designed](../docs/LOWCODE_DEVELOPER_INTERFACE_SPEC.md)
   but not yet built.
 - **Not broadly production-deployed.** Validated by 1550+ tests
   and two pilots. Production adoption is emerging.
@@ -156,17 +156,17 @@ All examples use stub/mock adapters — no API keys required.
 
 | Doc | What it covers |
 |-----|---------------|
-| [Quickstart](docs/QUICKSTART.md) | Prerequisites, first agent, API orientation, two approval layers |
-| [Mock → Real LLM](docs/MOCK_TO_REAL_LLM.md) | Switch from MockLLMAdapter to OpenAI/Anthropic — what changes, what stays |
-| [Goal Decomposition & Action Mapping](docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) | How prompts become governed actions — types, mapping, normalization |
-| [Examples Overview](docs/EXAMPLES_OVERVIEW.md) | All examples with recommended reading order |
-| [What Is Agentic Framework](docs/WHAT_IS_AGENTIC_FRAMEWORK.md) | Overview and positioning |
-| [Why Agentic Is Different](docs/WHY_AGENTIC_IS_DIFFERENT.md) | Table-stakes vs differentiators, execution path, signal enrichment |
-| [First Governed Agent](docs/FIRST_GOVERNED_AGENT.md) | Feature-by-feature build guide |
-| [Framework Status](docs/FRAMEWORK_STATUS.md) | What is proved, what is deferred |
-| [Pilot: Research Assistant](docs/PILOT_RESEARCH_ASSISTANT.md) | First adoption pilot — tool composition + governance |
-| [Pilot: Internal Copilot](docs/PILOT_INTERNAL_COPILOT.md) | Second adoption pilot — approval boundary clarity |
-| [Low-Code Interface Spec](docs/LOWCODE_DEVELOPER_INTERFACE_SPEC.md) | Design spec for future developer console (not yet built) |
+| [Quickstart](../docs/QUICKSTART.md) | Prerequisites, first agent, API orientation, two approval layers |
+| [Mock → Real LLM](../docs/MOCK_TO_REAL_LLM.md) | Switch from MockLLMAdapter to OpenAI/Anthropic — what changes, what stays |
+| [Goal Decomposition & Action Mapping](../docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) | How prompts become governed actions — types, mapping, normalization |
+| [Examples Overview](../docs/EXAMPLES_OVERVIEW.md) | All examples with recommended reading order |
+| [What Is Agentic Framework](../docs/WHAT_IS_AGENTIC_FRAMEWORK.md) | Overview and positioning |
+| [Why Agentic Is Different](../docs/WHY_AGENTIC_IS_DIFFERENT.md) | Table-stakes vs differentiators, execution path, signal enrichment |
+| [First Governed Agent](../docs/FIRST_GOVERNED_AGENT.md) | Feature-by-feature build guide |
+| [Framework Status](../docs/FRAMEWORK_STATUS.md) | What is proved, what is deferred |
+| [Pilot: Research Assistant](../docs/PILOT_RESEARCH_ASSISTANT.md) | First adoption pilot — tool composition + governance |
+| [Pilot: Internal Copilot](../docs/PILOT_INTERNAL_COPILOT.md) | Second adoption pilot — approval boundary clarity |
+| [Low-Code Interface Spec](../docs/LOWCODE_DEVELOPER_INTERFACE_SPEC.md) | Design spec for future developer console (not yet built) |
 
 ---
 
@@ -195,4 +195,4 @@ All examples use stub/mock adapters — no API keys required.
 **1.9.0** — Governed runtime complete. Developer ergonomics
 (`build_agent`, `ToolSpec`), trace viewer, approval coverage
 helper, two adoption pilots. See
-[Framework Status](docs/FRAMEWORK_STATUS.md) for details.
+[Framework Status](../docs/FRAMEWORK_STATUS.md) for details.
