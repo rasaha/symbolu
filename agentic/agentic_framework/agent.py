@@ -62,6 +62,10 @@ from agentic.agentic_framework.structured_output import (
     schema_name as _schema_name,
     validate_and_construct,
 )
+from agentic.agentic_framework.approval import (
+    ApprovalController,
+    PendingApproval,
+)
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
     make_event,
@@ -78,6 +82,8 @@ from agentic.agentic_framework.streaming_events import (
     REVISION_STARTED,
     REVISION_COMPLETED,
     STRUCTURED_VALIDATION,
+    APPROVAL_REQUESTED,
+    APPROVAL_RESOLVED,
 )
 from agentic.agentic_framework.coherence_tracker import (
     CoherenceState,
@@ -580,6 +586,7 @@ class AgenticLLMWrapper:
         user_input: str,
         cancellation_token: Optional[CancellationToken] = None,
         trace_collector: Optional[TraceCollector] = None,
+        approval_controller: Optional[ApprovalController] = None,
     ) -> Iterator[AgentRunEvent]:
         """
         Streaming variant of :meth:`run`.
@@ -595,6 +602,10 @@ class AgenticLLMWrapper:
                 stop the run cooperatively.
             trace_collector: Optional collector that records every
                 emitted event for post-run inspection.
+            approval_controller: Optional controller that gates action
+                execution.  When supplied, actions matching the
+                controller's policy emit ``approval_requested`` events
+                and pause until the callback approves or denies.
         """
         # Ensure session exists
         if self._memory is None:
@@ -730,6 +741,7 @@ class AgenticLLMWrapper:
 
             # 7. Execute actions if eligible
             actions_executed: List[str] = []
+            _ac = approval_controller
             if contract.eligible and self._goal_state:
                 for action in self._goal_state.actions:
                     if action.status != "pending":
@@ -743,6 +755,40 @@ class AgenticLLMWrapper:
                     if token and token.is_cancelled:
                         yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
                         return
+
+                    # --- approval gate (R4) ---
+                    if _ac and _ac.needs_approval(action.action_type):
+                        pending = PendingApproval(
+                            action_id=action.action_id,
+                            action_type=action.action_type,
+                            description=action.description,
+                            parameters=action.parameters or {},
+                            turn_id=turn_id,
+                            session_id=session_id,
+                            reason=f"Action type '{action.action_type}' requires approval",
+                        )
+                        yield _emit(_evt(APPROVAL_REQUESTED, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "description": action.description,
+                            "reason": pending.reason,
+                        }))
+                        response = _ac.request_approval(pending)
+                        yield _emit(_evt(APPROVAL_RESOLVED, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "approved": response.approved,
+                            "reason": response.reason,
+                        }))
+                        if not response.approved:
+                            action.status = "denied"
+                            action.error = response.reason or "Denied by human approval"
+                            yield _emit(_evt(ACTION_COMPLETED, {
+                                "action_id": action.action_id,
+                                "status": action.status,
+                                "error": action.error,
+                            }))
+                            continue
 
                     yield _emit(_evt(ACTION_STARTED, {
                         "action_id": action.action_id,
@@ -830,13 +876,16 @@ class AgenticLLMWrapper:
         user_input: str,
         cancellation_token: Optional[CancellationToken] = None,
         trace_collector: Optional[TraceCollector] = None,
+        approval_controller: Optional[ApprovalController] = None,
     ) -> AsyncIterator[AgentRunEvent]:
         """
         Async streaming variant of :meth:`run_stream`.
 
         Yields ``AgentRunEvent`` asynchronously.  Accepts the same
-        optional ``CancellationToken`` for cooperative cancellation
-        and an optional ``TraceCollector`` for in-memory tracing.
+        optional ``CancellationToken`` for cooperative cancellation,
+        an optional ``TraceCollector`` for in-memory tracing, and
+        an optional ``ApprovalController`` for human-in-the-loop
+        approval gating.
         """
         if self._memory is None:
             self.new_session()
@@ -960,6 +1009,7 @@ class AgenticLLMWrapper:
             ))
 
             actions_executed: List[str] = []
+            _ac = approval_controller
             if contract.eligible and self._goal_state:
                 for action in self._goal_state.actions:
                     if action.status != "pending":
@@ -972,6 +1022,42 @@ class AgenticLLMWrapper:
                     if token and token.is_cancelled:
                         yield _emit(_evt(RUN_CANCELLED, _cancelled_payload()))
                         return
+
+                    # --- approval gate (R4) ---
+                    if _ac and _ac.needs_approval(action.action_type):
+                        pending = PendingApproval(
+                            action_id=action.action_id,
+                            action_type=action.action_type,
+                            description=action.description,
+                            parameters=action.parameters or {},
+                            turn_id=turn_id,
+                            session_id=session_id,
+                            reason=f"Action type '{action.action_type}' requires approval",
+                        )
+                        yield _emit(_evt(APPROVAL_REQUESTED, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "description": action.description,
+                            "reason": pending.reason,
+                        }))
+                        response = await asyncio.to_thread(
+                            _ac.request_approval, pending,
+                        )
+                        yield _emit(_evt(APPROVAL_RESOLVED, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "approved": response.approved,
+                            "reason": response.reason,
+                        }))
+                        if not response.approved:
+                            action.status = "denied"
+                            action.error = response.reason or "Denied by human approval"
+                            yield _emit(_evt(ACTION_COMPLETED, {
+                                "action_id": action.action_id,
+                                "status": action.status,
+                                "error": action.error,
+                            }))
+                            continue
 
                     yield _emit(_evt(ACTION_STARTED, {
                         "action_id": action.action_id,

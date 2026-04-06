@@ -120,6 +120,13 @@ from agentic.agentic_framework.proactive_scheduler import (
     create_task,
 )
 from agentic.agentic_framework.cancellation import CancellationToken
+from agentic.agentic_framework.approval import (
+    ApprovalCallback,
+    ApprovalController,
+    ApprovalPolicy,
+    ApprovalResponse,
+    PendingApproval,
+)
 from agentic.agentic_framework.structured_output import (
     OutputSchema,
     SchemaTarget,
@@ -145,6 +152,8 @@ from agentic.agentic_framework.streaming_events import (
     RUN_CANCELLED,
     REVISION_STARTED,
     REVISION_COMPLETED,
+    APPROVAL_REQUESTED,
+    APPROVAL_RESOLVED,
 )
 from agentic.agentic_framework.llm_adapters import (
     MistralAdapter,
@@ -279,6 +288,14 @@ __all__ = [
     "REVISION_STARTED",
     "REVISION_COMPLETED",
     "STRUCTURED_VALIDATION",
+    "APPROVAL_REQUESTED",
+    "APPROVAL_RESOLVED",
+    # Approval / Human-in-the-Loop (R4)
+    "ApprovalCallback",
+    "ApprovalController",
+    "ApprovalPolicy",
+    "ApprovalResponse",
+    "PendingApproval",
     # LLM Adapters (Mistral API + local MistralCG)
     "MistralAdapter",
     "MistralCGAdapter",

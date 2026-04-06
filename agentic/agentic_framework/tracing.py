@@ -35,6 +35,8 @@ from agentic.agentic_framework.streaming_events import (
     SAFETY_GATE_RESULT,
     ACTION_COMPLETED,
     TEXT_CHUNK,
+    APPROVAL_REQUESTED,
+    APPROVAL_RESOLVED,
 )
 
 
@@ -69,6 +71,8 @@ class AgentRunTrace:
     safety_blocked: bool = False
     actions_executed: int = 0
     text_chunks: int = 0
+    approvals_requested: int = 0
+    approvals_denied: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a JSON-safe dict."""
@@ -85,6 +89,8 @@ class AgentRunTrace:
             "safety_blocked": self.safety_blocked,
             "actions_executed": self.actions_executed,
             "text_chunks": self.text_chunks,
+            "approvals_requested": self.approvals_requested,
+            "approvals_denied": self.approvals_denied,
             "events": [e.to_dict() for e in self.events],
         }
 
@@ -144,6 +150,16 @@ def _build_trace(events: List[AgentRunEvent]) -> AgentRunTrace:
         and e.payload.get("status") == "completed"
     )
     trace.text_chunks = sum(1 for e in events if e.event_type == TEXT_CHUNK)
+
+    # Count approval events (R4)
+    trace.approvals_requested = sum(
+        1 for e in events if e.event_type == APPROVAL_REQUESTED
+    )
+    trace.approvals_denied = sum(
+        1 for e in events
+        if e.event_type == APPROVAL_RESOLVED
+        and not e.payload.get("approved", True)
+    )
 
     return trace
 

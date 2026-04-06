@@ -35,6 +35,8 @@ RUN_CANCELLED = "run_cancelled"
 REVISION_STARTED = "revision_started"
 REVISION_COMPLETED = "revision_completed"
 STRUCTURED_VALIDATION = "structured_validation"
+APPROVAL_REQUESTED = "approval_requested"
+APPROVAL_RESOLVED = "approval_resolved"
 
 
 # ---------------------------------------------------------------------------
