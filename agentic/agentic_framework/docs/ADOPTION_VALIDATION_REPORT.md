@@ -188,3 +188,11 @@ a cold-start developer might not find.
   `ApprovalController`, `ApprovalPolicy`, `BudgetPolicy`, `TraceCollector`,
   `format_trace`, all 17 event types
 - Existing tests: 58 passed, 2 skipped (unchanged)
+
+### Additional finding: missing root README
+`pyproject.toml` declares `readme = "README.md"` but no `README.md`
+exists at the repo root. The actual README is at
+`agentic/agentic_framework/README.md`. This means `pip install -e .`
+metadata has no readme, and external devs exploring the repo root see
+no entry point. Creating a root README (or symlink) is recommended
+but deferred as a packaging decision outside this validation scope.
