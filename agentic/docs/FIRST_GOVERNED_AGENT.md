@@ -29,8 +29,7 @@ layers activate when you wire in a dispatcher and gateway.
 ## 1. Minimal agent (no governance)
 
 ```python
-from agentic.agentic_framework import AgenticLLMWrapper
-from agentic.agentic_framework.llm_adapters import OpenAIAdapter
+from agentic.agentic_framework import AgenticLLMWrapper, OpenAIAdapter
 
 # 1. Create an LLM adapter
 llm = OpenAIAdapter(api_key="sk-...", model="gpt-4")
@@ -54,10 +53,10 @@ and memory across turns — but no tool governance.
 Other adapters work the same way:
 
 ```python
-from agentic.agentic_framework.llm_adapters import AnthropicAdapter
+from agentic.agentic_framework import AnthropicAdapter
 llm = AnthropicAdapter(api_key="sk-ant-...", model="claude-sonnet-4-20250514")
 
-from agentic.agentic_framework.llm_adapters import MistralAdapter
+from agentic.agentic_framework import MistralAdapter
 llm = MistralAdapter(api_key="...", model="mistral-large-latest")
 ```
 
@@ -69,7 +68,7 @@ llm = MistralAdapter(api_key="...", model="mistral-large-latest")
 agent progresses through its execution path:
 
 ```python
-from agentic.agentic_framework.streaming_events import (
+from agentic.agentic_framework import (
     RUN_STARTED, GENERATION_COMPLETED, ACTION_STARTED,
     ACTION_COMPLETED, RUN_COMPLETED,
 )
@@ -107,7 +106,7 @@ print(f"Cost: ${trace.estimated_cost:.4f}")
 For more control, create the collector yourself:
 
 ```python
-from agentic.agentic_framework.tracing import TraceCollector
+from agentic.agentic_framework import TraceCollector
 
 collector = TraceCollector()
 for event in agent.run_stream("Hello", trace_collector=collector):
@@ -125,7 +124,7 @@ The approval system gates specific actions behind a callback before
 they execute:
 
 ```python
-from agentic.agentic_framework.approval import (
+from agentic.agentic_framework import (
     ApprovalController, ApprovalPolicy, ApprovalResponse,
 )
 
@@ -173,7 +172,7 @@ print(f"Approvals denied: {trace.approvals_denied}")
 `BudgetPolicy` sets hard caps on token usage and estimated cost:
 
 ```python
-from agentic.agentic_framework.token_budget import BudgetPolicy
+from agentic.agentic_framework import BudgetPolicy
 
 policy = BudgetPolicy(
     max_total_tokens=4000,
@@ -260,7 +259,7 @@ result = agent.run_structured("Capital of France?", schema=schema)
 in a `SafeMCPGateway`:
 
 ```python
-from agentic.agentic_framework.tool_discovery import ToolCatalog
+from agentic.agentic_framework import ToolCatalog
 
 # From a gateway
 catalog = ToolCatalog.from_gateway(gateway)

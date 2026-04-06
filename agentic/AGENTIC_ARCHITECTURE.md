@@ -1,14 +1,17 @@
 # Agentic Architecture: Governed Runtime & Signal Integration
 
-> **Version:** 6.0.0 | **Updated:** 2026-04-06
+> **Version:** 6.1.0 | **Updated:** 2026-04-06
 >
 > This document describes the agentic governance runtime — a code-first
 > developer framework for building agentic applications with a differentiated
 > governance/execution layer. The framework is not a thin wrapper around an
 > LLM adapter; it provides governed tool execution, structured runtime
 > primitives, and layered signal integration. It is also not yet a full
-> multi-agent platform — remaining gaps are around broader platforming and
-> adoption, not the basic runtime contract.
+> multi-agent platform — remaining gaps are around broader production adoption
+> and platforming, not the basic runtime contract. The framework is ready for
+> cold-start technical adoption by strong developers (validated through
+> simulated second-developer exercises and live-adapter validation), but is
+> not yet broadly production-adopted outside pilot use cases.
 >
 > The architecture comprises six completed tracks:
 >
@@ -1863,7 +1866,7 @@ build_governance_enrichment_kwargs(
   torch-free.
 
 **Request-boundary rules** (pinned by the helper; see
-`docs/REQUEST_BOUNDARY_CONVENTION.md`):
+`agentic/docs/REQUEST_BOUNDARY_CONVENTION.md`):
 
 1. Attach `entropy_result` and `vritti_result` when live CG metadata
    is available.
@@ -1990,9 +1993,9 @@ other wiring changes — same `SafetyGate`, same `_execute_actions`,
 same dispatcher, same gateway, same audit log.
 
 For the concrete end-to-end runtime diagram see
-`agentic/agentic_framework/docs/RUNTIME_MCP_PATH.md`. For the
+`agentic/docs/RUNTIME_MCP_PATH.md`. For the
 runnable `inference_mistral.py --cg` CLI see
-`agentic/agentic_framework/docs/CG_RUNTIME_RUNBOOK.md`.
+`agentic/docs/CG_RUNTIME_RUNBOOK.md`.
 
 ### Stub adapter vs real adapter
 
@@ -2070,6 +2073,16 @@ the mock gateway in `create_mock_mcp_gateway` has a matching set
 of registered tools. Callers with their own ontology pass their
 own mapping; nothing in the runtime hardcodes these three.
 
+Beyond direct mapping, the framework provides **`normalize_action_type()`**
+which remaps generic LLM-produced action types to developer-registered
+tool names using context-aware description signals. Normalization is:
+deterministic, context-aware (uses `_DESCRIPTION_SIGNALS`), fail-closed
+on ambiguity (falls back to original type), and traceable via
+`ActionItem.original_action_type`. See
+[Goal Decomposition and Action Mapping](docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md)
+for the full concepts doc covering decomposition, action types, mapping,
+normalization, governance flow, failure modes, and debugging.
+
 ### CLI path: `inference_mistral.py --cg`
 
 `agentic/agentic_framework/inference_mistral.py` now carries an
@@ -2118,7 +2131,7 @@ Rules:
   dispatch are proved here; **real local inference** requires an
   external torch + checkpoint + GPU environment and is
   operator-validated, not repo-validated. See
-  `docs/CG_RUNTIME_RUNBOOK.md` and `scripts/run_cg_gpu.sh`.
+  `agentic/docs/CG_RUNTIME_RUNBOOK.md` and `scripts/run_cg_gpu.sh`.
 
 **Intentionally deferred**:
 
@@ -2151,7 +2164,7 @@ Rules:
 ## Running the CG Runtime on GPU
 
 This section is the operational companion to
-`docs/CG_RUNTIME_RUNBOOK.md`. It shows the exact steps to stand up
+`agentic/docs/CG_RUNTIME_RUNBOOK.md`. It shows the exact steps to stand up
 `inference_mistral.py --cg` against a **real** `MistralCGAdapter`
 (local inference through `MistralCGWrapper`) on a CUDA host, plus
 the canonical helper script `scripts/run_cg_gpu.sh`.
@@ -2716,6 +2729,10 @@ committed on the current branch:
 | Tracing / observability (R11) | 26 tests in `test_tracing.py` |
 | Cross-feature hardening (R4+R9+R2+R11) | 23 tests in `test_audit_hardening.py` — approval+budget interaction, pre-action budget checkpoint, approval+cancellation, denied-approval traces, JSON extraction edge cases, adapter usage fallbacks, multi-generation accounting |
 | Stub-backed end-to-end runtime | Full `run()` pipeline into mock MCP |
+| Developer ergonomics (`build_agent`, `ToolSpec`, `format_trace`, `describe_approval_coverage`) | Ergonomics pass + 4 adoption pilots |
+| Context-aware action normalization (`normalize_action_type`) | Deterministic, fail-closed, traceable via `original_action_type` |
+| Live adapter validation (stock `AnthropicAdapter` with `auth_token`) | 3-phase end-to-end, exact usage accounting confirmed |
+| Cold-start adoption path (`pip install -e .` → first governed agent) | Simulated second-developer validation, 9/9 checks |
 | All five signal integration tracks (S, C, O, P, Safety) | 1000+ tests across dedicated suites |
 
 ### Partially Proved
@@ -2723,6 +2740,7 @@ committed on the current branch:
 | Capability | Status |
 |-----------|--------|
 | Real local `MistralCGAdapter` inference via `--cg` | Wiring and factory composition proved in repo. Real local inference requires torch + checkpoint + GPU environment and is **operator-validated**, not repo-validated. |
+| Real LLM adapter integration (`OpenAIAdapter`, `AnthropicAdapter`) | Live API validation passes (3/3 phases) with stock `AnthropicAdapter`. Exact usage accounting confirmed via `get_last_usage()`. Realistic-mock validation passes (60/60 checks). Not yet exercised under sustained production load. |
 
 ### Intentionally Deferred
 
@@ -2731,11 +2749,53 @@ committed on the current branch:
 | `AuthorizationRequest`-side runtime ownership | No production caller simultaneously holds adapter + request |
 | Live `SovereignProjectionResult` producer on MCP path | MCP path has 32D state, not full projection result |
 | Attaching `sovereign_projection_metadata` on live request-builder path | Requires a real producer, not fabrication |
-| Broad non-CLI runtime adoption | Other subsystems (voice, etc.) not migrated |
+| Broad production adoption | Validated for cold-start technical adoption; not yet adopted under sustained production load outside pilots |
 | Multi-agent / handoffs | Out of scope for current framework |
 | Mirror retirement / final migration collapse | `symbolu/agentic_framework/` still mirrors `agentic/agentic_framework/` |
 | OpenTelemetry / external telemetry backend | Runtime observability is local/in-memory |
 | `AuthorizationRequest`-side enrichment path | Seam ready in code, no honest production caller |
+| Low-code developer console | Design spec complete ([LOWCODE_DEVELOPER_INTERFACE_SPEC.md](docs/LOWCODE_DEVELOPER_INTERFACE_SPEC.md)). Recommended after one more adoption cycle. |
+| FP3: Greedy JSON regex in `_extract_json()` | Works for all tested format variations but could fail with multiple JSON objects in one response. Low risk. |
+
+### Adoption Readiness
+
+The framework has progressed from guided-only adoption to **cold-start
+technical adoption** for strong developers:
+
+- **Packaging:** `pip install -e .` installs all core dependencies;
+  optional groups (`[openai]`, `[anthropic]`, `[mistral]`, `[all]`)
+  for adapter-specific dependencies.
+- **Onboarding path:** Quickstart → First Governed Agent → Mock→Real
+  LLM tutorial → Goal Decomposition concepts doc → Examples.
+- **Adoption validation:** Simulated second-developer exercise built a
+  new governed use case (alert triage) from docs alone. 10 friction
+  points found, 7 fixed. See
+  [Adoption Validation Report](docs/ADOPTION_VALIDATION_REPORT.md).
+- **Live-adapter validation:** Stock `AnthropicAdapter` exercised
+  end-to-end with real API keys. Exposed and resolved FP1
+  (goal-alignment brittleness) and FP2 (action vocabulary mismatch).
+  Exact usage accounting confirmed.
+
+The next phase is **external developer validation** — real developers
+outside the project adopting from published docs.
+
+### Documentation Reference
+
+All agentic-related documentation lives under `agentic/docs/`. See
+[Documentation Index](docs/INDEX.md) for the full inventory.
+
+Key docs for architecture context:
+
+| Document | Purpose |
+|----------|---------|
+| [Quickstart](docs/QUICKSTART.md) | Setup + first governed agent |
+| [First Governed Agent](docs/FIRST_GOVERNED_AGENT.md) | Progressive build guide |
+| [Goal Decomposition and Action Mapping](docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) | Decomposition, normalization, failure modes |
+| [Mock → Real LLM Tutorial](docs/MOCK_TO_REAL_LLM.md) | Adapter migration guide |
+| [Framework Status](docs/FRAMEWORK_STATUS.md) | What is proved, partial, deferred |
+| [Adoption Validation Report](docs/ADOPTION_VALIDATION_REPORT.md) | Friction inventory and cold-start results |
+| [CG Runtime Runbook](docs/CG_RUNTIME_RUNBOOK.md) | Operational guide for `--cg` path |
+| [Runtime MCP Path](docs/RUNTIME_MCP_PATH.md) | End-to-end MCP execution walkthrough |
 
 ---
 

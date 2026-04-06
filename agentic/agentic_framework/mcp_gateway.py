@@ -130,6 +130,33 @@ class GatewayDecision(Enum):
 
 
 @dataclass
+class ToolSpec:
+    """Bundle a tool handler with its governance metadata.
+
+    Convenience type for :meth:`SafeMCPGateway.register_tool_with_handler`
+    and :func:`build_agent`.  Combines the callable that does the work
+    with the ``MCPToolDefinition`` that tells the gateway how to gate it.
+
+    Example::
+
+        spec = ToolSpec(
+            handler=lambda p: {"results": search(p["query"])},
+            description="Search academic papers",
+            risk_level=ToolRiskLevel.READ_ONLY,
+            capabilities=["research"],
+        )
+    """
+    handler: Callable[[Dict[str, Any]], Any]
+    description: str = ""
+    risk_level: ToolRiskLevel = ToolRiskLevel.READ_ONLY
+    capabilities: List[str] = field(default_factory=list)
+    requires_confirmation: bool = False
+    min_confidence: float = 0.3
+    timeout_seconds: float = 30.0
+    input_schema: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class MCPToolDefinition:
     """Definition of an MCP tool with risk metadata."""
     name: str
@@ -697,12 +724,60 @@ class SafeMCPGateway:
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
-        Register a tool definition.
+        Register a tool definition (metadata only).
+
+        The handler must already be registered on the underlying MCP
+        client.  For a one-step alternative that registers both the
+        handler and metadata, see :meth:`register_tool_with_handler`.
 
         Args:
             tool_def: Tool definition with risk metadata
         """
         self.tool_definitions[tool_def.name] = tool_def
+
+    def register_tool_with_handler(
+        self,
+        name: str,
+        spec: "ToolSpec",
+    ) -> None:
+        """Register a tool handler AND its governance metadata in one call.
+
+        This is the preferred registration path for custom tools.  It
+        registers the callable on the underlying ``MockMCPClient`` (or
+        any client with a ``register_tool`` method) **and** stores the
+        ``MCPToolDefinition`` on the gateway — eliminating the two-step
+        dance that was previously required.
+
+        Args:
+            name: Tool name (used for routing and audit).
+            spec: ``ToolSpec`` bundling the handler with risk metadata.
+
+        Raises:
+            TypeError: If the underlying MCP client does not support
+                handler registration (i.e. is not a ``MockMCPClient``).
+        """
+        # Register handler on the underlying client
+        client = self.mcp_client
+        if not hasattr(client, "register_tool"):
+            raise TypeError(
+                f"Underlying MCP client ({type(client).__name__}) does "
+                "not support handler registration.  "
+                "register_tool_with_handler requires a MockMCPClient "
+                "or compatible client."
+            )
+        client.register_tool(name, spec.handler, spec.risk_level)
+
+        # Register governance metadata on the gateway
+        self.tool_definitions[name] = MCPToolDefinition(
+            name=name,
+            description=spec.description,
+            risk_level=spec.risk_level,
+            capabilities=spec.capabilities,
+            requires_confirmation=spec.requires_confirmation,
+            min_confidence=spec.min_confidence,
+            timeout_seconds=spec.timeout_seconds,
+            input_schema=spec.input_schema,
+        )
 
     def _get_tool_definition(self, tool_name: str) -> MCPToolDefinition:
         """Get or create tool definition."""
@@ -1778,6 +1853,7 @@ __all__ = [
     "ToolRiskLevel",
     "GatewayDecision",
     # Data classes
+    "ToolSpec",
     "MCPToolDefinition",
     "MCPToolCall",
     "MCPToolResult",

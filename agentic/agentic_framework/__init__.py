@@ -28,11 +28,11 @@ Usage:
 
     # Run conversation
     result = agent.run("What is the capital of France?")
-    print(result["response"])
+    print(result.response)
 """
 
 from agentic.agentic_framework.agent import AgenticLLMWrapper
-from agentic.agentic_framework.goal_decomposition import GoalState, ActionItem, decompose_goal
+from agentic.agentic_framework.goal_decomposition import GoalState, ActionItem, decompose_goal, normalize_action_type
 from agentic.agentic_framework.memory_store import AgentMemory, TurnSnapshot, MemoryStore
 from agentic.agentic_framework.reflective_loop import (
     ReflectiveGenerator,
@@ -103,12 +103,14 @@ from agentic.agentic_framework.mcp_gateway import (
     MCPToolResult,
     ToolRiskLevel,
     ToolRiskClassifier,
+    ToolSpec,
     AuditEntry,
     MCPClientInterface,
     MockMCPClient,
     create_safe_mcp_gateway,
     create_mock_mcp_gateway,
 )
+from agentic.agentic_framework.agent_builder import build_agent
 from agentic.agentic_framework.proactive_scheduler import (
     ProactiveScheduler,
     ScheduledTask,
@@ -127,6 +129,11 @@ from agentic.agentic_framework.approval import (
     ApprovalResponse,
     PendingApproval,
 )
+from agentic.agentic_framework.approval_coverage import (
+    ApprovalCoverageEntry,
+    describe_approval_coverage,
+    format_approval_coverage,
+)
 from agentic.agentic_framework.token_budget import (
     BudgetPolicy,
     UsageStats,
@@ -140,6 +147,11 @@ from agentic.agentic_framework.structured_output import (
 from agentic.agentic_framework.tracing import (
     AgentRunTrace,
     TraceCollector,
+)
+from agentic.agentic_framework.trace_viewer import (
+    format_trace,
+    format_trace_summary,
+    format_trace_timeline,
 )
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
@@ -167,6 +179,10 @@ from agentic.agentic_framework.tool_discovery import (
     ToolCatalog,
 )
 from agentic.agentic_framework.llm_adapters import (
+    MockLLMAdapter,
+    SequentialMockAdapter,
+    OpenAIAdapter,
+    AnthropicAdapter,
     MistralAdapter,
     MistralCGAdapter,
 )
@@ -194,6 +210,7 @@ __all__ = [
     "GoalState",
     "ActionItem",
     "decompose_goal",
+    "normalize_action_type",
     # Memory
     "AgentMemory",
     "TurnSnapshot",
@@ -263,8 +280,11 @@ __all__ = [
     "AuditEntry",
     "MCPClientInterface",
     "MockMCPClient",
+    "ToolSpec",
     "create_safe_mcp_gateway",
     "create_mock_mcp_gateway",
+    # Agent builder
+    "build_agent",
     # Proactive Scheduler (autonomous task execution)
     "ProactiveScheduler",
     "ScheduledTask",
@@ -279,6 +299,10 @@ __all__ = [
     # Tracing (R11)
     "AgentRunTrace",
     "TraceCollector",
+    # Trace viewer (R11)
+    "format_trace",
+    "format_trace_summary",
+    "format_trace_timeline",
     # Structured Output (R6)
     "OutputSchema",
     "SchemaTarget",
@@ -313,10 +337,18 @@ __all__ = [
     "ApprovalPolicy",
     "ApprovalResponse",
     "PendingApproval",
+    # Approval coverage (R4 + gateway visibility)
+    "ApprovalCoverageEntry",
+    "describe_approval_coverage",
+    "format_approval_coverage",
     # MCP Discovery / Tool Introspection (R8)
     "DiscoveredTool",
     "ToolCatalog",
-    # LLM Adapters (Mistral API + local MistralCG)
+    # LLM Adapters
+    "MockLLMAdapter",
+    "SequentialMockAdapter",
+    "OpenAIAdapter",
+    "AnthropicAdapter",
     "MistralAdapter",
     "MistralCGAdapter",
     # Adaptive Prompts (automated AI reasoning)
@@ -336,4 +368,4 @@ __all__ = [
     "create_conservative_pipeline",
 ]
 
-__version__ = "1.8.0"  # R1-R11 runtime primitives: streaming, cancellation, approval, structured, budget, tracing, discovery
+__version__ = "1.9.0"  # R1-R11 runtime primitives, build_agent/ToolSpec ergonomics, trace viewer, approval coverage, two pilots

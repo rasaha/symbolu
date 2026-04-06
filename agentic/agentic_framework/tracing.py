@@ -137,18 +137,23 @@ def _build_trace(events: List[AgentRunEvent]) -> AgentRunTrace:
         trace.started_at = events[0].timestamp
         trace.ended_at = events[-1].timestamp
 
-    # Derive status from terminal event
+    # Derive status from terminal event.  Scan backwards because
+    # post-run events (e.g. STRUCTURED_VALIDATION) may be appended
+    # after the terminal lifecycle event.
     if events:
-        last = events[-1].event_type
-        if last == RUN_COMPLETED:
-            trace.status = "completed"
-        elif last == RUN_CANCELLED:
-            trace.status = "cancelled"
-            trace.cancelled = True
-        elif last == RUN_ERROR:
-            trace.status = "error"
-            trace.error_occurred = True
-            trace.error_message = events[-1].payload.get("error", "")
+        for _te in reversed(events):
+            if _te.event_type == RUN_COMPLETED:
+                trace.status = "completed"
+                break
+            elif _te.event_type == RUN_CANCELLED:
+                trace.status = "cancelled"
+                trace.cancelled = True
+                break
+            elif _te.event_type == RUN_ERROR:
+                trace.status = "error"
+                trace.error_occurred = True
+                trace.error_message = _te.payload.get("error", "")
+                break
         else:
             trace.status = "unknown"
 

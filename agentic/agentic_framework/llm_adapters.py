@@ -139,6 +139,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.kwargs = kwargs
+        self._last_usage: Optional[Dict[str, Any]] = None
 
         # Import and initialize client
         try:
@@ -150,6 +151,18 @@ class OpenAIAdapter(BaseLLMAdapter):
                 "openai package required. Install with: pip install openai"
             )
 
+    def _record_usage(self, response: Any) -> None:
+        """Record usage metadata from an OpenAI chat completion response."""
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            self._last_usage = {
+                "input_tokens": getattr(usage, "prompt_tokens", None),
+                "output_tokens": getattr(usage, "completion_tokens", None),
+                "model": getattr(response, "model", self.model),
+            }
+        else:
+            self._last_usage = None
+
     def call(self, prompt: str) -> str:
         """Call OpenAI API with prompt."""
         response = self.client.chat.completions.create(
@@ -159,6 +172,7 @@ class OpenAIAdapter(BaseLLMAdapter):
             max_tokens=self.max_tokens,
             **self.kwargs,
         )
+        self._record_usage(response)
         return response.choices[0].message.content or ""
 
     def call_with_messages(
@@ -173,7 +187,12 @@ class OpenAIAdapter(BaseLLMAdapter):
             max_tokens=self.max_tokens,
             **self.kwargs,
         )
+        self._record_usage(response)
         return response.choices[0].message.content or ""
+
+    def get_last_usage(self) -> Optional[Dict[str, Any]]:
+        """Return token usage from the most recent API call."""
+        return self._last_usage
 
 
 class AnthropicAdapter(BaseLLMAdapter):
@@ -182,14 +201,23 @@ class AnthropicAdapter(BaseLLMAdapter):
 
     Requires: anthropic package
 
+    Supports two authentication methods:
+    - ``api_key``: Standard API key (``sk-ant-...``)
+    - ``auth_token``: Session/OAuth token (``sk-ant-si-...``)
+
+    If neither is provided, the SDK falls back to the
+    ``ANTHROPIC_API_KEY`` environment variable.
+
     Usage:
         adapter = AnthropicAdapter(api_key="sk-ant-...")
+        adapter = AnthropicAdapter(auth_token="sk-ant-si-...")
         response = adapter.call("Hello!")
     """
 
     def __init__(
         self,
         api_key: Optional[str] = None,
+        auth_token: Optional[str] = None,
         model: str = "claude-sonnet-4-20250514",
         max_tokens: int = 1024,
         **kwargs: Any,
@@ -199,6 +227,7 @@ class AnthropicAdapter(BaseLLMAdapter):
 
         Args:
             api_key: Anthropic API key (uses ANTHROPIC_API_KEY env var if not provided)
+            auth_token: Anthropic auth/session token (alternative to api_key)
             model: Model name (default: claude-sonnet-4-20250514)
             max_tokens: Maximum tokens in response
             **kwargs: Additional parameters for API calls
@@ -206,16 +235,43 @@ class AnthropicAdapter(BaseLLMAdapter):
         self.model = model
         self.max_tokens = max_tokens
         self.kwargs = kwargs
+        self._last_usage: Optional[Dict[str, Any]] = None
 
         # Import and initialize client
         try:
             from anthropic import Anthropic  # type: ignore
 
-            self.client = Anthropic(api_key=api_key)
+            client_kwargs: Dict[str, Any] = {}
+            if api_key:
+                client_kwargs["api_key"] = api_key
+            if auth_token:
+                client_kwargs["auth_token"] = auth_token
+            self.client = Anthropic(**client_kwargs)
         except ImportError:
             raise ImportError(
                 "anthropic package required. Install with: pip install anthropic"
             )
+
+    def _extract_text(self, message: Any) -> str:
+        """Extract text from an Anthropic message response."""
+        content = message.content
+        if isinstance(content, list) and len(content) > 0:
+            first_block = content[0]
+            if hasattr(first_block, "text"):
+                return first_block.text
+        return str(content)
+
+    def _record_usage(self, message: Any) -> None:
+        """Record usage metadata from an Anthropic message response."""
+        usage = getattr(message, "usage", None)
+        if usage is not None:
+            self._last_usage = {
+                "input_tokens": getattr(usage, "input_tokens", None),
+                "output_tokens": getattr(usage, "output_tokens", None),
+                "model": getattr(message, "model", self.model),
+            }
+        else:
+            self._last_usage = None
 
     def call(self, prompt: str) -> str:
         """Call Anthropic API with prompt."""
@@ -225,13 +281,8 @@ class AnthropicAdapter(BaseLLMAdapter):
             messages=[{"role": "user", "content": prompt}],
             **self.kwargs,
         )
-        # Handle content blocks
-        content = message.content
-        if isinstance(content, list) and len(content) > 0:
-            first_block = content[0]
-            if hasattr(first_block, "text"):
-                return first_block.text
-        return str(content)
+        self._record_usage(message)
+        return self._extract_text(message)
 
     def call_with_messages(
         self,
@@ -244,12 +295,12 @@ class AnthropicAdapter(BaseLLMAdapter):
             messages=messages,  # type: ignore
             **self.kwargs,
         )
-        content = message.content
-        if isinstance(content, list) and len(content) > 0:
-            first_block = content[0]
-            if hasattr(first_block, "text"):
-                return first_block.text
-        return str(content)
+        self._record_usage(message)
+        return self._extract_text(message)
+
+    def get_last_usage(self) -> Optional[Dict[str, Any]]:
+        """Return token usage from the most recent API call."""
+        return self._last_usage
 
 
 class MistralAdapter(BaseLLMAdapter):

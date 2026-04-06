@@ -52,9 +52,32 @@ coherence, drift, and stability?"
 
 from __future__ import annotations
 
+import re as _re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
+
+def _lightweight_stem(word: str) -> str:
+    """Very simple English suffix stripper for goal-alignment matching.
+
+    NOT a full stemmer — just strips the most common suffixes that
+    cause paraphrase mismatches (e.g. "operational" vs "operation",
+    "monitoring" vs "monitor", "elevated" vs "elevate").
+
+    Keeps the result ≥ 4 chars to avoid over-stemming.
+    """
+    w = word.lower()
+    # Order: longest suffixes first
+    for suffix in ("ational", "ation", "ating", "ment", "ness",
+                   "ible", "able", "ious", "eous", "ting",
+                   "ing", "ity", "ive", "ful", "ous",
+                   "ise", "ize", "ent", "ant", "ure",
+                   "ted", "ied", "ion", "al", "ly",
+                   "ed", "er", "es"):
+        if w.endswith(suffix) and len(w) - len(suffix) >= 4:
+            return w[: -len(suffix)]
+    return w
 
 
 @dataclass
@@ -361,12 +384,48 @@ class CoherenceEngine:
         variance = sum((x - mean) ** 2 for x in recent) / len(recent)
         return min(1.0, variance * 5)  # Scale variance
 
+    @staticmethod
+    def _normalize_words(text: str) -> set:
+        """Extract normalized word tokens for goal-alignment comparison.
+
+        Improvements over naive ``split()``:
+        - strips punctuation from word boundaries
+        - lowercases
+        - splits hyphenated compounds ("payment-api" → {"payment", "api"})
+        - applies lightweight suffix stripping ("operational" → "oper",
+          "monitoring" → "monitor") so paraphrases have better overlap
+        - filters words ≤ 3 chars *after* normalization
+        """
+        import re as _re
+        # Split on whitespace, strip outer punctuation, lowercase
+        raw = _re.findall(r"[A-Za-z0-9][\w'-]*[A-Za-z0-9]|[A-Za-z0-9]", text.lower())
+        tokens: set = set()
+        for w in raw:
+            # Expand hyphenated words
+            parts = w.split("-") if "-" in w else [w]
+            for p in parts:
+                if len(p) > 3:
+                    tokens.add(p)
+                    stem = _lightweight_stem(p)
+                    if len(stem) > 3:
+                        tokens.add(stem)
+        return tokens
+
     def _compute_goal_alignment(
         self,
         turn: Any,
         goal_state: Optional[Any],
     ) -> float:
-        """Check if response serves the goal."""
+        """Check if response serves the goal.
+
+        Hardened to reduce false-blocking from paraphrased responses:
+        - Uses normalized/stemmed tokens instead of raw split words
+        - Includes user_input words (from the turn) as part of the
+          goal vocabulary so the original request language counts
+        - Raises baseline from 0.3 → 0.4 to reduce sensitivity to
+          minor vocabulary mismatches
+        - Still fails closed: zero overlap → 0.4 (below 0.60 threshold)
+        """
         if goal_state is None:
             return 0.7  # Default
 
@@ -380,15 +439,34 @@ class CoherenceEngine:
         if not response:
             return 0.5
 
-        # Simple keyword overlap check
-        goal_words = set(w.lower() for w in purpose.split() if len(w) > 3)
-        response_words = set(w.lower() for w in response.split() if len(w) > 3)
+        # Build goal vocabulary from purpose + user input (if available).
+        # Compute overlap separately for each source and take the best
+        # signal — this prevents a verbose purpose from diluting the
+        # overlap ratio when the response is actually well-aligned with
+        # the user's original request.
+        purpose_words = self._normalize_words(purpose)
+        user_input = getattr(turn, "user_input", "")
+        user_words = self._normalize_words(user_input) if user_input else set()
 
-        if not goal_words:
-            return 0.7
+        response_words = self._normalize_words(response)
 
-        overlap = len(goal_words & response_words) / len(goal_words)
-        return min(1.0, overlap + 0.3)  # Add baseline
+        # Purpose overlap
+        if purpose_words:
+            purpose_overlap = len(purpose_words & response_words) / len(purpose_words)
+        else:
+            purpose_overlap = 0.5
+
+        # User input overlap (often a better signal since the user's
+        # exact words are more likely to appear in a well-aligned response)
+        if user_words:
+            user_overlap = len(user_words & response_words) / len(user_words)
+        else:
+            user_overlap = 0.0
+
+        # Take the stronger signal — if either the purpose or the
+        # user's original input overlaps well, the response is aligned.
+        overlap = max(purpose_overlap, user_overlap)
+        return min(1.0, overlap + 0.4)  # baseline 0.4
 
     def _compute_identity_stability(
         self,

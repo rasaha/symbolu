@@ -11,11 +11,28 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24.0",
+    "pydantic>=2.0.0",
+]
 
-# Top-level symbolu package containing all modules
+[project.optional-dependencies]
+openai = ["openai>=1.0.0"]
+anthropic = ["anthropic>=0.40.0"]
+mistral = ["mistralai>=0.0.7"]
+all = [
+    "openai>=1.0.0",
+    "anthropic>=0.40.0",
+    "mistralai>=0.0.7",
+    "fastapi[standard]>=0.100.0",
+    "uvicorn>=0.20.0",
+    "matplotlib>=3.7.0",
+]
+
+# Top-level packages containing all modules
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["symbolu*"]
+include = ["symbolu*", "agentic*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
