@@ -691,6 +691,225 @@ it matters enormously for adoption.
 
 ---
 
+## Agentic Runtime Primitives: Framework-Layer Gaps
+
+The sections above cover high-level positioning (orchestration,
+hosting, content guardrails, sandboxing, ecosystem) and governance
+product gaps. This section covers a narrower, more concrete axis: the
+**runtime primitives** that leading agentic frameworks expose at the
+agent-loop level. These are the features a developer reaches for when
+building on top of an agentic runtime — independent of governance.
+
+Grounding: this is a comparison against `AGENTIC_ARCHITECTURE.md` §
+"Inference CG Metadata ↔ MCP Gateway" and the `AgenticLLMWrapper`
+runtime host (`agentic/agentic_framework/agent.py`), not the
+governance engine. The governance posture is covered elsewhere in
+this document.
+
+What Sentinel's agentic runtime currently exposes:
+
+- `AgenticLLMWrapper.run(user_input) -> AgentResult` — single-turn
+  synchronous host with goal decomposition, text-level reflective
+  generation, coherence tracking, `SafetyGate`, and dispatcher-backed
+  action execution.
+- `CGToolDispatcher` + `SafeMCPGateway` — CG-metadata-enriched
+  MCP tool dispatch with per-call governance.
+- `build_cg_mcp_agent(...)` — thin composition factory with a
+  default `action_type → tool` mapping (`search`/`compute`/`validate`).
+- `inference_mistral.py --cg` — opt-in CLI for real-inference runtime.
+
+What leading frameworks expose at this layer that Sentinel does not:
+
+### R1. Streaming / Incremental Output
+
+**Competitors ahead:** OpenAI Agents SDK, Anthropic Agent SDK,
+LangGraph, Pydantic AI, LlamaIndex Workflows
+
+`AgenticLLMWrapper.run(...)` is **synchronous and returns a completed
+`AgentResult`**. There is no token-streaming, no partial-response
+yield, no incremental tool-call emission. Every leading framework
+exposes a streaming contract (async generator, SSE, or event bus)
+because agent UX and latency-sensitive workflows require it.
+
+**Why it matters:** Without streaming, the agentic runtime cannot
+power interactive UIs, cannot surface reasoning progress mid-turn,
+and cannot be cancelled by a client mid-generation.
+
+### R2. Async / Cancellation Contract
+
+**Competitors ahead:** OpenAI Agents SDK, LangGraph, AutoGen, Pydantic AI
+
+`run(...)` is sync and blocking. Internally it shells out to
+`asyncio.new_event_loop()` to call `call_tool_simple`
+(`agent.py:506-509`). There is no async `run()` method, no
+`CancellationToken` equivalent, no cooperative cancellation on tool
+calls in progress.
+
+**Why it matters:** Modern agent hosts run many agents concurrently,
+need to cancel runaway loops, and need to integrate with async
+frameworks (FastAPI, aiohttp). A sync-only contract forces thread
+pools and defeats the purpose of async tool execution.
+
+### R3. Persistent Checkpointing / Resumable Sessions
+
+**Competitors ahead:** LangGraph (first-class), CrewAI (memory),
+AutoGen (message log), OpenAI (session state)
+
+Sentinel has an in-process `MemoryStore` and `session_id`, but no
+durable checkpoint of agent state across process boundaries. LangGraph
+makes this the centerpiece of its design — every node emits a
+checkpoint, runs can resume from any checkpoint, and time-travel
+debugging is free.
+
+**Why it matters:** Long-running agents need crash recovery. Human
+approval workflows need the agent to pause and resume later (hours
+or days). Debugging needs replay from a known state.
+
+### R4. Human-in-the-Loop Interrupts (Structured)
+
+**Competitors ahead:** LangGraph (`interrupt()` / `Command`),
+OpenAI Agents SDK (handoffs + approvals)
+
+Sentinel's `SafetyGate` can **block** an action, and governance can
+return a `DEFER` decision, but there is **no runtime mechanism** for
+the agent to pause, surface a question/approval to a caller, and
+resume execution once the caller responds. The
+`ApprovalManager` under `governance_patterns/` is an in-memory
+prototype (already noted above), not a runtime interrupt primitive.
+
+**Why it matters:** Governance DEFER without a structured interrupt
+primitive at the runtime layer leaves a capability gap between the
+governance decision and the user experience. LangGraph's `interrupt()`
+is the reference implementation here.
+
+### R5. Multi-Agent Orchestration / Handoffs
+
+**Competitors ahead:** CrewAI (crews, roles, delegation),
+AutoGen (GroupChat), LangGraph (subgraphs),
+OpenAI Agents SDK (handoffs)
+
+Sentinel is **single-agent only**. `AgenticLLMWrapper` wraps one
+`LLMClient`. There is no concept of agent-to-agent handoff, no
+parallel agent execution, no role-based crews, no supervisor/worker
+split. The multi-agent dimension is entirely absent.
+
+**Why it matters:** Most non-trivial agentic products are multi-agent
+(planner + executor, researcher + writer + critic, router + domain
+specialists). A single-agent runtime is a substrate, not a product.
+This is already flagged in "Where Sentinel Does NOT Yet Differentiate"
+but is restated here as a runtime-primitive gap because it shapes
+what API shape downstream builders need.
+
+### R6. Structured Outputs / Schema-Enforced Responses
+
+**Competitors ahead:** OpenAI Agents SDK (Pydantic output_type),
+Pydantic AI, Anthropic tool-use JSON schemas, Semantic Kernel
+
+Sentinel's `AgentResult` exposes `response: str` (plus pipeline
+metrics). There is no mechanism to declare a response schema and
+have the runtime coerce / validate the LLM output to it. Callers
+hand-parse free-form text.
+
+**Why it matters:** Production agent applications need typed, parsed
+outputs. Every competitor has either Pydantic-based output types,
+JSON-schema enforcement, or function-call outputs as first-class.
+Sentinel puts this entirely on the caller.
+
+### R7. Parallel Tool Calls
+
+**Competitors ahead:** OpenAI Agents SDK, Anthropic Agent SDK,
+LangGraph (fan-out)
+
+`_execute_actions` iterates over actions sequentially; each eligible
+action is dispatched in turn. There is no `asyncio.gather`-style
+parallel dispatch of independent tool calls within a single turn.
+
+**Why it matters:** When a goal decomposes into N independent lookups
+(search + compute + validate), sequential dispatch is an N× latency
+penalty vs parallel. Modern LLMs already emit parallel tool-call
+batches; the runtime should honor them.
+
+### R8. MCP Tool **Discovery** (not just governance over MCP)
+
+**Competitors ahead:** Anthropic Claude Agent SDK, Claude Code,
+Cursor, VS Code MCP clients
+
+Sentinel owns `SafeMCPGateway` — governance **over** MCP tool calls.
+But the gateway's mock tool set is **hardcoded**
+(`create_mock_mcp_gateway` registers `search`/`compute`/`validate`).
+There is no MCP **client** that discovers tools from arbitrary MCP
+servers over stdio/SSE and registers their schemas dynamically.
+
+**Why it matters:** The MCP ecosystem's value is that any
+MCP-speaking server (file system, GitHub, Slack, custom domain tools)
+can plug in. Without discovery, Sentinel gets the governance benefits
+of MCP without the ecosystem benefits. This is a concrete, bounded
+piece of work that would multiply the runtime's reach.
+
+### R9. Cost / Token-Budget Tracking and Enforcement
+
+**Competitors ahead:** OpenAI Agents SDK (usage tracking),
+LangGraph (budget checkpoints), Semantic Kernel (telemetry)
+
+There is no per-session token counter, no cost estimator, no
+runtime-level budget enforcement that halts an agent when it burns
+past a threshold. Revisions are capped by count
+(`max_revisions=3`), not by spend.
+
+**Why it matters:** Enterprise deployments need predictable cost
+guardrails. Reflective loops can spiral; without a budget, the
+runtime is exposed to pathological cost on degenerate inputs.
+
+### R10. Evaluation Harness
+
+**Competitors ahead:** Google ADK (built-in eval framework),
+LangChain LangSmith, OpenAI Evals
+
+Sentinel has rich unit/integration tests for the runtime seam, but
+no opinionated **eval harness** for running an agent across a task
+dataset, scoring outputs, comparing revisions, and tracking
+regressions over time. Framework-level eval is what competitors
+productize.
+
+**Why it matters:** Agentic systems regress silently on prompt / model
+/ policy changes. A framework without an eval story forces every
+adopter to build their own. Google ADK ships this in-box as a
+differentiator.
+
+### R11. Observability / Tracing Surfaces
+
+**Competitors ahead:** OpenAI Agents SDK (built-in tracing),
+LangSmith, AutoGen (conversation logs)
+
+Sentinel emits governance audit records at the MCP boundary, and
+`AgentResult` carries coherence and safety-contract diagnostics,
+but there is no **agent-loop tracing** primitive: no per-turn span
+tree of (decompose → generate → critic → revise → action) with
+durations, inputs, outputs, and linkage to governance audit.
+
+**Why it matters:** When an agentic loop misbehaves, operators need
+a tree view of the turn, not log lines. LangSmith exists because
+this is a product gap in every framework that doesn't ship tracing.
+
+### Summary
+
+Sentinel's **governance runtime** is architecturally distinctive.
+Sentinel's **agentic runtime** (the layer above governance, below
+the model) is **a thin single-agent wrapper** whose primitives
+trail the industry on streaming, async, checkpointing, interrupts,
+multi-agent, structured outputs, parallel tools, MCP discovery,
+budgets, eval, and tracing.
+
+These are not architectural gaps — nothing in the governance design
+prevents closing them. They are **framework-completeness gaps**.
+If the strategy is Position A ("governance runtime library inside
+someone else's agent framework"), most of R1-R11 can be deferred —
+the host framework supplies them. If the strategy is Position B
+("full governed agent platform"), closing R1, R2, R4, R6, R7, R8
+is table stakes, and R3, R5, R9, R10, R11 are competitive parity.
+
+---
+
 ## Missing Product Layers
 
 These are the product capabilities Sentinel needs to become a complete
