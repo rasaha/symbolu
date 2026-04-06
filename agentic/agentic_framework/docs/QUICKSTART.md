@@ -179,6 +179,30 @@ adapter  →  AgenticLLMWrapper  →  SafetyGate  →  action loop  →  trace
 
 ---
 
+## `build_agent` vs `build_cg_mcp_agent`
+
+The framework provides two agent factories:
+
+| Factory | Module | When to use |
+|---------|--------|-------------|
+| `build_agent()` | `agent_builder.py` | **Default.** Works with any adapter. Accepts a `tools` dict of `ToolSpec` objects. |
+| `build_cg_mcp_agent()` | `cg_tool_dispatcher.py` | When your adapter exposes `last_cg_metadata` (e.g. `MistralCGAdapter`, `StubCGLLMAdapter`). Uses CG signals for richer governance. |
+
+Both produce an `AgenticLLMWrapper` with the same runtime
+capabilities (streaming, approval, budget, tracing, structured
+output). The difference is in how governance signals are sourced:
+
+- **`build_agent`** — governance uses risk classification and
+  confidence thresholds from `ToolSpec`. Works with any LLM adapter
+  (OpenAI, Anthropic, Mistral API, mock/stub).
+- **`build_cg_mcp_agent`** — governance also consumes model-internal
+  CG metadata (sovereign state tensors) for richer per-tool gating.
+  Requires a CG-capable adapter.
+
+**If you are not sure which to use, use `build_agent()`.**
+
+---
+
 ## Where to go next
 
 | Goal | Doc |

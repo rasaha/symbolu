@@ -2,34 +2,53 @@
 
 Runnable examples and the patterns they demonstrate.
 
+**Start here →** `examples/minimal_governed_agent.py` — five lines to
+a governed agent with a custom tool.
+
 ---
 
 ## Example scripts
 
-| Script | Pattern | Runtime primitives used |
-|--------|---------|------------------------|
-| [`examples/first_governed_agent.py`](../../../examples/first_governed_agent.py) | Minimal governed agent with stub adapter, streaming, and tracing | `build_cg_mcp_agent`, `run_stream`, `TraceCollector`, `ToolCatalog` |
-| [`examples/governed_agent_with_approval_and_budget.py`](../../../examples/governed_agent_with_approval_and_budget.py) | Approval gates + budget enforcement + structured output + trace | `ApprovalController`, `BudgetPolicy`, `run_structured_with_trace`, `run_with_trace` |
-| [`examples/pilot_research_assistant.py`](../../../examples/pilot_research_assistant.py) | **Pilot:** governed research assistant with custom tools, approval, budget, structured output, discovery, audit | `MockMCPClient`, `SafeMCPGateway`, `CGToolDispatcher`, `ApprovalController`, `BudgetPolicy`, `ToolCatalog`, `run_structured_with_trace` |
-| [`examples/cg_tool_demo.py`](../../../examples/cg_tool_demo.py) | CG metadata enrichment end-to-end (lower-level, pre-R-phase) | `SafeMCPGateway`, `build_governance_enrichment_kwargs`, audit log |
+| Script | Pattern | Key APIs |
+|--------|---------|----------|
+| [`examples/minimal_governed_agent.py`](../../../examples/minimal_governed_agent.py) | **Start here.** Smallest useful governed agent | `build_agent`, `ToolSpec`, `run_with_trace` |
+| [`examples/first_governed_agent.py`](../../../examples/first_governed_agent.py) | Governed agent with streaming + tool discovery | `build_cg_mcp_agent`, `run_stream`, `TraceCollector`, `ToolCatalog` |
+| [`examples/governed_agent_with_approval_and_budget.py`](../../../examples/governed_agent_with_approval_and_budget.py) | Approval gates + budget enforcement + structured output | `ApprovalController`, `BudgetPolicy`, `run_structured_with_trace` |
+| [`examples/pilot_research_assistant.py`](../../../examples/pilot_research_assistant.py) | **Pilot:** custom tools, approval, budget, structured output, discovery, audit | `build_agent`, `ToolSpec`, `ApprovalController`, `BudgetPolicy`, `ToolCatalog` |
+| [`examples/cg_tool_demo.py`](../../../examples/cg_tool_demo.py) | CG metadata enrichment (lower-level, pre-R-phase) | `SafeMCPGateway`, `build_governance_enrichment_kwargs`, audit log |
+
+---
+
+## Recommended reading order
+
+1. **`minimal_governed_agent.py`** — build + run + trace in ~10 lines
+2. **`first_governed_agent.py`** — streaming events + tool discovery
+3. **`governed_agent_with_approval_and_budget.py`** — approval, budget, structured output
+4. **`pilot_research_assistant.py`** — realistic multi-phase pilot with custom tools
 
 ---
 
 ## Pattern index
 
-### 1. Minimal governed agent
+### 1. Minimal governed agent (start here)
+**Script:** `examples/minimal_governed_agent.py`
+
+The absolute shortest path:
+- `build_agent()` composes the full governed stack in one call
+- `ToolSpec` bundles a handler with governance metadata
+- `run_with_trace()` returns a complete execution summary
+- No API key, no GPU, no configuration
+
+### 2. Governed agent with streaming + discovery
 **Script:** `examples/first_governed_agent.py`
 
-Shows the shortest path to a working governed agent:
-- Uses `StubCGLLMAdapter` (no API key, no GPU)
-- Composes via `build_cg_mcp_agent(allow_stub=True)`
-- Streams events and prints lifecycle progress
-- Builds a trace and prints the summary
+Adds streaming and tool introspection:
+- Uses `StubCGLLMAdapter` + `build_cg_mcp_agent()`
+- Streams lifecycle events from `run_stream()`
+- Builds a trace and inspects the summary
 - Discovers registered tools via `ToolCatalog`
 
-Start here if you are new to the framework.
-
-### 2. Approval + budget + structured output
+### 3. Approval + budget + structured output
 **Script:** `examples/governed_agent_with_approval_and_budget.py`
 
 Shows runtime primitives working together:
@@ -38,26 +57,17 @@ Shows runtime primitives working together:
 - `BudgetPolicy(max_total_tokens=5000)` with enforcement
 - `run_structured_with_trace()` with a dataclass schema
 - Budget-exceeded terminal scenario
-- Prints trace summaries including approval counts and budget status
 
-Uses `SequentialMockAdapter` + `build_cg_mcp_agent` to produce a
-`"search"` action that maps to a real MCP tool, so the approval
-gate genuinely fires.
-
-Use this after the first example to see the richer execution
-controls.
-
-### 3. CG metadata enrichment (lower-level)
+### 4. CG metadata enrichment (lower-level)
 **Script:** `examples/cg_tool_demo.py`
 
-Shows the CG/MCP enrichment path at a lower level than the agent
-wrapper:
+Shows the CG/MCP enrichment path at a lower level:
 - Creates a demo CG adapter with synthetic 32D state
 - Calls `SafeMCPGateway.call_tool_simple(cg_metadata=...)`
 - Prints the audit record showing `vritti_signal_source="real"`
 
-This is a pre-R-phase demo that exercises the governance enrichment
-seam directly. Most developers should start with example 1 instead.
+This is a pre-R-phase demo. Most developers should start with
+example 1 instead.
 
 ---
 
@@ -83,15 +93,20 @@ Install the repo first (`pip install -e .` from repo root), then
 run from the repo root:
 
 ```bash
-# First governed agent (stub, no dependencies)
+# Start here — minimal governed agent
+python examples/minimal_governed_agent.py
+
+# Governed agent with streaming + tool discovery
 python examples/first_governed_agent.py
 
 # Approval + budget + structured output
 python examples/governed_agent_with_approval_and_budget.py
 
-# CG metadata enrichment demo
+# Full pilot — custom tools, approval, budget, structured output
+python examples/pilot_research_assistant.py
+
+# CG metadata enrichment demo (lower-level)
 python examples/cg_tool_demo.py
 ```
 
-No API keys or GPU required for the first two. They use stub/mock
-adapters.
+No API keys or GPU required. All examples use stub/mock adapters.

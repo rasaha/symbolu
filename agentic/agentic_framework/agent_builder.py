@@ -80,6 +80,13 @@ def build_agent(
         A fully wired ``AgenticLLMWrapper`` ready for
         ``agent.run()``, ``agent.run_stream()``, etc.
 
+    See also:
+        ``build_cg_mcp_agent()`` in ``cg_tool_dispatcher.py`` — a
+        similar factory for CG-capable adapters that expose
+        ``last_cg_metadata``.  Use ``build_agent()`` as the default;
+        use ``build_cg_mcp_agent()`` only when you need model-internal
+        CG signals for governance.
+
     Example::
 
         from agentic.agentic_framework.agent_builder import build_agent
