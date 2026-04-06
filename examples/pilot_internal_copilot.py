@@ -47,23 +47,23 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from agentic.agentic_framework.agent_builder import build_agent
-from agentic.agentic_framework.approval import (
+from agentic.agentic_framework import (
+    build_agent,
     ApprovalController,
     ApprovalPolicy,
     ApprovalResponse,
     PendingApproval,
-)
-from agentic.agentic_framework.approval_coverage import (
     describe_approval_coverage,
     format_approval_coverage,
-)
-from agentic.agentic_framework.llm_adapters import (
     MockLLMAdapter,
     SequentialMockAdapter,
-)
-from agentic.agentic_framework.mcp_gateway import ToolSpec, ToolRiskLevel
-from agentic.agentic_framework.streaming_events import (
+    ToolSpec,
+    ToolRiskLevel,
+    BudgetPolicy,
+    ToolCatalog,
+    format_trace,
+    format_trace_summary,
+    format_trace_timeline,
     ACTION_COMPLETED,
     ACTION_STARTED,
     APPROVAL_REQUESTED,
@@ -74,13 +74,6 @@ from agentic.agentic_framework.streaming_events import (
     RUN_ERROR,
     SAFETY_GATE_RESULT,
     USAGE_UPDATED,
-)
-from agentic.agentic_framework.token_budget import BudgetPolicy
-from agentic.agentic_framework.tool_discovery import ToolCatalog
-from agentic.agentic_framework.trace_viewer import (
-    format_trace,
-    format_trace_summary,
-    format_trace_timeline,
 )
 from agentic.agentic_framework.tracing import TraceCollector
 

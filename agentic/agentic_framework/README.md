@@ -18,10 +18,9 @@ pip install -e .
 ```
 
 ```python
-from agentic.agentic_framework.agent_builder import build_agent
-from agentic.agentic_framework.mcp_gateway import ToolSpec, ToolRiskLevel
-from agentic.agentic_framework.llm_adapters import MockLLMAdapter
-from agentic.agentic_framework.trace_viewer import format_trace
+from agentic.agentic_framework import (
+    build_agent, MockLLMAdapter, ToolSpec, ToolRiskLevel, format_trace,
+)
 
 agent = build_agent(
     adapter=MockLLMAdapter(default_response="Python is versatile."),
@@ -158,6 +157,7 @@ All examples use stub/mock adapters — no API keys required.
 | Doc | What it covers |
 |-----|---------------|
 | [Quickstart](docs/QUICKSTART.md) | Prerequisites, first agent, API orientation, two approval layers |
+| [Mock → Real LLM](docs/MOCK_TO_REAL_LLM.md) | Switch from MockLLMAdapter to OpenAI/Anthropic — what changes, what stays |
 | [Examples Overview](docs/EXAMPLES_OVERVIEW.md) | All examples with recommended reading order |
 | [What Is Agentic Framework](docs/WHAT_IS_AGENTIC_FRAMEWORK.md) | Overview and positioning |
 | [Why Agentic Is Different](docs/WHY_AGENTIC_IS_DIFFERENT.md) | Table-stakes vs differentiators, execution path, signal enrichment |

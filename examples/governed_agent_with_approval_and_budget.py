@@ -19,18 +19,15 @@ Run:
 import json
 from dataclasses import dataclass
 
-from agentic.agentic_framework import AgenticLLMWrapper
-from agentic.agentic_framework.approval import (
+from agentic.agentic_framework import (
+    AgenticLLMWrapper,
     ApprovalController,
     ApprovalPolicy,
     ApprovalResponse,
-)
-from agentic.agentic_framework.cg_tool_dispatcher import build_cg_mcp_agent
-from agentic.agentic_framework.llm_adapters import (
     MockLLMAdapter,
     SequentialMockAdapter,
-)
-from agentic.agentic_framework.streaming_events import (
+    BudgetPolicy,
+    TraceCollector,
     ACTION_COMPLETED,
     ACTION_STARTED,
     APPROVAL_REQUESTED,
@@ -39,8 +36,8 @@ from agentic.agentic_framework.streaming_events import (
     RUN_COMPLETED,
     USAGE_UPDATED,
 )
-from agentic.agentic_framework.token_budget import BudgetPolicy
-from agentic.agentic_framework.tracing import TraceCollector
+# CG-specific factory
+from agentic.agentic_framework.cg_tool_dispatcher import build_cg_mcp_agent
 
 
 # ---------------------------------------------------------------

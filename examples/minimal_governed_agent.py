@@ -17,10 +17,13 @@ Run:
     python examples/minimal_governed_agent.py
 """
 
-from agentic.agentic_framework.agent_builder import build_agent
-from agentic.agentic_framework.llm_adapters import MockLLMAdapter
-from agentic.agentic_framework.mcp_gateway import ToolSpec, ToolRiskLevel
-from agentic.agentic_framework.trace_viewer import format_trace
+from agentic.agentic_framework import (
+    build_agent,
+    MockLLMAdapter,
+    ToolSpec,
+    ToolRiskLevel,
+    format_trace,
+)
 
 
 def main():

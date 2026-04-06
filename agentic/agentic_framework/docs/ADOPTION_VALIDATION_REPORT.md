@@ -163,8 +163,8 @@ require either documentation reading or source-code inspection that
 a cold-start developer might not find.
 
 **Top 3 actions for the next adoption cycle:**
-1. Publish a pip-installable package (removes the clone-and-install barrier)
-2. Write a "from mock to real LLM" tutorial (the biggest gap after the quickstart)
+1. ~~Publish a pip-installable package~~ **Done** — pyproject.toml now declares core dependencies; `pip install -e .` works from fresh venv
+2. ~~Write a "from mock to real LLM" tutorial~~ **Done** — see `docs/MOCK_TO_REAL_LLM.md`
 3. Add a one-page "concepts" doc explaining goal decomposition, action types, and tool routing
 
 ---
@@ -190,9 +190,17 @@ a cold-start developer might not find.
 - Existing tests: 58 passed, 2 skipped (unchanged)
 
 ### Additional finding: missing root README
-`pyproject.toml` declares `readme = "README.md"` but no `README.md`
-exists at the repo root. The actual README is at
-`agentic/agentic_framework/README.md`. This means `pip install -e .`
-metadata has no readme, and external devs exploring the repo root see
-no entry point. Creating a root README (or symlink) is recommended
-but deferred as a packaging decision outside this validation scope.
+~~`pyproject.toml` declares `readme = "README.md"` but no `README.md`
+exists at the repo root.~~ **Fixed** — root README.md now exists with
+quickstart, example, and doc links.
+
+### Cold-start verification (adoption-enablement pass)
+Fresh venv created, `pip install -e .` run from repo root:
+- Core dependencies (numpy, pydantic) installed automatically
+- Test 1 (stub agent): `Status=completed, Events=16, Tokens=5`
+- Test 2 (governed agent): `Status=completed, Actions=0`
+- Test 3 (minimal example script): `Status: COMPLETED`
+- Test 4 (adoption validation 9/9 checks): all pass
+
+**Cold-start verdict:** A developer can now `pip install -e .` in a
+fresh venv and run all examples with zero additional setup.

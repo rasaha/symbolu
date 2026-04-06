@@ -40,19 +40,18 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from agentic.agentic_framework.approval import (
+from agentic.agentic_framework import (
     ApprovalController,
     ApprovalPolicy,
     ApprovalResponse,
     PendingApproval,
-)
-from agentic.agentic_framework.agent_builder import build_agent
-from agentic.agentic_framework.llm_adapters import SequentialMockAdapter
-from agentic.agentic_framework.mcp_gateway import (
+    build_agent,
+    SequentialMockAdapter,
     ToolSpec,
     ToolRiskLevel,
-)
-from agentic.agentic_framework.streaming_events import (
+    BudgetPolicy,
+    ToolCatalog,
+    TraceCollector,
     ACTION_COMPLETED,
     ACTION_STARTED,
     APPROVAL_REQUESTED,
@@ -64,9 +63,6 @@ from agentic.agentic_framework.streaming_events import (
     SAFETY_GATE_RESULT,
     USAGE_UPDATED,
 )
-from agentic.agentic_framework.token_budget import BudgetPolicy
-from agentic.agentic_framework.tool_discovery import ToolCatalog
-from agentic.agentic_framework.tracing import TraceCollector
 
 
 # =====================================================================

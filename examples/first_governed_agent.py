@@ -17,18 +17,19 @@ Run:
     python examples/first_governed_agent.py
 """
 
-from agentic.agentic_framework.cg_tool_dispatcher import build_cg_mcp_agent
-from agentic.agentic_framework.llm_adapters import StubCGLLMAdapter
-from agentic.agentic_framework.streaming_events import (
+from agentic.agentic_framework import (
     GENERATION_COMPLETED,
     ACTION_STARTED,
     ACTION_COMPLETED,
     RUN_COMPLETED,
     SAFETY_GATE_RESULT,
     USAGE_UPDATED,
+    ToolCatalog,
+    TraceCollector,
 )
-from agentic.agentic_framework.tool_discovery import ToolCatalog
-from agentic.agentic_framework.tracing import TraceCollector
+# CG-specific imports — not in the top-level package
+from agentic.agentic_framework.cg_tool_dispatcher import build_cg_mcp_agent
+from agentic.agentic_framework.llm_adapters import StubCGLLMAdapter
 
 
 def main():

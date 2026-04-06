@@ -11,8 +11,11 @@ Gemini) and adds a structured execution path on top.
 ## Prerequisites
 
 - Python 3.10+
-- Install the repo in editable mode: `pip install -e .` from the repo root
-- For API-based adapters: an API key for your LLM provider
+- Install the repo: `pip install -e .` from the repo root
+  (this automatically installs core dependencies: numpy, pydantic)
+- For real LLM adapters: `pip install -e ".[openai]"` or
+  `pip install -e ".[anthropic]"` — see
+  [Mock → Real LLM](MOCK_TO_REAL_LLM.md) for details
 - For the stub/dev path (no API key needed): nothing else
 
 ---
@@ -90,7 +93,7 @@ no more two-step registration.
 
 To switch to a real LLM, replace the adapter:
 ```python
-from agentic.agentic_framework.llm_adapters import OpenAIAdapter
+from agentic.agentic_framework import OpenAIAdapter
 agent = build_agent(
     adapter=OpenAIAdapter(api_key="sk-...", model="gpt-4"),
     tools={...},
@@ -311,7 +314,7 @@ even after R4 approval.
 Use `describe_approval_coverage()` to see which layers are active:
 
 ```python
-from agentic.agentic_framework.approval_coverage import (
+from agentic.agentic_framework import (
     describe_approval_coverage,
     format_approval_coverage,
 )
@@ -331,6 +334,7 @@ print(format_approval_coverage(coverage))
 | Goal | Doc |
 |------|-----|
 | Understand each feature in depth | [First Governed Agent](FIRST_GOVERNED_AGENT.md) |
+| Switch from mock to real LLM | [Mock → Real LLM](MOCK_TO_REAL_LLM.md) |
 | See what makes this different | [Why Agentic Is Different](WHY_AGENTIC_IS_DIFFERENT.md) |
 | Check what is proved / deferred | [Framework Status](FRAMEWORK_STATUS.md) |
 | See example scripts | [Examples Overview](EXAMPLES_OVERVIEW.md) |
