@@ -1776,6 +1776,176 @@ class TestGunaCsrAuditSignal:
 
 
 # =============================================================================
+# Test: Phase 2 Usefulness Evaluation — encoded assertions
+# =============================================================================
+
+
+class TestP2UsefulnessEvaluation:
+    """Encoded assertions from the P2 usefulness evaluation pass.
+
+    These tests validate that the Guna → CSR audit signal is:
+    1. Interpretable (dominant tendency matches CSR input patterns)
+    2. Stable (smooth under small perturbations)
+    3. Incrementally valuable (separates cases within same JEPA regime)
+    4. Does not change any live governance behavior
+    """
+
+    # Representative CSR → Guna → Audit scenarios
+    # (C_s, M, H, expected_dominant)
+    INTERPRETABILITY_CASES = [
+        # Sattva-dominant: high coherence, low entropy
+        (0.9, 0.3, 0.1, "clarify"),
+        (0.95, 0.2, 0.05, "clarify"),
+        # Rajas-dominant: high motion, mid entropy
+        (0.4, 0.9, 0.5, "agitate"),
+        (0.5, 0.85, 0.45, "agitate"),
+        # Tamas-dominant: high entropy, low coherence
+        (0.15, 0.2, 0.85, "dampen"),
+        (0.1, 0.1, 0.9, "dampen"),
+        (0.05, 0.05, 0.95, "dampen"),
+        # Edge cases
+        (1.0, 1.0, 0.0, "clarify"),
+        (0.0, 0.0, 1.0, "dampen"),
+    ]
+
+    def test_interpretability_all_cases_correct(self):
+        """P2 dominant tendency must match expected for all interpretability cases."""
+        from agentic.guna_modulation.guna_derivation import (
+            guna_csr_modulation_audit, derive_guna_from_values,
+        )
+        for C_s, M, H, expected in self.INTERPRETABILITY_CASES:
+            guna = derive_guna_from_values(C_s=C_s, M=M, H=H)
+            sig = guna_csr_modulation_audit(guna)
+            assert sig.dominant_tendency == expected, (
+                f"CSR=({C_s},{M},{H}): expected {expected}, got {sig.dominant_tendency}"
+            )
+
+    def test_stability_small_perturbation(self):
+        """Small CSR perturbation (eps=0.02) must cause <0.005 audit delta."""
+        from agentic.guna_modulation.guna_derivation import (
+            guna_csr_modulation_audit, derive_guna_from_values,
+        )
+        eps = 0.02
+        for C_s, M, H, _ in self.INTERPRETABILITY_CASES:
+            base = guna_csr_modulation_audit(derive_guna_from_values(C_s=C_s, M=M, H=H))
+            for param_idx, param_name in enumerate(["C_s", "M", "H"]):
+                vals = [C_s, M, H]
+                for direction in (-eps, +eps):
+                    perturbed = list(vals)
+                    perturbed[param_idx] = max(0.0, min(1.0, perturbed[param_idx] + direction))
+                    p_sig = guna_csr_modulation_audit(
+                        derive_guna_from_values(C_s=perturbed[0], M=perturbed[1], H=perturbed[2])
+                    )
+                    for attr in ("clarify_delta", "agitate_delta", "dampen_delta"):
+                        delta = abs(getattr(p_sig, attr) - getattr(base, attr))
+                        assert delta < 0.005, (
+                            f"Unstable: CSR=({C_s},{M},{H}) perturb {param_name}{direction:+.2f}: "
+                            f"{attr} changed by {delta:.6f}"
+                        )
+
+    def test_case_separation_within_same_regime(self):
+        """P2 must provide different dominant tendencies for cases that share
+        the same JEPA governance regime (all NORMAL in calibration set)."""
+        from agentic.guna_modulation.guna_derivation import (
+            guna_csr_modulation_audit, derive_guna_from_values,
+        )
+        # Three cases that all produce NORMAL regime in JEPA but
+        # represent fundamentally different energetic states
+        sattva_sig = guna_csr_modulation_audit(
+            derive_guna_from_values(C_s=0.9, M=0.3, H=0.1))
+        rajas_sig = guna_csr_modulation_audit(
+            derive_guna_from_values(C_s=0.4, M=0.9, H=0.5))
+        tamas_sig = guna_csr_modulation_audit(
+            derive_guna_from_values(C_s=0.15, M=0.2, H=0.85))
+
+        # P2 must distinguish them
+        assert sattva_sig.dominant_tendency == "clarify"
+        assert rajas_sig.dominant_tendency == "agitate"
+        assert tamas_sig.dominant_tendency == "dampen"
+
+        # net_coherence must meaningfully separate the three
+        assert sattva_sig.net_coherence_delta > 0.05   # positive: clarification
+        assert abs(rajas_sig.net_coherence_delta) < 0.02  # near zero: agitation
+        assert tamas_sig.net_coherence_delta < -0.05   # negative: damping
+
+    def test_stagnation_vs_oscillation_distinguishable(self):
+        """P2 must distinguish stagnation (low motion, high entropy) from
+        oscillation (high motion, mid entropy) — both may look similar in JEPA."""
+        from agentic.guna_modulation.guna_derivation import (
+            guna_csr_modulation_audit, derive_guna_from_values,
+        )
+        stagnation = guna_csr_modulation_audit(
+            derive_guna_from_values(C_s=0.35, M=0.1, H=0.6))
+        oscillation = guna_csr_modulation_audit(
+            derive_guna_from_values(C_s=0.4, M=0.9, H=0.5))
+
+        assert stagnation.dominant_tendency == "dampen"
+        assert oscillation.dominant_tendency == "agitate"
+        # Their net_coherence should have opposite signs or clearly differ
+        assert stagnation.net_coherence_delta < oscillation.net_coherence_delta
+
+    def test_no_live_behavior_change(self):
+        """P2 audit signal must NOT change any governance decision.
+        Same inputs with and without P2 computation must produce
+        identical regime, action, and confidence adjustment."""
+        from agentic.agentic_framework.jepa_governance import (
+            approximate_layer_weights, approximate_vritti,
+            build_ontology_signal, build_vritti_signal, build_jepa_composite,
+            build_runtime_process_state, assess_governance,
+        )
+        lw = approximate_layer_weights(
+            quality=0.5, coherence=0.5,
+            goal_alignment=0.5, overall_confidence=0.5,
+        )
+        vritti_dist = approximate_vritti(
+            quality=0.5, coherence=0.5,
+            overall_confidence=0.5, layer_weights=lw,
+        )
+        ontology = build_ontology_signal(layer_weights=lw)
+        vritti = build_vritti_signal(vritti_distribution=vritti_dist)
+        jepa = build_jepa_composite(ontology, vritti)
+        runtime = build_runtime_process_state(
+            action_type="search", tool_name="search",
+            risk_level="READ_ONLY", confidence_score=0.5,
+        )
+        assessment = assess_governance(jepa, runtime)
+
+        # Compute P2 signal (should not affect anything)
+        from agentic.guna_modulation.guna_derivation import (
+            guna_csr_modulation_audit, derive_guna_from_values,
+        )
+        guna = derive_guna_from_values(C_s=0.5, M=0.5, H=0.5)
+        audit = guna_csr_modulation_audit(guna)
+
+        # Re-run governance — must be identical
+        assessment2 = assess_governance(jepa, runtime)
+        assert assessment.regime == assessment2.regime
+        assert assessment.recommended_action == assessment2.recommended_action
+        assert assessment.confidence_adjustment == assessment2.confidence_adjustment
+
+        # Audit signal must be audit_only
+        assert audit.audit_only is True
+
+    def test_mixed_state_interpretability(self):
+        """Mixed guna states should produce interpretable, non-degenerate signals."""
+        from agentic.guna_modulation.guna_derivation import (
+            guna_csr_modulation_audit, derive_guna_from_values,
+        )
+        # Balanced: all deltas similar, net_coherence near zero
+        balanced = guna_csr_modulation_audit(
+            derive_guna_from_values(C_s=0.5, M=0.5, H=0.5))
+        assert abs(balanced.net_coherence_delta) < 0.01
+        assert abs(balanced.net_entropy_delta) < 0.01
+
+        # Sattva-rajas mix: clarify+agitate both meaningful
+        sr_mix = guna_csr_modulation_audit(
+            derive_guna_from_values(C_s=0.7, M=0.7, H=0.3))
+        assert sr_mix.clarify_delta > 0.01
+        assert sr_mix.agitate_delta > 0.01
+        assert sr_mix.dampen_delta < sr_mix.clarify_delta
+
+
+# =============================================================================
 # Test: MCP Gateway integration
 # =============================================================================
 
