@@ -10,6 +10,12 @@ with illustrative couplings based on philosophical grounding.
 
 The matrix encodes: "When in cognitive mode v, which layers become more prominent?"
 
+Directional role: R[v,a] is a coupling/consistency operator. It computes
+expected ontological activation from vritti, used to validate that the
+cognitive mode and ontological position are coherent. It does NOT generate
+ontology from vritti — ontology is structurally deeper. The cause direction
+(Ontology → Vritti) is handled separately via ontology_vritti_prior().
+
 12D Migration (from 10D):
     - Added O1_POTENTIAL (dormant capacity) at position 0
     - Added O11_INTEGRATION (resolution, consolidation) at position 10

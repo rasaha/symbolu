@@ -493,6 +493,7 @@ def _resolve_vritti(
     request: AuthorizationRequest,
     gate_decision: ConfidenceGateDecision,
     vritti_result: Any = None,
+    layer_weights: Optional[Dict[str, float]] = None,
 ) -> VrittiResolution:
     """Resolve vritti signal: prefer real chitta_vritti, fall back to approx.
 
@@ -500,10 +501,15 @@ def _resolve_vritti(
     when available on the request, otherwise falls back to the canonical
     approximate_vritti() heuristic.
 
+    When layer_weights is provided and the approximation fallback is used,
+    the Ontology → Vritti prior biases the distribution (cognitive-axis
+    cause direction). Real ChittaVrittiResult signals are used as-is.
+
     Args:
         request: Authorization request (may carry .vritti_result).
         gate_decision: Confidence gate output (provides overall confidence).
         vritti_result: Optional explicit ChittaVrittiResult override.
+        layer_weights: Optional ontology layer weights for prior biasing.
 
     Returns:
         VrittiResolution with distribution, provenance, and degradation flag.
@@ -514,6 +520,7 @@ def _resolve_vritti(
         quality=getattr(request, "quality_score", 0.5),
         coherence=getattr(request, "coherence_score", 0.5),
         overall_confidence=gate_decision.confidence.overall,
+        layer_weights=layer_weights,
     )
 
 
@@ -2318,7 +2325,11 @@ class GovernanceService:
         layer_weights = _approximate_layer_weights(request, gate_decision)
 
         # Phase 1: Resolve vritti via adapter (real > approximation)
-        vritti_resolution = _resolve_vritti(request, gate_decision)
+        # Pass layer_weights so the approximation fallback can apply the
+        # Ontology → Vritti prior (cognitive-axis cause direction).
+        vritti_resolution = _resolve_vritti(
+            request, gate_decision, layer_weights=layer_weights,
+        )
         vritti_dist = vritti_resolution.distribution
 
         # Phase 1: Resolve entropy for governance context

@@ -70,6 +70,7 @@ def resolve_vritti_signal(
     quality: float = 0.5,
     coherence: float = 0.5,
     overall_confidence: float = 0.5,
+    layer_weights: Optional[Dict[str, float]] = None,
 ) -> VrittiResolution:
     """Resolve the best available vritti signal for governance use.
 
@@ -82,6 +83,12 @@ def resolve_vritti_signal(
         quality: Quality score [0, 1] for approximation fallback.
         coherence: Coherence score [0, 1] for approximation fallback.
         overall_confidence: Overall confidence [0, 1] for fallback.
+        layer_weights: Optional ontology layer weights. When provided
+            and the approximation fallback is used, these bias the
+            vritti distribution via the Ontology → Vritti prior
+            (cognitive-axis cause direction). Real ChittaVrittiResult
+            signals are used as-is — the prior only applies to the
+            approximation path.
 
     Returns:
         VrittiResolution with distribution, metadata, and provenance.
@@ -91,7 +98,7 @@ def resolve_vritti_signal(
           approximation with degraded=True.
         - If approximation itself fails → return full dormancy (nidra=1.0).
     """
-    # Path 1: Try real chitta_vritti result
+    # Path 1: Try real chitta_vritti result (no ontology prior applied)
     if vritti_result is not None:
         try:
             return _from_real(vritti_result)
@@ -99,11 +106,12 @@ def resolve_vritti_signal(
             # Malformed result — degrade to approximation, don't crash
             pass
 
-    # Path 2: Approximation fallback
+    # Path 2: Approximation fallback (with ontology prior if available)
     return _from_approximation(
         quality=quality,
         coherence=coherence,
         overall_confidence=overall_confidence,
+        layer_weights=layer_weights,
     )
 
 
@@ -147,16 +155,24 @@ def _from_approximation(
     quality: float,
     coherence: float,
     overall_confidence: float,
+    layer_weights: Optional[Dict[str, float]] = None,
 ) -> VrittiResolution:
     """Fall back to the heuristic approximation.
 
     Uses the canonical approximate_vritti() from jepa_governance.
+    When layer_weights is provided, the Ontology → Vritti prior
+    biases the distribution.
     """
     dist = approximate_vritti(
         quality=quality,
         coherence=coherence,
         overall_confidence=overall_confidence,
+        layer_weights=layer_weights,
     )
+
+    prior_note = ""
+    if layer_weights is not None:
+        prior_note = ", ontology_prior=applied"
 
     return VrittiResolution(
         distribution=dist,
@@ -166,6 +182,6 @@ def _from_approximation(
         degraded=True,
         source_detail=(
             f"approximate_vritti(q={quality:.2f}, c={coherence:.2f}, "
-            f"conf={overall_confidence:.2f})"
+            f"conf={overall_confidence:.2f}{prior_note})"
         ),
     )

@@ -1297,6 +1297,223 @@ class TestSharedApproximation:
 
 
 # =============================================================================
+# Test: Ontology → Vritti prior (Phase 1, cognitive-axis cause direction)
+# =============================================================================
+
+
+class TestOntologyVrittiPrior:
+    """Tests for ontology_vritti_prior() and its integration into
+    approximate_vritti(). Phase 1 of the directional model refinement."""
+
+    def test_prior_reasoning_dominant_boosts_pramana(self):
+        """High O7_REASONING should produce a pramana-dominant prior."""
+        from agentic.agentic_framework.jepa_governance import ontology_vritti_prior
+        prior = ontology_vritti_prior({"O7_REASONING": 0.9, "O9_WITNESSES": 0.8})
+        assert prior["pramana"] > prior["viparyaya"]
+        assert prior["pramana"] > prior["vikalpa"]
+        assert prior["pramana"] > prior["nidra"]
+
+    def test_prior_agency_dominant_boosts_viparyaya(self):
+        """High O6_AGENCY should produce elevated viparyaya."""
+        from agentic.agentic_framework.jepa_governance import ontology_vritti_prior
+        prior = ontology_vritti_prior({"O6_AGENCY": 0.9})
+        assert prior["viparyaya"] > prior["smrti"]
+        assert prior["viparyaya"] > prior["nidra"]
+
+    def test_prior_cognition_dominant_boosts_vikalpa(self):
+        """High O5_COGNITION should produce elevated vikalpa."""
+        from agentic.agentic_framework.jepa_governance import ontology_vritti_prior
+        prior = ontology_vritti_prior({"O5_COGNITION": 0.9})
+        assert prior["vikalpa"] > prior["viparyaya"]
+        assert prior["vikalpa"] > prior["nidra"]
+
+    def test_prior_execution_purpose_boosts_smrti(self):
+        """High O3_EXECUTION + O8_PURPOSE should produce elevated smrti."""
+        from agentic.agentic_framework.jepa_governance import ontology_vritti_prior
+        prior = ontology_vritti_prior({"O3_EXECUTION": 0.9, "O8_PURPOSE": 0.9})
+        assert prior["smrti"] > prior["viparyaya"]
+        assert prior["smrti"] > prior["nidra"]
+
+    def test_prior_potential_dominant_boosts_nidra(self):
+        """High O1_POTENTIAL should produce elevated nidra."""
+        from agentic.agentic_framework.jepa_governance import ontology_vritti_prior
+        prior = ontology_vritti_prior({"O1_POTENTIAL": 0.9, "O12_ABSOLVING": 0.7})
+        assert prior["nidra"] > prior["viparyaya"]
+        assert prior["nidra"] > prior["vikalpa"]
+
+    def test_prior_all_zero_returns_all_zero(self):
+        """All-zero layer weights produce all-zero prior."""
+        from agentic.agentic_framework.jepa_governance import ontology_vritti_prior
+        prior = ontology_vritti_prior({})
+        assert all(v == 0.0 for v in prior.values())
+
+    def test_prior_always_nonnegative(self):
+        """Prior values are always non-negative."""
+        from agentic.agentic_framework.jepa_governance import ontology_vritti_prior
+        prior = ontology_vritti_prior({
+            "O1_POTENTIAL": 0.5, "O3_EXECUTION": 0.3,
+            "O5_COGNITION": 0.7, "O6_AGENCY": 0.2,
+            "O7_REASONING": 0.9, "O12_ABSOLVING": 0.4,
+        })
+        assert all(v >= 0.0 for v in prior.values())
+
+    def test_approximate_vritti_no_layer_weights_unchanged(self):
+        """Without layer_weights, approximate_vritti is identical to old behavior."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        dist_none = approximate_vritti(quality=0.7, coherence=0.6, overall_confidence=0.8)
+        dist_explicit = approximate_vritti(
+            quality=0.7, coherence=0.6, overall_confidence=0.8,
+            layer_weights=None,
+        )
+        for k in dist_none:
+            assert abs(dist_none[k] - dist_explicit[k]) < 1e-10
+
+    def test_approximate_vritti_with_prior_shifts_distribution(self):
+        """With reasoning-dominant layer_weights, pramana should increase."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        base = approximate_vritti(quality=0.5, coherence=0.5, overall_confidence=0.5)
+        with_prior = approximate_vritti(
+            quality=0.5, coherence=0.5, overall_confidence=0.5,
+            layer_weights={"O7_REASONING": 0.9, "O9_WITNESSES": 0.8},
+        )
+        # Prior should boost pramana
+        assert with_prior["pramana"] > base["pramana"]
+        # Shift should be modest (bounded by alpha=0.2)
+        assert with_prior["pramana"] - base["pramana"] < 0.20
+
+    def test_approximate_vritti_with_prior_stays_normalized(self):
+        """Distribution must sum to 1.0 after prior application."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        dist = approximate_vritti(
+            quality=0.3, coherence=0.8, overall_confidence=0.4,
+            layer_weights={
+                "O1_POTENTIAL": 0.3, "O3_EXECUTION": 0.7,
+                "O5_COGNITION": 0.5, "O6_AGENCY": 0.4,
+                "O7_REASONING": 0.9, "O8_PURPOSE": 0.6,
+                "O12_ABSOLVING": 0.2,
+            },
+        )
+        assert abs(sum(dist.values()) - 1.0) < 0.01
+
+    def test_approximate_vritti_prior_bounded_influence(self):
+        """Prior influence must be bounded by alpha even with extreme weights."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        base = approximate_vritti(quality=0.5, coherence=0.5, overall_confidence=0.5)
+        extreme = approximate_vritti(
+            quality=0.5, coherence=0.5, overall_confidence=0.5,
+            layer_weights={"O1_POTENTIAL": 1.0, "O12_ABSOLVING": 1.0},
+        )
+        # Even with extreme nidra-biased prior, each mode should shift
+        # by at most ~alpha (0.2)
+        for k in base:
+            assert abs(extreme[k] - base[k]) <= 0.21  # small tolerance
+
+    def test_approximate_vritti_all_zero_layer_weights_unchanged(self):
+        """All-zero layer_weights produce identical output to no prior."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        base = approximate_vritti(quality=0.5, coherence=0.5, overall_confidence=0.5)
+        with_zero = approximate_vritti(
+            quality=0.5, coherence=0.5, overall_confidence=0.5,
+            layer_weights={"O7_REASONING": 0.0, "O1_POTENTIAL": 0.0},
+        )
+        for k in base:
+            assert abs(base[k] - with_zero[k]) < 1e-10
+
+    def test_approximate_vritti_old_tests_still_pass(self):
+        """Existing approximate_vritti contracts still hold."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        # No smrti in output
+        dist = approximate_vritti(quality=0.5, coherence=0.5, overall_confidence=0.5)
+        assert dist["smrti"] == 0.0
+        assert abs(sum(dist.values()) - 1.0) < 0.01
+
+        # All-zero inputs produce valid distribution
+        dist = approximate_vritti(quality=0.0, coherence=0.0, overall_confidence=0.0)
+        assert abs(sum(dist.values()) - 1.0) < 0.01
+
+    def test_jepa_alignment_improves_with_prior(self):
+        """JEPA alignment should improve when ontology prior nudges vritti
+        toward the direction R[v,a] would predict.
+
+        Test case: analytical context (high quality, high coherence)
+        produces reasoning-dominant ontology. Without prior, vritti is
+        independently estimated. With prior, vritti should be nudged
+        toward pramana, which R[v,a] expects to couple with O7_REASONING.
+        """
+        from agentic.agentic_framework.jepa_governance import (
+            approximate_layer_weights,
+            approximate_vritti,
+            build_ontology_signal,
+            build_vritti_signal,
+            build_jepa_composite,
+        )
+
+        # Analytical context: high quality and coherence
+        lw = approximate_layer_weights(
+            quality=0.9, coherence=0.9,
+            goal_alignment=0.8, overall_confidence=0.85,
+        )
+
+        # Without ontology prior
+        vritti_base = approximate_vritti(
+            quality=0.9, coherence=0.9, overall_confidence=0.85,
+        )
+        # With ontology prior
+        vritti_prior = approximate_vritti(
+            quality=0.9, coherence=0.9, overall_confidence=0.85,
+            layer_weights=lw,
+        )
+
+        ontology = build_ontology_signal(layer_weights=lw)
+        vritti_no_prior = build_vritti_signal(vritti_distribution=vritti_base)
+        vritti_with_prior = build_vritti_signal(vritti_distribution=vritti_prior)
+
+        jepa_no_prior = build_jepa_composite(ontology, vritti_no_prior)
+        jepa_with_prior = build_jepa_composite(ontology, vritti_with_prior)
+
+        # Alignment should be at least as good with the prior
+        assert jepa_with_prior.ontology_vritti_alignment >= \
+               jepa_no_prior.ontology_vritti_alignment - 0.001  # tiny tolerance
+
+    def test_prior_can_shift_top1_vritti(self):
+        """When base vritti is ambiguous, a strong ontology prior can shift
+        the dominant mode."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+
+        # Low quality + low coherence → viparyaya/nidra dominant base
+        base = approximate_vritti(quality=0.2, coherence=0.2, overall_confidence=0.3)
+        # Strong reasoning ontology → should boost pramana
+        with_prior = approximate_vritti(
+            quality=0.2, coherence=0.2, overall_confidence=0.3,
+            layer_weights={"O7_REASONING": 0.95, "O9_WITNESSES": 0.9},
+        )
+        # Prior should meaningfully boost pramana even in low-quality context
+        assert with_prior["pramana"] > base["pramana"]
+
+    def test_prior_does_not_introduce_negative_values(self):
+        """No vritti mode should become negative after prior application."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        dist = approximate_vritti(
+            quality=0.1, coherence=0.1, overall_confidence=0.1,
+            layer_weights={"O7_REASONING": 1.0},
+        )
+        assert all(v >= 0.0 for v in dist.values())
+
+    def test_prior_with_smrti_via_ontology(self):
+        """Ontology prior can introduce non-zero smrti (which base never produces)."""
+        from agentic.agentic_framework.jepa_governance import approximate_vritti
+        base = approximate_vritti(quality=0.5, coherence=0.5, overall_confidence=0.5)
+        assert base["smrti"] == 0.0  # Base never produces smrti
+
+        with_prior = approximate_vritti(
+            quality=0.5, coherence=0.5, overall_confidence=0.5,
+            layer_weights={"O3_EXECUTION": 0.9, "O8_PURPOSE": 0.9},
+        )
+        # Prior should introduce non-zero smrti
+        assert with_prior["smrti"] > 0.0
+
+
+# =============================================================================
 # Test: MCP Gateway integration
 # =============================================================================
 

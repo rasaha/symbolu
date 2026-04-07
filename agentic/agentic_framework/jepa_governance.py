@@ -14,6 +14,18 @@ Architecture:
         ↓
     GovernanceAssessment (regime + allow/deny/confirm/halt + reason codes)
 
+Directional model (cognitive axis):
+    Ontology is structurally deeper — it represents the active domain of
+    being/process. Vritti is the operative/readout layer — it classifies
+    the cognitive mode arising within that domain.
+
+    Cause direction:  Ontology → Vritti (ontology_vritti_prior)
+    Consistency check: Vritti → expected Ontology (R[v,a] coupling matrix)
+
+    The R[v,a] matrix is a coupling/consistency operator. It answers:
+    "given this cognitive mode, what ontological activation do we expect?"
+    It does NOT generate ontology from vritti — it validates consistency.
+
 JEPA here is NOT a trajectory predictor. It is a composite latent state
 formed by integrating the vertical ontological classification with the
 horizontal 5-vritti cognitive classification. The R[v,a] coupling matrix
@@ -547,6 +559,11 @@ def build_jepa_composite(
     This reveals whether the cognitive mode and ontological position are
     coherent. High alignment means the system's cognitive state and
     semantic position agree.
+
+    R[v,a] is a consistency/coupling operator, not a causal generator.
+    It asks: "given this cognitive mode, what ontological activation
+    do we expect?" The cause direction is Ontology → Vritti (via
+    ontology_vritti_prior); this function validates the reverse.
     """
     # Step 1: Expected ontological activation from vritti
     expected = _get_aspect_weights(vritti.distribution)
@@ -1302,6 +1319,10 @@ def approximate_layer_weights(
     Canonical shared implementation used by both GovernanceService and
     SafeMCPGateway so that equivalent inputs produce identical JEPA
     composites across enforcement points.
+
+    Ontology is the structurally primary signal on the cognitive axis.
+    These weights are computed first and may be passed to
+    approximate_vritti() as a soft prior (Ontology → Vritti direction).
     """
     return {
         "O1_POTENTIAL": 0.3,
@@ -1319,11 +1340,53 @@ def approximate_layer_weights(
     }
 
 
+def ontology_vritti_prior(
+    layer_weights: Dict[str, float],
+) -> Dict[str, float]:
+    """Derive a vritti prior from ontological layer weights.
+
+    This is the Ontology → Vritti causal direction: the active ontological
+    layer determines which cognitive modes are structurally favored.
+
+    The couplings are the transpose of R[v,a] primary couplings:
+    - O7_REASONING active → pramana favored (valid cognition)
+    - O6_AGENCY active → viparyaya favored (self-referential conflict)
+    - O5_COGNITION active → vikalpa favored (conceptual branching)
+    - O3_EXECUTION + O8_PURPOSE active → smrti favored (continuity)
+    - O1_POTENTIAL + O12_ABSOLVING active → nidra favored (dormancy)
+
+    Weights are deliberately lower than R[v,a] (0.2–0.5 vs 0.85–0.95)
+    because this is a soft prior, not a deterministic mapping.
+
+    Returns:
+        Unnormalized vritti tendencies. Always non-negative.
+    """
+    get = layer_weights.get
+    return {
+        "pramana": get("O7_REASONING", 0.0) * 0.5
+                 + get("O9_WITNESSES", 0.0) * 0.3,
+        "viparyaya": get("O6_AGENCY", 0.0) * 0.4,
+        "vikalpa": get("O5_COGNITION", 0.0) * 0.4
+                 + get("O4_STRUCTURE", 0.0) * 0.2,
+        "smrti": get("O3_EXECUTION", 0.0) * 0.3
+               + get("O8_PURPOSE", 0.0) * 0.3,
+        "nidra": get("O1_POTENTIAL", 0.0) * 0.4
+               + get("O12_ABSOLVING", 0.0) * 0.2,
+    }
+
+
+# Ontology → Vritti prior mixing weight.
+# Controls how much the ontology prior can shift the vritti distribution.
+# alpha=0.2 means up to 20% influence. Hardcoded cap: must not exceed 0.4.
+_ONTOLOGY_VRITTI_PRIOR_ALPHA = 0.2
+
+
 def approximate_vritti(
     *,
     quality: float = 0.5,
     coherence: float = 0.5,
     overall_confidence: float = 0.5,
+    layer_weights: Optional[Dict[str, float]] = None,
 ) -> Dict[str, float]:
     """Approximate vritti distribution from available governance signals.
 
@@ -1331,7 +1394,14 @@ def approximate_vritti(
     normalizable because at least one component (pramana or nidra)
     is positive for any non-negative inputs.  If all inputs are 0.0,
     nidra = 0.3 dominates, producing a valid dormancy distribution.
+
+    When layer_weights is provided, an ontology-derived prior biases
+    the distribution via convex blending (Ontology → Vritti direction).
+    The prior is bounded by _ONTOLOGY_VRITTI_PRIOR_ALPHA and cannot
+    zero out any vritti mode. When layer_weights is None, behavior is
+    identical to the pre-prior implementation.
     """
+    # Step 1: Signal-based vritti (existing logic, unchanged)
     pramana = min(1.0, quality * 0.6 + coherence * 0.4)
     viparyaya = max(0.0, 0.5 - quality * 0.8)
     vikalpa = max(0.0, 0.4 - coherence * 0.5) * min(1.0, quality + 0.3)
@@ -1339,19 +1409,43 @@ def approximate_vritti(
 
     total = pramana + viparyaya + vikalpa + nidra
     if total <= 0:
-        # All signals exactly zero (mathematically unlikely but possible
-        # with quality=coherence=overall_confidence=0.0 → pramana=0,
-        # viparyaya=0.5, vikalpa=0.12, nidra=0.3 → total>0).
         # Defensive: treat as full dormancy.
         return {"pramana": 0.0, "viparyaya": 0.0, "vikalpa": 0.0,
                 "smrti": 0.0, "nidra": 1.0}
-    return {
+
+    base = {
         "pramana": pramana / total,
         "viparyaya": viparyaya / total,
         "vikalpa": vikalpa / total,
         "smrti": 0.0,
         "nidra": nidra / total,
     }
+
+    # Step 2: Apply ontology prior if available
+    if layer_weights is None:
+        return base
+
+    prior = ontology_vritti_prior(layer_weights)
+    prior_total = sum(prior.values())
+    if prior_total <= 0:
+        # All-zero layer_weights → prior contributes nothing
+        return base
+
+    # Normalize prior to a distribution
+    prior_norm = {k: v / prior_total for k, v in prior.items()}
+
+    # Step 3: Convex blend: result = (1-alpha)*base + alpha*prior
+    alpha = _ONTOLOGY_VRITTI_PRIOR_ALPHA
+    blended = {
+        k: (1.0 - alpha) * base[k] + alpha * prior_norm.get(k, 0.0)
+        for k in base
+    }
+
+    # Renormalize (should already sum to ~1.0, but ensure exactness)
+    blend_total = sum(blended.values())
+    if blend_total <= 0:
+        return base
+    return {k: v / blend_total for k, v in blended.items()}
 
 
 # =========================================================================
@@ -1384,4 +1478,5 @@ __all__ = [
     # Shared signal approximation
     "approximate_layer_weights",
     "approximate_vritti",
+    "ontology_vritti_prior",
 ]
