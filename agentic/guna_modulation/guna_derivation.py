@@ -57,6 +57,7 @@ from agentic.guna_modulation.types import (
     H_MID,
     EPSILON,
     GunaVector,
+    GunaCsrAuditSignal,
     PipelineInputs,
     ModulationTraceEntry,
 )
@@ -313,3 +314,75 @@ def derive_guna_with_trace(
     """
     inputs = PipelineInputs(C_s=C_s, M=M, H=H)
     return derive_guna_vector(inputs)
+
+
+# =============================================================================
+# Phase 2: Guna → CSR Audit Signal (audit-only, no live feedback)
+# =============================================================================
+
+# Maximum magnitude of any single delta. Deliberately conservative.
+_AUDIT_MAX_DELTA = 0.10
+
+
+def guna_csr_modulation_audit(
+    guna: GunaVector,
+) -> GunaCsrAuditSignal:
+    """Compute audit-only energetic feedback: what CSR modulation guna implies.
+
+    This is the Guna → CSR reverse direction on the energetic axis.
+    It does NOT modify any live CSR state. It produces a diagnostic
+    signal that describes the directional tendency of the current guna
+    state on CSR expression.
+
+    Directional semantics:
+        - Sattva clarifies: tends to increase C_s, decrease H
+        - Rajas agitates: tends to increase M (motion/transformation)
+        - Tamas dampens: tends to decrease C_s, increase H
+
+    The computation is:
+        clarify_delta  = sattva * _AUDIT_MAX_DELTA
+        agitate_delta  = rajas  * _AUDIT_MAX_DELTA
+        dampen_delta   = tamas  * _AUDIT_MAX_DELTA
+        net_coherence  = clarify - dampen  (bounded to [-max, +max])
+        net_entropy    = dampen - clarify  (bounded to [-max, +max])
+
+    All deltas are bounded to [-_AUDIT_MAX_DELTA, +_AUDIT_MAX_DELTA].
+    The audit_only flag is always True.
+
+    Args:
+        guna: Current guna vector (S, R, T). Must be normalized (~sum to 1).
+
+    Returns:
+        GunaCsrAuditSignal with bounded deltas and dominant tendency.
+
+    Determinism Guarantee:
+        Same input always produces same output.
+    """
+    s, r, t = guna.sattva, guna.rajas, guna.tamas
+
+    clarify = s * _AUDIT_MAX_DELTA
+    agitate = r * _AUDIT_MAX_DELTA
+    dampen = t * _AUDIT_MAX_DELTA
+
+    # Net effects on CSR dimensions
+    net_coherence = max(-_AUDIT_MAX_DELTA, min(_AUDIT_MAX_DELTA, clarify - dampen))
+    net_entropy = max(-_AUDIT_MAX_DELTA, min(_AUDIT_MAX_DELTA, dampen - clarify))
+
+    # Dominant tendency classification
+    tendencies = {"clarify": clarify, "agitate": agitate, "dampen": dampen}
+    max_val = max(tendencies.values())
+    if max_val < 1e-9:
+        dominant = "neutral"
+    else:
+        dominant = max(tendencies, key=tendencies.get)
+
+    return GunaCsrAuditSignal(
+        clarify_delta=clarify,
+        agitate_delta=agitate,
+        dampen_delta=dampen,
+        net_coherence_delta=net_coherence,
+        net_entropy_delta=net_entropy,
+        dominant_tendency=dominant,
+        guna_input=guna,
+        audit_only=True,
+    )

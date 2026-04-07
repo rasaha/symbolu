@@ -1642,6 +1642,140 @@ class TestP1Calibration:
 
 
 # =============================================================================
+# Test: Phase 2 — Guna → CSR audit signal (audit-only)
+# =============================================================================
+
+
+class TestGunaCsrAuditSignal:
+    """Tests for the Phase 2 Guna → CSR modulation audit signal.
+
+    Validates that the audit signal is bounded, directionally correct,
+    and strictly audit-only (no live behavior change).
+    """
+
+    def test_sattva_dominant_clarifies(self):
+        """Sattva-dominant guna should produce clarification tendency."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        sig = guna_csr_modulation_audit(GunaVector(sattva=0.8, rajas=0.1, tamas=0.1))
+        assert sig.clarify_delta > sig.dampen_delta
+        assert sig.clarify_delta > sig.agitate_delta
+        assert sig.dominant_tendency == "clarify"
+        assert sig.net_coherence_delta > 0  # sattva increases coherence
+        assert sig.net_entropy_delta < 0    # sattva decreases entropy
+
+    def test_rajas_dominant_agitates(self):
+        """Rajas-dominant guna should produce agitation tendency."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        sig = guna_csr_modulation_audit(GunaVector(sattva=0.1, rajas=0.8, tamas=0.1))
+        assert sig.agitate_delta > sig.clarify_delta
+        assert sig.agitate_delta > sig.dampen_delta
+        assert sig.dominant_tendency == "agitate"
+
+    def test_tamas_dominant_dampens(self):
+        """Tamas-dominant guna should produce damping tendency."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        sig = guna_csr_modulation_audit(GunaVector(sattva=0.1, rajas=0.1, tamas=0.8))
+        assert sig.dampen_delta > sig.clarify_delta
+        assert sig.dampen_delta > sig.agitate_delta
+        assert sig.dominant_tendency == "dampen"
+        assert sig.net_coherence_delta < 0  # tamas decreases coherence
+        assert sig.net_entropy_delta > 0    # tamas increases entropy
+
+    def test_balanced_guna_bounded(self):
+        """Balanced guna (1/3 each) should produce small bounded deltas."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        sig = guna_csr_modulation_audit(
+            GunaVector(sattva=0.333, rajas=0.334, tamas=0.333),
+        )
+        # All deltas should be approximately equal
+        assert abs(sig.clarify_delta - sig.dampen_delta) < 0.001
+        # Net effects near zero
+        assert abs(sig.net_coherence_delta) < 0.001
+        assert abs(sig.net_entropy_delta) < 0.001
+
+    def test_zero_guna_neutral(self):
+        """All-zero guna produces neutral signal."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        sig = guna_csr_modulation_audit(GunaVector(sattva=0.0, rajas=0.0, tamas=0.0))
+        assert sig.clarify_delta == 0.0
+        assert sig.agitate_delta == 0.0
+        assert sig.dampen_delta == 0.0
+        assert sig.net_coherence_delta == 0.0
+        assert sig.net_entropy_delta == 0.0
+        assert sig.dominant_tendency == "neutral"
+
+    def test_all_deltas_bounded(self):
+        """All deltas must be bounded within [-0.10, +0.10]."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        for s, r, t in [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0),
+                        (0.5, 0.5, 0.0), (0.0, 0.5, 0.5), (0.5, 0.0, 0.5),
+                        (0.8, 0.1, 0.1), (0.1, 0.8, 0.1), (0.1, 0.1, 0.8)]:
+            sig = guna_csr_modulation_audit(GunaVector(sattva=s, rajas=r, tamas=t))
+            assert 0.0 <= sig.clarify_delta <= 0.10
+            assert 0.0 <= sig.agitate_delta <= 0.10
+            assert 0.0 <= sig.dampen_delta <= 0.10
+            assert -0.10 <= sig.net_coherence_delta <= 0.10
+            assert -0.10 <= sig.net_entropy_delta <= 0.10
+
+    def test_audit_only_flag_always_true(self):
+        """audit_only must always be True — machine-readable guard."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        sig = guna_csr_modulation_audit(GunaVector(sattva=0.5, rajas=0.3, tamas=0.2))
+        assert sig.audit_only is True
+
+    def test_to_dict_serializable(self):
+        """Audit signal must be serializable to dict."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        sig = guna_csr_modulation_audit(GunaVector(sattva=0.6, rajas=0.2, tamas=0.2))
+        d = sig.to_dict()
+        assert isinstance(d, dict)
+        assert d["audit_only"] is True
+        assert "clarify_delta" in d
+        assert "dominant_tendency" in d
+        assert "guna_input" in d and isinstance(d["guna_input"], dict)
+
+    def test_deterministic(self):
+        """Same input must always produce same output."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        guna = GunaVector(sattva=0.45, rajas=0.35, tamas=0.20)
+        sig1 = guna_csr_modulation_audit(guna)
+        sig2 = guna_csr_modulation_audit(guna)
+        assert sig1.clarify_delta == sig2.clarify_delta
+        assert sig1.agitate_delta == sig2.agitate_delta
+        assert sig1.dampen_delta == sig2.dampen_delta
+        assert sig1.net_coherence_delta == sig2.net_coherence_delta
+        assert sig1.dominant_tendency == sig2.dominant_tendency
+
+    def test_guna_input_preserved(self):
+        """The input guna vector must be preserved in the audit signal."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        guna = GunaVector(sattva=0.7, rajas=0.2, tamas=0.1)
+        sig = guna_csr_modulation_audit(guna)
+        assert sig.guna_input.sattva == 0.7
+        assert sig.guna_input.rajas == 0.2
+        assert sig.guna_input.tamas == 0.1
+
+    def test_net_coherence_entropy_antisymmetric(self):
+        """net_coherence_delta and net_entropy_delta should be negatives of each other."""
+        from agentic.guna_modulation.guna_derivation import guna_csr_modulation_audit
+        from agentic.guna_modulation.types import GunaVector
+        for s, t in [(0.8, 0.1), (0.1, 0.8), (0.5, 0.5), (0.3, 0.4)]:
+            guna = GunaVector(sattva=s, rajas=1.0 - s - t, tamas=t)
+            sig = guna_csr_modulation_audit(guna)
+            assert abs(sig.net_coherence_delta + sig.net_entropy_delta) < 1e-10
+
+
+# =============================================================================
 # Test: MCP Gateway integration
 # =============================================================================
 
