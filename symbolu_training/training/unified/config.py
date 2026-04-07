@@ -654,6 +654,13 @@ class UnifiedTrainingConfig:
     seq_len_ppl_gate: float = 0.0                 # If > 0, only ramp when PPL < this (0 = step-based only)
 
     # CSR Phoneme-Ontological Grounding
+    # NOTE: This is the standalone spatial-grounding CSR path. It injects phoneme
+    # embeddings across layers (0, 7, 11) with entropy/synthesis safety gates.
+    # A separate token-level CSR path exists via `lambda_csr_token` (see CG
+    # Primitives section below). The two paths are NOT redundant:
+    #   - enable_csr: spatial grounding (phoneme→hidden-state injection per layer)
+    #   - lambda_csr_token: token scoring (bilinear phoneme×context compatibility)
+    # Both default to off. Neither path feeds into inference (MistralCGAdapter).
     enable_csr: bool = False                 # Enable CSR phoneme grounding (opt-in)
     csr_lambda: float = 0.1                  # CSR injection strength
     csr_tau: float = 0.07                    # InfoNCE temperature (lower = sharper gradients, 0.07 = 14x amplification)
@@ -1005,7 +1012,7 @@ class UnifiedTrainingConfig:
     lambda_bliss_token: float = 0.0                # Bliss token-level coherence loss weight
     lambda_plausibility_token: float = 0.0          # Plausibility token-level loss
     lambda_jepa_token: float = None                # Backward-compatible alias for lambda_plausibility_token
-    lambda_csr_token: float = 0.0                  # CSR token-level resonance loss
+    lambda_csr_token: float = 0.0                  # CSR token-level resonance loss (see also: enable_csr for spatial path)
     lambda_vritti_token: float = 0.0               # Vritti token-level cognitive mode loss
     lambda_guna_token: float = 0.0                 # Guna token-level energetic loss
     bliss_lambda_B: float = 1.0                    # λ_B temperature for Bliss gate

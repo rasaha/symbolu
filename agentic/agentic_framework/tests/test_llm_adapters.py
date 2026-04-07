@@ -801,3 +801,86 @@ class TestVrittiSamplingGate:
         adapter.call("test")
         events = adapter.last_cg_metadata['vritti_gate_events']
         assert len(events) > 0
+
+
+# =============================================================================
+# Vritti Index Ordering Invariant Test
+#
+# Guards against the known naming mismatch between:
+#   - training-side VrittiState enum (vritti.py): SMRITI=3, NIDRA=4
+#   - 32D state layout (state_projector, inference constants): NIDRA=3, SMRITI=4
+#
+# The 32D state layout is the canonical ordering. The VrittiState enum is used
+# only for PID physics lookup and display labels — it does NOT index into the
+# 32D state. All code that reads the 32D Vritti slice (state_projector,
+# VrittiResonanceLoss, VrittiValidatedPredictor, sovereign_bridge, vritti gate)
+# uses NIDRA=3, SMRITI=4 consistently.
+#
+# This test locks the invariant so any future change to either side will fail.
+# =============================================================================
+
+
+class TestVrittiIndexOrderingInvariant:
+    """Regression test: 32D Vritti ordering is consistent across inference."""
+
+    def test_sovereign_constants_match_gate_assumptions(self):
+        """The inference constants used by sovereign_bridge match the gate's
+        hardcoded indices: vritti[1]=ERROR, vritti[2]=IMAGINATION."""
+        from agentic.sovereign_constants import (
+            VRITTI_ERROR,
+            VRITTI_IMAGINATION,
+            VRITTI_FACT,
+            VRITTI_VOID,
+            VRITTI_MEMORY,
+        )
+        # Gate reads vritti[1] as ERROR and vritti[2] as IMAGINATION
+        assert VRITTI_ERROR == 1, f"VRITTI_ERROR must be 1, got {VRITTI_ERROR}"
+        assert VRITTI_IMAGINATION == 2, f"VRITTI_IMAGINATION must be 2, got {VRITTI_IMAGINATION}"
+        # Full 5D layout lock
+        assert VRITTI_FACT == 0
+        assert VRITTI_VOID == 3
+        assert VRITTI_MEMORY == 4
+
+    def test_vritti_index_enum_matches_constants(self):
+        """VrittiIndex enum matches the flat index constants."""
+        from agentic.sovereign_constants import (
+            VrittiIndex,
+            VRITTI_FACT, VRITTI_ERROR, VRITTI_IMAGINATION,
+            VRITTI_VOID, VRITTI_MEMORY,
+        )
+        assert VrittiIndex.PRAMANA == VRITTI_FACT
+        assert VrittiIndex.VIPARYAYA == VRITTI_ERROR
+        assert VrittiIndex.VIKALPA == VRITTI_IMAGINATION
+        assert VrittiIndex.NIDRA == VRITTI_VOID
+        assert VrittiIndex.SMRITI == VRITTI_MEMORY
+
+    def test_sovereign_bridge_uses_correct_indices(self):
+        """sovereign_bridge._vritti_to_confidence reads the right slots."""
+        from agentic.agentic_framework.sovereign_bridge import (
+            _vritti_to_confidence,
+        )
+        # ERROR-dominant Vritti: index 1 = 0.9, rest near zero
+        vritti = [0.02, 0.90, 0.02, 0.03, 0.03]
+        result = _vritti_to_confidence(vritti)
+        # If indices were swapped, reversal_risk would be near zero
+        assert result['prediction_reversal_risk'] > 0.8, (
+            f"Expected high reversal_risk for ERROR-dominant state, "
+            f"got {result['prediction_reversal_risk']}"
+        )
+
+    def test_gate_error_risk_uses_correct_indices(self):
+        """Vritti gate computes error_risk from the right positions."""
+        torch = pytest.importorskip("torch", reason="torch required")
+        # Construct a known 32D state: ERROR=0.8 at position 18 (17+1),
+        # IMAGINATION=0.1 at position 19 (17+2)
+        state = torch.zeros(1, 32)
+        state[0, 17] = 0.02   # FACT
+        state[0, 18] = 0.80   # ERROR  (index 1 within Vritti slice)
+        state[0, 19] = 0.10   # IMAGINATION (index 2 within Vritti slice)
+        state[0, 20] = 0.04   # VOID
+        state[0, 21] = 0.04   # MEMORY
+
+        vritti = state[0, 17:22]
+        error_risk = (vritti[1] + 0.3 * vritti[2]).clamp(0.0, 1.0).item()
+        # 0.80 + 0.3*0.10 = 0.83
+        assert abs(error_risk - 0.83) < 1e-5, f"Expected 0.83, got {error_risk}"

@@ -585,3 +585,47 @@ class TestCreateAdapterMistralCG:
                 # Expected: no model weights / no GPU in test env
                 # But NOT ValueError("Unknown provider")
                 pass
+
+
+# =============================================================================
+# Vritti Index Ordering Invariant Test
+#
+# Guards against the known naming mismatch between:
+#   - training-side VrittiState enum (vritti.py): SMRITI=3, NIDRA=4
+#   - 32D state layout (state_projector, inference constants): NIDRA=3, SMRITI=4
+#
+# The 32D state layout is the canonical ordering. This test locks the invariant.
+# =============================================================================
+
+
+class TestVrittiIndexOrderingInvariant:
+    """Regression test: 32D Vritti ordering is consistent across inference."""
+
+    def test_sovereign_constants_match_gate_assumptions(self):
+        """The inference constants match the gate's hardcoded indices:
+        vritti[1]=ERROR, vritti[2]=IMAGINATION."""
+        from agentic.sovereign_constants import (
+            VRITTI_ERROR,
+            VRITTI_IMAGINATION,
+            VRITTI_FACT,
+            VRITTI_VOID,
+            VRITTI_MEMORY,
+        )
+        assert VRITTI_ERROR == 1, f"VRITTI_ERROR must be 1, got {VRITTI_ERROR}"
+        assert VRITTI_IMAGINATION == 2, f"VRITTI_IMAGINATION must be 2, got {VRITTI_IMAGINATION}"
+        assert VRITTI_FACT == 0
+        assert VRITTI_VOID == 3
+        assert VRITTI_MEMORY == 4
+
+    def test_vritti_index_enum_matches_constants(self):
+        """VrittiIndex enum matches the flat index constants."""
+        from agentic.sovereign_constants import (
+            VrittiIndex,
+            VRITTI_FACT, VRITTI_ERROR, VRITTI_IMAGINATION,
+            VRITTI_VOID, VRITTI_MEMORY,
+        )
+        assert VrittiIndex.PRAMANA == VRITTI_FACT
+        assert VrittiIndex.VIPARYAYA == VRITTI_ERROR
+        assert VrittiIndex.VIKALPA == VRITTI_IMAGINATION
+        assert VrittiIndex.NIDRA == VRITTI_VOID
+        assert VrittiIndex.SMRITI == VRITTI_MEMORY
