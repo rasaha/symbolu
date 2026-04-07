@@ -870,12 +870,15 @@ class SafeMCPGateway:
         )
 
         # Phase 1: Resolve vritti via adapter (real > approximation)
+        # Pass layer_weights so the approximation fallback can apply the
+        # Ontology → Vritti prior (cognitive-axis cause direction).
         vritti_result = getattr(tool_call, "vritti_result", None)
         vritti_resolution = resolve_vritti_signal(
             vritti_result=vritti_result,
             quality=q,
             coherence=c,
             overall_confidence=overall,
+            layer_weights=layer_weights,
         )
         vritti_dist = vritti_resolution.distribution
 

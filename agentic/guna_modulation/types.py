@@ -254,6 +254,65 @@ class ModulationTraceEntry:
 
 
 # =============================================================================
+# Guna → CSR Audit Signal (Phase 2, audit-only)
+# =============================================================================
+
+@dataclass(frozen=True)
+class GunaCsrAuditSignal:
+    """Audit-only signal: what CSR expression modulation guna would imply.
+
+    This is the Guna → CSR reverse direction on the energetic axis.
+    It computes what would happen if guna fed back into CSR, but does
+    NOT apply the modulation. It exists for diagnostics and future
+    governance evaluation only.
+
+    Directional model context:
+        Cause direction: CSR → Guna (already wired in guna_derivation.py)
+        Reverse direction: Guna → CSR expression (this signal, audit-only)
+
+    The signal is bounded: each delta is clamped to [-max_delta, +max_delta].
+    The audit_only flag is always True and is a machine-readable guard.
+
+    Attributes:
+        clarify_delta: Sattva-driven tendency to increase coherence / decrease
+            entropy. Positive = clarification. Bounded.
+        agitate_delta: Rajas-driven tendency to increase motion / energy.
+            Positive = agitation/activation. Bounded.
+        dampen_delta: Tamas-driven tendency to increase entropy / decrease
+            coherence. Positive = damping/obscuration. Bounded.
+        net_coherence_delta: Combined effect on structural coherence C_s.
+            Positive = net clarification, negative = net obscuration.
+        net_entropy_delta: Combined effect on entropy H.
+            Positive = entropy increase, negative = entropy decrease.
+        dominant_tendency: Which guna tendency dominates ("clarify",
+            "agitate", "dampen", or "neutral").
+        guna_input: The guna vector that produced this signal.
+        audit_only: Always True. Machine-readable guard.
+    """
+    clarify_delta: float
+    agitate_delta: float
+    dampen_delta: float
+    net_coherence_delta: float
+    net_entropy_delta: float
+    dominant_tendency: str
+    guna_input: GunaVector
+    audit_only: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging/serialization."""
+        return {
+            "clarify_delta": self.clarify_delta,
+            "agitate_delta": self.agitate_delta,
+            "dampen_delta": self.dampen_delta,
+            "net_coherence_delta": self.net_coherence_delta,
+            "net_entropy_delta": self.net_entropy_delta,
+            "dominant_tendency": self.dominant_tendency,
+            "guna_input": self.guna_input.to_dict(),
+            "audit_only": self.audit_only,
+        }
+
+
+# =============================================================================
 # Modulation Result
 # =============================================================================
 

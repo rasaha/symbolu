@@ -1,6 +1,6 @@
 # Agentic Architecture: Governed Runtime & Signal Integration
 
-> **Version:** 6.1.0 | **Updated:** 2026-04-06
+> **Version:** 6.2.0 | **Updated:** 2026-04-07
 >
 > This document describes the agentic governance runtime — a code-first
 > developer framework for building agentic applications with a differentiated
@@ -10,8 +10,9 @@
 > multi-agent platform — remaining gaps are around broader production adoption
 > and platforming, not the basic runtime contract. The framework is ready for
 > cold-start technical adoption by strong developers (validated through
-> simulated second-developer exercises and live-adapter validation), but is
-> not yet broadly production-adopted outside pilot use cases.
+> simulated second-developer exercises, live-adapter validation, and an
+> external developer validation pack), but is not yet broadly
+> production-adopted outside pilot use cases.
 >
 > The architecture comprises six completed tracks:
 >
@@ -2734,6 +2735,7 @@ committed on the current branch:
 | Live adapter validation (stock `AnthropicAdapter` with `auth_token`) | 3-phase end-to-end, exact usage accounting confirmed |
 | Cold-start adoption path (`pip install -e .` → first governed agent) | Simulated second-developer validation, 9/9 checks |
 | All five signal integration tracks (S, C, O, P, Safety) | 1000+ tests across dedicated suites |
+| JEPA directional model P0 (interpretation codified) + P1 (Ontology → Vritti prior, alpha=0.2 calibrated) + P2 (Guna → CSR audit signal, usefulness-evaluated) | 120+ tests in `test_jepa_governance.py`, P1 calibration eval, P2 usefulness eval |
 
 ### Partially Proved
 
@@ -2755,6 +2757,7 @@ committed on the current branch:
 | OpenTelemetry / external telemetry backend | Runtime observability is local/in-memory |
 | `AuthorizationRequest`-side enrichment path | Seam ready in code, no honest production caller |
 | Low-code developer console | Design spec complete ([LOWCODE_DEVELOPER_INTERFACE_SPEC.md](docs/LOWCODE_DEVELOPER_INTERFACE_SPEC.md)). Recommended after one more adoption cycle. |
+| JEPA directional model P3 (governance-controlled promotion) | Design spec complete ([Phase 3 Design Spec](docs/PHASE3_DESIGN_SPEC.md)). Explicitly deferred — quantitative evaluation found no current operational use case where confidence-only penalty modulation would cross a decision threshold. Implement when a concrete trigger appears. |
 | FP3: Greedy JSON regex in `_extract_json()` | Works for all tested format variations but could fail with multiple JSON objects in one response. Low risk. |
 
 ### Adoption Readiness
@@ -2775,9 +2778,18 @@ technical adoption** for strong developers:
   end-to-end with real API keys. Exposed and resolved FP1
   (goal-alignment brittleness) and FP2 (action vocabulary mismatch).
   Exact usage accounting confirmed.
+- **External validation pack:** Structured trial package for 1–3
+  external developers: validation guide, task sheet, feedback
+  template, and tracking checklist. See
+  [External Developer Validation](docs/EXTERNAL_DEVELOPER_VALIDATION.md).
+- **JEPA directional model:** Cognitive axis (Ontology → Vritti prior)
+  implemented and calibrated. Energetic axis (Guna → CSR audit signal)
+  implemented and usefulness-evaluated. Governance-controlled promotion
+  (P3) designed but explicitly deferred — no operational use case
+  justifies implementation yet.
 
 The next phase is **external developer validation** — real developers
-outside the project adopting from published docs.
+outside the project adopting from the published validation pack.
 
 ### Documentation Reference
 
@@ -2794,6 +2806,9 @@ Key docs for architecture context:
 | [Mock → Real LLM Tutorial](docs/MOCK_TO_REAL_LLM.md) | Adapter migration guide |
 | [Framework Status](docs/FRAMEWORK_STATUS.md) | What is proved, partial, deferred |
 | [Adoption Validation Report](docs/ADOPTION_VALIDATION_REPORT.md) | Friction inventory and cold-start results |
+| [External Developer Validation](docs/EXTERNAL_DEVELOPER_VALIDATION.md) | External trial guide, tasks, feedback template |
+| [Directional Model Roadmap](docs/DIRECTIONAL_MODEL_ROADMAP.md) | JEPA cognitive/energetic axis refinement (P0–P4) |
+| [Phase 3 Design Spec](docs/PHASE3_DESIGN_SPEC.md) | P3 governance-controlled promotion (deferred) |
 | [CG Runtime Runbook](docs/CG_RUNTIME_RUNBOOK.md) | Operational guide for `--cg` path |
 | [Runtime MCP Path](docs/RUNTIME_MCP_PATH.md) | End-to-end MCP execution walkthrough |
 
@@ -2826,7 +2841,7 @@ are not merged.
 | `test_phase_s3_integration.py` | 32 | S3 diagnostics, bridge contracts, torch isolation | Sovereign |
 | `test_phase_s4_integration.py` | 67 | S4 anomaly/prior/telemetry, adapters, fallbacks | Sovereign |
 | `test_activation_e2e.py` | 8 | True E2E `authorize()` proving S3/S4 activation | Sovereign |
-| `test_jepa_governance.py` | ~100+ | JEPA composite, regimes, governance service integration | Sovereign |
+| `test_jepa_governance.py` | 120+ | JEPA composite, regimes, governance service integration, P1 prior calibration, P2 audit signal, P2 usefulness evaluation | Sovereign |
 | `test_phase_c4_predictive_and_counterfactual.py` | 45 | C4 adapter contracts, P35/P36/P37, counterfactual bridge | Core |
 | `test_closure_e2e_authorize.py` | 31 | E2E authorize proving C2/C3/C4, aggregate cap, generation gate | Core |
 | `test_policy_engine.py` | 31 | Policy engine rules, thresholds, boundary conditions | Policy |
