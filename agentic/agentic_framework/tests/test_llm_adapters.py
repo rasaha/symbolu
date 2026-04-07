@@ -480,6 +480,7 @@ class TestMistralCGAdapter:
         adapter.top_p = 1.0
         adapter.top_k = 0
         adapter.repetition_penalty = 1.0
+        adapter.enable_vritti_gate = False
         adapter.last_cg_metadata = {}
         adapter.call_history = []
 
@@ -585,3 +586,218 @@ class TestCreateAdapterMistralCG:
                 # Expected: no model weights / no GPU in test env
                 # But NOT ValueError("Unknown provider")
                 pass
+
+
+# =============================================================================
+# Vritti Sampling Gate Validation Tests (V-1 through V-7)
+# Reference: docs/specs/VRITTI_SAMPLING_GATE_SPEC.md
+# =============================================================================
+
+
+def _make_mock_mistral_cg_with_vritti(vritti_values):
+    """
+    Build a mock MistralCGWrapper that returns a controlled 32D state
+    with the specified Vritti values at indices [17:22].
+    """
+    torch = pytest.importorskip("torch", reason="torch required for Vritti gate tests")
+
+    vocab_size = 100
+    call_count = {"n": 0}
+
+    tokenizer = MagicMock()
+    tokenizer.pad_token = "[PAD]"
+    tokenizer.eos_token = "[EOS]"
+    tokenizer.eos_token_id = 2
+    tokenizer.pad_token_id = 0
+
+    def mock_tokenize(text, return_tensors=None, padding=False, truncation=False):
+        ids = torch.tensor([[10, 20, 30, 40, 50]])
+        mask = torch.ones_like(ids)
+        result = MagicMock()
+        result.__getitem__ = lambda self, k: {"input_ids": ids, "attention_mask": mask}[k]
+        result.get = lambda k, d=None: {"input_ids": ids, "attention_mask": mask}.get(k, d)
+        return result
+
+    tokenizer.side_effect = mock_tokenize
+    tokenizer.decode = MagicMock(side_effect=lambda ids, **kw: "Generated text")
+
+    model = MagicMock()
+    model.eval = MagicMock(return_value=model)
+    model.tokenizer = tokenizer
+
+    param = torch.nn.Parameter(torch.zeros(1))
+    model.parameters = MagicMock(return_value=iter([param]))
+
+    def mock_forward(input_ids, attention_mask=None, reset_state=False, **kwargs):
+        call_count["n"] += 1
+        B, T = input_ids.shape
+        logits = torch.randn(B, T, vocab_size)
+        if call_count["n"] > 3:
+            logits[0, -1, :] = -100.0
+            logits[0, -1, 2] = 100.0  # EOS
+
+        # Build 32D state with controlled Vritti at [17:22]
+        state = torch.zeros(B, 32)
+        vritti_tensor = torch.tensor(vritti_values, dtype=torch.float32)
+        state[0, 17:22] = vritti_tensor
+
+        return {
+            'logits': logits,
+            'state': state,
+            'delta_S': torch.zeros(B, 32),
+            'delta_bhava': torch.zeros(B, 12),
+            'intent_phase': torch.zeros(B, 32),
+            'adapter_gate': 0.12,
+        }
+
+    model.side_effect = mock_forward
+    model.__call__ = mock_forward
+    return model, tokenizer
+
+
+def _make_vritti_adapter(vritti_values, temperature=0.7, enable_gate=True):
+    """Create a MistralCGAdapter with mock model and controlled Vritti state."""
+    torch = pytest.importorskip("torch", reason="torch required for Vritti gate tests")
+    mock_model, mock_tokenizer = _make_mock_mistral_cg_with_vritti(vritti_values)
+
+    with patch(
+        "agentic.agentic_framework.llm_adapters.MistralCGAdapter.__init__",
+        lambda self, **kw: None,
+    ):
+        adapter = MistralCGAdapter.__new__(MistralCGAdapter)
+
+    adapter._torch = torch
+    adapter.model = mock_model
+    adapter.tokenizer = mock_tokenizer
+    adapter.max_new_tokens = 5
+    adapter.temperature = temperature
+    adapter.top_p = 1.0
+    adapter.top_k = 0
+    adapter.repetition_penalty = 1.0
+    adapter.enable_vritti_gate = enable_gate
+    adapter.last_cg_metadata = {}
+    adapter.call_history = []
+    return adapter
+
+
+class TestVrittiSamplingGate:
+    """
+    Validation tests for the Vritti sampling gate (V-1 through V-7).
+    Reference: docs/specs/VRITTI_SAMPLING_GATE_SPEC.md
+    """
+
+    # V-1: Bounded temperature effect
+    def test_v1_effective_temperature_bounded(self):
+        """V-1: effective_temperature is always in [min(0.5, base), base]."""
+        # High ERROR state: Vritti = [0.1, 0.7, 0.1, 0.05, 0.05]
+        adapter = _make_vritti_adapter([0.1, 0.7, 0.1, 0.05, 0.05], temperature=0.7)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        for ev in events:
+            assert ev['effective_temperature'] <= ev['base_temperature']
+            assert ev['effective_temperature'] >= min(0.5, ev['base_temperature'])
+
+    # V-2: No-op on untrained state (uniform softmax)
+    def test_v2_noop_on_uniform_vritti(self):
+        """V-2: Gate does not fire on uniform Vritti (simulates untrained state)."""
+        # Uniform: [0.2, 0.2, 0.2, 0.2, 0.2] -> error_risk = 0.2 + 0.06 = 0.26 < 0.5
+        adapter = _make_vritti_adapter([0.2, 0.2, 0.2, 0.2, 0.2], temperature=0.7)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        assert len(events) == 0, f"Gate should not fire on uniform Vritti, got {len(events)} events"
+
+    # V-3: Gate fires on high-error states
+    def test_v3_fires_on_high_error(self):
+        """V-3: Gate fires when ERROR dominates."""
+        # ERROR-dominant: [0.05, 0.7, 0.1, 0.1, 0.05]
+        # error_risk = 0.7 + 0.3*0.1 = 0.73 > 0.5
+        adapter = _make_vritti_adapter([0.05, 0.7, 0.1, 0.1, 0.05], temperature=0.7)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        assert len(events) > 0, "Gate should fire on high ERROR state"
+        for ev in events:
+            assert ev['action'] == 'cool'
+            assert ev['effective_temperature'] == 0.5
+
+    # V-4: Trace completeness
+    def test_v4_trace_completeness(self):
+        """V-4: Gate events have all required fields."""
+        adapter = _make_vritti_adapter([0.05, 0.8, 0.05, 0.05, 0.05], temperature=0.7)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        assert len(events) > 0
+        required_fields = {'step', 'error_risk', 'action', 'base_temperature', 'effective_temperature'}
+        for ev in events:
+            assert required_fields.issubset(ev.keys()), f"Missing fields: {required_fields - ev.keys()}"
+            assert isinstance(ev['step'], int)
+            assert isinstance(ev['error_risk'], float)
+            assert ev['action'] == 'cool'
+
+    def test_v4_vritti_gate_events_key_always_present(self):
+        """V-4b: vritti_gate_events key is always in metadata, even when gate is off."""
+        adapter = _make_vritti_adapter([0.8, 0.05, 0.05, 0.05, 0.05], temperature=0.7)
+        adapter.call("test")
+        assert 'vritti_gate_events' in adapter.last_cg_metadata
+        assert adapter.last_cg_metadata['vritti_gate_events'] == []
+
+    # V-5: No generation degeneration (basic: response is non-empty)
+    def test_v5_no_degenerate_output(self):
+        """V-5: Generation completes and returns non-empty string with gate on."""
+        adapter = _make_vritti_adapter([0.05, 0.7, 0.1, 0.1, 0.05], temperature=0.7)
+        response = adapter.call("test")
+        assert isinstance(response, str)
+        assert len(response) > 0
+
+    # V-6: Greedy mode bypass
+    def test_v6_greedy_bypass(self):
+        """V-6: Gate is entirely skipped when temperature=0."""
+        adapter = _make_vritti_adapter([0.05, 0.9, 0.05, 0.0, 0.0], temperature=0.0)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        assert len(events) == 0, "Gate must not fire in greedy mode (temperature=0)"
+
+    # V-7: Low-temperature no-op
+    def test_v7_low_temperature_no_raise(self):
+        """V-7: When temperature < 0.5, gate does not raise temperature to 0.5."""
+        # temperature=0.3, gate should cool to min(0.3, 0.5) = 0.3 (no change)
+        adapter = _make_vritti_adapter([0.05, 0.8, 0.1, 0.025, 0.025], temperature=0.3)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        for ev in events:
+            assert ev['effective_temperature'] <= 0.3, (
+                f"Gate must not raise temp above base 0.3, got {ev['effective_temperature']}"
+            )
+
+    # Additional: gate disabled by default
+    def test_gate_disabled_by_default(self):
+        """Gate is off by default — no events even with high-error state."""
+        adapter = _make_vritti_adapter([0.05, 0.9, 0.05, 0.0, 0.0],
+                                       temperature=0.7, enable_gate=False)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        assert len(events) == 0
+
+    # Additional: FACT-dominant state does not fire
+    def test_fact_dominant_no_fire(self):
+        """FACT-dominant Vritti does not trigger the gate."""
+        adapter = _make_vritti_adapter([0.7, 0.05, 0.1, 0.1, 0.05], temperature=0.7)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        assert len(events) == 0
+
+    # Additional: threshold boundary
+    def test_boundary_just_below_threshold(self):
+        """error_risk = 0.49 (just below 0.5) does not fire."""
+        # vritti[1]=0.4, vritti[2]=0.3 -> error_risk = 0.4 + 0.09 = 0.49
+        adapter = _make_vritti_adapter([0.1, 0.4, 0.3, 0.1, 0.1], temperature=0.7)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        assert len(events) == 0
+
+    def test_boundary_just_above_threshold(self):
+        """error_risk = 0.51 (just above 0.5) fires."""
+        # vritti[1]=0.45, vritti[2]=0.2 -> error_risk = 0.45 + 0.06 = 0.51
+        adapter = _make_vritti_adapter([0.1, 0.45, 0.2, 0.15, 0.1], temperature=0.7)
+        adapter.call("test")
+        events = adapter.last_cg_metadata['vritti_gate_events']
+        assert len(events) > 0

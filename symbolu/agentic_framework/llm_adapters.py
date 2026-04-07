@@ -325,6 +325,7 @@ class MistralCGAdapter(BaseLLMAdapter):
         trust_remote_code: bool = False,
         pretrained_model: Optional[Any] = None,
         pretrained_tokenizer: Optional[Any] = None,
+        enable_vritti_gate: bool = False,
         **kwargs: Any,
     ):
         """
@@ -342,6 +343,9 @@ class MistralCGAdapter(BaseLLMAdapter):
             trust_remote_code: Trust remote code in model hub
             pretrained_model: Pre-loaded nn.Module (skips loading)
             pretrained_tokenizer: Pre-loaded tokenizer (skips loading)
+            enable_vritti_gate: Enable Vritti-based temperature gate (experimental,
+                off by default). When enabled, cools sampling temperature when the
+                Vritti ERROR signal is high. Temperature-only, no logit modification.
             **kwargs: Additional kwargs for MistralCGWrapper
         """
         self.max_new_tokens = max_new_tokens
@@ -349,6 +353,7 @@ class MistralCGAdapter(BaseLLMAdapter):
         self.top_p = top_p
         self.top_k = top_k
         self.repetition_penalty = repetition_penalty
+        self.enable_vritti_gate = enable_vritti_gate
 
         # CG metadata from most recent call — consumed by sovereign_bridge
         self.last_cg_metadata: Dict[str, Any] = {}
@@ -437,13 +442,14 @@ class MistralCGAdapter(BaseLLMAdapter):
             'delta_bhava': cg_outputs.get('delta_bhava'),
             'intent_phase': cg_outputs.get('intent_phase'),
             'adapter_gate': cg_outputs.get('adapter_gate'),
+            'vritti_gate_events': [],
         }
 
         # Autoregressive generation
         generated_ids = input_ids.clone()
         past_mask = attention_mask
 
-        for _ in range(self.max_new_tokens):
+        for _step in range(self.max_new_tokens):
             with torch.no_grad():
                 outputs = self.model(
                     input_ids=generated_ids,
@@ -460,9 +466,28 @@ class MistralCGAdapter(BaseLLMAdapter):
                     else:
                         next_token_logits[0, token_id] *= self.repetition_penalty
 
+            # Vritti gate: temperature modulation only, no logit modification.
+            # Reads the 5D Vritti slice [17:22] from the already-computed 32D
+            # Sovereign State. Cools temperature when ERROR signal is high.
+            effective_temperature = self.temperature
+            if self.enable_vritti_gate and self.temperature > 0:
+                state = outputs.get('state')
+                if state is not None:
+                    vritti = state[0, 17:22]  # [5] softmax-normalized
+                    error_risk = (vritti[1] + 0.3 * vritti[2]).clamp(0.0, 1.0).item()
+                    if error_risk > 0.5:
+                        effective_temperature = min(self.temperature, 0.5)
+                        self.last_cg_metadata['vritti_gate_events'].append({
+                            'step': _step,
+                            'error_risk': error_risk,
+                            'action': 'cool',
+                            'base_temperature': self.temperature,
+                            'effective_temperature': effective_temperature,
+                        })
+
             # Apply temperature
-            if self.temperature > 0:
-                next_token_logits = next_token_logits / self.temperature
+            if effective_temperature > 0:
+                next_token_logits = next_token_logits / effective_temperature
 
                 # Top-k filtering
                 if self.top_k > 0:
