@@ -1513,6 +1513,134 @@ class TestOntologyVrittiPrior:
         assert with_prior["smrti"] > 0.0
 
 
+class TestP1Calibration:
+    """Calibration assertions for the Phase 1 ontology-vritti prior.
+
+    These tests encode the findings from the P1 calibration evaluation
+    (examples/p1_calibration_eval.py) as reproducible assertions.
+    """
+
+    CALIBRATION_SCENARIOS = [
+        # (name, quality, coherence, goal_alignment, overall_confidence)
+        ("analytical_high", 0.9, 0.9, 0.8, 0.85),
+        ("low_quality", 0.2, 0.2, 0.3, 0.3),
+        ("agency_dominant", 0.5, 0.5, 0.9, 0.7),
+        ("pure_reasoning", 0.95, 0.95, 0.5, 0.9),
+        ("dormant_low", 0.1, 0.1, 0.1, 0.1),
+        ("purpose_execution", 0.5, 0.5, 0.9, 0.7),
+        ("balanced_mid", 0.5, 0.5, 0.5, 0.5),
+        ("extreme_quality", 1.0, 1.0, 1.0, 1.0),
+        ("extreme_low", 0.0, 0.0, 0.0, 0.0),
+    ]
+
+    def _eval_scenario(self, quality, coherence, goal_alignment, overall_confidence):
+        from agentic.agentic_framework.jepa_governance import (
+            approximate_layer_weights, approximate_vritti,
+            build_ontology_signal, build_vritti_signal, build_jepa_composite,
+        )
+        lw = approximate_layer_weights(
+            quality=quality, coherence=coherence,
+            goal_alignment=goal_alignment, overall_confidence=overall_confidence,
+        )
+        base = approximate_vritti(
+            quality=quality, coherence=coherence,
+            overall_confidence=overall_confidence,
+        )
+        with_prior = approximate_vritti(
+            quality=quality, coherence=coherence,
+            overall_confidence=overall_confidence, layer_weights=lw,
+        )
+        ontology = build_ontology_signal(layer_weights=lw)
+        j_base = build_jepa_composite(ontology, build_vritti_signal(vritti_distribution=base))
+        j_prior = build_jepa_composite(ontology, build_vritti_signal(vritti_distribution=with_prior))
+        return base, with_prior, j_base, j_prior
+
+    def test_no_top1_churn_across_scenarios(self):
+        """At alpha=0.2, top-1 vritti must not change for any calibration scenario."""
+        for name, q, c, ga, oc in self.CALIBRATION_SCENARIOS:
+            base, with_prior, _, _ = self._eval_scenario(q, c, ga, oc)
+            base_top1 = max(base, key=base.get)
+            prior_top1 = max(with_prior, key=with_prior.get)
+            assert base_top1 == prior_top1, (
+                f"Top-1 flipped in {name}: {base_top1} → {prior_top1}"
+            )
+
+    def test_alignment_nonnegative_on_average(self):
+        """Average alignment delta across scenarios must be non-negative."""
+        deltas = []
+        for name, q, c, ga, oc in self.CALIBRATION_SCENARIOS:
+            _, _, j_base, j_prior = self._eval_scenario(q, c, ga, oc)
+            deltas.append(j_prior.ontology_vritti_alignment - j_base.ontology_vritti_alignment)
+        avg = sum(deltas) / len(deltas)
+        assert avg >= 0.0, f"Average alignment delta is negative: {avg}"
+
+    def test_alignment_mostly_improves(self):
+        """Alignment must improve in at least 70% of scenarios."""
+        improved = 0
+        for name, q, c, ga, oc in self.CALIBRATION_SCENARIOS:
+            _, _, j_base, j_prior = self._eval_scenario(q, c, ga, oc)
+            if j_prior.ontology_vritti_alignment > j_base.ontology_vritti_alignment + 0.0001:
+                improved += 1
+        pct = improved / len(self.CALIBRATION_SCENARIOS)
+        assert pct >= 0.70, f"Only {pct:.0%} of scenarios improved"
+
+    def test_normalization_and_nonnegativity(self):
+        """All prior-adjusted distributions must be normalized and non-negative."""
+        for name, q, c, ga, oc in self.CALIBRATION_SCENARIOS:
+            _, with_prior, _, _ = self._eval_scenario(q, c, ga, oc)
+            assert abs(sum(with_prior.values()) - 1.0) < 0.001, (
+                f"Not normalized in {name}: sum={sum(with_prior.values())}"
+            )
+            assert all(v >= 0 for v in with_prior.values()), (
+                f"Negative value in {name}: {with_prior}"
+            )
+
+    def test_no_regime_changes(self):
+        """Prior must not change governance regime for any calibration scenario."""
+        from agentic.agentic_framework.jepa_governance import (
+            build_runtime_process_state, assess_governance,
+        )
+        for name, q, c, ga, oc in self.CALIBRATION_SCENARIOS:
+            _, _, j_base, j_prior = self._eval_scenario(q, c, ga, oc)
+            runtime = build_runtime_process_state(
+                action_type="search", tool_name="search",
+                risk_level="READ_ONLY", confidence_score=oc,
+            )
+            regime_base = assess_governance(j_base, runtime).regime
+            regime_prior = assess_governance(j_prior, runtime).regime
+            assert regime_base == regime_prior, (
+                f"Regime changed in {name}: {regime_base} → {regime_prior}"
+            )
+
+    def test_smrti_activation_useful(self):
+        """Smrti should activate in purpose/execution-heavy scenarios."""
+        from agentic.agentic_framework.jepa_governance import (
+            approximate_layer_weights, approximate_vritti,
+        )
+        # Purpose/execution context should produce non-zero smrti
+        lw = approximate_layer_weights(
+            quality=0.5, coherence=0.5,
+            goal_alignment=0.9, overall_confidence=0.7,
+        )
+        with_prior = approximate_vritti(
+            quality=0.5, coherence=0.5, overall_confidence=0.7,
+            layer_weights=lw,
+        )
+        assert with_prior["smrti"] > 0.02, (
+            f"Smrti too low in purpose/execution context: {with_prior['smrti']}"
+        )
+
+    def test_bounded_shift_per_mode(self):
+        """No single vritti mode should shift by more than alpha + tolerance."""
+        for name, q, c, ga, oc in self.CALIBRATION_SCENARIOS:
+            base, with_prior, _, _ = self._eval_scenario(q, c, ga, oc)
+            for k in base:
+                delta = abs(with_prior[k] - base[k])
+                assert delta <= 0.22, (
+                    f"Excessive shift in {name}/{k}: {delta:.4f}"
+                )
+
+
 # =============================================================================
 # Test: MCP Gateway integration
 # =============================================================================
