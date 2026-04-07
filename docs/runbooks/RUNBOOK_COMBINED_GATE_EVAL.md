@@ -69,53 +69,71 @@ python scripts/eval_combined_gates.py \
 
 ## Output Artifacts
 
-The script produces three files in the output directory:
+The script produces four files in the output directory:
 
 | File | Format | Contents |
 |------|--------|----------|
-| `results.json` | JSON | Machine-readable full results (all events, states, outputs) |
-| `EVAL_SUMMARY.md` | Markdown | Firing rates, per-category breakdown, gate interaction, over-cooling check |
-| `prompt_comparison.md` | Markdown | Side-by-side output text for each prompt across all 4 modes |
+| `summary.json` | JSON | Top-level aggregates: per-mode firing rates, per-category stats, environment info |
+| `per_prompt_results.jsonl` | JSONL | One line per prompt-mode pair: output text, lengths, firing counts, rates |
+| `gate_events_sample.json` | JSON | Full gate event lists only for prompts where gates actually fired |
+| `combined_gate_report.md` | Markdown | Structured around 5 decision questions + decision tree + output samples |
 
 ## What to Copy Back to GitHub
 
-After the run completes, copy these artifacts to the repo:
+After the run completes, copy these four artifacts to the repo:
 
 ```bash
-# Copy results into the repo
-cp -r /workspace/eval_results/combined_gates \
-    /workspace/symbolu/docs/evaluations/combined_gate_eval_YYYYMMDD/
-
-# Commit and push
 cd /workspace/symbolu
+mkdir -p docs/evaluations/combined_gate_eval_YYYYMMDD
+cp /workspace/eval_results/combined_gates/summary.json \
+   /workspace/eval_results/combined_gates/per_prompt_results.jsonl \
+   /workspace/eval_results/combined_gates/gate_events_sample.json \
+   /workspace/eval_results/combined_gates/combined_gate_report.md \
+   docs/evaluations/combined_gate_eval_YYYYMMDD/
+
 git add docs/evaluations/combined_gate_eval_YYYYMMDD/
 git commit -m "Add combined gate evaluation results (YYYY-MM-DD RunPod run)"
 git push -u origin claude/audit-cg-signal-aggregation-HltyO
 ```
 
-## What to Look For
+## Post-Run: 5 Questions to Answer
 
-### Good signs
-- Gates fire on error-prone / high-agency prompts but NOT on factual / memory
-- Vritti and Guna fire on different prompts (complementary, not redundant)
-- Output quality improves on error-prone prompts with gates on
-- Output length / diversity is preserved on factual / creative prompts
+The `combined_gate_report.md` is structured around these questions. Review
+the data and fill in the verdict fields.
 
-### Bad signs
-- Gates fire on > 30% of all steps (over-cooling)
-- Gates fire on factual or creative prompts (false positives)
-- Both gates always fire together (redundant)
-- Output becomes repetitive or degenerate with gates on
-- Guna turbulence values are always near 0 or always near 1 (uninformative)
+### Q1: Are the gates alive?
+Check `summary.json` → `per_mode`. If either gate fires on < 5% of prompts,
+it is not yet useful. If > 50%, it is miscalibrated.
 
-### Decision guide
-After reviewing results, check one box in the EVAL_SUMMARY.md recommendation section:
-- **Keep both experimental** — if gates fire selectively and improve error-prone cases
-- **Keep Vritti only** — if Guna adds noise or is redundant
-- **Keep Guna only** — if Vritti is too aggressive or Guna is more selective
-- **Revise thresholds** — if gate logic is sound but fires too much / too little
-- **Disable** — if checkpoint quality is too low for gates to add value
-- **Insufficient quality** — if the 32D state is near-random (untrained projector)
+### Q2: Does either gate help more than it harms?
+Compare output quality across 4 modes per category. Look for: reduced bad
+outputs on error-prone, no flattening on factual/speculative, no unnecessary
+cooling on normal prompts.
+
+### Q3: Do the two gates compose safely?
+Check overlap rate in mode D. If both fire on the same prompts and output
+gets shorter/flatter/repetitive, combined mode over-cools.
+
+### Q4: Which gate carries value?
+Compare B vs C. One may fire correctly while the other is noisy or dormant.
+
+### Q5: Agentic integration?
+Almost certainly "not yet." Only consider if gate events are stable and
+correlate with meaningful runtime differences.
+
+## Decision Tree
+
+After answering the 5 questions, choose exactly one outcome in the report:
+
+| Outcome | Criteria | Action |
+|---------|----------|--------|
+| **A** Strong success | Gates fire selectively, error-prone improves, normal preserved | Keep both experimental, write calibration report |
+| **B** One good, one weak | One gate helps, the other fires wrong or not at all | Keep the useful gate, disable the weak one |
+| **C** Combined over-cools | Both fire together, output flattens | Keep gates mutually exclusive, do not combine |
+| **D** No value | Little behavioral difference, no quality gain | Keep experimental only, stop inference promotion |
+
+Then choose exactly one follow-up action: keep as-is, threshold tweak,
+combined-gate cap, or disable one gate.
 
 ## Troubleshooting
 

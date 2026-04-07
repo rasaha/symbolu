@@ -401,164 +401,344 @@ def run_evaluation(checkpoint_path: str, output_dir: str, quantize: str = "4bit"
         del adapter
         torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
-    # Save results
-    run_info.results = [asdict(r) for r in all_results]
+    # ---- Artifact 1: summary.json ----
+    summary_data = build_summary_json(all_results, run_info)
+    with open(out / "summary.json", "w") as f:
+        json.dump(summary_data, f, indent=2, default=str)
+    print(f"\n  Saved: {out / 'summary.json'}")
 
-    json_path = out / "results.json"
-    with open(json_path, "w") as f:
-        json.dump(asdict(run_info), f, indent=2, default=str)
-    print(f"\n  Saved: {json_path}")
+    # ---- Artifact 2: per_prompt_results.jsonl ----
+    with open(out / "per_prompt_results.jsonl", "w") as f:
+        for r in all_results:
+            row = asdict(r)
+            # Drop bulky gate event lists (they go in artifact 3)
+            row.pop("vritti_gate_events", None)
+            row.pop("guna_gate_events", None)
+            # Drop full state snapshot from per-line output
+            row.pop("state_snapshot", None)
+            f.write(json.dumps(row, default=str) + "\n")
+    print(f"  Saved: {out / 'per_prompt_results.jsonl'}")
 
-    # Generate summary
-    summary = generate_summary(all_results, run_info)
-    md_path = out / "EVAL_SUMMARY.md"
-    with open(md_path, "w") as f:
-        f.write(summary)
-    print(f"  Saved: {md_path}")
+    # ---- Artifact 3: gate_events_sample.json ----
+    gate_sample = build_gate_events_sample(all_results)
+    with open(out / "gate_events_sample.json", "w") as f:
+        json.dump(gate_sample, f, indent=2, default=str)
+    print(f"  Saved: {out / 'gate_events_sample.json'}")
 
-    # Save per-prompt comparison
-    comparison = generate_comparison(all_results)
-    comp_path = out / "prompt_comparison.md"
-    with open(comp_path, "w") as f:
-        f.write(comparison)
-    print(f"  Saved: {comp_path}")
+    # ---- Artifact 4: combined_gate_report.md ----
+    report = generate_report(all_results, run_info)
+    with open(out / "combined_gate_report.md", "w") as f:
+        f.write(report)
+    print(f"  Saved: {out / 'combined_gate_report.md'}")
 
     print(f"\n  Evaluation complete. Results in {out}/")
+    print(f"  Artifacts: summary.json, per_prompt_results.jsonl, "
+          f"gate_events_sample.json, combined_gate_report.md")
 
 
 # ============================================================================
-# Summary generation
+# Artifact builders
 # ============================================================================
 
-def generate_summary(results: List[PromptResult], run_info: EvalRun) -> str:
-    """Generate markdown summary report."""
-    lines = []
-    lines.append("# Combined Gate Evaluation Summary\n")
-    lines.append(f"**Date:** {run_info.timestamp}")
-    lines.append(f"**Checkpoint:** `{run_info.checkpoint_path}`")
-    lines.append(f"**GPU:** {run_info.gpu_name}")
-    lines.append(f"**Quantize:** {run_info.quantize}")
-    lines.append(f"**Temperature:** {run_info.temperature}")
-    lines.append(f"**Max tokens:** {run_info.max_new_tokens}")
-    lines.append(f"**Prompts:** {run_info.prompt_count}")
-    lines.append("")
+def _mode_stats(results: List[PromptResult], mode_name: str) -> Dict:
+    """Compute aggregate stats for one mode."""
+    mr = [r for r in results if r.mode == mode_name]
+    v_fires = sum(r.vritti_firing_count for r in mr)
+    g_fires = sum(r.guna_firing_count for r in mr)
+    total_steps = sum(r.total_steps for r in mr)
+    prompts_v_fired = sum(1 for r in mr if r.vritti_firing_count > 0)
+    prompts_g_fired = sum(1 for r in mr if r.guna_firing_count > 0)
+    prompts_both = sum(1 for r in mr
+                       if r.vritti_firing_count > 0 and r.guna_firing_count > 0)
+    v_risks = [r.max_error_risk for r in mr if r.max_error_risk > 0]
+    g_turbs = [r.max_turbulence for r in mr if r.max_turbulence > 0]
+    avg_outlen = sum(r.output_length for r in mr) / len(mr) if mr else 0
+    return {
+        "mode": mode_name,
+        "prompts": len(mr),
+        "vritti_total_fires": v_fires,
+        "guna_total_fires": g_fires,
+        "total_steps": total_steps,
+        "vritti_step_rate": round(v_fires / total_steps, 4) if total_steps else 0,
+        "guna_step_rate": round(g_fires / total_steps, 4) if total_steps else 0,
+        "prompts_vritti_fired": prompts_v_fired,
+        "prompts_guna_fired": prompts_g_fired,
+        "prompts_both_fired": prompts_both,
+        "overlap_rate": round(prompts_both / len(mr), 4) if mr else 0,
+        "avg_max_error_risk": round(sum(v_risks) / len(v_risks), 4) if v_risks else 0,
+        "avg_max_turbulence": round(sum(g_turbs) / len(g_turbs), 4) if g_turbs else 0,
+        "avg_output_length": round(avg_outlen, 1),
+    }
 
-    # Per-mode aggregate
-    lines.append("## Firing Rate Summary\n")
-    lines.append("| Mode | Vritti Fires | Guna Fires | Vritti Rate | Guna Rate | Avg ErrRisk | Avg Turb |")
-    lines.append("|------|-------------|-----------|-------------|-----------|-------------|----------|")
 
+def _category_stats(results: List[PromptResult], category: str) -> Dict:
+    """Compute per-category stats across all modes."""
+    cr = [r for r in results if r.category == category]
+    by_mode = {}
     for mode_name in MODES:
-        mode_results = [r for r in results if r.mode == mode_name]
-        v_fires = sum(r.vritti_firing_count for r in mode_results)
-        g_fires = sum(r.guna_firing_count for r in mode_results)
-        total_steps = sum(r.total_steps for r in mode_results)
-        v_rate = v_fires / total_steps if total_steps > 0 else 0
-        g_rate = g_fires / total_steps if total_steps > 0 else 0
+        mr = [r for r in cr if r.mode == mode_name]
+        v = sum(r.vritti_firing_count for r in mr)
+        g = sum(r.guna_firing_count for r in mr)
+        avg_len = sum(r.output_length for r in mr) / len(mr) if mr else 0
+        by_mode[mode_name] = {
+            "vritti_fires": v,
+            "guna_fires": g,
+            "avg_output_length": round(avg_len, 1),
+        }
+    return {"category": category, "prompt_count": len(cr) // len(MODES), "modes": by_mode}
 
-        v_risks = [r.avg_error_risk for r in mode_results if r.avg_error_risk > 0]
-        g_turbs = [r.avg_turbulence for r in mode_results if r.avg_turbulence > 0]
-        avg_risk = sum(v_risks) / len(v_risks) if v_risks else 0
-        avg_turb = sum(g_turbs) / len(g_turbs) if g_turbs else 0
 
-        lines.append(
-            f"| {mode_name} | {v_fires} | {g_fires} | {v_rate:.1%} | {g_rate:.1%} "
-            f"| {avg_risk:.3f} | {avg_turb:.3f} |"
-        )
-
-    # Per-category breakdown
-    lines.append("\n## Per-Category Breakdown\n")
+def build_summary_json(results: List[PromptResult], run_info: EvalRun) -> Dict:
+    """Build summary.json — top-level aggregate for the 5 decision questions."""
     categories = sorted(set(r.category for r in results))
+    return {
+        "environment": {
+            "checkpoint": run_info.checkpoint_path,
+            "timestamp": run_info.timestamp,
+            "torch_version": run_info.torch_version,
+            "cuda": run_info.cuda_available,
+            "gpu": run_info.gpu_name,
+            "quantize": run_info.quantize,
+            "temperature": run_info.temperature,
+            "max_new_tokens": run_info.max_new_tokens,
+        },
+        "counts": {
+            "prompts": run_info.prompt_count,
+            "modes": run_info.mode_count,
+            "total_generations": len(results),
+        },
+        "per_mode": {m: _mode_stats(results, m) for m in MODES},
+        "per_category": {c: _category_stats(results, c) for c in categories},
+    }
 
+
+def build_gate_events_sample(results: List[PromptResult]) -> Dict:
+    """Build gate_events_sample.json — full event lists for prompts that fired."""
+    sample = {}
+    for r in results:
+        if r.vritti_firing_count > 0 or r.guna_firing_count > 0:
+            key = f"{r.prompt_id}__{r.mode}"
+            sample[key] = {
+                "prompt_id": r.prompt_id,
+                "category": r.category,
+                "mode": r.mode,
+                "vritti_gate_events": r.vritti_gate_events,
+                "guna_gate_events": r.guna_gate_events,
+                "state_snapshot_32d": r.state_snapshot,
+            }
+    return sample
+
+
+def generate_report(results: List[PromptResult], run_info: EvalRun) -> str:
+    """Build combined_gate_report.md — structured around the 5 decision questions."""
+    L = []
+
+    # Header
+    L.append("# Combined Gate Evaluation Report\n")
+    L.append(f"**Date:** {run_info.timestamp}  ")
+    L.append(f"**Checkpoint:** `{run_info.checkpoint_path}`  ")
+    L.append(f"**GPU:** {run_info.gpu_name}  ")
+    L.append(f"**Quantize:** {run_info.quantize} | **Temp:** {run_info.temperature} "
+             f"| **Max tokens:** {run_info.max_new_tokens}  ")
+    L.append(f"**Prompts:** {run_info.prompt_count} | **Modes:** {list(MODES.keys())}")
+    L.append("")
+
+    # ------------------------------------------------------------------
+    # Q1: Are the gates alive?
+    # ------------------------------------------------------------------
+    L.append("## Q1: Are the gates actually alive on a real checkpoint?\n")
+    L.append("| Mode | V-Fires | G-Fires | V-Rate | G-Rate | Overlap |")
+    L.append("|------|---------|---------|--------|--------|---------|")
+    for mode_name in MODES:
+        s = _mode_stats(results, mode_name)
+        L.append(
+            f"| {mode_name} | {s['vritti_total_fires']} | {s['guna_total_fires']} "
+            f"| {s['vritti_step_rate']:.1%} | {s['guna_step_rate']:.1%} "
+            f"| {s['overlap_rate']:.0%} |"
+        )
+    L.append("")
+
+    # Per-category firing in modes B, C, D
+    categories = sorted(set(r.category for r in results))
+    L.append("**Per-category firing (mode D — both gates):**\n")
+    both = [r for r in results if r.mode == "D_both_gates"]
     for cat in categories:
-        lines.append(f"\n### {cat}\n")
-        lines.append("| Prompt | Mode | V-Fire | G-Fire | OutLen | ErrRisk | Turb |")
-        lines.append("|--------|------|--------|--------|--------|---------|------|")
-        cat_results = [r for r in results if r.category == cat]
-        for r in cat_results:
-            lines.append(
-                f"| {r.prompt_id} | {r.mode} | {r.vritti_firing_count} | "
-                f"{r.guna_firing_count} | {r.output_length} | "
-                f"{r.max_error_risk:.3f} | {r.max_turbulence:.3f} |"
-            )
+        cat_r = [r for r in both if r.category == cat]
+        v_fired = sum(1 for r in cat_r if r.vritti_firing_count > 0)
+        g_fired = sum(1 for r in cat_r if r.guna_firing_count > 0)
+        L.append(f"- **{cat}** ({len(cat_r)} prompts): "
+                 f"Vritti fired {v_fired}, Guna fired {g_fired}")
+    L.append("")
 
-    # Gate interaction (mode D only)
-    lines.append("\n## Gate Interaction (Both Gates Mode)\n")
+    # Alive verdict placeholder
+    L.append("**Verdict:** _[Fill after review: alive / mostly dead / miscalibrated]_\n")
+
+    # ------------------------------------------------------------------
+    # Q2: Does either gate help more than it harms?
+    # ------------------------------------------------------------------
+    L.append("## Q2: Does either gate help more than it harms?\n")
+    L.append("### Output length by mode and category\n")
+    L.append("| Category | Baseline | Vritti | Guna | Both |")
+    L.append("|----------|----------|--------|------|------|")
+    for cat in categories:
+        lens = {}
+        for mode_name in MODES:
+            mr = [r for r in results if r.category == cat and r.mode == mode_name]
+            lens[mode_name] = round(sum(r.output_length for r in mr) / len(mr), 0) if mr else 0
+        L.append(
+            f"| {cat} | {lens['A_baseline']:.0f} | {lens['B_vritti_only']:.0f} "
+            f"| {lens['C_guna_only']:.0f} | {lens['D_both_gates']:.0f} |"
+        )
+    L.append("")
+
+    # Over-cooling check
+    L.append("### Over-cooling check\n")
+    for cat in ["factual", "speculative", "memory"]:
+        cat_d = [r for r in both if r.category == cat]
+        fired = [r for r in cat_d if r.vritti_firing_count > 0 or r.guna_firing_count > 0]
+        if fired:
+            L.append(f"- WARNING: Gate fired on {len(fired)}/{len(cat_d)} **{cat}** prompts")
+            for r in fired:
+                L.append(f"  - `{r.prompt_id}`: V={r.vritti_firing_count}, G={r.guna_firing_count}")
+        else:
+            L.append(f"- OK: No firing on **{cat}** ({len(cat_d)} prompts)")
+    L.append("")
+
+    # Error-prone improvement check
+    L.append("### Error-prone prompts — did gates help?\n")
+    L.append("| Prompt | Baseline len | Vritti len | Guna len | Both len | V-fire | G-fire |")
+    L.append("|--------|-------------|-----------|---------|---------|--------|--------|")
+    for pid in [p["id"] for p in PROMPTS if p["category"] == "error-prone"]:
+        row = {}
+        for r in results:
+            if r.prompt_id == pid:
+                row[r.mode] = r
+        if row:
+            rb = row.get("A_baseline")
+            rv = row.get("B_vritti_only")
+            rg = row.get("C_guna_only")
+            rd = row.get("D_both_gates")
+            L.append(
+                f"| {pid} | {rb.output_length if rb else '?'} "
+                f"| {rv.output_length if rv else '?'} "
+                f"| {rg.output_length if rg else '?'} "
+                f"| {rd.output_length if rd else '?'} "
+                f"| {rv.vritti_firing_count if rv else '?'} "
+                f"| {rg.guna_firing_count if rg else '?'} |"
+            )
+    L.append("")
+    L.append("**Verdict:** _[Fill: helped / harmed / neutral]_\n")
+
+    # ------------------------------------------------------------------
+    # Q3: Do the two gates compose safely?
+    # ------------------------------------------------------------------
+    L.append("## Q3: Do the two gates compose safely?\n")
     both_results = [r for r in results if r.mode == "D_both_gates"]
     both_v = sum(1 for r in both_results if r.vritti_firing_count > 0)
     both_g = sum(1 for r in both_results if r.guna_firing_count > 0)
     both_overlap = sum(1 for r in both_results
                        if r.vritti_firing_count > 0 and r.guna_firing_count > 0)
-    lines.append(f"- Prompts where Vritti fired: {both_v}/{len(both_results)}")
-    lines.append(f"- Prompts where Guna fired: {both_g}/{len(both_results)}")
-    lines.append(f"- Prompts where BOTH fired: {both_overlap}/{len(both_results)}")
+    L.append(f"- Prompts where Vritti fired: **{both_v}/{len(both_results)}**")
+    L.append(f"- Prompts where Guna fired: **{both_g}/{len(both_results)}**")
+    L.append(f"- Prompts where BOTH fired: **{both_overlap}/{len(both_results)}**")
     if both_overlap > 0:
-        lines.append(f"- Overlap rate: {both_overlap / len(both_results):.0%}")
-    lines.append("")
+        L.append(f"- Overlap rate: **{both_overlap / len(both_results):.0%}**")
+    L.append("")
 
-    # Over-cooling check
-    lines.append("## Over-Cooling Assessment\n")
-    for cat in ["factual", "speculative", "memory"]:
-        cat_d = [r for r in both_results if r.category == cat]
-        fired = [r for r in cat_d if r.vritti_firing_count > 0 or r.guna_firing_count > 0]
-        if fired:
-            lines.append(f"- WARNING: Gate fired on {len(fired)}/{len(cat_d)} {cat} prompts")
-            for r in fired:
-                lines.append(f"  - `{r.prompt_id}`: V={r.vritti_firing_count}, G={r.guna_firing_count}")
-        else:
-            lines.append(f"- OK: No gate firing on {cat} prompts ({len(cat_d)} tested)")
+    # Compare baseline vs both output lengths
+    L.append("### Output length delta (Both vs Baseline)\n")
+    L.append("| Prompt | Baseline | Both | Delta | Both fired? |")
+    L.append("|--------|----------|------|-------|-------------|")
+    for pid in [p["id"] for p in PROMPTS]:
+        base = next((r for r in results if r.prompt_id == pid and r.mode == "A_baseline"), None)
+        combo = next((r for r in results if r.prompt_id == pid and r.mode == "D_both_gates"), None)
+        if base and combo:
+            delta = combo.output_length - base.output_length
+            fired = "V+G" if (combo.vritti_firing_count > 0 and combo.guna_firing_count > 0) \
+                else "V" if combo.vritti_firing_count > 0 \
+                else "G" if combo.guna_firing_count > 0 else "-"
+            L.append(f"| {pid} | {base.output_length} | {combo.output_length} "
+                     f"| {delta:+d} | {fired} |")
+    L.append("")
+    L.append("**Verdict:** _[Fill: safe / over-cools / acceptable]_\n")
 
-    # Output length comparison
-    lines.append("\n## Output Length Comparison\n")
-    lines.append("| Prompt | Baseline | Vritti | Guna | Both |")
-    lines.append("|--------|----------|--------|------|------|")
-    prompt_ids = [p["id"] for p in PROMPTS]
-    for pid in prompt_ids:
-        lens = {}
-        for r in results:
-            if r.prompt_id == pid:
-                lens[r.mode] = r.output_length
-        lines.append(
-            f"| {pid} | {lens.get('A_baseline', '?')} | {lens.get('B_vritti_only', '?')} "
-            f"| {lens.get('C_guna_only', '?')} | {lens.get('D_both_gates', '?')} |"
-        )
+    # ------------------------------------------------------------------
+    # Q4: Which gate is carrying value?
+    # ------------------------------------------------------------------
+    L.append("## Q4: Which gate is actually carrying value?\n")
+    L.append("Compare B (Vritti-only) vs C (Guna-only):\n")
+    sv = _mode_stats(results, "B_vritti_only")
+    sg = _mode_stats(results, "C_guna_only")
+    L.append(f"- Vritti fires on **{sv['prompts_vritti_fired']}/{sv['prompts']}** prompts, "
+             f"avg error_risk when firing: **{sv['avg_max_error_risk']:.3f}**")
+    L.append(f"- Guna fires on **{sg['prompts_guna_fired']}/{sg['prompts']}** prompts, "
+             f"avg turbulence when firing: **{sg['avg_max_turbulence']:.3f}**")
+    L.append("")
+    L.append("Possible outcomes:")
+    L.append("- [ ] Vritti helps, Guna weak")
+    L.append("- [ ] Guna helps, Vritti weak")
+    L.append("- [ ] Both help independently")
+    L.append("- [ ] Both mostly redundant")
+    L.append("- [ ] Neither helps enough")
+    L.append("")
+    L.append("**Verdict:** _[Fill after reviewing per-prompt outputs]_\n")
 
-    # Placeholder for recommendation
-    lines.append("\n## Recommendation\n")
-    lines.append("_Fill in after reviewing results:_\n")
-    lines.append("- [ ] Keep both experimental and continue")
-    lines.append("- [ ] Keep Vritti only")
-    lines.append("- [ ] Keep Guna only")
-    lines.append("- [ ] Keep both but revise thresholds")
-    lines.append("- [ ] Disable one or both")
-    lines.append("- [ ] Not enough checkpoint quality to judge")
-    lines.append("")
+    # ------------------------------------------------------------------
+    # Q5: Agentic integration?
+    # ------------------------------------------------------------------
+    L.append("## Q5: Is any agentic-framework integration justified?\n")
+    L.append("Criteria (all must be true):")
+    L.append("- [ ] Gate events are stable (no random firing)")
+    L.append("- [ ] They add real interpretive value (not cosmetic)")
+    L.append("- [ ] They correlate with meaningful runtime differences")
+    L.append("")
+    L.append("**Verdict:** _[Fill: yes / not yet / no]_\n")
 
-    return "\n".join(lines)
+    # ------------------------------------------------------------------
+    # Decision
+    # ------------------------------------------------------------------
+    L.append("## Decision\n")
+    L.append("Choose exactly one:\n")
+    L.append("- [ ] **A — Strong success:** Keep both experimental. "
+             "Write calibration report. Do not enable by default.")
+    L.append("- [ ] **B — One gate good, one weak:** Keep the useful gate. "
+             "Disable or leave the weak gate dormant.")
+    L.append("- [ ] **C — Combined over-cools:** Keep gates mutually exclusive "
+             "or sequentially bounded. Do not run both together by default.")
+    L.append("- [ ] **D — No meaningful value:** Keep experimental only. "
+             "Stop inference promotion. Focus on training-side calibration.")
+    L.append("")
+    L.append("## Rationale\n")
+    L.append("_2-5 sentences referencing specific prompt results and firing patterns._\n")
+    L.append("")
+    L.append("## Single Follow-Up Action\n")
+    L.append("Choose exactly one:\n")
+    L.append("- [ ] Keep as-is")
+    L.append("- [ ] Threshold tweak (specify which gate, what values)")
+    L.append("- [ ] Combined-gate cap design")
+    L.append("- [ ] Disable one gate (specify which)")
+    L.append("")
 
-
-def generate_comparison(results: List[PromptResult]) -> str:
-    """Generate per-prompt side-by-side output comparison."""
-    lines = []
-    lines.append("# Per-Prompt Output Comparison\n")
-
+    # ------------------------------------------------------------------
+    # Per-prompt output samples (truncated)
+    # ------------------------------------------------------------------
+    L.append("---\n")
+    L.append("## Appendix: Per-Prompt Output Samples\n")
     prompt_ids = [p["id"] for p in PROMPTS]
     for pid in prompt_ids:
         prompt_results = [r for r in results if r.prompt_id == pid]
         if not prompt_results:
             continue
-
-        prompt_text = prompt_results[0].prompt
-        lines.append(f"## {pid}\n")
-        lines.append(f"**Prompt:** {prompt_text}\n")
-
+        L.append(f"### {pid} ({prompt_results[0].category})\n")
+        L.append(f"**Prompt:** {prompt_results[0].prompt}\n")
         for r in prompt_results:
-            v_tag = f", V-fires={r.vritti_firing_count}" if r.vritti_firing_count else ""
-            g_tag = f", G-fires={r.guna_firing_count}" if r.guna_firing_count else ""
-            lines.append(f"### {r.mode} ({r.generation_time_s}s{v_tag}{g_tag})\n")
-            lines.append(f"```\n{r.output[:2000]}\n```\n")
+            v_tag = f", V={r.vritti_firing_count}" if r.vritti_firing_count else ""
+            g_tag = f", G={r.guna_firing_count}" if r.guna_firing_count else ""
+            L.append(f"**{r.mode}** ({r.generation_time_s}s, {r.output_length}ch"
+                     f"{v_tag}{g_tag}):")
+            L.append(f"```\n{r.output[:1000]}\n```\n")
 
-    return "\n".join(lines)
+    return "\n".join(L)
 
 
 # ============================================================================
