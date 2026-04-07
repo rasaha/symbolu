@@ -93,6 +93,9 @@ try:
     from symbolu_training.training.conscious_generation.losses.primitive_auxiliary import (
         PrimitiveAuxiliaryLosses,
     )
+    from symbolu_training.training.conscious_generation.losses.ontology_vritti_prior import (
+        OntologyVrittiPrior,
+    )
     from symbolu_training.training.conscious_generation.losses.bliss_coherence import (
         BlissCoherenceLoss,
     )
@@ -777,6 +780,14 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             prim_aux_losses = PrimitiveAuxiliaryLosses()
             model.conscious_gen["primitive_aux_losses"] = prim_aux_losses
 
+        _vritti_prior_lambda = getattr(config, 'lambda_vritti_ontology_prior', 0.0)
+        if _cg_curriculum or _vritti_prior_lambda > 0:
+            ont_vritti_prior = OntologyVrittiPrior(
+                alpha=getattr(config, 'vritti_ontology_prior_alpha', 0.1),
+                tau=getattr(config, 'vritti_ontology_prior_tau', 1.0),
+            )
+            model.conscious_gen["ontology_vritti_prior"] = ont_vritti_prior
+
         if _cg_curriculum or config.lambda_kosha_routing > 0:
             kosha_routing_loss = KoshaRoutingLoss()
             model.conscious_gen["kosha_routing_loss"] = kosha_routing_loss
@@ -801,6 +812,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             _p3_losses.append(f"L_vritti={config.lambda_vritti_token}")
         if config.lambda_guna_token > 0:
             _p3_losses.append(f"L_guna={config.lambda_guna_token}")
+        if _vritti_prior_lambda > 0:
+            _p3_losses.append(f"L_vritti_ont_prior={_vritti_prior_lambda} (α={getattr(config, 'vritti_ontology_prior_alpha', 0.1)})")
         if _p3_losses:
             print(f"    Losses: {', '.join(_p3_losses)}")
         else:

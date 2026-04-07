@@ -1015,6 +1015,14 @@ class UnifiedTrainingConfig:
     lambda_csr_token: float = 0.0                  # CSR token-level resonance loss (see also: enable_csr for spatial path)
     lambda_vritti_token: float = 0.0               # Vritti token-level cognitive mode loss
     lambda_guna_token: float = 0.0                 # Guna token-level energetic loss
+
+    # Ontology → Vritti directional prior (cognitive axis alignment)
+    # Adds a KL regularizer encouraging the learned Vritti context profile
+    # to be consistent with an ontology-derived prior via R[v,a] transpose.
+    # Training-only: no inference-path impact. Set to 0.0 to disable.
+    lambda_vritti_ontology_prior: float = 0.0      # Weight for ontology→vritti KL prior
+    vritti_ontology_prior_alpha: float = 0.1       # Mixing strength of prior (capped at 0.4)
+    vritti_ontology_prior_tau: float = 1.0         # Temperature for prior softmax
     bliss_lambda_B: float = 1.0                    # λ_B temperature for Bliss gate
     kosha_routing_init: str = "uniform"            # "uniform" or "base_dominant"
 
