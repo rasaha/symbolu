@@ -849,6 +849,16 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  CSR Phoneme Grounding: Disabled")
 
+    # Wire CSR affinity into CG token cache so R_tok gets populated
+    if csr_provider is not None and hasattr(model, 'conscious_gen') and 'token_cache' in model.conscious_gen:
+        _cg_cache = model.conscious_gen['token_cache']
+        if hasattr(csr_provider, '_token_affinity_table') and csr_provider._token_affinity_table is not None:
+            _affi_table = csr_provider._token_affinity_table  # (V, 12)
+            _cg_cache._csr_affinity_fn = lambda emb, _t=_affi_table: _t.to(emb.device)
+            print(f"  [Conscious Gen] CSR affinity wired into token cache (R_tok will be populated)")
+        else:
+            print(f"  [Conscious Gen] WARNING: CSR provider has no affinity table — R_tok will stay zeros")
+
     # V9.8.6: Initialize curriculum state variables (will be populated if resuming)
     # These must be defined before curriculum controllers are created
     resumed_csr_curriculum_state = None
@@ -5646,7 +5656,8 @@ def train(config: UnifiedTrainingConfig):
                     _cparams = [p for p in _cmod.parameters() if p.requires_grad]
                     _cnorm = (sum(p.grad.norm().item() ** 2 for p in _cparams if p.grad is not None)) ** 0.5
                     _chas = sum(1 for p in _cparams if p.grad is not None)
-                    _cg_grad_strs.append(f"{_cname}={_cnorm:.4f}({_chas}/{len(_cparams)})")
+                    _cfmt = f"{_cnorm:.2e}" if _cnorm < 0.0001 else f"{_cnorm:.4f}"
+                    _cg_grad_strs.append(f"{_cname}={_cfmt}({_chas}/{len(_cparams)})")
                 if _cg_grad_strs:
                     print(f"  [CG-GRAD] Step {global_step}: {' | '.join(_cg_grad_strs)}")
 
