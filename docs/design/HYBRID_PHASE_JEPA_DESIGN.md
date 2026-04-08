@@ -3294,6 +3294,31 @@ The Phase-VL-JEPA is intentionally designed as the **"Perception Body"** that th
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+#### C.1.1 Governance Integration Note: "JEPA" in Two Contexts
+
+The term **"JEPA"** appears in two distinct subsystems of SymbolU. This note
+clarifies the relationship to prevent confusion.
+
+| Aspect | This Document (Model Architecture) | Governance Subsystem |
+|--------|-------------------------------------|----------------------|
+| **What "JEPA" means** | Joint Embedding Predictive Architecture — a training paradigm that predicts latent state deltas (ΔS) rather than tokens | A composite semantic-cognitive **state layer** that combines ontology (12-layer OLM) and vritti (5-mode cognitive distribution) into a governance signal |
+| **Core output** | Predicted latent representations for the next context window | `JEPACompositeSignal`, `ResidualSignal`, and `GovernanceRegime` (NORMAL / PROCESS_DRIFT / SEMANTIC_SHIFT / DUAL_ANOMALY / UNKNOWN) |
+| **Role** | The "Body" — perception, world-modeling, prediction | Runtime governance — classifying semantic state to inform enforcement decisions |
+| **Key files** | `symbolu/jepa/`, this spec | `agentic/agentic_framework/jepa_governance.py`, `domain_policy.py` |
+
+The governance subsystem adopted "JEPA" terminology because it performs a
+structurally analogous operation: it maintains an expected semantic state
+(the "prediction") and compares it against observed runtime state (the
+"residual"), just as the model-architecture JEPA predicts latent state
+and measures prediction error. However, **the governance JEPA is not a
+trajectory predictor** — it is a declarative state-comparison layer that
+produces regime classifications for the Domain Semantic Policy Layer and
+the core GovernanceService.
+
+See `docs/governance/AGENTIC_ARCHITECTURE.md` §JEPA Composite
+Semantic-Cognitive Signal Layer and §Domain Semantic Policy Layer for
+full governance architecture details.
+
 ### C.2 Why Phase Math is Superior for Geometry
 
 Standard neural networks must learn geometric transformations via expensive matrix operations:

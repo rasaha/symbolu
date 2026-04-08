@@ -1050,15 +1050,10 @@ Each entry includes the **file path** relative to the repository root for locati
 
 > CTM+ (Coherence-Tier Memory Plus) is a next-generation memory tiering controller that delivers **significant cost savings** and **performance improvements** over traditional caching algorithms like LRU and ARC. By intelligently managing memory placement across fast and slow tiers, CTM+ enables organizations to:
 
-### `CTM_plus/Database/CTM_PLUS_DATABASE_BENEFITS.md`
-**How CTM+ Helps Databases**
+### `CTM_plus/KVSimulator/README.md`
+**CTM+ KV Cache Policy Simulator**
 
-> A comprehensive guide to CTM+ (Coherence-Tier Memory Plus) benefits for database buffer pool management.
-
-### `CTM_plus/Database/README.md`
-**CTM+ for Databases**
-
-> Intelligent buffer pool management for database systems using CTM+ (Coherence-Tier Memory Plus).
+> A lightweight simulator that models LLM inference access patterns and evaluates eviction policies. Research tool, not production code.
 
 ### `CTM_plus/DeepSpeed/README.md`
 **CTM+ for DeepSpeed**
@@ -1080,30 +1075,10 @@ Each entry includes the **file path** relative to the repository root for locati
 
 > A smart memory tiering controller that optimizes page placement between fast and slow memory tiers.
 
-### `CTM_plus/vLLM/CTM_PLUS_ENTERPRISE_BENCHMARK_RESULTS.md`
-**CTM+ Enterprise Benchmark Results**
+### `CTM_plus/KVPolicy/README.md`
+**CTM+ KV Cache Eviction Policy**
 
-> This document presents benchmark results comparing CTM+ against **realistic industry baselines**, not just LRU. The goal is to answer: *"Is CTM+ differentiated enough from what big LLM orgs already do internally?"*
-
-### `CTM_plus/vLLM/CTM_PLUS_KV_CACHE_BENCHMARK_RESULTS.md`
-**CTM+ KV Cache Benchmark Results**
-
-> This document presents comprehensive benchmark results comparing CTM+ (Coherence-Tier Memory Plus) against traditional cache eviction policies for KV (Key-Value) cache management in Large Language Model inference workloads.
-
-### `CTM_plus/vLLM/CTM_PLUS_KV_CACHE_OPTIMIZATION.md`
-**CTM+ for KV Cache Optimization**
-
-> A deep dive into how CTM+ (Coherence-Tier Memory Plus) can revolutionize KV cache management for Large Language Model inference.
-
-### `CTM_plus/vLLM/CTM_PLUS_PRODUCTION_READY.md`
-**CTM+ Production-Ready Implementation**
-
-> The score is a **dot product** of pre-computed per-token signals:
-
-### `CTM_plus/vLLM/README.md`
-**CTM+ for vLLM**
-
-> Intelligent KV cache block management for vLLM using CTM+ (Coherence-Tier Memory Plus).
+> A scoring-only eviction policy for LLM KV cache blocks. Does not manage memory, I/O, or block allocation — only decides which blocks to evict based on LLM-specific signals.
 
 ## Frontend
 

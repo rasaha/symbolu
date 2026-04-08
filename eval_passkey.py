@@ -29,6 +29,8 @@ Usage:
 """
 
 import argparse
+import dataclasses
+import json
 import random
 import torch
 import torch.nn.functional as F
@@ -40,6 +42,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from transformers import GPT2Tokenizer
 from train import TrainingConfig, create_model
+
+
+def _make_config(config_dict: dict) -> TrainingConfig:
+    """Create TrainingConfig, ignoring unknown fields from newer configs."""
+    valid_fields = {f.name for f in dataclasses.fields(TrainingConfig)}
+    filtered = {k: v for k, v in config_dict.items() if k in valid_fields}
+    return TrainingConfig(**filtered)
 
 
 # Filler text patterns (boring, repetitive content)
@@ -56,15 +65,54 @@ FILLER_SENTENCES = [
 
 
 def load_model(checkpoint_path: str, device: torch.device):
-    """Load model from checkpoint."""
+    """Load model from checkpoint.
+
+    Supports both legacy single-file format (checkpoint['model']) and
+    split-file format ({stem}_model.pt + config.json).
+    """
     print(f"Loading checkpoint: {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    ckpt_path = Path(checkpoint_path)
 
-    config_dict = checkpoint.get('config', {})
-    config = TrainingConfig(**config_dict)
+    # Detect split-file format: file named *_model.pt with a sibling config.json
+    is_split = ckpt_path.stem.endswith("_model")
 
-    model = create_model(config)
-    model.load_state_dict(checkpoint['model'], strict=False)
+    if is_split:
+        # Split format: file IS the raw state_dict
+        state_dict = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        # Load config from config.json in same directory
+        config_json = ckpt_path.parent / "config.json"
+        if config_json.exists():
+            with open(config_json) as f:
+                config_dict = json.load(f)
+        else:
+            raise FileNotFoundError(
+                f"config.json not found in {ckpt_path.parent}. "
+                "Cannot reconstruct model without config."
+            )
+        config = _make_config(config_dict)
+        model = create_model(config)
+        model.load_state_dict(state_dict, strict=False)
+    else:
+        # Legacy single-file format
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+        if isinstance(checkpoint, dict) and 'model' in checkpoint:
+            config_dict = checkpoint.get('config', {})
+            config = _make_config(config_dict)
+            model = create_model(config)
+            model.load_state_dict(checkpoint['model'], strict=False)
+        else:
+            # Raw state_dict without wrapping — try config.json
+            config_json = ckpt_path.parent / "config.json"
+            if config_json.exists():
+                with open(config_json) as f:
+                    config_dict = json.load(f)
+            else:
+                config_dict = {}
+            config = _make_config(config_dict)
+            model = create_model(config)
+            state_dict = checkpoint if isinstance(checkpoint, dict) else checkpoint
+            model.load_state_dict(state_dict, strict=False)
+
     model.to(device)
     model.eval()
 
@@ -167,7 +215,7 @@ def generate_completion(model, tokenizer, prompt: str, device: torch.device, max
     if tokens.shape[1] > max_len - max_new_tokens:
         tokens = tokens[:, -(max_len - max_new_tokens):]
 
-    with torch.no_grad():
+    with torch.no_grad(), torch.autocast(device_type=device.type, dtype=torch.bfloat16):
         generated = tokens.clone()
 
         for _ in range(max_new_tokens):
@@ -272,7 +320,7 @@ def main():
                         help="Path to model checkpoint")
     parser.add_argument("--samples", type=int, default=10,
                         help="Samples per context length")
-    parser.add_argument("--lengths", type=str, default="256,512,768,1024",
+    parser.add_argument("--lengths", type=str, default="256,512,1024,2048",
                         help="Comma-separated context lengths to test")
     parser.add_argument("--device", type=str, default="cuda",
                         help="Device (cuda/cpu)")
@@ -280,8 +328,8 @@ def main():
                         help="Random seed for reproducibility")
     args = parser.parse_args()
 
-    # Parse context lengths
-    context_lengths = [int(x.strip()) for x in args.lengths.split(",")]
+    # Parse context lengths (will be filtered after model load)
+    requested_lengths = [int(x.strip()) for x in args.lengths.split(",")]
 
     # Set seed
     random.seed(args.seed)
@@ -299,6 +347,12 @@ def main():
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
     model, config = load_model(args.checkpoint, device)
+
+    # Cap context lengths to model's max_seq_len
+    max_seq_len = getattr(model, 'max_seq_len', None) or getattr(model.config, 'max_seq_len', 2048)
+    context_lengths = [c for c in requested_lengths if c <= max_seq_len]
+    if not context_lengths:
+        context_lengths = [min(max_seq_len, requested_lengths[0])]
 
     # Run evaluation
     print("\n" + "=" * 60)

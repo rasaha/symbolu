@@ -4281,7 +4281,9 @@ def run_interference_benchmarks(
     # Create synthetic proposals [B, N, K, D]
     B, N, K, D = 2, 4, 8, 64
     proposals = torch.randn(B, N, K, D, device=device, requires_grad=True)
-    scores = torch.randn(B, N, K, device=device, requires_grad=True).abs()
+    # Use torch.rand (uniform [0,1]) to keep scores positive AND preserve leaf status.
+    # Previously: torch.randn(...).abs() — .abs() creates a non-leaf, breaking .grad access.
+    scores = torch.rand(B, N, K, device=device, requires_grad=True)
 
     # Test rescore function
     rescored, stats = text_interference_rescore(
@@ -4310,8 +4312,10 @@ def run_interference_benchmarks(
         stats.get("interference/multiplier_mean", 0) <= 1.1
     )
     print(f"\n  Multiplier stats:")
-    print(f"    Mean: {stats.get('interference/multiplier_mean', 'N/A'):.4f}")
-    print(f"    Std:  {stats.get('interference/multiplier_std', 'N/A'):.4f}")
+    mult_mean = stats.get('interference/multiplier_mean', 'N/A')
+    mult_std = stats.get('interference/multiplier_std', 'N/A')
+    print(f"    Mean: {mult_mean:.4f}" if isinstance(mult_mean, (int, float)) else f"    Mean: {mult_mean}")
+    print(f"    Std:  {mult_std:.4f}" if isinstance(mult_std, (int, float)) else f"    Std:  {mult_std}")
     print(f"  Multiplier in bounds [0.9, 1.1]: {'OK' if mult_in_bounds else 'WARN'}")
 
     # Check score change percentage
@@ -4349,18 +4353,26 @@ def run_interference_benchmarks(
     proposals_low_ent = proposals_low_ent + torch.randn_like(proposals_low_ent) * 0.01
 
     scores_low = torch.ones(B, N, K, device=device)
-    policy_low = TextInterferencePolicy(enable=True, lam=0.02, min_step=1, entropy_gate=1.2)
+    # TextInterferenceScorer.forward() accepts (proposals, scores, step, proposal_entropy).
+    # The entropy_gate is set via the scorer's config, not per-call policy.
     rescored_low, stats_low = scorer(
-        proposals_low_ent, scores_low, policy=policy_low, step=10
+        proposals_low_ent, scores_low, step=10
     )
     applied_low = stats_low.get("interference/applied", 0) > 0
 
-    # Test with high entropy (should apply)
+    # Test with high entropy (should apply) — use a scorer with low entropy gate
+    scorer_low_gate = TextInterferenceScorer(
+        config=TextInterferenceConfig(
+            enabled=True,
+            lambda_text=args.interference_lambda,
+            min_step=1,
+            entropy_gate=0.1,  # Very low gate so diverse proposals trigger interference
+        )
+    )
     proposals_high_ent = torch.randn(B, N, K, D, device=device)
-    scores_high = torch.randn(B, N, K, device=device).abs()
-    policy_high = TextInterferencePolicy(enable=True, lam=0.02, min_step=1, entropy_gate=0.1)  # Low gate
-    rescored_high, stats_high = scorer(
-        proposals_high_ent, scores_high, policy=policy_high, step=10
+    scores_high = torch.rand(B, N, K, device=device)
+    rescored_high, stats_high = scorer_low_gate(
+        proposals_high_ent, scores_high, step=10
     )
     applied_high = stats_high.get("interference/applied", 0) > 0
 
@@ -4389,12 +4401,10 @@ def run_interference_benchmarks(
         print("  Comparing: Base vs +Interference vs +BCVF vs +BCVF+Interference")
 
         # Create BCVF scorer
+        # BCVFTextScorer accepts (interference_enabled, interference_lambda), not d_model/config.
         bcvf_scorer = BCVFTextScorer(
-            d_model=D,
-            interference_config=TextInterferenceConfig(
-                enabled=True,
-                lambda_text=args.interference_lambda,
-            ),
+            interference_enabled=True,
+            interference_lambda=args.interference_lambda,
         ).to(device)
 
         # Synthetic compositional task proposals
@@ -4411,9 +4421,9 @@ def run_interference_benchmarks(
         )
 
         # +BCVF+Interference
-        policy = TextInterferencePolicy(enable=True, lam=0.02, min_step=1)
+        # BCVFTextScorer.forward() accepts (proposals, scores, memory_state, sf, sb).
         results_bcvf_interf, bcvf_stats = bcvf_scorer(
-            proposals_comp, scores_base, policy=policy, step=10
+            proposals_comp, scores_base
         )
 
         print(f"\n  Score statistics after each variant:")
@@ -7019,8 +7029,12 @@ class AssociativeRecallDataset(Dataset):
         # Create input and target
         x = torch.tensor(tokens, dtype=torch.long)
 
-        # Target: mostly ignore (PAD), but at the query_key position, target is query_value
-        y = torch.full((self.seq_len,), self.PAD_TOKEN, dtype=torch.long)
+        # Target: -100 (ignore) everywhere except the query answer position.
+        # V10.16.1: Use -100 (standard PyTorch ignore_index) instead of PAD_TOKEN
+        # so that (y != -100) correctly identifies only the query answer position.
+        y = torch.full((self.seq_len,), -100, dtype=torch.long)
+        # Query mask: True only at the position where model must retrieve the value
+        query_mask = torch.zeros(self.seq_len, dtype=torch.bool)
 
         # Find where query_key appears after QUERY_TOKEN
         # The answer should come right after
@@ -7030,8 +7044,9 @@ class AssociativeRecallDataset(Dataset):
                 # Target at i+2 should be query_value (what comes next)
                 if i + 3 < self.seq_len:
                     y[i + 2] = query_value  # After seeing key, predict value
+                    query_mask[i + 2] = True
 
-        return x, y, query_idx
+        return x, y, query_idx, query_mask
 
     def __len__(self):
         return self.num_samples
@@ -7040,12 +7055,12 @@ class AssociativeRecallDataset(Dataset):
         # V10.5.8: Support dynamic generation for curriculum learning
         if self.dynamic_delay or self.samples is None:
             # Generate on-the-fly with current delay range
-            x, y, _ = self._generate_one_sample()
-            return x, y
+            x, y, _, query_mask = self._generate_one_sample()
+            return x, y, query_mask
         else:
             # Use pre-generated samples
-            x, y, _ = self.samples[idx]
-            return x, y
+            x, y, _, query_mask = self.samples[idx]
+            return x, y, query_mask
 
     def get_accuracy(self, model: nn.Module, device: torch.device, num_samples: int = 100) -> float:
         """
@@ -7065,14 +7080,14 @@ class AssociativeRecallDataset(Dataset):
 
         with torch.no_grad():
             for i in range(min(num_samples, len(self.samples))):
-                x, y, query_idx = self.samples[i]
+                x, y, query_idx, query_mask = self.samples[i]
                 x = x.unsqueeze(0).to(device)
                 y = y.to(device)
 
                 logits = model(x)  # [1, seq_len, vocab_size]
 
-                # Find query position (where y is not PAD)
-                query_positions = (y != self.PAD_TOKEN).nonzero(as_tuple=True)[0]
+                # Find query position (where y != -100, i.e. the answer position)
+                query_positions = (y != -100).nonzero(as_tuple=True)[0]
 
                 for pos in query_positions:
                     pred = logits[0, pos].argmax().item()
@@ -7085,14 +7100,18 @@ class AssociativeRecallDataset(Dataset):
 
 
 class AssociativeRecallCollator:
-    """Custom collator that ignores PAD tokens in loss computation."""
+    """Custom collator that stacks AR samples and passes query_mask through."""
 
-    def __init__(self, pad_token: int):
+    def __init__(self, pad_token: int = -100):
         self.pad_token = pad_token
 
     def __call__(self, batch):
         x = torch.stack([item[0] for item in batch])
         y = torch.stack([item[1] for item in batch])
+        # V10.16.1: Pass explicit query_mask for retrieval loss
+        if len(batch[0]) >= 3:
+            query_mask = torch.stack([item[2] for item in batch])
+            return {"input_ids": x, "labels": y, "query_mask": query_mask}
         return x, y
 
 
@@ -9344,24 +9363,28 @@ def train_real_language(
 
         ar_vocab_size = getattr(args, 'ar_vocab_size', 1000)
         ar_num_pairs = getattr(args, 'ar_num_pairs', 8)
-        ar_delay_min = getattr(args, 'ar_delay_min', 80)
-        ar_delay_max = getattr(args, 'ar_delay_max', 150)
+        ar_delay_min = getattr(args, 'ar_delay_min', 5)
+        ar_delay_max = getattr(args, 'ar_delay_max', 30)
         ar_train_samples = getattr(args, 'ar_train_samples', 50000)
         ar_val_samples = getattr(args, 'ar_val_samples', 2000)
 
         print(f"  Vocabulary size: {ar_vocab_size}")
         print(f"  Key-value pairs: {ar_num_pairs}")
+        _local_win = getattr(args, 'local_window_size', 64)
         print(f"  Initial delay range: [{ar_delay_min}, {ar_delay_max}] tokens")
-        print(f"  Local window: {getattr(args, 'local_window_size', 64)}")
-        print(f"  → Delay > window, so LOCAL CANNOT SOLVE THIS")
+        print(f"  Local window: {_local_win}")
+        if ar_delay_min > _local_win:
+            print(f"  → Delay > window, so LOCAL CANNOT SOLVE THIS")
+        else:
+            print(f"  → Initial delay ≤ window (curriculum warmup — slots learn before they're needed)")
         print(f"  Train samples: {ar_train_samples}")
         print(f"  Val samples: {ar_val_samples}")
 
         # V10.5.8: Dynamic delay curriculum
-        ar_dynamic_delay = getattr(args, 'ar_dynamic_delay', False)
-        ar_target_delay_min = getattr(args, 'ar_target_delay_min', 120)
-        ar_target_delay_max = getattr(args, 'ar_target_delay_max', 200)
-        ar_curriculum_warmup = getattr(args, 'ar_curriculum_warmup', 0.3)
+        ar_dynamic_delay = getattr(args, 'ar_dynamic_delay', True)
+        ar_target_delay_min = getattr(args, 'ar_target_delay_min', 80)
+        ar_target_delay_max = getattr(args, 'ar_target_delay_max', 150)
+        ar_curriculum_warmup = getattr(args, 'ar_curriculum_warmup', 0.2)
 
         if ar_dynamic_delay:
             print(f"\n  ★ DYNAMIC DELAY CURRICULUM ENABLED (V10.5.8)")
@@ -9380,11 +9403,15 @@ def train_real_language(
             seed=42,
             dynamic_delay=ar_dynamic_delay,  # V10.5.8
         )
+        # V10.14.3: Validation ALWAYS uses target (hard) delay range so we measure
+        # actual long-range retrieval, not easy within-window cases.
+        _val_delay_min = ar_target_delay_min if ar_dynamic_delay else ar_delay_min
+        _val_delay_max = ar_target_delay_max if ar_dynamic_delay else ar_delay_max
         val_dataset = AssociativeRecallDataset(
             num_samples=ar_val_samples,
             num_pairs=ar_num_pairs,
-            delay_min=ar_delay_min,
-            delay_max=ar_delay_max,
+            delay_min=_val_delay_min,
+            delay_max=_val_delay_max,
             seq_len=args.seq_len,
             vocab_size=ar_vocab_size,
             seed=123,  # Different seed for validation
@@ -9552,6 +9579,140 @@ def train_real_language(
             max_seq_len=args.seq_len,
             bounded_phase=config.bounded_phase,
         ).to(config.device)
+    elif (getattr(args, 'phase_channels', 1) > 1 or getattr(args, 'phase_write_gate', False)
+          or getattr(args, 'phase_warmstart', False) or getattr(args, 'global_tokens', False)):
+        # V10.12/V10.13: Use HybridPhaseTransformer with advanced features
+        from symbolu.phase_transformer import HybridPhaseTransformer
+
+        phase_channels = getattr(args, 'phase_channels', 1)
+        phase_write_gate = getattr(args, 'phase_write_gate', False)
+        phase_warmstart = getattr(args, 'phase_warmstart', False)
+        phase_warmstart_steps = getattr(args, 'phase_warmstart_steps', 10000)
+        phase_warmstart_tau = getattr(args, 'phase_warmstart_tau', 2000.0)
+        global_tokens = getattr(args, 'global_tokens', False)
+        num_global_tokens = getattr(args, 'num_global_tokens', 16)
+        global_update_mode = getattr(args, 'global_update_mode', 'pool')
+        phase_to_global = getattr(args, 'phase_to_global', False)
+
+        print(f"\nCreating HybridPhaseTransformer (V10.14.6)...")
+        print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
+        print(f"  Phase Channels: {phase_channels}")
+        print(f"  Phase Write Gate: {'ENABLED' if phase_write_gate else 'disabled'}")
+        print(f"  Phase Warm-Start: {'ENABLED (steps={}, tau={})'.format(phase_warmstart_steps, phase_warmstart_tau) if phase_warmstart else 'disabled'}")
+        print(f"  Global Tokens: {'ENABLED (G={}, mode={})'.format(num_global_tokens, global_update_mode) if global_tokens else 'disabled'}")
+        print(f"  Phase→Global: {'ENABLED' if phase_to_global else 'disabled'}")
+
+        _inner_model = HybridPhaseTransformer(
+            vocab_size=args.lm_vocab_size,
+            embed_dim=config.d_model,
+            num_layers=config.num_layers,
+            num_heads=config.num_heads,
+            ff_dim=config.d_ff,
+            max_seq_len=args.seq_len,
+            dropout=config.dropout,
+            local_layers=config.num_layers // 2,  # Half local, half hybrid
+            window_size=getattr(args, 'local_window_size', 64),
+            local_backend=getattr(args, 'local_backend', 'sdpa'),
+            protected_phase=True,
+            phase_channels=phase_channels,
+            phase_write_gate=phase_write_gate,
+            # V10.13: Phase Warm-Start Gate
+            phase_warmstart=phase_warmstart,
+            phase_warmstart_steps=phase_warmstart_steps,
+            phase_warmstart_tau=phase_warmstart_tau,
+            # V10.13: Global Compressed Tokens (GCT)
+            global_tokens_enabled=global_tokens,
+            num_global_tokens=num_global_tokens,
+            global_update_mode=global_update_mode,
+            phase_to_global=phase_to_global,
+            # V10.14: Slot memory params (only effective when global_update_mode="slots")
+            slots_write_lr=getattr(args, 'slots_write_lr', 0.1),
+            retrieval_loss_weight=getattr(args, 'retrieval_loss_weight', 0.1),
+        ).to(config.device)
+
+        # Wrap to match training loop interface (expects logits tensor, not dict)
+        class _HybridPhaseAdapter(nn.Module):
+            def __init__(self, inner):
+                super().__init__()
+                self.inner = inner
+                self.layer_outputs = []
+                self.vocab_size = inner.config.vocab_size
+                # V10.14: Expose slot state from last forward pass for retrieval loss
+                self._last_result = None
+
+            def forward(self, input_ids, probe_layers=False):
+                result = self.inner(input_ids)
+                # V10.14: Stash full result dict so training loop can access slot state
+                self._last_result = result
+                return result['logits']
+
+            # V10.14: Expose inner model attributes for slot memory access
+            @property
+            def slot_memory(self):
+                return getattr(self.inner, 'slot_memory', None)
+
+            @property
+            def lm_head(self):
+                return self.inner.lm_head
+
+            @property
+            def retrieval_loss_weight(self):
+                return getattr(self.inner, 'retrieval_loss_weight', 0.0)
+
+            @property
+            def global_update_mode(self):
+                return getattr(self.inner, 'global_update_mode', 'pool')
+
+            def parameters(self, recurse=True):
+                return self.inner.parameters(recurse=recurse)
+
+            def named_parameters(self, prefix='', recurse=True):
+                return self.inner.named_parameters(prefix=prefix, recurse=recurse)
+
+            def train(self, mode=True):
+                self.inner.train(mode)
+                return self
+
+            def eval(self):
+                self.inner.eval()
+                return self
+
+            def state_dict(self, *args, **kwargs):
+                return self.inner.state_dict(*args, **kwargs)
+
+            def load_state_dict(self, *args, **kwargs):
+                return self.inner.load_state_dict(*args, **kwargs)
+
+            def set_global_step(self, step):
+                if hasattr(self.inner, 'set_global_step'):
+                    self.inner.set_global_step(step)
+
+            def update_curriculum(self, new_curriculum):
+                pass  # No curriculum in HybridPhaseTransformer
+
+            def ablate_attention(self, input_ids, targets,
+                                ablate_phase=False, ablate_local=False):
+                """Return normal PPL — HybridPhaseTransformer doesn't have
+                separate phase/local paths to ablate independently."""
+                with torch.no_grad():
+                    logits = self.forward(input_ids)
+                    loss = F.cross_entropy(
+                        logits.view(-1, self.vocab_size), targets.view(-1),
+                        ignore_index=self.vocab_size - 1,  # PAD token
+                    )
+                    return math.exp(min(loss.item(), 20.0))
+
+            def get_layer_contributions(self, input_ids, targets):
+                """Stub — layer contribution analysis not applicable."""
+                num_layers = self.inner.config.num_layers
+                return {
+                    'layer_ppl': [0.0] * num_layers,
+                    'contribution_pct': [1.0 / num_layers] * num_layers,
+                    'ppl_embed': 0.0,
+                    'total_reduction': 0.0,
+                }
+
+        model = _HybridPhaseAdapter(_inner_model)
     else:
         print(f"\nCreating HybridLMTransformer...")
         print(f"  d_model={config.d_model}, num_heads={config.num_heads}, num_layers={config.num_layers}")
@@ -9883,12 +10044,18 @@ def train_real_language(
                 train_dataset.set_delay_range(new_delay_min, new_delay_max)
 
         try:
-            x, y = next(train_iter)
+            batch = next(train_iter)
         except StopIteration:
             train_iter = iter(train_loader)
-            x, y = next(train_iter)
+            batch = next(train_iter)
 
-        x, y = x.to(config.device), y.to(config.device)
+        # V10.16.1: Handle dict batches (with query_mask) and tuple batches
+        if isinstance(batch, dict):
+            x = batch["input_ids"].to(config.device)
+            y = batch["labels"].to(config.device)
+        else:
+            x, y = batch
+            x, y = x.to(config.device), y.to(config.device)
 
         # V10.3.7: Check if witness entropy regularization is enabled
         use_witness_entropy = getattr(args, 'witness_entropy_reg', False) and witness_diagnostics is not None
@@ -9897,8 +10064,12 @@ def train_real_language(
         deep_loss_value = 0.0
         main_loss_value = 0.0  # V10.5.1: Track main loss separately for PPL reporting
 
-        # V10.5.6: Use ignore_index for associative recall (ignore PAD tokens in loss)
-        ignore_idx = ar_pad_token if use_associative_recall else -100  # -100 is PyTorch default (no ignore)
+        # V10.16.1: Targets now use -100 for ignored positions (standard PyTorch convention)
+        ignore_idx = -100
+
+        # V10.13: Update global step for warm-start gate
+        if hasattr(model, 'set_global_step'):
+            model.set_global_step(step)
 
         if use_deep_supervision and hasattr(model, 'forward_with_deep_supervision'):
             logits, deep_loss, layer_losses = model.forward_with_deep_supervision(x, y, ignore_index=ignore_idx)
@@ -9918,6 +10089,45 @@ def train_real_language(
             layer_hidden_states = None
             loss = F.cross_entropy(logits.view(-1, args.lm_vocab_size), y.view(-1), ignore_index=ignore_idx)
             main_loss_value = loss.item()
+
+        # V10.14: Slot memory retrieval auxiliary loss
+        # At query positions (where y != PAD), read from slots and predict value
+        if (hasattr(model, 'slot_memory') and model.slot_memory is not None
+                and hasattr(model, '_last_result') and model._last_result is not None
+                and '_slot_keys' in model._last_result
+                and model.retrieval_loss_weight > 0):
+            _result = model._last_result
+            # Query mask: True at positions where model must retrieve (non-PAD targets)
+            _query_mask = (y != ignore_idx) if ignore_idx != -100 else None
+            _retr_loss = model.slot_memory.compute_retrieval_loss(
+                x=_result['_slot_hidden'],
+                slot_keys=_result['_slot_keys'],
+                slot_vals=_result['_slot_vals'],
+                query_mask=_query_mask,
+                target_ids=y,
+                lm_head=model.lm_head,
+            )
+            # V10.14.5: MoE-style router loss (target entropy + load balancing)
+            # Weights are internal to compute_sharpness_loss() now:
+            #   0.01 * L_sharp + 0.05 * L_bal
+            _router_loss = model.slot_memory.compute_sharpness_loss()
+            loss = loss + _router_loss
+            if _retr_loss.item() > 0:
+                loss = loss + model.retrieval_loss_weight * _retr_loss
+            # V10.14.5: Update router step counter for noise decay
+            model.slot_memory._router_step = step
+            if step % log_interval == 0:
+                _sm = model.slot_memory
+                _marginal_H = getattr(_sm, '_diag_marginal_entropy', 0.0)
+                _L_sharp = getattr(_sm, '_diag_L_sharp', 0.0)
+                _L_bal = getattr(_sm, '_diag_L_bal', 0.0)
+                print(f"  [SLOTS] retr_loss={_retr_loss.item():.4f} "
+                      f"L_sharp={_L_sharp:.4f} L_bal={_L_bal:.4f} "
+                      f"write_gate={_sm._diag_write_gate_mean:.3f} "
+                      f"assign_H={_sm._diag_assignment_entropy:.3f} "
+                      f"marginal_H={_marginal_H:.3f} "
+                      f"read_H={max(0.0, _sm._diag_read_attn_entropy):.3f} "
+                      f"wr_scale={torch.exp(_sm._write_log_scale).item():.4f}")
 
         # V10.3.7: Witness entropy regularization to prevent vritti collapse
         if use_witness_entropy and layer_hidden_states:
@@ -10027,7 +10237,10 @@ def train_real_language(
             # V10.5.6: Associative Recall accuracy evaluation
             if use_associative_recall and ar_dataset is not None:
                 retrieval_acc = ar_dataset.get_accuracy(model, config.device, num_samples=500)
-                print(f"      ★ Retrieval Accuracy: {retrieval_acc*100:.1f}%")
+                _curr_delay = f"[{train_dataset.delay_min},{train_dataset.delay_max}]" if ar_dynamic_delay else f"[{ar_delay_min},{ar_delay_max}]"
+                _beyond_window = train_dataset.delay_min > getattr(args, 'local_window_size', 64) if ar_dynamic_delay else ar_delay_min > getattr(args, 'local_window_size', 64)
+                _phase_str = " [HARD: delay>window]" if _beyond_window else " [EASY: delay≤window]"
+                print(f"      ★ Retrieval Accuracy: {retrieval_acc*100:.1f}% (delay={_curr_delay}{_phase_str})")
                 # Random baseline for num_pairs=8 keys would be 12.5%
                 random_baseline = 100.0 / getattr(args, 'ar_num_pairs', 8)
                 if retrieval_acc * 100 > random_baseline * 2:
@@ -10278,7 +10491,7 @@ def train_real_language(
     if use_protected_phase:
         print(f"  Architecture: Protected Phase (sequential collaboration)")
         print(f"  Phase contributes 100% as memory accumulator")
-    else:
+    elif hasattr(model, 'curriculum'):
         print(f"  Final Curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
 
     # Convergence speed summary
@@ -10347,10 +10560,18 @@ def train_real_language(
         print(f"    • Phase and Quad have SEPARATE roles, not parallel mixing")
         print(f"    • No curriculum needed - roles are architecturally defined")
     elif pfc is not None:
-        print(f"    • Curriculum was DYNAMIC (PPL-based), applied to BOTH attention types")
-        print(f"    • Final curriculum: {[f'{c:.2f}' for c in model.curriculum]}")
+        _cur = getattr(model, 'curriculum', None)
+        if _cur is not None:
+            print(f"    • Curriculum was DYNAMIC (PPL-based), applied to BOTH attention types")
+            print(f"    • Final curriculum: {[f'{c:.2f}' for c in _cur]}")
+        else:
+            print(f"    • Curriculum was DYNAMIC (PPL-based)")
     else:
-        print(f"    • Curriculum was STATIC: {[f'{c:.2f}' for c in model.curriculum]}")
+        _cur = getattr(model, 'curriculum', None)
+        if _cur is not None:
+            print(f"    • Curriculum was STATIC: {[f'{c:.2f}' for c in _cur]}")
+        else:
+            print(f"    • No curriculum (HybridPhaseTransformer mode)")
 
     # =========================================================================
     # STABILITY / CONFIDENCE FLAGS (Trust indicators)
@@ -10808,10 +11029,16 @@ def run_chunking_tests_v10(args, config):
             local_layers=2,
             window_size=32,
             protected_phase=True,
+            phase_channels=getattr(args, 'phase_channels', 1),
+            phase_write_gate=getattr(args, 'phase_write_gate', False),
         ).to(device)
 
         print(f"  Model: {sum(p.numel() for p in model.parameters()):,} parameters")
         print(f"  Protected Phase: ENABLED")
+        if getattr(args, 'phase_channels', 1) > 1:
+            print(f"  Phase Channels: {args.phase_channels}")
+        if getattr(args, 'phase_write_gate', False):
+            print(f"  Phase Write Gate: ENABLED")
         print(f"  Vocab: {vocab_size} (anchors 0-9, query 10, fillers 11-49)")
 
         # =================================================================
@@ -12278,6 +12505,37 @@ Examples:
     parser.add_argument("--protected-phase", action="store_true",
                         help="Run Protected Phase model (Phase accumulates, Quad queries)")
 
+    # V10.12: Multi-channel Phase memory with selective write gating
+    parser.add_argument("--phase-channels", type=int, default=1,
+                        help="Number of independent Phase memory channels (1=legacy, 4=recommended)")
+    parser.add_argument("--phase-write-gate", action="store_true",
+                        help="Enable selective write gating for Phase memory updates")
+    # V10.13: Phase Warm-Start Gate
+    parser.add_argument("--phase-warmstart", action="store_true",
+                        help="Enable Phase warm-start gate (dampens Phase for first N steps)")
+    parser.add_argument("--phase-warmstart-steps", type=int, default=10000,
+                        help="Step at which warm-start alpha=0.5")
+    parser.add_argument("--phase-warmstart-tau", type=float, default=2000.0,
+                        help="Warm-start sigmoid steepness")
+    # V10.13: Global Compressed Tokens (GCT)
+    parser.add_argument("--global-tokens", action="store_true",
+                        help="Enable Global Compressed Tokens (GCT) memory slots")
+    parser.add_argument("--num-global-tokens", type=int, default=16,
+                        help="Number of global token memory slots")
+    parser.add_argument("--global-update-mode", type=str, default="pool",
+                        choices=["pool", "attn-lite", "slots"],
+                        help="GCT write mode: 'pool', 'attn-lite', or 'slots' (V10.14 addressable KV memory)")
+    # V10.14: Slot memory parameters (when --global-update-mode=slots)
+    parser.add_argument("--slots-write-lr", type=float, default=0.5,
+                        help="EMA learning rate for competitive slot writes (default: 0.5). "
+                             "V10.14.6: increased from 0.1 — with 4 layers of writes per "
+                             "forward pass, 0.1 retains 65%% init noise (0.9^4). At 0.5, "
+                             "only 6%% init noise remains (0.5^4).")
+    parser.add_argument("--retrieval-loss-weight", type=float, default=1.0,
+                        help="Weight for auxiliary retrieval CE loss at query positions (default: 1.0)")
+    parser.add_argument("--phase-to-global", action="store_true",
+                        help="Enable Phase→Global integration (Phase memory injects into GCT)")
+
     # Phase Rotation Test
     parser.add_argument("--rotation-test", action="store_true",
                         help="Run phase rotation test after training to verify phase encodes relations")
@@ -12387,10 +12645,10 @@ Examples:
                              "quad to retrieve from phase memory.")
     parser.add_argument("--ar-num-pairs", type=int, default=8,
                         help="Number of key-value pairs per sample (default: 8)")
-    parser.add_argument("--ar-delay-min", type=int, default=80,
-                        help="Minimum filler tokens between pairs and query (default: 80, > local window)")
-    parser.add_argument("--ar-delay-max", type=int, default=150,
-                        help="Maximum filler tokens between pairs and query (default: 150)")
+    parser.add_argument("--ar-delay-min", type=int, default=5,
+                        help="Initial minimum filler tokens (default: 5, within local window for curriculum)")
+    parser.add_argument("--ar-delay-max", type=int, default=30,
+                        help="Initial maximum filler tokens (default: 30, within local window for curriculum)")
     parser.add_argument("--ar-vocab-size", type=int, default=1000,
                         help="Vocabulary size for associative recall task (default: 1000)")
     parser.add_argument("--ar-train-samples", type=int, default=50000,
@@ -12399,15 +12657,17 @@ Examples:
                         help="Number of validation samples for associative recall (default: 2000)")
 
     # V10.5.8: Dynamic delay curriculum
-    parser.add_argument("--ar-dynamic-delay", action="store_true",
-                        help="Enable dynamic delay curriculum. Starts with --ar-delay-min/max and "
-                             "progressively increases to --ar-target-delay-min/max over training.")
-    parser.add_argument("--ar-target-delay-min", type=int, default=120,
-                        help="Target minimum delay at end of training (default: 120)")
-    parser.add_argument("--ar-target-delay-max", type=int, default=200,
-                        help="Target maximum delay at end of training (default: 200)")
-    parser.add_argument("--ar-curriculum-warmup", type=float, default=0.3,
-                        help="Fraction of training to stay at initial delay before ramping (default: 0.3)")
+    parser.add_argument("--ar-dynamic-delay", action="store_true", default=True,
+                        help="Enable dynamic delay curriculum (default: True). Starts with --ar-delay-min/max "
+                             "and progressively increases to --ar-target-delay-min/max over training.")
+    parser.add_argument("--ar-no-dynamic-delay", action="store_false", dest="ar_dynamic_delay",
+                        help="Disable dynamic delay curriculum (use fixed delay range)")
+    parser.add_argument("--ar-target-delay-min", type=int, default=80,
+                        help="Target minimum delay at end of training (default: 80, > local window)")
+    parser.add_argument("--ar-target-delay-max", type=int, default=150,
+                        help="Target maximum delay at end of training (default: 150)")
+    parser.add_argument("--ar-curriculum-warmup", type=float, default=0.2,
+                        help="Fraction of training to stay at initial delay before ramping (default: 0.2)")
 
     # V10.5.7: Binding Slot Cache (explicit key-value memory)
     parser.add_argument("--binding-slots", type=int, default=0,
@@ -12486,6 +12746,9 @@ Examples:
                         help="Top-K cache size for Quad query (default: 64)")
     parser.add_argument("--local-window-size", type=int, default=64,
                         help="Window size for local attention (default: 64)")
+    parser.add_argument("--local-backend", type=str, default="sdpa",
+                        choices=["auto", "flash", "sdpa", "unfold"],
+                        help="Local attention backend (default: sdpa; flash requires fp16/bf16)")
     parser.add_argument("--decay-gamma", type=float, default=0.9,
                         help="Decay factor for phase memory accumulation (default: 0.9)")
     parser.add_argument("--binding-cache-phase-ratio", type=str, default="0.3,0.3,0.3,0.3",

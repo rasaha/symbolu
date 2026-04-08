@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ncc-controller
+  namespace: ncc
+  labels:
+    app: ncc-controller
+    app.kubernetes.io/name: ncc-controller
+    app.kubernetes.io/part-of: neural-cloud-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ncc-controller
+  template:
+    metadata:
+      labels:
+        app: ncc-controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: ncc-controller
+      containers:
+        - name: controller
+          # Replace REGION/PROJECT_ID/REPO with your values, or use quickstart.sh
+          # which patches this automatically after Cloud Build.
+          image: us-central1-docker.pkg.dev/PROJECT_ID/ncc/ncc-controller:latest
+          args:
+            - "--config=/etc/ncc/controller.yaml"
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ncc
+              readOnly: true
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: NCC_LOG_LEVEL
+              value: "INFO"
+            - name: NCC_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+      volumes:
+        - name: config
+          configMap:
+            name: ncc-config

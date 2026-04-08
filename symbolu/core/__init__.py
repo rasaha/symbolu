@@ -2,19 +2,55 @@
 SOULPI Core - Symbol-U Intelligence Engine
 ==========================================
 
-PATENT NOTICE: All modules in symbolu/core/ contain patent-protected
-Symbol-U algorithms. Implementation details are placeholders only.
+Active submodules:
+- smi: Semantic Mismatch Index computation (vritti mapping, acoustic mapping, aspect mapping)
+- stitching: Candidate response scoring and cross-domain reasoning
+- consciousness: Unified Consciousness Formula (P26)
+- coherence: Multi-turn coherence tracking (P10/P12)
+- counterfactual: Counterfactual sandbox simulation (P25)
+- continuity: Adaptive continuity engine (P37)
+- predictive: Identity memory and persona drift prediction
 
-Submodules:
-- smi: Semantic Mismatch Index computation
-- stitching: Candidate response scoring and selection
-- bhava: Consciousness state geometry and temporal tracking
-- regulators: Three-force decision framework
-- energy: Energy word detection and folded truth
-- entropy: Entropy computation for entropy gating
+Shared data:
+- models: Core data structures (SMIResult, BhavaState, EntropyState, etc.)
+- constants: Canonical kosha/ontology mappings
+- generation_gate: Generation access control gate
+- ledger_generation_attest: Attestation blob generation
+
+Phase 0 Cleanup Notes:
+- CoreInterface and CorePipeline facades removed (all methods were NotImplementedError)
+- core/entropy/ stub removed (dead placeholder; real entropy lives in symbolu/entropy/)
+- See CANONICAL AUTHORITIES below for runtime signal sources
+
+CANONICAL AUTHORITIES (runtime):
+- Runtime vritti (cross-layer coherence): symbolu/chitta_vritti/
+- Runtime vritti (phonemic/syllable-level): symbolu/core/smi/vritti_mapping.py (complementary)
+- Runtime guna (pipeline-level, deterministic): symbolu/guna_modulation/guna_derivation.py
+- Runtime guna (token-level inference): symbolu/inference/guna_inference.py (complementary)
+- Runtime entropy: symbolu/entropy/
 """
 
-from symbolu.core.interface import CoreInterface
-from symbolu.core.pipeline import CorePipeline
+from symbolu.core.models import (
+    SyllableAnalysis,
+    WordAnalysis,
+    EntropyState,
+    BhavaState,
+    RecursionState,
+    CandidateResponse,
+    SMIResult,
+    DeliveryMode,
+    AnalysisResult,
+)
 
-__all__ = ["CoreInterface", "CorePipeline"]
+__all__ = [
+    # Core data models (always available)
+    "SyllableAnalysis",
+    "WordAnalysis",
+    "EntropyState",
+    "BhavaState",
+    "RecursionState",
+    "CandidateResponse",
+    "SMIResult",
+    "DeliveryMode",
+    "AnalysisResult",
+]

@@ -1,0 +1,85 @@
+======================================================================
+PIPELINE MULTI-TURN CONVERSATION SNAPSHOT
+======================================================================
+
+Total Turns: 4
+
+--------------------------------------------------
+TURN 1
+--------------------------------------------------
+
+Input: I feel stuck.
+
+Output:
+Perhaps To clarify: I feel stuck.
+
+You're doing meaningful work here.
+
+Metadata:
+  Mode: standard
+  Persona: neutral
+  MLCR Tier: N/A
+  MLCR Intent: N/A
+  DHA Tone: SWEET_RESONANCE
+  DHA Readiness: HIGH
+
+--------------------------------------------------
+TURN 2
+--------------------------------------------------
+
+Input: Now I see a little hope.
+
+Output:
+It seems that To clarify: Now I see a little hope.
+
+You're doing meaningful work here.
+
+Metadata:
+  Mode: standard
+  Persona: neutral
+  MLCR Tier: N/A
+  MLCR Intent: N/A
+  DHA Tone: SWEET_RESONANCE
+  DHA Readiness: HIGH
+
+--------------------------------------------------
+TURN 3
+--------------------------------------------------
+
+Input: I'm clearer but still conflicted.
+
+Output:
+Perhaps To clarify: I'm clearer but still conflicted.
+
+You're doing meaningful work here.
+
+Metadata:
+  Mode: standard
+  Persona: neutral
+  MLCR Tier: N/A
+  MLCR Intent: N/A
+  DHA Tone: SWEET_RESONANCE
+  DHA Readiness: HIGH
+
+--------------------------------------------------
+TURN 4
+--------------------------------------------------
+
+Input: I think I'm moving forward.
+
+Output:
+Gently speaking, To clarify: I think I'm moving forward.
+
+You're doing meaningful work here.
+
+Metadata:
+  Mode: standard
+  Persona: neutral
+  MLCR Tier: N/A
+  MLCR Intent: N/A
+  DHA Tone: SWEET_RESONANCE
+  DHA Readiness: HIGH
+
+======================================================================
+END OF CONVERSATION
+======================================================================

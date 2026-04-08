@@ -1,0 +1,18 @@
+# SOULPI Fusion Renderer v3.0 - Requirements
+# ============================================
+
+# Core dependencies
+numpy>=1.21.0
+
+# Testing dependencies (optional)
+pytest>=7.0.0
+pytest-cov>=3.0.0
+
+# Development dependencies (optional)
+black>=22.0.0  # Code formatting
+flake8>=4.0.0  # Linting
+mypy>=0.950    # Type checking
+
+# Documentation (optional)
+sphinx>=4.5.0
+sphinx-rtd-theme>=1.0.0

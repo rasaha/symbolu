@@ -79,6 +79,74 @@ from .logit_modulation_benchmark import (
     SweepResult,
 )
 
+# Appendix F Stage 0: Generation Tracer
+from .generation_tracer import (
+    GenerationTracer,
+    BindingCacheTracerMixin,
+    CTMPlusTracerMixin,
+    MistralCGGenerationTracer,
+    BaselineStatisticsAnalyzer,
+)
+
+# Appendix F Stage 1: Coherence-Aware Decoder
+from .coherence_aware_decoder import (
+    CoherenceAwareDecoder,
+    CoherenceDecoderConfig,
+)
+
+# Appendix F Stage 2: Interpretive Conditioner
+from .interpretive_conditioner import (
+    InterpretiveConditioner,
+    InterpretiveConditionerConfig,
+    InterpretiveStateBuilder,
+    BhavaVectorCompressor,
+)
+
+# Appendix F Stage 4: Unified Coherence Controller
+from .unified_coherence_controller import (
+    UnifiedCoherenceController,
+    UnifiedCoherenceConfig,
+)
+
+# Appendix F Stage 7A: Semantic Coherence Integration
+from .semantic_coherence_integration import (
+    SemanticCoherenceIntegration,
+    SemanticCoherenceConfig,
+)
+
+# Appendix F Stage 7C: Experiential State (Dual-Space Architecture)
+from .experiential_state import (
+    ExperientialStateModule,
+    ExperientialStateConfig,
+)
+
+# Appendix F Stage 7D: Polarity Encoding (Varna Polarity Gates)
+from .polarity_encoding import (
+    PolarityGate,
+    PolarityEncodingConfig,
+)
+
+# Appendix F Stage 7F: Phase Coherence Signal
+from .phase_coherence_signal import (
+    PhaseCoherenceExtractor,
+    PhaseCoherenceAggregator,
+    PhaseCoherenceProjection,
+    PhaseCoherenceConfig,
+)
+
+# Phase 4: Sovereign ↔ Inference Reconciliation
+from .signal_reconciliation import (
+    reconcile_signals,
+    ReconciliationResult,
+    GunaSnapshot,
+    VrittiSnapshot,
+)
+from .diagnostic_hooks import (
+    InferenceDiagnosticHooks,
+    DiagnosticHooksConfig,
+    DiagnosticSnapshot,
+)
+
 __all__ = [
     # Core engines (Legacy)
     "EvolutionaryInferenceEngine",
@@ -132,6 +200,54 @@ __all__ = [
     "LogitModulationBenchmark",
     "BenchmarkMetrics",
     "SweepResult",
+
+    # Appendix F Stage 0: Generation Tracer
+    "GenerationTracer",
+    "BindingCacheTracerMixin",
+    "CTMPlusTracerMixin",
+    "MistralCGGenerationTracer",
+    "BaselineStatisticsAnalyzer",
+
+    # Appendix F Stage 1: Coherence-Aware Decoder
+    "CoherenceAwareDecoder",
+    "CoherenceDecoderConfig",
+
+    # Appendix F Stage 2: Interpretive Conditioner
+    "InterpretiveConditioner",
+    "InterpretiveConditionerConfig",
+    "InterpretiveStateBuilder",
+    "BhavaVectorCompressor",
+
+    # Appendix F Stage 4: Unified Coherence Controller
+    "UnifiedCoherenceController",
+    "UnifiedCoherenceConfig",
+
+    # Appendix F Stage 7A: Semantic Coherence Integration
+    "SemanticCoherenceIntegration",
+    "SemanticCoherenceConfig",
+
+    # Appendix F Stage 7C: Experiential State
+    "ExperientialStateModule",
+    "ExperientialStateConfig",
+
+    # Appendix F Stage 7D: Polarity Encoding
+    "PolarityGate",
+    "PolarityEncodingConfig",
+
+    # Appendix F Stage 7F: Phase Coherence Signal
+    "PhaseCoherenceExtractor",
+    "PhaseCoherenceAggregator",
+    "PhaseCoherenceProjection",
+    "PhaseCoherenceConfig",
+
+    # Phase 4: Sovereign ↔ Inference Reconciliation
+    "reconcile_signals",
+    "ReconciliationResult",
+    "GunaSnapshot",
+    "VrittiSnapshot",
+    "InferenceDiagnosticHooks",
+    "DiagnosticHooksConfig",
+    "DiagnosticSnapshot",
 ]
 
 __version__ = "2.0.0"

@@ -71,10 +71,14 @@ except ImportError:
 
 # V9.6.8: Import SovereignStateProjector for proper 32D state normalization
 try:
-    from symbolu.jepa.state_projector import SovereignStateProjector
+    from symbolu_training.jepa.state_projector import SovereignStateProjector
     SOVEREIGN_PROJECTOR_AVAILABLE = True
 except ImportError:
-    SOVEREIGN_PROJECTOR_AVAILABLE = False
+    try:
+        from symbolu.jepa.state_projector import SovereignStateProjector
+        SOVEREIGN_PROJECTOR_AVAILABLE = True
+    except ImportError:
+        SOVEREIGN_PROJECTOR_AVAILABLE = False
 
 
 # =============================================================================
@@ -1029,6 +1033,7 @@ def enable_phase_diversity_capture(model: nn.Module, enable: bool = True) -> int
             module.capture_phase_for_diversity = enable
             if not enable:
                 module._captured_phi_k = None  # Clear captured data
+                module._captured_phi_q = None  # Clear captured data
             count += 1
     return count
 
@@ -1051,6 +1056,24 @@ def collect_captured_phases(model: nn.Module) -> List[torch.Tensor]:
     return phases
 
 
+def collect_captured_phases_q(model: nn.Module) -> List[torch.Tensor]:
+    """
+    Collect all captured phi_q tensors from PhaseAttentionLayer modules.
+
+    Args:
+        model: Model containing PhaseAttentionLayer modules
+
+    Returns:
+        List of phi_q tensors [B, N, H, D_h] from each layer
+    """
+    phases = []
+    for module in model.modules():
+        if module.__class__.__name__ == 'PhaseAttentionLayer':
+            if hasattr(module, '_captured_phi_q') and module._captured_phi_q is not None:
+                phases.append(module._captured_phi_q)
+    return phases
+
+
 def compute_model_phase_diversity_loss(
     model: nn.Module,
     lambda_uniform: float = 0.001,
@@ -1060,49 +1083,70 @@ def compute_model_phase_diversity_loss(
     Compute phase diversity loss across all PhaseAttentionLayer modules.
 
     V9.9.10: Aggregates diversity losses from all captured phases.
+    V11.x: Now includes phi_q for symmetric regularization (prevents R_q collapse).
     Uses ChatGPT's enhanced uniformity + entropy proxy approach.
 
     Args:
-        model: Model with captured phi_k tensors
+        model: Model with captured phi_k and phi_q tensors
         lambda_uniform: Weight for uniformity loss (default 0.001)
         lambda_entropy: Weight for entropy proxy loss (default 0.001)
 
     Returns:
-        total_loss: Combined loss across all layers
+        total_loss: Combined loss across all layers (phi_k + phi_q)
         metrics: Dict with aggregate metrics
     """
-    phases = collect_captured_phases(model)
+    phases_k = collect_captured_phases(model)
+    phases_q = collect_captured_phases_q(model)
 
-    if not phases:
+    if not phases_k and not phases_q:
         # No phases captured, return zero loss
         device = next(model.parameters()).device
         return torch.tensor(0.0, device=device, requires_grad=False), {
             'phase_uniform_loss': 0.0,
             'phase_entropy_proxy': 0.0,
+            'phase_uniform_loss_q': 0.0,
+            'phase_entropy_proxy_q': 0.0,
             'phase_diversity_loss': 0.0,
             'num_layers_captured': 0,
         }
 
-    # Compute loss for each layer and average
-    total_uniform = 0.0
-    total_entropy = 0.0
+    # Compute loss for phi_k (keys) — existing behavior
+    total_uniform_k = 0.0
+    total_entropy_k = 0.0
     total_loss = None
 
-    for phi_k in phases:
+    for phi_k in phases_k:
         loss, metrics = compute_phase_diversity_losses(phi_k, lambda_uniform, lambda_entropy)
-        total_uniform += metrics['phase_uniform_loss']
-        total_entropy += metrics['phase_entropy_proxy']
+        total_uniform_k += metrics['phase_uniform_loss']
+        total_entropy_k += metrics['phase_entropy_proxy']
         if total_loss is None:
             total_loss = loss
         else:
             total_loss = total_loss + loss
 
-    num_layers = len(phases)
+    # Compute loss for phi_q (queries) — V11.x symmetric regularization
+    total_uniform_q = 0.0
+    total_entropy_q = 0.0
+
+    for phi_q in phases_q:
+        loss, metrics = compute_phase_diversity_losses(phi_q, lambda_uniform, lambda_entropy)
+        total_uniform_q += metrics['phase_uniform_loss']
+        total_entropy_q += metrics['phase_entropy_proxy']
+        if total_loss is None:
+            total_loss = loss
+        else:
+            total_loss = total_loss + loss
+
+    num_layers_k = len(phases_k)
+    num_layers_q = len(phases_q)
+    num_layers = max(num_layers_k, num_layers_q, 1)
     avg_loss = total_loss / num_layers if total_loss is not None else torch.tensor(0.0)
 
     return avg_loss, {
-        'phase_uniform_loss': total_uniform / num_layers,
-        'phase_entropy_proxy': total_entropy / num_layers,
+        'phase_uniform_loss': total_uniform_k / max(num_layers_k, 1),
+        'phase_entropy_proxy': total_entropy_k / max(num_layers_k, 1),
+        'phase_uniform_loss_q': total_uniform_q / max(num_layers_q, 1),
+        'phase_entropy_proxy_q': total_entropy_q / max(num_layers_q, 1),
         'phase_diversity_loss': avg_loss.item() if torch.is_tensor(avg_loss) else avg_loss,
         'num_layers_captured': num_layers,
     }
@@ -1916,12 +1960,19 @@ class PhaseAttentionLayer(nn.Module):
         # V10.3.8: Dual-Channel Attention (ChatGPT recommendation)
         dual_channel_mode: bool = False,  # Separate content and alignment scores
         alignment_authority: float = 0.1,  # α: weight for alignment term
+        # V10.12: Multi-channel Phase memory with selective write gating
+        phase_channels: int = 1,  # Number of independent memory channels (1=legacy)
+        phase_write_gate: bool = False,  # Selective write gating for memory updates
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
         self.aux_scale = aux_scale
+
+        # V10.12: Multi-channel Phase memory with selective write gating
+        self.phase_channels = phase_channels
+        self.phase_write_gate_enabled = phase_write_gate
 
         # V9.9.11: Phase collapse fixes (ChatGPT mandatory fixes)
         self.bounded_phase = bounded_phase  # π*sin() bounds φ to S¹ manifold
@@ -1996,6 +2047,55 @@ class PhaseAttentionLayer(nn.Module):
             # Instead, just use self.decay_gamma directly in forward()
             self.decay_logit = None
 
+        # V10.12: Multi-channel Phase memory modules
+        if phase_channels > 1:
+            # Per-channel-per-head decay: allows each channel to specialize
+            # in different memory horizons (e.g., channel 0=short, channel 3=long)
+            if learned_decay:
+                # Shape [C*H]: folded so parallel_ema_scan treats each channel-head
+                # pair as an independent "virtual head"
+                min_ts, max_ts = 2.0, 2048.0
+                log_ts = torch.linspace(math.log(min_ts), math.log(max_ts), phase_channels * num_heads)
+                ts = torch.exp(log_ts)
+                ch_gamma = torch.clamp(1.0 - 1.0 / ts, 0.001, 0.9995)
+                ch_sig = 2.0 * ch_gamma - 1.0
+                ch_sig = torch.clamp(ch_sig, 0.01, 0.99)
+                ch_logits = torch.log(ch_sig / (1.0 - ch_sig))
+                self.channel_decay_logit = nn.Parameter(ch_logits)  # [C*H]
+            else:
+                self.channel_decay_logit = None
+
+            # Channel aggregation: learned weights to combine C channels at readout
+            # Initialized uniform so all channels contribute equally at start
+            self.channel_agg = nn.Parameter(torch.ones(phase_channels) / phase_channels)
+
+        if phase_write_gate:
+            # Selective write gate: g_t = sigmoid(W_g @ x_t)
+            # Per-channel per-head gate controls what gets written to memory
+            # Shape: embed_dim → phase_channels * num_heads
+            self.write_gate_proj = nn.Linear(embed_dim, phase_channels * num_heads, bias=True)
+            # Initialize bias to +2 so gates start near-open (sigmoid(2)≈0.88)
+            # This ensures training starts close to the unmodified behavior
+            nn.init.zeros_(self.write_gate_proj.weight)
+            nn.init.constant_(self.write_gate_proj.bias, 2.0)
+
+        # V10.12: Diagnostic capture flags
+        self._diag_phase_gate_mean = None
+        self._diag_phase_gate_std = None
+        self._diag_phase_state_norm_per_channel = None
+        self._diag_phase_attn_mass = None
+
+        # V10.13: Phase Warm-Start Gate (defaults, overridden by HybridPhaseTransformer)
+        self.phase_warmstart_enabled = False
+        self._warmstart_steps = 10000
+        self._warmstart_tau = 2000.0
+        self._warmstart_apply_inference = False
+        self._current_step = 0
+        self._diag_warmstart_alpha = None
+
+        # V10.13: Phase→Global state capture (detached, for external consumers)
+        self._last_final_state_agg = None
+
         # V9.9.9: PHASE SPREAD INITIALIZATION (Gemini's recommendation)
         # Distribute starting phases around the unit circle to shatter phase collapse.
         # Each head gets a unique rotational offset to encourage semantic diversity.
@@ -2005,9 +2105,10 @@ class PhaseAttentionLayer(nn.Module):
         self.phase_offset_k = nn.Parameter(phase_offsets.clone(), requires_grad=False)  # Fixed offsets
 
         # V9.9.10: Phase diversity loss capture
-        # When enabled, captures phi_k for computing repulsion + entropy losses
+        # When enabled, captures phi_k and phi_q for computing repulsion + entropy losses
         self.capture_phase_for_diversity = False  # Set True during training
         self._captured_phi_k = None  # [B, N, H, D_h] stored during forward
+        self._captured_phi_q = None  # [B, N, H, D_h] stored during forward (V11.x: symmetric regularization)
 
         # V9.9.12c: Health dashboard capture (diagnostic only, no gradients)
         # Uses separate _health_* attributes to avoid overwriting diversity capture
@@ -2051,11 +2152,13 @@ class PhaseAttentionLayer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
 
-        # V9.6.11: Initialize phase projections with uniform [-π, π]
-        # This ensures diverse phases at initialization for gradient flow
+        # V9.6.11: Initialize phase projections with diverse phases
         # V10.8: Apply to fused weight's phase half (first embed_dim rows)
-        nn.init.uniform_(self.W_q_fused.weight[:embed_dim], -3.14159, 3.14159)
-        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -3.14159, 3.14159)
+        # V10.15: Reduced from [-π, π] to [-1, 1] to prevent gradient spikes
+        # in fused projection during LR warmup. Phase diversity is preserved
+        # since sin/cos cover full range within [-1, 1] input.
+        nn.init.uniform_(self.W_q_fused.weight[:embed_dim], -1.0, 1.0)
+        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -1.0, 1.0)
 
         # V9.6.12: Complex-to-real projection for "complex" cosine mode
         # Projects [real, imag] → real, allowing the model to learn how to
@@ -2163,6 +2266,16 @@ class PhaseAttentionLayer(nn.Module):
         B, N, D = x.shape
         residual = x
 
+        # V10.13: Phase Warm-Start Gate — compute dampening coefficient
+        if self.phase_warmstart_enabled:
+            _ws_s = self._current_step
+            _warmstart_alpha = 1.0 / (1.0 + math.exp(-(_ws_s - self._warmstart_steps) / max(self._warmstart_tau, 1.0)))
+            if (not self.training) and (not self._warmstart_apply_inference):
+                _warmstart_alpha = 1.0
+            self._diag_warmstart_alpha = _warmstart_alpha
+        else:
+            _warmstart_alpha = 1.0
+
         # Pre-norm (standard for modern transformers)
         x_norm = self.norm(x)
 
@@ -2177,12 +2290,16 @@ class PhaseAttentionLayer(nn.Module):
         # V10.8: Fused query projection — one GEMM, then split
         q_fused = self.W_q_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
         phi_q_raw = q_fused[:, :, 0]  # [B, N, H, D_h]
-        a_q = torch.sigmoid(q_fused[:, :, 1])  # [B, N, H, D_h]
+        # V10.17: Amplitude floor prevents sigmoid collapse toward 0.
+        # When a_q ≈ 0, the normalizer (a_q * a_k_cumsum) hits the clamp floor
+        # and gradients through the sigmoid/cumsum path explode (2183x variance
+        # spikes observed on W_k_fused). Floor at 0.05 guarantees minimum amplitude.
+        a_q = 0.05 + 0.95 * torch.sigmoid(q_fused[:, :, 1])  # [B, N, H, D_h]
 
         # V10.8: Fused key projection — one GEMM, then split
         k_fused = self.W_k_fused(x_norm).view(B, N, 2, self.num_heads, self.head_dim)
         phi_k_raw = k_fused[:, :, 0]  # [B, N, H, D_h]
-        a_k = torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
+        a_k = 0.05 + 0.95 * torch.sigmoid(k_fused[:, :, 1])  # [B, N, H, D_h]
 
         # V9.9.11: Bounded phase parameterization (ChatGPT Fix 1 - mandatory)
         # Constrains φ to [-π, π] via π*sin() for proper S¹ manifold geometry.
@@ -2201,10 +2318,11 @@ class PhaseAttentionLayer(nn.Module):
             phi_q = phi_q + self.phase_offset_q.to(phi_q.dtype).view(1, 1, -1, 1)
             phi_k = phi_k + self.phase_offset_k.to(phi_k.dtype).view(1, 1, -1, 1)
 
-        # V9.9.10: Capture phi_k for phase diversity loss computation
+        # V9.9.10: Capture phi_k and phi_q for phase diversity loss computation
         # Only capture during training when flag is set (saves memory in eval)
         if self.capture_phase_for_diversity and self.training:
             self._captured_phi_k = phi_k  # [B, N, H, D_h] - gradients flow through
+            self._captured_phi_q = phi_q  # [B, N, H, D_h] - V11.x: symmetric regularization
 
         # V9.9.12c: Capture for health diagnostics (read-only, detached)
         # Use separate attributes to avoid overwriting diversity capture's
@@ -2306,66 +2424,115 @@ class PhaseAttentionLayer(nn.Module):
         # KV product: [B, N, H, D_h] × [B, N, H, D_h] -> [B, N, H, D_h]
         kv_complex = k_phasor * v_complex
 
-        # O(n) Causal aggregation with optional decay
-        # V9.6.13: State decay for memory horizon control
-        # V9.9.7: Learned per-head decay (Mamba/S4-style)
+        # V10.12: Multi-channel write gating and state accumulation
+        C = self.phase_channels
+        H_size = kv_complex.shape[2]
+        D_h = kv_complex.shape[3]
+
+        # --- Write Gate ---
+        # g_t = sigmoid(W_g @ x_t), applied: kv_gated = g_t * kv_t
+        if self.phase_write_gate_enabled:
+            # x is the pre-norm input [B, N, D] — use it for gating
+            gate_logits = self.write_gate_proj(x)  # [B, N, C*H]
+            gate = torch.sigmoid(gate_logits).view(B, N, C, H_size, 1)  # [B, N, C, H, 1]
+            # Diagnostic capture
+            with torch.no_grad():
+                self._diag_phase_gate_mean = gate.mean().item()
+                self._diag_phase_gate_std = gate.std().item()
+        else:
+            gate = None  # No gating — all 1s implicitly
+
+        # --- Expand kv to channels and apply gate ---
+        if C > 1:
+            # kv_complex: [B, N, H, D_h] → [B, N, C, H, D_h] (broadcast across channels)
+            kv_multi = kv_complex.unsqueeze(2).expand(B, N, C, H_size, D_h)
+            if gate is not None:
+                kv_multi = kv_multi * gate  # Per-channel per-head gating
+            # Fold channels into heads for parallel_ema_scan: [B, N, C*H, D_h]
+            kv_scan = kv_multi.reshape(B, N, C * H_size, D_h)
+        else:
+            # Single channel: apply gate directly (no expand needed)
+            if gate is not None:
+                kv_scan = kv_complex * gate.view(B, N, H_size, 1)
+            else:
+                kv_scan = kv_complex
+            # kv_scan: [B, N, H, D_h] — unchanged shape for backward compat
+
+        # V10.13: Phase Warm-Start — dampen writes during early training
+        if _warmstart_alpha < 1.0:
+            kv_scan = kv_scan * _warmstart_alpha
+
+        # --- State Accumulation (O(n) causal aggregation) ---
         use_decay = self.learned_decay or self.decay_gamma < 1.0
 
         if not use_decay:
-            # Original: infinite memory via cumsum
-            # V10.2: Add prev_state if provided (chunk continuation)
             if prev_state is not None:
-                # prev_state is [B, 1, H, D_h] - the final state from previous chunk
-                # Add it to cumsum: S_t = prev_state + Σ_{j≤t} KV_j
-                global_state = torch.cumsum(kv_complex, dim=1) + prev_state
+                global_state = torch.cumsum(kv_scan, dim=1) + prev_state
             else:
-                global_state = torch.cumsum(kv_complex, dim=1)  # [B, N, H, D_h]
+                global_state = torch.cumsum(kv_scan, dim=1)
         else:
-            # V9.9.8: Use parallel EMA scan for ~32x speedup over sequential loop
-            # Stable decay accumulation: S_t = γ * S_{t-1} + kv_t
-            H_size = kv_complex.shape[2]
-
-            # V9.9.7: Per-head learned decay or fixed decay
-            if self.learned_decay:
-                # Learned decay: γ ∈ [0.5, 1.0] per head via sigmoid
-                # Higher values = longer memory, lower = focus on recent
-                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+            # Compute decay: per-channel-per-head if C>1, else per-head
+            if C > 1 and self.learned_decay and self.channel_decay_logit is not None:
+                gamma = 0.97 + 0.0295 * torch.sigmoid(self.channel_decay_logit)  # [C*H]
+            elif self.learned_decay:
+                gamma = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)  # [H]
+                if C > 1:
+                    # Broadcast per-head decay to all channels: [H] → [C*H]
+                    gamma = gamma.repeat(C)
             else:
                 gamma = self.decay_gamma  # Scalar
 
-            # V10.2: Handle prev_state for chunked EMA scan
+            # Handle prev_state for chunked EMA scan
+            VH = kv_scan.shape[2]  # H or C*H
             if prev_state is not None:
-                # For EMA: S_t = γ * S_{t-1} + kv_t
-                # With prev_state: S_0 = γ * prev_state + kv_0
-                # We prepend a decayed prev_state contribution to each position
-                # S_t = γ^(t+1) * prev_state + Σ_{j≤t} γ^(t-j) * kv_j
                 if isinstance(gamma, float):
-                    gamma_tensor = torch.tensor(gamma, device=kv_complex.device, dtype=torch.float32)
+                    gamma_tensor = torch.tensor(gamma, device=kv_scan.device, dtype=torch.float32)
                 else:
                     gamma_tensor = gamma
-                # Compute decay factors for prev_state: γ^1, γ^2, ..., γ^N
-                t_indices = torch.arange(1, N + 1, device=kv_complex.device, dtype=torch.float32)
+                t_indices = torch.arange(1, N + 1, device=kv_scan.device, dtype=torch.float32)
                 if gamma_tensor.dim() == 0:
-                    # Scalar gamma
-                    decay_factors = gamma_tensor ** t_indices  # [N]
+                    decay_factors = gamma_tensor ** t_indices
                     decay_factors = decay_factors.view(1, N, 1, 1)
                 else:
-                    # Per-head gamma [H]
-                    decay_factors = gamma_tensor.unsqueeze(0) ** t_indices.unsqueeze(1)  # [N, H]
-                    decay_factors = decay_factors.view(1, N, H_size, 1)
-                # Add decayed prev_state to EMA scan result
-                global_state = parallel_ema_scan(kv_complex, gamma) + prev_state * decay_factors.to(kv_complex.dtype)
+                    decay_factors = gamma_tensor.unsqueeze(0) ** t_indices.unsqueeze(1)  # [N, VH]
+                    decay_factors = decay_factors.view(1, N, VH, 1)
+                global_state = parallel_ema_scan(kv_scan, gamma) + prev_state * decay_factors.to(kv_scan.dtype)
             else:
-                # Use optimized parallel scan instead of sequential loop
-                global_state = parallel_ema_scan(kv_complex, gamma)
+                global_state = parallel_ema_scan(kv_scan, gamma)
 
-            # V9.9.9: Capture state norm for cumsum health monitoring (Gemini's suggestion)
-            # If this grows linearly with sequence length, the leaky scan isn't working
+            # State norm diagnostic
             with torch.no_grad():
                 self._diag_state_norm = global_state.abs().mean(dim=-1).mean(dim=-1)  # [B, N]
 
-        # V10.2: Capture final state for chunk continuation
-        final_state = global_state[:, -1:, :, :]  # [B, 1, H, D_h] - last position's state
+        # Capture final state for chunk continuation
+        # Raw state: [B, 1, H, D_h] (C=1) or [B, 1, C*H, D_h] (C>1) — for Phase EMA continuation
+        final_state = global_state[:, -1:, :, :]
+        # Aggregated final state: always [B, 1, H, D_h] — for cross-attention concatenation
+        if C > 1:
+            final_state_ch = final_state.view(B, 1, C, H_size, D_h)
+            ch_w = torch.softmax(self.channel_agg, dim=0).view(1, 1, C, 1, 1)
+            final_state_agg = (final_state_ch * ch_w).sum(dim=2)  # [B, 1, H, D_h]
+        else:
+            final_state_agg = final_state
+
+        # V10.13: Store for Phase→Global integration (detached, no extra grad)
+        self._last_final_state_agg = final_state_agg.detach()
+
+        # --- Multi-channel readout: aggregate across channels ---
+        if C > 1:
+            # global_state: [B, N, C*H, D_h] → [B, N, C, H, D_h]
+            global_state_ch = global_state.view(B, N, C, H_size, D_h)
+            # Learned channel weights (softmax for stable mixing)
+            ch_weights = torch.softmax(self.channel_agg, dim=0)  # [C]
+            ch_weights = ch_weights.view(1, 1, C, 1, 1)
+            # Weighted sum across channels: [B, N, C, H, D_h] → [B, N, H, D_h]
+            global_state_agg = (global_state_ch * ch_weights).sum(dim=2)
+
+            # Per-channel norm diagnostic
+            with torch.no_grad():
+                self._diag_phase_state_norm_per_channel = global_state_ch.abs().mean(dim=(0, 1, 4))  # [C, H]
+        else:
+            global_state_agg = global_state
 
         # =====================================================================
         # 5. Readout: Synchronization via Q × State (NORMALIZED)
@@ -2375,21 +2542,20 @@ class PhaseAttentionLayer(nn.Module):
         # V9.6.13: Apply same decay to normalizer for consistency
         # V9.9.7: Use same per-head learned decay as state accumulation
         # V10.2: Handle prev_norm_state for chunk continuation
+        # NOTE: Normalizer uses per-head decay (not per-channel), since it tracks
+        # amplitude accumulation which is channel-independent.
         if not use_decay:
             if prev_norm_state is not None:
                 a_k_cumsum = torch.cumsum(a_k, dim=1) + prev_norm_state
             else:
                 a_k_cumsum = torch.cumsum(a_k, dim=1)  # [B, N, H, D_h], always positive
         else:
-            # V9.9.8: Use parallel EMA scan for normalizer (same gamma as state)
-            # Reuse gamma from above (already computed for learned_decay case)
             if self.learned_decay:
-                gamma_norm = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)  # [H]
+                gamma_norm = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)  # [H]
             else:
                 gamma_norm = self.decay_gamma
 
             if prev_norm_state is not None:
-                # Same decay logic as for main state
                 if isinstance(gamma_norm, float):
                     gamma_tensor = torch.tensor(gamma_norm, device=a_k.device, dtype=torch.float32)
                 else:
@@ -2399,20 +2565,27 @@ class PhaseAttentionLayer(nn.Module):
                     decay_factors = gamma_tensor ** t_indices
                     decay_factors = decay_factors.view(1, N, 1, 1)
                 else:
-                    H_size = a_k.shape[2]
                     decay_factors = gamma_tensor.unsqueeze(0) ** t_indices.unsqueeze(1)
                     decay_factors = decay_factors.view(1, N, H_size, 1)
                 a_k_cumsum = parallel_ema_scan(a_k, gamma_norm) + prev_norm_state * decay_factors.to(a_k.dtype)
             else:
                 a_k_cumsum = parallel_ema_scan(a_k, gamma_norm)
 
-        # V10.2: Capture final normalizer state for chunk continuation
+        # Capture final normalizer state for chunk continuation
         final_norm_state = a_k_cumsum[:, -1:, :, :]  # [B, 1, H, D_h]
 
-        normalizer = a_q * a_k_cumsum + 1e-6   # [B, N, H, D_h], always positive
+        # V10.19: Detached normalizer — same pattern as slot key normalization (line 8576).
+        # The division numerator/normalizer creates ∂L/∂normalizer = -numerator/normalizer²,
+        # which is -100x when normalizer hits the 0.1 clamp floor. This gradient propagates
+        # back through a_q → W_q_fused and cumsum(a_k) → W_k_fused, causing the variance
+        # spikes (906x on v_proj, 34x on W_k_fused) that cascade to full backbone divergence
+        # around step 720. Detaching preserves correct forward normalization while keeping
+        # amplitude gradients flowing only through the numerator (bounded, healthy signal).
+        normalizer = (a_q * a_k_cumsum).clamp(min=0.1).detach()  # [B, N, H, D_h]
 
         # V9.6.12: Cosine mode selection for interaction kernel
-        qk_product = q_phasor * global_state  # [B, N, H, D_h] complex
+        # Use aggregated state (channels already combined) for readout
+        qk_product = q_phasor * global_state_agg  # [B, N, H, D_h] complex
 
         if self.cosine_mode == "standard":
             # Original: cos(φ_q - φ_k), range [-1, +1]
@@ -2508,6 +2681,9 @@ class PhaseAttentionLayer(nn.Module):
             output = self.out_proj(sync_output)
             output = self.dropout(output)
             output = output * self.aux_scale
+            # V10.13: Phase Warm-Start — dampen reads during early training
+            if _warmstart_alpha < 1.0:
+                output = output * _warmstart_alpha
             result = output + residual
 
             # V10.2: Return state for chunk continuation
@@ -2569,17 +2745,23 @@ class PhaseAttentionLayer(nn.Module):
         # This prevents Phase from competing 50/50 with Quadratic attention
         output = output * self.aux_scale
 
+        # V10.13: Phase Warm-Start — dampen reads during early training
+        if _warmstart_alpha < 1.0:
+            output = output * _warmstart_alpha
+
         # Residual connection
         result = output + residual
 
         # V10.2: Return state for chunk continuation
         if return_state:
             state_dict = {
-                'final_state': final_state,  # [B, 1, H, D_h] complex
+                'final_state': final_state,  # [B, 1, H, D_h] or [B, 1, C*H, D_h] for Phase EMA
+                'final_state_agg': final_state_agg,  # [B, 1, H, D_h] always — for cross-attn
                 'final_norm_state': final_norm_state,  # [B, 1, H, D_h] real
                 # V10.2.1: Return memory_state for Local cross-attention
-                # This is the full cumsum state [B, N, H, D_h] that Local can query
-                'memory_state': global_state,  # [B, N, H, D_h] complex - FULL sequence state
+                # Uses aggregated state [B, N, H, D_h] (channels already combined)
+                # V10.13: Dampen memory for cross-attention during warm-start
+                'memory_state': global_state_agg * _warmstart_alpha if _warmstart_alpha < 1.0 else global_state_agg,
             }
             return result, state_dict
 
@@ -2625,6 +2807,8 @@ class PhaseStateCache:
         # Maps layer_idx -> {'final_state': Tensor, 'final_norm_state': Tensor}
         self._states: Dict[int, Dict[str, torch.Tensor]] = {}
         self._step_count: int = 0
+        # V10.7.1: Token buffer for full-prefix replay when local layers are active
+        self._token_buffer: Optional[torch.Tensor] = None
 
     def get_layer_state(self, layer_idx: int) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
         """Get (prev_state, prev_norm_state) for a layer. Returns (None, None) if no state yet."""
@@ -2674,10 +2858,31 @@ class PhaseStateCache:
         """Record that n_tokens were processed."""
         self._step_count += n_tokens
 
+    def append_tokens(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """
+        V10.7.1: Append new tokens to the token buffer and return full sequence.
+
+        Used by the safety fallback to reconstruct the full prefix for replay.
+        The token buffer grows linearly with sequence length — this is the
+        correctness-over-performance tradeoff when local layers are active.
+
+        Args:
+            input_ids: [B, N] new token IDs to append
+
+        Returns:
+            full_input_ids: [B, total_len] all tokens seen so far (including new)
+        """
+        if self._token_buffer is None:
+            self._token_buffer = input_ids
+        else:
+            self._token_buffer = torch.cat([self._token_buffer, input_ids], dim=1)
+        return self._token_buffer
+
     def reset(self) -> None:
         """Clear all state (start of new sequence)."""
         self._states.clear()
         self._step_count = 0
+        self._token_buffer = None
 
     def memory_bytes(self) -> int:
         """Total memory used by cached states (should be constant regardless of seq_len)."""
@@ -2724,6 +2929,7 @@ def forward_chunked_tbptt(
     grad_scaler: Optional[Any] = None,
     autocast_dtype: Optional[torch.dtype] = None,
     gradient_accumulation: int = 1,
+    aux_loss_fn: Optional[callable] = None,
 ) -> Dict[str, Any]:
     """
     Chunked forward + backward with Truncated BPTT for Phase state machines.
@@ -2750,6 +2956,10 @@ def forward_chunked_tbptt(
         gradient_accumulation: Number of gradient accumulation steps. Loss is scaled
                               by 1/(num_chunks * gradient_accumulation) so that
                               TBPTT gradient magnitude matches the standard path.
+        aux_loss_fn: Optional Callable(result_dict, chunk_targets) -> scalar loss.
+                     V10.14.10: Called per-chunk with the full result dict (including
+                     _slot_keys, _slot_vals, _slot_hidden) to compute auxiliary losses
+                     like slot retrieval loss that need to be backpropagated per-chunk.
 
     Returns:
         Dict with:
@@ -2800,6 +3010,12 @@ def forward_chunked_tbptt(
             )
             chunk_logits = result['logits']
             chunk_loss, chunk_metrics = loss_fn(chunk_logits, chunk_targets)
+
+        # V10.14.10: Add auxiliary loss (e.g. slot retrieval loss) per-chunk
+        if aux_loss_fn is not None:
+            _aux_loss = aux_loss_fn(result, chunk_targets)
+            if _aux_loss is not None:
+                chunk_loss = chunk_loss + _aux_loss
 
         # V10.8: Scale loss for BOTH chunk mean AND gradient accumulation
         scaled_loss = chunk_loss / loss_divisor
@@ -3058,8 +3274,8 @@ class BindingCachePhaseState(nn.Module):
         # This tests whether phase encodes relational structure
         self._rotation_angle = 0.0  # in radians
 
-        # Initialize phase half with uniform [-π, π]
-        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -3.14159, 3.14159)
+        # V10.15: Reduced from [-π, π] to [-1, 1] to prevent gradient spikes
+        nn.init.uniform_(self.W_k_fused.weight[:embed_dim], -1.0, 1.0)
 
     # V10.8: Backward-compatible properties for code accessing old separate weights
     class _FusedWeightView:
@@ -3198,7 +3414,7 @@ class BindingCachePhaseState(nn.Module):
         else:
             # EMA with decay
             if self.learned_decay:
-                gamma = 0.5 + 0.5 * torch.sigmoid(self.decay_logit)
+                gamma = 0.97 + 0.0295 * torch.sigmoid(self.decay_logit)
             else:
                 gamma = self.decay_gamma
             memory_state = parallel_ema_scan(kv, gamma)
@@ -3723,6 +3939,12 @@ class BindingCacheBlock(nn.Module):
         # Applied AFTER proposals, BEFORE phase integration (compositional creativity)
         self.interference_scorer = interference_scorer
 
+        # V10.7.2: RMSNorm on memory_state before Quad queries.
+        # With decay_gamma=1.0, cumsum causes memory_state norm to grow O(sqrt(N)).
+        # Without normalization, growing norms flatten quad attention scores
+        # (softmax saturates) and cause overconfident/repetitive generation.
+        self.norm_memory = nn.RMSNorm(embed_dim)
+
         # Feed-forward
         self.norm_ff = nn.LayerNorm(embed_dim)
         self.ff = nn.Sequential(
@@ -3835,6 +4057,11 @@ class BindingCacheBlock(nn.Module):
         # enable_slots_read only gates the READ path (quad retrieval)
         memory_state = self.phase_state(x, intent_phase=intent_phase)
 
+        # V10.7.2: Normalize memory_state before Quad queries it.
+        # With decay_gamma=1.0 (cumsum), memory_state norm grows O(sqrt(N)).
+        # RMSNorm stabilizes the scale so Quad attention scores don't saturate.
+        memory_state_normed = self.norm_memory(memory_state)
+
         # V10.6.2: Check if slot reading is enabled (D.2 recommendation)
         # This separates read path gating from write path
         if not enable_slots_read:
@@ -3852,7 +4079,7 @@ class BindingCacheBlock(nn.Module):
 
             # Get proposals from quad (no softmax mixing)
             proposals, proposal_scores = self.quad_query.get_proposals(
-                x, memory_state, binding_salience=binding_salience
+                x, memory_state_normed, binding_salience=binding_salience
             )
 
             # V10.5: Optional interference-aware rescoring (compositional creativity)
@@ -3865,15 +4092,15 @@ class BindingCacheBlock(nn.Module):
                 if hasattr(self, '_last_interference_stats'):
                     self._last_interference_stats = interference_stats
 
-            # Phase integrates proposals
+            # Phase integrates proposals (uses raw memory_state for gating context)
             mem_out = self.phase_state.integrate_proposals(
                 x, memory_state, proposals, proposal_scores
             )
             # Combine: local (syntax) + memory (semantics) - no competition
             attn_out = local_out + mem_out
         else:
-            # Original mode: Quad queries memory state with softmax attention
-            mem_out = self.quad_query(x, memory_state, binding_salience=binding_salience)
+            # Original mode: Quad queries normalized memory state with softmax attention
+            mem_out = self.quad_query(x, memory_state_normed, binding_salience=binding_salience)
             # Combine: local (syntax) + memory (semantics) - no competition
             attn_out = local_out + mem_out
 
@@ -4982,6 +5209,13 @@ class LocalAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.norm = nn.LayerNorm(embed_dim)
 
+        # V10.11: Learned Re+Im projection for complex phase memory.
+        # When phase_memory is complex [B, M, H, D_h], we concatenate Re and Im
+        # to get [B, M, 2*H*D_h], then project to embed_dim for K/V.
+        # Preserves both Re and Im instead of discarding Im (.real) or
+        # destroying sign (.abs()). Init std=0.02 prevents early amplification.
+        self.complex_proj = nn.Linear(2 * self.kv_dim, embed_dim)
+
         # Select backend
         if backend == 'auto':
             if FLASH_ATTN_AVAILABLE:
@@ -5231,30 +5465,28 @@ class LocalAttention(nn.Module):
             # V10.2.1: Cross-attention mode - K/V from Phase memory
             # phase_memory is [B, M, H, D_h] complex where M may differ from N
             # V10.2.2: M can be N+1 when prev_phase_state is concatenated
-            # Take real part for K/V (imaginary encodes phase relationships)
+            # V10.11: Learned Re+Im projection instead of .real (loses Im) or
+            # .abs() (destroys sign). Concatenate [Re(S); Im(S)] and project
+            # through a learned linear layer to preserve full complex signal.
+            M = phase_memory.shape[1]
+            H = phase_memory.shape[2]
+            D_h = phase_memory.shape[3]
+
             if phase_memory.is_complex():
-                memory_real = phase_memory.real  # [B, M, H, D_h]
+                re_part = phase_memory.real.reshape(B, M, H * D_h)
+                im_part = phase_memory.imag.reshape(B, M, H * D_h)
+                memory_flat = self.complex_proj(
+                    torch.cat([re_part, im_part], dim=-1)
+                )  # [B, M, embed_dim]
             else:
-                memory_real = phase_memory
-
-            # V10.2.2: Use memory's sequence length, not input's
-            M = memory_real.shape[1]  # Memory sequence length (may differ from N)
-            H = memory_real.shape[2]
-            D_h = memory_real.shape[3]
-            memory_flat = memory_real.view(B, M, H * D_h)
-
-            # Project to K/V (may need to handle dimension mismatch)
-            # If embed_dim != H * D_h, we need a separate projection
-            if memory_flat.shape[-1] != D:
-                # Create projection on-the-fly (or should be added to __init__)
-                # For now, use linear interpolation or truncation
-                if memory_flat.shape[-1] < D:
-                    # Pad with zeros
-                    padding = torch.zeros(B, M, D - memory_flat.shape[-1], device=x.device, dtype=x.dtype)
-                    memory_flat = torch.cat([memory_flat, padding], dim=-1)
-                else:
-                    # Truncate
-                    memory_flat = memory_flat[:, :, :D]
+                memory_flat = phase_memory.reshape(B, M, H * D_h)
+                # Handle dimension mismatch for real-only memory
+                if memory_flat.shape[-1] != D:
+                    if memory_flat.shape[-1] < D:
+                        padding = torch.zeros(B, M, D - memory_flat.shape[-1], device=x.device, dtype=x.dtype)
+                        memory_flat = torch.cat([memory_flat, padding], dim=-1)
+                    else:
+                        memory_flat = memory_flat[:, :, :D]
 
             # K, V from Phase memory (length M, may differ from Q length N)
             K = self.k_proj(memory_flat).view(B, M, self.n_kv_heads, self.head_dim).transpose(1, 2)
@@ -5592,8 +5824,9 @@ class GroupedHybridTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
@@ -5704,6 +5937,9 @@ class HybridAttentionLayer(nn.Module):
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
         alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2: Protected Phase pattern (default=True)
+        # V10.12: Multi-channel Phase memory with selective write gating
+        phase_channels: int = 1,
+        phase_write_gate: bool = False,
     ):
         super().__init__()
         # V9.9.1: Track layer index for per-layer phase weight control
@@ -5748,6 +5984,8 @@ class HybridAttentionLayer(nn.Module):
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
             dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
             alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
+            phase_channels=phase_channels,  # V10.12: Multi-channel memory
+            phase_write_gate=phase_write_gate,  # V10.12: Selective write gate
         )
 
         self.norm = nn.LayerNorm(embed_dim)
@@ -5844,27 +6082,42 @@ class HybridAttentionLayer(nn.Module):
             # This enforces: "Quadratic queries ONLY Phase memory for long-range info"
 
             # V10.2.2 FIX: Include previous chunk's final state in cross-attention
-            # Without this, Local can only see current chunk's Phase memory.
-            # The prev_phase_state contains aggregated info from all previous chunks.
+            # V10.12: prev_phase_state may be [B,1,C*H,D_h] with multi-channel.
+            # Aggregate it to [B,1,H,D_h] to match phase_memory for concatenation.
             if prev_phase_state is not None and phase_memory is not None:
-                # Concatenate: [prev_final_state, current_chunk_memory]
-                # prev_phase_state: [B, 1, H, D_h] (aggregated from previous chunks)
-                # phase_memory: [B, N, H, D_h] (current chunk positions)
-                # Result: [B, N+1, H, D_h] - Local can attend to both
-                phase_memory = torch.cat([prev_phase_state, phase_memory], dim=1)
+                prev_for_xattn = prev_phase_state
+                H_mem = phase_memory.shape[2]  # num_heads
+                if prev_for_xattn.shape[2] != H_mem:
+                    # Multi-channel: [B,1,C*H,D_h] → mean over channels → [B,1,H,D_h]
+                    C = prev_for_xattn.shape[2] // H_mem
+                    prev_for_xattn = prev_for_xattn.view(
+                        prev_for_xattn.shape[0], 1, C, H_mem, prev_for_xattn.shape[3]
+                    ).mean(dim=2)
+                phase_memory = torch.cat([prev_for_xattn, phase_memory], dim=1)
+
+            # V10.21: RMS-normalize phase_memory before local cross-attention.
+            # phase_memory is a cumsum output — magnitudes grow linearly with
+            # sequence position. When local_attn's complex_proj → k_proj/v_proj
+            # processes unbounded magnitudes, the softmax attention gradients
+            # create 300-500× spikes in W_k_fused and v_proj (step 700: 430×,
+            # 487×) that cascade through blocks 3-7 into full PPL collapse.
+            # RMS normalization bounds the magnitudes to O(1) while preserving
+            # relative structure and gradient flow. Using detached denominator
+            # (same pattern as phase normalizer V10.19) to prevent the
+            # normalization Jacobian from creating new amplification paths.
+            if phase_memory is not None:
+                _pm_rms = (phase_memory.abs() ** 2).mean(dim=-1, keepdim=True).sqrt().clamp(min=1e-6)
+                phase_memory = phase_memory / _pm_rms.detach()
 
             x_local = self.local_attn(x, causal_mask, phase_memory=phase_memory)
 
             # V10.2.1 GRADIENT ROUTING (Requirement 7):
-            # - Token loss → Local (via output): ✅
-            # - Token loss → Phase (via Local's K/V from memory_state): ✅
-            # - Token loss → Phase directly: ❌ (NO x_phase in output!)
-            #
-            # Phase gets gradients ONLY through:
-            #   loss → output → x_local → Local K/V → memory_state → Phase
-            #
-            # This is critical for "protected learning" - Phase must learn
-            # representations useful for Local's queries, not compete for loss.
+            # Phase output is NOT added to the residual directly. Phase influences
+            # logits only through Local's cross-attention to phase_memory.
+            # This is intentional: Phase state can have large norms (cumsum),
+            # and adding it directly would destabilize the residual stream.
+            # The fix for Phase signal strength is at the source (bounded state
+            # accumulation + learned Re+Im projection), not here.
             output = residual + x_local
         else:
             # Standard Parallel: Local processes original input independently
@@ -6000,6 +6253,9 @@ class HybridTransformerBlock(nn.Module):
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
         alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2.1: Protected Phase pattern for chunking
+        # V10.12: Multi-channel Phase memory with selective write gating
+        phase_channels: int = 1,
+        phase_write_gate: bool = False,
     ):
         super().__init__()
         self.layer_idx = layer_idx  # V9.9.1: Track layer index
@@ -6024,6 +6280,8 @@ class HybridTransformerBlock(nn.Module):
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
             dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
             alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
+            phase_channels=phase_channels,  # V10.12: Multi-channel memory
+            phase_write_gate=phase_write_gate,  # V10.12: Selective write gate
         )
         self.ff = FeedForward(
             embed_dim=config.embed_dim,
@@ -6226,8 +6484,9 @@ class PhaseTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
@@ -6301,7 +6560,7 @@ class PhaseTransformer(nn.Module):
                     block,
                     x,
                     True,  # causal_mask
-                    use_reentrant=False,
+                    use_reentrant=True,
                 )
             else:
                 x = block(x, causal_mask=True)
@@ -6370,7 +6629,7 @@ class PhaseTransformer(nn.Module):
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = block(x, causal_mask=True)
@@ -6467,13 +6726,36 @@ class HybridPhaseTransformer(nn.Module):
         temperature: float = 1.0,  # Lower = sharper attention (for classification)
         tie_embeddings: bool = True,  # V9.6.0: Set False when using Sanskrit/CSR to prevent embedding corruption
         cosine_mode: str = "standard",  # V9.6.12: "standard", "shifted", or "complex"
-        decay_gamma: float = 1.0,  # V9.6.13: State decay factor (1.0=infinite, <1.0=local focus)
-        learned_decay: bool = False,  # V9.9.7: Per-head learned decay (Mamba/S4-style)
+        decay_gamma: float = 0.99,  # V10.11: EMA decay (was 1.0 = unbounded cumsum → norm explosion)
+        learned_decay: bool = True,  # V10.11: Per-head learned decay γ∈[0.5,1.0] (was False)
         bounded_phase: bool = False,  # V9.9.11: Constrain φ to [-π, π] via π*sin()
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
         alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
         protected_phase: bool = True,  # V10.2.1: Protected Phase pattern for chunking
+        # V10.12: Multi-channel Phase memory with selective write gating
+        phase_channels: int = 1,  # Independent memory channels (1=legacy, 4=recommended)
+        phase_write_gate: bool = False,  # Selective write gating for memory updates
+        # V10.13: Phase Warm-Start Gate (training stability)
+        phase_warmstart: bool = False,  # Enable warm-start dampening
+        phase_warmstart_steps: int = 10000,  # Step at which alpha=0.5
+        phase_warmstart_tau: float = 2000.0,  # Sigmoid steepness
+        phase_warmstart_apply_inference: bool = False,  # Apply during inference
+        # V10.13: Global Compressed Tokens (GCT)
+        global_tokens_enabled: bool = False,  # Enable GCT memory slots
+        num_global_tokens: int = 16,  # Number of global tokens
+        global_update_enabled: bool = True,  # Enable controlled write
+        global_update_mode: str = "pool",  # "pool", "attn-lite", or "slots"
+        global_update_interval: int = 1,  # Update every N layers
+        global_token_write_detach: bool = True,  # Detach tokens in write path (auto-disabled for slots mode)
+        phase_to_global: bool = False,  # Phase→Global integration
+        # V10.14: Slot memory parameters (when global_update_mode="slots")
+        slots_write_lr: float = 0.1,  # EMA learning rate for slot writes
+        retrieval_loss_weight: float = 0.1,  # Weight for auxiliary retrieval loss
+        # V11: Slot memory experiment — read interval and late-layer writes
+        global_read_interval: int = 1,  # Read slots every N layers (1 = every layer)
+        global_write_start_layer: int = 0,  # Only write to slots from this layer onward
+        slot_scaling: Optional[dict] = None,  # V20: Auto-scaling overrides
     ):
         super().__init__()
 
@@ -6540,14 +6822,17 @@ class HybridPhaseTransformer(nn.Module):
                     dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
                     alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
                     protected_phase=protected_phase,  # V10.2.1: Protected Phase for chunking
+                    phase_channels=phase_channels,  # V10.12: Multi-channel memory
+                    phase_write_gate=phase_write_gate,  # V10.12: Selective write gate
                 ))
 
         # Output
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         # When tied, Sanskrit gradients corrupt the output decoder vocabulary space
@@ -6562,11 +6847,104 @@ class HybridPhaseTransformer(nn.Module):
             num_layers=2,
         )
 
+        # V10.13: Phase Warm-Start Gate config
+        self.phase_warmstart_enabled = phase_warmstart
+        self._phase_warmstart_steps = phase_warmstart_steps
+        self._phase_warmstart_tau = phase_warmstart_tau
+        self._phase_warmstart_apply_inference = phase_warmstart_apply_inference
+        self._global_step = 0
+
+        # V10.13: Global Compressed Tokens (GCT) — stable long-range memory slots
+        self.global_tokens_enabled = global_tokens_enabled
+        self.num_global_tokens = num_global_tokens
+        self.global_update_enabled = global_update_enabled
+        self.global_update_mode = global_update_mode
+        self.global_update_interval = global_update_interval
+        self.global_read_interval = global_read_interval
+        self.global_write_start_layer = global_write_start_layer
+        # V10.14.1: Slot memory uses selective detach internally (detaches x
+        # at write entry to protect backbone, keeps grad to slot params via
+        # aux losses). The global_token_write_detach flag controls whether
+        # slot UPDATE outputs are also detached — keep True for stability.
+        self.global_token_write_detach = global_token_write_detach
+
+        # V10.14: Store retrieval loss weight
+        self.retrieval_loss_weight = retrieval_loss_weight
+
+        if global_tokens_enabled:
+            if global_update_mode == "slots":
+                # V10.14: Addressable slot memory — replaces pool/attn-lite
+                # SlotMemoryGCT handles its own read/write paths.
+                # CRITICAL: Slots update ONLY through competitive write rule.
+                # No nn.MultiheadAttention read — SlotMemoryGCT.read() is used instead.
+                self.slot_memory = SlotMemoryGCT(
+                    num_slots=num_global_tokens,
+                    embed_dim=embed_dim,
+                    num_heads=num_heads,
+                    write_lr=slots_write_lr,
+                    dropout=dropout,
+                    vocab_size=vocab_size,
+                    scaling=slot_scaling,  # V20: Auto-scaling overrides
+                )
+                # No legacy GCT modules needed — slot_memory handles everything
+                self.global_tokens = None  # Slots init is inside SlotMemoryGCT
+                self.gct_read_attn = None  # Read is via SlotMemoryGCT.read()
+            else:
+                # Legacy: pool or attn-lite modes
+                self.slot_memory = None
+                # Learnable global token embeddings [G, D]
+                self.global_tokens = nn.Parameter(
+                    torch.randn(num_global_tokens, embed_dim) * 0.02
+                )
+                # READ path: tokens attend to globals via cross-attention
+                self.gct_read_attn = nn.MultiheadAttention(
+                    embed_dim, num_heads, dropout=dropout, batch_first=True
+                )
+                # WRITE path: controlled compression update (pool mode)
+                self.global_write_gate = nn.Linear(embed_dim, 1)
+                self.global_update_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+                # WRITE path: attn-lite mode (optional)
+                if global_update_mode == "attn-lite":
+                    self.gct_write_attn = nn.MultiheadAttention(
+                        embed_dim, num_heads, dropout=dropout, batch_first=True
+                    )
+                    self._gct_write_scale = 0.05
+            # Phase → Global integration (optional, only for non-slot modes)
+            if phase_to_global and global_update_mode != "slots":
+                # Input: Re + Im of phase state = 2 * embed_dim
+                self.phase_to_global_proj = nn.Linear(2 * embed_dim, embed_dim)
+            else:
+                self.phase_to_global_proj = None
+            # Diagnostics
+            self._diag_global_token_norm = None
+            self._diag_global_token_delta_norm = None
+            self._diag_global_write_gate_mean = None
+            self._diag_global_attn_mass = None
+
         # Gradient checkpointing (disabled by default)
         self.gradient_checkpointing = False
 
         # Initialize
         self.apply(self._init_weights)
+
+        # V10.12: Re-init write gate biases after _init_weights zeros them.
+        # sigmoid(2)≈0.88 means gates start near-open → initial training ≈ no gating.
+        if phase_write_gate:
+            for blk in self.blocks:
+                if hasattr(blk, 'attention') and hasattr(blk.attention, 'phase_attn'):
+                    _pa = blk.attention.phase_attn
+                    if hasattr(_pa, 'write_gate_proj') and _pa.write_gate_proj.bias is not None:
+                        nn.init.constant_(_pa.write_gate_proj.bias, 2.0)
+
+        # V10.13: Propagate warm-start config to PhaseAttentionLayers
+        if phase_warmstart:
+            for blk in self.blocks:
+                if hasattr(blk, 'attention') and hasattr(blk.attention, 'phase_attn'):
+                    _pa = blk.attention.phase_attn
+                    _pa.phase_warmstart_enabled = True
+                    _pa._warmstart_steps = phase_warmstart_steps
+                    _pa._warmstart_tau = phase_warmstart_tau
+                    _pa._warmstart_apply_inference = phase_warmstart_apply_inference
 
         # V9.6.10: For untied embeddings, copy token_embed to lm_head AFTER init
         # This provides semantic alignment at start while keeping them separate
@@ -6581,6 +6959,17 @@ class HybridPhaseTransformer(nn.Module):
     def gradient_checkpointing_disable(self):
         """Disable gradient checkpointing."""
         self.gradient_checkpointing = False
+
+    def set_global_step(self, step: int):
+        """V10.13: Set global training step for warm-start gating.
+
+        Call this once per training step before forward().
+        Propagates step to all PhaseAttentionLayers for warm-start alpha computation.
+        """
+        self._global_step = step
+        for module in self.modules():
+            if isinstance(module, PhaseAttentionLayer):
+                module._current_step = step
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -6629,26 +7018,31 @@ class HybridPhaseTransformer(nn.Module):
         x = self.embed_dropout(x)
 
         # Transformer blocks
+        # V11.0.1: Only use gradient checkpointing when grad is enabled.
+        # OntologicalHybridTransformer calls forward_hidden under torch.no_grad(),
+        # where checkpointing is wasteful and can interfere with the subsequent
+        # checkpointed forward pass (metadata mismatch on recomputation).
+        _use_gc = self.gradient_checkpointing and self.training and torch.is_grad_enabled()
         for i, block in enumerate(self.blocks):
             # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
             is_hybrid_block = i >= self.local_layers
             block_intent = intent_phase if is_hybrid_block else None
 
-            if self.gradient_checkpointing and self.training:
+            if _use_gc:
                 if is_hybrid_block and intent_phase is not None:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
                         block_intent,
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
             else:
                 if is_hybrid_block:
@@ -6720,9 +7114,31 @@ class HybridPhaseTransformer(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
+        # V11.3→V14-hotfix: Query source for slot retrieval/prediction losses.
+        # V11.3 used pre-attention embeddings (token embed + position only),
+        # making slots a simple bigram lookup table.
+        # V14: Capture after last Local layer instead (set below in the loop).
+        # By that point the model has processed local syntax, so the query
+        # becomes "I've seen these N words, what global fact comes next?"
+        # rather than "I am token X, what is X usually near?"
+        _x_pre_attn = x.detach()  # Fallback only; overwritten after Local block
+        _x_post_local = None  # Will be set after layer (local_layers - 1)
+
         # Transformer blocks with targeted extraction
         hidden_states = [] if should_extract else None
         decorr_losses = [] if return_decorr_loss else None
+
+        # V10.13/V10.14: Initialize GCT global state
+        _slot_keys = None  # V10.14: Only used in slots mode
+        _slot_vals = None
+        if self.global_tokens_enabled:
+            if self.global_update_mode == "slots":
+                # V10.14: Initialize addressable slot memory
+                _slot_keys, _slot_vals = self.slot_memory.init_state(B, x.dtype, x.device)
+            else:
+                # Legacy: pooled/attn-lite global tokens
+                _gct_state = self.global_tokens.unsqueeze(0).expand(B, -1, -1).clone()
+                _gct_state = _gct_state.to(dtype=x.dtype)
 
         for i, block in enumerate(self.blocks):
             # Only pass intent_phase to Hybrid blocks (not Local-only blocks)
@@ -6731,6 +7147,8 @@ class HybridPhaseTransformer(nn.Module):
 
             # Decorrelation loss incompatible with gradient checkpointing
             # (checkpoint can't handle tuple returns cleanly)
+            # V11.0.1: use_reentrant=True avoids strict metadata check that fails
+            # with complex tensors (torch.polar) and OntologicalHybrid double-forward.
             use_checkpoint = self.gradient_checkpointing and self.training and not return_decorr_loss
 
             if use_checkpoint:
@@ -6740,14 +7158,14 @@ class HybridPhaseTransformer(nn.Module):
                         x,
                         True,  # causal_mask
                         block_intent,
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
                 else:
                     x = checkpoint(
                         block,
                         x,
                         True,  # causal_mask
-                        use_reentrant=False,
+                        use_reentrant=True,
                     )
             else:
                 # Normal forward pass (potentially with decorr_loss)
@@ -6762,10 +7180,112 @@ class HybridPhaseTransformer(nn.Module):
                 else:
                     x = block(x, causal_mask=True)
 
+            # V14-hotfix: Capture hidden state after last Local layer for slot
+            # query source.  Local layers process syntax; this gives the slot
+            # queries richer context than raw embeddings.
+            if i == self.local_layers - 1:
+                _x_post_local = x.detach()
+
+            # =================================================================
+            # V10.13/V10.14: GCT — Token READ from memory
+            # =================================================================
+            if self.global_tokens_enabled:
+                if self.global_update_mode == "slots":
+                    # V11: Only read every global_read_interval layers
+                    if (i % self.global_read_interval) == 0:
+                        # V10.14: Read via SlotMemoryGCT (never modifies slot state)
+                        _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
+                        # V10.14.6d: Mostly detach read output so LM loss cannot
+                        # suppress read_output_proj. Retrieval loss trains
+                        # read_output_proj independently.
+                        # V11.5: Full gradient — no detach. Let LM loss fully
+                        # steer what the model does with slot reads.
+                        _alpha = self.slot_memory.read_warmstart_alpha
+                        x = x + _alpha * _slot_out
+                else:
+                    # Legacy: cross-attention to global tokens
+                    _gct_out = self.gct_read_attn(
+                        x, _gct_state, _gct_state, need_weights=False
+                    )[0]
+                    x = x + _gct_out
+
+            # =================================================================
+            # V10.13/V10.14: GCT — Memory WRITE
+            # =================================================================
+            if self.global_tokens_enabled and self.global_update_enabled:
+                if (i % self.global_update_interval) == 0 and i >= self.global_write_start_layer:
+                    if self.global_update_mode == "slots":
+                        # V10.14.1: Competitive slot write — the ONLY way slots update
+                        # Always pass detach=False for slots: write() uses x.detach()
+                        # internally to protect backbone, but slot_vals/keys must
+                        # carry grad so retrieval loss can teach write_val_proj
+                        # what to store (not just where).
+                        _slot_keys, _slot_vals = self.slot_memory.write(
+                            x, _slot_keys, _slot_vals,
+                            detach=False,
+                        )
+                    elif self.global_update_mode == "pool":
+                        # Gated pooled summary of tokens
+                        _w = torch.sigmoid(self.global_write_gate(x))  # [B, T, 1]
+                        _pooled = (_w * x).sum(dim=1) / (_w.sum(dim=1) + 1e-6)  # [B, D]
+                        _delta = self.global_update_proj(_pooled).unsqueeze(1)  # [B, 1, D]
+
+                        if self.global_token_write_detach and self.training:
+                            _delta = _delta.detach()
+                        _gct_state = _gct_state + _delta
+
+                        with torch.no_grad():
+                            self._diag_global_token_delta_norm = _delta.norm().item()
+                            self._diag_global_write_gate_mean = _w.mean().item()
+                    else:
+                        # attn-lite: globals attend to tokens with small scale
+                        _delta = self.gct_write_attn(
+                            _gct_state, x, x, need_weights=False
+                        )[0]
+                        _delta = _delta * self._gct_write_scale
+
+                        if self.global_token_write_detach and self.training:
+                            _delta = _delta.detach()
+                        _gct_state = _gct_state + _delta
+
+                        with torch.no_grad():
+                            self._diag_global_token_delta_norm = _delta.norm().item()
+
+            # =================================================================
+            # V10.13: Phase → Global integration (after hybrid blocks only)
+            # Skipped in slots mode — Phase stays separate as context summarizer
+            # =================================================================
+            _p2g = getattr(self, 'phase_to_global_proj', None)
+            if is_hybrid_block and self.global_tokens_enabled and _p2g is not None:
+                _pa = block.attention.phase_attn
+                _phase_agg = getattr(_pa, '_last_final_state_agg', None)
+                if _phase_agg is not None:
+                    _pf = _phase_agg.squeeze(1)  # [B, H, D_h] complex
+                    _p_in = torch.cat([
+                        _pf.real.reshape(B, -1),
+                        _pf.imag.reshape(B, -1),
+                    ], dim=-1).to(dtype=x.dtype)  # [B, 2D]
+                    _phase_upd = _p2g(_p_in).unsqueeze(1)  # [B, 1, D]
+                    # Scale by warm-start alpha if enabled
+                    if self.phase_warmstart_enabled:
+                        _ws_a = getattr(_pa, '_diag_warmstart_alpha', 1.0) or 1.0
+                        _phase_upd = _phase_upd * _ws_a
+                    _gct_state = _gct_state + _phase_upd
+
             # Extract if: return_hidden=True (all), or layer in extract_layers
             if should_extract:
                 if extract_set is None or i in extract_set:
                     hidden_states.append(x)
+
+        # V10.13/V10.14: GCT diagnostics (after all layers)
+        if self.global_tokens_enabled:
+            with torch.no_grad():
+                if self.global_update_mode == "slots":
+                    self._diag_global_token_norm = _slot_vals.norm(dim=-1).mean().item()
+                    # Expose slot diagnostics from SlotMemoryGCT
+                    self._diag_global_write_gate_mean = self.slot_memory._diag_write_gate_mean
+                else:
+                    self._diag_global_token_norm = _gct_state.norm(dim=-1).mean().item()
 
         # Output
         x = self.norm(x)
@@ -6782,6 +7302,21 @@ class HybridPhaseTransformer(nn.Module):
         if return_decorr_loss and decorr_losses:
             # Average decorrelation loss across all hybrid layers
             result['decorr_loss'] = torch.stack(decorr_losses).mean()
+
+        # V10.14: Expose slot state + hidden for retrieval loss computation
+        # The training loop uses these to call slot_memory.compute_retrieval_loss()
+        if self.global_tokens_enabled and self.global_update_mode == "slots":
+            result['_slot_keys'] = _slot_keys
+            result['_slot_vals'] = _slot_vals
+            # V11.3: Use pre-attention hidden state for retrieval loss queries.
+            # Previously used post-backbone x.detach(), which made retrieval
+            # redundant — slots learned to copy what the backbone already knows.
+            # Pre-attention x (embed + position only) forces slots to provide
+            # information that attention hasn't yet injected.
+            # Already detached at capture point (line ~7114).
+            # V14-hotfix: Use post-local hidden state (richer syntax context)
+            # instead of pre-attention embeddings (bare token+position).
+            result['_slot_hidden'] = _x_post_local if _x_post_local is not None else _x_pre_attn
 
         return result
 
@@ -6833,11 +7368,36 @@ class HybridPhaseTransformer(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
+        # V11.3→V14-hotfix: Pre-attention capture (fallback), overwritten by
+        # post-local capture below.
+        _x_pre_attn = x.detach()
+        _x_post_local = None
+
         # Initialize states if not provided
         if prev_layer_states is None:
             prev_layer_states = {}
 
         next_layer_states = {}
+
+        # V10.13/V10.14: GCT state — restore from previous chunk or initialize
+        _slot_keys = None
+        _slot_vals = None
+        if self.global_tokens_enabled:
+            if self.global_update_mode == "slots":
+                _prev_sk = prev_layer_states.get('_slot_keys', None)
+                _prev_sv = prev_layer_states.get('_slot_vals', None)
+                if _prev_sk is not None and _prev_sv is not None:
+                    _slot_keys = _prev_sk.to(dtype=x.dtype)
+                    _slot_vals = _prev_sv.to(dtype=x.dtype)
+                else:
+                    _slot_keys, _slot_vals = self.slot_memory.init_state(B, x.dtype, x.device)
+            else:
+                _gct_prev = prev_layer_states.get('_gct_global_state', None)
+                if _gct_prev is not None:
+                    _gct_state = _gct_prev.to(dtype=x.dtype)
+                else:
+                    _gct_state = self.global_tokens.unsqueeze(0).expand(B, -1, -1).clone()
+                    _gct_state = _gct_state.to(dtype=x.dtype)
 
         # Process through blocks with state management
         for i, block in enumerate(self.blocks):
@@ -6861,11 +7421,89 @@ class HybridPhaseTransformer(nn.Module):
                 # Local-only blocks: no state to manage
                 x = block(x, causal_mask=True)
 
+            # V14-hotfix: Capture post-local hidden state (mirrors forward())
+            if i == self.local_layers - 1:
+                _x_post_local = x.detach()
+
+            # V10.13/V10.14: GCT read/write (same logic as forward())
+            if self.global_tokens_enabled:
+                if self.global_update_mode == "slots":
+                    # V11: Only read every global_read_interval layers
+                    if (i % self.global_read_interval) == 0:
+                        _slot_out = self.slot_memory.read(x, _slot_keys, _slot_vals)
+                        # V11.5: Full gradient — no detach (mirrors forward())
+                        _alpha = self.slot_memory.read_warmstart_alpha
+                        x = x + _alpha * _slot_out
+                else:
+                    _gct_out = self.gct_read_attn(
+                        x, _gct_state, _gct_state, need_weights=False
+                    )[0]
+                    x = x + _gct_out
+
+            if self.global_tokens_enabled and self.global_update_enabled:
+                if (i % self.global_update_interval) == 0 and i >= self.global_write_start_layer:
+                    if self.global_update_mode == "slots":
+                        # V10.14.1: Always detach=False for slots (see comment above)
+                        _slot_keys, _slot_vals = self.slot_memory.write(
+                            x, _slot_keys, _slot_vals,
+                            detach=False,
+                        )
+                    elif self.global_update_mode == "pool":
+                        _w = torch.sigmoid(self.global_write_gate(x))
+                        _pooled = (_w * x).sum(dim=1) / (_w.sum(dim=1) + 1e-6)
+                        _delta = self.global_update_proj(_pooled).unsqueeze(1)
+                        if self.global_token_write_detach and self.training:
+                            _delta = _delta.detach()
+                        _gct_state = _gct_state + _delta
+                    else:
+                        _delta = self.gct_write_attn(
+                            _gct_state, x, x, need_weights=False
+                        )[0]
+                        _delta = _delta * self._gct_write_scale
+                        if self.global_token_write_detach and self.training:
+                            _delta = _delta.detach()
+                        _gct_state = _gct_state + _delta
+
+            # V10.13: Phase → Global (after hybrid blocks, non-slot modes only)
+            _p2g = getattr(self, 'phase_to_global_proj', None)
+            if is_hybrid_block and self.global_tokens_enabled and _p2g is not None:
+                _pa = block.attention.phase_attn
+                _phase_agg = getattr(_pa, '_last_final_state_agg', None)
+                if _phase_agg is not None:
+                    _pf = _phase_agg.squeeze(1)
+                    _p_in = torch.cat([
+                        _pf.real.reshape(B, -1),
+                        _pf.imag.reshape(B, -1),
+                    ], dim=-1).to(dtype=x.dtype)
+                    _phase_upd = _p2g(_p_in).unsqueeze(1)
+                    if self.phase_warmstart_enabled:
+                        _ws_a = getattr(_pa, '_diag_warmstart_alpha', 1.0) or 1.0
+                        _phase_upd = _phase_upd * _ws_a
+                    _gct_state = _gct_state + _phase_upd
+
+        # V10.13/V10.14: Save GCT/slot state for next chunk
+        if self.global_tokens_enabled:
+            if self.global_update_mode == "slots":
+                next_layer_states['_slot_keys'] = _slot_keys.detach()
+                next_layer_states['_slot_vals'] = _slot_vals.detach()
+            else:
+                next_layer_states['_gct_global_state'] = _gct_state.detach()
+
         # Output
         x = self.norm(x)
         logits = self.lm_head(x) * self.logit_scale
 
         result = {'logits': logits}
+
+        # V10.14.10: Expose slot state from chunked forward for retrieval loss.
+        # Without this, forward_chunked/TBPTT paths silently skip retrieval loss
+        # (slot tensors missing → _retr_loss_val = 0.0 with no warning).
+        if self.global_tokens_enabled and self.global_update_mode == "slots":
+            result['_slot_keys'] = _slot_keys
+            result['_slot_vals'] = _slot_vals
+            # V14-hotfix: Post-local hidden state (mirrors forward())
+            result['_slot_hidden'] = _x_post_local if _x_post_local is not None else _x_pre_attn
+
         return result, next_layer_states
 
     def diagnose_chunk_continuity(
@@ -7073,9 +7711,15 @@ class HybridPhaseTransformer(nn.Module):
     ) -> Tuple[Dict[str, torch.Tensor], 'PhaseStateCache']:
         """
         V10.7: Inference forward pass using PhaseStateCache.
+        V10.7.1: Safety fallback for correctness when local layers are active.
 
-        Guarantees O(1) memory per layer regardless of total sequence length.
-        Only processes the NEW tokens (not the full sequence).
+        When local_layers > 0, incremental decoding cannot be exactly reproduced
+        from Phase state alone — LocalAttention layers need token-level context
+        that is lost in the O(1) phase state. In this case, we fall back to
+        full-prefix replay to guarantee generation quality matches full forward.
+
+        When local_layers == 0 (pure phase model), O(1) incremental decoding
+        is exact and the fast path is used.
 
         For prefill (first call), pass the full prompt as input_ids.
         For decode (subsequent calls), pass one token at a time.
@@ -7095,7 +7739,19 @@ class HybridPhaseTransformer(nn.Module):
                 hybrid_layer_start=self.local_layers,
             )
 
-        # Use forward_chunk with cache state
+        # V10.7.1 SAFETY FALLBACK:
+        # If LocalAttention layers are active, exact incremental decoding cannot be
+        # reproduced from Phase state alone (local path needs token-level context).
+        # Use full-prefix replay for correctness to prevent generation quality drift.
+        if self.local_layers > 0:
+            full_input_ids = cache.append_tokens(input_ids)
+            result = self.forward(full_input_ids, intent_phase=intent_phase)
+            # Return logits only for newly appended tokens to preserve API shape.
+            result = {'logits': result['logits'][:, -input_ids.shape[1]:, :]}
+            cache.advance(input_ids.shape[1])
+            return result, cache
+
+        # Fast path: pure phase model (no local layers) — O(1) incremental decode
         prev_layer_states = cache.as_prev_layer_states() if cache.seq_len > 0 else None
 
         result, new_layer_states = self.forward_chunk(
@@ -7243,6 +7899,16 @@ class OntologicalHybridTransformer(nn.Module):
         zero_mean_cosine: bool = False,  # V9.9.11: Center cosine per head (forces selectivity)
         dual_channel_mode: bool = False,  # V10.3.8: Separate content and alignment scores
         alignment_authority: float = 0.1,  # V10.3.8: Weight for alignment term
+        # V10.14: Global Tokens / Slot Memory (passed through to HybridPhaseTransformer)
+        global_tokens_enabled: bool = False,
+        num_global_tokens: int = 16,
+        global_update_mode: str = "pool",
+        slots_write_lr: float = 0.1,
+        retrieval_loss_weight: float = 0.1,
+        # V11: Slot memory experiment
+        global_read_interval: int = 1,
+        global_write_start_layer: int = 0,
+        slot_scaling: Optional[dict] = None,  # V20: Auto-scaling overrides
     ):
         super().__init__()
 
@@ -7269,6 +7935,15 @@ class OntologicalHybridTransformer(nn.Module):
             zero_mean_cosine=zero_mean_cosine,  # V9.9.11: Phase collapse fix 2
             dual_channel_mode=dual_channel_mode,  # V10.3.8: Dual-channel attention
             alignment_authority=alignment_authority,  # V10.3.8: Alignment authority
+            # V10.14: Global Tokens / Slot Memory
+            global_tokens_enabled=global_tokens_enabled,
+            num_global_tokens=num_global_tokens,
+            global_update_mode=global_update_mode,
+            slots_write_lr=slots_write_lr,
+            retrieval_loss_weight=retrieval_loss_weight,
+            global_read_interval=global_read_interval,
+            global_write_start_layer=global_write_start_layer,
+            slot_scaling=slot_scaling,  # V20: Auto-scaling overrides
         )
 
         # State projector: hidden[embed_dim] → SovereignState[32]
@@ -7497,15 +8172,53 @@ class OntologicalHybridTransformer(nn.Module):
         max_new_tokens: int = 50,
         temperature: float = 1.0,
         top_k: int = 50,
+        use_field_integrated: bool = False,
     ) -> torch.Tensor:
-        """Generation with Ontological state tracking."""
+        """Generation with Ontological state tracking.
+
+        Args:
+            use_field_integrated: If True and conscious_gen Phase 4 modules are
+                present, use TwoStageGenerator for field-integrated token selection
+                instead of standard logit-based sampling.
+        """
         # Reset state at start of generation
         self.prev_state = None
         self.prev_bhava = None  # V11.0.0: Reset Bhava tracking too
 
+        # Check for Phase 4 two-stage generation
+        _has_two_stage = (
+            use_field_integrated
+            and hasattr(self, 'conscious_gen')
+            and 'two_stage_generator' in self.conscious_gen
+        )
+
         for _ in range(max_new_tokens):
-            result = self(input_ids, reset_state=(self.prev_state is None))
-            logits = result['logits'][:, -1, :]
+            result = self(input_ids, reset_state=(self.prev_state is None),
+                          return_last_hidden=_has_two_stage)
+            logits = result['logits'][:, -1, :]  # (B, V)
+
+            if _has_two_stage:
+                # Phase 4: Two-stage field-integrated generation
+                hidden = result.get('last_hidden_state', None)
+                o_ctx = result.get('state', None)
+                if hidden is not None and o_ctx is not None:
+                    hidden_last = hidden[:, -1, :]  # (B, D)
+                    o_ctx_last = o_ctx[:, -1, :] if o_ctx.dim() == 3 else o_ctx
+                    # TwoStageGenerator handles shortlist + scoring + softmax
+                    gen = self.conscious_gen['two_stage_generator']
+                    _cache = self.conscious_gen['token_cache'] if 'token_cache' in self.conscious_gen else None
+                    gen_result = gen(
+                        logits=logits.unsqueeze(1),       # (B, 1, V)
+                        hidden=hidden_last.unsqueeze(1),  # (B, 1, D)
+                        o_ctx=o_ctx_last.unsqueeze(1),    # (B, 1, state_dim)
+                        cache=_cache,
+                    )
+                    probs = gen_result['log_probs'][:, 0, :].exp()  # (B, V)
+                    next_token = torch.multinomial(probs, num_samples=1)
+                    input_ids = torch.cat([input_ids, next_token], dim=1)
+                    continue
+
+            # Standard generation path
             logits = logits / temperature
             if top_k > 0:
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
@@ -7575,8 +8288,9 @@ class LocalOnlyTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:
@@ -7642,7 +8356,7 @@ class LocalOnlyTransformer(nn.Module):
         hidden_states = [] if should_extract else None
         for i, block in enumerate(self.blocks):
             if self.gradient_checkpointing and self.training:
-                x = checkpoint(block, x, True, use_reentrant=False)
+                x = checkpoint(block, x, True, use_reentrant=True)
             else:
                 x = block(x, causal_mask=True)
 
@@ -7710,6 +8424,1666 @@ class LocalOnlyTransformer(nn.Module):
 #
 # Reference: FSCS pre-softmax routing pattern, adapted for quadratic softmax.
 # =============================================================================
+
+
+# =============================================================================
+# V10.14: SLOT MEMORY GCT — Addressable Key-Value Slots for Associative Recall
+# =============================================================================
+#
+# Problem: EMA/pooled GCT state is compressive — it cannot answer "what value
+# was paired with key X?" because distinct bindings get blurred together.
+#
+# Solution: Replace pooled writes with competitive slot assignment.
+# Each global token becomes an addressable memory slot with a key embedding
+# and value state. Tokens write to slots via competitive assignment (softmax
+# over slot keys), and read via cross-attention to slot values.
+#
+# CRITICAL INVARIANT: Slots update ONLY through the competitive write rule.
+# Normal attention must NOT modify slot state — otherwise slots become noisy.
+# The read path (cross-attention from tokens to slots) produces output that
+# feeds into the residual stream, but never writes back to slot state.
+#
+# Architecture:
+#   WRITE: assignment = softmax(token_key @ slot_keys.T / sqrt(d))
+#          slot_val = (1 - η*a) * slot_val + η*a * proj(token)
+#          slot_key = (1 - η*a) * slot_key + η*a * key_proj(token)
+#   READ:  attn_weights = softmax(query @ slot_keys.T / sqrt(d))
+#          output = attn_weights @ slot_vals
+#
+# This is Option 3 from the ChatGPT analysis: upgrade GCT into addressable
+# retrieval slots, using the existing global tokens scaffold.
+# =============================================================================
+
+
+class SlotMemoryGCT(nn.Module):
+    """
+    V10.14: Addressable Key-Value Slot Memory for GCT.
+
+    Replaces pooled/attn-lite GCT write with competitive slot assignment.
+    Enables true associative recall: given a query key, retrieve the value
+    that was stored with a matching key.
+
+    Slots are write-protected: only the competitive write rule can update
+    slot state. The read path (cross-attention) produces output for the
+    residual stream but NEVER writes back to slots.
+
+    V10.14.6: Top-k hard routing with straight-through gradient estimator.
+    Soft softmax over all K slots collapses to uniform when write keys are
+    similar (all from x.detach()). Top-k forces sparse assignment: each
+    token writes to at most k slots, then softmax only within those k.
+    Straight-through passes gradients through the full softmax for learning.
+
+    Args:
+        num_slots: Number of memory slots (= num_global_tokens)
+        embed_dim: Embedding dimension
+        num_heads: Number of attention heads for read path
+        write_lr: Learning rate for slot updates (η in the write rule)
+        dropout: Dropout rate
+        write_key_dim: Dimension for write key matching (default: embed_dim)
+        write_top_k: Number of slots each token can write to (default: 4)
+    """
+
+    def __init__(
+        self,
+        num_slots: int = 64,
+        embed_dim: int = 768,
+        num_heads: int = 12,  # Accepted for API compat, unused internally
+        write_lr: float = 0.1,
+        dropout: float = 0.1,
+        write_key_dim: Optional[int] = None,
+        write_top_k: int = 4,
+        vocab_size: int = 50257,
+        scaling: Optional[dict] = None,  # V20: Auto-scaling overrides from config.compute_slot_scaling()
+    ):
+        super().__init__()
+        self.num_slots = num_slots
+        self.embed_dim = embed_dim
+        # Triple-Patch: write_lr as nn.Parameter (init 0.5) so the Sovereign
+        # Controller optimizer can adjust it via gradients, in addition to the
+        # existing manual adaptive schedule.
+        self.write_lr = nn.Parameter(torch.tensor(0.5))
+        # V20: Apply auto-scaling overrides if provided
+        if scaling is not None:
+            write_top_k = scaling.get("write_top_k", write_top_k)
+        self.write_top_k = min(write_top_k, num_slots)  # V10.14.6
+        _key_dim = write_key_dim or embed_dim
+
+        # --- Slot state (learnable initialization) ---
+        # V10.14.5: Initialize slot keys on the unit hypersphere using orthogonal
+        # init. Previous randn*0.02 made all keys near-identical → EMA pushed
+        # them toward the same mean → winner-take-all collapse to one slot.
+        # Orthogonal + L2-normalized keys are maximally separated, giving each
+        # slot a distinct "identity" from the start.
+        _init_keys = torch.randn(num_slots, _key_dim)
+        if num_slots <= _key_dim:
+            # More dims than slots: use orthogonal rows
+            nn.init.orthogonal_(_init_keys)
+        # Normalize to unit sphere regardless
+        _init_keys = F.normalize(_init_keys, dim=-1)
+        self.slot_keys_init = nn.Parameter(_init_keys)
+        # V10.14.6: Zero-init slot values. Previous randn*0.02 contaminated
+        # reads before any writes — 65% of slot content was still init noise
+        # after 4 writes at eta=0.1. Zero init means reads return zero until
+        # the model writes actual content, eliminating init noise entirely.
+        self.slot_vals_init = nn.Parameter(
+            torch.zeros(num_slots, embed_dim)
+        )
+
+        # --- WRITE path: token → slot assignment ---
+        # Projects input token into write-key space for slot matching
+        self.write_key_proj = nn.Linear(embed_dim, _key_dim, bias=False)
+        # Projects input token into value to be written
+        self.write_val_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+        # Novelty gate: only write when the token carries new binding info
+        # sigmoid(gate) → 0 means "don't write", 1 means "write"
+        self.write_novelty_gate = nn.Linear(embed_dim, 1)
+        # V11.x: Initialize gate bias to +1.0 (sigmoid(1) ≈ 0.73).
+        # Previous bias=0.0 (sigmoid=0.5) combined with weak indirect gradient
+        # signal caused the gate to drift down to 0.072 (barely above the 0.05
+        # floor). Starting higher gives the write path a real chance to bootstrap:
+        # slots get meaningful writes → retrieval loss provides gradient → gate
+        # can learn to modulate. If writing is too aggressive, the gate will
+        # learn to close — but starting too low creates a chicken-and-egg trap.
+        nn.init.constant_(self.write_novelty_gate.bias, 2.0)  # V18: sigmoid(2)≈0.88 — start wide open
+        # V10.14.7: Gate floor moved to V10.29 adaptive block below.
+
+        # V10.27: Adaptive write gate ceiling — prevents runaway gate opening.
+        # The gate has three upward forces (L_gate_util, LM leak, retr_loss)
+        # but no downward pressure since L_gate sparsity was removed in V10.14.7.
+        # This adds a soft quadratic ceiling that adapts based on write utility:
+        # if retr_loss is improving → ceiling relaxes (writes are helpful),
+        # if retr_loss stagnates while gate is high → ceiling tightens (churn).
+        self._gate_target = 0.80          # V18: Forced open — bootstrap slot content before learning to gate
+        self._gate_target_min = 0.70      # V18: High floor to keep gate open during bootstrap
+        self._gate_target_max = 0.90      # V18: Allow near-full write
+        self._gate_ceil_weight = 50.0     # V14-hotfix: Linear+ReLU penalty weight (was 5.0 quadratic)
+        self._gate_ceil_margin = 0.05     # V11: Free exploration zone above target
+        self._retr_loss_window: List[float] = []  # Window for trend detection
+        self._gate_window: List[float] = []       # Gate value window
+        self._gate_adapt_window = 200     # Steps to accumulate before adapting
+        self._gate_adapt_counter = 0      # Steps since last adaptation
+
+        # V10.28: Adaptive constraint relaxation — detect when slots are
+        # over-constrained (uniform usage, scale at clamp, gate at ceiling)
+        # and progressively relax to allow specialization.
+        self.enable_adaptive_constraints = True  # V11: Toggle for constraint relaxation
+        # V12.5→V19: Raised from 4.0→num_slots/4. The gradient explosion
+        # concerns that motivated the 2.0 ceiling are addressed by: detached
+        # slot_keys in assignment (V10.20), L2-normalized incoming_keys,
+        # write_pressure floor at 0.1, and detached-norm slot key renorm.
+        # V19: For 64 slots with 768-dim keys, cosine sim std ≈ 0.036.
+        # Scale must be >> 1/std ≈ 28 to differentiate slots. The read path
+        # already uses floor=18 for this reason (V12.1). Apply same logic
+        # to writes: ceiling = num_slots, limit = 2*num_slots.
+        self._wr_scale_max = max(16.0, num_slots / 4)  # Write scale upper clamp
+        self._wr_scale_max_limit = max(32.0, num_slots)  # Maximum the clamp can relax to
+        self._L_bal_weight = 1.0          # Balance loss weight (starts full)
+        self._L_bal_weight_floor = 0.1    # Minimum balance weight
+        # V11.1: Track L_bal relaxation reason for diagnostics
+        self._L_bal_last_reason = ""
+        self._constraint_relax_window: List[float] = []  # marginal_H history
+        self._constraint_relax_counter = 0
+        self._constraint_relax_interval = 500  # Steps between adaptation checks
+        # V10.29 audit fix: Accumulate gate_mean and L_ortho in windows
+        # (not stale single-batch snapshots) for reliable decisions.
+        self._gate_mean_window: List[float] = []
+        self._L_ortho_window: List[float] = []
+
+        # V10.29: Extended adaptive hyperparameters — all start conservative
+        # and adapt based on slot health signals. Unified adaptation in
+        # update_constraint_relaxation() runs every _constraint_relax_interval steps.
+
+        # (a) Novelty gate floor — raise when gate collapsed, lower when healthy
+        self._novelty_gate_floor = 0.50         # V18: Force gate open — slots must get content to bootstrap
+        self._novelty_gate_floor_min = 0.30   # V18: Even minimum is aggressive
+        self._novelty_gate_floor_max = 0.70   # V18: Rescue ceiling also raised
+
+        # (b) Retrieval loss weight — scale down when retr_loss dominates,
+        #     scale up when slots are helping (caller tracks this externally)
+        self._adaptive_retr_loss_weight = 1.0
+        self._adaptive_retr_loss_weight_min = 0.5
+        self._adaptive_retr_loss_weight_max = 2.0
+        self._retr_loss_history: List[float] = []  # Track for dominance detection
+        self._lm_loss_history: List[float] = []    # Need LM loss for ratio
+        # V11.2: Ablation-aware retr_weight guard — don't decay when slots neutral/helping
+        self._last_ablation_delta: Optional[float] = None  # Set by training loop after ablation
+
+        # (c) H_target (sharpness entropy target) — adapt to slot utilization
+        self._H_target = 1.0                # nats, ~2-3 active slots
+        self._H_target_min = 0.5            # Sharper (1-2 slots)
+        self._H_target_max = 2.0            # Broader (5-7 slots)
+
+        # (d) L_ortho weight — reduce when slots already orthogonal
+        self._L_ortho_weight = 0.5
+        self._L_ortho_weight_min = 0.05
+        self._L_ortho_weight_max = 1.0
+
+        # (e) Read scale clamp max — mirrors write scale adaptive clamp
+        # V12.1: Raised from 5.0/8.0. Cosine sims in high-d cluster tightly
+        # (spread ~0.05), so scale=5 produces near-uniform softmax over 16 slots.
+        # Floor=18 ≈ num_slots. Ceiling=64 gives gyroscope room to widen.
+        self._read_scale_max = 64.0         # High ceiling so optimizer isn't clamped
+        self._read_scale_max_limit = 128.0  # V12.4: Allow gyroscope to widen if optimizer pushes
+
+        # (f) Router noise — tie decay to marginal_H instead of fixed schedule
+        self._adaptive_router_noise = True  # Enable marginal_H-based noise
+
+        # (g) Soft detach leak fraction — ramps up when slots show signal
+        # V13/B1-fix: Trigger based on slot_pred_ppl (content quality), not
+        # gate health.  Gate at 0.4 (healthy) was suppressing the ramp even
+        # though slots weren't storing useful info (ppl=395).  Now: when
+        # slot_pred_ppl drops below threshold, ramp leak so LM gradients
+        # flow into writes and accelerate slot content improvement.
+        # V14-hotfix: Start at 0.5 (was 0.1) — the LM loss is the only signal
+        # that knows what is "useful", so it needs to reach slot weights from
+        # the start.  Curriculum ramps to 1.0 (full gradient) by step 12k.
+        self._soft_detach_leak = 0.9        # V17: Start at 90% (was 50%) — LM gradient must reach writes early
+        self._soft_detach_leak_min = 0.05   # Minimum leak (emergency only)
+        self._soft_detach_leak_max = 1.0    # V14: Full gradient by curriculum end
+        self._leak_curriculum_target = 1.0  # V14: Target leak at curriculum end
+        self._leak_curriculum_steps = 4000  # V17: Shortened from 12K — reach full gradient faster
+        self._slot_pred_loss_window: List[float] = []  # Track slot_pred_loss for ppl-based ramp
+        self._leak_ramp_ppl_threshold = 300.0  # Ramp leak when slot_pred_ppl drops below this
+
+        # (h) L_sharp weight — reduce once sharpness is in good range
+        self._L_sharp_weight = 0.1
+        self._L_sharp_weight_min = 0.01
+        self._L_sharp_weight_max = 0.3
+
+        # (i) Adaptive write_lr (EMA interpolation coefficient for slot updates)
+        # Higher → slots update faster toward incoming content
+        # Lower → slots retain existing content longer
+        # Adapt based on retrieval loss trend: if retrieval is improving, slots
+        # are being written usefully → allow faster writes. If stagnating,
+        # slow down to preserve good content already stored.
+        self._write_lr_min = 0.05            # Floor: always some update
+        self._write_lr_max = 0.5             # Ceiling: never overwrite >50%
+        # Plasticity Schedule: keep write_lr high (0.5) during bootstrap phase
+        # (first 5k steps), then linearly cool to 0.1 over the next 5k steps
+        # for stability during the Refinement phase.
+        self._plasticity_high = 0.5          # Bootstrap phase write_lr
+        self._plasticity_low = 0.1           # Refinement phase write_lr
+        self._plasticity_warmup_end = 5000   # Steps at full plasticity
+        self._plasticity_cooldown_end = 10000  # Steps when cooldown finishes
+
+        # Write key scale: learnable inverse temperature for cosine similarity.
+        # V10.14.5: With cosine similarity (both keys L2-normalized), dot products
+        # are in [-1, 1]. Scale=10 gives softmax logits in [-10, 10] — sharp
+        # enough to differentiate but not saturate. This is the standard approach
+        # used in CLIP, prototypical networks, etc.
+        # V10.14.8: Lowered init temperature from 10→5. At scale=10, cosine
+        # similarity logits in [-10,10] → softmax is ultra-peaky → all tokens
+        # route to the same slot. Scale=5 gives enough sharpness to differentiate
+        # while allowing more balanced slot utilization.
+        # V19: Init write scale proportional to num_slots. For K slots with
+        # high-dim keys, cosine sims have std ≈ 1/sqrt(D). Need scale ≈ K/8
+        # to get ~1 nat of logit spread across K slots. Init at K/8, ceiling
+        # at K/4, so the param starts inside the clamp pass-through region
+        # with room to grow. Previous V10.25 init of 1.8 was catastrophically
+        # low for K>16 — softmax over 64 items with 0.13 logit spread is
+        # uniform, preventing any slot specialization.
+        _wr_scale_init = max(4.0, num_slots / 8)  # 8.0 for 64 slots
+        self._write_log_scale = nn.Parameter(
+            torch.tensor(math.log(_wr_scale_init))
+        )
+
+        # --- READ path: query → slot attention ---
+        # V12: Separate read_query_proj ACTIVE. Previously shared write_key_proj
+        # (V10.14.2), but write and read are different tasks — write asks "where
+        # to store" while read asks "what do I need." Shared projection meant
+        # write gradients dominated, leaving read queries unable to discriminate
+        # between slots (read_H pegged at max entropy ~4.0 for 16 slots).
+        # Separate projection lets retrieval loss train read queries independently.
+        self.read_query_proj = nn.Linear(embed_dim, _key_dim, bias=False)
+        self.read_output_proj = nn.Linear(embed_dim, embed_dim, bias=False)
+        # V13/B2: Learned read gate — replaces blind residual addition
+        # `x = x + alpha * slot_out` with `x = x + alpha * sigma(gate) * slot_out`.
+        # The model learns per-position when slot reads help.  Gate starts near
+        # zero (bias=-2.0 → sigmoid≈0.12) so it's safe by default, then opens
+        # where slots add value.  Full LM gradients flow through the gate.
+        # V15: "Open Door" read gate — bias=0.0 (sigmoid=0.50) with small
+        # positive weight init (std=0.01). Previous V13.1 used zero weight +
+        # bias=-2.0 (sigmoid=0.12), which created a cold-start trap: the gate
+        # was so closed that LM loss received negligible gradient through slot
+        # reads, so the gate never learned to open. Slot ablation stayed at
+        # +0.0% through 200+ steps despite slot_pred_ppl improving 50K→3.4K.
+        #
+        # The fix: start the gate at 50% open. The model is forced to deal
+        # with slot content immediately. LM loss has a strong gradient signal
+        # to either improve slot content (if helpful) or close the gate (if
+        # harmful). Small positive weight (not zero) lets the gate learn
+        # position-dependent gating from the start. If slot reads hurt, the
+        # gate will learn to close — but it won't get stuck near-zero.
+        self.read_gate_proj = nn.Linear(embed_dim, 1)
+        nn.init.normal_(self.read_gate_proj.weight, mean=0.0, std=0.01)
+        nn.init.constant_(self.read_gate_proj.bias, 0.0)
+        # V15.1: Frozen-gate curriculum — for the first N steps, the read gate
+        # is fixed at 0.5 (read_gate_proj.requires_grad=False). This prevents
+        # the model from taking the easy path of just closing the gate to avoid
+        # noisy slot reads. Instead, the backbone is forced to adapt to slot
+        # content, building a functional relationship with memory. After the
+        # freeze period, the gate unfreezes and can learn position-dependent
+        # gating on top of the already-established slot integration.
+        self._read_gate_freeze_steps = 500   # V17: Shortened from 2K — by PPL~600 slots have enough signal
+        self._read_gate_frozen = True  # Start frozen
+        self._read_gate_freeze_value = 1.0  # V17: Fully open (was 0.5) — force backbone to integrate slot reads
+        # Start with gate params frozen
+        self.read_gate_proj.weight.requires_grad = False
+        self.read_gate_proj.bias.requires_grad = False
+        # Diagnostic: average gate activation across positions
+        self._diag_read_gate_mean: float = 0.0
+        self.read_dropout = nn.Dropout(dropout)
+        # V10.14.6: Retrieval readout norm — raw slot values go through this
+        # LayerNorm before lm_head in compute_retrieval_loss. The lm_head
+        # expects layer-normed input; without this, raw slot values have
+        # arbitrary scale → lm_head predictions are garbage.
+        self.retr_read_norm = nn.LayerNorm(embed_dim)
+
+        # V11.4: Slot-only prediction head — tests whether slot content carries
+        # information useful for next-token prediction, independent of the main
+        # backbone. Uses a separate bottleneck head (not shared lm_head) so
+        # improvements here genuinely reflect slot content quality.
+        # Architecture: slot retrieval → LayerNorm → D→D/4 → GELU → D/4→V
+        # Gradients flow back into: read_output_proj, slot_vals (via retrieval
+        # attention), write_val_proj (via slot_vals computation graph).
+        # They do NOT flow into: backbone layers, token embeddings, lm_head.
+        _bottleneck_dim = embed_dim // 4
+        self.slot_pred_head = nn.Sequential(
+            nn.Linear(embed_dim, _bottleneck_dim, bias=False),
+            nn.GELU(),
+            nn.Linear(_bottleneck_dim, vocab_size, bias=False),
+        )
+        self.slot_pred_norm = nn.LayerNorm(embed_dim)
+        # Diagnostics for slot prediction
+        self._diag_slot_pred_loss: float = 0.0
+        self._diag_slot_pred_acc: float = 0.0
+
+        # V12.1: Read temperature. With cosine similarity over 16 slots,
+        # scale must be high enough to break uniform softmax. Cosine sims
+        # cluster tightly in high-d (~0.05 spread), so scale=5 can't produce
+        # sharp attention. Floor=18.0, ceiling=64.0, learnable.
+        # V12.7: Init at log(22.0) instead of log(18.0). Initializing AT
+        # the clamp floor meant gradients wanting to decrease scale were
+        # zeroed by the clamp, so the param could only move UP. Starting
+        # above floor gives room in both directions.
+        self._read_log_scale = nn.Parameter(
+            torch.tensor(math.log(22.0))
+        )
+
+        # --- Router noise (MoE-style symmetry breaking) ---
+        # V10.14.5: Add Gaussian noise to assignment logits during early training
+        # to prevent "slot 0 wins by tiny initial advantage" collapse.
+        # Noise decays linearly: noise_std * max(0, 1 - step/warmup_steps)
+        # V10.14.8: Extended noise warmup 2000→10000 and added noise floor.
+        # Noise decaying to 0 at step 2000 meant collapse was permanent after
+        # that point. Longer warmup + floor=0.1 maintains diversity pressure
+        # throughout training while still allowing sharp convergence.
+        self._router_noise_std = 0.5
+        self._router_noise_warmup = 10000  # steps to decay noise toward floor
+        self._router_noise_floor = 0.1  # minimum noise std (never fully zero)
+        # V10.27: Register as buffer so it's saved/restored with state_dict().
+        # Without this, resume resets _router_step to 0, which re-suppresses
+        # slot reads (warmstart_alpha → 0) and resets router noise for ~500 steps.
+        self.register_buffer('_router_step_buf', torch.tensor(0, dtype=torch.long))
+        self._router_step = 0  # Mirror for easy access; synced in properties
+
+        # --- Read warmstart ---
+        # V10.14.6d: Read output is detached before adding to residual (LM
+        # can't suppress read_output_proj). But we still ramp the mixing
+        # coefficient from 0→1 so early noisy reads don't disrupt LM training.
+        # Uses same _router_step counter. Sigmoid centered at 100 steps,
+        # tau=25 → effectively 0 for first ~50 steps, ~1 after ~150.
+        self._read_warmstart_center = 100
+        self._read_warmstart_tau = 25
+
+        # --- V16: Semantic Coherence Gate ---
+        # Modulates write assignment by value-space coherence between token
+        # and slot content: S[i,j] = cosine_sim(write_val[i], slot_val[j]).
+        # Prevents geometrically-close but semantically-unrelated tokens from
+        # polluting slots, directly improving ablation delta.
+        # Floor decays from initial value to 0 over warmup steps, letting
+        # writes bootstrap before coherence filtering tightens.
+        self._coherence_floor = 0.3          # Initial floor (lets writes through early)
+        self._coherence_floor_min = 0.0      # Final floor after warmup
+        self._coherence_floor_decay_steps = 4000  # Steps to decay floor to min
+        self._diag_coherence_mean: float = 0.0  # Mean coherence score
+
+        # --- V20: Auto-scaling overrides ---
+        # When scaling dict is provided (from config.compute_slot_scaling()),
+        # override all step-based schedules to be proportional to training budget.
+        # Dimensionless targets (gate_target, H_target, etc.) are NOT overridden
+        # because they don't depend on model size or training length.
+        if scaling is not None:
+            _total = scaling.get("total_steps", 10000)
+            # Plasticity schedule
+            self._plasticity_warmup_end = scaling.get(
+                "plasticity_warmup_end", max(500, int(_total * 0.10)))
+            self._plasticity_cooldown_end = scaling.get(
+                "plasticity_cooldown_end", max(1000, int(_total * 0.20)))
+            # Soft detach leak curriculum
+            self._leak_curriculum_steps = scaling.get(
+                "leak_curriculum_steps", max(500, int(_total * 0.08)))
+            # Read gate freeze
+            self._read_gate_freeze_steps = scaling.get(
+                "read_gate_freeze_steps", max(100, int(_total * 0.01)))
+            # Coherence floor decay
+            self._coherence_floor_decay_steps = scaling.get(
+                "coherence_floor_decay_steps", max(500, int(_total * 0.08)))
+            # Router noise warmup
+            self._router_noise_warmup = scaling.get(
+                "router_noise_warmup", max(1000, int(_total * 0.20)))
+            # Constraint relaxation interval scales too — check more often
+            # in short runs, less often in long runs
+            self._constraint_relax_interval = max(100, int(_total * 0.01))
+            self._gate_adapt_window = max(50, int(_total * 0.005))
+            # Store scaling dict for diagnostics
+            self._scaling_config = scaling
+
+        # --- Diagnostics ---
+        self._diag_write_gate_mean = None
+        self._diag_assignment_entropy = None
+        self._diag_slot_key_norm = None
+        self._diag_slot_val_norm = None
+        self._diag_read_attn_entropy = None
+        self._diag_read_scale = None  # V10.21: separate read temperature
+        self._last_slot_keys = None  # V10.14.8: for orthogonality loss
+
+    # V10.29: List of adaptive scalar attributes to persist across checkpoints.
+    _ADAPTIVE_KEYS = (
+        '_gate_target', '_gate_ceil_weight', '_wr_scale_max', '_L_bal_weight',
+        '_novelty_gate_floor', '_adaptive_retr_loss_weight', '_H_target',
+        '_L_ortho_weight', '_read_scale_max', '_soft_detach_leak',
+        '_L_sharp_weight', 'write_lr',
+        '_read_gate_frozen',  # V15.1: Persisted so resume knows freeze state
+        '_coherence_floor',   # V16: Semantic coherence gate floor
+    )
+
+    # V11: Initial defaults for all adaptive scalars — used by reset_constraints().
+    _ADAPTIVE_DEFAULTS = {
+        '_gate_target': 0.80,             # V18: Forced open for bootstrap
+        '_gate_ceil_weight': 50.0,       # V14-hotfix: Linear+ReLU (was 5.0 quadratic)
+        # _gate_ceil_margin is static (0.05), not adaptive — not in _ADAPTIVE_KEYS
+        '_wr_scale_max': 16.0,  # V19: Raised from 4.0 (see __init__ for num_slots scaling)
+        '_L_bal_weight': 1.0,
+        '_novelty_gate_floor': 0.50,     # V18: Forced open for bootstrap
+        '_adaptive_retr_loss_weight': 1.0,
+        '_H_target': 1.0,
+        '_L_ortho_weight': 0.5,
+        '_read_scale_max': 64.0,
+        '_soft_detach_leak': 0.9,        # V17: Start at 90% (was 50%) for early LM gradient
+        '_L_sharp_weight': 0.1,
+        'write_lr': 0.1,
+        '_coherence_floor': 0.3,          # V16: Semantic coherence gate floor
+    }
+
+    def reset_constraints(self):
+        """V11: Reset all adaptive constraint state to initial defaults.
+
+        Use when resuming a checkpoint with --disable_slot_adaptive_constraints
+        to undo any drift from the previous run's controller.
+        """
+        for key, default in self._ADAPTIVE_DEFAULTS.items():
+            setattr(self, key, default)
+        # Clear accumulated windows so stale history doesn't leak
+        self._constraint_relax_window.clear()
+        self._constraint_relax_counter = 0
+        self._gate_mean_window.clear()
+        self._L_ortho_window.clear()
+        self._retr_loss_history.clear()
+        self._lm_loss_history.clear()
+        self._retr_loss_window.clear()
+        self._gate_window.clear()
+        self._slot_pred_loss_window.clear()
+        self._gate_adapt_counter = 0
+
+    def state_dict(self, *args, **kwargs):
+        """V10.27/29: Sync runtime state before saving."""
+        self._router_step_buf.fill_(self._router_step)
+        sd = super().state_dict(*args, **kwargs)
+        # V10.29: Persist adaptive hyperparams as prefixed keys
+        for key in self._ADAPTIVE_KEYS:
+            sd[f'_adaptive.{key}'] = getattr(self, key)
+        return sd
+
+    def load_state_dict(self, state_dict, *args, **kwargs):
+        """V10.27/29: Restore runtime state after loading.
+
+        NOTE: This override is only called when slot_memory.load_state_dict()
+        is invoked directly. When loading via parent model.load_state_dict(),
+        PyTorch routes through _load_from_state_dict() instead — so the
+        post-load fixups live in apply_checkpoint_overrides() which must be
+        called separately from the training script.
+        """
+        # V10.29: Extract adaptive keys before super() (which would reject them)
+        adaptive_vals = {}
+        keys_to_remove = []
+        for k in list(state_dict.keys()):
+            if k.startswith('_adaptive.'):
+                adaptive_vals[k[len('_adaptive.'):]] = state_dict[k]
+                keys_to_remove.append(k)
+        for k in keys_to_remove:
+            del state_dict[k]
+        result = super().load_state_dict(state_dict, *args, **kwargs)
+        self._restore_adaptive_values(adaptive_vals)
+        self.apply_checkpoint_overrides()
+        return result
+
+    def _restore_adaptive_values(self, adaptive_vals: dict):
+        """Restore adaptive hyperparams from checkpoint."""
+        self._router_step = int(self._router_step_buf.item())
+        for key, val in adaptive_vals.items():
+            if hasattr(self, key):
+                setattr(self, key, val)
+        if adaptive_vals:
+            print(f"  [SLOTS] Restored {len(adaptive_vals)} adaptive params from checkpoint")
+
+    def apply_checkpoint_overrides(self):
+        """V12.7: Apply post-load fixups to checkpoint values.
+
+        Called after weights are loaded — either from load_state_dict() (direct)
+        or from train.py after model.load_state_dict() (via parent).
+
+        PyTorch's model.load_state_dict() uses _load_from_state_dict() internally
+        and does NOT call child module load_state_dict() overrides. All post-load
+        fixups must live here and be called explicitly.
+        """
+        self._router_step = int(self._router_step_buf.item())
+        # V11.2b: Enforce current floor on loaded retr_weight
+        if self._adaptive_retr_loss_weight < self._adaptive_retr_loss_weight_min:
+            old = self._adaptive_retr_loss_weight
+            self._adaptive_retr_loss_weight = self._adaptive_retr_loss_weight_min
+            print(f"  [SLOTS] retr_weight {old:.2f} → {self._adaptive_retr_loss_weight:.2f} "
+                  f"(clamped to new floor)")
+        # V19: Bump loaded _wr_scale_max if below num_slots/4 (V12.5 used
+        # class default=4.0; V19 makes it instance-aware since 64 slots need
+        # much higher ceiling than 16 slots).
+        _wr_min = max(16.0, self.num_slots / 4)
+        if self._wr_scale_max < _wr_min:
+            _old_max = self._wr_scale_max
+            self._wr_scale_max = _wr_min
+            print(f"  [SLOTS] V19: _wr_scale_max {_old_max:.1f}→{_wr_min:.1f} "
+                  f"(raised for {self.num_slots} slots)")
+        # V12.3: If loaded _write_log_scale is at or above _wr_scale_max,
+        # pull it to 90% of max. Hard clamp kills gradient at the boundary
+        # (value >= max → grad = 0), so we need to be strictly inside.
+        _wr_target = self._wr_scale_max * 0.9
+        _wr_target_log = math.log(_wr_target)
+        if self._write_log_scale.item() >= math.log(self._wr_scale_max) - 0.01:
+            _old_wr = math.exp(self._write_log_scale.item())
+            with torch.no_grad():
+                self._write_log_scale.fill_(_wr_target_log)
+            print(f"  [SLOTS] V12.3: _write_log_scale {math.log(_old_wr):.2f} (scale={_old_wr:.1f}) "
+                  f"→ {_wr_target_log:.2f} (scale={_wr_target:.1f}) (at/above ceiling, pulled inside)")
+        # V12.1: If loaded _read_log_scale is below new floor, override it.
+        # Otherwise the clamp kills gradients (value stuck below floor → zero grad)
+        # and the parameter can never learn upward.
+        # V12.7: Also override if AT the floor (within 0.01). Starting AT the
+        # clamp boundary means the param can only move UP — pull it above
+        # floor to give gradients room in both directions.
+        _rd_floor = math.log(18.0)
+        _rd_above_floor = math.log(22.0)  # V12.7: target when stuck at floor
+        if self._read_log_scale.item() < _rd_floor + 0.01:
+            _old_scale = math.exp(self._read_log_scale.item())
+            with torch.no_grad():
+                self._read_log_scale.fill_(_rd_above_floor)
+            print(f"  [SLOTS] V12.7: _read_log_scale {math.log(_old_scale):.2f} (scale={_old_scale:.1f}) "
+                  f"→ {_rd_above_floor:.2f} (scale=22.0) (at/below floor, pulled above)")
+        # V15/V15.1: On resume, check if we're still in the freeze period.
+        # If _router_step < freeze_steps, keep gate frozen. Otherwise unfreeze.
+        # This replaces V13.1's zero-init reset (which was for the old -2.0 bias).
+        if hasattr(self, 'read_gate_proj') and hasattr(self, '_read_gate_freeze_steps'):
+            if self._router_step >= self._read_gate_freeze_steps:
+                # Past freeze period — unfreeze gate if still frozen
+                if self._read_gate_frozen:
+                    self._read_gate_frozen = False
+                    self.read_gate_proj.weight.requires_grad = True
+                    self.read_gate_proj.bias.requires_grad = True
+                    print(f"  [SLOTS] V15.1: Read gate unfrozen on resume "
+                          f"(step {self._router_step} >= {self._read_gate_freeze_steps})")
+            else:
+                # Still in freeze period — ensure gate stays frozen
+                self._read_gate_frozen = True
+                self.read_gate_proj.weight.requires_grad = False
+                self.read_gate_proj.bias.requires_grad = False
+                print(f"  [SLOTS] V15.1: Read gate stays frozen on resume "
+                      f"(step {self._router_step} < {self._read_gate_freeze_steps})")
+        # V13.2: Enforce gate_target floor on resume. Old checkpoints may have
+        # _gate_target tightened below the new floor (0.40), creating a feedback
+        # loop where the ceiling caps the write gate before slots prove useful.
+        if self._gate_target < self._gate_target_min:
+            _old_target = self._gate_target
+            self._gate_target = self._gate_target_min
+            print(f"  [SLOTS] V13.2: _gate_target {_old_target:.2f} → {self._gate_target_min:.2f} "
+                  f"(clamped to new floor)")
+        # V14-hotfix: Force new leak/ceiling values on resume from old checkpoints.
+        # Old checkpoint may have _soft_detach_leak=0.1 and _gate_ceil_weight=5.0
+        # which would undo the realignment.
+        if self._soft_detach_leak < 0.9:
+            _old_leak = self._soft_detach_leak
+            self._soft_detach_leak = 0.9
+            print(f"  [SLOTS] V17: _soft_detach_leak {_old_leak:.2f} → 0.90 "
+                  f"(forced to new start for stronger gradient curriculum)")
+        if self._soft_detach_leak_max < 1.0:
+            self._soft_detach_leak_max = 1.0
+            print(f"  [SLOTS] V14: _soft_detach_leak_max raised to 1.0 (full gradient by curriculum end)")
+        if self._gate_ceil_weight < 50.0:
+            _old_w = self._gate_ceil_weight
+            self._gate_ceil_weight = 50.0
+            print(f"  [SLOTS] V14: _gate_ceil_weight {_old_w:.1f} → 50.0 "
+                  f"(linear+ReLU penalty)")
+        # V12: Re-ramp read warmstart on resume so fresh read_query_proj
+        # doesn't immediately dump noisy reads into the residual stream.
+        # Shift warmstart center to current step → sigmoid re-ramps over
+        # ~100 steps from ~0 to ~1, giving read_query_proj time to learn.
+        _step = int(self._router_step_buf.item())
+        if _step > self._read_warmstart_center + 200:
+            self._read_warmstart_center = _step
+            print(f"  [SLOTS] V12: read warmstart re-centered to step {_step} "
+                  f"(read_query_proj now active, re-ramping)")
+
+    @property
+    def read_warmstart_alpha(self) -> float:
+        """Sigmoid ramp for read mixing: 0 early, 1 later."""
+        return 1.0 / (1.0 + math.exp(
+            -(self._router_step - self._read_warmstart_center)
+            / max(self._read_warmstart_tau, 1.0)
+        ))
+
+    def maybe_unfreeze_read_gate(self):
+        """V15.1: Unfreeze read gate after the curriculum freeze period.
+
+        Called every step after _router_step increments. Once _router_step
+        reaches _read_gate_freeze_steps, the gate parameters are unfrozen
+        and the model can learn position-dependent gating on top of the
+        slot integration that the backbone learned during the freeze.
+        """
+        if self._read_gate_frozen and self._router_step >= self._read_gate_freeze_steps:
+            self._read_gate_frozen = False
+            self.read_gate_proj.weight.requires_grad = True
+            self.read_gate_proj.bias.requires_grad = True
+            print(f"  [SLOTS] V15.1: Read gate UNFROZEN at step {self._router_step} "
+                  f"(was fixed at {self._read_gate_freeze_value} for "
+                  f"{self._read_gate_freeze_steps} steps). Gate now learnable.")
+
+    def init_state(self, batch_size: int, dtype: torch.dtype, device: torch.device):
+        """Initialize slot state for a new batch.
+
+        Returns:
+            slot_keys: [B, K, D_key] — slot key embeddings
+            slot_vals: [B, K, D] — slot value embeddings
+        """
+        slot_keys = self.slot_keys_init.unsqueeze(0).expand(batch_size, -1, -1).clone()
+        slot_vals = self.slot_vals_init.unsqueeze(0).expand(batch_size, -1, -1).clone()
+        return slot_keys.to(dtype=dtype, device=device), slot_vals.to(dtype=dtype, device=device)
+
+    def write(
+        self,
+        x: torch.Tensor,            # [B, N, D] — token representations
+        slot_keys: torch.Tensor,     # [B, K, D_key] — current slot keys
+        slot_vals: torch.Tensor,     # [B, K, D] — current slot values
+        detach: bool = False,        # Detach write deltas (stop grad to main path)
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Competitive slot write: each token writes to the most similar slot.
+
+        The write uses a soft competitive assignment (softmax over slots),
+        followed by a gated EMA update. This ensures each slot specializes
+        in storing specific key-value bindings.
+
+        IMPORTANT: This is the ONLY way slot state gets modified.
+
+        Args:
+            x: Token representations [B, N, D]
+            slot_keys: Current slot keys [B, K, D_key]
+            slot_vals: Current slot values [B, K, D]
+            detach: If True, detach deltas from computation graph
+
+        Returns:
+            updated_slot_keys: [B, K, D_key]
+            updated_slot_vals: [B, K, D]
+        """
+        B, N, D = x.shape
+
+        # V10.24: Soft detach — pass 10% of gradient through to write path.
+        # Full detach (V10.14.1) prevented main LM loss from encouraging writes,
+        # starving write_novelty_gate of signal. 10% leak lets the LM loss
+        # gently push the gate open when slot reads help prediction, while
+        # still blocking 90% of gradient to prevent backbone destabilization.
+        # V10.29: Adaptive leak fraction (default 0.1, adapts based on gate health)
+        _leak = self._soft_detach_leak
+        x_write = x * _leak + x.detach() * (1.0 - _leak)
+
+        # Novelty gate: which tokens should write? [B, N, 1]
+        # V10.14.4: Floor clamp prevents gate death — ensures minimum write pressure
+        novelty = torch.sigmoid(self.write_novelty_gate(x_write))
+        novelty = torch.clamp(novelty, min=self._novelty_gate_floor)
+
+        # Project tokens into write key/value space
+        write_keys = self.write_key_proj(x_write)   # [B, N, D_key]
+        write_vals = self.write_val_proj(x_write)    # [B, N, D]
+
+        # V10.14.5: Cosine similarity assignment.
+        # L2-normalize both write keys and slot keys so assignment is based on
+        # direction only, not magnitude. This prevents winner-take-all collapse
+        # where one slot's key norm grows larger and attracts all tokens.
+        # [B, N, D_key] @ [B, D_key, K] → [B, N, K]
+        # V19: Write scale clamp [1.5, _wr_scale_max]. The ceiling is now
+        # num_slots/4 (e.g. 16.0 for 64 slots) instead of the old 2.0-4.0
+        # range. History: V10.20-V10.25 progressively lowered the ceiling to
+        # fix gradient explosions from F.normalize Jacobian on slot_keys, but
+        # V10.20 also detached slot_keys (line below) — fixing the root cause.
+        # The low ceiling remained as dead code that prevented slot
+        # specialization: with 64 slots and scale≤4, cosine sim spread
+        # ≈ 0.036*4 = 0.14 → softmax is uniform → marginal_H=1.0 → all
+        # slots store identical content → ablation shows 0% benefit.
+        _scale = torch.exp(self._write_log_scale).clamp(min=1.5, max=self._wr_scale_max)
+        _wk_norm = F.normalize(write_keys, dim=-1)     # [B, N, D_key]
+        # V10.20: Detach slot_keys before F.normalize in assignment computation.
+        # The F.normalize Jacobian (I - x̂x̂ᵀ)/||x|| on slot_keys creates 3000×+
+        # gradient variance when many tokens write to the same slot. Since slot_keys
+        # are updated via EMA (line 8577), they don't need assignment-path gradients —
+        # the learning signal comes through the EMA update itself. Detaching here
+        # severs the 1.2M× amplification path through slot_keys_init.
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)       # [B, K, D_key]
+        assignment_logits = torch.bmm(
+            _wk_norm, _sk_norm.transpose(1, 2)
+        ) * _scale  # cosine_sim * temperature
+
+        # V10.14.5: Router noise — break symmetry during early training.
+        # Without this, the slot with the tiny initial advantage snowballs.
+        if self.training and self._router_noise_std > 0:
+            # V10.14.8: Decay toward floor instead of 0
+            _noise_decay = max(0.0, 1.0 - self._router_step / self._router_noise_warmup)
+            _noise_std = self._router_noise_floor + (self._router_noise_std - self._router_noise_floor) * _noise_decay
+            # V10.29/V12.4: If marginal_H is high (slots uniform), boost noise
+            # to maintain exploration; if differentiated, accelerate decay.
+            # V12.4: Scale boost by _noise_decay so it fades with training
+            # instead of holding at a fixed 50% forever. At step 0 boost=25%
+            # of initial; at warmup end boost=0 (floor only).
+            if self._adaptive_router_noise:
+                _mH = getattr(self, '_diag_marginal_entropy', None)
+                if _mH is not None and _mH > 0.90:
+                    _boost = self._router_noise_std * 0.25 * (0.5 + 0.5 * _noise_decay)
+                    _noise_std = max(_noise_std, _boost)
+                elif _mH is not None and _mH < 0.5:
+                    # Slots well-differentiated — accelerate decay
+                    _noise_std = max(self._router_noise_floor, _noise_std * 0.5)
+            _noise = torch.randn_like(assignment_logits) * _noise_std
+            assignment_logits = assignment_logits + _noise
+
+        # V10.14.6: Top-k hard routing with straight-through gradient.
+        # Soft softmax over all K slots converges to uniform when write keys
+        # are similar. Top-k selects the k best-matching slots per token,
+        # then softmax only within those k. Straight-through estimator passes
+        # gradients through the full softmax so the router can still learn.
+        assignment_soft = F.softmax(assignment_logits, dim=-1)  # [B, N, K]
+        if self.write_top_k < self.num_slots:
+            topk_vals, topk_idx = assignment_logits.topk(self.write_top_k, dim=-1)  # [B, N, k]
+            topk_weights = F.softmax(topk_vals, dim=-1)  # [B, N, k] — normalized within top-k
+            assignment_hard = torch.zeros_like(assignment_logits)  # [B, N, K]
+            assignment_hard.scatter_(-1, topk_idx, topk_weights.to(assignment_hard.dtype))
+            # Straight-through: hard forward, soft backward
+            assignment = assignment_hard - assignment_soft.detach() + assignment_soft
+        else:
+            assignment = assignment_soft
+
+        # Gate assignment by novelty: only tokens with binding info write
+        # [B, N, K] * [B, N, 1] → [B, N, K]
+        gated_assignment = assignment * novelty
+
+        # V16: Semantic Coherence Gate — modulate assignment by value-space
+        # similarity between the token's write content and slot's existing content.
+        # This prevents geometrically-close but semantically-unrelated tokens from
+        # polluting slots. Key insight: cosine key similarity (routing) can match
+        # tokens to "nearby" slots that store unrelated content; value coherence
+        # filters these out.  A decaying floor handles cold-start (slot_vals ≈ 0
+        # early → all coherences ≈ 0 → floor lets writes bootstrap).
+        _wv_norm = F.normalize(write_vals, dim=-1)                  # [B, N, D]
+        _sv_norm = F.normalize(slot_vals.detach(), dim=-1)          # [B, K, D]
+        coherence = torch.bmm(_wv_norm, _sv_norm.transpose(1, 2))  # [B, N, K]
+        # Floor decays linearly from _coherence_floor to _coherence_floor_min
+        # over _coherence_floor_decay_steps, then stays at min.
+        _coh_progress = min(1.0, self._router_step / max(1, self._coherence_floor_decay_steps))
+        _coh_floor = self._coherence_floor + (self._coherence_floor_min - self._coherence_floor) * _coh_progress
+        coherence = torch.clamp(coherence, min=_coh_floor)
+        # Triple-Patch: Bypass coherence gating for first 2k steps to break
+        # the Coherence Catch-22 (slots empty → coherence≈0 → writes blocked
+        # → slots stay empty). After 2k steps, coherence gating kicks in.
+        if self._router_step < 2000:
+            gated_assignment = gated_assignment * torch.ones_like(coherence)
+        else:
+            gated_assignment = gated_assignment * coherence
+
+        # Aggregate writes per slot: sum over tokens
+        # effective_write[b, k] = sum_t(gated_assignment[b, t, k])
+        # This is the total write pressure on each slot
+        write_pressure = gated_assignment.sum(dim=1)  # [B, K]
+
+        # Weighted average of incoming keys/values per slot
+        # [B, K, N] @ [B, N, D_key] → [B, K, D_key]
+        incoming_keys = torch.bmm(
+            gated_assignment.transpose(1, 2), write_keys
+        )
+        # [B, K, N] @ [B, N, D] → [B, K, D]
+        incoming_vals = torch.bmm(
+            gated_assignment.transpose(1, 2), write_vals
+        )
+
+        # Normalize by write pressure (avoid division by zero)
+        # V10.20: Raised clamp floor from 1e-6 to 0.1. The old floor allowed
+        # 1/1e-6 = 1M× gradient amplification through the pressure division,
+        # which was the root cause of the 1.2M× slot_keys_init variance spikes.
+        # Floor of 0.1 caps amplification at 10× — consistent with the phase
+        # attention normalizer clamp.
+        pressure_norm = write_pressure.unsqueeze(-1).clamp(min=0.1)
+        incoming_keys = incoming_keys / pressure_norm
+        incoming_vals = incoming_vals / pressure_norm
+
+        # V10.20: L2-normalize incoming KEYS before EMA update.
+        # Without this, unbounded incoming_keys magnitude drifts slot_keys
+        # off the unit hypersphere, causing F.normalize Jacobian explosion
+        # in subsequent forward passes. Normalizing here ensures the EMA
+        # interpolates between unit vectors, keeping slot keys well-conditioned.
+        _ik_norm = incoming_keys.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        incoming_keys = incoming_keys / _ik_norm
+        # V12.4: Do NOT normalize incoming_vals. Values carry magnitude info
+        # (how strongly a concept is represented), and L2-norm destroys it —
+        # all slot values get forced onto the unit sphere, reducing expressiveness.
+        # Keys need normalization (cosine routing), values don't.
+
+        # EMA update rate per slot: η * min(write_pressure, 1.0)
+        # Slots with no write pressure don't update; heavy pressure caps at η
+        # Plasticity Schedule: override write_lr based on training phase.
+        # Bootstrap (0–5k): full plasticity at 0.5
+        # Cooldown (5k–10k): linear decay 0.5 → 0.1
+        # Refinement (10k+): stable at 0.1 (Sovereign Controller can still adjust)
+        _step = self._router_step
+        if _step < self._plasticity_warmup_end:
+            _effective_lr = self._plasticity_high
+        elif _step < self._plasticity_cooldown_end:
+            _cool_progress = (_step - self._plasticity_warmup_end) / max(
+                1, self._plasticity_cooldown_end - self._plasticity_warmup_end
+            )
+            _effective_lr = self._plasticity_high + (self._plasticity_low - self._plasticity_high) * _cool_progress
+        else:
+            _effective_lr = self.write_lr  # Sovereign Controller takes over
+        eta = _effective_lr * write_pressure.clamp(max=1.0).unsqueeze(-1)  # [B, K, 1]
+
+        if detach:
+            incoming_keys = incoming_keys.detach()
+            incoming_vals = incoming_vals.detach()
+            eta = eta.detach()
+
+        # Slot update: EMA rule
+        new_slot_keys = (1 - eta) * slot_keys + eta * incoming_keys
+        new_slot_vals = (1 - eta) * slot_vals + eta * incoming_vals
+
+        # V10.14.5 / V10.16: Re-normalize slot keys to unit sphere after EMA update.
+        # Prevents key norms from drifting, which would bias cosine similarity.
+        # V10.16: Use detached norms to avoid the F.normalize Jacobian explosion.
+        # When many tokens write to the same slot, the normalize Jacobian
+        # (I - x̂x̂ᵀ)/||x|| can produce 3000x+ gradient variance spikes.
+        # Detaching the denominator preserves forward normalization while keeping
+        # gradients flowing only through the EMA numerator (the actual learning signal).
+        _key_norms = new_slot_keys.detach().norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        new_slot_keys = new_slot_keys / _key_norms
+
+        # Store assignment for sharpness loss (WITH grad — this is the learning signal)
+        self._last_assignment = assignment  # [B, N, K]
+        self._last_novelty = novelty  # [B, N, 1]
+        # V10.14.8: Store updated slot keys for orthogonality loss
+        self._last_slot_keys = new_slot_keys  # [B, K, D_key]
+
+        # Diagnostics (no grad)
+        with torch.no_grad():
+            self._diag_write_gate_mean = novelty.mean().item()
+            # Assignment entropy: high = spread across slots, low = sharp assignment
+            _a_log = torch.log(assignment.clamp(min=1e-8))
+            self._diag_assignment_entropy = -(assignment * _a_log).sum(dim=-1).mean().item()
+            self._diag_slot_key_norm = new_slot_keys.norm(dim=-1).mean().item()
+            self._diag_slot_val_norm = new_slot_vals.norm(dim=-1).mean().item()
+            # V16: Mean semantic coherence (before floor clamp)
+            self._diag_coherence_mean = torch.bmm(
+                _wv_norm, _sv_norm.transpose(1, 2)
+            ).mean().item()
+
+        return new_slot_keys, new_slot_vals
+
+    def read(
+        self,
+        x: torch.Tensor,            # [B, N, D] — query tokens
+        slot_keys: torch.Tensor,     # [B, K, D_key] — slot keys
+        slot_vals: torch.Tensor,     # [B, K, D] — slot values
+    ) -> torch.Tensor:
+        """
+        Read from slots via attention: query tokens attend to slot keys,
+        retrieve weighted sum of slot values.
+
+        This produces output for the residual stream but NEVER modifies slots.
+
+        Args:
+            x: Query token representations [B, N, D]
+            slot_keys: Slot keys [B, K, D_key]
+            slot_vals: Slot values [B, K, D]
+
+        Returns:
+            read_output: [B, N, D] — retrieved information
+        """
+        # V12: Separate read_query_proj — read queries learn independently
+        # from write queries, trained by retrieval loss only.
+        queries = self.read_query_proj(x)  # [B, N, D_key]
+
+        # V12.1: Read scale floor raised to 18.0 (from 4.0). With cosine
+        # similarity in high-d, slot sims cluster within ~0.05 spread.
+        # Over 16 slots, scale=5 → near-uniform softmax. Floor=18 ≈ num_slots
+        # so a 0.05 sim gap → logit gap of 0.9 → sharp peak.
+        _read_scale = torch.exp(
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
+        )
+        _q_norm = F.normalize(queries, dim=-1)
+        # Triple-Patch: Enable key learning in read path. Previously detached
+        # to prevent F.normalize Jacobian explosion, but this severed the
+        # gradient path from LM loss → read attention → slot_keys, preventing
+        # keys from learning which slots to route to. With write_lr=0.5 and
+        # coherence bypass, keys now get strong EMA signal; allowing read-path
+        # gradients lets the LM loss directly shape key geometry.
+        _sk_norm = F.normalize(slot_keys, dim=-1)
+        attn_logits = torch.bmm(
+            _q_norm, _sk_norm.transpose(1, 2)
+        ) * _read_scale
+        attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
+        attn_weights = self.read_dropout(attn_weights)
+
+        # Retrieve: [B, N, K] @ [B, K, D] → [B, N, D]
+        retrieved = torch.bmm(attn_weights, slot_vals)
+
+        # Project to output space
+        output = self.read_output_proj(retrieved)
+
+        # V13/B2: Learned per-position gating.  The gate decides how much
+        # slot-derived information to inject at each position.  Input is the
+        # query token's hidden state `x` (NOT retrieved content) — the model
+        # decides based on its OWN state whether it needs slot info, before
+        # seeing what the slot returned.  This prevents the gate from just
+        # learning "is this slot content zero/noisy" → actually forces the
+        # model to learn WHEN to use memory.
+        # NOTE: gate is applied here (inside read()) so compute_retrieval_loss
+        # and compute_slot_prediction_loss are NOT gated — those losses train
+        # the read/write projections directly, independent of LM usefulness.
+        # V15.1: During frozen-gate phase, use fixed gate value instead of
+        # learned projection. This forces the backbone to adapt to slot reads.
+        if self._read_gate_frozen:
+            _gate = torch.full(
+                (x.shape[0], x.shape[1], 1),
+                self._read_gate_freeze_value,
+                device=x.device, dtype=x.dtype,
+            )
+        else:
+            _gate = torch.sigmoid(self.read_gate_proj(x))  # [B, N, 1]
+        output = output * _gate
+
+        # Diagnostics
+        with torch.no_grad():
+            _w_log = torch.log(attn_weights.clamp(min=1e-8))
+            self._diag_read_attn_entropy = -(attn_weights * _w_log).sum(dim=-1).mean().item()
+            self._diag_read_scale = _read_scale.item()
+            self._diag_read_gate_mean = _gate.mean().item()
+            # V11.2: Slot specialization diagnostics
+            # max_weight: how peaked is the read attention? High = specialized.
+            self._diag_read_max_weight = attn_weights.max(dim=-1).values.mean().item()
+            # key_variance: how diverse are slot keys? Low = collapsed.
+            # Compute pairwise cosine sim variance across K slots.
+            _sk_for_diag = F.normalize(slot_keys, dim=-1)  # [B, K, D]
+            _key_cos = torch.bmm(_sk_for_diag, _sk_for_diag.transpose(1, 2))  # [B, K, K]
+            self._diag_slot_key_cos_var = _key_cos.var().item()
+            # value_norm: mean L2 norm of slot values — zero means empty slots.
+            self._diag_slot_val_mean_norm = slot_vals.norm(dim=-1).mean().item()
+
+        return output
+
+    def compute_retrieval_loss(
+        self,
+        x: torch.Tensor,              # [B, N, D] — token representations
+        slot_keys: torch.Tensor,       # [B, K, D_key] — slot keys
+        slot_vals: torch.Tensor,       # [B, K, D] — slot values
+        query_mask: torch.Tensor,      # [B, N] — True at query positions
+        target_ids: torch.Tensor,      # [B, N] — target token IDs
+        lm_head: nn.Linear,            # Shared LM head for prediction
+    ) -> torch.Tensor:
+        """
+        V10.14.6d: Retrieval loss routes through read_output_proj.
+
+        The read output is detached in the main forward pass (LM can't suppress
+        read_output_proj). This means read_output_proj is trained ONLY by this
+        retrieval loss — it learns to produce useful projections for token
+        prediction, not to suppress noisy reads.
+
+        Path: slot_vals → attn·vals → read_output_proj → retr_read_norm → lm_head
+
+        Args:
+            x: Token representations [B, N, D]
+            slot_keys: Slot keys [B, K, D_key]
+            slot_vals: Slot values [B, K, D]
+            query_mask: Boolean mask, True at positions where retrieval is tested [B, N]
+            target_ids: Token IDs to predict at query positions [B, N]
+            lm_head: The model's LM head (shared, not separate)
+
+        Returns:
+            retrieval_loss: Scalar CE loss averaged over query positions.
+                           Returns 0 if no query positions exist.
+        """
+        if query_mask is None or not query_mask.any():
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # V12: Use read_query_proj (matches read() path) so retrieval loss
+        # gradients train the read projection, not the write projection.
+        queries = self.read_query_proj(x)  # [B, N, D_key]
+        # V14-hotfix: Sync scale with read() exactly. Previously used
+        # exp(x).clamp() (clamp in linear space) while read() uses
+        # exp(x.clamp()) (clamp in log space). The mismatch means retrieval
+        # loss evaluates at a different temperature than inference read(),
+        # causing gradients to optimize for the wrong sharpness.
+        _scale = torch.exp(
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
+        )
+        _q_norm = F.normalize(queries, dim=-1)
+        # V10.20: Detach slot_keys (consistent with read/write paths).
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
+        attn_logits = torch.bmm(
+            _q_norm, _sk_norm.transpose(1, 2)
+        ) * _scale  # [B, N, K]
+        attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
+
+        # Retrieve weighted slot values
+        raw_retrieved = torch.bmm(attn_weights, slot_vals)  # [B, N, D]
+
+        # V10.14.6d: Route through read_output_proj. Since the main forward
+        # detaches read output, this retrieval loss is the ONLY gradient source
+        # for read_output_proj — it learns useful projections without LM
+        # interference.
+        projected = self.read_output_proj(raw_retrieved)  # [B, N, D]
+
+        # Select only query positions
+        query_retrieved = projected[query_mask]  # [num_queries, D]
+        query_targets = target_ids[query_mask]
+
+        if query_retrieved.shape[0] == 0:
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # Normalize before lm_head: projected values may have arbitrary scale,
+        # but lm_head expects layer-normed input (same as main path).
+        query_retrieved = self.retr_read_norm(query_retrieved)  # [num_queries, D]
+        query_logits = lm_head(query_retrieved)  # [num_queries, V]
+
+        retrieval_loss = F.cross_entropy(
+            query_logits, query_targets, ignore_index=-100
+        )
+
+        # V11.3: Diagnostics for pre-attention retrieval experiment
+        with torch.no_grad():
+            self._diag_retr_query_norm = x[query_mask].norm(dim=-1).mean().item()
+            self._diag_retr_retrieved_norm = query_retrieved.norm(dim=-1).mean().item()
+
+        return retrieval_loss
+
+    def compute_slot_prediction_loss(
+        self,
+        x: torch.Tensor,              # [B, N, D] — token representations (pre-attention)
+        slot_keys: torch.Tensor,       # [B, K, D_key] — slot keys
+        slot_vals: torch.Tensor,       # [B, K, D] — slot values
+        query_mask: torch.Tensor,      # [B, N] — True at query positions
+        target_ids: torch.Tensor,      # [B, N] — target token IDs
+    ) -> torch.Tensor:
+        """
+        V11.4: Slot-only predictive usefulness test.
+
+        Tests whether slot content carries information useful for next-token
+        prediction, using a SEPARATE prediction head (not shared lm_head).
+        This eliminates the failure mode where retrieval loss improves because
+        lm_head improves, rather than because slots contain better content.
+
+        Slot-derived tensor: slot_vals → attention-weighted retrieval →
+            read_output_proj → slot_pred_norm → slot_pred_head → CE loss
+
+        The query is formed from x (pre-attention embeddings), which provides
+        only positional/token identity info — no backbone computation.
+        The prediction comes entirely from what the slots contain.
+
+        Cannot bypass slots: the only path to the prediction head goes through
+        slot_vals retrieval. If slots contain no useful info, this loss stays
+        at ~log(50257) ≈ 10.8 (random).
+
+        Gradient flow:
+          ✓ read_output_proj (projection of retrieved content)
+          ✓ slot_vals (via retrieval attention weighted sum)
+          ✓ write_val_proj (via slot_vals computation graph)
+          ✓ slot_pred_head (the separate prediction bottleneck)
+          ✓ slot_pred_norm (normalization before prediction)
+          ✗ backbone layers (x is detached at capture point)
+          ✗ lm_head (not used — separate head)
+          ✗ token embeddings (detached in x)
+
+        This loss tests usefulness to generation, NOT self-consistency:
+          - Retrieval loss = "can slots reconstruct what was stored?" (self-referential)
+          - Slot prediction loss = "can slots predict the next token?" (LM-useful)
+
+        Success criterion is NOT this loss improving alone — it's whether
+        ablation delta moves off zero. If this loss improves but ablation
+        stays flat, slots are still learning in isolation.
+
+        Returns:
+            slot_pred_loss: Scalar CE loss from slot-only prediction.
+        """
+        if query_mask is None or not query_mask.any():
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # V12: Use read_query_proj (matches read() and compute_retrieval_loss).
+        queries = self.read_query_proj(x)  # [B, N, D_key]
+        # V14-hotfix: Sync scale with read() exactly — clamp in log space,
+        # same floor (log(18.0)) so loss evaluates at inference temperature.
+        _scale = torch.exp(
+            self._read_log_scale.clamp(min=math.log(18.0), max=math.log(self._read_scale_max))
+        )
+        _q_norm = F.normalize(queries, dim=-1)
+        _sk_norm = F.normalize(slot_keys.detach(), dim=-1)
+        attn_logits = torch.bmm(
+            _q_norm, _sk_norm.transpose(1, 2)
+        ) * _scale  # [B, N, K]
+        attn_weights = F.softmax(attn_logits, dim=-1)  # [B, N, K]
+
+        # Retrieve weighted slot values — this is the slot-derived representation
+        raw_retrieved = torch.bmm(attn_weights, slot_vals)  # [B, N, D]
+
+        # Route through read_output_proj (shared with retrieval loss path)
+        projected = self.read_output_proj(raw_retrieved)  # [B, N, D]
+
+        # Select query positions
+        query_retrieved = projected[query_mask]  # [num_queries, D]
+        query_targets = target_ids[query_mask]
+
+        if query_retrieved.shape[0] == 0:
+            return torch.tensor(0.0, device=x.device, dtype=x.dtype)
+
+        # Normalize then predict through SEPARATE head (not lm_head)
+        query_retrieved = self.slot_pred_norm(query_retrieved)  # [num_queries, D]
+        slot_logits = self.slot_pred_head(query_retrieved)  # [num_queries, V]
+
+        slot_pred_loss = F.cross_entropy(
+            slot_logits, query_targets, ignore_index=-100
+        )
+
+        # Diagnostics: loss + top-1 accuracy
+        with torch.no_grad():
+            self._diag_slot_pred_loss = slot_pred_loss.item()
+            preds = slot_logits.argmax(dim=-1)
+            valid = query_targets != -100
+            if valid.any():
+                self._diag_slot_pred_acc = (
+                    (preds[valid] == query_targets[valid]).float().mean().item()
+                )
+            else:
+                self._diag_slot_pred_acc = 0.0
+
+        return slot_pred_loss
+
+    def compute_sharpness_loss(self) -> torch.Tensor:
+        """
+        V10.14.6: MoE-style router loss — sharp, balanced, and gate-selective.
+
+        Three-term loss:
+
+        Term 1 — Target sharpness (L_sharp):
+            ReLU(H(assign_t) - H_target) averaged over tokens.
+            H_target ≈ 1.0 nats: allows 2-3 active slots per token.
+
+        Term 2 — Load balancing (L_bal):
+            KL(marginal || uniform) where marginal = mean(assign) over tokens.
+            Prevents single-slot collapse.
+
+        Term 3 — Gate sparsity (L_gate):  [NEW in V10.14.6]
+            Mean(novelty) — L1 penalty pushing gate toward closed.
+            Without this, gate drifts to 1.0 (everything writes, including
+            filler). Retrieval loss counteracts by pushing gate open for
+            tokens that actually carry binding info. The tension creates
+            selectivity.
+
+        Returns:
+            router_loss: λ_sharp * L_sharp + λ_bal * L_bal + λ_gate * L_gate
+        """
+        if self._last_assignment is None:
+            return torch.tensor(0.0, device=self.slot_keys_init.device,
+                                dtype=self.slot_keys_init.dtype)
+
+        assignment = self._last_assignment  # [B, N, K]
+        K = self.num_slots
+        eps = 1e-8
+
+        # --- Term 1: Target sharpness ---
+        # Per-token entropy: H(a_t) = -sum(a * log(a))
+        log_a = torch.log(assignment + eps)
+        per_token_H = -(assignment * log_a).sum(dim=-1)  # [B, N], ≥ 0
+        # Only penalize if entropy exceeds target (don't reward going below)
+        # V10.29: Adaptive entropy target
+        H_target = self._H_target  # nats — adapts based on slot utilization
+        L_sharp = torch.relu(per_token_H - H_target).mean()
+
+        # --- Term 2: Load balancing (KL to uniform) ---
+        # Marginal: average assignment over all tokens in the batch
+        # [B, N, K] → [K] average
+        marginal = assignment.mean(dim=(0, 1))  # [K]
+        # KL(marginal || uniform) = sum(p * log(p * K))
+        L_bal = (marginal * torch.log(marginal * K + eps)).sum()
+
+        # --- Term 3: Gate sparsity (V10.14.6) ---
+        # V10.14.7 removed L_gate (pushed gate→0, causing chicken-and-egg collapse).
+        # But without ANY gate signal, the 10% gradient leak through x_write lets
+        # LM loss weakly push gate→floor (0.15). Gate has no upward pressure →
+        # collapses → slots starve → retr_loss plateaus at ~5.0.
+        #
+        # Fix: Log-barrier utilization loss. Penalizes gates near 0 but is gentle
+        # above ~0.3. This gives the gate a positive learning signal without
+        # overwhelming retrieval loss like the old L_gate did.
+        # L_gate_util = -mean(log(gate)) — strong near 0, weak near 1.
+        L_gate_util = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        if self._last_novelty is not None:
+            L_gate_util = -torch.log(self._last_novelty + eps).mean()
+
+        # Store diagnostics (normalized by max entropy for readability)
+        max_entropy = math.log(K)
+        with torch.no_grad():
+            self._diag_marginal_entropy = (
+                -(marginal * torch.log(marginal + eps)).sum() / max_entropy
+            ).item()
+            self._diag_per_token_entropy = per_token_H.mean().item()
+            self._diag_L_sharp = L_sharp.item()
+            self._diag_L_bal = L_bal.item()
+            # V10.29.1: Store for adaptive controller (avoids recomputation)
+            self._diag_L_ortho = None  # Set below after L_ortho is computed
+
+        # V10.14.7: Removed old L_gate (mean(novelty) pushed gate→0).
+        # V10.26: Added L_gate_util (log-barrier) — pushes gate OPEN.
+        # Weight 0.01: -log(0.15)=1.90 → contributes ~0.019 to loss.
+        # At gate=0.3: -log(0.3)=1.20 → ~0.012. Gentle enough not to
+        # overwhelm retrieval loss but prevents floor collapse.
+        # --- Term 4: Slot key orthogonality (V10.14.8) ---
+        # Penalize slot keys for being too similar. Without this, EMA updates
+        # drift keys toward the mean token embedding → all slots become identical.
+        # L_ortho = ||K·K^T - I||_F^2 / K^2 (normalized Frobenius norm)
+        # V12.4: Apply to BOTH _last_slot_keys (post-EMA, indirect gradient)
+        # AND slot_keys_init (direct gradient to the learnable parameter).
+        # Previously only applied to _last_slot_keys, but gradient through EMA
+        # is attenuated by η≈0.1 and the .clone() + detach in the assignment
+        # path makes it very indirect. Direct term on slot_keys_init ensures
+        # the initial key configuration stays orthogonal.
+        L_ortho = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        # (a) Post-EMA keys (existing)
+        if hasattr(self, '_last_slot_keys') and self._last_slot_keys is not None:
+            _sk = F.normalize(self._last_slot_keys, dim=-1)  # [B, K, D]
+            _sim = torch.bmm(_sk, _sk.transpose(1, 2))
+            _eye = torch.eye(self.num_slots, device=_sim.device, dtype=_sim.dtype)
+            _off_diag = _sim - _eye.unsqueeze(0)
+            L_ortho = (_off_diag ** 2).mean()
+            self._diag_L_ortho = L_ortho.item()
+        # (b) Direct term on slot_keys_init (learnable parameter)
+        _sk_init = F.normalize(self.slot_keys_init, dim=-1)  # [K, D_key]
+        _sim_init = _sk_init @ _sk_init.t()  # [K, K]
+        _eye_init = torch.eye(self.num_slots, device=_sim_init.device, dtype=_sim_init.dtype)
+        L_ortho_init = ((_sim_init - _eye_init) ** 2).mean()
+        L_ortho = L_ortho + L_ortho_init
+
+        # V10.14.8: L_bal weight 0.02→1.0. At 0.02 the balance loss contributed
+        # ~0.08 to a total loss of ~30 — completely drowned out. Slots collapsed
+        # to marginal_H=0.24 (1-2 slots used out of 64). At 1.0, L_bal≈4.16
+        # when fully collapsed, providing meaningful gradient to redistribute.
+        # V14-hotfix: Hard gate ceiling — Linear+ReLU penalty (was soft quadratic).
+        # Quadratic was too gentle at small violations and too aggressive at large
+        # ones, creating unstable oscillations.  Linear penalty with high weight
+        # (50.0) provides consistent, strong enforcement.
+        L_gate_ceil = torch.tensor(0.0, device=assignment.device, dtype=assignment.dtype)
+        if self._last_novelty is not None:
+            gate_mean = self._last_novelty.mean()
+            L_gate_ceil = torch.relu(gate_mean - self._gate_target - self._gate_ceil_margin)
+
+        # V10.29: All loss weights are adaptive
+        return (self._L_sharp_weight * L_sharp + self._L_bal_weight * L_bal
+                + self._L_ortho_weight * L_ortho
+                + 0.01 * L_gate_util + self._gate_ceil_weight * L_gate_ceil)
+
+    def update_write_gate_target(self, retr_loss: float):
+        """V10.27: Adapt write gate ceiling based on retrieval loss trend.
+
+        Called each step after computing retrieval loss. Accumulates a
+        window of retr_loss and gate values, then adjusts the ceiling
+        every _gate_adapt_window steps based on the window-level trend.
+
+        Rules (applied once per window, not per step):
+        - retr_loss decreased over window → relax ceiling (writes helping)
+        - retr_loss flat/increased + gate above target → tighten (churn)
+
+        Args:
+            retr_loss: Current retrieval loss value.
+        """
+        # V11: Skip adaptation when disabled
+        if not self.enable_adaptive_constraints:
+            return
+
+        gate_val = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
+
+        self._retr_loss_window.append(retr_loss)
+        self._gate_window.append(gate_val)
+        self._gate_adapt_counter += 1
+
+        # Only adapt every _gate_adapt_window steps
+        if self._gate_adapt_counter < self._gate_adapt_window:
+            return
+
+        # Compute window-level trend: compare first half mean to second half mean
+        n = len(self._retr_loss_window)
+        half = n // 2
+        first_half_retr = sum(self._retr_loss_window[:half]) / max(half, 1)
+        second_half_retr = sum(self._retr_loss_window[half:]) / max(n - half, 1)
+        retr_delta = second_half_retr - first_half_retr  # negative = improving
+
+        gate_mean = sum(self._gate_window) / n
+
+        # Adaptive rules (symmetric rates to prevent ratchet effect):
+        if retr_delta < -0.05:
+            # Retrieval improving over window → relax ceiling
+            self._gate_target = min(
+                self._gate_target_max,
+                self._gate_target + 0.02
+            )
+        elif retr_delta > -0.01 and gate_mean > self._gate_target:
+            # Retrieval stagnant/worsening AND gate above target → tighten
+            self._gate_target = max(
+                self._gate_target_min,
+                self._gate_target - 0.02
+            )
+
+        # Reset window
+        self._retr_loss_window.clear()
+        self._gate_window.clear()
+        self._gate_adapt_counter = 0
+
+    def update_constraint_relaxation(self, retr_loss: float, lm_loss: float = 0.0):
+        """V10.29: Unified adaptive hyperparameter controller.
+
+        Manages 11 adaptive parameters based on slot health signals.
+        All start conservative for fresh training, relax/tighten based
+        on sustained symptoms detected over _constraint_relax_interval steps.
+
+        Audit fixes (V10.29.1):
+        - gate_mean and L_ortho use window averages, not stale single-batch
+        - gate_target only modified by update_write_gate_target() (no double-write)
+        - gate floor clamped to never exceed gate_target - 0.05
+        - lists bounded to 2× interval as safety cap
+        - retr_loss_weight is absolute (not multiplied with config weight)
+
+        Args:
+            retr_loss: Current retrieval loss value.
+            lm_loss: Current LM loss value (for ratio-based adaptation).
+        """
+        # V11: Skip all adaptive adjustments when disabled
+        if not self.enable_adaptive_constraints:
+            return
+
+        marginal_H = getattr(self, '_diag_marginal_entropy', None)
+        if marginal_H is None:
+            return
+
+        # Accumulate per-step signals into windows
+        self._constraint_relax_window.append(marginal_H)
+        self._retr_loss_history.append(retr_loss)
+        if lm_loss > 0:
+            self._lm_loss_history.append(lm_loss)
+        # V13/B1: Accumulate slot_pred_loss for ppl-based leak ramp
+        _cur_sp_loss = getattr(self, '_diag_slot_pred_loss', 0.0) or 0.0
+        if _cur_sp_loss > 0:
+            self._slot_pred_loss_window.append(_cur_sp_loss)
+        # BUG 3 fix: Accumulate gate_mean per step (not stale single-batch)
+        _cur_gate = getattr(self, '_diag_write_gate_mean', 0.0) or 0.0
+        self._gate_mean_window.append(_cur_gate)
+        # BUG 4 fix: Accumulate L_ortho per step
+        _cur_ortho = getattr(self, '_diag_L_ortho', None)
+        if _cur_ortho is None and hasattr(self, '_last_slot_keys') and self._last_slot_keys is not None:
+            with torch.no_grad():
+                _sk = F.normalize(self._last_slot_keys, dim=-1)
+                _sim = torch.bmm(_sk, _sk.transpose(1, 2))
+                _eye = torch.eye(self.num_slots, device=_sim.device, dtype=_sim.dtype)
+                _cur_ortho = ((_sim - _eye.unsqueeze(0)) ** 2).mean().item()
+        if _cur_ortho is not None:
+            self._L_ortho_window.append(_cur_ortho)
+
+        self._constraint_relax_counter += 1
+
+        # BUG 6 fix: Cap list sizes to 2× interval as safety bound.
+        # Prevents unbounded growth if counter logic is bypassed.
+        _max_len = self._constraint_relax_interval * 2
+        for _lst in (self._constraint_relax_window, self._retr_loss_history,
+                     self._lm_loss_history, self._gate_mean_window,
+                     self._L_ortho_window, self._slot_pred_loss_window):
+            if len(_lst) > _max_len:
+                del _lst[:len(_lst) - _max_len]
+
+        if self._constraint_relax_counter < self._constraint_relax_interval:
+            return
+
+        # ── Compute window statistics ──────────────────────────────────────
+        n = len(self._constraint_relax_window)
+        avg_marginal_H = sum(self._constraint_relax_window) / n
+
+        # BUG 3 fix: Use window-averaged gate_mean
+        avg_gate = sum(self._gate_mean_window) / max(len(self._gate_mean_window), 1)
+        _raw_wr_scale = torch.exp(self._write_log_scale).item()
+        wr_scale = max(1.5, min(_raw_wr_scale, self._wr_scale_max))
+        _raw_rd_scale = torch.exp(self._read_log_scale).item()
+        read_scale = max(18.0, min(_raw_rd_scale, self._read_scale_max))
+        per_token_H = getattr(self, '_diag_per_token_entropy', 1.0) or 1.0
+        # BUG 4 fix: Use window-averaged L_ortho
+        avg_ortho = sum(self._L_ortho_window) / max(len(self._L_ortho_window), 1) if self._L_ortho_window else 0.0
+
+        avg_retr = sum(self._retr_loss_history) / len(self._retr_loss_history)
+        avg_lm = sum(self._lm_loss_history) / max(len(self._lm_loss_history), 1) if self._lm_loss_history else 0.0
+
+        changes = []
+
+        # ── (1) L_bal weight: adaptive retr_loss-driven ─────────────────
+        # V11.1: Replace hard-coded marginal_H threshold with signal-driven
+        # relaxation. The old threshold (marginal_H > 0.95) was too high —
+        # L_bal successfully enforced uniformity (marginal_H ≈ 0.93) which
+        # prevented slot specialization entirely.
+        #
+        # New logic: L_bal exists to prevent collapse (1-2 slots dominating).
+        # But if retr_loss is improving, slots are learning useful content,
+        # so L_bal should relax to let natural specialization emerge.
+        # If marginal_H drops too low (<0.7), slots have over-specialized
+        # and L_bal should increase to redistribute.
+        #
+        # Three conditions for relaxation (any one triggers):
+        # (a) retr_loss improving over window → slots learning, let them specialize
+        # (b) marginal_H high AND no collapse risk → uniform = L_bal succeeded too well
+        # (c) Collapse guard: marginal_H < 0.7 → re-apply L_bal
+        half = len(self._retr_loss_history) // 2
+        retr_improving = False
+        retr_velocity = 0.0
+        if half > 0:
+            first_half = sum(self._retr_loss_history[:half]) / half
+            second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
+            if first_half > 0:
+                retr_velocity = (second_half - first_half) / first_half  # negative = improving
+                retr_improving = retr_velocity < -0.02  # >2% improvement
+
+        if avg_marginal_H < 0.7 and self._L_bal_weight < 1.0:
+            # Collapse guard: slots over-specialized, strengthen balance
+            old = self._L_bal_weight
+            self._L_bal_weight = min(1.0, self._L_bal_weight * 1.5)
+            self._L_bal_last_reason = "over-specialized"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (over-specialized, mH={avg_marginal_H:.3f})")
+        elif retr_improving and avg_marginal_H > 0.80 and self._L_bal_weight > self._L_bal_weight_floor:
+            # Retr loss improving + slots still fairly uniform → relax L_bal
+            # Decay rate proportional to improvement velocity (faster improvement → faster relaxation)
+            decay_rate = max(0.5, 1.0 + retr_velocity * 5.0)  # e.g. vel=-0.05 → decay=0.75
+            old = self._L_bal_weight
+            self._L_bal_weight = max(self._L_bal_weight_floor, self._L_bal_weight * decay_rate)
+            self._L_bal_last_reason = "retr_improving"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (retr improving {retr_velocity:+.1%}, mH={avg_marginal_H:.3f})")
+        elif avg_marginal_H > 0.92 and not retr_improving and self._L_bal_weight > self._L_bal_weight_floor:
+            # Even without retr improvement, if slots are very uniform, gently relax
+            # (but slower than the retr-driven path — 0.85x vs velocity-proportional)
+            old = self._L_bal_weight
+            self._L_bal_weight = max(self._L_bal_weight_floor, self._L_bal_weight * 0.85)
+            self._L_bal_last_reason = "too_uniform"
+            changes.append(f"L_bal: {old:.3f}→{self._L_bal_weight:.3f} (too uniform, mH={avg_marginal_H:.3f})")
+
+        # ── (2) Write scale max clamp ─────────────────────────────────────
+        # Use raw (unclamped) scale: only relax when the optimizer is actively
+        # pushing the parameter above the clamp, not just because init > clamp.
+        if _raw_wr_scale > self._wr_scale_max * 1.02 and self._wr_scale_max < self._wr_scale_max_limit:
+            old = self._wr_scale_max
+            self._wr_scale_max = min(self._wr_scale_max_limit, self._wr_scale_max + 0.5)
+            changes.append(f"wr_scale_max: {old:.1f}→{self._wr_scale_max:.1f} (optimizer pushing)")
+
+        # ── (3) Gate ceiling weight (only) ────────────────────────────────
+        # BUG 5 fix: Only adjust _gate_ceil_weight here; _gate_target is
+        # exclusively owned by update_write_gate_target() (200-step window).
+        # V12.4: Bidirectional — decay when gate near target, strengthen when
+        # gate has collapsed well below target (was one-way ratchet before).
+        if avg_gate > self._gate_target * 0.95 and self._gate_ceil_weight > 1.0:
+            old_w = self._gate_ceil_weight
+            self._gate_ceil_weight = max(1.0, self._gate_ceil_weight * 0.7)
+            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (near target, relaxing)")
+        elif avg_gate < self._gate_target * 0.5 and self._gate_ceil_weight < 5.0:
+            # Gate well below target — strengthen ceiling to push it open
+            old_w = self._gate_ceil_weight
+            self._gate_ceil_weight = min(5.0, self._gate_ceil_weight * 1.3)
+            changes.append(f"gate_ceil: {old_w:.1f}→{self._gate_ceil_weight:.1f} (gate low, strengthening)")
+
+        # ── (4) Novelty gate floor ────────────────────────────────────────
+        # Gate collapsed at floor for sustained period → raise floor to rescue
+        if avg_gate <= self._novelty_gate_floor * 1.05 and self._novelty_gate_floor < self._novelty_gate_floor_max:
+            old = self._novelty_gate_floor
+            self._novelty_gate_floor = min(
+                self._novelty_gate_floor_max,
+                self._novelty_gate_floor + 0.02
+            )
+            changes.append(f"gate_floor: {old:.2f}→{self._novelty_gate_floor:.2f} (collapsed)")
+        # Gate well above floor → can lower floor for more dynamic range
+        elif avg_gate > self._novelty_gate_floor * 2.0 and self._novelty_gate_floor > self._novelty_gate_floor_min:
+            old = self._novelty_gate_floor
+            self._novelty_gate_floor = max(
+                self._novelty_gate_floor_min,
+                self._novelty_gate_floor - 0.02
+            )
+            changes.append(f"gate_floor: {old:.2f}→{self._novelty_gate_floor:.2f} (healthy)")
+
+        # BUG 2 fix: Enforce floor < ceiling invariant (min 0.05 gap)
+        _max_floor = self._gate_target - 0.05
+        if self._novelty_gate_floor > _max_floor:
+            old = self._novelty_gate_floor
+            self._novelty_gate_floor = max(self._novelty_gate_floor_min, _max_floor)
+            changes.append(f"gate_floor: {old:.2f}→{self._novelty_gate_floor:.2f} "
+                           f"(clamped: floor must be < ceiling {self._gate_target:.2f})")
+
+        # ── (5) Retrieval loss weight ─────────────────────────────────────
+        # BUG 7 fix: This weight is used AS-IS in train.py (replacing, not
+        # multiplying with, config.retrieval_loss_weight when adaptive is active).
+        # V11.2: Ablation-aware guard — don't decay if slots are neutral or helping.
+        # Only decay when ablation shows slots are actively hurting (delta < -1.0)
+        # or when no ablation data is available yet (None = pre-ablation warmup).
+        _ablation_allows_decay = (
+            self._last_ablation_delta is None  # No ablation yet, allow warmup decay
+            or self._last_ablation_delta < -1.0  # Slots actively hurting
+        )
+        if avg_lm > 0 and avg_retr > avg_lm * 0.5 and self._adaptive_retr_loss_weight > self._adaptive_retr_loss_weight_min:
+            if _ablation_allows_decay:
+                old = self._adaptive_retr_loss_weight
+                self._adaptive_retr_loss_weight = max(
+                    self._adaptive_retr_loss_weight_min,
+                    self._adaptive_retr_loss_weight * 0.8
+                )
+                changes.append(f"retr_weight: {old:.2f}→{self._adaptive_retr_loss_weight:.2f} "
+                               f"(retr/lm={avg_retr/avg_lm:.2f}, dominates)")
+            else:
+                changes.append(f"retr_weight: {self._adaptive_retr_loss_weight:.2f} "
+                               f"(held: ablation Δ={self._last_ablation_delta:+.2f}, slots not hurting)")
+        elif avg_lm > 0 and avg_retr < avg_lm * 0.1 and self._adaptive_retr_loss_weight < self._adaptive_retr_loss_weight_max:
+            half = len(self._retr_loss_history) // 2
+            if half > 0:
+                first_half = sum(self._retr_loss_history[:half]) / half
+                second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
+                if second_half < first_half * 0.95:
+                    old = self._adaptive_retr_loss_weight
+                    self._adaptive_retr_loss_weight = min(
+                        self._adaptive_retr_loss_weight_max,
+                        self._adaptive_retr_loss_weight * 1.2
+                    )
+                    changes.append(f"retr_weight: {old:.2f}→{self._adaptive_retr_loss_weight:.2f} "
+                                   f"(small & improving)")
+
+        # ── (6) H_target (sharpness entropy target) ──────────────────────
+        if per_token_H > self._H_target * 1.5 and self._H_target < self._H_target_max:
+            old = self._H_target
+            self._H_target = min(self._H_target_max, self._H_target + 0.1)
+            changes.append(f"H_target: {old:.2f}→{self._H_target:.2f} (entropy too high)")
+        elif per_token_H < self._H_target * 0.5 and self._H_target > self._H_target_min:
+            old = self._H_target
+            self._H_target = max(self._H_target_min, self._H_target - 0.1)
+            changes.append(f"H_target: {old:.2f}→{self._H_target:.2f} (already sharp)")
+
+        # ── (7) L_ortho weight (uses window avg) ─────────────────────────
+        if avg_ortho < 0.01 and self._L_ortho_weight > self._L_ortho_weight_min:
+            old = self._L_ortho_weight
+            self._L_ortho_weight = max(self._L_ortho_weight_min, self._L_ortho_weight * 0.7)
+            changes.append(f"L_ortho: {old:.3f}→{self._L_ortho_weight:.3f} (already orthogonal)")
+        elif avg_ortho > 0.1 and self._L_ortho_weight < self._L_ortho_weight_max:
+            old = self._L_ortho_weight
+            self._L_ortho_weight = min(self._L_ortho_weight_max, self._L_ortho_weight * 1.3)
+            changes.append(f"L_ortho: {old:.3f}→{self._L_ortho_weight:.3f} (collapsing)")
+
+        # ── (8) Read scale max clamp ──────────────────────────────────────
+        # Same fix as (2): use raw unclamped scale to detect genuine optimizer push.
+        if _raw_rd_scale > self._read_scale_max * 1.02 and self._read_scale_max < self._read_scale_max_limit:
+            old = self._read_scale_max
+            self._read_scale_max = min(self._read_scale_max_limit, self._read_scale_max + 1.0)
+            changes.append(f"read_scale_max: {old:.1f}→{self._read_scale_max:.1f} (optimizer pushing)")
+
+        # ── (9) Soft detach leak ──────────────────────────────────────────
+        # V14-hotfix: Deterministic curriculum — ramp leak linearly from 0.5
+        # to 1.0 over _leak_curriculum_steps.  The LM loss is the only signal
+        # that knows what is "useful" for generation; the retrieval loss only
+        # knows what is "storable".  Adaptive ramp was too slow (waited for
+        # ppl < 300 that never came).  Curriculum forces integration.
+        _curriculum_target = getattr(self, '_leak_curriculum_target', 1.0)
+        _curriculum_steps = getattr(self, '_leak_curriculum_steps', 12000)
+        _router_step = getattr(self, '_router_step', 0)
+        _curriculum_leak = 0.9 + (_curriculum_target - 0.9) * min(1.0, _router_step / max(1, _curriculum_steps))
+        if self._soft_detach_leak < _curriculum_leak:
+            old = self._soft_detach_leak
+            self._soft_detach_leak = min(self._soft_detach_leak_max, _curriculum_leak)
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} "
+                           f"(curriculum step {_router_step}/{_curriculum_steps})")
+        elif avg_gate <= self._novelty_gate_floor * 1.1 and self._soft_detach_leak < self._soft_detach_leak_max:
+            # Emergency fallback: gate collapsed, need gradient to rescue writes
+            old = self._soft_detach_leak
+            self._soft_detach_leak = min(self._soft_detach_leak_max, self._soft_detach_leak + 0.03)
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} (gate collapsed, emergency)")
+        elif _avg_sp_ppl > self._leak_ramp_ppl_threshold * 1.5 and self._soft_detach_leak > self._soft_detach_leak_min:
+            # Slots carry no useful info — don't waste gradient budget on writes
+            old = self._soft_detach_leak
+            self._soft_detach_leak = max(self._soft_detach_leak_min, self._soft_detach_leak - 0.01)
+            changes.append(f"detach_leak: {old:.2f}→{self._soft_detach_leak:.2f} "
+                           f"(slot_pred_ppl={_avg_sp_ppl:.0f}, no signal)")
+
+        # ── (10) L_sharp weight ───────────────────────────────────────────
+        # Note: Uses per_token_H which is last-batch (acceptable since
+        # H_target adjusts slowly and L_sharp is medium priority).
+        if abs(per_token_H - self._H_target) < 0.2 and self._L_sharp_weight > self._L_sharp_weight_min:
+            old = self._L_sharp_weight
+            self._L_sharp_weight = max(self._L_sharp_weight_min, self._L_sharp_weight * 0.8)
+            changes.append(f"L_sharp: {old:.3f}→{self._L_sharp_weight:.3f} (in range)")
+        elif abs(per_token_H - self._H_target) > 1.0 and self._L_sharp_weight < self._L_sharp_weight_max:
+            old = self._L_sharp_weight
+            self._L_sharp_weight = min(self._L_sharp_weight_max, self._L_sharp_weight * 1.3)
+            changes.append(f"L_sharp: {old:.3f}→{self._L_sharp_weight:.3f} (off target)")
+
+        # ── (11) Adaptive write_lr (EMA coefficient) ─────────────────────
+        # Retrieval loss improving → writes are useful → allow faster EMA
+        # Retrieval loss stagnating/worsening → slow down to preserve content
+        half = len(self._retr_loss_history) // 2
+        if half > 0:
+            first_half = sum(self._retr_loss_history[:half]) / half
+            second_half = sum(self._retr_loss_history[half:]) / max(len(self._retr_loss_history) - half, 1)
+            if second_half < first_half * 0.90 and self.write_lr.item() < self._write_lr_max:
+                # Retrieval improving (>10% drop) → writes are useful, speed up
+                old = self.write_lr.item()
+                self.write_lr.data.fill_(min(self._write_lr_max, old * 1.15))
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (retr improving)")
+            elif second_half > first_half * 1.05 and self.write_lr.item() > self._write_lr_min:
+                # Retrieval worsening (>5% rise) → slow down writes
+                old = self.write_lr.item()
+                self.write_lr.data.fill_(max(self._write_lr_min, old * 0.85))
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (retr worsening)")
+        # Also: if gate is collapsed, lower write_lr to reduce churn
+        if avg_gate < self._novelty_gate_floor * 1.1 and self.write_lr.item() > self._write_lr_min:
+            old = self.write_lr.item()
+            self.write_lr.data.fill_(max(self._write_lr_min, old * 0.90))
+            if not any('write_lr' in c for c in changes):
+                changes.append(f"write_lr: {old:.3f}→{self.write_lr.item():.3f} (gate collapsed)")
+
+        # ── Log changes ───────────────────────────────────────────────────
+        if changes:
+            print(f"\n  [SLOT ADAPT] {len(changes)} adjustment(s):")
+            for c in changes:
+                print(f"    → {c}")
+
+        # Reset all windows
+        self._constraint_relax_window.clear()
+        self._retr_loss_history.clear()
+        self._lm_loss_history.clear()
+        self._gate_mean_window.clear()
+        self._L_ortho_window.clear()
+        self._slot_pred_loss_window.clear()
+        self._constraint_relax_counter = 0
 
 
 @dataclass
@@ -8320,8 +10694,9 @@ class GCTTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         if tie_embeddings:
             self.lm_head.weight = self.token_embed.weight
@@ -8458,8 +10833,9 @@ class StandardTransformer(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
         self.lm_head = nn.Linear(embed_dim, vocab_size, bias=False)
 
-        # Logit scaling (milder than 1/sqrt(d) to prevent overconfident early logits)
-        self.logit_scale = 1.0 / math.sqrt(math.sqrt(embed_dim))
+        # V10.11: Learnable logit scale initialized to 1.0.
+        # Previous: 1/sqrt(sqrt(d)) ≈ 0.25 which flattened softmax → incoherent text.
+        self.logit_scale = nn.Parameter(torch.ones(1))
 
         # V9.6.0: Optionally tie weights (disable when using Sanskrit/CSR injection)
         if tie_embeddings:

@@ -1600,10 +1600,16 @@ class SovereignReasoningKernel(nn.Module):
         if not self._phase_corrector_initialized:
             if self.config.enable_phase_corrector:
                 try:
-                    from symbolu.losses.kosha_gyroscope import (
-                        KoshaPhaseCorrector,
-                        KoshaPhaseCorrectorConfig,
-                    )
+                    try:
+                        from symbolu_training.losses.kosha_gyroscope import (
+                            KoshaPhaseCorrector,
+                            KoshaPhaseCorrectorConfig,
+                        )
+                    except ImportError:
+                        from symbolu.losses.kosha_gyroscope import (
+                            KoshaPhaseCorrector,
+                            KoshaPhaseCorrectorConfig,
+                        )
                     self._phase_corrector = KoshaPhaseCorrector(
                         config=KoshaPhaseCorrectorConfig(
                             overactive_threshold=self.config.phase_corrector_threshold,

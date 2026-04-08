@@ -1,26 +1,11 @@
-"""
-Monitors Module: Training Progress Monitoring for Sovereign AI
+"""Backwards-compatibility stub — module moved to symbolu_training/."""
+import importlib
+import sys
 
-This module provides monitoring utilities for tracking training
-progress and curriculum transitions.
-
-Available Monitors:
-- GraduationMonitor: Tracks PPL stability for curriculum graduation
-- LogFileGraduationMonitor: Parses log files for graduation detection
-"""
-
-from symbolu.monitors.graduation_monitor import (
-    GraduationMonitor,
-    GraduationConfig,
-    GraduationState,
-    LogFileGraduationMonitor,
-    create_graduation_ceremony_message,
-)
-
-__all__ = [
-    'GraduationMonitor',
-    'GraduationConfig',
-    'GraduationState',
-    'LogFileGraduationMonitor',
-    'create_graduation_ceremony_message',
-]
+_new_name = __name__.replace("symbolu.", "symbolu_training.", 1)
+try:
+    _mod = importlib.import_module(_new_name)
+    sys.modules[__name__] = _mod
+    globals().update({k: v for k, v in _mod.__dict__.items() if not k.startswith("_")})
+except ImportError:
+    pass  # symbolu_training not installed; fail silently for partial installs

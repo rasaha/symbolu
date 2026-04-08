@@ -1,0 +1,20 @@
+{
+  "reports": [
+    "symbolu/core/drift_tests/mapper_activation_report.json"
+  ],
+  "high_drift_threshold": 0.05,
+  "focus_profiles": [
+    "LOWER:generic",
+    "LOWER:task",
+    "UPPER:therapy",
+    "UPPER:identity",
+    "UPPER:spiritual",
+    "UPPER:generic",
+    "HYBRID:generic"
+  ],
+  "mapper_labels": {
+    "hrm": "High-Resolution Mapper (HRM)",
+    "lcm": "Low-Context Mapper (LCM)",
+    "lam": "Long-Arc Mapper (LAM)"
+  }
+}

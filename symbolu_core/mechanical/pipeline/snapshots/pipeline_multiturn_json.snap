@@ -1,0 +1,49 @@
+{
+  "conversation_length": 4,
+  "turns": [
+    {
+      "dha_readiness": "HIGH",
+      "dha_tone": "SWEET_RESONANCE",
+      "input_text": "I feel stuck.",
+      "mlcr_intent": "N/A",
+      "mlcr_tier": "N/A",
+      "mode": "standard",
+      "output_text": "Perhaps To clarify: I feel stuck.\n\nYou're doing meaningful work here.",
+      "persona_id": "neutral",
+      "turn_number": 1
+    },
+    {
+      "dha_readiness": "HIGH",
+      "dha_tone": "SWEET_RESONANCE",
+      "input_text": "Now I see a little hope.",
+      "mlcr_intent": "N/A",
+      "mlcr_tier": "N/A",
+      "mode": "standard",
+      "output_text": "It seems that To clarify: Now I see a little hope.\n\nYou're doing meaningful work here.",
+      "persona_id": "neutral",
+      "turn_number": 2
+    },
+    {
+      "dha_readiness": "HIGH",
+      "dha_tone": "SWEET_RESONANCE",
+      "input_text": "I'm clearer but still conflicted.",
+      "mlcr_intent": "N/A",
+      "mlcr_tier": "N/A",
+      "mode": "standard",
+      "output_text": "Perhaps To clarify: I'm clearer but still conflicted.\n\nYou're doing meaningful work here.",
+      "persona_id": "neutral",
+      "turn_number": 3
+    },
+    {
+      "dha_readiness": "HIGH",
+      "dha_tone": "SWEET_RESONANCE",
+      "input_text": "I think I'm moving forward.",
+      "mlcr_intent": "N/A",
+      "mlcr_tier": "N/A",
+      "mode": "standard",
+      "output_text": "Gently speaking, To clarify: I think I'm moving forward.\n\nYou're doing meaningful work here.",
+      "persona_id": "neutral",
+      "turn_number": 4
+    }
+  ]
+}

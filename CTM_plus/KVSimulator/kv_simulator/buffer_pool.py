@@ -1,0 +1,1157 @@
+"""
+KV Cache Eviction Policy Simulator for LLM Inference.
+
+Simulates KV cache behavior during LLM inference to evaluate eviction
+policies. Models realistic access patterns: sequential prefill bursts,
+attention-weighted decode accesses, and continuous batching of multiple
+sequences.
+
+This is a research tool. No GPU logic, no memory allocators, no vLLM imports.
+
+Simulation model:
+    Prefill:  Sequence writes KV blocks sequentially. No reuse.
+    Decode:   Each new token attends to all prior tokens.
+              Attention follows sink+recent distribution:
+                ~15% on first few positions (attention sinks)
+                ~55% on recent window
+                ~30% spread across middle positions
+              Block access frequency reflects summed attention weights.
+    Eviction: When KV cache exceeds memory budget, policy selects victims.
+
+Policies:
+    LRU        — evict least recently accessed block
+    FIFO       — evict oldest admitted block
+    Random     — evict uniformly at random
+    CTM+       — evict lowest-scoring block (attention + position + recency)
+    KV_POLICY  — adapter for KVCachePolicy from the KVPolicy module
+"""
+
+import math
+import random
+import time
+from collections import OrderedDict, deque
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Dict, List, Optional, Set, Tuple
+
+
+# =============================================================================
+# Core Types
+# =============================================================================
+
+class BlockType(Enum):
+    SINK = auto()      # First few positions — attention sinks, almost never evict
+    ENTITY = auto()    # High cumulative attention — important context
+    FILLER = auto()    # Low attention — safe to evict
+    RECENT = auto()    # Recent window — transiently protected
+
+class Phase(Enum):
+    PREFILL = auto()
+    DECODE = auto()
+
+class PolicyType(Enum):
+    LRU = "lru"
+    FIFO = "fifo"
+    RANDOM = "random"
+    CTM_PLUS = "ctm_plus"
+    KV_POLICY = "kv_policy"
+
+
+# =============================================================================
+# KV Block State
+# =============================================================================
+
+@dataclass
+class KVBlock:
+    """State of a single KV cache block."""
+    block_id: int
+    sequence_id: int
+    token_positions: List[int]          # token positions stored in this block
+    created_step: int = 0
+    last_access_step: int = 0
+    access_count: int = 0
+    cumulative_attention: float = 0.0   # sum of attention weights received
+    block_type: BlockType = BlockType.FILLER
+
+    @property
+    def avg_attention(self) -> float:
+        return self.cumulative_attention / max(1, self.access_count)
+
+
+@dataclass
+class Sequence:
+    """State of an active sequence being served."""
+    sequence_id: int
+    context_length: int                 # total tokens to process
+    generated_tokens: int = 0           # tokens generated so far
+    phase: Phase = Phase.PREFILL
+    block_ids: Set[int] = field(default_factory=set)
+    last_block_id: int = -1             # most recently appended block
+    prefill_done: bool = False
+    evicted_positions: int = 0          # token positions lost to eviction
+
+
+# =============================================================================
+# Attention Pattern Generator
+# =============================================================================
+
+def sink_and_recent_attention(seq_len: int, sink_tokens: int = 4,
+                               recent_window: int = 128) -> List[float]:
+    """
+    Generate attention distribution matching observed LLM patterns.
+    ~15% on sinks, ~55% on recent window, ~30% on middle.
+    """
+    if seq_len == 0:
+        return []
+    weights = [0.0] * seq_len
+    for i in range(seq_len):
+        if i < sink_tokens:
+            weights[i] = 0.15 / max(1, sink_tokens)
+        elif i >= seq_len - recent_window and seq_len > sink_tokens:
+            recency = (i - (seq_len - recent_window)) / max(1, recent_window)
+            weights[i] = 0.55 * recency / max(1, min(recent_window, seq_len - sink_tokens))
+        else:
+            middle = max(1, seq_len - sink_tokens - min(recent_window, seq_len - sink_tokens))
+            weights[i] = 0.30 / middle
+    total = sum(weights)
+    return [w / total for w in weights] if total > 0 else [1.0 / seq_len] * seq_len
+
+
+def entity_focused_attention(seq_len: int, sink_tokens: int = 4,
+                              recent_window: int = 128) -> List[float]:
+    """
+    Entity-focused pattern: a few positions receive very high attention.
+    ~15% sinks, ~50% on ~5% of middle positions (entities), ~35% spread.
+    """
+    if seq_len == 0:
+        return []
+    weights = [0.0] * seq_len
+    # Sinks
+    for i in range(min(sink_tokens, seq_len)):
+        weights[i] = 0.15 / max(1, sink_tokens)
+    # Entity positions: ~5% of middle, evenly spaced
+    middle_start = sink_tokens
+    middle_end = seq_len
+    middle_len = max(1, middle_end - middle_start)
+    num_entities = max(1, middle_len // 20)  # ~5%
+    entity_step = max(1, middle_len // (num_entities + 1))
+    entity_positions = set()
+    for e in range(1, num_entities + 1):
+        pos = middle_start + e * entity_step
+        if pos < seq_len:
+            entity_positions.add(pos)
+    # Distribute
+    entity_share = 0.50 / max(1, len(entity_positions))
+    filler_count = middle_len - len(entity_positions)
+    filler_share = 0.35 / max(1, filler_count)
+    for i in range(middle_start, seq_len):
+        if i in entity_positions:
+            weights[i] = entity_share
+        else:
+            weights[i] = filler_share
+    total = sum(weights)
+    return [w / total for w in weights] if total > 0 else [1.0 / seq_len] * seq_len
+
+
+def uniform_attention(seq_len: int, sink_tokens: int = 4,
+                       recent_window: int = 128) -> List[float]:
+    """
+    Uniform / diffuse pattern: attention spread nearly evenly.
+    ~15% sinks, ~85% uniform across all other positions.
+    """
+    if seq_len == 0:
+        return []
+    weights = [0.0] * seq_len
+    for i in range(min(sink_tokens, seq_len)):
+        weights[i] = 0.15 / max(1, sink_tokens)
+    rest = max(1, seq_len - sink_tokens)
+    for i in range(sink_tokens, seq_len):
+        weights[i] = 0.85 / rest
+    total = sum(weights)
+    return [w / total for w in weights] if total > 0 else [1.0 / seq_len] * seq_len
+
+
+def mixed_multihead_attention(seq_len: int, sink_tokens: int = 4,
+                                recent_window: int = 128) -> List[float]:
+    """
+    Mixed multi-head pattern: averages sink+recent, entity, and uniform
+    to simulate different attention heads attending to different patterns.
+    """
+    if seq_len == 0:
+        return []
+    w1 = sink_and_recent_attention(seq_len, sink_tokens, recent_window)
+    w2 = entity_focused_attention(seq_len, sink_tokens, recent_window)
+    w3 = uniform_attention(seq_len, sink_tokens, recent_window)
+    combined = [(a + b + c) / 3.0 for a, b, c in zip(w1, w2, w3)]
+    total = sum(combined)
+    return [w / total for w in combined] if total > 0 else [1.0 / seq_len] * seq_len
+
+
+# =============================================================================
+# Block-Level Attention (O(1) per block)
+# =============================================================================
+
+def _block_attn_sink_recent(start: int, n: int, seq_len: int,
+                            sink_tokens: int, recent_window: int) -> float:
+    """O(1) block attention for sink+recent pattern."""
+    if seq_len == 0 or n == 0:
+        return 0.0
+    end = start + n
+    st = min(sink_tokens, seq_len)
+    rw = min(recent_window, max(0, seq_len - st))
+    recent_start_pos = seq_len - rw
+    middle_count = max(1, seq_len - st - rw)
+
+    # Sink contribution (unnormalized)
+    sink_n = max(0, min(end, st) - max(start, 0))
+    raw_sink = sink_n * 0.15 / max(1, st)
+
+    # Middle contribution (unnormalized)
+    mid_lo = max(start, st)
+    mid_hi = min(end, recent_start_pos)
+    mid_n = max(0, mid_hi - mid_lo)
+    raw_middle = mid_n * 0.30 / middle_count
+
+    # Recent contribution (unnormalized, recency-weighted)
+    rec_lo = max(start, recent_start_pos)
+    rec_hi = min(end, seq_len)
+    raw_recent = 0.0
+    if rec_hi > rec_lo and rw > 0 and seq_len > st:
+        base = seq_len - recent_window
+        lo_off = rec_lo - base
+        hi_off = rec_hi - base
+        j_sum = (hi_off * (hi_off - 1) - lo_off * (lo_off - 1)) / 2.0
+        raw_recent = 0.55 * j_sum / (max(1, recent_window) * max(1, rw))
+
+    block_raw = raw_sink + raw_middle + raw_recent
+
+    # Normalization factor (total across all positions)
+    total_sink = 0.15 if st > 0 else 0.0
+    total_middle = 0.30 * max(0, seq_len - st - rw) / middle_count
+    total_recent = 0.0
+    if rw > 0 and seq_len > st:
+        base = seq_len - recent_window
+        t_lo = recent_start_pos - base
+        t_hi = seq_len - base
+        t_sum = (t_hi * (t_hi - 1) - t_lo * (t_lo - 1)) / 2.0
+        total_recent = 0.55 * t_sum / (max(1, recent_window) * max(1, rw))
+
+    total_raw = total_sink + total_middle + total_recent
+    return block_raw / total_raw if total_raw > 0 else 0.0
+
+
+def _block_attn_entity_focused(start: int, n: int, seq_len: int,
+                               sink_tokens: int, recent_window: int) -> float:
+    """O(1) block attention for entity-focused pattern."""
+    if seq_len == 0 or n == 0:
+        return 0.0
+    end = start + n
+    st = min(sink_tokens, seq_len)
+
+    # Sink contribution
+    sink_n = max(0, min(end, st) - max(start, 0))
+    raw_sink = sink_n * 0.15 / max(1, st)
+
+    # Entity position parameters
+    middle_start = st
+    middle_len = max(1, seq_len - st)
+    num_entities = max(1, middle_len // 20)
+    entity_step = max(1, middle_len // (num_entities + 1))
+
+    # Count entity positions in [start, end) ∩ [middle_start, seq_len)
+    entity_in_block = 0
+    total_entities = 0
+    if entity_step > 0 and middle_start + entity_step < seq_len:
+        total_entities = min(num_entities, (seq_len - 1 - middle_start) // entity_step)
+        lo = max(start, middle_start)
+        hi = min(end, seq_len)
+        if hi > lo:
+            e_lo = max(1, math.ceil((lo - middle_start) / entity_step))
+            e_hi = min(total_entities, (hi - 1 - middle_start) // entity_step)
+            if e_lo <= e_hi:
+                entity_in_block = e_hi - e_lo + 1
+
+    # Non-sink positions in block
+    non_sink_n = max(0, min(end, seq_len) - max(start, st))
+    filler_in_block = non_sink_n - entity_in_block
+    total_filler = max(1, max(0, seq_len - st) - total_entities)
+
+    entity_share = 0.50 / max(1, total_entities)
+    filler_share = 0.35 / max(1, total_filler)
+
+    # Raw weights sum to ~1.0, normalization is near-identity
+    raw = raw_sink + entity_in_block * entity_share + filler_in_block * filler_share
+    norm = (0.15 if st > 0 else 0.0) + total_entities * entity_share + total_filler * filler_share
+    return raw / norm if norm > 0 else 0.0
+
+
+def _block_attn_uniform(start: int, n: int, seq_len: int,
+                        sink_tokens: int, recent_window: int) -> float:
+    """O(1) block attention for uniform pattern."""
+    if seq_len == 0 or n == 0:
+        return 0.0
+    end = start + n
+    st = min(sink_tokens, seq_len)
+    sink_n = max(0, min(end, st) - max(start, 0))
+    rest_n = max(0, min(end, seq_len) - max(start, st))
+    # Raw weights sum to 1.0, normalization is identity
+    return sink_n * 0.15 / max(1, st) + rest_n * 0.85 / max(1, seq_len - st)
+
+
+def _block_attn_mixed(start: int, n: int, seq_len: int,
+                      sink_tokens: int, recent_window: int) -> float:
+    """O(1) block attention for mixed multi-head pattern (average of three)."""
+    a = _block_attn_sink_recent(start, n, seq_len, sink_tokens, recent_window)
+    b = _block_attn_entity_focused(start, n, seq_len, sink_tokens, recent_window)
+    c = _block_attn_uniform(start, n, seq_len, sink_tokens, recent_window)
+    return (a + b + c) / 3.0
+
+
+# Map per-position attention functions to O(1) block-level equivalents
+_BLOCK_ATTN_FNS = {
+    sink_and_recent_attention: _block_attn_sink_recent,
+    entity_focused_attention: _block_attn_entity_focused,
+    uniform_attention: _block_attn_uniform,
+    mixed_multihead_attention: _block_attn_mixed,
+}
+
+
+# =============================================================================
+# Eviction Policies
+# =============================================================================
+
+class EvictionPolicy:
+    """
+    Base class for eviction policies.
+
+    Lifecycle hooks (no-op by default):
+      on_sequence_register / on_phase_change / on_sequence_complete
+    Per-step hooks:
+      on_block_attention — receives per-position attention weights.
+        Default delegates to on_access for backward compatibility.
+    """
+    def on_access(self, block_id: int, block: KVBlock) -> None:
+        pass
+    def on_admit(self, block_id: int, block: KVBlock) -> None:
+        pass
+    def on_evict(self, block_id: int) -> None:
+        pass
+    def on_block_attention(
+        self, block_id: int, block: KVBlock,
+        attention_sum: float,
+        sequence_id: int, seq_len: int,
+    ) -> None:
+        """Called with block-level attention sum each decode step."""
+        self.on_access(block_id, block)
+    def on_sequence_register(self, seq_id: int, context_length: int) -> None:
+        pass
+    def on_phase_change(self, seq_id: int, phase: Phase) -> None:
+        pass
+    def on_sequence_complete(self, seq_id: int) -> None:
+        pass
+    def select_victim(self, blocks: Dict[int, KVBlock], pinned: Set[int]) -> Optional[int]:
+        raise NotImplementedError
+
+
+class LRUPolicy(EvictionPolicy):
+    def __init__(self):
+        self.order: OrderedDict[int, None] = OrderedDict()
+
+    def on_access(self, block_id, block):
+        if block_id in self.order:
+            self.order.move_to_end(block_id)
+
+    def on_admit(self, block_id, block):
+        self.order[block_id] = None
+
+    def on_evict(self, block_id):
+        self.order.pop(block_id, None)
+
+    def select_victim(self, blocks, pinned):
+        for bid in self.order:
+            if bid not in pinned:
+                return bid
+        return None
+
+
+class FIFOPolicy(EvictionPolicy):
+    def __init__(self):
+        self.queue: deque[int] = deque()
+        self._in_queue: set = set()
+
+    def on_admit(self, block_id, block):
+        if block_id not in self._in_queue:
+            self.queue.append(block_id)
+            self._in_queue.add(block_id)
+
+    def on_evict(self, block_id):
+        self._in_queue.discard(block_id)
+
+    def select_victim(self, blocks, pinned):
+        while self.queue:
+            bid = self.queue.popleft()
+            self._in_queue.discard(bid)
+            if bid in blocks and bid not in pinned:
+                return bid
+        return None
+
+
+class RandomPolicy(EvictionPolicy):
+    def __init__(self, rng: random.Random = None):
+        self._rng = rng or random.Random(42)
+
+    def select_victim(self, blocks, pinned):
+        candidates = [b for b in blocks if b not in pinned]
+        return self._rng.choice(candidates) if candidates else None
+
+
+class AttentionAwarePolicy(EvictionPolicy):
+    """
+    CTM+ attention-aware eviction. Scores blocks by:
+      - attention_weight (cumulative, normalized)     weight: 0.35
+      - position_importance (sink/entity/recent)      weight: 0.30
+      - recency (exponential decay)                   weight: 0.25
+      - frequency (log-saturated access count)        weight: 0.10
+    Higher score = more valuable = less likely to evict.
+    Samples 48 candidates instead of scoring all blocks.
+    """
+    SAMPLE_SIZE = 48
+
+    def __init__(self, sink_tokens: int = 4, recent_window: int = 128,
+                 rng: random.Random = None):
+        self.sink_tokens = sink_tokens
+        self.recent_window = recent_window
+        self._step = 0
+        self._max_attention = 1e-9  # running max for normalization
+        self._rng = rng or random.Random(42)
+
+    def on_access(self, block_id, block):
+        self._step = max(self._step, block.last_access_step)
+        if block.cumulative_attention > self._max_attention:
+            self._max_attention = block.cumulative_attention
+
+    def select_victim(self, blocks, pinned):
+        candidates = [b for b in blocks if b not in pinned]
+        if not candidates:
+            return None
+        sample = self._rng.sample(candidates, min(self.SAMPLE_SIZE, len(candidates)))
+        return min(sample, key=lambda bid: self._score(blocks[bid]))
+
+    def _score(self, block: KVBlock) -> float:
+        # Attention value [0, 1]
+        attn = block.cumulative_attention / self._max_attention if self._max_attention > 0 else 0.0
+
+        # Position importance [0, 1]
+        pos_scores = {
+            BlockType.SINK: 1.0,
+            BlockType.ENTITY: 0.8,
+            BlockType.RECENT: 0.6,
+            BlockType.FILLER: 0.1,
+        }
+        position = pos_scores[block.block_type]
+
+        # Recency — exponential decay, half-life = 200 steps
+        age = max(0, self._step - block.last_access_step)
+        recency = math.exp(-0.00347 * age)  # ln(2)/200
+
+        # Frequency — log-saturated
+        frequency = min(1.0, math.log1p(block.access_count) / math.log1p(50))
+
+        return 0.35 * attn + 0.30 * position + 0.25 * recency + 0.10 * frequency
+
+
+class KVPolicyAdapter(EvictionPolicy):
+    """
+    Adapter that bridges KVCachePolicy (from KVPolicy module) to the
+    simulator's EvictionPolicy interface.
+
+    Forwards block-level attention sum directly to KVCachePolicy.
+    Maps select_victim() to select_victims(count=1).
+    """
+
+    def __init__(self, kv_policy):
+        """
+        Args:
+            kv_policy: A KVCachePolicy instance (from kv_policy.attention_evictor).
+        """
+        self._policy = kv_policy
+
+    def on_admit(self, block_id, block):
+        self._policy.ensure_block(block_id, block.sequence_id, block.token_positions)
+
+    def on_block_attention(self, block_id, block, attention_sum, sequence_id, seq_len):
+        self._policy.on_block_attention(
+            block_id=block_id,
+            attention_sum=attention_sum,
+            sequence_id=sequence_id,
+            seq_len=seq_len,
+        )
+
+    def on_evict(self, block_id):
+        self._policy.evict_block(block_id)
+
+    def on_sequence_register(self, seq_id, context_length):
+        self._policy.register_sequence(seq_id)
+
+    def on_phase_change(self, seq_id, phase):
+        from CTM_plus.KVPolicy.kv_policy.attention_evictor import InferencePhase
+        phase_map = {
+            Phase.PREFILL: InferencePhase.PREFILL,
+            Phase.DECODE: InferencePhase.DECODE,
+        }
+        self._policy.set_phase(seq_id, phase_map.get(phase, InferencePhase.DECODE))
+
+    def on_sequence_complete(self, seq_id):
+        self._policy.complete_sequence(seq_id)
+
+    def select_victim(self, blocks, pinned):
+        victims = self._policy.select_victims(count=1)
+        return victims[0] if victims else None
+
+
+def make_policy(policy_type: PolicyType, **kwargs) -> EvictionPolicy:
+    rng = kwargs.pop("rng", None)
+    if policy_type == PolicyType.LRU:
+        return LRUPolicy()
+    elif policy_type == PolicyType.FIFO:
+        return FIFOPolicy()
+    elif policy_type == PolicyType.RANDOM:
+        return RandomPolicy(rng=rng)
+    elif policy_type == PolicyType.CTM_PLUS:
+        return AttentionAwarePolicy(rng=rng, **kwargs)
+    elif policy_type == PolicyType.KV_POLICY:
+        kv_policy = kwargs.pop("kv_policy", None)
+        if kv_policy is None:
+            raise ValueError("PolicyType.KV_POLICY requires kv_policy= argument")
+        return KVPolicyAdapter(kv_policy)
+    raise ValueError(f"Unknown policy: {policy_type}")
+
+
+# =============================================================================
+# KV Cache Simulator
+# =============================================================================
+
+class KVCacheSimulator:
+    """
+    Simulates KV cache under LLM inference workload.
+
+    The simulator:
+    1. Runs sequences through prefill (bulk KV writes) and decode (attention)
+    2. Tracks per-block attention statistics
+    3. Evicts blocks when memory budget is exceeded
+    4. Collects metrics comparing policy quality
+    """
+
+    def __init__(
+        self,
+        max_blocks: int,
+        block_size: int = 16,
+        policy_type: PolicyType = PolicyType.CTM_PLUS,
+        sink_tokens: int = 4,
+        recent_window: int = 128,
+        seed: int = 42,
+        kv_policy=None,
+        attention_fn=None,
+    ):
+        """
+        Args:
+            kv_policy: A KVCachePolicy instance. Required when
+                policy_type=PolicyType.KV_POLICY; ignored otherwise.
+            attention_fn: Callable(seq_len, sink_tokens, recent_window) -> List[float].
+                Defaults to sink_and_recent_attention.
+        """
+        self.max_blocks = max_blocks
+        self.block_size = block_size
+        self.sink_tokens = sink_tokens
+        self.recent_window = recent_window
+        self.rng = random.Random(seed)
+        self.attention_fn = attention_fn or sink_and_recent_attention
+
+        # Create a child RNG for the policy so simulator and policy
+        # random streams don't interfere with each other.
+        policy_rng = random.Random(self.rng.randint(0, 2**32 - 1))
+
+        if policy_type == PolicyType.KV_POLICY:
+            if kv_policy is not None:
+                kv_policy.set_rng(policy_rng)
+            self.policy = make_policy(
+                policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
+                kv_policy=kv_policy, rng=policy_rng,
+            )
+        else:
+            self.policy = make_policy(
+                policy_type, sink_tokens=sink_tokens, recent_window=recent_window,
+                rng=policy_rng,
+            )
+
+        # State
+        self.blocks: Dict[int, KVBlock] = {}
+        self.pinned: Set[int] = set()        # sink blocks — never evict
+        self.sequences: Dict[int, Sequence] = {}
+        self._next_block_id = 0
+        self._step = 0
+        self._attn_sum = 0.0          # running sum of avg_attention across updates
+        self._attn_count = 0          # number of attention updates
+
+        # Metrics
+        self.stats = {
+            "blocks_allocated": 0,
+            "blocks_evicted": 0,
+            "attention_events": 0,
+            "sink_blocks_protected": 0,
+            "important_evictions": 0,     # evicted blocks with high attention
+            "recompute_cost": 0,          # tokens in evicted blocks re-accessed during decode
+            "decode_block_accesses": 0,   # total block accesses during decode
+            "decode_block_hits": 0,       # accesses where block was still in cache
+        }
+        self._evicted_block_ids: Set[int] = set()  # block IDs that have been evicted
+
+    # ---- Sequence lifecycle ----
+
+    def add_sequence(self, seq_id: int, context_length: int) -> Sequence:
+        seq = Sequence(sequence_id=seq_id, context_length=context_length)
+        self.sequences[seq_id] = seq
+        self.policy.on_sequence_register(seq_id, context_length)
+        return seq
+
+    def remove_sequence(self, seq_id: int) -> List[int]:
+        if seq_id not in self.sequences:
+            return []
+        self.policy.on_sequence_complete(seq_id)
+        seq = self.sequences.pop(seq_id)
+        freed = []
+        for bid in seq.block_ids:
+            if bid in self.blocks:
+                self.policy.on_evict(bid)
+                del self.blocks[bid]
+                self.pinned.discard(bid)
+                freed.append(bid)
+            self._evicted_block_ids.discard(bid)
+        return freed
+
+    # ---- Prefill phase ----
+
+    def prefill_sequence(self, seq_id: int) -> int:
+        """
+        Write all KV blocks for a sequence's prompt. Returns blocks allocated.
+        """
+        seq = self.sequences[seq_id]
+        num_blocks = math.ceil(seq.context_length / self.block_size)
+        allocated = 0
+
+        for i in range(num_blocks):
+            start_pos = i * self.block_size
+            end_pos = min(start_pos + self.block_size, seq.context_length)
+            positions = list(range(start_pos, end_pos))
+
+            # Evict if needed
+            while len(self.blocks) >= self.max_blocks:
+                self._evict()
+
+            bid = self._allocate_block(seq_id, positions)
+            seq.block_ids.add(bid)
+            seq.last_block_id = bid
+
+            # Classify block type
+            block = self.blocks[bid]
+            if start_pos < self.sink_tokens:
+                block.block_type = BlockType.SINK
+                self.pinned.add(bid)
+                self.stats["sink_blocks_protected"] += 1
+            allocated += 1
+
+        seq.phase = Phase.DECODE
+        seq.prefill_done = True
+        seq.generated_tokens = seq.context_length
+        self.policy.on_phase_change(seq_id, Phase.DECODE)
+        return allocated
+
+    # ---- Decode phase ----
+
+    def decode_step(self, seq_id: int) -> None:
+        """
+        Simulate one decode step: new token attends to all prior tokens.
+        Uses O(1) block-level attention when available, else falls back to
+        per-position computation.
+        """
+        seq = self.sequences[seq_id]
+        self._step += 1
+        seq.generated_tokens += 1
+        current_len = seq.generated_tokens
+        new_position = current_len - 1
+
+        # Resolve block-level attention function (O(1) per block)
+        block_attn_fn = _BLOCK_ATTN_FNS.get(self.attention_fn)
+        # Lazy fallback: only generate full attention vector if needed
+        _attn_cache = None
+
+        # Distribute attention to blocks and detect recompute cost
+        for bid in list(seq.block_ids):
+            self.stats["decode_block_accesses"] += 1
+
+            if bid not in self.blocks:
+                # Block was evicted — count recompute only on first re-access
+                if bid in self._evicted_block_ids:
+                    self.stats["recompute_cost"] += self.block_size
+                    seq.evicted_positions += self.block_size
+                    self._evicted_block_ids.discard(bid)
+                # Remove from sequence to avoid re-counting
+                seq.block_ids.discard(bid)
+                continue
+
+            # Block is present — cache hit
+            self.stats["decode_block_hits"] += 1
+            block = self.blocks[bid]
+
+            # Compute block attention
+            if block_attn_fn is not None:
+                # O(1) analytical block-level attention
+                start_pos = block.token_positions[0] if block.token_positions else 0
+                n_tokens = len(block.token_positions)
+                block_attn = block_attn_fn(
+                    start_pos, n_tokens, current_len,
+                    self.sink_tokens, self.recent_window,
+                )
+            else:
+                # Fallback: per-position summation for custom attention fns
+                if _attn_cache is None:
+                    _attn_cache = self.attention_fn(
+                        current_len, self.sink_tokens, self.recent_window,
+                    )
+                attn_len = len(_attn_cache)
+                block_attn = 0.0
+                for p in block.token_positions:
+                    if p < attn_len:
+                        block_attn += _attn_cache[p]
+
+            if block_attn > 0:
+                block.cumulative_attention += block_attn
+                block.access_count += 1
+                block.last_access_step = self._step
+                self.stats["attention_events"] += 1
+                self._attn_sum += block.avg_attention
+                self._attn_count += 1
+                self.policy.on_block_attention(
+                    bid, block, block_attn, seq_id, current_len,
+                )
+
+                # Reclassify based on attention
+                self._classify_block(block, current_len)
+
+        # Place new token into a block
+        needs_new_block = (
+            not seq.block_ids
+            or new_position % self.block_size == 0
+        )
+        if not needs_new_block:
+            # Check if last block was evicted — need a new block instead
+            if seq.last_block_id not in self.blocks:
+                needs_new_block = True
+
+        if needs_new_block:
+            # Allocate a fresh block for this token
+            while len(self.blocks) >= self.max_blocks:
+                self._evict()
+            bid = self._allocate_block(seq_id, [new_position])
+            seq.block_ids.add(bid)
+            seq.last_block_id = bid
+        else:
+            # Append position to the last block
+            self.blocks[seq.last_block_id].token_positions.append(new_position)
+
+    @property
+    def _entity_threshold(self) -> float:
+        """Adaptive entity threshold that scales with sequence length."""
+        from CTM_plus.KVPolicy.kv_policy.attention_evictor import compute_adaptive_threshold
+        return compute_adaptive_threshold(self._attn_sum, self._attn_count)
+
+    # ---- Internal ----
+
+    def _allocate_block(self, seq_id: int, positions: List[int]) -> int:
+        bid = self._next_block_id
+        self._next_block_id += 1
+        block = KVBlock(
+            block_id=bid, sequence_id=seq_id, token_positions=positions,
+            created_step=self._step, last_access_step=self._step,
+        )
+        self.blocks[bid] = block
+        self.policy.on_admit(bid, block)
+        self.stats["blocks_allocated"] += 1
+        return bid
+
+    def _evict(self) -> Optional[int]:
+        victim = self.policy.select_victim(self.blocks, self.pinned)
+        if victim is None:
+            return None
+        block = self.blocks[victim]
+
+        # Track if this was an important eviction
+        if block.block_type in (BlockType.SINK, BlockType.ENTITY):
+            self.stats["important_evictions"] += 1
+
+        # Mark as evicted for recompute detection on next decode access.
+        # Block stays in seq.block_ids so decode_step() can detect the miss.
+        self._evicted_block_ids.add(victim)
+
+        self.policy.on_evict(victim)
+        self.pinned.discard(victim)
+        del self.blocks[victim]
+        self.stats["blocks_evicted"] += 1
+        return victim
+
+    def _classify_block(self, block: KVBlock, seq_len: int) -> None:
+        """Reclassify block based on current attention and position."""
+        min_pos = min(block.token_positions) if block.token_positions else 0
+
+        if min_pos < self.sink_tokens:
+            block.block_type = BlockType.SINK
+            self.pinned.add(block.block_id)
+        elif min_pos >= seq_len - self.recent_window:
+            block.block_type = BlockType.RECENT
+        elif block.avg_attention > self._entity_threshold:
+            block.block_type = BlockType.ENTITY
+        else:
+            block.block_type = BlockType.FILLER
+
+    def get_metrics(self) -> Dict:
+        """Compute simulation metrics."""
+        total_blocks = self.stats["blocks_allocated"]
+        evictions = self.stats["blocks_evicted"]
+        important = self.stats["important_evictions"]
+        accesses = self.stats["decode_block_accesses"]
+        hits = self.stats["decode_block_hits"]
+
+        # Block type distribution in current cache
+        type_dist = {"sink": 0, "entity": 0, "recent": 0, "filler": 0}
+        for b in self.blocks.values():
+            type_dist[b.block_type.name.lower()] += 1
+
+        # Retention rate: fraction of allocated blocks still in cache
+        retention = len(self.blocks) / max(1, total_blocks)
+
+        # Accuracy: of blocks accessed during decode, how many were retained?
+        # Measures: "did the policy keep the blocks that were actually needed?"
+        accuracy = hits / max(1, accesses)
+
+        return {
+            **self.stats,
+            "cache_occupancy": len(self.blocks),
+            "max_blocks": self.max_blocks,
+            "utilization": len(self.blocks) / self.max_blocks,
+            "retention_rate": retention,
+            "accuracy": accuracy,
+            "block_type_distribution": type_dist,
+            "active_sequences": len(self.sequences),
+            "step": self._step,
+        }
+
+
+# =============================================================================
+# Workload Runner
+# =============================================================================
+
+def run_workload(
+    max_blocks: int,
+    block_size: int,
+    sequences: List[Tuple[int, int]],    # [(seq_id, context_length), ...]
+    decode_steps_per_seq: int,
+    policy_type: PolicyType,
+    seed: int = 42,
+    sink_tokens: int = 4,
+    recent_window: int = 128,
+    kv_policy=None,
+    attention_fn=None,
+    staggered: bool = False,
+    arrival_interval: int = 0,
+) -> Dict:
+    """
+    Run a complete workload and return metrics.
+
+    Args:
+        kv_policy: A KVCachePolicy instance. Required when
+            policy_type=PolicyType.KV_POLICY.
+        attention_fn: Optional attention pattern function override.
+        staggered: If True, admit sequences at intervals during decode
+            instead of prefilling all upfront.
+        arrival_interval: Steps between sequence arrivals when staggered.
+            0 = auto (spread evenly across decode_steps_per_seq).
+    """
+    sim = KVCacheSimulator(
+        max_blocks=max_blocks, block_size=block_size,
+        policy_type=policy_type, seed=seed,
+        sink_tokens=sink_tokens, recent_window=recent_window,
+        kv_policy=kv_policy, attention_fn=attention_fn,
+    )
+
+    if not staggered:
+        # Original: prefill all, then interleaved decode
+        for seq_id, ctx_len in sequences:
+            sim.add_sequence(seq_id, ctx_len)
+            sim.prefill_sequence(seq_id)
+
+        active_ids = [sid for sid, _ in sequences]
+        for step in range(decode_steps_per_seq):
+            for sid in active_ids:
+                if sid in sim.sequences:
+                    sim.decode_step(sid)
+    else:
+        # Staggered: admit sequences at intervals during decode
+        interval = arrival_interval if arrival_interval > 0 else max(
+            1, decode_steps_per_seq // max(1, len(sequences)),
+        )
+        pending = list(sequences)
+        active_ids: List[int] = []
+
+        for step in range(decode_steps_per_seq):
+            # Admit next pending sequence at interval
+            while pending and step >= len(active_ids) * interval:
+                sid, ctx_len = pending.pop(0)
+                sim.add_sequence(sid, ctx_len)
+                sim.prefill_sequence(sid)
+                active_ids.append(sid)
+
+            # Decode all active
+            for sid in active_ids:
+                if sid in sim.sequences:
+                    sim.decode_step(sid)
+
+        # Admit any remaining (if decode_steps too short for all arrivals)
+        for sid, ctx_len in pending:
+            sim.add_sequence(sid, ctx_len)
+            sim.prefill_sequence(sid)
+
+    metrics = sim.get_metrics()
+    metrics["policy"] = policy_type.value
+    return metrics
+
+
+ATTENTION_PATTERNS = [
+    sink_and_recent_attention,
+    entity_focused_attention,
+    uniform_attention,
+    mixed_multihead_attention,
+]
+
+
+def run_continuous_batching(
+    max_blocks: int,
+    block_size: int,
+    total_steps: int,
+    policy_type: PolicyType,
+    seed: int = 42,
+    sink_tokens: int = 4,
+    recent_window: int = 128,
+    kv_policy=None,
+    arrival_rate: float = 0.15,
+    completion_rate: float = 0.05,
+    max_concurrent: int = 16,
+    length_distribution: Optional[List[Tuple[float, int, int]]] = None,
+) -> Dict:
+    """
+    Run a continuous-batching workload with staggered arrivals and departures.
+
+    Simulates realistic serving: sequences arrive over time, run prefill + decode,
+    and complete at variable points. Memory pressure fluctuates naturally.
+
+    Args:
+        total_steps: Number of simulation steps to run.
+        arrival_rate: Probability of a new sequence arriving each step.
+        completion_rate: Probability of completing a decoding sequence each step.
+        max_concurrent: Maximum concurrent sequences.
+        length_distribution: List of (weight, min_len, max_len) for context lengths.
+            Defaults to a realistic mix of short/medium/long/extreme.
+    """
+    if length_distribution is None:
+        length_distribution = [
+            (0.30, 128, 512),      # short (chat turns)
+            (0.40, 1024, 4096),    # medium (general)
+            (0.20, 4096, 16384),   # long (documents)
+            (0.10, 16384, 32768),  # extreme (full context)
+        ]
+
+    rng = random.Random(seed)
+    next_seq_id = 0
+
+    sim = KVCacheSimulator(
+        max_blocks=max_blocks, block_size=block_size,
+        policy_type=policy_type, seed=seed,
+        sink_tokens=sink_tokens, recent_window=recent_window,
+        kv_policy=kv_policy,
+    )
+
+    # Per-sequence attention pattern assignment
+    seq_attention_fns: Dict[int, callable] = {}
+    utilization_trace: List[float] = []
+    sequences_completed = 0
+    decode_steps_run = 0
+
+    def _sample_context_length() -> int:
+        r = rng.random()
+        cumulative = 0.0
+        for weight, lo, hi in length_distribution:
+            cumulative += weight
+            if r < cumulative:
+                return rng.randint(lo, hi)
+        _, lo, hi = length_distribution[-1]
+        return rng.randint(lo, hi)
+
+    for step in range(total_steps):
+        # --- Arrivals ---
+        if len(sim.sequences) < max_concurrent and rng.random() < arrival_rate:
+            ctx_len = _sample_context_length()
+            sid = next_seq_id
+            next_seq_id += 1
+            sim.add_sequence(sid, ctx_len)
+            sim.prefill_sequence(sid)
+            # Assign random attention pattern
+            seq_attention_fns[sid] = rng.choice(ATTENTION_PATTERNS)
+
+        # --- Decode active sequences ---
+        active = [sid for sid, s in sim.sequences.items() if s.prefill_done]
+        for sid in active:
+            # Temporarily swap attention_fn for this sequence's pattern
+            orig_fn = sim.attention_fn
+            sim.attention_fn = seq_attention_fns.get(sid, sink_and_recent_attention)
+            sim.decode_step(sid)
+            sim.attention_fn = orig_fn
+            decode_steps_run += 1
+
+        # --- Completions ---
+        if active and rng.random() < completion_rate:
+            victim_sid = rng.choice(active)
+            sim.remove_sequence(victim_sid)
+            seq_attention_fns.pop(victim_sid, None)
+            sequences_completed += 1
+
+        # --- Track utilization ---
+        utilization_trace.append(len(sim.blocks) / max(1, max_blocks))
+
+    # Complete remaining sequences
+    for sid in list(sim.sequences):
+        sim.remove_sequence(sid)
+        sequences_completed += 1
+
+    metrics = sim.get_metrics()
+    metrics["policy"] = policy_type.value
+    metrics["sequences_completed"] = sequences_completed
+    metrics["decode_steps_run"] = decode_steps_run
+    metrics["total_steps"] = total_steps
+
+    # Utilization summary
+    if utilization_trace:
+        metrics["avg_utilization"] = sum(utilization_trace) / len(utilization_trace)
+        metrics["peak_utilization"] = max(utilization_trace)
+        # Time spent in pressure zones
+        high = sum(1 for u in utilization_trace if u >= 0.9)
+        med = sum(1 for u in utilization_trace if 0.7 <= u < 0.9)
+        low = sum(1 for u in utilization_trace if u < 0.7)
+        n = len(utilization_trace)
+        metrics["pct_high_pressure"] = high / n
+        metrics["pct_med_pressure"] = med / n
+        metrics["pct_low_pressure"] = low / n
+    else:
+        metrics["avg_utilization"] = 0.0
+        metrics["peak_utilization"] = 0.0
+        metrics["pct_high_pressure"] = 0.0
+        metrics["pct_med_pressure"] = 0.0
+        metrics["pct_low_pressure"] = 0.0
+
+    return metrics
+
+
+def compare_continuous_batching(
+    max_blocks: int = 256,
+    block_size: int = 16,
+    total_steps: int = 500,
+    seed: int = 42,
+    include_kv_policy: bool = True,
+    **kwargs,
+) -> Dict[str, Dict]:
+    """Run continuous-batching workload under all policies."""
+    results = {}
+
+    for policy in PolicyType:
+        if policy == PolicyType.KV_POLICY:
+            if not include_kv_policy:
+                continue
+            try:
+                from CTM_plus.KVPolicy.kv_policy.attention_evictor import KVCachePolicy
+            except ImportError:
+                continue
+            kv_pol = KVCachePolicy(
+                max_blocks=max_blocks, block_size=block_size,
+                sink_tokens=kwargs.get("sink_tokens", 4),
+                recent_window=kwargs.get("recent_window", 128),
+            )
+        else:
+            kv_pol = None
+
+        start = time.perf_counter()
+        metrics = run_continuous_batching(
+            max_blocks=max_blocks, block_size=block_size,
+            total_steps=total_steps, policy_type=policy,
+            seed=seed, kv_policy=kv_pol, **kwargs,
+        )
+        elapsed = time.perf_counter() - start
+        metrics["elapsed_seconds"] = round(elapsed, 4)
+        results[policy.value] = metrics
+
+    return results
+
+
+def compare_policies(
+    max_blocks: int = 256,
+    block_size: int = 16,
+    num_sequences: int = 4,
+    context_length: int = 512,
+    decode_steps: int = 128,
+    seed: int = 42,
+    include_kv_policy: bool = True,
+    attention_fn=None,
+    sequences: Optional[List[Tuple[int, int]]] = None,
+    staggered: bool = False,
+    arrival_interval: int = 0,
+) -> Dict[str, Dict]:
+    """
+    Run the same workload under all policies and return comparison.
+
+    Args:
+        include_kv_policy: Set False to skip KV_POLICY (requires KVPolicy module).
+        attention_fn: Optional attention pattern function override.
+        sequences: Optional explicit sequence list [(seq_id, context_length), ...].
+            Overrides num_sequences/context_length when provided.
+        staggered: If True, admit sequences at intervals during decode.
+        arrival_interval: Steps between arrivals (0 = auto).
+    """
+    if sequences is None:
+        sequences = [(i, context_length) for i in range(num_sequences)]
+    results = {}
+
+    for policy in PolicyType:
+        if policy == PolicyType.KV_POLICY:
+            if not include_kv_policy:
+                continue
+            try:
+                from CTM_plus.KVPolicy.kv_policy.attention_evictor import KVCachePolicy
+            except ImportError:
+                continue
+            kv_pol = KVCachePolicy(
+                max_blocks=max_blocks, block_size=block_size,
+                sink_tokens=4, recent_window=128,
+            )
+        else:
+            kv_pol = None
+
+        start = time.perf_counter()
+        metrics = run_workload(
+            max_blocks=max_blocks, block_size=block_size,
+            sequences=sequences, decode_steps_per_seq=decode_steps,
+            policy_type=policy, seed=seed,
+            kv_policy=kv_pol, attention_fn=attention_fn,
+            staggered=staggered, arrival_interval=arrival_interval,
+        )
+        elapsed = time.perf_counter() - start
+        metrics["elapsed_seconds"] = round(elapsed, 4)
+        results[policy.value] = metrics
+
+    return results

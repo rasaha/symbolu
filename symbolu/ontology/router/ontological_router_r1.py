@@ -46,35 +46,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import FrozenSet, Mapping, Optional, Tuple
 
-
-# =============================================================================
-# Core Types
-# =============================================================================
-
-class OntologicalLayer(Enum):
-    """
-    12 ontological layers for structural projection (patent-exact sequence).
-
-    Each layer represents a projection plane onto which Phase artifacts
-    can be mapped. Layers are structural containers, not semantic categories.
-
-    The ordering is fixed and immutable per the patent specification.
-    """
-    POTENTIAL = 1
-    IDENTITY = 2
-    EXECUTION = 3
-    STRUCTURE = 4
-    COGNITION = 5
-    AGENCY = 6
-    REASONING = 7
-    PURPOSE = 8
-    WITNESSES = 9
-    UNIFYING = 10
-    INTEGRATION = 11
-    ABSOLVING = 12  # GATED - requires explicit opt-in
-
-    def __repr__(self) -> str:
-        return f"OntologicalLayer.{self.name}"
+from symbolu.ontology.layers.ontology_layer import OntologicalLayer  # canonical source
+from symbolu.safety.gcc_runtime_guard import assert_non_expressive
 
 
 # =============================================================================
@@ -312,14 +285,19 @@ class OntologicalLayerRouter:
             projected_layers = default_layers
 
         # Step 4: (Validations occurred in _apply_hint if hint was provided)
-        # Step 5: Return response
-        return ProjectionResponse(
+        # Step 5: Build response
+        response = ProjectionResponse(
             artifact_id=request.artifact_id,
             artifact_hash=request.artifact_hash,
             phase_id=request.phase_id,
             projected_layers=projected_layers,
             router_version=self.ROUTER_VERSION,
         )
+
+        # GCC C-1: Assert return value is non-expressive (fail-closed)
+        assert_non_expressive(response, path="OntologicalLayerRouter.project:return")
+
+        return response
 
     def _apply_hint(
         self,
@@ -486,4 +464,5 @@ def route_projection(
     router = OntologicalLayerRouter(
         explicit_absolving_opt_in=explicit_absolving_opt_in
     )
+    # GCC guard applied inside router.project(); no double-check needed
     return router.project(request)

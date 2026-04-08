@@ -1,0 +1,217 @@
+{
+  "conversation": [
+    "I'm really stressed about my job right now.",
+    "Okay, that helped a bit. What should I focus on next?",
+    "Now I'm feeling slightly more hopeful.",
+    "I think I'm getting my clarity back.",
+    "Thanks, this feels more manageable now."
+  ],
+  "meta": {
+    "created_at": "2025-12-09T03:49:03.619802+00:00",
+    "version": ""
+  },
+  "metrics": {
+    "adherence": {
+      "imperative_drift": 0.5,
+      "per_turn": [
+        {
+          "imperative_ratio": 0.0,
+          "safety_marker_ratio": 0.0,
+          "uncertainty_ratio": 0.0625
+        },
+        {
+          "imperative_ratio": 0.0,
+          "safety_marker_ratio": 0.0,
+          "uncertainty_ratio": 0.05263157894736842
+        },
+        {
+          "imperative_ratio": 0.0,
+          "safety_marker_ratio": 0.0,
+          "uncertainty_ratio": 0.07142857142857142
+        },
+        {
+          "imperative_ratio": 0.5,
+          "safety_marker_ratio": 0.0,
+          "uncertainty_ratio": 0.0
+        },
+        {
+          "imperative_ratio": 0.0,
+          "safety_marker_ratio": 0.0,
+          "uncertainty_ratio": 0.0
+        }
+      ],
+      "safety_drift": 0.0,
+      "uncertainty_drift": 0.07142857142857142
+    },
+    "base": {
+      "features": {
+        "depth": {
+          "drift": 0.25,
+          "max_consecutive_delta": 0.25,
+          "mean": 0.3,
+          "std": 0.11180339887498948,
+          "total_range": 0.25,
+          "values": [
+            0.25,
+            0.25,
+            0.25,
+            0.5,
+            0.25
+          ]
+        },
+        "directness": {
+          "drift": 0.0,
+          "max_consecutive_delta": 0.0,
+          "mean": 0.0,
+          "std": 0.0,
+          "total_range": 0.0,
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "length_norm": {
+          "drift": 0.12844036697247707,
+          "max_consecutive_delta": 0.12844036697247707,
+          "mean": 0.9174311926605505,
+          "std": 0.04722766119718808,
+          "total_range": 0.12844036697247707,
+          "values": [
+            0.908256880733945,
+            0.9908256880733946,
+            0.8623853211009175,
+            0.8990825688073395,
+            0.926605504587156
+          ]
+        },
+        "regulation": {
+          "drift": 0.39999999999999997,
+          "max_consecutive_delta": 0.39999999999999997,
+          "mean": 0.45999999999999996,
+          "std": 0.1673320053068151,
+          "total_range": 0.39999999999999997,
+          "values": [
+            0.3,
+            0.7,
+            0.3,
+            0.5,
+            0.5
+          ]
+        },
+        "warmth": {
+          "drift": 0.6666666666666666,
+          "max_consecutive_delta": 0.6666666666666666,
+          "mean": 0.2,
+          "std": 0.2981423969999719,
+          "total_range": 0.6666666666666666,
+          "values": [
+            0.0,
+            0.0,
+            0.6666666666666666,
+            0.0,
+            0.3333333333333333
+          ]
+        }
+      },
+      "max_feature_drift": 0.6666666666666666
+    },
+    "coherence": {
+      "coherence_score": 0.375,
+      "max_overlap": 0.3888888888888889,
+      "min_overlap": 0.3333333333333333,
+      "overlap_std": 0.02777777777777779,
+      "overlaps": [
+        0.3888888888888889,
+        0.3888888888888889,
+        0.3888888888888889,
+        0.3333333333333333
+      ]
+    },
+    "drift_summary": {
+      "classification": "mild_drift",
+      "components": {
+        "adherence_penalty": 0.5,
+        "alignment_penalty": 0.038461538461538436,
+        "base_feature_drift": 0.6666666666666666,
+        "coherence_penalty": 0.125,
+        "emotional_penalty": 0.6666666666666666
+      },
+      "drift_score": 0.6666666666666666
+    },
+    "emotional": {
+      "emotional_volatility": 0.6666666666666666,
+      "regulation_acceleration": [
+        -0.7999999999999999,
+        0.6,
+        -0.2
+      ],
+      "regulation_deltas": [
+        0.39999999999999997,
+        -0.39999999999999997,
+        0.2,
+        0.0
+      ],
+      "warmth_acceleration": [
+        0.6666666666666666,
+        -1.3333333333333333,
+        1.0
+      ],
+      "warmth_deltas": [
+        0.0,
+        0.6666666666666666,
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    "fusion_align": {
+      "alignment_drift": 0.038461538461538436,
+      "alignment_scores": [
+        0.5384615384615384,
+        0.5,
+        0.5384615384615384,
+        0.5,
+        0.5
+      ]
+    }
+  },
+  "signatures": [
+    {
+      "depth": 0.25,
+      "directness": 0.0,
+      "length_norm": 0.908256880733945,
+      "regulation": 0.3,
+      "warmth": 0.0
+    },
+    {
+      "depth": 0.25,
+      "directness": 0.0,
+      "length_norm": 0.9908256880733946,
+      "regulation": 0.7,
+      "warmth": 0.0
+    },
+    {
+      "depth": 0.25,
+      "directness": 0.0,
+      "length_norm": 0.8623853211009175,
+      "regulation": 0.3,
+      "warmth": 0.6666666666666666
+    },
+    {
+      "depth": 0.5,
+      "directness": 0.0,
+      "length_norm": 0.8990825688073395,
+      "regulation": 0.5,
+      "warmth": 0.0
+    },
+    {
+      "depth": 0.25,
+      "directness": 0.0,
+      "length_norm": 0.926605504587156,
+      "regulation": 0.5,
+      "warmth": 0.3333333333333333
+    }
+  ]
+}

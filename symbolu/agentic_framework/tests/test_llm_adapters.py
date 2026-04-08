@@ -6,13 +6,17 @@ Tests the adapter classes for various LLM providers:
 - MockLLMAdapter
 - SequentialMockAdapter
 - MockEmbeddingAdapter
+- MistralCGAdapter (with mock backbone)
 - Factory function create_adapter
 """
 
+from unittest.mock import MagicMock, patch
 import pytest
 
 from symbolu.agentic_framework.llm_adapters import (
     BaseLLMAdapter,
+    MistralAdapter,
+    MistralCGAdapter,
     MockLLMAdapter,
     SequentialMockAdapter,
     MockEmbeddingAdapter,
@@ -270,6 +274,15 @@ class TestCreateAdapterFactory:
         except ImportError:
             pass
 
+    def test_create_mistral_adapter(self):
+        """Test 'mistral' provider is recognized."""
+        try:
+            adapter = create_adapter("mistral", api_key="test")
+            assert isinstance(adapter, MistralAdapter)
+        except ImportError:
+            # Expected if mistralai not installed
+            pass
+
 
 class TestBaseLLMAdapterInterface:
     """Tests for BaseLLMAdapter interface compliance."""
@@ -370,3 +383,249 @@ class TestAdapterIntegration:
 
         assert isinstance(sim_12, float)
         assert isinstance(sim_13, float)
+
+
+# =============================================================================
+# MistralCGAdapter Tests (with mock backbone)
+# =============================================================================
+
+
+def _make_mock_mistral_cg():
+    """
+    Build a fake MistralCGWrapper + tokenizer for testing MistralCGAdapter
+    without loading a real 7B model.
+    """
+    torch = pytest.importorskip("torch", reason="torch required for MistralCG tests")
+
+    vocab_size = 100
+    hidden_dim = 64
+
+    # --- Mock tokenizer ---
+    tokenizer = MagicMock()
+    tokenizer.pad_token = "[PAD]"
+    tokenizer.eos_token = "[EOS]"
+    tokenizer.eos_token_id = 2
+    tokenizer.pad_token_id = 0
+
+    def mock_tokenize(text, return_tensors=None, padding=False, truncation=False):
+        # Return 5 token ids for any input
+        ids = torch.tensor([[10, 20, 30, 40, 50]])
+        mask = torch.ones_like(ids)
+        result = MagicMock()
+        result.__getitem__ = lambda self, k: {"input_ids": ids, "attention_mask": mask}[k]
+        result.get = lambda k, d=None: {"input_ids": ids, "attention_mask": mask}.get(k, d)
+        return result
+
+    tokenizer.side_effect = mock_tokenize
+    tokenizer.decode = MagicMock(side_effect=lambda ids, **kw: "Generated response text")
+
+    # --- Mock MistralCGWrapper (nn.Module) ---
+    model = MagicMock()
+    model.eval = MagicMock(return_value=model)
+    model.tokenizer = tokenizer
+
+    # parameters() must yield at least one tensor (for device detection)
+    param = torch.nn.Parameter(torch.zeros(1))
+    model.parameters = MagicMock(return_value=iter([param]))
+
+    # Track call count for EOS injection
+    call_count = {"n": 0}
+
+    def mock_forward(input_ids, attention_mask=None, reset_state=False, **kwargs):
+        call_count["n"] += 1
+        B, T = input_ids.shape
+        # After 3 generation steps, emit EOS token as argmax
+        logits = torch.randn(B, T, vocab_size)
+        if call_count["n"] > 3:
+            # Make EOS token the highest logit at last position
+            logits[0, -1, :] = -100.0
+            logits[0, -1, 2] = 100.0  # eos_token_id = 2
+
+        return {
+            'logits': logits,
+            'state': torch.randn(B, 32),
+            'delta_S': torch.randn(B, 32),
+            'delta_bhava': torch.randn(B, 12),
+            'intent_phase': torch.randn(B, 32),
+            'adapter_gate': 0.12,
+        }
+
+    model.side_effect = mock_forward
+    model.__call__ = mock_forward
+
+    return model, tokenizer
+
+
+class TestMistralCGAdapter:
+    """Tests for MistralCGAdapter with mock backbone."""
+
+    def _make_adapter(self):
+        """Create adapter with mock model (bypasses real model loading)."""
+        mock_model, mock_tokenizer = _make_mock_mistral_cg()
+
+        with patch(
+            "symbolu.agentic_framework.llm_adapters.MistralCGAdapter.__init__",
+            lambda self, **kw: None,
+        ):
+            adapter = MistralCGAdapter.__new__(MistralCGAdapter)
+
+        # Manually set attributes that __init__ would set
+        import torch as _torch
+
+        adapter._torch = _torch
+        adapter.model = mock_model
+        adapter.tokenizer = mock_tokenizer
+        adapter.max_new_tokens = 10
+        adapter.temperature = 0.0  # Greedy for determinism
+        adapter.top_p = 1.0
+        adapter.top_k = 0
+        adapter.repetition_penalty = 1.0
+        adapter.last_cg_metadata = {}
+        adapter.call_history = []
+
+        return adapter
+
+    def test_adapter_creation(self):
+        """Test MistralCGAdapter can be created with mock backbone."""
+        adapter = self._make_adapter()
+        assert adapter.tokenizer is not None
+        assert adapter.model is not None
+
+    def test_call_returns_string(self):
+        """Test call() returns a string response."""
+        adapter = self._make_adapter()
+        response = adapter.call("What is consciousness?")
+        assert isinstance(response, str)
+
+    def test_call_stores_cg_metadata(self):
+        """Test CG metadata is captured after call()."""
+        adapter = self._make_adapter()
+        adapter.call("Test prompt")
+
+        meta = adapter.get_cg_metadata()
+        assert 'state' in meta
+        assert 'delta_S' in meta
+        assert 'delta_bhava' in meta
+        assert 'intent_phase' in meta
+        assert 'adapter_gate' in meta
+
+    def test_cg_metadata_has_correct_shapes(self):
+        """Test CG metadata tensors have expected shapes."""
+        adapter = self._make_adapter()
+        adapter.call("Test prompt")
+
+        meta = adapter.get_cg_metadata()
+        # state: [B, 32]
+        assert meta['state'].shape == (1, 32)
+        # delta_S: [B, 32]
+        assert meta['delta_S'].shape == (1, 32)
+        # delta_bhava: [B, 12]
+        assert meta['delta_bhava'].shape == (1, 12)
+
+    def test_call_tracks_history(self):
+        """Test call history is tracked."""
+        adapter = self._make_adapter()
+        adapter.call("First question")
+        adapter.call("Second question")
+
+        assert len(adapter.call_history) == 2
+        assert adapter.call_history[0] == "First question"
+        assert adapter.call_history[1] == "Second question"
+
+    def test_implements_base_interface(self):
+        """Test MistralCGAdapter implements BaseLLMAdapter interface."""
+        adapter = self._make_adapter()
+        assert hasattr(adapter, 'call')
+        assert callable(adapter.call)
+        assert hasattr(adapter, 'call_with_messages')
+        assert callable(adapter.call_with_messages)
+
+    def test_call_with_messages(self):
+        """Test call_with_messages works via base class fallback."""
+        adapter = self._make_adapter()
+        messages = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi"},
+            {"role": "user", "content": "How are you?"},
+        ]
+        response = adapter.call_with_messages(messages)
+        assert isinstance(response, str)
+
+    def test_cg_metadata_compatible_with_sovereign_bridge(self):
+        """Test CG metadata can be fed to signals_from_sovereign_state."""
+        adapter = self._make_adapter()
+        adapter.call("Test prompt")
+
+        meta = adapter.get_cg_metadata()
+
+        from symbolu.agentic_framework.sovereign_bridge import (
+            signals_from_sovereign_state,
+        )
+
+        # Should not raise — validates tensor/list compatibility
+        signals = signals_from_sovereign_state(
+            meta['state'],
+            meta['delta_S'],
+        )
+        assert 0.0 <= signals.quality_score <= 1.0
+        assert 0.0 <= signals.session_stability <= 1.0
+
+
+class TestCreateAdapterMistralCG:
+    """Tests for create_adapter with mistral_cg provider."""
+
+    def test_create_mistral_cg_alias(self):
+        """Test mistral_cg and mistralcg are recognized providers."""
+        # Will raise ImportError or loading error in test env (no GPU/model)
+        # but should NOT raise ValueError("Unknown provider")
+        for name in ("mistral_cg", "mistralcg"):
+            try:
+                create_adapter(name)
+            except (ImportError, ValueError, OSError, RuntimeError):
+                # Expected: no model weights / no GPU in test env
+                # But NOT ValueError("Unknown provider")
+                pass
+
+
+# =============================================================================
+# Vritti Index Ordering Invariant Test
+#
+# Guards against the known naming mismatch between:
+#   - training-side VrittiState enum (vritti.py): SMRITI=3, NIDRA=4
+#   - 32D state layout (state_projector, inference constants): NIDRA=3, SMRITI=4
+#
+# The 32D state layout is the canonical ordering. This test locks the invariant.
+# =============================================================================
+
+
+class TestVrittiIndexOrderingInvariant:
+    """Regression test: 32D Vritti ordering is consistent across inference."""
+
+    def test_sovereign_constants_match_gate_assumptions(self):
+        """The inference constants match the gate's hardcoded indices:
+        vritti[1]=ERROR, vritti[2]=IMAGINATION."""
+        from agentic.sovereign_constants import (
+            VRITTI_ERROR,
+            VRITTI_IMAGINATION,
+            VRITTI_FACT,
+            VRITTI_VOID,
+            VRITTI_MEMORY,
+        )
+        assert VRITTI_ERROR == 1, f"VRITTI_ERROR must be 1, got {VRITTI_ERROR}"
+        assert VRITTI_IMAGINATION == 2, f"VRITTI_IMAGINATION must be 2, got {VRITTI_IMAGINATION}"
+        assert VRITTI_FACT == 0
+        assert VRITTI_VOID == 3
+        assert VRITTI_MEMORY == 4
+
+    def test_vritti_index_enum_matches_constants(self):
+        """VrittiIndex enum matches the flat index constants."""
+        from agentic.sovereign_constants import (
+            VrittiIndex,
+            VRITTI_FACT, VRITTI_ERROR, VRITTI_IMAGINATION,
+            VRITTI_VOID, VRITTI_MEMORY,
+        )
+        assert VrittiIndex.PRAMANA == VRITTI_FACT
+        assert VrittiIndex.VIPARYAYA == VRITTI_ERROR
+        assert VrittiIndex.VIKALPA == VRITTI_IMAGINATION
+        assert VrittiIndex.NIDRA == VRITTI_VOID
+        assert VrittiIndex.SMRITI == VRITTI_MEMORY

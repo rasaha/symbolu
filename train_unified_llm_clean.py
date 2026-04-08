@@ -50,6 +50,21 @@ Usage:
 
     python train_unified_llm.py --model_type ontological_hybrid --model_size small \
 
+    # Test Conscious Generation phases (all phases, 100 steps)
+    python train_unified_llm.py --test_cg_phases --max_steps 100
+
+    # Test specific CG phases only
+    python train_unified_llm.py --test_cg_phases --test_cg_phases_list 1 2 3
+
+    # Test Phase 5 curriculum only (no GPU needed)
+    python train_unified_llm.py --test_cg_phase5_only
+
+    # Fast CG test with tiny model
+    python train_unified_llm.py --test_cg_phases --model_size tiny --max_steps 50
+
+    # Unit tests only, skip training loop
+    python train_unified_llm.py --test_cg_phases --test_cg_no_loop
+
     # Stress Test (Trial by Fire)
     python train_unified_llm.py --stress_test --resume checkpoints/best.pt
 
@@ -5044,6 +5059,10 @@ class AdaptiveTrainingController:
         grad_norm_spike_threshold: float = 100.0,  # Gradient norm above this triggers decay
         emergency_decay_factor: float = 0.5,     # Aggressive decay for emergencies
         consecutive_spike_limit: int = 3,        # After N consecutive spikes, halt boosts
+        # V10.23: Spike-aware boost dampening
+        max_boost_from_base: float = 2.0,         # Max LR = base_lr * this (cap compounding)
+        spike_dampen_threshold: int = 10,          # If >=N params spiked after last boost, dampen next
+        boost_cooldown_steps: int = 400,           # Min steps between boosts
     ):
         self.optimizer = optimizer
         self.base_lr = base_lr
@@ -5093,17 +5112,29 @@ class AdaptiveTrainingController:
         self.consecutive_spikes = 0  # V9.8.2: Track consecutive loss spikes
         self.boost_blocked = False  # V9.8.2: Block boosts after too many spikes
 
+        # V10.23: Spike-aware boost dampening
+        self._grad_variance_tracker = None  # Set via set_grad_variance_tracker()
+        self._last_boost_step = 0  # Step of last LR boost
+        self._max_boost_from_base: float = max_boost_from_base
+        self._spike_dampen_threshold: int = spike_dampen_threshold
+        self._boost_cooldown_steps: int = boost_cooldown_steps
+
         print(f"\n  [AdaptiveTraining] Controller initialized:")
         print(f"    Base LR: {base_lr:.2e} (range: {lr_min:.2e} - {self.lr_max:.2e})")
         print(f"    Velocity thresholds: slow < {velocity_slow_threshold}%, spike > {velocity_spike_threshold}%")
         print(f"    Kp range: {kp_min} - {kp_max} (base: {kp_base})")
         print(f"    V9.8.2 Safeguards: max_relative={max_lr_relative}x, loss_spike={loss_spike_threshold}%")
+        print(f"    V10.23: Boost cap={max_boost_from_base}x base, spike_dampen>={spike_dampen_threshold} params, cooldown={boost_cooldown_steps} steps")
         print(f"    V9.9.1: Scheduler-aware LR adjustments ENABLED")
 
     def set_scheduler(self, scheduler):
         """V9.9.1: Link to scheduler so LR boosts/decays persist through cosine decay."""
         self._scheduler = scheduler
         print(f"    Plateau detection: {self.plateau_window} evals, {self.plateau_threshold}% threshold")
+
+    def set_grad_variance_tracker(self, tracker):
+        """V10.23: Link to gradient variance tracker for spike-aware boost dampening."""
+        self._grad_variance_tracker = tracker
 
     def _compute_velocity(self) -> float:
         """Compute PPL velocity (% change per eval)."""
@@ -5275,19 +5306,43 @@ class AdaptiveTrainingController:
                     print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST SKIPPED ({reason}) - cosine schedule below floor, boost would be futile")
                     self._floor_boost_skip_logged = True
             else:
-                # Only boost if we're not already at max
-                new_lr = min(self.lr_max, current_lr * self.lr_boost_factor)
-                if new_lr != current_lr and new_lr > current_lr:
-                    for pg in self.optimizer.param_groups:
-                        pg['lr'] = new_lr
-                    # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
-                    if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
-                        self._scheduler.adjust_base_lr(new_lr)
-                    self.boost_count += 1
+                # V10.23: Cooldown — don't boost if too soon after last boost
+                steps_since_boost = global_step - self._last_boost_step
+                if self._last_boost_step > 0 and steps_since_boost < self._boost_cooldown_steps:
                     reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
-                    adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
-                    print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
-                    self.last_adjustment_step = global_step
+                    print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST COOLDOWN ({reason}) - {steps_since_boost}/{self._boost_cooldown_steps} steps since last boost")
+                else:
+                    # V10.23: Compute effective boost factor with spike dampening
+                    effective_boost = self.lr_boost_factor
+
+                    # Check if previous boost caused widespread spikes
+                    if self._grad_variance_tracker is not None and self._last_boost_step > 0:
+                        spike_count = self._grad_variance_tracker.get_spike_count_since(self._last_boost_step)
+                        if spike_count >= self._spike_dampen_threshold:
+                            # Linear dampening: threshold(10)→0.75x, 2x threshold(20)→0.5x, 4x threshold(40)→no boost
+                            dampen = max(0.0, 1.0 - spike_count / (self._spike_dampen_threshold * 4))
+                            effective_boost = 1.0 + (self.lr_boost_factor - 1.0) * dampen
+                            print(f"\n  🛡️  [AdaptiveTraining] BOOST DAMPENED: {spike_count} params spiked after last boost → factor {self.lr_boost_factor:.2f} → {effective_boost:.3f}")
+
+                    # V10.23: Hard cap — never exceed max_boost_from_base * base_lr
+                    hard_cap = self.base_lr * self._max_boost_from_base
+                    new_lr = min(self.lr_max, hard_cap, current_lr * effective_boost)
+
+                    if new_lr > current_lr:
+                        for pg in self.optimizer.param_groups:
+                            pg['lr'] = new_lr
+                        # V9.9.1: Also update scheduler base_lr so boost persists through cosine decay
+                        if self._scheduler is not None and hasattr(self._scheduler, 'adjust_base_lr'):
+                            self._scheduler.adjust_base_lr(new_lr)
+                        self.boost_count += 1
+                        self._last_boost_step = global_step
+                        reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                        adjustments["actions"].append(f"LR_BOOST: {current_lr:.2e}→{new_lr:.2e} ({reason})")
+                        print(f"\n  🔺 [AdaptiveTraining] LR BOOST: {current_lr:.2e} → {new_lr:.2e} ({reason})")
+                        self.last_adjustment_step = global_step
+                    elif new_lr <= current_lr:
+                        reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
+                        print(f"\n  ⏸️  [AdaptiveTraining] LR BOOST CAPPED ({reason}) - already at {current_lr:.2e} (cap: {hard_cap:.2e})")
         elif self.boost_blocked and (velocity > self.velocity_slow_threshold or is_plateau):
             # Log that boost was blocked
             reason = "plateau" if is_plateau else f"slow: {velocity:.1f}%"
@@ -8304,6 +8359,99 @@ def compute_sample_metrics(text: str) -> Dict[str, float]:
     }
 
 
+# V11.x: Factual evaluation prompts with ground-truth expected answers.
+# Each entry: (prompt, list_of_acceptable_answers, category)
+# Answers are checked as case-insensitive substrings of the generated text.
+FACTUAL_EVAL_PROMPTS = [
+    # Basic facts
+    ("The capital of France is", ["paris"], "fact"),
+    ("The chemical symbol for water is", ["h2o"], "fact"),
+    ("The speed of light is approximately", ["300", "3 ×", "3×", "3x10", "186,000"], "fact"),
+    # Arithmetic
+    ("2 + 2 =", ["4"], "arithmetic"),
+    ("The square root of 144 is", ["12"], "arithmetic"),
+    ("If x = 5, then 3x + 1 =", ["16"], "arithmetic"),
+    # Logical completion
+    ("The opposite of hot is", ["cold"], "logic"),
+    ("An animal that barks is a", ["dog"], "logic"),
+    # Factual continuation
+    ("The Earth orbits around the", ["sun"], "fact"),
+    ("There are 365 days in a", ["year"], "fact"),
+]
+
+
+def run_factual_eval(
+    model: nn.Module,
+    tokenizer,
+    device: torch.device,
+    step: int,
+    amp_dtype=None,
+    logger=None,
+) -> Dict[str, float]:
+    """
+    Run factual evaluation with ground-truth answer checking.
+
+    Uses greedy decoding (temperature=0) for deterministic evaluation
+    of factual knowledge. Returns accuracy scores by category.
+    """
+    def log(msg):
+        if logger:
+            logger.info(msg)
+        else:
+            print(msg)
+
+    correct_by_cat: Dict[str, int] = {}
+    total_by_cat: Dict[str, int] = {}
+    correct_total = 0
+
+    log(f"  📋 FACTUAL EVAL (Step {step})")
+
+    for prompt, expected_answers, category in FACTUAL_EVAL_PROMPTS:
+        total_by_cat[category] = total_by_cat.get(category, 0) + 1
+        try:
+            # Near-greedy decoding for deterministic factual evaluation
+            # Use temperature=0.01 (not 0.0) to avoid division-by-zero in generate_sample
+            generated = generate_sample(
+                model, tokenizer, prompt, device,
+                max_new_tokens=32,
+                temperature=0.01,
+                top_p=1.0,
+                top_k=0,
+                repetition_penalty=1.0,
+                no_repeat_ngram_size=0,
+                amp_dtype=amp_dtype,
+            )
+            # Check if any expected answer appears in generation
+            gen_lower = generated.lower()
+            hit = any(ans.lower() in gen_lower for ans in expected_answers)
+            if hit:
+                correct_by_cat[category] = correct_by_cat.get(category, 0) + 1
+                correct_total += 1
+            mark = "✓" if hit else "✗"
+            # Show compact output
+            gen_short = generated.strip().replace('\n', ' ')[:80]
+            log(f"     {mark} [{category}] \"{prompt}\" → \"{gen_short}\"")
+        except Exception as e:
+            log(f"     ✗ [{category}] \"{prompt}\" → ERROR: {e}")
+
+    # Summary
+    total = len(FACTUAL_EVAL_PROMPTS)
+    overall_acc = correct_total / total if total > 0 else 0.0
+    cat_summary = []
+    for cat in sorted(total_by_cat.keys()):
+        c = correct_by_cat.get(cat, 0)
+        t = total_by_cat[cat]
+        cat_summary.append(f"{cat}={c}/{t}")
+    log(f"  📊 Factual Accuracy: {correct_total}/{total} ({overall_acc*100:.0f}%) | {', '.join(cat_summary)}")
+    log("")
+
+    return {
+        'factual_accuracy': overall_acc,
+        'factual_correct': correct_total,
+        'factual_total': total,
+    }
+
+
 def run_quality_samples(
     model: nn.Module,
     tokenizer,
@@ -8386,8 +8534,8 @@ def run_quality_samples(
             generated = generate_sample(
                 model, tokenizer, prompt, device,
                 max_new_tokens=128,
-                temperature=0.9,
-                top_p=0.95,
+                temperature=0.7,
+                top_p=0.9,
                 top_k=50,
                 repetition_penalty=1.15,
                 no_repeat_ngram_size=3,
@@ -8550,6 +8698,17 @@ class UnifiedTrainingConfig:
     gct_warmup_steps: int = 500         # Full-attention-only warmup (Phase 1)
     gct_anneal_steps: int = 2000        # Anneal from full to gated (Phase 2)
 
+    # SlotMemoryGCT provides addressable memory slots for long-range retrieval.
+    global_tokens_enabled: bool = False  # Enable GCT memory slots
+    num_global_tokens: int = 64  # Number of memory slots
+    global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
+    slots_write_lr: float = 0.1  # EMA learning rate for slot writes
+    slot_prediction_loss_weight: float = 0.1  # Weight for slot-only prediction loss
+    slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
+    global_read_interval: int = 1  # Read slots every N layers (1 = every layer)
+    global_write_start_layer: int = 0  # Only write to slots from this layer onward
+    slot_coherence_floor: Optional[float] = None  # V16: Semantic coherence gate floor override
+
     # Hybrid-specific parameters
     local_layers: int = 4
     window_size: int = 256
@@ -8591,6 +8750,10 @@ class UnifiedTrainingConfig:
     alpha_phase_ppl_low: float = 0.3    # alpha_phase when PPL <= ppl_low_threshold
     ppl_high_threshold: float = 1000.0  # PPL threshold for max phase weight
     ppl_low_threshold: float = 100.0    # PPL threshold for min phase weight
+    # Post-curriculum adaptive alpha (slot ablation-driven)
+    enable_adaptive_alpha: bool = False  # Adapt alpha_phase from slot ablation after curriculum settles
+    # Phase health diagnostics
+    phase_health_interval: int = 500  # Log phase health diagnostics every N steps
     # Adaptive window size (small early for fast phase, large later for local context)
     enable_adaptive_window: bool = False  # Enable window size adaptation with PPL
     window_size_high_ppl: int = 128       # Window size when PPL >= ppl_high_threshold
@@ -8949,6 +9112,10 @@ class UnifiedTrainingConfig:
     adaptive_grad_norm_spike: float = 100.0  # Gradient norm above this triggers decay
     adaptive_emergency_decay: float = 0.5    # Aggressive decay factor for emergencies
     adaptive_consecutive_spike_limit: int = 3  # After N consecutive spikes, halt boosts
+    # V10.23: Spike-aware boost dampening
+    adaptive_max_boost_from_base: float = 2.0   # Max LR = base_lr * this (cap compounding boosts)
+    adaptive_spike_dampen_threshold: int = 10   # If >=N params spiked after last boost, dampen next
+    adaptive_boost_cooldown_steps: int = 400    # Min steps between consecutive boosts
 
     # Auto Batch Sizing (VRAM-based startup probing)
     enable_auto_batch: bool = False          # Enable automatic batch size detection at startup
@@ -12356,32 +12523,64 @@ def train(config: UnifiedTrainingConfig):
         print("  [CONFIDENCE] WARNING: enable_confidence_scaler=True but module not available")
 
     # Optimizer
+    # V10.15: Separate param groups for slot memory (0.1x LR) to prevent
+    # gradient variance explosions from cosine-similarity key matching
+    _slot_memory_lr_scale = config.slot_memory_lr_scale
+    _slot_param_ids = set()
+    _slot_params = []
+    _slot_no_wd_params = []  # V10.27: Params that receive zero gradient (exclude from WD)
+    _main_params = []
+    if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+        _sm = model.slot_memory
+        # V10.27: slot_keys_init receives zero gradient (all uses detach slot_keys).
+        _no_wd_names = {'slot_keys_init'}
+        for name, p in _sm.named_parameters():
+            _slot_param_ids.add(id(p))
+            if name in _no_wd_names:
+                _slot_no_wd_params.append(p)
+            else:
+                _slot_params.append(p)
+        for p in model.parameters():
+            if id(p) not in _slot_param_ids:
+                _main_params.append(p)
+        print(f"  [V10.15] Slot memory: separate param group ({len(_slot_params)} params + "
+              f"{len(_slot_no_wd_params)} no-WD, LR={config.learning_rate * _slot_memory_lr_scale:.2e})")
+        # V16: Apply coherence floor override if specified
+        if getattr(config, 'slot_coherence_floor', None) is not None:
+            _sm._coherence_floor = config.slot_coherence_floor
+            print(f"  [V16] Semantic coherence floor: {config.slot_coherence_floor}")
+    else:
+        _main_params = list(model.parameters())
+
+    _param_groups = [
+        {'params': _main_params, 'lr': config.learning_rate,
+         'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2)},
+    ]
+    if _slot_params:
+        _param_groups.append({
+            'params': _slot_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
+            'weight_decay': config.weight_decay, 'betas': (config.beta1, config.beta2),
+        })
+    if _slot_no_wd_params:
+        # V10.27: slot_keys_init gets zero gradient from all losses — exclude from WD
+        _param_groups.append({
+            'params': _slot_no_wd_params, 'lr': config.learning_rate * _slot_memory_lr_scale,
+            'weight_decay': 0.0, 'betas': (config.beta1, config.beta2),
+        })
+
     if config.use_8bit_optimizer:
         try:
             import bitsandbytes as bnb
             optimizer = bnb.optim.AdamW8bit(
-                model.parameters(),
-                lr=config.learning_rate,
-                weight_decay=config.weight_decay,
-                betas=(config.beta1, config.beta2),
+                _param_groups,
             )
             print(f"  8-bit Optimizer: ENABLED (bitsandbytes AdamW8bit)")
         except ImportError:
             print("  WARNING: bitsandbytes not installed, falling back to standard AdamW")
             print("           Install with: pip install bitsandbytes")
-            optimizer = AdamW(
-                model.parameters(),
-                lr=config.learning_rate,
-                weight_decay=config.weight_decay,
-                betas=(config.beta1, config.beta2),
-            )
+            optimizer = AdamW(_param_groups)
     else:
-        optimizer = AdamW(
-            model.parameters(),
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-            betas=(config.beta1, config.beta2),
-        )
+        optimizer = AdamW(_param_groups)
 
     # Scheduler with warmup
     use_adaptive_warmup = config.warmup_until_ppl > 0
@@ -12596,9 +12795,15 @@ def train(config: UnifiedTrainingConfig):
             grad_norm_spike_threshold=config.adaptive_grad_norm_spike,
             emergency_decay_factor=config.adaptive_emergency_decay,
             consecutive_spike_limit=config.adaptive_consecutive_spike_limit,
+            # V10.23: Spike-aware boost dampening
+            max_boost_from_base=config.adaptive_max_boost_from_base,
+            spike_dampen_threshold=config.adaptive_spike_dampen_threshold,
+            boost_cooldown_steps=config.adaptive_boost_cooldown_steps,
         )
         # V9.9.1: Link scheduler to controller so LR boosts/decays persist
         adaptive_controller.set_scheduler(scheduler)
+        # V10.23: Link gradient variance tracker for spike-aware boost dampening
+        # (only available when gradient tracker is initialized in modular train.py)
 
         # V9.8.3: Immediately enforce LR bounds after checkpoint restore
         # This catches runaway LR from corrupted checkpoint state before training starts
@@ -12792,6 +12997,11 @@ def train(config: UnifiedTrainingConfig):
     # V9.7.0: EvoFlow Fluency Gate - track engagement state
     evo_fluency_engaged = False  # Once True, stays True (no disengagement)
     last_val_ppl = float('inf')  # Track validation PPL for fluency check
+
+    # v2.2.1: Kosha Gyroscope Graduation tracking
+    kosha_graduation_monitor = None  # Not yet implemented - placeholder
+    kosha_graduated = False
+    vritti_resonance = None  # v2.3.0: Vritti Resonance Loss - placeholder
 
     # PPL-Gated Curriculum Controller
     curriculum_controller = None
@@ -13251,6 +13461,67 @@ def train(config: UnifiedTrainingConfig):
                     loss = loss + config.decorr_loss_weight * decorr_loss_tensor
                     metrics['decorr_loss'] = decorr_loss_tensor.item()
                     metrics['decorr_weight'] = config.decorr_loss_weight
+
+                # V10.14: Slot memory retrieval auxiliary loss
+                # When using slots mode, add CE loss at query positions to supervise
+                # addressable key-value retrieval through slot memory
+                if (isinstance(outputs, dict) and '_slot_keys' in outputs
+                        and hasattr(model, 'slot_memory') and model.slot_memory is not None
+                        and hasattr(model, 'retrieval_loss_weight') and model.retrieval_loss_weight > 0):
+                    # V10.16.1: Use explicit query_mask from batch if available.
+                    # V10.17: For general LM training, only apply retrieval loss at
+                    # positions BEYOND the local attention window. Tokens within the
+                    # window can be predicted by local attention alone — forcing slot
+                    # memory to retrieve them dilutes the learning signal (qmask=1.0
+                    # means ~50k→500 token narrowing instead of precise recall).
+                    # Positions beyond the window genuinely need long-range memory.
+                    _retr_query_mask = None
+                    if isinstance(batch, dict) and 'query_mask' in batch:
+                        _retr_query_mask = batch['query_mask'].to(device)
+                    if _retr_query_mask is None:
+                        _valid = (y != -100)  # [B, N]
+                        _B, _N = y.shape
+                        _win = getattr(config, 'window_size', 0)
+                        if _win > 0 and _N > _win:
+                            # Only positions beyond the local window are retrieval queries
+                            _pos_mask = torch.zeros(_B, _N, dtype=torch.bool, device=y.device)
+                            _pos_mask[:, _win:] = True
+                            _retr_query_mask = _valid & _pos_mask
+                        else:
+                            _retr_query_mask = _valid
+                    _retr_loss = model.slot_memory.compute_retrieval_loss(
+                        x=outputs['_slot_hidden'],
+                        slot_keys=outputs['_slot_keys'],
+                        slot_vals=outputs['_slot_vals'],
+                        query_mask=_retr_query_mask,
+                        target_ids=y,
+                        lm_head=model.lm_head,
+                    )
+                    # Sharpness loss: penalize uniform assignment to bootstrap slot specialization
+                    _sharp_loss = model.slot_memory.compute_sharpness_loss()
+                    loss = loss + 0.1 * _sharp_loss
+                    metrics['slot_sharpness_loss'] = _sharp_loss.item()
+                    if _retr_loss.item() > 0:
+                        loss = loss + model.retrieval_loss_weight * _retr_loss
+                        _retr_val = _retr_loss.item()
+                        metrics['retrieval_loss'] = _retr_val
+                        metrics['retrieval_weight'] = model.retrieval_loss_weight
+                        # V10.27: Feed retr_loss to adaptive gate ceiling
+                        model.slot_memory.update_write_gate_target(_retr_val)
+                    # Expose slot diagnostics
+                    if model.slot_memory._diag_write_gate_mean is not None:
+                        metrics['slot_write_gate'] = model.slot_memory._diag_write_gate_mean
+                    if model.slot_memory._diag_assignment_entropy is not None:
+                        metrics['slot_assignment_entropy'] = model.slot_memory._diag_assignment_entropy
+                    if model.slot_memory._diag_read_attn_entropy is not None:
+                        metrics['slot_read_entropy'] = model.slot_memory._diag_read_attn_entropy
+                    if hasattr(model.slot_memory, '_diag_marginal_entropy'):
+                        metrics['slot_marginal_entropy'] = model.slot_memory._diag_marginal_entropy
+                    if hasattr(model.slot_memory, '_gate_target'):
+                        metrics['slot_gate_ceil'] = model.slot_memory._gate_target
+                    # V16: Semantic coherence diagnostic
+                    if hasattr(model.slot_memory, '_diag_coherence_mean'):
+                        metrics['slot_coherence'] = model.slot_memory._diag_coherence_mean
 
                 # V9.9.5: Weight orthogonalization loss (parameter-level decorrelation)
                 # This directly regularizes attention weights, guaranteeing gradient flow
@@ -13916,6 +14187,17 @@ def train(config: UnifiedTrainingConfig):
                 if throttle_factor < 1.0 and global_step % config.log_every == 0:
                     print(f"  ⚡ [GRAD THROTTLE] norm={raw_grad_norm:.1f} | LR×{throttle_factor:.2f}")
 
+            # V10.15: Clip slot memory gradients separately (tighter bound)
+            if hasattr(model, 'slot_memory') and model.slot_memory is not None:
+                _slot_params_with_grad = [
+                    p for p in model.slot_memory.parameters()
+                    if p.grad is not None
+                ]
+                if _slot_params_with_grad:
+                    torch.nn.utils.clip_grad_norm_(
+                        _slot_params_with_grad, config.max_grad_norm * 0.1
+                    )
+
             # Gradient clipping: per-layer or global
             if config.use_per_layer_clipping and gradient_scaler_hgs is not None:
                 # Clip authority and sensory layers separately to respect 9:3 design
@@ -14298,6 +14580,25 @@ def train(config: UnifiedTrainingConfig):
                     if 'ortho_loss' in metrics:
                         log_msg += f" | Ortho: {metrics['ortho_loss']:.4f}"
 
+                    # V10.28: Slot memory diagnostics on console
+                    if 'slot_write_gate' in metrics or 'slot_assignment_entropy' in metrics:
+                        slot_parts = ["[Slots]"]
+                        if 'slot_write_gate' in metrics:
+                            slot_parts.append(f"wg:{metrics['slot_write_gate']:.3f}")
+                        if 'slot_gate_ceil' in metrics:
+                            slot_parts.append(f"ceil:{metrics['slot_gate_ceil']:.3f}")
+                        if 'slot_assignment_entropy' in metrics:
+                            slot_parts.append(f"asgn_H:{metrics['slot_assignment_entropy']:.2f}")
+                        if 'slot_read_entropy' in metrics:
+                            slot_parts.append(f"read_H:{metrics['slot_read_entropy']:.2f}")
+                        if 'slot_marginal_entropy' in metrics:
+                            slot_parts.append(f"marg_H:{metrics['slot_marginal_entropy']:.2f}")
+                        if 'slot_coherence' in metrics:
+                            slot_parts.append(f"coh:{metrics['slot_coherence']:.3f}")
+                        if 'retrieval_loss' in metrics:
+                            slot_parts.append(f"retr:{metrics['retrieval_loss']:.4f}")
+                        log_msg += " | " + " ".join(slot_parts)
+
                     # Check if this is a validation step (show verbose metrics)
                     is_verbose_step = (global_step % config.eval_every == 0)
 
@@ -14445,7 +14746,7 @@ def train(config: UnifiedTrainingConfig):
                         # Log health metrics
                         print(f"\n  📊 [PHASE HEALTH] Step {global_step}")
                         print(f"     ├─ R_k (key collapse):    {health_metrics['R_k']:.4f} {'⚠️' if health_metrics['R_k'] > 0.5 else '✓'}")
-                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f}")
+                        print(f"     ├─ R_q (query collapse):  {health_metrics['R_q']:.4f} {'⚠️' if health_metrics['R_q'] > 0.5 else '✓'}")
                         print(f"     ├─ Amp-Phase Corr:        {health_metrics['amp_phase_corr']:.4f} {'⚠️' if abs(health_metrics['amp_phase_corr']) > 0.5 else '✓'}")
                         print(f"     ├─ Head Redundancy:       {health_metrics['head_redundancy']:.4f} {'⚠️' if health_metrics['head_redundancy'] > 0.8 else '✓'}")
                         print(f"     ├─ Phase Drift Mean:      {health_metrics['phase_drift_mean']:.4f} {'⚠️' if health_metrics['phase_drift_mean'] < 0.01 else '✓'}")
@@ -14947,6 +15248,16 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("gct/coherence", metrics.get('gct_mean_coherence', 0.5), global_step)
                         tb_writer.add_scalar("gct/schedule_weight", metrics.get('gct_schedule_weight', 0.0), global_step)
 
+                    # V10.14: Slot memory metrics
+                    if 'retrieval_loss' in metrics:
+                        tb_writer.add_scalar("slots/retrieval_loss", metrics['retrieval_loss'], global_step)
+                    if 'slot_write_gate' in metrics:
+                        tb_writer.add_scalar("slots/write_gate", metrics['slot_write_gate'], global_step)
+                    if 'slot_assignment_entropy' in metrics:
+                        tb_writer.add_scalar("slots/assignment_entropy", metrics['slot_assignment_entropy'], global_step)
+                    if 'slot_read_entropy' in metrics:
+                        tb_writer.add_scalar("slots/read_entropy", metrics['slot_read_entropy'], global_step)
+
                     # Sattvic Brake metrics
                     # v2.7 Training State Tracker metrics
                     if training_state_tracker is not None and training_state_tracker.enabled:
@@ -15000,6 +15311,13 @@ def train(config: UnifiedTrainingConfig):
                 if tokenizer is not None:
                     model.eval()
                     run_quality_samples(model, tokenizer, config, device, global_step)
+                    # V11.x: Factual eval with ground-truth scoring
+                    _amp_dt = autocast_dtype if config.mixed_precision != "none" else None
+                    factual_metrics = run_factual_eval(
+                        model, tokenizer, device, global_step, amp_dtype=_amp_dt
+                    )
+                    for k, v in factual_metrics.items():
+                        metrics[k] = v
                     model.train()
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
@@ -15708,6 +16026,28 @@ def main():
     parser.add_argument("--gct_anneal_steps", type=int, default=2000,
                        help="GCT Phase 2: anneal from full to gated attention over N steps")
 
+    # SlotMemoryGCT (addressable memory slots for long-range retrieval)
+    parser.add_argument("--global_tokens", action="store_true",
+                       help="Enable SlotMemoryGCT for long-range associative retrieval")
+    parser.add_argument("--num_global_tokens", type=int, default=64,
+                       help="Number of memory slots (default: 64)")
+    parser.add_argument("--global_update_mode", type=str, default="slots",
+                       choices=["pool", "attn-lite", "slots"],
+                       help="Global token update mode (default: slots)")
+    parser.add_argument("--slots_write_lr", type=float, default=0.1,
+                       help="EMA learning rate for slot writes (default: 0.1)")
+    parser.add_argument("--slot_prediction_loss_weight", type=float, default=0.1,
+                       help="Weight for slot-only prediction loss (default: 0.1)")
+    parser.add_argument("--slot_memory_lr_scale", type=float, default=0.1,
+                       help="Slot param LR multiplier vs main LR (default: 0.1)")
+    parser.add_argument("--global_read_interval", type=int, default=1,
+                       help="Read slots every N layers (1 = every layer)")
+    parser.add_argument("--global_write_start_layer", type=int, default=0,
+                       help="Only write to slots from this layer onward")
+    # V16: Semantic coherence gate
+    parser.add_argument("--slot_coherence_floor", type=float, default=None,
+                       help="Initial coherence floor for semantic write gate (default: 0.3, decays to 0)")
+
     # Training
     parser.add_argument("--batch_size", type=int, default=8,
                        help="Batch size per GPU (reference batch for seq len curriculum)")
@@ -15832,6 +16172,12 @@ def main():
                        help="PPL threshold for max phase weight")
     parser.add_argument("--ppl_low_threshold", type=float, default=100.0,
                        help="PPL threshold for min phase weight")
+    # Post-curriculum adaptive alpha (slot ablation-driven)
+    parser.add_argument("--enable_adaptive_alpha", action="store_true",
+                       help="After PPL curriculum settles, adapt alpha_phase based on slot ablation delta")
+    # Phase health diagnostics
+    parser.add_argument("--phase_health_interval", type=int, default=500,
+                       help="Log phase health diagnostics every N steps (default: 500)")
     # Adaptive window size (small early for fast phase, large later for local context)
     parser.add_argument("--enable_adaptive_window", action="store_true",
                        help="Adapt window size based on PPL (small when high, large when low)")
@@ -16356,10 +16702,15 @@ def main():
                        help="Alarm threshold for cognitive discontinuity")
 
     # Full Evolutionary Flow System (Phase 2-5)
-    parser.add_argument("--enable_evolutionary_flow", action="store_true", default=True,
+    parser.add_argument("--enable_evolutionary_flow", action="store_true", default=False,
                        help="Enable full evolutionary flow across all layer transitions")
     parser.add_argument("--disable_evolutionary_flow", action="store_true",
                        help="Disable evolutionary flow system")
+    # CSR / SGP disable flags (accepted for compatibility, no-op in clean trainer)
+    parser.add_argument("--disable_csr", action="store_true",
+                       help="Disable CSR phoneme grounding (no-op in clean trainer)")
+    parser.add_argument("--disable_sgp", action="store_true",
+                       help="Disable SGP (no-op in clean trainer)")
     parser.add_argument("--evo_lambda", type=float, default=0.1,
                        help="Overall evolutionary loss weight")
     parser.add_argument("--evo_micro_weight", type=float, default=0.3,
@@ -16456,6 +16807,13 @@ def main():
                        help="Aggressive LR decay factor for emergencies")
     parser.add_argument("--adaptive_consecutive_spike_limit", type=int, default=3,
                        help="After N consecutive loss spikes, block LR boosts")
+    # V10.23: Spike-aware boost dampening
+    parser.add_argument("--adaptive_max_boost_from_base", type=float, default=2.0,
+                       help="Max LR as multiple of base_lr (caps compounding boosts)")
+    parser.add_argument("--adaptive_spike_dampen_threshold", type=int, default=10,
+                       help="If >=N params spiked after last boost, dampen next boost")
+    parser.add_argument("--adaptive_boost_cooldown_steps", type=int, default=400,
+                       help="Min steps between consecutive LR boosts")
 
     # Auto Batch Sizing (VRAM-based startup probing)
     parser.add_argument("--enable_auto_batch", action="store_true",
@@ -16684,6 +17042,17 @@ def main():
     parser.add_argument("--confidence_vritti_kl_weight", type=float, default=0.1,
                        help="Weight for Vritti KL auxiliary loss in risk gating")
 
+    # Conscious Generation Phase Test
+    parser.add_argument("--test_cg_phases", action="store_true",
+                       help="Run conscious generation phase tests instead of training. "
+                            "Smoke-tests Phases 1-5 with synthetic data.")
+    parser.add_argument("--test_cg_phases_list", type=int, nargs="*", default=None,
+                       help="Which CG phases to test (e.g., --test_cg_phases_list 1 2 3)")
+    parser.add_argument("--test_cg_phase5_only", action="store_true",
+                       help="Only test Phase 5 (curriculum) — no model needed")
+    parser.add_argument("--test_cg_no_loop", action="store_true",
+                       help="Skip integration training loop (unit tests only)")
+
     # Stress Test (V9.4.4)
     parser.add_argument("--stress_test", action="store_true",
                        help="Run stress test instead of training")
@@ -16702,6 +17071,29 @@ def main():
     # Handle --use_amp convenience flag
     if args.use_amp:
         args.mixed_precision = "bf16"
+
+    # Handle CG phase test redirect
+    if args.test_cg_phases or args.test_cg_phase5_only:
+        print("=" * 70)
+        print("  CONSCIOUS GENERATION PHASE TEST MODE")
+        print("=" * 70)
+        import subprocess
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "test_cg_phases.py")
+        cg_cmd = [sys.executable, script_path]
+        if args.test_cg_phase5_only:
+            cg_cmd.append("--phase5-only")
+        elif args.test_cg_phases_list:
+            cg_cmd.extend(["--phases"] + [str(p) for p in args.test_cg_phases_list])
+        cg_cmd.extend(["--steps", str(args.max_steps)])
+        cg_cmd.extend(["--eval-every", str(args.eval_every)])
+        cg_cmd.extend(["--batch-size", str(args.batch_size)])
+        if args.model_size == "tiny":
+            cg_cmd.append("--tiny")
+        if args.test_cg_no_loop:
+            cg_cmd.append("--no-loop")
+        print(f"\nRunning: {' '.join(cg_cmd)}\n")
+        result = subprocess.run(cg_cmd)
+        sys.exit(result.returncode)
 
     # Handle stress test redirect
     if args.stress_test:
@@ -16769,6 +17161,16 @@ def main():
         phase_rotation_angles=args.phase_rotation_angles,
         state_dim=args.state_dim,  # V9.6.14: Ontological Hybrid state dimension
         project_per_head_dim=args.project_per_head_dim,  # V9.6.14: Per-head-dim projection
+        # SlotMemoryGCT
+        global_tokens_enabled=args.global_tokens,
+        num_global_tokens=args.num_global_tokens,
+        global_update_mode=args.global_update_mode,
+        slots_write_lr=args.slots_write_lr,
+        slot_prediction_loss_weight=args.slot_prediction_loss_weight,
+        slot_memory_lr_scale=args.slot_memory_lr_scale,
+        global_read_interval=args.global_read_interval,
+        global_write_start_layer=args.global_write_start_layer,
+        slot_coherence_floor=getattr(args, 'slot_coherence_floor', None),
         # V10.0: Binding Cache options
         binding_cache_top_k=args.binding_cache_top_k,
         no_binding_cache=args.no_binding_cache,
@@ -16861,6 +17263,9 @@ def main():
         alpha_phase_ppl_low=args.alpha_phase_ppl_low,
         ppl_high_threshold=args.ppl_high_threshold,
         ppl_low_threshold=args.ppl_low_threshold,
+        # Post-curriculum adaptive alpha
+        enable_adaptive_alpha=args.enable_adaptive_alpha,
+        phase_health_interval=args.phase_health_interval,
         # Adaptive window size
         enable_adaptive_window=args.enable_adaptive_window,
         window_size_high_ppl=args.window_size_high_ppl,
@@ -17010,6 +17415,10 @@ def main():
         adaptive_grad_norm_spike=args.adaptive_grad_norm_spike,
         adaptive_emergency_decay=args.adaptive_emergency_decay,
         adaptive_consecutive_spike_limit=args.adaptive_consecutive_spike_limit,
+        # V10.23: Spike-aware boost dampening
+        adaptive_max_boost_from_base=args.adaptive_max_boost_from_base,
+        adaptive_spike_dampen_threshold=args.adaptive_spike_dampen_threshold,
+        adaptive_boost_cooldown_steps=args.adaptive_boost_cooldown_steps,
         # Auto Batch Sizing
         enable_auto_batch=args.enable_auto_batch,
         auto_batch_target_utilization=args.auto_batch_target_utilization,

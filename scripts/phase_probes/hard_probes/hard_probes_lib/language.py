@@ -334,8 +334,12 @@ class AssociativeRecallDataset(Dataset):
         # Create input and target
         x = torch.tensor(tokens, dtype=torch.long)
 
-        # Target: mostly ignore (PAD), but at the query_key position, target is query_value
-        y = torch.full((self.seq_len,), self.PAD_TOKEN, dtype=torch.long)
+        # Target: -100 (ignore) everywhere except the query answer position.
+        # V10.16.1: Use -100 (standard PyTorch ignore_index) instead of PAD_TOKEN
+        # so that (y != -100) correctly identifies only the query answer position.
+        y = torch.full((self.seq_len,), -100, dtype=torch.long)
+        # Query mask: True only at the position where model must retrieve the value
+        query_mask = torch.zeros(self.seq_len, dtype=torch.bool)
 
         # Find where query_key appears after QUERY_TOKEN
         # The answer should come right after
@@ -345,8 +349,9 @@ class AssociativeRecallDataset(Dataset):
                 # Target at i+2 should be query_value (what comes next)
                 if i + 3 < self.seq_len:
                     y[i + 2] = query_value  # After seeing key, predict value
+                    query_mask[i + 2] = True
 
-        return x, y, query_idx
+        return x, y, query_idx, query_mask
 
     def __len__(self):
         return self.num_samples
@@ -355,12 +360,12 @@ class AssociativeRecallDataset(Dataset):
         # V10.5.8: Support dynamic generation for curriculum learning
         if self.dynamic_delay or self.samples is None:
             # Generate on-the-fly with current delay range
-            x, y, _ = self._generate_one_sample()
-            return x, y
+            x, y, _, query_mask = self._generate_one_sample()
+            return x, y, query_mask
         else:
             # Use pre-generated samples
-            x, y, _ = self.samples[idx]
-            return x, y
+            x, y, _, query_mask = self.samples[idx]
+            return x, y, query_mask
 
     def get_accuracy(self, model: nn.Module, device: torch.device, num_samples: int = 100) -> float:
         """
@@ -380,14 +385,14 @@ class AssociativeRecallDataset(Dataset):
 
         with torch.no_grad():
             for i in range(min(num_samples, len(self.samples))):
-                x, y, query_idx = self.samples[i]
+                x, y, query_idx, query_mask = self.samples[i]
                 x = x.unsqueeze(0).to(device)
                 y = y.to(device)
 
                 logits = model(x)  # [1, seq_len, vocab_size]
 
-                # Find query position (where y is not PAD)
-                query_positions = (y != self.PAD_TOKEN).nonzero(as_tuple=True)[0]
+                # Find query position (where y != -100, i.e. the answer position)
+                query_positions = (y != -100).nonzero(as_tuple=True)[0]
 
                 for pos in query_positions:
                     pred = logits[0, pos].argmax().item()
@@ -400,14 +405,18 @@ class AssociativeRecallDataset(Dataset):
 
 
 class AssociativeRecallCollator:
-    """Custom collator that ignores PAD tokens in loss computation."""
+    """Custom collator that stacks AR samples and passes query_mask through."""
 
-    def __init__(self, pad_token: int):
+    def __init__(self, pad_token: int = -100):
         self.pad_token = pad_token
 
     def __call__(self, batch):
         x = torch.stack([item[0] for item in batch])
         y = torch.stack([item[1] for item in batch])
+        # V10.16.1: Pass explicit query_mask for retrieval loss
+        if len(batch[0]) >= 3:
+            query_mask = torch.stack([item[2] for item in batch])
+            return {"input_ids": x, "labels": y, "query_mask": query_mask}
         return x, y
 
 

@@ -382,13 +382,9 @@ class SGPController:
 
         This maintains the "circular flow" of the toroidal architecture.
         """
-        if self._sattvic_controller is not None:
-            # Get current CSR state from Sattvic Controller
-            status = self._sattvic_controller.get_status()
-            lambda_csr = status.get('lambda_csr', 0.5)
-
-            # Log sync event
-            print(f"  🔄 [SGP] Toroidal sync at step {self.step_count} (λ={lambda_csr:.3f})")
+        # No-op: structural sync is handled implicitly by gradient persistence.
+        # Logging removed to reduce noise — sync events are visible in rate_history.
+        pass
 
     def update(
         self,

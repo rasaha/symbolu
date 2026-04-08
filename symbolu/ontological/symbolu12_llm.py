@@ -177,6 +177,9 @@ class PhaseAttentionBlock(nn.Module):
     - U2: Total correlation C_total = (1/N²) × Σᵢ,ⱼ C[i,j]
     - U3: Mean-field approximation: Σⱼ sin(φᵢ-φⱼ) ≈ N × sin(φᵢ - φ_mean)
     - U4: Phase update: Δφᵢ = α × ∂C_total/∂φᵢ
+
+    Stage 9 ablation: When ablation_config.use_phase_sync is False, falls back
+    to standard scaled dot-product attention (no phase computation).
     """
 
     def __init__(
@@ -207,17 +210,45 @@ class PhaseAttentionBlock(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
+        # Stage 9: ablation config (None = all mechanisms active)
+        self.ablation_config = None
+
+    @property
+    def _use_phase_sync(self) -> bool:
+        if self.ablation_config is not None:
+            return self.ablation_config.use_phase_sync
+        return True
+
     def forward(
         self,
         x: torch.Tensor,
         causal_mask: bool = True,
-    ) -> torch.Tensor:
+        return_phase_angles: bool = False,
+    ) -> Union[torch.Tensor, tuple]:
         B, N, D = x.shape
 
         # Project to Q, K, V
         Q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
         K = self.k_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
         V = self.v_proj(x).view(B, N, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # ── Stage 9 ablation: standard dot-product fallback ──
+        if not self._use_phase_sync:
+            scale = math.sqrt(self.head_dim)
+            attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / scale  # [B, H, N, N]
+            if causal_mask:
+                mask = torch.triu(torch.ones(N, N, device=x.device, dtype=torch.bool), diagonal=1)
+                attn_scores = attn_scores.masked_fill(mask.unsqueeze(0).unsqueeze(0), float('-inf'))
+            attn_weights = F.softmax(attn_scores, dim=-1)
+            attn_weights = self.dropout(attn_weights)
+            output = torch.matmul(attn_weights, V)
+            output = output.transpose(1, 2).contiguous().view(B, N, D)
+            output = self.out_proj(output)
+            if return_phase_angles:
+                return output, None
+            return output
+
+        # ── Phase attention (original O(n) path) ──
 
         # Compute phases from queries
         phases = self.phase_proj(x).view(B, N, self.num_heads, self.phase_dim)
@@ -259,6 +290,9 @@ class PhaseAttentionBlock(nn.Module):
         output = self.out_proj(output)
         output = self.dropout(output)
 
+        # Stage 7F: Optionally return phase angles for phase coherence extraction
+        if return_phase_angles:
+            return output, phases  # phases: [B, H, N, phase_dim]
         return output
 
 
@@ -310,19 +344,31 @@ class OntologicalProjection(nn.Module):
 
 class BhavaRelationshipLayer(nn.Module):
     """
-    Computes 144D inter-layer Bhava relationships.
+    Computes 144D inter-layer Bhava relationships with vector compression.
 
     Based on Vedic Drishti (aspect) patterns:
     - Each layer can "see" (relate to) every other layer
     - Creates a 12×12 relationship matrix
     - Flattened to 144D Bhava vector
+
+    Stage 3 (F.5): Replaces scalar collapse with BhavaVectorCompressor
+    that preserves relational structure as a 16D vector while maintaining
+    backward-compatible scalar coherence.
     """
 
-    def __init__(self, num_layers: int = 12, hidden_dim: int = 64):
+    def __init__(self, num_layers: int = 12, hidden_dim: int = 64,
+                 bhava_output_dim: int = 16):
         super().__init__()
         self.num_layers = num_layers
 
-        # Coherence computation
+        # Stage 3: Vector compression preserving relational structure
+        from symbolu.inference.interpretive_conditioner import BhavaVectorCompressor
+        self.bhava_compressor = BhavaVectorCompressor(
+            bhava_dim=num_layers,
+            output_dim=bhava_output_dim,
+        )
+
+        # Legacy coherence_net kept for checkpoint backward compatibility
         self.coherence_net = nn.Sequential(
             nn.Linear(num_layers * num_layers, hidden_dim),
             nn.GELU(),
@@ -339,13 +385,14 @@ class BhavaRelationshipLayer(nn.Module):
         # Bhava vector (flattened relationship matrix)
         bhava = rel_matrix.view(B, N, L * L)
 
-        # Global coherence
-        coherence = self.coherence_net(bhava)
+        # Stage 3: Compress to 16D vector + backward-compatible coherence
+        compressor_out = self.bhava_compressor(bhava)
 
         return {
             "bhava": bhava,
             "relationship_matrix": rel_matrix,
-            "coherence": coherence,
+            "bhava_vector": compressor_out["bhava_vector"],
+            "coherence": compressor_out["coherence"].unsqueeze(-1),
         }
 
 
@@ -379,10 +426,23 @@ class SymbolU12Block(nn.Module):
         self.norm1 = nn.LayerNorm(config.embed_dim)
         self.norm2 = nn.LayerNorm(config.embed_dim)
 
-    def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
-        x = x + self.attention(self.norm1(x), causal_mask=causal_mask)
-        x = x + self.ffn(self.norm2(x))
-        return x
+    def forward(
+        self,
+        x: torch.Tensor,
+        causal_mask: bool = True,
+        return_phase_angles: bool = False,
+    ) -> Union[torch.Tensor, tuple]:
+        if return_phase_angles:
+            attn_out, phase_angles = self.attention(
+                self.norm1(x), causal_mask=causal_mask, return_phase_angles=True,
+            )
+            x = x + attn_out
+            x = x + self.ffn(self.norm2(x))
+            return x, phase_angles
+        else:
+            x = x + self.attention(self.norm1(x), causal_mask=causal_mask)
+            x = x + self.ffn(self.norm2(x))
+            return x
 
 
 # =============================================================================
@@ -451,6 +511,14 @@ class SymbolU12LLM(nn.Module):
         # Weight tying
         self.lm_head.weight = self.token_embed.weight
 
+        # Stage 2: Interpretive conditioning (optional, set via attach_interpretive_conditioner)
+        self._interpretive_state_builder = None
+        self._interpretive_conditioner = None
+
+        # Stage 8: Perspective Synthesizer (optional, set via attach_perspective_synthesizer)
+        # When set, replaces Stage 2's separate builder + conditioner with unified pipeline.
+        self._perspective_synthesizer = None
+
         # Initialize weights
         self.apply(self._init_weights)
 
@@ -472,10 +540,40 @@ class SymbolU12LLM(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
+    def attach_interpretive_conditioner(self, state_builder, conditioner):
+        """Attach Stage 2 interpretive conditioning modules.
+
+        Args:
+            state_builder: InterpretiveStateBuilder that builds interpretive
+                state from hidden + onto + bhava signals.
+            conditioner: InterpretiveConditioner that applies gated conditioning
+                to hidden state before lm_head.
+        """
+        self._interpretive_state_builder = state_builder
+        self._interpretive_conditioner = conditioner
+
+    def attach_perspective_synthesizer(self, synthesizer):
+        """Attach Stage 8 PerspectiveSynthesizer.
+
+        When attached, replaces Stage 2's separate builder + conditioner
+        with the unified synthesis pipeline. The PerspectiveSynthesizer
+        produces an InterpretiveState dataclass and applies gated residual
+        conditioning before lm_head.
+
+        Args:
+            synthesizer: PerspectiveSynthesizer instance.
+        """
+        self._perspective_synthesizer = synthesizer
+
     def forward(
         self,
         input_ids: torch.Tensor,
         return_ontological: bool = True,
+        semantic_coherence_integration=None,
+        phase_coherence_extractor=None,
+        phase_coherence_aggregator=None,
+        phase_coherence_vector=None,
+        experiential_vector=None,
     ) -> Dict[str, torch.Tensor]:
         B, N = input_ids.shape
         device = input_ids.device
@@ -485,27 +583,98 @@ class SymbolU12LLM(nn.Module):
         x = self.token_embed(input_ids) + self.pos_embed(positions)
         x = self.embed_dropout(x)
 
+        # Stage 7A/7F: Check if we need per-layer phase/coherence data
+        need_phase = (phase_coherence_extractor is not None
+                      and phase_coherence_aggregator is not None)
+
         # Transformer blocks (O(n) attention)
-        for block in self.blocks:
-            x = block(x, causal_mask=True)
+        for layer_idx, block in enumerate(self.blocks):
+            if need_phase:
+                block_out = block(x, causal_mask=True, return_phase_angles=True)
+                x, phase_angles = block_out
+                # Stage 7F: Extract per-head phase coherence
+                per_head_coherence = phase_coherence_extractor.compute_per_head(phase_angles)
+                phase_coherence_aggregator.record_layer(layer_idx, per_head_coherence)
+            else:
+                x = block(x, causal_mask=True)
+
+            # Stage 7A: Record per-layer semantic coherence (approximated from hidden norms)
+            if semantic_coherence_integration is not None:
+                # Use hidden state norm stability as S1 proxy
+                layer_norm = x.norm(dim=-1).mean().item()
+                s1_approx = min(1.0, max(0.0, 1.0 - abs(layer_norm - 1.0) * 0.1))
+                semantic_coherence_integration.record_layer(layer_idx, s1_approx)
 
         # Final norm
         x = self.final_norm(x)
+
+        # Ontological analysis (computed before lm_head for Stage 2/8 conditioning)
+        onto = None
+        bhava_output = None
+        has_stage8 = self._perspective_synthesizer is not None
+        has_conditioner = (
+            self._interpretive_state_builder is not None
+            and self._interpretive_conditioner is not None
+        )
+        need_onto = return_ontological or has_stage8 or has_conditioner
+
+        if need_onto:
+            onto = self.ontological(x)
+            bhava_output = self.bhava(onto)
+
+        # --- Stage 8: Perspective Synthesizer (takes precedence over Stage 2) ---
+        synth_result = None
+        if has_stage8:
+            synth_result = self._perspective_synthesizer(
+                hidden=x,
+                onto_state=onto,
+                bhava_matrix=bhava_output["relationship_matrix"],
+                phase_coherence_vector=phase_coherence_vector,
+                experiential_vector=experiential_vector,
+            )
+            x = synth_result["conditioned_hidden"]
+
+        # --- Stage 2 fallback: Interpretive conditioning (if Stage 8 not active) ---
+        elif has_conditioner:
+            builder_out = self._interpretive_state_builder(
+                hidden=x,
+                onto_state=onto,
+                bhava_matrix=bhava_output["relationship_matrix"],
+                phase_coherence_vector=phase_coherence_vector,
+                experiential_vector=experiential_vector,
+            )
+            x = self._interpretive_conditioner(
+                hidden=x,
+                interpretive_state=builder_out["interpretive_state"],
+            )
+            synth_result = {
+                "interpretive_state": None,
+                "gate_value": self._interpretive_conditioner.gate_value,
+                "conditioning_norm": 0.0,
+                "log_dict": {},
+                "interp_components": builder_out["components"],
+            }
 
         # Language model logits
         logits = self.lm_head(x)
 
         output = {"logits": logits}
 
-        # Ontological analysis
-        if return_ontological:
-            onto = self.ontological(x)
-            bhava_output = self.bhava(onto)
-
+        # Ontological outputs
+        if return_ontological and onto is not None:
             output["ontological"] = onto
             output["bhava"] = bhava_output["bhava"]
             output["coherence"] = bhava_output["coherence"]
             output["relationship_matrix"] = bhava_output["relationship_matrix"]
+            output["bhava_vector"] = bhava_output["bhava_vector"]
+
+        # Stage 8/2 conditioning metadata
+        if synth_result is not None:
+            output["synth_result"] = synth_result
+            output["gate_value"] = synth_result.get("gate_value", 0.0)
+            output["conditioning_norm"] = synth_result.get("conditioning_norm", 0.0)
+            if "interp_components" in synth_result:
+                output["interp_components"] = synth_result["interp_components"]
 
         return output
 
@@ -556,6 +725,15 @@ class SymbolU12LLM(nn.Module):
         top_k: int = 50,
         top_p: float = 0.9,
         return_ontological: bool = False,
+        generation_tracer=None,
+        coherence_decoder=None,
+        unified_coherence_controller=None,
+        semantic_coherence_integration=None,
+        phase_coherence_extractor=None,
+        phase_coherence_aggregator=None,
+        phase_coherence_projection=None,
+        experiential_state_module=None,
+        perspective_synthesizer=None,
     ) -> Union[str, Dict[str, Any]]:
         """
         Generate text from a prompt.
@@ -567,12 +745,57 @@ class SymbolU12LLM(nn.Module):
             top_k: Top-k sampling (0 = disabled)
             top_p: Nucleus sampling threshold
             return_ontological: Whether to return ontological analysis
+            generation_tracer: Optional GenerationTracer (Appendix F Stage 0)
+                for per-token baseline capture. Observation only — does not
+                modify generation behavior.
+            coherence_decoder: Optional CoherenceAwareDecoder (Appendix F
+                Stage 1). Adjusts temperature and top_p based on coherence
+                signals. Never modifies logit values — only decoding policy.
+            unified_coherence_controller: Optional UnifiedCoherenceController
+                (Appendix F Stage 4). Produces a single authoritative
+                coherence signal from token, latent, and conversation sources.
+                When provided, replaces the simple coherence scalar for
+                Stage 1 policy adjustment.
+            semantic_coherence_integration: Optional SemanticCoherenceIntegration
+                (Appendix F Stage 7A). Collects per-layer S1 scores and feeds
+                aggregated S1/S2/S3 signals into the unified controller.
+            phase_coherence_extractor: Optional PhaseCoherenceExtractor
+                (Appendix F Stage 7F). Extracts per-head phase coherence.
+            phase_coherence_aggregator: Optional PhaseCoherenceAggregator
+                (Appendix F Stage 7F). Aggregates phase coherence across layers.
+            phase_coherence_projection: Optional PhaseCoherenceProjection
+                (Appendix F Stage 7F). Projects phase coherence into
+                interpretive state dimension.
+            experiential_state_module: Optional ExperientialStateModule
+                (Appendix F Stage 7C). Maintains parallel experiential state
+                P_t with latent recurrence.
+            perspective_synthesizer: Optional PerspectiveSynthesizer
+                (Appendix F Stage 8). Unifies all interpretive axes into
+                representation conditioning before lm_head. When provided,
+                temporarily attaches to the model for the generation call.
 
         Returns:
             Generated text string, or dict with text and ontological analysis
         """
         self.eval()
         device = next(self.parameters()).device
+
+        # Stage 8: Temporarily attach synthesizer for this generation call
+        _prev_synth = self._perspective_synthesizer
+        if perspective_synthesizer is not None:
+            self._perspective_synthesizer = perspective_synthesizer
+
+        # If tracer, coherence decoder, or unified controller is provided,
+        # force ontological computation so coherence signals are available
+        need_ontological = (
+            return_ontological
+            or (generation_tracer is not None)
+            or (coherence_decoder is not None)
+            or (unified_coherence_controller is not None)
+            or (semantic_coherence_integration is not None)
+            or (experiential_state_module is not None)
+            or (perspective_synthesizer is not None)
+        )
 
         # Encode prompt
         input_ids = self.encode(prompt).to(device)
@@ -581,21 +804,110 @@ class SymbolU12LLM(nn.Module):
         # Track ontological data if requested
         onto_data = [] if return_ontological else None
 
+        # Stage 7C: Reset experiential state for new generation
+        if experiential_state_module is not None:
+            experiential_state_module.reset(batch_size=1)
+
         for _ in range(max_new_tokens):
-            # Forward pass
-            output = self.forward(generated, return_ontological=return_ontological)
-            logits = output["logits"][:, -1, :] / temperature
+            # Stage 7A/7F: Reset per-token layer accumulators
+            if semantic_coherence_integration is not None:
+                semantic_coherence_integration.reset()
+            if phase_coherence_aggregator is not None:
+                phase_coherence_aggregator.reset()
+
+            # Stage 7F: Get aggregated phase vector from previous token's layers
+            _phase_vec = None
+            if phase_coherence_aggregator is not None:
+                _phase_vec = phase_coherence_aggregator.get_phase_coherence_vector()
+
+            # Stage 7C: Get experiential vector from previous step
+            _exp_vec = None
+            if experiential_state_module is not None:
+                _exp_vec = experiential_state_module.get_experiential_vector()
+
+            # Forward pass (with optional per-layer phase/coherence extraction)
+            output = self.forward(
+                generated,
+                return_ontological=need_ontological,
+                semantic_coherence_integration=semantic_coherence_integration,
+                phase_coherence_extractor=phase_coherence_extractor,
+                phase_coherence_aggregator=phase_coherence_aggregator,
+                phase_coherence_vector=_phase_vec,
+                experiential_vector=_exp_vec,
+            )
+
+            # Pre-filtering logits (used by tracer before temperature/filtering)
+            raw_logits = output["logits"][:, -1, :]
+
+            # --- Extract coherence signals ---
+            coherence_scalar = 1.0  # Default: no degradation if no signal
+            c_latent = None
+            unified_result = None
+
+            if "coherence" in output:
+                if output["coherence"].dim() == 3:
+                    coherence_scalar = output["coherence"][:, -1, :].mean().item()
+                else:
+                    coherence_scalar = output["coherence"].mean().item()
+                c_latent = coherence_scalar
+
+            # --- Stage 7A: Feed S1/S2/S3 into unified controller ---
+            s1, s2, s3 = None, None, None
+            if semantic_coherence_integration is not None:
+                s_signals = semantic_coherence_integration.compute_signals()
+                s1 = s_signals["s1"]
+                s2 = s_signals["s2"]
+                s3 = s_signals["s3"]
+
+            # --- Stage 4: Unified coherence replaces simple scalar ---
+            if unified_coherence_controller is not None:
+                unified_result = unified_coherence_controller.update(
+                    c_token=None,   # Uses bliss_history if available
+                    c_latent=c_latent,
+                    c_conv=None,    # CoherenceEngine integration (future)
+                    s1=s1,          # Stage 7A semantic signals
+                    s2=s2,
+                    s3=s3,
+                )
+                coherence_scalar = unified_result["C_total"]
+
+            # --- Stage 7C: Advance experiential state ---
+            if experiential_state_module is not None:
+                # Use last-token hidden state for experiential recurrence
+                last_hidden = output["logits"][:, -1, :]  # [B, D] proxy
+                if "interp_components" in output:
+                    # Prefer pre-lm_head hidden (approximated from interp components)
+                    last_hidden = output["logits"][:, -1, :]
+                experiential_state_module.step(last_hidden, c_total=coherence_scalar)
+
+            # --- Stage 1: Adjust decoding policy via coherence ---
+            effective_temperature = temperature
+            effective_top_p = top_p
+            should_resample = False
+
+            if coherence_decoder is not None:
+                policy = coherence_decoder.adjust_policy(
+                    coherence=coherence_scalar,
+                    base_temperature=temperature,
+                    base_top_p=top_p,
+                )
+                effective_temperature = policy["temperature"]
+                effective_top_p = policy["top_p"]
+                should_resample = policy["should_resample"]
+
+            # Apply (possibly adjusted) temperature to raw logits
+            logits = raw_logits / effective_temperature
 
             # Top-k filtering
             if top_k > 0:
                 indices_to_remove = logits < torch.topk(logits, top_k)[0][:, -1, None]
                 logits[indices_to_remove] = float('-inf')
 
-            # Top-p (nucleus) filtering
-            if top_p < 1.0:
+            # Top-p (nucleus) filtering using effective top_p
+            if effective_top_p < 1.0:
                 sorted_logits, sorted_indices = torch.sort(logits, descending=True)
                 cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-                sorted_indices_to_remove = cumulative_probs > top_p
+                sorted_indices_to_remove = cumulative_probs > effective_top_p
                 sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
                 sorted_indices_to_remove[:, 0] = 0
                 indices_to_remove = sorted_indices_to_remove.scatter(
@@ -607,8 +919,107 @@ class SymbolU12LLM(nn.Module):
             probs = F.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
 
+            # --- Stage 1: Resample if coherence critically low ---
+            resample_count = 0
+            if should_resample and coherence_decoder is not None:
+                for _attempt in range(coherence_decoder.config.max_resample_attempts):
+                    candidate = torch.multinomial(probs, num_samples=1)
+                    if probs[0, candidate[0, 0]] > probs[0, next_token[0, 0]]:
+                        next_token = candidate
+                        resample_count += 1
+                        break
+
             # Append token
             generated = torch.cat([generated, next_token], dim=1)
+
+            # Stage 0 tracer: record per-token metrics (observation only)
+            if generation_tracer is not None:
+                _onto_state = None
+                if need_ontological and "coherence" in output:
+                    _onto_state = {
+                        "coherence": coherence_scalar,
+                    }
+                generation_tracer.record_token(
+                    token_id=next_token[0, 0].item(),
+                    logits=raw_logits[0],
+                    hidden_state=output["logits"][:, -1, :],
+                    onto_state=_onto_state,
+                )
+
+            # --- Stage 1: Record coherence-aware policy metrics in tracer ---
+            if generation_tracer is not None and coherence_decoder is not None:
+                generation_tracer.trace[-1].update({
+                    "coherence_before": coherence_scalar,
+                    "temperature_used": effective_temperature,
+                    "top_p_used": effective_top_p,
+                    "resample_events": resample_count,
+                })
+
+            # --- Stage 8/2: Record interpretive conditioning metrics in tracer ---
+            if generation_tracer is not None and "synth_result" in output:
+                sr = output["synth_result"]
+                stage8_entry = {
+                    "gate_value": sr.get("gate_value", 0.0),
+                    "conditioning_norm": sr.get("conditioning_norm", 0.0),
+                }
+                # Stage 8: Full InterpretiveState logging
+                if sr.get("log_dict"):
+                    stage8_entry.update(sr["log_dict"])
+                generation_tracer.trace[-1].update(stage8_entry)
+
+            # --- Stage 3: Record bhava vector metrics in tracer ---
+            if generation_tracer is not None and "bhava_vector" in output:
+                bv = output["bhava_vector"][:, -1, :]  # [B, 16]
+                stage3_entry = {
+                    "bhava_vector": bv[0].detach().cpu().tolist(),
+                    "bhava_vector_variance": bv[0].var().item(),
+                    "coherence_scalar": coherence_scalar,
+                }
+                # Compute drift from previous token's bhava_vector
+                prev_trace = generation_tracer.trace
+                if len(prev_trace) >= 2 and "bhava_vector" in prev_trace[-2]:
+                    prev_bv = torch.tensor(prev_trace[-2]["bhava_vector"])
+                    curr_bv = bv[0].detach().cpu()
+                    cos_sim = torch.nn.functional.cosine_similarity(
+                        prev_bv.unsqueeze(0), curr_bv.unsqueeze(0),
+                    ).item()
+                    stage3_entry["bhava_vector_drift"] = 1.0 - cos_sim
+                else:
+                    stage3_entry["bhava_vector_drift"] = 0.0
+                generation_tracer.trace[-1].update(stage3_entry)
+
+            # --- Stage 4: Record unified coherence metrics in tracer ---
+            if generation_tracer is not None and unified_result is not None:
+                generation_tracer.trace[-1].update({
+                    "C_total": unified_result["C_total"],
+                    "C_token": unified_result["C_token"],
+                    "C_latent": unified_result["C_latent"],
+                    "C_conversation": unified_result["C_conversation"],
+                    "C_raw": unified_result["C_raw"],
+                })
+
+            # --- Stage 7A: Record semantic coherence signals in tracer ---
+            if generation_tracer is not None and s1 is not None:
+                generation_tracer.trace[-1].update({
+                    "S1": s1,
+                    "S2": s2,
+                    "S3": s3,
+                })
+
+            # --- Stage 7C: Record experiential state norm in tracer ---
+            if generation_tracer is not None and experiential_state_module is not None:
+                p_vec = experiential_state_module.get_experiential_vector()
+                generation_tracer.trace[-1].update({
+                    "P_t_norm": p_vec.norm().item(),
+                })
+
+            # --- Stage 7F: Record phase coherence in tracer ---
+            if generation_tracer is not None and phase_coherence_aggregator is not None:
+                phase_vec = phase_coherence_aggregator.get_phase_coherence_vector()
+                if phase_vec is not None:
+                    generation_tracer.trace[-1].update({
+                        "phase_coherence_mean": phase_vec.mean().item(),
+                    })
 
             # Track ontological for last token
             if return_ontological:
@@ -620,6 +1031,9 @@ class SymbolU12LLM(nn.Module):
             # Stop if max length reached
             if generated.shape[1] >= self.config.max_seq_len:
                 break
+
+        # Stage 8: Restore previous synthesizer state
+        self._perspective_synthesizer = _prev_synth
 
         # Decode output
         generated_text = self.decode(generated)
