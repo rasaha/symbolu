@@ -235,12 +235,40 @@ class CurriculumStageManager:
         """
         Update lambda values for current step.
 
+        Also checks time-based stage advancement so stages transition
+        immediately on resume rather than waiting for the next eval call.
+
         Args:
             global_step: Current training step.
 
         Returns:
             Dict of current lambda values (keys match config field names).
         """
+        # Time-based stage advancement (mirrors update() fallback)
+        # This ensures stages advance on the first training step after
+        # resume, rather than waiting for the next eval_every boundary.
+        advanced = False
+        while self.current_stage_idx < len(self.STAGES) - 1:
+            next_stage = self.STAGES[self.current_stage_idx + 1]
+            next_start, _ = self.stage_boundaries[next_stage]
+            if global_step >= next_start:
+                old_stage = self.current_stage
+                self.current_stage_idx += 1
+                self.current_stage = self.STAGES[self.current_stage_idx]
+                self.stage_entry_step = global_step
+                self.stage_history.append((global_step, self.current_stage))
+                configurators = {
+                    self.STAGE_B: self._configure_stage_b,
+                    self.STAGE_C: self._configure_stage_c,
+                    self.STAGE_D: self._configure_stage_d,
+                }
+                configurators[self.current_stage](global_step)
+                print(f"[Conscious Gen Curriculum] Stage transition: {old_stage} -> "
+                      f"{self.current_stage} at step {global_step} (time-based, via step())")
+                advanced = True
+            else:
+                break
+
         return self.scheduler.step(global_step)
 
     @property
