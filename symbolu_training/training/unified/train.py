@@ -850,6 +850,35 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  CSR Phoneme Grounding: Disabled")
 
+    # Wire CSR affinity into CG token cache so R_tok gets populated
+    if hasattr(model, 'conscious_gen') and 'token_cache' in model.conscious_gen:
+        _cg_cache = model.conscious_gen['token_cache']
+        _affi_table = None
+
+        # Option 1: Get from existing CSR provider (when enable_csr=True)
+        if csr_provider is not None and hasattr(csr_provider, '_token_affinity_table'):
+            _affi_table = csr_provider._token_affinity_table
+
+        # Option 2: Build standalone affinity table (when enable_csr=False but CSR module exists)
+        elif CSR_AVAILABLE:
+            try:
+                if csr_wait_preload is not None:
+                    csr_wait_preload(timeout=30.0)
+                _tmp_provider = CSREmbeddingProvider(CSRConfig(), tokenizer)
+                _tmp_provider = _tmp_provider.to(device)
+                if hasattr(_tmp_provider, '_token_affinity_table') and _tmp_provider._token_affinity_table is not None:
+                    _affi_table = _tmp_provider._token_affinity_table.clone()
+                    print(f"  [Conscious Gen] Built standalone CSR affinity table for CG token cache")
+                del _tmp_provider
+            except Exception as e:
+                print(f"  [Conscious Gen] WARNING: Could not build CSR affinity table: {e}")
+
+        if _affi_table is not None:
+            _cg_cache._csr_affinity_fn = lambda emb, _t=_affi_table: _t.to(emb.device)
+            print(f"  [Conscious Gen] CSR affinity wired into token cache (R_tok will be populated)")
+        else:
+            print(f"  [Conscious Gen] WARNING: No CSR affinity available — R_tok will stay zeros")
+
     # V9.8.6: Initialize curriculum state variables (will be populated if resuming)
     # These must be defined before curriculum controllers are created
     resumed_csr_curriculum_state = None
@@ -4951,7 +4980,7 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_sov_state = outputs.get('state', None)
 
                             # Diagnostic: check gradient prerequisites
-                            if global_step <= resume_step + 30 and accumulation_step == 0:
+                            if global_step <= resume_step + 3 and accumulation_step == 0:
                                 _h_ok = _cg_hidden is not None
                                 _s_ok = _cg_sov_state is not None
                                 _s_rg = _cg_sov_state.requires_grad if _s_ok else False
@@ -5032,6 +5061,15 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_alpha = _cg_integ_result['alpha']    # (B, T, 6)
                                 _cg_B = _cg_integ_result['B']            # (B, T, K)
                                 _cg_D = _cg_integ_result['D']            # (B, T, K)
+
+                                # Alpha entropy regularization — prevent routing collapse.
+                                # Without this, softmax saturation makes one-hot alpha
+                                # self-reinforcing and unrecoverable.
+                                _cg_alpha_ent = -((_cg_alpha + 1e-8).log() * _cg_alpha).sum(dim=-1).mean()
+                                _cg_alpha_ent_weight = 0.1
+                                loss = loss - _cg_alpha_ent_weight * _cg_alpha_ent  # maximize entropy
+                                metrics['cg_alpha_entropy'] = _cg_alpha_ent.item()
+                                metrics['cg_alpha_ent_loss'] = (_cg_alpha_ent_weight * _cg_alpha_ent).item()
 
                                 # Phase 4: Replace L_LM with field-integrated cross-entropy
                                 # Strategy: subtract old LM CE, add field-integrated CE.
@@ -5368,8 +5406,10 @@ def train(config: UnifiedTrainingConfig):
                                     print("".join(_mech_parts))
 
                 except Exception as e:
-                    if global_step % 500 == 0:
-                        print(f"  [Conscious Gen] Error at step {global_step}: {e}")
+                    if global_step % 500 == 0 or global_step <= resume_step + 3:
+                        import traceback
+                        print(f"  [Conscious Gen] ERROR at step {global_step}: {e}")
+                        traceback.print_exc()
 
             # =====================================================================
             # Experiential Controller: resistance-modulated plasticity
@@ -5612,14 +5652,37 @@ def train(config: UnifiedTrainingConfig):
                     if p.grad is not None
                 )) ** 0.5
                 metrics['cg_state_proj_grad_norm'] = _sp_grad_norm
-                # Diagnostic: report grad status on first few steps after resume
-                if global_step <= resume_step + 30:
-                    _sp_total = len(_sp_params)
-                    _sp_req_grad = sum(1 for p in _sp_params if p.requires_grad)
-                    print(f"  [SP-GRAD-DIAG] Step {global_step}: "
-                          f"params={_sp_total} req_grad={_sp_req_grad} "
-                          f"has_grad={_sp_has_grad} nonzero={_sp_nonzero} "
-                          f"norm={_sp_grad_norm:.8f}")
+
+            # Per-component CG gradient diagnostic
+            if hasattr(_sp_model, 'conscious_gen') and global_step <= resume_step + 3:
+                _cg_grad_parts = {}
+                # Router + bliss (via integrated_scorer)
+                if 'integrated_scorer' in _sp_model.conscious_gen:
+                    _integ = _sp_model.conscious_gen['integrated_scorer']
+                    if hasattr(_integ, 'kosha_router'):
+                        _cg_grad_parts['router'] = _integ.kosha_router
+                    if hasattr(_integ, 'bliss_gate'):
+                        _cg_grad_parts['bliss'] = _integ.bliss_gate
+                # Individual scorers (via token_eval_tensor)
+                if 'token_eval_tensor' in _sp_model.conscious_gen:
+                    _tet = _sp_model.conscious_gen['token_eval_tensor']
+                    for _sname in ('jepa_scorer', 'csr_scorer', 'vritti_scorer', 'guna_scorer'):
+                        if hasattr(_tet, _sname):
+                            _cg_grad_parts[_sname.replace('_scorer', '')] = getattr(_tet, _sname)
+                # Wrapper-level components
+                for _wname in ('intent_projector', 'phase_adapter'):
+                    if hasattr(_sp_model, _wname):
+                        _cg_grad_parts[_wname.replace('_projector', '').replace('_adapter', '')] = getattr(_sp_model, _wname)
+                # Compute norms
+                _cg_grad_strs = []
+                for _cname, _cmod in _cg_grad_parts.items():
+                    _cparams = [p for p in _cmod.parameters() if p.requires_grad]
+                    _cnorm = (sum(p.grad.norm().item() ** 2 for p in _cparams if p.grad is not None)) ** 0.5
+                    _chas = sum(1 for p in _cparams if p.grad is not None)
+                    _cfmt = f"{_cnorm:.2e}" if _cnorm < 0.0001 else f"{_cnorm:.4f}"
+                    _cg_grad_strs.append(f"{_cname}={_cfmt}({_chas}/{len(_cparams)})")
+                if _cg_grad_strs:
+                    print(f"  [CG-GRAD] Step {global_step}: {' | '.join(_cg_grad_strs)}")
 
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients

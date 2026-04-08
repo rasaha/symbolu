@@ -138,16 +138,22 @@ class TokenEvaluationTensor(nn.Module):
 
         # Step 3: Compute context-side representations
         # Ontology scorer uses o_ctx directly (no separate context projection)
-        p_ctx = self.jepa_scorer.compute_context_repr(hidden, o_ctx)  # (..., d_j)
-        r_ctx = self.csr_scorer.compute_context_repr(hidden, o_ctx)  # (..., d_c)
-        v_ctx = self.vritti_scorer.compute_context_repr(hidden, o_ctx)  # (..., 5)
-        g_ctx = self.guna_scorer.compute_context_repr(hidden, o_ctx)  # (..., 3)
+        # Expand o_ctx to match hidden's sequence dimension if needed:
+        # hidden is [B, T, D], o_ctx may be [B, state_dim] (pooled) from
+        # MistralCGWrapper. Scorers' compute_context_repr expect matching dims.
+        _o_ctx = o_ctx
+        if hidden.dim() == 3 and o_ctx.dim() == 2:
+            _o_ctx = o_ctx.unsqueeze(1).expand(-1, hidden.shape[1], -1)  # [B, T, state_dim]
+        p_ctx = self.jepa_scorer.compute_context_repr(hidden, _o_ctx)  # (..., d_j)
+        r_ctx = self.csr_scorer.compute_context_repr(hidden, _o_ctx)  # (..., d_c)
+        v_ctx = self.vritti_scorer.compute_context_repr(hidden, _o_ctx)  # (..., 5)
+        g_ctx = self.guna_scorer.compute_context_repr(hidden, _o_ctx)  # (..., 3)
 
         # Step 4: Score each primitive over the K candidates
         s_base = base_scores
 
         # S_ont: o_ctx^T @ M @ o_cand for each candidate
-        s_ont = self._score_ontology(o_ctx, O_cand)
+        s_ont = self._score_ontology(_o_ctx, O_cand)
 
         # S_jepa: p_ctx (..., d_j) vs P_cand (..., K, d_j)
         s_jepa = self._score_bilinear(

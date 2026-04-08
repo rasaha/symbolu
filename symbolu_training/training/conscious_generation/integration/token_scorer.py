@@ -70,12 +70,17 @@ class IntegratedTokenScorer(nn.Module):
                 'candidate_ids': Token indices (passthrough)
         """
         # Step 1: Governance-plane routing (Kosha x Domain → alpha)
-        router_result = self.kosha_router(hidden, o_ctx, domain=domain)
+        # Expand o_ctx to match hidden's sequence dim if needed (MistralCG
+        # returns pooled [B, 32] state vs [B, T, D] hidden states)
+        _o_ctx = o_ctx
+        if hidden.dim() == 3 and o_ctx.dim() == 2:
+            _o_ctx = o_ctx.unsqueeze(1).expand(-1, hidden.shape[1], -1)
+        router_result = self.kosha_router(hidden, _o_ctx, domain=domain)
         alpha = router_result["alpha"]   # (..., 6)
         kosha = router_result["kosha"]   # (..., 5)
 
-        # Step 2: Bliss gating (with BLISSFUL Kosha modulating lambda)
-        bliss_result = self.bliss_gate(T, alpha, kosha=kosha)
+        # Step 2: Bliss gating (with Kosha + Guna modulating lambda)
+        bliss_result = self.bliss_gate(T, alpha, kosha=kosha, o_ctx=_o_ctx)
         B = bliss_result["B"]       # (..., K)
         D = bliss_result["D"]       # (..., K)
         Z = bliss_result["mu"]      # (..., K) -- this IS Z(w) = Sum_f alpha_f S_f(w)
@@ -93,6 +98,8 @@ class IntegratedTokenScorer(nn.Module):
             "lambda_eff": bliss_result["lambda_eff"],
             "router_result": router_result,
         }
+        if "guna_3d" in bliss_result:
+            result["guna_3d"] = bliss_result["guna_3d"]
         if candidate_ids is not None:
             result["candidate_ids"] = candidate_ids
 
