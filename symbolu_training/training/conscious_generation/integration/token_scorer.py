@@ -70,7 +70,12 @@ class IntegratedTokenScorer(nn.Module):
                 'candidate_ids': Token indices (passthrough)
         """
         # Step 1: Governance-plane routing (Kosha x Domain → alpha)
-        router_result = self.kosha_router(hidden, o_ctx, domain=domain)
+        # Expand o_ctx to match hidden's sequence dim if needed (MistralCG
+        # returns pooled [B, 32] state vs [B, T, D] hidden states)
+        _o_ctx = o_ctx
+        if hidden.dim() == 3 and o_ctx.dim() == 2:
+            _o_ctx = o_ctx.unsqueeze(1).expand(-1, hidden.shape[1], -1)
+        router_result = self.kosha_router(hidden, _o_ctx, domain=domain)
         alpha = router_result["alpha"]   # (..., 6)
         kosha = router_result["kosha"]   # (..., 5)
 
