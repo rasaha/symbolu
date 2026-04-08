@@ -192,7 +192,7 @@ class MistralCGWrapper(nn.Module):
         load_kwargs = {
             "device_map": device_map,
             "trust_remote_code": trust_remote_code,
-            "torch_dtype": torch.bfloat16,
+            "dtype": torch.bfloat16,
             "output_hidden_states": True,
             "attn_implementation": _attn_impl,
         }
