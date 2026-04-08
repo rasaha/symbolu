@@ -850,14 +850,33 @@ def train(config: UnifiedTrainingConfig):
         print(f"  CSR Phoneme Grounding: Disabled")
 
     # Wire CSR affinity into CG token cache so R_tok gets populated
-    if csr_provider is not None and hasattr(model, 'conscious_gen') and 'token_cache' in model.conscious_gen:
+    if hasattr(model, 'conscious_gen') and 'token_cache' in model.conscious_gen:
         _cg_cache = model.conscious_gen['token_cache']
-        if hasattr(csr_provider, '_token_affinity_table') and csr_provider._token_affinity_table is not None:
-            _affi_table = csr_provider._token_affinity_table  # (V, 12)
+        _affi_table = None
+
+        # Option 1: Get from existing CSR provider (when enable_csr=True)
+        if csr_provider is not None and hasattr(csr_provider, '_token_affinity_table'):
+            _affi_table = csr_provider._token_affinity_table
+
+        # Option 2: Build standalone affinity table (when enable_csr=False but CSR module exists)
+        elif CSR_AVAILABLE:
+            try:
+                if csr_wait_preload is not None:
+                    csr_wait_preload(timeout=30.0)
+                _tmp_provider = CSREmbeddingProvider(CSRConfig(), tokenizer)
+                _tmp_provider = _tmp_provider.to(device)
+                if hasattr(_tmp_provider, '_token_affinity_table') and _tmp_provider._token_affinity_table is not None:
+                    _affi_table = _tmp_provider._token_affinity_table.clone()
+                    print(f"  [Conscious Gen] Built standalone CSR affinity table for CG token cache")
+                del _tmp_provider
+            except Exception as e:
+                print(f"  [Conscious Gen] WARNING: Could not build CSR affinity table: {e}")
+
+        if _affi_table is not None:
             _cg_cache._csr_affinity_fn = lambda emb, _t=_affi_table: _t.to(emb.device)
             print(f"  [Conscious Gen] CSR affinity wired into token cache (R_tok will be populated)")
         else:
-            print(f"  [Conscious Gen] WARNING: CSR provider has no affinity table — R_tok will stay zeros")
+            print(f"  [Conscious Gen] WARNING: No CSR affinity available — R_tok will stay zeros")
 
     # V9.8.6: Initialize curriculum state variables (will be populated if resuming)
     # These must be defined before curriculum controllers are created
