@@ -5364,8 +5364,10 @@ def train(config: UnifiedTrainingConfig):
                                     print("".join(_mech_parts))
 
                 except Exception as e:
-                    if global_step % 500 == 0:
-                        print(f"  [Conscious Gen] Error at step {global_step}: {e}")
+                    if global_step % 500 == 0 or global_step <= resume_step + 30:
+                        import traceback
+                        print(f"  [Conscious Gen] ERROR at step {global_step}: {e}")
+                        traceback.print_exc()
 
             # =====================================================================
             # Experiential Controller: resistance-modulated plasticity
