@@ -5219,6 +5219,16 @@ def train(config: UnifiedTrainingConfig):
                                 # Phase 4 field-integrated generation
                                 if 'cg_field_lm_loss' in metrics:
                                     _cg_msg += f" | L_field={metrics['cg_field_lm_loss']:.4f}"
+                                # Curriculum stage + key lambdas (diagnose sp_grad=0)
+                                if cg_stage_manager is not None:
+                                    _cg_msg += (f" | stage={cg_stage_manager.current_stage}"
+                                               f" λ_k={config.lambda_kosha_routing:.5f}"
+                                               f" λ_b={config.lambda_bliss_token:.5f}"
+                                               f" λ_j={config.lambda_plausibility_token:.5f}"
+                                               f" λ_c={config.lambda_csr_token:.5f}")
+                                # Phase 3 entry diagnostic
+                                _p3_entered = 'cg_alpha_entropy' in metrics or 'cg_kosha_routing_loss' in metrics
+                                _cg_msg += f" | P3={'Y' if _p3_entered else 'N'}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
