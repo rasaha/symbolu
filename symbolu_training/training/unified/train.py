@@ -5628,6 +5628,36 @@ def train(config: UnifiedTrainingConfig):
                           f"has_grad={_sp_has_grad} nonzero={_sp_nonzero} "
                           f"norm={_sp_grad_norm:.8f}")
 
+            # Per-component CG gradient diagnostic
+            if hasattr(_sp_model, 'conscious_gen') and global_step <= resume_step + 30:
+                _cg_grad_parts = {}
+                # Router + bliss (via integrated_scorer)
+                if 'integrated_scorer' in _sp_model.conscious_gen:
+                    _integ = _sp_model.conscious_gen['integrated_scorer']
+                    if hasattr(_integ, 'kosha_router'):
+                        _cg_grad_parts['router'] = _integ.kosha_router
+                    if hasattr(_integ, 'bliss_gate'):
+                        _cg_grad_parts['bliss'] = _integ.bliss_gate
+                # Individual scorers (via token_eval_tensor)
+                if 'token_eval_tensor' in _sp_model.conscious_gen:
+                    _tet = _sp_model.conscious_gen['token_eval_tensor']
+                    for _sname in ('jepa_scorer', 'csr_scorer', 'vritti_scorer', 'guna_scorer'):
+                        if hasattr(_tet, _sname):
+                            _cg_grad_parts[_sname.replace('_scorer', '')] = getattr(_tet, _sname)
+                # Wrapper-level components
+                for _wname in ('intent_projector', 'phase_adapter'):
+                    if hasattr(_sp_model, _wname):
+                        _cg_grad_parts[_wname.replace('_projector', '').replace('_adapter', '')] = getattr(_sp_model, _wname)
+                # Compute norms
+                _cg_grad_strs = []
+                for _cname, _cmod in _cg_grad_parts.items():
+                    _cparams = [p for p in _cmod.parameters() if p.requires_grad]
+                    _cnorm = (sum(p.grad.norm().item() ** 2 for p in _cparams if p.grad is not None)) ** 0.5
+                    _chas = sum(1 for p in _cparams if p.grad is not None)
+                    _cg_grad_strs.append(f"{_cname}={_cnorm:.4f}({_chas}/{len(_cparams)})")
+                if _cg_grad_strs:
+                    print(f"  [CG-GRAD] Step {global_step}: {' | '.join(_cg_grad_strs)}")
+
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
             if gradient_variance_tracker is not None:
