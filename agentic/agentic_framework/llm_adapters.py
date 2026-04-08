@@ -473,17 +473,24 @@ class MistralCGAdapter(BaseLLMAdapter):
                     MistralCGWrapper,
                 )
 
-            self.model = MistralCGWrapper(
-                model_name=model_name,
-                quantize=quantize,
-                device_map=device_map,
-                trust_remote_code=trust_remote_code,
-                pretrained_model=pretrained_model,
-                pretrained_tokenizer=pretrained_tokenizer,
-                **kwargs,
-            )
-            self.model.eval()
-            self.tokenizer = self.model.tokenizer
+            # If pretrained_model is already a MistralCGWrapper (e.g. with
+            # checkpoint weights loaded), use it directly — don't double-wrap.
+            if isinstance(pretrained_model, MistralCGWrapper):
+                self.model = pretrained_model
+                self.model.eval()
+                self.tokenizer = pretrained_tokenizer or self.model.tokenizer
+            else:
+                self.model = MistralCGWrapper(
+                    model_name=model_name,
+                    quantize=quantize,
+                    device_map=device_map,
+                    trust_remote_code=trust_remote_code,
+                    pretrained_model=pretrained_model,
+                    pretrained_tokenizer=pretrained_tokenizer,
+                    **kwargs,
+                )
+                self.model.eval()
+                self.tokenizer = self.model.tokenizer
         except ImportError:
             raise ImportError(
                 "symbolu.training.unified.mistral_wrapper required. "
