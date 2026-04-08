@@ -4950,6 +4950,18 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_hidden = outputs.get('last_hidden_state', None)
                                 _cg_sov_state = outputs.get('state', None)
 
+                            # Diagnostic: check gradient prerequisites
+                            if global_step <= resume_step + 30 and accumulation_step == 0:
+                                _h_ok = _cg_hidden is not None
+                                _s_ok = _cg_sov_state is not None
+                                _s_rg = _cg_sov_state.requires_grad if _s_ok else False
+                                _s_gf = _cg_sov_state.grad_fn is not None if _s_ok else False
+                                _h_rg = _cg_hidden.requires_grad if _h_ok else False
+                                print(f"  [P3-DIAG] Step {global_step}: "
+                                      f"hidden={'OK' if _h_ok else 'NONE'}(rg={_h_rg}) "
+                                      f"state={'OK' if _s_ok else 'NONE'}(rg={_s_rg},gf={_s_gf}) "
+                                      f"phase4={_cg_phase4} any_p3={_cg_any_p3_loss}")
+
                             if _cg_hidden is not None and _cg_sov_state is not None:
                                 # Build T_t via TokenEvaluationTensor
                                 # Phase 3: Detach logits but keep hidden/o_ctx live
@@ -5223,6 +5235,16 @@ def train(config: UnifiedTrainingConfig):
                                 # Phase 4 field-integrated generation
                                 if 'cg_field_lm_loss' in metrics:
                                     _cg_msg += f" | L_field={metrics['cg_field_lm_loss']:.4f}"
+                                # Curriculum stage + key lambdas (diagnose sp_grad=0)
+                                if cg_stage_manager is not None:
+                                    _cg_msg += (f" | stage={cg_stage_manager.current_stage}"
+                                               f" λ_k={config.lambda_kosha_routing:.5f}"
+                                               f" λ_b={config.lambda_bliss_token:.5f}"
+                                               f" λ_j={config.lambda_plausibility_token:.5f}"
+                                               f" λ_c={config.lambda_csr_token:.5f}")
+                                # Phase 3 entry diagnostic
+                                _p3_entered = 'cg_alpha_entropy' in metrics or 'cg_kosha_routing_loss' in metrics
+                                _cg_msg += f" | P3={'Y' if _p3_entered else 'N'}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
@@ -5581,12 +5603,23 @@ def train(config: UnifiedTrainingConfig):
             # State projector gradient norm — confirms CG losses reach the projector
             _sp_model = getattr(model, 'module', model)  # unwrap DDP
             if hasattr(_sp_model, 'state_projector'):
+                _sp_params = list(_sp_model.state_projector.parameters())
+                _sp_has_grad = sum(1 for p in _sp_params if p.grad is not None)
+                _sp_nonzero = sum(1 for p in _sp_params if p.grad is not None and p.grad.abs().max().item() > 0)
                 _sp_grad_norm = (sum(
                     p.grad.norm().item() ** 2
-                    for p in _sp_model.state_projector.parameters()
+                    for p in _sp_params
                     if p.grad is not None
                 )) ** 0.5
                 metrics['cg_state_proj_grad_norm'] = _sp_grad_norm
+                # Diagnostic: report grad status on first few steps after resume
+                if global_step <= resume_step + 30:
+                    _sp_total = len(_sp_params)
+                    _sp_req_grad = sum(1 for p in _sp_params if p.requires_grad)
+                    print(f"  [SP-GRAD-DIAG] Step {global_step}: "
+                          f"params={_sp_total} req_grad={_sp_req_grad} "
+                          f"has_grad={_sp_has_grad} nonzero={_sp_nonzero} "
+                          f"norm={_sp_grad_norm:.8f}")
 
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
@@ -6255,7 +6288,8 @@ def train(config: UnifiedTrainingConfig):
                                 writer.add_scalar('cg_adapter/state_norm', _state_norm, global_step)
                         # State projector gradient norm (computed post-backward at ~L5579)
                         if 'cg_state_proj_grad_norm' in metrics:
-                            log_msg += f" | sp_grad={metrics['cg_state_proj_grad_norm']:.6f}"
+                            _sp_g = metrics['cg_state_proj_grad_norm']
+                            log_msg += f" | sp_grad={_sp_g:.2e}" if _sp_g < 0.001 else f" | sp_grad={_sp_g:.6f}"
 
                     # Phase layer training metrics (mistral_hybrid specific)
                     if config.model_type == "mistral_hybrid" and isinstance(outputs, dict):
@@ -7980,10 +8014,13 @@ def train(config: UnifiedTrainingConfig):
                         if cg_stage_manager is not None:
                             _cg_sections += 1
                             _cs_diag = cg_stage_manager.get_diagnostics()
-                            _cs_stage = _cs_diag.get('current_stage', '?')
-                            _cs_progress = _cs_diag.get('stage_progress', 0)
+                            _cs_stage = _cs_diag.get('cg_curriculum_stage', '?')
+                            _cs_idx = _cs_diag.get('cg_curriculum_stage_idx', 0)
+                            _cs_entry = _cs_diag.get('cg_curriculum_stage_entry_step', 0)
+                            _cs_steps_in = global_step - _cs_entry
                             print(f"  Phase 5 - Curriculum:")
-                            print(f"    Stage={_cs_stage}  progress={_cs_progress:.1%}  "
+                            print(f"    Stage={_cs_stage} ({_cs_idx+1}/4)  "
+                                  f"steps_in_stage={_cs_steps_in}  "
                                   f"field_integrated={cg_stage_manager.use_field_integrated_softmax}")
 
                         # --- Governance Diagnostics Summary ---
