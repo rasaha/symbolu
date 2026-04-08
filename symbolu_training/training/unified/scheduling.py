@@ -576,8 +576,8 @@ class PPLAlphaCurriculum:
         # Log transition when we cross the midpoint (PPL ~550)
         midpoint_ppl = (self.ppl_high + self.ppl_low) / 2
         if not self.transition_logged and self.ppl_ema < midpoint_ppl:
-            print(f"🔄 [PPL-Alpha] Phase→Local transition: PPL={self.ppl_ema:.1f} < {midpoint_ppl:.0f}")
-            print(f"   α_phase: {self.alpha_high:.2f} → {alpha_phase:.2f}, α_local: {1-self.alpha_high:.2f} → {alpha_local:.2f}")
+            print(f"🔄 [PPL-Window] PPL crossed midpoint: PPL={self.ppl_ema:.1f} < {midpoint_ppl:.0f}")
+            print(f"   α_phase(diag): {self.alpha_high:.2f} → {alpha_phase:.2f} (NOT used in Protected Phase mode — window size is the active control)")
             self.transition_logged = True
             self.last_transition_ppl = self.ppl_ema
 

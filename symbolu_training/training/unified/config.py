@@ -168,8 +168,8 @@ class UnifiedTrainingConfig:
     global_tokens_enabled: bool = False  # Enable GCT memory slots
     num_global_tokens: int = 64  # Number of memory slots
     global_update_mode: str = "slots"  # "pool", "attn-lite", or "slots"
-    slots_write_lr: float = 0.1  # EMA learning rate for slot writes
-    retrieval_loss_weight: float = 1.0  # Weight for auxiliary retrieval loss
+    slots_write_lr: float = 0.15  # EMA learning rate for slot writes (V10.22: 0.1->0.3 overshot, settling at 0.15)
+    retrieval_loss_weight: float = 2.0  # V10.21: Increased from 1.0 to compensate for gradient attenuation
     slot_prediction_loss_weight: float = 0.1  # V11.4: Weight for slot-only prediction loss
     slot_memory_lr_scale: float = 0.1  # Slot param LR multiplier vs main LR
 
@@ -787,6 +787,12 @@ class UnifiedTrainingConfig:
         "The three primary colors are red, blue, and yellow. If we mix the first two, we get",  # Memory/Reference
         "The primary difference between a stack and a queue is that",  # Definitions (FineWeb)
     )
+
+    # Knowledge Probes (factual accuracy, slot retrieval, phase coherence)
+    knowledge_probe_every: int = 0    # Run probes every N steps (0 = disabled)
+    knowledge_probe_top_k: int = 10   # Top-K to check for factual probes
+    knowledge_probe_coherence_tokens: int = 256  # Tokens to generate for coherence test
+    knowledge_probe_chunk_size: int = 64  # Chunk size for coherence measurement
 
     # LRA Validation (Long-Range Retrieval)
     lra_validate_every: int = 0  # Run LRA validation every N steps (0 = disabled)
