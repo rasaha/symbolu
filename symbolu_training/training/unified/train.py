@@ -4946,6 +4946,18 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_hidden = outputs.get('last_hidden_state', None)
                                 _cg_sov_state = outputs.get('state', None)
 
+                            # Diagnostic: check gradient prerequisites
+                            if global_step <= resume_step + 30 and accumulation_step == 0:
+                                _h_ok = _cg_hidden is not None
+                                _s_ok = _cg_sov_state is not None
+                                _s_rg = _cg_sov_state.requires_grad if _s_ok else False
+                                _s_gf = _cg_sov_state.grad_fn is not None if _s_ok else False
+                                _h_rg = _cg_hidden.requires_grad if _h_ok else False
+                                print(f"  [P3-DIAG] Step {global_step}: "
+                                      f"hidden={'OK' if _h_ok else 'NONE'}(rg={_h_rg}) "
+                                      f"state={'OK' if _s_ok else 'NONE'}(rg={_s_rg},gf={_s_gf}) "
+                                      f"phase4={_cg_phase4} any_p3={_cg_any_p3_loss}")
+
                             if _cg_hidden is not None and _cg_sov_state is not None:
                                 # Build T_t via TokenEvaluationTensor
                                 # Phase 3: Detach logits but keep hidden/o_ctx live
@@ -5587,12 +5599,23 @@ def train(config: UnifiedTrainingConfig):
             # State projector gradient norm — confirms CG losses reach the projector
             _sp_model = getattr(model, 'module', model)  # unwrap DDP
             if hasattr(_sp_model, 'state_projector'):
+                _sp_params = list(_sp_model.state_projector.parameters())
+                _sp_has_grad = sum(1 for p in _sp_params if p.grad is not None)
+                _sp_nonzero = sum(1 for p in _sp_params if p.grad is not None and p.grad.abs().max().item() > 0)
                 _sp_grad_norm = (sum(
                     p.grad.norm().item() ** 2
-                    for p in _sp_model.state_projector.parameters()
+                    for p in _sp_params
                     if p.grad is not None
                 )) ** 0.5
                 metrics['cg_state_proj_grad_norm'] = _sp_grad_norm
+                # Diagnostic: report grad status on first few steps after resume
+                if global_step <= resume_step + 30:
+                    _sp_total = len(_sp_params)
+                    _sp_req_grad = sum(1 for p in _sp_params if p.requires_grad)
+                    print(f"  [SP-GRAD-DIAG] Step {global_step}: "
+                          f"params={_sp_total} req_grad={_sp_req_grad} "
+                          f"has_grad={_sp_has_grad} nonzero={_sp_nonzero} "
+                          f"norm={_sp_grad_norm:.8f}")
 
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
