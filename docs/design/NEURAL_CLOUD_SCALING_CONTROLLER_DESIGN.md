@@ -1,243 +1,474 @@
-# Neural Cloud Scaling Controller — Modular Design Document
+# Neural Cloud Scaling Controller — Architecture Specification
 
-**Status**: Draft
+**Status**: Draft v2
+**Last revised**: 2026-04-08
 **Origin**: CG ExperientialController (12-parameter minimal controller)
-**Target**: Cloud infrastructure adaptive scaling and deployment safety
+**Target**: Kubernetes workload scaling — external adaptive controller
 
 ---
 
-## 1. Problem Statement
+## 1. System Objective
 
-Current cloud auto-scaling (AWS ASG, Azure VMSS, Kubernetes HPA) uses:
-- Single-signal thresholds (CPU > 70% → add instances)
-- Fixed cooldown periods (300s regardless of signal behavior)
-- No multi-signal consensus (CPU spike ≠ real load)
-- No deployment-awareness (scales during unstable rollouts)
-- No learning from past incidents
+Provide an external scaling controller for Kubernetes workloads that makes
+better scale-out/scale-in decisions than threshold-based autoscalers by
+synthesizing multiple metric signals, suppressing action during instability,
+and learning a per-service baseline over time.
 
-This controller replaces the decision logic between sensing and actuation.
+**Optimization target**: minimize the sum of (a) under-provisioning cost
+(elevated latency, errors) and (b) over-provisioning cost (idle replicas),
+subject to safety constraints on action rate and magnitude.
+
+**Core equation**:
+
+```
+A_t = d_t · G_t · P_t · S_t
+```
+
+The controller does not replace the metric collection layer (Prometheus,
+CloudWatch) or the pod lifecycle manager (Deployment controller, ASG).
+It replaces the **decision policy** between sensing and actuation.
 
 ---
 
-## 2. Core Equation
+## 2. Problem Statement
+
+Standard Kubernetes HPA computes desired replicas as:
 
 ```
-Action_t = d_t · G_t · P_t · S_t
+desiredReplicas = ceil(currentReplicas × (currentMetricValue / targetMetricValue))
 ```
 
-Where:
-- `S_t` = pressure signal (normalized multi-metric demand score)
-- `P_t` = plasticity gate (is it safe to act?)
-- `G_t` = adaptive gain (how aggressively?)
-- `d_t` = damping (suppress if volatile)
+This is a proportional controller on a single metric (typically CPU). Its
+known failure modes include:
 
-This is the cloud adaptation of `g_eff = d_t · G_t · P_t · ∇L_exp` from the CG controller.
+- **Single-signal blindness**: a CPU spike from a batch job triggers scale-out
+  even when latency, error rate, and queue depth are flat.
+- **Fixed cooldown**: HPA's `--horizontal-pod-autoscaler-downscale-stabilization`
+  (default 5 min) is time-based, not signal-based. It cannot distinguish
+  "signal is still volatile" from "signal has stabilized."
+- **No deployment awareness**: HPA will scale during a rolling update, adding
+  pods to a deployment that is actively replacing them.
+- **No cross-signal coherence**: HPA cannot express "scale only when CPU AND
+  latency are both elevated."
+- **No memory of past behavior**: each decision is stateless. The same
+  misleading signal pattern will trigger the same wrong action repeatedly.
+
+AWS ASG simple/step scaling policies and Azure VMSS autoscale rules share
+the same structural limitations: single-metric thresholds with fixed cooldowns.
 
 ---
 
-## 3. Module Architecture
+## 3. Scope and Non-Goals
+
+### In scope
+
+- Kubernetes Deployments and StatefulSets (via the `scale` subresource)
+- Prometheus as the primary metric source (MVP)
+- Pod-level horizontal scaling (replica count changes)
+- Shadow mode (observe and log, no mutations)
+- Recommend mode (human approves before execution)
+- Autonomous mode (bounded auto-execution)
+- Per-service configuration and identity learning
+
+### Non-goals
+
+- **Node provisioning**: out of scope. Use Karpenter or Cluster Autoscaler.
+- **Vertical scaling**: out of scope. Use VPA.
+- **Cost optimization**: the controller optimizes decision quality, not
+  instance pricing. Complement with cost tools (Cast AI, Kubecost) if needed.
+- **Traffic prediction / forecasting**: this is a reactive controller with
+  trend detection, not a predictive model. It does not forecast future load.
+- **ML-based policy**: the control law is a bounded adaptive policy with
+  12 parameters. There is no neural network, no gradient descent at runtime,
+  no model retraining.
+- **Multi-cluster federation**: v1 targets a single cluster.
+- **Replacing Prometheus or CloudWatch**: the controller wraps these as data
+  sources. It does not collect metrics itself.
+
+---
+
+## 4. Control Loop Timing
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| Poll interval | 15 s | Prometheus instant query per cycle |
+| Rolling normalization window | 240 samples (1 h) | Z-score baseline for signal normalization |
+| Identity consolidation interval | ~240 cycles (~1 h) | Slow baseline update |
+| Cooldown after executed action | 120 s | No new scaling during this window |
+| Replay buffer TTL | 200 cycles (~50 min) | Stale incidents expire |
+| Data freshness assumption | Metrics are ≤ 30 s old | Prometheus scrape interval ≤ 15 s assumed |
+
+The controller is a synchronous polling loop. Each cycle runs the full
+Sense → Interpret → Decide → Act pipeline. There is no event-driven path;
+all decisions are made at poll cadence.
+
+---
+
+## 5. Core Equation and Decision Ordering
+
+### 5.1 Core equation
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   SENSE (Module 1)                       │
-│  Prometheus/CloudWatch → Normalize → State Vector X_t    │
-└──────────────────────┬──────────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│                 INTERPRET (Module 2)                      │
-│  2A. Identity EMA      — adaptive baseline               │
-│  2B. Coherence Model   — multi-signal agreement          │
-│  2C. Resistance Model  — system stability score          │
-│  2D. Misalignment Model — proposed change vs. identity   │
-└──────────────────────┬──────────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│                  DECIDE (Module 3)                        │
-│  3A. Plasticity Gate   — P_t: permission to act          │
-│  3B. Adaptive Gain     — G_t: action magnitude           │
-│  3C. Damping           — d_t: volatility suppression     │
-│  3D. Action Policy     — A_t = d_t · G_t · P_t · S_t    │
-└──────────────────────┬──────────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│                   ACT (Module 4)                          │
-│  Mode A: Observe — log recommendation only               │
-│  Mode B: Approve — human confirms before execution       │
-│  Mode C: Autonomous — bounded auto-execution             │
-│  Actuators: K8s HPA, AWS ASG, Azure VMSS, ArgoCD gate   │
-└──────────────────────┬──────────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│                  LEARN (Module 5)                         │
-│  5A. Replay Buffer     — priority-weighted incident memory│
-│  5B. Baseline Adapt    — Identity EMA slow consolidation │
-│  5C. Outcome Tracking  — did the action help?            │
-└─────────────────────────────────────────────────────────┘
+A_t = d_t · G_t · P_t · S_t
+```
+
+| Variable | Name | Domain | Sign convention |
+|----------|------|--------|-----------------|
+| S_t | Pressure | ℝ | Positive = scale-out demand; negative = over-provisioned |
+| P_t | Plasticity gate | [0.27, 1.0] | Higher = safer to act |
+| G_t | Adaptive gain | [G_min, G_max] | Multiplier on action magnitude |
+| d_t | Damping | [0.01, 1.0] | 1.0 = no suppression; lower = more suppression |
+| A_t | Action score | ℝ | Positive = scale out; negative = scale in |
+
+A_t is then mapped to a discrete replica delta (see Section 9.4).
+
+### 5.2 Formal definition of S_t (pressure)
+
+Pressure is a weighted average of per-group demand deviations from neutral.
+All input metrics are normalized to [0, 1] before pressure computation.
+The neutral point is 0.5 (the sigmoid midpoint of z-score normalization).
+
+```
+s_group(g) = mean( metric_i - 0.5 )   for metric_i in group g
+S_t = (w_infra · s_infra + w_app · s_app + w_biz · s_biz) / W_total
+```
+
+Where `W_total` = sum of weights for groups that have at least one metric
+present. If a group has no metrics (e.g., no business signals configured),
+its weight is redistributed proportionally to the other groups.
+
+**Post-pressure adjustments** (applied sequentially):
+
+| Adjustment | Condition | Effect |
+|-----------|-----------|--------|
+| Unplanned drop boost | Replicas decreased without a pending scale-in | +0.0 to +0.3 additive |
+| Trend boost | Monotonic pressure rise over 20 cycles | Up to +0.15 additive |
+| Latency override | Latency rising while CPU is flat | Use latency as independent pressure signal |
+| Recovery boost | Pressure crosses zero upward at low replica count | 2.5× multiplicative for 20 cycles |
+
+These adjustments address known failure modes of pure threshold-based
+scaling (cascade latency, cold-start recovery, pod eviction detection).
+
+### 5.3 Dependency-safe decision ordering
+
+The decision ordering is strictly feed-forward. No variable depends on
+a value computed later in the same cycle.
+
+```
+Step 1 — SENSE
+  X_t = normalize(prometheus_query())          # Normalized metric vector
+
+Step 2 — PRESSURE
+  S_t = weighted_group_average(X_t)            # Depends on: X_t only
+  S_t += adjustments(trend, drop, recovery)    # Depends on: S_t history
+
+Step 3 — INTERPRET
+  C_t = coherence(X_t)                         # Depends on: X_t only
+  R_t = resistance(deploy_status, restarts,    # Depends on: system state
+                   recent_scales, variance)
+  M_t = |S_t × G_base| / current_replicas     # Depends on: S_t, G_base (constant)
+
+Step 4 — DECIDE
+  P_t = sigmoid(k_r · R_t - k_m · M_t + b_p)  # Depends on: R_t, M_t
+  G_t = clip(G_base · f_phase · f_coh(C_t),    # Depends on: C_t
+             G_min, G_max)
+  d_t = exp(-(k_dv · V_excess + k_dc · U_ema)) # Depends on: metric variance, C_t
+  A_t = d_t · G_t · P_t · S_t                  # Depends on: all above
+
+Step 5 — ACT
+  delta = score_to_action(A_t)                  # Depends on: A_t
+  execute_or_recommend(delta)                   # Depends on: operating mode
+
+Step 6 — LEARN
+  replay_buffer.maybe_store(M_t, P_t, A_t)     # Depends on: step 4 outputs
+  identity_ema.accumulate(X_t, C_t)             # Depends on: step 1, step 3
+```
+
+**Circularity note**: M_t uses `G_base` (a constant), not `G_t` (the
+cycle-computed gain). This is intentional — misalignment measures the
+*potential* magnitude of a change at base gain, not the final modulated
+magnitude. This breaks the circular dependency that would exist if M_t
+depended on G_t.
+
+---
+
+## 6. Module Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    SENSE                                  │
+│  Prometheus → SignalNormalizer → X_t ∈ [0,1]^n           │
+│  Input: raw PromQL results                               │
+│  Output: normalized metric vector X_t                    │
+└────────────────────────┬─────────────────────────────────┘
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│                  INTERPRET                                │
+│  Pressure:    S_t = weighted_group_avg(X_t)    ∈ ℝ      │
+│  Coherence:   C_t = signal_agreement(X_t)      ∈ [0,1]  │
+│  Resistance:  R_t = system_stability(events)   ∈ [0,1]  │
+│  Misalignment: M_t = |S_t·G_base| / replicas  ∈ [0,∞)  │
+│  Identity:    I_t = slow_ema(X_t)              ∈ [0,1]^n │
+└────────────────────────┬─────────────────────────────────┘
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│                   DECIDE                                  │
+│  Plasticity:  P_t = σ(k_r·R_t - k_m·M_t + b_p)         │
+│  Gain:        G_t = clip(G_base · f_phase · f_coh)       │
+│  Damping:     d_t = exp(-(k_dv·V_excess + k_dc·U_ema))  │
+│  Action:      A_t = d_t · G_t · P_t · S_t               │
+│  Delta:       Δreplicas = score_to_action(A_t)           │
+└────────────────────────┬─────────────────────────────────┘
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│                    ACT                                    │
+│  Mode A: Shadow  — log recommendation, no mutation       │
+│  Mode B: Approve — webhook notification, human confirms  │
+│  Mode C: Auto    — bounded execution via K8s scale API   │
+│                                                          │
+│  Safety bounds applied before any mutation:               │
+│    max scale-out +50%, max scale-in -25%, min replicas   │
+└────────────────────────┬─────────────────────────────────┘
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│                   LEARN                                   │
+│  Replay buffer:  store high-stress / low-plasticity events│
+│  Identity EMA:   slow baseline consolidation (~1h)       │
+│  Outcome track:  heuristic attribution (not causal)      │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. 12-Parameter Configuration
+## 7. Configuration Parameters
 
-Adapted from `ExperientialControllerConfig` (minimal_controller.py:42-77).
+12 core parameters control all behavior. Source: `cloud_controller/config.py`.
 
-| # | Parameter | CG Default | Cloud Default | Role |
-|---|-----------|-----------|---------------|------|
-| 1 | `w_infra` | λ_temporal=0.5 | 0.4 | Infrastructure signal weight (CPU, mem, disk) |
-| 2 | `w_app` | λ_coherence=0.3 | 0.4 | Application signal weight (latency, errors) |
-| 3 | `w_business` | λ_latent=0.1 | 0.2 | Business signal weight (conversions, queue) |
-| 4 | `k_r` | 2.0 | 2.0 | Resistance openness scaling |
-| 5 | `k_m` | 2.0 | 2.0 | Misalignment suppression scaling |
-| 6 | `b_p` | -1.0 | -1.0 | Plasticity floor (gate never fully closes) |
-| 7 | `G_base` | 3.0 | 1.0 | Base gain (conservative for cloud) |
-| 8 | `G_min` | 0.1 | 0.0 | Minimum gain (0 = allow "do nothing") |
-| 9 | `G_max` | 5.0 | 3.0 | Maximum gain (3x max scaling factor) |
-| 10 | `k_dv` | 1.0 | 1.0 | Variance sensitivity |
-| 11 | `k_dc` | 0.5 | 0.5 | Coherence instability sensitivity |
-| 12 | `α_base` | 0.01 | 0.01 | Identity EMA learning rate |
+| # | Parameter | Default | Domain | Role |
+|---|-----------|---------|--------|------|
+| 1 | `w_infra` | 0.4 | [0, 1] | Infrastructure signal weight (CPU, memory) |
+| 2 | `w_app` | 0.4 | [0, 1] | Application signal weight (latency, error rate) |
+| 3 | `w_business` | 0.2 | [0, 1] | Business signal weight (queue depth) |
+| 4 | `k_r` | 2.0 | ℝ+ | Resistance sensitivity in plasticity gate |
+| 5 | `k_m` | 2.0 | ℝ+ | Misalignment suppression in plasticity gate |
+| 6 | `b_p` | -1.0 | ℝ | Plasticity bias floor (σ(-1) ≈ 0.27) |
+| 7 | `G_base` | 1.0 | ℝ+ | Base gain |
+| 8 | `G_min` | 0.0 | ℝ≥0 | Minimum gain (0 = allow "do nothing") |
+| 9 | `G_max` | 3.0 | ℝ+ | Maximum gain cap |
+| 10 | `k_dv` | 1.0 | ℝ+ | Metric variance sensitivity for damping |
+| 11 | `k_dc` | 0.5 | ℝ+ | Coherence instability sensitivity for damping |
+| 12 | `α_base` | 0.01 | (0, 1) | Identity EMA base learning rate |
+
+Auxiliary (not in core 12): `replay_buffer_size` (256), `replay_ttl` (200 cycles),
+`min_replicas` (1), `cooldown_seconds` (120).
 
 ---
 
-## 5. Module Specifications (Detail Sections)
+## 8. Module Specifications — Sense
 
-### 5.1 Module 1 — Signal Ingestion & Normalization
+### 8.1 Signal Ingestion
 
-**Input sources** (MVP: Prometheus only):
-- Infrastructure: `node_cpu_seconds_total`, `node_memory_MemAvailable_bytes`
-- Application: `http_request_duration_seconds{quantile="0.99"}`, `http_requests_total{code=~"5.."}`
-- Capacity: `kube_deployment_status_replicas`, `kube_hpa_status_current_replicas`
-- Change events: deploy start/end, config changes (via EventBridge / K8s events)
+**Input**: Prometheus HTTP API (`/api/v1/query` instant queries).
 
-**Output**: Normalized state vector `X_t` with all signals in [0, 1] range.
+MVP metric set:
 
-**Normalization**: Per-signal z-score against rolling 1-hour window, then sigmoid to [0,1].
+| Signal | PromQL | Normalization |
+|--------|--------|---------------|
+| CPU utilization | `rate(node_cpu_seconds_total{mode!="idle"}[2m])` | z-score + sigmoid |
+| Memory pressure | `1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)` | Direct ratio [0,1] |
+| Latency p99 | `histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[2m]))` | z-score + sigmoid |
+| Error rate | `rate(http_requests_total{code=~"5.."}[2m]) / rate(http_requests_total[2m])` | Direct ratio [0,1] |
+| Queue depth | Application-specific (e.g., `queue_messages_ready`) | z-score + sigmoid |
+| Pod restarts | `rate(kube_pod_container_status_restarts_total[10m])` | > 0 = instability flag |
+| Current replicas | `kube_deployment_status_replicas` | Used for M_t and safety bounds |
+
+**Output**: Normalized state vector `X_t ∈ [0, 1]^n`.
+
+### 8.2 Normalization
+
+Two strategies, chosen per metric:
+
+**Z-score + sigmoid** (for unbounded metrics: CPU, latency, queue depth):
+```
+z = (value - rolling_mean) / rolling_std
+normalized = sigmoid(z)
+```
+Rolling window: 240 samples (1 hour at 15 s intervals). Before `min_samples`
+are collected, return 0.5 (neutral). On startup, the window can be
+pre-filled from a 1-hour Prometheus `query_range`.
+
+**Direct ratio** (for metrics already in [0, 1]: memory utilization, error rate):
+```
+normalized = clamp((value - low) / (high - low), 0, 1)
+```
+
+### 8.3 Missing signal handling
+
+If an expected metric returns no data from Prometheus (scrape gap, exporter
+down), it is omitted from X_t. The coherence model degrades its
+`signal_health` score by 0.15 per missing metric (floor 0.3), which reduces
+overall coherence and makes the controller more cautious. The pressure
+computation redistributes weight from empty groups to populated groups.
+
+---
+
+## 9. Module Specifications — Interpret and Decide
+
+### 9.1 Coherence Model
+
+Source: `cloud_controller/core/coherence.py`
+
+Coherence answers: "do the signals agree that something is actually happening?"
+
+**Within-group agreement** (per metric group):
+```
+agreement(group) = 1.0 - normalized_variance(group_metrics)
+```
+A single-metric group returns 0.5 (incomplete evidence).
+
+**Cross-group agreement**:
+```
+c_cross = 1.0 - min(variance(group_means) / 0.25, 1.0)
+```
+
+**Overall coherence**:
+```
+C_raw = 0.7 · mean(within_group_agreements) + 0.3 · c_cross
+C_raw *= signal_health                    # Degrade for missing signals
+C_t = ema(C_raw, beta=0.7)               # Temporal smoothing
+```
+
+Hysteresis band of ±0.05 prevents oscillation when C_t hovers near a
+decision threshold.
+
+**Interpretation**: C_t ≈ 1.0 means all signals agree the system is under
+pressure. C_t ≈ 0.3 means only one signal group is elevated (e.g., CPU
+spike but latency/errors flat) — likely a false alarm.
+
+### 9.2 Resistance Model
+
+Source: `cloud_controller/controller.py` lines 660-701
+
+Resistance R_t ∈ [0, 1] represents how fragile the system currently is.
+Computed as multiplicative penalties from 1.0:
 
 ```
-X_t = [cpu_norm, mem_norm, latency_p99_norm, error_rate_norm,
-       queue_depth_norm, request_rate_delta, deploy_flag, time_phase]
+R_t = 1.0
+if deploy_active:           R_t *= 0.6       # -40%
+if recent_restarts > 0:     R_t *= max(0.5, 1.0 - restarts × 0.1)
+if recent_scales > 0:       R_t *= max(0.5, 1.0 - scales × 0.1)
+if metric_variance > 0:     R_t *= max(0.7, 1.0 - variance × 2.0)
+R_t = clamp(R_t, 0.0, 1.0)
 ```
 
-### 5.2 Module 2A — Identity EMA (Adaptive Baseline)
+"Recent" means within the last 20 controller cycles (~5 minutes).
 
-**Origin**: `SelfModel.consolidate_identity()` (identity_layer.py:163-222)
+R_t is **not** identity-relative — it depends only on observable system
+state. The multiplicative form means penalties compound: a deploy during
+high variance and recent scaling produces very low resistance.
 
-**What changes from CG**: Signal source swaps from hidden states to infrastructure metrics. Math is identical.
+### 9.3 Identity EMA (Adaptive Baseline)
 
-**Fast loop** (every evaluation cycle, ~10-30s):
+Source: `cloud_controller/core/identity_ema.py`
+
+The identity EMA learns "what normal looks like" for this service.
+It is a **per-service** baseline, not global.
+
+**Fast loop** (every cycle): accumulate the current metric vector, weighted
+by salience (only when coherence > 0.3):
 ```
 accumulator = ema_decay · accumulator + (1 - ema_decay) · X_t
-# ema_decay = 0.99
 ```
 
-**Slow loop** (every consolidation_interval, ~1000 cycles ≈ hours):
+**Slow loop** (every ~240 cycles, ~1 hour): conditionally update the
+baseline:
 ```
-agreement  = max(0, (cosine_sim(accumulator, baseline) + 1) / 2)
-stability  = 1 / (1 + var(accumulator))
-α_eff      = max(α_base · stability · agreement, 0.1 · α_base)
-baseline   = (1 - α_eff) · baseline + α_eff · normalize(accumulator)
-```
-
-**Key property**: Baseline only updates when system is stable AND new signal agrees with current identity. Anomalous periods don't corrupt the baseline.
-
-### 5.3 Module 2B — Coherence Model
-
-**Origin**: CG coherence signals (c_tok, c_lat, c_conv)
-
-**Cloud mapping**:
-- `c_infra` = agreement among CPU, memory, disk I/O, network
-- `c_app` = agreement among latency, error rate, throughput
-- `c_business` = agreement among queue depth, conversion rate (if available)
-
-**V1 implementation** (rule-based):
-```
-C_t = w_infra · agreement(infra_signals)
-    + w_app · agreement(app_signals)
-    + w_business · agreement(business_signals)
-
-# agreement(signals) = 1 - normalized_pairwise_variance(signals)
-# All signals elevated and agreeing → C_t ≈ 1.0
-# Only CPU elevated, rest flat → C_t ≈ 0.3
+agreement = max(0, (cosine_sim(accumulator, baseline) + 1) / 2)
+stability = 1 / (1 + var(accumulator))
+α_eff = clamp(α_base · stability · agreement, 0.1 · α_base, 5 · α_base)
+baseline = (1 - α_eff) · baseline + α_eff · normalize(accumulator)
 ```
 
-### 5.4 Module 2C — Resistance Model (System Stability)
+**Key property**: the baseline updates slowly and only when the system
+is stable AND new observations agree with the existing baseline. An
+anomaly (DDoS, cascading failure) does not corrupt the baseline because
+`agreement` drops, which reduces `α_eff` to near-zero.
 
-**Inputs that lower resistance (system is fragile)**:
-- High metric variance over last N cycles
-- Recent scaling actions (scaled within last 5 minutes)
-- Active deployment / rollout in progress
-- Pod restart count increasing
-- Recent failed health checks
+**Bootstrap**: on first run, the baseline can be seeded from the mean of
+a 1-hour historical Prometheus query. Without historical data, it
+initializes to a neutral vector (all 0.5) and converges within ~2 hours.
 
-```
-R_t = 1.0 - weighted_sum(variance_score, recent_scale_score,
-                          deploy_active, restart_score)
-# R_t ∈ [0, 1]: 1.0 = fully stable, 0.0 = highly fragile
-```
+**Identity deviation**: cosine distance between current X_t and baseline
+I_t. Reported in decision logs. Not used in the control equation directly;
+it is an observability signal for operators.
 
-**Double-smoothed** (matching CG implementation):
-```
-R_t = 0.9 · persistent_R + 0.1 · R_t           # Fast blend
-persistent_R = 0.95 · persistent_R + 0.05 · R_t  # Slow update
-```
-
-### 5.5 Module 2D — Misalignment Model
+### 9.4 Misalignment Model
 
 ```
-proposed_replicas = current_replicas + round(G_t · S_t)
-M_t = |proposed_replicas - current_replicas| / current_replicas
-# Scaling from 5→6 = 0.2 misalignment
-# Scaling from 5→10 = 1.0 misalignment
+M_t = |S_t × G_base| / max(current_replicas, 1)
 ```
 
-### 5.6 Module 3A — Plasticity Gate
+M_t measures how large the proposed change is relative to current scale.
+It uses `G_base` (a configuration constant), not `G_t`, to avoid circular
+dependency (see Section 5.3).
 
-**Origin**: `PlasticityGate.forward()` (minimal_controller.py:211-261)
+Examples:
+- S_t=0.4, G_base=1.0, replicas=10 → M_t = 0.04 (small, gate stays open)
+- S_t=1.0, G_base=1.0, replicas=2 → M_t = 0.50 (large, gate partially closes)
+
+### 9.5 Plasticity Gate
+
+Source: `cloud_controller/core/plasticity_gate.py`
 
 ```
-P_t = sigmoid(k_r · R_t - k_m · M_t + b_p)
+P_t = σ(k_r · R_t - k_m · M_t + b_p)
 ```
 
-With defaults (k_r=2.0, k_m=2.0, b_p=-1.0):
-
-| R_t (stability) | M_t (misalignment) | P_t | Interpretation |
-|---|---|---|---|
+| R_t | M_t | P_t | Interpretation |
+|-----|-----|-----|----------------|
 | 1.0 (stable) | 0.0 (small change) | 0.73 | Open — safe to act |
 | 1.0 (stable) | 1.0 (large change) | 0.27 | Cautious — large change to stable system |
 | 0.0 (fragile) | 0.0 (small change) | 0.27 | Cautious — system already unstable |
-| 0.0 (fragile) | 1.0 (large change) | 0.007 | Closed — risky change to fragile system |
-| any | any | ≥ sigmoid(b_p)=0.27 | Floor — gate never fully closes |
+| 0.0 (fragile) | 1.0 (large change) | 0.007 | Effectively closed |
 
-**Note**: `sigmoid(-1.0) = 0.27` ensures the gate always allows ~27% throughput. This prevents total lockout — a critical safety property.
+**Floor**: σ(b_p) = σ(-1.0) ≈ 0.27. The gate never fully closes. This
+is a deliberate safety property — even in the worst case, ~27% of the
+action signal passes through, preventing total lockout during genuine
+emergencies.
 
-### 5.7 Module 3B — Adaptive Gain
+### 9.6 Adaptive Gain
 
-**Origin**: `AdaptiveGain.compute()` (minimal_controller.py:274-302)
+Source: `cloud_controller/core/adaptive_gain.py`
 
 ```
-f_phase = min(1.0, 0.5 + 0.5 · step / warmup_steps)
-f_coh   = 0.5 + 0.5 / (1 + exp(-(C_t - 0.5) · 4.0))
+f_phase = time_of_day_multiplier(current_time)
+f_coh   = 0.5 + 0.5 / (1 + exp(-(C_t - 0.5) × 4.0))
 target  = clip(G_base · f_phase · f_coh, G_min, G_max)
+G_t     = clamp(target, prev_G - max_delta, prev_G + max_delta)
 ```
 
-**Cloud adaptation of f_phase**:
-- Instead of training warmup, use time-of-day phase
-- Peak hours: f_phase = 1.0 (full responsiveness)
-- Off-peak: f_phase = 0.6 (conservative)
-- Maintenance window: f_phase = 0.3 (minimal)
+Where `max_delta = G_base × 0.1` (gain changes by at most ±10% of G_base
+per cycle).
 
-**Rate limiting** (critical for cloud — prevents scaling oscillation):
-```
-max_delta = G_base · 0.1    # Max 10% change per cycle
-G_t = clamp(target, prev_G - max_delta, prev_G + max_delta)
-```
+**Time-of-day phase** (implementation choice, not a product constraint):
 
-With G_base=1.0: gain changes by at most ±0.1 per cycle. From G_min=0.0 to G_max=3.0 takes minimum 30 cycles.
+| Phase | f_phase | When |
+|-------|---------|------|
+| Peak | 1.0 | Configurable (e.g., 09:00-18:00) |
+| Normal | 0.8 | Default outside peak |
+| Off-peak | 0.6 | Configurable (e.g., 22:00-06:00) |
+| Maintenance | 0.3 | Configurable blackout windows |
 
-### 5.8 Module 3C — Damping
+**Rate limiting** prevents scaling oscillation: from G_min=0.0 to G_max=3.0
+takes a minimum of 30 cycles (~7.5 minutes).
 
-**Origin**: `Damping.compute()` (minimal_controller.py:331-379)
+### 9.7 Damping
 
-**Asymmetric EMA** (fast spike detection, fast recovery):
+Source: `cloud_controller/core/damping.py`
+
+Damping suppresses action when metrics are volatile.
+
+**Asymmetric EMA** (fast spike detection, faster recovery):
 ```
 if variance > V_ema:
     V_ema = 0.90 · V_ema + 0.10 · variance    # Detect spike: α=0.10
@@ -245,66 +476,154 @@ else:
     V_ema = 0.80 · V_ema + 0.20 · variance    # Recover: α=0.20
 ```
 
-**Slow baseline** (self-calibrating):
+**Baseline-relative damping** (self-calibrating):
 ```
 V_baseline = 0.999 · V_baseline + 0.001 · variance
-```
-
-**Baseline-relative damping** (key difference from ChatGPT's formula):
-```
-V_excess = max(0, V_ema / V_baseline - 1.0)    # Only excess over normal
+V_excess = max(0, V_ema / V_baseline - 1.0)
 exponent = -(k_dv · V_excess + k_dc · U_ema)
 d_t = exp(clamp(exponent, -10, 0))
-d_t = max(d_t, 0.01)                           # Hard floor: never fully suppress
-d_t = clamp(d_t, prev_d ± 0.1)                 # Rate limit: ±0.1 per cycle
+d_t = max(d_t, 0.01)                          # Hard floor
+d_t = clamp(d_t, prev_d ± 0.1)                # Rate limit
 ```
 
-**Why baseline-relative matters**: A system with naturally high metric variance (e.g., batch processing cluster) won't be permanently damped. Only variance *above its own normal* triggers damping.
+**Why baseline-relative**: a batch-processing workload has naturally high
+metric variance. Raw-variance damping would permanently suppress it.
+Baseline-relative damping only activates when variance exceeds the
+service's own normal level.
 
-### 5.9 Module 3D — Action Policy
+### 9.8 Action Policy and Scale-In
 
-```
-A_t = d_t · G_t · P_t · S_t
-```
+**Action score to replica delta mapping**:
 
-**Action mapping**:
-
-| A_t Range | Action |
-|-----------|--------|
-| < 0.05 | No action |
+| |A_t| Range | Action |
+|-------------|--------|
+| < 0.05 | No action (dead zone) |
 | 0.05 – 0.2 | Log recommendation only |
-| 0.2 – 0.5 | Scale ±1 replica |
-| 0.5 – 1.0 | Scale ±2 replicas |
-| > 1.0 | Scale ±3 replicas (max bounded by G_max) |
+| 0.2 – 0.5 | ±1 replica |
+| 0.5 – 1.0 | ±2 replicas |
+| > 1.0 | ±3 replicas (bounded by safety limits) |
 
-Negative S_t (system over-provisioned) produces negative A_t → scale down.
+Sign of A_t determines direction: positive = scale out, negative = scale in.
 
-### 5.10 Module 4 — Action Layer
+**Scale-in asymmetry** (conservative by design):
 
-**Three operating modes**:
+Scale-in uses 2× the threshold of scale-out. This means stronger negative
+pressure is required to remove replicas than to add them. Rationale:
+adding a pod is fast and low-risk; removing a pod can cause request
+failures if load returns.
 
-| Mode | Behavior | Target Customer |
-|------|----------|----------------|
-| A: Observe | Log decisions, no execution | First adoption, POC |
-| B: Approve | Webhook/Slack notification, human confirms | Enterprise, regulated |
-| C: Autonomous | Direct API calls within bounds | Mature customers |
+Additional scale-in protections:
+- **Maximum rate**: -1 replica per cycle normally. -2 only after 30+
+  sustained calm cycles (pressure < -0.02).
+- **Baseline memory floor**: never scale below 80% of the highest
+  replica count observed in the recent window. This prevents collapse
+  to minimum replicas immediately after a demand spike.
+- **Minimum replicas**: never below the configured `min_replicas`.
+- **Weak-signal forced drain**: if A_t < -0.005 AND replicas > 10
+  AND sustained calm > 15 cycles, force -1 to escape the "stuck at
+  high replicas" plateau. Still respects the baseline memory floor.
 
-**Actuator interfaces** (MVP: Kubernetes only):
+---
+
+## 10. Module Specifications — Act
+
+### 10.1 Operating Modes
+
+| Mode | Behavior | K8s permissions required |
+|------|----------|------------------------|
+| Shadow (DRY_RUN) | Log decisions, compare to HPA, no mutations | Read-only (get deployments, get pods) |
+| Approve | Webhook notification, human confirms | Read + write (patch scale) |
+| Autonomous | Bounded auto-execution | Read + write (patch scale) |
+
+Mode is set per deployment at configuration time. Recommend starting in
+Shadow for ≥2 weeks before enabling Approve or Autonomous.
+
+### 10.2 Actuator: Kubernetes Scale API
+
+Source: `cloud_controller/action/k8s_actuator.py`
+
+The controller scales workloads via the standard Kubernetes scale subresource:
+
 ```
-K8sActuator:
-  - PATCH /apis/apps/v1/deployments/{name}/scale
-  - Or: set HPA custom metric target via metrics adapter
-
-GateActuator:
-  - ArgoCD: POST /api/v1/applications/{name}/sync (block/allow)
-  - K8s Admission Webhook: reject/allow deployment events when P_t < threshold
+PATCH /apis/apps/v1/namespaces/{ns}/deployments/{name}/scale
+Content-Type: application/strategic-merge-patch+json
+{"spec": {"replicas": <desired>}}
 ```
 
-### 5.11 Module 5A — Replay Buffer
+This is the same API that `kubectl scale` uses. It works with Deployments
+and StatefulSets. The controller authenticates via in-cluster ServiceAccount
+or explicit kubeconfig.
 
-**Origin**: `ReplayBuffer` (minimal_controller.py:443-487)
+**Retry**: max 2 retries with 1 s delay on API errors (429, 5xx).
 
-**Store trigger**: high misalignment + low plasticity (system was stressed AND couldn't adapt)
+**Alternative mode (HPA_METRIC)**: instead of patching replicas directly,
+the controller can expose `action_score` as a Prometheus metric. HPA is
+then configured with a custom metric target pointing at that metric. This
+preserves HPA as the pod lifecycle manager while the controller provides
+the decision signal. (Note: this mode is scaffolded but not production-ready;
+it requires a Prometheus adapter or custom metrics APIService.)
+
+### 10.3 Safety Bounds
+
+Source: `cloud_controller/recommend/safety.py`
+
+These limits are enforced on every action, regardless of operating mode,
+even after human approval:
+
+| Bound | Default | Rationale |
+|-------|---------|-----------|
+| Max scale-out per action | +50% of current replicas | Prevent runaway scaling |
+| Max scale-in per action | -25% of current replicas | Gradual drain |
+| Minimum replicas | 1 (configurable) | Never scale to zero |
+| Post-action cooldown | 120 s | Let metrics stabilize before next decision |
+
+### 10.4 Policy Engine
+
+Source: `cloud_controller/action/policy.py`
+
+Customer-configurable rules layered on top of safety bounds:
+
+- **Absolute replica bounds**: min/max replicas per deployment
+- **Blackout windows**: time ranges where scaling is blocked (supports
+  day-of-week, wraps midnight)
+- **Rate limits**: max actions per deployment per hour
+- **Per-deployment overrides**: different policies per namespace/deployment
+
+### 10.5 Recommendation Pipeline
+
+Source: `cloud_controller/recommend/engine.py`
+
+```
+Controller ActionResult
+  → Confidence scoring (action_score > threshold AND coherence > threshold)
+  → Dedup check (skip if pending recommendation for same service)
+  → Safety bounds (clamp delta)
+  → Policy engine (blackout, rate limit, absolute bounds)
+  → Create Recommendation (PENDING state)
+  → Webhook notifications (Slack, PagerDuty, OpsGenie)
+  → Approval tracking
+  → On approval → Actuator executes
+```
+
+Confidence levels:
+- NONE: |A_t| ≤ 0.3 or C_t ≤ 0.5
+- LOW: marginal scores
+- MEDIUM: A_t ∈ [0.5, 0.7] and C_t > 0.5
+- HIGH: A_t > 0.7 and C_t > 0.8
+
+Only MEDIUM and HIGH produce notifications. LOW is logged only.
+
+---
+
+## 11. Module Specifications — Learn
+
+### 11.1 Replay Buffer
+
+Source: `cloud_controller/core/replay_buffer.py`
+
+**Store trigger**: M_t > 0.3 AND P_t < 0.4 (the system was stressed and
+the gate was partially closed — these are the interesting events to
+remember).
 
 **Entry schema**:
 ```json
@@ -321,340 +640,306 @@ GateActuator:
 }
 ```
 
-**Capacity**: 256 entries (configurable)
-**TTL**: 200 cycles (configurable) — stale incidents expire
-**Eviction**: When full, sort by priority, remove lowest (not FIFO)
-**Sampling**: Probability-proportional to priority, without replacement
+- Capacity: 256 entries (configurable)
+- TTL: 200 cycles (~50 min) — stale entries expire
+- Eviction: when full, sort by priority, remove lowest (not FIFO)
+- Sampling: probability-proportional to priority
 
-### 5.12 Module 5B — Baseline Adaptation
+### 11.2 Baseline Adaptation
 
-Identity EMA slow consolidation (Module 2A) handles this. No separate service needed.
+Handled by Identity EMA (Section 9.3). No separate service needed.
 
-### 5.13 Module 5C — Outcome Tracking
+### 11.3 Outcome Tracking
 
-After each action, track:
-- Did latency decrease within 5 minutes?
+After each executed action, the controller observes whether metrics
+improved within a configurable window (default: 5 minutes):
+
+- Did latency p99 decrease?
 - Did error rate decrease?
-- Did scaling oscillation occur (scale up then down within 10 minutes)?
+- Did scaling oscillation occur (scale up then down within 10 min)?
 - Was the action overridden by a human?
 
-Feed outcomes back as priority weights for replay buffer entries.
+**Important caveat**: outcome attribution is **heuristic, not causal**.
+The controller cannot distinguish "metrics improved because of the scaling
+action" from "metrics improved because load naturally decreased." The
+outcome score is used only to adjust replay buffer priority weights —
+it does not directly modify the 12 core parameters. Any future parameter
+auto-tuning (Section 16.5) must treat these outcomes as noisy signals,
+not ground truth.
+
+**Implementation status**: outcome tracking is defined but not yet wired
+into the production recommendation pipeline. Replay buffer priority is
+currently set at store time based on M_t and P_t values.
 
 ---
 
-## 6. Explainability Output
+## 12. Safety Invariants
 
-Every decision produces a human-readable breakdown:
+These properties hold unconditionally, regardless of parameter values,
+operating mode, or input signals:
+
+| Invariant | Mechanism | Bound |
+|-----------|-----------|-------|
+| Plasticity never fully closes | σ(b_p) floor | P_t ≥ 0.27 |
+| Damping never fully suppresses | Hard floor | d_t ≥ 0.01 |
+| Gain is bounded | Clamp | G_t ∈ [G_min, G_max] |
+| Gain changes slowly | Rate limit | ΔG ≤ G_base × 0.1 per cycle |
+| Damping changes slowly | Rate limit | Δd ≤ 0.1 per cycle |
+| Scale-out bounded per action | Safety bounds | ≤ +50% of current replicas |
+| Scale-in bounded per action | Safety bounds | ≤ -25% of current replicas |
+| Minimum replicas enforced | Hard floor | ≥ min_replicas (default 1) |
+| Post-action cooldown | Timer | 120 s no-act window |
+| Baseline not corrupted by anomalies | Conditional α_eff | Requires stability + agreement |
+| Scale-in requires stronger signal | 2× threshold asymmetry | Harder to remove than to add |
+| Baseline memory floor | 80% of recent peak | Prevents collapse after spike |
+
+---
+
+## 13. Failure Modes and Fallback Behavior
+
+| Failure | Detection | Fallback |
+|---------|-----------|----------|
+| Prometheus unreachable | HTTP timeout / connection error | Skip cycle, log warning. After N consecutive failures, alert operator. Controller takes no action without fresh data. |
+| K8s API unreachable | API client error on PATCH | Retry 2× with 1 s delay. If still failing, log error and skip execution. Recommendation stays PENDING. |
+| All metrics missing | Empty X_t | pressure = 0 → A_t = 0 → no action. Signal health degrades coherence. |
+| NaN / Inf in computation | Checked per module | Clamp or skip. d_t and G_t have hard floors. P_t is bounded by sigmoid. |
+| Controller process crash | Standard K8s liveness probe | Deployment restarts the pod. State is lost (acceptable — controller converges within minutes from neutral). Identity EMA baseline is optionally persisted to a ConfigMap or PVC. |
+| HPA and controller conflict | Both try to set replicas | Avoided by operating mode: in Shadow, controller doesn't mutate. In Autonomous, HPA should be disabled or set to wide min/max as emergency backstop. In HPA_METRIC mode, HPA is the sole actuator. |
+| Scaling oscillation detected | 2+ opposing actions within 10 min | Resistance drops (recent_scales penalty), plasticity gate closes, damping increases. Controller self-suppresses. |
+
+**Design principle**: the controller fails safe. On any error, it does
+nothing rather than taking a potentially harmful action. The worst case
+for a controller failure is "scaling reverts to whatever was configured
+before" (HPA, manual, or nothing).
+
+---
+
+## 14. Observability and Explainability
+
+Every decision produces a structured log entry. Example:
 
 ```
-[2026-03-29 14:23:01] Decision: HOLD SCALING
+[2026-03-29 14:23:01] Decision: HOLD
   Pressure (S_t):      0.72 (moderate — CPU 78%, latency p99 rising)
   Coherence (C_t):     0.31 (low — only CPU elevated, queue/errors flat)
-  Stability (R_t):     0.45 (fragile — scaled 2x in last 8 minutes)
+  Resistance (R_t):    0.45 (fragile — scaled 2× in last 8 minutes)
   Misalignment (M_t):  0.40 (moderate — proposed +3 replicas from 5)
   Plasticity (P_t):    0.21 (closed)
   Gain (G_t):          0.44
   Damping (d_t):       0.31 (high variance suppression active)
   Action Score (A_t):  0.02 → NO ACTION
+  Identity deviation:  0.18 (normal)
   Reason: Incoherent pressure + recent scaling instability
 ```
 
----
+**Prometheus metrics exported by the controller** (for dashboarding):
 
-## 7. What This Replaces vs. Wraps
-
-| Cloud Component | Relationship |
-|----------------|-------------|
-| AWS ASG Simple/Step Scaling | **Replaces** — static thresholds → coherence-gated decisions |
-| AWS ASG Cooldown | **Replaces** — fixed timer → signal-aware damping |
-| Azure VMSS Autoscale Rules | **Replaces** — same as ASG |
-| K8s HPA Algorithm | **Replaces** — proportional controller → full P_t·G_t·d_t |
-| CloudWatch / Azure Monitor | **Wraps** — still the data source |
-| Prometheus | **Wraps** — primary MVP data source |
-| ASG / VMSS / K8s (resource) | **Wraps** — still the actuator, we replace the policy |
-| CodeDeploy / ArgoCD | **Wraps** — plasticity gate as deployment gate |
-| KEDA | **Coexists** — KEDA for simple event scaling, controller for multi-signal |
-
----
-
-## 8. Implementation Stages
-
-### Stage 1 — Core Library Extraction
-
-**Goal**: Standalone controller with zero cloud dependencies.
-
-**What to build**:
-- Extract `PlasticityGate`, `AdaptiveGain`, `Damping`, `IdentityEMA`, `ReplayBuffer` from `minimal_controller.py` and `identity_layer.py`
-- Remove all PyTorch dependencies — pure stdlib `math` + `numpy` (or stdlib-only)
-- Create `InfraControllerConfig` dataclass with the 12 cloud-adapted parameters
-- Wire them into a single `Controller.step(state_vector) → ActionResult` function
-
-**Source → Target mapping**:
-
-| CG Source | Cloud Target | What changes |
-|-----------|-------------|-------------|
-| `PlasticityGate.forward()` (lines 211-261) | `core/plasticity_gate.py` | Remove `nn.Module`, `nn.Sequential` resistance projector. R_t becomes a plain float input instead of neural network output. Keep double-smoothed EMA, sigmoid gate, all constants |
-| `AdaptiveGain.compute()` (lines 274-302) | `core/adaptive_gain.py` | Direct port — already pure math, no torch dependency. Replace training warmup with time-of-day phase |
-| `Damping.compute()` (lines 331-379) | `core/damping.py` | Direct port — already pure math. Rename `grad_variance` → `metric_variance` |
-| `SelfModel.consolidate_identity()` (lines 163-222) | `core/identity_ema.py` | Replace torch tensors with numpy arrays. Keep conditional α_eff, re-normalization, accumulator pattern |
-| `ReplayBuffer` (lines 443-487) | `core/replay_buffer.py` | Direct port — already plain Python. Change entry schema from ML states to infra states |
-| `ExperientialControllerConfig` (lines 42-78) | `config.py` | Swap λ_temporal/coherence/latent → w_infra/w_app/w_business. Adjust G_base from 3.0→1.0, G_max from 5.0→3.0 |
-
-**Deliverable**: A Python package that can be tested with synthetic signals in a unit test. No cluster needed.
-
-```python
-# Stage 1 test: synthetic signal → decision
-from cloud_controller import Controller, InfraControllerConfig
-
-ctrl = Controller(InfraControllerConfig())
-result = ctrl.step(
-    metrics={"cpu": 0.82, "latency_p99": 0.45, "error_rate": 0.12,
-             "queue_depth": 0.38, "memory": 0.55, "request_rate": 0.71},
-    deploy_active=False,
-    time_phase="peak"
-)
-# result.action_score = 0.34
-# result.recommendation = "scale +1"
-# result.explanation = "Moderate coherent pressure, system stable..."
-```
-
-**Validation**: Unit tests with known input/output pairs. Verify:
-- Plasticity gate closes when R_t=0, M_t=1 (P_t ≈ 0.007)
-- Damping suppresses when variance is 5x baseline (d_t < 0.4)
-- Gain rate-limits to ±10% per step
-- Identity EMA doesn't update when stability < 0.2
-
-**Estimated scope**: ~800 lines of Python across 7 files.
+| Metric | Type | Description |
+|--------|------|-------------|
+| `ncc_pressure` | Gauge | S_t per service |
+| `ncc_coherence` | Gauge | C_t per service |
+| `ncc_resistance` | Gauge | R_t per service |
+| `ncc_plasticity` | Gauge | P_t per service |
+| `ncc_gain` | Gauge | G_t per service |
+| `ncc_damping` | Gauge | d_t per service |
+| `ncc_action_score` | Gauge | A_t per service |
+| `ncc_replicas_current` | Gauge | Current replica count |
+| `ncc_replicas_recommended` | Gauge | Recommended replica count |
+| `ncc_decisions_total` | Counter | Total decisions by type (hold/scale_out/scale_in) |
+| `ncc_actions_executed_total` | Counter | Actions actually executed |
 
 ---
 
-### Stage 2 — Prometheus Integration & Signal Pipeline
+## 15. Product Integration Model
 
-**Goal**: Read real metrics from a Kubernetes cluster, normalize to state vector.
+The controller is an **external decision layer**. It does not modify or
+replace the internals of any cloud product. It reads metrics from standard
+APIs and writes scaling commands through standard APIs.
 
-**What to build**:
-- Prometheus HTTP client (`/api/v1/query` and `/api/v1/query_range`)
-- Signal normalizer: raw metric values → [0, 1] via rolling z-score + sigmoid
-- Coherence calculator: pairwise agreement across signal groups
-- Resistance estimator: variance + recent scaling events + deploy status → R_t
-- State vector assembler: combine all signals into `X_t`
+| System | Relationship | How |
+|--------|-------------|-----|
+| Prometheus | **Reads from** | Standard HTTP query API (`/api/v1/query`) |
+| Kubernetes Deployments | **Writes to** | `PATCH .../deployments/{name}/scale` (standard scale subresource) |
+| Kubernetes HPA | **Replaces or coexists** | In Autonomous mode, disable HPA or set wide min/max as backstop. In HPA_METRIC mode, controller provides a custom metric that HPA consumes. In Shadow mode, HPA runs normally; controller observes. |
+| KEDA | **Coexists** | KEDA handles event-driven scaling (queue triggers, cron). Controller handles multi-signal steady-state scaling. No conflict if targeting different deployments. If targeting the same deployment, one should be primary. |
+| ArgoCD | **Future: gate integration** | Planned: controller exposes a readiness endpoint; ArgoCD pre-sync hook checks it. Not yet implemented. |
+| AWS ASG / Azure VMSS | **Out of scope for v1** | The controller targets Kubernetes. ASG/VMSS integration would require separate actuator implementations using their respective APIs. |
+| CloudWatch / Azure Monitor | **Potential future metric source** | Not implemented in v1. Would require a signal adapter similar to the Prometheus adapter. |
+| Slack / PagerDuty / OpsGenie | **Sends notifications to** | Webhook integration for Approve mode recommendations. |
 
-**Prometheus queries (MVP set)**:
-
-| Signal | PromQL | Normalization |
-|--------|--------|---------------|
-| CPU utilization | `rate(node_cpu_seconds_total{mode!="idle"}[2m])` | z-score against 1h rolling mean |
-| Memory pressure | `1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)` | Direct ratio [0,1] |
-| Latency p99 | `histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[2m]))` | z-score against 1h rolling |
-| Error rate | `rate(http_requests_total{code=~"5.."}[2m]) / rate(http_requests_total[2m])` | Direct ratio [0,1] |
-| Queue depth | `queue_messages_ready` or `kube_pod_container_resource_requests` | z-score against 1h rolling |
-| Request rate | `rate(http_requests_total[2m])` | z-score for delta detection |
-| Pod restarts | `rate(kube_pod_container_status_restarts_total[10m])` | > 0 = instability signal |
-| HPA current replicas | `kube_hpa_status_current_replicas` | Used for misalignment calc |
-
-**Polling interval**: Every 15 seconds (configurable). Controller runs `step()` each poll.
-
-**Deliverable**: Controller running against a real or simulated Prometheus endpoint, producing decision logs to stdout/file.
-
-```
-[14:23:01] X_t=[cpu=0.78, mem=0.42, lat=0.65, err=0.08, queue=0.31, req=0.72]
-[14:23:01] Coherence=0.61, Resistance=0.73, Misalignment=0.15
-[14:23:01] P_t=0.65, G_t=0.82, d_t=0.91 → A_t=0.49 → RECOMMEND: scale +1
-```
-
-**Validation**: Run against a test cluster with `k6` or `locust` generating load patterns:
-- Steady load → controller says "no action" (correct)
-- Ramp up → controller recommends scale-out before HPA threshold fires
-- Spike + recover → controller damps, HPA would thrash
+**What this controller does NOT do**:
+- It does not run inside HPA. It is a separate Deployment.
+- It does not intercept or monkey-patch Kubernetes controllers.
+- It does not require CRDs or admission webhooks (though a future
+  deployment gate could optionally use an admission webhook).
+- It does not require cluster-admin privileges. It needs `get` on
+  deployments/pods/events and `patch` on the scale subresource.
 
 ---
 
-### Stage 3 — Shadow Mode (Proof of Value)
+## 16. Implementation Stages
 
-**Goal**: Run controller alongside existing HPA, log divergence, prove value.
+### 16.1 Stage 1 — Core Library (no cloud dependencies)
 
-**What to build**:
-- Shadow runner: polls metrics, runs controller, records recommendation
-- HPA watcher: polls `kube_hpa_status_desired_replicas` to see what HPA actually did
-- Delta logger: records every divergence between controller and HPA
-- Summary reporter: daily/weekly report of avoided thrash, early detections, false positives
+**Goal**: standalone Python package testable with synthetic signals.
 
-**Shadow log format**:
-```
-[14:23:01] DIVERGENCE
-  HPA action:        scale 5 → 8 (CPU 82% > threshold 70%)
-  Controller action:  HOLD (coherence=0.31 — only CPU elevated)
-  Reason:            Incoherent pressure — latency flat, queue flat, errors flat
-  Verdict:           PENDING (check if CPU returned to normal within 5 min)
+**Deliverable**: `cloud_controller/` package with:
+- `core/`: plasticity_gate, adaptive_gain, damping, identity_ema,
+  coherence, replay_buffer
+- `controller.py`: `Controller.step(metrics, ...) → ActionResult`
+- `config.py`: 12-parameter `InfraControllerConfig`
 
-[14:28:01] VERDICT for [14:23:01]
-  CPU returned to 54% within 4 minutes (single process spike)
-  Controller was CORRECT — HPA would have wasted 3 pods for 4 minutes
-  Estimated cost saved: $0.12 (3 pods × 4 min × $0.03/pod-min)
-```
+No Prometheus, no Kubernetes, no network calls. Pure computation.
 
-**Delta report** (weekly):
-```
-Neural Cloud Controller — Shadow Report (Week 13, 2026)
-  Total decisions:              2,016
-  Agreements with HPA:          1,847 (91.6%)
-  Controller caught earlier:       43 (controller scaled 2-5 min before HPA)
-  Controller prevented thrash:     89 (HPA scaled unnecessarily)
-  Controller too conservative:     37 (should have scaled, didn't)
-  Net improvement:                 95 better decisions
-  Estimated cost savings:         $847/week
-```
+**Validation**: unit tests with known input/output pairs:
+- P_t ≈ 0.007 when R_t=0, M_t=1
+- d_t < 0.4 when variance is 5× baseline
+- G_t rate-limits to ±10% per step
+- Identity EMA does not update when stability < 0.2
 
-**This report is the sales demo.** Run it against a prospect's cluster for 2 weeks.
+### 16.2 Stage 2 — Prometheus Integration
 
-**Deployment**: Kubernetes Deployment or DaemonSet, read-only access to Prometheus and K8s API. Zero write permissions — purely observational.
+**Goal**: read real metrics from a Kubernetes cluster.
 
-**Validation**: Run for 2+ weeks on a real cluster. Manual review of all divergences. Tune parameters based on false positives/negatives.
+**Deliverable**: `signals/` package with:
+- Prometheus HTTP client
+- Signal normalizer (z-score + sigmoid or direct ratio)
+- Signal pipeline (poll loop, phase detection)
+- Resistance estimator
 
----
+**Validation**: run against a test cluster with `k6` or `locust`:
+- Steady load → no action (correct baseline)
+- Ramp up → controller recommends scale-out
+- Spike + recover → controller damps, avoids thrash
 
-### Stage 4 — Recommend Mode (Human-in-the-Loop)
+### 16.3 Stage 3 — Shadow Mode
 
-**Goal**: Controller sends actionable recommendations, human approves.
+**Goal**: run alongside existing HPA, log divergence, measure value.
 
-**What to build**:
-- Webhook integration: Slack / PagerDuty / OpsGenie notification on high-confidence recommendations
-- Approval API: human clicks "approve" → controller executes the action
-- Explanation UI: web dashboard showing current state, controller reasoning, history
-- Confidence scoring: only recommend when action score > threshold AND coherence > 0.5
+**Deliverable**: Shadow runner that:
+- Polls metrics, runs controller, records recommendation
+- Watches `kube_hpa_status_desired_replicas` for what HPA actually did
+- Logs every divergence with explanation
+- Produces weekly summary (agreements, early catches, prevented thrash,
+  false negatives)
 
-**Notification example** (Slack):
-```
-⚠️ Neural Cloud Controller — Scale Recommendation
-Service: api-gateway (prod)
-Current replicas: 5
-Recommended: 7 (+2)
-Confidence: HIGH
+**Deployment**: Kubernetes Deployment with read-only RBAC. Zero write
+permissions.
 
-Signals:
-  CPU: 84% ↑ (sustained 8 min)
-  Latency p99: 340ms ↑ (was 120ms baseline)
-  Error rate: 2.1% ↑ (was 0.3%)
-  Queue depth: 1,247 ↑ (was 200)
-  Coherence: 0.89 (all signals agree)
-  System stability: 0.81 (stable)
+**Validation**: run for ≥2 weeks on a real cluster. Manual review of all
+divergences. Tune parameters based on false positive/negative rates.
 
-[Approve] [Dismiss] [Details]
-```
+### 16.4 Stage 4 — Recommend Mode
 
-**Safety bounds** (always enforced, even on approval):
-- Max scale-out: +50% of current replicas per action
-- Max scale-in: -25% of current replicas per action
-- Minimum replicas: never below the HPA minReplicas setting
-- Cooldown after action: controller enters observation mode for 2 minutes
+**Goal**: controller sends recommendations, human approves.
 
-**Deliverable**: Operator receives recommendations, can approve/dismiss, sees full reasoning.
+**Deliverable**:
+- Webhook notifications (Slack/PagerDuty/OpsGenie)
+- Approval API (human clicks approve → controller executes)
+- Confidence scoring (only recommend when score AND coherence exceed
+  thresholds)
 
----
+**Safety**: all safety bounds (Section 10.3) enforced even after approval.
 
-### Stage 5 — Active Mode (Bounded Autonomous Control)
+### 16.5 Stage 5 — Autonomous Mode
 
-**Goal**: Controller directly manages scaling within strict policy bounds.
+**Goal**: bounded auto-execution.
 
-**What to build**:
-- K8s actuator: PATCH `apps/v1/deployments/{name}/scale` or set HPA custom metric
-- Policy engine: customer-configurable safety limits (max replicas, max change rate, blackout windows)
-- Rollback trigger: if metrics degrade within 3 minutes of action, auto-revert
-- Audit log: every action recorded with full state snapshot and reasoning
+**Deliverable**:
+- K8s actuator (PATCH deployment scale)
+- Policy engine (rate limits, blackout windows, absolute bounds)
+- Post-action cooldown
+- Audit log (every action with full state snapshot)
 
-**Two integration options**:
+**Rollout**: staging for 2 weeks → canary on one production service →
+expand after validation.
 
-Option A — Custom Metrics Adapter:
-```
-Controller → exposes action_score as Prometheus metric
-HPA → configured to scale on controller_action_score metric
-HPA still manages pod lifecycle — controller provides the signal
-```
+### 16.6 Stage 6 — Learning Loop (future)
 
-Option B — Direct Replica Patching:
-```
-Controller → PATCH deployment replicas directly
-HPA → disabled or set to very wide min/max as safety net
-Controller owns scaling — HPA is emergency fallback only
-```
+**Goal**: controller improves over time using outcome data.
 
-Recommend Option A for initial active mode (less risk, HPA as safety net).
+**Approach** (conservative):
+- Replay-driven parameter review: sample replay entries, simulate what
+  different parameters would have produced, identify systematic errors
+- Parameter changes applied with warmup ramp (no sudden jumps)
+- Multi-service: one controller instance per service, optionally shared
+  cluster-wide identity EMA for common patterns
 
-**Deployment gate integration**:
-- ArgoCD: controller exposes `/api/readiness` endpoint
-- ArgoCD Sync pre-hook calls endpoint: if P_t < 0.3 → block sync, return reason
-- Operator sees: "Deployment blocked: system stability 0.34, recent scaling oscillation detected. Retry in ~10 min."
-
-**Validation**: Run in active mode on staging first (2 weeks), then canary on one production service, then expand.
+**Caveat**: outcome attribution is heuristic (Section 11.3). Any automated
+parameter tuning must be treated as an optimization over noisy signals,
+not deterministic reward. Human review of proposed parameter changes is
+recommended before applying them.
 
 ---
 
-### Stage 6 — Learning Loop & Multi-Service
+## 17. Validation Plan
 
-**Goal**: Controller improves over time, scales to multiple services.
+### 17.1 Unit tests (Stage 1)
 
-**What to build**:
-- Outcome attribution: after each action, measure whether metrics improved within 5 minutes
-- Replay-driven tuning: use replay buffer to identify systematic errors (e.g., consistently too conservative during morning traffic ramp)
-- Parameter auto-tuning: Bayesian optimization over the 12 parameters using outcome data
-- Multi-service support: one controller instance per service, shared identity EMA for cluster-wide patterns
-- Cross-service coherence: detect correlated scaling needs across services (if API gateway scales, downstream services likely need to scale too)
+Test each module in isolation with deterministic inputs. Verify all
+safety invariants from Section 12 hold under adversarial inputs
+(NaN, Inf, extreme values, empty metrics).
 
-**Parameter tuning loop**:
-```
-Weekly:
-  1. Sample 50 replay entries (priority-weighted)
-  2. For each: what would different parameters have produced?
-  3. Optimize parameters to maximize: correct_decisions / total_decisions
-  4. Apply new parameters with warmup ramp (don't jump to new values)
-```
+### 17.2 Simulation tests (Stage 1-2)
 
-This stage is where the controller becomes customer-specific and the moat deepens.
+Synthetic signal generators for common patterns:
+- Steady state (no action expected)
+- Linear ramp (scale-out expected)
+- Spike + recovery (damp expected, no thrash)
+- Rolling deployment (resistance drops, gate closes)
+- Cascading latency (latency override fires)
+- Single-metric false alarm (coherence suppresses)
+
+### 17.3 Shadow validation (Stage 3)
+
+| Metric | Target |
+|--------|--------|
+| Agreement with HPA | > 85% (most decisions should agree) |
+| Prevented thrash | > 0 (controller catches at least some unnecessary scaling) |
+| False negatives | < 5% (controller rarely misses genuine need to scale) |
+| Decision latency | < 1 s per cycle |
+
+### 17.4 Production validation (Stage 4-5)
+
+- All actions audited for 30 days
+- No scaling oscillation caused by the controller
+- Latency p99 does not degrade compared to HPA-only baseline
+- Operator satisfaction: recommendations are understandable and actionable
 
 ---
 
-## 9. Files to Create
+## 18. File Layout
 
 ```
-symbolu/cloud_controller/
+cloud_controller/
 ├── __init__.py
 ├── config.py                  # 12-parameter InfraControllerConfig
+├── controller.py              # Main: sense → interpret → decide → act → learn
 ├── core/
-│   ├── __init__.py
-│   ├── plasticity_gate.py     # P_t = sigmoid(k_r·R - k_m·M + b_p)
-│   ├── adaptive_gain.py       # G_t with rate limiting
-│   ├── damping.py             # d_t with asymmetric EMA + baseline-relative
-│   ├── identity_ema.py        # Slow baseline consolidation
-│   ├── coherence.py           # Multi-signal agreement scoring
-│   └── replay_buffer.py       # Priority-weighted, TTL-bounded
+│   ├── plasticity_gate.py     # P_t
+│   ├── adaptive_gain.py       # G_t
+│   ├── damping.py             # d_t
+│   ├── identity_ema.py        # Baseline learning
+│   ├── coherence.py           # C_t
+│   └── replay_buffer.py       # Priority-weighted incident memory
 ├── signals/
-│   ├── __init__.py
-│   ├── normalizer.py          # Raw metrics → [0,1] state vector
+│   ├── normalizer.py          # Raw metrics → [0,1]
 │   ├── prometheus.py          # Prometheus query adapter
-│   └── resistance.py          # System stability computation
+│   ├── pipeline.py            # Poll loop, phase detection
+│   └── resistance.py          # R_t computation
 ├── action/
-│   ├── __init__.py
-│   ├── policy.py              # A_t → action mapping
-│   ├── k8s_actuator.py        # Kubernetes scaling API
-│   └── gate_actuator.py       # Deployment gate (ArgoCD webhook)
-├── explain/
-│   ├── __init__.py
-│   └── decision_log.py        # Human-readable decision breakdown
-└── controller.py              # Main loop: sense → interpret → decide → act → learn
+│   ├── policy.py              # Customer safety rules
+│   ├── k8s_actuator.py        # PATCH deployment scale
+│   └── feedback.py            # Post-action outcome observation
+├── recommend/
+│   ├── engine.py              # Recommendation pipeline
+│   ├── confidence.py          # Confidence scoring
+│   ├── safety.py              # Hard safety bounds
+│   └── webhook.py             # Slack/PagerDuty/OpsGenie notifications
+├── shadow/
+│   └── reporter.py            # Shadow mode divergence logging
+├── observability/
+│   ├── exporter.py            # Prometheus metric export
+│   └── decision_log.py        # Structured decision logging
+└── orchestrator.py            # Production loop orchestration
 ```
-
----
-
-## 10. Math Corrections vs. ChatGPT Product Architecture
-
-ChatGPT's product architecture captures the first-order structure correctly. The following second-order properties from the actual CG implementation are critical and must be preserved:
-
-1. **Damping uses baseline-relative variance**, not raw variance — prevents permanent damping of high-variance systems
-2. **Asymmetric EMA** (α_up=0.10, α_down=0.20) — fast spike detection + fast recovery
-3. **Double-smoothed resistance** (two nested EMAs: α=0.1 fast, α=0.05 slow) — momentum prevents gate flicker
-4. **Rate limiting on gain AND damping** (±10% and ±0.1 per cycle) — bounded velocity prevents oscillation
-5. **Identity EMA conditional update** (α_eff = α_base × stability × agreement) — anomalies don't corrupt baseline
-6. **Replay eviction by priority** (not FIFO) — severe incidents persist, minor ones get displaced
-7. **Plasticity floor** (sigmoid(b_p=-1.0) = 0.27) — gate never fully closes, always allows partial action
-
-These are not implementation details — they are stability guarantees.
