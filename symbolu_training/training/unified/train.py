@@ -434,6 +434,7 @@ from symbolu_training.training.unified import (
     compute_sample_metrics,
     run_quality_samples,
     run_factual_eval,
+    run_knowledge_probes,
     LRAValidator,
     run_phase_rotation_test,
     print_phase_rotation_results,
@@ -2587,10 +2588,10 @@ def train(config: UnifiedTrainingConfig):
             adaptive_alpha_min=config.adaptive_alpha_min,
             adaptive_alpha_max=config.adaptive_alpha_max,
         )
-        print(f"\n  🔄 [PPL-Alpha] Phase/Local Alpha Curriculum ENABLED")
-        print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: α_phase = {config.alpha_phase_ppl_high:.2f} (phase dominates)")
-        print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  α_phase = {config.alpha_phase_ppl_low:.2f} (local refines)")
-        print(f"     └─ Linear interpolation between thresholds")
+        print(f"\n  🔄 [PPL-Window] Adaptive Window Curriculum ENABLED (alpha values are DIAGNOSTIC ONLY — not used in Protected Phase mode)")
+        print(f"     ├─ PPL >= {config.ppl_high_threshold:.0f}: window={config.window_size_high_ppl} (α_phase={config.alpha_phase_ppl_high:.2f} diagnostic)")
+        print(f"     ├─ PPL <= {config.ppl_low_threshold:.0f}:  window={config.window_size_low_ppl} (α_phase={config.alpha_phase_ppl_low:.2f} diagnostic)")
+        print(f"     └─ NOTE: In Protected Phase mode, α does NOT gate outputs. Gradient flow via architecture + aux losses.")
         if config.enable_adaptive_window:
             print(f"     📐 Adaptive Window: {config.window_size_high_ppl} (high PPL) → {config.window_size_low_ppl} (low PPL)")
         if config.enable_adaptive_alpha:
@@ -3002,14 +3003,15 @@ def train(config: UnifiedTrainingConfig):
                                     return None
                                 # Router loss
                                 _aux = _sm.compute_sharpness_loss()
-                                # Query mask: positions beyond local window
+                                # V10.21: Densified retrieval supervision (half-window threshold)
                                 _valid = (chunk_targets != -100)
                                 _B, _N = chunk_targets.shape
                                 _win = getattr(_cfg, 'window_size', 0)
-                                if _win > 0 and _N > _win:
+                                _retr_start = max(_win // 2, 1)
+                                if _retr_start > 0 and _N > _retr_start:
                                     _pos_mask = torch.zeros(_B, _N, dtype=torch.bool,
                                                             device=chunk_targets.device)
-                                    _pos_mask[:, _win:] = True
+                                    _pos_mask[:, _retr_start:] = True
                                     _qmask = _valid & _pos_mask
                                 else:
                                     _qmask = _valid
@@ -4773,12 +4775,14 @@ def train(config: UnifiedTrainingConfig):
                     if _lm_head is not None and _sk is not None and _sv is not None and _sh is not None:
                         # V10.16.1: Use explicit query_mask from batch if available
                         # (e.g. AssociativeRecallDataset provides True only at answer positions).
-                        # V10.17: For general LM training, only apply retrieval loss at
-                        # positions BEYOND the local attention window. Tokens within the
-                        # window can be predicted by local attention alone — forcing slot
-                        # memory to retrieve them dilutes the learning signal (qmask=1.0
-                        # means ~50k→500 token narrowing instead of precise recall).
-                        # Positions beyond the window genuinely need long-range memory.
+                        # V10.21: Densified retrieval supervision. V10.17 only supervised
+                        # positions beyond window_size, reasoning that within-window tokens
+                        # "don't need slots." But the retrieval loss gradient also teaches
+                        # write_val_proj WHAT to store — excluding within-window positions
+                        # starved that signal. Now supervise from window_size//2 onward:
+                        # positions 0..win/2 are pure local context (excluded), positions
+                        # win/2..win are "can predict locally but slot content is useful
+                        # training signal", positions win+ are "genuinely need long-range."
                         _retr_query_mask = None
                         if isinstance(batch, dict) and 'query_mask' in batch:
                             _retr_query_mask = batch['query_mask'].to(device)
@@ -4786,10 +4790,10 @@ def train(config: UnifiedTrainingConfig):
                             _valid = (y != -100)  # [B, N]
                             _B, _N = y.shape
                             _win = getattr(config, 'window_size', 0)
-                            if _win > 0 and _N > _win:
-                                # Only positions beyond the local window are retrieval queries
+                            _retr_start = max(_win // 2, 1)  # V10.21: half-window threshold
+                            if _retr_start > 0 and _N > _retr_start:
                                 _pos_mask = torch.zeros(_B, _N, dtype=torch.bool, device=y.device)
-                                _pos_mask[:, _win:] = True
+                                _pos_mask[:, _retr_start:] = True
                                 _retr_query_mask = _valid & _pos_mask
                             else:
                                 _retr_query_mask = _valid
@@ -6198,7 +6202,7 @@ def train(config: UnifiedTrainingConfig):
                     # Add alpha for phase/hybrid models (including ontological_hybrid)
                     # V9.8.10: Check if model type contains "phase" or "hybrid"
                     if "phase" in config.model_type or "hybrid" in config.model_type:
-                        log_msg += f" | α_phase: {current_alpha:.2f}"
+                        log_msg += f" | α(diag): {current_alpha:.2f}"
 
                     # Mistral adapter diagnostics: gate value, adapter output norm, state norm
                     if config.model_type in ("mistral_cg", "mistral_hybrid"):
@@ -7800,6 +7804,13 @@ def train(config: UnifiedTrainingConfig):
                 else:
                     print(f"  [Sampling] Skipped - tokenizer not available")
 
+            # Knowledge Probes (factual accuracy, slot retrieval, phase coherence)
+            if config.knowledge_probe_every > 0 and global_step % config.knowledge_probe_every == 0:
+                if tokenizer is not None:
+                    model.eval()
+                    run_knowledge_probes(model, tokenizer, config, device, global_step)
+                    model.train()
+
             # =============================================================
             # Conscious Generation Progress Snapshot
             # Independent of text quality samples. Controlled by --cg_sample_every.
@@ -8533,10 +8544,10 @@ def main():
     parser.add_argument("--global_update_mode", type=str, default="slots",
                        choices=["pool", "attn-lite", "slots"],
                        help="Global token update mode (default: slots)")
-    parser.add_argument("--slots_write_lr", type=float, default=0.1,
-                       help="EMA learning rate for slot writes (default: 0.1)")
-    parser.add_argument("--retrieval_loss_weight", type=float, default=1.0,
-                       help="Weight for auxiliary slot retrieval loss (default: 1.0)")
+    parser.add_argument("--slots_write_lr", type=float, default=0.15,
+                       help="EMA learning rate for slot writes (default: 0.15)")
+    parser.add_argument("--retrieval_loss_weight", type=float, default=2.0,
+                       help="Weight for auxiliary slot retrieval loss (default: 2.0)")
     parser.add_argument("--slot_auto_scale", action="store_true",
                        help="V20: Auto-derive slot hyperparameters from model size, training budget, and context length")
     parser.add_argument("--slot_prediction_loss_weight", type=float, default=0.1,
@@ -9259,6 +9270,18 @@ def main():
     # Quality Sampling
     parser.add_argument("--sample_every", type=int, default=50,
                        help="Generate quality samples every N steps (0 = disabled)")
+
+    # Knowledge Probes (factual accuracy, slot retrieval, phase coherence)
+    parser.add_argument("--knowledge_probe_every", type=int, default=0,
+                       help="Run knowledge probes every N steps (0 = disabled). "
+                            "Measures factual accuracy, slot retrieval precision, "
+                            "and phase coherence — signals orthogonal to PPL.")
+    parser.add_argument("--knowledge_probe_top_k", type=int, default=10,
+                       help="Top-K predictions to check for factual probes")
+    parser.add_argument("--knowledge_probe_coherence_tokens", type=int, default=256,
+                       help="Max tokens to generate for coherence measurement")
+    parser.add_argument("--knowledge_probe_chunk_size", type=int, default=64,
+                       help="Chunk size for coherence similarity measurement")
 
     # LRA Validation (Long-Range Retrieval)
     parser.add_argument("--lra_validate_every", type=int, default=0,
@@ -10500,6 +10523,11 @@ def main():
         phase_ramp_steps=args.phase_ramp_steps,
         tensorboard=args.tensorboard and not args.no_tensorboard,
         sample_every=args.sample_every,
+        # Knowledge Probes
+        knowledge_probe_every=args.knowledge_probe_every,
+        knowledge_probe_top_k=args.knowledge_probe_top_k,
+        knowledge_probe_coherence_tokens=args.knowledge_probe_coherence_tokens,
+        knowledge_probe_chunk_size=args.knowledge_probe_chunk_size,
         # LRA Validation
         lra_validate_every=args.lra_validate_every,
         lra_haystack_lengths=args.lra_haystack_lengths,
