@@ -182,12 +182,19 @@ class MistralCGWrapper(nn.Module):
                 "Install with: pip install transformers"
             )
 
+        # Prefer flash_attention_2 but fall back to sdpa if not installed
+        try:
+            import flash_attn as _fa  # noqa: F401
+            _attn_impl = "flash_attention_2"
+        except ImportError:
+            _attn_impl = "sdpa"
+
         load_kwargs = {
             "device_map": device_map,
             "trust_remote_code": trust_remote_code,
             "torch_dtype": torch.bfloat16,
             "output_hidden_states": True,
-            "attn_implementation": "flash_attention_2",
+            "attn_implementation": _attn_impl,
         }
 
         if quantize in ("4bit", "8bit"):
