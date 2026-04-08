@@ -1,4 +1,4 @@
-# Neural Cloud Scaling Controller — Architecture Specification
+# Cloud Scaling Controller — Architecture Specification
 
 **Status**: Draft v2
 **Last revised**: 2026-04-08
