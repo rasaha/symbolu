@@ -1,0 +1,72 @@
+{
+  "timestamp": "2026-04-08T05:39:36.957061",
+  "verdict": "FIXED",
+  "checks": {
+    "gradient_unblocked": true,
+    "gradients_stable": true,
+    "bhava_moving": true,
+    "vritti_moving": true,
+    "guna_moving": true
+  },
+  "gradient_comparison": {
+    "old_detached_sp_grad": 0.0,
+    "fix_live_sp_grad": 0.0012612390300647753
+  },
+  "stability": {
+    "grad_min": 9.648492546118747e-06,
+    "grad_max": 0.0016697016087310957,
+    "grad_mean": 0.0010137571294339671
+  },
+  "evolution_step_0": {
+    "bhava_entropy": 2.4622182846069336,
+    "bhava_max_entropy": 2.4849066497880004,
+    "bhava_dist_from_uniform": 0.06041167303919792,
+    "bhava_max": 0.11637106537818909,
+    "bhava_min": 0.05586572363972664,
+    "bhava_spread": 0.06050533801317215,
+    "vritti_entropy": 1.5944621562957764,
+    "vritti_max_entropy": 1.6094379124341003,
+    "vritti_dist_from_uniform": 0.07346630841493607,
+    "vritti_max": 0.2502247095108032,
+    "vritti_min": 0.15769384801387787,
+    "vritti_spread": 0.09253086149692535,
+    "guna_dist_from_midpoint": 0.034461576491594315,
+    "guna_mean": 0.5019251704216003,
+    "guna_std": 0.04394218325614929,
+    "guna_max": 0.5632826089859009,
+    "guna_min": 0.45355358719825745,
+    "step": 0,
+    "sp_grad_norm": 0.0012612390300647753,
+    "total_loss": 0.022005021572113037
+  },
+  "evolution_step_final": {
+    "bhava_entropy": 1.6917171478271484,
+    "bhava_max_entropy": 2.4849066497880004,
+    "bhava_dist_from_uniform": 0.41906508803367615,
+    "bhava_max": 0.40728461742401123,
+    "bhava_min": 0.010592721402645111,
+    "bhava_spread": 0.3966919183731079,
+    "vritti_entropy": 0.5521697998046875,
+    "vritti_max_entropy": 1.6094379124341003,
+    "vritti_dist_from_uniform": 0.7356418371200562,
+    "vritti_max": 0.8555617332458496,
+    "vritti_min": 0.01791703887283802,
+    "vritti_spread": 0.8376446962356567,
+    "guna_dist_from_midpoint": 0.3572288751602173,
+    "guna_mean": 0.8518002033233643,
+    "guna_std": 0.17278969287872314,
+    "guna_max": 0.9673147201538086,
+    "guna_min": 0.4860175549983978,
+    "step": 199,
+    "sp_grad_norm": 9.648492546118747e-06,
+    "total_loss": 0.02114044688642025
+  },
+  "config": {
+    "embed_dim": 256,
+    "state_dim": 32,
+    "batch_size": 4,
+    "seq_len": 16,
+    "num_steps": 200,
+    "lr": 0.001
+  }
+}
