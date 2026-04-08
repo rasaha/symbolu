@@ -110,8 +110,10 @@ class KoshaDomainRouter(nn.Module):
         # === Control parameters ===
         # Policy scale starts small, ramps up during training
         self.policy_scale = nn.Parameter(torch.tensor(initial_policy_scale))
-        # Routing temperature (clamped to [0.5, 2.0])
-        self.route_temp = nn.Parameter(torch.tensor(1.0))
+        # Routing temperature (clamped to [1.0, 3.0])
+        # Init at 2.0 to prevent early softmax collapse; the model can
+        # learn to sharpen routing as training stabilizes.
+        self.route_temp = nn.Parameter(torch.tensor(2.0))
 
         self._init_weights(init_mode)
 
@@ -189,7 +191,7 @@ class KoshaDomainRouter(nn.Module):
 
         # Combine: residual + scaled policy
         logits = residual_logits + self.policy_scale * policy_logits
-        tau = self.route_temp.clamp(min=0.5, max=2.0)
+        tau = self.route_temp.clamp(min=1.0, max=3.0)
         alpha = F.softmax(logits / tau, dim=-1)
 
         return {
