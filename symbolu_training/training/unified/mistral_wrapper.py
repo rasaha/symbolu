@@ -154,6 +154,35 @@ class MistralCGWrapper(nn.Module):
         self.register_buffer('prev_state', None, persistent=False)
         self.register_buffer('prev_bhava', None, persistent=False)
 
+        # Move CG modules to backbone device (needed for device_map="auto"
+        # where backbone is on CUDA but CG modules default to CPU)
+        self._sync_cg_device()
+
+    def _sync_cg_device(self):
+        """Move all CG (non-backbone) params/modules to backbone device+dtype."""
+        try:
+            bp = next(self.backbone.parameters())
+            device, dtype = bp.device, bp.dtype
+        except StopIteration:
+            return
+        # Move child modules (state_projector, phase_adapter, etc.)
+        for name, module in self.named_children():
+            if name == 'backbone':
+                continue
+            module.to(device=device, dtype=dtype)
+        # Move standalone parameters (adapter_gate) and buffers
+        for name, param in self.named_parameters():
+            if name.startswith('backbone.'):
+                continue
+            if param.device != device or param.dtype != dtype:
+                param.data = param.data.to(device=device, dtype=dtype)
+
+    def load_state_dict(self, state_dict, strict=True, **kwargs):
+        """Load state dict and re-sync CG modules to backbone device."""
+        result = super().load_state_dict(state_dict, strict=strict, **kwargs)
+        self._sync_cg_device()
+        return result
+
     def set_ablation_config(self, config) -> None:
         """
         Set ablation config for Stage 9 ablation audit.
@@ -182,12 +211,19 @@ class MistralCGWrapper(nn.Module):
                 "Install with: pip install transformers"
             )
 
+        # Prefer flash_attention_2 but fall back to sdpa if not installed
+        try:
+            import flash_attn as _fa  # noqa: F401
+            _attn_impl = "flash_attention_2"
+        except ImportError:
+            _attn_impl = "sdpa"
+
         load_kwargs = {
             "device_map": device_map,
             "trust_remote_code": trust_remote_code,
-            "torch_dtype": torch.bfloat16,
+            "dtype": torch.bfloat16,
             "output_hidden_states": True,
-            "attn_implementation": "flash_attention_2",
+            "attn_implementation": _attn_impl,
         }
 
         if quantize in ("4bit", "8bit"):

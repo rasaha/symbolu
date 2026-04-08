@@ -224,11 +224,17 @@ def load_adapter(checkpoint_path: str, quantize: str, mode_flags: Dict[str, bool
     from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
     from symbolu_training.training.unified.checkpointing import load_checkpoint
 
-    # Determine checkpoint format
-    ckpt_path = Path(checkpoint_path)
+    # Determine checkpoint format and validate BEFORE downloading backbone
+    ckpt_path = Path(checkpoint_path).resolve()
     model_file = Path(f"{ckpt_path.parent / ckpt_path.stem}_model.pt")
+    if not model_file.exists() and not ckpt_path.exists():
+        raise FileNotFoundError(
+            f"Checkpoint not found: {checkpoint_path}\n"
+            f"  Checked single-file: {ckpt_path}\n"
+            f"  Checked split-file:  {model_file}"
+        )
 
-    # Load the wrapper first (downloads backbone from HF if needed)
+    # Load the wrapper (downloads backbone from HF if needed)
     print(f"  Loading MistralCGWrapper (quantize={quantize})...")
     wrapper = MistralCGWrapper(
         model_name="mistralai/Mistral-7B-v0.3",
