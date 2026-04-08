@@ -5033,7 +5033,7 @@ def train(config: UnifiedTrainingConfig):
                                 # Without this, softmax saturation makes one-hot alpha
                                 # self-reinforcing and unrecoverable.
                                 _cg_alpha_ent = -((_cg_alpha + 1e-8).log() * _cg_alpha).sum(dim=-1).mean()
-                                _cg_alpha_ent_weight = 0.01
+                                _cg_alpha_ent_weight = 0.1
                                 loss = loss - _cg_alpha_ent_weight * _cg_alpha_ent  # maximize entropy
                                 metrics['cg_alpha_entropy'] = _cg_alpha_ent.item()
                                 metrics['cg_alpha_ent_loss'] = (_cg_alpha_ent_weight * _cg_alpha_ent).item()
