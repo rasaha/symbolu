@@ -5114,6 +5114,20 @@ def train(config: UnifiedTrainingConfig):
                                                 loss = loss + _prim_lam * _prim_loss
                                                 metrics[f'cg_{_prim_loss_key}'] = _prim_loss.item()
 
+                                # Ontology → Vritti directional prior (cognitive axis alignment)
+                                # KL regularizer encouraging v_ctx toward ontology-derived prior.
+                                _vritti_prior_lam = getattr(config, 'lambda_vritti_ontology_prior', 0.0)
+                                if _vritti_prior_lam > 0 and 'ontology_vritti_prior' in model.conscious_gen:
+                                    _cg_ovp = model.conscious_gen['ontology_vritti_prior']
+                                    _cg_vritti_scorer = model.conscious_gen['vritti_scorer']
+                                    _cg_v_ctx = _cg_vritti_scorer.compute_context_repr(
+                                        _cg_hidden, _cg_sov_state
+                                    )
+                                    _cg_ovp_loss = _cg_ovp(_cg_v_ctx, _cg_sov_state)
+                                    if torch.isfinite(_cg_ovp_loss):
+                                        loss = loss + _vritti_prior_lam * _cg_ovp_loss
+                                        metrics['cg_L_vritti_ont_prior'] = _cg_ovp_loss.item()
+
                                 # --- CG Primitive Loss Attribution ---
                                 # Track weighted contribution of each primitive to total CG loss.
                                 # This tells you which primitive is driving adapter weight changes.
@@ -5129,6 +5143,8 @@ def train(config: UnifiedTrainingConfig):
                                     _lam = getattr(config, f'lambda_{_pn}_token', 0)
                                     if _pk in metrics and _lam > 0:
                                         _cg_contribs[_pn] = _lam * metrics[_pk]
+                                if 'cg_L_vritti_ont_prior' in metrics and _vritti_prior_lam > 0:
+                                    _cg_contribs['vritti_ont_prior'] = _vritti_prior_lam * metrics['cg_L_vritti_ont_prior']
                                 _cg_total_contrib = sum(_cg_contribs.values()) if _cg_contribs else 0.0
                                 if _cg_total_contrib > 0:
                                     for _cn, _cv in _cg_contribs.items():
@@ -9909,6 +9925,12 @@ def main():
                        help="Vritti token-level cognitive mode loss")
     parser.add_argument("--lambda_guna_token", type=float, default=0.0,
                        help="Guna token-level energetic loss")
+    parser.add_argument("--lambda_vritti_ontology_prior", type=float, default=0.0,
+                       help="Ontology→Vritti directional prior KL regularizer weight")
+    parser.add_argument("--vritti_ontology_prior_alpha", type=float, default=0.1,
+                       help="Mixing strength of ontology-derived Vritti prior (capped at 0.4)")
+    parser.add_argument("--vritti_ontology_prior_tau", type=float, default=1.0,
+                       help="Temperature for ontology-derived Vritti prior softmax")
     parser.add_argument("--bliss_lambda_B", type=float, default=1.0,
                        help="Lambda_B temperature for Bliss gate")
     parser.add_argument("--kosha_routing_init", type=str, default="uniform",

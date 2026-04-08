@@ -1,12 +1,18 @@
 """
-TwoStageGenerator: End-to-end inference pipeline for field-integrated generation.
+TwoStageGenerator: Field-integrated generation pipeline.
 
 Stage 1: Extract top-K candidates from base transformer logits.
 Stage 2: Full primitive re-ranking via TokenEvaluationTensor → IntegratedTokenScorer
          → FieldIntegratedSoftmax.
 
-This module is used at inference time by OntologicalHybridTransformer.generate()
-when use_field_integrated_softmax=True.
+Status: TRAINING-ONLY / DORMANT at inference.
+  - Instantiated in model_factory.py as part of conscious_gen ModuleDict.
+  - Exercised in scripts/test_cg_phases.py for structural validation.
+  - NOT wired into MistralCGAdapter.call() — the Mistral-CG inference path
+    does not invoke two-stage re-ranking. This is intentional: the current
+    inference policy restricts live CG to Bhava (direct) and Vritti (bounded
+    gate). Promoting TwoStageGenerator to live inference would require a
+    separate design review.
 
 Reference: CONSCIOUS_GENERATION_DESIGN.md, Appendix D Phase 4 (D.6)
 """
