@@ -7969,10 +7969,13 @@ def train(config: UnifiedTrainingConfig):
                         if cg_stage_manager is not None:
                             _cg_sections += 1
                             _cs_diag = cg_stage_manager.get_diagnostics()
-                            _cs_stage = _cs_diag.get('current_stage', '?')
-                            _cs_progress = _cs_diag.get('stage_progress', 0)
+                            _cs_stage = _cs_diag.get('cg_curriculum_stage', '?')
+                            _cs_idx = _cs_diag.get('cg_curriculum_stage_idx', 0)
+                            _cs_entry = _cs_diag.get('cg_curriculum_stage_entry_step', 0)
+                            _cs_steps_in = global_step - _cs_entry
                             print(f"  Phase 5 - Curriculum:")
-                            print(f"    Stage={_cs_stage}  progress={_cs_progress:.1%}  "
+                            print(f"    Stage={_cs_stage} ({_cs_idx+1}/4)  "
+                                  f"steps_in_stage={_cs_steps_in}  "
                                   f"field_integrated={cg_stage_manager.use_field_integrated_softmax}")
 
                         # --- Governance Diagnostics Summary ---
