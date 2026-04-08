@@ -821,6 +821,45 @@ def run_quality_samples(
             for i, (prob, tid) in enumerate(zip(top_vals, top_ids)):
                 tok_str = tokenizer.decode([tid.item()])
                 log(f"      {i+1}. '{tok_str}' (id={tid.item()}, p={prob.item():.4f})")
+
+            # Sovereign state diagnostic: show 32D slice distributions
+            if isinstance(diag_out, dict) and 'state' in diag_out:
+                _sov = diag_out['state']  # [B, 32]
+                if _sov is not None and _sov.dim() >= 1:
+                    _s = _sov[0] if _sov.dim() == 2 else _sov  # first batch element
+                    _bhava = _s[0:12]
+                    _vritti = _s[17:22]
+                    _guna = _s[22:28]
+                    # Bhava: softmax → check entropy vs max entropy
+                    _bh_ent = -((_bhava + 1e-8).log() * _bhava).sum().item()
+                    _bh_max_ent = 2.485  # ln(12)
+                    _bh_dom_idx = _bhava.argmax().item()
+                    _bh_dom_val = _bhava[_bh_dom_idx].item()
+                    _BHAVA_NAMES = ["SHA", "VIK", "HAS", "KAR", "BIB", "BHA",
+                                    "VIR", "ADH", "SHA2", "RAU", "VIS", "ABS"]
+                    _bh_name = _BHAVA_NAMES[_bh_dom_idx] if _bh_dom_idx < len(_BHAVA_NAMES) else f"[{_bh_dom_idx}]"
+                    # Vritti: softmax → check if peaked or near-uniform
+                    _vr_ent = -((_vritti + 1e-8).log() * _vritti).sum().item()
+                    _vr_max_ent = 1.609  # ln(5)
+                    _vr_dom_idx = _vritti.argmax().item()
+                    _vr_dom_val = _vritti[_vr_dom_idx].item()
+                    _VRITTI_NAMES = ["PRA", "VIP", "VIK2", "NID", "SMR"]
+                    _vr_name = _VRITTI_NAMES[_vr_dom_idx] if _vr_dom_idx < len(_VRITTI_NAMES) else f"[{_vr_dom_idx}]"
+                    # Guna: sigmoid → distance from midpoint
+                    _gu_mid = (_guna - 0.5).abs().mean().item()
+                    _GUNA_NAMES = ["SAT", "RAJ", "TAM", "SAT2", "RAJ2", "TAM2"]
+                    _gu_vals = [f"{_GUNA_NAMES[i]}={_guna[i].item():.3f}" for i in range(min(6, _guna.shape[0]))]
+
+                    log(f"  🧠 [SOVEREIGN STATE] 32D slice diagnostics:")
+                    log(f"      Bhava:  dominant={_bh_name}({_bh_dom_val:.3f})"
+                        f"  entropy={_bh_ent:.3f}/{_bh_max_ent:.3f}"
+                        f"  {'(structured)' if _bh_ent < _bh_max_ent * 0.85 else '(near-uniform)'}")
+                    log(f"      Vritti: dominant={_vr_name}({_vr_dom_val:.3f})"
+                        f"  entropy={_vr_ent:.3f}/{_vr_max_ent:.3f}"
+                        f"  {'(peaked)' if _vr_ent < _vr_max_ent * 0.75 else '(near-uniform)'}")
+                    log(f"      Guna:   {' '.join(_gu_vals)}"
+                        f"  dist_from_mid={_gu_mid:.3f}"
+                        f"  {'(active)' if _gu_mid > 0.1 else '(near-init)'}")
     except Exception as e:
         log(f"  🔍 [DIAGNOSTIC] Failed: {e}")
 

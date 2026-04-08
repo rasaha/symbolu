@@ -5005,10 +5005,15 @@ def train(config: UnifiedTrainingConfig):
                                         candidate_ids=_cg_cand_ids,
                                     )
                                 else:
+                                    # Phase 3: detach hidden (no backbone grads from
+                                    # governance), but keep o_ctx LIVE so CG losses
+                                    # (kosha routing, bliss, primitives) can train the
+                                    # state projector.  Backbone is already frozen
+                                    # (requires_grad=False) so no weight updates leak.
                                     _cg_integ_result = _cg_integ(
                                         T=_cg_T,
                                         hidden=_cg_hidden.detach(),
-                                        o_ctx=_cg_sov_state.detach(),
+                                        o_ctx=_cg_sov_state,
                                         domain=_cg_domain,
                                         candidate_ids=_cg_cand_ids,
                                     )
@@ -5218,6 +5223,8 @@ def train(config: UnifiedTrainingConfig):
                                 # Phase 4 field-integrated generation
                                 if 'cg_field_lm_loss' in metrics:
                                     _cg_msg += f" | L_field={metrics['cg_field_lm_loss']:.4f}"
+                                if 'cg_state_proj_grad_norm' in metrics:
+                                    _cg_msg += f" | sp_grad={metrics['cg_state_proj_grad_norm']:.4f}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
@@ -5572,6 +5579,16 @@ def train(config: UnifiedTrainingConfig):
                 p.grad.norm().item() ** 2 for p in model.parameters()
                 if p.grad is not None
             )) ** 0.5
+
+            # State projector gradient norm — confirms CG losses reach the projector
+            _sp_model = getattr(model, 'module', model)  # unwrap DDP
+            if hasattr(_sp_model, 'state_projector'):
+                _sp_grad_norm = (sum(
+                    p.grad.norm().item() ** 2
+                    for p in _sp_model.state_projector.parameters()
+                    if p.grad is not None
+                )) ** 0.5
+                metrics['cg_state_proj_grad_norm'] = _sp_grad_norm
 
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
@@ -6627,6 +6644,8 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("grad/raw_norm_pre_clip", raw_grad_norm, global_step)
                     if 'variance_dampen' in metrics:
                         tb_writer.add_scalar("grad/variance_dampen", metrics['variance_dampen'], global_step)
+                    if 'cg_state_proj_grad_norm' in metrics:
+                        tb_writer.add_scalar("conscious_gen/state_proj_grad_norm", metrics['cg_state_proj_grad_norm'], global_step)
 
                 step_start_time = time.time()
 
@@ -7897,6 +7916,46 @@ def train(config: UnifiedTrainingConfig):
                                 print(f"    -> SPECIALIZING: koshas differentiating")
                             elif _alpha_h > 0:
                                 print(f"    -> COLLAPSED: one kosha dominating, check routing")
+
+                        # --- Sovereign State Projector Health ---
+                        # Quick forward pass to show 32D slice distributions.
+                        # Reveals whether Bhava/Vritti/Guna are structured
+                        # (state projector learning) or near-init (still flat).
+                        try:
+                            _sp_model = getattr(model, 'module', model)
+                            if hasattr(_sp_model, 'state_projector') and tokenizer is not None:
+                                _sp_prompt = "The meaning of"
+                                _sp_ids = tokenizer.encode(_sp_prompt, return_tensors="pt").to(device)
+                                with torch.no_grad():
+                                    _sp_out = model(_sp_ids)
+                                if isinstance(_sp_out, dict) and 'state' in _sp_out:
+                                    _cg_sections += 1
+                                    _sp_s = _sp_out['state'][0]  # [32]
+                                    _sp_bhava = _sp_s[0:12]
+                                    _sp_vritti = _sp_s[17:22]
+                                    _sp_guna = _sp_s[22:28]
+                                    _sp_bh_ent = -((_sp_bhava + 1e-8).log() * _sp_bhava).sum().item()
+                                    _sp_vr_ent = -((_sp_vritti + 1e-8).log() * _sp_vritti).sum().item()
+                                    _sp_gu_mid = (_sp_guna - 0.5).abs().mean().item()
+                                    _sp_bh_spread = (_sp_bhava.max() - _sp_bhava.min()).item()
+                                    _sp_vr_spread = (_sp_vritti.max() - _sp_vritti.min()).item()
+                                    print(f"  State Projector Health:")
+                                    print(f"    Bhava:  entropy={_sp_bh_ent:.3f}/2.485"
+                                          f"  spread={_sp_bh_spread:.3f}"
+                                          f"  dominant=[{_sp_bhava.argmax().item()}]={_sp_bhava.max().item():.3f}"
+                                          f"  {'(structured)' if _sp_bh_ent < 2.485 * 0.85 else '(near-uniform)'}")
+                                    print(f"    Vritti: entropy={_sp_vr_ent:.3f}/1.609"
+                                          f"  spread={_sp_vr_spread:.3f}"
+                                          f"  dominant=[{_sp_vritti.argmax().item()}]={_sp_vritti.max().item():.3f}"
+                                          f"  {'(peaked)' if _sp_vr_ent < 1.609 * 0.75 else '(near-uniform)'}")
+                                    _sp_gu_vals = " ".join([f"[{i}]={_sp_guna[i].item():.3f}" for i in range(min(6, _sp_guna.shape[0]))])
+                                    print(f"    Guna:   {_sp_gu_vals}"
+                                          f"  dist_mid={_sp_gu_mid:.3f}"
+                                          f"  {'(active)' if _sp_gu_mid > 0.1 else '(near-init)'}")
+                                    if metrics.get('cg_state_proj_grad_norm') is not None:
+                                        print(f"    sp_grad_norm={metrics['cg_state_proj_grad_norm']:.6f}")
+                        except Exception as _sp_err:
+                            print(f"  State Projector Health: skipped ({_sp_err})")
 
                         # --- Phase 4: Field-Integrated Generation ---
                         if metrics.get('cg_field_lm_loss') is not None:
