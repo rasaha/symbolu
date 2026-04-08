@@ -6284,7 +6284,8 @@ def train(config: UnifiedTrainingConfig):
                                 writer.add_scalar('cg_adapter/state_norm', _state_norm, global_step)
                         # State projector gradient norm (computed post-backward at ~L5579)
                         if 'cg_state_proj_grad_norm' in metrics:
-                            log_msg += f" | sp_grad={metrics['cg_state_proj_grad_norm']:.6f}"
+                            _sp_g = metrics['cg_state_proj_grad_norm']
+                            log_msg += f" | sp_grad={_sp_g:.2e}" if _sp_g < 0.001 else f" | sp_grad={_sp_g:.6f}"
 
                     # Phase layer training metrics (mistral_hybrid specific)
                     if config.model_type == "mistral_hybrid" and isinstance(outputs, dict):

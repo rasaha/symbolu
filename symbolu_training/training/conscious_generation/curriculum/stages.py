@@ -165,7 +165,13 @@ class CurriculumStageManager:
         old_stage = self.current_stage
         self.current_stage_idx += 1
         self.current_stage = self.STAGES[self.current_stage_idx]
-        self.stage_entry_step = global_step
+
+        # Use the stage's actual start boundary as the ramp origin so that
+        # scheduler.step(global_step) returns correctly interpolated values
+        # even when the advance happens late (time-based fallback).
+        stage_start, _ = self.stage_boundaries[self.current_stage]
+        ramp_origin = stage_start if reason == "time-based" else global_step
+        self.stage_entry_step = ramp_origin
         self.stage_history.append((global_step, self.current_stage))
 
         # Configure new stage
@@ -174,11 +180,11 @@ class CurriculumStageManager:
             self.STAGE_C: self._configure_stage_c,
             self.STAGE_D: self._configure_stage_d,
         }
-        configurators[self.current_stage](global_step)
+        configurators[self.current_stage](ramp_origin)
 
         return (f"[Conscious Gen Curriculum] Stage transition: {old_stage} -> "
                 f"{self.current_stage} at step {global_step} "
-                f"(PPL={val_ppl:.2f}, {reason})")
+                f"(PPL={val_ppl:.2f}, {reason}, ramp_origin={ramp_origin})")
 
     def update(self, val_ppl: float, global_step: int) -> Optional[str]:
         """
@@ -247,6 +253,9 @@ class CurriculumStageManager:
         # Time-based stage advancement (mirrors update() fallback)
         # This ensures stages advance on the first training step after
         # resume, rather than waiting for the next eval_every boundary.
+        # IMPORTANT: use each stage's actual start boundary (not global_step)
+        # as the ramp start_step, so that when skipping multiple stages,
+        # the scheduler computes correct interpolated values.
         advanced = False
         while self.current_stage_idx < len(self.STAGES) - 1:
             next_stage = self.STAGES[self.current_stage_idx + 1]
@@ -255,16 +264,21 @@ class CurriculumStageManager:
                 old_stage = self.current_stage
                 self.current_stage_idx += 1
                 self.current_stage = self.STAGES[self.current_stage_idx]
-                self.stage_entry_step = global_step
-                self.stage_history.append((global_step, self.current_stage))
+                self.stage_entry_step = next_start
+                self.stage_history.append((next_start, self.current_stage))
                 configurators = {
                     self.STAGE_B: self._configure_stage_b,
                     self.STAGE_C: self._configure_stage_c,
                     self.STAGE_D: self._configure_stage_d,
                 }
-                configurators[self.current_stage](global_step)
+                # Use the stage's actual start boundary as ramp origin,
+                # not global_step. This way scheduler.step(global_step)
+                # returns the correct interpolated value (e.g., if Stage D
+                # starts at step 550 and we're at 600, the ramp is 14% done).
+                configurators[self.current_stage](next_start)
                 print(f"[Conscious Gen Curriculum] Stage transition: {old_stage} -> "
-                      f"{self.current_stage} at step {global_step} (time-based, via step())")
+                      f"{self.current_stage} at step {global_step} "
+                      f"(time-based, via step(), ramp_origin={next_start})")
                 advanced = True
             else:
                 break
