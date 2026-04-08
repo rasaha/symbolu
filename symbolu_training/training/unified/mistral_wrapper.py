@@ -159,17 +159,23 @@ class MistralCGWrapper(nn.Module):
         self._sync_cg_device()
 
     def _sync_cg_device(self):
-        """Move all CG (non-backbone) modules to the backbone's device."""
+        """Move all CG (non-backbone) params/modules to backbone device+dtype."""
         try:
-            # Find the backbone's device from its first parameter
-            device = next(self.backbone.parameters()).device
-            # Move each CG module explicitly
-            for name, module in self.named_children():
-                if name == 'backbone':
-                    continue  # backbone manages its own device via device_map
-                module.to(device)
+            bp = next(self.backbone.parameters())
+            device, dtype = bp.device, bp.dtype
         except StopIteration:
-            pass  # No parameters in backbone (shouldn't happen)
+            return
+        # Move child modules (state_projector, phase_adapter, etc.)
+        for name, module in self.named_children():
+            if name == 'backbone':
+                continue
+            module.to(device=device, dtype=dtype)
+        # Move standalone parameters (adapter_gate) and buffers
+        for name, param in self.named_parameters():
+            if name.startswith('backbone.'):
+                continue
+            if param.device != device or param.dtype != dtype:
+                param.data = param.data.to(device=device, dtype=dtype)
 
     def load_state_dict(self, state_dict, strict=True, **kwargs):
         """Load state dict and re-sync CG modules to backbone device."""
