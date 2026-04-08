@@ -154,6 +154,29 @@ class MistralCGWrapper(nn.Module):
         self.register_buffer('prev_state', None, persistent=False)
         self.register_buffer('prev_bhava', None, persistent=False)
 
+        # Move CG modules to backbone device (needed for device_map="auto"
+        # where backbone is on CUDA but CG modules default to CPU)
+        self._sync_cg_device()
+
+    def _sync_cg_device(self):
+        """Move all CG (non-backbone) modules to the backbone's device."""
+        try:
+            # Find the backbone's device from its first parameter
+            device = next(self.backbone.parameters()).device
+            # Move each CG module explicitly
+            for name, module in self.named_children():
+                if name == 'backbone':
+                    continue  # backbone manages its own device via device_map
+                module.to(device)
+        except StopIteration:
+            pass  # No parameters in backbone (shouldn't happen)
+
+    def load_state_dict(self, state_dict, strict=True, **kwargs):
+        """Load state dict and re-sync CG modules to backbone device."""
+        result = super().load_state_dict(state_dict, strict=strict, **kwargs)
+        self._sync_cg_device()
+        return result
+
     def set_ablation_config(self, config) -> None:
         """
         Set ablation config for Stage 9 ablation audit.
