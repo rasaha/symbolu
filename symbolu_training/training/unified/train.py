@@ -5001,10 +5001,15 @@ def train(config: UnifiedTrainingConfig):
                                         candidate_ids=_cg_cand_ids,
                                     )
                                 else:
+                                    # Phase 3: detach hidden (no backbone grads from
+                                    # governance), but keep o_ctx LIVE so CG losses
+                                    # (kosha routing, bliss, primitives) can train the
+                                    # state projector.  Backbone is already frozen
+                                    # (requires_grad=False) so no weight updates leak.
                                     _cg_integ_result = _cg_integ(
                                         T=_cg_T,
                                         hidden=_cg_hidden.detach(),
-                                        o_ctx=_cg_sov_state.detach(),
+                                        o_ctx=_cg_sov_state,
                                         domain=_cg_domain,
                                         candidate_ids=_cg_cand_ids,
                                     )
@@ -5214,6 +5219,8 @@ def train(config: UnifiedTrainingConfig):
                                 # Phase 4 field-integrated generation
                                 if 'cg_field_lm_loss' in metrics:
                                     _cg_msg += f" | L_field={metrics['cg_field_lm_loss']:.4f}"
+                                if 'cg_state_proj_grad_norm' in metrics:
+                                    _cg_msg += f" | sp_grad={metrics['cg_state_proj_grad_norm']:.4f}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
@@ -5568,6 +5575,16 @@ def train(config: UnifiedTrainingConfig):
                 p.grad.norm().item() ** 2 for p in model.parameters()
                 if p.grad is not None
             )) ** 0.5
+
+            # State projector gradient norm — confirms CG losses reach the projector
+            _sp_model = getattr(model, 'module', model)  # unwrap DDP
+            if hasattr(_sp_model, 'state_projector'):
+                _sp_grad_norm = (sum(
+                    p.grad.norm().item() ** 2
+                    for p in _sp_model.state_projector.parameters()
+                    if p.grad is not None
+                )) ** 0.5
+                metrics['cg_state_proj_grad_norm'] = _sp_grad_norm
 
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
@@ -6623,6 +6640,8 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("grad/raw_norm_pre_clip", raw_grad_norm, global_step)
                     if 'variance_dampen' in metrics:
                         tb_writer.add_scalar("grad/variance_dampen", metrics['variance_dampen'], global_step)
+                    if 'cg_state_proj_grad_norm' in metrics:
+                        tb_writer.add_scalar("conscious_gen/state_proj_grad_norm", metrics['cg_state_proj_grad_norm'], global_step)
 
                 step_start_time = time.time()
 
