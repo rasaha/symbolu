@@ -1,0 +1,114 @@
+{
+  "environment": {
+    "checkpoint": "/workspace/symbolu/checkpoints_mistral_cg/best_model.pt",
+    "timestamp": "2026-04-08T04:02:34.484390",
+    "torch_version": "2.4.1+cu124",
+    "cuda": true,
+    "gpu": "NVIDIA A100 80GB PCIe",
+    "quantize": "4bit",
+    "temperature": 0.7,
+    "max_new_tokens": 256
+  },
+  "counts": {
+    "prompts": 15,
+    "modes": 4,
+    "total_generations": 60
+  },
+  "per_mode": {
+    "A_baseline": {
+      "mode": "A_baseline",
+      "prompts": 15,
+      "vritti_total_fires": 0,
+      "guna_total_fires": 0,
+      "total_steps": 2470,
+      "vritti_step_rate": 0.0,
+      "guna_step_rate": 0.0,
+      "prompts_vritti_fired": 0,
+      "prompts_guna_fired": 0,
+      "prompts_both_fired": 0,
+      "overlap_rate": 0.0,
+      "avg_max_error_risk": 0,
+      "avg_max_turbulence": 0,
+      "avg_output_length": 947.8
+    },
+    "B_vritti_only": {
+      "mode": "B_vritti_only",
+      "prompts": 15,
+      "vritti_total_fires": 0,
+      "guna_total_fires": 0,
+      "total_steps": 2470,
+      "vritti_step_rate": 0.0,
+      "guna_step_rate": 0.0,
+      "prompts_vritti_fired": 0,
+      "prompts_guna_fired": 0,
+      "prompts_both_fired": 0,
+      "overlap_rate": 0.0,
+      "avg_max_error_risk": 0,
+      "avg_max_turbulence": 0,
+      "avg_output_length": 947.8
+    },
+    "C_guna_only": {
+      "mode": "C_guna_only",
+      "prompts": 15,
+      "vritti_total_fires": 0,
+      "guna_total_fires": 0,
+      "total_steps": 2470,
+      "vritti_step_rate": 0.0,
+      "guna_step_rate": 0.0,
+      "prompts_vritti_fired": 0,
+      "prompts_guna_fired": 0,
+      "prompts_both_fired": 0,
+      "overlap_rate": 0.0,
+      "avg_max_error_risk": 0,
+      "avg_max_turbulence": 0,
+      "avg_output_length": 947.8
+    },
+    "D_both_gates": {
+      "mode": "D_both_gates",
+      "prompts": 15,
+      "vritti_total_fires": 0,
+      "guna_total_fires": 0,
+      "total_steps": 2470,
+      "vritti_step_rate": 0.0,
+      "guna_step_rate": 0.0,
+      "prompts_vritti_fired": 0,
+      "prompts_guna_fired": 0,
+      "prompts_both_fired": 0,
+      "overlap_rate": 0.0,
+      "avg_max_error_risk": 0,
+      "avg_max_turbulence": 0,
+      "avg_output_length": 947.8
+    }
+  },
+  "state_projector_diagnostic": {
+    "note": "Manual application of state_projector to random hidden vectors (no GPU needed)",
+    "projector_weights": {
+      "layer_norm.weight": {"shape": [4096], "mean": 0.991407, "std": 0.000851},
+      "layer_norm.bias": {"shape": [4096], "mean": -0.000007, "std": 0.000756},
+      "projector.0.weight": {"shape": [1024, 4096], "mean": -0.000001, "std": 0.008994},
+      "projector.0.bias": {"shape": [1024], "mean": 0.000008, "std": 0.008958},
+      "projector.3.weight": {"shape": [32, 1024], "mean": -0.000077, "std": 0.021587},
+      "projector.3.bias": {"shape": [32], "mean": 0.002502, "std": 0.020105}
+    },
+    "samples": [
+      {
+        "vritti_softmax": [0.1745, 0.2287, 0.1402, 0.2451, 0.2115],
+        "guna_sigmoid": [0.5029, 0.5389, 0.4708, 0.4766, 0.4697, 0.4167],
+        "error_risk": 0.2707,
+        "turbulence": 0.4998
+      },
+      {
+        "vritti_softmax": [0.1771, 0.1824, 0.1508, 0.2979, 0.1918],
+        "guna_sigmoid": [0.3804, 0.5064, 0.5088, 0.4765, 0.4246, 0.4864],
+        "error_risk": 0.2277,
+        "turbulence": 0.4755
+      },
+      {
+        "vritti_softmax": [0.185, 0.1653, 0.2691, 0.1876, 0.1931],
+        "guna_sigmoid": [0.4438, 0.5453, 0.5561, 0.4785, 0.6003, 0.5281],
+        "error_risk": 0.246,
+        "turbulence": 0.5357
+      }
+    ]
+  }
+}
