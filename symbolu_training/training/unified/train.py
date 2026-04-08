@@ -5223,8 +5223,6 @@ def train(config: UnifiedTrainingConfig):
                                 # Phase 4 field-integrated generation
                                 if 'cg_field_lm_loss' in metrics:
                                     _cg_msg += f" | L_field={metrics['cg_field_lm_loss']:.4f}"
-                                if 'cg_state_proj_grad_norm' in metrics:
-                                    _cg_msg += f" | sp_grad={metrics['cg_state_proj_grad_norm']:.4f}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
@@ -6255,6 +6253,9 @@ def train(config: UnifiedTrainingConfig):
                                 log_msg += f" | StN:{_state_norm:.2f}"
                             if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
                                 writer.add_scalar('cg_adapter/state_norm', _state_norm, global_step)
+                        # State projector gradient norm (computed post-backward at ~L5579)
+                        if 'cg_state_proj_grad_norm' in metrics:
+                            log_msg += f" | sp_grad={metrics['cg_state_proj_grad_norm']:.6f}"
 
                     # Phase layer training metrics (mistral_hybrid specific)
                     if config.model_type == "mistral_hybrid" and isinstance(outputs, dict):
@@ -7926,7 +7927,8 @@ def train(config: UnifiedTrainingConfig):
                             if hasattr(_sp_model, 'state_projector') and tokenizer is not None:
                                 _sp_prompt = "The meaning of"
                                 _sp_ids = tokenizer.encode(_sp_prompt, return_tensors="pt").to(device)
-                                with torch.no_grad():
+                                _sp_autocast = config.mixed_precision != "none"
+                                with torch.no_grad(), torch.amp.autocast('cuda', dtype=autocast_dtype, enabled=_sp_autocast):
                                     _sp_out = model(_sp_ids)
                                 if isinstance(_sp_out, dict) and 'state' in _sp_out:
                                     _cg_sections += 1
