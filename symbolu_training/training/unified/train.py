@@ -4947,7 +4947,7 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_sov_state = outputs.get('state', None)
 
                             # Diagnostic: check gradient prerequisites
-                            if global_step <= resume_step + 30 and accumulation_step == 0:
+                            if global_step <= resume_step + 3 and accumulation_step == 0:
                                 _h_ok = _cg_hidden is not None
                                 _s_ok = _cg_sov_state is not None
                                 _s_rg = _cg_sov_state.requires_grad if _s_ok else False
@@ -5373,7 +5373,7 @@ def train(config: UnifiedTrainingConfig):
                                     print("".join(_mech_parts))
 
                 except Exception as e:
-                    if global_step % 500 == 0 or global_step <= resume_step + 30:
+                    if global_step % 500 == 0 or global_step <= resume_step + 3:
                         import traceback
                         print(f"  [Conscious Gen] ERROR at step {global_step}: {e}")
                         traceback.print_exc()
@@ -5619,17 +5619,9 @@ def train(config: UnifiedTrainingConfig):
                     if p.grad is not None
                 )) ** 0.5
                 metrics['cg_state_proj_grad_norm'] = _sp_grad_norm
-                # Diagnostic: report grad status on first few steps after resume
-                if global_step <= resume_step + 30:
-                    _sp_total = len(_sp_params)
-                    _sp_req_grad = sum(1 for p in _sp_params if p.requires_grad)
-                    print(f"  [SP-GRAD-DIAG] Step {global_step}: "
-                          f"params={_sp_total} req_grad={_sp_req_grad} "
-                          f"has_grad={_sp_has_grad} nonzero={_sp_nonzero} "
-                          f"norm={_sp_grad_norm:.8f}")
 
             # Per-component CG gradient diagnostic
-            if hasattr(_sp_model, 'conscious_gen') and global_step <= resume_step + 30:
+            if hasattr(_sp_model, 'conscious_gen') and global_step <= resume_step + 3:
                 _cg_grad_parts = {}
                 # Router + bliss (via integrated_scorer)
                 if 'integrated_scorer' in _sp_model.conscious_gen:
