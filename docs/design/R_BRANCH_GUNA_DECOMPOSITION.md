@@ -139,13 +139,19 @@ R_total = w_struct * R_structural + w_guna * R_guna
 
 ### Cache Implications
 
-The Guna direction signal depends on the **context's Bhava position**, which changes every step. This means it cannot be fully cached in R_tok — the direction is context-dependent.
+Two components are needed at forward time:
 
-Options:
-1. **Cache token positions only:** Store `tok_position` (V,1) in cache. Compute `delta = tok_position - ctx_position` on the fly. Minimal cache addition.
-2. **No additional cache:** Compute from existing 12D affinity (already available as CSR affinity table) and context Bhava (already available as o_ctx[0:12]). Zero cache change.
+1. **Token-side Guna vectors** — fixed per token, changes only at cache refresh.
+   Cache as `Guna_tok (V, 3, 12)` buffer in `TokenPrimitiveCache`.
+   Derived from `varna_bridge_map` weights × `varna_polarity_map` labels.
+   Refreshed alongside R_tok (with EMA blending). ~1.2 MB.
 
-**Recommendation: Option 2.** The CSR affinity table already exists (built at startup, 32K × 12D). The context Bhava is already available in the TET forward pass. Computing the weighted mean position is a single dot product — negligible cost.
+2. **Context Guna state** — changes every step, cannot be cached.
+   Already available: sovereign state Guna slice `o_ctx[22:28]` → 3 classical via
+   `BlissTokenGate.guna_proj`. Or compute fresh: `softmax(guna_proj(o_ctx[22:28]))`.
+
+The Guna alignment `guna_dir · context_guna_3d` is computed on the fly from
+cached `Guna_tok` + live context Guna. Single dot product per candidate — negligible cost.
 
 ---
 
@@ -153,12 +159,61 @@ Options:
 
 | CRS Component | Current | After R-Guna decomposition |
 |---------------|---------|---------------------------|
-| R input | R_tok (cached 16D) | R_tok (cached 16D) + 12D affinity + context Bhava |
+| R input | R_tok (cached 16D) | R_tok (cached 16D) + Guna affinity cache (3×12D) + context Bhava + context Guna |
 | R output | Single scalar per candidate | Single scalar (Guna-modulated) |
 | R interpretation | "How compatible is this phoneme structure?" | "How compatible, AND is it uplifting/activating/inert for this context?" |
-| Cache changes | None | None (use existing CSR affinity table) |
-| New parameters | None | `guna_weight` (1 scalar), `k` and `sigma` (2 sharpness params) |
+| Cache changes | None | One new buffer: `Guna_tok (V, 3, 12)` — ~1.2MB |
+| New parameters | None | 3 scalars: `guna_weight`, `k`, `sigma` |
 | Column 3 in T | CRS combined (unchanged) | CRS combined with Guna-aware R (unchanged public shape) |
+
+---
+
+## Parameter and Memory Budget
+
+Guna-R integration is intentionally lightweight. It does **not** create large weights.
+
+### New learnable parameters: 3 total
+
+| Parameter | Shape | Count | Purpose |
+|-----------|-------|-------|---------|
+| `guna_weight` | scalar | 1 | Controls how much Guna modulates R (0 = no effect, ablation switch) |
+| `k` | scalar | 1 | Sharpness of Sattva/Tamas sigmoid (direction sensitivity) |
+| `sigma` | scalar | 1 | Width of Rajasic Gaussian (how broadly "same level" is defined) |
+
+For comparison: the existing CSRTokenScorer has ~9,400 parameters. Guna-R adds 3.
+
+### New cache buffer: 1
+
+| Buffer | Shape | Size at V=32K | Purpose |
+|--------|-------|---------------|---------|
+| `Guna_tok` | (V, 3, 12) | ~1.2 MB (fp16) | Pre-computed Guna-specific 12D affinity vectors per token. Derived from `varna_bridge_map` × `varna_polarity_map` at cache refresh. Not trained — pure data lookup. |
+
+For comparison: existing total cache is ~8.8 MB. Guna_tok adds 14%.
+
+### Existing parameters unchanged
+
+| Component | Parameters | Changed? |
+|-----------|-----------|----------|
+| `CSRTokenScorer.A, .B` (bilinear M_R) | 256 | NO |
+| `CSRTokenScorer.token_proj` (12D → 16D MLP) | ~768 | NO |
+| `CSRTokenScorer.context_proj` ([h;o] → 16D MLP) | ~8,400 | NO |
+| `CRSCombinedScorer.A_C, .B_C` (C bilinear) | 80 | NO |
+| `CRSCombinedScorer.A_S, .B_S` (S bilinear) | 256 | NO |
+| `CRSCombinedScorer.semantic_*_mlp` (S MLPs) | ~2,100 | NO |
+
+### Forward pass cost
+
+The Guna modulation adds per candidate per position:
+1. One dot product: `guna_dir · context_guna_3d` → (K,) — negligible
+2. One multiply: `R_structural * (1 + w * alignment)` → (K,) — negligible
+
+No new matrix multiplications. No new attention. No new MLP forward passes.
+
+### Why the weights stay small
+
+The Guna signal is **computed, not learned**. The three 12D Guna vectors per token are derived deterministically from existing data files at cache refresh time. The learned part is only "how much should this matter" (3 scalars), not "what is the Guna pattern" (that's given by the Sanskrit Varna system).
+
+This is by design: the Varna-Guna structure is **prior knowledge** from Sanskrit phonetics, not something the model discovers. The model only learns how strongly to use it.
 
 ---
 
