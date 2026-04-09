@@ -80,8 +80,11 @@ class CRSCombinedScorer(nn.Module):
         # Low-rank: M_C = A_C @ B_C^T, A_C/B_C ∈ ℝ^{10 × rank}
         self.A_C = nn.Parameter(torch.empty(cognitive_dim, cognitive_rank))
         self.B_C = nn.Parameter(torch.empty(cognitive_dim, cognitive_rank))
-        nn.init.orthogonal_(self.A_C, gain=0.3)
-        nn.init.orthogonal_(self.B_C, gain=0.3)
+        # gain=1.0 (not 0.3): softmax-normalized inputs have small per-element
+        # values (~0.2 for 5-class simplex), so the bilinear product is inherently
+        # small. gain=0.3 produced C_mean ≈ 0.005, too weak to contribute.
+        nn.init.orthogonal_(self.A_C, gain=1.0)
+        nn.init.orthogonal_(self.B_C, gain=1.0)
 
         # --- S branch: bilinear over learned semantic representations ---
         hidden_s = embed_dim // 4
