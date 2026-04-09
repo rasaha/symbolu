@@ -1024,6 +1024,10 @@ class UnifiedTrainingConfig:
     crs_weight_s: float = 0.6                      # w_S: semantic branch weight
     crs_alpha_base: float = 0.5                    # α_base: base-logit anchor weight
     lambda_crs_semantic: float = 0.0               # Dedicated S-branch contrastive loss weight (0 = disabled)
+    crs_adaptive_lambda: bool = False              # Enable adaptive L_S lambda scaling
+    crs_adaptive_lambda_target: float = 2.5        # L_S target — boost lambda when above this
+    crs_adaptive_lambda_max: float = 0.15          # Maximum lambda_crs_semantic after boosting
+    crs_adaptive_lambda_patience: int = 300        # Steps of plateau before boosting
 
     # Phase 3: Governance Integration
     lambda_kosha_routing: float = 0.0              # Kosha routing loss weight

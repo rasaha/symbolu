@@ -2282,6 +2282,11 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  ⚠️  KOSHA GYROSCOPE REQUESTED but module not available!")
         print(f"      Check: symbolu/losses/kosha_gyroscope.py exists and imports correctly")
 
+    # CRS adaptive L_S lambda state
+    _crs_adaptive_lambda_current = getattr(config, 'lambda_crs_semantic', 0.0)
+    _crs_adaptive_best_ls = float('inf')
+    _crs_adaptive_plateau_start = 0
+
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
     print(f"{'='*70}\n", flush=True)
@@ -5191,7 +5196,8 @@ def train(config: UnifiedTrainingConfig):
 
                                 # CRS dedicated S-branch loss: trains S bilinear directly
                                 # without competing with R for gradient through the combined column.
-                                _lambda_crs_s = getattr(config, 'lambda_crs_semantic', 0.0)
+                                # Use adaptive lambda if enabled, otherwise fixed config value
+                                _lambda_crs_s = _crs_adaptive_lambda_current if getattr(config, 'crs_adaptive_lambda', False) else getattr(config, 'lambda_crs_semantic', 0.0)
                                 if _lambda_crs_s > 0 and _crs_bd is not None:
                                     _s_scores = _crs_bd['S']  # (..., K)
                                     # Find correct token in shortlist
@@ -5208,6 +5214,27 @@ def train(config: UnifiedTrainingConfig):
                                         if torch.isfinite(_s_loss):
                                             loss = loss + _lambda_crs_s * _s_loss
                                             metrics['crs_L_S'] = _s_loss.item()
+
+                                # CRS adaptive L_S lambda: boost when plateaued
+                                if getattr(config, 'crs_adaptive_lambda', False) and 'crs_L_S' in metrics:
+                                    _als_val = metrics['crs_L_S']
+                                    _als_target = config.crs_adaptive_lambda_target
+                                    _als_patience = config.crs_adaptive_lambda_patience
+                                    _als_max = config.crs_adaptive_lambda_max
+                                    if _als_val < _crs_adaptive_best_ls - 0.05:
+                                        # New best — reset patience
+                                        _crs_adaptive_best_ls = _als_val
+                                        _crs_adaptive_plateau_start = global_step
+                                    elif _als_val > _als_target and (global_step - _crs_adaptive_plateau_start) >= _als_patience:
+                                        # Plateaued above target — boost lambda
+                                        _old_lam = _crs_adaptive_lambda_current
+                                        _crs_adaptive_lambda_current = min(_crs_adaptive_lambda_current * 1.5, _als_max)
+                                        if _crs_adaptive_lambda_current > _old_lam:
+                                            _crs_adaptive_plateau_start = global_step  # reset patience
+                                            print(f"  🔧 [CRS-ADAPT] L_S={_als_val:.3f} plateaued > {_als_target} for {_als_patience} steps."
+                                                  f" lambda_S: {_old_lam:.4f} → {_crs_adaptive_lambda_current:.4f}"
+                                                  f" (max={_als_max})", flush=True)
+                                    metrics['crs_lambda_S_eff'] = _crs_adaptive_lambda_current
 
                                 # Ontology → Vritti directional prior (cognitive axis alignment)
                                 # KL regularizer encouraging v_ctx toward ontology-derived prior.
@@ -5327,6 +5354,8 @@ def train(config: UnifiedTrainingConfig):
                                                 f" ovr={metrics.get('crs_semantic_override_rate', 0):.2f}")
                                 if 'crs_L_S' in metrics:
                                     _cg_msg += f" L_S={metrics['crs_L_S']:.3f}"
+                                    if 'crs_lambda_S_eff' in metrics:
+                                        _cg_msg += f" λS={metrics['crs_lambda_S_eff']:.4f}"
                                 # Phase 3 entry diagnostic
                                 _p3_entered = 'cg_alpha_entropy' in metrics or 'cg_kosha_routing_loss' in metrics
                                 _cg_msg += f" | P3={'Y' if _p3_entered else 'N'}"
@@ -10160,6 +10189,14 @@ def main():
                        help="CRS base-logit anchor weight for S branch")
     parser.add_argument("--lambda_crs_semantic", type=float, default=0.0,
                        help="Dedicated S-branch contrastive loss weight (0=disabled)")
+    parser.add_argument("--crs_adaptive_lambda", action="store_true", default=False,
+                       help="Enable adaptive L_S lambda scaling based on plateau detection")
+    parser.add_argument("--crs_adaptive_lambda_target", type=float, default=2.5,
+                       help="L_S target — boost lambda when L_S stays above this")
+    parser.add_argument("--crs_adaptive_lambda_max", type=float, default=0.15,
+                       help="Maximum lambda_crs_semantic after adaptive boosting")
+    parser.add_argument("--crs_adaptive_lambda_patience", type=int, default=300,
+                       help="Steps of L_S plateau before boosting lambda by 1.5x")
 
     # Conscious Generation Phase 3: Governance Integration
     parser.add_argument("--lambda_kosha_routing", type=float, default=0.0,
@@ -11087,6 +11124,10 @@ def main():
         crs_weight_s=args.crs_weight_s,
         crs_alpha_base=args.crs_alpha_base,
         lambda_crs_semantic=args.lambda_crs_semantic,
+        crs_adaptive_lambda=args.crs_adaptive_lambda,
+        crs_adaptive_lambda_target=args.crs_adaptive_lambda_target,
+        crs_adaptive_lambda_max=args.crs_adaptive_lambda_max,
+        crs_adaptive_lambda_patience=args.crs_adaptive_lambda_patience,
         # Conscious Generation (Phase 3)
         lambda_kosha_routing=args.lambda_kosha_routing,
         lambda_bliss_token=args.lambda_bliss_token,
