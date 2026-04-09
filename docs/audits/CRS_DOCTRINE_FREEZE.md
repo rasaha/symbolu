@@ -542,4 +542,205 @@ Phase 2 must NOT:
 
 ---
 
-*End of Phase 1.5 doctrine freeze. All design ambiguities resolved. Phase 2 may now implement with exact specifications.*
+## Addendum: Phase 1.5 Doctrine Patch (v1.1)
+
+**Date:** 2026-04-09
+**Scope:** Three targeted revisions to the frozen doctrine. No structural changes.
+
+### A. Revised Semantic Firewall Formula
+
+**Previous formula** (Section F, now superseded):
+```python
+CRS = S_gate * (w_c * C + w_r * R + w_s * S)
+# With unnormalized weights (all 1.0), producing values in [0, 3]
+```
+
+**Problem:** With S=0.2 and k_s=10, S_gate=0.27, the result 0.27 × (0.8 + 0.9 + 0.2) = 0.51 is not suppressed enough. A score of 0.51 may still rank competitively.
+
+**Revised formula (Option B with normalized weights + sigmoid on S only):**
+
+The complete CRS scoring pipeline, written as one unified formula:
+
+```
+(1)  S_raw   = s_ctx^T M_S S_tok[w]  +  α_base · ẑ_base(w)
+
+(2)  S_prob  = σ(S_raw)
+
+(3)  S_gate  = σ(k_s · (S_prob − τ_s))
+
+(4)  CRS(w)  = S_gate · (w_C · C_raw + w_R · R_raw + w_S · S_raw) · S_prob
+```
+
+Where:
+- `S_raw` is the full semantic signal: learned bilinear + base-logit anchor (step 1 is `compute_S()`)
+- `ẑ_base(w)` = standardized base logit for candidate w: `(logit_w − μ) / (σ + ε)` within the K-candidate set
+- `S_prob` = sigmoid of the already-anchored S_raw — maps to [0, 1]
+- `S_gate` = threshold gate on S_prob — fires when S_prob drops below τ_s
+- Steps 2–4 are `combine_crs()` — it receives S_raw (which already contains the anchor)
+
+```python
+def combine_crs(self, C_raw, R_raw, S_raw):
+    """
+    S_raw already includes the base-logit anchor from compute_S().
+
+    Semantic authority is enforced TWICE:
+      1. S_gate → threshold-based suppression (sigmoid cliff)
+      2. × S_prob → multiplicative scaling (structural floor)
+
+    When S is bad: S_prob < 0.5 AND S_gate << 1 → quadratic suppression.
+    When S is good: S_prob ≈ 1 AND S_gate ≈ 1 → near-unity pass-through.
+    """
+    S_prob = torch.sigmoid(S_raw)
+    S_gate = torch.sigmoid(self.k_s * (S_prob - self.tau_s))
+    weighted = self.w_c * C_raw + self.w_r * R_raw + self.w_s * S_raw
+    crs = S_gate * weighted * S_prob
+    return crs, S_gate, S_prob
+```
+
+**Parameters (Phase 2 defaults):**
+- `τ_s = 0.5` (sigmoid midpoint — the natural boundary between "semantically acceptable" and "not")
+- `k_s = 10.0` (gate sharpness)
+- `α_base = 0.5` (base-logit anchor weight — minority contributor)
+- `w_c = w_r = w_s = 1/3` (normalized, sum to 1)
+- All fixed config hyperparameters, not learnable in Phase 2
+
+**Key design properties:**
+- S_prob is sigmoid of the COMPLETE S_raw (bilinear + anchor). Not sigmoid of partial signal. The base-logit anchor is fused into S before any gating, so the gate always operates on the full semantic judgment.
+- Only S is sigmoid-normalized. C_raw and R_raw stay in their natural bilinear score space. This preserves gradient flow through C and R while making the gate and S-authority well-defined on [0, 1].
+- The weighted sum uses raw scores. The CRS output's absolute scale differs from other T columns, but the router compensates via learned α weights — this is standard for mixed-scale primitive columns.
+- The `* S_prob` term makes semantic authority *structural*, not just parametric. Even if k_s and threshold are imperfect, the multiplicative S_prob still suppresses low-S candidates.
+
+### B. Worked Suppression Example
+
+Candidate pool after "I love my", with raw bilinear scores from each CRS branch:
+
+| Candidate | C_raw | R_raw | S_raw | S_prob | S_gate | Weighted Sum | **CRS** |
+|-----------|-------|-------|-------|--------|--------|-------------|---------|
+| "wife" | 1.5 | 1.8 | 1.5 | 0.82 | 0.96 | 1.60 | **1.26** |
+| "mother" | 1.3 | 0.8 | 1.2 | 0.77 | 0.94 | 1.10 | **0.79** |
+| "life" | 0.5 | 1.6 | 0.3 | 0.57 | 0.68 | 0.80 | **0.31** |
+| "car" | -0.2 | 0.4 | -0.5 | 0.38 | 0.23 | -0.10 | **-0.01** |
+| "brick" | -0.5 | 2.0 | -1.0 | 0.27 | 0.09 | 0.17 | **0.004** |
+
+**"brick"** has perfect resonance (R_raw = 2.0 — maybe it has strong phonemic structure) but terrible semantics (S_raw = -1.0). Result: CRS = 0.004. **Destroyed.** The 2.0 resonance score is irrelevant because S_prob = 0.27 and S_gate = 0.09 jointly crush it.
+
+**"wife"** has good scores across all three branches. CRS = 1.26. **Wins.**
+
+**"life"** has excellent resonance (R_raw = 1.6, rhymes with "wife") but mediocre semantics (S_raw = 0.3). S_prob = 0.57, S_gate = 0.68. CRS = 0.31. **Survives but ranks below "wife" and "mother"** — resonance alone doesn't elevate it.
+
+Suppression ratios:
+- "wife" / "brick" = 315x (high resonance cannot rescue bad semantics)
+- "wife" / "car" = 126x (moderately bad semantics crushed)
+- "wife" / "life" = 4.1x (moderate semantics penalized proportionally)
+
+### C. Revised S-Branch Anchoring Doctrine
+
+**Previous doctrine** (Section D, partially superseded):
+> S starts with weak but non-trivial scores derived from embedding-space distances.
+
+**Problem:** At step 0, the bilinear term `s_ctx^T M_S S_tok[w]` produces near-zero random noise for all candidates. With S_raw ≈ 0 for everyone, S_prob ≈ 0.5 for everyone, S_gate ≈ 0.5 for everyone. The semantic firewall is blind — it halves all scores equally. This means during early training, CRS has no semantic authority, the router adapts without it, and then S "turns on" later causing a training discontinuity.
+
+**Revised doctrine: Additive base-logit residual, fused before gating.**
+
+This is step (1) of the unified formula in Section A above:
+
+```
+S_raw = s_ctx^T M_S S_tok[w]  +  α_base · ẑ_base(w)
+```
+
+```python
+def compute_S(self, s_ctx, S_cand, base_logits_cand):
+    """
+    S_raw = bilinear(s_ctx, S_cand) + alpha_base * standardize(base_logits_cand)
+
+    The base-logit residual provides semantic signal from step 0.
+    The bilinear term learns to refine and can override the prior.
+    S_raw is then fed to combine_crs(), which computes S_prob = sigmoid(S_raw)
+    and S_gate = sigmoid(k_s * (S_prob - tau_s)). The anchor is fused INTO S_raw
+    before any gating — the gate always sees the full semantic judgment.
+    """
+    s_bilinear = self._score_bilinear(s_ctx, S_cand)  # learned, starts ~0
+
+    # Standardize base logits within candidate set: zero mean, unit variance
+    mu = base_logits_cand.mean(dim=-1, keepdim=True)
+    sigma = base_logits_cand.std(dim=-1, keepdim=True) + 1e-6
+    s_base_norm = (base_logits_cand - mu) / sigma
+
+    return s_bilinear + self.alpha_base * s_base_norm
+```
+
+**Parameter:** `alpha_base = 0.5` (fixed, not learnable in Phase 2)
+
+**Why this works:**
+
+At step 0:
+- `s_bilinear ≈ 0` (random init)
+- `s_base_norm` has meaningful spread: good-base-logit tokens get S_raw > 0, bad ones get S_raw < 0
+- S_prob = sigmoid(S_raw) discriminates immediately
+- Semantic firewall has signal from the first training step
+
+After training:
+- `s_bilinear` grows to O(1) magnitude, dominating the O(0.5) base residual
+- S learns Bhava-level semantic compatibility that base logits don't capture
+- The base residual provides a permanent gentle prior: if the learned bilinear is uncertain (near zero), the base logit breaks the tie
+
+**Why this does NOT collapse S into raw logits:**
+
+1. **Standardization removes absolute scale.** S sees only the relative ordering of base logits within the K-candidate shortlist, not the raw probability. A token with base logit 5.0 vs 4.8 gets the same standardized difference as 1.0 vs 0.8.
+2. **alpha_base = 0.5 is a minority contributor.** The bilinear term has its own parameters, its own gradients (from CRS branch loss), and its own expressiveness (Bhava × hidden state). It dominates within ~100-200 training steps.
+3. **Different information.** The base logit captures everything (syntax, frequency, co-occurrence). The bilinear term captures specifically Bhava-level ontological identity compatibility. After training, they provide complementary signals.
+4. **Testable.** Log `corr(S_raw, base_logits_cand)` per step. At step 0, correlation ≈ 1.0 (dominated by base anchor). After training, correlation should drop to 0.3-0.6 as the bilinear term diverges.
+
+**What changes in Section D's functional contract:**
+
+The S formula becomes:
+```
+S_raw(w) = s_ctx^T M_S S_tok[w] + alpha_base * standardize(S_base(w))
+```
+
+All other aspects of Section D (S_tok cache, Bhava-focused input, MLP architecture, initialization) remain unchanged. The base-logit anchor is an additive term in `compute_S()`, not a change to S_tok or s_ctx.
+
+### D. Revised Dictionary Doctrine for S
+
+**Previous wording** (Section G, superseded):
+> S uses no dictionary features ever. Fully learned, no dictionaries ever.
+
+**Revised wording:**
+
+S uses no dictionary features in Phase 2. S must remain primarily context-anchored and learned — semantic compatibility is fundamentally contextual and cannot be captured by static lookups.
+
+However, the permanent prohibition is softened: future phases may introduce optional semantic ontology tags (e.g., WordNet hypernyms, Bhava-category labels) as auxiliary inputs to S_tok, provided they serve as priors that the learned component can override, not as fixed constraints. Any such features must be:
+- Optional (S must work without them)
+- Subordinate to the learned bilinear term
+- Validated to improve, not degrade, S's contextual discrimination
+
+**Revised summary table row:**
+
+| Branch | Dictionary in Phase 2 | Dictionary in Phase 3+ | Final doctrine |
+|--------|----------------------|----------------------|----------------|
+| S | No | Optional auxiliary priors (e.g., semantic ontology tags) | Primarily learned and context-anchored; dictionary priors permitted as subordinate optional inputs |
+
+### E. Final Phase 2 Doctrine Patch
+
+The following changes apply to the frozen Phase 1.5 doctrine:
+
+1. **Section F (Semantic Firewall):** Formula is now a unified 4-step pipeline:
+   ```
+   S_raw  = bilinear + α_base · ẑ_base     (compute_S — includes anchor)
+   S_prob = σ(S_raw)                        (combine_crs step 1)
+   S_gate = σ(k_s · (S_prob − τ_s))        (combine_crs step 2)
+   CRS    = S_gate · weighted_sum · S_prob  (combine_crs step 3)
+   ```
+   The base-logit anchor is fused into S_raw before any gating. S_prob and S_gate operate on the full semantic judgment. Weights normalized (sum to 1). τ_s = 0.5. The `× S_prob` term provides structural semantic authority beyond the gate.
+
+2. **Section D (Definition of S):** `compute_S()` returns `S_raw = bilinear + α_base · ẑ_base` with `α_base = 0.5`. S has semantic signal from step 0. The bilinear term dominates after early training. The anchor is a minority prior, not a replacement.
+
+3. **Section G (Dictionary Doctrine):** The absolute "no dictionaries ever" for S is replaced with "no dictionaries in Phase 2; optional subordinate auxiliary priors permitted in future phases."
+
+4. **Section I (Guardrails):** Add: "Do not set α_base > 0.7 — the base-logit anchor must remain a minority contributor to S, not the dominant signal."
+
+All other frozen decisions (C definition, R delegation, one CRS column, firewall inside combine_crs, no T shape changes, no renames) remain unchanged.
+
+---
+
+*End of Phase 1.5 doctrine freeze (v1.1). Phase 2 may now implement with revised specifications.*
