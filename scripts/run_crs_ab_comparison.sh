@@ -22,6 +22,12 @@
 
 set -e
 
+# Ensure repo root is on PYTHONPATH so symbolu_training is importable
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+cd "$REPO_ROOT"
+
 # =============================================================================
 # DEFAULTS — tuned for meaningful comparison on limited budget
 # =============================================================================
