@@ -998,6 +998,7 @@ class UnifiedTrainingConfig:
     enable_conscious_generation: bool = False      # Master toggle for conscious generation modules
     token_ontology_dim: int = 32                   # Must match SOVEREIGN_STATE_DIM
     ontology_cache_refresh_interval: int = 100     # Steps between O_tok cache refresh
+    cache_refresh_ema_decay: float = 0.8           # EMA decay for cache refresh (0.8 = retain 80% old, blend 20% new; 0.0 = full replacement, disables EMA)
     lambda_ont: float = 0.0                        # Ontological structure loss weight (0 = disabled)
     ontology_loss_type: str = "contrastive"        # "contrastive" (InfoNCE) or "prototype"
     ontology_loss_temperature: float = 0.1         # Temperature for contrastive loss

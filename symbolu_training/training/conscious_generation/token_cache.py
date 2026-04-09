@@ -55,11 +55,13 @@ class TokenPrimitiveCache(nn.Module):
         vritti_classes: int = 5,
         guna_classes: int = 3,
         semantic_dim: int = 0,
-        refresh_ema: float = 0.2,
+        refresh_ema_decay: float = 0.8,
     ):
         super().__init__()
         self.projector = projector
-        self.refresh_ema = refresh_ema
+        # EMA decay: 0.8 means retain 80% old, blend 20% new.
+        # 0.0 disables EMA (full replacement each refresh, legacy behavior).
+        self.refresh_ema_decay = refresh_ema_decay
         self.vocab_size = vocab_size
         self.state_dim = state_dim
         self.refresh_interval = refresh_interval
@@ -116,12 +118,14 @@ class TokenPrimitiveCache(nn.Module):
         self._semantic_scorer = semantic_scorer
 
     def _blend(self, buf: torch.Tensor, start: int, end: int, new_vals: torch.Tensor) -> None:
-        """Write new values into buffer, using EMA blending after first init."""
-        if self._is_initialized:
-            # EMA blend: buf = (1 - α) * old + α * new
-            buf[start:end] = (1.0 - self.refresh_ema) * buf[start:end] + self.refresh_ema * new_vals
+        """Write new values into buffer, using EMA blending after first init.
+
+        When decay=0.0 or not yet initialized: full replacement (legacy behavior).
+        When decay>0:  buf = decay * old + (1 - decay) * new
+        """
+        if self._is_initialized and self.refresh_ema_decay > 0.0:
+            buf[start:end] = self.refresh_ema_decay * buf[start:end] + (1.0 - self.refresh_ema_decay) * new_vals
         else:
-            # First init: full write
             buf[start:end] = new_vals
 
     @torch.no_grad()

@@ -10146,6 +10146,8 @@ def main():
                        help="Ontological code dimension (must match SOVEREIGN_STATE_DIM)")
     parser.add_argument("--ontology_cache_refresh_interval", type=int, default=100,
                        help="Steps between O_tok cache refresh")
+    parser.add_argument("--cache_refresh_ema_decay", type=float, default=0.8,
+                       help="EMA decay for cache refresh blending (0.8=retain 80%% old; 0.0=full replacement, disables EMA)")
     parser.add_argument("--lambda_ont", type=float, default=0.0,
                        help="Ontological structure loss weight (0 = disabled)")
     parser.add_argument("--ontology_loss_type", type=str, default="contrastive",
@@ -11105,6 +11107,7 @@ def main():
         enable_conscious_generation=args.enable_conscious_generation,
         token_ontology_dim=args.token_ontology_dim,
         ontology_cache_refresh_interval=args.ontology_cache_refresh_interval,
+        cache_refresh_ema_decay=args.cache_refresh_ema_decay,
         lambda_ont=args.lambda_ont,
         ontology_loss_type=args.ontology_loss_type,
         ontology_loss_temperature=args.ontology_loss_temperature,

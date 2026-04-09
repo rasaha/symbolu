@@ -639,6 +639,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             jepa_dim=config.plausibility_token_dim,
             csr_dim=config.csr_token_dim,
             semantic_dim=_crs_semantic_dim,
+            refresh_ema_decay=getattr(config, 'cache_refresh_ema_decay', 0.8),
         )
 
         ontology_scorer = OntologyCompatibilityScorer(
