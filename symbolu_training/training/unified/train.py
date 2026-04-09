@@ -10179,7 +10179,7 @@ def main():
     # CRS Phase 2: Combined Cognitive-Resonance-Semantic scorer
     parser.add_argument("--use_crs_combined_scorer", action="store_true", default=False,
                        help="Replace CSR column with CRS combined scorer (C+R+S with semantic firewall)")
-    parser.add_argument("--semantic_dim", type=int, default=16,
+    parser.add_argument("--semantic_dim", type=int, default=32,
                        help="Dimension for CRS S-branch token representations")
     parser.add_argument("--crs_semantic_threshold", type=float, default=0.45,
                        help="Semantic gate threshold (tau_s)")

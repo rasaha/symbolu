@@ -1017,7 +1017,7 @@ class UnifiedTrainingConfig:
     # CRS Phase 2: Combined Cognitive–Resonance–Semantic scorer
     # Reference: docs/audits/CRS_DOCTRINE_FREEZE.md
     use_crs_combined_scorer: bool = False          # Replace CSR column with CRS combined scorer
-    semantic_dim: int = 16                         # d_s for S branch representations
+    semantic_dim: int = 32                         # d_s for S branch representations (increased from 16 for expressiveness)
     crs_semantic_threshold: float = 0.45           # τ_s: semantic gate threshold
     crs_gate_sharpness: float = 10.0               # k_s: semantic gate sharpness
     crs_weight_c: float = 0.2                      # w_C: cognitive branch weight
