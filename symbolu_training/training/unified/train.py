@@ -11051,6 +11051,15 @@ def main():
         use_low_rank_primitives=args.use_low_rank_primitives,
         primitive_rank=args.primitive_rank,
         use_shared_token_basis=args.use_shared_token_basis,
+        # CRS Phase 2: Combined Cognitive-Resonance-Semantic scorer
+        use_crs_combined_scorer=args.use_crs_combined_scorer,
+        semantic_dim=args.semantic_dim,
+        crs_semantic_threshold=args.crs_semantic_threshold,
+        crs_gate_sharpness=args.crs_gate_sharpness,
+        crs_weight_c=args.crs_weight_c,
+        crs_weight_r=args.crs_weight_r,
+        crs_weight_s=args.crs_weight_s,
+        crs_alpha_base=args.crs_alpha_base,
         # Conscious Generation (Phase 3)
         lambda_kosha_routing=args.lambda_kosha_routing,
         lambda_bliss_token=args.lambda_bliss_token,
