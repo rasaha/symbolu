@@ -180,11 +180,216 @@ Options:
 
 ---
 
+## Data Files and Lineage
+
+### Current data files used by CRS
+
+| File | Contents | Used by CRS R branch |
+|------|----------|---------------------|
+| `csr_phoneme_provider.py` | `ARPABET_TO_VARNA` (phoneme→varna+single Vritti meaning), `PHONEME_MAP_ARPABET` (static 12D vectors), `SANSKRIT_VOWEL_CALIBRATION`, `VarnaCSRBridge` class | YES — primary pipeline |
+| `docs/data/varna_bridge_map_v1.json` | Per-consonant O1-O12 layer annotations with descriptions. Loaded by `VarnaCSRBridge`. | YES — loaded at runtime |
+| `docs/data/varna_polarity_map_v1.json` | Per-consonant per-layer polarity: `constructive` / `transitional` / `degenerative` | NOT YET — contains proto-Guna data |
+| `docs/data/varna_distortion_map_v1.json` | Distortion patterns per varna | Not used by CRS |
+| `docs/data/varna_layer_interaction_v1.json` | Cross-layer interaction weights | Not used by CRS |
+
+### Existing polarity → Guna mapping
+
+The `varna_polarity_map_v1.json` already contains a per-layer polarity for each consonant that maps directly to the three Gunas:
+
+| Polarity label | Guna equivalent |
+|---------------|----------------|
+| `constructive` | **Sattva** — uplifting, clarifying |
+| `transitional` | **Rajas** — activating, energizing |
+| `degenerative` | **Tamas** — inertial, obscuring |
+
+Example from current `varna_polarity_map_v1.json` for Ka (क):
+
+```json
+"ka": {
+    "O3_EXECUTION": "constructive",     ← Sattvic at execution layer
+    "O2_IDENTITY": "neutral",
+    "O4_STRUCTURE": "constructive",     ← Sattvic at structure layer
+    "O5_COGNITION": "transitional",     ← Rajasic at cognition layer
+    "O6_AGENCY": "transitional",        ← Rajasic at agency layer
+    "O8_PURPOSE": "constructive",       ← Sattvic at purpose layer
+    ...
+}
+```
+
+This confirms: **Ka is not uniformly Sattvic**. It is Sattvic at execution/structure/purpose layers, Rajasic at cognition/agency layers, and neutral at identity/witness layers. The Guna expression depends on which ontological layer is contextually active.
+
+### Required update: `varna_bridge_map_v2.json`
+
+The current `varna_bridge_map_v1.json` captures only a single `bridge_meaning` per consonant (e.g., `"hope_pressure"` for Ka). This is the **Sattvic expression only**.
+
+The updated v2 schema should capture all three Guna expressions per consonant:
+
+```json
+{
+  "meta": {
+    "source": "Sanskrit Varna Mala",
+    "version": "3.0",
+    "purpose": "Phase-1b substrate bridge with tri-Guna expressions",
+    "migration_note": "Added guna_expressions per consonant (Phase 5 R-branch target)"
+  },
+  "consonants": {
+    "ka": {
+      "type": "consonant",
+      "aspirated": false,
+      "varna_group": "ka_varga",
+      "bridge_meaning": "hope_pressure",
+      "guna_expressions": {
+        "sattva": {
+          "vritti": "Āśā (Hope)",
+          "quality": "forward-seeking clarity, trust in potential",
+          "dominant_layers": ["O3_EXECUTION", "O4_STRUCTURE", "O8_PURPOSE"]
+        },
+        "rajas": {
+          "vritti": "Anxiety / Restless anticipation",
+          "quality": "agitated forward-seeking, urgent projection",
+          "dominant_layers": ["O5_COGNITION", "O6_AGENCY"]
+        },
+        "tamas": {
+          "vritti": "Doubt / Frozen anticipation",
+          "quality": "blocked forward-seeking, hope collapsed into uncertainty",
+          "dominant_layers": ["O1_POTENTIAL", "O9_WITNESSES"]
+        }
+      },
+      "layers": {
+        "O3_EXECUTION": "forward-seeking activation",
+        "O2_IDENTITY": "possibility classification",
+        ...
+      }
+    },
+    "kha": {
+      "type": "consonant",
+      "aspirated": true,
+      "varna_group": "ka_varga",
+      "bridge_meaning": "worry_pressure",
+      "guna_expressions": {
+        "sattva": {
+          "vritti": "Vigilant discernment",
+          "quality": "clear-eyed caution, wise alertness",
+          "dominant_layers": ["O7_REASONING", "O8_PURPOSE"]
+        },
+        "rajas": {
+          "vritti": "Worry / Anxious scanning",
+          "quality": "agitated obstacle-detection, restless vigilance",
+          "dominant_layers": ["O3_EXECUTION", "O5_COGNITION"]
+        },
+        "tamas": {
+          "vritti": "Paranoia / Frozen fear",
+          "quality": "paralyzed by perceived obstacles, inert dread",
+          "dominant_layers": ["O1_POTENTIAL", "O12_ABSOLVING"]
+        }
+      },
+      "layers": { ... }
+    },
+    "ga": {
+      "type": "consonant",
+      "aspirated": false,
+      "varna_group": "ka_varga",
+      "bridge_meaning": "action_pressure",
+      "guna_expressions": {
+        "sattva": {
+          "vritti": "Ceṣṭā (Purposeful action)",
+          "quality": "clear kinetic momentum, dharmic activity",
+          "dominant_layers": ["O3_EXECUTION", "O6_AGENCY", "O8_PURPOSE"]
+        },
+        "rajas": {
+          "vritti": "Compulsive action / Driven momentum",
+          "quality": "agitated doing, action for action's sake",
+          "dominant_layers": ["O3_EXECUTION", "O5_COGNITION"]
+        },
+        "tamas": {
+          "vritti": "Inertia / Resistance to action",
+          "quality": "blocked momentum, stagnation despite potential",
+          "dominant_layers": ["O1_POTENTIAL", "O4_STRUCTURE"]
+        }
+      },
+      "layers": { ... }
+    }
+  }
+}
+```
+
+### Schema for `guna_expressions`
+
+Every consonant entry should have:
+
+```json
+"guna_expressions": {
+  "sattva": {
+    "vritti": "<Sattvic expression of this phoneme's mental propensity>",
+    "quality": "<brief description of the clarified/uplifted form>",
+    "dominant_layers": ["<O-layers where Sattvic expression is strongest>"]
+  },
+  "rajas": {
+    "vritti": "<Rajasic expression — agitated/active form>",
+    "quality": "<brief description of the energized/restless form>",
+    "dominant_layers": ["<O-layers where Rajasic expression is strongest>"]
+  },
+  "tamas": {
+    "vritti": "<Tamasic expression — inert/obscured form>",
+    "quality": "<brief description of the blocked/collapsed form>",
+    "dominant_layers": ["<O-layers where Tamasic expression is strongest>"]
+  }
+}
+```
+
+### Consonants requiring three-Guna expressions
+
+All consonants in `ARPABET_TO_VARNA` need this treatment:
+
+| Varga | Consonants | Current single Vritti | Needs 3 Guna expressions |
+|-------|-----------|----------------------|-------------------------|
+| Ka-varga (Guttural) | ka, kha, ga, gha, ṅa | Hope, Worry, Action, ... | YES |
+| Ca-varga (Palatal) | ca, cha, ja, jha, ña | Scatter, ... | YES |
+| Ṭa-varga (Retroflex) | ṭa, ṭha, ḍa, ḍha, ṇa | Overstatement, Shyness, ... | YES |
+| Ta-varga (Dental) | ta, tha, da, dha, na | Melancholy, Craving, ... | YES |
+| Pa-varga (Labial) | pa, pha, ba, bha, ma | Revulsion, Fear, Indifference, ... | YES |
+| Semi-vowels | ya, ra, la, va | Lack of confidence, Annihilation, Cruelty, Dharma | YES |
+| Sibilants | śa, ṣa, sa, ha | Material greed, Escapism, Darkness | YES |
+
+Total: ~40 consonants × 3 Guna states = ~120 expressions to document.
+
+### Cross-reference with polarity map
+
+The `varna_polarity_map_v1.json` can be used to **validate** the new Guna expressions:
+
+- Layers marked `constructive` for a consonant should align with that consonant's `sattva.dominant_layers`
+- Layers marked `transitional` should align with `rajas.dominant_layers`
+- Layers marked `degenerative` should align with `tamas.dominant_layers`
+
+This provides a consistency check between the two data sources.
+
+### How the updated JSON will be consumed (Phase 5)
+
+```python
+# In VarnaCSRBridge (or new GunaBridge):
+def get_guna_vectors(self, varna: str) -> Dict[str, List[float]]:
+    """Return three 12D vectors: one per Guna expression."""
+    entry = self._data['consonants'][varna]
+    guna_expr = entry['guna_expressions']
+    return {
+        'sattva': self._layers_to_vector(guna_expr['sattva']['dominant_layers']),
+        'rajas': self._layers_to_vector(guna_expr['rajas']['dominant_layers']),
+        'tamas': self._layers_to_vector(guna_expr['tamas']['dominant_layers']),
+    }
+
+# In R-branch Guna-aware computation:
+# token_guna_vectors: (V, 3, 12) — three 12D vectors per token
+# context_guna_3d: (..., 3) — context Guna distribution
+# effective_affinity = sum_g context_guna[g] * token_guna_vectors[:, g, :]
+```
+
+---
+
 ## Not In Scope
 
-- Vowel Guna decomposition (vowels map to consciousness states, not Vritti propensities — different Guna logic)
-- Changing the 12D affinity vectors themselves
-- Modifying the CSR phoneme provider
+- Vowel Guna decomposition (vowels map to consciousness states, not Vritti propensities — different Guna logic, may need separate treatment)
+- Changing the 12D affinity vectors themselves (the current vectors remain as the "default/combined" affinity; Guna vectors are additional)
+- Modifying the CSR phoneme provider in Phase 5 (it continues to provide the combined 12D; Guna-aware R reads from the new JSON)
 - Changing cache shapes or checkpoint keys
 
 ---
