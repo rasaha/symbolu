@@ -5318,10 +5318,12 @@ def train(config: UnifiedTrainingConfig):
                                                f" λ_c={config.lambda_csr_token:.5f}")
                                 # CRS branch diagnostics (appended when active)
                                 if 'crs_S_gate_mean' in metrics:
+                                    _s_val = metrics.get('crs_S_mean', 0)
+                                    _s_fmt = f"{_s_val:.1e}" if abs(_s_val) < 0.01 else f"{_s_val:.3f}"
                                     _cg_msg += (f" | CRS: C={metrics.get('crs_C_mean', 0):.3f}"
                                                 f" R={metrics.get('crs_R_mean', 0):.3f}"
-                                                f" S={metrics.get('crs_S_mean', 0):.3f}"
-                                                f" Sg={metrics.get('crs_S_gate_mean', 0):.2f}"
+                                                f" S={_s_fmt}"
+                                                f" Sg={metrics.get('crs_S_gate_mean', 0):.4f}"
                                                 f" ovr={metrics.get('crs_semantic_override_rate', 0):.2f}")
                                 if 'crs_L_S' in metrics:
                                     _cg_msg += f" L_S={metrics['crs_L_S']:.3f}"
