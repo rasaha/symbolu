@@ -1023,6 +1023,7 @@ class UnifiedTrainingConfig:
     crs_weight_r: float = 0.2                      # w_R: resonance branch weight
     crs_weight_s: float = 0.6                      # w_S: semantic branch weight
     crs_alpha_base: float = 0.5                    # α_base: base-logit anchor weight
+    lambda_crs_semantic: float = 0.0               # Dedicated S-branch contrastive loss weight (0 = disabled)
 
     # Phase 3: Governance Integration
     lambda_kosha_routing: float = 0.0              # Kosha routing loss weight

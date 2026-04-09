@@ -5189,6 +5189,26 @@ def train(config: UnifiedTrainingConfig):
                                                 loss = loss + _prim_lam * _prim_loss
                                                 metrics[f'cg_{_prim_loss_key}'] = _prim_loss.item()
 
+                                # CRS dedicated S-branch loss: trains S bilinear directly
+                                # without competing with R for gradient through the combined column.
+                                _lambda_crs_s = getattr(config, 'lambda_crs_semantic', 0.0)
+                                if _lambda_crs_s > 0 and _crs_bd is not None:
+                                    _s_scores = _crs_bd['S']  # (..., K)
+                                    # Find correct token in shortlist
+                                    _s_target_exp = y.unsqueeze(-1)  # (..., 1)
+                                    _s_target_mask = (_cg_cand_ids == _s_target_exp)  # (..., K)
+                                    _s_has_target = _s_target_mask.any(dim=-1)  # (...)
+                                    if _s_has_target.any():
+                                        _s_valid = _s_scores[_s_has_target]  # (N, K)
+                                        _s_mask_valid = _s_target_mask[_s_has_target]  # (N, K)
+                                        _s_target_idx = _s_mask_valid.float().argmax(dim=-1)  # (N,)
+                                        _s_loss = torch.nn.functional.cross_entropy(
+                                            _s_valid / 0.1, _s_target_idx
+                                        )
+                                        if torch.isfinite(_s_loss):
+                                            loss = loss + _lambda_crs_s * _s_loss
+                                            metrics['crs_L_S'] = _s_loss.item()
+
                                 # Ontology → Vritti directional prior (cognitive axis alignment)
                                 # KL regularizer encouraging v_ctx toward ontology-derived prior.
                                 _vritti_prior_lam = getattr(config, 'lambda_vritti_ontology_prior', 0.0)
@@ -5303,6 +5323,8 @@ def train(config: UnifiedTrainingConfig):
                                                 f" S={metrics.get('crs_S_mean', 0):.3f}"
                                                 f" Sg={metrics.get('crs_S_gate_mean', 0):.2f}"
                                                 f" ovr={metrics.get('crs_semantic_override_rate', 0):.2f}")
+                                if 'crs_L_S' in metrics:
+                                    _cg_msg += f" L_S={metrics['crs_L_S']:.3f}"
                                 # Phase 3 entry diagnostic
                                 _p3_entered = 'cg_alpha_entropy' in metrics or 'cg_kosha_routing_loss' in metrics
                                 _cg_msg += f" | P3={'Y' if _p3_entered else 'N'}"
@@ -10134,6 +10156,8 @@ def main():
                        help="CRS semantic branch weight")
     parser.add_argument("--crs_alpha_base", type=float, default=0.5,
                        help="CRS base-logit anchor weight for S branch")
+    parser.add_argument("--lambda_crs_semantic", type=float, default=0.0,
+                       help="Dedicated S-branch contrastive loss weight (0=disabled)")
 
     # Conscious Generation Phase 3: Governance Integration
     parser.add_argument("--lambda_kosha_routing", type=float, default=0.0,
@@ -11060,6 +11084,7 @@ def main():
         crs_weight_r=args.crs_weight_r,
         crs_weight_s=args.crs_weight_s,
         crs_alpha_base=args.crs_alpha_base,
+        lambda_crs_semantic=args.lambda_crs_semantic,
         # Conscious Generation (Phase 3)
         lambda_kosha_routing=args.lambda_kosha_routing,
         lambda_bliss_token=args.lambda_bliss_token,
