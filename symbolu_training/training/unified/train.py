@@ -5041,13 +5041,15 @@ def train(config: UnifiedTrainingConfig):
                                         _r_top1 = _crs_bd['R'].argmax(dim=-1)
                                         metrics['crs_semantic_override_rate'] = (_crs_top1 != _r_top1).float().mean().item()
 
-                                # Build domain signal from Gyroscope detection
-                                # Soft mapping: LANG/MATH/CODE → 8-dim distribution
+                                # Build domain signal
                                 _cg_domain = None
+                                _cg_domain_hardcoded = None  # kept for bootstrap loss + diagnostics
+
+                                # Always compute hardcoded bridge (fallback + bootstrap target)
                                 try:
                                     from symbolu_training.training.conscious_generation.governance.domain_bridge import map_gyro_to_domain
                                     _cg_domain_label = metrics.get('gyroscope_domain_label', 'LANG')
-                                    _cg_domain = map_gyro_to_domain(
+                                    _cg_domain_hardcoded = map_gyro_to_domain(
                                         domain_label=_cg_domain_label,
                                         batch_size=_cg_hidden.shape[0],
                                         seq_len=_cg_hidden.shape[1] if _cg_hidden.dim() == 3 else None,
@@ -5056,6 +5058,25 @@ def train(config: UnifiedTrainingConfig):
                                     )
                                 except ImportError:
                                     pass
+
+                                # Phase 5: Learned domain classifier (when enabled)
+                                _cg_domain_cls_result = None
+                                if 'domain_classifier' in model.conscious_gen:
+                                    _dc = model.conscious_gen['domain_classifier']
+                                    _cg_domain_cls_result = _dc(
+                                        hidden=_cg_hidden,
+                                        o_ctx=_cg_sov_state,
+                                    )
+                                    # Use learned domain for routing
+                                    _cg_domain = _cg_domain_cls_result['domain']
+                                    # Expand to match hidden seq dim if needed
+                                    if _cg_hidden.dim() == 3 and _cg_domain.dim() == 2:
+                                        _cg_domain = _cg_domain.unsqueeze(1).expand(
+                                            -1, _cg_hidden.shape[1], -1
+                                        )
+                                else:
+                                    # Fallback: hardcoded bridge
+                                    _cg_domain = _cg_domain_hardcoded
 
                                 # Run IntegratedTokenScorer (Kosha + Bliss)
                                 # Phase 3: Detach hidden/o_ctx (router trains its MLP
@@ -5240,6 +5261,39 @@ def train(config: UnifiedTrainingConfig):
                                                   f" (max={_als_max})", flush=True)
                                     metrics['crs_lambda_S_eff'] = _crs_adaptive_lambda_current
 
+                                # Phase 5: Domain classification loss + diagnostics
+                                if _cg_domain_cls_result is not None:
+                                    # Diagnostics (always logged when classifier is active)
+                                    with torch.no_grad():
+                                        _dc_domain = _cg_domain_cls_result['domain']  # (B, 8)
+                                        _dc_entropy = _cg_domain_cls_result['entropy']  # (B,)
+                                        metrics['domain_entropy'] = _dc_entropy.mean().item()
+                                        _dc_mean = _dc_domain.mean(dim=0)  # (8,)
+                                        metrics['domain_top1'] = _dc_mean.argmax().item()
+                                        metrics['domain_top1_mass'] = _dc_mean.max().item()
+                                        # Agreement with hardcoded bridge
+                                        if _cg_domain_hardcoded is not None:
+                                            _hc = _cg_domain_hardcoded
+                                            if _hc.dim() == 3:
+                                                _hc = _hc[:, 0, :]  # take first position
+                                            _dc_top1_learned = _dc_domain.argmax(dim=-1)
+                                            _dc_top1_hardcoded = _hc.argmax(dim=-1)
+                                            metrics['domain_bridge_agreement'] = (_dc_top1_learned == _dc_top1_hardcoded).float().mean().item()
+
+                                    # Bootstrap loss: KL against hardcoded bridge distribution
+                                    _lambda_dc = getattr(config, 'lambda_domain_cls', 0.0)
+                                    if _lambda_dc > 0 and _cg_domain_hardcoded is not None:
+                                        _dc_logits = _cg_domain_cls_result['logits']  # (B, 8)
+                                        _dc_target = _cg_domain_hardcoded
+                                        if _dc_target.dim() == 3:
+                                            _dc_target = _dc_target[:, 0, :]  # (B, 8)
+                                        _dc_loss = model.conscious_gen['domain_classifier'].compute_loss(
+                                            _dc_logits, _dc_target, soft_target=True
+                                        )
+                                        if torch.isfinite(_dc_loss):
+                                            loss = loss + _lambda_dc * _dc_loss
+                                            metrics['domain_cls_loss'] = _dc_loss.item()
+
                                 # Ontology → Vritti directional prior (cognitive axis alignment)
                                 # KL regularizer encouraging v_ctx toward ontology-derived prior.
                                 _vritti_prior_lam = getattr(config, 'lambda_vritti_ontology_prior', 0.0)
@@ -5360,6 +5414,16 @@ def train(config: UnifiedTrainingConfig):
                                     _cg_msg += f" L_S={metrics['crs_L_S']:.3f}"
                                     if 'crs_lambda_S_eff' in metrics:
                                         _cg_msg += f" λS={metrics['crs_lambda_S_eff']:.4f}"
+                                # Domain classifier diagnostics
+                                if 'domain_entropy' in metrics:
+                                    from symbolu_training.training.conscious_generation.governance.domain_classifier import DOMAIN_NAMES
+                                    _dom_top1_idx = metrics.get('domain_top1', 0)
+                                    _dom_name = DOMAIN_NAMES[_dom_top1_idx] if _dom_top1_idx < len(DOMAIN_NAMES) else '?'
+                                    _cg_msg += (f" | DOM: {_dom_name}({metrics.get('domain_top1_mass', 0):.2f})"
+                                                f" H={metrics.get('domain_entropy', 0):.2f}"
+                                                f" agr={metrics.get('domain_bridge_agreement', 0):.2f}")
+                                    if 'domain_cls_loss' in metrics:
+                                        _cg_msg += f" L_d={metrics['domain_cls_loss']:.3f}"
                                 # Phase 3 entry diagnostic
                                 _p3_entered = 'cg_alpha_entropy' in metrics or 'cg_kosha_routing_loss' in metrics
                                 _cg_msg += f" | P3={'Y' if _p3_entered else 'N'}"
@@ -10204,6 +10268,12 @@ def main():
     parser.add_argument("--crs_adaptive_lambda_patience", type=int, default=300,
                        help="Steps of L_S plateau before boosting lambda by 1.5x")
 
+    # Phase 5: Learned Domain Conditioning
+    parser.add_argument("--use_learned_domain_classifier", action="store_true", default=False,
+                       help="Replace hardcoded domain bridge with learned domain classifier")
+    parser.add_argument("--lambda_domain_cls", type=float, default=0.0,
+                       help="Domain classification loss weight (bootstrap from hardcoded labels)")
+
     # Conscious Generation Phase 3: Governance Integration
     parser.add_argument("--lambda_kosha_routing", type=float, default=0.0,
                        help="Kosha routing loss weight")
@@ -11135,6 +11205,9 @@ def main():
         crs_adaptive_lambda_target=args.crs_adaptive_lambda_target,
         crs_adaptive_lambda_max=args.crs_adaptive_lambda_max,
         crs_adaptive_lambda_patience=args.crs_adaptive_lambda_patience,
+        # Phase 5: Learned Domain Conditioning
+        use_learned_domain_classifier=args.use_learned_domain_classifier,
+        lambda_domain_cls=args.lambda_domain_cls,
         # Conscious Generation (Phase 3)
         lambda_kosha_routing=args.lambda_kosha_routing,
         lambda_bliss_token=args.lambda_bliss_token,
