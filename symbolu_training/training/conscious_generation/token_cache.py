@@ -55,9 +55,11 @@ class TokenPrimitiveCache(nn.Module):
         vritti_classes: int = 5,
         guna_classes: int = 3,
         semantic_dim: int = 0,
+        refresh_ema: float = 0.2,
     ):
         super().__init__()
         self.projector = projector
+        self.refresh_ema = refresh_ema
         self.vocab_size = vocab_size
         self.state_dim = state_dim
         self.refresh_interval = refresh_interval
@@ -113,6 +115,15 @@ class TokenPrimitiveCache(nn.Module):
         self._csr_affinity_fn = csr_affinity_fn
         self._semantic_scorer = semantic_scorer
 
+    def _blend(self, buf: torch.Tensor, start: int, end: int, new_vals: torch.Tensor) -> None:
+        """Write new values into buffer, using EMA blending after first init."""
+        if self._is_initialized:
+            # EMA blend: buf = (1 - α) * old + α * new
+            buf[start:end] = (1.0 - self.refresh_ema) * buf[start:end] + self.refresh_ema * new_vals
+        else:
+            # First init: full write
+            buf[start:end] = new_vals
+
     @torch.no_grad()
     def refresh(
         self,
@@ -125,6 +136,10 @@ class TokenPrimitiveCache(nn.Module):
 
         Processes in chunks to limit peak memory. Phase 2 buffers are only
         refreshed if their respective scorers have been registered.
+
+        After first initialization, uses EMA blending (controlled by
+        self.refresh_ema) to smooth transitions and prevent gradient
+        variance spikes at refresh boundaries.
 
         Args:
             embedding_weight: Token embedding matrix (V, embed_dim)
@@ -147,38 +162,43 @@ class TokenPrimitiveCache(nn.Module):
 
             # Phase 1: Ontological codes
             o_chunk = self.projector(chunk_emb)
-            self.O_tok[start:end] = o_chunk
+            self._blend(self.O_tok, start, end, o_chunk)
 
             # Phase 2: Plausibility — needs [e_w; o_w]
             if self._plausibility_scorer is not None:
-                self.P_tok[start:end] = self._plausibility_scorer.compute_token_repr(
+                new_p = self._plausibility_scorer.compute_token_repr(
                     chunk_emb, o_chunk
                 )
+                self._blend(self.P_tok, start, end, new_p)
 
             # Phase 2: CSR — needs phoneme affinity
             if self._csr_scorer is not None and csr_affinity is not None:
-                self.R_tok[start:end] = self._csr_scorer.compute_token_repr(
+                new_r = self._csr_scorer.compute_token_repr(
                     csr_affinity[start:end]
                 )
+                self._blend(self.R_tok, start, end, new_r)
 
             # Phase 2: Vritti — needs embeddings
             if self._vritti_scorer is not None:
-                self.V_tok[start:end] = self._vritti_scorer.compute_token_repr(
+                new_v = self._vritti_scorer.compute_token_repr(
                     chunk_emb
                 )
+                self._blend(self.V_tok, start, end, new_v)
 
             # Phase 2: Guna — needs embeddings
             if self._guna_scorer is not None:
-                self.G_tok[start:end] = self._guna_scorer.compute_token_repr(
+                new_g = self._guna_scorer.compute_token_repr(
                     chunk_emb
                 )
+                self._blend(self.G_tok, start, end, new_g)
 
             # CRS Phase 2: Semantic — needs [e_w; bhava_w]
             if self._semantic_scorer is not None and self.semantic_dim > 0:
-                bhava_chunk = o_chunk[..., 0:12]
-                self.S_tok[start:end] = self._semantic_scorer.compute_S_token_repr(
+                bhava_chunk = o_chunk[..., 0:12] if not self._is_initialized else self.O_tok[start:end, 0:12]
+                new_s = self._semantic_scorer.compute_S_token_repr(
                     chunk_emb, bhava_chunk
                 )
+                self._blend(self.S_tok, start, end, new_s)
 
         self._is_initialized = True
 
