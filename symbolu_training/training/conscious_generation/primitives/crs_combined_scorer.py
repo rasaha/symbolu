@@ -49,7 +49,7 @@ class CRSCombinedScorer(nn.Module):
         self,
         csr_scorer: nn.Module,
         embed_dim: int,
-        semantic_dim: int = 16,
+        semantic_dim: int = 32,
         bhava_dim: int = 12,
         cognitive_dim: int = 10,
         cognitive_rank: int = 4,
@@ -265,14 +265,23 @@ class CRSCombinedScorer(nn.Module):
         """
         Combine CRS branches with semantic firewall.
 
-        S_prob = σ(S_raw)                             — S_raw already includes anchor
+        S_centered = S_raw - mean(S_raw)              — prevent S mean drift
+        S_prob = σ(S_centered)                         — centered, so σ ≈ 0.5 on average
         S_gate = σ(k_s · (S_prob − τ_s))
         CRS    = S_gate · (w_C·C + w_R·R + w_S·S) · S_prob
+
+        Center-normalization ensures S_prob stays near 0.5 on average across
+        candidates, preventing the negative-drift failure mode where S_mean
+        goes strongly negative → S_gate closes → L_S explodes → runaway.
+        The gate still discriminates: candidates with above-average S get
+        S_prob > 0.5 → S_gate opens; below-average get S_gate closes.
 
         Returns:
             Dict with 'crs_score', 'S_prob', 'S_gate'
         """
-        S_prob = torch.sigmoid(S_raw)
+        # Center S within each candidate set to prevent mean drift
+        S_centered = S_raw - S_raw.mean(dim=-1, keepdim=True)
+        S_prob = torch.sigmoid(S_centered)
         S_gate = torch.sigmoid(self.k_s * (S_prob - self.s_threshold))
         weighted = self.w_c * C_raw + self.w_r * R_raw + self.w_s * S_raw
         crs_score = S_gate * weighted * S_prob

@@ -630,7 +630,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         )
 
         # Single cache with Phase 1 + Phase 2 buffer dimensions
-        _crs_semantic_dim = getattr(config, 'semantic_dim', 16) if getattr(config, 'use_crs_combined_scorer', False) else 0
+        _crs_semantic_dim = getattr(config, 'semantic_dim', 32) if getattr(config, 'use_crs_combined_scorer', False) else 0
         token_cache = TokenPrimitiveCache(
             projector=token_projector,
             vocab_size=config.vocab_size,
@@ -639,6 +639,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             jepa_dim=config.plausibility_token_dim,
             csr_dim=config.csr_token_dim,
             semantic_dim=_crs_semantic_dim,
+            refresh_ema_decay=getattr(config, 'cache_refresh_ema_decay', 0.8),
         )
 
         ontology_scorer = OntologyCompatibilityScorer(
@@ -689,7 +690,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             crs_combined_scorer = CRSCombinedScorer(
                 csr_scorer=csr_scorer,
                 embed_dim=embed_dim,
-                semantic_dim=getattr(config, 'semantic_dim', 16),
+                semantic_dim=getattr(config, 'semantic_dim', 32),
                 w_c=getattr(config, 'crs_weight_c', 0.2),
                 w_r=getattr(config, 'crs_weight_r', 0.2),
                 w_s=getattr(config, 'crs_weight_s', 0.6),
@@ -762,7 +763,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         if crs_combined_scorer is not None:
             print(f"  [Conscious Gen CRS] Combined Cognitive-Resonance-Semantic scorer ENABLED")
             print(f"    Column 3 = CRS combined (was: raw CSR)")
-            print(f"    S branch: d_s={getattr(config, 'semantic_dim', 16)}, S_tok cache active")
+            print(f"    S branch: d_s={getattr(config, 'semantic_dim', 32)}, S_tok cache active")
             print(f"    Weights: w_C={config.crs_weight_c}, w_R={config.crs_weight_r}, w_S={config.crs_weight_s}")
             print(f"    Gate: tau_s={config.crs_semantic_threshold}, k_s={config.crs_gate_sharpness}, alpha_base={config.crs_alpha_base}")
         print(f"    VrittiTokenScorer: 5 classes (dot-product)")

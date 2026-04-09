@@ -22,6 +22,12 @@
 
 set -e
 
+# Ensure repo root is on PYTHONPATH so symbolu_training is importable
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
+cd "$REPO_ROOT"
+
 # =============================================================================
 # DEFAULTS — tuned for meaningful comparison on limited budget
 # =============================================================================
@@ -107,12 +113,13 @@ echo "============================================================"
 # Common training args (identical between A and B)
 COMMON_ARGS=(
     --model_type mistral_cg
-    --model_name "$MISTRAL_MODEL"
-    --quantize "$QUANTIZE"
+    --mistral_model_name "$MISTRAL_MODEL"
+    --mistral_quantize "$QUANTIZE"
     --dataset "$DATASET"
     --max_steps "$MAX_STEPS"
     --batch_size "$BATCH_SIZE"
-    --gradient_accumulation_steps "$GRADIENT_ACCUMULATION"
+    --gradient_accumulation "$GRADIENT_ACCUMULATION"
+    --max_seq_len 512
     --learning_rate "$LEARNING_RATE"
     --warmup_steps "$WARMUP_STEPS"
     --eval_every "$EVAL_EVERY"

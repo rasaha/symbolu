@@ -2282,6 +2282,15 @@ def train(config: UnifiedTrainingConfig):
         print(f"\n  ⚠️  KOSHA GYROSCOPE REQUESTED but module not available!")
         print(f"      Check: symbolu/losses/kosha_gyroscope.py exists and imports correctly")
 
+    # CRS adaptive L_S lambda state
+    _crs_adaptive_lambda_current = getattr(config, 'lambda_crs_semantic', 0.0)
+    if getattr(config, 'crs_adaptive_lambda', False) and _crs_adaptive_lambda_current <= 0:
+        # Adaptive enabled but no starting lambda — set a reasonable floor
+        _crs_adaptive_lambda_current = 0.01
+        print(f"  [CRS-ADAPT] lambda_crs_semantic=0, auto-setting starting lambda to 0.01")
+    _crs_adaptive_best_ls = float('inf')
+    _crs_adaptive_plateau_start = 0
+
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
     print(f"{'='*70}\n", flush=True)
@@ -5189,6 +5198,48 @@ def train(config: UnifiedTrainingConfig):
                                                 loss = loss + _prim_lam * _prim_loss
                                                 metrics[f'cg_{_prim_loss_key}'] = _prim_loss.item()
 
+                                # CRS dedicated S-branch loss: trains S bilinear directly
+                                # without competing with R for gradient through the combined column.
+                                # Use adaptive lambda if enabled, otherwise fixed config value
+                                _lambda_crs_s = _crs_adaptive_lambda_current if getattr(config, 'crs_adaptive_lambda', False) else getattr(config, 'lambda_crs_semantic', 0.0)
+                                if _lambda_crs_s > 0 and _crs_bd is not None:
+                                    _s_scores = _crs_bd['S']  # (..., K)
+                                    # Find correct token in shortlist
+                                    _s_target_exp = y.unsqueeze(-1)  # (..., 1)
+                                    _s_target_mask = (_cg_cand_ids == _s_target_exp)  # (..., K)
+                                    _s_has_target = _s_target_mask.any(dim=-1)  # (...)
+                                    if _s_has_target.any():
+                                        _s_valid = _s_scores[_s_has_target]  # (N, K)
+                                        _s_mask_valid = _s_target_mask[_s_has_target]  # (N, K)
+                                        _s_target_idx = _s_mask_valid.float().argmax(dim=-1)  # (N,)
+                                        _s_loss = torch.nn.functional.cross_entropy(
+                                            _s_valid / 0.1, _s_target_idx
+                                        )
+                                        if torch.isfinite(_s_loss):
+                                            loss = loss + _lambda_crs_s * _s_loss
+                                            metrics['crs_L_S'] = _s_loss.item()
+
+                                # CRS adaptive L_S lambda: boost when plateaued
+                                if getattr(config, 'crs_adaptive_lambda', False) and 'crs_L_S' in metrics:
+                                    _als_val = metrics['crs_L_S']
+                                    _als_target = config.crs_adaptive_lambda_target
+                                    _als_patience = config.crs_adaptive_lambda_patience
+                                    _als_max = config.crs_adaptive_lambda_max
+                                    if _als_val < _crs_adaptive_best_ls - 0.05:
+                                        # New best — reset patience
+                                        _crs_adaptive_best_ls = _als_val
+                                        _crs_adaptive_plateau_start = global_step
+                                    elif _als_val > _als_target and (global_step - _crs_adaptive_plateau_start) >= _als_patience:
+                                        # Plateaued above target — boost lambda
+                                        _old_lam = _crs_adaptive_lambda_current
+                                        _crs_adaptive_lambda_current = min(_crs_adaptive_lambda_current * 1.5, _als_max)
+                                        if _crs_adaptive_lambda_current > _old_lam:
+                                            _crs_adaptive_plateau_start = global_step  # reset patience
+                                            print(f"  🔧 [CRS-ADAPT] L_S={_als_val:.3f} plateaued > {_als_target} for {_als_patience} steps."
+                                                  f" lambda_S: {_old_lam:.4f} → {_crs_adaptive_lambda_current:.4f}"
+                                                  f" (max={_als_max})", flush=True)
+                                    metrics['crs_lambda_S_eff'] = _crs_adaptive_lambda_current
+
                                 # Ontology → Vritti directional prior (cognitive axis alignment)
                                 # KL regularizer encouraging v_ctx toward ontology-derived prior.
                                 _vritti_prior_lam = getattr(config, 'lambda_vritti_ontology_prior', 0.0)
@@ -5298,11 +5349,17 @@ def train(config: UnifiedTrainingConfig):
                                                f" λ_c={config.lambda_csr_token:.5f}")
                                 # CRS branch diagnostics (appended when active)
                                 if 'crs_S_gate_mean' in metrics:
+                                    _s_val = metrics.get('crs_S_mean', 0)
+                                    _s_fmt = f"{_s_val:.1e}" if abs(_s_val) < 0.01 else f"{_s_val:.3f}"
                                     _cg_msg += (f" | CRS: C={metrics.get('crs_C_mean', 0):.3f}"
                                                 f" R={metrics.get('crs_R_mean', 0):.3f}"
-                                                f" S={metrics.get('crs_S_mean', 0):.3f}"
-                                                f" Sg={metrics.get('crs_S_gate_mean', 0):.2f}"
+                                                f" S={_s_fmt}"
+                                                f" Sg={metrics.get('crs_S_gate_mean', 0):.4f}"
                                                 f" ovr={metrics.get('crs_semantic_override_rate', 0):.2f}")
+                                if 'crs_L_S' in metrics:
+                                    _cg_msg += f" L_S={metrics['crs_L_S']:.3f}"
+                                    if 'crs_lambda_S_eff' in metrics:
+                                        _cg_msg += f" λS={metrics['crs_lambda_S_eff']:.4f}"
                                 # Phase 3 entry diagnostic
                                 _p3_entered = 'cg_alpha_entropy' in metrics or 'cg_kosha_routing_loss' in metrics
                                 _cg_msg += f" | P3={'Y' if _p3_entered else 'N'}"
@@ -10089,6 +10146,8 @@ def main():
                        help="Ontological code dimension (must match SOVEREIGN_STATE_DIM)")
     parser.add_argument("--ontology_cache_refresh_interval", type=int, default=100,
                        help="Steps between O_tok cache refresh")
+    parser.add_argument("--cache_refresh_ema_decay", type=float, default=0.8,
+                       help="EMA decay for cache refresh blending (0.8=retain 80%% old; 0.0=full replacement, disables EMA)")
     parser.add_argument("--lambda_ont", type=float, default=0.0,
                        help="Ontological structure loss weight (0 = disabled)")
     parser.add_argument("--ontology_loss_type", type=str, default="contrastive",
@@ -10120,7 +10179,7 @@ def main():
     # CRS Phase 2: Combined Cognitive-Resonance-Semantic scorer
     parser.add_argument("--use_crs_combined_scorer", action="store_true", default=False,
                        help="Replace CSR column with CRS combined scorer (C+R+S with semantic firewall)")
-    parser.add_argument("--semantic_dim", type=int, default=16,
+    parser.add_argument("--semantic_dim", type=int, default=32,
                        help="Dimension for CRS S-branch token representations")
     parser.add_argument("--crs_semantic_threshold", type=float, default=0.45,
                        help="Semantic gate threshold (tau_s)")
@@ -10134,6 +10193,16 @@ def main():
                        help="CRS semantic branch weight")
     parser.add_argument("--crs_alpha_base", type=float, default=0.5,
                        help="CRS base-logit anchor weight for S branch")
+    parser.add_argument("--lambda_crs_semantic", type=float, default=0.0,
+                       help="Dedicated S-branch contrastive loss weight (0=disabled)")
+    parser.add_argument("--crs_adaptive_lambda", action="store_true", default=False,
+                       help="Enable adaptive L_S lambda scaling based on plateau detection")
+    parser.add_argument("--crs_adaptive_lambda_target", type=float, default=2.5,
+                       help="L_S target — boost lambda when L_S stays above this")
+    parser.add_argument("--crs_adaptive_lambda_max", type=float, default=0.15,
+                       help="Maximum lambda_crs_semantic after adaptive boosting")
+    parser.add_argument("--crs_adaptive_lambda_patience", type=int, default=300,
+                       help="Steps of L_S plateau before boosting lambda by 1.5x")
 
     # Conscious Generation Phase 3: Governance Integration
     parser.add_argument("--lambda_kosha_routing", type=float, default=0.0,
@@ -11038,6 +11107,7 @@ def main():
         enable_conscious_generation=args.enable_conscious_generation,
         token_ontology_dim=args.token_ontology_dim,
         ontology_cache_refresh_interval=args.ontology_cache_refresh_interval,
+        cache_refresh_ema_decay=args.cache_refresh_ema_decay,
         lambda_ont=args.lambda_ont,
         ontology_loss_type=args.ontology_loss_type,
         ontology_loss_temperature=args.ontology_loss_temperature,
@@ -11051,6 +11121,20 @@ def main():
         use_low_rank_primitives=args.use_low_rank_primitives,
         primitive_rank=args.primitive_rank,
         use_shared_token_basis=args.use_shared_token_basis,
+        # CRS Phase 2: Combined Cognitive-Resonance-Semantic scorer
+        use_crs_combined_scorer=args.use_crs_combined_scorer,
+        semantic_dim=args.semantic_dim,
+        crs_semantic_threshold=args.crs_semantic_threshold,
+        crs_gate_sharpness=args.crs_gate_sharpness,
+        crs_weight_c=args.crs_weight_c,
+        crs_weight_r=args.crs_weight_r,
+        crs_weight_s=args.crs_weight_s,
+        crs_alpha_base=args.crs_alpha_base,
+        lambda_crs_semantic=args.lambda_crs_semantic,
+        crs_adaptive_lambda=args.crs_adaptive_lambda,
+        crs_adaptive_lambda_target=args.crs_adaptive_lambda_target,
+        crs_adaptive_lambda_max=args.crs_adaptive_lambda_max,
+        crs_adaptive_lambda_patience=args.crs_adaptive_lambda_patience,
         # Conscious Generation (Phase 3)
         lambda_kosha_routing=args.lambda_kosha_routing,
         lambda_bliss_token=args.lambda_bliss_token,
