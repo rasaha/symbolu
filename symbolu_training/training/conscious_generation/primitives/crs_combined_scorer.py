@@ -49,7 +49,7 @@ class CRSCombinedScorer(nn.Module):
         self,
         csr_scorer: nn.Module,
         embed_dim: int,
-        semantic_dim: int = 16,
+        semantic_dim: int = 32,
         bhava_dim: int = 12,
         cognitive_dim: int = 10,
         cognitive_rank: int = 4,
