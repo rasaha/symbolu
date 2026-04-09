@@ -2284,6 +2284,10 @@ def train(config: UnifiedTrainingConfig):
 
     # CRS adaptive L_S lambda state
     _crs_adaptive_lambda_current = getattr(config, 'lambda_crs_semantic', 0.0)
+    if getattr(config, 'crs_adaptive_lambda', False) and _crs_adaptive_lambda_current <= 0:
+        # Adaptive enabled but no starting lambda — set a reasonable floor
+        _crs_adaptive_lambda_current = 0.01
+        print(f"  [CRS-ADAPT] lambda_crs_semantic=0, auto-setting starting lambda to 0.01")
     _crs_adaptive_best_ls = float('inf')
     _crs_adaptive_plateau_start = 0
 
