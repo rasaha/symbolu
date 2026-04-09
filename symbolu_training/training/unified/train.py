@@ -10117,6 +10117,24 @@ def main():
     parser.add_argument("--use_shared_token_basis", action="store_true", default=False,
                        help="Share intermediate projection across primitives")
 
+    # CRS Phase 2: Combined Cognitive-Resonance-Semantic scorer
+    parser.add_argument("--use_crs_combined_scorer", action="store_true", default=False,
+                       help="Replace CSR column with CRS combined scorer (C+R+S with semantic firewall)")
+    parser.add_argument("--semantic_dim", type=int, default=16,
+                       help="Dimension for CRS S-branch token representations")
+    parser.add_argument("--crs_semantic_threshold", type=float, default=0.45,
+                       help="Semantic gate threshold (tau_s)")
+    parser.add_argument("--crs_gate_sharpness", type=float, default=10.0,
+                       help="Semantic gate sharpness (k_s)")
+    parser.add_argument("--crs_weight_c", type=float, default=0.2,
+                       help="CRS cognitive branch weight")
+    parser.add_argument("--crs_weight_r", type=float, default=0.2,
+                       help="CRS resonance branch weight")
+    parser.add_argument("--crs_weight_s", type=float, default=0.6,
+                       help="CRS semantic branch weight")
+    parser.add_argument("--crs_alpha_base", type=float, default=0.5,
+                       help="CRS base-logit anchor weight for S branch")
+
     # Conscious Generation Phase 3: Governance Integration
     parser.add_argument("--lambda_kosha_routing", type=float, default=0.0,
                        help="Kosha routing loss weight")
