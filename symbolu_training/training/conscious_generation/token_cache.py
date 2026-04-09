@@ -54,6 +54,7 @@ class TokenPrimitiveCache(nn.Module):
         csr_dim: int = 16,
         vritti_classes: int = 5,
         guna_classes: int = 3,
+        semantic_dim: int = 0,
     ):
         super().__init__()
         self.projector = projector
@@ -64,6 +65,7 @@ class TokenPrimitiveCache(nn.Module):
         self.csr_dim = csr_dim
         self.vritti_classes = vritti_classes
         self.guna_classes = guna_classes
+        self.semantic_dim = semantic_dim
 
         # Phase 1: Ontological codes
         self.register_buffer("O_tok", torch.zeros(vocab_size, state_dim))
@@ -74,6 +76,15 @@ class TokenPrimitiveCache(nn.Module):
         self.register_buffer("V_tok", torch.zeros(vocab_size, vritti_classes))
         self.register_buffer("G_tok", torch.zeros(vocab_size, guna_classes))
 
+        # CRS Phase 2: Semantic token representations (S branch)
+        # Buffer is always registered for checkpoint shape stability.
+        # When semantic_dim=0 (CRS disabled), it's a (V, 0) no-op tensor.
+        # Old checkpoints missing this key will get zeros via default buffer.
+        if semantic_dim > 0:
+            self.register_buffer("S_tok", torch.zeros(vocab_size, semantic_dim))
+        else:
+            self.register_buffer("S_tok", torch.zeros(vocab_size, 0))
+
         self.register_buffer("_step_counter", torch.tensor(0, dtype=torch.long))
         self._is_initialized = False
 
@@ -83,6 +94,7 @@ class TokenPrimitiveCache(nn.Module):
         self._vritti_scorer = None
         self._guna_scorer = None
         self._csr_affinity_fn = None  # callable: (V, embed_dim) -> (V, 12)
+        self._semantic_scorer = None  # CRS Phase 2: CRSCombinedScorer (for S_tok refresh)
 
     def set_scorers(
         self,
@@ -91,6 +103,7 @@ class TokenPrimitiveCache(nn.Module):
         vritti_scorer: Optional[Any] = None,
         guna_scorer: Optional[Any] = None,
         csr_affinity_fn: Optional[Any] = None,
+        semantic_scorer: Optional[Any] = None,
     ) -> None:
         """Register Phase 2 scorer modules for cache refresh."""
         self._plausibility_scorer = jepa_scorer
@@ -98,6 +111,7 @@ class TokenPrimitiveCache(nn.Module):
         self._vritti_scorer = vritti_scorer
         self._guna_scorer = guna_scorer
         self._csr_affinity_fn = csr_affinity_fn
+        self._semantic_scorer = semantic_scorer
 
     @torch.no_grad()
     def refresh(
@@ -157,6 +171,13 @@ class TokenPrimitiveCache(nn.Module):
             if self._guna_scorer is not None:
                 self.G_tok[start:end] = self._guna_scorer.compute_token_repr(
                     chunk_emb
+                )
+
+            # CRS Phase 2: Semantic — needs [e_w; bhava_w]
+            if self._semantic_scorer is not None and self.semantic_dim > 0:
+                bhava_chunk = o_chunk[..., 0:12]
+                self.S_tok[start:end] = self._semantic_scorer.compute_S_token_repr(
+                    chunk_emb, bhava_chunk
                 )
 
         self._is_initialized = True
@@ -263,12 +284,15 @@ class TokenPrimitiveCache(nn.Module):
             ).sum(dim=-1).mean().item()
 
             # Phase 2 buffer norms (if populated)
-            for name, buf in [
+            buffers_to_check = [
                 ("P_tok", self.P_tok),
                 ("R_tok", self.R_tok),
                 ("V_tok", self.V_tok),
                 ("G_tok", self.G_tok),
-            ]:
+            ]
+            if self.semantic_dim > 0:
+                buffers_to_check.append(("S_tok", self.S_tok))
+            for name, buf in buffers_to_check:
                 norm = buf.norm(dim=-1).mean().item()
                 diag[f"{name}_mean_norm"] = norm
 

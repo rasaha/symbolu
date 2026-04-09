@@ -17,9 +17,11 @@ from symbolu_training.training.conscious_generation.primitives.jepa_scorer impor
 from symbolu_training.training.conscious_generation.primitives.csr_scorer import CSRTokenScorer
 from symbolu_training.training.conscious_generation.primitives.vritti_scorer import VrittiTokenScorer
 from symbolu_training.training.conscious_generation.primitives.guna_scorer import GunaTokenScorer
+from symbolu_training.training.conscious_generation.primitives.crs_combined_scorer import CRSCombinedScorer
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from typing import Optional, Dict, Any
 
 
@@ -59,6 +61,7 @@ class TokenEvaluationTensor(nn.Module):
         vritti_scorer: VrittiTokenScorer,
         guna_scorer: GunaTokenScorer,
         shortlist_k: int = 128,
+        crs_combined_scorer: Optional[CRSCombinedScorer] = None,
     ):
         super().__init__()
         self.base_scorer = base_scorer
@@ -68,6 +71,8 @@ class TokenEvaluationTensor(nn.Module):
         self.vritti_scorer = vritti_scorer
         self.guna_scorer = guna_scorer
         self.shortlist_k = shortlist_k
+        # CRS Phase 2: When set, column 3 becomes combined CRS instead of raw CSR
+        self.crs_combined_scorer = crs_combined_scorer
 
     def select_candidates(
         self, logits: torch.Tensor, k: Optional[int] = None
@@ -160,10 +165,37 @@ class TokenEvaluationTensor(nn.Module):
             p_ctx, P_cand, self.jepa_scorer
         )
 
-        # S_csr: r_ctx (..., d_c) vs R_cand (..., K, d_c)
-        s_csr = self._score_bilinear(
-            r_ctx, R_cand, self.csr_scorer
-        )
+        # Column 3: CRS combined score (when enabled) or legacy CSR
+        crs_branch_data = None
+        if self.crs_combined_scorer is not None:
+            # Gather S_tok for candidates (CRS semantic cache)
+            S_cand = cache.get_cached_repr("S_tok", flat_ids).reshape(
+                *candidate_ids.shape, -1
+            )  # (..., K, d_s)
+
+            # Kosha slices for C branch
+            kosha_ctx = F.softmax(_o_ctx[..., 12:17], dim=-1)
+            Kosha_cand = O_cand[..., 12:17]
+
+            crs_result = self.crs_combined_scorer(
+                v_ctx=v_ctx,
+                kosha_ctx=kosha_ctx,
+                V_cand=V_cand,
+                Kosha_cand=Kosha_cand,
+                r_ctx=r_ctx,
+                R_cand=R_cand,
+                hidden=hidden,
+                o_ctx=_o_ctx,
+                S_cand=S_cand,
+                base_logits_cand=base_scores,
+            )
+            s_col3 = crs_result["crs_score"]
+            crs_branch_data = crs_result  # saved for diagnostics
+        else:
+            # Legacy CSR path
+            s_col3 = self._score_bilinear(
+                r_ctx, R_cand, self.csr_scorer
+            )
 
         # S_vritti: dot product v_ctx (..., 5) vs V_cand (..., K, 5)
         s_vritti = torch.einsum("...d,...kd->...k", v_ctx, V_cand)
@@ -173,13 +205,17 @@ class TokenEvaluationTensor(nn.Module):
         s_guna = torch.einsum("...d,...kd->...k", g_transformed, G_cand)
 
         # Step 5: Stack into T_t ∈ ℝ^{..., K, 6}
-        T = torch.stack([s_base, s_ont, s_jepa, s_csr, s_vritti, s_guna], dim=-1)
+        # Column order: [S_base, S_ont, S_plausibility, CRS_or_CSR, S_vritti, S_guna]
+        T = torch.stack([s_base, s_ont, s_jepa, s_col3, s_vritti, s_guna], dim=-1)
 
-        return {
+        result = {
             "T": T,
             "candidate_ids": candidate_ids,
             "candidate_base_scores": base_scores,
         }
+        if crs_branch_data is not None:
+            result["crs_branch_data"] = crs_branch_data
+        return result
 
     def _score_ontology(
         self, o_ctx: torch.Tensor, O_cand: torch.Tensor
@@ -233,6 +269,7 @@ __all__ = [
     "PlausibilityTokenScorer",
     "JEPATokenScorer",  # backward-compatible alias
     "CSRTokenScorer",
+    "CRSCombinedScorer",
     "VrittiTokenScorer",
     "GunaTokenScorer",
     "TokenEvaluationTensor",

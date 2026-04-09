@@ -1013,6 +1013,17 @@ class UnifiedTrainingConfig:
     primitive_rank: int = 8                        # Rank for low-rank factorization
     use_shared_token_basis: bool = False           # Share intermediate projection across primitives
 
+    # CRS Phase 2: Combined Cognitive–Resonance–Semantic scorer
+    # Reference: docs/audits/CRS_DOCTRINE_FREEZE.md
+    use_crs_combined_scorer: bool = False          # Replace CSR column with CRS combined scorer
+    semantic_dim: int = 16                         # d_s for S branch representations
+    crs_semantic_threshold: float = 0.45           # τ_s: semantic gate threshold
+    crs_gate_sharpness: float = 10.0               # k_s: semantic gate sharpness
+    crs_weight_c: float = 0.2                      # w_C: cognitive branch weight
+    crs_weight_r: float = 0.2                      # w_R: resonance branch weight
+    crs_weight_s: float = 0.6                      # w_S: semantic branch weight
+    crs_alpha_base: float = 0.5                    # α_base: base-logit anchor weight
+
     # Phase 3: Governance Integration
     lambda_kosha_routing: float = 0.0              # Kosha routing loss weight
     lambda_bliss_token: float = 0.0                # Bliss token-level coherence loss weight

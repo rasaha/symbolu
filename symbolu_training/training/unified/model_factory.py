@@ -630,6 +630,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         )
 
         # Single cache with Phase 1 + Phase 2 buffer dimensions
+        _crs_semantic_dim = getattr(config, 'semantic_dim', 16) if getattr(config, 'use_crs_combined_scorer', False) else 0
         token_cache = TokenPrimitiveCache(
             projector=token_projector,
             vocab_size=config.vocab_size,
@@ -637,6 +638,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             refresh_interval=config.ontology_cache_refresh_interval,
             jepa_dim=config.plausibility_token_dim,
             csr_dim=config.csr_token_dim,
+            semantic_dim=_crs_semantic_dim,
         )
 
         ontology_scorer = OntologyCompatibilityScorer(
@@ -680,6 +682,22 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             state_dim=config.token_ontology_dim,
         )
 
+        # CRS Phase 2: Combined Cognitive-Resonance-Semantic scorer (behind flag)
+        crs_combined_scorer = None
+        if getattr(config, 'use_crs_combined_scorer', False):
+            from symbolu_training.training.conscious_generation.primitives.crs_combined_scorer import CRSCombinedScorer
+            crs_combined_scorer = CRSCombinedScorer(
+                csr_scorer=csr_scorer,
+                embed_dim=embed_dim,
+                semantic_dim=getattr(config, 'semantic_dim', 16),
+                w_c=getattr(config, 'crs_weight_c', 0.2),
+                w_r=getattr(config, 'crs_weight_r', 0.2),
+                w_s=getattr(config, 'crs_weight_s', 0.6),
+                s_threshold=getattr(config, 'crs_semantic_threshold', 0.45),
+                k_s=getattr(config, 'crs_gate_sharpness', 10.0),
+                alpha_base=getattr(config, 'crs_alpha_base', 0.5),
+            )
+
         token_eval_tensor = TokenEvaluationTensor(
             base_scorer=base_scorer,
             ontology_scorer=ontology_scorer,
@@ -688,6 +706,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             vritti_scorer=vritti_scorer,
             guna_scorer=guna_scorer,
             shortlist_k=config.primitive_shortlist_k,
+            crs_combined_scorer=crs_combined_scorer,
         )
 
         # Register Phase 2 scorers with cache for refresh
@@ -696,6 +715,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             csr_scorer=csr_scorer,
             vritti_scorer=vritti_scorer,
             guna_scorer=guna_scorer,
+            semantic_scorer=crs_combined_scorer,
         )
 
         conscious_gen_modules = {
@@ -722,6 +742,8 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             "guna_scorer": guna_scorer,
             "token_eval_tensor": token_eval_tensor,
         })
+        if crs_combined_scorer is not None:
+            model.conscious_gen["crs_combined_scorer"] = crs_combined_scorer
         if ontology_loss is not None:
             model.conscious_gen["ontology_loss"] = ontology_loss
 
@@ -737,6 +759,12 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"  [Conscious Gen Phase 2] Primitive Scoring Heads")
         print(f"    PlausibilityTokenScorer: d_j={config.plausibility_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
         print(f"    CSRTokenScorer: d_c={config.csr_token_dim}, {'low-rank r=' + str(config.primitive_rank) if config.use_low_rank_primitives else 'full bilinear'}")
+        if crs_combined_scorer is not None:
+            print(f"  [Conscious Gen CRS] Combined Cognitive-Resonance-Semantic scorer ENABLED")
+            print(f"    Column 3 = CRS combined (was: raw CSR)")
+            print(f"    S branch: d_s={getattr(config, 'semantic_dim', 16)}, S_tok cache active")
+            print(f"    Weights: w_C={config.crs_weight_c}, w_R={config.crs_weight_r}, w_S={config.crs_weight_s}")
+            print(f"    Gate: tau_s={config.crs_semantic_threshold}, k_s={config.crs_gate_sharpness}, alpha_base={config.crs_alpha_base}")
         print(f"    VrittiTokenScorer: 5 classes (dot-product)")
         print(f"    GunaTokenScorer: 3 classes (bilinear G)")
         print(f"    TokenEvaluationTensor: K={config.primitive_shortlist_k}, 6 primitives")

@@ -5016,6 +5016,22 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_T = _cg_tet_result['T']              # (B, T, K, 6)
                                 _cg_cand_ids = _cg_tet_result['candidate_ids']  # (B, T, K)
 
+                                # CRS Phase 2: Log branch diagnostics when CRS is active
+                                _crs_bd = _cg_tet_result.get('crs_branch_data')
+                                if _crs_bd is not None:
+                                    with torch.no_grad():
+                                        metrics['crs_C_mean'] = _crs_bd['C'].mean().item()
+                                        metrics['crs_R_mean'] = _crs_bd['R'].mean().item()
+                                        metrics['crs_S_mean'] = _crs_bd['S'].mean().item()
+                                        metrics['crs_S_prob_mean'] = _crs_bd['S_prob'].mean().item()
+                                        metrics['crs_S_gate_mean'] = _crs_bd['S_gate'].mean().item()
+                                        metrics['crs_col3_mean'] = _crs_bd['crs_score'].mean().item()
+                                        # semantic_override_rate: fraction of positions where
+                                        # top-CRS candidate differs from top-R (pure resonance)
+                                        _crs_top1 = _crs_bd['crs_score'].argmax(dim=-1)  # (...,)
+                                        _r_top1 = _crs_bd['R'].argmax(dim=-1)
+                                        metrics['crs_semantic_override_rate'] = (_crs_top1 != _r_top1).float().mean().item()
+
                                 # Build domain signal from Gyroscope detection
                                 # Soft mapping: LANG/MATH/CODE → 8-dim distribution
                                 _cg_domain = None
@@ -5280,6 +5296,13 @@ def train(config: UnifiedTrainingConfig):
                                                f" λ_b={config.lambda_bliss_token:.5f}"
                                                f" λ_j={config.lambda_plausibility_token:.5f}"
                                                f" λ_c={config.lambda_csr_token:.5f}")
+                                # CRS branch diagnostics (appended when active)
+                                if 'crs_S_gate_mean' in metrics:
+                                    _cg_msg += (f" | CRS: C={metrics.get('crs_C_mean', 0):.3f}"
+                                                f" R={metrics.get('crs_R_mean', 0):.3f}"
+                                                f" S={metrics.get('crs_S_mean', 0):.3f}"
+                                                f" Sg={metrics.get('crs_S_gate_mean', 0):.2f}"
+                                                f" ovr={metrics.get('crs_semantic_override_rate', 0):.2f}")
                                 # Phase 3 entry diagnostic
                                 _p3_entered = 'cg_alpha_entropy' in metrics or 'cg_kosha_routing_loss' in metrics
                                 _cg_msg += f" | P3={'Y' if _p3_entered else 'N'}"
