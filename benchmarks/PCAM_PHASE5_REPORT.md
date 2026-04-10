@@ -4,8 +4,22 @@
 **Artifact status:** active-mode vLLM bridge landed and unit-tested end-to-end against a mock `FreeKVCacheBlockQueue`. Real serving metrics pending one live run on a GPU machine.
 **Source branch:** PCAM software-product roadmap, Phase 5
 **Spec of record:** [`docs/design/ADR-0001`](../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Architecture overview:** [`../simulator/pcam/docs/ARCHITECTURE_OVERVIEW.md`](../simulator/pcam/docs/ARCHITECTURE_OVERVIEW.md)
 **Phase 5 operational doc:** [`../simulator/pcam/docs/PHASE5_ACTIVE_MODE.md`](../simulator/pcam/docs/PHASE5_ACTIVE_MODE.md)
 **Closure run log:** [`PHASE4_CLOSURE_RUN_LOG.md`](PHASE4_CLOSURE_RUN_LOG.md) (Phase 5 closure runs will be appended here)
+
+---
+
+## CTM+ ↔ PCAM relationship (canonical)
+
+**CTM+ is the canonical KV-cache policy specification. PCAM is the runtime backend that implements it bit-for-bit, exposes it through a small Python API, and plugs into inference runtimes through narrow adapters. The two are kept in sync by a 20-test parity harness that has been green since Phase A.**
+
+- **CTM+** on this branch is the scoring policy spec at `CTM_plus/KVPolicy/kv_policy/attention_evictor.py`: four-signal phase-aware scoring, Count-Min frequency sketch, sink / entity / filler classification, sequence lifecycle. Per-process, per-policy, per-sequence. It is **not** a multi-runtime orchestrator on this branch — any document that describes it that way is overclaiming what the code does today.
+- **PCAM** is the runtime backend that imports the vendored CTM+ reference, matches it bit-for-bit via `simulator/pcam/kv_policy.py::KVCachePolicy`, and exposes `PCAMEvictor`, tier hints, trace replay, and the benchmark layers in this report. One scoring function, one file, one oracle.
+- **Shadow mode** (Phases 2–4) is **verified live**: real torch forward passes, real attention tensors, real TraceEvent replay through `KVCachePolicy`. Observational — PCAM reports what it *would* have decided on the observed workload.
+- **Active mode** (Phase 5) is **implemented and unit-tested, pending one live GPU run**: a monkey-patch against vLLM's v1 `FreeKVCacheBlockQueue.popleft_n` routes live eviction through PCAM. 23 unit tests green against a mock queue. The live GPU closure runbook is at [`PHASE4_CLOSURE_RUN_LOG.md`](PHASE4_CLOSURE_RUN_LOG.md) section D.
+
+See [`ARCHITECTURE_OVERVIEW.md`](../simulator/pcam/docs/ARCHITECTURE_OVERVIEW.md) for the full diagram, the explicit clarifications, and the source-of-truth pointers. That page is the single authoritative source for this relationship; any doc that disagrees with it should be corrected toward it.
 
 ---
 
