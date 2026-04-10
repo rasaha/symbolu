@@ -4359,12 +4359,23 @@ def train(config: UnifiedTrainingConfig):
                             # V9.8.5: Pass toroidal coherence for Vital-Coherence coupling
                             coherence_for_gyro = toroidal_coherence if 'toroidal_coherence' in dir() else None
 
+                            # Decode a sample of the batch for domain detection
+                            # Only decode first sequence, first 200 tokens (cheap)
+                            _gyro_text = None
+                            try:
+                                if tokenizer is not None and x is not None:
+                                    _sample_ids = x[0, :200].tolist()
+                                    _gyro_text = tokenizer.decode(_sample_ids, skip_special_tokens=True)
+                            except Exception:
+                                pass
+
                             gyro_loss, gyroscope_components = kosha_gyroscope(
                                 kosha_states_for_gyro,
                                 current_ppl=current_ppl,
                                 return_components=True,
                                 authority_factor=auth_factor,
                                 coherence=coherence_for_gyro,
+                                input_text=_gyro_text,
                             )
 
                             # Apply warmup scaling
