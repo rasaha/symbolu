@@ -69,6 +69,22 @@ from simulator.pcam import (  # noqa: E402
 )
 from simulator.pcam._report import emit_json, format_table, section_header  # noqa: E402
 from simulator.pcam.integrations.vllm import PCAMEvictor  # noqa: E402
+from simulator.pcam.trace import replay  # noqa: E402
+
+# vllm_bridge does NOT import vllm at module load. It is safe to import
+# here whether or not vllm is installed; the actual vllm import happens
+# lazily inside generate_with_derived_trace / ensure_vllm_available.
+from benchmarks.vllm_bridge import (  # noqa: E402
+    DerivedRunResult,
+    VLLMBridgeUnavailable,
+    ensure_vllm_available,
+    generate_with_derived_trace,
+)
+
+# Phase 3 used a separate RealVLLMNotAvailable exception. Phase 4 routes
+# everything through VLLMBridgeUnavailable so there's one failure class.
+# The alias keeps Phase 3 test imports working without churn.
+RealVLLMNotAvailable = VLLMBridgeUnavailable
 
 
 # ---------------------------------------------------------------------------
@@ -283,37 +299,125 @@ def render_report(result: Dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
-class RealVLLMNotAvailable(RuntimeError):
-    """Raised when --real-vllm is requested but the path is not implemented."""
-
-
 def _attempt_real_vllm_path() -> None:
     """
-    Stub for the future real-vLLM execution path. Deliberately does
-    not silently fall back to the synthetic path — a demo user who
-    asked for the real path should get a clear, actionable error
-    rather than wondering whether the numbers they're looking at
-    came from a real model or a hand-written trace.
+    Thin importability probe for the real-vLLM path. Preserved from
+    Phase 3 as a named entry point so existing tests that assert on
+    the fail-clean behavior without vllm installed continue to work.
+    Delegates to ``benchmarks.vllm_bridge.ensure_vllm_available``,
+    which raises ``VLLMBridgeUnavailable`` (aliased as
+    ``RealVLLMNotAvailable``) with an actionable hint.
     """
-    try:
-        import vllm  # noqa: F401
-    except ImportError as exc:
-        raise RealVLLMNotAvailable(
-            "--real-vllm requires the vllm package to be installed "
-            "(pip install vllm). The synthetic demo path is the "
-            "default and does not require vllm."
-        ) from exc
-    raise RealVLLMNotAvailable(
-        "--real-vllm is not yet wired up. The Phase 3 demo ships only "
-        "the synthetic walkthrough. Wiring a real vLLM model + PCAM "
-        "eviction is Phase 4 work. Run without --real-vllm for the "
-        "current demo."
+    ensure_vllm_available()
+
+
+def run_real_vllm_path(
+    *,
+    model: str,
+    prompts: List[str],
+    max_tokens: int,
+    block_size: int,
+    max_blocks: int,
+    sink_tokens: int,
+    dtype: Optional[str] = None,
+    trust_remote_code: bool = False,
+) -> Dict[str, Any]:
+    """
+    Execute a real vLLM ``LLM.generate`` run, derive a ``TraceEvent``
+    list from the observed sequence shapes, and replay that trace
+    through ``KVCachePolicy``.
+
+    Returns a dict that mirrors the synthetic-walkthrough result
+    shape (plus an extra ``mode`` key so a downstream consumer can
+    always tell which path produced the numbers). Raises
+    ``VLLMBridgeUnavailable`` on any missing-dependency or
+    model-load failure — never silently falls back to the synthetic
+    path.
+
+    See ``benchmarks/vllm_bridge.py`` for the shadow-mode
+    honesty-notes: this path runs a real model on real inputs but
+    does not patch vLLM's internal evictor, so the numbers
+    describe "what PCAM would have decided on the observed
+    workload", not "what PCAM did while driving vLLM's allocator".
+    """
+    run_result: DerivedRunResult = generate_with_derived_trace(
+        model=model,
+        prompts=prompts,
+        max_tokens=max_tokens,
+        block_size=block_size,
+        sink_tokens=sink_tokens,
+        dtype=dtype,
+        trust_remote_code=trust_remote_code,
     )
+
+    cfg = PCAMConfig(max_blocks=max_blocks, sink_tokens=sink_tokens)
+    policy = cfg.build_policy()
+    replay_result = replay(policy, run_result.trace)
+
+    final_stats = PolicyMetrics(policy).snapshot()
+    tier_hints_all: Dict[int, str] = {}
+    for hints in replay_result.tier_hint_results:
+        for bid, hint in hints.items():
+            tier_hints_all[bid] = hint.value
+
+    return {
+        "mode": "real-vllm-shadow",
+        "vllm_run": run_result.summary(),
+        "config": {
+            "max_blocks": cfg.max_blocks,
+            "sink_tokens": cfg.sink_tokens,
+        },
+        "trace_events": len(run_result.trace),
+        "victim_ids": [bid for lst in replay_result.victim_lists for bid in lst],
+        "tier_hints": tier_hints_all,
+        "final_stats": final_stats,
+    }
+
+
+def render_real_report(result: Dict[str, Any]) -> str:
+    """Human-readable report for a real-vLLM shadow-mode run."""
+    lines: List[str] = []
+    lines.append(section_header("PCAM vLLM Demo — REAL vLLM (Shadow Mode)"))
+    lines.append(
+        "NOTE: vLLM ran a real model on real inputs. The PCAM numbers "
+        "below describe what PCAM's policy would have decided on the "
+        "observed workload. vLLM's own eviction was NOT replaced — "
+        "this is shadow mode, not active control. See "
+        "benchmarks/vllm_bridge.py and "
+        "simulator/pcam/docs/PHASE4_REAL_RUNTIME.md for the caveats."
+    )
+
+    vllm_run = result["vllm_run"]
+    vllm_rows = [
+        ("model", vllm_run["model"]),
+        ("block_size", vllm_run["block_size"]),
+        ("num_prompts", vllm_run["num_prompts"]),
+        ("total_prompt_tokens", vllm_run["total_prompt_tokens"]),
+        ("total_completion_tokens", vllm_run["total_completion_tokens"]),
+        ("derived events", vllm_run["derived_events"]),
+    ]
+    lines.append("\nvLLM run")
+    lines.append(format_table(vllm_rows, ["metric", "value"]))
+
+    lines.append(f"\nVictim IDs selected during replay: {len(result['victim_ids'])}")
+    if result["victim_ids"][:16]:
+        lines.append("  first 16: " + ", ".join(str(v) for v in result["victim_ids"][:16]))
+
+    if result["tier_hints"]:
+        tier_rows = [(k, v) for k, v in list(result["tier_hints"].items())[:20]]
+        lines.append("\nTier hints (first 20)")
+        lines.append(format_table(tier_rows, ["block_id", "tier"]))
+
+    stats_rows = [(k, v) for k, v in result["final_stats"].items()]
+    lines.append("\nFinal policy stats")
+    lines.append(format_table(stats_rows, ["metric", "value"]))
+    return "\n".join(lines) + "\n"
 
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="PCAM vLLM-facing demo (Phase 3 synthetic walkthrough).",
+        description="PCAM vLLM-facing demo — synthetic walkthrough "
+                    "(default) or real-vLLM shadow mode (--real-vllm).",
     )
     p.add_argument(
         "--max-blocks", type=int, default=128,
@@ -325,13 +429,47 @@ def build_argparser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--real-vllm", action="store_true",
-        help="Attempt the real-vLLM execution path. Not yet implemented; "
-             "fails with an explicit error rather than silently falling "
-             "back to the synthetic demo.",
+        help="Run a real vllm.LLM.generate() call, derive a TraceEvent "
+             "list from the observed sequence shapes, and replay it "
+             "through KVCachePolicy (shadow mode). Requires a vllm "
+             "install and a GPU. Fails clean via VLLMBridgeUnavailable "
+             "if vllm is absent.",
+    )
+    p.add_argument(
+        "--model", type=str, default="facebook/opt-125m",
+        help="Model name passed to vllm.LLM(...) when --real-vllm is set "
+             "(default: facebook/opt-125m — small enough to fit on most "
+             "GPUs for a smoke test).",
+    )
+    p.add_argument(
+        "--prompt", action="append", default=None,
+        help="Prompt to generate against. Repeat to pass multiple "
+             "prompts. If omitted when --real-vllm is set, a small "
+             "default prompt list is used.",
+    )
+    p.add_argument(
+        "--max-tokens", type=int, default=64,
+        help="Max completion tokens per prompt under --real-vllm "
+             "(default: 64).",
+    )
+    p.add_argument(
+        "--block-size", type=int, default=16,
+        help="Block size used to derive admissions under --real-vllm "
+             "(default: 16).",
+    )
+    p.add_argument(
+        "--dtype", type=str, default=None,
+        help="Optional vllm dtype override (e.g. float16, bfloat16).",
+    )
+    p.add_argument(
+        "--trust-remote-code", action="store_true",
+        help="Pass trust_remote_code=True to vllm.LLM. Required for "
+             "some custom architectures.",
     )
     p.add_argument(
         "--json", type=Path, default=None,
-        help="If provided, write the demo transcript to this JSON file.",
+        help="If provided, write the transcript / real-run result to "
+             "this JSON file.",
     )
     p.add_argument(
         "--quiet", action="store_true",
@@ -340,15 +478,38 @@ def build_argparser() -> argparse.ArgumentParser:
     return p
 
 
+_DEFAULT_REAL_PROMPTS: List[str] = [
+    "Explain the PCAM project in two sentences.",
+    "Write a one-line summary of vLLM's paged attention.",
+    "Name three kinds of cache eviction algorithms.",
+]
+
+
 def run(argv: Optional[List[str]] = None) -> int:
     args = build_argparser().parse_args(argv)
 
     if args.real_vllm:
+        prompts = args.prompt if args.prompt else list(_DEFAULT_REAL_PROMPTS)
         try:
-            _attempt_real_vllm_path()
-        except RealVLLMNotAvailable as exc:
+            real_result = run_real_vllm_path(
+                model=args.model,
+                prompts=prompts,
+                max_tokens=args.max_tokens,
+                block_size=args.block_size,
+                max_blocks=args.max_blocks,
+                sink_tokens=args.sink_tokens,
+                dtype=args.dtype,
+                trust_remote_code=args.trust_remote_code,
+            )
+        except VLLMBridgeUnavailable as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             return 2
+
+        if not args.quiet:
+            print(render_real_report(real_result))
+        if args.json is not None:
+            emit_json(real_result, args.json)
+        return 0
 
     result = run_synthetic_walkthrough(
         max_blocks=args.max_blocks,

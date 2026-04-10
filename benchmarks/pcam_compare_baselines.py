@@ -37,6 +37,7 @@ traces, not to publish an acquisition-grade benchmark today.
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -168,6 +169,158 @@ class LFUBaseline(_BaselineBase):
 
 
 # ===========================================================================
+# Phase 4: in-repo baseline adapter
+# ===========================================================================
+#
+# The repo ships richer baselines at simulator/pcam/baselines/:
+#   - sink_lru.py:       Sink+LRU — pins first N blocks, LRU otherwise
+#   - h2o.py:            H2O — heavy-hitters oracle, attention-mass based
+#   - industry_style.py: Combined heuristic with a ghost buffer
+#
+# These were built for the older ControllerConfig API, not the Phase 1
+# TraceEvent stream. InRepoBaselineAdapter translates TraceEvents into
+# the older API shape so the compare harness can drive them.
+#
+# Honesty notes:
+#
+# - Sink semantics differ slightly. PCAM pins blocks whose ADMISSION
+#   positions contain any index < sink_tokens. The in-repo baselines
+#   pin the first num_sinks block_ids they see. On the demo trace
+#   where the sink block is admitted first, the two agree. On more
+#   complex traces where non-sink blocks may be admitted before the
+#   sink, they can disagree.
+#
+# - The "attention" signal is mapped as follows: each
+#   on_block_attention event becomes a record_access call with
+#   query_block=block_id and attention_scores={block_id: attention_sum}.
+#   This is a self-attention interpretation; it preserves "how much
+#   attention this block received" but does not capture cross-block
+#   query→key structure.
+#
+# - IndustryStyleController has a warmup / ghost-buffer cooldown and
+#   may return empty victim lists on short traces. This is a property
+#   of the baseline, not a bug in the adapter.
+#
+# The wiring is a small deterministic shim; any future richer
+# integration (e.g. multi-sequence tracking, cross-block attention
+# mass) belongs to a later phase.
+
+
+class InRepoBaselineAdapter(_BaselineBase):
+    """
+    Drives an in-repo ``BaselineController`` through the same
+    TraceEvent→metric pipeline as the inline LRU/LFU baselines.
+
+    Constructed with a factory callable that returns a fresh
+    ``BaselineController`` instance. The factory is deferred so the
+    compare harness can report a clear skip if the import fails.
+    """
+
+    def __init__(
+        self,
+        *,
+        controller: Any,
+        display_name: str,
+        sink_tokens: int,
+    ) -> None:
+        super().__init__(sink_tokens)
+        self._controller = controller
+        self.name = display_name
+        self._last_seq_id: int = 1
+
+    def _admit(self, block_id: int) -> None:
+        self._controller.record_access(
+            query_block=block_id,
+            accessed_blocks=[block_id],
+            attention_scores={block_id: 0.0},
+            sequence_id=self._last_seq_id,
+        )
+
+    def _touch(self, block_id: int) -> None:
+        # Caller passed attention via on_attention, which already
+        # recorded the attention mass on the live side. We mirror it
+        # into the controller here.
+        attn = self.attention.get(block_id, 0.0)
+        self._controller.record_access(
+            query_block=block_id,
+            accessed_blocks=[block_id],
+            attention_scores={block_id: attn},
+            sequence_id=self._last_seq_id,
+        )
+
+    def _select(self, count: int) -> List[int]:
+        return list(
+            self._controller.select_evictions(
+                num_to_evict=count,
+                sequence_id=self._last_seq_id,
+            )
+        )
+
+    def set_sequence(self, seq_id: int) -> None:
+        """Update the sequence id used in subsequent record_access calls."""
+        self._last_seq_id = seq_id
+
+
+def _try_build_inrepo_adapters(
+    *,
+    max_blocks: int,
+    sink_tokens: int,
+) -> Tuple[List[InRepoBaselineAdapter], List[str]]:
+    """
+    Attempt to build adapters for the three in-repo baselines. Returns
+    ``(adapters, skip_reasons)``. If an import fails (e.g. numpy is
+    missing), the corresponding adapter is omitted and the reason is
+    surfaced in the returned ``skip_reasons`` list.
+    """
+    adapters: List[InRepoBaselineAdapter] = []
+    skip_reasons: List[str] = []
+
+    try:
+        from simulator.pcam.baselines.base import ControllerConfig
+    except Exception as exc:
+        skip_reasons.append(
+            f"in-repo baselines unavailable: {type(exc).__name__}: {exc}"
+        )
+        return adapters, skip_reasons
+
+    # num_sinks=1 on traces where the sink block is admitted first.
+    # The configured sink_tokens value drives PCAM's per-position
+    # sink detection; the in-repo baseline uses block-id order.
+    cfg = ControllerConfig(
+        cache_capacity=max_blocks,
+        num_sinks=1,
+        recent_window=16,
+        top_k=4,
+    )
+
+    targets = [
+        ("simulator.pcam.baselines.sink_lru", "SinkLRUController", "SinkLRU (in-repo)"),
+        ("simulator.pcam.baselines.h2o", "H2OController", "H2O (in-repo)"),
+        ("simulator.pcam.baselines.industry_style", "IndustryStyleController",
+         "IndustryStyle (in-repo)"),
+    ]
+    for module_path, class_name, display in targets:
+        try:
+            import importlib
+            mod = importlib.import_module(module_path)
+            cls = getattr(mod, class_name)
+            controller = cls(cfg)
+        except Exception as exc:
+            skip_reasons.append(
+                f"{display}: {type(exc).__name__}: {exc}"
+            )
+            continue
+        adapters.append(
+            InRepoBaselineAdapter(
+                controller=controller,
+                display_name=display,
+                sink_tokens=sink_tokens,
+            )
+        )
+    return adapters, skip_reasons
+
+
+# ===========================================================================
 # Replay drivers
 # ===========================================================================
 
@@ -176,10 +329,21 @@ def run_baseline(
     events: List[TraceEvent],
     baseline: _BaselineBase,
 ) -> Dict[str, Any]:
-    """Drive a baseline through a trace. Ignores tier_hints and set_phase
-    events since the baselines don't use that information."""
+    """
+    Drive a baseline through a trace. Updates the baseline's
+    current-sequence id on ``register_sequence`` events so the
+    in-repo adapter can scope ``record_access`` correctly; the
+    naive inline baselines ignore that hook. Ignores tier_hints
+    and set_phase events.
+    """
     for event in events:
-        if event.kind is EventKind.ENSURE_BLOCK:
+        if event.kind is EventKind.REGISTER_SEQUENCE:
+            # The in-repo adapter scopes record_access by sequence_id.
+            # The inline LRU/LFU baselines don't track sequences and
+            # don't need this hook, but the adapter does.
+            if hasattr(baseline, "set_sequence"):
+                baseline.set_sequence(int(event.args["seq_id"]))
+        elif event.kind is EventKind.ENSURE_BLOCK:
             baseline.on_ensure(
                 int(event.args["block_id"]),
                 list(event.args["positions"]),
@@ -191,8 +355,8 @@ def run_baseline(
             )
         elif event.kind is EventKind.SELECT_VICTIMS:
             baseline.on_select_victims(int(event.args["count"]))
-        # register_sequence, set_phase, complete_sequence, tier_hints
-        # are no-ops for these naive baselines.
+        # set_phase, complete_sequence, tier_hints are no-ops for
+        # all baselines — they don't consume phase or tier hints.
     return {
         "policy": baseline.name,
         **baseline.metrics,
@@ -269,6 +433,7 @@ def render_report(rows: List[Dict[str, Any]]) -> str:
 
     headers = [
         "policy",
+        "source",
         "evictions",
         "sink_evictions",
         "attn_weighted_cost",
@@ -278,6 +443,7 @@ def render_report(rows: List[Dict[str, Any]]) -> str:
     table = [
         [
             row["policy"],
+            row.get("source", "?"),
             row["evictions"],
             row["sink_evictions"],
             f"{row['attention_weighted_cost']:.4f}",
@@ -288,6 +454,11 @@ def render_report(rows: List[Dict[str, Any]]) -> str:
     ]
     lines.append("")
     lines.append(format_table(table, headers))
+    lines.append("")
+    lines.append("Source tags:")
+    lines.append("  runtime  = PCAM KVCachePolicy via simulator.pcam.trace.replay")
+    lines.append("  inline   = minimal LRU/LFU heuristic implemented in this file")
+    lines.append("  in-repo  = adapted from simulator/pcam/baselines/ via InRepoBaselineAdapter")
     lines.append("")
     lines.append("Lower sink_evictions and lower attn_weighted_cost are better.")
     lines.append(
@@ -304,7 +475,8 @@ def render_report(rows: List[Dict[str, Any]]) -> str:
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="PCAM vs software baselines replay comparison (Phase 3).",
+        description="PCAM vs software baselines replay comparison "
+                    "(Phase 3 inline + Phase 4 in-repo adapter).",
     )
     p.add_argument(
         "--trace",
@@ -322,6 +494,13 @@ def build_argparser() -> argparse.ArgumentParser:
         help="sink_tokens threshold (default: 4). Applied consistently "
              "across PCAM and the inline baselines so the sink_evictions "
              "metric is apples-to-apples.",
+    )
+    p.add_argument(
+        "--include-inrepo-baselines", action="store_true", default=False,
+        help="Include the in-repo baselines from simulator/pcam/baselines/ "
+             "(SinkLRU, H2O, IndustryStyle) via the Phase 4 adapter. "
+             "Off by default; the Phase 3 default output continues to "
+             "show only PCAM + inline LRU/LFU.",
     )
     p.add_argument(
         "--json",
@@ -357,11 +536,31 @@ def run(argv: Optional[List[str]] = None) -> int:
     lfu_row = run_baseline(events, LFUBaseline(sink_tokens=args.sink_tokens))
     rows = [pcam_row, lru_row, lfu_row]
 
+    # Source-tag each row so the report can distinguish inline from in-repo.
+    pcam_row["source"] = "runtime"
+    lru_row["source"] = "inline"
+    lfu_row["source"] = "inline"
+
+    skip_reasons: List[str] = []
+    if args.include_inrepo_baselines:
+        adapters, skip_reasons = _try_build_inrepo_adapters(
+            max_blocks=args.max_blocks,
+            sink_tokens=args.sink_tokens,
+        )
+        for adapter in adapters:
+            row = run_baseline(events, adapter)
+            row["source"] = "in-repo"
+            rows.append(row)
+
     if not args.quiet:
         print(render_report(rows))
+        if skip_reasons:
+            print("\nSkipped in-repo baselines:")
+            for reason in skip_reasons:
+                print(f"  - {reason}")
 
     if args.json is not None:
-        emit_json({"rows": rows, "config": {
+        emit_json({"rows": rows, "skipped": skip_reasons, "config": {
             "max_blocks": config.max_blocks,
             "sink_tokens": config.sink_tokens,
         }}, args.json)
