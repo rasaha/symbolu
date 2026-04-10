@@ -50,21 +50,17 @@ sorted() tie-breaks. Anything else is a parity violation.
 from __future__ import annotations
 
 import random
-import sys
-from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
 import pytest
 
 # ---------------------------------------------------------------------------
-# Reference import wiring (see test_sketch_conformance.py for rationale).
+# Reference import — vendored, not sys.path-hacked (see
+# test_sketch_conformance.py for rationale). The vendored file at
+# simulator/pcam/reference/attention_evictor_vendored.py is the
+# Phase 0 in-tree oracle per ADR-0001.
 # ---------------------------------------------------------------------------
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_KV_POLICY_PARENT = _REPO_ROOT / "CTM_plus" / "KVPolicy"
-if str(_KV_POLICY_PARENT) not in sys.path:
-    sys.path.insert(0, str(_KV_POLICY_PARENT))
-
-from kv_policy.attention_evictor import (
+from simulator.pcam.reference.attention_evictor_vendored import (
     InferencePhase,
     KVCachePolicy as RefKVCachePolicy,
 )

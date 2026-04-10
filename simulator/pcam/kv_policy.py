@@ -70,23 +70,23 @@ from __future__ import annotations
 
 import math
 import random
-import sys
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Dict, List, Set
 
 # ---------------------------------------------------------------------------
-# Reference package wiring. CTM_plus/KVPolicy/kv_policy is a setup.py
-# package imported as `kv_policy` (not `CTM_plus.KVPolicy.kv_policy`); we
-# add its parent to sys.path so enum re-exports resolve without requiring
-# a pip install.
+# Reference re-exports — vendored, not sys.path-hacked.
+#
+# Phase 0 of the PCAM software-product roadmap vendored the CTM+
+# KV-cache policy reference to
+# simulator/pcam/reference/attention_evictor_vendored.py so that
+# ``simulator.pcam.kv_policy`` no longer depends on the ambient
+# location of the CTM_plus package. ``InferencePhase`` and
+# ``PositionClass`` are re-exported from the vendored copy, which
+# is a bit-parity snapshot of the upstream reference per ADR-0001.
+#
+# Update ritual: simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md
 # ---------------------------------------------------------------------------
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-_KV_POLICY_PARENT = _REPO_ROOT / "CTM_plus" / "KVPolicy"
-if str(_KV_POLICY_PARENT) not in sys.path:
-    sys.path.insert(0, str(_KV_POLICY_PARENT))
-
-from kv_policy.attention_evictor import (  # noqa: E402
+from .reference.attention_evictor_vendored import (
     InferencePhase,
     PositionClass,
 )

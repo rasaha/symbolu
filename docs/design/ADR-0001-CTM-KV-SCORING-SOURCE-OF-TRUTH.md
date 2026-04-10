@@ -139,3 +139,33 @@ Rejected as the default path, but preserved as an escape hatch. If the CTM+ owne
 - **Consumers:** `CTM_plus/KVPolicy/kv_policy/vllm_evictor.py`, `CTM_plus/KVPolicy/kv_policy/vllm_adapter.py`
 - **Superseded design note:** `docs/design/CTM_PLUS_LIMITATIONS_AND_DESIGN_UPDATES.md:61-89`
 - **Follow-up:** PCAM update PR scope (ADR-0002 or PR description), to be written against this ADR.
+
+---
+
+## Implementation note — vendored reference (Phase 0)
+
+*This section is an operational addendum and does not change the
+decision above.*
+
+Phase 0 of the PCAM software-product roadmap vendored the CTM+
+reference into the PCAM package at
+`simulator/pcam/reference/attention_evictor_vendored.py` so that
+`simulator.pcam` can be consumed as a standalone Python package
+without requiring `CTM_plus/KVPolicy` on `sys.path` at runtime. The
+vendored file is a **read-only specification reference**; it is not
+the runtime policy. The runtime policy remains
+`simulator/pcam/kv_policy.py::KVCachePolicy`, which is the bit-parity
+port this ADR contracts for.
+
+When the upstream reference changes, maintainers follow the ritual
+at
+[`simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md`](../../simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md):
+re-copy the file, re-apply the vendoring header, run the parity
+harness, update the runtime port only if behavior diverged, and
+commit the bump with the new pinned commit hash in the header.
+
+The parity harness at
+`simulator/pcam/tests/test_sketch_conformance.py` and
+`simulator/pcam/tests/test_attention_evictor_parity.py` imports the
+vendored file directly — not the upstream path — and is the sole
+mechanism that detects drift between the two.

@@ -25,10 +25,14 @@ as the implementation lands.
 
 Reference side
 --------------
-Imported directly from `kv_policy.attention_evictor`. The reference is the
+Imported from the vendored copy at
+``simulator/pcam/reference/attention_evictor_vendored.py``, not via a
+sys.path hack against the upstream CTM+ package. See ADR-0001 and
+``simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md`` for how the
+vendored file is kept in sync with upstream. The reference is the
 oracle — we never assert against hand-computed hash outputs. We assert
-PCAM equals reference on a fixed trace, and we assert structural invariants
-(saturation, monotonicity, halving) that must hold on both.
+PCAM equals reference on a fixed trace, and we assert structural
+invariants (saturation, monotonicity, halving) that must hold on both.
 
 Golden trace
 ------------
@@ -41,25 +45,26 @@ exact-equality assertions.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import pytest
 
 # ---------------------------------------------------------------------------
-# Path wiring for the reference package.
+# Reference import — vendored, not sys.path-hacked.
 #
-# CTM_plus/KVPolicy/kv_policy is a standalone setup.py package imported as
-# `kv_policy`, not as `CTM_plus.KVPolicy.kv_policy`. We add its parent to
-# sys.path so tests run without requiring `pip install -e`.
+# Per ADR-0001 and Phase 0 of the software-product roadmap, the CTM+
+# KV-cache policy reference lives in-tree at
+# simulator/pcam/reference/attention_evictor_vendored.py. This test
+# module imports the vendored copy so the parity harness has a stable,
+# release-safe oracle that does not depend on the ambient location of
+# the CTM_plus package.
+#
+# Update ritual: simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md
 # ---------------------------------------------------------------------------
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_KV_POLICY_PARENT = _REPO_ROOT / "CTM_plus" / "KVPolicy"
-if str(_KV_POLICY_PARENT) not in sys.path:
-    sys.path.insert(0, str(_KV_POLICY_PARENT))
-
-from kv_policy.attention_evictor import FrequencySketch as RefFrequencySketch
+from simulator.pcam.reference.attention_evictor_vendored import (
+    FrequencySketch as RefFrequencySketch,
+)
 
 
 # ---------------------------------------------------------------------------
