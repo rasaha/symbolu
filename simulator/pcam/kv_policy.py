@@ -1,68 +1,69 @@
 """
-PCAM-side KV-cache policy — INTENTIONAL TDD STUB.
+PCAM-side KV-cache policy — verbatim port of the CTM+ reference.
 
 Status
 ------
-Stub. This module exists so that `simulator/pcam/tests/test_sketch_conformance.py`
-and `simulator/pcam/tests/test_attention_evictor_parity.py` can import
-`simulator.pcam.kv_policy` successfully. Before this file existed, the
-conformance tests skipped with a module-not-found message; now they fail
-loudly with NotImplementedError, turning the test suite from a waiting
-room into a hard implementation gate.
+Active port. This module is a faithful, bit-parity Python port of
+``CTM_plus/KVPolicy/kv_policy/attention_evictor.py`` per ADR-0001.
+Every scoring decision, every sketch increment, every victim set
+produced by this module is observationally equivalent to the reference
+on an identically-seeded trace. The conformance harness at
+``simulator/pcam/tests/test_sketch_conformance.py`` and
+``simulator/pcam/tests/test_attention_evictor_parity.py`` asserts
+this parity on every commit.
 
-Contract and plan
------------------
-Do not fill this in with partial or simplified logic.
+Contract
+--------
+- **ADR:** ``docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md``
+  locks the four-signal phase-aware scoring model and the Count-Min
+  frequency sketch as canonical. Any behavioral change must land in the
+  ADR first.
 
-- **Contract:** docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md
-  (declares `CTM_plus/KVPolicy/kv_policy/attention_evictor.py` the
-  canonical reference for KV-cache scoring and locks the four-signal
-  phase-aware formula)
+- **Reference / oracle:** ``CTM_plus/KVPolicy/kv_policy/attention_evictor.py``.
+  This module is a copy, not an import — the conformance harness exists
+  specifically to detect drift between the two files, and importing at
+  runtime would make the detection trivially circular.
 
-- **Plan:** simulator/pcam/docs/PCAM_UPDATE_PR_SCOPE.md
-  (files and line ranges to change, commit ordering, non-goals,
-  acceptance criteria)
+- **RTL counterpart:** ``simulator/pcam/rtl/core/freq_sketch.sv`` is the
+  SystemVerilog translation of ``FrequencySketch`` below. The RTL must
+  be observationally equivalent to this module (same seeds, same
+  saturation, same halving trigger), and its acceptance is asserted via
+  the tb_pcam_top sketch tests.
 
-- **Oracle:** `CTM_plus/KVPolicy/kv_policy/attention_evictor.py`
-  (the Python reference the PCAM implementation must be observationally
-  equivalent to)
+Scoring model (four-signal, phase-aware)
+----------------------------------------
+    score = w.recency   * exp(-0.01 * (now - last_access))
+          + w.frequency * min(1.0, freq_sketch.estimate(bid) / 10.0)
+          + w.attention * block.attention_ema
+          + w.position  * classify_block_importance(is_sink, ema, threshold)
 
-What "done" looks like
-----------------------
-Both of these commands report all green, with a fixed RNG seed and zero
-mismatches across every parity test:
+    entity bonus: +0.5 when (not is_sink) and (attention_ema > adaptive_threshold)
 
-    pytest simulator/pcam/tests/test_sketch_conformance.py
-    pytest simulator/pcam/tests/test_attention_evictor_parity.py
+    PHASE_WEIGHTS:
+      PREFILL: recency=0.15  frequency=0.20  attention=0.35  position=0.30
+      DECODE:  recency=0.30  frequency=0.20  attention=0.30  position=0.20
 
-Structural surface (deliberately constructible)
------------------------------------------------
-- `FrequencySketch.__init__`  — computes width (floor 64, power of two),
-  depth (4), and reset_threshold (capacity * 10). These are invariants,
-  not algorithm; the conformance suite asserts them and they must be
-  correct. The sketch table itself is NOT allocated here.
-- `KVCachePolicy.__init__`    — stores constructor parameters and
-  initializes `gpu_blocks` and `pinned_blocks` as empty sets. Exposing
-  these attributes as empty sets (rather than leaving them undefined)
-  ensures parity tests fail on missing BEHAVIOR, not missing attributes
-  — a clearer failure mode for anyone picking up the PR.
+Frequency sketch: 4 rows × power-of-two width (floor 64) × 4-bit
+saturating counters. Four fixed seed hashes
+(0x9E3779B9, 0x517CC1B7, 0x6C62272E, 0x2E1B2138). Event-driven halving
+at ``capacity * 10`` increments. Ported verbatim from the reference.
 
-Behavioral surface (must raise NotImplementedError)
----------------------------------------------------
-Everything else. Every call into the scoring path, the sketch path, the
-eviction path, or the policy state machine must raise loudly. No no-ops.
-No silent stores. No partial logic. The reference is the oracle; the
-stub stays a stub until a real port lands.
+Terms deferred by ADR-0001 — do NOT re-introduce without amending the ADR:
+
+- ``reuse`` scoring term (dropped; scan resistance comes from the sketch
+  and the entity bonus)
+- ``sequence_priority`` scoring term (dropped; phase captures the
+  intended variation)
+- ``PositionClass.RECENT`` window protection (declared in the reference
+  but not exercised; the port matches the reference by also not
+  exercising it)
 
 Re-exports
 ----------
-`InferencePhase` and `PositionClass` are re-exported from the reference
-so tests and implementations can import the whole contract from
-`simulator.pcam.kv_policy` once the stub is replaced. This means the
-parity test's `from kv_policy.attention_evictor import InferencePhase`
-can, in the finished state, become
-`from simulator.pcam.kv_policy import InferencePhase` — but that
-migration is explicitly not part of this stub.
+``InferencePhase`` and ``PositionClass`` are re-exported from the
+reference so that consumers can import the whole contract from one
+module path: ``from simulator.pcam.kv_policy import KVCachePolicy,
+FrequencySketch, InferencePhase, PhaseWeights, PHASE_WEIGHTS``.
 """
 
 from __future__ import annotations
@@ -96,24 +97,6 @@ __all__ = [
     "InferencePhase",
     "PositionClass",
 ]
-
-
-# ---------------------------------------------------------------------------
-# Error helper — every NotImplementedError points at the contract and the
-# plan so the failure message is actionable on its own.
-# ---------------------------------------------------------------------------
-
-_STUB_POINTER = (
-    "simulator.pcam.kv_policy is a stub. "
-    "Contract: docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md. "
-    "Plan: simulator/pcam/docs/PCAM_UPDATE_PR_SCOPE.md. "
-    "Oracle: CTM_plus/KVPolicy/kv_policy/attention_evictor.py. "
-    "Do not fill in with partial logic — replace with a real port."
-)
-
-
-def _unimplemented(method: str) -> NotImplementedError:
-    return NotImplementedError(f"{method}: {_STUB_POINTER}")
 
 
 # ===========================================================================
