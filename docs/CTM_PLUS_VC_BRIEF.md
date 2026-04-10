@@ -1,7 +1,7 @@
 # CTM+ (Coherence-Tier Memory Plus) — VC Brief
 
 **A three-page introduction for investors**
-**Where we are:** Python simulator, Linux kernel module, CUDA/GPU implementation, and vLLM + DeepSpeed integrations are all working today. FPGA prototype is next.
+**Where we are:** Python simulator, Linux kernel module, CUDA/GPU implementation, and vLLM + DeepSpeed integrations are all working today. Since the first draft of this brief, the LLM-serving arm has also matured into a full software product: a canonical CTM+ KV-cache scoring spec (locked by ADR-0001), a bit-parity Python runtime (PCAM), a shadow-mode integration that runs alongside real vLLM workloads, an active-mode bridge that installs PCAM as the live eviction policy inside vLLM, a 20-test parity harness that is green on every commit, and an acquisition-facing benchmark report. FPGA prototype is still the next hardware milestone.
 
 ---
 
@@ -71,13 +71,21 @@ The fast path keeps us on the critical path of real workloads. The slow path kee
 **3. Dual Shadow Tier — learning from the decisions we didn't make.**
 ARC-style ghost caches (B1 and B2) that track what *would* have been kept under different policies, so the controller can adapt its balance between recency and frequency automatically. No manual parameter tuning.
 
-**4. Smart Victim Selection — six signals, not one.**
-Instead of picking the oldest thing, we score candidates against six orthogonal signals:
+**4. Smart Victim Selection — phase-aware multi-signal scoring.**
+Instead of picking the oldest thing, we score candidates against four orthogonal signals, with the weights shifting between prefill and decode phases of an LLM forward pass. This is the form locked by an internal source-of-truth ADR and is what the runtime actually implements today:
 ```
-score = 0.40·recency + 0.30·frequency + 0.15·reuse
-      + 0.10·coherence + 0.05·neighbor − page_type_bonus
+score = w_recency · exp(-0.01·(now − last_access))
+      + w_frequency · min(1.0, sketch_estimate(bid) / 10.0)
+      + w_attention · attention_ema
+      + w_position  · importance(is_sink, ema, adaptive_threshold)
+
+entity bonus: +0.5 for non-sink blocks whose attention_ema
+              exceeds the adaptive threshold
+
+PREFILL weights:  recency=0.15  frequency=0.20  attention=0.35  position=0.30
+DECODE  weights:  recency=0.30  frequency=0.20  attention=0.30  position=0.20
 ```
-Sampled selection keeps it O(k) with k ≤ 48 — still effectively constant time, but now the decision is informed.
+Sink blocks (attention sinks, positions 0..k) are pinned at admission and never scored. Sampled selection keeps the hot path at O(k) with k ≤ 48, and an earlier filler-fast-path handles the common case deterministically. An earlier draft of this brief showed a six-signal formula including `reuse` and a page-type bonus — that version was explicitly superseded when we consolidated the policy into the four-signal phase-aware form above; the parity harness enforces the current form on every commit.
 
 **5. BCVF Gate — the "will I regret this?" check.**
 Bidirectional Coherence Verification. Every proposed move is checked both forward (will this hurt latency right now?) and backward (is this move consistent with the long-term health of the tier?). ARC adapts one-way. We adapt both ways. That's the safety story that lets an SRE actually turn this on.
@@ -160,6 +168,8 @@ On generic synthetic traces with no semantic structure — the kind of workloads
 
 ### What's already built
 
+**Core algorithm and deployment surfaces (unchanged since first draft):**
+
 - **Python simulator** — production-quality, runs all our validation traces.
 - **Linux kernel module** with sysfs interface.
 - **CUDA / GPU implementation** for H100 and A100 HBM tiering.
@@ -167,13 +177,25 @@ On generic synthetic traces with no semantic structure — the kind of workloads
 - **DeepSpeed ZeRO-Offload integration** for training memory.
 - **Comprehensive specification and patent documentation.**
 
+**PCAM software-product roadmap (landed since first draft):**
+
+- **ADR-0001** as the source-of-truth contract: CTM+ is the canonical KV-cache scoring spec, PCAM is the bit-parity runtime, the parity harness is the only sync mechanism.
+- **20-test parity harness** asserting bit-for-bit equivalence between the runtime and the vendored CTM+ reference on a fixed RNG seed. Green on every commit since Phase A of the roadmap.
+- **Attention-aware KV-cache evictor** — ships today as `CTM_plus/KVPolicy/kv_policy/attention_evictor.py` plus its bit-parity Python port at `simulator/pcam/kv_policy.py`. Sink pinning, entity-bonus protection, phase-aware scoring, and the 4-row 4-bit Count-Min frequency sketch are all live and unit-tested.
+- **Phase 1 public API** — a small, stable `simulator.pcam` surface (`KVCachePolicy`, `PCAMConfig`, `TierHint`, `PolicyMetrics`) that a real inference runtime can import.
+- **Phase 2 runtime integration** — `PCAMEvictor` (duck-typed vLLM Evictor adapter) and an offline `trace.replay` primitive.
+- **Phase 3 benchmarks** — replay harness, baseline comparison against LRU/LFU plus the in-repo SinkLRU/H2O/IndustryStyle baselines, vLLM synthetic demo.
+- **Phase 4 shadow-mode vLLM integration** — runs alongside a real `vllm.LLM.generate()` call and derives a TraceEvent stream; HuggingFace attention-trace extractor verified live on real torch.
+- **Phase 5 active-mode vLLM bridge** — a monkey-patch against vLLM's v1 `FreeKVCacheBlockQueue.popleft_n` so PCAM drives live eviction. Implemented, feature-detected against the vLLM ≥ 0.7.0 core surface, 23 unit tests green against a mock queue.
+- **Acquisition-facing benchmark artifact** at `benchmarks/PCAM_PHASE5_REPORT.md` with a canonical CTM+ ↔ PCAM relationship statement, live measurements, and honest "what's verified vs what's pending" labeling.
+
 ### What's next
 
 | Phase | What we're building | Timeframe |
 |---|---|---|
-| **Phase 2 — FPGA prototype** | Xilinx Alveo board. RTL for fast-path coherence (<10ns), BCVF gate, CXL or PCIe interface. Target: 250MHz timing closure, <50ns latency overhead. | 2–3 months |
-| **Phase 3 — ASIC controller** | 7nm/5nm process. Three integration paths on the table: CXL memory expander, SSD controller FTL, and HBM controller for GPU. Full RTL IP package + integration guide. | 12–18 months |
-| **LLM-specific upgrades** | Attention-aware KV-cache evictor (treat attention sinks as first-class citizens), S3-FIFO simplification for the hot path, Count-Min Sketch for bounded-memory frequency tracking. | In parallel with Phase 2 |
+| **One live GPU closure run** | Execute `pcam_vllm_perf.py --policy both` on a CUDA machine to produce the first real serving-tier throughput/latency numbers for active-mode PCAM vs vLLM default LRU. Seven-step runbook already exists at `benchmarks/PHASE4_CLOSURE_RUN_LOG.md` section D. | ~30 engineer-minutes once a machine is available |
+| **FPGA prototype** | Xilinx Alveo board. RTL for fast-path coherence (<10ns), CXL or PCIe interface. Target: 250MHz timing closure, <50ns latency overhead. The Phase 2.5 cocotb sketch-parity harness is already landed and waits for one live cocotb run to close. | 2–3 months |
+| **ASIC controller** | 7nm/5nm process. Three integration paths on the table: CXL memory expander, SSD controller FTL, and HBM controller for GPU. Full RTL IP package + integration guide. | 12–18 months |
 
 **Production targets** we're holding ourselves to: >15% KV-cache hit rate improvement on long-context workloads, >90% important-token retention at 50% cache ratio, p99 eviction latency under 100µs, and >20% training memory savings vs naive optimizer-state offloading.
 
