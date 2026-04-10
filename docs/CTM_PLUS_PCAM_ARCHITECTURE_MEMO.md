@@ -212,7 +212,64 @@ The broader architecture has not drifted. Every architectural decision record ha
 
 ---
 
-## 9. What Is Still Pending
+## 9. Benchmarks
+
+This section separates benchmark evidence into clearly-labelled tiers for each layer. **Live-verified** numbers are reproducible on the current branch by running a single command. **Historical claims** are numbers from earlier CTM+ measurement work recorded in other repository documents — they are included for context and should not be treated as independently re-measured on this branch. **Environment-dependent** numbers are the ones pending the three closure runs discussed in Section 7; they are named here rather than omitted so a reviewer can see exactly which numbers are not yet claimable.
+
+### 9.1 CTM+ benchmarks
+
+CTM+ benchmarks cover the policy layer: correctness against the canonical specification, sketch-level behavior, and cross-workload claims from prior CTM+ measurement work.
+
+**Live-verified on this branch.** These are correctness benchmarks, not throughput benchmarks. They are the mechanism by which a reviewer can trust that the CTM+ specification and the PCAM runtime cannot silently disagree. Green on every commit of the roadmap.
+
+| Benchmark | Result | Evidence |
+|---|---|---|
+| Parity harness against vendored reference | 20 tests green, bit-for-bit equivalence on a fixed RNG seed | `simulator/pcam/tests/test_sketch_conformance.py` + `test_attention_evictor_parity.py` |
+| Count-Min sketch saturation | Counter saturates at 15 after 20 increments of the same key | `TestSketchParity::test_single_key_saturation_parity` |
+| Event-driven halving | Fires at `size >= reset_threshold`, halves counters and size atomically | `TestHalvingParity::test_halving_fires_at_reset_threshold` |
+| Phase-aware scoring determinism | Identical PREFILL and DECODE scores for identical traces under a fixed RNG seed | `TestPhaseAwareScoring::test_prefill_and_decode_both_match_reference` |
+| 500-step randomized differential | Zero divergence between the runtime and the vendored reference | `TestRandomizedEndToEnd::test_randomized_500_ops_parity` |
+
+**Historical claims from prior CTM+ investor materials.** The numbers below appear in `CTM_plus/INVESTOR_PITCH.md`, the source-of-truth investor document for the broader CTM+ cross-workload narrative. They were produced in an earlier measurement context that predates the PCAM software-product roadmap, and **they have not been independently reproduced by the current parity or benchmark harness.** They are reported here because they are part of the CTM+ historical record, not because they have been re-validated on this branch. A diligence reviewer should treat them as CTM+ historical context and not as current live measurements against the PCAM runtime.
+
+| Workload | Metric | LRU | CTM+ | Delta |
+|---|---|---|---|---|
+| Hotspot (batch ML) | Hit rate | 76.4% | 94.2% | +17.8 pts |
+| vLLM inference | Tokens/sec | 1,850 | 2,180 | +18% |
+| vLLM inference | Concurrent requests / GPU | 32 | 48 | +50% |
+| GPU memory efficiency | Utilization | 72% | 89% | +17 pts |
+| Database (TPC-C) | p99 latency | 12 ms | 8.5 ms | −29% |
+| Database (TPC-C) | Transactions/sec | 125K | 142K | +13.6% |
+| Decision latency | p99 | — | 2.35 µs | under the 3 µs requirement |
+| KV cache retention | Important-token retention | 25.4% | 29.5% | +16.2% |
+
+Reproducing these historical numbers against the current PCAM runtime on a fresh measurement environment is one of the open items in Section 10.
+
+### 9.2 PCAM benchmarks
+
+PCAM benchmarks cover the runtime-backend layer: policy-decision metrics on real and synthetic traces, runtime-adapter tests, and the pending real-vLLM serving-tier closures.
+
+**Live-verified on this branch.**
+
+| Benchmark | Result | Evidence |
+|---|---|---|
+| PCAM vs inline LRU/LFU (built-in demo trace) | 6 evictions, **0 sink evictions** for PCAM; 6 evictions, **1 sink eviction** for LRU and for LFU | `benchmarks/pcam_compare_baselines.py` |
+| PCAM vs in-repo baselines (Sink+LRU, H2O, IndustryStyle) | PCAM matches Sink+LRU and H2O on zero sink evictions; IndustryStyle has a documented ghost-buffer warmup on short traces | `pcam_compare_baselines.py --include-inrepo-baselines` |
+| Tier-hint distribution on demo trace | 5 HOT, 0 WARM, 2 COLD, 0 EVICT across 8 probed blocks | `benchmarks/pcam_trace_replay.py` |
+| HuggingFace real-attention extraction | 25 `TraceEvent`s from 11 blocks from 44 tokens; per-block mass shows the expected causal-attention envelope `[13.17, 8.07, 5.99, 4.64, 3.63, ...]` | Phase 4 live run against real torch 2.11 + real eager attention |
+| Round-trip: real extracted trace → replay → baseline comparison | Green end-to-end against the real trace file | `pcam_trace_replay.py --trace ...` + `pcam_compare_baselines.py --trace ...` |
+| Active-mode bridge wiring | 23 tests green against a mock `FreeKVCacheBlockQueue`: install/uninstall idempotency, method-surface probing, LRU fallback, bridge statistics accounting | `simulator/pcam/tests/test_phase5_active_mode.py` |
+| Full PCAM test suite (cumulative across all phases) | 239 passed, 3 skipped (environment-dependent), 0 failed, 0 errored | `pytest simulator/pcam/tests/ simulator/pcam/rtl/tests/ -q` |
+
+The single defensible headline from the live-verified PCAM benchmarks is this: **on the built-in demo trace, PCAM's sink-pinning by construction yields zero sink evictions, while naive LRU and LFU baselines each evict one sink block.** The quantitative magnitude is small because the trace itself is small, but the direction is correct, reproducible, and applies to any serving stack whose default evictor is LRU-shaped. PCAM's behavior also matches the best-in-class sink-aware reference baselines (Sink+LRU, H2O) on that same trace, which is the correct apples-to-apples framing: PCAM is as safe as a hand-tuned sink-aware policy and safer than a naive one, as measured by the metric that matters most for LLM inference.
+
+**Environment-dependent closures (pending).** Serving-tier throughput and latency numbers for PCAM against vLLM's default eviction — the numbers that would directly support an "X% more tokens/sec" or "Y% more concurrent requests" claim for the PCAM runtime itself — require one real run of `benchmarks/pcam_vllm_perf.py --policy both` on a CUDA machine with a working vLLM install and network access to a model. That run has not yet happened on this branch. The seven-step runbook for it is at `benchmarks/PHASE4_CLOSURE_RUN_LOG.md` section D, and the estimated engineer-time on a prepared machine is under an hour.
+
+**What cannot be honestly reported yet.** The PCAM software runtime does **not** currently carry a published end-to-end serving throughput delta against vLLM's default. The active-mode bridge is implemented and unit-tested, but no live GPU run has produced tokens/sec, p50/p95/p99 latency, or concurrent-request-capacity numbers for PCAM specifically. Any document that cites such a number for PCAM must be citing either the pending closure run or the historical CTM+ investor-pitch numbers in Section 9.1, not a reproducible PCAM-runtime measurement on this branch. This distinction is exactly the kind of caveat a diligence reviewer should check; the memo is written so that check produces a clean answer.
+
+---
+
+## 10. What Is Still Pending
 
 The pending work is best framed as a forward plan, because none of it is blocking the platform's current usefulness. It is what turns the current software-first asset into a broader production story.
 
@@ -228,7 +285,7 @@ The pending list is not a weakness list. It is the normal forward work plan of a
 
 ---
 
-## 10. Conclusion
+## 11. Conclusion
 
 CTM+ and PCAM together address a concrete and growing problem in modern AI infrastructure: LLM serving systems are increasingly memory-bound, and the default eviction policies those systems ship with were not designed for attention-based workloads. The combined platform's answer is to treat memory policy as something that deserves the same rigor compute kernels already receive — a canonical specification, a bit-parity runtime, a conformance harness that enforces agreement between the two, and a set of integration layers that let the policy actually run inside real inference systems rather than sitting in a design document.
 
