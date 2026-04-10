@@ -264,6 +264,18 @@ The external memory controller uses these hints for KV cache placement.
 Full CTM+ (shadow caches, mode switching, Markov prediction) stays
 off-chip.
 
+**Scoring behavior (ADR-0001).** Per-block importance is computed by
+the four-signal phase-aware model locked in
+[`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md):
+recency, frequency, attention EMA, and position importance, with
+PREFILL/DECODE weight splits and a +0.5 entity bonus for high-attention
+non-sink blocks. Frequency is estimated by a 4-row, 4-bit Count-Min
+sketch (`rtl/core/freq_sketch.sv`, ported from
+`simulator/pcam/kv_policy.py`) rather than the legacy per-entry
+`access_count` counter that used to live in `block_entry_t`. Sink
+tokens are pinned at admission and are never emitted as eviction
+candidates by the policy.
+
 ---
 
 ## Validation
