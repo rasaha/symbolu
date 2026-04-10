@@ -43,7 +43,7 @@ from typing import Dict, List, Optional, Tuple
 # Ensure project root is on path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from simulator.pcam import PCAMSimulator, PCAMConfig
+from simulator.pcam import PCAMSimulator, PCAMSimulatorConfig as PCAMConfig
 from simulator.pcam.core.config import (
     InterconnectType,
     InterconnectConfig,

@@ -71,6 +71,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Set
 
 # ---------------------------------------------------------------------------
@@ -91,11 +92,43 @@ from .reference.attention_evictor_vendored import (
     PositionClass,
 )
 
+
+# ---------------------------------------------------------------------------
+# Tier hint enum (Phase 1)
+#
+# Tier hints map a block's current scoring state into a placement
+# recommendation for an external memory controller (CTM+ Lite, CXL
+# tier policy, vLLM block manager, etc.). They do NOT change eviction
+# behavior — that is governed by select_victims, which is unchanged.
+#
+# Thresholds match Section 2.7 of the PCAM spec:
+#   HOT  : score >= 0.7        — keep in HBM
+#   WARM : 0.3 <= score < 0.7  — OK in DRAM
+#   COLD : 0.0 <  score < 0.3  — can demote to slower tier
+#   EVICT: score <= 0.0        — unknown / invalid block (safe to drop)
+#
+# Sink-pinned blocks (is_sink == True) are clamped to HOT regardless of
+# their raw score, because select_victims never evicts them and a
+# tier-placement consumer must not demote them. This is the only
+# clamp; raw score otherwise drives the classification.
+# ---------------------------------------------------------------------------
+
+
+class TierHint(Enum):
+    """Memory-placement recommendation derived from a block's score."""
+
+    HOT = "HOT"
+    WARM = "WARM"
+    COLD = "COLD"
+    EVICT = "EVICT"
+
+
 __all__ = [
     "FrequencySketch",
     "KVCachePolicy",
     "InferencePhase",
     "PositionClass",
+    "TierHint",
 ]
 
 
@@ -555,6 +588,57 @@ class KVCachePolicy:
             "active_sequences": len(self.sequences),
             "step": self._step,
         }
+
+    # ---- Tier hints (Phase 1) -----------------------------------------------
+    #
+    # classify_tier and tier_hints map a block's score to a placement
+    # recommendation (HOT/WARM/COLD/EVICT). They are observational,
+    # build directly on the existing four-signal score_block, and
+    # introduce no second scoring system. Sink-pinned blocks clamp to
+    # HOT because select_victims will never evict them and a memory
+    # controller consuming these hints must not demote them.
+
+    # Tier thresholds — keep as class-level constants so consumers can
+    # introspect or subclass without re-implementing the cutpoints.
+    TIER_HOT_THRESHOLD: float = 0.7
+    TIER_WARM_THRESHOLD: float = 0.3
+
+    def classify_tier(self, block_id: int) -> "TierHint":
+        """
+        Return the tier-placement recommendation for a single block.
+
+        Semantics:
+            - Unknown block (not in self.blocks)         -> EVICT
+            - Sink block (is_sink, in pinned_blocks)     -> HOT  (clamped)
+            - score >= TIER_HOT_THRESHOLD                -> HOT
+            - score >= TIER_WARM_THRESHOLD               -> WARM
+            - score >  0.0                               -> COLD
+            - otherwise (score <= 0.0)                   -> EVICT
+
+        This method does not modify policy state.
+        """
+        block = self.blocks.get(block_id)
+        if block is None:
+            return TierHint.EVICT
+        if block.is_sink:
+            return TierHint.HOT
+
+        score = self.score_block(block_id)
+        if score >= self.TIER_HOT_THRESHOLD:
+            return TierHint.HOT
+        if score >= self.TIER_WARM_THRESHOLD:
+            return TierHint.WARM
+        if score > 0.0:
+            return TierHint.COLD
+        return TierHint.EVICT
+
+    def tier_hints(self, block_ids: List[int]) -> Dict[int, "TierHint"]:
+        """
+        Batched ``classify_tier``. Returns a ``{block_id: TierHint}``
+        mapping for every block_id in the input list, including unknown
+        blocks (which map to EVICT). Order is not guaranteed.
+        """
+        return {bid: self.classify_tier(bid) for bid in block_ids}
 
     # ---- Victim selection ---------------------------------------------------
 
