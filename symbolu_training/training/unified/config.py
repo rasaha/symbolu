@@ -1032,6 +1032,10 @@ class UnifiedTrainingConfig:
 
     # Phase 3: Governance Integration
     lambda_kosha_routing: float = 0.0              # Kosha routing loss weight
+
+    # Phase 5: Learned Domain Conditioning (MVP)
+    use_learned_domain_classifier: bool = False    # Replace hardcoded domain bridge with learned classifier
+    lambda_domain_cls: float = 0.0                 # Domain classification loss weight (0 = disabled, uses hardcoded as bootstrap target)
     lambda_bliss_token: float = 0.0                # Bliss token-level coherence loss weight
     lambda_plausibility_token: float = 0.0          # Plausibility token-level loss
     lambda_jepa_token: float = None                # Backward-compatible alias for lambda_plausibility_token

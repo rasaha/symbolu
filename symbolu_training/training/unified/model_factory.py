@@ -798,6 +798,20 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         model.conscious_gen["bliss_gate"] = bliss_gate
         model.conscious_gen["integrated_scorer"] = integrated_scorer
 
+        # Phase 5: Learned Domain Classifier (behind flag)
+        if getattr(config, 'use_learned_domain_classifier', False):
+            from symbolu_training.training.conscious_generation.governance.domain_classifier import DomainClassifier
+            domain_classifier = DomainClassifier(
+                embed_dim=embed_dim,
+                state_dim=config.token_ontology_dim,
+            )
+            model.conscious_gen["domain_classifier"] = domain_classifier
+            print(f"  [Conscious Gen Phase 5] Learned Domain Classifier ENABLED")
+            print(f"    Input: pooled hidden ({embed_dim}D) + sovereign state ({config.token_ontology_dim}D)")
+            print(f"    Output: 8-category domain distribution")
+            if getattr(config, 'lambda_domain_cls', 0) > 0:
+                print(f"    Bootstrap loss: lambda_domain_cls={config.lambda_domain_cls}")
+
         # Phase 3 losses: instantiate when lambda > 0 OR when curriculum is enabled
         # (curriculum starts lambdas at 0 and ramps them up later)
         _cg_curriculum = getattr(config, 'enable_cg_curriculum', False)
