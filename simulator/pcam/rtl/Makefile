@@ -43,7 +43,8 @@ CORE_FILES := \
     core/bank_mem.sv \
     core/topk_network.sv \
     core/update_coalescer.sv \
-    core/decay_engine.sv
+    core/decay_engine.sv \
+    core/freq_sketch.sv
 
 HOST_FILES := \
     host_if/pcie_endpoint.sv \
