@@ -114,44 +114,40 @@ def _unimplemented(method: str) -> NotImplementedError:
 
 
 # ===========================================================================
-# FrequencySketch stub.
+# FrequencySketch — ported from the canonical CTM+ reference.
+#
+# Source: CTM_plus/KVPolicy/kv_policy/attention_evictor.py:69-112
+# Contract: docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md
+#
+# Any intentional divergence from the reference is a contract change and
+# must be reflected in the ADR first. The conformance harness at
+# simulator/pcam/tests/test_sketch_conformance.py asserts bit-for-bit
+# parity with the reference on a fixed RNG seed.
 # ===========================================================================
 
 
 class FrequencySketch:
     """
-    Stub for the 4-bit Count-Min Sketch.
+    4-bit Count-Min Sketch for O(1) approximate frequency tracking.
 
-    Constructible with correct structural invariants so the `width >= 64`
-    / power-of-two / `depth == 4` / `reset_threshold == capacity * 10`
-    assertions in `TestStructuralInvariants.test_pcam_matches_structural_invariants`
-    can run. Every mutating or querying method raises.
+    Periodically halves all counters to age out stale frequencies. The
+    four fixed seed hashes, the 4-bit counter saturation, the power-of-two
+    width with a floor of 64, and the event-driven halving at
+    ``capacity * 10`` increments are all load-bearing for parity with the
+    reference. Do not tune them.
     """
 
     def __init__(self, capacity: int) -> None:
         self.capacity = capacity
         self.width = self._next_pow2(max(64, capacity))
         self.depth = 4
+        self.table = [[0] * self.width for _ in range(self.depth)]
         self.size = 0
         self.reset_threshold = capacity * 10
-        # Table deliberately NOT allocated. Allocating the 2D counter
-        # array would invite accidental partial-implementation drift.
-        # A real port will add the table AND the hash seeds AND the
-        # increment/estimate/halve paths in one atomic change, per the
-        # PR scope doc.
+        self._seeds = [0x9E3779B9, 0x517CC1B7, 0x6C62272E, 0x2E1B2138]
 
     @staticmethod
     def _next_pow2(n: int) -> int:
-        """
-        Structural helper for the width invariant. This is deliberately
-        the same bit-twiddling used in the reference (attention_evictor.py
-        lines 83-87) because width is a function of capacity, not an
-        algorithm choice. Copying it here is not "partial implementation"
-        — the sketch's behavior lives in increment/estimate/halve, which
-        remain unimplemented below.
-        """
-        if n <= 1:
-            return 1
         n -= 1
         n |= n >> 1
         n |= n >> 2
@@ -160,11 +156,30 @@ class FrequencySketch:
         n |= n >> 16
         return n + 1
 
+    def _hash(self, key: int, i: int) -> int:
+        h = key * self._seeds[i]
+        h ^= h >> 16
+        return h & (self.width - 1)
+
     def increment(self, key: int) -> int:
-        raise _unimplemented("FrequencySketch.increment")
+        self.size += 1
+        if self.size >= self.reset_threshold:
+            self._halve()
+        min_count = 15
+        for i in range(self.depth):
+            idx = self._hash(key, i)
+            self.table[i][idx] = min(15, self.table[i][idx] + 1)
+            min_count = min(min_count, self.table[i][idx])
+        return min_count
 
     def estimate(self, key: int) -> int:
-        raise _unimplemented("FrequencySketch.estimate")
+        return min(self.table[i][self._hash(key, i)] for i in range(self.depth))
+
+    def _halve(self) -> None:
+        for row in self.table:
+            for j in range(len(row)):
+                row[j] >>= 1
+        self.size >>= 1
 
 
 # ===========================================================================
