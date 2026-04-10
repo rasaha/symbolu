@@ -576,4 +576,49 @@ class KVCachePolicy:
     # ---- Victim selection ---------------------------------------------------
 
     def select_victims(self, count: int) -> List[int]:
-        raise _unimplemented("KVCachePolicy.select_victims")
+        """
+        Select up to ``count`` blocks to evict. Returns block_ids sorted
+        by score (lowest first = best eviction candidates).
+
+        Two codepaths, exactly matching the reference at
+        attention_evictor.py:419-450:
+
+        1. Filler fast path — if the set of all-filler blocks in
+           ``available`` is large enough to satisfy the request, sort
+           them by ``freq_sketch.estimate()`` ascending and return the
+           lowest. This path is deterministic and does not consume the
+           RNG.
+
+        2. Sampled path — otherwise draw ``min(48, len(available))``
+           candidates via ``self._rng.sample``, score them via
+           ``score_block``, stable-sort by score ascending, and return
+           the lowest ``count`` block_ids.
+
+        Pinned (sink) blocks are excluded from ``available`` before
+        either codepath runs; they are never scored, sampled, or
+        considered.
+        """
+        if not self.gpu_blocks:
+            return []
+
+        available = self.gpu_blocks - self.pinned_blocks
+        if not available:
+            return []
+
+        # Fast path: enough all-filler blocks to satisfy the request.
+        filler_blocks = [bid for bid in available if self._is_all_filler(bid)]
+        if len(filler_blocks) >= count:
+            filler_blocks.sort(key=lambda b: self.freq_sketch.estimate(b))
+            self.stats["filler_evictions"] += min(count, len(filler_blocks))
+            return filler_blocks[:count]
+
+        # Sampled path.
+        sample_size = min(48, len(available))
+        candidates = self._rng.sample(list(available), sample_size)
+
+        scored = [(bid, self.score_block(bid)) for bid in candidates]
+        scored.sort(key=lambda x: x[1])
+
+        victims = [bid for bid, _ in scored[:count]]
+        self.stats["evictions"] += len(victims)
+        return victims
