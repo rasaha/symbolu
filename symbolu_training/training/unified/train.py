@@ -10554,6 +10554,7 @@ def main():
         dataset=args.dataset,
         dataset_name=args.dataset_name,
         dataset_subset=args.dataset_subset,
+        mix_datasets=args.mix_datasets,
         cache_val_batches=args.cache_val_batches,
         cache_dataset=args.cache_dataset,
         gradient_checkpointing=args.gradient_checkpointing,
