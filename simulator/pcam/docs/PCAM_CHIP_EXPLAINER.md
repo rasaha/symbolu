@@ -1,6 +1,6 @@
 # PCAM (Phase-Coherent Attention Memory) Chip — Explainer
 
-**Source:** `simulator/pcam/`, `docs/design/PCAM_CHIP_SPECIFICATION.md`, RTL in `simulator/pcam/rtl/`
+**Source:** `simulator/pcam/`, [`PCAM_CHIP_SPECIFICATION.md`](PCAM_CHIP_SPECIFICATION.md), RTL in `simulator/pcam/rtl/`
 **Purpose:** Explains the PCAM hardware accelerator to someone who knows
 ML/systems but hasn't seen the codebase.
 

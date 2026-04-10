@@ -1,7 +1,7 @@
 # PCAM Update PR — Scope Against ADR-0001
 
 **Status:** Ready to implement
-**Depends on:** [ADR-0001](ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Depends on:** [ADR-0001](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md) (CTM+ source-of-truth; lives in `docs/design/`, not under PCAM)
 **Reference:** `CTM_plus/KVPolicy/kv_policy/attention_evictor.py`
 
 ---
@@ -22,7 +22,7 @@ PCAM's block-level eviction behavior must be **observationally equivalent** to c
 
 ## Mandatory changes
 
-### 1. `docs/design/PCAM_CHIP_SPECIFICATION.md`
+### 1. `simulator/pcam/docs/PCAM_CHIP_SPECIFICATION.md`
 
 | Section | Lines | Change |
 |---|---|---|
@@ -98,7 +98,7 @@ The following are **out of scope for this PR**. Each has a real reason to defer,
 | **Training memory manager** | Lives in `CTM_plus/training/`, not in PCAM. Zero intersection with the PCAM spec/sim/RTL. |
 | **`RECENT` window protection** | Not in the reference (`attention_evictor.py` declares `PositionClass.RECENT` at line 121 and stores `recent_window` at line 205, but neither is read in scoring). ADR-0001 pins this as a known deferred item. Activating it in PCAM before the reference would violate the "code leads, PCAM follows" ordering. |
 | **`reuse` and `sequence_priority` signals** | Dropped by ADR-0001. Adding them to PCAM now would be speculative — no reference behavior to test against. |
-| **Explainer doc polish** (`docs/architecture/PCAM_CHIP_EXPLAINER.md`) | Mostly still correct. Can land in a follow-up cleanup PR. |
+| **Explainer doc polish** (`simulator/pcam/docs/PCAM_CHIP_EXPLAINER.md`) | Mostly still correct. Can land in a follow-up cleanup PR. |
 | **`ALPHA` EMA retuning** in RTL | Flag in code, measure after simulator lands, decide in a follow-up. Retuning without a measurement is a guess. |
 | **New kv_policy features** (attention sinks > 4, token-level tracking) | Those are reference-implementation changes. This PR is strictly alignment, not extension. |
 
@@ -117,7 +117,7 @@ Suggested commit order inside the single PR:
 5. **RTL: `pcam_pkg.sv`** — remove `access_count`, add sketch constants, add seed hash parameters.
 6. **RTL: `pcam_top.sv`** — sketch BRAM, increment path, estimate path, halving FSM.
 7. **RTL: testbench update** (`tb/tb_pcam_top.sv`) — match the simulator's sketch behavior.
-8. **Spec doc edits** — update `PCAM_CHIP_SPECIFICATION.md` § 1.4, § H.3.2, § H.4, and any stray `access_count` references.
+8. **Spec doc edits** — update `simulator/pcam/docs/PCAM_CHIP_SPECIFICATION.md` § 1.4, § H.3.2, § H.4, and any stray `access_count` references.
 
 Each commit should leave the tree buildable in its own language (Python commits don't break RTL, RTL commits don't break Python). The PR as a whole flips the contract.
 
@@ -126,10 +126,10 @@ Each commit should leave the tree buildable in its own language (Python commits 
 ## Acceptance criteria
 
 - [ ] `grep -n access_count simulator/pcam/` returns only comments or historical references (ideally nothing).
-- [ ] `grep -n access_count docs/design/PCAM_CHIP_SPECIFICATION.md` returns nothing.
+- [ ] `grep -n access_count simulator/pcam/docs/PCAM_CHIP_SPECIFICATION.md` returns nothing.
 - [ ] `test_sketch_conformance.py` passes with zero mismatches over 500 eviction cycles using `random.Random(42)` on both sides.
 - [ ] `tb_pcam_top.sv` simulates the new sketch BRAM to timing closure at the existing target frequency (document if it doesn't — that's a real finding, not a failure).
-- [ ] `PCAM_CHIP_SPECIFICATION.md` § H.3.2 quotes the four-signal `PHASE_WEIGHTS` table and cites ADR-0001.
+- [ ] `simulator/pcam/docs/PCAM_CHIP_SPECIFICATION.md` § H.3.2 quotes the four-signal `PHASE_WEIGHTS` table and cites ADR-0001.
 - [ ] `CTM_PLUS_LIMITATIONS_AND_DESIGN_UPDATES.md` § 2.1 has the superseded banner pointing at ADR-0001 (already landed).
 - [ ] PR description links ADR-0001 and this scope doc, and lists the non-goals verbatim so reviewers don't ask for them.
 
