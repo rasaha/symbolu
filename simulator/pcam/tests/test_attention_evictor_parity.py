@@ -76,9 +76,9 @@ from kv_policy.attention_evictor import (
 _PCAM_SKIP_REASON = (
     "PCAM-side KVCachePolicy not found at simulator.pcam.kv_policy. "
     "This module is introduced by the PCAM alignment PR described in "
-    "docs/design/PCAM_UPDATE_PR_SCOPE.md. The test suite will auto-activate "
-    "once that module exposes a KVCachePolicy class (or an adapter matching "
-    "the duck-type surface documented at the top of this file)."
+    "simulator/pcam/docs/PCAM_UPDATE_PR_SCOPE.md. The test suite will "
+    "auto-activate once that module exposes a KVCachePolicy class (or an "
+    "adapter matching the duck-type surface documented at the top of this file)."
 )
 
 

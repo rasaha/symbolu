@@ -10,7 +10,7 @@
     "what behaviors the conformance suite exercises without running Python.",
     "",
     "Source of truth for scoring model: docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md",
-    "PR scope: docs/design/PCAM_UPDATE_PR_SCOPE.md"
+    "PR scope: simulator/pcam/docs/PCAM_UPDATE_PR_SCOPE.md"
   ],
 
   "sketch_traces": {
