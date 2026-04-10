@@ -210,7 +210,27 @@ class TestPCAMVLLMDemoRealPath:
 # ===========================================================================
 
 
+def _transformers_stack_installed() -> bool:
+    """
+    True iff both ``torch`` and ``transformers`` are importable. Used to
+    skip the fail-clean tests below when the deps ARE present — those
+    tests only assert meaningful behavior in a stripped environment.
+    A separate test verifies the present-deps case.
+    """
+    try:
+        import torch  # noqa: F401
+        import transformers  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 class TestTraceExtractor:
+    @pytest.mark.skipif(
+        _transformers_stack_installed(),
+        reason="torch + transformers are installed; fail-clean path "
+               "is only reachable in a stripped environment.",
+    )
     def test_ensure_transformers_fails_clean(self):
         with pytest.raises(TraceExtractorUnavailable) as excinfo:
             ensure_transformers_available()
@@ -218,6 +238,11 @@ class TestTraceExtractor:
         assert "torch" in msg or "transformers" in msg
         assert "pip install" in msg
 
+    @pytest.mark.skipif(
+        _transformers_stack_installed(),
+        reason="torch + transformers are installed; fail-clean exit "
+               "code is only reachable in a stripped environment.",
+    )
     def test_extract_run_cli_fails_clean(self, tmp_path, capsys):
         out_path = tmp_path / "trace.json"
         rc = extract_run(
@@ -227,6 +252,20 @@ class TestTraceExtractor:
         err = capsys.readouterr().err
         assert "ERROR:" in err
         assert not out_path.exists()
+
+    @pytest.mark.skipif(
+        not _transformers_stack_installed(),
+        reason="torch + transformers not installed; the present-deps "
+               "path is only meaningful when they are.",
+    )
+    def test_ensure_transformers_available_succeeds_when_installed(self):
+        """
+        Complement to ``test_ensure_transformers_fails_clean``: when
+        the stack IS installed, the probe must return cleanly (no
+        raise, no side effects).
+        """
+        # Must not raise.
+        ensure_transformers_available()
 
     def test_attention_to_block_mass_simple(self):
         """

@@ -263,8 +263,13 @@ def extract_trace_from_prompt(
     from transformers import AutoModelForCausalLM, AutoTokenizer  # pragma: no cover
 
     tokenizer = AutoTokenizer.from_pretrained(model)  # pragma: no cover
+    # attn_implementation="eager" is required for output_attentions=True
+    # to work on transformers >= 4.36 where SDPA is the default attention
+    # kernel. SDPA intentionally does not return attention weights. The
+    # eager attention path is slower but is the only implementation that
+    # exposes per-layer attention tensors, which the extractor needs.
     hf_model = AutoModelForCausalLM.from_pretrained(  # pragma: no cover
-        model, output_attentions=True
+        model, output_attentions=True, attn_implementation="eager"
     )
     hf_model.to(device)  # pragma: no cover
     hf_model.eval()  # pragma: no cover

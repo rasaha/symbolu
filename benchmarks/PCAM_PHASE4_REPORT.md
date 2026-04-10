@@ -1,9 +1,10 @@
 # PCAM Phase 4 Benchmark Report
 
 **Audience:** engineering reviewers, technical diligence, partner/acquirer corp-dev
-**Artifact status:** replay-only measurements live; real-runtime paths ready-to-run pending external dependencies
+**Artifact status:** replay-only measurements live; HF extractor path closed live in partial form (real torch forward pass, random-init model); real vLLM shadow-mode path remains environmentally blocked pending a GPU machine.
 **Source branch:** PCAM software-product roadmap, Phase 4
 **Spec of record:** [`docs/design/ADR-0001`](../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Closure run log:** [`PHASE4_CLOSURE_RUN_LOG.md`](PHASE4_CLOSURE_RUN_LOG.md)
 
 ---
 
@@ -117,19 +118,31 @@ derived events            ~240
 
 **What remains:** one live run on a machine with vllm installed. Pattern identical to Phase 2.5 RTL closure.
 
-### Real HuggingFace attention-trace extraction
+### Real HuggingFace attention-trace extraction — **LIVE VERIFIED** ✓
 
 `benchmarks/pcam_trace_extract.py` loads a HuggingFace causal LM, runs a prompt through it with `output_attentions=True`, aggregates last-layer attention to per-block mass, and emits a `TraceEvent` JSON list that any Phase 3 or Phase 4 script can consume. This is the highest-fidelity "real trace" path currently in the repo.
 
-**Status:** Extractor code landed. Pure-Python helpers (`_attention_to_block_mass`, `_events_from_block_attention`) verified by 4 tests against hand-constructed attention matrices. Full model run fails clean without `torch` / `transformers`.
+**Status:** **Live verified in partial form.** Executed against a real torch 2.11 forward pass through a locally-constructed `GPT2LMHeadModel` (real `transformers` class, real eager attention, 35,712 params, random-init weights because HuggingFace Hub is sandbox-proxy-blocked). See `PHASE4_CLOSURE_RUN_LOG.md` for the full command, output, and the workaround rationale.
 
-**What remains:** `pip install torch transformers` + one live run against a small model (gpt2 fits on CPU). The output JSON can then be fed into `pcam_trace_replay.py --trace` and `pcam_compare_baselines.py --trace` as a real trace.
+**Real bug fixed during closure.** The extractor's first live run failed with a `transformers` ≥4.36 breaking change: `output_attentions=True` is incompatible with the default SDPA attention kernel. A one-line fix added `attn_implementation="eager"` to the `from_pretrained` call.
+
+**Live output on 44-token input ("The quick brown fox jumps over the lazy dog."), `--block-size 4`:**
+
+```
+wrote 25 events (11 blocks, 44 tokens) from '.../local_gpt2' to .../real_trace.json
+```
+
+**Per-block attention mass:** `[13.17, 8.07, 5.99, 4.64, 3.63, ...]` — the monotone decrease is the real signature of causal self-attention (earlier blocks are attended to by more queries). Even with random weights, the architectural pattern is real.
+
+**Round-trip verification:** the emitted JSON successfully replays through both `pcam_trace_replay.py --trace ...` and `pcam_compare_baselines.py --trace ... --include-inrepo-baselines`.
+
+**What remains:** one live run against a pretrained model (e.g. real `gpt2` weights) on any machine with HuggingFace Hub network access, so the extracted attention signal carries semantic meaning, not just structural meaning. The code path is proven; only the data is random.
 
 ## Current limitations
 
 Stated bluntly so a diligence reviewer cannot mistake "what Phase 4 landed" for "what Phase 4 has proven end-to-end."
 
-1. **No real-model throughput, latency, or quality numbers yet.** All live numbers in this report are policy-decision metrics (evictions, sink evictions, attention-weighted cost, tier distribution). Token throughput, p50/p95/p99 latency, and quality preservation against ground truth require real-runtime execution, which is ready to run but not yet executed.
+1. **No real-model throughput, latency, or quality numbers yet.** All live numbers in this report are policy-decision metrics (evictions, sink evictions, attention-weighted cost, tier distribution). Token throughput, p50/p95/p99 latency, and quality preservation against ground truth require real-runtime execution. As of the 2026-04-10 closure attempt, the HuggingFace extractor path has been live-verified against a locally-constructed random-init torch model (see `PHASE4_CLOSURE_RUN_LOG.md`), but the real vLLM shadow-mode path remains environmentally blocked pending a CUDA machine.
 2. **Shadow mode, not active mode.** The real-vLLM path observes vllm's default eviction and reports PCAM's hypothetical decisions. It does not replace vllm's evictor. Replacing the evictor is Phase 5 work (~50 lines of consumer code plus version-compatibility testing against current vllm releases).
 3. **Single demo trace.** The 119-event built-in trace exercises sink pinning, entity bonus, filler fast path, and tier classification, but it is synthetic and short. Real workload traces (LongBench, PassKey, needle-in-a-haystack) will produce more representative comparison numbers. The HuggingFace extractor is the path to those traces; execution pending.
 4. **One sink-semantics corner.** The in-repo baselines use `num_sinks=1` because PCAM's demo trace admits the sink block first. On traces where non-sink blocks are admitted before the sink, PCAM's position-based pinning and the in-repo baselines' block-id-order pinning can disagree. Documented in `PHASE4_REAL_RUNTIME.md`.
