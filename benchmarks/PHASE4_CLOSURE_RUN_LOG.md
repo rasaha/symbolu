@@ -403,6 +403,195 @@ Do not squash both closures into the same commit even if one engineer runs both 
 
 ---
 
+## D. Phase 5 real-GPU verification (active-mode perf harness)
+
+**Prerequisites**
+
+- A CUDA-capable GPU with ≥ 4 GB VRAM (tested target: any Ampere/Ada/Hopper SKU, or Turing with FP16 fallback)
+- NVIDIA driver installed (`nvidia-smi` reports the GPU)
+- Network access to `pypi.org` **and** `huggingface.co`
+- Linux recommended (vLLM's Windows support is limited)
+- The symbolu repo cloned locally
+
+**Step 1: Verify the environment**
+
+```bash
+# GPU probe
+nvidia-smi | head -20
+
+# CUDA visibility from Python
+python3 -c "import torch; assert torch.cuda.is_available(), 'no CUDA'; \
+             print('CUDA ok:', torch.cuda.get_device_name(0), '| mem:', \
+                   torch.cuda.get_device_properties(0).total_memory // (1024**3), 'GB')"
+
+# HuggingFace Hub reachability (the perf harness downloads a model)
+curl -sI https://huggingface.co/facebook/opt-125m/resolve/main/config.json | head -1
+# expect: HTTP/1.1 200 OK  or  HTTP/1.1 302 Found
+```
+
+If any probe fails, stop — Phase 5 is not closable on this machine.
+
+**Step 2: Install vLLM in a dedicated virtualenv**
+
+vLLM pins specific `torch` and `transformers` versions that conflict with the Phase 4 extractor's stack. Always use a fresh venv per path.
+
+```bash
+cd /path/to/symbolu
+python3 -m venv .venv-pcam-phase5
+source .venv-pcam-phase5/bin/activate
+pip install --upgrade pip
+pip install vllm
+
+# Sanity: verify the installed vllm has the v1 core surface the bridge targets
+python -c "
+from vllm.v1.core.block_pool import BlockPool
+from vllm.v1.core.kv_cache_utils import FreeKVCacheBlockQueue, KVCacheBlock
+import vllm
+print('vllm:', vllm.__version__)
+print('v1 core: present')
+print('FreeKVCacheBlockQueue methods:', [
+    m for m in ('popleft_n', 'append', 'append_n', 'remove', 'get_all_free_blocks')
+    if hasattr(FreeKVCacheBlockQueue, m)
+])
+"
+```
+
+If any of the `v1.core.block_pool` / `kv_cache_utils` imports fail, you are on an older vLLM release that does not support active mode. Either upgrade vLLM to ≥ 0.7.0 or stay on Phase 4 shadow mode.
+
+**Step 3: Verify the bridge's version check accepts this vLLM**
+
+```bash
+python -c "
+from benchmarks.vllm_active_bridge import check_vllm_active_mode_supported, VLLMVersionSupportError
+try:
+    check_vllm_active_mode_supported()
+    print('check_vllm_active_mode_supported: PASS')
+except VLLMVersionSupportError as e:
+    print('check_vllm_active_mode_supported: FAIL —', e)
+    raise SystemExit(1)
+"
+# expect: check_vllm_active_mode_supported: PASS
+```
+
+If this fails on a vLLM release whose v1 core import you just verified in Step 2, the method-surface probe inside `check_vllm_active_mode_supported` is rejecting a method the new release renamed. The fix is to update the `_required_queue_methods` tuple in `benchmarks/vllm_active_bridge.py` with the new names. Single-line change; record it in the Run log.
+
+**Step 4: Run the Phase 5 perf harness with a small model and both policies**
+
+```bash
+python benchmarks/pcam_vllm_perf.py \
+    --model facebook/opt-125m \
+    --prompt "Explain PCAM in one sentence." \
+    --prompt "Name three cache eviction algorithms." \
+    --prompt "Summarize paged attention in one sentence." \
+    --max-tokens 32 \
+    --max-blocks 4096 \
+    --sink-tokens 4 \
+    --policy both \
+    --json /tmp/pcam_phase5_perf.json
+```
+
+Keep the first run small: `facebook/opt-125m` is ~250 MB, three short prompts, 32 max tokens each. Total GPU time should be well under a minute on any modern GPU. Scale up only after this smoke test is green.
+
+**Step 5: Expected output signature**
+
+A clean run prints a `REAL SERVING METRICS` banner followed by two tables:
+
+```
+======================================================
+  PCAM vLLM Perf — Real Serving Metrics
+======================================================
+NOTE: REAL SERVING METRICS from vllm.LLM.generate()...
+
+policy   tps     wall_sec  mean_ms  p50_ms  p95_ms  prompt_toks  completion_toks
+-------  ------  --------  -------  ------  ------  -----------  ---------------
+default  NN.NN   X.XXXX    NNN.NN   NNN.NN  NNN.NN  ~25-40       96
+pcam     NN.NN   X.XXXX    NNN.NN   NNN.NN  NNN.NN  ~25-40       96
+
+PCAM throughput delta vs default LRU: +/−X.YZ%
+
+Active-mode bridge stats (pcam run)
+metric                value
+--------------------  -----
+popleft_n_calls       N
+blocks_evicted        N
+pcam_chosen_blocks    N
+lru_fallback_blocks   N
+append_events         N
+```
+
+And the JSON output at `/tmp/pcam_phase5_perf.json` contains the same data in machine-readable form, with two entries in `results[]` — one for `default` and one for `pcam` — each carrying the full `PolicyRunResult.summary()` shape.
+
+**What to look for in the output:**
+
+- Both policies finish without raising.
+- The `pcam` run's `active_mode_stats` has `popleft_n_calls > 0` — confirms PCAM's `popleft_n` replacement was actually called (not bypassed).
+- `pcam_chosen_blocks + lru_fallback_blocks = blocks_evicted` — the math adds up.
+- The throughput delta line appears. The sign (+/−) is whatever the real measurement says — do NOT edit it to match a preferred narrative.
+
+**Step 6: Common failure modes and the smallest fix for each**
+
+1. **`VLLMBridgeUnavailable: vllm is not installed`** — The pytest wrapper check saw the wrong environment. Verify `which python` and `which pip` point at the venv, then re-run.
+
+2. **`VLLMVersionSupportError: FreeKVCacheBlockQueue is missing methods required by the PCAM active-mode bridge`** — Upstream renamed a method. The error message lists exactly which methods went missing. Update `_required_queue_methods` in `benchmarks/vllm_active_bridge.py`, and correspondingly update the install path's method-hook assignments (`queue.popleft_n`, `queue.append`, `queue.append_n`) if the method names themselves changed.
+
+3. **`VLLMVersionSupportError: Could not locate BlockPool on the vLLM LLM instance. Tried:`** — The `_find_block_pool` helper's candidate-path list doesn't know about your vLLM release's internal layout. Inspect the live engine interactively:
+
+   ```python
+   from vllm import LLM
+   llm = LLM(model="facebook/opt-125m")
+   # Dig for the block pool
+   engine = llm.llm_engine
+   print(dir(engine))  # look for kv_cache_manager, block_pool, scheduler, etc.
+   ```
+
+   Once you find the real path, append it to the `candidate_paths` list in `benchmarks/pcam_vllm_perf.py::_find_block_pool`. One-line change.
+
+4. **Out of GPU memory** — Try `--max-tokens 16` first, or move to an even smaller model (`--model facebook/opt-350m` is sometimes smaller than opt-125m after quantization in certain vllm builds — verify on your hardware).
+
+5. **`RuntimeError: remove() called on an invalid block`** — The bridge's `popleft_n` replacement handed a block to `queue.remove(block)` when the block's `prev_free_block` / `next_free_block` pointers were already `None`. This can happen if vLLM changed when it clears those pointers. Debug by adding a `print(block.block_id, block.prev_free_block, block.next_free_block)` immediately before `queue.remove(block)` and see which call corrupts the pointers.
+
+6. **The `pcam` run finishes but `active_mode_stats["popleft_n_calls"] == 0`** — The monkey-patch didn't take effect for this particular `BlockPool`. Either `_find_block_pool` returned the wrong pool or vLLM created a second pool after install. Verify by printing `id(pool)` at install time and `id(llm.llm_engine.kv_cache_manager.block_pool)` just before generate(). They must match.
+
+7. **The `pcam` throughput is significantly lower than `default`** — This is the known O(num_free_blocks) overhead of the active-mode `popleft_n` replacement. It is not a bug; it is the tradeoff the Phase 5 doc calls out explicitly. Record the overhead number in the Run log. If the overhead is material enough to hurt the acquisition pitch, that is Phase 6 optimization work, not a Phase 5 closure blocker.
+
+**In all cases, debug against the Python reference and the parity harness — never against the report, the test, or the honesty banner.** If the fix is non-trivial (more than ~20 lines), file a follow-up rather than expanding Phase 5 scope inside the closure commit.
+
+**Step 7: Record the result**
+
+Append an entry to the Run log below following the template:
+
+```
+### YYYY-MM-DD — Phase 5 closure
+
+- **engineer:** <name/handle>
+- **env:** <OS, Python version, GPU model, CUDA version, vllm version>
+- **deps installed:** <commands you ran>
+- **model:** <model used for the run>
+- **prompts:** <count and approximate total tokens>
+- **policy:** both
+- **result:** <one-line summary with numbers, e.g. "default 45 tps, pcam 41 tps, delta −8.9%">
+- **bridge stats:** popleft_n_calls=N, blocks_evicted=N, pcam_chosen=N, lru_fallback=N
+- **fixes landed:** <any code changes during the run, or "none">
+- **regression:** `pytest simulator/pcam/tests/ simulator/pcam/rtl/tests/ -q` → N passed, M skipped
+- **Phase 5 closure state:** CLOSED (first live active-mode run completed)
+```
+
+Also update `benchmarks/PCAM_PHASE5_REPORT.md`:
+
+1. Flip the header status line from "pending one live run" to "CLOSED on YYYY-MM-DD".
+2. Add a "Live active-mode serving results" section under "What has actually been measured" with the real throughput table, the delta percentage, and the bridge stats.
+3. Keep all the honesty caveats exactly as they are. Do not delete the known-limitation list; those items remain even after the first live run (O(num_free) overhead, block-level-only scoring, single synthetic sequence id, narrow version window).
+
+One commit per closure:
+
+```
+Phase 5 closure: first live active-mode vllm run on <env>
+
+<one-paragraph summary referencing the Run log entry>
+```
+
+---
+
 ## Run log
 
 Append to this section after each closure attempt.
@@ -417,5 +606,22 @@ Append to this section after each closure attempt.
 - **fixes landed:** `attn_implementation="eager"` added to extractor's `from_pretrained` call (1 line); pytest skipif markers on two now-unreachable fail-clean tests (5 lines); complementary positive test added (1 method).
 - **regression result:** `pytest simulator/pcam/tests/ simulator/pcam/rtl/tests/ -q` → 112 passed, 3 skipped, 0 failed.
 - **Phase 4 closure state:** 1 of 2 live paths closed. vLLM requires a different environment.
+
+### 2026-04-10 — Phase 5 closure attempt: sandbox-blocked, runbook added
+
+- **engineer:** PCAM software-product roadmap Phase 5 closure task
+- **env:** sandbox, Linux 6.18.5, Python 3.11.15, `torch 2.11.0+cu130` (CPU), no CUDA, no `/dev/nvidia*`, no `/proc/driver/nvidia`, `nvidia-smi` not present, `torch.cuda.is_available() == False`
+- **vllm:** not installed. Prior session attempts failed: PyJWT system-package conflict on full install; `--no-deps` install imports but is incompatible with the torch version needed by Phase 4's extractor and would fail at `LLM(...)` construction anyway because no CUDA hardware
+- **HF Hub:** proxy-blocked (`huggingface.co` → `403 host_not_allowed`)
+- **closure target:** `pcam_vllm_perf.py --policy both`
+- **result:** ✗ not run. Environmental hard block on all three requirements simultaneously — GPU, vllm install, HF Hub access.
+- **verification done in this attempt:**
+  - Phase 5 unit tests still green: `pytest simulator/pcam/tests/test_phase5_active_mode.py -q` → 23 passed.
+  - Perf harness fail-clean path verified: `python benchmarks/pcam_vllm_perf.py --policy both --prompt "hi" --quiet` → `ERROR: vllm is not installed...`, rc=2, banner and install hint correct.
+  - `check_vllm_active_mode_supported()` raises `VLLMVersionSupportError` with the expected actionable message.
+  - Full PCAM suite: `pytest simulator/pcam/tests/ simulator/pcam/rtl/tests/ -q` → 239 passed, 3 skipped, 0 failed.
+- **fixes landed:** none (no code bugs found — the infrastructure is sound; only the environment is wrong).
+- **docs landed:** this entry, plus section **D** above (Phase 5 real-GPU verification runbook) with seven numbered steps covering prerequisites, venv install, version check, harness invocation, expected output signature, common failure modes and their smallest fixes, and the result-recording template.
+- **Phase 5 closure state:** LANDED, EXECUTION PENDING on any machine that has a GPU + vllm 0.7.0+ + HF Hub access. See section D above for the copy-pasteable runbook.
 
 *(Next closure attempt: append here.)*
