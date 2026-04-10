@@ -797,6 +797,47 @@ A: PARTIALLY.
    • Clean separation: PCAM says WHAT matters, CTM+ decides WHERE
 ```
 
+**Scoring model — source of truth (ADR-0001).**
+
+PCAM's importance scoring, sink pinning, entity bonus, and frequency
+tracking are governed by ADR-0001 (`docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md`).
+The canonical behavioral reference is `CTM_plus/KVPolicy/kv_policy/attention_evictor.py`,
+and the Python port that PCAM's simulator and RTL must match bit-for-bit
+on a fixed RNG seed is `simulator/pcam/kv_policy.py`. The scoring model
+is four-signal and phase-aware:
+
+```
+  score = w.recency   * exp(-0.01 * (now - last_access))
+        + w.frequency * min(1.0, freq_sketch.estimate(bid) / 10.0)
+        + w.attention * block.attention_ema
+        + w.position  * importance(is_sink, attention_ema, adaptive_threshold)
+
+  entity bonus: score += 0.5 when (not is_sink) and (attention_ema > adaptive_threshold)
+
+  PHASE_WEIGHTS:
+    PREFILL: recency=0.15  frequency=0.20  attention=0.35  position=0.30
+    DECODE:  recency=0.30  frequency=0.20  attention=0.30  position=0.20
+```
+
+Frequency is tracked by a 4-row, 4-bit Count-Min sketch with four fixed
+seed hashes, power-of-two width (floor 64), and event-driven halving
+at `capacity * 10` increments. This replaces the legacy unbounded
+`access_count` field that was previously carried per block entry.
+Sink blocks (positions < `sink_tokens`) are pinned at admission and
+never appear in victim sets. See `simulator/pcam/rtl/core/freq_sketch.sv`
+for the RTL implementation and `simulator/pcam/tests/test_sketch_conformance.py`
+/ `test_attention_evictor_parity.py` for the bit-parity harness.
+
+Terms deferred by ADR-0001 (do not re-introduce without amending it):
+
+- `reuse` scoring term — dropped; scan resistance comes from the
+  frequency sketch and the entity bonus.
+- `sequence_priority` scoring term — dropped; per-sequence phase
+  (PREFILL/DECODE) captures the intended variation.
+- `PositionClass.RECENT` window protection — declared in the reference
+  but not read in scoring; PCAM does not model it until the reference
+  activates it.
+
 ---
 
 ## 3. The Paradigm Shift
@@ -3610,10 +3651,24 @@ vLLM Architecture (PCAM Integration Points):
 
 ##### H.4.2 Exact Integration Points
 
+> **Scoring source of truth:** the pseudocode below is a thin adapter
+> around the canonical policy at `simulator/pcam/kv_policy.py::KVCachePolicy`,
+> which is a verbatim port of `CTM_plus/KVPolicy/kv_policy/attention_evictor.py`
+> per ADR-0001. `pcam.get_block_scores(...)` corresponds to repeated
+> `score_block(...)` calls against that policy; the four-signal
+> phase-aware formula and +0.5 entity bonus defined in Section 2.7
+> apply. The protected set is the union of `pinned_blocks` (sink
+> positions, auto-populated by `ensure_block` when any position <
+> `sink_tokens`) and any caller-specified anchors. `reuse` and
+> `sequence_priority` are explicitly NOT parameters — they were
+> dropped by ADR-0001.
+
 **Integration Point 1: Block Manager Eviction Hook**
 
 ```python
 # File: vllm/core/block_manager.py
+# See simulator/pcam/kv_policy.py::KVCachePolicy.select_victims for the
+# canonical victim-selection behavior this hook adapts.
 
 class PCAMEvictor:
     """PCAM-guided eviction policy for KV blocks."""
@@ -3627,12 +3682,19 @@ class PCAMEvictor:
         num_blocks_needed: int,
         current_blocks: List[int],
     ) -> List[int]:
-        """Select blocks to evict based on PCAM attention scores."""
+        """Select blocks to evict based on PCAM attention scores.
 
-        # Get PCAM's view of block importance
+        Delegates to the canonical KVCachePolicy per ADR-0001. Sinks
+        are excluded automatically via pinned_blocks; the filler fast
+        path is deterministic; the sampled path consumes the policy's
+        injected RNG so parity against the reference is reproducible.
+        """
+
+        # Get PCAM's view of block importance (four-signal phase-aware
+        # scoring from the canonical kv_policy module).
         block_scores = self.pcam.get_block_scores(sequence_id, current_blocks)
 
-        # Never evict: sinks, recent window, anchors
+        # Never evict: sinks (auto-pinned), recent window, anchors
         protected = self._get_protected_blocks(sequence_id)
 
         # Sort by score, evict lowest

@@ -390,6 +390,73 @@ module tb_pcam_top;
         test_passed++;
 
         //---------------------------------------------------------------------
+        // Test 6: CTM+ Frequency Sketch — size counter
+        //---------------------------------------------------------------------
+        // Every UPDATE we've issued so far (1 in Test 2, 10 in Test 4 = 11
+        // total) should have incremented the sketch exactly once. Read
+        // sketch_size_count via CSR 0x20 and verify.
+        $display("\n[Test 6] CTM+ Frequency Sketch — size_count");
+
+        read_csr(32'h20, csr_data);
+        $display("  sketch_size_count = %0d (expect >= 11)", csr_data);
+
+        if (csr_data >= 32'd11) begin
+            $display("  PASSED: sketch observed UPDATE commands");
+            test_passed++;
+        end else begin
+            $display("  FAILED: sketch size_count did not match UPDATEs");
+            test_failed++;
+        end
+
+        //---------------------------------------------------------------------
+        // Test 7: CTM+ Frequency Sketch — repeated key saturation
+        //---------------------------------------------------------------------
+        // Drive 20 UPDATEs against the same key_block. The sketch counter
+        // for that key must saturate at 15 (FREQ_SKETCH_COUNTER_MAX).
+        // We observe the running inc_min_count via CSR 0x28.
+        $display("\n[Test 7] CTM+ Frequency Sketch — saturation at 15");
+
+        for (int i = 0; i < 20; i++) begin
+            send_command(build_update_cmd(
+                6'd0,
+                20'd100,       // query_block — same every time
+                20'd7,         // key_block   — saturate THIS key
+                15'd64
+            ));
+            repeat(20) @(posedge clk);
+        end
+
+        read_csr(32'h28, csr_data);
+        $display("  sketch_inc_min after 20 bumps on key=7 = %0d (expect 15)", csr_data);
+
+        if (csr_data[3:0] == 4'd15) begin
+            $display("  PASSED: sketch counter saturated");
+            test_passed++;
+        end else begin
+            $display("  FAILED: sketch counter did not saturate");
+            test_failed++;
+        end
+
+        //---------------------------------------------------------------------
+        // Test 8: CTM+ Frequency Sketch — busy-clear
+        //---------------------------------------------------------------------
+        // After the saturation burst, allow a few idle cycles and then
+        // check that the halving FSM is NOT active (busy=0).
+        $display("\n[Test 8] CTM+ Frequency Sketch — busy-clear");
+
+        repeat(50) @(posedge clk);
+        read_csr(32'h2C, csr_data);
+        $display("  sketch_busy = %0d (expect 0)", csr_data[0]);
+
+        if (csr_data[0] == 1'b0) begin
+            $display("  PASSED: sketch idle");
+            test_passed++;
+        end else begin
+            $display("  FAILED: sketch still halving");
+            test_failed++;
+        end
+
+        //---------------------------------------------------------------------
         // Test Summary
         //---------------------------------------------------------------------
         $display("\n========================================");

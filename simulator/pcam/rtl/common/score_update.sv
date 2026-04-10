@@ -124,8 +124,13 @@ endmodule : score_decay
 //-----------------------------------------------------------------------------
 // Frequency Boost Calculator
 //-----------------------------------------------------------------------------
-// Adds a small boost based on access frequency:
-//   boost = log1p(access_count) * 0.01
+// Adds a small boost based on sketch-estimated frequency:
+//   boost = log1p(freq_estimate) * 0.01
+//
+// Input is a 4-bit saturating estimate from the CTM+ Count-Min sketch
+// (FREQ_SKETCH_COUNTER_BITS, see pcam_pkg.sv and freq_sketch.sv). The
+// legacy 12-bit access_count input was removed per ADR-0001 when
+// block_entry_t lost its frequency field.
 //
 // Uses a small LUT for log approximation.
 //-----------------------------------------------------------------------------
@@ -136,8 +141,8 @@ module frequency_boost
     input  logic             clk,
     input  logic             rst_n,
 
-    // Input
-    input  logic [11:0]      access_count,
+    // Input — 4-bit sketch estimate, already saturated at 15.
+    input  logic [FREQ_SKETCH_COUNTER_BITS-1:0] freq_estimate,
     input  logic             valid_in,
 
     // Output (1-cycle latency)
@@ -146,7 +151,7 @@ module frequency_boost
 );
 
     // Log1p LUT: log(1 + x) * 256 * 0.01 = log(1+x) * 2.56
-    // Indexed by upper bits of access_count (0-15 range after saturation)
+    // Indexed directly by the 4-bit sketch estimate (0-15 range).
     logic [7:0] log_lut [16];
 
     initial begin
@@ -175,18 +180,13 @@ module frequency_boost
         log_lut[15] = 8'd7;
     end
 
-    logic [3:0] lut_index;
-
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             boost_value <= '0;
             valid_out   <= 1'b0;
         end else begin
-            // Saturate access_count to 4 bits for LUT indexing
-            lut_index = (access_count > 12'd15) ? 4'd15 : access_count[3:0];
-
-            // Boost value is small (0-7 in Q8.8)
-            boost_value <= {8'b0, log_lut[lut_index]};
+            // freq_estimate is already 4 bits — direct LUT index.
+            boost_value <= {8'b0, log_lut[freq_estimate]};
             valid_out   <= valid_in;
         end
     end
