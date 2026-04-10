@@ -1,0 +1,136 @@
+{
+  "_README": [
+    "Golden traces for PCAM ↔ CTM+ KVCachePolicy conformance tests.",
+    "",
+    "Each trace is INPUT ONLY — the reference implementation at",
+    "CTM_plus/KVPolicy/kv_policy/attention_evictor.py is the oracle.",
+    "Tests replay the trace on both sides and assert equality at every step.",
+    "",
+    "This file is intentionally human-readable so reviewers can see exactly",
+    "what behaviors the conformance suite exercises without running Python.",
+    "",
+    "Source of truth for scoring model: docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md",
+    "PR scope: docs/design/PCAM_UPDATE_PR_SCOPE.md"
+  ],
+
+  "sketch_traces": {
+    "single_key_saturation": {
+      "description": "Repeatedly increment one key. Estimate must rise 1..15 then saturate.",
+      "capacity": 1024,
+      "increments": [42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42],
+      "checkpoints_at_step": [1, 5, 10, 15, 16, 20],
+      "observe_key": 42,
+      "notes": "After step 15 the counter is pinned at 15 (4-bit saturation). Steps 16+ must return 15."
+    },
+
+    "distinct_keys_light_load": {
+      "description": "Many distinct keys, one touch each. Load factor << 1 so collisions are rare.",
+      "capacity": 1024,
+      "increments": "range(0, 32)",
+      "observe_keys": [0, 1, 7, 15, 31, 9999],
+      "notes": "Key 9999 was never inserted. Its estimate must be 0. Inserted keys must be >= 1 (collisions may bump estimate higher, but never below true count)."
+    },
+
+    "halving_threshold": {
+      "description": "Push size past reset_threshold to force a halve.",
+      "capacity": 16,
+      "reset_threshold": 160,
+      "increments": "range(0, 159) then key 42 at step 160",
+      "probe_at_step": [159, 160, 161],
+      "notes": "The halve fires inside increment() when size >= reset_threshold, BEFORE the current key's counter is bumped. After halving, counters are right-shifted by 1 and size is halved. Every previously-saturated key must now estimate <= 7, and size must be 80."
+    },
+
+    "post_halving_order_preservation": {
+      "description": "Keys with very different pre-halve counts must retain rough ordering after halving.",
+      "capacity": 64,
+      "setup": "increment key 0 eight times, key 1 four times, key 2 two times, key 3 one time",
+      "then": "increment key 99 repeatedly until size crosses reset_threshold = 640",
+      "observe_keys": [0, 1, 2, 3],
+      "notes": "After one halving, estimates should be approximately 4, 2, 1, 0. Strict ordering breaks at the boundary (1>>1 = 0, 0>>1 = 0) but 0 >= 1 >= 2 >= 3 in raw count ordering must still hold at the estimate level."
+    },
+
+    "hash_determinism": {
+      "description": "Two sketches of the same capacity must map identical keys to identical rows.",
+      "capacity": 256,
+      "keys": [0, 1, 42, 128, 255, 1000, 65535, 2147483647],
+      "notes": "Structural check: for every key, the four hashed indices must match across any two FrequencySketch instances with the same capacity. This is what lets RTL's fixed seed constants be trusted."
+    }
+  },
+
+  "policy_traces": {
+    "sink_pinning": {
+      "description": "Sink positions (0..3) must never appear in victim sets, ever.",
+      "max_blocks": 64,
+      "block_size": 16,
+      "sink_tokens": 4,
+      "phase": "DECODE",
+      "admissions": [
+        {"block_id": 0, "sequence_id": 1, "positions": [0, 1, 2, 3], "is_sink_expected": true},
+        {"block_id": 1, "sequence_id": 1, "positions": [4, 5, 6, 7], "is_sink_expected": false},
+        {"block_id": 2, "sequence_id": 1, "positions": [8, 9, 10, 11], "is_sink_expected": false}
+      ],
+      "attention_events": [
+        {"block_id": 0, "attention_sum": 0.45, "sequence_id": 1},
+        {"block_id": 1, "attention_sum": 0.01, "sequence_id": 1},
+        {"block_id": 2, "attention_sum": 0.01, "sequence_id": 1}
+      ],
+      "evict_request": 2,
+      "assert": "block_id 0 is NOT in the victim set (it is pinned via sink)."
+    },
+
+    "filler_fast_path": {
+      "description": "When enough all-filler blocks exist to satisfy the request, the fast path runs instead of sampled scoring.",
+      "max_blocks": 128,
+      "phase": "DECODE",
+      "admissions": [
+        {"block_id": "10..25", "sequence_id": 1, "positions": "any non-sink"}
+      ],
+      "attention_events": "All blocks receive attention_sum = 0.005 (below entity threshold).",
+      "evict_request": 4,
+      "assert": [
+        "Victim set size == 4.",
+        "All victims are fillers (low attention_ema).",
+        "filler_evictions counter in stats increases by 4."
+      ]
+    },
+
+    "entity_bonus_protection": {
+      "description": "High-attention non-sink blocks survive under eviction pressure.",
+      "max_blocks": 64,
+      "phase": "DECODE",
+      "admissions": [
+        {"block_id": "0..31", "sequence_id": 1, "positions": "non-sink"}
+      ],
+      "attention_pattern": [
+        {"blocks": [0, 1, 2], "attention_sum": 0.50, "repeat": 20, "note": "strong entity"},
+        {"blocks": [3, 4, 5, 6, 7, 8, 9, 10], "attention_sum": 0.002, "repeat": 1, "note": "filler"}
+      ],
+      "evict_request": 3,
+      "assert": "Blocks 0, 1, 2 must NOT be in the victim set. The +0.5 entity bonus should push their scores above any filler."
+    },
+
+    "prefill_vs_decode_weight_shift": {
+      "description": "Same trace, different phase — different victim ordering must result.",
+      "max_blocks": 64,
+      "admissions": [
+        {"block_id": "0..15", "sequence_id": 1, "positions": "non-sink"}
+      ],
+      "attention_pattern": "Gradient: block 0 gets 0.30, block 1 gets 0.28, ..., block 15 gets 0.0.",
+      "evict_request": 4,
+      "assert": [
+        "Under PREFILL (attention weight 0.35), blocks 12-15 are evicted first.",
+        "Under DECODE (attention weight 0.30, recency 0.30), the recency component matters more — order may differ.",
+        "Critical: both sides must produce the SAME ordering under the SAME phase. Phase-sensitivity is the test."
+      ]
+    },
+
+    "sampled_path_determinism": {
+      "description": "When the filler set is smaller than the request, the sampled path runs. Same RNG seed must yield the same 48-candidate sample on both sides.",
+      "max_blocks": 256,
+      "phase": "DECODE",
+      "rng_seed": 42,
+      "trace": "200 admissions, mixed sink/filler/entity, evict 32 at a time for 10 rounds.",
+      "assert": "Victim sets match block-for-block across all 10 rounds. Any mismatch is a sampling-path divergence — check that PCAM and reference share the same random.Random(42) instance semantics."
+    }
+  }
+}
