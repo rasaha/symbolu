@@ -80,6 +80,16 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Ensure the repo root is on sys.path so that 'from symbolu.fscs.core
+# import ...' works when this script is invoked directly from the
+# repo root via 'python3 scripts/train_fscs_alignment.py'. Without
+# this, Python only adds scripts/ to sys.path (the script's own dir),
+# not the repo root, and the symbolu package is not importable.
+# Operators should NOT need to set PYTHONPATH manually.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 
 # ---------------------------------------------------------------------------
 # CLI
