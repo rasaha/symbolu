@@ -407,6 +407,13 @@ class MistralFSCSWrapper(nn.Module):
             gl.boundary_detector.to(device=device)  # int64 buffer, no dtype cast
             gl.layer_cap.to(device=device, dtype=torch.float32)
             gl.surprise_suppressor.to(device=device, dtype=torch.float32)
+            # Coarse adapter (optional, only present when co-training).
+            # Cast to float32 for numerical stability during the
+            # alignment-loss backward. The adapter's gated residual
+            # in the forward pass already casts inputs and outputs
+            # between adapter dtype and backbone dtype as needed.
+            if getattr(gl, "coarse_adapter", None) is not None:
+                gl.coarse_adapter.to(device=device, dtype=torch.float32)
 
     # ------------------------------------------------------------------ #
     # Forward pass — runs the backbone with gated layers installed

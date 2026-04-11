@@ -57,6 +57,8 @@ from symbolu.fscs.core import (
     FSCSBoundaryDetector,
     FSCSLayerCap,
     FSCSSurpriseDeltaSuppressor,
+    FSCSCoarseAdapter,
+    fscs_alignment_loss,
 )
 
 
@@ -131,6 +133,30 @@ class FSCSGatedDecoderLayer(nn.Module):
         self.layer_cap = FSCSLayerCap(cfg)
         self.surprise_suppressor = FSCSSurpriseDeltaSuppressor(cfg)
 
+        # Optional coarse adapter for alignment-loss co-training.
+        # Disabled by default so the frozen-backbone inference path is
+        # unchanged. Enable via cfg.use_coarse_adapter = True when
+        # running scripts/train_fscs_alignment.py. The adapter is the
+        # piece the §12.2 alignment loss actually trains — without it,
+        # the "coarse path" shares all weights with the full path
+        # (same Q/K/V/O projections, only the mask differs) and the
+        # alignment loss has nothing to act on.
+        self.use_coarse_adapter = bool(getattr(cfg, "use_coarse_adapter", False))
+        if self.use_coarse_adapter:
+            d_model = self._infer_d_model(original_layer)
+            d_inner = int(getattr(cfg, "coarse_adapter_d_inner", 256))
+            self.coarse_adapter: Optional[nn.Module] = FSCSCoarseAdapter(
+                d_model=d_model,
+                d_inner=d_inner,
+            )
+        else:
+            self.coarse_adapter = None
+
+        # Accumulated per-forward alignment loss, read by the training
+        # loop via get_alignment_loss(). Zero when the adapter is
+        # disabled or when forward has not run yet.
+        self._last_alignment_loss: Optional[torch.Tensor] = None
+
         # We need to know the attention module's callable signature.
         # MistralDecoderLayer exposes .self_attn and .mlp as submodules,
         # with .input_layernorm and .post_attention_layernorm around them.
@@ -168,6 +194,43 @@ class FSCSGatedDecoderLayer(nn.Module):
         # aggregate into per-run metrics.
         self.last_gate_fraction: float = 0.0
         self.last_mean_pi: float = 0.0
+
+    @staticmethod
+    def _infer_d_model(original_layer: nn.Module) -> int:
+        """
+        Infer d_model from the wrapped Mistral decoder layer. Used only
+        when the coarse adapter is enabled.
+
+        HuggingFace MistralDecoderLayer exposes `hidden_size` via
+        `self_attn.head_dim * self_attn.num_heads`, but the simpler
+        path is to read the output projection's in_features, which
+        equals d_model by construction.
+        """
+        try:
+            return int(original_layer.self_attn.o_proj.in_features)
+        except AttributeError:
+            pass
+        try:
+            return int(original_layer.self_attn.head_dim *
+                       original_layer.self_attn.num_heads)
+        except AttributeError:
+            pass
+        raise AttributeError(
+            "Could not infer d_model from the wrapped decoder layer. "
+            "Expected original_layer.self_attn.o_proj.in_features or "
+            "(self_attn.head_dim * self_attn.num_heads). Layer type: "
+            f"{type(original_layer).__name__}"
+        )
+
+    def get_alignment_loss(self) -> Optional[torch.Tensor]:
+        """
+        Return the alignment loss accumulated in the most recent
+        forward pass, or None if the coarse adapter is disabled or
+        forward has not been called yet.
+
+        Called by the training loop in scripts/train_fscs_alignment.py.
+        """
+        return self._last_alignment_loss
 
     # ------------------------------------------------------------------ #
     # Interface expected by MistralFSCSWrapper
@@ -275,6 +338,40 @@ class FSCSGatedDecoderLayer(nn.Module):
             out_coarse = attn_coarse_out[0]
         else:
             out_coarse = attn_coarse_out
+
+        # ---- Optional coarse adapter + alignment loss ---------------
+        # When the coarse adapter is enabled, pass the windowed
+        # attention output through a small trainable residual module.
+        # This is the only place in the gated layer where §12.2
+        # alignment loss has a trainable target to act on. The adapter
+        # is residual-initialized (zero weights on the up-projection +
+        # sigmoid gate starting near sigmoid(-2) ≈ 0.12), so at step 0
+        # the adapted coarse output equals the raw coarse output and
+        # the forward pass is numerically identical to the
+        # adapter-disabled path.
+        if self.coarse_adapter is not None:
+            # Run the adapter on the raw coarse output. The adapter's
+            # own dtype is whatever the optimizer configured it to
+            # be; we cast inputs to that dtype for safety.
+            adapter_dtype = next(self.coarse_adapter.parameters()).dtype
+            out_coarse_adapted = self.coarse_adapter(
+                out_coarse.to(adapter_dtype)
+            )
+            # Cast back to the backbone's dtype so the downstream
+            # blend sees a consistent dtype.
+            out_coarse = out_coarse_adapted.to(out_full.dtype)
+
+            # Alignment loss: ||stopgrad(O_full) - O_coarse||²
+            # Computed in the adapter's dtype (likely fp32) for
+            # numerical stability; the lambda weight is applied
+            # inside fscs_alignment_loss.
+            self._last_alignment_loss = fscs_alignment_loss(
+                output_full=out_full.to(adapter_dtype),
+                output_coarse=out_coarse_adapted,
+                lambda_weight=float(getattr(self.cfg, "alignment_lambda", 0.1)),
+            )
+        else:
+            self._last_alignment_loss = None
 
         # ---- FSCS gate ------------------------------------------------
         # Compute coherence from the full branch output + residual stream.

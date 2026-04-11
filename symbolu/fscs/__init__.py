@@ -37,6 +37,7 @@ from symbolu.fscs.core import (
     FSCSBoundaryDetector,
     FSCSSurpriseDeltaSuppressor,
     FSCSLayerCap,
+    FSCSCoarseAdapter,
     fscs_alignment_loss,
 )
 
@@ -54,6 +55,7 @@ __all__ = [
     "FSCSBoundaryDetector",
     "FSCSSurpriseDeltaSuppressor",
     "FSCSLayerCap",
+    "FSCSCoarseAdapter",
     "fscs_alignment_loss",
 ]
 

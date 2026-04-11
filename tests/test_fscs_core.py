@@ -46,6 +46,7 @@ from symbolu.fscs.core import (
     FSCSBoundaryDetector,
     FSCSSurpriseDeltaSuppressor,
     FSCSLayerCap,
+    FSCSCoarseAdapter,
     fscs_alignment_loss,
 )
 
@@ -355,6 +356,97 @@ class TestCompositeFlow:
         pi_exp = pi_capped.unsqueeze(-1)
         blended = (1 - pi_exp) * fake_full + pi_exp * fake_coarse
         assert blended.shape == (B, N, D)
+
+
+# ============================================================================
+# FSCSCoarseAdapter + alignment-loss training smoke test
+# ============================================================================
+
+
+class TestCoarseAdapter:
+    """
+    The coarse adapter is the trainable piece the alignment loss acts on.
+    These tests verify that (1) it has the right residual semantics at
+    init, (2) it produces gradients that flow through the alignment
+    loss, (3) the stopgrad on the full path still holds when the
+    adapter is in the loop, and (4) a handful of training steps visibly
+    reduce the alignment loss on synthetic data.
+    """
+
+    def test_shapes_and_init_identity(self):
+        """At init, gate ≈ 0.12 and up-weights are zero → adapter output
+        is approximately an identity map on its input."""
+        d_model = 64
+        ad = FSCSCoarseAdapter(d_model=d_model, d_inner=16, gate_init=-2.0)
+        x = torch.randn(B, N, d_model)
+        y = ad(x)
+        assert y.shape == x.shape
+        # With up.weight=0 and up.bias=0, the gated residual is
+        # x + sigmoid(-2) * 0 = x exactly.
+        assert torch.allclose(y, x, atol=1e-6)
+
+    def test_gradient_flows_through_alignment_loss(self):
+        """Gradient flows from alignment loss through the adapter to
+        its trainable parameters, but NOT back to the full output."""
+        d_model = 64
+        ad = FSCSCoarseAdapter(d_model=d_model, d_inner=16, gate_init=0.0)
+
+        out_full = torch.randn(B, N, d_model, requires_grad=True)
+        out_coarse_raw = torch.randn(B, N, d_model, requires_grad=True)
+
+        out_coarse_adapted = ad(out_coarse_raw)
+        loss = fscs_alignment_loss(out_full, out_coarse_adapted,
+                                   lambda_weight=1.0)
+        loss.backward()
+
+        # Stopgrad invariant
+        assert out_full.grad is None or out_full.grad.abs().sum().item() == 0.0
+        # Adapter parameters should receive gradient
+        ad_grad_total = 0.0
+        for p in ad.parameters():
+            if p.grad is not None:
+                ad_grad_total += p.grad.abs().sum().item()
+        assert ad_grad_total > 0.0, \
+            "coarse adapter received no gradient from alignment loss"
+
+    def test_training_reduces_alignment_loss(self):
+        """Five AdamW steps on synthetic data should measurably reduce
+        the alignment loss, with the adapter gate opening from its
+        near-zero init."""
+        d_model = 64
+        ad = FSCSCoarseAdapter(d_model=d_model, d_inner=16, gate_init=-2.0)
+        opt = torch.optim.AdamW(ad.parameters(), lr=1e-2)
+
+        # Fixed synthetic pair — the "full" target is a specific linear
+        # projection of the "coarse" raw, so the adapter CAN learn it.
+        torch.manual_seed(0)
+        coarse_raw = torch.randn(B, N, d_model)
+        target_proj = torch.randn(d_model, d_model) * 0.1
+        out_full = coarse_raw @ target_proj + coarse_raw  # linear residual
+
+        losses = []
+        for step in range(10):
+            opt.zero_grad()
+            out_coarse_adapted = ad(coarse_raw)
+            loss = fscs_alignment_loss(out_full, out_coarse_adapted,
+                                       lambda_weight=1.0)
+            loss.backward()
+            opt.step()
+            losses.append(loss.item())
+
+        assert losses[-1] < losses[0], (
+            f"alignment loss did not decrease: {losses[0]:.6f} -> "
+            f"{losses[-1]:.6f}. Adapter training may be broken."
+        )
+
+    def test_num_trainable_params_reasonable(self):
+        """Adapter at d_model=4096, d_inner=256 should have ~2M params
+        per layer (within an order of magnitude)."""
+        ad = FSCSCoarseAdapter(d_model=4096, d_inner=256)
+        n = ad.num_trainable_params()
+        assert 1_000_000 < n < 5_000_000, (
+            f"expected adapter param count in [1M, 5M], got {n}"
+        )
 
 
 if __name__ == "__main__":

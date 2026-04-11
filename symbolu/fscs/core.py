@@ -34,6 +34,7 @@ from typing import List, Optional, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 # ============================================================================
@@ -132,6 +133,14 @@ class FSCSConfig:
 
     # Alignment loss (§12.2)
     alignment_lambda: float = 0.1
+
+    # Coarse adapter for alignment-loss co-training (§12.2 target)
+    # Disabled by default — frozen-backbone inference path works
+    # without any trainable coarse-branch parameters. Enable this
+    # only when running scripts/train_fscs_alignment.py. See
+    # symbolu/fscs/core.py::FSCSCoarseAdapter for the module.
+    use_coarse_adapter: bool = False
+    coarse_adapter_d_inner: int = 256  # low-rank bottleneck dim
 
     # Windowed coarse operator (first-pass, §9 Local-band path)
     coarse_window: int = 256
@@ -504,10 +513,111 @@ def fscs_alignment_loss(
 
     This loss is zero-cost during inference (both paths computed anyway
     in Mode 1/Mode 2 — see §6.2 of the spec). It is only meaningful when
-    the coarse path is trainable, i.e., during co-training. For the
-    frozen-Mistral first-pass r* measurement it is not used.
+    the coarse path has trainable parameters, i.e., FSCSCoarseAdapter is
+    enabled in FSCSGatedDecoderLayer. For the frozen-Mistral first-pass
+    r* measurement (zero-shot) it is not used.
     """
     target = output_full.detach()
     diff = target - output_coarse
     mse = (diff * diff).mean()
     return lambda_weight * mse
+
+
+# ============================================================================
+# Coarse adapter — small trainable residual on top of the coarse branch
+# ============================================================================
+
+
+class FSCSCoarseAdapter(nn.Module):
+    """
+    Small low-rank residual adapter that post-processes the coarse
+    branch's output to approximate the full branch's output.
+
+    This is the trainable piece the alignment loss (§12.2) optimizes.
+    Without it, the coarse branch shares all its parameters with the
+    full branch (same Q/K/V/O projections, only the attention mask
+    differs), so the alignment loss has nothing to act on — any
+    gradient would update the shared weights in ways that would
+    also move the full branch, violating the spec's stopgrad
+    invariant.
+
+    Architecture:
+
+        coarse_out = coarse_raw + gate * adapter(coarse_raw)
+
+        adapter(x) = Linear(d_inner → d_model)[
+                       GELU(
+                         Linear(d_model → d_inner)(
+                           LayerNorm(x)
+                         )
+                       )
+                     ]
+
+        gate       = sigmoid(learnable scalar), init at sigmoid(-2) ≈ 0.12
+
+    Zero-init on the final Linear's weight+bias means the adapter
+    starts as an identity (adapter output ≈ 0, so coarse_out ≈
+    coarse_raw). As alignment-loss training proceeds, the adapter
+    learns a small residual correction that pulls the coarse output
+    toward the full output.
+
+    Parameter count at d_model=4096, d_inner=256:
+        LayerNorm        : 2 * 4096 = 8192
+        down-projection  : 4096 * 256 + 256 = 1,048,832
+        up-projection    : 256 * 4096 + 4096 = 1,052,672
+        gate scalar      : 1
+        TOTAL per layer  : ~2.1M params
+
+    Across 32 Mistral-7B decoder layers that is ~67M trainable params.
+    Large, but still tiny relative to Mistral's 7.25B, and gradient
+    memory is the only training-time cost (forward memory is
+    dominated by the dual-branch self_attn calls, not the adapter).
+
+    For tighter memory budgets use a smaller d_inner (e.g. 128 or 64).
+    """
+
+    def __init__(
+        self,
+        d_model: int,
+        d_inner: int = 256,
+        gate_init: float = -2.0,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.d_inner = d_inner
+
+        self.norm = nn.LayerNorm(d_model)
+        self.down = nn.Linear(d_model, d_inner)
+        self.up = nn.Linear(d_inner, d_model)
+        self.gate_param = nn.Parameter(torch.tensor([gate_init]))
+
+        # Zero-init the output projection so the adapter starts as
+        # identity — coarse_out starts equal to coarse_raw, and the
+        # alignment loss's pressure gradually opens the adapter.
+        nn.init.zeros_(self.up.weight)
+        nn.init.zeros_(self.up.bias)
+
+    def forward(self, coarse_raw: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            coarse_raw: [B, N, D] output of the windowed coarse branch,
+                        BEFORE any FSCS blending. Typically bf16 on a
+                        bf16 backbone; the adapter runs in the input
+                        tensor's dtype.
+
+        Returns:
+            coarse_out: [B, N, D] adapted coarse output with residual
+                        shortcut and sigmoid gate applied.
+        """
+        x = self.norm(coarse_raw)
+        x = self.down(x)
+        x = F.gelu(x)
+        x = self.up(x)
+
+        # Sigmoid-gated residual: gate starts small, grows during training
+        gate = torch.sigmoid(self.gate_param)
+        return coarse_raw + gate * x
+
+    def num_trainable_params(self) -> int:
+        """Parameter count used by training scripts for logging."""
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
