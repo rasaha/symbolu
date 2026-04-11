@@ -214,17 +214,37 @@ class FSCSGatedDecoderLayer(nn.Module):
         device = normed.device
         dtype = normed.dtype
 
+        # ---- Cache-free kwargs for both branches ---------------------
+        # We call self_attn twice per forward pass (full branch, then
+        # coarse branch). HF's MistralAttention writes into past_key_value
+        # unconditionally if it is not None — even if use_cache=False —
+        # because the .update(K, V, ...) call happens independently of
+        # the use_cache flag. If we passed the same Cache object to both
+        # branches, the coarse branch would see K doubled in length.
+        # For eval on complete sequences the cache has no functional
+        # purpose, so we strip it entirely and force use_cache=False.
+        #
+        # We also strip any past_key_value / past_key_values that may
+        # have been threaded through **kwargs by recent HF versions —
+        # the explicit parameter is defensively ignored below as well.
+        _sa_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in ("past_key_value", "past_key_values")
+        }
+
         # ---- Branch 1: Full attention ---------------------------------
         # Call the original self_attn with the caller-provided attention
         # mask (which is the normal causal mask from Mistral's runner).
+        # past_key_value is forced to None so Mistral does not mutate any
+        # cache object shared with the coarse branch below.
         attn_full_out = self.original_layer.self_attn(
             hidden_states=normed,
             attention_mask=attention_mask,
             position_ids=position_ids,
-            past_key_value=past_key_value,
+            past_key_value=None,
             output_attentions=False,
             use_cache=False,
-            **kwargs,
+            **_sa_kwargs,
         )
         # Mistral's self_attn returns a tuple (attn_output, attn_weights, past_kv).
         # We only need the first element; attn_weights will be None because
@@ -249,7 +269,7 @@ class FSCSGatedDecoderLayer(nn.Module):
             past_key_value=None,  # intentionally not sharing KV cache here
             output_attentions=False,
             use_cache=False,
-            **kwargs,
+            **_sa_kwargs,
         )
         if isinstance(attn_coarse_out, tuple):
             out_coarse = attn_coarse_out[0]

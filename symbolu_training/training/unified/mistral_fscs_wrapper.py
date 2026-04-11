@@ -413,6 +413,18 @@ class MistralFSCSWrapper(nn.Module):
         for gl in self.gated_layers:
             gl.set_current_input_ids(input_ids)
 
+        # Strip cache-related kwargs before the backbone call.
+        # The FSCS dual-branch forward calls self_attn twice per layer,
+        # and any cache object created by MistralModel.forward would be
+        # mutated twice (K and V both doubled in length) because HF's
+        # MistralAttention.forward writes into past_key_value regardless
+        # of the use_cache flag. For eval on complete sequences the
+        # cache is pure overhead anyway.
+        _bb_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in ("past_key_values", "past_key_value", "use_cache")
+        }
+
         # Run the backbone forward pass — the gated layers are already
         # installed inside backbone.model.layers, so this call dispatches
         # to them layer by layer.
@@ -421,7 +433,9 @@ class MistralFSCSWrapper(nn.Module):
             attention_mask=attention_mask,
             labels=labels,
             output_hidden_states=False,
-            **kwargs,
+            use_cache=False,
+            past_key_values=None,
+            **_bb_kwargs,
         )
 
         # Collect per-layer metrics
