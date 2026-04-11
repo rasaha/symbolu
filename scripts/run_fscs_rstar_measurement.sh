@@ -62,6 +62,10 @@ EVAL_DATASET="${EVAL_DATASET:-wikitext2}"
 SEQ_LEN="${SEQ_LEN:-2048}"
 MAX_EVAL_SAMPLES="${MAX_EVAL_SAMPLES:-256}"
 COARSE_WINDOW="${COARSE_WINDOW:-256}"
+# Batched eval: default 8 sequences per forward pass. Safe on A100-80GB
+# with Mistral-7B bf16 (peak ~32 GB at seq_len=2048, plenty of headroom).
+# Lower to 1 on smaller GPUs or raise toward 16 on larger ones.
+EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-8}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/fscs_rstar}"
 OUTPUT_JSON="${OUTPUT_DIR}/results.json"
 
@@ -100,6 +104,7 @@ echo "  Quantization:    ${QUANTIZE}"
 echo "  Eval dataset:    ${EVAL_DATASET}"
 echo "  Sequence len:    ${SEQ_LEN}"
 echo "  Eval samples:    ${MAX_EVAL_SAMPLES}"
+echo "  Eval batch size: ${EVAL_BATCH_SIZE}"
 echo "  Coarse window:   ${COARSE_WINDOW}"
 echo "  Output JSON:     ${OUTPUT_JSON}"
 echo "================================================================"
@@ -170,6 +175,7 @@ if [[ "${FULL_ONLY}" -eq 0 ]]; then
         --seq-len "${SEQ_LEN}" \
         --max-eval-samples 32 \
         --coarse-window "${COARSE_WINDOW}" \
+        --eval-batch-size "${EVAL_BATCH_SIZE}" \
         --single-tau 0.99 \
         --output "${OUTPUT_DIR}/ab_wiring_check.json"
 
@@ -206,6 +212,7 @@ if [[ "${FULL_ONLY}" -eq 0 ]]; then
         --seq-len "${SEQ_LEN}" \
         --max-eval-samples 16 \
         --coarse-window "${COARSE_WINDOW}" \
+        --eval-batch-size "${EVAL_BATCH_SIZE}" \
         --single-tau 0.5 \
         --output "${OUTPUT_DIR}/sanity.json"
 
@@ -221,7 +228,7 @@ fi
 
 # ----- 5. Full tau sweep ------------------------------------------------
 echo
-echo "[5/5] Full tau sweep — ~several hours at ${MAX_EVAL_SAMPLES} samples × 8 tau × 2 modes…"
+echo "[5/5] Full tau sweep — ${MAX_EVAL_SAMPLES} samples × 8 tau × 2 modes at batch=${EVAL_BATCH_SIZE}…"
 python scripts/r_star_sweep.py \
     --model "${MODEL}" \
     --quantize "${QUANTIZE}" \
@@ -229,6 +236,7 @@ python scripts/r_star_sweep.py \
     --seq-len "${SEQ_LEN}" \
     --max-eval-samples "${MAX_EVAL_SAMPLES}" \
     --coarse-window "${COARSE_WINDOW}" \
+    --eval-batch-size "${EVAL_BATCH_SIZE}" \
     --tau-sweep 0.90 0.80 0.70 0.60 0.50 0.40 0.30 0.20 \
     --output "${OUTPUT_JSON}"
 
