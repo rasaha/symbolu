@@ -95,8 +95,14 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--quantize", type=str, default="4bit",
-        choices=["none", "4bit", "8bit"],
-        help="Backbone quantization for memory efficiency (4bit recommended).",
+        choices=["none", "bf16", "fp16", "4bit", "8bit"],
+        help=(
+            "Backbone quantization. '4bit'/'8bit' use bitsandbytes and "
+            "require torch>=2.5 with recent transformers versions. "
+            "'bf16'/'fp16'/'none' skip quantization and load in the "
+            "chosen dtype (use these if your torch is older than 2.5; "
+            "Mistral-7B fits in ~14GB at bf16)."
+        ),
     )
     p.add_argument(
         "--eval-dataset", type=str, default="wikitext2",
