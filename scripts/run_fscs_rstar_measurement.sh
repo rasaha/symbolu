@@ -68,12 +68,14 @@ OUTPUT_JSON="${OUTPUT_DIR}/results.json"
 SMOKE_ONLY=0
 SANITY_ONLY=0
 SKIP_SMOKE=0
+FULL_ONLY=0  # Skip wiring + sanity and go straight to the full sweep.
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --smoke) SMOKE_ONLY=1; shift ;;
         --sanity) SANITY_ONLY=1; shift ;;
         --skip-smoke) SKIP_SMOKE=1; shift ;;
+        --full-only) FULL_ONLY=1; shift ;;
         --quantize)
             if [[ $# -lt 2 ]]; then
                 echo "ERROR: --quantize requires an argument (4bit|8bit|bf16|none)" >&2
@@ -157,19 +159,21 @@ fi
 # This is the most important validity check: if the FSCS-wrapped Mistral
 # does not produce ~baseline ppl when the gate is off, every later number
 # is meaningless. Hard-fail the runbook if Delta ppl exceeds 0.1%.
-echo
-echo "[3/5] A/B wiring check — tau=0.99 should reduce to baseline Mistral…"
-python scripts/r_star_sweep.py \
-    --model "${MODEL}" \
-    --quantize "${QUANTIZE}" \
-    --eval-dataset "${EVAL_DATASET}" \
-    --seq-len "${SEQ_LEN}" \
-    --max-eval-samples 32 \
-    --coarse-window "${COARSE_WINDOW}" \
-    --single-tau 0.99 \
-    --output "${OUTPUT_DIR}/ab_wiring_check.json"
+# Skipped if --full-only was passed (wiring has already been validated).
+if [[ "${FULL_ONLY}" -eq 0 ]]; then
+    echo
+    echo "[3/5] A/B wiring check — tau=0.99 should reduce to baseline Mistral…"
+    python scripts/r_star_sweep.py \
+        --model "${MODEL}" \
+        --quantize "${QUANTIZE}" \
+        --eval-dataset "${EVAL_DATASET}" \
+        --seq-len "${SEQ_LEN}" \
+        --max-eval-samples 32 \
+        --coarse-window "${COARSE_WINDOW}" \
+        --single-tau 0.99 \
+        --output "${OUTPUT_DIR}/ab_wiring_check.json"
 
-python - <<PYWIRING
+    python - <<PYWIRING
 import json, sys
 with open("${OUTPUT_DIR}/ab_wiring_check.json") as f:
     r = json.load(f)
@@ -186,24 +190,33 @@ if abs(delta) > 0.1:
     sys.exit(1)
 print(f"  PASS: wrapper is transparent at tau=0.99")
 PYWIRING
+else
+    echo
+    echo "[3/5] A/B wiring check — SKIPPED (--full-only)."
+fi
 
 # ----- 4. Sanity pass (single tau, small sample) -----------------------
-echo
-echo "[4/5] Sanity pass — single tau=0.5, 16 samples, should complete in ~15 min…"
-python scripts/r_star_sweep.py \
-    --model "${MODEL}" \
-    --quantize "${QUANTIZE}" \
-    --eval-dataset "${EVAL_DATASET}" \
-    --seq-len "${SEQ_LEN}" \
-    --max-eval-samples 16 \
-    --coarse-window "${COARSE_WINDOW}" \
-    --single-tau 0.5 \
-    --output "${OUTPUT_DIR}/sanity.json"
-
-if [[ "${SANITY_ONLY}" -eq 1 ]]; then
+if [[ "${FULL_ONLY}" -eq 0 ]]; then
     echo
-    echo "Sanity-only mode complete. Check ${OUTPUT_DIR}/sanity.json"
-    exit 0
+    echo "[4/5] Sanity pass — single tau=0.5, 16 samples, should complete in ~15 min…"
+    python scripts/r_star_sweep.py \
+        --model "${MODEL}" \
+        --quantize "${QUANTIZE}" \
+        --eval-dataset "${EVAL_DATASET}" \
+        --seq-len "${SEQ_LEN}" \
+        --max-eval-samples 16 \
+        --coarse-window "${COARSE_WINDOW}" \
+        --single-tau 0.5 \
+        --output "${OUTPUT_DIR}/sanity.json"
+
+    if [[ "${SANITY_ONLY}" -eq 1 ]]; then
+        echo
+        echo "Sanity-only mode complete. Check ${OUTPUT_DIR}/sanity.json"
+        exit 0
+    fi
+else
+    echo
+    echo "[4/5] Sanity pass — SKIPPED (--full-only)."
 fi
 
 # ----- 5. Full tau sweep ------------------------------------------------
