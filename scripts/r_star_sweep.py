@@ -130,6 +130,41 @@ def parse_args() -> argparse.Namespace:
         "--single-tau", type=float, default=None,
         help="If set, only run a single τ point (useful for quick comparison).",
     )
+    # Per-band τ and layer-cap calibration overrides. Added after the
+    # first frozen-Mistral r* sweep showed gate_frac ≈ 0 across the
+    # spec's original τ defaults. These flags let an operator sweep
+    # calibration without editing FSCSConfig directly.
+    p.add_argument(
+        "--tau-global", type=float, default=None,
+        help=(
+            "Override FSCSConfig.tau_global (initial per-band threshold "
+            "for the global band). Lower = easier to route. Default set "
+            "in FSCSConfig."
+        ),
+    )
+    p.add_argument(
+        "--tau-mid", type=float, default=None,
+        help="Override FSCSConfig.tau_mid.",
+    )
+    p.add_argument(
+        "--tau-local", type=float, default=None,
+        help="Override FSCSConfig.tau_local.",
+    )
+    p.add_argument(
+        "--beta-max-inference", type=float, default=None,
+        help=(
+            "Override FSCSConfig.beta_max_inference (layer cap at "
+            "inference time). Spec presets: 0.3 train / 0.5 safe / "
+            "0.7 aggressive. Higher = more tokens routed per layer."
+        ),
+    )
+    p.add_argument(
+        "--alpha-sharpness", type=float, default=None,
+        help=(
+            "Override FSCSConfig.alpha_sharpness (sigmoid sharpness α). "
+            "Higher = sharper threshold transition. Default 10."
+        ),
+    )
     p.add_argument(
         "--output", type=str,
         default="results/fscs_rstar/results.json",
@@ -270,10 +305,34 @@ def run_sweep(args: argparse.Namespace) -> Dict[str, Any]:
     print(f"τ sweep:           {args.tau_sweep}")
     print("=" * 72)
 
-    cfg = FSCSConfig(
-        coarse_window=args.coarse_window,
-        use_hard_routing=False,  # Mode 2 (soft) first
-    )
+    # Construct the FSCS config, applying any CLI calibration overrides.
+    # The defaults inside FSCSConfig have already been tuned by the V2
+    # calibration pass after the first frozen-Mistral sweep; these
+    # overrides let an operator probe alternative calibrations without
+    # re-editing the config module.
+    _cfg_kwargs: Dict[str, Any] = {
+        "coarse_window": args.coarse_window,
+        "use_hard_routing": False,  # Mode 2 (soft) first
+    }
+    if args.tau_global is not None:
+        _cfg_kwargs["tau_global"] = args.tau_global
+    if args.tau_mid is not None:
+        _cfg_kwargs["tau_mid"] = args.tau_mid
+    if args.tau_local is not None:
+        _cfg_kwargs["tau_local"] = args.tau_local
+    if args.beta_max_inference is not None:
+        _cfg_kwargs["beta_max_inference"] = args.beta_max_inference
+    if args.alpha_sharpness is not None:
+        _cfg_kwargs["alpha_sharpness"] = args.alpha_sharpness
+    cfg = FSCSConfig(**_cfg_kwargs)
+
+    # Log the calibration for the record. These three lines appear in
+    # the run banner so the results.json can be re-read later and the
+    # exact calibration that produced it is still obvious.
+    print(f"FSCS τ calibration: global={cfg.tau_global} "
+          f"mid={cfg.tau_mid} local={cfg.tau_local}")
+    print(f"FSCS α sharpness:   {cfg.alpha_sharpness}")
+    print(f"FSCS β_max (infer): {cfg.beta_max_inference}")
 
     print("\n[1/4] Loading Mistral backbone + installing FSCS gated layers…")
     # Normalize --quantize flag values:

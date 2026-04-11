@@ -63,9 +63,21 @@ class FSCSConfig:
     # Routing gate (§6)
     num_bands: int = 3              # Global, Mid, Local
     alpha_sharpness: float = 10.0   # Sigmoid sharpness α_b
-    tau_global: float = 0.7         # Global band τ (hardest to gate)
-    tau_mid: float = 0.5            # Mid band τ
-    tau_local: float = 0.3          # Local band τ (easiest to gate)
+    # Per-band τ defaults (V2, post first-run calibration).
+    # The original V1 defaults were {0.7, 0.5, 0.3} per the spec §6,
+    # but the first frozen-Mistral-7B τ sweep (commit 256e5eb) produced
+    # gate_frac ≈ 0 across τ ∈ [0.6, 0.9] because the sigmoid transition
+    # sat above the observed coherence distribution on Mistral's bf16
+    # residual stream. Lowered by 0.2 across all bands so the gate
+    # actually exercises the coarse branch on a frozen backbone.
+    # V1 values are preserved as tau_*_spec in case we need them for a
+    # matched comparison against the spec's expected operating points.
+    tau_global: float = 0.5         # Global band τ (hardest to gate)
+    tau_mid: float = 0.3            # Mid band τ
+    tau_local: float = 0.1          # Local band τ (easiest to gate)
+    tau_global_spec: float = 0.7    # V1 defaults kept for reference
+    tau_mid_spec: float = 0.5
+    tau_local_spec: float = 0.3
 
     # Hard routing (Mode 3 inference)
     hard_route_threshold: float = 0.7  # θ
@@ -83,8 +95,14 @@ class FSCSConfig:
     boundary_token_ids: Tuple[int, ...] = ()
 
     # Layer cap (§7)
+    # Spec §7.2 gives three preset points: training 0.3, inference safe 0.5,
+    # inference fast 0.7. We default inference to 0.7 (the aggressive preset)
+    # for the r* measurement because the purpose of the measurement is to
+    # find the quality-preservation frontier, not to be maximally safe.
+    # Without the aggressive cap, a well-firing gate gets silently clamped
+    # to 50% even when the quality bar would allow more.
     beta_max_train: float = 0.3
-    beta_max_inference: float = 0.5
+    beta_max_inference: float = 0.7
 
     # Cross-layer caution (§8). Used by the wrapper, not by individual modules.
     zeta: float = 0.5
