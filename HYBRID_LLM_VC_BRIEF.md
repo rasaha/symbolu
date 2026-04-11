@@ -7,44 +7,52 @@
 
 ## Page 1 — The Problem
 
-### The attention tradeoff that has not actually been solved.
+### The long-context attention tradeoff remains only partially solved.
 
-Modern LLMs pay for their capability with a fundamental attention
-tradeoff. The three families in production today each give up
-something material:
+Modern LLMs pay for their capability with a well-known attention
+tradeoff, and no dominant production architecture fully resolves it.
+Each of the three major families in production today makes a
+deliberate compromise on one of the three properties teams actually
+want from long-context attention — **global content-addressable
+retrieval**, **local precision**, and **efficient scaling** — and
+then compensates for that compromise with additional mechanisms:
 
-| Attention family | What it does well | What it gives up |
+| Attention family | What it does well | The compromise, and how the field has compensated |
 |---|---|---|
-| **Full quadratic softmax** (GPT, LLaMA, Claude API) | Rich, content-addressable retrieval across the whole context | O(n²) time and memory — pushes long-context inference into hardware regimes that burn cost and latency |
-| **Sliding-window / local attention** (Mistral, Longformer-style) | O(n·w) scaling, very fast, excellent for syntax, bigrams, and short-range fluency | No mechanism to reach information outside the window; long-range retrieval degrades quickly |
-| **Linear / state-space attention** (Mamba, RWKV, Performer, S4) | O(n) scaling, constant per-step inference memory | State is a compressed running sum; older tokens fade via exponential decay, so strict long-range *retrieval* is lossy |
+| **Full quadratic softmax** (GPT, LLaMA, Claude API) | Rich, content-addressable retrieval across the whole context | O(n²) time and memory. The field has compensated with FlashAttention, KV-cache tricks, sparse patterns, and retrieval augmentation — all of which work *around* the quadratic cost rather than removing it. |
+| **Sliding-window / local attention** (Mistral sliding-window, Longformer) | O(n·w) scaling, very fast, excellent for short-range syntax and fluency | No direct attention path to information outside the active window without extra mechanisms. Longformer itself pairs the window with explicit **task-motivated global attention tokens**; Mistral's sliding-window paper frames the window as an *efficiency* move rather than a full replacement for global attention. Local attention is not presented as a complete long-context solution even by its own authors. |
+| **Linear / state-space attention** (Mamba, RWKV, Performer, S4) | O(n) scaling, constant per-step inference memory | The recurrent state is a compressed running sum, and recent work (including the 2024 "Stuffed Mamba" line of research on state collapse and state capacity) directly studies the limits of RNN-style state for strict long-range retrieval. Linear-time scaling is real; lossless long-range retrieval at arbitrary distances is still an active research question. |
 
-In practice, teams deploying LLMs in production pick one of these
-families and then spend significant engineering effort compensating
-for its weakness — KV-cache tricks, sparse patterns, retrieval
-augmentation, aggressive truncation, reranking. Each compensation is
-*around* the attention mechanism, not inside it.
+In other words, the current production stack is *"partially solved,
+with compensating mechanisms"*, not *"solved"*. In practice, teams
+deploying long-context LLMs pick one of these families and then spend
+significant engineering effort compensating for its weakness —
+KV-cache tricks, sparse patterns, retrieval augmentation, aggressive
+truncation, reranking. Those compensations usually act *around* the
+attention mechanism rather than inside it.
 
-### Why hybrids so far have not closed the gap
+### Why stacked hybrids so far have not fully closed the gap
 
-Several recent papers and open-source models have layered two
+A growing number of recent papers and open-source models layer two
 attention mechanisms together — *some* layers full, *other* layers
 local, or a linear recurrent state side-by-side with a small window.
-These approaches help, but they usually stop at **stacking**: each
-mechanism runs on the same input tokens in parallel, and the model is
-left to blend their outputs with a weighted sum or a gate. That has
-two structural issues:
+These approaches help measurably, and we think they are directionally
+right. But in most public hybrids we have studied, the two mechanisms
+still **stack** rather than fuse: each runs on the same input tokens
+in parallel, and the model is left to blend their outputs with a
+weighted sum or a gate. In our view, that leaves two structural issues
+on the table:
 
 1. **Gradient competition.** When two attention heads attack the same
-   token stream in parallel, they fight over the same gradient signal
-   during training. The stronger mechanism tends to dominate and the
-   weaker one becomes vestigial, which undercuts the point of the
-   hybrid.
+   token stream in parallel, they tend to fight over the same
+   gradient signal during training. The stronger mechanism can
+   dominate and the weaker one can become vestigial, which undercuts
+   the point of the hybrid.
 2. **No shared memory substrate.** A linear-attention branch produces
    a running state. A local-attention branch reads raw tokens.
-   Because they operate on different representations, neither can use
-   what the other has computed — they coexist, but they do not
-   *compose*.
+   Because they typically operate on different representations,
+   neither can use what the other has computed — they coexist, but
+   they do not *compose*.
 
 We think the interesting question is not *"which attention mechanism
 is best?"* but *"can linear, local, and quadratic attention be
@@ -122,11 +130,12 @@ The cumulative state at each position is the running sum of all prior
 
 Unlike Mamba / RWKV / Performer, there is no `γ < 1` decay baked into
 the state. Information is encoded in **phase** rather than magnitude,
-so old tokens do not vanish exponentially — they can be "tuned back
-in" by a query at a matching phase. The amplitude gate is sigmoided
-(with a floor to prevent gradient collapse), each head learns its own
-phase offset, and an optional per-head decay factor is available as
-an explicit forgetting knob when the task wants one. An internal
+so the default phase branch does not impose mandatory exponential
+decay, which in principle allows older information to remain
+recoverable through phase-aligned queries. The amplitude gate is
+sigmoided (with a floor to prevent gradient collapse), each head
+learns its own phase offset, and an optional per-head decay factor
+is available as an explicit forgetting knob when the task wants one. An internal
 technical report on the phase-attention mechanism documents a small
 (~240K-param) pure-phase model reaching 100% needle-in-haystack
 retrieval accuracy at both 2K and 10K token recall distances on a
@@ -157,10 +166,12 @@ The result is a single forward pass in which the linear branch
 establishes long-range context, the windowed branch extracts local
 detail from that context, and the quadratic branch is invoked only
 where it is actually earning its cost. Because the three mechanisms
-are serial, **they do not compete for gradient** — phase is forced
-to learn a representation that local and quad can consume, and local
-and quad are forced to learn to read from it. A legacy parallel-blend
-mode is retained behind a flag for ablation.
+are composed serially over a shared state, **the design is intended
+to reduce direct gradient competition and force clearer role
+specialization** — phase has to learn a representation that local
+and quad can consume, and local and quad have to learn to read from
+it. A legacy parallel-blend mode is retained behind a flag for
+ablation.
 
 ### Slot memory — associative recall beyond layer weights
 
@@ -190,7 +201,7 @@ ablation says they are helping.
 | Linear / phase branch | O(n) cumulative-sum scan with complex phasors, three readout modes (`standard`, `shifted`, `complex`), per-head phase offsets, optional per-head decay, chunked sequence support for arbitrarily long documents. |
 | Binding-Cache Quad Query (V10.4) | Top-K proposal mode with conditional skip when phase confidence exceeds a threshold. |
 | Slot memory | 64 slots, detached write path, retrieval loss beyond the window, every-200-step ablation eval, adaptive slot LR controller with bootstrap → adaptive → stabilize phases. |
-| Inference path | `symbolu/inference/` module with Fast / Standard / Sovereign modes, Phase State Cache for O(1) per-step phase update, and V11.0.0 inference filters (Vritti gate, Kosha depth control, Sovereign Bridge). `generate_sovereign.py` CLI is wired end-to-end. Status doc: `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` (all phases marked complete). |
+| Inference path | `symbolu/inference/` module with Fast / Standard / Sovereign modes, Phase State Cache for O(1) per-step phase update, and V11.0.0 inference filters (Vritti gate, Kosha depth control, Sovereign Bridge). `generate_sovereign.py` CLI is wired end-to-end. Status doc: `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` — the inference stack is implemented end-to-end; remaining work is benchmark and scale validation. |
 | Training-time instrumentation | `SovereignPhaseController`, `AdaptiveTrainingController`, and `AdaptiveSlotLRController` — surgical gradient clipping per numerical regime (slot keys on unit sphere, phase sin/cos amplification, global norm), PPL-alpha curriculum, adaptive warmup on validation PPL rather than fixed steps. |
 
 ### Preliminary retrieval signal (separate research report)
@@ -258,12 +269,13 @@ working training stack with a validated phase-memory mechanism to a
 architecture. The research risk is concentrated in well-identified
 places — LRA and retrieval sweeps at scale, the 7B training run, and
 ablations that isolate each of the three fused attention mechanisms —
-and the engineering risk is manageable because the training recipe,
-inference path, and adaptive controllers are already built. What
-capital funds is specifically: benchmarking against open-weights
-baselines at matched parameter count, finishing and publishing the
-7B training run, and maturing the hybrid backend into a first-class
-option behind the Agentic Framework.
+and the implementation risk is reduced because the training recipe,
+inference path, and adaptive controllers are already built; the
+remaining uncertainty is concentrated in scale training and external
+benchmarking. What capital funds is specifically: benchmarking
+against open-weights baselines at matched parameter count, finishing
+and publishing the 7B training run, and maturing the hybrid backend
+into a first-class option behind the Agentic Framework.
 
 ---
 
