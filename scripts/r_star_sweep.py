@@ -166,6 +166,28 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--coherence-gamma", type=float, default=None,
+        help=(
+            "Override FSCSConfig.gamma (output-delta sensitivity in "
+            "coherence metric). Lower = wider coherence distribution. "
+            "V1 spec: 5.0, V3 Mistral-tuned: 1.0."
+        ),
+    )
+    p.add_argument(
+        "--coherence-delta", type=float, default=None,
+        help=(
+            "Override FSCSConfig.delta_residual (residual-delta sensitivity "
+            "in coherence metric). V1 spec: 3.0, V3 Mistral-tuned: 0.5."
+        ),
+    )
+    p.add_argument(
+        "--hard-threshold", type=float, default=None,
+        help=(
+            "Override FSCSConfig.hard_route_threshold (θ in Mode 3). "
+            "V1 spec: 0.7, V3 Mistral-tuned: 0.5."
+        ),
+    )
+    p.add_argument(
         "--eval-batch-size", type=int, default=1,
         help=(
             "Mini-batch size for the eval forward pass. Default 1 "
@@ -343,15 +365,22 @@ def run_sweep(args: argparse.Namespace) -> Dict[str, Any]:
         _cfg_kwargs["beta_max_inference"] = args.beta_max_inference
     if args.alpha_sharpness is not None:
         _cfg_kwargs["alpha_sharpness"] = args.alpha_sharpness
+    if args.coherence_gamma is not None:
+        _cfg_kwargs["gamma"] = args.coherence_gamma
+    if args.coherence_delta is not None:
+        _cfg_kwargs["delta_residual"] = args.coherence_delta
+    if args.hard_threshold is not None:
+        _cfg_kwargs["hard_route_threshold"] = args.hard_threshold
     cfg = FSCSConfig(**_cfg_kwargs)
 
-    # Log the calibration for the record. These three lines appear in
-    # the run banner so the results.json can be re-read later and the
-    # exact calibration that produced it is still obvious.
+    # Log the calibration for the record. These lines appear in the
+    # run banner so results.json files are self-documenting.
     print(f"FSCS τ calibration: global={cfg.tau_global} "
           f"mid={cfg.tau_mid} local={cfg.tau_local}")
     print(f"FSCS α sharpness:   {cfg.alpha_sharpness}")
     print(f"FSCS β_max (infer): {cfg.beta_max_inference}")
+    print(f"FSCS γ/δ/ρ:         {cfg.gamma}/{cfg.delta_residual}/{cfg.ema_decay}")
+    print(f"FSCS hard θ:        {cfg.hard_route_threshold}")
 
     print("\n[1/4] Loading Mistral backbone + installing FSCS gated layers…")
     # Normalize --quantize flag values:

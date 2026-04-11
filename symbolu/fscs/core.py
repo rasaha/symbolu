@@ -51,9 +51,23 @@ class FSCSConfig:
     """
 
     # Coherence metric (§1)
-    gamma: float = 5.0              # Output delta sensitivity
-    delta_residual: float = 3.0     # Residual delta sensitivity (δ in the spec)
-    ema_decay: float = 0.4          # EMA smoothing ρ (spec default)
+    # V3 calibration (post-first-sweep): lowered γ/δ to widen the raw
+    # coherence distribution. The V1 defaults (γ=5.0, δ=3.0) collapsed
+    # C_raw = exp(-γ·ΔO_rel) · exp(-δ·ΔR_rel) to values in [0.01, 0.15]
+    # on Mistral-7B's bf16 residual stream, because ΔO_rel is typically
+    # ~0.3-0.6 between adjacent tokens — so exp(-5·0.5) ≈ 0.08. The V2
+    # τ calibration moved per-band thresholds down to {0.5, 0.3, 0.1},
+    # but those were still above the top of the coherence distribution,
+    # so gate_frac only reached ~10% even at τ=0.2. V3 drops γ and δ by
+    # 5x, which moves the typical C_raw distribution up into [0.3, 0.9]
+    # where the V2 τ values sit near the middle and the gate can
+    # actually fire.
+    gamma: float = 1.0              # γ: output delta sensitivity
+    delta_residual: float = 0.5     # δ: residual delta sensitivity
+    ema_decay: float = 0.4          # ρ: EMA smoothing (spec default)
+    # V1 spec values kept for reference/A-B comparison
+    gamma_spec: float = 5.0
+    delta_residual_spec: float = 3.0
     use_attention_kl: bool = False  # Optional block-mass KL term; off by default
                                     # (requires storing attention summaries, §1.3)
 
@@ -80,7 +94,15 @@ class FSCSConfig:
     tau_local_spec: float = 0.3
 
     # Hard routing (Mode 3 inference)
-    hard_route_threshold: float = 0.7  # θ
+    # Hard routing threshold θ. V1 default was 0.7, matching the spec.
+    # The first Mistral sweep (commit 98176c0) showed soft mode reaching
+    # gate_frac=0.108 at τ=0.2 while hard mode stayed at gate_frac=0.000
+    # at every τ — meaning no individual token's π exceeded 0.7 even when
+    # the mean π distribution had non-trivial mass. Lowered to 0.5 so
+    # Mode 3 actually exercises the hard-route path at the same
+    # operating points where soft blend is engaging.
+    hard_route_threshold: float = 0.5  # θ (V3)
+    hard_route_threshold_spec: float = 0.7  # V1 default kept for reference
     use_hard_routing: bool = False
 
     # Surprise-delta suppressor (§2)
