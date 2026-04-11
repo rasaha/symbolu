@@ -678,10 +678,10 @@ def run_training(args: argparse.Namespace) -> int:
         args.max_train_samples,
         max_tokens=args.max_tokens,
     )
-    print(f"    Train shape: {tuple(train_ids.shape)}")
+    print(f"    Train shape: {tuple(train_ids.shape)}", flush=True)
 
     # ---- Optimizer -------------------------------------------------
-    print("\n[3/5] Initializing optimizer...")
+    print("\n[3/5] Initializing optimizer...", flush=True)
     optimizer = torch.optim.AdamW(
         trainable, lr=args.learning_rate,
         weight_decay=args.weight_decay, betas=(0.9, 0.95),
@@ -693,7 +693,7 @@ def run_training(args: argparse.Namespace) -> int:
         print(f"    Resumed from step {start_step}")
 
     # ---- Training loop ---------------------------------------------
-    print("\n[4/5] Training...")
+    print("\n[4/5] Training...", flush=True)
     metrics_history: List[StepMetrics] = []
     n_train = train_ids.shape[0]
     start_time = time.perf_counter()
@@ -727,7 +727,8 @@ def run_training(args: argparse.Namespace) -> int:
                 f"  step {step:5d}/{args.max_steps}  "
                 f"align_loss={align_loss:.6f}  gate={gate_frac:.4f}  "
                 f"lr={lr_now:.2e}  step_wall={step_wall:.2f}s  "
-                f"total={total_wall/60:.1f}min"
+                f"total={total_wall/60:.1f}min",
+                flush=True,
             )
 
         if step > 0 and step % args.save_every == 0:
@@ -766,6 +767,23 @@ def run_training(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 def main() -> int:
+    # Force line buffering on stdout regardless of whether it is a
+    # TTY or a pipe (e.g. when the operator uses `2>&1 | tee log`,
+    # Python defaults to block buffering at ~4-8 KB, which hides
+    # training-loop output for minutes at a time and makes a
+    # running process look hung).
+    #
+    # sys.stdout.reconfigure(line_buffering=True) requires Python
+    # 3.7+. It makes every newline-terminated print() flush
+    # immediately, which is what operators expect from a training
+    # script that logs per-step metrics.
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except (AttributeError, OSError):
+        pass  # Fallback: per-print flush=True is still present on
+              # critical paths in load_training_tokens() and the
+              # training loop.
+
     args = build_argparser().parse_args()
     if args.smoke_test:
         return run_smoke_test()
