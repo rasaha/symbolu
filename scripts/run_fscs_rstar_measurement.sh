@@ -11,10 +11,13 @@
 #      HuggingFace cache with Mistral-7B weights).
 #   2. Run the CPU smoke test on the FSCS core modules first — if those
 #      are broken, there is no point firing up an A100.
-#   3. Run a fast single-τ sanity check on Mistral (15 minutes) to catch
+#   3. A/B wiring check: run the sweep at tau=0.99 (gate effectively off)
+#      and verify Delta ppl < 0.1% vs baseline. If the wrapper is not
+#      transparent at r=0, the whole sweep is meaningless. Abort on fail.
+#   4. Sanity pass: single tau=0.5 on 16 samples (~15 min) to catch
 #      wiring bugs before the full sweep.
-#   4. Run the full τ sweep (several hours depending on eval sample count).
-#   5. Summarize results and point the operator at the results JSON.
+#   5. Full tau sweep (several hours depending on eval sample count).
+#   6. Summarize results and point the operator at the results JSON.
 #
 # Prerequisites
 # -------------
@@ -125,9 +128,43 @@ if [[ "${SMOKE_ONLY}" -eq 1 ]]; then
     exit 0
 fi
 
-# ----- 3. Sanity pass (single τ, small sample) --------------------------
+# ----- 3. A/B wiring check (tau=0.99, gate effectively off) -------------
+# This is the most important validity check: if the FSCS-wrapped Mistral
+# does not produce ~baseline ppl when the gate is off, every later number
+# is meaningless. Hard-fail the runbook if Delta ppl exceeds 0.1%.
 echo
-echo "[3/4] Sanity pass — single τ=0.5, 16 samples, should complete in ~15 min…"
+echo "[3/5] A/B wiring check — tau=0.99 should reduce to baseline Mistral…"
+python scripts/r_star_sweep.py \
+    --model "${MODEL}" \
+    --quantize "${QUANTIZE}" \
+    --eval-dataset "${EVAL_DATASET}" \
+    --seq-len "${SEQ_LEN}" \
+    --max-eval-samples 32 \
+    --coarse-window "${COARSE_WINDOW}" \
+    --single-tau 0.99 \
+    --output "${OUTPUT_DIR}/ab_wiring_check.json"
+
+python - <<PYWIRING
+import json, sys
+with open("${OUTPUT_DIR}/ab_wiring_check.json") as f:
+    r = json.load(f)
+delta = r["sweep"][0]["soft"]["delta_pct"]
+print(f"  A/B wiring delta: {delta:.4f}%")
+if abs(delta) > 0.1:
+    print(f"  FAIL: wrapper not transparent at tau=0.99 (delta={delta:.4f}%)",
+          file=sys.stderr)
+    print(f"  This means the dual-branch FSCS forward is not reducing to",
+          file=sys.stderr)
+    print(f"  stock Mistral when the gate is off. Fix the wrapper before",
+          file=sys.stderr)
+    print(f"  trusting any r* number from a real sweep.", file=sys.stderr)
+    sys.exit(1)
+print(f"  PASS: wrapper is transparent at tau=0.99")
+PYWIRING
+
+# ----- 4. Sanity pass (single tau, small sample) -----------------------
+echo
+echo "[4/5] Sanity pass — single tau=0.5, 16 samples, should complete in ~15 min…"
 python scripts/r_star_sweep.py \
     --model "${MODEL}" \
     --quantize "${QUANTIZE}" \
@@ -144,9 +181,9 @@ if [[ "${SANITY_ONLY}" -eq 1 ]]; then
     exit 0
 fi
 
-# ----- 4. Full τ sweep --------------------------------------------------
+# ----- 5. Full tau sweep ------------------------------------------------
 echo
-echo "[4/4] Full τ sweep — ~several hours at ${MAX_EVAL_SAMPLES} samples × 8 τ × 2 modes…"
+echo "[5/5] Full tau sweep — ~several hours at ${MAX_EVAL_SAMPLES} samples × 8 tau × 2 modes…"
 python scripts/r_star_sweep.py \
     --model "${MODEL}" \
     --quantize "${QUANTIZE}" \
