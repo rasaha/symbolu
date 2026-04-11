@@ -62,10 +62,13 @@ EVAL_DATASET="${EVAL_DATASET:-wikitext2}"
 SEQ_LEN="${SEQ_LEN:-2048}"
 MAX_EVAL_SAMPLES="${MAX_EVAL_SAMPLES:-256}"
 COARSE_WINDOW="${COARSE_WINDOW:-256}"
-# Batched eval: default 8 sequences per forward pass. Safe on A100-80GB
-# with Mistral-7B bf16 (peak ~32 GB at seq_len=2048, plenty of headroom).
-# Lower to 1 on smaller GPUs or raise toward 16 on larger ones.
-EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-8}"
+# Batched eval: default 16 sequences per forward pass. Safe on A100-80GB
+# with Mistral-7B bf16 (peak ~26 GB at seq_len=2048 observed in the
+# first measurement session; 32 also fits comfortably and is ~20% faster).
+# Lower to 8 on smaller GPUs (~20 GB peak) or all the way to 1 on tight
+# VRAM. Raise to 32 on A100-80GB for ~20% more throughput when nothing
+# else is sharing the GPU.
+EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-16}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/fscs_rstar}"
 OUTPUT_JSON="${OUTPUT_DIR}/results.json"
 

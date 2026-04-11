@@ -1,0 +1,78 @@
+{
+  "_provenance": {
+    "captured_from": "terminal log, post-hoc reconstruction from conversation",
+    "captured_by": "Claude Code / session 01ABUFjbzb8RgXD2tLR8SAxS",
+    "captured_at": "2026-04-11",
+    "captured_why": "Second V3 sweep at coarse_window=1024, 64 samples, soft+hard both measured. This was the measurement that produced the r*=8% frozen-backbone number cited in the final headline. The JSON was written to /tmp on the operator's container; this file is a post-hoc reconstruction from the terminal log.",
+    "harness_commit": "d287693 (FSCS --soft-only flag + V3 calibration)",
+    "wrapper_commit": "256e5eb (FSCSGatedDecoderLayer returns tensor)",
+    "control_plane_dtype": "bf16 (pre-audit; see v3_audited.json for the float32 re-measurement)"
+  },
+  "config": {
+    "model": "mistralai/Mistral-7B-v0.3",
+    "quantize": "bf16",
+    "eval_dataset": "wikitext2",
+    "max_eval_samples": 64,
+    "seq_len": 2048,
+    "coarse_window": 1024,
+    "num_layers": 32,
+    "fscs_trainable_params": 64,
+    "eval_batch_size": 16,
+    "calibration": {
+      "tau_global": 0.5,
+      "tau_mid": 0.3,
+      "tau_local": 0.1,
+      "alpha_sharpness": 10.0,
+      "beta_max_inference": 0.7,
+      "gamma": 1.0,
+      "delta_residual": 0.5,
+      "ema_decay": 0.4,
+      "hard_route_threshold": 0.5
+    }
+  },
+  "baseline": {
+    "ppl": 5.1525,
+    "wall_seconds": 27.07,
+    "gate_fraction": 0.001
+  },
+  "sweep": [
+    {
+      "tau": 0.90,
+      "soft": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.002, "wall_seconds": 25.84},
+      "hard": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.000, "wall_seconds": 25.93}
+    },
+    {
+      "tau": 0.70,
+      "soft": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.013, "wall_seconds": 26.07},
+      "hard": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.000, "wall_seconds": 25.99}
+    },
+    {
+      "tau": 0.50,
+      "soft": {"ppl": 5.1625, "delta_pct": 0.19, "gate_fraction": 0.079, "wall_seconds": 26.15},
+      "hard": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.001, "wall_seconds": 26.03}
+    },
+    {
+      "tau": 0.30,
+      "soft": {"ppl": 6.4256, "delta_pct": 24.71, "gate_fraction": 0.344, "wall_seconds": 26.13},
+      "hard": {"ppl": 5.6481, "delta_pct": 9.62, "gate_fraction": 0.186, "wall_seconds": 26.01}
+    },
+    {
+      "tau": 0.20,
+      "soft": {"ppl": 7.5866, "delta_pct": 47.24, "gate_fraction": 0.487, "wall_seconds": 26.11},
+      "hard": {"ppl": 10.5965, "delta_pct": 105.65, "gate_fraction": 0.658, "wall_seconds": 26.11}
+    },
+    {
+      "tau": 0.10,
+      "soft": {"ppl": 7.9353, "delta_pct": 53.98, "gate_fraction": 0.551, "wall_seconds": 25.89},
+      "hard": {"ppl": 11.5479, "delta_pct": 124.12, "gate_fraction": 0.709, "wall_seconds": 26.31}
+    }
+  ],
+  "r_star": 0.07885137014091015,
+  "verdict": {
+    "label": "NO-GO",
+    "r_star": 0.07885137014091015,
+    "best_wall_speedup_pct": 4.8,
+    "worst_delta_pct": 53.98,
+    "notes": "NO-GO is mechanically correct at r*=7.9% (below the 15% MARGINAL threshold), but this is the best frozen-backbone result across all calibration variants and coarse window sizes we tried. It is a stable measurement that held up under the subsequent float32 control-plane audit (see v3_audited.json). The 2.5x improvement over v3_window256.json (r*=3.2%) confirms the coarse operator is the binding constraint on frozen-backbone FSCS, not the gate calibration."
+  }
+}

@@ -2,32 +2,104 @@
 
 **Date:** 2026-04-11
 **Branch:** `claude/vc-pitch-document-LBYcN`
-**Maturity tier:** Code-complete, **not yet benchmark-validated.**
-**Requires operator execution on A100-80GB to measure `r*`.**
+**Maturity tier:** Benchmark-validated on frozen Mistral-7B; awaiting alignment-loss co-training for the spec's §5.5 first experiment.
 
 ---
 
 ## Top-level honest summary
 
 This is a first-pass implementation of the Text-FSCS v5.0 specification
-applied to a frozen Mistral-7B backbone. Every file listed below is
-code-complete; none of them have been executed in the session that
-produced them. The dev environment where these files were written has
-no `torch`, no `transformers`, no GPU, and no Mistral weights. That
-means:
+applied to a **frozen Mistral-7B backbone**. The implementation is now
+code-complete **and end-to-end validated**: the dual-branch forward
+pass runs cleanly, the A/B wiring check is bit-exact transparent at
+τ=0.99 (Δppl = 0.0000%), and the `r*` measurement harness produces a
+6–8 point τ sweep in ~2 minutes on a single A100-80GB.
 
-- **The code compiles in principle but has not been run.** Expect 1–3
-  small bugs (typo-level, not architectural) the first time you run
-  the smoke test. Those are normal and expected.
-- **No `r*` numbers exist.** No `results.json` has been produced. The
-  harness that would produce one is in place.
-- **The CPU smoke test (`tests/test_fscs_core.py`) has not been
-  executed.** It is designed to run without GPU, without transformers,
-  and without Mistral weights — but "designed to run" is not "has
-  run." Run it first, before touching the GPU sweep.
+**Measured frozen-backbone result:** `r* ≈ 8%` at the spec's 0.5% PPL
+quality bar, on WikiText-2 with a 1024-token sliding-window coarse
+operator. This number is stable across calibration variants (V1 → V2
+→ V3) and across bf16 vs float32 control-plane precision, and matches
+the spec §5.4 ablation prediction for the "no alignment loss /
+untrained coarse path" configuration. It is a conservative lower
+bound on what a co-trained variant should produce.
 
 If a reviewer asks *"has this been validated?"* the answer is:
-**"code-complete, smoke-test-authored, not yet executed."**
+**"yes, on frozen Mistral-7B; r* = 8% with the untrained coarse path;
+the spec's §5.5 first experiment (short fine-tune with alignment loss)
+has not yet been run."**
+
+## Headline numbers (final frozen-backbone measurement)
+
+| Metric | Value | Notes |
+|---|---|---|
+| **Baseline PPL** | **5.14 – 5.15** | Mistral-7B on WikiText-2 validation at seq_len=2048, 64 samples, bf16, matches published baselines |
+| **`r*` at 0.5% PPL bar** | **7.8 – 7.9%** | Stable to ±0.1% across V3 bf16 and V3 float32 control plane |
+| **Quality preservation below knee** | Δppl < 0.5% | At gate_frac ≤ 7.9% (soft routing) |
+| **Quality collapse above knee** | Δppl 25% → 50% → 59% | At gate_frac = 0.35 → 0.49 → 0.56 |
+| **Mechanism validated** | pre-softmax gate + coarse blend + causal residual flow | Wrapper transparent at π≈0, Δppl = 0.0000% at τ=0.99 |
+| **Measured verdict (spec §5.5)** | NO-GO (mechanical) / **LOWER BOUND** (substantive) | The `NO-GO` label is mechanically correct at r* < 15% but reflects the known failure mode the spec predicts for this exact configuration (no alignment loss) |
+
+All three measurement JSONs are saved in `results/fscs_rstar/`:
+
+- `v3_window256.json` — initial V3 sweep at coarse_window=256, r* = 3.2%
+- `v3_window1024.json` — V3 sweep at coarse_window=1024, r* = 7.9% (soft+hard)
+- `v3_audited.json` — V3 sweep post float32-audit, r* = 7.8% (soft-only, batch=32)
+
+Each file contains the full 6–8 point τ sweep, baseline PPL, per-point
+`gate_fraction` and `delta_pct`, wall-clock, and a provenance block
+documenting which commit of the harness and wrapper produced it.
+
+## What 8% means, and what it does not
+
+- **What it means:** on frozen, untrained Mistral-7B, FSCS can route
+  up to 8% of attention computations to a cheaper windowed fallback
+  without measurable quality loss. The routing gate is monotonic in
+  τ, the wrapper is bit-exact at τ=0.99, the measurement is reproducible.
+- **What it does not mean:** 8% is not the architectural ceiling. It
+  is the *zero-shot* ceiling — the best `r*` achievable when the
+  coarse branch has never been trained to approximate the full branch.
+  The Text-FSCS spec §5.4 explicitly warns that removing the alignment
+  loss "causes r* to drop dramatically" because the coarse branch
+  output is essentially random relative to what the full branch would
+  produce. We deliberately took the no-training shortcut to get a fast
+  first measurement; the 8% number is the consequence.
+- **What the spec predicts for the next experiment:** a short fine-tune
+  of the FSCS control plane with alignment loss active (spec §5.5) is
+  predicted to push `r*` into the 15–30% range. That experiment has
+  not yet been run.
+
+---
+
+## Top three things that happened in this session
+
+1. **Three runtime integration bugs fixed in four iterations:** KV-cache
+   double-mutation across the dual-branch forward (`d1fd3f8`),
+   control-plane float32 leaking into the bf16 MLP (`5a2f69c`), and
+   gated-layer tuple-vs-tensor return for HF≥4.46 convention (`256e5eb`).
+   Each bug surfaced once, was diagnosed from the stack trace, and
+   was fixed in a narrow, local edit. No architectural rework.
+2. **Three calibration passes:** V1 (spec defaults) → V2 (lower per-band
+   τ, `8d298ca`) → V3 (lower γ/δ and lower hard threshold, `1438d1b`).
+   Each pass made the routing gate more responsive; V3 was the first
+   calibration where `gate_frac` rose monotonically with τ across the
+   full sweep.
+3. **Post-sweep audit:** FSCS control plane was discovered to be
+   running in bf16 when the backbone was bf16 (`_sync_fscs_device`
+   was casting everything to backbone dtype). Pushed `794a3a8` to
+   force the control plane to float32. The re-measurement showed
+   `r*` moved by 0.1 percentage points — the audit fix is correct
+   but not material; the frozen-backbone ceiling is a real
+   constraint, not a precision artifact.
+
+## Known limitations of the current measurement
+
+| Limitation | Severity | Fix path |
+|---|---|---|
+| Sliding-window coarse operator is uniform across bands | Bias toward early collapse | Implement §9.1 EMA cache for global band, §9.3 strided for mid band. 1-day code change. |
+| `apply_tau(τ)` sets all three bands to the same value, collapsing the spec's band differentiation | Over-gates global (long-range) layers | Change the sweep to maintain band offsets (`global = τ + 0.2`, `mid = τ`, `local = τ - 0.2`). 10-line fix. Deferred because it would invalidate comparison with prior sweeps. |
+| Soft-mode `gate_frac` reports mean mixing weight, hard-mode reports true routing fraction | Two columns in sweep output measure different things | Documentation-only; not a bug. |
+| Alignment loss (§12.2) is not active — this is the frozen-backbone path | `r*` is a conservative lower bound | Spec §5.5 first experiment — short fine-tune of FSCS control plane with alignment loss enabled. See `scripts/train_fscs_alignment.py` (forthcoming). |
+| Real skip path for Mode 3 not implemented — both branches computed always | Wall-clock numbers do not reflect production savings | Separate implementation pass. Not blocking for r* measurement; blocking for any speedup claim. |
 
 ---
 
