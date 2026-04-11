@@ -188,6 +188,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--soft-only", action="store_true",
+        help=(
+            "Skip Mode 3 (hard routing) evaluation at every tau. "
+            "Halves the sweep wall-clock. Use during calibration "
+            "sweeps where the soft curve alone is the diagnostic."
+        ),
+    )
+    p.add_argument(
         "--eval-batch-size", type=int, default=1,
         help=(
             "Mini-batch size for the eval forward pass. Default 1 "
@@ -435,8 +443,11 @@ def run_sweep(args: argparse.Namespace) -> Dict[str, Any]:
             batch_size=args.eval_batch_size,
         )
 
-        # Mode 3 (hard) at the same τ — measures soft-to-hard gap
-        if not args.smoke:
+        # Mode 3 (hard) at the same τ — measures soft-to-hard gap.
+        # Skipped in --smoke mode and when --soft-only is passed (for
+        # faster calibration sweeps where the soft curve carries the
+        # information and hard mode just doubles wall-clock).
+        if (not args.smoke) and (not args.soft_only):
             wrapper.set_hard_routing(True)
             apply_tau(wrapper, tau)
             ppl_hard, wall_hard, gf_hard = eval_perplexity(
