@@ -307,6 +307,23 @@ class FSCSGatedDecoderLayer(nn.Module):
         # Layer cap (§7): clamp the fraction of tokens routed to coarse
         pi = self.layer_cap.apply(pi, training=self.training)
 
+        # ---- Dtype reconciliation -------------------------------------
+        # The FSCS control plane (coherence module, routing gate,
+        # layer cap, boundary detector) runs in float32 by default
+        # because its parameters were created without being cast to
+        # the backbone dtype. The Mistral backbone is bf16. If we blend
+        # a float32 pi tensor with bf16 attention outputs, PyTorch dtype
+        # promotion turns the blend into float32, which then flows
+        # through residual + layernorm + mlp and collides with the
+        # bf16 weights of mlp.gate_proj / up_proj / down_proj.
+        #
+        # The fix is to cast pi back to the backbone dtype before the
+        # blend. We also cast the blended attention output back to
+        # residual.dtype belt-and-suspenders in case any upstream op
+        # (layer cap, boundary mask) still produced a float32 value.
+        target_dtype = out_full.dtype
+        pi = pi.to(target_dtype)
+
         # ---- Blend full and coarse outputs ----------------------------
         if self.cfg.use_hard_routing and not self.training:
             # Mode 3: hard route per token
@@ -321,11 +338,17 @@ class FSCSGatedDecoderLayer(nn.Module):
             pi_exp = pi.unsqueeze(-1)                # [B, N, 1]
             attn_blended = (1.0 - pi_exp) * out_full + pi_exp * out_coarse
             # Record the "effective" fraction via the mean of pi
-            gated_frac = pi.mean().item()
+            gated_frac = pi.float().mean().item()
+
+        # Belt-and-suspenders: the blend may still have promoted to
+        # float32 if any upstream code path mixed dtypes. Cast back to
+        # the residual's dtype so the rest of the decoder layer
+        # (layernorm + mlp + residual2) sees a uniform dtype.
+        attn_blended = attn_blended.to(residual.dtype)
 
         # Stats for the wrapper / metrics
         self.last_gate_fraction = gated_frac
-        self.last_mean_pi = pi.mean().item()
+        self.last_mean_pi = pi.float().mean().item()
 
         # ---- Complete the decoder layer residual flow ----------------
         # hidden = residual + attn_blended
