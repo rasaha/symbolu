@@ -270,9 +270,17 @@ def run_sweep(args: argparse.Namespace) -> Dict[str, Any]:
     )
 
     print("\n[1/4] Loading Mistral backbone + installing FSCS gated layers…")
+    # Normalize --quantize flag values:
+    #   "none" or "bf16"  -> None (load in bf16 via torch_dtype, no bnb)
+    #   "4bit" or "8bit"  -> forwarded to MistralFSCSWrapper for bnb config
+    _quant_arg = args.quantize.lower()
+    if _quant_arg in ("none", "bf16", "fp16"):
+        _quant_value = None
+    else:
+        _quant_value = _quant_arg
     wrapper = MistralFSCSWrapper(
         model_name=args.model,
-        quantize=None if args.quantize == "none" else args.quantize,
+        quantize=_quant_value,
         fscs_cfg=cfg,
     )
     device = next(wrapper.backbone.parameters()).device

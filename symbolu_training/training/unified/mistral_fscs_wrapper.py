@@ -64,6 +64,7 @@ For a full r* sweep, see scripts/r_star_sweep.py.
 
 from __future__ import annotations
 
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
@@ -207,6 +208,34 @@ class MistralFSCSWrapper(nn.Module):
         }
 
         if quantize in ("4bit", "8bit"):
+            # Preflight: bitsandbytes quantization paths in recent
+            # transformers versions call model.set_submodule(), which was
+            # only added to torch.nn.Module in PyTorch 2.5. Older torch +
+            # newer transformers produces a confusing deep stack trace:
+            #     AttributeError: 'MistralForCausalLM' object has no
+            #     attribute 'set_submodule'. Did you mean: 'get_submodule'?
+            # Catch it here and either auto-fall-back to bf16 (when the
+            # operator has not explicitly requested 4-bit) or raise a
+            # clear diagnostic pointing at the torch upgrade path.
+            import torch.nn as _nn
+            _has_set_submodule = hasattr(_nn.Module, "set_submodule")
+            if not _has_set_submodule:
+                _msg = (
+                    f"[MistralFSCSWrapper] torch {torch.__version__} does not "
+                    f"provide torch.nn.Module.set_submodule, which recent "
+                    f"transformers versions require for bitsandbytes "
+                    f"{quantize} quantization. You have three options:\n"
+                    f"  1. Upgrade torch: pip install --upgrade 'torch>=2.5'\n"
+                    f"  2. Downgrade transformers: pip install 'transformers==4.44.*'\n"
+                    f"  3. Run without quantization (bf16, ~14GB VRAM):\n"
+                    f"     ./scripts/run_fscs_rstar_measurement.sh --sanity --quantize bf16"
+                )
+                print(_msg, file=sys.stderr)
+                raise RuntimeError(
+                    f"bitsandbytes {quantize} quantization requires "
+                    f"torch>=2.5 with this transformers version; "
+                    f"current torch is {torch.__version__}."
+                )
             try:
                 from transformers import BitsAndBytesConfig
                 import bitsandbytes as _bnb  # noqa: F401

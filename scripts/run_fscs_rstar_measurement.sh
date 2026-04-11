@@ -32,10 +32,23 @@
 #
 # Usage
 # -----
-#   ./scripts/run_fscs_rstar_measurement.sh                 # full run
-#   ./scripts/run_fscs_rstar_measurement.sh --smoke          # smoke only
-#   ./scripts/run_fscs_rstar_measurement.sh --sanity         # sanity only
-#   ./scripts/run_fscs_rstar_measurement.sh --skip-smoke     # skip CPU tests
+#   ./scripts/run_fscs_rstar_measurement.sh                          # full run
+#   ./scripts/run_fscs_rstar_measurement.sh --smoke                   # smoke only
+#   ./scripts/run_fscs_rstar_measurement.sh --sanity                  # sanity only
+#   ./scripts/run_fscs_rstar_measurement.sh --skip-smoke              # skip CPU tests
+#   ./scripts/run_fscs_rstar_measurement.sh --quantize bf16           # override 4bit
+#   ./scripts/run_fscs_rstar_measurement.sh --sanity --quantize bf16  # combined
+#
+# Quantization options
+# --------------------
+#   4bit   Default. Requires torch>=2.5 with current transformers versions
+#          because of a bitsandbytes integration change (set_submodule).
+#          Mistral-7B fits in ~14GB at 4-bit.
+#   8bit   Same torch>=2.5 requirement. ~18GB VRAM.
+#   bf16   No quantization. ~14GB VRAM. Works with torch 2.4.x. Use this
+#          if your environment has torch<2.5 and you cannot upgrade.
+#          A100-80GB has ample headroom.
+#   none   Alias for bf16.
 #
 # IMPORTANT: This script has NOT been executed. It is code-complete but
 # requires operator execution on appropriate hardware to produce results.
@@ -61,9 +74,21 @@ while [[ $# -gt 0 ]]; do
         --smoke) SMOKE_ONLY=1; shift ;;
         --sanity) SANITY_ONLY=1; shift ;;
         --skip-smoke) SKIP_SMOKE=1; shift ;;
+        --quantize)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --quantize requires an argument (4bit|8bit|bf16|none)" >&2
+                exit 2
+            fi
+            QUANTIZE="$2"; shift 2 ;;
+        --quantize=*) QUANTIZE="${1#*=}"; shift ;;
         *) echo "Unknown argument: $1"; exit 2 ;;
     esac
 done
+
+# Normalize 'none' -> 'bf16' for display; r_star_sweep.py accepts both.
+if [[ "${QUANTIZE}" == "none" ]]; then
+    QUANTIZE="bf16"
+fi
 
 echo "================================================================"
 echo "  Text-FSCS r* measurement"
