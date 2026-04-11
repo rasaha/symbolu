@@ -208,7 +208,7 @@ benchmarks. An external benchmark is planned (see roadmap).
 
 We are not trying to win on ecosystem breadth or hosted infrastructure
 in year one. We are trying to win on the governance properties that
-regulated enterprises cannot ship without: pinned action-loop ordering,
+regulated enterprises often cannot ship without: pinned action-loop ordering,
 per-tool risk classification, runtime approvals, hard budget caps,
 replayable traces, and — where customers adopt the CG path — signal
 enrichment from model-internal state.
@@ -250,8 +250,8 @@ external design-partner pilots, the managed runtime and low-code
 console, multi-agent and retrieval support, and the compliance and
 audit-persistence work required for regulated enterprise deployment.
 
-Governance is becoming a procurement requirement for autonomous agents,
-not a nice-to-have. We think the next 12–18 months are the right
+Governance is increasingly becoming a procurement requirement for
+autonomous agents, not just a nice-to-have. We think the next 12–18 months are the right
 window to establish a credible default for that layer, and we believe
 the combination of a tested runtime contract, a clean developer
 surface, and a path to model-internal signal enrichment gives Agentic
