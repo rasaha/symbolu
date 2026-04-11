@@ -191,27 +191,57 @@ def load_training_tokens(
     """
     Load and tokenize the training split. Returns a Tensor [num_samples, seq_len]
     suitable for batched slicing.
+
+    Tokenizes the entire corpus in a single call. For WikiText-103 this takes
+    several minutes on CPU (103M tokens / ~200K tok/sec ≈ 8 min). For
+    WikiText-2 it is ~10 seconds. Progress banners are printed eagerly so
+    the caller does not mistake a slow tokenization for a hang.
     """
     import torch
     from datasets import load_dataset
 
     if dataset_name == "synthetic":
-        # 128 random sequences of the configured length
+        print("    [data] using synthetic tokens (128 random sequences)",
+              flush=True)
         return torch.randint(0, 32000, (128, seq_len))
 
     if dataset_name == "wikitext2":
+        print("    [data] loading wikitext-2-raw-v1 (train split, "
+              "~2M tokens, expect ~10s tokenize)...", flush=True)
         ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
     else:  # wikitext103
+        print("    [data] loading wikitext-103-raw-v1 (train split, "
+              "~103M tokens, expect ~5-10 MIN to tokenize — this is "
+              "NOT a hang)...", flush=True)
         ds = load_dataset("wikitext", "wikitext-103-raw-v1", split="train")
 
+    print(f"    [data] joining {len(ds)} raw lines into a single string...",
+          flush=True)
     full_text = "\n\n".join(s for s in ds["text"] if s.strip())
-    enc = tokenizer(full_text, return_tensors="pt", add_special_tokens=False)
-    ids = enc.input_ids[0]
+    print(f"    [data] corpus length: {len(full_text) / 1e6:.1f} MB "
+          f"characters. Tokenizing now (no progress bar; wait for "
+          f"'tokenized N tokens' line)...", flush=True)
 
-    n_total = (ids.shape[0] // seq_len) * seq_len
+    t0 = time.perf_counter()
+    enc = tokenizer(full_text, return_tensors="pt", add_special_tokens=False)
+    tok_seconds = time.perf_counter() - t0
+    ids = enc.input_ids[0]
+    total_tokens = int(ids.shape[0])
+    print(f"    [data] tokenized {total_tokens:,} tokens in "
+          f"{tok_seconds:.1f}s ({total_tokens / max(1.0, tok_seconds):.0f} tok/s)",
+          flush=True)
+
+    n_total = (total_tokens // seq_len) * seq_len
+    if n_total == 0:
+        raise RuntimeError(
+            f"Corpus tokenized to {total_tokens} tokens but seq_len "
+            f"is {seq_len}; not even one full sequence available."
+        )
     ids = ids[:n_total].view(-1, seq_len)
     if ids.shape[0] > max_samples:
         ids = ids[:max_samples]
+    print(f"    [data] reshaped to {tuple(ids.shape)} "
+          f"(seq_len={seq_len}, samples={ids.shape[0]})", flush=True)
     return ids
 
 
@@ -533,7 +563,7 @@ def run_training(args: argparse.Namespace) -> int:
     print("=" * 72)
 
     # ---- Load backbone + install gated layers (with adapter) -------
-    print("\n[1/5] Loading Mistral backbone + FSCS gated layers...")
+    print("\n[1/5] Loading Mistral backbone + FSCS gated layers...", flush=True)
     quant = None if args.quantize in ("none", "bf16", "fp16") else args.quantize
     wrapper = MistralFSCSWrapper(
         model_name=args.model,
@@ -541,20 +571,24 @@ def run_training(args: argparse.Namespace) -> int:
         fscs_cfg=cfg,
     )
     device = next(wrapper.backbone.parameters()).device
-    print(f"    Backbone device:           {device}")
-    print(f"    FSCS trainable params:     {wrapper.fscs_trainable_parameters()}")
+    print(f"    Backbone device:           {device}", flush=True)
+    print(f"    FSCS trainable params:     {wrapper.fscs_trainable_parameters()}",
+          flush=True)
 
     # ---- Freeze the backbone, verify the adapter is trainable -----
+    print("    Freezing 7.25B backbone parameters (this is sub-second)...",
+          flush=True)
     for p in wrapper.backbone.parameters():
         p.requires_grad = False
 
+    print("    Collecting trainable adapter parameters...", flush=True)
     trainable, counts = collect_trainable_parameters(
         wrapper, include_routing_gate=args.train_routing_gate,
     )
     total_trainable = sum(p.numel() for p in trainable)
-    print(f"    Total trainable params:    {total_trainable:,}")
-    print(f"    .coarse_adapter:           {counts['coarse_adapter']:,}")
-    print(f"    .routing_gate:             {counts['routing_gate']:,}")
+    print(f"    Total trainable params:    {total_trainable:,}", flush=True)
+    print(f"    .coarse_adapter:           {counts['coarse_adapter']:,}", flush=True)
+    print(f"    .routing_gate:             {counts['routing_gate']:,}", flush=True)
 
     if total_trainable == 0:
         print("ERROR: no trainable parameters found. "
@@ -563,7 +597,7 @@ def run_training(args: argparse.Namespace) -> int:
         return 1
 
     # ---- Tokenize training data ------------------------------------
-    print("\n[2/5] Loading training data...")
+    print("\n[2/5] Loading training data...", flush=True)
     train_ids = load_training_tokens(
         wrapper.tokenizer, args.dataset, args.seq_len,
         args.max_train_samples,
