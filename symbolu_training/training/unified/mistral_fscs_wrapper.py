@@ -260,9 +260,42 @@ class MistralFSCSWrapper(nn.Module):
         print(f"[MistralFSCSWrapper] Quantization: {quantize or 'none (bf16)'}")
         print(f"[MistralFSCSWrapper] Device map: {device_map}")
 
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name, trust_remote_code=trust_remote_code,
-        )
+        # Force the fast (Rust-backed) tokenizer. Mistral ships a
+        # tokenizer.json alongside tokenizer.model, and AutoTokenizer
+        # normally picks the fast variant when both are present. But
+        # on some transformers / tokenizers version combinations (we
+        # have seen this with transformers 5.5.3 in the operator
+        # container), the default silently falls back to the slow
+        # SentencePiece path, which tokenizes at ~5-10K tok/sec vs
+        # the fast path's ~200K tok/sec — a 20-40x slowdown on
+        # WikiText-103 that turns a 5-minute tokenize into a
+        # 2-hour wait.
+        #
+        # Passing use_fast=True explicitly makes this preference
+        # explicit and surfaces a clean error if the fast tokenizer
+        # genuinely isn't available, rather than silently burning
+        # hours of CPU time. Operators who know they only have the
+        # slow path can still drop back by editing this line.
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                trust_remote_code=trust_remote_code,
+                use_fast=True,
+            )
+        except Exception as e:
+            print(f"[MistralFSCSWrapper] WARNING: fast tokenizer unavailable "
+                  f"({type(e).__name__}: {e}). Falling back to slow "
+                  f"tokenizer. Training data tokenization will be 20-40x "
+                  f"slower; prefer --dataset wikitext2 for debugging.",
+                  file=sys.stderr)
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                trust_remote_code=trust_remote_code,
+            )
+        print(f"[MistralFSCSWrapper] Tokenizer: "
+              f"{type(tokenizer).__name__} "
+              f"(is_fast={getattr(tokenizer, 'is_fast', 'unknown')})")
+
         model = AutoModelForCausalLM.from_pretrained(model_name, **load_kwargs)
 
         total_params = sum(p.numel() for p in model.parameters())

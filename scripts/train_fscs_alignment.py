@@ -117,6 +117,18 @@ def build_argparser() -> argparse.ArgumentParser:
     )
     p.add_argument("--seq-len", type=int, default=1024)
     p.add_argument("--max-train-samples", type=int, default=10000)
+    p.add_argument(
+        "--max-tokens", type=int, default=None,
+        help=(
+            "Hard cap on total tokens tokenized from the training corpus. "
+            "Default None = tokenize whatever the line-chunk loop needs to "
+            "produce max_train_samples * seq_len tokens (plus a 10% margin). "
+            "Set to a smaller number (e.g. 5_000_000) to force early stop "
+            "even if max_train_samples * seq_len would ask for more. Useful "
+            "with --dataset wikitext103 + slow tokenizer to avoid hours of "
+            "tokenization on data you'll truncate anyway."
+        ),
+    )
 
     # Training
     p.add_argument("--batch-size", type=int, default=4)
@@ -187,15 +199,28 @@ def load_training_tokens(
     dataset_name: str,
     seq_len: int,
     max_samples: int,
+    max_tokens: Optional[int] = None,
 ) -> Any:
     """
     Load and tokenize the training split. Returns a Tensor [num_samples, seq_len]
     suitable for batched slicing.
 
-    Tokenizes the entire corpus in a single call. For WikiText-103 this takes
-    several minutes on CPU (103M tokens / ~200K tok/sec ≈ 8 min). For
-    WikiText-2 it is ~10 seconds. Progress banners are printed eagerly so
-    the caller does not mistake a slow tokenization for a hang.
+    Tokenization strategy:
+      - The corpus is tokenized in line-chunks of N raw lines at a time
+        rather than as one monolithic string. This gives us:
+          * Real-time progress visibility (% complete + tokens/sec)
+          * Bounded peak memory (the tokenizer does not have to hold a
+            540 MB string plus its internal intermediates in RAM at once)
+          * Early termination when we have enough tokens to fill
+            max_samples sequences, so operators can skip tokenizing
+            the tail of a huge corpus they won't use anyway.
+      - max_tokens caps the total tokens processed; once reached we
+        stop tokenizing even if the corpus has more to offer. Set via
+        --max-tokens on the training CLI.
+
+    For WikiText-2 this is ~10 s. For WikiText-103 with a fast tokenizer
+    it is ~3-5 min. For WikiText-103 with a slow tokenizer it is ~2-3
+    hours — use --max-tokens to cap this, or use WikiText-2.
     """
     import torch
     from datasets import load_dataset
@@ -206,43 +231,91 @@ def load_training_tokens(
         return torch.randint(0, 32000, (128, seq_len))
 
     if dataset_name == "wikitext2":
-        print("    [data] loading wikitext-2-raw-v1 (train split, "
-              "~2M tokens, expect ~10s tokenize)...", flush=True)
+        print("    [data] loading wikitext-2-raw-v1 (train split)...",
+              flush=True)
         ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="train")
     else:  # wikitext103
-        print("    [data] loading wikitext-103-raw-v1 (train split, "
-              "~103M tokens, expect ~5-10 MIN to tokenize — this is "
-              "NOT a hang)...", flush=True)
+        print("    [data] loading wikitext-103-raw-v1 (train split)...",
+              flush=True)
         ds = load_dataset("wikitext", "wikitext-103-raw-v1", split="train")
 
-    print(f"    [data] joining {len(ds)} raw lines into a single string...",
+    # Report the tokenizer class so the operator can see at a glance
+    # whether they are on the fast or slow path. is_fast=True runs at
+    # ~200K tok/sec; is_fast=False runs at ~5-10K tok/sec.
+    print(f"    [data] tokenizer: {type(tokenizer).__name__} "
+          f"(is_fast={getattr(tokenizer, 'is_fast', 'unknown')})",
           flush=True)
-    full_text = "\n\n".join(s for s in ds["text"] if s.strip())
-    print(f"    [data] corpus length: {len(full_text) / 1e6:.1f} MB "
-          f"characters. Tokenizing now (no progress bar; wait for "
-          f"'tokenized N tokens' line)...", flush=True)
 
+    # Filter blank lines up front, then process in line-chunks.
+    lines = [s for s in ds["text"] if s.strip()]
+    n_lines = len(lines)
+
+    # Stop early if we have enough tokens to fill max_samples sequences.
+    # A small safety margin (1.1x) avoids re-tokenizing on a short tail.
+    target_tokens = max_samples * seq_len
+    target_tokens = int(target_tokens * 1.1)
+    if max_tokens is not None and max_tokens > 0:
+        target_tokens = min(target_tokens, max_tokens)
+
+    print(f"    [data] {n_lines:,} non-empty lines to process, "
+          f"target {target_tokens:,} tokens "
+          f"(= {max_samples} samples × {seq_len} seq_len + 10% margin)",
+          flush=True)
+    print(f"    [data] tokenizing in line-chunks for real-time progress; "
+          f"stopping early once target is reached...", flush=True)
+
+    chunk_size_lines = 2000   # ~60-100 KB of raw text per chunk
+    all_ids: List[int] = []
     t0 = time.perf_counter()
-    enc = tokenizer(full_text, return_tensors="pt", add_special_tokens=False)
-    tok_seconds = time.perf_counter() - t0
-    ids = enc.input_ids[0]
-    total_tokens = int(ids.shape[0])
-    print(f"    [data] tokenized {total_tokens:,} tokens in "
-          f"{tok_seconds:.1f}s ({total_tokens / max(1.0, tok_seconds):.0f} tok/s)",
-          flush=True)
+    last_print = t0
 
-    n_total = (total_tokens // seq_len) * seq_len
-    if n_total == 0:
+    for chunk_start in range(0, n_lines, chunk_size_lines):
+        chunk_lines = lines[chunk_start:chunk_start + chunk_size_lines]
+        chunk_text = "\n\n".join(chunk_lines)
+        enc = tokenizer(chunk_text, add_special_tokens=False,
+                        return_tensors=None)
+        all_ids.extend(enc["input_ids"])
+
+        now = time.perf_counter()
+        # Print progress every ~5 seconds to avoid flooding the log
+        if (now - last_print) >= 5.0 or len(all_ids) >= target_tokens:
+            elapsed = now - t0
+            tok_per_sec = len(all_ids) / max(1e-6, elapsed)
+            pct_lines = 100.0 * (chunk_start + chunk_size_lines) / n_lines
+            pct_tokens = 100.0 * len(all_ids) / max(1, target_tokens)
+            print(f"    [data]   {len(all_ids):>12,} tokens  "
+                  f"({pct_tokens:5.1f}% of target, "
+                  f"{min(100.0, pct_lines):5.1f}% of corpus)  "
+                  f"{tok_per_sec:>7,.0f} tok/s  "
+                  f"elapsed {elapsed:6.1f}s",
+                  flush=True)
+            last_print = now
+
+        if len(all_ids) >= target_tokens:
+            print(f"    [data] reached target token count; "
+                  f"stopping early.", flush=True)
+            break
+
+    tok_seconds = time.perf_counter() - t0
+    total_tokens = len(all_ids)
+    tok_rate = total_tokens / max(1e-6, tok_seconds)
+    print(f"    [data] DONE: tokenized {total_tokens:,} tokens in "
+          f"{tok_seconds:.1f}s ({tok_rate:,.0f} tok/s)", flush=True)
+
+    if total_tokens < seq_len:
         raise RuntimeError(
             f"Corpus tokenized to {total_tokens} tokens but seq_len "
             f"is {seq_len}; not even one full sequence available."
         )
-    ids = ids[:n_total].view(-1, seq_len)
-    if ids.shape[0] > max_samples:
-        ids = ids[:max_samples]
-    print(f"    [data] reshaped to {tuple(ids.shape)} "
-          f"(seq_len={seq_len}, samples={ids.shape[0]})", flush=True)
-    return ids
+
+    ids_tensor = torch.tensor(all_ids, dtype=torch.long)
+    n_total = (total_tokens // seq_len) * seq_len
+    ids_tensor = ids_tensor[:n_total].view(-1, seq_len)
+    if ids_tensor.shape[0] > max_samples:
+        ids_tensor = ids_tensor[:max_samples]
+    print(f"    [data] reshaped to {tuple(ids_tensor.shape)} "
+          f"(seq_len={seq_len}, samples={ids_tensor.shape[0]})", flush=True)
+    return ids_tensor
 
 
 # ---------------------------------------------------------------------------
@@ -599,8 +672,11 @@ def run_training(args: argparse.Namespace) -> int:
     # ---- Tokenize training data ------------------------------------
     print("\n[2/5] Loading training data...", flush=True)
     train_ids = load_training_tokens(
-        wrapper.tokenizer, args.dataset, args.seq_len,
+        wrapper.tokenizer,
+        args.dataset,
+        args.seq_len,
         args.max_train_samples,
+        max_tokens=args.max_tokens,
     )
     print(f"    Train shape: {tuple(train_ids.shape)}")
 
