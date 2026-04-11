@@ -7,44 +7,52 @@
 
 ## Page 1 — The Problem
 
-### The attention tradeoff that has not actually been solved.
+### The long-context attention tradeoff remains only partially solved.
 
-Modern LLMs pay for their capability with a fundamental attention
-tradeoff. The three families in production today each give up
-something material:
+Modern LLMs pay for their capability with a well-known attention
+tradeoff, and no dominant production architecture fully resolves it.
+Each of the three major families in production today makes a
+deliberate compromise on one of the three properties teams actually
+want from long-context attention — **global content-addressable
+retrieval**, **local precision**, and **efficient scaling** — and
+then compensates for that compromise with additional mechanisms:
 
-| Attention family | What it does well | What it gives up |
+| Attention family | What it does well | The compromise, and how the field has compensated |
 |---|---|---|
-| **Full quadratic softmax** (GPT, LLaMA, Claude API) | Rich, content-addressable retrieval across the whole context | O(n²) time and memory — pushes long-context inference into hardware regimes that burn cost and latency |
-| **Sliding-window / local attention** (Mistral, Longformer-style) | O(n·w) scaling, very fast, excellent for syntax, bigrams, and short-range fluency | No mechanism to reach information outside the window; long-range retrieval degrades quickly |
-| **Linear / state-space attention** (Mamba, RWKV, Performer, S4) | O(n) scaling, constant per-step inference memory | State is a compressed running sum; older tokens fade via exponential decay, so strict long-range *retrieval* is lossy |
+| **Full quadratic softmax** (GPT, LLaMA, Claude API) | Rich, content-addressable retrieval across the whole context | O(n²) time and memory. The field has compensated with FlashAttention, KV-cache tricks, sparse patterns, and retrieval augmentation — all of which work *around* the quadratic cost rather than removing it. |
+| **Sliding-window / local attention** (Mistral sliding-window, Longformer) | O(n·w) scaling, very fast, excellent for short-range syntax and fluency | The window alone cannot reach information outside it. Longformer itself pairs the window with explicit **task-motivated global attention tokens**; Mistral's sliding-window paper frames the window as an *efficiency* move rather than a full replacement for global attention. Local attention is not presented as a complete long-context solution even by its own authors. |
+| **Linear / state-space attention** (Mamba, RWKV, Performer, S4) | O(n) scaling, constant per-step inference memory | The recurrent state is a compressed running sum, and recent work (including the 2024 "Stuffed Mamba" line of research on state collapse and state capacity) directly studies the limits of RNN-style state for strict long-range retrieval. Linear-time scaling is real; lossless long-range retrieval at arbitrary distances is still an active research question. |
 
-In practice, teams deploying LLMs in production pick one of these
-families and then spend significant engineering effort compensating
-for its weakness — KV-cache tricks, sparse patterns, retrieval
-augmentation, aggressive truncation, reranking. Each compensation is
-*around* the attention mechanism, not inside it.
+In other words, the current production stack is *"partially solved,
+with compensating mechanisms"*, not *"solved"*. In practice, teams
+deploying long-context LLMs pick one of these families and then spend
+significant engineering effort compensating for its weakness —
+KV-cache tricks, sparse patterns, retrieval augmentation, aggressive
+truncation, reranking. Those compensations usually act *around* the
+attention mechanism rather than inside it.
 
-### Why hybrids so far have not closed the gap
+### Why stacked hybrids so far have not fully closed the gap
 
-Several recent papers and open-source models have layered two
+A growing number of recent papers and open-source models layer two
 attention mechanisms together — *some* layers full, *other* layers
 local, or a linear recurrent state side-by-side with a small window.
-These approaches help, but they usually stop at **stacking**: each
-mechanism runs on the same input tokens in parallel, and the model is
-left to blend their outputs with a weighted sum or a gate. That has
-two structural issues:
+These approaches help measurably, and we think they are directionally
+right. But in most public hybrids we have studied, the two mechanisms
+still **stack** rather than fuse: each runs on the same input tokens
+in parallel, and the model is left to blend their outputs with a
+weighted sum or a gate. In our view, that leaves two structural issues
+on the table:
 
 1. **Gradient competition.** When two attention heads attack the same
-   token stream in parallel, they fight over the same gradient signal
-   during training. The stronger mechanism tends to dominate and the
-   weaker one becomes vestigial, which undercuts the point of the
-   hybrid.
+   token stream in parallel, they tend to fight over the same
+   gradient signal during training. The stronger mechanism can
+   dominate and the weaker one can become vestigial, which undercuts
+   the point of the hybrid.
 2. **No shared memory substrate.** A linear-attention branch produces
    a running state. A local-attention branch reads raw tokens.
-   Because they operate on different representations, neither can use
-   what the other has computed — they coexist, but they do not
-   *compose*.
+   Because they typically operate on different representations,
+   neither can use what the other has computed — they coexist, but
+   they do not *compose*.
 
 We think the interesting question is not *"which attention mechanism
 is best?"* but *"can linear, local, and quadratic attention be
