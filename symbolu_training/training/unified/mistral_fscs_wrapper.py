@@ -369,20 +369,44 @@ class MistralFSCSWrapper(nn.Module):
     # ------------------------------------------------------------------ #
 
     def _sync_fscs_device(self) -> None:
-        """Move FSCS trainable params to the backbone's device / dtype."""
+        """
+        Move FSCS trainable params to the backbone's device and set them
+        to float32 for control-plane numerical stability.
+
+        The FSCS control plane (coherence module, routing gate, layer
+        cap, boundary detector) is deliberately kept in float32 even
+        when the backbone is in bf16. Rationale:
+
+          1. Coherence computation involves 4096-dim norms, an
+             exp kernel, and an N-step EMA loop. In bf16 these
+             accumulate rounding error fast (bf16 mantissa is only
+             ~3 decimal digits).
+          2. The routing gate's sigmoid is extremely sensitive to
+             small differences (C - τ): at α=10, a 0.03 bf16
+             rounding error pushes the output by ~7.5% absolutely.
+          3. The FSCS control plane is tiny (64 params total per
+             wrapper), so the memory and throughput cost of float32
+             is negligible.
+          4. The dtype reconciliation step in FSCSGatedDecoderLayer
+             casts pi back to the backbone dtype at the blend site,
+             so the backbone forward path still runs in bf16.
+        """
         try:
             bp = next(self.backbone.parameters())
         except StopIteration:
             return
-        device, dtype = bp.device, bp.dtype
+        device = bp.device  # follow the backbone's device
+        # Explicit float32 for control-plane modules. Do NOT pass the
+        # backbone's dtype — we want the control plane in float32
+        # regardless of whether the backbone is bf16, fp16, or fp32.
         for gl in self.gated_layers:
             # Only move the FSCS control-plane submodules, not the wrapped
             # original layer (which is already on the right device).
-            gl.coherence_module.to(device=device, dtype=dtype)
-            gl.routing_gate.to(device=device, dtype=dtype)
-            gl.boundary_detector.to(device=device, dtype=dtype)
-            gl.layer_cap.to(device=device, dtype=dtype)
-            gl.surprise_suppressor.to(device=device, dtype=dtype)
+            gl.coherence_module.to(device=device, dtype=torch.float32)
+            gl.routing_gate.to(device=device, dtype=torch.float32)
+            gl.boundary_detector.to(device=device)  # int64 buffer, no dtype cast
+            gl.layer_cap.to(device=device, dtype=torch.float32)
+            gl.surprise_suppressor.to(device=device, dtype=torch.float32)
 
     # ------------------------------------------------------------------ #
     # Forward pass — runs the backbone with gated layers installed

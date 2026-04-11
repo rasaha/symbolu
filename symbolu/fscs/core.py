@@ -196,12 +196,29 @@ class FSCSCoherenceModule(nn.Module):
         Returns:
             coherence: [B, N] in [0, 1], where high = stable (safe to gate).
         """
+        # Cast to float32 for numerical stability. The coherence signal
+        # is a control-plane value, not a backbone forward path, and
+        # computing it in bf16 accumulates rounding errors rapidly:
+        #   - norm() over 4096-dim vectors in bf16 drops ~2 decimal
+        #     digits per reduction (bf16 mantissa is 8 bits)
+        #   - the EMA smoothing loop runs N ≈ 2048 sequential
+        #     multiply-adds, each adding rounding error
+        #   - exp(-γ·ΔO_rel) compresses the dynamic range further
+        # The cost of float32 here is negligible (this module adds
+        # ~64 FSCS parameters per layer) and the downstream dtype
+        # reconciliation in FSCSGatedDecoderLayer.forward() casts the
+        # final pi back to the backbone dtype before the blend, so
+        # the rest of the forward pass is unaffected.
+        input_dtype = attn_output.dtype
+        attn_output = attn_output.float()
+        residual = residual.float()
+
         B, N, D = attn_output.shape
 
         if N < 2:
             # Not enough context for a delta — return neutral coherence.
             return torch.full((B, N), 0.5, device=attn_output.device,
-                              dtype=attn_output.dtype)
+                              dtype=torch.float32)
 
         # Output delta, scale-normalized (§1.1)
         o_delta = attn_output[:, 1:] - attn_output[:, :-1]       # [B, N-1, D]
@@ -241,6 +258,10 @@ class FSCSCoherenceModule(nn.Module):
             warmup_end = min(w, N)
             coherence[:, :warmup_end] = 0.0
 
+        # Return in float32. Downstream dtype reconciliation will cast
+        # to backbone dtype at the blend step. The routing gate's
+        # parameters are float32 too (see _sync_fscs_device audit),
+        # so the sigmoid itself stays in float32 precision.
         return coherence
 
 
