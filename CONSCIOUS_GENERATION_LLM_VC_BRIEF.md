@@ -7,23 +7,20 @@
 
 ## Page 1 — The Problem
 
-### Standard LLMs choose the next token from one signal. That is most of what goes wrong.
+### Standard LLMs ultimately rank candidate tokens through a single projection bottleneck.
 
-In a standard transformer, every candidate token receives a single scalar
-logit from `lm_head(hidden_state)`, and softmax picks the next word by
-statistical continuation alone. The model has no explicit mechanism to
-ask whether the token is **physically plausible**, whether it fits the
-**cognitive mode** of the passage (fact vs. imagination vs. memory),
-whether it is **tonally or relationally compatible** with what was said
-before, or whether it aligns with an **ontological identity** the
-context has already established. Everything that humans would call
-*"that word doesn't belong here"* is approximated implicitly through
-token co-occurrence statistics.
+In a standard transformer, the hidden state summarizes a great deal of
+context, but each candidate token is ultimately ranked by a single
+scalar logit produced by `lm_head(hidden_state)`, and softmax picks the
+next word by statistical continuation over that one ranking. Many of
+the constraints humans apply implicitly — plausibility, mode, tone,
+relational fit, identity continuity — are not explicitly separated in
+token selection and must be approximated through the hidden state.
 
-This single-signal token selection is, in our view, the structural
-root of several well-known LLM failure modes:
+This compression is, in our view, **one structural contributor** to
+several well-known LLM failure modes:
 
-| Failure observed in standard LLMs | Missing signal the model never explicitly consults |
+| Failure observed in standard LLMs | A signal the model does not explicitly isolate |
 |---|---|
 | Factual hallucinations (*"the Eiffel Tower is in London"*) | Physical / causal plausibility of the candidate token |
 | Tone and register drift inside a single passage | Emotional / phonemic resonance of the candidate token |
@@ -31,27 +28,34 @@ root of several well-known LLM failure modes:
 | Relational incoherence (*"calmly placed the cup on the explosion"*) | Energetic / relational harmony between candidate and context |
 | Topic / identity drift over long contexts | Ontological identity stability across turns |
 
-Post-hoc mitigations — RLHF, classifier-based moderation, retrieval
-augmentation, tool-checking — all act *after* the model has already
-committed to a distribution. None of them change the fact that the
-distribution itself came from a single-signal projection. The
-interpretability community describes this as the *"single bottleneck
-problem"*: one hidden state, one projection, one softmax.
+We do not claim these are the only causes of the failures above — LLM
+error modes are multi-causal, and many of them respond partially to
+better data, RLHF, retrieval, or moderation. What we do claim is that
+post-hoc mitigations act *after* the model has already committed to a
+distribution, and none of them change the fact that the distribution
+itself came from a single projection. The architecture effectively
+compresses many competing considerations into a single token-ranking
+projection bottleneck — and in our view, relaxing that bottleneck is a
+research direction worth funding.
 
 ### What we think a more grounded approach looks like
 
 Our thesis is that next-token probability should be computed as the
 **integrated agreement of multiple semantic fields** evaluating each
-candidate token — not as a scalar continuation score. Concretely, we
-believe a competitive next-generation LLM will need (i) an explicit
-internal state representing ontological identity, cognitive mode, and
-energetic profile; (ii) trainable per-token auxiliary scorers that can
-evaluate candidates against that state; and (iii) a mechanism for those
-signals to actually influence token selection during generation, not
-just to be observed post-hoc.
+candidate token, rather than as a single continuation score from one
+projection. Concretely, we believe a competitive next-generation LLM
+will need (i) an explicit internal state representing ontological
+identity, cognitive mode, and energetic profile; (ii) trainable
+per-token auxiliary scorers that can evaluate candidates against that
+state; and (iii) a mechanism for those signals to actually influence
+token selection during generation, not just to be observed post-hoc.
 
-This is a significant architectural bet, not a drop-in fix. It is the
-bet `mistral_cg` — our Conscious Generation LLM — is built around.
+This is a significant architectural bet, not a drop-in fix. `mistral_cg`
+— our Conscious Generation LLM — is a live *partial* implementation of
+that thesis today: the state, the scorers, and one inference-time
+mechanism (the phase adapter) are in place, and the next 12 months are
+about closing the remaining gap between the training-time signal stack
+and the generation path.
 
 ---
 
@@ -154,7 +158,7 @@ available.
 | 32D Sovereign State (Bhava · Kosha · Vritti · Guna · Reserved) | Produced in every forward pass when CG is enabled. |
 | Phase adapter | Trainable, gated, active on every forward pass — the currently active CG mechanism that modifies token probabilities (via hidden-state correction before the frozen LM head). |
 | Stage 8 Perspective Synthesizer | Implemented and flag-enabled in `scripts/train_mistral_cg.sh`; conditions the hidden state via interpretive signals (CSR, Vritti, Kosha, Bhava) before the LM head. |
-| Training auxiliaries (CSR · Guna · Ontological · Vritti · JEPA · Kosha · Bliss) | All six scorer modules and their InfoNCE / contrastive losses are implemented and wired into the training loop. |
+| Training auxiliaries (CSR · Guna · Ontological · Vritti · JEPA · Kosha · Bliss) | All six scorer modules and their associated auxiliary losses are implemented in the training stack and can be activated through the training configuration (flags and per-signal lambda weights). |
 | 4-bit / 8-bit quantization | Supported via bitsandbytes. ~14GB VRAM at 4-bit, ~18GB at 8-bit. |
 | Trainable parameter count | ~5M (CG modules only; Mistral backbone remains frozen). |
 | Inference adapter | `MistralCGAdapter` exposes `mistral_cg` to the Agentic Framework's `BaseLLMAdapter` interface, including entropy + vritti signal readouts from the 32D state for governed tool dispatch. |
@@ -219,7 +223,7 @@ architecture into a deployed one.
 ### The ask
 
 We are raising seed capital to take `mistral_cg` from a research
-architecture with a live phase-adapter inference path and a complete
+architecture with a live phase-adapter inference path and a broad
 training-time signal stack, to a model where the **full multi-field
 token evaluation thesis is wired into generation**, measurable against
 hallucination and coherence benchmarks, and exposed to enterprise
