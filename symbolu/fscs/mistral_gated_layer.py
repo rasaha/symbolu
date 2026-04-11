@@ -45,7 +45,7 @@ Requires: transformers >= 4.36 (for MistralDecoderLayer public API).
 
 from __future__ import annotations
 
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 import torch
 import torch.nn as nn
@@ -194,7 +194,7 @@ class FSCSGatedDecoderLayer(nn.Module):
         output_attentions: bool = False,
         use_cache: bool = False,
         **kwargs: Any,
-    ) -> Tuple[torch.Tensor, ...]:
+    ) -> torch.Tensor:
         """
         MistralDecoderLayer.forward-compatible signature.
 
@@ -360,9 +360,19 @@ class FSCSGatedDecoderLayer(nn.Module):
         hidden = self.original_layer.mlp(hidden)
         hidden = residual2 + hidden
 
-        outputs: Tuple[Any, ...] = (hidden,)
-        if output_attentions:
-            outputs = outputs + (None,)  # we did not compute attention weights
-        if use_cache:
-            outputs = outputs + (None,)  # FSCS does not mutate KV cache in this pass
-        return outputs
+        # Return convention: modern HF transformers (>=4.46) has
+        # MistralDecoderLayer.forward() return a tensor directly, not a
+        # tuple. MistralModel.forward() assigns the result straight into
+        # hidden_states without [0] indexing. Returning a tuple here
+        # would make the NEXT layer try to layernorm a tuple, producing:
+        #     AttributeError: 'tuple' object has no attribute 'dtype'
+        # inside MistralRMSNorm.
+        #
+        # We ignore output_attentions / use_cache. FSCS intentionally
+        # does not produce attention weights (we never materialized the
+        # attention matrix), and we force use_cache=False in the dual-
+        # branch forward to avoid KV-cache double-mutation. If a caller
+        # genuinely needs those outputs we will need a separate forward
+        # path. For the r* measurement (inference on complete sequences
+        # with output_attentions=False, use_cache=False) this is correct.
+        return hidden
