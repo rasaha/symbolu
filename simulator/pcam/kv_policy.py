@@ -227,6 +227,17 @@ class BlockState:
     # that many heads attend to; evicting them causes disproportionate
     # quality damage. Default 0.0 = no boundary information available.
     boundary_score: float = 0.0
+    # Stage 2 (FSCS-derived): band class. Multiplicative modifier on the
+    # final score. Represents the long-range importance of this block's
+    # layer/position in the model.
+    #   > 1.0 = global-context block, expensive to miss, harder to evict
+    #   = 1.0 = neutral (default, no effect)
+    #   < 1.0 = local-syntax block, cheaper to recompute, easier to evict
+    # Set by the caller via set_block_band() or ensure_block(band_class=...).
+    # Multiplicative rather than additive because band class modifies the
+    # importance of ALL other signals for that block — a global block's
+    # recency, frequency, and attention are all more valuable.
+    band_class: float = 1.0
 
 
 @dataclass
@@ -422,6 +433,30 @@ class KVCachePolicy:
 
     # ---- Stage 1 (FSCS-derived): boundary sensitivity --------------------
 
+    def set_block_band(
+        self,
+        block_id: int,
+        band_class: float,
+    ) -> None:
+        """
+        Set the band-class multiplier for an existing block (Stage 2).
+
+        Semantics:
+            band_class > 1.0 → global-context block, harder to evict
+            band_class = 1.0 → neutral (default)
+            band_class < 1.0 → local-syntax block, easier to evict
+
+        Recommended values from the FSCS per-band research:
+            global = 1.3   (layers handling document-level context)
+            mid    = 1.0   (paragraph structure — neutral)
+            local  = 0.8   (local syntax — cheaper to recompute)
+
+        No-op if ``block_id`` is unknown.
+        """
+        block = self.blocks.get(block_id)
+        if block is not None:
+            block.band_class = float(band_class)
+
     def set_block_boundary(
         self,
         block_id: int,
@@ -452,6 +487,7 @@ class KVCachePolicy:
         sequence_id: int,
         positions: List[int],
         boundary_score: float = 0.0,
+        band_class: float = 1.0,
     ) -> None:
         """
         Lightweight block registration. Creates block metadata without
@@ -462,6 +498,10 @@ class KVCachePolicy:
         sensitivity hint in [0, 1]. Higher = block contains structurally
         important boundary tokens. Has no effect unless the boundary
         weight in PhaseWeights is non-zero.
+
+        ``band_class`` (Stage 2, optional, default 1.0): multiplicative
+        score modifier. >1.0 = global (harder to evict), 1.0 = neutral,
+        <1.0 = local (easier to evict).
         """
         if block_id not in self.blocks:
             self._step += 1
@@ -473,6 +513,7 @@ class KVCachePolicy:
                 token_count=len(positions),
                 is_sink=is_sink,
                 boundary_score=float(boundary_score),
+                band_class=float(band_class),
             )
             self.blocks[block_id] = block
 
@@ -618,6 +659,13 @@ class KVCachePolicy:
         # Entity bonus: protect high-attention non-sink blocks.
         if not block.is_sink and block.attention_ema > self._adaptive_threshold:
             score += 0.5
+
+        # Stage 2 (FSCS-derived): band-class multiplier.
+        # Applied last so it scales the entire composite score.
+        # band_class=1.0 (default) is a no-op. >1.0 protects global-
+        # context blocks; <1.0 makes local-syntax blocks easier to evict.
+        if block.band_class != 1.0:
+            score *= block.band_class
 
         return score
 
