@@ -1734,5 +1734,429 @@ types, and ablation support.
 
 ---
 
-_End of Phase 3B. Sub-section 3C (planning loop, config loading, timing
-validation) will follow._
+### 3C — Planning Loop, Config Loading, and Timing Validation
+
+#### 3C.1 Purpose
+
+Phase 3C is the integration layer. It wires the simulator (3A), planner (3B),
+predictors (Phase 2), and math kernel (Phase 1) into a single closed-loop
+execution pipeline. It also adds config file loading so experiments can be
+run from YAML without editing Python, and establishes the timing benchmark
+that validates the 50Hz budget.
+
+Phase 3C does NOT define scenarios or metrics — that is Phase 4. It provides
+the machinery that Phase 4 drives.
+
+#### 3C.2 Modules
+
+Two concerns, two locations:
+
+| File                          | Responsibility                                              | Est. Lines |
+|-------------------------------|-------------------------------------------------------------|------------|
+| `bcvf_autonomous/runner.py`   | Closed-loop planning loop + config loading                  | ~200       |
+| `bcvf_autonomous/tests/test_runner.py` | Integration tests + timing benchmark              | ~150       |
+
+#### 3C.3 The Planning Loop
+
+The planning loop is the heartbeat of the system. Each iteration:
+
+```
+1. Planner observes predictor states (already updated by simulator)
+2. Planner runs MPPI → returns MPPIResult
+3. Simulator executes first_control → returns SimState
+4. SimState is annotated with costs from MPPIResult
+5. Repeat until done
+```
+
+```python
+@dataclass
+class RunConfig:
+    """Complete configuration for one experiment run."""
+    sim: SimConfig
+    mppi: MPPIConfig
+    perf: PerfCostConfig
+    bcvf: BCVFConfig
+    bicycle: BicycleConfig
+    seed: int = 42
+    # Failure injection (applied by Phase 4 scenarios, empty by default)
+    failures: Dict[str, FailureConfig] = field(default_factory=dict)
+
+@dataclass
+class RunResult:
+    """Complete output of one experiment run."""
+    history: List[SimState]          # full time series
+    collision: bool                  # did the vehicle collide?
+    collision_step: Optional[int]    # when (if applicable)
+    total_steps: int
+    total_time: float                # simulated time (steps * dt)
+    mean_perf_cost: float
+    mean_bcvf_cost: float
+    mean_solve_time_ms: float        # average planner wall-clock time
+    max_solve_time_ms: float         # worst-case planner time
+    p99_solve_time_ms: float         # 99th percentile
+    effective_samples_mean: float    # average weight concentration
+
+class Runner:
+    """
+    Closed-loop planning runner.
+
+    Wires together: Simulator + MPPIPlanner + Predictors.
+    """
+
+    def __init__(self, config: RunConfig):
+        ...
+
+    def run(self) -> RunResult:
+        """
+        Execute one complete episode.
+
+        Process:
+        1. Build predictors from config
+        2. Build simulator with predictors
+        3. Build planner with predictors, road, obstacles
+        4. Apply failure configs to predictors
+        5. Reset simulator
+        6. Loop: plan → step → record, until done
+        7. Aggregate and return RunResult
+        """
+        ...
+```
+
+**`run()` implementation detail:**
+
+```python
+def run(self) -> RunResult:
+    # 1. Build components
+    predictors = create_predictor_set(self._config.bicycle, seed=self._config.seed)
+    sim = Simulator(self._config.sim, predictors)
+    planner = MPPIPlanner(
+        self._config.mppi, self._config.perf,
+        predictors, self._config.sim.road, self._config.sim.obstacles,
+    )
+
+    # 2. Inject failures
+    for model_id, failure_cfg in self._config.failures.items():
+        predictors[model_id].set_failure(failure_cfg)
+
+    # 3. Reset
+    sim_state = sim.reset()
+    solve_times = []
+
+    # 4. Closed loop
+    while not sim.is_done():
+        result = planner.plan()
+        solve_times.append(result.solve_time_ms)
+
+        sim_state = sim.step(result.first_control)
+
+        # Annotate SimState with planner costs
+        sim_state.bcvf_cost = result.bcvf_cost
+        sim_state.perf_cost = result.perf_cost
+        sim_state.total_cost = result.total_cost
+
+    # 5. Aggregate
+    history = sim.get_history()
+    return RunResult(
+        history=history,
+        collision=any(s.collision for s in history),
+        collision_step=next((s.step for s in history if s.collision), None),
+        total_steps=len(history) - 1,
+        total_time=(len(history) - 1) * self._config.sim.dt,
+        mean_perf_cost=np.mean([s.perf_cost for s in history[1:]]),
+        mean_bcvf_cost=np.mean([s.bcvf_cost for s in history[1:]]),
+        mean_solve_time_ms=np.mean(solve_times),
+        max_solve_time_ms=np.max(solve_times),
+        p99_solve_time_ms=np.percentile(solve_times, 99),
+        effective_samples_mean=np.mean([...]),  # from planner diagnostics
+    )
+```
+
+**Failure injection timing:** The `FailureConfig.onset_time` field controls
+when during the episode the failure activates. The runner does not manage this —
+the predictor's `apply_failure()` checks the current simulation time against
+`onset_time` internally (per Phase 2 spec). The runner just passes the
+`FailureConfig` to each predictor at setup time.
+
+#### 3C.4 Config Loading
+
+Load `RunConfig` from the YAML file defined in Phase 0 (`default_se2.yaml`)
+plus optional overrides.
+
+```python
+def load_config(
+    config_path: str = "configs/bcvf_autonomous/default_se2.yaml",
+    overrides: Optional[Dict[str, Any]] = None,
+) -> RunConfig:
+    """
+    Load RunConfig from YAML with optional overrides.
+
+    Overrides are dot-separated paths:
+        {"mppi.num_rollouts": 500, "bcvf.lambda_c": 2.0}
+    """
+    ...
+```
+
+**Implementation:** Read YAML with `yaml.safe_load`, walk the nested dict to
+populate dataclass fields. Apply overrides by splitting on `.` and setting the
+nested field. This keeps the config surface flat for the Phase 4 sweep scripts.
+
+**Dependency:** PyYAML. This is the only non-NumPy dependency in V1. It is
+already present in the broader `symbolu` repo (used by existing config files
+in `configs/`). If it is not installed, `load_config` raises `ImportError`
+with a message; all other modules work without it.
+
+**Override examples for Phase 4 sweeps:**
+
+```python
+# Lambda_c sweep
+config = load_config(overrides={"bcvf.lambda_c": 5.0})
+
+# Ablation: 0th-order
+config = load_config(overrides={"bcvf.cost_order": "ZEROTH"})
+
+# Reduce rollouts for fast iteration
+config = load_config(overrides={"mppi.num_rollouts": 200})
+```
+
+#### 3C.5 Road and Obstacle Construction from Config
+
+The YAML config specifies road type and obstacle positions. `load_config`
+translates these into `Road` and `Obstacle` objects:
+
+```yaml
+# Added to default_se2.yaml for Phase 3C:
+environment:
+  road_type: straight         # straight | curved | urban
+  road_length: 200.0          # meters (for straight)
+  road_radius: 100.0          # meters (for curved)
+  obstacles: []               # list of {x, y, radius}
+```
+
+```python
+def _build_road(env_config: dict) -> Road:
+    road_type = env_config.get("road_type", "straight")
+    if road_type == "straight":
+        return make_straight_road(env_config.get("road_length", 200.0))
+    elif road_type == "curved":
+        return make_curved_road(env_config.get("road_radius", 100.0))
+    elif road_type == "urban":
+        return make_urban_road()
+    ...
+
+def _build_obstacles(env_config: dict) -> List[Obstacle]:
+    return [Obstacle(**obs) for obs in env_config.get("obstacles", [])]
+```
+
+#### 3C.6 Timing Validation
+
+The timing benchmark validates the Phase 0 budget: one MPPI planning cycle must
+complete in <20ms on a single CPU core at K=1000, H=50, M=4 with anchor
+pairing.
+
+**Why 20ms, not the 50Hz = 20ms total?** The planner is the dominant cost. The
+simulator step, predictor state update, and bookkeeping are negligible (<1ms
+combined). Allocating the full 20ms to the planner leaves margin for overhead.
+
+**Benchmark approach:**
+
+```python
+def benchmark_planner(
+    config: RunConfig,
+    num_cycles: int = 100,
+) -> Dict[str, float]:
+    """
+    Run num_cycles planning iterations and report timing statistics.
+
+    Returns:
+        {
+            "mean_ms": float,
+            "p50_ms": float,
+            "p95_ms": float,
+            "p99_ms": float,
+            "max_ms": float,
+            "within_budget": bool,   # p99 < 20ms
+        }
+    """
+    ...
+```
+
+**What to measure:** Wall-clock time for `planner.plan()` only, excluding
+simulator step and bookkeeping. Use `time.perf_counter()` for sub-millisecond
+resolution.
+
+**Timing breakdown (expected for K=1000, H=50, M=4 anchor, NumPy on modern
+x86):**
+
+| Component                                | Expected Time | Notes                               |
+|------------------------------------------|---------------|--------------------------------------|
+| Control sampling (K x H x 2)            | ~0.5ms        | One vectorized `normal()` call       |
+| Predictor rollouts (K x M x H bicycle)  | ~12ms         | 200K bicycle steps (Option A loop)   |
+| BCVF batch scoring (K x 3 pairs x H)    | ~3ms          | Vectorized disagreement + gate + Huber |
+| J_perf batch scoring (K x H)            | ~1ms          | Lane projection + distance            |
+| Weight computation + weighted mean       | ~0.5ms        | Pure NumPy over (K,) arrays          |
+| **Total**                                | **~17ms**     | Within 20ms budget                   |
+
+**If timing fails:** The primary lever is `predict_batch()` on `BasePredictor`
+(Option B from Section 3B.7). Vectorizing the bicycle model across K rollouts
+reduces the predictor rollout from ~12ms to ~2ms, bringing total to ~7ms. This
+is the escalation path — implement Option B only if Option A exceeds budget.
+
+**Secondary levers (V2, not V1):**
+- Reduce K from 1000 to 500 (2x speedup, slight quality loss)
+- JAX JIT compilation of the full planning cycle (~10x speedup)
+- Reduce H from 50 to 30 (1.7x speedup, shorter prediction horizon)
+
+#### 3C.7 Diagnostic Output
+
+The runner produces structured diagnostic output for each episode, saved as
+a Python dict (serializable to JSON). This is the interface between Phase 3
+(execution) and Phase 4 (analysis).
+
+```python
+@dataclass
+class EpisodeDiagnostics:
+    """Structured diagnostics for one episode."""
+    # Config snapshot
+    config: Dict[str, Any]          # serialized RunConfig
+
+    # Outcome
+    collision: bool
+    collision_step: Optional[int]
+    total_steps: int
+
+    # Time series (per step)
+    ground_truth_trajectory: np.ndarray   # (T, 3) — [x, y, theta]
+    predictor_trajectories: Dict[str, np.ndarray]  # model_id -> (T, 3)
+    applied_controls: np.ndarray          # (T, 2) — [velocity, steering]
+    bcvf_costs: np.ndarray                # (T,)
+    perf_costs: np.ndarray                # (T,)
+    total_costs: np.ndarray               # (T,)
+
+    # Planner diagnostics (per step)
+    solve_times_ms: np.ndarray            # (T,)
+    effective_samples: np.ndarray         # (T,)
+
+    # Aggregates
+    mean_solve_time_ms: float
+    p99_solve_time_ms: float
+    path_length: float                    # total distance traveled
+    path_efficiency: float                # path_length / road_length
+    mean_lateral_deviation: float         # average distance from lane center
+    rms_lateral_jerk: float               # comfort metric
+```
+
+**`path_efficiency`:** Ratio of actual path length to optimal (road centerline)
+path length. A value of 1.0 means the vehicle followed the ideal path exactly.
+Values > 1.0 indicate detours (obstacle avoidance, BCVF-induced conservatism).
+Target from V3.1 Section 7.3: >= 0.95.
+
+**`rms_lateral_jerk`:** Root-mean-square of the third derivative of lateral
+position with respect to time. Computed from the ground-truth trajectory using
+finite differences. This is the comfort metric from V3.1 Section 7.3 — BCVF
+should not degrade ride comfort by more than 10% relative to baseline.
+
+**Serialization:** `EpisodeDiagnostics` has a `to_dict()` method that converts
+all numpy arrays to lists for JSON serialization. Phase 4 loads these dicts for
+aggregation and plotting.
+
+#### 3C.8 Config Update for Phase 3C
+
+Add the `environment` section to `default_se2.yaml`:
+
+```yaml
+# --- Environment ---
+environment:
+  road_type: straight
+  road_length: 200.0
+  road_radius: 100.0          # used only for curved roads
+  obstacles: []                # populated per-scenario in Phase 4
+```
+
+#### 3C.9 Test Specification
+
+Tests go in `bcvf_autonomous/tests/test_runner.py`.
+
+#### 3C.9.1 Integration Tests
+
+| Test                                     | What It Validates                                                    |
+|------------------------------------------|----------------------------------------------------------------------|
+| `test_full_episode_completes`            | Runner executes a full episode (straight road, no failures, no obstacles) without error. Returns `RunResult` with `total_steps == max_steps`. |
+| `test_episode_with_collision_terminates` | Obstacle placed on road center, no BCVF. Episode terminates early with `collision == True`. |
+| `test_bcvf_prevents_collision`           | Same obstacle scenario but with BCVF enabled and LiDAR failure injected. Vehicle avoids collision (the BCVF signal steers the planner away from the failing model's prediction). |
+| `test_config_loading`                    | `load_config("default_se2.yaml")` produces a valid `RunConfig` with expected default values. |
+| `test_config_overrides`                  | `load_config(overrides={"bcvf.lambda_c": 5.0})` produces config with `lambda_c == 5.0`, all other values at defaults. |
+| `test_config_dot_path_nested`            | Override with deep path `"mppi.noise_std"` correctly sets nested field. |
+| `test_episode_diagnostics_shapes`        | `EpisodeDiagnostics` arrays have consistent shapes: all time-series arrays have length == total_steps. |
+| `test_diagnostics_serializable`          | `diagnostics.to_dict()` produces a dict that survives `json.dumps` / `json.loads` round-trip. |
+| `test_deterministic_episodes`            | Two `Runner` instances with same config produce identical `RunResult` (same collision, same path length, same cost time series). |
+| `test_failure_onset_timing`              | Failure with `onset_time=5.0` produces zero BCVF cost before step 50 (5s / 0.1s) and positive cost after. |
+
+#### 3C.9.2 Timing Benchmark
+
+| Test                                     | What It Validates                                                    |
+|------------------------------------------|----------------------------------------------------------------------|
+| `test_planner_timing_budget`             | `benchmark_planner` with K=1000, H=50, M=4 anchor: p99 < 20ms. Mark as `@pytest.mark.slow` — skipped in normal test runs, run explicitly for performance validation. |
+| `test_planner_timing_reduced`            | Same benchmark with K=200, H=30: p99 < 5ms. Runs in normal test suite as a fast sanity check that nothing is catastrophically slow. |
+
+**pytest marker:** Timing tests are non-deterministic (depend on hardware).
+Use `@pytest.mark.slow` for the full budget test so CI runs the fast variant
+only. The full benchmark is run manually before milestone reviews.
+
+#### 3C.10 Design Constraints
+
+1. **Runner is stateless across episodes.** Each `run()` call creates fresh
+   predictors, simulator, and planner from config. No state leaks between
+   episodes. This is critical for the Phase 4 sweep protocol, which runs
+   hundreds of episodes with varying parameters.
+
+2. **Config is immutable during execution.** `RunConfig` is frozen after
+   `load_config`. The runner does not modify config at runtime. Sweeps create
+   new configs per run, they do not mutate a shared config.
+
+3. **Diagnostics are comprehensive but raw.** The runner records everything;
+   Phase 4 computes derived metrics (collision rate, early warning time,
+   statistical tests). No analysis in the runner.
+
+4. **No parallelism in V1.** Episodes run sequentially. The Phase 4 sweep
+   of 7,000 episodes at ~10s each is ~20 hours sequential. Parallelism across
+   episodes (multiprocessing) is a Phase 5 packaging concern, not a Phase 3
+   concern. The stateless-runner design makes this trivially parallelizable
+   when needed.
+
+#### 3C.11 Acceptance Criteria for Sub-section 3C
+
+- [ ] `runner.py` implements `Runner`, `RunConfig`, `RunResult`, `EpisodeDiagnostics`
+- [ ] `load_config` reads `default_se2.yaml` and applies dot-path overrides
+- [ ] Full episode completes on straight road with no errors
+- [ ] Episode with obstacle terminates on collision
+- [ ] BCVF-enabled episode avoids collision that baseline hits
+- [ ] Failure onset timing is respected (zero BCVF cost before onset)
+- [ ] `EpisodeDiagnostics.to_dict()` round-trips through JSON
+- [ ] Deterministic replay: same config = same result
+- [ ] Timing benchmark (K=200, H=30) passes p99 < 5ms in normal test suite
+- [ ] Full timing benchmark (K=1000, H=50) passes p99 < 20ms (manual run)
+
+#### 3C.12 Phase 3 Acceptance Criteria (All Sub-sections)
+
+Phase 3 is complete when all of 3A, 3B, and 3C acceptance criteria are met,
+plus the following end-to-end integration check:
+
+- [ ] A single `Runner.run()` call on `default_se2.yaml` with no failures
+  completes a 200-step episode, vehicle stays on road, no collision, BCVF
+  cost near zero, solve time within budget
+- [ ] Same run with `failures: {M2: {active: true, onset_time: 5.0, severity: 1.0}}`
+  shows BCVF cost spike at t=5s and vehicle avoidance behavior
+- [ ] `default_se2.yaml` updated with `environment` section
+
+#### 3C.13 What Phase 3 Does NOT Build
+
+- Scenario definitions (which failures, when, on which road) — Phase 4
+- Statistical analysis, aggregation across runs, plots — Phase 4
+- Sweep orchestration (lambda_c sweep, ablation matrix) — Phase 4
+- CLI entry point (`run_experiments.py`) — Phase 4
+- Packaging, demo notebooks, adapter interfaces — Phase 5
+
+---
+
+_End of Phase 3. Phase 4 (Scenario and Metrics Harness) will be appended after
+Phase 3 implementation is complete._
