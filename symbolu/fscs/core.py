@@ -185,7 +185,10 @@ class FSCSConfig:
     # the entire second self_attn call — making the coarse branch
     # dramatically cheaper than the windowed operator at every gate
     # fraction.
-    use_ema_cache: bool = False
+    use_ema_cache: bool = False       # Global override: ALL layers use EMA cache
+    use_per_band_coarse: bool = False # Per-band differentiation (§9):
+                                      #   Global+Mid → EMA cache
+                                      #   Local → windowed attention
     ema_cache_beta: float = 0.9      # β in: cache_t = β·cache_{t-1} + (1-β)·out_full_t
                                       # Higher β = slower update, longer memory.
                                       # Spec §9.1 recommends 0.8-0.95.

@@ -208,6 +208,17 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--use-per-band-coarse", action="store_true",
+        help=(
+            "Per-band coarse operator differentiation (spec §9): "
+            "Global+Mid bands use EMA cache (long-range context), "
+            "Local band uses windowed attention (local syntax). "
+            "This is the architecturally-correct configuration and "
+            "is mutually exclusive with --use-ema-cache (which forces "
+            "ALL bands to use EMA cache)."
+        ),
+    )
+    p.add_argument(
         "--use-ema-cache", action="store_true",
         help=(
             "Use EMA-cache coarse operator (§9.1) instead of the "
@@ -408,6 +419,8 @@ def run_sweep(args: argparse.Namespace) -> Dict[str, Any]:
         _cfg_kwargs["delta_residual"] = args.coherence_delta
     if args.hard_threshold is not None:
         _cfg_kwargs["hard_route_threshold"] = args.hard_threshold
+    if args.use_per_band_coarse:
+        _cfg_kwargs["use_per_band_coarse"] = True
     if args.use_ema_cache:
         _cfg_kwargs["use_ema_cache"] = True
     if args.ema_cache_beta is not None:

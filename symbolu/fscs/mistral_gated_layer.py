@@ -134,11 +134,39 @@ class FSCSGatedDecoderLayer(nn.Module):
         self.layer_cap = FSCSLayerCap(cfg)
         self.surprise_suppressor = FSCSSurpriseDeltaSuppressor(cfg)
 
-        # EMA-cache coarse operator (§9.1). When enabled, replaces the
-        # windowed self_attn call with a running EMA of the full branch
-        # output. This gives the coarse branch access to long-range
-        # context that the windowed operator loses.
-        self.use_ema_cache = bool(getattr(cfg, "use_ema_cache", False))
+        # EMA-cache coarse operator (§9.1). Three activation modes:
+        #
+        # 1. cfg.use_ema_cache = True (global override):
+        #    ALL layers use EMA cache regardless of band. This is
+        #    the mode used for the v5_ema_cache.json measurement.
+        #
+        # 2. cfg.use_per_band_coarse = True (recommended, spec §9):
+        #    Band-differentiated coarse operators:
+        #      Global band → EMA cache  (long-range context)
+        #      Mid band    → EMA cache  (paragraph structure)
+        #      Local band  → windowed attention (local syntax)
+        #    This gives each band the operator matched to its function.
+        #
+        # 3. Both False (default):
+        #    ALL layers use windowed attention. This is the baseline
+        #    used in v3_window256.json and v3_window1024.json.
+        use_per_band = bool(getattr(cfg, "use_per_band_coarse", False))
+        use_global_ema = bool(getattr(cfg, "use_ema_cache", False))
+
+        if use_global_ema:
+            # Mode 1: all layers use EMA cache
+            self.use_ema_cache = True
+        elif use_per_band:
+            # Mode 2: band-differentiated
+            # Global and Mid bands get EMA cache (they handle long-range
+            # and paragraph-level context). Local band gets windowed
+            # attention (handles local syntax where exact recent context
+            # matters more than smoothed history).
+            self.use_ema_cache = (band in ("global", "mid"))
+        else:
+            # Mode 3: all layers use windowed attention
+            self.use_ema_cache = False
+
         if self.use_ema_cache:
             self.ema_cache: Optional[nn.Module] = FSCSEMACache(cfg)
         else:
