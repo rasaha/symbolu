@@ -196,6 +196,18 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--load-fscs-checkpoint", type=str, default=None,
+        help=(
+            "Path to a checkpoint saved by scripts/train_fscs_alignment.py. "
+            "Loads the trained coarse-adapter weights into the "
+            "MistralFSCSWrapper before running the sweep. Without this "
+            "flag, the sweep runs against a freshly-initialized (untrained) "
+            "adapter, which is the frozen-backbone baseline. With this "
+            "flag, the sweep measures the post-training r* and you can "
+            "compare against results/fscs_rstar/v3_audited.json."
+        ),
+    )
+    p.add_argument(
         "--eval-batch-size", type=int, default=1,
         help=(
             "Mini-batch size for the eval forward pass. Default 1 "
@@ -379,6 +391,23 @@ def run_sweep(args: argparse.Namespace) -> Dict[str, Any]:
         _cfg_kwargs["delta_residual"] = args.coherence_delta
     if args.hard_threshold is not None:
         _cfg_kwargs["hard_route_threshold"] = args.hard_threshold
+    # If a trained checkpoint is being loaded, enable the coarse adapter
+    # so the wrapper creates adapter modules to load the weights into.
+    # The checkpoint was trained with use_coarse_adapter=True; without
+    # this, the wrapper creates layers with no adapter and there is
+    # nothing to load the checkpoint INTO.
+    if args.load_fscs_checkpoint:
+        _cfg_kwargs["use_coarse_adapter"] = True
+        # Read d_inner from the checkpoint's saved args if available
+        try:
+            _ckpt_peek = torch.load(args.load_fscs_checkpoint, map_location="cpu")
+            _ckpt_args = _ckpt_peek.get("args", {})
+            if "coarse_adapter_d_inner" in _ckpt_args:
+                _cfg_kwargs["coarse_adapter_d_inner"] = _ckpt_args["coarse_adapter_d_inner"]
+                print(f"    (checkpoint d_inner: {_ckpt_args['coarse_adapter_d_inner']})")
+        except Exception:
+            pass  # Proceed with default d_inner; load_state_dict will
+                  # catch any shape mismatch.
     cfg = FSCSConfig(**_cfg_kwargs)
 
     # Log the calibration for the record. These lines appear in the
@@ -408,6 +437,30 @@ def run_sweep(args: argparse.Namespace) -> Dict[str, Any]:
     print(f"    Backbone device: {device}")
     print(f"    Number of gated layers: {len(wrapper.gated_layers)}")
     print(f"    FSCS trainable params: {wrapper.fscs_trainable_parameters()}")
+
+    # ---- Load trained checkpoint if provided -------------------------
+    if args.load_fscs_checkpoint:
+        ckpt_path = args.load_fscs_checkpoint
+        print(f"\n    Loading trained FSCS checkpoint: {ckpt_path}")
+        ckpt = torch.load(ckpt_path, map_location="cpu")
+        state = ckpt.get("trainable_state_dict", {})
+        loaded_count = 0
+        for i, gl in enumerate(wrapper.gated_layers):
+            if gl.coarse_adapter is not None:
+                prefix = f"layer_{i}.coarse_adapter."
+                sd = {
+                    k[len(prefix):]: v
+                    for k, v in state.items()
+                    if k.startswith(prefix)
+                }
+                if sd:
+                    gl.coarse_adapter.load_state_dict(sd)
+                    loaded_count += 1
+        print(f"    Loaded adapter weights into {loaded_count} layers")
+        if loaded_count == 0:
+            print("    WARNING: no adapter weights found in checkpoint. "
+                  "The sweep will run against an untrained adapter, "
+                  "which is the frozen-backbone baseline.", flush=True)
 
     print("\n[2/4] Tokenizing eval set…")
     eval_ids = load_eval_tokens(
