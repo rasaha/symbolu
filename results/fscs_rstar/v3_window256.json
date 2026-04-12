@@ -1,0 +1,88 @@
+{
+  "_provenance": {
+    "captured_from": "terminal log, post-hoc reconstruction from conversation",
+    "captured_by": "Claude Code / session 01ABUFjbzb8RgXD2tLR8SAxS",
+    "captured_at": "2026-04-11",
+    "captured_why": "Sweep executed against 64-sample WikiText-2 at coarse_window=256 with V3 calibration on frozen Mistral-7B bf16. The JSON was written to /tmp on the operator's container; this file is a post-hoc reconstruction from the terminal log so the measurements are tracked in-repo. Numbers match the log to the precision the log displayed (4 decimal places for ppl, 3 for gate_fraction).",
+    "harness_commit": "1438d1b (FSCS V3 coherence + hard-threshold calibration)",
+    "wrapper_commit": "256e5eb (FSCSGatedDecoderLayer returns tensor, HF>=4.46 convention)",
+    "control_plane_dtype": "bf16 (pre-audit; see v3_audited.json for the float32 re-measurement)"
+  },
+  "config": {
+    "model": "mistralai/Mistral-7B-v0.3",
+    "quantize": "bf16",
+    "eval_dataset": "wikitext2",
+    "max_eval_samples": 64,
+    "seq_len": 2048,
+    "coarse_window": 256,
+    "num_layers": 32,
+    "fscs_trainable_params": 64,
+    "eval_batch_size": 16,
+    "calibration": {
+      "tau_global": 0.5,
+      "tau_mid": 0.3,
+      "tau_local": 0.1,
+      "alpha_sharpness": 10.0,
+      "beta_max_inference": 0.7,
+      "gamma": 1.0,
+      "delta_residual": 0.5,
+      "ema_decay": 0.4,
+      "hard_route_threshold": 0.5
+    }
+  },
+  "baseline": {
+    "ppl": 5.1525,
+    "wall_seconds": 25.98,
+    "gate_fraction": 0.001
+  },
+  "sweep": [
+    {
+      "tau": 0.90,
+      "soft": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.002, "wall_seconds": 25.78},
+      "hard": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.000, "wall_seconds": 25.40}
+    },
+    {
+      "tau": 0.80,
+      "soft": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.005, "wall_seconds": 25.54},
+      "hard": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.000, "wall_seconds": 25.40}
+    },
+    {
+      "tau": 0.70,
+      "soft": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.013, "wall_seconds": 25.45},
+      "hard": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.000, "wall_seconds": 25.39}
+    },
+    {
+      "tau": 0.60,
+      "soft": {"ppl": 5.1625, "delta_pct": 0.19, "gate_fraction": 0.032, "wall_seconds": 25.51},
+      "hard": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.000, "wall_seconds": 25.35}
+    },
+    {
+      "tau": 0.50,
+      "soft": {"ppl": 5.1929, "delta_pct": 0.78, "gate_fraction": 0.078, "wall_seconds": 25.43},
+      "hard": {"ppl": 5.1525, "delta_pct": 0.00, "gate_fraction": 0.001, "wall_seconds": 25.36}
+    },
+    {
+      "tau": 0.40,
+      "soft": {"ppl": 5.7483, "delta_pct": 11.57, "gate_fraction": 0.180, "wall_seconds": 25.54},
+      "hard": {"ppl": 5.1827, "delta_pct": 0.59, "gate_fraction": 0.013, "wall_seconds": 25.45}
+    },
+    {
+      "tau": 0.30,
+      "soft": {"ppl": 9.9542, "delta_pct": 93.19, "gate_fraction": 0.371, "wall_seconds": 25.57},
+      "hard": {"ppl": 6.5013, "delta_pct": 26.18, "gate_fraction": 0.171, "wall_seconds": 25.32}
+    },
+    {
+      "tau": 0.20,
+      "soft": {"ppl": 15.3006, "delta_pct": 196.96, "gate_fraction": 0.509, "wall_seconds": 25.43},
+      "hard": {"ppl": 23.7032, "delta_pct": 359.96, "gate_fraction": 0.666, "wall_seconds": 25.28}
+    }
+  ],
+  "r_star": 0.031594816100550815,
+  "verdict": {
+    "label": "NO-GO",
+    "r_star": 0.031594816100550815,
+    "best_wall_speedup_pct": 2.1,
+    "worst_delta_pct": 196.96,
+    "notes": "NO-GO is mechanically correct at r*=3.2% but reflects the known failure mode from spec §5.4 ablation row 'no alignment loss: coarse path untrained'. See v3_window1024.json for the same calibration with a wider coarse window, which pushes r* to ~8%."
+  }
+}
