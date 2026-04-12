@@ -374,6 +374,13 @@ class KVCachePolicy:
         self._ema_count = 0   # number of attention updates
         self._entity_k = 2.0  # entity = ema > global_mean * k
 
+        # Track whether any enhanced (Stage 1-3) signals are enabled.
+        # When True, select_victims() skips the filler fast path and
+        # always uses the sampled path with full score_block() calls,
+        # because the fast path sorts by frequency only and would
+        # bypass the signals the caller explicitly asked for.
+        self._enhanced_signals_active: bool = False
+
         # Per-instance phase weights, initialized from the global defaults.
         # Override via set_boundary_weight() to enable Stage 1 without
         # modifying the ADR-0001 global weights.
@@ -419,6 +426,7 @@ class KVCachePolicy:
             cur_d.recency, cur_d.frequency, cur_d.attention,
             cur_d.position, boundary=dw, instability=cur_d.instability,
         )
+        self._enhanced_signals_active = True
 
     def set_instability_weight(
         self,
@@ -449,6 +457,7 @@ class KVCachePolicy:
             cur_d.recency, cur_d.frequency, cur_d.attention,
             cur_d.position, boundary=cur_d.boundary, instability=dw,
         )
+        self._enhanced_signals_active = True
 
     # ---- Sequence lifecycle -------------------------------------------------
 
@@ -889,13 +898,21 @@ class KVCachePolicy:
             return []
 
         # Fast path: enough all-filler blocks to satisfy the request.
-        filler_blocks = [bid for bid in available if self._is_all_filler(bid)]
-        if len(filler_blocks) >= count:
-            filler_blocks.sort(key=lambda b: self.freq_sketch.estimate(b))
-            self.stats["filler_evictions"] += min(count, len(filler_blocks))
-            return filler_blocks[:count]
+        # This path sorts by frequency ONLY and does not call score_block(),
+        # so it bypasses the Stage 1-3 FSCS-derived signals entirely.
+        # When enhanced signals are active, we skip the fast path and
+        # always use the sampled path with full scoring, because the
+        # caller explicitly asked for boundary/band/instability signals
+        # to influence eviction decisions — which they cannot do if
+        # score_block() is never called.
+        if not self._enhanced_signals_active:
+            filler_blocks = [bid for bid in available if self._is_all_filler(bid)]
+            if len(filler_blocks) >= count:
+                filler_blocks.sort(key=lambda b: self.freq_sketch.estimate(b))
+                self.stats["filler_evictions"] += min(count, len(filler_blocks))
+                return filler_blocks[:count]
 
-        # Sampled path.
+        # Sampled path — full scoring including all enabled signals.
         sample_size = min(48, len(available))
         candidates = self._rng.sample(list(available), sample_size)
 
