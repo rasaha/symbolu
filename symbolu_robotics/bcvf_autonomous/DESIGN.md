@@ -3437,5 +3437,508 @@ plus the following end-to-end validation:
 
 ---
 
-_End of Phase 4. Phase 5 (Packaging) will be appended after Phase 4
-implementation is complete._
+## Phase 5 — Packaging
+
+### 5.1 Purpose
+
+Phase 5 turns the validated engineering artifact from Phases 1-4 into a
+presentable product: a package that autonomy teams can evaluate, a set of
+figures that demonstrate BCVF's value, and integration hooks for future
+expansion. Phase 5 does not build new capabilities — it wraps and presents
+what Phases 1-4 built.
+
+The product form for V1 is:
+
+> **BCVF for planner evaluation and simulation** — a tool that lets autonomy
+> teams measure and penalize structural cross-model instability in trajectory
+> selection.
+
+### 5.2 Deliverables
+
+| Deliverable                    | File / Location                       | Purpose                                    |
+|--------------------------------|---------------------------------------|--------------------------------------------|
+| Package `__init__.py`          | `bcvf_autonomous/__init__.py`         | Public API surface with version             |
+| Plotting module                | `bcvf_autonomous/plotting.py`         | Generate the 4 key figures from results     |
+| Updated config                 | `configs/bcvf_autonomous/default_se2.yaml` | Finalized defaults after Phase 4 tuning |
+| Parent module registration     | `symbolu_robotics/__init__.py`        | Announce bcvf_autonomous as a product line  |
+| Test suite entry point         | `bcvf_autonomous/tests/conftest.py`   | Shared fixtures for pytest                  |
+
+### 5.3 Public API
+
+The `__init__.py` updated in Phase 5 exposes a clean public surface. A user
+should be able to import the essential pieces without navigating the internal
+module structure.
+
+```python
+"""
+BCVF for Autonomous Systems
+============================
+
+Second-order cross-model coherence regularizer for multi-model predictive
+control. Implements the BCVF V3.1 specification.
+
+Quick start:
+    from symbolu_robotics.bcvf_autonomous import (
+        compute_bcvf_cost,
+        compute_bcvf_cost_batch,
+        BCVFConfig,
+        BCVFResult,
+        SE2Pose,
+        body_frame_error,
+        MPPIPlanner,
+        MPPIConfig,
+        create_predictor_set,
+        Runner,
+        RunConfig,
+    )
+
+Run experiments:
+    python -m symbolu_robotics.bcvf_autonomous.run_experiments --quick
+"""
+
+__version__ = "0.1.0"
+
+# Core math (Phase 1)
+from symbolu_robotics.bcvf_autonomous.core import (
+    compute_bcvf_cost,
+    compute_bcvf_cost_batch,
+    BCVFConfig,
+    BCVFResult,
+    CostOrder,
+)
+from symbolu_robotics.bcvf_autonomous.manifold import (
+    SE2Pose,
+    body_frame_error,
+    compose,
+    inverse,
+    log_map,
+    wrap_angle,
+)
+
+# Predictors (Phase 2)
+from symbolu_robotics.bcvf_autonomous.predictors import create_predictor_set
+from symbolu_robotics.bcvf_autonomous.predictors.base import (
+    BasePredictor,
+    BicycleConfig,
+    PredictorState,
+    FailureConfig,
+)
+
+# Planner (Phase 3)
+from symbolu_robotics.bcvf_autonomous.mppi_planner import (
+    MPPIPlanner,
+    MPPIConfig,
+    MPPIResult,
+    PerfCostConfig,
+)
+
+# Runner (Phase 3)
+from symbolu_robotics.bcvf_autonomous.runner import (
+    Runner,
+    RunConfig,
+    RunResult,
+)
+
+# Scenarios (Phase 4)
+from symbolu_robotics.bcvf_autonomous.scenarios import (
+    SCENARIOS,
+    get_scenario,
+    list_scenarios,
+    ScenarioConfig,
+)
+```
+
+**API stability commitment:** The symbols listed above are the public API for
+V1. Internal functions (leading underscore, or not listed here) may change
+between versions. The public API will follow semantic versioning starting at
+0.1.0.
+
+### 5.4 Plotting Module
+
+**File:** `bcvf_autonomous/plotting.py` (~150 lines)
+
+The V3.1 document (Appendix E.10) specifies 4 key figures for minimum viable
+submission. This module generates them from the results directory produced by
+Phase 4C.
+
+**Dependency:** `matplotlib`. This is the only dependency beyond NumPy and
+PyYAML in V1. It is imported lazily — `plotting.py` works only if matplotlib
+is installed, and all other modules work without it. If matplotlib is missing,
+importing `plotting` raises `ImportError` with a message.
+
+```python
+def generate_all_figures(
+    results_dir: str = "results",
+    output_dir: str = "results/figures",
+    format: str = "png",
+    dpi: int = 150,
+) -> List[str]:
+    """
+    Generate all 4 key figures from experiment results.
+
+    Returns list of saved file paths.
+    """
+    ...
+```
+
+#### Figure 1 — Ablation Bar Chart
+
+```python
+def plot_ablation_comparison(
+    results_dir: str,
+    output_path: str,
+    **kwargs,
+) -> str:
+    """
+    Bar chart: collision rate by variant across failure scenarios.
+
+    X-axis: scenarios (S2-S6)
+    Y-axis: collision rate (0-1)
+    Bars: A0 (baseline), A1 (0th), A2 (1st), A3 (BCVF)
+    Error bars: Wilson 95% CI
+
+    This is the headline figure — it shows BCVF prevents collisions
+    that baseline and lower-order variants do not.
+    """
+    ...
+```
+
+Layout: grouped bar chart, 5 scenario groups, 4 bars each. Color scheme:
+A0 = gray, A1 = light blue, A2 = medium blue, A3 = dark blue. Error bars from
+Wilson CI. S1 excluded (all variants have ~0 collision rate).
+
+#### Figure 2 — Lambda_c Sweep Curves
+
+```python
+def plot_lambda_sweep(
+    results_dir: str,
+    output_path: str,
+    **kwargs,
+) -> str:
+    """
+    Multi-panel line plot: metrics vs lambda_c.
+
+    One panel per metric: collision rate, path efficiency, RMS jerk,
+    early warning time, solve time.
+    X-axis: lambda_c (log scale)
+    Lines: one per failure scenario (S2-S6)
+
+    Shows the Pareto trade-off: higher lambda_c = more safety,
+    less efficiency, more compute.
+    """
+    ...
+```
+
+Layout: 2x3 subplot grid (5 metrics + 1 legend panel). X-axis is log-scaled.
+Each line is one scenario. This figure identifies the Pareto-optimal lambda_c
+range.
+
+#### Figure 3 — Time-Series Plot (Single Scenario)
+
+```python
+def plot_time_series(
+    results_dir: str,
+    scenario: str,
+    output_path: str,
+    run_index: int = 0,
+    **kwargs,
+) -> str:
+    """
+    4-panel time-series plot for one episode of one failure scenario.
+
+    Panel 1: disagreement magnitude ||e(k)|| for each model pair
+    Panel 2: disagreement velocity ||v(k)||
+    Panel 3: disagreement acceleration ||a(k)|| — the BCVF signal
+    Panel 4: J_BCVF cost over time
+
+    Vertical dashed line at failure onset time.
+
+    This figure shows the core innovation in action: e grows, v grows,
+    but a spikes early — BCVF detects the structural instability before
+    the disagreement magnitude becomes large.
+    """
+    ...
+```
+
+Layout: 4 vertically stacked panels sharing an x-axis (time in seconds).
+Default scenario: S6 (glass corridor) because it produces the clearest
+signal. Vertical dashed line at failure onset.
+
+**Data source:** This figure requires the per-step predictor trajectories from
+`EpisodeDiagnostics`. The disagreement, velocity, and acceleration are
+recomputed from the stored trajectories using the Phase 1 functions. This
+keeps the plotting module decoupled from the planner internals.
+
+#### Figure 4 — Bias Tolerance Comparison
+
+```python
+def plot_bias_tolerance(
+    results_dir: str,
+    output_path: str,
+    **kwargs,
+) -> str:
+    """
+    3-panel comparison for S5 (constant bias scenario).
+
+    Panel 1: 0th-order cost over time (elevated — false positive)
+    Panel 2: 1st-order cost over time (zero after transient)
+    Panel 3: 2nd-order BCVF cost over time (zero throughout)
+
+    This figure visually demonstrates Lemma 1: constant disagreement
+    produces zero BCVF cost but nonzero 0th-order cost.
+    """
+    ...
+```
+
+Layout: 3 vertically stacked panels. Same y-scale across all 3 for direct
+visual comparison. Panel 1 should show a constant elevated cost (the false
+positive). Panel 3 should be flat at zero. This is the figure that makes
+the invariance argument tangible.
+
+### 5.5 Parent Module Registration
+
+Update `symbolu_robotics/__init__.py` to acknowledge the new product line.
+This is a minimal, non-breaking addition.
+
+```python
+# At the end of the existing __init__.py, add:
+
+# BCVF for Autonomous Systems (new product line)
+# Import conditionally — bcvf_autonomous has its own dependency surface
+try:
+    from symbolu_robotics.bcvf_autonomous import __version__ as bcvf_autonomous_version
+except ImportError:
+    bcvf_autonomous_version = None
+```
+
+Add `"bcvf_autonomous_version"` to `__all__`. This lets consumers check
+whether `bcvf_autonomous` is available without hard-failing if it is not
+installed.
+
+Update the module docstring to include:
+
+```python
+"""
+Symbolu Robotics & Autonomous AI Module
+========================================
+
+Adapts the Symbolu ontological engine for autonomous AI systems including
+robotics, drones, and autonomous vehicles.
+
+Product Lines:
+    - Core Robotics: 3-tier control, safety, planning (existing)
+    - BCVF Autonomous: Second-order cross-model coherence regularizer
+      for multi-model predictive control (new, V1)
+...
+"""
+```
+
+### 5.6 Test Fixtures
+
+**File:** `bcvf_autonomous/tests/conftest.py` (~60 lines)
+
+Shared pytest fixtures used across test modules:
+
+```python
+import pytest
+import numpy as np
+from symbolu_robotics.bcvf_autonomous.manifold import SE2Pose
+from symbolu_robotics.bcvf_autonomous.core import BCVFConfig
+from symbolu_robotics.bcvf_autonomous.predictors.base import BicycleConfig
+from symbolu_robotics.bcvf_autonomous.predictors import create_predictor_set
+
+
+@pytest.fixture
+def default_bcvf_config():
+    """Default BCVFConfig matching default_se2.yaml."""
+    return BCVFConfig(
+        lambda_c=1.0,
+        gate_threshold=0.1,
+        gate_beta=200.0,
+        huber_delta=0.5,
+        lever_arm=2.5,
+        weight_matrix=np.array([1.0, 1.0, 1.0]),
+        use_anchor_pairing=True,
+        anchor_index=0,
+        dt=0.1,
+    )
+
+@pytest.fixture
+def default_bicycle_config():
+    """Default BicycleConfig matching default_se2.yaml."""
+    return BicycleConfig(
+        wheelbase=2.7,
+        max_steering=0.6,
+        max_velocity=15.0,
+        max_acceleration=3.0,
+        dt=0.1,
+    )
+
+@pytest.fixture
+def predictor_set(default_bicycle_config):
+    """Standard 4-predictor set with deterministic seed."""
+    return create_predictor_set(default_bicycle_config, seed=42)
+
+@pytest.fixture
+def straight_control_sequence():
+    """50-step straight-line control: 8 m/s, zero steering."""
+    return np.column_stack([
+        np.full(50, 8.0),   # velocity
+        np.zeros(50),       # steering
+    ])
+
+@pytest.fixture
+def results_dir(tmp_path):
+    """Temporary results directory for test output."""
+    return str(tmp_path / "results")
+```
+
+### 5.7 Finalized Config
+
+After Phase 4 experiments complete, the `default_se2.yaml` config may need
+parameter adjustments based on empirical results (e.g., tuned lambda_c,
+adjusted gate threshold). Phase 5 updates the config with final values and
+adds a `version` field:
+
+```yaml
+# Added at top of default_se2.yaml:
+version: "0.1.0"
+description: "BCVF V1 defaults for SE(2) ground vehicle, tuned from Phase 4 experiments"
+```
+
+If Phase 4 experiments reveal that the default lambda_c=1.0 is not optimal,
+update it here. The sweep results (Figure 2) identify the Pareto-optimal
+range — pick the value that maximizes early warning time while keeping path
+efficiency >= 0.95.
+
+### 5.8 Final Repository Structure
+
+After Phase 5, the complete `bcvf_autonomous` directory looks like this:
+
+```
+symbolu_robotics/
+  bcvf_autonomous/
+    __init__.py                  # Public API, version 0.1.0         (Phase 5)
+    DESIGN.md                    # This document                      (Phase 0)
+    manifold.py                  # SE(2) Lie group operations          (Phase 1)
+    core.py                      # BCVF cost functional                (Phase 1)
+    predictors/
+      __init__.py                # create_predictor_set factory        (Phase 2)
+      base.py                    # BasePredictor + bicycle model       (Phase 2)
+      imu_odometry.py            # M1 (anchor)                        (Phase 2)
+      lidar_slam.py              # M2                                  (Phase 2)
+      visual_odometry.py         # M3                                  (Phase 2)
+      gnss_map.py                # M4                                  (Phase 2)
+    simulator.py                 # 2D kinematic environment            (Phase 3A)
+    mppi_planner.py              # MPPI with J_perf + J_BCVF           (Phase 3B)
+    runner.py                    # Closed-loop planning runner         (Phase 3C)
+    scenarios.py                 # 6 scenario definitions              (Phase 4A)
+    metrics.py                   # Per-episode + aggregate metrics     (Phase 4B)
+    run_experiments.py           # Sweep orchestrator + CLI            (Phase 4C)
+    plotting.py                  # 4 key figures                       (Phase 5)
+    tests/
+      __init__.py
+      conftest.py                # Shared fixtures                     (Phase 5)
+      test_manifold.py           # 11 tests                           (Phase 1)
+      test_core.py               # 13 tests + 3 numerical cases       (Phase 1)
+      test_predictors.py         # 15 tests                           (Phase 2)
+      test_simulator.py          # 7 tests                            (Phase 3A)
+      test_mppi.py               # 13 tests                           (Phase 3B)
+      test_runner.py             # 12 tests                           (Phase 3C)
+      test_scenarios.py          # 7 tests                            (Phase 4A)
+      test_metrics.py            # 16 tests                           (Phase 4B)
+      test_experiments.py        # 10 tests                           (Phase 4C)
+  configs/
+    bcvf_autonomous/
+      default_se2.yaml           # Finalized config                    (Phase 0 + 5)
+```
+
+**Totals:**
+- **13 production files**, ~1,540 lines
+- **10 test files** (including conftest), ~600 lines + fixtures
+- **~104 tests** across all phases
+- **1 config file**
+- **1 design document**
+
+### 5.9 Dependency Summary
+
+| Dependency  | Required By        | Required/Optional | Notes                          |
+|-------------|--------------------|--------------------|--------------------------------|
+| NumPy       | Everything         | Required           | Core computation               |
+| PyYAML      | runner.py          | Required           | Config loading                 |
+| matplotlib  | plotting.py        | Optional           | Lazy import; all other modules work without it |
+| pytest      | tests/             | Dev only           | Test runner                    |
+
+No scipy, no JAX, no PyTorch, no ROS2, no CARLA.
+
+### 5.10 V2 Roadmap (Out of Scope, Documented for Context)
+
+Phase 5 does not build these, but they are the natural next steps after V1
+validation:
+
+| V2 Feature                  | Depends On V1          | Estimated Effort |
+|-----------------------------|------------------------|------------------|
+| SE(3) manifold              | manifold.py extension  | 1 sprint         |
+| Quadrotor predictor set     | SE(3) + new predictors | 1 sprint         |
+| JAX-accelerated MPPI        | mppi_planner.py rewrite | 1 sprint        |
+| CARLA adapter               | simulator.py interface | 2 sprints        |
+| ROS2 node wrapper           | runner.py adaptation   | 1 sprint         |
+| Dynamic obstacle scenarios  | simulator.py extension | 1 sprint         |
+| Automatic anchor selection  | core.py + health metric | 1 sprint        |
+| Multi-process sweep runner  | run_experiments.py     | 0.5 sprint       |
+| CI integration (GitHub Actions) | test suite          | 0.5 sprint       |
+| Interactive dashboard       | plotting.py extension  | 1 sprint         |
+
+### 5.11 Test Specification
+
+Tests for Phase 5 additions go in existing test files or `conftest.py`.
+
+| Test                                     | What It Validates                                    | Location         |
+|------------------------------------------|------------------------------------------------------|------------------|
+| `test_public_api_importable`             | All symbols in `__init__.py` `__all__` import without error | `test_core.py` |
+| `test_version_string`                    | `bcvf_autonomous.__version__` is `"0.1.0"`           | `test_core.py`   |
+| `test_plotting_import_without_matplotlib` | `plotting.py` raises clear `ImportError` if matplotlib missing | `test_experiments.py` |
+| `test_plotting_generates_figures`        | With matplotlib, `generate_all_figures` produces 4 PNG files in output dir | `test_experiments.py` (slow) |
+| `test_parent_module_registration`        | `symbolu_robotics.bcvf_autonomous_version` is `"0.1.0"` | `test_core.py` |
+| `test_conftest_fixtures`                 | All fixtures in `conftest.py` instantiate without error | `test_core.py` |
+
+### 5.12 Acceptance Criteria
+
+Phase 5 — and V1 as a whole — is complete when:
+
+- [ ] `__init__.py` exports all public API symbols cleanly
+- [ ] `plotting.py` generates 4 figures from Phase 4 results
+- [ ] `conftest.py` provides shared fixtures used by 3+ test files
+- [ ] `symbolu_robotics/__init__.py` registers bcvf_autonomous
+- [ ] `default_se2.yaml` has finalized parameters from Phase 4 evidence
+- [ ] All ~104 tests pass
+- [ ] `python -m symbolu_robotics.bcvf_autonomous.run_experiments --quick` completes
+  end-to-end in < 3 minutes and produces `results/summary_table.json`
+- [ ] Figures 1-4 are generated and visually demonstrate:
+  - Fig 1: BCVF reduces collision rate vs baseline and lower-order variants
+  - Fig 2: Pareto trade-off between lambda_c and efficiency/safety
+  - Fig 3: Second-order signal detects instability before first-order magnitude
+  - Fig 4: Constant bias = zero BCVF cost (Lemma 1)
+
+---
+
+## Design Document Summary
+
+| Phase | Files | Est. Lines | Tests | Key Deliverable |
+|-------|-------|------------|-------|-----------------|
+| **0** | 3 skeleton + 1 config | 0 (structure only) | 0 | Scope lock |
+| **1** | 2 (manifold.py, core.py) | ~270 | 27 | Math kernel |
+| **2** | 5 (base.py + 4 predictors) | ~420 | 15 | Predictor framework |
+| **3** | 3 (simulator, planner, runner) | ~700 | 32 | Closed-loop system |
+| **4** | 3 (scenarios, metrics, experiments) | ~450 | 33 | Evidence |
+| **5** | 2 (plotting, conftest) + updates | ~210 | 6 | Product |
+| **Total** | **18 files** | **~2,050** | **~113** | |
+
+**Dependencies:** NumPy (required), PyYAML (required), matplotlib (optional),
+pytest (dev only).
+
+**Estimated execution:** 5 sprints, one phase per sprint.
+
+---
+
+_End of Design Document — BCVF for Autonomous Systems V1._
