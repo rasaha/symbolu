@@ -155,6 +155,13 @@ def replay(
                 args["block_id"],
                 args["sequence_id"],
                 list(args["positions"]),
+                # Stage 1-3 FSCS-derived signals (optional, default-off).
+                # Traces that predate these fields omit them; .get()
+                # returns the neutral default so old traces replay
+                # identically to before.
+                boundary_score=float(args.get("boundary_score", 0.0)),
+                band_class=float(args.get("band_class", 1.0)),
+                instability_hint=float(args.get("instability_hint", 0.0)),
             )
 
         elif kind is EventKind.ON_BLOCK_ATTENTION:
