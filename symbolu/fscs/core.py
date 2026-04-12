@@ -168,6 +168,28 @@ class FSCSConfig:
     # Windowed coarse operator (first-pass, §9 Local-band path)
     coarse_window: int = 256
 
+    # EMA-cache coarse operator (§9.1 Global-band path)
+    # When use_ema_cache=True, the coarse branch does NOT run windowed
+    # self_attn a second time. Instead, it uses a running exponential
+    # moving average of the full branch's attention output. This gives
+    # the coarse branch access to a compressed summary of ALL previous
+    # positions' contributions — exactly the information the windowed
+    # operator loses and the adapter cannot reconstruct.
+    #
+    # The EMA state is maintained per-layer and persists across
+    # positions within a sequence. It is reset at the start of each
+    # new sequence (or batch) by the wrapper.
+    #
+    # At inference (eval) time, the EMA cache costs essentially zero
+    # compute (one multiply-add per position per layer) and eliminates
+    # the entire second self_attn call — making the coarse branch
+    # dramatically cheaper than the windowed operator at every gate
+    # fraction.
+    use_ema_cache: bool = False
+    ema_cache_beta: float = 0.9      # β in: cache_t = β·cache_{t-1} + (1-β)·out_full_t
+                                      # Higher β = slower update, longer memory.
+                                      # Spec §9.1 recommends 0.8-0.95.
+
 
 # ============================================================================
 # §1 — Three-signal coherence
@@ -565,6 +587,109 @@ class FSCSLayerCap(nn.Module):
         threshold = topk_values[:, -1:].clamp(min=1e-6)          # [B, 1]
         mask = (pi >= threshold).float()                         # [B, N]
         return pi * mask
+
+
+# ============================================================================
+# §9.1 — EMA-cache coarse operator (Global-band path)
+# ============================================================================
+
+
+class FSCSEMACache(nn.Module):
+    """
+    EMA-cache coarse operator from Text-FSCS §9.1.
+
+    Maintains a running exponential moving average of the full branch's
+    attention output. When the FSCS gate routes a token to "coarse," the
+    EMA state is used AS the coarse output — no second self_attn call,
+    no windowed attention, no adapter.
+
+    This solves the fundamental limitation of the windowed coarse
+    operator: the window throws away tokens outside its range, and
+    no adapter can reconstruct what was lost. The EMA cache retains a
+    compressed summary of ALL previous positions' full-attention outputs,
+    so the coarse branch always has long-range context available.
+
+    Math:
+        cache_t = β · cache_{t-1} + (1 - β) · out_full_t
+
+    Where:
+        β = decay factor (0.8–0.95, higher = longer memory)
+        cache_t = EMA state at position t, shape [B, D]
+        out_full_t = full-branch attention output at position t, shape [B, D]
+
+    For the r* sweep, the EMA cache operates per-position across the
+    sequence dimension (causal). The cache state at position t is a
+    weighted summary of all full outputs from positions 0..t, with
+    exponentially decaying weights.
+
+    Properties:
+        - O(1) compute per position (one multiply-add)
+        - O(D) memory per layer (just the current state vector)
+        - Access to ALL previous positions (via exponential summary)
+        - No second self_attn call → real compute savings in Mode 3
+        - No trainable parameters (the full branch produces the inputs)
+    """
+
+    def __init__(self, cfg: FSCSConfig):
+        super().__init__()
+        self.beta = cfg.ema_cache_beta
+        # Cache state — initialized lazily on first forward call
+        # because we don't know D (d_model) at __init__ time.
+        self._cache: Optional[torch.Tensor] = None
+
+    def reset(self) -> None:
+        """Reset the cache state. Called by the wrapper at the start of
+        each new sequence / batch."""
+        self._cache = None
+
+    def forward(self, out_full: torch.Tensor) -> torch.Tensor:
+        """
+        Update the EMA cache with the full branch output and return
+        the current cache state as the coarse output.
+
+        Args:
+            out_full: [B, N, D] — full-branch attention output for the
+                      current forward pass. All N positions are processed
+                      causally (position t's cache state uses only
+                      positions 0..t).
+
+        Returns:
+            ema_output: [B, N, D] — per-position EMA cache state. At
+                        position t, this is the exponentially-weighted
+                        average of out_full at positions 0..t.
+        """
+        B, N, D = out_full.shape
+        beta = self.beta
+
+        # Lazy init — match the input's device and dtype
+        if self._cache is None:
+            # Initialize to the first position's output so the EMA
+            # doesn't start from zero (which would make the first
+            # few positions' cache output wildly different from out_full
+            # and cause a quality cliff at the start of every sequence).
+            self._cache = out_full[:, 0].clone()  # [B, D]
+
+        # Process each position causally. The cache at position t
+        # is updated with out_full at position t, then emitted as
+        # the coarse output for position t.
+        #
+        # This is an O(N) Python loop, same as the EMA in the
+        # coherence module. For production, this should be fused
+        # into a CUDA scan kernel. For the r* measurement it is
+        # fine (N=1024–2048, D=4096, the loop body is two bf16
+        # tensor multiply-adds which are memory-bound anyway).
+        ema_output = torch.empty_like(out_full)  # [B, N, D]
+
+        for t in range(N):
+            if t == 0 and self._cache is not None:
+                # First position: blend cache (from previous sequence
+                # or from the lazy init above) with current output
+                self._cache = beta * self._cache + (1 - beta) * out_full[:, 0]
+            else:
+                self._cache = beta * self._cache + (1 - beta) * out_full[:, t]
+            ema_output[:, t] = self._cache
+
+        return ema_output  # [B, N, D]
 
 
 # ============================================================================

@@ -473,9 +473,12 @@ class MistralFSCSWrapper(nn.Module):
         approximation is sufficient for the r* measurement and is
         simpler to implement correctly on top of HF's backbone forward).
         """
-        # Push input_ids into each gated layer for boundary detection
+        # Push input_ids into each gated layer for boundary detection,
+        # and reset EMA caches so each sequence starts fresh.
         for gl in self.gated_layers:
             gl.set_current_input_ids(input_ids)
+            if getattr(gl, "ema_cache", None) is not None:
+                gl.ema_cache.reset()
 
         # Strip cache-related kwargs before the backbone call.
         # The FSCS dual-branch forward calls self_attn twice per layer,

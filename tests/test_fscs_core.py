@@ -46,6 +46,7 @@ from symbolu.fscs.core import (
     FSCSBoundaryDetector,
     FSCSSurpriseDeltaSuppressor,
     FSCSLayerCap,
+    FSCSEMACache,
     FSCSCoarseAdapter,
     fscs_alignment_loss,
     fscs_band_contrast_loss,
@@ -453,6 +454,82 @@ class TestCoarseAdapter:
 # ============================================================================
 # USE U1: Phase correlation in coherence module
 # ============================================================================
+
+
+# ============================================================================
+# §9.1 — EMA-cache coarse operator
+# ============================================================================
+
+
+class TestEMACache:
+    """Tests for the EMA-cache coarse operator."""
+
+    def test_output_shape(self):
+        cfg = FSCSConfig(use_ema_cache=True, ema_cache_beta=0.9)
+        cache = FSCSEMACache(cfg)
+        out_full = torch.randn(B, N, D)
+        result = cache(out_full)
+        assert result.shape == (B, N, D)
+
+    def test_first_position_matches_input(self):
+        """At position 0, the EMA cache should be initialized from the
+        input (not from zero), so cache[0] ≈ out_full[0]."""
+        cfg = FSCSConfig(use_ema_cache=True, ema_cache_beta=0.9)
+        cache = FSCSEMACache(cfg)
+        out_full = torch.randn(B, N, D)
+        result = cache(out_full)
+        # After reset, first position: cache = out_full[:,0]
+        # Then: cache = 0.9 * out_full[:,0] + 0.1 * out_full[:,0] = out_full[:,0]
+        assert torch.allclose(result[:, 0], out_full[:, 0], atol=1e-5)
+
+    def test_cache_smooths_output(self):
+        """The EMA output should be smoother (lower variance across positions)
+        than the raw input."""
+        cfg = FSCSConfig(use_ema_cache=True, ema_cache_beta=0.9)
+        cache = FSCSEMACache(cfg)
+        torch.manual_seed(42)
+        out_full = torch.randn(B, N, D)
+        result = cache(out_full)
+        # Per-position variance of the EMA should be lower than raw
+        raw_var = out_full.var(dim=1).mean().item()
+        ema_var = result.var(dim=1).mean().item()
+        assert ema_var < raw_var, \
+            f"EMA should smooth: raw_var={raw_var:.4f}, ema_var={ema_var:.4f}"
+
+    def test_reset_clears_state(self):
+        """After reset(), the cache should produce the same output on
+        the same input regardless of what was processed before."""
+        cfg = FSCSConfig(use_ema_cache=True, ema_cache_beta=0.9)
+        cache = FSCSEMACache(cfg)
+        torch.manual_seed(0)
+        out1 = torch.randn(B, N, D)
+        out2 = torch.randn(B, N, D)
+
+        # Run with out1 first
+        cache(out1)
+        # Reset and run with out2
+        cache.reset()
+        result_after_reset = cache(out2)
+
+        # Fresh cache on out2 (never saw out1)
+        cache2 = FSCSEMACache(cfg)
+        result_fresh = cache2(out2)
+
+        assert torch.allclose(result_after_reset, result_fresh, atol=1e-5)
+
+    def test_high_beta_preserves_history(self):
+        """With high β (0.99), the EMA output at the last position should
+        still be influenced by early positions."""
+        cfg = FSCSConfig(use_ema_cache=True, ema_cache_beta=0.99)
+        cache = FSCSEMACache(cfg)
+        out_full = torch.zeros(1, 32, D)
+        out_full[:, 0, :] = 10.0  # strong signal at position 0
+        result = cache(out_full)
+        # At position 31, the influence of position 0 should still be
+        # ~0.99^31 * 10 ≈ 7.3 — non-trivial
+        pos31_mean = result[:, 31].mean().item()
+        assert pos31_mean > 1.0, \
+            f"high beta should preserve history, got mean={pos31_mean:.4f}"
 
 
 class TestPhaseCorrelation:

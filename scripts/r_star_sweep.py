@@ -208,6 +208,23 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--use-ema-cache", action="store_true",
+        help=(
+            "Use EMA-cache coarse operator (§9.1) instead of the "
+            "windowed attention coarse operator. The EMA cache maintains "
+            "a running average of the full branch output and uses it as "
+            "the coarse branch, giving the coarse branch access to long- "
+            "range context. Eliminates the second self_attn call entirely."
+        ),
+    )
+    p.add_argument(
+        "--ema-cache-beta", type=float, default=None,
+        help=(
+            "Override FSCSConfig.ema_cache_beta (decay factor in the "
+            "EMA cache). Higher = longer memory. Default 0.9."
+        ),
+    )
+    p.add_argument(
         "--eval-batch-size", type=int, default=1,
         help=(
             "Mini-batch size for the eval forward pass. Default 1 "
@@ -391,6 +408,10 @@ def run_sweep(args: argparse.Namespace) -> Dict[str, Any]:
         _cfg_kwargs["delta_residual"] = args.coherence_delta
     if args.hard_threshold is not None:
         _cfg_kwargs["hard_route_threshold"] = args.hard_threshold
+    if args.use_ema_cache:
+        _cfg_kwargs["use_ema_cache"] = True
+    if args.ema_cache_beta is not None:
+        _cfg_kwargs["ema_cache_beta"] = args.ema_cache_beta
     # If a trained checkpoint is being loaded, enable the coarse adapter
     # so the wrapper creates adapter modules to load the weights into.
     # The checkpoint was trained with use_coarse_adapter=True; without

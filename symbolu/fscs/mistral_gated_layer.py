@@ -57,6 +57,7 @@ from symbolu.fscs.core import (
     FSCSBoundaryDetector,
     FSCSLayerCap,
     FSCSSurpriseDeltaSuppressor,
+    FSCSEMACache,
     FSCSCoarseAdapter,
     fscs_alignment_loss,
 )
@@ -132,6 +133,16 @@ class FSCSGatedDecoderLayer(nn.Module):
         self.boundary_detector = FSCSBoundaryDetector(cfg)
         self.layer_cap = FSCSLayerCap(cfg)
         self.surprise_suppressor = FSCSSurpriseDeltaSuppressor(cfg)
+
+        # EMA-cache coarse operator (§9.1). When enabled, replaces the
+        # windowed self_attn call with a running EMA of the full branch
+        # output. This gives the coarse branch access to long-range
+        # context that the windowed operator loses.
+        self.use_ema_cache = bool(getattr(cfg, "use_ema_cache", False))
+        if self.use_ema_cache:
+            self.ema_cache: Optional[nn.Module] = FSCSEMACache(cfg)
+        else:
+            self.ema_cache = None
 
         # Optional coarse adapter for alignment-loss co-training.
         # Disabled by default so the frozen-backbone inference path is
@@ -317,27 +328,46 @@ class FSCSGatedDecoderLayer(nn.Module):
         else:
             out_full = attn_full_out  # Some versions return a tensor directly
 
-        # ---- Branch 2: Windowed attention -----------------------------
-        # Build a windowed causal mask and run the original self_attn
-        # again. This gives us Mistral's own attention primitive
-        # restricted to a local window — no reimplementation of RoPE,
-        # GQA, or SDPA.
-        windowed_mask = _build_windowed_attention_mask(
-            B, N, self.cfg.coarse_window, device, dtype,
-        )
-        attn_coarse_out = self.original_layer.self_attn(
-            hidden_states=normed,
-            attention_mask=windowed_mask,
-            position_ids=position_ids,
-            past_key_value=None,  # intentionally not sharing KV cache here
-            output_attentions=False,
-            use_cache=False,
-            **_sa_kwargs,
-        )
-        if isinstance(attn_coarse_out, tuple):
-            out_coarse = attn_coarse_out[0]
+        # ---- Branch 2: Coarse output ------------------------------------
+        # Two modes depending on whether EMA cache is enabled:
+        #
+        # Mode A (EMA cache, §9.1 — preferred for Global/Mid bands):
+        #   Uses a running exponential moving average of the full branch
+        #   output. NO second self_attn call — O(1) compute per position.
+        #   The EMA state carries a compressed summary of ALL previous
+        #   positions' full-attention outputs, so the coarse branch has
+        #   long-range context the windowed operator would lose.
+        #
+        # Mode B (windowed attention, §9 Local-band path — original):
+        #   Runs self_attn a second time with a sliding-window mask.
+        #   O(N·w) compute. The coarse branch sees only the last
+        #   `coarse_window` tokens.
+        if self.ema_cache is not None:
+            # EMA cache mode: use the full-branch output to update the
+            # cache, then use the cache state as the coarse output.
+            # This means: out_coarse_t = β·cache_{t-1} + (1-β)·out_full_t
+            # At positions where the gate routes to "coarse," the model
+            # gets a smoothed, long-range-aware version of the full output
+            # rather than a truncated windowed version.
+            out_coarse = self.ema_cache(out_full.detach())
         else:
-            out_coarse = attn_coarse_out
+            # Windowed attention mode (original)
+            windowed_mask = _build_windowed_attention_mask(
+                B, N, self.cfg.coarse_window, device, dtype,
+            )
+            attn_coarse_out = self.original_layer.self_attn(
+                hidden_states=normed,
+                attention_mask=windowed_mask,
+                position_ids=position_ids,
+                past_key_value=None,
+                output_attentions=False,
+                use_cache=False,
+                **_sa_kwargs,
+            )
+            if isinstance(attn_coarse_out, tuple):
+                out_coarse = attn_coarse_out[0]
+            else:
+                out_coarse = attn_coarse_out
 
         # ---- Optional coarse adapter + alignment loss ---------------
         # When the coarse adapter is enabled, pass the windowed
