@@ -207,6 +207,8 @@ symbolu_robotics/
     manifold.py                  # SE(2) Lie group: compose, inverse, log_map,
                                  #   body_frame_error, wrap_angle
                                  #   (~120 lines, Phase 1)
+    traces.py                    # Disagreement signal characterization
+                                 #   (~80 lines, Phase 1.5)
     predictors/
       __init__.py
       base.py                    # Abstract predictor interface + bicycle model
@@ -233,6 +235,7 @@ symbolu_robotics/
       __init__.py
       test_manifold.py           # SE(2) operations (Phase 1)
       test_core.py               # BCVF math kernel (Phase 1)
+      test_traces.py             # Signal characterization (Phase 1.5)
       test_predictors.py         # Predictor agreement/divergence (Phase 2)
       test_mppi.py               # Planner integration (Phase 3)
       test_scenarios.py          # End-to-end scenario runs (Phase 4)
@@ -248,13 +251,14 @@ symbolu_robotics/
 Each phase maps to specific V3.1 sections. Implementers must read these sections
 before starting the corresponding phase.
 
-| Phase   | V3.1 Sections Required                                              |
-|---------|---------------------------------------------------------------------|
-| Phase 1 | 3.1-3.6 (math formulation), 4.1 (convexity), Lemma 1 (bias tol.)  |
-| Phase 2 | Appendix E.2 (predictor specs), E.3 (failure modes)                |
-| Phase 3 | Appendix D (MPPI convergence), E.1 (platform), D.6 (MPPI config)  |
-| Phase 4 | E.3-E.8 (scenarios, ablation, metrics), 7.1-7.5 (validation)      |
-| Phase 5 | 5.1 (domain coverage), 6.3 (defense-in-depth), 9.2 (readiness)    |
+| Phase     | V3.1 Sections Required                                              |
+|-----------|---------------------------------------------------------------------|
+| Phase 1   | 3.1-3.6 (math formulation), 4.1 (convexity), Lemma 1 (bias tol.)  |
+| Phase 1.5 | 3.4.1 (gate parameter guidance), 2.4.1 (why 2nd-order alone)      |
+| Phase 2   | Appendix E.2 (predictor specs), E.3 (failure modes)                |
+| Phase 3   | Appendix D (MPPI convergence), E.1 (platform), D.6 (MPPI config)  |
+| Phase 4   | E.3-E.8 (scenarios, ablation, metrics), 7.1-7.5 (validation)      |
+| Phase 5   | 5.1 (domain coverage), 6.3 (defense-in-depth), 9.2 (readiness)    |
 
 ### 0.9 Success Criteria for Phase 0
 
@@ -563,14 +567,185 @@ Phase 1 is complete when:
   <50ms on a single CPU core (timing assertion in test)
 - [ ] No imports from any other `symbolu_robotics` module
 
-### 1.6 What Phase 1 Does NOT Build
+### 1.6 Success Gate
 
+**Proceed to Phase 1.5 only if ALL of the following hold:**
+
+1. Invariance tests pass: constant bias = zero cost, linear drift = near-zero cost.
+2. Cost behaves monotonically under synthetic acceleration — doubling the
+   quadratic divergence coefficient at least doubles the BCVF cost.
+3. No SE(2) discontinuities: wrap-angle boundary at +/-pi does not produce
+   cost spikes or NaN.
+
+If any gate fails, the math kernel has a fundamental problem. Stop and debug
+before proceeding. Do not build predictors on a broken foundation.
+
+### 1.7 What Phase 1 Does NOT Build
+
+- Disagreement signal characterization (Phase 1.5)
 - Predictor objects (Phase 2)
 - MPPI planner or J_perf (Phase 3)
 - Scenario injection or metrics collection (Phase 4)
 - Config file loading (Phase 3)
 - Real-time ring buffer for streaming disagreement history (Phase 3)
 - Visualization or plotting (Phase 5)
+
+---
+
+## Phase 1.5 — Disagreement Signal Characterization
+
+### 1.5.1 Purpose
+
+Phase 1 proves the math is correct. Phase 1.5 proves the math is _useful_.
+
+Before building predictors and a planner, we must understand whether the
+second-order disagreement signal is clean enough to be actionable. If nominal
+sensor jitter produces disagreement acceleration comparable in magnitude to
+real failure acceleration, then the gate threshold T is wrong and the entire
+BCVF cost will be dominated by noise. Phase 1.5 catches this before investing
+in Phases 2-4.
+
+This phase was absent from the original plan and was identified during
+evaluation of the BCVF-v2/Hybrid proposal as a critical gap.
+
+### 1.5.2 Module
+
+**File:** `bcvf_autonomous/traces.py` (~80 lines)
+
+### 1.5.3 Synthetic Trace Families
+
+Generate pairs of SE(2) trajectories (H=50, dt=0.1) representing controlled
+disagreement patterns. Each trace family isolates one disagreement dynamic:
+
+```python
+@dataclass
+class TraceResult:
+    """Statistics from one synthetic trace evaluation."""
+    name: str
+    e_max: float          # max ||e_ij(k)||
+    e_mean: float
+    e_std: float
+    v_max: float          # max ||v_ij(k)||
+    v_mean: float
+    a_max: float          # max ||a_ij(k)||
+    a_mean: float
+    a_std: float
+    bcvf_cost: float      # J_BCVF with default config
+    gate_activation_rate: float  # fraction of steps where g > 0.5
+
+def generate_trace(
+    name: str,
+    H: int = 50,
+    dt: float = 0.1,
+    **kwargs,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Generate a pair of trajectories for one trace family."""
+    ...
+
+def analyze_trace(
+    traj_i: np.ndarray,
+    traj_j: np.ndarray,
+    config: BCVFConfig,
+) -> TraceResult:
+    """Compute e, v, a statistics and BCVF cost for a trace pair."""
+    ...
+```
+
+**6 trace families:**
+
+| Family | Description | Expected e | Expected a | Expected J_BCVF |
+|--------|-------------|-----------|-----------|-----------------|
+| `constant_bias` | traj_j offset by [0.5, 0, 0] at every step | constant 0.5m | 0 | 0 |
+| `linear_drift` | traj_j drifts at 0.01 m/step | grows linearly | ~0 (constant v) | ~0 |
+| `quadratic_divergence` | traj_j diverges as 0.01*k^2 | grows quadratically | constant nonzero | > 0 |
+| `one_time_jump` | traj_j jumps by 2m at step 25 | step function | spike at steps 24-26 | > 0 |
+| `repeated_jitter` | traj_j has N(0, 0.05) noise per step | noisy ~0.05m | noisy, small | should be ~0 if T is set correctly |
+| `mode_switch` | traj_j follows traj_i until step 20, then diverges quadratically | grows after step 20 | nonzero after step 20 | > 0, localized after step 20 |
+
+### 1.5.4 Parameter Sensitivity Report
+
+`traces.py` includes a function that sweeps T and beta across the trace
+families and reports the operating region:
+
+```python
+def parameter_sensitivity_report(
+    T_values: List[float] = [0.01, 0.05, 0.1, 0.2, 0.5],
+    beta_multipliers: List[float] = [10, 20, 50, 100],
+) -> Dict[str, Any]:
+    """
+    Sweep T and beta across all trace families.
+
+    For each (T, beta) pair, report:
+    - false_activation_rate: gate activations on constant_bias + repeated_jitter
+    - true_activation_rate: gate activations on quadratic_divergence + one_time_jump
+    - separation_ratio: true_activation_rate / max(false_activation_rate, 1e-6)
+
+    A good (T, beta) pair has:
+    - false_activation_rate < 0.05
+    - true_activation_rate > 0.5
+    - separation_ratio > 10
+
+    Returns:
+        Dict with per-(T, beta) statistics and recommended values.
+    """
+    ...
+```
+
+This replaces the hardcoded T=0.1, beta=200 from Phase 0 with empirically
+validated values. If the defaults from `default_se2.yaml` survive the sweep
+(separation_ratio > 10), they are confirmed. If not, the config is updated
+before Phase 2 begins.
+
+### 1.5.5 Test Specification
+
+Tests go in `bcvf_autonomous/tests/test_traces.py`.
+
+| Test                                     | What It Validates                                            |
+|------------------------------------------|--------------------------------------------------------------|
+| `test_constant_bias_quiet`               | constant_bias trace: a_max < 1e-10, bcvf_cost < 1e-10       |
+| `test_linear_drift_quiet`                | linear_drift trace: a_mean < 1e-6, bcvf_cost < 1e-6         |
+| `test_quadratic_divergence_loud`         | quadratic_divergence trace: bcvf_cost > 0.1                  |
+| `test_one_time_jump_detected`            | one_time_jump trace: a_max > 1.0 at the jump boundary       |
+| `test_jitter_suppressed_by_gate`         | repeated_jitter trace with default T: gate_activation_rate < 0.05 |
+| `test_mode_switch_localized`             | mode_switch trace: gate activations cluster after step 20    |
+| `test_separation_ratio`                  | parameter_sensitivity_report: default (T=0.1, beta=200) achieves separation_ratio > 10 |
+| `test_all_traces_generate`               | All 6 trace families produce valid (H, 3) trajectory pairs   |
+
+### 1.5.6 Success Gate
+
+**Proceed to Phase 2 only if ALL of the following hold:**
+
+1. Constant bias and linear drift traces produce near-zero BCVF cost (< 1e-6).
+   This reconfirms Lemma 1 on realistic-scale trajectories, not just unit tests.
+2. Quadratic divergence and one-time jump produce BCVF cost at least 100x
+   larger than repeated jitter at the same scale. This is the signal-to-noise
+   separation requirement.
+3. The default gate parameters (T=0.1, beta=200) achieve separation_ratio > 10
+   in the parameter sensitivity report. If they don't, update `default_se2.yaml`
+   with the recommended values before proceeding.
+4. Repeated jitter at N(0, 0.05) produces gate_activation_rate < 0.05 (less
+   than 5% false activation). This validates that normal sensor noise does not
+   trigger BCVF.
+
+If gate 2 fails (signal-to-noise separation is poor), the second-order approach
+may not be viable at the chosen dt and noise levels. This is the most important
+early kill switch in the entire project.
+
+### 1.5.7 Estimated Size
+
+~80 lines for `traces.py` + ~60 lines for `test_traces.py`.
+
+### 1.5.8 Update to Repository Structure
+
+Add to the Phase 0 file listing (Section 0.7):
+
+```
+bcvf_autonomous/
+    traces.py                    # Disagreement signal characterization
+                                 #   (~80 lines, Phase 1.5)
+    tests/
+      test_traces.py             # 8 tests (Phase 1.5)
+```
 
 ---
 
@@ -1073,7 +1248,25 @@ Phase 2 is complete when:
 - [ ] `predict()` does not mutate predictor internal state
 - [ ] All predictors are deterministic given the same seed
 
-### 2.9 What Phase 2 Does NOT Build
+### 2.9 Success Gate
+
+**Proceed to Phase 3 only if ALL of the following hold:**
+
+1. Predictors agree in nominal mode: max pairwise disagreement < 2m over
+   H=50 steps for a straight-line control sequence at 8 m/s.
+2. Each injected failure mode creates _distinct_ disagreement dynamics —
+   LiDAR failure produces quadratic divergence, GPS multipath produces
+   discrete jumps, VO degradation produces noise inflation then freeze.
+   The traces from Phase 1.5 should be recognizable in the predictor output.
+3. The BCVF cost computed on predictor output (not synthetic traces) shows
+   the same separation properties as Phase 1.5: nominal cost near zero,
+   failure cost at least 10x larger.
+
+If gate 3 fails — the predictor noise floor swamps the failure signal when
+measured through the full BCVF pipeline — revisit predictor noise parameters
+or gate threshold T before proceeding to the planner.
+
+### 2.10 What Phase 2 Does NOT Build
 
 - Simulation environment or time-stepping loop (Phase 3)
 - Control sequence generation or sampling (Phase 3)
@@ -2148,7 +2341,32 @@ plus the following end-to-end integration check:
   shows BCVF cost spike at t=5s and vehicle avoidance behavior
 - [ ] `default_se2.yaml` updated with `environment` section
 
-#### 3C.13 What Phase 3 Does NOT Build
+#### 3C.13 Phase 3 Success Gate
+
+**Proceed to Phase 4 only if ALL of the following hold:**
+
+1. BCVF-Core shows **lower false positives than 0th-order** in the S1 (normal
+   driving) end-to-end check: run 10 episodes with A0, A1, A3 variants.
+   A3 (BCVF) must have fewer BCVF-active steps than A1 (0th-order) in nominal
+   operation.
+2. BCVF-Core shows **earlier warning than 1st-order** in at least one failure
+   scenario: run 10 episodes of S6 (glass corridor) with A2 and A3. A3 must
+   activate (J_BCVF > threshold) at an earlier step than A2 on average.
+3. BCVF-Core shows **minimal interference** in nominal driving: path efficiency
+   >= 0.95 and RMS lateral jerk increase < 20% vs baseline (A0).
+
+These are directional checks on small sample sizes (N=10), not statistically
+rigorous tests. Phase 4 provides the statistical rigor at N=100. The purpose
+here is to confirm the core innovation works before investing in the full
+experiment harness.
+
+**Hard stop rule:** If BCVF-Core cannot clearly beat 0th-order on false
+positives AND 1st-order on early warning in even one failure scenario at N=10,
+the second-order approach may not be viable. Stop and investigate before
+building Phase 4. Do not run 6,900 episodes to confirm a negative result that
+is visible at 10 episodes.
+
+#### 3C.14 What Phase 3 Does NOT Build
 
 - Scenario definitions (which failures, when, on which road) — Phase 4
 - Statistical analysis, aggregation across runs, plots — Phase 4
@@ -3878,6 +4096,7 @@ validation:
 
 | V2 Feature                  | Depends On V1          | Estimated Effort |
 |-----------------------------|------------------------|------------------|
+| **BCVF-Hybrid Governor**    | Phase 4 evidence       | 2-3 sprints      |
 | SE(3) manifold              | manifold.py extension  | 1 sprint         |
 | Quadrotor predictor set     | SE(3) + new predictors | 1 sprint         |
 | JAX-accelerated MPPI        | mppi_planner.py rewrite | 1 sprint        |
@@ -3888,6 +4107,46 @@ validation:
 | Multi-process sweep runner  | run_experiments.py     | 0.5 sprint       |
 | CI integration (GitHub Actions) | test suite          | 0.5 sprint       |
 | Interactive dashboard       | plotting.py extension  | 1 sprint         |
+
+#### V2 Highlight: BCVF-Hybrid Governor
+
+The BCVF-Hybrid extension (identified during BCVF-v2 planning) adds a regime-
+aware, multi-scale, event-gated layer on top of BCVF-Core. The hybrid
+objective replaces the fixed lambda_c with context-dependent parameters:
+
+```
+J_hybrid(u) = J_perf(u) + lambda_c(r_t) * Gamma_event(x, context)
+              * SUM_s lambda_s(r_t) * J_BCVF^(s)(u; theta_core(r_t), dt_s)
+```
+
+Where:
+- `r_t` is the detected driving regime (highway, urban, intersection, etc.)
+- `Gamma_event` is an event trigger gate (context-dependent activation)
+- `s` indexes time scales (fast + slow disagreement)
+- `theta_core(r_t)` is regime-specific gate/Huber parameter preset
+
+**Proposed module structure** (V2 only, not built in V1):
+
+```
+bcvf_autonomous/
+  hybrid/
+    event_triggers.py       # Context-dependent BCVF activation
+    multiscale.py           # BCVF at multiple time scales
+    regime_governor.py      # Parameter switching by driving regime
+    parameter_presets.py    # Per-regime (T, beta, lambda_c) presets
+    hybrid_cost.py          # Composes core + event + multiscale
+```
+
+**Key design refinement:** Use a floor-scaled event gate `gamma_0 + (1 -
+gamma_0) * Gamma_event` with gamma_0 in [0.25, 0.5] instead of full
+suppression. This preserves baseline Core protection even when event
+evidence is weak.
+
+**Decision rule for V2:**
+- If V1 Core cannot clearly beat 0th/1st-order baselines, stop before Hybrid.
+- If Core works but Hybrid adds noise/complexity, ship Core-only as V1 product.
+- If Hybrid improves transient and regime-mixed scenarios without instability,
+  make Hybrid the V2 product.
 
 ### 5.11 Test Specification
 
@@ -3924,20 +4183,26 @@ Phase 5 — and V1 as a whole — is complete when:
 
 ## Design Document Summary
 
-| Phase | Files | Est. Lines | Tests | Key Deliverable |
-|-------|-------|------------|-------|-----------------|
-| **0** | 3 skeleton + 1 config | 0 (structure only) | 0 | Scope lock |
-| **1** | 2 (manifold.py, core.py) | ~270 | 27 | Math kernel |
-| **2** | 5 (base.py + 4 predictors) | ~420 | 15 | Predictor framework |
-| **3** | 3 (simulator, planner, runner) | ~700 | 32 | Closed-loop system |
-| **4** | 3 (scenarios, metrics, experiments) | ~450 | 33 | Evidence |
-| **5** | 2 (plotting, conftest) + updates | ~210 | 6 | Product |
-| **Total** | **18 files** | **~2,050** | **~113** | |
+| Phase | Files | Est. Lines | Tests | Gate | Key Deliverable |
+|-------|-------|------------|-------|------|-----------------|
+| **0** | 3 skeleton + 1 config | 0 (structure only) | 0 | — | Scope lock |
+| **1** | 2 (manifold.py, core.py) | ~270 | 27 | Invariance + monotonicity + no discontinuities | Math kernel |
+| **1.5** | 1 (traces.py) | ~80 | 8 | Signal-to-noise separation > 10x | Signal characterization |
+| **2** | 5 (base.py + 4 predictors) | ~420 | 15 | Distinct failure dynamics + BCVF separation on real predictors | Predictor framework |
+| **3** | 3 (simulator, planner, runner) | ~700 | 32 | BCVF beats 0th-order on FP, beats 1st-order on early warning | Closed-loop system |
+| **4** | 3 (scenarios, metrics, experiments) | ~450 | 33 | Statistical evidence at N=100 | Evidence |
+| **5** | 2 (plotting, conftest) + updates | ~210 | 6 | — | Product |
+| **Total** | **19 files** | **~2,130** | **~121** | | |
 
 **Dependencies:** NumPy (required), PyYAML (required), matplotlib (optional),
 pytest (dev only).
 
-**Estimated execution:** 5 sprints, one phase per sprint.
+**Estimated execution:** 5 sprints. Phase 1 + 1.5 share sprint 1. Phases 2-5
+map to sprints 2-5.
+
+**Hard stop rule:** If BCVF-Core cannot beat 0th/1st-order baselines by the
+Phase 3 success gate, stop before investing in Phase 4's 6,900-run experiment
+suite. V2 Hybrid extension is only justified if Core succeeds.
 
 ---
 
