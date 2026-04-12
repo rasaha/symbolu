@@ -1321,5 +1321,418 @@ Tests go in `bcvf_autonomous/tests/test_simulator.py`.
 
 ---
 
-_End of Phase 3A. Sub-sections 3B (MPPI planner) and 3C (planning loop) will
-follow._
+### 3B — MPPI Planner with J_perf + J_BCVF
+
+#### 3B.1 Purpose
+
+Build the MPPI (Model Predictive Path Integral) planner that selects control
+sequences by minimizing:
+
+```
+J_total(u) = J_perf(u) + lambda_c * J_BCVF(u)
+```
+
+This is the module where Phase 1 and Phase 2 meet. The planner samples K
+candidate control sequences, forward-simulates all M predictors for each
+candidate, scores each candidate using both performance cost and BCVF coherence
+cost, and returns the importance-weighted optimal control.
+
+**V3.1 reference:** Section 3.5 (Definition 7), Appendix D (MPPI convergence),
+Appendix D.6 (recommended configuration).
+
+#### 3B.2 Module
+
+**File:** `bcvf_autonomous/mppi_planner.py` (~300 lines)
+
+#### 3B.3 MPPI Algorithm
+
+MPPI is a sampling-based trajectory optimizer. It does not compute gradients —
+it evaluates cost at K independently sampled control sequences and computes a
+weighted average, where lower-cost rollouts receive higher weight.
+
+**Algorithm per planning cycle:**
+
+```
+Input:  current predictor states, previous solution u_prev
+Output: optimal control sequence u*
+
+1. SAMPLE: Generate K candidate control sequences
+   u_k = u_mean + epsilon_k,  epsilon_k ~ N(0, Sigma)
+   where u_mean = shifted previous solution (warm start)
+
+2. ROLLOUT: For each candidate k = 1..K:
+   a. For each predictor m = 1..M:
+      traj_m_k = predictor[m].predict(u_k)          # (H, 3)
+   b. J_perf_k  = compute_perf_cost(traj_anchor_k, u_k, road)
+   c. J_bcvf_k  = compute_bcvf_cost([traj_1_k, ..., traj_M_k], bcvf_config)
+   d. J_total_k = J_perf_k + lambda_c * J_bcvf_k
+
+3. WEIGHT: Compute importance weights
+   w_k = exp(-J_total_k / temperature)
+   W_k = w_k / sum(w_j)
+
+4. UPDATE: Compute weighted mean
+   u* = sum(W_k * u_k)
+
+5. Return u*[0] as the control to execute (receding horizon)
+   Save u* as u_prev for next cycle (warm start)
+```
+
+#### 3B.4 Types
+
+```python
+@dataclass
+class MPPIConfig:
+    """MPPI planner configuration."""
+    # Sampling
+    num_rollouts: int = 1000      # K
+    horizon: int = 50             # H steps
+    dt: float = 0.1               # seconds per step
+    temperature: float = 5.0      # lambda (softmin sharpness)
+    control_dim: int = 2          # [velocity, steering]
+
+    # Noise distribution for sampling
+    noise_std: np.ndarray = field(
+        default_factory=lambda: np.array([1.0, 0.15])
+    )  # [velocity_std, steering_std]
+
+    # Control limits
+    velocity_bounds: Tuple[float, float] = (-2.0, 15.0)  # m/s
+    steering_bounds: Tuple[float, float] = (-0.6, 0.6)   # rad
+
+    # Warm start
+    warm_start: bool = True
+
+    # BCVF integration
+    lambda_c: float = 1.0
+    bcvf_config: BCVFConfig = field(default_factory=BCVFConfig)
+
+@dataclass
+class PerfCostConfig:
+    """Performance cost J_perf configuration."""
+    lane_deviation_weight: float = 1.0
+    progress_weight: float = 0.5
+    control_smoothness_weight: float = 0.1
+    collision_weight: float = 1000.0
+    collision_margin: float = 3.0     # meters: soft penalty starts here
+
+@dataclass
+class MPPIResult:
+    """Result of one MPPI planning cycle."""
+    optimal_control: np.ndarray       # (H, 2) full sequence
+    first_control: np.ndarray         # (2,) control to execute now
+    total_cost: float                 # J_total of the weighted mean
+    perf_cost: float                  # J_perf component
+    bcvf_cost: float                  # J_BCVF component
+    solve_time_ms: float              # wall-clock time for this cycle
+    effective_samples: float          # 1/sum(W_k^2), measures weight concentration
+```
+
+#### 3B.5 Performance Cost J_perf
+
+J_perf is deliberately kept simple. The interesting signal comes from J_BCVF,
+not from a sophisticated baseline planner. J_perf provides just enough
+structure for the vehicle to follow a road and avoid obstacles.
+
+```python
+def compute_perf_cost(
+    trajectory: np.ndarray,          # (H, 3) from anchor predictor
+    control_sequence: np.ndarray,    # (H, 2)
+    road: Road,
+    obstacles: List[Obstacle],
+    config: PerfCostConfig,
+) -> float:
+```
+
+**Cost terms:**
+
+**1. Lane deviation** (keeps vehicle on the road):
+```
+For each step k:
+    d_k = perpendicular distance from trajectory[k] to nearest road segment
+    cost += lane_deviation_weight * d_k^2
+```
+
+Finding the nearest road segment: project the vehicle position onto each
+consecutive segment of `road.centerline`, keep the minimum distance. This is
+O(H * N_segments) but N_segments is small for V1 roads.
+
+**2. Progress** (rewards forward motion toward goal):
+```
+progress = arc-length distance along road from start to projection of final pose
+cost -= progress_weight * progress
+```
+
+Negative cost = reward. The planner prefers control sequences that move the
+vehicle further along the road.
+
+**3. Control smoothness** (penalizes jerk for comfort):
+```
+For each step k = 1..H-1:
+    du = control[k] - control[k-1]
+    cost += control_smoothness_weight * ||du||^2
+```
+
+This is a first-difference penalty on control inputs, not a jerk penalty on
+state. It keeps the MPPI sampling distribution smooth.
+
+**4. Collision proximity** (soft penalty near obstacles):
+```
+For each step k, for each obstacle:
+    dist = ||trajectory[k, :2] - obstacle.center|| - obstacle.radius
+    if dist < collision_margin:
+        cost += collision_weight * (1 - dist / collision_margin)^2
+```
+
+This is a smooth quadratic penalty that activates inside `collision_margin`
+meters of any obstacle surface. It does not replace the binary collision check
+in the simulator — that terminates the episode. This penalty steers the planner
+away from obstacles before collision occurs.
+
+**Which trajectory for J_perf?** The anchor predictor's trajectory
+(`traj_anchor_k`). The performance cost evaluates the plan against one model's
+prediction of reality. BCVF evaluates how much the other models disagree
+with that prediction. This separation is intentional — J_perf says "is this a
+good plan assuming M1 is right?" and J_BCVF says "do the other models agree
+that M1 is right?"
+
+#### 3B.6 MPPI Planner Class
+
+```python
+class MPPIPlanner:
+    """
+    Model Predictive Path Integral planner with BCVF coherence cost.
+
+    Implements V3.1 Definition 7:
+        u* = argmin_u [J_perf(u) + lambda_c * J_BCVF(u)]
+
+    Uses importance-weighted sampling (no gradients).
+    """
+
+    def __init__(
+        self,
+        mppi_config: MPPIConfig,
+        perf_config: PerfCostConfig,
+        predictors: Dict[str, BasePredictor],
+        road: Road,
+        obstacles: List[Obstacle],
+    ):
+        ...
+
+    def plan(self) -> MPPIResult:
+        """
+        Run one MPPI planning cycle.
+
+        Returns optimal control sequence and diagnostics.
+        """
+        ...
+
+    def _sample_controls(self) -> np.ndarray:
+        """
+        Sample K candidate control sequences.
+
+        Returns: (K, H, 2) array
+
+        Sampling distribution:
+            u_k[h] = u_mean[h] + N(0, noise_std)
+            clamped to [velocity_bounds, steering_bounds]
+
+        u_mean is the warm-started previous solution (shifted by 1 step,
+        last step duplicated) or zeros if no previous solution.
+        """
+        ...
+
+    def _rollout_all(self, controls_batch: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Forward-simulate all predictors for all K candidates.
+
+        Args:
+            controls_batch: (K, H, 2)
+
+        Returns:
+            perf_costs: (K,) — J_perf for each candidate
+            bcvf_costs: (K,) — J_BCVF for each candidate
+
+        Implementation:
+            For each k in K:
+                trajs = [predictor.predict(controls_batch[k]) for predictor in predictors]
+                perf_costs[k] = compute_perf_cost(trajs[anchor], controls_batch[k], ...)
+                bcvf_costs[k] = compute_bcvf_cost(trajs, bcvf_config).total_cost
+        """
+        ...
+
+    def _compute_weights(self, total_costs: np.ndarray) -> np.ndarray:
+        """
+        Compute normalized importance weights.
+
+        w_k = exp(-(J_total_k - min(J_total)) / temperature)
+        W_k = w_k / sum(w_k)
+
+        The min-subtraction prevents numerical underflow when costs are large.
+        """
+        ...
+
+    def _weighted_mean(self, controls_batch: np.ndarray, weights: np.ndarray) -> np.ndarray:
+        """
+        Compute weighted mean control sequence.
+
+        u* = sum_k(W_k * u_k)  — shape (H, 2)
+        """
+        ...
+
+    def reset(self) -> None:
+        """Clear warm-start state."""
+        ...
+```
+
+#### 3B.7 Vectorization Strategy
+
+The inner loop — K rollouts, each with M predictor forward-simulations — is the
+performance bottleneck. The budget from Phase 0 is K=1000, H=50, M=4 (anchor
+mode, 3 pairs), all in <20ms per planning cycle at 50Hz.
+
+**Level 1 — Vectorize control sampling:**
+`_sample_controls` generates the full (K, H, 2) noise tensor in one
+`np.random.Generator.normal()` call, adds it to the (H, 2) mean, and clips.
+No Python loop over K.
+
+**Level 2 — Vectorize cost aggregation:**
+`_compute_weights` and `_weighted_mean` are pure NumPy over (K,) arrays and
+(K, H, 2) arrays. No Python loop.
+
+**Level 3 — Batch BCVF scoring:**
+Use `compute_bcvf_cost_batch` from Phase 1 (Section 1.2.2) to score all K
+rollouts in a single call. The inner disagreement / acceleration / gate / Huber
+chain is vectorized over K.
+
+**Level 4 — Predictor rollouts (the bottleneck):**
+Each predictor's `predict()` runs a sequential bicycle model simulation over H
+steps — this cannot be vectorized across steps (each step depends on the
+previous). However, it CAN be vectorized across K rollouts if the predictor
+supports a batch interface.
+
+For V1, the pragmatic approach:
+
+```python
+# Option A: Python loop over K (simple, correct, ~30ms for K=1000)
+for k in range(K):
+    for m, predictor in enumerate(predictors):
+        trajs[k][m] = predictor.predict(controls_batch[k])
+
+# Option B: Batch bicycle model (vectorize across K, loop over H)
+# Requires BasePredictor.predict_batch(controls_batch: (K, H, 2)) -> (K, H, 3)
+# Vectorizes the bicycle step across K rollouts at each time step
+```
+
+**Recommendation:** Implement Option A first. If the timing benchmark (Section
+3C) fails the <20ms target, add `predict_batch()` to `BasePredictor` as Option
+B. The bicycle step is 3 trig calls per step — at K=1000, H=50, M=4 that is
+200K trig calls. NumPy vectorizes these to ~2ms for Option B vs ~15ms for
+Option A. Option A is likely sufficient.
+
+**Effective sample count:**
+
+```python
+effective_samples = 1.0 / np.sum(weights ** 2)
+```
+
+This diagnostic measures weight concentration. If effective_samples << K, the
+temperature is too low (weights collapse to one rollout) or the cost landscape
+has a very sharp minimum. Healthy range: effective_samples > K/10. Log this in
+`MPPIResult` for tuning.
+
+#### 3B.8 Warm Start
+
+**V3.1 reference:** Appendix D.6 — "Critical for stability between planning
+cycles."
+
+At each planning cycle, the previous solution is shifted forward by one step:
+
+```python
+def _warm_start_mean(self) -> np.ndarray:
+    if self._prev_solution is None:
+        return np.zeros((self.config.horizon, self.config.control_dim))
+
+    # Shift: drop first step, duplicate last step
+    shifted = np.roll(self._prev_solution, -1, axis=0)
+    shifted[-1] = shifted[-2]
+    return shifted
+```
+
+This ensures the sampling distribution is centered on a reasonable control
+sequence rather than zero. Without warm start, the first few planning cycles
+after a scenario change waste most rollouts on irrelevant regions of control
+space.
+
+#### 3B.9 BCVF On/Off Switch
+
+The planner must support running with `lambda_c = 0` (BCVF disabled) for
+baseline comparison. When `lambda_c = 0`:
+- Skip all non-anchor predictor rollouts (only M1 is needed for J_perf)
+- Skip `compute_bcvf_cost_batch` entirely
+- Report `bcvf_cost = 0.0` in `MPPIResult`
+
+This is not just a performance optimization — it is the baseline condition (A0)
+in the Phase 4 ablation protocol. The planner must produce identical J_perf
+behavior regardless of whether BCVF is enabled, so the comparison is fair.
+
+#### 3B.10 Ablation Variants
+
+Phase 4 requires 0th-order and 1st-order ablation variants (V3.1 Section E.5).
+Rather than building separate planners, support these via a `cost_order` field
+on `BCVFConfig`:
+
+```python
+class CostOrder(Enum):
+    ZEROTH = 0   # Penalize ||e_ij|| directly (disagreement magnitude)
+    FIRST = 1    # Penalize ||v_ij|| (disagreement velocity)
+    SECOND = 2   # Penalize ||a_ij|| (disagreement acceleration) — BCVF
+```
+
+When `cost_order` is ZEROTH or FIRST, `compute_bcvf_cost` substitutes the
+corresponding quantity into the gate-penalty chain instead of the acceleration.
+This reuses the same gate, Huber, and summation logic — only the input signal
+changes. Implement this as a parameter on the Phase 1 `compute_bcvf_cost`
+function, but specify it here because it affects planner configuration.
+
+#### 3B.11 Test Specification
+
+Tests go in `bcvf_autonomous/tests/test_mppi.py`.
+
+| Test                                     | What It Validates                                                    |
+|------------------------------------------|----------------------------------------------------------------------|
+| `test_mppi_straight_road_tracks_lane`    | On straight road, no obstacles, no failures: vehicle follows lane center. Final lateral deviation < 1m. |
+| `test_mppi_avoids_obstacle`              | Obstacle on road center: planner steers around it. No collision.     |
+| `test_bcvf_zero_nominal`                | All predictors nominal: `MPPIResult.bcvf_cost` < epsilon.            |
+| `test_bcvf_positive_under_failure`       | LiDAR failure injected: `MPPIResult.bcvf_cost` > 0.                 |
+| `test_lambda_c_zero_skips_bcvf`          | With `lambda_c = 0`: only anchor predictor is rolled out, bcvf_cost = 0. |
+| `test_warm_start_shift`                 | After one planning cycle, warm start mean is shifted previous solution. |
+| `test_control_clamping`                  | Sampled controls respect velocity_bounds and steering_bounds.        |
+| `test_weights_sum_to_one`               | Importance weights sum to 1.0 within floating-point tolerance.       |
+| `test_effective_samples_healthy`         | With default temperature, effective_samples > K/10.                  |
+| `test_perf_cost_rewards_progress`        | Control sequence with forward velocity scores lower J_perf than stationary. |
+| `test_perf_cost_penalizes_deviation`     | Control sequence that drifts off-road scores higher J_perf.          |
+| `test_ablation_zeroth_order`             | `cost_order=ZEROTH` penalizes constant bias (unlike BCVF 2nd-order). |
+| `test_ablation_first_order`              | `cost_order=FIRST` penalizes linear drift (unlike BCVF 2nd-order).  |
+
+#### 3B.12 Estimated Size
+
+~300 lines for `mppi_planner.py` including `MPPIPlanner`, `compute_perf_cost`,
+types, and ablation support.
+
+#### 3B.13 Acceptance Criteria for Sub-section 3B
+
+- [ ] `MPPIPlanner` implements sample, rollout, weight, update cycle
+- [ ] `compute_perf_cost` implements lane deviation, progress, smoothness, collision
+- [ ] Warm start shifts previous solution correctly
+- [ ] `lambda_c = 0` skips BCVF rollouts and scoring
+- [ ] Ablation variants (0th, 1st, 2nd order) configurable via `CostOrder` enum
+- [ ] Vehicle tracks lane on straight road with no failures
+- [ ] Vehicle avoids single obstacle on straight road
+- [ ] BCVF cost is near-zero nominal, positive under failure
+- [ ] Effective sample count is healthy (> K/10) at default temperature
+
+---
+
+_End of Phase 3B. Sub-section 3C (planning loop, config loading, timing
+validation) will follow._
