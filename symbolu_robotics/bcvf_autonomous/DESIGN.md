@@ -2571,5 +2571,445 @@ Tests go in `bcvf_autonomous/tests/test_scenarios.py`.
 
 ---
 
-_End of Phase 4A. Sub-sections 4B (metrics and analysis) and 4C (sweep
-orchestrator and CLI) will follow._
+### 4B — Metrics and Analysis
+
+#### 4B.1 Purpose
+
+Define the metrics that answer "does BCVF work?" and build the analysis
+functions that compute them from `EpisodeDiagnostics` (Phase 3C). Metrics fall
+into two categories:
+
+1. **Per-episode metrics** — computed from a single run (e.g., did it collide?
+   what was the path efficiency?)
+2. **Aggregate metrics** — computed across N runs of the same configuration
+   (e.g., collision rate with 95% confidence interval, mean early warning time)
+
+Phase 4B builds the functions. Phase 4C calls them across the sweep matrix.
+
+**V3.1 reference:** Section 7.3 (metrics table), Appendix E.7 (metrics
+collection).
+
+#### 4B.2 Module
+
+**File:** `bcvf_autonomous/metrics.py` (~200 lines)
+
+#### 4B.3 Per-Episode Metrics
+
+These functions accept a single `EpisodeDiagnostics` and return a scalar or
+small dict.
+
+```python
+@dataclass
+class EpisodeMetrics:
+    """All metrics computed from a single episode."""
+    # Safety
+    collision: bool
+    collision_step: Optional[int]
+    collision_time: Optional[float]            # collision_step * dt
+
+    # Early warning
+    early_warning_time: Optional[float]        # seconds before would-be collision
+    first_bcvf_activation_step: Optional[int]  # first step where J_BCVF > threshold
+    first_bcvf_activation_time: Optional[float]
+
+    # Efficiency
+    path_length: float                         # total distance traveled (meters)
+    road_length: float                         # optimal distance (road centerline)
+    path_efficiency: float                     # path_length / road_length (target >= 0.95)
+
+    # Comfort
+    rms_lateral_jerk: float                    # m/s^3
+    rms_steering_rate: float                   # rad/s
+    max_lateral_acceleration: float            # m/s^2
+
+    # BCVF behavior
+    mean_bcvf_cost: float
+    max_bcvf_cost: float
+    bcvf_activation_rate: float                # fraction of steps with J_BCVF > threshold
+    mean_perf_cost: float
+
+    # Planner health
+    mean_solve_time_ms: float
+    p99_solve_time_ms: float
+    mean_effective_samples: float
+
+def compute_episode_metrics(
+    diagnostics: EpisodeDiagnostics,
+    bcvf_activation_threshold: float = 0.01,
+) -> EpisodeMetrics:
+    """Compute all per-episode metrics from diagnostics."""
+    ...
+```
+
+**Metric computation details:**
+
+---
+
+**Early warning time** (V3.1 Section 7.3: target >= 2 seconds)
+
+The time between BCVF first activating and the vehicle reaching the point where
+baseline (no BCVF) would have collided. This requires comparing against a
+baseline run.
+
+```python
+def compute_early_warning_time(
+    bcvf_diagnostics: EpisodeDiagnostics,
+    baseline_diagnostics: EpisodeDiagnostics,
+    bcvf_activation_threshold: float = 0.01,
+) -> Optional[float]:
+    """
+    Compute early warning time.
+
+    Args:
+        bcvf_diagnostics: episode run WITH BCVF enabled
+        baseline_diagnostics: same scenario run WITHOUT BCVF (lambda_c=0)
+
+    Returns:
+        Seconds between first BCVF activation and baseline collision time.
+        None if baseline did not collide (no warning needed).
+    """
+    if not baseline_diagnostics.collision:
+        return None  # baseline didn't collide, no warning to measure
+
+    baseline_collision_time = baseline_diagnostics.collision_step * dt
+
+    # Find first BCVF activation
+    activation_steps = np.where(
+        bcvf_diagnostics.bcvf_costs > bcvf_activation_threshold
+    )[0]
+    if len(activation_steps) == 0:
+        return None  # BCVF never activated (missed detection)
+
+    first_activation_time = activation_steps[0] * dt
+    return baseline_collision_time - first_activation_time
+```
+
+**Why this needs a baseline run:** Early warning time is defined relative to
+when a collision _would have happened_ without BCVF. The BCVF-enabled run
+avoids the collision (ideally), so there is no collision time in that run to
+reference. The baseline provides the counterfactual.
+
+---
+
+**Path efficiency** (V3.1 Section 7.3: target >= 0.95)
+
+```python
+def _compute_path_length(trajectory: np.ndarray) -> float:
+    """Sum of Euclidean distances between consecutive poses."""
+    diffs = np.diff(trajectory[:, :2], axis=0)
+    return float(np.sum(np.linalg.norm(diffs, axis=1)))
+
+def _compute_road_length(road_centerline: np.ndarray) -> float:
+    """Arc length of the road centerline."""
+    diffs = np.diff(road_centerline, axis=0)
+    return float(np.sum(np.linalg.norm(diffs, axis=1)))
+```
+
+Path efficiency = `road_length / path_length`. Note the inversion from V3.1:
+the document says "path_length / optimal_path_length" but since the vehicle
+may take a longer path (detour around obstacle), this ratio can exceed 1.0.
+We use `road_length / path_length` so the metric is in [0, 1] with 1.0 being
+optimal. Values below 0.95 indicate excessive conservatism.
+
+**Correction:** Actually V3.1 uses `path_length / optimal_path_length` where
+values >= 1.0 mean detours. Both conventions work. We use the V3.1 convention
+to match the document. Target: ratio <= 1.05 (path at most 5% longer than
+optimal).
+
+---
+
+**Comfort metrics** (V3.1 Section 7.3: impact <= 10%)
+
+Three comfort metrics, all computed from the ground-truth trajectory using
+finite differences:
+
+```python
+def _compute_lateral_jerk(trajectory: np.ndarray, dt: float) -> float:
+    """
+    RMS of the third derivative of lateral position.
+
+    Lateral position = perpendicular distance from road centerline at each step.
+    Jerk = d^3(lateral) / dt^3, approximated by third-order finite difference.
+    """
+    # Compute lateral positions (requires road centerline)
+    # Third finite difference: j[k] = (lat[k+3] - 3*lat[k+2] + 3*lat[k+1] - lat[k]) / dt^3
+    ...
+
+def _compute_steering_rate(controls: np.ndarray, dt: float) -> float:
+    """RMS of steering angle rate of change."""
+    steering = controls[:, 1]  # column 1 is steering
+    steering_rate = np.diff(steering) / dt
+    return float(np.sqrt(np.mean(steering_rate ** 2)))
+
+def _compute_max_lateral_accel(trajectory: np.ndarray, dt: float) -> float:
+    """Maximum lateral acceleration magnitude."""
+    # Lateral acceleration from trajectory curvature and velocity
+    velocities = np.linalg.norm(np.diff(trajectory[:, :2], axis=0), axis=1) / dt
+    headings = trajectory[:, 2]
+    heading_rate = np.diff(headings) / dt
+    lateral_accel = velocities[:-1] * heading_rate[:-1]  # v * dtheta/dt
+    return float(np.max(np.abs(lateral_accel)))
+```
+
+Comfort impact is measured as the ratio of the BCVF-enabled metric to the
+baseline metric. Target: ratio <= 1.10 (at most 10% degradation).
+
+---
+
+**BCVF activation rate** (V3.1 Section 7.3: false positive rate <= 1%)
+
+```python
+bcvf_activation_rate = np.mean(bcvf_costs > bcvf_activation_threshold)
+```
+
+For S1 (normal driving), this is the false positive rate. Target: <= 0.01.
+For failure scenarios, this measures how responsive BCVF is. Higher is not
+necessarily better — activation should correlate with the failure onset, not
+with noise.
+
+---
+
+#### 4B.4 Aggregate Metrics
+
+These functions accept a list of `EpisodeMetrics` (from N runs of the same
+configuration) and return population statistics with confidence intervals.
+
+```python
+@dataclass
+class AggregateMetrics:
+    """Statistics across N runs of one configuration."""
+    n_runs: int
+
+    # Safety
+    collision_rate: float                   # fraction of runs with collision
+    collision_rate_ci_low: float            # 95% Wilson CI lower bound
+    collision_rate_ci_high: float           # 95% Wilson CI upper bound
+
+    # Early warning
+    early_warning_time_median: Optional[float]
+    early_warning_time_iqr: Optional[Tuple[float, float]]  # 25th, 75th percentile
+
+    # Efficiency
+    path_efficiency_mean: float
+    path_efficiency_std: float
+
+    # Comfort
+    rms_lateral_jerk_mean: float
+    rms_lateral_jerk_std: float
+
+    # BCVF
+    false_positive_rate: float              # activation rate in S1 (normal)
+    mean_bcvf_cost_mean: float
+    mean_bcvf_cost_std: float
+
+    # Planner
+    solve_time_mean_ms: float
+    solve_time_p99_ms: float
+
+def compute_aggregate_metrics(
+    episode_metrics_list: List[EpisodeMetrics],
+) -> AggregateMetrics:
+    """Aggregate N episode metrics into population statistics."""
+    ...
+```
+
+**Wilson confidence interval for collision rate:**
+
+The collision rate is a binomial proportion. The Wilson interval is preferred
+over the Wald interval because it is accurate even for small N or extreme
+proportions (near 0 or 1), which is the regime BCVF targets (near-zero
+collision rate).
+
+```python
+def _wilson_ci(successes: int, n: int, z: float = 1.96) -> Tuple[float, float]:
+    """
+    Wilson score interval for binomial proportion.
+
+    Args:
+        successes: number of "positive" outcomes (collisions)
+        n: total number of trials
+        z: z-score for confidence level (1.96 = 95%)
+
+    Returns:
+        (lower_bound, upper_bound) of the confidence interval
+    """
+    if n == 0:
+        return (0.0, 1.0)
+    p_hat = successes / n
+    denominator = 1 + z**2 / n
+    center = (p_hat + z**2 / (2*n)) / denominator
+    margin = (z / denominator) * np.sqrt(p_hat*(1-p_hat)/n + z**2/(4*n**2))
+    return (max(0.0, center - margin), min(1.0, center + margin))
+```
+
+**V3.1 reference:** Appendix E.7 — "95% Wilson confidence interval."
+
+---
+
+#### 4B.5 Comparative Analysis
+
+The ablation study (V3.1 Section E.5) compares 4 variants across scenarios.
+This requires pairwise comparison functions.
+
+```python
+@dataclass
+class ComparisonResult:
+    """Pairwise comparison between two configurations."""
+    config_a_name: str
+    config_b_name: str
+    metric_name: str
+    a_mean: float
+    b_mean: float
+    difference: float                      # b_mean - a_mean
+    relative_change: float                 # difference / a_mean (if a_mean != 0)
+    significant: bool                      # p < 0.05
+    p_value: float
+
+def compare_collision_rates(
+    metrics_a: AggregateMetrics,
+    metrics_b: AggregateMetrics,
+) -> ComparisonResult:
+    """
+    Compare collision rates using Fisher's exact test.
+
+    Used for: "Does BCVF reduce collision rate vs. baseline?"
+    """
+    ...
+
+def compare_continuous_metric(
+    values_a: List[float],
+    values_b: List[float],
+    metric_name: str,
+    config_a_name: str,
+    config_b_name: str,
+) -> ComparisonResult:
+    """
+    Compare continuous metrics using paired or unpaired t-test.
+
+    Used for: path efficiency, comfort metrics, solve time.
+    """
+    ...
+```
+
+**Statistical tests:**
+
+| Metric | Test | Justification |
+|--------|------|---------------|
+| Collision rate | Fisher's exact test | Binary outcome, small expected counts |
+| Path efficiency | Welch's t-test (unpaired) | Continuous, may have unequal variance |
+| RMS lateral jerk | Welch's t-test (unpaired) | Continuous |
+| Early warning time | Mann-Whitney U test | May not be normally distributed, often has outliers |
+| Solve time | Welch's t-test (unpaired) | Continuous, approximately normal |
+
+**Implementation note:** These tests use only `numpy` and basic math — no
+`scipy.stats` dependency. The t-test and Fisher's exact test are implementable
+in ~20 lines each using standard formulas. Mann-Whitney U uses the normal
+approximation for N >= 20, which is always true for our N=100 runs.
+
+---
+
+#### 4B.6 Result Summary Table
+
+The final output of Phase 4 analysis is a summary table matching V3.1 Appendix
+E.8. This function produces a structured dict suitable for printing or JSON
+export.
+
+```python
+def build_summary_table(
+    results: Dict[Tuple[str, str], AggregateMetrics],
+) -> Dict:
+    """
+    Build the V3.1 Appendix E.8 summary table.
+
+    Args:
+        results: mapping of (scenario_name, variant_name) -> AggregateMetrics
+                 variant_name is one of: "A0_baseline", "A1_zeroth",
+                 "A2_first", "A3_second_bcvf"
+
+    Returns:
+        Nested dict:
+        {
+            scenario: {
+                variant: {
+                    "collision_rate": "0.85 [0.77, 0.91]",
+                    "path_efficiency": "1.02 +/- 0.03",
+                    "early_warning_s": "3.1 [2.4, 4.0]",
+                    "false_positive_rate": "0.00",
+                    "rms_jerk_ratio": "1.04",
+                    "solve_time_ms": "17.2 +/- 1.1",
+                }
+            }
+        }
+    """
+    ...
+```
+
+**Expected table shape** (matches V3.1 Appendix E.8):
+
+```
+                   | Baseline (A0)  | 0th-Order (A1)  | 1st-Order (A2) | BCVF (A3)
+-------------------+----------------+-----------------+----------------+----------
+S1 Normal          | —              | —               | —              | —
+S2 GPS multipath   | collision 85%  | avoids          | delayed        | early avoidance
+S3 Map error       | collision 90%  | avoids (noisy)  | late           | early
+S4 Camera degrade  | wrong lane     | noisy           | gradual        | smooth
+S5 Constant bias   | optimal        | degraded (FP)   | optimal        | optimal (a=0)
+S6 Glass corridor  | collision 95%  | avoids (FP)     | late avoidance | early, low FP
+```
+
+---
+
+#### 4B.7 Test Specification
+
+Tests go in `bcvf_autonomous/tests/test_metrics.py`.
+
+| Test                                        | What It Validates                                                      |
+|---------------------------------------------|------------------------------------------------------------------------|
+| `test_path_length_straight_line`            | Straight trajectory of length 100m -> `path_length == 100.0`          |
+| `test_path_efficiency_perfect`              | Path exactly on road centerline -> efficiency ~= 1.0                  |
+| `test_path_efficiency_detour`               | Path 10% longer than road -> efficiency ~= 1.10                      |
+| `test_lateral_jerk_constant_velocity`       | Straight line at constant speed -> lateral jerk ~= 0                  |
+| `test_steering_rate_constant`               | Constant steering -> steering rate ~= 0                               |
+| `test_bcvf_activation_rate_zero_nominal`    | All-zero BCVF costs -> activation rate = 0                            |
+| `test_bcvf_activation_rate_half`            | Half of steps above threshold -> activation rate = 0.5               |
+| `test_early_warning_time_basic`             | Baseline collides at step 100, BCVF activates at step 50 -> EWT = 5.0s |
+| `test_early_warning_time_no_baseline_collision` | Baseline does not collide -> EWT is None                          |
+| `test_wilson_ci_zero_rate`                  | 0 successes out of 100 -> CI includes 0.0, upper bound < 0.05       |
+| `test_wilson_ci_full_rate`                  | 100 successes out of 100 -> CI includes 1.0, lower bound > 0.95     |
+| `test_wilson_ci_half_rate`                  | 50 out of 100 -> CI approximately [0.40, 0.60]                       |
+| `test_aggregate_metrics_shapes`             | 100 episode metrics aggregate correctly, all fields populated         |
+| `test_compare_collision_rates_significant`  | 85/100 vs 5/100 -> significant=True, p < 0.001                       |
+| `test_compare_continuous_metric`            | Two normal samples with different means -> detects difference         |
+| `test_summary_table_structure`              | `build_summary_table` returns dict with all scenarios and variants   |
+
+#### 4B.8 Design Constraints
+
+1. **No scipy dependency.** Statistical tests are implemented from formulas
+   using NumPy only. This matches the V1 NumPy-only policy from Phase 0.
+
+2. **No plotting.** `metrics.py` computes numbers. Plotting is Phase 5
+   packaging. The summary table dict is the visualization-ready output.
+
+3. **No execution.** `metrics.py` does not run episodes. It accepts
+   `EpisodeDiagnostics` or `EpisodeMetrics` lists and returns analysis. Phase 4C
+   orchestrates the runs and passes results to these functions.
+
+4. **Deterministic analysis.** Given the same diagnostics, `compute_episode_metrics`
+   always returns the same result. No randomness in the analysis layer.
+
+#### 4B.9 Acceptance Criteria for Sub-section 4B
+
+- [ ] `metrics.py` implements `compute_episode_metrics`, `compute_aggregate_metrics`,
+  `compute_early_warning_time`, `compare_collision_rates`,
+  `compare_continuous_metric`, `build_summary_table`
+- [ ] Wilson CI implemented without scipy
+- [ ] Fisher's exact test implemented without scipy
+- [ ] Welch's t-test implemented without scipy
+- [ ] Path efficiency computed correctly for straight and detour trajectories
+- [ ] Early warning time requires baseline comparison run
+- [ ] Summary table matches V3.1 Appendix E.8 structure
+- [ ] All 16 tests pass
+
+---
+
+_End of Phase 4B. Sub-section 4C (sweep orchestrator and CLI) will follow._
