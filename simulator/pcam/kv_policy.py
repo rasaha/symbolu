@@ -72,7 +72,7 @@ import math
 import random
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 # ---------------------------------------------------------------------------
 # Reference re-exports — vendored, not sys.path-hacked.
@@ -219,6 +219,14 @@ class BlockState:
     last_access_step: int = 0
     access_count: int = 0
     is_sink: bool = False
+    # Stage 1 (FSCS-derived): boundary sensitivity. Set by the caller
+    # via set_block_boundary() or ensure_block(boundary_score=...).
+    # Higher = block contains or is near structurally important
+    # boundary tokens (sentence starts, paragraph breaks, discourse
+    # markers). Blocks with high boundary_score are attention sinks
+    # that many heads attend to; evicting them causes disproportionate
+    # quality damage. Default 0.0 = no boundary information available.
+    boundary_score: float = 0.0
 
 
 @dataclass
@@ -234,13 +242,25 @@ class PhaseWeights:
     frequency: float
     attention: float
     position: float
+    # Stage 1 (FSCS-derived): boundary sensitivity weight.
+    # Default 0.0 preserves exact backward compatibility with the
+    # ADR-0001 four-signal model. When non-zero, blocks with high
+    # boundary_score get a proportional score boost, making them
+    # harder to evict. The signal is additive, same convention as
+    # the other four terms.
+    boundary: float = 0.0
 
 
 # Four-signal phase-aware scoring weights. These are the canonical values
 # locked by ADR-0001; do not retune without an ADR amendment.
+#
+# The boundary weight defaults to 0.0 in both phases, making the
+# fifth signal completely inert unless an operator explicitly enables
+# it. Recommended starting point when enabled: 0.10 in both phases
+# (boundary tokens are equally important during prefill and decode).
 PHASE_WEIGHTS = {
-    InferencePhase.PREFILL: PhaseWeights(0.15, 0.20, 0.35, 0.30),
-    InferencePhase.DECODE:  PhaseWeights(0.30, 0.20, 0.30, 0.20),
+    InferencePhase.PREFILL: PhaseWeights(0.15, 0.20, 0.35, 0.30, boundary=0.0),
+    InferencePhase.DECODE:  PhaseWeights(0.30, 0.20, 0.30, 0.20, boundary=0.0),
 }
 
 
@@ -333,6 +353,11 @@ class KVCachePolicy:
         self._ema_count = 0   # number of attention updates
         self._entity_k = 2.0  # entity = ema > global_mean * k
 
+        # Per-instance phase weights, initialized from the global defaults.
+        # Override via set_boundary_weight() to enable Stage 1 without
+        # modifying the ADR-0001 global weights.
+        self._phase_weights: Dict[InferencePhase, PhaseWeights] = dict(PHASE_WEIGHTS)
+
         self.stats = {
             "evictions": 0,
             "filler_evictions": 0,
@@ -343,6 +368,36 @@ class KVCachePolicy:
     def set_rng(self, rng: random.Random) -> None:
         """Set the RNG instance for reproducible victim selection."""
         self._rng = rng
+
+    def set_boundary_weight(
+        self,
+        weight: float,
+        prefill: Optional[float] = None,
+        decode: Optional[float] = None,
+    ) -> None:
+        """
+        Enable the Stage 1 boundary-sensitivity signal by setting its
+        weight in the scoring formula. By default, both phases use the
+        same weight. Pass ``prefill`` or ``decode`` to differentiate.
+
+        The boundary weight is additive alongside the existing four
+        signals. Recommended starting value: 0.10.
+
+        Does NOT modify the global PHASE_WEIGHTS constant (which is
+        locked by ADR-0001). Only this instance's scoring is affected.
+        """
+        pw = prefill if prefill is not None else weight
+        dw = decode if decode is not None else weight
+        base_p = PHASE_WEIGHTS[InferencePhase.PREFILL]
+        base_d = PHASE_WEIGHTS[InferencePhase.DECODE]
+        self._phase_weights[InferencePhase.PREFILL] = PhaseWeights(
+            base_p.recency, base_p.frequency, base_p.attention,
+            base_p.position, boundary=pw,
+        )
+        self._phase_weights[InferencePhase.DECODE] = PhaseWeights(
+            base_d.recency, base_d.frequency, base_d.attention,
+            base_d.position, boundary=dw,
+        )
 
     # ---- Sequence lifecycle -------------------------------------------------
 
@@ -365,16 +420,48 @@ class KVCachePolicy:
 
     # ---- Block admission and attention events -------------------------------
 
+    # ---- Stage 1 (FSCS-derived): boundary sensitivity --------------------
+
+    def set_block_boundary(
+        self,
+        block_id: int,
+        boundary_score: float,
+    ) -> None:
+        """
+        Set boundary sensitivity for an existing block. The caller
+        determines what constitutes a boundary (sentence start, paragraph
+        break, discourse marker, etc.) and passes a score in [0, 1].
+
+        This is the primary interface for callers that discover boundary
+        information after initial block admission. For callers that know
+        boundary status at admission time, ``ensure_block()`` also accepts
+        an optional ``boundary_score`` parameter.
+
+        No-op if ``block_id`` is unknown. Does not change any other
+        block state.
+        """
+        block = self.blocks.get(block_id)
+        if block is not None:
+            block.boundary_score = float(boundary_score)
+
+    # ---- Block admission and attention events -------------------------------
+
     def ensure_block(
         self,
         block_id: int,
         sequence_id: int,
         positions: List[int],
+        boundary_score: float = 0.0,
     ) -> None:
         """
         Lightweight block registration. Creates block metadata without
         recording any attention — used on admission. Idempotent: re-calls
         with an existing block_id are a no-op and do not increment _step.
+
+        ``boundary_score`` (Stage 1, optional, default 0.0): boundary
+        sensitivity hint in [0, 1]. Higher = block contains structurally
+        important boundary tokens. Has no effect unless the boundary
+        weight in PhaseWeights is non-zero.
         """
         if block_id not in self.blocks:
             self._step += 1
@@ -385,6 +472,7 @@ class KVCachePolicy:
                 created_step=self._step,
                 token_count=len(positions),
                 is_sink=is_sink,
+                boundary_score=float(boundary_score),
             )
             self.blocks[block_id] = block
 
@@ -497,7 +585,7 @@ class KVCachePolicy:
         seq = self.sequences.get(block.sequence_id)
         phase = seq.phase if seq else InferencePhase.DECODE
 
-        w = PHASE_WEIGHTS.get(phase)
+        w = self._phase_weights.get(phase)
         if not w:
             return -1.0
 
@@ -519,6 +607,13 @@ class KVCachePolicy:
             + w.attention * attention
             + w.position * importance
         )
+
+        # Signal 5 (Stage 1, FSCS-derived): boundary sensitivity.
+        # Blocks containing or near structural boundaries get a score
+        # boost proportional to their boundary_score. The weight is
+        # 0.0 by default (no effect unless explicitly enabled).
+        if w.boundary > 0.0 and block.boundary_score > 0.0:
+            score += w.boundary * block.boundary_score
 
         # Entity bonus: protect high-attention non-sink blocks.
         if not block.is_sink and block.attention_ema > self._adaptive_threshold:
