@@ -574,5 +574,514 @@ Phase 1 is complete when:
 
 ---
 
-_End of Phase 1. Phase 2 (Predictor Framework) will be appended after Phase 1
-implementation is complete._
+## Phase 2 — Predictor Framework
+
+### 2.1 Purpose
+
+Build a set of 4 heterogeneous predictors that can generate divergent SE(2)
+trajectories under injected failure conditions. These predictors feed into the
+Phase 1 math kernel — they produce the trajectory arrays that `compute_bcvf_cost`
+scores.
+
+Phase 2 does NOT build real SLAM, visual odometry, or GPS receivers. It builds
+_proxy predictors_: lightweight objects that simulate the characteristic noise
+and failure profiles of their real-world counterparts. The key V3.1 design
+insight (Appendix E.2) is that each predictor shares a common forward dynamics
+model — the kinematic bicycle model — but starts from its own state estimate,
+which diverges under different failure conditions. This produces realistic
+heterogeneous disagreement without requiring full localization stacks.
+
+Phase 2 produces 5 files: `base.py` + 4 predictor implementations.
+
+### 2.2 Architecture
+
+```
+                    ┌───────────────────────────┐
+                    │     BasePredictor          │
+                    │  - bicycle_model(state, u) │
+                    │  - predict(state, u_seq)   │
+                    │  - inject_failure(params)  │
+                    │  - reset()                 │
+                    └─────────┬─────────────────┘
+                              │ inherits
+            ┌─────────────────┼─────────────────────┐
+            │                 │                      │
+    ┌───────┴───────┐ ┌──────┴────────┐  ┌──────────┴──────────┐
+    │ IMUOdometry   │ │ LidarSLAM     │  │ VisualOdometry      │
+    │ (M1 - anchor) │ │ (M2)          │  │ (M3)                │
+    └───────────────┘ └───────────────┘  └─────────────────────┘
+                                                    │
+                                          ┌─────────┴──────────┐
+                                          │ GNSSMap             │
+                                          │ (M4)                │
+                                          └────────────────────┘
+```
+
+All 4 predictors share the same `bicycle_model()` forward dynamics. They differ
+only in:
+1. **State estimate noise** — each has a different noise profile in nominal mode
+2. **Failure injection** — each has a characteristic failure mode that can be
+   triggered at runtime to cause its state estimate to diverge
+
+### 2.3 Modules
+
+#### 2.3.1 `predictors/base.py` — Abstract Base + Bicycle Model
+
+**V3.1 reference:** Appendix E.2
+
+**Types to define:**
+
+```python
+@dataclass
+class BicycleConfig:
+    """Kinematic bicycle model parameters."""
+    wheelbase: float = 2.7       # L_wb: meters (rear axle to front axle)
+    max_steering: float = 0.6    # radians (~34 degrees)
+    max_velocity: float = 15.0   # m/s
+    max_acceleration: float = 3.0  # m/s^2
+    dt: float = 0.1              # seconds
+
+@dataclass
+class PredictorState:
+    """Current state estimate held by a predictor."""
+    x: float = 0.0
+    y: float = 0.0
+    theta: float = 0.0
+    velocity: float = 0.0       # current forward velocity (m/s)
+    timestamp: float = 0.0
+
+@dataclass
+class FailureConfig:
+    """Failure injection parameters."""
+    active: bool = False
+    onset_time: float = 0.0     # when failure begins (seconds)
+    severity: float = 1.0       # 0.0 = nominal, 1.0 = full failure
+    ramp_duration: float = 0.0  # seconds to ramp from 0 to severity
+
+class ControlInput:
+    """Single control input for bicycle model."""
+    velocity: float = 0.0       # desired forward velocity (m/s)
+    steering: float = 0.0       # steering angle (radians)
+```
+
+**Abstract base class:**
+
+```python
+class BasePredictor(ABC):
+    """
+    Abstract predictor that forward-simulates trajectories from its own
+    state estimate using a kinematic bicycle model.
+    """
+
+    def __init__(self, model_id: str, bicycle_config: BicycleConfig):
+        ...
+
+    def bicycle_step(self, state: PredictorState, control: ControlInput) -> PredictorState:
+        """One step of kinematic bicycle model. Shared by all predictors."""
+        ...
+
+    @abstractmethod
+    def apply_noise(self, state: PredictorState, step: int) -> PredictorState:
+        """Apply predictor-specific noise to state estimate."""
+        ...
+
+    @abstractmethod
+    def apply_failure(self, state: PredictorState, time: float) -> PredictorState:
+        """Apply predictor-specific failure distortion."""
+        ...
+
+    def predict(self, control_sequence: np.ndarray) -> np.ndarray:
+        """
+        Forward-simulate trajectory from current state estimate.
+
+        Args:
+            control_sequence: (H, 2) array of [velocity, steering] per step
+
+        Returns:
+            trajectory: (H, 3) array of [x, y, theta] per step
+        """
+        ...
+
+    def update_state(self, ground_truth: PredictorState) -> None:
+        """Update internal state estimate from ground truth + noise."""
+        ...
+
+    def set_failure(self, config: FailureConfig) -> None:
+        """Configure failure injection."""
+        ...
+
+    def reset(self) -> None:
+        """Reset to initial state, clear failure."""
+        ...
+```
+
+**Kinematic bicycle model** (`bicycle_step`):
+
+```
+x_{t+1}     = x_t + v * cos(theta_t) * dt
+y_{t+1}     = y_t + v * sin(theta_t) * dt
+theta_{t+1} = theta_t + (v / L_wb) * tan(delta) * dt
+```
+
+Where:
+- `v` = forward velocity, clamped to `[-max_velocity, max_velocity]`
+- `delta` = steering angle, clamped to `[-max_steering, max_steering]`
+- `L_wb` = wheelbase
+- `dt` = time step
+
+This is the standard kinematic bicycle model used throughout the autonomous
+driving literature. It is shared identically across all 4 predictors — the only
+difference is the state estimate each predictor starts from.
+
+**`predict()` method flow:**
+
+```
+1. Start from self._state (predictor's current state estimate)
+2. For each step k in control_sequence:
+   a. state = bicycle_step(state, control[k])
+   b. state = apply_noise(state, k)      # predictor-specific noise
+   c. state = apply_failure(state, time)  # if failure is active
+   d. record state into trajectory array
+3. Return trajectory as (H, 3) ndarray of [x, y, theta]
+```
+
+**Important:** `predict()` does NOT mutate `self._state`. It simulates forward
+from a copy. The internal state only changes via `update_state()`, which is
+called once per real time step by the simulation loop (Phase 3).
+
+**Estimated size:** ~100 lines.
+
+#### 2.3.2 `predictors/imu_odometry.py` — M1 (Anchor)
+
+**V3.1 reference:** Appendix E.2 Model M1
+
+**Sensor basis:** IMU + wheel encoders (dead reckoning)
+
+**Nominal noise profile:**
+- Position noise: N(0, 0.01) meters per step
+- Heading noise: N(0, 0.001) radians per step
+- Cumulative drift: 0.005 m/step (random walk, does not self-correct)
+
+**Characteristic failure mode:** Drift over time. No absolute reference, so
+errors accumulate. This is the _mildest_ failure — M1 is chosen as anchor
+because it degrades slowly and predictably, never jumping or hallucinating.
+
+**Failure injection:** Accelerated drift rate. When failure is active, drift
+rate increases from 0.005 to `0.005 + severity * 0.05` m/step. This simulates
+IMU bias instability or wheel slip.
+
+**`apply_noise` implementation:**
+```python
+def apply_noise(self, state, step):
+    state.x += self._rng.normal(0, 0.01)
+    state.y += self._rng.normal(0, 0.01)
+    state.theta += self._rng.normal(0, 0.001)
+    # Cumulative drift (random walk)
+    self._drift_x += self._rng.normal(0, self._drift_rate)
+    self._drift_y += self._rng.normal(0, self._drift_rate)
+    state.x += self._drift_x
+    state.y += self._drift_y
+    return state
+```
+
+**`apply_failure` implementation:**
+```python
+def apply_failure(self, state, time):
+    if not self._failure.active or time < self._failure.onset_time:
+        return state
+    progress = min(1.0, (time - self._failure.onset_time) / max(self._failure.ramp_duration, 1e-6))
+    boosted_rate = 0.005 + progress * self._failure.severity * 0.05
+    self._drift_rate = boosted_rate
+    return state
+```
+
+**Why M1 is the anchor:** The anchor model should be the one least likely to
+experience sudden, large-scale failures. IMU+odometry degrades gracefully
+(linear drift) rather than catastrophically (GPS jumps, camera blackout). Its
+failure mode produces linearly growing disagreement — which BCVF ignores by
+design (2nd-order is zero for linear drift). This means the anchor's own slow
+degradation does not contaminate the BCVF cost signal.
+
+**Estimated size:** ~80 lines.
+
+#### 2.3.3 `predictors/lidar_slam.py` — M2
+
+**V3.1 reference:** Appendix E.2 Model M2
+
+**Sensor basis:** LiDAR point cloud
+
+**Nominal noise profile:**
+- Position noise: N(0, 0.02) meters per step
+- Heading noise: N(0, 0.005) radians per step
+- No cumulative drift (SLAM loop closure corrects drift)
+
+**Characteristic failure mode:** Degrades in glass/reflective surfaces, rain,
+and fog. LiDAR returns pass through glass or scatter in rain, causing the SLAM
+algorithm to lose tracking or register false surfaces.
+
+**Failure injection:** When active, position noise increases exponentially and
+a systematic bias term grows quadratically (simulating the SLAM estimate
+drifting as scan matching quality degrades).
+
+**`apply_failure` implementation:**
+```python
+def apply_failure(self, state, time):
+    if not self._failure.active or time < self._failure.onset_time:
+        return state
+    elapsed = time - self._failure.onset_time
+    progress = min(1.0, elapsed / max(self._failure.ramp_duration, 1e-6))
+    scale = progress * self._failure.severity
+
+    # Noise inflation (scan matching uncertainty)
+    noise_boost = 1.0 + scale * 10.0
+    state.x += self._rng.normal(0, 0.02 * noise_boost)
+    state.y += self._rng.normal(0, 0.02 * noise_boost)
+
+    # Systematic drift (false surface registration)
+    # Quadratic: simulates accelerating divergence
+    state.x += scale * 0.5 * elapsed**2 * 0.01
+    return state
+```
+
+**Key property:** The quadratic bias term produces _accelerating divergence_ —
+exactly the signal that BCVF's second-order detector is designed to catch. This
+is the primary scenario where BCVF should activate.
+
+**Estimated size:** ~80 lines.
+
+#### 2.3.4 `predictors/visual_odometry.py` — M3
+
+**V3.1 reference:** Appendix E.2 Model M3
+
+**Sensor basis:** RGB camera
+
+**Nominal noise profile:**
+- Position noise: N(0, 0.03) meters per step
+- Heading noise: N(0, 0.008) radians per step
+- Mild drift: 0.002 m/step (VO accumulates small errors without loop closure)
+
+**Characteristic failure mode:** Fails in low light, texture-poor environments,
+and during rapid motion (motion blur). Unlike LiDAR, camera failure is often
+binary — tracking is either good or lost entirely.
+
+**Failure injection:** When active, VO tracking quality degrades progressively.
+Modeled as a two-phase process:
+1. **Degradation phase** (severity 0-0.5): noise increases, small heading jumps
+2. **Tracking loss phase** (severity 0.5-1.0): state estimate freezes (last
+   known position) with random walk, simulating lost feature tracking
+
+**`apply_failure` implementation:**
+```python
+def apply_failure(self, state, time):
+    if not self._failure.active or time < self._failure.onset_time:
+        return state
+    elapsed = time - self._failure.onset_time
+    progress = min(1.0, elapsed / max(self._failure.ramp_duration, 1e-6))
+    scale = progress * self._failure.severity
+
+    if scale < 0.5:
+        # Degradation: increasing noise + occasional heading jumps
+        noise_mult = 1.0 + scale * 8.0
+        state.x += self._rng.normal(0, 0.03 * noise_mult)
+        state.y += self._rng.normal(0, 0.03 * noise_mult)
+        if self._rng.random() < scale * 0.1:
+            state.theta += self._rng.normal(0, 0.2)  # heading jump
+    else:
+        # Tracking loss: freeze + random walk
+        if self._frozen_state is None:
+            self._frozen_state = PredictorState(
+                x=state.x, y=state.y, theta=state.theta
+            )
+        state.x = self._frozen_state.x + self._rng.normal(0, 0.1)
+        state.y = self._frozen_state.y + self._rng.normal(0, 0.1)
+        state.theta = self._frozen_state.theta
+    return state
+```
+
+**Key property:** The heading jumps in the degradation phase create sudden
+changes in disagreement velocity, which produce acceleration spikes that BCVF
+detects. The tracking loss phase creates growing position error that accelerates
+as the true vehicle moves away from the frozen estimate.
+
+**Estimated size:** ~80 lines.
+
+#### 2.3.5 `predictors/gnss_map.py` — M4
+
+**V3.1 reference:** Appendix E.2 Model M4
+
+**Sensor basis:** GPS receiver + HD map
+
+**Nominal noise profile:**
+- Position noise: N(0, 0.5) meters per step (GPS is inherently noisier)
+- Heading noise: N(0, 0.01) radians per step (derived from velocity vector)
+- No cumulative drift (absolute reference)
+
+**Characteristic failure mode:** GPS multipath in urban canyons and outdated
+maps. Multipath causes position jumps of 2-5m with increasing frequency. Map
+errors cause systematic position offset when the road layout has changed.
+
+**Failure injection:** Two sub-modes controlled by a `failure_type` field:
+
+**Mode A — GPS multipath:**
+```python
+def _apply_multipath(self, state, elapsed, scale):
+    # Increasing frequency of position jumps
+    jump_probability = scale * 0.3  # up to 30% of steps
+    if self._rng.random() < jump_probability:
+        jump_magnitude = 2.0 + self._rng.exponential(scale * 3.0)
+        jump_angle = self._rng.uniform(0, 2 * np.pi)
+        state.x += jump_magnitude * np.cos(jump_angle)
+        state.y += jump_magnitude * np.sin(jump_angle)
+    return state
+```
+
+**Mode B — Map error (construction zone):**
+```python
+def _apply_map_error(self, state, elapsed, scale):
+    # Road layout differs from map: systematic lateral offset
+    # that grows as vehicle proceeds into the changed area
+    lateral_offset = scale * elapsed * 0.5  # meters
+    # Offset is perpendicular to heading
+    state.x += lateral_offset * np.cos(state.theta + np.pi/2)
+    state.y += lateral_offset * np.sin(state.theta + np.pi/2)
+    return state
+```
+
+**Key property:** GPS multipath produces _discrete jumps_ in disagreement — the
+second difference operator sees these as large acceleration spikes at the jump
+boundaries. Map error produces _smoothly accelerating_ lateral divergence. Both
+trigger BCVF, but through different acceleration patterns.
+
+**Estimated size:** ~80 lines.
+
+### 2.4 Predictor Factory
+
+A simple factory function in `predictors/__init__.py` creates the standard set:
+
+```python
+def create_predictor_set(
+    bicycle_config: Optional[BicycleConfig] = None,
+    seed: int = 42,
+) -> Dict[str, BasePredictor]:
+    """Create the standard 4-predictor set for SE(2) ground vehicle."""
+    return {
+        "M1": IMUOdometry(bicycle_config, seed=seed),
+        "M2": LidarSLAM(bicycle_config, seed=seed + 1),
+        "M3": VisualOdometry(bicycle_config, seed=seed + 2),
+        "M4": GNSSMap(bicycle_config, seed=seed + 3),
+    }
+```
+
+**Seeding:** Each predictor gets a deterministic RNG seeded from the base seed.
+This ensures reproducible failure trajectories across experiment runs.
+
+### 2.5 Integration with Phase 1
+
+Phase 2 output plugs directly into Phase 1 input. The contract is:
+
+```python
+# Phase 2 produces:
+control_sequence = np.array(...)        # (H, 2) — velocity + steering
+trajectories = [
+    predictors["M1"].predict(control_sequence),  # (H, 3)
+    predictors["M2"].predict(control_sequence),  # (H, 3)
+    predictors["M3"].predict(control_sequence),  # (H, 3)
+    predictors["M4"].predict(control_sequence),  # (H, 3)
+]
+
+# Phase 1 consumes:
+result = compute_bcvf_cost(trajectories, bcvf_config)
+```
+
+No adapters, no type conversion. Predictor output shape (H, 3) matches
+`compute_bcvf_cost` input shape (H, 3) directly.
+
+### 2.6 Test Specification
+
+Tests go in `bcvf_autonomous/tests/test_predictors.py`.
+
+#### 2.6.1 Bicycle Model Tests
+
+| Test                                  | What It Validates                                                    |
+|---------------------------------------|----------------------------------------------------------------------|
+| `test_bicycle_straight_line`          | Zero steering + constant velocity -> straight-line trajectory        |
+| `test_bicycle_constant_turn`          | Constant steering -> circular arc (check radius = L_wb / tan(delta)) |
+| `test_bicycle_zero_velocity`          | Zero velocity -> stationary regardless of steering                   |
+| `test_bicycle_clamps_velocity`        | Velocity above max is clamped                                        |
+| `test_bicycle_clamps_steering`        | Steering above max is clamped                                        |
+| `test_bicycle_reverse`                | Negative velocity -> backward motion                                 |
+
+#### 2.6.2 Nominal Agreement Tests
+
+| Test                                  | What It Validates                                                    |
+|---------------------------------------|----------------------------------------------------------------------|
+| `test_nominal_trajectories_close`     | All 4 predictors produce similar trajectories in nominal mode (no failure). Max pairwise disagreement < 2m over H=50 steps. |
+| `test_nominal_bcvf_low`               | BCVF cost across all 4 nominal trajectories is near zero (gate suppresses noise-floor disagreement). |
+| `test_predictor_determinism`          | Same seed -> same trajectory (reproducibility)                       |
+
+#### 2.6.3 Failure Divergence Tests
+
+| Test                                  | What It Validates                                                    |
+|---------------------------------------|----------------------------------------------------------------------|
+| `test_lidar_failure_accelerating`     | M2 with glass-corridor failure: disagreement vs M1 grows quadratically. Fit a quadratic to e(k) and verify R^2 > 0.9. |
+| `test_vo_tracking_loss`              | M3 with tracking-loss failure: state freezes, growing displacement from true position.  |
+| `test_gps_multipath_jumps`           | M4 with multipath: position jumps of 2-5m appear with increasing frequency. Count jumps > 2m.  |
+| `test_gps_map_error_lateral`         | M4 with map error: systematic lateral offset grows over time.        |
+| `test_imu_drift_linear`              | M1 accelerated drift: disagreement grows linearly (not quadratically). Important: BCVF should produce near-zero cost for this because acceleration of linear drift is zero.  |
+
+#### 2.6.4 Integration Test with Phase 1
+
+| Test                                  | What It Validates                                                    |
+|---------------------------------------|----------------------------------------------------------------------|
+| `test_nominal_all_predictors_bcvf_zero` | Create all 4 predictors in nominal mode, generate trajectories for a straight-line control sequence, pass to `compute_bcvf_cost`. Assert cost < epsilon. |
+| `test_lidar_failure_bcvf_positive`   | Create predictors, inject LiDAR failure at t=2s, generate trajectories, assert `compute_bcvf_cost` > 0. |
+| `test_failure_vs_nominal_ordering`   | BCVF cost with LiDAR failure > BCVF cost nominal (directional check). |
+
+### 2.7 Design Constraints
+
+1. **No planner dependency.** Predictors accept raw control sequences as (H, 2)
+   arrays. They do not know about MPPI, J_perf, or planning costs.
+
+2. **No simulator dependency.** Predictors do not interact with an environment.
+   They forward-simulate from their internal state estimate. The simulation loop
+   that feeds ground truth into `update_state()` is a Phase 3 concern.
+
+3. **Deterministic by default.** All randomness flows through `numpy.random.Generator`
+   instances seeded at construction. Same seed -> same trajectories.
+
+4. **Failure is injectable, not automatic.** Predictors start in nominal mode.
+   Failures are activated by calling `set_failure(FailureConfig(...))`. This
+   separates the predictor mechanics from the scenario definitions (Phase 4).
+
+5. **No internal state mutation during predict.** `predict()` returns a trajectory
+   without changing the predictor's state. Only `update_state()` advances the
+   internal estimate. This allows MPPI to call `predict()` on K candidate
+   control sequences without corrupting the predictor's state between rollouts.
+
+### 2.8 Acceptance Criteria
+
+Phase 2 is complete when:
+
+- [ ] `base.py` implements `BasePredictor` with `bicycle_step` and `predict`
+- [ ] All 4 predictor implementations pass their nominal and failure tests
+- [ ] Bicycle model tests verify straight-line, circular arc, clamping
+- [ ] Nominal agreement test: all 4 predictors within 2m over H=50 steps
+- [ ] LiDAR failure produces quadratic divergence (R^2 > 0.9 on quadratic fit)
+- [ ] Integration test: nominal trajectories -> near-zero BCVF cost
+- [ ] Integration test: LiDAR failure -> positive BCVF cost
+- [ ] IMU drift failure -> near-zero BCVF cost (Lemma 1 invariance)
+- [ ] `predict()` does not mutate predictor internal state
+- [ ] All predictors are deterministic given the same seed
+
+### 2.9 What Phase 2 Does NOT Build
+
+- Simulation environment or time-stepping loop (Phase 3)
+- Control sequence generation or sampling (Phase 3)
+- Scenario orchestration or failure timing (Phase 4)
+- Real sensor interfaces or ROS2 integration (out of V1 scope)
+- Predictor health monitoring or automatic anchor selection (V2)
+
+---
+
+_End of Phase 2. Phase 3 (MPPI Planner Integration) will be appended after
+Phase 2 implementation is complete._
