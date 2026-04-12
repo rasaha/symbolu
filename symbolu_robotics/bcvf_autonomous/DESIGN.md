@@ -3012,4 +3012,430 @@ Tests go in `bcvf_autonomous/tests/test_metrics.py`.
 
 ---
 
-_End of Phase 4B. Sub-section 4C (sweep orchestrator and CLI) will follow._
+### 4C — Sweep Orchestrator and CLI
+
+#### 4C.1 Purpose
+
+Build the orchestration layer that runs the full experiment matrix — scenarios x
+ablation variants x lambda_c sweep x N repeats — and feeds the results into the
+metrics engine (Phase 4B) to produce the summary table. This is the top of the
+call stack: the user runs one command and gets a results directory with all
+evidence needed to evaluate BCVF.
+
+Phase 4C produces one file (`run_experiments.py`) that serves as both a Python
+module and a CLI entry point.
+
+**V3.1 reference:** Appendix E.5 (ablation protocol), E.6 (lambda_c sweep),
+E.10 (minimum viable submission).
+
+#### 4C.2 Module
+
+**File:** `bcvf_autonomous/run_experiments.py` (~100 lines)
+
+#### 4C.3 Experiment Matrix
+
+The full experiment matrix has three dimensions:
+
+**Dimension 1 — Scenarios (6):**
+S1 through S6 from Phase 4A.
+
+**Dimension 2 — Ablation variants (4):**
+
+| Variant ID | Name              | lambda_c | CostOrder  | Description                   |
+|------------|-------------------|----------|------------|-------------------------------|
+| A0         | Baseline          | 0.0      | —          | No BCVF, J_perf only          |
+| A1         | 0th-order         | 1.0      | ZEROTH     | Penalize disagreement magnitude |
+| A2         | 1st-order         | 1.0      | FIRST      | Penalize disagreement velocity  |
+| A3         | 2nd-order (BCVF)  | 1.0      | SECOND     | Penalize disagreement acceleration |
+
+**Dimension 3 — Repeats:**
+N = 100 per configuration (V3.1 Appendix E.7). Each repeat uses a different
+seed: `base_seed + repeat_index`.
+
+**Total runs for the ablation study:**
+6 scenarios x 4 variants x 100 repeats = **2,400 runs**
+
+**Dimension 4 — Lambda_c sweep (applied to A3 only):**
+9 lambda_c values x 5 failure scenarios (S2-S6, not S1) x 100 repeats = **4,500 runs**
+
+S1 is excluded from the lambda_c sweep because BCVF cost is ~zero in nominal
+driving regardless of lambda_c — the sweep would measure nothing.
+
+**Grand total: ~6,900 runs.** At ~10 seconds per run on a modern CPU, this is
+approximately 19 hours sequential. Acceptable for a research validation run.
+
+#### 4C.4 Types
+
+```python
+@dataclass
+class ExperimentConfig:
+    """Configuration for the full experiment suite."""
+    scenarios: List[str] = field(
+        default_factory=lambda: list(SCENARIOS.keys())
+    )
+    ablation_variants: List[str] = field(
+        default_factory=lambda: ["A0", "A1", "A2", "A3"]
+    )
+    lambda_c_sweep_values: List[float] = field(
+        default_factory=lambda: [0.0, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
+    )
+    runs_per_config: int = 100
+    base_seed: int = 42
+    output_dir: str = "results"
+
+    # Subset control (for fast iteration)
+    quick_mode: bool = False     # if True: 3 runs, 2 scenarios, skip sweep
+
+@dataclass
+class ExperimentResult:
+    """Complete output of the experiment suite."""
+    ablation_results: Dict[Tuple[str, str], AggregateMetrics]
+        # (scenario_name, variant_id) -> aggregate metrics
+    sweep_results: Dict[Tuple[str, float], AggregateMetrics]
+        # (scenario_name, lambda_c) -> aggregate metrics
+    summary_table: Dict          # from build_summary_table()
+    comparisons: List[ComparisonResult]  # pairwise statistical tests
+    wall_clock_seconds: float    # total execution time
+```
+
+#### 4C.5 Orchestrator
+
+```python
+class ExperimentRunner:
+    """
+    Orchestrates the full experiment matrix.
+
+    Responsibilities:
+    1. Enumerate all (scenario, variant, seed) triples
+    2. Translate each into a RunConfig
+    3. Execute via Runner.run()
+    4. Collect EpisodeDiagnostics
+    5. Compute per-episode metrics
+    6. Aggregate across repeats
+    7. Run statistical comparisons
+    8. Build summary table
+    9. Save results to output_dir
+    """
+
+    def __init__(self, config: ExperimentConfig):
+        ...
+
+    def run_ablation_study(self) -> Dict[Tuple[str, str], AggregateMetrics]:
+        """
+        Run the 4-variant ablation across all scenarios.
+
+        For each (scenario, variant):
+            For each repeat in range(runs_per_config):
+                1. Build RunConfig from scenario + variant + seed
+                2. Execute Runner.run()
+                3. Compute EpisodeMetrics
+            Aggregate into AggregateMetrics
+
+        Returns: mapping of (scenario, variant) -> AggregateMetrics
+        """
+        ...
+
+    def run_lambda_sweep(self) -> Dict[Tuple[str, float], AggregateMetrics]:
+        """
+        Run lambda_c sweep for BCVF (A3) across failure scenarios.
+
+        For each scenario in S2-S6:
+            For each lambda_c in sweep_values:
+                For each repeat:
+                    1. Build RunConfig with this lambda_c
+                    2. Execute
+                    3. Metrics
+                Aggregate
+
+        Returns: mapping of (scenario, lambda_c) -> AggregateMetrics
+        """
+        ...
+
+    def run_all(self) -> ExperimentResult:
+        """
+        Run complete experiment suite: ablation + sweep + analysis.
+        """
+        ...
+
+    def _variant_to_config(
+        self,
+        variant_id: str,
+        lambda_c_override: Optional[float] = None,
+    ) -> Tuple[BCVFConfig, MPPIConfig]:
+        """
+        Translate variant ID to BCVF and MPPI configs.
+
+        A0: lambda_c=0.0 (BCVF disabled)
+        A1: lambda_c=1.0, cost_order=ZEROTH
+        A2: lambda_c=1.0, cost_order=FIRST
+        A3: lambda_c=1.0, cost_order=SECOND (or lambda_c_override for sweep)
+        """
+        ...
+```
+
+#### 4C.6 Quick Mode
+
+For development iteration, `quick_mode=True` reduces the matrix to:
+
+| Dimension | Full Mode | Quick Mode |
+|-----------|-----------|------------|
+| Scenarios | 6         | 2 (S1, S6) |
+| Variants  | 4         | 2 (A0, A3) |
+| Repeats   | 100       | 3          |
+| Sweep     | 9 values  | Skipped    |
+| **Total runs** | **6,900** | **12** |
+
+Quick mode runs in ~2 minutes and validates that the pipeline works end-to-end
+before committing to the full 19-hour suite. It is the default during
+development.
+
+#### 4C.7 Result Persistence
+
+Results are saved incrementally — each episode's diagnostics is written to disk
+as it completes, so a crashed run can be resumed.
+
+**Output directory structure:**
+
+```
+results/
+  ablation/
+    S1_normal_driving/
+      A0_baseline/
+        run_000.json          # EpisodeDiagnostics.to_dict()
+        run_001.json
+        ...
+        run_099.json
+        aggregate.json        # AggregateMetrics
+      A1_zeroth/
+        ...
+      A2_first/
+        ...
+      A3_second_bcvf/
+        ...
+    S2_gps_multipath/
+      ...
+  sweep/
+    S2_gps_multipath/
+      lambda_0.00/
+        run_000.json
+        ...
+        aggregate.json
+      lambda_0.10/
+        ...
+      lambda_20.00/
+        ...
+    S3_map_error/
+      ...
+  summary_table.json          # build_summary_table() output
+  comparisons.json            # all ComparisonResult entries
+  experiment_config.json      # serialized ExperimentConfig
+  timing.json                 # wall_clock_seconds, per-scenario times
+```
+
+**Why JSON, not pickle/HDF5?** JSON is human-readable, diffable, and requires
+no additional dependencies. NumPy arrays are serialized as lists via
+`EpisodeDiagnostics.to_dict()`. File sizes are small — each episode is ~50KB
+of JSON. Total for 6,900 episodes: ~350MB. Acceptable for a research run.
+
+**Resumption:** Before running a configuration, the orchestrator checks if
+`results/ablation/{scenario}/{variant}/run_{i:03d}.json` exists. If it does,
+skip that run. This makes the suite idempotent — restarting after a crash
+resumes from where it left off.
+
+```python
+def _should_skip(self, scenario: str, variant: str, run_index: int) -> bool:
+    path = Path(self._config.output_dir) / "ablation" / scenario / variant / f"run_{run_index:03d}.json"
+    return path.exists()
+```
+
+#### 4C.8 CLI Entry Point
+
+`run_experiments.py` doubles as a CLI via `argparse`:
+
+```python
+def main():
+    parser = argparse.ArgumentParser(
+        description="BCVF Autonomous — Experiment Runner"
+    )
+    parser.add_argument(
+        "--config", type=str,
+        default="configs/bcvf_autonomous/default_se2.yaml",
+        help="Path to base config YAML",
+    )
+    parser.add_argument(
+        "--output", type=str, default="results",
+        help="Output directory for results",
+    )
+    parser.add_argument(
+        "--quick", action="store_true",
+        help="Quick mode: 2 scenarios, 2 variants, 3 repeats, no sweep",
+    )
+    parser.add_argument(
+        "--scenarios", nargs="+", type=str, default=None,
+        help="Run only these scenarios (e.g., S1_normal_driving S6_glass_corridor)",
+    )
+    parser.add_argument(
+        "--variants", nargs="+", type=str, default=None,
+        help="Run only these variants (e.g., A0 A3)",
+    )
+    parser.add_argument(
+        "--runs", type=int, default=100,
+        help="Number of repeats per configuration",
+    )
+    parser.add_argument(
+        "--sweep-only", action="store_true",
+        help="Run lambda_c sweep only (skip ablation)",
+    )
+    parser.add_argument(
+        "--ablation-only", action="store_true",
+        help="Run ablation only (skip lambda_c sweep)",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=42,
+        help="Base random seed",
+    )
+
+    args = parser.parse_args()
+    ...
+```
+
+**Usage examples:**
+
+```bash
+# Quick validation (2 minutes)
+python -m symbolu_robotics.bcvf_autonomous.run_experiments --quick
+
+# Full ablation study only (6 scenarios x 4 variants x 100 = 2,400 runs, ~7 hours)
+python -m symbolu_robotics.bcvf_autonomous.run_experiments --ablation-only
+
+# Lambda sweep only (5 scenarios x 9 values x 100 = 4,500 runs, ~12 hours)
+python -m symbolu_robotics.bcvf_autonomous.run_experiments --sweep-only
+
+# Full suite (~19 hours)
+python -m symbolu_robotics.bcvf_autonomous.run_experiments
+
+# Single scenario for debugging
+python -m symbolu_robotics.bcvf_autonomous.run_experiments \
+    --scenarios S6_glass_corridor --variants A0 A3 --runs 10
+
+# Lemma 1 validation only
+python -m symbolu_robotics.bcvf_autonomous.run_experiments \
+    --scenarios S5_constant_bias --runs 50
+```
+
+#### 4C.9 Progress Reporting
+
+The orchestrator prints progress to stdout during execution:
+
+```
+BCVF Autonomous — Experiment Runner
+====================================
+Mode: ablation + sweep
+Scenarios: 6, Variants: 4, Repeats: 100
+Total runs: 6,900 (estimated ~19 hours)
+
+[ablation] S1_normal_driving / A0_baseline: 100/100 runs (42s)
+[ablation] S1_normal_driving / A1_zeroth:   100/100 runs (45s)
+...
+[ablation] S6_glass_corridor / A3_second_bcvf: 100/100 runs (51s)
+Ablation complete: 2,400 runs in 6h 12m
+
+[sweep] S2_gps_multipath / lambda_c=0.00:  100/100 runs (40s)
+[sweep] S2_gps_multipath / lambda_c=0.10:  100/100 runs (43s)
+...
+Sweep complete: 4,500 runs in 12h 05m
+
+Generating summary table...
+Writing results to results/
+
+DONE. Total wall-clock: 18h 17m
+Results: results/summary_table.json
+```
+
+No progress bars or fancy formatting — plain text lines that work in terminal,
+log files, and CI output. Each line is flushed immediately (`flush=True`) so
+tailing the log shows real-time progress.
+
+#### 4C.10 Test Specification
+
+Tests go in `bcvf_autonomous/tests/test_experiments.py`.
+
+| Test                                       | What It Validates                                                         |
+|--------------------------------------------|---------------------------------------------------------------------------|
+| `test_quick_mode_runs`                     | `ExperimentRunner(quick_mode=True).run_all()` completes without error and returns `ExperimentResult` with 12 runs total |
+| `test_ablation_variant_configs`            | `_variant_to_config` produces correct lambda_c and CostOrder for A0-A3    |
+| `test_scenario_subset`                     | `scenarios=["S1_normal_driving"]` runs only S1, ignores others            |
+| `test_variant_subset`                      | `variants=["A0", "A3"]` runs only baseline and BCVF                       |
+| `test_result_persistence`                  | After `run_all()`, `results/ablation/S1_normal_driving/A0_baseline/run_000.json` exists and is valid JSON |
+| `test_resumption`                          | Pre-create `run_000.json`; runner skips it and starts from `run_001.json` |
+| `test_seed_produces_different_runs`        | Run index 0 (seed=42) and run index 1 (seed=43) produce different trajectories |
+| `test_summary_table_generated`             | After `run_all()`, `results/summary_table.json` exists                    |
+| `test_experiment_config_saved`             | `results/experiment_config.json` contains serialized ExperimentConfig      |
+| `test_cli_quick_mode`                      | `main()` with `["--quick"]` completes without error                       |
+
+**Note:** All tests use `quick_mode=True` or minimal subsets (1 scenario,
+1 variant, 3 runs) to keep the test suite fast. The full 6,900-run suite is
+a manual validation step, not a CI test.
+
+#### 4C.11 Design Constraints
+
+1. **Sequential execution in V1.** No multiprocessing, no threading. The
+   stateless Runner design (Phase 3C) makes future parallelization trivial —
+   each run is independent — but V1 does not implement it. The 19-hour
+   runtime is acceptable for a one-time research validation.
+
+2. **Idempotent.** Re-running the same experiment skips completed runs. A
+   crashed run resumes from the last incomplete episode. This is critical for
+   the 19-hour full suite.
+
+3. **No database.** Results are flat JSON files in a directory tree. No SQLite,
+   no Parquet, no HDF5. JSON is human-readable and diff-friendly.
+
+4. **CLI is thin.** `argparse` parses flags into an `ExperimentConfig`, passes
+   it to `ExperimentRunner`, and calls `run_all()`. No business logic in the
+   CLI layer.
+
+5. **Progress is text.** No tqdm, no rich, no curses. Plain `print(..., flush=True)`
+   lines. Works in every terminal, log file, and CI runner.
+
+#### 4C.12 Acceptance Criteria for Sub-section 4C
+
+- [ ] `run_experiments.py` implements `ExperimentRunner` with `run_ablation_study`,
+  `run_lambda_sweep`, and `run_all`
+- [ ] CLI entry point with `--quick`, `--scenarios`, `--variants`, `--runs`,
+  `--sweep-only`, `--ablation-only`, `--seed` flags
+- [ ] Quick mode completes in < 3 minutes
+- [ ] Results saved as JSON in structured directory tree
+- [ ] Resumption: skips existing run files on restart
+- [ ] Summary table and comparisons written to output directory
+- [ ] `ExperimentConfig` saved alongside results for reproducibility
+- [ ] All 10 tests pass
+
+#### 4C.13 Phase 4 Acceptance Criteria (All Sub-sections)
+
+Phase 4 is complete when all of 4A, 4B, and 4C acceptance criteria are met,
+plus the following end-to-end validation:
+
+- [ ] `--quick` mode completes: 2 scenarios x 2 variants x 3 repeats = 12 runs
+- [ ] `results/summary_table.json` is generated and contains all expected cells
+- [ ] S5 (constant bias): BCVF (A3) shows near-zero cost; 0th-order (A1) shows
+  elevated cost — the Lemma 1 invariance is visible in the table
+- [ ] S6 (glass corridor): A3 collision rate < A0 collision rate with p < 0.05
+  (BCVF prevents collisions that baseline does not)
+- [ ] S1 (normal driving): A3 false positive rate < 0.01 (BCVF does not
+  interfere with normal operation)
+- [ ] Ablation ordering for S6: A3 early warning time > A2 > A1 (directional,
+  not necessarily statistically significant at N=3 in quick mode)
+
+#### 4C.14 What Phase 4 Does NOT Build
+
+- Plotting or visualization (Phase 5)
+- Parallelism across runs (Phase 5)
+- CARLA integration or hardware-in-the-loop (out of V1 scope)
+- Automated parameter tuning (V2)
+- Continuous integration hooks (Phase 5)
+
+---
+
+_End of Phase 4. Phase 5 (Packaging) will be appended after Phase 4
+implementation is complete._
