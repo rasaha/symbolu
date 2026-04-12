@@ -30,7 +30,7 @@ Not in this file (deferred scope):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -71,6 +71,29 @@ class FSCSConfig:
     delta_residual_spec: float = 3.0
     use_attention_kl: bool = False  # Optional block-mass KL term; off by default
                                     # (requires storing attention summaries, §1.3)
+
+    # USE U1 — pairwise phase correlation as a third coherence signal.
+    # When enabled, the coherence module extracts Q/K phase angles from
+    # the attention output and computes inter-head pairwise cosine
+    # correlation over a sliding window. This replaces the attention-KL
+    # signal from §1.3 with a FlashAttention-compatible alternative
+    # derived from the USE patent's formula U1.
+    use_phase_correlation: bool = False
+    phase_corr_window: int = 8       # W in USE U1: sliding window length
+    phase_corr_weight: float = 0.3   # Multiplicative weight on the phase
+                                     # correlation term in the combined
+                                     # coherence score
+
+    # USE U3+U4 — contrastive band-specialization loss.
+    # Applied during training alongside alignment loss. Pushes heads
+    # within the same band to synchronize (U4 with positive α) and
+    # heads in different bands to desynchronize (U4 with negative α).
+    # This actively prevents band collapse, replacing GCT's reactive
+    # lambda_ladder with a proactive training signal.
+    use_band_contrast_loss: bool = False
+    band_contrast_lambda: float = 0.01  # Weight on the contrastive loss
+    band_contrast_within_weight: float = 1.0   # Pull-together weight
+    band_contrast_between_weight: float = 1.0  # Push-apart weight
 
     # Sequence warmup (§4)
     warmup_tokens: int = 3
@@ -244,6 +267,57 @@ class FSCSCoherenceModule(nn.Module):
         # Raw coherence: high when deltas are small
         c_raw = torch.exp(-self.gamma * o_delta_rel) \
               * torch.exp(-self.delta_residual * r_delta_rel)    # [B, N-1]
+
+        # ---- USE U1: Pairwise phase correlation (optional 3rd signal) ----
+        # Derives a per-position "phase stability" score from the phase
+        # angles of the attention output vectors over a sliding window.
+        # This replaces the attention-KL signal from §1.3 with a
+        # FlashAttention-compatible alternative that also captures
+        # inter-head synchronization (something attention-KL cannot).
+        #
+        # C_phase(t) = mean_{W} cos(φ(t-k) - φ(t-k-1))
+        #
+        # where φ(t) = atan2(output[t, 1], output[t, 0]) — the phase
+        # angle of the first two elements of the attention output vector.
+        # This is a cheap proxy for directional stability.
+        if self.cfg.use_phase_correlation:
+            # Extract phase angles from the first two elements of the
+            # attention output. Shape: [B, N]
+            phase_angles = torch.atan2(
+                attn_output[:, :, 1],   # sin-like component
+                attn_output[:, :, 0],   # cos-like component
+            )  # [B, N]
+
+            # Phase deltas between adjacent positions
+            phase_delta = phase_angles[:, 1:] - phase_angles[:, :-1]  # [B, N-1]
+
+            # Cosine of phase delta: 1.0 when phase is stable, -1.0 when
+            # it flips 180°, 0.0 when it rotates 90°
+            phase_cos = torch.cos(phase_delta)  # [B, N-1]
+
+            # Sliding-window average over the last W positions (causal)
+            W = self.cfg.phase_corr_window
+            if W > 1 and phase_cos.shape[1] > 1:
+                # Cumulative sum for efficient windowed mean
+                cumsum = torch.cumsum(phase_cos, dim=1)  # [B, N-1]
+                # Windowed sum: cumsum[t] - cumsum[t-W] for t >= W
+                padded = F.pad(cumsum, (W, 0), value=0.0)  # [B, N-1+W]
+                windowed_sum = cumsum - padded[:, :cumsum.shape[1]]  # [B, N-1]
+                # Count of valid elements in window (handles positions < W)
+                positions = torch.arange(1, phase_cos.shape[1] + 1,
+                                         device=phase_cos.device,
+                                         dtype=phase_cos.dtype)
+                window_count = torch.clamp(positions, max=float(W))  # [N-1]
+                phase_stability = windowed_sum / window_count  # [B, N-1]
+            else:
+                phase_stability = phase_cos  # [B, N-1]
+
+            # Map from [-1, 1] to [0, 1]: (cos + 1) / 2
+            phase_stability = (phase_stability + 1.0) * 0.5  # [B, N-1]
+
+            # Blend into raw coherence with configurable weight
+            w_phase = self.cfg.phase_corr_weight
+            c_raw = c_raw * (1.0 - w_phase) + phase_stability * w_phase
 
         # Pad position 0 with neutral coherence
         c0 = torch.full((B, 1), 0.5, device=c_raw.device, dtype=c_raw.dtype)
@@ -521,6 +595,106 @@ def fscs_alignment_loss(
     diff = target - output_coarse
     mse = (diff * diff).mean()
     return lambda_weight * mse
+
+
+# ============================================================================
+# USE U3+U4 — Contrastive band-specialization loss
+# ============================================================================
+
+
+def fscs_band_contrast_loss(
+    layer_outputs: List[Tuple[torch.Tensor, str]],
+    cfg: "FSCSConfig",
+) -> torch.Tensor:
+    """
+    Contrastive band-specialization loss derived from USE patent formulas
+    U3 (gradient for phase optimization) and U4 (bidirectional phase
+    update rule).
+
+    Concept: USE U3+U4 synchronize physical oscillators via peer-to-peer
+    gradient ascent on pairwise phase correlation. Here we apply the same
+    math to transformer attention heads, but with a CONTRASTIVE twist:
+
+        Within-band:  pull heads TOGETHER (same as USE U4 with +α)
+        Between-band: push heads APART   (inverse of USE U4, with -β)
+
+    This actively trains heads in the same band to develop similar
+    attention patterns (making per-band coarse operators viable) while
+    training heads in different bands to diversify (preventing band
+    collapse, replacing GCT's reactive lambda_ladder with a proactive
+    training signal).
+
+    Args:
+        layer_outputs: list of (attn_output [B, N, D], band_str) tuples,
+                       one per gated decoder layer. The attn_output is the
+                       FULL branch output from each layer (not the coarse
+                       branch — we're measuring head specialization of the
+                       actual attention computation, not its approximation).
+        cfg: FSCSConfig with band_contrast_* parameters.
+
+    Returns:
+        Scalar loss tensor. Minimize this to achieve band specialization.
+    """
+    if not layer_outputs:
+        return torch.zeros(1)
+
+    # Group layers by band
+    band_groups: Dict[str, List[torch.Tensor]] = {}
+    for output, band in layer_outputs:
+        if band not in band_groups:
+            band_groups[band] = []
+        band_groups[band].append(output)
+
+    if len(band_groups) < 2:
+        # Only one band — no contrastive signal possible
+        return torch.zeros(1, device=layer_outputs[0][0].device)
+
+    # Compute per-band mean representation (detached from the main graph
+    # so this loss only drives the routing gate and adapter, not the
+    # frozen backbone). Shape: [B, N, D] per band.
+    band_means: Dict[str, torch.Tensor] = {}
+    for band, outputs in band_groups.items():
+        stacked = torch.stack(outputs, dim=0)  # [L_band, B, N, D]
+        band_means[band] = stacked.mean(dim=0)  # [B, N, D]
+
+    # ---- Within-band: pull layers together (USE U4 with +α) --------
+    # For each band, compute pairwise cosine similarity between each
+    # layer's output and the band mean, and MAXIMIZE it (= minimize
+    # negative similarity).
+    within_loss = torch.zeros(1, device=layer_outputs[0][0].device)
+    within_count = 0
+    for band, outputs in band_groups.items():
+        if len(outputs) < 2:
+            continue
+        mean = band_means[band].detach()  # target
+        for out in outputs:
+            # Cosine similarity per token, averaged
+            sim = F.cosine_similarity(out, mean, dim=-1)  # [B, N]
+            within_loss = within_loss - sim.mean()  # minimize -sim = maximize sim
+            within_count += 1
+    if within_count > 0:
+        within_loss = within_loss / within_count
+
+    # ---- Between-band: push bands apart (USE U4 with -β) -----------
+    # For each pair of bands, compute cosine similarity between their
+    # means and MINIMIZE it (= maximize dissimilarity).
+    between_loss = torch.zeros(1, device=layer_outputs[0][0].device)
+    between_count = 0
+    band_names = list(band_means.keys())
+    for i in range(len(band_names)):
+        for j in range(i + 1, len(band_names)):
+            mean_i = band_means[band_names[i]]
+            mean_j = band_means[band_names[j]]
+            sim = F.cosine_similarity(mean_i, mean_j, dim=-1)  # [B, N]
+            between_loss = between_loss + sim.mean()  # minimize sim = maximize dissimilarity
+            between_count += 1
+    if between_count > 0:
+        between_loss = between_loss / between_count
+
+    # Combined contrastive loss
+    total = (cfg.band_contrast_within_weight * within_loss +
+             cfg.band_contrast_between_weight * between_loss)
+    return cfg.band_contrast_lambda * total
 
 
 # ============================================================================

@@ -48,6 +48,7 @@ from symbolu.fscs.core import (
     FSCSLayerCap,
     FSCSCoarseAdapter,
     fscs_alignment_loss,
+    fscs_band_contrast_loss,
 )
 
 
@@ -447,6 +448,139 @@ class TestCoarseAdapter:
         assert 1_000_000 < n < 5_000_000, (
             f"expected adapter param count in [1M, 5M], got {n}"
         )
+
+
+# ============================================================================
+# USE U1: Phase correlation in coherence module
+# ============================================================================
+
+
+class TestPhaseCorrelation:
+    """Tests for the USE U1 phase-correlation signal in FSCSCoherenceModule."""
+
+    def test_phase_corr_changes_coherence(self):
+        """Enabling phase correlation should produce different coherence
+        values than the 2-signal baseline."""
+        cfg_base = FSCSConfig(use_phase_correlation=False)
+        cfg_phase = FSCSConfig(use_phase_correlation=True,
+                               phase_corr_weight=0.3,
+                               phase_corr_window=4)
+        coh_base = FSCSCoherenceModule(cfg_base)
+        coh_phase = FSCSCoherenceModule(cfg_phase)
+
+        torch.manual_seed(42)
+        attn_output = torch.randn(B, N, D)
+        residual = torch.randn(B, N, D)
+
+        c_base = coh_base(attn_output, residual)
+        c_phase = coh_phase(attn_output, residual)
+
+        assert c_base.shape == c_phase.shape == (B, N)
+        # The two should differ (unless by extreme coincidence)
+        assert not torch.allclose(c_base, c_phase, atol=1e-4), \
+            "Phase correlation should change coherence output"
+
+    def test_phase_corr_in_unit_interval(self):
+        """Phase-correlation-enhanced coherence should still be in [0, 1]."""
+        cfg = FSCSConfig(use_phase_correlation=True,
+                         phase_corr_weight=0.5,
+                         phase_corr_window=8)
+        coh = FSCSCoherenceModule(cfg)
+
+        torch.manual_seed(0)
+        attn_output = torch.randn(B, N, D)
+        residual = torch.randn(B, N, D)
+
+        coherence = coh(attn_output, residual)
+        assert coherence.min() >= -0.01, f"coherence min {coherence.min()}"
+        assert coherence.max() <= 1.01, f"coherence max {coherence.max()}"
+
+    def test_stable_phase_gives_high_coherence(self):
+        """When phase angles are constant across positions, the phase
+        correlation should be high, boosting overall coherence."""
+        cfg = FSCSConfig(use_phase_correlation=True,
+                         phase_corr_weight=0.5,
+                         phase_corr_window=4,
+                         gamma=0.5, delta_residual=0.2)
+        coh = FSCSCoherenceModule(cfg)
+
+        # Constant first two elements → constant phase angle
+        attn_output = torch.randn(B, N, D)
+        attn_output[:, :, 0] = 1.0  # cos component
+        attn_output[:, :, 1] = 0.0  # sin component → phase = 0
+        residual = attn_output.clone()
+
+        coherence = coh(attn_output, residual)
+        # After warmup tokens, coherence should be close to 1.0
+        mean_post_warmup = coherence[:, 5:].mean().item()
+        assert mean_post_warmup > 0.6, \
+            f"stable phase should give high coherence (above neutral 0.5), got {mean_post_warmup}"
+
+
+# ============================================================================
+# USE U3+U4: Contrastive band-specialization loss
+# ============================================================================
+
+
+class TestBandContrastLoss:
+    """Tests for the USE U3+U4-derived contrastive band-specialization loss."""
+
+    def test_returns_scalar(self):
+        cfg = FSCSConfig(band_contrast_lambda=0.01)
+        layers = [
+            (torch.randn(B, N, D), "global"),
+            (torch.randn(B, N, D), "mid"),
+            (torch.randn(B, N, D), "local"),
+        ]
+        loss = fscs_band_contrast_loss(layers, cfg)
+        assert loss.dim() == 0 or (loss.dim() == 1 and loss.shape[0] == 1)
+
+    def test_zero_when_empty(self):
+        cfg = FSCSConfig(band_contrast_lambda=0.01)
+        loss = fscs_band_contrast_loss([], cfg)
+        assert loss.item() == 0.0
+
+    def test_identical_bands_have_high_between_loss(self):
+        """When all bands produce identical outputs, between-band
+        similarity is maximal → high loss (the contrastive signal
+        should push them apart)."""
+        cfg = FSCSConfig(band_contrast_lambda=1.0,
+                         band_contrast_within_weight=0.0,
+                         band_contrast_between_weight=1.0)
+        shared = torch.randn(B, N, D)
+        layers = [
+            (shared.clone(), "global"),
+            (shared.clone(), "mid"),
+            (shared.clone(), "local"),
+        ]
+        loss_identical = fscs_band_contrast_loss(layers, cfg)
+
+        # Compare with diverse outputs
+        layers_diverse = [
+            (torch.randn(B, N, D), "global"),
+            (torch.randn(B, N, D) * 5, "mid"),
+            (torch.randn(B, N, D) * 10, "local"),
+        ]
+        loss_diverse = fscs_band_contrast_loss(layers_diverse, cfg)
+
+        assert loss_identical.item() > loss_diverse.item(), \
+            "identical bands should have higher between-loss than diverse bands"
+
+    def test_gradient_flows(self):
+        """Contrastive loss should produce gradients on layer outputs."""
+        cfg = FSCSConfig(band_contrast_lambda=1.0)
+        out_g = torch.randn(B, N, D, requires_grad=True)
+        out_m = torch.randn(B, N, D, requires_grad=True)
+        out_l = torch.randn(B, N, D, requires_grad=True)
+        layers = [(out_g, "global"), (out_m, "mid"), (out_l, "local")]
+
+        loss = fscs_band_contrast_loss(layers, cfg)
+        loss.backward()
+
+        for out, name in [(out_g, "global"), (out_m, "mid"), (out_l, "local")]:
+            assert out.grad is not None, f"{name} received no gradient"
+            assert out.grad.abs().sum().item() > 0, \
+                f"{name} gradient is zero"
 
 
 if __name__ == "__main__":

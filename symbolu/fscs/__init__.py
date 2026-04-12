@@ -39,6 +39,7 @@ from symbolu.fscs.core import (
     FSCSLayerCap,
     FSCSCoarseAdapter,
     fscs_alignment_loss,
+    fscs_band_contrast_loss,
 )
 
 try:
