@@ -1,0 +1,31 @@
+{
+  "_provenance": {
+    "captured_from": "terminal log",
+    "captured_at": "2026-04-12",
+    "harness_commit": "c64d123",
+    "description": "Fine tau sweep around the per-band crossing point. Pins down r*=6.7% at the 0.5% PPL bar."
+  },
+  "config": {
+    "model": "mistralai/Mistral-7B-v0.3",
+    "quantize": "bf16",
+    "eval_dataset": "wikitext2",
+    "seq_len": 1024,
+    "max_eval_samples": 64,
+    "coarse_operator": "per_band (global+mid=ema_cache, local=windowed_w256)",
+    "eval_batch_size": 16,
+    "soft_only": true
+  },
+  "baseline": {"ppl": 5.5002, "wall_seconds": 14.52, "gate_fraction": 0.001},
+  "sweep": [
+    {"tau": 0.70, "soft": {"ppl": 5.5002, "delta_pct": 0.00, "gate_fraction": 0.012}},
+    {"tau": 0.60, "soft": {"ppl": 5.5002, "delta_pct": 0.00, "gate_fraction": 0.032}},
+    {"tau": 0.55, "soft": {"ppl": 5.5110, "delta_pct": 0.20, "gate_fraction": 0.051}},
+    {"tau": 0.52, "soft": {"ppl": 5.5218, "delta_pct": 0.39, "gate_fraction": 0.067}},
+    {"tau": 0.50, "soft": {"ppl": 5.5326, "delta_pct": 0.59, "gate_fraction": 0.080}},
+    {"tau": 0.48, "soft": {"ppl": 5.5543, "delta_pct": 0.98, "gate_fraction": 0.095}},
+    {"tau": 0.45, "soft": {"ppl": 5.6088, "delta_pct": 1.97, "gate_fraction": 0.121}},
+    {"tau": 0.40, "soft": {"ppl": 5.7532, "delta_pct": 4.60, "gate_fraction": 0.179}}
+  ],
+  "r_star": 0.06682410719804466,
+  "r_star_summary": "6.7% of attention routable to coarse at <0.5% PPL loss on frozen Mistral-7B with per-band coarse operators"
+}
