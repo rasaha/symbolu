@@ -1083,5 +1083,243 @@ Phase 2 is complete when:
 
 ---
 
-_End of Phase 2. Phase 3 (MPPI Planner Integration) will be appended after
-Phase 2 implementation is complete._
+## Phase 3 — MPPI Planner Integration
+
+Phase 3 is the largest phase. It connects the math kernel (Phase 1) to the
+predictor framework (Phase 2) through an MPPI planner, and wraps the whole
+system in a lightweight simulation environment. This plan is split into three
+sub-sections to manage scope:
+
+- **3A** — Simulator and environment (this section)
+- **3B** — MPPI planner with J_perf + J_BCVF (next)
+- **3C** — Planning loop, config loading, timing validation (next)
+
+---
+
+### 3A — Simulator and Environment
+
+#### 3A.1 Purpose
+
+Build a lightweight 2D simulation environment that:
+1. Maintains ground-truth vehicle state
+2. Steps the vehicle forward using the kinematic bicycle model
+3. Feeds ground truth (with per-predictor noise) to the predictor set
+4. Provides a lane/road geometry for the performance cost J_perf
+5. Supports obstacle placement for collision cost
+6. Records full state history for metrics (Phase 4)
+
+This is NOT a production simulator. It is ~200 lines of deterministic,
+NumPy-only code that provides the closed-loop test bed for BCVF.
+
+#### 3A.2 Module
+
+**File:** `bcvf_autonomous/simulator.py`
+
+#### 3A.3 Types
+
+```python
+@dataclass
+class Road:
+    """Simple road geometry for J_perf computation."""
+    centerline: np.ndarray      # (N, 2) waypoints [x, y] defining lane center
+    width: float = 3.5          # lane width in meters
+    speed_limit: float = 10.0   # m/s
+
+@dataclass
+class Obstacle:
+    """Static circular obstacle."""
+    x: float
+    y: float
+    radius: float = 1.0
+
+@dataclass
+class SimConfig:
+    """Simulator configuration."""
+    dt: float = 0.1                  # time step (matches planner dt)
+    max_steps: int = 200             # 20 seconds at dt=0.1
+    bicycle: BicycleConfig = field(default_factory=BicycleConfig)
+    road: Road = field(default_factory=Road)
+    obstacles: List[Obstacle] = field(default_factory=list)
+    seed: int = 42
+
+@dataclass
+class SimState:
+    """Complete simulation state at one time step."""
+    step: int
+    time: float
+    ground_truth: PredictorState    # true vehicle pose + velocity
+    predictor_states: Dict[str, PredictorState]  # each predictor's estimate
+    applied_control: np.ndarray     # [velocity, steering] actually applied
+    bcvf_cost: float = 0.0         # J_BCVF for the chosen control
+    perf_cost: float = 0.0         # J_perf for the chosen control
+    total_cost: float = 0.0        # J_perf + lambda_c * J_BCVF
+    collision: bool = False
+```
+
+#### 3A.4 Simulator Class
+
+```python
+class Simulator:
+    """
+    Lightweight 2D ground-vehicle simulation environment.
+
+    Responsibilities:
+    - Owns the ground-truth vehicle state
+    - Steps physics via kinematic bicycle model
+    - Updates each predictor's state estimate (ground truth + noise)
+    - Checks collision against obstacles
+    - Records full history for post-hoc analysis
+    """
+
+    def __init__(self, config: SimConfig, predictors: Dict[str, BasePredictor]):
+        ...
+
+    def reset(self, initial_pose: Optional[PredictorState] = None) -> SimState:
+        """Reset simulator and all predictors. Returns initial state."""
+        ...
+
+    def step(self, control: np.ndarray) -> SimState:
+        """
+        Advance one time step.
+
+        Args:
+            control: [velocity, steering] to apply
+
+        Process:
+        1. Apply control to ground-truth state via bicycle_step
+        2. Check collision
+        3. Update each predictor's state via predictor.update_state()
+        4. Record and return SimState
+
+        Returns:
+            SimState with updated ground truth and predictor states
+        """
+        ...
+
+    def get_history(self) -> List[SimState]:
+        """Return full state history."""
+        ...
+
+    def is_done(self) -> bool:
+        """True if max_steps reached or collision occurred."""
+        ...
+```
+
+#### 3A.5 Road Geometry
+
+For V1, roads are polylines — a sequence of (x, y) waypoints defining the lane
+center. Three built-in road generators cover the needed scenarios:
+
+```python
+def make_straight_road(length: float = 200.0, spacing: float = 1.0) -> Road:
+    """Straight road along x-axis. For nominal driving + GPS multipath."""
+    ...
+
+def make_curved_road(radius: float = 100.0, arc_degrees: float = 90.0) -> Road:
+    """Constant-radius curve. For testing lateral dynamics."""
+    ...
+
+def make_urban_road(blocks: int = 4, block_size: float = 50.0) -> Road:
+    """Grid-like urban road with turns. For GPS multipath scenarios."""
+    ...
+```
+
+The performance cost J_perf (Section 3B) uses the road centerline to compute
+lateral deviation and forward progress. The road does not need to be complex —
+the interesting signal comes from the predictor failures, not the road geometry.
+
+#### 3A.6 Collision Detection
+
+Simple point-in-circle test against the obstacle list:
+
+```python
+def _check_collision(self, state: PredictorState) -> bool:
+    for obs in self._config.obstacles:
+        dx = state.x - obs.x
+        dy = state.y - obs.y
+        if dx*dx + dy*dy < obs.radius * obs.radius:
+            return True
+    return False
+```
+
+No swept-volume, no vehicle footprint. This is sufficient for V1 because
+collision cost in J_perf uses a smooth distance-based penalty (not a binary
+check), and the binary check here is only for episode termination.
+
+#### 3A.7 Predictor State Update
+
+Each simulation step, the simulator updates every predictor's internal state
+estimate from ground truth:
+
+```python
+def _update_predictors(self, ground_truth: PredictorState, time: float):
+    for name, predictor in self._predictors.items():
+        predictor.update_state(ground_truth)
+        # Failure injection is already configured on the predictor
+        # via set_failure() — the predictor applies it internally
+```
+
+This is the only place where predictor internal state advances. Between
+`update_state()` calls, `predict()` is called many times by MPPI (once per
+rollout) without mutating state — per the Phase 2 design constraint.
+
+#### 3A.8 State Recording
+
+Every `step()` appends a `SimState` to an internal history list. This history
+is the raw data source for Phase 4 metrics. No aggregation or analysis happens
+in the simulator — it records, Phase 4 analyzes.
+
+The history captures everything needed for post-hoc analysis:
+- Ground truth trajectory (for path efficiency, collision timing)
+- Per-predictor state estimates (for disagreement visualization)
+- Applied controls (for comfort metrics — jerk, lateral acceleration)
+- BCVF / J_perf costs (for cost curve analysis)
+- Collision flag (for collision rate computation)
+
+#### 3A.9 Design Constraints
+
+1. **No planner dependency.** The simulator accepts control inputs via `step()`.
+   It does not know about MPPI, J_perf, or BCVF. The planning loop (Section 3C)
+   connects the planner to the simulator.
+
+2. **Deterministic.** All randomness (noise in predictors, initial conditions)
+   flows through seeded RNGs. Same config + same control sequence = same history.
+
+3. **Real-time ratio irrelevant.** The simulator is not real-time. One `step()`
+   call computes instantly. Clock time is `step * dt`, not wall time.
+
+4. **Stateless road/obstacles.** Road geometry and obstacle positions are fixed
+   at construction. Dynamic obstacles are a V2 concern.
+
+#### 3A.10 Test Specification
+
+Tests go in `bcvf_autonomous/tests/test_simulator.py`.
+
+| Test                                   | What It Validates                                                   |
+|----------------------------------------|---------------------------------------------------------------------|
+| `test_straight_drive_no_collision`     | Drive straight on straight road with no obstacles -> no collision    |
+| `test_collision_detection`             | Drive into an obstacle -> collision flag set, `is_done()` returns True |
+| `test_predictor_states_updated`        | After `step()`, each predictor's internal state has advanced         |
+| `test_history_length`                  | After N steps, `get_history()` has N+1 entries (initial + N steps)   |
+| `test_deterministic_replay`            | Two simulators with same config + same controls produce identical histories |
+| `test_road_centerline_geometry`        | `make_straight_road` produces waypoints along x-axis; `make_curved_road` produces arc |
+| `test_reset_clears_state`             | After `reset()`, step count is 0, history is empty, predictors are reset |
+
+#### 3A.11 Estimated Size
+
+~200 lines for `simulator.py` including road generators and collision detection.
+
+#### 3A.12 Acceptance Criteria for Sub-section 3A
+
+- [ ] `simulator.py` implements `Simulator`, `SimConfig`, `SimState`, `Road`, `Obstacle`
+- [ ] 3 road generators: straight, curved, urban
+- [ ] Collision detection works for point-in-circle
+- [ ] Predictor states advance each step
+- [ ] Full history is recorded and retrievable
+- [ ] Deterministic replay verified by test
+- [ ] No imports from Phase 1 (`core.py`, `manifold.py`) — simulator is physics only
+
+---
+
+_End of Phase 3A. Sub-sections 3B (MPPI planner) and 3C (planning loop) will
+follow._
