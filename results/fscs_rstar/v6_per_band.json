@@ -1,0 +1,58 @@
+{
+  "_provenance": {
+    "captured_from": "terminal log, post-hoc reconstruction",
+    "captured_by": "Claude Code / session 01ABUFjbzb8RgXD2tLR8SAxS",
+    "captured_at": "2026-04-12",
+    "harness_commit": "c64d123 (FSCS per-band coarse operator differentiation)",
+    "description": "First r* sweep with per-band coarse operators: Global+Mid bands use EMA cache, Local band uses windowed w=256. This is the architecturally-correct configuration from spec §9."
+  },
+  "config": {
+    "model": "mistralai/Mistral-7B-v0.3",
+    "quantize": "bf16",
+    "eval_dataset": "wikitext2",
+    "max_eval_samples": 64,
+    "seq_len": 1024,
+    "coarse_operator": "per_band (global+mid=ema_cache, local=windowed_w256)",
+    "ema_cache_beta": 0.9,
+    "coarse_window": 256,
+    "num_layers": 32,
+    "band_assignment": "layers 0-10 global (EMA), 11-21 mid (EMA), 22-31 local (windowed)",
+    "fscs_trainable_params": 64,
+    "eval_batch_size": 16,
+    "soft_only": true,
+    "calibration": {
+      "tau_global": 0.5, "tau_mid": 0.3, "tau_local": 0.1,
+      "alpha_sharpness": 10.0, "beta_max_inference": 0.7,
+      "gamma": 1.0, "delta_residual": 0.5, "ema_decay": 0.4
+    }
+  },
+  "baseline": {"ppl": 5.5002, "wall_seconds": 14.60, "gate_fraction": 0.001},
+  "sweep": [
+    {"tau": 0.90, "soft": {"ppl": 5.5002, "delta_pct": 0.00, "gate_fraction": 0.002, "wall_seconds": 14.55}},
+    {"tau": 0.70, "soft": {"ppl": 5.5002, "delta_pct": 0.00, "gate_fraction": 0.012, "wall_seconds": 13.92}},
+    {"tau": 0.50, "soft": {"ppl": 5.5326, "delta_pct": 0.59, "gate_fraction": 0.080, "wall_seconds": 13.98}},
+    {"tau": 0.30, "soft": {"ppl": 6.7009, "delta_pct": 21.83, "gate_fraction": 0.333, "wall_seconds": 14.00}},
+    {"tau": 0.20, "soft": {"ppl": 9.5459, "delta_pct": 73.56, "gate_fraction": 0.478, "wall_seconds": 14.02}},
+    {"tau": 0.10, "soft": {"ppl": 14.2241, "delta_pct": 158.62, "gate_fraction": 0.557, "wall_seconds": 13.89}}
+  ],
+  "r_star": 0.012409030212438665,
+  "verdict": {
+    "label": "NO-GO",
+    "r_star": 0.012409030212438665,
+    "best_wall_speedup_pct": 4.9,
+    "notes": "Per-band is the best operator configuration measured. At the critical tau=0.50 (gate_frac=8%), per-band produces Dppl=0.59% vs all-windowed 0.78% and all-EMA 0.79% (25% less quality loss). At the tail (gate_frac=56%), per-band produces the best PPL of all three configurations. The measured r* is limited by sweep resolution; a finer sweep around tau=0.50 would likely show r* at gate_frac ~6-7%."
+  },
+  "comparison": {
+    "at_tau_0.50_gate_0.08": {
+      "all_windowed_w256": "0.78%",
+      "all_ema_cache": "0.79%",
+      "per_band": "0.59%",
+      "per_band_improvement_vs_best_uniform": "25% less quality loss"
+    },
+    "at_tau_0.10_gate_0.56": {
+      "all_ema_cache_ppl": 14.8492,
+      "per_band_ppl": 14.2241,
+      "verdict": "per-band is best at the tail too"
+    }
+  }
+}
