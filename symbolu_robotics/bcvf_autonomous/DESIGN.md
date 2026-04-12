@@ -2158,5 +2158,418 @@ plus the following end-to-end integration check:
 
 ---
 
-_End of Phase 3. Phase 4 (Scenario and Metrics Harness) will be appended after
-Phase 3 implementation is complete._
+## Phase 4 — Scenario and Metrics Harness
+
+Phase 4 is where the product becomes demonstrable. It defines the failure
+scenarios, the metrics that measure BCVF's value, and the orchestration
+machinery that runs sweeps and ablations at scale. This is the phase that
+produces the evidence: does BCVF actually work?
+
+This plan is split into three sub-sections:
+
+- **4A** — Scenario definitions (this section)
+- **4B** — Metrics and analysis (next)
+- **4C** — Sweep orchestrator and CLI (next)
+
+---
+
+### 4A — Scenario Definitions
+
+#### 4A.1 Purpose
+
+Define a concrete set of failure scenarios that exercise BCVF's core properties:
+bias tolerance, early warning of accelerating divergence, and action-conditional
+cost shaping. Each scenario specifies a road geometry, obstacle layout, failure
+injection (which predictor, when, what mode), and expected BCVF behavior.
+
+Scenarios are data — they are not code. Each scenario is a `ScenarioConfig`
+dataclass that the runner (Phase 3C) can execute without modification.
+
+**V3.1 reference:** Appendix E.3-E.4 (scenario implementations), Section 7.2
+(scenario design table).
+
+#### 4A.2 Module
+
+**File:** `bcvf_autonomous/scenarios.py` (~150 lines)
+
+#### 4A.3 Types
+
+```python
+@dataclass
+class ScenarioConfig:
+    """Complete definition of one test scenario."""
+    name: str                             # human-readable identifier
+    description: str                      # what this scenario tests
+    road_type: str = "straight"           # straight | curved | urban
+    road_length: float = 200.0            # meters
+    road_radius: float = 100.0            # for curved roads
+    obstacles: List[Dict] = field(default_factory=list)  # [{x, y, radius}]
+    failures: Dict[str, FailureConfig] = field(default_factory=dict)
+    max_steps: int = 200                  # episode length
+    initial_velocity: float = 8.0         # m/s starting speed
+
+    # Expected behavior (for directional validation, not hard assertions)
+    expect_bcvf_activation: bool = False  # should J_BCVF spike?
+    expect_collision_baseline: bool = False  # would baseline (no BCVF) collide?
+    expect_collision_bcvf: bool = False   # should BCVF-enabled vehicle collide?
+```
+
+#### 4A.4 Scenario Catalog
+
+V3.1 Appendix E.3 defines 6 scenarios. Phase 0 scoped V1 to 4 initial
+scenarios plus 2 added after the pipeline is working. This plan specifies all
+6 upfront so the interface is stable; scenarios 5-6 are implemented last.
+
+---
+
+**Scenario S1 — Normal Driving (Control Case)**
+
+```python
+S1_NORMAL = ScenarioConfig(
+    name="S1_normal_driving",
+    description="Highway driving at 8 m/s, all sensors nominal. "
+                "No failures, no obstacles. Measures false positive rate "
+                "and baseline path efficiency.",
+    road_type="straight",
+    road_length=200.0,
+    obstacles=[],
+    failures={},
+    max_steps=200,
+    initial_velocity=8.0,
+    expect_bcvf_activation=False,
+    expect_collision_baseline=False,
+    expect_collision_bcvf=False,
+)
+```
+
+**Purpose:** Prove BCVF introduces zero overhead in normal operation. J_BCVF
+should be near-zero at every step. Path efficiency should be >= 0.99. This is
+the false-positive-rate measurement scenario.
+
+**V3.1 reference:** Appendix E.3 Scenario 5.
+
+---
+
+**Scenario S2 — GPS Multipath (Urban Canyon)**
+
+```python
+S2_GPS_MULTIPATH = ScenarioConfig(
+    name="S2_gps_multipath",
+    description="Vehicle drives between tall buildings. GPS multipath causes "
+                "M4 position jumps of 2-5m with increasing frequency. "
+                "Other models unaffected.",
+    road_type="straight",
+    road_length=200.0,
+    obstacles=[
+        {"x": 100.0, "y": 3.0, "radius": 0.5},   # wall-like obstacle
+    ],
+    failures={
+        "M4": FailureConfig(
+            active=True,
+            onset_time=3.0,       # failure begins at t=3s
+            severity=0.8,
+            ramp_duration=2.0,    # ramps over 2 seconds
+        ),
+    },
+    max_steps=200,
+    initial_velocity=8.0,
+    expect_bcvf_activation=True,
+    expect_collision_baseline=True,   # GPS-trusting planner swerves into wall
+    expect_collision_bcvf=False,      # BCVF steers away from M4-consistent path
+)
+```
+
+**Purpose:** GPS jumps create discrete spikes in disagreement acceleration.
+BCVF should activate and steer the planner toward M1/M2/M3-consistent
+trajectories, avoiding the wall that a GPS-trusting baseline would hit.
+
+**V3.1 reference:** Appendix E.3 Scenario 2.
+
+---
+
+**Scenario S3 — Map Error (Construction Zone)**
+
+```python
+S3_MAP_ERROR = ScenarioConfig(
+    name="S3_map_error",
+    description="Road layout differs from HD map. M4 predicts road continues "
+                "straight; M2/M3 perceive barriers. Systematic lateral offset "
+                "grows as vehicle enters construction zone.",
+    road_type="straight",
+    road_length=200.0,
+    obstacles=[
+        {"x": 120.0, "y": 0.0, "radius": 1.5},  # construction barrier
+        {"x": 130.0, "y": 0.5, "radius": 1.5},
+        {"x": 140.0, "y": 1.0, "radius": 1.5},
+    ],
+    failures={
+        "M4": FailureConfig(
+            active=True,
+            onset_time=5.0,
+            severity=1.0,
+            ramp_duration=5.0,    # gradual onset over 5 seconds
+        ),
+    },
+    max_steps=200,
+    initial_velocity=8.0,
+    expect_bcvf_activation=True,
+    expect_collision_baseline=True,   # map-trusting planner drives into barriers
+    expect_collision_bcvf=False,
+)
+```
+
+**Purpose:** Map error produces smoothly accelerating lateral divergence
+between M4 and M1/M2/M3. BCVF detects the acceleration of disagreement before
+the vehicle reaches the barriers.
+
+**V3.1 reference:** Appendix E.3 Scenario 4.
+
+---
+
+**Scenario S4 — Gradual Camera Degradation (Rain/Fog)**
+
+```python
+S4_CAMERA_DEGRADATION = ScenarioConfig(
+    name="S4_camera_degradation",
+    description="Weather degrades progressively. M3 (visual odometry) tracking "
+                "quality degrades over 10 seconds, eventually losing tracking. "
+                "Other models unaffected. Tests graceful transition.",
+    road_type="curved",
+    road_length=200.0,
+    road_radius=80.0,              # gentle curve to make VO failure visible
+    obstacles=[],
+    failures={
+        "M3": FailureConfig(
+            active=True,
+            onset_time=2.0,
+            severity=1.0,
+            ramp_duration=10.0,   # slow degradation over 10 seconds
+        ),
+    },
+    max_steps=200,
+    initial_velocity=6.0,          # slower for curved road
+    expect_bcvf_activation=True,
+    expect_collision_baseline=False,  # no obstacles to hit
+    expect_collision_bcvf=False,
+)
+```
+
+**Purpose:** Tests BCVF's response to gradual failure. M3's degradation
+produces increasing noise then tracking loss (Phase 2 two-phase failure model).
+BCVF cost should rise smoothly as M3 diverges, demonstrating graceful detection
+rather than a binary alarm. No collision expected because there are no
+obstacles — the metric here is early warning time and smoothness of BCVF
+activation.
+
+**V3.1 reference:** Appendix E.3 Scenario 3.
+
+---
+
+**Scenario S5 — Constant Bias Validation (Lemma 1)**
+
+```python
+S5_CONSTANT_BIAS = ScenarioConfig(
+    name="S5_constant_bias",
+    description="Normal driving with M4 (GPS) injected with a constant 0.5m "
+                "position bias throughout. Validates Lemma 1: constant "
+                "disagreement produces zero BCVF cost. The critical "
+                "invariance property that differentiates BCVF from "
+                "0th-order methods.",
+    road_type="straight",
+    road_length=200.0,
+    obstacles=[],
+    failures={
+        "M4": FailureConfig(
+            active=True,
+            onset_time=0.0,       # bias present from start
+            severity=0.0,         # severity=0 with special bias_mode flag
+            ramp_duration=0.0,
+        ),
+    },
+    max_steps=200,
+    initial_velocity=8.0,
+    expect_bcvf_activation=False,  # constant bias -> a=0 -> J_BCVF=0
+    expect_collision_baseline=False,
+    expect_collision_bcvf=False,
+)
+```
+
+**Implementation note for constant bias:** The standard `GNSSMap.apply_failure`
+produces multipath jumps or map error (both non-constant). For S5, the
+predictor needs a third failure sub-mode: **constant offset**. Add a
+`failure_type` field to `GNSSMap` that selects between `multipath`, `map_error`,
+and `constant_bias`. When `constant_bias` is active, apply a fixed 0.5m offset
+to x position at every step, with no randomness and no growth.
+
+```python
+# In gnss_map.py:
+def _apply_constant_bias(self, state, elapsed, scale):
+    state.x += 0.5  # constant, no time-dependence
+    return state
+```
+
+**Purpose:** This is the single most important validation scenario for BCVF's
+novelty claim. It demonstrates the invariance property from V3.1 Lemma 1:
+constant disagreement produces zero BCVF cost. The ablation comparison is
+critical — 0th-order penalizes this (false positive), BCVF does not.
+
+**V3.1 reference:** Appendix E.4 (constant bias validation).
+
+---
+
+**Scenario S6 — LiDAR Failure (Glass Corridor)**
+
+```python
+S6_GLASS_CORRIDOR = ScenarioConfig(
+    name="S6_glass_corridor",
+    description="Vehicle approaches a glass-walled corridor. M2 (LiDAR) state "
+                "estimate drifts as LiDAR returns pass through glass. M1, M3, "
+                "M4 remain consistent. Tests primary BCVF activation case.",
+    road_type="straight",
+    road_length=200.0,
+    obstacles=[
+        {"x": 130.0, "y": 2.5, "radius": 0.5},  # glass wall (invisible to LiDAR)
+    ],
+    failures={
+        "M2": FailureConfig(
+            active=True,
+            onset_time=5.0,
+            severity=1.0,
+            ramp_duration=3.0,
+        ),
+    },
+    max_steps=200,
+    initial_velocity=8.0,
+    expect_bcvf_activation=True,
+    expect_collision_baseline=True,   # LiDAR-trusting planner enters corridor
+    expect_collision_bcvf=False,
+)
+```
+
+**Purpose:** The canonical BCVF scenario. LiDAR failure produces quadratic
+divergence (Phase 2 design), which is exactly the signal BCVF's second-order
+detector targets. Demonstrates early warning — BCVF cost spikes before the
+vehicle reaches the glass wall.
+
+**V3.1 reference:** Appendix E.3 Scenario 1.
+
+---
+
+#### 4A.5 Scenario Registry
+
+A simple dictionary providing programmatic access to all scenarios:
+
+```python
+SCENARIOS: Dict[str, ScenarioConfig] = {
+    "S1_normal_driving": S1_NORMAL,
+    "S2_gps_multipath": S2_GPS_MULTIPATH,
+    "S3_map_error": S3_MAP_ERROR,
+    "S4_camera_degradation": S4_CAMERA_DEGRADATION,
+    "S5_constant_bias": S5_CONSTANT_BIAS,
+    "S6_glass_corridor": S6_GLASS_CORRIDOR,
+}
+
+def get_scenario(name: str) -> ScenarioConfig:
+    """Look up scenario by name. Raises KeyError if not found."""
+    return SCENARIOS[name]
+
+def list_scenarios() -> List[str]:
+    """Return all scenario names."""
+    return list(SCENARIOS.keys())
+```
+
+#### 4A.6 Scenario-to-RunConfig Translation
+
+Each scenario must be translated into a `RunConfig` that the runner can
+execute. This is a pure function — no side effects:
+
+```python
+def scenario_to_run_config(
+    scenario: ScenarioConfig,
+    bcvf_config: BCVFConfig,
+    mppi_config: MPPIConfig,
+    perf_config: PerfCostConfig,
+    bicycle_config: BicycleConfig,
+    seed: int = 42,
+) -> RunConfig:
+    """
+    Convert a ScenarioConfig into a RunConfig.
+
+    The scenario provides: road, obstacles, failures, episode length.
+    The caller provides: BCVF/MPPI/perf/bicycle tuning parameters.
+
+    This separation is intentional — the same scenario can be run with
+    different lambda_c values, different ablation orders, or different
+    rollout counts, producing different RunConfigs from the same scenario.
+    """
+    road = _build_road_from_scenario(scenario)
+    obstacles = [Obstacle(**o) for o in scenario.obstacles]
+
+    return RunConfig(
+        sim=SimConfig(
+            dt=mppi_config.dt,
+            max_steps=scenario.max_steps,
+            bicycle=bicycle_config,
+            road=road,
+            obstacles=obstacles,
+            seed=seed,
+        ),
+        mppi=mppi_config,
+        perf=perf_config,
+        bcvf=bcvf_config,
+        bicycle=bicycle_config,
+        seed=seed,
+        failures=scenario.failures,
+    )
+```
+
+**Why separate scenario from tuning?** The Phase 4 sweep matrix runs each
+scenario across 9 lambda_c values and 4 ablation orders. If the scenario
+contained tuning parameters, there would be 6 * 9 * 4 = 216 scenario objects.
+By separating them, there are 6 scenarios and the sweep constructs 216
+RunConfigs programmatically.
+
+#### 4A.7 GNSSMap Predictor Update
+
+Phase 4A requires a minor addition to the Phase 2 `gnss_map.py` predictor: a
+`constant_bias` failure sub-mode for scenario S5. This is the only Phase 2
+modification required by Phase 4.
+
+```python
+class GNSSFailureType(Enum):
+    MULTIPATH = "multipath"
+    MAP_ERROR = "map_error"
+    CONSTANT_BIAS = "constant_bias"
+```
+
+The `FailureConfig` dataclass gains an optional `failure_type: str` field that
+defaults to `"multipath"`. This is backwards-compatible — existing tests that
+do not specify `failure_type` continue to use multipath.
+
+#### 4A.8 Test Specification
+
+Tests go in `bcvf_autonomous/tests/test_scenarios.py`.
+
+| Test                                   | What It Validates                                                      |
+|----------------------------------------|------------------------------------------------------------------------|
+| `test_all_scenarios_loadable`          | Every entry in `SCENARIOS` produces a valid `ScenarioConfig`           |
+| `test_scenario_to_run_config`          | `scenario_to_run_config` produces a `RunConfig` with correct road type, obstacles, and failures |
+| `test_s1_no_failures`                  | S1_NORMAL has empty failures dict                                      |
+| `test_s2_m4_failure`                   | S2_GPS_MULTIPATH has M4 failure with onset_time=3.0                    |
+| `test_s5_constant_bias_flag`           | S5 failure config has `failure_type="constant_bias"`                   |
+| `test_scenario_registry_complete`      | `list_scenarios()` returns 6 entries, all unique                       |
+| `test_scenario_separation`             | Same scenario with two different lambda_c values produces two distinct RunConfigs with different bcvf_config |
+
+#### 4A.9 Acceptance Criteria for Sub-section 4A
+
+- [ ] `scenarios.py` defines all 6 scenarios as `ScenarioConfig` instances
+- [ ] `SCENARIOS` registry provides programmatic access
+- [ ] `scenario_to_run_config` translates scenario + tuning into `RunConfig`
+- [ ] `GNSSMap` predictor extended with `constant_bias` failure sub-mode
+- [ ] All tests pass
+- [ ] Scenarios are data only — no execution logic in `scenarios.py`
+
+---
+
+_End of Phase 4A. Sub-sections 4B (metrics and analysis) and 4C (sweep
+orchestrator and CLI) will follow._
