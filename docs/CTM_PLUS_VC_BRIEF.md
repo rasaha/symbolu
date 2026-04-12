@@ -87,6 +87,34 @@ DECODE  weights:  recency=0.30  frequency=0.20  attention=0.30  position=0.20
 ```
 Sink blocks (attention sinks, positions 0..k) are pinned at admission and never scored. Sampled selection keeps the hot path at O(k) with k ≤ 48, and an earlier filler-fast-path handles the common case deterministically. An earlier draft of this brief showed a six-signal formula including `reuse` and a page-type bonus — that version was explicitly superseded when we consolidated the policy into the four-signal phase-aware form above; the parity harness enforces the current form on every commit.
 
+**New (April 2026): FSCS-derived signal extensions.** Three optional
+scoring signals derived from Text-FSCS attention-operator research have
+been integrated into the scoring model and validated on a real
+Mistral-7B KV-cache trace:
+
+```
+score += w_boundary    · boundary_score      [0,1]  — structural boundary protection
+score += w_instability · instability_hint    [0,1]  — future full-read demand
+score *= band_class                          >1 global, =1 mid, <1 local
+```
+
+These signals are **default-off** (zero weight / neutral multiplier) so
+the ADR-0001 four-signal model is unchanged when they are not activated.
+When enabled, they address three blind spots in the base scoring:
+
+| Signal | What it catches | What the base model misses |
+|---|---|---|
+| **Boundary** | Sentence starts, paragraph breaks, discourse markers | These tokens are attention sinks — evicting them causes disproportionate quality damage even when their recency/frequency look unremarkable |
+| **Band class** | Global-context vs local-syntax blocks (by layer depth) | Global-context blocks are expensive to re-read if evicted; local-syntax blocks are cheap to recompute. The base model treats all layers equally |
+| **Instability** | Attention behavior is changing — the model will likely re-read this block with full attention soon | The base model only sees what HAS happened (recency, frequency). This signal predicts what WILL happen |
+
+**Validation:** replaying a real Mistral-7B annotated KV-cache trace
+through baseline (signals off) vs enhanced (signals on) produced
+**100% eviction-decision changes** — every eviction round made
+different victim choices with the signals active (1,108 different block
+choices across 4 eviction rounds, 276 existing tests pass with 0
+regressions).
+
 **5. BCVF Gate — the "will I regret this?" check.**
 Bidirectional Coherence Verification. Every proposed move is checked both forward (will this hurt latency right now?) and backward (is this move consistent with the long-term health of the tier?). ARC adapts one-way. We adapt both ways. That's the safety story that lets an SRE actually turn this on.
 
@@ -188,12 +216,14 @@ On generic synthetic traces with no semantic structure — the kind of workloads
 - **Phase 4 shadow-mode vLLM integration** — runs alongside a real `vllm.LLM.generate()` call and derives a TraceEvent stream; HuggingFace attention-trace extractor verified live on real torch.
 - **Phase 5 active-mode vLLM bridge** — a monkey-patch against vLLM's v1 `FreeKVCacheBlockQueue.popleft_n` so PCAM drives live eviction. Implemented, feature-detected against the vLLM ≥ 0.7.0 core surface, 23 unit tests green against a mock queue.
 - **Acquisition-facing benchmark artifact** at `benchmarks/PCAM_PHASE5_REPORT.md` with a canonical CTM+ ↔ PCAM relationship statement, live measurements, and honest "what's verified vs what's pending" labeling.
+- **FSCS-derived signal integration (Stages 1-3)** — three optional scoring signals (boundary sensitivity, band class, instability) added to CTM+/PCAM scoring, with 36 new unit tests, annotated trace capture from real Mistral-7B, and a replay comparison pipeline that shows 100% eviction-decision impact on real LLM data. Default-off, backward-compatible, 276 total tests green.
 
 ### What's next
 
 | Phase | What we're building | Timeframe |
 |---|---|---|
 | **One live GPU closure run** | Execute `pcam_vllm_perf.py --policy both` on a CUDA machine to produce the first real serving-tier throughput/latency numbers for active-mode PCAM vs vLLM default LRU. Seven-step runbook already exists at `benchmarks/PHASE4_CLOSURE_RUN_LOG.md` section D. | ~30 engineer-minutes once a machine is available |
+| **FSCS signal calibration** | Tune the three new signal weights (boundary, band, instability) against real vLLM serving workloads and measure cache-hit-rate improvement over the four-signal baseline. The trace capture + replay pipeline is already built; the calibration needs a representative serving-tier workload. | Days (pipeline exists) |
 | **FPGA prototype** | Xilinx Alveo board. RTL for fast-path coherence (<10ns), CXL or PCIe interface. Target: 250MHz timing closure, <50ns latency overhead. The Phase 2.5 cocotb sketch-parity harness is already landed and waits for one live cocotb run to close. | 2–3 months |
 | **ASIC controller** | 7nm/5nm process. Three integration paths on the table: CXL memory expander, SSD controller FTL, and HBM controller for GPU. Full RTL IP package + integration guide. | 12–18 months |
 

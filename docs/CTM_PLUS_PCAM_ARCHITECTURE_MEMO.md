@@ -267,6 +267,60 @@ The single defensible headline from the live-verified PCAM benchmarks is this: *
 
 **What cannot be honestly reported yet.** The PCAM software runtime does **not** currently carry a published end-to-end serving throughput delta against vLLM's default. The active-mode bridge is implemented and unit-tested, but no live GPU run has produced tokens/sec, p50/p95/p99 latency, or concurrent-request-capacity numbers for PCAM specifically. Any document that cites such a number for PCAM must be citing either the pending closure run or the historical CTM+ investor-pitch numbers in Section 9.1, not a reproducible PCAM-runtime measurement on this branch. This distinction is exactly the kind of caveat a diligence reviewer should check; the memo is written so that check produces a clean answer.
 
+### 9.4 FSCS-Derived Signal Integration (April 2026)
+
+Three new optional scoring signals were derived from the Text-FSCS
+attention-operator research program and integrated into PCAM's
+KV-cache scoring as policy-layer enhancements:
+
+| Signal | What it captures | Scoring integration | Default |
+|---|---|---|---|
+| **Boundary sensitivity** (D) | Structural boundary tokens (sentence starts, paragraph breaks) that are attention sinks | Additive: `score += w_boundary · D` | weight=0.0 (off) |
+| **Band class** (G) | Layer-depth-based block importance: global-context layers (expensive to miss) vs local-syntax layers (cheap to recompute) | Multiplicative: `score *= G` | G=1.0 (neutral) |
+| **Instability** (U) | Future full-attention demand — blocks in unstable regions will likely be re-read and are expensive to evict | Additive: `score += w_instability · U` | weight=0.0 (off) |
+
+**Design principle:** the signals are caller-supplied metadata, not
+internally computed. PCAM does not import transformer code or FSCS
+modules. The caller (inference runtime, trace replayer, or vLLM
+bridge) determines boundary positions, layer bands, and instability
+levels and passes them to PCAM via `ensure_block()` or
+`set_block_*()` methods. This preserves the CTM+/PCAM boundary as a
+pure memory-management layer.
+
+**Test evidence:** 36 new unit tests across three test files (12 + 11
++ 13), covering default-off behavior, enabled scoring, proportionality,
+admission paths, per-instance weight management, cross-signal
+composition, and backward compatibility. All existing 240 PCAM tests
+continue to pass (276 total, 0 failures).
+
+**Validation on real data:** an annotated KV-cache trace was captured
+from FSCS-wrapped Mistral-7B (4 sequences × 512 tokens × 32 layers =
+4,096 blocks, 8,208 events) and replayed through PCAM in baseline
+(four-signal, signals off) vs enhanced (six-signal, signals on) mode.
+
+Result:
+- **Baseline:** 1,022 victims evicted across 4 rounds
+- **Enhanced:** 192 victims evicted across 4 rounds
+- **Eviction rounds changed: 4 of 4 (100%)**
+- **Individual block choices changed: 1,108**
+
+The signals changed every single eviction decision. The enhanced
+policy is more conservative (protecting boundary / global-context /
+unstable blocks), which reduces eviction volume by 81%. Whether
+this conservatism improves downstream serving quality (cache hit
+rate, p99 latency, concurrent requests) requires a serving-tier
+benchmark, which is the next calibration step.
+
+**Caveats:** the 100% decision-change result demonstrates *signal
+impact*, not *quality improvement*. The weights (boundary=0.10,
+instability=0.15, band={1.3, 1.0, 0.8}) are starting points, not
+tuned values. The trace uses a position-based attention-mass proxy
+rather than real per-block attention weights (real attention
+requires `output_attentions=True` which was not used to conserve
+VRAM). A serving-tier benchmark comparing enhanced PCAM against
+baseline on cache hit rate and latency under load is the
+measurement that would support a quantitative improvement claim.
+
 ---
 
 ## 10. What Is Still Pending

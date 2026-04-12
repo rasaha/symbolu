@@ -25,9 +25,12 @@ That sentence is the claim every other PCAM document is allowed to make. Any str
       │               CTM+                  │
       │    (canonical policy spec)          │
       │                                     │
-      │   Four-signal phase-aware scoring   │
-      │     (recency, frequency,            │
-      │      attention, position)           │
+      │   Phase-aware scoring (4 base +      │
+      │     3 optional FSCS-derived)       │
+      │     Base: recency, frequency,       │
+      │       attention, position           │
+      │     Opt: boundary, band class,      │
+      │       instability (default-off)     │
       │   Count-Min frequency sketch        │
       │     (4 rows × 4-bit counters,       │
       │      fixed seed hashes,             │
@@ -100,7 +103,9 @@ That sentence is the claim every other PCAM document is allowed to make. Any str
 
 4. **Active mode is implemented and unit-tested, but one live GPU run is still pending.** Phase 5 added a monkey-patch against vLLM's v1 `FreeKVCacheBlockQueue.popleft_n` so PCAM's decisions drive live eviction — this turns the arrow from PCAM into the KV cache from observational into causal. The bridge is feature-detected against the vLLM v1 core surface, fails clean on unsupported releases, and has 23 unit tests green against a mock `FreeKVCacheBlockQueue`. What remains is one real `pcam_vllm_perf.py --policy both` run on a CUDA machine with vllm 0.7.0+ installed — the runbook for that closure lives at `benchmarks/PHASE4_CLOSURE_RUN_LOG.md` section D.
 
-5. **The parity harness is the only synchronization mechanism.** There is no bridge class between CTM+ and PCAM. ADR-0001 explicitly forbids one. When CTM+ changes upstream, the update ritual is: re-vendor the reference file, re-run the parity harness, fix any runtime divergence against the reference (never the other way around), bump the PCAM version, commit. This is why it is correct to say "CTM+ is the spec" and "PCAM is the runtime": the code path from spec to runtime goes through vendoring plus a 20-test bit-parity check, not through an adapter layer.
+5. **FSCS-derived scoring signals are optional policy extensions, not transformer modifications.** Three signals from the Text-FSCS attention-operator research (boundary sensitivity, band class, instability) were integrated into PCAM's `score_block()` as caller-supplied metadata. PCAM does NOT import any FSCS module, does NOT run transformer attention code, and does NOT compute these signals internally. The inference runtime or trace capture tool sets them via `ensure_block(boundary_score=, band_class=, instability_hint=)` or `set_block_*()` methods. When no signals are set, scoring is unchanged from the four-signal ADR-0001 model. Validated on a real Mistral-7B annotated trace: 100% of eviction rounds changed with signals active (1,108 different block choices across 4 rounds). 276 total tests pass, 36 of which cover the new signals. The signals are in `kv_policy.py` alongside the existing scoring code; no separate module, no separate config file, no new dependency.
+
+6. **The parity harness is the only synchronization mechanism.** There is no bridge class between CTM+ and PCAM. ADR-0001 explicitly forbids one. When CTM+ changes upstream, the update ritual is: re-vendor the reference file, re-run the parity harness, fix any runtime divergence against the reference (never the other way around), bump the PCAM version, commit. This is why it is correct to say "CTM+ is the spec" and "PCAM is the runtime": the code path from spec to runtime goes through vendoring plus a 20-test bit-parity check, not through an adapter layer.
 
 ## Source-of-truth pointers
 
@@ -119,6 +124,9 @@ That sentence is the claim every other PCAM document is allowed to make. Any str
 | Phase 5 active mode | Monkey-patch installer, perf harness | [`PHASE5_ACTIVE_MODE.md`](PHASE5_ACTIVE_MODE.md) |
 | Phase 5 benchmark report | Acquisition-facing summary with the active-mode status | [`../../../benchmarks/PCAM_PHASE5_REPORT.md`](../../../benchmarks/PCAM_PHASE5_REPORT.md) |
 | Closure run log | Live-run runbooks + dated attempts for Phase 2.5 / 4 / 5 closures | [`../../../benchmarks/PHASE4_CLOSURE_RUN_LOG.md`](../../../benchmarks/PHASE4_CLOSURE_RUN_LOG.md) |
+| FSCS signal tests (Stage 1-3) | 36 tests covering boundary, band class, instability signals | [`../tests/test_boundary_signal.py`](../tests/test_boundary_signal.py), [`../tests/test_band_class_signal.py`](../tests/test_band_class_signal.py), [`../tests/test_instability_signal.py`](../tests/test_instability_signal.py) |
+| Annotated trace capture | Captures FSCS-derived signals from Mistral-7B into a replayable trace | [`../../../benchmarks/pcam_fscs_trace_capture.py`](../../../benchmarks/pcam_fscs_trace_capture.py) |
+| Baseline vs enhanced replay | Compares eviction decisions with signals on vs off | [`../../../benchmarks/pcam_fscs_replay_compare.py`](../../../benchmarks/pcam_fscs_replay_compare.py) |
 
 ## What this document does not say
 
