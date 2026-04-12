@@ -72,7 +72,7 @@ import math
 import random
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 # ---------------------------------------------------------------------------
 # Reference re-exports — vendored, not sys.path-hacked.
@@ -219,6 +219,36 @@ class BlockState:
     last_access_step: int = 0
     access_count: int = 0
     is_sink: bool = False
+    # Stage 1 (FSCS-derived): boundary sensitivity. Set by the caller
+    # via set_block_boundary() or ensure_block(boundary_score=...).
+    # Higher = block contains or is near structurally important
+    # boundary tokens (sentence starts, paragraph breaks, discourse
+    # markers). Blocks with high boundary_score are attention sinks
+    # that many heads attend to; evicting them causes disproportionate
+    # quality damage. Default 0.0 = no boundary information available.
+    boundary_score: float = 0.0
+    # Stage 2 (FSCS-derived): band class. Multiplicative modifier on the
+    # final score. Represents the long-range importance of this block's
+    # layer/position in the model.
+    #   > 1.0 = global-context block, expensive to miss, harder to evict
+    #   = 1.0 = neutral (default, no effect)
+    #   < 1.0 = local-syntax block, cheaper to recompute, easier to evict
+    # Set by the caller via set_block_band() or ensure_block(band_class=...).
+    # Multiplicative rather than additive because band class modifies the
+    # importance of ALL other signals for that block — a global block's
+    # recency, frequency, and attention are all more valuable.
+    band_class: float = 1.0
+    # Stage 3 (FSCS-derived): instability / future full-read demand.
+    # Higher = the attention behavior around this block is unstable,
+    # meaning the block is likely to be re-read with full attention
+    # soon. Unstable blocks should be kept in cache because evicting
+    # them is expensive (a full recompute will be needed). Stable
+    # blocks can be evicted more safely because the model's attention
+    # pattern around them is predictable and a cache miss is less
+    # costly. Set by the caller via set_block_instability() or
+    # ensure_block(instability_hint=...). Default 0.0 = no instability
+    # information available.
+    instability_hint: float = 0.0
 
 
 @dataclass
@@ -234,13 +264,24 @@ class PhaseWeights:
     frequency: float
     attention: float
     position: float
+    # Stage 1 (FSCS-derived): boundary sensitivity weight.
+    boundary: float = 0.0
+    # Stage 3 (FSCS-derived): instability / future full-read demand weight.
+    # Higher instability = block is likely to be re-read with full attention
+    # soon → keep it. Default 0.0 = signal disabled.
+    instability: float = 0.0
 
 
 # Four-signal phase-aware scoring weights. These are the canonical values
 # locked by ADR-0001; do not retune without an ADR amendment.
+#
+# The boundary weight defaults to 0.0 in both phases, making the
+# fifth signal completely inert unless an operator explicitly enables
+# it. Recommended starting point when enabled: 0.10 in both phases
+# (boundary tokens are equally important during prefill and decode).
 PHASE_WEIGHTS = {
-    InferencePhase.PREFILL: PhaseWeights(0.15, 0.20, 0.35, 0.30),
-    InferencePhase.DECODE:  PhaseWeights(0.30, 0.20, 0.30, 0.20),
+    InferencePhase.PREFILL: PhaseWeights(0.15, 0.20, 0.35, 0.30, boundary=0.0, instability=0.0),
+    InferencePhase.DECODE:  PhaseWeights(0.30, 0.20, 0.30, 0.20, boundary=0.0, instability=0.0),
 }
 
 
@@ -333,6 +374,18 @@ class KVCachePolicy:
         self._ema_count = 0   # number of attention updates
         self._entity_k = 2.0  # entity = ema > global_mean * k
 
+        # Track whether any enhanced (Stage 1-3) signals are enabled.
+        # When True, select_victims() skips the filler fast path and
+        # always uses the sampled path with full score_block() calls,
+        # because the fast path sorts by frequency only and would
+        # bypass the signals the caller explicitly asked for.
+        self._enhanced_signals_active: bool = False
+
+        # Per-instance phase weights, initialized from the global defaults.
+        # Override via set_boundary_weight() to enable Stage 1 without
+        # modifying the ADR-0001 global weights.
+        self._phase_weights: Dict[InferencePhase, PhaseWeights] = dict(PHASE_WEIGHTS)
+
         self.stats = {
             "evictions": 0,
             "filler_evictions": 0,
@@ -343,6 +396,68 @@ class KVCachePolicy:
     def set_rng(self, rng: random.Random) -> None:
         """Set the RNG instance for reproducible victim selection."""
         self._rng = rng
+
+    def set_boundary_weight(
+        self,
+        weight: float,
+        prefill: Optional[float] = None,
+        decode: Optional[float] = None,
+    ) -> None:
+        """
+        Enable the Stage 1 boundary-sensitivity signal by setting its
+        weight in the scoring formula. By default, both phases use the
+        same weight. Pass ``prefill`` or ``decode`` to differentiate.
+
+        The boundary weight is additive alongside the existing four
+        signals. Recommended starting value: 0.10.
+
+        Does NOT modify the global PHASE_WEIGHTS constant (which is
+        locked by ADR-0001). Only this instance's scoring is affected.
+        """
+        pw = prefill if prefill is not None else weight
+        dw = decode if decode is not None else weight
+        cur_p = self._phase_weights[InferencePhase.PREFILL]
+        cur_d = self._phase_weights[InferencePhase.DECODE]
+        self._phase_weights[InferencePhase.PREFILL] = PhaseWeights(
+            cur_p.recency, cur_p.frequency, cur_p.attention,
+            cur_p.position, boundary=pw, instability=cur_p.instability,
+        )
+        self._phase_weights[InferencePhase.DECODE] = PhaseWeights(
+            cur_d.recency, cur_d.frequency, cur_d.attention,
+            cur_d.position, boundary=dw, instability=cur_d.instability,
+        )
+        self._enhanced_signals_active = True
+
+    def set_instability_weight(
+        self,
+        weight: float,
+        prefill: Optional[float] = None,
+        decode: Optional[float] = None,
+    ) -> None:
+        """
+        Enable the Stage 3 instability signal by setting its weight.
+        By default, both phases use the same weight. Pass ``prefill``
+        or ``decode`` to differentiate.
+
+        Recommended starting value: 0.15 (instability is a strong
+        signal — a block that is likely to be re-read with full
+        attention is genuinely expensive to evict).
+
+        Does NOT modify the global PHASE_WEIGHTS constant.
+        """
+        pw = prefill if prefill is not None else weight
+        dw = decode if decode is not None else weight
+        cur_p = self._phase_weights[InferencePhase.PREFILL]
+        cur_d = self._phase_weights[InferencePhase.DECODE]
+        self._phase_weights[InferencePhase.PREFILL] = PhaseWeights(
+            cur_p.recency, cur_p.frequency, cur_p.attention,
+            cur_p.position, boundary=cur_p.boundary, instability=pw,
+        )
+        self._phase_weights[InferencePhase.DECODE] = PhaseWeights(
+            cur_d.recency, cur_d.frequency, cur_d.attention,
+            cur_d.position, boundary=cur_d.boundary, instability=dw,
+        )
+        self._enhanced_signals_active = True
 
     # ---- Sequence lifecycle -------------------------------------------------
 
@@ -365,16 +480,106 @@ class KVCachePolicy:
 
     # ---- Block admission and attention events -------------------------------
 
+    # ---- Stage 1 (FSCS-derived): boundary sensitivity --------------------
+
+    def set_block_band(
+        self,
+        block_id: int,
+        band_class: float,
+    ) -> None:
+        """
+        Set the band-class multiplier for an existing block (Stage 2).
+
+        Semantics:
+            band_class > 1.0 → global-context block, harder to evict
+            band_class = 1.0 → neutral (default)
+            band_class < 1.0 → local-syntax block, easier to evict
+
+        Recommended values from the FSCS per-band research:
+            global = 1.3   (layers handling document-level context)
+            mid    = 1.0   (paragraph structure — neutral)
+            local  = 0.8   (local syntax — cheaper to recompute)
+
+        No-op if ``block_id`` is unknown.
+        """
+        block = self.blocks.get(block_id)
+        if block is not None:
+            block.band_class = float(band_class)
+
+    def set_block_instability(
+        self,
+        block_id: int,
+        instability_hint: float,
+    ) -> None:
+        """
+        Set the instability / future-read-demand hint for a block (Stage 3).
+
+        Semantics:
+            instability_hint ≈ 1.0 → attention behavior is unstable,
+                block is likely to be re-read with full attention soon,
+                keep it in cache (high eviction cost)
+            instability_hint ≈ 0.0 → attention behavior is stable,
+                block is unlikely to be re-read, safe to evict
+
+        The caller is responsible for computing instability. Typical
+        sources:
+            - FSCS coherence signal (1.0 - coherence = instability)
+            - Attention-pattern variance across recent steps
+            - Model-internal entropy or confidence signals
+
+        No-op if ``block_id`` is unknown. Can be called repeatedly
+        to update the hint as new attention events arrive.
+        """
+        block = self.blocks.get(block_id)
+        if block is not None:
+            block.instability_hint = float(instability_hint)
+
+    def set_block_boundary(
+        self,
+        block_id: int,
+        boundary_score: float,
+    ) -> None:
+        """
+        Set boundary sensitivity for an existing block. The caller
+        determines what constitutes a boundary (sentence start, paragraph
+        break, discourse marker, etc.) and passes a score in [0, 1].
+
+        This is the primary interface for callers that discover boundary
+        information after initial block admission. For callers that know
+        boundary status at admission time, ``ensure_block()`` also accepts
+        an optional ``boundary_score`` parameter.
+
+        No-op if ``block_id`` is unknown. Does not change any other
+        block state.
+        """
+        block = self.blocks.get(block_id)
+        if block is not None:
+            block.boundary_score = float(boundary_score)
+
+    # ---- Block admission and attention events -------------------------------
+
     def ensure_block(
         self,
         block_id: int,
         sequence_id: int,
         positions: List[int],
+        boundary_score: float = 0.0,
+        band_class: float = 1.0,
+        instability_hint: float = 0.0,
     ) -> None:
         """
         Lightweight block registration. Creates block metadata without
         recording any attention — used on admission. Idempotent: re-calls
         with an existing block_id are a no-op and do not increment _step.
+
+        ``boundary_score`` (Stage 1, optional, default 0.0): boundary
+        sensitivity hint in [0, 1].
+
+        ``band_class`` (Stage 2, optional, default 1.0): multiplicative
+        score modifier. >1.0 = global, 1.0 = neutral, <1.0 = local.
+
+        ``instability_hint`` (Stage 3, optional, default 0.0): future
+        full-read demand in [0, 1]. Higher = unstable = keep in cache.
         """
         if block_id not in self.blocks:
             self._step += 1
@@ -385,6 +590,9 @@ class KVCachePolicy:
                 created_step=self._step,
                 token_count=len(positions),
                 is_sink=is_sink,
+                boundary_score=float(boundary_score),
+                band_class=float(band_class),
+                instability_hint=float(instability_hint),
             )
             self.blocks[block_id] = block
 
@@ -497,7 +705,7 @@ class KVCachePolicy:
         seq = self.sequences.get(block.sequence_id)
         phase = seq.phase if seq else InferencePhase.DECODE
 
-        w = PHASE_WEIGHTS.get(phase)
+        w = self._phase_weights.get(phase)
         if not w:
             return -1.0
 
@@ -520,9 +728,26 @@ class KVCachePolicy:
             + w.position * importance
         )
 
+        # Signal 5 (Stage 1, FSCS-derived): boundary sensitivity.
+        if w.boundary > 0.0 and block.boundary_score > 0.0:
+            score += w.boundary * block.boundary_score
+
+        # Signal 6 (Stage 3, FSCS-derived): instability / future demand.
+        # Unstable blocks get a score boost — they are likely to be
+        # re-read with full attention soon, so evicting them is costly.
+        if w.instability > 0.0 and block.instability_hint > 0.0:
+            score += w.instability * block.instability_hint
+
         # Entity bonus: protect high-attention non-sink blocks.
         if not block.is_sink and block.attention_ema > self._adaptive_threshold:
             score += 0.5
+
+        # Stage 2 (FSCS-derived): band-class multiplier.
+        # Applied last so it scales the entire composite score.
+        # band_class=1.0 (default) is a no-op. >1.0 protects global-
+        # context blocks; <1.0 makes local-syntax blocks easier to evict.
+        if block.band_class != 1.0:
+            score *= block.band_class
 
         return score
 
@@ -673,13 +898,21 @@ class KVCachePolicy:
             return []
 
         # Fast path: enough all-filler blocks to satisfy the request.
-        filler_blocks = [bid for bid in available if self._is_all_filler(bid)]
-        if len(filler_blocks) >= count:
-            filler_blocks.sort(key=lambda b: self.freq_sketch.estimate(b))
-            self.stats["filler_evictions"] += min(count, len(filler_blocks))
-            return filler_blocks[:count]
+        # This path sorts by frequency ONLY and does not call score_block(),
+        # so it bypasses the Stage 1-3 FSCS-derived signals entirely.
+        # When enhanced signals are active, we skip the fast path and
+        # always use the sampled path with full scoring, because the
+        # caller explicitly asked for boundary/band/instability signals
+        # to influence eviction decisions — which they cannot do if
+        # score_block() is never called.
+        if not self._enhanced_signals_active:
+            filler_blocks = [bid for bid in available if self._is_all_filler(bid)]
+            if len(filler_blocks) >= count:
+                filler_blocks.sort(key=lambda b: self.freq_sketch.estimate(b))
+                self.stats["filler_evictions"] += min(count, len(filler_blocks))
+                return filler_blocks[:count]
 
-        # Sampled path.
+        # Sampled path — full scoring including all enabled signals.
         sample_size = min(48, len(available))
         candidates = self._rng.sample(list(available), sample_size)
 
