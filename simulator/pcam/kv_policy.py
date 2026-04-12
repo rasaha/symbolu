@@ -238,6 +238,17 @@ class BlockState:
     # importance of ALL other signals for that block — a global block's
     # recency, frequency, and attention are all more valuable.
     band_class: float = 1.0
+    # Stage 3 (FSCS-derived): instability / future full-read demand.
+    # Higher = the attention behavior around this block is unstable,
+    # meaning the block is likely to be re-read with full attention
+    # soon. Unstable blocks should be kept in cache because evicting
+    # them is expensive (a full recompute will be needed). Stable
+    # blocks can be evicted more safely because the model's attention
+    # pattern around them is predictable and a cache miss is less
+    # costly. Set by the caller via set_block_instability() or
+    # ensure_block(instability_hint=...). Default 0.0 = no instability
+    # information available.
+    instability_hint: float = 0.0
 
 
 @dataclass
@@ -254,12 +265,11 @@ class PhaseWeights:
     attention: float
     position: float
     # Stage 1 (FSCS-derived): boundary sensitivity weight.
-    # Default 0.0 preserves exact backward compatibility with the
-    # ADR-0001 four-signal model. When non-zero, blocks with high
-    # boundary_score get a proportional score boost, making them
-    # harder to evict. The signal is additive, same convention as
-    # the other four terms.
     boundary: float = 0.0
+    # Stage 3 (FSCS-derived): instability / future full-read demand weight.
+    # Higher instability = block is likely to be re-read with full attention
+    # soon → keep it. Default 0.0 = signal disabled.
+    instability: float = 0.0
 
 
 # Four-signal phase-aware scoring weights. These are the canonical values
@@ -270,8 +280,8 @@ class PhaseWeights:
 # it. Recommended starting point when enabled: 0.10 in both phases
 # (boundary tokens are equally important during prefill and decode).
 PHASE_WEIGHTS = {
-    InferencePhase.PREFILL: PhaseWeights(0.15, 0.20, 0.35, 0.30, boundary=0.0),
-    InferencePhase.DECODE:  PhaseWeights(0.30, 0.20, 0.30, 0.20, boundary=0.0),
+    InferencePhase.PREFILL: PhaseWeights(0.15, 0.20, 0.35, 0.30, boundary=0.0, instability=0.0),
+    InferencePhase.DECODE:  PhaseWeights(0.30, 0.20, 0.30, 0.20, boundary=0.0, instability=0.0),
 }
 
 
@@ -399,15 +409,45 @@ class KVCachePolicy:
         """
         pw = prefill if prefill is not None else weight
         dw = decode if decode is not None else weight
-        base_p = PHASE_WEIGHTS[InferencePhase.PREFILL]
-        base_d = PHASE_WEIGHTS[InferencePhase.DECODE]
+        cur_p = self._phase_weights[InferencePhase.PREFILL]
+        cur_d = self._phase_weights[InferencePhase.DECODE]
         self._phase_weights[InferencePhase.PREFILL] = PhaseWeights(
-            base_p.recency, base_p.frequency, base_p.attention,
-            base_p.position, boundary=pw,
+            cur_p.recency, cur_p.frequency, cur_p.attention,
+            cur_p.position, boundary=pw, instability=cur_p.instability,
         )
         self._phase_weights[InferencePhase.DECODE] = PhaseWeights(
-            base_d.recency, base_d.frequency, base_d.attention,
-            base_d.position, boundary=dw,
+            cur_d.recency, cur_d.frequency, cur_d.attention,
+            cur_d.position, boundary=dw, instability=cur_d.instability,
+        )
+
+    def set_instability_weight(
+        self,
+        weight: float,
+        prefill: Optional[float] = None,
+        decode: Optional[float] = None,
+    ) -> None:
+        """
+        Enable the Stage 3 instability signal by setting its weight.
+        By default, both phases use the same weight. Pass ``prefill``
+        or ``decode`` to differentiate.
+
+        Recommended starting value: 0.15 (instability is a strong
+        signal — a block that is likely to be re-read with full
+        attention is genuinely expensive to evict).
+
+        Does NOT modify the global PHASE_WEIGHTS constant.
+        """
+        pw = prefill if prefill is not None else weight
+        dw = decode if decode is not None else weight
+        cur_p = self._phase_weights[InferencePhase.PREFILL]
+        cur_d = self._phase_weights[InferencePhase.DECODE]
+        self._phase_weights[InferencePhase.PREFILL] = PhaseWeights(
+            cur_p.recency, cur_p.frequency, cur_p.attention,
+            cur_p.position, boundary=cur_p.boundary, instability=pw,
+        )
+        self._phase_weights[InferencePhase.DECODE] = PhaseWeights(
+            cur_d.recency, cur_d.frequency, cur_d.attention,
+            cur_d.position, boundary=cur_d.boundary, instability=dw,
         )
 
     # ---- Sequence lifecycle -------------------------------------------------
@@ -457,6 +497,34 @@ class KVCachePolicy:
         if block is not None:
             block.band_class = float(band_class)
 
+    def set_block_instability(
+        self,
+        block_id: int,
+        instability_hint: float,
+    ) -> None:
+        """
+        Set the instability / future-read-demand hint for a block (Stage 3).
+
+        Semantics:
+            instability_hint ≈ 1.0 → attention behavior is unstable,
+                block is likely to be re-read with full attention soon,
+                keep it in cache (high eviction cost)
+            instability_hint ≈ 0.0 → attention behavior is stable,
+                block is unlikely to be re-read, safe to evict
+
+        The caller is responsible for computing instability. Typical
+        sources:
+            - FSCS coherence signal (1.0 - coherence = instability)
+            - Attention-pattern variance across recent steps
+            - Model-internal entropy or confidence signals
+
+        No-op if ``block_id`` is unknown. Can be called repeatedly
+        to update the hint as new attention events arrive.
+        """
+        block = self.blocks.get(block_id)
+        if block is not None:
+            block.instability_hint = float(instability_hint)
+
     def set_block_boundary(
         self,
         block_id: int,
@@ -488,6 +556,7 @@ class KVCachePolicy:
         positions: List[int],
         boundary_score: float = 0.0,
         band_class: float = 1.0,
+        instability_hint: float = 0.0,
     ) -> None:
         """
         Lightweight block registration. Creates block metadata without
@@ -495,13 +564,13 @@ class KVCachePolicy:
         with an existing block_id are a no-op and do not increment _step.
 
         ``boundary_score`` (Stage 1, optional, default 0.0): boundary
-        sensitivity hint in [0, 1]. Higher = block contains structurally
-        important boundary tokens. Has no effect unless the boundary
-        weight in PhaseWeights is non-zero.
+        sensitivity hint in [0, 1].
 
         ``band_class`` (Stage 2, optional, default 1.0): multiplicative
-        score modifier. >1.0 = global (harder to evict), 1.0 = neutral,
-        <1.0 = local (easier to evict).
+        score modifier. >1.0 = global, 1.0 = neutral, <1.0 = local.
+
+        ``instability_hint`` (Stage 3, optional, default 0.0): future
+        full-read demand in [0, 1]. Higher = unstable = keep in cache.
         """
         if block_id not in self.blocks:
             self._step += 1
@@ -514,6 +583,7 @@ class KVCachePolicy:
                 is_sink=is_sink,
                 boundary_score=float(boundary_score),
                 band_class=float(band_class),
+                instability_hint=float(instability_hint),
             )
             self.blocks[block_id] = block
 
@@ -650,11 +720,14 @@ class KVCachePolicy:
         )
 
         # Signal 5 (Stage 1, FSCS-derived): boundary sensitivity.
-        # Blocks containing or near structural boundaries get a score
-        # boost proportional to their boundary_score. The weight is
-        # 0.0 by default (no effect unless explicitly enabled).
         if w.boundary > 0.0 and block.boundary_score > 0.0:
             score += w.boundary * block.boundary_score
+
+        # Signal 6 (Stage 3, FSCS-derived): instability / future demand.
+        # Unstable blocks get a score boost — they are likely to be
+        # re-read with full attention soon, so evicting them is costly.
+        if w.instability > 0.0 and block.instability_hint > 0.0:
+            score += w.instability * block.instability_hint
 
         # Entity bonus: protect high-attention non-sink blocks.
         if not block.is_sink and block.attention_ema > self._adaptive_threshold:
