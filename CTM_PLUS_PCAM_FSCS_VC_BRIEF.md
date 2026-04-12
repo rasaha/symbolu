@@ -7,24 +7,26 @@
 
 ## Page 1 — The Problem
 
-### LLM inference is memory-bound, and the eviction algorithm is from 1965.
+### LLM inference is becoming memory-bound, and today's eviction heuristics are too shallow.
 
-The cost structure of LLM inference has quietly inverted. The
-dominant cost for any production LLM serving system — vLLM, TGI,
-Triton, or a custom stack — is no longer the matrix multiplications.
-It is the **KV-cache**: the per-request memory that stores every
-token's key and value tensors so the model does not recompute them
-on every generation step.
+As context windows grow, the dominant serving bottleneck shifts from
+pure matrix math toward KV-cache pressure. The **KV-cache** — the
+per-request memory that stores every token's key and value tensors
+so the model does not recompute them on every generation step — is
+now the largest single consumer of GPU HBM in most inference
+deployments.
 
-A single Mistral-7B request at 32K context consumes ~2 GB of
-KV-cache in bf16. An A100-80GB running 40 concurrent requests
-dedicates ~80% of its HBM to KV-cache, leaving the remaining 20%
-for model weights, activations, and operating headroom. When the
-cache is full and a new request arrives, the serving system must
-**evict** — decide which cached blocks to throw away to make room.
+A single Mistral-7B request at 32K context can consume on the order
+of ~2 GB of KV-cache in bf16. An A100-80GB running tens of
+concurrent requests can dedicate the majority of its HBM to
+KV-cache. When the cache is full and a new request arrives, the
+serving system must **evict** — decide which cached blocks to throw
+away to make room.
 
-The algorithm that makes this decision, in nearly every production
-serving stack deployed today, is **LRU** (Least Recently Used) — a
+In many serving stacks, the effective eviction policy remains
+**LRU-like** — dominated by recency and largely blind to
+transformer-specific block value. LRU knows one thing: *when was
+this block last touched?*
 policy invented in the 1960s that knows exactly one thing: *when was
 this block last touched?*
 
@@ -57,13 +59,11 @@ context grows, the gap between "evict the right block" and
 "evict the wrong block" widens — and LRU, which cannot
 distinguish between the two, becomes increasingly costly.
 
-The market evidence is clear: every serious inference provider has
-shipped partial workarounds for KV-cache pressure (Anthropic's
-prompt caching, OpenAI's long-context pricing tiers, vLLM's paged
-attention, llama.cpp's sliding-window caches). None of them solved
-it at the eviction-policy layer, because none of them replaced
-LRU's single-signal decision with a multi-signal policy that
-actually knows what matters about each block.
+Most provider-side mitigations address KV pressure indirectly —
+through pricing (OpenAI's long-context tiers), prompt caching
+(Anthropic), context management (chunked prefill), or paging
+(vLLM's paged attention) — rather than through a multi-signal
+eviction policy that reasons about block value directly.
 
 ---
 
@@ -81,8 +81,9 @@ HuggingFace) through narrow adapters.
 
 ### The scoring model
 
-Every candidate block is scored by up to seven orthogonal signals,
-with phase-aware weights that shift between prefill and decode:
+Every candidate block is scored by up to seven signals (six additive,
+one multiplicative), with phase-aware weights that shift between
+prefill and decode:
 
 ```
 score = w_r · recency                      signal 1: when was it last read?
@@ -103,14 +104,13 @@ attention it received, and whether it is structurally important
 (sink blocks are pinned and never evicted).
 
 Signals 5–7 are **FSCS-derived extensions** — three diagnostic
-signals identified during our Text-FSCS attention-operator research
-and folded into the memory-policy layer where they naturally belong.
-These capture **future risk**: whether evicting a specific block
-will damage quality (boundary), whether the eviction cost is high
-or low (band class), and whether the block is about to be needed
-again (instability). They are default-off, caller-supplied, and
-backward-compatible — the base four-signal model is unchanged when
-they are not activated.
+signals identified during our Text-FSCS research and folded into
+the memory-policy layer where they naturally belong. Together they
+refine **eviction-risk estimation**: boundary sensitivity captures
+structural importance, band class captures expected miss cost by
+layer role, and instability hints at near-future reread likelihood.
+They are default-off, caller-supplied, and backward-compatible —
+the base four-signal model is unchanged when they are not activated.
 
 ### Two-layer architecture
 
@@ -171,30 +171,38 @@ Mistral-7B KV-cache data.
 
 ## Page 3 — What Is Proven and What Is Next
 
-### Benchmark evidence (CTM+ core, prior work)
+### Benchmark evidence (CTM+ core, across representative cache-sensitive workloads)
 
 | Workload | LRU baseline | CTM+ | Delta |
 |---|---|---|---|
-| Hotspot (batch ML) | 76.4% hit rate | 94.2% | **+17.8%** |
-| LLM inference (vLLM) | 32 concurrent | 48 concurrent | **+50%** |
-| Database (TPC-C) | 125K txn/sec | 142K txn/sec | **+13.6%** |
-| p99 latency | 12ms | 8.5ms | **−29%** |
-| 5-year TCO (100 GPUs) | $5.85M | $4.01M | **−31%** |
+| **LLM inference (vLLM)** | **32 concurrent** | **48 concurrent** | **+50%** |
+| **LLM p99 latency** | **12ms** | **8.5ms** | **−29%** |
+| Hotspot (batch ML) | 76.4% hit rate | 94.2% | +17.8% |
+| Database (TPC-C) | 125K txn/sec | 142K txn/sec | +13.6% |
+| 5-year TCO (100 GPUs) | $5.85M | $4.01M | −31% |
 
-### FSCS signal validation (this session, real Mistral-7B data)
+*LLM rows bolded as the primary target workload. Database and batch
+ML rows demonstrate cross-domain applicability of the scoring model.*
+
+### FSCS-derived signal integration validation (real Mistral-7B trace)
 
 | Metric | Baseline (4 signals) | Enhanced (7 signals) |
 |---|---|---|
 | Eviction rounds | 4 | 4 |
-| Victims evicted | 1,022 | 192 |
+| Eviction selections emitted | 1,022 | 192 |
 | Rounds with changed decisions | 0 | **4 (100%)** |
 | Individual block choices changed | — | **1,108** |
+
+*Interpretation: policy behavior changed materially; serving
+benefit not yet measured.*
 
 **Every single eviction round made different victim choices** when
 the three FSCS-derived signals were active. The enhanced policy
 protected boundary blocks, global-context blocks, and unstable
-blocks that the baseline would have evicted. 276 unit tests pass
-with zero regressions.
+blocks that the baseline would have evicted. Whether this
+conservatism improves downstream serving quality (hit rate, latency,
+concurrent requests) is the next calibration step. 276 unit tests
+pass with zero regressions.
 
 ### What is implemented today
 
@@ -237,13 +245,11 @@ with zero regressions.
 
 We are raising seed to fund the FPGA prototype, land the first
 design-partner deployments, and calibrate the FSCS-derived scoring
-signals against real serving workloads. The software stack is
-built, tested, and integrated end-to-end — from the scoring
-specification through the runtime backend through the trace capture
-pipeline to the validated eviction-decision impact on real
-Mistral-7B data. The capital is for hardware, partners, and the
-serving-tier benchmark that converts "decisions changed" into
-"quality improved."
+signals against real serving workloads. The software stack is built, tested, and integrated end-to-end for
+policy execution and trace-driven validation; the remaining step is
+serving-tier closure under live load. The capital is for hardware,
+partners, and the serving-tier benchmark that converts "decisions
+changed" into "quality improved."
 
 > *"Seven signals. Every block in the right tier. Every eviction justified."*
 
