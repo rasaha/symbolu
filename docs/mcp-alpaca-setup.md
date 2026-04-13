@@ -96,25 +96,62 @@ entire "install" step on every machine.
 
 ---
 
-## 4. First-run approval in Claude Code
+## 4. Register the server with Claude Code
+
+There are two paths. Pick whichever works on your platform.
+
+### 4a. Project scope via `.mcp.json` (preferred, macOS/Linux)
+
+The `.mcp.json` in the repo root already defines the alpaca server.
+Claude Code auto-discovers it and prompts you to approve project-scoped
+MCP servers on first session.
 
 1. Open this repo in Claude Code.
-2. On the first session after `.mcp.json` appears, Claude Code prompts you to
-   approve the project-scoped MCP servers. Read the prompt, then approve.
-   This is a one-time trust decision per repo per machine.
-3. If you ever need to reset the approval:
+2. Approve the trust prompt when it appears.
+3. Verify:
 
    ```bash
-   claude mcp reset-project-choices
+   claude mcp get alpaca
    ```
 
-4. Verify the server is loaded:
+   Expected: `Status: ✓ Connected`.
 
-   ```bash
-   claude mcp list
-   ```
+### 4b. User scope via wrapper script (Windows fallback)
 
-   You should see an `alpaca` entry with status `connected` (or similar).
+On Windows + Claude Code 2.1.x the project-scope trust dialog does
+not always surface, which silently prevents `.mcp.json`-defined
+servers from loading into interactive sessions (`claude mcp get` still
+shows them as Connected, but chat sessions have no alpaca tools).
+
+The workaround is to register the server at **user scope** via a
+wrapper script. Run this once per machine:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\register-alpaca-mcp.ps1
+```
+
+What the script does:
+
+- Removes any prior alpaca registration at project / user / local scope
+- Registers a new user-scoped server pointing at
+  `scripts\alpaca-mcp-wrapper.cmd`
+- The wrapper sets `PYTHONUTF8=1` (sidesteps the upstream cp1252 crash
+  in `alpaca-mcp-server` on Windows) and `cd`s into the repo root so
+  `--env-file .env` resolves
+- Runs `claude mcp get alpaca` at the end to verify the registration
+
+After it completes successfully, relaunch Claude Code and the alpaca
+tools will be available in every session.
+
+### Resetting either registration
+
+```bash
+# Wipe project approvals (forces re-prompt)
+claude mcp reset-project-choices
+
+# Remove user-scope registration
+claude mcp remove alpaca -s user
+```
 
 ---
 
