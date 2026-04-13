@@ -229,6 +229,14 @@ fusion** — linear, local, and quadratic attention composed serially
 over a shared phase-memory substrate — so that the tradeoff in the
 Page 1 table becomes a design axis rather than a forced choice.
 
+### The broader stake (honest framing)
+
+The structural bet here — **linear-time long-range recall without a
+decay tax** — is the kind of primitive that future, more ambitious
+architectures will need whether they reach AGI or not; we are not
+claiming to solve intelligence, we are claiming to remove one of the
+limits that any solution to it will have to navigate.
+
 ---
 
 ## Page 4 — Evidence, Training Recipe & Roadmap
