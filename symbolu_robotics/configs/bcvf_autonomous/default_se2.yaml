@@ -1,0 +1,76 @@
+# BCVF for Autonomous Systems — Default SE(2) Ground Vehicle Configuration
+# Source: V3.1 Appendix D.6, E.2, Section 3.4.1
+# Domain: Ground vehicle on SE(2) manifold
+
+# --- MPPI Planner ---
+mppi:
+  rollouts: 1000              # K: candidate trajectories per planning cycle
+  horizon: 50                 # H: prediction steps (5s at dt=0.1)
+  dt: 0.1                     # Sampling period (seconds)
+  temperature: 5.0            # MPPI temperature (not lambda_c)
+  warm_start: true            # Reuse previous solution as sampling mean
+  control_dim: 2              # [linear_velocity, steering_angle]
+
+# --- BCVF Cost ---
+bcvf:
+  lambda_c: 1.0               # Coherence weight (SE(2) range: 1.0-2.0)
+  pairing_mode: anchor        # "anchor" (O(M)) or "all_pairs" (O(M^2))
+  anchor_model: M1            # IMU+odom is most stable baseline
+
+  # Smooth gate (V3.1 Definition 4, Section 3.4.1)
+  gate:
+    threshold: 0.1            # T: noise floor (meters)
+    beta: 200.0               # Steepness: 20/T = 200 (range: 20/T to 50/T)
+
+  # Pseudo-Huber penalty (V3.1 Definition 5)
+  huber:
+    delta: 0.5                # Quadratic-linear transition point
+
+  # Weighting matrix W_c for disagreement acceleration
+  # Diagonal: [dx_weight, dy_weight, dtheta_weight]
+  weight_matrix: [1.0, 1.0, 1.0]
+
+# --- SE(2) Manifold ---
+manifold:
+  lever_arm: 2.5              # L: meters, homogenizes yaw to displacement risk
+  angle_wrap: true            # Wrap theta to [-pi, pi)
+
+# --- Predictors ---
+predictors:
+  count: 4
+  shared_dynamics: bicycle    # Kinematic bicycle model for forward prediction
+  bicycle:
+    wheelbase: 2.7            # meters (typical passenger vehicle)
+    max_steering_angle: 0.6   # radians (~34 degrees)
+    max_velocity: 15.0        # m/s (~54 km/h, urban driving)
+    max_acceleration: 3.0     # m/s^2
+
+  # Per-predictor noise profiles (nominal operation)
+  M1_imu_odometry:
+    position_noise_std: 0.01  # meters per step
+    heading_noise_std: 0.001  # radians per step
+    drift_rate: 0.005         # meters per step cumulative
+  M2_lidar_slam:
+    position_noise_std: 0.02
+    heading_noise_std: 0.005
+    drift_rate: 0.0           # SLAM corrects drift
+  M3_visual_odometry:
+    position_noise_std: 0.03
+    heading_noise_std: 0.008
+    drift_rate: 0.002
+  M4_gnss_map:
+    position_noise_std: 0.5   # GPS is noisier
+    heading_noise_std: 0.01
+    drift_rate: 0.0           # Absolute reference
+
+# --- Baseline Performance Cost (J_perf) ---
+performance_cost:
+  lane_deviation_weight: 1.0  # Penalize lateral offset from lane center
+  progress_weight: 0.5        # Reward forward progress toward goal
+  control_smoothness_weight: 0.1
+  collision_weight: 1000.0    # Hard penalty for collision proximity
+
+# --- Lambda_c Sweep (V3.1 Section E.6) ---
+sweep:
+  lambda_c_values: [0.0, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
+  runs_per_value: 100
