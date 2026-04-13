@@ -61,6 +61,13 @@ cp .env.example .env
 Edit `.env` and fill in the Alpaca section:
 
 ```bash
+# Variable names the alpaca-mcp-server actually reads:
+ALPACA_API_KEY=PK********************
+ALPACA_SECRET_KEY=****************************************
+PAPER=True
+
+# SDK-compatible aliases — same values. Keep these for other tooling
+# in the repo that uses the alpaca-py convention.
 APCA_API_KEY_ID=PK********************
 APCA_API_SECRET_KEY=****************************************
 APCA_API_BASE_URL=https://paper-api.alpaca.markets
@@ -69,8 +76,12 @@ ALPACA_DATA_FEED=iex
 
 Notes:
 
-- Leave `APCA_API_BASE_URL` pointed at paper. Do not change it to the live
-  endpoint until you have completed section 7.
+- The MCP server reads `ALPACA_API_KEY` / `ALPACA_SECRET_KEY`, not
+  `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY`. The names differ from the
+  alpaca-py SDK convention — we set both to stay compatible with any
+  code in this repo that uses either name.
+- `PAPER=True` routes the MCP server at the paper endpoint. Set to
+  `False` only after you have completed section 7 below.
 - `ALPACA_DATA_FEED=iex` is the free data tier. The Algo Trader Plus
   subscription (roughly $99/mo) unlocks `sip` — the full consolidated US
   equities feed. Stay on `iex` until you need broader symbol coverage.
