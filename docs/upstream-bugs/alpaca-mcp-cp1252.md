@@ -1,12 +1,13 @@
 # Upstream bug: alpaca-mcp-server cp1252 crash on Windows
 
-**Status:** Not yet filed. Draft ready to paste at
-<https://github.com/alpacahq/alpaca-mcp-server/issues/new>.
+**Status:** Filed as
+[alpacahq/alpaca-mcp-server#65](https://github.com/alpacahq/alpaca-mcp-server/issues/65).
 
 **Workaround in this repo:** `scripts/alpaca-mcp-wrapper.cmd` sets
 `PYTHONUTF8=1` before launching the server, and `.mcp.json` sets the
-same env var. Both sidestep the bug. This draft exists so the upstream
-fix can be tracked once filed.
+same env var. Both sidestep the bug. Once the upstream fix lands, the
+workaround can stay in place as defense-in-depth or be removed — it is
+harmless either way.
 
 ---
 
