@@ -76,18 +76,12 @@ Notes:
   equities feed. Stay on `iex` until you need broader symbol coverage.
 - `.env` is gitignored. Never commit filled-in keys.
 
-Export the variables into your shell before starting Claude Code. The
-simplest option is `direnv`, since this repo already ships a `.envrc`:
-
-```bash
-direnv allow
-```
-
-Or manually:
-
-```bash
-set -a && source .env && set +a
-```
+You do **not** need to export these variables into your shell. The
+`.mcp.json` in this repo launches the server with
+`uvx alpaca-mcp-server --env-file .env`, so the server reads `.env`
+directly at startup. No `direnv`, no PowerShell loader, no
+`[Environment]::SetEnvironmentVariable` dance. Saving `.env` is the
+entire "install" step on every machine.
 
 ---
 
