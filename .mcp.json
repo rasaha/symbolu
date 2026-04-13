@@ -3,12 +3,9 @@
     "alpaca": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["alpaca-mcp-server"],
+      "args": ["alpaca-mcp-server", "--env-file", ".env"],
       "env": {
-        "APCA_API_KEY_ID": "${APCA_API_KEY_ID}",
-        "APCA_API_SECRET_KEY": "${APCA_API_SECRET_KEY}",
-        "APCA_API_BASE_URL": "${APCA_API_BASE_URL:-https://paper-api.alpaca.markets}",
-        "ALPACA_DATA_FEED": "${ALPACA_DATA_FEED:-iex}"
+        "PYTHONUTF8": "1"
       }
     }
   }
