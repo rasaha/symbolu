@@ -16,43 +16,68 @@
 #     powershell -ExecutionPolicy Bypass -File scripts\register-alpaca-mcp.ps1
 #
 # Safe to re-run: it removes any prior alpaca registration at
-# project and user scope before adding the new one.
+# user and local scope before adding the new one. Errors from
+# "remove" calls are swallowed on purpose — they fire when there
+# is nothing to remove, which is the normal case on first run.
 # ---------------------------------------------------------------
 
-$ErrorActionPreference = "Stop"
+# Don't halt on native command stderr. The "claude mcp remove" calls
+# below intentionally error out when the server hasn't been registered
+# yet; we want to ignore those.
+$ErrorActionPreference = "Continue"
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $wrapper  = Join-Path $repoRoot "scripts\alpaca-mcp-wrapper.cmd"
 
 if (-not (Test-Path $wrapper)) {
-    Write-Error "Wrapper script not found: $wrapper"
+    Write-Host "ERROR: Wrapper script not found: $wrapper" -ForegroundColor Red
     exit 1
 }
 
 $envFile = Join-Path $repoRoot ".env"
 if (-not (Test-Path $envFile)) {
-    Write-Warning ".env not found at $envFile"
-    Write-Warning "The server will crash at runtime until you create it."
-    Write-Warning "See docs/mcp-alpaca-setup.md for the expected contents."
-}
-
-Write-Host "Removing any prior alpaca MCP registrations..."
-# Both calls are allowed to fail (server not yet registered at that scope).
-& claude mcp remove alpaca -s project 2>$null | Out-Null
-& claude mcp remove alpaca -s user    2>$null | Out-Null
-& claude mcp remove alpaca -s local   2>$null | Out-Null
-
-Write-Host "Registering alpaca at user scope..."
-Write-Host "  wrapper: $wrapper"
-& claude mcp add alpaca --scope user $wrapper
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "claude mcp add failed (exit $LASTEXITCODE)"
-    exit $LASTEXITCODE
+    Write-Host "WARNING: .env not found at $envFile" -ForegroundColor Yellow
+    Write-Host "         The server will crash at runtime until you create it." -ForegroundColor Yellow
+    Write-Host "         See docs/mcp-alpaca-setup.md for the expected contents." -ForegroundColor Yellow
+    Write-Host ""
 }
 
 Write-Host ""
-Write-Host "Verifying..."
+Write-Host "=== Removing any prior alpaca MCP registrations ==="
+Write-Host "(errors here are expected and ignored)"
+foreach ($scope in @("user", "local")) {
+    Write-Host "  scope=$scope ..." -NoNewline
+    try {
+        & claude mcp remove alpaca -s $scope 2>&1 | Out-Null
+        Write-Host " done"
+    } catch {
+        Write-Host " (ignored)"
+    }
+}
+
+Write-Host ""
+Write-Host "=== Registering alpaca at user scope ==="
+Write-Host "  wrapper: $wrapper"
+# Options (--scope user) must come BEFORE the positional name.
+& claude mcp add --scope user alpaca $wrapper
+$addExit = $LASTEXITCODE
+if ($addExit -ne 0) {
+    Write-Host ""
+    Write-Host "ERROR: claude mcp add failed with exit code $addExit" -ForegroundColor Red
+    Write-Host "Likely causes:" -ForegroundColor Red
+    Write-Host "  - alpaca already registered at user scope — rerun this script" -ForegroundColor Red
+    Write-Host "  - claude CLI not on PATH — run 'claude --version' to verify" -ForegroundColor Red
+    exit $addExit
+}
+
+Write-Host ""
+Write-Host "=== Verifying ==="
 & claude mcp get alpaca
 
 Write-Host ""
 Write-Host "Done. Relaunch Claude Code and the alpaca tools should load."
+Write-Host "Test with: /mcp  (inside Claude Code) or send a chat prompt asking"
+Write-Host "Claude to call the alpaca account info tool."
