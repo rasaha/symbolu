@@ -1,0 +1,88 @@
+{
+  "_provenance": {
+    "captured_from": "terminal log, post-hoc reconstruction",
+    "captured_by": "Claude Code / session 01ABUFjbzb8RgXD2tLR8SAxS",
+    "captured_at": "2026-04-11",
+    "harness_commit": "37647a5 (FSCS EMA-cache coarse operator)",
+    "description": "First r* sweep with EMA-cache coarse operator on frozen Mistral-7B. No adapter, no training. Compared against windowed operator baselines in v3_window256.json and v3_window1024.json."
+  },
+  "config": {
+    "model": "mistralai/Mistral-7B-v0.3",
+    "quantize": "bf16",
+    "eval_dataset": "wikitext2",
+    "max_eval_samples": 64,
+    "seq_len": 1024,
+    "coarse_operator": "ema_cache",
+    "ema_cache_beta": 0.9,
+    "num_layers": 32,
+    "fscs_trainable_params": 64,
+    "eval_batch_size": 16,
+    "soft_only": true,
+    "calibration": {
+      "tau_global": 0.5,
+      "tau_mid": 0.3,
+      "tau_local": 0.1,
+      "alpha_sharpness": 10.0,
+      "beta_max_inference": 0.7,
+      "gamma": 1.0,
+      "delta_residual": 0.5,
+      "ema_decay": 0.4,
+      "hard_route_threshold": 0.5
+    }
+  },
+  "baseline": {
+    "ppl": 5.5002,
+    "wall_seconds": 16.86,
+    "gate_fraction": 0.001
+  },
+  "sweep": [
+    {
+      "tau": 0.90,
+      "soft": {"ppl": 5.5002, "delta_pct": 0.00, "gate_fraction": 0.002, "wall_seconds": 15.68}
+    },
+    {
+      "tau": 0.70,
+      "soft": {"ppl": 5.5002, "delta_pct": 0.00, "gate_fraction": 0.012, "wall_seconds": 15.69}
+    },
+    {
+      "tau": 0.50,
+      "soft": {"ppl": 5.5434, "delta_pct": 0.79, "gate_fraction": 0.080, "wall_seconds": 15.74}
+    },
+    {
+      "tau": 0.30,
+      "soft": {"ppl": 6.6358, "delta_pct": 20.65, "gate_fraction": 0.339, "wall_seconds": 15.76}
+    },
+    {
+      "tau": 0.20,
+      "soft": {"ppl": 9.5833, "delta_pct": 74.24, "gate_fraction": 0.486, "wall_seconds": 15.75}
+    },
+    {
+      "tau": 0.10,
+      "soft": {"ppl": 14.8492, "delta_pct": 169.98, "gate_fraction": 0.561, "wall_seconds": 15.78}
+    }
+  ],
+  "r_star": 0.012425661348970607,
+  "verdict": {
+    "label": "NO-GO",
+    "r_star": 0.012425661348970607,
+    "best_wall_speedup_pct": 7.5,
+    "notes": "r* at the strict 0.5% bar is similar to the windowed operator (~1-8%), but the degradation curve above r* is dramatically better: at gate_frac=0.34, EMA produces Dppl=20.6% vs windowed w=256's 93.2% (4.5x improvement). The EMA cache also eliminates the second self_attn call entirely, making the per-gated-token cost O(D) instead of O(N*w). The value proposition is graceful degradation + real compute savings, not a higher strict r*."
+  },
+  "comparison_vs_windowed": {
+    "at_gate_frac_0.08": {
+      "windowed_w256_dppl": "0.78%",
+      "ema_cache_dppl": "0.79%",
+      "verdict": "equivalent"
+    },
+    "at_gate_frac_0.34": {
+      "windowed_w256_dppl": "93.2%",
+      "ema_cache_dppl": "20.6%",
+      "improvement": "4.5x"
+    },
+    "at_gate_frac_0.49": {
+      "windowed_w256_dppl": "196.9%",
+      "ema_cache_dppl": "74.2%",
+      "improvement": "2.7x"
+    }
+  }
+}

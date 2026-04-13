@@ -1,6 +1,6 @@
 # PCAM (Phase-Coherent Attention Memory) Chip — Explainer
 
-**Source:** `simulator/pcam/`, `docs/design/PCAM_CHIP_SPECIFICATION.md`, RTL in `simulator/pcam/rtl/`
+**Source:** `simulator/pcam/`, [`PCAM_CHIP_SPECIFICATION.md`](PCAM_CHIP_SPECIFICATION.md), RTL in `simulator/pcam/rtl/`
 **Purpose:** Explains the PCAM hardware accelerator to someone who knows
 ML/systems but hasn't seen the codebase.
 
@@ -263,6 +263,18 @@ classifies each returned candidate into a tier hint:
 The external memory controller uses these hints for KV cache placement.
 Full CTM+ (shadow caches, mode switching, Markov prediction) stays
 off-chip.
+
+**Scoring behavior (ADR-0001).** Per-block importance is computed by
+the four-signal phase-aware model locked in
+[`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md):
+recency, frequency, attention EMA, and position importance, with
+PREFILL/DECODE weight splits and a +0.5 entity bonus for high-attention
+non-sink blocks. Frequency is estimated by a 4-row, 4-bit Count-Min
+sketch (`rtl/core/freq_sketch.sv`, ported from
+`simulator/pcam/kv_policy.py`) rather than the legacy per-entry
+`access_count` counter that used to live in `block_entry_t`. Sink
+tokens are pinned at admission and are never emitted as eviction
+candidates by the policy.
 
 ---
 

@@ -56,6 +56,37 @@ package pcam_pkg;
     parameter logic [SCORE_WIDTH-1:0] SECTION_ALPHA = 16'h0026;
 
     //-------------------------------------------------------------------------
+    // CTM+ Frequency Sketch Parameters
+    //-------------------------------------------------------------------------
+    // Canonical per ADR-0001 and the Python reference at
+    // CTM_plus/KVPolicy/kv_policy/attention_evictor.py:69-112. The four
+    // seed hashes, the depth of 4, and the 4-bit counter saturation are
+    // load-bearing for bit-parity with the Python port in
+    // simulator/pcam/kv_policy.py. Do not retune.
+    //
+    // Width is parameterizable so the RTL can size the sketch BRAM
+    // per deployment; the top-level width must be a power of two and
+    // should satisfy width >= max(64, capacity).
+
+    parameter int FREQ_SKETCH_DEPTH         = 4;
+    parameter int FREQ_SKETCH_WIDTH         = 1024;   // must be power of two
+    parameter int FREQ_SKETCH_COUNTER_BITS  = 4;      // 4-bit saturating counter
+    parameter int FREQ_SKETCH_COUNTER_MAX   = 15;     // 2**4 - 1
+    parameter int FREQ_SKETCH_KEY_WIDTH     = 32;     // wide enough for block_id * seed
+    parameter int FREQ_SKETCH_INDEX_WIDTH   = 10;     // log2(FREQ_SKETCH_WIDTH)
+
+    // Reset threshold multiplier: halve all counters once the total
+    // number of increments crosses capacity * RESET_MULT. Matches the
+    // reference's `reset_threshold = capacity * 10`.
+    parameter int FREQ_SKETCH_RESET_MULT    = 10;
+
+    // Four fixed seed hashes — byte-for-byte identical to the reference.
+    parameter logic [31:0] FREQ_SKETCH_SEED_0 = 32'h9E3779B9;
+    parameter logic [31:0] FREQ_SKETCH_SEED_1 = 32'h517CC1B7;
+    parameter logic [31:0] FREQ_SKETCH_SEED_2 = 32'h6C62272E;
+    parameter logic [31:0] FREQ_SKETCH_SEED_3 = 32'h2E1B2138;
+
+    //-------------------------------------------------------------------------
     // Command Encoding
     //-------------------------------------------------------------------------
 
@@ -75,9 +106,15 @@ package pcam_pkg;
     //-------------------------------------------------------------------------
 
     // Block Entry (stored in BRAM)
+    //
+    // The legacy 12-bit access_count field has been removed per ADR-0001.
+    // Frequency tracking now lives in the CTM+ Count-Min sketch (see
+    // FREQ_SKETCH_* parameters above and freq_sketch.sv). The 12 bits
+    // are preserved as reserved2 to keep the struct at 64 bits so
+    // consumers of bank_mem / bank_array do not need alignment changes.
     typedef struct packed {
         logic [SCORE_WIDTH-1:0]   score;         // Q8.8 attention score
-        logic [11:0]              access_count;  // 0-4095
+        logic [11:0]              reserved2;     // formerly access_count; sketch owns frequency now
         logic [19:0]              last_step;     // Last access step
         logic [15:0]              reserved;      // Future use
     } block_entry_t;
@@ -183,6 +220,36 @@ package pcam_pkg;
         logic [16:0] sum;
         sum = {1'b0, a} + {1'b0, b};
         return sum[16] ? 16'hFFFF : sum[15:0];
+    endfunction
+
+    //-------------------------------------------------------------------------
+    // Frequency Sketch Hash
+    //-------------------------------------------------------------------------
+    // Combinational hash helper matching the reference at
+    // attention_evictor.py:89-92 :
+    //
+    //     h = key * seed
+    //     h ^= h >> 16
+    //     return h & (width - 1)
+    //
+    // `row_select` picks one of the four fixed seeds. Used by freq_sketch.sv
+    // in its increment and estimate paths. Result width is the full index
+    // width; callers mask down to log2(FREQ_SKETCH_WIDTH) bits.
+    function automatic logic [FREQ_SKETCH_KEY_WIDTH-1:0] sketch_hash(
+        input logic [BLOCK_ID_WIDTH-1:0] key,
+        input logic [1:0]                row_select
+    );
+        logic [FREQ_SKETCH_KEY_WIDTH-1:0] seed;
+        logic [FREQ_SKETCH_KEY_WIDTH-1:0] product;
+        unique case (row_select)
+            2'd0: seed = FREQ_SKETCH_SEED_0;
+            2'd1: seed = FREQ_SKETCH_SEED_1;
+            2'd2: seed = FREQ_SKETCH_SEED_2;
+            2'd3: seed = FREQ_SKETCH_SEED_3;
+            default: seed = FREQ_SKETCH_SEED_0;
+        endcase
+        product = key * seed;
+        return product ^ (product >> 16);
     endfunction
 
 endpackage : pcam_pkg

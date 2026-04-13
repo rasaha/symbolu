@@ -34,6 +34,10 @@ from .core.tiered_config import (
     TurboQuantEdgeConfig,
     TierPolicy,
 )
+# CTM+ frequency sketch — canonical per ADR-0001. The CXL pool uses it
+# as the frequency proxy for eviction scoring, replacing the prior
+# unbounded cxl_access_count-based boost.
+from .kv_policy import FrequencySketch
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +181,15 @@ class CXLEdgePool:
         # Coherence: entry_key -> set of hosts with cached copies
         self._sharers: Dict[Tuple[int, int], Set[int]] = defaultdict(set)
 
+        # Frequency sketch for eviction scoring. Canonical per ADR-0001
+        # and ported from CTM_plus/KVPolicy/kv_policy/attention_evictor.py
+        # via simulator.pcam.kv_policy.FrequencySketch. This replaces the
+        # prior "cxl_access_count as frequency proxy" pattern in
+        # _evict_one. cxl_access_count remains on CompressedBlockEntry
+        # as a tier-dwell counter for the promotion gate in
+        # TieredSequenceState (unrelated to KV-cache scoring).
+        self.freq_sketch = FrequencySketch(max(1, self.capacity))
+
         # Statistics
         self.stats = {
             "admissions": 0,
@@ -256,6 +269,9 @@ class CXLEdgePool:
         self._sharers[key].add(host_id)
         entry.owner_host = host_id
 
+        # Admission counts as a frequency event for the sketch.
+        self.freq_sketch.increment(entry.block_id)
+
         self.stats["admissions"] += 1
         return True
 
@@ -281,6 +297,10 @@ class CXLEdgePool:
 
         self.stats["hits"] += 1
         entry.cxl_access_count += 1
+        # Sketch sees every cache hit as a frequency event, matching the
+        # reference's on_block_attention pattern. cxl_access_count is
+        # kept in lockstep for the tier-dwell promotion gate.
+        self.freq_sketch.increment(entry.block_id)
 
         # Track cross-host sharing
         if accessor_host != entry.owner_host:
@@ -304,9 +324,13 @@ class CXLEdgePool:
     def _evict_one(self, requesting_host: int) -> bool:
         """Select and evict one entry from the pool.
 
-        Uses score + access recency for victim selection.
-        Penalizes shared entries (more costly to evict).
-        Prefers evicting entries from over-quota hosts.
+        Uses score + sketch-estimated frequency for victim selection,
+        plus CXL-tier-specific penalties (shared entries, over-quota
+        hosts). The frequency signal is provided by the CTM+
+        FrequencySketch per ADR-0001, replacing the prior
+        cxl_access_count-based boost. cxl_access_count is still
+        maintained on each entry but is used only by the promotion
+        gate in TieredSequenceState — not here.
         """
         if not self._entries:
             return False
@@ -324,9 +348,11 @@ class CXLEdgePool:
                 penalty = self.config.shared_entry_penalty * num_sharers
                 eviction_score *= (1.0 + penalty)
 
-            # Boost for recently accessed entries (don't evict)
-            if entry.cxl_access_count > 0:
-                eviction_score *= (1.0 + 0.1 * min(entry.cxl_access_count, 10))
+            # Boost for frequently accessed entries (don't evict).
+            # Sketch estimate is bounded [0, 15] by 4-bit saturation.
+            freq_estimate = self.freq_sketch.estimate(entry.block_id)
+            if freq_estimate > 0:
+                eviction_score *= (1.0 + 0.1 * min(freq_estimate, 10))
 
             # Prefer evicting from over-quota hosts (multi-GPU fairness)
             if self.config.num_hosts > 1:

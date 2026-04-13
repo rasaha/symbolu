@@ -998,6 +998,7 @@ class UnifiedTrainingConfig:
     enable_conscious_generation: bool = False      # Master toggle for conscious generation modules
     token_ontology_dim: int = 32                   # Must match SOVEREIGN_STATE_DIM
     ontology_cache_refresh_interval: int = 100     # Steps between O_tok cache refresh
+    cache_refresh_ema_decay: float = 0.8           # EMA decay for cache refresh (0.8 = retain 80% old, blend 20% new; 0.0 = full replacement, disables EMA)
     lambda_ont: float = 0.0                        # Ontological structure loss weight (0 = disabled)
     ontology_loss_type: str = "contrastive"        # "contrastive" (InfoNCE) or "prototype"
     ontology_loss_temperature: float = 0.1         # Temperature for contrastive loss
@@ -1013,8 +1014,28 @@ class UnifiedTrainingConfig:
     primitive_rank: int = 8                        # Rank for low-rank factorization
     use_shared_token_basis: bool = False           # Share intermediate projection across primitives
 
+    # CRS Phase 2: Combined Cognitive–Resonance–Semantic scorer
+    # Reference: docs/audits/CRS_DOCTRINE_FREEZE.md
+    use_crs_combined_scorer: bool = False          # Replace CSR column with CRS combined scorer
+    semantic_dim: int = 32                         # d_s for S branch representations (increased from 16 for expressiveness)
+    crs_semantic_threshold: float = 0.45           # τ_s: semantic gate threshold
+    crs_gate_sharpness: float = 10.0               # k_s: semantic gate sharpness
+    crs_weight_c: float = 0.2                      # w_C: cognitive branch weight
+    crs_weight_r: float = 0.2                      # w_R: resonance branch weight
+    crs_weight_s: float = 0.6                      # w_S: semantic branch weight
+    crs_alpha_base: float = 0.5                    # α_base: base-logit anchor weight
+    lambda_crs_semantic: float = 0.0               # Dedicated S-branch contrastive loss weight (0 = disabled)
+    crs_adaptive_lambda: bool = False              # Enable adaptive L_S lambda scaling
+    crs_adaptive_lambda_target: float = 2.5        # L_S target — boost lambda when above this
+    crs_adaptive_lambda_max: float = 0.15          # Maximum lambda_crs_semantic after boosting
+    crs_adaptive_lambda_patience: int = 300        # Steps of plateau before boosting
+
     # Phase 3: Governance Integration
     lambda_kosha_routing: float = 0.0              # Kosha routing loss weight
+
+    # Phase 5: Learned Domain Conditioning (MVP)
+    use_learned_domain_classifier: bool = False    # Replace hardcoded domain bridge with learned classifier
+    lambda_domain_cls: float = 0.0                 # Domain classification loss weight (0 = disabled, uses hardcoded as bootstrap target)
     lambda_bliss_token: float = 0.0                # Bliss token-level coherence loss weight
     lambda_plausibility_token: float = 0.0          # Plausibility token-level loss
     lambda_jepa_token: float = None                # Backward-compatible alias for lambda_plausibility_token

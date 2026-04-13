@@ -160,9 +160,41 @@ class CurriculumStageManager:
         start, end = self.stage_boundaries[self.current_stage]
         return max(int(0.5 * (end - start)), 100)
 
+    def _advance_stage(self, global_step: int, val_ppl: float, reason: str) -> str:
+        """Advance to the next stage. Returns transition message."""
+        old_stage = self.current_stage
+        self.current_stage_idx += 1
+        self.current_stage = self.STAGES[self.current_stage_idx]
+
+        # Use the stage's actual start boundary as the ramp origin so that
+        # scheduler.step(global_step) returns correctly interpolated values
+        # even when the advance happens late (time-based fallback).
+        stage_start, _ = self.stage_boundaries[self.current_stage]
+        ramp_origin = stage_start if reason == "time-based" else global_step
+        self.stage_entry_step = ramp_origin
+        self.stage_history.append((global_step, self.current_stage))
+
+        # Configure new stage
+        configurators = {
+            self.STAGE_B: self._configure_stage_b,
+            self.STAGE_C: self._configure_stage_c,
+            self.STAGE_D: self._configure_stage_d,
+        }
+        configurators[self.current_stage](ramp_origin)
+
+        return (f"[Conscious Gen Curriculum] Stage transition: {old_stage} -> "
+                f"{self.current_stage} at step {global_step} "
+                f"(PPL={val_ppl:.2f}, {reason}, ramp_origin={ramp_origin})")
+
     def update(self, val_ppl: float, global_step: int) -> Optional[str]:
         """
         Update with new validation PPL. May trigger stage transition.
+
+        Transitions use two paths:
+        1. PPL-gated: advance when PPL variance < threshold over stability_window
+        2. Time-based fallback: advance when global_step passes the next stage
+           boundary, preventing the PPL gate from blocking indefinitely in
+           short training runs.
 
         Args:
             val_ppl: Current validation perplexity.
@@ -179,6 +211,23 @@ class CurriculumStageManager:
         if self.current_stage_idx >= len(self.STAGES) - 1:
             return None  # Already at Stage D
 
+        # Time-based fallback: if global_step has passed the NEXT stage's
+        # start boundary, advance unconditionally.  This prevents the PPL
+        # gate from blocking progress indefinitely when the stability_window
+        # requires more evaluations than the stage allows.
+        messages = []
+        while self.current_stage_idx < len(self.STAGES) - 1:
+            next_stage = self.STAGES[self.current_stage_idx + 1]
+            next_start, _ = self.stage_boundaries[next_stage]
+            if global_step >= next_start:
+                messages.append(self._advance_stage(global_step, val_ppl, "time-based"))
+            else:
+                break
+
+        if messages:
+            return "\n".join(messages)
+
+        # PPL-gated path: advance if stable
         steps_in_stage = global_step - self.stage_entry_step
         if steps_in_stage < self._min_steps_in_stage():
             return None  # Not enough time in current stage
@@ -186,27 +235,14 @@ class CurriculumStageManager:
         if not self._is_ppl_stable():
             return None  # PPL not stable yet
 
-        # Advance to next stage
-        old_stage = self.current_stage
-        self.current_stage_idx += 1
-        self.current_stage = self.STAGES[self.current_stage_idx]
-        self.stage_entry_step = global_step
-        self.stage_history.append((global_step, self.current_stage))
-
-        # Configure new stage
-        configurators = {
-            self.STAGE_B: self._configure_stage_b,
-            self.STAGE_C: self._configure_stage_c,
-            self.STAGE_D: self._configure_stage_d,
-        }
-        configurators[self.current_stage](global_step)
-
-        return (f"[Conscious Gen Curriculum] Stage transition: {old_stage} -> "
-                f"{self.current_stage} at step {global_step} (PPL={val_ppl:.2f})")
+        return self._advance_stage(global_step, val_ppl, "PPL-stable")
 
     def step(self, global_step: int) -> Dict[str, float]:
         """
         Update lambda values for current step.
+
+        Also checks time-based stage advancement so stages transition
+        immediately on resume rather than waiting for the next eval call.
 
         Args:
             global_step: Current training step.
@@ -214,6 +250,39 @@ class CurriculumStageManager:
         Returns:
             Dict of current lambda values (keys match config field names).
         """
+        # Time-based stage advancement (mirrors update() fallback)
+        # This ensures stages advance on the first training step after
+        # resume, rather than waiting for the next eval_every boundary.
+        # IMPORTANT: use each stage's actual start boundary (not global_step)
+        # as the ramp start_step, so that when skipping multiple stages,
+        # the scheduler computes correct interpolated values.
+        advanced = False
+        while self.current_stage_idx < len(self.STAGES) - 1:
+            next_stage = self.STAGES[self.current_stage_idx + 1]
+            next_start, _ = self.stage_boundaries[next_stage]
+            if global_step >= next_start:
+                old_stage = self.current_stage
+                self.current_stage_idx += 1
+                self.current_stage = self.STAGES[self.current_stage_idx]
+                self.stage_entry_step = next_start
+                self.stage_history.append((next_start, self.current_stage))
+                configurators = {
+                    self.STAGE_B: self._configure_stage_b,
+                    self.STAGE_C: self._configure_stage_c,
+                    self.STAGE_D: self._configure_stage_d,
+                }
+                # Use the stage's actual start boundary as ramp origin,
+                # not global_step. This way scheduler.step(global_step)
+                # returns the correct interpolated value (e.g., if Stage D
+                # starts at step 550 and we're at 600, the ramp is 14% done).
+                configurators[self.current_stage](next_start)
+                print(f"[Conscious Gen Curriculum] Stage transition: {old_stage} -> "
+                      f"{self.current_stage} at step {global_step} "
+                      f"(time-based, via step(), ramp_origin={next_start})")
+                advanced = True
+            else:
+                break
+
         return self.scheduler.step(global_step)
 
     @property

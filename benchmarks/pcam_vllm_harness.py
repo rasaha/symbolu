@@ -236,7 +236,7 @@ def run_mock_harness(
     Every measurement is tagged [simulated] to make clear what
     needs real validation.
     """
-    from simulator.pcam import PCAMSimulator, PCAMConfig
+    from simulator.pcam import PCAMSimulator, PCAMSimulatorConfig as PCAMConfig
     from simulator.pcam.traces.generators import SyntheticTraceGenerator
     from simulator.pcam.baselines import H2OController
     from simulator.pcam.baselines.base import ControllerConfig

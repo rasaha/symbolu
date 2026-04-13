@@ -157,10 +157,14 @@ module bank_mem
                 end
 
                 RMW_WRITE: begin
-                    // Write back updated entry
+                    // Write back updated entry. The legacy access_count
+                    // field was removed per ADR-0001; frequency tracking
+                    // now lives in the global CTM+ sketch (freq_sketch.sv
+                    // instanced at the pcam_top level). reserved2 is
+                    // written back unchanged.
                     mem[rmw_addr_reg] <= {
                         rmw_new_score,                           // score
-                        rmw_entry.access_count + 12'd1,          // access_count++
+                        rmw_entry.reserved2,                     // reserved2 (formerly access_count)
                         rmw_entry.last_step,                     // last_step (updated externally)
                         rmw_entry.reserved
                     };

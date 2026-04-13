@@ -850,6 +850,35 @@ def train(config: UnifiedTrainingConfig):
     else:
         print(f"  CSR Phoneme Grounding: Disabled")
 
+    # Wire CSR affinity into CG token cache so R_tok gets populated
+    if hasattr(model, 'conscious_gen') and 'token_cache' in model.conscious_gen:
+        _cg_cache = model.conscious_gen['token_cache']
+        _affi_table = None
+
+        # Option 1: Get from existing CSR provider (when enable_csr=True)
+        if csr_provider is not None and hasattr(csr_provider, '_token_affinity_table'):
+            _affi_table = csr_provider._token_affinity_table
+
+        # Option 2: Build standalone affinity table (when enable_csr=False but CSR module exists)
+        elif CSR_AVAILABLE:
+            try:
+                if csr_wait_preload is not None:
+                    csr_wait_preload(timeout=30.0)
+                _tmp_provider = CSREmbeddingProvider(CSRConfig(), tokenizer)
+                _tmp_provider = _tmp_provider.to(device)
+                if hasattr(_tmp_provider, '_token_affinity_table') and _tmp_provider._token_affinity_table is not None:
+                    _affi_table = _tmp_provider._token_affinity_table.clone()
+                    print(f"  [Conscious Gen] Built standalone CSR affinity table for CG token cache")
+                del _tmp_provider
+            except Exception as e:
+                print(f"  [Conscious Gen] WARNING: Could not build CSR affinity table: {e}")
+
+        if _affi_table is not None:
+            _cg_cache._csr_affinity_fn = lambda emb, _t=_affi_table: _t.to(emb.device)
+            print(f"  [Conscious Gen] CSR affinity wired into token cache (R_tok will be populated)")
+        else:
+            print(f"  [Conscious Gen] WARNING: No CSR affinity available — R_tok will stay zeros")
+
     # V9.8.6: Initialize curriculum state variables (will be populated if resuming)
     # These must be defined before curriculum controllers are created
     resumed_csr_curriculum_state = None
@@ -2252,6 +2281,15 @@ def train(config: UnifiedTrainingConfig):
     elif config.enable_kosha_gyroscope and not KOSHA_GYROSCOPE_AVAILABLE:
         print(f"\n  ⚠️  KOSHA GYROSCOPE REQUESTED but module not available!")
         print(f"      Check: symbolu/losses/kosha_gyroscope.py exists and imports correctly")
+
+    # CRS adaptive L_S lambda state
+    _crs_adaptive_lambda_current = getattr(config, 'lambda_crs_semantic', 0.0)
+    if getattr(config, 'crs_adaptive_lambda', False) and _crs_adaptive_lambda_current <= 0:
+        # Adaptive enabled but no starting lambda — set a reasonable floor
+        _crs_adaptive_lambda_current = 0.01
+        print(f"  [CRS-ADAPT] lambda_crs_semantic=0, auto-setting starting lambda to 0.01")
+    _crs_adaptive_best_ls = float('inf')
+    _crs_adaptive_plateau_start = 0
 
     print(f"\n{'='*70}")
     print("   STARTING TRAINING")
@@ -4321,12 +4359,23 @@ def train(config: UnifiedTrainingConfig):
                             # V9.8.5: Pass toroidal coherence for Vital-Coherence coupling
                             coherence_for_gyro = toroidal_coherence if 'toroidal_coherence' in dir() else None
 
+                            # Decode a sample of the batch for domain detection
+                            # Only decode first sequence, first 200 tokens (cheap)
+                            _gyro_text = None
+                            try:
+                                if tokenizer is not None and x is not None:
+                                    _sample_ids = x[0, :200].tolist()
+                                    _gyro_text = tokenizer.decode(_sample_ids, skip_special_tokens=True)
+                            except Exception:
+                                pass
+
                             gyro_loss, gyroscope_components = kosha_gyroscope(
                                 kosha_states_for_gyro,
                                 current_ppl=current_ppl,
                                 return_components=True,
                                 authority_factor=auth_factor,
                                 coherence=coherence_for_gyro,
+                                input_text=_gyro_text,
                             )
 
                             # Apply warmup scaling
@@ -4950,6 +4999,18 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_hidden = outputs.get('last_hidden_state', None)
                                 _cg_sov_state = outputs.get('state', None)
 
+                            # Diagnostic: check gradient prerequisites
+                            if global_step <= resume_step + 3 and accumulation_step == 0:
+                                _h_ok = _cg_hidden is not None
+                                _s_ok = _cg_sov_state is not None
+                                _s_rg = _cg_sov_state.requires_grad if _s_ok else False
+                                _s_gf = _cg_sov_state.grad_fn is not None if _s_ok else False
+                                _h_rg = _cg_hidden.requires_grad if _h_ok else False
+                                print(f"  [P3-DIAG] Step {global_step}: "
+                                      f"hidden={'OK' if _h_ok else 'NONE'}(rg={_h_rg}) "
+                                      f"state={'OK' if _s_ok else 'NONE'}(rg={_s_rg},gf={_s_gf}) "
+                                      f"phase4={_cg_phase4} any_p3={_cg_any_p3_loss}")
+
                             if _cg_hidden is not None and _cg_sov_state is not None:
                                 # Build T_t via TokenEvaluationTensor
                                 # Phase 3: Detach logits but keep hidden/o_ctx live
@@ -4975,13 +5036,31 @@ def train(config: UnifiedTrainingConfig):
                                 _cg_T = _cg_tet_result['T']              # (B, T, K, 6)
                                 _cg_cand_ids = _cg_tet_result['candidate_ids']  # (B, T, K)
 
-                                # Build domain signal from Gyroscope detection
-                                # Soft mapping: LANG/MATH/CODE → 8-dim distribution
+                                # CRS Phase 2: Log branch diagnostics when CRS is active
+                                _crs_bd = _cg_tet_result.get('crs_branch_data')
+                                if _crs_bd is not None:
+                                    with torch.no_grad():
+                                        metrics['crs_C_mean'] = _crs_bd['C'].mean().item()
+                                        metrics['crs_R_mean'] = _crs_bd['R'].mean().item()
+                                        metrics['crs_S_mean'] = _crs_bd['S'].mean().item()
+                                        metrics['crs_S_prob_mean'] = _crs_bd['S_prob'].mean().item()
+                                        metrics['crs_S_gate_mean'] = _crs_bd['S_gate'].mean().item()
+                                        metrics['crs_col3_mean'] = _crs_bd['crs_score'].mean().item()
+                                        # semantic_override_rate: fraction of positions where
+                                        # top-CRS candidate differs from top-R (pure resonance)
+                                        _crs_top1 = _crs_bd['crs_score'].argmax(dim=-1)  # (...,)
+                                        _r_top1 = _crs_bd['R'].argmax(dim=-1)
+                                        metrics['crs_semantic_override_rate'] = (_crs_top1 != _r_top1).float().mean().item()
+
+                                # Build domain signal
                                 _cg_domain = None
+                                _cg_domain_hardcoded = None  # kept for bootstrap loss + diagnostics
+
+                                # Always compute hardcoded bridge (fallback + bootstrap target)
                                 try:
                                     from symbolu_training.training.conscious_generation.governance.domain_bridge import map_gyro_to_domain
                                     _cg_domain_label = metrics.get('gyroscope_domain_label', 'LANG')
-                                    _cg_domain = map_gyro_to_domain(
+                                    _cg_domain_hardcoded = map_gyro_to_domain(
                                         domain_label=_cg_domain_label,
                                         batch_size=_cg_hidden.shape[0],
                                         seq_len=_cg_hidden.shape[1] if _cg_hidden.dim() == 3 else None,
@@ -4990,6 +5069,25 @@ def train(config: UnifiedTrainingConfig):
                                     )
                                 except ImportError:
                                     pass
+
+                                # Phase 5: Learned domain classifier (when enabled)
+                                _cg_domain_cls_result = None
+                                if 'domain_classifier' in model.conscious_gen:
+                                    _dc = model.conscious_gen['domain_classifier']
+                                    _cg_domain_cls_result = _dc(
+                                        hidden=_cg_hidden,
+                                        o_ctx=_cg_sov_state,
+                                    )
+                                    # Use learned domain for routing
+                                    _cg_domain = _cg_domain_cls_result['domain']
+                                    # Expand to match hidden seq dim if needed
+                                    if _cg_hidden.dim() == 3 and _cg_domain.dim() == 2:
+                                        _cg_domain = _cg_domain.unsqueeze(1).expand(
+                                            -1, _cg_hidden.shape[1], -1
+                                        )
+                                else:
+                                    # Fallback: hardcoded bridge
+                                    _cg_domain = _cg_domain_hardcoded
 
                                 # Run IntegratedTokenScorer (Kosha + Bliss)
                                 # Phase 3: Detach hidden/o_ctx (router trains its MLP
@@ -5005,16 +5103,30 @@ def train(config: UnifiedTrainingConfig):
                                         candidate_ids=_cg_cand_ids,
                                     )
                                 else:
+                                    # Phase 3: detach hidden (no backbone grads from
+                                    # governance), but keep o_ctx LIVE so CG losses
+                                    # (kosha routing, bliss, primitives) can train the
+                                    # state projector.  Backbone is already frozen
+                                    # (requires_grad=False) so no weight updates leak.
                                     _cg_integ_result = _cg_integ(
                                         T=_cg_T,
                                         hidden=_cg_hidden.detach(),
-                                        o_ctx=_cg_sov_state.detach(),
+                                        o_ctx=_cg_sov_state,
                                         domain=_cg_domain,
                                         candidate_ids=_cg_cand_ids,
                                     )
                                 _cg_alpha = _cg_integ_result['alpha']    # (B, T, 6)
                                 _cg_B = _cg_integ_result['B']            # (B, T, K)
                                 _cg_D = _cg_integ_result['D']            # (B, T, K)
+
+                                # Alpha entropy regularization — prevent routing collapse.
+                                # Without this, softmax saturation makes one-hot alpha
+                                # self-reinforcing and unrecoverable.
+                                _cg_alpha_ent = -((_cg_alpha + 1e-8).log() * _cg_alpha).sum(dim=-1).mean()
+                                _cg_alpha_ent_weight = 0.1
+                                loss = loss - _cg_alpha_ent_weight * _cg_alpha_ent  # maximize entropy
+                                metrics['cg_alpha_entropy'] = _cg_alpha_ent.item()
+                                metrics['cg_alpha_ent_loss'] = (_cg_alpha_ent_weight * _cg_alpha_ent).item()
 
                                 # Phase 4: Replace L_LM with field-integrated cross-entropy
                                 # Strategy: subtract old LM CE, add field-integrated CE.
@@ -5118,6 +5230,81 @@ def train(config: UnifiedTrainingConfig):
                                                 loss = loss + _prim_lam * _prim_loss
                                                 metrics[f'cg_{_prim_loss_key}'] = _prim_loss.item()
 
+                                # CRS dedicated S-branch loss: trains S bilinear directly
+                                # without competing with R for gradient through the combined column.
+                                # Use adaptive lambda if enabled, otherwise fixed config value
+                                _lambda_crs_s = _crs_adaptive_lambda_current if getattr(config, 'crs_adaptive_lambda', False) else getattr(config, 'lambda_crs_semantic', 0.0)
+                                if _lambda_crs_s > 0 and _crs_bd is not None:
+                                    _s_scores = _crs_bd['S']  # (..., K)
+                                    # Find correct token in shortlist
+                                    _s_target_exp = y.unsqueeze(-1)  # (..., 1)
+                                    _s_target_mask = (_cg_cand_ids == _s_target_exp)  # (..., K)
+                                    _s_has_target = _s_target_mask.any(dim=-1)  # (...)
+                                    if _s_has_target.any():
+                                        _s_valid = _s_scores[_s_has_target]  # (N, K)
+                                        _s_mask_valid = _s_target_mask[_s_has_target]  # (N, K)
+                                        _s_target_idx = _s_mask_valid.float().argmax(dim=-1)  # (N,)
+                                        _s_loss = torch.nn.functional.cross_entropy(
+                                            _s_valid / 0.1, _s_target_idx
+                                        )
+                                        if torch.isfinite(_s_loss):
+                                            loss = loss + _lambda_crs_s * _s_loss
+                                            metrics['crs_L_S'] = _s_loss.item()
+
+                                # CRS adaptive L_S lambda: boost when plateaued
+                                if getattr(config, 'crs_adaptive_lambda', False) and 'crs_L_S' in metrics:
+                                    _als_val = metrics['crs_L_S']
+                                    _als_target = config.crs_adaptive_lambda_target
+                                    _als_patience = config.crs_adaptive_lambda_patience
+                                    _als_max = config.crs_adaptive_lambda_max
+                                    if _als_val < _crs_adaptive_best_ls - 0.05:
+                                        # New best — reset patience
+                                        _crs_adaptive_best_ls = _als_val
+                                        _crs_adaptive_plateau_start = global_step
+                                    elif _als_val > _als_target and (global_step - _crs_adaptive_plateau_start) >= _als_patience:
+                                        # Plateaued above target — boost lambda
+                                        _old_lam = _crs_adaptive_lambda_current
+                                        _crs_adaptive_lambda_current = min(_crs_adaptive_lambda_current * 1.5, _als_max)
+                                        if _crs_adaptive_lambda_current > _old_lam:
+                                            _crs_adaptive_plateau_start = global_step  # reset patience
+                                            print(f"  🔧 [CRS-ADAPT] L_S={_als_val:.3f} plateaued > {_als_target} for {_als_patience} steps."
+                                                  f" lambda_S: {_old_lam:.4f} → {_crs_adaptive_lambda_current:.4f}"
+                                                  f" (max={_als_max})", flush=True)
+                                    metrics['crs_lambda_S_eff'] = _crs_adaptive_lambda_current
+
+                                # Phase 5: Domain classification loss + diagnostics
+                                if _cg_domain_cls_result is not None:
+                                    # Diagnostics (always logged when classifier is active)
+                                    with torch.no_grad():
+                                        _dc_domain = _cg_domain_cls_result['domain']  # (B, 8)
+                                        _dc_entropy = _cg_domain_cls_result['entropy']  # (B,)
+                                        metrics['domain_entropy'] = _dc_entropy.mean().item()
+                                        _dc_mean = _dc_domain.mean(dim=0)  # (8,)
+                                        metrics['domain_top1'] = _dc_mean.argmax().item()
+                                        metrics['domain_top1_mass'] = _dc_mean.max().item()
+                                        # Agreement with hardcoded bridge
+                                        if _cg_domain_hardcoded is not None:
+                                            _hc = _cg_domain_hardcoded
+                                            if _hc.dim() == 3:
+                                                _hc = _hc[:, 0, :]  # take first position
+                                            _dc_top1_learned = _dc_domain.argmax(dim=-1)
+                                            _dc_top1_hardcoded = _hc.argmax(dim=-1)
+                                            metrics['domain_bridge_agreement'] = (_dc_top1_learned == _dc_top1_hardcoded).float().mean().item()
+
+                                    # Bootstrap loss: KL against hardcoded bridge distribution
+                                    _lambda_dc = getattr(config, 'lambda_domain_cls', 0.0)
+                                    if _lambda_dc > 0 and _cg_domain_hardcoded is not None:
+                                        _dc_logits = _cg_domain_cls_result['logits']  # (B, 8)
+                                        _dc_target = _cg_domain_hardcoded
+                                        if _dc_target.dim() == 3:
+                                            _dc_target = _dc_target[:, 0, :]  # (B, 8)
+                                        _dc_loss = model.conscious_gen['domain_classifier'].compute_loss(
+                                            _dc_logits, _dc_target, soft_target=True
+                                        )
+                                        if torch.isfinite(_dc_loss):
+                                            loss = loss + _lambda_dc * _dc_loss
+                                            metrics['domain_cls_loss'] = _dc_loss.item()
+
                                 # Ontology → Vritti directional prior (cognitive axis alignment)
                                 # KL regularizer encouraging v_ctx toward ontology-derived prior.
                                 _vritti_prior_lam = getattr(config, 'lambda_vritti_ontology_prior', 0.0)
@@ -5218,6 +5405,39 @@ def train(config: UnifiedTrainingConfig):
                                 # Phase 4 field-integrated generation
                                 if 'cg_field_lm_loss' in metrics:
                                     _cg_msg += f" | L_field={metrics['cg_field_lm_loss']:.4f}"
+                                # Curriculum stage + key lambdas (diagnose sp_grad=0)
+                                if cg_stage_manager is not None:
+                                    _cg_msg += (f" | stage={cg_stage_manager.current_stage}"
+                                               f" λ_k={config.lambda_kosha_routing:.5f}"
+                                               f" λ_b={config.lambda_bliss_token:.5f}"
+                                               f" λ_j={config.lambda_plausibility_token:.5f}"
+                                               f" λ_c={config.lambda_csr_token:.5f}")
+                                # CRS branch diagnostics (appended when active)
+                                if 'crs_S_gate_mean' in metrics:
+                                    _s_val = metrics.get('crs_S_mean', 0)
+                                    _s_fmt = f"{_s_val:.1e}" if abs(_s_val) < 0.01 else f"{_s_val:.3f}"
+                                    _cg_msg += (f" | CRS: C={metrics.get('crs_C_mean', 0):.3f}"
+                                                f" R={metrics.get('crs_R_mean', 0):.3f}"
+                                                f" S={_s_fmt}"
+                                                f" Sg={metrics.get('crs_S_gate_mean', 0):.4f}"
+                                                f" ovr={metrics.get('crs_semantic_override_rate', 0):.2f}")
+                                if 'crs_L_S' in metrics:
+                                    _cg_msg += f" L_S={metrics['crs_L_S']:.3f}"
+                                    if 'crs_lambda_S_eff' in metrics:
+                                        _cg_msg += f" λS={metrics['crs_lambda_S_eff']:.4f}"
+                                # Domain classifier diagnostics
+                                if 'domain_entropy' in metrics:
+                                    from symbolu_training.training.conscious_generation.governance.domain_classifier import DOMAIN_NAMES
+                                    _dom_top1_idx = metrics.get('domain_top1', 0)
+                                    _dom_name = DOMAIN_NAMES[_dom_top1_idx] if _dom_top1_idx < len(DOMAIN_NAMES) else '?'
+                                    _cg_msg += (f" | DOM: {_dom_name}({metrics.get('domain_top1_mass', 0):.2f})"
+                                                f" H={metrics.get('domain_entropy', 0):.2f}"
+                                                f" agr={metrics.get('domain_bridge_agreement', 0):.2f}")
+                                    if 'domain_cls_loss' in metrics:
+                                        _cg_msg += f" L_d={metrics['domain_cls_loss']:.3f}"
+                                # Phase 3 entry diagnostic
+                                _p3_entered = 'cg_alpha_entropy' in metrics or 'cg_kosha_routing_loss' in metrics
+                                _cg_msg += f" | P3={'Y' if _p3_entered else 'N'}"
                                 print(_cg_msg)
 
                             # TensorBoard logging
@@ -5341,8 +5561,10 @@ def train(config: UnifiedTrainingConfig):
                                     print("".join(_mech_parts))
 
                 except Exception as e:
-                    if global_step % 500 == 0:
-                        print(f"  [Conscious Gen] Error at step {global_step}: {e}")
+                    if global_step % 500 == 0 or global_step <= resume_step + 3:
+                        import traceback
+                        print(f"  [Conscious Gen] ERROR at step {global_step}: {e}")
+                        traceback.print_exc()
 
             # =====================================================================
             # Experiential Controller: resistance-modulated plasticity
@@ -5572,6 +5794,50 @@ def train(config: UnifiedTrainingConfig):
                 p.grad.norm().item() ** 2 for p in model.parameters()
                 if p.grad is not None
             )) ** 0.5
+
+            # State projector gradient norm — confirms CG losses reach the projector
+            _sp_model = getattr(model, 'module', model)  # unwrap DDP
+            if hasattr(_sp_model, 'state_projector'):
+                _sp_params = list(_sp_model.state_projector.parameters())
+                _sp_has_grad = sum(1 for p in _sp_params if p.grad is not None)
+                _sp_nonzero = sum(1 for p in _sp_params if p.grad is not None and p.grad.abs().max().item() > 0)
+                _sp_grad_norm = (sum(
+                    p.grad.norm().item() ** 2
+                    for p in _sp_params
+                    if p.grad is not None
+                )) ** 0.5
+                metrics['cg_state_proj_grad_norm'] = _sp_grad_norm
+
+            # Per-component CG gradient diagnostic
+            if hasattr(_sp_model, 'conscious_gen') and global_step <= resume_step + 3:
+                _cg_grad_parts = {}
+                # Router + bliss (via integrated_scorer)
+                if 'integrated_scorer' in _sp_model.conscious_gen:
+                    _integ = _sp_model.conscious_gen['integrated_scorer']
+                    if hasattr(_integ, 'kosha_router'):
+                        _cg_grad_parts['router'] = _integ.kosha_router
+                    if hasattr(_integ, 'bliss_gate'):
+                        _cg_grad_parts['bliss'] = _integ.bliss_gate
+                # Individual scorers (via token_eval_tensor)
+                if 'token_eval_tensor' in _sp_model.conscious_gen:
+                    _tet = _sp_model.conscious_gen['token_eval_tensor']
+                    for _sname in ('jepa_scorer', 'csr_scorer', 'vritti_scorer', 'guna_scorer'):
+                        if hasattr(_tet, _sname):
+                            _cg_grad_parts[_sname.replace('_scorer', '')] = getattr(_tet, _sname)
+                # Wrapper-level components
+                for _wname in ('intent_projector', 'phase_adapter'):
+                    if hasattr(_sp_model, _wname):
+                        _cg_grad_parts[_wname.replace('_projector', '').replace('_adapter', '')] = getattr(_sp_model, _wname)
+                # Compute norms
+                _cg_grad_strs = []
+                for _cname, _cmod in _cg_grad_parts.items():
+                    _cparams = [p for p in _cmod.parameters() if p.requires_grad]
+                    _cnorm = (sum(p.grad.norm().item() ** 2 for p in _cparams if p.grad is not None)) ** 0.5
+                    _chas = sum(1 for p in _cparams if p.grad is not None)
+                    _cfmt = f"{_cnorm:.2e}" if _cnorm < 0.0001 else f"{_cnorm:.4f}"
+                    _cg_grad_strs.append(f"{_cname}={_cfmt}({_chas}/{len(_cparams)})")
+                if _cg_grad_strs:
+                    print(f"  [CG-GRAD] Step {global_step}: {' | '.join(_cg_grad_strs)}")
 
             # Appendix G: Record gradient variance (after unscale, before clip)
             # Phase 4: Also tracks JEPA injection projector gradients
@@ -6238,6 +6504,10 @@ def train(config: UnifiedTrainingConfig):
                                 log_msg += f" | StN:{_state_norm:.2f}"
                             if TENSORBOARD_AVAILABLE and 'writer' in dir() and writer is not None:
                                 writer.add_scalar('cg_adapter/state_norm', _state_norm, global_step)
+                        # State projector gradient norm (computed post-backward at ~L5579)
+                        if 'cg_state_proj_grad_norm' in metrics:
+                            _sp_g = metrics['cg_state_proj_grad_norm']
+                            log_msg += f" | sp_grad={_sp_g:.2e}" if _sp_g < 0.001 else f" | sp_grad={_sp_g:.6f}"
 
                     # Phase layer training metrics (mistral_hybrid specific)
                     if config.model_type == "mistral_hybrid" and isinstance(outputs, dict):
@@ -6627,6 +6897,8 @@ def train(config: UnifiedTrainingConfig):
                         tb_writer.add_scalar("grad/raw_norm_pre_clip", raw_grad_norm, global_step)
                     if 'variance_dampen' in metrics:
                         tb_writer.add_scalar("grad/variance_dampen", metrics['variance_dampen'], global_step)
+                    if 'cg_state_proj_grad_norm' in metrics:
+                        tb_writer.add_scalar("conscious_gen/state_proj_grad_norm", metrics['cg_state_proj_grad_norm'], global_step)
 
                 step_start_time = time.time()
 
@@ -7898,6 +8170,47 @@ def train(config: UnifiedTrainingConfig):
                             elif _alpha_h > 0:
                                 print(f"    -> COLLAPSED: one kosha dominating, check routing")
 
+                        # --- Sovereign State Projector Health ---
+                        # Quick forward pass to show 32D slice distributions.
+                        # Reveals whether Bhava/Vritti/Guna are structured
+                        # (state projector learning) or near-init (still flat).
+                        try:
+                            _sp_model = getattr(model, 'module', model)
+                            if hasattr(_sp_model, 'state_projector') and tokenizer is not None:
+                                _sp_prompt = "The meaning of"
+                                _sp_ids = tokenizer.encode(_sp_prompt, return_tensors="pt").to(device)
+                                _sp_autocast = config.mixed_precision != "none"
+                                with torch.no_grad(), torch.amp.autocast('cuda', dtype=autocast_dtype, enabled=_sp_autocast):
+                                    _sp_out = model(_sp_ids)
+                                if isinstance(_sp_out, dict) and 'state' in _sp_out:
+                                    _cg_sections += 1
+                                    _sp_s = _sp_out['state'][0]  # [32]
+                                    _sp_bhava = _sp_s[0:12]
+                                    _sp_vritti = _sp_s[17:22]
+                                    _sp_guna = _sp_s[22:28]
+                                    _sp_bh_ent = -((_sp_bhava + 1e-8).log() * _sp_bhava).sum().item()
+                                    _sp_vr_ent = -((_sp_vritti + 1e-8).log() * _sp_vritti).sum().item()
+                                    _sp_gu_mid = (_sp_guna - 0.5).abs().mean().item()
+                                    _sp_bh_spread = (_sp_bhava.max() - _sp_bhava.min()).item()
+                                    _sp_vr_spread = (_sp_vritti.max() - _sp_vritti.min()).item()
+                                    print(f"  State Projector Health:")
+                                    print(f"    Bhava:  entropy={_sp_bh_ent:.3f}/2.485"
+                                          f"  spread={_sp_bh_spread:.3f}"
+                                          f"  dominant=[{_sp_bhava.argmax().item()}]={_sp_bhava.max().item():.3f}"
+                                          f"  {'(structured)' if _sp_bh_ent < 2.485 * 0.85 else '(near-uniform)'}")
+                                    print(f"    Vritti: entropy={_sp_vr_ent:.3f}/1.609"
+                                          f"  spread={_sp_vr_spread:.3f}"
+                                          f"  dominant=[{_sp_vritti.argmax().item()}]={_sp_vritti.max().item():.3f}"
+                                          f"  {'(peaked)' if _sp_vr_ent < 1.609 * 0.75 else '(near-uniform)'}")
+                                    _sp_gu_vals = " ".join([f"[{i}]={_sp_guna[i].item():.3f}" for i in range(min(6, _sp_guna.shape[0]))])
+                                    print(f"    Guna:   {_sp_gu_vals}"
+                                          f"  dist_mid={_sp_gu_mid:.3f}"
+                                          f"  {'(active)' if _sp_gu_mid > 0.1 else '(near-init)'}")
+                                    if metrics.get('cg_state_proj_grad_norm') is not None:
+                                        print(f"    sp_grad_norm={metrics['cg_state_proj_grad_norm']:.6f}")
+                        except Exception as _sp_err:
+                            print(f"  State Projector Health: skipped ({_sp_err})")
+
                         # --- Phase 4: Field-Integrated Generation ---
                         if metrics.get('cg_field_lm_loss') is not None:
                             _cg_sections += 1
@@ -7919,10 +8232,13 @@ def train(config: UnifiedTrainingConfig):
                         if cg_stage_manager is not None:
                             _cg_sections += 1
                             _cs_diag = cg_stage_manager.get_diagnostics()
-                            _cs_stage = _cs_diag.get('current_stage', '?')
-                            _cs_progress = _cs_diag.get('stage_progress', 0)
+                            _cs_stage = _cs_diag.get('cg_curriculum_stage', '?')
+                            _cs_idx = _cs_diag.get('cg_curriculum_stage_idx', 0)
+                            _cs_entry = _cs_diag.get('cg_curriculum_stage_entry_step', 0)
+                            _cs_steps_in = global_step - _cs_entry
                             print(f"  Phase 5 - Curriculum:")
-                            print(f"    Stage={_cs_stage}  progress={_cs_progress:.1%}  "
+                            print(f"    Stage={_cs_stage} ({_cs_idx+1}/4)  "
+                                  f"steps_in_stage={_cs_steps_in}  "
                                   f"field_integrated={cg_stage_manager.use_field_integrated_softmax}")
 
                         # --- Governance Diagnostics Summary ---
@@ -9905,6 +10221,8 @@ def main():
                        help="Ontological code dimension (must match SOVEREIGN_STATE_DIM)")
     parser.add_argument("--ontology_cache_refresh_interval", type=int, default=100,
                        help="Steps between O_tok cache refresh")
+    parser.add_argument("--cache_refresh_ema_decay", type=float, default=0.8,
+                       help="EMA decay for cache refresh blending (0.8=retain 80%% old; 0.0=full replacement, disables EMA)")
     parser.add_argument("--lambda_ont", type=float, default=0.0,
                        help="Ontological structure loss weight (0 = disabled)")
     parser.add_argument("--ontology_loss_type", type=str, default="contrastive",
@@ -9932,6 +10250,40 @@ def main():
                        help="Rank for primitive low-rank factorization")
     parser.add_argument("--use_shared_token_basis", action="store_true", default=False,
                        help="Share intermediate projection across primitives")
+
+    # CRS Phase 2: Combined Cognitive-Resonance-Semantic scorer
+    parser.add_argument("--use_crs_combined_scorer", action="store_true", default=False,
+                       help="Replace CSR column with CRS combined scorer (C+R+S with semantic firewall)")
+    parser.add_argument("--semantic_dim", type=int, default=32,
+                       help="Dimension for CRS S-branch token representations")
+    parser.add_argument("--crs_semantic_threshold", type=float, default=0.45,
+                       help="Semantic gate threshold (tau_s)")
+    parser.add_argument("--crs_gate_sharpness", type=float, default=10.0,
+                       help="Semantic gate sharpness (k_s)")
+    parser.add_argument("--crs_weight_c", type=float, default=0.2,
+                       help="CRS cognitive branch weight")
+    parser.add_argument("--crs_weight_r", type=float, default=0.2,
+                       help="CRS resonance branch weight")
+    parser.add_argument("--crs_weight_s", type=float, default=0.6,
+                       help="CRS semantic branch weight")
+    parser.add_argument("--crs_alpha_base", type=float, default=0.5,
+                       help="CRS base-logit anchor weight for S branch")
+    parser.add_argument("--lambda_crs_semantic", type=float, default=0.0,
+                       help="Dedicated S-branch contrastive loss weight (0=disabled)")
+    parser.add_argument("--crs_adaptive_lambda", action="store_true", default=False,
+                       help="Enable adaptive L_S lambda scaling based on plateau detection")
+    parser.add_argument("--crs_adaptive_lambda_target", type=float, default=2.5,
+                       help="L_S target — boost lambda when L_S stays above this")
+    parser.add_argument("--crs_adaptive_lambda_max", type=float, default=0.15,
+                       help="Maximum lambda_crs_semantic after adaptive boosting")
+    parser.add_argument("--crs_adaptive_lambda_patience", type=int, default=300,
+                       help="Steps of L_S plateau before boosting lambda by 1.5x")
+
+    # Phase 5: Learned Domain Conditioning
+    parser.add_argument("--use_learned_domain_classifier", action="store_true", default=False,
+                       help="Replace hardcoded domain bridge with learned domain classifier")
+    parser.add_argument("--lambda_domain_cls", type=float, default=0.0,
+                       help="Domain classification loss weight (bootstrap from hardcoded labels)")
 
     # Conscious Generation Phase 3: Governance Integration
     parser.add_argument("--lambda_kosha_routing", type=float, default=0.0,
@@ -10213,6 +10565,7 @@ def main():
         dataset=args.dataset,
         dataset_name=args.dataset_name,
         dataset_subset=args.dataset_subset,
+        mix_datasets=args.mix_datasets,
         cache_val_batches=args.cache_val_batches,
         cache_dataset=args.cache_dataset,
         gradient_checkpointing=args.gradient_checkpointing,
@@ -10836,6 +11189,7 @@ def main():
         enable_conscious_generation=args.enable_conscious_generation,
         token_ontology_dim=args.token_ontology_dim,
         ontology_cache_refresh_interval=args.ontology_cache_refresh_interval,
+        cache_refresh_ema_decay=args.cache_refresh_ema_decay,
         lambda_ont=args.lambda_ont,
         ontology_loss_type=args.ontology_loss_type,
         ontology_loss_temperature=args.ontology_loss_temperature,
@@ -10849,6 +11203,23 @@ def main():
         use_low_rank_primitives=args.use_low_rank_primitives,
         primitive_rank=args.primitive_rank,
         use_shared_token_basis=args.use_shared_token_basis,
+        # CRS Phase 2: Combined Cognitive-Resonance-Semantic scorer
+        use_crs_combined_scorer=args.use_crs_combined_scorer,
+        semantic_dim=args.semantic_dim,
+        crs_semantic_threshold=args.crs_semantic_threshold,
+        crs_gate_sharpness=args.crs_gate_sharpness,
+        crs_weight_c=args.crs_weight_c,
+        crs_weight_r=args.crs_weight_r,
+        crs_weight_s=args.crs_weight_s,
+        crs_alpha_base=args.crs_alpha_base,
+        lambda_crs_semantic=args.lambda_crs_semantic,
+        crs_adaptive_lambda=args.crs_adaptive_lambda,
+        crs_adaptive_lambda_target=args.crs_adaptive_lambda_target,
+        crs_adaptive_lambda_max=args.crs_adaptive_lambda_max,
+        crs_adaptive_lambda_patience=args.crs_adaptive_lambda_patience,
+        # Phase 5: Learned Domain Conditioning
+        use_learned_domain_classifier=args.use_learned_domain_classifier,
+        lambda_domain_cls=args.lambda_domain_cls,
         # Conscious Generation (Phase 3)
         lambda_kosha_routing=args.lambda_kosha_routing,
         lambda_bliss_token=args.lambda_bliss_token,

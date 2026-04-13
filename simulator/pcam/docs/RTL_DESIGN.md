@@ -1407,7 +1407,7 @@ endmodule
 | `simulator/pcam/core/state.py` | Python reference implementation |
 | `simulator/pcam/core/config.py` | Configuration parameters |
 | `simulator/pcam/interface.py` | Interface specification |
-| `simulator/pcam/VALIDATION_REPORT.md` | Validation results |
+| `simulator/pcam/docs/VALIDATION_REPORT.md` | Validation results |
 
 ### 13.2 RTL Source Files
 

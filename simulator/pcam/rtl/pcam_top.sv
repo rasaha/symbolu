@@ -112,6 +112,18 @@ module pcam_top
     logic [31:0]                  bank_conflict_count;
     logic [31:0]                  cycle_count;
 
+    // CTM+ frequency sketch interface (see freq_sketch.sv and ADR-0001).
+    logic                         sketch_inc_valid;
+    logic [BLOCK_ID_WIDTH-1:0]    sketch_inc_key;
+    logic                         sketch_inc_done;
+    logic [FREQ_SKETCH_COUNTER_BITS-1:0] sketch_inc_min;
+    logic                         sketch_est_valid;
+    logic [BLOCK_ID_WIDTH-1:0]    sketch_est_key;
+    logic                         sketch_est_done;
+    logic [FREQ_SKETCH_COUNTER_BITS-1:0] sketch_est_value;
+    logic                         sketch_busy;
+    logic [31:0]                  sketch_size_count;
+
     // FSM state
     typedef enum logic [3:0] {
         IDLE,
@@ -296,6 +308,48 @@ module pcam_top
     assign bank_wr_en       = (state == UPDATE_RMW);
 
     //=========================================================================
+    // CTM+ Frequency Sketch
+    //=========================================================================
+    // Replaces the legacy per-entry access_count. Every UPDATE command
+    // increments the sketch against cmd_decoded.key_block; the estimate
+    // path is exposed for the ATTEND response path / downstream frequency
+    // boost module. See freq_sketch.sv and ADR-0001.
+
+    assign sketch_inc_valid = (state == UPDATE_RMW) && !sketch_busy;
+    assign sketch_inc_key   = cmd_decoded.key_block;
+
+    // Estimate is driven combinationally from the query_block of the
+    // currently decoded command during ATTEND. Downstream frequency
+    // boost / scoring logic can consume sketch_est_value one cycle
+    // later via sketch_est_done.
+    assign sketch_est_valid = (state == ATTEND_BANK_READ);
+    assign sketch_est_key   = cmd_decoded.query_block;
+
+    freq_sketch #(
+        .WIDTH          (FREQ_SKETCH_WIDTH),
+        .INDEX_WIDTH    (FREQ_SKETCH_INDEX_WIDTH),
+        .COUNTER_BITS   (FREQ_SKETCH_COUNTER_BITS),
+        .CAPACITY       (TOTAL_ENTRIES),
+        .RESET_THRESHOLD(TOTAL_ENTRIES * FREQ_SKETCH_RESET_MULT)
+    ) u_freq_sketch (
+        .clk            (clk),
+        .rst_n          (rst_n),
+
+        .inc_valid      (sketch_inc_valid),
+        .inc_key        (sketch_inc_key),
+        .inc_done       (sketch_inc_done),
+        .inc_min_count  (sketch_inc_min),
+
+        .est_valid      (sketch_est_valid),
+        .est_key        (sketch_est_key),
+        .est_done       (sketch_est_done),
+        .est_value      (sketch_est_value),
+
+        .busy           (sketch_busy),
+        .size_count     (sketch_size_count)
+    );
+
+    //=========================================================================
     // Response Generation (Multi-Beat for K=256)
     //=========================================================================
     //
@@ -437,6 +491,11 @@ module pcam_top
                     8'h08: s_axil_rdata <= bank_conflict_count;
                     8'h0C: s_axil_rdata <= cycle_count;
                     8'h10: s_axil_rdata <= {28'b0, state};
+                    // CTM+ frequency sketch telemetry (ADR-0001).
+                    8'h20: s_axil_rdata <= sketch_size_count;
+                    8'h24: s_axil_rdata <= {28'b0, sketch_est_value};
+                    8'h28: s_axil_rdata <= {28'b0, sketch_inc_min};
+                    8'h2C: s_axil_rdata <= {31'b0, sketch_busy};
                     default: s_axil_rdata <= 32'hDEADBEEF;
                 endcase
             end else if (s_axil_rvalid && s_axil_rready) begin

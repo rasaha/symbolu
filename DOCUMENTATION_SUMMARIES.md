@@ -530,7 +530,7 @@ Each entry includes the **file path** relative to the repository root for locati
 
 > **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30) **Hierarchy:** PRIMARY (Bhava + Kosha) from step 0 → EMERGENT (Vritti + Guna) after grounding
 
-### `docs/design/PCAM_CHIP_SPECIFICATION.md`
+### `simulator/pcam/docs/PCAM_CHIP_SPECIFICATION.md`
 **PCAM: Phase-Coherent Attention Memory**
 
 > **Status**: Draft **Authors**: Symbol-U Research **Date**: 2026-01-31
@@ -1106,17 +1106,17 @@ Each entry includes the **file path** relative to the repository root for locati
 
 > Validation framework for Coherence-Tier Memory Plus (CTM+) algorithm.
 
-### `simulator/pcam/PCAM_BENCHMARK_TEST_REPORT.md`
+### `simulator/pcam/docs/PCAM_BENCHMARK_TEST_REPORT.md`
 **PCAM Comprehensive Benchmark & Test Report**
 
 > **Framework Version:** 0.8.0 (K=256 silicon sizing + section centroid ranking + slot reservation)
 
-### `simulator/pcam/RTL_DESIGN.md`
+### `simulator/pcam/docs/RTL_DESIGN.md`
 **PCAM FPGA RTL Design Specification**
 
 > **Version**: 3.0 (K=256 silicon sizing) **Date**: 2026-02-11 **Status**: Implementation Complete **Target**: Xilinx Alveo U280 / AMD Versal / Intel Agilex
 
-### `simulator/pcam/VALIDATION_REPORT.md`
+### `simulator/pcam/docs/VALIDATION_REPORT.md`
 **PCAM Validation Report**
 
 > This report documents the comprehensive validation of the PCAM (Phase-Coherent Attention Memory) simulation framework as specified in Appendix H of the PCAM Chip Specification.

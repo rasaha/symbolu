@@ -60,6 +60,12 @@ The `MistralCGWrapper` (conscious generation) and CTM+ live in completely separa
 
 ### 2.1 Attention-Aware KV-Cache Evictor (Priority 1)
 
+> **⚠ SUPERSEDED BY [ADR-0001](ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md) — scoring formula only.**
+>
+> The six-signal formula below was never implemented. The reference implementation at `CTM_plus/KVPolicy/kv_policy/attention_evictor.py` uses a **four-signal phase-aware** formula (recency / frequency / attention / position) with an entity bonus and a filler fast path. `reuse` and `sequence_priority` are not tracked. See ADR-0001 for the canonical scoring model, the rationale for dropping the two terms, and the list of deferred items (`RECENT` window protection is declared but not yet active).
+>
+> The rest of this section — the component names (AttentionAccumulator / PositionClassifier / SequencePriorityManager / PhaseAwarePolicy), the phase-aware intent, and the S3-FIFO / frequency sketch / training memory follow-ons in later sections — remains valid as forward-looking design notes.
+
 The core innovation: **use attention scores as a first-class signal in victim selection**.
 
 ```
