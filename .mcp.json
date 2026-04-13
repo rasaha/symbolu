@@ -3,7 +3,10 @@
     "alpaca": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["alpaca-mcp-server", "--env-file", ".env"]
+      "args": ["alpaca-mcp-server", "--env-file", ".env"],
+      "env": {
+        "PYTHONUTF8": "1"
+      }
     }
   }
 }
