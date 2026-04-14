@@ -90,6 +90,45 @@ and we build the per-token scoring and governance machinery to measure
 and act on that sub-problem inside the existing Conscious Generation
 architecture.
 
+### Note on Framing Tunability
+
+The Core Claim above is stated in its sharpest form, as a design
+target. **The same underlying thesis can be stated in a softer,
+harder, or more neutral register without changing its content**, and
+downstream authors (including the VC brief, product surfaces, and
+external review documents) should choose whichever register fits
+their audience and state it consistently within a given document.
+Three reference registers:
+
+- **Softer — general audience / product surfaces.**
+  *"Conscious Generation makes the zoom level of a claim — who it is
+  about, and over what time frame — into a signal the model can
+  reason about, so that statistical patterns are not silently turned
+  into judgments about individuals."*
+
+- **Sharper — research / alignment audience.**
+  *"The unjustified transfer of a claim between categorical
+  (Individual / Group / Population / Universal) or temporal
+  (instantaneous / eternal) zoom levels is one structural component
+  of bias, and the Level Discipline Scorer trains a Conscious
+  Generation model to detect and resist such transfers at the token
+  level, with per-field scoring exposed to the governance layer."*
+
+- **Most neutral — diligence / legal / external review.**
+  *"The scorer adds trained per-token classification of claim zoom
+  level (categorical and temporal) and flags level transfers that do
+  not match the zoom level of the evidence in context, exposing the
+  result to the governance layer. No claim is made about solving
+  bias; only about making one structural component of it measurable
+  and addressable."*
+
+Authors should not mix registers within a single document. Mixing the
+sharp research register with the soft product register in the same
+paragraph tends to read as either overclaiming (if the soft version
+inherits the sharp version's ambition) or hedging (if the sharp
+version inherits the soft version's caution), and both failure modes
+weaken the framing.
+
 ---
 
 *Step 1 complete.*
