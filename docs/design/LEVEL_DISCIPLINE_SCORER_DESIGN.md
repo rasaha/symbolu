@@ -1399,3 +1399,518 @@ Step 4 fixes the module contract that Steps 5–8 depend on:
 ---
 
 *Step 4 complete.*
+
+---
+
+## Step 5 — Training Signal, Curriculum, and Data Requirements
+
+This section turns the module contract from Step 4 into a concrete
+training signal. It specifies the composition of `L_level_discipline`,
+the overall lambda weight and its four-stage curriculum, and the three
+datasets required to train the classifier head, the temporal head, and
+the justification head. Datasets are given size targets, bootstrap
+strategies, and honest cost estimates; the research-critical dataset
+(C) is gated on an explicit inter-annotator agreement threshold before
+the curriculum's transfer-aware phase can begin.
+
+### 5.1 — Auxiliary Loss Structure
+
+`L_level_discipline` is a weighted sum of five components. Four of
+them are standard supervised classification or regression losses on
+the outputs of `LevelClassifierHead`; the fifth is the transfer-risk
+hinge already defined in §4.7, averaged across non-masked positions.
+Each component has its own sub-lambda weight so that the four
+supervised signals and the novel transfer signal can be balanced
+independently as training progresses.
+
+```python
+import torch.nn.functional as F
+
+# Supervised components — one per LevelClassifierHead output.
+L_cat        = F.cross_entropy(cat_logits,        cat_label)          # 4-way I/G/P/U
+L_temp       = F.smooth_l1_loss(temp_log,         temp_label)         # Huber on log-seconds
+L_claim_type = F.cross_entropy(claim_type_logits, claim_type_label)   # 5-way claim type
+L_role       = F.cross_entropy(role_logits,       role_label)         # 3-way evidence/claim/neither
+
+# Transfer-risk hinge from §4.7, averaged over non-masked positions.
+L_transfer   = risk[valid_mask].mean()
+
+L_level_discipline = (
+    w_cat        * L_cat +
+    w_temp       * L_temp +
+    w_claim_type * L_claim_type +
+    w_role       * L_role +
+    w_transfer   * L_transfer
+)
+```
+
+The temporal component uses Huber (`smooth_l1_loss`), not MSE,
+because the log-seconds labels inherit noise from the heuristic and
+LLM-distillation bootstraps specified in §5.4: a few percent of
+labels will be off by an order of magnitude (one full unit on the
+log-seconds axis), and MSE would let those outliers dominate the
+gradient. Huber caps the per-example contribution for residuals
+above its transition point and is the standard choice for regression
+targets that carry label noise.
+
+The transfer component reads directly from the `risk` tensor in the
+`LevelDisciplineScorer.forward(...)` output dict from §4.6 — no
+additional derivation at the loss layer. The `valid_mask` here is
+the same mask that the rest of the training loop already builds for
+padding and for the §4.6 inactive-token short-circuit; tokens where
+either the evidence pair or the claim pair is still uncommitted have
+`risk = 0` by construction, but excluding them from the mean as
+well keeps the loss magnitude comparable across batches of different
+active-token densities.
+
+**Initial sub-lambdas — hyperparameters, not constants.** Recommended
+starting values:
+
+```
+w_cat        = 1.0
+w_temp       = 1.0
+w_claim_type = 1.0
+w_role       = 1.0
+w_transfer   = 0.5
+```
+
+The four supervised components start at equal weight. `w_transfer`
+is deliberately conservative at `0.5`: the transfer hinge is the new
+research signal of the scorer, and during the first epochs of
+transfer-aware training the classifier heads are still settling,
+which means the evidence-vs-claim deltas feeding `risk` are themselves
+noisy. Under-weighting `L_transfer` early prevents the justification
+head from being supervised against transfer labels the classifiers
+cannot yet produce reliably. All five sub-lambdas are exposed on the
+training config — `w_cat`, `w_temp`, `w_claim_type`, `w_role`,
+`w_transfer` — and calibrated against the Step 6 validation plan;
+these values are not baked into the module.
+
+### 5.2 — Lambda Weight and the Four-Stage Curriculum
+
+The overall `lambda_level_discipline` weight multiplies
+`L_level_discipline` in the total CG loss:
+
+```
+L_total = L_lm + ... + lambda_level_discipline * L_level_discipline
+```
+
+where `L_lm` is the base next-token cross-entropy and the `...`
+stands for the existing six scorer-family auxiliary losses (CSR,
+Vritti, Guna, Ontological, JEPA, Kosha/Bliss). The starting value is
+`lambda_level_discipline = 0.005`, matching the existing CSR /
+Vritti / Guna convention in `scripts/train_mistral_cg.sh` — so that
+the Level Discipline auxiliary enters the total loss at the same
+conservative order of magnitude as the auxiliaries it is joining and
+does not silently dominate gradient direction in early training.
+
+The curriculum has four stages, matching the `AdaptiveTrainingController`
+pattern already used by the existing CG scorers. Stage transitions
+are gated on validation PPL, not on fixed step counts alone: step
+ranges below are approximate targets, not fixed boundaries.
+
+| Phase | Step range (approx.) | `lambda_level_discipline` | Active loss components |
+|---|---|---|---|
+| **1 — Warmup** | `0 – 5K` | `0.0` | Scorer is instantiated and runs in the forward pass, but contributes zero gradient. Base LM task only; the rest of the CG stack is unchanged from its pre-scorer behavior. |
+| **2 — Introduction** | `5K – 15K` | ramp `0.0 → 0.005` | `L_cat`, `L_temp`, `L_claim_type`, `L_role` enabled (i.e., `w_transfer = 0`). Classifier heads begin training on supervised labels from Datasets A and B. The `JustificationHead` is present but frozen; its gradients are not consumed. |
+| **3 — Transfer-aware** | `15K – 30K` | `0.005` | `L_transfer` enabled (`w_transfer` ramps `0 → 0.5`). `JustificationHead` is unfrozen and begins training on Dataset C. Classifier heads continue training; their gradients are no longer the only signal the shared hidden representation carries from the scorer. |
+| **4 — Stabilization** | `30K +` | conditional ramp `0.005 → 0.01` | All five loss components active. Overall lambda may be raised *only if* the 200-step ablation eval shows no PPL regression on the base LM task and a measurable improvement on the Step 6 bias-pathology test set. Otherwise lambda stays at `0.005`. |
+
+**Phase-transition gates.** Matching the existing
+`AdaptiveTrainingController` convention, each phase transition is
+gated on the validation-PPL trajectory rather than on the step count
+alone. The specific gate is:
+
+```
+advance_phase = (
+    val_ppl_improvement_over_last_N_steps > epsilon
+    AND val_ppl_has_not_spiked
+)
+```
+
+where `N` and `epsilon` are the same gating hyperparameters the
+existing controller already uses, and `val_ppl_has_not_spiked` is
+defined against the controller's rolling reference. A step-range
+boundary that is reached without the gate condition holding holds
+the training loop in the current phase until the gate clears; a gate
+condition that clears before the step-range boundary is permitted to
+advance early. This keeps the curriculum responsive to the base
+training signal instead of marching through stages on a fixed
+schedule that might introduce the transfer loss before the
+classifier heads have stabilized.
+
+**Phase 3 has an additional hard gate** — see §5.5 — on the
+inter-annotator agreement of Dataset C's `justified?` label. If
+that agreement has not reached the threshold by the time the PPL
+gate would otherwise permit the Phase 2 → 3 transition, lambda
+stays at the Phase 2 level and `JustificationHead` remains frozen.
+This is a data-readiness gate, not a training-dynamics gate, and
+overriding it would train the justification head against an
+unreliable target.
+
+**Graceful degradation at `lambda_level_discipline = 0`.** Setting
+the overall lambda to zero at any point — whether as a rollback or
+as a default for a downstream consumer who does not want the
+Level Discipline auxiliary active — leaves the scorer in the graph
+but removes its gradient contribution entirely. Combined with the
+bit-parity guarantee from §4.1, this means the scorer can be merged
+into `mistral_cg` and shipped with `lambda_level_discipline = 0` on
+day one, and the rest of the CG stack's behavior is
+guaranteed-identical to its pre-merge behavior on every input.
+
+### 5.3 — Dataset A: Categorical Level Labels
+
+Dataset A is the easy-to-medium labeled corpus required to train the
+`categorical` head of `LevelClassifierHead` (§4.3). Each example is a
+sentence or a claim-bearing span labeled with its categorical zoom
+level over `{I, G, P, U}`.
+
+- **Size target.** `20K – 50K` labeled spans. The lower end is
+  sufficient to train a 4-way classifier on top of a frozen backbone;
+  the upper end is preferred for coverage of the long tail of
+  implicit-generic constructions.
+- **Label space.** One label per claim-bearing span, drawn from the
+  four categorical levels in §2.1:
+  - `I` — Individual (one concrete case)
+  - `G` — Group (a class or cluster)
+  - `P` — Population (the statistical field)
+  - `U` — Universal (applies to all persons or contexts)
+- **Bootstrap strategies.**
+  1. **Quantifier-presence weak labels.** Explicit quantifiers give
+     the labeling bootstrap a cheap starting signal. *"this patient"*,
+     *"this specific case"*, *"she said"* → `I`. *"most radiologists"*,
+     *"typical presentations"*, *"the average"* → `G` or `P`.
+     *"every patient"*, *"all X"*, *"universally"*, *"by definition"*
+     → `U`. These rules are applied automatically over a large
+     unlabeled corpus and produce the first pass of weak labels.
+  2. **LLM distillation.** An engineer curates roughly 5K challenging
+     sentences that the quantifier rules either mis-label or cannot
+     label, then prompts a capable model (e.g. Claude or GPT-4) with
+     a strict rubric that mirrors §2.1. The LLM's labels become
+     ground truth for a distillation training run, and the resulting
+     smaller classifier is used to re-label the weakly-labeled
+     corpus. The pipeline iterates — label, train, re-label — until
+     held-out accuracy on an expert-annotated development set
+     stabilizes.
+  3. **Existing linguistic resources.** NLI datasets, genericity
+     annotations from linguistic corpora (e.g., GenericsKB-style
+     resources), and coreference-resolved entity annotations all
+     carry partial signal for the `I` vs `G/P` distinction. These
+     resources are cheap to adapt but cover only a subset of the
+     label space, so they are used as a prior, not as primary
+     supervision.
+- **Cost estimate.** Roughly 2 engineer-weeks for the bootstrap
+  pipeline (quantifier rules, LLM distillation harness, iteration
+  loop), plus approximately `$2K` in LLM API spend for the
+  distillation passes. This is the cheapest of the three datasets.
+- **Honest caveat.** The quantifier-rule bootstrap produces noisy
+  labels for *implicit generics* — sentences like *"elephants are
+  large"* or *"water is wet"* are `G`/`U` claims with no quantifier
+  word, and the rule-based pass will mis-label them as `I`. LLM
+  distillation is necessary, not optional, for the hard cases, and
+  the final model's `I` vs `G` boundary accuracy will be the limiting
+  factor on classifier-head quality for this axis.
+
+### 5.4 — Dataset B: Temporal Level Labels
+
+Dataset B is the medium-difficulty labeled corpus required to train
+the `temporal` regression head of `LevelClassifierHead`. Each example
+is a sentence or claim-bearing span labeled with the *native time
+frame* of the claim's content — the temporal horizon over which the
+claim averages — expressed as a continuous log-seconds scalar.
+
+- **Size target.** `20K – 50K` labeled spans, parallel to Dataset A
+  in size so that the classifier and temporal heads train on
+  comparable data volumes.
+- **Label space.** A single continuous log-seconds value per span.
+  Annotators are not asked to pick a bin; they are asked to place
+  the claim on a continuous axis whose landmark anchors are the
+  §2.2 labels (`N`, `S`, `L`, `H`, `E`). The regression target is
+  the anchor's numeric log-seconds value, or an interpolation
+  between anchors where annotators judge it appropriate. The
+  training signal is the continuous scalar — the discrete landmarks
+  are used only during labeling, never as a classification target
+  against the head.
+- **Bootstrap strategies.**
+  1. **Tense, aspect, and temporal-adverb rules.** Surface cues give
+     the bootstrap a cheap first pass. Present-progressive and deictic
+     adverbs (*"now"*, *"currently"*, *"this week"*, *"tomorrow"*)
+     map to low log-seconds. Past-historical and aggregating adverbs
+     (*"historically"*, *"over the past century"*, *"in the long
+     run"*, *"eventually"*) map to high log-seconds. Habitual and
+     generic aspect (*"tends to"*, *"usually"*) sit in the middle.
+     These rules cover a meaningful fraction of explicit time
+     references and leave the implicit-time cases for the
+     distillation pass.
+  2. **Existing temporal resources.** `TimeBank`, `TimeML`, and
+     related corpora contain event-time annotations that can be
+     adapted for weak supervision. They do not directly annotate the
+     *native time frame of a claim*, but they contribute labels for
+     event horizons and duration expressions that carry partial
+     signal for this axis and are cheap to incorporate.
+  3. **LLM distillation.** Same pipeline as Dataset A — curate
+     challenging examples, prompt with a strict rubric tied to the
+     §2.2 landmark scale, treat LLM labels as ground truth for a
+     distillation run, iterate against an expert-annotated dev set.
+- **Cost estimate.** Roughly 2 engineer-weeks plus LLM API spend
+  comparable to Dataset A. The primary engineering effort is in the
+  rubric — keeping annotators and LLM prompts consistent on how to
+  place a claim whose content has multiple candidate time frames
+  (e.g., *"radiologists trained in the 1990s tend to miss X"* — is
+  the label the training era, the career span, or the current
+  tendency?).
+- **Honest caveat.** Domain-specific time scales are a significant
+  confounder. *"Slow"* means microseconds to a physicist, seconds
+  to a software engineer, and decades to a geologist; *"recent"*
+  means different things in news, in genomics, and in cosmology.
+  The dataset must be balanced across domains, or the scorer will
+  inherit a domain-specific time prior and will mis-regress on
+  out-of-domain input. The validation plan in Step 6 tests
+  explicitly for this failure mode.
+
+### 5.5 — Dataset C: Justification Labels (Research Risk)
+
+Dataset C is the research-critical labeled corpus for
+`JustificationHead`. It is where most of the novel contribution of
+the scorer lives, where the labeling cost is concentrated, and where
+the curriculum has its hard data-readiness gate. Unlike Datasets A
+and B — which both have cheap rule-based bootstraps and partial
+off-the-shelf resources — **no off-the-shelf dataset exists for the
+justification axis.** The labeled set has to be hand-built with
+expert annotators, bootstrapped through LLM distillation against a
+rubric, and iterated against an expert-held-out development set
+before it is trusted as a training signal.
+
+- **Size target.** `2K – 5K` `(context, evidence_level, claim_level,
+  claim_type, justified?)` training examples. The target is
+  deliberately small: the justification decision is high-effort to
+  annotate correctly, and the scorer's open research question is
+  about *whether* the labels can be produced reliably at all, not
+  about matching the volume of the classifier-head datasets.
+- **Seed set.** A high-quality seed of roughly `500` expert-labeled
+  examples precedes any distillation. The seed is used both as the
+  kappa-agreement reference set (see below) and as the LLM
+  distillation anchor.
+- **Label space.**
+  - `justified?` — binary in `{0, 1}`; the primary training target.
+  - `reason_code` — optional categorical label from a fixed
+    vocabulary. Reason codes are the input to the §5.6 multi-task
+    extension and to the governance readout's escalation logic, but
+    the primary `JustificationHead` loss is on the binary label
+    alone.
+
+  The reason-code vocabulary is drawn from §2.7 and §2.8 and is
+  fixed at eleven codes:
+
+  | Code | Category | Description |
+  |---|---|---|
+  | `justified: bayesian_base_rate` | justified | `P → I` used for belief updating with individual evidence (required for calibration). |
+  | `justified: causal_identification` | justified | `G → I` under a stated causal structure that licenses the transfer. |
+  | `justified: statistical_necessity` | justified | The claim's subject matter inherently lives at the higher zoom (geology, evolution, cosmology). |
+  | `justified: universal_constraint` | justified | `U → I/G/P` as a rule application, not a stereotype (e.g. informed consent applied to a specific patient). |
+  | `justified: within_level` | justified | Transfer distance is zero — reasoning at a single level without crossing zoom. |
+  | `unjustified: stereotype` | unjustified | `G → I` applying a group tendency to an individual without case evidence. |
+  | `unjustified: anecdotal_overreach` | unjustified | `I → G` or `I → P` generalizing from a single case without sample adequacy. |
+  | `unjustified: statistical_flattening` | unjustified | `P → I` treated as a normative judgment on an individual (distinct from the licensed Bayesian update above). |
+  | `unjustified: cultural_universalization` | unjustified | `G → U` elevating a group's norm to a universal rule without plural legitimacy. |
+  | `unjustified: historical_whitewashing` | unjustified | `N → H` or `N → E` abstraction that hides individual harm. |
+  | `unjustified: anachronism` | unjustified | `E → N` application of an eternal-frame claim to a specific instantaneous case that does not match it. |
+
+- **Bootstrap pipeline.** The pipeline is strict because the label
+  is fragile:
+  1. An engineer and a domain-expert annotator jointly draft the
+     rubric, grounded in the §2.7 structural definition of bias and
+     the §2.8 pathology table.
+  2. Two or more annotators independently label the seed set (~500
+     examples) against the rubric, without consulting each other.
+  3. Cohen's kappa is computed on the binary `justified?` label. If
+     it is below the threshold, the rubric is sharpened and the
+     seed set is re-labeled; distillation does not begin until the
+     threshold is met.
+  4. Once the seed set is stable, an LLM is prompted with the
+     rubric and the seed set as few-shot anchors, and labels an
+     expanded pool of candidate examples. LLM labels are treated
+     as weak supervision, not ground truth, and are verified on a
+     held-out expert-labeled slice before being accepted.
+  5. The pipeline iterates: rubric, seed, distillation,
+     verification, expand.
+- **Inter-annotator agreement target.** `≥ 0.7` Cohen's kappa on the
+  binary `justified?` label within the first `500` examples, before
+  any distillation. If expert annotators cannot reach `0.7` on a
+  fresh seed set, the rubric is not yet sharp enough to be a
+  training signal, and the scorer's research risk has materialized.
+  Sharpening options include: (a) restricting the label space to a
+  smaller, less ambiguous subset of transfers; (b) splitting the
+  binary label into multiple labels reflecting different
+  sub-dimensions of justification; (c) adding a `uncertain` option
+  and treating the dataset as 3-class. These are escalation paths,
+  not defaults.
+- **Cost estimate.** Roughly `4 – 6 engineer-weeks` for the seed set
+  (including rubric drafting, annotator onboarding, iterative
+  sharpening), approximately `$5K` in LLM API spend for the
+  distillation and verification passes, and an approximately `$3K`
+  annotator budget for the expert pass on the seed set and the
+  held-out verification slices. The total is deliberately the
+  largest of the three datasets; this is where the research money
+  is concentrated.
+- **Honest caveat — the main research risk.** If human experts
+  cannot reliably distinguish justified from unjustified transfers
+  on held-out examples, the framework is not yet ready to be a
+  training signal, and no amount of scaling fixes the problem. This
+  is the gate that decides whether Phase 3 of the §5.2 curriculum
+  can be entered at all.
+
+**Phase 3 data-readiness gate.** Phase 3 of the curriculum requires
+that the `justified?` label achieves `≥ 0.7` Cohen's kappa on a
+held-out expert-labeled set of at least 200 examples. If that
+threshold is not met at the time the PPL gate would otherwise permit
+the Phase 2 → 3 transition, `lambda_level_discipline` stays at the
+Phase 2 level and `JustificationHead` remains frozen. This is a hard
+gate — it cannot be overridden by choosing a larger lambda or a
+different curriculum schedule, because the underlying failure is in
+the label itself, not in the training dynamics. The operator's
+escalation path in that case is to either sharpen the rubric and
+re-annotate, or to ship the scorer with only the four classifier
+losses active (Phases 1 and 2 only) and defer the transfer-aware
+stage until the data is trustworthy.
+
+### 5.6 — Reason-Code Multi-Task Training (Optional but Recommended)
+
+Even if the primary training signal is the binary `justified?` label
+from Dataset C, the eleven reason codes above are valuable as a
+secondary classification target. The binary label answers *is this
+transfer justified?* — which is the question the loss penalizes —
+but the reason code answers *which specific pathology is this
+closest to?*, which is the question the Agentic Framework actually
+needs at the governance layer to decide between escalation, tool
+gating, and refusal. This subsection specifies how to train the
+reason-code signal as an optional multi-task extension of the
+justification head, without altering the core loss or the forward
+dict.
+
+**Module extension.** The reason-code signal is produced by a small
+additional head, `ReasonCodeHead`, that runs on the *same* inputs as
+`JustificationHead` — the backbone hidden, the NaN-substituted
+Reserved slice, and the claim-type softmax. It is a single linear
+projection to 11 classes:
+
+**[SKETCH — specification, not implementation]**
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class ReasonCodeHead(nn.Module):
+    """Optional secondary head emitting reason-code logits.
+
+    Runs on the same inputs as JustificationHead. Trained with
+    cross-entropy against the 11-class reason-code vocabulary from
+    §5.5. The head is optional; the main L_level_discipline loss
+    composes without it.
+    """
+
+    NUM_REASON_CODES: int = 11
+
+    def __init__(self, hidden_dim: int) -> None:
+        super().__init__()
+        in_dim: int = hidden_dim + 4 + 5  # same as JustificationHead
+        self.linear: nn.Linear = nn.Linear(in_dim, self.NUM_REASON_CODES)
+
+    def forward(
+        self,
+        hidden:            torch.Tensor,  # [B, T, hidden_dim]
+        reserved:          torch.Tensor,  # [B, T, 4], NaN already substituted to 0
+        claim_type_logits: torch.Tensor,  # [B, T, 5]
+    ) -> torch.Tensor:                    # [B, T, 11]
+        claim_type_probs: torch.Tensor = F.softmax(claim_type_logits, dim=-1)
+        x: torch.Tensor = torch.cat([hidden, reserved, claim_type_probs], dim=-1)
+        return self.linear(x)
+```
+
+**Loss extension.** When the reason-code head is enabled, a sixth
+component is added to `L_level_discipline`:
+
+```python
+L_reason = F.cross_entropy(reason_code_logits, reason_code_label)
+
+L_level_discipline_with_reason = (
+    L_level_discipline_base +
+    w_reason * L_reason
+)
+```
+
+The reason-code sub-lambda is small: initial recommendation
+`w_reason = 0.1 * w_transfer`, so the reason-code signal is on the
+order of one-tenth the transfer signal. The reason-code head trains
+only on tokens where Dataset C provides a reason-code label (most
+of Dataset A and Dataset B will not); training-loop masking excludes
+unlabeled positions from the cross-entropy term, and the
+`L_reason` component is skipped entirely on batches that contain no
+reason-code labels.
+
+**Governance benefit.** With the reason-code head trained, the
+`MistralCGAdapter` governance readout from §3.6 gains an additional
+field:
+
+```python
+governance_readout["level_discipline"]["reason_code"] = {
+    "top_code":   argmax(reason_code_logits),
+    "confidence": max(softmax(reason_code_logits)),
+}
+```
+
+which turns `"risk = high"` into `"risk = high, most consistent with
+stereotype (confidence 0.73)"`. This is the form the Agentic
+Framework's `SafetyGate` actually consumes at escalation time: the
+binary justification score tells it *whether* to escalate, and the
+reason code tells it *what to say when it escalates*. The main loss
+can ship without this extension, and adding it is a second research
+commitment on top of Dataset C; both for that reason and because
+the eleven-class signal is likely to be noisier than the binary
+signal, the extension is explicitly **optional** in the design.
+Engineers shipping the scorer without it lose the governance
+granularity but retain the transfer-risk gating, and the rest of
+the Step 4 module contract is unaffected.
+
+### 5.7 — What Step 5 Establishes
+
+Step 5 fixes the training-signal contract that Steps 6–8 depend on:
+
+- **Total auxiliary loss composition is fixed.** `L_level_discipline`
+  is the weighted sum of `L_cat`, `L_temp`, `L_claim_type`, `L_role`,
+  and `L_transfer`, with per-component sub-lambdas that are
+  configurable surfaces, not constants. The optional
+  `ReasonCodeHead` extension adds `L_reason` under an additional
+  sub-lambda.
+- **The curriculum has four stages with explicit gating
+  conditions.** Phase transitions are gated on validation-PPL
+  trajectory (matching the existing `AdaptiveTrainingController`
+  convention), and Phase 3 additionally has a hard data-readiness
+  gate on Dataset C's inter-annotator agreement. Fixed step counts
+  are targets, not boundaries.
+- **Three datasets are defined with size targets, bootstrap
+  strategies, and cost estimates.** Dataset A (categorical,
+  `20K – 50K`, ~2 engineer-weeks + ~$2K LLM spend) and Dataset B
+  (temporal, `20K – 50K`, ~2 engineer-weeks + LLM spend) are
+  easy-to-medium supervised learning. Dataset C (justification,
+  `2K – 5K`, ~4–6 engineer-weeks + ~$5K LLM spend + ~$3K annotator
+  budget) is the research-critical corpus.
+- **The research-critical dataset has a hard gate before Phase 3
+  of the curriculum can begin.** `≥ 0.7` Cohen's kappa on the
+  binary `justified?` label over a held-out expert-labeled set of
+  at least 200 examples, or `JustificationHead` stays frozen and
+  `lambda_level_discipline` stays at its Phase 2 value. The gate
+  cannot be overridden by re-weighting the loss or by choosing a
+  different curriculum schedule.
+- **No hyperparameter is baked into code.** `lambda_level_discipline`,
+  the five (or six) sub-lambdas, `beta`, `first_commit_threshold`,
+  `temp_scale`, and the phase-transition gating thresholds are all
+  exposed on the training config. Step 6 can now specify integration
+  points (file paths in the existing `mistral_cg` tree) and the
+  validation plan that consumes these hyperparameters.
+
+---
+
+*Step 5 complete.*
