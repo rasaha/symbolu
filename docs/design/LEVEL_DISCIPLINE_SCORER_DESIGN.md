@@ -386,3 +386,276 @@ trainable component of the Conscious Generation stack.
 ---
 
 *Step 2 complete.*
+
+---
+
+## Step 3 — Architectural Placement in Conscious Generation
+
+This section specifies exactly where the Level Discipline Scorer sits
+in the `mistral_cg` forward pass, how it relates to the existing
+components of the Conscious Generation stack, and why it can be added
+without fundamental architectural changes. The guiding constraint is
+that the scorer must reuse existing interfaces and state slots
+wherever possible, so that it is a **strictly additive** component and
+the rest of the CG training and inference path is unaffected when the
+scorer is disabled.
+
+### 3.1 Recap: The Existing Conscious Generation Forward Pass
+
+For orientation, the current `MistralCGWrapper` forward pass is:
+
+```
+  input_ids
+      │
+      ▼
+  Mistral-7B backbone  [FROZEN, optional 4-bit]
+      │                             hidden_states  [B, T, 4096]
+      ▼
+  SovereignStateProjector  [trainable]
+      │                             32D state  (Bhava 12 · Kosha 5 · Vritti 5 · Guna 6 · Reserved 4)
+      ▼
+  Δ Bhava  →  IntentPhaseProjector  →  intent_phase   [trainable]
+      │
+      ▼
+  Phase Adapter  (Linear → GELU → Linear, gated residual)   [trainable]
+      │
+      ▼
+  adapted_hidden = hidden + sigmoid(gate) · adapter_output
+      │
+      ▼
+  backbone.lm_head  [FROZEN]  →  logits
+      │
+      ▼
+  next token
+```
+
+On top of this forward pass, the Token Evaluation Tensor runs per-token
+scorers (CSR, Vritti, Guna, Ontological, JEPA / Plausibility, Kosha /
+Bliss) whose InfoNCE / contrastive auxiliary losses shape the shared
+hidden representation and the 32D state during training. The phase
+adapter is the current CG mechanism that modifies token probabilities
+at inference time (via its gated residual on the hidden state before
+the frozen LM head).
+
+### 3.2 Placement of the Level Discipline Scorer
+
+The Level Discipline Scorer is added as a **seventh entry in the Token
+Evaluation Tensor**, architecturally parallel to the existing six
+scorer families. It reads from the same shared hidden representation
+used by the other scorers, writes into the `Reserved 4D` slice of the
+Sovereign State via a small additional head on the
+`SovereignStateProjector`, and contributes its own auxiliary loss term
+gated by an explicit lambda weight in the training configuration.
+
+The updated forward pass is:
+
+```
+  input_ids
+      │
+      ▼
+  Mistral-7B backbone  [FROZEN]
+      │                             hidden_states  [B, T, 4096]
+      ▼
+  SovereignStateProjector  [trainable]            ──► 32D state
+      │                                                ├── Bhava 12   (existing)
+      │                                                ├── Kosha 5    (existing)
+      │                                                ├── Vritti 5   (existing)
+      │                                                ├── Guna 6     (existing)
+      │                                                └── Reserved 4 (now structured — see §3.4)
+      │
+      ├───► Existing scorer families (training-time auxiliaries):
+      │         CSR · Vritti · Guna · Ontological · JEPA · Kosha / Bliss
+      │
+      ├───► Level Discipline Scorer  [NEW, training-time auxiliary]
+      │         LevelClassifierHead    → (cat_level, temp_level, claim_type, role)
+      │         JustificationHead      → transfer justification score
+      │         writes → Reserved[0..3]
+      │         emits  → L_level_discipline  (auxiliary loss)
+      │
+      ▼
+  Δ Bhava  →  IntentPhaseProjector  →  intent_phase   [trainable, unchanged]
+      │
+      ▼
+  Phase Adapter  [trainable, unchanged]
+      │
+      ▼
+  adapted_hidden = hidden + sigmoid(gate) · adapter_output
+      │
+      ▼
+  backbone.lm_head  [FROZEN]  →  logits  →  next token
+```
+
+The key invariant is that the new scorer **does not modify the existing
+forward-pass data flow**. It reads the hidden state, writes to the
+previously unused Reserved slice, and emits an auxiliary loss. When
+`lambda_level_discipline = 0` (the default on first merge), the scorer
+is present in the graph but its contribution to training and to state
+content is zero, so the rest of the CG stack is guaranteed unchanged.
+
+### 3.3 Scorer Neighborhood: Relationship to the Existing Six Families
+
+The Level Discipline Scorer is additive to, and orthogonal to, each of
+the existing six scorer families. Explicit clarification is worth
+stating because two of them (Vritti and Ontological) superficially
+look adjacent and should not be confused with Level Discipline:
+
+| Existing scorer | What it judges | Relationship to Level Discipline |
+|---|---|---|
+| **CSRTokenScorer** | Phonemic / tonal resonance (sound-level fit) | Completely orthogonal. Operates on sub-lexical acoustics. |
+| **VrittiTokenScorer** | Current cognitive mode (fact · fiction · opinion · memory · imagination) | **Orthogonal axis.** Vritti classifies *what kind of mental activity* the model is in. Level Discipline classifies *what categorical and temporal zoom* the current claim is at. A single token can be in Vritti=`fact` and Level Discipline=`P·H` at the same time — those are two independent properties. |
+| **GunaTokenScorer** | Energetic / relational compatibility between token and context | Orthogonal. Guna is a tone-and-relation axis, not a zoom axis. |
+| **TokenOntologyProjector + OntologyCompatibilityScorer** | Identity-level compatibility of a token with the 32D state | **Superficially adjacent.** The existing ontology scorer judges whether a token is consistent with the model's *ontological identity* (Bhava) — "is this the kind of thing the current ontological state would say?". Level Discipline judges whether a token completes a *zoom-level transfer* that is not supported by context evidence. Different questions, different training signals, different heads. |
+| **JEPA / Plausibility heads** | Causal / physical grounding of the token (world-model plausibility) | Orthogonal. Plausibility is about physical world consistency; Level Discipline is about epistemic zoom discipline. |
+| **Kosha / Bliss** | Layer weighting (Kosha) and coherence integration (Bliss) | Orthogonal infrastructure signals, not token-content judges. |
+
+The Level Discipline Scorer is therefore the *seventh* distinct signal
+family, not a refinement of any of the existing six. It is the first
+scorer in the CG stack that is specifically epistemic — concerned with
+*how a claim relates to the evidence that supports it*, rather than
+with what the claim is about, how it sounds, what mode it is in, or
+whether it is physically plausible.
+
+### 3.4 The Reserved 4D Slice — Why It Is the Right Place
+
+The Sovereign State in the current CG architecture has five slices:
+Bhava (12D), Kosha (5D), Vritti (5D), Guna (6D), and **Reserved (4D)**.
+The Reserved slice was explicitly designed as a place for additive
+signals that do not fit in the existing semantic slices, and it is
+currently unused. The Level Discipline Scorer uses it — all of it —
+for evidence-level and claim-level tracking across the sequence:
+
+```
+Reserved[0]  =  evidence_categorical_level   (continuous in [0, 3]; soft over I/G/P/U)
+Reserved[1]  =  evidence_temporal_level      (continuous in log-seconds)
+Reserved[2]  =  claim_categorical_level      (continuous in [0, 3])
+Reserved[3]  =  claim_temporal_level         (continuous in log-seconds)
+```
+
+Three reasons this placement is correct:
+
+1. **It is the only slice with unused capacity.** Bhava, Kosha, Vritti,
+   and Guna are semantic slices with trained, ADR-pinned dimension
+   meanings. Adding Level Discipline tracking there would require
+   reinterpreting existing dimensions and would break bit-parity with
+   existing checkpoints.
+
+2. **Tracking evidence vs claim level is sequence-level state, not
+   per-token content.** It needs to persist across tokens the same way
+   the Sovereign State does, and the Reserved slice is the only slot
+   in the existing state object that can carry it without allocating
+   a new state container.
+
+3. **The Agentic Framework already reads the Sovereign State via
+   `MistralCGAdapter`.** Placing the scorer's output state in the
+   Reserved slice means the governance readout pathway *already*
+   exposes it — no new adapter surface, no new serialization, no new
+   protocol. See §3.6.
+
+The `SovereignStateProjector` is extended with a small `LevelStateHead`
+that writes to `Reserved[0..3]` on each forward pass. The head is
+trained by the same auxiliary loss as the rest of the scorer, so the
+main backbone signal and the level-tracking signal share a gradient
+path.
+
+### 3.5 Training-Time Behavior vs Inference-Time Behavior
+
+The Level Discipline Scorer follows the existing CG pattern of
+**training-time auxiliaries shaping a shared hidden representation
+that flows into inference via the phase adapter**. In plain terms:
+
+- **At training time**, the scorer contributes `L_level_discipline` to
+  the total loss. The classifier heads learn to tag categorical level,
+  temporal level, claim type, and evidence/claim role. The
+  justification head learns to distinguish justified from unjustified
+  transfers. Gradient flows back through the shared hidden
+  representation, reshaping it so that the phase adapter's downstream
+  correction inherits level-discipline structure.
+
+- **At inference time today (Phase 1–3)**, the scorer's contribution
+  reaches generation via the same mechanism as the other six scorers:
+  the shared hidden representation has been shaped by the training
+  auxiliaries, and the phase adapter's gated residual on the hidden
+  state carries that shaping into the frozen LM head. The scorer's
+  state (evidence/claim level, transfer magnitude, justification
+  score) is also written into `Reserved[0..3]` on every forward pass
+  and is available to the governance layer (§3.6) at inference, even
+  though it does not directly modify the logits.
+
+- **At inference time in the future (Phase 4 — field-integrated
+  softmax)**, the Level Discipline signal joins CSR, Vritti, Guna, and
+  Ontological as a direct contributor to the multi-field token
+  ranking. This requires the curriculum-gated Phase 4 path to be
+  default-on, which is a Q2 roadmap item in the existing CG brief. The
+  scorer is designed to plug into Phase 4 without additional wiring —
+  its per-token output already has the shape Phase 4 expects.
+
+This matches the honest-scope framing the existing CG brief uses for
+the other six scorers: *implemented end-to-end as a training-time
+signal, readable at inference via state exposure, becomes a direct
+inference contributor under Phase 4*.
+
+### 3.6 Governance Readout via `MistralCGAdapter`
+
+Because the Level Discipline Scorer writes into `Reserved[0..3]` of
+the Sovereign State, and because `MistralCGAdapter` already exposes
+Sovereign State fields to the Agentic Framework as part of its
+governance readout, **the scorer's output is available to governance
+code at generation time with no new adapter surface**. The adapter
+readout is extended with a new `level_discipline` record:
+
+```python
+governance_readout = {
+    "entropy":      ...,               # existing
+    "vritti":       ...,               # existing
+    "level_discipline": {              # NEW
+        "evidence_cat_level":   Reserved[0],
+        "evidence_temp_level":  Reserved[1],
+        "claim_cat_level":      Reserved[2],
+        "claim_temp_level":     Reserved[3],
+        "delta_cat":            |Reserved[2] - Reserved[0]|,
+        "delta_temp":           |Reserved[3] - Reserved[1]|,
+        "justification":        J_head_output,
+        "risk":                 risk_flag(delta_cat, delta_temp, J),
+    },
+}
+```
+
+This readout is consumable by the Agentic Framework's `SafetyGate`
+and `SafeMCPGateway` exactly the same way existing entropy and vritti
+readouts are — meaning a governed agent can condition escalation,
+tool gating, or refusal on level-transfer risk in the same motion it
+already uses for model-internal uncertainty and cognitive mode. No
+change to the Agentic Framework runtime contract, no change to the
+`BaseLLMAdapter` interface, no change to the `build_agent(...)`
+factory call. The scorer composes with the existing governance stack
+purely additively.
+
+### 3.7 What Step 3 Establishes
+
+Step 3 locks in four architectural commitments for the rest of the
+design:
+
+1. **The scorer is additive.** It is a seventh entry in the Token
+   Evaluation Tensor, runs parallel to the existing six, and does
+   not modify the forward-pass data flow.
+2. **The Reserved 4D slice carries its state.** No new Sovereign
+   State dimensions are allocated; no existing dimensions are
+   reinterpreted.
+3. **Training-time behavior matches the existing CG pattern.** The
+   scorer contributes an auxiliary loss that shapes the shared
+   hidden representation, reaching inference via the phase adapter
+   today and via Phase 4 field-integrated softmax when that becomes
+   default-on.
+4. **Governance readout is free.** Because the state lives in the
+   Sovereign State and `MistralCGAdapter` already exposes that to
+   the Agentic Framework, no new adapter surface is required for a
+   governed agent to read level-transfer risk at generation time.
+
+With these commitments in place, Steps 4–8 can specify the module
+breakdown (§4), training signal and curriculum (§5), data
+requirements (§5), integration points with existing code (§6),
+validation plan (§6), and research risks (§7).
+
+---
+
+*Step 3 complete.*
