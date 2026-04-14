@@ -1914,3 +1914,427 @@ Step 5 fixes the training-signal contract that Steps 6–8 depend on:
 ---
 
 *Step 5 complete.*
+
+---
+
+## Step 6 — Integration Points and Validation Plan
+
+This section turns the module contract from Step 4 and the training
+signal from Step 5 into a concrete integration plan against the
+existing `mistral_cg` codebase. It lists every file that must change
+or be added, the interface contracts that must remain
+backwards-compatible, the test suite that must accompany the change,
+the four-test validation plan with explicit success targets, and
+the measurable graduation criteria that decide when each curriculum
+phase from §5.2 may advance. No new module sketches appear here —
+Step 4 owns those; Step 6 is about *where* they go and *how* they
+are validated.
+
+### 6.1 — File-Level Integration Points
+
+> **Path-verification note.** Before writing this table, the
+> existing CG stack was audited against the file paths the earlier
+> steps of this document implicitly assume. Two paths shifted
+> relative to the first-draft assumptions:
+>
+> 1. `SovereignStateProjector` is defined in
+>    `symbolu_training/jepa/state_projector.py`, *not* in
+>    `symbolu_training/training/unified/mistral_wrapper.py`. The
+>    wrapper imports and instantiates the projector; the class
+>    definition lives in the `jepa` subtree. The `LevelStateHead`
+>    composition must therefore be wired in both places — the
+>    class change goes in `state_projector.py`, and the
+>    instantiation site goes in `mistral_wrapper.py`.
+> 2. `MistralCGAdapter` is defined in
+>    `agentic/agentic_framework/llm_adapters.py`, *not* in
+>    `agentic/agentic_framework/inference_mistral.py`. The
+>    `inference_mistral.py` file imports and configures the
+>    adapter for the CLI runtime; the class definition lives in
+>    `llm_adapters.py`, and the governance-readout extension
+>    belongs there. Additionally, the governance readout surface
+>    is not a dedicated `governance_readout()` method but the
+>    existing `last_cg_metadata: Dict[str, Any]` field that the
+>    adapter already exposes; the Level Discipline extension
+>    adds a new `level_discipline` sub-dict to that field (see
+>    §6.2).
+>
+> The table below uses the verified paths. The architectural
+> commitments from Steps 3 and 4 are unaffected; only the specific
+> file the change lands in has moved.
+
+Every file that needs to change or be added to merge the Level
+Discipline Scorer into the existing CG training stack is listed
+below. Size estimates are rough upper bounds and exclude comments
+and docstrings.
+
+| File | Change Type | What Changes | Size Estimate (lines) |
+|---|---|---|---|
+| `symbolu_training/training/conscious_generation/primitives/level_discipline_scorer.py` | **new** | Defines `LevelClassifierHead`, `JustificationHead`, `LevelStateHead`, and `LevelDisciplineScorer` per the Step 4 module contract. Imports `nn.Linear`, `F.softmax`, `F.gelu`, `F.cross_entropy`, `F.smooth_l1_loss` only — no project-internal CG dependencies beyond `primitives/base_scorer.py` for the standard scorer base. | ~350 |
+| `symbolu_training/jepa/state_projector.py` | modify | Extend `SovereignStateProjector` to accept an optional `level_state_head: Optional[LevelStateHead]` sub-module (composition, not subclassing, per §4.5). When present, the projector's forward pass calls `level_state_head(...)` to produce `Reserved[0..3]` and concatenates the result onto the 28-D semantic state. When absent, the projector falls back to its existing zero-initialized Reserved slice, preserving bit-parity per §4.1. | ~50 |
+| `symbolu_training/training/unified/mistral_wrapper.py` | modify | At the `SovereignStateProjector` instantiation site (line ~100), conditionally attach a `LevelStateHead` when the training config sets `lambda_level_discipline > 0` or when the config explicitly opts in via a new `enable_level_discipline: bool` flag. Instantiate the full `LevelDisciplineScorer` alongside the existing CG scorers and wire its forward call into the per-token auxiliary path. | ~40 |
+| `symbolu_training/training/conscious_generation/losses/auxiliary_loss_supervisor.py` | modify | Extend `AuxiliaryLossConfig` with five new fields: `lambda_level_discipline: float = 0.0` (overall weight) and the four sub-lambdas `w_cat`, `w_temp`, `w_claim_type`, `w_role`, `w_transfer` from §5.1. Extend `AuxiliaryLossSupervisor.forward(...)` to compute `L_level_discipline` from the `LevelDisciplineScorer.forward(...)` output dict per §5.1's formula, and add it to `L_total` gated by `lambda_level_discipline`. Extend the diagnostics dict with `weighted_level_discipline` and per-component breakdown, matching the existing `weighted_csr` / `weighted_vritti` pattern. | ~90 |
+| `symbolu_training/training/conscious_generation/curriculum/weight_scheduler.py` | modify | Register `lambda_level_discipline` and its per-component sub-lambdas as scheduled quantities, following the four-stage curriculum in §5.2. Add the Phase 2 → 3 hard gate on Dataset C inter-annotator agreement as a new gating condition on the existing `AdaptiveTrainingController`-style transition logic. | ~60 |
+| `scripts/train_mistral_cg.sh` | modify | Add `LAMBDA_LEVEL_DISCIPLINE=0.005` alongside the existing `LAMBDA_CSR=0.005`, `LAMBDA_VRITTI=0.005`, `LAMBDA_GUNA=0.005` constants (lines ~71–77). Pass `--lambda_level_discipline "$LAMBDA_LEVEL_DISCIPLINE"` on the training CLI (alongside the existing `--lambda_csr_token`, `--lambda_vritti_token`, `--lambda_guna_token` flags, lines ~225–231). Default remains `0.0` for any run that does not set the variable. | ~10 |
+| `agentic/agentic_framework/llm_adapters.py` | modify | Extend `MistralCGAdapter.call(...)` to populate a new `level_discipline` key on `self.last_cg_metadata` with the sub-dict specified in §3.6: `evidence_cat_level`, `evidence_temp_level`, `claim_cat_level`, `claim_temp_level`, `delta_cat`, `delta_temp`, `justification`, `risk`. The sub-dict is populated only when the underlying `MistralCGWrapper` was trained with `lambda_level_discipline > 0`; otherwise the key is absent, preserving backwards compatibility with existing consumers. | ~40 |
+| `agentic/agentic_framework/sovereign_bridge.py` | modify | Extend `signals_from_sovereign_state(...)` (the existing bridge from `last_cg_metadata` into the `SafetyGate` signal schema) to forward the `level_discipline` sub-dict when present. Existing callers that consume only entropy and vritti continue to work unchanged; callers that opt in to level discipline receive the new fields. | ~25 |
+| `tests/test_level_discipline_scorer.py` | **new** | Unit and integration tests for each of the four modules defined in §6.1 line 1, plus the integration test from §6.3.2 and the synthetic bias pathology tests from §6.3.3. Follows the existing `tests/test_crs_combined_scorer.py` naming and structure pattern. | ~400 |
+| `tests/test_level_discipline_construal_level.py` | **new** | The Construal Level Theory consistency test from §6.3.4. Held out from the main scorer unit test file because the stimuli corpus has external provenance and the test is fixture-heavy. | ~150 |
+| `symbolu_training/training/conscious_generation/data/level_discipline/__init__.py` | **new** | New package directory. Currently no `data/` subpackage exists under `conscious_generation/`; this is the first one, and subsequent dataset-labeling code for the scorer lives under it. | ~5 |
+| `symbolu_training/training/conscious_generation/data/level_discipline/dataset_a_categorical.py` | **new** | Dataset A labeling pipeline per §5.3: quantifier-presence rule pass, LLM-distillation harness, held-out evaluation against the expert-annotated dev set. Emits a JSONL of `(span, cat_label)` records. | ~300 |
+| `symbolu_training/training/conscious_generation/data/level_discipline/dataset_b_temporal.py` | **new** | Dataset B labeling pipeline per §5.4: tense / adverb rule pass, TimeBank / TimeML adapter, LLM-distillation harness. Emits a JSONL of `(span, temp_log_label)` records with the §2.2 landmark anchors documented in the rubric. | ~300 |
+| `symbolu_training/training/conscious_generation/data/level_discipline/dataset_c_justification.py` | **new** | Dataset C labeling pipeline per §5.5: expert seed harness, Cohen's kappa computation on the binary `justified?` label, LLM-distillation scaffold against the rubric, and verification against the held-out expert slice. Emits a JSONL of `(context, evidence_level, claim_level, claim_type, justified?, reason_code?)` records and a separate `kappa_report.json` for the curriculum gate in §5.2. | ~400 |
+| `docs/audits/LEVEL_DISCIPLINE_RESERVED_SLICE_ADR.md` | **new** | Architecture Decision Record that locks in the `Reserved[0..3]` allocation (§3.4 and §4.1) as a decision with an explicit "do not reinterpret these dimensions without a new ADR" clause. Matches the existing ADR-style pattern in `docs/audits/` (e.g. `STATE_PROJECTOR_READINESS_AUDIT.md`, `CRS_DOCTRINE_FREEZE.md`). | ~120 |
+
+The table gives 9 new files and 6 modified files, for a total of
+15 files touched. The modifications are all additive — no existing
+behavior is removed or renamed — and the new files are all in
+greenfield locations that do not collide with existing CG or
+`agentic_framework` modules.
+
+### 6.2 — Existing Interface Contracts That Must Remain Unchanged
+
+The changes above touch several interface surfaces that are already
+consumed by code outside the scorer's immediate neighborhood. Each
+such surface must remain backwards-compatible after the merge. This
+subsection enumerates the contracts and states the guarantee for
+each.
+
+| Interface | Backwards-compatibility guarantee |
+|---|---|
+| **`BaseLLMAdapter`** (`agentic/agentic_framework/llm_adapters.py`) | Unchanged. No new methods, no new required fields, no new required constructor arguments. The Level Discipline extension lives entirely inside `MistralCGAdapter`, which is a concrete subclass; non-CG adapters (`AnthropicAdapter`, mock adapters, any third-party implementers) are not affected. |
+| **`MistralCGAdapter.last_cg_metadata`** | Additive only. The existing keys (`state`, `delta_S`, `delta_bhava`, `intent_phase`, `vritti_gate_events`, `guna_gate_events`) continue to be populated exactly as before. The new `level_discipline` key is optional; it is present only when the underlying `MistralCGWrapper` was trained with `lambda_level_discipline > 0`, and consumers that do not check for it continue to work unchanged. The `signals_from_sovereign_state(...)` bridge defaults the field to absent when consumed by older callers. |
+| **CG training config (`AuxiliaryLossConfig`)** | Additive only. `lambda_level_discipline` defaults to `0.0`; the five sub-lambdas default to the §5.1 recommended starting values. A training run that does not explicitly set any of these produces bit-identical outputs to a pre-merge training run on the same checkpoint and the same data, because `L_level_discipline * 0.0 = 0` contributes no gradient to `L_total`. |
+| **CG training CLI (`scripts/train_mistral_cg.sh`)** | Additive only. The new `--lambda_level_discipline` flag defaults to `0.0` when unset, matching the default in `AuxiliaryLossConfig`. Existing invocations of `train_mistral_cg.sh` that do not export `LAMBDA_LEVEL_DISCIPLINE` produce bit-identical behavior to their pre-merge runs. |
+| **Existing CG checkpoints** | Must load without modification. The new `LevelStateHead`, `LevelClassifierHead`, `JustificationHead`, and `LevelDisciplineScorer` module weights are absent from old checkpoints; the loader instantiates them with default initialization (small random weights for the linear projections, zero for the biases). With `lambda_level_discipline = 0.0` as the default, these fresh weights receive no gradient and never affect the `Reserved[0..3]` slice in a way that the rest of the CG stack reads. Output parity against pre-merge inference is preserved until a new training run is explicitly started with a non-zero lambda. |
+| **`SovereignStateProjector` forward signature** | Unchanged from the caller's perspective. The projector continues to accept the same hidden input and return the same 32-D state tensor. Internally, the `level_state_head` sub-module is called only when it is attached; when absent, the forward pass falls through to the pre-existing zero-initialized Reserved slice behavior. No existing caller needs to change to accommodate the new code path. |
+| **`MistralCGWrapper.forward(...)`** | Unchanged shape and keys on the existing outputs. The Level Discipline Scorer's forward output dict (§4.6) is attached as a new entry `cg_outputs["level_discipline"]` when the scorer is active, and is absent otherwise. Training-loop code that consumes `cg_outputs["csr"]`, `cg_outputs["vritti"]`, etc. is unaffected. |
+| **Agentic Framework `SafetyGate` / `SafeMCPGateway`** | Unchanged runtime contract. These consumers already read a dict of signals from `signals_from_sovereign_state(...)`; the new `level_discipline` signals are additive fields in that dict. Existing gate logic that conditions on entropy or vritti alone continues to produce the same decisions; gate logic that opts in to level-discipline signals is new code written on the consumer side, not a rewrite of existing code. |
+
+The net effect of these guarantees is that the Level Discipline
+Scorer can be merged into `mistral_cg` with `lambda_level_discipline
+= 0.0` as the default, and the entire rest of the CG and Agentic
+Framework stack — including existing training runs, existing
+checkpoints, existing CLI invocations, existing governed agents —
+is guaranteed to produce identical behavior to its pre-merge state.
+The scorer becomes active only when an operator explicitly sets
+`lambda_level_discipline > 0` in a fresh training run or opts into
+the `level_discipline` governance signals in a fresh consumer.
+
+### 6.3 — Test Suite Additions
+
+The test suite for the scorer is split into four categories, each
+with a named target file under `tests/`, a naming pattern matching
+the existing `tests/test_crs_combined_scorer.py` convention, and at
+least one representative test case documented below. Every test is
+a specification target — the pass criteria are concrete and
+measurable, not aspirational.
+
+**1. Unit tests per module.** Target file:
+`tests/test_level_discipline_scorer.py`, organized with one pytest
+class per module from Step 4 (`TestLevelClassifierHead`,
+`TestJustificationHead`, `TestLevelStateHead`,
+`TestLevelDisciplineScorer`). Each class covers four properties:
+
+- *Shape correctness.* Random input of shape `[B, T, hidden_dim]`
+  produces output tensors of the shapes documented in §4.3–§4.6.
+- *Gradient flow.* A loss constructed as a weighted sum of the
+  outputs produces non-zero gradients on every trainable parameter
+  of the module, with no `NaN` or `Inf` gradients on any parameter.
+- *Determinism under seed.* Two forward passes with
+  `torch.manual_seed(0)` and identical inputs produce bitwise
+  identical outputs.
+- *No NaN outputs on random finite input.* The output dict keys
+  listed in §4.6 contain no `NaN` or `Inf` values on random
+  `[B, T, hidden_dim]` input drawn from a standard normal, *after*
+  the `LevelStateHead` first-commit branch has been triggered.
+  (Uncommitted-slot `NaN`s in `new_reserved` are expected and
+  intentional — see §4.1 — and the test asserts their presence on
+  pre-commit positions and their absence on post-commit positions.)
+
+Representative test case — `LevelStateHead._ema_update` first-commit
+branch:
+
+> Given `prev = torch.tensor([float('nan'), float('nan')])`,
+> `new = torch.tensor([2.3, 1.7])`, and
+> `alpha = torch.tensor([0.4, 0.1])`, with
+> `first_commit_threshold = 0.25`, the expected output is
+> `[2.3, nan]` — the first slot commits because `0.4 ≥ 0.25`, the
+> second stays `NaN` because `0.1 < 0.25`.
+
+**2. Integration test — `Reserved[0..3]` update semantics.** Same
+target file, new pytest class `TestReservedSliceIntegration`. One
+test feeds a synthetic 20-token sequence hand-crafted so that
+tokens 1–5 have strong evidence role (`p_e ≈ 0.9`), tokens 6–10
+have strong claim role (`p_c ≈ 0.9`), and tokens 11–20 are filler
+(`p_n ≈ 0.9`). The test runs `LevelDisciplineScorer.forward(...)`
+on this sequence and asserts:
+
+- `new_reserved[0..4, 0:2]` transition from `NaN` at position 0 to
+  finite values by position 5 (the evidence pair commits during the
+  evidence run).
+- `new_reserved[5..9, 2:4]` transition from `NaN` at position 5 to
+  finite values by position 10 (the claim pair commits during the
+  claim run).
+- `new_reserved[10..19, :]` drifts by less than `0.1` per position
+  in absolute value on both the categorical and temporal axes
+  (filler tokens barely change the state).
+- The soft EMA blend is numerically verified: for position 4, the
+  value of `new_reserved[4, 0]` equals
+  `(1 - alpha_e) * new_reserved[3, 0] + alpha_e * soft_cat_level(cat_logits[4])`
+  within `1e-5`.
+
+**3. Synthetic bias pathology tests.** Target file:
+`tests/test_level_discipline_scorer.py`, new pytest class
+`TestBiasPathologyPairs`. Hand-build roughly 50 paired examples
+following the §2.4 template: the *same logical claim* stated at
+two different grid cells, typically `I·N` (the grounded version)
+and `U·E` or `P·H` (the bias-hiding version). Examples to include:
+
+- The three §2.4 paired examples verbatim (colonialism / markets /
+  progress) — three pairs.
+- Analogous pairs drawn from healthcare, hiring, criminal justice,
+  and environmental policy, covering the full §2.8 pathology table.
+
+For each pair, the test asserts that the scorer assigns a *higher*
+`risk` to the high-zoom version than to the `I·N` version — i.e.,
+the transfer-penalty ordering matches the human-labeled bias-hiding
+ordering. **Success target:** `≥ 80%` directional agreement across
+the full test set, with failures logged to a dev-readable
+diagnostic for rubric review.
+
+**4. Construal Level Theory consistency test.** Target file:
+`tests/test_level_discipline_construal_level.py`. Use `20 – 50`
+stimuli adapted from published Construal Level Theory studies
+(Trope and Liberman, 2003 and follow-ups) where the
+psychological-distance prediction is known from the literature.
+The test runs the scorer on each stimulus, extracts `delta_temp`
+from the output dict, and computes Pearson correlation against
+the published distance prediction. **Success target:** Pearson
+`r ≥ 0.5` on the pilot set — explicitly a soft target, because
+the scorer is trained on different data than the CLT stimuli and
+the published predictions themselves have effect-size uncertainty.
+A correlation below `0.3` is a flag to investigate the temporal
+regressor's domain coverage; a correlation between `0.3` and `0.5`
+is allowed to ship with a documented caveat.
+
+All four test categories are expected to be green for the Step 6
+integration to be considered landed. Failure in (1) or (2) blocks
+the merge; failure in (3) or (4) blocks curriculum advancement per
+§6.5, but does not block the initial merge with
+`lambda_level_discipline = 0.0`.
+
+### 6.4 — Validation Plan and Success Criteria
+
+The validation plan is four tests, ordered from easiest to hardest.
+Each has an explicit success target, and each is the evidence basis
+for one or more of the curriculum graduation gates in §6.5. These
+are targets, not current results — the scorer is a proposed
+addition, and these numbers define what "proposed" must become
+before it is promoted to an active training signal at each stage.
+
+**Test 1 — Synthetic level classification.** Hand-build roughly
+`200` sentences for each of the four categorical levels
+(`I`, `G`, `P`, `U`) and roughly `200` sentences for each of the
+five temporal landmarks (`N`, `S`, `L`, `H`, `E`). Train the
+classifier and temporal heads on Datasets A and B (§5.3, §5.4),
+then evaluate on this synthetic held-out set.
+
+- **Success target — categorical:** `≥ 85%` top-1 accuracy on the
+  4-way `{I, G, P, U}` task.
+- **Success target — temporal:** `RMSE ≤ 1.0` on the log-seconds
+  regression target. One log-decade is roughly an order of
+  magnitude on the temporal axis; the target says the head must
+  be within "the right order of magnitude" on typical held-out
+  input.
+- **Failure mode to check:** If the categorical head hits the
+  accuracy target but the `I` vs `G` confusion dominates the error
+  rate, the implicit-generics problem from §5.3's caveat has
+  materialized and the Dataset A bootstrap needs a targeted LLM
+  distillation pass on generic constructions.
+
+**Test 2 — Transfer detection on synthetic bias pathologies.** Use
+the ~50 paired examples from §6.3.3. Run the scorer on each pair
+and record the ordering of `risk` scores between the `I·N` and
+high-zoom members.
+
+- **Success target:** `≥ 80%` directional agreement — the
+  transfer-penalty ordering matches the human-labeled bias-hiding
+  ordering in at least 80% of pairs. This is a soft target; the
+  `20%` tolerance reflects the irreducible ambiguity of some
+  pairs and the inherent noise of a small test set.
+- **Failure mode to check:** If directional agreement is below
+  `50%`, the scorer's `risk` ordering is worse than chance on the
+  test set — which either means `JustificationHead` has not
+  converged (Phase 3 is not complete), or the rubric the test
+  pairs were labeled against is inconsistent with the rubric the
+  scorer was trained against. Both are recoverable; neither is
+  silent.
+
+**Test 3 — Ablation eval against the existing CG training corpus.**
+Run the full `mistral_cg` training loop on WikiText-103 (the
+existing CG ablation corpus used by
+`symbolu_training/training/conscious_generation/ablation/runner.py`)
+under two configurations, with all other hyperparameters held
+fixed:
+
+- *A — baseline:* `lambda_level_discipline = 0.0`. The scorer is
+  in the graph but produces no gradient.
+- *B — classifier-only:* `lambda_level_discipline = 0.005` with
+  the Phase 2 curriculum (classifier losses only, `w_transfer = 0`).
+
+Measure token-level cross-entropy and validation perplexity on
+the held-out WikiText-103 validation split across matched step
+counts.
+
+- **Success target:** configuration B is **neutral-to-positive**
+  relative to configuration A — `PPL(B) ≤ PPL(A) + epsilon`, with
+  `epsilon` set to the run-to-run noise floor of the existing CG
+  ablation corpus (typically within `±0.5` PPL). The new signal
+  must not degrade the language-modeling quality of the base
+  task.
+- **Secondary measurement:** the diagnostics dict's
+  `weighted_level_discipline` component should decrease over
+  training, indicating the four classifier heads are converging
+  on their supervised targets.
+- **Failure mode to check:** if `PPL(B) > PPL(A) + epsilon`,
+  either one of the sub-lambdas is too high (roll back `w_cat`,
+  `w_temp`, `w_claim_type`, `w_role` toward zero in the order
+  most correlated with the regression), or `lambda_level_discipline`
+  itself is too high for Phase 2 (halve it and re-run). The
+  curriculum remains in Phase 2 until this test clears.
+
+**Test 4 — External bias benchmarks.** Evaluate the scorer's
+governance readout (the `delta_cat`, `delta_temp`, `justification`,
+and `risk` fields in `last_cg_metadata["level_discipline"]`) on
+three external benchmarks:
+
+- **BBQ** (Bias Benchmark for QA) — Parrish et al., 2022.
+- **StereoSet** — Nadeem et al., 2020.
+- **WinoBias** — Zhao et al., 2018.
+
+For each benchmark, evaluate whether the scorer's signals correlate
+with the benchmark's labeled bias cases. Specifically, for each
+example compute the scorer output over the example's tokens, take
+the maximum `risk` across the example, and compute Spearman
+correlation against the benchmark's binary or continuous bias
+label.
+
+- **Success target:** a measurable correlation `Spearman ρ ≥ 0.3`
+  on **at least one** of the three benchmarks.
+- **Explicit honest caveat:** These three benchmarks were
+  designed for a different definition of bias than the one this
+  scorer uses. BBQ tests whether the model's final answer changes
+  when demographic attributes in the prompt change; StereoSet
+  tests whether the model's stereo-typical completions are
+  preferred over non-stereotypical ones; WinoBias tests whether
+  coreference resolution is affected by stereotype-consistent
+  pronoun binding. None of them directly tests whether a claim
+  has been transferred between ontological zoom levels without
+  justification — which is the specific thing this scorer
+  measures. A perfect score on these benchmarks is therefore
+  *neither expected nor desired*, because a perfect score would
+  indicate the scorer is collapsing to a different definition of
+  bias than the one it was designed around. The target of
+  `ρ ≥ 0.3` on at least one benchmark is the weakest credible
+  claim — a loose alignment with existing bias literature — and
+  the scorer's *primary* validation remains Test 2 (synthetic
+  pathology pairs) and Test 1 (level classification accuracy),
+  which test the framework directly.
+
+A higher correlation on BBQ, StereoSet, or WinoBias is a welcome
+signal that the framework aligns with some of the existing bias
+literature; a lower or negative correlation is not a failure of
+the scorer but an indication that level-transfer discipline and
+demographic-swap invariance are measuring distinct things — which
+is consistent with the Step 2 framing.
+
+### 6.5 — Graduation Criteria Between Curriculum Phases
+
+Step 5 defined the four-stage curriculum and the conditions under
+which each phase transition is permitted. Step 6 restates those
+conditions as concrete measurable quantities and identifies which
+test from §6.4 produces the relevant measurement. Every gate is a
+quantity the training loop or the validation harness can read at
+transition time — no subjective judgment is on the critical path.
+
+| Curriculum transition | Gating condition | Measured by |
+|---|---|---|
+| **Phase 1 → Phase 2** | `5000` training steps elapsed; base LM loss stable (within `±epsilon_lm` of its rolling mean over the last `1000` steps). | Standard training diagnostics — the existing `AdaptiveTrainingController` already exports the rolling mean. |
+| **Phase 2 → Phase 3** | `L_cat`, `L_temp`, `L_claim_type`, and `L_role` have all converged (each within `±epsilon_aux` of its rolling mean over the last `1000` steps); **and** Dataset C's binary `justified?` label has achieved `≥ 0.7` Cohen's kappa on a held-out expert-labeled set of at least `200` examples. | **Test 1** (classifier convergence on the synthetic held-out set) **plus Dataset C audit** (`kappa_report.json` emitted by `dataset_c_justification.py` from the §6.1 table). |
+| **Phase 3 → Phase 4** | No PPL regression over the last `5000` steps of Phase 3 (`PPL` delta within the run-to-run noise floor); **and** Test 2 directional agreement `≥ 80%` on the synthetic bias pathology pairs. | **Test 3** (ablation PPL measurement, now with `w_transfer > 0` so the transfer component is active) **plus Test 2** (pathology-pair ordering). |
+| **Phase 4 raise (`0.005 → 0.01`)** | Test 3 shows a neutral-to-positive PPL delta at the Phase 4 lambda; **and** Test 4 shows `Spearman ρ ≥ 0.3` on at least one of BBQ, StereoSet, or WinoBias. | **Test 3** (under the raised lambda) **plus Test 4** (external-benchmark correlation). |
+
+Two properties of this gating scheme are worth stating explicitly:
+
+1. **Every gate is a quantity that a script can compute.** There is
+   no "engineer reviews and approves" step on the critical path.
+   The `AdaptiveTrainingController` reads the training-loop
+   diagnostics, the ablation runner reads Test 3's PPL delta, the
+   pathology harness reads Test 2's directional agreement count,
+   and the dataset audit reads `kappa_report.json`. A phase
+   transition is either permitted or it isn't, and the decision
+   is auditable after the fact.
+2. **A gate that does not clear holds the training loop in the
+   current phase indefinitely.** The curriculum does not advance
+   on step count alone; a step-count target that is reached
+   without the gate clearing holds the loop in the current phase
+   until the gate does clear. This is the same behavior the
+   existing `AdaptiveTrainingController` already has for the other
+   CG auxiliary losses, and the Level Discipline Scorer inherits
+   it without modification. The specific case that matters most is
+   the Dataset C kappa gate: if annotator agreement never reaches
+   `0.7`, Phase 3 never begins and the scorer ships in
+   classifier-only mode, which is a graceful degradation of the
+   design rather than a broken training run.
+
+The gates in the table are intentionally tied to §6.4's four tests,
+not to new quantities invented here, because every new measurement
+is another surface that can be wrong or gamed. Keeping the
+validation plan and the graduation criteria on the same test set
+reduces the risk that the curriculum advances on a metric that
+looks good on paper but that the §6.4 validation does not actually
+cover.
+
+### 6.6 — What Step 6 Establishes
+
+Step 6 fixes the integration and validation contract that Steps 7
+and 8 can now build on:
+
+- **Every integration point is a named file and a named change.**
+  The §6.1 table lists `9` new files and `6` modified files for
+  a total of `15` files touched, with a one-line description of
+  what changes in each and a rough size estimate. Two file-path
+  assumptions from earlier drafts were verified against the repo
+  and corrected: `SovereignStateProjector` lives in
+  `symbolu_training/jepa/state_projector.py`, and
+  `MistralCGAdapter` lives in
+  `agentic/agentic_framework/llm_adapters.py`.
+- **No existing interface is broken.** Every change in §6.2 is
+  additive: new optional config keys default to `0.0`, new
+  governance-readout fields are absent unless the scorer is
+  trained with a non-zero lambda, and existing CG checkpoints
+  continue to load and produce bit-identical outputs under the
+  default configuration.
+- **Test coverage spans four categories.** Unit tests per module,
+  an integration test for `Reserved[0..3]` update semantics, a
+  synthetic bias pathology test on hand-built paired examples,
+  and a Construal Level Theory consistency test against adapted
+  published stimuli. Each category has a target file, at least
+  one representative test case, and a concrete pass criterion.
+- **Each curriculum phase transition has a concrete measurable
+  gate.** The §6.5 table binds every Phase N → Phase N+1
+  transition to specific quantities produced by the §6.4 tests or
+  by standard training diagnostics. No phase transition depends
+  on subjective judgment, and no gate is checked in a place the
+  validation harness does not already cover.
+- **Steps 7 and 8 can now address what these tests might not
+  catch.** The validation plan in §6.4 measures everything the
+  design can measure; Step 7 enumerates the research risks that
+  fall *outside* that envelope (the things a green test suite
+  does not guarantee), and Step 8 is the honest-scope wrap-up
+  that binds the whole document to what the scorer does and does
+  not claim.
+
+---
+
+*Step 6 complete.*
