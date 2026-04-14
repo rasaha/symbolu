@@ -1,6 +1,6 @@
 # Neural Cloud Scaling Controller — VC Brief
 
-**A three-page introduction for investors**
+**A four-page introduction for investors**
 **Where we are:** Stage 4 complete — shadow mode and recommend mode are production-ready today.
 
 ---
@@ -125,7 +125,38 @@ Think of cloud autoscaling as an 8-layer stack — from raw metric sensing at th
 
 ---
 
-## Page 3 — What We've Proven and What's Next
+## Page 3 — Competitive Landscape: Who We're Standing Next To
+
+### The crowded part of the stack, and the empty part
+
+Cloud autoscaling tooling has gotten genuinely good over the last five years. Node provisioning is solved. Cost optimization is solved. Prediction is solved. Observability is overflowing. What *isn't* solved — and what almost nobody is even looking at — is whether any of those decisions actually worked after the fact. That's the question we ask, and it's the reason we don't fit neatly into any of the buckets a platform team will already recognize.
+
+The table below places us against the tools we get compared to in investor conversations and SRE channels. For each one, we say *what they do well*, *how we differ*, and *why that difference is actually an advantage* rather than a positioning game.
+
+| Category | Representative players | What they ship | How we differ — and why we're better |
+|---|---|---|---|
+| **Reactive autoscalers** | Kubernetes HPA, KEDA, AWS Auto Scaling | Threshold- or event-driven rules that compute a scaling action from current metrics. Clean, fast, built-in. | HPA and KEDA are brilliant at computing *intent to scale*. Neither one ever looks back to ask whether the last action helped. **Better because:** we are the feedback loop they don't have. HPA keeps producing `raw_delta`; we observe whether the last `raw_delta` did any good and filter the next one if the evidence says no. A cluster running HPA can turn us on in shadow mode with zero configuration changes to HPA itself. |
+| **Node provisioning** | Karpenter (AWS), Cluster Autoscaler, Azure AKS autoscaler | Just-in-time node materialization, bin-packing, instance-type selection. The part that turns a replica-count delta into actual compute. | Karpenter answers *"how do we materialize the scale decision?"*. We answer *"should the scale decision be made at all?"*. Different layers, different questions. **Better because:** every futile scale-out we catch is a Karpenter provisioning event that never needs to run. The savings compound: no extra replica cost, no extra node cost, no extra provisioning churn, no extra scheduling noise downstream. We make Karpenter's job smaller, not harder. |
+| **Cost optimization / FinOps** | Cast AI, Kubecost, Spot.io (NetApp Spot), StormForge | Pick cheaper instance types, surface overprovisioning, right-size requests/limits, negotiate spot and reserved pricing. | These tools make the decisions you already made *cheaper*. We question whether the decision should have been made. **Better because:** a scale-out that never happens is 100% cheaper than any rightsizing can make it. Our savings stack on top of Cast AI / Kubecost / Spot — a cluster running all four sees the L4 decision-quality cut *first*, then the L2 cost optimization applied to whatever is left. The economics compose; they don't conflict. |
+| **Predictive autoscaling** | ScaleOps, Google Vertical Pod Autoscaler's predictive mode | ML-driven load forecasting. Pre-scales for known diurnal, seasonal, and bursty workloads. | Prediction answers *"what will the load be?"*. We answer *"given the signal we're seeing, should we take the action the controller wants?"*. Prediction is excellent when the problem is a load problem — but when the root cause isn't load (upstream failure, noisy metrics, flaky probe, conflicting signals), a confident prediction makes things worse, not better. **Better because:** we compose with prediction cleanly. ScaleOps tells the controller what's coming; we verify whether the actions taken in response actually helped. Prediction + feedback is strictly stronger than prediction alone. |
+| **Observability / AIOps** | Datadog, New Relic, Dynatrace, Grafana Cloud | Anomaly detection, alert correlation, incident summarization, dashboards. Some early "suggest an action" surfaces. | Observability vendors watch the system and *tell humans* what's wrong. We sit *inside* the control loop and stop bad actions before they ship. **Better because:** we are a closed-loop controller, not an alerting surface. Observability tools make incidents legible after the fact; we prevent one of the specific incidents — runaway scale-out under futile conditions — from happening in the first place. An SRE team using Datadog for visibility and us for control is using each tool for what it's actually good at. |
+| **In-house SRE tooling** | Bespoke Slack bots, on-call runbooks, custom HPA wrappers each team writes in-house | *"When HPA fires five times in a row and nothing's improving, page me and we'll look at it."* Every mature SRE team has eventually written some version of this. | We are that runbook — minus the human in the middle, minus the ambiguity about exactly when to fire, minus the 228+ unit tests each team rewrites from scratch. **Better because:** the product is off-the-shelf, ablation-validated, safety-constrained by construction, and production-grade today. SRE teams get back the time they were spending babysitting the autoscaler, and they get to spend it on actual incidents instead. The bespoke runbook stops being a bus factor. |
+
+### Why the overall bet is better, not just different
+
+- **We occupy a layer nobody else is in.** Every competitor in the table above operates at L0–L3 (sensing, provisioning, cost, prediction) or at L5–L7 (safety bounds, observability, governance). **Layer 4 — decision quality — is empty in the market.** We are the first tool in this space whose entire purpose is to ask *"did the last action actually work, and if not, should we really do it again?"*.
+- **We wrap, we don't replace.** HPA stays. Karpenter stays. Cast AI stays. ScaleOps stays. Datadog stays. The platform team installs us in shadow mode with zero write permissions — no configuration changes to any other tool in the stack, no midnight cutover, no vendor migration. This is a strictly additive product, which is the opposite of how every other FinOps vendor enters a new customer.
+- **Safety by construction.** 19 adversarial scenarios, **zero catastrophic failures, zero severe failures, zero SLO regressions, zero false positives**. The guard can only say "no" to a scale-out — it can never say "yes" to an action the controller wasn't already going to take. That's a property no learned AIOps system can claim, and it's why we can ship on a Tuesday without a change-management committee and a six-week pilot.
+- **Proof-of-value is free.** Shadow mode runs read-only, auto-generates proof-of-value reports, and costs the customer nothing to try. A platform team can turn us on, watch for two weeks, and see exactly what we *would* have saved them — without adopting any dependency, signing any contract, or taking any production risk. No other tool in this space offers that kind of zero-commitment trial, because no other tool can: they all have to write something to work.
+- **The economics compose.** Every other vendor in the table saves money by making the thing you're already doing cheaper or faster. We save money by *not doing the thing*. A scale-out that doesn't happen is 100% cheaper than any rightsizing, spot-instance swap, or bin-packing optimization can ever make it — and those savings are additive to whatever the rest of your stack is already doing.
+
+### In one sentence
+
+Every other tool in this market either **scales you faster** (HPA, Karpenter, KEDA), **scales you cheaper** (Cast AI, Kubecost, Spot), **predicts what to scale** (ScaleOps), or **tells you when you scaled wrong after the fact** (Datadog, New Relic). We're the only one that **stops the wrong scale-out from shipping in the first place** — and we do it as a wrap around the stack you already have, not as a replacement for anything in it.
+
+---
+
+## Page 4 — What We've Proven and What's Next
 
 ### 19 adversarial scenarios, and what happened
 
