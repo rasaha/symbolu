@@ -659,3 +659,743 @@ validation plan (§6), and research risks (§7).
 ---
 
 *Step 3 complete.*
+
+---
+
+## Step 4 — State Layout and Module Definitions
+
+This section turns the architectural commitments locked in by Step 3
+into a concrete module contract that the rest of the design (training
+signal, data requirements, integration, validation) can build on. It
+defines the exact layout of the `Reserved 4D` slice, the update
+semantics that move state from one token to the next, and the four
+PyTorch modules the scorer is composed of: `LevelClassifierHead`,
+`JustificationHead`, `LevelStateHead`, and the top-level
+`LevelDisciplineScorer`. All Python in this section is specification,
+not implementation — every code block is marked as a sketch.
+
+### 4.1 — `Reserved[0..3]` State Layout in Detail
+
+Step 3.4 fixed the placement: the four floats of the previously unused
+Reserved slice now hold evidence-level and claim-level tracking across
+the sequence. This subsection specifies what each dimension holds, its
+dtype and initial value, and how it survives the existing checkpoint
+and serialization path without breaking bit-parity with the current
+`SovereignStateProjector`.
+
+| Dim | Field | Range | Dtype | Initial value |
+|---|---|---|---|---|
+| `Reserved[0]` | `evidence_categorical_level` | continuous in `[0, 3]` | `float32` | `NaN` |
+| `Reserved[1]` | `evidence_temporal_level`    | continuous log-seconds, unbounded | `float32` | `NaN` |
+| `Reserved[2]` | `claim_categorical_level`    | continuous in `[0, 3]` | `float32` | `NaN` |
+| `Reserved[3]` | `claim_temporal_level`       | continuous log-seconds, unbounded | `float32` | `NaN` |
+
+**Why `NaN`, not a numeric sentinel.** A numeric sentinel (e.g. `-1.0`
+for the categorical dimensions, `-100.0` for the log-seconds
+dimensions) is in principle valid, but it is not safe: every numeric
+sentinel is also a legitimate value the regression heads could output
+on some input, and a downstream consumer that forgets the sentinel
+convention silently treats the sentinel as a real measurement. `NaN`
+is structurally distinguishable from every legitimate output of the
+classifier and temporal heads, so "never written" is unambiguous to
+every reader of the slice. The operational cost — that `NaN`
+propagates through arithmetic and gradient paths if read naively — is
+paid once, in `LevelStateHead`, by gating every read with a
+`torch.isnan(...)` mask before the value enters any differentiable
+computation (see §4.5). The alternative, a sentinel plus an
+out-of-band validity flag, would require allocating a fifth Reserved
+dimension the slice does not have.
+
+**First-evidence-token overwrite.** On the first token whose role
+classifier assigns evidence probability above a configurable
+`first_commit_threshold`, the `LevelStateHead` update rule writes the
+current token's classifier output directly into `Reserved[0..1]`,
+replacing the `NaN` prior. From the second such token onward, the
+standard EMA blend of §4.2 takes over. The same rule applies
+symmetrically to the `claim` role and `Reserved[2..3]`. This means
+the slice is `NaN` at sequence start and remains `NaN` until the model
+itself decides a token is acting as evidence (or as a claim) with
+sufficient confidence; it never holds a value the model did not put
+there, and an under-confident filler token cannot accidentally commit
+a near-random level into an uncommitted slot.
+
+**Serialization and bit-parity.** The Reserved slice is *per-sequence*
+state, recomputed on every forward pass; it is not a saved model
+parameter. The persisted artifacts are the new module weights —
+`LevelClassifierHead`, `JustificationHead`, `LevelStateHead`, and
+`LevelDisciplineScorer` — which are added as new submodules of the
+existing `SovereignStateProjector` and the `mistral_cg` model graph.
+Bit-parity with existing checkpoints is preserved by two rules:
+
+1. The existing Bhava / Kosha / Vritti / Guna projection paths inside
+   `SovereignStateProjector` are not modified — they produce the same
+   28 dimensions they did before, from the same weights they did
+   before, bit-for-bit.
+2. When the new modules are absent from a checkpoint, the loader
+   instantiates them with their default initialization and the
+   training configuration sets `lambda_level_discipline = 0`, so the
+   Reserved slice is written with values that the rest of the CG
+   stack does not read. No existing scorer or adapter depends on the
+   contents of `Reserved[0..3]`, so whatever is written there cannot
+   cause a behavioral diff against an old checkpoint as long as the
+   loss weight is zero.
+
+The bit-parity guarantee is therefore: *under
+`lambda_level_discipline = 0`, an old checkpoint loaded into a binary
+that contains the new modules produces identical Bhava / Kosha /
+Vritti / Guna outputs and identical `lm_head` logits, on every input,
+to the same checkpoint loaded into a binary that does not contain the
+new modules.*
+
+### 4.2 — Update Semantics: Evidence Role vs Claim Role
+
+The core operational question of the scorer is: for the current token,
+is this token *establishing evidence*, *making a claim*, or *neither*?
+The first case updates the evidence pair `Reserved[0..1]`, the second
+updates the claim pair `Reserved[2..3]`, and the third leaves both
+pairs essentially untouched.
+
+**3-way role classifier, not 2-way.** The role head in
+`LevelClassifierHead` (see §4.3) is a 3-way classifier over
+(`evidence`, `claim`, `neither`), not a 2-way classifier over
+(`evidence`, `claim`). A 2-way head would be forced to assign every
+token to one of the two content roles, which is empirically wrong:
+most tokens in natural language are syntactic glue, transitions,
+function words, or in-progress phrases that are neither
+evidence-establishing nor claim-making. Forcing them into evidence or
+claim would inject noise into the Reserved slice at every token. The
+explicit `neither` class lets the soft update have near-zero magnitude
+on filler tokens — both `p_evidence` and `p_claim` are small — and
+recovers the 2-way distinction only where it is meaningful. The 3-way
+split is also closer to how the labeling task can actually be
+specified to human annotators: see Step 5.
+
+**Soft EMA blend, not hard switching.** Let
+`(p_e, p_c, p_n) = softmax(role_logits)` for the current token, and
+let `cat` and `temp` be the soft-argmax categorical level and the
+continuous temporal regressor output of `LevelClassifierHead` for the
+same token. Let `beta` be a fixed update-rate hyperparameter (initial
+value `0.5`, calibrated in Step 5). The update rule for the evidence
+dimensions is:
+
+```
+alpha_e            = beta * p_e
+new_evidence_cat   = (1 - alpha_e) * old_evidence_cat  + alpha_e * cat
+new_evidence_temp  = (1 - alpha_e) * old_evidence_temp + alpha_e * temp
+```
+
+and symmetrically for the claim dimensions, gated by `p_c`:
+
+```
+alpha_c            = beta * p_c
+new_claim_cat      = (1 - alpha_c) * old_claim_cat     + alpha_c * cat
+new_claim_temp     = (1 - alpha_c) * old_claim_temp    + alpha_c * temp
+```
+
+Three properties of this rule are load-bearing:
+
+1. **Gradient flow is preserved.** No `argmax`, no hard branching on
+   the role decision, no straight-through estimator. The role
+   probabilities, the soft-argmax categorical level, and the temporal
+   regressor are all differentiable, and the new state is a
+   differentiable function of the old state and the current token's
+   classifier outputs. Backpropagation through the EMA chain works
+   the same way it works in any sequential recurrent update.
+2. **Filler tokens are near-no-ops.** When `p_n` dominates, both
+   `alpha_e` and `alpha_c` are small, the new state is approximately
+   the old state, and the slice drifts slowly. This is the correct
+   inductive bias: most tokens are not making epistemic moves.
+3. **Confident evidence does not erase history.** Even when
+   `p_e ≈ 1`, `alpha_e = beta < 1`, so a single confident evidence
+   token updates the running evidence state by at most `beta` of the
+   way toward the current classification. The state retains memory
+   of earlier evidence tokens. `beta` is the knob that controls how
+   quickly evidence is allowed to be replaced; it is intentionally
+   exposed as a hyperparameter, not hard-coded.
+
+**Boundary conditions.**
+
+- *First token of a sequence.* Both slots are `NaN`. `LevelStateHead`
+  treats `NaN` as "uncommitted" and triggers a first-commit branch:
+  if `alpha` (= `beta * p_role`) exceeds a `first_commit_threshold`
+  hyperparameter, the slot is written directly with the current
+  token's classifier output (`new`); otherwise the slot stays `NaN`
+  until a more confident token arrives. The initial recommended
+  threshold is `beta * 0.5`, i.e., commit on a `NaN` slot only when
+  the role classifier assigns `p_role > 0.5`.
+- *Claim token arriving before any evidence token.* `Reserved[0..1]`
+  are still `NaN`. The claim update fires normally and writes
+  `Reserved[2..3]`, but the transfer-magnitude computation in
+  `LevelDisciplineScorer` (§4.7) reads `Reserved[0..1]`, sees `NaN`,
+  and short-circuits the risk to zero for this token. This is the
+  epistemically correct interpretation: an unsupported claim made
+  before any evidence has been established is not a *transfer*
+  between levels, and the scorer does not flag it as one. Step 5
+  specifies a separate auxiliary term that penalizes claims with no
+  evidence basis; it is orthogonal to the transfer-risk term and
+  lives in a different part of the loss.
+- *Role classifier uncertain.* If `p_e ≈ p_c ≈ p_n ≈ 1/3`, both
+  `alpha_e` and `alpha_c` are around `beta/3 ≈ 0.17`, both fall
+  below the first-commit threshold, and the behavior splits cleanly:
+  uncommitted slots stay `NaN`, committed slots drift very slowly.
+  This is the desired behavior — the scorer does not commit the
+  slice on tokens where the role is ambiguous, and later confident
+  tokens dominate the running average.
+
+**Causal-mask interaction.** The update is autoregressive: the new
+state at position `t` is a function of the prior state (the state
+written at position `t - 1`) and the classifier outputs at position
+`t`. The transfer-magnitude and risk computations at position `t`
+read the *new* state at `t` and compare its evidence pair to its
+claim pair; both pairs were constructed from positions `≤ t`, so
+causality is preserved. In a parallel forward-pass implementation
+this is realized either by an explicit sequential scan over positions
+or by a cumulative-blending / parallel-prefix reformulation that
+produces identical outputs; the design fixes only the semantics, not
+the implementation strategy. What is fixed is that no token may read
+state derived from positions strictly greater than its own —
+`LevelStateHead` must be implemented such that position `t`'s state
+depends only on positions `1..t`.
+
+### 4.3 — `LevelClassifierHead` Module Definition
+
+`LevelClassifierHead` is a small multi-task head that runs on the
+shared hidden representation and produces, for every token, the four
+classifications the rest of the scorer consumes: categorical level,
+temporal level (continuous regression), claim type, and
+evidence/claim/neither role. Each task has its own linear projection
+from the hidden state; there is no shared trunk beyond the backbone
+hidden itself. The four projections are independent so that the
+auxiliary loss in Step 5 can weight each task separately without
+entangling their gradients.
+
+**[SKETCH — specification, not implementation]**
+
+```python
+import torch
+import torch.nn as nn
+from typing import Tuple
+
+
+class LevelClassifierHead(nn.Module):
+    """Per-token multi-task classifier for ontological zoom level.
+
+    Produces four outputs for every token in the sequence:
+
+      - categorical level over (Individual, Group, Population, Universal)
+      - temporal level as a continuous log-seconds scalar
+      - claim type over (descriptive, statistical, interpretive,
+                         normative, universal_constraint)
+      - evidence / claim / neither role
+
+    Each task is a single linear projection from the hidden state.
+    The four projections are independent; there is no shared trunk
+    beyond the backbone hidden representation itself.
+    """
+
+    def __init__(self, hidden_dim: int) -> None:
+        super().__init__()
+        self.categorical: nn.Linear = nn.Linear(hidden_dim, 4)
+        self.temporal:    nn.Linear = nn.Linear(hidden_dim, 1)
+        self.claim_type:  nn.Linear = nn.Linear(hidden_dim, 5)
+        self.role:        nn.Linear = nn.Linear(hidden_dim, 3)
+
+    def forward(
+        self,
+        hidden: torch.Tensor,  # [B, T, hidden_dim]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        cat_logits:        torch.Tensor = self.categorical(hidden)           # [B, T, 4]
+        temp_log:          torch.Tensor = self.temporal(hidden).squeeze(-1)  # [B, T]
+        claim_type_logits: torch.Tensor = self.claim_type(hidden)            # [B, T, 5]
+        role_logits:       torch.Tensor = self.role(hidden)                  # [B, T, 3]
+        return cat_logits, temp_log, claim_type_logits, role_logits
+```
+
+The categorical output is logits, not a single scalar in `[0, 3]`;
+the soft, scalar form that `Reserved[0]` and `Reserved[2]` carry is
+computed by `LevelStateHead` (§4.5) as the soft-argmax expectation
+`Σ_i i · softmax(cat_logits)_i`. Storing logits at the head and
+collapsing to a soft-argmax at the state head keeps the training
+signal sharp — cross-entropy against the discrete I/G/P/U label — while
+keeping the state-slice representation continuous, which is the
+property §4.8 justifies at length. The temporal head is a scalar
+regression against log-seconds labels; no `softplus` or other
+nonlinearity is applied, so the output can take any real value
+(including negative log-seconds for sub-second time references)
+without special-casing.
+
+### 4.4 — `JustificationHead` Module Definition
+
+`JustificationHead` is the research-critical component of the scorer.
+Given a token's hidden state, the current 4-tuple of evidence and
+claim level state, and the claim-type features, it produces a scalar
+in `[0, 1]` interpreted as: *to what extent is the level transfer
+this token would complete justified by the surrounding context?* The
+other three modules in this section are standard supervised learning
+composed in standard ways. This one is the bet.
+
+The module is a small MLP — a single hidden layer with a GELU
+non-linearity — followed by a sigmoid. Its inputs are concatenated:
+the hidden vector, the four Reserved-slice scalars (with `NaN`
+substituted to `0.0` at the call site — see §4.6), and the 5-way
+claim-type softmax. The hidden layer is intentionally shallow so
+that training-time signal is not absorbed into a deep stack whose
+internals the loss cannot interpret and whose failure modes the
+validation plan in Step 6 cannot probe.
+
+**[SKETCH — specification, not implementation]**
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class JustificationHead(nn.Module):
+    """Estimate whether the current level transfer is justified.
+
+    NOTE: This is the head where the open research question lives.
+    The other three modules in the Level Discipline Scorer are
+    standard supervised learning; this one is the bet. See Step 7.
+    """
+
+    def __init__(self, hidden_dim: int, mlp_dim: int = 256) -> None:
+        super().__init__()
+        # 4 reserved scalars + 5 claim-type probabilities = 9 extra features
+        in_dim: int = hidden_dim + 4 + 5
+        self.fc1: nn.Linear = nn.Linear(in_dim, mlp_dim)
+        self.fc2: nn.Linear = nn.Linear(mlp_dim, 1)
+
+    def forward(
+        self,
+        hidden:            torch.Tensor,  # [B, T, hidden_dim]
+        reserved:          torch.Tensor,  # [B, T, 4], NaN already substituted to 0
+        claim_type_logits: torch.Tensor,  # [B, T, 5]
+    ) -> torch.Tensor:                    # [B, T], scalar in [0, 1]
+        claim_type_probs: torch.Tensor = F.softmax(claim_type_logits, dim=-1)
+        x: torch.Tensor = torch.cat([hidden, reserved, claim_type_probs], dim=-1)
+        h: torch.Tensor = F.gelu(self.fc1(x))
+        return torch.sigmoid(self.fc2(h)).squeeze(-1)
+```
+
+The `reserved` tensor passed in is the *new* Reserved slice for the
+current token — i.e., the state after §4.2's update for the current
+position — so the justification head sees both the evidence state
+and the claim state that the current token is itself asserting. Any
+`NaN` entries (uncommitted slots) are substituted to `0.0` by
+`LevelDisciplineScorer.forward` (§4.6) before this head is called,
+so the head itself assumes its inputs are finite and does not perform
+NaN masking. This substitution is a neutral default — an uncommitted
+slot reads as "zero information" to the justification head — and
+Step 5 specifies an explicit gating term in the loss that stops the
+justification head from being supervised on tokens whose transfer
+magnitude is zero anyway (§4.7's inactive-token short-circuit).
+
+### 4.5 — `LevelStateHead` Module Definition
+
+`LevelStateHead` is the extension to the existing
+`SovereignStateProjector` that owns the `Reserved[0..3]` slice. It
+consumes the outputs of `LevelClassifierHead` for the current token,
+applies the §4.2 soft-update rule, performs the NaN-masked
+first-commit overwrite, and emits the new 4-D Reserved slice. It is
+purely functional in its inputs — the previous Reserved state is
+passed in, not read from internal buffers — so that the orchestration
+of the per-position scan lives in `LevelDisciplineScorer` (§4.6) and
+this head is straightforward to unit-test in isolation.
+
+**Composition, not subclassing.** `LevelStateHead` is registered as a
+sub-module on the existing `SovereignStateProjector` via
+`projector.level_state_head = LevelStateHead(...)`, *not* as a
+subclass that overrides the projector's forward pass. The motivation
+is bit-parity. Subclassing would require the new class to reproduce
+the existing Bhava / Kosha / Vritti / Guna projection paths byte for
+byte, which couples the two modules so tightly that any future change
+to either one risks a silent behavioral diff against existing
+checkpoints. Composition keeps the 28 existing semantic dimensions
+untouched — they are produced by the existing `SovereignStateProjector`
+code path, unchanged — and lets the Reserved slice be driven by a
+clearly delineated child module that the projector calls into only
+for those four dimensions. The projector's existing forward signature
+is unchanged from the perspective of upstream callers; internally,
+after producing the 28-D semantic state, it concatenates the 4-D
+Reserved slice produced by `level_state_head` and returns the full
+32-D state. When the sub-module is absent (old checkpoints, or
+configurations that elect not to instantiate it), the projector falls
+back to its pre-existing zero-initialized Reserved slice, which
+preserves bit-parity per §4.1.
+
+**[SKETCH — specification, not implementation]**
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class LevelStateHead(nn.Module):
+    """Write evidence / claim level state into Reserved[0..3].
+
+    Composition contract: this module is registered as a sub-module
+    of SovereignStateProjector. It does not modify the existing 28
+    semantic dimensions; it only produces the 4-D Reserved slice,
+    which the projector concatenates onto its semantic output.
+
+    The head is purely functional in its inputs: the previous
+    Reserved state is passed in, not read from an internal buffer.
+    Per-position scan orchestration lives in LevelDisciplineScorer.
+    """
+
+    def __init__(
+        self,
+        beta:                   float = 0.5,   # EMA update rate
+        first_commit_threshold: float = 0.25,  # = beta * 0.5, i.e. p_role > 0.5
+    ) -> None:
+        super().__init__()
+        self.beta:                   float = beta
+        self.first_commit_threshold: float = first_commit_threshold
+
+    @staticmethod
+    def _soft_cat_level(cat_logits: torch.Tensor) -> torch.Tensor:
+        """Soft-argmax over the 4 categorical levels.
+
+        Σ_i i · softmax(cat_logits)_i  →  continuous scalar in [0, 3].
+        """
+        idx: torch.Tensor = torch.arange(
+            4, device=cat_logits.device, dtype=cat_logits.dtype
+        )
+        return (F.softmax(cat_logits, dim=-1) * idx).sum(dim=-1)
+
+    def _ema_update(
+        self,
+        prev:  torch.Tensor,   # [B], may contain NaN on uncommitted slots
+        new:   torch.Tensor,   # [B]
+        alpha: torch.Tensor,   # [B], in [0, beta]
+    ) -> torch.Tensor:         # [B]
+        """Soft EMA update with NaN-safe first-commit branch.
+
+        - Uncommitted (prev is NaN) AND alpha ≥ threshold → direct write of new.
+        - Uncommitted (prev is NaN) AND alpha <  threshold → stay NaN.
+        - Committed  (prev is finite)                      → standard EMA blend.
+        """
+        is_uncommitted: torch.Tensor = torch.isnan(prev)
+        # Mask prev to a safe value before arithmetic so NaN does not
+        # propagate through the unselected branch of torch.where.
+        prev_safe: torch.Tensor = torch.where(
+            is_uncommitted, torch.zeros_like(prev), prev
+        )
+        ema: torch.Tensor = (1.0 - alpha) * prev_safe + alpha * new
+        first_commit: torch.Tensor = torch.where(
+            alpha >= self.first_commit_threshold, new, prev
+        )
+        return torch.where(is_uncommitted, first_commit, ema)
+
+    def forward(
+        self,
+        prev_reserved: torch.Tensor,  # [B, 4], state from position t - 1
+        cat_logits:    torch.Tensor,  # [B, 4], from LevelClassifierHead
+        temp_log:      torch.Tensor,  # [B]
+        role_logits:   torch.Tensor,  # [B, 3]
+    ) -> torch.Tensor:                # [B, 4], new Reserved slice
+        cat_level:  torch.Tensor = self._soft_cat_level(cat_logits)          # [B]
+        role_probs: torch.Tensor = F.softmax(role_logits, dim=-1)            # [B, 3]
+        p_e: torch.Tensor = role_probs[..., 0]
+        p_c: torch.Tensor = role_probs[..., 1]
+        alpha_e: torch.Tensor = self.beta * p_e
+        alpha_c: torch.Tensor = self.beta * p_c
+
+        new_ev_cat:  torch.Tensor = self._ema_update(prev_reserved[..., 0], cat_level, alpha_e)
+        new_ev_temp: torch.Tensor = self._ema_update(prev_reserved[..., 1], temp_log,  alpha_e)
+        new_cl_cat:  torch.Tensor = self._ema_update(prev_reserved[..., 2], cat_level, alpha_c)
+        new_cl_temp: torch.Tensor = self._ema_update(prev_reserved[..., 3], temp_log,  alpha_c)
+
+        return torch.stack(
+            [new_ev_cat, new_ev_temp, new_cl_cat, new_cl_temp],
+            dim=-1,
+        )
+```
+
+The `prev_reserved` argument carries the per-batch state at position
+`t - 1`; feeding the previous step's output back into the current
+step's input is the responsibility of `LevelDisciplineScorer.forward`
+(§4.6), not of this head. Keeping `LevelStateHead` stateless in this
+sense makes the autoregressive scan explicit at the orchestration
+layer — the only layer that has visibility into the sequence axis —
+and allows a future parallel-prefix implementation to replace the
+scan without touching this module.
+
+### 4.6 — `LevelDisciplineScorer` Top-Level Module
+
+`LevelDisciplineScorer` is the top-level module that owns the other
+three heads, runs them in order for every token, computes the
+transfer magnitudes and the risk score from §4.7, and returns the
+structured dict that Step 5 (auxiliary loss and curriculum) and
+Step 3.6 (governance readout) both consume. It is the only module in
+this section that is aware of the sequence axis; everything
+underneath it operates per-position.
+
+**[SKETCH — specification, not implementation]**
+
+```python
+import math
+import torch
+import torch.nn as nn
+from typing import Dict
+
+
+class LevelDisciplineScorer(nn.Module):
+    """Top-level Level Discipline Scorer.
+
+    Owns the three trainable heads, runs them in order on each
+    token, computes transfer magnitudes and the risk score, and
+    emits the structured dict consumed by the auxiliary loss
+    (Step 5) and the MistralCGAdapter governance readout (Step 3.6).
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        beta:       float = 0.5,
+        # Natural log of ~10 years in seconds (~3.15e8). Initial
+        # recommendation; calibrated at training time. See §4.7.
+        temp_scale: float = math.log(10 * 365.25 * 24 * 3600),
+    ) -> None:
+        super().__init__()
+        self.classifier:    LevelClassifierHead = LevelClassifierHead(hidden_dim)
+        self.state_head:    LevelStateHead      = LevelStateHead(beta=beta)
+        self.justification: JustificationHead   = JustificationHead(hidden_dim)
+        self.temp_scale:    float               = temp_scale
+
+    def forward(
+        self,
+        hidden:            torch.Tensor,  # [B, T, hidden_dim]
+        reserved_state_in: torch.Tensor,  # [B, 4], state at sequence start
+                                          # (NaN-initialized for fresh sequences)
+    ) -> Dict[str, torch.Tensor]:
+        cat_logits, temp_log, claim_type_logits, role_logits = self.classifier(hidden)
+
+        B, T, _ = hidden.shape
+        new_reserved_seq: torch.Tensor = hidden.new_empty((B, T, 4))
+        prev_reserved: torch.Tensor = reserved_state_in
+        for t in range(T):
+            prev_reserved = self.state_head(
+                prev_reserved=prev_reserved,
+                cat_logits=cat_logits[:, t],
+                temp_log=temp_log[:, t],
+                role_logits=role_logits[:, t],
+            )
+            new_reserved_seq[:, t] = prev_reserved
+
+        # Identify "inactive" tokens where either the evidence pair or
+        # the claim pair is still uncommitted (NaN). Their transfer
+        # magnitude is undefined; their risk is zero by construction.
+        ev_cat:  torch.Tensor = new_reserved_seq[..., 0]
+        ev_temp: torch.Tensor = new_reserved_seq[..., 1]
+        cl_cat:  torch.Tensor = new_reserved_seq[..., 2]
+        cl_temp: torch.Tensor = new_reserved_seq[..., 3]
+        inactive: torch.Tensor = (
+            torch.isnan(ev_cat) | torch.isnan(ev_temp)
+            | torch.isnan(cl_cat) | torch.isnan(cl_temp)
+        )
+
+        zero = torch.zeros_like(ev_cat)
+        ev_cat_safe:  torch.Tensor = torch.where(inactive, zero, ev_cat)
+        ev_temp_safe: torch.Tensor = torch.where(inactive, zero, ev_temp)
+        cl_cat_safe:  torch.Tensor = torch.where(inactive, zero, cl_cat)
+        cl_temp_safe: torch.Tensor = torch.where(inactive, zero, cl_temp)
+
+        # Transfer magnitudes (see §4.7).
+        delta_cat:          torch.Tensor = (cl_cat_safe  - ev_cat_safe).abs()
+        delta_temp:         torch.Tensor = (cl_temp_safe - ev_temp_safe).abs()
+        delta_temp_scaled:  torch.Tensor = delta_temp / self.temp_scale
+        transfer_magnitude: torch.Tensor = delta_cat + delta_temp_scaled
+
+        # JustificationHead requires finite inputs; substitute zero
+        # for any NaN in the reserved slice before the call.
+        reserved_safe: torch.Tensor = torch.stack(
+            [ev_cat_safe, ev_temp_safe, cl_cat_safe, cl_temp_safe],
+            dim=-1,
+        )
+        justification: torch.Tensor = self.justification(
+            hidden=hidden,
+            reserved=reserved_safe,
+            claim_type_logits=claim_type_logits,
+        )
+
+        # Risk hinge: see §4.7 for the multiplier-vs-subtraction argument.
+        allowed: torch.Tensor = justification * transfer_magnitude.detach()
+        risk:    torch.Tensor = torch.relu(transfer_magnitude - allowed)
+        risk = torch.where(inactive, zero, risk)
+
+        return {
+            "cat_logits":        cat_logits,
+            "temp_log":          temp_log,
+            "claim_type_logits": claim_type_logits,
+            "role_logits":       role_logits,
+            "new_reserved":      new_reserved_seq,
+            "delta_cat":         delta_cat,
+            "delta_temp":        delta_temp,
+            "justification":     justification,
+            "risk":              risk,
+        }
+```
+
+Two notes on this sketch. First, the sequential `for t in range(T)`
+scan is the simplest correct implementation of §4.2's autoregressive
+update and is what the spec fixes as the semantic baseline. A
+cumulative-blending or parallel-prefix reformulation that produces
+identical outputs is permitted and expected for performance, but is
+an implementation optimization, not part of the contract. Second,
+the output dict has both the keys Step 5's auxiliary loss expects
+(`cat_logits`, `temp_log`, `claim_type_logits`, `role_logits`, `risk`)
+and the keys the governance readout in Step 3.6 expects
+(`new_reserved`, `delta_cat`, `delta_temp`, `justification`, `risk`).
+No caller reads from the internal heads directly; this dict is the
+stable interface.
+
+### 4.7 — Transfer Magnitude and Risk Computation
+
+The transfer magnitude is the distance between the evidence state
+and the claim state on the combined (categorical, temporal) axis.
+Both deltas are absolute values:
+
+```
+delta_cat   =  | Reserved[2] - Reserved[0] |        (continuous, [0, 3] axis)
+delta_temp  =  | Reserved[3] - Reserved[1] |        (log-seconds, unbounded)
+```
+
+The two deltas live on different scales — the categorical axis runs
+from 0 to 3, the temporal axis spans roughly 0 to ~20 in log-seconds
+— so they cannot be summed directly. The temporal delta is rescaled
+so that one decade of the temporal range contributes about the same
+as one step on the categorical axis:
+
+```
+delta_temp_scaled    =  delta_temp / log(10 * year_in_seconds)
+transfer_magnitude   =  delta_cat + delta_temp_scaled
+```
+
+The denominator `log(10 * year_in_seconds) ≈ 19.6` (natural log of
+~3.15e8 seconds) is the initial recommendation, not a constant. It
+should be calibrated at training time against the empirical
+distribution of evidence/claim temporal gaps in the labeled corpus
+(Step 5), and exposed as a hyperparameter on `LevelDisciplineScorer`
+(as `temp_scale` in the §4.6 sketch). The point of the rescaling is
+only that a one-step categorical transfer (e.g. P → I) and a
+full-temporal-range transfer (e.g. N → E) should produce transfer
+magnitudes of comparable order, so the auxiliary loss does not
+silently weight one axis a hundred times more than the other.
+
+The risk score is a hinge on transfer magnitude, gated by the
+justification score:
+
+```
+risk  =  relu( transfer_magnitude - justification * transfer_magnitude.detach() )
+```
+
+On tokens flagged `inactive` by §4.6 — either the evidence pair or
+the claim pair is still uncommitted — `transfer_magnitude` is
+substituted to `0` and therefore `risk` is `0` as well. Step 5's loss
+separately penalizes claims made without evidence; the transfer-risk
+term here is specifically about *unsupported level crossings*, not
+about *unsupported claims in general*, and keeping the two cases on
+different loss terms is what lets Step 5 weight them independently.
+
+**Why `justification` is a multiplier on allowed transfer, not a
+subtraction from penalty.** The alternative formulation
+`risk = relu(transfer_magnitude - justification)` would treat the
+justification score as a fixed credit the model can spend regardless
+of how large the transfer is — a unit of justification cancels a
+unit of magnitude. This has two failure modes. First, a small
+unjustified transfer (`magnitude = 0.3`, `justification = 0.5`) ends
+up with `risk = 0`, so the scorer cannot penalize small
+bias-hiding moves at all. Second, a large justified transfer
+(`magnitude = 5.0`, `justification = 0.9`) ends up with `risk = 4.1`,
+so the scorer penalizes a fully-supported reasoning step almost as
+harshly as an egregiously unsupported one. The multiplier
+formulation fixes both: a fully-justified transfer
+(`justification = 1.0`) has `risk = 0` *regardless* of magnitude, and
+an unjustified transfer (`justification = 0.0`) has
+`risk = transfer_magnitude`, so the penalty scales linearly with how
+much zoom the model crossed. The `.detach()` on the multiplier's
+reference magnitude is intentional: gradients should flow into
+`justification` through the *reduction* of risk it provides, not
+through the magnitude it is rescaling, so that the head learns to
+predict whether transfers are justified rather than learning to
+suppress the transfer magnitude itself (which belongs to the
+categorical and temporal heads, and has its own supervision).
+
+### 4.8 — Why Continuous Representation, Not Discrete Bins
+
+Both the categorical level and the temporal level are stored as
+continuous scalars in the Reserved slice rather than as discrete
+class indices. Three reasons, each independently sufficient:
+
+1. **Gradient flow through `argmax` is bad.** A discrete-index
+   representation would require an `argmax` (or a Gumbel-softmax
+   surrogate) on the classifier output before writing the slice,
+   and either of those breaks or distorts the gradient signal
+   flowing back from the auxiliary loss into the classifier head
+   and the shared hidden representation. The soft-argmax expectation
+   `Σ_i i · softmax(cat_logits)_i` used by `LevelStateHead` (§4.5)
+   is fully differentiable and is the same trick the rest of the CG
+   stack uses wherever it has to expose a discrete-looking property
+   as a state-slice scalar.
+2. **Bin boundaries are inherently fuzzy in natural language.**
+   Natural-language claims do not partition cleanly at the boundary
+   between *Group* and *Population*, or between *Short-term* and
+   *Long-term*. A discretization would commit the model to a
+   partition the labeling process cannot reliably reproduce, which
+   means the discrete target is itself noisy and the model would be
+   trained to fit label noise. A continuous representation lets the
+   model express gradations the labeling task could not have
+   captured anyway, and leaves the discrete-label training signal
+   strictly where it belongs: at the cross-entropy loss in Step 5,
+   not in the persistent state.
+3. **It matches the existing `GunaTokenScorer` bilinear precedent.**
+   `GunaTokenScorer` already represents Guna mixtures as continuous
+   probability vectors and uses a bilinear projection rather than a
+   discrete category. The Level Discipline Scorer's continuous
+   handling of categorical level via soft-argmax is the same pattern
+   applied to a different axis, which keeps the CG codebase
+   internally consistent and means engineers reading either scorer
+   will recognize the idiom immediately.
+
+The temporal axis was first introduced as a continuous log-seconds
+scalar in §2.2; this subsection is the specification-level
+justification for that choice.
+
+### 4.9 — What Step 4 Establishes
+
+Step 4 fixes the module contract that Steps 5–8 depend on:
+
+- **Four modules are defined.** `LevelClassifierHead`,
+  `JustificationHead`, `LevelStateHead`, and `LevelDisciplineScorer`,
+  with the forward signatures sketched above. No additional modules
+  are introduced in Step 4; new heads belong in later steps if they
+  earn their place.
+- **`Reserved[0..3]` update semantics are fixed.** The 3-way role
+  classifier, the soft EMA blend gated by role probability, the
+  `NaN`-masked first-commit overwrite, the inactive-token
+  short-circuit, and the autoregressive causal-mask compliance are
+  all part of the spec, not implementation freedom.
+- **The research risk is concentrated in `JustificationHead`.** The
+  classifier head, the state head, and the top-level scorer are
+  standard supervised learning composed in standard ways. Whether
+  the `JustificationHead` can actually distinguish justified from
+  unjustified transfers given labeled data is the open question,
+  and Step 7 enumerates the failure modes.
+- **The output dict is the stable interface to the rest of the
+  design.** Step 5's auxiliary loss reads from
+  `LevelDisciplineScorer.forward(...)`'s return dict; Step 3.6's
+  governance readout reads the same dict. No other module reaches
+  into the heads directly, and no other module writes into
+  `Reserved[0..3]`.
+- **No hyperparameters or loss weights are committed in Step 4.**
+  `beta`, `first_commit_threshold`, `temp_scale`, the
+  `JustificationHead` MLP width, and the loss weight
+  `lambda_level_discipline` are all left as configurable surfaces.
+  Their initial values and calibration plan live in Step 5.
+
+---
+
+*Step 4 complete.*
