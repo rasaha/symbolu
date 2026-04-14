@@ -2338,3 +2338,586 @@ and 8 can now build on:
 ---
 
 *Step 6 complete.*
+
+---
+
+## Step 7 — Research Risks and Failure Modes
+
+Step 6 specified the validation plan — what the design can measure
+and the targets each measurement must hit. This section specifies
+what the validation plan *does not* measure, where the design could
+fail even under a green test suite, and the mitigations the
+implementation should plan for in advance. The scorer is a proposed
+addition; this section is the honest accounting of what "proposed"
+could turn into if the bets in Steps 4 and 5 do not pay off.
+
+The section is organized into eight risk categories: the primary
+research risk (`JustificationHead` learnability), the known blind
+spots in the §6.4 validation plan, distributional shift on the
+temporal axis, label leakage across Datasets A/B/C, gaming of the
+risk signal during gradient descent, the limits of using
+Construal Level Theory as a benchmark, the explicit contingency
+plan for the Phase 3 data-readiness gate never clearing, and the
+risks the design explicitly accepts without mitigation.
+
+### 7.1 — The Primary Research Risk: `JustificationHead` Learnability
+
+The central research bet of the scorer is that the binary
+`justified?` label can be produced with enough inter-annotator
+reliability, and that a small MLP can learn to predict it from the
+backbone hidden state plus the 4-tuple level state plus the
+claim-type features. Both halves of that bet are load-bearing, and
+both halves can fail independently.
+
+**Three places this can fail.**
+
+1. **Label noise from rubric ambiguity.** Human experts may
+   genuinely disagree about whether a particular `P → I` transfer
+   is a legitimate Bayesian base-rate update or an illegitimate
+   statistical flattening. The distinction depends on context that
+   is not always spelled out in the source text, and reasonable
+   annotators with the same rubric may land on opposite labels on
+   the same example. This shows up as a Cohen's kappa below `0.7`
+   on the seed set (§5.5) and trips the Phase 3 gate (§5.2).
+2. **Systematic rubric drift across domains.** Even when
+   intra-domain agreement is high, the rubric may apply
+   differently across domains. A medical `P → I` statement, a
+   legal `G → U` statement, and a historical `N → H` statement
+   may each be labeled consistently within their own domain but
+   with no shared calibration across domains. The scorer then
+   learns domain-specific patterns that do not transfer, and the
+   §6.4 Test 2 pathology pairs (which span multiple domains) show
+   uneven directional agreement with a clear per-domain gradient.
+3. **Capacity failure of the MLP head.** Even with clean labels,
+   the single-hidden-layer MLP in `JustificationHead` (§4.4) may
+   be too shallow to capture the dependence of `justified?` on the
+   full context. A deeper head would introduce an interpretability
+   problem — the scorer is supposed to produce a signal the
+   governance layer can reason about, and a deep head's intermediate
+   computations are not legible — but a shallow head may
+   underperform. Both options are bets.
+
+**Mitigation paths, in order of cost.**
+
+| Mitigation | Cost | What it preserves |
+|---|---|---|
+| **Rubric sharpening.** Iterate the §5.5 rubric against the Dataset C seed set until kappa clears `0.7`. Pick the five most ambiguous example classes; rewrite the rubric to decide each one explicitly; re-annotate. | ~1 engineer-week per iteration | The binary label. The full scorer design ships as planned. |
+| **Label-space restriction.** Shrink the justified/unjustified label space to the transfer types the annotators agree on most reliably (e.g., keep `stereotype` and `Bayesian_base_rate` but drop `historical_whitewashing`). The scorer trains on a smaller but cleaner target. | ~0.5 engineer-week | The binary label, at reduced coverage. Some §2.8 pathologies are no longer flagged. |
+| **Three-class with `uncertain`.** Add an explicit `uncertain` class and exclude those examples from `L_transfer`. The scorer learns the confident cases and abstains on the rest; the governance layer treats abstention the same as `risk = 0`. | ~0.5 engineer-week | The binary signal on the confident majority. Edge cases are abstained on rather than mispredicted. |
+| **Classifier-only shipping.** Freeze `JustificationHead` and ship with Phases 1 and 2 of the curriculum only. The scorer exposes per-token zoom-level and claim-type signals; `risk` is reported as always `0`. This is the §5.5 fallback. | Zero additional engineering beyond the classifier heads | Everything in Step 4 except the transfer-risk contribution. The scorer is still useful as a governance observable; it is no longer a training signal for bias-hiding resistance. |
+| **Unsupervised anomaly framing.** Train `JustificationHead` as an unsupervised density / reconstruction head on the `(hidden, reserved, claim_type)` manifold, and treat high-reconstruction-error tokens as "surprising transfers". This abandons the binary supervised target entirely. | ~2–3 engineer-months of additional research | The scorer as a signal, but not as the signal the rest of the design was written for. This is a genuine re-plan, not a mitigation. |
+
+The first three mitigations are the expected escalation path; the
+fourth is the documented fallback from Step 5.5; the fifth is a
+flag that the primary design is not viable and the project needs
+to reconsider the thesis. The design does not *plan* for the fifth
+— but it names it, so that the operator can recognize the
+condition if it arrives.
+
+### 7.2 — Risks the §6.4 Validation Plan Does Not Catch
+
+The four tests in §6.4 — synthetic level classification, synthetic
+bias pathology pairs, WikiText-103 PPL ablation, and external
+benchmarks — are the strongest measurements the design can make.
+They are also not sufficient. This subsection enumerates the known
+blind spots: failure modes that can produce a *green* test suite
+while the scorer is silently not doing its job.
+
+| Blind spot | Why §6.4 misses it |
+|---|---|
+| **Circularity of the synthetic pathology pairs.** The ~50 paired examples in §6.3.3 are hand-built against the same rubric the scorer is trained against. Passing Test 2 with `≥ 80%` directional agreement shows the scorer has learned the rubric, not that the rubric is correct. An operator who wrote both the training labels and the test labels by the same intuition cannot use Test 2 to verify that intuition. |
+| **PPL-neutrality of bias-hiding behavior.** Test 3 measures whether the base LM task degrades under the scorer's gradient. It does not measure whether the model's bias-hiding behavior has changed. A model can produce unchanged PPL while the distribution of the tokens it emits on bias-sensitive prompts has shifted in either direction — or has not shifted at all, and the scorer's gradient has been absorbed by other parts of the network. A green Test 3 is a necessary-not-sufficient condition. |
+| **Narrow stimulus base of Construal Level Theory.** The CLT literature is built on lab studies, mostly with English-speaking undergraduates, in tasks constructed for experimental control rather than for ecological validity. A correlation with published CLT predictions shows the temporal head has not *violated* the CLT pattern; it does not show the head works on text the CLT literature never examined — legal rulings, medical discharge summaries, multi-speaker transcripts, code comments, non-English text. |
+| **Benchmark-definition mismatch on external tests.** Test 4 is explicitly framed so that a low correlation on BBQ / StereoSet / WinoBias is *not* a failure — because those benchmarks measure different things. The symmetric consequence is that a *high* correlation is not a success either: the scorer could be high-correlating with StereoSet by implicitly learning StereoSet's definition of bias (demographic-swap invariance) rather than the zoom-level definition. The correlation target `ρ ≥ 0.3` on at least one benchmark is a loose-alignment check, not a validity check. |
+| **Transfers that never commit the state.** The `inactive` short-circuit in §4.6 means that tokens whose evidence or claim slots are still `NaN` produce `risk = 0`. A long document that makes claims without ever establishing evidence — opinion text, marketing copy, pure interpretation — is entirely invisible to the transfer-risk signal even though those may be exactly the cases where bias-hiding is most likely. The validation plan does not test this case because Datasets A/B/C are annotated against sentences that do contain evidence-claim structure. |
+| **Long-range transfer across document boundaries.** The Reserved slice is per-sequence state; it resets at sequence boundaries. If the operator constructs prompts that split evidence and claim across multiple sequences (e.g., a system prompt establishes evidence, a user prompt makes a claim), the scorer sees the claim with uncommitted evidence slots and emits `risk = 0`. This is correct by the §4.6 rules but incorrect by the Step 2 framework's intent. Test 2 uses single-sequence pathology pairs and does not probe this failure mode. |
+| **Adversarial rephrasing.** An operator (or the model itself, under Phase 4 field-integrated softmax) can rephrase a bias-hiding claim so the role classifier sees the bias-hiding token as `neither`, never as `claim`. The soft update rule of §4.2 then leaves `Reserved[2..3]` uncommitted or only slightly updated, and the transfer-risk term does not fire. `L_role`'s supervised signal mitigates this for known rephrasings but cannot enumerate all of them. |
+| **Claim-type boundary errors.** The §5.5 reason-code vocabulary splits `statistical` from `interpretive` from `normative`, and the §4.7 transfer-risk hinge assumes the claim-type head has gotten this split right. A systematic confusion between `interpretive` and `normative` at the claim-type head would propagate through `JustificationHead` (which consumes `claim_type_probs` as input) without showing up directly in any §6.4 test. |
+
+The consequence is that a passing §6.4 validation is evidence that
+the scorer is internally consistent with its own rubric and
+behaves as specified on the synthetic tests — but not evidence
+that the rubric captures what the Step 2 framework intended to
+capture. The §6.4 plan is the strongest check the design can
+perform on itself; external validation of the framework as a whole
+requires human review of live outputs against real text, which is
+Step 8's responsibility, not Step 6's.
+
+### 7.3 — Distributional Shift and Domain Generalization
+
+The temporal head and, to a lesser extent, the categorical head
+are domain-sensitive in ways the §5.3 and §5.4 caveats already
+flag. This subsection makes the failure modes explicit so the
+operator can plan for them.
+
+**The temporal axis is the worse of the two.** The continuous
+log-seconds target regressed by `LevelClassifierHead.temporal`
+depends on implicit domain conventions about what time scale a
+given phrase *means*. The §5.4 caveat names the canonical
+examples — *"slow"* is microseconds to a physicist and decades to a
+geologist — but the effect is pervasive:
+
+- **News vs scientific text.** News conventions ("recent",
+  "historically", "decades ago") anchor the temporal axis around
+  human lifetime. Scientific text anchors the same vocabulary at
+  scales specific to each field. A scorer trained predominantly
+  on news will mis-regress scientific text and flag
+  domain-appropriate statements as extreme-scale transfers.
+- **Legal text.** Legal language uses "forever", "in perpetuity",
+  "universal", and "all persons" as technical terms with
+  restricted meaning. The categorical head's `U` label and the
+  temporal head's eternal-frame label both fire on these, and the
+  scorer inherits a bias toward flagging routine legal language as
+  universal-scale claims.
+- **Fiction and narrative.** Narrative uses historical-present
+  tense (*"Caesar crosses the Rubicon"*), embedded quotation, and
+  free indirect style. The temporal axis has no clean answer for
+  *"the time frame of the claim"* in these constructions, and the
+  scorer either regresses to an average or to whichever convention
+  dominated the training corpus.
+- **Code comments and technical documentation.** Time-scale
+  references in code (*"this runs in O(n)"*, *"updates every
+  100ms"*) use the temporal axis in a way the scorer's landmark
+  scale (§2.2) does not cover at all. The head will regress to
+  something, and whatever it regresses to will not correspond to
+  the author's intended meaning.
+
+**The categorical axis is more robust but not immune.** The `I`,
+`G`, `P`, `U` split is relatively stable across domains in the
+sense that a sentence about "this patient" is `I` in every
+domain. But the *boundary* between `G` and `P` is sensitive:
+*"cardiologists"* is `G` in a casual register and `P` in a
+statistical register, and the same sentence may land on different
+sides of the boundary depending on whether it comes from a
+textbook or from a trial report. The classifier head will pick
+one, and that choice will be a function of the training
+distribution.
+
+**Mitigations.**
+
+1. **Domain-stratified training data.** Dataset A and Dataset B
+   should be stratified to include at least the five domains
+   above in roughly balanced proportions, so that the classifier
+   and temporal heads are trained on the variance across domains
+   rather than on a single dominant one. This adds cost to the
+   labeling pipeline — each stratum needs its own distillation
+   pass — but it is the only way to produce a scorer whose
+   out-of-domain behavior can be predicted from its in-domain
+   behavior.
+2. **Domain-conditional evaluation in Test 1.** The synthetic
+   classification accuracy target (`≥ 85%` categorical, `RMSE ≤ 1.0`
+   temporal) should be reported per domain as well as in
+   aggregate, so that a scorer passing the aggregate target while
+   failing on one stratum is visible in the §6.4 Test 1 output.
+3. **Out-of-domain refusal at the governance layer.** When the
+   scorer is invoked on text from a domain outside its training
+   strata, the governance readout can expose a `domain_unknown`
+   flag and the Agentic Framework can gate on that flag instead
+   of acting on the potentially-miscalibrated `risk` signal.
+   This requires a separate domain classifier and is out of scope
+   for Step 6's validation plan, but is called out here as the
+   defensible production-time fallback.
+
+The honest statement is that the scorer's domain generalization
+is a function of Datasets A/B/C's domain coverage, and Datasets
+A/B/C are themselves a function of the engineering budget
+allocated in Step 5. A scorer trained on a narrow corpus will be
+a scorer whose `risk` signal is narrow, and the responsibility
+for widening it lies with the data pipeline, not with the
+architecture.
+
+### 7.4 — Label Leakage Between Datasets A, B, and C
+
+Datasets A (categorical), B (temporal), and C (justification) are
+specified in Step 5 as three independent labeling pipelines with
+different rubrics, different size targets, and different cost
+structures. In practice, the same people — the same engineers
+drafting rubrics, the same annotator pool, the same LLM used for
+distillation — will produce labels across multiple datasets, and
+systematic bias in one will contaminate the others.
+
+The specific risk is that `JustificationHead` is trained on top of
+the level-tuple state that `LevelClassifierHead` produces, and the
+`justified?` label in Dataset C is conditioned on what the
+annotator believed the evidence level and claim level *were* for
+the example being labeled. If the same annotator labeled Dataset A
+and Dataset C, the annotator's implicit categorical-level
+intuition drives both the `cat_label` in A and the `justified?`
+label in C, and the justification head learns a signal that is
+circular against the classifier head rather than an independent
+judgment about the transfer's legitimacy.
+
+**Concrete failure mode.** Suppose an annotator systematically
+labels ambiguous `G` vs `P` cases as `G` in Dataset A, and also
+systematically labels `G → I` transfers as `unjustified:
+stereotype` in Dataset C. A classifier head trained on Dataset A
+will produce `G` labels on the same ambiguous cases at inference,
+the transfer-magnitude computation will report a `G → I` delta,
+and `JustificationHead` will correctly (by the annotator's
+rubric) flag it as unjustified. The test suite will pass, the
+kappa will clear, and the scorer will appear to be working — but
+the system has only learned the annotator's implicit boundary,
+not any property of the underlying text.
+
+**Mitigations.**
+
+| Mitigation | Cost | What it buys |
+|---|---|---|
+| **Blind cross-annotation.** Annotators labeling Dataset C see only the raw text, not any Dataset A or Dataset B labels the same text may have received. The Dataset C labeling pipeline has a separate rubric that defines `justified?` without reference to the specific categorical or temporal labels. | ~1 extra engineer-week on pipeline hygiene | Decouples the Dataset C label from any implicit Dataset A/B intuition the same annotator may hold. |
+| **Separate annotator pools.** The seed set for Dataset C is labeled by annotators who did not work on Datasets A or B. The LLM used for Dataset C distillation is prompted without reference to Dataset A or B's distillation prompts. | ~$1–2K additional annotator budget | Breaks the person-level and prompt-level correlation between datasets. |
+| **Independent distillation prompts.** The distillation prompts for Datasets A, B, and C are drafted by different engineers, reviewed independently, and not shared across the three pipelines. | Marginal cost; ~0.5 engineer-week | Prevents an implicit LLM-level rubric from propagating across all three datasets. |
+| **Post-hoc correlation audit.** After training, measure the Spearman correlation between `cat_logits` argmax (from A's head) and `justified?` (from C's head) on a held-out set of unlabeled text. A correlation above `0.8` is a flag that the two heads are learning the same annotator-level signal rather than independent properties of the text. | ~0.5 engineer-week | A red-flag detector for the failure above; does not prevent leakage, but surfaces it so the operator can act. |
+
+The post-hoc correlation audit is worth emphasizing: even a scorer
+that passes every §6.4 test and clears the Phase 3 kappa gate can
+be silently contaminated by dataset-level label leakage, and the
+correlation audit is the cheapest way to notice. The audit is a
+diagnostic, not a gate — some correlation between categorical
+level and justification is expected on real data (e.g., `G → I`
+transfers really are more often unjustified than `I → I`
+transfers) — but the diagnostic establishes a baseline against
+which "too high" can be judged.
+
+### 7.5 — Gaming the Risk Signal During Gradient Descent
+
+Because `L_transfer` is a differentiable loss term feeding into
+`L_total`, gradient descent will find whatever path minimizes it.
+The path the design intends is: `JustificationHead` learns to
+predict `justified?` accurately, so `justification` rises on real
+transfers that are legitimate and the hinge term falls. The paths
+the design does *not* intend — but which the loss landscape makes
+available — are where the risk lives.
+
+**Path 1 — Suppressing the transfer magnitude.** The transfer
+magnitude (§4.7) is a function of `Reserved[0..3]`, which is a
+function of the classifier-head outputs. Nothing in the loss
+prevents the classifier head from learning to produce
+small-magnitude categorical and temporal deltas everywhere — for
+example, by collapsing the `cat_logits` softmax toward uniform so
+the soft-argmax always lands near `1.5`. This makes every transfer
+look small, and `L_transfer` drops without `JustificationHead`
+learning anything useful.
+
+**Mitigation.** The supervised losses `L_cat`, `L_temp`,
+`L_claim_type`, `L_role` directly penalize the classifier heads
+for deviating from the Dataset A/B labels. They are the dominant
+signal the classifier heads receive — the four sub-lambdas start
+at `1.0` each in §5.1 while `w_transfer` starts at `0.5` — and
+they make the "uniform softmax" solution expensive enough that
+gradient descent should not find it. The `.detach()` in §4.7's
+hinge formula is the other half of the mitigation: it prevents
+`JustificationHead` from backpropagating through
+`transfer_magnitude` as a way of making its loss smaller, which
+removes the most direct gaming path. Neither mitigation is
+airtight; both are load-bearing.
+
+**Path 2 — Driving `p_neither` high on problematic tokens.** The
+role classifier is a 3-way head and the `neither` class exists
+precisely so filler tokens do not commit the Reserved slice. But
+gradient descent can also drive `p_neither` high on
+*bias-sensitive* tokens, so that the state slice never updates in
+the way the transfer-risk term would punish. The token that would
+have made a high-zoom claim is classified as `neither`, the claim
+slot stays uncommitted, and `risk = 0` via the §4.6 inactive-token
+short-circuit.
+
+**Mitigation.** The supervised `L_role` cross-entropy penalizes
+the role head for disagreeing with Dataset C's role labels on the
+Dataset C examples. On examples outside Dataset C, nothing
+penalizes a drift toward `neither`. The design has no complete
+mitigation for this; the partial mitigation is to monitor the
+role-head output distribution during training and trigger an
+alarm when `p_neither` averaged over non-Dataset-C batches rises
+above the average over Dataset-C batches by more than a small
+threshold.
+
+**Path 3 — Phase 4 field-integrated softmax: concealment vs
+correction.** In Phase 4 (field-integrated softmax, not default-on
+today), the scorer becomes a direct contributor to token selection
+via the multi-field ranking. A model under Phase 4 has a strong
+incentive to avoid generating tokens that `LevelDisciplineScorer`
+would flag — which looks like bias correction but is actually
+bias *concealment*. The model learns to not-generate the
+high-zoom token without ever learning to not-think it; downstream
+observers see cleaner output, but the underlying representation
+has only learned to route around the flagger.
+
+**Mitigation.** This is a generic problem with any token-level
+reward signal and is not specific to the Level Discipline Scorer.
+The established mitigations — off-policy evaluation on held-out
+prompts, divergence monitoring against the Phase 1–3 baseline,
+and post-hoc human review of concealment-sensitive categories —
+all apply here. The Level Discipline Scorer does not add a new
+concealment mitigation; it inherits the existing CG stack's Phase
+4 monitoring plan, and the design flags that the concealment
+problem is not solved by the scorer's internal structure alone.
+
+Gaming the risk signal is the class of failure where the
+validation plan looks healthy and the metrics move in the right
+direction but the model has not actually learned what the design
+intended. The §7.2 blind spots and the §7.5 gaming paths should
+be read together: between them, they account for the scenarios
+in which *every* §6.4 test passes and the scorer is still wrong.
+
+### 7.6 — Construal Level Theory as a Validation Target: Strengths and Limits
+
+§2.6 grounds the scorer's temporal axis in Construal Level Theory,
+and §6.3.4 adds a CLT consistency test as part of the validation
+suite. CLT is the strongest external benchmark the design can
+reach for — it is a 20+ year research program with published
+predictions about how psychological distance changes claim
+processing, and it is the only non-circular reference point for
+the temporal head's behavior. That is precisely what the design
+uses it for, and the framing in §2.6 is honest. This subsection
+spells out the limits of that grounding, because the rest of
+Step 7 has acknowledged the weaknesses of every other
+validation target and CLT should not be held to a lower standard.
+
+**What CLT validation gives the design.**
+
+- A *non-circular* reference point. The scorer's temporal axis was
+  not designed against CLT stimuli, and the CLT stimuli were not
+  designed against the scorer. A positive correlation between the
+  two is genuine independent evidence that the temporal head has
+  learned something that corresponds to a published cognitive
+  pattern, not just to its own training distribution.
+- A *pre-registered* set of predictions. The effect directions in
+  CLT are documented in the literature before the scorer exists,
+  so the validation test cannot be subtly re-framed after running
+  it. Either the temporal head's `delta_temp` correlates with the
+  predicted distance, or it does not.
+- A *soft target*. The §6.3.4 Pearson `r ≥ 0.5` threshold is
+  explicitly soft, and the §6.4 Test 4 caveat on external
+  benchmarks carries the same logic: the scorer is not trained to
+  fit CLT, and a modest correlation is strong evidence rather
+  than weak evidence precisely because the baseline expectation
+  is uncorrelated.
+
+**What CLT validation does not give the design.**
+
+- *Effect sizes are modest.* CLT's published effects are typically
+  in the `d = 0.2 – 0.4` range, and several have failed to
+  replicate cleanly in larger-sample pre-registered studies. The
+  literature's "known predictions" are not as tightly pinned as a
+  citation-only reading would suggest, and a correlation of
+  `r = 0.5` against an effect that is itself uncertain is less
+  impressive than the number implies.
+- *Stimulus base is narrow.* CLT stimuli are laboratory-constructed
+  for experimental control: short sentences, isolated claims,
+  English-speaking undergraduate subjects, limited topic range.
+  Correlation on CLT stimuli does not generalize to longer-form
+  real-world text any more than the §7.3 domain-shift failure
+  modes generalize from news to legal text.
+- *CLT is a claim about human processing, not about text
+  structure.* CLT predicts how *people read* a claim at a given
+  psychological distance. The scorer is a claim about *how the
+  text is structured* with respect to evidence-vs-claim zoom. The
+  two are correlated — a claim at greater temporal distance *is*
+  further from its evidence on the scorer's axis — but they are
+  not the same construct, and a perfect alignment would in fact
+  be suspicious because it would suggest the scorer is
+  approximating a reader model rather than a text structure.
+- *The test set is small.* `20 – 50` stimuli (§6.3.4) is enough to
+  flag a gross regression but not enough to rule out a subtle
+  domain-shift or capacity-failure. A correlation of `r = 0.5` on
+  `n = 30` has a wide enough confidence interval that the true
+  correlation could be anywhere from `r ≈ 0.2` to `r ≈ 0.75`.
+
+**The honest reading.** A positive CLT correlation is evidence
+worth having. It is not sufficient to conclude the scorer is
+working, and a negative correlation is not sufficient to conclude
+the scorer is broken. The §6.3.4 test is a sanity check against a
+published literature whose predictions the design has borrowed, and
+nothing more. The primary evidence for the scorer's temporal head
+remains Test 1's synthetic classification accuracy against
+Dataset B, and the primary evidence for the scorer's transfer
+logic remains Test 2's directional agreement on the pathology
+pairs, both of which have their own §7.2 blind spots.
+
+### 7.7 — What Happens if the Phase 3 Kappa Gate Never Clears
+
+The Phase 2 → Phase 3 transition in §5.2 is gated on Dataset C
+achieving `≥ 0.7` Cohen's kappa on the binary `justified?` label
+over a held-out expert-labeled set of at least `200` examples.
+§5.5 frames this as the scorer's most consequential single failure
+mode; §7.1 gives the three places it could fail; this subsection
+is the contingency plan for the case where it does fail.
+
+**Decision flow when the gate does not clear.**
+
+1. *Iterate the rubric once.* The expected first failure is that
+   the rubric has a small number of ambiguous categories that
+   generate most of the disagreement. The engineering response is
+   to identify the top three disagreement-generating categories
+   via confusion-matrix analysis on the seed set, rewrite the
+   rubric to decide each one explicitly, and re-annotate. Budget:
+   one engineer-week per iteration, up to three iterations.
+2. *If iteration 3 does not clear `0.7`, restrict the label
+   space.* Drop the reason-code categories with the worst
+   intra-category agreement, which in practice means dropping the
+   hardest pathologies (`historical_whitewashing`, `anachronism`)
+   and keeping the sharper ones (`stereotype`,
+   `statistical_flattening`). The scorer trains on a smaller but
+   cleaner label space; Step 5.5's label vocabulary in the
+   training code is reduced to whatever subset cleared the gate.
+3. *If label-space restriction does not clear `0.7`, add the
+   `uncertain` class.* Three-class labels, with the `uncertain`
+   examples excluded from `L_transfer`. `JustificationHead` trains
+   only on the confident majority of examples, and the §3.6
+   governance readout exposes an explicit "uncertain" state that
+   the Agentic Framework treats as `risk = 0`. This preserves the
+   scorer as a binary signal on most inputs and a null signal on
+   edge cases.
+4. *If none of the above clears the gate, ship classifier-only.*
+   The §5.5 fallback: freeze `JustificationHead` permanently,
+   remove `L_transfer` from the auxiliary loss, keep Phases 1 and
+   2 of the curriculum, and ship the scorer as a per-token
+   zoom-level observable with no transfer-risk contribution. The
+   governance readout exposes `evidence_cat_level`,
+   `evidence_temp_level`, `claim_cat_level`, `claim_temp_level`,
+   `delta_cat`, and `delta_temp`, but reports `justification` as
+   `null` and `risk` as always `0`. This is documented in the
+   governance contract as a configuration-level choice, not a
+   runtime error.
+5. *If even the classifier-only path does not produce measurable
+   value on Test 1, the scorer's framework itself is in question.*
+   This is out of scope for a fallback plan — it is a signal that
+   the Step 2 framework did not operationalize bias into something
+   the classifier heads could learn, and the project should
+   reconsider the thesis rather than ship a broken scorer.
+
+**What is preserved at each fallback level.** Steps 3.2 and 3.7's
+architectural commitments (additive placement, Reserved 4D slice,
+free governance readout) are preserved at every level of the
+fallback, because none of them depend on `JustificationHead`
+working. The module contract from Step 4 is preserved through
+fallback level 3; fallback level 4 reduces the contract to the
+classifier heads only, which is still a strictly smaller version
+of the Step 4 design rather than a replacement for it. No
+fallback level requires the rest of the CG stack to change.
+
+### 7.8 — Risks the Design Explicitly Accepts Without Mitigation
+
+Not every risk in this section has a mitigation in the design.
+Some are known consequences of the scope the document committed
+to, and the honest accounting requires naming them as accepted
+rather than mitigated. This subsection is the list.
+
+- **The scorer does not solve bias.** Step 1 and Step 2 are
+  explicit about this; §1's Core Claim and §2.7's structural
+  definition both restrict the scope to one component of bias
+  (unjustified zoom-level transfer) and name it as a sub-problem,
+  not a solution. The risk is that a downstream reader treats
+  "the CG stack has a Level Discipline Scorer" as "the CG stack
+  handles bias", and acts on that belief. The mitigation is the
+  §1 framing-tunability note and the §8 honest-scope wrap-up,
+  both of which are document-level controls, not architectural
+  ones.
+- **Training cost is non-trivial.** Step 5 gives honest estimates:
+  ~2 engineer-weeks + ~$2K LLM spend for Dataset A, ~2
+  engineer-weeks + LLM spend for Dataset B, ~4–6 engineer-weeks
+  + ~$5K LLM spend + ~$3K annotator budget for Dataset C. The
+  total engineering effort is on the order of three engineer-months
+  and the total external spend is on the order of $10–15K. This
+  is non-trivial for an auxiliary signal and the design does not
+  reduce it; an operator who wants a cheaper version has to drop
+  to the classifier-only fallback from §7.7.
+- **The scorer has no direct inference-time contribution today.**
+  Step 3.5 is explicit that the scorer is a training-time
+  auxiliary whose influence on inference flows through the phase
+  adapter's gated residual on the hidden state. Under Phase 1–3,
+  it does not directly change next-token probabilities at
+  generation time. Under Phase 4 field-integrated softmax — a
+  roadmap item, not a default configuration — it would. The
+  design accepts that the shipping configuration reaches inference
+  only via state-shaping, and that operators who want a direct
+  logit contribution have to wait for Phase 4.
+- **The scorer's output is interpretable by experts, not by
+  end-users.** The `level_discipline` governance readout exposes
+  `delta_cat`, `delta_temp`, `justification`, and `risk` as
+  numbers, and the optional reason-code head (§5.6) adds a
+  categorical label. None of this is a natural-language
+  explanation, and the design does not include one. An end-user
+  looking at the scorer's output sees numeric signals; producing
+  a human-facing explanation is the responsibility of a
+  downstream surface (product UI, governance dashboard, audit
+  log), not of the scorer itself. The design accepts this
+  separation of concerns and does not attempt to own the
+  explanation layer.
+- **The scorer does not detect framing bias, selection bias, or
+  omission bias.** The scorer detects transfers between levels
+  within the text it is given. A bias that shows up as *which
+  claims are in the text at all* is not visible to any module in
+  Step 4, because there is no counterfactual "evidence that was
+  not cited" for the scorer to compare against. Framing bias (the
+  same claim emphasized differently across otherwise-identical
+  text) and omission bias (evidence that would be relevant but
+  was not included) are entirely out of scope. The design accepts
+  this limit and names it; it does not attempt to cover these
+  forms of bias under the same framework.
+- **The scorer inherits Mistral-7B's baseline bias.** The frozen
+  backbone carries whatever distributional biases the pretraining
+  corpus embedded. The scorer's gradient reshapes the hidden
+  representation, but the backbone's weights are frozen (Step
+  3.1) and cannot be corrected by any auxiliary loss at this
+  training scale. A bias that lives in the backbone's
+  token-level probabilities is not addressable by the Level
+  Discipline Scorer or by any of the existing six CG scorers.
+- **Phase 4 field-integrated softmax is a separate commitment.**
+  The design claims the scorer plugs into Phase 4 without
+  additional wiring (§3.5), and that the scorer's per-token output
+  already has the shape Phase 4 expects. The claim is accurate
+  for the data flow; it does not extend to validating that Phase
+  4 itself works under the added signal. Validating the Phase
+  4 integration is a separate engineering effort with its own
+  validation plan, not part of Step 6 and not part of this
+  design. The design accepts that the Phase 4 claim is a *design
+  compatibility claim*, not a *shipping readiness claim*.
+
+These seven accepted risks are the things the design knows it
+does not address, has decided not to address, and names so that a
+downstream reviewer can distinguish "the scorer does not solve X"
+from "the scorer tried to solve X and failed." They belong in
+Step 7 because they are risks the scorer carries; they are
+distinct from Step 8's honest-scope wrap-up, which is about how
+the whole document frames itself to its readers rather than about
+specific risks inside the design.
+
+### 7.9 — What Step 7 Establishes
+
+Step 7 fixes the honest risk accounting that Step 8 can wrap up:
+
+- **The primary research risk is named and bounded.** Whether
+  `JustificationHead` can be trained to predict `justified?`
+  reliably is the central bet, and §7.1 gives three failure
+  places and a five-step mitigation escalation path ending in
+  the classifier-only fallback.
+- **The §6.4 validation plan's blind spots are explicit.** §7.2
+  enumerates eight scenarios in which every §6.4 test passes and
+  the scorer is still wrong. The validation plan is the strongest
+  check the design can perform on itself, but it is not a
+  sufficient one.
+- **Domain generalization and label leakage are called out as
+  operational risks.** §7.3 and §7.4 specify the data-pipeline
+  hygiene that the scorer's cross-domain behavior and its
+  independence from annotator-level rubric drift both depend on.
+  Neither is fully solved by the architecture; both require
+  discipline in Dataset A/B/C construction.
+- **The gaming paths during gradient descent are enumerated with
+  partial mitigations.** §7.5 names three paths by which the loss
+  landscape allows the model to reduce `L_transfer` without
+  learning what the design intended, and is explicit that the
+  mitigations are load-bearing rather than airtight.
+- **The contingency plan for the Phase 3 kappa gate never
+  clearing is a decision flow, not an aspiration.** §7.7 gives
+  five explicit fallback levels ending in reconsideration of the
+  thesis itself, and preserves the Step 3 architectural
+  commitments at every level.
+- **Seven risks are explicitly accepted without mitigation.** §7.8
+  names them so that a reviewer can distinguish "the scorer does
+  not do X" from "the scorer fails at X." Step 8 can now frame
+  the document as a whole against these acknowledged limits.
+
+---
+
+*Step 7 complete.*
