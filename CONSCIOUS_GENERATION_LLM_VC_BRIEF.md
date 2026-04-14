@@ -126,6 +126,7 @@ signal families in our thesis:
 | **Ontological** | `TokenOntologyProjector` + `OntologyCompatibilityScorer` | Identity-level compatibility with the 32D state |
 | **JEPA / Plausibility** | JEPA-style predictor and plausibility heads | Causal / physical grounding of the token |
 | **Kosha / Bliss** | Kosha router + Bliss gate | Layer weighting and coherence integration |
+| **Level Discipline** *(proposed — design spec complete, implementation pending)* | `LevelDisciplineScorer` + `LevelClassifierHead` / `JustificationHead` / `LevelStateHead` — writes `Reserved[0..3]` of the Sovereign State. See `docs/design/LEVEL_DISCIPLINE_SCORER_DESIGN.md`. | Epistemic match: a claim's categorical (I/G/P/U) and temporal (log-seconds) zoom vs. the zoom of the evidence in context |
 
 Each scorer ships with its own InfoNCE / contrastive auxiliary loss,
 gated by an explicit lambda weight in the training config. During
@@ -230,6 +231,30 @@ softmax" thesis is implemented but still curriculum-gated. This is
 exactly the kind of project where the next 12 months turn a research
 architecture into a deployed one.
 
+### Design specs with implementation pending — proposed additions to the stack
+
+One proposed addition is at spec-complete, implementation-pending
+status as of this brief, and we surface it here for the same
+reason we surface the caveats above: we would rather name the gap
+between a design document and the code than let it be discovered
+in diligence.
+
+| Proposed scorer | Design spec | Status |
+|---|---|---|
+| **Level Discipline Scorer** (would be the seventh scorer family in the Token Evaluation Tensor) | `docs/design/LEVEL_DISCIPLINE_SCORER_DESIGN.md` (Steps 1–8): framework, module contract, training signal and curriculum, integration points, validation plan, research risks, and honest scope. | **Design spec complete, implementation pending.** Zero files yet written. Research risk is concentrated in `JustificationHead` (spec §7.1) and in the Dataset C inter-annotator-agreement gate (spec §5.5). See spec §8.2 for the three-phase deliverable path and §6.1 for the file-level implementation plan (9 new files, 6 modified). |
+
+The scorer would add an **epistemic** field — claim zoom level vs.
+evidence zoom level — to the existing six semantic fields in the
+Token Evaluation Tensor, extending the multi-field thesis from
+*semantic agreement* to *semantic and epistemic agreement*. It is
+included in this brief not as shipped capability but as the next
+research commitment for which the design work has been completed
+and the engineering path is specified. Whether it graduates from
+design spec to active training signal depends on the §5.5 kappa
+gate on expert-annotator agreement for the `justified?` label,
+which is a measurable, pre-registered pass/fail condition rather
+than an open-ended milestone.
+
 ### Training setup we run today
 
 | Setting | Default (via `scripts/train_mistral_cg.sh`) |
@@ -285,4 +310,4 @@ validating the recipe on one larger backbone.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Modules: `symbolu_training/training/unified/mistral_wrapper.py`, `symbolu_training/training/conscious_generation/`, `agentic/agentic_framework/inference_mistral.py`*
-*Design: `docs/design/CONSCIOUS_GENERATION_DESIGN.md` · Audit: `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md` · Training: `scripts/train_mistral_cg.sh`*
+*Design: `docs/design/CONSCIOUS_GENERATION_DESIGN.md`, `docs/design/LEVEL_DISCIPLINE_SCORER_DESIGN.md` · Audit: `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md` · Training: `scripts/train_mistral_cg.sh`*
