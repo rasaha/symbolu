@@ -189,7 +189,57 @@ ablation says they are helping.
 
 ---
 
-## Page 3 — Evidence, Training Recipe & Roadmap
+## Page 3 — Competitive Landscape
+
+`HybridPhaseTransformer` lives in the most crowded, most actively
+researched corner of modern LLM architecture — long-context attention.
+Nearly every major lab has an answer to the quadratic problem, and
+the open literature now contains a growing list of hybrid architectures
+that stack two mechanisms together. The table below positions us
+against each family of alternative, stating for every row both *how*
+we differ and *why* that difference is an advantage.
+
+| Category | Representative players | What they ship | How `HybridPhaseTransformer` differs — and why it is better |
+|---|---|---|---|
+| **Full quadratic transformers** | GPT-4/5, Claude, LLaMA 3, Mistral-7B, Qwen, DeepSeek | Standard dense softmax attention, scaled with FlashAttention, KV-cache tricks, and RoPE extensions to reach long contexts. | We do not fight quadratic attention on its own cost curve — we invoke it *conditionally*, only where phase confidence is already low, via the Binding-Cache Quad Query's Top-K O(n·k) path. **Better because:** the operator gets the content-addressable precision of quadratic attention exactly on the tokens that need it, and linear-cost phase memory everywhere else — the same model no longer has to pay the O(n²) tax on every position to earn occasional retrieval quality. |
+| **Linear / state-space models** | Mamba / Mamba-2, RWKV, RetNet, Performer, Linear Transformer, S4 | O(n) recurrent or linearized state machines that compress context into a running hidden state, typically with an exponential decay (`γ < 1`) baked into the recurrence. | These models encode information in **magnitude** with a decaying running sum — which is why the recent "Stuffed Mamba" line of research finds structural state-capacity limits on strict long-range retrieval. Our phase branch encodes information in **phase**, not magnitude, with no mandatory `γ < 1` — older information remains recoverable via phase-aligned queries. **Better because:** the retrieval ceiling is a function of phase-angle resolution rather than geometric decay, which is the mechanism behind a 240K-param pure-phase model reaching 100% needle-in-haystack at 10K tokens on a controlled task. Linear cost is preserved; the decay tax is not. |
+| **Sliding-window / local attention** | Longformer, BigBird, Mistral sliding-window, Sparse Transformer | O(n·w) local attention over a fixed window, usually paired with a handful of task-defined global tokens to reach long-range dependencies. | Local attention is strong at short-range syntax and silent outside its window. We keep sliding-window attention — but in the Protected Phase block, **it cross-attends to the phase memory, not to raw tokens**. Its queries come from current tokens; its keys and values come from the long-range phase state. **Better because:** the window now does *precise short-range extraction from a long-range representation*, instead of competing with a separate global mechanism for gradient. Longformer's hand-chosen global tokens are no longer necessary, because the global path is structural. |
+| **Stacked / parallel hybrids** | Jamba (AI21), Zamba, Griffin / Hawk (DeepMind), Samba, Hymba, StripedHyena, RecurrentGemma | Interleave Mamba/SSM blocks with transformer blocks, or run two attention mechanisms in parallel and blend their outputs with a gate. | Stacked hybrids are directionally right but, in our view, leave two issues unresolved: two heads on the same token stream fight for the same gradient (the weaker mechanism often becomes vestigial), and a linear branch and a local branch operate on different representations and cannot compose. Our Protected Phase block runs the three mechanisms **serially over a single RMS-normalized `memory_state`** — phase produces the state, local attention reads it, quad proposes on top of it. **Better because:** the architecture *forces* role specialization rather than hoping for it — phase has to learn a representation that local and quad can consume, and each mechanism earns its place by operating on the output of the others, not by racing them. |
+| **Retrieval-augmented generation** | LangChain / LlamaIndex + vector DBs (Pinecone, Weaviate, Chroma, pgvector), RETRO-style retrieval-conditioned LMs | Sidestep long context entirely by chunking corpora and retrieving top-K passages into a short context window at inference time. | RAG is a **preprocessing** strategy: it moves the long-range problem out of the model and into a separate retrieval system. That is fine for document Q&A and brittle for agentic tool chains, long chat histories, and ordered reasoning where the position of information matters. **Better because:** we give the model a learned long-range memory substrate *inside* the forward pass, so the same architecture handles both retrieval-shaped and continuation-shaped workloads. RAG remains usable on top; we are complementary to it, not a replacement for its use cases. |
+| **External-memory / cached-context architectures** | Memorizing Transformers, Landmark Attention, Infini-attention, Transformer-XL segment recurrence, RMT | Attach an external KV store or segment-level recurrent state that the attention layer queries alongside its own window. | External-memory designs keep attention unchanged and bolt a second, often weakly-differentiable store alongside it. **Better because:** our `SlotMemoryGCT` is a 64-slot associative memory whose writes are detached from the LM loss and shaped by a separate retrieval loss applied beyond the window, with an every-200-step ablation eval that adaptively adjusts slot LR, gate ceiling, and retrieval-loss weight. Slots only keep earning their place if the ablation says they are helping — no silent dead weight, no "add more memory and hope" failure mode. |
+| **Context-extension via position encoding** | RoPE extensions — YaRN, NTK-aware scaling, LongRoPE, PI (Positional Interpolation) | Rescale or interpolate existing rotary embeddings to make a model pre-trained at 4K–8K extrapolate to 32K–1M tokens, without architecture change. | Position-extension methods are a **patch** applied to quadratic models — they extend where the model *can look* without changing how expensively it looks. The model still pays O(n²) at the new context length, still has no long-range memory substrate, and still relies on training-time priors to recall distant information. **Better because:** we change the mechanism, not the coordinates. An operator is not picking between YaRN and our model; they are picking between "a 32K-capable quadratic stack whose cost scales with context" and "a hybrid stack whose long-range path is O(n) by construction and whose quadratic branch is invoked only where it is earning its cost." |
+| **Efficient attention implementations** | FlashAttention (1/2/3), PagedAttention (vLLM), Ring Attention, xFormers | Kernel-level and memory-layout optimizations that make standard softmax attention faster and more memory-efficient on existing hardware. | These projects are **substrate**, not a thesis about long-range attention. They accelerate whichever attention mechanism is already chosen. **Better because:** `HybridPhaseTransformer` composes with FlashAttention exactly the way any other transformer does (the local branch uses SDPA / FlashAttention directly) — the operator gets the FlashAttention speedup *and* the hybrid's structural cost reduction, rather than having to choose between them. |
+
+### Why the overall bet is better, not just different
+
+- **Serial fusion over a shared state, not parallel stacking.** Every hybrid architecture we know of runs its two mechanisms in parallel and blends the outputs. We run three mechanisms — linear phase, sliding-window local, and Top-K binding-cache quad — **serially over a single RMS-normalized phase memory**. That is the architectural bet: composition, not blending, and a shared substrate that forces each mechanism to earn its role by consuming what the previous one produced.
+- **Phase, not magnitude, carries long-range information.** The entire linear-model family encodes state as a decaying running sum. We encode it as a running sum of complex phasors with per-head phase offsets and no mandatory `γ < 1`. The mechanism-level evidence — a 240K-param pure-phase model hitting 100% needle-in-haystack at 10K tokens on a controlled task — is the first signal that the decay tax is not necessary for linear-time attention to work at long distances.
+- **Quadratic is a tool, not a default.** The Binding-Cache Quad Query runs at O(n·k) on Top-K proposals and is conditionally skipped when phase confidence is already high enough. Quadratic precision is spent exactly where it is needed and saved everywhere else — the opposite of the status quo, which pays quadratic cost on every token to earn occasional retrieval quality.
+- **Memory that has to prove itself every 200 steps.** `SlotMemoryGCT` is the only long-term memory in this landscape that runs its own ablation eval against the live model during training and adaptively shrinks or grows itself based on the PPL delta. An external KV-store bolted onto a transformer has no such feedback loop, which is why most of them quietly degrade into dead weight.
+- **Honest scope on what is validated today.** We do not claim benchmark wins on LRA, Path-X, or head-to-head vs. Mamba / Mistral at 7B — those are explicitly the Q1 roadmap item. What we claim is a working training stack, a validated phase-memory mechanism at pilot scale, and an architecture whose structural bet (serial fusion over shared phase memory) is implemented, runnable, and ready to be measured against the baselines in the table above.
+
+### In one sentence
+
+Every other entry in this landscape either **pays the quadratic tax
+everywhere**, **stacks two mechanisms in parallel and lets them
+fight for gradient**, **decays its long-range memory into a running
+sum**, or **sidesteps long context by retrieving around it**.
+`HybridPhaseTransformer` is a bet that the next step is **algorithmic
+fusion** — linear, local, and quadratic attention composed serially
+over a shared phase-memory substrate — so that the tradeoff in the
+Page 1 table becomes a design axis rather than a forced choice.
+
+### The broader stake (honest framing)
+
+The structural bet here — **linear-time long-range recall without a
+decay tax** — is the kind of primitive that future, more ambitious
+architectures will need whether they reach AGI or not; we are not
+claiming to solve intelligence, we are claiming to remove one of the
+limits that any solution to it will have to navigate.
+
+---
+
+## Page 4 — Evidence, Training Recipe & Roadmap
 
 ### What is built and training today
 

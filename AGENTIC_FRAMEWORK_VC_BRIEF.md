@@ -163,7 +163,64 @@ easy to evaluate before any procurement conversation.
 
 ---
 
-## Page 3 — Evidence & Roadmap
+## Page 3 — Competitive Landscape
+
+Agentic Framework sits in a crowded category — "agent tooling" is one
+of the noisiest spaces in enterprise AI right now — but most of that
+crowd is solving a different problem. Most current frameworks are
+built to make it **easy to wire an LLM to a tool-calling loop**. We
+are built to make the layer *between* that tool loop and a production
+action **governed, auditable, and interruptible by default**. The
+table below positions us against each family of competitor, stating
+for every row both *how* we differ and *why* that difference is an
+advantage for a regulated enterprise buyer.
+
+| Category | Representative players | What they ship | How Agentic Framework differs — and why it is better |
+|---|---|---|---|
+| **Open-source agent frameworks** | LangChain / LangGraph, CrewAI, AutoGen, SmolAgents | Python (and JS) libraries that wire an LLM to a tool-calling loop, with middleware-composed safety, approvals, and logging. Multi-agent orchestration and ecosystem breadth are their strengths. | We treat governance as a **runtime contract, not middleware.** The execution ordering `cancel → budget → approve → execute` is pinned by the test suite and cannot be silently reordered; per-tool risk classification runs at the gateway; human approvals are a runtime argument, not a framework rewrite. **Better because:** a regulated buyer can point to a specific test that proves the agent cannot execute a denied or over-budget action, rather than reasoning about middleware composition order — which is exactly the property that closes enterprise diligence. |
+| **Cloud-native managed agent platforms** | AWS Bedrock Agents, Vertex AI Agent Builder, Azure AI Studio Agents | Provider-hosted agent runtimes with console-driven tool registration, managed approval workflows, and observability tied to the cloud's logging stack. | We are code-first, portable across LLM providers, and emit a **replayable in-memory `AgentRunTrace`** that is not tied to a single cloud's telemetry. Approvals are per-action-type runtime arguments rather than console flows. **Better because:** customers who run multi-cloud or hybrid — which is most of BFSI and healthcare — can adopt us without provider lock-in, and the audit story is a single trace the customer owns, not a provider-specific log pipeline that evaporates the day they switch clouds. |
+| **LLM-native tool / function-calling APIs** | OpenAI Assistants & Tools, Anthropic Tool Use, Mistral Function Calling | Provider-side tool-calling primitives exposed through a proprietary API. They decide *which* tool the model wants to call. | These are **substrate**, not a governance layer. They do not decide whether the call is allowed, affordable, approved, or in-scope for the current turn. **Better because:** Agentic Framework consumes these APIs through `BaseLLMAdapter` and *adds* the governance contract on top, so a customer using OpenAI Tool Use today gets SafetyGate, SafeMCPGateway, hard budget caps, and runtime approvals without migrating off their existing provider. We are additive to, not competitive with, the primitives they already pay for. |
+| **Post-hoc guardrails & moderation** | NeMo Guardrails, Guardrails AI, Llama Guard, OpenAI Moderation API | Content-level filters and output classifiers applied *after* the model has produced a response. | Guardrails protect **text**, not **actions**. A hallucinated tool name, a budget breach, a denied approval, or a destructive side effect is not something a content filter is in a position to catch. **Better because:** we intervene at the action boundary — the thing that actually touches production systems — and we compose with a content-level guardrail rather than replacing it; a customer can still run NeMo Guardrails on the LLM output and use Agentic Framework for the tool-execution path. |
+| **Observability & eval platforms** | LangSmith, Langfuse, Helicone, Arize Phoenix, W&B Traces | Instrumentation layers that record prompts, responses, latencies, and evals for after-the-fact debugging and scoring. | Observability tools answer *"what did the agent do?"* after the fact. We answer *"what is the agent allowed to do right now, and can we stop it?"* at execution time. **Better because:** the `AgentRunTrace` we emit is a first-class replayable object produced by the runtime contract itself — the same structure governance decisions were made against, not an out-of-band log pulled from a SaaS dashboard. Observability platforms remain useful on top; they become a *consumer* of the trace rather than a substitute for governance. |
+| **Workflow / orchestration platforms** | Temporal, Airflow, Prefect, n8n, Zapier AI | Durable workflow engines (often retrofitted with LLM steps) that execute business processes with retry, state machines, and fan-out. | Workflow engines assume steps are **deterministic and pre-approved** — they are strong at durability and weak at *"the next action is chosen by an LLM and might be unsafe."* We assume steps are **LLM-chosen and must be gated**. **Better because:** we live exactly at the gap workflow engines do not cover — between *"the model decided to act"* and *"the action touched the system"* — and we can be invoked from inside a Temporal activity the same way a workflow engine calls any Python library. |
+
+### Feature-level differentiation on governance primitives
+
+For buyers who want the one-page side-by-side on the primitives that
+come up in procurement conversations, here is the honest feature
+comparison against the two most common competitor families:
+
+| Area | Agentic Framework | LangGraph / CrewAI / AutoGen | Bedrock / Vertex Agents |
+|---|---|---|---|
+| Action loop ordering pinned by tests | **Yes** | Varies; typically middleware-composed | Provider-opaque |
+| Per-tool risk classification at the gateway | **Yes** | Partial / per-integration | Partial |
+| Human-in-the-loop as a runtime argument | **Yes** | Bolt-on patterns | Console-driven |
+| Hard budget caps as terminal events | **Yes** | Typically soft / dashboard | Partial |
+| Signal enrichment from model-internal state | **Differentiated** (requires CG adapter) | Not available without model-internal access | Not exposed |
+| Multi-agent orchestration | Not yet — on roadmap | **Mature** | **Mature** |
+| Managed / hosted runtime | Not yet — on roadmap | Partial | **Mature** |
+| Ecosystem breadth (integrations, templates) | Narrow, focused | **Broad** | **Broad** |
+
+### Why the overall bet is better, not just different
+
+- **Governance *is* the execution path, not a wrapper around it.** The `cancel → budget → approve → execute` invariant is a tested runtime contract. No other framework in this landscape makes that a first-class, diff-testable property of the library itself — which is exactly what an enterprise risk team needs in order to sign off an autonomous agent.
+- **Portable across LLM providers by construction.** `BaseLLMAdapter` lets a customer start on OpenAI or Anthropic today and move to a self-hosted or CG-enabled model later with no application rewrite. Managed platforms on the list lock the buyer into a single cloud; open-source frameworks leave portability to the user.
+- **Signal enrichment from model internals is a category of one.** Because we ship our own CG-capable adapter (`MistralCGAdapter`) alongside the framework, governance can read entropy and vritti signals straight from the model's 32D state rather than trusting a text-level self-reported confidence. No wrapper on top of a closed API can reproduce this, and no closed API currently exposes it.
+- **Composes with, rather than replaces, the rest of the stack.** A customer can keep LangChain for its ecosystem, Temporal for durability, LangSmith for observability, NeMo Guardrails for content filtering — and still put Agentic Framework at the tool-execution boundary. We are the missing layer, not a rival to every layer.
+- **Honest scope on where we do not compete (year one).** We are not trying to win on ecosystem breadth, managed infrastructure, or multi-agent orchestration in the first twelve months. We are trying to win on the governance properties that regulated enterprises often cannot ship without: pinned action-loop ordering, per-tool risk classification, runtime approvals, hard budget caps, replayable traces, and — where customers adopt the CG path — signal enrichment from model-internal state.
+
+### In one sentence
+
+Agent frameworks make it easy to call an LLM and run a tool. Managed
+platforms make it easy to host an agent on one cloud. Guardrails make
+it easy to filter text. Agentic Framework makes it **safe for a
+regulated enterprise to let an autonomous agent touch production** —
+and that is a different product category than any of the incumbents
+in this table are building for.
+
+---
+
+## Page 4 — Evidence & Roadmap
 
 ### What is proved today (v1.9.0, internal evidence)
 
@@ -192,26 +249,6 @@ benchmarks. An external benchmark is planned (see roadmap).
 | Switching mock → real LLM | Rewire several components | Swap adapter only |
 | Preview which actions are gated | Manual inspection | `describe_approval_coverage()` |
 | Human-readable trace | Custom print loop | `format_trace(trace)` |
-
-### Competitive position (honest)
-
-| Area | Agentic Framework | LangGraph / CrewAI / AutoGen | Bedrock / Vertex Agents |
-|---|---|---|---|
-| Action loop ordering pinned by tests | **Yes** | Varies; typically middleware-composed | Provider-opaque |
-| Per-tool risk classification at the gateway | **Yes** | Partial / per-integration | Partial |
-| Human-in-the-loop as a runtime argument | **Yes** | Bolt-on patterns | Console-driven |
-| Hard budget caps as terminal events | **Yes** | Typically soft / dashboard | Partial |
-| Signal enrichment from model-internal state | **Differentiated** (requires CG adapter) | Not available without model-internal access | Not exposed |
-| Multi-agent orchestration | Not yet — on roadmap | **Mature** | **Mature** |
-| Managed / hosted runtime | Not yet — on roadmap | Partial | **Mature** |
-| Ecosystem breadth (integrations, templates) | Narrow, focused | **Broad** | **Broad** |
-
-We are not trying to win on ecosystem breadth or hosted infrastructure
-in year one. We are trying to win on the governance properties that
-regulated enterprises often cannot ship without: pinned action-loop ordering,
-per-tool risk classification, runtime approvals, hard budget caps,
-replayable traces, and — where customers adopt the CG path — signal
-enrichment from model-internal state.
 
 ### 12-month roadmap
 

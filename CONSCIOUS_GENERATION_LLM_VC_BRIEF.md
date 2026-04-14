@@ -148,7 +148,50 @@ available.
 
 ---
 
-## Page 3 — Evidence, Honest Status & Roadmap
+## Page 3 — Competitive Landscape
+
+`mistral_cg` occupies an unusual position in the current LLM tooling
+stack. It is neither a foundation-model company trying to outspend
+OpenAI on pre-training, nor a wrapper layer that sits outside a
+black-box API. It is a **trainable internal modification to an
+open-weights model** with an explicit thesis about how token selection
+should be computed. The table below places our product against the
+families it is most commonly compared to in investor conversations,
+stating for each family *how* we differ and *why* that difference is
+an advantage.
+
+| Category | Representative players | What they ship | How `mistral_cg` differs — and why it is better |
+|---|---|---|---|
+| **Closed-weights foundation labs** | OpenAI (GPT-4/5), Anthropic (Claude), Google DeepMind (Gemini) | Massive, closed-weights models tuned via RLHF / Constitutional AI. Mitigations (refusals, factuality, tone) are applied as a preference layer over a single softmax. | We do not compete on pre-training scale. We bolt a ~5M-parameter trainable layer onto a frozen open-weights backbone and intervene *inside* the generation mechanism. **Better because:** the intervention is structural rather than preference-tuned, self-hostable, orders of magnitude cheaper to train, and our governance layer gets access to actual model internals — not just the text that a closed API returns. |
+| **Open-weights backbones** | Mistral AI, Meta Llama, Qwen, DeepSeek | Open-weights base / instruct models intended as a starting point for downstream fine-tuning. | These are our **substrate**, not our competitor. `mistral_cg` is what you would build *on top of* Mistral-7B if you wanted the model to expose an interpretable 32D state and a multi-field token-evaluation path. **Better because:** we inherit every quality gain the open-weights ecosystem produces (our recipe is deliberately backbone-agnostic) and we add a capability — interpretable, per-field token scoring — that no base model exposes on its own. |
+| **Parameter-efficient fine-tuning** | LoRA / QLoRA, PEFT, IA³, adapter tuning | Generic low-rank or adapter modules that shift a frozen model's output distribution toward a target dataset, tone, or persona. | LoRA-class methods are **architecturally neutral**: they adjust a distribution without making any claim about *why* a token should be chosen. Our phase adapter looks like a LoRA from the outside, but it is driven by a designed 32D Sovereign State (Bhava · Kosha · Vritti · Guna) and supervised by per-field scorers. **Better because:** every trainable parameter has a named role (identity, mode, energy, phoneme, plausibility), so a failure mode can be localized to a field rather than debugged as an opaque weight shift — and the same structure gives downstream systems something legible to read. |
+| **Retrieval-augmented generation** | LangChain / LlamaIndex + vector DBs (Pinecone, Weaviate, Chroma) | Inject retrieved documents into the prompt to ground generation on external facts. | RAG grounds *what* the model sees in its context window. It does not change *how* the model ranks candidate tokens given that context. **Better because:** even with perfect retrieval, the final token is still picked by a single softmax; `mistral_cg` replaces that softmax with multi-field agreement, so RAG + CG is strictly stronger than RAG alone — retrieval provides evidence, and CG enforces that the chosen token is actually consistent with it. |
+| **Guardrails & post-hoc moderation** | NeMo Guardrails, Guardrails AI, Llama Guard, OpenAI Moderation API | Filter, rewrite, or refuse outputs *after* the model has already produced them. | Guardrails act after the distribution is committed. Our thesis is that hallucinations, tone drift, and mode confusion originate *inside* the token-ranking step, so the intervention has to happen there. **Better because:** shaping the distribution at the source avoids the whack-a-mole cost of filtering and catches failures a pattern-based filter cannot even express — energetic incoherence, cognitive-mode drift, ontological identity breakdown — which are exactly the cases where standard moderation is silent today. |
+| **Interpretability / steering startups** | Goodfire, Transluce, Anthropic interpretability, EleutherAI mech-interp | Probe, visualize, or steer existing model internals *after* the model has been trained by someone else. | Interpretability players treat the model as **given** and learn to read or nudge it. We treat interpretable internal state as a **designed, trained, and supervised** component of the model itself. **Better because:** every dimension of the 32D Sovereign State is a contract the training stack optimizes against, so a governance readout is not an empirical probe that might generalize — it is a named axis the model was trained to expose and respect. |
+| **Agent frameworks & governance wrappers** | LangChain, AutoGen, CrewAI, LangGraph | Orchestration layers that call LLM APIs and add tool use, memory, retries, and confidence heuristics. | These frameworks rely on **prompt-level, self-reported** signals — the model says "I am not sure" and the wrapper trusts it. Our Agentic Framework consumes **model-internal** signals (entropy + vritti read from the 32D state) through `MistralCGAdapter`. **Better because:** a model's self-reported confidence is itself a text completion and can hallucinate; a state readout cannot — it is literally the vector the model used to pick the next token, so escalation, tool gating, and refusal decisions are grounded in what the model *did*, not what it *said*. |
+
+### Why the overall bet is better, not just different
+
+- **Structural, not behavioral.** Every other player in this table either (a) trains a bigger black box, (b) writes better prompts around a black box, or (c) filters the output of a black box. `mistral_cg` is the only approach in this list that changes *the mechanism of token selection itself*, which is where the failure modes we care about originate.
+- **Seed-stage cost, foundation-lab capability.** ~5M trainable parameters on a frozen 4-bit Mistral-7B. That is reproducible on commodity GPUs with a single-digit-million training budget — the opposite of the capital moat closed labs rely on, and cheap enough that each new signal family can be ablated honestly.
+- **Interpretable by construction.** The 32D Sovereign State is a designed contract (Bhava · Kosha · Vritti · Guna · Reserved), not a post-hoc probe. That makes the resulting model **auditable in the same motion that produces it** — a property governance buyers cannot get from a closed API and cannot reliably manufacture with an interpretability tool applied from the outside.
+- **Governance coupling is native, not bolted on.** Because the Agentic Framework reads signals directly from the 32D state via `MistralCGAdapter`, a governed agent built on `mistral_cg` gets runtime decisions (escalation, tool gating, refusal) based on what the model *actually did*, not on what it *said it did*. No wrapper framework on top of a closed API can match that loop, and no closed API is likely to expose it.
+- **Composes with, rather than replaces, the rest of the stack.** `mistral_cg` does not ask an operator to throw away RAG, guardrails, or their agent framework — it makes each of those layers more effective, because the model underneath is now producing a signal they can actually condition on. The competitive question is not "CG or RAG?" but "with or without the field-integrated generation path underneath?"
+
+### In one sentence
+
+Everyone else in this landscape either **trains a bigger model**,
+**adds text around an existing model**, or **observes an existing
+model from the outside**. `mistral_cg` is a bet that the next
+improvement in LLM reliability comes from **changing how a single
+token is chosen**, using an explicit, interpretable internal state
+that both the model and a governance layer can read — and that this
+bet is winnable at seed-stage cost, because the backbone is free and
+the trainable surface is small.
+
+---
+
+## Page 4 — Evidence, Honest Status & Roadmap
 
 ### What is built and running today
 
