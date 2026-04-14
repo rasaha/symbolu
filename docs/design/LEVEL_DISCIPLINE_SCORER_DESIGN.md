@@ -2921,3 +2921,303 @@ Step 7 fixes the honest risk accounting that Step 8 can wrap up:
 ---
 
 *Step 7 complete.*
+
+---
+
+## Step 8 — What This Buys and Does Not Buy
+
+### 8.1 — Positive Framing Orientation
+
+Step 7 has named every risk the design carries, every blind spot in
+its validation plan, every gaming path through the loss landscape,
+every contingency if the Phase 3 kappa gate does not clear, and
+every risk the design explicitly accepts without mitigation. That
+work is done. Step 8 inherits that scope, does not retread any of
+it, and states positively what the scorer delivers — so that
+downstream authors (the VC brief, product surfaces, external
+reviewers) have a clean anchor for the positive claim that is
+fully backed by Steps 1–7 and bounded by §7.8.
+
+The crispness of this section is *earned* by the honesty of Step 7,
+not purchased by hiding it. Every positive claim below is either a
+reference to a structural commitment made in an earlier step, a
+statement of a capability the scorer unlocks in architectural
+terms, or an explicit boundary against §7.8. Nothing here is
+promotional; everything here is load-bearing.
+
+### 8.2 — What This Buys: The Three-Level Summary
+
+The scorer delivers at three progressively more ambitious levels,
+matching the framing-tunability pattern from §1. Each level is
+contingent on the corresponding curriculum phase from §5.2
+clearing its graduation gates from §6.5.
+
+**1. Immediate deliverable — after Phase 2 of the §5 curriculum.**
+A trained per-token classifier over categorical level (`I/G/P/U`),
+temporal level (continuous log-seconds), claim type
+(`descriptive / statistical / interpretive / normative /
+universal_constraint`), and evidence-vs-claim role, integrated into
+the existing CG Token Evaluation Tensor as its seventh scorer
+family and exposed via the `MistralCGAdapter` governance readout
+per §3.6. The Agentic Framework can read per-token zoom level and
+level-transfer distance as a generation-time signal without needing
+`JustificationHead` to have completed its research phase, because
+`delta_cat` and `delta_temp` are computed directly from the
+classifier outputs and do not require a trained justification
+score to be useful.
+
+**2. Mid-term deliverable — after Phase 3 of the §5 curriculum,
+contingent on the §5.5 kappa gate.** A trained `JustificationHead`
+that estimates per-token whether the current token would complete
+a justified or unjustified zoom-level transfer, optionally
+accompanied by the §5.6 multi-task `ReasonCodeHead` that surfaces
+*which* of the eleven named pathologies from §2.8 the `risk`
+signal is most consistent with. Governance escalation can then
+distinguish *stereotype risk* from *historical whitewashing risk*
+from *statistical flattening risk* at the token level — a
+capability no existing bias-detection stack offers, because the
+existing stacks do not represent ontological zoom level as a
+model-internal signal in the first place.
+
+**3. Long-term deliverable — after Phase 4 of the §5 curriculum
+and the field-integrated softmax roadmap item in the existing CG
+brief.** Direct per-token influence on generation, where the
+level-discipline signal joins CSR, Vritti, Guna, and Ontological
+as a contributor to the multi-field token ranking rather than
+reaching inference only via the phase adapter's gated residual on
+the hidden state. A CG model under Phase 4 *prefers* tokens whose
+completion does not require an unjustified zoom-level transfer,
+making the framework's core claim from §1 an active property of
+the generation distribution rather than only an observable
+property of the governance readout. §7.5 is explicit that this
+phase introduces a concealment-vs-correction concern the scorer
+does not by itself resolve; the Phase 4 monitoring plan for the
+rest of the CG stack applies unchanged.
+
+### 8.3 — What This Gives the Agentic Framework Specifically
+
+Three concrete capabilities the governance layer gains that it
+does not have today, each localized to a specific existing
+surface rather than to a new adapter.
+
+- **Per-token zoom-level telemetry.** The existing
+  `MistralCGAdapter` governance readout already exposes `entropy`
+  and `vritti` values through the `last_cg_metadata` field. The
+  scorer adds
+  `last_cg_metadata["level_discipline"] = {cat_level, temp_level,
+  delta_cat, delta_temp, justification, risk}` as a sibling sub-dict
+  (§6.1). Governed agents can condition escalation, tool gating,
+  and refusal on level-transfer distance in the same call path they
+  already use for model-internal uncertainty and cognitive mode,
+  with no changes to `BaseLLMAdapter`, no new `build_agent(...)`
+  wiring, and no modification to the Agentic Framework runtime
+  contract (§3.6, §6.2).
+- **Reason-code-aware escalation.** With the §5.6 multi-task
+  `ReasonCodeHead` active, the governance readout's `risk`
+  signal is accompanied by a concrete reason code drawn from the
+  eleven-category vocabulary in §5.5. A `SafetyGate` that
+  currently sees only *"risk = high"* sees *"risk = high,
+  top_code = unjustified:stereotype, confidence = 0.73"*, and
+  can map each reason code to a different policy response —
+  escalate a stereotype to human review, flag a historical
+  whitewashing transfer for documentation, block a statistical
+  flattening under a differential-privacy policy. The mapping
+  lives in the governance layer; the scorer supplies the
+  discriminator.
+- **Surface-level legibility for downstream product layers.** A
+  product UI that elects to surface the `level_discipline`
+  sub-dict gains the ability to show, per turn, *"the model is
+  currently making a `P·H` claim with `justification ≈ 0.3`
+  risk"* — turning what would otherwise be invisible into
+  something a reader can see, weigh, and challenge. §7.8 is
+  explicit that the scorer's output is expert-interpretable,
+  not end-user-interpretable, on its own; whether an end user
+  sees any of this is a **product decision**, not an
+  architecture decision, and the scorer delivers the signal
+  without committing to a particular product surface for it.
+
+### 8.4 — What This Gives Conscious Generation as an Architecture
+
+Three architectural contributions that are specific to the CG
+stack rather than generic bias-detection wins.
+
+- **It completes the epistemic axis of the Token Evaluation
+  Tensor.** The existing six CG scorers judge *what the token is
+  about* (`TokenOntologyProjector` + `OntologyCompatibilityScorer`
+  — identity content), *how it sounds* (`CSRTokenScorer` —
+  phonemic resonance), *what cognitive mode it is in*
+  (`VrittiTokenScorer` — fact / fiction / opinion / memory /
+  imagination), *how it relates energetically*
+  (`GunaTokenScorer`), *whether it is physically plausible*
+  (JEPA / plausibility heads), and *how the layers integrate*
+  (Kosha / Bliss). None of them judge *how the token relates to
+  the evidence that supports it*. The Level Discipline Scorer is
+  the first scorer in the stack that is explicitly epistemic —
+  not about *what* the claim says, but about *whether its zoom
+  matches its warrant* (§3.3).
+- **It makes the `Reserved 4D` slice load-bearing.** The Reserved
+  slice was designed as a place for additive signals that do not
+  fit the existing four semantic slices (Bhava, Kosha, Vritti,
+  Guna), and until now it has been unused. The scorer is the
+  first consumer that fully uses all four dimensions per §3.4 and
+  §4.1, which validates the slice's original design intent and
+  sets a precedent for future additive signals that need
+  sequence-level state without allocating a new state container.
+- **It extends the multi-field token-evaluation thesis.** The
+  existing CG brief frames CG as next-token probability computed
+  as the *integrated agreement of multiple semantic fields*. The
+  scorer adds an **epistemic** field to that list, extending the
+  thesis from *semantic agreement* to *semantic and epistemic
+  agreement*. This is a conceptual extension of the framework,
+  not just a new module: it opens the question of what other
+  epistemic fields (§8.5) belong in the tensor alongside it.
+
+### 8.5 — What This Gives the Broader CG Thesis
+
+Two forward-looking claims the scorer enables but has not yet
+delivered — framed as *the door it opens*, not *the thing it has
+already done*.
+
+- **A path from "bias is prejudice" to "bias is level-confusion"
+  that is empirically falsifiable.** The structural definition
+  of bias from §2.7 — a judgment is biased when a claim valid at
+  one zoom level is transferred to a different zoom level without
+  proportional justification — is, as far as this document's
+  authors are aware, not implemented in any production LLM
+  architecture. The scorer is the first machinery that makes
+  that definition *testable*: not just as a philosophical
+  framing but as a signal a model can be trained against and
+  that human annotators can label under a rubric that clears a
+  stated kappa threshold (§5.5). If the scorer ships and the §6.4
+  validation targets are met, the framing has empirical support;
+  if §5.5's kappa gate is never cleared, the framing fails as a
+  training signal in the specific, checkable way Step 7 enumerates.
+  Either outcome is informative, and neither was possible before
+  the scorer was specified.
+- **A reusable scorer pattern for future epistemic signals.** The
+  four-module template from Step 4 — a classifier head that
+  annotates properties of the current token, a state head that
+  maintains sequence-level epistemic state in the Reserved slice,
+  a judgment head that scores whether a transition between
+  states is licensed, and a top-level scorer that orchestrates
+  the three and emits a structured output dict — is general.
+  Future epistemic signals such as *does this token rely on an
+  unstated premise?*, *does this token commit to a temporal
+  ordering that contradicts prior evidence?*, or *does this token
+  invoke an authority the context has not established?* can reuse
+  the same template and the same Reserved-slice convention. Level
+  Discipline is the first instance of a broader "epistemic
+  scorer" family, and the Step 4 module contract is what makes
+  the next instance cheap to build.
+
+### 8.6 — What This Does Not Buy
+
+Every item on the §7.8 list is outside the scope of this scorer.
+Step 7 names them explicitly, and the framework is built to
+coexist with them rather than to subsume them. A content-safety
+filter, an alignment process, a backbone retraining run, and a
+user-facing transparency layer all remain necessary for a complete
+bias-management stack; the Level Discipline Scorer is additive to
+each, and nothing in Steps 1–7 claims otherwise. The §7.8 list is
+the authoritative boundary; this subsection is deliberately short
+so that it cannot be read in isolation as a weak claim.
+
+### 8.7 — Strongest Honest Claim for Downstream Authors
+
+The paragraph below is written in the sharper research / alignment
+register from §1's framing-tunability note and is wrapped as a
+blockquote so that downstream authors (the VC brief, product
+surfaces, external reviewers) can lift it whole without adapting
+it. It is the strongest positive claim this document licenses.
+
+> *The unjustified transfer of a claim between categorical
+> (Individual / Group / Population / Universal) or temporal
+> (instantaneous / eternal) zoom levels is one structural
+> component of bias, and the Level Discipline Scorer is the first
+> architectural mechanism in the Conscious Generation stack that
+> represents this component as a trained per-token signal. It
+> adds an epistemic field — the seventh — to the existing Token
+> Evaluation Tensor, writes its sequence-level state into the
+> previously unused `Reserved 4D` slice of the Sovereign State,
+> and exposes its output to the Agentic Framework through the
+> existing `MistralCGAdapter` governance readout, so a governed
+> agent can condition escalation on level-transfer risk at
+> generation time in the same call path it already uses for
+> entropy and cognitive mode. The scorer does not solve bias and
+> does not replace content-safety filters, alignment processes,
+> or user-facing transparency layers; it makes one structural
+> component of bias measurable and addressable inside the
+> existing CG architecture, and is additive to every other
+> bias-management surface in the stack.*
+
+### 8.8 — The Design Document Hand-off
+
+- **What is complete.** Steps 1–8 of this design document define
+  the framework, architectural placement, module contract,
+  training signal, integration points, validation plan, research
+  risks, and honest scope of the Level Discipline Scorer. The
+  document is a specification ready for implementation; no
+  further design work is required before engineering can begin
+  walking §6.1 file by file.
+- **What is next.** Implementation proceeds by walking the §6.1
+  table file by file. The `JustificationHead` module and the
+  Dataset C labeling pipeline (`dataset_c_justification.py`)
+  should be started first, because the §5.5 kappa gate is the
+  bottleneck for the entire Phase 3 curriculum and the earliest
+  point at which the research bet in §7.1 becomes evaluable.
+  Dataset A, Dataset B, the classifier head, the state head, the
+  top-level scorer, the `AuxiliaryLossSupervisor` extension, the
+  `SovereignStateProjector` composition wiring, the
+  `MistralCGAdapter` readout extension, the test files, and the
+  `LEVEL_DISCIPLINE_RESERVED_SLICE_ADR.md` audit record can all
+  proceed in parallel with the Dataset C work.
+- **What the VC brief should reference.** The existing
+  `CONSCIOUS_GENERATION_LLM_VC_BRIEF.md` should be updated to
+  reference this design document in its Token Evaluation Tensor
+  table, with a new row for Level Discipline marked as
+  **design spec complete, implementation pending** — using the
+  same honest-scope pattern the brief already uses for its
+  existing "Honest Scope Caveats" section. That brief edit is a
+  separate task and is not performed in this session; Step 8
+  only flags it as the next document-level item to close.
+
+### 8.9 — What Step 8 Establishes
+
+- **The scorer's deliverable is stated at three levels.**
+  Immediate (classifier-only, after Phase 2), mid-term
+  (`JustificationHead` + reason codes, after Phase 3), and
+  long-term (direct generation influence, under Phase 4) —
+  matching the framing-tunability pattern from §1 and the
+  curriculum-phase structure from §5.2.
+- **The three concrete capabilities the Agentic Framework gains
+  are named and localized.** Per-token zoom-level telemetry on
+  `last_cg_metadata["level_discipline"]`, reason-code-aware
+  escalation via the §5.6 `ReasonCodeHead`, and surface-level
+  legibility for downstream product layers — each additive to
+  existing surfaces, with no new `BaseLLMAdapter` or
+  `build_agent(...)` changes required.
+- **The architectural contribution to CG is stated as the
+  completion of the epistemic axis of the Token Evaluation
+  Tensor.** The scorer is the seventh scorer family and the
+  first one that is explicitly epistemic, extending the
+  multi-field thesis from *semantic agreement* to *semantic and
+  epistemic agreement*.
+- **The strongest honest claim is provided as a liftable
+  blockquote.** §8.7 is written in the sharper research register
+  from §1 and is deliberately structured so downstream authors
+  can quote it verbatim without adapting it.
+- **The design document is marked complete.** §8.8 specifies
+  the implementation hand-off (walk §6.1 file by file;
+  `JustificationHead` and Dataset C first because the §5.5 kappa
+  gate is the bottleneck) and flags the VC-brief update as a
+  separate next task.
+
+---
+
+*Step 8 complete.*
+
+---
+
+*Design document complete. See `CONSCIOUS_GENERATION_LLM_VC_BRIEF.md`
+for the VC-facing summary once that brief has been updated to
+reference this spec.*
