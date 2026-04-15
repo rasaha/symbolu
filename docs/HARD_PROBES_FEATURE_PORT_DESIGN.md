@@ -3404,4 +3404,266 @@ are unaffected. This is the intended posture for a P3 feature.
 
 ---
 
-*3B.7 (Rollout Plan) follows next.*
+### 3B.7 Rollout Plan
+
+Five phases instead of §3A.7's seven. The reduction comes from
+(a) §3B being gated on §3A already shipped (Phase 0 is lighter),
+(b) no new trainable module to stress-test (Phase 2 is smaller),
+and (c) the verdict space being narrower (Phase 6 and Phase 7 from
+§3A.7 collapse into a single gate-evaluation-plus-decision phase).
+
+Sequential execution is still required: phases must not be
+skipped, reordered, or run in parallel. The sequencing discipline
+from §3A.7 applies here for the same reason — §3B touches
+`PrimitiveAuxiliaryLosses`, which every CG auxiliary reads from,
+and a broken rollout would produce a diffuse regression across the
+CG auxiliary stack.
+
+#### 3B.7.1 Phase 0 — Prerequisites
+
+**Inputs:** an up-to-date `main` with both P0-1 (§1) and §3A LSTB
+merged and measured.
+
+**Actions:**
+
+1. **Verify §3A is shipped and §3A.6 was completed.** Open the
+   §3A.7 rollout note and confirm that Phase 6 gate evaluation was
+   performed. It does not matter for §3B whether §3A passed all
+   seven gates or was downgraded — §3B only requires that §3A's
+   measurements exist, so that the shared baseline for §3B.6 is
+   well-defined.
+2. **Verify `cmudict` / ARPABET dependencies.** Run:
+   ```bash
+   python -c "import nltk; from nltk.corpus import cmudict; \
+              print(len(cmudict.dict()))"
+   ```
+   If this fails, install the dependency (`python -m nltk.downloader
+   cmudict`) and retry. Do not proceed until the import succeeds in
+   the same environment that will run training.
+3. **Locate `PrimitiveAuxiliaryLosses` construction site in
+   `model_factory.py`.** Same pattern as §3A.7.1 Action 2 — line
+   numbers will drift, the rollout note is the source of truth.
+4. **Confirm tokenizer is available at the construction site.**
+   `model_factory.py` already loads the tokenizer for the
+   `mistral_cg` path; verify by searching for `tokenizer=` or
+   `AutoTokenizer` in the function that builds the CG model.
+
+**Artifact:** a short rollout note recording the §3A rollout note
+reference, the `cmudict` vocabulary size, and the exact file/line
+numbers used in Phases 1–5.
+
+**Gate:** all four actions produce expected output. No code
+modified yet.
+
+#### 3B.7.2 Phase 1 — Implementation
+
+**Inputs:** the Phase 0 rollout note and §3B.3 (Integration Points).
+
+**Actions:** apply the five-file patch in this order:
+
+1. **`csr_phoneme.py`** (new) first. Self-contained, zero
+   dependencies on existing CG code. Smoke-test it in isolation by
+   importing it in an interactive Python session and calling
+   `build_phonemic_table(tokenizer, tokenizer.vocab_size)` directly.
+   Record the valid-row count — this is the first measurement of
+   R4 (low phonemic coverage).
+2. **`config.py`** second. One field, defaults to off, cannot
+   break anything.
+3. **`primitive_auxiliary.py`** third. Constructor + `forward()`
+   changes. Verify by instantiating `PrimitiveAuxiliaryLosses`
+   directly with a tokenizer and `lambda_csr_phonemic=0.0` and
+   confirming the buffers are not registered (since the lambda is
+   zero).
+4. **`model_factory.py`** fourth. Thread the new kwargs into the
+   construction call.
+5. **`train.py`** last. Argparse flag + loss block addition.
+
+**Artifact:** a single commit (or small commit series) on a
+feature branch `csr-phonemic-v1`.
+
+**Gate:** project builds with no import errors.
+`./scripts/train_mistral_cg.sh --smoke-test` succeeds with no
+`--lambda_csr_phonemic` flag set. The isolated Phase 1 Action 1
+smoke test shows a **valid-row count ≥ 10% of vocab size** — if
+below 10%, stop here and investigate R4 before writing tests.
+
+#### 3B.7.3 Phase 2 — Unit tests and coverage verification
+
+**Inputs:** the Phase 1 commit.
+
+**Actions:**
+
+1. **Add a unit test for the phoneme provider.** File:
+   `symbolu_training/training/conscious_generation/providers/tests/test_csr_phoneme.py`.
+   The test constructs a mock tokenizer with a hand-picked list of
+   50 tokens (common words, contractions, punctuation, sub-word
+   fragments, rare byte sequences), runs `build_phonemic_table`,
+   and asserts:
+   - All 50 tokens produce either a valid vector or `mask=False`.
+   - Known-similar word pairs (e.g., `cat`/`bat`) have cosine
+     similarity above a threshold.
+   - Known-dissimilar pairs (`cat`/`xyz`) have cosine similarity
+     below a threshold.
+   This is the R1 regression guard.
+2. **Add a unit test for mask polarity.** Construct a table with
+   one invalid token, run `PrimitiveAuxiliaryLosses.forward()` on
+   a batch that includes it, and assert that the masked MSE
+   divides by exactly the count of valid pairs — not the total
+   batch size, not zero. This is the R2 regression guard.
+3. **Add a unit test for shape correctness.** Feed a known-shape
+   `T` tensor and assert that `_cos_sim.shape == _csr_col.shape`
+   after the cosine similarity computation. This is the R3
+   regression guard.
+4. **Coverage verification.** Run the provider on the actual
+   Mistral tokenizer (not the mock one) and record:
+   - Total vocabulary size.
+   - Valid-row count.
+   - Percentage of valid rows.
+   - A sample of 10 tokens with valid decompositions and 10
+     without, so the rollout note contains concrete examples.
+
+**Artifact:** the three new unit tests + the coverage verification
+block in the rollout note.
+
+**Gate:** all three tests pass first-run. Coverage verification
+shows ≥ 10% valid rows. Existing test suite still passes.
+
+#### 3B.7.4 Phase 3 — Smoke test and diagnostic measurement
+
+**Inputs:** the Phase 2 commit.
+
+**Actions:**
+
+1. Run `./scripts/train_mistral_cg.sh --smoke-test
+   --lambda_csr_phonemic 0.005`. Confirm:
+   - No crash.
+   - Expected metrics appear:
+     `cg_L_csr_phonemic`, `cg_L_csr_phonemic_valid_count`,
+     `cg_L_csr_phonemic_mean_sim`, `cg_csr_col3_mean`,
+     `cg_csr_col3_std`.
+   - `cg_L_csr_phonemic_valid_count` is non-zero — if zero, R4 has
+     triggered and the smoke test batches happen to contain no
+     valid token pairs (very unlikely but possible).
+2. **Diagnostic measurement for R7 (numeric range mismatch).**
+   At step 0 of the smoke test, record `cg_csr_col3_mean`,
+   `cg_csr_col3_std`, `cg_csr_col3_min`, and `cg_csr_col3_max`.
+   If the range is significantly outside `[-1, 1]`, this is the
+   signal that the scorer's column 3 needs a `torch.tanh`
+   normalization before the MSE. If so, apply the normalization
+   as a one-line fix in `primitive_auxiliary.py` and **return to
+   Phase 1** — do not proceed to measurement with the raw range.
+
+**Artifact:** a saved smoke-test log with the diagnostic values,
+attached to the rollout note.
+
+**Gate:** smoke test completes cleanly, all metrics present,
+non-finite count is zero, R7 diagnostic confirms scorer range is
+compatible with the cosine target (or the tanh fix has been
+applied and Phase 1 re-validated).
+
+#### 3B.7.5 Phase 4 — Measurement (baseline + evaluation paired)
+
+**Inputs:** the Phase 3 commit.
+
+**Actions:**
+
+1. Run the **baseline** command from §3B.6.2 (with
+   `--lambda_csr_phonemic 0.0`). Persist the full metric log to
+   `metrics_csr_phon_baseline_<date>.jsonl`. Record the seven
+   values needed for Gates 1, 2, 3, 4, 5 at step 1000.
+2. Immediately afterward, run the **evaluation** command from
+   §3B.6.1 (with `--lambda_csr_phonemic 0.005`). Same seed, same
+   data, same schedule. Persist to
+   `metrics_csr_phon_eval_<date>.jsonl`.
+3. **Execute the phonemic correlation probe** (§3B.6.3) on both
+   runs' final checkpoints. Record both baseline and evaluation
+   correlation scalars in the rollout note.
+
+Unlike §3A.7 which separates baseline and evaluation into Phases
+4 and 5, §3B.7 combines them into Phase 4 because the two runs
+are paired and have no intermediate decision point — there is no
+"run the baseline, then decide whether the evaluation is worth
+running" branch, because both runs are always needed for Gate 2.
+
+**Artifact:** both metric logs + rollout note with recorded
+baseline and evaluation values + two correlation probe scalars.
+
+**Gate:** both runs complete cleanly. Non-finite loss count is
+zero on both runs.
+
+#### 3B.7.6 Phase 5 — Gate evaluation and decision
+
+**Inputs:** the Phase 4 recorded values.
+
+**Actions:**
+
+1. Compute each of Gates 1–5 from §3B.6.4 against the recorded
+   values. Write pass/fail with the raw numbers into the rollout
+   note.
+2. Consult the §3B.6.6 decision table to determine the verdict
+   for the gate pass pattern.
+3. File a **finding note** in the repository's design document
+   tree (or wherever findings are tracked). The finding note
+   must contain:
+   - The rollout note reference.
+   - The five gate outcomes with raw numbers.
+   - The decision table verdict.
+   - The date of the measurement and the commit hash used.
+4. **Do not modify `scripts/train_mistral_cg.sh`** under any
+   verdict. §3B ships off-by-default regardless of outcome
+   (§3B.4.3). The code and flag are now available; the finding
+   note lets future operators cite the measurement when deciding
+   whether to enable the flag.
+5. Merge `csr-phonemic-v1` to `main` if and only if:
+   - Gates 1 and 5 both pass (the LM floor and non-finite hard
+     stop — these are blockers).
+   - The finding note has been filed.
+   Other gate outcomes do not block the merge, because §3B is
+   additive and the flag stays off. A failed Gate 2 or Gate 3 is
+   a useful finding for future operators; it does not indicate
+   broken code that must be kept out of `main`.
+
+**Artifact:** completed rollout note + finding note + (if gates
+1 and 5 pass) merged branch.
+
+**Gate:** none — this is the terminal phase.
+
+#### 3B.7.7 Post-measurement follow-ups
+
+Unlike §3A.7.9, which lists five named follow-up experiments, §3B
+has only one follow-up worth naming:
+
+- **Alternative phonemic operationalization.** R5 from §3B.5 is a
+  design-time unresolved question: ARPABET-derived cosine
+  similarity may not be what the CG doctrine actually means by
+  "phonemic resonance." A future follow-up could replace the
+  `arpabet_to_10d_vector` helper with a learned phonemic
+  embedding, a linguistic corpus similarity, or a Sanskrit-specific
+  Varna mapping refinement. The provider module is the right place
+  to swap this in; the rest of §3B's integration is unchanged.
+
+All other experiments (soft-label KL divergence from §3B.2 Decision
+2 Option C, per-plane phonemic grounding, multi-lingual extension)
+are explicitly out of scope (§3B.8) and not tracked as follow-ups.
+
+#### 3B.7.8 Rollback path
+
+Trivial. §3B is entirely additive and off-by-default.
+
+- **Unmerged rollback:** do not merge `csr-phonemic-v1`.
+- **Merged rollback:** there is nothing to roll back. Operators who
+  do not pass `--lambda_csr_phonemic` see no change. If a future
+  issue is traced to the phoneme provider, set
+  `lambda_csr_phonemic=0.0` in the affected run (which is the
+  default, so no action needed) and the issue disappears.
+- **Code revert** is only needed if the Phase 2 unit tests or the
+  defensive guards in `forward()` turn out to produce
+  side effects even when `lambda_csr_phonemic=0.0` — which should
+  be impossible by design (the guards are gated on
+  `self.lambda_csr_phonemic > 0`) and is the reason the
+  master-switch behavior is tested in Phase 1 Action 3 and Phase 3.
+
+---
+
+*3B.8 (Out of Scope) follows next — the final §3B subsection, and
+the end of §3.*
