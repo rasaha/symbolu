@@ -3971,5 +3971,266 @@ in the wrapper code.
 
 ---
 
-*4.3 (Design Approach) and 4.4 (Integration Points) follow in the
-next part.*
+### 4.3 Design Approach
+
+Three design decisions. Smaller than §3A's five and §2's (implicit)
+because P1-2 is a constructor-injection task on already-complete
+primitives — most of the design effort was done by whoever built
+the core phase attention layer, and §4 just consumes it correctly.
+
+#### Decision 1: Where the kwargs thread through the wrapper
+
+Two options for how `phase_channels` and `phase_write_gate` reach
+the inner `PhaseAttentionLayer`:
+
+| Option | Approach | Verdict |
+|--------|----------|---------|
+| A | **Constructor kwargs on `MistralHybridWrapper.__init__`** that are passed to `HybridTransformerBlock(...)` at the block construction site | **Chosen** |
+| B | Post-construction walk of `PhaseAttentionLayer` submodules (same pattern as §2 warmstart) | Rejected — the kwargs are **structural** (they allocate `write_gate_proj` and `channel_decay_logit` parameters), not runtime state. Trying to set them post-construction would require creating the parameters later, which cannot be done without restructuring the already-built block |
+
+Option A is strictly simpler because `HybridTransformerBlock`
+already accepts these kwargs at construction time. The wrapper
+just needs to pass them through.
+
+#### Decision 2: `LocalTransformerBlock` handling
+
+The first `local_layers` blocks in `MistralHybridWrapper` are
+`LocalTransformerBlock` instances (local attention only, no phase
+branch). Later blocks (`i >= local_layers`) are
+`HybridTransformerBlock` with both local and phase attention.
+Should `phase_channels` and `phase_write_gate` be passed to
+`LocalTransformerBlock` too?
+
+**No.** `LocalTransformerBlock` has no phase attention, so
+`phase_channels` and `phase_write_gate` have nowhere to attach
+inside it. Passing them would either (a) error out if the
+constructor doesn't accept them, or (b) silently discard them.
+Neither is desirable.
+
+**Conditional pass:** the wrapper's construction loop conditionally
+passes the phase kwargs only to `HybridTransformerBlock` (the
+`else` branch at `mistral_hybrid_wrapper.py:126–138`). The
+`LocalTransformerBlock` branch at `:117–125` is unchanged. This
+mirrors how the existing `alpha_local`, `alpha_phase`, and
+`learned_decay` kwargs are already scoped — they only apply to
+hybrid blocks, and the local blocks ignore them.
+
+#### Decision 3: Default values for the new kwargs
+
+What should `phase_channels` and `phase_write_gate` default to
+inside the `MistralHybridWrapper` constructor?
+
+- `phase_channels=1` (default). Matches the core
+  `PhaseAttentionLayer` default at `phase_transformer.py:1964`, so
+  the wrapper's behavior when the new kwargs are not set is
+  **bit-for-bit identical** to the current behavior. No silent
+  change to existing runs.
+- `phase_write_gate=False` (default). Same rationale. Existing
+  checkpoints that were trained without the gate can be loaded
+  into a wrapper with the default, and the resulting model has
+  the same parameter count and forward-pass semantics as before.
+
+**Checkpoint compatibility note.** When `phase_channels` is set
+to `> 1`, the `channel_decay_logit` parameter is allocated with
+shape `[C*H]` — different from the `decay_logit` shape of `[H]`
+that a single-channel model uses. This means:
+
+- Checkpoints saved with `phase_channels=1` **cannot** be loaded
+  into a model built with `phase_channels=4` via strict
+  `load_state_dict()` — the shapes do not match.
+- Checkpoints saved with `phase_channels=4` **cannot** be loaded
+  into a model built with `phase_channels=1` for the same reason.
+
+The wrapper does not attempt to bridge this — the `phase_channels`
+value at checkpoint load time must match the value at checkpoint
+save time. If operators need to change the value mid-training,
+they must start a fresh run. This is documented as a §4.6 risk and
+is the standard behavior for any architectural hyperparameter.
+
+### 4.4 Integration Points
+
+**Four files touched.** Sketches below are illustrative, not
+literal patches.
+
+#### File 1: `symbolu_training/training/unified/mistral_hybrid_wrapper.py`
+
+Two changes. Constructor signature and construction loop.
+
+**Change 1a — add kwargs to `__init__`:**
+
+Place next to the existing phase-related kwargs like `alpha_phase`
+and `learned_decay`:
+
+```python
+# mistral_hybrid_wrapper.py — __init__ signature (line ~55)
+def __init__(
+    self,
+    ...,
+    alpha_local: float = 0.8,
+    alpha_phase: float = 0.2,
+    decay_gamma: float = 0.99,
+    learned_decay: bool = True,
+    protected_phase: bool = True,
+    phase_adapter_hidden: int = 1024,
+    # V10.12 — Multi-channel phase memory + selective write gating (§4)
+    phase_channels: int = 1,
+    phase_write_gate: bool = False,
+    ...,
+):
+```
+
+**Change 1b — thread kwargs into the `HybridTransformerBlock`
+construction call:**
+
+At the existing loop at `mistral_hybrid_wrapper.py:115–138`, the
+`else` branch constructs `HybridTransformerBlock`. Add the new
+kwargs to that call:
+
+```python
+# mistral_hybrid_wrapper.py — inside the phase_blocks construction loop
+for i in range(num_phase_layers):
+    if i < local_layers:
+        # Local-only branch (unchanged)
+        self.phase_blocks.append(
+            LocalTransformerBlock(
+                phase_config,
+                window_size=window_size,
+                backend=local_backend,
+            )
+        )
+    else:
+        # Hybrid branch — threaded with new kwargs
+        self.phase_blocks.append(
+            HybridTransformerBlock(
+                phase_config,
+                window_size=window_size,
+                local_backend=local_backend,
+                alpha_local=alpha_local,
+                alpha_phase=alpha_phase,
+                learned_decay=learned_decay,
+                protected_phase=protected_phase,
+                # NEW — §4
+                phase_channels=phase_channels,
+                phase_write_gate=phase_write_gate,
+            )
+        )
+```
+
+**Diagnostic logging at construction time:** emit a startup line
+when either feature is enabled, so operators see confirmation in
+the log:
+
+```python
+# mistral_hybrid_wrapper.py — after the phase_blocks loop
+if phase_channels > 1 or phase_write_gate:
+    _n_hybrid = num_phase_layers - local_layers
+    print(
+        f"  Phase channels: {phase_channels} "
+        f"({'multi-horizon' if phase_channels > 1 else 'single'})"
+    )
+    print(
+        f"  Phase write gate: "
+        f"{'ENABLED' if phase_write_gate else 'disabled'}"
+    )
+    print(
+        f"  Wired across {_n_hybrid} HybridTransformerBlock(s)"
+    )
+```
+
+No other changes inside the wrapper. `compute_state_delta`, Stage 8
+Perspective Synthesizer, adapter gate, and the output norm are all
+unchanged. This matches the §2 non-interference guarantee — P1-2
+does not touch anything §2 or P0-1 depends on.
+
+#### File 2: `symbolu_training/training/unified/config.py`
+
+Two new config fields in the hybrid-specific block:
+
+```python
+# config.py — inside the mistral_hybrid config section
+phase_channels: int = 1          # §4 — multi-channel phase memory (1=legacy)
+phase_write_gate: bool = False   # §4 — selective write gate on phase memory
+```
+
+#### File 3: `symbolu_training/training/unified/model_factory.py`
+
+Thread the two config fields into the `MistralHybridWrapper`
+construction call. The construction site should be located by
+searching for `MistralHybridWrapper(` in `model_factory.py`; there
+should be exactly one occurrence.
+
+```python
+# model_factory.py — where MistralHybridWrapper is constructed
+
+model = MistralHybridWrapper(
+    model_name=config.mistral_model_name,
+    quantize=config.mistral_quantize,
+    num_phase_layers=config.num_phase_layers,
+    local_layers=config.local_layers,
+    ...,
+    # NEW — §4
+    phase_channels=config.phase_channels,
+    phase_write_gate=config.phase_write_gate,
+)
+```
+
+#### File 4: `symbolu_training/training/unified/train.py`
+
+Two argparse flags, threaded into `UnifiedConfig` at the existing
+CG/hybrid config construction site:
+
+```python
+# train.py — near the existing mistral_hybrid argparse block
+parser.add_argument("--phase_channels", type=int, default=1,
+    help="Number of independent phase memory channels in "
+         "mistral_hybrid. 1 = legacy single-channel. "
+         "Recommended: 4 for multi-horizon memory. "
+         "See §4 of HARD_PROBES_FEATURE_PORT_DESIGN.md.")
+parser.add_argument("--phase_write_gate", action="store_true",
+    help="Enable selective write gating on phase memory in "
+         "mistral_hybrid. Reduces noise corruption of long-range "
+         "phase state. See §4 of HARD_PROBES_FEATURE_PORT_DESIGN.md.")
+```
+
+Threaded into `UnifiedConfig` alongside the §2 phase warmstart
+flags:
+
+```python
+# train.py — UnifiedConfig construction
+config = UnifiedConfig(
+    ...,
+    phase_warmstart=args.phase_warmstart,
+    phase_warmstart_steps=args.phase_warmstart_steps,
+    phase_warmstart_tau=args.phase_warmstart_tau,
+    # NEW — §4
+    phase_channels=args.phase_channels,
+    phase_write_gate=args.phase_write_gate,
+)
+```
+
+**This is also the natural place for the §2 wiring to live** —
+both §2 and §4 flags are `mistral_hybrid`-specific, both are
+constructor-time configuration, and both need to be threaded
+through `model_factory.py` → `MistralHybridWrapper.__init__`.
+If §2 has already shipped, the §4 additions slot in adjacent to
+the existing wiring.
+
+#### Patch-size budget
+
+| File | Lines added / modified |
+|------|-----------------------|
+| `mistral_hybrid_wrapper.py` | ~15 (signature + block construction + diagnostic print) |
+| `config.py` | ~2 (two new fields) |
+| `model_factory.py` | ~5 (two new kwargs in the construction call) |
+| `train.py` | ~10 (argparse + UnifiedConfig threading) |
+| **Total** | **~32 lines** |
+
+Smaller than §2's ~60 lines because there is no post-construction
+submodule walk and no `set_global_step` method to add. This is the
+smallest patch in the document.
+
+---
+
+*4.5 (Configuration Interface), 4.6 (Risks), 4.7 (Success
+Criteria), 4.8 (Rollout), 4.9 (Out of Scope) follow in the next
+parts.*
