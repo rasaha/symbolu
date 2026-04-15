@@ -2913,4 +2913,195 @@ and has zero runtime cost on non-§3B runs (it is not imported unless
 
 ---
 
-*3B.4 (Configuration Interface) follows next.*
+### 3B.4 Configuration Interface
+
+§3B introduces **one** new flag. Unlike §3A, which ships with a
+recommended default configuration for production CG runs, §3B ships
+with the feature **off by default even after merge**, because §3B is
+P3 and no measurement currently justifies enabling it.
+
+#### 3B.4.1 Flag reference
+
+| Flag | Type | Default | Valid range | Meaning |
+|------|------|---------|-------------|---------|
+| `--lambda_csr_phonemic` | float | `0.0` | `[0.0, 0.1]` | Weight for the masked phonemic MSE term on column 3 of the Token Evaluation Tensor. `0.0` disables the feature entirely (no provider import, no buffer allocation, no compute cost). Recommended experimental starting point: `0.005` — matches the envelope of the existing token-level CG auxiliaries (`lambda_csr_token=0.005`, `lambda_vritti_token=0.005`). |
+
+That is the complete new flag surface for §3B. The underlying
+tuning knobs (VICReg analogs, temperature, decomposition fallback
+behavior) are **not** exposed as flags — they are fixed inside the
+ported `csr_phoneme.py` provider with values that match the
+hard-probes source, so behavior is reproducible by reference.
+
+**Why no `--csr_phonemic_*` sub-flags.** §3A ships five tunable
+sub-flags because LSTB introduces a new trainable module whose
+capacity and loss composition matter at training time. §3B does
+not — the phonemic table is a fixed lookup, the regression target
+is a fixed cosine similarity, and there is nothing meaningful to
+tune besides the scalar weight. Adding sub-flags would invite
+bike-shedding on values that cannot be measured independently of
+the master weight.
+
+#### 3B.4.2 Recommended configurations
+
+Two named configurations. **There is no v1 production
+configuration** for §3B — unlike §3A, which has a Configuration B
+recommended for default shipping, §3B stays off by default even
+after merge.
+
+**Configuration A — `off` (default, and also the shipping default).**
+
+```bash
+--lambda_csr_phonemic 0.0
+```
+
+Every production CG run uses this, including runs with §3A LSTB
+enabled. §3B adds nothing unless an operator explicitly turns it on
+with evidence that it is needed.
+
+**Configuration B — `experimental` (for operators investigating CSR
+interpretability).**
+
+```bash
+--lambda_csr_phonemic 0.005
+```
+
+Use this when running the phonemic correlation probe from §3B.6,
+or when investigating why the hard-probes
+`test_csr_bridge` benchmark reports a phonemic correlation failure
+on a trained CG model, or when prototyping a future feature that
+depends on column 3 of `T` carrying phonemic information.
+
+Rationale for `0.005`: peers with the existing token-level
+auxiliaries (`lambda_csr_token=0.005`, `lambda_vritti_token=0.005`,
+etc. at `train_mistral_cg.sh:60–66`). The phonemic regression term
+is a quality upgrade on an auxiliary loss, not a primary training
+signal, so the weight sits at the same magnitude as the loss it
+augments. A weight noticeably higher than `lambda_csr_token` would
+invert the signal hierarchy — phonemic alignment dominating the
+ranking objective is not what §3B is trying to produce.
+
+**No stress-test configuration.** §3A has a Configuration C for
+plateau investigation. §3B does not, because §3B does not have a
+plateau mode — it is either helping the phonemic correlation
+probe in §3B.6 or it is not, and cranking the weight higher does
+not add dimensionality to the question.
+
+#### 3B.4.3 Integration with `scripts/train_mistral_cg.sh`
+
+**Do not add `--lambda_csr_phonemic` to the shell script by
+default.** This is the single most important contract in §3B.4.
+
+The shell script represents the "known-good production
+configuration" for mistral_cg. §3B is P3 and has not been shown to
+improve any measured property of production training runs. Adding
+it to the default script would (a) invite every operator running
+the script to spend cognitive budget on a flag they do not need,
+(b) trigger the phonemic table construction at every model
+initialization (~1.28 MB buffer + tokenizer iteration), and (c)
+implicitly commit the project to maintaining the phonemic
+infrastructure at production-grade quality even though no
+production use case requires it.
+
+The correct usage for an operator who wants to experiment with
+phonemic grounding is:
+
+```bash
+./scripts/train_mistral_cg.sh \
+    --dataset wikitext2 \
+    --max-steps 1000 \
+    --lambda_csr_phonemic 0.005
+```
+
+The shell script's argument pass-through already handles unknown
+flags by forwarding them to the Python invocation (see the
+`$EXTRA_ARGS` handling at `train_mistral_cg.sh:~160`). No script
+edit is needed for §3B to be usable — which is exactly the point.
+§3B is available without being default.
+
+If, in a future rollout, §3B.6 measurements justify enabling it by
+default, that is a **separate design revision** that re-evaluates
+this subsection. This document does not pre-authorize that
+revision.
+
+#### 3B.4.4 Interaction with P0-1 and §3A
+
+**Disjoint tensor paths. No interaction expected.** Stated
+precisely:
+
+- **P0-1** operates on `outputs['state']` — the pooled 32D
+  Sovereign State. Uses unary VICReg for anti-collapse.
+- **§3A** operates on `outputs['state_trajectory']` — the per-token
+  32D Sovereign State trajectory. Uses binary VICReg inside
+  `JEPAPredictionLoss` for temporal prediction.
+- **§3B** operates on `T[..., 3]` — column 3 of the Token Evaluation
+  Tensor. Uses masked MSE against a cosine similarity target
+  derived from a fixed phonemic lookup table.
+
+These are three disjoint tensors produced by three different
+components of the forward pass. P0-1 and §3A both pull on the
+`SovereignStateProjector`; §3B pulls on the scorer that produces
+`T` (whatever module that is in the current CG architecture —
+`integrated_scorer` per `train.py:4985`). The scorer and the state
+projector are different modules, so §3B's gradients reach neither
+P0-1's nor §3A's optimization target.
+
+**Operational consequence:** enabling `--lambda_csr_phonemic` does
+not invalidate any §3A or P0-1 success criteria. If §3A has been
+measured successful with Configuration B and an operator later
+enables §3B experimentally, there is **no need to re-run §3A's
+§3A.6 gates** — the tensors §3A depends on are unchanged.
+
+**Small print.** If in some future architecture revision the CSR
+scorer and the state projector come to share a subnetwork (e.g.,
+the projector's output is fed into the scorer), this contract
+breaks and §3B.4.4 must be revised. The current architecture at
+design time (2026-04) does not have this coupling — `T` is
+produced from `adapted_hidden` and candidate embeddings, not from
+the Sovereign State.
+
+#### 3B.4.5 Warnings and forbidden configurations
+
+Two warnings and one forbidden configuration.
+
+**Warning 1 — Phonemic grounding without the base InfoNCE.**
+
+```bash
+--lambda_csr_token 0.0 --lambda_csr_phonemic 0.005
+```
+
+This configuration is not forbidden but is unusual: it trains
+column 3 of `T` via phonemic regression only, with no contrastive
+ranking signal. Column 3 will converge to something that
+approximates phonemic similarity but has no reason to rank correct
+tokens above incorrect ones on the actual LM objective. Emit a
+startup warning naming the combination: *"lambda_csr_phonemic > 0
+without lambda_csr_token > 0: phonemic regression will train the
+CSR column without a ranking objective. This is a research
+configuration; ensure it is intentional."*
+
+**Warning 2 — Phonemic grounding without a tokenizer.**
+
+If `PrimitiveAuxiliaryLosses` is constructed without a `tokenizer`
+reference but `lambda_csr_phonemic > 0` is set, the constructor's
+fallback logic (§3B.3 File 2 Change 2a) catches the case, warns
+once, and sets `self.lambda_csr_phonemic = 0.0` for the run. This
+is a warning, not a forbidden configuration, because operators
+running non-Mistral CG paths may legitimately lack a tokenizer
+reference at that call site and should see training continue with
+phonemic grounding silently disabled rather than crashed.
+
+**Forbidden — Phonemic grounding without CG enabled.**
+
+```bash
+--lambda_csr_phonemic 0.005   # without --enable_conscious_generation
+```
+
+Produces a startup error. `PrimitiveAuxiliaryLosses` is only
+instantiated on the CG path, so `lambda_csr_phonemic > 0` on a
+non-CG run has nowhere to attach. The check lives in the same
+validation block as §3A's forbidden configurations
+(§3A.4.5, `train.py:~11189`).
+
+---
+
+*3B.5 (Risks and Mitigations) follows next.*
