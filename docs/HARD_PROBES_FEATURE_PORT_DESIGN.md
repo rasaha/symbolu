@@ -1529,4 +1529,110 @@ with a message naming the flag and the violated contract.
 
 ---
 
-*3A.5 (Risks and Mitigations) follows next.*
+### 3A.5 Risks and Mitigations
+
+LSTB has more failure modes than §1 (P0-1) or §2 (P0-2) because it
+introduces a new **trainable module** (the JEPA predictor), a new
+**training signal path** (stop-gradient JEPA loss), and a new
+**forward-pass contract** (per-token state trajectory). Each of
+those surfaces invites its own class of bug.
+
+This section enumerates the risks worth naming explicitly, what
+causes each to trigger, how to mitigate at design time, and — the
+part most often missing from risk tables — **how an operator
+actually detects the risk at runtime**. A mitigation that cannot be
+verified by a metric is a mitigation that will drift.
+
+#### 3A.5.1 Risk register
+
+Ten named risks, grouped by category. Likelihood and severity are
+relative to a v1 run with Configuration B from §3A.4.2
+(`lambda_lstb=0.05, k=1`).
+
+**Category A — Correctness risks (bugs that produce silently wrong
+training):**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R1 | **Stop-gradient leaked on target.** `_lstb_target` is not actually detached (e.g. future refactor removes the `.detach()` at the call site). Projector learns the degenerate "constant state" solution because the target gradient pulls it toward being trivially predictable. | Medium (easy to regress on refactor) | **High** — silent training corruption, LM loss appears fine while 32D bottleneck collapses | Explicit `.detach()` call at the sketch in §3A.3 (File 4, Change 4b). Add a runtime assertion in the LSTB loss block: `assert not _lstb_target.requires_grad, "LSTB target must be detached"` | `cg_anticollapse_var` (P0-1 metric) drops sharply below baseline while `cg_lstb_mse` simultaneously collapses toward zero — both at the same step |
+| R2 | **Non-causal predictor.** A future refactor of `PhaseJEPAPredictor._phase_attention` replaces `torch.cumsum(dim=1)` with a non-causal operation (e.g. a full self-attention). The predictor peeks at future tokens, MSE drops to near-zero, and the loss becomes meaningless. | Low (would require a conscious change to the predictor internals) | **High** — silent metric collapse, downstream decisions based on false success | Pin the causal-by-construction invariant in the design (§3A.2 Decision 5). Add a unit test in `symbolu_training/jepa/tests/test_jepa.py` that constructs a predictor, feeds a sequence with position `t+1` corrupted, and asserts the prediction for position `t` is unchanged | Unit test failure on refactor; at runtime, `cg_lstb_mse` approaches zero within the first 100 steps (suspiciously fast) |
+| R3 | **Target / context shape mismatch.** The call site at File 4 Change 4b slices `state_traj[:, :-k]` and `state_traj[:, k:]` but a future change to `k_steps` handling in the predictor produces an off-by-one on the returned shape. MSE is computed on misaligned positions. | Low–Medium | Medium — training runs but optimizes the wrong objective | Runtime shape assertion before the loss call: `assert _lstb_s_pred.shape == _lstb_target.shape` | Assertion failure at step 0; or, if the assertion is missed, `cg_lstb_mse` is flat and suspiciously high across all steps |
+| R4 | **Non-finite loss under `bfloat16` training.** `PhaseJEPAPredictor._phase_attention` at `predictor.py:244–249` casts inputs to `float32` for `torch.polar`, but the surrounding training loop runs in `bfloat16`. A mixed-precision bug at the boundary could produce NaN/Inf in the JEPA loss. | Low (the cast is already in place) | Medium — single-step crash, not corruption | The `torch.isfinite(_lstb_loss)` guard at File 4 Change 4b silently drops non-finite loss contributions, matching every other CG auxiliary. Emit a `cg_lstb_nonfinite_count` metric when the guard triggers | `cg_lstb_nonfinite_count > 0` in the per-step metrics; also visible as a step-level warning log |
+
+**Category B — Signal quality risks (loss trains cleanly but carries
+no useful information):**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R5 | **Predictor underfits due to 32D bottleneck.** The Sovereign State is only 32-dimensional. `PhaseJEPAPredictor` with `hidden_dim=128` may be over-parameterized relative to the prediction target, or conversely the target may be too low-entropy for the prediction loss to have meaningful dynamic range. Result: `cg_lstb_mse` plateaus at near-zero immediately, the loss contributes nothing. | Medium (unknown until measured) | Medium — feature is effectively off, but does not actively harm training | Measure `cg_lstb_mse` against a trivial-baseline predictor (identity: `s_pred = s_context`) at step 0 and at step 1000. If the learned predictor does not beat the baseline by a measurable margin (§3A.6 success criterion 2), downgrade LSTB to optional | `cg_lstb_mse / cg_lstb_identity_baseline_mse > 0.9` at step 1000 — i.e. the learned predictor is barely better than "predict current state unchanged" |
+| R6 | **Predictor overfits the 32D space, ignores temporal structure.** With only 32 dimensions to predict, a high-capacity predictor can memorize a per-position mapping without learning actual sequence dynamics. The MSE looks great but the trained predictor fails to generalize across different sequences. | Low (the predictor is ~100K params, the dataset is large) | Medium | Validate at eval time on held-out sequences. Emit `cg_lstb_eval_mse` on a small eval subset during periodic eval. A large gap between train MSE and eval MSE indicates memorization | `cg_lstb_eval_mse / cg_lstb_mse > 2.0` — more than 2× gap between train and eval MSE |
+
+**Category C — Interaction risks (LSTB works correctly in isolation
+but interferes with other training signals):**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R7 | **Gradient interference with LM cross-entropy.** The per-token projection applied to `hidden` flows gradients back through the state projector, and from there into — nothing, since the Mistral backbone is frozen. **But** the projector is also used by existing CG auxiliaries that compute against the pooled `state`. Adding a new training signal to the projector changes the projector's update trajectory, which changes the pooled state, which changes every CG auxiliary that reads it. If `lambda_lstb` is too high, the projector is dragged toward "good JEPA target" at the expense of "good input to every other CG auxiliary." | Medium (directly controlled by `lambda_lstb`) | Medium — observable LM/CG auxiliary regression | v1 weight of `0.05` is chosen to keep LSTB subordinate to the LM cross-entropy path and approximately peer with the existing token-level auxiliaries. Success criterion 4 in §3A.6 requires that CG auxiliary losses be unchanged-or-improved, not merely "LM loss unchanged" | Any of `cg_ont_loss`, `cg_kosha_routing_loss`, `cg_vritti_token_loss`, `cg_L_csr` regresses by > 5% from a disabled-LSTB baseline at step 1000 |
+| R8 | **Interaction with P0-1 anti-collapse.** Both terms push against projector collapse but operate on different inputs (pooled vs per-token) and in different VICReg modes (unary vs binary). If misconfigured, one term can dominate and make the other vestigial — or worse, they can pull in subtly different directions. | Medium | Medium | Treat P0-1 and P1-1 as a **linked pair** when tuning. If one is dialed up or down, re-measure the other. Emit both `cg_anticollapse_var` (P0-1, pooled) and `cg_lstb_target_var` (P1-1, per-token) at every metric-emit step so the operator can see both health curves side-by-side. See §3A.4.4 for the contract | `cg_anticollapse_var` and `cg_lstb_target_var` diverge — one healthy, the other collapsing |
+| R9 | **CG curriculum stage interaction.** The existing CG curriculum (`cg_stage_manager` at `train.py:4934`) overrides CG lambda weights on a per-step schedule. If an early stage sets the CG auxiliaries to zero but the curriculum does not know about `lambda_lstb`, LSTB keeps training while every other CG signal is off — producing a projector pulled only by LSTB + P0-1 for a stage where no other CG module is learning. | Medium (depends on how the curriculum manager is written) | Low–Medium | Add `lambda_lstb` to the set of fields the curriculum manager can override. If the curriculum is written as a dict of overrides, simply ensure `lambda_lstb` is in the set of supported keys. Worst case, document that operators must set `lambda_lstb=0` manually during stages that zero out other CG auxiliaries | Stage transition in the curriculum log without a corresponding change in `cg_lstb_loss` magnitude |
+
+**Category D — Operational risks (the feature works but is hard to
+operate):**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R10 | **Checkpoint resume does not restore the predictor.** `PhaseJEPAPredictor` is attached to `model.conscious_gen['jepa_predictor']`. If the existing checkpoint save/load path at `symbolu_training/training/unified/checkpointing.py` does not iterate `model.conscious_gen` recursively, the predictor's parameters are silently initialized fresh on resume — but the surrounding training state (global_step, optimizer state, other CG modules) all resume normally. Result: LSTB loss spikes on the first step after resume as the freshly-initialized predictor scrambles to catch up. | Medium–High (depends on existing checkpointing behavior) | Medium — observable one-step spike, not silent corruption | Before shipping, **verify** that checkpointing iterates `model.conscious_gen` recursively. The existing CG modules (`kosha_routing_loss`, `bliss_coherence_loss`, etc.) have ~millions of params collectively, so if they resume correctly today, LSTB will too. If the check shows otherwise, it is a pre-existing bug affecting every CG module and must be fixed in the checkpointing code, not in LSTB | `cg_lstb_loss` on the first step after checkpoint resume is > 2× the value from the step immediately before the save |
+
+#### 3A.5.2 Risk categories explicitly **not** covered
+
+For completeness — these categories were considered and judged not
+worth a row in the register above:
+
+- **Compute cost.** The per-token projection adds <1% to forward
+  cost (§3A.2 Decision 1). Predictor cost is O(B × T × 32) for
+  attention and O(B × T × 32 × 128) for the delta MLP — both
+  negligible. Memory for the new `state_trajectory` tensor is
+  `B × T × 32 × 2 bytes` under bf16, ≈256KB per batch for `B=4,
+  T=1024`. Not a risk.
+- **Tokenizer / data pipeline interaction.** LSTB does not touch
+  the tokenizer, the dataset, or the data loader. It operates
+  entirely on per-token hidden states that are already produced by
+  the forward pass. No data-pipeline risk surface.
+- **Multi-GPU / DDP.** `PhaseJEPAPredictor` is a standard
+  `nn.Module` with parameters that inherit the DDP wrapping of the
+  surrounding model. No explicit synchronization is needed.
+- **Interaction with §3B (CSR phonemic grounding).** §3B operates
+  on column 3 of `T` (the Token Evaluation Tensor); §3A operates on
+  `outputs['state_trajectory']`. These are disjoint tensors. No
+  interaction surface. If §3B is shipped after §3A, the v1
+  measurements from §3A do not need to be re-run.
+
+#### 3A.5.3 Pre-flight mitigation checklist
+
+Before running any `--lambda_lstb > 0` experiment, verify:
+
+1. **P0-1 is already shipped and healthy.** LSTB's success criteria
+   (§3A.6) assume `cg_anticollapse_*` metrics are available and
+   within the healthy band defined in §1.7. Do not run LSTB on a
+   build where P0-1 is not yet in place or is known to be broken.
+2. **Checkpointing round-trips the predictor.** Construct a CG model
+   with `--lambda_lstb 0.05`, save a checkpoint, reload it, and
+   verify `model.conscious_gen['jepa_predictor'].state_dict()`
+   matches exactly before and after the round-trip. This catches
+   R10 at the cheapest possible moment.
+3. **Identity baseline MSE is measured.** Run 100 steps with
+   `--lambda_lstb 0.05` and log both `cg_lstb_mse` and a
+   trivial-identity-baseline MSE (where the "prediction" is the
+   context state unchanged). This establishes the reference that
+   R5 and §3A.6 success criterion 2 measure against.
+4. **Stop-gradient assertion is in place.** The runtime assertion
+   from R1 (`assert not _lstb_target.requires_grad`) is
+   non-negotiable for v1. It costs nothing and catches the single
+   most expensive silent-failure mode.
+
+All four checks should pass before the operator proceeds to the
+§3A.7 rollout plan.
+
+---
+
+*3A.6 (Success Criteria) follows next.*
