@@ -617,5 +617,159 @@ Evaluated on a 10K-step `train_hybrid_7b.py`-style run (FineWeb, bf16,
 
 ---
 
-*Subsequent priorities (P1-1, P1-2, P2-1, P2-2) will be appended to this
-document as §3–§6.*
+---
+
+## §3 P1-1 — LSTB / CSR Bridge Supervision (`mistral_cg`)
+
+### 3.0 Recommendation Up Front
+
+P1-1 as originally scoped in the executive summary is **two distinct
+sub-tasks** that share only the name "bridge supervision". They have
+different mechanisms, different attach points, different failure modes,
+and different urgency. This section treats them separately:
+
+- **§3A — LSTB (Latent Semantic Token Bridge) Wiring.** Gives the 32D
+  Sovereign State a causal prediction target via `PhaseJEPAPredictor`.
+  **Primary, recommended.** Ship as P1-1. Full-depth design below.
+- **§3B — CSR Phonemic Grounding.** Upgrades the existing `L_csr`
+  contrastive loss with a phonemic-similarity target via the hard-probes
+  `csr_phoneme_provider`. **Secondary, optional.** Treat as a P3
+  follow-up, conditional on §3A's baseline measurements showing that the
+  Sovereign State still lacks symbolic grounding after §3A is active.
+
+The two sub-tasks can ship independently with zero interaction. An
+implementer needing to execute P1-1 should read §3A in full and may
+skim or skip §3B.
+
+### 3.1 Scope and Correction of Earlier Framing
+
+The feature comparison that motivated this design document (see the
+executive summary) claimed that `lambda_csr_token` is "a weight on
+nothing" — that porting the LSTB infrastructure would give it "a real
+training signal instead of a weak proxy." **That claim is wrong in one
+direction and right in another, and the distinction matters enough to
+correct explicitly before proceeding.**
+
+What is wrong:
+
+- `lambda_csr_token` is **not** a dangling weight. It drives a real
+  InfoNCE contrastive loss inside
+  `PrimitiveAuxiliaryLosses.forward()` at
+  `symbolu_training/training/conscious_generation/losses/primitive_auxiliary.py:27`.
+  The loss extracts column 3 of the Token Evaluation Tensor `T`,
+  identifies the correct token's score, and computes softmax
+  cross-entropy against shortlist negatives. Gradients flow back through
+  the scorer that produced `T`.
+- The existing `L_csr` loss is not "a weak proxy for phoneme structure".
+  It is a perfectly functional shortlist-scoring loss that does what
+  shortlist-scoring losses do: it teaches the scorer to rank the correct
+  token higher than incorrect candidates on column 3 of `T`.
+
+What is right:
+
+- Nothing in the existing `L_csr` loss **forces** column 3 of `T` to
+  correlate with actual phoneme structure. Column 3 learns whatever it
+  needs to learn to minimize the InfoNCE objective, which — given enough
+  capacity in the scorer — can be achieved by any arbitrary ranking
+  function that happens to separate correct from incorrect tokens.
+  Phonemic grounding is a *property we would like* column 3 to have; it
+  is not currently a *property we train for*.
+- The original comparison also conflated "bridge" in two different
+  senses. LSTB refers to a **latent bridge** — a temporal prediction
+  loss on the 32D Sovereign State. The CSR bridge refers to a
+  **symbolic bridge** — an ARPABET → 10D resonance-vector decomposition
+  used to ground token-level phonemic reasoning. These share the word
+  "bridge" and a `--test-*-bridge` CLI flag in `train_hard_probes.py`,
+  nothing else.
+
+The corrected framing is therefore:
+
+- **§3A is about giving the 32D Sovereign State a *temporal* target** —
+  addressing a real gap (P0-1's anti-collapse term prevents degenerate
+  states but provides no positive learning signal for the projector).
+- **§3B is about giving `L_csr` a *symbolic* target** — a quality
+  upgrade on an already-working loss, conditional on evidence that the
+  upgrade is needed.
+
+### 3.2 Current State in Repository
+
+Shared inventory of the relevant modules, so both sub-tasks can
+reference this section rather than re-enumerating.
+
+**Already implemented and available for wiring:**
+
+- **`SovereignStateProjector`** at
+  `symbolu_training/jepa/state_projector.py:43`. An MLP projector from
+  `hidden_dim → 32` with per-plane normalization (softmax on the 12D
+  Bhava slice, sigmoid on the 5D Kosha slice, etc.). Already instantiated
+  by `MistralCGWrapper` at `mistral_wrapper.py:103` and applied at
+  `:305` to the pooled hidden state via
+  `state = self.state_projector(pooled)` where
+  `pooled = hidden.mean(dim=1)`. Output is shape `[B, 32]` — **one
+  state per sequence, not per-token**.
+- **`PhaseJEPAPredictor`** at
+  `symbolu_training/jepa/predictor.py:43`. Takes a context state of
+  shape `[B, T, 32]` (or `[B, 32]`) and predicts `k`-step deltas in the
+  Sovereign State space using complex-phasor attention. Supports
+  `prediction_steps` up to `k_steps` configurable at construction. The
+  `VrittiValidatedPredictor` subclass at `:304` adds a Vritti-gated
+  variant that skips updates when the Vritti classifier reports low
+  cognitive reliability. **Zero references in
+  `symbolu_training/training/unified/`** (verified by grep) — present in
+  the JEPA package, not wired into the CG training loop.
+- **`VICRegLoss`** at `symbolu_training/jepa/losses.py:23`. Already
+  scheduled for the unary anti-collapse use in §1 (P0-1). For §3A it
+  is used in its **binary** mode: `VICRegLoss(x_pred, y_target)` with
+  nonzero invariance (MSE) coefficient, which is its canonical JEPA
+  form.
+- **`JEPAPredictionLoss`** and **`CompositeJEPALoss`** — also in
+  `symbolu_training/jepa/losses.py`. Wrap `VICRegLoss` + MSE +
+  orthogonality regularization into a single callable with
+  `vicreg_weight` and `ortho_weight` parameters. Already imported by
+  the hard-probes `latent_bridge.py` benchmark at
+  `scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/latent_bridge.py:35`.
+- **`PrimitiveAuxiliaryLosses`** at
+  `symbolu_training/training/conscious_generation/losses/primitive_auxiliary.py:27`.
+  Hosts the existing `L_csr` (and `L_jepa`, `L_vritti`, `L_guna`)
+  contrastive losses. Already wired into the CG loss block in the
+  training loop at `symbolu_training/training/unified/train.py:5218`.
+
+**Present in `train_hard_probes.py` but not packaged for reuse:**
+
+- **`csr_phoneme_provider`** — referenced in the hard-probes CSR bridge
+  benchmark at
+  `scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/csr_bridge.py:62–78`.
+  Provides `CSREmbeddingProvider`, `VarnaCSRBridge`,
+  `ARPABET_TO_VARNA`, and `SANSKRIT_VOWEL_CALIBRATION`. The module
+  itself lives inside the `hard_probes_lib` tree and is not exposed as
+  an importable utility from the unified pipeline.
+
+**CG forward-pass contract (relevant to both sub-tasks):**
+
+- `MistralCGWrapper.forward()` at `mistral_wrapper.py:346` returns a
+  dict with `'state': [B, 32]`, `'delta_S': [B, 32]`, and
+  `'delta_bhava': [B, 12]`. The state is **pooled across the sequence**
+  — per-token state is not currently available through the forward
+  dict. Any design that needs a trajectory must either (a) modify the
+  wrapper to expose per-token state, or (b) reconstruct the trajectory
+  from `last_hidden_state` (which is already returned when
+  `return_last_hidden=True`) by applying the projector externally.
+- The CG loss block in `train.py:4931+` extracts the pooled state at
+  `:5000` via `_cg_sov_state = outputs.get('state', None)`. This is
+  the natural attach point for the §1 (P0-1) unary anti-collapse term.
+  A trajectory-based JEPA loss (§3A) needs either a different attach
+  point that provides per-token state, or a new forward flag that adds
+  per-token state to the output dict.
+
+**What is absent:**
+
+- No references to `PhaseJEPAPredictor`, `JEPAPredictionLoss`, or
+  `CompositeJEPALoss` anywhere in `symbolu_training/training/unified/`.
+- No phoneme-based grounding loss anywhere in
+  `symbolu_training/training/conscious_generation/`.
+- No mechanism in the CG forward pass to expose per-token Sovereign
+  State, nor any call site that consumes one.
+
+---
+
+*§3A (LSTB latent bridge) follows next — full-depth design.*
