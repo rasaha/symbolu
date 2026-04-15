@@ -4767,4 +4767,133 @@ Trivial. §4 is entirely additive and defaults to off.
 
 ---
 
-*4.9 (Out of Scope) follows as the final §4 subsection.*
+### 4.9 Out of Scope
+
+Three categories matching §3A.8's structure: deferred, hard
+limits, non-goals.
+
+#### 4.9.1 Deferred — plausible follow-ups with a measurement path
+
+- **`phase_channels > 4`.** The core supports arbitrary `C`. The
+  v1 success criteria use `C=4` because that is the smallest
+  value that spans the logarithmic decay range meaningfully. `C=8`
+  would roughly double memory and compute cost for a 2× finer
+  decay grid; the benefit is unclear without the `C=4` baseline
+  measurement. Defer until `C=4` is measured.
+- **Per-layer `phase_channels`.** A hypothetical design where
+  early phase layers use `C=1` and later layers use `C=4` or
+  more, reflecting the intuition that early layers handle
+  short-range structure and later layers handle long-range
+  structure. Architecturally plausible but not supported by the
+  current `HybridTransformerBlock` constructor — would require
+  threading a per-layer list instead of a scalar. Out of scope
+  until the uniform-`C` version is measured and found wanting.
+- **Adaptive channel count.** A design that starts with `C=1` and
+  grows channels during training once the single-channel signal
+  plateaus. Requires checkpoint-format changes (channel count as
+  dynamic state) and training-loop instrumentation to detect
+  plateau. Deferred.
+- **Learned channel initialization.** Instead of the hardcoded
+  logarithmic spread over `[2.0, 2048.0]` at
+  `phase_transformer.py:2057`, make the initialization
+  itself learnable from data or expose the min/max timescales
+  as CLI flags. Not blocking anything, not justified by any
+  measurement.
+- **Write gate temperature / sharpness.** Exposing a `tau`
+  parameter on `sigmoid(W_g @ x / tau)` to control gate
+  sharpness. The hard-probes source uses unit temperature; §4
+  matches. Deferred because no evidence exists that temperature
+  matters.
+- **Gate loss regularization.** Adding a regularization term that
+  pushes gate values toward a target mean (e.g., to prevent R4
+  gate collapse proactively instead of reactively). Interesting
+  but would require a new loss hyperparameter, which v1 is
+  deliberately avoiding.
+- **Non-Mistral hybrid path extension.** `HybridPhaseTransformer`
+  (the non-Mistral hybrid at `phase_transformer.py:6737+`)
+  already wires up `phase_channels` and `phase_write_gate` in
+  its own construction path. The §4 rollout adds the flags to
+  the unified CLI, so `HybridPhaseTransformer` automatically
+  benefits when the model type is `hybrid` instead of
+  `mistral_hybrid` — **this is already in scope** because the
+  CLI flags reach both model factories. The only thing out of
+  scope is adding a separate success-criteria measurement for the
+  non-Mistral hybrid path; that would be a follow-up if anyone
+  is actively developing the non-Mistral path.
+
+#### 4.9.2 Hard limits — will not be done even if asked
+
+- **No modification to `PhaseAttentionLayer` internals.** The
+  forward-path composition order at `phase_transformer.py:2434–2463`
+  (write gate → channel expansion → warmstart → EMA scan) is
+  deliberate and correct. §4 does not reorder any of those
+  steps, skip any of them, or add new steps. Changes to the
+  composition order would affect every caller of
+  `PhaseAttentionLayer`, including the non-Mistral hybrid path,
+  and must be a separate design effort.
+- **No modification to `HybridTransformerBlock` or
+  `HybridAttentionLayer`.** They already accept and forward the
+  kwargs; §4 does not touch their implementations. If a future
+  finding shows that the forwarding logic is wrong, that is a
+  core-phase-transformer bug, not a §4 issue.
+- **No gradient flow to the frozen Mistral backbone.** Same
+  contract as §2 and §3A — the write gate and multi-channel
+  parameters are part of the trainable phase layers only. The
+  backbone stays frozen.
+- **No new `model_type`.** §4 is two flags on `mistral_hybrid`.
+  No `mistral_hybrid_multichannel` or similar variant.
+- **No change to `LocalTransformerBlock`.** Local blocks have
+  no phase attention and no multi-channel concept. §4 does not
+  expand the local attention mechanism to have channels.
+- **No runtime modification of `phase_channels` after
+  construction.** Once the model is built with `phase_channels=C`,
+  that value is fixed for the lifetime of the model. §4 does
+  not support dynamic channel count changes mid-training. Future
+  extensions that want this should add it to the deferred
+  "adaptive channel count" item in §4.9.1.
+
+#### 4.9.3 Non-goals — clarifications
+
+- **§4 is not a new attention mechanism.** It is a capacity
+  expansion of the existing phase attention. The attention math
+  is unchanged — what changes is how many independent EMA-state
+  slots each head maintains and whether writes to those slots
+  are gated.
+- **§4 is not a solution to LM perplexity on its own.** §4.7
+  Gate 2 requires a measurable improvement on at least one of
+  training loss or validation perplexity, but the improvement
+  may be modest (1–2%). §4 is a capacity upgrade, not a
+  breakthrough — expected gains are on the order of "a useful
+  small improvement" rather than "a step change." If §4.7
+  measurements show no improvement at all, §4 downgrades to
+  optional and the hypothesis that multi-horizon phase memory
+  matters for this workload is falsified.
+- **§4 is not a replacement for §2 (phase warmstart).** §2 fixes
+  early-training stability; §4 expands capacity for the
+  stable-training regime. Both should be enabled together.
+  Disabling §2 while enabling §4 is not a supported
+  configuration — the phase branch would spike early training
+  while simultaneously running with 4× more memory state to
+  thrash through.
+- **§4 is not tuned.** The defaults (`C=4`, logarithmic decay
+  spread over `[2.0, 2048.0]`, gate `bias=2.0`, uniform
+  `channel_agg` init) are all inherited from the hard-probes
+  source without modification. If §4.7 measurements suggest
+  different values work better, that is a separate tuning
+  effort on top of the shipped v1.
+- **§4 is not a research benchmark.** The hard-probes
+  `train_hard_probes.py` pipeline has the full research
+  harness for testing phase memory hypotheses — ablations,
+  per-channel analyses, comparison against alternative memory
+  mechanisms. §4 is the production wiring of the two specific
+  primitives that hard-probes has validated. Operators who want
+  research-grade measurement should continue to use
+  `train_hard_probes.py`, not `train_hybrid_7b.py`, for that
+  purpose.
+
+---
+
+**End of §4 (P1-2: Phase Write-Gate + Multi-Channel Phase Memory).**
+
+§5 (P2-1: `LayerInfluenceDiagnostics` for both `mistral_cg` and
+`mistral_hybrid`) follows next.
