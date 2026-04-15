@@ -1635,4 +1635,270 @@ All four checks should pass before the operator proceeds to the
 
 ---
 
-*3A.6 (Success Criteria) follows next.*
+### 3A.6 Success Criteria
+
+Success criteria are pass/fail gates, not aspirations. A feature that
+cannot be shown to satisfy every gate on a **named evaluation run
+against a named baseline** does not ship by default — it stays behind
+a flag while the failure is investigated.
+
+This section specifies (3A.6.1) the named evaluation run, (3A.6.2)
+the named baseline it is compared against, (3A.6.3) the primary
+gates, (3A.6.4) the diagnostic metrics that must be logged regardless
+of gate outcome, and (3A.6.5) the downgrade path for when a gate
+fails.
+
+#### 3A.6.1 Named evaluation run
+
+**Command.** Operators running the §3A.7 rollout step "1K-step
+WikiText-2 measurement" must execute exactly this command, with only
+`--checkpoint_dir` and output paths varying:
+
+```bash
+./scripts/train_mistral_cg.sh \
+    --dataset wikitext2 \
+    --max-steps 1000 \
+    --lambda_sovereign_anticollapse 0.02 \
+    --anticollapse_warmup_steps 1000 \
+    --lambda_lstb 0.05 \
+    --lstb_k_steps 1 \
+    --checkpoint-dir checkpoints_lstb_v1
+```
+
+The `--lambda_sovereign_anticollapse` and
+`--anticollapse_warmup_steps` flags are included because P0-1 is a
+hard prerequisite for LSTB (§3A.5.3, pre-flight check 1). All other
+LSTB sub-flags use their v1 defaults (`lstb_vicreg_weight=0.5`,
+`lstb_ortho_weight=0.05`, `lstb_hidden_dim=128`, `lstb_num_heads=4`)
+and do not appear on the command line.
+
+**Environment.** Any single GPU with ≥24GB VRAM (A100, 4090, 3090).
+4-bit Mistral quantization is the default and should be kept for this
+measurement — changing quantization changes the numerical baseline
+and invalidates comparison against runs with different precision.
+
+**Runtime.** 1000 steps at batch 4 × grad accum 8 (`effective_batch =
+32`) takes roughly 30–60 minutes on an A100. The smoke-test command
+(10 steps) must succeed before this measurement is attempted.
+
+#### 3A.6.2 Named baseline
+
+Every gate is evaluated as a **delta** against a specific baseline
+run, not against an absolute threshold. The baseline is:
+
+```bash
+./scripts/train_mistral_cg.sh \
+    --dataset wikitext2 \
+    --max-steps 1000 \
+    --lambda_sovereign_anticollapse 0.02 \
+    --anticollapse_warmup_steps 1000 \
+    --lambda_lstb 0.0 \
+    --checkpoint-dir checkpoints_lstb_baseline
+```
+
+The baseline run is **identical** to the evaluation run except that
+`--lambda_lstb=0.0` (disabled). This isolates LSTB as the only
+variable. Both runs share the same random seed, the same data, the
+same LR schedule, and the same P0-1 configuration.
+
+Run the baseline **first**, persist the full per-step metric log,
+and only then run the evaluation. Do not compare against historical
+runs from different dates, different code revisions, or different
+configurations — the gates below are precise enough that small
+unrelated changes invalidate the comparison.
+
+#### 3A.6.3 Primary gates
+
+Seven numbered gates. LSTB ships by default in
+`scripts/train_mistral_cg.sh` only if **all seven** pass. Each gate
+is stated as a pass condition; the operator records the observed
+value and a pass/fail verdict.
+
+**Gate 1 — LM loss is not degraded.**
+
+> **Pass condition:** `lm_loss` at step 1000 on the evaluation run is
+> within ±1% of `lm_loss` at step 1000 on the baseline run.
+
+This is the LM-quality floor. LSTB is an auxiliary signal; it cannot
+be shipped if it measurably degrades the primary language modeling
+objective. A ±1% tolerance is chosen to absorb noise from sources
+that are not LSTB (dropout, batch ordering, quantization-induced
+nondeterminism) while still rejecting any real regression.
+
+**Gate 2 — Learned predictor beats the identity baseline.**
+
+> **Pass condition:** `cg_lstb_mse / cg_lstb_identity_baseline_mse
+> < 0.7` at step 1000 on the evaluation run.
+
+This is the "LSTB is doing something" gate, and it directly
+addresses R5 from §3A.5 (predictor underfits the 32D bottleneck).
+The identity baseline is a trivial "prediction equals context"
+computation that is done on the same batch as the learned prediction
+and logged as a diagnostic metric alongside `cg_lstb_mse`. If the
+learned predictor cannot beat trivial self-prediction by at least
+30%, LSTB is not learning temporal structure — it is burning FLOPs
+to reproduce what a one-line tensor copy would produce.
+
+**Gate 3 — P0-1 anti-collapse metrics remain healthy.**
+
+> **Pass condition:** `cg_anticollapse_var` at step 1000 on the
+> evaluation run is ≥ 95% of the same metric on the baseline run.
+
+This directly addresses R8 (interaction with P0-1). P0-1's variance
+metric is the health signal for the pooled Sovereign State. If LSTB
+is correctly complementary — not competing — the pooled state should
+remain at least as varied as it was without LSTB. A drop below 95%
+of baseline indicates that LSTB is dragging the projector away from
+P0-1's guard rail.
+
+**Gate 4 — CG auxiliary losses are unchanged or improved.**
+
+> **Pass condition:** For each of `cg_ont_loss`,
+> `cg_kosha_routing_loss`, `cg_bliss_loss`, `cg_L_csr`,
+> `cg_L_vritti`, `cg_L_guna`, the value at step 1000 on the
+> evaluation run is within [-∞, +5%] of the baseline — that is, the
+> loss may decrease freely but may not increase by more than 5%.
+
+This addresses R7 (gradient interference with CG auxiliaries).
+Asymmetric tolerance is deliberate: improvements are good (and
+expected, since a better-trained projector should produce better
+inputs to downstream CG modules), regressions are not. A 5% ceiling
+on regressions catches real interference while absorbing noise.
+
+**Gate 5 — No silent non-finite loss spikes.**
+
+> **Pass condition:** `cg_lstb_nonfinite_count` is zero for every
+> step in the evaluation run.
+
+This addresses R4 (non-finite loss under `bfloat16`). The
+`torch.isfinite` guard from §3A.3 File 4 Change 4b is permitted to
+catch occasional NaN without failing the run, but any occurrence
+during the v1 evaluation run is a hard stop: the root cause must be
+diagnosed before shipping. Production-grade code should not rely on
+the guard as a steady-state fallback.
+
+**Gate 6 — Train/eval MSE gap is bounded.**
+
+> **Pass condition:** `cg_lstb_eval_mse / cg_lstb_mse < 2.0` at step
+> 1000, measured on a held-out WikiText-2 validation subset.
+
+This addresses R6 (predictor memorizes per-position mapping instead
+of learning sequence dynamics). A memorizing predictor shows a large
+train-vs-eval gap; a genuinely learning predictor shows a gap near
+1.0. The 2.0 ceiling is loose enough to absorb normal
+train-vs-eval drift and tight enough to catch real memorization.
+Requires emitting `cg_lstb_eval_mse` during periodic eval, which is
+a new diagnostic that does not currently exist — adding it is part
+of the File 4 patch.
+
+**Gate 7 — Checkpoint round-trip preserves the predictor.**
+
+> **Pass condition:** Save a checkpoint at step 500 of the
+> evaluation run, load it into a fresh process, and verify that
+> `model.conscious_gen['jepa_predictor'].state_dict()` matches
+> exactly (bitwise) before and after the round-trip.
+
+This addresses R10 (checkpoint resume does not restore the
+predictor). The gate is a one-off manual verification, not a
+continuous metric, but it must be performed at least once during the
+rollout plan and the result recorded. If the check fails, LSTB is
+blocked until checkpointing is fixed — but note that the fix likely
+lives in `symbolu_training/training/unified/checkpointing.py`, not
+in LSTB code, since the same bug would affect every other CG
+module.
+
+#### 3A.6.4 Required diagnostic metrics
+
+Gates 1–7 are pass/fail. The following metrics must be **emitted on
+every logging step** regardless of gate outcome, because they are
+the raw signal operators use to diagnose a failure:
+
+- `cg_lstb_loss` — total LSTB loss (MSE + VICReg + ortho).
+- `cg_lstb_mse` — the raw MSE invariance term.
+- `cg_lstb_vicreg` — the VICReg component.
+- `cg_lstb_ortho` — the orthogonality component.
+- `cg_lstb_identity_baseline_mse` — MSE of the trivial "predict
+  current state unchanged" baseline, computed on the same batch.
+- `cg_lstb_target_var` — variance of the (detached) target state
+  across the batch, dimension-averaged. The per-token analog of
+  P0-1's `cg_anticollapse_var`.
+- `cg_lstb_nonfinite_count` — count of non-finite loss occurrences
+  since the last log step. Should be zero; nonzero is Gate 5 failure.
+- `cg_lstb_eval_mse` — train/eval MSE on the held-out subset, emitted
+  during periodic eval (not every step).
+
+These metrics are added as part of the File 4 training-loop change
+in §3A.3 and are visible in whatever metric backend the operator is
+using (TensorBoard, Weights & Biases, stdout JSON).
+
+#### 3A.6.5 Failure mode decision tree
+
+If any gate fails, do **not** re-tune in place. Instead, follow the
+decision tree below to choose between "investigate the failure" and
+"downgrade LSTB".
+
+```
+Gate 1 fails (LM loss regressed > 1%)?
+    → Investigate R7. Lower lambda_lstb to 0.02, re-run. If Gate 1
+      passes at 0.02 but Gate 2 also drops below 0.7, LSTB cannot
+      be simultaneously non-regressive and effective at these
+      hyperparameters — downgrade to optional.
+
+Gate 2 fails (predictor does not beat identity by 30%)?
+    → Investigate R5. Run Configuration C (§3A.4.2 stress-test)
+      once. If Configuration C passes Gate 2 and still passes
+      Gate 1, file the result and consider raising the v1 defaults.
+      If Configuration C also fails Gate 2, downgrade LSTB to
+      optional — the 32D state does not contain enough temporal
+      structure for JEPA prediction to be a useful signal on this
+      workload.
+
+Gate 3 fails (P0-1 variance dropped > 5%)?
+    → Investigate R8. This is the "linked pair" divergence. First
+      re-run with lambda_lstb=0.02 and lambda_sovereign_anticollapse
+      held constant. If Gate 3 still fails, the projector is being
+      pulled by LSTB's VICReg (inside JEPAPredictionLoss) against
+      P0-1's VICReg on pooled state — lower lstb_vicreg_weight from
+      0.5 to 0.25 and re-run. Do not ship until Gate 3 passes.
+
+Gate 4 fails (a CG auxiliary regressed > 5%)?
+    → Investigate R7 and R9. Check whether the curriculum manager
+      is overriding lambda_lstb on the stage where the regression
+      appears. If not, lower lambda_lstb to 0.02 and re-run.
+
+Gate 5 fails (any non-finite loss)?
+    → Hard stop. Do not re-run. Attach a debugger, catch the
+      non-finite step, and investigate the root cause in
+      PhaseJEPAPredictor._phase_attention. The torch.polar float32
+      cast at predictor.py:244-249 is the first place to look.
+
+Gate 6 fails (train/eval MSE gap > 2x)?
+    → Investigate R6. Lower lstb_hidden_dim from 128 to 64 (less
+      memorization capacity) and re-run. If Gate 6 still fails,
+      the predictor is overfitting — downgrade to optional.
+
+Gate 7 fails (checkpoint round-trip is not bitwise-identical)?
+    → Stop shipping LSTB. Fix the checkpointing bug in
+      symbolu_training/training/unified/checkpointing.py (this is a
+      pre-existing bug affecting every CG module, not an LSTB bug)
+      and re-run the gate.
+```
+
+**Downgrade semantics.** "Downgrade LSTB to optional" means: keep
+the code, keep the config flags, but do **not** add `--lambda_lstb
+0.05` to `scripts/train_mistral_cg.sh` by default. LSTB remains
+available for operators who want to experiment with it, but it is
+not part of the default mistral_cg training configuration. This is
+the same posture that P0-1 takes in §1.7 if the baseline does not
+exhibit the collapse failure mode.
+
+A downgrade is not a failure of the design — it is a finding that
+LSTB, at v1 defaults, does not meaningfully improve the current
+training configuration. The design stays in the document as
+reference; the flags stay in the code as entry points; the default
+stays off until a future experiment shows the downgrade can be
+reversed.
+
+---
+
+*3A.7 (Rollout Plan) follows next.*
