@@ -2232,4 +2232,175 @@ behavior is tested in Phase 1.
 
 ---
 
-*3A.8 (Out of Scope) follows next — the final §3A subsection.*
+### 3A.8 Out of Scope
+
+Out-of-scope items are grouped into three categories by intent:
+**deferred** (plausible follow-ups with a measurement path),
+**hard limits** (things LSTB will not do even if asked), and
+**non-goals** (clarifications about what LSTB is not claiming to be).
+
+Each item here has been considered at least briefly during the design.
+Readers encountering one of these items in a review or a feature
+request should be able to cite this section rather than re-arguing
+the scope.
+
+#### 3A.8.1 Deferred — plausible follow-ups, not shipped in v1
+
+These are the items already listed in §3A.7.9 as post-ship
+experiments, re-stated here with the explicit reason each one is
+deferred. Every item is a valid future experiment with a clear
+measurement path, but none of them is justified by any evidence
+currently in hand.
+
+- **Multi-step lookahead (`k_steps > 1`).** `PhaseJEPAPredictor`
+  supports autoregressive rollout up to `k` steps, but v1 ships with
+  `k=1` only. Reason: §3A.2 Decision 5 — `k=1` is the densest signal,
+  the lowest-variance training target, and the minimum sufficient
+  test of whether the projector can produce temporal structure at
+  all. Raising `k` before `k=1` is measured would conflate two
+  independent questions ("is LSTB useful?" and "is longer-horizon
+  prediction useful?") into one.
+- **EMA target encoder.** §3A.2 Decision 2 Option B. Maintain an
+  exponential-moving-average copy of `SovereignStateProjector` and
+  use it to produce prediction targets. Reason: the same-projector
+  stop-gradient recipe (Option A) is simpler, adds no checkpoint
+  state, adds no decay hyperparameter, and is sufficient for v1
+  according to the hard-probes benchmark that already uses it.
+  Upgrade is justified only if Option A plateaus.
+- **`VrittiValidatedPredictor` substitution.** The subclass at
+  `predictor.py:304` adds Vritti-gated updates that skip prediction
+  when the Vritti classifier reports low cognitive reliability.
+  Reason: it is a gating mechanism on top of the base predictor, not
+  a replacement, and gating is only useful if (a) the base predictor
+  is already producing meaningful signal and (b) the Vritti
+  classifier is itself healthy. Neither is true in a v1 run — both
+  are brand-new signals on the same commit.
+- **Ontological hybrid path extension.** `OntologicalHybridTransformer`
+  (the non-Mistral hybrid path) also has a `SovereignStateProjector`
+  and could in principle support LSTB identically. Reason: extending
+  to a second model type doubles the test surface and the rollout
+  effort with no additional learning, because both paths share the
+  same projector and the same predictor code. Ship on `mistral_cg`
+  first, port to `ontological_hybrid` second if v1 succeeds.
+- **Configuration C stress-test as default.** The higher-capacity
+  configuration from §3A.4.2 (`lambda_lstb=0.1, k=2, hidden_dim=256`)
+  is deferred because it trades off against Gate 1 (LM loss floor)
+  and Gate 7 (gradient interference) more aggressively than v1. Use
+  only as a plateau investigation tool, not as a default.
+- **Per-stage predictor schedules.** A hypothetical design where
+  the predictor is active only during certain CG curriculum stages
+  (e.g., enabled in Stage 4+ once the pooled state is trained).
+  Reason: adds a scheduling contract between LSTB and
+  `cg_stage_manager` that v1 does not need — v1 simply lets the
+  curriculum manager override `lambda_lstb` per-stage
+  (§3A.5 R9), which is strictly more flexible than a hard-coded
+  schedule.
+
+#### 3A.8.2 Hard limits — will not be done even if asked
+
+These are items that LSTB v1 actively refuses to do. They are not
+"deferred" — they are architecturally out of the feature's job
+description, and adding them would turn LSTB into a different
+feature.
+
+- **No modification to `SovereignStateProjector`.** The projector's
+  architecture — MLP layers, per-plane activations (softmax on
+  Bhava, sigmoid on Kosha, etc.), component-wise normalization — is
+  untouched. LSTB consumes the projector's output; it does not
+  redesign the projector. If a future finding shows that the
+  projector architecture is wrong, that is a separate design
+  effort, not an LSTB revision.
+- **No modification to `compute_state_delta`.** The pooled state
+  path at `mistral_wrapper.py:291` is load-bearing for §1 (P0-1),
+  Stage 8 Perspective Synthesizer, and every existing CG auxiliary.
+  LSTB adds a new trajectory path alongside it but does not touch
+  the pooled path itself. A future design that wants to unify the
+  two paths is a separate effort.
+- **No modification to `PrimitiveAuxiliaryLosses` or the Token
+  Evaluation Tensor `T`.** `L_jepa`, `L_csr`, `L_vritti`, `L_guna`
+  all stay exactly as they are. LSTB does not replace them, augment
+  them, or reinterpret them. In particular, LSTB does **not**
+  address the CSR phonemic grounding gap — that is §3B's job,
+  shipped independently.
+- **No gradient flow to the frozen Mistral backbone.** `MistralCGWrapper`
+  sets `requires_grad=False` on the backbone at
+  `mistral_hybrid_wrapper.py:86` (the analogous line exists in the
+  CG wrapper). LSTB's per-token projection runs on the backbone's
+  output `hidden` tensor, which already has `requires_grad=False`
+  flowing into the projector. Gradients reaching backbone
+  parameters from the LSTB loss would be a bug, not a feature. The
+  frozen-backbone contract is a hard limit that LSTB explicitly
+  preserves.
+- **No inference-time footprint.** `PhaseJEPAPredictor` is a
+  training-only module. It is constructed inside
+  `model.conscious_gen` but is not exercised during generation.
+  Checkpoints saved with LSTB enabled are fully compatible with
+  inference-time loading paths that do not instantiate the
+  predictor — the predictor weights are simply ignored.
+  Inference-time latency, memory, and output shape are all
+  unchanged.
+- **No dataset, tokenizer, or data-pipeline changes.** LSTB operates
+  entirely on tensors that already flow through the training loop.
+  No new vocabulary entries, no new tokenizer behavior, no new
+  dataset fields, no new preprocessing. The WikiText-2 evaluation
+  run in §3A.6.1 uses the unchanged existing data pipeline.
+- **No new model_type.** LSTB ships as a flag on the existing
+  `mistral_cg` model type. It does **not** introduce a new
+  `--model_type mistral_cg_lstb` or similar. The model type
+  taxonomy stays at its current size; LSTB is a trainable
+  sub-module, not a new architecture.
+
+#### 3A.8.3 Non-goals — clarifications about what LSTB is not
+
+These are not limits or deferrals; they are clarifications of the
+feature's claim. Someone reading "LSTB is a latent bridge" might
+reasonably infer capabilities that LSTB does not actually provide.
+This subsection preempts those inferences.
+
+- **LSTB is not a semantic quality metric.** `cg_lstb_mse` measures
+  latent-space distance between predicted and target Sovereign
+  State vectors. It does **not** measure whether the predicted
+  state is semantically correct, whether it corresponds to a valid
+  ontological state, or whether it would produce good generations
+  downstream. MSE is a training signal, not an evaluation metric.
+- **LSTB is not a downstream inference conditioner.** The predicted
+  state `_lstb_s_pred` is used **only** as input to the MSE loss
+  and is then discarded. It is not fed back into the model as a
+  conditioning signal, not used to modify `adapted_hidden`, and not
+  available to Stage 8 Perspective Synthesizer. If a future design
+  wants to condition inference on predicted states, that is a
+  different feature — probably closer to the "Phase 3 causal
+  conditioning" mode referenced by the `--lstb-phase 3` flag in
+  `train_hard_probes.py` — and is deferred indefinitely.
+- **LSTB is not a replacement for the CG auxiliary losses.** It
+  augments them with a self-supervised temporal target. `L_ont`,
+  `L_kosha_routing`, `L_vritti`, and friends are still the primary
+  ways the Sovereign State is connected to the language modeling
+  task. LSTB's job is to make the projector's output *temporally
+  coherent*, not to make it *correct* in the sense that downstream
+  CG losses define correctness.
+- **LSTB is not a research benchmark.** The hard-probes
+  `latent_bridge.py` benchmark at
+  `scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/latent_bridge.py`
+  is a research probe: it measures R² of state prediction on
+  synthetic data, ablates individual JEPA components, tests VICReg
+  health, and runs an ontology alignment check. LSTB v1 is a
+  **training loss**. It does not port the benchmark harness, does
+  not emit the benchmark's metrics, and does not replicate its
+  ablation study. If research-grade measurement is needed,
+  operators should continue to use the hard-probes benchmark on
+  the same model checkpoints — the two tools are complementary, not
+  redundant.
+- **LSTB is not an answer to "does the 32D state carry meaning?"**
+  It is specifically an answer to "does the 32D state carry
+  **temporally coherent** meaning?" A projector that produces a
+  state with no semantic content but smooth temporal trajectories
+  will pass every LSTB gate and still be useless for downstream
+  reasoning. The CG auxiliary losses are the signals that test
+  semantic content; LSTB is the signal that tests temporal
+  coherence. **Both are necessary, neither is sufficient, and this
+  design document does not claim LSTB is enough on its own.**
+
+---
+
+*End of §3A. §3B (CSR phonemic grounding, half depth) follows next.*
