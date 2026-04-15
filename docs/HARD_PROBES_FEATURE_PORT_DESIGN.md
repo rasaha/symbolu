@@ -2658,4 +2658,259 @@ not crash the training run.
 
 ---
 
-*3B.3 (Integration Points) follows next.*
+### 3B.3 Integration Points
+
+Five files touched. §3B's integration is narrower than §3A's
+because it does **not** touch `mistral_wrapper.py` — the phonemic
+term operates on the Token Evaluation Tensor `T` that already
+flows through the CG loss block at `train.py:5218`, where
+`PrimitiveAuxiliaryLosses.forward()` is called. No new
+forward-pass contract is needed.
+
+Sketches below are illustrative, not literal patches.
+
+#### File 1: `symbolu_training/training/conscious_generation/providers/csr_phoneme.py` (NEW)
+
+Port the phoneme provider primitives from
+`scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/csr_bridge.py:62–180`.
+Copy only what is strictly needed:
+
+- `ARPABET_TO_VARNA` — dict mapping ARPABET phonemes to Varna classes.
+- `SANSKRIT_VOWEL_CALIBRATION` — calibration constants for vowel
+  resonance weighting.
+- `simple_text_to_phonemes(text: str) -> List[str]` — the fallback
+  word-level decomposition function at `csr_bridge.py:165`.
+- A new `arpabet_to_10d_vector(phonemes: List[str]) -> np.ndarray`
+  helper that produces the 10D resonance vector. In the hard-probes
+  benchmark this logic is inline in `test_ontology_alignment`; in
+  the port it is extracted into a named function for reuse.
+
+The public surface is a single function:
+
+```python
+# csr_phoneme.py
+
+def build_phonemic_table(
+    tokenizer,
+    vocab_size: int,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Precompute a [vocab_size, 10] phonemic table and validity mask.
+
+    For each token id in [0, vocab_size), decode to text, run the
+    ARPABET decomposition, and produce a 10D resonance vector.
+    Tokens with no valid decomposition get a zero row and mask[i]=False.
+
+    Returns:
+        table:  [vocab_size, 10] float32 tensor
+        mask:   [vocab_size]     bool tensor
+    """
+```
+
+The function is called exactly once per model instance, at
+`PrimitiveAuxiliaryLosses.__init__` time. It is not called during
+training forward/backward passes. **Python-loop cost is acceptable
+here** because it runs once at startup, not per step.
+
+Fallback semantics: if any internal step raises (missing `cmudict`,
+tokenizer decode failure, ARPABET lookup failure for a byte that
+happens to occur in the vocab), the function catches the exception
+per-token, emits a single summary warning at the end ("N tokens out
+of V had invalid decompositions — phonemic grounding will skip
+them"), and returns the table with zeros in the affected rows and
+`False` in the mask.
+
+**Estimated size:** ~100 lines, most of which is the ARPABET dict
+literal copied from the hard-probes source.
+
+#### File 2: `symbolu_training/training/conscious_generation/losses/primitive_auxiliary.py`
+
+Three changes to `PrimitiveAuxiliaryLosses`: add constructor
+parameters, register the phonemic table as a buffer, and extend the
+`forward()` method with the masked-MSE term.
+
+**Change 2a — constructor parameters:**
+
+```python
+# primitive_auxiliary.py — PrimitiveAuxiliaryLosses.__init__ (line ~50)
+
+def __init__(
+    self,
+    loss_type: str = "infonce",
+    margin: float = 0.1,
+    temperature: float = 0.1,
+    primitive_indices: Optional[Dict[str, int]] = None,
+    # NEW — §3B phonemic grounding
+    tokenizer: Optional[object] = None,
+    vocab_size: Optional[int] = None,
+    lambda_csr_phonemic: float = 0.0,
+):
+    super().__init__()
+    ...  # existing init
+
+    # Phonemic grounding table (§3B)
+    self.lambda_csr_phonemic = lambda_csr_phonemic
+    if lambda_csr_phonemic > 0 and tokenizer is not None and vocab_size is not None:
+        try:
+            from symbolu_training.training.conscious_generation.providers.csr_phoneme import (
+                build_phonemic_table,
+            )
+            table, mask = build_phonemic_table(tokenizer, vocab_size)
+            self.register_buffer('phonemic_table', table)  # [V, 10]
+            self.register_buffer('phonemic_valid', mask)   # [V]
+        except Exception as e:
+            import warnings
+            warnings.warn(
+                f"Failed to build phonemic table: {e}. "
+                f"Disabling lambda_csr_phonemic for this run."
+            )
+            self.lambda_csr_phonemic = 0.0
+```
+
+The buffers (not parameters) ensure the phonemic table is moved to
+the correct device with the model, serialized into checkpoints, and
+excluded from the optimizer's parameter list. `register_buffer` is
+the standard PyTorch mechanism for this.
+
+**Change 2b — `forward()` extension:**
+
+Inside the existing `PrimitiveAuxiliaryLosses.forward()` method
+(`primitive_auxiliary.py:63`), after the existing InfoNCE losses
+are computed and stored in the result dict, add the phonemic
+regression term:
+
+```python
+# primitive_auxiliary.py — forward() method, after existing loss computation
+
+if self.lambda_csr_phonemic > 0 and hasattr(self, 'phonemic_table'):
+    # Fetch phonemic vectors for target and candidate tokens
+    # target_ids: [...], candidate_ids: [..., K]
+    _phon_target = self.phonemic_table[target_ids]                  # [..., 10]
+    _phon_cand   = self.phonemic_table[candidate_ids]               # [..., K, 10]
+    _valid_target = self.phonemic_valid[target_ids]                 # [...]
+    _valid_cand   = self.phonemic_valid[candidate_ids]              # [..., K]
+
+    # Cosine similarity between target and each candidate, per-position
+    _phon_target_exp = _phon_target.unsqueeze(-2)                   # [..., 1, 10]
+    _cos_sim = F.cosine_similarity(
+        _phon_target_exp, _phon_cand, dim=-1,
+    )                                                                # [..., K]
+
+    # Masked regression: only contribute where BOTH sides are valid
+    _valid_pair = _valid_target.unsqueeze(-1) & _valid_cand         # [..., K]
+    _csr_col = T[..., self.primitive_indices['csr']]                # [..., K]
+    _sq_err = (_csr_col - _cos_sim) ** 2                            # [..., K]
+    _masked_sum = (_sq_err * _valid_pair.float()).sum()
+    _mask_count = _valid_pair.float().sum().clamp(min=1.0)
+
+    result['L_csr_phonemic'] = _masked_sum / _mask_count
+```
+
+The result dict now has both `L_csr` (the existing InfoNCE term)
+and `L_csr_phonemic` (the new masked regression term). The caller
+in `train.py` consumes both independently with separate weights.
+
+**Estimated size:** ~50 lines added.
+
+#### File 3: `symbolu_training/training/unified/config.py`
+
+One new field, placed alongside the existing CG lambda block at
+`config.py:~1042` (where `lambda_csr_token` lives):
+
+```python
+lambda_csr_phonemic: float = 0.0   # §3B — masked phonemic regression on L_csr
+```
+
+**Estimated size:** ~1 line.
+
+#### File 4: `symbolu_training/training/unified/model_factory.py`
+
+Thread `tokenizer`, `vocab_size`, and `lambda_csr_phonemic` into
+the existing `PrimitiveAuxiliaryLosses` construction site. The
+tokenizer is already available in `model_factory.py` because it is
+loaded alongside the Mistral backbone for the CG path.
+
+```python
+# model_factory.py — where PrimitiveAuxiliaryLosses is currently constructed
+
+model.conscious_gen['primitive_aux_losses'] = PrimitiveAuxiliaryLosses(
+    loss_type="infonce",
+    temperature=0.1,
+    # NEW — §3B
+    tokenizer=tokenizer,
+    vocab_size=tokenizer.vocab_size,
+    lambda_csr_phonemic=config.lambda_csr_phonemic,
+)
+```
+
+The exact construction site should be located by searching for
+`PrimitiveAuxiliaryLosses(` in `model_factory.py`. There should be
+exactly one occurrence.
+
+**Estimated size:** ~5 lines modified (3 new kwargs added to
+existing constructor call).
+
+#### File 5: `symbolu_training/training/unified/train.py`
+
+Two changes. One argparse flag, one loss-block addition.
+
+**Change 5a — argparse flag:**
+
+```python
+# train.py — near the existing lambda_csr_token flag at ~:10297
+
+parser.add_argument("--lambda_csr_phonemic", type=float, default=0.0,
+    help="Weight for masked phonemic MSE term on the CSR column of T. "
+         "Augments L_csr with ARPABET-derived phonemic grounding. "
+         "0.0 disables. Recommended: 0.005 (matches existing token-level "
+         "auxiliary envelope). See §3B of HARD_PROBES_FEATURE_PORT_DESIGN.md.")
+```
+
+Thread into the `UnifiedConfig` constructor at `train.py:11189+`
+alongside `lambda_csr_token=args.lambda_csr_token`.
+
+**Change 5b — loss-block addition:**
+
+Inside the existing CG loss block, at the site where
+`primitive_aux_losses` is called (around `train.py:5218`), the
+existing code already loops over primitive lambdas. The new
+`L_csr_phonemic` key must be consumed with its own weight —
+separate from the existing `_cg_prim_lambdas` dict because it uses
+a different config field:
+
+```python
+# train.py — after the existing _cg_prim_lambdas loop
+
+# §3B — phonemic grounding term
+if config.lambda_csr_phonemic > 0 and 'L_csr_phonemic' in _cg_pa_result:
+    _phon_loss = _cg_pa_result['L_csr_phonemic']
+    if torch.isfinite(_phon_loss):
+        loss = loss + config.lambda_csr_phonemic * _phon_loss
+        metrics['cg_L_csr_phonemic'] = _phon_loss.item()
+```
+
+The guard structure matches every other CG auxiliary — key
+presence check, finite check, additive contribution. No new
+defensive patterns are introduced.
+
+**Estimated size:** ~15 lines added.
+
+#### Patch-size budget
+
+| File | Lines added / modified |
+|------|-----------------------|
+| `csr_phoneme.py` (new) | ~100 (mostly ARPABET dict literal) |
+| `primitive_auxiliary.py` | ~50 |
+| `config.py` | ~1 |
+| `model_factory.py` | ~5 |
+| `train.py` | ~15 |
+| **Total** | **~170 lines** |
+
+Larger than §3A's ~76 lines because of the new provider file, but
+the footprint inside existing files is smaller (§3A adds ~40 lines
+to `train.py` alone; §3B adds ~15). The new file is self-contained
+and has zero runtime cost on non-§3B runs (it is not imported unless
+`lambda_csr_phonemic > 0`).
+
+---
+
+*3B.4 (Configuration Interface) follows next.*
