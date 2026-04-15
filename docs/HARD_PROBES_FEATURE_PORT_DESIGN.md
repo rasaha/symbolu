@@ -838,4 +838,185 @@ rewards temporal coherence.
 
 ---
 
-*3A.2 (Design Approach) follows next.*
+### 3A.2 Design Approach
+
+Five design decisions drive the implementation. Each is stated with the
+options considered, the choice, and the justification — so future
+readers can see which decisions are load-bearing and which are
+incidental.
+
+#### Decision 1: How to produce the per-token Sovereign State trajectory
+
+`MistralCGWrapper.compute_state_delta` currently produces **one pooled
+state per sequence** at `mistral_wrapper.py:301–305`:
+
+```python
+pooled = hidden.mean(dim=1)              # [B, D_mistral]
+state = self.state_projector(pooled)     # [B, 32]
+```
+
+A JEPA-style predictor needs a **trajectory** `[B, T, 32]` — one state
+per token position. Options considered:
+
+| Option | Approach | Verdict |
+|--------|----------|---------|
+| A | Apply the projector per-token: `state_traj = self.state_projector(hidden)` → `[B, T, 32]` | **Chosen** |
+| B | Sliding-window pool: project over overlapping chunks of `K` tokens | Rejected — introduces a window hyperparameter, breaks causality on the right boundary, adds edge-case bugs |
+| C | Reconstruct trajectory externally in the training loop from `last_hidden_state` | Rejected — scatters the projector usage across two call sites, invites drift when the projector changes |
+
+`SovereignStateProjector` is an MLP with per-plane activations applied
+on the last dimension. It handles arbitrary leading dimensions cleanly
+— applying it to `[B, T, D]` returns `[B, T, 32]` with no code change
+to the projector itself. The only change needed is a new forward-path
+option on `MistralCGWrapper` that computes and exposes the trajectory
+when LSTB is enabled.
+
+**Cost.** For a typical CG run (B=4, T=1024, D_mistral=4096), the
+per-token projection adds roughly `B × T × D_mistral × 32 ≈ 500 MFLOPs`
+per forward. The frozen Mistral backbone consumes on the order of
+`200+ TFLOPs` per forward at the same batch size. The extra cost is
+well under 1% and not a deciding factor.
+
+**Contract change on `MistralCGWrapper.forward`:** add an optional
+parameter `return_state_trajectory: bool = False`. When `True`, the
+forward dict gains an additional key `'state_trajectory': [B, T, 32]`.
+The existing pooled `'state': [B, 32]` key is unchanged, preserving
+backwards compatibility for §1 (P0-1), every existing CG auxiliary
+loss, and Stage 8. The new key is computed only when the flag is set
+so non-LSTB runs pay nothing.
+
+#### Decision 2: JEPA target construction (context vs. target, same projector vs. EMA)
+
+Three canonical JEPA recipes were considered:
+
+| Option | Approach | Verdict |
+|--------|----------|---------|
+| A | **Same projector, stop-gradient on target.** Context = `state_traj[:, :-k]`. Target = `state_traj[:, k:].detach()`. One projector, one code path. | **Chosen** |
+| B | **EMA target encoder.** Maintain an exponential-moving-average copy of `SovereignStateProjector` and use it to produce targets. | Rejected for v1 — adds EMA state to checkpoints, doubles projector memory, adds a decay hyperparameter |
+| C | **Separate target projector** (fresh init, different params). | Rejected — adds a second trainable module with no clear supervision signal for it |
+
+Option A is the minimum viable JEPA. It is what `CompositeJEPALoss`
+and `JEPAPredictionLoss` already expect at their call sites in the
+hard-probes `latent_bridge.py` benchmark
+(`scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/latent_bridge.py:362`).
+Upgrading to Option B is a mechanical follow-up if and only if the
+1K-step measurement (§3A.6) shows that Option A plateaus at a
+non-useful prediction MSE. **Do not ship Option B speculatively.**
+
+**Stop-gradient correctness.** The target tensor is produced by the
+same projector instance as the context, but passed through `.detach()`
+before entering the loss. This means:
+
+- The projector **does** receive gradient from the loss through the
+  context path (positions `[:, :-k]`).
+- The projector **does not** receive gradient from the loss through
+  the target path (positions `[:, k:]`). Those gradients are blocked
+  by the detach.
+- The predictor (`PhaseJEPAPredictor`) receives gradient normally
+  through its own parameters, pulled toward making the prediction
+  match the detached target.
+
+This is the standard JEPA recipe and avoids the degenerate solution
+where the projector learns to produce a trivial (e.g., constant) state
+that is trivially predictable.
+
+#### Decision 3: Predictor ownership and instantiation
+
+`PhaseJEPAPredictor` is a standalone `nn.Module` with ~100K parameters
+for a 32D state (default `hidden_dim=128, num_heads=4,
+prediction_steps=k`). It needs to live **somewhere** in the model
+graph so the optimizer sees its parameters and checkpointing picks it
+up.
+
+The existing CG module suite follows a **dict pattern** visible at
+`train.py:5183` (`model.conscious_gen['kosha_routing_loss']`) and
+`:5197` (`model.conscious_gen['bliss_coherence_loss']`), where
+`model.conscious_gen` is a plain dict of named sub-modules attached
+during `model_factory.build_mistral_cg(...)`. The LSTB predictor and
+loss fit this pattern directly:
+
+```python
+model.conscious_gen['jepa_predictor'] = PhaseJEPAPredictor(...)
+model.conscious_gen['jepa_loss']      = JEPAPredictionLoss(...)
+```
+
+The predictor is constructed inside `model_factory.py` at the same
+site that constructs the existing CG modules. The parameter count is
+small enough that it does not require special-case handling for
+optimizer groups, gradient clipping, or mixed precision — it
+inherits the same treatment as every other trainable CG module.
+
+**Why not put it on `MistralCGWrapper` directly?** Because
+`MistralCGWrapper` already bundles the backbone, state projector,
+intent projector, and phase adapter. Adding the JEPA predictor there
+would blur the boundary between "representation-producing modules"
+(which the wrapper owns) and "auxiliary training signals" (which
+`model.conscious_gen` owns). Keeping the predictor in
+`model.conscious_gen` preserves that boundary.
+
+#### Decision 4: Loss composition (roll our own vs. reuse `JEPAPredictionLoss`)
+
+`JEPAPredictionLoss` at `symbolu_training/jepa/losses.py:192` already
+wraps three terms:
+
+- **MSE invariance** between predicted and detached target state.
+- **VICReg regularization** on the predicted state (the binary form
+  of `VICRegLoss`, with nonzero invariance coefficient).
+- **Orthogonality regularization** on the predictor's learned
+  projection weights, preventing the predictor from collapsing to a
+  low-rank mapping.
+
+It exposes `vicreg_weight` and `ortho_weight` as construction-time
+hyperparameters. The hard-probes `latent_bridge.py` benchmark already
+instantiates it as
+`JEPAPredictionLoss(vicreg_weight=0.5, ortho_weight=0.05)` at line
+364, which is the recommended starting configuration.
+
+**Verdict: reuse `JEPAPredictionLoss` as-is.** Rolling a custom
+MSE + VICReg combination in the training loop would duplicate code
+that already exists, fork the source of truth for the math, and make
+future changes to JEPA defaults require two-site updates. The only
+cost of reuse is that the ortho term operates on the predictor's
+internal projection weights — which the predictor already exposes
+because that is its documented interface. No wrapping or adapter code
+is needed.
+
+#### Decision 5: `k_steps` value for v1
+
+`PhaseJEPAPredictor` supports multi-step autoregressive prediction via
+`prediction_steps`. The value matters because:
+
+- **Small `k` (e.g. `k=1`)** gives the predictor an easy target
+  (next-position state) and produces a dense training signal — every
+  token position except the last contributes a prediction loss.
+- **Large `k` (e.g. `k=4, 8`)** gives the predictor a harder target
+  that forces it to model longer-horizon dynamics, but the signal is
+  sparser and the autoregressive rollout accumulates error.
+
+For v1, **start with `k_steps = 1`**. Rationale:
+
+1. It is the densest, lowest-variance training signal available.
+2. It is the minimum that tests whether the projector can produce a
+   trajectory with any temporal structure at all — if `k=1` does not
+   reduce MSE meaningfully below a trivial baseline (see §3A.6), then
+   `k>1` will fail harder.
+3. It avoids an autoregressive rollout loop in the critical path,
+   keeping the forward cost of the JEPA loss at `O(B × T × 32)`
+   rather than `O(k × B × T × 32)`.
+4. `k_steps` is exposed as a config flag (§3A.4), so upgrading to
+   `k=2` or larger is a one-line change once v1 is measured.
+
+**Causal correctness of `k=1` in `PhaseJEPAPredictor`.** The
+predictor's `_phase_attention` implementation at `predictor.py:257`
+accumulates state via `torch.cumsum(kv, dim=1)`. Cumsum along the time
+dimension is **causal by construction**: the output at position `t`
+depends only on inputs at positions `≤ t`. No explicit causal mask
+is required. This was verified against
+`symbolu_training/jepa/predictor.py:255–257` before committing this
+design. The mechanism works because the model is structurally
+prevented from peeking at future tokens, not because of an attention
+mask that could be forgotten.
+
+---
+
+*3A.3 (Integration Points) follows next.*
