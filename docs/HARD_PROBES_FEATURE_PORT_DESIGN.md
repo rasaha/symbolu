@@ -772,4 +772,70 @@ reference this section rather than re-enumerating.
 
 ---
 
-*§3A (LSTB latent bridge) follows next — full-depth design.*
+## §3A — LSTB (Latent Semantic Token Bridge) Wiring
+
+*Primary sub-task of P1-1. Ships standalone. Depends on §1 (P0-1) being
+correctly in place; does not depend on §3B.*
+
+### 3A.1 Problem Statement
+
+After §1 (P0-1: VICReg unary anti-collapse on the pooled Sovereign
+State) is in place, the 32D state projector has **one** training signal
+that acts directly on its output: a regularizer that says "don't
+collapse, keep your dimensions varied and decorrelated." That is a
+necessary guardrail, but it is not a **learning target**. Anti-collapse
+only tells the projector what *not* to do; it does not tell the
+projector what the state *should represent*.
+
+The projector is indirectly pulled by downstream CG auxiliary losses —
+`lambda_ont`, `lambda_kosha_routing`, `lambda_bliss_token`,
+`lambda_vritti_token`, `lambda_csr_token`, `lambda_guna_token` — but
+those gradients arrive through long loss paths that go through the
+Token Evaluation Tensor, shortlist scoring, integrated softmax, and
+contrastive targets. Each of those auxiliaries is computed at a single
+pooled state per sequence, provides a weak signal relative to the LM
+cross-entropy path, and has no notion of **temporal structure** in the
+sequence of states that the projector produces as a sequence is
+consumed.
+
+The specific gap:
+
+- **The 32D Sovereign State has no causal prediction target.** Nothing
+  in the current training loop asks the projector to produce a state
+  at position `t` that is *predictable* from its own past
+  `state_{<t}`. The projector is free to produce a state trajectory
+  that is temporally incoherent — every step lives on its own, with
+  no continuity constraint.
+- **Temporal incoherence silently degrades every downstream CG module
+  that reads the state across a sequence.** Stage 8's Perspective
+  Synthesizer, the Kosha router, and the Vritti classifier all consume
+  the Sovereign State as if it carries stable meaning across token
+  positions. If the trajectory is in fact a random walk (or worse, a
+  step function), those modules fit noise — and they will converge to
+  losses that *look* reasonable on average, even though the underlying
+  representation has no structure.
+- **This failure is not caught by P0-1.** VICReg's variance term only
+  asks that each of the 32 dimensions has non-trivial variance across
+  the *batch*, not across *time*. A projector that produces the same
+  state for every token in a sequence (but different states across
+  sequences) passes P0-1 trivially and fails §3A completely.
+
+The symptom to watch for — which operators will only notice if they
+measure it — is a combination of (a) healthy `cg_anticollapse_*`
+metrics from P0-1, (b) healthy `cg_ont_loss` / `cg_kosha_routing_loss`
+/ `cg_vritti_token_loss` curves, and (c) Stage 8 Perspective
+Synthesizer outputs that show no meaningful temporal structure when
+probed with a diagnostic like per-token state cosine similarity. The
+loop runs, the losses go down, and the 32D bottleneck is still
+carrying nothing useful across time.
+
+LSTB (Latent Semantic Token Bridge) solves this by adding a
+**predictive self-supervision loss** on the Sovereign State trajectory:
+given the state at positions `≤ t`, predict the state at `t + k`, and
+penalize the distance between prediction and the (detached) target.
+This gives the projector a positive learning signal that directly
+rewards temporal coherence.
+
+---
+
+*3A.2 (Design Approach) follows next.*
