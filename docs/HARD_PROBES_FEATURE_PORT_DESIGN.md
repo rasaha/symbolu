@@ -1318,4 +1318,215 @@ package are touched.
 
 ---
 
-*3A.4 (Configuration Interface) follows next.*
+### 3A.4 Configuration Interface
+
+This subsection specifies the user-facing contract for LSTB — what
+flags exist, what they mean, what values are supported, and what the
+recommended configurations are for the scenarios operators will
+actually run. The argparse definitions are sketched in §3A.3; this
+section is about the **contract**, not the parser code.
+
+#### 3A.4.1 Flag reference
+
+Six flags total. Five are tunable hyperparameters; one
+(`--lambda_lstb`) is the master enable/disable.
+
+| Flag | Type | Default | Valid range | Meaning |
+|------|------|---------|-------------|---------|
+| `--lambda_lstb` | float | `0.0` | `[0.0, 1.0]` | Master weight on the composite JEPA prediction loss. `0.0` disables LSTB entirely (no predictor constructed, no trajectory computed, zero compute cost). Values above `0.1` are not recommended for v1 without a reason — the LM cross-entropy path should remain dominant. |
+| `--lstb_k_steps` | int | `1` | `{1, 2, 3, 4}` | Prediction lookahead. `1` means "predict the next-position state" (default, recommended). `> 1` enables autoregressive rollout inside `PhaseJEPAPredictor`; useful only if `k=1` measurements plateau and longer-horizon structure is needed. |
+| `--lstb_vicreg_weight` | float | `0.5` | `[0.0, 10.0]` | Weight of the VICReg term inside `JEPAPredictionLoss`. `0.0` reduces the loss to pure MSE; higher values push harder against predictor collapse. The default matches the hard-probes `latent_bridge.py:364` benchmark. |
+| `--lstb_ortho_weight` | float | `0.05` | `[0.0, 1.0]` | Weight of the orthogonality term on the predictor's learned projection matrices. Prevents the predictor from collapsing to a low-rank mapping. The default matches the hard-probes benchmark. |
+| `--lstb_hidden_dim` | int | `128` | `{32, 64, 128, 256}` | Hidden dimension inside `PhaseJEPAPredictor`'s delta MLP. Larger values increase capacity at roughly linear cost; `128` is the default and is ~100K params total. |
+| `--lstb_num_heads` | int | `4` | `{1, 2, 4, 8}` | Number of phase attention heads. Must evenly divide `state_dim=32`. The default of `4` gives `head_dim=8`. |
+
+**Single enable flag convention.** `--lambda_lstb` is both the weight
+and the master switch. There is intentionally **no** separate
+`--enable_lstb` flag: it would be redundant and invite
+inconsistent states ("enabled but weight is zero", "disabled but
+weight is nonzero"). The `lambda_lstb > 0` check at construction time
+and in the loss block ensures that the feature's compute cost is
+strictly zero when disabled.
+
+**Flags that do not exist and will not be added for v1.** For
+completeness, the following are deliberate non-features — if an
+operator asks about them, the answer is "not in v1, see §3A.8":
+
+- `--lstb_target_encoder ema` — deferred EMA target encoder (§3A.2
+  Decision 2, Option B).
+- `--lstb_per_layer_schedule` — per-layer predictor schedules.
+- `--lstb_vritti_gated` — the `VrittiValidatedPredictor` subclass.
+- `--lstb_benchmark` — no standalone benchmark harness; LSTB is a
+  training loss, not a research probe.
+
+#### 3A.4.2 Recommended configurations
+
+Three named configurations, each tied to a scenario. Operators should
+pick the one that matches their scenario and resist the temptation to
+tune before measuring.
+
+**Configuration A — `off` (default).**
+All existing runs, all non-CG runs, and every model type other than
+`mistral_cg`. Zero code change from today:
+
+```bash
+--lambda_lstb 0.0
+```
+
+No other LSTB flags need to be set. The predictor is not constructed,
+the trajectory is not computed, and the forward-dict contract is
+unchanged from today.
+
+**Configuration B — `v1` (recommended starting point for CG runs).**
+The configuration that the §3A.6 success criteria are measured
+against. This is what `scripts/train_mistral_cg.sh` should pass by
+default **after** P0-1 is in place and validated:
+
+```bash
+--lambda_lstb 0.05
+--lstb_k_steps 1
+--lstb_vicreg_weight 0.5
+--lstb_ortho_weight 0.05
+--lstb_hidden_dim 128
+--lstb_num_heads 4
+```
+
+Rationale for `lambda_lstb=0.05`: consistent with the weight envelope
+of the existing CG auxiliaries (`lambda_ont=0.01`,
+`lambda_kosha_routing=0.01`, `lambda_bliss_token=0.01`,
+`lambda_plausibility_token=0.005`, etc. — see
+`scripts/train_mistral_cg.sh` lines 60–66). LSTB is a stronger signal
+than the token-level auxiliaries because it trains the projector
+directly rather than through a shortlist scorer, so `0.05` puts it at
+roughly 5× the individual token-level weights — enough to matter, not
+enough to dominate.
+
+**Configuration C — `stress-test` (for operators investigating
+plateau).**
+Use only after Configuration B has been run for at least 1000 steps
+and the `cg_lstb_mse` metric has plateaued at a level the operator
+considers too high. Increases capacity and signal strength:
+
+```bash
+--lambda_lstb 0.1
+--lstb_k_steps 2
+--lstb_hidden_dim 256
+# VICReg and ortho weights unchanged from v1
+```
+
+Do **not** start here. Do not use these values for routine runs. If
+Configuration C succeeds where Configuration B plateaus, file the
+result and consider whether to raise the v1 defaults — but do not
+change the config defaults in this design document until that
+measurement is in hand.
+
+#### 3A.4.3 Integration with `scripts/train_mistral_cg.sh`
+
+The existing training script at `scripts/train_mistral_cg.sh:60–66`
+defines CG lambda weights as shell variables:
+
+```bash
+LAMBDA_ONT=0.01
+LAMBDA_KOSHA=0.01
+LAMBDA_BLISS=0.01
+LAMBDA_PLAUSIBILITY=0.005
+LAMBDA_CSR=0.005
+LAMBDA_VRITTI=0.005
+LAMBDA_GUNA=0.005
+```
+
+and passes them to `python train_unified_llm.py` around lines 214–220.
+The LSTB integration follows the same pattern — add the shell
+variable near the existing block, pass it through to the Python
+invocation near the existing `--lambda_*` flags:
+
+```bash
+# Near line 66, alongside the existing CG lambdas
+LAMBDA_LSTB=0.05
+
+# Near line 220, alongside the existing --lambda_* flags
+    --lambda_lstb "$LAMBDA_LSTB" \
+    --lstb_k_steps 1 \
+```
+
+The five tunable LSTB sub-flags (`--lstb_k_steps`,
+`--lstb_vicreg_weight`, `--lstb_ortho_weight`, `--lstb_hidden_dim`,
+`--lstb_num_heads`) **should not** be exposed as shell variables in
+the script. They are fixed at the v1 defaults. An operator who wants
+to change them should do so directly on the Python command line, not
+by editing the script — this preserves the script as a "known-good
+configuration" rather than a tuning playground.
+
+**Smoke test mode** (`--smoke-test` in the shell script) already
+overrides `MAX_STEPS=10` and sets `EXTRA_ARGS="--no_save --quiet"` at
+lines 148–158. The LSTB shell variable should **not** be gated out
+in smoke mode — LSTB adds negligible cost, and exercising its code
+path in the smoke test is exactly what makes the smoke test useful as
+a regression guard. Leave `LAMBDA_LSTB=0.05` active during the smoke
+test so that a broken LSTB integration fails loudly on the ten-step
+run.
+
+#### 3A.4.4 Interaction with P0-1 flags
+
+LSTB and P0-1 anti-collapse are complementary, not competing. They
+should both be enabled on any production `mistral_cg` run. The full
+set of new flags introduced by P0-1 + P1-1 on a standard CG run is:
+
+```bash
+# P0-1 — unary anti-collapse on pooled state (§1)
+--lambda_sovereign_anticollapse 0.02
+--anticollapse_warmup_steps 1000
+
+# P1-1 — LSTB latent bridge on per-token trajectory (§3A)
+--lambda_lstb 0.05
+--lstb_k_steps 1
+```
+
+**Key contract between the two:**
+
+- P0-1's `--lambda_sovereign_anticollapse` operates on the **pooled**
+  `outputs['state']` `[B, 32]`. Its VICReg term uses
+  `compute_collapse_only(x)` (unary, no target).
+- P1-1's `--lambda_lstb` operates on the **per-token**
+  `outputs['state_trajectory']` `[B, T, 32]`. Its VICReg term is
+  inside `JEPAPredictionLoss` and uses the binary form
+  `VICRegLoss(x_pred, y_target)` with nonzero invariance.
+
+These are different inputs, different VICReg coefficients, different
+attach points, and they pull the projector toward different
+properties. **Neither subsumes the other.** If the two VICReg terms
+ever produce numerically identical losses in a diagnostic, that is a
+**bug** to investigate, not an optimization opportunity to exploit.
+
+The detailed interaction analysis (when to dial one down, how to
+attribute a regression to one or the other) lives in §3A.5 (Risks
+and Mitigations, including the interaction risk table).
+
+#### 3A.4.5 Forbidden configurations
+
+Three flag combinations are explicitly **not supported** and should
+produce a startup error, not a silent misbehavior:
+
+1. `--lambda_lstb > 0` without `--enable_conscious_generation`.
+   LSTB is CG-specific. Setting `lambda_lstb > 0` on a
+   non-CG model type (`hybrid`, `ontological`, `mistral_hybrid`,
+   etc.) should raise a clear error at argparse-validation time.
+2. `--lambda_lstb > 0` with `--model_type` ≠ `mistral_cg` **and**
+   `ontological_hybrid`. The latter is grandfathered in because
+   `OntologicalHybridTransformer` also has a `SovereignStateProjector`
+   and could in principle support LSTB, but that extension is out of
+   scope for v1 (§3A.8). For v1, LSTB is `mistral_cg`-only.
+3. `--lstb_k_steps >= seq_len`. If the requested lookahead is longer
+   than the sequence length, no (context, target) pair can be
+   formed. Raise a clear startup error instead of silently producing
+   zero loss every step.
+
+These checks live in the argparse validation block at `train.py` near
+line 11189 where other cross-flag validation already happens (e.g.
+the existing checks on `enable_conscious_generation` + CG sub-flag
+consistency). A failure of any of these checks should abort startup
+with a message naming the flag and the violated contract.
+
+---
+
+*3A.5 (Risks and Mitigations) follows next.*
