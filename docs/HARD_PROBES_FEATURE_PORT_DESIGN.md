@@ -3665,5 +3665,151 @@ Trivial. §3B is entirely additive and off-by-default.
 
 ---
 
-*3B.8 (Out of Scope) follows next — the final §3B subsection, and
-the end of §3.*
+### 3B.8 Out of Scope
+
+Three categories matching §3A.8's structure: deferred, hard
+limits, non-goals. Shorter because §3B is a smaller feature with
+a narrower surface, so the potential for scope creep is smaller
+to begin with.
+
+#### 3B.8.1 Deferred — plausible follow-ups
+
+These items have a clear measurement path but are not justified
+by any evidence in hand and are deliberately **not** part of v1.
+
+- **Soft-label KL divergence loss form.** §3B.2 Decision 2
+  Option C — replace the cosine-similarity MSE with a soft
+  distribution over candidates and use KL divergence between
+  `softmax(T[..., 3])` and the phonemic distribution. More
+  principled but requires temperature tuning; the regression MSE
+  form is sufficient for v1 and is what the hard-probes
+  benchmark already uses.
+- **Alternative phonemic operationalization** (R5 in §3B.5). The
+  single named follow-up from §3B.7.7. ARPABET cosine similarity
+  is the only concrete operationalization currently in the
+  codebase; if a future investigation shows it is the wrong
+  answer, the fix is in the `csr_phoneme.py` provider, not in
+  the rest of §3B's integration. Candidates include learned
+  phonemic embeddings, linguistic-corpus-derived similarity,
+  Sanskrit Varna mapping refinement, or a composite of several.
+- **Per-plane phonemic grounding.** Instead of a single 10D
+  resonance vector per token, produce separate phonemic signals
+  for different Koshas or Varna classes and train different
+  columns of `T` against each. Architecturally cleaner but
+  roughly doubles the design surface; out of scope until the
+  single-column version has been measured.
+- **Multi-lingual phonemic extension.** ARPABET covers English
+  phonemes. For a multi-lingual Mistral training run, the
+  phonemic table would need IPA (International Phonetic Alphabet)
+  or language-specific decomposition. Out of scope until
+  §3B demonstrates value on English WikiText-2.
+- **Vocabulary-level shortlist comparison.** Instead of comparing
+  against the per-batch shortlist `K`, compute cosine similarity
+  against the full vocabulary `V` at a sampled subset. Gives a
+  denser training signal at the cost of a larger tensor
+  operation. Out of scope — the per-batch shortlist is what the
+  existing `L_csr` loss uses, and §3B should match its envelope
+  for fair comparison.
+
+#### 3B.8.2 Hard limits — will not be done even if asked
+
+These items turn §3B into a different feature and are not on any
+roadmap.
+
+- **No modification to `SovereignStateProjector`, `compute_state_delta`,
+  or the 32D Sovereign State.** §3B operates on the CSR column of
+  `T`, which is architecturally outside the 32D state
+  (`state_projector.py:13–14` — CSR is the Manomaya Plane,
+  intentionally separated from the five planes of the Sovereign
+  State). Modifying any of those would mean ignoring the doctrinal
+  boundary that §3B's very existence is designed to respect.
+- **No modification to the `PrimitiveAuxiliaryLosses` InfoNCE
+  contract.** The existing `L_csr` contrastive loss stays exactly
+  as it is. §3B adds an additive term and a validity-masked
+  regression; it does not reinterpret, replace, or restructure
+  the existing ranking loss.
+- **No new trainable parameters in the phoneme provider.** The
+  `[vocab_size, 10]` phonemic table is a **fixed lookup**,
+  registered as a buffer (not a parameter). There is no "learned
+  phonemic embedding" in v1 — that is 3B.8.1's deferred
+  follow-up, and it lives in a different module. The v1 provider
+  is deterministic: given the same tokenizer and the same
+  `csr_phoneme.py` source, it produces bitwise-identical tables.
+- **No gradient flow to the frozen Mistral backbone.** The
+  phonemic table is a static buffer; the cosine similarity is a
+  comparison, not a projection; the MSE gradient flows only
+  through the scorer that produces column 3 of `T`. No path
+  exists from §3B's loss to the backbone parameters, and none
+  will be added.
+- **No inference-time footprint.** The phonemic table is a
+  non-trainable buffer that is loaded into memory at model
+  construction time regardless of training vs inference, but
+  **it is not accessed during generation** — the loss is a
+  training-only operation. Inference latency, memory-after-init,
+  and output shape are unchanged. (The 1.3 MB buffer is present
+  in inference memory but not used; callers who care can strip
+  the buffer from the state dict before deployment.)
+- **No changes to the tokenizer.** §3B reads from the tokenizer
+  at construction time to build the phonemic table. It does not
+  modify the tokenizer, register new tokens, or alter vocabulary
+  behavior. Any tokenizer upgrade or replacement is handled
+  entirely outside §3B.
+- **No new `model_type`.** §3B is a flag on `mistral_cg`. It
+  does not introduce `mistral_cg_phonemic` or any variant.
+- **No port of the hard-probes CSR bridge benchmark harness.**
+  `scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/csr_bridge.py`
+  stays where it is. §3B ports the **primitives** (ARPABET
+  decomposition, 10D resonance vector) but not the benchmark
+  runner, the ablation study, or the research metrics. Research
+  tools stay in the research tree.
+
+#### 3B.8.3 Non-goals — clarifications about what §3B is not
+
+Preempts misreadings of the feature name.
+
+- **§3B is not a phonemic model.** It does not understand
+  phonology, articulation, or linguistic structure. It computes a
+  cosine similarity between fixed 10D vectors derived from a
+  handcrafted ARPABET-to-Varna mapping. Anything beyond "cosine
+  similarity of handcrafted vectors" is out of scope for v1.
+- **§3B is not a replacement for the existing `L_csr` InfoNCE
+  loss.** It augments the existing loss with a phonemic alignment
+  term. Both losses pull on column 3 of `T` simultaneously. If
+  the two objectives ever appear to be in tension (a §3B.6 Gate 3
+  failure mode), the resolution is to lower `lambda_csr_phonemic`,
+  not to disable `lambda_csr_token`.
+- **§3B is not a general-purpose token embedding.** The 10D
+  phonemic vectors are only used as targets for column 3 of `T`
+  and are not exposed to any other module. A future extension
+  that wants to use phonemic embeddings for a different purpose
+  should construct its own provider, not reuse §3B's buffer.
+- **§3B is not an answer to "does CSR work?"** It is only an
+  answer to "does column 3 of `T` correlate with
+  ARPABET-derived cosine similarity?" The CG doctrine's claim
+  that CSR handles the Manomaya plane involves much more than
+  phonemic similarity (resonance vectors, Sanskrit calibration,
+  symbolic entropy modulation — see the 40-line file docstring
+  at `csr_bridge.py:1–50`). §3B addresses the narrowest provable
+  slice of that claim. Full CSR validation is research work that
+  belongs in the hard-probes benchmark harness, not in the
+  production training loop.
+- **§3B is not a benchmark.** The hard-probes
+  `test_csr_bridge` harness is the research tool; §3B v1 is a
+  training loss. They are complementary: §3B provides the
+  production training signal that the hard-probes harness can
+  then measure on trained checkpoints. Neither replaces the
+  other.
+- **§3B is not priority P1 work.** Despite being numbered as
+  part of P1-1, §3B is **P3** (§3.0 recommendation). The
+  numbering reflects the umbrella origin of the feature pair
+  (both §3A and §3B came out of the original P1-1 "LSTB / CSR
+  bridge supervision" recommendation), not their current
+  priority. An operator reading this document for P1 shipping
+  decisions should read §3A and skip §3B.
+
+---
+
+**End of §3 (P1-1: LSTB / CSR Bridge Supervision).**
+
+§4 (P1-2: Phase write-gate + multi-channel phase memory for
+`mistral_hybrid`) follows next.
