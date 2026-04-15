@@ -3811,5 +3811,165 @@ Preempts misreadings of the feature name.
 
 **End of §3 (P1-1: LSTB / CSR Bridge Supervision).**
 
-§4 (P1-2: Phase write-gate + multi-channel phase memory for
-`mistral_hybrid`) follows next.
+---
+
+## §4 P1-2 — Phase Write-Gate + Multi-Channel Phase Memory (`mistral_hybrid`)
+
+### 4.1 Problem Statement
+
+After §2 (P0-2: phase warmstart curve) is in place, the phase branch
+of each `HybridTransformerBlock` in `MistralHybridWrapper` has a
+training curve that ramps from near-silent to fully active during
+the first ~10K steps. That fixes the *temporal* instability of the
+phase branch — it does not fix the *capacity* and *selectivity*
+limitations of the phase memory itself.
+
+Two specific limitations remain:
+
+1. **Single-channel phase memory can only specialize at one
+   timescale.** The `PhaseAttentionLayer` maintains a rolling
+   phase-coherent state via `parallel_ema_scan` with a learned
+   per-head decay parameter. With `phase_channels=1` (the default),
+   all phase heads share the same EMA-state tensor and differ only
+   in their per-head decay parameters — which are initialized from
+   the same distribution and converge toward similar values. The
+   result is that a 4-layer hybrid stack with 32 phase heads
+   effectively operates at **one dominant memory horizon** rather
+   than mixing short-term and long-term phase signals.
+2. **Unconditional writes corrupt long-range phase memory on noisy
+   tokens.** Every token contributes to the phase state
+   accumulation unconditionally — the `kv_complex` tensor is
+   scanned in full via `torch.cumsum` (phase_transformer.py:2425).
+   On corpora with significant noise (FineWeb, Common Crawl, any
+   web-scale dataset), a large fraction of tokens are punctuation,
+   whitespace, URLs, or boilerplate that carry no useful long-range
+   signal. These tokens still update the phase state, pulling the
+   memory toward a running average of noise rather than a signal-
+   selective representation.
+
+The hard-probes `train_hard_probes.py` pipeline solves both
+limitations simultaneously with two compositional mechanisms:
+
+- **`phase_channels > 1`** — allocates `C` independent EMA-state
+  slots per head, each with its own per-channel-per-head decay
+  parameter spread **logarithmically across timescales** `[2.0,
+  2048.0]`. Channel 0 learns short-term memory (~2 tokens),
+  channel `C-1` learns long-term memory (~2048 tokens), and the
+  readout combines them via a learned `channel_agg` weight vector.
+  This gives the phase stack explicit multi-horizon capacity
+  without adding new attention heads.
+- **`phase_write_gate`** — adds a learned per-channel-per-head
+  write gate `g_t = sigmoid(W_g @ x_t)` that multiplies `kv_complex`
+  before state accumulation. Tokens with low gate values are
+  excluded from the phase memory update, so the memory stays
+  selective even on noisy corpora. The gate is initialized with
+  `bias=2.0` so `sigmoid(2) ≈ 0.88` — training starts close to
+  the unmodified "all writes active" behavior and the gates
+  differentiate as training proceeds.
+
+Both mechanisms compose naturally with the phase warmstart curve
+from §2. In fact, the composition order inside `PhaseAttentionLayer`
+is deliberate:
+
+```text
+1. Compute kv_complex from attention (unchanged)
+2. Compute write gate sigmoid(W_g @ x)           ← §4 phase_write_gate
+3. Expand kv_complex to C channels               ← §4 phase_channels
+4. Multiply by gate                               ← §4 phase_write_gate
+5. Multiply by warmstart_alpha                   ← §2 phase_warmstart
+6. Run parallel_ema_scan with per-channel decay  ← §4 phase_channels
+```
+
+Write gating is applied **before** warmstart dampening, so the
+write gate's bias-toward-open initialization means early training
+sees `warmstart_alpha × 0.88` rather than `warmstart_alpha × 1.0`
+— a slightly gentler phase contribution in the first steps. This
+is a feature, not a bug: the composition is conservative by
+construction.
+
+### 4.2 Current State in Repository
+
+Like §2 (P0-2), this is a **wiring task**, not an implementation
+task. All mechanics already exist in `symbolu/phase_transformer.py`;
+they just are not exposed through `MistralHybridWrapper` or the
+unified CLI.
+
+**Already implemented in the core:**
+
+- **`PhaseAttentionLayer` constructor** at
+  `symbolu/phase_transformer.py:1964–1965` accepts both
+  `phase_channels: int = 1` and `phase_write_gate: bool = False`.
+- **Multi-channel state structure** is built at
+  `phase_transformer.py:2051–2070`:
+  - Per-channel-per-head decay via
+    `channel_decay_logit` parameter of shape `[C*H]`, spread
+    logarithmically over `[2.0, 2048.0]` via `torch.linspace` on
+    log-scale.
+  - Per-channel aggregation weights via `channel_agg` parameter
+    of shape `[C]`, initialized uniform so all channels contribute
+    equally at start.
+- **Write gate projection** is built at
+  `phase_transformer.py:2072–2080`:
+  - `write_gate_proj: Linear(embed_dim → C*H)` with
+    `bias=2.0` initialization.
+  - Zero-weight initialization so the gate starts as a constant
+    `sigmoid(2)` regardless of input, and differentiates only
+    when training moves the weights off zero.
+- **Forward-path integration** at `phase_transformer.py:2427–2463`:
+  - Write gate applied before channel expansion.
+  - Multi-channel `kv_complex` expansion via
+    `unsqueeze(2).expand(B, N, C, H, D_h)`.
+  - Folded to `[B, N, C*H, D_h]` for `parallel_ema_scan` — each
+    channel-head pair is treated as an independent "virtual head"
+    by the scan, preserving the O(n) complexity.
+- **Diagnostic capture flags** at `phase_transformer.py:2082–2086`:
+  - `_diag_phase_gate_mean`, `_diag_phase_gate_std` — gate
+    statistics per step.
+  - `_diag_phase_state_norm_per_channel` — per-channel state
+    magnitudes, for detecting channel imbalance.
+  - `_diag_phase_attn_mass` — per-channel attention mass.
+- **`HybridTransformerBlock` constructor** at
+  `phase_transformer.py:6241–6258` accepts both kwargs and forwards
+  them to its inner `HybridAttentionLayer` at `:6283–6284`, which in
+  turn forwards to the inner `PhaseAttentionLayer`.
+- **`HybridPhaseTransformer`** (the non-Mistral hybrid path) wires
+  all of this up at `phase_transformer.py:6737–6826`. It is the
+  reference implementation — its usage pattern is the model for
+  what `MistralHybridWrapper` should do.
+
+**The gap:**
+
+- **`MistralHybridWrapper` bypasses `HybridPhaseTransformer`
+  entirely.** It constructs `LocalTransformerBlock` and
+  `HybridTransformerBlock` directly at
+  `symbolu_training/training/unified/mistral_hybrid_wrapper.py:115–138`.
+  The constructor calls to `HybridTransformerBlock(...)` at line
+  `128` do **not** pass `phase_channels` or `phase_write_gate`, so
+  both default to the `phase_channels=1, phase_write_gate=False`
+  legacy single-channel, unconditional-write behavior.
+- **The unified config has zero references** to either flag.
+  Verified by grep: `phase_channels` and `phase_write_gate` do
+  not appear in any file under `symbolu_training/training/unified/`.
+- **The unified CLI has no argparse flags** for either feature.
+
+So the gap is: `MistralHybridWrapper` cannot enable either feature
+even on the command line, because the kwargs are not threaded
+through the constructor. The constructor-injection fix is a pure
+plumbing task — unlike §2's P0-2 which needed a post-construction
+submodule walk, P1-2's kwargs are already accepted by
+`HybridTransformerBlock.__init__` at construction time.
+
+**A note on composition with §2.** §2 (P0-2) is a **post-construction
+submodule walk** that sets `.phase_warmstart_enabled = True` on
+every `PhaseAttentionLayer` after the blocks are built. §4 (P1-2)
+is **constructor injection** at the `HybridTransformerBlock` call
+site. The two approaches do not interact: §2's walk runs after §4's
+construction, and both end up setting attributes on the same
+`PhaseAttentionLayer` instances without conflict. Both features can
+be enabled simultaneously on the same run with no ordering concerns
+in the wrapper code.
+
+---
+
+*4.3 (Design Approach) and 4.4 (Integration Points) follow in the
+next part.*
