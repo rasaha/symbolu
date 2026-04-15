@@ -1901,4 +1901,335 @@ reversed.
 
 ---
 
-*3A.7 (Rollout Plan) follows next.*
+### 3A.7 Rollout Plan
+
+Seven sequential phases. Each phase produces a named artifact and a
+go/no-go gate that unlocks the next phase. **Phases must not be
+skipped, reordered, or run in parallel** — each one catches a class
+of failure that later phases are blind to.
+
+The rollout is deliberately conservative. LSTB touches the projector
+that every other CG module reads, so a broken rollout would not
+produce a localized failure — it would produce a diffuse regression
+across every CG auxiliary, which is the hardest kind of failure to
+attribute. Sequential phases keep attribution cheap.
+
+#### 3A.7.1 Phase 0 — Prerequisites
+
+**Inputs:** an up-to-date `main` with P0-1 already merged and the
+four pre-flight checks from §3A.5.3 completed.
+
+**Actions:**
+
+1. **Verify P0-1 is shipped and healthy.** Run
+   `./scripts/train_mistral_cg.sh --dataset wikitext2 --max-steps 200
+   --lambda_sovereign_anticollapse 0.02`. Confirm `cg_anticollapse_*`
+   metrics appear in the log and that the §1.7 success criteria are
+   met on this short run. If P0-1 is absent or broken, stop here
+   and fix P0-1 first.
+2. **Locate `build_mistral_cg` in `model_factory.py`.** The
+   function name may have drifted since this design was written —
+   the important thing is to find the site where the existing CG
+   modules (`kosha_routing_loss`, `bliss_coherence_loss`,
+   `primitive_aux_losses`) are constructed. This is the target for
+   §3A.3 File 2.
+3. **Locate the CG loss block in `train.py`.** The current design
+   references line 4931 as the start of the CG block and line 5000
+   as the `_cg_sov_state` extraction site. Confirm these line
+   numbers are still approximately correct by searching for
+   `enable_conscious_generation and hasattr(model, 'conscious_gen')`
+   — that string should match the block opening.
+4. **Confirm `PhaseJEPAPredictor` exports.** Verify that
+   `from symbolu_training.jepa.predictor import PhaseJEPAPredictor`
+   and `from symbolu_training.jepa.losses import
+   JEPAPredictionLoss` both succeed in an interactive Python
+   session. These imports are the load-bearing dependency; if
+   either fails, stop and investigate packaging.
+
+**Artifact:** a short note (file or commit message) recording the
+exact file paths and line numbers used in Phases 1–6. The line
+numbers in this design document will drift; the rollout note is the
+source of truth for the specific commit being shipped.
+
+**Gate:** all four actions produce the expected output. No code has
+been modified yet.
+
+#### 3A.7.2 Phase 1 — Implementation
+
+**Inputs:** the Phase 0 rollout note and §3A.3 (Integration Points).
+
+**Actions:** apply the four-file patch described in §3A.3, in the
+order:
+
+1. **`config.py`** first. Add the six config fields. This is the
+   safest first edit because nothing else depends on it and the
+   fields default to off.
+2. **`mistral_wrapper.py`** second. Add the
+   `return_state_trajectory` kwarg and the guarded trajectory
+   branch. Do **not** touch `compute_state_delta`. Run the CG
+   smoke test (`./scripts/train_mistral_cg.sh --smoke-test`) after
+   this edit to confirm the wrapper still constructs and forwards
+   without the new flag set.
+3. **`model_factory.py`** third. Add the `PhaseJEPAPredictor` and
+   `JEPAPredictionLoss` construction, guarded by `config.lambda_lstb
+   > 0`. Run the smoke test again with `--lambda_lstb 0.0` to
+   confirm nothing changes when LSTB is off.
+4. **`train.py`** last. Add the argparse flags, the
+   `_need_state_traj` branch at the forward call site, and the
+   LSTB loss block inside the CG loss region. This is the largest
+   patch and the one most likely to need iteration — which is why
+   it comes last, when every other file is already known-good.
+
+**Artifact:** a single commit (or small commit series) on a feature
+branch named `lstb-v1`. The commit message should reference this
+design document by filename.
+
+**Gate:**
+- Project builds with no import errors.
+- `./scripts/train_mistral_cg.sh --smoke-test` succeeds with the
+  default configuration (no LSTB flags set).
+- `./scripts/train_mistral_cg.sh --smoke-test` with
+  `--lambda_lstb 0.0` explicitly set also succeeds (redundant but
+  exercises the flag parsing path).
+
+#### 3A.7.3 Phase 2 — Unit and integration tests
+
+**Inputs:** the Phase 1 commit.
+
+**Actions:**
+
+1. **Add a unit test for `PhaseJEPAPredictor` causality.** File:
+   `symbolu_training/jepa/tests/test_jepa.py`. The test constructs
+   a predictor with `state_dim=32, k_steps=1`, feeds a sequence
+   `[B=2, T=8, D=32]`, records the prediction at position 3, then
+   perturbs position 4 (a future position relative to 3) and
+   re-predicts. Assert that the prediction at position 3 is
+   **bitwise identical** before and after the perturbation. This
+   is the R2 regression guard from §3A.5.
+2. **Add a unit test for stop-gradient correctness.** Same file.
+   Construct a predictor + projector, forward a synthetic sequence,
+   compute the LSTB loss, and assert that
+   `projector.state_dict()` parameters have nonzero gradients on
+   the context slice and zero gradients on the target slice after
+   `loss.backward()`. This is the R1 regression guard.
+3. **Add an integration test for checkpoint round-trip.** File:
+   `tests/integration/test_mistral_cg_lstb_checkpoint.py` (new
+   file, if no similar test exists). Build a CG model with
+   `lambda_lstb=0.05`, save a checkpoint, reload into a fresh
+   model instance, and assert that
+   `model.conscious_gen['jepa_predictor'].state_dict()` is
+   bitwise-identical before and after. This is the Gate 7
+   pre-check from §3A.6.
+
+**Artifact:** a follow-up commit on `lstb-v1` adding the three
+tests. All three must pass on first run.
+
+**Gate:** all three new tests pass locally. Full existing test
+suite still passes (no regressions in unrelated tests).
+
+#### 3A.7.4 Phase 3 — Smoke test
+
+**Inputs:** the Phase 2 commit.
+
+**Actions:**
+
+1. Run `./scripts/train_mistral_cg.sh --smoke-test --lambda_lstb
+   0.05 --lstb_k_steps 1`. This executes 10 steps on synthetic data
+   with LSTB active.
+2. Verify the expected metrics appear in the log:
+   `cg_lstb_loss`, `cg_lstb_mse`, `cg_lstb_vicreg`,
+   `cg_lstb_ortho`, `cg_lstb_target_var`,
+   `cg_lstb_identity_baseline_mse`, `cg_lstb_nonfinite_count`.
+3. Confirm `cg_lstb_nonfinite_count == 0` across all 10 steps.
+4. Confirm the run completes without crashing or producing a
+   Python exception.
+
+**Artifact:** a log file from the smoke test, saved with the
+filename `smoke_lstb_v1_<date>.log` attached to the rollout note
+from Phase 0.
+
+**Gate:** smoke test completes cleanly, all expected metrics are
+present, no non-finite loss occurrences. If any of these fail, stop
+and return to Phase 1 — do **not** attempt to debug on a real
+training run.
+
+#### 3A.7.5 Phase 4 — Baseline measurement
+
+**Inputs:** the Phase 2 commit (not yet touching defaults).
+
+**Actions:**
+
+1. Run the **baseline** command from §3A.6.2 — identical to the
+   evaluation command but with `--lambda_lstb 0.0`. This takes
+   30–60 minutes on an A100.
+2. Persist the full per-step metric log to
+   `metrics_lstb_baseline_<date>.jsonl` (or the equivalent in the
+   metric backend being used).
+3. Verify that `cg_anticollapse_*` metrics are healthy throughout —
+   this is the P0-1 health baseline that Gate 3 is measured
+   against.
+4. Record the following specific values at step 1000 to the
+   rollout note:
+   - `lm_loss` (for Gate 1 comparison)
+   - `cg_anticollapse_var` (for Gate 3 comparison)
+   - `cg_ont_loss`, `cg_kosha_routing_loss`, `cg_bliss_loss`,
+     `cg_L_csr`, `cg_L_vritti`, `cg_L_guna` (for Gate 4 comparison)
+
+**Artifact:** the baseline metrics log + the rollout note's "Phase 4
+baseline values" block.
+
+**Gate:** baseline run completes cleanly. `cg_anticollapse_var` is
+healthy (see §1.7 criterion 2). The seven values needed for Gates
+1, 3, and 4 are recorded.
+
+**This phase is non-optional even if P0-1 was verified healthy in
+Phase 0.** The Phase 0 check was a 200-step smoke; Phase 4 is the
+full 1000-step baseline that Gate comparisons are measured against.
+
+#### 3A.7.6 Phase 5 — Evaluation measurement
+
+**Inputs:** the Phase 4 baseline metrics and the Phase 2 commit.
+
+**Actions:**
+
+1. Run the **evaluation** command from §3A.6.1 — identical to the
+   baseline but with `--lambda_lstb 0.05`. Same seed, same data,
+   same LR schedule.
+2. Persist the full per-step metric log to
+   `metrics_lstb_eval_<date>.jsonl`.
+3. At step 500, pause the run (or save a mid-run checkpoint without
+   stopping) and perform the Gate 7 checkpoint round-trip check
+   manually: load the step-500 checkpoint in a fresh Python process,
+   extract `model.conscious_gen['jepa_predictor'].state_dict()`,
+   and compare bitwise against the same dict from the running
+   process. Record pass/fail.
+4. Let the run complete to step 1000.
+5. Record the same seven values as Phase 4 (plus the LSTB-specific
+   metrics) at step 1000.
+
+**Artifact:** the evaluation metrics log + the rollout note's
+"Phase 5 evaluation values" block + the Gate 7 pass/fail record.
+
+**Gate:** evaluation run completes cleanly. No non-finite loss
+occurrences (this is a soft check — Gate 5 is the hard check at
+Phase 6).
+
+#### 3A.7.7 Phase 6 — Gate evaluation
+
+**Inputs:** the Phase 4 baseline values and the Phase 5 evaluation
+values.
+
+**Actions:**
+
+1. Open a fresh section of the rollout note titled "Gate evaluation".
+2. For each of Gates 1–7 from §3A.6.3, compute the pass condition
+   from the recorded values and record **pass** or **fail** with
+   the observed value and the threshold. Do not round, do not
+   summarize — record the raw numbers.
+3. Identify the first failing gate (if any) and consult the §3A.6.5
+   decision tree for the next action.
+
+**Artifact:** the completed gate evaluation block in the rollout
+note. Seven pass/fail verdicts with raw numbers.
+
+**Gate:** this phase has no gate — it is pure evaluation. The
+outcome determines which branch of Phase 7 runs.
+
+#### 3A.7.8 Phase 7 — Decision
+
+**Inputs:** the Phase 6 gate evaluation.
+
+**Branch A — all seven gates pass.**
+
+1. Update `scripts/train_mistral_cg.sh` to pass `--lambda_lstb
+   0.05 --lstb_k_steps 1` by default (the §3A.4.3 integration).
+2. Add a commit to `lstb-v1` documenting the gate evaluation
+   results. Reference the rollout note.
+3. Merge `lstb-v1` to `main`.
+4. File a follow-up ticket to monitor `cg_lstb_*` metrics on the
+   next production run for drift.
+
+**Branch B — one or more gates fail.**
+
+1. Consult §3A.6.5 for the failing gate's investigation path.
+2. If the decision tree recommends re-running with different
+   hyperparameters (e.g., `lambda_lstb=0.02`, `lstb_vicreg_weight=0.25`),
+   return to Phase 5 with the new values. **Do not modify Phase 4
+   baseline** — the baseline is unchanged, only the evaluation run
+   is re-run.
+3. If the decision tree recommends downgrading:
+   - Keep the Phase 2 commit merged (code and flags stay).
+   - Do **not** add `--lambda_lstb` to
+     `scripts/train_mistral_cg.sh`.
+   - File a finding note recording which gate failed and why, so
+     that a future operator considering LSTB can see the historical
+     measurement rather than repeating it.
+   - Mark LSTB as "available but not default" in the project's
+     feature status document (if one exists).
+4. If the decision tree recommends a hard stop (Gate 5 or Gate 7):
+   - Revert the Phase 2 commit.
+   - Do not merge `lstb-v1`.
+   - File a bug against the root cause (bf16 / polar cast for
+     Gate 5, checkpointing for Gate 7).
+   - LSTB cannot be shipped until the root cause is fixed, **but**
+     the fix is not LSTB work — it is pre-existing infrastructure
+     work.
+
+#### 3A.7.9 Post-ship follow-ups (Branch A only)
+
+These are optional experiments that can be filed as follow-up
+tickets. None of them are required for v1, and all of them are
+explicitly out of scope for this design document (§3A.8).
+
+1. **Configuration C stress-test.** Run the §3A.4.2 Configuration C
+   for 1K steps and compare against v1. If Configuration C
+   produces meaningfully lower `cg_lstb_mse` without regressing
+   Gates 1, 3, or 4, file a result and consider raising the v1
+   defaults in a follow-up design revision.
+2. **Multi-step lookahead.** Try `--lstb_k_steps 2` for 1K steps.
+   Record whether the multi-step rollout in
+   `PhaseJEPAPredictor.forward` produces meaningful signal on the
+   32D state or plateaus at the same MSE as `k=1`.
+3. **EMA target encoder.** Add an EMA copy of
+   `SovereignStateProjector` and use it to produce targets in the
+   LSTB loss block. Measure whether the EMA target unlocks
+   improvement that the same-projector stop-gradient target could
+   not. This is a 2–3 day experiment, not a single-run measurement.
+4. **`VrittiValidatedPredictor` substitution.** Swap
+   `PhaseJEPAPredictor` for `VrittiValidatedPredictor` in
+   `model_factory.py` and measure whether Vritti gating changes
+   the training curve. Requires the Vritti classifier to be
+   producing meaningful signals, which itself depends on the v1
+   CG run being healthy.
+5. **Ontological hybrid path.** Extend LSTB to the
+   `ontological_hybrid` model type (which also has a
+   `SovereignStateProjector`). Requires checking whether the
+   forward path of `OntologicalHybridTransformer` exposes a
+   per-token projection surface analogous to
+   `MistralCGWrapper.return_state_trajectory`.
+
+Each of these is a research-grade experiment, not a routine
+rollout. File them as tickets; do not run them opportunistically.
+
+#### 3A.7.10 Rollback path
+
+At any phase up through Phase 7 Branch B, rollback is a single
+action: **do not merge `lstb-v1` to `main`**. Because LSTB is
+entirely additive (no existing file signatures are modified, no
+defaults are changed until Phase 7 Branch A), rollback does not
+require reverting anything. The branch can be left open indefinitely
+as a reference, or deleted after the finding note is filed.
+
+If LSTB **has** been merged and a regression is discovered in
+production, rollback is: set `LAMBDA_LSTB=0.0` in
+`scripts/train_mistral_cg.sh` and force a redeploy. No code revert
+is needed because the flag is the master switch. A full code revert
+is only required if the R1 or R2 correctness risks turn out to have
+been triggered and the code in `mistral_wrapper.py` or `train.py`
+is producing silent corruption even when the flag is zero — which
+should be impossible by design, but is the reason the master-switch
+behavior is tested in Phase 1.
+
+---
+
+*3A.8 (Out of Scope) follows next — the final §3A subsection.*
