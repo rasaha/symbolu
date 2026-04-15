@@ -4231,6 +4231,226 @@ smallest patch in the document.
 
 ---
 
-*4.5 (Configuration Interface), 4.6 (Risks), 4.7 (Success
-Criteria), 4.8 (Rollout), 4.9 (Out of Scope) follow in the next
-parts.*
+### 4.5 Configuration Interface
+
+Two new flags. Both default to off; both must be explicitly set
+by the operator to enable the feature. Unlike §3A LSTB which has
+a recommended default configuration for shipping, P1-2 ships
+with a recommended configuration for enabling — but the feature
+stays off by default in `scripts/train_hybrid_7b.py` until
+measurements justify the default flip.
+
+#### 4.5.1 Flag reference
+
+| Flag | Type | Default | Valid range | Meaning |
+|------|------|---------|-------------|---------|
+| `--phase_channels` | int | `1` | `{1, 2, 4, 8}` | Number of independent phase memory channels in `mistral_hybrid`. `1` is the legacy single-channel behavior (bit-for-bit identical to non-§4 runs). `4` is the recommended multi-horizon starting point — four channels with logarithmically-spaced decay timescales covering ~2 to ~2048 tokens. Values above 8 inflate memory cost without evidence of benefit. |
+| `--phase_write_gate` | action | `False` | bool | Enables the learned per-channel-per-head write gate on phase memory. When set, adds a `write_gate_proj` Linear layer to each `HybridTransformerBlock` and multiplies `kv_complex` by `sigmoid(W_g @ x)` before state accumulation. Gate initializes with `bias=2.0` (near-open) so training starts close to the unmodified write behavior. |
+
+**Why no `--phase_channel_agg_mode` or similar sub-flags.** The
+core implementation at `phase_transformer.py:2054–2070` hard-codes
+the channel decay initialization (logarithmic spread over
+`[2.0, 2048.0]`) and the channel aggregation (uniform-initialized
+learned weights). These are exposed as parameters inside the model
+and become trainable once `phase_channels > 1`. There is no
+meaningful CLI knob — operators who want to tune the initialization
+should edit `phase_transformer.py` directly, not expose a shell
+flag.
+
+#### 4.5.2 Recommended configurations
+
+Three named configurations.
+
+**Configuration A — `off` (default).**
+
+```bash
+--phase_channels 1
+# --phase_write_gate not set
+```
+
+All existing `mistral_hybrid` runs. Zero code change from today.
+The new argparse flags exist but are defaulted off, and
+`mistral_hybrid_wrapper.py` constructs blocks with the legacy
+single-channel unconditional-write behavior.
+
+**Configuration B — `v1` (recommended for multi-horizon experiments).**
+
+```bash
+--phase_channels 4
+--phase_write_gate
+```
+
+The §4.7 success criteria are measured against this configuration.
+Rationale for the values:
+
+- `phase_channels=4`: the smallest value that spans the full decay
+  range meaningfully. With `linspace` on log scale over `[2.0,
+  2048.0]`, four channels get timescales approximately `[2.0,
+  22.6, 255.8, 2048.0]` — short/medium/long/very-long. Three
+  channels would collapse short and medium; two would lose the
+  medium horizon entirely.
+- `phase_write_gate`: enabled unconditionally alongside
+  `phase_channels=4`. The two features compose naturally and the
+  hard-probes reference configuration at
+  `train_hard_probes.py:9588–9602` enables them together.
+
+**Configuration C — `channels-only` (ablation).**
+
+```bash
+--phase_channels 4
+# --phase_write_gate not set
+```
+
+Use this only for attribution — to isolate the contribution of
+multi-channel memory from the contribution of write gating. Not
+a production configuration. If §4.7 Gate 2 fails on Configuration
+B, running Configuration C and comparing against a
+`--phase_write_gate`-only configuration tells the operator which
+of the two mechanisms is carrying the improvement (or which is
+failing).
+
+#### 4.5.3 Integration with `train_hybrid_7b.py`
+
+`train_hybrid_7b.py` at the repo root is the established training
+script for `mistral_hybrid` / `HybridPhaseTransformer` runs. Unlike
+`train_mistral_cg.sh` which is a wrapper around
+`train_unified_llm.py`, `train_hybrid_7b.py` is a Python script
+that directly constructs the training loop.
+
+**For §4 v1 (after success criteria pass):** add the two flags to
+`train_hybrid_7b.py`'s argparse block and pass them through to the
+model construction. Do not change defaults — the script's current
+behavior stays bit-for-bit identical unless the operator explicitly
+sets the flags on the command line. Default flip (adding
+`--phase_channels 4 --phase_write_gate` to the script's default
+invocation) is a **separate decision** made after §4.7 measurements,
+not as part of §4's initial implementation.
+
+**For §4 smoke-test coverage:** unlike `train_mistral_cg.sh` which
+has a `--smoke-test` mode, `train_hybrid_7b.py` does not currently
+have one. §4 smoke-testing uses a short-step configuration
+(`--max_steps 100`) on synthetic or small WikiText-2 data.
+
+#### 4.5.4 Interaction with §2 (P0-2 phase warmstart)
+
+§2 and §4 are both `mistral_hybrid`-specific and compose naturally.
+Stated precisely:
+
+- **§2** adds `--phase_warmstart`, `--phase_warmstart_steps`,
+  `--phase_warmstart_tau` to the CLI. These set attributes on
+  `PhaseAttentionLayer` instances post-construction.
+- **§4** adds `--phase_channels`, `--phase_write_gate` to the CLI.
+  These are constructor kwargs that allocate parameters at block
+  construction time.
+
+Enabling both simultaneously is the recommended production
+configuration once both features have passed their respective
+success criteria. The composition order inside
+`PhaseAttentionLayer` is:
+
+```text
+1. Write gate applied to kv_complex        ← §4 phase_write_gate
+2. Channel expansion                        ← §4 phase_channels
+3. Warmstart alpha dampening                ← §2 phase_warmstart
+4. EMA scan with per-channel decay          ← §4 phase_channels
+```
+
+Documented at `phase_transformer.py:2434–2463`. Operators do not
+need to worry about this ordering — it is fixed inside the forward
+pass and both features compose correctly regardless of the order
+the CLI flags are parsed.
+
+**Recommended combined configuration:**
+
+```bash
+python train_hybrid_7b.py \
+    --phase_warmstart \
+    --phase_warmstart_steps 5000 \
+    --phase_warmstart_tau 1000.0 \
+    --phase_channels 4 \
+    --phase_write_gate
+```
+
+#### 4.5.5 Forbidden configurations
+
+Two flag combinations produce a startup error rather than silent
+misbehavior:
+
+1. **`--phase_channels > 1` with `--model_type` ≠ `mistral_hybrid`
+   and `≠ hybrid`.** The feature is hybrid-specific. Setting it on
+   `mistral_cg`, `ontological`, or other non-hybrid model types has
+   nowhere to attach. The `hybrid` model type (non-Mistral
+   `HybridPhaseTransformer`) is permitted because it already wires
+   up `phase_channels` in its own construction path at
+   `phase_transformer.py:6737+`.
+2. **`--phase_write_gate` without a hybrid model type.** Same
+   rationale. The `write_gate_proj` parameter is only constructed
+   inside `PhaseAttentionLayer`, which only exists in hybrid
+   blocks.
+
+These checks live in the argparse validation block at
+`train.py:~11189` alongside the §2 and §3A validation.
+
+### 4.6 Risks and Mitigations
+
+Fewer risks than §3A because P1-2 is a constructor-injection task
+on existing primitives. Six named risks in four categories, each
+with the §3A.5-style detection signal.
+
+#### 4.6.1 Risk register
+
+**Category A — Correctness risks:**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R1 | **Kwargs not passed to the correct block.** The construction loop passes `phase_channels` to `LocalTransformerBlock` by mistake, or forgets to pass it to `HybridTransformerBlock`. Silent: the feature runs without the expected capacity. | Low (simple loop, caught by review) | Medium | Explicit unit test that constructs a `MistralHybridWrapper` with `phase_channels=4` and asserts that every `HybridTransformerBlock` instance has a `PhaseAttentionLayer.channel_decay_logit` parameter of shape `[4*H]`, and that every `LocalTransformerBlock` does not | Parameter count at startup does not match the expected count for `phase_channels > 1` |
+| R2 | **Checkpoint load with mismatched `phase_channels`.** Operator loads a checkpoint saved with `phase_channels=1` into a model built with `phase_channels=4`. `load_state_dict` raises a shape mismatch error on `channel_decay_logit`. | Medium (operators who experiment with different values) | Low — the error is loud, not silent | Explicit error message at checkpoint load time: *"phase_channels mismatch: checkpoint has [H]-shaped decay but model expects [C*H]-shaped decay. Either build the model with the same phase_channels value used at save time, or start a fresh training run."* The standard PyTorch error is sufficient but can be improved with an explicit pre-check | `RuntimeError: size mismatch` on `channel_decay_logit` at checkpoint load |
+
+**Category B — Signal quality risks:**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R3 | **Multi-channel memory collapses to single-channel behavior.** All four channel decay logits converge to the same value during training, or `channel_agg` converges to `[1, 0, 0, 0]`, effectively reducing the stack to a single channel. Feature is enabled but not producing multi-horizon behavior. | Medium (unknown until measured — depends on whether the task actually benefits from multi-horizon memory) | Medium — feature works but delivers no capacity improvement | Emit the `_diag_phase_state_norm_per_channel` metric at every logging step. If one channel's norm dominates by more than 10× the others at step 1000, the feature has collapsed. Also log `channel_agg.softmax()` to confirm learned aggregation weights have non-trivial dynamic range | Per-channel state norm ratio > 10× at step 1000; or `channel_agg.softmax()` has entropy < 0.5 (in a 4-channel setup, uniform entropy = 2.0) |
+| R4 | **Write gate learns to close entirely.** `sigmoid(W_g @ x)` converges toward zero for all tokens, effectively masking all writes to phase memory. Phase state decays to zero and the phase branch becomes inert. | Low (the bias=2.0 initialization starts far from this failure mode) | Medium — phase branch silently becomes a no-op | Emit `_diag_phase_gate_mean` and `_diag_phase_gate_std` at every logging step. Mean below 0.3 or std below 0.05 indicates gate collapse | `_diag_phase_gate_mean < 0.3` at step 1000; phase state L2 norm approaches zero |
+
+**Category C — Interaction risks:**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R5 | **Memory cost scales with `phase_channels`.** Each additional channel multiplies the state tensor size by `C`. For a 4-phase-layer stack with `phase_channels=4`, the state memory is 4× the baseline. On an A100-80GB with `batch=2`, this can push the total memory budget over the limit. | Medium (A100-80GB with batch=2 is the current default per `train_hybrid_7b.py:8–15`, and 4× state memory is ~128 MB for typical configs, well within budget — but `batch=4` or `seq_len=2048` scenarios could tip over) | Medium — OOM crash, clearly observable | Document the memory scaling in the CLI `--help`. Provide a pre-flight memory estimation heuristic: `extra_memory_mb = phase_channels × num_phase_layers × batch × seq_len × num_heads × head_dim × 4 (complex) × 4 bytes / 1024^2`. For B=2, T=1024, H=32, D_h=128, C=4, L=2: ~128 MB — negligible on A100. For B=4, T=2048, C=8, L=4: ~2 GB — potentially significant | OOM on model construction or first forward pass |
+
+**Category D — Operational risks:**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R6 | **Diagnostic capture flags are disabled by default.** The `_diag_phase_gate_mean`, `_diag_phase_state_norm_per_channel`, and `_diag_phase_attn_mass` attributes exist at `phase_transformer.py:2082–2086` but are not emitted to the training metric backend unless the training loop explicitly reads them. Without this wiring, R3 and R4 are invisible to operators. | High (the flags are currently captured but not logged) | Medium — mitigations for R3/R4 cannot function without the metrics | The §4 rollout plan explicitly includes **adding metric emission for the diagnostic flags** as part of the File 4 (train.py) patch — not as a follow-up. If the diagnostics are not wired, the feature ships blind | `cg_phase_gate_mean` and `cg_phase_channel_norms` metrics are absent from the training log |
+
+#### 4.6.2 Pre-flight mitigation checklist
+
+Before running any `--phase_channels > 1` or `--phase_write_gate`
+experiment:
+
+1. **§2 (P0-2) is shipped and healthy.** Same prerequisite as §3A
+   — both §2 and §4 touch `PhaseAttentionLayer` instances in the
+   same wrapper, and running them concurrently with §2 unshipped
+   makes attribution impossible.
+2. **Diagnostic metrics are wired.** Verify that the training log
+   emits `cg_phase_gate_mean`, `cg_phase_gate_std`, and
+   `cg_phase_channel_norms` (or equivalent names). If these
+   metrics do not appear in a smoke test run, the File 4 diagnostic
+   wiring from the §4.4 patch is incomplete — stop and fix before
+   continuing.
+3. **Memory pre-flight.** Compute the expected extra memory cost
+   from the R5 heuristic. If `extra_memory > 10%` of the GPU
+   budget, either reduce `phase_channels` or reduce batch size
+   before running the full measurement.
+4. **Checkpoint compatibility plan.** Decide at rollout time
+   whether the experiment run will start from a fresh init or
+   resume from an existing checkpoint. If resume, the existing
+   checkpoint must have been saved with the same `phase_channels`
+   value, or the run must start fresh (R2).
+
+---
+
+*4.7 (Success Criteria), 4.8 (Rollout Plan), 4.9 (Out of Scope)
+follow in the next parts.*
