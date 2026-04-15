@@ -3199,4 +3199,209 @@ success criteria and §3B.7 rollout.
 
 ---
 
-*3B.6 (Success Criteria) follows next.*
+### 3B.6 Success Criteria
+
+§3B's success criteria are structured identically to §3A.6 (named
+run, named baseline, numbered gates, decision path) but are
+shorter and have a **different verdict space**. §3A.6 asks "should
+we ship by default?"; §3B.6 asks "has the feature demonstrated its
+claimed value on a named probe?" — because §3B ships off-by-default
+even after merge (§3B.4.3), the decision path does not include a
+"flip the default" branch.
+
+#### 3B.6.1 Named evaluation run
+
+```bash
+./scripts/train_mistral_cg.sh \
+    --dataset wikitext2 \
+    --max-steps 1000 \
+    --lambda_sovereign_anticollapse 0.02 \
+    --anticollapse_warmup_steps 1000 \
+    --lambda_lstb 0.05 \
+    --lstb_k_steps 1 \
+    --lambda_csr_phonemic 0.005 \
+    --checkpoint-dir checkpoints_csr_phon_v1
+```
+
+The P0-1 and §3A flags are included because §3B is measured on
+top of a fully-shipped P0-1 + §3A stack (§3B.5.3 pre-flight
+check 1). The baseline and evaluation runs must have identical
+P0-1 and §3A configurations — the only variable is
+`--lambda_csr_phonemic`.
+
+**Hardware / runtime / dataset:** same as §3A.6.1 (single GPU
+≥24GB, 4-bit Mistral, ≈30–60 min on A100).
+
+#### 3B.6.2 Named baseline
+
+```bash
+./scripts/train_mistral_cg.sh \
+    --dataset wikitext2 \
+    --max-steps 1000 \
+    --lambda_sovereign_anticollapse 0.02 \
+    --anticollapse_warmup_steps 1000 \
+    --lambda_lstb 0.05 \
+    --lstb_k_steps 1 \
+    --lambda_csr_phonemic 0.0 \
+    --checkpoint-dir checkpoints_csr_phon_baseline
+```
+
+Same seed, same data, same schedule. Run first, persist the
+per-step metric log, then run the evaluation.
+
+#### 3B.6.3 The phonemic correlation probe
+
+§3B introduces one new measurement that does not exist in the
+current training loop: a **phonemic correlation probe** that runs
+at the end of training and computes a scalar statistic for the
+gates below.
+
+**Probe procedure:**
+
+1. Take a fixed, held-out eval batch of `N = 512` token sequences
+   from the WikiText-2 validation split.
+2. Run the trained model in eval mode and extract the Token
+   Evaluation Tensor `T` for each position, specifically column
+   3 (CSR).
+3. For each (position, candidate) pair in the batch, also compute
+   the cosine similarity of the candidate against the target token
+   using the model's own `phonemic_table` buffer. This produces a
+   per-pair reference similarity `r`.
+4. Compute the **Pearson correlation** between `T[..., 3]` and `r`
+   across all valid pairs in the batch (pairs where the phonemic
+   validity mask is `True` on both sides).
+5. Emit the scalar `cg_csr_phonemic_correlation` as the probe
+   output.
+
+**On the baseline run** (`lambda_csr_phonemic=0.0`) the probe is
+computed on a model where column 3 has been trained only by
+InfoNCE. There is no training signal pulling column 3 toward
+phonemic similarity, so the expected correlation is close to zero
+(but may be non-zero by accident).
+
+**On the evaluation run** (`lambda_csr_phonemic=0.005`) the probe
+is computed on a model where column 3 has been trained against the
+cosine similarity target. A meaningful improvement in correlation
+is the primary success signal.
+
+**Implementation note.** The probe is small enough to include
+inline in `train.py` at the end of the training run (triggered by
+end-of-training hook or final eval pass). It does **not** need to
+be a standalone script, because reproducing the measurement from
+saved checkpoints is straightforward if needed later.
+
+#### 3B.6.4 Primary gates
+
+Five gates. The feature is considered to have **demonstrated its
+claimed value** if all five pass. Gates are evaluated as deltas
+against the §3B.6.2 baseline unless stated otherwise.
+
+**Gate 1 — LM loss is not degraded.**
+
+> **Pass condition:** `lm_loss` at step 1000 on the evaluation run
+> is within ±1% of the baseline.
+
+Same as §3A.6.3 Gate 1. Identical rationale — §3B is an auxiliary
+signal on an auxiliary loss; it cannot be shown to demonstrate
+value if the LM floor regresses.
+
+**Gate 2 — The phonemic correlation probe improves measurably.**
+
+> **Pass condition:** `cg_csr_phonemic_correlation` on the
+> evaluation run is both (a) **≥ 0.3** in absolute terms, and
+> (b) **≥ baseline correlation + 0.2**.
+
+This is the central gate. Clause (a) ensures the correlation is
+high enough to be useful (a Pearson r below ~0.3 is typically
+interpreted as a weak relationship at best). Clause (b) ensures
+the improvement is attributable to §3B and not to whatever
+accidental correlation the baseline already had — this protects
+against the case where the scorer's column 3 happens to correlate
+with phonemic similarity by chance because of shared upstream
+features.
+
+Both clauses must hold. If only (a) holds, §3B did not actually
+move the needle — the baseline was already phonemically aligned.
+If only (b) holds, §3B moved the needle but to a level that is
+still too weak to be useful.
+
+**Gate 3 — The existing InfoNCE term does not regress.**
+
+> **Pass condition:** `cg_L_csr` (the existing InfoNCE loss) at
+> step 1000 on the evaluation run is within `[-∞, +5%]` of the
+> baseline value.
+
+Addresses R6 (phonemic regression pulls column 3 away from the
+InfoNCE ranking objective). Asymmetric tolerance: improvements
+are welcome (and plausible if phonemic grounding happens to
+provide useful inductive bias for ranking), regressions above 5%
+are rejected.
+
+**Gate 4 — Phonemic MSE decreases monotonically.**
+
+> **Pass condition:** `cg_L_csr_phonemic` at step 1000 is at most
+> 50% of its value at step 100.
+
+The internal-consistency check: if the feature is turned on and
+producing real gradients, the MSE it is computing against its own
+target should decrease. Monotonicity is not strictly required
+(small fluctuations are normal), but the factor-of-two reduction
+between step 100 and step 1000 is a sanity floor. Failure here
+means either the gradients are not flowing, the target is
+numerically broken (R7), or the valid-pair count is too sparse
+to accumulate signal (R4).
+
+**Gate 5 — No silent non-finite losses.**
+
+> **Pass condition:** `cg_L_csr_phonemic` is finite at every step,
+> and `cg_L_csr_phonemic_nonfinite_count` (if emitted by the
+> defensive guard) is zero.
+
+Same posture as §3A.6 Gate 5. A single non-finite step is a hard
+stop: diagnose the root cause before shipping.
+
+#### 3B.6.5 Required diagnostic metrics
+
+Six metrics that must be emitted on every logging step regardless
+of gate outcome:
+
+- `cg_L_csr_phonemic` — the masked MSE value.
+- `cg_L_csr_phonemic_valid_count` — number of valid (target,
+  candidate) pairs in the batch that contributed to the loss.
+  Zero or near-zero indicates R4 (low coverage).
+- `cg_L_csr_phonemic_mean_sim` — mean of the cosine similarity
+  target over valid pairs, diagnostic for whether the target
+  itself has dynamic range.
+- `cg_L_csr` — the existing InfoNCE loss, for Gate 3 comparison.
+- `cg_csr_col3_mean` / `cg_csr_col3_std` — running statistics of
+  the scorer's column 3 output, diagnostic for R7 (numeric range
+  mismatch).
+- `cg_csr_phonemic_correlation` — emitted once, at end of training,
+  as the primary Gate 2 measurement.
+
+#### 3B.6.6 Decision table
+
+Because §3B ships off-by-default and the verdict space is
+narrower than §3A's, the failure-mode decision collapses from a
+tree into a simple table:
+
+| Gates passing | Verdict |
+|---------------|---------|
+| **All five pass** | §3B has demonstrated its claimed value. Document the result in a finding note. **Do not** change the default in `train_mistral_cg.sh` — the P3 posture is preserved (§3B.4.3), but operators who want phonemic grounding can now cite the measurement when enabling it. |
+| **Gate 1 fails** (LM loss regressed) | Investigate R6 with lower `lambda_csr_phonemic`. If 0.002 still fails Gate 1, §3B cannot be non-regressive at any meaningful weight on this workload. Mark as "unshippable on mistral_cg v1" in the finding note. |
+| **Gate 2 fails**, clause (a) — correlation < 0.3 | The feature is training something but the something is not strong phonemic alignment. Investigate R4 (low coverage) or R5 (wrong operationalization). File the finding; §3B remains off-by-default with no further action required. |
+| **Gate 2 fails**, clause (b) — correlation did not improve over baseline by 0.2 | The InfoNCE baseline was already phonemically aligned by accident, or §3B's gradients are not reaching column 3. Investigate R2 (mask polarity) and R7 (scale mismatch). Re-run with the diagnostic fix; if still fails, file finding. |
+| **Gate 3 fails** (InfoNCE regressed) | Weight is too high. Re-run with `lambda_csr_phonemic=0.002`, one iteration only. If Gate 3 still fails at 0.002, the tension between the two terms is intrinsic; file finding and leave off. |
+| **Gate 4 fails** (MSE does not decrease) | Investigate R4 (coverage), R7 (scale), or the startup diagnostic for the scorer's column 3 range. This is a debuggable failure, not a design failure. |
+| **Gate 5 fails** (non-finite loss) | Hard stop. Same posture as §3A.6 Gate 5 — attach a debugger, do not re-run. |
+
+**Downgrade semantics.** Note that §3B has no "ship by default"
+upside even when all gates pass. The verdict on success is
+"measurement recorded in finding note, §3B remains a documented
+experimental option." Operators who want phonemic grounding on a
+subsequent run can cite the finding. Operators who do not want it
+are unaffected. This is the intended posture for a P3 feature.
+
+---
+
+*3B.7 (Rollout Plan) follows next.*
