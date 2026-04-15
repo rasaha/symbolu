@@ -2515,4 +2515,147 @@ any future follow-up investigation.
 
 ---
 
-*3B.2 (Design Approach) follows next.*
+### 3B.2 Design Approach
+
+Four design decisions drive the implementation. Fewer than §3A.2
+because §3B is a simpler feature — it adds one new auxiliary term
+to an already-wired loss, rather than introducing a new trainable
+module with its own forward-pass contract.
+
+#### Decision 1: Where to host the phoneme provider
+
+The hard-probes `csr_phoneme_provider` lives at
+`scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/csr_bridge.py:62–78`.
+That file is inside a research tree that is not packaged for import
+from the unified pipeline. Two options:
+
+| Option | Approach | Verdict |
+|--------|----------|---------|
+| A | Port the provider into `symbolu_training/training/conscious_generation/providers/csr_phoneme.py` as a reusable module | **Chosen** |
+| B | Import directly from `hard_probes_lib.benchmarks.csr_bridge` | Rejected — `hard_probes_lib` is a research tree, imports from production code would create a dependency inversion |
+
+Option A copies only the minimum surface needed: `ARPABET_TO_VARNA`,
+`SANSKRIT_VOWEL_CALIBRATION`, `simple_text_to_phonemes`, and the
+10D resonance vector generator. The benchmarks built on top of these
+(the `run_csr_bridge_benchmark_integration` harness, the ablation
+studies) **stay in hard-probes** — §3B ports the primitives, not the
+research tools.
+
+The new module exposes a single public function:
+
+```python
+def get_phonemic_embedding(token_ids: List[int], tokenizer) -> torch.Tensor:
+    """Return [N, 10] phonemic resonance vectors for the given tokens.
+
+    Tokens without meaningful phonemic decomposition get a zero row
+    AND a mask entry of 0 in the returned mask.
+
+    Returns:
+        vectors: [N, 10] float tensor
+        mask:    [N]     bool tensor, True where the decomposition is valid
+    """
+```
+
+#### Decision 2: Phonemic target shape and loss form
+
+The existing `L_csr` loss takes column 3 of the Token Evaluation
+Tensor `T` and trains it to rank the correct token highest among
+shortlist candidates via InfoNCE. The phonemic grounding must hook
+into that same column without disrupting the ranking semantics.
+Three options:
+
+| Option | Approach | Verdict |
+|--------|----------|---------|
+| A | **Cosine-similarity target on column 3.** For each (target, candidate) pair, compute `cos_sim(phon_target, phon_candidate)` as an auxiliary regression target, and add `MSE(T[..., 3], cos_sim_matrix)` as a new term | **Chosen** |
+| B | **Replace column 3 with a phonemic dot product.** Feed the 10D phonemic vectors through a learned projection to produce column 3 directly | Rejected — invasive, replaces a working loss instead of augmenting it |
+| C | **Soft-label KL divergence.** Produce a soft distribution over candidates from phonemic similarity, compare against `softmax(T[..., 3])` via KL | Deferred — more principled but requires more careful temperature tuning, defer to follow-up |
+
+Option A is the minimum change. It says "column 3 should roughly
+correlate with phonemic similarity," not "column 3 should equal
+phonemic similarity." The new term is an **auxiliary regression
+pressure** on top of the existing InfoNCE ranking pressure; the
+two coexist and are both useful.
+
+**Composition with the existing `L_csr` term:**
+
+```text
+L_csr_total = L_csr_infonce                         # existing, unchanged
+            + lambda_csr_phonemic * L_csr_phonemic  # new, additive
+```
+
+where `L_csr_phonemic = MSE(T[..., 3], cos_sim_matrix)` masked to
+positions where the phonemic decomposition is valid (see Decision 3).
+Neither term replaces the other. The existing `lambda_csr_token`
+weight is unchanged; the new `lambda_csr_phonemic` weight is
+separate and defaults to 0.
+
+#### Decision 3: Missing-decomposition handling
+
+Not every Mistral BPE token has a meaningful phonemic decomposition
+(§3B.1 BPE complication). Three options for tokens where the
+provider returns a zero row:
+
+| Option | Approach | Verdict |
+|--------|----------|---------|
+| A | **Skip the phonemic term for invalid tokens** — mask the MSE contribution to zero for any (target, candidate) pair where either side has an invalid decomposition | **Chosen** |
+| B | Use a neutral default vector for invalid tokens | Rejected — pollutes the signal with a spurious similarity baseline |
+| C | Filter invalid tokens out of the batch entirely | Rejected — reduces the effective batch size in a non-transparent way |
+
+Option A preserves the existing loss structure: the InfoNCE term
+still runs on the full shortlist, only the **phonemic regression
+term** is masked out for tokens where the ground truth is missing.
+This means the phonemic signal is strictly additive — it can only
+improve training on tokens where phonemic decomposition is well-
+defined, and is a no-op on tokens where it is not.
+
+The provider's returned `mask` (from Decision 1) is the input to
+the masking logic. The masked MSE is computed as:
+
+```python
+# valid_mask: [B, K] — True where BOTH target and candidate have
+# valid phonemic decompositions
+masked_mse = ((T[..., 3] - cos_sim_matrix) ** 2 * valid_mask).sum() \
+           / valid_mask.sum().clamp(min=1.0)
+```
+
+The `.clamp(min=1.0)` guards against the degenerate case where a
+batch contains zero valid pairs — which should be rare but produces
+a silent NaN otherwise.
+
+#### Decision 4: Caching strategy (precompute vs on-the-fly)
+
+ARPABET decomposition is a string-processing operation that is not
+vectorizable on GPU. Doing it per-forward-pass would serialize
+through a Python loop and crater throughput. Since the vocabulary
+is fixed at model construction time, the phonemic table can be
+precomputed once and consulted by ID lookup thereafter.
+
+**Chosen: precompute a `[vocab_size, 10]` phonemic table at model
+construction time** and store it as a buffer (not a parameter —
+phonemic embeddings are not trainable) on the
+`PrimitiveAuxiliaryLosses` module. Also precompute a
+`[vocab_size]` boolean mask of which token IDs have valid
+decompositions.
+
+**Budget.** Mistral's vocabulary is ~32,000 tokens. The phonemic
+table is `32000 × 10 × 4 bytes = 1.28 MB` in float32. The validity
+mask is `32000 × 1 bit = 4 KB`. Both are negligible relative to
+every other tensor in the training loop.
+
+**Construction site.** The table is built once inside
+`PrimitiveAuxiliaryLosses.__init__` when `lambda_csr_phonemic > 0`,
+using the model's tokenizer (passed in at construction time). The
+tokenizer reference is already available inside `model_factory.py`
+where `PrimitiveAuxiliaryLosses` is constructed — no new plumbing
+is needed.
+
+**Fallback when construction fails.** If the phoneme provider
+raises an exception (e.g., missing `cmudict` dependency,
+tokenizer vocabulary mismatch), log a warning and set
+`lambda_csr_phonemic = 0.0` for the rest of the run. Phonemic
+grounding is an optional quality upgrade; a broken provider should
+not crash the training run.
+
+---
+
+*3B.3 (Integration Points) follows next.*
