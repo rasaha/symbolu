@@ -286,5 +286,336 @@ measuring baseline variance should be done **before** merging.
 
 ---
 
-*Subsequent priorities (P0-2, P1-1, P1-2, P2-1, P2-2) will be appended to
-this document as §2–§6.*
+---
+
+## §2 P0-2 — Phase Warmstart Curve (`mistral_hybrid`)
+
+### 2.1 Problem Statement
+
+`MistralHybridWrapper` attaches `num_phase_layers` trainable attention
+blocks on top of a frozen Mistral-7B backbone
+(`mistral_hybrid_wrapper.py:101–138`). The later blocks (`i >= local_layers`)
+are `HybridTransformerBlock` instances that blend local attention with
+**Phase attention**, the O(n) long-range mechanism that is the whole point
+of the hybrid architecture.
+
+Phase attention maintains a rolling phase-coherent memory across the
+sequence. At **initialization**, this memory contains garbage — the phase
+projections are random and carry no meaningful temporal signal. Nonetheless
+the Phase branch of every `HybridTransformerBlock` contributes to the
+block's output from step 0, which means the frozen-backbone signal is
+immediately corrupted by random phase-branch output before the phase
+parameters have learned anything.
+
+The symptoms observed in practice on `train_hybrid_7b.py`-style runs:
+
+- **Early-step LM loss spike** — the hybrid wrapper's loss is higher than
+  a frozen-backbone-only baseline for the first several hundred steps
+  because the phase correction is actively harmful.
+- **Slow recovery** — the adapter gate
+  (`mistral_hybrid_wrapper.py:161`, `sigmoid(-2) ≈ 0.12`) is a constant
+  multiplicative cap, not a training-time curve, so it cannot distinguish
+  "phase layers are still warming up" from "phase layers have converged".
+- **Fragile combinations** — small learning rate changes or batch size
+  changes tip the early curve from "recovers" to "diverges" because the
+  only thing keeping early-step loss finite is the frozen `adapter_gate`
+  scalar.
+
+The `train_hard_probes.py` pipeline solves this with a **phase warmstart
+sigmoid curve** that multiplies the phase branch's contribution by an
+`alpha(step)` that ramps from ≈0 at step 0 to ≈1 well after training is
+underway. This gives the phase projections time to learn a useful
+representation before they are allowed to influence the residual stream.
+
+### 2.2 Current State in Repository
+
+Unlike P0-1, the **mechanism is fully implemented** in the core phase
+transformer — it just isn't wired into `MistralHybridWrapper`:
+
+- **`PhaseAttentionLayer`** carries per-instance warmstart state at
+  `symbolu/phase_transformer.py:2088–2094`:
+  ```python
+  self.phase_warmstart_enabled = False
+  self._warmstart_steps = 10000
+  self._warmstart_tau = 2000.0
+  self._warmstart_apply_inference = False
+  self._current_step = 0
+  self._diag_warmstart_alpha = None
+  ```
+- **The sigmoid curve is computed inside the forward pass** at
+  `phase_transformer.py:2270–2272`:
+  ```python
+  if self.phase_warmstart_enabled:
+      _warmstart_alpha = 1.0 / (
+          1.0 + math.exp(-(_ws_s - self._warmstart_steps)
+                         / max(self._warmstart_tau, 1.0))
+      )
+  ```
+  The sigmoid is centered at `_warmstart_steps` (alpha = 0.5 at that step)
+  with steepness `_warmstart_tau`.
+- **`HybridPhaseTransformer.set_global_step(step)`** at
+  `phase_transformer.py:6963–6972` walks all `PhaseAttentionLayer`
+  submodules and updates `_current_step`. This is the canonical way to
+  advance the warmstart curve once per training step.
+- **`HybridPhaseTransformer.__init__`** at
+  `phase_transformer.py:6940–6947` contains the wiring pattern that
+  enables warmstart on every phase attention submodule after construction.
+
+The gap:
+
+- **`MistralHybridWrapper` bypasses `HybridPhaseTransformer` entirely** —
+  it constructs `LocalTransformerBlock` and `HybridTransformerBlock`
+  directly (`mistral_hybrid_wrapper.py:115–138`). None of the three
+  warmstart wiring paths above are touched.
+- **No warmstart references in the unified pipeline** — verified by
+  `grep -r 'phase_warmstart\|warmstart_tau\|warmstart_steps'` across
+  `symbolu_training/training/unified/`: zero matches.
+- **The training loop never calls `set_global_step`** on any model —
+  verified by grep for `set_global_step` in `train.py`.
+
+So this is a **wiring task**, not an implementation task. All the core
+mechanics live in `symbolu/phase_transformer.py`; we just need to expose
+them through `MistralHybridWrapper` and the unified CLI.
+
+### 2.3 Design Approach
+
+**Four-part integration:**
+
+1. Add warmstart fields to `MistralHybridWrapper.__init__`.
+2. After `self.phase_blocks` is constructed, walk every
+   `HybridTransformerBlock` and set warmstart attributes on its inner
+   `PhaseAttentionLayer` submodules. Local-only blocks
+   (`i < local_layers`) are skipped because `LocalTransformerBlock` does
+   not have a phase branch.
+3. Add a `set_global_step(step)` method on `MistralHybridWrapper` that
+   mirrors `HybridPhaseTransformer.set_global_step` — walks the model
+   once, updates `_current_step` on every `PhaseAttentionLayer`.
+4. Call `model.set_global_step(global_step)` once per optimizer step in
+   `symbolu_training/training/unified/train.py` before the forward pass,
+   guarded so it is a no-op when the model does not expose the method.
+
+**Why not inherit from `HybridPhaseTransformer`?** Because
+`MistralHybridWrapper` owns the frozen backbone + adapter + output norm
++ `adapter_gate` + `phase_output_proj` — it is a wrapper, not a
+transformer. Inheriting would drag in `HybridPhaseTransformer`'s token
+embeddings, lm_head, and RoPE cache, none of which the wrapper uses.
+Mirroring the wiring code is cheaper and clearer.
+
+**Why walk submodules instead of constructor injection?** Because
+`HybridTransformerBlock.__init__` does not currently accept warmstart
+kwargs. Adding them would change the constructor signature and ripple
+through every caller. The submodule walk is a three-line no-op when
+warmstart is disabled and a five-line setup when enabled.
+
+### 2.4 Integration Points
+
+**Four files touched:**
+
+1. **`symbolu_training/training/unified/mistral_hybrid_wrapper.py`** —
+   add `__init__` kwargs, post-construction wiring, and `set_global_step`.
+2. **`symbolu_training/training/unified/config.py`** — add three config
+   fields in the hybrid block:
+   ```python
+   phase_warmstart: bool = False
+   phase_warmstart_steps: int = 10000
+   phase_warmstart_tau: float = 2000.0
+   ```
+3. **`symbolu_training/training/unified/train.py`** —
+   - add the three argparse flags alongside the other `mistral_hybrid`
+     args;
+   - thread them into the `MistralHybridWrapper(...)` constructor call
+     in `model_factory.py`;
+   - call `model.set_global_step(global_step)` once per optimizer step,
+     guarded by `hasattr(model, 'set_global_step')`.
+4. **`symbolu_training/training/unified/model_factory.py`** — forward
+   the three config fields from `UnifiedConfig` into the wrapper's
+   constructor.
+
+### 2.5 Wrapper Changes (Sketch)
+
+```python
+# symbolu_training/training/unified/mistral_hybrid_wrapper.py
+
+class MistralHybridWrapper(nn.Module):
+    def __init__(
+        self,
+        ...,
+        # Phase warmstart (V10.13 curve ported from HybridPhaseTransformer)
+        phase_warmstart: bool = False,
+        phase_warmstart_steps: int = 10000,
+        phase_warmstart_tau: float = 2000.0,
+        phase_warmstart_apply_inference: bool = False,
+        ...,
+    ):
+        super().__init__()
+        ...
+        # ── Trainable Phase attention layers (existing code) ────────
+        self.phase_blocks = nn.ModuleList()
+        for i in range(num_phase_layers):
+            ...  # existing LocalTransformerBlock / HybridTransformerBlock construction
+
+        # ── Phase warmstart wiring (new) ────────────────────────────
+        self.phase_warmstart_enabled = phase_warmstart
+        if phase_warmstart:
+            from symbolu.phase_transformer import PhaseAttentionLayer
+            _n_wired = 0
+            for block in self.phase_blocks:
+                for sub in block.modules():
+                    if isinstance(sub, PhaseAttentionLayer):
+                        sub.phase_warmstart_enabled = True
+                        sub._warmstart_steps = phase_warmstart_steps
+                        sub._warmstart_tau = phase_warmstart_tau
+                        sub._warmstart_apply_inference = phase_warmstart_apply_inference
+                        _n_wired += 1
+            print(
+                f"  Phase Warm-Start: ENABLED on {_n_wired} PhaseAttentionLayer(s) "
+                f"(steps={phase_warmstart_steps}, tau={phase_warmstart_tau})"
+            )
+        ...
+
+    def set_global_step(self, step: int) -> None:
+        """Advance the phase warmstart curve for all phase attention layers.
+
+        No-op if warmstart is disabled. Call once per optimizer step from
+        the training loop, before the forward pass.
+        """
+        if not self.phase_warmstart_enabled:
+            return
+        from symbolu.phase_transformer import PhaseAttentionLayer
+        for sub in self.modules():
+            if isinstance(sub, PhaseAttentionLayer):
+                sub._current_step = step
+```
+
+### 2.6 Training Loop Changes (Sketch)
+
+```python
+# symbolu_training/training/unified/train.py  — inside the main loop,
+# at the top of each optimizer step, BEFORE the forward pass
+
+if hasattr(model, 'set_global_step'):
+    model.set_global_step(global_step)
+```
+
+One line, guarded by `hasattr`, so it is a no-op for any model that does
+not opt in (including `mistral_cg`, `ontological_hybrid`, and every other
+`--model_type`). The `HybridPhaseTransformer` path already has a
+`set_global_step` method, so turning this on means **both** `mistral_hybrid`
+and the non-Mistral hybrid transformer automatically benefit.
+
+### 2.7 Configuration Interface
+
+**New CLI flags** (argparse block in `train.py`, near existing
+`mistral_hybrid` args around `:10057`):
+
+```
+--phase_warmstart                             (default: False)
+    Enable phase warmstart curve on mistral_hybrid / ontological
+    hybrid paths. Multiplies each PhaseAttentionLayer's phase-branch
+    output by sigmoid((step - warmstart_steps) / warmstart_tau), so
+    the phase branch is dampened early and activated gradually.
+
+--phase_warmstart_steps INT                   (default: 10000)
+    Step at which the warmstart sigmoid reaches alpha = 0.5.
+    Recommended: ~5-10% of total training steps.
+
+--phase_warmstart_tau FLOAT                   (default: 2000.0)
+    Sigmoid steepness. Smaller = sharper transition.
+    Recommended: roughly warmstart_steps / 5.
+```
+
+**Recommended setting for `train_hybrid_7b.py`-style 50K-step runs:**
+
+```bash
+--phase_warmstart
+--phase_warmstart_steps 5000
+--phase_warmstart_tau 1000.0
+```
+
+At these settings the curve is ≈0.01 at step 0, 0.12 at step 2500, 0.50
+at step 5000, 0.88 at step 7500, and 0.99 at step 10000 — i.e. the
+phase branch is effectively silent for the first ~2000 steps, warming
+up fast thereafter, fully active by step 10K out of 50K total.
+
+### 2.8 Risks and Mitigations
+
+| Risk                                                             | Likelihood | Mitigation |
+|------------------------------------------------------------------|------------|------------|
+| Warmstart curve too slow → phase layers never get enough signal  | Low–Medium | Defaults chosen so alpha ≥ 0.5 by step 10K; tau/steps are both CLI-tunable |
+| Warmstart curve too fast → defeats the purpose, early-step spike remains | Low | Log the alpha value at steps 0, 1K, 5K, 10K so operators see the curve |
+| Inference-time behavior silently changes when model reloaded     | Low        | `phase_warmstart_apply_inference` defaults to `False`; warmstart alpha is always 1.0 at eval unless explicitly opted in |
+| `set_global_step` is forgotten in the training loop              | Medium     | Guarded by `hasattr` so absent method is a no-op; enable a startup assertion when `phase_warmstart=True` that prints a warning if `_current_step` is still 0 after step 10 |
+| Checkpoint resume restarts the curve at step 0                   | Medium     | `global_step` is already persisted in checkpoints; `set_global_step` is called every step in the loop so resume picks up the correct value on the first step after reload |
+| Interaction with `adapter_gate` (existing constant cap)          | Low        | Warmstart multiplies the phase contribution *inside* the block; `adapter_gate` multiplies the block output. Both apply — the net early-step scaling is `sigmoid(-2) * warmstart_alpha ≈ 0.12 * 0.01 ≈ 0.0012`. This is fine; if anything it is extra safety |
+
+### 2.9 Success Criteria
+
+Evaluated on a 10K-step `train_hybrid_7b.py`-style run (FineWeb, bf16,
+`num_phase_layers=4`, `local_layers=2`) with
+`--phase_warmstart --phase_warmstart_steps 2000 --phase_warmstart_tau 500`:
+
+1. **Early-step LM loss curve is monotonically non-increasing** after
+   step 100, i.e. no early-step spike relative to the frozen-backbone-only
+   baseline.
+2. **Logged `phase_warmstart_alpha` metric** reaches 0.5 within 10% of
+   `phase_warmstart_steps` and ≥0.95 by step `2 * phase_warmstart_steps`.
+   Requires adding a one-line metric emission in the wrapper's forward
+   or a periodic probe.
+3. **Final LM loss at step 10K is within 1%** of a baseline run with
+   warmstart disabled — i.e. warmstart does not slow down convergence
+   to the final perplexity, it just improves the early-step trajectory.
+4. **Baseline verification**: before claiming criterion (1), run a
+   disabled-warmstart control and confirm the early-step spike actually
+   exists. If it does not, this feature is optional — document the
+   finding and leave the flag off by default.
+5. **No NaN/Inf** in phase-attention outputs during the first 1000
+   steps, where historically the combination of random phase projections
+   and large effective learning rate is most fragile.
+
+### 2.10 Rollout Plan
+
+1. **Baseline measurement.** Before any code change, run 1K steps of
+   the current `mistral_hybrid` path, log per-step LM loss, and confirm
+   the early-step spike exists. Save curve for comparison.
+2. **Implement** the four-file change (§2.4). Target patch size:
+   ~40 lines added to `mistral_hybrid_wrapper.py`, ~15 lines of config
+   plumbing, ~3 lines in the training loop, ~5 lines in `model_factory.py`.
+3. **Unit test.** Add a test in `tests/` that constructs a
+   `MistralHybridWrapper` with a synthetic backbone stub, enables
+   warmstart, calls `set_global_step(0)` and `set_global_step(10000)`,
+   asserts the `_current_step` is propagated to every
+   `PhaseAttentionLayer`, and asserts the diagnostic
+   `_diag_warmstart_alpha` attribute changes between the two steps.
+4. **Smoke test.** 100-step synthetic run with warmstart enabled and
+   `phase_warmstart_steps=50, phase_warmstart_tau=10`. Confirm no NaN,
+   no crash, `phase_warmstart_alpha` crosses 0.5 at step 50.
+5. **10K-step FineWeb run.** Evaluate against success criteria §2.9.
+6. **Default flip.** If criterion (3) holds, change the default in
+   `train_hybrid_7b.py` to pass `--phase_warmstart` by default with
+   `warmstart_steps = total_steps // 10`. Leave the config default at
+   `phase_warmstart=False` so other model types are unaffected.
+
+### 2.11 Out of Scope (for P0-2)
+
+- `phase_write_gate` and `phase_channels` — separate P1-2 port. They
+  share the CLI heritage of warmstart but attach to different mechanisms
+  (memory write gating and multi-channel phase memory). Keeping them
+  separate preserves the ability to isolate which change moved the
+  metric.
+- Exposing warmstart through the non-Mistral hybrid path
+  (`train_hybrid_7b.py` with `HybridPhaseTransformer` directly). That
+  path already has `set_global_step`; the change to `train.py` at §2.6
+  will automatically activate it for that model too, but verifying the
+  end-to-end curve on the non-Mistral path is a separate validation.
+- Curve shapes other than sigmoid. The existing implementation at
+  `phase_transformer.py:2270` hard-codes the sigmoid. Linear/cosine/step
+  curves could be added later if the sigmoid turns out to be wrong, but
+  changing the curve is an orthogonal decision and not blocking.
+- Per-layer warmstart schedules (e.g. later phase layers warm up after
+  earlier ones). Architecturally interesting; not justified by any
+  observed failure mode.
+
+---
+
+*Subsequent priorities (P1-1, P1-2, P2-1, P2-2) will be appended to this
+document as §3–§6.*
