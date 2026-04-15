@@ -3104,4 +3104,99 @@ validation block as §3A's forbidden configurations
 
 ---
 
-*3B.5 (Risks and Mitigations) follows next.*
+### 3B.5 Risks and Mitigations
+
+§3B has fewer risks than §3A because it is a smaller feature: no
+trainable module, no new forward-pass contract, no interaction
+with the 32D state projector (§3B.4.4). The risks that remain are
+concentrated in two areas — **fidelity of the phonemic table** and
+**numeric alignment between scorer output and cosine target**.
+
+Seven named risks, grouped by the same four-category schema as
+§3A.5 for structural symmetry. Likelihood and severity are relative
+to a run with Configuration B from §3B.4.2 (`lambda_csr_phonemic =
+0.005`).
+
+#### 3B.5.1 Risk register
+
+**Category A — Correctness risks:**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R1 | **Phonemic table contains wrong values.** ARPABET decomposition silently fails on some token class (e.g., contractions, hyphenated words), and the resulting 10D vector is a misleading approximation instead of a zero row. Feature trains column 3 to approximate garbage for that token class. | Medium (language-specific edge cases are hard to unit-test exhaustively) | Medium — silent quality degradation on the affected subset | Unit test in `symbolu_training/training/conscious_generation/providers/tests/test_csr_phoneme.py` covering a curated list of 50+ tokens (common words, contractions, punctuation, sub-word fragments, rare bytes) with expected outputs or expected mask-false. Any regression in decomposition logic shows up as a test failure | `cg_L_csr_phonemic` does not decrease monotonically; or a spot-check of the phonemic table's valid rows shows unexpected similarity between dissimilar words |
+| R2 | **Mask polarity inverted.** `_valid_pair = _valid_target.unsqueeze(-1) & _valid_cand` is written incorrectly as `| ~` or similar, masking out valid pairs. Feature silently degrades into a no-op that still emits `cg_L_csr_phonemic` metrics at plausible-looking values. | Low (one-line bug, easy to spot in review) | Medium — silent no-op, waste of the feature | Unit test that builds a table with one invalid token, computes the masked MSE on a batch that includes that token, and asserts the masked sum divides by the exact count of valid pairs | `cg_L_csr_phonemic` is numerically stuck at `0` or at the initial MSE with no gradient flow |
+| R3 | **Cosine similarity dim confusion.** `F.cosine_similarity(_phon_target_exp, _phon_cand, dim=-1)` uses the wrong dim, producing the wrong reduction. The resulting `_cos_sim` has shape `[..., 10]` instead of `[..., K]`, and the subsequent MSE silently broadcasts against `T[..., 3]` without an error. | Low | Medium | Runtime shape assertion immediately after the cosine similarity call: `assert _cos_sim.shape == _csr_col.shape` | Assertion failure at step 0; or, if the assertion is missed, `cg_L_csr_phonemic` is implausibly large and does not change across training steps |
+
+**Category B — Signal quality risks:**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R4 | **Low phonemic coverage on the Mistral vocabulary.** BPE fragmentation means many tokens are sub-word pieces for which ARPABET decomposition is undefined. If <10% of tokens in the vocabulary have `mask=True`, the phonemic signal trains column 3 on a sparse subset of the distribution that may not reflect real training usage. | High (unknown until measured) | Medium — feature works on the valid subset but is effectively off in aggregate | Log the valid-fraction at startup: `print(f"Phonemic table valid rows: {mask.sum()}/{V} ({100*mask.float().mean():.1f}%)")`. A valid fraction below 10% is a red flag and should trigger investigation before running long experiments | Startup log shows valid fraction below 10%; or the per-step `cg_L_csr_phonemic_valid_count` metric (emitted per batch) shows that most batches have <10 valid pairs |
+| R5 | **ARPABET similarity does not match the CG doctrine's notion of "phonemic resonance."** `ARPABET_TO_VARNA` in the hard-probes source is a handcrafted mapping that encodes one interpretation of Sanskrit Varna classes; the doctrine at `state_projector.py:13` refers to "phonemic/resonance" without specifying an operational definition. The cosine similarity target may train column 3 toward a notion of phonemic similarity that is not what the architecture was designed to represent. | Medium | Medium — feature trains something, but the something may not be the right thing | This is a **design-time unresolved question**, not a runtime risk. The hard-probes mapping is the only concrete operationalization currently in the codebase, so it is what §3B ports. If a better operationalization emerges (linguistic corpus study, learned phonemic embedding, etc.), §3B's provider is the right place to swap it in | §3B.6 correlation probe fails to show a measurable improvement; or the hard-probes `test_csr_bridge` benchmark continues to report low phonemic correlation on §3B-enabled runs |
+
+**Category C — Interaction risks:**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R6 | **Phonemic regression pulls column 3 away from the InfoNCE ranking objective.** If `lambda_csr_phonemic` is too high, the MSE target dominates the cross-entropy ranking target, column 3 becomes a phonemic similarity scalar instead of a ranking scalar, and the existing `L_csr` InfoNCE loss regresses measurably. | Medium (directly controlled by the weight) | Medium — observable `cg_L_csr` (InfoNCE) regression | §3B.4.2 experimental weight of `0.005` is chosen to peer with the existing `lambda_csr_token` envelope, not to dominate it. §3B.6 success criterion requires that `cg_L_csr` (the existing InfoNCE term) not regress by more than 5% | `cg_L_csr` (InfoNCE) regresses by > 5% from the disabled-§3B baseline after 1000 steps |
+| R7 | **Numeric range mismatch between scorer output and cosine target.** Column 3 of `T` is produced by a bilinear scorer whose output range is not bounded to `[-1, 1]`. The cosine similarity target is bounded to `[-1, 1]`. The MSE is dominated by the scale mismatch rather than by any meaningful alignment, and the feature trains column 3 to be small rather than to be phonemically aligned. | Medium (depends on the scorer's output distribution, which we have not measured) | Medium — silent quality degradation | **Runtime diagnostic**: log `T[..., 3].mean()`, `T[..., 3].std()`, `T[..., 3].min()`, `T[..., 3].max()` at the first step when `lambda_csr_phonemic > 0`. If the scorer's column 3 range is significantly outside `[-1, 1]`, insert a `torch.tanh` normalization before the MSE (trivial one-line change). This is a measurement question that should be answered before running the full experiment | `T[..., 3]` statistics at step 0 show the scorer's column 3 range is incompatible with the cosine target; or `cg_L_csr_phonemic` is dominated by a constant offset rather than by alignment |
+
+**Category D — Operational risks:**
+
+| # | Risk | Likelihood | Severity | Mitigation | Detection signal |
+|---|------|------------|----------|------------|------------------|
+| R8 | **Missing `cmudict` or ARPABET dependency.** The phoneme provider depends on a phonetic dictionary (typically `cmudict` via NLTK). If the dependency is not installed in the training environment, `build_phonemic_table` raises at construction time, the fallback at §3B.3 File 2 Change 2a catches the exception, warns once, and silently disables the feature. An operator who set `lambda_csr_phonemic=0.005` expecting to run the experiment sees no phonemic training and no obvious error. | Medium | Low — explicit warning is emitted, but operators who miss log lines will not notice | The fallback warning message must be explicit: **"PHONEMIC GROUNDING DISABLED — failed to build phonemic table: {exception}. Install cmudict/nltk data to enable."** The warning should appear as a clearly-labeled line at startup, not buried in info-level logs | Startup log contains the "PHONEMIC GROUNDING DISABLED" warning; `cg_L_csr_phonemic` metric is absent from the per-step log entirely |
+
+#### 3B.5.2 Risk categories explicitly not covered
+
+Stated for symmetry with §3A.5.2, so future readers can cite this
+section rather than re-raising the concerns:
+
+- **Compute cost.** The phonemic table lookup is `O(B × K)` index
+  operations plus one cosine similarity and one masked MSE, all on
+  tensors whose largest dimension is `K ≤ 32` (shortlist size).
+  Memory for the buffers is ~1.3 MB for Mistral. Not a risk.
+- **Multi-GPU / DDP.** The phonemic table and validity mask are
+  registered as `nn.Module` buffers and inherit DDP synchronization
+  automatically. No explicit handling needed.
+- **Dataset interaction.** §3B reads only token ids and does not
+  touch the data pipeline. No risk surface.
+- **§3A interaction.** Already covered in §3B.4.4 — disjoint
+  tensor paths, no measurable interaction. Not re-enumerated here.
+- **Checkpoint resume.** The phonemic table and validity mask are
+  buffers, not parameters, and are serialized alongside the rest
+  of the `PrimitiveAuxiliaryLosses` state dict. Resume correctness
+  is inherited from the existing CG checkpointing path. No separate
+  gate needed (unlike §3A R10 which is a genuine risk because
+  LSTB's predictor is a trainable module with its own parameters).
+
+#### 3B.5.3 Pre-flight mitigation checklist
+
+Smaller than §3A.5.3 because §3B has fewer dependencies. Before
+running any `--lambda_csr_phonemic > 0` experiment, verify:
+
+1. **§3A (LSTB) has been measured and shipped.** §3B is P3 and
+   gated on §3A's measurements (§3.0, §3B.4.3). Do not run §3B
+   experiments on a build where §3A's Phase 6 gate evaluation has
+   not been completed — the concurrent changes make attribution
+   impossible.
+2. **`cmudict` / ARPABET dependency is installed.** Run the
+   phoneme provider's startup path in isolation
+   (`python -c "from symbolu_training.training.conscious_generation.providers.csr_phoneme import build_phonemic_table; ..."`)
+   and confirm no warning is emitted.
+3. **Phonemic coverage fraction is measured.** Run the provider on
+   the Mistral tokenizer and record the valid fraction. If it is
+   below 10%, stop and investigate (R4) — the feature cannot
+   produce meaningful signal on a near-empty subset.
+4. **Scorer column 3 range is measured.** Run 10 steps of the
+   baseline (no phonemic grounding) and log `T[..., 3]` statistics.
+   If the range is significantly outside `[-1, 1]`, either apply a
+   `torch.tanh` normalization inside the MSE computation or adjust
+   the target range (R7) before running the full experiment.
+
+All four checks should pass before the operator proceeds to §3B.6
+success criteria and §3B.7 rollout.
+
+---
+
+*3B.6 (Success Criteria) follows next.*
