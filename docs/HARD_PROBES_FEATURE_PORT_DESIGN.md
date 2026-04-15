@@ -2403,4 +2403,116 @@ This subsection preempts those inferences.
 
 ---
 
-*End of §3A. §3B (CSR phonemic grounding, half depth) follows next.*
+## §3B — CSR Phonemic Grounding for `L_csr`
+
+*Secondary sub-task of P1-1. P3 priority. Gated on §3A.6 baseline
+measurements. Written at half the depth of §3A — anywhere a decision
+depends on §3A's outcome, this section defers rather than
+pre-deciding.*
+
+### 3B.1 Problem Statement
+
+Per §3.1, the earlier framing that `lambda_csr_token` was a "dangling
+weight" is wrong. The weight drives a real InfoNCE contrastive loss
+inside `PrimitiveAuxiliaryLosses.forward()` at
+`symbolu_training/training/conscious_generation/losses/primitive_auxiliary.py:27`.
+That loss takes the scorer's output column for CSR (index 3 of the
+Token Evaluation Tensor `T`), identifies the correct token's score
+within a shortlist, and computes softmax cross-entropy against the
+negative candidates. Gradients flow back through whatever scorer
+produced column 3. This is a perfectly functional contrastive ranking
+loss.
+
+What the existing loss does not do is **ground column 3 in actual
+phoneme structure**. Nothing in the training signal forces the scorer
+to produce a CSR column that correlates with the phonemic properties
+of the candidate tokens. Column 3 learns whatever it needs to learn
+to minimize InfoNCE on the shortlist — which, given enough scorer
+capacity, can be satisfied by any arbitrary ranking function that
+happens to separate correct from incorrect tokens. That function may
+or may not resemble phonemic similarity; the training signal has no
+opinion on the matter.
+
+The doctrinal context matters here. `SovereignStateProjector` at
+`symbolu_training/jepa/state_projector.py:13–14` comments:
+
+> Note: Manomaya (Mental Plane) is handled by CSR (phonemic/resonance),
+> which operates outside the 32D state as a separate scoring
+> primitive.
+
+CSR is **architecturally positioned** as the phonemic/resonance signal
+— the Mental Plane that sits outside the 32D Sovereign State precisely
+because it operates on symbolic phonemic structure rather than on
+pooled hidden states. The existing `L_csr` loss trains the CSR column
+without reference to that symbolic structure, so the doctrinal claim
+("CSR is phonemic") and the training reality ("CSR is whatever the
+scorer learned to rank") are quietly disconnected.
+
+The hard-probes CSR bridge provides a concrete mechanism to close
+that gap. At
+`scripts/phase_probes/hard_probes/hard_probes_lib/benchmarks/csr_bridge.py:62–78`,
+the `CSREmbeddingProvider` / `VarnaCSRBridge` / `ARPABET_TO_VARNA` /
+`SANSKRIT_VOWEL_CALIBRATION` modules decompose words into ARPABET
+phonemes, map phonemes to Varna classes, and produce 10D resonance
+vectors per token. That decomposition is the "actual phonemic
+structure" that the existing `L_csr` loss currently has no opinion
+about.
+
+§3B proposes to wire that decomposition into `PrimitiveAuxiliaryLosses`
+as an **optional auxiliary target for column 3** — not to replace the
+InfoNCE loss, but to augment it with a phonemic alignment term that
+pulls column 3 toward correlating with the phonemic similarity of the
+shortlist candidates.
+
+**Why this is P3 and not P1.** The existing `L_csr` contributes
+normally to CG training and there is no evidence that the lack of
+phonemic grounding is causing downstream harm. No operator has
+reported a CG training failure that was root-caused to "column 3 of
+T is not phonemically grounded." The value of §3B is therefore
+**latent**: it is a quality upgrade that might matter if and when a
+future measurement shows that symbolic CSR matters for downstream
+reasoning, interpretability, or generalization. Until such a
+measurement exists, §3B is a design option on the shelf, not a
+shipping feature.
+
+**Who would want §3B.** Three plausible stakeholders, in decreasing
+order of likelihood:
+
+1. An operator debugging an interpretability probe who wants the CSR
+   column to mean what the doctrine says it means (phonemic
+   resonance), not whatever the scorer invented.
+2. A researcher running the hard-probes `test_csr_bridge` benchmark
+   on a trained CG model and finding that the model's CSR column
+   fails the phonemic correlation check in the benchmark.
+3. A future extension of the Manomaya plane that assumes column 3
+   carries real phonemic information and breaks quietly when it
+   does not.
+
+None of these stakeholders currently has an open ticket. §3B's job
+is to make sure that when one of them does, the design is ready to
+ship rather than requiring a fresh investigation.
+
+**Complication: BPE tokens are not phonemes.** Mistral uses
+byte-pair-encoded subword tokens. Many Mistral tokens are valid
+English words, but many others are sub-word fragments, punctuation,
+or whitespace. ARPABET decomposition works cleanly on words and
+degrades gracefully on common fragments, but it has no meaningful
+output for punctuation or rare byte sequences. This means phonemic
+grounding is **partial** — it can provide a training signal on the
+subset of tokens that have meaningful phonemic decompositions, but
+cannot cover the full vocabulary. §3B's design must acknowledge this
+and skip the phonemic target for tokens where the decomposition is
+unavailable or ill-defined, rather than corrupting the signal with
+garbage phonemes for the long tail.
+
+The rest of §3B describes a design that, when shipped, adds this
+phonemic alignment term to `L_csr`, gates it behind a dedicated flag,
+and measures whether enabling it improves a named phonemic
+correlation probe without regressing any existing CG metric. It does
+**not** claim that §3B is necessary, useful, or ready to ship — those
+questions are explicitly deferred to the measurements in §3A.6 and
+any future follow-up investigation.
+
+---
+
+*3B.2 (Design Approach) follows next.*
