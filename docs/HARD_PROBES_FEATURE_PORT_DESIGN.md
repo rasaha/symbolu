@@ -1019,4 +1019,303 @@ mask that could be forgotten.
 
 ---
 
-*3A.3 (Integration Points) follows next.*
+### 3A.3 Integration Points
+
+Four files are touched. The changes are small and localized — the
+hard work is in the preceding design section, not here. Every line
+number in this section is a **reference into the current code**, not
+a target for the new code.
+
+The sketches below are illustrative, not literal patches. An
+implementer should read the surrounding code before transcribing.
+
+#### File 1: `symbolu_training/training/unified/mistral_wrapper.py`
+
+**Two changes.** One new forward-path option, one new output-dict key.
+No breaking changes to the existing signature or to any caller that
+does not opt in.
+
+**Change 1a — add `return_state_trajectory` to `forward`:**
+
+The forward signature currently ends with `**kwargs` at line 356, so
+the new parameter can be inserted before it without affecting any
+existing caller. Place it next to `return_last_hidden` for
+discoverability:
+
+```python
+# mistral_wrapper.py — forward signature (line 346)
+def forward(
+    self,
+    input_ids: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    labels: Optional[torch.Tensor] = None,
+    return_hidden: bool = False,
+    extract_layers: Optional[List[int]] = None,
+    return_last_hidden: bool = False,
+    return_state_trajectory: bool = False,   # NEW — LSTB (§3A)
+    reset_state: bool = False,
+    return_decorr_loss: bool = False,
+    **kwargs,
+) -> Dict[str, torch.Tensor]:
+```
+
+**Change 1b — compute the trajectory and add it to the result dict:**
+
+The existing pooled path at line 390 is unchanged. The new trajectory
+is computed from the raw backbone `hidden` — the same input the
+pooled path uses — and added to the result dict only when the flag
+is set. Insert after the pooled `state` is assembled and before the
+result dict is returned (between lines 462 and 474, alongside the
+existing `return_last_hidden` branch at line 470):
+
+```python
+# mistral_wrapper.py — inside forward, after existing result dict is built
+
+if return_state_trajectory and _use_state:
+    # Per-token Sovereign State trajectory for LSTB.
+    # Projects each token's hidden state through the same projector
+    # used by compute_state_delta, preserving semantic consistency
+    # with the pooled 'state' field.
+    #
+    # Cost: O(B × T × D_mistral × 32) — ≪ 1% of Mistral backbone
+    # forward cost at typical batch sizes. Only computed when LSTB
+    # is enabled; non-LSTB runs pay nothing.
+    result['state_trajectory'] = self.state_projector(hidden)
+```
+
+**Rationale for the conditional on `_use_state`.** The existing
+ablation path (`_use_state = False` → state is zeroed at line 393)
+sets the pooled `state` to zeros to isolate the contribution of the
+state projector. The trajectory field should follow the same ablation
+semantics — if `_use_state` is false, omit the trajectory entirely
+rather than producing a real one that contradicts the ablation. The
+LSTB loss in `train.py` will then see `'state_trajectory' not in
+outputs` and skip the loss computation (see File 4 below).
+
+**No changes** to `compute_state_delta` at line 291. The pooled state
+computation stays exactly as-is, so every existing caller — P0-1
+anti-collapse, Stage 8 Perspective Synthesizer, Kosha router, Vritti
+classifier — is untouched.
+
+#### File 2: `symbolu_training/training/unified/model_factory.py`
+
+Construct the `PhaseJEPAPredictor` and `JEPAPredictionLoss` and attach
+them to `model.conscious_gen` alongside the existing CG modules.
+
+The existing CG module suite is built inside
+`build_mistral_cg(...)` (or equivalent — the actual function name
+should be confirmed against current `model_factory.py`; the relevant
+region is near the `_p3_losses.append(f"L_csr=...")` reference at
+line 853). The pattern in that file attaches each CG sub-module to
+`model.conscious_gen[name]` as a plain dict assignment.
+
+**Sketch of the addition:**
+
+```python
+# model_factory.py — inside build_mistral_cg() or equivalent
+
+if config.lambda_lstb > 0:
+    from symbolu_training.jepa.predictor import PhaseJEPAPredictor
+    from symbolu_training.jepa.losses import JEPAPredictionLoss
+
+    model.conscious_gen['jepa_predictor'] = PhaseJEPAPredictor(
+        state_dim=32,
+        hidden_dim=config.lstb_hidden_dim,
+        num_heads=config.lstb_num_heads,
+        prediction_steps=config.lstb_k_steps,
+        cosine_mode='complex',
+        dropout=0.1,
+    ).to(device)
+
+    model.conscious_gen['jepa_loss'] = JEPAPredictionLoss(
+        vicreg_weight=config.lstb_vicreg_weight,
+        ortho_weight=config.lstb_ortho_weight,
+    ).to(device)
+
+    print(
+        f"  LSTB enabled: k={config.lstb_k_steps}, "
+        f"hidden={config.lstb_hidden_dim}, "
+        f"vicreg={config.lstb_vicreg_weight}, "
+        f"ortho={config.lstb_ortho_weight}"
+    )
+```
+
+**Parameter budget.** With the default `state_dim=32, hidden_dim=128,
+num_heads=4`, `PhaseJEPAPredictor` instantiates with roughly 100K
+parameters. `JEPAPredictionLoss` has no trainable parameters of its
+own (it is a wrapper around `VICRegLoss` and MSE). Both modules are
+moved to `device` on construction and inherit the same optimizer
+group, gradient clipping, and mixed-precision treatment as every
+other module in `model.conscious_gen`.
+
+**Optimizer visibility.** `model.conscious_gen` is iterated by the
+existing optimizer setup code when collecting trainable parameters
+(this is how `kosha_routing_loss`, `bliss_coherence_loss`,
+`primitive_aux_losses`, etc. are all picked up today). The LSTB
+predictor inherits this behavior automatically — no special-case
+optimizer setup is required.
+
+#### File 3: `symbolu_training/training/unified/config.py`
+
+Five new config fields, placed in the CG block alongside the existing
+lambda weights around lines 998–1043. All default to values that make
+the feature **off** by default, so every existing run is unaffected.
+
+```python
+# config.py — inside the CG config block
+
+# LSTB (§3A) — Latent Semantic Token Bridge
+lambda_lstb: float = 0.0                  # Weight for JEPA prediction loss on state trajectory
+lstb_k_steps: int = 1                     # Prediction lookahead (1 = next-position)
+lstb_vicreg_weight: float = 0.5           # VICReg weight inside JEPAPredictionLoss
+lstb_ortho_weight: float = 0.05           # Orthogonality weight inside JEPAPredictionLoss
+lstb_hidden_dim: int = 128                # Predictor hidden dimension
+lstb_num_heads: int = 4                   # Predictor phase attention heads
+```
+
+Corresponding argparse flags are added in `train.py` near the existing
+CG flag block around line 10218:
+
+```python
+# train.py — argparse additions
+parser.add_argument("--lambda_lstb", type=float, default=0.0,
+    help="LSTB JEPA prediction loss weight on per-token Sovereign "
+         "State trajectory. Recommended: 0.05 for mistral_cg. "
+         "0.0 disables the feature entirely.")
+parser.add_argument("--lstb_k_steps", type=int, default=1,
+    help="LSTB prediction lookahead. Default 1 (next-position). "
+         "Values > 1 enable autoregressive rollout.")
+parser.add_argument("--lstb_vicreg_weight", type=float, default=0.5)
+parser.add_argument("--lstb_ortho_weight", type=float, default=0.05)
+parser.add_argument("--lstb_hidden_dim", type=int, default=128)
+parser.add_argument("--lstb_num_heads", type=int, default=4)
+```
+
+The config fields are threaded into the `UnifiedConfig` constructor
+call at `train.py:11189+` alongside the existing CG lambdas, matching
+the pattern already used for `lambda_csr_token`, `lambda_vritti_token`,
+etc.
+
+#### File 4: `symbolu_training/training/unified/train.py`
+
+Two changes. One in the forward call site to request the trajectory,
+one in the CG loss block to consume it.
+
+**Change 4a — request the trajectory in the CG forward call.**
+
+The CG forward call site lives near line 4994 where the existing code
+checks `'last_hidden_state'` and `'state'` in the outputs. The call
+that produces `outputs` is upstream of that check, near line 3112
+where `_need_hidden` is computed. The forward call itself already
+passes `return_last_hidden=True` conditionally; add
+`return_state_trajectory=True` next to it when LSTB is enabled:
+
+```python
+# train.py — wherever the CG forward call is constructed
+_need_state_traj = (
+    config.enable_conscious_generation
+    and config.lambda_lstb > 0
+)
+
+outputs = model(
+    input_ids=x,
+    labels=y,
+    return_last_hidden=_need_hidden,
+    return_state_trajectory=_need_state_traj,   # NEW
+    ...
+)
+```
+
+The exact call site should be located by grepping for
+`return_last_hidden` inside `train.py` and inserting the new kwarg
+adjacent to every occurrence that serves the CG path.
+
+**Change 4b — compute the LSTB loss inside the CG loss block.**
+
+Inside the existing CG loss block at `train.py:4931+`, after
+`_cg_sov_state = outputs.get('state', None)` at line 5000, add the
+LSTB prediction loss. The loss must be placed **after** the existing
+CG auxiliary losses so that its metrics appear grouped with the other
+CG diagnostics, but the exact ordering does not affect correctness
+because all CG auxiliaries contribute additively to `loss`:
+
+```python
+# train.py — inside CG loss block, after _cg_sov_state extraction
+
+if config.lambda_lstb > 0:
+    _cg_state_traj = outputs.get('state_trajectory', None)
+    if (_cg_state_traj is not None
+        and 'jepa_predictor' in model.conscious_gen
+        and 'jepa_loss'      in model.conscious_gen):
+
+        _k = config.lstb_k_steps
+        _B, _T, _D = _cg_state_traj.shape
+
+        # Need at least k+1 positions to form a (context, target) pair
+        if _T > _k:
+            # Context: positions [0 .. T-k-1]  (gradient flows through projector)
+            # Target:  positions [k .. T-1]    (stop-gradient — standard JEPA)
+            _lstb_context = _cg_state_traj[:, :-_k, :]
+            _lstb_target  = _cg_state_traj[:,  _k:, :].detach()
+
+            _lstb_predictor = model.conscious_gen['jepa_predictor']
+            _lstb_loss_fn   = model.conscious_gen['jepa_loss']
+
+            # Predict k-step state (causal by construction — see §3A.2 decision 5)
+            _lstb_s_pred, _lstb_deltas = _lstb_predictor(
+                _lstb_context, k_steps=_k,
+            )
+
+            # Compute composite loss (MSE + VICReg + ortho)
+            _lstb_loss_result = _lstb_loss_fn(
+                s_pred=_lstb_s_pred,
+                s_target=_lstb_target,
+                predictor_weight=_lstb_predictor.W_v.weight,  # for ortho term
+            )
+            _lstb_loss = _lstb_loss_result['loss']
+
+            if torch.isfinite(_lstb_loss):
+                loss = loss + config.lambda_lstb * _lstb_loss
+                metrics['cg_lstb_loss']       = _lstb_loss.item()
+                metrics['cg_lstb_mse']        = _lstb_loss_result['mse'].item()
+                metrics['cg_lstb_vicreg']     = _lstb_loss_result['vicreg'].item()
+                metrics['cg_lstb_ortho']      = _lstb_loss_result['ortho'].item()
+                metrics['cg_lstb_target_var'] = _lstb_target.var(dim=0).mean().item()
+```
+
+**Guards in the sketch.** Four defensive conditions are present for
+specific reasons, each of which would produce a silent failure if
+omitted:
+
+| Guard | What it protects against |
+|-------|-------------------------|
+| `_cg_state_traj is not None` | Ablation mode (`_use_state=False` in the wrapper) omits the trajectory; this check preserves ablation semantics |
+| `'jepa_predictor' in model.conscious_gen` | Handles the case where `lambda_lstb > 0` was set after construction (e.g. via CLI override) but the model was built without LSTB. Explicit skip, not a crash |
+| `_T > _k` | Handles short sequences at the start of training where `T ≤ k` would produce empty tensors |
+| `torch.isfinite(_lstb_loss)` | Matches the defensive pattern used by every other CG auxiliary loss in this block — NaN in one auxiliary should not poison the whole step |
+
+The exact field names on `_lstb_loss_result` (`'mse'`, `'vicreg'`,
+`'ortho'`) should be confirmed against `JEPAPredictionLoss.forward`'s
+return dict; if the keys differ, adjust the metric emission
+accordingly without changing the loss computation.
+
+#### Patch-size budget
+
+Approximate line counts for the full change:
+
+| File | Lines added |
+|------|-------------|
+| `mistral_wrapper.py` | ~8 (signature + trajectory branch) |
+| `model_factory.py` | ~20 (predictor + loss construction, guarded) |
+| `config.py` | ~8 (config fields) |
+| `train.py` | ~40 (argparse + forward kwarg + loss block) |
+| **Total** | **~76 lines** |
+
+No existing code is modified beyond inserting new branches. No
+existing function signatures are changed in a way that breaks
+backward compatibility. No files outside the unified training
+package are touched.
+
+---
+
+*3A.4 (Configuration Interface) follows next.*
