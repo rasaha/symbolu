@@ -4452,5 +4452,319 @@ experiment:
 
 ---
 
-*4.7 (Success Criteria), 4.8 (Rollout Plan), 4.9 (Out of Scope)
-follow in the next parts.*
+### 4.7 Success Criteria
+
+P1-2 ships by default in `train_hybrid_7b.py` only if all named
+gates pass on a 10K-step FineWeb measurement against a matched
+baseline. Structure matches §3A.6 (named run, named baseline,
+numbered gates, decision table).
+
+#### 4.7.1 Named evaluation run
+
+```bash
+python train_hybrid_7b.py \
+    --dataset fineweb \
+    --max_steps 10000 \
+    --batch_size 1 \
+    --gradient_accumulation 8 \
+    --phase_warmstart \
+    --phase_warmstart_steps 2000 \
+    --phase_warmstart_tau 500.0 \
+    --phase_channels 4 \
+    --phase_write_gate
+```
+
+§2 (P0-2) phase warmstart is included because §4 is measured on
+top of a §2-shipped stack. The warmstart flag values match §2's
+§2.9 success criteria run so the two measurements are directly
+comparable.
+
+**Hardware:** A100-80GB or equivalent. `batch=1` with gradient
+accumulation of 8 gives `effective_batch=8`, matching the default
+`train_hybrid_7b.py` single-GPU configuration.
+
+**Runtime:** 10K steps at this batch size takes ~4–8 hours on an
+A100. This is the longest success-criteria run in the document.
+The length is justified because the multi-channel memory
+specialization (R3) is a slow process — channel decay parameters
+that are initialized logarithmically need many thousands of steps
+to differentiate through training, and a shorter run cannot
+distinguish "still converging" from "collapsed."
+
+#### 4.7.2 Named baseline
+
+```bash
+python train_hybrid_7b.py \
+    --dataset fineweb \
+    --max_steps 10000 \
+    --batch_size 1 \
+    --gradient_accumulation 8 \
+    --phase_warmstart \
+    --phase_warmstart_steps 2000 \
+    --phase_warmstart_tau 500.0 \
+    --phase_channels 1
+    # --phase_write_gate intentionally not set
+```
+
+Identical to the evaluation run except for the §4 flags. Same
+seed, same data, same schedule.
+
+#### 4.7.3 Primary gates
+
+Six numbered gates. Pass condition for each is stated as a delta
+against the §4.7.2 baseline.
+
+**Gate 1 — LM loss is not degraded.**
+
+> **Pass condition:** `lm_loss` at step 10000 on the evaluation
+> run is within ±1% of the baseline.
+
+Same LM floor as every other priority. P1-2 is an auxiliary
+capacity upgrade; if it regresses the primary objective, it does
+not ship.
+
+**Gate 2 — LM loss is meaningfully improved, OR validation
+perplexity improves.**
+
+> **Pass condition:** At least one of the following holds at
+> step 10000:
+> - `lm_loss` is **at least 1% lower** than the baseline, OR
+> - `val_ppl` on a WikiText-2 validation subset is **at least 2%
+>   lower** than the baseline.
+
+This is the "feature actually improved something" gate. The ±1%
+LM floor tolerance from Gate 1 admits the case where §4 has no
+effect (neither positive nor negative), which means shipping by
+default would be unjustified churn. Gate 2 requires a measurable
+improvement to justify enabling the feature. Two acceptance
+channels (train loss OR validation perplexity) because some
+capacity improvements are visible on validation but not on training
+loss (and vice versa).
+
+**Gate 3 — Multi-channel memory does not collapse.**
+
+> **Pass condition:** At step 10000, the ratio of the largest
+> per-channel state norm to the smallest is at most 10×:
+> `max(cg_phase_channel_norms) / min(cg_phase_channel_norms) <= 10`.
+
+Directly addresses R3 (multi-channel collapse). Requires that the
+`_diag_phase_state_norm_per_channel` diagnostic be wired per §4.6
+R6. If the ratio exceeds 10×, one channel has swallowed the
+signal and multi-channel memory has collapsed to single-channel
+behavior.
+
+**Gate 4 — Write gate is selective, not degenerate.**
+
+> **Pass condition:** At step 10000:
+> - `cg_phase_gate_mean ∈ [0.3, 0.9]`, AND
+> - `cg_phase_gate_std ≥ 0.1`.
+
+Directly addresses R4 (write gate collapse). A healthy gate sits
+in the middle of its range (not stuck at 0 or 1) and shows
+non-trivial variance across tokens (not constant). A gate mean
+near the `sigmoid(2) ≈ 0.88` initialization would mean the gate
+never learned to differentiate, which is a softer failure than
+"collapsed to zero" but still means the feature is not producing
+selectivity.
+
+**Gate 5 — Channel aggregation has non-trivial entropy.**
+
+> **Pass condition:** `softmax(channel_agg)` entropy at step
+> 10000 is at least 80% of uniform entropy. For `phase_channels=4`,
+> uniform entropy is `log(4) ≈ 1.386`, and the gate requires
+> entropy `≥ 1.11`.
+
+Complements Gate 3 by catching the case where channel norms are
+balanced but `channel_agg` has learned to weight only one of them.
+If the learned aggregation collapses to a one-hot vector, the
+readout uses only one channel regardless of how well the others
+trained.
+
+**Gate 6 — Memory budget respected.**
+
+> **Pass condition:** Peak GPU memory during training does not
+> exceed 110% of the §4.7.2 baseline.
+
+Addresses R5 (memory scaling). If the feature pushes peak memory
+over 110% of baseline on the standard configuration, operators
+using non-default batch sizes or sequence lengths are likely to
+hit OOM. The 10% headroom is deliberate — it gives some cushion
+without turning the gate into a free pass.
+
+#### 4.7.4 Required diagnostic metrics
+
+Five metrics that must be emitted on every logging step (all
+require the §4.6 R6 wiring patch in `train.py`):
+
+- `cg_phase_gate_mean` — mean of the write gate sigmoid output.
+- `cg_phase_gate_std` — standard deviation of write gate across
+  tokens.
+- `cg_phase_channel_norms` — per-channel state L2 norm (list of
+  `C` values, emitted as a tensor or a dict).
+- `cg_phase_channel_agg` — `softmax(channel_agg)` values (list
+  of `C` values).
+- `cg_phase_attn_mass_per_channel` — per-channel attention mass,
+  diagnostic for which channels are actually contributing to the
+  forward output.
+
+Plus the standard gates-1/2 metrics that already exist:
+`lm_loss`, `val_ppl`, `peak_memory_mb`.
+
+#### 4.7.5 Decision table
+
+| Gates passing | Verdict |
+|---------------|---------|
+| **All six pass** | Add `--phase_channels 4 --phase_write_gate` to `train_hybrid_7b.py`'s default argparse block. Merge `phase-mcmem-v1` to `main`. File finding note. |
+| **Gate 1 fails** (LM regression) | Investigate R1 (kwargs not threaded) and R3/R4 (channel or gate collapse degrading training). If R1 is ruled out, downgrade to optional and file finding. Do not ship by default. |
+| **Gate 2 fails** (no improvement) | Run Configuration C ablation from §4.5.2 to isolate which mechanism (channels or write gate) is inert. If channels alone show no improvement, log as "multi-channel capacity not useful on this workload." If write gate alone shows no improvement, log as "write gating not useful." Downgrade to optional. |
+| **Gate 3 or Gate 5 fails** (channel collapse) | Investigate whether training steps were sufficient for channel differentiation (may need longer run). Re-run at 20K steps if resources permit. If collapse persists at 20K, downgrade to optional — the multi-horizon hypothesis does not hold for this workload. |
+| **Gate 4 fails** (gate collapse) | Lower gate bias initialization from `2.0` to `1.0` and re-run. The lower init makes early-training gate values slightly more selective and may prevent the gate from sitting frozen near its initialization. |
+| **Gate 6 fails** (memory regression) | Reduce `phase_channels` from 4 to 2. Re-run. If Gate 6 fails at `phase_channels=2`, the memory cost is intrinsic and operators must reduce batch size. Document the memory trade-off in the finding note. |
+
+### 4.8 Rollout Plan
+
+Six phases. Simpler than §3A's seven because P1-2 does not need
+a separate "gate evaluation" phase — the gate computation is fast
+enough to fold into the decision phase.
+
+#### 4.8.1 Phase 0 — Prerequisites
+
+**Actions:**
+
+1. **Verify §2 (P0-2) is shipped and healthy.** Same prerequisite
+   as §3A — both §2 and §4 touch `PhaseAttentionLayer` in the
+   same wrapper, and running §4 on a build where §2 is not yet
+   in place or is known-broken makes attribution impossible.
+2. **Locate `MistralHybridWrapper.__init__` and the block
+   construction loop in `mistral_hybrid_wrapper.py`.** Line
+   numbers will drift — the rollout note is the source of truth.
+3. **Verify `_diag_phase_*` capture flags exist.** Open
+   `phase_transformer.py:2082–2086` and confirm the attributes
+   are still in place. The §4 rollout depends on reading them;
+   if a future refactor has moved or removed them, the §4
+   diagnostic wiring cannot work and must be redesigned before
+   continuing.
+
+**Artifact:** rollout note recording file/line references.
+
+**Gate:** all three actions succeed.
+
+#### 4.8.2 Phase 1 — Implementation
+
+Apply the four-file patch from §4.4 in order:
+
+1. `config.py` — two new fields.
+2. `mistral_hybrid_wrapper.py` — constructor kwargs + block
+   construction + diagnostic print.
+3. `model_factory.py` — thread fields into wrapper constructor.
+4. `train.py` — argparse flags + `UnifiedConfig` threading +
+   **metric emission wiring for the `_diag_phase_*` flags
+   (critical — R6)**.
+
+The metric wiring in File 4 must walk `model.modules()` for
+`PhaseAttentionLayer` instances, extract the diagnostic
+attributes, and emit them as `cg_phase_*` metrics at every
+logging step. This is the §4.6 R6 mitigation and is the only
+file-4 work beyond the argparse plumbing.
+
+**Gate:** smoke test with `--phase_channels 4 --phase_write_gate`
+completes 100 steps on synthetic data, all five diagnostic
+metrics appear in the log, no NaN/Inf.
+
+#### 4.8.3 Phase 2 — Unit tests
+
+Three tests:
+
+1. **R1 regression guard.** Construct `MistralHybridWrapper(
+   phase_channels=4, phase_write_gate=True)`. Walk
+   `model.modules()` for `PhaseAttentionLayer` and assert
+   `channel_decay_logit.shape == (4*num_heads,)` and
+   `write_gate_proj is not None`. Walk for
+   `LocalTransformerBlock` (the `i < local_layers` branch) and
+   assert those do NOT have `channel_decay_logit`.
+2. **Diagnostic wiring test.** Construct the wrapper, run a
+   forward pass with synthetic input, and assert that
+   `_diag_phase_gate_mean` is not `None` after the forward.
+3. **Checkpoint compatibility test.** Save a checkpoint with
+   `phase_channels=1`, attempt to load into a model built with
+   `phase_channels=4`, and assert that `load_state_dict(strict=True)`
+   raises a clear error. Then repeat in the opposite direction.
+   This locks in R2's expected failure mode.
+
+**Gate:** all three tests pass.
+
+#### 4.8.4 Phase 3 — Smoke test and diagnostic verification
+
+Run a 200-step synthetic test with
+`--phase_channels 4 --phase_write_gate --phase_warmstart
+--phase_warmstart_steps 50 --phase_warmstart_tau 10`. Verify:
+
+1. All five diagnostic metrics appear in the log.
+2. `cg_phase_gate_mean` starts near `sigmoid(2) ≈ 0.88` and
+   either stays there or drifts measurably.
+3. `cg_phase_channel_norms` are approximately equal at step 0
+   (uniform initialization) and diverge slightly by step 200.
+4. No NaN/Inf in any metric.
+5. Peak GPU memory is within 10% of a baseline run with
+   `--phase_channels 1`.
+
+**Gate:** all five checks pass.
+
+#### 4.8.5 Phase 4 — Baseline + evaluation measurement
+
+Run the §4.7.2 baseline first, then the §4.7.1 evaluation run.
+Both runs save per-step metric logs. 10K steps each, ~4–8 hours
+per run on an A100.
+
+Unlike §3A.7 which separates baseline and evaluation into two
+phases with a gate in between, §4.8 combines them into a single
+phase because:
+
+- The baseline run is not itself a gate for the evaluation run.
+- The baseline-vs-evaluation comparison is done only at the end,
+  after both runs complete.
+- Running them sequentially on the same GPU is the most
+  resource-efficient path.
+
+**Gate:** both runs complete cleanly, all diagnostic metrics
+present, no NaN/Inf.
+
+#### 4.8.6 Phase 5 — Gate evaluation and decision
+
+Compute Gates 1–6 from §4.7.3 against the recorded values. File
+a finding note with:
+
+- The rollout note reference.
+- Per-gate pass/fail with raw numbers.
+- The §4.7.5 decision table verdict.
+- Peak memory values for both runs.
+- The `channel_agg.softmax()` values at step 10000 for the
+  evaluation run (diagnostic for understanding channel
+  specialization).
+
+**Branch A — all six gates pass:** add
+`--phase_channels 4 --phase_write_gate` to
+`train_hybrid_7b.py`'s default argparse block. Merge
+`phase-mcmem-v1` to `main`.
+
+**Branch B — some gates fail:** consult the §4.7.5 decision
+table. Re-run specific configurations as needed, file finding
+note, do not change defaults if the decision is downgrade.
+
+#### 4.8.7 Rollback path
+
+Trivial. §4 is entirely additive and defaults to off.
+
+- **Unmerged rollback:** do not merge `phase-mcmem-v1`.
+- **Merged rollback:** set `--phase_channels 1` (the default) on
+  affected runs, or remove the flags from the script. No code
+  revert needed.
+- **Full code revert** only if the master-switch behavior is
+  broken — i.e., if `phase_channels=1, phase_write_gate=False`
+  runs produce different results from a pre-§4 build. This
+  should be impossible by design and is the reason Phase 1's
+  smoke test includes a run with the defaults.
+
+---
+
+*4.9 (Out of Scope) follows as the final §4 subsection.*
