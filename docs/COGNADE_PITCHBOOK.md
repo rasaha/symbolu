@@ -1,6 +1,27 @@
 # Cognade Labs — Investor Pitchbook
 
 **Five Product Briefs | Prepared April 2026**
+*Contact: Rakesh Mohan — Cognade Labs*
+
+---
+
+## Executive Summary
+
+Cognade Labs builds **infrastructure-layer intelligence for AI systems and cloud operations** — the decision-quality, memory-policy, governance, and generation layers that sit between raw compute and reliable production behavior.
+
+Our thesis is that the next wave of value in AI infrastructure comes not from bigger models or faster hardware, but from **smarter decisions at the seams** — where an autoscaler decides whether to scale, where an inference engine decides which cache block to evict, where an agent decides whether to execute a tool call, and where a language model decides which token to emit next. Each of those seams is currently handled by a shallow heuristic, a single-signal policy, or no policy at all. We build the multi-signal, feedback-aware, governance-ready layers that fill those gaps.
+
+Five products, one stack:
+
+| # | Product | Layer | One-line summary | Stage |
+|---|---|---|---|---|
+| 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — zero SLO regressions across 19 adversarial scenarios | Shadow + recommend mode production-ready |
+| 2 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | Software production-ready; FPGA path started |
+| 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | v1.9.0, 1,550+ tests, 2 internal pilots |
+| 4 | **Conscious Generation LLM** | Token selection | Multi-field token evaluation on frozen Mistral-7B — ~5M trainable params, interpretable 32D state | Phase adapter live at inference; full field integration Q1–Q2 |
+| 5 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | Training stack built; external benchmarks Q1 |
+
+The products compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **CG LLM** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **CTM+/PCAM** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Each product is independently valuable; together they form a full-stack AI infrastructure company.
 
 ---
 
@@ -11,6 +32,7 @@
 3. [Agentic Framework — Governed Runtime for Autonomous AI Agents](#3-agentic-framework--governed-runtime-for-autonomous-ai-agents)
 4. [Conscious Generation LLM](#4-conscious-generation-llm)
 5. [Hybrid LLM — Algorithmic Fusion of Attention Mechanisms](#5-hybrid-llm--algorithmic-fusion-of-attention-mechanisms)
+6. [Company Summary — Composition, Evidence & Ask](#company-summary)
 
 ---
 
@@ -18,8 +40,7 @@
 # 1. Neural Cloud Scaling Controller
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**A four-page introduction for investors**
-**Where we are:** Stage 4 complete — shadow mode and recommend mode are production-ready today.
+**Stage 4 complete** — shadow mode and recommend mode are production-ready today.
 
 ## 1.1 The Problem
 
@@ -242,8 +263,7 @@ We're raising to fund Stage 5 (active mode), land our first design-partner deplo
 # 2. CTM+ / PCAM — Intelligent KV-Cache Eviction
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Cognade Labs | Intelligent KV-Cache Eviction for LLM Inference**
-*Prepared April 2026*
+**Intelligent KV-Cache Eviction for LLM Inference**
 
 ## 2.1 The Problem
 
@@ -266,9 +286,7 @@ away to make room.
 In many serving stacks, the effective eviction policy remains
 **LRU-like** — dominated by recency and largely blind to
 transformer-specific block value. LRU knows one thing: *when was
-this block last touched?*
-
-LRU does not know:
+this block last touched?* It does not know:
 
 | What LRU misses | Why it matters |
 |---|---|
@@ -536,8 +554,7 @@ changed" into "quality improved."
 # 3. Agentic Framework — Governed Runtime for Autonomous AI Agents
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Cognade Labs | Governed Runtime for Autonomous AI Agents**
-*Version 1.9.0 — Prepared April 2026*
+**Governed Runtime for Autonomous AI Agents** — v1.9.0
 
 ## 3.1 The Problem
 
@@ -654,7 +671,7 @@ other protects the specific action.
 ### Signal-enriched governance (our differentiation)
 
 When the agent is backed by a **CG-capable adapter** (our
-`MistralCGAdapter`, or the Phase Quad LLM from our broader stack),
+`MistralCGAdapter` from Section 4, or the Phase Quad LLM from our broader stack),
 governance decisions can be enriched with *model-internal runtime
 signals* — entropy and vritti (coherence-fluctuation) values derived
 from the model's internal state after inference. These are
@@ -831,8 +848,7 @@ Framework a defensible position in it.
 # 4. Conscious Generation LLM
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Cognade Labs | `mistral_cg` — Multi-Field Token Evaluation on a Frozen Mistral-7B Backbone**
-*Prepared April 2026*
+**`mistral_cg` — Multi-Field Token Evaluation on a Frozen Mistral-7B Backbone**
 
 ## 4.1 The Problem
 
@@ -964,8 +980,8 @@ testable on a frozen backbone without retraining Mistral from scratch.
 
 ### Integration with the Agentic Framework
 
-`mistral_cg` ships behind the same `BaseLLMAdapter` interface the rest
-of the Agentic Framework uses, exposed as `MistralCGAdapter`. That means
+`mistral_cg` ships behind the same `BaseLLMAdapter` interface the
+Agentic Framework (Section 3) uses, exposed as `MistralCGAdapter`. That means
 a governed agent built with `build_agent(...)` can swap in a CG backend
 with no wiring changes, and the **governance layer gains access to
 model-internal runtime signals** (entropy and vritti values read from
@@ -1120,8 +1136,7 @@ is concentrated in well-identified places we can show progress against.
 # 5. Hybrid LLM — Algorithmic Fusion of Attention Mechanisms
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Cognade Labs | `HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
-*Prepared April 2026*
+**`HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
 
 ## 5.1 The Problem
 
@@ -1256,7 +1271,7 @@ technical report on the phase-attention mechanism documents a small
 (~240K-param) pure-phase model reaching 100% needle-in-haystack
 retrieval accuracy at both 2K and 10K token recall distances on a
 controlled retrieval task (full retrieval benchmarks on larger models
-are on the roadmap — see Page 3).
+are on the roadmap — see Section 5.3).
 
 ### The algorithmic fusion — Protected Phase
 
@@ -1341,7 +1356,7 @@ sum**, or **sidesteps long context by retrieving around it**.
 `HybridPhaseTransformer` is a bet that the next step is **algorithmic
 fusion** — linear, local, and quadratic attention composed serially
 over a shared phase-memory substrate — so that the tradeoff in the
-Page 1 table becomes a design axis rather than a forced choice.
+Section 5.1 table becomes a design axis rather than a forced choice.
 
 ### The broader stake (honest framing)
 
@@ -1438,6 +1453,57 @@ benchmarking.
 
 *Modules: `symbolu/phase_transformer.py`, `train_hybrid_7b.py`, `symbolu_training/training/unified/mistral_hybrid_wrapper.py`, `symbolu/inference/`*
 *Architecture ref: `docs/HYBRID_PHASE_QUAD_ARCHITECTURE.md` · Training CLI: `docs/TRAIN_HYBRID_7B.md` · Inference status: `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` · Mechanism report: `docs/PHASE_ATTENTION_PAPER.md`*
+
+---
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+# Company Summary
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+## How the Five Products Compose
+
+Cognade Labs is not five unrelated projects — it is a vertically integrated AI infrastructure stack where each layer feeds the others:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  5. Hybrid LLM              Long-context attention substrate            │
+│     └──► 4. CG LLM          Multi-field token evaluation + 32D state   │
+│           └──► 3. Agentic    Governed runtime reading model internals   │
+│  2. CTM+/PCAM               KV-cache eviction for inference serving    │
+│  1. Cloud Scaling Controller Decision-quality layer for infrastructure  │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+- The **Hybrid LLM** provides efficient long-context attention; **CG LLM** adds interpretable multi-field generation on top of it.
+- The **Agentic Framework** consumes CG's 32D state for signal-enriched governance — a capability no wrapper around a closed API can replicate.
+- **CTM+/PCAM** ensures the KV-cache that serves both models evicts intelligently, not blindly.
+- The **Cloud Scaling Controller** ensures the underlying compute scales only when scaling actually helps.
+
+Each product is independently deployable and independently valuable. Together they form a defensible, vertically integrated position across the AI infrastructure stack.
+
+## Aggregate Evidence
+
+| Metric | Value |
+|---|---|
+| Total tests across all products | **3,200+** (228 scaling + 276 CTM+/PCAM + 1,550 agentic + CG smoke + hybrid training) |
+| Adversarial safety scenarios (scaling) | 19 scenarios, **0 catastrophic / severe failures, 0 SLO regressions** |
+| FSCS signal validation (CTM+) | **100% eviction rounds changed** with enhanced signals on real Mistral-7B trace |
+| Agentic governance invariant | `cancel → budget → approve → execute` — **pinned by test suite** |
+| CG trainable parameters | **~5M** on frozen Mistral-7B (4-bit: ~14GB VRAM) |
+| Phase-attention retrieval | **100% needle-in-haystack at 10K tokens** (240K-param pilot) |
+| LLM inference improvement (CTM+) | **+50% concurrent requests, −29% p99 latency** vs. LRU |
+
+## The Unified Ask
+
+We are raising seed capital to take five validated, tested infrastructure products from internal proof-of-concept to external design-partner deployments and first revenue. Specifically:
+
+- **Cloud Scaling Controller** — Stage 5 (active mode) and first paid deployments
+- **CTM+/PCAM** — FPGA prototype and serving-tier benchmark closure
+- **Agentic Framework** — Managed runtime, low-code console, and SOC 2 readiness
+- **Conscious Generation LLM** — Close the training-to-inference gap and publish ablations
+- **Hybrid LLM** — External benchmarks (LRA, retrieval) and 7B training run
+
+The technology is built and internally validated. The capital is for benchmarks, partners, and the managed infrastructure that converts research results into enterprise revenue.
 
 ---
 
