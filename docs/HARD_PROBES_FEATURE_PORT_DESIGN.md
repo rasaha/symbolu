@@ -4895,5 +4895,195 @@ limits, non-goals.
 
 **End of §4 (P1-2: Phase Write-Gate + Multi-Channel Phase Memory).**
 
-§5 (P2-1: `LayerInfluenceDiagnostics` for both `mistral_cg` and
-`mistral_hybrid`) follows next.
+---
+
+## §5 Closing Notes — P2 Rescoping and Final Priority Table
+
+### 5.1 P2-1 Rescoped: `LayerInfluenceDiagnostics` — Dropped
+
+The original recommendation to port `LayerInfluenceDiagnostics` from
+`train_hard_probes.py:1898` to both `mistral_cg` and `mistral_hybrid`
+is **withdrawn** after closer investigation.
+
+**Reason:** `LayerInfluenceDiagnostics` computes pseudo-phase metrics
+from hidden-state heuristics (`hidden_states[..., :num_heads * 4]`
+treated as a phase signal) and classifies layers as
+CONSTRUCTIVE / NEUTRAL / DESTRUCTIVE. This was designed for the
+hard-probes SRK architecture's named intervention points (DNA Bridge,
+CSR Alignment, Witness Arbitrator, Synthesis Gate) — not for
+standard transformer layers.
+
+For `mistral_hybrid`, the native `_diag_phase_*` diagnostics at
+`symbolu/phase_transformer.py:2082–2086` already measure the **real**
+phase signal — complex phasors, per-channel state norms, write gate
+activations, warmstart alpha. These are strictly more accurate than
+LID's hidden-state proxy. Porting LID would add a second, weaker
+diagnostic that operators would have to learn to distrust.
+
+For `mistral_cg`, the architecture has no stack of phase-learning
+layers for LID to operate on. The frozen Mistral backbone does
+standard attention; the CG modules are single intervention points,
+not a stack. LID's per-layer analysis is conceptually mismatched.
+
+**Where the real diagnostic work lives:** §4.6 R6 already identifies
+the critical gap — the native `_diag_phase_*` capture flags exist
+but are **not wired to the training metric backend**. The §4.8.2
+Phase 1 rollout plan explicitly includes wiring these metrics to the
+log as part of the `train.py` patch for P1-2. That work addresses
+the real observability gap and is strictly more valuable than porting
+LID.
+
+**What could be salvaged (optional follow-up, not tracked):** LID's
+visual report format (the `get_influence_bar()` ASCII bar rendering
+and the CONSTRUCTIVE/NEUTRAL/DESTRUCTIVE classification framework)
+is a useful UX pattern. A future follow-up could build a small
+~50-line wrapper in `symbolu_training/training/unified/diagnostics.py`
+that reads the native `_diag_phase_*` metrics and pretty-prints them
+with a bar-chart summary at every logging interval. This is cosmetic,
+not functional, and does not block any priority.
+
+### 5.2 P2-2 Rescoped: Kosha Gyroscopic Loss for CG — 5-Line Fix
+
+The original recommendation to port the Kosha Gyroscopic Loss from
+`train_hard_probes.py` to the CG path is **rescoped** from a full
+design section to a 5-line validation task.
+
+**Reason:** `KoshaGyroscopicLoss` is **already fully implemented and
+integrated** in the unified training pipeline:
+
+- Class: `symbolu_training/losses/kosha_gyroscope.py:307`
+- Import: `train.py:291`
+- Construction: `train.py:2098–2134` (~40 lines of config threading
+  with Harmonic Pentad, Three-Stage Hybrid Logic, Dynamic Weight
+  Scheduler, PID authority control, Reflexive Domain Morph)
+- Loss computation: `train.py:4327–4372`
+- Checkpointing: `train.py:7981`, `checkpointing.py:38, 111, 464`
+- Curriculum integration: `train.py:2187–2188`
+- CLI flag: `train.py:9364` — `--enable_kosha_gyroscope`
+- Config: `config.py:329` + ~20 gyroscope-specific config params
+
+There is nothing to port from hard_probes. The hard_probes version
+at `train_hard_probes.py:1087` is an older, simpler variant. The
+unified pipeline's version is more mature.
+
+**The only code gap:** at `train.py:4339`, the Kosha state extraction
+is hardcoded to `ontological` and `ontological_hybrid` model types:
+
+```python
+if config.model_type in ("ontological", "ontological_hybrid"):
+    sovereign_state = outputs.get('state', None) ...
+    kosha_states_for_gyro = sovereign_state[:, KOSHA_SLICE].unsqueeze(1)
+```
+
+`mistral_cg` also produces `outputs['state']` with the same 32D
+Sovereign State (including `KOSHA_SLICE` at `[12:17]`), but the
+extraction code does not include it. The fix is:
+
+```python
+if config.model_type in ("ontological", "ontological_hybrid", "mistral_cg"):
+```
+
+**Validation task (not a design section):**
+
+1. Apply the 5-line `model_type` branch addition at `train.py:4339`.
+2. Run `./scripts/train_mistral_cg.sh --smoke-test
+   --enable_kosha_gyroscope` and confirm:
+   - No crash.
+   - `gyroscope_loss` metric appears in the log.
+   - The gyroscope's curriculum controller initializes without
+     conflicting with `cg_stage_manager`.
+3. Run a 200-step WikiText-2 test with both
+   `--enable_conscious_generation` and `--enable_kosha_gyroscope`
+   and confirm that `cg_ont_loss`, `cg_kosha_routing_loss`, and
+   `gyroscope_loss` all decrease without interference.
+4. If the smoke test passes, add `--enable_kosha_gyroscope` to
+   `scripts/train_mistral_cg.sh` alongside the existing CG flags.
+
+**Interaction risks to verify during the smoke test:**
+
+- **Double Kosha signal:** the CG path already trains the Kosha
+  slice via `lambda_kosha_routing` (shortlist routing loss). The
+  Kosha Gyroscope pushes on the same Kosha slice `[12:17]` via
+  homeostatic bounds. These are complementary
+  (`lambda_kosha_routing` = ranking signal, gyroscope = regulatory
+  bounds) but the composition must be verified empirically. If the
+  gyroscope clamps Kosha values to a narrow band while
+  `lambda_kosha_routing` pushes them outside that band, the two
+  losses will fight and training will oscillate. The smoke test's
+  200-step run is the minimum needed to detect this.
+- **Curriculum conflict:** both `cg_stage_manager` and
+  `kosha_curriculum_controller` manage training schedules. If they
+  both override the same parameters at different phases, training
+  could oscillate or stall. Verify that `kosha_curriculum_controller`
+  operates on gyroscope-specific parameters and does not touch the
+  CG lambda weights.
+- **Sovereign State load:** P0-1's VICReg anti-collapse and §3A's
+  LSTB prediction both pull on the Sovereign State. Adding a third
+  signal (Kosha Gyroscope's homeostatic bounds on the `[12:17]`
+  slice) adds a third constraint. The smoke test should confirm
+  that `cg_anticollapse_var` remains healthy when the gyroscope
+  is active.
+
+**Ship criteria:** smoke test passes (no crash, metrics present, no
+oscillation) + 200-step measurement shows no regression on existing
+CG auxiliaries. If the smoke test reveals a curriculum conflict or
+a double-Kosha-signal oscillation, file a finding note and leave
+`--enable_kosha_gyroscope` off by default for CG until the conflict
+is resolved.
+
+### 5.3 Revised Priority Table
+
+The final priority table after rescoping P2-1 and P2-2:
+
+| Priority | Target | Feature | Section | Status |
+|----------|--------|---------|---------|--------|
+| **P0-1** | `mistral_cg` | VICReg anti-collapse on Sovereign State projector | §1 | Full design |
+| **P0-2** | `mistral_hybrid` | Phase warmstart curve | §2 | Full design |
+| **P1-1a** | `mistral_cg` | LSTB latent bridge (temporal prediction target) | §3A | Full design |
+| **P1-1b** | `mistral_cg` | CSR phonemic grounding (P3, deferred) | §3B | Half-depth design |
+| **P1-2** | `mistral_hybrid` | Phase write-gate + multi-channel memory | §4 | Full design |
+| ~~P2-1~~ | ~~Both~~ | ~~`LayerInfluenceDiagnostics`~~ | §5.1 | **Dropped** — redundant with native `_diag_phase_*` diagnostics; real work is §4.6 R6 metric wiring |
+| ~~P2-2~~ | ~~`mistral_cg`~~ | ~~Kosha gyroscopic loss~~ | §5.2 | **Rescoped** — already fully integrated, needs only a 5-line `model_type` branch + smoke test validation |
+
+### 5.4 Summary of Deliverables
+
+This design document specifies **four full-design features** and
+**one half-depth design option**, totaling five features that
+require code changes:
+
+| Feature | Patch size | New trainable params | Key mechanism |
+|---------|-----------|---------------------|---------------|
+| P0-1 VICReg anti-collapse | ~80 lines | 0 | Unary VICReg on pooled 32D state |
+| P0-2 Phase warmstart | ~60 lines | 0 | Sigmoid alpha curve on phase branch |
+| P1-1a LSTB latent bridge | ~76 lines | ~100K | `PhaseJEPAPredictor` + JEPA loss on per-token state trajectory |
+| P1-1b CSR phonemic grounding | ~170 lines | 0 | Precomputed `[V, 10]` ARPABET table + masked MSE on `T` column 3 |
+| P1-2 Phase write-gate + channels | ~32 lines | ~10K–50K | `write_gate_proj` + `channel_decay_logit` + `channel_agg` per hybrid block |
+
+Plus one **validation task** (P2-2 Kosha Gyroscope 5-line branch,
+no design section) and one **dropped feature** (P2-1 LID, replaced
+by §4.6 R6 metric wiring).
+
+**Recommended implementation order:**
+
+1. **P0-1 + P0-2** (parallel — independent features on independent
+   targets). P0-1 addresses silent collapse in CG; P0-2 addresses
+   early-step instability in hybrid. Both are ~60–80 line patches
+   with no trainable modules.
+2. **P2-2 validation** (immediately after P0-1 — the 5-line
+   `model_type` branch can be added in the same commit as P0-1,
+   since both touch the CG loss block in `train.py`).
+3. **P1-2** (after P0-2 — depends on the hybrid wrapper having the
+   phase warmstart wiring in place first, since §4 and §2 compose).
+4. **P1-1a** (after P0-1 — depends on the Sovereign State projector
+   having anti-collapse regularization, since LSTB builds on it).
+5. **P1-1b** (only after P1-1a measurements are complete — P3
+   priority, gated on P1-1a results per §3.0).
+
+Each feature ships on its own branch, with its own success criteria,
+and rolls back independently. No feature depends on another feature
+being enabled at the same time — they are complementary, not
+compositionally required.
+
+---
+
+**End of document.**
