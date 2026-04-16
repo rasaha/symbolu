@@ -5347,4 +5347,93 @@ The results determine everything else.
 
 ---
 
-**End of document.**
+---
+
+## §6 The Real Fix — Gradient Routing Imbalance in the Sovereign State Projector
+
+### 6.1 Finding: The Problem Is Gradient Imbalance, Not Collapse
+
+A targeted investigation of gradient flow through the `mistral_cg`
+training path revealed that the 32D Sovereign State projector
+(`SovereignStateProjector` at
+`symbolu_training/jepa/state_projector.py:43`) does not have a
+collapse problem. It has a **gradient routing imbalance problem**
+where the Bhava plane receives ~100× stronger training signal than
+the governance planes.
+
+Two gradient paths reach the projector:
+
+**Path A — Stage 8 → LM Cross-Entropy (STRONG):**
+
+```text
+state_projector → state [B, 32]
+  → state[:, BHAVA_SLICE] → bhava_seq [B, T, 12]
+  → bhava_matrix [B, 12, 12]  (outer product)
+  → PerspectiveSynthesizer (mistral_wrapper.py:428–443)
+  → conditioned adapted_hidden [B, T, D]
+  → logits via frozen lm_head
+  → LM cross-entropy loss (~4 nats)
+  → full-strength gradient back through state_projector
+```
+
+No `.detach()` on the state during the forward pass — verified by
+exhaustive search of `mistral_wrapper.py` and the CG loss block in
+`train.py:4931–5250`. The Bhava slice `[0:12]` receives **direct,
+full-strength gradient** from the primary LM objective every step.
+
+**Path B — CG Auxiliary Losses (WEAK):**
+
+```text
+state → Kosha [12:17] → KoshaDomainRouter → lambda_kosha (0.01)
+state → Guna  [22:28] → BlissTokenGate    → lambda_bliss (0.01)
+state → concat(hidden, state) → Primitive Scorers:
+    → JEPA scorer   → lambda_plausibility (0.005)
+    → CSR scorer    → lambda_csr          (0.005)
+    → Vritti scorer → lambda_vritti       (0.005)
+    → Guna scorer   → lambda_guna         (0.005)
+```
+
+Total effective weight from all CG auxiliary losses: **~0.046**.
+Against an LM loss of ~4 nats, the governance planes receive
+approximately **1.15%** of the effective gradient signal.
+
+**The resulting asymmetry:**
+
+| Plane | Dims | Gradient source | Effective magnitude |
+|-------|------|----------------|---------------------|
+| Bhava (identity) | [0:12] | Path A: full LM loss via Stage 8 | **~4.0** |
+| Kosha (governance) | [12:17] | Path B: `lambda_kosha` | 0.01 |
+| Vritti (cognitive) | [17:22] | Path B: `lambda_vritti` | 0.005 |
+| Guna (energetic) | [22:28] | Path B: `lambda_guna` + `lambda_bliss` | 0.015 |
+| Reserved (learning) | [28:32] | Path B: indirect | ~0.005 |
+
+The Bhava slice is well-trained because Stage 8 feeds it into the
+LM loss path. The governance planes are **starved** — they receive
+real gradient, but at ~1% the magnitude of the Bhava gradient. The
+projector learns a good 12D Bhava representation and a barely-
+trained 20D governance representation.
+
+**Why VICReg is the wrong fix:** VICReg says "make all 32 dimensions
+have non-trivial variance." But variance is not the problem — the
+Bhava slice has plenty of variance because it gets strong gradient.
+The governance planes may have low variance, but that is a
+**symptom** of weak training signal, not structural collapse.
+Enforcing variance on under-trained planes produces high-variance
+noise, not meaningful representations. The right fix addresses the
+root cause (gradient magnitude imbalance), not the symptom
+(low variance).
+
+**Why this finding supersedes §1 (P0-1).** The entire §1 design
+(VICReg anti-collapse) was predicated on the assumption that the
+projector's 32D bottleneck is vulnerable to representational
+collapse. The investigation shows the bottleneck is **not
+collapsing** — it is being trained lopsidedly. The per-plane
+normalization (softmax on Bhava, sigmoid on Kosha, etc.) prevents
+zero-collapse structurally, and Stage 8 provides strong gradient
+that keeps the Bhava slice active. The problem is that the 20D
+governance portion of the state receives ~1% the gradient of the
+12D identity portion. §1's VICReg proposal does not address this.
+
+---
+
+*6.2 (Fix 1: Boost CG Lambda Weights) follows next.*
