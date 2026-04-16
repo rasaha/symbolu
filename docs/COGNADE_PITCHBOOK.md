@@ -1,27 +1,27 @@
-# Cognade Labs — Investor Pitchbook
+# Cognade Labs — Platform Overview
 
-**Five Product Briefs | Prepared April 2026**
+**AI Infrastructure Platform | Five Modules | Prepared April 2026**
 *Contact: Rakesh Mohan — Cognade Labs*
 
 ---
 
 ## Executive Summary
 
-Cognade Labs builds **infrastructure-layer intelligence for AI systems and cloud operations** — the decision-quality, memory-policy, governance, and generation layers that sit between raw compute and reliable production behavior.
+Cognade Labs is building an **AI infrastructure platform** — the decision-quality, memory-policy, governance, and generation layers that sit between raw compute and reliable production behavior.
 
 Our thesis is that the next wave of value in AI infrastructure comes not from bigger models or faster hardware, but from **smarter decisions at the seams** — where an autoscaler decides whether to scale, where an inference engine decides which cache block to evict, where an agent decides whether to execute a tool call, and where a language model decides which token to emit next. Each of those seams is currently handled by a shallow heuristic, a single-signal policy, or no policy at all. We build the multi-signal, feedback-aware, governance-ready layers that fill those gaps.
 
-Five products, one stack:
+**One platform, five modules** — each independently deployable, with near-term commercialization focused on the most production-ready wedges (Cloud Scaling Controller, CTM+/PCAM, and Agentic Framework) while the research-stage modules (CG LLM, Hybrid LLM) mature toward benchmark validation and product coupling:
 
-| # | Product | Layer | One-line summary | Stage |
+| # | Module | Layer | One-line summary | Readiness |
 |---|---|---|---|---|
-| 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — zero SLO regressions across 19 adversarial scenarios | Shadow + recommend mode production-ready |
-| 2 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | Software production-ready; FPGA path started |
-| 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | v1.9.0, 1,550+ tests, 2 internal pilots |
-| 4 | **Conscious Generation LLM** | Token selection | Multi-field token evaluation on frozen Mistral-7B — ~5M trainable params, interpretable 32D state | Phase adapter live at inference; full field integration Q1–Q2 |
-| 5 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | Training stack built; external benchmarks Q1 |
+| 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — zero SLO regressions across 19 adversarial scenarios | **Production-ready** — shadow + recommend mode |
+| 2 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
+| 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.9.0, 1,550+ tests, 2 internal pilots |
+| 4 | **Conscious Generation LLM** | Token selection | Multi-field token evaluation on frozen Mistral-7B — ~5M trainable params, interpretable 32D state | **Research-stage** — phase adapter live; full field integration Q1–Q2 |
+| 5 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | **Research-stage** — training stack built; external benchmarks Q1 |
 
-The products compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **CG LLM** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **CTM+/PCAM** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Each product is independently valuable; together they form a full-stack AI infrastructure company.
+The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **CG LLM** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **CTM+/PCAM** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Commercialization is phased, not simultaneous — the production-ready modules enter the market first and fund the maturation of the research-stage modules behind them.
 
 ---
 
@@ -32,7 +32,7 @@ The products compose vertically: the **Hybrid LLM** provides the long-context at
 3. [Agentic Framework — Governed Runtime for Autonomous AI Agents](#3-agentic-framework--governed-runtime-for-autonomous-ai-agents)
 4. [Conscious Generation LLM](#4-conscious-generation-llm)
 5. [Hybrid LLM — Algorithmic Fusion of Attention Mechanisms](#5-hybrid-llm--algorithmic-fusion-of-attention-mechanisms)
-6. [Company Summary — Composition, Evidence & Ask](#company-summary)
+6. [Company Summary & Accelerator Fit](#company-summary)
 
 ---
 
@@ -164,7 +164,7 @@ Think of cloud autoscaling as an 8-layer stack — from raw metric sensing at th
 
 Cloud autoscaling tooling has gotten genuinely good over the last five years. Node provisioning is solved. Cost optimization is solved. Prediction is solved. Observability is overflowing. What *isn't* solved — and what almost nobody is even looking at — is whether any of those decisions actually worked after the fact. That's the question we ask, and it's the reason we don't fit neatly into any of the buckets a platform team will already recognize.
 
-The table below places us against the tools we get compared to in investor conversations and SRE channels. For each one, we say *what they do well*, *how we differ*, and *why that difference is actually an advantage* rather than a positioning game.
+The table below places us against the tools we get compared to in technical evaluations and SRE channels. For each one, we say *what they do well*, *how we differ*, and *why that difference is actually an advantage* rather than a positioning game.
 
 | Category | Representative players | What they ship | How we differ — and why we're better |
 |---|---|---|---|
@@ -193,7 +193,7 @@ Every other tool in this market either **scales you faster** (HPA, Karpenter, KE
 
 We didn't benchmark this on a friendly load test. We built 19 deliberately nasty scenarios covering signal corruption, actuation delays, system shocks, budget constraints, and controller pathologies — the kinds of things that quietly break autoscalers in production.
 
-#### Safety first (because it's the first thing investors ask)
+#### Safety first (because it's the first thing evaluators ask)
 
 | Metric | Result |
 |---|---|
@@ -249,11 +249,11 @@ This isn't a research prototype. It's been staged, tested, and written to be dep
 | **Layer 3** | Prediction module — proactive scaling driven by the replay buffer and historical data | Puts us head-to-head with ScaleOps on seasonal and bursty workloads |
 | **Layer 2** | Cost optimization integration — pull Cast AI / Kubecost constraints directly into the decision equation | A single decision surface that balances FinOps and reliability together |
 
-### Why we're raising, and what we're asking for
+### What's next to validate commercially
 
 We are the **decision-quality layer** for cloud autoscaling — the missing piece between "what's happening" and "what should we do about it." The product is validated, production-grade, and genuinely easy to try today: shadow mode has zero write permissions and auto-generates proof-of-value reports, which means any platform team can turn it on, watch for two weeks, and see exactly what it would have saved them without taking on any risk.
 
-We're raising to fund Stage 5 (active mode), land our first design-partner deployments, and build out the learning loop that turns every customer into a self-improving control surface. If that sounds like the kind of problem you want to help solve, we'd love to keep talking.
+The near-term path is Stage 5 (active mode), first design-partner deployments, and the learning loop that turns every customer into a self-improving control surface. This module is one of Cognade's most commercially ready wedges.
 
 > *"Scale because it works, not because the metrics say so."*
 
@@ -533,15 +533,15 @@ pass with zero regressions.
 | **Design-partner pilot** | Real inference workload with real quality/latency metrics | Quarters |
 | **ASIC controller** | CXL memory expander or GPU-side HBM controller | 12–18 months |
 
-### The ask
+### What's next to validate commercially
 
-We are raising seed to fund the FPGA prototype, land the first
-design-partner deployments, and calibrate the FSCS-derived scoring
-signals against real serving workloads. The software stack is built, tested, and integrated end-to-end for
-policy execution and trace-driven validation; the remaining step is
-serving-tier closure under live load. The capital is for hardware,
-partners, and the serving-tier benchmark that converts "decisions
-changed" into "quality improved."
+The software stack is built, tested, and integrated end-to-end for
+policy execution and trace-driven validation. The remaining steps are:
+serving-tier closure under live load, FSCS signal weight calibration
+against real serving workloads, and first design-partner deployments
+with production inference operators. The FPGA prototype is the
+medium-term hardware milestone that converts the scored-math
+specification into a silicon-credible artifact.
 
 > *"Seven signals. Every block in the right tier. Every eviction justified."*
 
@@ -822,20 +822,18 @@ benchmarks. An external benchmark is planned (see roadmap).
 - Enterprise audit-log persistence (Postgres + S3-backed)
 - Target a production reference customer on the managed runtime
 
-### The ask
+### What's next to validate commercially
 
-We are raising seed to evolve Agentic Framework from a tested
-code-first library into a managed governed-runtime product. The
-technology is live, internally tested, and validated in two pilots and
-on live commercial LLM APIs today. The capital is earmarked for:
-external design-partner pilots, the managed runtime and low-code
-console, multi-agent and retrieval support, and the compliance and
+The technology is live, internally tested, and validated in two pilots
+and on live commercial LLM APIs today. The near-term path is:
+external design-partner pilots (target: BFSI and healthcare), the
+managed runtime and low-code console, and the compliance and
 audit-persistence work required for regulated enterprise deployment.
 
 Governance is increasingly becoming a procurement requirement for
 autonomous agents, not just a nice-to-have. We think the next 12–18 months are the right
-window to establish a credible default for that layer, and we believe
-the combination of a tested runtime contract, a clean developer
+window to establish a credible default for that layer, and the
+combination of a tested runtime contract, a clean developer
 surface, and a path to model-internal signal enrichment gives Agentic
 Framework a defensible position in it.
 
@@ -998,7 +996,7 @@ OpenAI on pre-training, nor a wrapper layer that sits outside a
 black-box API. It is a **trainable internal modification to an
 open-weights model** with an explicit thesis about how token selection
 should be computed. The table below places our product against the
-families it is most commonly compared to in investor conversations,
+families it is most commonly compared to in technical evaluations,
 stating for each family *how* we differ and *why* that difference is
 an advantage.
 
@@ -1115,17 +1113,19 @@ in diligence.
 - Validate the same frozen-backbone + trainable-CG recipe on a larger open-weights model (e.g. Mistral Small 3 / Llama 3.1 class) to test that the architecture is backbone-agnostic.
 - Begin work on a paper submission documenting the multi-field token-evaluation architecture and ablations.
 
-### The ask
+### What's next to validate
 
-We are raising seed capital to take `mistral_cg` from a research
+The near-term goal is to take `mistral_cg` from a research
 architecture with a live phase-adapter inference path and a broad
 training-time signal stack, to a model where the **full multi-field
 token evaluation thesis is wired into generation**, measurable against
 hallucination and coherence benchmarks, and exposed to enterprise
-customers through our governed Agentic Framework. The technology is
+customers through the governed Agentic Framework. The technology is
 built on an open-weights backbone, the trainable surface is small
 (~5M parameters), the cost structure is modest, and the research risk
 is concentrated in well-identified places we can show progress against.
+This module is a longer-horizon platform asset that strengthens the
+Agentic Framework's differentiation once benchmark validation is complete.
 
 *Modules: `symbolu_training/training/unified/mistral_wrapper.py`, `symbolu_training/training/conscious_generation/`, `agentic/agentic_framework/inference_mistral.py`*
 *Design: `docs/design/CONSCIOUS_GENERATION_DESIGN.md`, `docs/design/LEVEL_DISCIPLINE_SCORER_DESIGN.md` · Audit: `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md`*
@@ -1438,10 +1438,10 @@ the interesting benchmarks on this architecture are still ahead of us:
 - Expose the Hybrid LLM as a first-class backend adapter for the Agentic Framework, so governed agents get long-context hybrid inference without rewiring.
 - Begin work on a paper submission documenting the Protected-Phase serial-fusion architecture and the LRA / retrieval ablations.
 
-### The ask
+### What's next to validate
 
-We are raising seed capital to take `HybridPhaseTransformer` from a
-working training stack with a validated phase-memory mechanism to a
+The near-term goal is to take `HybridPhaseTransformer` from a working
+training stack with a validated phase-memory mechanism to a
 **benchmarked, published, and productized** long-context LLM
 architecture. The research risk is concentrated in well-identified
 places — LRA and retrieval sweeps at scale, the 7B training run, and
@@ -1449,7 +1449,9 @@ ablations that isolate each of the three fused attention mechanisms —
 and the implementation risk is reduced because the training recipe,
 inference path, and adaptive controllers are already built; the
 remaining uncertainty is concentrated in scale training and external
-benchmarking.
+benchmarking. This module is a longer-horizon platform asset —
+cloud/GPU credits and benchmarking infrastructure are the primary
+accelerators for this work.
 
 *Modules: `symbolu/phase_transformer.py`, `train_hybrid_7b.py`, `symbolu_training/training/unified/mistral_hybrid_wrapper.py`, `symbolu/inference/`*
 *Architecture ref: `docs/HYBRID_PHASE_QUAD_ARCHITECTURE.md` · Training CLI: `docs/TRAIN_HYBRID_7B.md` · Inference status: `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` · Mechanism report: `docs/PHASE_ATTENTION_PAPER.md`*
@@ -1457,12 +1459,12 @@ benchmarking.
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-# Company Summary
+# Company Summary & Accelerator Fit
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-## How the Five Products Compose
+## How the Platform Composes
 
-Cognade Labs is not five unrelated projects — it is a vertically integrated AI infrastructure stack where each layer feeds the others:
+Cognade Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -1479,13 +1481,13 @@ Cognade Labs is not five unrelated projects — it is a vertically integrated AI
 - **CTM+/PCAM** ensures the KV-cache that serves both models evicts intelligently, not blindly.
 - The **Cloud Scaling Controller** ensures the underlying compute scales only when scaling actually helps.
 
-Each product is independently deployable and independently valuable. Together they form a defensible, vertically integrated position across the AI infrastructure stack.
+Each module is independently deployable and independently valuable. Commercialization is phased: the **production-ready modules** (Cloud Scaling Controller, CTM+/PCAM, Agentic Framework) enter the market first as the commercial wedge, while the **research-stage modules** (CG LLM, Hybrid LLM) mature toward benchmark validation and product coupling behind them.
 
 ## Aggregate Evidence
 
 | Metric | Value |
 |---|---|
-| Total tests across all products | **3,200+** (228 scaling + 276 CTM+/PCAM + 1,550 agentic + CG smoke + hybrid training) |
+| Total tests across all modules | **3,200+** (228 scaling + 276 CTM+/PCAM + 1,550 agentic + CG smoke + hybrid training) |
 | Adversarial safety scenarios (scaling) | 19 scenarios, **0 catastrophic / severe failures, 0 SLO regressions** |
 | FSCS signal validation (CTM+) | **100% eviction rounds changed** with enhanced signals on real Mistral-7B trace |
 | Agentic governance invariant | `cancel → budget → approve → execute` — **pinned by test suite** |
@@ -1493,17 +1495,50 @@ Each product is independently deployable and independently valuable. Together th
 | Phase-attention retrieval | **100% needle-in-haystack at 10K tokens** (240K-param pilot) |
 | LLM inference improvement (CTM+) | **+50% concurrent requests, −29% p99 latency** vs. LRU |
 
-## The Unified Ask
+## Module Readiness Summary
 
-We are raising seed capital to take five validated, tested infrastructure products from internal proof-of-concept to external design-partner deployments and first revenue. Specifically:
+| Module | Readiness | Near-term commercial path |
+|---|---|---|
+| **Cloud Scaling Controller** | Production-ready (shadow + recommend mode) | First design-partner deployments; Stage 5 active mode |
+| **CTM+/PCAM** | Production-ready (software); FPGA path started | Serving-tier benchmark closure; design-partner pilots with inference operators |
+| **Agentic Framework** | Pilot-ready (v1.9.0, 2 internal pilots) | External design-partner pilots (BFSI, healthcare); managed runtime |
+| **Conscious Generation LLM** | Research-stage (phase adapter live) | Benchmark validation; adapter maturation for Agentic Framework |
+| **Hybrid LLM** | Research-stage (training stack built) | External benchmarks (LRA, retrieval); 7B training run |
 
-- **Cloud Scaling Controller** — Stage 5 (active mode) and first paid deployments
-- **CTM+/PCAM** — FPGA prototype and serving-tier benchmark closure
-- **Agentic Framework** — Managed runtime, low-code console, and SOC 2 readiness
-- **Conscious Generation LLM** — Close the training-to-inference gap and publish ablations
-- **Hybrid LLM** — External benchmarks (LRA, retrieval) and 7B training run
+## Why Cognade for This Accelerator
 
-The technology is built and internally validated. The capital is for benchmarks, partners, and the managed infrastructure that converts research results into enterprise revenue.
+**The platform thesis is coherent and technically validated.** Five modules sounds ambitious until you see that they compose into a single vertical stack, share common architectural patterns (multi-signal scoring, phase-aware state, spec-and-runtime separation), and are built to reinforce each other's competitive moats. The platform is not five bets — it is one thesis (smarter decisions at the seams) applied to five layers of the AI infrastructure stack.
+
+**The technology is built, not pitched.** 3,200+ tests across the platform. 228+ unit tests on the scaling controller. 276 on the KV-cache policy. 1,550+ on the agentic runtime. Production-grade code with adversarial safety validation, not slideware. Every module has a working implementation, a test suite, and an honest assessment of what is validated versus what remains to be proven.
+
+**The timing is right.** FinOps, KV-cache pressure, agent governance, and long-context attention are all active pain points in production AI infrastructure *right now*. Each module addresses a gap that is growing, not shrinking, as models get larger, contexts get longer, and agents get more autonomous. The window to establish credible defaults in these layers is the next 12–18 months.
+
+**The commercial wedge is clear.** The Cloud Scaling Controller and CTM+/PCAM are the most deployable modules today — both offer zero-risk shadow-mode trials that auto-generate proof-of-value reports. The Agentic Framework is pilot-ready with a tested governance contract that regulated enterprises need. These three modules are the near-term revenue path; the research-stage modules strengthen the platform moat behind them.
+
+## What We Need From the Accelerator
+
+| Area | What it would unlock |
+|---|---|
+| **Enterprise design-partner access** | The three production-ready modules need real workloads to validate against. Introductions to platform teams running Kubernetes autoscaling, LLM inference at scale, or autonomous agent pilots would convert shadow-mode data into paid deployments. |
+| **GTM and wedge refinement** | Mentorship on which of the three commercial-ready modules to lead with, how to position a multi-module platform without sounding unfocused, and how to price shadow-mode-to-active-mode conversion. |
+| **Pilot validation support** | Structured feedback on how to run and measure design-partner pilots — what metrics matter, what contract structures work, how to convert a two-week proof-of-value into a procurement conversation. |
+| **Cloud and infrastructure credits** | GPU time for the Hybrid LLM's 7B training run and external benchmarks, and general compute for the CTM+/PCAM serving-tier benchmark. These are the two highest-leverage experiments that convert research-stage modules into benchmark-validated assets. |
+| **Technical and commercial mentorship** | Access to mentors with experience in infrastructure-layer B2B startups, FinOps, LLM serving, and enterprise AI governance — the domains where our modules compete. |
+| **Strategic introductions** | Connections to inference-serving operators, cloud-native platform teams, and regulated enterprise buyers (BFSI, healthcare) who are actively blocked on the problems our modules solve. |
+
+## What Success Looks Like in 6–12 Months
+
+**Why now:** Every layer of AI infrastructure that Cognade addresses — autoscaling decision quality, KV-cache eviction, agent governance, token-selection quality, long-context attention — is under active pressure from the shift to larger models, longer contexts, and more autonomous agents. These are not future problems; they are problems that production teams are spending engineering time on today with inadequate tooling.
+
+**Why this team:** A single founder with deep technical fluency across cloud infrastructure, LLM internals, and systems engineering — demonstrated by 3,200+ tests, adversarial safety validation, production-grade code across five modules, and the ability to bridge from a Python policy to SystemVerilog RTL. The breadth of the platform is a strength, not a risk, because the modules share a common architectural discipline and compose into a coherent stack.
+
+**Why this accelerator:** Cognade's primary bottleneck is not technology — it is access to the enterprise design partners, pilot validation infrastructure, and GTM mentorship that convert internally validated technology into externally validated commercial products. An accelerator with a strong enterprise network and infrastructure-company experience is the highest-leverage intervention at this stage.
+
+**Concrete 6–12 month goals:**
+
+- **Month 1–3:** Land 2–3 design-partner pilots on the Cloud Scaling Controller and/or CTM+/PCAM (shadow mode, zero-risk). Begin the Agentic Framework's first external pilot with a regulated enterprise buyer.
+- **Month 3–6:** Convert at least one shadow-mode pilot to active mode (first revenue). Publish the CTM+/PCAM serving-tier benchmark and the Hybrid LLM's LRA/retrieval results. Ship the Agentic Framework's managed runtime preview.
+- **Month 6–12:** Establish the first paid recurring customer on one of the three commercial-ready modules. Complete the Hybrid LLM's 7B training run. Begin the CG LLM's first external design-partner integration through the Agentic Framework. Publish at least one peer-reviewed paper on either the phase-attention mechanism or the multi-field token-evaluation architecture.
 
 ---
 
