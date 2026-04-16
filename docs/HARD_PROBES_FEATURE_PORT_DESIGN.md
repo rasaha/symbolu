@@ -5619,4 +5619,83 @@ regresses LM loss.**
 
 ---
 
-*6.4 (Fix 3: Direct State Supervision) follows next.*
+### 6.4 Fix 3 — Direct State Supervision (Research, Deferred)
+
+**Cost:** ~200 lines + training-data design. Research-grade effort.
+
+**Mechanism:** add a curriculum-based loss that teaches each plane
+of the 32D Sovereign State its intended role directly, rather than
+relying on the indirect routing/scoring losses in Path B to
+discover what each plane should represent.
+
+**Why Fixes 1 and 2 may not be enough:** Fixes 1 and 2 boost the
+magnitude of the **existing** auxiliary gradient signals. But those
+signals are contrastive scoring losses (InfoNCE, margin, routing
+agreement) — they teach the scorer to rank correctly using the
+state as input. They do NOT directly teach the state what it
+should represent. Even with 3× boosted lambdas, the gradient to
+the projector still arrives through the scorer's backprop path,
+which is long and may dilute the signal. Direct supervision
+bypasses the scorer entirely and provides a per-plane target.
+
+**Sketch per plane:**
+
+| Plane | Dims | Supervision target | Source |
+|-------|------|--------------------|--------|
+| Bhava (identity) | [0:12] | **Already supervised** via Stage 8 → LM loss. No additional supervision needed. | Path A |
+| Kosha (governance) | [12:17] | Task-domain classifier: `[scientific, narrative, code, dialogue, instructional]`. Kosha values should cluster by domain. | Heuristic labels derived from dataset metadata (e.g., FineWeb domain tags, or a lightweight classifier run offline) |
+| Vritti (cognitive) | [17:22] | Cognitive-mode classifier: `[factual, reasoning, creative, procedural, recall]`. Vritti values should cluster by the cognitive demand of the passage. | Heuristic labels derived from prompt structure (questions → reasoning, lists → procedural, etc.) |
+| Guna (energetic) | [22:28] | Energetic-profile regressor: `[sattva, rajas, tamas, velocity, acceleration, stability]`. Guna values should correlate with stylistic properties. | Sentiment/style heuristics (high information density → sattva, high perplexity → rajas, boilerplate → tamas) |
+| Reserved (learning) | [28:32] | No supervision target defined. These dimensions are architecturally reserved for future use. Leave unmodified. | — |
+
+**Loss form:** for classifier-type targets (Kosha, Vritti), use
+cross-entropy between `softmax(plane_output)` and the target
+label distribution. For regressor-type targets (Guna), use MSE
+between `sigmoid(plane_output)` and the target real values. Both
+forms respect the per-plane normalization already applied by
+`_apply_constraints()`.
+
+**Why this is deferred:**
+
+1. **Requires labeled training data.** The heuristic labels
+   described above do not currently exist in the training
+   pipeline. Generating them requires either (a) offline
+   pre-processing of the training corpus with a classifier, or
+   (b) online heuristic labeling during data loading. Both add
+   infrastructure that does not exist today.
+2. **The label quality problem.** Heuristic labels are noisy.
+   Training the Sovereign State against noisy labels may produce
+   worse representations than the indirect scoring losses, which
+   at least optimize for a real downstream objective (token
+   ranking). The tradeoff between direct-but-noisy and
+   indirect-but-clean is an empirical question that requires
+   careful measurement.
+3. **Fixes 1 and 2 should be tried first.** If boosting the
+   existing auxiliary gradient (Fix 1) or phasing it (Fix 2)
+   solves the governance-plane starvation problem, direct
+   supervision is unnecessary complexity. Fix 3 is only
+   justified if the indirect signals, even at boosted magnitude,
+   cannot teach the governance planes their intended roles.
+
+**When to revisit Fix 3:** after Fix 1 (and optionally Fix 2) has
+been validated, run the baseline measurement from §5.7:
+
+```python
+# Per-plane variance diagnostic
+state = outputs['state']  # [B, 32]
+bhava_var  = state[:, 0:12].var(dim=0).mean()
+kosha_var  = state[:, 12:17].var(dim=0).mean()
+vritti_var = state[:, 17:22].var(dim=0).mean()
+guna_var   = state[:, 22:28].var(dim=0).mean()
+```
+
+If `kosha_var`, `vritti_var`, and `guna_var` are all within 50%
+of `bhava_var` after Fix 1/2, the gradient imbalance is resolved
+and Fix 3 is unnecessary. If any governance plane's variance is
+still below 25% of `bhava_var`, Fix 3 becomes the next candidate
+— but only with a proper training-data design, not as a quick
+patch.
+
+---
+
+*6.5 (Pre-Flight Verification Diagnostic) follows next.*
