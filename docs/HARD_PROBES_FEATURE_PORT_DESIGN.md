@@ -5084,6 +5084,267 @@ and rolls back independently. No feature depends on another feature
 being enabled at the same time — they are complementary, not
 compositionally required.
 
+### 5.5 Critical Re-evaluation — Do These Features Actually Need to Exist?
+
+After the design document was completed, a second-pass critical
+evaluation was performed to verify whether the **claimed failure
+modes actually exist** in the current codebase, and whether the
+proposed features are genuinely needed or already addressed by
+existing mechanisms. This section amends the priority table
+accordingly.
+
+The evaluation is **deliberately harsh** — the question is not
+"would this feature be architecturally elegant?" but "does the
+existing codebase already prevent the failure mode this feature
+claims to fix?"
+
+#### P0-1 (VICReg anti-collapse on Sovereign State) — DEMOTE to optional
+
+**The design doc claims:** The 32D Sovereign State projector is
+vulnerable to representational collapse because it's a low-dimensional
+bottleneck with weak supervision. VICReg is needed to prevent the
+projector from mapping all inputs to a narrow cone.
+
+**What the code actually does:** `SovereignStateProjector` at
+`symbolu_training/jepa/state_projector.py:168` applies **per-plane
+normalization constraints** to every output:
+
+- **Bhava [0:12]:** `torch.softmax(bhava, dim=-1)` — forces one
+  value to dominate, prevents all-zero, guarantees the output
+  sums to 1.0.
+- **Koshas [12:17]:** `torch.sigmoid(kosha)` — each dimension
+  independently maps to `(0, 1)`.
+- **Vrittis [17:22]:** `torch.softmax(vritti, dim=-1)` — same as
+  Bhava.
+- **Gunas [22:28]:** `torch.sigmoid(guna)` — same as Koshas.
+- **Reserved [28:32]:** `torch.tanh(reserved)` — bounded to
+  `(-1, 1)`.
+
+These constraints **partially prevent collapse**: softmax and sigmoid
+prevent all-zero output and guarantee bounded, non-degenerate values.
+However, they do NOT prevent **constant-collapse** — a degenerate
+projector that ignores its input and produces the same softmax
+distribution for every sequence would pass through the constraints
+unchanged.
+
+**What already guards against constant-collapse:** The 6 CG auxiliary
+losses (`lambda_ont`, `lambda_kosha_routing`, `lambda_bliss_token`,
+`lambda_plausibility_token`, `lambda_csr_token`, `lambda_vritti_token`,
+`lambda_guna_token`) each produce gradients that depend on the input
+tokens. For the projector to produce a constant output, ALL 6 losses
+would need to produce gradients that push toward constant output,
+which requires all 6 scoring paths to be simultaneously degenerate.
+This is possible in theory but unlikely in practice.
+
+**Verdict: DEMOTE to optional.** The per-plane constraints provide
+structural protection against zero-collapse, and the diversity of CG
+losses provides indirect protection against constant-collapse. VICReg
+would add explicit variance enforcement — a belt-and-suspenders
+improvement, not a fix for an active failure mode. **Only implement
+if baseline measurements (§1.8 step 1) show state variance below a
+concerning threshold.** If baseline variance is healthy, skip this
+feature entirely.
+
+#### P0-2 (Phase warmstart curve for mistral_hybrid) — DEMOTE to optional
+
+**The design doc claims:** Phase attention contributes random output
+from step 0, corrupting the frozen backbone's signal and causing
+an early-step LM loss spike. A sigmoid warmstart curve dampens
+the phase contribution during early training.
+
+**What the code already does:** `MistralHybridWrapper` has **three
+layers of early-step protection** that the design doc acknowledges
+but undervalues:
+
+1. **`adapter_gate = nn.Parameter(torch.tensor([-2.0]))`** at
+   `mistral_hybrid_wrapper.py:161` — `sigmoid(-2) ≈ 0.12`, so only
+   12% of the adapter output reaches the residual stream.
+2. **`nn.init.zeros_(self.phase_output_proj[-1].weight)`** at `:150`
+   — the final linear layer of the output projection is
+   zero-initialized.
+3. **`nn.init.zeros_(self.phase_output_proj[-1].bias)`** at `:151`
+   — the final linear layer's bias is also zero.
+
+At step 0, the net contribution of the phase branch is:
+
+```text
+adapted_hidden = hidden + sigmoid(-2) × (0_weight × phase_output + 0_bias)
+               = hidden + 0.12 × 0
+               = hidden
+```
+
+The phase contribution is **literally zero at initialization**,
+regardless of how noisy the phase attention's internal activations
+are. The phase branch only starts contributing to the residual
+stream as the optimizer moves `phase_output_proj` away from zero
+— which happens gradually, governed by the learning rate, and is
+itself an **implicit gradient-driven warmstart**.
+
+The explicit sigmoid warmstart from §2 would add a **4th dampening
+factor** on top of the three that already exist. At early steps,
+it would multiply `0.12 × 0 × warmstart_alpha ≈ 0` — dampening
+something that is already zero.
+
+**Verdict: DEMOTE to optional.** The existing three-layer
+initialization (`adapter_gate` + zero-weight + zero-bias) already
+provides effective warmstart. Phase blocks receive near-zero
+gradient in early steps because the output projection is zero and
+the gate is small. An explicit sigmoid schedule is a marginal
+stability improvement, not a fix for an active failure mode. **Only
+implement if a baseline measurement shows an actual early-step LM
+loss spike.** If the existing initialization already produces a
+smooth loss curve, skip this feature.
+
+#### P1-1a (LSTB latent bridge for mistral_cg) — DEMOTE to experimental
+
+**The design doc claims:** The 32D Sovereign State has no causal
+prediction target and the trajectory is temporally incoherent. LSTB
+adds a JEPA-style prediction loss to reward temporal coherence.
+
+**What the code already provides:** The `SovereignStateProjector`
+runs on the frozen Mistral backbone's hidden states. These hidden
+states are already locally correlated by the transformer's
+self-attention mechanism — consecutive token positions produce
+similar hidden representations because they attend to overlapping
+context windows. This means the per-token Sovereign State trajectory
+is likely to be locally coherent **by construction**, not because of
+any explicit training signal but because the backbone's outputs are
+correlated.
+
+Additionally, `PhaseJEPAPredictor` uses complex-phasor attention
+with multi-step autoregressive rollout — a sophisticated mechanism
+designed for rich latent-space dynamics. For a 32D state trajectory
+that is already locally correlated, a simple 1-layer MLP predictor
+would likely serve the same purpose at a fraction of the complexity.
+
+**What raises real concern:** The §3A design is careful about the
+"verify first" discipline (§3A.6 Gate 2 requires beating an
+identity baseline by 30%), and the rollout plan includes baseline
+measurement. This discipline is correct — but the feature should
+not have been positioned as P1 if the failure mode is unproven.
+
+**Verdict: DEMOTE to experimental.** The claimed failure mode
+(temporal incoherence) is hypothetical, not demonstrated. The
+backbone provides implicit local coherence, and the CG auxiliary
+losses already train the projector through 6+ diverse paths. **Do
+not implement until a baseline measurement proves the trajectory is
+actually incoherent.** If the identity-baseline comparison (§3A.6
+Gate 2) shows the trajectory is already smooth, this feature adds
+compute and complexity without benefit.
+
+#### P1-1b (CSR phonemic grounding) — DROP from active list
+
+**The design doc itself flags this as P3.** It should not appear on
+a priority list at all. The design is in the document as a
+reference for future operators; it is not a shipping feature.
+
+**Verdict: DROP from the priority table.** Retain the §3B design
+text as reference documentation but remove P1-1b from any list of
+features to implement.
+
+#### P1-2 (Phase write-gate + multi-channel for mistral_hybrid) — DEMOTE to experimental
+
+**The design doc claims:** Single-channel phase memory can only
+specialize at one timescale, and unconditional writes corrupt
+long-range memory on noisy tokens.
+
+**What the code already provides:** `PhaseAttentionLayer` at
+`symbolu/phase_transformer.py:2015` implements `learned_decay=True`
+with **per-head** decay parameters. With 32 heads and learned
+decay, each head can independently learn a different timescale.
+Additionally, the EMA scan's exponential decay inherently suppresses
+noisy tokens: a token's contribution to memory decays exponentially
+with distance, so noisy tokens far in the past contribute near-zero
+to the current state.
+
+The multi-channel mechanism provides a stronger inductive bias
+(logarithmic initialization across explicit timescale bands), but
+the existing per-head learned decay already addresses the core
+problem. Whether the stronger inductive bias actually produces
+measurably better results is an empirical question.
+
+**Verdict: DEMOTE to experimental.** The existing per-head learned
+decay provides multi-timescale capacity. Write gating may be
+redundant with EMA's inherent noise suppression. **Do not implement
+until a measurement shows that per-head decay is insufficient** —
+specifically, that the per-head decay parameters converge to
+similar values despite the task requiring multi-horizon memory.
+
+#### P2-2 (Kosha gyroscopic loss 5-line fix) — DROP
+
+**Already rescoped to a 5-line fix in §5.2.** However, even the
+5-line fix is not justified:
+
+The Kosha Gyroscope is a sophisticated subsystem with ~20 config
+parameters, a PID authority controller, three-stage hybrid logic,
+domain morphing, and its own curriculum integration — all designed
+and tuned for the `ontological` / `ontological_hybrid` model types
+which have different training dynamics. Adding `"mistral_cg"` to a
+model-type check does not validate that the gyroscope's
+hyperparameters are appropriate for the CG path. At minimum, the
+floor/ceiling thresholds, engagement PPL curves, and authority
+controller dynamics would need CG-specific tuning.
+
+**Verdict: DROP.** Either invest in full CG-specific gyroscope
+tuning (a substantial effort, not a 5-line patch) or leave the
+gyroscope on the model types it was designed for. A 5-line patch
+that enables a 20-parameter subsystem without retuning is a
+liability.
+
+### 5.6 Revised Priority Table (Post Re-evaluation)
+
+| Priority | Feature | Original verdict | Revised verdict | Key finding |
+|----------|---------|-----------------|-----------------|-------------|
+| ~~P0-1~~ | VICReg anti-collapse | Full design, recommended | **OPTIONAL** — implement only if baseline shows low state variance | Per-plane softmax/sigmoid + diverse CG losses already provide meaningful collapse protection |
+| ~~P0-2~~ | Phase warmstart curve | Full design, recommended | **OPTIONAL** — implement only if baseline shows early-step LM spike | Three-layer init (adapter_gate + zero-weight + zero-bias) already produces zero phase contribution at step 0 |
+| ~~P1-1a~~ | LSTB latent bridge | Full design, recommended | **EXPERIMENTAL** — implement only after proving temporal incoherence exists | Backbone provides implicit local coherence; 6 CG losses already train the projector; JEPA predictor may be over-engineered for a 32D trajectory |
+| ~~P1-1b~~ | CSR phonemic grounding | Half-depth, P3 | **DROPPED** — retain design text as reference only | Already flagged as P3 in the original design; no place on an active priority list |
+| ~~P1-2~~ | Phase write-gate + multi-channel | Full design, recommended | **EXPERIMENTAL** — implement only after proving per-head decay is insufficient | Per-head `learned_decay=True` with 32 heads already provides multi-timescale capacity; EMA inherently suppresses noise |
+| ~~P2-2~~ | Kosha gyroscopic loss | 5-line fix | **DROPPED** — either invest in full CG tuning or skip | 5-line patch of a 20-param system designed for a different model type is a liability |
+
+### 5.7 What Should Actually Ship
+
+**None of the features have demonstrated a failure mode that
+currently exists in the codebase.** Every feature in this document
+addresses a hypothetical problem that *might* exist but has not been
+measured.
+
+The honest recommendation is:
+
+1. **Run baseline measurements first.** Before implementing any
+   feature, run the existing `mistral_cg` and `mistral_hybrid`
+   pipelines for 1000 steps and measure:
+   - **For P0-1:** `outputs['state'].var(dim=0).mean()` across
+     batches. If > 0.5, skip P0-1.
+   - **For P0-2:** Per-step LM loss curve. If smooth and
+     monotonically decreasing after step 50, skip P0-2.
+   - **For P1-1a:** Per-token state cosine similarity between
+     adjacent positions. If > 0.8, the trajectory is already
+     coherent — skip P1-1a.
+   - **For P1-2:** Per-head decay parameter values after 1000
+     steps. If they span at least a 10× range (e.g., some heads
+     at 0.97, others at 0.999), the existing mechanism is working
+     — skip P1-2.
+
+2. **Implement only the features whose baseline measurements
+   reveal a real problem.** This may be zero features, one
+   feature, or all four. The design document provides the
+   implementation plan for each; the baseline measurements
+   determine which plans to execute.
+
+3. **The design document remains valuable as reference.** Even if
+   no features ship, the document serves as:
+   - A record of what was considered and why it was deferred.
+   - Ready-to-execute implementation plans for each feature,
+     available whenever a future training run reveals the failure
+     mode.
+   - A precedent for "measure first, implement second" discipline
+     in future feature proposals.
+
+**The single most productive next step is not implementing any
+feature — it is running the four baseline measurements above.**
+The results determine everything else.
+
 ---
 
 **End of document.**
