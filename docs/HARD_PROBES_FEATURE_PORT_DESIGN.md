@@ -5698,4 +5698,126 @@ patch.
 
 ---
 
-*6.5 (Pre-Flight Verification Diagnostic) follows next.*
+### 6.5 Pre-Flight Verification Diagnostic
+
+Before running Fix 1 (or any other fix), confirm the §6.1 gradient
+analysis with a one-time runtime diagnostic. This takes 1 training
+step and costs nothing.
+
+**Add this to `train.py` inside the CG loss block, guarded by
+`global_step == 1`:**
+
+```python
+# One-time gradient verification — remove after first successful run
+if global_step == 1 and config.enable_conscious_generation:
+    # Check: does the state projector receive gradient from
+    # the LM loss + CG auxiliary losses?
+    for name, param in model.state_projector.named_parameters():
+        if param.grad is not None:
+            grad_norm = param.grad.norm().item()
+            print(f"  [GRAD CHECK] state_projector.{name}: "
+                  f"grad_norm={grad_norm:.6f}")
+        else:
+            print(f"  [GRAD CHECK] state_projector.{name}: "
+                  f"grad=None  *** NO GRADIENT ***")
+
+    # Check: per-plane variance of the state at step 1
+    # (before any training has meaningfully moved the projector)
+    _state = outputs.get('state', None)
+    if _state is not None:
+        print(f"  [STATE CHECK] Bhava  var={_state[:, 0:12].var(dim=0).mean():.4f}")
+        print(f"  [STATE CHECK] Kosha  var={_state[:, 12:17].var(dim=0).mean():.4f}")
+        print(f"  [STATE CHECK] Vritti var={_state[:, 17:22].var(dim=0).mean():.4f}")
+        print(f"  [STATE CHECK] Guna   var={_state[:, 22:28].var(dim=0).mean():.4f}")
+        print(f"  [STATE CHECK] Resrvd var={_state[:, 28:32].var(dim=0).mean():.4f}")
+```
+
+**Expected results if §6.1 is correct:**
+
+- All `state_projector` parameters show nonzero `grad_norm`. If
+  any parameter shows `grad=None`, there is a hidden `.detach()`
+  that the §6.1 investigation missed — stop and investigate before
+  proceeding with any fix.
+- `Bhava var` is meaningfully higher than `Kosha/Vritti/Guna var`
+  even at step 1 (due to the softmax constraint producing more
+  diverse initial outputs than sigmoid, not due to gradient
+  imbalance — the imbalance takes many steps to manifest). But all
+  planes should show nonzero variance at init because the MLP
+  weights are randomly initialized.
+
+**Expected results that would change the recommendation:**
+
+- If `grad=None` on any parameter: the projector is not receiving
+  gradient from the LM path. This would mean Stage 8's gradient
+  does NOT flow back through the projector, and the §6.1 analysis
+  is wrong. In this case, the original §1 (P0-1 VICReg) or a
+  gradient-path fix becomes the right intervention.
+- If all planes have similar variance at step 1 AND at step 1000
+  (after running the full baseline): the projector is not being
+  trained lopsidedly. In this case, neither Fix 1 nor VICReg is
+  needed, and the governance planes are already healthy.
+
+This diagnostic is a **one-time check**, not a permanent addition
+to the training loop. Remove it after the first successful run
+confirms the expected gradient flow.
+
+### 6.6 Updated Final Recommendation
+
+§6 supersedes the §5.7 recommendation ("run four baseline
+measurements") with a more focused action plan based on the
+gradient-flow investigation.
+
+**Step 1 — Run the verification diagnostic (§6.5).**
+One training step. Confirms the gradient-flow analysis. If
+`grad=None` appears, stop and investigate the gradient path before
+any other action.
+
+**Step 2 — Run Fix 1's A/B test (§6.2).**
+Two 1000-step runs: one with current lambdas, one with 3×-boosted
+lambdas. The only intervention in this document that addresses the
+measured root cause with zero code risk. If it passes (LM within
+±2%, governance metrics improve), ship the new lambdas.
+
+**Step 3 — If Fix 1 regresses LM loss: implement Fix 2 (§6.3).**
+~20-line curriculum schedule in `cg_stage_manager`. Defers
+governance gradient to avoid early-step LM interference. Only
+implement if Fix 1's static boost produces a measurable LM
+regression.
+
+**Step 4 — If Fix 1 + Fix 2 still leave governance planes
+under-trained: consider Fix 3 (§6.4).**
+Research-grade effort requiring training-data design. Deferred
+until Fixes 1 and 2 have been measured and found insufficient.
+
+**Revised priority table incorporating §6:**
+
+| Priority | Fix | Cost | Gate |
+|----------|-----|------|------|
+| **Do first** | §6.5 Verification diagnostic | 0 (one step) | `grad_norm` nonzero on all projector params |
+| **Do second** | §6.2 Fix 1: Boost lambdas 3× | 0 code (config) | LM within ±2%, governance metrics improve |
+| **If Fix 1 regresses LM** | §6.3 Fix 2: Lambda curriculum | ~20 lines | LM ≤ Fix 1, governance within ±10% |
+| **If Fix 1+2 insufficient** | §6.4 Fix 3: Direct supervision | ~200 lines + data | Research — deferred |
+| **Dropped** | §1 P0-1 VICReg anti-collapse | — | Superseded by §6.1 finding |
+
+**What remains from the original §1–§4 designs:**
+
+The §5.5 critical re-evaluation demoted all original features to
+OPTIONAL or EXPERIMENTAL. §6 provides a **replacement action
+plan** for the `mistral_cg` path (the gradient imbalance fix)
+that is both cheaper and more targeted than P0-1.
+
+The `mistral_hybrid` features (P0-2 phase warmstart, P1-2
+write-gate + multi-channel) remain at their §5.6 OPTIONAL /
+EXPERIMENTAL status. They are not affected by §6's findings
+because they operate on a different model target (`mistral_hybrid`
+has no Sovereign State projector, no CG auxiliary losses, and no
+Stage 8 Perspective Synthesizer). If an operator wants to pursue
+them, the §2 and §4 designs are ready-to-execute — but the §5.5
+re-evaluation found that the existing three-layer initialization
+in `mistral_hybrid` (adapter_gate + zero-weight + zero-bias)
+and per-head learned_decay may already address the claimed failure
+modes.
+
+---
+
+**End of document.**
