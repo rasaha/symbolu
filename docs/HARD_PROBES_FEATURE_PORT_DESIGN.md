@@ -5436,4 +5436,93 @@ governance portion of the state receives ~1% the gradient of the
 
 ---
 
-*6.2 (Fix 1: Boost CG Lambda Weights) follows next.*
+### 6.2 Fix 1 — Boost CG Lambda Weights (Zero Code, Config Only)
+
+**Cost:** zero code change. Edit 7 lines in
+`scripts/train_mistral_cg.sh:60–66`.
+
+**Mechanism:** increase the CG auxiliary lambda weights so the
+governance planes receive a meaningful fraction of the total gradient.
+The current total (~0.046) is ~1.15% of the LM loss; the proposed
+total (~0.13) is ~3.25% — a 3× boost that brings the governance
+signal into the range where the optimizer can realistically move the
+projector's weights on those planes.
+
+**Current configuration** (`scripts/train_mistral_cg.sh:60–66`):
+
+```bash
+LAMBDA_ONT=0.01            # ontological structure loss
+LAMBDA_KOSHA=0.01          # governance routing agreement
+LAMBDA_BLISS=0.01          # coherence gating
+LAMBDA_PLAUSIBILITY=0.005  # JEPA plausibility
+LAMBDA_CSR=0.005           # CSR resonance
+LAMBDA_VRITTI=0.005        # cognitive mode
+LAMBDA_GUNA=0.005          # energetic quality
+# Total ≈ 0.046
+```
+
+**Proposed configuration:**
+
+```bash
+LAMBDA_ONT=0.02            # 2× — direct projector gradient
+LAMBDA_KOSHA=0.03          # 3× — strongest governance signal
+LAMBDA_BLISS=0.03          # 3× — Guna-plane driver
+LAMBDA_PLAUSIBILITY=0.015  # 3× — JEPA plausibility
+LAMBDA_CSR=0.015           # 3× — CSR resonance
+LAMBDA_VRITTI=0.015        # 3× — cognitive mode
+LAMBDA_GUNA=0.015          # 3× — energetic quality
+# Total ≈ 0.13
+```
+
+**Rationale for the multipliers:**
+
+- `lambda_kosha_routing` and `lambda_bliss_token` get the largest
+  boost (3×) because they directly train the Kosha and Guna planes
+  respectively. These are the planes most starved by the current
+  weights.
+- `lambda_ont` gets a 2× boost (not 3×) because it trains the
+  token projector (`_cg_projector`), not the state projector
+  directly. Its gradient reaches the state projector only
+  indirectly through shared embedding space. Boosting it too
+  aggressively risks dominating the LM signal on the token path.
+- The four primitive scorers (`plausibility`, `csr`, `vritti`,
+  `guna`) all get 3× because they each produce input-dependent
+  gradient through the `concat(hidden, state)` path in
+  `PrimitiveAuxiliaryLosses`.
+
+**Validation plan:**
+
+1. Run 1000 steps of
+   `./scripts/train_mistral_cg.sh --dataset wikitext2 --max-steps 1000`
+   with the **current** lambdas. Record `lm_loss` at step 1000
+   and all `cg_*` metrics.
+2. Run 1000 steps with the **proposed** lambdas. Same seed, same
+   data.
+3. **Pass condition:**
+   - `lm_loss` at step 1000 within ±2% of baseline. (Wider
+     tolerance than §1's ±1% because we are deliberately
+     increasing auxiliary loss contribution; a small LM increase
+     may be acceptable if governance metrics improve.)
+   - At least 3 of the 6 `cg_*` auxiliary losses decrease by
+     ≥10% relative to baseline — indicating the governance
+     planes are learning faster.
+   - No NaN/Inf.
+4. If the pass condition is met, update
+   `scripts/train_mistral_cg.sh` with the proposed values.
+5. If `lm_loss` regresses > 2%, try an intermediate boost (2×
+   instead of 3×): total ~0.09 instead of ~0.13. If that also
+   regresses, the LM path is sensitive to auxiliary gradient
+   noise and a different approach (Fix 2: curriculum) is needed.
+
+**Why this is the highest-ROI fix:** it is the only intervention in
+this document that addresses the **measured root cause** (gradient
+magnitude imbalance) with **zero code risk** (config change only).
+Every other fix in this document either addresses a hypothetical
+problem or requires code changes with integration risks. Fix 1
+changes numbers that operators already tune — the only novel
+contribution of §6 is the specific numbers and the gradient-flow
+analysis that justifies them.
+
+---
+
+*6.3 (Fix 2: Lambda Curriculum) follows next.*
