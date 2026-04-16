@@ -5525,4 +5525,98 @@ analysis that justifies them.
 
 ---
 
-*6.3 (Fix 2: Lambda Curriculum) follows next.*
+### 6.3 Fix 2 — Lambda Curriculum (~20 Lines, Ship After Fix 1)
+
+**Cost:** ~20 lines of schedule configuration in the existing
+`cg_stage_manager` infrastructure.
+
+**Mechanism:** instead of static lambda weights (even the boosted
+ones from Fix 1), ramp the governance-plane weights up during
+training. This lets Stage 8's Bhava gradient dominate early
+training — when the projector is still learning what the 12D
+identity representation should look like — and then gradually
+introduces governance-plane pressure once the Bhava representation
+is stable.
+
+**Why phasing matters:** with Fix 1's static 3× boost, the
+governance gradients compete with the Bhava gradient from step 0.
+At step 0, neither the Bhava nor the governance representations
+are meaningful — but the Bhava path has the LM loss to guide it
+toward a useful solution, while the governance paths only have
+contrastive scoring losses that need the Bhava representation to
+be partially trained before they can produce coherent signal. A
+curriculum that defers governance training avoids the
+"pulling in six directions at once from random init" failure mode.
+
+**Proposed 3-phase schedule:**
+
+| Phase | Steps | Governance total | Rationale |
+|-------|-------|------------------|-----------|
+| 1 (identity) | 0–5000 | 0.046 (current) | Let Stage 8 train Bhava via LM loss. Governance lambdas stay at current weak values to avoid interfering. |
+| 2 (transition) | 5000–20000 | 0.09 (2× current) | Bhava is partially stable. Begin investing in governance. Intermediate weight reduces risk of LM regression. |
+| 3 (full) | 20000+ | 0.13 (3× current) | Bhava is well-trained and resilient. Full governance signal per Fix 1. |
+
+**Integration point:** the existing `cg_stage_manager` at
+`train.py:4934` already supports per-step lambda overrides via a
+`_cg_lambdas = cg_stage_manager.step(global_step)` call that
+returns a dict of overrides. Fix 2 adds a schedule to the stage
+manager's configuration that maps step ranges to lambda
+multipliers. The mechanism exists; only the schedule data is new.
+
+**Sketch of the schedule configuration:**
+
+```python
+# Inside cg_stage_manager configuration (or a new schedule dict)
+LAMBDA_CURRICULUM = {
+    'phases': [
+        {'until_step': 5000,  'multiplier': 1.0},   # Phase 1: current weights
+        {'until_step': 20000, 'multiplier': 2.0},   # Phase 2: 2× boost
+        {'until_step': None,  'multiplier': 3.0},   # Phase 3: 3× boost (Fix 1 values)
+    ],
+    'affected_keys': [
+        'lambda_kosha_routing', 'lambda_bliss_token',
+        'lambda_plausibility_token', 'lambda_csr_token',
+        'lambda_vritti_token', 'lambda_guna_token',
+    ],
+    # lambda_ont is NOT in the affected list — it follows its own
+    # schedule via the existing CG stage manager
+}
+```
+
+The multiplier is applied to the **base** lambda value (the one
+set in `scripts/train_mistral_cg.sh`), so operators still control
+the absolute magnitude via the shell script and the curriculum
+controls only the relative phasing.
+
+**Validation plan:**
+
+1. **Prerequisite:** Fix 1 has been validated (the static 3× boost
+   passes the §6.2 validation). Fix 2 builds on Fix 1's numbers —
+   the Phase 3 multiplier should match whatever Fix 1 validated.
+2. Run 5000 steps with Fix 2 enabled. Compare against a 5000-step
+   Fix 1 run (static 3× from step 0).
+3. **Pass condition:**
+   - `lm_loss` at step 5000 is ≤ Fix 1's `lm_loss` at step 5000.
+     (The curriculum should produce equal or better LM quality
+     because governance gradients are deferred.)
+   - The `cg_*` auxiliary losses at step 5000 are within ±10% of
+     Fix 1's values. (Phasing should not permanently handicap
+     governance learning; by step 5000 both configs are at 3×.)
+   - No oscillation in `cg_*` metrics at the phase boundaries
+     (steps 5000 and 20000). Smooth transitions indicate the
+     schedule is not producing discontinuities.
+4. If validation passes, the curriculum becomes the recommended
+   configuration in `scripts/train_mistral_cg.sh`, replacing
+   Fix 1's static weights.
+
+**When to skip Fix 2:** if Fix 1's static 3× boost already passes
+its validation (§6.2) with no LM regression and healthy governance
+metrics, Fix 2 adds complexity without clear benefit. The phasing
+is most valuable when the static boost causes early-step LM
+regression that the curriculum can avoid by deferring governance
+pressure. **Run Fix 1 first. Only implement Fix 2 if Fix 1
+regresses LM loss.**
+
+---
+
+*6.4 (Fix 3: Direct State Supervision) follows next.*
