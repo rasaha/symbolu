@@ -13,11 +13,27 @@ of shape (H, 3) with columns [x, y, theta]. No imports from other
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import IntEnum
 from typing import Dict, List, Tuple
 
 import numpy as np
 
 from .manifold import body_frame_error_trajectory
+
+
+class CostOrder(IntEnum):
+    """Which derivative order of disagreement the gate-Huber chain scores.
+
+    V3.1 §E.5 / DESIGN.md §3B.10 ablation variants:
+
+    * ``ZEROTH`` — penalize ``||e_ij||`` (magnitude of disagreement).
+    * ``FIRST``  — penalize ``||v_ij||`` (velocity of disagreement).
+    * ``SECOND`` — penalize ``||a_ij||`` (BCVF, the V3.1 innovation).
+    """
+
+    ZEROTH = 0
+    FIRST = 1
+    SECOND = 2
 
 
 @dataclass
@@ -35,6 +51,7 @@ class BCVFConfig:
     use_anchor_pairing: bool = True
     anchor_index: int = 0
     dt: float = 0.1
+    cost_order: CostOrder = CostOrder.SECOND
 
 
 @dataclass
@@ -137,25 +154,34 @@ def _pair_cost(
 ) -> Tuple[float, float, int]:
     """Compute the per-pair BCVF cost plus diagnostic stats.
 
-    Returns (pair_cost, max_accel_norm, gate_activation_count).
+    Returns (pair_cost, max_signal_norm, gate_activation_count).
     """
     e = compute_disagreement(traj_i, traj_j, config.lever_arm)  # (H, 3)
-    a = compute_disagreement_acceleration(e, config.dt)  # (H-2, 3)
-    # Gate must align with acceleration stencil: k in [1, H-2].
+    # Select which derivative-order signal to penalize and align the gate
+    # to the same stencil indices (DESIGN.md §3B.10 ablation variants).
+    if config.cost_order == CostOrder.SECOND:
+        signal = compute_disagreement_acceleration(e, config.dt)  # (H-2, 3)
+        gate_input = e[1:-1]                                      # (H-2, 3)
+    elif config.cost_order == CostOrder.FIRST:
+        signal = compute_disagreement_velocity(e, config.dt)      # (H-1, 3)
+        gate_input = 0.5 * (e[:-1] + e[1:])                       # (H-1, 3)
+    else:  # ZEROTH
+        signal = e                                                # (H, 3)
+        gate_input = e                                            # (H, 3)
+
     gate = smooth_gate(
-        e[1:-1], config.gate_threshold, config.gate_beta, config.weight_matrix
-    )  # (H-2,)
+        gate_input, config.gate_threshold, config.gate_beta, config.weight_matrix
+    )
 
     w_sqrt = np.sqrt(np.asarray(config.weight_matrix, dtype=np.float64))
-    a_weighted = a * w_sqrt
-    accel_norms = np.linalg.norm(a_weighted, axis=-1)  # (H-2,)
+    signal_norms = np.linalg.norm(signal * w_sqrt, axis=-1)
 
-    penalty = pseudo_huber(accel_norms, config.huber_delta)  # (H-2,)
+    penalty = pseudo_huber(signal_norms, config.huber_delta)
     pair_cost = float(np.sum(gate * penalty) * config.dt)
 
-    max_accel = float(accel_norms.max()) if accel_norms.size > 0 else 0.0
+    max_signal = float(signal_norms.max()) if signal_norms.size > 0 else 0.0
     activations = int(np.count_nonzero(gate > 0.5))
-    return pair_cost, max_accel, activations
+    return pair_cost, max_signal, activations
 
 
 def compute_bcvf_cost(
@@ -246,19 +272,26 @@ def compute_bcvf_cost_batch(
         # Body-frame error over (K, H, 3): reuse vectorized manifold op.
         e = body_frame_error_trajectory(traj_i, traj_j, config.lever_arm)
 
-        a = (e[:, 2:, :] - 2.0 * e[:, 1:-1, :] + e[:, :-2, :]) / (
-            config.dt * config.dt
-        )  # (K, H-2, 3)
+        if config.cost_order == CostOrder.SECOND:
+            signal = (e[:, 2:, :] - 2.0 * e[:, 1:-1, :] + e[:, :-2, :]) / (
+                config.dt * config.dt
+            )
+            gate_input = e[:, 1:-1, :]
+        elif config.cost_order == CostOrder.FIRST:
+            signal = (e[:, 1:, :] - e[:, :-1, :]) / config.dt
+            gate_input = 0.5 * (e[:, :-1, :] + e[:, 1:, :])
+        else:  # ZEROTH
+            signal = e
+            gate_input = e
 
-        e_mid = e[:, 1:-1, :]  # (K, H-2, 3)
-        gate_norm = np.linalg.norm(e_mid * w_sqrt, axis=-1)  # (K, H-2)
+        gate_norm = np.linalg.norm(gate_input * w_sqrt, axis=-1)
         gate_arg = config.gate_beta * (gate_norm - config.gate_threshold)
         gate_arg = np.clip(gate_arg, -50.0, 50.0)
         gate = 1.0 / (1.0 + np.exp(-gate_arg))
 
-        accel_norms = np.linalg.norm(a * w_sqrt, axis=-1)  # (K, H-2)
+        signal_norms = np.linalg.norm(signal * w_sqrt, axis=-1)
         penalty = (config.huber_delta ** 2) * (
-            np.sqrt(1.0 + (accel_norms / config.huber_delta) ** 2) - 1.0
+            np.sqrt(1.0 + (signal_norms / config.huber_delta) ** 2) - 1.0
         )
 
         total += np.sum(gate * penalty, axis=-1) * config.dt

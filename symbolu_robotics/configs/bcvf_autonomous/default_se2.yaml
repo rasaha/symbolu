@@ -78,3 +78,16 @@ performance_cost:
 sweep:
   lambda_c_values: [0.0, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
   runs_per_value: 100
+
+# --- Environment (Phase 3C) ---
+environment:
+  road_type: straight         # straight | curved | urban
+  road_length: 200.0          # meters (straight)
+  road_radius: 100.0          # meters (curved)
+  road_arc_degrees: 90.0      # degrees (curved)
+  road_width: 3.5             # meters
+  obstacles: []               # [{x, y, radius}, ...]
+  max_steps: 200              # episode length (20s at dt=0.1)
+
+# --- Cost order (Phase 3B ablations) ---
+cost_order: SECOND            # ZEROTH | FIRST | SECOND (BCVF)

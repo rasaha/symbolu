@@ -39,6 +39,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "slow: hardware-sensitive timing tests (skipped in normal CI runs)",
+]
 # Ignore directories with broken or missing dependencies
 norecursedirs = [
     "restoration",

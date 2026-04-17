@@ -2468,7 +2468,56 @@ plus the following end-to-end integration check:
   shows BCVF cost spike at t=5s and vehicle avoidance behavior
 - [ ] `default_se2.yaml` updated with `environment` section
 
-#### 3C.13 Phase 3 Success Gate
+#### 3C.13a Phase 3 Implementation Notes
+
+Implementation-time deviations from the DESIGN draft:
+
+1. **Anchor index plumbing.** ``compute_bcvf_cost`` uses the ``anchor_index``
+   field on ``BCVFConfig`` to enumerate anchor pairs, but the planner stores
+   the anchor by model **name** (``MPPIConfig.anchor = "M1"``). The planner
+   internally maps ``name → index`` and constructs a derived ``BCVFConfig``
+   before calling ``compute_bcvf_cost_batch``. Top-level callers should
+   pass the anchor via ``MPPIConfig.anchor``; the numeric ``anchor_index``
+   inside ``BCVFConfig`` is only meaningful when calling the batch function
+   directly.
+
+2. **Option A rollout loop.** Each MPPI plan iterates ``for k in range(K)``
+   over the predictor ``predict()`` calls. DESIGN §3B.7 anticipated this and
+   flagged a batched ``predict_batch()`` (Option B) as the escalation path
+   when the timing budget is exceeded. In the V1 Phase 3 implementation
+   Option A is retained and the reduced / full timing benchmarks are
+   marked ``@pytest.mark.slow`` — they document the budget but do not
+   gate CI. Option B is tracked as a Phase 5 optimization.
+
+3. **Per-step ``solve_time_ms`` / ``effective_samples``.** ``EpisodeDiagnostics``
+   records only the episode aggregates from ``RunResult`` for these two
+   fields (a per-step series would require a planner hook into ``SimState``).
+   Episode-level statistics are still accurate; per-step variation is
+   available via a Phase 5 diagnostic hook if needed.
+
+#### 3C.13b `__init__.py` Public API (Phase 3)
+
+Extends §1.2.3, §1.5.9, §2.12. After Phase 3 the subpackage re-exports:
+
+```python
+from symbolu_robotics.bcvf_autonomous import (
+    # Simulator
+    Road, Obstacle, SimConfig, SimState, Simulator,
+    make_straight_road, make_curved_road, make_urban_road,
+    # Planner
+    MPPIConfig, MPPIResult, MPPIPlanner,
+    PerfCostConfig, compute_perf_cost, CostOrder,
+    # Runner
+    RunConfig, RunResult, EpisodeDiagnostics,
+    Runner, load_config, benchmark_planner,
+)
+```
+
+Bumps ``__version__`` to ``"0.3.0"``; ``__all__`` is now 55 symbols.
+``default_se2.yaml`` gains an ``environment`` section and a top-level
+``cost_order`` knob.
+
+#### 3C.14 Phase 3 Success Gate
 
 **Proceed to Phase 4 only if ALL of the following hold:**
 

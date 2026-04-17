@@ -3,12 +3,12 @@
 Second-order cross-model coherence regularizer for multi-model predictive
 control. See ``DESIGN.md`` for the full specification.
 
-Public API through Phase 2 (math kernel + disagreement characterization
-+ 4-predictor framework — MPPI planner lands in Phase 3):
+Public API through Phase 3 (math kernel + trace characterization +
+4-predictor framework + simulator + MPPI planner + runner):
 
     from symbolu_robotics.bcvf_autonomous import (
         # Phase 1 — math kernel
-        BCVFConfig, BCVFResult,
+        BCVFConfig, BCVFResult, CostOrder,
         compute_bcvf_cost, compute_bcvf_cost_batch,
         SE2Pose, body_frame_error, wrap_angle,
         # Phase 1.5 — trace families and sensitivity sweep
@@ -19,12 +19,22 @@ Public API through Phase 2 (math kernel + disagreement characterization
         FailureConfig, ControlInput,
         IMUOdometry, LidarSLAM, VisualOdometry, GNSSMap,
         create_predictor_set,
+        # Phase 3A — simulator
+        Road, Obstacle, SimConfig, SimState, Simulator,
+        make_straight_road, make_curved_road, make_urban_road,
+        # Phase 3B — MPPI planner
+        MPPIConfig, MPPIResult, MPPIPlanner,
+        PerfCostConfig, compute_perf_cost,
+        # Phase 3C — runner
+        RunConfig, RunResult, EpisodeDiagnostics,
+        Runner, load_config, benchmark_planner,
     )
 """
 
 from symbolu_robotics.bcvf_autonomous.core import (
     BCVFConfig,
     BCVFResult,
+    CostOrder,
     compute_bcvf_cost,
     compute_bcvf_cost_batch,
     compute_disagreement,
@@ -64,8 +74,33 @@ from symbolu_robotics.bcvf_autonomous.traces import (
     parameter_sensitivity_report,
     run_all_traces,
 )
+from symbolu_robotics.bcvf_autonomous.simulator import (
+    Obstacle,
+    Road,
+    SimConfig,
+    SimState,
+    Simulator,
+    make_curved_road,
+    make_straight_road,
+    make_urban_road,
+)
+from symbolu_robotics.bcvf_autonomous.mppi_planner import (
+    MPPIConfig,
+    MPPIPlanner,
+    MPPIResult,
+    PerfCostConfig,
+    compute_perf_cost,
+)
+from symbolu_robotics.bcvf_autonomous.runner import (
+    EpisodeDiagnostics,
+    RunConfig,
+    RunResult,
+    Runner,
+    benchmark_planner,
+    load_config,
+)
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "__version__",
@@ -107,4 +142,27 @@ __all__ = [
     "VisualOdometry",
     "GNSSMap",
     "create_predictor_set",
+    # simulator (Phase 3A)
+    "Road",
+    "Obstacle",
+    "SimConfig",
+    "SimState",
+    "Simulator",
+    "make_straight_road",
+    "make_curved_road",
+    "make_urban_road",
+    # planner (Phase 3B)
+    "MPPIConfig",
+    "MPPIResult",
+    "MPPIPlanner",
+    "PerfCostConfig",
+    "compute_perf_cost",
+    "CostOrder",
+    # runner (Phase 3C)
+    "RunConfig",
+    "RunResult",
+    "EpisodeDiagnostics",
+    "Runner",
+    "load_config",
+    "benchmark_planner",
 ]
