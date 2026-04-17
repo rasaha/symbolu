@@ -163,6 +163,26 @@ Operation: Pd = Ps × (10000 / layer_freq[layer])
 Cycles:   3
 ```
 
+#### PH_ROPE - Rotary Position Embedding
+```
+Encoding: 0x0 DST SRC1 FREQ POS   ----  FLAGS 0x7
+Syntax:   PH_ROPE Rd_base, Rs_base, Rfreq_base, pos_offset, rope_dim
+Operation:
+  For token t (absolute position p = pos_offset + t):
+    for k in 0..rope_dim/2:
+      theta = p × Rfreq_base[k]        ; inv-freq table on device
+      x0    = Rs_base[2k]
+      x1    = Rs_base[2k + 1]
+      Rd_base[2k]     = x0 × cos(theta) - x1 × sin(theta)
+      Rd_base[2k + 1] = x0 × sin(theta) + x1 × cos(theta)
+Notes:
+  - Applied in-place if Rd_base == Rs_base.
+  - rope_dim is the LOW portion of the head; upper (head_dim - rope_dim)
+    is copied through unchanged (matches Llama/Mistral convention).
+  - FLAGS[0] = fp16/bf16 select, FLAGS[1] = async.
+Cycles:   4 × (rope_dim / 2) + 6
+```
+
 ### 3.2 Coherence Operations (OP = 0x1)
 
 #### CO_MEASURE - Measure Coherence
@@ -204,6 +224,21 @@ Syntax:   CO_VERIFY Cd, Cs_fwd, Cs_bwd
 Operation:
   Cd = 1 - |Cs_fwd - Cs_bwd|
 Cycles:   3
+```
+
+#### CO_GATED_RESIDUAL - Coherence-Gated Residual Blend
+```
+Encoding: 0x1 DST SRC1 SRC2 GATE  ----  FLAGS 0x4
+Syntax:   CO_GATED_RESIDUAL Rd_base, Rhidden_base, Radapter_base, Rgate, dim
+Operation:
+  ; Rgate is a scalar register holding the sigmoid gate value in [0, 1]
+  for i in 0..dim:
+    Rd_base[i] = Rhidden_base[i] + Rgate × Radapter_base[i]
+Purpose:
+  Fused residual blend used by the mistral_cg PhaseAdapter, replacing the
+  separate CO_GATE + vector-add chain. The gate is produced by a
+  sigmoid(adapter_gate_init) scalar upstream (init -2 -> ~0.12).
+Cycles:   dim / 16 + 3
 ```
 
 ### 3.3 Ontology Operations (OP = 0x2)
@@ -254,6 +289,37 @@ Operation:
   for i in 0..output_dim:
     Rd_base[i] = Σ Rs_layers_base[j][i] × Rweights_base[j]
 Cycles:   count × output_dim / 8
+```
+
+#### ON_PROJECT_SOVEREIGN - 32-D Sovereign State Projection
+```
+Encoding: 0x2 DST SRC1 ---- ---- MODE  FLAGS 0x4
+Syntax:   ON_PROJECT_SOVEREIGN Rd_base, Rs_base, hidden_dim, kosha_mode
+Operation:
+  ; two-stage MLP: hidden_dim -> intermediate_dim (default hidden/4) -> 32
+  ; weights W_in, W_out and biases come from per-model OPU slots
+  h  = GELU(Rs_base[0:hidden_dim] · W_in + b_in)       ; intermediate
+  v  = h · W_out + b_out                                ; [32]
+
+  ; Component-wise normalization of v into the 32-D Sovereign layout
+  bhava    = softmax(v[0:12])                           ; 12
+  if kosha_mode == SIGMOID: kosha = sigmoid(v[12:17])
+  else:                     kosha = softmax(v[12:17])   ; 5
+  vritti   = softmax(v[17:22])                          ; 5
+  guna     = sigmoid(v[22:28])                          ; 6
+  reserved = tanh(v[28:32])                             ; 4
+
+  Rd_base[0:12]  = bhava
+  Rd_base[12:17] = kosha
+  Rd_base[17:22] = vritti
+  Rd_base[22:28] = guna
+  Rd_base[28:32] = reserved
+Purpose:
+  mistral_cg SovereignStateProjector in one opcode; replaces two ON_PROJECT
+  + five per-component activation sequences.
+Cycles:   hidden_dim × intermediate_dim / 16
+        + intermediate_dim × 32 / 16
+        + 32 (activation) + 10
 ```
 
 ### 3.4 Memory Operations (OP = 0x3)
@@ -352,14 +418,17 @@ Cycles:   1
 | 0x0 | Phase | 0x4 | PH_UPDATE | Update phase |
 | 0x0 | Phase | 0x5 | PH_LOCK | Lock phase above threshold |
 | 0x0 | Phase | 0x6 | PH_MOD | Frequency modulation |
+| 0x0 | Phase | 0x7 | PH_ROPE | Rotary position embedding |
 | 0x1 | Coherence | 0x0 | CO_MEASURE | Measure coherence |
 | 0x1 | Coherence | 0x1 | CO_GATE | Coherence-gated output |
 | 0x1 | Coherence | 0x2 | CO_ENTROPY | Phase entropy |
 | 0x1 | Coherence | 0x3 | CO_VERIFY | BCVF verification |
+| 0x1 | Coherence | 0x4 | CO_GATED_RESIDUAL | Fused gate × adapter + hidden |
 | 0x2 | Ontology | 0x0 | ON_PROJECT | Layer projection |
 | 0x2 | Ontology | 0x1 | ON_ACTIVATE | Kosha activation |
 | 0x2 | Ontology | 0x2 | ON_VRITTI | Vritti detection |
 | 0x2 | Ontology | 0x3 | ON_BLEND | Layer blending |
+| 0x2 | Ontology | 0x4 | ON_PROJECT_SOVEREIGN | 32-D Sovereign State |
 | 0x3 | Memory | 0x0 | MEM_LOAD | HBM3 load |
 | 0x3 | Memory | 0x1 | MEM_STORE | HBM3 store |
 | 0x3 | Memory | 0x2 | MEM_TCU_RD | TCU read |

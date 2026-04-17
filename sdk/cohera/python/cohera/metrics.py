@@ -3,8 +3,8 @@ COHERA Metrics and Coherence Monitoring
 """
 
 from enum import IntEnum
-from dataclasses import dataclass
-from typing import Optional, Callable
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional
 
 
 class VrittiState(IntEnum):
@@ -154,3 +154,123 @@ def unregister_coherence_callback() -> None:
     global _coherence_callback
     _coherence_callback = None
     # TODO: Call cohera_unregister_coherence_callback()
+
+
+# ---------------------------------------------------------------------------
+# Distillation + FSCS gate telemetry (P4)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class DistillationMetrics:
+    """
+    Teacher-student distillation telemetry for mistral_teacher / mistral_cg.
+
+    Matches the loss decomposition in
+    ``symbolu_training/training/unified/mistral_teacher.py`` so the runtime
+    can surface the same numbers end-to-end.
+    """
+    teacher_ce: float = 0.0              # teacher's cross-entropy on labels
+    student_ce: float = 0.0              # student's cross-entropy on labels
+    kl_div: float = 0.0                  # KL(student || teacher) on soft logits
+    temperature: float = 1.0             # softmax temperature used for KL
+    alpha_kl: float = 0.5                # KL weight in total loss
+    alpha_ce: float = 0.5                # student CE weight in total loss
+    total_loss: float = 0.0              # alpha_kl * kl + alpha_ce * student_ce
+    tokens: int = 0                      # tokens participating in the loss
+
+    @property
+    def student_teacher_gap(self) -> float:
+        """student_ce - teacher_ce. Positive = student worse than teacher."""
+        return self.student_ce - self.teacher_ce
+
+
+@dataclass
+class FSCSGateMetrics:
+    """
+    Per-layer telemetry for the FSCS routing gate
+    (``symbolu/fscs/mistral_gated_layer.py``). Mirrors the fields
+    ``FSCSGatedDecoderLayer.last_gate_fraction`` and friends expose after
+    a forward pass.
+    """
+    layer_idx: int = 0
+    gate_fraction: float = 0.0           # fraction of tokens routed to coarse
+    mean_coherence: float = 0.0          # mean pi (gate probability)
+    tau: float = 0.0                     # effective threshold at this layer
+    alpha: float = 0.0                   # routing softness param
+    alignment_loss: float = 0.0          # §12.2 alignment regularizer
+    prev_layer_gate_fraction: float = 0.0  # for cross-layer caution (§8)
+    boundary_hits: int = 0
+    tokens: int = 0
+
+
+@dataclass
+class RuntimeHooks:
+    """
+    Container for hook-delivered metrics. The runtime populates these by
+    callback during training / eval so the trainer can log them without
+    reaching into the accelerator internals.
+    """
+    distillation: Optional[DistillationMetrics] = None
+    fscs_gate_per_layer: List[FSCSGateMetrics] = field(default_factory=list)
+    coherence_per_layer: List[float] = field(default_factory=list)
+    state_delta_per_layer: List[float] = field(default_factory=list)
+
+    def reset(self) -> None:
+        self.distillation = None
+        self.fscs_gate_per_layer.clear()
+        self.coherence_per_layer.clear()
+        self.state_delta_per_layer.clear()
+
+    def to_dict(self) -> Dict[str, object]:
+        return {
+            "distillation": (
+                self.distillation.__dict__ if self.distillation else None
+            ),
+            "fscs_gate_per_layer": [m.__dict__ for m in self.fscs_gate_per_layer],
+            "coherence_per_layer": list(self.coherence_per_layer),
+            "state_delta_per_layer": list(self.state_delta_per_layer),
+        }
+
+
+_runtime_hooks = RuntimeHooks()
+
+
+def get_runtime_hooks() -> RuntimeHooks:
+    """Return the process-wide RuntimeHooks container."""
+    return _runtime_hooks
+
+
+def record_distillation(metrics: DistillationMetrics) -> None:
+    """
+    Publish a distillation telemetry frame. Called by
+    ``mistral_teacher.compute_distillation_loss`` per training step.
+    """
+    if not isinstance(metrics, DistillationMetrics):
+        raise TypeError("record_distillation requires a DistillationMetrics")
+    _runtime_hooks.distillation = metrics
+    # Runtime: cohera_metrics_record_distillation(&metrics)
+
+
+def record_fscs_gate(metrics: FSCSGateMetrics) -> None:
+    """
+    Publish an FSCS gate telemetry frame. Called by
+    ``FSCSGatedDecoderLayer`` after each forward pass.
+    """
+    if not isinstance(metrics, FSCSGateMetrics):
+        raise TypeError("record_fscs_gate requires an FSCSGateMetrics")
+    _runtime_hooks.fscs_gate_per_layer.append(metrics)
+    # Runtime: cohera_metrics_record_fscs_gate(&metrics)
+
+
+def record_per_layer_coherence(
+    coherence_per_layer: List[float],
+    state_delta_per_layer: Optional[List[float]] = None,
+) -> None:
+    """
+    Publish per-layer coherence / state-delta traces emitted by the
+    HybridOntologicalAccelerator. Replaces the previous list contents so
+    each forward pass starts fresh.
+    """
+    _runtime_hooks.coherence_per_layer = list(coherence_per_layer)
+    if state_delta_per_layer is not None:
+        _runtime_hooks.state_delta_per_layer = list(state_delta_per_layer)

@@ -1,185 +1,261 @@
 /*
  * Phase Attention Kernel
  *
- * Core kernel for O(n) phase-coherent attention using Kuramoto synchronization.
+ * O(n) phase-coherent attention via Kuramoto synchronization.
+ * Supports:
+ *   - Causal masking (Mistral / hybrid decoder path)
+ *   - Grouped Query Attention (num_kv_heads <= num_heads)
+ *   - Sliding-window attention (window_size)
+ *   - FP16 / BF16 / FP32 compute (dtype_id)
+ *   - Runtime-parameterized sync steps & learning rate
  *
  * Compile: coherac -arch pavpu10 -O3 -o phase_attention.cbin phase_attention.ckl
  */
 
 #include <cohera_kernel.h>
 
-// Configuration constants
+/* Upper bound for validation; actual phases[] is sized by the launch via
+ * dynamic shared memory (see extern __shared__ below). */
 #define MAX_SEQ_LEN 32768
-#define HEAD_DIM 64
-#define SYNC_STEPS 3
-#define SYNC_LR 0.1f
+#define TWO_PI      6.28318530717958647692f
+
+/* dtype_id mirrors cohera_dtype_t { FP16=0, BF16=1, FP32=2, INT8=3 } */
+#define COHERA_DTYPE_FP16 0
+#define COHERA_DTYPE_BF16 1
+#define COHERA_DTYPE_FP32 2
+
+static __inline__ float load_typed(const void* base, int idx, int dtype_id) {
+    if (dtype_id == COHERA_DTYPE_FP32) return ((const float*)base)[idx];
+    if (dtype_id == COHERA_DTYPE_BF16) return __bf16_to_f32(((const bfloat16*)base)[idx]);
+    return (float)((const float16*)base)[idx];  /* FP16 fallback */
+}
+
+static __inline__ void store_typed(void* base, int idx, float v, int dtype_id) {
+    if (dtype_id == COHERA_DTYPE_FP32)      ((float*)base)[idx]    = v;
+    else if (dtype_id == COHERA_DTYPE_BF16) ((bfloat16*)base)[idx] = __f32_to_bf16(v);
+    else                                    ((float16*)base)[idx]  = (float16)v;
+}
 
 /*
- * Single-head phase attention kernel
+ * Single-head phase attention.
  *
- * Inputs:
- *   query[N, D]  - Query vectors
- *   key[N, D]    - Key vectors
- *   value[N, D]  - Value vectors
+ *  query[N, D_q]     used to initialize per-token phase
+ *  key[N,  D_kv]     reserved; phase init uses Q and aggregation uses V.
+ *                    K is accepted for ABI stability / future variants that
+ *                    consume it (e.g. Q.K phase modulation).
+ *  value[N, D_kv]
+ *  output[N, D_q]
+ *  coherence_out     scalar
  *
- * Outputs:
- *   output[N, D] - Attended output
- *   coherence    - Scalar coherence score
+ *  causal:      1 = drop j > i
+ *  window_size: <= 0 = full; else drop j < i - window_size + 1
+ *
+ *  Caller must launch with shared_mem_size >= seq_len * sizeof(float)
+ *  (plus 2 * sizeof(float) for the sin_sum / cos_sum scratch).
  */
 __phase_kernel__ void phase_attention_head(
-    const float16* __restrict__ query,
-    const float16* __restrict__ key,
-    const float16* __restrict__ value,
-    float16* __restrict__ output,
+    const void* __restrict__ query,
+    const void* __restrict__ key,
+    const void* __restrict__ value,
+    void* __restrict__ output,
     float* __restrict__ coherence_out,
     int seq_len,
     int head_dim,
+    int dtype_id,
+    int causal,
+    int window_size,
+    int sync_steps,
+    float sync_lr,
     int ontology_layer
 ) {
-    // Thread indexing
+    (void)key;  /* reserved; see note above */
+
     int tid = __thread_idx();
     int bid = __block_idx();
     int gid = bid * __block_dim() + tid;
 
-    // Shared memory for phase synchronization
-    __shared__ float phases[MAX_SEQ_LEN];
-    __shared__ float sin_sum;
-    __shared__ float cos_sum;
+    /* Dynamic shared memory: phases[0..seq_len) followed by two reduction
+     * slots. Caller passes shared_mem_size = (seq_len + 2) * sizeof(float). */
+    extern __shared__ float _shared_scratch[];
+    float* phases = _shared_scratch;
+    float* p_sin_sum = &_shared_scratch[seq_len];
+    float* p_cos_sum = &_shared_scratch[seq_len + 1];
+#define sin_sum (*p_sin_sum)
+#define cos_sum (*p_cos_sum)
 
     if (gid >= seq_len) return;
 
-    // =========================================================================
-    // Step 1: Initialize phases from query vectors
-    // =========================================================================
-    // Project query to scalar, then map to [0, 2π]
+    /* ----- 1. init phases from query projection ----- */
     float q_proj = 0.0f;
     for (int d = 0; d < head_dim; d++) {
-        q_proj += (float)query[gid * head_dim + d];
+        q_proj += load_typed(query, gid * head_dim + d, dtype_id);
     }
-    phases[gid] = __phase_compute_scalar(q_proj);  // sigmoid(x) * 2π
-
+    phases[gid] = __phase_compute_scalar(q_proj);
     __syncthreads();
 
-    // =========================================================================
-    // Step 2: Kuramoto phase synchronization
-    // =========================================================================
-    for (int step = 0; step < SYNC_STEPS; step++) {
-        // Compute circular mean (reduction)
-        if (tid == 0) {
-            sin_sum = 0.0f;
-            cos_sum = 0.0f;
+    /* ----- precompute this thread's visible range (used by sync + agg) ----- */
+    int j_lo = 0;
+    int j_hi = seq_len;
+    if (causal)              j_hi = gid + 1;
+    if (window_size > 0) {
+        int lo = gid - window_size + 1;
+        if (lo > j_lo) j_lo = lo;
+    }
+    /* When mask is a no-op we take the fast shared-reduction path. Causal or
+     * sliding-window forces per-position masked reductions so a position never
+     * observes tokens outside its visible set during phase sync or coherence. */
+    int use_global_reduction = (!causal) && (window_size <= 0);
+
+    /* ----- 2. Kuramoto sync (masked or global) ----- */
+    for (int step = 0; step < sync_steps; step++) {
+        float mean_phase;
+
+        if (use_global_reduction) {
+            if (tid == 0) { sin_sum = 0.0f; cos_sum = 0.0f; }
+            __syncthreads();
+            atomicAdd(&sin_sum, __sinf(phases[gid]));
+            atomicAdd(&cos_sum, __cosf(phases[gid]));
+            __syncthreads();
+            mean_phase = atan2f(sin_sum, cos_sum);
+        } else {
+            /* Per-position masked circular mean. Causality preserved: position
+             * gid reads only phases[j_lo..j_hi). */
+            float ls = 0.0f;
+            float lc = 0.0f;
+            for (int j = j_lo; j < j_hi; j++) {
+                ls += __sinf(phases[j]);
+                lc += __cosf(phases[j]);
+            }
+            mean_phase = (j_hi > j_lo) ? atan2f(ls, lc) : phases[gid];
         }
+
+        /* compute next phase but defer the write so concurrent neighbors finish
+         * reading the current step's phases before any thread mutates them */
+        float gradient  = -__sinf(phases[gid] - mean_phase);
+        float new_phase = fmodf(phases[gid] + sync_lr * gradient + TWO_PI, TWO_PI);
+
         __syncthreads();
-
-        // Parallel reduction for mean phase
-        float local_sin = __sinf(phases[gid]);
-        float local_cos = __cosf(phases[gid]);
-
-        atomicAdd(&sin_sum, local_sin);
-        atomicAdd(&cos_sum, local_cos);
-        __syncthreads();
-
-        float mean_phase = atan2f(sin_sum, cos_sum);
-
-        // Compute gradient and update phase
-        float gradient = -__sinf(phases[gid] - mean_phase);
-        phases[gid] += SYNC_LR * gradient;
-
-        // Clamp to [0, 2π)
-        phases[gid] = fmodf(phases[gid] + 6.28318f, 6.28318f);
-
+        phases[gid] = new_phase;
         __syncthreads();
     }
 
-    // =========================================================================
-    // Step 3: Compute coherence
-    // =========================================================================
-    // Coherence = |Σ exp(iφ)| / N
-    if (tid == 0) {
-        sin_sum = 0.0f;
-        cos_sum = 0.0f;
+    /* ----- 3. final coherence + mean over visible set ----- */
+    float coh_sin;
+    float coh_cos;
+
+    if (use_global_reduction) {
+        if (tid == 0) { sin_sum = 0.0f; cos_sum = 0.0f; }
+        __syncthreads();
+        atomicAdd(&sin_sum, __sinf(phases[gid]));
+        atomicAdd(&cos_sum, __cosf(phases[gid]));
+        __syncthreads();
+        coh_sin = sin_sum;
+        coh_cos = cos_sum;
+    } else {
+        coh_sin = 0.0f;
+        coh_cos = 0.0f;
+        for (int j = j_lo; j < j_hi; j++) {
+            coh_sin += __sinf(phases[j]);
+            coh_cos += __cosf(phases[j]);
+        }
     }
-    __syncthreads();
 
-    atomicAdd(&sin_sum, __sinf(phases[gid]));
-    atomicAdd(&cos_sum, __cosf(phases[gid]));
-    __syncthreads();
+    float visible = (float)(j_hi - j_lo);
+    if (visible < 1.0f) visible = 1.0f;
+    float coherence  = sqrtf(coh_sin * coh_sin + coh_cos * coh_cos) / visible;
+    float mean_phase = atan2f(coh_sin, coh_cos);
 
-    float coherence = sqrtf(sin_sum * sin_sum + cos_sum * cos_sum) / (float)seq_len;
+    /* Scalar coherence_out is written from the position that sees the deepest
+     * visible set: gid 0 for global reduction (all identical), or the last
+     * token for causal/window (matches the "current step" of decode). */
+    int report_gid = use_global_reduction ? 0 : (seq_len - 1);
+    if (gid == report_gid) *coherence_out = coherence;
 
-    if (gid == 0) {
-        *coherence_out = coherence;
-    }
-
-    // =========================================================================
-    // Step 4: Compute attention weights from phases
-    // =========================================================================
-    // Weight = (1 + cos(φᵢ - φ_mean)) / 2  (normalized to [0, 1])
-    float mean_phase = atan2f(sin_sum, cos_sum);
-    float weight = (1.0f + __cosf(phases[gid] - mean_phase)) * 0.5f;
-
-    // =========================================================================
-    // Step 5: Apply coherence gating and weighted aggregation
-    // =========================================================================
+    /* ----- 4. masked weighted aggregation ----- */
     float threshold = __get_coherence_threshold(ontology_layer);
 
     if (coherence > threshold) {
-        // Output = weighted sum of values
+        float norm = visible;
         for (int d = 0; d < head_dim; d++) {
             float v_sum = 0.0f;
-            for (int j = 0; j < seq_len; j++) {
+            for (int j = j_lo; j < j_hi; j++) {
                 float w_j = (1.0f + __cosf(phases[j] - mean_phase)) * 0.5f;
-                v_sum += w_j * (float)value[j * head_dim + d];
+                v_sum   += w_j * load_typed(value, j * head_dim + d, dtype_id);
             }
-            output[gid * head_dim + d] = (float16)(v_sum / (float)seq_len);
+            store_typed(output, gid * head_dim + d, v_sum / norm, dtype_id);
         }
     } else {
-        // Below coherence threshold - pass through query (residual)
+        /* below coherence: residual pass-through */
         for (int d = 0; d < head_dim; d++) {
-            output[gid * head_dim + d] = query[gid * head_dim + d];
+            float q = load_typed(query, gid * head_dim + d, dtype_id);
+            store_typed(output, gid * head_dim + d, q, dtype_id);
         }
     }
 
-    // =========================================================================
-    // Step 6: Update TCU for temporal context
-    // =========================================================================
+    /* ----- 5. TCU accumulate ----- */
     if (__tcu_enabled()) {
         __tcu_accumulate_phase(gid % __num_heads(), phases[gid]);
     }
+
+#undef sin_sum
+#undef cos_sum
 }
 
 
 /*
- * Multi-head phase attention kernel
- * Launches phase_attention_head for each head in parallel
+ * Multi-head phase attention with GQA.
+ *
+ *   query         [batch, seq, num_heads,    head_dim]
+ *   key / value   [batch, seq, num_kv_heads, head_dim]
+ *   output        [batch, seq, num_heads,    head_dim]
+ *
+ * Each query head h maps to KV head (h / head_group_size).
+ * head_group_size = num_heads / num_kv_heads  (num_kv_heads==0 -> MHA).
  */
 __phase_kernel__ void multi_head_phase_attention(
-    const float16* __restrict__ query,   // [batch, seq, heads, head_dim]
-    const float16* __restrict__ key,
-    const float16* __restrict__ value,
-    float16* __restrict__ output,
-    float* __restrict__ coherence,        // [batch, heads]
+    const void* __restrict__ query,
+    const void* __restrict__ key,
+    const void* __restrict__ value,
+    void* __restrict__ output,
+    float* __restrict__ coherence,   /* [batch, num_heads] */
     int batch_size,
     int seq_len,
     int num_heads,
+    int num_kv_heads,
     int head_dim,
+    int dtype_id,
+    int causal,
+    int window_size,
+    int sync_steps,
+    float sync_lr,
     int ontology_layer
 ) {
     int batch_idx = __block_idx() / num_heads;
-    int head_idx = __block_idx() % num_heads;
-
+    int head_idx  = __block_idx() % num_heads;
     if (batch_idx >= batch_size) return;
 
-    // Offset pointers for this batch and head
-    int offset = batch_idx * seq_len * num_heads * head_dim + head_idx * head_dim;
-    int stride = num_heads * head_dim;
+    int kv_heads        = (num_kv_heads > 0) ? num_kv_heads : num_heads;
+    int head_group_size = num_heads / kv_heads;
+    int kv_head_idx     = head_idx / head_group_size;
 
-    const float16* q = query + offset;
-    const float16* k = key + offset;
-    const float16* v = value + offset;
-    float16* out = output + offset;
-    float* coh = coherence + batch_idx * num_heads + head_idx;
+    int q_stride_batch  = seq_len * num_heads  * head_dim;
+    int kv_stride_batch = seq_len * kv_heads   * head_dim;
 
-    // Call single-head kernel
-    phase_attention_head(q, k, v, out, coh, seq_len, head_dim, ontology_layer);
+    int q_off  = batch_idx * q_stride_batch  + head_idx    * head_dim;
+    int kv_off = batch_idx * kv_stride_batch + kv_head_idx * head_dim;
+
+    int elem_size = (dtype_id == COHERA_DTYPE_FP32) ? 4 : 2;
+    const void* q = (const char*)query  + q_off  * elem_size;
+    const void* k = (const char*)key    + kv_off * elem_size;
+    const void* v = (const char*)value  + kv_off * elem_size;
+    void*       o = (char*)output       + q_off  * elem_size;
+    float*      c = coherence + batch_idx * num_heads + head_idx;
+
+    phase_attention_head(
+        q, k, v, o, c,
+        seq_len, head_dim, dtype_id,
+        causal, window_size,
+        sync_steps, sync_lr,
+        ontology_layer
+    );
 }

@@ -1,0 +1,111 @@
+/*
+ * Phase Adapter + Gated Residual Kernel
+ *
+ * Implements the mistral_cg PhaseAdapter in one kernel:
+ *
+ *   intent_phase [B, T, H]
+ *       -> w_in   [H, adapter_hidden]          -> GELU
+ *       -> w_out  [adapter_hidden, hidden_dim] -> adapter_out [B, T, hidden_dim]
+ *       -> output = hidden + sigmoid(gate_logit) * adapter_out
+ *
+ * The residual add is the CO_GATED_RESIDUAL ISA op fused with the MLP so
+ * the full CG adapter path is a single launch.
+ *
+ * Compile:
+ *   coherac -arch pavpu10 -O3 -o phase_adapter_gate.cbin phase_adapter_gate.ckl
+ */
+
+#include <cohera_kernel.h>
+
+/* dtype_id mirrors cohera_dtype_t { FP16=0, BF16=1, FP32=2, INT8=3 } */
+#define COHERA_DTYPE_FP16 0
+#define COHERA_DTYPE_BF16 1
+#define COHERA_DTYPE_FP32 2
+
+static __inline__ float load_typed(const void* base, int idx, int dtype_id) {
+    if (dtype_id == COHERA_DTYPE_FP32) return ((const float*)base)[idx];
+    if (dtype_id == COHERA_DTYPE_BF16) return __bf16_to_f32(((const bfloat16*)base)[idx]);
+    return (float)((const float16*)base)[idx];
+}
+
+static __inline__ void store_typed(void* base, int idx, float v, int dtype_id) {
+    if (dtype_id == COHERA_DTYPE_FP32)      ((float*)base)[idx]    = v;
+    else if (dtype_id == COHERA_DTYPE_BF16) ((bfloat16*)base)[idx] = __f32_to_bf16(v);
+    else                                    ((float16*)base)[idx]  = (float16)v;
+}
+
+static __inline__ float gelu(float x) {
+    const float k = 0.7978845608f;  /* sqrt(2/pi) */
+    float inner = k * (x + 0.044715f * x * x * x);
+    return 0.5f * x * (1.0f + tanhf(inner));
+}
+
+static __inline__ float sigmoidf(float x) {
+    return 1.0f / (1.0f + expf(-x));
+}
+
+
+/*
+ * One thread per (batch, seq) token. Grid size = batch * seq_len.
+ *
+ * intent_phase : [B, T, num_heads]
+ * hidden       : [B, T, hidden_dim]
+ * w_in         : [num_heads,       adapter_hidden]
+ * b_in         : [adapter_hidden]
+ * w_out        : [adapter_hidden,  hidden_dim]
+ * b_out        : [hidden_dim]
+ * output       : [B, T, hidden_dim]
+ * gate_logit   : scalar; effective gate = sigmoid(gate_logit). With
+ *                gate_logit=-2 this gives ~0.12 (mistral_cg init).
+ *
+ * Dynamic shared memory = adapter_hidden * sizeof(float).
+ */
+__phase_kernel__ void phase_adapter_gate(
+    const void* __restrict__ intent_phase,
+    const void* __restrict__ hidden,
+    const void* __restrict__ w_in,
+    const void* __restrict__ b_in,
+    const void* __restrict__ w_out,
+    const void* __restrict__ b_out,
+    void* __restrict__ output,
+    int batch_size,
+    int seq_len,
+    int num_heads,
+    int adapter_hidden,
+    int hidden_dim,
+    int dtype_id,
+    float gate_logit
+) {
+    int gid = __block_idx() * __block_dim() + __thread_idx();
+    int total_tokens = batch_size * seq_len;
+    if (gid >= total_tokens) return;
+
+    const int ip_off = gid * num_heads;
+    const int h_off  = gid * hidden_dim;
+
+    extern __shared__ float adapter_mid[];
+
+    /* ----- stage 1: num_heads -> adapter_hidden, GELU ----- */
+    for (int i = 0; i < adapter_hidden; i++) {
+        float acc = load_typed(b_in, i, dtype_id);
+        for (int j = 0; j < num_heads; j++) {
+            acc += load_typed(intent_phase, ip_off + j, dtype_id)
+                 * load_typed(w_in, j * adapter_hidden + i, dtype_id);
+        }
+        adapter_mid[i] = gelu(acc);
+    }
+
+    /* ----- stage 2: adapter_hidden -> hidden_dim ----- */
+    /*         plus  CO_GATED_RESIDUAL: output = hidden + gate * adapter_out  */
+    float gate = sigmoidf(gate_logit);
+
+    for (int i = 0; i < hidden_dim; i++) {
+        float adapter_out = load_typed(b_out, i, dtype_id);
+        for (int j = 0; j < adapter_hidden; j++) {
+            adapter_out += adapter_mid[j]
+                         * load_typed(w_out, j * hidden_dim + i, dtype_id);
+        }
+        float residual = load_typed(hidden, h_off + i, dtype_id);
+        store_typed(output, h_off + i, residual + gate * adapter_out, dtype_id);
+    }
+}

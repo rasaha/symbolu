@@ -115,6 +115,31 @@ typedef struct {
 } cohera_cognitive_state_t;
 
 /*============================================================================
+ * Sovereign State (32 dimensions) — matches mistral_cg SovereignStateProjector
+ *  layout: Bhava(12) + Kosha(5) + Vritti(5) + Guna(6) + Reserved(4) = 32
+ *============================================================================*/
+
+#define COHERA_SOVEREIGN_BHAVA_DIM    12
+#define COHERA_SOVEREIGN_KOSHA_DIM    5
+#define COHERA_SOVEREIGN_VRITTI_DIM   5
+#define COHERA_SOVEREIGN_GUNA_DIM     6
+#define COHERA_SOVEREIGN_RESERVED_DIM 4
+#define COHERA_SOVEREIGN_TOTAL_DIM    32
+
+typedef enum {
+    COHERA_KOSHA_MODE_SIGMOID = 0,
+    COHERA_KOSHA_MODE_SOFTMAX = 1,
+} cohera_kosha_mode_t;
+
+typedef struct {
+    float bhava[COHERA_SOVEREIGN_BHAVA_DIM];        /* softmax */
+    float kosha[COHERA_SOVEREIGN_KOSHA_DIM];        /* sigmoid / softmax */
+    float vritti[COHERA_SOVEREIGN_VRITTI_DIM];      /* softmax */
+    float guna[COHERA_SOVEREIGN_GUNA_DIM];          /* sigmoid */
+    float reserved[COHERA_SOVEREIGN_RESERVED_DIM];  /* tanh */
+} cohera_sovereign_state_t;
+
+/*============================================================================
  * Runtime Metrics
  *============================================================================*/
 
@@ -134,7 +159,15 @@ typedef struct {
  * Attention Configuration
  *============================================================================*/
 
+/*
+ * Field ordering note: v1 fields (seq_len..coherence_threshold) come first
+ * and must not be reordered. v2 fields (num_kv_heads onward) are append-only
+ * so zero-initialized v1 callers keep working — defaulting num_kv_heads=0
+ * selects MHA, dtype=FP16 selects the legacy path, window_size=0 is coerced
+ * to full attention by the kernel, and rope_* default NULL/0 disables RoPE.
+ */
 typedef struct {
+    /* --- v1: stable --- */
     int seq_len;
     int embed_dim;
     int num_heads;
@@ -145,6 +178,13 @@ typedef struct {
     int use_tcu;                   /* Enable temporal context */
     int ontology_layer;            /* Bound to layer (0-11, -1 for all) */
     float coherence_threshold;     /* Gating threshold */
+    /* --- v2: append-only --- */
+    int num_kv_heads;              /* GQA: KV head count (<= num_heads). 0 -> MHA (num_heads). */
+    cohera_dtype_t dtype;          /* Compute dtype (FP16 / BF16 / FP32) */
+    int window_size;               /* Sliding window (<= 0 = full attention) */
+    const cohera_tensor_t* rope_freqs; /* Device tensor [rope_dim/2] FP32, or NULL */
+    int rope_dim;                  /* Dim to apply RoPE over (0 = disabled) */
+    int rope_base_position;        /* Starting position id (for KV cache continuation) */
 } cohera_attention_config_t;
 
 /*============================================================================
@@ -373,11 +413,97 @@ cohera_error_t cohera_phase_attention_with_phases(
 );
 
 /**
+ * Fused phase attention for Mistral-style decoders.
+ *
+ * Composes the standard decoder pre-steps into one call on a single stream:
+ *
+ *   1. If config->rope_dim > 0 and config->rope_freqs is non-NULL, apply
+ *      RoPE to Q and K with position offset = config->rope_base_position.
+ *   2. If config->num_kv_heads > 0 and < config->num_heads, broadcast K/V
+ *      from num_kv_heads to num_heads (GQA expansion).
+ *   3. Run cohera_phase_attention with the (possibly rotated / expanded)
+ *      tensors.
+ *   4. TCU accumulation is handled inside the phase kernel per config->use_tcu.
+ *
+ * Key / value shapes on entry:
+ *   key   : [batch, seq, num_kv_heads, head_dim]
+ *   value : [batch, seq, num_kv_heads, head_dim]
+ *   query : [batch, seq, num_heads,    head_dim]
+ *
+ * The fused path avoids host-side chaining and lets the runtime schedule
+ * all three ops on the supplied stream with no intermediate sync.
+ */
+cohera_error_t cohera_phase_attention_fused(
+    cohera_tensor_t* output,
+    const cohera_tensor_t* query,
+    const cohera_tensor_t* key,
+    const cohera_tensor_t* value,
+    const cohera_attention_config_t* config,
+    cohera_stream_t stream
+);
+
+/**
  * Project hidden states to cognitive state.
  */
 cohera_error_t cohera_ontology_project(
     cohera_cognitive_state_t* output,
     const cohera_tensor_t* hidden,
+    cohera_stream_t stream
+);
+
+/**
+ * Project hidden states to 32-D Sovereign State
+ * (mistral_cg SovereignStateProjector).
+ *
+ * hidden: [batch, seq, hidden_dim] or [batch, hidden_dim]
+ */
+cohera_error_t cohera_ontology_project_sovereign(
+    cohera_sovereign_state_t* output,
+    const cohera_tensor_t* hidden,
+    cohera_kosha_mode_t kosha_mode,
+    cohera_stream_t stream
+);
+
+/**
+ * Apply Rotary Position Embedding (RoPE) in-place / to output.
+ *
+ * input / output shape: [batch, seq, heads, head_dim]
+ * rope_freqs:           device tensor [rope_dim / 2] FP32
+ *                       (typically head_dim / 2 precomputed inverse freqs)
+ * position_offset:      base token position (supports KV-cache continuation)
+ */
+cohera_error_t cohera_apply_rope(
+    cohera_tensor_t* output,
+    const cohera_tensor_t* input,
+    const cohera_tensor_t* rope_freqs,
+    int rope_dim,
+    int position_offset,
+    cohera_stream_t stream
+);
+
+/**
+ * Broadcast KV heads for Grouped Query Attention.
+ *
+ * Expands   kv [batch, seq, num_kv_heads, head_dim]
+ *       to kv' [batch, seq, num_heads,    head_dim]
+ * by repeating each KV head (num_heads / num_kv_heads) times.
+ */
+cohera_error_t cohera_gqa_broadcast(
+    cohera_tensor_t* kv_expanded,
+    const cohera_tensor_t* kv,
+    int num_heads,
+    cohera_stream_t stream
+);
+
+/**
+ * Build a causal + sliding-window mask on device.
+ * mask shape: [seq_len, seq_len], dtype FP32, 0.0 = keep, -INF = drop.
+ * window_size < 0 or >= seq_len -> full causal only.
+ */
+cohera_error_t cohera_build_sliding_window_mask(
+    cohera_tensor_t* mask,
+    int seq_len,
+    int window_size,
     cohera_stream_t stream
 );
 
@@ -393,12 +519,46 @@ cohera_error_t cohera_state_delta(
 
 /*============================================================================
  * Temporal Context Unit (TCU)
+ *
+ * The TCU supports two accumulation modes:
+ *
+ *   COHERA_TCU_MODE_FRAME_EMA  (default)
+ *     Frame-global exponential moving average. A single phase context per
+ *     head decays across frames. Used by the hybrid vision / streaming
+ *     paths where each frame is an independent inference.
+ *
+ *   COHERA_TCU_MODE_KV_CACHE
+ *     Per-sequence KV-cache accumulation. Each (stream, head) owns an
+ *     independent phase history indexed by absolute position. Used by
+ *     mistral_cg autoregressive decoding so a prefill's accumulated phase
+ *     is reused when continuing from the same sequence.
  *============================================================================*/
 
+typedef enum {
+    COHERA_TCU_MODE_FRAME_EMA = 0,  /* global EMA per head (default) */
+    COHERA_TCU_MODE_KV_CACHE  = 1,  /* per-sequence per-head phase history */
+} cohera_tcu_mode_t;
+
 /**
- * Reset all TCU accumulators.
+ * Select the TCU accumulation mode. Must be called before the first
+ * accumulate of a new sequence; resets per-sequence state on transition.
+ */
+cohera_error_t cohera_tcu_set_mode(cohera_tcu_mode_t mode);
+
+/**
+ * Query the current TCU accumulation mode.
+ */
+cohera_error_t cohera_tcu_get_mode(cohera_tcu_mode_t* mode);
+
+/**
+ * Reset all TCU accumulators (frame EMA and KV-cache slots).
  */
 cohera_error_t cohera_tcu_reset(void);
+
+/**
+ * Reset the per-sequence slot for a specific stream (KV_CACHE mode only).
+ */
+cohera_error_t cohera_tcu_reset_sequence(cohera_stream_t stream);
 
 /**
  * Get current frame count from TCU.
@@ -406,14 +566,19 @@ cohera_error_t cohera_tcu_reset(void);
 cohera_error_t cohera_tcu_get_frame_count(uint64_t* count);
 
 /**
- * Set TCU decay factor for exponential moving average.
+ * Set TCU decay factor for exponential moving average (FRAME_EMA mode).
  */
 cohera_error_t cohera_tcu_set_decay(float decay);
 
 /**
  * Read phase context from TCU.
+ *   FRAME_EMA: returns the rolling context for `head`.
+ *   KV_CACHE:  returns the history slice for (stream, head).
+ * For KV_CACHE mode, pass a non-NULL stream to select the sequence.
  */
-cohera_error_t cohera_tcu_read_context(cohera_tensor_t* context, int head);
+cohera_error_t cohera_tcu_read_context(cohera_tensor_t* context,
+                                       int head,
+                                       cohera_stream_t stream);
 
 /*============================================================================
  * Coherence Monitoring
