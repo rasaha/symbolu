@@ -2542,7 +2542,7 @@ the second-order approach may not be viable. Stop and investigate before
 building Phase 4. Do not run 6,900 episodes to confirm a negative result that
 is visible at 10 episodes.
 
-#### 3C.14 What Phase 3 Does NOT Build
+#### 3C.15 What Phase 3 Does NOT Build
 
 - Scenario definitions (which failures, when, on which road) — Phase 4
 - Statistical analysis, aggregation across runs, plots — Phase 4
