@@ -4437,3 +4437,54 @@ suite. V2 Hybrid extension is only justified if Core succeeds.
 ---
 
 _End of Design Document — BCVF for Autonomous Systems V1._
+
+---
+
+## Appendix: Post-Phase-4 Calibration Finding
+
+A calibration pass on this sandbox surfaced an architectural subtlety
+worth recording before Phase 5:
+
+**Observation.** The closed-loop planner (§3B.5) uses ``anchor=M1`` for
+``J_perf``. With M1 always reliable (mild drift only, per §2.3.2),
+failures on M2/M3/M4 never mislead the *planned* path — they only
+surface in ``J_BCVF``. The §4C.13 gate-2 collision-rate contrast
+("A3 collision rate < A0 collision rate on S6") is therefore **not
+producible under the V1 planner architecture** on any of the
+currently-specified failure scenarios.
+
+**What the calibration actually demonstrates.** The signal-level
+claim — Lemma 1 invariance — **is** producible and matches §4C.13
+gate 1 directly. Measured on this sandbox at the post-sweep defaults
+(T=0.2, β=100, tuned predictor noise from Phase 2):
+
+| Scenario              | ZEROTH | FIRST | SECOND |
+|-----------------------|-------:|------:|-------:|
+| S1 no-failure floor   |   0.16 |  0.09 |   5.59 |
+| S5 constant bias      |  31.00 | 11.23 |  11.84 |
+| S6 accelerating LiDAR |  69.67 | 52.74 |  47.31 |
+
+Response to constant bias (S5 ÷ S1):
+- ZEROTH: 198× — false alarm on a harmless static offset.
+- FIRST: 123× — also alarms, because the "bias on at t=0" is a step.
+- SECOND: 2.1× — barely above the noise floor, as Lemma 1 predicts.
+
+The demo is runnable: ``python -m symbolu_robotics.bcvf_autonomous.demos.lemma1_invariance``.
+
+**V2 work needed for collision-rate demonstrations.** To produce the
+§4C.13 gate-2 contrast, the planner needs one of:
+
+1. **Scenario-specific anchor selection** — each scenario names its
+   anchor (S2 → M4, S4 → M3, S6 → M2). The failing predictor becomes
+   the one MPPI trusts for ``J_perf``, so baseline A0 gets misled and
+   A3 BCVF steers back to the consensus. Minimal code change
+   (``MPPIConfig.anchor`` already exists); requires a new
+   ``ScenarioConfig.anchor`` field plumbed through
+   ``scenario_to_run_config``.
+2. **Consensus J_perf** — compute ``J_perf`` on the weighted mean of
+   all predictor rollouts rather than a single anchor. This matches
+   the V3.1 narrative better but is a larger refactor.
+
+Either is tractable as a V2 addition. V1's testable, honest claim is
+the Lemma 1 invariance demo above.
+
