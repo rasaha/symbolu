@@ -79,36 +79,7 @@ __phase_kernel__ void phase_attention_head(
     phases[gid] = __phase_compute_scalar(q_proj);
     __syncthreads();
 
-    /* ----- 2. Kuramoto sync (runtime params) ----- */
-    for (int step = 0; step < sync_steps; step++) {
-        if (tid == 0) { sin_sum = 0.0f; cos_sum = 0.0f; }
-        __syncthreads();
-
-        atomicAdd(&sin_sum, __sinf(phases[gid]));
-        atomicAdd(&cos_sum, __cosf(phases[gid]));
-        __syncthreads();
-
-        float mean_phase = atan2f(sin_sum, cos_sum);
-        float gradient   = -__sinf(phases[gid] - mean_phase);
-        phases[gid]     += sync_lr * gradient;
-        phases[gid]      = fmodf(phases[gid] + TWO_PI, TWO_PI);
-        __syncthreads();
-    }
-
-    /* ----- 3. coherence over visible set ----- */
-    if (tid == 0) { sin_sum = 0.0f; cos_sum = 0.0f; }
-    __syncthreads();
-    atomicAdd(&sin_sum, __sinf(phases[gid]));
-    atomicAdd(&cos_sum, __cosf(phases[gid]));
-    __syncthreads();
-
-    float coherence  = sqrtf(sin_sum * sin_sum + cos_sum * cos_sum) / (float)seq_len;
-    float mean_phase = atan2f(sin_sum, cos_sum);
-    if (gid == 0) *coherence_out = coherence;
-
-    /* ----- 4. masked weighted aggregation ----- */
-    float threshold = __get_coherence_threshold(ontology_layer);
-
+    /* ----- precompute this thread's visible range (used by sync + agg) ----- */
     int j_lo = 0;
     int j_hi = seq_len;
     if (causal)              j_hi = gid + 1;
@@ -116,12 +87,81 @@ __phase_kernel__ void phase_attention_head(
         int lo = gid - window_size + 1;
         if (lo > j_lo) j_lo = lo;
     }
+    /* When mask is a no-op we take the fast shared-reduction path. Causal or
+     * sliding-window forces per-position masked reductions so a position never
+     * observes tokens outside its visible set during phase sync or coherence. */
+    int use_global_reduction = (!causal) && (window_size <= 0);
+
+    /* ----- 2. Kuramoto sync (masked or global) ----- */
+    for (int step = 0; step < sync_steps; step++) {
+        float mean_phase;
+
+        if (use_global_reduction) {
+            if (tid == 0) { sin_sum = 0.0f; cos_sum = 0.0f; }
+            __syncthreads();
+            atomicAdd(&sin_sum, __sinf(phases[gid]));
+            atomicAdd(&cos_sum, __cosf(phases[gid]));
+            __syncthreads();
+            mean_phase = atan2f(sin_sum, cos_sum);
+        } else {
+            /* Per-position masked circular mean. Causality preserved: position
+             * gid reads only phases[j_lo..j_hi). */
+            float ls = 0.0f;
+            float lc = 0.0f;
+            for (int j = j_lo; j < j_hi; j++) {
+                ls += __sinf(phases[j]);
+                lc += __cosf(phases[j]);
+            }
+            mean_phase = (j_hi > j_lo) ? atan2f(ls, lc) : phases[gid];
+        }
+
+        /* compute next phase but defer the write so concurrent neighbors finish
+         * reading the current step's phases before any thread mutates them */
+        float gradient  = -__sinf(phases[gid] - mean_phase);
+        float new_phase = fmodf(phases[gid] + sync_lr * gradient + TWO_PI, TWO_PI);
+
+        __syncthreads();
+        phases[gid] = new_phase;
+        __syncthreads();
+    }
+
+    /* ----- 3. final coherence + mean over visible set ----- */
+    float coh_sin;
+    float coh_cos;
+
+    if (use_global_reduction) {
+        if (tid == 0) { sin_sum = 0.0f; cos_sum = 0.0f; }
+        __syncthreads();
+        atomicAdd(&sin_sum, __sinf(phases[gid]));
+        atomicAdd(&cos_sum, __cosf(phases[gid]));
+        __syncthreads();
+        coh_sin = sin_sum;
+        coh_cos = cos_sum;
+    } else {
+        coh_sin = 0.0f;
+        coh_cos = 0.0f;
+        for (int j = j_lo; j < j_hi; j++) {
+            coh_sin += __sinf(phases[j]);
+            coh_cos += __cosf(phases[j]);
+        }
+    }
+
+    float visible = (float)(j_hi - j_lo);
+    if (visible < 1.0f) visible = 1.0f;
+    float coherence  = sqrtf(coh_sin * coh_sin + coh_cos * coh_cos) / visible;
+    float mean_phase = atan2f(coh_sin, coh_cos);
+
+    /* Scalar coherence_out is written from the position that sees the deepest
+     * visible set: gid 0 for global reduction (all identical), or the last
+     * token for causal/window (matches the "current step" of decode). */
+    int report_gid = use_global_reduction ? 0 : (seq_len - 1);
+    if (gid == report_gid) *coherence_out = coherence;
+
+    /* ----- 4. masked weighted aggregation ----- */
+    float threshold = __get_coherence_threshold(ontology_layer);
 
     if (coherence > threshold) {
-        /* normalization count = visible tokens under the mask */
-        float norm = (float)(j_hi - j_lo);
-        if (norm < 1.0f) norm = 1.0f;
-
+        float norm = visible;
         for (int d = 0; d < head_dim; d++) {
             float v_sum = 0.0f;
             for (int j = j_lo; j < j_hi; j++) {
