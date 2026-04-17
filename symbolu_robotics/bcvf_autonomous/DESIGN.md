@@ -199,7 +199,10 @@ disagreement regularization). These are different systems.
 ```
 symbolu_robotics/
   bcvf_autonomous/
-    __init__.py                  # Package init, version, public API
+    __init__.py                  # Package init, __version__, public API
+                                 #   (populated incrementally starting Phase 1;
+                                 #    re-exports each phase's new symbols as
+                                 #    they land — see §1.2.3, §2, §3, §4)
     DESIGN.md                    # This document
     core.py                      # Definitions 1-7: disagreement, velocity,
                                  #   acceleration, gate, Huber, J_BCVF
@@ -465,6 +468,25 @@ def compute_bcvf_cost_batch(
 
 **Estimated size:** ~150 lines including docstrings.
 
+#### 1.2.3 `__init__.py` — Phase 1 Public API Surface
+
+The subpackage's `__init__.py` is populated in this phase (not deferred to
+Phase 5) so callers can reach the math kernel via the canonical import path:
+
+```python
+from symbolu_robotics.bcvf_autonomous import (
+    BCVFConfig, BCVFResult,
+    compute_bcvf_cost, compute_bcvf_cost_batch,
+    SE2Pose, body_frame_error, wrap_angle,
+)
+```
+
+The module must also define `__version__` (starting at `"0.1.0"` for the
+Phase 1 math-kernel-only surface) and an `__all__` listing every re-exported
+symbol. Later phases append to `__all__` and bump the version — Phase 5
+deals only with the **parent** `symbolu_robotics/__init__.py` registration
+(§5.5), not the subpackage's own `__init__.py`.
+
 ### 1.3 Test Specification
 
 Tests go in `bcvf_autonomous/tests/test_manifold.py` and
@@ -566,6 +588,9 @@ Phase 1 is complete when:
 - [ ] `compute_bcvf_cost_batch` with K=1000, H=50, M=4 (anchor) completes in
   <50ms on a single CPU core (timing assertion in test)
 - [ ] No imports from any other `symbolu_robotics` module
+- [ ] `bcvf_autonomous/__init__.py` re-exports the Phase 1 public API
+  (§1.2.3), exposes `__version__ = "0.1.0"`, and lists every symbol in
+  `__all__`
 
 ### 1.6 Success Gate
 
@@ -3915,8 +3940,12 @@ the invariance argument tangible.
 
 ### 5.5 Parent Module Registration
 
-Update `symbolu_robotics/__init__.py` to acknowledge the new product line.
-This is a minimal, non-breaking addition.
+Update the **parent** `symbolu_robotics/__init__.py` to acknowledge the new
+product line. This is a minimal, non-breaking addition. The subpackage's
+own `bcvf_autonomous/__init__.py` public API is populated per-phase
+starting in Phase 1 (§1.2.3), so by the time Phase 5 runs it already
+exports `__version__` and the full `__all__`; this section only touches
+the **parent** package init.
 
 ```python
 # At the end of the existing __init__.py, add:
