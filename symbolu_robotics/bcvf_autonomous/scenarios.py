@@ -51,6 +51,12 @@ class ScenarioConfig:
     # the §4C.13 gate-2 A0-vs-A3 contrast producible. Leave as ``None``
     # to preserve the default anchor from the caller's MPPIConfig.
     anchor: Optional[str] = None
+    # V2 follow-up (gate-2 enablement): per-scenario MPPI rollout horizon.
+    # Default ``base_mppi.horizon`` is too short for the in-rollout failure
+    # bias to integrate enough 2nd-order signal at the gate threshold. A
+    # scenario can opt into a longer horizon when its failure dynamics
+    # need more integration time. ``None`` preserves the caller's default.
+    mppi_horizon: Optional[int] = None
 
     # Directional expectations (not hard assertions).
     expect_bcvf_activation: bool = False
@@ -108,14 +114,19 @@ S3_MAP_ERROR = ScenarioConfig(
     name="S3_map_error",
     description=(
         "Construction zone: road layout differs from HD map. M4 diverges "
-        "laterally with quadratically growing offset."
+        "laterally with quadratically growing offset. Primary gate-2 "
+        "scenario — failure injects in the lane-deviation-relevant axis "
+        "(lateral), so anchor=M4 misroutes the baseline planner."
     ),
     road_type="straight",
     road_length=200.0,
+    # V2 follow-up: barrier line moved from x=120-140 to x=60-80 so the
+    # 20s episode at current MPPI tuning (~3.5 m/s) actually reaches it.
+    # Same barrier shape (3 obstacles, 10 m apart, lateral offset growing).
     obstacles=[
-        {"x": 120.0, "y": 0.0, "radius": 1.5},
-        {"x": 130.0, "y": 0.5, "radius": 1.5},
-        {"x": 140.0, "y": 1.0, "radius": 1.5},
+        {"x": 60.0, "y": 0.0, "radius": 1.5},
+        {"x": 70.0, "y": 0.5, "radius": 1.5},
+        {"x": 80.0, "y": 1.0, "radius": 1.5},
     ],
     failures={
         "M4": FailureConfig(
@@ -124,6 +135,10 @@ S3_MAP_ERROR = ScenarioConfig(
     },
     gnss_failure_type="map_error",
     anchor="M4",  # V2 B1
+    # V2 follow-up: 2s rollout horizon (H=20) is too short for the
+    # accelerating lateral bias to push BCVF above the gate threshold.
+    # 5s horizon gives the failure 2.5x the integration time.
+    mppi_horizon=50,
     max_steps=200,
     initial_velocity=8.0,
     expect_bcvf_activation=True,
@@ -267,6 +282,11 @@ def scenario_to_run_config(
     mppi_out = replace(mppi_config)
     if scenario.anchor is not None:
         mppi_out = replace(mppi_out, anchor=scenario.anchor)
+    # Scenario MPPI horizon, if set, overrides the caller's default. Used
+    # by gate-2 scenarios whose accelerating failure needs a longer
+    # rollout to push BCVF cost above the gate threshold.
+    if scenario.mppi_horizon is not None:
+        mppi_out = replace(mppi_out, horizon=scenario.mppi_horizon)
 
     return RunConfig(
         sim=sim,

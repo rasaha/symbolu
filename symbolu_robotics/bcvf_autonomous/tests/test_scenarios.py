@@ -139,6 +139,42 @@ def replace_mppi_anchor(mppi, anchor):
     return replace(mppi, anchor=anchor)
 
 
+# --- V2 follow-up: per-scenario MPPI horizon ---
+
+
+def test_scenario_mppi_horizon_default_is_none_for_other_scenarios() -> None:
+    """All non-S3 scenarios leave mppi_horizon as None (caller default
+    flows through). Regression guard against accidental scope creep."""
+    for name in (
+        "S1_normal_driving",
+        "S2_gps_multipath",
+        "S4_camera_degradation",
+        "S5_constant_bias",
+        "S6_glass_corridor",
+    ):
+        assert SCENARIOS[name].mppi_horizon is None, name
+
+
+def test_s3_has_extended_horizon() -> None:
+    assert SCENARIOS["S3_map_error"].mppi_horizon == 50
+
+
+def test_s3_obstacles_in_reach_band() -> None:
+    """S3 obstacles relocated to the 60-80 m band so the 20s episode at
+    current pacing actually reaches them."""
+    xs = sorted(o["x"] for o in SCENARIOS["S3_map_error"].obstacles)
+    assert xs == [60.0, 70.0, 80.0]
+
+
+def test_scenario_horizon_reaches_mppi_config() -> None:
+    bcvf, mppi, perf, bicycle = _tuning()
+    assert mppi.horizon == 5  # caller default from _tuning()
+    cfg_s3 = scenario_to_run_config(SCENARIOS["S3_map_error"], bcvf, mppi, perf, bicycle)
+    assert cfg_s3.mppi.horizon == 50  # scenario override wins
+    cfg_s1 = scenario_to_run_config(SCENARIOS["S1_normal_driving"], bcvf, mppi, perf, bicycle)
+    assert cfg_s1.mppi.horizon == 5  # no override -> caller default preserved
+
+
 def test_scenario_anchor_used_by_planner_at_runtime() -> None:
     """End-to-end behavioral: build a Runner from a scenario with a
     non-default anchor and verify the instantiated MPPIPlanner uses that
