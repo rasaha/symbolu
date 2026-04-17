@@ -258,17 +258,35 @@ cohera_error_t cohera_stream_wait_event(cohera_stream_t stream, cohera_event_t e
 
 ### 4.4 Kernel Launch API
 
+The attention config is versioned append-only: v1 fields (`seq_len` through
+`coherence_threshold`) are stable and must not be reordered. v2 fields were
+added to support Mistral-style decoders (GQA, RoPE, sliding window, BF16).
+Zero-initialized v1 callers continue to work unchanged — `num_kv_heads=0`
+selects MHA, `window_size<=0` selects full attention, and `rope_*` NULL/0
+disables RoPE.
+
 ```c
 // Phase attention kernel configuration
 typedef struct {
+    // --- v1: stable ---
     int seq_len;
     int embed_dim;
     int num_heads;
     int sync_steps;             // Phase sync iterations (default: 3)
     float sync_lr;              // Phase learning rate (default: 0.1)
     float temperature;          // Attention temperature
-    bool causal;                // Causal masking
-    bool use_tcu;               // Enable temporal context
+    int causal;                 // Causal masking (0 / 1)
+    int use_tcu;                // Enable temporal context (0 / 1)
+    int ontology_layer;         // Bound layer (0-11, -1 = all)
+    float coherence_threshold;  // Gating threshold
+
+    // --- v2: append-only ---
+    int num_kv_heads;                  // GQA: 0 -> MHA, else <= num_heads
+    cohera_dtype_t dtype;              // FP16 / BF16 / FP32
+    int window_size;                   // Sliding window (<= 0 = full)
+    const cohera_tensor_t* rope_freqs; // Device tensor [rope_dim/2] FP32, NULL = off
+    int rope_dim;                      // 0 = RoPE disabled
+    int rope_base_position;            // KV-cache continuation offset
 } cohera_attention_config_t;
 
 // Launch phase attention
@@ -281,21 +299,77 @@ cohera_error_t cohera_phase_attention(
     cohera_stream_t stream
 );
 
-// Launch ontology projection
+// Fused decoder path: RoPE (if configured) -> GQA broadcast (if
+// num_kv_heads < num_heads) -> phase attention -> TCU, all on `stream`.
+cohera_error_t cohera_phase_attention_fused(
+    cohera_tensor_t* output,
+    const cohera_tensor_t* query,      // [batch, seq, num_heads,    head_dim]
+    const cohera_tensor_t* key,        // [batch, seq, num_kv_heads, head_dim]
+    const cohera_tensor_t* value,      // [batch, seq, num_kv_heads, head_dim]
+    const cohera_attention_config_t* config,
+    cohera_stream_t stream
+);
+
+// Apply Rotary Position Embedding (RoPE) on Q or K.
+cohera_error_t cohera_apply_rope(
+    cohera_tensor_t* output,
+    const cohera_tensor_t* input,      // [batch, seq, heads, head_dim]
+    const cohera_tensor_t* rope_freqs, // [rope_dim / 2] FP32
+    int rope_dim,
+    int position_offset,
+    cohera_stream_t stream
+);
+
+// Broadcast KV heads from num_kv_heads to num_heads (GQA expansion).
+cohera_error_t cohera_gqa_broadcast(
+    cohera_tensor_t* kv_expanded,
+    const cohera_tensor_t* kv,
+    int num_heads,
+    cohera_stream_t stream
+);
+
+// Build a causal + sliding-window mask on device.
+// window_size <= 0 or >= seq_len -> full causal only.
+cohera_error_t cohera_build_sliding_window_mask(
+    cohera_tensor_t* mask,             // [seq_len, seq_len] FP32
+    int seq_len,
+    int window_size,
+    cohera_stream_t stream
+);
+
+// Launch 124-D ontology projection
 cohera_error_t cohera_ontology_project(
-    cohera_tensor_t* cognitive_state,   // Output: [batch, 124]
-    const cohera_tensor_t* hidden,      // Input: [batch, seq, 768]
+    cohera_cognitive_state_t* cognitive_state,   // Output: 124-D
+    const cohera_tensor_t* hidden,               // Input: [batch, seq, hidden]
+    cohera_stream_t stream
+);
+
+// Launch 32-D Sovereign-State projection (mistral_cg)
+//   Bhava(12) + Kosha(5) + Vritti(5) + Guna(6) + Reserved(4) = 32
+cohera_error_t cohera_ontology_project_sovereign(
+    cohera_sovereign_state_t* output,
+    const cohera_tensor_t* hidden,
+    cohera_kosha_mode_t kosha_mode,
     cohera_stream_t stream
 );
 
 // Get state delta
 cohera_error_t cohera_state_delta(
-    cohera_tensor_t* delta,             // Output: [batch, 124]
-    const cohera_tensor_t* prev_state,
-    const cohera_tensor_t* curr_state,
+    cohera_cognitive_state_t* delta,
+    const cohera_cognitive_state_t* prev_state,
+    const cohera_cognitive_state_t* curr_state,
     cohera_stream_t stream
 );
 ```
+
+#### Kernel shared-memory contract
+
+`phase_attention_head` allocates its `phases[]` buffer from dynamic shared
+memory; the caller must pass `shared_mem_size = (seq_len + 2) * sizeof(float)`
+to `cohera_kernel_launch` (two trailing floats for the global sin/cos
+reductions on the non-masked fast path). When `causal` or `window_size > 0`
+the kernel takes a per-position masked reduction instead, so causality is
+preserved during Kuramoto sync, coherence measurement, and aggregation.
 
 ### 4.5 Coherence Monitoring
 

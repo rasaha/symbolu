@@ -413,6 +413,36 @@ cohera_error_t cohera_phase_attention_with_phases(
 );
 
 /**
+ * Fused phase attention for Mistral-style decoders.
+ *
+ * Composes the standard decoder pre-steps into one call on a single stream:
+ *
+ *   1. If config->rope_dim > 0 and config->rope_freqs is non-NULL, apply
+ *      RoPE to Q and K with position offset = config->rope_base_position.
+ *   2. If config->num_kv_heads > 0 and < config->num_heads, broadcast K/V
+ *      from num_kv_heads to num_heads (GQA expansion).
+ *   3. Run cohera_phase_attention with the (possibly rotated / expanded)
+ *      tensors.
+ *   4. TCU accumulation is handled inside the phase kernel per config->use_tcu.
+ *
+ * Key / value shapes on entry:
+ *   key   : [batch, seq, num_kv_heads, head_dim]
+ *   value : [batch, seq, num_kv_heads, head_dim]
+ *   query : [batch, seq, num_heads,    head_dim]
+ *
+ * The fused path avoids host-side chaining and lets the runtime schedule
+ * all three ops on the supplied stream with no intermediate sync.
+ */
+cohera_error_t cohera_phase_attention_fused(
+    cohera_tensor_t* output,
+    const cohera_tensor_t* query,
+    const cohera_tensor_t* key,
+    const cohera_tensor_t* value,
+    const cohera_attention_config_t* config,
+    cohera_stream_t stream
+);
+
+/**
  * Project hidden states to cognitive state.
  */
 cohera_error_t cohera_ontology_project(

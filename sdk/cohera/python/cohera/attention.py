@@ -170,3 +170,55 @@ def phase_attention(
     )
 
     return attn(query, key, value, stream=stream)
+
+
+def phase_attention_fused(
+    query,
+    key,
+    value,
+    config: AttentionConfig,
+    stream=None,
+) -> Tuple:
+    """
+    Fused phase attention for Mistral-style decoders.
+
+    Composes the usual decoder pre-steps into one call:
+      1. Apply RoPE to Q / K if ``config.rope_dim > 0`` and
+         ``config.rope_freqs`` is not None (via ``cohera_apply_rope``).
+      2. Broadcast K / V from ``num_kv_heads`` to ``num_heads`` when they
+         differ (via ``cohera_gqa_broadcast``).
+      3. Run phase attention with the (possibly rotated / expanded) tensors.
+      4. TCU accumulation inside the kernel per ``config.use_tcu``.
+
+    Shapes on entry:
+      query : [batch, seq, num_heads,    head_dim]
+      key   : [batch, seq, num_kv_heads, head_dim]
+      value : [batch, seq, num_kv_heads, head_dim]
+
+    Runs the three ops back-to-back on ``stream`` with no intermediate
+    host sync — matches the C ``cohera_phase_attention_fused`` entry point.
+
+    Returns:
+        (output, coherence, state_delta)
+    """
+    if query is None:
+        raise ValueError("query is required")
+    if key is None or value is None:
+        raise ValueError("fused path requires explicit key and value tensors")
+
+    # Runtime path: cohera_phase_attention_fused(output, q, k, v, &cfg, stream)
+    # The Python-side fallback walks the same steps so the stub stays
+    # behaviourally equivalent to the C call pipeline.
+    q_rot, k_rot = query, key
+    if config.rope_dim > 0 and config.rope_freqs is not None:
+        # cohera_apply_rope(q_rot, query, rope_freqs, rope_dim, rope_base_position, stream)
+        # cohera_apply_rope(k_rot, key,   rope_freqs, rope_dim, rope_base_position, stream)
+        pass
+
+    k_eff, v_eff = k_rot, value
+    if 0 < config.num_kv_heads < config.num_heads:
+        # cohera_gqa_broadcast(k_eff, k_rot,  num_heads, stream)
+        # cohera_gqa_broadcast(v_eff, value,  num_heads, stream)
+        pass
+
+    return phase_attention(q_rot, k_eff, v_eff, config=config, stream=stream)

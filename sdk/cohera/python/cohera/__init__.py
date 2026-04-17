@@ -13,7 +13,7 @@ from .device import Device, get_device_count, set_device, synchronize
 from .memory import malloc, free, memcpy_h2d, memcpy_d2h
 from .tensor import Tensor, CognitiveState, SovereignState, KoshaMode, DType
 from .stream import Stream
-from .attention import PhaseAttention, phase_attention, AttentionConfig
+from .attention import PhaseAttention, phase_attention, phase_attention_fused, AttentionConfig
 from .ontology import (
     OntologyProjector,
     project_to_cognitive_state,
@@ -46,6 +46,7 @@ __all__ = [
     # Attention
     "PhaseAttention",
     "phase_attention",
+    "phase_attention_fused",
     "AttentionConfig",
     # Ontology
     "OntologyProjector",
