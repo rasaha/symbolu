@@ -519,12 +519,46 @@ cohera_error_t cohera_state_delta(
 
 /*============================================================================
  * Temporal Context Unit (TCU)
+ *
+ * The TCU supports two accumulation modes:
+ *
+ *   COHERA_TCU_MODE_FRAME_EMA  (default)
+ *     Frame-global exponential moving average. A single phase context per
+ *     head decays across frames. Used by the hybrid vision / streaming
+ *     paths where each frame is an independent inference.
+ *
+ *   COHERA_TCU_MODE_KV_CACHE
+ *     Per-sequence KV-cache accumulation. Each (stream, head) owns an
+ *     independent phase history indexed by absolute position. Used by
+ *     mistral_cg autoregressive decoding so a prefill's accumulated phase
+ *     is reused when continuing from the same sequence.
  *============================================================================*/
 
+typedef enum {
+    COHERA_TCU_MODE_FRAME_EMA = 0,  /* global EMA per head (default) */
+    COHERA_TCU_MODE_KV_CACHE  = 1,  /* per-sequence per-head phase history */
+} cohera_tcu_mode_t;
+
 /**
- * Reset all TCU accumulators.
+ * Select the TCU accumulation mode. Must be called before the first
+ * accumulate of a new sequence; resets per-sequence state on transition.
+ */
+cohera_error_t cohera_tcu_set_mode(cohera_tcu_mode_t mode);
+
+/**
+ * Query the current TCU accumulation mode.
+ */
+cohera_error_t cohera_tcu_get_mode(cohera_tcu_mode_t* mode);
+
+/**
+ * Reset all TCU accumulators (frame EMA and KV-cache slots).
  */
 cohera_error_t cohera_tcu_reset(void);
+
+/**
+ * Reset the per-sequence slot for a specific stream (KV_CACHE mode only).
+ */
+cohera_error_t cohera_tcu_reset_sequence(cohera_stream_t stream);
 
 /**
  * Get current frame count from TCU.
@@ -532,14 +566,19 @@ cohera_error_t cohera_tcu_reset(void);
 cohera_error_t cohera_tcu_get_frame_count(uint64_t* count);
 
 /**
- * Set TCU decay factor for exponential moving average.
+ * Set TCU decay factor for exponential moving average (FRAME_EMA mode).
  */
 cohera_error_t cohera_tcu_set_decay(float decay);
 
 /**
  * Read phase context from TCU.
+ *   FRAME_EMA: returns the rolling context for `head`.
+ *   KV_CACHE:  returns the history slice for (stream, head).
+ * For KV_CACHE mode, pass a non-NULL stream to select the sequence.
  */
-cohera_error_t cohera_tcu_read_context(cohera_tensor_t* context, int head);
+cohera_error_t cohera_tcu_read_context(cohera_tensor_t* context,
+                                       int head,
+                                       cohera_stream_t stream);
 
 /*============================================================================
  * Coherence Monitoring

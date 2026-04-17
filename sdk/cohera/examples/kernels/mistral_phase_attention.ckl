@@ -1,0 +1,197 @@
+/*
+ * Mistral Phase Attention Kernel
+ *
+ * Decoder-shaped fused entry point for mistral_cg / mistral_hybrid:
+ *
+ *   1. Apply RoPE to Q (num_heads) and K (num_kv_heads).
+ *   2. Broadcast K / V from num_kv_heads to num_heads (GQA).
+ *   3. Run causal + sliding-window phase attention (delegates to
+ *      multi_head_phase_attention from phase_attention.ckl).
+ *   4. TCU accumulates per head if use_tcu.
+ *
+ * This is the kernel-side analogue of cohera_phase_attention_fused. It
+ * exists as a separate template so the compiler can specialize constant
+ * folding for Mistral's canonical shapes (4096 hidden, 32 heads, 8 KV,
+ * head_dim 128, rope_dim 128, window 4096, BF16).
+ *
+ * Compile:
+ *   coherac -arch pavpu10 -O3 -o mistral_phase_attention.cbin \
+ *           mistral_phase_attention.ckl
+ */
+
+#include <cohera_kernel.h>
+
+/* Kernels defined in sibling templates; linker resolves at compile time. */
+extern __phase_kernel__ void multi_head_phase_attention(
+    const void* query, const void* key, const void* value, void* output,
+    float* coherence, int batch_size, int seq_len, int num_heads,
+    int num_kv_heads, int head_dim, int dtype_id, int causal, int window_size,
+    int sync_steps, float sync_lr, int ontology_layer);
+
+/* dtype_id mirrors cohera_dtype_t */
+#define COHERA_DTYPE_FP16 0
+#define COHERA_DTYPE_BF16 1
+#define COHERA_DTYPE_FP32 2
+
+static __inline__ int elem_size(int dtype_id) {
+    return (dtype_id == COHERA_DTYPE_FP32) ? 4 : 2;
+}
+
+static __inline__ float load_typed(const void* base, int idx, int dtype_id) {
+    if (dtype_id == COHERA_DTYPE_FP32) return ((const float*)base)[idx];
+    if (dtype_id == COHERA_DTYPE_BF16) return __bf16_to_f32(((const bfloat16*)base)[idx]);
+    return (float)((const float16*)base)[idx];
+}
+
+static __inline__ void store_typed(void* base, int idx, float v, int dtype_id) {
+    if (dtype_id == COHERA_DTYPE_FP32)      ((float*)base)[idx]    = v;
+    else if (dtype_id == COHERA_DTYPE_BF16) ((bfloat16*)base)[idx] = __f32_to_bf16(v);
+    else                                    ((float16*)base)[idx]  = (float16)v;
+}
+
+
+/*
+ * Apply RoPE to a Q or K tensor.
+ *   x           : [batch, seq, heads, head_dim]
+ *   rope_freqs  : [rope_dim / 2] FP32 inverse frequencies
+ *   rope_dim    : dim to rotate (Mistral: full head_dim)
+ *   pos_offset  : absolute position of token 0 (KV-cache continuation)
+ */
+__phase_kernel__ void apply_rope(
+    void* __restrict__ x,
+    const float* __restrict__ rope_freqs,
+    int batch_size,
+    int seq_len,
+    int heads,
+    int head_dim,
+    int rope_dim,
+    int pos_offset,
+    int dtype_id
+) {
+    int token = __block_idx() * __block_dim() + __thread_idx();
+    int total = batch_size * seq_len * heads;
+    if (token >= total) return;
+
+    int seq_idx = (token / heads) % seq_len;
+    int pos     = pos_offset + seq_idx;
+
+    int base = token * head_dim;
+    int pairs = rope_dim / 2;
+
+    for (int k = 0; k < pairs; k++) {
+        float theta = (float)pos * rope_freqs[k];
+        float c = __cosf(theta);
+        float s = __sinf(theta);
+
+        float x0 = load_typed(x, base + 2 * k,     dtype_id);
+        float x1 = load_typed(x, base + 2 * k + 1, dtype_id);
+
+        store_typed(x, base + 2 * k,     x0 * c - x1 * s, dtype_id);
+        store_typed(x, base + 2 * k + 1, x0 * s + x1 * c, dtype_id);
+    }
+    /* Upper [rope_dim, head_dim) pass-through (already in place). */
+}
+
+
+/*
+ * Broadcast K or V from num_kv_heads to num_heads by repeating each KV
+ * head head_group_size = num_heads / num_kv_heads times.
+ *
+ * src : [batch, seq, num_kv_heads, head_dim]
+ * dst : [batch, seq, num_heads,    head_dim]
+ */
+__phase_kernel__ void gqa_broadcast(
+    const void* __restrict__ src,
+    void* __restrict__ dst,
+    int batch_size,
+    int seq_len,
+    int num_heads,
+    int num_kv_heads,
+    int head_dim,
+    int dtype_id
+) {
+    int q_head = __block_idx() * __block_dim() + __thread_idx();
+    int total  = batch_size * seq_len * num_heads;
+    if (q_head >= total) return;
+
+    int head_group_size = num_heads / num_kv_heads;
+    int token_idx = q_head / num_heads;          /* linear (batch, seq) */
+    int h         = q_head % num_heads;
+    int kv_h      = h / head_group_size;
+
+    int src_base = (token_idx * num_kv_heads + kv_h) * head_dim;
+    int dst_base = q_head * head_dim;
+
+    for (int d = 0; d < head_dim; d++) {
+        float v = load_typed(src, src_base + d, dtype_id);
+        store_typed(dst, dst_base + d, v, dtype_id);
+    }
+}
+
+
+/*
+ * mistral_phase_attention_fused
+ *
+ * Required HBM scratch buffers (caller-allocated, recycled per layer):
+ *   k_expanded [batch, seq, num_heads, head_dim]
+ *   v_expanded [batch, seq, num_heads, head_dim]
+ *
+ * For MHA (num_kv_heads == num_heads) the broadcast stage is skipped and
+ * the original k / v pointers are passed through.
+ */
+__phase_kernel__ void mistral_phase_attention_fused(
+    void* __restrict__ query,            /* [B, T, num_heads,    head_dim] */
+    void* __restrict__ key,              /* [B, T, num_kv_heads, head_dim] */
+    void* __restrict__ value,            /* [B, T, num_kv_heads, head_dim] */
+    void* __restrict__ k_expanded,       /* [B, T, num_heads,    head_dim] */
+    void* __restrict__ v_expanded,       /* [B, T, num_heads,    head_dim] */
+    void* __restrict__ output,           /* [B, T, num_heads,    head_dim] */
+    float* __restrict__ coherence,       /* [B, num_heads] */
+    const float* __restrict__ rope_freqs,
+    int batch_size,
+    int seq_len,
+    int num_heads,
+    int num_kv_heads,
+    int head_dim,
+    int rope_dim,
+    int rope_base_position,
+    int window_size,
+    int sync_steps,
+    float sync_lr,
+    int ontology_layer,
+    int dtype_id
+) {
+    /* ----- 1. RoPE on Q and K ----- */
+    if (rope_dim > 0 && rope_freqs != 0) {
+        apply_rope(query, rope_freqs,
+                   batch_size, seq_len, num_heads, head_dim,
+                   rope_dim, rope_base_position, dtype_id);
+        apply_rope(key, rope_freqs,
+                   batch_size, seq_len, num_kv_heads, head_dim,
+                   rope_dim, rope_base_position, dtype_id);
+    }
+
+    /* ----- 2. GQA broadcast (skipped when MHA) ----- */
+    const void* k_eff = key;
+    const void* v_eff = value;
+    if (num_kv_heads > 0 && num_kv_heads < num_heads) {
+        gqa_broadcast(key,   k_expanded, batch_size, seq_len,
+                      num_heads, num_kv_heads, head_dim, dtype_id);
+        gqa_broadcast(value, v_expanded, batch_size, seq_len,
+                      num_heads, num_kv_heads, head_dim, dtype_id);
+        k_eff = k_expanded;
+        v_eff = v_expanded;
+    }
+
+    /* ----- 3. Phase attention (causal, window-masked, BF16-aware) ----- */
+    multi_head_phase_attention(
+        query, k_eff, v_eff, output, coherence,
+        batch_size, seq_len,
+        num_heads, num_heads,          /* KV count after broadcast == num_heads */
+        head_dim, dtype_id,
+        /* causal = */ 1,
+        window_size,
+        sync_steps, sync_lr,
+        ontology_layer
+    );
+}

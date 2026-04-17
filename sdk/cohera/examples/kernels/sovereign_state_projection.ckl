@@ -1,0 +1,153 @@
+/*
+ * Sovereign State Projection Kernel
+ *
+ * Implements the mistral_cg SovereignStateProjector in a single kernel:
+ *   hidden_dim  ->  intermediate_dim (GELU)  ->  32  (component-wise norm)
+ *
+ *   layout of the 32-D output:
+ *     [0:12)   bhava    softmax
+ *     [12:17)  kosha    sigmoid or softmax (KOSHA_MODE)
+ *     [17:22)  vritti   softmax
+ *     [22:28)  guna     sigmoid
+ *     [28:32)  reserved tanh
+ *
+ * Designed to match symbolu_training/jepa/state_projector.py so an OPU
+ * binding can slot directly in as a replacement for the PyTorch path.
+ *
+ * Compile:
+ *   coherac -arch pavpu10 -O3 -o sovereign_state_projection.cbin \
+ *           sovereign_state_projection.ckl
+ */
+
+#include <cohera_kernel.h>
+
+#define BHAVA_DIM        12
+#define KOSHA_DIM        5
+#define VRITTI_DIM       5
+#define GUNA_DIM         6
+#define RESERVED_DIM     4
+#define STATE_DIM        32   /* BHAVA + KOSHA + VRITTI + GUNA + RESERVED */
+
+#define BHAVA_OFFSET     0
+#define KOSHA_OFFSET     (BHAVA_OFFSET + BHAVA_DIM)       /* 12 */
+#define VRITTI_OFFSET    (KOSHA_OFFSET + KOSHA_DIM)       /* 17 */
+#define GUNA_OFFSET      (VRITTI_OFFSET + VRITTI_DIM)     /* 22 */
+#define RESERVED_OFFSET  (GUNA_OFFSET + GUNA_DIM)         /* 28 */
+
+#define KOSHA_MODE_SIGMOID 0
+#define KOSHA_MODE_SOFTMAX 1
+
+/* dtype_id mirrors cohera_dtype_t { FP16=0, BF16=1, FP32=2, INT8=3 } */
+#define COHERA_DTYPE_FP16 0
+#define COHERA_DTYPE_BF16 1
+#define COHERA_DTYPE_FP32 2
+
+static __inline__ float load_typed(const void* base, int idx, int dtype_id) {
+    if (dtype_id == COHERA_DTYPE_FP32) return ((const float*)base)[idx];
+    if (dtype_id == COHERA_DTYPE_BF16) return __bf16_to_f32(((const bfloat16*)base)[idx]);
+    return (float)((const float16*)base)[idx];
+}
+
+static __inline__ float gelu(float x) {
+    /* tanh approximation; matches PyTorch's gelu(approximate='tanh'). */
+    const float k = 0.7978845608f;   /* sqrt(2/pi) */
+    float inner = k * (x + 0.044715f * x * x * x);
+    return 0.5f * x * (1.0f + tanhf(inner));
+}
+
+static __inline__ float sigmoidf(float x) {
+    return 1.0f / (1.0f + expf(-x));
+}
+
+/*
+ * Softmax in place over a small contiguous window.
+ * Numerically stable: subtract max before exp.
+ */
+static __inline__ void softmax_window(float* dst, int n) {
+    float m = dst[0];
+    for (int i = 1; i < n; i++) if (dst[i] > m) m = dst[i];
+    float s = 0.0f;
+    for (int i = 0; i < n; i++) {
+        dst[i] = expf(dst[i] - m);
+        s     += dst[i];
+    }
+    float inv = 1.0f / s;
+    for (int i = 0; i < n; i++) dst[i] *= inv;
+}
+
+
+/*
+ * hidden           [batch, hidden_dim]     (or pooled [B, T, H] -> reduce upstream)
+ * w_in, b_in       [hidden_dim, intermediate_dim], [intermediate_dim]
+ * w_out, b_out     [intermediate_dim, 32], [32]
+ * state_out        [batch, 32]
+ *
+ * One thread per batch element. batch_size = grid * block.
+ */
+__phase_kernel__ void sovereign_state_projection(
+    const void* __restrict__ hidden,
+    const void* __restrict__ w_in,
+    const void* __restrict__ b_in,
+    const void* __restrict__ w_out,
+    const void* __restrict__ b_out,
+    float* __restrict__ state_out,
+    int batch_size,
+    int hidden_dim,
+    int intermediate_dim,
+    int dtype_id,
+    int kosha_mode
+) {
+    int gid = __block_idx() * __block_dim() + __thread_idx();
+    if (gid >= batch_size) return;
+
+    const int h_off = gid * hidden_dim;
+    const int s_off = gid * STATE_DIM;
+
+    /* ----- stage 1: hidden_dim -> intermediate_dim, GELU ----- */
+    /* Scratch lives in dynamic shared memory so the caller can size it by
+     * intermediate_dim (typical 1024). */
+    extern __shared__ float hidden_act[];
+
+    for (int i = 0; i < intermediate_dim; i++) {
+        float acc = load_typed(b_in, i, dtype_id);
+        for (int j = 0; j < hidden_dim; j++) {
+            acc += load_typed(hidden, h_off + j, dtype_id)
+                 * load_typed(w_in, j * intermediate_dim + i, dtype_id);
+        }
+        hidden_act[i] = gelu(acc);
+    }
+
+    /* ----- stage 2: intermediate_dim -> 32 ----- */
+    float v[STATE_DIM];
+    for (int i = 0; i < STATE_DIM; i++) {
+        float acc = load_typed(b_out, i, dtype_id);
+        for (int j = 0; j < intermediate_dim; j++) {
+            acc += hidden_act[j]
+                 * load_typed(w_out, j * STATE_DIM + i, dtype_id);
+        }
+        v[i] = acc;
+    }
+
+    /* ----- component-wise normalization ----- */
+    softmax_window(&v[BHAVA_OFFSET],  BHAVA_DIM);
+
+    if (kosha_mode == KOSHA_MODE_SOFTMAX) {
+        softmax_window(&v[KOSHA_OFFSET], KOSHA_DIM);
+    } else {
+        for (int i = 0; i < KOSHA_DIM; i++)
+            v[KOSHA_OFFSET + i] = sigmoidf(v[KOSHA_OFFSET + i]);
+    }
+
+    softmax_window(&v[VRITTI_OFFSET], VRITTI_DIM);
+
+    for (int i = 0; i < GUNA_DIM; i++)
+        v[GUNA_OFFSET + i] = sigmoidf(v[GUNA_OFFSET + i]);
+
+    for (int i = 0; i < RESERVED_DIM; i++)
+        v[RESERVED_OFFSET + i] = tanhf(v[RESERVED_OFFSET + i]);
+
+    /* ----- emit ----- */
+    for (int i = 0; i < STATE_DIM; i++) {
+        state_out[s_off + i] = v[i];
+    }
+}

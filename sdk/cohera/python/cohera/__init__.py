@@ -34,7 +34,7 @@ from .models import (
     MistralCGConfig,
 )
 from .mistral_integration import bind_mistral_to_cohera, load_mistral_tokenizer
-from .tcu import TCU, reset_tcu, get_frame_count
+from .tcu import TCU, TCUMode, reset_tcu, get_frame_count
 from .metrics import get_metrics, Metrics, VrittiState, Kosha
 
 __version__ = "1.0.0"
@@ -79,6 +79,7 @@ __all__ = [
     "load_mistral_tokenizer",
     # TCU
     "TCU",
+    "TCUMode",
     "reset_tcu",
     "get_frame_count",
     # Metrics
