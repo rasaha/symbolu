@@ -3,7 +3,7 @@ COHERA Phase Attention Operations
 """
 
 from typing import Optional, Tuple, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .tensor import DType
 
@@ -36,10 +36,14 @@ class PhaseAttention:
     Unlike standard attention with O(n^2) softmax, phase attention uses
     Kuramoto synchronization with O(n) complexity. Supports:
       - Causal masking (Mistral decoder, hybrid decoder blocks)
-      - Grouped Query Attention (``num_kv_heads < num_heads``)
+      - Grouped Query Attention (``num_kv_heads <= num_heads``; equal = MHA)
       - Sliding window attention (``window_size``)
       - Rotary Position Embeddings (``rope_freqs`` / ``rope_dim``)
       - FP16 / BF16 / FP32 compute (``dtype``)
+
+    Phase initialization uses the query tensor; aggregation uses the value
+    tensor. The ``key`` argument is accepted for API stability and future
+    Q.K-modulated variants, but the current kernel does not read it.
 
     Example:
         >>> attn = PhaseAttention(

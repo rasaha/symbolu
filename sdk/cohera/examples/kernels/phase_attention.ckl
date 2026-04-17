@@ -14,6 +14,8 @@
 
 #include <cohera_kernel.h>
 
+/* Upper bound for validation; actual phases[] is sized by the launch via
+ * dynamic shared memory (see extern __shared__ below). */
 #define MAX_SEQ_LEN 32768
 #define TWO_PI      6.28318530717958647692f
 
@@ -37,14 +39,19 @@ static __inline__ void store_typed(void* base, int idx, float v, int dtype_id) {
 /*
  * Single-head phase attention.
  *
- *  query[N, D_q]     (this head's query)
- *  key[N,  D_kv]     (KV head shared by `head_group_size` query heads)
+ *  query[N, D_q]     used to initialize per-token phase
+ *  key[N,  D_kv]     reserved; phase init uses Q and aggregation uses V.
+ *                    K is accepted for ABI stability / future variants that
+ *                    consume it (e.g. Q.K phase modulation).
  *  value[N, D_kv]
  *  output[N, D_q]
  *  coherence_out     scalar
  *
  *  causal:      1 = drop j > i
- *  window_size: -1 = full; else drop j < i - window_size + 1
+ *  window_size: <= 0 = full; else drop j < i - window_size + 1
+ *
+ *  Caller must launch with shared_mem_size >= seq_len * sizeof(float)
+ *  (plus 2 * sizeof(float) for the sin_sum / cos_sum scratch).
  */
 __phase_kernel__ void phase_attention_head(
     const void* __restrict__ query,
@@ -61,13 +68,20 @@ __phase_kernel__ void phase_attention_head(
     float sync_lr,
     int ontology_layer
 ) {
+    (void)key;  /* reserved; see note above */
+
     int tid = __thread_idx();
     int bid = __block_idx();
     int gid = bid * __block_dim() + tid;
 
-    __shared__ float phases[MAX_SEQ_LEN];
-    __shared__ float sin_sum;
-    __shared__ float cos_sum;
+    /* Dynamic shared memory: phases[0..seq_len) followed by two reduction
+     * slots. Caller passes shared_mem_size = (seq_len + 2) * sizeof(float). */
+    extern __shared__ float _shared_scratch[];
+    float* phases = _shared_scratch;
+    float* p_sin_sum = &_shared_scratch[seq_len];
+    float* p_cos_sum = &_shared_scratch[seq_len + 1];
+#define sin_sum (*p_sin_sum)
+#define cos_sum (*p_cos_sum)
 
     if (gid >= seq_len) return;
 
@@ -182,6 +196,9 @@ __phase_kernel__ void phase_attention_head(
     if (__tcu_enabled()) {
         __tcu_accumulate_phase(gid % __num_heads(), phases[gid]);
     }
+
+#undef sin_sum
+#undef cos_sum
 }
 
 

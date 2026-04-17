@@ -159,11 +159,18 @@ typedef struct {
  * Attention Configuration
  *============================================================================*/
 
+/*
+ * Field ordering note: v1 fields (seq_len..coherence_threshold) come first
+ * and must not be reordered. v2 fields (num_kv_heads onward) are append-only
+ * so zero-initialized v1 callers keep working — defaulting num_kv_heads=0
+ * selects MHA, dtype=FP16 selects the legacy path, window_size=0 is coerced
+ * to full attention by the kernel, and rope_* default NULL/0 disables RoPE.
+ */
 typedef struct {
+    /* --- v1: stable --- */
     int seq_len;
     int embed_dim;
     int num_heads;
-    int num_kv_heads;              /* GQA: KV head count (<= num_heads). 0 -> MHA (num_heads). */
     int sync_steps;                /* Phase sync iterations (default: 3) */
     float sync_lr;                 /* Phase learning rate (default: 0.1) */
     float temperature;             /* Attention temperature */
@@ -171,9 +178,11 @@ typedef struct {
     int use_tcu;                   /* Enable temporal context */
     int ontology_layer;            /* Bound to layer (0-11, -1 for all) */
     float coherence_threshold;     /* Gating threshold */
+    /* --- v2: append-only --- */
+    int num_kv_heads;              /* GQA: KV head count (<= num_heads). 0 -> MHA (num_heads). */
     cohera_dtype_t dtype;          /* Compute dtype (FP16 / BF16 / FP32) */
-    int window_size;               /* Sliding window (-1 = full attention) */
-    const float* rope_freqs;       /* Precomputed RoPE freqs [rope_dim/2], or NULL */
+    int window_size;               /* Sliding window (<= 0 = full attention) */
+    const cohera_tensor_t* rope_freqs; /* Device tensor [rope_dim/2] FP32, or NULL */
     int rope_dim;                  /* Dim to apply RoPE over (0 = disabled) */
     int rope_base_position;        /* Starting position id (for KV cache continuation) */
 } cohera_attention_config_t;
@@ -429,13 +438,14 @@ cohera_error_t cohera_ontology_project_sovereign(
  * Apply Rotary Position Embedding (RoPE) in-place / to output.
  *
  * input / output shape: [batch, seq, heads, head_dim]
- * rope_freqs:           [rope_dim / 2]  (typically head_dim / 2)
+ * rope_freqs:           device tensor [rope_dim / 2] FP32
+ *                       (typically head_dim / 2 precomputed inverse freqs)
  * position_offset:      base token position (supports KV-cache continuation)
  */
 cohera_error_t cohera_apply_rope(
     cohera_tensor_t* output,
     const cohera_tensor_t* input,
-    const float* rope_freqs,
+    const cohera_tensor_t* rope_freqs,
     int rope_dim,
     int position_offset,
     cohera_stream_t stream
