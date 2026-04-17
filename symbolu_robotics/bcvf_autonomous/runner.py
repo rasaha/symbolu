@@ -52,6 +52,7 @@ class RunConfig:
     bicycle: BicycleConfig = field(default_factory=BicycleConfig)
     seed: int = 42
     failures: Dict[str, FailureConfig] = field(default_factory=dict)
+    gnss_failure_type: str = "multipath"  # "multipath" | "map_error" | "constant_bias"
 
 
 @dataclass
@@ -131,7 +132,11 @@ class Runner:
 
     def run(self) -> RunResult:
         cfg = self._config
-        predictors = create_predictor_set(bicycle_config=cfg.bicycle, seed=cfg.seed)
+        predictors = create_predictor_set(
+            bicycle_config=cfg.bicycle,
+            seed=cfg.seed,
+            gnss_failure_type=cfg.gnss_failure_type,
+        )
 
         for model_id, failure_cfg in cfg.failures.items():
             if model_id not in predictors:
@@ -574,7 +579,11 @@ def benchmark_planner(
     config: RunConfig, num_cycles: int = 100
 ) -> Dict[str, float]:
     """Time ``MPPIPlanner.plan`` over ``num_cycles`` iterations."""
-    predictors = create_predictor_set(bicycle_config=config.bicycle, seed=config.seed)
+    predictors = create_predictor_set(
+        bicycle_config=config.bicycle,
+        seed=config.seed,
+        gnss_failure_type=config.gnss_failure_type,
+    )
     for model_id, failure_cfg in config.failures.items():
         predictors[model_id].set_failure(failure_cfg)
     mppi_cfg = _inherit_bcvf(config.mppi, config.bcvf)

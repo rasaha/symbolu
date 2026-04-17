@@ -3821,7 +3821,57 @@ plus the following end-to-end validation:
 - [ ] Ablation ordering for S6: A3 early warning time > A2 > A1 (directional,
   not necessarily statistically significant at N=3 in quick mode)
 
-#### 4C.14 What Phase 4 Does NOT Build
+#### 4C.13a Phase 4 Implementation Notes
+
+Deviations from the DESIGN draft worth calling out:
+
+1. **GNSS ``constant_bias`` sub-mode (§4A.7).** ``FailureConfig`` stays
+   unchanged (no ``failure_type`` field). The failure type is a
+   *predictor-level* attribute set at construction time, routed through
+   the new ``RunConfig.gnss_failure_type`` field and the existing
+   ``create_predictor_set(gnss_failure_type=...)`` parameter. This keeps
+   ``FailureConfig`` shape stable across predictors and lets the same
+   ``FailureConfig`` be reused by different GNSS sub-modes.
+
+2. **Per-episode diagnostics inside ``ExperimentRunner``.** Each episode
+   is written immediately to ``run_NNN.json`` and the aggregation phase
+   re-reads the whole directory. This means resumption is cheap (no
+   in-memory re-replay needed) and the aggregation step is idempotent.
+
+3. **CLI.** ``run_experiments.main(argv)`` is importable and used by the
+   CLI test; executing the module (``python -m …``) calls the same entry
+   point. No progress bar dependency (``print(..., flush=True)`` only).
+
+4. **Comparisons.** V1 emits only the A0-vs-A3 per-scenario
+   collision-rate comparison, which is what §4C.13 gate 2 needs. Extra
+   pairwise comparisons (A1 vs A3, A2 vs A3) can be added in Phase 5
+   without touching the orchestration layer.
+
+#### 4C.13b `__init__.py` Public API (Phase 4)
+
+Extends §1.2.3, §1.5.9, §2.12, §3C.13b. After Phase 4 the subpackage
+re-exports:
+
+```python
+from symbolu_robotics.bcvf_autonomous import (
+    # Scenarios (Phase 4A)
+    ScenarioConfig, SCENARIOS, get_scenario, list_scenarios,
+    scenario_to_run_config,
+    # Metrics (Phase 4B)
+    EpisodeMetrics, AggregateMetrics, ComparisonResult,
+    compute_episode_metrics, compute_aggregate_metrics,
+    compute_early_warning_time,
+    compare_collision_rates, compare_continuous_metric,
+    build_summary_table,
+    wilson_ci, welch_t_test, fisher_exact_2x2,
+    # Experiments (Phase 4C)
+    ExperimentConfig, ExperimentResult, ExperimentRunner, VARIANT_IDS,
+)
+```
+
+Bumps ``__version__`` to ``"0.4.0"``; ``__all__`` is now 76 symbols.
+
+#### 4C.15 What Phase 4 Does NOT Build
 
 - Plotting or visualization (Phase 5)
 - Parallelism across runs (Phase 5)

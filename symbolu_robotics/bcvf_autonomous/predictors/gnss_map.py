@@ -41,11 +41,14 @@ class GNSSMap(BasePredictor):
         failure_type: str = "multipath",
     ) -> None:
         super().__init__(model_id="M4", bicycle_config=bicycle_config, seed=seed)
-        if failure_type not in ("multipath", "map_error"):
+        if failure_type not in ("multipath", "map_error", "constant_bias"):
             raise ValueError(
-                f"failure_type must be 'multipath' or 'map_error'; got {failure_type!r}"
+                f"failure_type must be 'multipath', 'map_error', or 'constant_bias'; "
+                f"got {failure_type!r}"
             )
         self.failure_type = failure_type
+        # Constant-bias magnitude (meters) used by the S5 validation scenario.
+        self.constant_bias_x = 0.5
 
     def apply_noise(self, state: PredictorState, step: int) -> PredictorState:
         rng = self._rng
@@ -67,6 +70,8 @@ class GNSSMap(BasePredictor):
 
         if self.failure_type == "multipath":
             return self._apply_multipath(state, elapsed, scale)
+        if self.failure_type == "constant_bias":
+            return self._apply_constant_bias(state, elapsed, scale)
         return self._apply_map_error(state, elapsed, scale)
 
     # --- failure sub-modes ---
@@ -92,4 +97,13 @@ class GNSSMap(BasePredictor):
         lateral_heading = state.theta + math.pi / 2.0
         state.x += lateral * math.cos(lateral_heading)
         state.y += lateral * math.sin(lateral_heading)
+        return state
+
+    def _apply_constant_bias(
+        self, state: PredictorState, elapsed: float, scale: float
+    ) -> PredictorState:
+        # Phase 4A scenario S5: Lemma 1 validation. Time-invariant offset
+        # with no randomness and no growth -> 2nd-diff of disagreement = 0,
+        # so J_BCVF = 0 while J_ZEROTH / J_FIRST see the bias.
+        state.x += self.constant_bias_x
         return state

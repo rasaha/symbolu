@@ -99,8 +99,35 @@ from symbolu_robotics.bcvf_autonomous.runner import (
     benchmark_planner,
     load_config,
 )
+from symbolu_robotics.bcvf_autonomous.scenarios import (
+    SCENARIOS,
+    ScenarioConfig,
+    get_scenario,
+    list_scenarios,
+    scenario_to_run_config,
+)
+from symbolu_robotics.bcvf_autonomous.metrics import (
+    AggregateMetrics,
+    ComparisonResult,
+    EpisodeMetrics,
+    build_summary_table,
+    compare_collision_rates,
+    compare_continuous_metric,
+    compute_aggregate_metrics,
+    compute_early_warning_time,
+    compute_episode_metrics,
+    fisher_exact_2x2,
+    welch_t_test,
+    wilson_ci,
+)
+from symbolu_robotics.bcvf_autonomous.run_experiments import (
+    ExperimentConfig,
+    ExperimentResult,
+    ExperimentRunner,
+    VARIANT_IDS,
+)
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "__version__",
@@ -165,4 +192,28 @@ __all__ = [
     "Runner",
     "load_config",
     "benchmark_planner",
+    # scenarios (Phase 4A)
+    "ScenarioConfig",
+    "SCENARIOS",
+    "get_scenario",
+    "list_scenarios",
+    "scenario_to_run_config",
+    # metrics (Phase 4B)
+    "EpisodeMetrics",
+    "AggregateMetrics",
+    "ComparisonResult",
+    "compute_episode_metrics",
+    "compute_aggregate_metrics",
+    "compute_early_warning_time",
+    "compare_collision_rates",
+    "compare_continuous_metric",
+    "build_summary_table",
+    "wilson_ci",
+    "welch_t_test",
+    "fisher_exact_2x2",
+    # experiments (Phase 4C)
+    "ExperimentConfig",
+    "ExperimentResult",
+    "ExperimentRunner",
+    "VARIANT_IDS",
 ]
