@@ -395,6 +395,71 @@ cohera_error_t cohera_register_coherence_callback(
 );
 ```
 
+### 4.6 Temporal Context Unit (TCU)
+
+The TCU ships two accumulation modes. Pick one per model binding; a
+mode switch resets the per-sequence slots so the next accumulate starts
+clean.
+
+```c
+typedef enum {
+    COHERA_TCU_MODE_FRAME_EMA = 0,  // Global EMA per head (default).
+                                    // Used by streaming / vision paths
+                                    // where each frame is independent.
+    COHERA_TCU_MODE_KV_CACHE  = 1,  // Per-sequence per-head phase
+                                    // history, indexed by stream.
+                                    // Required for mistral_cg
+                                    // autoregressive decoding so a
+                                    // prefill's accumulated phase is
+                                    // reused when continuing the same
+                                    // sequence.
+} cohera_tcu_mode_t;
+
+// Select the TCU accumulation mode. Must be called before the first
+// accumulate of a new sequence; resets per-sequence state on transition.
+cohera_error_t cohera_tcu_set_mode(cohera_tcu_mode_t mode);
+cohera_error_t cohera_tcu_get_mode(cohera_tcu_mode_t* mode);
+
+// Reset all TCU accumulators (frame EMA + KV-cache slots).
+cohera_error_t cohera_tcu_reset(void);
+
+// Reset only the per-sequence slot for a stream (KV_CACHE mode only;
+// no-op under FRAME_EMA).
+cohera_error_t cohera_tcu_reset_sequence(cohera_stream_t stream);
+
+// Frame counter (monotonic; not reset by mode change).
+cohera_error_t cohera_tcu_get_frame_count(uint64_t* count);
+
+// EMA decay factor (FRAME_EMA mode only).
+cohera_error_t cohera_tcu_set_decay(float decay);
+
+// Read phase context.
+//   FRAME_EMA: returns the rolling context for `head`; stream is ignored.
+//   KV_CACHE : pass the stream that identifies the sequence; context is
+//              the history slice for (stream, head).
+cohera_error_t cohera_tcu_read_context(cohera_tensor_t* context,
+                                       int head,
+                                       cohera_stream_t stream);
+```
+
+**Usage pattern (mistral_cg decode):**
+
+```c
+cohera_stream_t s;
+cohera_stream_create(&s, /*ontology_layer=*/-1);
+cohera_tcu_set_mode(COHERA_TCU_MODE_KV_CACHE);
+
+// Prefill: accumulate phase into the stream's slot.
+cohera_phase_attention_fused(out, q, k, v, &cfg, s);
+
+// Decode step N: config.rope_base_position = N, same stream.
+cfg.rope_base_position = token_index;
+cohera_phase_attention_fused(out, q, k, v, &cfg, s);
+
+// End of sequence: release only this sequence's slot.
+cohera_tcu_reset_sequence(s);
+```
+
 ---
 
 ## 5. COHERA Kernel Language (CKL)
