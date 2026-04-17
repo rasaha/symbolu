@@ -87,3 +87,74 @@ def test_gnss_failure_type_routed_to_runner() -> None:
     assert cfg.gnss_failure_type == "constant_bias"
     # Running it must not raise despite the non-default failure type.
     _ = Runner(cfg).run()
+
+
+# --- V2 Option B1: scenario-specific anchor plumbing ---
+
+
+def test_scenario_anchor_default_is_none() -> None:
+    """A scenario without an explicit anchor leaves the field None so the
+    caller's MPPIConfig.anchor passes through unchanged (regression)."""
+    assert SCENARIOS["S1_normal_driving"].anchor is None
+    assert SCENARIOS["S5_constant_bias"].anchor is None
+
+
+def test_failure_scenarios_pin_anchor_to_failing_predictor() -> None:
+    """Fault-injection scenarios pin anchor = failing predictor so the
+    baseline planner is actually driven by the model whose failure is
+    being injected (the V2 B1 unblock)."""
+    assert SCENARIOS["S2_gps_multipath"].anchor == "M4"
+    assert SCENARIOS["S3_map_error"].anchor == "M4"
+    assert SCENARIOS["S4_camera_degradation"].anchor == "M3"
+    assert SCENARIOS["S6_glass_corridor"].anchor == "M2"
+
+
+def test_scenario_anchor_reaches_mppi_config() -> None:
+    """The scenario anchor must appear in the final RunConfig.mppi.anchor —
+    this is the one plumbing path that matters for gate-2 validation."""
+    bcvf, mppi, perf, bicycle = _tuning()
+    # Caller config defaults to "M1"; scenario override must win.
+    assert mppi.anchor == "M1"
+
+    cfg_s6 = scenario_to_run_config(SCENARIOS["S6_glass_corridor"], bcvf, mppi, perf, bicycle)
+    assert cfg_s6.mppi.anchor == "M2"
+
+    cfg_s3 = scenario_to_run_config(SCENARIOS["S3_map_error"], bcvf, mppi, perf, bicycle)
+    assert cfg_s3.mppi.anchor == "M4"
+
+
+def test_no_anchor_preserves_caller_default() -> None:
+    """When the scenario does not specify an anchor, the caller's
+    MPPIConfig.anchor is preserved (regression guard)."""
+    bcvf, mppi, perf, bicycle = _tuning()
+    mppi_custom = replace_mppi_anchor(mppi, "M3")
+    cfg_s1 = scenario_to_run_config(
+        SCENARIOS["S1_normal_driving"], bcvf, mppi_custom, perf, bicycle
+    )
+    assert cfg_s1.mppi.anchor == "M3"  # caller default flows through
+
+
+def replace_mppi_anchor(mppi, anchor):
+    from dataclasses import replace
+    return replace(mppi, anchor=anchor)
+
+
+def test_scenario_anchor_used_by_planner_at_runtime() -> None:
+    """End-to-end behavioral: build a Runner from a scenario with a
+    non-default anchor and verify the instantiated MPPIPlanner uses that
+    predictor for its anchor-mode rollouts. We reach into the planner's
+    config because there is no public introspection hook; if that ever
+    breaks, the test signals the observable surface has shifted."""
+    from symbolu_robotics.bcvf_autonomous.predictors import create_predictor_set
+    from symbolu_robotics.bcvf_autonomous.mppi_planner import MPPIPlanner
+    from symbolu_robotics.bcvf_autonomous.simulator import make_straight_road
+
+    bcvf, mppi, perf, bicycle = _tuning()
+    cfg = scenario_to_run_config(
+        SCENARIOS["S6_glass_corridor"], bcvf, mppi, perf, bicycle
+    )
+    predictors = create_predictor_set(bicycle_config=cfg.bicycle, seed=cfg.seed)
+    road = make_straight_road(length=100.0)
+    planner = MPPIPlanner(cfg.mppi, cfg.perf, predictors, road, cfg.sim.obstacles)
+    assert planner.config.anchor == "M2"
+    assert planner.predictors[planner.config.anchor].model_id == "M2"

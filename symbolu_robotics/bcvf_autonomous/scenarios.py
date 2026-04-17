@@ -44,6 +44,13 @@ class ScenarioConfig:
     max_steps: int = 200
     initial_velocity: float = 8.0
     gnss_failure_type: Optional[str] = None  # override M4 failure_type if set
+    # V2 Option B1 (scenario-specific anchor): when set, overrides the
+    # default MPPIConfig.anchor at scenario_to_run_config time. Use the
+    # failing predictor as the anchor so the baseline planner is driven
+    # by the model whose failure is being injected — this is what makes
+    # the §4C.13 gate-2 A0-vs-A3 contrast producible. Leave as ``None``
+    # to preserve the default anchor from the caller's MPPIConfig.
+    anchor: Optional[str] = None
 
     # Directional expectations (not hard assertions).
     expect_bcvf_activation: bool = False
@@ -88,6 +95,7 @@ S2_GPS_MULTIPATH = ScenarioConfig(
         )
     },
     gnss_failure_type="multipath",
+    anchor="M4",  # V2 B1: baseline uses failing predictor as J_perf reference
     max_steps=200,
     initial_velocity=8.0,
     expect_bcvf_activation=True,
@@ -115,6 +123,7 @@ S3_MAP_ERROR = ScenarioConfig(
         )
     },
     gnss_failure_type="map_error",
+    anchor="M4",  # V2 B1
     max_steps=200,
     initial_velocity=8.0,
     expect_bcvf_activation=True,
@@ -139,6 +148,7 @@ S4_CAMERA_DEGRADATION = ScenarioConfig(
             active=True, onset_time=2.0, severity=1.0, ramp_duration=10.0
         )
     },
+    anchor="M3",  # V2 B1
     max_steps=200,
     initial_velocity=6.0,
     expect_bcvf_activation=True,
@@ -185,6 +195,7 @@ S6_GLASS_CORRIDOR = ScenarioConfig(
             active=True, onset_time=5.0, severity=1.0, ramp_duration=3.0
         )
     },
+    anchor="M2",  # V2 B1
     max_steps=200,
     initial_velocity=8.0,
     expect_bcvf_activation=True,
@@ -249,9 +260,17 @@ def scenario_to_run_config(
         seed=seed,
     )
 
+    # Scenario anchor, if set, overrides the caller's MPPIConfig.anchor.
+    # This is the V2 Option B1 entry point: a scenario selects which
+    # predictor the planner trusts for J_perf, independent of which
+    # variant (A0/A1/A2/A3) is being run.
+    mppi_out = replace(mppi_config)
+    if scenario.anchor is not None:
+        mppi_out = replace(mppi_out, anchor=scenario.anchor)
+
     return RunConfig(
         sim=sim,
-        mppi=replace(mppi_config),
+        mppi=mppi_out,
         perf=replace(perf_config),
         bcvf=replace(bcvf_config),
         bicycle=replace(bicycle_config),
