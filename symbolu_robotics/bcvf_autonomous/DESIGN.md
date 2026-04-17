@@ -1334,6 +1334,73 @@ or gate threshold T before proceeding to the planner.
 - Real sensor interfaces or ROS2 integration (out of V1 scope)
 - Predictor health monitoring or automatic anchor selection (V2)
 
+### 2.11 Phase 2 Tuning Outcome
+
+Phase 2 implementation invoked the §2.9 gate-3 license to revisit predictor
+noise parameters. Three issues surfaced when the DESIGN draft values were
+plugged into the full BCVF pipeline:
+
+1. **Per-step independent noise blows up through the `1/dt²` stencil.**
+   With the draft's `N(0, 0.5)` per-step GNSS noise the second-difference
+   standard deviation is `√6 · 0.5 / 0.01 ≈ 122 m/s²`, which saturates the
+   pseudo-Huber penalty on every gate-activated step and produces ~250
+   units of nominal cost for the M4–M1 pair alone.
+2. **The DESIGN's pseudocode conflates observation noise with state drift**
+   (both applied to the same `state` variable inside `apply_noise`). Phase 2
+   formalizes the split: `evolve_state` holds cumulative drift (carried
+   forward), `apply_noise` returns the single-step observation error
+   (recorded but non-compounding), and `apply_failure` owns state-corrupting
+   failure effects plus a `self._noise_multiplier` hook used by subsequent
+   `apply_noise`.
+3. **Draft LiDAR quadratic coefficient (`0.01`) is too mild** to produce a
+   ≥10x nominal-vs-failure separation once predictor noise is at post-
+   filter levels.
+
+Tuned values (applied in the predictor source):
+
+| Predictor | Draft `σ_pos` / `σ_heading` / drift | Tuned (Phase 2) |
+|-----------|-------------------------------------|-----------------|
+| M1 (IMU)  | 0.01 / 0.001 / 0.005                | 0.002 / 0.0002 / 0.001 |
+| M2 (LiDAR)| 0.02 / 0.005 / —                    | 0.004 / 0.001 / —      |
+| M3 (VO)   | 0.03 / 0.008 / 0.002                | 0.006 / 0.0016 / 0.0004|
+| M4 (GNSS) | 0.5 / 0.01 / —                      | 0.01 / 0.002 / —       |
+
+Draft → tuned failure parameters: `IMUOdometry.FAILURE_EXTRA_DRIFT` 0.05 → 0.01
+(keeps the ~10x drift-boost ratio at severity=1 under the new nominal),
+`LidarSLAM.FAILURE_QUADRATIC_COEFF` 0.01 → 0.5. M3 / M4 failure geometry
+(degradation-then-freeze, multipath-or-map-error) is unchanged.
+
+Measured separation (30-seed mean, H=50 @ 8 m/s straight line, default
+BCVF config T=0.2 β=100):
+
+| Scenario            | BCVF cost | separation |
+|---------------------|-----------|------------|
+| Nominal (all 4)     | ~2.1      | —          |
+| LiDAR failure       | ~30       | ≥ 10x      |
+| VO tracking loss    | ~49       | ≥ 20x      |
+| GNSS multipath      | ~358      | ≥ 150x     |
+
+Gate 1 (pairwise disagreement < 2 m over H=50): max observed 0.28 m.
+Gate 2 (distinct dynamics): the three injected failure types reproduce
+the quadratic-divergence, one-time-jump, and mode-switch shapes from the
+Phase 1.5 trace families. Gate 3 (≥ 10x separation): satisfied for every
+failure mode.
+
+### 2.12 `__init__.py` Public API (Phase 2)
+
+Append to the subpackage's `__init__.py` (extending §1.2.3 and §1.5.9):
+
+```python
+from symbolu_robotics.bcvf_autonomous import (
+    BasePredictor,
+    BicycleConfig, PredictorState, FailureConfig, ControlInput,
+    IMUOdometry, LidarSLAM, VisualOdometry, GNSSMap,
+    create_predictor_set,
+)
+```
+
+Bump `__version__` to `"0.2.0"` and append each new symbol to `__all__`.
+
 ---
 
 ## Phase 3 — MPPI Planner Integration

@@ -3,23 +3,22 @@
 Second-order cross-model coherence regularizer for multi-model predictive
 control. See ``DESIGN.md`` for the full specification.
 
-Public API through Phase 1.5 (math kernel + disagreement signal
-characterization — no predictors or planner yet):
+Public API through Phase 2 (math kernel + disagreement characterization
++ 4-predictor framework — MPPI planner lands in Phase 3):
 
     from symbolu_robotics.bcvf_autonomous import (
-        BCVFConfig,
-        BCVFResult,
-        compute_bcvf_cost,
-        compute_bcvf_cost_batch,
-        SE2Pose,
-        body_frame_error,
-        wrap_angle,
-        # Phase 1.5
-        TraceResult,
-        generate_trace,
-        analyze_trace,
-        run_all_traces,
-        parameter_sensitivity_report,
+        # Phase 1 — math kernel
+        BCVFConfig, BCVFResult,
+        compute_bcvf_cost, compute_bcvf_cost_batch,
+        SE2Pose, body_frame_error, wrap_angle,
+        # Phase 1.5 — trace families and sensitivity sweep
+        TraceResult, generate_trace, analyze_trace,
+        run_all_traces, parameter_sensitivity_report,
+        # Phase 2 — predictor framework
+        BasePredictor, BicycleConfig, PredictorState,
+        FailureConfig, ControlInput,
+        IMUOdometry, LidarSLAM, VisualOdometry, GNSSMap,
+        create_predictor_set,
     )
 """
 
@@ -43,6 +42,18 @@ from symbolu_robotics.bcvf_autonomous.manifold import (
     log_map,
     wrap_angle,
 )
+from symbolu_robotics.bcvf_autonomous.predictors import (
+    BasePredictor,
+    BicycleConfig,
+    ControlInput,
+    FailureConfig,
+    GNSSMap,
+    IMUOdometry,
+    LidarSLAM,
+    PredictorState,
+    VisualOdometry,
+    create_predictor_set,
+)
 from symbolu_robotics.bcvf_autonomous.traces import (
     FAILURE_FAMILIES,
     NOMINAL_FAMILIES,
@@ -54,7 +65,7 @@ from symbolu_robotics.bcvf_autonomous.traces import (
     run_all_traces,
 )
 
-__version__ = "0.1.5"
+__version__ = "0.2.0"
 
 __all__ = [
     "__version__",
@@ -85,4 +96,15 @@ __all__ = [
     "analyze_trace",
     "run_all_traces",
     "parameter_sensitivity_report",
+    # predictors (Phase 2)
+    "BasePredictor",
+    "BicycleConfig",
+    "PredictorState",
+    "FailureConfig",
+    "ControlInput",
+    "IMUOdometry",
+    "LidarSLAM",
+    "VisualOdometry",
+    "GNSSMap",
+    "create_predictor_set",
 ]
