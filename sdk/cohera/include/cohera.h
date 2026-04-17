@@ -115,6 +115,31 @@ typedef struct {
 } cohera_cognitive_state_t;
 
 /*============================================================================
+ * Sovereign State (32 dimensions) — matches mistral_cg SovereignStateProjector
+ *  layout: Bhava(12) + Kosha(5) + Vritti(5) + Guna(6) + Reserved(4) = 32
+ *============================================================================*/
+
+#define COHERA_SOVEREIGN_BHAVA_DIM    12
+#define COHERA_SOVEREIGN_KOSHA_DIM    5
+#define COHERA_SOVEREIGN_VRITTI_DIM   5
+#define COHERA_SOVEREIGN_GUNA_DIM     6
+#define COHERA_SOVEREIGN_RESERVED_DIM 4
+#define COHERA_SOVEREIGN_TOTAL_DIM    32
+
+typedef enum {
+    COHERA_KOSHA_MODE_SIGMOID = 0,
+    COHERA_KOSHA_MODE_SOFTMAX = 1,
+} cohera_kosha_mode_t;
+
+typedef struct {
+    float bhava[COHERA_SOVEREIGN_BHAVA_DIM];        /* softmax */
+    float kosha[COHERA_SOVEREIGN_KOSHA_DIM];        /* sigmoid / softmax */
+    float vritti[COHERA_SOVEREIGN_VRITTI_DIM];      /* softmax */
+    float guna[COHERA_SOVEREIGN_GUNA_DIM];          /* sigmoid */
+    float reserved[COHERA_SOVEREIGN_RESERVED_DIM];  /* tanh */
+} cohera_sovereign_state_t;
+
+/*============================================================================
  * Runtime Metrics
  *============================================================================*/
 
@@ -138,6 +163,7 @@ typedef struct {
     int seq_len;
     int embed_dim;
     int num_heads;
+    int num_kv_heads;              /* GQA: KV head count (<= num_heads). 0 -> MHA (num_heads). */
     int sync_steps;                /* Phase sync iterations (default: 3) */
     float sync_lr;                 /* Phase learning rate (default: 0.1) */
     float temperature;             /* Attention temperature */
@@ -145,6 +171,11 @@ typedef struct {
     int use_tcu;                   /* Enable temporal context */
     int ontology_layer;            /* Bound to layer (0-11, -1 for all) */
     float coherence_threshold;     /* Gating threshold */
+    cohera_dtype_t dtype;          /* Compute dtype (FP16 / BF16 / FP32) */
+    int window_size;               /* Sliding window (-1 = full attention) */
+    const float* rope_freqs;       /* Precomputed RoPE freqs [rope_dim/2], or NULL */
+    int rope_dim;                  /* Dim to apply RoPE over (0 = disabled) */
+    int rope_base_position;        /* Starting position id (for KV cache continuation) */
 } cohera_attention_config_t;
 
 /*============================================================================
@@ -378,6 +409,61 @@ cohera_error_t cohera_phase_attention_with_phases(
 cohera_error_t cohera_ontology_project(
     cohera_cognitive_state_t* output,
     const cohera_tensor_t* hidden,
+    cohera_stream_t stream
+);
+
+/**
+ * Project hidden states to 32-D Sovereign State
+ * (mistral_cg SovereignStateProjector).
+ *
+ * hidden: [batch, seq, hidden_dim] or [batch, hidden_dim]
+ */
+cohera_error_t cohera_ontology_project_sovereign(
+    cohera_sovereign_state_t* output,
+    const cohera_tensor_t* hidden,
+    cohera_kosha_mode_t kosha_mode,
+    cohera_stream_t stream
+);
+
+/**
+ * Apply Rotary Position Embedding (RoPE) in-place / to output.
+ *
+ * input / output shape: [batch, seq, heads, head_dim]
+ * rope_freqs:           [rope_dim / 2]  (typically head_dim / 2)
+ * position_offset:      base token position (supports KV-cache continuation)
+ */
+cohera_error_t cohera_apply_rope(
+    cohera_tensor_t* output,
+    const cohera_tensor_t* input,
+    const float* rope_freqs,
+    int rope_dim,
+    int position_offset,
+    cohera_stream_t stream
+);
+
+/**
+ * Broadcast KV heads for Grouped Query Attention.
+ *
+ * Expands   kv [batch, seq, num_kv_heads, head_dim]
+ *       to kv' [batch, seq, num_heads,    head_dim]
+ * by repeating each KV head (num_heads / num_kv_heads) times.
+ */
+cohera_error_t cohera_gqa_broadcast(
+    cohera_tensor_t* kv_expanded,
+    const cohera_tensor_t* kv,
+    int num_heads,
+    cohera_stream_t stream
+);
+
+/**
+ * Build a causal + sliding-window mask on device.
+ * mask shape: [seq_len, seq_len], dtype FP32, 0.0 = keep, -INF = drop.
+ * window_size < 0 or >= seq_len -> full causal only.
+ */
+cohera_error_t cohera_build_sliding_window_mask(
+    cohera_tensor_t* mask,
+    int seq_len,
+    int window_size,
     cohera_stream_t stream
 );
 
