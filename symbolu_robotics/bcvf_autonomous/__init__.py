@@ -3,7 +3,8 @@
 Second-order cross-model coherence regularizer for multi-model predictive
 control. See ``DESIGN.md`` for the full specification.
 
-Phase 1 public API (math kernel only — no predictors or planner yet):
+Public API through Phase 1.5 (math kernel + disagreement signal
+characterization — no predictors or planner yet):
 
     from symbolu_robotics.bcvf_autonomous import (
         BCVFConfig,
@@ -13,6 +14,12 @@ Phase 1 public API (math kernel only — no predictors or planner yet):
         SE2Pose,
         body_frame_error,
         wrap_angle,
+        # Phase 1.5
+        TraceResult,
+        generate_trace,
+        analyze_trace,
+        run_all_traces,
+        parameter_sensitivity_report,
     )
 """
 
@@ -36,8 +43,18 @@ from symbolu_robotics.bcvf_autonomous.manifold import (
     log_map,
     wrap_angle,
 )
+from symbolu_robotics.bcvf_autonomous.traces import (
+    FAILURE_FAMILIES,
+    NOMINAL_FAMILIES,
+    TRACE_FAMILIES,
+    TraceResult,
+    analyze_trace,
+    generate_trace,
+    parameter_sensitivity_report,
+    run_all_traces,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.1.5"
 
 __all__ = [
     "__version__",
@@ -59,4 +76,13 @@ __all__ = [
     "log_map",
     "body_frame_error",
     "body_frame_error_trajectory",
+    # traces (Phase 1.5)
+    "TraceResult",
+    "TRACE_FAMILIES",
+    "NOMINAL_FAMILIES",
+    "FAILURE_FAMILIES",
+    "generate_trace",
+    "analyze_trace",
+    "run_all_traces",
+    "parameter_sensitivity_report",
 ]

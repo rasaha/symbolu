@@ -18,9 +18,13 @@ bcvf:
   anchor_model: M1            # IMU+odom is most stable baseline
 
   # Smooth gate (V3.1 Definition 4, Section 3.4.1)
+  # Phase 1.5 sweep found T=0.1 produced ~5% false activations on
+  # N(0, 0.05) jitter whose second-difference |a| is large; T=0.2 fully
+  # suppresses jitter while still detecting failure traces. beta=200
+  # remains inside V3.1's recommended [20/T, 50/T]=[100, 250] band.
   gate:
-    threshold: 0.1            # T: noise floor (meters)
-    beta: 200.0               # Steepness: 20/T = 200 (range: 20/T to 50/T)
+    threshold: 0.2            # T: noise floor (meters) — updated by Phase 1.5 sweep
+    beta: 100.0               # Steepness = 20/T; V3.1 range for T=0.2: [100, 250]
 
   # Pseudo-Huber penalty (V3.1 Definition 5)
   huber:

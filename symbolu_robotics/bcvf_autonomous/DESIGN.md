@@ -690,7 +690,8 @@ def analyze_trace(
 ### 1.5.4 Parameter Sensitivity Report
 
 `traces.py` includes a function that sweeps T and beta across the trace
-families and reports the operating region:
+families and reports the operating region. `beta_multipliers` parametrize
+`beta = multiplier / T` (V3.1 §3.4.1 recommends multiplier ∈ [20, 50]):
 
 ```python
 def parameter_sensitivity_report(
@@ -698,28 +699,45 @@ def parameter_sensitivity_report(
     beta_multipliers: List[float] = [10, 20, 50, 100],
 ) -> Dict[str, Any]:
     """
-    Sweep T and beta across all trace families.
+    Sweep T and beta across all trace families. For each (T, beta) pair:
 
-    For each (T, beta) pair, report:
-    - false_activation_rate: gate activations on constant_bias + repeated_jitter
-    - true_activation_rate: gate activations on quadratic_divergence + one_time_jump
-    - separation_ratio: true_activation_rate / max(false_activation_rate, 1e-6)
-
-    A good (T, beta) pair has:
-    - false_activation_rate < 0.05
-    - true_activation_rate > 0.5
-    - separation_ratio > 10
-
-    Returns:
-        Dict with per-(T, beta) statistics and recommended values.
+    - false_cost:   max J_BCVF across nominal families
+                    (constant_bias, linear_drift, repeated_jitter).
+    - true_cost:    min J_BCVF across failure families
+                    (quadratic_divergence, one_time_jump, mode_switch).
+    - separation_ratio: true_cost / max(false_cost, 1e-9).
+    - false_activation_rate_jitter: gate activation rate on repeated_jitter
+                    (the narrow metric that matches success gate §1.5.6 #4).
+    - true_activation_rate: mean gate activation rate across failure families.
     """
     ...
 ```
 
-This replaces the hardcoded T=0.1, beta=200 from Phase 0 with empirically
-validated values. If the defaults from `default_se2.yaml` survive the sweep
-(separation_ratio > 10), they are confirmed. If not, the config is updated
-before Phase 2 begins.
+A recommended (T, beta) pair satisfies:
+
+- `separation_ratio > 10`
+- `false_activation_rate_jitter < 0.05`
+- `true_activation_rate > 0.5`
+
+**Metric-model reconciliation (from initial draft).** Earlier drafts
+specified `false_activation_rate` over `{constant_bias, repeated_jitter}`.
+That combined metric is structurally ≥ 1.0 because `constant_bias` has
+||e|| = 0.5 m » any realistic T, so its gate is always on — yet its BCVF
+*cost* is zero (acceleration is zero). Phase 1.5 therefore separates on
+**cost** across nominal vs. failure families, and reports the targeted
+jitter gate-rate as a companion metric. Cost is the primitive that
+actually steers MPPI, so cost-based separation is the operationally
+meaningful criterion.
+
+**Outcome of the initial sweep.** `default_se2.yaml`'s original
+`T = 0.1, β = 200` produces `separation_ratio ≈ 1.3` because `N(0, 0.05)`
+jitter crosses the 0.1 m threshold ~4 % of the time, and each activation
+amplifies into a large `|a|` through the `1/dt²` stencil. The sweep
+recommends `T = 0.2, β = 100` (same `20/T` multiplier, within V3.1's
+`[20/T, 50/T]` band), which drops jitter cost to effectively zero while
+keeping every failure family loud. **`default_se2.yaml` has been updated
+accordingly; the V1 operating point is now `T = 0.2, β = 100`.** The
+sweep then verifies separation_ratio > 10 at the new default.
 
 ### 1.5.5 Test Specification
 
@@ -733,7 +751,7 @@ Tests go in `bcvf_autonomous/tests/test_traces.py`.
 | `test_one_time_jump_detected`            | one_time_jump trace: a_max > 1.0 at the jump boundary       |
 | `test_jitter_suppressed_by_gate`         | repeated_jitter trace with default T: gate_activation_rate < 0.05 |
 | `test_mode_switch_localized`             | mode_switch trace: gate activations cluster after step 20    |
-| `test_separation_ratio`                  | parameter_sensitivity_report: default (T=0.1, beta=200) achieves separation_ratio > 10 |
+| `test_separation_ratio`                  | parameter_sensitivity_report: post-sweep default (T=0.2, beta=100) achieves separation_ratio > 10 and jitter gate-rate < 0.05 |
 | `test_all_traces_generate`               | All 6 trace families produce valid (H, 3) trajectory pairs   |
 
 ### 1.5.6 Success Gate
@@ -745,9 +763,11 @@ Tests go in `bcvf_autonomous/tests/test_traces.py`.
 2. Quadratic divergence and one-time jump produce BCVF cost at least 100x
    larger than repeated jitter at the same scale. This is the signal-to-noise
    separation requirement.
-3. The default gate parameters (T=0.1, beta=200) achieve separation_ratio > 10
-   in the parameter sensitivity report. If they don't, update `default_se2.yaml`
-   with the recommended values before proceeding.
+3. The default gate parameters in `default_se2.yaml` (post-sweep:
+   T=0.2, beta=100) achieve separation_ratio > 10 in the parameter
+   sensitivity report. If a later change to the trace set or noise
+   profile drops this below 10, update `default_se2.yaml` with the
+   recommended values before proceeding.
 4. Repeated jitter at N(0, 0.05) produces gate_activation_rate < 0.05 (less
    than 5% false activation). This validates that normal sensor noise does not
    trigger BCVF.
@@ -771,6 +791,21 @@ bcvf_autonomous/
     tests/
       test_traces.py             # 8 tests (Phase 1.5)
 ```
+
+### 1.5.9 `__init__.py` Public API (Phase 1.5)
+
+Append to the subpackage's `__init__.py` (extending §1.2.3):
+
+```python
+from symbolu_robotics.bcvf_autonomous import (
+    TraceResult,
+    TRACE_FAMILIES, NOMINAL_FAMILIES, FAILURE_FAMILIES,
+    generate_trace, analyze_trace, run_all_traces,
+    parameter_sensitivity_report,
+)
+```
+
+Bump `__version__` to `"0.1.5"` and append each new symbol to `__all__`.
 
 ---
 
