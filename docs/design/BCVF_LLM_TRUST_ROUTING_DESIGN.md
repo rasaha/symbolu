@@ -353,14 +353,118 @@ Risks inherited from the autonomy chain and LLM-specific risks that §0–§1 co
 
 ## Section 2 — Phase 1 — Core Math (LLM Adaptation)
 
-**Purpose:** Translate the autonomy BCVF kernel into LLM-domain equations. Specifically decide:
-- disagreement metric between LLM source states (L2, cosine, or domain-specific)
-- temporal window semantics (lookahead via speculative decoding vs. retrospective over past tokens)
-- 2nd-order stencil over the chosen temporal axis
-- gate + pseudo-Huber preservation
-- Lemma 1 analogue: which "constant disagreement" conditions must produce zero distrust
+### 2.0 Sub-section plan
 
-**Details pending.**
+Nine sub-sections, each added one at a time on authorization. Structure
+mirrors the autonomy `DESIGN.md` §1 (Core Math Engine), re-grounded in
+the LLM domain:
+
+- **§2.1** — Purpose & deliverable of Phase 1. What this section produces, what it defers.
+- **§2.2** — Choice of disagreement metric over logits/probabilities. Candidates: L2 on logits, cosine on hidden states, symmetric KL, Jensen-Shannon. One chosen and justified.
+- **§2.3** — Temporal window: forward lookahead via speculative decoding. Exact definition of the LLM analogue to the autonomy H-step rollout.
+- **§2.4** — Second-order BCVF operator over the lookahead window. Stencil, edge cases at the window boundaries.
+- **§2.5** — Gate function + pseudo-Huber preservation. What the gate threshold means in the LLM metric, how it's calibrated.
+- **§2.6** — Lemma 1 analogue: statement, conditions, proof sketch. Hard gate: §3 does not start until this is proven.
+- **§2.7** — Edge cases and numerical considerations. Variable-length outputs, EOS, underflow, log-space vs probability-space.
+- **§2.8** — Python equations parallel to `core.py`. Module boundary, what `bcvf_llm/disagreement.py` implements.
+- **§2.9** — Acceptance criteria + test specification. What passes §2 sign-off.
+
+---
+
+### 2.1 Purpose & deliverable of Phase 1
+
+#### What Phase 1 does
+
+Phase 1 translates the BCVF mathematical kernel from the autonomy
+domain into LLM-domain equations that satisfy the same formal
+properties. The autonomy kernel is specified in
+`symbolu_robotics/bcvf_autonomous/core.py` (Definitions 1–7, Lemma 1,
+Phase 1 of the autonomy DESIGN.md). Phase 1 of **this** document is
+the direct analogue: produce a math kernel that computes a
+per-source distrust signal from LLM decoding state such that
+
+1. the operator is second-order in time,
+2. the gate + pseudo-Huber envelope survives,
+3. Lemma 1 invariance holds under the chosen metric,
+4. no LLM-specific pathology is silently introduced.
+
+The deliverable is a pure-math module (`bcvf_llm/disagreement.py`)
+with synthetic-input tests. **It does not run an LLM, does not need
+a GPU, and has no I/O outside NumPy arrays.** This is deliberate —
+it makes §2 fully audit-able before any inference cost is incurred.
+Same discipline as the autonomy Phase 1: the math kernel was proven
+correct on synthetic traces before any predictor or planner work
+began.
+
+#### What Phase 1 produces
+
+| Artifact | Form |
+|---|---|
+| Disagreement operator | `pairwise_disagreement(source_states_batch) → (K, M) or (K, M, L) signal` |
+| Forward-lookahead temporal window | Fixed `L`-step construction over logit/state sequences |
+| Second-order BCVF operator | Vectorized stencil + gate + Huber + per-source attribution |
+| Lemma-1 proof sketch | A concrete statement and a mathematical argument, written out in §2.6 |
+| Parallel-to-`core.py` Python module | `bcvf_llm/disagreement.py`, est. 100–150 lines |
+| Synthetic test suite | `tests/test_disagreement.py`, 12–16 tests covering invariance + accelerating response |
+
+#### What Phase 1 explicitly does not do
+
+Deferred to later phases, captured here so scope creep is visible:
+
+- **Source implementation** (base decoder, verifier). Phase 1 treats sources as abstract `(batch, lookahead_len, state_dim)` arrays. The actual decoders are §4 (Phase 2, "Source Framework").
+- **Trust weighting + consensus construction.** The `softmin(d_i / τ_w)` and weighted mean are §5 (Phase 3 Integration). Phase 1 produces the per-source signal `d_i`; Phase 3 turns it into weights and a reference.
+- **Decoder wrapping and logit blending.** Belongs to §5 as well.
+- **Benchmark, eval harness, pre-committed metrics.** §6 (Phase 4).
+- **Lemma-1 *signal-level* empirical demo on real sources.** That is §3 (Phase 1.5), which comes after §2. §2 produces the math + invariance proof + synthetic-trace tests. §3 characterizes the signal under controlled traces before hooking up real decoders.
+
+#### Hard gate on §3 start
+
+§2 must pass its sign-off (§2.9) before §3 begins. Specifically:
+
+- Lemma 1 analogue (§2.6) must be mathematically stated and, under the
+  specific metric + operator chosen in §2.2–§2.4, provably true. If
+  the chosen metric produces a counter-example (e.g. constant
+  disagreement gives non-zero 2nd-order signal), §2.2/§2.4 is
+  rewritten until invariance holds, or Phase 1 stops and reports
+  "the autonomy composition's invariance does not transfer under the
+  tested LLM metric" (§0.6 stop rule #4).
+- All synthetic tests in §2.9 must pass deterministically.
+- No LLM dependency has been added to the codebase yet. `torch` /
+  `transformers` / `datasets` enter only in §4 or later.
+
+#### Estimated size and effort
+
+- **Math notes in this doc (§2.2–§2.7):** 1–2 days of design work.
+- **Lemma-1 proof sketch (§2.6):** 0.5–1 day.
+- **Python implementation (`disagreement.py`):** 1 day given the autonomy kernel as reference.
+- **Tests:** 0.5 day.
+- **Total Phase 1:** ~3–4 days within the 2-week V1 budget (§1.9).
+
+#### Reference artifact
+
+Throughout §2 the autonomy kernel is cited as the source of truth for
+the *structural* definitions (Definition 1–7 and Lemma 1 in the
+autonomy DESIGN.md). Where §2 deviates from the autonomy equations,
+the deviation is explicit and justified by domain difference, not
+hand-wave.
+
+---
+
+### 2.2 Disagreement metric over logits — **pending authorization**
+
+### 2.3 Forward lookahead via speculative decoding — **pending**
+
+### 2.4 Second-order BCVF operator — **pending**
+
+### 2.5 Gate + pseudo-Huber — **pending**
+
+### 2.6 Lemma 1 analogue — **pending**
+
+### 2.7 Edge cases & numerical considerations — **pending**
+
+### 2.8 Python equations parallel to `core.py` — **pending**
+
+### 2.9 Acceptance criteria + test specification — **pending**
 
 ---
 
