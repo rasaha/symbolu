@@ -3147,6 +3147,154 @@ Each stage has an in-loop pass/fail aggregate; if any stage fails globally, late
 - **No calibration against real-model distributions.** §4 retroactively validates `sigma_logit=3.0` against a real HuggingFace model; §3 does not.
 - **No result-aggregation protocol.** §3.9 specifies how per-cell pass/fail aggregates into per-family and per-parameter-tuple pass rates.
 
+### 3.5 Acceptance criteria per trace family
+
+§3.2 sketched per-family expected outputs. §3.4 enumerated the grid of cells to run. §3.5 commits the **exact numerical thresholds** each cell must satisfy to count as pass. No threshold in §3.5 is soft — they are either met or not met when the sweep runs.
+
+#### 3.5.1 Per-cell pass/fail contract
+
+Every cell in any §3.4 grid is defined by a tuple `(family, family_params, T, β, δ, sigma_logit, V, seed)`. Each cell is evaluated by:
+
+1. Running `generate_trace(...)` per §3.3.6 with the cell's parameters.
+2. Calling `compute_bcvf_cost_batch(sources, config, valid_masks_batch, return_per_source=True)` per §2.8.12.
+3. Computing the family-specific pass metrics listed in §3.5.2–§3.5.8.
+4. Comparing each metric against its threshold.
+5. Emitting `cell_pass = True` iff **every** metric for that family is within threshold.
+
+**Three-seed rule** (§3.4 committed): a cell's `(family, family_params, T, β, δ, sigma_logit, V)` pass status is `True` iff all three seeded variants `(..., seed=s)` independently pass. A single-seed pass is recorded but does **not** satisfy §3.9 sign-off. This catches RNG-boundary flakes where one seed's random direction vector happens to cancel the gate threshold.
+
+**Precision regime per metric.** Lemma 1 metrics (C1, C2) evaluate in fp64 with `total_cost ≤ 1e-10`. All other metrics evaluate in fp32 with looser tolerances appropriate for softmax rounding. The generator upcasts to fp64 only for Lemma 1 cells (explicit `dtype=np.float64` in `generate_trace`), so the precision regime is selected by the family, not by a global flag.
+
+#### 3.5.2 §3.2.1 Baseline — all sources agree
+
+All three sources produce the same distribution at every lookahead position.
+
+| Metric | Threshold | Precision |
+|---|---|---|
+| `total_cost` | `< 1e-6` at `σ_noise = 0` | fp32 |
+| `total_cost` | `< 1e-4` at `σ_noise = 1e-6` (fp32 rounding regime) | fp32 |
+| `max_acceleration_norm` | `< 1e-3` | fp32 |
+| `gate_activation_count` | `== 0` | — |
+| `per_source_costs[s]` for all `s` | `< 1e-6` | fp32 |
+
+**Pass iff all 5 metrics within threshold.** Fail cases diagnose: if `total_cost > 1e-6` despite `σ_noise = 0`, the kernel has a false-positive bug. If `gate_activation_count > 0`, the noise noise is crossing the gate threshold — either a bug or the baseline generator is wrong.
+
+#### 3.5.3 §3.2.2 Constant-bias — §2.6 Case 1
+
+Source 1 differs from sources 0 and 2 by a fixed logit offset `α_logit`.
+
+| Metric | Threshold | Precision |
+|---|---|---|
+| `total_cost` | `≤ 1e-10` | **fp64** |
+| `per_source_costs[s]` for all `s` | `≤ 1e-10` | **fp64** |
+| `max_acceleration_norm` | `≤ 1e-10` | **fp64** |
+
+**Pass iff all 3 within threshold, for every `α_mag` in the sweep range.** This is the LLM analogue of `test_lemma_1_constant_bias_zero` (§2.9) evaluated on softmax-projected realistic inputs. A failure here indicates an implementation deviation from §2.6.3's proof — or an unreported floating-point issue when `p_s` values are near fp64 rounding limits (unlikely but worth diagnosing).
+
+#### 3.5.4 §3.2.3 Linear-drift — §2.6 Case 2
+
+Source 1 drifts linearly in logit space from sources 0 and 2.
+
+| Metric | Threshold | Precision |
+|---|---|---|
+| `total_cost` | `≤ 1e-10` | **fp64** |
+| `per_source_costs[s]` for all `s` | `≤ 1e-10` | **fp64** |
+| `max_acceleration_norm` | `≤ 1e-10` | **fp64** |
+
+**Pass iff all 3 within threshold, for every `drift_rate` in the sweep range.** The critical family: §2.4.1's vector-path choice either holds empirically here or it doesn't. If a cell fails with `cost_order=SECOND`, §2.4.1 is wrong or §2.8.6's implementation is wrong. If a cell fails with `cost_order=FIRST`, that is **expected** (§3.4.4 ablation) and is recorded as a positive confirmation, not a failure.
+
+#### 3.5.5 §3.2.4 Accelerating-divergence — §2.6 Case 3
+
+Source 1 accelerates away from sources 0 and 2 quadratically.
+
+| Metric | Threshold | Precision |
+|---|---|---|
+| `total_cost` | `> 1e-4` when gate is open (i.e., `accel_mag ≥ 0.1`) | fp32 |
+| `total_cost` | **monotonically non-decreasing** in `accel_mag` within family | fp32 |
+| `gate_activation_count` | `> 0` when `accel_mag ≥ 0.1` | — |
+| `max_acceleration_norm` | `> T / 10` when gate is open (sanity that `‖a‖` is meaningful) | fp32 |
+| `total_cost` | `< 10^6` at any `accel_mag ≤ 1.0` (Huber finite-bound check per §2.6.7) | fp32 |
+
+**Pass iff all 5 within threshold.** Fail cases: if `total_cost` is flat across `accel_mag`, the gate never opens or the Huber is saturated pathologically. If `total_cost` is non-monotonic, rounding or numerical instability is corrupting the stencil.
+
+#### 3.5.6 §3.2.5 Noise-floor — §2.5.1 gate suppression
+
+All three sources receive IID Gaussian noise in logit space with standard deviation `σ_noise`.
+
+| Metric | Threshold | Precision |
+|---|---|---|
+| `total_cost` | `< 1e-3` for `σ_noise ≤ 0.005` | fp32 |
+| `total_cost` | **monotonically non-decreasing** in `σ_noise` | fp32 |
+| `gate_activation_count` | `== 0` for `σ_noise ≤ 0.001` | — |
+| `per_source_costs[s]` standard deviation across `s` | `< 0.1 · mean(per_source_costs)` for `σ_noise ≤ 0.01` | fp32 |
+
+**Pass iff all 4 within threshold.** The 4th metric is the symmetry check — under IID noise, all three sources should accumulate roughly equal per-source cost, since no source is an outlier. Asymmetry would signal a bug in `_enumerate_pairs` or the per-source accumulation in §2.8.11.
+
+#### 3.5.7 §3.2.6 Single-source-outlier — §2.4.5 attribution
+
+Source 0 accelerates; sources 1 and 2 agree.
+
+| Metric | Threshold | Precision |
+|---|---|---|
+| `per_source_costs[0] / per_source_costs[1]` | `≥ 1.8` | fp32 |
+| `per_source_costs[0] / per_source_costs[2]` | `≥ 1.8` | fp32 |
+| `abs(per_source_costs[1] − per_source_costs[2]) / per_source_costs[1]` | `< 0.1` | fp32 |
+| `argmax(per_source_costs) == 0` | `True` | — |
+| `gate_activation_count` | `> 0` | — |
+
+**Pass iff all 5 within threshold.** Threshold `1.8` is the theoretical `2.0` relaxed by 10% for finite-V softmax noise (per §3.1). The 3rd metric enforces **symmetry** — the two non-outliers should have per-source cost within 10% of each other; a large gap signals a pairing bug.
+
+**This family is load-bearing for §5.** If §3.2.6 fails, the Ketu→Rahu softmin has nothing to work with. No pass here = no Phase 1.5 sign-off = no §4 unlock.
+
+#### 3.5.8 §3.2.7 EOS-truncation — §2.7.4
+
+Source 0 emits EOS at position `k_eos`; the outer family (baseline or outlier) determines the underlying shape.
+
+| Metric | Condition | Threshold | Precision |
+|---|---|---|---|
+| `pair_cost_{0,1}` | at `k_eos = 0` | `== 0.0` exactly | — |
+| `pair_cost_{0,2}` | at `k_eos = 0` | `== 0.0` exactly | — |
+| `pair_cost_{1,2}` | at `k_eos = 0` | matches no-mask baseline within `1e-10` | fp64 |
+| `total_cost(k_eos = L−1)` | equals `total_cost(no mask)` | within `1e-10` | fp64 |
+| `total_cost(k_eos)` | **monotonically non-decreasing** in `k_eos` for outlier outer family | fp32 |
+| `total_cost`, `per_source_costs`, `gate_activation_count` | any trace | all finite (no NaN, no Inf) | — |
+
+**Pass iff all 6 within threshold.** The `k_eos = 0` cell is the strictest test of §2.4.4's `valid(l*)` predicate — both pairs involving source 0 must produce exactly zero, not "approximately zero." The monotonicity check guards against mask application bugs where an off-by-one would make partial-truncation cells produce artifacts.
+
+#### 3.5.9 Global aggregation across seeds and magnitudes
+
+Per §3.4, a *cell* is a 3-seed-replicated `(family, params, BCVF_config, sigma_logit, V)`. §3.5 defines two aggregation levels above the cell:
+
+**Per-family pass rate.** For each family, across all magnitude values in its sweep range and all 3 seeds per magnitude:
+
+```
+family_pass_rate = (#cells passing all family-specific thresholds)
+                 / (#cells total for the family)
+```
+
+A family is considered **pass** iff `family_pass_rate == 1.0` (100%). Anything less is a fail, because §3.5's thresholds are pass-every-cell, not pass-on-average.
+
+**Per-BCVF-config pass rate.** For sensitivity-grid sweeps, across all 7 families at that `(T, β, δ)`:
+
+```
+config_pass_rate = (#families passing under this (T, β, δ))
+                 / 7
+```
+
+A BCVF config is a **candidate V1 tuple** iff `config_pass_rate == 1.0`. §3.9 picks the winner from the candidate set using a tiebreaker rule defined there (likely: prefer the tuple closest to V1 defaults `(0.1, 200, 0.5)` to minimize deviation from the design spec).
+
+**Failure attribution.** When `config_pass_rate < 1.0`, §3.9 reports which family(families) failed, which magnitudes within each family, and which seeds. This produces an actionable diagnostic report, not a pass/fail bit alone.
+
+#### 3.5.10 What §3.5 does NOT do
+
+- **No tuning of the thresholds themselves.** If the §2 defaults are correct and the kernel is implemented per §2.8, these thresholds pass. If they don't pass, the answer is to revise §2 or the implementation, **not** to relax the thresholds. Sign-off discipline.
+- **No soft thresholds or probabilistic passes.** Every threshold is an absolute-value or equality check. Phase 1.5 is a structural sweep, not a statistical one.
+- **No time-series / streaming analysis.** Each cell is evaluated in isolation. Cross-cell statistics (e.g., "does `total_cost` trend over `accel_mag` fit a quadratic?") are out of scope — they're useful diagnostic narratives but not pass criteria.
+- **No model-dependent thresholds.** Every threshold is a pure function of the generator parameters and the kernel output; nothing references a real LLM's distribution.
+- **No recovery-rate / regression-guard pass.** §3.7's regression-guard traces have their own thresholds (defined there); §3.5 stays on the 7 core families.
+
+§3.5 is intentionally spartan: a table of numbers, evaluated mechanically against the sweep output. §3.9 is where these numbers become sign-off decisions; §3.6 is where the alignment-diagnostic dimension is added beyond raw pass/fail.
+
 ---
 
 ## Section 4 — Phase 2 — Source Framework
