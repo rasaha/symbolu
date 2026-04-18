@@ -1576,6 +1576,68 @@ class BCVFLLMConfig:
 
 **Parity test.** §2.9 will include `test_bcvflllm_config_defaults` that asserts each of the 8 fields has the exact default value committed above. This is a one-line mechanical assertion that catches drift between the design doc and the implementation.
 
+#### 2.8.5 `compute_disagreement` — replacing `body_frame_error_trajectory`
+
+The autonomy kernel's `compute_disagreement` is a thin wrapper that delegates to the SE(2) body-frame helper (`bcvf_autonomous/core.py:67–74`):
+
+```python
+def compute_disagreement(
+    traj_i: np.ndarray, traj_j: np.ndarray, lever_arm: float
+) -> np.ndarray:
+    """V3.1 Definition 1. Body-frame error over the full trajectory.
+
+    Inputs: (H, 3). Output: (H, 3).
+    """
+    return body_frame_error_trajectory(traj_i, traj_j, lever_arm)
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+def compute_disagreement(p_i: np.ndarray, p_j: np.ndarray) -> np.ndarray:
+    """§2.2 disagreement metric. Probability-simplex difference.
+
+    Inputs: (..., V) arrays from softmax-normalized logits. Output:
+    same leading shape, same V. The ellipsis supports both unbatched
+    (L, V) sequences and batched (T, L, V) or (M, T, L, V) tensors.
+
+    No normalization, no projection, no clamping. By §2.7.3 the BCVF
+    operator is translation-invariant over the per-vocab mean, so
+    simplex-sum rounding drift does not affect downstream 2nd-
+    differences or norms. The caller is responsible for ensuring
+    inputs came from a softmax pass (§2.7.1 commits T=1.0, fp32).
+    """
+    return p_i - p_j
+```
+
+**Diff against autonomy:**
+
+| Aspect | Autonomy | LLM-kernel | Rationale |
+|---|---|---|---|
+| Signature | `(traj_i, traj_j, lever_arm)` | `(p_i, p_j)` | No `lever_arm` per §2.8.4; disagreement is already in ℝ^V |
+| Implementation | delegates to `body_frame_error_trajectory` | **one-line vector subtraction** | §2.2.1 committed `e_{ij}(l) = p_i(l) − p_j(l)`. Nothing to delegate — NumPy's native operator does it |
+| Input shape | strict `(H, 3)` | `(..., V)` with ellipsis | Callers at §2.8.11 pass `(M, T, L, V)`; callers at §2.8.10 pass `(T, L, V)` per-pair; test harnesses may pass `(L, V)` directly. `p_i - p_j` broadcasts cleanly for all three |
+| Output shape | `(H, 3)` | `(..., V)` | Consequence of NumPy broadcast |
+| Docstring reference | `V3.1 Definition 1` | `§2.2` | Replaces autonomy paper reference with this doc's metric commitment |
+| Translation-invariance note | implicit (SE(2) body-frame math absorbs it) | **explicit** | §2.7.3 committed that BCVF does not depend on simplex-sum holding exactly. Docstring states this so future maintainers don't add an `np.clip(e, 0, 1)` or re-normalization that would silently break Lemma 1 |
+| No-clamping note | — | **explicit** | Prevents well-meaning contributors from inserting `np.clip(p_i - p_j, -1, 1)`. The theoretical range is `[−1, 1]` by simplex constraint, so clipping is a no-op in theory but could shift numerical rounding noise in a way that fails the §2.9 tests |
+
+**Why this is a one-liner and why it has a function anyway.** The body of `compute_disagreement` could be replaced everywhere with `p_i - p_j`, saving one function call. The function is kept because:
+
+1. **Structural parity with autonomy.** Autonomy's `compute_disagreement` exists as a named operation in the pipeline `disagreement → velocity → acceleration → gate → huber → sum`. Keeping the same name in the LLM kernel preserves the pipeline stage naming and makes the side-by-side reading of the two files possible.
+2. **Testability.** §2.9 will unit-test the disagreement stage separately from the acceleration and gate stages. A named function is a natural test target.
+3. **Extension point.** If V2 (§9) introduces an alternative disagreement metric (KL-divergence, Hellinger), the function signature is the extension point: `compute_disagreement(p_i, p_j, metric="kl")`. The V1 body stays trivial; V2 grows it.
+
+**What the function does NOT do** (deliberate non-features):
+
+- **No validation of simplex sum.** Inputs could have `Σ_k p_{i,k} = 1.0000001` due to fp32 rounding after softmax; the kernel tolerates this per §2.7.3.
+- **No NaN check.** §2.7.6 locates the NaN guard in `compute_bcvf_cost_batch` at the kernel boundary, not in every stage. Per-stage checks would be redundant and slow.
+- **No `where`/masking.** EOS truncation is handled downstream by the `valid_mask` parameter in §2.8.10's `_pair_cost`, not by masking the disagreement itself (truncated positions still produce values; they're just dropped from the sum later). Keeping masking out of this stage means the function stays pure elementwise.
+
+**FLOP cost.** `(..., V)` subtraction is `V` FLOPs per leading element. At V=32000, M=3, T=1, L=5, the total per outer step is `3×1×5×32000 = 480K` FLOPs — a rounding error against the 16 GFLOPs of the model forward pass (§2.4.6).
+
+**Parity test.** §2.9 will include `test_compute_disagreement_shape_broadcast` that passes a (3, 1, 5, 32000) input and asserts output shape matches, plus `test_compute_disagreement_translation_invariant` that adds a constant vector to both `p_i` and `p_j` and asserts the output is unchanged (verifying §2.7.3's translation invariance at the stage boundary).
+
 
 
 ### 2.9 Acceptance criteria + test specification — **pending**
