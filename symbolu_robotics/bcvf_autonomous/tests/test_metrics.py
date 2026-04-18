@@ -213,6 +213,88 @@ def test_compare_continuous_metric() -> None:
 # --- Summary table ---
 
 
+# --- Recovery metrics (B2-smoke follow-up) ---
+
+
+def _diag_with_y(y_series: np.ndarray) -> EpisodeDiagnostics:
+    """Make an EpisodeDiagnostics whose ground_truth y-column is y_series."""
+    T = y_series.size
+    gt = np.stack([np.linspace(0.0, T, T), y_series, np.zeros(T)], axis=-1)
+    return EpisodeDiagnostics(
+        config={},
+        collision=False,
+        collision_step=None,
+        total_steps=T,
+        ground_truth_trajectory=gt,
+        predictor_trajectories={},
+        applied_controls=np.zeros((T, 2)),
+        bcvf_costs=np.zeros(T),
+        perf_costs=np.zeros(T),
+        total_costs=np.zeros(T),
+        solve_times_ms=np.full(T, 5.0),
+        effective_samples=np.full(T, 50.0),
+        mean_solve_time_ms=5.0,
+        p99_solve_time_ms=7.0,
+        path_length=float(T),
+        path_efficiency=1.0,
+        mean_lateral_deviation=float(np.mean(np.abs(y_series))),
+        rms_lateral_jerk=0.0,
+    )
+
+
+def test_final_lateral_deviation_uses_last_step() -> None:
+    diag = _diag_with_y(np.array([0.0, 3.0, 5.0, 2.0]))
+    m = compute_episode_metrics(diag, dt=0.1)
+    assert m.final_lateral_deviation == pytest.approx(2.0)
+
+
+def test_time_integrated_lateral_sums_over_dt() -> None:
+    # Constant |y| = 0.5, 20 steps, dt = 0.1 → ∫|y|dt = 0.5 * 20 * 0.1 = 1.0.
+    diag = _diag_with_y(np.full(20, 0.5))
+    m = compute_episode_metrics(diag, dt=0.1)
+    assert m.time_integrated_lateral == pytest.approx(1.0)
+
+
+def test_post_peak_recovery_returns_seconds_from_peak() -> None:
+    # Peak at index 2 (y=5). Recover to |y|<0.5 at index 5. Gap = 3 steps → 0.3s.
+    y = np.array([0.0, 3.0, 5.0, 3.0, 1.0, 0.3, 0.1, 0.1])
+    diag = _diag_with_y(y)
+    m = compute_episode_metrics(diag, dt=0.1, recovery_threshold_m=0.5)
+    # (index_of_first_below + 1) * dt — 'first below' in after-peak slice is
+    # index 2 of that slice (step 5 of full series), so (2+1)*0.1 = 0.3s.
+    assert m.post_peak_recovery_s == pytest.approx(0.3)
+
+
+def test_post_peak_recovery_none_when_never_recovers() -> None:
+    # Monotonic excursion, never re-enters threshold after peak.
+    y = np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+    diag = _diag_with_y(y)
+    m = compute_episode_metrics(diag, dt=0.1, recovery_threshold_m=0.5)
+    assert m.post_peak_recovery_s is None
+
+
+def test_aggregate_recovery_rate_counts_only_recoverers() -> None:
+    """3 of 5 episodes recover → recovery_rate = 0.6."""
+    recovered = EpisodeMetrics(
+        collision=False, collision_step=None, collision_time=None,
+        final_lateral_deviation=0.1,
+        time_integrated_lateral=5.0,
+        post_peak_recovery_s=0.5,
+    )
+    not_recovered = EpisodeMetrics(
+        collision=False, collision_step=None, collision_time=None,
+        final_lateral_deviation=10.0,
+        time_integrated_lateral=200.0,
+        post_peak_recovery_s=None,
+    )
+    agg = compute_aggregate_metrics([recovered, recovered, recovered, not_recovered, not_recovered])
+    assert agg.recovery_rate == pytest.approx(0.6)
+    # Median recovery time taken only over recoverers.
+    assert agg.post_peak_recovery_median_s == pytest.approx(0.5)
+    # Final lateral mean across all 5 runs.
+    assert agg.final_lateral_mean == pytest.approx((3 * 0.1 + 2 * 10.0) / 5.0)
+
+
 def test_summary_table_structure() -> None:
     agg = AggregateMetrics(
         n_runs=10,

@@ -56,6 +56,16 @@ class EpisodeMetrics:
     p99_solve_time_ms: float = 0.0
     mean_effective_samples: float = 0.0
 
+    # Recovery metrics (added after B2 smoke revealed A3's advantage is
+    # concentrated in lane-center recovery after the failure peak, not in
+    # peak magnitude itself). See DESIGN Appendix and metrics.py docstring.
+    final_lateral_deviation: float = 0.0  # |y| at the last recorded step
+    time_integrated_lateral: float = 0.0  # Σ |y(t)| · dt over the episode
+    post_peak_recovery_s: Optional[float] = None  # seconds from peak |y|
+                                                   # to first step where
+                                                   # |y| < recovery threshold;
+                                                   # None if never recovers
+
 
 def _first_activation(
     bcvf_costs: np.ndarray, threshold: float
@@ -95,6 +105,7 @@ def compute_episode_metrics(
     diagnostics: EpisodeDiagnostics,
     bcvf_activation_threshold: float = 0.01,
     dt: float = 0.1,
+    recovery_threshold_m: float = 0.5,
 ) -> EpisodeMetrics:
     """Compute per-episode metrics (DESIGN §4B.3)."""
     gt = diagnostics.ground_truth_trajectory
@@ -123,6 +134,30 @@ def compute_episode_metrics(
     # Lateral jerk requires the road centerline; diagnostics.config serializes
     # only the road length. Fall back to the episode's own rms_lateral_jerk
     # (already computed in Phase 3C) rather than recomputing here.
+
+    # Recovery metrics: use the ground-truth y directly. Straight-road
+    # scenarios put the lane center at y=0 so |y| is the lateral
+    # deviation. For curved-road scenarios a proper "lateral deviation
+    # from centerline" would need the road polyline; current V1 scenarios
+    # (S3_map_error[_accel], S6_glass_corridor) are all straight.
+    y = gt[:, 1] if gt.shape[0] > 0 else np.zeros(0)
+    abs_y = np.abs(y)
+    if abs_y.size > 0:
+        final_lat = float(abs_y[-1])
+        time_int_lat = float(np.sum(abs_y) * dt)
+        peak_idx = int(np.argmax(abs_y))
+        # Post-peak recovery: time from the peak to the first subsequent
+        # step where |y| < threshold.
+        post_peak_recovery: Optional[float] = None
+        after = abs_y[peak_idx + 1:]
+        below = np.where(after < recovery_threshold_m)[0]
+        if below.size > 0:
+            post_peak_recovery = float((int(below[0]) + 1) * dt)
+    else:
+        final_lat = 0.0
+        time_int_lat = 0.0
+        post_peak_recovery = None
+
     return EpisodeMetrics(
         collision=diagnostics.collision,
         collision_step=diagnostics.collision_step,
@@ -143,6 +178,9 @@ def compute_episode_metrics(
         mean_solve_time_ms=diagnostics.mean_solve_time_ms,
         p99_solve_time_ms=diagnostics.p99_solve_time_ms,
         mean_effective_samples=float(diagnostics.effective_samples.mean()) if diagnostics.effective_samples.size > 0 else 0.0,
+        final_lateral_deviation=final_lat,
+        time_integrated_lateral=time_int_lat,
+        post_peak_recovery_s=post_peak_recovery,
     )
 
 
@@ -193,6 +231,14 @@ class AggregateMetrics:
     mean_bcvf_cost_std: float
     solve_time_mean_ms: float
     solve_time_p99_ms: float
+    # Recovery (added after B2 smoke — see EpisodeMetrics recovery fields)
+    final_lateral_mean: float = 0.0
+    final_lateral_std: float = 0.0
+    time_integrated_lateral_mean: float = 0.0
+    time_integrated_lateral_std: float = 0.0
+    recovery_rate: float = 0.0                 # fraction of runs that
+                                               # recovered after peak
+    post_peak_recovery_median_s: Optional[float] = None
 
 
 def wilson_ci(successes: int, n: int, z: float = 1.96) -> Tuple[float, float]:
@@ -230,6 +276,12 @@ def compute_aggregate_metrics(
             mean_bcvf_cost_std=0.0,
             solve_time_mean_ms=0.0,
             solve_time_p99_ms=0.0,
+            final_lateral_mean=0.0,
+            final_lateral_std=0.0,
+            time_integrated_lateral_mean=0.0,
+            time_integrated_lateral_std=0.0,
+            recovery_rate=0.0,
+            post_peak_recovery_median_s=None,
         )
 
     collisions = sum(1 for m in episode_metrics_list if m.collision)
@@ -252,6 +304,18 @@ def compute_aggregate_metrics(
     solve = np.asarray([m.mean_solve_time_ms for m in episode_metrics_list])
     p99 = np.asarray([m.p99_solve_time_ms for m in episode_metrics_list])
 
+    final_lat = np.asarray([m.final_lateral_deviation for m in episode_metrics_list])
+    ti_lat = np.asarray([m.time_integrated_lateral for m in episode_metrics_list])
+    recovery_times = [
+        m.post_peak_recovery_s
+        for m in episode_metrics_list
+        if m.post_peak_recovery_s is not None
+    ]
+    recovery_rate = len(recovery_times) / n if n > 0 else 0.0
+    recovery_median = (
+        float(np.median(recovery_times)) if recovery_times else None
+    )
+
     return AggregateMetrics(
         n_runs=n,
         collision_rate=collision_rate,
@@ -268,6 +332,12 @@ def compute_aggregate_metrics(
         mean_bcvf_cost_std=float(bcvf.std(ddof=0)),
         solve_time_mean_ms=float(solve.mean()),
         solve_time_p99_ms=float(np.percentile(p99, 99)) if p99.size > 0 else 0.0,
+        final_lateral_mean=float(final_lat.mean()),
+        final_lateral_std=float(final_lat.std(ddof=0)),
+        time_integrated_lateral_mean=float(ti_lat.mean()),
+        time_integrated_lateral_std=float(ti_lat.std(ddof=0)),
+        recovery_rate=recovery_rate,
+        post_peak_recovery_median_s=recovery_median,
     )
 
 
@@ -458,6 +528,11 @@ def build_summary_table(
             m = results.get((scenario, variant))
             if m is None:
                 continue
+            recovery = (
+                f"{m.post_peak_recovery_median_s:.1f}s"
+                if m.post_peak_recovery_median_s is not None
+                else "—"
+            )
             table[scenario][variant] = {
                 "collision_rate": _format_collision_rate(m),
                 "path_efficiency": _format_path_efficiency(m),
@@ -465,5 +540,10 @@ def build_summary_table(
                 "false_positive_rate": f"{m.false_positive_rate:.3f}",
                 "rms_jerk_ratio": f"{m.rms_lateral_jerk_mean:.2f}",
                 "solve_time_ms": f"{m.solve_time_mean_ms:.1f} (p99 {m.solve_time_p99_ms:.1f})",
+                # Recovery suite — the metrics the B2 smoke says differ.
+                "final_lateral_m": f"{m.final_lateral_mean:.2f} +/- {m.final_lateral_std:.2f}",
+                "time_integrated_lateral": f"{m.time_integrated_lateral_mean:.1f} +/- {m.time_integrated_lateral_std:.1f}",
+                "recovery_rate": f"{m.recovery_rate:.2f}",
+                "post_peak_recovery_median": recovery,
             }
     return table
