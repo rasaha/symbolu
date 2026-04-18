@@ -2027,6 +2027,175 @@ Two pairs, both against source 0 as anchor. This **does not** produce a 2:1 outl
 - `test_enumerate_pairs_m3_all_sources_covered_twice` — asserts that in all-pairs mode at M=3, every source index appears in exactly 2 tuples.
 - `test_enumerate_pairs_matches_autonomy` — cross-kernel parity: call both autonomy's `_enumerate_pairs` and LLM's with same `(M, use_anchor, anchor)` and assert outputs are equal.
 
+#### 2.8.10 `_pair_cost` — per-pair stage with `valid_mask` for EOS
+
+Autonomy defines the per-pair cost with its diagnostic triple return (`bcvf_autonomous/core.py:150–184`):
+
+```python
+def _pair_cost(
+    traj_i: np.ndarray,
+    traj_j: np.ndarray,
+    config: BCVFConfig,
+) -> Tuple[float, float, int]:
+    """Compute the per-pair BCVF cost plus diagnostic stats.
+
+    Returns (pair_cost, max_signal_norm, gate_activation_count).
+    """
+    e = compute_disagreement(traj_i, traj_j, config.lever_arm)  # (H, 3)
+    if config.cost_order == CostOrder.SECOND:
+        signal = compute_disagreement_acceleration(e, config.dt)  # (H-2, 3)
+        gate_input = e[1:-1]                                      # (H-2, 3)
+    elif config.cost_order == CostOrder.FIRST:
+        signal = compute_disagreement_velocity(e, config.dt)      # (H-1, 3)
+        gate_input = 0.5 * (e[:-1] + e[1:])                       # (H-1, 3)
+    else:  # ZEROTH
+        signal = e                                                # (H, 3)
+        gate_input = e                                            # (H, 3)
+
+    gate = smooth_gate(
+        gate_input, config.gate_threshold, config.gate_beta, config.weight_matrix
+    )
+
+    w_sqrt = np.sqrt(np.asarray(config.weight_matrix, dtype=np.float64))
+    signal_norms = np.linalg.norm(signal * w_sqrt, axis=-1)
+
+    penalty = pseudo_huber(signal_norms, config.huber_delta)
+    pair_cost = float(np.sum(gate * penalty) * config.dt)
+
+    max_signal = float(signal_norms.max()) if signal_norms.size > 0 else 0.0
+    activations = int(np.count_nonzero(gate > 0.5))
+    return pair_cost, max_signal, activations
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+def _pair_cost(
+    p_i: np.ndarray,
+    p_j: np.ndarray,
+    config: BCVFLLMConfig,
+    valid_mask: Optional[np.ndarray] = None,
+) -> Tuple[float, float, int]:
+    """Compute the per-pair BCVF cost plus diagnostic stats (§2.5.3).
+
+    Inputs:
+        p_i, p_j    shape (L, V) — probability sequences for one pair
+                    at one outer step, along the lookahead axis
+        config      BCVFLLMConfig (§2.8.4)
+        valid_mask  optional shape (L-2,) boolean — True at stencil
+                    centers l* where both sources have defined logits
+                    per §2.7.4. None ⇒ all positions valid.
+
+    Returns: (pair_cost, max_signal_norm, gate_activation_count)
+
+    SECOND-order path is the V1 default. ZEROTH/FIRST retained for
+    §3 ablation only; FIRST breaks Lemma 1 case 2 (§2.6.4 / §2.8.3).
+    """
+    e = compute_disagreement(p_i, p_j)  # (L, V)
+
+    if config.cost_order == CostOrder.SECOND:
+        signal = compute_disagreement_acceleration(e, config.step_l)  # (L-2, V)
+        gate_input = e[1:-1]                                          # (L-2, V)
+    elif config.cost_order == CostOrder.FIRST:
+        signal = compute_disagreement_velocity(e, config.step_l)      # (L-1, V)
+        gate_input = 0.5 * (e[:-1] + e[1:])                           # (L-1, V)
+    else:  # ZEROTH
+        signal = e                                                    # (L, V)
+        gate_input = e                                                # (L, V)
+
+    gate = smooth_gate(
+        gate_input, config.gate_threshold, config.gate_beta,
+        config.weight_vector,
+    )
+
+    # Signal-norm weighting. weight_vector=None short-circuits as in
+    # smooth_gate — identity weight, skip the multiply (§2.8.7).
+    if config.weight_vector is None:
+        signal_weighted = signal
+    else:
+        w_sqrt = np.sqrt(
+            np.asarray(config.weight_vector, dtype=np.float64)
+        )
+        signal_weighted = signal * w_sqrt
+    signal_norms = np.linalg.norm(signal_weighted, axis=-1)      # (L*, )
+
+    penalty = pseudo_huber(signal_norms, config.huber_delta)     # (L*, )
+
+    # Apply EOS / truncation mask before the sum (§2.7.4). Invalid
+    # positions contribute exactly 0. For non-SECOND cost_order the
+    # mask length is (L-1,) or (L,); the caller is responsible for
+    # providing a correctly-sized mask.
+    contrib = gate * penalty                                     # (L*, )
+    if valid_mask is not None:
+        contrib = contrib * valid_mask.astype(contrib.dtype)
+
+    pair_cost = float(np.sum(contrib) * config.step_l)
+    max_signal = float(signal_norms.max()) if signal_norms.size > 0 else 0.0
+    activations = int(np.count_nonzero((gate > 0.5) & (
+        np.ones_like(gate, dtype=bool) if valid_mask is None
+        else valid_mask.astype(bool)
+    )))
+    return pair_cost, max_signal, activations
+```
+
+**Diff against autonomy:**
+
+| Aspect | Autonomy | LLM-kernel | Rationale |
+|---|---|---|---|
+| Parameter names | `traj_i, traj_j` | `p_i, p_j` | §2.8.5 domain vocabulary |
+| Extra parameter | — | `valid_mask: Optional[np.ndarray] = None` | §2.7.4 EOS handling; optional so short-context tests can omit |
+| `lever_arm` argument to `compute_disagreement` | passed through | **removed** | §2.8.5 — LLM disagreement takes no extra arg |
+| `config.dt` → `config.step_l` | — | renamed per §2.8.4 | Consistent with renamed field |
+| Stencil axis | `e[1:-1]`, `e[:-1] + e[1:]` slicing axis 0 | **same slicing logic** but axis is `L`-axis by function contract | Input shape `(L, V)` means axis 0 is already `L`; autonomy's axis-0 slicing is preserved here. The `(M, T, L, V)` → `(L, V)` extraction happens one level up in §2.8.12 |
+| Gate input weight arg | `config.weight_matrix` | `config.weight_vector` | §2.8.4 rename |
+| Weight-vector None short-circuit | — | **added** | `weight_vector=None` means identity; skip the `sqrt(1)*signal` multiply. Matches §2.8.7 smooth_gate's None handling |
+| `valid_mask` application | — | **added, elementwise before sum** | §2.7.4 — invalid stencil positions contribute exactly 0. Applied to `gate * penalty` elementwise, then summed |
+| `activations` count | `np.count_nonzero(gate > 0.5)` | `np.count_nonzero((gate > 0.5) & valid_mask)` | Don't count activations at invalidated positions — those would inflate the diagnostic |
+| Final multiplier | `* config.dt` | `* config.step_l` | §2.8.4 rename; `step_l=1.0` default makes this a no-op at V1 |
+| Return triple | `(pair_cost, max_signal_norm, gate_activation_count)` | **verbatim** | Same diagnostic interface |
+
+**Why the mask is applied to `gate * penalty`, not upstream.** There are three places the mask could be applied:
+
+1. At `e` itself (zero out truncated rows before the stencil).
+2. At `signal` / `gate_input` (zero out truncated rows after the stencil).
+3. At `contrib = gate * penalty` (zero out contributions at the sum stage).
+
+Option 3 is correct because:
+
+- **Option 1 breaks the stencil.** Zeroing out `e[k]` when source `i` emitted EOS at position `k` would corrupt the 2nd-difference at `l* = k−1` and `l* = k+1`, which still reference the zeroed-out position. The stencil's Lemma 1 invariance (§2.6.3/§2.6.4) depends on `e` values being the true disagreements, not masked placeholders.
+- **Option 2 is subtle.** Signal at position `l*` depends on `e(l*−1), e(l*), e(l*+1)`. If any of those is truncated, `valid(l*) = False` per §2.4.4 regardless of whether `l*` itself is truncated. Option 2 would require propagating truncation one position outward, which is exactly what the §2.4.4 `valid(l*)` predicate already does — so applying the mask at contrib time uses the pre-computed predicate directly.
+- **Option 3 is correct.** The mask is already expressed in stencil-output indices by §2.4.4's `valid(l*) = (last_defined_l[i] ≥ l*+1) AND (last_defined_l[j] ≥ l*+1)`. Applying it at `contrib` time matches the predicate's natural domain.
+
+**Why `astype(contrib.dtype)` on the mask.** `valid_mask` is a boolean array; `contrib` is fp64. Naive multiplication `contrib * valid_mask` works in NumPy (boolean promotes), but being explicit about the dtype cast avoids surprising performance regressions if a caller passes `valid_mask.astype(np.int32)` or similar. The dtype promotion is exact: `True → 1.0`, `False → 0.0`, no rounding.
+
+**Empty-stencil edge case.** If `valid_mask` is all `False` (every stencil position invalidated, e.g. all sources emit EOS at `l = 0`), `contrib = [0, 0, ...]`, sum = 0, `pair_cost = 0`, `max_signal = max(signal_norms)` (not masked — the `max_signal` diagnostic reports the unconditional max, since it's used for debugging regardless of gate/mask state), `activations = 0`. This matches §2.7.4's "no data → no distrust signal, not false distrust" rule.
+
+**Why `max_signal` is unmasked.** The `max_signal_norm` diagnostic is used by the autonomy kernel for logging / threshold calibration and by §3 signal-characterization to understand the range of acceleration values produced by specific failure traces. Masking it would hide the actual computed signal at invalidated positions. Callers who want the "valid-only max" should compute it themselves from `signal_norms[valid_mask]`.
+
+**Why `activations` IS masked.** Unlike `max_signal`, the `activations` diagnostic is used to answer "how many positions triggered the gate," and triggering a gate at an invalidated position is both physically impossible (the data is missing) and misleading for calibration. So `activations = count(gate > 0.5 AND valid)`, not just `gate > 0.5`.
+
+**Scalar entry-point scope.** `_pair_cost` operates on a single `(L, V)` pair at a single outer step. It is the **scalar** building block called by `compute_bcvf_cost` (§2.8.11). The **batched/vectorized** entry `compute_bcvf_cost_batch` (§2.8.12) inlines the same math on `(T_outer, L, V)` tensors rather than calling `_pair_cost` in a Python loop, matching the autonomy kernel's `compute_bcvf_cost_batch` which inlines rather than delegates.
+
+**FLOP cost per invocation.** At `L=5, V=32000`:
+- `compute_disagreement`: ~160K FLOPs
+- `compute_disagreement_acceleration`: ~200K FLOPs
+- `smooth_gate`: ~200K FLOPs (weighted norm + sigmoid on `L−2 = 3` positions)
+- `signal_norms`: ~200K FLOPs
+- `pseudo_huber`: ~15 FLOPs (on 3 scalars)
+- Sum + mask: ~10 FLOPs
+- **Total per-pair: ~760K FLOPs.** For M=3 (3 pairs): ~2.3M per outer step, matching §2.4.6's ~6.2M estimate (with overhead from the `e` cache shared across pairs in the batch variant).
+
+**Parity tests.** §2.9 will include:
+
+- `test_pair_cost_no_mask_matches_unmasked_sum` — call with `valid_mask=None` and with `valid_mask=np.ones((L-2,), dtype=bool)`; assert `pair_cost` outputs equal exactly.
+- `test_pair_cost_all_invalid_returns_zero` — call with `valid_mask=np.zeros((L-2,), dtype=bool)`; assert `pair_cost == 0.0`, `activations == 0`.
+- `test_pair_cost_mask_shape_validation` — call with wrong-shape mask and assert ValueError (or clean NumPy broadcasting error).
+- `test_pair_cost_constant_bias_zero` — `p_i = p_j + α` with `α` constant in `l`; assert `pair_cost == 0.0`.
+- `test_pair_cost_linear_drift_zero` — `p_i = p_j + α + γ·l`; assert `pair_cost < 1e-10`.
+- `test_pair_cost_quadratic_positive` — quadratic divergence above gate threshold; assert `pair_cost > 0` and `activations > 0`.
+- `test_pair_cost_eos_single_source_truncation` — valid_mask reflects source 0 EOS at l=1; assert pair_cost uses only unaffected stencil positions.
+- `test_pair_cost_max_signal_unmasked` — even when mask excludes a position, `max_signal_norm` reflects the unmasked max (documented behavior).
+
 ### 2.9 Acceptance criteria + test specification — **pending**
 
 ---
