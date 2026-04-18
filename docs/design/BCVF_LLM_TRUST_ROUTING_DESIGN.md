@@ -1485,6 +1485,97 @@ class CostOrder(IntEnum):
 
 **Parity test.** §2.9 will include `test_cost_order_enum_values`, which asserts `CostOrder.ZEROTH.value == 0`, `FIRST.value == 1`, `SECOND.value == 2`. This is a one-line mechanical assertion that catches accidental re-ordering and guards the cross-kernel ablation parity claim above.
 
+#### 2.8.4 `BCVFLLMConfig` dataclass — translated from `BCVFConfig`
+
+The autonomy kernel exposes a dataclass with nine tunable fields (`bcvf_autonomous/core.py:39–54`):
+
+```python
+@dataclass
+class BCVFConfig:
+    """All tunable parameters for the BCVF cost functional."""
+
+    lambda_c: float = 1.0
+    gate_threshold: float = 0.1
+    gate_beta: float = 200.0
+    huber_delta: float = 0.5
+    lever_arm: float = 2.5
+    weight_matrix: np.ndarray = field(
+        default_factory=lambda: np.ones(3, dtype=np.float64)
+    )
+    use_anchor_pairing: bool = True
+    anchor_index: int = 0
+    dt: float = 0.1
+    cost_order: CostOrder = CostOrder.SECOND
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+@dataclass
+class BCVFLLMConfig:
+    """All tunable parameters for the LLM-domain BCVF cost functional.
+
+    Parallels ``BCVFConfig`` in ``bcvf_autonomous/core.py:39``. Every
+    field that has a meaningful LLM analogue is carried over with the
+    same name and default; SE(2)-specific fields are dropped; LLM-
+    specific fields are added with explicit reference to the design
+    sub-section that motivated them.
+    """
+
+    # Gate/Huber parameters — carried verbatim from autonomy defaults
+    # (see §2.5.1, §2.5.2). V1 starting point; §3 will sweep.
+    gate_threshold: float = 0.1          # §2.5.1 T
+    gate_beta: float = 200.0             # §2.5.1 β
+    huber_delta: float = 0.5             # §2.5.2 δ
+
+    # Vocabulary-space weight matrix. V1 uses identity (all ones) —
+    # §2.4.3 committed W = I_V. Default factory builds to the correct
+    # length once the caller supplies `vocab_size`; kernel accepts
+    # None and fills in at first use.
+    weight_vector: Optional[np.ndarray] = None   # shape (V,) or None
+
+    # Pairing mode. Autonomy V1 uses anchor_pairing=True with M=2.
+    # LLM V1 uses use_anchor_pairing=False at M=3 — all-pairs
+    # enumeration (0,1), (0,2), (1,2). See §2.4.5 per-source
+    # attribution argument (symmetric sum requires all pairs).
+    use_anchor_pairing: bool = False     # §2.4.5
+    anchor_index: int = 0                # unused when use_anchor_pairing=False
+
+    # Lookahead-axis sample spacing. Autonomy has dt=0.1 (simulator
+    # step). LLM V1 treats the lookahead axis as dimensionless
+    # integer positions, so step_l = 1.0 by construction.
+    step_l: float = 1.0                  # §2.3 lookahead-index spacing
+
+    # Derivative order feeding the gate-Huber chain. V1 locks SECOND
+    # per §2.4.1 + §2.6.4. ZEROTH/FIRST retained for §3 ablation only.
+    cost_order: CostOrder = CostOrder.SECOND
+```
+
+**Field-level translation table:**
+
+| Autonomy field | LLM field | Status | Justification |
+|---|---|---|---|
+| `lambda_c: float = 1.0` | — | **dropped** | `lambda_c` scaled BCVF into the additive-cost MPPI objective. Ketu→Rahu composition does not add BCVF into the objective (§0.1 / autonomy N=10 validation); it uses per-source cost as trust-weighting input. No scalar scale factor needed at the kernel level |
+| `gate_threshold: float = 0.1` | `gate_threshold: float = 0.1` | **verbatim** | §2.5.1 committed T = 0.1 (same as autonomy starting point; rescaled by domain but the ratio β·T=20 is what matters) |
+| `gate_beta: float = 200.0` | `gate_beta: float = 200.0` | **verbatim** | §2.5.1; β·T = 20 ratio preserved |
+| `huber_delta: float = 0.5` | `huber_delta: float = 0.5` | **verbatim** | §2.5.2 |
+| `lever_arm: float = 2.5` | — | **dropped** | SE(2)-specific. `body_frame_error_trajectory` consumed it to convert yaw-angle error into a displacement. No analogue in logit space; disagreement is already in ℝ^V |
+| `weight_matrix: np.ndarray = np.ones(3)` | `weight_vector: Optional[np.ndarray] = None` | **renamed + shape-changed** | Autonomy's `W` is shape (3,) for SE(2) xyθ weights. LLM's is shape (V,) for vocabulary dimensions. V1 uses identity per §2.4.3, but V ≈ 32000 is model-dependent, so default is `None` and the kernel infers `V` from the first input. Renamed to `_vector` because it's a 1-D per-dimension weight, never a matrix (autonomy's `_matrix` name was already a slight misnomer) |
+| `use_anchor_pairing: bool = True` | `use_anchor_pairing: bool = False` | **default flipped** | Autonomy's anchor mode works at M=2. LLM V1 at M=3 needs the all-pairs enumeration `{(0,1), (0,2), (1,2)}` so §2.4.5's per-source attribution sum `per_source_cost_i = Σ_{j≠i} pair_cost_{ij}` discriminates the outlier 2:1. Anchor mode would give only two pairs, both including the anchor, breaking symmetry |
+| `anchor_index: int = 0` | `anchor_index: int = 0` | **retained but inert** | Only meaningful when `use_anchor_pairing=True`. Kept so callers can opt into anchor mode for ablation or for M=2 legacy cases without API breakage |
+| `dt: float = 0.1` | `step_l: float = 1.0` | **renamed + value changed** | Autonomy `dt` is simulator step (seconds). LLM `step_l` is lookahead-axis spacing; positions are integer token indices, so spacing = 1 by construction. Name change makes this obvious and prevents callers from trying to set it to a "frequency". Kept as a float field so §9 V2 Roadmap experiments (e.g. non-uniform speculative sampling) can parameterize |
+| `cost_order: CostOrder = CostOrder.SECOND` | `cost_order: CostOrder = CostOrder.SECOND` | **verbatim** | §2.8.3 |
+
+**Net count:** 10 autonomy fields → 8 LLM fields (2 dropped: `lambda_c`, `lever_arm`; 0 added). The reduction is a clean "no unused parameters" outcome of the Ketu→Rahu composition (no `lambda_c`) and the domain shift (no `lever_arm`).
+
+**Mutable-default discipline.** Autonomy uses `field(default_factory=lambda: np.ones(3, dtype=np.float64))` to avoid the classic mutable-default pitfall. LLM V1 sidesteps this by making `weight_vector` default to `None` (immutable) and materializing the identity weights inside `_pair_cost` the first time it's needed. This also solves the "don't know V at config-construction time" problem that would otherwise force callers to pass `vocab_size` into the constructor.
+
+**Validation.** The kernel will validate the config at entry to `compute_bcvf_cost_batch` (§2.8.11), not at `__init__`. This is deliberate: dataclass defaults must be cheap and non-failing; validation needs to see the actual input shape (V) to check `weight_vector.shape == (V,)`. The autonomy kernel makes the same choice — `BCVFConfig.__init__` doesn't validate `weight_matrix.shape == (3,)` either; `_pair_cost` discovers the mismatch via NumPy broadcasting error.
+
+**What §2.8.4 does NOT add.** No trust-weighting temperature `τ_w`. That belongs in §5's Rahu attractor consumer, not the BCVF kernel. §2.5.5 already committed this separation. The kernel computes per-source cost; the caller turns it into a trust distribution.
+
+**Parity test.** §2.9 will include `test_bcvflllm_config_defaults` that asserts each of the 8 fields has the exact default value committed above. This is a one-line mechanical assertion that catches drift between the design doc and the implementation.
+
 
 
 ### 2.9 Acceptance criteria + test specification — **pending**
