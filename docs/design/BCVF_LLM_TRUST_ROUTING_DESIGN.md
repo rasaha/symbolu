@@ -2771,6 +2771,127 @@ The §3.9 sign-off asks a binary question: did Phase 1.5 find a winning tuple? I
 
 **Reference artifact.** The autonomy analogue is `symbolu_robotics/bcvf_autonomous/characterization/` with its Phase 1.5 sweep over `(gate_threshold, gate_beta, huber_delta, lambda_c, weight_matrix_variant)` — which characterized the autonomy kernel over SE(2) trajectories before any MPPI integration. §3 mirrors that structure module-for-module, replacing SE(2) trajectory generators with probability-sequence generators and dropping `lambda_c` per §2.8.4.
 
+### 3.2 Synthetic trace families
+
+§3.2 enumerates the seven trace families the Phase 1.5 sweep runs against. Each family is a **parameterized generator** of `M=3` probability sequences of shape `(L, V)` — one sequence per source — constructed to isolate exactly one behavior of the BCVF kernel. Each family maps to one §2 claim and has one expected BCVF output signature. The construction recipes are high-level here; concrete generator parameters live in §3.3.
+
+#### 3.2.0 Overview and family taxonomy
+
+Seven families, organized by which §2 invariance / claim they exercise:
+
+| Family | §2 claim tested | Expected BCVF signature |
+|---|---|---|
+| §3.2.1 Baseline | Kernel doesn't produce false positive on healthy agreement | `total_cost ≈ 0` below noise floor |
+| §3.2.2 Constant-bias | §2.6 C1 — invariance under constant disagreement | `total_cost ≤ 1e−10` in fp64 |
+| §3.2.3 Linear-drift | §2.6 C2 — invariance under linear drift (vector path) | `total_cost ≤ 1e−10` in fp64 |
+| §3.2.4 Accelerating-divergence | §2.6 C3 — positive signal on quadratic accel | `total_cost > 0`, gate open |
+| §3.2.5 Noise-floor | §2.5.1 gate suppression below `T` | `total_cost ≈ 0` despite non-zero `‖a‖` |
+| §3.2.6 Single-source-outlier | §2.4.5 2:1 attribution ratio | `per_source[outlier] ≥ 1.8 × per_source[non-outlier]` |
+| §3.2.7 EOS-truncation | §2.7.4 / §2.4.4 valid_mask propagation | `pair_cost_{ij} = 0` for pairs involving the truncated source |
+
+**Coverage claim.** Every §2 mathematical claim that can be stated as "the kernel produces X on input Y" has at least one family in this list. Claims that are structurally unprovable by synthetic traces (e.g., "the signal correlates with real-model hallucinations") are deferred to §4+ where real models are in play. §3 is the last layer where we can cheaply and deterministically verify the claims.
+
+**Common parameterization.** All families accept:
+
+- `L`: lookahead horizon (V1 default 5, per §2.3.4).
+- `V`: vocabulary size (default 32000 to match production; smaller values like 1024 used for fast iteration).
+- `M`: source count (locked to 3 for §3, per §1.3).
+- `rng_seed`: `np.random.default_rng(seed=...)` for reproducibility.
+
+Family-specific parameters are described per sub-section below.
+
+#### 3.2.1 Baseline — all sources agree
+
+**Construction.** All three sources produce the same distribution at every lookahead position. Specifically: generate one `(L, V)` base sequence by sampling logits from `N(0, σ²)` and applying softmax; set `p_0 = p_1 = p_2 = base`. Optionally add tiny IID fp32 rounding noise (`σ_noise = 1e-6`) to exercise the noise-floor tolerance path.
+
+**Expected signature.** Every pairwise `e_{ij}(l) ≈ 0` (or exactly 0 with `σ_noise = 0`). `a_{ij}(l*) ≈ 0`. Gate input below `T`. `total_cost ≈ 0`. `per_source_costs[s] ≈ 0` for every source `s`. `gate_activation_count = 0`.
+
+**§2 claim tested.** Kernel does not produce a false positive on healthy agreement. This is the negative control — if the baseline family produces `total_cost > 0`, either the kernel has a bug or the parameter sweep is pathological. Either way, no other family's results can be trusted until baseline passes.
+
+**Pass threshold (§3.5 will formalize).** `total_cost < 1e−6` at `σ_noise = 0`; `total_cost < 1e−4` at `σ_noise = 1e−6`.
+
+#### 3.2.2 Constant-bias — sources disagree by a fixed offset
+
+**Construction.** Generate one `(L, V)` base sequence as in §3.2.1. Construct a **fixed bias vector** `α ∈ ℝ^V` with `‖α‖ = bias_magnitude` (sweep range, typically `0.05, 0.1, 0.2, 0.5`). Set `p_0 = base`, `p_1 = softmax(logit(base) + α_logit)` where `α_logit` is chosen to produce the target `‖p_1 − p_0‖ ≈ bias_magnitude`, `p_2 = base` (so source 1 is biased, sources 0 and 2 agree). The bias is constant in `l` — the same `α` at every lookahead position.
+
+**Expected signature.** `e_{0,1}(l) = -α` for all `l` (constant in `l`). `a_{0,1}(l*) = 0` by §2.6 C1. `e_{2,1}(l) = -α`. `e_{0,2}(l) = 0`. `total_cost ≤ 1e−10` in fp64. Gate may or may not be open (depends on whether `‖α‖ > T`), but penalty = 0 regardless.
+
+**§2 claim tested.** §2.6 Case 1 (C1) — constant-bias invariance at the kernel level. This is the LLM analogue of `test_lemma_1_constant_bias_zero` from §2.9, but over a *realistic-scale* softmax input instead of an arithmetic construction.
+
+**Pass threshold.** `total_cost < 1e−10` in fp64 across the full `bias_magnitude` sweep.
+
+#### 3.2.3 Linear-drift — sources diverge at a constant rate
+
+**Construction.** Generate base sequence as in §3.2.1. Construct `γ ∈ ℝ^V` with `‖γ‖ = drift_rate` per position (sweep: `0.01, 0.02, 0.05`). Set `p_0 = base`; `p_1(l) = softmax(logit(base(l)) + l · γ_logit)`; `p_2 = base`. The drift accumulates linearly in `l`.
+
+**Expected signature.** `e_{0,1}(l) = -l · γ` (linear in `l`). `a_{0,1}(l*) = 0` by §2.6 C2 (vector-path proof from §2.6.4). Gate may open at the larger `l` values where `‖e‖ > T`; penalty is still 0 because `‖a‖ = 0`. `total_cost ≤ 1e−10` in fp64.
+
+**§2 claim tested.** §2.6 Case 2 (C2) — linear-drift invariance. **This is the family the structural choice in §2.4.1 is most visible in.** If the scalar-path alternative had been chosen, this family would fail (the scalar path's cusp at `l=0` produces spurious 2nd-difference signal). Failure of this family under the vector-path implementation indicates a genuine bug, not a parameter issue.
+
+**Pass threshold.** `total_cost < 1e−10` in fp64 across the full `drift_rate` sweep.
+
+#### 3.2.4 Accelerating-divergence — a source pulls away quadratically
+
+**Construction.** Generate base sequence as in §3.2.1. Construct `η ∈ ℝ^V` with `‖η‖ = accel_magnitude` per position² (sweep: `0.05, 0.1, 0.2, 0.5`). Set `p_0 = base`; `p_1(l) = softmax(logit(base(l)) + 0.5 · l² · η_logit)`; `p_2 = base`. Source 1 accelerates away from sources 0 and 2 quadratically in `l`.
+
+**Expected signature.** `e_{0,1}(l) ≈ -0.5 · l² · η`. `a_{0,1}(l*) ≈ -η` (constant, per §2.6 C3 proof). Gate open at `l*` where `‖e‖ > T` (depends on `accel_magnitude` and `L`). `total_cost > 0` monotonically increasing with `accel_magnitude`.
+
+**§2 claim tested.** §2.6 Case 3 (C3) — affirmative acceleration detection. This is the **primary positive control** — if this family doesn't produce `total_cost > 0` when gate is open, BCVF is not doing its job. Also validates the §2.6.7 Huber bound (`total_cost` finite even at large `accel_magnitude`).
+
+**Pass threshold.** `total_cost > 1e−4` at `accel_magnitude ≥ 0.1` with gate open. Monotonic increase check: `total_cost(accel=0.2) > total_cost(accel=0.1)`.
+
+#### 3.2.5 Noise-floor — sources fluctuate below the gate threshold
+
+**Construction.** Generate base sequence as in §3.2.1. Add IID Gaussian noise to each source's logits at each lookahead position: `p_s(l) = softmax(logit(base(l)) + noise_{s,l})` where `noise_{s,l} ∼ N(0, σ_noise²)` independently across `s, l`. Sweep `σ_noise ∈ {0.001, 0.005, 0.01, 0.02}` in logit space. The noise produces non-zero `‖a‖` but `‖e‖` stays below `T` (by construction at low `σ_noise`).
+
+**Expected signature.** `‖e_{ij}(l)‖` clustered around `σ_noise · √V` (small). Gate suppressed (output ≈ 0) when `‖e‖ < T`. `total_cost ≈ 0` despite the 2nd-difference being non-zero.
+
+**§2 claim tested.** §2.5.1 gate suppression below noise floor. The operator must not chase arithmetic noise in the tail of the simplex. This family defines the upper bound on `σ_noise` that the V1 defaults tolerate — critical for real-model integration where some forward-pass stochasticity is unavoidable.
+
+**Pass threshold.** `total_cost < 1e−3` for `σ_noise ≤ 0.005`. Graceful degradation: `total_cost` monotonically increases with `σ_noise` but stays bounded.
+
+#### 3.2.6 Single-source-outlier — one source diverges, two agree
+
+**Construction.** Combines §3.2.4 (accelerating divergence) with §3.2.1 (baseline) at M=3. Sources 1 and 2 hold the base sequence; source 0 gets the accelerating-divergence offset from §3.2.4 with `accel_magnitude` chosen to put the gate clearly in the open regime (e.g., `0.3`). This is the canonical scenario §2.4.5's 2:1 attribution claim was designed for.
+
+**Expected signature.** `pair_cost_{0,1}` and `pair_cost_{0,2}` both large (both involve source 0). `pair_cost_{2,1} ≈ 0` (sources 1 and 2 agree). Per-source attribution: `per_source[0] = pair_cost_{0,1} + pair_cost_{0,2} ≈ 2·LARGE`; `per_source[1] = pair_cost_{0,1} + pair_cost_{2,1} ≈ LARGE`; `per_source[2] = pair_cost_{0,2} + pair_cost_{2,1} ≈ LARGE`. Ratio: `per_source[0] / per_source[1] ≈ 2.0`.
+
+**§2 claim tested.** §2.4.5 per-source attribution with 2:1 outlier discrimination. This is the **load-bearing claim for §5's trust-weighting**: if the attribution ratio isn't reliably close to 2:1 on this family, softmin on per-source costs won't produce a meaningful trust distribution, and the whole Ketu→Rahu architecture breaks.
+
+**Pass threshold.** `per_source[0] / per_source[1] ≥ 1.8` and `per_source[0] / per_source[2] ≥ 1.8` simultaneously. Symmetry check: `|per_source[1] − per_source[2]| / per_source[1] < 0.1` (the two non-outliers should be roughly equal).
+
+#### 3.2.7 EOS-truncation — one source emits EOS mid-window
+
+**Construction.** Generate any of §3.2.1–§3.2.6 patterns. For source 0, set `valid_mask_0[k:] = False` for some `k < L` (source 0 "emitted EOS" at position `k`). Pass `valid_masks_batch` to `compute_bcvf_cost_batch` per §2.8.12.
+
+**Expected signature.** Pairs involving source 0 have stencil positions with `l* ≥ k` invalidated per §2.4.4. `pair_cost_{0,1}` and `pair_cost_{0,2}` reflect only the valid stencil positions. At `k=0` (source 0 emits EOS immediately), both pairs have empty stencil and both `pair_cost = 0`. At `k=L-1` (no truncation), identical to the baseline family. Smooth degradation in between.
+
+**§2 claim tested.** §2.7.4 EOS handling + §2.4.4 stencil-coverage rule. Critical for real-model integration because real sources will frequently emit EOS mid-lookahead.
+
+**Pass threshold.** At `k=0`: `pair_cost_{0,*} = 0` exactly. At `k=L-1`: `pair_cost` equals the no-mask baseline within 1e-10. Monotonic: `pair_cost(k)` increases with `k` (more valid stencil positions → more signal when source 0 is genuinely diverging).
+
+#### 3.2.8 Family coverage matrix
+
+Each family exercises a specific kernel property. The matrix below summarizes which §2 sub-sections are tested by which families — ensuring no §2 claim is left unverified by §3:
+
+| §2 sub-section | §3.2.1 Baseline | §3.2.2 Const-bias | §3.2.3 Lin-drift | §3.2.4 Accel | §3.2.5 Noise | §3.2.6 Outlier | §3.2.7 EOS |
+|---|---|---|---|---|---|---|---|
+| §2.4.1 Vector-path choice | — | — | **✓** | — | — | — | — |
+| §2.4.5 Per-source attribution | — | — | — | — | — | **✓** | — |
+| §2.5.1 Gate threshold | — | — | — | ✓ | **✓** | ✓ | — |
+| §2.5.2 Huber bound | — | — | — | **✓** | — | ✓ | — |
+| §2.6 C1 Constant-bias | — | **✓** | — | — | — | — | — |
+| §2.6 C2 Linear-drift | — | — | **✓** | — | — | — | — |
+| §2.6 C3 Acceleration | — | — | — | **✓** | — | ✓ | — |
+| §2.7.3 Underflow robustness | ✓ | — | — | — | **✓** | — | — |
+| §2.7.4 / §2.4.4 EOS mask | — | — | — | — | — | — | **✓** |
+| §2.7.6 NaN guard (negative) | — | — | — | — | — | — | — |
+| §2.8.4 M=3 all-pairs | — | — | — | — | — | **✓** | — |
+
+**Boldface ✓ = the family that primarily tests the claim. Regular ✓ = a secondary stress path.** `§2.7.6 NaN guard` has no family because a synthetic trace that produced NaN would be caught by Python's `assert np.isfinite(...)` upstream; §2.9's `test_compute_bcvf_cost_scalar_nan_guard` handles that claim. Every other §2 claim has at least one dedicated family.
+
+**What §3.2 does NOT commit to.** The concrete numerical ranges for `bias_magnitude`, `drift_rate`, `accel_magnitude`, `σ_noise`, and the base logit distribution `σ` are deferred to §3.3 (generator protocol). The pass thresholds are formalized in §3.5. The cross product of families × parameters is defined in §3.4 (sweep grid).
+
 ---
 
 ## Section 4 — Phase 2 — Source Framework
