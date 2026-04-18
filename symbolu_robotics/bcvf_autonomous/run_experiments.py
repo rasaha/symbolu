@@ -149,7 +149,12 @@ def _default_tuning() -> Tuple[BCVFConfig, MPPIConfig, PerfCostConfig, BicycleCo
         velocity_bounds=(0.5, 10.0),
         bcvf_config=bcvf,
     )
-    return bcvf, mppi, PerfCostConfig(), BicycleConfig()
+    # Gate-2 cost-balance experiment: cap per-step squared lane deviation
+    # at 10 (d < ~3.16 m, comfortably outside the 3.5 m lane). Prevents
+    # J_perf from saturating at 1e4+ under the failing-anchor rollout —
+    # without which MPPI's softmax collapses and strips J_BCVF of leverage.
+    perf = PerfCostConfig(lane_deviation_cap=10.0)
+    return bcvf, mppi, perf, BicycleConfig()
 
 
 def _apply_quick_mode(cfg: ExperimentConfig) -> ExperimentConfig:

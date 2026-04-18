@@ -54,6 +54,12 @@ class PerfCostConfig:
     control_smoothness_weight: float = 0.1
     collision_weight: float = 1000.0
     collision_margin: float = 3.0
+    # Gate-2 cost-balance experiment: when set, the per-step squared lane
+    # deviation is clamped to this value before being summed. Prevents
+    # J_perf from saturating at 1e4+ under a failing-anchor rollout,
+    # which collapses MPPI's softmax onto a single winner and strips
+    # J_BCVF of leverage. ``None`` = no cap (legacy behavior).
+    lane_deviation_cap: Optional[float] = None
 
 
 @dataclass
@@ -124,7 +130,10 @@ def compute_perf_cost(
 
     # 1. Lane deviation.
     lane_d = _project_point_to_polyline(xy, pts)
-    lane_cost = float(np.sum(lane_d * lane_d)) * config.lane_deviation_weight
+    lane_d_sq = lane_d * lane_d
+    if config.lane_deviation_cap is not None:
+        lane_d_sq = np.minimum(lane_d_sq, config.lane_deviation_cap)
+    lane_cost = float(np.sum(lane_d_sq)) * config.lane_deviation_weight
 
     # 2. Progress — reward the arc-length traveled from start of horizon to end.
     arc = _project_arclength(xy[[0, -1]], pts)

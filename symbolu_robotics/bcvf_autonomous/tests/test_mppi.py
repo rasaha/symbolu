@@ -217,6 +217,45 @@ def test_perf_cost_penalizes_deviation() -> None:
     assert c_off > c_on
 
 
+def test_perf_cost_lane_deviation_cap_clamps_saturated_rollout() -> None:
+    """Gate-2 cost-balance experiment. A rollout far off-lane (100 m) must
+    produce a bounded J_perf under lane_deviation_cap, so MPPI's softmax
+    stays non-degenerate and BCVF can influence weight selection. Without
+    the cap the contribution would blow up as ~H * 100^2 * weight = 5e6."""
+    road = make_straight_road(length=500.0)
+    H = 50
+    # Trajectory with massive lateral deviation — mimics failing-anchor rollout.
+    traj = np.stack(
+        [np.linspace(0.0, 400.0, H), np.full(H, 100.0), np.zeros(H)], axis=-1
+    )
+    controls = np.zeros((H, 2))
+
+    uncapped = compute_perf_cost(traj, controls, road, [], PerfCostConfig())
+    capped = compute_perf_cost(
+        traj, controls, road, [],
+        PerfCostConfig(lane_deviation_cap=10.0),
+    )
+    # Uncapped: lane cost ~ H * 100^2 = 5e5; capped: H * 10 = 500.
+    # Difference should be ~3 orders of magnitude (progress/smoothness terms
+    # are unchanged so they cancel; only lane deviation diverges).
+    assert uncapped - capped > 4.0e5
+    assert abs(capped) < 2.0e3
+
+
+def test_perf_cost_cap_does_not_affect_normal_driving() -> None:
+    """With the cap=10, typical on-lane trajectories (|y| < ~3.16) have
+    d^2 < cap everywhere, so capped result equals uncapped result."""
+    road = make_straight_road(length=100.0)
+    H = 20
+    traj = np.stack([np.linspace(0.0, 8.0, H), np.full(H, 1.0), np.zeros(H)], -1)
+    controls = np.zeros((H, 2))
+    uncapped = compute_perf_cost(traj, controls, road, [], PerfCostConfig())
+    capped = compute_perf_cost(
+        traj, controls, road, [], PerfCostConfig(lane_deviation_cap=10.0)
+    )
+    assert abs(uncapped - capped) < 1e-9
+
+
 # --- ablation variants ---
 
 
