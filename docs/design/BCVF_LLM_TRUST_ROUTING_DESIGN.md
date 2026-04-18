@@ -1337,6 +1337,93 @@ The goal of §2.8 is to commit to a line-for-line translation of the autonomy BC
 
 **What this sub-section does NOT commit to.** The internal file split (single `core.py` vs. `core.py + disagreement.py + gate.py`) is a §4 implementation concern; §2.8 only commits that there IS a kernel module called `core.py` in a package called `symbolu_bcvf_llm`. If §4 decides to split the kernel across multiple files for readability, that's fine as long as the public API (§2.8.11) and the test targets (§2.9) remain stable.
 
+#### 2.8.2 Imports and module docstring
+
+The autonomy kernel opens with (`bcvf_autonomous/core.py:1–21`):
+
+```python
+"""BCVF cost functional (V3.1 Sections 3.3-3.5, Lemma 1).
+
+Implements the complete BCVF cost chain over a set of predictor
+trajectories:
+
+    disagreement -> velocity -> acceleration -> gate -> huber -> sum
+
+All functions are pure. Trajectory inputs are NumPy float64 arrays
+of shape (H, 3) with columns [x, y, theta]. No imports from other
+``symbolu_robotics`` modules.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import IntEnum
+from typing import Dict, List, Tuple
+
+import numpy as np
+
+from .manifold import body_frame_error_trajectory
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py:1–19`):
+
+```python
+"""BCVF cost functional — LLM logit-space adaptation.
+
+Parallels ``symbolu_robotics/bcvf_autonomous/core.py``. Implements
+the same 2nd-order BCVF cost chain, re-targeted from SE(2) body-
+frame trajectories to probability-simplex sequences along the
+forward-lookahead axis:
+
+    disagreement -> velocity -> acceleration -> gate -> huber -> sum
+
+All functions are pure. Probability inputs are NumPy float32 or
+float64 arrays of shape (M, T, L, V) where:
+    M = number of sources (V1: M >= 3, see §1.3 / §2.2.4)
+    T = number of outer decoding steps (streaming; may be 1)
+    L = forward-lookahead horizon (V1: L = 5, see §2.3.4)
+    V = vocabulary size (shared across sources for V1, see §2.7.5)
+
+Design anchor: ``docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md``
+§2.4-§2.7. Mathematical specification: V3.1 Lemma 1 (autonomy)
+restated in §2.6 with the vector-path proof in §2.6.4.
+
+No imports from other ``symbolu_bcvf_llm`` modules; no imports from
+``symbolu_robotics``; no ML-framework imports (torch/transformers/
+datasets). The caller in §4 handles fp16/bf16 -> fp32 conversion
+(see §2.7.2) before invoking this kernel.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import IntEnum
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+```
+
+**What changed and why:**
+
+| Line | Autonomy | LLM-kernel | Why |
+|---|---|---|---|
+| Title | `V3.1 Sections 3.3–3.5, Lemma 1` | `LLM logit-space adaptation` plus explicit pointer to `BCVF_LLM_TRUST_ROUTING_DESIGN.md` §2.4–§2.7 | The autonomy kernel's math reference is the V3.1 paper; the LLM kernel's reference is this design document (which, in turn, cites §2.6 for the Lemma 1 analogue proof) |
+| Shape doc | `(H, 3)` with SE(2) columns | `(M, T, L, V)` batch with semantic labels | §2.2 locked `(p_i − p_j) ∈ ℝ^V`; §2.3 added the `l` axis; §1.3 added `M ≥ 3`. The 4-D tensor shape is the natural generalization and what `compute_bcvf_cost_batch` consumes |
+| dtype | `float64` | `float32` *or* `float64` | §2.7.2 committed fp32 as the V1 default (matches PyTorch's default post-upcast). fp64 is permitted for the §2.9 Lemma-1 tests that require `1e−10` tolerance. Accepting either is ergonomic; internally the kernel promotes scalars via `np.asarray(..., dtype=np.float64)` where stencil cancellation matters |
+| `from .manifold import body_frame_error_trajectory` | **removed** | — | SE(2) helper with no LLM analogue. §2.8.5 defines the replacement `compute_disagreement` inline — it's a one-line vector subtraction, no helper module needed |
+| `typing.Optional` | not imported | **added** | Needed by the `valid_mask: Optional[np.ndarray]` parameter in `_pair_cost` and `compute_bcvf_cost_batch` (EOS / truncation handling from §2.7.4) |
+| stdlib imports (`dataclass`, `field`, `IntEnum`, `Dict`, `List`, `Tuple`, `np`) | all present | **unchanged** | Same dataclass-config pattern (§2.8.4), same enum-driven cost-order switch (§2.8.3), same pairwise aggregation types |
+
+**What stayed verbatim:** the `from __future__ import annotations`, the stdlib import block, and the NumPy import. Purity discipline stays the same — no logging, no I/O, no framework deps.
+
+**Critical non-additions.** The docstring explicitly names three import prohibitions that §4's CI must enforce:
+
+1. No `import torch` / `import torch.nn.functional as F`. The kernel never sees tensors; §4's caller is responsible for `.cpu().numpy()` conversion and fp32 upcasting at the boundary (§2.7.2).
+2. No `import transformers` / no `from transformers import AutoModelForCausalLM, AutoTokenizer`. The kernel doesn't know what model produced the probabilities.
+3. No `from symbolu_robotics.bcvf_autonomous import ...`. Parallel implementations, not shared — §2.8.1 justified this separation. If a helper turns out to be needed in both kernels (e.g. a future `pseudo_huber_jit` optimized version), it lives in a third neutral package, not cross-imported.
+
+**Enforcement.** The §2.9 test suite includes an import-graph assertion: `python -c "import symbolu_bcvf_llm.core"` must succeed in an environment where `torch`, `transformers`, and `datasets` are not installed. This is the mechanical guarantee that §2.8.1's dependency-isolation claim is real.
+
 
 
 ### 2.9 Acceptance criteria + test specification — **pending**
