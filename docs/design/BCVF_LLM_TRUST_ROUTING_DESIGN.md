@@ -3536,6 +3536,96 @@ Each §3.7 trace is a **single cell**, no magnitude sweep, no seed replication (
 
 §3.7 is the safety net under §3.5 + §3.6. If the core families pass but a §3.7 guard fails, there's a specific bug class to investigate; if all §3.7 pass but core families fail, the bug is in magnitude-dependent behavior. Diagnostic separation.
 
+### 3.8 What §3 does NOT do
+
+§3 is a *correctness* sweep over a bounded synthetic surface. Most sub-sections touched on specific exclusions inline; §3.8 consolidates every exclusion into one authoritative list, grouped by reason, so no future reviewer has to reconstruct scope from scattered non-goals.
+
+#### 3.8.1 Domain exclusions — no real LLM in sight
+
+- **No real model forward passes.** The characterization harness (§3.3.6) is pure NumPy; no `torch`, no `transformers`, no `datasets`. Deferred to §4.
+- **No tokenizer.** `V` is an integer vocab size; no token ids, no text, no vocabulary semantics. Deferred to §4.
+- **No attention-correlated noise.** §3.2.5's noise is IID Gaussian in logit space. Real forward passes have attention-head-correlated noise that §3 explicitly doesn't model. Deferred to §4.
+- **No semantically-plausible outlier patterns.** §3 synthesizes outliers as pure algebraic perturbations (§3.3.2). Real hallucinations, repetition, incoherence — deferred to §4 empirical study.
+- **No sampling from probability sequences.** §3 compares distributions; it never draws tokens. Sampling is a §4 integration concern.
+- **No `sigma_logit` calibration against real models.** §3 spans `{1.0, 3.0, 5.0}` as an envelope; §4 will retroactively report what a real model actually produces and validate the envelope.
+
+#### 3.8.2 Architectural exclusions — no trust-weighting yet
+
+- **No §5 Ketu→Rahu composition.** §3 validates that `per_source_costs` is a usable *input* for trust-weighting. §5 is where those costs get passed through a softmin and become an attractor. Zero §5-side code runs in §3.
+- **No `τ_w` calibration.** Temperature for §5's softmin is a Phase 3 concern. §3 exits with per-source cost distributions; §5 decides how to compress them.
+- **No Rahu attractor integration with the base decoder.** §3 doesn't touch hidden-state shaping, logit blending, or routing/gating. Deferred to §5.
+- **No J_perf replacement.** Autonomy's J_perf → trust-weighted-consensus-attractor was the N=10 Ketu→Rahu breakthrough. The LLM analogue is §5's problem; §3 has no MPPI or objective function to replace.
+
+#### 3.8.3 Integration exclusions — no §4 plumbing
+
+- **No speculative-decoding pipeline integration.** §3 constructs `(L, V)` sequences directly. Real speculative decoding requires a draft model, acceptance loop, KV-cache synchronization — all deferred to §4.
+- **No KV-cache management.** §3 never shares or replicates KV-cache across sources because §3 has no model.
+- **No batched outer-step streaming.** §3's `T` axis is always 1 (or a small fixed batch). Real streaming generation with `T` growing over time is §4/§5.
+- **No source-framework API contract.** §3 doesn't define how a "source" is implemented. §4 handles that.
+
+#### 3.8.4 Metric exclusions — no end-to-end quality signal
+
+- **No Pearson correlation against continuous ground truth.** There is no LLM-side `Δ|y|` equivalent (§3.6.1). §3 uses only discrete `truth_label` classification metrics.
+- **No causal / temporal alignment.** §3 traces are static snapshots along `l`; no "does BCVF signal precede the failure?" question. That's a streaming-generation property, §4+.
+- **No comparison to a naive baseline classifier.** §3 doesn't ask "does BCVF beat a trivial vocab-L2 outlier detector?" — that's V2 benchmark territory.
+- **No perplexity / coherence / factuality scores.** End-to-end quality metrics require a real LLM and an evaluation dataset; §3 has neither.
+- **No soft-alignment via `per_source_costs` as a probability distribution.** §3.6 checks that `argmax` points at truth; it does NOT test the downstream softmin's distribution quality. §5 does that.
+
+#### 3.8.5 Sweep exclusions — bounded grid only
+
+- **No cross-family joint sweeps.** §3 keeps families isolated (§3.4.8). Combined stressors (outlier + noise + partial EOS simultaneously) are V2.
+- **No sweep over `M`.** §1.3 locks `M = 3`. V2 may explore M=2 degeneracy or M=5 redundancy.
+- **No sweep over `L`.** §2.3.4 locks `L = 5`. V2 may explore L=3 (tight) or L=7 (speculative budget expansion).
+- **No sweep over `cost_order` outside the §3.4.4 ablation.** `SECOND` is the production regime; ZEROTH/FIRST are there to empirically confirm §2.8.3's Lemma-1 violation warning, not to characterize production performance.
+- **No sweep over alternative disagreement metrics** (KL, Hellinger, top-k-truncated L2). V2 per §2.2.6 / §9.
+- **No cross-cell statistics.** "Does `total_cost` trend fit a quadratic across `accel_mag`?" is a useful *narrative* in §3.9 but not a *pass criterion*. §3 sticks to per-cell pass/fail.
+
+#### 3.8.6 Discipline exclusions — what §3 refuses to do
+
+- **No threshold tuning mid-sweep.** §3.5 thresholds are fixed before the sweep runs. If a threshold fails, the answer is to revise §2 or the kernel implementation — not to relax the threshold. Discipline is non-negotiable.
+- **No soft or probabilistic passes.** Every threshold is absolute. No "pass 8 of 10 cells" or "acceptable at 90% confidence."
+- **No interactive human-in-the-loop evaluation.** §3 is a deterministic script; it produces pass/fail bits without human judgment at evaluation time. The threshold choices themselves are human-authored (in §3.5), but the evaluation is mechanical.
+- **No retries on transient failures.** If a cell fails, it fails. Reproducibility from seeded RNG means there are no "transient" failures — only real ones.
+
+#### 3.8.7 Training / optimization exclusions — no gradient anywhere
+
+- **No training-time signal** (`L_trust`, `L_smooth`, or any loss function involving BCVF). Explicitly V2 per §2.5.5.
+- **No gradient-based tuning of `T`, `β`, `δ`, `τ_w`.** Phase 1.5 is a grid sweep, not an optimizer. Gradient-based hyperparameter search is V2.
+- **No auto-calibration of thresholds.** §3.5's pass thresholds are hand-chosen; no data-driven tuning.
+- **No online adaptation.** §3 is fully offline / deterministic; adaptive behavior is §5+ territory.
+
+#### 3.8.8 What each exclusion unblocks downstream
+
+Cross-reference table linking exclusions to their resolution phase:
+
+| Exclusion | Resolved by |
+|---|---|
+| Real model forward passes, tokenizer, attention noise | §4 Phase 2 |
+| Speculative decoding, KV-cache, source-framework API | §4 Phase 2 |
+| Trust-weighting, τ_w, J_perf replacement | §5 Phase 3 |
+| Pearson correlation, causal alignment, perplexity | §4+ empirical studies |
+| M/L/metric sweeps, multi-outlier, joint families | §9 V2 Roadmap |
+| Gradient-based hyperparameter tuning, training losses | §9 V2 Roadmap |
+| Cross-cell narrative / trend fitting | §3.9 reporting (narrative only, not pass criteria) |
+
+Every exclusion in §3.8 has a named downstream home. Nothing is silently dropped; everything has a sign-off path for later.
+
+#### 3.8.9 Summary rubric
+
+§3 does exactly two things well:
+
+1. **Proves the kernel is correct by construction on tight synthetic inputs.**
+2. **Picks V1 parameter defaults that withstand realistic-scale inputs.**
+
+§3 does not:
+
+1. Prove the kernel is useful.
+2. Prove the kernel matches real LLM failure modes.
+3. Prove the composition with §5 works.
+4. Prove anything about end-to-end generation quality.
+
+All four "does not" items are §4 / §5 / §6 responsibilities. §3 is the last cheap-abort gate before expensive downstream work — nothing more, nothing less.
+
 ---
 
 ## Section 4 — Phase 2 — Source Framework
