@@ -59,8 +59,56 @@ def test_s5_constant_bias_flag() -> None:
 
 def test_scenario_registry_complete() -> None:
     names = list_scenarios()
-    assert len(names) == 6
-    assert len(set(names)) == 6
+    assert len(names) == 7  # 6 originals + S3_map_error_accel variant
+    assert len(set(names)) == 7
+
+
+# --- S3 accelerating-failure variant ---
+
+
+def test_s3_accel_variant_registered_and_wired() -> None:
+    s = SCENARIOS["S3_map_error_accel"]
+    assert s.anchor == "M4"
+    assert s.gnss_failure_type == "map_error_accel"
+    assert s.mppi_horizon == 50
+    assert s.max_steps == 400
+    # Geometry matches S3 so results are directly comparable.
+    accel_obstacles = sorted(o["x"] for o in s.obstacles)
+    s3_obstacles = sorted(o["x"] for o in SCENARIOS["S3_map_error"].obstacles)
+    assert accel_obstacles == s3_obstacles
+
+
+def test_map_error_accel_grows_quadratically() -> None:
+    """Per-step lateral bias must grow as ~elapsed^2 so that the state's
+    2nd-difference in rollout-step index stays non-zero after the ramp
+    completes — this is what keeps 2nd-order BCVF active beyond the
+    onset transient."""
+    from symbolu_robotics.bcvf_autonomous.predictors import FailureConfig, GNSSMap
+    from symbolu_robotics.bcvf_autonomous.predictors.base import PredictorState
+
+    def bias_at(elapsed: float) -> float:
+        g = GNSSMap(seed=0, failure_type="map_error_accel")
+        g.set_failure(
+            FailureConfig(active=True, onset_time=0.0, severity=1.0, ramp_duration=0.0)
+        )
+        state = PredictorState(theta=0.0)
+        out = g.apply_failure(state, time=elapsed)
+        return out.y
+
+    # Quadratic: bias(2t) / bias(t) -> 4 as t grows. At t=10, bias = rate*100
+    # = 0.02*100 = 2.0. At t=20, bias = 0.02*400 = 8.0. Ratio = 4.
+    b10, b20 = bias_at(10.0), bias_at(20.0)
+    assert abs(b20 / b10 - 4.0) < 0.01
+    # Compared to linear map_error: linear bias at t=20 would be 20*0.5=10.
+    # Accel at t=20 is 8 — ordering-wise smaller early, but grows faster.
+    assert b20 > 0.0
+
+
+def test_gnss_map_error_accel_accepted_by_gnssmap() -> None:
+    from symbolu_robotics.bcvf_autonomous.predictors import GNSSMap
+
+    g = GNSSMap(seed=0, failure_type="map_error_accel")
+    assert g.failure_type == "map_error_accel"
 
 
 def test_scenario_separation_by_tuning() -> None:

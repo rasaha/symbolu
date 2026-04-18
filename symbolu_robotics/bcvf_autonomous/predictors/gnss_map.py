@@ -33,6 +33,11 @@ class GNSSMap(BasePredictor):
     MULTIPATH_BASE_JUMP_M = 2.0
     MULTIPATH_EXPONENTIAL_SCALE = 3.0
     MAP_ERROR_RATE = 0.5
+    # Phase 4 follow-up (§4C.13 gate-2 enablement, S3_map_error_accel
+    # variant): quadratic-in-time lateral drift so the per-step bias
+    # increment keeps accelerating across the episode — gives 2nd-order
+    # BCVF persistent signal instead of only a transient during the ramp.
+    MAP_ERROR_ACCEL_RATE = 0.02
 
     def __init__(
         self,
@@ -41,10 +46,12 @@ class GNSSMap(BasePredictor):
         failure_type: str = "multipath",
     ) -> None:
         super().__init__(model_id="M4", bicycle_config=bicycle_config, seed=seed)
-        if failure_type not in ("multipath", "map_error", "constant_bias"):
+        if failure_type not in (
+            "multipath", "map_error", "map_error_accel", "constant_bias"
+        ):
             raise ValueError(
-                f"failure_type must be 'multipath', 'map_error', or 'constant_bias'; "
-                f"got {failure_type!r}"
+                f"failure_type must be 'multipath', 'map_error', "
+                f"'map_error_accel', or 'constant_bias'; got {failure_type!r}"
             )
         self.failure_type = failure_type
         # Constant-bias magnitude (meters) used by the S5 validation scenario.
@@ -72,6 +79,8 @@ class GNSSMap(BasePredictor):
             return self._apply_multipath(state, elapsed, scale)
         if self.failure_type == "constant_bias":
             return self._apply_constant_bias(state, elapsed, scale)
+        if self.failure_type == "map_error_accel":
+            return self._apply_map_error_accel(state, elapsed, scale)
         return self._apply_map_error(state, elapsed, scale)
 
     # --- failure sub-modes ---
@@ -94,6 +103,20 @@ class GNSSMap(BasePredictor):
     ) -> PredictorState:
         # Lateral offset perpendicular to current heading (+pi/2).
         lateral = scale * elapsed * self.MAP_ERROR_RATE
+        lateral_heading = state.theta + math.pi / 2.0
+        state.x += lateral * math.cos(lateral_heading)
+        state.y += lateral * math.sin(lateral_heading)
+        return state
+
+    def _apply_map_error_accel(
+        self, state: PredictorState, elapsed: float, scale: float
+    ) -> PredictorState:
+        # Quadratic-in-time lateral drift. Per-step increment grows as
+        # ``elapsed^2``, so in a rollout of length H the state's second
+        # difference in rollout-step index stays O(elapsed · dt) rather
+        # than collapsing to zero once the ramp completes. 2nd-order
+        # BCVF has persistent signal through the misrouting phase.
+        lateral = scale * self.MAP_ERROR_ACCEL_RATE * elapsed * elapsed
         lateral_heading = state.theta + math.pi / 2.0
         state.x += lateral * math.cos(lateral_heading)
         state.y += lateral * math.sin(lateral_heading)

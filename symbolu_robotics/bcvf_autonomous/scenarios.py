@@ -196,6 +196,38 @@ S5_CONSTANT_BIAS = ScenarioConfig(
 )
 
 
+S3_MAP_ERROR_ACCEL = ScenarioConfig(
+    name="S3_map_error_accel",
+    description=(
+        "Accelerating-failure variant of S3. Same geometry/anchor/horizon "
+        "as S3 but M4's lateral drift grows quadratically in absolute "
+        "time (per-step increment ~elapsed^2). Keeps the 2nd-order BCVF "
+        "signal alive throughout the misrouting phase, giving A3 a fair "
+        "chance to separate from A0 on the closed-loop metrics."
+    ),
+    road_type="straight",
+    road_length=200.0,
+    obstacles=[
+        {"x": 60.0, "y": 0.0, "radius": 1.5},
+        {"x": 70.0, "y": 0.5, "radius": 1.5},
+        {"x": 80.0, "y": 1.0, "radius": 1.5},
+    ],
+    failures={
+        "M4": FailureConfig(
+            active=True, onset_time=5.0, severity=1.0, ramp_duration=5.0
+        )
+    },
+    gnss_failure_type="map_error_accel",
+    anchor="M4",
+    mppi_horizon=50,
+    max_steps=400,
+    initial_velocity=8.0,
+    expect_bcvf_activation=True,
+    expect_collision_baseline=True,
+    expect_collision_bcvf=False,
+)
+
+
 S6_GLASS_CORRIDOR = ScenarioConfig(
     name="S6_glass_corridor",
     description=(
@@ -223,6 +255,7 @@ SCENARIOS: Dict[str, ScenarioConfig] = {
     "S1_normal_driving": S1_NORMAL,
     "S2_gps_multipath": S2_GPS_MULTIPATH,
     "S3_map_error": S3_MAP_ERROR,
+    "S3_map_error_accel": S3_MAP_ERROR_ACCEL,
     "S4_camera_degradation": S4_CAMERA_DEGRADATION,
     "S5_constant_bias": S5_CONSTANT_BIAS,
     "S6_glass_corridor": S6_GLASS_CORRIDOR,
