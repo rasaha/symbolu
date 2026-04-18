@@ -1312,7 +1312,32 @@ If M is raised in V2 (§9), the pairs grow as `M·(M−1)/2`. At `M = 5`, pairs 
 
 Items 1–9 are satisfied by this section. No pending empirical verification for §2.7 — all rules are design-time and will be enforced by implementation + the §2.9 tests.
 
-### 2.8 Python equations parallel to `core.py` — **pending**
+### 2.8 Python equations parallel to `core.py`
+
+The goal of §2.8 is to commit to a line-for-line translation of the autonomy BCVF kernel (`symbolu_robotics/bcvf_autonomous/core.py`) into an LLM-domain kernel, so that §4 implementation is mechanical and §2.9 tests have a concrete target to verify against. Each sub-section names what autonomy has, what the LLM version keeps verbatim, and what it changes — with justification tied back to §2.1–§2.7.
+
+#### 2.8.1 File layout & naming — where the LLM kernel lives
+
+**Target file for V1:** `symbolu_bcvf_llm/core.py`, a new package sitting alongside `symbolu_robotics/bcvf_autonomous/`. The module mirrors the autonomy kernel's structure one-to-one: same function names where semantics carry over, renamed where domain requires it, and the same dataclass-driven configuration pattern.
+
+**Why a separate package, not a shared utility module.** The two kernels operate on fundamentally different inputs (SE(2) trajectories vs. probability-simplex distributions) even though the 2nd-order BCVF math is identical. Three concrete reasons to keep them separate:
+
+1. **No cross-domain import coupling.** `bcvf_autonomous/core.py` imports `body_frame_error_trajectory` from `.manifold` — that helper is SE(2)-specific and has no meaning in the LLM domain. Conversely, `bcvf_llm/core.py` will have a `compute_disagreement` that operates on vocabulary-vector probabilities — meaningless in autonomy. Forcing these into a shared module would require a generic interface that neither side needs.
+2. **Dependency isolation.** The autonomy kernel is pure NumPy with no optional deps. The LLM kernel is also pure NumPy (see §2.8.2) — but §4's caller layer around it will import `torch` and `transformers`. Keeping the kernel file free of ML-framework imports means it can be unit-tested without a GPU, without model downloads, and without HuggingFace cache warm-up. This matches the autonomy kernel's test discipline.
+3. **Independent evolution.** If V2 (§9) experiments with alternative LLM disagreement metrics (KL, Hellinger) or mixed-model ensembles, those changes land in `bcvf_llm/core.py` only. The autonomy kernel, which is shipped and validated by the Ketu→Rahu N=26 smoke, stays frozen.
+
+**Module-level expectations** (enforced by the §2.9 test suite):
+
+- Pure NumPy. No `import torch`, `import transformers`, `import datasets`, `import jax`. The kernel accepts `np.ndarray` inputs in fp32 (per §2.7.2) and returns `np.ndarray` outputs in fp32.
+- No I/O. No logging at the INFO level or higher from inside the kernel. Debug-level logging is permitted but off by default.
+- No global state. All configuration is passed via `BCVFLLMConfig` dataclass instances, mirroring autonomy's `BCVFConfig` pattern (`core.py:39`).
+- No hidden randomness. The kernel is deterministic given its inputs. If V2 adds a stochastic component (e.g. sub-sampling vocab for efficiency), it enters as an explicit `rng` argument, never as `np.random.default_rng()` called internally.
+
+**Reference artifact at the top of the file.** The module docstring will cite the autonomy kernel by path and function names — specifically `compute_bcvf_cost_batch` in `bcvf_autonomous/core.py:232` — so that a reader can open both files side-by-side and verify structural parity. This is the same discipline §2 applies throughout: the autonomy kernel is the source of truth for the math; the LLM kernel is its domain-adapted twin.
+
+**What this sub-section does NOT commit to.** The internal file split (single `core.py` vs. `core.py + disagreement.py + gate.py`) is a §4 implementation concern; §2.8 only commits that there IS a kernel module called `core.py` in a package called `symbolu_bcvf_llm`. If §4 decides to split the kernel across multiple files for readability, that's fine as long as the public API (§2.8.11) and the test targets (§2.9) remain stable.
+
+
 
 ### 2.9 Acceptance criteria + test specification — **pending**
 
