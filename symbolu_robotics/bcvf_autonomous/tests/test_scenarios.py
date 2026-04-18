@@ -166,6 +166,12 @@ def test_s3_obstacles_in_reach_band() -> None:
     assert xs == [60.0, 70.0, 80.0]
 
 
+def test_s3_max_steps_extended_for_reach() -> None:
+    """40-s episode (H=50 horizon makes the planner more conservative;
+    20-s episode reach was ~50 m, falling short of the 60-80 m band)."""
+    assert SCENARIOS["S3_map_error"].max_steps == 400
+
+
 def test_scenario_horizon_reaches_mppi_config() -> None:
     bcvf, mppi, perf, bicycle = _tuning()
     assert mppi.horizon == 5  # caller default from _tuning()

@@ -139,7 +139,7 @@ S3_MAP_ERROR = ScenarioConfig(
     # accelerating lateral bias to push BCVF above the gate threshold.
     # 5s horizon gives the failure 2.5x the integration time.
     mppi_horizon=50,
-    max_steps=200,
+    max_steps=400,  # V2 follow-up: 40-s episode so vehicle reaches the 60-80m obstacle band
     initial_velocity=8.0,
     expect_bcvf_activation=True,
     expect_collision_baseline=True,
