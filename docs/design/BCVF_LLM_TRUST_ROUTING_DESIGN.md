@@ -1166,7 +1166,151 @@ Items 1–5 are satisfied by this section. Item 6 is the hard gate that closes P
 
 ---
 
-### 2.7 Edge cases & numerical considerations — **pending**
+### 2.7 Edge cases & numerical considerations
+
+§2.7 handles the concrete corner cases of running the §2.4–§2.6 chain against real model outputs. Three of these (EOS truncation, vocabulary alignment, exp-argument clipping) were already sketched or resolved inline in §2.3–§2.5; §2.7 consolidates them here and adds the ones that only emerge at implementation time.
+
+#### 2.7.1 Softmax temperature when computing `p` from logits (resolves §2.2.7 deferral)
+
+§2.2.7 deferred the question: when we compute `p_i(t, l) = softmax(z_i(t, l))`, what temperature?
+
+**V1 rule: temperature = 1.0** (standard softmax, no scaling).
+
+- §1.3 locked **greedy decoding** for token emission, so the softmax distribution is used *only* as a disagreement measure — never as a sampling distribution. The sampling path ignores this choice entirely.
+- Temperature ≠ 1 would artificially compress or expand the gap between disagreeing distributions, changing `‖e_{ij}‖` in a way unrelated to the underlying source disagreement. That drifts the gate calibration (`T = 0.1` in §2.5.1) without a principled reason.
+- The autonomy analogue — `lever_arm = 2.5` in SE(2) — plays a similar role (it scales body-frame error) and autonomy keeps it fixed across all experiments. Same discipline applies here.
+
+If §3 signal characterization shows the disagreement distribution is pathologically concentrated (or diffuse), §2.7.1 is revisited. V1 default is T = 1.0.
+
+#### 2.7.2 Numerical precision — fp32 inside BCVF, fp16/bf16 outside
+
+§1.3 commits the **model forward pass** to fp16 or bf16 (whichever the GPU supports). The BCVF kernel has different numerical requirements.
+
+**V1 rule: upcast to fp32 at the boundary.**
+
+```
+logits_i (fp16/bf16, shape (M, T_outer, L, V))
+  → p_i = softmax(logits_i, dim=-1).to(torch.float32)
+  → compute_bcvf_cost_batch(p_i, config)  # fp32 throughout
+```
+
+Rationale:
+
+- The 2nd-difference stencil `a = e(l*+1) − 2·e(l*) + e(l*−1)` is a cancellation operation. If `e` values are close, significant digits are lost in the subtraction. In bf16 (7-bit mantissa, ~2 decimal digits), two values differing by `1e−4` cannot produce a meaningful difference. fp32 (23-bit mantissa, ~7 decimal digits) preserves the signal down to `~1e−6`.
+- The Lemma 1 numerical test (§2.9) verifies zero-output on constructed linear-drift inputs within a floating-point tolerance. That tolerance is `1e−10` per §2.6.8 — achievable in fp32, **not** achievable in bf16. A test that only passes in fp32 would silently fail on a bf16 implementation.
+- The cost of fp32 on the BCVF kernel is negligible: §2.4.6 estimated ~6.2M FLOPs per outer step. fp32 vs fp16 doubles memory but memory isn't the bottleneck here.
+
+The softmax itself should be computed in fp32 too (many frameworks default to this already for numerical stability). The `.to(torch.float32)` call is explicit, not implicit.
+
+#### 2.7.3 Simplex arithmetic and underflow
+
+When both `p_i` and `p_j` are produced by softmax, exactly-zero entries are impossible (softmax output is strictly positive). However:
+
+- In fp16/bf16, `exp(−50)` underflows to 0 before the softmax normalization. The result is a "probability" that reports 0 exactly at tokens with very negative logits.
+- Even in fp32, the minimum representable positive value of `exp` is around `1e−44`, so after softmax the minimum non-zero probability is on the order of `1e−44 / Σ exp(·)` — effectively 0 for V = 32000 vocab.
+
+**Consequences for BCVF:**
+
+- `e_{ij,k} = p_{i,k} − p_{j,k}` can be exactly 0 at long-tail tokens in both distributions. This is **not** a numerical problem for BCVF — it just means the vocabulary position contributes nothing to the ℓ² norm. Zero is a valid result.
+- The simplex constraint `Σ_k p_{i,k} = 1` is enforced by softmax up to fp32 rounding (`~1e−7` drift over V = 32000). After subtraction, `Σ_k e_{ij,k} ≈ 0` up to that same drift. **The BCVF kernel does not depend on the simplex constraint holding exactly.** It only computes differences, 2nd-differences, and norms — all of which are translation-invariant with respect to the per-vocab mean, so simplex drift is irrelevant.
+- The gate condition `‖e‖ > T = 0.1` is robust to rounding noise at the `1e−6` level by roughly five orders of magnitude. Underflow cannot falsely trigger the gate.
+
+**V1 rule: do nothing special.** Standard softmax + fp32 BCVF handles underflow correctly. No `epsilon` floors, no log-space reformulation. Log-space is a V2 consideration (§9) if some future metric demands it.
+
+#### 2.7.4 EOS and truncated lookahead — consolidating §2.3.5 + §2.4.4
+
+**V1 rule (unchanged from prior sections):** use the `valid(l*)` predicate defined in §2.4.4 to restrict the stencil sum. Reiterated here for completeness:
+
+```
+last_defined_l[i] = L − 1  if source i did not emit EOS within the window,
+                    k       if source i emitted EOS at lookahead position k.
+
+valid(l*) = (last_defined_l[i] ≥ l* + 1) AND (last_defined_l[j] ≥ l* + 1)
+```
+
+**Edge cases that §2.7 adds on top of §2.4.4:**
+
+- **All sources emit EOS before position 2.** Then `valid(l*) = False` for every `l* ∈ [1, L−2]`, and the per-pair sum is empty. The convention is `pair_cost_{ij}(t) = 0` for an empty sum. This is **not** a distrust signal — it's a "no data" signal. §5's trust-weighting must not treat 0 as an informative value (see §5 deferral).
+- **Exactly one source emits EOS early.** The stencil is invalidated for pairs involving that source but remains valid for the other pair. At M = 3 with sources {0, 1, 2}, if source 0 emits EOS at `l = 1`: pairs (0,1) and (0,2) drop out of the sum for any `l* ≥ 1`, but pair (1,2) is unaffected. Per-source cost for source 0 becomes 0 (no pairs contribute); per-source cost for sources 1 and 2 inherit whatever pair (1,2) reports. This is correct behavior — we have no evidence to distrust source 0 based on BCVF; the trust-weighting step (§5) will blend based on the remaining two sources.
+- **EOS behavior is deterministic for greedy decoding.** Since §1.3 locks greedy, `last_defined_l[i]` is a deterministic function of the context and the source — not a stochastic variable. Reproducibility is preserved.
+
+#### 2.7.5 Degenerate inputs — identical sources, insufficient lookahead, M < 3
+
+**Identical sources (`e_{ij} ≡ 0`).** If sources `i` and `j` produce bit-identical distributions (e.g. same model, same seed, same decoding path), every `e_{ij}(l) = 0`, hence every `a_{ij}(l*) = 0`, penalty = 0, contrib = 0. `pair_cost_{ij}(t) = 0`. This is the correct output (no disagreement → no distrust signal) and matches Lemma 1 case 1 trivially. The BCVF kernel does not special-case this.
+
+**Insufficient lookahead (`L < 3`).** The 2nd-order stencil requires `L ≥ 3` (three consecutive positions). The autonomy kernel already raises `ValueError("BCVF requires H >= 3")` in `compute_bcvf_cost_batch` — the LLM implementation carries over this hard guard. If speculative decoding returns `L = 2` or `L = 1` tokens (e.g. due to immediate EOS on all sources), the caller is expected to **skip the BCVF computation entirely** for that outer step and fall back to the no-BCVF trust-weighting default (§5 will specify).
+
+**M < 3 sources.** §1 locked `M = 3` as the minimum viable source count for trust-weighting discrimination. The BCVF kernel must still accept `M = 2` (for the degenerate backward-compat tests) but callers in the LLM pipeline never supply fewer than 3. Kernel-level validation: `if num_models < 2: raise ValueError` (autonomy has this already). Callers should validate `M = 3` upstream of the kernel.
+
+#### 2.7.6 NaN / Inf handling and propagation
+
+Model forward passes **can** produce NaN logits on pathological inputs (e.g. under-flowed attention weights, numerical issues in fp16). BCVF must behave predictably.
+
+**V1 rule: NaN in → NaN out, explicit check at the kernel boundary.**
+
+```
+if not np.isfinite(logits).all():
+    raise ValueError("BCVF received non-finite logits; upstream forward pass failed")
+```
+
+Rationale:
+
+- Silently masking NaN (e.g. `nan_to_num`) converts a model-level bug into a silent degradation of the BCVF signal. The trust-weighting step (§5) would then blend in a source whose outputs were actually garbage.
+- Raising at the kernel boundary forces the caller to decide: skip this outer step, fall back to a default, or abort the generation entirely. That's a policy decision above the BCVF kernel's pay grade.
+- The autonomy kernel doesn't have this guard because SE(2) simulator states are always finite by construction. LLMs don't have that guarantee.
+
+Once logits pass the finite-check, softmax cannot produce NaN (it's numerically stable for any finite input), so `p_i`, `e_{ij}`, `a_{ij}` are all guaranteed finite. No further in-kernel NaN propagation risk.
+
+#### 2.7.7 Sigmoid / exp clipping — pointer to §2.5.1
+
+§2.5.1 already specifies `clip(β·(‖e‖−T), −50, +50)` before `exp`. Repeated here for navigability:
+
+- Without clipping, `exp(β · (√2 − T))` = `exp(200 · 1.31)` = `exp(262)` → overflow to `inf` → gate = 1 but downstream arithmetic could poison other terms if any branch divides by `1 + exp(...)`.
+- The clip value `[−50, +50]` is far outside the gate's active region (`σ(±50) = 1.0` / `~0` within machine epsilon), so the clip is cosmetic for the gate value but protective against NaN propagation.
+- Same clip applied in autonomy `core.py`; carried over verbatim.
+
+#### 2.7.8 Per-outer-step memory and compute budget at M = 3, L = 5
+
+Concrete numbers for sizing the pipeline:
+
+| Quantity | Shape | fp32 bytes | Notes |
+|---|---|---|---|
+| Logits batch `z` | `(M, 1, L, V) = (3, 1, 5, 32000)` | 1.92 MB | Stored per outer step; freed after BCVF compute |
+| Probabilities `p` | `(M, 1, L, V) = (3, 1, 5, 32000)` | 1.92 MB | Derived from `z` via softmax |
+| Disagreement `e` | `(3-choose-2, L, V) = (3, 5, 32000)` | 1.92 MB | Pairwise differences |
+| Acceleration `a` | `(3, L−2, V) = (3, 3, 32000)` | 1.15 MB | 2nd-difference output |
+| Gate input norms | `(3, L−2)` | 36 B | Scalar norm per stencil point |
+| Penalty | `(3, L−2)` | 36 B | Scalar Huber per stencil point |
+| **Per-outer-step peak (fp32)** | — | **~7 MB** | All BCVF intermediates |
+
+The forward-pass KV-cache for a 7B model at L = 5, batch = 8 is roughly **2–3 GB** on fp16. BCVF intermediates are a rounding-error fraction of total memory. **V1 rule: no memory-optimization work needed.** The §2.4.6 FLOP estimate (~6M FLOPs/step) similarly makes BCVF compute dwarfed by the forward pass (~16B FLOPs/step at 7B).
+
+If M is raised in V2 (§9), the pairs grow as `M·(M−1)/2`. At `M = 5`, pairs = 10, memory = ~19 MB — still negligible. Quadratic scaling in `M` is the right concern for large ensembles.
+
+#### 2.7.9 What §2.7 does NOT cover
+
+- **KV-cache management across the M = 3 sources.** That is a §4 implementation detail (how to share or replicate cache when sources are prompt-variants of the same model), not a BCVF-math concern.
+- **Batch-across-outer-steps vectorization.** The autonomy kernel has `compute_bcvf_cost_batch` vectorized across K rollouts; the LLM analogue may or may not batch across `t` depending on the pipeline design (streaming vs. batched generation). §4 decision.
+- **Mixed-model ensembles** (different base models with different vocabs). Explicitly V2 per §2.2.7 and §9.
+- **Alternative precision regimes** (int8 quantization, 4-bit). V2 / out of scope.
+- **Error recovery policy** when the finite-check in §2.7.6 raises. That's a caller policy, decided in §4 or §5.
+- **Concurrency / thread safety.** The BCVF kernel is pure (no shared state); standard NumPy/PyTorch concurrency rules apply. No special treatment.
+
+#### 2.7.10 Acceptance criteria for §2.7
+
+§2.7 is complete when:
+
+1. ✅ Softmax temperature = 1.0 rule is committed (§2.7.1).
+2. ✅ fp32 boundary rule is committed (§2.7.2).
+3. ✅ Underflow and simplex-drift analysis is in place (§2.7.3).
+4. ✅ EOS / truncation rule is consolidated with corner cases (§2.7.4).
+5. ✅ Degenerate inputs (identical sources, L < 3, M < 3) have explicit rules (§2.7.5).
+6. ✅ NaN / Inf policy at the kernel boundary is committed (§2.7.6).
+7. ✅ Exp-clipping pointer to §2.5.1 is in place (§2.7.7).
+8. ✅ Memory / compute budget is quantified (§2.7.8).
+9. ✅ Out-of-scope deferrals are enumerated (§2.7.9).
+
+Items 1–9 are satisfied by this section. No pending empirical verification for §2.7 — all rules are design-time and will be enforced by implementation + the §2.9 tests.
 
 ### 2.8 Python equations parallel to `core.py` — **pending**
 
