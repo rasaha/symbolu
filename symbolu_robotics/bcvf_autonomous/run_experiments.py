@@ -563,13 +563,30 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--sweep-only", action="store_true")
     parser.add_argument("--ablation-only", action="store_true")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--gate-threshold", type=float, default=None,
+                        help="Override BCVF gate_threshold (default: _default_tuning=0.2)")
+    parser.add_argument("--gate-beta", type=float, default=None,
+                        help="Override BCVF gate_beta (default: _default_tuning=100.0)")
     args = parser.parse_args(argv)
+
+    base_bcvf_override = None
+    if args.gate_threshold is not None or args.gate_beta is not None:
+        base_bcvf, _, _, _ = _default_tuning()
+        import dataclasses as _dc
+        base_bcvf_override = _dc.replace(
+            base_bcvf,
+            gate_threshold=(args.gate_threshold if args.gate_threshold is not None
+                            else base_bcvf.gate_threshold),
+            gate_beta=(args.gate_beta if args.gate_beta is not None
+                       else base_bcvf.gate_beta),
+        )
 
     cfg = ExperimentConfig(
         output_dir=args.output,
         quick_mode=args.quick,
         base_seed=args.seed,
         runs_per_config=args.runs,
+        base_bcvf=base_bcvf_override,
     )
     if args.scenarios:
         cfg.scenarios = args.scenarios
