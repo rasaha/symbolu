@@ -75,22 +75,15 @@ def _variant_to_configs(
         mppi.lambda_c = 1.0
         bcvf.lambda_c = 1.0
         bcvf.cost_order = CostOrder.ZEROTH
-        # Gate-2 experiment: all-pairs BCVF so the coherence term does
-        # not inherit the planner's (possibly failing) anchor as its
-        # reference frame. Keep A0 with the default (anchor pairing) —
-        # BCVF is skipped there anyway via the lambda_c=0 short-circuit.
-        bcvf.use_anchor_pairing = False
     elif variant_id == "A2":
         mppi.lambda_c = 1.0
         bcvf.lambda_c = 1.0
         bcvf.cost_order = CostOrder.FIRST
-        bcvf.use_anchor_pairing = False
     elif variant_id == "A3":
         lam = lambda_c_override if lambda_c_override is not None else 1.0
         mppi.lambda_c = lam
         bcvf.lambda_c = lam
         bcvf.cost_order = CostOrder.SECOND
-        bcvf.use_anchor_pairing = False
     else:
         raise ValueError(f"unknown variant {variant_id!r}; expected one of {VARIANT_IDS}")
 

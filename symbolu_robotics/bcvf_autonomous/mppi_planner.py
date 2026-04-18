@@ -265,32 +265,43 @@ class MPPIPlanner:
     ) -> Tuple[np.ndarray, np.ndarray]:
         c = self.config
         k_batch = controls_batch.shape[0]
-        anchor = self.predictors[c.anchor]
         model_ids = list(self.predictors.keys())
         num_models = len(model_ids)
         anchor_idx = model_ids.index(c.anchor)
 
-        if c.lambda_c == 0.0:
-            # Lambda_c = 0: only anchor rollouts needed for J_perf. Skip BCVF.
-            anchor_trajs = np.zeros((k_batch, c.horizon, 3), dtype=np.float64)
-            for k in range(k_batch):
-                anchor_trajs[k] = anchor.predict(controls_batch[k])
-            perf_costs = _compute_perf_cost_batch(
-                anchor_trajs, controls_batch, self.road, self.obstacles, self.perf_config
-            )
-            bcvf_costs = np.zeros(k_batch, dtype=np.float64)
-            return perf_costs, bcvf_costs
-
-        # Full rollouts for every predictor.
+        # Gate-2 experiment (B2 consensus J_perf): roll out every predictor
+        # for every candidate and score J_perf against the per-step
+        # *consensus* trajectory rather than the anchor's alone. This
+        # removes the failing predictor's unilateral influence on J_perf's
+        # reference frame — for M=4 with one failing predictor, the
+        # failure weight drops from 100% (anchor) to 25% (equal-weight
+        # mean). A0 no longer short-circuits to anchor-only rollouts
+        # (same reference for A0 and A3 so variant comparisons isolate
+        # BCVF's effect rather than reference-frame choice).
         all_trajs = np.zeros((k_batch, num_models, c.horizon, 3), dtype=np.float64)
         for k in range(k_batch):
             for m_idx, name in enumerate(model_ids):
                 all_trajs[k, m_idx] = self.predictors[name].predict(controls_batch[k])
 
-        anchor_trajs = all_trajs[:, anchor_idx, :, :]
+        # Per-step equal-weight consensus across the M predictor rollouts.
+        # Use atan2(mean sin, mean cos) for the heading to avoid wrap
+        # pathologies at theta = +/-pi (matters nowhere in the current
+        # scenario catalog but keeps the operation principled).
+        xy_mean = all_trajs[..., :2].mean(axis=1)                    # (K, H, 2)
+        sin_mean = np.sin(all_trajs[..., 2]).mean(axis=1)            # (K, H)
+        cos_mean = np.cos(all_trajs[..., 2]).mean(axis=1)            # (K, H)
+        theta_mean = np.arctan2(sin_mean, cos_mean)                  # (K, H)
+        consensus_trajs = np.concatenate(
+            [xy_mean, theta_mean[..., None]], axis=-1
+        )                                                            # (K, H, 3)
+
         perf_costs = _compute_perf_cost_batch(
-            anchor_trajs, controls_batch, self.road, self.obstacles, self.perf_config
+            consensus_trajs, controls_batch, self.road, self.obstacles, self.perf_config
         )
+
+        if c.lambda_c == 0.0:
+            # A0 baseline: J_perf from consensus above, BCVF term zero.
+            return perf_costs, np.zeros(k_batch, dtype=np.float64)
 
         # Sync anchor_index for the BCVF config (relevant only when
         # anchor pairing is enabled). Respect the caller's

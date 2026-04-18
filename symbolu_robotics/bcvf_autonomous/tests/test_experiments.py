@@ -80,18 +80,18 @@ def test_ablation_variant_configs() -> None:
     assert swept.lambda_c == 5.0
 
 
-def test_bcvf_variants_use_all_pairs_not_anchor() -> None:
-    """Gate-2 experiment: A1/A2/A3 must run reference-free BCVF so the
-    coherence term is not tied to the planner's (possibly failing)
-    anchor. A0 is unaffected because its BCVF rollouts are skipped
-    (lambda_c=0 short-circuit)."""
+def test_bcvf_variants_use_anchor_pairs_by_default() -> None:
+    """All-pairs BCVF was empirically worse than anchor-pairs on
+    S3_map_error_accel (see prior smoke). Reverted here. The B2
+    experiment (consensus J_perf) addresses the reference-frame issue
+    structurally, so BCVF itself stays on anchor-pairs."""
     bcvf, mppi, _, _ = _fast_tuning()
     a1_b, _ = _variant_to_configs("A1", bcvf, mppi)
     a2_b, _ = _variant_to_configs("A2", bcvf, mppi)
     a3_b, _ = _variant_to_configs("A3", bcvf, mppi)
-    assert a1_b.use_anchor_pairing is False
-    assert a2_b.use_anchor_pairing is False
-    assert a3_b.use_anchor_pairing is False
+    assert a1_b.use_anchor_pairing is True
+    assert a2_b.use_anchor_pairing is True
+    assert a3_b.use_anchor_pairing is True
 
 
 def test_planner_all_pairs_enumerates_six_pairs_for_m4() -> None:

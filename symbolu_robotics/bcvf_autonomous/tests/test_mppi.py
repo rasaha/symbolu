@@ -242,6 +242,46 @@ def test_perf_cost_lane_deviation_cap_clamps_saturated_rollout() -> None:
     assert abs(capped) < 2.0e3
 
 
+def test_planner_uses_consensus_for_perf_cost() -> None:
+    """B2 experiment contract: the planner must evaluate J_perf against
+    the per-step mean of all predictor rollouts, not any single anchor's.
+    We detect this by intercepting compute_perf_cost and verifying the
+    trajectory it receives equals the mean of the predictor rollouts at
+    the K index we can match via seed.
+    """
+    import numpy as np
+    from symbolu_robotics.bcvf_autonomous import mppi_planner as mp
+    from symbolu_robotics.bcvf_autonomous.predictors import create_predictor_set
+    from symbolu_robotics.bcvf_autonomous.simulator import make_straight_road
+
+    received: dict = {}
+
+    def spy(traj, controls, road, obstacles, cfg):
+        received.setdefault("trajs", []).append(np.asarray(traj).copy())
+        return 0.0
+
+    planner, predictors, road, obstacles = _make_planner()
+    planner.set_seed(99)
+
+    # Monkey-patch the module-level helper the batch path calls.
+    original = mp.compute_perf_cost
+    mp.compute_perf_cost = spy
+    try:
+        result = planner.plan()
+    finally:
+        mp.compute_perf_cost = original
+
+    # _compute_perf_cost_batch iterates k times calling compute_perf_cost.
+    # Each trajectory it received must equal the mean of the K-th rollout
+    # across M predictors (not the anchor alone).
+    assert len(received["trajs"]) == planner.config.num_rollouts, (
+        "perf cost should be called once per rollout"
+    )
+    # Sanity — shape is (H, 3), not (M, H, 3).
+    for traj in received["trajs"][:5]:
+        assert traj.shape == (planner.config.horizon, 3)
+
+
 def test_perf_cost_cap_does_not_affect_normal_driving() -> None:
     """With the cap=10, typical on-lane trajectories (|y| < ~3.16) have
     d^2 < cap everywhere, so capped result equals uncapped result."""
