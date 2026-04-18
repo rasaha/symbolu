@@ -29,6 +29,7 @@ from .metrics import (
     ComparisonResult,
     build_summary_table,
     compare_collision_rates,
+    compare_recovery_rates,
     compute_aggregate_metrics,
     compute_episode_metrics,
     compute_early_warning_time,
@@ -311,13 +312,21 @@ class ExperimentRunner:
         summary = build_summary_table(ablation)
         comparisons: List[ComparisonResult] = []
 
-        # A0 vs A3 collision-rate comparison per scenario (DESIGN §4C.13).
+        # A0 vs A3 comparisons per scenario: collision rate (DESIGN §4C.13)
+        # and post-peak recovery rate (B2-smoke-motivated addition — the
+        # primary gate-2 metric when collisions are absent on both variants
+        # because the failure geometry misses rather than hits).
         for scenario in self._config.scenarios:
             a0_key = (scenario, VARIANT_DIRNAMES["A0"])
             a3_key = (scenario, VARIANT_DIRNAMES["A3"])
             if a0_key in ablation and a3_key in ablation:
                 comparisons.append(
                     compare_collision_rates(
+                        ablation[a0_key], ablation[a3_key], "A0", "A3"
+                    )
+                )
+                comparisons.append(
+                    compare_recovery_rates(
                         ablation[a0_key], ablation[a3_key], "A0", "A3"
                     )
                 )

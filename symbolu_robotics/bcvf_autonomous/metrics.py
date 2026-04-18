@@ -460,6 +460,39 @@ def compare_collision_rates(
     )
 
 
+def compare_recovery_rates(
+    metrics_a: AggregateMetrics,
+    metrics_b: AggregateMetrics,
+    name_a: str = "A",
+    name_b: str = "B",
+    alpha: float = 0.05,
+) -> ComparisonResult:
+    """Fisher's exact test on recovery counts (binomial, N from each).
+
+    Recovery = post-peak |y| drops below recovery_threshold_m. Higher
+    is better. Reported as ``difference = b_mean - a_mean`` so a
+    positive difference means B recovers more often than A.
+    """
+    a_succ = int(round(metrics_a.recovery_rate * metrics_a.n_runs))
+    a_fail = metrics_a.n_runs - a_succ
+    b_succ = int(round(metrics_b.recovery_rate * metrics_b.n_runs))
+    b_fail = metrics_b.n_runs - b_succ
+    _, p = fisher_exact_2x2(a_succ, a_fail, b_succ, b_fail)
+    diff = metrics_b.recovery_rate - metrics_a.recovery_rate
+    rel = diff / max(metrics_a.recovery_rate, 1e-9)
+    return ComparisonResult(
+        config_a_name=name_a,
+        config_b_name=name_b,
+        metric_name="recovery_rate",
+        a_mean=metrics_a.recovery_rate,
+        b_mean=metrics_b.recovery_rate,
+        difference=diff,
+        relative_change=rel,
+        significant=p < alpha,
+        p_value=p,
+    )
+
+
 def compare_continuous_metric(
     values_a: Sequence[float],
     values_b: Sequence[float],
@@ -533,6 +566,7 @@ def build_summary_table(
                 if m.post_peak_recovery_median_s is not None
                 else "—"
             )
+            recovered_count = int(round(m.recovery_rate * m.n_runs))
             table[scenario][variant] = {
                 "collision_rate": _format_collision_rate(m),
                 "path_efficiency": _format_path_efficiency(m),
@@ -544,6 +578,7 @@ def build_summary_table(
                 "final_lateral_m": f"{m.final_lateral_mean:.2f} +/- {m.final_lateral_std:.2f}",
                 "time_integrated_lateral": f"{m.time_integrated_lateral_mean:.1f} +/- {m.time_integrated_lateral_std:.1f}",
                 "recovery_rate": f"{m.recovery_rate:.2f}",
+                "recovery_count": f"{recovered_count}/{m.n_runs}",
                 "post_peak_recovery_median": recovery,
             }
     return table

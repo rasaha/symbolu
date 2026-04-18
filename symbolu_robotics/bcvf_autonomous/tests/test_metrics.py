@@ -201,6 +201,55 @@ def test_compare_collision_rates_significant() -> None:
     assert result.p_value < 0.001
 
 
+def test_compare_recovery_rates_detects_significant_uplift() -> None:
+    """N=30 with 18 recoveries (A0) vs 27 recoveries (A3) should be clearly
+    significant under Fisher's exact (two-sided)."""
+    from symbolu_robotics.bcvf_autonomous.metrics import compare_recovery_rates
+
+    def agg(recovered: int, n: int) -> AggregateMetrics:
+        return AggregateMetrics(
+            n_runs=n,
+            collision_rate=0.0, collision_rate_ci_low=0.0, collision_rate_ci_high=0.0,
+            early_warning_time_median=None, early_warning_time_iqr=None,
+            path_efficiency_mean=1.0, path_efficiency_std=0.0,
+            rms_lateral_jerk_mean=0.0, rms_lateral_jerk_std=0.0,
+            false_positive_rate=0.0,
+            mean_bcvf_cost_mean=0.0, mean_bcvf_cost_std=0.0,
+            solve_time_mean_ms=0.0, solve_time_p99_ms=0.0,
+            recovery_rate=recovered / n,
+        )
+
+    result = compare_recovery_rates(agg(18, 30), agg(27, 30), "A0", "A3")
+    assert result.metric_name == "recovery_rate"
+    assert result.a_mean == pytest.approx(0.6)
+    assert result.b_mean == pytest.approx(0.9)
+    assert result.difference == pytest.approx(0.3)
+    assert result.significant
+    assert result.p_value < 0.05
+
+
+def test_compare_recovery_rates_null_when_rates_equal() -> None:
+    from symbolu_robotics.bcvf_autonomous.metrics import compare_recovery_rates
+
+    def agg(rate: float, n: int = 30) -> AggregateMetrics:
+        return AggregateMetrics(
+            n_runs=n,
+            collision_rate=0.0, collision_rate_ci_low=0.0, collision_rate_ci_high=0.0,
+            early_warning_time_median=None, early_warning_time_iqr=None,
+            path_efficiency_mean=1.0, path_efficiency_std=0.0,
+            rms_lateral_jerk_mean=0.0, rms_lateral_jerk_std=0.0,
+            false_positive_rate=0.0,
+            mean_bcvf_cost_mean=0.0, mean_bcvf_cost_std=0.0,
+            solve_time_mean_ms=0.0, solve_time_p99_ms=0.0,
+            recovery_rate=rate,
+        )
+
+    result = compare_recovery_rates(agg(0.7), agg(0.7))
+    assert result.difference == pytest.approx(0.0)
+    assert not result.significant
+    assert result.p_value == pytest.approx(1.0)
+
+
 def test_compare_continuous_metric() -> None:
     rng = np.random.default_rng(0)
     a = rng.normal(loc=1.0, scale=0.1, size=50)
