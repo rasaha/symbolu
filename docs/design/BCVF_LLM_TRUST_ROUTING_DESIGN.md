@@ -450,7 +450,205 @@ hand-wave.
 
 ---
 
-### 2.2 Disagreement metric over logits — **pending authorization**
+### 2.2 Disagreement metric over logits
+
+#### 2.2.1 Candidate metrics considered
+
+Five candidates evaluated against four required properties: symmetry,
+well-definedness (no division-by-zero / log-of-zero blow-up),
+invariance under semantics-preserving reparameterizations of the
+decoding state, and scale-boundedness.
+
+| # | Metric | Symmetric | Safe on zero probs | Invariant to logit-shift | Bounded |
+|---|---|---|---|---|---|
+| 1 | L2 on logits | yes | yes | **no** | no |
+| 2 | L2 on probabilities (post-softmax) | yes | yes | **yes** | yes (`[0, √2]`) |
+| 3 | Cosine on logits/hidden-states | yes | yes | **no** | yes |
+| 4 | KL divergence (asymmetric) | **no** | **no** (blows on zero probs) | yes | no |
+| 5 | Symmetric KL / Jeffreys divergence | yes | **no** | yes | no |
+| 6 | Jensen–Shannon divergence | yes | yes | yes | yes (`[0, ln 2]`) |
+| 7 | Token-level argmax agreement (0/1) | yes | n/a | yes | yes | 
+
+"Invariant to logit-shift" is critical: adding a constant `c` to every
+logit leaves the softmax output unchanged (same distribution). Any
+metric that flags that as "disagreement" fails Lemma 1 by construction
+because two *semantically identical* sources would accumulate non-zero
+distrust over time. Rules out candidates **#1** and **#3**.
+
+**Candidate #4** (asymmetric KL) fails symmetry: `KL(P‖Q) ≠ KL(Q‖P)`,
+so the per-pair cost would depend on which source is labeled `i` and
+which `j`. BCVF's autonomy kernel attributes pair cost symmetrically
+to both predictors (`core.py:_pair_cost`). Rules out **#4**.
+
+**Candidates #4, #5** blow up when one distribution has `p=0` where
+the other has `p>0`. For large-vocab LLMs (V ≈ 128k) with low-frequency
+tokens, this is a real numerical hazard. Rules out **#5** pending a
+stabilized variant; **#6** (Jensen–Shannon) is the zero-safe symmetric
+sibling of **#5** and survives this filter.
+
+**Candidate #7** (token-level argmax agreement) throws away all
+confidence information. The resulting 0/1 signal makes
+second-derivative + gate + Huber meaningless — either noise-dominated
+or sparse zeros. Rules out **#7**.
+
+Two survive: **#2 L2-on-probabilities** and **#6 Jensen–Shannon**.
+
+#### 2.2.2 Choice: L2 on probabilities (primary), Jensen–Shannon (V2 alternative)
+
+**Primary metric for V1:**
+
+```
+d_{ij}(t) = ‖ softmax(z_i(t)) − softmax(z_j(t)) ‖₂
+```
+
+where `z_i(t), z_j(t) ∈ ℝ^V` are the logits produced by source `i`
+and source `j` at time step `t`.
+
+**Justification:**
+
+- **Simplicity.** One vector subtraction, one L2 norm. Straightforward
+  to vectorize over batch / time / pair dimensions in NumPy. Matches
+  the autonomy kernel's use of L2 on body-frame error — the
+  *mathematical shape* of the operator is the same across domains,
+  only the input space changes (ℝ³ → Δ^{V-1}, the probability
+  simplex).
+- **Bounded.** `d ∈ [0, √2]` regardless of vocab size. Gate
+  threshold `T` (§2.5) can be set domain-agnostically.
+- **Cheap.** O(V) per pair per step. Competitive with JS which is
+  O(3V) and needs log-probability computations.
+- **Invariant to logit-shift** (via softmax shift-invariance). Any
+  decoder that scales its logit output by an additive constant —
+  as happens in some inference harnesses — produces identical L2
+  distances. This is the property we need for Lemma 1 (§2.6).
+- **Empirically interpretable.** Two identical distributions give
+  `d = 0`; two maximally-disagreeing one-hot distributions give
+  `d = √2 ≈ 1.414`.
+
+**Jensen–Shannon** is recorded as a V2 alternative in §9 for cases
+where information-theoretic rather than Euclidean geometry on the
+simplex is desired. Not chosen for V1 because the extra cost and
+conceptual machinery aren't justified at M=3 (§2.2.3) and the
+invariance behavior is the same.
+
+#### 2.2.3 Downstream discovery: the M=2 structural issue, and its §1 implication
+
+Working through this metric choice surfaces a structural issue that
+**requires revising §1.2 and §1.4 before §2 can proceed**.
+
+**The issue.** At `M=2` with one pair `(0, 1)`:
+
+- Per-source pair-attribution (the autonomy kernel's
+  `core.py:compute_bcvf_cost_batch` logic) accumulates the pair's
+  cost to both members:
+  `per_predictor[i] += pair_cost; per_predictor[j] += pair_cost`.
+- Both sources receive **the same** per-source distrust value.
+- Softmin over identical distrusts yields **uniform weights**:
+  `w_0 = w_1 = 0.5`.
+- Trust-weighted consensus reduces to equal-weight mean.
+- **The Ketu→Rahu composition is mathematically inactive at M=2**:
+  A3 ≡ A0 under trust-weighting.
+
+This is not a bug in the autonomy kernel — it's a structural property.
+At the autonomy side, `M=4` means a lone failing predictor appears in
+three anchor-pairs while each healthy predictor appears in one, giving
+the outlier a 3× distrust attribution that drives its weight toward
+zero. At `M=2`, the outlier and the correct source appear in the same
+single pair, so attribution cannot discriminate between them. The pair
+carries information about *that something is wrong*, but not *which
+side* is wrong.
+
+**Implications for V1.** Three possible resolutions, each with
+architectural implications:
+
+| # | Resolution | Scope cost | Keeps Ketu→Rahu? |
+|---|---|---|---|
+| A | **Bump `M` from 2 to 3** in §1.2 — e.g., base + paraphrase₁ + paraphrase₂ | +1 decode per step (~1.5× conventional-blend latency; still inside §1.10 budget) | Yes, cleanly |
+| B | Keep `M=2` but pivot composition to **veto/confidence gate** (Option D from the autonomy ranking). Disagreement serves as a scalar confidence, not per-source trust | Reframes V1; `softmin` + weighted consensus not exercised | **No** — different composition, different transfer claim |
+| C | Keep `M=2` with **asymmetric anchor-relative attribution** (base is anchor; only the verifier can be distrusted) | Smallest code change; loses symmetry | Partially — not the full composition |
+
+**Recommendation: resolution A** (bump to M=3). Rationale:
+
+- It preserves the architectural claim being transferred (§0.4),
+  which is specifically the Ketu→Rahu composition, not a different
+  composition.
+- Latency cost fits inside §1.10's ≤2× ceiling against the
+  conventional-blend baseline (which itself does 2 decodes, so M=3
+  is 1.5× conventional-blend latency; M=4 would be exactly at the
+  limit).
+- Matches the autonomy configuration more directly (autonomy's M=4
+  is the minimum to produce a 3:1 majority-vs-outlier discrimination;
+  M=3 is the bare minimum for trust-weighting to distinguish any
+  outlier at all).
+- The two paraphrased sources can share the paraphrase pipeline (two
+  different fixed rewrites of the same prompt at temperature 0 with
+  different rewrite seeds), so infrastructure cost is marginal.
+
+Resolution **B** remains a clean V2 experiment, captured in §9 as
+"veto-structured variant." It is explicitly *not* what this document
+is testing.
+
+Resolution **C** is discarded — it's half-way to a different
+architecture and loses the symmetric per-pair attribution that the
+autonomy invariance proof (Lemma 1) relies on.
+
+#### 2.2.4 §1 revision required as precondition for §2.3+
+
+**Before §2.3 can be authorized**, the following §1 revisions must be
+applied (minor amendment, recorded as a §1 sign-off note):
+
+- §1.2 source count: `M = 2` → **`M = 3`**.
+- §1.4: keep §1.4.1 (base decoder) unchanged; replace the single
+  §1.4.2 self-consistency verifier with **two independent paraphrased
+  decodes**, generated by the same model at temperature 0 with two
+  distinct rewrite-instruction seeds. Both are "fallible" sources in
+  the same way; the base decoder is the third.
+- §1.9 budget: no material change. Engineering still fits; compute
+  ceiling unchanged because TruthfulQA eval pass count is the same.
+- §1.10 thresholds: unchanged. The success criterion is about the
+  three-way decoder comparison (vanilla / conventional-blend /
+  BCVF-trust), not about the value of `M`.
+
+This is the kind of design-phase discovery §2 was specifically
+introduced to surface *before* implementation begins. The discipline
+of working through the math honestly, rather than jumping to
+implementation, is what prevents the autonomy-style "byte-identical
+smoke revealed we were solving the wrong problem" episode.
+
+#### 2.2.5 Equation summary
+
+With the §1 revision in place, the per-pair disagreement at step `t`
+becomes:
+
+```
+For each pair (i, j) ∈ { (0,1), (0,2), (1,2) } at step t:
+    p_i(t) = softmax(z_i(t))              # (V,)
+    p_j(t) = softmax(z_j(t))              # (V,)
+    d_{ij}(t) = ‖ p_i(t) − p_j(t) ‖₂      # scalar ∈ [0, √2]
+```
+
+The per-pair scalar `d_{ij}(t)` is the LLM-domain analogue of the
+autonomy `‖body_frame_error‖` used in `core.py:_pair_cost`. The 2nd-
+order temporal operator, gate, and Huber will be layered on top of
+this scalar time-series in §2.3–§2.5.
+
+#### 2.2.6 What §2.2 does NOT commit to
+
+- The exact temporal axis `t` indexes (generation step? lookahead
+  position? both?). That is §2.3's job.
+- The stencil form of the 2nd-order operator. §2.4.
+- The gate threshold `T` and its calibration to the `[0, √2]` range.
+  §2.5.
+- Per-source attribution rule beyond the symmetric sum stated in
+  §2.2.3 (unchanged from autonomy). §2.4 will finalize when per-source
+  cost is actually needed.
+- Whether `softmax` uses temperature 1.0 everywhere or scales by
+  a factor. §1.3 locked greedy decoding, so the softmax distribution
+  matters only as a disagreement measure, not for sampling — but the
+  implementation must be explicit. §2.7.
+
+---
+
+### 2.3 Forward lookahead via speculative decoding — **pending**
 
 ### 2.3 Forward lookahead via speculative decoding — **pending**
 
