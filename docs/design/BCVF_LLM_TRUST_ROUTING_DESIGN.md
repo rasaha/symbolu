@@ -759,9 +759,233 @@ The 2nd-order operator in §2.4 will run along the `l` axis (the forward-lookahe
 
 ---
 
-### 2.4 Second-order BCVF operator — **pending**
+### 2.4 Second-order BCVF operator
 
-### 2.5 Gate + pseudo-Huber — **pending**
+#### 2.4.1 Choice: vector 2nd-difference, not scalar 2nd-difference
+
+A critical structural decision. Given the per-pair disagreement sequence from §2.3.7:
+
+```
+e_{ij}(t, l) = p_i(t, l) − p_j(t, l)    ∈ ℝ^V   for l = 0, 1, ..., L−1
+d_{ij}(t, l) = ‖ e_{ij}(t, l) ‖₂         scalar ∈ [0, √2]
+```
+
+there are two possible places to insert the 2nd-difference operator:
+
+- **Vector path** (autonomy-faithful): apply 2nd-diff to the **vector** `e_{ij}`, *then* take the norm.
+  ```
+  a_{ij}(t, l) = e_{ij}(t, l+1) − 2·e_{ij}(t, l) + e_{ij}(t, l−1)   ∈ ℝ^V
+  s_{ij}(t, l) = ‖ a_{ij}(t, l) ‖₂                                  scalar
+  ```
+- **Scalar path** (ChatGPT proposal): apply 2nd-diff to the **scalar** `d_{ij}`.
+  ```
+  s_{ij}(t, l) = d_{ij}(t, l+1) − 2·d_{ij}(t, l) + d_{ij}(t, l−1)    scalar
+  ```
+
+These are **not equivalent**. Under linear drift `e(l) = a + b·l` for constant vectors `a, b ∈ ℝ^V`:
+
+- Vector path: `a_{ij}(l) = (a + b(l+1)) − 2(a + bl) + (a + b(l−1)) = 0`. Norm of zero = 0. **Lemma 1 preserved.**
+- Scalar path: `d(l) = ‖a + bl‖`. For arbitrary `a ⊥ b` this is a **nonlinear** function of `l` — even with `a=0` it becomes `d(l) = |l|·‖b‖`, which has a cusp at `l=0` producing spurious 2nd-difference signal. **Lemma 1 breaks.**
+
+The autonomy kernel uses the vector path (`core.py:compute_bcvf_cost_batch`), and §2.6's Lemma 1 proof will depend on this choice. **V1 commits to the vector path.** The scalar path is documented in §9 (V2 Roadmap) as an alternative worth revisiting only if someone proves its own invariance, which no one has.
+
+#### 2.4.2 Stencil formula and valid domain
+
+At each outer step `t`, for each pair `(i, j) ∈ {(0,1), (0,2), (1,2)}`:
+
+```
+a_{ij}(t, l) = e_{ij}(t, l+1) − 2·e_{ij}(t, l) + e_{ij}(t, l−1)       ∈ ℝ^V
+```
+
+defined for `l ∈ [1, L−2]`. At `L = 5`, that is `l ∈ {1, 2, 3}` — three stencil points per pair. This matches the autonomy kernel's `signal[:, 2:, :] - 2*signal[:, 1:-1, :] + signal[:, :-2, :]` form, re-indexed for the lookahead axis.
+
+No division by `dl²` is applied. Autonomy's `core.py` divides by `dt²` because the continuous-time interpretation requires it; LLM lookahead positions are unit-spaced (`dl = 1`) and the scale of `‖a‖` is absorbed by the Huber δ in §2.5. Keeping the dimensionless form simplifies gate threshold calibration.
+
+#### 2.4.3 Weighted norm (identity weight for V1)
+
+Autonomy's `core.py` computes a weighted norm:
+
+```
+s = ‖ W^{½} · a ‖₂
+```
+
+with `W` a `3×3` diagonal weight matrix over SE(2) error components (default `diag(1, 1, 1)`). The analogue for LLM is a `V×V` matrix.
+
+**V1 fixes `W = I_V`** (identity) — plain L2 norm on the probability-space 2nd-difference vector. Rationale:
+
+- No principled prior over which vocabulary dimensions should be up-weighted (e.g., "factual" tokens vs "filler" tokens is not an a-priori-defined partition).
+- An identity weight preserves the bounded-by-construction property of §2.2 (`s_{ij}(t, l) ≤ 4·‖e‖_max ≤ 4·√2 ≈ 5.66`).
+- Sparse weighting (e.g., mask certain vocab regions) is a V2 experiment documented in §9.
+
+#### 2.4.4 Stencil coverage rule (EOS / truncated lookahead)
+
+Continuing §2.3.5: if source `i`'s greedy continuation emits EOS at lookahead position `l = k < L−1`, source `i`'s logits are **undefined** for `l > k`. The stencil at `l*` requires `e_{ij}(t, l*−1)`, `e_{ij}(t, l*)`, and `e_{ij}(t, l*+1)` all defined, which in turn requires both sources `i` and `j` to have valid logits at those three positions.
+
+**Coverage rule.** Per pair `(i, j)` at step `t`:
+
+```
+valid(l*) = (last_defined_l[i] ≥ l*+1) AND (last_defined_l[j] ≥ l*+1)
+            where last_defined_l[s] is L−1 if source s didn't hit EOS,
+            else the position at which source s emitted EOS
+```
+
+Stencil points at `l*` where `valid(l*) = False` are dropped from the sum in §2.4.5. A pair's per-step cost may therefore be zero (or near-zero) if every stencil point is invalidated by truncation — this is the correct behavior: *we have no data to compute BCVF against*, so the operator reports no signal rather than extrapolating.
+
+#### 2.4.5 Per-pair aggregation and per-source attribution
+
+**Per-pair cost at step `t`** — sum over the valid stencil domain (§2.5 will plug in `gate_{ij}` and `huber(s_{ij})` for the bracketed term):
+
+```
+pair_cost_{ij}(t) = Σ_{l* ∈ [1, L−2] : valid(l*)}  [ gate_{ij}(t, l*) · huber(s_{ij}(t, l*)) ]
+```
+
+**Per-source attribution** at step `t` — symmetric sum over pairs containing source `i`:
+
+```
+per_source_cost_i(t) = Σ_{(i, j) : j ≠ i, (i,j) ∈ pairs_at_M=3}  pair_cost_{ij}(t)
+```
+
+At `M = 3` with pair set `{(0,1), (0,2), (1,2)}`:
+
+```
+per_source_cost_0(t) = pair_cost(0,1) + pair_cost(0,2)
+per_source_cost_1(t) = pair_cost(0,1) + pair_cost(1,2)
+per_source_cost_2(t) = pair_cost(0,2) + pair_cost(1,2)
+```
+
+**Why this attribution discriminates outliers.** If source 0 is destabilizing and sources 1, 2 agree, then `pair_cost(0,1)` and `pair_cost(0,2)` are large while `pair_cost(1,2)` is small:
+
+```
+per_source_cost_0(t) = LARGE + LARGE  = 2·LARGE       (outlier)
+per_source_cost_1(t) = LARGE + small ≈ LARGE + 0      (non-outlier)
+per_source_cost_2(t) = LARGE + small ≈ LARGE + 0      (non-outlier)
+```
+
+Ratio ~ 2 : 1. Softmin in §5 (Phase 3) sharply downweights source 0. This is the mathematical reason §2.2.3 required `M ≥ 3`: at `M = 2` with one pair, every source is in one pair, and the attribution is symmetric by construction.
+
+#### 2.4.6 Computational cost
+
+For V1 parameters (`M = 3`, `L = 5`, `V ≈ 128k`):
+
+| Operation | Count per outer step | Approximate FLOPs |
+|---|---|---|
+| Softmax per source (`L` positions × `M` sources) | `3 × 5 = 15` | `15 · V = ~1.9M` |
+| Pair difference `e_{ij}` (`3` pairs × `L` positions) | `15` | `15 · V = ~1.9M` |
+| Vector 2nd-difference `a_{ij}` (`3` pairs × `L−2` positions) | `9` | `9 · V = ~1.2M` |
+| L2 norm `s_{ij}` (`3` pairs × `L−2`) | `9` | `9 · V = ~1.2M` |
+| **Total BCVF ops per outer step** | | **~6.2M FLOPs** |
+
+Compared to a single forward pass through an 8B model (~16 × 10⁹ FLOPs), BCVF's per-step computation is **four orders of magnitude smaller than a single token generation**. BCVF is not the latency bottleneck; the lookahead rollouts are (§2.3.4).
+
+#### 2.4.7 What §2.4 does NOT commit to
+
+- `gate_{ij}(t, l)` functional form and threshold. §2.5.
+- `huber(·)` definition and `δ` calibration. §2.5.
+- Lemma 1 formal proof that ties together the vector-2nd-diff (§2.4.1) with gate + Huber to preserve invariance. §2.6.
+- Softmin trust temperature `τ_w` and the consensus construction. §5.
+
+---
+
+### 2.5 Gate + pseudo-Huber
+
+#### 2.5.1 Gate — suppress contributions below noise floor
+
+Carry forward the autonomy kernel's **sigmoid gate** on the raw disagreement magnitude at the stencil center. For each pair `(i, j)` at each valid stencil position `l* ∈ [1, L−2]`:
+
+```
+gate_input_{ij}(t, l*) = ‖ e_{ij}(t, l*) ‖₂                                    scalar ∈ [0, √2]
+gate_{ij}(t, l*)       = σ( β · (gate_input_{ij}(t, l*) − T) )                 scalar ∈ [0, 1]
+                       = 1 / (1 + exp(−clip(β · (·), −50, +50)))
+```
+
+**What the gate achieves.** Even when `a_{ij}(t, l*)` is non-zero, if the raw disagreement `e` at that position is below the softmax-floor noise, the pair's contribution is suppressed. The gate is the LLM analogue of the autonomy kernel's `gate_threshold` — it prevents the operator from chasing arithmetic noise in the tail of the probability simplex.
+
+**Stencil alignment.** Autonomy computes the gate input at the *center* of the 2nd-difference stencil (i.e. `e` at `l*`, not at `l*±1`). This rule carries over unchanged: gate at `l*` evaluates `‖e(l*)‖`, not `‖a(l*)‖`. The gate and the signal are evaluated at coincident indices — no alignment drift between them.
+
+**V1 parameter defaults.**
+
+| Parameter | V1 default | Derivation |
+|---|---|---|
+| `T` (threshold) | **0.1** | ~7% of max disagreement (`√2 ≈ 1.41`). Below typical meaningful disagreement (`~0.3–0.5` for divergent top-k distributions); well above softmax-floor numerical noise (`~10⁻³`) |
+| `β` (steepness) | **200** | `β·T = 20`, same ratio the autonomy gate uses (autonomy V1: `T=0.2, β=100`, ratio 20). Near-step function at `d = T` |
+| Clipping | `exp arg ∈ [−50, +50]` | Numerical-stability guard carried over from autonomy `core.py`; prevents under/overflow in `exp` when disagreement is far from threshold |
+
+The `β·T = 20` ratio is the structural parameter, not the absolute values. At that steepness, the gate is ~5% open at `d = T − 0.01` and ~95% open at `d = T + 0.01`. This gives a clean on/off behavior without pathological gradient spikes.
+
+Both `T` and `β` are swept in §3 (Phase 1.5) signal characterization — this `(T=0.1, β=200)` pair is the V1 starting point, not a locked final value. If the §3 sweep reveals a better operating point, §2.5 is updated and the synthetic tests in §2.9 re-run before §3 sign-off.
+
+#### 2.5.2 Pseudo-Huber — robust penalty on the signal
+
+Given `s_{ij}(t, l*) = ‖a_{ij}(t, l*)‖₂` from §2.4.2:
+
+```
+huber_{ij}(t, l*) = δ² · ( √(1 + (s_{ij}(t, l*) / δ)²) − 1 )
+```
+
+**Properties.**
+
+- Near-zero `s`: `huber(s) ≈ s² / 2` (quadratic regime — standard MSE-like penalty).
+- Large `s`: `huber(s) ≈ δ·s − δ²/2` (linear regime — robust to outliers).
+- Smooth transition at `s ≈ δ`.
+- Strictly non-negative, zero at `s = 0`.
+
+**V1 parameter default.**
+
+| Parameter | V1 default | Rationale |
+|---|---|---|
+| `δ` (transition point) | **0.5** | Direct carry-over from autonomy `core.py` (autonomy default `huber_delta = 0.5`). Matches the expected scale of `‖a‖` under moderate accelerating failure: typical hallucination-driven 2nd-difference magnitudes fall in the `0.2–1.0` range, so `δ = 0.5` sits cleanly at the quadratic–linear transition |
+
+Like `T` and `β`, `δ` is swept in §3; V1 starts from the autonomy value and refines empirically.
+
+#### 2.5.3 Composition — what plugs into §2.4.5
+
+With gate and Huber defined, the per-pair cost from §2.4.5 is now concrete:
+
+```
+For each pair (i, j) ∈ {(0,1), (0,2), (1,2)} and each outer step t:
+
+  For each l* ∈ [1, L−2] with valid(l*) = True:
+      gate_input = p_i(t, l*) − p_j(t, l*)                           ∈ ℝ^V
+      gate       = σ( β · (‖gate_input‖₂ − T) )                      ∈ [0, 1]
+      signal     = (p_i(t, l*+1) − p_j(t, l*+1))
+                 − 2·(p_i(t, l*) − p_j(t, l*))
+                 + (p_i(t, l*−1) − p_j(t, l*−1))                     ∈ ℝ^V
+      s          = ‖signal‖₂                                          ≥ 0
+      penalty    = δ² · (√(1 + (s/δ)²) − 1)                          ≥ 0
+      contrib_{ij}(l*) = gate · penalty                              ∈ [0, penalty_max]
+
+  pair_cost_{ij}(t) = Σ_{l* valid} contrib_{ij}(l*)
+```
+
+Per-source cost from §2.4.5 unchanged:
+
+```
+per_source_cost_i(t) = Σ_{(i, j) : j ≠ i}  pair_cost_{ij}(t)
+```
+
+#### 2.5.4 Properties §2.5 guarantees (to be proven in §2.6)
+
+The choices above are specifically designed so that the following hold under §2.6's Lemma 1 proof:
+
+1. **Non-negativity.** `contrib_{ij}(l*) ≥ 0` everywhere. Follows from `gate ∈ [0, 1]` and `penalty ≥ 0`.
+2. **Zero under constant disagreement.** If `e_{ij}(t, l)` is constant in `l`, then `a_{ij} = 0`, `s = 0`, `penalty = 0`, `contrib = 0`. **Lemma 1 case 1.**
+3. **Zero under linear drift.** If `e_{ij}(t, l) = α + β·l` with `α, β ∈ ℝ^V`, then `a_{ij} = 0` by the vector-path choice in §2.4.1. `s = 0`, `penalty = 0`, `contrib = 0`. **Lemma 1 case 2.**
+4. **Positive under quadratic (or higher) accelerating disagreement**, provided `‖e_{ij}(t, l*)‖ > T` (gate open). This is the only regime that contributes, by design.
+5. **Gate suppresses contributions below noise floor.** If `‖e_{ij}(t, l*)‖ < T − 1/β ≈ T − 0.005`, gate ≈ 0, contribution ≈ 0, regardless of `a`. Prevents noise-driven false positives.
+6. **Huber bounds outlier sensitivity.** For `s >> δ`, `penalty` scales linearly rather than quadratically. One extreme single-position spike cannot dominate the cost.
+
+These six properties are the invariance guarantees §2.6 will formalize and prove.
+
+#### 2.5.5 What §2.5 does NOT commit to
+
+- Softmin trust weighting formula (applied to per-source cost in §5, Phase 3).
+- Temperature `τ_w` for softmin — explicitly a §5 concern; the autonomy default `τ_w = 1.0` is the V1 starting point but its calibration depends on the empirical distribution of `per_source_cost` under the §3 synthetic traces.
+- The gate/Huber parameter sweep protocol. §3.
+- Any training-time signal (L_trust, L_smooth). Explicitly V2 per §9.
+
+---
+
+### 2.6 Lemma 1 analogue — **pending**
 
 ### 2.6 Lemma 1 analogue — **pending**
 
