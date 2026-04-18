@@ -2462,6 +2462,71 @@ def compute_bcvf_cost_batch(
 
 **Parity tests.** §2.9 queues `test_compute_bcvf_cost_batch_matches_scalar_elementwise` (assert `compute_bcvf_cost_batch(sources_batch=stack)[t] == compute_bcvf_cost(sources=stack[t]).total_cost` for each `t`), `test_compute_bcvf_cost_batch_per_source_shape` (`(T, M)`), and `test_compute_bcvf_cost_batch_valid_masks_propagate` (per-`t` EOS patterns).
 
+#### 2.8.13 Fidelity summary — autonomy → LLM mapping
+
+The full translation table across §2.8.2–§2.8.12:
+
+| Autonomy element (`bcvf_autonomous/core.py`) | LLM element (`symbolu_bcvf_llm/core.py`) | Status | Sub-section |
+|---|---|---|---|
+| Module docstring (lines 1–11) | Module docstring w/ `(M,T,L,V)` shape doc, §2.4–§2.7 pointer | **retargeted** | §2.8.2 |
+| `from __future__ import annotations`, stdlib imports, `import numpy as np` | **verbatim** | verbatim | §2.8.2 |
+| `from .manifold import body_frame_error_trajectory` | — | **dropped** | §2.8.2, §2.8.5 |
+| `from typing import ... Optional` | **added** | new | §2.8.2 |
+| `class CostOrder(IntEnum)` | **verbatim values + retargeted docstring** | near-verbatim | §2.8.3 |
+| `class BCVFConfig` (10 fields) | `class BCVFLLMConfig` (8 fields) | **2 dropped, 2 renamed, rest verbatim** | §2.8.4 |
+| `lambda_c`, `lever_arm` | — | **dropped** | §2.8.4 |
+| `weight_matrix` | `weight_vector` with `None` default | **renamed + default** | §2.8.4 |
+| `dt` | `step_l` | **renamed + default 1.0** | §2.8.4 |
+| `use_anchor_pairing=True` | `use_anchor_pairing=False` | **default flipped** | §2.8.4 |
+| `class BCVFResult` (4 fields) | `class BCVFLLMResult` (5 fields) | **+ `per_source_costs`** | §2.8.11 |
+| `compute_disagreement(traj_i, traj_j, lever_arm)` | `compute_disagreement(p_i, p_j)` | **body trivialized to subtraction; function kept for pipeline parity** | §2.8.5 |
+| `compute_disagreement_velocity(dis, dt)` | `compute_disagreement_velocity(e, step_l)` | **ellipsis-axis slicing; Lemma-1 warning** | §2.8.6 |
+| `compute_disagreement_acceleration(dis, dt)` | `compute_disagreement_acceleration(e, step_l)` | **ellipsis-axis slicing** | §2.8.6 |
+| `smooth_gate(dis, T, β, W)` | `smooth_gate(e, T, β, weight_vector=None)` | **None short-circuit; ellipsis-axis norm** | §2.8.7 |
+| `pseudo_huber(r, δ)` | `pseudo_huber(r, δ)` | **character-for-character verbatim** | §2.8.8 |
+| `_enumerate_pairs(num_models, ...)` | `_enumerate_pairs(num_sources, ...)` | **param rename; body verbatim** | §2.8.9 |
+| `_pair_cost(traj_i, traj_j, config)` | `_pair_cost(p_i, p_j, config, valid_mask=None)` | **+ valid_mask; per-pair math unchanged** | §2.8.10 |
+| — | `_intersect_valid_masks(mask_i, mask_j, cost_order)` | **new helper** | §2.8.11 |
+| `compute_bcvf_cost(trajectories, config)` | `compute_bcvf_cost(sources, config, valid_masks=None)` | **+ valid_masks, + NaN guard, + per_source accumulation** | §2.8.11 |
+| `compute_bcvf_cost_batch(traj_batch, config, return_per_predictor)` | `compute_bcvf_cost_batch(sources_batch, config, valid_masks_batch, return_per_source)` | **+ valid_masks_batch; batch axis renamed K→T** | §2.8.12 |
+
+**Counts.**
+
+- Functions kept (same signature skeleton): **9** — `compute_disagreement`, `compute_disagreement_velocity`, `compute_disagreement_acceleration`, `smooth_gate`, `pseudo_huber`, `_enumerate_pairs`, `_pair_cost`, `compute_bcvf_cost`, `compute_bcvf_cost_batch`.
+- Functions character-for-character verbatim: **1** — `pseudo_huber` (§2.8.8).
+- Functions added: **1** — `_intersect_valid_masks` (§2.8.11 helper).
+- Functions dropped: **0**.
+- Dataclass fields dropped: **2** (`lambda_c`, `lever_arm`).
+- Dataclass fields added: **1** (`BCVFLLMResult.per_source_costs`).
+- Parameters added across all functions: **3** (`valid_mask`, `valid_masks`, `valid_masks_batch`).
+
+**What this table enables.** A reviewer can open `bcvf_autonomous/core.py` and `symbolu_bcvf_llm/core.py` side-by-side with the table above as the diff legend. Every meaningful deviation is named, justified by sub-section, and one of a small fixed set of status codes (verbatim / renamed / extended / new / dropped / default-changed). There are no unexplained deltas. This is the §2.8 version of the "structural fidelity" guarantee §0 promised.
+
+#### 2.8.14 Acceptance criteria for §2.8
+
+§2.8 is complete when:
+
+1. ✅ Target package (`symbolu_bcvf_llm`) and file (`core.py`) are named (§2.8.1).
+2. ✅ Module docstring, imports, and dependency-isolation discipline are committed (§2.8.2).
+3. ✅ `CostOrder` enum is committed with V1 lock on `SECOND` (§2.8.3).
+4. ✅ `BCVFLLMConfig` is committed with 8 fields, explicit defaults, and the dropped/renamed/default-flipped fields all justified (§2.8.4).
+5. ✅ `compute_disagreement` committed (§2.8.5).
+6. ✅ `compute_disagreement_velocity` and `compute_disagreement_acceleration` committed with ellipsis-axis slicing rule and lookahead-axis convention (§2.8.6).
+7. ✅ `smooth_gate` committed with weight-vector `None` short-circuit (§2.8.7).
+8. ✅ `pseudo_huber` committed as character-for-character verbatim from autonomy (§2.8.8).
+9. ✅ `_enumerate_pairs` committed with concrete V1 enumeration documented (§2.8.9).
+10. ✅ `_pair_cost` committed with `valid_mask` extension and the three mask-application options evaluated (§2.8.10).
+11. ✅ `BCVFLLMResult` and `compute_bcvf_cost` scalar entry committed with NaN guard, per-source attribution, `_intersect_valid_masks` helper (§2.8.11).
+12. ✅ `compute_bcvf_cost_batch` vectorized entry committed with inlined math and `(T, M)` per-source return shape (§2.8.12).
+13. ✅ Fidelity summary table enumerated and totals counted (§2.8.13).
+14. **Pending §2.9:** the full parity test suite (roughly 40 tests queued across §2.8.3–§2.8.12) passes deterministically against a reference Python implementation, including the cross-kernel bit-exact test for `pseudo_huber` and the 2:1 outlier-discrimination test for `compute_bcvf_cost`.
+
+Items 1–13 are satisfied by this section. Item 14 is the hard gate — §2.8 is a design-time specification; §2.9's test list is what mechanically verifies the spec is implementable and correct. No `bcvf_llm/core.py` source file is written until §2.9 is authorized and the tests listed there are agreed to as the acceptance bar.
+
+**What §2.8 does NOT commit.** The implementation itself. The design document specifies what the code should look like at the function-signature and docstring level, with algorithmic bodies stated in Python-prose form. Actual `bcvf_llm/core.py` is written during Phase 1 execution, after §2.9 sign-off, and must conform to §2.8.1–§2.8.13 at every point. Deviations discovered during implementation (e.g., a performance issue forces inlining a helper) loop back to §2.8 for revision, not the other way around.
+
+---
+
 ### 2.9 Acceptance criteria + test specification — **pending**
 
 ---
