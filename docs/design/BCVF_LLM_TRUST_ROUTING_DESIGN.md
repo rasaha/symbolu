@@ -3626,6 +3626,115 @@ Every exclusion in §3.8 has a named downstream home. Nothing is silently droppe
 
 All four "does not" items are §4 / §5 / §6 responsibilities. §3 is the last cheap-abort gate before expensive downstream work — nothing more, nothing less.
 
+### 3.9 Acceptance criteria for §3 itself + effort estimate
+
+§3.9 closes Phase 1.5. It defines the sign-off procedure that converts the raw sweep output into a binary decision (unlock §4 or trigger §0.6 stop rule #4), picks the V1 parameter tuple, and commits the deliverable timeline.
+
+#### 3.9.1 Sign-off decision procedure
+
+§3 is signed off — i.e., Phase 1.5 closes and §4 unlocks — when **all four** of the following hold:
+
+1. **§3.4.4 ablation grid.** `cost_order = SECOND` passes §3.2.3 linear-drift thresholds on every cell; `cost_order = FIRST` **fails** §3.2.3 on cells with `drift_rate > 0` (positive confirmation of §2.8.3 / §2.6.4 warning). If `FIRST` passes linear-drift, §3 is blocked and the entire §2 chain is re-opened.
+2. **§3.4.2 primary grid.** All 7 trace families from §3.2 achieve `family_pass_rate == 1.0` under V1 defaults `(T=0.1, β=200, δ=0.5)` at `sigma_logit=3.0, V=1024`, per §3.5 thresholds AND §3.6 alignment thresholds.
+3. **§3.4.3 sensitivity grid.** At least one `(T, β, δ)` tuple achieves `config_pass_rate == 1.0` across all 7 families *and* `sigma_logit ∈ {1.0, 3.0, 5.0}`. If V1 defaults pass primary, they by definition pass this at `sigma_logit=3.0`; sensitivity confirms robustness to entropy variation.
+4. **§3.4.5 full-V spot check.** The winning tuple from step 3 passes all 7 families at `V = 32000`, confirming V=1024→V=32000 scaling doesn't flip any pass/fail bit.
+
+Additionally (non-gating but required for the artifact):
+
+5. **§3.7 regression guards.** All 7 guard traces pass per §3.7.9. A guard failure does not itself block sign-off (guards catch specific bug classes that may already be known and worked around), but §3.9 reporting must explicitly enumerate any guard failure and why it's accepted.
+
+**All four primary conditions are binary.** If any one fails, §3 is not signed off, §4 does not unlock, and §3.9.4's failure-mode reporting kicks in.
+
+#### 3.9.2 Aggregating sweep results into a V1 winner tuple
+
+From the sensitivity grid (§3.4.3), more than one `(T, β, δ)` may satisfy `config_pass_rate == 1.0`. The V1 winner is chosen by the following deterministic tiebreaker:
+
+1. **Filter** to tuples satisfying conditions 2 and 3 of §3.9.1.
+2. **Rank** candidates by Euclidean distance in parameter space to V1 defaults `(0.1, 200, 0.5)`:
+   ```
+   distance = sqrt( ((T - 0.1)/0.1)^2
+                  + ((β - 200)/200)^2
+                  + ((δ - 0.5)/0.5)^2 )
+   ```
+   Normalized deviations so the three parameters contribute equitably.
+3. **Select** the minimum-distance tuple. Ties broken by (a) lowest `T`, then (b) highest `β`, then (c) lowest `δ` — in that order, purely for determinism.
+4. **Validate** the winner with §3.4.5 full-V spot check. If it fails at `V=32000`, fall back to the next-best tuple and re-validate. If all sensitivity-grid winners fail full-V, §3.9 is blocked and §3.9.4 reports scale-mismatch at production V.
+
+The "closest to V1 defaults" rule is a deliberate design-stability choice: among tuples that pass, prefer the one that least disrupts §2.5's derivations. This keeps §2.5 documentation aligned with the §3 empirical choice whenever possible.
+
+#### 3.9.3 Failure-mode classification and reporting
+
+If any §3.9.1 condition fails, the failure is classified per §3.1:
+
+**Scale mismatch (fixable in §3).** Characterized by: (a) some `(T, β, δ)` tuple exists that passes all families, but (b) V1 defaults are not it. Fix: adopt the winner tuple from §3.9.2 as the new V1 default, update §2.5.1 / §2.5.2 tables accordingly, re-commit. Scale mismatch does not require returning to §2 math — only updating the default values §2.5 declared provisional.
+
+**Structural mismatch (escalates to §2 revision).** Characterized by: *no* `(T, β, δ)` tuple in the sensitivity grid achieves `config_pass_rate == 1.0`, OR §3.2.3 linear-drift fails at `cost_order=SECOND`. This indicates that the kernel does not satisfy Lemma 1 under realistic-scale inputs, or the 2:1 attribution claim does not hold — either is a §2 math problem, not a §3 tuning problem. Trigger: §0.6 stop rule #4.
+
+**Vocabulary-scale mismatch (fixable in §3, diagnostic).** Characterized by: sensitivity grid finds a winner at `V=1024` but it fails at `V=32000`. Indicates softmax rounding at larger V changes effective noise regime. Fix: expand sensitivity grid to `V=32000` directly and re-pick winner — adds roughly 30× runtime but still minutes total. Still cheap compared to §4.
+
+The §3.9 deliverable summary (§3.9.5) explicitly classifies the run as one of: `PASS`, `SCALE_MISMATCH_FIXED`, `VOCAB_SCALE_MISMATCH_FIXED`, `STRUCTURAL_FAILURE`. The first three unlock §4; the fourth halts Phase 1.5 and triggers §2 revision.
+
+#### 3.9.4 Deliverable artifact checklist
+
+The §3 sign-off produces three artifacts, all committed to the repo:
+
+1. **Code:** `symbolu_bcvf_llm/characterization/` package with:
+   - `traces.py` — `generate_trace` + `TraceBundle` (§3.3.6).
+   - `alignment.py` — `compute_alignment_metrics` + `aggregate_alignment` (§3.6.6).
+   - `sweep.py` — orchestrates the four §3.4 grids; returns per-cell `CellResult` list.
+   - `__main__.py` — CLI entry `python -m symbolu_bcvf_llm.characterization` runs the full sweep and writes artifacts below.
+   - `tests/` — pytest coverage of generator determinism, alignment metric correctness, sweep harness (not the kernel itself; that's §2.9).
+
+2. **Results data:** `docs/experiments/phase_1_5_results.csv` (or JSON) with one row per cell: `(family, family_params, T, β, δ, sigma_logit, V, seed, total_cost, max_accel_norm, gate_activations, per_source_costs, hit, margin, rank, threshold_pass, alignment_pass, cell_pass)`. Reproducible from the committed code + seed list.
+
+3. **Report:** `docs/experiments/phase_1_5_summary.md` — 1–2 pages containing:
+   - Sweep scope (grid counts).
+   - Pass rate per family at V1 defaults.
+   - Winner tuple from §3.9.2 (usually V1 defaults themselves).
+   - Failure-mode classification per §3.9.3.
+   - Any §3.7 guard failures with acceptance rationale.
+   - Recommendation: `UNLOCK §4 AT (T=..., β=..., δ=...)` or `HALT`.
+
+All three artifacts land in one commit tagged `phase_1_5_signoff`.
+
+#### 3.9.5 Effort estimate
+
+- **Characterization module implementation:** 1 day. `traces.py` is roughly 200 LOC of generator code plus dataclass wiring; `alignment.py` is 100 LOC; `sweep.py` orchestrates and writes results.
+- **Sweep execution:** <1 minute wall time (§3.4.6's 3–4 seconds plus full-V spot check runtime, plus CSV I/O).
+- **Results analysis + report writing:** 0.5 day. The hard work is already done by the sweep; the report is a summary of committed numbers, not a novel analysis.
+- **Debug iterations (if scale mismatch):** 0.5 day budgeted. Typically one cycle of re-picking winner tuple and re-running.
+- **Total Phase 1.5:** ~2 days, within §1.9's 2-week V1 budget.
+
+**Dependency on Phase 1 execution.** §3 *design* (this sub-section and earlier) can be authorized and land without Phase 1 execution — it's pure specification. §3 *execution* requires `symbolu_bcvf_llm/core.py` to exist and pass §2.9's 49 tests. The earliest §3 execution can start is immediately after §2.9 sign-off.
+
+#### 3.9.6 Acceptance criteria for §3 overall
+
+§3 is considered design-complete when:
+
+1. ✅ §3.0 sub-section plan enumerated.
+2. ✅ §3.1 purpose & deliverable committed.
+3. ✅ §3.2 seven trace families defined with coverage matrix.
+4. ✅ §3.3 generation protocol (base sequence, perturbation primitives, generator API) committed.
+5. ✅ §3.4 four sweep sub-grids (primary / sensitivity / ablation / full-V spot check) enumerated.
+6. ✅ §3.5 per-family threshold tables committed with 3-seed rule.
+7. ✅ §3.6 alignment diagnostic (hit / margin / rank) committed with 4 pass thresholds.
+8. ✅ §3.7 seven regression-guard traces committed.
+9. ✅ §3.8 exclusions consolidated.
+10. ✅ §3.9 sign-off procedure, tiebreaker, failure classification, deliverable checklist, effort estimate committed (this sub-section).
+
+Items 1–10 are satisfied. §3 **design is complete**; §3 execution remains pending §2.9 sign-off and Phase 1 execution.
+
+#### 3.9.7 What §3.9 does NOT cover
+
+- **No §4 unlock procedure beyond "§3 passes."** §4 has its own entry criteria documented in §4 (once that section is filled); §3.9 just commits that §3 passes or fails, not what §4 does next.
+- **No rollback procedure** if §3 passes but §4 reveals a regression. That's §4's concern — §4's implementation will re-run §3's sweep as part of its own sanity checks, and if the kernel has regressed, §4 halts and reports.
+- **No live-monitoring or CI wiring.** The §3 sweep is designed to run once per design iteration, not continuously. V2 may wire it into CI.
+- **No publishing path.** The summary report is internal documentation, not a paper or external artifact. If the full experimental protocol ever becomes externally shareable, that's a V2 concern.
+
+---
+
+**§3 Phase 1.5 design is now complete end-to-end: §3.0 through §3.9.**
+
 ---
 
 ## Section 4 — Phase 2 — Source Framework
