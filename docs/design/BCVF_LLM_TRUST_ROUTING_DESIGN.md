@@ -1927,6 +1927,106 @@ def pseudo_huber(r: np.ndarray, delta: float) -> np.ndarray:
 - `test_pseudo_huber_monotonic` — generate sorted `r` values, assert `penalty` is monotonically non-decreasing.
 - `test_pseudo_huber_matches_autonomy_bit_exact` — call both autonomy's `pseudo_huber` and LLM's with same `(r, δ)` input and assert outputs are bit-identical. This is the strongest cross-kernel parity test in §2.9 and catches any unintentional drift between the two implementations of this stage.
 
+#### 2.8.9 `_enumerate_pairs` — pair-enumeration helper
+
+Autonomy defines the pair enumerator as (`bcvf_autonomous/core.py:133–147`):
+
+```python
+def _enumerate_pairs(
+    num_models: int, use_anchor_pairing: bool, anchor_index: int
+) -> List[Tuple[int, int]]:
+    """Enumerate (i, j) model pairs. j is the body-frame reference.
+
+    Anchor mode: j = anchor_index, i ranges over the other models
+    (V3.1 Section 4.5). All-pairs mode enumerates every unordered
+    pair once with the lower-indexed model as the reference j so
+    that for M=2 both modes produce the same single pair.
+    """
+    if use_anchor_pairing:
+        return [
+            (i, anchor_index) for i in range(num_models) if i != anchor_index
+        ]
+    return [(i, j) for i in range(num_models) for j in range(i)]
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+def _enumerate_pairs(
+    num_sources: int, use_anchor_pairing: bool, anchor_index: int
+) -> List[Tuple[int, int]]:
+    """Enumerate (i, j) source pairs. j is the reference source.
+
+    Anchor mode: j = anchor_index, i ranges over the other sources.
+    All-pairs mode enumerates every unordered pair once with the
+    lower-indexed source as the reference j.
+
+    For V1 LLM domain with M=3 and use_anchor_pairing=False
+    (§2.8.4 default), this returns [(1, 0), (2, 0), (2, 1)] — all
+    three pairs needed for §2.4.5 per-source attribution to
+    discriminate an outlier source 2:1 against non-outliers.
+    """
+    if use_anchor_pairing:
+        return [
+            (i, anchor_index) for i in range(num_sources) if i != anchor_index
+        ]
+    return [(i, j) for i in range(num_sources) for j in range(i)]
+```
+
+**Diff against autonomy:**
+
+| Aspect | Autonomy | LLM-kernel | Rationale |
+|---|---|---|---|
+| Parameter name | `num_models` | `num_sources` | §2.2–§2.7 consistently uses "sources" (prompt-variants of the same base model) not "models" (different base models). Renaming the parameter aligns vocabulary with the rest of the design doc |
+| Body | `[(i, anchor) for i ... if i != anchor] / [(i, j) for i in range(N) for j in range(i)]` | **verbatim identical logic** | No domain adaptation needed. The pair-enumeration math is combinatorial, not SE(2)-specific |
+| Return type | `List[Tuple[int, int]]` | **verbatim** | Same tuple convention; `j` is the reference index |
+| V3.1 reference in docstring | `V3.1 Section 4.5` | removed | No LLM equivalent of the autonomy Section 4.5 reference; the LLM context is committed in §2.4.5 / §2.8.4 instead |
+| Concrete enumeration note | — | **added** for `M=3, use_anchor=False` | Docstring explicitly states the expected pair list `[(1,0), (2,0), (2,1)]` so readers cross-checking against §2.4.5 can verify at a glance |
+
+**Concrete enumeration for V1.** At `num_sources=3, use_anchor_pairing=False, anchor_index=0`:
+
+```python
+>>> _enumerate_pairs(3, False, 0)
+[(1, 0), (2, 0), (2, 1)]
+```
+
+Three pairs, matching §2.4.5's per-source attribution:
+
+- Source 0 participates in pairs `(1, 0)` and `(2, 0)` → `per_source_cost_0 = pair_cost_{1,0} + pair_cost_{2,0}`
+- Source 1 participates in pairs `(1, 0)` and `(2, 1)` → `per_source_cost_1 = pair_cost_{1,0} + pair_cost_{2,1}`
+- Source 2 participates in pairs `(2, 0)` and `(2, 1)` → `per_source_cost_2 = pair_cost_{2,0} + pair_cost_{2,1}`
+
+Each source appears in exactly 2 of 3 pairs — the symmetry that makes the outlier discrimination 2:1 work. If source 0 is the outlier producing large disagreement, both `pair_cost_{1,0}` and `pair_cost_{2,0}` are large; `pair_cost_{2,1}` is small. Sources 1 and 2 each get one large + one small, summing to `LARGE`; source 0 gets `LARGE + LARGE`. Ratio ≈ 2:1 — the core §2.4.5 claim.
+
+**Alternative anchor mode for V1.** At `num_sources=3, use_anchor_pairing=True, anchor_index=0`:
+
+```python
+>>> _enumerate_pairs(3, True, 0)
+[(1, 0), (2, 0)]
+```
+
+Two pairs, both against source 0 as anchor. This **does not** produce a 2:1 outlier signal (sources 1 and 2 each participate in only 1 pair, source 0 in 2 pairs — the symmetry is lost). That's why §2.8.4 flipped the default to `use_anchor_pairing=False`. Anchor mode is retained for:
+
+- M=2 legacy case where both modes produce the same single pair `[(1, 0)]`.
+- §3 ablation runs that explicitly test whether anchor-mode produces distinguishable per-source signal (expected: no).
+- Future V2 workflows where one source is designated as a ground-truth reference (e.g. a larger verifier model) and distrust is computed relative to it.
+
+**Determinism.** The enumeration order is deterministic given the inputs. `(i, j)` tuples are sorted by `(i, j)` ascending — `(1,0) < (2,0) < (2,1)` lexicographically. This determinism matters because §2.8.10's `_pair_cost` iterates over pairs and §2.8.12's per-source attribution indexes into a `(T, M)` array by pair — a non-deterministic order would make the per-source output non-reproducible across runs even with fixed seeds.
+
+**Underscore prefix convention.** Both kernels name this `_enumerate_pairs` with a leading underscore, signaling "module-private helper, not part of the public API." §2.9 unit-tests this via `test_enumerate_pairs_not_in_public_namespace` — `symbolu_bcvf_llm.core._enumerate_pairs` is callable, but `symbolu_bcvf_llm.core.__all__` (if defined) does not include it. Follows autonomy convention.
+
+**FLOP / allocation cost.** Returns a Python list of tuples. At `M=3` the list has 3 elements (all-pairs) or 2 elements (anchor); construction is O(M²) Python-level operations. Called **once per `compute_bcvf_cost_batch` invocation** (§2.8.12), not once per outer step, so the overhead is amortized across all `T` outer steps in a batch. Negligible.
+
+**What §2.8.9 does NOT add.** No caching or memoization. The result is so small and cheap to compute that caching would introduce complexity without benefit. If profiling (V2) ever shows this is a hotspot, `functools.lru_cache` adds one line.
+
+**Parity tests.** §2.9 will include:
+
+- `test_enumerate_pairs_all_pairs_m3` — asserts `_enumerate_pairs(3, False, 0) == [(1, 0), (2, 0), (2, 1)]` exactly (order-sensitive).
+- `test_enumerate_pairs_anchor_m3` — asserts `_enumerate_pairs(3, True, 0) == [(1, 0), (2, 0)]`.
+- `test_enumerate_pairs_m2_anchor_equals_all_pairs` — asserts `_enumerate_pairs(2, True, 0) == _enumerate_pairs(2, False, 0) == [(1, 0)]` — the M=2 degenerate case the autonomy docstring called out.
+- `test_enumerate_pairs_m3_all_sources_covered_twice` — asserts that in all-pairs mode at M=3, every source index appears in exactly 2 tuples.
+- `test_enumerate_pairs_matches_autonomy` — cross-kernel parity: call both autonomy's `_enumerate_pairs` and LLM's with same `(M, use_anchor, anchor)` and assert outputs are equal.
+
 ### 2.9 Acceptance criteria + test specification — **pending**
 
 ---
