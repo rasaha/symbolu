@@ -380,6 +380,39 @@ def test_fisher_exact_symmetry() -> None:
     assert p_ab < 0.001
 
 
+def test_mcnemar_exact_null_when_equal_splits() -> None:
+    from symbolu_robotics.bcvf_autonomous.metrics import mcnemar_exact
+    n, p = mcnemar_exact(5, 5)  # perfectly balanced discordants
+    assert n == 10
+    assert p == pytest.approx(1.0)
+
+
+def test_mcnemar_exact_significant_on_large_asymmetry() -> None:
+    from symbolu_robotics.bcvf_autonomous.metrics import mcnemar_exact
+    # 10 discordants: 1 favors A0, 9 favor A3 — should be significant.
+    n, p = mcnemar_exact(1, 9)
+    assert n == 10
+    assert p < 0.05
+    # Symmetric in arguments (two-sided).
+    _, p_rev = mcnemar_exact(9, 1)
+    assert p == pytest.approx(p_rev)
+
+
+def test_mcnemar_exact_no_discordants() -> None:
+    from symbolu_robotics.bcvf_autonomous.metrics import mcnemar_exact
+    n, p = mcnemar_exact(0, 0)
+    assert n == 0
+    assert p == 1.0
+
+
+def test_mcnemar_known_exact_value() -> None:
+    """3 vs 0 discordants under H0 ~ Bin(3, 0.5): one-sided P = 1/8,
+    two-sided p = 0.25 (clamped at 1 if > 1)."""
+    from symbolu_robotics.bcvf_autonomous.metrics import mcnemar_exact
+    _, p = mcnemar_exact(0, 3)
+    assert p == pytest.approx(0.25)
+
+
 def test_welch_t_extreme() -> None:
     rng = np.random.default_rng(0)
     a = rng.normal(loc=1.0, scale=0.1, size=60)

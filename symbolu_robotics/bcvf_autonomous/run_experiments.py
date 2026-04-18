@@ -33,6 +33,7 @@ from .metrics import (
     compute_aggregate_metrics,
     compute_episode_metrics,
     compute_early_warning_time,
+    mcnemar_exact,
 )
 from .mppi_planner import MPPIConfig, PerfCostConfig
 from .predictors.base import BicycleConfig
@@ -331,6 +332,12 @@ class ExperimentRunner:
                     )
                 )
 
+        # Per-seed paired-outcome output for A0-vs-A3 recovery analysis.
+        # Re-loads run_NNN.json files (cheap) and builds the McNemar table
+        # per scenario. This is what downstream reviewers need to call the
+        # gate-2 decision when Fisher's-exact p is borderline.
+        paired_by_scenario = self._build_paired_outcomes(ablation)
+
         wall = time.perf_counter() - start
         total_runs = (
             len(ablation) * self._config.runs_per_config
@@ -347,6 +354,8 @@ class ExperimentRunner:
             json.dump(_config_to_dict(self._config), f, indent=2)
         with open(out_dir / "timing.json", "w", encoding="utf-8") as f:
             json.dump({"wall_clock_seconds": wall, "total_runs": total_runs}, f, indent=2)
+        with open(out_dir / "paired_outcomes.json", "w", encoding="utf-8") as f:
+            json.dump(paired_by_scenario, f, indent=2)
 
         return ExperimentResult(
             ablation_results=ablation,
@@ -358,6 +367,82 @@ class ExperimentRunner:
         )
 
     # --- helpers ---
+
+    def _build_paired_outcomes(
+        self, ablation: Dict[Tuple[str, str], AggregateMetrics]
+    ) -> Dict[str, Any]:
+        """Construct the per-seed paired-outcome tables needed for the
+        McNemar analysis on A0 vs A3 recovery (B2 smoke follow-up).
+
+        For each scenario with both A0 and A3 run, produces:
+
+            {
+              scenario_name: {
+                "seeds": [s_0, ..., s_{N-1}],
+                "A0_recovered":    [bool, ...],
+                "A3_recovered":    [bool, ...],
+                "A0_final_lateral":[float, ...],
+                "A3_final_lateral":[float, ...],
+                "discordant": {
+                   "a3_wins": [seed_idx where A3 recovered, A0 didn't],
+                   "a0_wins": [seed_idx where A0 recovered, A3 didn't],
+                   "both_recovered": [...],
+                   "both_failed":    [...],
+                },
+                "mcnemar": {"n_discordant": int, "p_value": float},
+              }
+            }
+
+        The function is cheap — it re-reads each run's JSON (same data
+        _load_episodes already uses) and is idempotent.
+        """
+        out: Dict[str, Any] = {}
+        for scenario in self._config.scenarios:
+            a0_dir = self._ablation_dir(scenario, "A0")
+            a3_dir = self._ablation_dir(scenario, "A3")
+            if not (a0_dir.exists() and a3_dir.exists()):
+                continue
+            a0_ems = self._load_episodes(a0_dir, self._config.runs_per_config)
+            a3_ems = self._load_episodes(a3_dir, self._config.runs_per_config)
+            n = min(len(a0_ems), len(a3_ems))
+            if n == 0:
+                continue
+            seeds = [self._config.base_seed + i for i in range(n)]
+            a0_rec = [m.post_peak_recovery_s is not None for m in a0_ems[:n]]
+            a3_rec = [m.post_peak_recovery_s is not None for m in a3_ems[:n]]
+            a0_final = [float(m.final_lateral_deviation) for m in a0_ems[:n]]
+            a3_final = [float(m.final_lateral_deviation) for m in a3_ems[:n]]
+
+            a3_wins, a0_wins, both_rec, both_fail = [], [], [], []
+            for i, (r0, r3) in enumerate(zip(a0_rec, a3_rec)):
+                if r0 and r3:
+                    both_rec.append(i)
+                elif not r0 and not r3:
+                    both_fail.append(i)
+                elif r3 and not r0:
+                    a3_wins.append(i)
+                else:
+                    a0_wins.append(i)
+            n_disc, p_mcnemar = mcnemar_exact(len(a0_wins), len(a3_wins))
+
+            out[scenario] = {
+                "seeds": seeds,
+                "A0_recovered": a0_rec,
+                "A3_recovered": a3_rec,
+                "A0_final_lateral": a0_final,
+                "A3_final_lateral": a3_final,
+                "discordant": {
+                    "a3_wins": a3_wins,
+                    "a0_wins": a0_wins,
+                    "both_recovered": both_rec,
+                    "both_failed": both_fail,
+                },
+                "mcnemar": {
+                    "n_discordant": int(n_disc),
+                    "p_value": float(p_mcnemar),
+                },
+            }
+        return out
 
     def _load_episodes(self, run_dir: Path, n: int) -> List:
         ems = []

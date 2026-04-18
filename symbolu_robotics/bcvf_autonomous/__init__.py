@@ -118,6 +118,7 @@ from symbolu_robotics.bcvf_autonomous.metrics import (
     compute_early_warning_time,
     compute_episode_metrics,
     fisher_exact_2x2,
+    mcnemar_exact,
     welch_t_test,
     wilson_ci,
 )
@@ -213,6 +214,7 @@ __all__ = [
     "wilson_ci",
     "welch_t_test",
     "fisher_exact_2x2",
+    "mcnemar_exact",
     # experiments (Phase 4C)
     "ExperimentConfig",
     "ExperimentResult",

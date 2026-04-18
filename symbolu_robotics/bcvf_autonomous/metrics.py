@@ -417,6 +417,44 @@ def fisher_exact_2x2(
     return (float(odds_ratio), float(p_value))
 
 
+def mcnemar_exact(b_only_a: int, b_only_b: int) -> Tuple[int, float]:
+    """McNemar's exact test for paired binomial outcomes.
+
+    Given a 2x2 paired table with counts
+        both_A_and_B_success
+        only_A_success  (= b_only_a)
+        only_B_success  (= b_only_b)
+        both_fail
+    the test asks whether the two asymmetric cells are drawn from the
+    same underlying probability (H0). Under H0, each discordant trial
+    is a coin flip for which side it falls on, so b_only_b ~ Binomial(
+    n_discordant=b_only_a + b_only_b, p=0.5). The two-sided exact
+    p-value is twice the probability of observing as extreme or more
+    extreme a split, clamped at 1.
+
+    Returns ``(n_discordant, two_sided_p_value)``. Concordant pairs
+    (both succeed or both fail) carry no information and are not needed
+    as input — this matches standard McNemar semantics for paired
+    binomial A0-vs-A3 recovery analysis.
+    """
+    n = int(b_only_a + b_only_b)
+    if n == 0:
+        return (0, 1.0)
+    k = int(min(b_only_a, b_only_b))
+    # Σ_{i=0..k} C(n, i) * 0.5^n
+    log_half_n = n * math.log(0.5)
+    one_side = 0.0
+    for i in range(k + 1):
+        one_side += math.exp(
+            math.lgamma(n + 1)
+            - math.lgamma(i + 1)
+            - math.lgamma(n - i + 1)
+            + log_half_n
+        )
+    p_value = min(1.0, 2.0 * one_side)
+    return (n, float(p_value))
+
+
 @dataclass
 class ComparisonResult:
     """Pairwise comparison result (DESIGN §4B.5)."""
