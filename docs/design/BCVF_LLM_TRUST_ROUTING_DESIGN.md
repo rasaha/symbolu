@@ -2719,9 +2719,57 @@ All items 1–8 satisfied by this section. §2.9 is closed; §2 Phase 1 design i
 
 ## Section 3 — Phase 1.5 — Signal Characterization
 
-**Purpose:** Synthetic LLM trace families that isolate the distrust signal under controlled conditions, analogous to the autonomy Phase 1.5 sweep. Validate that the adapted BCVF math produces Lemma-1-invariant behavior in the LLM context *before* exposing it to real model outputs. Sweep the temperature `τ_w` and gate threshold `T`.
+**Purpose:** Synthetic LLM trace families that isolate the distrust signal under controlled conditions, analogous to the autonomy Phase 1.5 sweep. Validate that the adapted BCVF math produces Lemma-1-invariant behavior in the LLM context *before* exposing it to real model outputs. Sweep the gate threshold `T`, steepness `β`, and Huber `δ`.
 
-**Details pending.**
+### 3.0 Sub-section plan
+
+§3 is filled sub-section-by-sub-section with authorization gates between each, matching §2's pattern. This planning sub-section lists the intended sub-sections so a reader can see the arc of Phase 1.5 before the details land.
+
+- **§3.1** — Purpose & deliverable. What Phase 1.5 produces as an artifact; what the hard gate on §4 (Phase 2) is; what success looks like.
+- **§3.2** — Synthetic trace families (baseline / constant-bias / linear-drift / accelerating-divergence / noise-floor / single-source-outlier / EOS-truncation). Each family has a target BCVF output and a mapping to the §2.6 Lemma 1 case or §2.4.5 attribution claim it tests.
+- **§3.3** — Trace generation protocol. How `(L, V)` probability sequences are synthesized (softmax over parameterized logits), what controls are exposed (bias direction, drift rate, acceleration magnitude, noise level), and why the synthetic traces are a legitimate proxy for real model outputs.
+- **§3.4** — Parameter sweep grid. Which of `(T, β, δ, cost_order, weight_vector_variant)` are swept, their ranges, and the cross product size. Justify each range relative to the V1 defaults locked in §2.5.
+- **§3.5** — Acceptance criteria per trace family. For each family in §3.2, the exact pass threshold on `total_cost`, `per_source_costs`, and diagnostics. These are the pass/fail cells of the §3 sweep matrix.
+- **§3.6** — Alignment diagnostic. Correlation-style metric between the BCVF signal and the ground-truth outlier label in the synthetic traces. The autonomy analogue was the Pearson correlation between `J_BCVF(t)` and `Δ|y|(t+lookahead)` — §3.6 defines the LLM version.
+- **§3.7** — Edge cases and regression-guard traces. Traces that must NOT produce signal (e.g. identical sources, simplex-drift rounding noise) and traces that guard against future regressions (e.g. `weight_vector` mis-broadcast).
+- **§3.8** — What §3 does NOT do. Explicit non-goals: no real model forward passes, no trust-weighting composition, no τ_w calibration, no performance benchmarking.
+- **§3.9** — Acceptance criteria for §3 itself + effort estimate. Hard gate on §4; Phase 1.5 execution budget.
+
+Each sub-section lands one commit at a time, with the user authorizing the next before work begins.
+
+### 3.1 Purpose & deliverable of Phase 1.5
+
+**Purpose.** Phase 1 ships a mathematically correct BCVF kernel (§2.8) that passes Lemma 1 tests on constructed invariance inputs (§2.9). That's necessary but not sufficient. Before plugging the kernel into a real LLM forward pass (§4) or a trust-weighting integration (§5), we need empirical evidence that the kernel **actually fires on LLM-shaped signals** — not just on the three mathematically-tight Lemma 1 traces. Phase 1.5 provides that evidence by exercising the kernel against a family of synthetic `(L, V)` probability sequences designed to resemble what a real model *would* emit under specific conditions (benign disagreement, accelerating failure, noise-floor fluctuation, EOS-truncated lookahead, etc.), before the real model is ever involved.
+
+**Why "signal characterization" and not just "testing."** §2.9's unit tests check the kernel is mathematically correct under tightly-constructed inputs. §3 asks a different question: given probability sequences that look *statistically realistic* for a V=32000 vocabulary (low-entropy, long-tail, mostly agreeing across sources), does the BCVF signal still discriminate an accelerating outlier from a noisy non-outlier? If the answer is no — if the signal is drowned by noise at realistic entropy levels — the issue is *not* a math bug; it's a *scale mismatch* between the V1 default parameters and the LLM domain. §3 is where that mismatch is diagnosed and fixed (by re-tuning `T`, `β`, or `δ`) before the expensive §4 integration is built.
+
+**Hard gate on §4.** Phase 1.5 is the last gate where we can cheaply abort. Real-model integration costs: GPU time, tokenizer alignment work, KV-cache plumbing, `torch` dependency contamination risk (§2.8.2). If §3 shows the synthetic signal is weak or directionless — i.e. the `per_source_costs[outlier] / per_source_costs[non-outlier]` ratio does not approach 2 when a clear outlier is constructed — we stop before paying the §4 cost. §0.6's stop rule #4 is the formal version of this condition. Phase 1.5 is the empirical trigger for that rule.
+
+**Deliverable.** A bounded artifact consisting of three parts:
+
+1. A Python module `symbolu_bcvf_llm/characterization/` containing trace-family generators, sweep harness, and result aggregation — callable as `python -m symbolu_bcvf_llm.characterization`. Pure NumPy, no ML-framework dependency (matches §2.8.1 discipline).
+2. A results CSV/JSON artifact listing every `(trace_family, parameter_tuple)` cell with its `total_cost`, `max_acceleration_norm`, `gate_activation_count`, `per_source_costs` vector, and a per-cell pass/fail bit derived from §3.5's acceptance criteria.
+3. A one-page summary in `docs/experiments/phase_1_5_summary.md` reporting: sweep scope, cells run, pass rate per family, parameter tuples that satisfy all families simultaneously, and the single tuple recommended for §4 adoption. This is a concise report, not a thesis — roughly 1–2 pages with the parameter matrix as the main artifact.
+
+**Success definition.** Phase 1.5 passes iff at least one `(T, β, δ)` tuple exists that:
+
+- Produces `total_cost` within the Lemma 1 tolerance (≤ 1e−10 in fp64) for constant-bias and linear-drift traces.
+- Produces `total_cost > 0` and `per_source_costs[outlier] ≥ 1.8 × per_source_costs[non-outlier]` for single-source outlier traces.
+- Produces `total_cost ≈ 0` (below a noise-floor threshold set in §3.5) for baseline (all-sources-agree) traces.
+- Does not produce NaN/Inf or ValueError on any trace in the sweep.
+
+The 1.8× threshold is the §2.4.5 2:1 claim relaxed by 10% to account for finite-sample noise in synthetic traces. §3.5 will specify exact pass thresholds per family.
+
+**Failure mode.** Phase 1.5 **fails** iff no `(T, β, δ)` tuple satisfies the four conditions above across all trace families simultaneously. This can happen for at least two reasons:
+
+- **Scale mismatch (fixable).** The V1 defaults `T=0.1, β=200, δ=0.5` were tuned on SE(2) body-frame error in the `[0, 1]`-ish range (§2.5.1). LLM probability-difference norms may cluster at a different scale — e.g. typical `‖e‖` for two softmax outputs on divergent tokens might be `0.02`, below `T=0.1`. Fix: re-tune the parameters to the observed scale and re-run.
+- **Structural mismatch (harder).** The 2nd-order BCVF operator may not discriminate an LLM outlier strongly enough at V=32000 — the vocab-dimensional "signal" may be too dilute. Fix: revisit §2.2's metric choice (weighted norm? top-k truncation?) or re-scope to M=4 or M=5 for stronger attribution. Either fix loops back to §2, not to §3.
+
+The §3.9 sign-off asks a binary question: did Phase 1.5 find a winning tuple? If yes, §4 starts. If no, §3.9 records which reason (scale vs structural) and §0.6 stop rule #4 triggers for the structural case.
+
+**What §3.1 does NOT commit to.** The exact synthetic-trace construction (§3.2), the parameter-sweep ranges (§3.4), the pass thresholds (§3.5). Those are pending sub-section authorization. §3.1 commits **that** Phase 1.5 will be run, **what** its deliverable looks like, and **how** its pass/fail is evaluated at the purpose level.
+
+**Reference artifact.** The autonomy analogue is `symbolu_robotics/bcvf_autonomous/characterization/` with its Phase 1.5 sweep over `(gate_threshold, gate_beta, huber_delta, lambda_c, weight_matrix_variant)` — which characterized the autonomy kernel over SE(2) trajectories before any MPPI integration. §3 mirrors that structure module-for-module, replacing SE(2) trajectory generators with probability-sequence generators and dropping `lambda_c` per §2.8.4.
 
 ---
 
