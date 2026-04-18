@@ -1424,6 +1424,67 @@ import numpy as np
 
 **Enforcement.** The §2.9 test suite includes an import-graph assertion: `python -c "import symbolu_bcvf_llm.core"` must succeed in an environment where `torch`, `transformers`, and `datasets` are not installed. This is the mechanical guarantee that §2.8.1's dependency-isolation claim is real.
 
+#### 2.8.3 `CostOrder` enum — verbatim carry-over
+
+The autonomy kernel defines an `IntEnum` that selects which derivative-order of the disagreement signal feeds into the gate-Huber chain (`bcvf_autonomous/core.py:24–36`):
+
+```python
+class CostOrder(IntEnum):
+    """Which derivative order of disagreement the gate-Huber chain scores.
+
+    V3.1 §E.5 / DESIGN.md §3B.10 ablation variants:
+
+    * ``ZEROTH`` — penalize ``||e_ij||`` (magnitude of disagreement).
+    * ``FIRST``  — penalize ``||v_ij||`` (velocity of disagreement).
+    * ``SECOND`` — penalize ``||a_ij||`` (BCVF, the V3.1 innovation).
+    """
+
+    ZEROTH = 0
+    FIRST = 1
+    SECOND = 2
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+class CostOrder(IntEnum):
+    """Which derivative order of disagreement the gate-Huber chain scores.
+
+    Carried verbatim from the autonomy kernel. V1 locks ``SECOND`` (see
+    §2.4.1 vector-path choice and §2.6.4 linear-drift invariance proof).
+    ZEROTH and FIRST are retained so the §3 signal-characterization
+    sweep can ablate without code changes.
+
+    * ``ZEROTH`` — penalize ``||e_ij(l*)||`` at each lookahead position.
+    * ``FIRST``  — penalize ``||v_ij(l*)||``, the 1st-order forward
+      difference along the lookahead axis. **Does not preserve
+      Lemma 1 case 2** (non-zero under linear drift); diagnostic only.
+    * ``SECOND`` — penalize ``||a_ij(l*)||``, the 2nd-order stencil
+      from §2.4.2. **This is what V1 uses.**
+    """
+
+    ZEROTH = 0
+    FIRST = 1
+    SECOND = 2
+```
+
+**What changed and why:**
+
+| Aspect | Autonomy | LLM-kernel | Rationale |
+|---|---|---|---|
+| Enum values (`ZEROTH=0, FIRST=1, SECOND=2`) | — | **verbatim** | Cross-domain ablation parity — if someone swaps `CostOrder` in either kernel for a test, the integer values mean the same thing |
+| Docstring references (`V3.1 §E.5`, `DESIGN.md §3B.10`) | autonomy refs | replaced with **this doc §2.4.1 / §2.6.4** | The reader of this file should reach the correct math reference; autonomy's V3.1 paper has no LLM section |
+| ZEROTH description | `||e_ij||` on trajectory | `||e_ij(l*)||` per lookahead position | Same math, re-indexed onto the `l` axis; §2.3.1 |
+| FIRST description | `||v_ij||` | `||v_ij(l*)||` **with explicit Lemma-1 violation note** | Deliberately flagged: under linear drift `e(l) = α + γl`, `v(l) = γ` — constant non-zero — so FIRST would gate+penalize steady drift. This was true in autonomy too (first-order stencil violates Lemma 1 case 2) but §2.6.4 makes it explicit for the LLM setting, and callers ablating need the warning |
+| SECOND description | `||a_ij||` (the V3.1 innovation) | `||a_ij(l*)||` with pointer to §2.4.2 stencil | Same innovation, same math; references the explicit stencil formula §2.4.2 committed |
+| `IntEnum` (not `Enum`) | — | **verbatim** | `IntEnum` lets callers write `config.cost_order == 2` ergonomically and makes CSV/JSON config loaders work without a custom codec. Autonomy chose this deliberately; keep it |
+
+**V1 lock.** `BCVFLLMConfig.cost_order` defaults to `CostOrder.SECOND` (specified in §2.8.4 next). §3's signal-characterization sweep may temporarily set it to `CostOrder.ZEROTH` or `CostOrder.FIRST` for ablation rows — those sweeps live in `tests/` or `run_experiments/`, never as production defaults.
+
+**What §2.8.3 does NOT add.** No higher-order variants (`THIRD = 3`, etc.). The autonomy kernel stops at 2nd-order because 2nd-order is the minimum order that (a) kills constant bias, (b) kills linear drift, and (c) still produces signal on quadratic divergence. Higher orders kill more benign patterns but require more lookahead positions (`L ≥ 4` for 3rd-order, breaking §2.3.4's `L = 5` budget margin). Deferred to §9 V2 Roadmap if signal quality warrants.
+
+**Parity test.** §2.9 will include `test_cost_order_enum_values`, which asserts `CostOrder.ZEROTH.value == 0`, `FIRST.value == 1`, `SECOND.value == 2`. This is a one-line mechanical assertion that catches accidental re-ordering and guards the cross-kernel ablation parity claim above.
+
 
 
 ### 2.9 Acceptance criteria + test specification — **pending**
