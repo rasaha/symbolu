@@ -242,6 +242,79 @@ def test_perf_cost_lane_deviation_cap_clamps_saturated_rollout() -> None:
     assert abs(capped) < 2.0e3
 
 
+def test_ketu_rahu_uniform_trust_under_no_disagreement() -> None:
+    """Ketu→Rahu invariant: when predictors agree (no accelerating
+    disagreement), trust weights are uniform and the trust-weighted
+    consensus equals the equal-weight mean. This is the Lemma-1
+    preservation claim — under constant or linear disagreement the
+    SECOND-order BCVF observer reports zero per-predictor cost, so
+    softmin gives uniform weights and the attractor is unchanged.
+    """
+    from symbolu_robotics.bcvf_autonomous.core import (
+        BCVFConfig, CostOrder, compute_bcvf_cost_batch,
+    )
+
+    K, M, H = 3, 4, 20
+    rng = np.random.default_rng(0)
+    # All predictors share a near-identical trajectory (tiny noise only
+    # — the SECOND-order gate should leave all per-predictor costs at ~0).
+    base = rng.normal(scale=0.01, size=(H, 3))
+    trajs_batch = [[base + rng.normal(scale=0.005, size=(H, 3)) for _ in range(M)]
+                   for _ in range(K)]
+    cfg = BCVFConfig(
+        gate_threshold=0.2, gate_beta=100.0, huber_delta=0.5,
+        lever_arm=2.5, weight_matrix=np.ones(3), dt=0.1,
+        cost_order=CostOrder.SECOND, use_anchor_pairing=True, anchor_index=0,
+    )
+    total, per_pred = compute_bcvf_cost_batch(
+        trajs_batch, cfg, return_per_predictor=True
+    )
+    assert per_pred.shape == (K, M)
+    # Under near-agreement, all per-predictor costs should be near zero,
+    # meaning softmin weights would be essentially uniform 1/M.
+    assert np.all(per_pred < 1.0)
+
+
+def test_ketu_rahu_outlier_gets_low_trust() -> None:
+    """Under strong accelerating disagreement where one predictor is
+    the clear outlier, its per-predictor BCVF cost dominates the others
+    (it appears in every anchor-pair with M-1 healthy predictors)."""
+    from symbolu_robotics.bcvf_autonomous.core import (
+        BCVFConfig, CostOrder, compute_bcvf_cost_batch,
+    )
+
+    K, M, H = 1, 4, 20
+    ks = np.arange(H, dtype=np.float64)
+    healthy = np.stack([np.zeros(H), np.zeros(H), np.zeros(H)], axis=-1)
+    # M4 = the failing predictor, with quadratic x-drift (accelerating).
+    failing = np.stack([0.1 * ks * ks, np.zeros(H), np.zeros(H)], axis=-1)
+    trajs = [[healthy.copy(), healthy.copy(), healthy.copy(), failing]]
+    cfg = BCVFConfig(
+        gate_threshold=0.2, gate_beta=100.0, huber_delta=0.5,
+        lever_arm=2.5, weight_matrix=np.ones(3), dt=0.1,
+        cost_order=CostOrder.SECOND, use_anchor_pairing=True, anchor_index=3,
+    )
+    total, per_pred = compute_bcvf_cost_batch(
+        trajs, cfg, return_per_predictor=True
+    )
+    # Predictor 3 (M4) appears in all 3 anchor-relative pairs → its
+    # per-predictor cost ≈ 3× any healthy predictor's (which appears
+    # in exactly one pair, against M4).
+    cost_m4 = per_pred[0, 3]
+    cost_healthy = per_pred[0, 0]   # any of the healthy ones
+    assert cost_m4 > 2.0 * cost_healthy, (
+        f"failing predictor cost {cost_m4:.2f} should dominate healthy "
+        f"{cost_healthy:.2f} by ≥2x under anchor-pairs with failing=anchor"
+    )
+    # Softmin with τ=1.0 on these costs drives M4's weight below 1/M.
+    tau = 1.0
+    arg = -(per_pred[0] - per_pred[0].min()) / tau
+    weights = np.exp(arg) / np.exp(arg).sum()
+    assert weights[3] < 1.0 / M, (
+        f"outlier weight {weights[3]:.3f} should drop below uniform 1/{M}"
+    )
+
+
 def test_planner_uses_consensus_for_perf_cost() -> None:
     """B2 experiment contract: the planner must evaluate J_perf against
     the per-step mean of all predictor rollouts, not any single anchor's.

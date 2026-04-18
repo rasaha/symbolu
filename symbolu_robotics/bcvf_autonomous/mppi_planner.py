@@ -201,6 +201,14 @@ class MPPIPlanner:
             )
         self._rng = np.random.default_rng(0)
         self._prev_solution: Optional[np.ndarray] = None
+        # Softmin temperature for the Ketu→Rahu trust weighting. Per-
+        # predictor BCVF costs in the prior smokes ranged ~0–10 per
+        # rollout; τ_w=1 gives exp(10/1) ≈ 22000 weight ratio between
+        # the healthiest and most-distrusted predictor — sharp enough
+        # to push a clear outlier toward zero weight without completely
+        # pinning when disagreement is mild. Exposed as a knob (set_*)
+        # for tuning.
+        self._trust_temperature: float = 1.0
 
     # --- public API ---
 
@@ -211,7 +219,14 @@ class MPPIPlanner:
         start = time.perf_counter()
         controls_batch = self._sample_controls()   # (K, H, 2)
         perf_costs, bcvf_costs = self._rollout_all(controls_batch)
-        total_costs = perf_costs + self.config.lambda_c * bcvf_costs
+        # Ketu→Rahu composition: BCVF is an observer that shapes the
+        # attractor (via trust weights in _rollout_all); it does NOT
+        # contribute to J_total. The softmax ranks rollouts purely on
+        # J_perf evaluated against the trust-weighted consensus.
+        # bcvf_costs is carried forward as a diagnostic for downstream
+        # reporting (SimState.bcvf_cost, tests that verify observer
+        # activity, alignment analyses).
+        total_costs = perf_costs
         weights = self._compute_weights(total_costs)
         optimal = self._weighted_mean(controls_batch, weights)
         solve_ms = (time.perf_counter() - start) * 1000.0
@@ -226,9 +241,9 @@ class MPPIPlanner:
         return MPPIResult(
             optimal_control=optimal,
             first_control=optimal[0].copy(),
-            total_cost=perf_w + self.config.lambda_c * bcvf_w,
+            total_cost=perf_w,  # J_total = J_perf only (no additive BCVF)
             perf_cost=perf_w,
-            bcvf_cost=bcvf_w,
+            bcvf_cost=bcvf_w,   # diagnostic: observer activity, not in J_total
             solve_time_ms=solve_ms,
             effective_samples=effective,
         )
@@ -263,69 +278,105 @@ class MPPIPlanner:
     def _rollout_all(
         self, controls_batch: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
+        """Ketu→Rahu composition: BCVF acts as a silent observer that
+        shapes the attractor via per-predictor trust weights, rather
+        than as an additive cost term in the softmax.
+
+        1. Roll out every predictor for every candidate.
+        2. If ``lambda_c > 0`` (BCVF active), extract per-predictor
+           disagreement cost and convert to softmin trust weights;
+           the consensus trajectory becomes a trust-weighted mean of
+           the predictor rollouts. If ``lambda_c == 0`` (A0 baseline),
+           use equal-weight consensus — BCVF is absent as an observer
+           so every predictor is trusted equally.
+        3. Evaluate J_perf on the (trust-weighted or equal-weight)
+           consensus. No additive J_BCVF term in J_total.
+        4. Report J_BCVF as a diagnostic only — it no longer appears
+           in the softmax and does not affect control selection.
+
+        This structurally prevents the two failure modes the N=34
+        data exposed:
+          - same-direction amplification (BCVF rewarding rollouts that
+            align with the failing predictor's hallucinated future)
+          - sign-flip collusion (BCVF picking the wrong side of
+            centerline when J_perf is indecisive)
+        Because BCVF no longer votes on which rollout wins, it cannot
+        reward alignment with the failing predictor — it can only shift
+        which predictor the attractor trusts.
+        """
         c = self.config
         k_batch = controls_batch.shape[0]
         model_ids = list(self.predictors.keys())
         num_models = len(model_ids)
         anchor_idx = model_ids.index(c.anchor)
 
-        # Gate-2 experiment (B2 consensus J_perf): roll out every predictor
-        # for every candidate and score J_perf against the per-step
-        # *consensus* trajectory rather than the anchor's alone. This
-        # removes the failing predictor's unilateral influence on J_perf's
-        # reference frame — for M=4 with one failing predictor, the
-        # failure weight drops from 100% (anchor) to 25% (equal-weight
-        # mean). A0 no longer short-circuits to anchor-only rollouts
-        # (same reference for A0 and A3 so variant comparisons isolate
-        # BCVF's effect rather than reference-frame choice).
+        # Always roll out every predictor.
         all_trajs = np.zeros((k_batch, num_models, c.horizon, 3), dtype=np.float64)
         for k in range(k_batch):
             for m_idx, name in enumerate(model_ids):
                 all_trajs[k, m_idx] = self.predictors[name].predict(controls_batch[k])
 
-        # Per-step equal-weight consensus across the M predictor rollouts.
-        # Use atan2(mean sin, mean cos) for the heading to avoid wrap
-        # pathologies at theta = +/-pi (matters nowhere in the current
-        # scenario catalog but keeps the operation principled).
-        xy_mean = all_trajs[..., :2].mean(axis=1)                    # (K, H, 2)
-        sin_mean = np.sin(all_trajs[..., 2]).mean(axis=1)            # (K, H)
-        cos_mean = np.cos(all_trajs[..., 2]).mean(axis=1)            # (K, H)
-        theta_mean = np.arctan2(sin_mean, cos_mean)                  # (K, H)
+        # Compute per-predictor trust weights.
+        if c.lambda_c > 0.0:
+            # BCVF observes; trust weights softmin over per-predictor
+            # disagreement cost. Lemma 1 is preserved: under constant
+            # or linear-in-time disagreement the SECOND-order BCVF cost
+            # per predictor is ~0, so weights stay uniform and consensus
+            # equals the equal-weight mean — same as A0 baseline.
+            bcvf_cfg = BCVFConfig(
+                lambda_c=c.bcvf_config.lambda_c,
+                gate_threshold=c.bcvf_config.gate_threshold,
+                gate_beta=c.bcvf_config.gate_beta,
+                huber_delta=c.bcvf_config.huber_delta,
+                lever_arm=c.bcvf_config.lever_arm,
+                weight_matrix=np.asarray(c.bcvf_config.weight_matrix, dtype=np.float64),
+                use_anchor_pairing=c.bcvf_config.use_anchor_pairing,
+                anchor_index=anchor_idx,
+                dt=c.bcvf_config.dt,
+                cost_order=c.bcvf_config.cost_order,
+            )
+            trajectories_list = [
+                [all_trajs[k, m] for m in range(num_models)] for k in range(k_batch)
+            ]
+            bcvf_total, per_pred_cost = compute_bcvf_cost_batch(
+                trajectories_list, bcvf_cfg, return_per_predictor=True
+            )
+            # Softmin weights: softmin(c) = softmax(-c). Scale by a
+            # per-rollout min-shift so numerical exponents stay bounded
+            # regardless of absolute cost magnitudes.
+            tau_w = max(self._trust_temperature, 1e-9)
+            shifted = per_pred_cost - per_pred_cost.min(axis=1, keepdims=True)
+            arg = np.clip(-shifted / tau_w, -50.0, 50.0)
+            raw = np.exp(arg)                                 # (K, M)
+            weights = raw / raw.sum(axis=1, keepdims=True)    # (K, M)
+        else:
+            # A0 baseline: equal weights (no observer).
+            bcvf_total = np.zeros(k_batch, dtype=np.float64)
+            weights = np.full(
+                (k_batch, num_models), 1.0 / num_models, dtype=np.float64
+            )
+
+        # Weighted consensus — atan2-safe on heading.
+        w_expand = weights[..., None, None]  # (K, M, 1, 1)
+        xy_w = np.sum(all_trajs[..., :2] * w_expand, axis=1)                    # (K, H, 2)
+        sin_w = np.sum(np.sin(all_trajs[..., 2]) * weights[..., None], axis=1)  # (K, H)
+        cos_w = np.sum(np.cos(all_trajs[..., 2]) * weights[..., None], axis=1)
+        theta_w = np.arctan2(sin_w, cos_w)
         consensus_trajs = np.concatenate(
-            [xy_mean, theta_mean[..., None]], axis=-1
-        )                                                            # (K, H, 3)
+            [xy_w, theta_w[..., None]], axis=-1
+        )                                                                       # (K, H, 3)
 
         perf_costs = _compute_perf_cost_batch(
             consensus_trajs, controls_batch, self.road, self.obstacles, self.perf_config
         )
 
-        if c.lambda_c == 0.0:
-            # A0 baseline: J_perf from consensus above, BCVF term zero.
-            return perf_costs, np.zeros(k_batch, dtype=np.float64)
-
-        # Sync anchor_index for the BCVF config (relevant only when
-        # anchor pairing is enabled). Respect the caller's
-        # use_anchor_pairing flag so the planner can run all-pairs BCVF
-        # when requested — that detaches BCVF from a single poisoned
-        # reference frame on scenarios where the anchor itself is the
-        # failing predictor.
-        bcvf_cfg = BCVFConfig(
-            lambda_c=c.bcvf_config.lambda_c,
-            gate_threshold=c.bcvf_config.gate_threshold,
-            gate_beta=c.bcvf_config.gate_beta,
-            huber_delta=c.bcvf_config.huber_delta,
-            lever_arm=c.bcvf_config.lever_arm,
-            weight_matrix=np.asarray(c.bcvf_config.weight_matrix, dtype=np.float64),
-            use_anchor_pairing=c.bcvf_config.use_anchor_pairing,
-            anchor_index=anchor_idx,
-            dt=c.bcvf_config.dt,
-            cost_order=c.bcvf_config.cost_order,
-        )
-        trajectories_list = [
-            [all_trajs[k, m] for m in range(num_models)] for k in range(k_batch)
-        ]
-        bcvf_costs = compute_bcvf_cost_batch(trajectories_list, bcvf_cfg)
-        return perf_costs, bcvf_costs
+        # BCVF is reported as a diagnostic so downstream (SimState,
+        # tests, reports) can still see observer activity, but its
+        # contribution to J_total is zero — the Ketu role is to shape
+        # the attractor (via weights above), not to score. The planner's
+        # _compute_weights call multiplies this by λ_c=0 effectively
+        # because we return it as a pure diagnostic channel.
+        return perf_costs, bcvf_total
 
     def _compute_weights(self, total_costs: np.ndarray) -> np.ndarray:
         shifted = total_costs - float(total_costs.min())

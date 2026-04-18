@@ -232,7 +232,8 @@ def compute_bcvf_cost(
 def compute_bcvf_cost_batch(
     trajectories_batch: List[List[np.ndarray]],
     config: BCVFConfig,
-) -> np.ndarray:
+    return_per_predictor: bool = False,
+):
     """Vectorized batch entry point for MPPI.
 
     ``trajectories_batch`` is a list of K items, each a list of M
@@ -242,9 +243,19 @@ def compute_bcvf_cost_batch(
     disagreement, acceleration, gate, and Huber all operate on
     (K, H, 3) tensors. The only Python-level loop is over model pairs,
     which is O(M) in anchor mode.
+
+    If ``return_per_predictor`` is True, also returns a ``(K, M)`` array
+    of per-predictor disagreement costs — used by the Ketu→Rahu
+    composition where BCVF's per-predictor output shapes the attractor
+    via trust-weighted consensus instead of competing additively in the
+    softmax. Each predictor's cost is the sum over pairs containing that
+    predictor of the per-pair BCVF cost.
     """
     if len(trajectories_batch) == 0:
-        return np.zeros(0, dtype=np.float64)
+        zeros = np.zeros(0, dtype=np.float64)
+        if return_per_predictor:
+            return zeros, np.zeros((0, 0), dtype=np.float64)
+        return zeros
 
     # Stack to a (K, M, H, 3) tensor.
     stacked = np.asarray(trajectories_batch, dtype=np.float64)
@@ -264,6 +275,11 @@ def compute_bcvf_cost_batch(
 
     w_sqrt = np.sqrt(np.asarray(config.weight_matrix, dtype=np.float64))
     total = np.zeros(k_batch, dtype=np.float64)
+    per_predictor = (
+        np.zeros((k_batch, num_models), dtype=np.float64)
+        if return_per_predictor
+        else None
+    )
 
     for (i, j) in pairs:
         traj_i = stacked[:, i, :, :]  # (K, H, 3)
@@ -294,6 +310,19 @@ def compute_bcvf_cost_batch(
             np.sqrt(1.0 + (signal_norms / config.huber_delta) ** 2) - 1.0
         )
 
-        total += np.sum(gate * penalty, axis=-1) * config.dt
+        pair_cost = np.sum(gate * penalty, axis=-1) * config.dt  # (K,)
+        total += pair_cost
+        if per_predictor is not None:
+            # Attribute the disagreement to both predictors in the pair —
+            # BCVF tells us "i and j don't agree"; it doesn't identify
+            # who's lying. The population view (sum over all pairs a
+            # predictor participates in) reveals the outlier: a lone
+            # failing predictor accumulates disagreement across every
+            # pair that includes it, while healthy ones accumulate only
+            # the pair among themselves (if any).
+            per_predictor[:, i] += pair_cost
+            per_predictor[:, j] += pair_cost
 
+    if return_per_predictor:
+        return total, per_predictor
     return total
