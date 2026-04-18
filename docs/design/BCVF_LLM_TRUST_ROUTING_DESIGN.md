@@ -2196,6 +2196,240 @@ Option 3 is correct because:
 - `test_pair_cost_eos_single_source_truncation` — valid_mask reflects source 0 EOS at l=1; assert pair_cost uses only unaffected stencil positions.
 - `test_pair_cost_max_signal_unmasked` — even when mask excludes a position, `max_signal_norm` reflects the unmasked max (documented behavior).
 
+#### 2.8.11 `BCVFLLMResult` + `compute_bcvf_cost` — scalar entry point
+
+Autonomy's result dataclass and scalar entry live at `bcvf_autonomous/core.py:58–64` and `core.py:187–229`:
+
+```python
+@dataclass
+class BCVFResult:
+    """Detailed output from BCVF cost computation."""
+
+    total_cost: float
+    per_pair_costs: Dict[Tuple[int, int], float]
+    max_acceleration_norm: float
+    gate_activation_count: int
+
+
+def compute_bcvf_cost(
+    trajectories: List[np.ndarray], config: BCVFConfig
+) -> BCVFResult:
+    """V3.1 Definition 6. Full J_BCVF over a set of model trajectories.
+
+    ``trajectories`` is a list of M arrays shaped (H, 3).
+    """
+    # shape validation, pair enumeration, pair loop, aggregate
+    ...
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+@dataclass
+class BCVFLLMResult:
+    """Detailed output from LLM-domain BCVF cost computation at a
+    single outer decoding step.
+
+    Parallels ``BCVFResult`` (bcvf_autonomous/core.py:58). Adds
+    ``per_source_costs`` — the §2.4.5 per-source attribution that
+    §5's Rahu trust-weighting consumes. Autonomy's BCVFResult does
+    not carry this field because autonomy's Ketu→Rahu integration
+    keeps per-source attribution in the MPPI planner, not in the
+    kernel result. LLM V1 moves it into the kernel result so the
+    §4 caller has a single return type.
+    """
+
+    total_cost: float
+    per_pair_costs: Dict[Tuple[int, int], float]
+    per_source_costs: Dict[int, float]        # §2.4.5 attribution
+    max_acceleration_norm: float
+    gate_activation_count: int
+
+
+def compute_bcvf_cost(
+    sources: List[np.ndarray],
+    config: BCVFLLMConfig,
+    valid_masks: Optional[List[np.ndarray]] = None,
+) -> BCVFLLMResult:
+    """§2.5.3 / §2.8.11 full J_BCVF at a single outer decoding step.
+
+    Inputs:
+        sources       list of M arrays, each shape (L, V) — probability
+                      sequences for one outer step along the lookahead
+                      axis, one per source (§1.3 M>=3 for V1)
+        config        BCVFLLMConfig (§2.8.4)
+        valid_masks   optional list of M arrays, each shape (L,),
+                      boolean; True at lookahead positions where the
+                      source has defined logits (§2.7.4). None ⇒ all
+                      positions valid. If given, length must equal M.
+
+    Returns: BCVFLLMResult with per-pair AND per-source attribution.
+
+    Raises:
+        ValueError — on shape mismatch, M<2, L<3, or non-finite input
+                     (NaN/Inf guard per §2.7.6).
+    """
+    num_sources = len(sources)
+    if num_sources < 2:
+        raise ValueError(
+            f"BCVF requires at least 2 sources; got {num_sources}"
+        )
+    lookahead_sizes = {s.shape[0] for s in sources}
+    if len(lookahead_sizes) != 1:
+        raise ValueError(
+            f"Sources must share the same lookahead length L; "
+            f"got {lookahead_sizes}"
+        )
+    vocab_sizes = {s.shape[-1] for s in sources}
+    if len(vocab_sizes) != 1:
+        raise ValueError(
+            f"Sources must share the same vocab size V; got {vocab_sizes}"
+        )
+    if any(s.ndim != 2 for s in sources):
+        raise ValueError(
+            "Each source must have shape (L, V) for scalar entry"
+        )
+    if next(iter(lookahead_sizes)) < 3:
+        raise ValueError(
+            "BCVF requires L >= 3 for the second-difference stencil"
+        )
+    if any(not np.isfinite(s).all() for s in sources):
+        raise ValueError(
+            "BCVF received non-finite source probabilities; "
+            "upstream softmax failed (§2.7.6)"
+        )
+    if valid_masks is not None and len(valid_masks) != num_sources:
+        raise ValueError(
+            f"valid_masks length {len(valid_masks)} != sources {num_sources}"
+        )
+
+    pairs = _enumerate_pairs(
+        num_sources, config.use_anchor_pairing, config.anchor_index
+    )
+
+    per_pair: Dict[Tuple[int, int], float] = {}
+    per_source: Dict[int, float] = {s: 0.0 for s in range(num_sources)}
+    max_accel = 0.0
+    activations = 0
+    total = 0.0
+
+    for (i, j) in pairs:
+        pair_mask = _intersect_valid_masks(
+            valid_masks[i] if valid_masks is not None else None,
+            valid_masks[j] if valid_masks is not None else None,
+            config.cost_order,
+        )
+        cost, pair_max_accel, pair_activations = _pair_cost(
+            sources[i], sources[j], config, valid_mask=pair_mask
+        )
+        per_pair[(i, j)] = cost
+        per_source[i] += cost              # §2.4.5 symmetric attribution
+        per_source[j] += cost
+        total += cost
+        if pair_max_accel > max_accel:
+            max_accel = pair_max_accel
+        activations += pair_activations
+
+    return BCVFLLMResult(
+        total_cost=total,
+        per_pair_costs=per_pair,
+        per_source_costs=per_source,
+        max_acceleration_norm=max_accel,
+        gate_activation_count=activations,
+    )
+```
+
+The `_intersect_valid_masks` helper is the §2.4.4 predicate, implemented once:
+
+```python
+def _intersect_valid_masks(
+    mask_i: Optional[np.ndarray],
+    mask_j: Optional[np.ndarray],
+    cost_order: CostOrder,
+) -> Optional[np.ndarray]:
+    """Combine two per-source (L,) masks into a per-stencil mask.
+
+    Implements §2.4.4:
+        valid(l*) = (last_defined_l[i] >= l*+1)
+                  AND (last_defined_l[j] >= l*+1)
+
+    For SECOND-order, stencil centers are l* ∈ [1, L-2] and the
+    stencil references l*-1, l*, l*+1. So valid(l*) requires
+    mask_i[l*-1], mask_i[l*], mask_i[l*+1] all True, likewise for j.
+
+    For FIRST-order, l* ∈ [0, L-2] and stencil references l*, l*+1.
+    For ZEROTH-order, l* ∈ [0, L-1] and only l* itself.
+
+    Returns None if both inputs are None (caller short-circuits).
+    """
+    if mask_i is None and mask_j is None:
+        return None
+    # materialize all-True defaults for the missing side
+    L = (mask_i if mask_i is not None else mask_j).shape[0]
+    mi = np.ones(L, dtype=bool) if mask_i is None else mask_i.astype(bool)
+    mj = np.ones(L, dtype=bool) if mask_j is None else mask_j.astype(bool)
+    if cost_order == CostOrder.SECOND:
+        # require l-1, l, l+1 all valid in both sources
+        return mi[:-2] & mi[1:-1] & mi[2:] & mj[:-2] & mj[1:-1] & mj[2:]
+    if cost_order == CostOrder.FIRST:
+        return mi[:-1] & mi[1:] & mj[:-1] & mj[1:]
+    return mi & mj  # ZEROTH
+```
+
+**Diff against autonomy — result dataclass:**
+
+| Field | Autonomy | LLM | Rationale |
+|---|---|---|---|
+| `total_cost` | `float` | **verbatim** | Sum of per-pair costs; unchanged |
+| `per_pair_costs` | `Dict[Tuple[int, int], float]` | **verbatim** | Same tuple-keyed dict |
+| `per_source_costs` | — | **added, `Dict[int, float]`** | §2.4.5 per-source attribution for §5 Rahu consumption. Autonomy keeps this in the planner; LLM moves it into the kernel result so §4's caller has one return type to handle |
+| `max_acceleration_norm` | `float` | **verbatim** | Diagnostic; same semantics (even for ZEROTH/FIRST modes where it's not technically "acceleration", the name is kept for cross-kernel parity) |
+| `gate_activation_count` | `int` | **verbatim** | Diagnostic; sum across all pairs, with §2.8.10's masking applied |
+
+**Diff against autonomy — scalar entry function:**
+
+| Aspect | Autonomy | LLM | Rationale |
+|---|---|---|---|
+| Function name | `compute_bcvf_cost` | `compute_bcvf_cost` | **verbatim** — same public API name for cross-kernel parity |
+| Input name | `trajectories` | `sources` | §2.2–§2.7 domain vocabulary |
+| Input shape validation | `shape[-1] != 3` | `shape[-1] != 3` replaced with **check all sources share V** | `V` is model-dependent (not a fixed 3); only cross-source consistency matters |
+| Dim validation | ndim check implicit in shape | `ndim != 2` explicit | LLM's `(L, V)` is 2-D; autonomy's `(H, 3)` is also 2-D but the 3 is a fixed constant. Explicit check prevents a `(L, V_i, V_j)` mistake from propagating silently |
+| Horizon/lookahead minimum | `< 3` (H ≥ 3) | `< 3` (L ≥ 3) | Same stencil constraint; variable renamed |
+| NaN/Inf guard | — | **added** | §2.7.6 committed kernel-boundary NaN check. Autonomy SE(2) states are always finite; LLM softmax can produce NaN from a broken forward pass |
+| `valid_masks` parameter | — | **added** | §2.7.4 EOS handling. Optional (None ⇒ no EOS) |
+| Per-source accumulation | — | **added** `per_source[i] += cost; per_source[j] += cost` | §2.4.5 symmetric attribution. Note: a source that appears in 2 pairs gets 2 additions |
+| Total cost aggregation | `total += cost` | **verbatim** | Same sum-across-pairs |
+| Return type | `BCVFResult` | `BCVFLLMResult` | Same fields plus `per_source_costs` |
+
+**Validation order.** The checks are intentionally ordered from cheapest (length check) to most expensive (NaN check on the full tensor). The NaN check runs last so callers with malformed shapes fail fast without paying the scan cost.
+
+**Why `per_source` initializes to 0.0 for every index, not just the ones in pairs.** At `M=3, use_anchor_pairing=False`, every source appears in at least 2 pairs, so all entries get updated. But in anchor mode at `M=3`, source indices 1 and 2 appear once each (in the two pairs) and source 0 (anchor) appears in both — pre-initializing to 0 ensures the dict has an entry for every source, even if an index were to miss all pairs in some future enumeration variant. Defensive.
+
+**Symmetric attribution at the source level.** When BCVF detects `pair_cost_{i,j}` = large, we attribute the cost to *both* `i` and `j` — we don't know which one is "wrong." §2.4.5 argued this: a lone outlier accumulates disagreement across every pair it participates in, while non-outliers accumulate only one pair (the one between the non-outliers). At M=3 this gives the 2:1 ratio. The `+= cost` on both `i` and `j` is the mechanical implementation of the symmetric-attribution rule.
+
+**Double-counting at the total?** The **total cost** is the sum over *pairs*, not the sum over *per-source* entries. `per_source` sums to `2·total` (each pair cost contributes to two source entries), which is the right relationship — `per_source` is a **distribution** over sources (§5 will normalize it via softmin), not a partition of `total`.
+
+**Empty-sources edge case.** If `len(sources) == 0`, the `<2` guard raises. If exactly 2 sources, `pairs == [(1, 0)]`, `per_source = {0: cost, 1: cost}`. No anomaly at M=2 — the per-source dict is still well-formed; it just has no discriminative power (both sources get the same cost). §1.3 / §2.8.4 require M≥3 for discrimination to work.
+
+**Reference artifact check.** `compute_bcvf_cost` in autonomy is labeled "V3.1 Definition 6." The LLM entry is the same "Definition 6" applied to the LLM cost chain — the label is preserved in spirit, with the docstring pointing to §2.5.3 / §2.8.11 for the explicit formulation.
+
+**What §2.8.11 does NOT add.**
+
+- No caching of `e` across pairs. If two pairs share a reference source (e.g. `(1, 0)` and `(2, 0)` both use `sources[0]`), each call to `_pair_cost` recomputes `e = p_i - p_j` from scratch. Caching would save ~30% FLOPs on this stage; deferred to §2.8.12 which inlines and **does** share intermediates across pairs.
+- No early termination. The function loops over all pairs unconditionally. Some BCVF variants (V2) could short-circuit if the running `max_acceleration_norm` exceeds a threshold, but V1 always computes the full set.
+- No per-pair diagnostic table. `per_pair_costs` is keyed by `(i, j)` and carries the scalar cost, but not `max_signal` or `activations` per-pair. Those are aggregated up. §3 signal characterization may add a diagnostic mode (V2) that returns per-pair tuples; V1 does not.
+
+**Parity tests.** §2.9 will include:
+
+- `test_bcvflllmresult_fields` — asserts the 5 field names and types.
+- `test_compute_bcvf_cost_scalar_shape_validation` — feeds mismatched shapes and asserts each ValueError branch triggers.
+- `test_compute_bcvf_cost_scalar_nan_guard` — feeds `sources` with a NaN entry; asserts ValueError.
+- `test_compute_bcvf_cost_scalar_m3_all_pairs_enumeration` — runs with M=3, all-pairs, and asserts `per_pair_costs` has exactly 3 entries keyed `(1,0), (2,0), (2,1)`.
+- `test_compute_bcvf_cost_scalar_per_source_sums_to_double_total` — asserts `sum(per_source_costs.values()) == 2 * total_cost` (within 1e-10).
+- `test_compute_bcvf_cost_scalar_outlier_discrimination_2_to_1` — construct M=3 scenario where source 0 produces accelerating divergence and sources 1,2 agree; assert `per_source_costs[0] ≈ 2 * per_source_costs[1]` ratio.
+- `test_compute_bcvf_cost_scalar_eos_valid_masks_propagated` — call with a `valid_masks` where source 0 truncates at l=1; assert the `per_pair_costs[(1,0)]` and `per_pair_costs[(2,0)]` entries use only non-truncated stencil positions.
+- `test_compute_bcvf_cost_scalar_matches_autonomy_on_identical_shape_inputs` — cross-kernel test: construct inputs at (L=5, V=3) for both kernels and a fake "SE(2)" interpretation; assert total_cost agrees to 1e-10. (This test is more subtle because autonomy expects V=3 specifically; it exists as a structural sanity check, not a primary correctness test.)
+
 ### 2.9 Acceptance criteria + test specification — **pending**
 
 ---
