@@ -2430,6 +2430,38 @@ def _intersect_valid_masks(
 - `test_compute_bcvf_cost_scalar_eos_valid_masks_propagated` — call with a `valid_masks` where source 0 truncates at l=1; assert the `per_pair_costs[(1,0)]` and `per_pair_costs[(2,0)]` entries use only non-truncated stencil positions.
 - `test_compute_bcvf_cost_scalar_matches_autonomy_on_identical_shape_inputs` — cross-kernel test: construct inputs at (L=5, V=3) for both kernels and a fake "SE(2)" interpretation; assert total_cost agrees to 1e-10. (This test is more subtle because autonomy expects V=3 specifically; it exists as a structural sanity check, not a primary correctness test.)
 
+#### 2.8.12 `compute_bcvf_cost_batch` — vectorized entry across outer steps
+
+Parallels `compute_bcvf_cost_batch` in autonomy (`bcvf_autonomous/core.py:232–328`), which vectorizes across the MPPI rollout axis `K`. The LLM variant vectorizes across the outer-step axis `T` instead.
+
+**Signature:**
+
+```python
+def compute_bcvf_cost_batch(
+    sources_batch: np.ndarray,                 # shape (T, M, L, V)
+    config: BCVFLLMConfig,
+    valid_masks_batch: Optional[np.ndarray] = None,   # shape (T, M, L)
+    return_per_source: bool = True,
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    """§2.8.12 batched entry. Returns (T,) total_cost array, and if
+    return_per_source=True also returns (T, M) per-source cost array
+    for §5 Rahu consumption."""
+```
+
+**Three deltas from §2.8.11's scalar entry:**
+
+1. **Batch axis is `T` (outer decoding steps), not `K` (MPPI rollouts).** Otherwise identical tensor semantics — autonomy vectorizes across parallel candidate actions; LLM vectorizes across sequential decoding positions. Same 4-D tensor shape `(batch, M, horizon, features)`.
+2. **Math is inlined, not delegated to `_pair_cost` in a Python loop.** `e = sources_batch[:, i, :, :] - sources_batch[:, j, :, :]` computed once per pair produces `(T, L, V)` directly; the stencil, gate, Huber, and sum all operate on `(T, L-2, V)` tensors. This matches autonomy's `compute_bcvf_cost_batch:284–313` which inlines for the same reason — per-pair Python-loop overhead at T=512 outer steps would dominate the kernel FLOPs otherwise.
+3. **Return shape is arrays, not scalars.** `total` is `(T,)`; `per_source` is `(T, M)` when `return_per_source=True`. The attribution rule `per_source[:, i] += pair_cost` and `per_source[:, j] += pair_cost` is the vectorized equivalent of §2.8.11's symmetric accumulation.
+
+**`valid_masks_batch` handling.** Same §2.4.4 stencil-window intersection logic as §2.8.11's `_intersect_valid_masks`, but implemented in-place over `(T, M, L)` boolean tensors and broadcast-multiplied into `(T, L-2)` contribution arrays before summing over the `L-2` axis. Invalid positions contribute exactly 0; no Python-level branching.
+
+**Validation, NaN guard, and result semantics are identical to §2.8.11** — performed once on the full `(T, M, L, V)` tensor. §2.8.11's correctness properties (Lemma 1 invariance per-step, per-source 2:1 outlier discrimination, `sum(per_source) == 2·total` per step) carry over unchanged per batch-axis element.
+
+**FLOP and memory.** ~6M FLOPs/step × T = full-batch cost; memory is `O(M · L · V)` per step plus pairwise `e` tensors — at T=1 (streaming), matches §2.7.8's 7 MB peak.
+
+**Parity tests.** §2.9 queues `test_compute_bcvf_cost_batch_matches_scalar_elementwise` (assert `compute_bcvf_cost_batch(sources_batch=stack)[t] == compute_bcvf_cost(sources=stack[t]).total_cost` for each `t`), `test_compute_bcvf_cost_batch_per_source_shape` (`(T, M)`), and `test_compute_bcvf_cost_batch_valid_masks_propagate` (per-`t` EOS patterns).
+
 ### 2.9 Acceptance criteria + test specification — **pending**
 
 ---
