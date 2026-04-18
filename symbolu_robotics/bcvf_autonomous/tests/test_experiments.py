@@ -80,6 +80,50 @@ def test_ablation_variant_configs() -> None:
     assert swept.lambda_c == 5.0
 
 
+def test_bcvf_variants_use_all_pairs_not_anchor() -> None:
+    """Gate-2 experiment: A1/A2/A3 must run reference-free BCVF so the
+    coherence term is not tied to the planner's (possibly failing)
+    anchor. A0 is unaffected because its BCVF rollouts are skipped
+    (lambda_c=0 short-circuit)."""
+    bcvf, mppi, _, _ = _fast_tuning()
+    a1_b, _ = _variant_to_configs("A1", bcvf, mppi)
+    a2_b, _ = _variant_to_configs("A2", bcvf, mppi)
+    a3_b, _ = _variant_to_configs("A3", bcvf, mppi)
+    assert a1_b.use_anchor_pairing is False
+    assert a2_b.use_anchor_pairing is False
+    assert a3_b.use_anchor_pairing is False
+
+
+def test_planner_all_pairs_enumerates_six_pairs_for_m4() -> None:
+    """The planner-level BCVFConfig rebuilt inside MPPIPlanner._rollout_all
+    must respect the caller's use_anchor_pairing flag. When False with
+    M=4, compute_bcvf_cost enumerates all 6 unordered pairs."""
+    import numpy as np
+    from symbolu_robotics.bcvf_autonomous.core import (
+        BCVFConfig, CostOrder, compute_bcvf_cost,
+    )
+
+    H = 10
+    rng = np.random.default_rng(0)
+    # Four distinct trajectories so per-pair costs are non-zero.
+    trajs = [rng.normal(scale=0.5, size=(H, 3)) for _ in range(4)]
+
+    cfg_anchor = BCVFConfig(
+        lambda_c=1.0, gate_threshold=0.2, gate_beta=100.0, huber_delta=0.5,
+        lever_arm=2.5, weight_matrix=np.ones(3), dt=0.1,
+        cost_order=CostOrder.SECOND, use_anchor_pairing=True, anchor_index=0,
+    )
+    cfg_all = BCVFConfig(
+        lambda_c=1.0, gate_threshold=0.2, gate_beta=100.0, huber_delta=0.5,
+        lever_arm=2.5, weight_matrix=np.ones(3), dt=0.1,
+        cost_order=CostOrder.SECOND, use_anchor_pairing=False, anchor_index=0,
+    )
+    r_anchor = compute_bcvf_cost(trajs, cfg_anchor)
+    r_all = compute_bcvf_cost(trajs, cfg_all)
+    assert len(r_anchor.per_pair_costs) == 3  # M-1 pairs
+    assert len(r_all.per_pair_costs) == 6     # M(M-1)/2 pairs
+
+
 def test_invalid_variant_raises() -> None:
     bcvf, mppi, _, _ = _fast_tuning()
     with pytest.raises(ValueError):

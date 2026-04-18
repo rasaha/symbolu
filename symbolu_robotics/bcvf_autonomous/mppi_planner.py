@@ -292,8 +292,12 @@ class MPPIPlanner:
             anchor_trajs, controls_batch, self.road, self.obstacles, self.perf_config
         )
 
-        # Sync anchor_index inside the BCVF config to match this planner's
-        # anchor model (core.py pairs (i, anchor_index)).
+        # Sync anchor_index for the BCVF config (relevant only when
+        # anchor pairing is enabled). Respect the caller's
+        # use_anchor_pairing flag so the planner can run all-pairs BCVF
+        # when requested — that detaches BCVF from a single poisoned
+        # reference frame on scenarios where the anchor itself is the
+        # failing predictor.
         bcvf_cfg = BCVFConfig(
             lambda_c=c.bcvf_config.lambda_c,
             gate_threshold=c.bcvf_config.gate_threshold,
@@ -301,7 +305,7 @@ class MPPIPlanner:
             huber_delta=c.bcvf_config.huber_delta,
             lever_arm=c.bcvf_config.lever_arm,
             weight_matrix=np.asarray(c.bcvf_config.weight_matrix, dtype=np.float64),
-            use_anchor_pairing=True,
+            use_anchor_pairing=c.bcvf_config.use_anchor_pairing,
             anchor_index=anchor_idx,
             dt=c.bcvf_config.dt,
             cost_order=c.bcvf_config.cost_order,
