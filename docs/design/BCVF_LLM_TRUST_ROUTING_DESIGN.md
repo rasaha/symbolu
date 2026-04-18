@@ -1638,6 +1638,119 @@ def compute_disagreement(p_i: np.ndarray, p_j: np.ndarray) -> np.ndarray:
 
 **Parity test.** §2.9 will include `test_compute_disagreement_shape_broadcast` that passes a (3, 1, 5, 32000) input and asserts output shape matches, plus `test_compute_disagreement_translation_invariant` that adds a constant vector to both `p_i` and `p_j` and asserts the output is unchanged (verifying §2.7.3's translation invariance at the stage boundary).
 
+#### 2.8.6 `compute_disagreement_velocity` and `compute_disagreement_acceleration` — finite-difference stages
+
+Autonomy defines these as two named stages (`bcvf_autonomous/core.py:77–98`):
+
+```python
+def compute_disagreement_velocity(
+    disagreement: np.ndarray, dt: float
+) -> np.ndarray:
+    """V3.1 Definition 2. First finite difference of the disagreement.
+
+    Input: (H, 3). Output: (H-1, 3).
+    """
+    return (disagreement[1:] - disagreement[:-1]) / dt
+
+
+def compute_disagreement_acceleration(
+    disagreement: np.ndarray, dt: float
+) -> np.ndarray:
+    """V3.1 Definition 3. Second finite difference of the disagreement.
+
+    a(k) = [e(k+1) - 2 e(k) + e(k-1)] / dt^2
+
+    Input: (H, 3). Output: (H-2, 3). This is the core innovation.
+    """
+    return (disagreement[2:] - 2.0 * disagreement[1:-1] + disagreement[:-2]) / (
+        dt * dt
+    )
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+def compute_disagreement_velocity(
+    e: np.ndarray, step_l: float = 1.0
+) -> np.ndarray:
+    """§2.4 forward-difference along the lookahead axis.
+
+    v(..., l*, :) = [e(..., l*+1, :) - e(..., l*, :)] / step_l
+
+    for l* ∈ [0, L-2].
+
+    Input:  (..., L, V)    (lookahead axis is second-to-last)
+    Output: (..., L-1, V)
+
+    Note: under linear drift e(l) = α + γ·l, v(l) = γ — constant but
+    non-zero. This breaks Lemma 1 case 2 (§2.6.4). V1 uses SECOND
+    (§2.8.3, §2.8.4); velocity is exposed for §3 ablation only.
+    """
+    return (e[..., 1:, :] - e[..., :-1, :]) / step_l
+
+
+def compute_disagreement_acceleration(
+    e: np.ndarray, step_l: float = 1.0
+) -> np.ndarray:
+    """§2.4.2 stencil. Second finite difference along the lookahead axis.
+
+    a(..., l*, :) = [e(..., l*+1, :) - 2·e(..., l*, :) + e(..., l*-1, :)] / step_l²
+
+    for l* ∈ [1, L-2].
+
+    Input:  (..., L, V)    (lookahead axis is second-to-last)
+    Output: (..., L-2, V)
+
+    This is the **core BCVF innovation** (§2.4) and the operator whose
+    Lemma-1 invariance is proved in §2.6.3 / §2.6.4. V1 locks this
+    stage as the signal feeding the gate-Huber chain.
+    """
+    return (
+        e[..., 2:, :] - 2.0 * e[..., 1:-1, :] + e[..., :-2, :]
+    ) / (step_l * step_l)
+```
+
+**Diff against autonomy, per stage:**
+
+| Aspect | Autonomy velocity | LLM velocity | Rationale |
+|---|---|---|---|
+| Signature | `(disagreement, dt)` | `(e, step_l=1.0)` | `dt` renamed per §2.8.4; default = 1.0 so callers rarely pass it |
+| Slice axis | `[1:]`, `[:-1]` (axis 0) | `[..., 1:, :]`, `[..., :-1, :]` (second-to-last) | LLM tensors have `V` as the trailing axis; the diff is along the **lookahead** axis, which is second-to-last in the `(M, T, L, V)` convention from §2.8.2. Ellipsis + explicit-axis slicing handles (L, V), (T, L, V), (M, T, L, V), and per-pair (T, L, V) callers uniformly |
+| Output shape | `(H-1, 3)` | `(..., L-1, V)` | Consequence of the slice axis change |
+| Lemma-1 warning in docstring | — | **added** | §2.8.3 flagged the FIRST violation; repeated here at the function the ablation would actually call, so readers don't miss it |
+
+| Aspect | Autonomy acceleration | LLM acceleration | Rationale |
+|---|---|---|---|
+| Signature | `(disagreement, dt)` | `(e, step_l=1.0)` | Same rename as above |
+| Slice axis | `[2:]`, `[1:-1]`, `[:-2]` (axis 0) | `[..., 2:, :]`, `[..., 1:-1, :]`, `[..., :-2, :]` (second-to-last) | Same axis-convention reason |
+| Output shape | `(H-2, 3)` | `(..., L-2, V)` | Consequence of the slice axis change |
+| Formula | `(e[2:] - 2*e[1:-1] + e[:-2]) / (dt*dt)` | `(e[..., 2:, :] - 2*e[..., 1:-1, :] + e[..., :-2, :]) / (step_l*step_l)` | **Identical math**, just re-indexed onto the lookahead axis |
+| Docstring | "V3.1 Definition 3 … core innovation" | "§2.4.2 stencil … core BCVF innovation (§2.4) … Lemma-1 invariance proved in §2.6.3 / §2.6.4" | Reference redirects; emphasis on the proof locations |
+
+**Mathematical equivalence check.** Under a linear-drift input `e(l) = α + γ·l` shaped `(L, V)` with `α, γ ∈ ℝ^V`:
+
+- Autonomy time-axis slicing on `(L, 3)`: `e[2:] - 2*e[1:-1] + e[:-2] = (α+γ(l+1)) − 2(α+γl) + (α+γ(l−1)) = 0 ∈ ℝ^{L−2, 3}`.
+- LLM lookahead-axis slicing on `(L, V)`: `e[..., 2:, :] - 2*e[..., 1:-1, :] + e[..., :-2, :] = 0 ∈ ℝ^{L−2, V}`.
+
+Same algebra, same invariance — just over a different trailing dimension. §2.6.4's proof does not depend on whether the ambient space is ℝ³ or ℝ^V, which is exactly why the transfer is clean.
+
+**Why the axis convention matters.** If `compute_disagreement_acceleration` were implemented with `e[2:]` (autonomy-style, slicing the first axis), then calling it on `(M, T, L, V)` would compute the 2nd-difference along the **M** axis — i.e. "difference between source 0 and source 1 and source 2", which is nonsense. The ellipsis-then-axis slicing makes the axis commitment explicit in the code and prevents this class of bug.
+
+**Division by `step_l²` with `step_l = 1.0`.** The division is a no-op numerically (`a / 1.0 = a`) but kept for three reasons: (1) structural parity with autonomy, (2) §9 V2 experiments with non-uniform lookahead sampling would set `step_l ≠ 1.0`, and (3) keeping the units semantically correct (the output of `compute_disagreement_acceleration` has units of `probability / step²`, not `probability`).
+
+**Numerical precision at the stencil.** §2.7.2 committed fp32 as the V1 boundary rule. The 2nd-difference cancellation is the **most** numerically-sensitive stage in the whole chain: if `e(l*+1) ≈ e(l*) ≈ e(l*−1)` (say all equal to 0.3), the subtraction `0.3 − 0.6 + 0.3` produces a result whose magnitude is dominated by the low-order bits of each operand. fp32 gives ~7 decimal digits of precision, so a true-zero 2nd-difference comes out as `~3e−8` magnitude (rounding noise), well below the gate threshold `T = 0.1` and the `1e−10` tolerance is only needed in fp64 tests (§2.9 will use `np.float64` inputs for the Lemma-1 unit tests, fp32 for everything else).
+
+**FLOP cost per invocation.** For inputs `(M, T, L, V)` at M=3, T=1, L=5, V=32000:
+
+- Velocity: `(L−1)·V` per pair element = `4 · 32000 = 128K` FLOPs, times `M·T = 3` batch → **384K FLOPs**.
+- Acceleration: `(L−2) · 2 · V` (subtract, multiply-by-2, add per element) ≈ `3 · 32000 · 3 = 288K` FLOPs batch-total → **~1M FLOPs**.
+
+Both stages are sub-millisecond on a modern CPU core; GPU execution is not needed (and is actively avoided — see §2.8.1's kernel-purity discipline).
+
+**What §2.8.6 does NOT add.** No weighted 2nd-difference. The `weight_vector` from §2.8.4 is applied **only** at the gate and signal-norm stages (§2.8.7, §2.8.10), not inside the stencil. This matches the autonomy implementation where `weight_matrix` is multiplied into `gate_input` and `signal` after the 2nd-difference, not during. Doing it during would break Lemma 1 for non-uniform weight vectors: `a(l) = W(e(l+1) − 2e(l) + e(l−1))` is still zero under linear drift, but a future `W(l)` that varied with `l` would not preserve invariance. Keeping the stencil weight-free is the defensive choice.
+
+**Parity tests.** §2.9 will include `test_compute_disagreement_acceleration_constant_bias_zero` (constant input → output norm ≤ 1e-10 in fp64), `test_compute_disagreement_acceleration_linear_drift_zero` (linear input → same), and `test_compute_disagreement_acceleration_quadratic_positive` (quadratic input `e(l) = l² · η` → output equals `η` up to rounding). These three tests are the mechanical verification of §2.6.3 / §2.6.4 / §2.6.5 respectively — each Lemma 1 case has a corresponding unit test anchored to this stage.
+
 
 
 ### 2.9 Acceptance criteria + test specification — **pending**
