@@ -1751,6 +1751,116 @@ Both stages are sub-millisecond on a modern CPU core; GPU execution is not neede
 
 **Parity tests.** §2.9 will include `test_compute_disagreement_acceleration_constant_bias_zero` (constant input → output norm ≤ 1e-10 in fp64), `test_compute_disagreement_acceleration_linear_drift_zero` (linear input → same), and `test_compute_disagreement_acceleration_quadratic_positive` (quadratic input `e(l) = l² · η` → output equals `η` up to rounding). These three tests are the mechanical verification of §2.6.3 / §2.6.4 / §2.6.5 respectively — each Lemma 1 case has a corresponding unit test anchored to this stage.
 
+#### 2.8.7 `smooth_gate` — weighted-norm sigmoid with exp-arg clipping
+
+Autonomy defines the gate as (`bcvf_autonomous/core.py:101–119`):
+
+```python
+def smooth_gate(
+    disagreement: np.ndarray,
+    threshold: float,
+    beta: float,
+    weight_matrix: np.ndarray,
+) -> np.ndarray:
+    """V3.1 Definition 4. Smooth gate in [0, 1].
+
+    g(k) = sigmoid(beta * (||W_g^{1/2} e(k)|| - T))
+
+    Input disagreement: (N, 3). Output: (N,).
+    """
+    w_sqrt = np.sqrt(np.asarray(weight_matrix, dtype=np.float64))
+    weighted = disagreement * w_sqrt
+    norm = np.linalg.norm(weighted, axis=-1)
+    arg = beta * (norm - threshold)
+    # Clip for numerical stability before exp
+    arg_clipped = np.clip(arg, -50.0, 50.0)
+    return 1.0 / (1.0 + np.exp(-arg_clipped))
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+def smooth_gate(
+    e: np.ndarray,
+    threshold: float,
+    beta: float,
+    weight_vector: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """§2.5.1 smooth gate in [0, 1].
+
+    g(..., l*) = sigmoid(beta * (||W^{1/2} e(..., l*, :)||_2 - T))
+
+    Input e:  (..., V)      (gate input at stencil centers per §2.5.1)
+    Output:   (...)         (scalar gate per leading element)
+
+    V1 defaults: threshold T = 0.1, beta = 200.0 (β·T = 20 ratio, see
+    §2.5.1 parameter table). weight_vector = None means W = I_V
+    (§2.4.3); a non-None weight is element-wise multiplied by the
+    disagreement before the ℓ² norm, matching autonomy's diagonal-W
+    convention.
+
+    Clipping: exp argument is clipped to [-50, 50] for numerical
+    stability per §2.5.1 / §2.7.7. Structural parity with autonomy.
+    """
+    weighted = e if weight_vector is None else e * np.sqrt(
+        np.asarray(weight_vector, dtype=np.float64)
+    )
+    norm = np.linalg.norm(weighted, axis=-1)
+    arg = beta * (norm - threshold)
+    arg_clipped = np.clip(arg, -50.0, 50.0)
+    return 1.0 / (1.0 + np.exp(-arg_clipped))
+```
+
+**Diff against autonomy:**
+
+| Aspect | Autonomy | LLM-kernel | Rationale |
+|---|---|---|---|
+| Signature param name | `weight_matrix` | `weight_vector` | §2.8.4 rename — 1-D per-vocab-dim weight, not a matrix |
+| Default value | — (required) | `None` | §2.8.4 committed `None` sentinel so identity weight can be inferred at use site; removes the "don't know V at config construction" problem |
+| Weight path when None | — (always multiplies) | **skip multiplication** | `None` means `W = I_V`, and `e · 1 = e`. Skipping the `sqrt(ones(V)) * e` work saves `V` multiplies per leading element — small but nonzero at V = 32000 |
+| Input shape | `(N, 3)` | `(..., V)` | §2.8.1 / §2.8.2 shape convention; ellipsis supports (L, V), (T, L, V), per-pair tensors |
+| Output shape | `(N,)` | `(...)` | Norm reduces the last axis; leading axes pass through |
+| Clip bounds `[-50, 50]` | — | **verbatim** | §2.5.1 / §2.7.7 — same numerical-stability guard carried over |
+| Sigmoid formula | `1 / (1 + exp(-arg_clipped))` | **verbatim** | Standard logistic sigmoid |
+| dtype cast at `sqrt` | `np.float64` | `np.float64` | Same promotion; the gate is a reduction stage where precision matters more than throughput |
+| Docstring reference | `V3.1 Definition 4` | `§2.5.1` | Replaces autonomy paper reference with this doc's commitment |
+
+**Weight-application timing is post-subtraction, pre-norm.** The kernel does `sqrt(W) * e` **elementwise** (Hadamard), then takes the ℓ² norm. This is equivalent to `sqrt(e · W · e)` for diagonal `W`, which is the correct weighted-norm formula. Structural parity with autonomy, which does the same (autonomy's `W` is a diagonal matrix represented as shape-(3,) vector, same convention as LLM's `weight_vector`).
+
+**None-handling ergonomics.** Autonomy requires `weight_matrix` as a positional argument with no default, forcing every caller to pass a weight. LLM's `weight_vector=None` default is a quiet ergonomics improvement: §2.9 test helpers that only care about the gate math (not the weight) can omit the argument. Functionally equivalent when the caller would have passed `np.ones(V)`.
+
+**Gate-input-at-stencil-center rule.** §2.5.1 committed that the gate reads `‖e(l*)‖`, not `‖a(l*)‖`. This function doesn't enforce the rule — the caller (§2.8.10 `_pair_cost`) is responsible for passing `e[..., 1:-1, :]` as the input so the stencil centers align. The function is a pure weighted-norm + sigmoid; the semantic of "which positions are stencil centers" lives upstream.
+
+**Numerical properties.**
+
+- **Range.** Output is strictly in `(0, 1)` (the clip prevents the open endpoints from being hit in fp32, but values within `1e-22` of 0 or 1 are possible). Monotonic increasing in `norm`.
+- **At V1 defaults** (`T=0.1, β=200`): `smooth_gate(e)` with `‖e‖ = 0.1` returns exactly `0.5`. `‖e‖ = 0.105` returns `σ(1) ≈ 0.731`. `‖e‖ = 0.095` returns `σ(-1) ≈ 0.269`. Transition width `2/β = 0.01` as §2.6.6 noted.
+- **Derivative.** `d g / d (‖e‖) = β · g · (1−g)`. Peaks at `g = 0.5` (i.e. `‖e‖ = T`) at value `β/4 = 50`. This is steep enough to be near-step for practical purposes but not so steep that autodiff (§4) would overflow.
+- **Bounded argument.** The clip ensures `arg ∈ [−50, 50]`, so `exp(−arg_clipped) ∈ [exp(−50), exp(50)] ≈ [1.9e−22, 5.2e21]`. The sigmoid output is thus always finite and in `[exp(−50)/(1+exp(−50)), 1/(1+exp(−50))] ≈ [1.9e−22, 1 − 1.9e−22]`.
+
+**FLOP cost per invocation.** For input `(M-pairs, T, L-2, V)` at `M-pairs=3, T=1, L-2=3, V=32000` (gate evaluated at valid stencil centers per §2.5.3):
+
+- `sqrt(W)`: `V = 32000` FLOPs (or 0 if weight is None)
+- `e * sqrt(W)`: `3·1·3·32000 = 288K` FLOPs
+- `norm (sum + sqrt)`: `3·1·3·32000 ≈ 288K` FLOPs
+- `arg`, `clip`, `exp`, `sigmoid`: `~9` scalar ops each, times 9 elements = ~100 FLOPs
+- **Total: ~600K FLOPs per outer step**, fully negligible.
+
+**What §2.8.7 does NOT do.**
+
+- **No gating decisions based on `a(l*)`.** The input is `e`, not `a`. The gate suppresses *noise-floor disagreement* regardless of whether it's accelerating. This is deliberate: autonomy's gate has the same semantics, and §2.5.1 documented the "stencil alignment" rule. Future V2 alternatives (e.g. gate on signal norm) are §9.
+- **No learnable β, T.** These are hyperparameters from `BCVFLLMConfig` (§2.8.4). V2 may make them learnable via `L_trust` loss, but §2.5.5 explicitly excluded training-time signal from V1.
+- **No per-vocab masking.** If a caller wants to exclude specific vocab dims (e.g. special tokens) from the gate computation, they set the corresponding `weight_vector[k] = 0`. No separate mask parameter.
+
+**Parity tests.** §2.9 will include:
+
+- `test_smooth_gate_shape` — input `(3, 3, 32000)`, output `(3, 3)`.
+- `test_smooth_gate_threshold_midpoint` — construct `e` with `‖e‖ == T` exactly and assert output equals 0.5 within 1e-7.
+- `test_smooth_gate_below_floor_suppressed` — `e` with `‖e‖ = T − 2/β` → output < 0.2.
+- `test_smooth_gate_above_floor_open` — `e` with `‖e‖ = T + 2/β` → output > 0.8.
+- `test_smooth_gate_clipping_no_nan_no_inf` — construct `e` with `‖e‖ = 100` (absurdly large) and assert output is finite and ≈ 1.0.
+- `test_smooth_gate_none_weight_equivalent_to_ones` — call with `weight_vector=None` vs `weight_vector=np.ones(V)` and assert outputs equal within 1e-10.
+
 
 
 ### 2.9 Acceptance criteria + test specification — **pending**
