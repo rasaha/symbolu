@@ -1861,7 +1861,71 @@ def smooth_gate(
 - `test_smooth_gate_clipping_no_nan_no_inf` — construct `e` with `‖e‖ = 100` (absurdly large) and assert output is finite and ≈ 1.0.
 - `test_smooth_gate_none_weight_equivalent_to_ones` — call with `weight_vector=None` vs `weight_vector=np.ones(V)` and assert outputs equal within 1e-10.
 
+#### 2.8.8 `pseudo_huber` — verbatim carry-over
 
+Autonomy defines the pseudo-Huber penalty as (`bcvf_autonomous/core.py:122–130`):
+
+```python
+def pseudo_huber(r: np.ndarray, delta: float) -> np.ndarray:
+    """V3.1 Definition 5. Pseudo-Huber penalty.
+
+    rho(r; delta) = delta^2 * (sqrt(1 + (r/delta)^2) - 1)
+
+    Quadratic near zero, linear for large |r|.
+    """
+    r_arr = np.asarray(r, dtype=np.float64)
+    return (delta * delta) * (np.sqrt(1.0 + (r_arr / delta) ** 2) - 1.0)
+```
+
+**LLM-kernel equivalent** (target content of `symbolu_bcvf_llm/core.py`):
+
+```python
+def pseudo_huber(r: np.ndarray, delta: float) -> np.ndarray:
+    """§2.5.2 pseudo-Huber penalty.
+
+    rho(r; delta) = delta^2 * (sqrt(1 + (r/delta)^2) - 1)
+
+    Quadratic near zero, linear for large |r|. Input and output have
+    the same shape; no axis reduction. Applies element-wise.
+    """
+    r_arr = np.asarray(r, dtype=np.float64)
+    return (delta * delta) * (np.sqrt(1.0 + (r_arr / delta) ** 2) - 1.0)
+```
+
+**Diff against autonomy:**
+
+| Aspect | Autonomy | LLM-kernel | Rationale |
+|---|---|---|---|
+| Function body | `(delta*delta) * (np.sqrt(1.0 + (r_arr/delta)**2) - 1.0)` | **verbatim identical** | Pure scalar math; no domain-specific adaptation possible or needed |
+| Signature | `(r, delta)` | `(r, delta)` | **verbatim** |
+| dtype cast | `np.asarray(r, dtype=np.float64)` | **verbatim** | Same precision promotion; the penalty is the stage where the final cost value is assembled, and fp64 reduces rounding drift across the sum in §2.8.10 |
+| Input shape | unspecified (any) | unspecified (any) | Elementwise; no reduction |
+| Output shape | same as input | same as input | Elementwise |
+| Docstring reference | `V3.1 Definition 5` | `§2.5.2` | Replaces paper reference with this doc's commitment |
+
+**Zero-for-zero property.** `pseudo_huber(0, δ) = δ² · (√(1) − 1) = 0` exactly — not "approximately zero". This is relied on by §2.6.3 / §2.6.4 where `a_{ij} = 0` must produce contribution exactly 0 (not a small positive number that would accumulate across `l*` in the sum). `np.sqrt(1.0)` evaluates to `1.0` in IEEE 754 fp64 exactly, so the subtraction is exact.
+
+**Monotonicity.** Strictly increasing in `|r|`, zero only at `r = 0`. Already cited in §2.6.5's Case-3 proof where `s > 0 ⇒ penalty > 0` was needed.
+
+**Transition behavior.** For `|r| << δ`: `penalty ≈ r²/2` (quadratic regime, standard MSE). For `|r| >> δ`: `penalty ≈ δ·|r| − δ²/2` (linear asymptote, robust to outliers). The transition is smooth with continuous first derivative everywhere. §2.6.7 used the asymptote `penalty ≤ δ·|r|` to bound per-position contribution.
+
+**Why this is literally the same as autonomy.** The pseudo-Huber is a scalar function of a scalar input — no dimensionality, no domain structure, no axis convention. Whether the input came from SE(2) error norms or probability-simplex acceleration norms is invisible to the function. Keeping the code character-for-character identical (including variable names `r_arr`, `delta`) is the maximal form of structural parity and makes `git diff` between the two files trivial to review.
+
+**No ops added, no ops removed.** Specifically NOT doing any of:
+
+- Adding `np.maximum(r, 0)` "just in case" — `r` comes from `np.linalg.norm` upstream, which is non-negative by construction. A guard would be defensive programming against an impossibility.
+- Adding numerical stability tricks like `np.log1p` — the `sqrt(1 + x²) - 1` form is already numerically stable for all `x ∈ ℝ` in fp64; there is no regime where catastrophic cancellation occurs (`x² ≥ 0`, so `1 + x² ≥ 1`, so `sqrt(·) ≥ 1`, so the subtraction never crosses zero).
+- Adding a `reduce` step — this is elementwise; reduction happens later in §2.8.10.
+
+**FLOP cost per invocation.** For input `(M-pairs, T, L-2)` at `M-pairs=3, T=1, L-2=3` (scalar norms, one per stencil position per pair): `3·3 = 9` scalar invocations, each with `~5` FLOPs (`div, mul, add, sqrt, sub, mul`) = **~45 FLOPs per outer step**. This is the cheapest stage in the whole kernel.
+
+**Parity tests.** §2.9 will include:
+
+- `test_pseudo_huber_zero_exact` — `pseudo_huber(0.0, 0.5)` returns **exactly** `0.0` (bit-equal, not just approximate).
+- `test_pseudo_huber_quadratic_regime` — for `r = 0.01, δ = 0.5`: assert `|penalty − r²/2| < 1e-8`.
+- `test_pseudo_huber_linear_regime` — for `r = 10.0, δ = 0.5`: assert `|penalty − (δ·r − δ²/2)| / penalty < 0.01`.
+- `test_pseudo_huber_monotonic` — generate sorted `r` values, assert `penalty` is monotonically non-decreasing.
+- `test_pseudo_huber_matches_autonomy_bit_exact` — call both autonomy's `pseudo_huber` and LLM's with same `(r, δ)` input and assert outputs are bit-identical. This is the strongest cross-kernel parity test in §2.9 and catches any unintentional drift between the two implementations of this stage.
 
 ### 2.9 Acceptance criteria + test specification — **pending**
 
