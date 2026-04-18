@@ -2892,6 +2892,139 @@ Each family exercises a specific kernel property. The matrix below summarizes wh
 
 **What §3.2 does NOT commit to.** The concrete numerical ranges for `bias_magnitude`, `drift_rate`, `accel_magnitude`, `σ_noise`, and the base logit distribution `σ` are deferred to §3.3 (generator protocol). The pass thresholds are formalized in §3.5. The cross product of families × parameters is defined in §3.4 (sweep grid).
 
+### 3.3 Trace generation protocol
+
+§3.2 defined **what** each family produces. §3.3 commits **how** — the concrete Python-level recipe that turns family name + parameters into a reproducible `(M, L, V)` probability-tensor plus optional valid masks.
+
+#### 3.3.1 Base sequence generation
+
+Every family starts from a **base logit sequence** `z_base: (L, V)` synthesized to mimic the statistical shape of real model logits without invoking a model. The recipe:
+
+```
+rng = np.random.default_rng(seed)
+z_base = rng.normal(loc=0.0, scale=sigma_logit, size=(L, V))
+p_base = softmax(z_base, axis=-1)          # (L, V)
+```
+
+**Parameter: `sigma_logit`.** Controls the entropy of the base distribution. Concrete defaults:
+
+| `sigma_logit` | Approximate top-1 probability | Regime |
+|---|---|---|
+| 1.0 | ~0.1 | High-entropy / near-uniform — stress test for dilute disagreement |
+| 3.0 | ~0.5 | Medium-entropy / typical decoding-mid-token regime |
+| 5.0 | ~0.9 | Low-entropy / confident-token regime |
+
+V1 defaults to **`sigma_logit = 3.0`** (medium entropy) as the primary characterization regime, because real model outputs at decoding time under greedy-with-temperature-1.0 (§2.7.1) cluster there empirically. §3.4's parameter sweep will also run at `sigma_logit ∈ {1.0, 5.0}` as sensitivity checks; if any family's pass/fail status flips across the `sigma_logit` sweep, §3.9 records it as a robustness concern requiring §4 validation.
+
+**No tokenizer, no vocabulary semantics.** The `V` dimensions are interchangeable integers. We are not constructing "plausible English next-token distributions" — we are constructing random-but-shaped probability sequences. §3.3.7 explains why this is legitimate.
+
+#### 3.3.2 Logit-space perturbation primitives
+
+Disagreements between sources are constructed in **logit space**, not probability space, and projected through softmax. This preserves the simplex constraint without requiring ad-hoc re-normalization.
+
+Three primitives, one per derivative-order signature from §2.6:
+
+- **`bias(α_direction, α_magnitude) → ℝ^V`**: returns a constant logit perturbation `α_logit(l) = α_magnitude · α_direction` for all `l`. `α_direction` is a unit vector in logit space, sampled once per trace.
+- **`drift(γ_direction, drift_rate) → ℝ^{L,V}`**: returns a linearly-growing logit perturbation `γ_logit(l) = l · drift_rate · γ_direction`. Linear in `l`.
+- **`accelerate(η_direction, accel_magnitude) → ℝ^{L,V}`**: returns a quadratic logit perturbation `η_logit(l) = 0.5 · l² · accel_magnitude · η_direction`. Quadratic in `l`.
+
+The direction vectors are sampled from `N(0, I_V)` and ℓ²-normalized. Their identity matters only through the magnitude parameters; sampled once per trace with the seeded RNG.
+
+**Why logit-space, not probability-space.** Adding a perturbation to `p_base` directly would require explicit re-normalization, and the re-normalization would itself be non-linear in the perturbation (breaking the exact Lemma 1 structure at the input layer). Adding in logit space and softmaxing preserves the exact algebraic form `p_s(l) = softmax(z_base(l) + perturbation_s(l))`, which makes the tests reproducible at fp64 tolerance.
+
+#### 3.3.3 Family-specific assembly
+
+Each family combines the base sequence with the primitives:
+
+| Family | Source 0 logits | Source 1 logits | Source 2 logits |
+|---|---|---|---|
+| §3.2.1 Baseline | `z_base` | `z_base` | `z_base` |
+| §3.2.2 Constant-bias | `z_base` | `z_base + bias(α, α_mag)` | `z_base` |
+| §3.2.3 Linear-drift | `z_base` | `z_base + drift(γ, drift_rate)` | `z_base` |
+| §3.2.4 Accelerating | `z_base` | `z_base + accelerate(η, accel_mag)` | `z_base` |
+| §3.2.5 Noise-floor | `z_base + N(0, σ²)` | `z_base + N(0, σ²)` | `z_base + N(0, σ²)` |
+| §3.2.6 Outlier | `z_base + accelerate(η, 0.3)` | `z_base` | `z_base` |
+| §3.2.7 EOS-truncation | Any of §3.2.1–§3.2.6 | — | — |
+
+Then `p_s(l) = softmax(z_s(l))` for each source and lookahead position.
+
+**Concrete parameter ranges** per family (the cells that §3.4 will sweep over):
+
+| Parameter | Range | Rationale |
+|---|---|---|
+| `α_mag` (§3.2.2) | `{0.05, 0.1, 0.2, 0.5, 1.0, 2.0}` logit units | Spans below/at/above the gate threshold `T = 0.1` in probability space after softmax |
+| `drift_rate` (§3.2.3) | `{0.01, 0.02, 0.05, 0.1, 0.2}` logit units/step | Produces `‖e‖` values ranging from below-gate to well-above |
+| `accel_mag` (§3.2.4) | `{0.02, 0.05, 0.1, 0.2, 0.5, 1.0}` logit units/step² | Spans sub-gate to clearly-accelerating |
+| `σ_noise` (§3.2.5) | `{0.001, 0.005, 0.01, 0.02, 0.05}` logit units | Realistic fp32 softmax rounding (~1e-3) to pathological |
+| `k_eos` (§3.2.7) | `{0, 1, 2, 3, 4}` at `L=5` | Full truncation-position sweep |
+| `sigma_logit` (base) | `{1.0, 3.0, 5.0}` | Low/medium/high-entropy regimes |
+
+**Scale commentary.** A logit-space bias of `α_mag = 0.1` on a medium-entropy base produces a probability-space `‖p_1 - p_0‖₂` of roughly `0.02–0.05` (depending on `sigma_logit`). This is below the V1 gate threshold `T = 0.1`. The sweep intentionally straddles the threshold so the gate's behavior is characterized on both sides.
+
+#### 3.3.4 Realism rationale — why these traces are a legitimate stand-in
+
+A reviewer might reasonably ask: "Real model outputs aren't random Gaussians in logit space — they have semantic structure, peaked distributions, attention-head-correlated noise. What does characterization against synthetic traces prove?"
+
+Three-part answer:
+
+1. **BCVF is a local mathematical operator.** It consumes `(L, V)` probability sequences and computes `e_{ij}, a_{ij}`, gate, Huber, sum. None of these operations depend on the *semantic identity* of the `V` dimensions — they only depend on the *statistical shape* of the distribution (entropy, tail weight, per-position stability). Random-logit softmax outputs reproduce the shape (parameterized by `sigma_logit`) without reproducing the semantics, which is all BCVF sees.
+2. **The Lemma 1 invariance claims are structural.** §2.6's proofs don't depend on what `p_s(l)` *means* — only on the algebra of 2nd-differences in `ℝ^V`. If C1 and C2 pass on synthetic traces, they pass on real traces, period. The Phase 1.5 sweep is not re-proving Lemma 1; it is *confirming* that the implementation correctly realizes what Lemma 1 proves.
+3. **The falsifier is parameter-scale, not semantic.** What §3 can plausibly discover is: "V1 defaults are calibrated for the wrong `‖e‖` range." That's a scale discovery, and synthetic traces at `sigma_logit ∈ {1, 3, 5}` span the full relevant range. What §3 cannot discover is: "real hallucinations produce a different *pattern* than our synthetic outlier" — that's a §4/§5 question and requires real models.
+
+Phase 1.5 is thus the right place to find scale-mismatch bugs but **not** the right place to find semantic-pattern mismatches. §3.1 already committed this distinction in the scale-vs-structural failure-mode split.
+
+#### 3.3.5 RNG discipline and reproducibility
+
+- Single `np.random.default_rng(seed)` constructed at the top of each generator call. No global RNG state is touched.
+- Seed is a required positional argument — no default. Every call in the sweep is explicitly seeded.
+- Direction vectors (`α_direction`, `γ_direction`, `η_direction`) are drawn *after* the base sequence, in fixed order. Changing the order of draws silently changes every downstream result; the order is documented and locked.
+- The noise for §3.2.5 is drawn last, so noise traces are reproducible even when generated alongside the other families.
+
+**Replay guarantee.** For any `(family, parameter_tuple, seed)`, calling the generator twice produces bit-identical tensors. §3.5 pass thresholds will be specified under this guarantee.
+
+#### 3.3.6 Generator module API
+
+Target module: `symbolu_bcvf_llm/characterization/traces.py`. Public API:
+
+```python
+def generate_trace(
+    family: str,                    # "baseline" | "constant_bias" | "linear_drift" | ...
+    L: int = 5,
+    V: int = 32000,
+    sigma_logit: float = 3.0,
+    seed: int = 0,
+    **family_params,                # family-specific magnitudes
+) -> TraceBundle:
+    """Return a reproducible M=3 probability sequence for the given family.
+
+    Returns a TraceBundle dataclass with:
+        sources: np.ndarray shape (3, L, V), fp32
+        valid_masks: Optional[np.ndarray] shape (3, L), bool (None unless family=EOS)
+        truth_label: Optional[int] — source index of the outlier, or None for baseline
+        metadata: Dict[str, Any] — seed, family, parameters (for result provenance)
+    """
+
+@dataclass
+class TraceBundle:
+    sources: np.ndarray
+    valid_masks: Optional[np.ndarray]
+    truth_label: Optional[int]
+    metadata: Dict[str, Any]
+```
+
+**`truth_label`** is what makes §3.6's alignment diagnostic possible: for each trace where a specific source was synthesized to be the outlier, `truth_label` records its index. The diagnostic will ask "does `argmax(per_source_costs) == truth_label`?" and accumulate hit rate.
+
+#### 3.3.7 What §3.3 does NOT do
+
+- **No tokenizer.** `V` is an integer vocabulary size; no token ids, no words.
+- **No real model forward pass.** Pure NumPy logit sampling; no torch, no transformers.
+- **No attention-correlated noise** (`noise_{s,l}` is IID). Real forward passes have correlated noise from attention stochasticity; that's §4's domain.
+- **No semantically-plausible outlier patterns** (hallucination, repetition, incoherence). §3 tests the math; §4 tests the match to real failure modes.
+- **No sampling from `p_s(l)`** (we never draw tokens — we compare distributions directly).
+- **No calibration of `sigma_logit` against real models.** The `{1, 3, 5}` sweep is a span, not a match. §4 will report empirical `sigma_logit_equivalent` from a real model to validate the choice retroactively.
+
+§3.3 is an intentionally minimal spec. The test harness is small, pure, and runs in seconds; everything beyond the §3.2 families and their magnitude sweeps is V2 or §4.
+
 ---
 
 ## Section 4 — Phase 2 — Source Framework
