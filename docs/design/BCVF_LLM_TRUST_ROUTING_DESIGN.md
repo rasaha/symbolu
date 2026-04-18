@@ -3418,6 +3418,124 @@ class AlignmentAggregate:
 
 §3.6 + §3.5 together constitute the full acceptance bar for Phase 1.5 per-cell evaluation. §3.9 aggregates them into the sign-off decision.
 
+### 3.7 Edge cases and regression-guard traces
+
+§3.2 exercises the kernel on families that *should* produce signal (or specifically zero under Lemma 1). §3.7 adds a complementary suite of **adversarial and regression-guard traces** — constructions designed to catch specific classes of implementation bugs that the core families might not. These are non-blocking individually but a failure in any one is an automatic §3 sign-off blocker.
+
+#### 3.7.1 Purpose
+
+Three kinds of trace live here:
+
+1. **Hard-zero traces.** Constructions where the *exact* BCVF output must be zero (not "≤ 1e-10"). Identical sources, null perturbations, and fully-truncated stencils. These catch silent introduction of numerical noise at the sub-`1e-10` level.
+2. **Broadcast / shape regression traces.** Constructions that exercise the `(..., V)` ellipsis-axis slicing decisions from §2.8.5–§2.8.7 with unusual-but-valid inputs. Catch off-by-one and axis-confusion bugs.
+3. **Numerical-stability guards.** Constructions that push the kernel toward fp32 overflow, underflow, or catastrophic cancellation regimes. Validate §2.7.2's fp32 boundary rule and §2.6.7's Huber finite bound.
+
+Unlike the §3.2 families which sweep over magnitudes, each §3.7 trace is a **single fixed construction** with a single pass/fail bit. The grid cost is trivial (≈8 cells total) and runs alongside the ablation grid in §3.4.7's execution order.
+
+#### 3.7.2 Identical-sources hard zero
+
+**Construction.** All three sources produce the *same* probability tensor bit-for-bit:
+```
+z = rng.normal(loc=0.0, scale=3.0, size=(L, V))
+p_base = softmax(z, axis=-1)
+p_0 = p_1 = p_2 = p_base      # literal reference, not copy
+```
+
+**Expected signature.** `e_{ij}(l) == 0` exactly (same object, subtraction yields zero). `a_{ij}(l*) == 0` exactly. `gate_input == 0`. `‖gate_input‖ == 0 < T`, so gate output ≈ `σ(-β·T) = σ(-20)` which is ~2e-9 (not zero but tiny). `‖a‖ == 0` so `penalty == 0` exactly. `total_cost == 0.0` bit-equal.
+
+**Pass threshold.** `total_cost == 0.0` *exactly* (not within tolerance). `per_source_costs[s] == 0.0` exactly for all `s`. Any non-exact zero is a bug.
+
+**What this catches.** Any numerical drift introduced by mixed-dtype arithmetic, silent dtype promotion bugs, or a spurious non-zero term added at the aggregation step. The bit-equal requirement is the strictest test in §3.
+
+#### 3.7.3 Simplex-drift tolerance
+
+**Construction.** Generate a base sequence per §3.3.1. For each source, apply an exact softmax in fp64, then **downcast to fp32** and back to fp64. This introduces fp32 rounding drift (~1e-7 per vocab entry, `Σ p` deviates from 1.0 by ~1e-5). Set `p_0 = p_1 = p_2 = drifted_base`.
+
+**Expected signature.** Small rounding drift in `e_{ij}` and `a_{ij}`, but well below the gate threshold `T = 0.1`. Gate open probability ~0. `total_cost` should be ≲ `1e-6` purely from floating-point rounding after the Huber on the tiny `a`.
+
+**Pass threshold.** `total_cost < 1e-5`. `gate_activation_count == 0`. No NaN or Inf.
+
+**What this catches.** §2.7.3 committed that BCVF does not depend on the simplex sum holding exactly. This trace empirically verifies the claim. A failure would indicate that some path in the kernel implicitly assumes `Σ p = 1` — e.g., a division by `Σ p` or an assertion. Either would be a §2.7.3 violation.
+
+#### 3.7.4 Weight-vector mis-broadcast guard
+
+**Construction.** Two variants:
+
+- Variant A: `weight_vector = np.ones(V, dtype=np.float64)` (explicit identity). Must produce the same result as `weight_vector = None` to within 1e-10.
+- Variant B: `weight_vector = np.ones((1, V), dtype=np.float64)` (wrong shape — leading singleton axis). Must raise `ValueError` at the config-validation stage in `compute_bcvf_cost_batch` per §2.8.4.
+
+**Expected signature.** Variant A: total_cost identical to identical-sources case. Variant B: `ValueError` with message matching "weight_vector shape".
+
+**Pass threshold.** Variant A within 1e-10 of None-path. Variant B raises `ValueError`, kernel doesn't silently broadcast.
+
+**What this catches.** Broadcasting bugs in the `smooth_gate` or signal-norm stage. NumPy's permissive broadcasting could silently accept a `(1, V)` weight and produce subtly wrong norms. §2.8.4 said validation belongs at `compute_bcvf_cost_batch` entry; this trace confirms that validation is actually present and rejects the bad shape.
+
+#### 3.7.5 dtype mismatch guard
+
+**Construction.** Generate sources in fp64. Pass to `compute_bcvf_cost_batch` with a `weight_vector` in fp32. 
+
+**Expected signature.** Kernel either (a) upcasts `weight_vector` to fp64 at `np.asarray(..., dtype=np.float64)` inside `_pair_cost` / `smooth_gate`, preserving correctness, or (b) raises a dtype mismatch error clearly.
+
+**Pass threshold.** Either: total_cost matches the all-fp64 path within 1e-10, OR ValueError raised. No silent precision loss.
+
+**What this catches.** The §2.7.2 fp32-boundary commitment is about the *source tensor* dtype. `weight_vector` in a different dtype is an edge that could silently demote precision via NumPy broadcast rules. The kernel's `np.asarray(..., dtype=np.float64)` calls in `smooth_gate` and `_pair_cost` are the explicit promotions — this trace verifies they fire.
+
+#### 3.7.6 Huber finite-bound stress
+
+**Construction.** Set `accel_mag = 100.0` (extreme). Use the §3.2.4 family setup otherwise. Evaluate with V1 defaults `(T=0.1, β=200, δ=0.5)`.
+
+**Expected signature.** `‖a‖` is huge (on the order of 10 after softmax compression), but the pseudo-Huber asymptote `penalty ≲ δ·‖a‖ = 0.5·10 = 5` per stencil position. `total_cost` bounded by `3 (pairs) · 3 (stencil positions) · 5 ≈ 45` at most. No NaN, no Inf.
+
+**Pass threshold.** `total_cost < 1e3` (generous bound). `total_cost` finite. `np.isfinite(total_cost) and np.isfinite(max_acceleration_norm)`.
+
+**What this catches.** §2.6.7's Huber-bound claim is load-bearing for §5 trust-weighting calibration. A kernel that blows up under extreme inputs would produce unbounded per-source costs, breaking softmin. This trace empirically verifies the bound holds.
+
+#### 3.7.7 Empty-stencil guard (full EOS truncation)
+
+**Construction.** All three sources emit EOS at `l=0`. `valid_masks_batch[:, :, 0] = True`, everything else `False`. Use any underlying family — baseline is simplest.
+
+**Expected signature.** Every `valid(l*) = False` for all `l*`. Every pair contribution is zero. `total_cost == 0.0`. `per_source_costs[s] == 0.0` for all `s`. `gate_activation_count == 0`.
+
+**Pass threshold.** Exact zeros as in §3.7.2. No NaN, no Inf. No division-by-zero.
+
+**What this catches.** §2.4.4 / §2.7.4 specify that empty-stencil pairs report zero cost, not NaN. A naive implementation might compute `mean(empty_array)` → NaN. This trace catches that bug. It also stresses the "early termination over empty sum" path in `_pair_cost` if one is implemented as an optimization.
+
+#### 3.7.8 NaN / Inf rejection
+
+**Construction.** Generate sources per §3.3.1. Inject a single `np.nan` at one vocab position of one source.
+
+**Expected signature.** `compute_bcvf_cost_batch` raises `ValueError` at the §2.7.6 kernel-boundary guard. No propagation of NaN downstream.
+
+**Pass threshold.** Raises `ValueError` with message matching "non-finite". Does NOT return a NaN-containing result silently.
+
+**What this catches.** §2.7.6 committed the NaN-at-boundary policy. This trace verifies the guard is present and fires. Forgetting the guard would allow NaN-poisoned per-source costs to pollute §5's softmin and fail silently.
+
+#### 3.7.9 Aggregation and pass/fail for §3.7
+
+Each §3.7 trace is a **single cell**, no magnitude sweep, no seed replication (the constructions are either bit-deterministic or exercise fp32 rounding which seed-to-seed doesn't affect the pass/fail outcome). §3.9 sign-off requires **all 7 traces** (§3.7.2–§3.7.8) pass.
+
+| Trace | Primary role | Pass bit |
+|---|---|---|
+| §3.7.2 Identical sources | Hard-zero regression guard | `total_cost == 0.0` exact |
+| §3.7.3 Simplex drift | Rounding-tolerance guard | `total_cost < 1e-5`, no activations |
+| §3.7.4 Weight mis-broadcast | Shape-validation guard | Variant A within 1e-10; Variant B raises |
+| §3.7.5 dtype mismatch | Precision guard | Matches fp64 path OR raises |
+| §3.7.6 Huber extreme stress | Bound check | `total_cost < 1e3`, finite |
+| §3.7.7 Empty stencil | Truncation edge | All zeros exact |
+| §3.7.8 NaN injection | Boundary-guard verification | `ValueError` raised |
+
+**Zero failures tolerated.** Unlike §3.5's 3-seed replication, §3.7 is deterministic — either the guard works or it doesn't. One fail = §3.9 blocked.
+
+#### 3.7.10 What §3.7 does NOT do
+
+- **No sweep over parameters.** Each §3.7 trace uses V1 defaults `(T, β, δ) = (0.1, 200, 0.5)`, `sigma_logit = 3.0`, `V = 1024`. Parameter-space robustness of the guards is irrelevant — the guards check structural properties that should hold regardless of parameter values.
+- **No interaction with alignment diagnostic (§3.6).** None of the §3.7 traces carry a `truth_label`, so alignment metrics don't apply. Guard traces are pass/fail only.
+- **No performance / timing constraints.** A guard trace may be slow if it triggers a validation path that doesn't vectorize well; that's acceptable for a once-per-sweep check.
+- **No coverage of speculative-decoding plumbing** (that's §4's concern — speculative-decode pipeline integration is where those bugs would emerge).
+- **No V2-roadmap guards** (e.g., multi-model ensemble shape bugs, KL-metric fallback). Deferred to §9.
+
+§3.7 is the safety net under §3.5 + §3.6. If the core families pass but a §3.7 guard fails, there's a specific bug class to investigate; if all §3.7 pass but core families fail, the bug is in magnitude-dependent behavior. Diagnostic separation.
+
 ---
 
 ## Section 4 — Phase 2 — Source Framework
