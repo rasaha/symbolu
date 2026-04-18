@@ -3295,6 +3295,129 @@ A BCVF config is a **candidate V1 tuple** iff `config_pass_rate == 1.0`. §3.9 p
 
 §3.5 is intentionally spartan: a table of numbers, evaluated mechanically against the sweep output. §3.9 is where these numbers become sign-off decisions; §3.6 is where the alignment-diagnostic dimension is added beyond raw pass/fail.
 
+### 3.6 Alignment diagnostic
+
+§3.5 asks whether each cell's output satisfies a numerical threshold. §3.6 asks a different question: when the kernel's per-source cost distribution is **interpreted as a trust signal** (which source should §5's Rahu down-weight?), does it point at the source we synthetically constructed to be the outlier? §3.6 is the "right answer for the right reason" check — it catches cases where the threshold passes but the attribution points at the wrong source.
+
+#### 3.6.1 Purpose and relation to autonomy
+
+The autonomy kernel characterization tracked a **Pearson correlation** between the per-timestep BCVF signal `J_BCVF(t)` and the downstream safety objective (`Δ|y|(t + lookahead)`, the lateral-deviation change a few steps ahead). The N=34 additive-cost experiments showed that correlation at only `+0.04` (directionless); the N=10 Ketu→Rahu refactor showed strong negative correlation (BCVF signal high *precedes* safety improving — the operator correctly warns of impending failure).
+
+The LLM analogue cannot use the same correlation formula — there is no `Δ|y|(t + lookahead)` equivalent, because the "safety" axis in LLM generation (fluency, coherence, factuality) is not a scalar-regression target. Instead §3.6 asks the corresponding **classification** question: does `argmax(per_source_costs)` point at the truth-label source?
+
+This is a necessary condition for the §5 Ketu→Rahu composition to work. If BCVF's per-source attribution is uncorrelated with which source is actually diverging in the synthetic traces, then §5's softmin over per-source costs produces a meaningless trust distribution, and no parameter tuning in §5 will fix it.
+
+#### 3.6.2 Metric definitions
+
+Three metrics, computed per cell:
+
+**Hit (binary).**
+
+```
+hit(cell) = 1 if argmax(per_source_costs) == truth_label else 0
+```
+
+Defined only for cells with a non-None `truth_label` (§3.3.6) — i.e., families §3.2.4 (accelerating-divergence, truth = source 1) and §3.2.6 (outlier, truth = source 0). Baseline, constant-bias, linear-drift, noise-floor, and EOS families have `truth_label = None` and are excluded from hit-rate aggregation (for those families, alignment is trivially satisfied or undefined).
+
+**Margin (continuous).**
+
+```
+margin(cell) = per_source_costs[truth_label]
+             / mean(per_source_costs[s] for s != truth_label)
+```
+
+A ratio, ideally ≥ 2.0 at M=3 per the §2.4.5 theoretical claim. `margin > 1.0` means the truth source accumulates more cost than the average non-truth source. Defined same as `hit`.
+
+**Rank (ordinal).**
+
+```
+rank(cell) = position of truth_label in sort-descending(per_source_costs)
+             ∈ {1, 2, 3} at M=3
+```
+
+`rank == 1` means truth_label is the single highest-cost source (equivalent to `hit == 1` at M=3). `rank == 2` means truth_label was second-ranked (a near-miss). `rank == 3` means fully inverted (pathological).
+
+#### 3.6.3 Applicability per family
+
+| Family | `truth_label` | Alignment metrics apply? |
+|---|---|---|
+| §3.2.1 Baseline | None | No — no outlier |
+| §3.2.2 Constant-bias | None | No — bias is symmetric across sources 0 and 2; no "outlier" |
+| §3.2.3 Linear-drift | None | No — source 1 is technically the drifting one, but Lemma 1 says total_cost ≈ 0, so per_source_costs are dominated by rounding and the metric is ill-defined |
+| §3.2.4 Accelerating | **1** (source 1 accelerates) | **Yes** — primary positive alignment check |
+| §3.2.5 Noise-floor | None | No — all sources get IID noise |
+| §3.2.6 Outlier | **0** (source 0 is outlier) | **Yes** — primary alignment check + 2:1 ratio |
+| §3.2.7 EOS-truncation | Inherited from outer family | Yes if outer family has truth_label |
+
+So alignment metrics are evaluated on families §3.2.4, §3.2.6, and §3.2.7-with-outlier-backing. Roughly 30% of sweep cells carry alignment measurements.
+
+#### 3.6.4 Aggregation across cells
+
+**Hit rate over a family.** For each family with truth_label-bearing cells:
+
+```
+hit_rate(family) = mean(hit(cell) for cell in family)
+```
+
+At M=3, random guessing gives `hit_rate = 1/3 ≈ 0.333`. A kernel that "works" must clear that baseline significantly.
+
+**Margin distribution.** Track per-cell margin values; report mean, 25th/50th/75th percentile across a family. Useful for diagnosing whether a family that passes `hit_rate` does so robustly (margin tight around 2.0) or marginally (margin barely above 1.0).
+
+**Rank distribution.** Track fraction of cells at each rank value. Ideally rank 1 dominates; rank 3 should be zero.
+
+#### 3.6.5 Pass thresholds for alignment
+
+§3.5 thresholds are necessary but not sufficient. §3.6 adds:
+
+| Metric | Threshold | Families |
+|---|---|---|
+| `hit_rate` | `≥ 0.95` | §3.2.4, §3.2.6 |
+| `mean(margin)` | `≥ 1.8` | §3.2.4, §3.2.6 |
+| `fraction(rank == 1)` | `≥ 0.95` | §3.2.4, §3.2.6 |
+| `fraction(rank == 3)` | `== 0.0` (strict) | all alignment-applicable families |
+
+**Pass iff all 4 within threshold.** A candidate V1 tuple from §3.5.9 must additionally pass §3.6's thresholds to reach §3.9 sign-off. The 5% miss budget in `hit_rate` covers RNG-boundary cases where synthetic magnitude is near the gate threshold; the `rank == 3` strict zero catches "pointing at the wrong source" errors, which are always a bug regardless of margin scale.
+
+**Why not 100% hit rate?** Because at magnitudes near the gate threshold (e.g., `accel_mag = 0.05` in the sensitivity grid), a lucky noise pattern can flip which source looks most divergent. This is a real phenomenon in the operator, not an implementation bug. The 95% threshold is the empirical cliff where "kernel works" starts — per the autonomy N=10 Ketu→Rahu data, the autonomy analogue cleared ~97% hit rate on equivalent constructions.
+
+#### 3.6.6 Implementation in the characterization harness
+
+Target module: `symbolu_bcvf_llm/characterization/alignment.py`. Three public functions:
+
+```python
+def compute_alignment_metrics(
+    cell_result: CellResult,           # wraps BCVFLLMResult + TraceBundle
+) -> AlignmentMetrics:
+    """Return (hit, margin, rank) for cells with truth_label, or None.
+    """
+
+def aggregate_alignment(
+    cell_results: List[CellResult],
+    group_by: str,                     # "family" | "bcvf_config" | "sigma_logit"
+) -> Dict[str, AlignmentAggregate]:
+    """Aggregate per-cell alignment into per-group statistics."""
+
+@dataclass
+class AlignmentAggregate:
+    hit_rate: float
+    margin_mean: float
+    margin_percentiles: Tuple[float, float, float]   # 25/50/75
+    rank_distribution: Dict[int, float]              # {1: ..., 2: ..., 3: ...}
+    n_cells: int
+```
+
+`CellResult`, `AlignmentMetrics`, and the harness are pure NumPy; matches §2.8.1 dependency discipline. No ML-framework or plotting dependencies in the compute path.
+
+#### 3.6.7 What §3.6 does NOT do
+
+- **No Pearson correlation against a continuous ground-truth.** There is no continuous LLM-side analogue of `Δ|y|`. §4+ experiments may define one (perplexity change, human-rated factuality score) but §3 uses only the synthetic `truth_label`.
+- **No multi-outlier scenarios.** V1 synthetic constructions have exactly one truth-outlier source. Multi-outlier (e.g., 2 of 3 sources diverge in different directions) is a V2 family per §9.
+- **No soft alignment metric using `per_source_costs` as a probability distribution.** The normalized per-source costs *are* the input to §5's softmin, but §3.6 doesn't test that pipeline — it tests whether the raw per-source costs point the right way.
+- **No causal alignment (does BCVF signal *precede* the failure?).** §3 traces are static snapshots without a time axis beyond `l`. Temporal precedence is a §4+ question once streaming generation is plumbed in.
+- **No comparison to a baseline classifier** (e.g., "does a trivial vocab-L2 classifier without BCVF get the same hit rate?"). §3 is a correctness sweep, not a benchmark. The baseline-comparison ablation is V2.
+
+§3.6 + §3.5 together constitute the full acceptance bar for Phase 1.5 per-cell evaluation. §3.9 aggregates them into the sign-off decision.
+
 ---
 
 ## Section 4 — Phase 2 — Source Framework
