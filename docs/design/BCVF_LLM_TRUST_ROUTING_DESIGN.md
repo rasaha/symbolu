@@ -985,9 +985,186 @@ These six properties are the invariance guarantees §2.6 will formalize and prov
 
 ---
 
-### 2.6 Lemma 1 analogue — **pending**
+### 2.6 Lemma 1 analogue
 
-### 2.6 Lemma 1 analogue — **pending**
+The autonomy V3.1 design rests on **Lemma 1**: the 2nd-order BCVF operator is zero under constant disagreement and zero under linear drift, reacting only to genuine *accelerating* divergence. §0.1 identified this invariance as one of the two non-negotiable properties the LLM transfer must preserve. §2.6 formally states, proves, and bounds the LLM analogue.
+
+#### 2.6.1 Statement (LLM Lemma 1)
+
+**Theorem (Lemma 1 analogue).** *Let `p_i, p_j : {0, 1, ..., L−1} → Δ^{V−1}` be two probability-simplex trajectories along the lookahead axis for sources `i ≠ j` at fixed outer step `t`. Let `e_{ij}(l) = p_i(l) − p_j(l) ∈ ℝ^V`, and let `contrib_{ij}(l*) = gate_{ij}(l*) · penalty_{ij}(l*)` be the per-position contribution defined in §2.5.3.*
+
+*Then:*
+
+*(C1) **Constant-bias invariance.** If there exists `α ∈ ℝ^V` such that `e_{ij}(l) = α` for all `l ∈ [0, L−1]`, then `contrib_{ij}(l*) = 0` for every valid `l* ∈ [1, L−2]`.*
+
+*(C2) **Linear-drift invariance.** If there exist `α, γ ∈ ℝ^V` such that `e_{ij}(l) = α + γ·l` for all `l ∈ [0, L−1]`, then `contrib_{ij}(l*) = 0` for every valid `l* ∈ [1, L−2]`.*
+
+*(C3) **Acceleration detection (affirmative).** If there exist `α, γ, η ∈ ℝ^V` with `η ≠ 0` such that `e_{ij}(l) = α + γ·l + ½·η·l²`, and at some `l* ∈ [1, L−2]` the gate is open (`‖e_{ij}(l*)‖ > T + 1/β ≈ T + 0.005`), then `contrib_{ij}(l*) > 0`.*
+
+Cases C1 and C2 are the **invariances** — BCVF commits the same "don't react to steady-state or linear divergences" promise it makes in autonomy. C3 is the **completeness** claim: the operator is not trivially zero; the one regime the autonomy design targets (accelerating departure) does produce a positive signal.
+
+#### 2.6.2 Preliminaries and scope
+
+The proof operates on the operator chain fixed by §2.4.2 and §2.5.3:
+
+```
+e_{ij}(l)      = p_i(l) − p_j(l)                            ∈ ℝ^V      (§2.2/§2.3)
+a_{ij}(l*)     = e_{ij}(l*+1) − 2·e_{ij}(l*) + e_{ij}(l*−1) ∈ ℝ^V      (§2.4.2)
+s_{ij}(l*)     = ‖ a_{ij}(l*) ‖₂                            ≥ 0         (§2.4.2)
+gate_{ij}(l*)  = σ( β · (‖e_{ij}(l*)‖₂ − T) )               ∈ [0, 1]    (§2.5.1)
+penalty_{ij}(l*) = δ² · ( √(1 + (s_{ij}(l*)/δ)²) − 1 )      ≥ 0         (§2.5.2)
+contrib_{ij}(l*) = gate_{ij}(l*) · penalty_{ij}(l*)         ≥ 0         (§2.5.3)
+```
+
+The proof is **pointwise in `l*`** — each claim is established at a single valid stencil center, and the per-pair sum `pair_cost_{ij}(t) = Σ_{l*} contrib_{ij}(l*)` inherits the property by non-negativity.
+
+Outer-step `t` is suppressed throughout §2.6 (everything is evaluated at a fixed `t`). The lemma is about the *shape* of the lookahead curve for each `(i, j, t)` triple, not about `t`-axis dynamics (which don't exist — the operator has no retrospective memory, per §2.3.1).
+
+#### 2.6.3 Proof of Case 1 — constant-bias invariance
+
+*Assume* `e_{ij}(l) = α` (constant in `l`) for some `α ∈ ℝ^V`.
+
+At any valid `l* ∈ [1, L−2]`:
+
+```
+a_{ij}(l*) = e_{ij}(l*+1) − 2·e_{ij}(l*) + e_{ij}(l*−1)
+           = α − 2·α + α
+           = 0 ∈ ℝ^V
+```
+
+Hence `s_{ij}(l*) = ‖0‖₂ = 0`. Substituting into the pseudo-Huber:
+
+```
+penalty_{ij}(l*) = δ² · ( √(1 + (0/δ)²) − 1 )
+                 = δ² · (1 − 1)
+                 = 0.
+```
+
+Therefore `contrib_{ij}(l*) = gate_{ij}(l*) · 0 = 0`. ∎
+
+**Interpretation.** If two sources consistently disagree at a fixed offset throughout the whole lookahead window (e.g. one always prefers "run" to "ran" at every position), BCVF stays silent. This is stylistic/habitual divergence — not evidence of a local failure mode. The operator is correctly indifferent.
+
+#### 2.6.4 Proof of Case 2 — linear-drift invariance
+
+*Assume* `e_{ij}(l) = α + γ·l` for some `α, γ ∈ ℝ^V`.
+
+At any valid `l* ∈ [1, L−2]`:
+
+```
+a_{ij}(l*) = [α + γ·(l*+1)] − 2·[α + γ·l*] + [α + γ·(l*−1)]
+           = (α − 2α + α) + γ·((l*+1) − 2·l* + (l*−1))
+           = 0 + γ·0
+           = 0 ∈ ℝ^V
+```
+
+Hence `s_{ij}(l*) = 0`, `penalty_{ij}(l*) = 0`, `contrib_{ij}(l*) = 0`. ∎
+
+**This is where the vector-path choice in §2.4.1 becomes critical.** The proof consumes the fact that the 2nd-difference of a vector-valued linear function is identically the zero vector. Had we taken the scalar path `d_{ij}(l) = ‖e_{ij}(l)‖ = ‖α + γ·l‖`, the function `l ↦ ‖α + γ·l‖` is in general **not** linear in `l` (it's a convex piecewise-affine function with a cusp at `l = −α·γ / ‖γ‖²`), so its 2nd-difference need not vanish — Case 2 would fail. The vector-path is the structural reason Lemma 1 transfers.
+
+**Interpretation.** If one source is steadily drifting away from another at a constant rate (e.g. models gradually diverging in confidence on a token), BCVF stays silent. Constant-rate divergence is already linearly extrapolable — no surprise, no acceleration, nothing to flag. The operator only wakes up when the rate of divergence itself changes.
+
+#### 2.6.5 Proof of Case 3 — acceleration detection
+
+*Assume* `e_{ij}(l) = α + γ·l + ½·η·l²` with `η ≠ 0` (so `‖η‖₂ > 0`), and that at some `l* ∈ [1, L−2]` the gate is open, i.e. `‖e_{ij}(l*)‖ > T + 1/β`.
+
+At that `l*`:
+
+```
+a_{ij}(l*) = [α + γ(l*+1) + ½·η·(l*+1)²]
+           − 2·[α + γ·l*   + ½·η·(l*)²]
+           + [α + γ(l*−1) + ½·η·(l*−1)²]
+```
+
+The constant and linear terms vanish exactly as in Cases 1 and 2. The quadratic term evaluates to:
+
+```
+½·η · [ (l*+1)² − 2·(l*)² + (l*−1)² ]
+= ½·η · [ (l*² + 2·l* + 1) − 2·l*² + (l*² − 2·l* + 1) ]
+= ½·η · [ 2 ]
+= η
+```
+
+Hence `a_{ij}(l*) = η`, and `s_{ij}(l*) = ‖η‖₂ > 0`.
+
+The pseudo-Huber is strictly increasing in `s` and zero only at `s = 0`:
+
+```
+d/ds [ δ² · (√(1 + (s/δ)²) − 1) ] = s / √(1 + (s/δ)²) > 0   for s > 0.
+```
+
+So `penalty_{ij}(l*) > 0`.
+
+For the gate, the assumption `‖e_{ij}(l*)‖ > T + 1/β` gives `β·(‖e(l*)‖ − T) > 1`, so `gate_{ij}(l*) = σ(β·(‖e(l*)‖ − T)) > σ(1) ≈ 0.73 > 0`.
+
+Therefore `contrib_{ij}(l*) = gate_{ij}(l*) · penalty_{ij}(l*) > 0`. ∎
+
+**Interpretation.** If one source starts accelerating away from another over the 5-token lookahead window *and* the underlying disagreement is above the noise floor, BCVF produces a strictly positive signal. Combined with C1 and C2, this means the operator is tuned precisely: it is silent on benign divergence patterns and positive on the one pattern the autonomy design flags as evidence of an emerging failure.
+
+#### 2.6.6 Gate behavior and the noise floor
+
+The gate condition in C3 (`‖e(l*)‖ > T + 1/β`) is necessary: without it, a quadratic bias in `e` with tiny norm (e.g. `η = 10⁻⁶·u` for some unit vector `u`) would produce technically positive `penalty` but with `contrib ≈ 0`. Near the gate threshold, the gate is smooth, so the statement "gate suppresses below noise floor" is not a hard cliff but a sharp-sigmoid:
+
+- `‖e‖ ≤ T − 1/β ⇒ gate ≤ σ(−1) ≈ 0.27`. At Huber `penalty ≈ s²/2` for small `s`, `contrib ≤ 0.27·(s²/2)`.
+- `‖e‖ ≥ T + 1/β ⇒ gate ≥ σ(+1) ≈ 0.73`. `contrib ≥ 0.73·penalty`.
+
+With V1 defaults `T = 0.1, β = 200`, the gate transition width is `2/β = 0.01`, i.e. 1% of the maximum disagreement `√2 ≈ 1.41`. This is tight enough that **for the purposes of §2.6**, the gate can be treated as a hard switch at `‖e‖ = T` without loss of proof-level correctness. The synthetic tests in §2.9 will verify this empirically.
+
+#### 2.6.7 Huber bounding and outlier protection
+
+Case 3 establishes positivity. A symmetric bound from above is useful for §5's trust-weighting calibration: a single extreme stencil cannot produce unbounded cost. For any `s ≥ 0`:
+
+```
+penalty(s) = δ² · (√(1 + (s/δ)²) − 1) ≤ δ · s
+```
+
+(The RHS is the large-s asymptote; the LHS is always below it since the correction term `−δ²` is negative for `s > δ/√2`.)
+
+So per-position `contrib ≤ δ · s ≤ δ · ‖a_{ij}(l*)‖`. Since each component of `e_{ij} ∈ [−1, 1]`, `‖a_{ij}‖₂ ≤ 4·√V` (four unit-magnitude contributions from the stencil), giving `contrib ≤ 4·δ·√V`. For V1's `δ = 0.5, V = 32000`, this caps a single-position contribution at roughly `358` cost units — a large number, but **finite**. A single pathological prediction cannot blow up the per-source cost into numerical overflow.
+
+This bound matters for §5: the softmin trust-weighting temperature `τ_w` is calibrated against the distribution of `per_source_cost`, and an unbounded-right tail would make that calibration brittle. Huber gives us the tail control.
+
+#### 2.6.8 Relation to autonomy Lemma 1 (V3.1 §3.5)
+
+The autonomy lemma operates on SE(2) body-frame error trajectories `e_{ij}(k) ∈ ℝ³`, with `k` indexing a **time** axis of simulator states. The LLM lemma operates on probability-simplex differences `e_{ij}(l) ∈ ℝ^V`, with `l` indexing a **lookahead** axis of speculative tokens. Despite the domain shift, the proof structure is identical:
+
+| Autonomy (V3.1 §3.5) | LLM (§2.6) | Why they transfer |
+|---|---|---|
+| Domain: SE(2) body-frame, `ℝ³` | Domain: probability simplex differences, `ℝ^V` | 2nd-diff is linear in its inputs regardless of ambient dimension |
+| Axis: time `k`, 10 Hz simulator | Axis: lookahead `l`, speculative tokens | Both are discrete, uniform-spacing sequences — same stencil applies |
+| Metric: `‖·‖₂` (Euclidean) | Metric: `‖·‖₂` (Euclidean on `ℝ^V`) | Metric choice carries directly (§2.2.6) |
+| C1: constant SE(2) offset → 0 | C1: constant simplex-diff bias → 0 | Same algebra |
+| C2: linear SE(2) drift → 0 | C2: linear simplex-diff drift → 0 | Same algebra — *hinges on vector-path* |
+| C3: accelerating SE(2) divergence → positive | C3: accelerating simplex divergence → positive | Same algebra |
+| Gate input: ‖e‖ at stencil center | Gate input: ‖e‖ at stencil center | Structural rule preserved (§2.5.1) |
+| Huber δ = 0.5 | Huber δ = 0.5 | Carry-over pending §3 sweep |
+
+**What transfers cleanly.** The operator is linear (it's a finite-difference), so its invariances (C1, C2) depend only on the linearity of polynomial evaluation in the ambient vector space — which is the same in `ℝ³` or `ℝ^V`. The proof is **dimension-agnostic**.
+
+**What differs.** The *domain* of `e_{ij}` is different: probability-simplex differences live in a subset of `ℝ^V` satisfying `Σ_k e_{ij,k} = 0` and `e_{ij,k} ∈ [−1, 1]`. The autonomy `e` lives in `ℝ³` unconstrained. None of the Lemma 1 proof uses the constraint structure, so the differences don't affect the invariance result, but they do affect the **bound** in §2.6.7 (autonomy uses a much smaller domain-specific bound based on SE(2) lever-arm geometry).
+
+**What remains empirical.** The autonomy Lemma 1 also shipped with a numerical verification (`test_core.py::test_lemma_1_linear_drift_zero`). §2.9 must include the analogous LLM test: synthesize linear-drift `p_i(l), p_j(l)` on the simplex and verify that `compute_bcvf_cost_batch` returns exactly zero (within `1e−10` floating-point tolerance).
+
+#### 2.6.9 What §2.6 does NOT prove
+
+- **No claim about trust-weighting optimality.** The lemma proves per-pair invariance. Whether the softmin over `per_source_cost_i` correctly identifies the outlier source is §5's responsibility and requires empirical demonstration on §3 synthetic traces.
+- **No claim about LLM-semantic alignment.** Cases C1–C3 are claims about the *mathematical* output of the operator on *algebraic* patterns. Whether those patterns correspond to "stylistic divergence vs. hallucination" in the LLM domain is the Phase 1.5 (§3) empirical question, not a provable theorem.
+- **No claim over the `t` axis.** The lemma is pointwise in `t`. If the per-source cost is accumulated over `t` (e.g. in a streaming agent setting), invariance still holds per-step; aggregate-over-`t` dynamics are a §5/§6 concern.
+- **No claim about probability-simplex geometry specifically.** The proof works in any finite-dimensional real vector space with Euclidean metric. Alternative metrics (KL, Hellinger) require re-proving C2 — flagged in §2.2.6 and §9 V2 Roadmap.
+
+#### 2.6.10 Acceptance criteria for §2.6
+
+§2.6 is considered **complete and passing** when:
+
+1. ✅ Theorem statement is explicit over `e_{ij} ∈ ℝ^V` with the exact stencil from §2.4.2 (this section).
+2. ✅ Cases C1, C2, C3 are proven by direct algebraic computation (§2.6.3–§2.6.5).
+3. ✅ Gate + Huber side conditions are bounded (§2.6.6, §2.6.7).
+4. ✅ Relation to autonomy Lemma 1 is explicit, with transfer points and differences enumerated (§2.6.8).
+5. ✅ Scope limits are declared (§2.6.9).
+6. **Pending §2.9:** synthetic tests `test_lemma_1_constant_bias_zero`, `test_lemma_1_linear_drift_zero`, `test_lemma_1_quadratic_positive` pass deterministically against the Python implementation.
+
+Items 1–5 are satisfied by this section. Item 6 is the hard gate that closes Phase 1 and unlocks Phase 1.5 (§3).
+
+---
 
 ### 2.7 Edge cases & numerical considerations — **pending**
 
