@@ -2527,7 +2527,193 @@ Items 1–13 are satisfied by this section. Item 14 is the hard gate — §2.8 i
 
 ---
 
-### 2.9 Acceptance criteria + test specification — **pending**
+### 2.9 Acceptance criteria + test specification
+
+§2.9 is the **hard gate** that closes Phase 1 and unlocks Phase 1.5 (§3). Items 1–13 of §2.8.14, item 6 of §2.6.10, and all the parity tests queued throughout §2.5 / §2.7 / §2.8 must land, deterministically pass, and cover the math spec. Nothing about §2.9 is aspirational — if a test in this list fails on the implementation, §2 is re-opened and the offending sub-section is revised.
+
+#### 2.9.1 Purpose and hard-gate role
+
+Every prior sub-section of §2 makes claims about what the kernel *will* do. §2.9 is where those claims become **mechanical assertions** — Python test functions whose pass/fail status is the single source of truth for "§2 is correct."
+
+Three classes of claim need mechanical verification:
+
+1. **Lemma 1 invariance** (§2.6). Constant-bias and linear-drift inputs must produce exactly zero (within floating-point tolerance); quadratic inputs must produce positive output. Three tests, tight tolerances.
+2. **Stage-level mathematical parity** with the autonomy kernel (§2.8.3–§2.8.12). Every sub-section queued at least 2–8 tests; §2.9 collects them.
+3. **System-level correctness** of the composed kernel — shape validation, NaN guards, EOS masking, per-source attribution ratio, scalar/batch consistency. These are the highest-value tests: they catch integration bugs that stage-level tests would miss.
+
+If §2.9's full suite passes on a reference implementation of `symbolu_bcvf_llm/core.py`, Phase 1 is complete and Phase 1.5 is authorized to start. If any single test fails, Phase 1 is not complete and the failing test points to the §2 sub-section that needs revision.
+
+#### 2.9.2 Test file layout
+
+Target directory: `symbolu_bcvf_llm/tests/`.
+
+```
+symbolu_bcvf_llm/
+├── __init__.py
+├── core.py                          # The kernel (§2.8)
+└── tests/
+    ├── __init__.py
+    ├── test_core_config.py          # §2.8.3 - §2.8.4 (enum, dataclass)
+    ├── test_core_stages.py          # §2.8.5 - §2.8.8 (stage functions)
+    ├── test_core_pairs.py           # §2.8.9 - §2.8.10 (pair-level)
+    ├── test_core_entry.py           # §2.8.11 - §2.8.12 (entry points)
+    ├── test_core_lemma1.py          # §2.6 invariance tests (priority)
+    ├── test_core_cross_kernel.py    # cross-checks against autonomy
+    └── test_core_import_isolation.py # §2.8.2 dep-isolation assertion
+```
+
+**Discipline:** pure `pytest`, no ML-framework dependency, runnable in < 5 seconds on a CPU-only laptop. If the test suite ever requires a GPU or model download, it's failed the discipline and §2.9 is revised.
+
+#### 2.9.3 Test categories
+
+| Category | Count (approx) | What it proves |
+|---|---|---|
+| **Config / enum** | 3 | `CostOrder` values fixed; `BCVFLLMConfig` defaults match §2.8.4 exactly |
+| **Stage unit** | 14 | Each of `compute_disagreement`, `_velocity`, `_acceleration`, `smooth_gate`, `pseudo_huber`, `_enumerate_pairs` has correct shape, axis behavior, edge cases |
+| **Lemma 1 (priority)** | 3 | Constant bias → 0, linear drift → 0, quadratic → positive. Anchors §2.6 proof to mechanical verification |
+| **Pair-level (`_pair_cost`)** | 8 | Scalar per-pair cost, including valid_mask, diagnostic return values, Lemma 1 cases at the pair level |
+| **Scalar entry (`compute_bcvf_cost`)** | 8 | Shape validation, NaN guard, per-source attribution, 2:1 outlier ratio, EOS propagation |
+| **Batch entry (`compute_bcvf_cost_batch`)** | 3 | Batch/scalar elementwise consistency, per-source `(T, M)` shape, per-`t` EOS |
+| **Cross-kernel parity** | 3 | `pseudo_huber` bit-exact; `_enumerate_pairs` equal; scalar-entry structural sanity at `L=5, V=3` |
+| **Import isolation** | 2 | `import symbolu_bcvf_llm.core` succeeds without torch / transformers / datasets |
+| **Total** | **≈ 44** | |
+
+#### 2.9.4 Full test catalog
+
+Grouped by target module. Each test is a single-function `pytest` test with a one-line assertion at its core. Full names follow `pytest` discovery convention (prefix `test_`).
+
+**test_core_config.py (§2.8.3–§2.8.4):**
+
+1. `test_cost_order_enum_values` — `ZEROTH.value == 0, FIRST.value == 1, SECOND.value == 2`.
+2. `test_bcvflllm_config_defaults` — each of the 8 fields has the exact default from §2.8.4's table.
+3. `test_bcvflllm_config_weight_vector_none_by_default` — `BCVFLLMConfig().weight_vector is None`.
+
+**test_core_stages.py (§2.8.5–§2.8.8):**
+
+4. `test_compute_disagreement_shape_broadcast` — `(3, 1, 5, 32000)` input → output same shape.
+5. `test_compute_disagreement_translation_invariant` — adding constant vector to both inputs leaves output unchanged.
+6. `test_compute_disagreement_acceleration_constant_bias_zero` — constant `e(l)` → output ≤ 1e-10 in fp64.
+7. `test_compute_disagreement_acceleration_linear_drift_zero` — linear `e(l) = α + γ·l` → output ≤ 1e-10 in fp64.
+8. `test_compute_disagreement_acceleration_quadratic_positive` — `e(l) = l²·η` → output equals `η` up to rounding.
+9. `test_compute_disagreement_velocity_shape` — `(L, V)` → `(L-1, V)`.
+10. `test_smooth_gate_shape` — input `(3, 3, 32000)` → output `(3, 3)`.
+11. `test_smooth_gate_threshold_midpoint` — `‖e‖ = T` exactly → gate ≈ 0.5 within 1e-7.
+12. `test_smooth_gate_below_floor_suppressed` — `‖e‖ = T − 2/β` → gate < 0.2.
+13. `test_smooth_gate_above_floor_open` — `‖e‖ = T + 2/β` → gate > 0.8.
+14. `test_smooth_gate_clipping_no_nan_no_inf` — `‖e‖ = 100` → finite, ≈ 1.0.
+15. `test_smooth_gate_none_weight_equivalent_to_ones` — `weight_vector=None` vs `np.ones(V)` within 1e-10.
+16. `test_pseudo_huber_zero_exact` — `pseudo_huber(0.0, 0.5)` returns **bit-equal** 0.0.
+17. `test_pseudo_huber_quadratic_regime` — `|penalty − r²/2| < 1e-8` for small `r`.
+18. `test_pseudo_huber_linear_regime` — `|penalty − (δ·r − δ²/2)| / penalty < 0.01` for large `r`.
+19. `test_pseudo_huber_monotonic` — strictly non-decreasing over sorted `r`.
+
+**test_core_pairs.py (§2.8.9–§2.8.10):**
+
+20. `test_enumerate_pairs_all_pairs_m3` — exactly `[(1, 0), (2, 0), (2, 1)]`.
+21. `test_enumerate_pairs_anchor_m3` — exactly `[(1, 0), (2, 0)]`.
+22. `test_enumerate_pairs_m2_anchor_equals_all_pairs` — both modes return `[(1, 0)]`.
+23. `test_enumerate_pairs_m3_all_sources_covered_twice` — each source index in exactly 2 tuples.
+24. `test_pair_cost_no_mask_matches_unmasked_sum` — `valid_mask=None` equals `np.ones((L-2,), bool)` exactly.
+25. `test_pair_cost_all_invalid_returns_zero` — `valid_mask=np.zeros(...)` → pair_cost=0, activations=0.
+26. `test_pair_cost_constant_bias_zero` — `p_i = p_j + constant` → pair_cost = 0.
+27. `test_pair_cost_linear_drift_zero` — `p_i - p_j = α + γ·l` → pair_cost < 1e-10.
+28. `test_pair_cost_quadratic_positive` — above gate threshold → pair_cost > 0.
+29. `test_pair_cost_eos_single_source_truncation` — source 0 EOS at `l=1` → uses only valid stencil positions.
+30. `test_pair_cost_max_signal_unmasked` — max_signal reflects the unconditional max.
+31. `test_pair_cost_activations_counts_valid_only` — `activations == count(gate > 0.5 AND valid)`.
+
+**test_core_entry.py (§2.8.11–§2.8.12):**
+
+32. `test_bcvflllmresult_fields` — asserts 5 fields exist with correct types.
+33. `test_compute_bcvf_cost_scalar_shape_validation` — every ValueError branch fires (M<2, L<3, vocab mismatch, ndim≠2).
+34. `test_compute_bcvf_cost_scalar_nan_guard` — NaN in sources → ValueError.
+35. `test_compute_bcvf_cost_scalar_m3_all_pairs_enumeration` — `per_pair_costs` has exactly 3 entries.
+36. `test_compute_bcvf_cost_scalar_per_source_sums_to_double_total` — `sum(per_source) == 2·total` within 1e-10.
+37. `test_compute_bcvf_cost_scalar_outlier_discrimination_2_to_1` — source-0 outlier → `per_source_costs[0] ≈ 2 · per_source_costs[1]`.
+38. `test_compute_bcvf_cost_scalar_eos_valid_masks_propagated` — per-source masks correctly combine into stencil masks.
+39. `test_compute_bcvf_cost_batch_matches_scalar_elementwise` — for each `t`: batch output `[t]` equals scalar call on `sources_batch[t]`.
+40. `test_compute_bcvf_cost_batch_per_source_shape` — `per_source` output has shape `(T, M)`.
+41. `test_compute_bcvf_cost_batch_valid_masks_propagate` — per-`t` EOS pattern reflected correctly.
+
+**test_core_lemma1.py (§2.6 top-level invariance — priority tests):**
+
+42. `test_lemma_1_constant_bias_zero` — at the kernel level with M=3 sources constructed so all pairwise `e` are constant: total_cost = 0 within 1e-10 in fp64.
+43. `test_lemma_1_linear_drift_zero` — at the kernel level with M=3 sources constructed for linear pairwise drift: total_cost = 0 within 1e-10 in fp64.
+44. `test_lemma_1_quadratic_positive` — at the kernel level with a source producing accelerating divergence above gate threshold: total_cost > 0.
+
+**test_core_cross_kernel.py:**
+
+45. `test_pseudo_huber_matches_autonomy_bit_exact` — import both kernels' `pseudo_huber`; same input → bit-identical output.
+46. `test_enumerate_pairs_matches_autonomy` — same `(M, anchor, idx)` → equal tuple lists.
+47. `test_compute_bcvf_cost_scalar_matches_autonomy_on_identical_shape_inputs` — at `(L=5, V=3)` with matching shape inputs, total_cost agreement within 1e-10 (structural sanity, not primary correctness).
+
+**test_core_import_isolation.py (§2.8.2):**
+
+48. `test_kernel_import_without_torch` — in a subprocess with `torch` hidden from `sys.modules`, `import symbolu_bcvf_llm.core` succeeds.
+49. `test_kernel_import_without_transformers` — same, for `transformers`.
+
+**Count: 49 tests.** Roughly matches §2.9.3's estimate of ≈44, with Lemma 1 and import-isolation each getting their own file for visibility.
+
+#### 2.9.5 Determinism and tolerance conventions
+
+- **Precision for Lemma 1 tests:** fp64. The 2nd-difference cancellation in §2.8.6 produces residuals around `1e-15` in fp64, so the `1e-10` tolerance used for C1 and C2 tests has 5 orders of magnitude of slack.
+- **Precision for non-Lemma 1 tests:** fp32 is the default, matching §2.7.2's V1 production rule. The `1e-7` tolerance used for shape/equivalence tests has enough slack for fp32 rounding at vocab size V=32000.
+- **Seed discipline:** Any test that uses random probabilities uses `np.random.default_rng(seed=42)` with a fixed seed. Reproducibility is non-negotiable.
+- **Shape assertions:** always exact (not a subset; not a broadcast-compatible match).
+- **Value equality:** always via `np.testing.assert_allclose` with explicit `rtol` and `atol`. Never `==` on floats.
+
+#### 2.9.6 Pass/fail criteria and Phase 1 sign-off
+
+Phase 1 is **signed off** when all three conditions hold:
+
+1. `pytest symbolu_bcvf_llm/tests/ -x -v` returns 0 on CI. `-x` = fail-fast: one failure = sign-off blocked.
+2. All 49 tests above are **present and non-skipped** (no `pytest.mark.skip` or `xfail` markers in the shipped suite).
+3. Code review confirms each test file's assertions correspond to the claim documented in the referenced §2 sub-section. A test that passes but doesn't assert the claimed property is worse than a failing test (it gives false confidence). Review is mandatory.
+
+**On failure.** If any test fails during Phase 1 execution:
+
+- The test output identifies the sub-section (by the test file/function name).
+- The relevant §2 sub-section is re-opened and revised.
+- `git revert` the kernel implementation commit and restart from the design fix.
+- `HISTORY.md` records the revision and its trigger (e.g., "§2.8.10 revised after test_pair_cost_linear_drift_zero failed in fp32 — boundary upcast enforcement added").
+
+This is the same discipline autonomy used: design → test → implement → test-pass → sign-off.
+
+#### 2.9.7 What §2.9 does NOT cover
+
+- **Signal-characterization tests** under synthetic LLM traces with failure injection — that's §3 (Phase 1.5), after Phase 1 closes.
+- **Model-backed tests** using an actual HuggingFace model — that's §4 (Phase 2), far downstream.
+- **Trust-weighting calibration tests** for softmin `τ_w` — that's §5 (Phase 3).
+- **Benchmark / performance tests** — these are useful but not gate criteria. May be added to a separate `tests/benchmarks/` directory and run selectively.
+- **Property-based tests** (e.g., Hypothesis) — complement but do not replace the explicit tests above. Can be added in V2 if coverage gaps emerge.
+
+#### 2.9.8 Effort estimate
+
+- **Test implementation:** 0.5–1 day given that autonomy's `test_core.py` (approx. 300 lines, 40+ tests) is a direct template. The LLM versions are structurally parallel plus the ~10 new tests for `valid_mask`, per_source attribution, and NaN guard.
+- **Cross-kernel tests:** 2 hours to get the import paths correct and verify bit-exact behavior of `pseudo_huber`.
+- **CI wiring:** 1 hour to add `symbolu_bcvf_llm/tests/` to the existing pytest config.
+- **Implementation of `symbolu_bcvf_llm/core.py`:** 1 day, bounded by the sub-section-by-sub-section §2.8 spec.
+- **Debug iterations:** 0.5 day budgeted, realistically often zero since the autonomy kernel is already debugged.
+- **Total Phase 1 execution:** ~3 days, within §1.9's 2-week V1 budget.
+
+#### 2.9.9 Acceptance criteria for §2.9 itself
+
+§2.9 is considered complete when:
+
+1. ✅ Purpose and hard-gate role stated (§2.9.1).
+2. ✅ Test file layout committed (§2.9.2).
+3. ✅ Test categories and counts tabulated (§2.9.3).
+4. ✅ Full test catalog (49 tests) enumerated with target files and one-line assertions (§2.9.4).
+5. ✅ Determinism and tolerance conventions committed (§2.9.5).
+6. ✅ Pass/fail criteria and sign-off protocol defined (§2.9.6).
+7. ✅ Out-of-scope items enumerated (§2.9.7).
+8. ✅ Effort estimate provided (§2.9.8).
+
+All items 1–8 satisfied by this section. §2.9 is closed; §2 Phase 1 design is **complete end-to-end** (§2.0–§2.9).
+
+**Next step after §2.9 sign-off:** Phase 1 **execution** — write `symbolu_bcvf_llm/core.py` + `tests/` per this spec. When all 49 tests pass, Phase 1 closes and §3 (Phase 1.5) is authorized. §3 onward remain as skeleton sub-sections pending authorization.
+
+---
 
 ---
 
