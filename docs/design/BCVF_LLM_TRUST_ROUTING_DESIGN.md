@@ -3025,6 +3025,128 @@ class TraceBundle:
 
 §3.3 is an intentionally minimal spec. The test harness is small, pure, and runs in seconds; everything beyond the §3.2 families and their magnitude sweeps is V2 or §4.
 
+### 3.4 Parameter sweep grid
+
+§3.2 named the families, §3.3 specified how to generate them. §3.4 commits **which parameter combinations are actually run** — the cross product of families × magnitudes × BCVF config × entropy regimes.
+
+#### 3.4.1 Sweep dimensions
+
+Five dimensions cross-multiplied:
+
+1. **Family** (7 values from §3.2): `baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, eos_truncation`.
+2. **Family magnitude** (per-family values from §3.3.3 tables): `α_mag`, `drift_rate`, `accel_mag`, `σ_noise`, `k_eos` — each family has 5–6 values.
+3. **BCVF gate parameters** `(T, β)`: V1 defaults `(0.1, 200)` plus a sensitivity grid.
+4. **Huber parameter** `δ`: V1 default `0.5` plus a sensitivity grid.
+5. **Base entropy** `sigma_logit`: `{1.0, 3.0, 5.0}` from §3.3.1.
+6. **Seed**: 3 seeds per cell for RNG-stability. Cells are considered to pass only if all 3 seeds pass independently.
+
+**Fixed across all sweeps:** `L = 5` (§2.3.4), `M = 3` (§1.3), `V = 32000` (production) *and* `V = 1024` (fast iteration). `cost_order = SECOND` for primary sweeps; `FIRST` and `ZEROTH` for the §3.2.3 linear-drift family only (ablation check — `FIRST` must fail there per §2.6.4 / §2.8.3, confirming the Lemma-1-violation warning is empirical).
+
+#### 3.4.2 Primary grid — production characterization
+
+The primary grid uses V1 BCVF defaults and sweeps only the family-side dimensions. This is the core "does the kernel fire correctly on realistic inputs?" sweep.
+
+| Dimension | Primary values | Count |
+|---|---|---|
+| Family | all 7 from §3.2 | 7 |
+| Family magnitude | per-family range (§3.3.3); avg 5 values | avg 5 |
+| `(T, β)` | **`(0.1, 200)` only** (V1 default) | 1 |
+| `δ` | **`0.5` only** (V1 default) | 1 |
+| `sigma_logit` | **`3.0` only** (V1 primary regime) | 1 |
+| `V` | **`1024` only** (fast iteration) | 1 |
+| Seeds | 3 seeds | 3 |
+
+**Primary grid size:** `7 × 5 × 1 × 1 × 1 × 1 × 3 ≈ 105 cells`. Each cell is one `compute_bcvf_cost_batch` call on a `(1, 3, 5, 1024)` tensor — milliseconds.
+
+**Purpose.** Primary grid answers: *at V1 defaults and the primary entropy regime, does every family pass §3.5's thresholds?* If yes, Phase 1.5 core result is green. If no, either a family's pass threshold is wrong (§3.5 revisit) or the V1 defaults are wrong (sensitivity grid diagnoses which).
+
+#### 3.4.3 Sensitivity grid — robustness & tuning
+
+The sensitivity grid holds family + magnitude fixed at each family's *canonical* value (middle of its range) and sweeps the BCVF parameters + entropy regime. Catches "V1 defaults are pathological at some entropy" failures.
+
+| Dimension | Sensitivity values | Count |
+|---|---|---|
+| Family | all 7 | 7 |
+| Family magnitude | **1 canonical value per family** (the middle of §3.3.3's range) | 1 |
+| `T` (gate threshold) | `{0.05, 0.1, 0.2}` | 3 |
+| `β` (gate steepness) | `{100, 200, 500}` | 3 |
+| `δ` (Huber) | `{0.25, 0.5, 1.0}` | 3 |
+| `sigma_logit` | `{1.0, 3.0, 5.0}` | 3 |
+| `V` | `1024` | 1 |
+| Seeds | 3 seeds | 3 |
+
+**Sensitivity grid size:** `7 × 1 × 3 × 3 × 3 × 3 × 1 × 3 = 1701 cells`. Still milliseconds each → entire sweep in roughly 10–30 seconds on a single CPU core.
+
+**Purpose.** Sensitivity grid answers: *if V1 defaults fail on primary, does a nearby `(T, β, δ)` tuple work?* Combined with `sigma_logit` variation, identifies whether the failure is parameter-scale or entropy-scale. §3.5's pass thresholds apply per-cell; §3.9 aggregates the sensitivity-grid pass rate per `(T, β, δ)` tuple and picks the winner.
+
+#### 3.4.4 Ablation grid — cost-order confirmation
+
+A small, targeted grid to empirically confirm the §2.8.3 Lemma-1-violation warning on `CostOrder.FIRST`.
+
+| Dimension | Values | Count |
+|---|---|---|
+| Family | **`linear_drift` only** | 1 |
+| Family magnitude | **full range** (5 values) | 5 |
+| `cost_order` | `{ZEROTH, FIRST, SECOND}` | 3 |
+| `sigma_logit` | `3.0` | 1 |
+| `V` | `1024` | 1 |
+| Seeds | 3 | 3 |
+
+**Ablation grid size:** `1 × 5 × 3 × 1 × 1 × 3 = 45 cells`. Expected result pattern:
+
+- `SECOND`: all cells pass (`total_cost ≤ 1e−10` per §3.2.3) — the Lemma-1-respecting regime.
+- `FIRST`: cells with `drift_rate > 0` **fail** (produce `total_cost > 0`) — empirically confirms §2.6.4's warning.
+- `ZEROTH`: cells with `drift_rate > 0` also fail when `‖e‖ > T` — reported for completeness, no claim about C2 invariance.
+
+If `FIRST` passes the `linear_drift` family, something is wrong with either the implementation or the §2.6 proof — Phase 1.5 is blocked until resolved.
+
+#### 3.4.5 Full-vocabulary spot check
+
+Production will run at `V = 32000`. The primary and sensitivity grids use `V = 1024` for iteration speed; a final spot-check grid validates that the winner from §3.4.3 produces the same qualitative behavior at production scale.
+
+| Dimension | Values | Count |
+|---|---|---|
+| Family | all 7 | 7 |
+| Family magnitude | canonical only | 1 |
+| `(T, β, δ)` | **winner from sensitivity** (1 tuple) | 1 |
+| `sigma_logit` | `3.0` | 1 |
+| `V` | **`32000` only** | 1 |
+| Seeds | 3 | 3 |
+
+**Spot-check grid size:** `7 × 1 × 1 × 1 × 1 × 3 = 21 cells`. Each cell is ~30× more data than the `V=1024` cells; expected cell runtime ~10–50 ms; total ~1 second.
+
+**Purpose.** Confirms the V=1024 → V=32000 scaling doesn't flip any pass/fail. If it does (e.g., noise-floor fails at V=32000 because the dilute simplex changes the effective noise level), §3.5 and §3.9 record the vocabulary-scale dependency as a §4 integration risk.
+
+#### 3.4.6 Grand total and runtime
+
+| Grid | Cells | Per-cell runtime | Total runtime |
+|---|---|---|---|
+| Primary (§3.4.2) | 105 | ~1 ms | ~0.1 s |
+| Sensitivity (§3.4.3) | 1701 | ~1 ms | ~2 s |
+| Ablation (§3.4.4) | 45 | ~1 ms | ~0.05 s |
+| Full-V spot check (§3.4.5) | 21 | ~30 ms | ~1 s |
+| **Total** | **≈ 1872 cells** | | **~3–4 seconds wall time on single CPU core** |
+
+The entire §3 Phase 1.5 experimental campaign completes in under 5 seconds. This is deliberate: §3 is a *correctness* sweep, not a *performance* benchmark. If the sweep takes longer than 30 seconds, something has gone wrong with the generator or the kernel, not with the experimental design.
+
+#### 3.4.7 Execution order
+
+1. Ablation grid (§3.4.4) runs first — if `cost_order=FIRST` doesn't violate C2 empirically, the whole design doc is wrong and the rest of §3 is moot.
+2. Primary grid (§3.4.2) runs second — fast sanity check that V1 defaults work at all.
+3. Sensitivity grid (§3.4.3) runs third — identifies best `(T, β, δ)` tuple if primary has gaps.
+4. Full-V spot check (§3.4.5) runs last — confirms the winner survives vocabulary scaling.
+
+Each stage has an in-loop pass/fail aggregate; if any stage fails globally, later stages don't run (execution is explicitly short-circuited to save developer attention, not compute). §3.9 sign-off requires all four stages green.
+
+#### 3.4.8 What §3.4 does NOT do
+
+- **No cross-family joint sweeps** (e.g., "outlier + noise at the same time"). V1 keeps families isolated; combined-stressor families are V2 per §3.8.
+- **No sweep over M.** §1.3 locks M=3; sweeping over M=2 and M=4 is a §9 V2 question.
+- **No sweep over L.** §2.3.4 locks L=5; sweeping over L=3, 7 is §9.
+- **No performance tuning.** Grid sizing prioritizes coverage over FLOP efficiency.
+- **No calibration against real-model distributions.** §4 retroactively validates `sigma_logit=3.0` against a real HuggingFace model; §3 does not.
+- **No result-aggregation protocol.** §3.9 specifies how per-cell pass/fail aggregates into per-family and per-parameter-tuple pass rates.
+
 ---
 
 ## Section 4 — Phase 2 — Source Framework
