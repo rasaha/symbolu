@@ -405,6 +405,70 @@ def test_mcnemar_exact_no_discordants() -> None:
     assert p == 1.0
 
 
+def test_alignment_diagnostic_aligned_signal() -> None:
+    """Synthetic: A3 holds centerline while A0 drifts. BCVF rises in
+    lockstep with A0's drift (i.e., as predictor disagreement grows,
+    A0 is getting worse but A3 is being held in place). Under this
+    construction, Δ|y|(t) = |y_A3| − |y_A0| becomes increasingly
+    negative exactly when BCVF rises — the hallmark of an aligned
+    safety signal. Alignment correlation is strongly negative."""
+    from symbolu_robotics.bcvf_autonomous.metrics import compute_alignment_diagnostic
+
+    T = 40
+    # A0 drifts monotonically; A3 stays pinned to centerline; BCVF
+    # rises as the disagreement grows — A3's BCVF cost reflects the
+    # effort needed to stay on-center against the failing anchor.
+    y_a0 = np.linspace(0.0, 5.0, T)
+    y_a3 = np.zeros(T)
+    bcvf = np.linspace(0.0, 5.0, T)  # monotone, matched shape
+
+    d0 = _diag_with_y(y_a0)
+    d3 = _diag_with_y(y_a3)
+    d3.bcvf_costs = bcvf
+
+    out = compute_alignment_diagnostic([d0], [d3], dt=0.1, lookahead_steps=0)
+    r = out["per_seed"][0]["correlation"]
+    assert math.isfinite(r)
+    # Δ|y| = |y_a3| − |y_a0| = −linspace(0, 5) — exactly anti-correlated
+    # with BCVF. Pearson r should be −1.0.
+    assert r < -0.95, f"expected r ≈ -1; got r={r:.3f}"
+
+
+def test_alignment_diagnostic_misaligned_signal() -> None:
+    """Synthetic: BCVF fires when A3 is drifting FURTHER off-lane than A0.
+    Alignment correlation should be positive (BCVF coincides with A3
+    being worse)."""
+    from symbolu_robotics.bcvf_autonomous.metrics import compute_alignment_diagnostic
+
+    T = 60
+    t = np.arange(T, dtype=np.float64)
+    y_a0 = np.full(T, 0.1)  # A0 stays near centerline
+    y_a3 = np.where(t < 20, 0.1, 0.1 + 0.5 * (t - 20))  # A3 drifts
+    bcvf = np.where(t < 20, 0.0, 0.5 * (t - 20))  # BCVF rises as A3 drifts
+
+    d0 = _diag_with_y(y_a0)
+    d3 = _diag_with_y(y_a3)
+    d3.bcvf_costs = bcvf
+
+    out = compute_alignment_diagnostic([d0], [d3], dt=0.1, lookahead_steps=0)
+    r = out["per_seed"][0]["correlation"]
+    assert math.isfinite(r)
+    assert r > 0.3, f"expected strongly positive mis-alignment; got r={r:.3f}"
+
+
+def test_alignment_diagnostic_empty_input() -> None:
+    from symbolu_robotics.bcvf_autonomous.metrics import compute_alignment_diagnostic
+    out = compute_alignment_diagnostic([], [])
+    assert out["n_seeds"] == 0
+    assert out["per_seed"] == []
+
+
+def test_alignment_diagnostic_length_mismatch_raises() -> None:
+    from symbolu_robotics.bcvf_autonomous.metrics import compute_alignment_diagnostic
+    with pytest.raises(ValueError):
+        compute_alignment_diagnostic([_diag_with_y(np.zeros(10))], [])
+
+
 def test_mcnemar_known_exact_value() -> None:
     """3 vs 0 discordants under H0 ~ Bin(3, 0.5): one-sided P = 1/8,
     two-sided p = 0.25 (clamped at 1 if > 1)."""

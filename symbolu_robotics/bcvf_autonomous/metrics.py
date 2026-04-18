@@ -417,6 +417,156 @@ def fisher_exact_2x2(
     return (float(odds_ratio), float(p_value))
 
 
+def _pearson_r(x: np.ndarray, y: np.ndarray) -> float:
+    """Pearson correlation. Returns NaN if either series has no variance."""
+    if x.size != y.size or x.size < 2:
+        return float("nan")
+    x_c = x - x.mean()
+    y_c = y - y.mean()
+    denom = float(np.sqrt(float(np.sum(x_c * x_c)) * float(np.sum(y_c * y_c))))
+    if denom <= 0.0 or not math.isfinite(denom):
+        return float("nan")
+    return float(np.sum(x_c * y_c) / denom)
+
+
+def compute_alignment_diagnostic(
+    a0_diags: List,
+    a3_diags: List,
+    dt: float = 0.1,
+    lookahead_steps: int = 10,
+    recovery_threshold_m: float = 0.5,
+) -> Dict[str, Any]:
+    """BCVF-recovery alignment diagnostic (post-B2-smoke addition).
+
+    For each matched seed i:
+      - Build |y_A0(t)| and |y_A3(t)| from the ground-truth trajectories.
+      - Compute Δ|y|(t) = |y_A3|(t+lookahead) − |y_A0|(t+lookahead).
+      - Correlate A3's J_BCVF(t) against Δ|y|(t+lookahead).
+      - Classify the seed into {a3_wins, a0_wins, both_recovered, both_failed}
+        by post-peak recovery outcome.
+
+    The engineering interpretation:
+
+    - correlation < 0 → higher BCVF activity precedes *smaller* A3-A0
+      lateral gap, i.e. BCVF firings are aligned with the safety
+      objective (A3 closer to centerline when BCVF reacts).
+    - correlation ≈ 0 → BCVF activity is uncorrelated with A3 vs A0
+      lateral outcomes; BCVF is neither aligned nor anti-aligned.
+    - correlation > 0 → BCVF activity precedes *larger* A3-A0 lateral
+      gap, i.e. BCVF firings coincide with A3 ending further from
+      centerline than A0. Mis-aligned; BCVF is not acting as a safety
+      term under the current composition.
+
+    This is the criterion from the user's engineering-review note:
+    ``ΔJ_BCVF should correlate with reduced future lateral error, not
+    merely reduced predictor disagreement.``
+
+    Returns a dict suitable for JSON serialization.
+    """
+    if len(a0_diags) != len(a3_diags):
+        raise ValueError(
+            f"paired analysis requires equal-length inputs; got "
+            f"len(A0)={len(a0_diags)}, len(A3)={len(a3_diags)}"
+        )
+    n = len(a0_diags)
+    if n == 0:
+        return {
+            "n_seeds": 0,
+            "lookahead_steps": lookahead_steps,
+            "per_seed": [],
+            "mean_correlation": float("nan"),
+        }
+
+    per_seed: List[Dict[str, Any]] = []
+    for i, (d0, d3) in enumerate(zip(a0_diags, a3_diags)):
+        gt0 = np.asarray(d0.ground_truth_trajectory, dtype=np.float64)
+        gt3 = np.asarray(d3.ground_truth_trajectory, dtype=np.float64)
+        if gt0.shape[0] != gt3.shape[0]:
+            # Shouldn't happen in a deterministic sim, but guard.
+            T = min(gt0.shape[0], gt3.shape[0])
+            gt0, gt3 = gt0[:T], gt3[:T]
+        abs_y0 = np.abs(gt0[:, 1])
+        abs_y3 = np.abs(gt3[:, 1])
+        dy = abs_y3 - abs_y0                                  # Δ|y|(t)
+        bcvf = np.asarray(d3.bcvf_costs, dtype=np.float64)
+
+        T = min(bcvf.size, dy.size)
+        if T <= lookahead_steps + 1:
+            r = float("nan")
+        else:
+            bcvf_s = bcvf[: T - lookahead_steps]
+            dy_shifted = dy[lookahead_steps:T]
+            r = _pearson_r(bcvf_s, dy_shifted)
+
+        a0_rec = bool(
+            np.any(
+                abs_y0[int(np.argmax(abs_y0)) + 1 :] < recovery_threshold_m
+            )
+        ) if abs_y0.size > 0 else False
+        a3_rec = bool(
+            np.any(
+                abs_y3[int(np.argmax(abs_y3)) + 1 :] < recovery_threshold_m
+            )
+        ) if abs_y3.size > 0 else False
+
+        if a0_rec and a3_rec:
+            cls = "both_recovered"
+        elif a0_rec and not a3_rec:
+            cls = "a0_wins"
+        elif a3_rec and not a0_rec:
+            cls = "a3_wins"
+        else:
+            cls = "both_failed"
+
+        per_seed.append(
+            {
+                "seed_idx": i,
+                "classification": cls,
+                "correlation": r,
+                "final_y_A0": float(abs_y0[-1]) if abs_y0.size else 0.0,
+                "final_y_A3": float(abs_y3[-1]) if abs_y3.size else 0.0,
+                "peak_y_A0": float(abs_y0.max()) if abs_y0.size else 0.0,
+                "peak_y_A3": float(abs_y3.max()) if abs_y3.size else 0.0,
+                "bcvf_mean": float(bcvf.mean()) if bcvf.size else 0.0,
+                "bcvf_max": float(bcvf.max()) if bcvf.size else 0.0,
+            }
+        )
+
+    # Aggregates — means per classification, ignoring NaN correlations.
+    def class_mean(cls: str) -> Optional[float]:
+        rs = [
+            p["correlation"]
+            for p in per_seed
+            if p["classification"] == cls and math.isfinite(p["correlation"])
+        ]
+        if not rs:
+            return None
+        return float(np.mean(rs))
+
+    all_rs = [
+        p["correlation"]
+        for p in per_seed
+        if math.isfinite(p["correlation"])
+    ]
+    counts = {
+        cls: sum(1 for p in per_seed if p["classification"] == cls)
+        for cls in ("a3_wins", "a0_wins", "both_recovered", "both_failed")
+    }
+
+    return {
+        "n_seeds": n,
+        "lookahead_steps": lookahead_steps,
+        "recovery_threshold_m": recovery_threshold_m,
+        "per_seed": per_seed,
+        "counts": counts,
+        "mean_correlation": float(np.mean(all_rs)) if all_rs else float("nan"),
+        "mean_correlation_a3_wins": class_mean("a3_wins"),
+        "mean_correlation_a0_wins": class_mean("a0_wins"),
+        "mean_correlation_both_recovered": class_mean("both_recovered"),
+        "mean_correlation_both_failed": class_mean("both_failed"),
+    }
+
+
 def mcnemar_exact(b_only_a: int, b_only_b: int) -> Tuple[int, float]:
     """McNemar's exact test for paired binomial outcomes.
 

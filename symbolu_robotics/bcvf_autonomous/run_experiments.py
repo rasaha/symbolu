@@ -31,6 +31,7 @@ from .metrics import (
     compare_collision_rates,
     compare_recovery_rates,
     compute_aggregate_metrics,
+    compute_alignment_diagnostic,
     compute_episode_metrics,
     compute_early_warning_time,
     mcnemar_exact,
@@ -338,6 +339,12 @@ class ExperimentRunner:
         # gate-2 decision when Fisher's-exact p is borderline.
         paired_by_scenario = self._build_paired_outcomes(ablation)
 
+        # BCVF-recovery alignment diagnostic: per-seed Pearson correlation
+        # between A3's BCVF cost time-series and the lookahead-shifted A3-A0
+        # lateral gap. Answers "is BCVF actually steering toward safety,
+        # or just firing on predictor disagreement?"
+        alignment_by_scenario = self._build_alignment_diagnostic()
+
         wall = time.perf_counter() - start
         total_runs = (
             len(ablation) * self._config.runs_per_config
@@ -356,6 +363,8 @@ class ExperimentRunner:
             json.dump({"wall_clock_seconds": wall, "total_runs": total_runs}, f, indent=2)
         with open(out_dir / "paired_outcomes.json", "w", encoding="utf-8") as f:
             json.dump(paired_by_scenario, f, indent=2)
+        with open(out_dir / "alignment_diagnostic.json", "w", encoding="utf-8") as f:
+            json.dump(alignment_by_scenario, f, indent=2)
 
         return ExperimentResult(
             ablation_results=ablation,
@@ -442,6 +451,38 @@ class ExperimentRunner:
                     "p_value": float(p_mcnemar),
                 },
             }
+        return out
+
+    def _load_diagnostics(self, run_dir: Path, n: int) -> List:
+        """Load raw EpisodeDiagnostics (not the derived EpisodeMetrics).
+        Used by the alignment diagnostic, which needs the full
+        ground_truth trajectory and bcvf_costs time series."""
+        diags: List = []
+        for i in range(n):
+            path = run_dir / f"run_{i:03d}.json"
+            if not path.exists():
+                continue
+            with open(path, "r", encoding="utf-8") as f:
+                diags.append(_diagnostics_from_dict(json.load(f)))
+        return diags
+
+    def _build_alignment_diagnostic(self) -> Dict[str, Any]:
+        """Run the BCVF-recovery alignment analysis for each scenario
+        with both A0 and A3 runs completed."""
+        out: Dict[str, Any] = {}
+        for scenario in self._config.scenarios:
+            a0_dir = self._ablation_dir(scenario, "A0")
+            a3_dir = self._ablation_dir(scenario, "A3")
+            if not (a0_dir.exists() and a3_dir.exists()):
+                continue
+            a0_diags = self._load_diagnostics(a0_dir, self._config.runs_per_config)
+            a3_diags = self._load_diagnostics(a3_dir, self._config.runs_per_config)
+            if not a0_diags or not a3_diags:
+                continue
+            n = min(len(a0_diags), len(a3_diags))
+            out[scenario] = compute_alignment_diagnostic(
+                a0_diags[:n], a3_diags[:n]
+            )
         return out
 
     def _load_episodes(self, run_dir: Path, n: int) -> List:
