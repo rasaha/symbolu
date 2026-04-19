@@ -209,11 +209,20 @@ class MPPIPlanner:
         # pinning when disagreement is mild. Exposed as a knob (set_*)
         # for tuning.
         self._trust_temperature: float = 1.0
+        # Level-2 adaptive normalization (per-predictor EMA mean on
+        # per_pred_cost, subtracted before softmin). α=0 disables —
+        # softmin operates on raw per_pred_cost (prior behavior). α>0
+        # maintains a running mean across outer steps and softmins on
+        # the residual, removing the seed-dependent constant floor
+        # identified in the N=26 diagnostic (option 3).
+        self._ema_alpha: float = 0.0
+        self._ema_mean: Optional[np.ndarray] = None  # (M,) once initialized
 
     # --- public API ---
 
     def reset(self) -> None:
         self._prev_solution = None
+        self._ema_mean = None
 
     def plan(self) -> MPPIResult:
         start = time.perf_counter()
@@ -341,11 +350,32 @@ class MPPIPlanner:
             bcvf_total, per_pred_cost = compute_bcvf_cost_batch(
                 trajectories_list, bcvf_cfg, return_per_predictor=True
             )
+            # Level-2 adaptive normalization: subtract per-predictor EMA
+            # mean (computed across outer steps) to remove the seed-
+            # dependent constant floor. On the first step _ema_mean is
+            # None → initialize from current step's mean across K, which
+            # makes the residual identically zero at step 0 and yields
+            # uniform weights (safe cold start). On subsequent steps,
+            # residual = per_pred_cost - EMA_mean, and softmin operates
+            # on residual instead of raw cost.
+            if self._ema_alpha > 0.0:
+                step_mean = per_pred_cost.mean(axis=0)  # (M,)
+                if self._ema_mean is None:
+                    self._ema_mean = step_mean.copy()
+                pred_signal = per_pred_cost - self._ema_mean[np.newaxis, :]
+                # Update EMA *after* using current signal, so the first
+                # step operates on its own mean (zero residual) and
+                # subsequent steps use the stale-by-one estimate.
+                a = self._ema_alpha
+                self._ema_mean = a * step_mean + (1.0 - a) * self._ema_mean
+            else:
+                pred_signal = per_pred_cost
+
             # Softmin weights: softmin(c) = softmax(-c). Scale by a
             # per-rollout min-shift so numerical exponents stay bounded
             # regardless of absolute cost magnitudes.
             tau_w = max(self._trust_temperature, 1e-9)
-            shifted = per_pred_cost - per_pred_cost.min(axis=1, keepdims=True)
+            shifted = pred_signal - pred_signal.min(axis=1, keepdims=True)
             arg = np.clip(-shifted / tau_w, -50.0, 50.0)
             raw = np.exp(arg)                                 # (K, M)
             weights = raw / raw.sum(axis=1, keepdims=True)    # (K, M)
@@ -397,3 +427,16 @@ class MPPIPlanner:
     def set_seed(self, seed: int) -> None:
         """Re-seed the internal sampling RNG (for deterministic tests)."""
         self._rng = np.random.default_rng(seed)
+
+    def set_ema_alpha(self, alpha: float) -> None:
+        """Set EMA rate for Level-2 adaptive trust-weight normalization.
+
+        alpha=0 disables (softmin operates on raw per_pred_cost).
+        alpha>0 subtracts a running per-predictor mean before softmin.
+        Typical values: 0.02-0.1, giving effective τ ~ 10-50 outer steps
+        (1-5 s at dt=0.1).
+        """
+        if alpha < 0.0 or alpha > 1.0:
+            raise ValueError(f"ema_alpha must be in [0, 1]; got {alpha}")
+        self._ema_alpha = alpha
+        self._ema_mean = None

@@ -118,6 +118,9 @@ class ExperimentConfig:
     base_perf: Optional[PerfCostConfig] = None
     base_bicycle: Optional[BicycleConfig] = None
 
+    # Level-2 adaptive normalization rate for Rahu softmin. 0 disables.
+    ema_alpha: float = 0.0
+
 
 @dataclass
 class ExperimentResult:
@@ -225,6 +228,7 @@ class ExperimentRunner:
             self._base_bicycle,
             seed=seed,
         )
+        run_cfg.ema_alpha = self._config.ema_alpha
         diag = Runner(run_cfg).diagnostics()
 
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -567,6 +571,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Override BCVF gate_threshold (default: _default_tuning=0.2)")
     parser.add_argument("--gate-beta", type=float, default=None,
                         help="Override BCVF gate_beta (default: _default_tuning=100.0)")
+    parser.add_argument("--ema-alpha", type=float, default=0.0,
+                        help="Level-2 adaptive Rahu-softmin EMA rate "
+                             "(0 disables — raw per_pred_cost softmin)")
     args = parser.parse_args(argv)
 
     base_bcvf_override = None
@@ -587,6 +594,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         base_seed=args.seed,
         runs_per_config=args.runs,
         base_bcvf=base_bcvf_override,
+        ema_alpha=args.ema_alpha,
     )
     if args.scenarios:
         cfg.scenarios = args.scenarios

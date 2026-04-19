@@ -53,6 +53,7 @@ class RunConfig:
     seed: int = 42
     failures: Dict[str, FailureConfig] = field(default_factory=dict)
     gnss_failure_type: str = "multipath"  # "multipath" | "map_error" | "constant_bias"
+    ema_alpha: float = 0.0  # Level-2 adaptive trust-weight normalization
 
 
 @dataclass
@@ -155,6 +156,9 @@ class Runner:
             cfg.sim.obstacles,
         )
         planner.set_seed(cfg.seed)
+        ema_alpha = getattr(cfg, "ema_alpha", 0.0)
+        if ema_alpha > 0.0:
+            planner.set_ema_alpha(ema_alpha)
 
         sim.reset()
         solve_times: List[float] = []
