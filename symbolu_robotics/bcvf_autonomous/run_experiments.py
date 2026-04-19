@@ -122,6 +122,8 @@ class ExperimentConfig:
     ema_alpha: float = 0.0
     # Solution-3 deadband threshold (in EMA-std units). 0 disables.
     deadband_k_sigma: float = 0.0
+    # When set, dump per-step trust log to {output_dir}/trust_log_seed_N.json
+    trust_log_dir: Optional[str] = None
 
 
 @dataclass
@@ -232,6 +234,12 @@ class ExperimentRunner:
         )
         run_cfg.ema_alpha = self._config.ema_alpha
         run_cfg.deadband_k_sigma = self._config.deadband_k_sigma
+        if self._config.trust_log_dir:
+            from pathlib import Path as _P
+            run_cfg.trust_log_path = str(
+                _P(self._config.trust_log_dir)
+                / f"trust_log_seed_{seed:03d}.json"
+            )
         diag = Runner(run_cfg).diagnostics()
 
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -580,6 +588,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--deadband-k-sigma", type=float, default=0.0,
                         help="Solution-3 deadband threshold in EMA-std "
                              "units (0 disables; requires --ema-alpha > 0)")
+    parser.add_argument("--trust-log-dir", type=str, default=None,
+                        help="If set, dump per-step trust-state JSON for "
+                             "deep-dive diagnostic. One file per seed.")
     args = parser.parse_args(argv)
 
     base_bcvf_override = None
@@ -602,6 +613,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         base_bcvf=base_bcvf_override,
         ema_alpha=args.ema_alpha,
         deadband_k_sigma=args.deadband_k_sigma,
+        trust_log_dir=args.trust_log_dir,
     )
     if args.scenarios:
         cfg.scenarios = args.scenarios
