@@ -229,3 +229,65 @@ per outer step on a single CPU core, and has no dependency on torch,
 ROS, or any robotics-platform-specific stack.
 
 ---
+
+## Page 3 — Competitive Landscape
+
+BCVF Autonomy Runtime sits in a category that does not yet have a
+clean name in the autonomy market — the layer between *"the predictor
+stack produced multiple disagreeing trajectories"* and *"the planner
+chose a control input."* That layer exists in every production AV /
+robotics stack, but it is almost universally **in-house engineering
+glue** rather than a portable runtime with a stated mathematical
+property. The table below positions us against each family of
+adjacent technology, stating for every row both *how* we differ and
+*why* that difference matters for an operator building a defensible
+safety case.
+
+| Category | Representative players | What they ship | How BCVF Autonomy Runtime differs — and why it is better |
+|---|---|---|---|
+| **Classical sensor / state fusion** | Kalman / EKF / UKF filters, particle filters, late-fusion ensembles, ROS `robot_localization`, MRPT, Apollo perception fusion | Deterministic blending of redundant sensor / state channels with hand-tuned weights or covariance models. Strong at combining noisy-but-honest signals into a single estimate. | We do not *fuse* signals — we **detect predictor disagreement** with a formal invariance and gate trust accordingly. **Better because:** classical fusion assumes the predictors are noisy-but-correctly-modeled; the failure mode our runtime targets (a predictor that is silently wrong) is exactly the case the Kalman covariance model cannot represent. We compose with classical fusion: the fusion layer can still combine sensors, and BCVF Autonomy Runtime sits one level up arbitrating between *predictors* whose outputs the fusion layer fed into. |
+| **ML uncertainty estimation** | Deep ensembles, Monte-Carlo dropout, evidential deep learning, conformal prediction, Bayesian deep learning libraries | Bolt-on uncertainty scores attached to per-prediction outputs, calibrated against held-out data and used as inputs to a downstream decision rule. | These produce *numbers* but **no formal invariance property** — their behavior on unseen failure shapes is exactly the unknown the safety case was supposed to bound. **Better because:** the Lemma 1 invariance gives a safety reviewer a structural statement ("this signal cannot fire on constant or linear-drift disagreement — therefore a non-zero signal is informative") that no empirically-calibrated uncertainty score can match. We are additive: a stack can keep its existing per-model uncertainty and feed it into our trust-weighting layer as additional context. |
+| **Closed AV / robotics platform stacks** | Waymo Driver, Cruise, Mobileye REM, Tesla Autopilot, NVIDIA DRIVE, Apollo (Baidu), Toyota Woven Driver | Full closed perception → prediction → planning stacks, often with proprietary internal arbitration logic between competing predictors. | These are end-to-end stacks with **proprietary, non-portable** internal trust mechanisms — the customer cannot inspect, certify, or substitute the predictor-arbitration logic. **Better because:** we ship the arbitration layer as a *portable, inspectable runtime* with a published Lemma 1 proof. A customer using NVIDIA DRIVE today can adopt our runtime as an explicit predictor-trust layer between DRIVE's perception output and the customer's own planning code, without giving up the rest of their stack — a capability no closed platform offers because none of them sell their internal arbitration as a separable component. |
+| **Open-source AV / robotics stacks** | Autoware (TIER IV), Apollo OSS, OpenPilot, CARLA, NAV2, MoveIt | Reference open-source autonomy stacks providing perception, prediction, and planning modules with community-developed glue between them. | They ship **stack components** and leave predictor-arbitration as glue code in `behavior_planner` / `decision_maker` modules that are configured per integrator, not pinned by tests. **Better because:** we provide the missing tested runtime contract for the disagreement regime. We integrate as a planning-layer dependency (`pip install symbolu_robotics`) and produce a structured `MPPIResult` that an Autoware or Apollo planning node can consume directly — replacing per-integrator decision-maker glue with a tested kernel + consumer pattern. |
+| **Functional-safety tooling** | ANSYS Medini Analyze, Vector vTESTstudio, dSPACE SystemDesk, Foretellix Foretify, Applied Intuition | Safety-case authoring, requirements traceability, FMEA / HARA / SOTIF documentation, scenario-based regression testing. | These tools document *what* the system should do; they do not enforce it at runtime. **Better because:** we provide the runtime artifact that those documents need to refer to. A SOTIF safety case asks "how does the system handle silent predictor miscalibration?" — without a runtime layer with a stated invariance, the answer has to be empirical ("we tested N scenarios"); with our runtime, the answer can be structural ("Lemma 1 guarantees no false trust shift on benign disagreement, and the consumer-layer pattern is validated to N=21 paired"). The two are complementary, not competing. |
+| **Robotics simulation + verification** | NVIDIA Isaac Sim, MathWorks Automated Driving Toolbox, CARLA, LGSVL, MORAI | Scenario libraries, simulation environments, regression-test infrastructure for autonomy stacks. | Simulation platforms test *whether* a stack passes a scenario; they do not provide a portable runtime *property* to test against. **Better because:** we ship the property (Lemma 1 invariance + autonomy-validated consumer pattern). The simulation platforms become a *consumer* of our test surface — they instantiate the BCVF kernel, run scenarios against it, and report regressions against a known mathematical baseline rather than against an opaque stack. |
+
+### Feature-level differentiation on predictor-trust primitives
+
+For autonomy program leads who want the one-page side-by-side on the
+primitives that come up in safety-review conversations, here is the
+honest comparison against the two most common competitor families:
+
+| Area | BCVF Autonomy Runtime | Classical fusion (Kalman / late-fusion) | ML uncertainty (ensemble / MC dropout / evidential) |
+|---|---|---|---|
+| Lemma 1 invariance proof (constant + linear drift → 0) | **Yes** | Not applicable (no invariance concept) | No — calibrated empirically |
+| Per-source attribution at M ≥ 3 (2:1 outlier discrimination) | **Yes** (symmetric all-pairs) | Partial (per-channel residuals) | Partial (per-model variance) |
+| Per-context baseline normalization (EMA mean centering) | **Yes** (autonomy-validated, §2.7.11) | Static covariance | Static calibration |
+| Significance gate / hinge-φ to suppress noise residuals | **Yes** (k=2σ default, §5.1) | No | No |
+| Non-anchor pairing at M ≥ 3 (avoids anchor-failure collusion) | **Yes** (default) | Often anchor-biased | Not applicable |
+| Pure-NumPy kernel, no GPU / torch dependency | **Yes** (166 tests, ms/step on CPU) | Varies; typically C++ | Typically requires torch/tf |
+| Tested runtime contract (predict→score→normalize→trust→consensus→plan→act) | **Yes** (pinned by tests) | No (per-stack glue) | No (per-stack glue) |
+| Drop-in to existing AV stacks | Drop-in to MPPI-style planners; adapter needed for non-MPPI planners | Mature | Mature |
+| Production AV deployments | Not yet — pilots in design | **Mature** (decades of deployment) | **Mature** (multiple production stacks) |
+| Ecosystem breadth (sensor drivers, simulation, perception primitives) | Narrow, focused on the arbitration layer | **Broad** | **Broad** |
+| Multi-stack platform integrations (ROS / Apollo / Autoware / DRIVE) | Not yet — on roadmap | **Mature** | **Mature** |
+
+### Why the overall bet is better, not just different
+
+- **The Lemma 1 invariance is a structural property no incumbent can match.** It is not a tuning improvement on existing uncertainty estimators — it is a *different kind of guarantee*. A 2nd-order operator on vector-valued disagreement is provably zero on constant offsets and linear drifts; the proof is dimension-agnostic and three pages of algebra (§2.6). No bolt-on uncertainty layer in the competitive table is derived from a structurally-zero-on-benign operator, because they are all calibration-based rather than invariance-based.
+- **We arbitrate predictors; we do not replace stacks.** A customer using Autoware for perception, Mobileye REM for HD-map priors, and a custom learned predictor can adopt BCVF Autonomy Runtime at the planning-layer arbitration boundary without giving up any of those investments. We are the missing layer for the disagreement regime, not a rival to perception/prediction or to planning.
+- **The autonomy-validated consumer-layer pattern is non-obvious and now empirically published.** EMA-mean centering + significance gate + non-anchor pairing was the configuration that produced the first statistically significant improvement (sign test p < 0.01) over a no-shaping baseline in our N=21 paired companion experiment. Each component alone underperforms; the combination is the result. A competitor would have to either reproduce the experiment or guess the same recipe — neither is fast.
+- **Pure-NumPy kernel, no GPU dependency.** Autonomy validation, regression testing, and CI for the kernel run on a laptop in seconds. Customers can add the runtime to their CI pipeline without provisioning GPU runners or modifying their build environment — a procurement-friendly property that closed AV stacks and torch-dependent uncertainty libraries do not match.
+- **Composes with, rather than replaces, the rest of the stack.** A customer can keep their existing classical fusion for sensor-level blending, their existing per-model uncertainty estimator for prediction-level scoring, and their existing functional-safety tooling for documentation — and still put BCVF Autonomy Runtime at the planner-arbitration boundary. We are additive at the layer where additive is hardest to provide today.
+- **Honest scope on where we do not compete (year one).** We are not trying to win on perception, on sensor drivers, on full-stack ecosystem breadth, on production-AV deployment count, or on multi-stack platform integrations in the first twelve months. We are trying to win on the one property that an autonomy safety case currently has no portable answer for: a runtime layer with a *proven* invariance for predictor-trust, validated end-to-end on a controlled failure scenario, with a pure-NumPy implementation that any program can drop into its existing planner without giving up the rest of its stack.
+
+### In one sentence
+
+Classical fusion combines signals. ML uncertainty estimates noise.
+Closed AV stacks bury arbitration inside proprietary code. Open-source
+stacks leave it to integrators. BCVF Autonomy Runtime gives the
+planner a **provably invariant trust signal for its competing
+predictors** — and that is a different product category than any of
+the incumbents in this table are building for.
+
+---
