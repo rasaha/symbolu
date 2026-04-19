@@ -55,6 +55,7 @@ class RunConfig:
     gnss_failure_type: str = "multipath"  # "multipath" | "map_error" | "constant_bias"
     ema_alpha: float = 0.0  # Level-2 adaptive trust-weight normalization
     deadband_k_sigma: float = 0.0  # Solution-3 deadband gate
+    trust_log_path: Optional[str] = None  # If set, dump per-step log here
 
 
 @dataclass
@@ -163,6 +164,9 @@ class Runner:
         deadband_k = getattr(cfg, "deadband_k_sigma", 0.0)
         if deadband_k > 0.0:
             planner.set_deadband_k_sigma(deadband_k)
+        trust_log_path = getattr(cfg, "trust_log_path", None)
+        if trust_log_path:
+            planner.set_trust_log_enabled(True)
 
         sim.reset()
         solve_times: List[float] = []
@@ -187,6 +191,13 @@ class Runner:
         collision = any(s.collision for s in history)
         collision_step = next((s.step for s in history if s.collision), None)
         mean = lambda xs: float(np.mean(xs)) if xs else 0.0
+
+        if trust_log_path:
+            log = planner.get_trust_log()
+            from pathlib import Path as _P
+            _P(trust_log_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(trust_log_path, "w", encoding="utf-8") as f:
+                json.dump({"seed": cfg.seed, "log": log}, f)
 
         return RunResult(
             history=history,

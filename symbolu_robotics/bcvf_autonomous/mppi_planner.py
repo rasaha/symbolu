@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -226,6 +226,13 @@ class MPPIPlanner:
         # were shaping softmin weights. 0 disables.
         self._deadband_k_sigma: float = 0.0
         self._ema_var: Optional[np.ndarray] = None  # (M,) EMA of residual^2
+        # Optional per-step trust-state log (deep-dive diagnostic). When
+        # enabled via set_trust_log_enabled(True), each plan() call
+        # appends a compact summary dict to self._trust_log. Disabled
+        # by default to avoid memory bloat in production runs.
+        self._trust_log_enabled: bool = False
+        self._trust_log: List[Dict[str, Any]] = []
+        self._trust_log_step: int = 0
 
     # --- public API ---
 
@@ -233,6 +240,9 @@ class MPPIPlanner:
         self._prev_solution = None
         self._ema_mean = None
         self._ema_var = None
+        self._trust_log_step = 0
+        if self._trust_log_enabled:
+            self._trust_log = []
 
     def plan(self) -> MPPIResult:
         start = time.perf_counter()
@@ -405,6 +415,7 @@ class MPPIPlanner:
             # the noise regime — fall back to uniform weights for that
             # rollout. Residual = pred_signal when ema_alpha > 0 (zero-
             # centered); if ema disabled this block also disables.
+            deadband_active_count = 0
             if (self._deadband_k_sigma > 0.0
                     and self._ema_alpha > 0.0
                     and self._ema_var is not None):
@@ -413,11 +424,55 @@ class MPPIPlanner:
                 z = np.abs(pred_signal) / ema_std[np.newaxis, :]  # (K, M)
                 max_abs_z_per_rollout = z.max(axis=1)              # (K,)
                 insignificant = max_abs_z_per_rollout < self._deadband_k_sigma
+                deadband_active_count = int(np.sum(insignificant))
                 if np.any(insignificant):
                     uniform = np.full(
                         (num_models,), 1.0 / num_models, dtype=np.float64
                     )
                     weights[insignificant] = uniform
+
+            # Optional deep-dive trust-state log. Records per-step
+            # summaries (per-predictor stats, not full K×M matrices) so
+            # post-hoc analysis can attribute trajectory failures to
+            # specific BCVF/EMA/deadband behavior.
+            if self._trust_log_enabled:
+                ema_mean_view = (
+                    self._ema_mean.tolist() if self._ema_mean is not None else None
+                )
+                ema_std_view = (
+                    np.sqrt(self._ema_var).tolist()
+                    if self._ema_var is not None else None
+                )
+                argmax_pred = np.argmax(weights, axis=1)  # (K,)
+                argmax_hist = np.bincount(
+                    argmax_pred, minlength=num_models
+                ).tolist()
+                self._trust_log.append({
+                    "step": self._trust_log_step,
+                    "per_pred_cost": {
+                        "mean": per_pred_cost.mean(axis=0).tolist(),
+                        "std": per_pred_cost.std(axis=0).tolist(),
+                        "min": per_pred_cost.min(axis=0).tolist(),
+                        "max": per_pred_cost.max(axis=0).tolist(),
+                        "median": np.median(per_pred_cost, axis=0).tolist(),
+                    },
+                    "weights": {
+                        "mean": weights.mean(axis=0).tolist(),
+                        "max": weights.max(axis=0).tolist(),
+                        "argmax_hist": argmax_hist,
+                    },
+                    "ema_mean": ema_mean_view,
+                    "ema_std": ema_std_view,
+                    "deadband": {
+                        "active_count": deadband_active_count,
+                        "k_sigma": self._deadband_k_sigma,
+                    },
+                    "bcvf_total_summary": {
+                        "mean": float(bcvf_total.mean()),
+                        "max": float(bcvf_total.max()),
+                    },
+                })
+                self._trust_log_step += 1
         else:
             # A0 baseline: equal weights (no observer).
             bcvf_total = np.zeros(k_batch, dtype=np.float64)
@@ -493,3 +548,14 @@ class MPPIPlanner:
         if k_sigma < 0.0:
             raise ValueError(f"deadband k_sigma must be >= 0; got {k_sigma}")
         self._deadband_k_sigma = k_sigma
+
+    def set_trust_log_enabled(self, enabled: bool) -> None:
+        """Enable/disable per-step trust-state logging (deep-dive)."""
+        self._trust_log_enabled = bool(enabled)
+        if enabled:
+            self._trust_log = []
+            self._trust_log_step = 0
+
+    def get_trust_log(self) -> List[Dict[str, Any]]:
+        """Return the accumulated trust-state log (one dict per step)."""
+        return list(self._trust_log)
