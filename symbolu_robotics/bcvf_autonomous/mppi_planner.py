@@ -217,12 +217,22 @@ class MPPIPlanner:
         # identified in the N=26 diagnostic (option 3).
         self._ema_alpha: float = 0.0
         self._ema_mean: Optional[np.ndarray] = None  # (M,) once initialized
+        # Solution-3 deadband gate: also track EMA residual variance per
+        # predictor. If max_m(|residual[k,m]|/EMA_std[m]) <
+        # _deadband_k_sigma for a rollout, fall back to uniform weights
+        # for that rollout (noise regime). Addresses the N=26 Level-2
+        # observation that seeds 76/81/96 were previously-healthy but
+        # went catastrophic under EMA because small noise residuals
+        # were shaping softmin weights. 0 disables.
+        self._deadband_k_sigma: float = 0.0
+        self._ema_var: Optional[np.ndarray] = None  # (M,) EMA of residual^2
 
     # --- public API ---
 
     def reset(self) -> None:
         self._prev_solution = None
         self._ema_mean = None
+        self._ema_var = None
 
     def plan(self) -> MPPIResult:
         start = time.perf_counter()
@@ -362,11 +372,21 @@ class MPPIPlanner:
                 step_mean = per_pred_cost.mean(axis=0)  # (M,)
                 if self._ema_mean is None:
                     self._ema_mean = step_mean.copy()
+                    if self._deadband_k_sigma > 0.0:
+                        # Initialize variance from within-K dispersion
+                        # so the first meaningful residuals have a
+                        # non-degenerate std reference. Residual^2 of
+                        # the first step's (cost - step_mean) equals
+                        # the rollout-wise variance at step 0.
+                        self._ema_var = per_pred_cost.var(axis=0).copy()
                 pred_signal = per_pred_cost - self._ema_mean[np.newaxis, :]
                 # Update EMA *after* using current signal, so the first
                 # step operates on its own mean (zero residual) and
                 # subsequent steps use the stale-by-one estimate.
                 a = self._ema_alpha
+                if self._deadband_k_sigma > 0.0:
+                    resid_sq = (pred_signal ** 2).mean(axis=0)   # (M,)
+                    self._ema_var = a * resid_sq + (1.0 - a) * self._ema_var
                 self._ema_mean = a * step_mean + (1.0 - a) * self._ema_mean
             else:
                 pred_signal = per_pred_cost
@@ -379,6 +399,25 @@ class MPPIPlanner:
             arg = np.clip(-shifted / tau_w, -50.0, 50.0)
             raw = np.exp(arg)                                 # (K, M)
             weights = raw / raw.sum(axis=1, keepdims=True)    # (K, M)
+
+            # Solution-3 deadband: for each rollout, check if the
+            # largest |residual|/std exceeds k_sigma. If not, we're in
+            # the noise regime — fall back to uniform weights for that
+            # rollout. Residual = pred_signal when ema_alpha > 0 (zero-
+            # centered); if ema disabled this block also disables.
+            if (self._deadband_k_sigma > 0.0
+                    and self._ema_alpha > 0.0
+                    and self._ema_var is not None):
+                eps = 1e-9
+                ema_std = np.sqrt(self._ema_var) + eps        # (M,)
+                z = np.abs(pred_signal) / ema_std[np.newaxis, :]  # (K, M)
+                max_abs_z_per_rollout = z.max(axis=1)              # (K,)
+                insignificant = max_abs_z_per_rollout < self._deadband_k_sigma
+                if np.any(insignificant):
+                    uniform = np.full(
+                        (num_models,), 1.0 / num_models, dtype=np.float64
+                    )
+                    weights[insignificant] = uniform
         else:
             # A0 baseline: equal weights (no observer).
             bcvf_total = np.zeros(k_batch, dtype=np.float64)
@@ -440,3 +479,17 @@ class MPPIPlanner:
             raise ValueError(f"ema_alpha must be in [0, 1]; got {alpha}")
         self._ema_alpha = alpha
         self._ema_mean = None
+        self._ema_var = None
+
+    def set_deadband_k_sigma(self, k_sigma: float) -> None:
+        """Set deadband threshold in units of EMA residual std.
+
+        k_sigma=0 disables (softmin applied to all rollouts). k_sigma>0
+        requires ema_alpha>0 to have effect; for each rollout, the
+        per-predictor residual z-score must exceed k_sigma before
+        softmin-based weight shaping is applied — otherwise uniform
+        weights. Typical values 1.5-3.0 (1σ to 3σ significance).
+        """
+        if k_sigma < 0.0:
+            raise ValueError(f"deadband k_sigma must be >= 0; got {k_sigma}")
+        self._deadband_k_sigma = k_sigma

@@ -120,6 +120,8 @@ class ExperimentConfig:
 
     # Level-2 adaptive normalization rate for Rahu softmin. 0 disables.
     ema_alpha: float = 0.0
+    # Solution-3 deadband threshold (in EMA-std units). 0 disables.
+    deadband_k_sigma: float = 0.0
 
 
 @dataclass
@@ -229,6 +231,7 @@ class ExperimentRunner:
             seed=seed,
         )
         run_cfg.ema_alpha = self._config.ema_alpha
+        run_cfg.deadband_k_sigma = self._config.deadband_k_sigma
         diag = Runner(run_cfg).diagnostics()
 
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -574,6 +577,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--ema-alpha", type=float, default=0.0,
                         help="Level-2 adaptive Rahu-softmin EMA rate "
                              "(0 disables — raw per_pred_cost softmin)")
+    parser.add_argument("--deadband-k-sigma", type=float, default=0.0,
+                        help="Solution-3 deadband threshold in EMA-std "
+                             "units (0 disables; requires --ema-alpha > 0)")
     args = parser.parse_args(argv)
 
     base_bcvf_override = None
@@ -595,6 +601,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         runs_per_config=args.runs,
         base_bcvf=base_bcvf_override,
         ema_alpha=args.ema_alpha,
+        deadband_k_sigma=args.deadband_k_sigma,
     )
     if args.scenarios:
         cfg.scenarios = args.scenarios

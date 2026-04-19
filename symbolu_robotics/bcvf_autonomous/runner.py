@@ -54,6 +54,7 @@ class RunConfig:
     failures: Dict[str, FailureConfig] = field(default_factory=dict)
     gnss_failure_type: str = "multipath"  # "multipath" | "map_error" | "constant_bias"
     ema_alpha: float = 0.0  # Level-2 adaptive trust-weight normalization
+    deadband_k_sigma: float = 0.0  # Solution-3 deadband gate
 
 
 @dataclass
@@ -159,6 +160,9 @@ class Runner:
         ema_alpha = getattr(cfg, "ema_alpha", 0.0)
         if ema_alpha > 0.0:
             planner.set_ema_alpha(ema_alpha)
+        deadband_k = getattr(cfg, "deadband_k_sigma", 0.0)
+        if deadband_k > 0.0:
+            planner.set_deadband_k_sigma(deadband_k)
 
         sim.reset()
         solve_times: List[float] = []
