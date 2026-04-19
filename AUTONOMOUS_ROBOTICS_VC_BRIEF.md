@@ -291,3 +291,129 @@ predictors** — and that is a different product category than any of
 the incumbents in this table are building for.
 
 ---
+
+## Page 4 — Evidence & Roadmap
+
+### What is proved today (v0.1, internal evidence)
+
+| Area | Current state |
+|---|---|
+| **Test suite** | 166 tests passing across kernel, MPPI planner, runner, scenarios, predictors, manifold, traces, metrics, experiments |
+| **Kernel modules shipped** | `core.py` (BCVF cost functional, V3.1 §3.3–§3.5 + Lemma 1), `manifold.py` (SE(2) body-frame error), `mppi_planner.py` (MPPI + Ketu→Rahu trust-weighted consensus), `runner.py`, `scenarios.py` (6 failure scenarios S1–S6), `predictors/` (M1–M4 SE(2) variants with failure injection) |
+| **Lines of code** | ~4,100 LOC across 11 modules + tests, pure NumPy |
+| **Lemma 1 invariance** | Mathematically proven (V3.1 §3.5; LLM analogue restated in `docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md` §2.6) and verified by unit tests on constructed constant-bias and linear-drift inputs |
+| **Cost-order ablation** | ZEROTH / FIRST / SECOND empirically validated on linear-drift family — FIRST fails on linear drift as Lemma 1 case 2 predicts; SECOND passes; ZEROTH gates correctly |
+| **Runtime contract ordering** | `predict → score → normalize → trust → consensus → plan → act` is pinned by tests, not configurable |
+| **Companion experiment (autonomy validation)** | N=21 paired, scenario `S3_map_error_accel`, M=4 predictors, M4 failing-anchor injected. Final config: T=0.05, β=400, EMA α=0.05, deadband k=2σ, non-anchor pairing. Result: catastrophe rate 14.3% vs A0 23.8%; mean lateral deviation 1.79 m vs 4.30 m (best of all variants tested); std 5.76 vs 8.01; **sign test p = 0.0072** (17/21 seeds improve, 4 worsen). First statistically significant improvement over no-shaping baseline. |
+| **Iterative ablation evidence** | Six bounded experiments traced the path from "additive-cost BCVF — directionless" to the validated config, with each architectural step (Ketu→Rahu refactor, EMA centering, deadband gate, non-anchor pairing) isolated and individually committed. Per-step trust-state logs available for the four resistant seeds. |
+| **Design specification** | `docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md` — §0–§3 closed end-to-end (~3700 lines), §5.1/§5.2 autonomy-validated consumer pattern committed, §4/§6+ skeleton-only awaiting LLM-domain execution |
+| **Known gaps** | No real-sensor data (synthetic predictors only); no multi-platform integration (ROS / Autoware / Apollo adapters not yet shipped); only the `S3_map_error_accel` scenario family deeply validated; LLM-domain transfer is design-stage only, no execution evidence yet |
+
+All numbers above are from our own repository and CI — not third-party
+benchmarks. An external multi-scenario benchmark and at least one
+real-sensor-data pilot are planned (see roadmap).
+
+### Empirical iteration that arrived at the validated config
+
+| Experiment | Config | N | Headline | Outcome |
+|---|---|---|---|---|
+| Initial Ketu→Rahu smoke | T=0.2, β=100, raw cost softmin, anchor pairing | 26 | A3 vs A0 directionless | 4/26 cat (vs 5 A0); McNemar p = 1.00 |
+| Lower-T sweep | T=0.1, β=200, raw cost softmin, anchor pairing | 26 | Worse than baseline (active-floor regression) | 8/26 cat; McNemar p = 0.55 |
+| Add EMA centering | T=0.1, β=200, EMA α=0.05, anchor pairing | 26 | Rescued all 5 A0 catastrophes but 4 new regressions | 4/26 cat; McNemar p = 0.73 |
+| Add deadband gate | T=0.05, β=400, EMA α=0.05, deadband k=2σ, anchor pairing | 21 | Best mean / std among single-fix variants | 3/21 cat; McNemar p = 0.625; mean 2.13 m |
+| **Add non-anchor pairing (validated)** | T=0.05, β=400, EMA α=0.05, deadband k=2σ, **non-anchor pairing** | 21 | First statistically significant improvement | **3/21 cat; sign test p = 0.0072; mean 1.79 m** |
+
+The trajectory above — published in our session repo with per-experiment
+seed-by-seed traces and a deep-dive trust-state log on the resistant
+seed set — is the empirical record an external reviewer can replay
+end-to-end without GPU or sensor-data access. Each architectural
+addition (EMA, deadband, non-anchor pairing) was isolated and committed
+individually so the ablation is per-step inspectable.
+
+### Developer-ergonomics and design improvements (this development cycle)
+
+| Measure | Before BCVF runtime | After |
+|---|---|---|
+| Lines to compose a trust-weighted multi-predictor MPPI planner | Hand-written per stack (typically 200–500 LOC of arbitration glue) | ~10 lines (one factory call + two setters) |
+| Empirically-validated trust-weighting recipe | None published | `T=0.05, β=400, ema_alpha=0.05, deadband_k_sigma=2.0, use_anchor_pairing=False` (autonomy-validated, sign p<0.01) |
+| Replayable per-step trust-state trace | Custom logging per integration | First-class `set_trust_log_enabled(True)` + JSON dump |
+| Per-source attribution at M ≥ 3 | Per-stack derivation | Shipped: `BCVFLLMResult.per_source_costs` with symmetric all-pairs sum |
+| Lemma 1 verification in CI | Implicit / per-stack | Explicit unit tests on constructed invariance inputs |
+| Switching between cost orders for ablation | Code change + retest | `cost_order = CostOrder.ZEROTH / FIRST / SECOND` config flag |
+
+### 12-month roadmap
+
+**Quarter 1 — External validation and ROS adapter**
+- 2–3 external design-partner pilots in adjacent robotics domains
+  (drones, mobile robots, manipulator arms — domains where the
+  multi-predictor pattern exists and the safety-case pressure is
+  real but the AV-program inertia is lower)
+- ROS 2 adapter — the most common gap raised by robotics integrators
+  in our early conversations; lets the runtime drop into a Nav2 /
+  MoveIt planning node as a single dependency
+- Multi-scenario validation: extend the N=21 sign-test result to all
+  six S1–S6 scenarios at the validated config; publish per-scenario
+  results
+
+**Quarter 2 — Platform integrations and real-sensor pilot**
+- Autoware perception → BCVF arbitrator → Autoware planner integration
+  spike with a TIER IV-compatible reference customer
+- Apollo OSS adapter (Baidu's open-source AV stack)
+- KITTI / nuScenes replay pilot — validate the runtime on real-sensor
+  multi-predictor traces rather than only synthetic SE(2) trajectories
+- Begin the second domain track: drone-swarm trajectory arbitration
+  (M = 5–10 predictor case where per-source attribution becomes more
+  discriminative)
+
+**Quarter 3 — Safety case template and certification path**
+- Publish a safety-case template for the predictor-trust gap that maps
+  the Lemma 1 invariance and the autonomy-validated consumer pattern
+  to SOTIF (ISO 21448) and ISO 26262 traceability
+- Regulator workshop preparation with two operators in BFSI-adjacent
+  industrial-robotics or drone-delivery contexts
+- First-party benchmark suite: extend S1–S6 with community-contributed
+  scenarios and publish baseline numbers
+
+**Quarter 4 — Production reference and managed offering**
+- Target a production reference customer in an adjacent robotics domain
+  (industrial mobile robot, drone delivery, warehouse automation)
+- Optional managed runtime preview for teams that prefer a hosted
+  trust-arbitration service over a library
+- Begin SOC 2 process if the managed runtime is part of the offering
+- Generalization beyond MPPI planners: adapter pattern for MPC, hybrid
+  A*, sampling-based planners — kernel stays pure NumPy, integration
+  layer adds adapters
+
+### The ask
+
+We are raising seed to evolve BCVF Autonomy Runtime from a pure-Python
+research-grade kernel with one statistically-significant validated
+configuration into a portable, multi-platform predictor-trust runtime
+that operators can adopt without giving up their existing perception/
+planning stack. The technology is live, internally tested with 166
+passing tests, and validated end-to-end on a controlled failure
+scenario with a published statistically-significant result. The
+capital is earmarked for: external design-partner pilots in adjacent
+robotics domains, ROS / Autoware / Apollo adapters, real-sensor-data
+pilots (KITTI / nuScenes), the safety-case template work required for
+SOTIF / ISO 26262 traceability, and the multi-scenario benchmark
+expansion needed to make the validated configuration claim hold across
+families beyond `S3_map_error_accel`.
+
+Predictor disagreement handling is a structural gap in every modern
+multi-model autonomy stack. The next 12–24 months are the right window
+to establish a credible portable default for that layer — before the
+incumbent AV platforms calcify their proprietary in-house solutions
+into vendor-locked dependencies, and before the open-source robotics
+stacks bake decision-maker glue code into their reference modules in
+ways that are hard to displace later. We believe the combination of a
+mathematically-proven invariance, an autonomy-validated consumer
+pattern, and a pure-NumPy kernel that drops into any planner gives
+BCVF Autonomy Runtime a defensible position in that window.
+
+---
+
+*Contact: Rakesh Mohan — Cognade Labs*
+*Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
+*v0.1 · 166 internal tests · autonomy-validated at sign-test p<0.01 (N=21)*
+
