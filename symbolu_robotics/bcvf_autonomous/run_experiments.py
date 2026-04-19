@@ -582,6 +582,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Override BCVF gate_threshold (default: _default_tuning=0.2)")
     parser.add_argument("--gate-beta", type=float, default=None,
                         help="Override BCVF gate_beta (default: _default_tuning=100.0)")
+    parser.add_argument("--use-anchor-pairing", type=str, default=None,
+                        choices=["true", "false"],
+                        help="Override BCVF use_anchor_pairing (default: True). "
+                             "Use 'false' for all-pairs enumeration at M>=3.")
     parser.add_argument("--ema-alpha", type=float, default=0.0,
                         help="Level-2 adaptive Rahu-softmin EMA rate "
                              "(0 disables — raw per_pred_cost softmin)")
@@ -594,7 +598,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     base_bcvf_override = None
-    if args.gate_threshold is not None or args.gate_beta is not None:
+    use_anchor_override = (
+        None if args.use_anchor_pairing is None
+        else (args.use_anchor_pairing == "true")
+    )
+    if (args.gate_threshold is not None or args.gate_beta is not None
+            or use_anchor_override is not None):
         base_bcvf, _, _, _ = _default_tuning()
         import dataclasses as _dc
         base_bcvf_override = _dc.replace(
@@ -603,6 +612,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                             else base_bcvf.gate_threshold),
             gate_beta=(args.gate_beta if args.gate_beta is not None
                        else base_bcvf.gate_beta),
+            use_anchor_pairing=(use_anchor_override if use_anchor_override is not None
+                                else base_bcvf.use_anchor_pairing),
         )
 
     cfg = ExperimentConfig(
