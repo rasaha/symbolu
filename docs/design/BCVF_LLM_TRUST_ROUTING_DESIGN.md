@@ -1296,7 +1296,37 @@ If M is raised in V2 (§9), the pairs grow as `M·(M−1)/2`. At `M = 5`, pairs 
 - **Error recovery policy** when the finite-check in §2.7.6 raises. That's a caller policy, decided in §4 or §5.
 - **Concurrency / thread safety.** The BCVF kernel is pure (no shared state); standard NumPy/PyTorch concurrency rules apply. No special treatment.
 
-#### 2.7.10 Acceptance criteria for §2.7
+#### 2.7.11 Per-source baseline drift handling (consumer-layer recommendation)
+
+The BCVF kernel emits a per-source cost (§2.8.11 `BCVFLLMResult.per_source_costs`) whose **baseline can vary substantially across contexts** — different prompts, different source configurations, and different decoding states all produce different "floor" levels in the raw cost. This is a property of the cost being a quadratic-positive function of an input distribution that itself has context-dependent shape; it is **not** a bug in the kernel and **not** a violation of Lemma 1 (constant disagreement still produces zero acceleration; the floor we observe is from genuine per-context disagreement structure, not from numerical artifact).
+
+The consequence is an integration-layer concern: any consumer that converts `per_source_costs` into trust weights via a continuous mechanism (softmin, softmax-on-negatives, etc.) will, without normalization, produce trust distributions that are dominated by the per-context baseline rather than by the disagreement *event* the consumer is trying to detect. **This was empirically confirmed in the autonomy companion experiments** on `S3_map_error_accel` (M = 4 SE(2) predictors, N = 26 paired): raw per-source cost magnitudes spanned roughly four orders of magnitude across seeds, and a single fixed gate threshold could neither expose all real disagreement events nor suppress all baseline noise simultaneously.
+
+**Consumer-layer recommendation (autonomy-validated, two-stage pattern).** When BCVF is consumed by a continuous trust-shaping layer (§5), the layer should apply the following before the softmin:
+
+1. **Per-source EMA mean centering.** Maintain an exponential moving average `EMA_mean[i]` of `per_source_costs[i]` across consumer steps (e.g., outer decoding steps for an LLM streaming consumer). Subtract `EMA_mean` from the current cost before any trust-weighting computation. This removes the per-context baseline drift and exposes the residual disagreement signal at a comparable scale across contexts.
+
+2. **Significance gate / hinge-φ shaping.** After centering, the residual signal includes both genuine disagreement events and the small noise that the baseline previously masked. Apply a significance filter before softmin: either a hard deadband (zero out residual if `|residual| < k · σ` for some EMA-tracked `σ`) or — equivalently and more numerically gentle — a hinge transform on the cost feeding softmin, e.g. `φ(d) = max(d − θ, 0)` so that disagreement below `θ` contributes nothing to the trust shift.
+
+The hinge-φ form integrates more cleanly with autodiff and avoids the discontinuity of a hard gate, but is mathematically near-equivalent for moderate `k · σ ≈ θ`. Either implementation is acceptable.
+
+**Why both stages, not just one.** The autonomy experiments isolated each component:
+
+- **EMA alone (no gate)** removed the per-seed floor but exposed previously-masked rollout noise; healthy seeds suffered new catastrophes from spurious trust shifts (regression on 4 of 26 seeds vs A0 baseline).
+- **Gate alone (no EMA)** required a single absolute threshold that could not simultaneously be small enough to detect events on low-floor seeds and large enough to suppress noise on high-floor seeds; outcomes flipped catastrophically as the threshold moved.
+- **EMA + gate together** preserved all baseline rescues, recovered all EMA-only regressions, and produced the first statistically significant improvement vs the no-shaping baseline (sign test p < 0.01).
+
+The pair is the validated pattern. Either component alone is incomplete.
+
+**Scope and non-claims.** This sub-section is a **consumer-layer recommendation**, not a kernel-level requirement:
+
+- The BCVF kernel itself remains unchanged. `compute_bcvf_cost` and `compute_bcvf_cost_batch` (§2.8.11–§2.8.12) emit raw `per_source_costs`. Centering and gating are downstream operations.
+- This recommendation applies specifically to **continuous trust-shaping consumers**. Other consumer architectures — episodic gating, threshold-routing, hard-mask predictor selection — have different signal-to-noise structure and may not need either stage. §5 will discuss consumer-architecture choice without committing V1 to a single mode.
+- The pattern is **autonomy-validated, not LLM-validated.** The mathematical mechanism (per-context baseline drift, residual noise after centering) is structural and is expected to transfer to LLM domains where BCVF is consumed continuously, but the empirical confirmation in the LLM domain awaits §3 / §4 / §5 execution. The recommendation is offered as an evidence-led design constraint, not a universal theorem.
+
+**Deferral to §5.** Concrete parameters (EMA rate `α`, gate threshold `k · σ` or `θ`, warmup behavior, freeze rules) are specified in §5 as part of the integration-layer design. §2.7.11 records only the existence of the two-stage pattern and the rationale for both stages; §5 fixes the V1 numerical defaults.
+
+#### 2.7.12 Acceptance criteria for §2.7
 
 §2.7 is complete when:
 
@@ -1309,8 +1339,9 @@ If M is raised in V2 (§9), the pairs grow as `M·(M−1)/2`. At `M = 5`, pairs 
 7. ✅ Exp-clipping pointer to §2.5.1 is in place (§2.7.7).
 8. ✅ Memory / compute budget is quantified (§2.7.8).
 9. ✅ Out-of-scope deferrals are enumerated (§2.7.9).
+10. ✅ Per-source baseline drift handling — consumer-layer two-stage pattern (EMA mean + significance gate / hinge-φ) recorded with autonomy evidence (§2.7.11).
 
-Items 1–9 are satisfied by this section. No pending empirical verification for §2.7 — all rules are design-time and will be enforced by implementation + the §2.9 tests.
+Items 1–10 are satisfied by this section. No pending empirical verification for §2.7 — all rules are design-time and will be enforced by implementation + the §2.9 tests, plus §5 commits the concrete parameters of the two-stage consumer pattern from §2.7.11.
 
 ### 2.8 Python equations parallel to `core.py`
 
@@ -3754,7 +3785,34 @@ Items 1–10 are satisfied. §3 **design is complete**; §3 execution remains pe
 
 Select one for V1, justify the choice, and document the other two as deferred alternatives.
 
-**Details pending.**
+**Most details pending.** §5 is filled sub-section-by-sub-section under the same authorization gating as §2 and §3. The two sub-sections below land first because they capture autonomy-validated structural commitments that any §5 V1 implementation must respect; the consumer-architecture choice (hidden-state shaping vs logit blending vs routing/gating) and the V1 use-case taxonomy will be filled in subsequent authorized passes.
+
+### 5.1 Continuous trust-shaping integration pattern (autonomy-validated)
+
+When a §5 consumer uses BCVF as a **continuous trust-shaping signal** — converting per-source costs into trust weights at every consumer step and using those weights to compose a consensus — the autonomy companion experiments (`S3_map_error_accel`, M = 4 SE(2) predictors, N = 26 paired) established a small structural pattern that the LLM V1 implementation must follow. The pattern is taken as a **design constraint for V1**, not a universal theorem; broader use-case guidance is deferred to later sub-sections.
+
+**Pattern (V1 commitment for continuous trust-shaping consumers):**
+
+1. **Per-source baseline normalization.** Maintain an exponential moving average `EMA_mean[i]` of `per_source_costs[i]` across consumer steps and subtract it from the current cost before any trust-weighting computation. Required because the raw per-source cost has a context-dependent baseline (§2.7.11) that, if uncorrected, dominates the trust distribution and reduces the consumer to a near-no-op. V1 default `α = 0.05` (effective τ ≈ 20 outer steps); cold-start initializes `EMA_mean[i]` from the first observed value so the residual is exactly zero on step 0 (safe — uniform weights).
+2. **Significance gate / hinge-φ shaping before softmin.** Apply either a hard deadband (`|residual| < k · σ`, `k ≈ 2`, with `σ` tracked as an EMA of squared residual) or — equivalently and gentler at the boundary — a hinge transform `φ(d) = max(d − θ, 0)` on the cost feeding softmin. Required because the centered residual surfaces previously-masked noise that, without filtering, drives spurious trust shifts on contexts where no genuine disagreement is present. Either form is acceptable; the hinge composes more cleanly with autodiff and is the V1 preference if §5 implementation needs gradient-friendly behavior.
+3. **All-pairs (non-anchor) pair enumeration when M ≥ 3.** Already committed at the kernel-config level in §2.4.5 / §2.8.4 (`use_anchor_pairing = False` is the V1 default for `BCVFLLMConfig`). The autonomy result is empirical confirmation: under anchor pairing with the failing source as the anchor, the trust softmin can up-weight the predictor that *agrees with the failing anchor* (collusion semantic); non-anchor pairing avoids this by symmetric attribution. §5 consumers must consume per-source costs produced under non-anchor pairing.
+
+**What this pattern is NOT.** The pattern above does not specify the consumer-architecture choice (hidden-state shaping vs logit blending vs routing/gating), the use case (token-level reweighting vs branch selection vs document retrieval vs verifier ensemble), the trust-temperature `τ_w`, or any LLM-specific tuning. Those are deferred to authorized sub-sections of §5 once empirical evidence in the LLM domain is available. §5.1 commits only the two-stage normalization plus non-anchor pairing as the **necessary preprocessing** for any continuous trust-shaping consumer.
+
+**Reproducibility pointer.** The autonomy companion experiments and their statistical results are recorded in `docs/experiments/` (commit history in `symbolu_robotics/bcvf_autonomous/`). The validated configuration is `T = 0.05, β = 400, ema_alpha = 0.05, deadband_k_sigma = 2.0, use_anchor_pairing = False`, with sign-test p < 0.01 vs the no-shaping baseline at N = 21 paired.
+
+### 5.2 Caveat — downstream dynamic sensitivity
+
+A second autonomy finding worth recording before §5 commits to a consumer architecture: **trust shaping has limited dynamic range when downstream system dynamics are chaotic.** In the autonomy experiments, the validated §5.1 pattern produced trust weights that were near-uniform on roughly 80% of consumer steps (deadband active) and within ±0.013 of uniform (0.25 ± 0.013 at M = 4) on the remaining 20%. Despite this, the system's catastrophe count remained at a structural floor (3 of 26 across multiple parameter configurations), with the **specific seed identities rotating** as parameters changed. Tiny weight perturbations (< 0.02) drove > 20 m outcome divergences on borderline seeds — i.e., the downstream dynamics amplified small consensus shifts into large outcome differences, and small parameter changes that did not meaningfully change the trust-weighting magnitude still flipped which seeds caught and which were lost.
+
+This has two consequences for §5 design and reporting:
+
+- **Integration claims should be scoped.** A statement like "BCVF trust-shaping improves outcome X by Y" should be accompanied by a downstream-sensitivity caveat: "under suitable downstream sensitivity to consensus shifts." Trust shaping is a necessary-but-not-sufficient mechanism; the downstream consumer's transfer function determines whether the shift is amplified into a meaningful outcome change.
+- **The shared-catastrophe-tail pattern is expected.** When §5's V1 consumer is benchmarked, observing a non-zero floor of failures that no parameter combination can erase is consistent with the autonomy result and should not be misinterpreted as a §5.1 pattern failure. The right interpretation is "trust shaping reduced failures from baseline X to floor Y; further reduction requires architectural change to the downstream consumer, not further tuning of trust shaping." §6 (Phase 4 benchmark) acceptance criteria should be set with this in mind.
+
+**§5.2 is short by intent.** It records an empirical caveat from the autonomy work, not a positive design commitment. The implication for §5's eventual consumer-architecture choice is that consumers with low downstream sensitivity to consensus shifts will benefit less from trust shaping, and vice versa — but quantifying this for LLM use cases requires §3 / §4 / §5 execution data and is deferred.
+
+**Details pending.** Subsequent §5 sub-sections will commit, in order: the V1 consumer architecture (one of hidden-state shaping, logit blending, routing/gating), the V1 trust-temperature and softmin formulation, the cold-start and warmup behavior, integration with the §4 source framework, and the V1 acceptance criteria.
 
 ---
 
