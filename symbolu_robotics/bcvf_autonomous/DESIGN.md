@@ -4627,21 +4627,83 @@ catastrophe count is the same 3/21 as simpler configurations. The
 floor is not yet understood to be scenario-structural vs
 architecturally fixable.
 
-**Plan.** Dynamic anchor rotation. When the current MPPI anchor's
-per-source cost is sustained-high (e.g., EMA of cost ratio above a
-threshold for more than `T_anchor` seconds), re-anchor MPPI on the
-predictor with the current lowest per-source cost. Hypothesis: this
-breaks the "anchor-failure" pathology at its root rather than
-patching around it via trust-weighting.
+**Architectural hypothesis.** Dynamic anchor rotation. When the
+current MPPI anchor's per-source cost is sustained-high (e.g., EMA of
+cost ratio above a threshold for more than `T_anchor` seconds),
+re-anchor MPPI on the predictor with the current lowest per-source
+cost. This breaks the "anchor-failure" pathology at its root rather
+than patching around it via trust-weighting.
 
-**Acceptance.** Re-run the §6.1 multi-scenario sweep with anchor
-rotation enabled. If catastrophe count drops below the V1 floor on at
-least two scenarios without regressing the others, §6.6 is validated.
-If not, the floor is characterized as scenario-structural and the
-finding is recorded as a scope caveat.
+Anchor rotation is **architectural**, not a tuning parameter — it
+changes which predictor the MPPI rollouts are constructed around, so
+any multi-scenario claim made on V1 would need to be re-run under
+rotation if rotation is later adopted. To avoid that redundant work,
+§6.6 is split into a cheap architectural decision gate (§6.6a, runs
+before §6.1) and a full-scale ablation that is absorbed into §6.1
+rather than living as a separate later phase (§6.6b).
 
-**Effort.** ~2 weeks of implementation + a full §6.1 re-sweep. Runs
-only after §6.1 has established the V1 floor across scenarios.
+#### 6.6a Architectural decision gate — S3 only, N=21
+
+**Plan.** Implement dynamic anchor rotation behind a config flag.
+Run N=21 paired on `S3_map_error_accel` — the scenario family where
+the V1 validation already established the baseline numbers — with
+the same seed discipline (seeds 72–92), same non-anchor pairing,
+same EMA + deadband parameters, anchor rotation toggled on.
+
+**Promotion threshold (strict, all conditions required).** Rotation
+is promoted as the V2 default only if it beats V1 on the **full
+decision metric suite** the V1 S3 validation uses — not on any
+single metric:
+
+- **Sign test p-value** ≤ V1's `p = 0.0072` (i.e., same or stronger
+  per-seed-paired improvement over A0).
+- **Catastrophe count** ≤ V1's 3/21 (no new catastrophes introduced
+  by rotation).
+- **Mean lateral deviation** ≤ V1's 1.79 m within the paired sample's
+  standard error.
+- **Standard deviation of final |y|** ≤ V1's 5.76 m within sample SE.
+- **No regression on the A0 catastrophe rescue set** (seeds 72, 75,
+  78, 82, 85 — all five must remain below 2 m under rotation).
+- **No new catastrophes on seeds 76, 81, 96 that rotation did not
+  already fail on under V1** (i.e., rotation must not re-introduce
+  the EMA-only regressions that deadband fixed).
+
+Any one metric regressing rejects rotation. Directional-but-weak
+outcomes are interpreted as "no evidence to promote" — V1 stays the
+default and rotation is recorded as a null result.
+
+**Acceptance.** One of three outcomes, each with a committed
+artifact:
+
+- **Promoted:** §6.6a report in `docs/experiments/phase_6_6a_rotation.md`
+  shows rotation passes all six metrics above. V2 default changes
+  to anchor rotation on. §6.1 runs under rotation from the start.
+- **Rejected:** Report shows one or more metrics regress. V1 stays
+  the default. §6.1 runs under V1 architecture. Rotation finding
+  recorded as "tested and not promoted" with the specific metric(s)
+  that rejected it.
+- **Directionless:** Report shows no metric regresses but no metric
+  improves meaningfully either. Treated as rejection — no
+  architectural change without positive evidence.
+
+**Effort.** ~2 weeks of implementation (rotation logic + config
+flag + unit tests for rotation invariants) plus ~2 hours of compute
+for the N=21 S3 sweep.
+
+#### 6.6b Full multi-scenario ablation — absorbed into §6.1
+
+If §6.6a promotes rotation, §6.1's multi-scenario sweep runs under
+rotation as the V2 default. The former "§6.6 full-scale ablation"
+disappears as a separate phase.
+
+If §6.6a rejects or is directionless, §6.1 runs under V1. If §6.1
+subsequently reveals scenario families where V1 fails hard, §6.6b
+may be reopened as a targeted per-scenario rotation experiment — but
+only for the specific failing families, not as a global architectural
+change, and only after the failing scenarios are documented.
+
+This split means the multi-scenario sweep runs **exactly once**, on
+whatever architecture §6.6a decided.
 
 ### 6.7 Diagnostic-consistency tests in CI
 
@@ -4706,15 +4768,31 @@ conversation in the near term:
 
 ### 6.10 Priority order (recommended V2 execution sequence)
 
-1. **§6.1 Multi-scenario validation** — lowest risk, biggest statistical-claim upgrade.
-2. **§6.3 Non-MPPI adapter extraction** — unblocks §6.4 / §6.5 / §6.6 / §6.7.
-3. **§6.2 Real-sensor pilot prep** — highest fundraising leverage; design work starts in parallel with §6.1 / §6.3.
-4. **§6.7 Diagnostic-consistency CI tests** — cheap polish, run whenever.
-5. **§6.5 Latency benchmark** — feeds §6.4 integration conversations.
-6. **§6.4 ROS 2 adapter** — first external-integration artifact.
-7. **§6.6 Anchor rotation (catastrophe-floor investigation)** — runs only after §6.1 establishes the V1 floor across scenarios.
+The key re-ordering discipline: **architectural decisions before
+expensive validation.** §6.6 changes the architecture if promoted, so
+its cheap decision gate (§6.6a, S3-only, ~2 hours compute) runs
+*before* §6.1's multi-scenario sweep (~10 hours compute). That way
+§6.1 runs once, on whatever architecture §6.6a decided on, rather
+than running twice.
+
+1. **§6.7 Diagnostic-consistency CI tests** — 1 day, no compute, run whenever; best landed first so subsequent refactors have bug-class guards from the start.
+2. **§6.6a Anchor-rotation decision gate (S3 only, N=21)** — ~2 weeks implementation + ~2 hours compute. Settles the architectural question before expensive validation, under a strict multi-metric promotion threshold (§6.6a above). Outcome: V2 default either stays V1 or switches to rotation.
+3. **§6.3 Non-MPPI adapter extraction** — ~3 weeks refactor; §6.7 CI tests catch regressions. Unblocks §6.4 / §6.5. Architecturally behavior-preserving (kernel tests must pass unchanged), so can safely follow §6.6a.
+4. **§6.1 Multi-scenario validation** — runs **once** on the architecture §6.6a decided on. Biggest statistical-claim upgrade.
+5. **§6.2 Real-sensor pilot prep (KITTI/nuScenes)** — highest fundraising leverage; design can start in parallel with §6.1 since it does not depend on the §6.6a outcome (real-sensor pilot validates the *chosen* architecture regardless of which it is).
+6. **§6.5 Latency benchmark** — runs in parallel with §6.1 / §6.2; feeds §6.4 integration conversations.
+7. **§6.4 ROS 2 adapter** — needs §6.3 extracted; parallel with §6.1 / §6.2 / §6.5. First external-integration artifact.
 8. **§6.8 First production reference** — continuous BD work, Series-A gated.
 
-§6.1–§6.7 form a tractable 3–4 month V2 development scope.
-§6.8 is longer-horizon BD work running in parallel.
+**What this ordering does NOT include:** §6.6b as a separate phase.
+If §6.6a promotes rotation, §6.1 runs under rotation and §6.6b is
+effectively absorbed. If §6.6a rejects rotation, §6.6b is not
+scheduled unless §6.1 subsequently reveals scenario-specific failure
+modes where rotation would be worth retrying — in which case it is
+reopened as a targeted per-scenario experiment, not a global
+architectural change.
+
+§6.7 → §6.6a → §6.3 → §6.1 → (§6.2 / §6.5 / §6.4 in parallel) forms
+a tractable 3–4 month V2 development scope. §6.8 is longer-horizon
+BD work running continuously in parallel.
 
