@@ -4488,3 +4488,233 @@ The demo is runnable: ``python -m symbolu_robotics.bcvf_autonomous.demos.lemma1_
 Either is tractable as a V2 addition. V1's testable, honest claim is
 the Lemma 1 invariance demo above.
 
+---
+
+## Phase 6 — V2 Roadmap: open problems and de-risking sequence
+
+This section records the open technical problems identified during the
+V1 Ketu→Rahu validation work (N=21 `S3_map_error_accel` companion
+experiments, commits `6282e66` / `c86cdd7`), and sequences the work
+needed to upgrade V1's narrow-but-valid result into a broader
+architectural claim. Items are ordered by a combination of likely
+impact and prerequisite dependency — earlier items unblock later ones.
+
+### 6.1 Multi-scenario validation (upgrade the statistical claim)
+
+**Problem.** All V1 statistical significance (sign-test p = 0.0072)
+is on one scenario family: `S3_map_error_accel`, M = 4 SE(2)
+predictors, M4 as the failing anchor. The validated configuration
+(`T=0.05, β=400, ema_alpha=0.05, deadband_k_sigma=2.0,
+use_anchor_pairing=False`) may be overfit to this family.
+
+**Plan.** Re-run the validated config at N ≥ 21 paired across all
+six scenarios (`S1_normal_driving`, `S2_*`, `S3_map_error_accel`,
+`S4_*`, `S5_*`, `S6_*`), each with its own pre-committed failure
+injection. Report per-scenario sign-test p, catastrophe count, mean
+lateral deviation, and standard deviation. A claim of "the validated
+configuration is structurally sound, not scenario-specific" requires
+passing at least three of six scenarios at p < 0.05.
+
+**Acceptance.** Published per-scenario results in
+`docs/experiments/phase_6_multi_scenario.md` with raw JSON traces
+committed to the repo. If fewer than three scenarios pass, §6.1 is
+blocked and the finding is recorded as a scope caveat rather than a
+generalization.
+
+**Effort.** ~2 weeks of compute + analysis, no code changes beyond
+the runner's existing multi-scenario sweep support.
+
+### 6.2 Real-sensor pilot preparation (validate beyond synthetic SE(2))
+
+**Problem.** The M1–M4 predictors in `predictors/` are synthetic
+SE(2) variants with explicit failure injection. Real perception /
+prediction outputs have correlated noise, attention-level
+stochasticity, and non-Gaussian tails — none of which the synthetic
+harness exercises.
+
+**Plan.** KITTI or nuScenes replay pilot. Construct M predictors from:
+(a) an HD-map prior from the dataset's lane-centerline,
+(b) a learned trajectory forecaster (e.g., MTR, Trajectron, or a
+lightweight in-house baseline) — or the dataset's published prediction
+track,
+(c) a Kalman-based kinematic extrapolation from the ego state.
+Inject a realistic failure pattern (sensor dropout window, misaligned
+map tile) and re-run the N=21 paired sign-test protocol from §6.1.
+
+**Acceptance.** If BCVF Autonomy Runtime passes on KITTI or nuScenes
+replay at the same threshold as §6.1's synthetic claim, the runtime
+is validated for **real sensor trace disagreement**, not only
+synthetic-predictor disagreement.
+
+**Effort.** Design work can start immediately; execution requires
+dataset access and 3–4 weeks of integration work on the predictor-
+construction pipeline.
+
+### 6.3 Non-MPPI planner adapter pattern (unblock ROS / Autoware / Apollo)
+
+**Problem.** The current V1 integration point is `MPPIPlanner.plan()`,
+which composes the full stack (BCVF kernel + consumer normalization +
+weighted consensus + MPPI softmax). Most production AV / robotics
+planners are MPC-based, sampling-based (RRT*), or hybrid A*. These do
+not have a per-rollout consensus stage the MPPI loop assumes.
+
+**Plan.** Extract the BCVF kernel + consumer normalization into an
+independent callable: `trust_weights(predictor_trajectories, state)
+→ (M,)`. MPPI-specific composition (per-rollout consensus, softmax
+action selection) moves into an `integrations/mppi.py` adapter that
+calls the kernel. New adapters for MPC (`integrations/mpc.py`),
+sampling-based planners (`integrations/rrt.py`), and hybrid A*
+(`integrations/hybrid_astar.py`) can then be added by any integrator
+without touching the kernel.
+
+**Acceptance.** The kernel's 166 tests pass unchanged after the
+extraction. At least one non-MPPI adapter (MPC is the natural first
+target) is shipped with its own integration tests. The API contract
+for the adapter is documented in
+`symbolu_robotics/bcvf_autonomous/integrations/README.md`.
+
+**Effort.** ~3 weeks of focused refactoring + testing. Prerequisite
+for §6.4 / §6.5 / §6.6 / §6.7.
+
+### 6.4 ROS 2 adapter + platform integration spike
+
+**Problem.** ROS 2 is the most common dependency gap raised by
+robotics integrators. Without a ROS adapter, BCVF Autonomy Runtime
+cannot drop into a Nav2 / MoveIt planning node as a single `pip`
+dependency.
+
+**Plan.** `symbolu_bcvf_ros2` companion package exposing:
+(a) a `BCVFTrustNode` that consumes `PredictedTrajectories` messages
+and publishes `TrustDistribution` messages,
+(b) a drop-in adapter for Nav2's `smac_planner` and for MoveIt's
+`OMPL` planner,
+(c) example launch files for `Nav2 + BCVF` and `Autoware.universe +
+BCVF` integration.
+
+**Acceptance.** A pre-recorded rosbag plays through the integrated
+stack with per-step BCVF trace logged. At least one external
+integrator (design partner or OSS community contributor) confirms
+the package installs and runs against their stack.
+
+**Effort.** ~4 weeks. Depends on §6.3.
+
+### 6.5 Real-time latency benchmark
+
+**Problem.** We know the kernel runs in milliseconds on a laptop CPU.
+We have no data on: latency under real AV-rate control loops
+(10–100 Hz), jitter characteristics at M = 3/4/5 with K = 256+
+rollouts, thread / concurrency behavior when the planner is one of
+many ROS nodes on a shared compute substrate.
+
+**Plan.** Benchmark suite in `tests/benchmarks/` measuring per-step
+latency distribution (mean, p50, p95, p99, max) across (M, K, H)
+combinations: M ∈ {3, 4, 5}, K ∈ {128, 256, 512, 1024}, H ∈ {10, 20,
+50}. Report against a stated latency budget for each integration
+tier (automotive 10 Hz, industrial robot 50 Hz, drone 100 Hz).
+
+**Acceptance.** Latency table committed to
+`docs/experiments/phase_6_latency.md` with seed-reproducible numbers.
+A latency-budget document an integrator can plan against.
+
+**Effort.** ~1 week. Useful in parallel with §6.3 / §6.4.
+
+### 6.6 Catastrophe-floor investigation (anchor rotation)
+
+**Problem.** The V1 deep-dive trace showed trust weights collapse to
+near-uniform (~0.25 ± 0.013) on 80 %+ of planning steps. The
+validated config beats baseline by *mean* and *std*, but the hard
+catastrophe count is the same 3/21 as simpler configurations. The
+floor is not yet understood to be scenario-structural vs
+architecturally fixable.
+
+**Plan.** Dynamic anchor rotation. When the current MPPI anchor's
+per-source cost is sustained-high (e.g., EMA of cost ratio above a
+threshold for more than `T_anchor` seconds), re-anchor MPPI on the
+predictor with the current lowest per-source cost. Hypothesis: this
+breaks the "anchor-failure" pathology at its root rather than
+patching around it via trust-weighting.
+
+**Acceptance.** Re-run the §6.1 multi-scenario sweep with anchor
+rotation enabled. If catastrophe count drops below the V1 floor on at
+least two scenarios without regressing the others, §6.6 is validated.
+If not, the floor is characterized as scenario-structural and the
+finding is recorded as a scope caveat.
+
+**Effort.** ~2 weeks of implementation + a full §6.1 re-sweep. Runs
+only after §6.1 has established the V1 floor across scenarios.
+
+### 6.7 Diagnostic-consistency tests in CI
+
+**Problem.** The planner returns `bcvf_cost` as a diagnostic *and*
+uses per-source cost in the consensus. If the two drift due to a
+silent bug (e.g., a refactor that changes attribution but leaves the
+diagnostic summary unchanged), the test suite does not catch it.
+
+**Plan.** Assertion tests in CI: `bcvf_cost` equals the sum of
+`per_source_cost` scaled by the current attribution rule, up to
+floating-point tolerance. One test per (anchor_pairing, cost_order)
+combination.
+
+**Acceptance.** New tests added to `tests/test_core.py` and
+`tests/test_mppi.py`. Pass on every commit.
+
+**Effort.** ~1 day. Can run in parallel with anything.
+
+### 6.8 First production reference customer
+
+**Problem.** No production deployment. The fundraising narrative
+needs at least one operator running BCVF Autonomy Runtime on their
+own stack in their own environment.
+
+**Plan.** Target a production reference in an adjacent robotics
+domain (industrial mobile robot, drone delivery, warehouse
+automation) rather than AV directly — adjacent domains have the
+multi-predictor pattern, real safety-case pressure, and lower
+program-inertia than full-autonomy AV. Close at least one paid
+design-partner engagement with the production reference as the
+committed milestone.
+
+**Acceptance.** One operator running V1 or early-V2 in production
+(or shadow-deployed with real sensor traces) with a public reference
+letter or case study. Alternative: a published benchmark of their
+stack with and without BCVF Autonomy Runtime, with their approval.
+
+**Effort.** 6–9 months of BD / technical-integration work. The gating
+constraint for Series A, not seed.
+
+### 6.9 Research-grade items deferred
+
+The following problems are identified but deliberately scope-excluded
+from the §6 sequence because they do not move the fundraising
+conversation in the near term:
+
+- **Conditional EMA update** (Solution 4 from the V1 deep dive).
+  Freezes EMA when residual is large to prevent assimilation of
+  slow-onset failures. Ruled out empirically in the N=21 scenario;
+  may become relevant for longer-episode or slower-ramp failure modes.
+- **Per-rollout BCVF (not just per-predictor).** Scores individual
+  MPPI rollouts at the kernel level rather than per-predictor
+  aggregation. Changes attribution granularity; research-grade.
+- **Long-horizon per-predictor reputation.** A slow EMA that carries
+  trust state across episodes rather than re-initializing at each
+  planning episode. Useful for vehicles that encounter the same
+  predictor-failure pattern repeatedly.
+- **Non-Euclidean metric Lemma 1 restatement.** The V1 Lemma 1 proof
+  is Euclidean. If the disagreement metric becomes non-Euclidean
+  (KL on probability trajectories, Wasserstein on occupancy grids,
+  Hellinger on belief states), the invariance must be re-proven.
+
+### 6.10 Priority order (recommended V2 execution sequence)
+
+1. **§6.1 Multi-scenario validation** — lowest risk, biggest statistical-claim upgrade.
+2. **§6.3 Non-MPPI adapter extraction** — unblocks §6.4 / §6.5 / §6.6 / §6.7.
+3. **§6.2 Real-sensor pilot prep** — highest fundraising leverage; design work starts in parallel with §6.1 / §6.3.
+4. **§6.7 Diagnostic-consistency CI tests** — cheap polish, run whenever.
+5. **§6.5 Latency benchmark** — feeds §6.4 integration conversations.
+6. **§6.4 ROS 2 adapter** — first external-integration artifact.
+7. **§6.6 Anchor rotation (catastrophe-floor investigation)** — runs only after §6.1 establishes the V1 floor across scenarios.
+8. **§6.8 First production reference** — continuous BD work, Series-A gated.
+
+§6.1–§6.7 form a tractable 3–4 month V2 development scope.
+§6.8 is longer-horizon BD work running in parallel.
+
