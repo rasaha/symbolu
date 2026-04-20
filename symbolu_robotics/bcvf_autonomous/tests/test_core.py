@@ -174,6 +174,39 @@ def test_batch_matches_sequential() -> None:
     assert np.allclose(batch_costs, sequential, rtol=1e-10, atol=1e-12)
 
 
+@pytest.mark.parametrize("use_anchor_pairing", [True, False])
+@pytest.mark.parametrize(
+    "cost_order", [CostOrder.ZEROTH, CostOrder.FIRST, CostOrder.SECOND]
+)
+def test_batch_matches_sequential_parametrized(
+    use_anchor_pairing, cost_order
+) -> None:
+    """§6.7: batch entry's per-rollout total matches the scalar entry's
+    total on the same trajectories across every (pairing, cost_order)
+    combination — the cross-entry diagnostic-consistency guard.
+
+    Complements ``test_batch_matches_sequential`` (default config only)
+    by extending the check to every supported configuration.
+    """
+    k_batch, num_models, horizon = 4, 3, 20
+    rng = np.random.default_rng(seed=123)
+    rollouts = rng.normal(
+        scale=0.3, size=(k_batch, num_models, horizon, 3)
+    ).astype(np.float64)
+    rollouts_list = [
+        [rollouts[k, m] for m in range(num_models)] for k in range(k_batch)
+    ]
+    cfg = _default_config(
+        use_anchor_pairing=use_anchor_pairing,
+        cost_order=cost_order,
+    )
+    bcvf_total = compute_bcvf_cost_batch(rollouts_list, cfg)
+    scalar_totals = np.array(
+        [compute_bcvf_cost(rollouts_list[k], cfg).total_cost for k in range(k_batch)]
+    )
+    np.testing.assert_allclose(bcvf_total, scalar_totals, atol=1e-12)
+
+
 def test_cost_positive_semidefinite() -> None:
     rng = np.random.default_rng(seed=1)
     cfg = _default_config()
@@ -315,9 +348,10 @@ def test_batch_timing_under_50ms() -> None:
 # by the kernel stay in sync with the per-pair / per-predictor
 # attribution the Rahu consumer actually uses. A refactor that changes
 # attribution but leaves the diagnostic summary unchanged (or vice
-# versa) would be caught here. One test per (anchor_pairing, cost_order)
-# combination — parameterized — so every supported configuration is
-# checked on every CI run.
+# versa) would be caught here. Parameterized over (anchor_pairing,
+# cost_order) so every supported configuration is checked on every CI
+# run. Cross-entry batch-vs-scalar consistency is covered by
+# ``test_batch_matches_sequential_parametrized`` above.
 
 
 @pytest.mark.parametrize("use_anchor_pairing", [True, False])
@@ -327,8 +361,14 @@ def test_batch_timing_under_50ms() -> None:
 def test_scalar_total_equals_pair_sum(use_anchor_pairing, cost_order) -> None:
     """§6.7: ``BCVFResult.total_cost`` equals sum of ``per_pair_costs``.
 
-    The scalar-entry public contract for the diagnostic-vs-attribution
-    consistency.
+    Narrow guard by design: ``total`` is computed as a running sum of
+    the same pair-cost values that populate ``per_pair_costs``, so the
+    identity is structurally true in the current implementation. This
+    test catches a refactor that desynchronizes the two accumulations
+    — e.g., one gets vectorized while the other keeps the Python loop,
+    and the two drift. It does NOT guard deeper attribution bugs; the
+    symmetric-attribution invariant in
+    ``test_batch_per_predictor_sums_to_twice_total`` does that.
     """
     horizon = 20
     rng = np.random.default_rng(seed=42)
@@ -354,11 +394,18 @@ def test_batch_per_predictor_sums_to_twice_total(
 ) -> None:
     """§6.7: ``per_predictor[k, :].sum() == 2 * bcvf_total[k]``.
 
-    Each pair cost is attributed symmetrically to both predictors in
-    the pair (see ``compute_bcvf_cost_batch`` in ``core.py``), so the
-    sum of per-predictor costs over ``M`` must equal twice the scalar
-    total for every rollout ``k``. A refactor that drops one side of
-    the symmetric attribution would break this identity.
+    The real symmetric-attribution guard. Each pair cost is attributed
+    to both predictors in the pair via two separate lines in
+    ``compute_bcvf_cost_batch``:
+
+        per_predictor[:, i] += pair_cost
+        per_predictor[:, j] += pair_cost
+
+    A refactor that drops one line, or that applies the cost
+    asymmetrically (one predictor only), would break this identity.
+    Holds for both anchor and all-pairs enumeration — the number of
+    pairs and the M-way distribution differ, but each pair still
+    contributes to exactly two predictor entries.
     """
     k_batch, num_models, horizon = 8, 3, 20
     rng = np.random.default_rng(seed=7)
@@ -378,33 +425,3 @@ def test_batch_per_predictor_sums_to_twice_total(
     assert per_pred.shape == (k_batch, num_models)
     pred_sum = per_pred.sum(axis=1)
     np.testing.assert_allclose(pred_sum, 2.0 * bcvf_total, atol=1e-12)
-
-
-@pytest.mark.parametrize("use_anchor_pairing", [True, False])
-@pytest.mark.parametrize(
-    "cost_order", [CostOrder.ZEROTH, CostOrder.FIRST, CostOrder.SECOND]
-)
-def test_batch_total_matches_scalar_total(
-    use_anchor_pairing, cost_order
-) -> None:
-    """§6.7: batch entry's per-rollout total agrees with the scalar
-    entry's total computed on the same trajectories — the cross-entry
-    diagnostic-consistency guard.
-    """
-    k_batch, num_models, horizon = 4, 3, 20
-    rng = np.random.default_rng(seed=123)
-    rollouts = rng.normal(
-        scale=0.3, size=(k_batch, num_models, horizon, 3)
-    ).astype(np.float64)
-    rollouts_list = [
-        [rollouts[k, m] for m in range(num_models)] for k in range(k_batch)
-    ]
-    cfg = _default_config(
-        use_anchor_pairing=use_anchor_pairing,
-        cost_order=cost_order,
-    )
-    bcvf_total = compute_bcvf_cost_batch(rollouts_list, cfg)
-    scalar_totals = np.array(
-        [compute_bcvf_cost(rollouts_list[k], cfg).total_cost for k in range(k_batch)]
-    )
-    np.testing.assert_allclose(bcvf_total, scalar_totals, atol=1e-12)
