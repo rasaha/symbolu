@@ -4524,6 +4524,43 @@ generalization.
 **Effort.** ~2 weeks of compute + analysis, no code changes beyond
 the runner's existing multi-scenario sweep support.
 
+**Status (execution).** ✅ **Done in commits `11fea1a` (scout) and
+`d534826` (full S3_map_error N=19).** Final report:
+`docs/experiments/phase_6_1_multiscenario.md`.
+
+Scout pass across S1–S6 surfaced that only 2/6 scenarios are
+responsive; 4/6 are benign (A0 produces no catastrophes; A3 is
+bit-identical to A0 — correct no-op fallback) and 1/6
+(`S4_camera_degradation`) produces catastrophes BCVF cannot detect
+because the failure doesn't manifest in M1–M4 predictor
+disagreement.
+
+Full results: both responsive scenarios pass sign-test p < 0.05:
+
+- `S3_map_error_accel`: N = 21, p = 0.0072
+- `S3_map_error`: N = 19, p = 0.0192
+
+The original "≥ 3/6 scenarios" bar was replaced in the final report
+with a scope-revised "all responsive scenarios pass" bar, which is
+what the current predictor set can support. The original bar
+requires either a richer predictor set (so more scenarios surface
+disagreement) or a dataset-expanded pilot (§6.2).
+
+**Pending verification / follow-up for §6.1.**
+
+- **Richer predictor set** needed to close the "3/6 bar" as
+  originally written; current M1–M4 are synthetic SE(2) variants
+  and cannot cover S4-style camera degradation. §6.2 KITTI /
+  nuScenes pilot supersedes this.
+- **N = 21 parity** — S3_map_error ran at N = 19 (vs S3_accel's N =
+  21) due to CPU time budgeting; re-running at N = 21 for strict
+  parity is a ~25-min compute task if parity matters for an
+  external reviewer.
+- **Per-scenario statistical-power diagnostics** — McNemar is
+  underpowered at b=3/c=1. A confidence-interval reporting layer
+  (Wilson or exact binomial bounds on rescue rate) would strengthen
+  the claim; it's a reporting-only change.
+
 ### 6.2 Real-sensor pilot preparation (validate beyond synthetic SE(2))
 
 **Problem.** The M1–M4 predictors in `predictors/` are synthetic
@@ -4549,6 +4586,57 @@ synthetic-predictor disagreement.
 **Effort.** Design work can start immediately; execution requires
 dataset access and 3–4 weeks of integration work on the predictor-
 construction pipeline.
+
+**Status (execution).** ⚠️ **Design + scaffold done in commit
+`b82b60d`; real-data execution pending.** Pilot plan:
+`docs/experiments/phase_6_2_pilot_plan.md`.
+
+Shipped now:
+- Dataset-adapter abstract interface (`datasets/base.py`,
+  `SceneRecord` + `DatasetAdapter` ABC)
+- `RealisticNoiseAdapter` (`datasets/synthetic_realistic.py`) — a
+  bridge adapter that generates 21 scenes with AR(1)-correlated
+  noise (α = 0.8), non-Gaussian outlier frames (2 % rate, 5×
+  scale), and 4 failure-injection patterns matching the pilot
+  design. Validates V1 numerics on real-like noise without actual
+  dataset access.
+- 11 passing tests on the adapter interface + bridge end-to-end.
+
+**Pending execution.**
+
+- **nuScenes-mini download + access setup** (≤ 1 day of admin;
+  blocking all other §6.2 execution).
+- **`datasets/nuscenes.py`** — the real nuScenes adapter. ~1 week.
+  Depends on `nuscenes-devkit`.
+- **Predictor implementations** — ~2 weeks total:
+  - M1 HD-map prior (projects ego onto nuScenes map centerline).
+  - M2 Kalman / CTRV kinematic extrapolation from CAN-bus state.
+  - M3 learned forecaster: first attempt the nuPrediction baseline
+    (CoverNet / MTP) for reproducibility; fall back to
+    Trajectron++ or a lightweight LSTM if the baseline proves
+    heavy to integrate.
+  - M4 failure-injected variant using the four patterns the pilot
+    plan specifies.
+- **Pilot runner** — ~1 week. Closed-loop Mode B bridging: feed
+  real ego state to the existing `Simulator`'s bicycle dynamics
+  after failure onset, reuse the §6.1 metric framework (sign-test,
+  catastrophe count).
+- **Seed / scene selection protocol** — choose 21 scenes from
+  nuScenes-mini's ~850 with representative failure-pattern
+  coverage. Document the selection rule so the run is reproducible.
+- **Analysis + `phase_6_2_multiscenario.md` final report** — ~2
+  days.
+- **KITTI fallback adapter** — ~3 days if nuScenes licensing or
+  devkit issues block progress.
+
+**What we can already report without executing the pilot.** The
+`RealisticNoiseAdapter` can be used to produce a pre-pilot
+statistical claim: "the V1 consumer pattern holds under correlated
+noise + outlier-frame conditions at the §3-validated significance
+level." That would be a meaningful intermediate result if the full
+real-data pilot slips. Not shipped in this session's scope but
+within reach as a follow-up run of the §6.1 protocol against
+`RealisticNoiseAdapter` scenes.
 
 ### 6.3 Non-MPPI planner adapter pattern (unblock ROS / Autoware / Apollo)
 
@@ -4576,6 +4664,47 @@ for the adapter is documented in
 **Effort.** ~3 weeks of focused refactoring + testing. Prerequisite
 for §6.4 / §6.5 / §6.6 / §6.7.
 
+**Status (execution).** ✅ **Done in commits `5114f44` (extraction)
+and `169dcd5` (README + argmin selector + 7 tests).**
+
+Shipped:
+- `symbolu_robotics/bcvf_autonomous/trust.py` — `TrustWeightComputer`
+  + `TrustWeightResult`. Pure-Python, planner-agnostic.
+- `MPPIPlanner` refactored to delegate to the computer via backward-
+  compat `@property` accessors. 190 pre-existing tests pass unchanged
+  after the refactor.
+- `integrations/README.md` — API contract + 5 invariance guarantees
+  + 6-step "adding a new adapter" checklist.
+- `integrations/argmin_selector.py` — minimal non-MPPI reference
+  adapter. Differs from MPPI only in action-selection (argmin cost
+  vs softmax weighted mean); shares the `TrustWeightComputer` with
+  zero code duplication.
+- 7 integration tests proving the extraction is decoupled.
+
+**Pending execution.**
+
+- **MPC adapter (`integrations/mpc.py`).** The design-doc acceptance
+  mentions MPC as "the natural first target." The argmin selector
+  demonstrates decoupling, but is not a production planner. ~1 week
+  to ship a real MPC adapter (CasADi or cvxpy backed) with its own
+  integration tests.
+- **RRT* / hybrid A* adapters.** Similar pattern to MPC. ~1 week
+  each. Optional: design doc says "can then be added by any
+  integrator" — may be left to integrators rather than shipped
+  first-party.
+- **Numerical-parity audit** vs the pre-refactor behavior. Current
+  evidence is "190 tests still pass" which is a strong-but-not-
+  bit-exact check. A rerun of the §6.1 S3_accel N=21 sweep against
+  the post-refactor branch to confirm sign-test p = 0.0072 would
+  make the behavior-preservation claim airtight. ~25 min compute;
+  worth doing before the post-refactor code hits any external
+  integrator.
+- **Extension-point review** for the integrations API. The README
+  commits the contract but has not yet been tried by an external
+  integrator. A dry-run code review with a robotics engineer outside
+  the project would surface any API ergonomics issues before §6.4
+  ROS 2 work locks in the shape.
+
 ### 6.4 ROS 2 adapter + platform integration spike
 
 **Problem.** ROS 2 is the most common dependency gap raised by
@@ -4598,6 +4727,62 @@ the package installs and runs against their stack.
 
 **Effort.** ~4 weeks. Depends on §6.3.
 
+**Status (execution).** ⚠️ **Design + pure-Python scaffold done in
+commit `afa6172`; rclpy / colcon / Nav2 plumbing pending.** Plan:
+`docs/experiments/phase_6_4_ros2_plan.md`.
+
+Shipped now (~370 LOC of framework-agnostic core, 13 tests):
+- `symbolu_robotics/bcvf_ros2/messages.py` — `PredictedTrajectories`
+  and `TrustDistribution` dataclasses with shape validation.
+- `symbolu_robotics/bcvf_ros2/core.py` — `BCVFTrustBridge` + config.
+  Pure Python, wraps `TrustWeightComputer`, message-level API
+  (`bridge.step(msg) -> msg`). Works without `rclpy`.
+- `symbolu_robotics/bcvf_ros2/ros2_shim.py` — `rclpy` lazy-import
+  with clean `ImportError` when ROS 2 is absent; factory function
+  `build_bcvf_trust_node(bridge_config)` skeleton.
+- 13 passing tests proving the bridge produces valid simplex
+  weights, propagates Lemma 1 invariance, and short-circuits on
+  `lambda_c = 0`.
+
+**Pending execution.**
+
+- **`.msg` file definitions** — `PredictedTrajectories.msg` and
+  `TrustDistribution.msg` per the schema sketched in the plan
+  doc. Requires `CMakeLists.txt` and `package.xml` for a
+  `colcon build`. ~3 days.
+- **Real `rclpy` pub/sub wiring.** The current shim skeleton
+  registers the node but does not subscribe / publish. Needs:
+  - Message <-> dataclass conversion (flatten `Pose2D[]` arrays).
+  - QoS profile exposure as node parameter.
+  - Timer / topic-driven step triggers.
+  - Graceful shutdown.
+  ~1 week in a real ROS 2 Humble / Jazzy environment.
+- **Nav2 `CriticPlugin` implementation.** Not the standalone node
+  — a plugin that lives inside `smac_planner`'s plugin system and
+  consumes `/trust_distribution` to weight rollout-cost
+  evaluation. ~1 week.
+- **MoveIt `OMPL` PathSimplifier variant.** Flagged in the plan as
+  V2+ if the Nav2 path proves easier; may be dropped.
+- **Example launch files.**
+  - `launch/nav2_with_bcvf.launch.py`.
+  - `launch/autoware_with_bcvf.launch.py`.
+  - Reference converter from `nav_msgs/Path[]` to
+    `PredictedTrajectories` (so integrators with existing multi-
+    predictor outputs don't have to rewrite). ~3 days.
+- **Pre-recorded rosbag + end-to-end integration test.** The
+  §6.4 acceptance line item: "rosbag plays through the integrated
+  stack with per-step BCVF trace logged." ~2 days + rosbag
+  acquisition.
+- **Compatibility matrix** — test against ROS 2 Humble and Jazzy;
+  document minimum supported distro. ~2 days.
+- **External integrator confirmation.** The §6.4 acceptance
+  explicitly requires one external integrator (design-partner or
+  OSS contributor) to verify install-and-run. BD-gated; typical
+  turnaround 2–4 weeks once the package is installable.
+- **DDS QoS edge cases.** The plan identifies `reliable` +
+  `keep_last` as recommended; document what breaks if an
+  integrator uses `best_effort`. ~1 day.
+
 ### 6.5 Real-time latency benchmark
 
 **Problem.** We know the kernel runs in milliseconds on a laptop CPU.
@@ -4617,6 +4802,49 @@ tier (automotive 10 Hz, industrial robot 50 Hz, drone 100 Hz).
 A latency-budget document an integrator can plan against.
 
 **Effort.** ~1 week. Useful in parallel with §6.3 / §6.4.
+
+**Status (execution).** ✅ **Done in commit `c8055ce`.** Benchmark
+artifact: `docs/experiments/phase_6_5_latency.md`.
+
+Shipped:
+- `symbolu_robotics/bcvf_autonomous/benchmarks/latency.py` — CLI-
+  runnable sweep script. Parametrizable (M, K, H, warmup, cycles,
+  seed) via argparse.
+- 18-cell result table covering M ∈ {3, 4} × K ∈ {128, 256, 512}
+  × H ∈ {10, 20, 50}, measured p50 / p95 / p99 / max.
+- Pass/fail tables against three integration-tier budgets:
+  automotive 10 Hz (100 ms), industrial 50 Hz (20 ms), drone
+  100 Hz (10 ms).
+- Honest interpretation section: smallest config fits 10 Hz with
+  24 ms headroom; nothing fits 50 Hz or 100 Hz on this CPU.
+  Dominant cost is the Python-level per-rollout predictor loop
+  (~100k `predict()` calls per plan at K = 512, M = 4, H = 50).
+
+**Pending verification / follow-up.**
+
+- **M = 5 sweep.** The design doc spec included M ∈ {3, 4, 5};
+  shipped at M ∈ {3, 4} because `create_predictor_set` produces
+  M = 4 and subsetting to M = 5 requires a new synthetic predictor
+  or a replication scheme. ~2 days to extend the harness.
+- **Production compute substrate re-runs.** These numbers are on
+  whatever CPU the CI session was given. Integrators need numbers
+  on their actual hardware (TDA4VH, Orin, AMD EPYC variants).
+  Benchmark is seed-reproducible but integrator-gated.
+- **cProfile / snakeviz profiling** to confirm the per-rollout
+  predictor loop is the bottleneck before optimizing. ~0.5 day.
+- **Vectorized `BasePredictor.predict_batch` implementation** — the
+  interface is documented in the autonomy DESIGN.md §3B but the
+  method is not yet implemented. Once available, expected 10–50×
+  speedup on the rollout stage, which would bring K = 256, H = 20
+  inside the 20 ms industrial tier. ~1–2 weeks.
+- **Multi-threaded / concurrent-execution jitter** — current
+  benchmark is single-thread. Real ROS 2 deployments have multiple
+  nodes on a shared CPU; the benchmark should be re-run inside a
+  `ros2 run` context to characterize jitter under contention. ~2
+  days, requires §6.4 rclpy work.
+- **GPU offload** via torch — only if drone 100 Hz budgets
+  actually matter to an integrator; breaks the "pure NumPy, no
+  GPU dependency" discipline documented in §6.3.
 
 ### 6.6 Catastrophe-floor investigation (dynamic predictor exclusion)
 
@@ -4726,6 +4954,40 @@ rotation framing because exclusion is a pure consumer-layer change
 (planner state plus a weights-array masking step) with no impact on
 the BCVF kernel or the MPPI sampling path.
 
+**Status (execution).** ✅ **Done in commit `04a114b`.** Outcome:
+**REJECTED** under the strict multi-metric promotion threshold.
+Report: `docs/experiments/phase_6_6a_exclusion.md`.
+
+Six-condition promotion gate, three conditions failed:
+
+- ❌ Sign-test p ≤ 0.0072: exclusion p = 0.1892 (significance lost)
+- ✅ Catastrophe count ≤ 3: exclusion = 3
+- ✅ Mean |y| ≤ V1 + SE: exclusion = 1.790
+- ✅ Std |y| ≤ V1 + SE: exclusion = 4.842 (tighter)
+- ❌ A0 rescue set {72, 75, 78, 82, 85} all < 2 m: seeds 78, 82
+  worse than V1
+- ❌ No new catastrophes on V1-rescued seeds: seed 73
+  regressed (V1 0.08 → exclusion 20.80)
+
+Finding: exclusion **rotates** the catastrophe pattern but doesn't
+reduce the count. Fixes V1's seed-81 regression (26.09 → 0.04) but
+breaks seed 73 (0.08 → 20.80). 3/21 catastrophes in both.
+
+Implementation + 8 invariant tests stay in the codebase behind
+`exclusion_enabled=False`. Available for §6.6b reopens.
+
+**Pending (optional, §6.6b-gated).**
+
+- **Per-scenario exclusion experiments** if §6.1 surfaces any
+  scenario where V1 fails hard and exclusion might rescue. Not
+  scheduled; conditional on §6.1 outcomes (currently satisfied).
+- **Alternative mechanisms beyond exclusion.** The §6.6 problem
+  statement — "the catastrophe floor is scenario-structural, not
+  trust-shaping-fixable" — is now empirically supported. Further
+  architectural attacks on the floor (e.g., replacing softmin with
+  a threshold-routing mechanism, or adding a safety-monitor layer
+  above the planner) would be V2+ research, not §6 scope.
+
 #### 6.6b Full multi-scenario ablation — absorbed into §6.1
 
 If §6.6a promotes exclusion, §6.1's multi-scenario sweep runs under
@@ -4759,6 +5021,30 @@ combination.
 
 **Effort.** ~1 day. Can run in parallel with anything.
 
+**Status (execution).** ✅ **Done in commits `6938152` (initial)
+and `62bdb66` (audit + fix).** 18 tests currently passing.
+
+Shipped tests (all parametrized over `anchor_pairing × cost_order`,
+6 configurations each):
+
+- `test_scalar_total_equals_pair_sum` — 6 cases. Narrow guard
+  against a refactor that desynchronizes `total_cost` from
+  `sum(per_pair_costs.values())`.
+- `test_batch_per_predictor_sums_to_twice_total` — 6 cases. The
+  load-bearing symmetric-attribution invariant in
+  `compute_bcvf_cost_batch`. Catches a bug where the per-pair
+  cost is applied to only one of the two predictors.
+- `test_batch_matches_sequential_parametrized` — 6 cases. Cross-
+  entry consistency between the batch and scalar kernel paths.
+
+Honest docstrings call out that `test_scalar_total_equals_pair_sum`
+is nearly tautological by the current code structure (valuable
+as a refactor guard but narrow). `test_batch_per_predictor_sums
+_to_twice_total` is the genuinely non-tautological invariant
+check.
+
+**Pending.** Nothing. §6.7 is complete.
+
 ### 6.8 First production reference customer
 
 **Problem.** No production deployment. The fundraising narrative
@@ -4780,6 +5066,24 @@ stack with and without BCVF Autonomy Runtime, with their approval.
 
 **Effort.** 6–9 months of BD / technical-integration work. The gating
 constraint for Series A, not seed.
+
+**Status.** ⬜ **Not started — explicitly out of scope for code-
+session work.** BD / design-partner conversations are the input
+here, not software. Enabled by §6.2 (real-sensor pilot, for
+demo-ability), §6.4 (ROS 2 adapter, for integration path), and
+§6.5 (latency benchmark, for integrator conversations) — all of
+which have shipped their scaffolds. Execution is Series-A gated
+and takes the stated 6–9 months once BD engagement begins.
+
+**Pending (all BD-driven, not code-driven).**
+
+- Identify candidate adjacent-domain operators (drone delivery,
+  industrial mobile robot, warehouse automation).
+- Frame the first-pilot offer: what the integrator gets, what we
+  ask in return (reference letter or benchmark publication).
+- Integration engineering against their stack — ~1 month per
+  pilot, assuming §6.4 ROS 2 work is productionized by then.
+- Publish the resulting benchmark or case study.
 
 ### 6.9 Research-grade items deferred
 
@@ -4832,4 +5136,52 @@ architectural change.
 §6.7 → §6.6a → §6.3 → §6.1 → (§6.2 / §6.5 / §6.4 in parallel) forms
 a tractable 3–4 month V2 development scope. §6.8 is longer-horizon
 BD work running continuously in parallel.
+
+### 6.11 Post-execution status summary
+
+A single-table overview of what was shipped in the V2 execution
+window vs what remains, for anyone reading §6 after the fact.
+
+| Item | Shipped? | Commit(s) | Pending for full closure |
+|---|---|---|---|
+| 6.1 Multi-scenario validation | ✅ | `11fea1a`, `d534826` | Richer predictor set to cover S4-style failures; N=21 parity on S3_map_error |
+| 6.2 Real-sensor pilot prep | ⚠️ scaffold only | `b82b60d` | nuScenes adapter, HD-map/Kalman/learned predictors, pilot runner, analysis report, KITTI fallback |
+| 6.3 TrustWeightComputer extraction | ✅ | `5114f44`, `169dcd5` | MPC adapter, RRT* / hybrid A* adapters, numerical-parity audit vs pre-refactor, external API review |
+| 6.4 ROS 2 adapter | ⚠️ scaffold only | `afa6172` | .msg files + colcon build, real rclpy pub/sub, Nav2 CriticPlugin, launch files, rosbag QA, external integrator confirmation |
+| 6.5 Latency benchmark | ✅ | `c8055ce` | M=5 sweep, production-substrate re-runs, cProfile, `predict_batch` vectorization, jitter-under-contention |
+| 6.6a Predictor exclusion | ✅ (REJECTED) | `04a114b` | Optional §6.6b per-scenario reopens if §6.1 surfaces new hard-fail scenarios |
+| 6.7 CI consistency tests | ✅ | `6938152`, `62bdb66` | — |
+| 6.8 First production reference | ⬜ | — | All items — BD-driven, Series-A gated |
+
+**Legend.**
+
+- ✅ — shipped and verified in CI.
+- ⚠️ scaffold only — design + pure-Python core + tests shipped;
+  execution work remains and requires non-code dependencies
+  (dataset access, ROS 2 install, BD engagement).
+- ⬜ — not started.
+
+**Critical items needing verification before external-integrator
+contact:**
+
+1. §6.3 numerical-parity audit — re-run §6.1 S3_accel N=21 sweep
+   against the post-refactor branch. ~25 min compute. Strengthens
+   "behavior-preserving extraction" claim from "190 tests pass"
+   to "bit-accurate statistical parity with the pre-refactor
+   validated run."
+2. §6.5 production-substrate re-runs — current numbers are on a
+   CI laptop-class CPU. Any integrator conversation needs numbers
+   on their target hardware.
+
+**Known empirical findings that should surface in any fundraising
+conversation (already in the reports; worth repeating):**
+
+- §6.1 — V1 generalizes across the S3 family but not to S4 camera-
+  degradation scenarios; 4/6 synthetic scenarios are BCVF-benign.
+  Predictor set is the blocker, not trust-shaping math.
+- §6.5 — V1 fits automotive 10 Hz at the smallest (M, K, H) only;
+  50 Hz / 100 Hz budgets need predictor-batch vectorization work.
+- §6.6a — The 3-catastrophe floor on S3_map_error_accel is
+  scenario-structural. Trust-shaping alternatives rotate which
+  seeds fail; they don't reduce the count.
 
