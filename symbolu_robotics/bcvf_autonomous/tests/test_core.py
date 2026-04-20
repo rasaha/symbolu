@@ -14,6 +14,7 @@ import pytest
 
 from symbolu_robotics.bcvf_autonomous.core import (
     BCVFConfig,
+    CostOrder,
     compute_bcvf_cost,
     compute_bcvf_cost_batch,
     compute_disagreement,
@@ -306,3 +307,104 @@ def test_batch_timing_under_50ms() -> None:
     assert costs.shape == (k_batch,)
     # Acceptance criterion from DESIGN.md Section 1.5.
     assert elapsed_ms < 50.0, f"batch cost took {elapsed_ms:.2f} ms (budget 50 ms)"
+
+
+# --- §6.7 diagnostic-consistency invariants ---
+#
+# These tests guard the invariant that the diagnostic scalars reported
+# by the kernel stay in sync with the per-pair / per-predictor
+# attribution the Rahu consumer actually uses. A refactor that changes
+# attribution but leaves the diagnostic summary unchanged (or vice
+# versa) would be caught here. One test per (anchor_pairing, cost_order)
+# combination — parameterized — so every supported configuration is
+# checked on every CI run.
+
+
+@pytest.mark.parametrize("use_anchor_pairing", [True, False])
+@pytest.mark.parametrize(
+    "cost_order", [CostOrder.ZEROTH, CostOrder.FIRST, CostOrder.SECOND]
+)
+def test_scalar_total_equals_pair_sum(use_anchor_pairing, cost_order) -> None:
+    """§6.7: ``BCVFResult.total_cost`` equals sum of ``per_pair_costs``.
+
+    The scalar-entry public contract for the diagnostic-vs-attribution
+    consistency.
+    """
+    horizon = 20
+    rng = np.random.default_rng(seed=42)
+    trajectories = [
+        rng.normal(scale=0.3, size=(horizon, 3)).astype(np.float64)
+        for _ in range(3)
+    ]
+    cfg = _default_config(
+        use_anchor_pairing=use_anchor_pairing,
+        cost_order=cost_order,
+    )
+    result = compute_bcvf_cost(trajectories, cfg)
+    pair_sum = sum(result.per_pair_costs.values())
+    assert result.total_cost == pytest.approx(pair_sum, abs=1e-12)
+
+
+@pytest.mark.parametrize("use_anchor_pairing", [True, False])
+@pytest.mark.parametrize(
+    "cost_order", [CostOrder.ZEROTH, CostOrder.FIRST, CostOrder.SECOND]
+)
+def test_batch_per_predictor_sums_to_twice_total(
+    use_anchor_pairing, cost_order
+) -> None:
+    """§6.7: ``per_predictor[k, :].sum() == 2 * bcvf_total[k]``.
+
+    Each pair cost is attributed symmetrically to both predictors in
+    the pair (see ``compute_bcvf_cost_batch`` in ``core.py``), so the
+    sum of per-predictor costs over ``M`` must equal twice the scalar
+    total for every rollout ``k``. A refactor that drops one side of
+    the symmetric attribution would break this identity.
+    """
+    k_batch, num_models, horizon = 8, 3, 20
+    rng = np.random.default_rng(seed=7)
+    rollouts = rng.normal(
+        scale=0.3, size=(k_batch, num_models, horizon, 3)
+    ).astype(np.float64)
+    rollouts_list = [
+        [rollouts[k, m] for m in range(num_models)] for k in range(k_batch)
+    ]
+    cfg = _default_config(
+        use_anchor_pairing=use_anchor_pairing,
+        cost_order=cost_order,
+    )
+    bcvf_total, per_pred = compute_bcvf_cost_batch(
+        rollouts_list, cfg, return_per_predictor=True
+    )
+    assert per_pred.shape == (k_batch, num_models)
+    pred_sum = per_pred.sum(axis=1)
+    np.testing.assert_allclose(pred_sum, 2.0 * bcvf_total, atol=1e-12)
+
+
+@pytest.mark.parametrize("use_anchor_pairing", [True, False])
+@pytest.mark.parametrize(
+    "cost_order", [CostOrder.ZEROTH, CostOrder.FIRST, CostOrder.SECOND]
+)
+def test_batch_total_matches_scalar_total(
+    use_anchor_pairing, cost_order
+) -> None:
+    """§6.7: batch entry's per-rollout total agrees with the scalar
+    entry's total computed on the same trajectories — the cross-entry
+    diagnostic-consistency guard.
+    """
+    k_batch, num_models, horizon = 4, 3, 20
+    rng = np.random.default_rng(seed=123)
+    rollouts = rng.normal(
+        scale=0.3, size=(k_batch, num_models, horizon, 3)
+    ).astype(np.float64)
+    rollouts_list = [
+        [rollouts[k, m] for m in range(num_models)] for k in range(k_batch)
+    ]
+    cfg = _default_config(
+        use_anchor_pairing=use_anchor_pairing,
+        cost_order=cost_order,
+    )
+    bcvf_total = compute_bcvf_cost_batch(rollouts_list, cfg)
+    scalar_totals = np.array(
+        [compute_bcvf_cost(rollouts_list[k], cfg).total_cost for k in range(k_batch)]
+    )
+    np.testing.assert_allclose(bcvf_total, scalar_totals, atol=1e-12)
