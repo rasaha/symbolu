@@ -124,6 +124,11 @@ class ExperimentConfig:
     deadband_k_sigma: float = 0.0
     # When set, dump per-step trust log to {output_dir}/trust_log_seed_N.json
     trust_log_dir: Optional[str] = None
+    # §6.6a dynamic predictor exclusion. Default off.
+    exclusion_enabled: bool = False
+    exclusion_r: float = 1.5
+    exclusion_T: int = 20
+    exclusion_T_reinstate: int = 20
 
 
 @dataclass
@@ -234,6 +239,10 @@ class ExperimentRunner:
         )
         run_cfg.ema_alpha = self._config.ema_alpha
         run_cfg.deadband_k_sigma = self._config.deadband_k_sigma
+        run_cfg.exclusion_enabled = self._config.exclusion_enabled
+        run_cfg.exclusion_r = self._config.exclusion_r
+        run_cfg.exclusion_T = self._config.exclusion_T
+        run_cfg.exclusion_T_reinstate = self._config.exclusion_T_reinstate
         if self._config.trust_log_dir:
             from pathlib import Path as _P
             run_cfg.trust_log_path = str(
@@ -595,6 +604,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--trust-log-dir", type=str, default=None,
                         help="If set, dump per-step trust-state JSON for "
                              "deep-dive diagnostic. One file per seed.")
+    parser.add_argument("--exclusion-enabled", action="store_true",
+                        help="§6.6a dynamic predictor exclusion: predictors "
+                             "with sustained high cost have their trust "
+                             "weight zeroed and remaining renormalized.")
+    parser.add_argument("--exclusion-r", type=float, default=1.5,
+                        help="§6.6a suspect-cost ratio threshold (default 1.5)")
+    parser.add_argument("--exclusion-T", type=int, default=20,
+                        help="§6.6a consecutive suspect steps → exclude (default 20)")
+    parser.add_argument("--exclusion-T-reinstate", type=int, default=20,
+                        help="§6.6a consecutive ok steps → reinstate (default 20)")
     args = parser.parse_args(argv)
 
     base_bcvf_override = None
@@ -625,6 +644,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         ema_alpha=args.ema_alpha,
         deadband_k_sigma=args.deadband_k_sigma,
         trust_log_dir=args.trust_log_dir,
+        exclusion_enabled=args.exclusion_enabled,
+        exclusion_r=args.exclusion_r,
+        exclusion_T=args.exclusion_T,
+        exclusion_T_reinstate=args.exclusion_T_reinstate,
     )
     if args.scenarios:
         cfg.scenarios = args.scenarios

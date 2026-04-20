@@ -56,6 +56,10 @@ class RunConfig:
     ema_alpha: float = 0.0  # Level-2 adaptive trust-weight normalization
     deadband_k_sigma: float = 0.0  # Solution-3 deadband gate
     trust_log_path: Optional[str] = None  # If set, dump per-step log here
+    exclusion_enabled: bool = False  # §6.6a dynamic predictor exclusion
+    exclusion_r: float = 1.5
+    exclusion_T: int = 20
+    exclusion_T_reinstate: int = 20
 
 
 @dataclass
@@ -164,6 +168,13 @@ class Runner:
         deadband_k = getattr(cfg, "deadband_k_sigma", 0.0)
         if deadband_k > 0.0:
             planner.set_deadband_k_sigma(deadband_k)
+        if getattr(cfg, "exclusion_enabled", False):
+            planner.set_exclusion(
+                enabled=True,
+                r=getattr(cfg, "exclusion_r", 1.5),
+                T_exclude=getattr(cfg, "exclusion_T", 20),
+                T_reinstate=getattr(cfg, "exclusion_T_reinstate", 20),
+            )
         trust_log_path = getattr(cfg, "trust_log_path", None)
         if trust_log_path:
             planner.set_trust_log_enabled(True)

@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from .core import BCVFConfig, CostOrder, compute_bcvf_cost_batch
+from .trust import TrustWeightComputer, TrustWeightResult
 from .predictors.base import BasePredictor
 from .simulator import Obstacle, Road
 
@@ -201,31 +202,13 @@ class MPPIPlanner:
             )
         self._rng = np.random.default_rng(0)
         self._prev_solution: Optional[np.ndarray] = None
-        # Softmin temperature for the Ketu→Rahu trust weighting. Per-
-        # predictor BCVF costs in the prior smokes ranged ~0–10 per
-        # rollout; τ_w=1 gives exp(10/1) ≈ 22000 weight ratio between
-        # the healthiest and most-distrusted predictor — sharp enough
-        # to push a clear outlier toward zero weight without completely
-        # pinning when disagreement is mild. Exposed as a knob (set_*)
-        # for tuning.
-        self._trust_temperature: float = 1.0
-        # Level-2 adaptive normalization (per-predictor EMA mean on
-        # per_pred_cost, subtracted before softmin). α=0 disables —
-        # softmin operates on raw per_pred_cost (prior behavior). α>0
-        # maintains a running mean across outer steps and softmins on
-        # the residual, removing the seed-dependent constant floor
-        # identified in the N=26 diagnostic (option 3).
-        self._ema_alpha: float = 0.0
-        self._ema_mean: Optional[np.ndarray] = None  # (M,) once initialized
-        # Solution-3 deadband gate: also track EMA residual variance per
-        # predictor. If max_m(|residual[k,m]|/EMA_std[m]) <
-        # _deadband_k_sigma for a rollout, fall back to uniform weights
-        # for that rollout (noise regime). Addresses the N=26 Level-2
-        # observation that seeds 76/81/96 were previously-healthy but
-        # went catastrophic under EMA because small noise residuals
-        # were shaping softmin weights. 0 disables.
-        self._deadband_k_sigma: float = 0.0
-        self._ema_var: Optional[np.ndarray] = None  # (M,) EMA of residual^2
+        # §6.3: consumer-layer trust-weight computation is now a
+        # separate module (trust.TrustWeightComputer) so non-MPPI
+        # planners can reuse the validated V1 pattern. This planner
+        # delegates all EMA / deadband / exclusion state to it and
+        # keeps only the MPPI-specific bits (rollout generation,
+        # weighted consensus, MPPI softmax action selection).
+        self._trust_computer = TrustWeightComputer(mppi_config.bcvf_config)
         # Optional per-step trust-state log (deep-dive diagnostic). When
         # enabled via set_trust_log_enabled(True), each plan() call
         # appends a compact summary dict to self._trust_log. Disabled
@@ -238,8 +221,7 @@ class MPPIPlanner:
 
     def reset(self) -> None:
         self._prev_solution = None
-        self._ema_mean = None
-        self._ema_var = None
+        self._trust_computer.reset()
         self._trust_log_step = 0
         if self._trust_log_enabled:
             self._trust_log = []
@@ -345,140 +327,79 @@ class MPPIPlanner:
             for m_idx, name in enumerate(model_ids):
                 all_trajs[k, m_idx] = self.predictors[name].predict(controls_batch[k])
 
-        # Compute per-predictor trust weights.
-        if c.lambda_c > 0.0:
-            # BCVF observes; trust weights softmin over per-predictor
-            # disagreement cost. Lemma 1 is preserved: under constant
-            # or linear-in-time disagreement the SECOND-order BCVF cost
-            # per predictor is ~0, so weights stay uniform and consensus
-            # equals the equal-weight mean — same as A0 baseline.
-            bcvf_cfg = BCVFConfig(
-                lambda_c=c.bcvf_config.lambda_c,
-                gate_threshold=c.bcvf_config.gate_threshold,
-                gate_beta=c.bcvf_config.gate_beta,
-                huber_delta=c.bcvf_config.huber_delta,
-                lever_arm=c.bcvf_config.lever_arm,
-                weight_matrix=np.asarray(c.bcvf_config.weight_matrix, dtype=np.float64),
-                use_anchor_pairing=c.bcvf_config.use_anchor_pairing,
-                anchor_index=anchor_idx,
-                dt=c.bcvf_config.dt,
-                cost_order=c.bcvf_config.cost_order,
-            )
-            trajectories_list = [
-                [all_trajs[k, m] for m in range(num_models)] for k in range(k_batch)
-            ]
-            bcvf_total, per_pred_cost = compute_bcvf_cost_batch(
-                trajectories_list, bcvf_cfg, return_per_predictor=True
-            )
-            # Level-2 adaptive normalization: subtract per-predictor EMA
-            # mean (computed across outer steps) to remove the seed-
-            # dependent constant floor. On the first step _ema_mean is
-            # None → initialize from current step's mean across K, which
-            # makes the residual identically zero at step 0 and yields
-            # uniform weights (safe cold start). On subsequent steps,
-            # residual = per_pred_cost - EMA_mean, and softmin operates
-            # on residual instead of raw cost.
-            if self._ema_alpha > 0.0:
-                step_mean = per_pred_cost.mean(axis=0)  # (M,)
-                if self._ema_mean is None:
-                    self._ema_mean = step_mean.copy()
-                    if self._deadband_k_sigma > 0.0:
-                        # Initialize variance from within-K dispersion
-                        # so the first meaningful residuals have a
-                        # non-degenerate std reference. Residual^2 of
-                        # the first step's (cost - step_mean) equals
-                        # the rollout-wise variance at step 0.
-                        self._ema_var = per_pred_cost.var(axis=0).copy()
-                pred_signal = per_pred_cost - self._ema_mean[np.newaxis, :]
-                # Update EMA *after* using current signal, so the first
-                # step operates on its own mean (zero residual) and
-                # subsequent steps use the stale-by-one estimate.
-                a = self._ema_alpha
-                if self._deadband_k_sigma > 0.0:
-                    resid_sq = (pred_signal ** 2).mean(axis=0)   # (M,)
-                    self._ema_var = a * resid_sq + (1.0 - a) * self._ema_var
-                self._ema_mean = a * step_mean + (1.0 - a) * self._ema_mean
-            else:
-                pred_signal = per_pred_cost
+        # §6.3: delegate consumer-layer trust-weight computation to
+        # the shared TrustWeightComputer. The computer handles EMA
+        # centering, deadband gate, exclusion, softmin. It falls back
+        # to uniform weights automatically when lambda_c == 0 (A0).
+        # The effective lambda_c is MPPIConfig.lambda_c (the outer
+        # gate — "is the planner using BCVF at all?"), not the
+        # kernel's lambda_c; the MPPI planner sets the computer's
+        # BCVFConfig.lambda_c = MPPIConfig.lambda_c so the trust
+        # computer's internal short-circuit matches the original
+        # planner-level gate. The anchor_index override for BCVF
+        # anchor-pairing mode is handled here.
+        self._trust_computer._bcvf_config = BCVFConfig(
+            lambda_c=c.lambda_c,
+            gate_threshold=c.bcvf_config.gate_threshold,
+            gate_beta=c.bcvf_config.gate_beta,
+            huber_delta=c.bcvf_config.huber_delta,
+            lever_arm=c.bcvf_config.lever_arm,
+            weight_matrix=np.asarray(
+                c.bcvf_config.weight_matrix, dtype=np.float64
+            ),
+            use_anchor_pairing=c.bcvf_config.use_anchor_pairing,
+            anchor_index=anchor_idx,
+            dt=c.bcvf_config.dt,
+            cost_order=c.bcvf_config.cost_order,
+        )
+        trust_result = self._trust_computer.compute(all_trajs)
+        weights = trust_result.weights
+        bcvf_total = trust_result.bcvf_total
 
-            # Softmin weights: softmin(c) = softmax(-c). Scale by a
-            # per-rollout min-shift so numerical exponents stay bounded
-            # regardless of absolute cost magnitudes.
-            tau_w = max(self._trust_temperature, 1e-9)
-            shifted = pred_signal - pred_signal.min(axis=1, keepdims=True)
-            arg = np.clip(-shifted / tau_w, -50.0, 50.0)
-            raw = np.exp(arg)                                 # (K, M)
-            weights = raw / raw.sum(axis=1, keepdims=True)    # (K, M)
-
-            # Solution-3 deadband: for each rollout, check if the
-            # largest |residual|/std exceeds k_sigma. If not, we're in
-            # the noise regime — fall back to uniform weights for that
-            # rollout. Residual = pred_signal when ema_alpha > 0 (zero-
-            # centered); if ema disabled this block also disables.
-            deadband_active_count = 0
-            if (self._deadband_k_sigma > 0.0
-                    and self._ema_alpha > 0.0
-                    and self._ema_var is not None):
-                eps = 1e-9
-                ema_std = np.sqrt(self._ema_var) + eps        # (M,)
-                z = np.abs(pred_signal) / ema_std[np.newaxis, :]  # (K, M)
-                max_abs_z_per_rollout = z.max(axis=1)              # (K,)
-                insignificant = max_abs_z_per_rollout < self._deadband_k_sigma
-                deadband_active_count = int(np.sum(insignificant))
-                if np.any(insignificant):
-                    uniform = np.full(
-                        (num_models,), 1.0 / num_models, dtype=np.float64
-                    )
-                    weights[insignificant] = uniform
-
-            # Optional deep-dive trust-state log. Records per-step
-            # summaries (per-predictor stats, not full K×M matrices) so
-            # post-hoc analysis can attribute trajectory failures to
-            # specific BCVF/EMA/deadband behavior.
-            if self._trust_log_enabled:
-                ema_mean_view = (
-                    self._ema_mean.tolist() if self._ema_mean is not None else None
-                )
-                ema_std_view = (
-                    np.sqrt(self._ema_var).tolist()
-                    if self._ema_var is not None else None
-                )
-                argmax_pred = np.argmax(weights, axis=1)  # (K,)
-                argmax_hist = np.bincount(
-                    argmax_pred, minlength=num_models
-                ).tolist()
-                self._trust_log.append({
-                    "step": self._trust_log_step,
-                    "per_pred_cost": {
-                        "mean": per_pred_cost.mean(axis=0).tolist(),
-                        "std": per_pred_cost.std(axis=0).tolist(),
-                        "min": per_pred_cost.min(axis=0).tolist(),
-                        "max": per_pred_cost.max(axis=0).tolist(),
-                        "median": np.median(per_pred_cost, axis=0).tolist(),
-                    },
-                    "weights": {
-                        "mean": weights.mean(axis=0).tolist(),
-                        "max": weights.max(axis=0).tolist(),
-                        "argmax_hist": argmax_hist,
-                    },
-                    "ema_mean": ema_mean_view,
-                    "ema_std": ema_std_view,
-                    "deadband": {
-                        "active_count": deadband_active_count,
-                        "k_sigma": self._deadband_k_sigma,
-                    },
-                    "bcvf_total_summary": {
-                        "mean": float(bcvf_total.mean()),
-                        "max": float(bcvf_total.max()),
-                    },
-                })
-                self._trust_log_step += 1
-        else:
-            # A0 baseline: equal weights (no observer).
-            bcvf_total = np.zeros(k_batch, dtype=np.float64)
-            weights = np.full(
-                (k_batch, num_models), 1.0 / num_models, dtype=np.float64
+        # Optional deep-dive trust-state log. Records per-step
+        # summaries (per-predictor stats, not full K×M matrices) so
+        # post-hoc analysis can attribute trajectory failures to
+        # specific BCVF/EMA/deadband behavior.
+        if self._trust_log_enabled and c.lambda_c > 0.0:
+            per_pred_cost = trust_result.per_pred_cost
+            ema_mean_view = (
+                trust_result.ema_mean.tolist()
+                if trust_result.ema_mean is not None else None
             )
+            ema_std_view = (
+                trust_result.ema_std.tolist()
+                if trust_result.ema_std is not None else None
+            )
+            argmax_pred = np.argmax(weights, axis=1)  # (K,)
+            argmax_hist = np.bincount(
+                argmax_pred, minlength=num_models
+            ).tolist()
+            self._trust_log.append({
+                "step": self._trust_log_step,
+                "per_pred_cost": {
+                    "mean": per_pred_cost.mean(axis=0).tolist(),
+                    "std": per_pred_cost.std(axis=0).tolist(),
+                    "min": per_pred_cost.min(axis=0).tolist(),
+                    "max": per_pred_cost.max(axis=0).tolist(),
+                    "median": np.median(per_pred_cost, axis=0).tolist(),
+                },
+                "weights": {
+                    "mean": weights.mean(axis=0).tolist(),
+                    "max": weights.max(axis=0).tolist(),
+                    "argmax_hist": argmax_hist,
+                },
+                "ema_mean": ema_mean_view,
+                "ema_std": ema_std_view,
+                "deadband": {
+                    "active_count": trust_result.deadband_active_count,
+                    "k_sigma": self._trust_computer._deadband_k_sigma,
+                },
+                "bcvf_total_summary": {
+                    "mean": float(bcvf_total.mean()),
+                    "max": float(bcvf_total.max()),
+                },
+            })
+            self._trust_log_step += 1
 
         # Weighted consensus — atan2-safe on heading.
         w_expand = weights[..., None, None]  # (K, M, 1, 1)
@@ -524,30 +445,101 @@ class MPPIPlanner:
 
     def set_ema_alpha(self, alpha: float) -> None:
         """Set EMA rate for Level-2 adaptive trust-weight normalization.
-
-        alpha=0 disables (softmin operates on raw per_pred_cost).
-        alpha>0 subtracts a running per-predictor mean before softmin.
-        Typical values: 0.02-0.1, giving effective τ ~ 10-50 outer steps
-        (1-5 s at dt=0.1).
+        Delegates to the trust computer.
         """
-        if alpha < 0.0 or alpha > 1.0:
-            raise ValueError(f"ema_alpha must be in [0, 1]; got {alpha}")
-        self._ema_alpha = alpha
-        self._ema_mean = None
-        self._ema_var = None
+        self._trust_computer.set_ema_alpha(alpha)
 
     def set_deadband_k_sigma(self, k_sigma: float) -> None:
-        """Set deadband threshold in units of EMA residual std.
+        """Set deadband threshold. Delegates to the trust computer."""
+        self._trust_computer.set_deadband_k_sigma(k_sigma)
 
-        k_sigma=0 disables (softmin applied to all rollouts). k_sigma>0
-        requires ema_alpha>0 to have effect; for each rollout, the
-        per-predictor residual z-score must exceed k_sigma before
-        softmin-based weight shaping is applied — otherwise uniform
-        weights. Typical values 1.5-3.0 (1σ to 3σ significance).
-        """
-        if k_sigma < 0.0:
-            raise ValueError(f"deadband k_sigma must be >= 0; got {k_sigma}")
-        self._deadband_k_sigma = k_sigma
+    def set_exclusion(
+        self,
+        enabled: bool,
+        r: float = 1.5,
+        T_exclude: int = 20,
+        T_reinstate: int = 20,
+    ) -> None:
+        """Configure §6.6a dynamic predictor exclusion. Delegates."""
+        self._trust_computer.set_exclusion(
+            enabled=enabled, r=r, T_exclude=T_exclude, T_reinstate=T_reinstate,
+        )
+
+    # --- Backward-compat property accessors for tests that inspect
+    # --- internal trust state. Newer tests should use the
+    # --- TrustWeightComputer directly via self._trust_computer.
+
+    @property
+    def _ema_alpha(self) -> float:
+        return self._trust_computer._ema_alpha
+
+    @property
+    def _ema_mean(self):
+        return self._trust_computer._ema_mean
+
+    @_ema_mean.setter
+    def _ema_mean(self, value):
+        self._trust_computer._ema_mean = value
+
+    @property
+    def _ema_var(self):
+        return self._trust_computer._ema_var
+
+    @_ema_var.setter
+    def _ema_var(self, value):
+        self._trust_computer._ema_var = value
+
+    @property
+    def _deadband_k_sigma(self) -> float:
+        return self._trust_computer._deadband_k_sigma
+
+    @property
+    def _exclusion_enabled(self) -> bool:
+        return self._trust_computer._exclusion_enabled
+
+    @property
+    def _exclusion_r(self) -> float:
+        return self._trust_computer._exclusion_r
+
+    @property
+    def _exclusion_T(self) -> int:
+        return self._trust_computer._exclusion_T
+
+    @property
+    def _exclusion_T_reinstate(self) -> int:
+        return self._trust_computer._exclusion_T_reinstate
+
+    @property
+    def _consec_suspect(self):
+        return self._trust_computer._consec_suspect
+
+    @_consec_suspect.setter
+    def _consec_suspect(self, value):
+        self._trust_computer._consec_suspect = value
+
+    @property
+    def _consec_ok(self):
+        return self._trust_computer._consec_ok
+
+    @_consec_ok.setter
+    def _consec_ok(self, value):
+        self._trust_computer._consec_ok = value
+
+    @property
+    def _is_excluded(self):
+        return self._trust_computer._is_excluded
+
+    @_is_excluded.setter
+    def _is_excluded(self, value):
+        self._trust_computer._is_excluded = value
+
+    @property
+    def _trust_temperature(self) -> float:
+        return self._trust_computer._trust_temperature
+
+    @_trust_temperature.setter
+    def _trust_temperature(self, value: float):
+        self._trust_computer.set_trust_temperature(value)
 
     def set_trust_log_enabled(self, enabled: bool) -> None:
         """Enable/disable per-step trust-state logging (deep-dive)."""
