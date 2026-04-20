@@ -226,6 +226,21 @@ class MPPIPlanner:
         # were shaping softmin weights. 0 disables.
         self._deadband_k_sigma: float = 0.0
         self._ema_var: Optional[np.ndarray] = None  # (M,) EMA of residual^2
+        # §6.6a dynamic predictor exclusion. When enabled, predictors
+        # whose per-rollout mean cost stays above r_exclude * argmin
+        # for T_exclude consecutive planning steps have their trust-
+        # weight column forced to zero and the remaining columns
+        # renormalized. Reinstated when the predictor re-joins the
+        # argmin cohort for T_reinstate steps. Disabled by default
+        # (exclusion_enabled=False) — the validated V1/V2 behavior is
+        # preserved when flag is off.
+        self._exclusion_enabled: bool = False
+        self._exclusion_r: float = 1.5         # suspect ratio threshold
+        self._exclusion_T: int = 20            # consec-suspect steps → excl
+        self._exclusion_T_reinstate: int = 20  # consec-ok steps → reinstate
+        self._consec_suspect: Optional[np.ndarray] = None  # (M,) int counter
+        self._consec_ok: Optional[np.ndarray] = None       # (M,) int counter
+        self._is_excluded: Optional[np.ndarray] = None     # (M,) bool mask
         # Optional per-step trust-state log (deep-dive diagnostic). When
         # enabled via set_trust_log_enabled(True), each plan() call
         # appends a compact summary dict to self._trust_log. Disabled
@@ -240,6 +255,9 @@ class MPPIPlanner:
         self._prev_solution = None
         self._ema_mean = None
         self._ema_var = None
+        self._consec_suspect = None
+        self._consec_ok = None
+        self._is_excluded = None
         self._trust_log_step = 0
         if self._trust_log_enabled:
             self._trust_log = []
@@ -431,6 +449,52 @@ class MPPIPlanner:
                     )
                     weights[insignificant] = uniform
 
+            # §6.6a dynamic predictor exclusion. Binary gate on trust
+            # attribution: predictors whose per-rollout mean cost stays
+            # above r_exclude * argmin for T_exclude consecutive steps
+            # are excluded (weights set to 0 and renormalized). Holds
+            # only while lambda_c > 0 (trust weights exist) and the
+            # exclusion flag is on.
+            if self._exclusion_enabled:
+                if self._consec_suspect is None:
+                    self._consec_suspect = np.zeros(num_models, dtype=np.int64)
+                    self._consec_ok = np.zeros(num_models, dtype=np.int64)
+                    self._is_excluded = np.zeros(num_models, dtype=bool)
+                m = per_pred_cost.mean(axis=0)         # (M,)
+                m_min = float(m.min())
+                # Suspect if m[i] > r_exclude * m_min. Use >1e-12 guard
+                # so a zero floor (perfect agreement) does not cause
+                # division-by-zero edge behavior — at m_min ≈ 0 no
+                # predictor is suspect.
+                if m_min > 1e-12:
+                    suspect_mask = m > self._exclusion_r * m_min
+                else:
+                    suspect_mask = np.zeros(num_models, dtype=bool)
+                # Update counters
+                self._consec_suspect[suspect_mask] += 1
+                self._consec_suspect[~suspect_mask] = 0
+                self._consec_ok[~suspect_mask] += 1
+                self._consec_ok[suspect_mask] = 0
+                # Decide exclusion / reinstatement
+                newly_excluded = (
+                    self._consec_suspect >= self._exclusion_T
+                )
+                newly_ok = (
+                    self._is_excluded & (self._consec_ok >= self._exclusion_T_reinstate)
+                )
+                self._is_excluded = np.where(
+                    newly_ok, False,
+                    self._is_excluded | newly_excluded,
+                )
+                # Apply mask: zero excluded columns and renormalize.
+                # If all predictors are excluded (pathological), keep
+                # uniform weights over all M to avoid a degenerate
+                # all-zero distribution.
+                if self._is_excluded.any() and not self._is_excluded.all():
+                    weights[:, self._is_excluded] = 0.0
+                    row_sum = weights.sum(axis=1, keepdims=True)
+                    weights = weights / np.where(row_sum > 0, row_sum, 1.0)
+
             # Optional deep-dive trust-state log. Records per-step
             # summaries (per-predictor stats, not full K×M matrices) so
             # post-hoc analysis can attribute trajectory failures to
@@ -548,6 +612,40 @@ class MPPIPlanner:
         if k_sigma < 0.0:
             raise ValueError(f"deadband k_sigma must be >= 0; got {k_sigma}")
         self._deadband_k_sigma = k_sigma
+
+    def set_exclusion(
+        self,
+        enabled: bool,
+        r: float = 1.5,
+        T_exclude: int = 20,
+        T_reinstate: int = 20,
+    ) -> None:
+        """Configure §6.6a dynamic predictor exclusion.
+
+        enabled=False disables (trust weights as in V2 base).
+        enabled=True activates the binary trust-weight gate: predictors
+        with mean-cost > r * argmin-mean for T_exclude consecutive
+        planning steps are excluded (weights zeroed and renormalized).
+        Reinstated when they re-join the argmin cohort for T_reinstate
+        steps. Per-episode state resets on planner.reset().
+
+        Typical §6.6a values (autonomy S3 decision gate):
+            r = 1.5, T_exclude = 20 (= 2s at dt=0.1), T_reinstate = 20
+        """
+        if r <= 1.0:
+            raise ValueError(f"exclusion r must be > 1.0; got {r}")
+        if T_exclude < 1 or T_reinstate < 1:
+            raise ValueError(
+                f"exclusion thresholds must be >= 1; got "
+                f"T_exclude={T_exclude}, T_reinstate={T_reinstate}"
+            )
+        self._exclusion_enabled = bool(enabled)
+        self._exclusion_r = float(r)
+        self._exclusion_T = int(T_exclude)
+        self._exclusion_T_reinstate = int(T_reinstate)
+        self._consec_suspect = None
+        self._consec_ok = None
+        self._is_excluded = None
 
     def set_trust_log_enabled(self, enabled: bool) -> None:
         """Enable/disable per-step trust-state logging (deep-dive)."""
