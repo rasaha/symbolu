@@ -4618,7 +4618,7 @@ A latency-budget document an integrator can plan against.
 
 **Effort.** ~1 week. Useful in parallel with §6.3 / §6.4.
 
-### 6.6 Catastrophe-floor investigation (anchor rotation)
+### 6.6 Catastrophe-floor investigation (dynamic predictor exclusion)
 
 **Problem.** The V1 deep-dive trace showed trust weights collapse to
 near-uniform (~0.25 ± 0.013) on 80 %+ of planning steps. The
@@ -4627,30 +4627,63 @@ catastrophe count is the same 3/21 as simpler configurations. The
 floor is not yet understood to be scenario-structural vs
 architecturally fixable.
 
-**Architectural hypothesis.** Dynamic anchor rotation. When the
-current MPPI anchor's per-source cost is sustained-high (e.g., EMA of
-cost ratio above a threshold for more than `T_anchor` seconds),
-re-anchor MPPI on the predictor with the current lowest per-source
-cost. This breaks the "anchor-failure" pathology at its root rather
-than patching around it via trust-weighting.
+**Architectural hypothesis.** Dynamic predictor exclusion. When a
+predictor's per-source cost is sustained above the current per-step
+minimum for more than `T_exclude` consecutive planning steps, set its
+trust weight to zero and renormalize over the remaining predictors.
+When the condition reverses (the predictor re-joins the argmin cohort
+for `T_reinstate` consecutive steps), it is reinstated into the
+consensus. This is a binary gate on trust attribution — the excluded
+predictor is removed from the weighted consensus entirely while it
+is suspect — rather than the continuous trust-shift the V1 deadband
+softmin produces.
 
-Anchor rotation is **architectural**, not a tuning parameter — it
-changes which predictor the MPPI rollouts are constructed around, so
-any multi-scenario claim made on V1 would need to be re-run under
-rotation if rotation is later adopted. To avoid that redundant work,
-§6.6 is split into a cheap architectural decision gate (§6.6a, runs
-before §6.1) and a full-scale ablation that is absorbed into §6.1
-rather than living as a separate later phase (§6.6b).
+**Why not "anchor rotation."** An earlier draft of §6.6 framed this
+as rotating the MPPI anchor. Under V2 defaults (`use_anchor_pairing
+= False`), the `anchor` field is inert — it only affects the BCVF
+kernel's pair enumeration when anchor-pairing is enabled, which V2
+has turned off. Dynamic predictor exclusion is the same hypothesis
+in spirit ("when a predictor is persistently suspect, stop using it")
+but translated to a mechanism that actually changes planner behavior
+under V2 architecture.
+
+Predictor exclusion is **architectural**, not a tuning parameter —
+it changes which predictors contribute to the weighted consensus that
+the MPPI planner scores, so any multi-scenario claim made on V1 would
+need to be re-run under exclusion if exclusion is later adopted. To
+avoid that redundant work, §6.6 is split into a cheap architectural
+decision gate (§6.6a, runs before §6.1) and a full-scale ablation
+that is absorbed into §6.1 rather than living as a separate later
+phase (§6.6b).
 
 #### 6.6a Architectural decision gate — S3 only, N=21
 
-**Plan.** Implement dynamic anchor rotation behind a config flag.
-Run N=21 paired on `S3_map_error_accel` — the scenario family where
-the V1 validation already established the baseline numbers — with
-the same seed discipline (seeds 72–92), same non-anchor pairing,
-same EMA + deadband parameters, anchor rotation toggled on.
+**Plan.** Implement dynamic predictor exclusion behind a config flag
+on the planner. Run N=21 paired on `S3_map_error_accel` — the
+scenario family where the V1 validation already established the
+baseline numbers — with the same seed discipline (seeds 72–92), same
+non-anchor pairing, same EMA + deadband parameters, exclusion toggled
+on.
 
-**Promotion threshold (strict, all conditions required).** Rotation
+Exclusion mechanism (concrete):
+
+- Per-predictor state tracked on the planner: `consec_suspect_steps
+  [i]` for each predictor `i`.
+- At each planning step after `per_pred_cost` (shape `(K, M)`) is
+  computed, compute per-predictor mean cost `m[i] = mean_k
+  per_pred_cost[k, i]` and `m_min = min_i m[i]`.
+- For each predictor `i`:
+    - If `m[i] > m_min · r_exclude` (default `r_exclude = 1.5`),
+      increment `consec_suspect_steps[i]`.
+    - Otherwise reset `consec_suspect_steps[i] = 0` and if `i` was
+      excluded, mark it reinstated.
+- Predictors with `consec_suspect_steps[i] ≥ T_exclude` (default
+  `T_exclude = 20` steps = 2 s at dt=0.1) are **excluded**: their
+  column in the trust weights is forced to zero and the remaining
+  columns are re-normalized across `K`.
+- Reset on `planner.reset()` (per-episode state).
+
+**Promotion threshold (strict, all conditions required).** Exclusion
 is promoted as the V2 default only if it beats V1 on the **full
 decision metric suite** the V1 S3 validation uses — not on any
 single metric:
@@ -4658,49 +4691,53 @@ single metric:
 - **Sign test p-value** ≤ V1's `p = 0.0072` (i.e., same or stronger
   per-seed-paired improvement over A0).
 - **Catastrophe count** ≤ V1's 3/21 (no new catastrophes introduced
-  by rotation).
+  by exclusion).
 - **Mean lateral deviation** ≤ V1's 1.79 m within the paired sample's
   standard error.
 - **Standard deviation of final |y|** ≤ V1's 5.76 m within sample SE.
 - **No regression on the A0 catastrophe rescue set** (seeds 72, 75,
-  78, 82, 85 — all five must remain below 2 m under rotation).
-- **No new catastrophes on seeds 76, 81, 96 that rotation did not
-  already fail on under V1** (i.e., rotation must not re-introduce
-  the EMA-only regressions that deadband fixed).
+  78, 82, 85 — all five must remain below 2 m under exclusion).
+- **No new catastrophes on seeds that V1 rescued** (seeds not in the
+  A0 cat set that V1 kept below 2 m must remain below 2 m under
+  exclusion).
 
-Any one metric regressing rejects rotation. Directional-but-weak
+Any one metric regressing rejects exclusion. Directional-but-weak
 outcomes are interpreted as "no evidence to promote" — V1 stays the
-default and rotation is recorded as a null result.
+default and exclusion is recorded as a null result.
 
 **Acceptance.** One of three outcomes, each with a committed
 artifact:
 
-- **Promoted:** §6.6a report in `docs/experiments/phase_6_6a_rotation.md`
-  shows rotation passes all six metrics above. V2 default changes
-  to anchor rotation on. §6.1 runs under rotation from the start.
+- **Promoted:** §6.6a report in `docs/experiments/phase_6_6a_exclusion.md`
+  shows exclusion passes all six metrics above. V2 default changes
+  to exclusion on. §6.1 runs under exclusion from the start.
 - **Rejected:** Report shows one or more metrics regress. V1 stays
-  the default. §6.1 runs under V1 architecture. Rotation finding
+  the default. §6.1 runs under V1 architecture. Exclusion finding
   recorded as "tested and not promoted" with the specific metric(s)
   that rejected it.
 - **Directionless:** Report shows no metric regresses but no metric
   improves meaningfully either. Treated as rejection — no
   architectural change without positive evidence.
 
-**Effort.** ~2 weeks of implementation (rotation logic + config
-flag + unit tests for rotation invariants) plus ~2 hours of compute
-for the N=21 S3 sweep.
+**Effort.** ~1 week of implementation (exclusion logic + config flag
++ unit tests for exclusion invariants) plus ~2 hours of compute for
+the N=21 S3 sweep. Reduced from the "~2 weeks" in the earlier anchor-
+rotation framing because exclusion is a pure consumer-layer change
+(planner state plus a weights-array masking step) with no impact on
+the BCVF kernel or the MPPI sampling path.
 
 #### 6.6b Full multi-scenario ablation — absorbed into §6.1
 
-If §6.6a promotes rotation, §6.1's multi-scenario sweep runs under
-rotation as the V2 default. The former "§6.6 full-scale ablation"
+If §6.6a promotes exclusion, §6.1's multi-scenario sweep runs under
+exclusion as the V2 default. The former "§6.6 full-scale ablation"
 disappears as a separate phase.
 
 If §6.6a rejects or is directionless, §6.1 runs under V1. If §6.1
 subsequently reveals scenario families where V1 fails hard, §6.6b
-may be reopened as a targeted per-scenario rotation experiment — but
-only for the specific failing families, not as a global architectural
-change, and only after the failing scenarios are documented.
+may be reopened as a targeted per-scenario exclusion experiment —
+but only for the specific failing families, not as a global
+architectural change, and only after the failing scenarios are
+documented.
 
 This split means the multi-scenario sweep runs **exactly once**, on
 whatever architecture §6.6a decided.
@@ -4776,7 +4813,7 @@ its cheap decision gate (§6.6a, S3-only, ~2 hours compute) runs
 than running twice.
 
 1. **§6.7 Diagnostic-consistency CI tests** — 1 day, no compute, run whenever; best landed first so subsequent refactors have bug-class guards from the start.
-2. **§6.6a Anchor-rotation decision gate (S3 only, N=21)** — ~2 weeks implementation + ~2 hours compute. Settles the architectural question before expensive validation, under a strict multi-metric promotion threshold (§6.6a above). Outcome: V2 default either stays V1 or switches to rotation.
+2. **§6.6a Predictor-exclusion decision gate (S3 only, N=21)** — ~1 week implementation + ~2 hours compute. Settles the architectural question before expensive validation, under a strict multi-metric promotion threshold (§6.6a above). Outcome: V2 default either stays V1 or adopts dynamic predictor exclusion.
 3. **§6.3 Non-MPPI adapter extraction** — ~3 weeks refactor; §6.7 CI tests catch regressions. Unblocks §6.4 / §6.5. Architecturally behavior-preserving (kernel tests must pass unchanged), so can safely follow §6.6a.
 4. **§6.1 Multi-scenario validation** — runs **once** on the architecture §6.6a decided on. Biggest statistical-claim upgrade.
 5. **§6.2 Real-sensor pilot prep (KITTI/nuScenes)** — highest fundraising leverage; design can start in parallel with §6.1 since it does not depend on the §6.6a outcome (real-sensor pilot validates the *chosen* architecture regardless of which it is).
@@ -4785,10 +4822,10 @@ than running twice.
 8. **§6.8 First production reference** — continuous BD work, Series-A gated.
 
 **What this ordering does NOT include:** §6.6b as a separate phase.
-If §6.6a promotes rotation, §6.1 runs under rotation and §6.6b is
-effectively absorbed. If §6.6a rejects rotation, §6.6b is not
+If §6.6a promotes exclusion, §6.1 runs under exclusion and §6.6b is
+effectively absorbed. If §6.6a rejects exclusion, §6.6b is not
 scheduled unless §6.1 subsequently reveals scenario-specific failure
-modes where rotation would be worth retrying — in which case it is
+modes where exclusion would be worth retrying — in which case it is
 reopened as a targeted per-scenario experiment, not a global
 architectural change.
 
