@@ -1,0 +1,203 @@
+"""§4.4 HuggingFaceSource — real-model scaffold.
+
+**Status.** Scaffold only. The class body is structurally complete
+and reflects §2.3.4's KV-cache amortization and §2.7.2's fp32
+boundary, but it has NOT been executed against a real model in
+this environment (torch / transformers are not installed, and V1
+targets Llama 3.1 8B which requires GPU). End-to-end verification
+against an actual HuggingFace model is Phase 2's closing task and
+is hard-gated on §0.6 rule 1 (autonomy N=26 confirmation) before
+§6 benchmark execution.
+
+**Design per §2.3.2 / §2.3.4.**
+
+Initialization:
+  1. Tokenize the prompt; push through `model.__call__` to obtain
+     the prompt-final hidden state + KV cache.
+  2. Run L-1 greedy speculative steps forward, accumulating logits
+     and extending the KV cache, to seed the initial L-step
+     lookahead window.
+
+Per outer step (amortized, two forward passes):
+  1. Call `commit(token_id)` with the token decided by the blend
+     — not necessarily the source's own greedy argmax. Append to
+     committed prefix; run one forward pass to advance the KV
+     cache to the new "current position."
+  2. Run one forward pass from the advanced position to extend
+     the lookahead frontier by one, producing the new L-th
+     speculative logit. The other L-1 speculative positions
+     were already computed and remain in the KV cache.
+  3. Stack the L positions into a (L, V) logit array; upcast to
+     fp32; softmax along V; return `(probs, valid_mask)`.
+
+Per §2.7.2, softmax + subsequent BCVF operations need fp32 for
+the 2nd-difference cancellation; the forward pass runs in
+fp16/bf16 and the boundary upcast happens inside `lookahead()`.
+
+**What this class does NOT do** (by design):
+  - No token sampling. §1.3 locked greedy; any temperature/top-k
+    is out of scope for V1.
+  - No cross-source KV sharing. Each HuggingFaceSource owns its
+    own cache. Sharing across paraphrase variants is a V2
+    optimization (§9).
+  - No batching across outer steps. V1 streaming = T=1.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional, Tuple
+
+import numpy as np
+
+from .base import stable_softmax, truncating_valid_mask
+
+if TYPE_CHECKING:  # pragma: no cover — type-only imports
+    import torch
+    from transformers import PreTrainedModel, PreTrainedTokenizerBase
+
+
+class HuggingFaceSource:
+    """Wraps a HuggingFace causal LM into the §4.2 Source protocol.
+
+    Import-level torch/transformers dependency is deferred to
+    `__init__` so callers that only use `MockSource` never pay
+    the ML-framework import cost, matching §2.8.1's discipline.
+    """
+
+    L: int
+    vocab_size: int
+    eos_token_id: Optional[int]
+
+    def __init__(
+        self,
+        model: "PreTrainedModel",
+        tokenizer: "PreTrainedTokenizerBase",
+        prompt: str,
+        L: int = 5,
+        device: Optional[str] = None,
+    ) -> None:
+        try:
+            import torch  # noqa: F401 — runtime-only import
+        except ImportError as exc:  # pragma: no cover — environment-dependent
+            raise RuntimeError(
+                "HuggingFaceSource requires `torch` and `transformers`. "
+                "Install them or use MockSource for testing. "
+                "See docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §4.4."
+            ) from exc
+
+        if L < 3:
+            raise ValueError("L >= 3 required for BCVF 2nd-difference stencil")
+
+        self._model = model
+        self._tokenizer = tokenizer
+        self.L = L
+        self.vocab_size = int(getattr(model.config, "vocab_size", 0)) or (
+            len(tokenizer)
+        )
+        self.eos_token_id = getattr(tokenizer, "eos_token_id", None)
+        self._device = device or str(next(model.parameters()).device)
+
+        # State: KV cache + committed prefix + current L-step lookahead
+        # logits. Initialized lazily on first `lookahead()` call so the
+        # constructor is cheap and side-effect-free w.r.t. the model.
+        self._committed_prefix_ids: List[int] = list(
+            tokenizer.encode(prompt, add_special_tokens=True)
+        )
+        self._past_key_values = None
+        self._lookahead_logits: Optional[np.ndarray] = None  # (L, V)
+        self._lookahead_token_ids: Optional[np.ndarray] = None  # (L,)
+        self._initialized = False
+
+    # §4.2 protocol ------------------------------------------------- #
+
+    def lookahead(self) -> Tuple[np.ndarray, np.ndarray]:
+        if not self._initialized:
+            self._initialize_lookahead()
+        assert self._lookahead_logits is not None
+        assert self._lookahead_token_ids is not None
+        probs = stable_softmax(self._lookahead_logits, axis=-1)
+        mask = truncating_valid_mask(
+            self._lookahead_token_ids, self.eos_token_id, self.L
+        )
+        return probs, mask
+
+    def commit(self, token_id: int) -> None:
+        if not self._initialized:
+            self._initialize_lookahead()
+        self._committed_prefix_ids.append(int(token_id))
+        # Amortization step 1: advance KV cache by the committed token
+        # (one forward pass). Step 2: extend the lookahead frontier by
+        # one position from the new position (one more forward pass).
+        self._advance_one(int(token_id))
+        self._extend_frontier()
+
+    # Internal ------------------------------------------------------ #
+
+    def _initialize_lookahead(self) -> None:
+        """Prime the L-step lookahead from the prompt. See §4.4 docstring."""
+        import torch  # local import per §2.8.1 discipline
+
+        input_ids = torch.tensor(
+            [self._committed_prefix_ids], device=self._device
+        )
+        with torch.inference_mode():
+            out = self._model(input_ids=input_ids, use_cache=True)
+        self._past_key_values = out.past_key_values
+        # Start with the prompt-final logits at position 0 of the lookahead.
+        step0_logits = out.logits[0, -1, :].to(torch.float32).cpu().numpy()
+        self._lookahead_logits = np.zeros(
+            (self.L, self.vocab_size), dtype=np.float32
+        )
+        self._lookahead_logits[0, :] = step0_logits
+        self._lookahead_token_ids = np.zeros(self.L, dtype=np.int64)
+        self._lookahead_token_ids[0] = int(np.argmax(step0_logits))
+
+        # Greedy-extend L-1 more speculative positions.
+        for i in range(1, self.L):
+            self._greedy_step(i)
+
+        self._initialized = True
+
+    def _greedy_step(self, slot: int) -> None:
+        """Run one greedy forward pass from `_past_key_values`, placing
+        the resulting logits at `_lookahead_logits[slot]`."""
+        import torch
+
+        prev_token = int(self._lookahead_token_ids[slot - 1])
+        input_ids = torch.tensor([[prev_token]], device=self._device)
+        with torch.inference_mode():
+            out = self._model(
+                input_ids=input_ids,
+                past_key_values=self._past_key_values,
+                use_cache=True,
+            )
+        self._past_key_values = out.past_key_values
+        logits = out.logits[0, -1, :].to(torch.float32).cpu().numpy()
+        self._lookahead_logits[slot, :] = logits
+        self._lookahead_token_ids[slot] = int(np.argmax(logits))
+
+    def _advance_one(self, token_id: int) -> None:
+        """Commit `token_id` into the KV cache (one forward pass)."""
+        import torch
+
+        input_ids = torch.tensor([[int(token_id)]], device=self._device)
+        with torch.inference_mode():
+            out = self._model(
+                input_ids=input_ids,
+                past_key_values=self._past_key_values,
+                use_cache=True,
+            )
+        self._past_key_values = out.past_key_values
+        # Shift the lookahead window left by one: positions 1..L-1 become
+        # 0..L-2. The new frontier slot L-1 is filled by _extend_frontier.
+        self._lookahead_logits = np.roll(self._lookahead_logits, -1, axis=0)
+        self._lookahead_token_ids = np.roll(self._lookahead_token_ids, -1)
+        # Replace the (now-stale) last row with the freshly-emitted-token
+        # logits from the advance pass, which become the new position 0.
+        new_step0 = out.logits[0, -1, :].to(torch.float32).cpu().numpy()
+        self._lookahead_logits[0, :] = new_step0
+        self._lookahead_token_ids[0] = int(np.argmax(new_step0))
+
+    def _extend_frontier(self) -> None:
+        """Fill the new frontier slot (L-1) by greedy-stepping from slot L-2."""
+        self._greedy_step(self.L - 1)

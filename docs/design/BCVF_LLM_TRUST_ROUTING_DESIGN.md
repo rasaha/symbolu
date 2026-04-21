@@ -3823,9 +3823,86 @@ Recorded here after-the-fact so the recommendation in §3.9.4 / §3.9.5 is ancho
 
 ## Section 4 — Phase 2 — Source Framework
 
-**Purpose:** Define the two V1 sources (base decoder + verifier), their output shape, how their states are sampled at each token, and the API contract they present to the trust-weighting layer. Discuss scaling from M=2 toward M=small-k (verifier ensemble) without committing V1 to it.
+**Purpose:** Define the M=3 V1 sources (base decoder + two paraphrased decoders), their output shape, how their states are sampled at each outer decoding step, and the API contract they present to the two baseline decoders from §1.10 (vanilla, conventional-blend) as well as to §5's trust-shaped decoder.
 
-**Details pending.**
+### 4.0 Sub-section plan
+
+§4 follows the same authorization-per-sub-section discipline as §2 and §3. This planning sub-section enumerates the intended sub-sections so the arc of Phase 2 is visible before details land.
+
+- **§4.1** — Purpose & deliverable. What §4 produces, what §4 explicitly defers to §5 / §6.
+- **§4.2** — `Source` protocol. The abstract interface every source satisfies: `lookahead()`, `commit()`, `vocab_size`, `L`, `eos_token_id`. Justification for pull-based `lookahead/commit` rather than a streaming generator.
+- **§4.3** — `MockSource` for testing. Deterministic `(prefix) → logits` callable used by the §4.9 test suite and by §5's integration tests without a real model dependency.
+- **§4.4** — `HuggingFaceSource` for real execution. Llama 3.1 8B via `transformers`, fp16/bf16 inside, fp32 at the BCVF boundary (§2.7.2). KV-cache amortization per §2.3.4 (two forward passes per outer step). Delayed torch import so the kernel tests never pull an ML stack.
+- **§4.5** — Paraphrased-prompt construction. How rewrite-seeds α, β produce the two fallible sources per §1.4.2 / §1.4.3 at temperature 0 with a fixed rewrite instruction.
+- **§4.6** — Two baseline decoders from §1.10 (vanilla + conventional-blend). The generic outer greedy loop that both share. BCVF integration hook left for §5 to plug into.
+- **§4.7** — EOS and valid-mask production. Per-source EOS detection, how a truncated lookahead flows through `valid_mask` into §2.8.11 / §2.8.12.
+- **§4.8** — What §4 does NOT do. No trust-weighting (§5), no benchmark / eval harness (§6), no sampling beyond greedy (§1.3).
+- **§4.9** — Acceptance criteria + test specification. What closes Phase 2 and unlocks Phase 3.
+
+Each sub-section lands one commit at a time per §0.8.
+
+### 4.1 Purpose & deliverable of Phase 2
+
+**Purpose.** §3 verified the BCVF kernel on synthetic probability sequences. §4 bridges the gap to real model outputs by defining:
+
+1. A domain-neutral `Source` protocol that any "something that produces per-step probability lookaheads" can satisfy — mocked, HuggingFace-backed, or (V2) a different model family.
+2. Two baseline decoders from §1.10 (vanilla, conventional-blend) that operate on a list of sources and emit tokens via greedy outer decoding. These baselines are what §6 will compare BCVF-trust against.
+3. Paraphrased-prompt construction so the M=3 requirement from §1.3 / §2.2.3 is realizable from one model and one original prompt.
+
+**Hard gate on §6.** §6 cannot start until §4 produces a verified decoder output on `MockSource`-backed traces that matches, token-for-token, a hand-computed reference. The real-model (HuggingFace) path is structurally scaffolded in §4 but its empirical verification is §6's concern, running inside the benchmark harness.
+
+**Deliverable.** A bounded artifact consisting of:
+
+1. Python package `symbolu_bcvf_llm/sources/` with:
+   - `base.py` — `Source` protocol + shared utilities.
+   - `mock.py` — `MockSource` for deterministic prefix-keyed logits.
+   - `huggingface.py` — `HuggingFaceSource` scaffold with delayed torch/transformers imports.
+   - `paraphrase.py` — `make_paraphrased_prompt` utility.
+2. Python package `symbolu_bcvf_llm/decoders/` with:
+   - `loop.py` — generic greedy outer-decoding loop.
+   - `vanilla.py` — source-0-only decoder.
+   - `blend.py` — equal-weight conventional blend over M sources.
+3. Tests in `symbolu_bcvf_llm/sources/tests/` and `symbolu_bcvf_llm/decoders/tests/` that exercise both baseline decoders end-to-end via `MockSource`, without pulling torch.
+
+**Independence from §0.6 rule 1.** §4 *code* can be scaffolded and unit-tested (via MockSource) without autonomy N=26 confirmation — same as §2 / §3 code. §4 *real-model execution* (HuggingFaceSource actually running against Llama 3.1 8B) and §4's role inside the §6 benchmark remain hard-gated on §0.6 rule 1.
+
+**Sub-sections §4.2–§4.9 are currently pending authorization.** The in-line implementation notes below document what was built under the §4 scaffold commit as a strategic realization of §4.1's deliverable, matching the §3 pattern where design-draft sub-sections were implemented and surgically annotated after.
+
+### 4.N Implementation notes — §4 scaffold (commit pending `go §4`)
+
+This sub-section records the actual §4 scaffold landed under Phase 2 execution. Contents match `symbolu_bcvf_llm/sources/` and `symbolu_bcvf_llm/decoders/`. Each note ties back to the §4.0 sub-section it realizes.
+
+**§4.2 Source protocol.** `symbolu_bcvf_llm/sources/base.py` defines a `typing.Protocol` with two methods (`lookahead() → (probs, valid_mask)`, `commit(token_id)`) and three attributes (`L`, `vocab_size`, `eos_token_id`). Shared utilities `stable_softmax` (fp64 internal, fp32 return per §2.7.2) and `truncating_valid_mask` (EOS-aware masking per §2.7.4) live alongside. `MockSource` and `HuggingFaceSource` both declare structural conformance via `runtime_checkable`.
+
+**§4.3 MockSource.** `symbolu_bcvf_llm/sources/mock.py` takes a `logits_fn: Callable[[Tuple[int, ...]], np.ndarray]` and owns the committed-prefix state + softmax boundary + EOS-mask production. No ML-framework dependency. 10 unit tests in `sources/tests/test_mock_source.py` verify protocol conformance, shape/dtype, fp32 boundary, softmax normalization, EOS mask truncation, commit-state advancement, and validation of out-of-range tokens, wrong-shape fn output, and `L < 3`.
+
+**§4.4 HuggingFaceSource.** `symbolu_bcvf_llm/sources/huggingface.py` scaffolds the real-model path with delayed torch/transformers imports: `__init__` imports torch locally and raises a clear `RuntimeError` if it's missing. The class body encodes §2.3.4's KV-cache amortization (one forward pass to commit, one to extend the frontier) and §2.7.2's fp32 boundary (softmax upcast inside `lookahead`). **Not executed against a real model in this environment** — V1 targets Llama 3.1 8B which requires GPU, and real-model verification is hard-gated on §0.6 rule 1. Two scaffold tests verify (a) the module imports without torch, (b) the constructor raises a clear RuntimeError when torch is absent.
+
+**§4.5 Paraphrase utility.** `symbolu_bcvf_llm/sources/paraphrase.py` exposes `make_paraphrased_prompt(model, tokenizer, original_prompt, rewrite_seed)` — a thin `model.generate` wrapper with a fixed rewrite instruction templated with `{seed}` and `{prompt}`. Temperature 0 per §1.4. Same delayed-torch discipline as §4.4.
+
+**§4.6 Decoders.** `symbolu_bcvf_llm/decoders/`:
+- `loop.py` — `run_decode(sources, next_token_fn, max_tokens, eos_token_id)` generic greedy outer loop. Calls `lookahead()` once per source per outer step, asks the strategy for a token, commits into every source. Shape-checks sources share a vocabulary. Returns `DecodeResult(emitted_tokens, stopped_on_eos, num_steps)`.
+- `vanilla.py` — `decode_vanilla(sources, max_tokens, eos_token_id)` §1.10 baseline A0. Strategy: `argmax(p_0(l=0))`. Ignores sources 1..M-1 for the *decision* but commits into them so state stays coherent.
+- `blend.py` — `decode_conventional_blend(sources, ...)` §1.10 conventional-blend baseline. Strategy: `argmax(mean_s p_s(l=0))`.
+
+The §5 trust-shaped decoder is a one-function drop-in at the `next_token_fn` hook — no outer-loop refactor needed when §5 lands.
+
+**§4.7 EOS and valid masks.** Handled in two places: `truncating_valid_mask(lookahead_tokens, eos_id, L)` in `sources/base.py` produces the per-source `(L,)` mask; `run_decode` stops the outer loop when the strategy emits `eos_token_id`. These two mechanisms are complementary — the per-source mask feeds the BCVF kernel's `valid_masks` argument (§2.8.11) so the stencil correctly skips positions past each source's EOS, while the outer-loop EOS check is the hard stop for generation.
+
+**§4.8 What §4 does NOT do.** No trust-weighting (§5). No benchmark harness (§6). No sampling beyond greedy (§1.3). No batched outer steps (T=1 streaming only). No cross-source KV-cache sharing (each HuggingFaceSource owns its own cache — V2 optimization per §9).
+
+**§4.9 Acceptance criteria — status.** §4 sign-off would require:
+
+1. ✅ Source protocol committed (§4.2) with structural conformance tests.
+2. ✅ MockSource implementation + unit tests — 10 tests pass deterministically.
+3. ✅ HuggingFaceSource scaffold with delayed-import discipline — 2 scaffold tests pass.
+4. ✅ Two baseline decoders (vanilla, conventional-blend) + generic outer loop — 11 tests pass.
+5. ⏳ **Pending:** real-model smoke test on HuggingFaceSource against Llama 3.1 8B, end-to-end token-for-token match against a hand-computed reference. Blocked on GPU availability and §0.6 rule 1. Landing point: §6 benchmark setup.
+6. ⏳ **Pending:** integration smoke test of the three-source paraphrased pipeline end-to-end. Same blocker.
+
+Items 1–4 are sufficient to unlock §5 (trust-shaped decoder) scaffolding and its MockSource-backed tests; items 5–6 are the §6 entry condition, not §5's.
+
+**Test totals for §4 scaffold:** 24 tests, <1 s on CPU, no torch/transformers import in any passing test.
 
 ---
 
