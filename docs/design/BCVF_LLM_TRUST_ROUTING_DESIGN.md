@@ -4109,6 +4109,70 @@ Items 1–5 close Phase 4 *infrastructure*; items 6–9 are the real-model verdi
 
 **Test totals for §6 scaffold:** 29 tests, <2 s on CPU, no torch/transformers/datasets import in any passing test.
 
+### 6.Exec Execution addendum — RunPod command sequence
+
+Pre-committed command sequence for executing §6 on a GPU-equipped RunPod pod (or any equivalent environment with torch + transformers + datasets + Llama 3.1 8B access). All three steps land artifacts under `docs/experiments/` — CSV results, Markdown summary, a DEBUG log file, and a structured JSON manifest (§ logging-util) per invocation, so any failure is reconstructible without re-executing.
+
+**Prerequisite gates** (unchanged from §6.1 + §0.6 rule 1):
+
+1. Autonomy N=26 confirmation recorded (§0.6 rule 1).
+2. Pod with GPU ≥ 16 GB VRAM (A100 / L40S / H100 — §1.9 envelope).
+3. `pip install torch transformers datasets accelerate` on the pod.
+4. `huggingface-cli login` with a token that has accepted the Llama 3.1 license at <https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct>.
+
+Full operational runbook lives at `scripts/BCVF_LLM_RUNPOD.md`; this addendum records only the three-command sequence so the design doc carries the canonical invocation.
+
+**Step 1 — Plumbing smoke** (< 30 s, any small HF model):
+
+```bash
+python scripts/verify_hf_source.py
+```
+
+Seven PASS/FAIL checks on `HuggingFaceSource`: constructor, `lookahead()` shape + dtype (fp32 boundary per §2.7.2), Σp = 1 per lookahead position, `argmax(lookahead[l=0])` matches `model.generate` (KV-cache drift guard from §2.3.4), `commit()` advances context, teacher-forced scoring through the three §6 scorers (vanilla / blend / trust). Exits 0 on all-pass. Defaults to `gpt2` (~500 MB, CPU-viable) so the plumbing itself is validated independent of Llama availability.
+
+**Step 2 — Harness smoke on Llama** (few min, N=2 questions):
+
+```bash
+python -m symbolu_bcvf_llm.benchmark \
+    --benchmark truthfulqa --smoke \
+    --model meta-llama/Meta-Llama-3.1-8B-Instruct
+```
+
+`--smoke` auto-sets `--num-questions 2`, `--no-paraphrase`, and `--suffix _smoke`. Verifies the full pipeline (model load, `TruthfulQABenchmark` → three `HuggingFaceSource`s per question → `run_benchmark` → `classify_phase_six_result`) runs end-to-end against Llama. The §1.10 classification at N=2 is meaningless — stack viability is what's being checked. If this step classifies as `EXCEPTION` in the manifest, fix the issue before proceeding.
+
+**Step 3 — Primary + replication** (§1.10 bullets 1 & 2):
+
+```bash
+python -m symbolu_bcvf_llm.benchmark \
+    --benchmark truthfulqa --seed 1 --suffix _seed1 \
+    --model meta-llama/Meta-Llama-3.1-8B-Instruct
+
+python -m symbolu_bcvf_llm.benchmark \
+    --benchmark truthfulqa --seed 2 --suffix _seed2 \
+    --model meta-llama/Meta-Llama-3.1-8B-Instruct
+```
+
+Two independently-seeded primary runs on the TruthfulQA-MC validation split. §1.10 sign-off requires **both** seeds to classify `PASS` in their manifest + the `|accuracy_seed_1 − accuracy_seed_2|` on the BCVF-trust decoder to be ≤ 1 pp. Estimated wall time per seed: ~1–2 GPU-hours at Llama 3.1 8B + full validation split (paraphrase round-trip × N questions dominates; §9 KV-snapshot optimization is the V2 path to reduce this).
+
+**Post-execution verdict.** Read the `classification` field of `phase_6_truthfulqa_manifest_seed1.json` and `..._seed2.json`. Possible outcomes per §1.10:
+
+| Outcome per seed | §1.10 classification |
+|---|---|
+| Both `PASS`, within ±1 pp | **V1 success** → §10 decision-gate proceeds |
+| Either `NULL` | V1 null result → write-up, close doc |
+| Either `REGRESSION` | Post-mortem per §1.10 bullet 3 |
+| Either `UNVIABLE_COST` | V1 architecturally unviable, §9 alternatives |
+| Split `PASS` / `NULL` or AMBIGUOUS | Expand N, re-run; do not conclude |
+
+**Artifacts to preserve from a successful run** (for §7 packaging):
+
+- `phase_6_truthfulqa_results_seed1.csv` + `_seed2.csv` — raw per-question rows.
+- `phase_6_truthfulqa_summary_seed1.md` + `_seed2.md` — §1.10 verdict summaries.
+- `phase_6_truthfulqa_manifest_seed1.json` + `_seed2.json` — environment fingerprint + exact model / dataset / git commit / CUDA device / torch version.
+- `phase_6_truthfulqa_run_seed1.log` + `_seed2.log` — per-question DEBUG log (useful for §8 failure-mode analysis if the verdict is mixed).
+
+The manifest JSON is the single most important artifact — it alone is sufficient to reproduce the environment for a third-party reviewer or for §7 Packaging. Attach it to any sign-off communication or issue report.
+
 ---
 
 ## Section 7 — Phase 5 — Packaging & Reproducibility
