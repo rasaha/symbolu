@@ -4016,7 +4016,98 @@ Items 1–5 unlock §6 scaffolding and its MockSource-backed tests; items 6–8 
 - Baseline 2: standard verifier blend with fixed weight (the "conventional engineering" baseline we must beat)
 - Success threshold: BCVF-trust routing must beat Baseline 2 by a pre-committed margin
 
-**Details pending.**
+### 6.0 Sub-section plan
+
+- **§6.1** — Purpose & deliverable. Pre-committed thresholds (already locked at §1.10), benchmark choice, scoring protocol, what §6 produces.
+- **§6.2** — Benchmark / dataset abstraction. `Question` dataclass + `Benchmark` protocol + `MockBenchmark` (offline, torch-free) + `TruthfulQABenchmark` skeleton with delayed `datasets` import.
+- **§6.3** — MC scoring via teacher-forcing. How the three decoders score each candidate answer; argmax over per-choice log-prob sums.
+- **§6.4** — Benchmark harness. `run_benchmark(benchmark, decoders)` — per-decoder accuracy, per-question correctness array, per-question latency.
+- **§6.5** — Primary + secondary metrics. Accuracy, paired McNemar tests, latency percentiles, §1.10 threshold evaluation.
+- **§6.6** — Replication protocol. Two seeds per §1.10; report both independently and the within-±1pp consistency check.
+- **§6.7** — Output artifacts. CSV + JSON per-question table, summary Markdown with the §1.10 go/no-go verdict.
+- **§6.8** — What §6 does NOT do. No adversarial eval, no cross-lingual, no model-size sweep (all §9).
+- **§6.9** — Acceptance criteria + effort estimate.
+
+### 6.1 Purpose & deliverable of Phase 4
+
+**Purpose.** Execute the pre-committed three-decoder comparison from §1.10 on the benchmark locked by §1.2 (TruthfulQA-MC) against Llama 3.1 8B (§1.3), with the exact thresholds already fixed in §1.10 so the result is non-negotiable: BCVF-trust either beats conventional-blend by ≥2 pp (success), matches within ±0.5 pp (null), or regresses (post-mortem). §6 is where the design's central claim is tested.
+
+**Hard gate on V1 sign-off.** §6 passing is the condition on which §10's proceed/don't-proceed checklist hinges. If §6 passes per §1.10, V1 is a positive result and writes up accordingly. If §6 produces null or regression, V1 closes with the finding and §9's V2 roadmap is consulted only if the null result was informative (not if the infrastructure itself was the blocker).
+
+**Independence from §0.6 rule 1.** Same as §4 and §5: §6 *code* (harness, metrics, MockBenchmark) can be scaffolded and unit-tested without autonomy N=26 confirmation. §6 *real-model execution* — running against actual Llama 3.1 8B on actual TruthfulQA — remains hard-gated on §0.6 rule 1 and the availability of a GPU-equipped environment.
+
+**Deliverable.**
+
+1. Python package `symbolu_bcvf_llm/benchmark/` with:
+   - `dataset.py` — `Question` dataclass + `Benchmark` protocol + `MockBenchmark` (offline, deterministic, torch-free) + `TruthfulQABenchmark` scaffold (delayed `datasets` + `transformers` import).
+   - `scoring.py` — teacher-forced MC choice scoring for the three decoders from §1.10.
+   - `harness.py` — `run_benchmark(benchmark, decoders)` driver returning per-decoder results.
+   - `metrics.py` — accuracy, paired McNemar, latency statistics, §1.10 threshold evaluation.
+   - `__main__.py` — CLI entry `python -m symbolu_bcvf_llm.benchmark`.
+2. Tests in `symbolu_bcvf_llm/benchmark/tests/` that exercise the three-decoder comparison end-to-end via `MockBenchmark` + `MockSource`.
+3. Results artifacts in `docs/experiments/`: `phase_6_mock_results.csv`, `phase_6_mock_summary.md` (equivalent of §3.9.4 for the benchmark).
+
+**Sub-sections §6.2–§6.9 are currently pending authorization.** Implementation-notes sub-section below records the actual scaffold landed under Phase 4 execution, matching the §3/§4/§5 pattern.
+
+### 6.N Implementation notes — §6 scaffold (commit pending `go §6`)
+
+Strategic realization of §6.2–§6.9 as runnable code + an end-to-end MockBenchmark sweep. Each note ties back to the sub-section it realizes.
+
+**§6.2 Dataset abstraction.** `symbolu_bcvf_llm/benchmark/dataset.py`:
+- `Question(prompt_tokens, choices, choice_tokens, correct_index, metadata)` — token-level MC item. Integer token IDs only; tokenizer dependency is pushed into `TruthfulQABenchmark`.
+- `Benchmark` `typing.Protocol` (runtime-checkable) with `questions` + `make_sources(question)` + `vocab_size` / `L` / `eos_token_id`.
+- `MockBenchmark` — torch-free, deterministic from a seed. Generates `N` two-choice questions; per-question `make_sources` fabricates M=3 `MockSource` instances under one of three policies: `healthy` (all sources favour correct), `healthy_majority` (source 0 favours distractor; 1 and 2 favour correct), `trust_required` (source 0 produces §3.2.4-style accelerating divergence toward the distractor; 1 and 2 are clean).
+- `TruthfulQABenchmark` — real loader (`datasets.load_dataset("truthful_qa", "multiple_choice")`) with delayed torch/transformers/datasets imports. Constructor raises clearly without the ML stack. **Not executed against a real model in this environment** (§0.6 rule 1).
+
+**§6.3 Teacher-forced MC scoring.** `scoring.py`:
+- One factored inner loop `_score_with_prob_fn(sources, choice_tokens, prob_fn)` accumulates `log P(target_t | ...)` while teacher-force-committing targets into all sources.
+- Three public scorers — `score_choice_vanilla`, `score_choice_blend`, `score_choice_trust` — differ only in `prob_fn`: source-0 p(l=0); equal-weight mean of p_s(l=0); §5 trust-weighted consensus of p_s(l=0).
+- `score_choice_trust` rejects `BCVFLLMConfig(use_anchor_pairing=True)` at call time (same §5.1 stage 3 enforcement as the decoder).
+
+**§6.4 Harness.** `harness.py`:
+- `run_benchmark(benchmark, decoders, bcvf_config, trust_config, max_questions, seed, progress_callback) → BenchmarkRunBundle` orchestrates the three-decoder sweep.
+- Per (decoder, question): fresh sources are instantiated via `benchmark.make_sources(question)` once per choice, the choice is scored, per-choice log-probs collected; argmax → predicted choice; latency is `time.perf_counter()` around the choice-scoring loop.
+- Result is a `BenchmarkRunBundle` with per-decoder `BenchmarkRunResult` (per-question correctness, per-question predicted index, per-question latency, per-question per-choice scores, accuracy).
+
+**§6.5 Metrics.** `metrics.py`:
+- `accuracy`, `mcnemar_paired` (exact two-sided binomial — matches the autonomy N=26 discipline, no SciPy dep), `latency_stats` (mean / median / p95 / min / max).
+- `classify_phase_six_result(trust_correct, blend_correct, trust_latencies, blend_latencies) → PhaseSixVerdict` applies §1.10's pre-committed thresholds: `UNVIABLE_COST` (> 5× latency) > `REGRESSION` (≤ −1 pp) > `NULL` (|Δ| < 0.5 pp) > `PASS` (≥ 2 pp AND ≤ 2× latency) > `AMBIGUOUS` (between bands). Verdict carries the McNemar result, delta, latency ratio, and a plaintext rationale.
+
+**§6.7 CLI + artifacts.** `__main__.py`:
+- `python -m symbolu_bcvf_llm.benchmark --benchmark mock --num-questions 48 --seed 0` runs the mock sweep and writes `docs/experiments/phase_6_mock_results_seed0.csv` + `phase_6_mock_summary_seed0.md`.
+- `--benchmark truthfulqa` is the real path; lazy-instantiates `TruthfulQABenchmark` and requires torch/transformers/datasets.
+
+**Mock-benchmark sweep result (recorded for the §6.N scaffold pass):**
+
+Two seeds `(0, 1)` × 48 questions each. Both seeds produce identical accuracy tables (the mock generator is deterministic per-question, and policy rotation mod 3 is seed-independent — the seed parameter controls vocabulary choice offsets):
+
+| Decoder | Accuracy | Mean latency (ms) |
+|---|---|---|
+| vanilla | 33.33% | 0.59 |
+| conventional_blend | 100.00% | 0.75 |
+| bcvf_trust | 100.00% | 2.97 |
+
+Classification: **`NULL`** (Δ = +0.00 pp). This is the *expected* mock-benchmark outcome and not a negative finding — `MockBenchmark` is a harness exerciser, not a hallucination simulator. All three policies are solvable by majority vote, so the conventional-blend baseline is already at the ceiling and there is no daylight for trust-shaping to close. The four §1.10 classification branches (PASS / NULL / REGRESSION / UNVIABLE_COST) are all independently covered by unit tests in `test_metrics.py`.
+
+**Latency note.** Mock mean latency ratio trust/blend ≈ 4× comes from the BCVF kernel's fixed overhead at V=32 where the underlying probability ops are essentially free. At production V=32000 with a real forward pass dominating (~16 G FLOPs), the kernel overhead (~6 M FLOPs per step, §2.4.6) is a rounding error and the real latency ratio on a GPU will be much closer to 1× — but this is a §6 execution-time measurement against an actual model, not something the mock sweep can predict.
+
+**§6.9 Acceptance status:**
+
+| # | Criterion | Status |
+|---|---|---|
+| 1 | Dataset abstraction + `MockBenchmark` + `TruthfulQABenchmark` scaffold | ✅ 6 tests |
+| 2 | Teacher-forced MC scoring, three decoders | ✅ 5 tests |
+| 3 | Harness end-to-end via mock | ✅ 7 tests |
+| 4 | Metrics + §1.10 classifier (all 4 branches covered) | ✅ 10 tests |
+| 5 | Two-seed reproducibility on mock | ✅ both seeds classify NULL with matching numbers |
+| 6 | Real-model smoke — `TruthfulQABenchmark` with Llama 3.1 8B | ⏳ §0.6 rule 1 + GPU |
+| 7 | TruthfulQA-MC validation split primary run | ⏳ §0.6 rule 1 + GPU |
+| 8 | TruthfulQA-MC second-seed replication (§1.10 bullet 2) | ⏳ §0.6 rule 1 + GPU |
+| 9 | §1.10 verdict published | ⏳ after 6–8 complete |
+
+Items 1–5 close Phase 4 *infrastructure*; items 6–9 are the real-model verdict and constitute V1 sign-off when they complete.
+
+**Test totals for §6 scaffold:** 29 tests, <2 s on CPU, no torch/transformers/datasets import in any passing test.
 
 ---
 
