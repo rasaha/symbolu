@@ -129,8 +129,8 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument(
         "--num-questions",
         type=int,
-        default=48,
-        help="number of questions (mock only; truthfulqa uses full split)",
+        default=None,
+        help="cap number of questions (both mock + truthfulqa)",
     )
     parser.add_argument(
         "--seed",
@@ -148,19 +148,62 @@ def main(argv: List[str] | None = None) -> int:
         default="",
         help="filename suffix for results (e.g. '_seed42')",
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="meta-llama/Meta-Llama-3.1-8B-Instruct",
+        help="HuggingFace model name (truthfulqa only). "
+             "Defaults to §1.3's Llama 3.1 8B Instruct.",
+    )
+    parser.add_argument(
+        "--no-paraphrase",
+        action="store_true",
+        help="truthfulqa only: use three identical prompts instead of "
+             "paraphrasing. Useful for smoke-testing the HuggingFaceSource "
+             "plumbing without the paraphrase round-trip.",
+    )
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="smoke run: N=2 questions, --no-paraphrase, suffix '_smoke'. "
+             "Meant for first-time verification that the ML stack and the "
+             "harness run end-to-end before committing to a full sweep.",
+    )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="validation",
+        help="truthfulqa split (validation is the usual choice).",
+    )
     args = parser.parse_args(argv)
 
-    if args.benchmark == "mock":
-        bench = MockBenchmark(
-            num_questions=args.num_questions, seed=args.seed,
+    # Smoke mode rewrites the other args for convenience.
+    if args.smoke:
+        args.num_questions = 2 if args.num_questions is None else min(
+            args.num_questions, 2
         )
+        args.no_paraphrase = True
+        if not args.suffix:
+            args.suffix = "_smoke"
+
+    if args.benchmark == "mock":
+        n = args.num_questions if args.num_questions is not None else 48
+        bench = MockBenchmark(num_questions=n, seed=args.seed)
     else:  # pragma: no cover — real benchmark path not exercised here
         from .dataset import TruthfulQABenchmark
-        bench = TruthfulQABenchmark()
+        bench = TruthfulQABenchmark(
+            model_name=args.model,
+            split=args.split,
+            max_questions=args.num_questions,
+            use_paraphrase=not args.no_paraphrase,
+        )
 
     print(
         f"Running {args.benchmark} benchmark, "
-        f"N={len(bench.questions)}, seed={args.seed} ..."
+        f"N={len(bench.questions)}, seed={args.seed}"
+        + (f", model={args.model}" if args.benchmark == "truthfulqa" else "")
+        + (", NO-PARAPHRASE" if args.no_paraphrase else "")
+        + " ..."
     )
 
     def progress(i, n, decoder):

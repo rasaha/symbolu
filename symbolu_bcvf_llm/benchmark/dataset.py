@@ -306,6 +306,8 @@ class TruthfulQABenchmark:
         split: str = "validation",
         max_questions: Optional[int] = None,
         L: int = 5,
+        use_paraphrase: bool = True,
+        paraphrase_max_new_tokens: int = 128,
     ) -> None:
         try:
             import torch  # noqa: F401
@@ -328,6 +330,9 @@ class TruthfulQABenchmark:
         self.vocab_size = int(self._tokenizer.vocab_size)
         self.L = L
         self.eos_token_id = int(self._tokenizer.eos_token_id)
+        self._use_paraphrase = bool(use_paraphrase)
+        self._paraphrase_max_new_tokens = int(paraphrase_max_new_tokens)
+        self._model_name = model_name
 
         ds = load_dataset("truthful_qa", "multiple_choice", split=split)
         if max_questions is not None:
@@ -379,20 +384,26 @@ class TruthfulQABenchmark:
         base_prompt = self._tokenizer.decode(
             question.prompt_tokens, skip_special_tokens=True
         )
-        para_a = make_paraphrased_prompt(
-            self._model, self._tokenizer, base_prompt, rewrite_seed=1
-        )
-        para_b = make_paraphrased_prompt(
-            self._model, self._tokenizer, base_prompt, rewrite_seed=2
-        )
+        if self._use_paraphrase:
+            para_a = make_paraphrased_prompt(
+                self._model, self._tokenizer, base_prompt,
+                rewrite_seed=1,
+                max_new_tokens=self._paraphrase_max_new_tokens,
+            )
+            para_b = make_paraphrased_prompt(
+                self._model, self._tokenizer, base_prompt,
+                rewrite_seed=2,
+                max_new_tokens=self._paraphrase_max_new_tokens,
+            )
+            prompts = [base_prompt, para_a, para_b]
+        else:
+            # Smoke mode: three identical prompts. Exercises the
+            # HuggingFaceSource plumbing end-to-end without the
+            # paraphrase round-trip; BCVF-trust quality is not
+            # meaningful in this mode (all three sources agree
+            # perfectly → uniform trust weights).
+            prompts = [base_prompt, base_prompt, base_prompt]
         return [
-            HuggingFaceSource(
-                self._model, self._tokenizer, base_prompt, L=self.L
-            ),
-            HuggingFaceSource(
-                self._model, self._tokenizer, para_a, L=self.L
-            ),
-            HuggingFaceSource(
-                self._model, self._tokenizer, para_b, L=self.L
-            ),
+            HuggingFaceSource(self._model, self._tokenizer, p, L=self.L)
+            for p in prompts
         ]
