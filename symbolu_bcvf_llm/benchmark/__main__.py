@@ -8,6 +8,14 @@ V1 defaults to `--benchmark mock` so the harness is runnable
 offline without torch / transformers / datasets. `--benchmark
 truthfulqa` requires the ML stack and is hard-gated on §0.6
 rule 1.
+
+Every run writes four artifacts alongside the existing CSV +
+summary, under `--out-dir` with suffix `<suffix>`:
+
+  phase_6_<bench>_results<suffix>.csv     per-question rows
+  phase_6_<bench>_summary<suffix>.md      §1.10 verdict summary
+  phase_6_<bench>_run<suffix>.log         full DEBUG log file
+  phase_6_<bench>_manifest<suffix>.json   env + args + git + outcome
 """
 
 from __future__ import annotations
@@ -15,10 +23,23 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import logging
+import time
+import traceback
+from dataclasses import asdict
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 import numpy as np
+
+from symbolu_bcvf_llm.logging_util import (
+    capture_environment,
+    capture_git_state,
+    configure_logging,
+    format_exception,
+    log_environment,
+    write_manifest,
+)
 
 from .dataset import MockBenchmark
 from .harness import BenchmarkRunBundle, run_benchmark
@@ -116,65 +137,58 @@ def _write_summary(bundle: BenchmarkRunBundle, path: Path) -> None:
     path.write_text("\n".join(lines) + "\n")
 
 
-def main(argv: List[str] | None = None) -> int:
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="§6 Phase 4 — three-decoder benchmark sweep"
     )
     parser.add_argument(
-        "--benchmark",
-        choices=("mock", "truthfulqa"),
-        default="mock",
+        "--benchmark", choices=("mock", "truthfulqa"), default="mock",
         help="which benchmark to run",
     )
     parser.add_argument(
-        "--num-questions",
-        type=int,
-        default=None,
+        "--num-questions", type=int, default=None,
         help="cap number of questions (both mock + truthfulqa)",
     )
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
-        "--seed",
-        type=int,
-        default=0,
-    )
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
+        "--out-dir", type=Path,
         default=Path(__file__).resolve().parents[2] / "docs" / "experiments",
     )
     parser.add_argument(
-        "--suffix",
-        type=str,
-        default="",
+        "--suffix", type=str, default="",
         help="filename suffix for results (e.g. '_seed42')",
     )
     parser.add_argument(
-        "--model",
-        type=str,
+        "--model", type=str,
         default="meta-llama/Meta-Llama-3.1-8B-Instruct",
         help="HuggingFace model name (truthfulqa only). "
              "Defaults to §1.3's Llama 3.1 8B Instruct.",
     )
     parser.add_argument(
-        "--no-paraphrase",
-        action="store_true",
+        "--no-paraphrase", action="store_true",
         help="truthfulqa only: use three identical prompts instead of "
              "paraphrasing. Useful for smoke-testing the HuggingFaceSource "
              "plumbing without the paraphrase round-trip.",
     )
     parser.add_argument(
-        "--smoke",
-        action="store_true",
+        "--smoke", action="store_true",
         help="smoke run: N=2 questions, --no-paraphrase, suffix '_smoke'. "
              "Meant for first-time verification that the ML stack and the "
              "harness run end-to-end before committing to a full sweep.",
     )
     parser.add_argument(
-        "--split",
-        type=str,
-        default="validation",
+        "--split", type=str, default="validation",
         help="truthfulqa split (validation is the usual choice).",
     )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true",
+        help="DEBUG level on the console handler (file log is always DEBUG).",
+    )
+    return parser
+
+
+def main(argv: List[str] | None = None) -> int:
+    parser = _build_parser()
     args = parser.parse_args(argv)
 
     # Smoke mode rewrites the other args for convenience.
@@ -186,47 +200,171 @@ def main(argv: List[str] | None = None) -> int:
         if not args.suffix:
             args.suffix = "_smoke"
 
-    if args.benchmark == "mock":
-        n = args.num_questions if args.num_questions is not None else 48
-        bench = MockBenchmark(num_questions=n, seed=args.seed)
-    else:  # pragma: no cover — real benchmark path not exercised here
-        from .dataset import TruthfulQABenchmark
-        bench = TruthfulQABenchmark(
-            model_name=args.model,
-            split=args.split,
-            max_questions=args.num_questions,
-            use_paraphrase=not args.no_paraphrase,
+    # Output paths resolved up-front so the log file is created
+    # before any heavy work (model load, dataset download) that can
+    # fail with informative tracebacks.
+    out_dir = Path(args.out_dir)
+    run_tag = f"phase_6_{args.benchmark}{args.suffix}"
+    csv_path = out_dir / f"{run_tag.replace('phase_6_', 'phase_6_') }_results".replace(
+        "_results", "_results"
+    )  # keep original layout
+    csv_path = out_dir / f"phase_6_{args.benchmark}_results{args.suffix}.csv"
+    md_path = out_dir / f"phase_6_{args.benchmark}_summary{args.suffix}.md"
+    log_path = out_dir / f"phase_6_{args.benchmark}_run{args.suffix}.log"
+    manifest_path = (
+        out_dir / f"phase_6_{args.benchmark}_manifest{args.suffix}.json"
+    )
+
+    logger = configure_logging(log_path=log_path, verbose=args.verbose)
+    logger.info("=" * 72)
+    logger.info("§6 Phase 4 benchmark run starting")
+    logger.info("=" * 72)
+    logger.info("args = %s", {k: str(v) for k, v in vars(args).items()})
+    env_info = log_environment(logger)
+
+    manifest: Dict[str, Any] = {
+        "script": "symbolu_bcvf_llm.benchmark",
+        "args": {k: str(v) for k, v in vars(args).items()},
+        "output_paths": {
+            "results_csv": str(csv_path),
+            "summary_md": str(md_path),
+            "run_log": str(log_path),
+            "manifest_json": str(manifest_path),
+        },
+        **env_info,
+        "outcome": "PENDING",
+    }
+    write_manifest(manifest_path, manifest)
+
+    t_start = time.perf_counter()
+
+    try:
+        if args.benchmark == "mock":
+            n = args.num_questions if args.num_questions is not None else 48
+            logger.info("Instantiating MockBenchmark(num_questions=%d)", n)
+            bench = MockBenchmark(num_questions=n, seed=args.seed)
+        else:  # pragma: no cover — real benchmark path not exercised here
+            logger.info(
+                "Instantiating TruthfulQABenchmark(model=%s, split=%s, "
+                "max_questions=%s, use_paraphrase=%s)",
+                args.model, args.split, args.num_questions,
+                not args.no_paraphrase,
+            )
+            t_load = time.perf_counter()
+            from .dataset import TruthfulQABenchmark
+            bench = TruthfulQABenchmark(
+                model_name=args.model,
+                split=args.split,
+                max_questions=args.num_questions,
+                use_paraphrase=not args.no_paraphrase,
+            )
+            logger.info(
+                "Model + dataset loaded in %.1f s", time.perf_counter() - t_load
+            )
+            manifest["model"] = {
+                "name": args.model,
+                "vocab_size": bench.vocab_size,
+                "L": bench.L,
+                "eos_token_id": bench.eos_token_id,
+                "use_paraphrase": not args.no_paraphrase,
+            }
+            write_manifest(manifest_path, manifest)
+
+        n_questions = len(bench.questions)
+        logger.info(
+            "Running benchmark '%s' with N=%d questions at seed=%d",
+            args.benchmark, n_questions, args.seed,
         )
 
-    print(
-        f"Running {args.benchmark} benchmark, "
-        f"N={len(bench.questions)}, seed={args.seed}"
-        + (f", model={args.model}" if args.benchmark == "truthfulqa" else "")
-        + (", NO-PARAPHRASE" if args.no_paraphrase else "")
-        + " ..."
-    )
+        def progress(i: int, n: int, decoder: str) -> None:
+            # Log every completion; also console print on decoder-completion.
+            logger.debug("  %s: %d/%d", decoder, i, n)
+            if i == n:
+                logger.info("  %s: %d/%d", decoder, i, n)
 
-    def progress(i, n, decoder):
-        if i == n:
-            print(f"  {decoder}: {i}/{n}")
+        bundle = run_benchmark(
+            benchmark=bench,
+            seed=args.seed,
+            progress_callback=progress,
+        )
 
-    bundle = run_benchmark(
-        benchmark=bench,
-        seed=args.seed,
-        progress_callback=progress,
-    )
+        _write_csv(bundle, csv_path)
+        _write_summary(bundle, md_path)
 
-    csv_path = args.out_dir / f"phase_6_{args.benchmark}_results{args.suffix}.csv"
-    md_path = args.out_dir / f"phase_6_{args.benchmark}_summary{args.suffix}.md"
-    _write_csv(bundle, csv_path)
-    _write_summary(bundle, md_path)
+        for decoder, r in bundle.results.items():
+            ls = latency_stats(r.per_question_latency_s)
+            logger.info(
+                "  %-20s accuracy=%.2f%%  mean_latency=%.3f s  median=%.3f s  p95=%.3f s",
+                decoder, r.accuracy * 100, ls.mean_s, ls.median_s, ls.p95_s,
+            )
 
-    for decoder, r in bundle.results.items():
-        print(f"  {decoder}: accuracy = {r.accuracy:.2%}")
+        # Compute verdict once so it lands in both the summary and
+        # the manifest.
+        verdict: Dict[str, Any] = {}
+        if (
+            "bcvf_trust" in bundle.results
+            and "conventional_blend" in bundle.results
+        ):
+            trust = bundle.results["bcvf_trust"]
+            blend = bundle.results["conventional_blend"]
+            v = classify_phase_six_result(
+                trust_correct=trust.per_question_correct,
+                blend_correct=blend.per_question_correct,
+                trust_latencies=trust.per_question_latency_s,
+                blend_latencies=blend.per_question_latency_s,
+            )
+            verdict = {
+                "classification": v.classification,
+                "accuracy_trust": v.accuracy_trust,
+                "accuracy_blend": v.accuracy_blend,
+                "delta_pp": v.delta_pp,
+                "latency_ratio": v.latency_ratio,
+                "mcnemar": asdict(v.mcnemar),
+                "notes": v.notes,
+            }
+            logger.info(
+                "§1.10 classification: %s  Δ=%+0.2f pp  latency_ratio=%.2f×",
+                v.classification, v.delta_pp, v.latency_ratio,
+            )
 
-    print(f"\nResults: {csv_path}")
-    print(f"Summary: {md_path}")
-    return 0
+        manifest["per_decoder"] = {
+            name: {
+                "accuracy": float(r.accuracy),
+                "num_questions": int(r.num_questions),
+                "mean_latency_s": float(
+                    np.mean(r.per_question_latency_s)
+                ) if r.num_questions else 0.0,
+            }
+            for name, r in bundle.results.items()
+        }
+        manifest["verdict"] = verdict
+        manifest["duration_s"] = round(time.perf_counter() - t_start, 3)
+        manifest["outcome"] = "OK"
+        write_manifest(manifest_path, manifest)
+
+        logger.info("Results: %s", csv_path)
+        logger.info("Summary: %s", md_path)
+        logger.info("Run log: %s", log_path)
+        logger.info("Manifest: %s", manifest_path)
+        logger.info("Finished in %.1f s", manifest["duration_s"])
+        return 0
+
+    except Exception as exc:
+        logger.error(
+            "FATAL: run aborted by exception after %.1f s",
+            time.perf_counter() - t_start,
+        )
+        logger.error("%s", traceback.format_exc())
+        manifest["outcome"] = "EXCEPTION"
+        manifest["exception"] = format_exception(exc)
+        manifest["duration_s"] = round(time.perf_counter() - t_start, 3)
+        try:
+            write_manifest(manifest_path, manifest)
+        except Exception:  # pragma: no cover — manifest write failure
+            logger.exception("also failed to write manifest")
+        logger.error("Manifest with failure state: %s", manifest_path)
+        logger.error("Run log: %s", log_path)
+        return 1
 
 
 if __name__ == "__main__":

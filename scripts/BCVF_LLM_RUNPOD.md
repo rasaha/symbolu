@@ -115,3 +115,34 @@ Re-run `huggingface-cli login` with a token that has `read` scope, and make sure
 | `python -m symbolu_bcvf_llm.benchmark --benchmark truthfulqa --seed N` | Primary §6 Phase 4 run (§1.10 evaluation) | ~1–2 GPU-hours |
 
 All three are runnable independently; the smoke scripts are advisory but highly recommended before a primary run.
+
+## Logging & artifacts (every run writes these)
+
+Both the CLI and the verify script produce a **run log** and a **manifest JSON** next to their results so any failure is reconstructible without re-executing. All four are written under `--out-dir` (default `docs/experiments/`).
+
+**`python -m symbolu_bcvf_llm.benchmark ...`:**
+
+| File | Contents |
+|---|---|
+| `phase_6_<bench>_results<suffix>.csv` | Per-question rows (predicted, correct, latency, scores) |
+| `phase_6_<bench>_summary<suffix>.md` | §1.10 verdict + paired McNemar table |
+| `phase_6_<bench>_run<suffix>.log` | DEBUG log — env, args, model, per-question progress, exceptions w/ traceback |
+| `phase_6_<bench>_manifest<suffix>.json` | Structured env + args + model + per-decoder accuracy + verdict + outcome (`OK` / `EXCEPTION` / `PENDING`) |
+
+**`scripts/verify_hf_source.py`:**
+
+| File | Contents |
+|---|---|
+| `verify_hf_source_<model-slug>.log` | DEBUG log — env, model load, per-check shapes/dtypes |
+| `verify_hf_source_<model-slug>.json` | Per-check PASS/FAIL + env + model info + `outcome` |
+
+Add `--verbose` / `-v` to either command to promote the console handler to DEBUG too (file log is always DEBUG regardless).
+
+## Diagnosing a failed run
+
+1. **Open the manifest first.** `phase_6_truthfulqa_manifest_seed1.json` tells you whether the run hit `EXCEPTION` (code abort), `PENDING` (process killed mid-run), or `OK` (ran to completion). For `EXCEPTION`, it contains the full traceback + python/torch/transformers versions + CUDA device info + git commit — usually enough to reproduce.
+2. **Then the log.** `phase_6_truthfulqa_run_seed1.log` has per-question progress at DEBUG, so you can see exactly which question index the run died on. The `__main__.py` line numbers in each log line point back at the source so stacktraces and progress are co-located.
+3. **`git diff` against the manifest's `git.commit`.** If the run crashes in production but not on your dev machine, the manifest records the exact commit — compare before assuming the code changed.
+4. **VRAM OOM mid-run** usually shows up as a `torch.cuda.OutOfMemoryError` traceback in the log, with the manifest outcome = `EXCEPTION`. See the OOM troubleshooting section above.
+
+If you need to share a failure report, the manifest JSON is the single file to attach — it contains everything needed to reconstruct the environment. The log file adds the per-step detail when the manifest isn't enough.
