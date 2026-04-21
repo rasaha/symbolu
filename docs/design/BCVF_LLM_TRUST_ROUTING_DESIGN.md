@@ -3944,6 +3944,67 @@ This has two consequences for §5 design and reporting:
 
 **Details pending.** Subsequent §5 sub-sections will commit, in order: the V1 consumer architecture (one of hidden-state shaping, logit blending, routing/gating), the V1 trust-temperature and softmin formulation, the cold-start and warmup behavior, integration with the §4 source framework, and the V1 acceptance criteria.
 
+### 5.N Implementation notes — §5 scaffold (commit pending `go §5`)
+
+Strategic realization of §5.1 + §5.2 as runnable code. Each note ties back to the sub-section it realizes. Sub-sections §5.3–§5.9 remain pending authorization; the scaffold below implements the minimum V1-viable shape so §6 benchmark prep is unblocked.
+
+**V1 consumer architecture: logit blending.** Picked over hidden-state shaping (requires `Source` to expose `h_t`, which `HuggingFaceSource` currently does not) and routing/gating (hard-switch semantics conflict with §5.2's dynamic-sensitivity caveat). Logit blending generalizes §1.10's conventional-blend baseline cleanly: same outer loop, same EOS handling, same §4.6 `next_token_fn` hook — only the weight distribution changes.
+
+**§5.1 realization — `symbolu_bcvf_llm/trust/shaper.py`:**
+
+- `TrustShaperConfig` carries the four V1-default parameters from §5.1: `ema_alpha = 0.05`, `deadband_k_sigma = 2.0`, `use_hinge = False` (deadband is V1 default; hinge is opt-in), `trust_temperature = 1.0` (§2.5.5 carry-over). `hinge_theta` is 0.0 by default when `use_hinge = True`.
+- `TrustShaper` is stateful (holds `_ema_mean`, `_ema_sq`) and exposes `step(per_source_costs) → weights`. Cold-start initializes `EMA_mean[i] ← per_source_costs[i]` on step 0 so the residual is exactly zero → uniform weights — matches §5.1 stage 1's "safe" cold-start rule.
+- σ is tracked as `sqrt(mean(EMA_sq))` (scalar across sources; matches the autonomy `S3_map_error_accel` implementation rather than a per-source σ).
+- Only the *positive* side of the residual feeds the softmin. A source whose cost is below the EMA is not an outlier; both deadband and hinge zero out negative residuals alongside the sub-threshold middle.
+- `TrustShaper.history` records a `TrustShaperStep` per call (cost / ema_mean_before / residual / σ / shaped / weights) for §6-style diagnostics and inspection.
+
+**V1 consumer realization — `symbolu_bcvf_llm/trust/decoder.py`:**
+
+- `decode_trust_shaped(sources, bcvf_config, trust_config, max_tokens, eos_token_id) → TrustShapedDecodeResult` plugs into §4's `run_decode` via the `next_token_fn` hook. No outer-loop refactor relative to §4's baselines.
+- At each outer step: upcasts per-source `probs` to fp64 at the BCVF boundary (§2.7.2), calls `compute_bcvf_cost(..., valid_masks=masks)` (§2.8.11), extracts `per_source_costs`, feeds them to the shaper, forms the weighted consensus `Σ_i w_i · p_i(l=0)`, emits argmax.
+- §5.1 stage 3 enforcement: constructor rejects `BCVFLLMConfig(use_anchor_pairing=True)` with a clear error. Non-anchor pairing is a hard V1 requirement, not a default that can be toggled off.
+- `TrustShapedDecodeResult` wraps §4's `DecodeResult` with per-step arrays `(T, M)` — weights, costs, residuals — plus `(T,)` BCVF totals and activations. These are what §6 will report per-decoder for the three-way comparison and the downstream-sensitivity narrative from §5.2.
+
+**V1 parameter defaults (per-module docstrings cite these):**
+
+| Parameter | V1 default | Source |
+|---|---|---|
+| `ema_alpha` | 0.05 | §5.1 stage 1 |
+| `deadband_k_sigma` | 2.0 | §5.1 stage 2 |
+| `use_hinge` | `False` (V1 uses deadband) | §5.1 stage 2 preference |
+| `hinge_theta` | 0.0 | §5.1 stage 2 (when hinge on) |
+| `trust_temperature` | 1.0 | §2.5.5 carry-over |
+| `use_anchor_pairing` | `False` (enforced) | §5.1 stage 3 |
+| BCVF `T / β / δ` | 0.1 / 200 / 0.5 | §3.9.6.bis winner (= V1 defaults) |
+
+**§5.2 acknowledgement in tests.** The outlier-downweighting test intentionally evaluates at the **first step where source divergence first crosses BCVF's gate-open regime**, because the §5.1 pattern is designed for spike-like outliers — sustained monotonic growth of per-source cost eventually drives the EMA up alongside, which is the expected-and-correct behaviour. §5.2's downstream-sensitivity caveat applies to §6 benchmark interpretation, not to this test.
+
+**Deliberate V1 omissions (tie-backs to §9):**
+
+- No hidden-state shaping. V2, pending `Source` API extension.
+- No routing/gating. V2; §5.2 caveat applies.
+- No `τ_w` sweep. §3 synthetic sweep characterized the per-source cost distribution but did not sweep the Rahu-side temperature. §6 may sweep τ_w if the primary success margin is close to threshold.
+- No training-time trust-calibration loss (`L_trust`). V2 per §2.5.5.
+- No cross-source KV sharing. V2 optimization.
+- No BCVF-trust alignment diagnostic at decode time. The per-step diagnostics expose enough raw signal that a §3-style sweep over decoding traces is straightforward follow-up, but §3's `AlignmentMetrics` vocabulary is about static traces, not streaming runs.
+
+**§5.9 acceptance status:**
+
+| # | Criterion | Status |
+|---|---|---|
+| 1 | Consumer architecture committed (logit blending) | ✅ |
+| 2 | `TrustShaper` implements §5.1 three-stage pattern | ✅ 12 unit tests pass |
+| 3 | `decode_trust_shaped` integrates with §4 `run_decode` | ✅ 9 end-to-end tests pass |
+| 4 | Anchor-pairing rejection at call time | ✅ |
+| 5 | Per-step diagnostics for §6 | ✅ 5-array `TrustShapedDecodeResult` |
+| 6 | Real-model smoke — `HuggingFaceSource` × 3 through `decode_trust_shaped` | ⏳ gated on §0.6 rule 1 + GPU |
+| 7 | τ_w calibration on real-model per-source-cost distribution | ⏳ §6 territory |
+| 8 | Benchmark comparison — §1.10 three-way (vanilla / conventional-blend / BCVF-trust) | ⏳ §6 |
+
+Items 1–5 unlock §6 scaffolding and its MockSource-backed tests; items 6–8 are the §6 acceptance criteria, not §5's.
+
+**Test totals for §5 scaffold:** 21 tests, <0.5 s on CPU, no torch/transformers import.
+
 ---
 
 ## Section 6 — Phase 4 — Benchmark, Metrics, Pre-committed Success Criteria
