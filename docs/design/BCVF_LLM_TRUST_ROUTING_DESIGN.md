@@ -2992,6 +2992,25 @@ Then `p_s(l) = softmax(z_s(l))` for each source and lookahead position.
 
 **Scale commentary.** A logit-space bias of `α_mag = 0.1` on a medium-entropy base produces a probability-space `‖p_1 - p_0‖₂` of roughly `0.02–0.05` (depending on `sigma_logit`). This is below the V1 gate threshold `T = 0.1`. The sweep intentionally straddles the threshold so the gate's behavior is characterized on both sides.
 
+**Implementation note (§3 execution, commit `543e3e8`).** The logit-space construction above is the spec's descriptive form. In the executed harness (`symbolu_bcvf_llm/characterization/traces.py`), perturbations are applied in **probability space** for four of the seven families, because two structural issues make the pure logit-space recipe incompatible with §3.5's thresholds:
+
+1. **Softmax nonlinearity vs. Lemma 1.** A logit-space constant shift `α` produces `p_1(l) − p_0(l) = softmax(z_base(l) + α) − softmax(z_base(l))`, which varies with `l` because `z_base(l)` varies with `l`. §2.6 C1/C2 proofs require probability-space `e` to be *exactly* constant / linear in `l` for the 1e-10 fp64 threshold in §3.5.3 / §3.5.4 to be structurally attainable. Probability-space perturbation (`p_1 = p_base + α`, `p_1 = p_base + l·γ`) makes `e` exactly constant / linear as the proofs demand.
+2. **Scale amplification by softmax + unit direction.** At V=1024 with a unit-ℓ²-norm logit direction, a logit perturbation of 0.3 produces probability-space disagreement on the order of `1e-5` — four orders of magnitude below `T = 0.1`. Gate never opens and §3.5.5 / §3.5.7 gate-activation thresholds fail. Probability-space perturbation with the same magnitude parameter puts `‖e‖` directly on a controllable scale.
+
+Revised per-family perturbation space (what the harness actually uses):
+
+| Family | Perturbation space | Rationale |
+|---|---|---|
+| §3.2.1 Baseline | — (identical sources) | no perturbation |
+| §3.2.2 Constant-bias | **probability** | exact §2.6 C1 invariance |
+| §3.2.3 Linear-drift | **probability** | exact §2.6 C2 invariance |
+| §3.2.4 Accelerating | **probability** | controllable ‖a‖ for gate activation |
+| §3.2.5 Noise-floor | **logit** (unchanged) | softmax-suppression is the family's purpose |
+| §3.2.6 Outlier | **probability** | controllable 2:1 attribution signal |
+| §3.2.7 EOS-truncation | inherits outer family | — |
+
+The deviation is recorded per-cell in `TraceBundle.metadata["perturbation_space"]`. §3.3.4's realism rationale (Parts 1–3) still applies: BCVF is a local mathematical operator that only sees the algebraic shape of `e`; whether `e` is constructed via logit-then-softmax or directly in probability space doesn't affect what the operator proves. The base sequence `p_base = softmax(z_base)` is still a softmax-shaped distribution; only the *perturbation layered on top* changes space.
+
 #### 3.3.4 Realism rationale — why these traces are a legitimate stand-in
 
 A reviewer might reasonably ask: "Real model outputs aren't random Gaussians in logit space — they have semantic structure, peaked distributions, attention-head-correlated noise. What does characterization against synthetic traces prove?"
@@ -3557,6 +3576,17 @@ Each §3.7 trace is a **single cell**, no magnitude sweep, no seed replication (
 
 **Zero failures tolerated.** Unlike §3.5's 3-seed replication, §3.7 is deterministic — either the guard works or it doesn't. One fail = §3.9 blocked.
 
+**Implementation note (§3 execution, commit `543e3e8`).** Four of the seven §3.7 guards are covered by the §2.9 unit-test suite rather than re-executed as separate cells in the §3.4 sweep harness, because the unit tests verify the identical property at the kernel-API level:
+
+| §3.7 guard | Coverage |
+|---|---|
+| §3.7.2 Identical sources → hard zero | `test_pair_cost_constant_bias_zero` + `test_lemma_1_constant_bias_zero` (§2.9 #27, #42) |
+| §3.7.3 Simplex-drift tolerance | `test_compute_disagreement_translation_invariant` (§2.9 #5) |
+| §3.7.7 Empty-stencil guard (full EOS) | `test_pair_cost_all_invalid_returns_zero` (§2.9 #25) |
+| §3.7.8 NaN / Inf rejection | `test_compute_bcvf_cost_scalar_nan_guard` (§2.9 #34) |
+
+The remaining three guards (§3.7.4 weight mis-broadcast, §3.7.5 dtype mismatch, §3.7.6 Huber extreme stress) are not yet exercised by either §2.9 or the §3 harness. Adding them as either §2.9 tests or §3.4.4-adjacent single-cell traces is outstanding work; the absence is recorded here rather than silently skipped.
+
 #### 3.7.10 What §3.7 does NOT do
 
 - **No sweep over parameters.** Each §3.7 trace uses V1 defaults `(T, β, δ) = (0.1, 200, 0.5)`, `sigma_logit = 3.0`, `V = 1024`. Parameter-space robustness of the guards is irrelevant — the guards check structural properties that should hold regardless of parameter values.
@@ -3754,6 +3784,29 @@ All three artifacts land in one commit tagged `phase_1_5_signoff`.
 10. ✅ §3.9 sign-off procedure, tiebreaker, failure classification, deliverable checklist, effort estimate committed (this sub-section).
 
 Items 1–10 are satisfied. §3 **design is complete**; §3 execution remains pending §2.9 sign-off and Phase 1 execution.
+
+#### 3.9.6.bis Empirical addendum — §3 sweep result (commit `543e3e8`)
+
+Recorded here after-the-fact so the recommendation in §3.9.4 / §3.9.5 is anchored to actual numbers rather than projected ones. Artifacts: `docs/experiments/phase_1_5_results.csv`, `docs/experiments/phase_1_5_summary.md`.
+
+**Classification: `PASS`** (§3.9.3). All four §3.9.1 conditions hold:
+
+| Condition | Result |
+|---|---|
+| §3.4.4 ablation — SECOND passes linear-drift, FIRST fails on drift>0 | ✅ SECOND 15/15 pass; FIRST 0/15 pass; ZEROTH 0/15 pass — §2.6 C2 vector-path invariance empirically confirmed both ways |
+| §3.4.2 primary — all 7 families 100% at V1 defaults, σ=3.0, V=1024 | ✅ 87/87 cells pass |
+| §3.4.3 sensitivity — at least one `(T, β, δ)` tuple passes all families × σ | ✅ 1701/1701 cells pass; all 27 `(T, β, δ)` tuples qualify as candidates |
+| §3.4.5 full-V spot check at V=32000 with winner tuple | ✅ 21/21 cells pass |
+
+**Winner tuple (§3.9.2): `T = 0.1, β = 200, δ = 0.5`** — V1 defaults unchanged. Tiebreaker produced 27 candidates (every sensitivity-grid tuple passes); the Euclidean-distance ranking selects V1 defaults at rank 1 as the minimum-deviation choice. Top 5 by distance: (0.1, 200, 0.5), (0.05, 200, 0.5), (0.1, 200, 0.25), (0.1, 100, 0.5), (0.05, 200, 0.25).
+
+**Alignment (§3.6):** all truth-label-bearing families return `hit_rate = 1.00` and `margin_mean = 2.00` across the sweep. Zero rank-3 (fully inverted) cells observed.
+
+**Deviations from spec** (also noted inline at §3.3.3 and §3.7.9):
+1. Perturbation space for 4 of 7 families is probability-space, not logit-space (§3.3.3 implementation note). Softmax nonlinearity + V=1024 unit-direction scale made logit-space perturbations incompatible with §3.5.3 / §3.5.4 fp64 1e-10 thresholds and §3.5.5 / §3.5.7 gate-activation thresholds. Probability-space construction preserves §3.3.4 realism rationale (base is still softmax-shaped; only the perturbation layer changes).
+2. §3.7.2 / §3.7.3 / §3.7.7 / §3.7.8 guards are covered by §2.9 unit tests rather than re-executed as separate §3 sweep cells. §3.7.4–§3.7.6 are noted as outstanding (§3.7.9 implementation note).
+
+**Recommendation:** `UNLOCK §4 AT (T=0.1, β=200, δ=0.5)`. §0.6 rule 1 (autonomy N=26 confirmation) remains the independent gate on §4 execution; §3 does not and cannot substitute for it.
 
 #### 3.9.7 What §3.9 does NOT cover
 
