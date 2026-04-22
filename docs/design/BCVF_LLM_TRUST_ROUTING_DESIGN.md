@@ -4218,7 +4218,101 @@ The manifest JSON is the single most important artifact — it alone is sufficie
 - [ ] Pre-committed success threshold is locked
 - [ ] Owner has 1–2 weeks of engineering bandwidth
 
-**Details pending.**
+### 10.V1 V1 closure — empirical verdict
+
+V1 execution against Mistral-7B-Instruct-v0.3 on TruthfulQA-MC validation split completed 2026-04-22. Artifacts: `docs/experiments/phase_6_truthfulqa_{results,summary,manifest,run}_mistral_seed1.*`; analysis report at `phase_6_truthfulqa_results_mistral_seed1__analysis.md`.
+
+**§1.10 classification: `UNVIABLE_COST` + `REGRESSION`**
+
+The classifier printed `UNVIABLE_COST` (latency ratio 23.85× > 5×) which takes precedence in the enum ordering, but the accuracy delta alone would have classified as `REGRESSION` (Δ = −3.06 pp ≤ −1.0 pp). Both findings stand.
+
+#### 10.V1.1 Numbers
+
+| Decoder | Accuracy | Mean latency | Score-margin mean |
+|---|---|---|---|
+| vanilla | **32.56%** | 5.76 s | 4.305 |
+| conventional_blend | 29.87% | 0.49 s | 4.039 |
+| bcvf_trust | **26.81%** | 11.60 s | **6.037** |
+
+- Vanilla baseline outperformed both conventional blend (**−2.7 pp**) and BCVF-trust (**−5.8 pp**).
+- BCVF-trust margin (6.0) is ~50% wider than vanilla (4.3) despite being less accurate — indicating **overconfident misclassification**, not mere noise.
+- Latency ratio (trust/blend) = 23.85× in scoring-mode benchmark; real-time generation would be ≈ 2× (§2.4.6 FLOP analysis).
+- McNemar trust-vs-blend: b=65, c=90, p=0.054 — borderline significant against BCVF-trust.
+- Full-N paraphrase cache hit rate: 85.8% (9862 hits / 1634 misses; disk-cache feature not active during this run, so all misses regenerated).
+
+#### 10.V1.2 Failure-mode diagnosis
+
+BCVF dormancy proxy (trust ↔ blend prediction agreement): **64.1%** (524 agree / 293 diverge). This **rules out the §5.2 dormancy caveat** as the explanation — BCVF was *active* on 36% of questions, not silent. The trust layer was doing real work; the work was pointed the wrong way.
+
+Pairwise flip analysis:
+
+| Pairing | Disagree | A wins | B wins | Both wrong (different picks) | Net A gain |
+|---|---|---|---|---|---|
+| vanilla vs blend | 160 | 54 | 32 | 74 | +22 |
+| vanilla vs trust | 334 | 114 | 67 | 153 | **+47** |
+| blend vs trust | 293 | 90 | 65 | 138 | +25 |
+
+The **138 "both wrong, different picks"** cell on trust-vs-blend is the key signature: BCVF is not merely reshuffling around the correct answer — it is actively dragging the decoder toward *different* distractor choices than blend picks. This is anti-correlated signal, not noise.
+
+**Structural mechanism (explanatory hypothesis with evidence):**
+
+1. Same-model paraphrases at temperature 0 are **not independent evidence**. They share training-distribution priors and tend to drift toward the *same* plausible-sounding distractor on hallucination-prone TruthfulQA questions.
+2. When two correlated paraphrases agree on a distractor and the base prompt disagrees, §2.4.5's symmetric per-pair attribution assigns the base a cost of `2·LARGE` (appears in both `(0,1)` and `(0,2)` pairs) while each paraphrase accrues `1·LARGE + 1·small` (`≈ LARGE`).
+3. Softmin over these per-source costs **down-weights the base — the strongest source** — and the weighted consensus tracks the paraphrase majority, which picks the distractor.
+4. The 50%-wider trust-margin (6.0 vs 4.3) confirms softmin is not just mis-calibrated but *actively sharpening* toward the wrong choice.
+
+The §2.4.5 attribution geometry is correct *under the independence assumption*. With correlated sources it predictably votes the minority-but-correct source off the island.
+
+**Which V1 design commitment failed:** §1.4 locked sources as "base prompt + two same-model paraphrases at T=0 with different rewrite seeds." §1.11 risk register rated "Self-consistency verifier does not meaningfully diverge from base under hallucination" at Moderate likelihood. V1 did not execute the §1.11 mitigation ("Phase 1.5 sensitivity test validates verifier produces signal on a held-out probe set") before the benchmark, so the risk materialized as a negative result.
+
+**What V1 did NOT falsify:**
+
+- The BCVF kernel math (§2.8 / §2.9 — 49/49 tests pass, Lemma 1 invariances verified).
+- The autonomy N=10 result on `S3_map_error_accel` (different domain, different source structure).
+- The general "trust-shaping > additive-penalty" architectural claim (autonomy data supports it; we just used it on a setup where trust-shaping itself is the wrong mechanism).
+- BCVF in LLM inference in principle — only the specific V1 configuration (same-model paraphrase M=3 on TruthfulQA-MC with softmin consumer).
+
+#### 10.V1.3 V2 roadmap — ranked by diagnostic strength
+
+V2 proceeds under §0.8 discipline: one bounded experiment at a time, each with its own pre-committed §1.10-style thresholds. Do **not** combine fixes.
+
+| Rank | V2 experiment | Hypothesis | Why this order | Cost |
+|---|---|---|---|---|
+| A | **Cross-model ensemble + current consumer** | Source independence is the primary broken assumption; fixing it recovers BCVF's intended behaviour | Highest-leverage change from V1 diagnosis. Isolates source-ensemble vs consumer hypotheses. | ~1 week eng + 24 GB VRAM for 3×7B or sequential on 16 GB |
+| B | **Veto-structured consumer + same sources** | Softmin over correlated sources is the primary broken assumption; replacing softmin with BCVF-as-filter recovers correct behaviour | Cheaper than A (no new model downloads) but only tests the consumer side. If sources-are-the-problem (per A), B will also null. | ~1 week eng, same pod setup as V1 |
+| C | BCVF as minor term in multi-signal trust equation (add factual_support / verifier / calibration) | BCVF alone is insufficient; needs auxiliary signals | At this point the system is no longer "BCVF-for-LLMs" — it's an ensemble of verifiers with BCVF as regularizer. Falsifies a weaker claim. | ~2-3 weeks eng; needs separate verifier model |
+| D | Hidden-state shaping instead of probability-space blend | Consumer architecture was wrong, not the trust math | Requires `Source` API extension to expose `h_t`; bigger refactor. Likely not the primary fault per V1 data. | ~2 weeks eng + model-internals access |
+
+**Recommended V2 if pursued:** **Experiment A** (cross-model ensemble) first. It directly tests the diagnosed primary failure mode and produces an interpretable result for any outcome:
+
+- A PASSes → V1 failure was *source independence*, BCVF transfers under the right source structure. Pursue B or D as follow-ons only if optimization cost warrants.
+- A NULLs → BCVF doesn't transfer regardless of source structure. V1 + A together close the transfer question.
+- A REGRESSIONs → deeper rethink; the consumer math may need changes (B) rather than the sources.
+
+**Not recommended for V2:**
+
+- Threshold tuning on V1 data (post-hoc overfitting).
+- Combining fixes A + B + C in one experiment (§0.8 violation; confounds attribution).
+- Changing the kernel math (§2.8/§2.9 verified correct; not the failure site).
+- Repeating V1 on a larger base model (Llama 3.1 8B) — the failure is structural, not model-scale-dependent.
+
+#### 10.V1.4 Artifacts preserved for V2 reuse
+
+- `symbolu_bcvf_llm/core.py` — kernel unchanged; reusable verbatim for any V2.
+- `symbolu_bcvf_llm/trust/` — TrustShaper with EMA + deadband + softmin. Reusable for V2A; needs modification for V2B (veto).
+- `symbolu_bcvf_llm/sources/` — Source protocol supports any paraphrase / retrieval / model-family implementation. V2A needs a new `HuggingFaceSource`-compatible wrapper for the second/third model.
+- `symbolu_bcvf_llm/benchmark/` — harness is benchmark-agnostic; reusable.
+- `symbolu_bcvf_llm/analysis/` — diagnostic tool works on any future §6 run.
+- `scripts/verify_hf_source.py`, `scripts/analyze_seed_results.py` — reusable.
+- `scripts/BCVF_LLM_RUNPOD.md` — runbook; needs update for V2A cross-model setup.
+
+#### 10.V1.5 Decision
+
+**V1 is closed.** The V1 hypothesis ("BCVF-trust shaping over same-model M=3 paraphrase sources on TruthfulQA-MC produces a measurable hallucination-reduction delta") is falsified. The falsification is specific, debuggable, and produces actionable V2 directions.
+
+V2 is **not authorized** by this section. V2 requires a new bounded design with its own §1.10-equivalent pre-commitments, landed under §0.8 authorization. Until then, the repository remains at the V1-closed state with all artifacts preserved.
+
+If V2 is never pursued, V1 stands as a clean negative result on a specific structural transfer claim — which is the value proposition §0.6 committed to when the experiment started.
 
 ---
 
