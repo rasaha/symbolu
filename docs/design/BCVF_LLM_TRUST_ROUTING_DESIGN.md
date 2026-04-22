@@ -4306,13 +4306,93 @@ V2 proceeds under §0.8 discipline: one bounded experiment at a time, each with 
 - `scripts/verify_hf_source.py`, `scripts/analyze_seed_results.py` — reusable.
 - `scripts/BCVF_LLM_RUNPOD.md` — runbook; needs update for V2A cross-model setup.
 
-#### 10.V1.5 Decision
+#### 10.V1.5 Decision (provisional — see §10.V1.6 addendum)
 
 **V1 is closed.** The V1 hypothesis ("BCVF-trust shaping over same-model M=3 paraphrase sources on TruthfulQA-MC produces a measurable hallucination-reduction delta") is falsified. The falsification is specific, debuggable, and produces actionable V2 directions.
 
 V2 is **not authorized** by this section. V2 requires a new bounded design with its own §1.10-equivalent pre-commitments, landed under §0.8 authorization. Until then, the repository remains at the V1-closed state with all artifacts preserved.
 
 If V2 is never pursued, V1 stands as a clean negative result on a specific structural transfer claim — which is the value proposition §0.6 committed to when the experiment started.
+
+**See §10.V1.6 below — a paraphrase-pipeline corruption was discovered after this decision was written and partly re-attributes the V1 failure.**
+
+#### 10.V1.6 Addendum — paraphrase corruption discovered post-hoc
+
+After §10.V1.5 was committed, a 5-question inspection run persisted the paraphrases Mistral had been generating during V1. The cache file had not existed during the full V1 run (disk-persistence feature landed in commit `15c688a`, after the V1 seed-1 run started on `8778b27`). Inspection of 10 raw paraphrases revealed the `make_paraphrased_prompt` utility was systemically producing corrupted output. Three failure modes, each appearing in multiple of the 10 samples:
+
+**1. Template leakage.** The V1 template ended with `"Rewrite #{seed}. Do not answer it."` plus `"Rewrite:"`. Mistral interpreted the `#{seed}` suffix as "this is example rewrite #1; now generate #2, #3, ..." and kept emitting `\nQuestion: ...\nRewrite: ...` pairs until hitting `max_new_tokens=128`. Actual observed sample `0__1`:
+
+```
+What is the smallest nation in the world that has an area of at least one square mile?
+
+Question: Q: What is the largest city in the world by population that is not a capital city?
+A:
+
+Rewrite: What is the most populous city in the world that is not the capital of its country?
+...
+```
+
+**2. Inline answer leakage.** Mistral often appended `"(Answer: X)"` inline, effectively answering the question it was asked to paraphrase. Sample `0__2`:
+
+```
+What is the smallest nation in the world that has an area of at least one square mile?
+
+A:
+
+(Answer: Vatican City)
+```
+
+When `HuggingFaceSource` conditions its next-token distribution on a prompt containing `(Answer: Vatican City)`, the distribution is dominated by the leaked answer, not by the original question. **This is the mechanism that produced the "overconfident wrong" signature** (trust margin 6.0 vs vanilla 4.3 in §10.V1.1): two paraphrases with similar inline-answer leaks produced strongly-peaked distributions on the same (wrong-on-hallucination-questions) token, BCVF read "agreement = low disagreement = trustworthy," softmin sharpened weights onto the paraphrases, consensus tracked the leaked answer.
+
+**3. Meta-commentary substitution.** Sometimes Mistral produced explanatory notes about the question instead of a rewrite. Sample `3__2`:
+
+```
+Which cities receive more precipitation than Seattle?
+
+Note: The question asks for cities that receive more rainfall than Seattle, not cities that are wetter overall. [...]
+```
+
+**Implication for §10.V1.2 attribution.**
+
+The §10.V1.2 diagnosis attributed the failure to "same-model paraphrase correlation + §2.4.5 attribution geometry votes base out." With the paraphrase-corruption finding in hand, that attribution is at least partially premature. The corrupted paraphrases would have produced similar overconfident-wrong BCVF dynamics regardless of the underlying correlation structure, because the sources were conditioning on text that contained either the correct answer (inline leak) or a different question entirely (question drift).
+
+The two layers of failure — paraphrase pipeline vs BCVF geometry — are **not disentangled** by the V1 data alone. We cannot distinguish:
+
+- **(a)** "Paraphrase pipeline was broken; BCVF would work if fed clean paraphrases of the same model," vs
+- **(b)** "Even with clean paraphrases, same-model correlation + §2.4.5 geometry causes regression."
+
+Resolving (a) vs (b) requires a re-run with a fixed paraphrase pipeline. That experiment is defined in §10.V1.7 below.
+
+**Fix landed alongside this addendum.** `symbolu_bcvf_llm/sources/paraphrase.py` was rewritten:
+
+- `DEFAULT_REWRITE_INSTRUCTION` is now a few-shot template with explicit rules ("Output ONLY the rewritten question on a single line. Do NOT answer it. Do NOT provide explanations, commentary, or additional examples.") and the seed threaded as `"wording variant {seed}"` rather than `"Rewrite #{seed}"` to eliminate the "example list" interpretation.
+- `_clean_rewrite(raw)` post-processes the decoded output to truncate at the first template-leak marker (`\nQuestion:`, `\nAnswer:`, `\n(Answer:`, `\nNote:`, `\nExample`, etc.), strip inline `(Answer: ...)` patterns, and collapse to the first paragraph.
+- `_is_valid_rewrite(text, original, min_chars=10)` rejects empty, too-short, or answer-leaked output.
+- `make_paraphrased_prompt(..., clean_output=True)` uses the full clean-and-validate pipeline and **falls back to the original prompt** when validation fails. Downstream BCVF then sees a degenerate M=3 with one or more sources identical to the base — conventional-blend-equivalent, which is a safer failure mode than corrupted sources.
+- `V1_REWRITE_INSTRUCTION` is preserved as a module constant for A/B reproduction of the V1 behaviour if ever needed.
+- 18 new pure-Python tests in `symbolu_bcvf_llm/sources/tests/test_paraphrase_cleaning.py` validate the cleaning logic against the actual corrupted samples observed in V1 (sample `0__1`, `0__2`, `3__2` reproduced as test fixtures).
+
+Commit: `<next>`.
+
+#### 10.V1.7 V2 Experiment Zero — fixed-paraphrase V1 re-run
+
+Before pursuing Experiments A–D in §10.V1.3, a cheaper higher-information experiment is available:
+
+**Experiment Zero.** Re-run V1 unchanged **except** for the paraphrase-pipeline fix from §10.V1.6.
+
+- **Hypothesis.** V1's REGRESSION classification was primarily caused by paraphrase corruption (inline answer leakage + template pollution), not by the BCVF geometry over correlated same-model paraphrases.
+- **Pre-committed thresholds.** Same as §1.10 — PASS if Δ ≥ 2pp, NULL if |Δ| < 0.5pp, REGRESSION if ≤ -1pp, UNVIABLE_COST if latency > 5×.
+- **Budget.** ~3 GPU-hours per seed at Phase-2 speeds.
+- **Outcomes:**
+  - **PASS / NULL:** the V1 REGRESSION was a paraphrase-pipeline artifact, not a structural transfer failure. §10.V1.5's "V1 falsified the transfer claim" conclusion must be retracted or amended.
+  - **REGRESSION:** both layers (paraphrase + geometry) contributed; geometry alone is still a problem. §10.V1.3's Experiment A (cross-model ensemble) is the next test.
+  - **AMBIGUOUS:** run seed 2 with the fixed pipeline; combined N=1634 decides.
+
+This experiment supersedes §10.V1.3 Experiments A-D in priority: it is ~3× cheaper than any of them and directly tests the confounded interpretation §10.V1.6 surfaced. A and B from §10.V1.3 should only run if Experiment Zero's result is REGRESSION.
+
+**Commit discipline for Experiment Zero.** Same §0.8 — pre-commit the thresholds (done, reuse §1.10) before running. Do not combine the paraphrase fix with any other experimental change (no concurrent cross-model ensemble, no consumer-algorithm change). Isolate the paraphrase-pipeline variable cleanly.
+
+If/when Experiment Zero is run, its result gets §10.V1.8 and the §10.V1.5 decision is amended to reflect the disentangled outcome.
 
 ---
 
