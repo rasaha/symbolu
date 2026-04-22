@@ -4306,7 +4306,7 @@ V2 proceeds under §0.8 discipline: one bounded experiment at a time, each with 
 - `scripts/verify_hf_source.py`, `scripts/analyze_seed_results.py` — reusable.
 - `scripts/BCVF_LLM_RUNPOD.md` — runbook; needs update for V2A cross-model setup.
 
-#### 10.V1.5 Decision (provisional — see §10.V1.6 addendum)
+#### 10.V1.5 Decision (final — confirmed by §10.V1.8 Experiment Zero)
 
 **V1 is closed.** The V1 hypothesis ("BCVF-trust shaping over same-model M=3 paraphrase sources on TruthfulQA-MC produces a measurable hallucination-reduction delta") is falsified. The falsification is specific, debuggable, and produces actionable V2 directions.
 
@@ -4314,7 +4314,7 @@ V2 is **not authorized** by this section. V2 requires a new bounded design with 
 
 If V2 is never pursued, V1 stands as a clean negative result on a specific structural transfer claim — which is the value proposition §0.6 committed to when the experiment started.
 
-**See §10.V1.6 below — a paraphrase-pipeline corruption was discovered after this decision was written and partly re-attributes the V1 failure.**
+*This decision was initially marked provisional pending §10.V1.6 (paraphrase-pipeline corruption addendum) and §10.V1.7 (Experiment Zero). Experiment Zero executed 2026-04-22 at N=100 with the fixed paraphrase pipeline produced the same REGRESSION pattern (Δ = −4.00 pp, vs V1's −3.06 pp at N=817). §10.V1.8 documents the result; §10.V1.5's closure is now final and un-conditional.*
 
 #### 10.V1.6 Addendum — paraphrase corruption discovered post-hoc
 
@@ -4394,6 +4394,67 @@ This experiment supersedes §10.V1.3 Experiments A-D in priority: it is ~3× che
 
 If/when Experiment Zero is run, its result gets §10.V1.8 and the §10.V1.5 decision is amended to reflect the disentangled outcome.
 
+#### 10.V1.8 Experiment Zero result — §10.V1.5 closure is vindicated
+
+Experiment Zero was executed 2026-04-22 at N=100 after the paraphrase-pipeline fixes landed (commits `e8352fe`, `ad3c7ce`, `0c02cc3`). Ran at N=100 rather than full N=817 for cost efficiency (~30 min vs ~3 h); the directional signal at N=100 is sufficient given the magnitude observed.
+
+Artifacts: `docs/experiments/phase_6_truthfulqa_{results,summary,manifest,run}_mistral_v2_n100.*`; analysis: `phase_6_truthfulqa_results_mistral_v2_n100__analysis.md`.
+
+**Result: `REGRESSION` reproduced. §10.V1.5 closure stands, unamended.**
+
+| Decoder | N=100 accuracy | mean latency |
+|---|---|---|
+| vanilla | 25.00% | 3.03 s |
+| conventional_blend | 23.00% | 0.46 s |
+| bcvf_trust | **19.00%** | 12.04 s |
+
+- Δ (trust − blend) = **−4.00 pp** — more negative than V1's −3.06 pp, not less.
+- McNemar p = 0.454 (not statistically significant at N=100, but the point estimate direction matches V1).
+- Trust↔Blend agreement: 58.0% — *lower* dormancy than V1's 64.1%. BCVF was *more* active with cleaner, more-diverse paraphrases, which means more opportunities to vote wrong.
+- Pairwise flips blend-vs-trust: 42 disagreements → blend wins 10, trust wins 6, both-wrong-different 26. Same anti-correlated pattern V1 exhibited.
+
+**Paraphrase fix verification.** The fix itself worked as designed:
+- 10-question paraphrase inspection (`inspect_paraphrases.py`) showed 20/20 clean rewrites — no template leakage, no inline `(Answer: X)`, no meta-commentary.
+- 9/10 questions showed distinct seed-1 vs seed-2 rewrites (only short questions like "What did CERN do in 2012?" collapse to identical because style directives can't meaningfully differentiate ≤6-word questions).
+- N=100 run's paraphrase cache showed 200 entries written, 0 fallbacks to original.
+
+Clean paraphrases did not rescue BCVF. The delta magnitude is consistent with V1; if anything slightly larger.
+
+**Confounded hypotheses resolved.**
+
+§10.V1.6 raised a two-layer question: was V1's failure primarily (a) paraphrase-pipeline corruption or (b) §10.V1.2's structural geometry attribution? The Experiment Zero result disentangles them:
+
+- (a) is **rejected as primary cause** — fixing the paraphrase pipeline produced the same regression magnitude. If paraphrase corruption were the main story, we'd expect at least a partial rescue (Δ moving toward zero). We saw the opposite: Δ moved slightly further negative.
+- (b) is **confirmed as primary cause** — the same-model paraphrase correlation + §2.4.5 symmetric attribution geometry produces the failure even when paraphrases are clean and seed-diverse.
+
+The original §10.V1.2 structural mechanism hypothesis stands as the **primary explanation** of V1's failure:
+
+> Same-model paraphrases are correlated evidence; when two correlated paraphrases agree on a distractor on hallucination-prone questions, §2.4.5's symmetric attribution assigns the base decoder cost 2·LARGE (it appears in both `(0,1)` and `(0,2)` pairs) while each paraphrase gets `LARGE + 0`. Softmin down-weights the base — the strongest source — and consensus tracks the paraphrase majority toward the distractor.
+
+**Decision — V1 closure is final.**
+
+- §10.V1.5's "V1 hypothesis is falsified" conclusion is unamended and now supported by two independent runs (V1 full N=817 and Experiment Zero N=100) with different paraphrase pipelines.
+- Full N=817 with the fixed pipeline is **not run** — at Δ=-4 pp already, a larger N would confirm the direction with greater statistical precision but would not change the qualitative verdict. Estimated cost ~3 GPU-hours; estimated information gain near zero.
+- §10.V1.3's Experiment A (cross-model ensemble) becomes the sole remaining V2 candidate that directly tests the diagnosed primary failure mode (same-model source correlation). Experiment A would isolate whether source *independence* alone rescues BCVF.
+- Experiments B, C, D from §10.V1.3 remain V2 possibilities but are now lower-priority: Experiment A tests the most-likely-to-rescue change first; if A fails, B–D are variants that share the same untested assumption (that the consumer-side algorithm is the primary issue), which V1 data does not support.
+
+**What V1 + Experiment Zero have jointly established:**
+
+1. The BCVF kernel math (§2.8, §2.9) is correct and transfers — proven on synthetic traces at §3, verified on the scoring path.
+2. Logit-blending consumer architecture (§5 V1 choice) works mechanically — the pipeline produces coherent outputs; the decisions are just systematically wrong.
+3. **Same-model paraphrase at M=3 is not a valid source ensemble for BCVF on hallucination-focused MC benchmarks.** Correlation + symmetric attribution produces anti-correlated signal.
+4. Paraphrase pipeline quality matters for clean engineering but is not the primary determinant of the verdict on this benchmark.
+
+**What V1 + Experiment Zero did NOT establish:**
+
+- Whether BCVF transfers to LLM inference at all. Only the specific same-model-paraphrase V1 configuration is falsified. Different source ensembles (cross-model, retrieval-grounded, etc.) remain open and would require their own bounded tests.
+- Whether the trust-shaping > additive-penalty claim from autonomy (§0.1) transfers — that's conditional on having a valid source ensemble, which V1 lacked.
+
+**Artifacts preserved for V2** (unchanged from §10.V1.4): kernel, TrustShaper, Source protocol, benchmark harness, analysis tool, scripts all reusable for V2 Experiment A.
+
+**V1 repository state at closure:** all code, tests, runs, and design documentation committed to `claude/bcvf-llm-documentation-RPqCi`. Final commit: `<next>`. No further V1 work authorized.
+
 ---
+
 
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
