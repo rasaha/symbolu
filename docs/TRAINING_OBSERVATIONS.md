@@ -2745,11 +2745,7 @@ Traditional temperature scaling is static and requires manual tuning. The entrop
 |------|-------|-------------|
 | `symbolu/training/entropy_control.py` | 436 | Entropy-based logit scale control module |
 | `tests/test_entropy_control.py` | 544 | Validation tests for entropy control |
-| `Spanda/spanda/*.py` | ~1,064 | Spanda-Softmax hybrid attention module |
-| `Spanda/run_benchmark.py` | 905 | Spanda benchmark runner |
 | `resonant_model/*.py` | ~5,409 | Resonant model experiments (heads, diagnostics, benchmarks) |
-| `docs/design/SPANDA_SOFTMAX_HYBRID_DESIGN.md` | 1,000 | Spanda architectural design document |
-| `scripts/train_three_attention_benchmark.py` | 778 | Three-attention comparison benchmark |
 
 ---
 
