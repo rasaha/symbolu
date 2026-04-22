@@ -196,6 +196,13 @@ def _build_parser() -> argparse.ArgumentParser:
              "because teacher-forcing produces variable sequence lengths; "
              "static compile would recompile on every shape change).",
     )
+    parser.add_argument(
+        "--no-fast-scoring", action="store_true",
+        help="§6.2 Phase 2 escape hatch: force every decoder to use the "
+             "slow lookahead/commit scoring loop. Default is fast-scoring "
+             "ON (~15× speedup on vanilla + blend via single-forward-pass "
+             "teacher-forcing; trust stays speculation-based regardless).",
+    )
     return parser
 
 
@@ -319,6 +326,7 @@ def main(argv: List[str] | None = None) -> int:
             benchmark=bench,
             seed=args.seed,
             progress_callback=progress,
+            fast_scoring=not args.no_fast_scoring,
         )
 
         _write_csv(bundle, csv_path)

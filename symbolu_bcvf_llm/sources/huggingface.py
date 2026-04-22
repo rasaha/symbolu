@@ -201,3 +201,53 @@ class HuggingFaceSource:
     def _extend_frontier(self) -> None:
         """Fill the new frontier slot (L-1) by greedy-stepping from slot L-2."""
         self._greedy_step(self.L - 1)
+
+    # §6.2 Phase 2 batched scoring ---------------------------------- #
+
+    def score_teacher_forced(
+        self, target_tokens  # np.ndarray | list[int]
+    ) -> np.ndarray:
+        """Single forward pass over (committed_prefix ⊕ target_tokens);
+        return per-position probabilities for each target token.
+
+        Returns: shape (K, V) fp64 where K = len(target_tokens).
+            row k = p(· | committed_prefix ⊕ target[:k])
+
+        This bypasses `lookahead()` + `commit()` entirely for the common
+        case of scoring a fixed target sequence (§6.3 teacher-forcing).
+        Cost: 1 forward pass, not K × (2 + speculation). ~15× speedup on
+        scoring-dominated workloads.
+
+        State: the source's `_committed_prefix_ids` is NOT mutated —
+        caller's state is preserved. Useful for re-using one source
+        across multiple candidate choices from the same prompt context.
+        """
+        import torch
+
+        tgt = list(int(t) for t in target_tokens)
+        if len(tgt) == 0:
+            return np.zeros((0, self.vocab_size), dtype=np.float64)
+
+        full_ids = list(self._committed_prefix_ids) + tgt
+        input_ids = torch.tensor([full_ids], device=self._device)
+        with torch.inference_mode():
+            out = self._model(input_ids=input_ids, use_cache=False)
+        # out.logits: (1, len(full_ids), V)
+        # Position i's logits predict token i+1. For the k-th target
+        # token (lives at index len(committed) + k in full_ids), the
+        # predictive logits are at position len(committed) + k - 1.
+        prompt_len = len(self._committed_prefix_ids)
+        K = len(tgt)
+        # Slice logits that predict target positions: indices
+        # [prompt_len - 1, prompt_len - 1 + K) — K rows.
+        start = prompt_len - 1
+        assert start >= 0, (
+            f"prompt_len={prompt_len}; source has no committed context. "
+            "score_teacher_forced requires at least one prompt token."
+        )
+        logits_slice = out.logits[0, start : start + K, :].to(torch.float64)
+        # Stable softmax → probabilities.
+        shifted = logits_slice - logits_slice.amax(dim=-1, keepdim=True)
+        exp = torch.exp(shifted)
+        probs = exp / exp.sum(dim=-1, keepdim=True)
+        return probs.cpu().numpy()

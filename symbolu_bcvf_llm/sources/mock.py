@@ -98,6 +98,35 @@ class MockSource:
         """Rewind committed state — test-only, not part of the §4.2 protocol."""
         self._committed = list(prefix or [])
 
+    # §6.2 Phase 2 batched scoring ---------------------------------- #
+
+    def score_teacher_forced(self, target_tokens) -> np.ndarray:
+        """Teacher-forced per-position probabilities via the source's
+        `logits_fn` callback (slow-path fallback).
+
+        Mock sources' logits_fn returns a (L, V) lookahead; for
+        teacher-forced scoring we read only position l=0 at each
+        step. Iterates target_tokens, snapshotting + restoring the
+        committed prefix so `self` ends unchanged — matches the
+        §6.2 contract.
+
+        For the HuggingFace batched path that does it in one forward
+        pass, see ``HuggingFaceSource.score_teacher_forced``.
+        """
+        saved = tuple(self._committed)
+        try:
+            out_rows: List[np.ndarray] = []
+            for target in target_tokens:
+                probs_L_V, _mask = self.lookahead()
+                row = probs_L_V[0].astype(np.float64)
+                out_rows.append(row)
+                self.commit(int(target))
+            return np.stack(out_rows, axis=0) if out_rows else (
+                np.zeros((0, self.vocab_size), dtype=np.float64)
+            )
+        finally:
+            self._committed = list(saved)
+
 
 # Structural check: MockSource must satisfy the Source protocol.
 _: Source = MockSource(lambda _p: np.zeros((3, 2)), L=3, V=2)
