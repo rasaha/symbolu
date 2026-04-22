@@ -184,6 +184,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "--verbose", "-v", action="store_true",
         help="DEBUG level on the console handler (file log is always DEBUG).",
     )
+    parser.add_argument(
+        "--no-compile", action="store_true",
+        help="truthfulqa only: disable `torch.compile` on the model. "
+             "Default is ON (2-3× forward-pass speedup on Ampere+); "
+             "disable if compile throws an unrecoverable error.",
+    )
+    parser.add_argument(
+        "--no-compile-dynamic", action="store_true",
+        help="use static shapes in torch.compile (default is dynamic=True "
+             "because teacher-forcing produces variable sequence lengths; "
+             "static compile would recompile on every shape change).",
+    )
     return parser
 
 
@@ -257,16 +269,20 @@ def main(argv: List[str] | None = None) -> int:
                 split=args.split,
                 max_questions=args.num_questions,
                 use_paraphrase=not args.no_paraphrase,
+                compile_model=not args.no_compile,
+                compile_dynamic=not args.no_compile_dynamic,
             )
             logger.info(
                 "Model + dataset loaded in %.1f s", time.perf_counter() - t_load
             )
+            logger.info("torch.compile status: %s", bench.compile_status)
             manifest["model"] = {
                 "name": args.model,
                 "vocab_size": bench.vocab_size,
                 "L": bench.L,
                 "eos_token_id": bench.eos_token_id,
                 "use_paraphrase": not args.no_paraphrase,
+                "compile_status": bench.compile_status,
             }
             write_manifest(manifest_path, manifest)
 

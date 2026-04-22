@@ -308,6 +308,8 @@ class TruthfulQABenchmark:
         L: int = 5,
         use_paraphrase: bool = True,
         paraphrase_max_new_tokens: int = 128,
+        compile_model: bool = True,
+        compile_dynamic: bool = True,
     ) -> None:
         try:
             import torch  # noqa: F401
@@ -322,11 +324,31 @@ class TruthfulQABenchmark:
 
         from transformers import AutoModelForCausalLM, AutoTokenizer
         from datasets import load_dataset
+        import torch
 
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._model = AutoModelForCausalLM.from_pretrained(
             model_name, torch_dtype="auto", device_map="auto"
         )
+        self._model.eval()
+
+        # torch.compile gives ~2-3× speedup on Ampere+ for the forward
+        # pass. dynamic=True avoids recompilation on every seq-length
+        # change (teacher-forcing produces variable shapes). Wrapped in
+        # try/except with graceful fallback so a compile failure doesn't
+        # abort the benchmark — the uncompiled model still works.
+        self._compile_status: str = "disabled"
+        if compile_model:
+            try:
+                self._model = torch.compile(
+                    self._model, dynamic=bool(compile_dynamic)
+                )
+                self._compile_status = (
+                    f"compiled (dynamic={bool(compile_dynamic)})"
+                )
+            except Exception as exc:  # pragma: no cover — compile-env-specific
+                self._compile_status = f"skipped: {type(exc).__name__}: {exc}"
+
         self.vocab_size = int(self._tokenizer.vocab_size)
         self.L = L
         self.eos_token_id = int(self._tokenizer.eos_token_id)
@@ -448,3 +470,8 @@ class TruthfulQABenchmark:
             "misses": int(self._paraphrase_misses),
             "entries": int(len(self._paraphrase_cache)),
         }
+
+    @property
+    def compile_status(self) -> str:
+        """`disabled` / `compiled (dynamic=...)` / `skipped: <reason>`."""
+        return self._compile_status
