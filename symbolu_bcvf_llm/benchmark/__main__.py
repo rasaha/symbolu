@@ -50,31 +50,59 @@ from .metrics import (
 )
 
 
-def _write_csv(bundle: BenchmarkRunBundle, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+CSV_FIELDNAMES = [
+    "benchmark", "seed", "decoder", "question_id",
+    "predicted", "correct", "latency_s", "scores",
+]
+
+
+def _result_to_rows(
+    bench_name: str, seed: int, decoder: str, result
+) -> List[Dict[str, Any]]:
     rows = []
-    for decoder_name, result in bundle.results.items():
-        for i in range(result.num_questions):
-            rows.append({
-                "benchmark": bundle.benchmark_name,
-                "seed": bundle.seed,
-                "decoder": decoder_name,
-                "question_id": i,
-                "predicted": int(result.per_question_predicted[i]),
-                "correct": bool(result.per_question_correct[i]),
-                "latency_s": float(result.per_question_latency_s[i]),
-                "scores": json.dumps(result.per_question_scores[i]),
-            })
+    for i in range(result.num_questions):
+        rows.append({
+            "benchmark": bench_name,
+            "seed": seed,
+            "decoder": decoder,
+            "question_id": i,
+            "predicted": int(result.per_question_predicted[i]),
+            "correct": bool(result.per_question_correct[i]),
+            "latency_s": float(result.per_question_latency_s[i]),
+            "scores": json.dumps(result.per_question_scores[i]),
+        })
+    return rows
+
+
+def _write_csv_rows(rows: List[Dict[str, Any]], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                "benchmark", "seed", "decoder", "question_id",
-                "predicted", "correct", "latency_s", "scores",
-            ],
-        )
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _write_csv(bundle: BenchmarkRunBundle, path: Path) -> None:
+    """Write all decoders' results as a single CSV (end-of-run)."""
+    rows: List[Dict[str, Any]] = []
+    for decoder_name, result in bundle.results.items():
+        rows.extend(
+            _result_to_rows(bundle.benchmark_name, bundle.seed, decoder_name, result)
+        )
+    _write_csv_rows(rows, path)
+
+
+def _write_per_decoder_csv(
+    benchmark_name: str,
+    seed: int,
+    decoder: str,
+    result,
+    path: Path,
+) -> None:
+    """Crash-safe incremental CSV — one file per decoder, written as
+    soon as that decoder completes."""
+    rows = _result_to_rows(benchmark_name, seed, decoder, result)
+    _write_csv_rows(rows, path)
 
 
 def _write_summary(bundle: BenchmarkRunBundle, path: Path) -> None:
@@ -203,6 +231,17 @@ def _build_parser() -> argparse.ArgumentParser:
              "ON (~15× speedup on vanilla + blend via single-forward-pass "
              "teacher-forcing; trust stays speculation-based regardless).",
     )
+    parser.add_argument(
+        "--paraphrase-cache-file", type=Path, default=None,
+        help="disk-persistent paraphrase cache path (truthfulqa only). "
+             "If unset, defaults to <out-dir>/paraphrase_cache_<model>_<split>.json. "
+             "Set to '' or 'none' to disable disk persistence (in-memory "
+             "cache only — back to pre-cache behaviour).",
+    )
+    parser.add_argument(
+        "--no-paraphrase-cache-file", action="store_true",
+        help="disable disk-persistent paraphrase cache entirely.",
+    )
     return parser
 
 
@@ -271,6 +310,24 @@ def main(argv: List[str] | None = None) -> int:
             )
             t_load = time.perf_counter()
             from .dataset import TruthfulQABenchmark
+
+            # Resolve default paraphrase-cache path: per model + split
+            # so two models' caches never collide. Disabled by
+            # --no-paraphrase-cache-file.
+            if args.no_paraphrase_cache_file:
+                cache_file = None
+            elif args.paraphrase_cache_file is not None:
+                cache_file = args.paraphrase_cache_file
+            else:
+                model_slug = args.model.replace("/", "_").replace(":", "_")
+                cache_file = (
+                    args.out_dir
+                    / f"paraphrase_cache_{model_slug}__{args.split}.json"
+                )
+            if cache_file is not None:
+                logger.info("Paraphrase cache file: %s (exists=%s)",
+                            cache_file, cache_file.exists())
+
             bench = TruthfulQABenchmark(
                 model_name=args.model,
                 split=args.split,
@@ -278,11 +335,23 @@ def main(argv: List[str] | None = None) -> int:
                 use_paraphrase=not args.no_paraphrase,
                 compile_model=not args.no_compile,
                 compile_dynamic=not args.no_compile_dynamic,
+                paraphrase_cache_file=cache_file,
             )
             logger.info(
                 "Model + dataset loaded in %.1f s", time.perf_counter() - t_load
             )
             logger.info("torch.compile status: %s", bench.compile_status)
+            _stats0 = bench.paraphrase_cache_stats
+            if _stats0.get("loaded_from_disk", 0) > 0:
+                logger.info(
+                    "Paraphrase cache warm-start: %d entries loaded from %s",
+                    _stats0["loaded_from_disk"], _stats0.get("persisted_to"),
+                )
+            elif _stats0.get("persisted_to"):
+                logger.info(
+                    "Paraphrase cache cold-start; will persist to %s as it fills.",
+                    _stats0.get("persisted_to"),
+                )
             manifest["model"] = {
                 "name": args.model,
                 "vocab_size": bench.vocab_size,
@@ -322,11 +391,41 @@ def main(argv: List[str] | None = None) -> int:
                 )
                 progress_t0["t"] = time.perf_counter() if i == n else progress_t0["t"]
 
+        # Per-decoder incremental save — crashes mid-run after this point
+        # preserve the decoder CSVs that have already completed.
+        per_decoder_paths: Dict[str, Path] = {}
+
+        def on_decoder_complete(decoder_name: str, result) -> None:
+            p = (
+                args.out_dir
+                / f"phase_6_{args.benchmark}_results{args.suffix}__{decoder_name}.csv"
+            )
+            _write_per_decoder_csv(
+                bench.name, args.seed, decoder_name, result, p
+            )
+            per_decoder_paths[decoder_name] = p
+            from .metrics import latency_stats as _ls
+            ls = _ls(result.per_question_latency_s)
+            logger.info(
+                "  %-20s CHECKPOINT: accuracy=%.2f%%  "
+                "mean_latency=%.3f s  csv=%s",
+                decoder_name, result.accuracy * 100, ls.mean_s, p.name,
+            )
+            # Snapshot the manifest so the partial state is on disk.
+            manifest.setdefault("per_decoder_checkpoints", {})
+            manifest["per_decoder_checkpoints"][decoder_name] = {
+                "accuracy": float(result.accuracy),
+                "mean_latency_s": float(ls.mean_s),
+                "csv": str(p),
+            }
+            write_manifest(manifest_path, manifest)
+
         bundle = run_benchmark(
             benchmark=bench,
             seed=args.seed,
             progress_callback=progress,
             fast_scoring=not args.no_fast_scoring,
+            per_decoder_complete_callback=on_decoder_complete,
         )
 
         _write_csv(bundle, csv_path)

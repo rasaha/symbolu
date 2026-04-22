@@ -22,7 +22,9 @@ of integer token IDs. ``MockBenchmark`` fabricates these directly;
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -310,6 +312,7 @@ class TruthfulQABenchmark:
         paraphrase_max_new_tokens: int = 128,
         compile_model: bool = True,
         compile_dynamic: bool = True,
+        paraphrase_cache_file: Optional["Path"] = None,
     ) -> None:
         try:
             import torch  # noqa: F401
@@ -366,16 +369,45 @@ class TruthfulQABenchmark:
         self._use_paraphrase = bool(use_paraphrase)
         self._paraphrase_max_new_tokens = int(paraphrase_max_new_tokens)
         self._model_name = model_name
+        self._split = split
 
         # Paraphrase cache: (question_row_id, rewrite_seed) -> paraphrased prompt.
         # Paraphrases are deterministic given (model, prompt, seed) at
         # temperature 0, so computing them once per question and reusing
-        # across the ~15 make_sources invocations per question (3 decoders ×
-        # ~5 choices) cuts the per-seed paraphrase cost by ~15×.
-        # Hit-rate is tracked as a diagnostic.
+        # across the ~15 make_sources invocations per question cuts the
+        # per-seed paraphrase cost by ~15×.
+        #
+        # If `paraphrase_cache_file` is given, the cache is also
+        # persisted to disk so subsequent runs (e.g., seed-2) start with
+        # a fully-populated cache and skip the ~20 min paraphrase cost.
+        # Cache file is keyed by (model_name, split) — mismatches are
+        # rejected so we never serve stale paraphrases for a different
+        # model.
         self._paraphrase_cache: Dict[Tuple[int, int], str] = {}
         self._paraphrase_hits = 0
         self._paraphrase_misses = 0
+        self._paraphrase_cache_file: Optional[Path] = (
+            Path(paraphrase_cache_file)
+            if paraphrase_cache_file is not None else None
+        )
+        self._paraphrase_cache_loaded = 0
+        if self._paraphrase_cache_file is not None and (
+            self._paraphrase_cache_file.exists()
+        ):
+            try:
+                with open(self._paraphrase_cache_file) as fh:
+                    payload = json.load(fh)
+                if (
+                    payload.get("model_name") == model_name
+                    and payload.get("split") == split
+                ):
+                    for k, v in payload.get("entries", {}).items():
+                        row_str, seed_str = k.split("__", 1)
+                        self._paraphrase_cache[(int(row_str), int(seed_str))] = v
+                    self._paraphrase_cache_loaded = len(self._paraphrase_cache)
+            except Exception:  # pragma: no cover — corrupt cache, start fresh
+                self._paraphrase_cache = {}
+                self._paraphrase_cache_loaded = 0
 
         ds = load_dataset("truthful_qa", "multiple_choice", split=split)
         if max_questions is not None:
@@ -433,6 +465,11 @@ class TruthfulQABenchmark:
         same rewrite. Computing once per (question, seed) and reusing
         across the ~15 `make_sources` calls per question saves ~13×
         of the paraphrase-generation cost.
+
+        If a `paraphrase_cache_file` is configured, every cache miss
+        also writes the updated cache to disk so a subsequent run
+        (seed 2, replication) loads a fully-populated cache and skips
+        paraphrase generation entirely.
         """
         from symbolu_bcvf_llm.sources.paraphrase import make_paraphrased_prompt
 
@@ -447,7 +484,33 @@ class TruthfulQABenchmark:
             max_new_tokens=self._paraphrase_max_new_tokens,
         )
         self._paraphrase_cache[key] = para
+        self._persist_paraphrase_cache()
         return para
+
+    def _persist_paraphrase_cache(self) -> None:
+        """Atomic-ish JSON dump of the paraphrase cache. No-op if no
+        cache file is configured. Tolerates errors — disk write is
+        a performance optimization, not correctness-critical.
+        """
+        if self._paraphrase_cache_file is None:
+            return
+        payload = {
+            "model_name": self._model_name,
+            "split": self._split,
+            "entries": {
+                f"{row}__{seed}": text
+                for (row, seed), text in self._paraphrase_cache.items()
+            },
+        }
+        try:
+            self._paraphrase_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._paraphrase_cache_file.with_suffix(
+                self._paraphrase_cache_file.suffix + ".tmp"
+            )
+            tmp.write_text(json.dumps(payload, indent=2))
+            tmp.replace(self._paraphrase_cache_file)
+        except Exception:  # pragma: no cover — disk error, in-memory cache unaffected
+            pass
 
     def make_sources(self, question: Question) -> List[Source]:
         from symbolu_bcvf_llm.sources.huggingface import HuggingFaceSource
@@ -473,13 +536,18 @@ class TruthfulQABenchmark:
         ]
 
     @property
-    def paraphrase_cache_stats(self) -> Dict[str, int]:
+    def paraphrase_cache_stats(self) -> Dict[str, Any]:
         """Diagnostic: cache hit / miss counts. Useful for verifying
         the 15× expected speedup is actually materializing."""
         return {
             "hits": int(self._paraphrase_hits),
             "misses": int(self._paraphrase_misses),
             "entries": int(len(self._paraphrase_cache)),
+            "loaded_from_disk": int(self._paraphrase_cache_loaded),
+            "persisted_to": (
+                str(self._paraphrase_cache_file)
+                if self._paraphrase_cache_file is not None else None
+            ),
         }
 
     @property

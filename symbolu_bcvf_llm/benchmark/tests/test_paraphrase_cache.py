@@ -39,6 +39,11 @@ def _make_fake_benchmark(row_id: int = 0):
     bench._use_paraphrase = True
     bench._model = object()      # placeholder; make_paraphrased_prompt is mocked
     bench._tokenizer = object()  # same
+    # Disk-cache fields (disabled for this test helper).
+    bench._paraphrase_cache_file = None
+    bench._paraphrase_cache_loaded = 0
+    bench._model_name = "test-model"
+    bench._split = "test"
     return bench
 
 
@@ -117,11 +122,12 @@ def test_paraphrase_cache_separates_by_row():
 
     assert bench._paraphrase_misses == 2
     assert bench._paraphrase_hits == 1
-    assert bench.paraphrase_cache_stats == {
-        "hits": 1,
-        "misses": 2,
-        "entries": 2,
-    }
+    stats = bench.paraphrase_cache_stats
+    assert stats["hits"] == 1
+    assert stats["misses"] == 2
+    assert stats["entries"] == 2
+    assert stats["loaded_from_disk"] == 0
+    assert stats["persisted_to"] is None
 
 
 def test_paraphrase_cache_expected_count_for_simulated_run():

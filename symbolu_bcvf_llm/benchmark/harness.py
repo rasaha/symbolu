@@ -158,6 +158,9 @@ def run_benchmark(
     seed: int = 0,
     progress_callback: Optional[Callable[[int, int, DecoderName], None]] = None,
     fast_scoring: bool = True,
+    per_decoder_complete_callback: Optional[
+        Callable[[DecoderName, "BenchmarkRunResult"], None]
+    ] = None,
 ) -> BenchmarkRunBundle:
     """Run each decoder against the benchmark.
 
@@ -171,6 +174,11 @@ def run_benchmark(
             (~15× speedup). Trust stays on the speculation path
             regardless. Set False to force slow path everywhere
             (useful for debugging or verifying fast/slow parity).
+        per_decoder_complete_callback: Called with `(decoder_name,
+            BenchmarkRunResult)` immediately after each decoder
+            finishes. Used by the CLI to incrementally write per-
+            decoder CSV so a crash mid-run doesn't lose earlier
+            decoders' results.
     """
     cfg = bcvf_config or BCVFLLMConfig()
     t_cfg = trust_config or TrustShaperConfig()
@@ -196,7 +204,7 @@ def run_benchmark(
             scores_list.append(scores)
             if progress_callback is not None:
                 progress_callback(i + 1, N, decoder_name)
-        results[decoder_name] = BenchmarkRunResult(
+        result = BenchmarkRunResult(
             decoder_name=decoder_name,
             num_questions=N,
             per_question_correct=correct,
@@ -206,6 +214,13 @@ def run_benchmark(
             accuracy=float(correct.mean()) if N > 0 else 0.0,
             metadata={"seed": seed, "fast_scoring": bool(fast_scoring)},
         )
+        results[decoder_name] = result
+        # Fire the per-decoder callback so the CLI can flush this
+        # decoder's CSV / update the manifest before the next
+        # decoder starts. Mid-run crashes after this point preserve
+        # at least what's been flushed.
+        if per_decoder_complete_callback is not None:
+            per_decoder_complete_callback(decoder_name, result)
 
     return BenchmarkRunBundle(
         benchmark_name=benchmark.name,
