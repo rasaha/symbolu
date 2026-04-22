@@ -76,6 +76,7 @@ def _fake_tqa_benchmark(tmp_path: Path, model_name: str = "m1",
     bench._split = split
     bench._paraphrase_cache_file = tmp_path / "cache.json"
     bench._paraphrase_cache_loaded = 0
+    bench._paraphrase_cache_discarded_reason = None
     bench._model = object()
     bench._tokenizer = object()
     bench._rewrite_seed_pair = (1, 2)
@@ -124,6 +125,7 @@ def test_paraphrase_cache_reloads_from_disk(tmp_path: Path):
     bench._split = "validation"
     bench._paraphrase_cache_file = cache_path
     bench._paraphrase_cache_loaded = 0
+    bench._paraphrase_cache_discarded_reason = None
     bench._rewrite_seed_pair = (1, 2)
     bench._evaluation_seed = 1
 

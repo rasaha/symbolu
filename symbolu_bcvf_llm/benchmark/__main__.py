@@ -242,6 +242,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-paraphrase-cache-file", action="store_true",
         help="disable disk-persistent paraphrase cache entirely.",
     )
+    parser.add_argument(
+        "--clear-paraphrase-cache", action="store_true",
+        help="truthfulqa only: delete the disk paraphrase cache file "
+             "before the run (if it exists). Forces fresh paraphrase "
+             "generation. Useful as a belt-and-suspenders over the "
+             "automatic pipeline-version check that normally rejects "
+             "stale caches.",
+    )
     return parser
 
 
@@ -325,6 +333,18 @@ def main(argv: List[str] | None = None) -> int:
                     / f"paraphrase_cache_{model_slug}__{args.split}.json"
                 )
             if cache_file is not None:
+                if args.clear_paraphrase_cache and cache_file.exists():
+                    logger.info(
+                        "--clear-paraphrase-cache: deleting %s "
+                        "(explicit user request)",
+                        cache_file,
+                    )
+                    try:
+                        cache_file.unlink()
+                    except OSError as exc:
+                        logger.warning(
+                            "Failed to delete cache file: %s", exc
+                        )
                 logger.info("Paraphrase cache file: %s (exists=%s)",
                             cache_file, cache_file.exists())
 
@@ -353,6 +373,14 @@ def main(argv: List[str] | None = None) -> int:
                     _stats0["loaded_from_disk"], _stats0.get("persisted_to"),
                 )
             elif _stats0.get("persisted_to"):
+                discard_reason = _stats0.get("discarded_reason")
+                if discard_reason:
+                    # Cache file existed but was rejected — auto-detect
+                    # handled the "rm stale cache" step for the user.
+                    logger.info(
+                        "Paraphrase cache auto-discarded on load: %s",
+                        discard_reason,
+                    )
                 logger.info(
                     "Paraphrase cache cold-start; will persist to %s as it fills.",
                     _stats0.get("persisted_to"),

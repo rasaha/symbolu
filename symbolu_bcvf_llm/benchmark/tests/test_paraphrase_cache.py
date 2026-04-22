@@ -42,6 +42,7 @@ def _make_fake_benchmark(row_id: int = 0):
     # Disk-cache fields (disabled for this test helper).
     bench._paraphrase_cache_file = None
     bench._paraphrase_cache_loaded = 0
+    bench._paraphrase_cache_discarded_reason = None
     bench._model_name = "test-model"
     bench._split = "test"
     # Rewrite-seed plumbing (§1.10 replication).

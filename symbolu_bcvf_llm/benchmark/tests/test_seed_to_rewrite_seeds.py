@@ -34,6 +34,7 @@ def _fake_tqa(
     bench._split = "validation"
     bench._paraphrase_cache_file = None
     bench._paraphrase_cache_loaded = 0
+    bench._paraphrase_cache_discarded_reason = None
     bench._model = object()
     bench._tokenizer = object()
 
