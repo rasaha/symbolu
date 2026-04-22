@@ -326,6 +326,17 @@ class TruthfulQABenchmark:
         from datasets import load_dataset
         import torch
 
+        # Enable TF32 matmul on Ampere+ (A100/H100 tensor cores). PyTorch
+        # 2.x defaults to 'highest' (strict fp32); 'high' allows TF32 which
+        # has fp32 range + fp19 precision — plenty for LM inference, gives
+        # ~1.5-2× additional matmul speedup on Ampere. This is the
+        # warning PyTorch emits at compile time if you don't set it.
+        # Safe global setting; no effect on non-Ampere hardware.
+        try:
+            torch.set_float32_matmul_precision("high")
+        except Exception:  # pragma: no cover
+            pass
+
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._model = AutoModelForCausalLM.from_pretrained(
             model_name, torch_dtype="auto", device_map="auto"
