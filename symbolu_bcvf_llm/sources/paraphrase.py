@@ -70,6 +70,14 @@ def make_paraphrased_prompt(
     template = instruction_template or DEFAULT_REWRITE_INSTRUCTION
     instruction = template.format(seed=rewrite_seed, prompt=original_prompt)
     inputs = tokenizer(instruction, return_tensors="pt").to(model.device)
+
+    # Explicit pad_token_id suppresses the "Setting pad_token_id to
+    # eos_token_id for open-end generation" warning that otherwise
+    # fires on every generate call in the paraphrase loop.
+    pad_id = getattr(tokenizer, "pad_token_id", None)
+    if pad_id is None:
+        pad_id = getattr(tokenizer, "eos_token_id", None)
+
     with torch.inference_mode():
         output_ids = model.generate(
             **inputs,
@@ -77,6 +85,7 @@ def make_paraphrased_prompt(
             do_sample=False,
             temperature=1.0,
             top_p=1.0,
+            pad_token_id=pad_id,
         )
     # Strip the instruction prefix; keep the rewrite only.
     prompt_len = inputs["input_ids"].shape[1]

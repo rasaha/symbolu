@@ -276,11 +276,28 @@ def main(argv: List[str] | None = None) -> int:
             args.benchmark, n_questions, args.seed,
         )
 
+        # Periodic INFO-level progress so long runs (N=817 can take
+        # hours per seed) visibly heartbeat. Fires at every 5% milestone
+        # and at the final completion; DEBUG fires on every question.
+        progress_t0 = {"t": time.perf_counter()}
+
         def progress(i: int, n: int, decoder: str) -> None:
-            # Log every completion; also console print on decoder-completion.
             logger.debug("  %s: %d/%d", decoder, i, n)
-            if i == n:
-                logger.info("  %s: %d/%d", decoder, i, n)
+            step = max(1, n // 20)  # 5% granularity
+            if i == n or i % step == 0:
+                elapsed = time.perf_counter() - progress_t0["t"]
+                rate = i / elapsed if elapsed > 0 else 0.0
+                eta_s = (n - i) / rate if rate > 0 else float("inf")
+                logger.info(
+                    "  %s: %d/%d  (%.1f q/min, ETA %s)",
+                    decoder, i, n,
+                    rate * 60,
+                    (
+                        f"{eta_s / 60:.1f} min"
+                        if eta_s < 3600 else f"{eta_s / 3600:.1f} h"
+                    ) if eta_s != float("inf") else "?",
+                )
+                progress_t0["t"] = time.perf_counter() if i == n else progress_t0["t"]
 
         bundle = run_benchmark(
             benchmark=bench,
@@ -297,6 +314,18 @@ def main(argv: List[str] | None = None) -> int:
                 "  %-20s accuracy=%.2f%%  mean_latency=%.3f s  median=%.3f s  p95=%.3f s",
                 decoder, r.accuracy * 100, ls.mean_s, ls.median_s, ls.p95_s,
             )
+
+        # Paraphrase-cache diagnostics (TruthfulQABenchmark only).
+        cache_stats = getattr(bench, "paraphrase_cache_stats", None)
+        if cache_stats is not None:
+            logger.info(
+                "  paraphrase cache: hits=%d misses=%d entries=%d (hit_rate=%.1f%%)",
+                cache_stats["hits"], cache_stats["misses"],
+                cache_stats["entries"],
+                100.0 * cache_stats["hits"]
+                / max(cache_stats["hits"] + cache_stats["misses"], 1),
+            )
+            manifest["paraphrase_cache_stats"] = cache_stats
 
         # Compute verdict once so it lands in both the summary and
         # the manifest.

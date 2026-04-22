@@ -334,6 +334,16 @@ class TruthfulQABenchmark:
         self._paraphrase_max_new_tokens = int(paraphrase_max_new_tokens)
         self._model_name = model_name
 
+        # Paraphrase cache: (question_row_id, rewrite_seed) -> paraphrased prompt.
+        # Paraphrases are deterministic given (model, prompt, seed) at
+        # temperature 0, so computing them once per question and reusing
+        # across the ~15 make_sources invocations per question (3 decoders ×
+        # ~5 choices) cuts the per-seed paraphrase cost by ~15×.
+        # Hit-rate is tracked as a diagnostic.
+        self._paraphrase_cache: Dict[Tuple[int, int], str] = {}
+        self._paraphrase_hits = 0
+        self._paraphrase_misses = 0
+
         ds = load_dataset("truthful_qa", "multiple_choice", split=split)
         if max_questions is not None:
             ds = ds.select(range(min(max_questions, len(ds))))
@@ -377,24 +387,45 @@ class TruthfulQABenchmark:
     def questions(self) -> Sequence[Question]:
         return tuple(self._questions)
 
+    def _get_or_create_paraphrase(
+        self,
+        row_id: int,
+        base_prompt: str,
+        rewrite_seed: int,
+    ) -> str:
+        """Cached paraphrase lookup keyed by `(row_id, rewrite_seed)`.
+
+        Paraphrases are deterministic at temperature 0 given (model,
+        prompt, seed), so the same question+seed always yields the
+        same rewrite. Computing once per (question, seed) and reusing
+        across the ~15 `make_sources` calls per question saves ~13×
+        of the paraphrase-generation cost.
+        """
+        from symbolu_bcvf_llm.sources.paraphrase import make_paraphrased_prompt
+
+        key = (int(row_id), int(rewrite_seed))
+        if key in self._paraphrase_cache:
+            self._paraphrase_hits += 1
+            return self._paraphrase_cache[key]
+        self._paraphrase_misses += 1
+        para = make_paraphrased_prompt(
+            self._model, self._tokenizer, base_prompt,
+            rewrite_seed=rewrite_seed,
+            max_new_tokens=self._paraphrase_max_new_tokens,
+        )
+        self._paraphrase_cache[key] = para
+        return para
+
     def make_sources(self, question: Question) -> List[Source]:
         from symbolu_bcvf_llm.sources.huggingface import HuggingFaceSource
-        from symbolu_bcvf_llm.sources.paraphrase import make_paraphrased_prompt
 
         base_prompt = self._tokenizer.decode(
             question.prompt_tokens, skip_special_tokens=True
         )
         if self._use_paraphrase:
-            para_a = make_paraphrased_prompt(
-                self._model, self._tokenizer, base_prompt,
-                rewrite_seed=1,
-                max_new_tokens=self._paraphrase_max_new_tokens,
-            )
-            para_b = make_paraphrased_prompt(
-                self._model, self._tokenizer, base_prompt,
-                rewrite_seed=2,
-                max_new_tokens=self._paraphrase_max_new_tokens,
-            )
+            row_id = int(question.metadata.get("truthfulqa_row_id", -1))
+            para_a = self._get_or_create_paraphrase(row_id, base_prompt, 1)
+            para_b = self._get_or_create_paraphrase(row_id, base_prompt, 2)
             prompts = [base_prompt, para_a, para_b]
         else:
             # Smoke mode: three identical prompts. Exercises the
@@ -407,3 +438,13 @@ class TruthfulQABenchmark:
             HuggingFaceSource(self._model, self._tokenizer, p, L=self.L)
             for p in prompts
         ]
+
+    @property
+    def paraphrase_cache_stats(self) -> Dict[str, int]:
+        """Diagnostic: cache hit / miss counts. Useful for verifying
+        the 15× expected speedup is actually materializing."""
+        return {
+            "hits": int(self._paraphrase_hits),
+            "misses": int(self._paraphrase_misses),
+            "entries": int(len(self._paraphrase_cache)),
+        }
