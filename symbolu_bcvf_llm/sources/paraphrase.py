@@ -42,18 +42,52 @@ if TYPE_CHECKING:  # pragma: no cover
     from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 
+# Per-seed style directives — indexed by ``(seed - 1) mod len``.
+#
+# At temperature 0, Mistral-7B-Instruct-v0.3 (and likely other
+# instruction-tuned models) was observed to produce IDENTICAL rewrites
+# for seed 1 and seed 2 when the only seed-dependent difference was
+# a numeric token (e.g. "Rewrite #1" vs "Rewrite #2"). The model
+# essentially ignored the number and converged to the same argmax.
+#
+# Fix: each seed injects a genuinely different STYLE constraint into
+# the instruction text, so the argmax rewrite is different for each
+# seed. The directives are mild and meaning-preserving — they guide
+# phrasing, not content — so every variant is still a valid
+# paraphrase of the same question.
+#
+# §1.10's rewrite_seed_pair maps evaluation_seed N → (2N-1, 2N), so
+# for --seed 1 this gives seeds (1, 2) which hit directives 0 and 1
+# — two distinct styles. For --seed 2 → (3, 4), hitting directives
+# 2 and 3. Provides 4-way diversity before the index wraps.
+_SEED_STYLE_DIRECTIVES = (
+    "Use concise, everyday phrasing.",
+    "Use more formal, precise phrasing.",
+    "Begin the question with a different word than the original.",
+    "Rephrase using the passive voice where natural.",
+)
+
+
+def _style_for_seed(seed: int) -> str:
+    """Look up the style directive for a rewrite seed."""
+    idx = (int(seed) - 1) % len(_SEED_STYLE_DIRECTIVES)
+    return _SEED_STYLE_DIRECTIVES[idx]
+
+
 # V2-compatible template: few-shot, directive, single-line target.
-# The seed appears in a phrase that does NOT invite the model to
-# continue generating a numbered example list.
+# `{style}` varies per seed via `_style_for_seed` — this is what makes
+# seed-1 and seed-2 produce meaningfully different rewrites at T=0.
 DEFAULT_REWRITE_INSTRUCTION = (
     "Your task is to rewrite a question in different words while "
     "preserving its exact meaning.\n"
+    "\n"
+    "Style guidance for this rewrite: {style}\n"
     "\n"
     "Rules:\n"
     "- Output ONLY the rewritten question on a single line.\n"
     "- Do NOT answer the question.\n"
     "- Do NOT provide explanations, commentary, or additional examples.\n"
-    "- Use wording variant {seed} — a paraphrase distinct from other variants.\n"
+    "- Preserve the exact factual meaning and intent.\n"
     "\n"
     "Examples:\n"
     "Question: What is the capital of France?\n"
@@ -203,7 +237,14 @@ def make_paraphrased_prompt(
     import torch
 
     template = instruction_template or DEFAULT_REWRITE_INSTRUCTION
-    instruction = template.format(seed=rewrite_seed, prompt=original_prompt)
+    # Pass all possible placeholders; str.format silently ignores unused
+    # ones, so V1_REWRITE_INSTRUCTION (which uses only {seed} and {prompt})
+    # continues to work unchanged.
+    instruction = template.format(
+        seed=rewrite_seed,
+        prompt=original_prompt,
+        style=_style_for_seed(rewrite_seed),
+    )
     inputs = tokenizer(instruction, return_tensors="pt").to(model.device)
 
     # Explicit pad_token_id suppresses the "Setting pad_token_id to

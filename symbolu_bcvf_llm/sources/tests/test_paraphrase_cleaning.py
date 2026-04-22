@@ -15,8 +15,10 @@ import pytest
 from symbolu_bcvf_llm.sources.paraphrase import (
     DEFAULT_REWRITE_INSTRUCTION,
     V1_REWRITE_INSTRUCTION,
+    _SEED_STYLE_DIRECTIVES,
     _clean_rewrite,
     _is_valid_rewrite,
+    _style_for_seed,
 )
 
 
@@ -214,11 +216,76 @@ def test_heavily_corrupted_falls_through_to_empty_or_short():
 
 
 def test_templates_contain_required_placeholders():
-    """Both templates must have {seed} and {prompt} for str.format."""
-    for tmpl in (DEFAULT_REWRITE_INSTRUCTION, V1_REWRITE_INSTRUCTION):
-        assert "{seed}" in tmpl
-        assert "{prompt}" in tmpl
-        # Round-trip through format() to confirm no latent template bugs.
-        rendered = tmpl.format(seed=7, prompt="test?")
-        assert "7" in rendered
-        assert "test?" in rendered
+    """V1 template uses {seed} + {prompt}; DEFAULT also uses {style}."""
+    # V1 template — 2 placeholders, rendered with seed/prompt only.
+    assert "{seed}" in V1_REWRITE_INSTRUCTION
+    assert "{prompt}" in V1_REWRITE_INSTRUCTION
+    rendered = V1_REWRITE_INSTRUCTION.format(seed=7, prompt="test?")
+    assert "7" in rendered
+    assert "test?" in rendered
+    # DEFAULT template — uses {style}, not {seed} directly. Must still
+    # format cleanly when given all three placeholders (as
+    # make_paraphrased_prompt does — str.format ignores unused kwargs).
+    assert "{style}" in DEFAULT_REWRITE_INSTRUCTION
+    assert "{prompt}" in DEFAULT_REWRITE_INSTRUCTION
+    rendered = DEFAULT_REWRITE_INSTRUCTION.format(
+        seed=7, prompt="test?", style=_style_for_seed(7),
+    )
+    assert "test?" in rendered
+    assert _style_for_seed(7) in rendered
+
+
+# --------------------------------------------------------------------------- #
+# Seed-diversity — §10.V1.6 follow-up fix so seed 1 and seed 2 produce
+# genuinely different rewrites at temperature 0.
+# --------------------------------------------------------------------------- #
+
+
+def test_style_directives_non_empty():
+    """At least 2 distinct directives required to distinguish seed pairs."""
+    assert len(_SEED_STYLE_DIRECTIVES) >= 2
+    assert len(set(_SEED_STYLE_DIRECTIVES)) == len(_SEED_STYLE_DIRECTIVES), (
+        "style directives must be unique — duplicates defeat the point"
+    )
+
+
+def test_style_for_seed_deterministic():
+    """Same seed → same directive (determinism is essential for reproducibility)."""
+    assert _style_for_seed(1) == _style_for_seed(1)
+    assert _style_for_seed(17) == _style_for_seed(17)
+
+
+def test_style_for_seed_1_and_2_are_different():
+    """The critical property: --seed 1's rewrite pair (1, 2) must get
+    distinct style directives. Without this, BCVF degenerates from
+    M=3 to effectively M=2 because Mistral produces identical rewrites
+    for both seeds at T=0 (observed in the N=5 post-fix inspection)."""
+    assert _style_for_seed(1) != _style_for_seed(2)
+
+
+def test_style_for_seed_3_and_4_are_different():
+    """--seed 2's rewrite pair (3, 4) must also get distinct directives."""
+    assert _style_for_seed(3) != _style_for_seed(4)
+
+
+def test_style_for_seed_wraps_modulo():
+    """When seed exceeds the directive count, modulo wrap applies."""
+    n = len(_SEED_STYLE_DIRECTIVES)
+    assert _style_for_seed(1) == _style_for_seed(1 + n)
+    assert _style_for_seed(2) == _style_for_seed(2 + n)
+
+
+def test_rendered_templates_differ_for_seeds_1_and_2():
+    """Rendered instruction text must differ for seeds 1 and 2 — otherwise
+    Mistral at T=0 will produce the same argmax rewrite (the concrete
+    failure mode this fix addresses)."""
+    t1 = DEFAULT_REWRITE_INSTRUCTION.format(
+        seed=1, prompt="What is X?", style=_style_for_seed(1),
+    )
+    t2 = DEFAULT_REWRITE_INSTRUCTION.format(
+        seed=2, prompt="What is X?", style=_style_for_seed(2),
+    )
+    assert t1 != t2, (
+        "Seed 1 and seed 2 produced identical instruction text — "
+        "the model will return the same argmax at temperature 0"
+    )
