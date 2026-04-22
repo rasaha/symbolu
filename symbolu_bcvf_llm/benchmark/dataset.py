@@ -313,6 +313,8 @@ class TruthfulQABenchmark:
         compile_model: bool = True,
         compile_dynamic: bool = True,
         paraphrase_cache_file: Optional["Path"] = None,
+        evaluation_seed: int = 1,
+        rewrite_seed_pair: Optional[Tuple[int, int]] = None,
     ) -> None:
         try:
             import torch  # noqa: F401
@@ -370,6 +372,26 @@ class TruthfulQABenchmark:
         self._paraphrase_max_new_tokens = int(paraphrase_max_new_tokens)
         self._model_name = model_name
         self._split = split
+
+        # §1.10 replication requires seed 2 to use *different* paraphrases
+        # than seed 1 so the verdict is tested against a different source
+        # triple. Map evaluation_seed N → rewrite_seed_pair (2N-1, 2N):
+        #   seed 1 → (1, 2)  ← what the hardcoded pre-fix code used
+        #   seed 2 → (3, 4)
+        #   seed N → (2N-1, 2N)
+        # For backward compat, evaluation_seed 0 maps to (1, 2) same as 1.
+        # An explicit rewrite_seed_pair override wins over the derivation.
+        if rewrite_seed_pair is not None:
+            pair = tuple(int(s) for s in rewrite_seed_pair)
+            if len(pair) != 2 or pair[0] == pair[1]:
+                raise ValueError(
+                    f"rewrite_seed_pair must be two distinct ints, got {pair}"
+                )
+            self._rewrite_seed_pair: Tuple[int, int] = pair  # type: ignore
+        else:
+            base = max(int(evaluation_seed), 1)
+            self._rewrite_seed_pair = (2 * base - 1, 2 * base)
+        self._evaluation_seed = int(evaluation_seed)
 
         # Paraphrase cache: (question_row_id, rewrite_seed) -> paraphrased prompt.
         # Paraphrases are deterministic given (model, prompt, seed) at
@@ -520,8 +542,9 @@ class TruthfulQABenchmark:
         )
         if self._use_paraphrase:
             row_id = int(question.metadata.get("truthfulqa_row_id", -1))
-            para_a = self._get_or_create_paraphrase(row_id, base_prompt, 1)
-            para_b = self._get_or_create_paraphrase(row_id, base_prompt, 2)
+            seed_a, seed_b = self._rewrite_seed_pair
+            para_a = self._get_or_create_paraphrase(row_id, base_prompt, seed_a)
+            para_b = self._get_or_create_paraphrase(row_id, base_prompt, seed_b)
             prompts = [base_prompt, para_a, para_b]
         else:
             # Smoke mode: three identical prompts. Exercises the
@@ -548,7 +571,14 @@ class TruthfulQABenchmark:
                 str(self._paraphrase_cache_file)
                 if self._paraphrase_cache_file is not None else None
             ),
+            "rewrite_seed_pair": list(self._rewrite_seed_pair),
         }
+
+    @property
+    def rewrite_seed_pair(self) -> Tuple[int, int]:
+        """§1.10 replication: the two paraphrase rewrite seeds used
+        by this benchmark instance. Seed 1 → (1, 2); seed 2 → (3, 4)."""
+        return self._rewrite_seed_pair
 
     @property
     def compile_status(self) -> str:

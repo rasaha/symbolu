@@ -78,6 +78,8 @@ def _fake_tqa_benchmark(tmp_path: Path, model_name: str = "m1",
     bench._paraphrase_cache_loaded = 0
     bench._model = object()
     bench._tokenizer = object()
+    bench._rewrite_seed_pair = (1, 2)
+    bench._evaluation_seed = 1
     return bench
 
 
@@ -122,6 +124,8 @@ def test_paraphrase_cache_reloads_from_disk(tmp_path: Path):
     bench._split = "validation"
     bench._paraphrase_cache_file = cache_path
     bench._paraphrase_cache_loaded = 0
+    bench._rewrite_seed_pair = (1, 2)
+    bench._evaluation_seed = 1
 
     # Emulate the __init__ load block.
     with open(cache_path) as fh:
@@ -164,6 +168,7 @@ def test_paraphrase_cache_stats_exposes_disk_metadata(tmp_path: Path):
     assert stats["entries"] == 0
     assert stats["loaded_from_disk"] == 0
     assert stats["persisted_to"] == str(bench._paraphrase_cache_file)
+    assert stats["rewrite_seed_pair"] == [1, 2]
 
 
 def test_paraphrase_cache_stats_persisted_to_none_when_disabled(tmp_path: Path):

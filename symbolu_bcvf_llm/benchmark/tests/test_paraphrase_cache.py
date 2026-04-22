@@ -44,6 +44,9 @@ def _make_fake_benchmark(row_id: int = 0):
     bench._paraphrase_cache_loaded = 0
     bench._model_name = "test-model"
     bench._split = "test"
+    # Rewrite-seed plumbing (§1.10 replication).
+    bench._rewrite_seed_pair = (1, 2)
+    bench._evaluation_seed = 1
     return bench
 
 

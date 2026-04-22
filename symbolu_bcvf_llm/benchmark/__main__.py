@@ -336,11 +336,16 @@ def main(argv: List[str] | None = None) -> int:
                 compile_model=not args.no_compile,
                 compile_dynamic=not args.no_compile_dynamic,
                 paraphrase_cache_file=cache_file,
+                evaluation_seed=args.seed,
             )
             logger.info(
                 "Model + dataset loaded in %.1f s", time.perf_counter() - t_load
             )
             logger.info("torch.compile status: %s", bench.compile_status)
+            logger.info(
+                "§1.10 rewrite seed pair for --seed %d: %s",
+                args.seed, bench.rewrite_seed_pair,
+            )
             _stats0 = bench.paraphrase_cache_stats
             if _stats0.get("loaded_from_disk", 0) > 0:
                 logger.info(
@@ -359,6 +364,8 @@ def main(argv: List[str] | None = None) -> int:
                 "eos_token_id": bench.eos_token_id,
                 "use_paraphrase": not args.no_paraphrase,
                 "compile_status": bench.compile_status,
+                "rewrite_seed_pair": list(bench.rewrite_seed_pair),
+                "evaluation_seed": args.seed,
             }
             write_manifest(manifest_path, manifest)
 
