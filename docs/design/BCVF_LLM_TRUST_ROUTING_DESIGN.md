@@ -4762,6 +4762,115 @@ design; not sufficient on its own to authorize a decoder run.
 - §11 infrastructure is retained as the standing gate for all
   future decoder proposals on this package.
 
+### 11.9 Per-step BCVF probe — aggregate-masks-signal hypothesis test
+
+§11.8 left one open question: the §10.V1.2 mechanism is a
+per-token conditional (paraphrase alignment on distractors
+penalizes base on specific hallucination-prone tokens), but the
+shipped BCVF observables score per-(Q, choice) at a single
+commit-position lookahead. If the mechanism is real at the
+per-token level, a per-step probe should surface signal that the
+aggregate view averaged out.
+
+Two new observables (commit `7b2ee0a`):
+
+- `BCVFPerStepMaxObservable` — walks the teacher-forced answer
+  path, computes BCVF at every step, reduces via `max`.
+- `BCVFSourceZeroPerStepMaxObservable` — same, but returns the
+  per-source cost of source 0 specifically.
+
+Both mutate source state via `commit()` along the answer path and
+opt into the probe harness's `requires_isolated_sources = True`
+flag.
+
+**Command:**
+
+```
+python scripts/probe_observables.py \
+    --benchmark truthfulqa \
+    --num-questions 100 \
+    --model mistralai/Mistral-7B-Instruct-v0.3 \
+    --no-compile \
+    --suffix _v1_per_step
+```
+
+Wall clock: 2794 s (~47 min) on the same A100 80GB. The 5.5×
+runtime vs §11.8 comes from per-step commits: each answer token
+(~10 on average) adds `2 × 3 = 6` forward passes per source
+triple, doubled across the two isolated observables.
+
+**Aggregate vs per-step comparison:**
+
+| Observable | §11.8 aggregate AUC | §11.9 per-step AUC | Δ |
+|---|---|---|---|
+| `bcvf_total_cost` / `bcvf_per_step_max` | 0.495 | **0.462** | −0.033 |
+| `bcvf_source_0_cost` / `bcvf_source_0_per_step_max` | 0.502 | **0.478** | −0.024 |
+| `source_0_entropy` | 0.532 | — | (unchanged — not BCVF-family) |
+| `source_disagreement_fraction` | 0.498 | — | (unchanged — not BCVF-family) |
+
+Both BCVF-family observables shift in the ANTI direction under
+the per-step drill-down, by 0.024-0.033 AUC. Standard error at
+N=521 with balanced classes is ≈0.022, so 0.462 is ≈1.7 SD below
+the null and 0.478 is ≈1 SD below; neither crosses the 0.45
+ANTI_CORRELATED gate threshold on its own, but the consistency of
+the direction (both down, neither up) carries information beyond
+the marginal per-observable p-values.
+
+**Hypothesis tests:**
+
+1. **"Aggregate masks truth-correlated signal that per-step reveals."**
+   *Falsified.* Per-step did not surface a positive AUC for any
+   observable. Both BCVF-family per-step observables remain
+   below 0.5.
+
+2. **"§10.V1.2 mechanism operates at per-token level with
+   anti-correlated sign."** *Weakly consistent.* Aggregate BCVF
+   was indistinguishable from noise (AUC 0.495 / 0.502); per-step
+   drill-down revealed a slight negative shift in both, matching
+   what a per-token wrong-direction mechanism would predict.
+   Consistent with the −3.06 pp / −4.00 pp V1 regression
+   magnitudes: a small-effect mechanism that exists at per-token
+   granularity, averages out at per-choice aggregate, and
+   partially resurfaces under max-reduction over steps.
+
+**Verdict — V1 source ensemble is saturated.**
+
+Six observables have now been probed on the V1 configuration
+(same-model Mistral-7B paraphrase, M=3, TruthfulQA-MC):
+
+| Observable | AUC | Classification |
+|---|---|---|
+| `bcvf_total_cost` | 0.495 | UNCORRELATED |
+| `bcvf_source_0_cost` | 0.502 | UNCORRELATED |
+| `source_0_entropy` | 0.532 | UNCORRELATED |
+| `source_disagreement_fraction` | 0.498 | UNCORRELATED |
+| `bcvf_per_step_max` | 0.462 | UNCORRELATED |
+| `bcvf_source_0_per_step_max` | 0.478 | UNCORRELATED |
+
+Six observables across three semantic families (BCVF-aggregate,
+BCVF-per-step, cheap-proxy) all fail §11's 0.60 TRUTH_CORRELATED
+gate. The "change the observable" lever is exhausted on this
+source ensemble. No V2 decoder is authorized on same-model
+paraphrase sources for this benchmark regardless of what
+observable is built on top.
+
+**Next lever — change the source ensemble.**
+
+§10.V1.3 Experiment A (cross-model source ensemble) becomes the
+sole remaining untested configuration. Replace the two same-model
+paraphrase sources with paraphrases from a *different* model
+(cross-model source independence). The existing six observables
+are re-probed against the new ensemble; if any passes §11.6, a
+bounded V2 decoder experiment is authorized. If none pass, the
+default-consumer architecture (softmin trust-shaping over
+symmetric per-source attribution) is also implicated and must be
+redesigned alongside the source ensemble.
+
+§11.9 result is retained as the empirical lower bound on what any
+V2 proposal must improve on: cross-model ensembles must produce
+at least one observable with AUC ≥ 0.60, measured by the same
+probe harness, on the same benchmark subset.
+
 ---
 
 
