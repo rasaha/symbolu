@@ -39,6 +39,11 @@ def _make_fake_benchmark(row_id: int = 0):
     bench._use_paraphrase = True
     bench._model = object()      # placeholder; make_paraphrased_prompt is mocked
     bench._tokenizer = object()  # same
+    # Same-model paraphraser (V1 default) — the cross-model path sets
+    # these to a distinct pair.
+    bench._paraphraser_model = bench._model
+    bench._paraphraser_tokenizer = bench._tokenizer
+    bench._paraphraser_model_name = "test-model"
     # Disk-cache fields (disabled for this test helper).
     bench._paraphrase_cache_file = None
     bench._paraphrase_cache_loaded = 0

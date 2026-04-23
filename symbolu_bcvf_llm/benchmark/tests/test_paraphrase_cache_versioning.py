@@ -43,6 +43,9 @@ def _fake_tqa_with_cache(
     bench._evaluation_seed = 1
     bench._model = object()
     bench._tokenizer = object()
+    bench._paraphraser_model = bench._model
+    bench._paraphraser_tokenizer = bench._tokenizer
+    bench._paraphraser_model_name = model_name
 
     # Replicate the __init__ load block.
     if cache_file.exists():

@@ -37,6 +37,9 @@ def _fake_tqa(
     bench._paraphrase_cache_discarded_reason = None
     bench._model = object()
     bench._tokenizer = object()
+    bench._paraphraser_model = bench._model
+    bench._paraphraser_tokenizer = bench._tokenizer
+    bench._paraphraser_model_name = bench._model_name
 
     # Replicate the __init__ derivation logic.
     if rewrite_seed_pair is not None:

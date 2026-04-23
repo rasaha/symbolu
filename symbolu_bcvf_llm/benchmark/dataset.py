@@ -317,6 +317,7 @@ class TruthfulQABenchmark:
         paraphrase_cache_file: Optional["Path"] = None,
         evaluation_seed: int = 1,
         rewrite_seed_pair: Optional[Tuple[int, int]] = None,
+        paraphraser_model_name: Optional[str] = None,
     ) -> None:
         try:
             import torch  # noqa: F401
@@ -349,6 +350,31 @@ class TruthfulQABenchmark:
             model_name, torch_dtype="auto", device_map="auto"
         )
         self._model.eval()
+
+        # Cross-model paraphraser (§10.V1.3 Experiment A). If
+        # `paraphraser_model_name` is None or equal to `model_name`,
+        # the paraphraser shares the base model + tokenizer — the V1
+        # same-model configuration. Otherwise a second
+        # (tokenizer, model) pair is loaded independently and used
+        # only for paraphrase generation. Source 0 always uses the
+        # primary model regardless.
+        self._paraphraser_model_name: str = (
+            paraphraser_model_name
+            if paraphraser_model_name is not None
+            else model_name
+        )
+        if self._paraphraser_model_name == model_name:
+            self._paraphraser_tokenizer = self._tokenizer
+            self._paraphraser_model = self._model
+        else:
+            self._paraphraser_tokenizer = AutoTokenizer.from_pretrained(
+                self._paraphraser_model_name
+            )
+            self._paraphraser_model = AutoModelForCausalLM.from_pretrained(
+                self._paraphraser_model_name,
+                torch_dtype="auto", device_map="auto",
+            )
+            self._paraphraser_model.eval()
 
         # torch.compile gives ~2-3× speedup on Ampere+ for the forward
         # pass. dynamic=True avoids recompilation on every seq-length
@@ -429,10 +455,19 @@ class TruthfulQABenchmark:
                     payload = json.load(fh)
                 cached_version = payload.get("paraphrase_pipeline_version")
                 model_ok = payload.get("model_name") == model_name
+                # paraphraser_model_name was introduced alongside
+                # cross-model support; older caches omit it and are
+                # treated as same-model (paraphraser == model).
+                cached_paraphraser = payload.get(
+                    "paraphraser_model_name", payload.get("model_name")
+                )
+                paraphraser_ok = (
+                    cached_paraphraser == self._paraphraser_model_name
+                )
                 split_ok = payload.get("split") == split
                 version_ok = cached_version == current_version
 
-                if model_ok and split_ok and version_ok:
+                if model_ok and paraphraser_ok and split_ok and version_ok:
                     for k, v in payload.get("entries", {}).items():
                         row_str, seed_str = k.split("__", 1)
                         self._paraphrase_cache[(int(row_str), int(seed_str))] = v
@@ -448,6 +483,12 @@ class TruthfulQABenchmark:
                             f"model_name mismatch "
                             f"(cache={payload.get('model_name')}, "
                             f"current={model_name})"
+                        )
+                    if not paraphraser_ok:
+                        reasons.append(
+                            f"paraphraser_model_name mismatch "
+                            f"(cache={cached_paraphraser}, "
+                            f"current={self._paraphraser_model_name})"
                         )
                     if not split_ok:
                         reasons.append(
@@ -538,7 +579,8 @@ class TruthfulQABenchmark:
             return self._paraphrase_cache[key]
         self._paraphrase_misses += 1
         para = make_paraphrased_prompt(
-            self._model, self._tokenizer, base_prompt,
+            self._paraphraser_model, self._paraphraser_tokenizer,
+            base_prompt,
             rewrite_seed=rewrite_seed,
             max_new_tokens=self._paraphrase_max_new_tokens,
         )
@@ -565,6 +607,7 @@ class TruthfulQABenchmark:
 
         payload = {
             "model_name": self._model_name,
+            "paraphraser_model_name": self._paraphraser_model_name,
             "split": self._split,
             "paraphrase_pipeline_version": paraphrase_pipeline_version(),
             "paraphrase_version_tag": PARAPHRASE_VERSION_TAG,
