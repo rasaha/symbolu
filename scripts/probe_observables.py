@@ -37,7 +37,9 @@ if str(_REPO_ROOT) not in sys.path:
 
 from symbolu_bcvf_llm.benchmark.dataset import MockBenchmark  # noqa: E402
 from symbolu_bcvf_llm.observables import (  # noqa: E402
+    BCVFPerStepMaxObservable,
     BCVFSourceZeroCostObservable,
+    BCVFSourceZeroPerStepMaxObservable,
     BCVFTotalCostObservable,
     Source0EntropyObservable,
     SourceAgreementObservable,
@@ -51,6 +53,8 @@ def build_observables():
         BCVFSourceZeroCostObservable(),
         Source0EntropyObservable(),
         SourceAgreementObservable(),
+        BCVFPerStepMaxObservable(),
+        BCVFSourceZeroPerStepMaxObservable(),
     ]
 
 
@@ -139,6 +143,23 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--no-compile", action="store_true")
     parser.add_argument("--no-paraphrase", action="store_true")
+    parser.add_argument(
+        "--paraphraser-model", type=str, default=None,
+        help=(
+            "HF model name to use for paraphrase generation. Defaults "
+            "to the same model as --model (V1 same-model configuration). "
+            "Set to a different model for §10.V1.3 Experiment A "
+            "cross-model source ensemble."
+        ),
+    )
+    parser.add_argument(
+        "--paraphrase-cache-file", type=pathlib.Path, default=None,
+        help=(
+            "Persist paraphrases to this JSON so subsequent runs reuse "
+            "them. Cache is invalidated if (model, paraphraser, split, "
+            "pipeline version) change."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.benchmark == "mock":
@@ -151,6 +172,8 @@ def main(argv=None) -> int:
             compile_model=not args.no_compile,
             use_paraphrase=not args.no_paraphrase,
             evaluation_seed=args.seed,
+            paraphraser_model_name=args.paraphraser_model,
+            paraphrase_cache_file=args.paraphrase_cache_file,
         )
 
     observables = build_observables()
