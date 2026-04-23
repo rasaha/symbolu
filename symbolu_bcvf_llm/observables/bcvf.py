@@ -1,45 +1,45 @@
-"""§11 BCVF-based observables.
+"""BCVF-based observables.
 
-Two variants of V1's Ketu witness:
+Two variants of the V1 Ketu witness:
 
-  BCVFTotalCostObservable       — total BCVF cost across all pairs for
-                                  the (Q, choice) pair. Higher = more
-                                  disagreement. V1's implicit observable.
-
+  BCVFTotalCostObservable       — total BCVF cost across all source pairs.
   BCVFSourceZeroCostObservable  — per-source BCVF cost for source 0
-                                  specifically. Probes the §10.V1.2
-                                  mechanism ("2:1 attribution votes
-                                  source 0 off the island"): if this
-                                  observable is anti-correlated with
-                                  correctness, it confirms the hypothesis.
+                                  (the base decoder).
 
-Both consume the §4 Source protocol's `lookahead()` returns and feed
-into the §2 kernel unchanged.
+Both feed the §4 Source protocol's `lookahead()` returns into the §2
+kernel unchanged.
 """
 
 from __future__ import annotations
 
-from typing import List, Sequence
+from typing import Sequence, Tuple
 
 import numpy as np
 
-from symbolu_bcvf_llm.core import BCVFLLMConfig, compute_bcvf_cost
+from symbolu_bcvf_llm.core import BCVFLLMConfig, BCVFLLMResult, compute_bcvf_cost
 from symbolu_bcvf_llm.sources.base import Source
 
 from .base import ObservableValue
 
 
+def _run_bcvf(
+    sources: Sequence[Source], cfg: BCVFLLMConfig
+) -> Tuple[BCVFLLMResult, np.ndarray]:
+    """Pull lookahead from each source, run the kernel, return (result, per_source)."""
+    probs_list = [s.lookahead()[0].astype(np.float64) for s in sources]
+    masks_list = [s.lookahead()[1] for s in sources]
+    result = compute_bcvf_cost(probs_list, cfg, valid_masks=masks_list)
+    per_source = np.array(
+        [float(result.per_source_costs[i]) for i in range(len(sources))],
+        dtype=np.float64,
+    )
+    return result, per_source
+
+
 class BCVFTotalCostObservable:
     """Sum of per-pair BCVF costs for a (question, choice) scoring event.
 
-    V1's implicit Ketu. Observed at the commit-time lookahead window
-    per §2.3.2. Higher total cost = more accelerating disagreement
-    among sources = "something is off" in V1's intended semantics.
-
-    §10.V1.8 shows this observable is likely ANTI_CORRELATED on same-
-    model paraphrase sources for TruthfulQA-MC; running the probe on
-    a v1-configured MockBenchmark or real TruthfulQA set should
-    reproduce that finding cheaply.
+    Scalar = total cost. Higher = more accelerating disagreement.
     """
 
     name: str = "bcvf_total_cost"
@@ -54,19 +54,7 @@ class BCVFTotalCostObservable:
         prompt_tokens: Sequence[int],
         choice_tokens: Sequence[int],
     ) -> ObservableValue:
-        probs_list: List[np.ndarray] = []
-        masks_list: List[np.ndarray] = []
-        for s in sources:
-            p, m = s.lookahead()
-            probs_list.append(p.astype(np.float64))
-            masks_list.append(m)
-        result = compute_bcvf_cost(
-            probs_list, self._cfg, valid_masks=masks_list
-        )
-        per_source = np.array(
-            [float(result.per_source_costs[i]) for i in range(len(sources))],
-            dtype=np.float64,
-        )
+        result, per_source = _run_bcvf(sources, self._cfg)
         return ObservableValue(
             scalar=float(result.total_cost),
             per_source=per_source,
@@ -84,11 +72,8 @@ class BCVFTotalCostObservable:
 class BCVFSourceZeroCostObservable:
     """Per-source BCVF cost of source 0 (the base decoder).
 
-    Probes the §10.V1.2 hypothesis directly: if source 0 is getting
-    systematically high per-source cost on questions where it's
-    right, the observable will be ANTI_CORRELATED. That would confirm
-    the "base voted off the island" mechanism without needing to run
-    a full Rahu attractor.
+    Scalar = per_source_costs[0]. Higher = source 0 is the largest
+    contributor to total disagreement.
     """
 
     name: str = "bcvf_source_0_cost"
@@ -103,20 +88,8 @@ class BCVFSourceZeroCostObservable:
         prompt_tokens: Sequence[int],
         choice_tokens: Sequence[int],
     ) -> ObservableValue:
-        probs_list: List[np.ndarray] = []
-        masks_list: List[np.ndarray] = []
-        for s in sources:
-            p, m = s.lookahead()
-            probs_list.append(p.astype(np.float64))
-            masks_list.append(m)
-        result = compute_bcvf_cost(
-            probs_list, self._cfg, valid_masks=masks_list
-        )
+        result, per_source = _run_bcvf(sources, self._cfg)
         source_0_cost = float(result.per_source_costs.get(0, 0.0))
-        per_source = np.array(
-            [float(result.per_source_costs[i]) for i in range(len(sources))],
-            dtype=np.float64,
-        )
         return ObservableValue(
             scalar=source_0_cost,
             per_source=per_source,

@@ -1,19 +1,14 @@
-"""§11 Ketu observable framework — public API.
+"""Ketu observable framework — public API.
 
-A Ketu (observable) is a witness function that reads the sources'
-behavior on a (question, choice) pair and produces a scalar. It
-does NOT act — it only reports. Separating the Ketu observable
-from the Rahu attractor is the design discipline §10.V1 showed is
-essential.
+An observable is a witness function that reads the sources' behavior
+on a (question, choice) pair and produces a scalar. The probe harness
+runs an observable against a benchmark and measures how well its
+scalar predicts correctness. Four classifications:
 
-The probe harness runs an observable against a benchmark and
-measures how well its scalar predicts correctness. Four classifications:
-
-  TRUTH_CORRELATED  — AUC > 0.60. Observable is signal.
-  UNCORRELATED      — 0.45 < AUC < 0.55. Observable is noise.
-  ANTI_CORRELATED   — AUC < 0.40. Observable has signal with the
-                      wrong sign — would help if flipped.
-  NULL              — too few data points for a verdict.
+  TRUTH_CORRELATED  — AUC ≥ 0.60.
+  UNCORRELATED      — 0.45 ≤ AUC < 0.60.
+  ANTI_CORRELATED   — AUC < 0.45 (signal with the wrong sign).
+  NULL              — fewer than 40 datapoints.
 
 Usage:
 
@@ -25,11 +20,6 @@ Usage:
     bench = MockBenchmark(num_questions=24)
     report = probe_observable(BCVFTotalCostObservable(), bench)
     print(report.classification, report.auc, report.recommendation)
-
-The probe runs before any attractor (softmin, veto, etc.) is
-built — that's the point. An observable with AUC ≈ 0.5 is not
-worth building a decoder around; an anti-correlated observable
-would actively hurt the decoder.
 """
 
 from __future__ import annotations

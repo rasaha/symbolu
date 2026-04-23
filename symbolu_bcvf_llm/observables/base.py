@@ -1,13 +1,6 @@
-"""§11 Observable protocol + core dataclasses + classification logic.
+"""Observable protocol + core dataclasses + classification logic.
 
-A Ketu observable is a witness function. Given a question + candidate
-choice + the sources' behavior on that choice, it produces a scalar
-(and optionally per-source decomposition). The scalar is then
-correlated with ground-truth correctness over the benchmark to
-determine whether the observable is worth building a Rahu attractor
-around.
-
-This module is pure NumPy + stdlib. No torch. Tests run on CPU in <1 s.
+Pure NumPy + stdlib. No torch.
 """
 
 from __future__ import annotations
@@ -22,8 +15,6 @@ from typing import (
     Sequence,
     runtime_checkable,
 )
-
-import math
 
 import numpy as np
 
@@ -51,7 +42,7 @@ class ObservableValue:
 
 @runtime_checkable
 class Observable(Protocol):
-    """A Ketu — a witness function that produces a scalar per (Q, choice)."""
+    """A witness function that produces a scalar per (question, choice)."""
 
     name: str
     higher_means_more_suspicious: bool
@@ -86,7 +77,6 @@ class ProbeReport:
     observable_name: str
     higher_means_more_suspicious: bool
     n_questions: int
-    n_choices: int
     n_datapoints: int
 
     pearson_r: float            # signed correlation between scalar and correctness
@@ -146,25 +136,18 @@ def _spearman_rho(x: np.ndarray, y: np.ndarray) -> float:
 def _roc_auc(scores: np.ndarray, labels: np.ndarray) -> float:
     """Area under ROC curve for binary labels. Returns 0.5 on degenerate input.
 
-    The observable's `higher_means_more_suspicious` flag is NOT applied
-    here — this function computes AUC as 'probability that a label=1
-    example scores HIGHER than a label=0 example'. The probe harness
-    inverts labels before calling when the observable is suspicion-
-    polarity so the final reported AUC is consistently "higher AUC =
-    observable predicts correctness better."
+    Tie-aware rank-sum formulation: O(n log n) via the existing rank
+    primitive, which already averages tied ranks (ties → 0.5 contribution).
     """
     scores = np.asarray(scores, dtype=np.float64)
     labels = np.asarray(labels).astype(bool)
-    pos = scores[labels]
-    neg = scores[~labels]
-    n_pos, n_neg = len(pos), len(neg)
+    n_pos = int(labels.sum())
+    n_neg = int(labels.size - n_pos)
     if n_pos == 0 or n_neg == 0:
         return 0.5
-    # Tie-aware rank-sum AUC — O((n_pos + n_neg)^2) is fine at benchmark sizes.
-    greater = 0.0
-    for p in pos:
-        greater += float((p > neg).sum()) + 0.5 * float((p == neg).sum())
-    return greater / (n_pos * n_neg)
+    ranks = _rankdata(scores)
+    rank_sum_pos = float(ranks[labels].sum())
+    return (rank_sum_pos - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg)
 
 
 def classify_observable(
@@ -174,13 +157,11 @@ def classify_observable(
 ) -> str:
     """Classify an observable by its AUC vs correctness.
 
-    Uses thresholds calibrated for the §11 Observable Discipline:
+    Bands:
       AUC ≥ 0.60 → TRUTH_CORRELATED
-      0.45 ≤ AUC < 0.60 → UNCORRELATED (marginal signal at best)
-      AUC < 0.45 → ANTI_CORRELATED (has signal with wrong sign)
-
-    If fewer than `min_n` datapoints are available, returns NULL
-    because the AUC estimate itself is unreliable.
+      0.45 ≤ AUC < 0.60 → UNCORRELATED
+      AUC < 0.45 → ANTI_CORRELATED
+      n_datapoints < min_n → NULL (estimate is unreliable)
     """
     if n_datapoints < min_n:
         return "NULL"
@@ -191,31 +172,30 @@ def classify_observable(
     return "UNCORRELATED"
 
 
+_RECOMMENDATIONS = {
+    "TRUTH_CORRELATED": (
+        "AUC={auc:.3f} — observable has signal. Worth building a Rahu "
+        "attractor around. Proceed to bounded benchmark."
+    ),
+    "ANTI_CORRELATED": (
+        "AUC={auc:.3f} < 0.45 — observable has signal with the WRONG "
+        "sign. A conventional trust-shaped attractor on this would "
+        "ACTIVELY HURT accuracy. Options: flip the observable's sign, "
+        "reject it, or verify with a larger N."
+    ),
+    "UNCORRELATED": (
+        "AUC={auc:.3f} near 0.5 — observable is close to noise. A "
+        "Rahu built on this converges to conventional-blend at best. "
+        "Not worth the inference cost."
+    ),
+    "NULL": (
+        "n<40 datapoints — estimate unreliable. Re-probe with a larger "
+        "benchmark subset before classifying."
+    ),
+}
+
+
 def recommendation_for(classification: str, auc: float) -> str:
     """Human-readable next-step recommendation per classification."""
-    if classification == "TRUTH_CORRELATED":
-        return (
-            f"AUC={auc:.3f} — observable has signal. Worth building a "
-            "Rahu attractor around. Proceed to §10.V1.3 Experiment A-style "
-            "attractor design + bounded benchmark."
-        )
-    if classification == "ANTI_CORRELATED":
-        return (
-            f"AUC={auc:.3f} < 0.45 — observable has signal with the WRONG "
-            "sign. Building a conventional trust-shaped attractor on this "
-            "would ACTIVELY HURT accuracy (the V1 failure mode). Options: "
-            "(1) flip the observable's sign (invert the direction); "
-            "(2) reject this observable and try another; (3) verify this "
-            "is real by re-probing with a larger N."
-        )
-    if classification == "UNCORRELATED":
-        return (
-            f"AUC={auc:.3f} near 0.5 — observable is close to noise. "
-            "A Rahu built on this produces trust ≈ uniform most of the "
-            "time — converges to conventional-blend at best. Not worth "
-            "the inference cost."
-        )
-    return (
-        f"n<40 datapoints — estimate unreliable. Re-probe with a larger "
-        "benchmark subset before classifying."
-    )
+    template = _RECOMMENDATIONS.get(classification, _RECOMMENDATIONS["NULL"])
+    return template.format(auc=auc)

@@ -2,22 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Sequence
-
 import numpy as np
 import pytest
 
 from symbolu_bcvf_llm.benchmark.dataset import MockBenchmark
-from symbolu_bcvf_llm.observables.base import (
-    Observable,
-    ObservableValue,
-)
+from symbolu_bcvf_llm.observables.base import ObservableValue
 from symbolu_bcvf_llm.observables.probe import (
     probe_observable,
     probe_observables_parallel,
 )
-from symbolu_bcvf_llm.sources.base import Source
 
 
 # --------------------------------------------------------------------------- #
@@ -25,79 +18,48 @@ from symbolu_bcvf_llm.sources.base import Source
 # --------------------------------------------------------------------------- #
 
 
-class _OracleObservable:
-    """Perfect truth-predictor: scalar = 1 if choice is correct, else 0.
+class _LookupOracle:
+    """Oracle observable that resolves the (Q, C) pair by matching
+    prompt_tokens (unique per MockBenchmark question) and choice_tokens,
+    then returns `scalar_correct` if the choice is correct else
+    `scalar_wrong`."""
 
-    `higher_means_more_suspicious = False` (higher scalar → more trusted).
-    Probe AUC should be 1.0.
-    """
-
-    name = "oracle"
-    higher_means_more_suspicious = False
+    def __init__(
+        self, benchmark, *, name, polarity, scalar_correct, scalar_wrong,
+    ):
+        self.name = name
+        self.higher_means_more_suspicious = polarity
+        self._benchmark = benchmark
+        self._scalar_correct = scalar_correct
+        self._scalar_wrong = scalar_wrong
 
     def observe(self, sources, prompt_tokens, choice_tokens):
-        # Encode correctness directly — test-only construction.
-        # choice_tokens[0] is the first token of the candidate answer.
-        # The MockBenchmark fixture gives us correct_token via metadata.
-        # We sneak it in here via the convention that correct choice is 0.
-        # For testing we just use a lookup: if the choice matches the
-        # "correct" marker (encoded in sources somehow).
-        # Simpler: hard-code correctness into a closure in the test.
-        raise NotImplementedError("Use OracleObservable.with_benchmark in tests")
+        for q in self._benchmark.questions:
+            if list(q.prompt_tokens) != list(prompt_tokens):
+                continue
+            for c_idx, ct in enumerate(q.choice_tokens):
+                if list(ct) == list(choice_tokens):
+                    scalar = (
+                        self._scalar_correct
+                        if c_idx == q.correct_index
+                        else self._scalar_wrong
+                    )
+                    return ObservableValue(scalar=scalar)
+        return ObservableValue(scalar=0.5)
 
 
 def _make_oracle_obs(benchmark):
-    """Returns an Observable that knows each choice's correctness via closure
-    over `benchmark`. Scalar = 1.0 if correct, 0.0 if wrong."""
-
-    class _Obs:
-        name = "oracle"
-        higher_means_more_suspicious = False
-
-        def observe(self, sources, prompt_tokens, choice_tokens):
-            # Identify the question by prompt_tokens (unique per question
-            # in MockBenchmark), then find the choice index by matching
-            # choice_tokens.
-            for q in benchmark.questions:
-                if list(q.prompt_tokens) != list(prompt_tokens):
-                    continue
-                for c_idx, ct in enumerate(q.choice_tokens):
-                    if list(ct) == list(choice_tokens):
-                        is_correct = (c_idx == q.correct_index)
-                        return ObservableValue(
-                            scalar=1.0 if is_correct else 0.0,
-                        )
-            return ObservableValue(scalar=0.5)   # unknown — shouldn't happen
-
-    return _Obs()
+    return _LookupOracle(
+        benchmark, name="oracle", polarity=False,
+        scalar_correct=1.0, scalar_wrong=0.0,
+    )
 
 
 def _make_anti_oracle_obs(benchmark):
-    """Perfectly ANTI-correlated observable: scalar = 1 if WRONG, 0 if correct.
-
-    With `higher_means_more_suspicious = True` the probe should report
-    AUC = 1.0 (observable is perfectly suspicious-of-wrong-choices).
-    With `higher_means_more_suspicious = False` the probe should report
-    AUC = 0.0 (observable direction is inverted).
-    """
-
-    class _Obs:
-        name = "anti_oracle"
-        higher_means_more_suspicious = True
-
-        def observe(self, sources, prompt_tokens, choice_tokens):
-            for q in benchmark.questions:
-                if list(q.prompt_tokens) != list(prompt_tokens):
-                    continue
-                for c_idx, ct in enumerate(q.choice_tokens):
-                    if list(ct) == list(choice_tokens):
-                        is_correct = (c_idx == q.correct_index)
-                        return ObservableValue(
-                            scalar=0.0 if is_correct else 1.0,
-                        )
-            return ObservableValue(scalar=0.5)
-
-    return _Obs()
+    return _LookupOracle(
+        benchmark, name="anti_oracle", polarity=True,
+        scalar_correct=0.0, scalar_wrong=1.0,
+    )
 
 
 def _make_random_obs():

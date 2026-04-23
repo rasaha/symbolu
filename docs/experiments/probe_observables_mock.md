@@ -26,7 +26,7 @@
 - **N datapoints:** 96 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
-**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this produces trust ≈ uniform most of the time — converges to conventional-blend at best. Not worth the inference cost.
+**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
 
 ### `bcvf_source_0_cost`
 
@@ -39,7 +39,7 @@
 - **N datapoints:** 96 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
-**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this produces trust ≈ uniform most of the time — converges to conventional-blend at best. Not worth the inference cost.
+**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
 
 ### `source_0_entropy`
 
@@ -52,7 +52,7 @@
 - **N datapoints:** 96 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
-**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this produces trust ≈ uniform most of the time — converges to conventional-blend at best. Not worth the inference cost.
+**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
 
 ### `source_disagreement_fraction`
 
@@ -65,7 +65,7 @@
 - **N datapoints:** 96 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
-**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this produces trust ≈ uniform most of the time — converges to conventional-blend at best. Not worth the inference cost.
+**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
 
 
 ## Discipline — what this report means

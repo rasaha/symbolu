@@ -154,9 +154,11 @@ def main(argv=None) -> int:
         )
 
     observables = build_observables()
+    total_q = len(list(bench.questions))
+    n_q = min(args.num_questions, total_q) if args.num_questions else total_q
     print(
         f"Probing {len(observables)} observables against "
-        f"{args.benchmark} N={len(list(bench.questions)[:args.num_questions or len(list(bench.questions))])}...",
+        f"{args.benchmark} N={n_q}...",
         flush=True,
     )
 
