@@ -4650,6 +4650,118 @@ default path, not the accident of post-hoc analysis.
   seeing probe data is the same §0.8 discipline violation §10
   codified.
 
+### 11.8 Empirical probe result — V1 configuration
+
+The §11 harness was run against the V1 configuration that produced
+§10's REGRESSION verdict, answering the retrospective question:
+"would a §11 probe have blocked V1 at the gate?"
+
+**Command:**
+
+```
+python scripts/probe_observables.py \
+    --benchmark truthfulqa \
+    --num-questions 100 \
+    --model mistralai/Mistral-7B-Instruct-v0.3 \
+    --no-compile \
+    --suffix _v1_config
+```
+
+**Configuration:** same-model paraphrase ensemble (M=3, source 0 =
+base Mistral-7B, sources 1-2 = same-model paraphrases of the prompt
+via the fixed §10.V1.6 paraphrase pipeline), TruthfulQA-MC validation
+split, N=100 questions, ~521 (question, choice) datapoints (TruthfulQA
+averages ~5.2 choices per question). Wall clock: 510 s on an A100 80GB.
+
+**Verdict table:**
+
+| Observable | AUC | Classification |
+|---|---|---|
+| `bcvf_total_cost` | 0.495 | **UNCORRELATED** |
+| `bcvf_source_0_cost` | 0.502 | **UNCORRELATED** |
+| `source_0_entropy` | 0.532 | **UNCORRELATED** |
+| `source_disagreement_fraction` | 0.498 | **UNCORRELATED** |
+
+Raw report on the runpod pod at
+`docs/experiments/probe_observables_truthfulqa_v1_config.md`.
+
+**Retrospective verification — §11 would have caught V1.**
+
+All four shipped observables are UNCORRELATED on the V1 source
+ensemble. Per §11.6 the gate blocks decoder construction on any
+non-`TRUTH_CORRELATED` observable. Applied pre-V1, the gate would
+have returned four simultaneous blocks and refused to authorize a
+decoder run on this (source ensemble × benchmark) combination.
+
+The §11 probe takes ~9 minutes of GPU time and produces the same
+operational output ("V1 configuration is not viable") as the ~4
+GPU-hour V1 full run plus the ~30-minute Experiment Zero confirmation.
+The cost ratio is ~30× in §11's favor. This is the §10.V1 lesson
+encoded: the cheap check precedes the expensive confirmation.
+
+**Surprise — the probe result is UNCORRELATED, not ANTI_CORRELATED.**
+
+§10.V1.8 attributed V1's REGRESSION to a specific mechanism (§2.4.5
+symmetric attribution penalizing base when paraphrases align on
+distractors). The mechanism hypothesis predicted that
+`bcvf_source_0_cost` in particular would probe as ANTI_CORRELATED.
+Empirically it came back at AUC 0.502 — indistinguishable from
+noise. Two observations follow:
+
+1. **Probe-level aggregate BCVF and decoder-level commit-loop
+   behavior are different quantities.** The probe scores per
+   (question, choice) using the commit-position lookahead window.
+   The V1 REGRESSION mechanism is a *conditional, per-token*
+   dynamic: on hallucination-prone tokens where paraphrases happen
+   to agree on a distractor, the softmin trust-shaper down-weights
+   the base decoder, and those per-token missteps compound over the
+   commit loop into the -4 pp accuracy loss. At the per-choice
+   aggregate, correct and wrong choices show similar BCVF cost
+   distributions because the mechanism only fires on the fraction
+   of tokens where same-model paraphrase correlation and
+   distractor alignment coincide.
+
+2. **§11 is therefore a conservative gate, not a mechanism replay.**
+   It blocks things that have no usable per-choice signal (which
+   the V1 configuration clearly doesn't). It may not reproduce
+   decoder-loop failure mechanisms that are only visible under
+   trust-shaping dynamics over many commit steps. The §11
+   commitment is one-directional: a passing probe is necessary
+   before a Rahu is authorized; a failing probe blocks. The probe
+   does not claim to be a complete explanation of why any specific
+   configuration would or wouldn't fail.
+
+This is consistent with §10.V1.8's finding and does not unwind it.
+§10.V1.8 explains *why* V1 regressed (mechanism); §11.8 shows
+*that* §11 would have flagged the configuration as unviable without
+needing the mechanism (gate). Both are true.
+
+**Marginally-positive signal — `source_0_entropy` at 0.532.**
+
+Source 0 entropy is weakly positive (AUC 0.532 vs 0.500 null) but
+below the 0.60 TRUTH_CORRELATED threshold. Standard error on AUC
+at N=521 with balanced classes is ≈ 0.022, so 0.532 is ~1.4 SD
+above 0.500 — not statistically compelling. Of the four observables
+it is the only one that is kernel-independent (reads source 0's
+next-token distribution alone), so the faint signal is from the
+base model's own calibration rather than from any cross-source
+disagreement machinery. Worth noting for future V2 observable
+design; not sufficient on its own to authorize a decoder run.
+
+**Decision — V1 closure is empirical and gate-confirmed.**
+
+- §10.V1.5's falsification verdict stands (V1 configuration is not
+  viable).
+- §11.8 adds: the §11 gate independently confirms the same verdict
+  at 30× lower cost.
+- No V2 decoder is authorized on the V1 source ensemble. Any V2
+  proposal must either (a) change the source ensemble and re-probe
+  (§10.V1.3's Experiment A — cross-model paraphrasers), or (b)
+  propose a new observable whose probe passes §11.6 on at least
+  one source ensemble.
+- §11 infrastructure is retained as the standing gate for all
+  future decoder proposals on this package.
+
 ---
 
 
