@@ -4457,4 +4457,200 @@ The original §10.V1.2 structural mechanism hypothesis stands as the **primary e
 ---
 
 
+## Section 11 — Observable Discipline (Ketu-before-Rahu)
+
+### 11.1 Why this section exists
+
+§10.V1.5 falsified V1 because of a missing pre-run check: no one had
+confirmed that the signal V1 relied on — BCVF per-source cost over
+same-model paraphrases — was *truth-correlated on this benchmark*
+before a 4-hour N=817 run was spent conditioning a decoder on it.
+§10.V1.8's post-hoc diagnosis established that the signal was
+**anti-correlated** with truth under §2.4.5's symmetric attribution
+geometry, meaning a Rahu-shaped consumer pulling toward the
+observable's low-cost basin was pulled *toward* the majority-wrong
+distractor. The structural cause was identifiable with a cheap
+observable-vs-correctness AUC probe on a few dozen questions;
+instead it was confirmed by running the full pipeline twice.
+
+§11 codifies the discipline V1 needed but lacked:
+
+> Before any Rahu-shaped attractor is built on a Ketu-shaped
+> observable, the observable must be probed on a held-out benchmark
+> subset and shown to be truth-correlated (AUC ≥ 0.60). If it is
+> not, no decoder is built on it.
+
+This is the LLM counterpart to the autonomy stack's §0.1 "observe
+before you attract" rule. Autonomy enforces it by convention; here
+we enforce it by code (`scripts/probe_observables.py`) and by gate
+(this §11).
+
+### 11.2 Ketu ↔ Rahu decomposition
+
+V1 conflated two distinct roles. §11 separates them:
+
+- **Ketu observable (detector).** A deterministic witness
+  function `observe(sources, prompt_tokens, choice_tokens) →
+  ObservableValue` that reports a scalar and optional per-source
+  attribution. It does not make decisions; it only measures. Its
+  only contract is polarity: `higher_means_more_suspicious ∈
+  {True, False}`. Examples: BCVF total cost, per-source cost,
+  source-0 entropy, source argmax-agreement fraction.
+- **Rahu attractor (shaper).** The consumer architecture that
+  translates an observable's signal into trust-weighting or logit
+  modulation. V1's Rahu was TrustShaper's softmin-consensus (§5.1).
+  A Rahu is only built on a Ketu that has passed the probe.
+
+The two are orthogonal: the same Ketu can feed multiple Rahu
+shapes (additive penalty, trust clipping, two-stage veto, etc.);
+the same Rahu shape can consume multiple Ketu signals. V1 tested
+exactly one (Ketu, Rahu) pair and inferred — incorrectly — that
+both components had to change together to fix the regression.
+The §11 discipline tests Ketu in isolation first, which bounds
+what the Rahu is allowed to do.
+
+### 11.3 Four classification bands
+
+The probe harness (`symbolu_bcvf_llm/observables/probe.py`)
+computes the observable's AUC against choice-level correctness
+labels and emits one of four verdicts:
+
+| Band | AUC range | N requirement | Verdict |
+|---|---|---|---|
+| `TRUTH_CORRELATED` | `AUC ≥ 0.60` | `n ≥ 40` | Observable predicts correctness. A Rahu attractor *may* be worth building on it. Does not guarantee success — only unblocks further work. |
+| `UNCORRELATED` | `0.45 ≤ AUC < 0.60` | `n ≥ 40` | Signal is near noise. A Rahu on this collapses to conventional blend at best; inference cost is pure overhead. **Do not build a Rahu.** |
+| `ANTI_CORRELATED` | `AUC < 0.45` | `n ≥ 40` | Signal exists with the *wrong* sign. A Rahu built on this actively hurts accuracy — V1's exact failure mode. **Do not build a Rahu.** |
+| `NULL` | any | `n < 40` | Too few datapoints to classify. Expand N before interpreting. |
+
+Polarity is normalized inside the probe: observables with
+`higher_means_more_suspicious=True` have their scalars negated
+before AUC is computed, so the reported AUC uniformly means
+"higher AUC ⇒ higher truth-predictiveness", regardless of the
+observable's polarity convention.
+
+The 0.60 threshold is deliberately loose. It is a
+*go/no-go-on-building-a-decoder* gate, not a success claim. A
+V2-era observable at AUC 0.62 is worth a bounded Rahu experiment;
+the Rahu itself may still fail. The gate rules out the
+V1-regression class of failure (AUC < 0.45) and the V1-dormant
+class (AUC ≈ 0.5), which together accounted for all of V1's
+observed behavior.
+
+### 11.4 Observables shipped in this section
+
+`symbolu_bcvf_llm/observables/` ships four built-in observables,
+each conformant to the `Observable` Protocol. All are
+deterministic, torch-free where possible, and safe to probe on
+`MockBenchmark` (no GPU, no tokenizer). They are ordered by
+diagnostic power against V1's specific failure mode:
+
+1. **`BCVFSourceZeroCostObservable`** (`bcvf.py`). Per-source BCVF
+   cost at source index 0 (the base decoder). Directly
+   instruments §10.V1.2's "base voted off the island" mechanism
+   — if this observable is `ANTI_CORRELATED`, paraphrase
+   correlation is assigning the base model outsized cost when it
+   is *correct* vs the paraphrase majority. Polarity:
+   `higher = more suspicious`.
+2. **`BCVFTotalCostObservable`** (`bcvf.py`). Sum of all per-pair
+   BCVF costs — the kernel's default global disagreement
+   measure. V1's implicit Ketu. Included for continuity with V1
+   and as a control against (1). Polarity: `higher = more
+   suspicious`.
+3. **`SourceAgreementObservable`** (`agreement.py`). Fraction of
+   lookahead positions where every source's argmax coincides,
+   reported as `1 - agreement_fraction` so polarity aligns with
+   BCVF. A polarity-simpler, kernel-free alternative to BCVF
+   total cost; if BCVF total cost is `UNCORRELATED` but
+   agreement-fraction is `TRUTH_CORRELATED`, the BCVF kernel is
+   not extracting the available signal.
+4. **`Source0EntropyObservable`** (`entropy.py`). Shannon entropy
+   of source 0's next-token distribution at the first lookahead
+   position. Choice-independent. Calibration signal: a model
+   unsure of its own next token is generically less reliable.
+   Polarity: `higher = more suspicious`.
+
+Additional observables (cross-model-disagreement, retrieval-
+grounded contradiction, token-level log-probability gap, etc.)
+are V2-scoped and not shipped here. Adding a new observable is
+one file implementing the Protocol; the probe harness picks it up
+by name.
+
+### 11.5 Probe harness
+
+`symbolu_bcvf_llm/observables/probe.py` provides:
+
+- `probe_observable(obs, benchmark, max_questions=None,
+  retain_datapoints=True) → ProbeReport`. Runs `obs.observe(...)`
+  over every (question, choice) in the benchmark subset, applies
+  polarity normalization, computes Pearson r, Spearman ρ, AUC,
+  class-conditional means, and returns a classified report with
+  human-readable recommendation text.
+- `probe_observables_parallel(obs_list, benchmark, max_questions,
+  retain_datapoints=False) → {name: ProbeReport}`. Same, but for
+  multiple observables in a single pass over the benchmark.
+  Sources are reconstructed per-observable per-(Q, C) to preserve
+  independence when observables have side effects on source
+  state.
+
+CLI: `scripts/probe_observables.py`. Defaults to
+`--benchmark mock --num-questions 48` (no GPU required). With
+`--benchmark truthfulqa` it loads TruthfulQA-MC via the §6.2
+benchmark adapter with the fixed paraphrase pipeline from
+§10.V1.6. Output is a Markdown report in
+`docs/experiments/probe_observables_<benchmark>_<suffix>.md`.
+
+Correlation primitives (`_pearson_r`, `_spearman_rho`,
+`_roc_auc`, `_rankdata`) are implemented in pure NumPy to avoid
+a scipy dependency on the probe path.
+
+### 11.6 Gate — what §11 enforces
+
+**§11 gate (binding for any future decoder work beyond V1).**
+
+Before a V2 decoder is built on any observable `X`:
+
+1. `X` must conform to the `Observable` Protocol.
+2. `X` must be probed by `probe_observable` on a benchmark subset
+   with `n_datapoints ≥ 40`.
+3. The returned `ProbeReport.classification` must be
+   `TRUTH_CORRELATED` (AUC ≥ 0.60).
+4. The probe report must be checked into
+   `docs/experiments/probe_observables_*.md` alongside the design
+   note that cites it.
+
+If `(3)` fails, the observable is shelved or redesigned. A Rahu
+attractor is not permitted on a non-passing observable. This is
+the V1 lesson encoded: the observable gate is the cheap check;
+the decoder run is the expensive confirmation. Do the cheap check
+first, always.
+
+Retrospective application to V1: a §11 probe of
+`BCVFSourceZeroCostObservable` on TruthfulQA-MC N=48 with the
+fixed paraphrase pipeline would have returned `ANTI_CORRELATED`
+or `UNCORRELATED` and blocked the V1 full run at the gate —
+saving ~4 GPU-hours and producing the same epistemic output
+(V1 configuration is not viable). §11 makes that path the
+default path, not the accident of post-hoc analysis.
+
+### 11.7 What §11 does NOT claim
+
+- §11 does not claim any observable listed in §11.4 will pass
+  its own probe. Running the probe is the §11 deliverable; the
+  verdicts are empirical and reported per-observable in the
+  check-in report.
+- §11 does not replace §10.V1 falsification. A passing probe
+  (AUC ≥ 0.60) is necessary but not sufficient for a V2 decoder
+  to yield PASS; the §10 PASS/NULL/REGRESSION classification
+  still governs decoder-level verdicts.
+- §11 does not specify the Rahu shape. Trust-shaping (§5.1),
+  additive penalty, veto, two-stage filter are all permitted
+  Rahu choices *conditional on* the Ketu passing §11.3.
+- §11 does not authorize threshold tuning on the probe output.
+  The 0.60 / 0.45 bands are pre-committed; moving them after
+  seeing probe data is the same §0.8 discipline violation §10
+  codified.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._

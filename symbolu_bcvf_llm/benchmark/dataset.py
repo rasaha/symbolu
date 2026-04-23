@@ -206,7 +206,9 @@ class MockBenchmark:
             cfg = _MockQuestionConfig(policy=policy)
 
             q = Question(
-                prompt_tokens=[0, 1],  # placeholder short prompt
+                # Unique per-question prompt so downstream observables /
+                # probes can disambiguate questions by their prompt.
+                prompt_tokens=[0, 1, q_idx],
                 choices=[
                     f"choice_correct_{correct_token}",
                     f"choice_distractor_{distractor_token}",
