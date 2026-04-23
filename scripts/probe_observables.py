@@ -45,6 +45,7 @@ from symbolu_bcvf_llm.observables import (  # noqa: E402
     CoherenceAnchoredBCVFPerStepObservable,
     Source0EntropyObservable,
     SourceAgreementObservable,
+    UncertaintyGatedBCVFPerStepMaxObservable,
     probe_observables_parallel,
 )
 
@@ -59,6 +60,7 @@ def build_observables():
         BCVFSourceZeroPerStepMaxObservable(),
         CoherenceAnchoredBCVFObservable(),
         CoherenceAnchoredBCVFPerStepObservable(),
+        UncertaintyGatedBCVFPerStepMaxObservable(),
     ]
 
 

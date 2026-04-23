@@ -46,6 +46,7 @@ from .coherence import (
 )
 from .entropy import Source0EntropyObservable
 from .probe import probe_observable, probe_observables_parallel
+from .uncertainty_gated import UncertaintyGatedBCVFPerStepMaxObservable
 
 __all__ = [
     "BCVFPerStepMaxObservable",
@@ -60,6 +61,7 @@ __all__ = [
     "ProbeReport",
     "Source0EntropyObservable",
     "SourceAgreementObservable",
+    "UncertaintyGatedBCVFPerStepMaxObservable",
     "classify_observable",
     "probe_observable",
     "probe_observables_parallel",
