@@ -40,6 +40,7 @@ from .bcvf_per_step import (
     BCVFPerStepMaxObservable,
     BCVFSourceZeroPerStepMaxObservable,
 )
+from .coherence import CoherenceAnchoredBCVFObservable
 from .entropy import Source0EntropyObservable
 from .probe import probe_observable, probe_observables_parallel
 
@@ -48,6 +49,7 @@ __all__ = [
     "BCVFSourceZeroCostObservable",
     "BCVFSourceZeroPerStepMaxObservable",
     "BCVFTotalCostObservable",
+    "CoherenceAnchoredBCVFObservable",
     "Observable",
     "ObservableValue",
     "ProbeDatapoint",

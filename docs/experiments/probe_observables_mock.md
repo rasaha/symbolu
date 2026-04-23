@@ -2,7 +2,7 @@
 
 - **Benchmark:** `mock`
 - **Questions probed:** 48
-- **Observables tested:** 6
+- **Observables tested:** 7
 
 ## Verdict summary
 
@@ -14,6 +14,7 @@
 | `source_disagreement_fraction` | 0.500 | **UNCORRELATED** | 0.6000 | 0.6000 |
 | `bcvf_per_step_max` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
 | `bcvf_source_0_per_step_max` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
+| `coherence_anchored_bcvf` | 0.333 | **ANTI_CORRELATED** | 0.3333 | 0.3810 |
 
 ## Per-observable detail
 
@@ -94,6 +95,19 @@
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
+
+### `coherence_anchored_bcvf`
+
+- **AUC:** 0.333  (higher AUC = observable predicts correctness better)
+- **Pearson r:** -0.052
+- **Spearman ρ:** -0.301
+- **Polarity:** higher = more trusted
+- **Mean scalar when correct:** 0.3333
+- **Mean scalar when wrong:** 0.3810
+- **N datapoints:** 96 (from 48 questions)
+- **Classification:** **`ANTI_CORRELATED`**
+
+**Recommendation:** AUC=0.333 < 0.45 — observable has signal with the WRONG sign. A conventional trust-shaped attractor on this would ACTIVELY HURT accuracy. Options: flip the observable's sign, reject it, or verify with a larger N.
 
 
 ## Discipline — what this report means
