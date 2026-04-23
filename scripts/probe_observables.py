@@ -124,7 +124,9 @@ def main(argv=None) -> int:
         description="§11 probe candidate Ketu observables vs benchmark ground truth."
     )
     parser.add_argument(
-        "--benchmark", choices=("mock", "truthfulqa"), default="mock",
+        "--benchmark",
+        choices=("mock", "truthfulqa", "halueval"),
+        default="mock",
     )
     parser.add_argument(
         "--num-questions", type=int, default=48,
@@ -165,8 +167,13 @@ def main(argv=None) -> int:
     if args.benchmark == "mock":
         bench = MockBenchmark(num_questions=args.num_questions, seed=args.seed)
     else:
-        from symbolu_bcvf_llm.benchmark.dataset import TruthfulQABenchmark
-        bench = TruthfulQABenchmark(
+        if args.benchmark == "truthfulqa":
+            from symbolu_bcvf_llm.benchmark.dataset import TruthfulQABenchmark
+            bench_cls = TruthfulQABenchmark
+        else:  # halueval
+            from symbolu_bcvf_llm.benchmark.dataset import HaluEvalBenchmark
+            bench_cls = HaluEvalBenchmark
+        bench = bench_cls(
             model_name=args.model,
             max_questions=args.num_questions,
             compile_model=not args.no_compile,

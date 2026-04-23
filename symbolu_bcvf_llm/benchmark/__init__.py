@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from .dataset import (
     Benchmark,
+    HaluEvalBenchmark,
     MockBenchmark,
     Question,
     TruthfulQABenchmark,
@@ -44,6 +45,7 @@ __all__ = [
     "BenchmarkRunResult",
     "LatencyStats",
     "McNemarResult",
+    "HaluEvalBenchmark",
     "MockBenchmark",
     "PhaseSixVerdict",
     "Question",
