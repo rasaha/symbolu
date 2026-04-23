@@ -37,7 +37,9 @@ if str(_REPO_ROOT) not in sys.path:
 
 from symbolu_bcvf_llm.benchmark.dataset import MockBenchmark  # noqa: E402
 from symbolu_bcvf_llm.observables import (  # noqa: E402
+    BCVFPerStepMaxObservable,
     BCVFSourceZeroCostObservable,
+    BCVFSourceZeroPerStepMaxObservable,
     BCVFTotalCostObservable,
     Source0EntropyObservable,
     SourceAgreementObservable,
@@ -51,6 +53,8 @@ def build_observables():
         BCVFSourceZeroCostObservable(),
         Source0EntropyObservable(),
         SourceAgreementObservable(),
+        BCVFPerStepMaxObservable(),
+        BCVFSourceZeroPerStepMaxObservable(),
     ]
 
 

@@ -2,7 +2,7 @@
 
 - **Benchmark:** `mock`
 - **Questions probed:** 48
-- **Observables tested:** 4
+- **Observables tested:** 6
 
 ## Verdict summary
 
@@ -12,6 +12,8 @@
 | `bcvf_source_0_cost` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
 | `source_0_entropy` | 0.500 | **UNCORRELATED** | 0.0000 | 0.0000 |
 | `source_disagreement_fraction` | 0.500 | **UNCORRELATED** | 0.6000 | 0.6000 |
+| `bcvf_per_step_max` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
+| `bcvf_source_0_per_step_max` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
 
 ## Per-observable detail
 
@@ -62,6 +64,32 @@
 - **Polarity:** higher = more suspicious
 - **Mean scalar when correct:** 0.6000
 - **Mean scalar when wrong:** 0.6000
+- **N datapoints:** 96 (from 48 questions)
+- **Classification:** **`UNCORRELATED`**
+
+**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
+
+### `bcvf_per_step_max`
+
+- **AUC:** 0.500  (higher AUC = observable predicts correctness better)
+- **Pearson r:** +0.000
+- **Spearman ρ:** +0.000
+- **Polarity:** higher = more suspicious
+- **Mean scalar when correct:** 2.0000
+- **Mean scalar when wrong:** 2.0000
+- **N datapoints:** 96 (from 48 questions)
+- **Classification:** **`UNCORRELATED`**
+
+**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
+
+### `bcvf_source_0_per_step_max`
+
+- **AUC:** 0.500  (higher AUC = observable predicts correctness better)
+- **Pearson r:** +0.000
+- **Spearman ρ:** +0.000
+- **Polarity:** higher = more suspicious
+- **Mean scalar when correct:** 2.0000
+- **Mean scalar when wrong:** 2.0000
 - **N datapoints:** 96 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
