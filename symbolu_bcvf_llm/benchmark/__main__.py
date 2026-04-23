@@ -170,7 +170,9 @@ def _build_parser() -> argparse.ArgumentParser:
         description="§6 Phase 4 — three-decoder benchmark sweep"
     )
     parser.add_argument(
-        "--benchmark", choices=("mock", "truthfulqa"), default="mock",
+        "--benchmark",
+        choices=("mock", "truthfulqa", "halueval"),
+        default="mock",
         help="which benchmark to run",
     )
     parser.add_argument(
@@ -250,6 +252,13 @@ def _build_parser() -> argparse.ArgumentParser:
              "automatic pipeline-version check that normally rejects "
              "stale caches.",
     )
+    parser.add_argument(
+        "--paraphraser-model", type=str, default=None,
+        help="HF model name to use for paraphrase generation (truthfulqa "
+             "+ halueval only). Defaults to --model (same-model V1 "
+             "configuration). Set to a different model for cross-model "
+             "source ensemble (§10.V1.3 Experiment A).",
+    )
     return parser
 
 
@@ -310,17 +319,25 @@ def main(argv: List[str] | None = None) -> int:
             logger.info("Instantiating MockBenchmark(num_questions=%d)", n)
             bench = MockBenchmark(num_questions=n, seed=args.seed)
         else:  # pragma: no cover — real benchmark path not exercised here
+            if args.benchmark == "halueval":
+                from .dataset import HaluEvalBenchmark as _BenchCls
+                effective_split = "data"
+            else:
+                from .dataset import TruthfulQABenchmark as _BenchCls
+                effective_split = args.split
+
             logger.info(
-                "Instantiating TruthfulQABenchmark(model=%s, split=%s, "
-                "max_questions=%s, use_paraphrase=%s)",
-                args.model, args.split, args.num_questions,
+                "Instantiating %s(model=%s, split=%s, "
+                "max_questions=%s, use_paraphrase=%s, paraphraser=%s)",
+                _BenchCls.__name__,
+                args.model, effective_split, args.num_questions,
                 not args.no_paraphrase,
+                args.paraphraser_model or args.model,
             )
             t_load = time.perf_counter()
-            from .dataset import TruthfulQABenchmark
 
-            # Resolve default paraphrase-cache path: per model + split
-            # so two models' caches never collide. Disabled by
+            # Resolve default paraphrase-cache path: per (base, paraphraser,
+            # split) so cross-model caches never collide. Disabled by
             # --no-paraphrase-cache-file.
             if args.no_paraphrase_cache_file:
                 cache_file = None
@@ -328,9 +345,14 @@ def main(argv: List[str] | None = None) -> int:
                 cache_file = args.paraphrase_cache_file
             else:
                 model_slug = args.model.replace("/", "_").replace(":", "_")
+                paraphraser_slug = (
+                    (args.paraphraser_model or args.model)
+                    .replace("/", "_").replace(":", "_")
+                )
                 cache_file = (
                     args.out_dir
-                    / f"paraphrase_cache_{model_slug}__{args.split}.json"
+                    / f"paraphrase_cache_{model_slug}__{paraphraser_slug}__"
+                      f"{effective_split}.json"
                 )
             if cache_file is not None:
                 if args.clear_paraphrase_cache and cache_file.exists():
@@ -348,15 +370,16 @@ def main(argv: List[str] | None = None) -> int:
                 logger.info("Paraphrase cache file: %s (exists=%s)",
                             cache_file, cache_file.exists())
 
-            bench = TruthfulQABenchmark(
+            bench = _BenchCls(
                 model_name=args.model,
-                split=args.split,
+                split=effective_split,
                 max_questions=args.num_questions,
                 use_paraphrase=not args.no_paraphrase,
                 compile_model=not args.no_compile,
                 compile_dynamic=not args.no_compile_dynamic,
                 paraphrase_cache_file=cache_file,
                 evaluation_seed=args.seed,
+                paraphraser_model_name=args.paraphraser_model,
             )
             logger.info(
                 "Model + dataset loaded in %.1f s", time.perf_counter() - t_load

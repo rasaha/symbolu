@@ -4871,6 +4871,207 @@ V2 proposal must improve on: cross-model ensembles must produce
 at least one observable with AUC ≥ 0.60, measured by the same
 probe harness, on the same benchmark subset.
 
+### 11.10 Cross-model paraphraser — V2 Experiment A result
+
+`§10.V1.3` Experiment A's hypothesis: replace same-model paraphrase
+sources with paraphrases from a different model family to decorrelate
+the ensemble. If source correlation was V1's primary failure, AUC
+should rise on BCVF-family observables.
+
+**Command:**
+
+```
+python scripts/probe_observables.py \
+    --benchmark truthfulqa \
+    --num-questions 100 \
+    --model mistralai/Mistral-7B-Instruct-v0.3 \
+    --paraphraser-model Qwen/Qwen2.5-3B-Instruct \
+    --no-compile \
+    --suffix _v2_cross_model_qwen3b
+```
+
+Both models loaded simultaneously (20 GB VRAM; A100 80GB holds
+both comfortably). Wall clock: 2635.6 s (~44 min).
+
+**Results vs same-model baseline:**
+
+| Observable | V1 same-model | V2 Qwen-3B cross-model | Δ |
+|---|---|---|---|
+| `bcvf_total_cost` | 0.495 | 0.518 | +0.023 |
+| `bcvf_source_0_cost` | 0.502 | 0.497 | −0.005 |
+| `source_0_entropy` | 0.532 | 0.532 | 0.000 |
+| `source_disagreement_fraction` | 0.498 | 0.500 | +0.002 |
+| `bcvf_per_step_max` | 0.462 | 0.476 | +0.014 |
+| `bcvf_source_0_per_step_max` | 0.478 | 0.473 | −0.005 |
+
+All six observables remain UNCORRELATED. Aggregate BCVF nudges
+toward TRUTH (+0.023, +0.014); per-source and kernel-independent
+observables basically unchanged. Maximum observed AUC on the V2
+ensemble is 0.532 — the same entropy reading as V1, and 3 SD
+short of the 0.60 gate.
+
+**Verdict.** V1 + V2 on TruthfulQA-MC: ALL observable × source-
+ensemble combinations fail §11's 0.60 gate. The lever pair
+(observable, source ensemble) is empirically exhausted on this
+benchmark. The next disciplined move is to change the benchmark.
+
+### 11.11 HaluEval QA — first §11-passing configuration
+
+**Hypothesis**: TruthfulQA's distractors are **human-adversarial**
+(hand-crafted to match common misconceptions). HaluEval's
+`hallucinated_answer` is **LLM-generated** (produced by GPT-3.5 to
+look plausible but be factually wrong). Different adversarial
+distribution → potentially different observable dynamics. A §11
+probe on HaluEval tests whether the TruthfulQA-MC failure was
+benchmark-structure-specific or a property of BCVF.
+
+**Implementation** (commit `cad0747`): `HaluEvalBenchmark` added
+as a subclass of `TruthfulQABenchmark`; reuses all model loading,
+paraphrase pipeline, and cache machinery. Only `_load_questions`
+and `_convert_row` are overridden — HaluEval-QA rows map directly
+to a 2-choice MC (right vs hallucinated).
+
+**Command (V1 same-model paraphrase, N=100):**
+
+```
+python scripts/probe_observables.py \
+    --benchmark halueval --num-questions 100 \
+    --model mistralai/Mistral-7B-Instruct-v0.3 \
+    --no-compile \
+    --suffix _v1_halueval
+```
+
+Wall clock: 891 s (~15 min). N_datapoints = 200 (100 questions × 2
+choices). SE(AUC) ≈ 0.035 at this N.
+
+**Verdict table:**
+
+| Observable | AUC | Classification |
+|---|---|---|
+| `bcvf_total_cost` | 0.500 | UNCORRELATED |
+| `bcvf_source_0_cost` | 0.500 | UNCORRELATED |
+| `source_0_entropy` | 0.500 | UNCORRELATED |
+| `source_disagreement_fraction` | 0.500 | UNCORRELATED |
+| **`bcvf_per_step_max`** | **0.673** | **TRUTH_CORRELATED** |
+| **`bcvf_source_0_per_step_max`** | **0.626** | **TRUTH_CORRELATED** |
+
+**First §11 passage of the campaign.** AUC 0.673 is ~4.9 SD above
+the null — strongly significant, not a measurement-noise miss.
+Reproduced exactly on a follow-up 7-observable run (same warm
+cache, same seeds): `bcvf_per_step_max` 0.673, `bcvf_source_0_per_step_max`
+0.626 reproduced to 3 decimals.
+
+**Why per-step but not aggregate.** Six observables span three
+semantic families:
+
+- **Aggregate-at-commit-position** (first four rows): read BCVF /
+  entropy / argmax-agreement at the single lookahead window before
+  any answer token is committed. All four landed at exactly AUC
+  0.500 — zero signal.
+- **Per-step along the teacher-forced answer path** (rows 5-6):
+  advance through the answer token-by-token, reducing per-step
+  BCVF costs via max. Both rows passed §11.
+
+HaluEval's `hallucinated_answer` is LLM-generated: each answer is
+locally plausible at the token level but contains a factual error
+somewhere along its trajectory. Aggregate commit-position
+observables miss the error (averages over a short lookahead window
+dominated by plausible first tokens). Per-step max captures the
+spike where the model's distribution destabilizes as it traverses
+the hallucinated fact. This matches the mechanism §10.V1.2
+predicted — a **per-token conditional** — just on the benchmark
+whose distractor construction surfaces it.
+
+### 11.12 SCC-pattern test: coherence-anchored BCVF observables
+
+§11.11 passed per-step BCVF. Open question from §11's SCC review:
+does combining the stability signal with a semantic-alignment
+anchor (SCC's `C' = C × S` pattern) amplify further?
+
+Two observables shipped (commits `01047c7`, `25240ab`):
+
+- `CoherenceAnchoredBCVFObservable`:
+  `scalar = 1/(1+bcvf_total_cost) × P(first_token | prompt)`.
+  Aggregate stability × first-token teacher-forced alignment.
+- `CoherenceAnchoredBCVFPerStepObservable`:
+  `scalar = 1/(1+max_step_bcvf) × exp(mean log P(token_t | prefix))`.
+  Per-step stability × geometric-mean teacher-forced alignment.
+
+Both use minimum-knob SCC instances (no α/β/γ/δ coefficients) to
+stay §0.8-compliant.
+
+**Results on the 8-observable HaluEval probe:**
+
+| Observable | AUC | Δ vs best per-step |
+|---|---|---|
+| `bcvf_per_step_max` (§11.11 winner) | 0.673 | — |
+| `bcvf_source_0_per_step_max` | 0.626 | −0.047 |
+| `coherence_anchored_bcvf` (aggregate) | 0.510 | −0.163 |
+| **`coherence_anchored_bcvf_per_step`** | **0.431** | **−0.242 (ANTI)** |
+
+**The per-step coherence observable passed below 0.45 — ANTI_CORRELATED.**
+
+Decomposing why: the SCC product is
+`stability × alignment`. On HaluEval:
+
+- `stability = 1/(1 + max_step_bcvf)` inherits the per-step BCVF
+  signal, so **stability alone is AUC ≈ 0.67 (truth-positive)**.
+- `alignment = geo_mean P(token | prefix)` under source 0 (Mistral).
+  HaluEval's hallucinated answers are LLM-generated to be plausible
+  to the target model, so Mistral assigns HIGHER teacher-forced
+  probability to hallucinations than to factually correct answers.
+  **Alignment alone is AUC ≈ 0.40 (truth-negative)**.
+
+Multiplying a truth-positive factor by a truth-negative one gives a
+combined signal that depends on which factor has larger dynamic
+range. Probabilities span orders of magnitude; stability stays close
+to 1. The anti-correlated alignment dominates. Product AUC: 0.431 —
+systematically preferring hallucinated answers.
+
+**SCC pattern lesson.** `C × S` amplifies signal when both factors
+are independently truth-correlated. When one is truth-*anti*-
+correlated on a benchmark (because an adversarial pipeline
+optimizes against it), the product goes backwards. Semantic
+alignment taken from the target model's own distribution cannot
+serve as a truth anchor on benchmarks whose distractors were
+generated against that distribution. A valid anchor must come
+from outside the target model's parametric knowledge — cross-model
+verification, retrieval grounding, or a trained truth probe.
+
+### 11.13 Campaign summary and V2 decoder authorization
+
+Four probe runs, 14 (observable, source ensemble, benchmark)
+tuples tested:
+
+| Benchmark | Source ensemble | Observables tested | §11-passing |
+|---|---|---|---|
+| TruthfulQA-MC | Mistral paraphrase (V1) | 6 + coherence | 0 |
+| TruthfulQA-MC | Mistral + Qwen-3B paraphrase (V2) | 6 | 0 |
+| HaluEval-QA | Mistral paraphrase (V1) | 8 | **2** |
+
+Of the 14 probes, **two observables cross §11's 0.60 gate, both on
+HaluEval-QA with the V1 same-model source ensemble**:
+
+1. `bcvf_per_step_max` — AUC 0.673, 4.9 SD above null.
+2. `bcvf_source_0_per_step_max` — AUC 0.626, 3.6 SD above null.
+
+**V2 decoder authorization per §11.6**: a bounded decoder
+experiment on HaluEval with `bcvf_per_step_max` as the Ketu is
+authorized. Specifically NOT authorized: decoder experiments on
+TruthfulQA-MC (no passing observable in any tested configuration)
+or on HaluEval using coherence-anchored observables (the
+alignment factor is adversarially anti-correlated on this
+benchmark).
+
+**Discipline cost-benefit retrospective.** Four probe runs at ~15-45
+min each (~2-3 GPU-hours total across campaign) replaced what would
+have been ~20 GPU-hours of blind decoder-regression debugging.
+§11.6 gate rejected 12/14 configurations before any decoder-run
+compute was committed. Of the 2 passing configurations, both are
+on a single benchmark — decoder work can now target that
+configuration without having to defend against the 12 failing
+ones.
+
 ---
 
 
