@@ -22,7 +22,9 @@ of integer token IDs. ``MockBenchmark`` fabricates these directly;
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -204,7 +206,9 @@ class MockBenchmark:
             cfg = _MockQuestionConfig(policy=policy)
 
             q = Question(
-                prompt_tokens=[0, 1],  # placeholder short prompt
+                # Unique per-question prompt so downstream observables /
+                # probes can disambiguate questions by their prompt.
+                prompt_tokens=[0, 1, q_idx],
                 choices=[
                     f"choice_correct_{correct_token}",
                     f"choice_distractor_{distractor_token}",
@@ -308,6 +312,11 @@ class TruthfulQABenchmark:
         L: int = 5,
         use_paraphrase: bool = True,
         paraphrase_max_new_tokens: int = 128,
+        compile_model: bool = True,
+        compile_dynamic: bool = True,
+        paraphrase_cache_file: Optional["Path"] = None,
+        evaluation_seed: int = 1,
+        rewrite_seed_pair: Optional[Tuple[int, int]] = None,
     ) -> None:
         try:
             import torch  # noqa: F401
@@ -322,17 +331,142 @@ class TruthfulQABenchmark:
 
         from transformers import AutoModelForCausalLM, AutoTokenizer
         from datasets import load_dataset
+        import torch
+
+        # Enable TF32 matmul on Ampere+ (A100/H100 tensor cores). PyTorch
+        # 2.x defaults to 'highest' (strict fp32); 'high' allows TF32 which
+        # has fp32 range + fp19 precision — plenty for LM inference, gives
+        # ~1.5-2× additional matmul speedup on Ampere. This is the
+        # warning PyTorch emits at compile time if you don't set it.
+        # Safe global setting; no effect on non-Ampere hardware.
+        try:
+            torch.set_float32_matmul_precision("high")
+        except Exception:  # pragma: no cover
+            pass
 
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._model = AutoModelForCausalLM.from_pretrained(
             model_name, torch_dtype="auto", device_map="auto"
         )
+        self._model.eval()
+
+        # torch.compile gives ~2-3× speedup on Ampere+ for the forward
+        # pass. dynamic=True avoids recompilation on every seq-length
+        # change (teacher-forcing produces variable shapes). Wrapped in
+        # try/except with graceful fallback so a compile failure doesn't
+        # abort the benchmark — the uncompiled model still works.
+        self._compile_status: str = "disabled"
+        if compile_model:
+            try:
+                self._model = torch.compile(
+                    self._model, dynamic=bool(compile_dynamic)
+                )
+                self._compile_status = (
+                    f"compiled (dynamic={bool(compile_dynamic)})"
+                )
+            except Exception as exc:  # pragma: no cover — compile-env-specific
+                self._compile_status = f"skipped: {type(exc).__name__}: {exc}"
+
         self.vocab_size = int(self._tokenizer.vocab_size)
         self.L = L
         self.eos_token_id = int(self._tokenizer.eos_token_id)
         self._use_paraphrase = bool(use_paraphrase)
         self._paraphrase_max_new_tokens = int(paraphrase_max_new_tokens)
         self._model_name = model_name
+        self._split = split
+
+        # §1.10 replication requires seed 2 to use *different* paraphrases
+        # than seed 1 so the verdict is tested against a different source
+        # triple. Map evaluation_seed N → rewrite_seed_pair (2N-1, 2N):
+        #   seed 1 → (1, 2)  ← what the hardcoded pre-fix code used
+        #   seed 2 → (3, 4)
+        #   seed N → (2N-1, 2N)
+        # For backward compat, evaluation_seed 0 maps to (1, 2) same as 1.
+        # An explicit rewrite_seed_pair override wins over the derivation.
+        if rewrite_seed_pair is not None:
+            pair = tuple(int(s) for s in rewrite_seed_pair)
+            if len(pair) != 2 or pair[0] == pair[1]:
+                raise ValueError(
+                    f"rewrite_seed_pair must be two distinct ints, got {pair}"
+                )
+            self._rewrite_seed_pair: Tuple[int, int] = pair  # type: ignore
+        else:
+            base = max(int(evaluation_seed), 1)
+            self._rewrite_seed_pair = (2 * base - 1, 2 * base)
+        self._evaluation_seed = int(evaluation_seed)
+
+        # Paraphrase cache: (question_row_id, rewrite_seed) -> paraphrased prompt.
+        # Paraphrases are deterministic given (model, prompt, seed) at
+        # temperature 0, so computing them once per question and reusing
+        # across the ~15 make_sources invocations per question cuts the
+        # per-seed paraphrase cost by ~15×.
+        #
+        # If `paraphrase_cache_file` is given, the cache is also
+        # persisted to disk so subsequent runs (e.g., seed-2) start with
+        # a fully-populated cache and skip the ~20 min paraphrase cost.
+        # Cache file is keyed by (model_name, split) — mismatches are
+        # rejected so we never serve stale paraphrases for a different
+        # model.
+        self._paraphrase_cache: Dict[Tuple[int, int], str] = {}
+        self._paraphrase_hits = 0
+        self._paraphrase_misses = 0
+        self._paraphrase_cache_file: Optional[Path] = (
+            Path(paraphrase_cache_file)
+            if paraphrase_cache_file is not None else None
+        )
+        self._paraphrase_cache_loaded = 0
+        self._paraphrase_cache_discarded_reason: Optional[str] = None
+        if self._paraphrase_cache_file is not None and (
+            self._paraphrase_cache_file.exists()
+        ):
+            from symbolu_bcvf_llm.sources.paraphrase import (
+                paraphrase_pipeline_version,
+            )
+
+            current_version = paraphrase_pipeline_version()
+            try:
+                with open(self._paraphrase_cache_file) as fh:
+                    payload = json.load(fh)
+                cached_version = payload.get("paraphrase_pipeline_version")
+                model_ok = payload.get("model_name") == model_name
+                split_ok = payload.get("split") == split
+                version_ok = cached_version == current_version
+
+                if model_ok and split_ok and version_ok:
+                    for k, v in payload.get("entries", {}).items():
+                        row_str, seed_str = k.split("__", 1)
+                        self._paraphrase_cache[(int(row_str), int(seed_str))] = v
+                    self._paraphrase_cache_loaded = len(self._paraphrase_cache)
+                else:
+                    # Record WHY the cache was discarded — logged by the CLI
+                    # so the user sees when a stale cache was rejected. This
+                    # is the auto-detect behavior that replaces the manual
+                    # `rm` step.
+                    reasons = []
+                    if not model_ok:
+                        reasons.append(
+                            f"model_name mismatch "
+                            f"(cache={payload.get('model_name')}, "
+                            f"current={model_name})"
+                        )
+                    if not split_ok:
+                        reasons.append(
+                            f"split mismatch "
+                            f"(cache={payload.get('split')}, current={split})"
+                        )
+                    if not version_ok:
+                        reasons.append(
+                            f"paraphrase_pipeline_version mismatch "
+                            f"(cache={cached_version or 'missing'}, "
+                            f"current={current_version})"
+                        )
+                    self._paraphrase_cache_discarded_reason = "; ".join(reasons)
+            except Exception as exc:  # pragma: no cover — corrupt cache
+                self._paraphrase_cache = {}
+                self._paraphrase_cache_loaded = 0
+                self._paraphrase_cache_discarded_reason = (
+                    f"load error: {type(exc).__name__}: {exc}"
+                )
 
         ds = load_dataset("truthful_qa", "multiple_choice", split=split)
         if max_questions is not None:
@@ -377,24 +511,89 @@ class TruthfulQABenchmark:
     def questions(self) -> Sequence[Question]:
         return tuple(self._questions)
 
+    def _get_or_create_paraphrase(
+        self,
+        row_id: int,
+        base_prompt: str,
+        rewrite_seed: int,
+    ) -> str:
+        """Cached paraphrase lookup keyed by `(row_id, rewrite_seed)`.
+
+        Paraphrases are deterministic at temperature 0 given (model,
+        prompt, seed), so the same question+seed always yields the
+        same rewrite. Computing once per (question, seed) and reusing
+        across the ~15 `make_sources` calls per question saves ~13×
+        of the paraphrase-generation cost.
+
+        If a `paraphrase_cache_file` is configured, every cache miss
+        also writes the updated cache to disk so a subsequent run
+        (seed 2, replication) loads a fully-populated cache and skips
+        paraphrase generation entirely.
+        """
+        from symbolu_bcvf_llm.sources.paraphrase import make_paraphrased_prompt
+
+        key = (int(row_id), int(rewrite_seed))
+        if key in self._paraphrase_cache:
+            self._paraphrase_hits += 1
+            return self._paraphrase_cache[key]
+        self._paraphrase_misses += 1
+        para = make_paraphrased_prompt(
+            self._model, self._tokenizer, base_prompt,
+            rewrite_seed=rewrite_seed,
+            max_new_tokens=self._paraphrase_max_new_tokens,
+        )
+        self._paraphrase_cache[key] = para
+        self._persist_paraphrase_cache()
+        return para
+
+    def _persist_paraphrase_cache(self) -> None:
+        """Atomic-ish JSON dump of the paraphrase cache. No-op if no
+        cache file is configured. Tolerates errors — disk write is
+        a performance optimization, not correctness-critical.
+
+        Includes `paraphrase_pipeline_version` so that future reads
+        refuse to load entries generated by a different template /
+        cleaner. Prevents the class of bug where V1's corrupted
+        paraphrases silently feed a V2 benchmark run.
+        """
+        if self._paraphrase_cache_file is None:
+            return
+        from symbolu_bcvf_llm.sources.paraphrase import (
+            paraphrase_pipeline_version,
+            PARAPHRASE_VERSION_TAG,
+        )
+
+        payload = {
+            "model_name": self._model_name,
+            "split": self._split,
+            "paraphrase_pipeline_version": paraphrase_pipeline_version(),
+            "paraphrase_version_tag": PARAPHRASE_VERSION_TAG,
+            "entries": {
+                f"{row}__{seed}": text
+                for (row, seed), text in self._paraphrase_cache.items()
+            },
+        }
+        try:
+            self._paraphrase_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._paraphrase_cache_file.with_suffix(
+                self._paraphrase_cache_file.suffix + ".tmp"
+            )
+            tmp.write_text(json.dumps(payload, indent=2))
+            tmp.replace(self._paraphrase_cache_file)
+        except Exception:  # pragma: no cover — disk error, in-memory cache unaffected
+            pass
+
     def make_sources(self, question: Question) -> List[Source]:
         from symbolu_bcvf_llm.sources.huggingface import HuggingFaceSource
-        from symbolu_bcvf_llm.sources.paraphrase import make_paraphrased_prompt
 
         base_prompt = self._tokenizer.decode(
             question.prompt_tokens, skip_special_tokens=True
         )
         if self._use_paraphrase:
-            para_a = make_paraphrased_prompt(
-                self._model, self._tokenizer, base_prompt,
-                rewrite_seed=1,
-                max_new_tokens=self._paraphrase_max_new_tokens,
-            )
-            para_b = make_paraphrased_prompt(
-                self._model, self._tokenizer, base_prompt,
-                rewrite_seed=2,
-                max_new_tokens=self._paraphrase_max_new_tokens,
-            )
+            row_id = int(question.metadata.get("truthfulqa_row_id", -1))
+            seed_a, seed_b = self._rewrite_seed_pair
+            para_a = self._get_or_create_paraphrase(row_id, base_prompt, seed_a)
+            para_b = self._get_or_create_paraphrase(row_id, base_prompt, seed_b)
             prompts = [base_prompt, para_a, para_b]
         else:
             # Smoke mode: three identical prompts. Exercises the
@@ -407,3 +606,31 @@ class TruthfulQABenchmark:
             HuggingFaceSource(self._model, self._tokenizer, p, L=self.L)
             for p in prompts
         ]
+
+    @property
+    def paraphrase_cache_stats(self) -> Dict[str, Any]:
+        """Diagnostic: cache hit / miss counts. Useful for verifying
+        the 15× expected speedup is actually materializing."""
+        return {
+            "hits": int(self._paraphrase_hits),
+            "misses": int(self._paraphrase_misses),
+            "entries": int(len(self._paraphrase_cache)),
+            "loaded_from_disk": int(self._paraphrase_cache_loaded),
+            "persisted_to": (
+                str(self._paraphrase_cache_file)
+                if self._paraphrase_cache_file is not None else None
+            ),
+            "rewrite_seed_pair": list(self._rewrite_seed_pair),
+            "discarded_reason": self._paraphrase_cache_discarded_reason,
+        }
+
+    @property
+    def rewrite_seed_pair(self) -> Tuple[int, int]:
+        """§1.10 replication: the two paraphrase rewrite seeds used
+        by this benchmark instance. Seed 1 → (1, 2); seed 2 → (3, 4)."""
+        return self._rewrite_seed_pair
+
+    @property
+    def compile_status(self) -> str:
+        """`disabled` / `compiled (dynamic=...)` / `skipped: <reason>`."""
+        return self._compile_status

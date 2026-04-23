@@ -50,31 +50,59 @@ from .metrics import (
 )
 
 
-def _write_csv(bundle: BenchmarkRunBundle, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+CSV_FIELDNAMES = [
+    "benchmark", "seed", "decoder", "question_id",
+    "predicted", "correct", "latency_s", "scores",
+]
+
+
+def _result_to_rows(
+    bench_name: str, seed: int, decoder: str, result
+) -> List[Dict[str, Any]]:
     rows = []
-    for decoder_name, result in bundle.results.items():
-        for i in range(result.num_questions):
-            rows.append({
-                "benchmark": bundle.benchmark_name,
-                "seed": bundle.seed,
-                "decoder": decoder_name,
-                "question_id": i,
-                "predicted": int(result.per_question_predicted[i]),
-                "correct": bool(result.per_question_correct[i]),
-                "latency_s": float(result.per_question_latency_s[i]),
-                "scores": json.dumps(result.per_question_scores[i]),
-            })
+    for i in range(result.num_questions):
+        rows.append({
+            "benchmark": bench_name,
+            "seed": seed,
+            "decoder": decoder,
+            "question_id": i,
+            "predicted": int(result.per_question_predicted[i]),
+            "correct": bool(result.per_question_correct[i]),
+            "latency_s": float(result.per_question_latency_s[i]),
+            "scores": json.dumps(result.per_question_scores[i]),
+        })
+    return rows
+
+
+def _write_csv_rows(rows: List[Dict[str, Any]], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                "benchmark", "seed", "decoder", "question_id",
-                "predicted", "correct", "latency_s", "scores",
-            ],
-        )
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _write_csv(bundle: BenchmarkRunBundle, path: Path) -> None:
+    """Write all decoders' results as a single CSV (end-of-run)."""
+    rows: List[Dict[str, Any]] = []
+    for decoder_name, result in bundle.results.items():
+        rows.extend(
+            _result_to_rows(bundle.benchmark_name, bundle.seed, decoder_name, result)
+        )
+    _write_csv_rows(rows, path)
+
+
+def _write_per_decoder_csv(
+    benchmark_name: str,
+    seed: int,
+    decoder: str,
+    result,
+    path: Path,
+) -> None:
+    """Crash-safe incremental CSV — one file per decoder, written as
+    soon as that decoder completes."""
+    rows = _result_to_rows(benchmark_name, seed, decoder, result)
+    _write_csv_rows(rows, path)
 
 
 def _write_summary(bundle: BenchmarkRunBundle, path: Path) -> None:
@@ -184,6 +212,44 @@ def _build_parser() -> argparse.ArgumentParser:
         "--verbose", "-v", action="store_true",
         help="DEBUG level on the console handler (file log is always DEBUG).",
     )
+    parser.add_argument(
+        "--no-compile", action="store_true",
+        help="truthfulqa only: disable `torch.compile` on the model. "
+             "Default is ON (2-3× forward-pass speedup on Ampere+); "
+             "disable if compile throws an unrecoverable error.",
+    )
+    parser.add_argument(
+        "--no-compile-dynamic", action="store_true",
+        help="use static shapes in torch.compile (default is dynamic=True "
+             "because teacher-forcing produces variable sequence lengths; "
+             "static compile would recompile on every shape change).",
+    )
+    parser.add_argument(
+        "--no-fast-scoring", action="store_true",
+        help="§6.2 Phase 2 escape hatch: force every decoder to use the "
+             "slow lookahead/commit scoring loop. Default is fast-scoring "
+             "ON (~15× speedup on vanilla + blend via single-forward-pass "
+             "teacher-forcing; trust stays speculation-based regardless).",
+    )
+    parser.add_argument(
+        "--paraphrase-cache-file", type=Path, default=None,
+        help="disk-persistent paraphrase cache path (truthfulqa only). "
+             "If unset, defaults to <out-dir>/paraphrase_cache_<model>_<split>.json. "
+             "Set to '' or 'none' to disable disk persistence (in-memory "
+             "cache only — back to pre-cache behaviour).",
+    )
+    parser.add_argument(
+        "--no-paraphrase-cache-file", action="store_true",
+        help="disable disk-persistent paraphrase cache entirely.",
+    )
+    parser.add_argument(
+        "--clear-paraphrase-cache", action="store_true",
+        help="truthfulqa only: delete the disk paraphrase cache file "
+             "before the run (if it exists). Forces fresh paraphrase "
+             "generation. Useful as a belt-and-suspenders over the "
+             "automatic pipeline-version check that normally rejects "
+             "stale caches.",
+    )
     return parser
 
 
@@ -252,21 +318,82 @@ def main(argv: List[str] | None = None) -> int:
             )
             t_load = time.perf_counter()
             from .dataset import TruthfulQABenchmark
+
+            # Resolve default paraphrase-cache path: per model + split
+            # so two models' caches never collide. Disabled by
+            # --no-paraphrase-cache-file.
+            if args.no_paraphrase_cache_file:
+                cache_file = None
+            elif args.paraphrase_cache_file is not None:
+                cache_file = args.paraphrase_cache_file
+            else:
+                model_slug = args.model.replace("/", "_").replace(":", "_")
+                cache_file = (
+                    args.out_dir
+                    / f"paraphrase_cache_{model_slug}__{args.split}.json"
+                )
+            if cache_file is not None:
+                if args.clear_paraphrase_cache and cache_file.exists():
+                    logger.info(
+                        "--clear-paraphrase-cache: deleting %s "
+                        "(explicit user request)",
+                        cache_file,
+                    )
+                    try:
+                        cache_file.unlink()
+                    except OSError as exc:
+                        logger.warning(
+                            "Failed to delete cache file: %s", exc
+                        )
+                logger.info("Paraphrase cache file: %s (exists=%s)",
+                            cache_file, cache_file.exists())
+
             bench = TruthfulQABenchmark(
                 model_name=args.model,
                 split=args.split,
                 max_questions=args.num_questions,
                 use_paraphrase=not args.no_paraphrase,
+                compile_model=not args.no_compile,
+                compile_dynamic=not args.no_compile_dynamic,
+                paraphrase_cache_file=cache_file,
+                evaluation_seed=args.seed,
             )
             logger.info(
                 "Model + dataset loaded in %.1f s", time.perf_counter() - t_load
             )
+            logger.info("torch.compile status: %s", bench.compile_status)
+            logger.info(
+                "§1.10 rewrite seed pair for --seed %d: %s",
+                args.seed, bench.rewrite_seed_pair,
+            )
+            _stats0 = bench.paraphrase_cache_stats
+            if _stats0.get("loaded_from_disk", 0) > 0:
+                logger.info(
+                    "Paraphrase cache warm-start: %d entries loaded from %s",
+                    _stats0["loaded_from_disk"], _stats0.get("persisted_to"),
+                )
+            elif _stats0.get("persisted_to"):
+                discard_reason = _stats0.get("discarded_reason")
+                if discard_reason:
+                    # Cache file existed but was rejected — auto-detect
+                    # handled the "rm stale cache" step for the user.
+                    logger.info(
+                        "Paraphrase cache auto-discarded on load: %s",
+                        discard_reason,
+                    )
+                logger.info(
+                    "Paraphrase cache cold-start; will persist to %s as it fills.",
+                    _stats0.get("persisted_to"),
+                )
             manifest["model"] = {
                 "name": args.model,
                 "vocab_size": bench.vocab_size,
                 "L": bench.L,
                 "eos_token_id": bench.eos_token_id,
                 "use_paraphrase": not args.no_paraphrase,
+                "compile_status": bench.compile_status,
+                "rewrite_seed_pair": list(bench.rewrite_seed_pair),
+                "evaluation_seed": args.seed,
             }
             write_manifest(manifest_path, manifest)
 
@@ -276,16 +403,64 @@ def main(argv: List[str] | None = None) -> int:
             args.benchmark, n_questions, args.seed,
         )
 
+        # Periodic INFO-level progress so long runs (N=817 can take
+        # hours per seed) visibly heartbeat. Fires at every 5% milestone
+        # and at the final completion; DEBUG fires on every question.
+        progress_t0 = {"t": time.perf_counter()}
+
         def progress(i: int, n: int, decoder: str) -> None:
-            # Log every completion; also console print on decoder-completion.
             logger.debug("  %s: %d/%d", decoder, i, n)
-            if i == n:
-                logger.info("  %s: %d/%d", decoder, i, n)
+            step = max(1, n // 20)  # 5% granularity
+            if i == n or i % step == 0:
+                elapsed = time.perf_counter() - progress_t0["t"]
+                rate = i / elapsed if elapsed > 0 else 0.0
+                eta_s = (n - i) / rate if rate > 0 else float("inf")
+                logger.info(
+                    "  %s: %d/%d  (%.1f q/min, ETA %s)",
+                    decoder, i, n,
+                    rate * 60,
+                    (
+                        f"{eta_s / 60:.1f} min"
+                        if eta_s < 3600 else f"{eta_s / 3600:.1f} h"
+                    ) if eta_s != float("inf") else "?",
+                )
+                progress_t0["t"] = time.perf_counter() if i == n else progress_t0["t"]
+
+        # Per-decoder incremental save — crashes mid-run after this point
+        # preserve the decoder CSVs that have already completed.
+        per_decoder_paths: Dict[str, Path] = {}
+
+        def on_decoder_complete(decoder_name: str, result) -> None:
+            p = (
+                args.out_dir
+                / f"phase_6_{args.benchmark}_results{args.suffix}__{decoder_name}.csv"
+            )
+            _write_per_decoder_csv(
+                bench.name, args.seed, decoder_name, result, p
+            )
+            per_decoder_paths[decoder_name] = p
+            from .metrics import latency_stats as _ls
+            ls = _ls(result.per_question_latency_s)
+            logger.info(
+                "  %-20s CHECKPOINT: accuracy=%.2f%%  "
+                "mean_latency=%.3f s  csv=%s",
+                decoder_name, result.accuracy * 100, ls.mean_s, p.name,
+            )
+            # Snapshot the manifest so the partial state is on disk.
+            manifest.setdefault("per_decoder_checkpoints", {})
+            manifest["per_decoder_checkpoints"][decoder_name] = {
+                "accuracy": float(result.accuracy),
+                "mean_latency_s": float(ls.mean_s),
+                "csv": str(p),
+            }
+            write_manifest(manifest_path, manifest)
 
         bundle = run_benchmark(
             benchmark=bench,
             seed=args.seed,
             progress_callback=progress,
+            fast_scoring=not args.no_fast_scoring,
+            per_decoder_complete_callback=on_decoder_complete,
         )
 
         _write_csv(bundle, csv_path)
@@ -297,6 +472,18 @@ def main(argv: List[str] | None = None) -> int:
                 "  %-20s accuracy=%.2f%%  mean_latency=%.3f s  median=%.3f s  p95=%.3f s",
                 decoder, r.accuracy * 100, ls.mean_s, ls.median_s, ls.p95_s,
             )
+
+        # Paraphrase-cache diagnostics (TruthfulQABenchmark only).
+        cache_stats = getattr(bench, "paraphrase_cache_stats", None)
+        if cache_stats is not None:
+            logger.info(
+                "  paraphrase cache: hits=%d misses=%d entries=%d (hit_rate=%.1f%%)",
+                cache_stats["hits"], cache_stats["misses"],
+                cache_stats["entries"],
+                100.0 * cache_stats["hits"]
+                / max(cache_stats["hits"] + cache_stats["misses"], 1),
+            )
+            manifest["paraphrase_cache_stats"] = cache_stats
 
         # Compute verdict once so it lands in both the summary and
         # the manifest.

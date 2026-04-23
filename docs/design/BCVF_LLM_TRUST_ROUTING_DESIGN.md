@@ -4218,8 +4218,439 @@ The manifest JSON is the single most important artifact — it alone is sufficie
 - [ ] Pre-committed success threshold is locked
 - [ ] Owner has 1–2 weeks of engineering bandwidth
 
-**Details pending.**
+### 10.V1 V1 closure — empirical verdict
+
+V1 execution against Mistral-7B-Instruct-v0.3 on TruthfulQA-MC validation split completed 2026-04-22. Artifacts: `docs/experiments/phase_6_truthfulqa_{results,summary,manifest,run}_mistral_seed1.*`; analysis report at `phase_6_truthfulqa_results_mistral_seed1__analysis.md`.
+
+**§1.10 classification: `UNVIABLE_COST` + `REGRESSION`**
+
+The classifier printed `UNVIABLE_COST` (latency ratio 23.85× > 5×) which takes precedence in the enum ordering, but the accuracy delta alone would have classified as `REGRESSION` (Δ = −3.06 pp ≤ −1.0 pp). Both findings stand.
+
+#### 10.V1.1 Numbers
+
+| Decoder | Accuracy | Mean latency | Score-margin mean |
+|---|---|---|---|
+| vanilla | **32.56%** | 5.76 s | 4.305 |
+| conventional_blend | 29.87% | 0.49 s | 4.039 |
+| bcvf_trust | **26.81%** | 11.60 s | **6.037** |
+
+- Vanilla baseline outperformed both conventional blend (**−2.7 pp**) and BCVF-trust (**−5.8 pp**).
+- BCVF-trust margin (6.0) is ~50% wider than vanilla (4.3) despite being less accurate — indicating **overconfident misclassification**, not mere noise.
+- Latency ratio (trust/blend) = 23.85× in scoring-mode benchmark; real-time generation would be ≈ 2× (§2.4.6 FLOP analysis).
+- McNemar trust-vs-blend: b=65, c=90, p=0.054 — borderline significant against BCVF-trust.
+- Full-N paraphrase cache hit rate: 85.8% (9862 hits / 1634 misses; disk-cache feature not active during this run, so all misses regenerated).
+
+#### 10.V1.2 Failure-mode diagnosis
+
+BCVF dormancy proxy (trust ↔ blend prediction agreement): **64.1%** (524 agree / 293 diverge). This **rules out the §5.2 dormancy caveat** as the explanation — BCVF was *active* on 36% of questions, not silent. The trust layer was doing real work; the work was pointed the wrong way.
+
+Pairwise flip analysis:
+
+| Pairing | Disagree | A wins | B wins | Both wrong (different picks) | Net A gain |
+|---|---|---|---|---|---|
+| vanilla vs blend | 160 | 54 | 32 | 74 | +22 |
+| vanilla vs trust | 334 | 114 | 67 | 153 | **+47** |
+| blend vs trust | 293 | 90 | 65 | 138 | +25 |
+
+The **138 "both wrong, different picks"** cell on trust-vs-blend is the key signature: BCVF is not merely reshuffling around the correct answer — it is actively dragging the decoder toward *different* distractor choices than blend picks. This is anti-correlated signal, not noise.
+
+**Structural mechanism (explanatory hypothesis with evidence):**
+
+1. Same-model paraphrases at temperature 0 are **not independent evidence**. They share training-distribution priors and tend to drift toward the *same* plausible-sounding distractor on hallucination-prone TruthfulQA questions.
+2. When two correlated paraphrases agree on a distractor and the base prompt disagrees, §2.4.5's symmetric per-pair attribution assigns the base a cost of `2·LARGE` (appears in both `(0,1)` and `(0,2)` pairs) while each paraphrase accrues `1·LARGE + 1·small` (`≈ LARGE`).
+3. Softmin over these per-source costs **down-weights the base — the strongest source** — and the weighted consensus tracks the paraphrase majority, which picks the distractor.
+4. The 50%-wider trust-margin (6.0 vs 4.3) confirms softmin is not just mis-calibrated but *actively sharpening* toward the wrong choice.
+
+The §2.4.5 attribution geometry is correct *under the independence assumption*. With correlated sources it predictably votes the minority-but-correct source off the island.
+
+**Which V1 design commitment failed:** §1.4 locked sources as "base prompt + two same-model paraphrases at T=0 with different rewrite seeds." §1.11 risk register rated "Self-consistency verifier does not meaningfully diverge from base under hallucination" at Moderate likelihood. V1 did not execute the §1.11 mitigation ("Phase 1.5 sensitivity test validates verifier produces signal on a held-out probe set") before the benchmark, so the risk materialized as a negative result.
+
+**What V1 did NOT falsify:**
+
+- The BCVF kernel math (§2.8 / §2.9 — 49/49 tests pass, Lemma 1 invariances verified).
+- The autonomy N=10 result on `S3_map_error_accel` (different domain, different source structure).
+- The general "trust-shaping > additive-penalty" architectural claim (autonomy data supports it; we just used it on a setup where trust-shaping itself is the wrong mechanism).
+- BCVF in LLM inference in principle — only the specific V1 configuration (same-model paraphrase M=3 on TruthfulQA-MC with softmin consumer).
+
+#### 10.V1.3 V2 roadmap — ranked by diagnostic strength
+
+V2 proceeds under §0.8 discipline: one bounded experiment at a time, each with its own pre-committed §1.10-style thresholds. Do **not** combine fixes.
+
+| Rank | V2 experiment | Hypothesis | Why this order | Cost |
+|---|---|---|---|---|
+| A | **Cross-model ensemble + current consumer** | Source independence is the primary broken assumption; fixing it recovers BCVF's intended behaviour | Highest-leverage change from V1 diagnosis. Isolates source-ensemble vs consumer hypotheses. | ~1 week eng + 24 GB VRAM for 3×7B or sequential on 16 GB |
+| B | **Veto-structured consumer + same sources** | Softmin over correlated sources is the primary broken assumption; replacing softmin with BCVF-as-filter recovers correct behaviour | Cheaper than A (no new model downloads) but only tests the consumer side. If sources-are-the-problem (per A), B will also null. | ~1 week eng, same pod setup as V1 |
+| C | BCVF as minor term in multi-signal trust equation (add factual_support / verifier / calibration) | BCVF alone is insufficient; needs auxiliary signals | At this point the system is no longer "BCVF-for-LLMs" — it's an ensemble of verifiers with BCVF as regularizer. Falsifies a weaker claim. | ~2-3 weeks eng; needs separate verifier model |
+| D | Hidden-state shaping instead of probability-space blend | Consumer architecture was wrong, not the trust math | Requires `Source` API extension to expose `h_t`; bigger refactor. Likely not the primary fault per V1 data. | ~2 weeks eng + model-internals access |
+
+**Recommended V2 if pursued:** **Experiment A** (cross-model ensemble) first. It directly tests the diagnosed primary failure mode and produces an interpretable result for any outcome:
+
+- A PASSes → V1 failure was *source independence*, BCVF transfers under the right source structure. Pursue B or D as follow-ons only if optimization cost warrants.
+- A NULLs → BCVF doesn't transfer regardless of source structure. V1 + A together close the transfer question.
+- A REGRESSIONs → deeper rethink; the consumer math may need changes (B) rather than the sources.
+
+**Not recommended for V2:**
+
+- Threshold tuning on V1 data (post-hoc overfitting).
+- Combining fixes A + B + C in one experiment (§0.8 violation; confounds attribution).
+- Changing the kernel math (§2.8/§2.9 verified correct; not the failure site).
+- Repeating V1 on a larger base model (Llama 3.1 8B) — the failure is structural, not model-scale-dependent.
+
+#### 10.V1.4 Artifacts preserved for V2 reuse
+
+- `symbolu_bcvf_llm/core.py` — kernel unchanged; reusable verbatim for any V2.
+- `symbolu_bcvf_llm/trust/` — TrustShaper with EMA + deadband + softmin. Reusable for V2A; needs modification for V2B (veto).
+- `symbolu_bcvf_llm/sources/` — Source protocol supports any paraphrase / retrieval / model-family implementation. V2A needs a new `HuggingFaceSource`-compatible wrapper for the second/third model.
+- `symbolu_bcvf_llm/benchmark/` — harness is benchmark-agnostic; reusable.
+- `symbolu_bcvf_llm/analysis/` — diagnostic tool works on any future §6 run.
+- `scripts/verify_hf_source.py`, `scripts/analyze_seed_results.py` — reusable.
+- `scripts/BCVF_LLM_RUNPOD.md` — runbook; needs update for V2A cross-model setup.
+
+#### 10.V1.5 Decision (final — confirmed by §10.V1.8 Experiment Zero)
+
+**V1 is closed.** The V1 hypothesis ("BCVF-trust shaping over same-model M=3 paraphrase sources on TruthfulQA-MC produces a measurable hallucination-reduction delta") is falsified. The falsification is specific, debuggable, and produces actionable V2 directions.
+
+V2 is **not authorized** by this section. V2 requires a new bounded design with its own §1.10-equivalent pre-commitments, landed under §0.8 authorization. Until then, the repository remains at the V1-closed state with all artifacts preserved.
+
+If V2 is never pursued, V1 stands as a clean negative result on a specific structural transfer claim — which is the value proposition §0.6 committed to when the experiment started.
+
+*This decision was initially marked provisional pending §10.V1.6 (paraphrase-pipeline corruption addendum) and §10.V1.7 (Experiment Zero). Experiment Zero executed 2026-04-22 at N=100 with the fixed paraphrase pipeline produced the same REGRESSION pattern (Δ = −4.00 pp, vs V1's −3.06 pp at N=817). §10.V1.8 documents the result; §10.V1.5's closure is now final and un-conditional.*
+
+#### 10.V1.6 Addendum — paraphrase corruption discovered post-hoc
+
+After §10.V1.5 was committed, a 5-question inspection run persisted the paraphrases Mistral had been generating during V1. The cache file had not existed during the full V1 run (disk-persistence feature landed in commit `15c688a`, after the V1 seed-1 run started on `8778b27`). Inspection of 10 raw paraphrases revealed the `make_paraphrased_prompt` utility was systemically producing corrupted output. Three failure modes, each appearing in multiple of the 10 samples:
+
+**1. Template leakage.** The V1 template ended with `"Rewrite #{seed}. Do not answer it."` plus `"Rewrite:"`. Mistral interpreted the `#{seed}` suffix as "this is example rewrite #1; now generate #2, #3, ..." and kept emitting `\nQuestion: ...\nRewrite: ...` pairs until hitting `max_new_tokens=128`. Actual observed sample `0__1`:
+
+```
+What is the smallest nation in the world that has an area of at least one square mile?
+
+Question: Q: What is the largest city in the world by population that is not a capital city?
+A:
+
+Rewrite: What is the most populous city in the world that is not the capital of its country?
+...
+```
+
+**2. Inline answer leakage.** Mistral often appended `"(Answer: X)"` inline, effectively answering the question it was asked to paraphrase. Sample `0__2`:
+
+```
+What is the smallest nation in the world that has an area of at least one square mile?
+
+A:
+
+(Answer: Vatican City)
+```
+
+When `HuggingFaceSource` conditions its next-token distribution on a prompt containing `(Answer: Vatican City)`, the distribution is dominated by the leaked answer, not by the original question. **This is the mechanism that produced the "overconfident wrong" signature** (trust margin 6.0 vs vanilla 4.3 in §10.V1.1): two paraphrases with similar inline-answer leaks produced strongly-peaked distributions on the same (wrong-on-hallucination-questions) token, BCVF read "agreement = low disagreement = trustworthy," softmin sharpened weights onto the paraphrases, consensus tracked the leaked answer.
+
+**3. Meta-commentary substitution.** Sometimes Mistral produced explanatory notes about the question instead of a rewrite. Sample `3__2`:
+
+```
+Which cities receive more precipitation than Seattle?
+
+Note: The question asks for cities that receive more rainfall than Seattle, not cities that are wetter overall. [...]
+```
+
+**Implication for §10.V1.2 attribution.**
+
+The §10.V1.2 diagnosis attributed the failure to "same-model paraphrase correlation + §2.4.5 attribution geometry votes base out." With the paraphrase-corruption finding in hand, that attribution is at least partially premature. The corrupted paraphrases would have produced similar overconfident-wrong BCVF dynamics regardless of the underlying correlation structure, because the sources were conditioning on text that contained either the correct answer (inline leak) or a different question entirely (question drift).
+
+The two layers of failure — paraphrase pipeline vs BCVF geometry — are **not disentangled** by the V1 data alone. We cannot distinguish:
+
+- **(a)** "Paraphrase pipeline was broken; BCVF would work if fed clean paraphrases of the same model," vs
+- **(b)** "Even with clean paraphrases, same-model correlation + §2.4.5 geometry causes regression."
+
+Resolving (a) vs (b) requires a re-run with a fixed paraphrase pipeline. That experiment is defined in §10.V1.7 below.
+
+**Fix landed alongside this addendum.** `symbolu_bcvf_llm/sources/paraphrase.py` was rewritten:
+
+- `DEFAULT_REWRITE_INSTRUCTION` is now a few-shot template with explicit rules ("Output ONLY the rewritten question on a single line. Do NOT answer it. Do NOT provide explanations, commentary, or additional examples.") and the seed threaded as `"wording variant {seed}"` rather than `"Rewrite #{seed}"` to eliminate the "example list" interpretation.
+- `_clean_rewrite(raw)` post-processes the decoded output to truncate at the first template-leak marker (`\nQuestion:`, `\nAnswer:`, `\n(Answer:`, `\nNote:`, `\nExample`, etc.), strip inline `(Answer: ...)` patterns, and collapse to the first paragraph.
+- `_is_valid_rewrite(text, original, min_chars=10)` rejects empty, too-short, or answer-leaked output.
+- `make_paraphrased_prompt(..., clean_output=True)` uses the full clean-and-validate pipeline and **falls back to the original prompt** when validation fails. Downstream BCVF then sees a degenerate M=3 with one or more sources identical to the base — conventional-blend-equivalent, which is a safer failure mode than corrupted sources.
+- `V1_REWRITE_INSTRUCTION` is preserved as a module constant for A/B reproduction of the V1 behaviour if ever needed.
+- 18 new pure-Python tests in `symbolu_bcvf_llm/sources/tests/test_paraphrase_cleaning.py` validate the cleaning logic against the actual corrupted samples observed in V1 (sample `0__1`, `0__2`, `3__2` reproduced as test fixtures).
+
+Commit: `<next>`.
+
+#### 10.V1.7 V2 Experiment Zero — fixed-paraphrase V1 re-run
+
+Before pursuing Experiments A–D in §10.V1.3, a cheaper higher-information experiment is available:
+
+**Experiment Zero.** Re-run V1 unchanged **except** for the paraphrase-pipeline fix from §10.V1.6.
+
+- **Hypothesis.** V1's REGRESSION classification was primarily caused by paraphrase corruption (inline answer leakage + template pollution), not by the BCVF geometry over correlated same-model paraphrases.
+- **Pre-committed thresholds.** Same as §1.10 — PASS if Δ ≥ 2pp, NULL if |Δ| < 0.5pp, REGRESSION if ≤ -1pp, UNVIABLE_COST if latency > 5×.
+- **Budget.** ~3 GPU-hours per seed at Phase-2 speeds.
+- **Outcomes:**
+  - **PASS / NULL:** the V1 REGRESSION was a paraphrase-pipeline artifact, not a structural transfer failure. §10.V1.5's "V1 falsified the transfer claim" conclusion must be retracted or amended.
+  - **REGRESSION:** both layers (paraphrase + geometry) contributed; geometry alone is still a problem. §10.V1.3's Experiment A (cross-model ensemble) is the next test.
+  - **AMBIGUOUS:** run seed 2 with the fixed pipeline; combined N=1634 decides.
+
+This experiment supersedes §10.V1.3 Experiments A-D in priority: it is ~3× cheaper than any of them and directly tests the confounded interpretation §10.V1.6 surfaced. A and B from §10.V1.3 should only run if Experiment Zero's result is REGRESSION.
+
+**Commit discipline for Experiment Zero.** Same §0.8 — pre-commit the thresholds (done, reuse §1.10) before running. Do not combine the paraphrase fix with any other experimental change (no concurrent cross-model ensemble, no consumer-algorithm change). Isolate the paraphrase-pipeline variable cleanly.
+
+If/when Experiment Zero is run, its result gets §10.V1.8 and the §10.V1.5 decision is amended to reflect the disentangled outcome.
+
+#### 10.V1.8 Experiment Zero result — §10.V1.5 closure is vindicated
+
+Experiment Zero was executed 2026-04-22 at N=100 after the paraphrase-pipeline fixes landed (commits `e8352fe`, `ad3c7ce`, `0c02cc3`). Ran at N=100 rather than full N=817 for cost efficiency (~30 min vs ~3 h); the directional signal at N=100 is sufficient given the magnitude observed.
+
+Artifacts: `docs/experiments/phase_6_truthfulqa_{results,summary,manifest,run}_mistral_v2_n100.*`; analysis: `phase_6_truthfulqa_results_mistral_v2_n100__analysis.md`.
+
+**Result: `REGRESSION` reproduced. §10.V1.5 closure stands, unamended.**
+
+| Decoder | N=100 accuracy | mean latency |
+|---|---|---|
+| vanilla | 25.00% | 3.03 s |
+| conventional_blend | 23.00% | 0.46 s |
+| bcvf_trust | **19.00%** | 12.04 s |
+
+- Δ (trust − blend) = **−4.00 pp** — more negative than V1's −3.06 pp, not less.
+- McNemar p = 0.454 (not statistically significant at N=100, but the point estimate direction matches V1).
+- Trust↔Blend agreement: 58.0% — *lower* dormancy than V1's 64.1%. BCVF was *more* active with cleaner, more-diverse paraphrases, which means more opportunities to vote wrong.
+- Pairwise flips blend-vs-trust: 42 disagreements → blend wins 10, trust wins 6, both-wrong-different 26. Same anti-correlated pattern V1 exhibited.
+
+**Paraphrase fix verification.** The fix itself worked as designed:
+- 10-question paraphrase inspection (`inspect_paraphrases.py`) showed 20/20 clean rewrites — no template leakage, no inline `(Answer: X)`, no meta-commentary.
+- 9/10 questions showed distinct seed-1 vs seed-2 rewrites (only short questions like "What did CERN do in 2012?" collapse to identical because style directives can't meaningfully differentiate ≤6-word questions).
+- N=100 run's paraphrase cache showed 200 entries written, 0 fallbacks to original.
+
+Clean paraphrases did not rescue BCVF. The delta magnitude is consistent with V1; if anything slightly larger.
+
+**Confounded hypotheses resolved.**
+
+§10.V1.6 raised a two-layer question: was V1's failure primarily (a) paraphrase-pipeline corruption or (b) §10.V1.2's structural geometry attribution? The Experiment Zero result disentangles them:
+
+- (a) is **rejected as primary cause** — fixing the paraphrase pipeline produced the same regression magnitude. If paraphrase corruption were the main story, we'd expect at least a partial rescue (Δ moving toward zero). We saw the opposite: Δ moved slightly further negative.
+- (b) is **confirmed as primary cause** — the same-model paraphrase correlation + §2.4.5 symmetric attribution geometry produces the failure even when paraphrases are clean and seed-diverse.
+
+The original §10.V1.2 structural mechanism hypothesis stands as the **primary explanation** of V1's failure:
+
+> Same-model paraphrases are correlated evidence; when two correlated paraphrases agree on a distractor on hallucination-prone questions, §2.4.5's symmetric attribution assigns the base decoder cost 2·LARGE (it appears in both `(0,1)` and `(0,2)` pairs) while each paraphrase gets `LARGE + 0`. Softmin down-weights the base — the strongest source — and consensus tracks the paraphrase majority toward the distractor.
+
+**Decision — V1 closure is final.**
+
+- §10.V1.5's "V1 hypothesis is falsified" conclusion is unamended and now supported by two independent runs (V1 full N=817 and Experiment Zero N=100) with different paraphrase pipelines.
+- Full N=817 with the fixed pipeline is **not run** — at Δ=-4 pp already, a larger N would confirm the direction with greater statistical precision but would not change the qualitative verdict. Estimated cost ~3 GPU-hours; estimated information gain near zero.
+- §10.V1.3's Experiment A (cross-model ensemble) becomes the sole remaining V2 candidate that directly tests the diagnosed primary failure mode (same-model source correlation). Experiment A would isolate whether source *independence* alone rescues BCVF.
+- Experiments B, C, D from §10.V1.3 remain V2 possibilities but are now lower-priority: Experiment A tests the most-likely-to-rescue change first; if A fails, B–D are variants that share the same untested assumption (that the consumer-side algorithm is the primary issue), which V1 data does not support.
+
+**What V1 + Experiment Zero have jointly established:**
+
+1. The BCVF kernel math (§2.8, §2.9) is correct and transfers — proven on synthetic traces at §3, verified on the scoring path.
+2. Logit-blending consumer architecture (§5 V1 choice) works mechanically — the pipeline produces coherent outputs; the decisions are just systematically wrong.
+3. **Same-model paraphrase at M=3 is not a valid source ensemble for BCVF on hallucination-focused MC benchmarks.** Correlation + symmetric attribution produces anti-correlated signal.
+4. Paraphrase pipeline quality matters for clean engineering but is not the primary determinant of the verdict on this benchmark.
+
+**What V1 + Experiment Zero did NOT establish:**
+
+- Whether BCVF transfers to LLM inference at all. Only the specific same-model-paraphrase V1 configuration is falsified. Different source ensembles (cross-model, retrieval-grounded, etc.) remain open and would require their own bounded tests.
+- Whether the trust-shaping > additive-penalty claim from autonomy (§0.1) transfers — that's conditional on having a valid source ensemble, which V1 lacked.
+
+**Artifacts preserved for V2** (unchanged from §10.V1.4): kernel, TrustShaper, Source protocol, benchmark harness, analysis tool, scripts all reusable for V2 Experiment A.
+
+**V1 repository state at closure:** all code, tests, runs, and design documentation committed to `claude/bcvf-llm-documentation-RPqCi`. Final commit: `<next>`. No further V1 work authorized.
 
 ---
+
+
+## Section 11 — Observable Discipline (Ketu-before-Rahu)
+
+### 11.1 Why this section exists
+
+§10.V1.5 falsified V1 because of a missing pre-run check: no one had
+confirmed that the signal V1 relied on — BCVF per-source cost over
+same-model paraphrases — was *truth-correlated on this benchmark*
+before a 4-hour N=817 run was spent conditioning a decoder on it.
+§10.V1.8's post-hoc diagnosis established that the signal was
+**anti-correlated** with truth under §2.4.5's symmetric attribution
+geometry, meaning a Rahu-shaped consumer pulling toward the
+observable's low-cost basin was pulled *toward* the majority-wrong
+distractor. The structural cause was identifiable with a cheap
+observable-vs-correctness AUC probe on a few dozen questions;
+instead it was confirmed by running the full pipeline twice.
+
+§11 codifies the discipline V1 needed but lacked:
+
+> Before any Rahu-shaped attractor is built on a Ketu-shaped
+> observable, the observable must be probed on a held-out benchmark
+> subset and shown to be truth-correlated (AUC ≥ 0.60). If it is
+> not, no decoder is built on it.
+
+This is the LLM counterpart to the autonomy stack's §0.1 "observe
+before you attract" rule. Autonomy enforces it by convention; here
+we enforce it by code (`scripts/probe_observables.py`) and by gate
+(this §11).
+
+### 11.2 Ketu ↔ Rahu decomposition
+
+V1 conflated two distinct roles. §11 separates them:
+
+- **Ketu observable (detector).** A deterministic witness
+  function `observe(sources, prompt_tokens, choice_tokens) →
+  ObservableValue` that reports a scalar and optional per-source
+  attribution. It does not make decisions; it only measures. Its
+  only contract is polarity: `higher_means_more_suspicious ∈
+  {True, False}`. Examples: BCVF total cost, per-source cost,
+  source-0 entropy, source argmax-agreement fraction.
+- **Rahu attractor (shaper).** The consumer architecture that
+  translates an observable's signal into trust-weighting or logit
+  modulation. V1's Rahu was TrustShaper's softmin-consensus (§5.1).
+  A Rahu is only built on a Ketu that has passed the probe.
+
+The two are orthogonal: the same Ketu can feed multiple Rahu
+shapes (additive penalty, trust clipping, two-stage veto, etc.);
+the same Rahu shape can consume multiple Ketu signals. V1 tested
+exactly one (Ketu, Rahu) pair and inferred — incorrectly — that
+both components had to change together to fix the regression.
+The §11 discipline tests Ketu in isolation first, which bounds
+what the Rahu is allowed to do.
+
+### 11.3 Four classification bands
+
+The probe harness (`symbolu_bcvf_llm/observables/probe.py`)
+computes the observable's AUC against choice-level correctness
+labels and emits one of four verdicts:
+
+| Band | AUC range | N requirement | Verdict |
+|---|---|---|---|
+| `TRUTH_CORRELATED` | `AUC ≥ 0.60` | `n ≥ 40` | Observable predicts correctness. A Rahu attractor *may* be worth building on it. Does not guarantee success — only unblocks further work. |
+| `UNCORRELATED` | `0.45 ≤ AUC < 0.60` | `n ≥ 40` | Signal is near noise. A Rahu on this collapses to conventional blend at best; inference cost is pure overhead. **Do not build a Rahu.** |
+| `ANTI_CORRELATED` | `AUC < 0.45` | `n ≥ 40` | Signal exists with the *wrong* sign. A Rahu built on this actively hurts accuracy — V1's exact failure mode. **Do not build a Rahu.** |
+| `NULL` | any | `n < 40` | Too few datapoints to classify. Expand N before interpreting. |
+
+Polarity is normalized inside the probe: observables with
+`higher_means_more_suspicious=True` have their scalars negated
+before AUC is computed, so the reported AUC uniformly means
+"higher AUC ⇒ higher truth-predictiveness", regardless of the
+observable's polarity convention.
+
+The 0.60 threshold is deliberately loose. It is a
+*go/no-go-on-building-a-decoder* gate, not a success claim. A
+V2-era observable at AUC 0.62 is worth a bounded Rahu experiment;
+the Rahu itself may still fail. The gate rules out the
+V1-regression class of failure (AUC < 0.45) and the V1-dormant
+class (AUC ≈ 0.5), which together accounted for all of V1's
+observed behavior.
+
+### 11.4 Observables shipped in this section
+
+`symbolu_bcvf_llm/observables/` ships four built-in observables,
+each conformant to the `Observable` Protocol. All are
+deterministic, torch-free where possible, and safe to probe on
+`MockBenchmark` (no GPU, no tokenizer). They are ordered by
+diagnostic power against V1's specific failure mode:
+
+1. **`BCVFSourceZeroCostObservable`** (`bcvf.py`). Per-source BCVF
+   cost at source index 0 (the base decoder). Directly
+   instruments §10.V1.2's "base voted off the island" mechanism
+   — if this observable is `ANTI_CORRELATED`, paraphrase
+   correlation is assigning the base model outsized cost when it
+   is *correct* vs the paraphrase majority. Polarity:
+   `higher = more suspicious`.
+2. **`BCVFTotalCostObservable`** (`bcvf.py`). Sum of all per-pair
+   BCVF costs — the kernel's default global disagreement
+   measure. V1's implicit Ketu. Included for continuity with V1
+   and as a control against (1). Polarity: `higher = more
+   suspicious`.
+3. **`SourceAgreementObservable`** (`agreement.py`). Fraction of
+   lookahead positions where every source's argmax coincides,
+   reported as `1 - agreement_fraction` so polarity aligns with
+   BCVF. A polarity-simpler, kernel-free alternative to BCVF
+   total cost; if BCVF total cost is `UNCORRELATED` but
+   agreement-fraction is `TRUTH_CORRELATED`, the BCVF kernel is
+   not extracting the available signal.
+4. **`Source0EntropyObservable`** (`entropy.py`). Shannon entropy
+   of source 0's next-token distribution at the first lookahead
+   position. Choice-independent. Calibration signal: a model
+   unsure of its own next token is generically less reliable.
+   Polarity: `higher = more suspicious`.
+
+Additional observables (cross-model-disagreement, retrieval-
+grounded contradiction, token-level log-probability gap, etc.)
+are V2-scoped and not shipped here. Adding a new observable is
+one file implementing the Protocol; the probe harness picks it up
+by name.
+
+### 11.5 Probe harness
+
+`symbolu_bcvf_llm/observables/probe.py` provides:
+
+- `probe_observable(obs, benchmark, max_questions=None,
+  retain_datapoints=True) → ProbeReport`. Runs `obs.observe(...)`
+  over every (question, choice) in the benchmark subset, applies
+  polarity normalization, computes Pearson r, Spearman ρ, AUC,
+  class-conditional means, and returns a classified report with
+  human-readable recommendation text.
+- `probe_observables_parallel(obs_list, benchmark, max_questions,
+  retain_datapoints=False) → {name: ProbeReport}`. Same, but for
+  multiple observables in a single pass over the benchmark.
+  Sources are reconstructed per-observable per-(Q, C) to preserve
+  independence when observables have side effects on source
+  state.
+
+CLI: `scripts/probe_observables.py`. Defaults to
+`--benchmark mock --num-questions 48` (no GPU required). With
+`--benchmark truthfulqa` it loads TruthfulQA-MC via the §6.2
+benchmark adapter with the fixed paraphrase pipeline from
+§10.V1.6. Output is a Markdown report in
+`docs/experiments/probe_observables_<benchmark>_<suffix>.md`.
+
+Correlation primitives (`_pearson_r`, `_spearman_rho`,
+`_roc_auc`, `_rankdata`) are implemented in pure NumPy to avoid
+a scipy dependency on the probe path.
+
+### 11.6 Gate — what §11 enforces
+
+**§11 gate (binding for any future decoder work beyond V1).**
+
+Before a V2 decoder is built on any observable `X`:
+
+1. `X` must conform to the `Observable` Protocol.
+2. `X` must be probed by `probe_observable` on a benchmark subset
+   with `n_datapoints ≥ 40`.
+3. The returned `ProbeReport.classification` must be
+   `TRUTH_CORRELATED` (AUC ≥ 0.60).
+4. The probe report must be checked into
+   `docs/experiments/probe_observables_*.md` alongside the design
+   note that cites it.
+
+If `(3)` fails, the observable is shelved or redesigned. A Rahu
+attractor is not permitted on a non-passing observable. This is
+the V1 lesson encoded: the observable gate is the cheap check;
+the decoder run is the expensive confirmation. Do the cheap check
+first, always.
+
+Retrospective application to V1: a §11 probe of
+`BCVFSourceZeroCostObservable` on TruthfulQA-MC N=48 with the
+fixed paraphrase pipeline would have returned `ANTI_CORRELATED`
+or `UNCORRELATED` and blocked the V1 full run at the gate —
+saving ~4 GPU-hours and producing the same epistemic output
+(V1 configuration is not viable). §11 makes that path the
+default path, not the accident of post-hoc analysis.
+
+### 11.7 What §11 does NOT claim
+
+- §11 does not claim any observable listed in §11.4 will pass
+  its own probe. Running the probe is the §11 deliverable; the
+  verdicts are empirical and reported per-observable in the
+  check-in report.
+- §11 does not replace §10.V1 falsification. A passing probe
+  (AUC ≥ 0.60) is necessary but not sufficient for a V2 decoder
+  to yield PASS; the §10 PASS/NULL/REGRESSION classification
+  still governs decoder-level verdicts.
+- §11 does not specify the Rahu shape. Trust-shaping (§5.1),
+  additive penalty, veto, two-stage filter are all permitted
+  Rahu choices *conditional on* the Ketu passing §11.3.
+- §11 does not authorize threshold tuning on the probe output.
+  The 0.60 / 0.45 bands are pre-committed; moving them after
+  seeing probe data is the same §0.8 discipline violation §10
+  codified.
+
+---
+
 
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._

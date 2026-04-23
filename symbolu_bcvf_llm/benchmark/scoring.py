@@ -152,3 +152,65 @@ def score_choice_trust(
     t_cfg = trust_config or TrustShaperConfig()
     prob_fn = _make_trust_prob_fn(len(sources), cfg, t_cfg)
     return _score_with_prob_fn(sources, choice_tokens, prob_fn)
+
+
+# --------------------------------------------------------------------------- #
+# §6.2 Phase 2 fast scoring paths — single forward-pass per source
+# --------------------------------------------------------------------------- #
+
+def _has_batched_scoring(source: Source) -> bool:
+    """True if the source implements ``score_teacher_forced``."""
+    return callable(getattr(source, "score_teacher_forced", None))
+
+
+def score_choice_vanilla_batched(
+    sources: Sequence[Source],
+    choice_tokens: Sequence[int],
+    log_floor: float = 1e-30,
+) -> float:
+    """Fast §1.10 A0 baseline: single forward pass on source 0 via
+    ``score_teacher_forced``. Sums log-prob of the target tokens.
+
+    Assumes ``sources[0]`` implements `BatchedScoringSource`. Caller
+    verifies via `_has_batched_scoring` before invoking.
+    """
+    if not _has_batched_scoring(sources[0]):
+        raise TypeError(
+            "score_choice_vanilla_batched requires source 0 to implement "
+            "score_teacher_forced; use score_choice_vanilla for fallback."
+        )
+    tgt = list(int(t) for t in choice_tokens)
+    probs = sources[0].score_teacher_forced(tgt)  # (K, V) fp64
+    total = 0.0
+    for k, target in enumerate(tgt):
+        p = float(probs[k, target])
+        total += math.log(max(p, log_floor))
+    return total
+
+
+def score_choice_blend_batched(
+    sources: Sequence[Source],
+    choice_tokens: Sequence[int],
+    log_floor: float = 1e-30,
+) -> float:
+    """Fast §1.10 conventional-blend baseline: one forward pass per
+    source (M passes total, not M × K). Equal-weight average of per-
+    position probabilities, then log-prob of target.
+
+    All sources must implement `BatchedScoringSource`. Caller checks.
+    """
+    if not all(_has_batched_scoring(s) for s in sources):
+        raise TypeError(
+            "score_choice_blend_batched requires every source to implement "
+            "score_teacher_forced; use score_choice_blend for fallback."
+        )
+    tgt = list(int(t) for t in choice_tokens)
+    # Stack per-source per-position probabilities.
+    per_source = [s.score_teacher_forced(tgt) for s in sources]  # each (K, V)
+    stacked = np.stack(per_source, axis=0)  # (M, K, V)
+    avg = stacked.mean(axis=0)              # (K, V)
+    total = 0.0
+    for k, target in enumerate(tgt):
+        p = float(avg[k, target])
+        total += math.log(max(p, log_floor))
+    return total

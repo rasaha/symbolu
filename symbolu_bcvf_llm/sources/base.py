@@ -64,6 +64,39 @@ class Source(Protocol):
         ...
 
 
+@runtime_checkable
+class BatchedScoringSource(Source, Protocol):
+    """Optional extension — a source that can teacher-force score a
+    sequence in one forward pass (§6.2 Phase 2 optimization).
+
+    Sources that implement this protocol provide a fast path for
+    vanilla + blend scoring by computing log-probs for all target
+    tokens in a single batched forward pass, instead of the
+    per-token lookahead/commit loop. BCVF-trust scoring continues to
+    use the speculation-based path to preserve §2.3.2 semantics.
+
+    Implementors: `HuggingFaceSource` (§4.4). Callers: the §6.3
+    `score_choice_vanilla` / `score_choice_blend` when the source
+    satisfies this protocol; fallback to per-token loop otherwise.
+    """
+
+    def score_teacher_forced(
+        self, target_tokens: "np.ndarray | list[int]"
+    ) -> np.ndarray:
+        """Return fp64 per-position probabilities given teacher-forcing.
+
+        For each position `k ∈ [0, K-1]` (K = len(target_tokens)),
+        produce the full probability vector `p(· | prompt ⊕ target[:k])`.
+        The caller indexes into these to compute log P(target[k]).
+
+        Returns: shape (K, V) fp64.
+
+        MUST NOT mutate the source's committed-prefix state — leaves
+        `self` in the same state as before the call.
+        """
+        ...
+
+
 def stable_softmax(z: np.ndarray, axis: int = -1) -> np.ndarray:
     """Numerically-stable softmax returning fp32 regardless of input dtype.
 
