@@ -1,23 +1,26 @@
 """Coherence-anchored BCVF observables.
 
-§11.11 hypothesis test: pure BCVF is scale-free and direction-free —
-it detects disagreement but not truth. When same-model paraphrases
-confidently agree on a hallucinated distractor, BCVF reports "low
-cost = high trust" in the wrong direction.
+§11.11 hypothesis test: V1-V3 probes showed pure BCVF is sign-free
+and direction-free — it detects disagreement but can't tell truth
+from consensus hallucination. Adding a truth-direction anchor (per
+the SCC `C' = C × S` pattern) should surface signal that neither
+factor alone carries.
 
-The SCC-style fix couples BCVF to a semantic-alignment anchor:
+Two variants:
 
-    scalar = stability × alignment
-    stability = 1 / (1 + bcvf_total_cost)          ∈ (0, 1]
-    alignment = P(first_token_of_choice | prompt)   ∈ [0, 1]
+  CoherenceAnchoredBCVFObservable
+    scalar = 1/(1+bcvf_total_cost) × P(first_token | prompt)
+    Aggregate stability × first-token alignment. Cheap; no state
+    mutation; shared sources.
 
-High scalar requires BOTH high cross-source stability AND the base
-model finding the candidate plausible. Mirrors the autonomy pattern
-of pairing a fault detector with a direction sensor — BCVF supplies
-stability, the teacher-forced answer-probability supplies direction.
+  CoherenceAnchoredBCVFPerStepObservable
+    scalar = 1/(1+max_step_bcvf_cost) × geo_mean(P(t_i | prefix))
+    Per-step stability × per-step geometric-mean alignment. Walks
+    the teacher-forced answer path, commits between steps;
+    requires_isolated_sources = True.
 
-Matches the SCC `C' = C × S` pattern with a minimum-knob instance
-(no α,β,γ,δ — just the two factors) to stay §0.8-compliant.
+Both match the SCC `C' = C × S` pattern with a minimum-knob
+instance (no α,β,γ,δ — just the two factors) to stay §0.8-compliant.
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ from typing import Sequence
 
 import numpy as np
 
-from symbolu_bcvf_llm.core import BCVFLLMConfig
+from symbolu_bcvf_llm.core import BCVFLLMConfig, compute_bcvf_cost
 from symbolu_bcvf_llm.sources.base import Source
 
 from .base import ObservableValue
@@ -88,5 +91,106 @@ class CoherenceAnchoredBCVFObservable:
                 "alignment": alignment,
                 "bcvf_total_cost": float(result.total_cost),
                 "first_token": first_token,
+            },
+        )
+
+
+class CoherenceAnchoredBCVFPerStepObservable:
+    """scalar = 1/(1 + max_step_bcvf) × geo_mean(P(t_i | prefix)).
+
+    Per-step SCC instance: walks the teacher-forced answer path,
+    computes BCVF at every step (matching BCVFPerStepMaxObservable's
+    reduction), and teacher-forces source 0 through the answer to
+    get a per-step probability trajectory for the alignment factor.
+
+    Stability factor: `1 / (1 + max_t bcvf_total_cost(step_t))`.
+    Max over steps — matches the reduction that surfaced signal on
+    HaluEval at §11.11 (AUC 0.673).
+
+    Alignment factor: `exp(mean_t log P(token_t | prompt, tokens_0..t-1))`
+    — geometric mean of teacher-forced per-step probabilities on
+    source 0. Geometric mean is the correct combiner for
+    multi-token answer-likelihood: robust to answer length, reflects
+    the per-step plausibility trajectory rather than one surprising
+    token or one confident token.
+
+    Polarity: trust (higher = more trusted).
+    Opt-in to isolated sources because commit() mutates source state.
+    """
+
+    name: str = "coherence_anchored_bcvf_per_step"
+    higher_means_more_suspicious: bool = False
+    requires_isolated_sources: bool = True
+
+    def __init__(self, bcvf_config: "BCVFLLMConfig | None" = None) -> None:
+        self._cfg = bcvf_config or BCVFLLMConfig()
+
+    def observe(
+        self,
+        sources: Sequence[Source],
+        prompt_tokens: Sequence[int],
+        choice_tokens: Sequence[int],
+    ) -> ObservableValue:
+        n = len(choice_tokens)
+        if n == 0:
+            # Degenerate fallback: pure aggregate stability, alignment=1
+            result, per_source = _run_bcvf(sources, self._cfg)
+            stability = 1.0 / (1.0 + float(result.total_cost))
+            return ObservableValue(
+                scalar=stability,
+                per_source=per_source,
+                metadata={
+                    "stability": stability,
+                    "alignment": 1.0,
+                    "max_step_bcvf": float(result.total_cost),
+                    "geo_mean_log_prob": 0.0,
+                    "n_steps": 0,
+                    "per_step_costs": [],
+                    "per_step_source_0_costs": [],
+                },
+            )
+
+        step_bcvf_costs: list = []
+        step_source_0_costs: list = []
+        step_log_probs: list = []
+
+        for t in range(n):
+            probs_list = [s.lookahead()[0].astype(np.float64) for s in sources]
+            masks_list = [s.lookahead()[1] for s in sources]
+            result = compute_bcvf_cost(
+                probs_list, self._cfg, valid_masks=masks_list,
+            )
+            step_bcvf_costs.append(float(result.total_cost))
+            step_source_0_costs.append(
+                float(result.per_source_costs.get(0, 0.0))
+            )
+
+            token = int(choice_tokens[t])
+            # Source 0's next-token probability at lookahead position 0
+            p_token = float(probs_list[0][0, token])
+            step_log_probs.append(float(np.log(max(p_token, 1e-30))))
+
+            if t < n - 1:
+                for s in sources:
+                    s.commit(token)
+
+        max_bcvf = max(step_bcvf_costs)
+        stability = 1.0 / (1.0 + max_bcvf)
+
+        geo_mean_log_prob = float(np.mean(step_log_probs))
+        alignment = float(np.exp(geo_mean_log_prob))
+
+        scalar = stability * alignment
+
+        return ObservableValue(
+            scalar=scalar,
+            metadata={
+                "stability": stability,
+                "alignment": alignment,
+                "max_step_bcvf": max_bcvf,
+                "geo_mean_log_prob": geo_mean_log_prob,
+                "n_steps": n,
+                "per_step_costs": step_bcvf_costs,
+                "per_step_source_0_costs": step_source_0_costs,
             },
         )

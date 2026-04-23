@@ -7,10 +7,13 @@ from typing import List
 import numpy as np
 import pytest
 
+from symbolu_bcvf_llm.benchmark.dataset import MockBenchmark
 from symbolu_bcvf_llm.observables.base import ObservableValue
 from symbolu_bcvf_llm.observables.coherence import (
     CoherenceAnchoredBCVFObservable,
+    CoherenceAnchoredBCVFPerStepObservable,
 )
+from symbolu_bcvf_llm.observables.probe import probe_observables_parallel
 from symbolu_bcvf_llm.sources.mock import MockSource
 
 
@@ -139,3 +142,109 @@ def test_does_not_mutate_source_state():
     obs.observe(srcs, [1, 2], [3])
     after = [s.committed_prefix for s in srcs]
     assert before == after
+
+
+# --------------------------------------------------------------------------- #
+# CoherenceAnchoredBCVFPerStepObservable
+# --------------------------------------------------------------------------- #
+
+
+def test_per_step_returns_scalar_float():
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    v = obs.observe(_make_agreeing_sources(), [1, 2], [3, 3, 3])
+    assert isinstance(v, ObservableValue)
+    assert isinstance(v.scalar, float)
+
+
+def test_per_step_polarity_is_trust():
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    assert obs.higher_means_more_suspicious is False
+
+
+def test_per_step_requires_isolated_sources():
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    assert obs.requires_isolated_sources is True
+
+
+def test_per_step_metadata_shape():
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    choice = [3, 3, 3]
+    v = obs.observe(_make_agreeing_sources(), [1], choice)
+    for k in ("stability", "alignment", "max_step_bcvf",
+              "geo_mean_log_prob", "n_steps",
+              "per_step_costs", "per_step_source_0_costs"):
+        assert k in v.metadata
+    assert v.metadata["n_steps"] == len(choice)
+    assert len(v.metadata["per_step_costs"]) == len(choice)
+
+
+def test_per_step_agreeing_sources_stability_is_one():
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    v = obs.observe(_make_agreeing_sources(), [1], [3, 3, 3])
+    assert v.metadata["max_step_bcvf"] == pytest.approx(0.0, abs=1e-10)
+    assert v.metadata["stability"] == pytest.approx(1.0, abs=1e-10)
+
+
+def test_per_step_alignment_high_when_choices_match_peak():
+    """Source 0 peaks on token 3 at every position; choice = [3, 3, 3].
+    Every step's P(token=3) ≈ 1, so geo_mean ≈ 1, alignment ≈ 1."""
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    v = obs.observe(_make_agreeing_sources(V=8, top=3), [1], [3, 3, 3])
+    assert v.metadata["alignment"] > 0.9
+
+
+def test_per_step_alignment_low_when_choices_diverge_from_peak():
+    """Source 0 peaks on token 3; choice = [5, 5, 5] → P(5) ≈ 0 at every
+    step → geo_mean ≈ 0 → alignment ≈ 0."""
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    v = obs.observe(_make_agreeing_sources(V=8, top=3), [1], [5, 5, 5])
+    assert v.metadata["alignment"] < 1e-5
+
+
+def test_per_step_empty_choice_returns_pure_stability():
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    v = obs.observe(_make_agreeing_sources(), [1], [])
+    # Fallback: alignment = 1, scalar = stability
+    assert v.metadata["n_steps"] == 0
+    assert v.metadata["alignment"] == 1.0
+    assert v.scalar == v.metadata["stability"]
+
+
+def test_per_step_scalar_equals_stability_times_alignment():
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    v = obs.observe(_make_agreeing_sources(V=8, top=3), [1], [3, 3, 3])
+    expected = v.metadata["stability"] * v.metadata["alignment"]
+    assert v.scalar == pytest.approx(expected, abs=1e-10)
+
+
+def test_per_step_advances_source_state_through_commits():
+    """For K-token choice, the observable commits K-1 tokens between
+    steps (one commit after each step except the last)."""
+    obs = CoherenceAnchoredBCVFPerStepObservable()
+    srcs = [
+        MockSource(lambda p: _peaked(8, 3), L=5, V=8, initial_prefix=[1, 2])
+        for _ in range(3)
+    ]
+    choice = [3, 3, 3]
+    obs.observe(srcs, [1, 2], choice)
+    # Each source started with prefix [1, 2]. After 3-token choice:
+    # K-1 = 2 commits happen (after step 0 and step 1). Last step
+    # doesn't commit.
+    for s in srcs:
+        assert list(s.committed_prefix) == [1, 2, 3, 3]
+
+
+def test_per_step_integrates_with_probe_harness_isolation():
+    """End-to-end via probe_observables_parallel. Each (Q, C) gets a
+    fresh source triple per the requires_isolated_sources flag."""
+    bench = MockBenchmark(num_questions=3)
+    reports = probe_observables_parallel(
+        [CoherenceAnchoredBCVFPerStepObservable()],
+        bench,
+        retain_datapoints=True,
+    )
+    r = reports["coherence_anchored_bcvf_per_step"]
+    assert r.n_datapoints == 6  # 3 questions × 2 choices
+    for dp in r.datapoints:
+        # MockBenchmark produces 3-token choices.
+        assert dp.observable_value.metadata["n_steps"] == 3
