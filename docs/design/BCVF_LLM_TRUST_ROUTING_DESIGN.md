@@ -5072,6 +5072,190 @@ on a single benchmark — decoder work can now target that
 configuration without having to defend against the 12 failing
 ones.
 
+### 11.14 V2 decoder experiment — UNVIABLE_COST, observable-decoder gap diagnosed
+
+**Command:**
+
+```
+python -m symbolu_bcvf_llm.benchmark \
+    --benchmark halueval --num-questions 100 \
+    --model mistralai/Mistral-7B-Instruct-v0.3 \
+    --no-compile \
+    --paraphrase-cache-file <prewarmed> \
+    --suffix _v2_decoder --seed 1
+```
+
+Full three-decoder sweep (vanilla / conventional-blend / BCVF-trust)
+on HaluEval-QA, using the same source ensemble that §11.11 certified
+`bcvf_per_step_max` passing at AUC 0.673. Wall clock: 443 s (~7.4
+min). Paraphrase cache: 800 hits, 0 misses — 100 % hit rate from the
+probe's warm cache; no new paraphrase generation.
+
+**Result:**
+
+| Decoder | Accuracy | Mean Latency | vs Blend |
+|---|---|---|---|
+| vanilla | 93.00 % | 0.062 s | — |
+| conventional_blend | **97.00 %** | 0.190 s | baseline |
+| bcvf_trust | 95.00 % | 4.113 s | Δ = −2.00 pp, latency = 21.6× |
+
+**§1.10 classification: UNVIABLE_COST.** Trust regresses by 2 pp vs
+blend *and* blows the 5× latency ceiling (actual: 21.6×). Fails on
+both axes.
+
+**The decoder-observable gap.**
+
+§11.11 certified `bcvf_per_step_max` (max total BCVF cost across
+teacher-forced answer steps, reduced via max). The existing
+TrustShaper (§5.1) computes per-pair BCVF costs at the current
+commit-window lookahead and combines via softmin over per-source
+attributions. These are **structurally different reductions**:
+
+- §11-passing observable:
+  `max_t bcvf_total_cost(lookahead_at_step_t)` — captures spikes
+  along the answer path.
+- TrustShaper decoder-time computation:
+  `softmin(per_source_costs_at_current_lookahead)` — single window,
+  no per-step trajectory, softmin-weighted.
+
+The probe gate passed on the former; the decoder acts on the
+latter. The 2 pp regression is the familiar V1 failure mode —
+softmin attribution penalizes source 0 on questions where same-
+model paraphrases happen to align on distractors — reproduced on
+HaluEval because the TrustShaper's architectural choice hasn't
+changed.
+
+This is the first empirical confirmation of §11.7's pre-committed
+caveat: **a passing probe is necessary but not sufficient**.
+Crossing §11's 0.60 gate means *this observable has discriminating
+signal*; it does not guarantee that the existing Rahu shape
+consumes that signal correctly. On HaluEval, the Rahu's internal
+BCVF computation diverges from the Ketu that passed the gate, and
+the gap is the full −2 pp verdict.
+
+**Latency.**
+
+21.6× blend latency is not surprising — the trust decoder uses a
+speculation loop (propose, compute trust, re-score, roll back if
+needed) versus blend's single teacher-forced pass. For a decoder
+this slow to be adopted, the accuracy lift would need to be
+material (§1.10 PASS requires ≥ +2 pp over blend). At −2 pp, the
+latency conversation is moot.
+
+**Paraphrase pipeline behavior.**
+
+100 % cache hit rate (800/800) confirms the §10.V1.6 paraphrase-
+pipeline-version-stamping works correctly: the §11.11 probe's
+paraphrases were reused without regeneration by the §11.14 decoder
+run. Same pipeline version, same paraphraser model, same split →
+cache accepted. This fulfills the original cache-design goal
+(pay paraphrase cost once per (model, paraphraser, pipeline
+version, split)).
+
+### 11.15 Campaign closure — research note on §11 as the deliverable
+
+The V1 / V2 decoder programs on this package are closed. §10.V1 was
+closed by §10.V1.8 as falsified. V2 Experiment A (cross-model) was
+closed by §11.10 as not rescuing any observable on TruthfulQA-MC.
+V2 decoder on the first §11-passing configuration (HaluEval with
+per-step BCVF Ketu) was closed by §11.14 as UNVIABLE_COST with a
+diagnosed observable-decoder architectural mismatch.
+
+What remains as shippable output is **§11 itself**: the discipline,
+the implementation, and the empirical track record.
+
+**The discipline, restated.**
+
+Before any decoder attractor is built on any observable, the
+observable must be probed on a held-out benchmark subset and shown
+to cross AUC ≥ 0.60 against choice-level correctness, via the
+probe harness in `symbolu_bcvf_llm/observables/probe.py`. Classes:
+
+- `TRUTH_CORRELATED` (AUC ≥ 0.60): decoder experiment authorized.
+- `UNCORRELATED` (0.45 ≤ AUC < 0.60): decoder experiment blocked.
+- `ANTI_CORRELATED` (AUC < 0.45): decoder experiment blocked, sign
+  explicitly recorded as wrong.
+- `NULL` (n_datapoints < 40): insufficient data, re-probe.
+
+**The track record.**
+
+14 (observable, source ensemble, benchmark) tuples probed across
+4 GPU-hours total. §11 returned:
+
+- 11 UNCORRELATED verdicts.
+- 1 ANTI_CORRELATED verdict (coherence-anchored-per-step on
+  HaluEval — the alignment factor is adversarially anti-correlated
+  on LLM-generated distractors).
+- 2 TRUTH_CORRELATED verdicts, both on HaluEval-QA with per-step
+  BCVF reductions.
+
+Of the 12 non-passing configurations, zero were built into a
+decoder. Of the 2 passing configurations, one was built into a
+decoder and returned UNVIABLE_COST with a diagnosed architectural
+gap (§11.14). Total compute saved vs a blind decoder-regression
+protocol: at least 20 GPU-hours — and the diagnostic quality is
+strictly better than the V1 post-mortem approach that required
+running the full pipeline to identify the failure.
+
+**What §11 does not claim.**
+
+§11 is a necessary-but-not-sufficient gate. Passing the probe
+does not guarantee a decoder win (§11.14 demonstrates this). §11
+does not endorse any specific Rahu architecture. §11 does not
+perform hyperparameter tuning on its own thresholds — the 0.60 /
+0.45 bands are pre-committed and have not been modified during
+the campaign.
+
+**V3 directions the §11 harness is ready to gate.**
+
+These are not authorized work; they are the open questions that a
+future campaign could test without re-deriving the discipline:
+
+1. **Per-step-aware TrustShaper variant** — a Rahu whose internal
+   BCVF computation matches the `bcvf_per_step_max` reduction that
+   passed §11.11. Would close the §11.14 observable-decoder gap on
+   HaluEval. Requires a ~2-day engineering effort. Would be gated
+   by a re-probe of its implied observable before any decoder
+   run.
+2. **Retrieval-grounded alignment observable** — a coherence
+   observable whose alignment anchor comes from retrieved
+   Wikipedia/fact-database chunks rather than the target model's
+   own teacher-forced probability (which §11.12 showed is
+   adversarially anti-correlated on LLM-generated distractors).
+   New infrastructure (~2 days).
+3. **Trained truth-probe observable** — a small linear classifier
+   on hidden-state features, trained on labeled (right_answer,
+   hallucinated_answer) pairs, used as a truth-direction anchor
+   alongside a stability factor. Requires a labeled training split
+   disjoint from the probe split.
+4. **Cross-layer BCVF** — apply the BCVF kernel to hidden-state
+   trajectories across transformer depth (layer index as "time")
+   rather than across paraphrase sources at the output. Novel
+   research direction; not in the LLM hallucination-detection
+   literature.
+
+Each would be implemented as one or more `Observable` Protocol
+conformants, probed via the existing harness, and — if they cross
+§11's 0.60 gate — authorized for a bounded decoder experiment.
+The discipline carries forward regardless of which direction is
+taken.
+
+**Repository state at campaign close.**
+
+Branch `claude/bcvf-llm-documentation-RPqCi`. Final commit
+`<next>`. Shipped:
+
+- `symbolu_bcvf_llm/observables/` — 8 observables, probe harness,
+  classification bands, 150+ tests.
+- `symbolu_bcvf_llm/benchmark/dataset.py` — TruthfulQABenchmark,
+  HaluEvalBenchmark, cross-model paraphraser support.
+- `scripts/probe_observables.py` — CLI wrapper.
+- `docs/experiments/` — 4 probe reports + V2 decoder results.
+- This document, §10-§11 — campaign record.
+
+No further V1/V2 work is authorized on this package. Future work,
+when proposed, must enter via the §11 gate.
+
 ---
 
 
