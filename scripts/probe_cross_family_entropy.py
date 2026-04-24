@@ -119,6 +119,10 @@ class QuestionResult:
     # §13.10 while preserving family attribution for the JSON dump.
     samples: List[str]
     sample_model_ids: List[int]
+    # Per-model prompt strings. Equal across models when --chat-template
+    # is off (all use the shared "Q: ... A:" completion format, matching
+    # §13.10). Diverge per family when --chat-template is on.
+    prompts_by_model: List[str]
     greedy: str
     label_model_idx: int
     cluster_ids: List[int]
@@ -242,21 +246,69 @@ def semantic_entropy_nats(cluster_ids: List[int]) -> float:
     return float(-np.sum(p * np.log(p)))
 
 
+def build_prompt_for_tokenizer(
+    tokenizer, q_text: str, include_context: bool,
+    knowledge: Optional[str], use_chat_template: bool,
+) -> str:
+    """Build the prompt string for a specific tokenizer.
+
+    When ``use_chat_template`` is False (default, §13.10 parity): returns
+    the classic ``"Q: ... A:"`` completion format, identical across all
+    tokenizers in the run. This is what §13.11's initial pass used and
+    what TruthfulQA-MC returned AUC 0.633 on.
+
+    When ``use_chat_template`` is True (diagnostic mode for the TruthfulQA
+    split): wraps the question as a ``user`` message and applies the
+    tokenizer's ``chat_template``. Produces per-family prompt strings —
+    ChatML for Qwen (``<|im_start|>user`` etc.), Llama-3 tags for Llama
+    (``<|begin_of_text|><|start_header_id|>user<|end_header_id|>`` etc.),
+    ``[INST] ... [/INST]`` for Mistral. Tests whether Llama and Mistral's
+    high singleton-cluster rates were driven by prompt-format mismatch
+    rather than genuine cross-family divergence.
+
+    Per-family chat templates include their own special tokens (BOS, role
+    markers). The caller must pair this with ``add_special_tokens=False``
+    in the subsequent tokenizer(...) call to avoid double-BOS.
+    """
+    if include_context and knowledge:
+        user_content = f"{knowledge}\n\nQuestion: {q_text}"
+    else:
+        user_content = q_text
+
+    if use_chat_template:
+        if getattr(tokenizer, "chat_template", None) is None:
+            raise RuntimeError(
+                f"Tokenizer {tokenizer.name_or_path!r} has no chat_template; "
+                "cannot run with --chat-template."
+            )
+        messages = [{"role": "user", "content": user_content}]
+        return tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+        )
+    # Completion-style — identical to §13.10 and the §13.11 initial pass.
+    if include_context and knowledge:
+        return f"{knowledge}\n\nQ: {q_text}\nA:"
+    return f"Q: {q_text}\nA:"
+
+
 def generate_samples(
     model, tokenizer, prompt: str, k: int, temperature: float,
     max_new_tokens: int, device: str, seed: int,
+    add_special_tokens: bool = True,
 ) -> List[str]:
     """Sample `k` completions from (model, tokenizer). Returns decoded
     strings with the prompt prefix stripped.
 
-    Same implementation as §13.10; this script calls it once per model
-    in the configured list so each family contributes K samples to
-    the pooled set.
+    ``add_special_tokens`` defaults to True for §13.10 parity on
+    completion-style prompts. Callers using chat-templated prompts
+    (built via ``build_prompt_for_tokenizer`` with
+    ``use_chat_template=True``) must pass ``add_special_tokens=False``
+    because the chat template already emits BOS / role tokens.
     """
     import torch
 
     torch.manual_seed(seed)
-    enc = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)
+    enc = tokenizer(prompt, return_tensors="pt", add_special_tokens=add_special_tokens)
     input_ids = enc.input_ids.to(device)
     attention_mask = torch.ones_like(input_ids)
     prompt_len = input_ids.shape[1]
@@ -280,13 +332,17 @@ def generate_samples(
 
 def generate_greedy(
     model, tokenizer, prompt: str, max_new_tokens: int, device: str,
+    add_special_tokens: bool = True,
 ) -> str:
     """Deterministic T=0 completion from (model, tokenizer). Used by
     the label model to produce the greedy reference for correctness
-    labeling, matching §13.10's methodology."""
+    labeling, matching §13.10's methodology.
+
+    ``add_special_tokens`` defaults to True; see ``generate_samples``
+    for the chat-template note."""
     import torch
 
-    enc = tokenizer(prompt, return_tensors="pt", add_special_tokens=True)
+    enc = tokenizer(prompt, return_tensors="pt", add_special_tokens=add_special_tokens)
     input_ids = enc.input_ids.to(device)
     attention_mask = torch.ones_like(input_ids)
     prompt_len = input_ids.shape[1]
@@ -472,6 +528,20 @@ def main() -> int:
         help="MNLI-trained classifier for entailment checks. Same "
              "default as §13.10.",
     )
+    parser.add_argument(
+        "--chat-template", action="store_true",
+        help="Apply each tokenizer's apply_chat_template() to wrap the "
+             "question as a user message (ChatML for Qwen, Llama-3 tags "
+             "for Llama, [INST] for Mistral). Default False — §13.10 "
+             "'Q: ... A:' completion format, shared across all families. "
+             "Enable as a §13.11 diagnostic to test whether prompt-format "
+             "mismatch drove the TruthfulQA-MC AUC 0.633 anti-finding "
+             "while HaluEval-QA cleared 0.716. Pre-commitment: a strong "
+             "lift on TruthfulQA-MC under --chat-template (≥ 0.68, into "
+             "the SATURATION band) reclassifies the §13.11 pre-committed "
+             "result. No lift means the prompt-format hypothesis is "
+             "falsified and the combined ANTI_FINDING stands.",
+    )
     parser.add_argument("--k-samples", type=int, default=10,
                         help="Samples per model per question. Pool "
                              "size is M×K (default 3×10 = 30).")
@@ -494,6 +564,18 @@ def main() -> int:
         parser.error(
             f"--label-model-idx {args.label_model_idx} out of range for "
             f"{len(args.models)} configured models."
+        )
+
+    # Auto-suffix the output filenames when --chat-template is on and the
+    # user didn't supply their own suffix. Prevents silently overwriting
+    # the §13.11 initial-pass reports (the ones that produced the 0.633
+    # / 0.716 result) with diagnostic variant numbers.
+    if args.chat_template and not args.suffix:
+        args.suffix = "_chat"
+        print(
+            "Auto-applied --suffix=_chat to keep diagnostic outputs "
+            "separate from the §13.11 initial-pass reports.",
+            flush=True,
         )
 
     import torch
@@ -566,6 +648,7 @@ def main() -> int:
     t_start = time.perf_counter()
 
     for q_idx, row in enumerate(ds):
+        knowledge: Optional[str] = None
         if args.benchmark == "truthfulqa_mc":
             q_text = row["question"]
             choices = list(row["mc1_targets"]["choices"])
@@ -575,15 +658,24 @@ def main() -> int:
             distractors = [
                 c for i, c in enumerate(choices) if i != correct_index
             ]
-            prompt = f"Q: {q_text}\nA:"
         else:  # halueval_qa
             q_text = row["question"]
             correct_choice = row["right_answer"]
             distractors = [row["hallucinated_answer"]]
-            if args.include_context and row.get("knowledge"):
-                prompt = f"{row['knowledge']}\n\nQ: {q_text}\nA:"
-            else:
-                prompt = f"Q: {q_text}\nA:"
+            if args.include_context:
+                knowledge = row.get("knowledge")
+
+        # Build per-model prompts. Identical across models unless
+        # --chat-template is on, in which case each family gets its
+        # own tokenizer's chat template applied.
+        prompts_by_model = [
+            build_prompt_for_tokenizer(
+                tok, q_text, args.include_context, knowledge,
+                args.chat_template,
+            )
+            for tok in tokenizers
+        ]
+        label_prompt = prompts_by_model[args.label_model_idx]
 
         # Sample K completions from EACH model, pooling into a flat
         # list with parallel source-id tracking. The seed is perturbed
@@ -591,19 +683,23 @@ def main() -> int:
         # that could couple their sampling streams in unintended ways.
         pooled_samples: List[str] = []
         pooled_model_ids: List[int] = []
-        for m_idx, (tok, mdl) in enumerate(zip(tokenizers, models)):
+        for m_idx, (tok, mdl, prompt_m) in enumerate(
+            zip(tokenizers, models, prompts_by_model)
+        ):
             samples_m = generate_samples(
-                mdl, tok, prompt,
+                mdl, tok, prompt_m,
                 k=args.k_samples, temperature=args.temperature,
                 max_new_tokens=args.max_new_tokens, device=device,
                 seed=args.seed + q_idx * len(models) + m_idx,
+                add_special_tokens=(not args.chat_template),
             )
             pooled_samples.extend(samples_m)
             pooled_model_ids.extend([m_idx] * len(samples_m))
 
         greedy = generate_greedy(
-            label_mdl, label_tok, prompt,
+            label_mdl, label_tok, label_prompt,
             max_new_tokens=args.max_new_tokens, device=device,
+            add_special_tokens=(not args.chat_template),
         )
 
         cluster_ids = cluster_pooled_by_entailment(
@@ -615,10 +711,11 @@ def main() -> int:
         )
 
         results.append(QuestionResult(
-            q_idx=q_idx, question=q_text, prompt=prompt,
+            q_idx=q_idx, question=q_text, prompt=label_prompt,
             correct_choice=correct_choice, distractors=distractors,
             samples=pooled_samples,
             sample_model_ids=pooled_model_ids,
+            prompts_by_model=prompts_by_model,
             greedy=greedy,
             label_model_idx=args.label_model_idx,
             cluster_ids=cluster_ids,
@@ -744,6 +841,15 @@ def main() -> int:
         f"(index {args.label_model_idx}, Qwen default per §13.10 "
         f"comparability)",
         f"- **NLI model:** `{args.nli_model}`",
+        (
+            f"- **Prompt format:** per-family chat templates "
+            f"(apply_chat_template) — §13.11 diagnostic variant"
+            if args.chat_template
+            else (
+                "- **Prompt format:** shared `Q: ... A:` completion "
+                "(§13.10 parity)"
+            )
+        ),
         f"- **Benchmark:** `{args.benchmark}`",
         (
             "- **Dataset:** `truthful_qa / multiple_choice / validation`"
@@ -839,6 +945,7 @@ def main() -> int:
                     "nli_model": args.nli_model,
                     "benchmark": args.benchmark,
                     "include_context": bool(args.include_context),
+                    "chat_template": bool(args.chat_template),
                     "num_questions": args.num_questions,
                     "k_samples": args.k_samples,
                     "temperature": args.temperature,
@@ -871,6 +978,7 @@ def main() -> int:
                         "distractors": r.distractors,
                         "greedy": r.greedy,
                         "label_model_idx": r.label_model_idx,
+                        "prompts_by_model": r.prompts_by_model,
                         "samples": r.samples,
                         "sample_model_ids": r.sample_model_ids,
                         "cluster_ids": r.cluster_ids,
