@@ -172,8 +172,11 @@ class HuggingFaceSource:
         self._past_key_values = out.past_key_values
         # Start with the prompt-final logits at position 0 of the lookahead.
         step0_logits = out.logits[0, -1, :].to(torch.float32).cpu().numpy()
+        # Internal storage uses the MODEL'S vocab (config.vocab_size),
+        # which may exceed the effective `self.vocab_size` when a cap
+        # is set. Slicing happens on output in `lookahead()`.
         self._lookahead_logits = np.zeros(
-            (self.L, self.vocab_size), dtype=np.float32
+            (self.L, self._full_vocab_size), dtype=np.float32
         )
         self._lookahead_logits[0, :] = step0_logits
         self._lookahead_token_ids = np.zeros(self.L, dtype=np.int64)
@@ -277,7 +280,11 @@ class HuggingFaceSource:
         shifted = logits_slice - logits_slice.amax(dim=-1, keepdim=True)
         exp = torch.exp(shifted)
         probs = exp / exp.sum(dim=-1, keepdim=True)
-        return probs.cpu().numpy()
+        probs_np = probs.cpu().numpy()
+        if self._slice_vocab:
+            probs_np = probs_np[:, : self.vocab_size]
+            probs_np = probs_np / probs_np.sum(axis=-1, keepdims=True)
+        return probs_np
 
     # §12.5 cross-layer logit-lens ----------------------------------- #
 
