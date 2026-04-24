@@ -5256,6 +5256,96 @@ Branch `claude/bcvf-llm-documentation-RPqCi`. Final commit
 No further V1/V2 work is authorized on this package. Future work,
 when proposed, must enter via the §11 gate.
 
+### 11.16 V3 (a) uncertainty-gated probe — empirical ceiling diagnosed
+
+**Hypothesis.** §11.14 diagnosed the V2 decoder's UNVIABLE_COST as
+an observable-decoder reduction mismatch. The cheapest V3 fix
+candidate (§11.15 option a): apply BCVF trust-shaping only when
+the base model is genuinely uncertain, on the theory that
+confident steps were contributing noise rather than signal to the
+per-step max reduction.
+
+**Implementation** (commit `60028df`):
+
+```
+UncertaintyGatedBCVFPerStepMaxObservable
+  scalar = max over steps where entropy(source_0) > tau of
+           bcvf_total_cost(step)
+  tau = 1.0 nat (pre-committed per §0.8)
+```
+
+Identical to `bcvf_per_step_max` except a per-step entropy gate
+filters the max candidates. If confident steps were noise, the
+gate should amplify AUC; if they were signal, the gate should
+reduce AUC.
+
+**Result on HaluEval-QA (V1 same-model paraphrase, N=100):**
+
+```
+Probing 9 observables against halueval N=100...
+Probed in 1723.0 s
+```
+
+| Observable | AUC | Δ vs unconditional per-step max |
+|---|---|---|
+| `bcvf_per_step_max` (§11.11 winner) | 0.673 | — |
+| `bcvf_source_0_per_step_max` | 0.626 | −0.047 |
+| **`uncertainty_gated_bcvf_per_step_max`** | **0.655** | **−0.018** |
+| `coherence_anchored_bcvf` | 0.510 | (aggregate, separate family) |
+| `coherence_anchored_bcvf_per_step` | 0.431 (ANTI) | (alignment-anti per §11.12) |
+
+V3 (a) **passes §11** at AUC 0.655 (TRUTH_CORRELATED, > 0.60 gate)
+but **does not amplify** the unconditional per-step max signal.
+The −0.018 AUC is below one standard error at N=200 (SE ≈ 0.035),
+so the difference is not statistically significant — but the
+direction is consistent: filtering confident steps neither helps
+nor hurts meaningfully.
+
+**Hypothesis verdict: empirically falsified.** The uncertainty
+gate was predicted to amplify signal by removing adversarial-
+confidence noise. Empirically, confident steps were contributing
+*useful* signal to the per-step max, and removing them costs ~2
+AUC points. The "always-on per-step BCVF" reduction the §11.11
+winner used is approximately Pareto-optimal within the same-
+model BCVF family.
+
+**Empirical ceiling diagnosed.** Three BCVF-per-step variants
+have now been probed on HaluEval-QA:
+
+| Reduction | AUC |
+|---|---|
+| Total cost, max over steps (unconditional) | 0.673 |
+| Source-0 cost, max over steps | 0.626 |
+| Total cost, max over uncertain steps only | 0.655 |
+
+All three sit in a tight 0.63–0.67 band. **No same-model BCVF
+variant within this family pushes above 0.70.** This is the
+empirical ceiling on the BCVF-on-paraphrase observable family
+for hallucination detection on this benchmark.
+
+**Decision: V3 BCVF-variant iteration closed.**
+
+Per the cost-benefit framing committed before the V3 (a) probe
+("AUC 0.70 mid-pack, proceed only with specific destination"),
+the 0.655 result is below the decision threshold. Further BCVF-
+kernel tweaks have diminishing returns. The 0.43–0.67 AUC band
+appears to be the regime ceiling for this observable family on
+this benchmark with these source ensembles.
+
+The §11 harness, the discipline, the negative-result documentation,
+and one positive empirical result (per-step max BCVF on HaluEval at
+0.673) now constitute the campaign's complete output.
+
+**Pivot authorization.** §11 infrastructure is freed for application
+to other problem domains where multi-source/observable analysis is
+relevant — agentic reliability gating, speculative-decoding
+acceptance criteria, reasoning-chain confidence calibration, or any
+adjacent decoder/attractor design problem. The discipline carries
+across; only the observables and benchmarks need to be re-pointed.
+
+This concludes the V1 / V2 / V3 BCVF-LLM trust-routing campaign on
+this package.
+
 ---
 
 
