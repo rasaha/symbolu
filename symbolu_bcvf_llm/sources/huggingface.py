@@ -75,6 +75,7 @@ class HuggingFaceSource:
         prompt: str,
         L: int = 5,
         device: Optional[str] = None,
+        max_vocab_size: Optional[int] = None,
     ) -> None:
         try:
             import torch  # noqa: F401 — runtime-only import
@@ -91,9 +92,28 @@ class HuggingFaceSource:
         self._model = model
         self._tokenizer = tokenizer
         self.L = L
-        self.vocab_size = int(getattr(model.config, "vocab_size", 0)) or (
+        # config.vocab_size may be padded (e.g. Qwen-2.5-7B pads from
+        # 151936 tokenizer vocab to 152064 model vocab — a multiple of
+        # 128). max_vocab_size lets callers cap the effective V for
+        # cross-model kernel compatibility (e.g. spec-dec's
+        # target+draft pair where each model pads differently).
+        config_vocab = int(getattr(model.config, "vocab_size", 0)) or (
             len(tokenizer)
         )
+        if max_vocab_size is not None:
+            if max_vocab_size < 1:
+                raise ValueError("max_vocab_size must be >= 1")
+            if max_vocab_size > config_vocab:
+                raise ValueError(
+                    f"max_vocab_size={max_vocab_size} exceeds model "
+                    f"config.vocab_size={config_vocab}"
+                )
+            self.vocab_size = int(max_vocab_size)
+            self._slice_vocab = (self.vocab_size < config_vocab)
+        else:
+            self.vocab_size = config_vocab
+            self._slice_vocab = False
+        self._full_vocab_size = config_vocab
         self.eos_token_id = getattr(tokenizer, "eos_token_id", None)
         self._device = device or str(next(model.parameters()).device)
 
@@ -116,6 +136,13 @@ class HuggingFaceSource:
         assert self._lookahead_logits is not None
         assert self._lookahead_token_ids is not None
         probs = stable_softmax(self._lookahead_logits, axis=-1)
+        if self._slice_vocab:
+            probs = probs[:, : self.vocab_size]
+            # Renormalize per row so each position sums to 1 after
+            # dropping the padded-tail dims. Numerically safe because
+            # padded entries have near-zero mass (model rarely predicts
+            # padded token IDs).
+            probs = probs / probs.sum(axis=-1, keepdims=True)
         mask = truncating_valid_mask(
             self._lookahead_token_ids, self.eos_token_id, self.L
         )
@@ -295,4 +322,8 @@ class HuggingFaceSource:
             shifted = logits - logits.max()
             exp = np.exp(shifted)
             per_layer.append(exp / exp.sum())
-        return np.stack(per_layer, axis=0)  # (N_layers, V)
+        arr = np.stack(per_layer, axis=0)  # (N_layers, full_vocab)
+        if self._slice_vocab:
+            arr = arr[:, : self.vocab_size]
+            arr = arr / arr.sum(axis=-1, keepdims=True)
+        return arr

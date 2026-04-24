@@ -270,18 +270,29 @@ class SpeculativeDecodingBenchmark:
             self._draft_model.eval()
 
         # Tokenizer compatibility sanity check — rejection sampling
-        # assumes the two models share vocabulary. Vocab-size mismatch
-        # is a hard fail; BOS/EOS mismatch is recorded but not fatal.
+        # assumes the two models share vocabulary. Tokenizer vocab
+        # must match exactly; model config.vocab_size may differ
+        # (e.g. Qwen-2.5-7B pads the 151936-token tokenizer to a
+        # 152064-aligned model vocab) and is handled by capping
+        # both HuggingFaceSources to the tokenizer vocab in
+        # make_sources.
         t_vocab = int(self._target_tokenizer.vocab_size)
         d_vocab = int(self._draft_tokenizer.vocab_size)
         if t_vocab != d_vocab:
             raise ValueError(
                 f"Tokenizer vocab size mismatch: target={t_vocab} "
                 f"draft={d_vocab}. Speculative-decoding rejection "
-                f"sampling requires matching vocabularies. Pick a "
-                f"same-family pair (e.g., Qwen-7B + Qwen-3B)."
+                f"sampling requires matching tokenizer vocabularies. "
+                f"Pick a same-family pair (e.g., Qwen-7B + Qwen-3B)."
             )
-        self.vocab_size = t_vocab
+        # Shared source vocab = min(all model config vocab sizes, tokenizer
+        # vocab). Ensures cross-source BCVF math sees matching V across
+        # HuggingFaceSource instances even if model configs pad to
+        # different alignments.
+        t_cfg = int(getattr(self._target_model.config, "vocab_size", 0)) or t_vocab
+        d_cfg = int(getattr(self._draft_model.config, "vocab_size", 0)) or d_vocab
+        self._shared_vocab = min(t_vocab, d_vocab, t_cfg, d_cfg)
+        self.vocab_size = self._shared_vocab
         self.eos_token_id = getattr(self._target_tokenizer, "eos_token_id", None)
 
         # torch.compile — default OFF. Benchmark runs are latency-bound
@@ -351,9 +362,15 @@ class SpeculativeDecodingBenchmark:
         ).to(next(self._draft_model.parameters()).device)
         prompt_len = int(input_ids.shape[1])
 
+        # Explicit attention mask silences the "pad_token_id ==
+        # eos_token_id" warning and avoids any ambiguity when
+        # pad/eos collide (standard for Qwen/Mistral/Llama).
+        attention_mask = torch.ones_like(input_ids)
+
         with torch.inference_mode():
             out = self._draft_model.generate(
                 input_ids,
+                attention_mask=attention_mask,
                 do_sample=True,
                 temperature=self.draft_temperature,
                 num_return_sequences=self.num_candidates,
@@ -382,11 +399,16 @@ class SpeculativeDecodingBenchmark:
         full_tensor = torch.tensor(
             [full], device=next(self._target_model.parameters()).device,
         )
+        attention_mask = torch.ones_like(full_tensor)
         prompt_len = len(input_ids)
 
         with torch.inference_mode():
-            t_out = self._target_model(full_tensor)
-            d_out = self._draft_model(full_tensor)
+            t_out = self._target_model(
+                full_tensor, attention_mask=attention_mask,
+            )
+            d_out = self._draft_model(
+                full_tensor, attention_mask=attention_mask,
+            )
 
         # Next-token distributions at each position that PREDICTS a
         # candidate token. Position (prompt_len - 1) predicts the
@@ -482,11 +504,11 @@ class SpeculativeDecodingBenchmark:
         prompt_text = question.metadata["prompt_text"]
         target_source = HuggingFaceSource(
             self._target_model, self._target_tokenizer, prompt_text,
-            L=self.L,
+            L=self.L, max_vocab_size=self._shared_vocab,
         )
         draft_source = HuggingFaceSource(
             self._draft_model, self._draft_tokenizer, prompt_text,
-            L=self.L,
+            L=self.L, max_vocab_size=self._shared_vocab,
         )
         return [target_source, draft_source]
 
