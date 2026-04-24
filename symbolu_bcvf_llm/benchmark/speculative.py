@@ -461,15 +461,24 @@ class SpeculativeDecodingBenchmark:
         choice_tokens: List[List[int]] = []
         for c in range(self.num_candidates):
             cand_tokens = candidate_np[c]
-            # Trim trailing pad/eos tokens if any.
-            trimmed = [int(t) for t in cand_tokens]
-            if self.eos_token_id is not None:
-                if self.eos_token_id in trimmed:
-                    trimmed = trimmed[: trimmed.index(self.eos_token_id)]
+            # Truncate at first out-of-range token (padded-vocab region
+            # between tokenizer_vocab and config_vocab — not meaningful
+            # downstream) or EOS. Draft models can sample into the
+            # padded region; those tokens are not in the shared vocab.
+            trimmed = []
+            for tok in cand_tokens:
+                t = int(tok)
+                if t >= self._shared_vocab:
+                    break
+                if self.eos_token_id is not None and t == self.eos_token_id:
+                    break
+                trimmed.append(t)
             if not trimmed:
-                # Degenerate candidate — give it zero acceptance.
+                # Degenerate: draft produced only padded / EOS tokens.
+                # Assign zero acceptance and a single-token placeholder
+                # so downstream code still has a non-empty choice.
                 expected_per_cand.append(0.0)
-                choice_tokens.append([int(self.eos_token_id or 0)])
+                choice_tokens.append([0])
                 continue
             e = self._compute_expected_accepted(prompt_text, np.array(trimmed))
             expected_per_cand.append(e)
@@ -491,6 +500,7 @@ class SpeculativeDecodingBenchmark:
                     float(e) for e in expected_per_cand
                 ],
                 "candidate_length": self.candidate_length,
+                "shared_vocab": self._shared_vocab,
             },
         )
 
