@@ -251,3 +251,48 @@ class HuggingFaceSource:
         exp = torch.exp(shifted)
         probs = exp / exp.sum(dim=-1, keepdim=True)
         return probs.cpu().numpy()
+
+    # §12.5 cross-layer logit-lens ----------------------------------- #
+
+    def layer_lookahead(self) -> np.ndarray:
+        """Per-layer next-token distributions at the current position.
+
+        Runs one forward pass on the committed prefix with
+        `output_hidden_states=True`. Each layer's hidden state at the
+        last input position is projected through the output embedding
+        matrix (logit lens; Nostalgebraist 2020), softmax-normalized,
+        returning an ``(N_layers, V)`` array.
+
+        Shape: ``N_layers = n_hidden_layers + 1`` in HuggingFace —
+        entry 0 is the embedding layer, entries 1..N are transformer
+        blocks. All share vocab size V.
+
+        Cost: one full forward pass (no KV-cache reuse), so probe-time
+        only — not for decoding hot paths.
+        """
+        import torch
+
+        input_ids = torch.tensor(
+            [self._committed_prefix_ids], device=self._device
+        )
+        with torch.inference_mode():
+            out = self._model(
+                input_ids=input_ids,
+                output_hidden_states=True,
+                use_cache=False,
+            )
+
+        # Output projection matrix (V, hidden_dim).
+        lm_head = self._model.get_output_embeddings()
+        W = lm_head.weight.to(torch.float32)
+
+        per_layer = []
+        for h in out.hidden_states:
+            # h: (1, seq_len, hidden_dim). Last position's hidden state.
+            h_last = h[0, -1, :].to(torch.float32)
+            logits = (h_last @ W.t()).cpu().numpy()
+            # Stable softmax
+            shifted = logits - logits.max()
+            exp = np.exp(shifted)
+            per_layer.append(exp / exp.sum())
+        return np.stack(per_layer, axis=0)  # (N_layers, V)

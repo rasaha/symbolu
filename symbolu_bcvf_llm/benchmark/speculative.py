@@ -32,7 +32,7 @@ import numpy as np
 
 from .dataset import Question
 from symbolu_bcvf_llm.sources.base import Source
-from symbolu_bcvf_llm.sources.mock import MockSource
+from symbolu_bcvf_llm.sources.mock import MockLayerSource, MockSource
 
 
 def _peak_logits(V: int, top: int, L: int = 5, peak: float = 10.0) -> np.ndarray:
@@ -149,16 +149,27 @@ class SpeculativeDecodingMockBenchmark:
         L = self.L
         q_idx = int(question.metadata["question_id"])
 
-        target = MockSource(
+        # Synthetic per-layer trajectory: each layer peaks on
+        # correct_token with increasing confidence — a smooth
+        # representational convergence with no jitter. Keeps
+        # cross-layer 2nd-diff small (stable representation).
+        def _synthetic_layer_logits(prefix, n_layers, v_size):
+            z = np.full((n_layers, v_size), -5.0, dtype=np.float32)
+            for l in range(n_layers):
+                z[l, correct_token] = 2.0 + 0.5 * l
+            return z
+
+        target = MockLayerSource(
             lambda p: _peak_logits(V, correct_token, L=L, peak=10.0),
-            L=L, V=V,
+            L=L, V=V, n_layers=8,
+            layer_logits_fn=_synthetic_layer_logits,
         )
-        draft = MockSource(
+        draft = MockLayerSource(
             lambda p, q_idx=q_idx: _noisy_peak_logits(
                 V, correct_token, L=L, peak=5.0, noise_std=0.5,
                 seed=self._seed * 1_000 + q_idx,
             ),
-            L=L, V=V,
+            L=L, V=V, n_layers=8,
         )
         return [target, draft]
 

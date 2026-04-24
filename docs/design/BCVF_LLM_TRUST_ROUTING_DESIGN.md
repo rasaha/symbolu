@@ -5457,6 +5457,105 @@ stable-softmax, prompt-text routing, 9 tests — 3 torch-gated
 skip in CI, the other 6 run everywhere). Full suite: 360 passed,
 5 skipped.
 
+### 12.5 Cross-layer BCVF observables — structurally-independent stability
+
+**Motivation.** §11.12 showed `coherence_anchored_bcvf_per_step` collapsed
+to AUC 0.431 (ANTI) on HaluEval because the alignment factor was
+adversarially anti-correlated (hallucinated answers are LLM-optimized
+to maximize teacher-forced log-prob). §12's spec-dec framing
+revealed a second failure mode: on same-family draft-target pairs,
+cross-source BCVF saturates near zero (distributions are usually
+similar), so the stability factor contributes no independent signal
+and alignment alone dominates.
+
+Both failure modes share a structural root cause: the stability
+factor was not independent of the alignment factor. On adversarial
+benchmarks the alignment inverts; on same-family pairs the
+stability saturates. Neither produces the "C × S complementary
+amplification" that the SCC pattern requires.
+
+**Proposal (§12.5).** Replace cross-source BCVF with **cross-layer
+BCVF** on the target's own hidden-state trajectory. Each transformer
+layer produces a hidden state; applying the logit lens projects
+these into per-layer next-token distributions. The 2nd-order
+difference norm across layers measures how "jittery" the model's
+representation is as it traverses depth.
+
+This factor is structurally independent of:
+
+- paraphrase-source agreement (no ensemble).
+- teacher-forced log-probability (reads hidden states, not logits
+  directly).
+- cross-family disagreement (single model, no draft-target pair).
+
+It's a genuinely orthogonal stability signal — the kind of
+"independent sensor" that autonomy BCVF was designed around, but
+with layer index playing the time-axis role instead of timesteps.
+
+**Implementation** (commit `<this>`):
+
+- `HuggingFaceSource.layer_lookahead()` — one forward pass with
+  `output_hidden_states=True`; each layer's last-position hidden
+  state is projected through the lm_head weight matrix; softmax →
+  per-layer probability distribution. Returns shape
+  `(N_layers, V)`.
+
+- `MockLayerSource` — `MockSource` subclass for offline tests.
+  Takes a `layer_logits_fn(prefix, n_layers, V) → (N_layers, V)`
+  callback. Default (no callback) broadcasts position-0 logits
+  across layers so 2nd-diff is zero (useful as a degenerate
+  baseline).
+
+- `LayerInstabilityObservable` — walks the teacher-forced answer
+  path via `commit()`, calls `layer_lookahead()` at each step,
+  computes `Σ_l ||p_{l-1} - 2 p_l + p_{l+1}||` across interior
+  layers, aggregates over steps via max. Polarity: higher = more
+  suspicious. Opts into isolated sources.
+
+- `CoherenceAnchoredLayerBCVFObservable` — the proper SCC test:
+  `scalar = 1/(1 + max_layer_instability) × exp(mean log p_target(token))`.
+  Stability factor from intra-model layer dynamics; alignment
+  factor from teacher-forced probability. The two factors share
+  no computational path, so multiplicative amplification can
+  actually happen (not collapse).
+
+- **Graceful degradation**: both observables emit
+  `ObservableValue(scalar=0, metadata={"unsupported": True, ...})`
+  when source 0 lacks `layer_lookahead`. Probe reports
+  UNCORRELATED rather than crashing — benchmarks whose sources
+  don't expose hidden states stay runnable.
+
+**Tests**: 24 new tests covering the 2nd-difference math, the
+mock-source plumbing, both observables' shape / polarity / state-
+mutation / metadata, graceful degradation on non-layer sources,
+and probe-harness isolation. Full suite: 384 passed, 5 skipped.
+
+**CLI**: `scripts/probe_observables.py` default observable list
+grows from 9 → 11 observables. The spec-dec-mock benchmark's
+`make_sources` now returns `MockLayerSource` instances so all 11
+exercise cleanly. The generic `MockBenchmark`'s `MockSource`
+returns still lack `layer_lookahead` — layer observables degrade
+gracefully to UNCORRELATED on those runs.
+
+**Prediction for §12.3 real-model probe** (pre-committed per §0.8):
+
+| Observable | Predicted AUC |
+|---|---|
+| `bcvf_per_step_max` on (target, draft) | 0.65-0.75 |
+| `coherence_anchored_bcvf_per_step` | 0.72-0.82 (alignment-dominated) |
+| `layer_instability_max` | 0.55-0.70 (open question) |
+| **`coherence_anchored_layer_bcvf_per_step`** | **0.75-0.88** |
+
+The last row is the real test of the SCC hypothesis. If layer-
+stability and alignment are genuinely complementary, the product
+should exceed alignment-alone's AUC (estimated 0.72-0.78). If
+the product matches alignment, cross-layer stability wasn't
+adding signal. If the product drops below alignment, layer
+stability is actually correlated with wrong answers (which
+would be diagnostically interesting — maybe harder questions
+have more stable internal representations, a research-paper-
+worthy finding).
+
 ### 12.4 Research predictions (pre-committed per §0.8)
 
 Before the §12.3 probe is run, the following predictions are
