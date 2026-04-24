@@ -275,6 +275,15 @@ pilot are the next scheduled steps.
   rotate which seeds fail but do not reduce the count. Structural
   improvement requires either a richer predictor set or a
   higher-level safety-monitor layer — both out of V1 scope.
+- **LLM-domain transfer is not claimed.** An internal research
+  track (`docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md` §13)
+  tested whether the same BCVF math applies to LLM
+  hallucination detection. The N=100 TruthfulQA probe across
+  11 candidate observables returned AUC in [0.476, 0.527] —
+  a clean null. BCVF does **not** currently transfer to LLM
+  trust routing, and we do not position it as a hallucination
+  detector. The autonomy result above is not predicated on
+  LLM transfer and stands independently.
 
 ### 12-month roadmap (de-risking sequence, matches §6.10)
 
