@@ -5588,5 +5588,181 @@ the real-model §12.3 probe.
 
 ---
 
+## Section 13 — Null Result: N=100 TruthfulQA Transfer Experiment
+
+### 13.1 Status
+
+**The §12.4 pre-committed predictions have been falsified.** The
+§11 observable probe was executed against TruthfulQA at N=100
+(521 datapoints) on Qwen2.5-7B-Instruct. No observable cleared
+the §11 `AUC ≥ 0.60` bar. No observable cleared the relaxed
+`AUC ≥ 0.55` marginal-lift bar. All 11 observables returned AUC
+in the range **[0.476, 0.527]** — a ±2.5-point band around random
+chance, statistically indistinguishable from 0.500 at the 95%
+confidence interval of ±0.045 achievable at this N.
+
+The §11 Rahu-authorization gate therefore remains closed. No
+decoder-layer or acceptance-rule BCVF variant is authorized.
+The §5.1 / §5.2 "autonomy-validated consumer pattern" is
+accordingly downgraded from `pre-committed` to `unvalidated in
+the LLM domain`.
+
+### 13.2 Experiment specification
+
+- **Script**: `scripts/probe_observables.py` at commit `a5ace72`
+  (§12 vocab-alignment fixes in place).
+- **Benchmark**: TruthfulQA (`truthful_qa` HF dataset).
+- **Model**: `Qwen/Qwen2.5-7B-Instruct`, `--no-compile`.
+- **N**: 100 questions, yielding 521 (question, paraphrase, choice)
+  triples after §3 paraphrase expansion.
+- **Observable suite**: all 11 §11 observables built via
+  `build_observables()` at their default §2.5.1 V1 configurations
+  (`gate_threshold=0.1`, `gate_beta=200.0`, `huber_delta=0.5`).
+- **Report**: `docs/experiments/probe_observables_truthfulqa_diag1c_truthfulqa_n100.md`.
+
+### 13.3 Result table — observed vs pre-committed
+
+Predictions from §12.4 (the speculative-decoding probe design)
+carry over to the TruthfulQA probe with slightly relaxed
+expectations (TruthfulQA is the harder of the two — no
+draft-vs-target probability-ratio shortcut). Predictions below
+are the §12.4 lower bounds; the §11 pass threshold (0.60) is
+the hard bar.
+
+| Observable | §12.4 predicted | Observed AUC | Verdict |
+|---|---|---|---|
+| `bcvf_total_cost` | 0.55–0.70 | **0.507** | FAIL (below range) |
+| `bcvf_source_0_cost` | — | **0.508** | FAIL |
+| `source_0_entropy` | 0.60–0.70 | **0.522** | FAIL (below range) |
+| `source_disagreement_fraction` | — | **0.503** | FAIL |
+| `bcvf_per_step_max` | 0.60–0.75 | **0.501** | FAIL (far below range) |
+| `bcvf_source_0_per_step_max` | — | **0.494** | FAIL |
+| `coherence_anchored_bcvf` | 0.65–0.80 | **0.476** | FAIL (anti-correlation territory) |
+| `coherence_anchored_bcvf_per_step` | 0.70–0.85 | **0.522** | FAIL (far below range) |
+| `uncertainty_gated_bcvf_per_step_max` | — | **0.506** | FAIL |
+| `layer_instability_max` | — | **0.487** | FAIL |
+| `coherence_anchored_layer_bcvf_per_step` | — | **0.527** | FAIL |
+
+None of the five observables with pre-committed lower bounds
+cleared their lower bound. The tightest-clustered observable
+(`coherence_anchored_layer_bcvf_per_step`, 0.527) is the
+nominal "best", but at the 95% CI it is not distinguishable
+from random. The worst (`coherence_anchored_bcvf`, 0.476) is
+below 0.500, meaning the observable's sign is slightly
+wrong-sign — the §10.V1 "anti-correlation" failure mode that
+§11 was built to catch.
+
+### 13.4 Why this is a clean null, not a noisy near-miss
+
+Three features of the data distinguish this from an
+"inconclusive, need more N" result:
+
+1. **Tight clustering.** The spread across 11 independently
+   designed observables is 5.1 AUC points
+   (0.527 − 0.476). A real signal in at least one of the 11
+   would lift *that* observable well above the cluster's
+   median (0.506). No such lift exists.
+2. **Independent validation on a second benchmark.** The
+   speculative-decoding N=100 probe on HaluEval showed the
+   same pattern (noise band AUC 0.486–0.586, no observable
+   above 0.60). Two benchmarks, two predictor configurations,
+   same null outcome.
+3. **Pre-committed predictions (§12.4) were wrong.** The
+   five observables that had explicit lower-bound predictions
+   all failed their lower bounds by ≥ 0.05 AUC. This is not
+   "we were too ambitious"; this is "the underlying
+   mechanism isn't present."
+
+### 13.5 Scope of the null
+
+This null result **rejects** the following specific claims:
+
+- The §0 "transfer premise" that BCVF's autonomy-domain
+  disagreement-detection signal carries over to LLM token-
+  probability space under the §2 metric choice
+  (probability-simplex Euclidean distance) and the §1.3
+  predictor ensemble design (target + draft of the same
+  model family).
+- The §5.1 / §5.2 "autonomy-validated consumer pattern" as
+  applied to LLM trust routing — the consumer pattern is
+  vacuous in the absence of a truth-correlated Ketu
+  observable to consume.
+- The §12.4 V4 decoder experiment authorization path — the
+  §11 gate that authorizes it has not opened and remains
+  closed.
+
+This null result **does not** reject:
+
+- The BCVF autonomy runtime itself. The autonomy-domain
+  validation (§6.1 N=21 sign-test p=0.0072 on
+  `S3_map_error_accel`, N=19 p=0.0192 on `S3_map_error`,
+  `symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.11) is
+  independent of this LLM-domain test and stands.
+- A re-formulated LLM-domain BCVF under a different §2.2
+  metric (e.g., embedding-space distance instead of
+  probability-simplex) or a different §1.3 predictor
+  ensemble (e.g., independent-family M≥3 ensemble instead
+  of same-family target+draft). Either revision would be a
+  new hypothesis requiring its own §11 probe.
+
+### 13.6 Authorization gate — what this section closes
+
+The following tracks are hereby **paused pending a revised
+hypothesis**:
+
+- Section 4 (Phase 2 — Source Framework) extensions beyond
+  the two sources already exercised (target + draft of same
+  family).
+- Section 5 (Phase 3 — Integration Layer) Rahu-trust
+  weighting deployment. With no §11-passing Ketu observable,
+  there is nothing for §5 to consume.
+- Section 6 (Phase 4 — Benchmark, Metrics) scale-out. No
+  larger-N probe is authorized at the current configuration;
+  the marginal cost does not buy a different answer.
+- Section 7 (Phase 5 — Packaging & Reproducibility). No
+  packaging is authorized for a component that has not
+  passed §11.
+
+The following tracks remain **open for a new hypothesis**:
+
+- A §2.2 metric-space revision — specifically, moving from
+  probability-simplex distance to an embedding-space or
+  contrastive-representation distance, with a fresh §11
+  probe. This is a non-trivial redesign and affects the
+  §2 Lemma 1 proof.
+- A §1.3 predictor-ensemble revision — specifically, moving
+  from same-family target+draft to an independent-family
+  M≥3 ensemble (e.g., Qwen + Llama + Mistral). This breaks
+  the "speculative-decoding reuse" efficiency argument in
+  §12 but could restore the disagreement signal BCVF needs.
+- A different benchmark entirely — one where the positive
+  class is structurally detectable from token-probability
+  disagreement (currently unknown whether such a benchmark
+  exists for hallucination-style tasks).
+
+Any of these requires a new `§0.8`-style pre-commitment before
+compute is spent.
+
+### 13.7 What this means for the autonomy track
+
+Nothing. The autonomy-domain validation (`symbolu_robotics/
+bcvf_autonomous/DESIGN.md` §6.1 and §6.7) is a separate
+experiment on a separate dataset with a separate predictor
+set, and its pre-committed §6.11 gates were met. The LLM
+transfer premise was an expansion hypothesis; its failure
+does not retrospectively invalidate the autonomy result, any
+more than the failure of deep learning on a particular
+vision task invalidates deep learning on language tasks. The
+two domains are independent.
+
+For VC / investor communication, the autonomy track should
+be presented without reference to the LLM track. The LLM
+design doc is an internal research artifact and the null
+result documented here is a finding, not a deliverable.
+See `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest scope
+caveats" for the external-facing framing.
+
+---
+
 
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
