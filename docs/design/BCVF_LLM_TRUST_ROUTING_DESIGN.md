@@ -5346,6 +5346,136 @@ across; only the observables and benchmarks need to be re-pointed.
 This concludes the V1 / V2 / V3 BCVF-LLM trust-routing campaign on
 this package.
 
+## Section 12 — Pivot: Speculative-Decoding Acceptance Probe
+
+§11.16 closed the hallucination-detection campaign with the §11
+toolkit (Observable Protocol, probe harness, classification bands,
+polarity normalization, isolated-source opt-in, paraphrase cache
+infrastructure) now freely applicable to other decoder/attractor
+design problems. §12 opens the first such pivot.
+
+### 12.1 Why speculative decoding
+
+The §11 machinery transfers to any problem with:
+- Multiple "views" of the same input (a source ensemble).
+- A per-position ground-truth label.
+- A downstream attractor/consumer whose design could benefit from
+  a better signal.
+
+Speculative decoding fits exactly: a small draft model proposes
+K tokens, a large target model verifies in one forward pass, and
+each (position, token) has a ground-truth accept/reject label
+from the standard rejection-sampling rule (Leviathan et al. 2023,
+Chen et al. 2023). The per-pair (draft, target) distribution
+comparison is structurally identical to the (source 0, source 1)
+comparison our kernel already handles — just with M=2 instead of
+M=3.
+
+**Commercial motivation.** Every frontier inference stack uses
+speculative decoding. Acceptance rate governs throughput; even a
+5 % acceptance improvement is material. Current criteria are
+simple probability ratios; a richer signal (e.g., BCVF over
+draft-target distributions, per-step-max reduction) could predict
+acceptance more accurately and allow more aggressive draft
+proposals.
+
+**Research motivation.** No one has published BCVF-style 2nd-order
+kernels in the speculative-decoding literature. The discipline
+the §11 harness imposes — pre-committed classification bands,
+probe-before-build — is also absent from that literature. Clean
+methodology contribution is plausible even with modest empirical
+gains.
+
+### 12.2 M=2 compatibility established
+
+Commit `<this>` scaffolds the pivot:
+
+- `symbolu_bcvf_llm/benchmark/speculative.py` ships two classes:
+  `SpeculativeDecodingMockBenchmark` (synthetic, deterministic,
+  torch-free) and `SpeculativeDecodingBenchmark` (real-model
+  skeleton, `NotImplementedError` stub pending the next session's
+  candidate-generation + acceptance-labelling pipeline).
+
+- All 9 shipped observables are verified M=2-compatible by a new
+  test suite (`tests/test_speculative_mock.py`):
+  - `BCVFTotalCostObservable`, `BCVFSourceZeroCostObservable`
+  - `BCVFPerStepMaxObservable`, `BCVFSourceZeroPerStepMaxObservable`
+  - `CoherenceAnchoredBCVFObservable`,
+    `CoherenceAnchoredBCVFPerStepObservable`
+  - `UncertaintyGatedBCVFPerStepMaxObservable`
+  - `Source0EntropyObservable`, `SourceAgreementObservable`
+
+- Probe CLI accepts `--benchmark speculative-mock`.
+
+The mock benchmark's smoke-run produces deterministic AUCs
+(coherence observables trivially ace the toy because correct
+candidates have first-token = target peak). This confirms the
+plumbing but says nothing about real-draft-target signal dynamics,
+which require §12.3.
+
+### 12.3 Deferred — real draft-target benchmark
+
+`SpeculativeDecodingBenchmark` pending the following implementation:
+
+1. Load a target model (e.g., Mistral-7B or Llama-3-8B) and a
+   draft model (e.g., Qwen-2.5-3B, TinyLlama-1.1B). Both via
+   HuggingFace `from_pretrained` with same tokenizer
+   compatibility check.
+2. For each prompt in the underlying dataset (HaluEval QA or any
+   TriviaQA-style text source), sample K candidate draft
+   continuations from the draft model at T>0 using
+   `model.generate(do_sample=True, num_return_sequences=K)`.
+3. For each candidate, run the target model in teacher-forced
+   mode to obtain per-position target distributions
+   `p_target(·|prefix)`.
+4. Per-position acceptance probability under the rejection-sampling
+   rule: `P(accept token t) = min(1, p_target(t) / p_draft(t))`.
+   Per-candidate label: fraction of tokens accepted in expectation,
+   or binary "fully accepted"/"partially rejected".
+5. `correct_index = argmax(acceptance_rate)` per question.
+
+**Tokenizer-mismatch note.** Draft and target may use different
+tokenizers. Simplest robust path: constrain both to the same
+tokenizer family (Mistral draft + Mistral target, or a
+distillation pair). Cross-family draft-target requires a
+re-tokenization step with bounded precision loss.
+
+**Effort estimate for §12.3.** ~3-5 days of engineering including
+tokenizer-compat handling, candidate-generation plumbing, and
+per-position label computation. Then a probe run on 100 prompts
+with 5 candidates each (500 datapoints) — ~20-30 min of GPU
+time on an A100 with Mistral-7B target + Qwen-2.5-3B draft.
+
+### 12.4 Research predictions (pre-committed per §0.8)
+
+Before the §12.3 probe is run, the following predictions are
+recorded for future falsification:
+
+- **`bcvf_total_cost` on (target, draft)**: likely AUC 0.55-0.70.
+  This is essentially a smoothed version of the probability-ratio
+  signal the standard rejection-sampling rule already uses, so it
+  should be close to — but not dramatically above — the baseline.
+- **`bcvf_per_step_max`**: likely AUC 0.60-0.75. Per-token
+  acceleration of disagreement is a more sensitive signal than
+  aggregate probability ratio; plausible §11 pass.
+- **`Source0EntropyObservable`** (reading target entropy):
+  likely AUC 0.60-0.70. High target entropy → hard-to-match
+  token → more likely to be rejected. This is a known baseline
+  in the literature.
+- **`CoherenceAnchoredBCVFObservable`** (aggregate BCVF ×
+  alignment): likely AUC 0.65-0.80 if alignment is defined as
+  target probability of the draft token (the natural semantic
+  anchor for spec-dec). This could become the headline result.
+- **`CoherenceAnchoredBCVFPerStepObservable`**: likely AUC
+  0.70-0.85. Per-step coherence over all K tokens in the draft.
+  If this crosses §11 strongly, it authorizes a V4 decoder
+  experiment: replace the standard acceptance rule with a
+  coherence-anchored one.
+
+The §11 gate applies: no decoder / acceptance-rule variant is
+authorized until at least one observable passes AUC ≥ 0.60 on
+the real-model §12.3 probe.
+
 ---
 
 

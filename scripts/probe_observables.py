@@ -131,7 +131,7 @@ def main(argv=None) -> int:
     )
     parser.add_argument(
         "--benchmark",
-        choices=("mock", "truthfulqa", "halueval"),
+        choices=("mock", "truthfulqa", "halueval", "speculative-mock"),
         default="mock",
     )
     parser.add_argument(
@@ -172,6 +172,13 @@ def main(argv=None) -> int:
 
     if args.benchmark == "mock":
         bench = MockBenchmark(num_questions=args.num_questions, seed=args.seed)
+    elif args.benchmark == "speculative-mock":
+        from symbolu_bcvf_llm.benchmark.speculative import (
+            SpeculativeDecodingMockBenchmark,
+        )
+        bench = SpeculativeDecodingMockBenchmark(
+            num_questions=args.num_questions, seed=args.seed,
+        )
     else:
         if args.benchmark == "truthfulqa":
             from symbolu_bcvf_llm.benchmark.dataset import TruthfulQABenchmark

@@ -19,6 +19,10 @@ from .dataset import (
     Question,
     TruthfulQABenchmark,
 )
+from .speculative import (
+    SpeculativeDecodingBenchmark,
+    SpeculativeDecodingMockBenchmark,
+)
 from .harness import (
     BenchmarkRunBundle,
     BenchmarkRunResult,
@@ -49,6 +53,8 @@ __all__ = [
     "MockBenchmark",
     "PhaseSixVerdict",
     "Question",
+    "SpeculativeDecodingBenchmark",
+    "SpeculativeDecodingMockBenchmark",
     "TruthfulQABenchmark",
     "accuracy",
     "classify_phase_six_result",
