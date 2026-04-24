@@ -59,6 +59,14 @@ def main() -> int:
     parser.add_argument("--candidate-length", type=int, default=16)
     parser.add_argument("--draft-temperature", type=float, default=0.8)
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument(
+        "--gate-threshold", type=float, default=None,
+        help="override BCVFLLMConfig.gate_threshold for the Phase 2 "
+             "full-probe run. If set, the BCVF-family observables are "
+             "constructed with this threshold (matching probe_observables.py "
+             "--gate-threshold behavior). Source0EntropyObservable does "
+             "NOT consume this. Entropy-only probe is always at default.",
+    )
     args = parser.parse_args()
 
     from symbolu_bcvf_llm.benchmark.speculative import (
@@ -152,6 +160,9 @@ def main() -> int:
     print("Phase 2: probe loop comparison")
     print("=" * 72)
 
+    from dataclasses import replace as dc_replace
+
+    from symbolu_bcvf_llm.core import BCVFLLMConfig
     from symbolu_bcvf_llm.observables import (
         BCVFPerStepMaxObservable,
         BCVFSourceZeroCostObservable,
@@ -167,16 +178,22 @@ def main() -> int:
         probe_observables_parallel,
     )
 
+    bcvf_cfg = None
+    if args.gate_threshold is not None:
+        bcvf_cfg = dc_replace(BCVFLLMConfig(), gate_threshold=args.gate_threshold)
+        print(f"\n[Phase 2] BCVF config override: gate_threshold="
+              f"{args.gate_threshold}", flush=True)
+
     full_obs = [
-        BCVFTotalCostObservable(),
-        BCVFSourceZeroCostObservable(),
+        BCVFTotalCostObservable(bcvf_config=bcvf_cfg),
+        BCVFSourceZeroCostObservable(bcvf_config=bcvf_cfg),
         Source0EntropyObservable(),
         SourceAgreementObservable(),
-        BCVFPerStepMaxObservable(),
-        BCVFSourceZeroPerStepMaxObservable(),
-        CoherenceAnchoredBCVFObservable(),
-        CoherenceAnchoredBCVFPerStepObservable(),
-        UncertaintyGatedBCVFPerStepMaxObservable(),
+        BCVFPerStepMaxObservable(bcvf_config=bcvf_cfg),
+        BCVFSourceZeroPerStepMaxObservable(bcvf_config=bcvf_cfg),
+        CoherenceAnchoredBCVFObservable(bcvf_config=bcvf_cfg),
+        CoherenceAnchoredBCVFPerStepObservable(bcvf_config=bcvf_cfg),
+        UncertaintyGatedBCVFPerStepMaxObservable(bcvf_config=bcvf_cfg),
         LayerInstabilityObservable(),
         CoherenceAnchoredLayerBCVFObservable(),
     ]
