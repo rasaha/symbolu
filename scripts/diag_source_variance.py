@@ -141,6 +141,104 @@ def main() -> int:
         print("  → HuggingFaceSource is working correctly.")
         print("  → The 1.3821-constant report is a downstream bug: probe loop,")
         print("    observable aggregation, or the report's mean-computation path.")
+
+    # -------------------------------------------------------------- #
+    # Phase 2: rerun the full probe loop on the same 5 questions to
+    # compare direct-lookahead entropy (above) against probe-loop
+    # entropy. If they differ, the bug is in probe_observables_parallel
+    # or in how the observables share source state.
+    # -------------------------------------------------------------- #
+    print("\n" + "=" * 72)
+    print("Phase 2: probe loop comparison")
+    print("=" * 72)
+
+    from symbolu_bcvf_llm.observables import (
+        BCVFPerStepMaxObservable,
+        BCVFSourceZeroCostObservable,
+        BCVFSourceZeroPerStepMaxObservable,
+        BCVFTotalCostObservable,
+        CoherenceAnchoredBCVFObservable,
+        CoherenceAnchoredBCVFPerStepObservable,
+        CoherenceAnchoredLayerBCVFObservable,
+        LayerInstabilityObservable,
+        Source0EntropyObservable,
+        SourceAgreementObservable,
+        UncertaintyGatedBCVFPerStepMaxObservable,
+        probe_observables_parallel,
+    )
+
+    full_obs = [
+        BCVFTotalCostObservable(),
+        BCVFSourceZeroCostObservable(),
+        Source0EntropyObservable(),
+        SourceAgreementObservable(),
+        BCVFPerStepMaxObservable(),
+        BCVFSourceZeroPerStepMaxObservable(),
+        CoherenceAnchoredBCVFObservable(),
+        CoherenceAnchoredBCVFPerStepObservable(),
+        UncertaintyGatedBCVFPerStepMaxObservable(),
+        LayerInstabilityObservable(),
+        CoherenceAnchoredLayerBCVFObservable(),
+    ]
+    entropy_only = [Source0EntropyObservable()]
+
+    print("\nFull 11-observable probe (retain_datapoints=True):")
+    reports_full = probe_observables_parallel(
+        full_obs, bench,
+        max_questions=args.num_questions,
+        retain_datapoints=True,
+    )
+    r_full = reports_full["source_0_entropy"]
+    full_scalars = [dp.observable_value.scalar for dp in r_full.datapoints]
+    full_vocabs = [
+        dp.observable_value.metadata.get("vocab_size", None)
+        for dp in r_full.datapoints
+    ]
+    full_top1s = [
+        dp.observable_value.metadata.get("top1_token", None)
+        for dp in r_full.datapoints
+    ]
+
+    print("\nEntropy-only probe (1 observable, baseline — no ordering effects):")
+    reports_solo = probe_observables_parallel(
+        entropy_only, bench,
+        max_questions=args.num_questions,
+        retain_datapoints=True,
+    )
+    r_solo = reports_solo["source_0_entropy"]
+    solo_scalars = [dp.observable_value.scalar for dp in r_solo.datapoints]
+
+    print(f"\n{'q,c':>5} {'full_entropy':>14} {'solo_entropy':>14} "
+          f"{'vocab':>8} {'top1_tok':>10}")
+    print("-" * 60)
+    for i, dp in enumerate(r_full.datapoints):
+        print(f"{dp.question_id},{dp.choice_id:<3} "
+              f"{full_scalars[i]:>14.4f} {solo_scalars[i]:>14.4f} "
+              f"{str(full_vocabs[i]):>8} {str(full_top1s[i]):>10}")
+
+    print(f"\nFull-probe entropy: stddev={np.std(full_scalars):.6f}  "
+          f"range=[{min(full_scalars):.4f}, {max(full_scalars):.4f}]")
+    print(f"Solo-probe entropy: stddev={np.std(solo_scalars):.6f}  "
+          f"range=[{min(solo_scalars):.4f}, {max(solo_scalars):.4f}]")
+
+    print("\nFINAL DIAGNOSIS:")
+    if np.std(full_scalars) < 1e-6 and np.std(solo_scalars) > 1e-6:
+        print("  * Full 11-observable probe: entropy is CONSTANT")
+        print("  * Solo entropy-only probe:  entropy VARIES")
+        print("  → Bug is in observable ORDERING — some earlier observable")
+        print("    mutates source state before Source0EntropyObservable runs.")
+        print("    Investigate: do BCVFTotalCost / BCVFSourceZeroCost call")
+        print("    source.commit() indirectly via compute_bcvf_cost?")
+    elif np.std(full_scalars) < 1e-6 and np.std(solo_scalars) < 1e-6:
+        print("  * Both full and solo probes: entropy is CONSTANT")
+        print("  * Direct lookahead (Phase 1): entropy VARIES")
+        print("  → Bug is in the PROBE LOOP itself, not observable ordering.")
+        print("    probe_observables_parallel is constructing sources differently")
+        print("    than a direct make_sources() call. Possible culprits:")
+        print("    make_sources caching, question reuse, shared_sources aliasing.")
+    else:
+        print("  * Full-probe entropy varies — we cannot reproduce the bug on N=5.")
+        print("  * Rerun with higher --num-questions or diff config.")
     return 0
 
 
