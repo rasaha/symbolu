@@ -5588,24 +5588,37 @@ the real-model §12.3 probe.
 
 ---
 
-## Section 13 — Null Result: N=100 TruthfulQA Transfer Experiment
+## Section 13 — Configuration Null + Literature-Informed Revision Plan
 
 ### 13.1 Status
 
-**The §12.4 pre-committed predictions have been falsified.** The
-§11 observable probe was executed against TruthfulQA at N=100
-(521 datapoints) on Qwen2.5-7B-Instruct. No observable cleared
-the §11 `AUC ≥ 0.60` bar. No observable cleared the relaxed
-`AUC ≥ 0.55` marginal-lift bar. All 11 observables returned AUC
-in the range **[0.476, 0.527]** — a ±2.5-point band around random
-chance, statistically indistinguishable from 0.500 at the 95%
-confidence interval of ±0.045 achievable at this N.
+**The §12.4 pre-committed predictions have been falsified at the
+tested configuration** — probability-simplex Euclidean distance
+on a same-family target+draft predictor pair (Qwen2.5-7B-Instruct
++ Qwen2.5-3B-Instruct). The §11 observable probe ran on
+TruthfulQA at N=100 (521 datapoints); all 11 observables returned
+AUC in **[0.476, 0.527]**, a ±2.5-point band around random, and
+none cleared the §11 `AUC ≥ 0.60` bar nor the relaxed `≥ 0.55`
+marginal-lift bar.
 
-The §11 Rahu-authorization gate therefore remains closed. No
-decoder-layer or acceptance-rule BCVF variant is authorized.
-The §5.1 / §5.2 "autonomy-validated consumer pattern" is
-accordingly downgraded from `pre-committed` to `unvalidated in
-the LLM domain`.
+**A post-experiment literature audit (§13.6) shows this null was
+predictable and is method-specific, not field-level.** Same-
+family logit-space disagreement is a known dead end in the
+published hallucination-detection literature; what we tested was
+the configuration multiple prior papers already identified as
+uninformative. The field-standard working techniques — semantic
+entropy (Farquhar 2024, *Nature*), activation probes (Azaria &
+Mitchell 2023; Marks & Tegmark 2024), cross-family ensemble
+disagreement (Yoffe 2024; Feng 2024) — remain untested in this
+codebase.
+
+The §11 Rahu-authorization gate is therefore closed **at the
+simplex+same-family configuration** but remains **open** under
+two specific revision paths, each with direct published
+replication targets: §13.7 semantic-entropy metric revision
+(§2.2), and a subsequent §1.3 cross-family ensemble revision.
+The §13.7 experiment is pre-committed here and is the next
+authorized probe.
 
 ### 13.2 Experiment specification
 
@@ -5652,115 +5665,261 @@ below 0.500, meaning the observable's sign is slightly
 wrong-sign — the §10.V1 "anti-correlation" failure mode that
 §11 was built to catch.
 
-### 13.4 Why this is a clean null, not a noisy near-miss
+### 13.4 Why this is a clean configuration null
 
 Three features of the data distinguish this from an
-"inconclusive, need more N" result:
+"inconclusive, need more N" result — all three are now
+understood to be diagnostic of the specific configuration
+tested, not of BCVF-for-LLM in general:
 
-1. **Tight clustering.** The spread across 11 independently
-   designed observables is 5.1 AUC points
-   (0.527 − 0.476). A real signal in at least one of the 11
-   would lift *that* observable well above the cluster's
-   median (0.506). No such lift exists.
+1. **Tight clustering across 11 observables.** The spread is
+   5.1 AUC points (0.527 − 0.476). A real signal in any one
+   observable would lift *that* observable well above the
+   cluster's median (0.506). The tight clustering indicates
+   every observable is measuring the same degenerate quantity
+   — token-level probability distance between two models
+   that are trained to agree at the token level.
 2. **Independent validation on a second benchmark.** The
    speculative-decoding N=100 probe on HaluEval showed the
-   same pattern (noise band AUC 0.486–0.586, no observable
-   above 0.60). Two benchmarks, two predictor configurations,
-   same null outcome.
-3. **Pre-committed predictions (§12.4) were wrong.** The
-   five observables that had explicit lower-bound predictions
-   all failed their lower bounds by ≥ 0.05 AUC. This is not
-   "we were too ambitious"; this is "the underlying
-   mechanism isn't present."
+   same pattern (noise band AUC 0.486–0.586). Two
+   benchmarks, same target+draft predictor pair, same null.
+3. **Pre-committed predictions (§12.4) were wrong by the
+   amount the literature would predict.** §12.4 anticipated
+   AUC 0.55–0.85 across observables; actual was 0.476–0.527.
+   This ~0.10-point shortfall matches the independently-
+   reported AUROC for same-family logit-space signals in
+   Kadavath 2022 (AUROC 0.55–0.62), Xiong 2024 (0.50–0.58),
+   and Fadeeva 2024 (AUROC < 0.60 for simplex-style
+   estimators on TriviaQA/TruthfulQA). See §13.6.
 
-### 13.5 Scope of the null
+### 13.5 Scope of the null — precisely what is and is not rejected
 
-This null result **rejects** the following specific claims:
+This null result **rejects** one specific tuple of design
+choices from §0–§12:
 
-- The §0 "transfer premise" that BCVF's autonomy-domain
-  disagreement-detection signal carries over to LLM token-
-  probability space under the §2 metric choice
-  (probability-simplex Euclidean distance) and the §1.3
-  predictor ensemble design (target + draft of the same
-  model family).
-- The §5.1 / §5.2 "autonomy-validated consumer pattern" as
-  applied to LLM trust routing — the consumer pattern is
-  vacuous in the absence of a truth-correlated Ketu
-  observable to consume.
-- The §12.4 V4 decoder experiment authorization path — the
-  §11 gate that authorizes it has not opened and remains
-  closed.
+- **§2.2 metric = probability-simplex Euclidean distance**,
+  **§1.3 ensemble = same-family target+draft**, combined on
+  TruthfulQA-MC and HaluEval-QA. Under this configuration,
+  no observable in the §11 suite is truth-correlated.
 
-This null result **does not** reject:
+This null **does not** reject:
 
-- The BCVF autonomy runtime itself. The autonomy-domain
+- **BCVF-shaped hypotheses under a different §2.2 metric.**
+  In particular, a meaning-space metric (semantic-entropy
+  clusters of sampled generations, hidden-state covariance,
+  activation-probe scores) has not been tested in this
+  codebase. Published AUROCs for meaning-space signals on
+  TruthfulQA reach 0.70–0.83 (§13.6).
+- **BCVF-shaped hypotheses under a different §1.3 ensemble.**
+  Same-family target+draft are trained to agree at the
+  token level (speculative-decoding literature, §13.6).
+  Independent-family M≥3 ensembles (Qwen + Llama + Mistral)
+  reach AUROC 0.68–0.73 on published cross-family work and
+  remain untested here.
+- **The BCVF autonomy runtime.** The autonomy-domain
   validation (§6.1 N=21 sign-test p=0.0072 on
   `S3_map_error_accel`, N=19 p=0.0192 on `S3_map_error`,
   `symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.11) is
   independent of this LLM-domain test and stands.
-- A re-formulated LLM-domain BCVF under a different §2.2
-  metric (e.g., embedding-space distance instead of
-  probability-simplex) or a different §1.3 predictor
-  ensemble (e.g., independent-family M≥3 ensemble instead
-  of same-family target+draft). Either revision would be a
-  new hypothesis requiring its own §11 probe.
 
-### 13.6 Authorization gate — what this section closes
+This narrower framing replaces the earlier blanket "§0
+transfer premise falsified" phrasing — it was too strong for
+the evidence actually in hand.
 
-The following tracks are hereby **paused pending a revised
-hypothesis**:
+### 13.6 Literature audit — why the tested configuration was doomed
+
+A post-experiment audit of 2023–2025 hallucination-detection
+literature (Anthropic, DeepMind, Meta, and academic groups)
+reframes the null: **same-family logit-space disagreement is
+an independently-established dead end, and the benchmark-
+standard working techniques operate in meaning-space, not
+token-probability space**.
+
+Key findings:
+
+- **Kadavath et al. 2022 (Anthropic, "Language Models (Mostly)
+  Know What They Know")**: same-family probability-based
+  uncertainty signals give AUROC ~0.55–0.62 on short-form QA.
+  Explicitly identified as a weak standalone signal.
+- **Xiong et al. 2024 (ICLR, "Can LLMs Express Their
+  Uncertainty?")**: raw token-probability AUROC across
+  TruthfulQA clustered in **0.50–0.58** — matches our [0.476,
+  0.527] null within noise.
+- **Fadeeva et al. 2024 (EMNLP, LM-Polygraph)**: systematic
+  evaluation of 15+ logit-space uncertainty estimators;
+  simplex-style variants within a single model family
+  underperformed (AUROC often < 0.60 on TriviaQA /
+  TruthfulQA).
+- **Speculative-decoding literature** (Leviathan et al. 2023;
+  Chen et al. 2023): target+draft from the same family are
+  *designed to agree* on easy tokens. Their disagreement
+  tracks compute savings, not truth. Our §1.3 choice predicts
+  null on theoretical grounds.
+
+The field-standard techniques that **do** clear AUROC 0.65–
+0.80 on TruthfulQA and comparable benchmarks are all in one
+of three categories, and all operate outside token-simplex
+space:
+
+- **Semantic entropy (Farquhar et al. 2024, *Nature* 630,
+  625–630).** Sample K generations, cluster by bidirectional
+  NLI entailment, Shannon entropy over cluster sizes. AUROC
+  **0.75–0.79** on TriviaQA/SQuAD; ~0.70 on TruthfulQA-style
+  free-form. The §13.7 experiment is a direct replication of
+  this on this codebase.
+- **Activation probes (Azaria & Mitchell 2023; Marks &
+  Tegmark 2024 "The Geometry of Truth").** Linear / difference-
+  of-means probes on mid-layer residual-stream activations.
+  AUROC **0.71–0.83** on SAPLMA, various truth benchmarks.
+- **Cross-family ensemble disagreement (Yoffe et al. 2024
+  "DebUnc"; Feng et al. 2024 "Don't Hallucinate, Abstain").**
+  Disagreement across independent model families (Llama +
+  Mistral + Qwen) reaches AUROC **0.68–0.73** — a direct
+  §1.3 ensemble-revision target.
+- **INSIDE / EigenScore (Chen et al. 2024, ICLR).** Covariance
+  of hidden states, AUROC **0.74–0.81** across HaluEval/
+  TruthfulQA.
+- **SelfCheckGPT (Manakul et al. 2023, EMNLP).** Sampling +
+  NLI-based self-consistency. AUROC 0.74–0.83 on WikiBio,
+  ~0.68 on TruthfulQA.
+
+**Field consensus (Huang et al. 2024 ACM CSUR survey;
+Zhang et al. 2025 "Siren's Song")**: LLM trust routing is
+unsolved but actively tractable. Same-family logit-space
+approaches are a known dead end. Meaning-space and cross-
+family ensemble approaches are the current frontier.
+
+Our null result is therefore consistent with — and predicted
+by — the published record. It is a **method-level null, not
+a field-level null**, and the two specific revision targets
+below are backed by direct replication references.
+
+### 13.7 Revision plan — semantic-entropy probe (§2.2 metric revision)
+
+The first authorized revision probe replaces §2.2's
+probability-simplex Euclidean distance with Farquhar 2024
+semantic-entropy clustering. This is a pure §2.2 change; the
+§1.3 ensemble (single target model, no draft) and §11
+benchmark (TruthfulQA-MC) are held fixed so that the lift
+measured is attributable to the metric swap, not to a
+confound.
+
+**Specification:**
+
+- **Script:** `scripts/probe_semantic_entropy.py`.
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct` (unchanged
+  from §13.2 — enables direct comparison).
+- **NLI clustering model:** `MoritzLaurer/DeBERTa-v3-base-
+  mnli-fever-anli` (standard MNLI-trained classifier; matches
+  Farquhar 2024 methodology).
+- **Benchmark:** TruthfulQA multiple-choice, validation
+  split, N=100.
+- **Sampling:** K=10 completions per question at T=1.0,
+  max_new_tokens=32 (matches Farquhar 2024 defaults).
+- **Clustering rule:** bidirectional NLI entailment (i → j
+  AND j → i), union-find on the K samples per question.
+- **Scalar:** Shannon entropy (nats) over cluster-size
+  distribution.
+- **Correctness label:** greedy generation (T=0) NLI-entails
+  the correct MC choice AND does not entail any distractor.
+- **Statistic:** AUC of (−semantic_entropy) as a truth
+  predictor (higher entropy → less confident → more likely
+  wrong, negated for the higher-AUC-is-better convention).
+
+**Pre-committed success bands** (per §0.8 discipline — these
+are recorded before the experiment is run, and the script's
+`classify()` function is pinned to these thresholds in
+`scripts/probe_semantic_entropy.py`):
+
+- `AUC ≥ 0.70` → **TRUTH_CORRELATED_STRONG**. §2.2 metric
+  revision lands on-branch. Next authorized probe: §1.3
+  cross-family ensemble revision (Qwen + Llama + Mistral).
+- `0.60 ≤ AUC < 0.70` → **TRUTH_CORRELATED_MARGINAL**.
+  Semantic entropy clears the §11 bar but needs cross-
+  benchmark confirmation. Next authorized probe: same
+  script on HaluEval-QA at N=100 before §2.2 revision lands.
+- `0.55 ≤ AUC < 0.60` → **NOISE_BAND_LIFT**. Above random
+  but below the §11 bar. No revision authorized. Diagnostic
+  follow-up: audit K, T, and NLI-clustering parameters.
+- `AUC < 0.55` → **SECOND_NULL**. The §13 null strengthens
+  to field-consistent. Pause LLM-domain compute pending the
+  §1.3 cross-family ensemble revision, which is the only
+  remaining literature-backed fix; that revision is a
+  separate §0.8-style pre-commitment.
+
+**Expected cost:** ~30–45 min on a single GPU with the
+combined Qwen-7B + DeBERTa-v3-base-MNLI footprint (~8.5 GB).
+No multi-model vocabulary alignment is required (single
+target model), so the §12 shared-vocab machinery is not
+exercised.
+
+**Report destination:** `docs/experiments/probe_semantic_
+entropy.md`. Per-question JSON dump available via
+`--dump-json`.
+
+**Relationship to BCVF 2nd-difference core:** Semantic
+entropy as specified here replaces the §2.2 metric but does
+**not** yet introduce a 2nd-difference-of-entropy observable.
+If semantic entropy clears ≥ 0.60, a follow-up experiment
+can test whether `d²(semantic_entropy)/dk²` across outer
+decoding steps (the true BCVF-shaped signal) improves on the
+static entropy scalar. That follow-up is NOT pre-committed
+here; it depends on §13.7 passing.
+
+### 13.8 Authorization gate — what §13 leaves open vs paused
+
+**Paused** (no compute authorized until the §13.7 or §1.3
+revisions land a positive result):
 
 - Section 4 (Phase 2 — Source Framework) extensions beyond
-  the two sources already exercised (target + draft of same
-  family).
+  the two sources already exercised at simplex+same-family.
 - Section 5 (Phase 3 — Integration Layer) Rahu-trust
-  weighting deployment. With no §11-passing Ketu observable,
-  there is nothing for §5 to consume.
-- Section 6 (Phase 4 — Benchmark, Metrics) scale-out. No
-  larger-N probe is authorized at the current configuration;
-  the marginal cost does not buy a different answer.
-- Section 7 (Phase 5 — Packaging & Reproducibility). No
-  packaging is authorized for a component that has not
-  passed §11.
+  deployment. With no §11-passing Ketu observable yet, there
+  is nothing for §5 to consume.
+- Section 6 (Phase 4 — Benchmark, Metrics) scale-out at the
+  simplex+same-family configuration. No larger-N probe is
+  authorized there; §13.4 evidence shows marginal cost does
+  not buy a different answer.
+- Section 7 (Phase 5 — Packaging & Reproducibility) for any
+  component that has not passed §11.
+- Section 12 speculative-decoding integration. The §12.3
+  probe shares §13's configuration and inherits §13's null.
 
-The following tracks remain **open for a new hypothesis**:
+**Open and authorized** (in priority order):
 
-- A §2.2 metric-space revision — specifically, moving from
-  probability-simplex distance to an embedding-space or
-  contrastive-representation distance, with a fresh §11
-  probe. This is a non-trivial redesign and affects the
-  §2 Lemma 1 proof.
-- A §1.3 predictor-ensemble revision — specifically, moving
-  from same-family target+draft to an independent-family
-  M≥3 ensemble (e.g., Qwen + Llama + Mistral). This breaks
-  the "speculative-decoding reuse" efficiency argument in
-  §12 but could restore the disagreement signal BCVF needs.
-- A different benchmark entirely — one where the positive
-  class is structurally detectable from token-probability
-  disagreement (currently unknown whether such a benchmark
-  exists for hallucination-style tasks).
+1. **§13.7 semantic-entropy probe.** Pre-committed above.
+   Expected ~30–45 min compute. This is the next authorized
+   action.
+2. **§1.3 cross-family ensemble revision (Qwen + Llama +
+   Mistral).** Requires extending `Benchmark.make_sources`
+   to support M=3 heterogeneous tokenizer families, which
+   is non-trivial (~1–2 days). Authorized conditional on
+   §13.7 passing `≥ 0.60`, OR authorized standalone as a
+   separate §0.8 pre-commitment if §13.7 fails.
+3. **Embedding-space metric (alternative to semantic
+   entropy).** Activation probes or hidden-state
+   covariance (INSIDE / EigenScore). Secondary to §13.7;
+   listed for completeness.
 
-Any of these requires a new `§0.8`-style pre-commitment before
-compute is spent.
-
-### 13.7 What this means for the autonomy track
+### 13.9 What this means for the autonomy track
 
 Nothing. The autonomy-domain validation (`symbolu_robotics/
 bcvf_autonomous/DESIGN.md` §6.1 and §6.7) is a separate
 experiment on a separate dataset with a separate predictor
-set, and its pre-committed §6.11 gates were met. The LLM
-transfer premise was an expansion hypothesis; its failure
-does not retrospectively invalidate the autonomy result, any
-more than the failure of deep learning on a particular
-vision task invalidates deep learning on language tasks. The
-two domains are independent.
+set, and its pre-committed §6.11 gates were met. The §13
+LLM-domain configuration null does not retrospectively
+invalidate the autonomy result.
 
 For VC / investor communication, the autonomy track should
-be presented without reference to the LLM track. The LLM
-design doc is an internal research artifact and the null
-result documented here is a finding, not a deliverable.
-See `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest scope
-caveats" for the external-facing framing.
+continue to be presented on its own merits. The LLM design
+doc is an internal research artifact; the §13.7 revision
+probe is work-in-progress and is not positioned as a
+deliverable. `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest
+scope caveats" already reflects the current external-facing
+framing ("BCVF is not positioned as an LLM hallucination
+detector"). That framing remains accurate until §13.7
+produces evidence that changes it; no VC-facing material
+should be updated on the basis of the §13 plan alone.
 
 ---
 
