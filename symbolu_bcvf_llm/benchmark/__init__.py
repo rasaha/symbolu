@@ -14,9 +14,14 @@ from __future__ import annotations
 
 from .dataset import (
     Benchmark,
+    HaluEvalBenchmark,
     MockBenchmark,
     Question,
     TruthfulQABenchmark,
+)
+from .speculative import (
+    SpeculativeDecodingBenchmark,
+    SpeculativeDecodingMockBenchmark,
 )
 from .harness import (
     BenchmarkRunBundle,
@@ -44,9 +49,12 @@ __all__ = [
     "BenchmarkRunResult",
     "LatencyStats",
     "McNemarResult",
+    "HaluEvalBenchmark",
     "MockBenchmark",
     "PhaseSixVerdict",
     "Question",
+    "SpeculativeDecodingBenchmark",
+    "SpeculativeDecodingMockBenchmark",
     "TruthfulQABenchmark",
     "accuracy",
     "classify_phase_six_result",

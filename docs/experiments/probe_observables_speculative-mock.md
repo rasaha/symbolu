@@ -1,6 +1,6 @@
 # §11 Ketu Observable Probe Report
 
-- **Benchmark:** `mock`
+- **Benchmark:** `speculative-mock`
 - **Questions probed:** 48
 - **Observables tested:** 11
 
@@ -8,17 +8,17 @@
 
 | Observable | AUC | Classification | Mean(correct) | Mean(wrong) |
 |---|---|---|---|---|
-| `bcvf_total_cost` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
-| `bcvf_source_0_cost` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
+| `bcvf_total_cost` | 0.500 | **UNCORRELATED** | 0.0565 | 0.0565 |
+| `bcvf_source_0_cost` | 0.500 | **UNCORRELATED** | 0.0565 | 0.0565 |
 | `source_0_entropy` | 0.500 | **UNCORRELATED** | 0.0000 | 0.0000 |
-| `source_disagreement_fraction` | 0.500 | **UNCORRELATED** | 0.6000 | 0.6000 |
-| `bcvf_per_step_max` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
-| `bcvf_source_0_per_step_max` | 0.500 | **UNCORRELATED** | 2.0000 | 2.0000 |
-| `coherence_anchored_bcvf` | 0.333 | **ANTI_CORRELATED** | 0.3333 | 0.3810 |
-| `coherence_anchored_bcvf_per_step` | 0.333 | **ANTI_CORRELATED** | 0.3333 | 0.3810 |
+| `source_disagreement_fraction` | 0.500 | **UNCORRELATED** | 0.0000 | 0.0000 |
+| `bcvf_per_step_max` | 0.500 | **UNCORRELATED** | 0.0565 | 0.0565 |
+| `bcvf_source_0_per_step_max` | 0.500 | **UNCORRELATED** | 0.0565 | 0.0565 |
+| `coherence_anchored_bcvf` | 1.000 | **TRUTH_CORRELATED** | 0.9501 | 0.0000 |
+| `coherence_anchored_bcvf_per_step` | 0.963 | **TRUTH_CORRELATED** | 0.0000 | 0.0000 |
 | `uncertainty_gated_bcvf_per_step_max` | 0.500 | **UNCORRELATED** | 0.0000 | 0.0000 |
-| `layer_instability_max` | 0.500 | **UNCORRELATED** | 0.0000 | 0.0000 |
-| `coherence_anchored_layer_bcvf_per_step` | 0.500 | **UNCORRELATED** | 0.0000 | 0.0000 |
+| `layer_instability_max` | 0.500 | **UNCORRELATED** | 0.0102 | 0.0102 |
+| `coherence_anchored_layer_bcvf_per_step` | 0.976 | **TRUTH_CORRELATED** | 0.0000 | 0.0000 |
 
 ## Per-observable detail
 
@@ -28,9 +28,9 @@
 - **Pearson r:** +0.000
 - **Spearman ρ:** +0.000
 - **Polarity:** higher = more suspicious
-- **Mean scalar when correct:** 2.0000
-- **Mean scalar when wrong:** 2.0000
-- **N datapoints:** 96 (from 48 questions)
+- **Mean scalar when correct:** 0.0565
+- **Mean scalar when wrong:** 0.0565
+- **N datapoints:** 144 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
@@ -41,9 +41,9 @@
 - **Pearson r:** +0.000
 - **Spearman ρ:** +0.000
 - **Polarity:** higher = more suspicious
-- **Mean scalar when correct:** 2.0000
-- **Mean scalar when wrong:** 2.0000
-- **N datapoints:** 96 (from 48 questions)
+- **Mean scalar when correct:** 0.0565
+- **Mean scalar when wrong:** 0.0565
+- **N datapoints:** 144 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
@@ -56,7 +56,7 @@
 - **Polarity:** higher = more suspicious
 - **Mean scalar when correct:** 0.0000
 - **Mean scalar when wrong:** 0.0000
-- **N datapoints:** 96 (from 48 questions)
+- **N datapoints:** 144 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
@@ -67,9 +67,9 @@
 - **Pearson r:** +0.000
 - **Spearman ρ:** +0.000
 - **Polarity:** higher = more suspicious
-- **Mean scalar when correct:** 0.6000
-- **Mean scalar when wrong:** 0.6000
-- **N datapoints:** 96 (from 48 questions)
+- **Mean scalar when correct:** 0.0000
+- **Mean scalar when wrong:** 0.0000
+- **N datapoints:** 144 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
@@ -80,9 +80,9 @@
 - **Pearson r:** +0.000
 - **Spearman ρ:** +0.000
 - **Polarity:** higher = more suspicious
-- **Mean scalar when correct:** 2.0000
-- **Mean scalar when wrong:** 2.0000
-- **N datapoints:** 96 (from 48 questions)
+- **Mean scalar when correct:** 0.0565
+- **Mean scalar when wrong:** 0.0565
+- **N datapoints:** 144 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
@@ -93,38 +93,38 @@
 - **Pearson r:** +0.000
 - **Spearman ρ:** +0.000
 - **Polarity:** higher = more suspicious
-- **Mean scalar when correct:** 2.0000
-- **Mean scalar when wrong:** 2.0000
-- **N datapoints:** 96 (from 48 questions)
+- **Mean scalar when correct:** 0.0565
+- **Mean scalar when wrong:** 0.0565
+- **N datapoints:** 144 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
 
 ### `coherence_anchored_bcvf`
 
-- **AUC:** 0.333  (higher AUC = observable predicts correctness better)
-- **Pearson r:** -0.052
-- **Spearman ρ:** -0.301
+- **AUC:** 1.000  (higher AUC = observable predicts correctness better)
+- **Pearson r:** +0.997
+- **Spearman ρ:** +0.817
 - **Polarity:** higher = more trusted
-- **Mean scalar when correct:** 0.3333
-- **Mean scalar when wrong:** 0.3810
-- **N datapoints:** 96 (from 48 questions)
-- **Classification:** **`ANTI_CORRELATED`**
+- **Mean scalar when correct:** 0.9501
+- **Mean scalar when wrong:** 0.0000
+- **N datapoints:** 144 (from 48 questions)
+- **Classification:** **`TRUTH_CORRELATED`**
 
-**Recommendation:** AUC=0.333 < 0.45 — observable has signal with the WRONG sign. A conventional trust-shaped attractor on this would ACTIVELY HURT accuracy. Options: flip the observable's sign, reject it, or verify with a larger N.
+**Recommendation:** AUC=1.000 — observable has signal. Worth building a Rahu attractor around. Proceed to bounded benchmark.
 
 ### `coherence_anchored_bcvf_per_step`
 
-- **AUC:** 0.333  (higher AUC = observable predicts correctness better)
-- **Pearson r:** -0.052
-- **Spearman ρ:** -0.301
+- **AUC:** 0.963  (higher AUC = observable predicts correctness better)
+- **Pearson r:** +0.283
+- **Spearman ρ:** +0.755
 - **Polarity:** higher = more trusted
-- **Mean scalar when correct:** 0.3333
-- **Mean scalar when wrong:** 0.3810
-- **N datapoints:** 96 (from 48 questions)
-- **Classification:** **`ANTI_CORRELATED`**
+- **Mean scalar when correct:** 0.0000
+- **Mean scalar when wrong:** 0.0000
+- **N datapoints:** 144 (from 48 questions)
+- **Classification:** **`TRUTH_CORRELATED`**
 
-**Recommendation:** AUC=0.333 < 0.45 — observable has signal with the WRONG sign. A conventional trust-shaped attractor on this would ACTIVELY HURT accuracy. Options: flip the observable's sign, reject it, or verify with a larger N.
+**Recommendation:** AUC=0.963 — observable has signal. Worth building a Rahu attractor around. Proceed to bounded benchmark.
 
 ### `uncertainty_gated_bcvf_per_step_max`
 
@@ -134,7 +134,7 @@
 - **Polarity:** higher = more suspicious
 - **Mean scalar when correct:** 0.0000
 - **Mean scalar when wrong:** 0.0000
-- **N datapoints:** 96 (from 48 questions)
+- **N datapoints:** 144 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
@@ -145,25 +145,25 @@
 - **Pearson r:** +0.000
 - **Spearman ρ:** +0.000
 - **Polarity:** higher = more suspicious
-- **Mean scalar when correct:** 0.0000
-- **Mean scalar when wrong:** 0.0000
-- **N datapoints:** 96 (from 48 questions)
+- **Mean scalar when correct:** 0.0102
+- **Mean scalar when wrong:** 0.0102
+- **N datapoints:** 144 (from 48 questions)
 - **Classification:** **`UNCORRELATED`**
 
 **Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
 
 ### `coherence_anchored_layer_bcvf_per_step`
 
-- **AUC:** 0.500  (higher AUC = observable predicts correctness better)
-- **Pearson r:** +0.000
-- **Spearman ρ:** +0.000
+- **AUC:** 0.976  (higher AUC = observable predicts correctness better)
+- **Pearson r:** +0.284
+- **Spearman ρ:** +0.796
 - **Polarity:** higher = more trusted
 - **Mean scalar when correct:** 0.0000
 - **Mean scalar when wrong:** 0.0000
-- **N datapoints:** 96 (from 48 questions)
-- **Classification:** **`UNCORRELATED`**
+- **N datapoints:** 144 (from 48 questions)
+- **Classification:** **`TRUTH_CORRELATED`**
 
-**Recommendation:** AUC=0.500 near 0.5 — observable is close to noise. A Rahu built on this converges to conventional-blend at best. Not worth the inference cost.
+**Recommendation:** AUC=0.976 — observable has signal. Worth building a Rahu attractor around. Proceed to bounded benchmark.
 
 
 ## Discipline — what this report means

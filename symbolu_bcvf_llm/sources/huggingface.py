@@ -75,6 +75,7 @@ class HuggingFaceSource:
         prompt: str,
         L: int = 5,
         device: Optional[str] = None,
+        max_vocab_size: Optional[int] = None,
     ) -> None:
         try:
             import torch  # noqa: F401 — runtime-only import
@@ -91,9 +92,28 @@ class HuggingFaceSource:
         self._model = model
         self._tokenizer = tokenizer
         self.L = L
-        self.vocab_size = int(getattr(model.config, "vocab_size", 0)) or (
+        # config.vocab_size may be padded (e.g. Qwen-2.5-7B pads from
+        # 151936 tokenizer vocab to 152064 model vocab — a multiple of
+        # 128). max_vocab_size lets callers cap the effective V for
+        # cross-model kernel compatibility (e.g. spec-dec's
+        # target+draft pair where each model pads differently).
+        config_vocab = int(getattr(model.config, "vocab_size", 0)) or (
             len(tokenizer)
         )
+        if max_vocab_size is not None:
+            if max_vocab_size < 1:
+                raise ValueError("max_vocab_size must be >= 1")
+            if max_vocab_size > config_vocab:
+                raise ValueError(
+                    f"max_vocab_size={max_vocab_size} exceeds model "
+                    f"config.vocab_size={config_vocab}"
+                )
+            self.vocab_size = int(max_vocab_size)
+            self._slice_vocab = (self.vocab_size < config_vocab)
+        else:
+            self.vocab_size = config_vocab
+            self._slice_vocab = False
+        self._full_vocab_size = config_vocab
         self.eos_token_id = getattr(tokenizer, "eos_token_id", None)
         self._device = device or str(next(model.parameters()).device)
 
@@ -116,6 +136,13 @@ class HuggingFaceSource:
         assert self._lookahead_logits is not None
         assert self._lookahead_token_ids is not None
         probs = stable_softmax(self._lookahead_logits, axis=-1)
+        if self._slice_vocab:
+            probs = probs[:, : self.vocab_size]
+            # Renormalize per row so each position sums to 1 after
+            # dropping the padded-tail dims. Numerically safe because
+            # padded entries have near-zero mass (model rarely predicts
+            # padded token IDs).
+            probs = probs / probs.sum(axis=-1, keepdims=True)
         mask = truncating_valid_mask(
             self._lookahead_token_ids, self.eos_token_id, self.L
         )
@@ -145,8 +172,11 @@ class HuggingFaceSource:
         self._past_key_values = out.past_key_values
         # Start with the prompt-final logits at position 0 of the lookahead.
         step0_logits = out.logits[0, -1, :].to(torch.float32).cpu().numpy()
+        # Internal storage uses the MODEL'S vocab (config.vocab_size),
+        # which may exceed the effective `self.vocab_size` when a cap
+        # is set. Slicing happens on output in `lookahead()`.
         self._lookahead_logits = np.zeros(
-            (self.L, self.vocab_size), dtype=np.float32
+            (self.L, self._full_vocab_size), dtype=np.float32
         )
         self._lookahead_logits[0, :] = step0_logits
         self._lookahead_token_ids = np.zeros(self.L, dtype=np.int64)
@@ -250,4 +280,60 @@ class HuggingFaceSource:
         shifted = logits_slice - logits_slice.amax(dim=-1, keepdim=True)
         exp = torch.exp(shifted)
         probs = exp / exp.sum(dim=-1, keepdim=True)
-        return probs.cpu().numpy()
+        probs_np = probs.cpu().numpy()
+        if self._slice_vocab:
+            probs_np = probs_np[:, : self.vocab_size]
+            probs_np = probs_np / probs_np.sum(axis=-1, keepdims=True)
+        return probs_np
+
+    # §12.5 cross-layer logit-lens ----------------------------------- #
+
+    def layer_lookahead(self) -> np.ndarray:
+        """Per-layer next-token distributions at the current position.
+
+        Runs one forward pass on the committed prefix with
+        ``output_hidden_states=True``. Each layer's hidden state at the
+        last input position is projected through the output embedding
+        matrix (logit lens; Nostalgebraist 2020), softmax-normalized,
+        returning an ``(N_layers, V)`` array.
+
+        Shape: ``N_layers = n_hidden_layers + 1`` in HuggingFace —
+        entry 0 is the embedding layer, entries 1..N are transformer
+        blocks. All share vocab size V.
+
+        Cost: one full forward pass (no KV-cache reuse), so probe-time
+        only — not for decoding hot paths.
+        """
+        import torch
+
+        input_ids = torch.tensor(
+            [self._committed_prefix_ids], device=self._device
+        )
+        with torch.inference_mode():
+            out = self._model(
+                input_ids=input_ids,
+                output_hidden_states=True,
+                use_cache=False,
+            )
+
+            # Output projection matrix (V, hidden_dim). The matmul and
+            # numpy conversion must happen INSIDE inference_mode so
+            # the parameter's requires_grad doesn't propagate to the
+            # result and break .numpy().
+            lm_head = self._model.get_output_embeddings()
+            W = lm_head.weight.to(torch.float32)
+
+            per_layer = []
+            for h in out.hidden_states:
+                # h: (1, seq_len, hidden_dim). Last position's hidden state.
+                h_last = h[0, -1, :].to(torch.float32)
+                logits = (h_last @ W.t()).cpu().numpy()
+                # Stable softmax
+                shifted = logits - logits.max()
+                exp = np.exp(shifted)
+                per_layer.append(exp / exp.sum())
+        arr = np.stack(per_layer, axis=0)  # (N_layers, full_vocab)
+        if self._slice_vocab:
+            arr = arr[:, : self.vocab_size]
+            arr = arr / arr.sum(axis=-1, keepdims=True)
+        return arr

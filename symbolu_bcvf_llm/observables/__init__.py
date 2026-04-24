@@ -40,20 +40,34 @@ from .bcvf_per_step import (
     BCVFPerStepMaxObservable,
     BCVFSourceZeroPerStepMaxObservable,
 )
+from .coherence import (
+    CoherenceAnchoredBCVFObservable,
+    CoherenceAnchoredBCVFPerStepObservable,
+)
 from .entropy import Source0EntropyObservable
+from .layer import (
+    CoherenceAnchoredLayerBCVFObservable,
+    LayerInstabilityObservable,
+)
 from .probe import probe_observable, probe_observables_parallel
+from .uncertainty_gated import UncertaintyGatedBCVFPerStepMaxObservable
 
 __all__ = [
     "BCVFPerStepMaxObservable",
     "BCVFSourceZeroCostObservable",
     "BCVFSourceZeroPerStepMaxObservable",
     "BCVFTotalCostObservable",
+    "CoherenceAnchoredBCVFObservable",
+    "CoherenceAnchoredBCVFPerStepObservable",
+    "CoherenceAnchoredLayerBCVFObservable",
+    "LayerInstabilityObservable",
     "Observable",
     "ObservableValue",
     "ProbeDatapoint",
     "ProbeReport",
     "Source0EntropyObservable",
     "SourceAgreementObservable",
+    "UncertaintyGatedBCVFPerStepMaxObservable",
     "classify_observable",
     "probe_observable",
     "probe_observables_parallel",

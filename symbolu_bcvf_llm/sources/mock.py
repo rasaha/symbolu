@@ -130,3 +130,69 @@ class MockSource:
 
 # Structural check: MockSource must satisfy the Source protocol.
 _: Source = MockSource(lambda _p: np.zeros((3, 2)), L=3, V=2)
+
+
+# --------------------------------------------------------------------------- #
+# MockLayerSource — for §12.5 cross-layer observable tests
+# --------------------------------------------------------------------------- #
+
+
+class MockLayerSource(MockSource):
+    """MockSource augmented with a synthetic per-layer probability
+    distribution, for offline testing of cross-layer observables.
+
+    Inherits the full MockSource protocol (`lookahead`, `commit`,
+    `score_teacher_forced`). Adds `layer_lookahead()` returning an
+    ``(N_layers, V)`` array sampled from a caller-supplied
+    ``layer_logits_fn``. When no layer fn is given, defaults to
+    broadcasting the regular `lookahead()` position-0 logits across
+    all layers (i.e., no cross-layer variation — useful as a
+    degenerate baseline).
+    """
+
+    def __init__(
+        self,
+        logits_fn: Callable[[Tuple[int, ...]], np.ndarray],
+        L: int,
+        V: int,
+        *,
+        n_layers: int = 8,
+        layer_logits_fn: Optional[
+            Callable[[Tuple[int, ...], int, int], np.ndarray]
+        ] = None,
+        eos_token_id: Optional[int] = None,
+        initial_prefix: Optional[List[int]] = None,
+    ) -> None:
+        super().__init__(
+            logits_fn=logits_fn, L=L, V=V,
+            eos_token_id=eos_token_id, initial_prefix=initial_prefix,
+        )
+        if n_layers < 3:
+            raise ValueError(
+                "n_layers >= 3 required for the 2nd-difference stencil"
+            )
+        self.n_layers = int(n_layers)
+        self._layer_logits_fn = layer_logits_fn
+
+    def layer_lookahead(self) -> np.ndarray:
+        """Return ``(N_layers, V)`` synthetic per-layer probabilities."""
+        if self._layer_logits_fn is not None:
+            z = np.asarray(
+                self._layer_logits_fn(
+                    tuple(self._committed), self.n_layers, self.vocab_size,
+                )
+            )
+            if z.shape != (self.n_layers, self.vocab_size):
+                raise ValueError(
+                    f"layer_logits_fn returned shape {z.shape}; "
+                    f"expected ({self.n_layers}, {self.vocab_size})"
+                )
+        else:
+            # Degenerate default: broadcast the regular lookahead's
+            # position-0 logits across layers (no cross-layer variation).
+            base = np.asarray(self._logits_fn(tuple(self._committed)))
+            z = np.tile(base[0], (self.n_layers, 1))
+        # Stable softmax per layer.
+        shifted = z - np.max(z, axis=-1, keepdims=True)
+        exp = np.exp(shifted)
+        return exp / np.sum(exp, axis=-1, keepdims=True)

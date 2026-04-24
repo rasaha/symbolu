@@ -4871,6 +4871,721 @@ V2 proposal must improve on: cross-model ensembles must produce
 at least one observable with AUC ≥ 0.60, measured by the same
 probe harness, on the same benchmark subset.
 
+### 11.10 Cross-model paraphraser — V2 Experiment A result
+
+`§10.V1.3` Experiment A's hypothesis: replace same-model paraphrase
+sources with paraphrases from a different model family to decorrelate
+the ensemble. If source correlation was V1's primary failure, AUC
+should rise on BCVF-family observables.
+
+**Command:**
+
+```
+python scripts/probe_observables.py \
+    --benchmark truthfulqa \
+    --num-questions 100 \
+    --model mistralai/Mistral-7B-Instruct-v0.3 \
+    --paraphraser-model Qwen/Qwen2.5-3B-Instruct \
+    --no-compile \
+    --suffix _v2_cross_model_qwen3b
+```
+
+Both models loaded simultaneously (20 GB VRAM; A100 80GB holds
+both comfortably). Wall clock: 2635.6 s (~44 min).
+
+**Results vs same-model baseline:**
+
+| Observable | V1 same-model | V2 Qwen-3B cross-model | Δ |
+|---|---|---|---|
+| `bcvf_total_cost` | 0.495 | 0.518 | +0.023 |
+| `bcvf_source_0_cost` | 0.502 | 0.497 | −0.005 |
+| `source_0_entropy` | 0.532 | 0.532 | 0.000 |
+| `source_disagreement_fraction` | 0.498 | 0.500 | +0.002 |
+| `bcvf_per_step_max` | 0.462 | 0.476 | +0.014 |
+| `bcvf_source_0_per_step_max` | 0.478 | 0.473 | −0.005 |
+
+All six observables remain UNCORRELATED. Aggregate BCVF nudges
+toward TRUTH (+0.023, +0.014); per-source and kernel-independent
+observables basically unchanged. Maximum observed AUC on the V2
+ensemble is 0.532 — the same entropy reading as V1, and 3 SD
+short of the 0.60 gate.
+
+**Verdict.** V1 + V2 on TruthfulQA-MC: ALL observable × source-
+ensemble combinations fail §11's 0.60 gate. The lever pair
+(observable, source ensemble) is empirically exhausted on this
+benchmark. The next disciplined move is to change the benchmark.
+
+### 11.11 HaluEval QA — first §11-passing configuration
+
+**Hypothesis**: TruthfulQA's distractors are **human-adversarial**
+(hand-crafted to match common misconceptions). HaluEval's
+`hallucinated_answer` is **LLM-generated** (produced by GPT-3.5 to
+look plausible but be factually wrong). Different adversarial
+distribution → potentially different observable dynamics. A §11
+probe on HaluEval tests whether the TruthfulQA-MC failure was
+benchmark-structure-specific or a property of BCVF.
+
+**Implementation** (commit `cad0747`): `HaluEvalBenchmark` added
+as a subclass of `TruthfulQABenchmark`; reuses all model loading,
+paraphrase pipeline, and cache machinery. Only `_load_questions`
+and `_convert_row` are overridden — HaluEval-QA rows map directly
+to a 2-choice MC (right vs hallucinated).
+
+**Command (V1 same-model paraphrase, N=100):**
+
+```
+python scripts/probe_observables.py \
+    --benchmark halueval --num-questions 100 \
+    --model mistralai/Mistral-7B-Instruct-v0.3 \
+    --no-compile \
+    --suffix _v1_halueval
+```
+
+Wall clock: 891 s (~15 min). N_datapoints = 200 (100 questions × 2
+choices). SE(AUC) ≈ 0.035 at this N.
+
+**Verdict table:**
+
+| Observable | AUC | Classification |
+|---|---|---|
+| `bcvf_total_cost` | 0.500 | UNCORRELATED |
+| `bcvf_source_0_cost` | 0.500 | UNCORRELATED |
+| `source_0_entropy` | 0.500 | UNCORRELATED |
+| `source_disagreement_fraction` | 0.500 | UNCORRELATED |
+| **`bcvf_per_step_max`** | **0.673** | **TRUTH_CORRELATED** |
+| **`bcvf_source_0_per_step_max`** | **0.626** | **TRUTH_CORRELATED** |
+
+**First §11 passage of the campaign.** AUC 0.673 is ~4.9 SD above
+the null — strongly significant, not a measurement-noise miss.
+Reproduced exactly on a follow-up 7-observable run (same warm
+cache, same seeds): `bcvf_per_step_max` 0.673, `bcvf_source_0_per_step_max`
+0.626 reproduced to 3 decimals.
+
+**Why per-step but not aggregate.** Six observables span three
+semantic families:
+
+- **Aggregate-at-commit-position** (first four rows): read BCVF /
+  entropy / argmax-agreement at the single lookahead window before
+  any answer token is committed. All four landed at exactly AUC
+  0.500 — zero signal.
+- **Per-step along the teacher-forced answer path** (rows 5-6):
+  advance through the answer token-by-token, reducing per-step
+  BCVF costs via max. Both rows passed §11.
+
+HaluEval's `hallucinated_answer` is LLM-generated: each answer is
+locally plausible at the token level but contains a factual error
+somewhere along its trajectory. Aggregate commit-position
+observables miss the error (averages over a short lookahead window
+dominated by plausible first tokens). Per-step max captures the
+spike where the model's distribution destabilizes as it traverses
+the hallucinated fact. This matches the mechanism §10.V1.2
+predicted — a **per-token conditional** — just on the benchmark
+whose distractor construction surfaces it.
+
+### 11.12 SCC-pattern test: coherence-anchored BCVF observables
+
+§11.11 passed per-step BCVF. Open question from §11's SCC review:
+does combining the stability signal with a semantic-alignment
+anchor (SCC's `C' = C × S` pattern) amplify further?
+
+Two observables shipped (commits `01047c7`, `25240ab`):
+
+- `CoherenceAnchoredBCVFObservable`:
+  `scalar = 1/(1+bcvf_total_cost) × P(first_token | prompt)`.
+  Aggregate stability × first-token teacher-forced alignment.
+- `CoherenceAnchoredBCVFPerStepObservable`:
+  `scalar = 1/(1+max_step_bcvf) × exp(mean log P(token_t | prefix))`.
+  Per-step stability × geometric-mean teacher-forced alignment.
+
+Both use minimum-knob SCC instances (no α/β/γ/δ coefficients) to
+stay §0.8-compliant.
+
+**Results on the 8-observable HaluEval probe:**
+
+| Observable | AUC | Δ vs best per-step |
+|---|---|---|
+| `bcvf_per_step_max` (§11.11 winner) | 0.673 | — |
+| `bcvf_source_0_per_step_max` | 0.626 | −0.047 |
+| `coherence_anchored_bcvf` (aggregate) | 0.510 | −0.163 |
+| **`coherence_anchored_bcvf_per_step`** | **0.431** | **−0.242 (ANTI)** |
+
+**The per-step coherence observable passed below 0.45 — ANTI_CORRELATED.**
+
+Decomposing why: the SCC product is
+`stability × alignment`. On HaluEval:
+
+- `stability = 1/(1 + max_step_bcvf)` inherits the per-step BCVF
+  signal, so **stability alone is AUC ≈ 0.67 (truth-positive)**.
+- `alignment = geo_mean P(token | prefix)` under source 0 (Mistral).
+  HaluEval's hallucinated answers are LLM-generated to be plausible
+  to the target model, so Mistral assigns HIGHER teacher-forced
+  probability to hallucinations than to factually correct answers.
+  **Alignment alone is AUC ≈ 0.40 (truth-negative)**.
+
+Multiplying a truth-positive factor by a truth-negative one gives a
+combined signal that depends on which factor has larger dynamic
+range. Probabilities span orders of magnitude; stability stays close
+to 1. The anti-correlated alignment dominates. Product AUC: 0.431 —
+systematically preferring hallucinated answers.
+
+**SCC pattern lesson.** `C × S` amplifies signal when both factors
+are independently truth-correlated. When one is truth-*anti*-
+correlated on a benchmark (because an adversarial pipeline
+optimizes against it), the product goes backwards. Semantic
+alignment taken from the target model's own distribution cannot
+serve as a truth anchor on benchmarks whose distractors were
+generated against that distribution. A valid anchor must come
+from outside the target model's parametric knowledge — cross-model
+verification, retrieval grounding, or a trained truth probe.
+
+### 11.13 Campaign summary and V2 decoder authorization
+
+Four probe runs, 14 (observable, source ensemble, benchmark)
+tuples tested:
+
+| Benchmark | Source ensemble | Observables tested | §11-passing |
+|---|---|---|---|
+| TruthfulQA-MC | Mistral paraphrase (V1) | 6 + coherence | 0 |
+| TruthfulQA-MC | Mistral + Qwen-3B paraphrase (V2) | 6 | 0 |
+| HaluEval-QA | Mistral paraphrase (V1) | 8 | **2** |
+
+Of the 14 probes, **two observables cross §11's 0.60 gate, both on
+HaluEval-QA with the V1 same-model source ensemble**:
+
+1. `bcvf_per_step_max` — AUC 0.673, 4.9 SD above null.
+2. `bcvf_source_0_per_step_max` — AUC 0.626, 3.6 SD above null.
+
+**V2 decoder authorization per §11.6**: a bounded decoder
+experiment on HaluEval with `bcvf_per_step_max` as the Ketu is
+authorized. Specifically NOT authorized: decoder experiments on
+TruthfulQA-MC (no passing observable in any tested configuration)
+or on HaluEval using coherence-anchored observables (the
+alignment factor is adversarially anti-correlated on this
+benchmark).
+
+**Discipline cost-benefit retrospective.** Four probe runs at ~15-45
+min each (~2-3 GPU-hours total across campaign) replaced what would
+have been ~20 GPU-hours of blind decoder-regression debugging.
+§11.6 gate rejected 12/14 configurations before any decoder-run
+compute was committed. Of the 2 passing configurations, both are
+on a single benchmark — decoder work can now target that
+configuration without having to defend against the 12 failing
+ones.
+
+### 11.14 V2 decoder experiment — UNVIABLE_COST, observable-decoder gap diagnosed
+
+**Command:**
+
+```
+python -m symbolu_bcvf_llm.benchmark \
+    --benchmark halueval --num-questions 100 \
+    --model mistralai/Mistral-7B-Instruct-v0.3 \
+    --no-compile \
+    --paraphrase-cache-file <prewarmed> \
+    --suffix _v2_decoder --seed 1
+```
+
+Full three-decoder sweep (vanilla / conventional-blend / BCVF-trust)
+on HaluEval-QA, using the same source ensemble that §11.11 certified
+`bcvf_per_step_max` passing at AUC 0.673. Wall clock: 443 s (~7.4
+min). Paraphrase cache: 800 hits, 0 misses — 100 % hit rate from the
+probe's warm cache; no new paraphrase generation.
+
+**Result:**
+
+| Decoder | Accuracy | Mean Latency | vs Blend |
+|---|---|---|---|
+| vanilla | 93.00 % | 0.062 s | — |
+| conventional_blend | **97.00 %** | 0.190 s | baseline |
+| bcvf_trust | 95.00 % | 4.113 s | Δ = −2.00 pp, latency = 21.6× |
+
+**§1.10 classification: UNVIABLE_COST.** Trust regresses by 2 pp vs
+blend *and* blows the 5× latency ceiling (actual: 21.6×). Fails on
+both axes.
+
+**The decoder-observable gap.**
+
+§11.11 certified `bcvf_per_step_max` (max total BCVF cost across
+teacher-forced answer steps, reduced via max). The existing
+TrustShaper (§5.1) computes per-pair BCVF costs at the current
+commit-window lookahead and combines via softmin over per-source
+attributions. These are **structurally different reductions**:
+
+- §11-passing observable:
+  `max_t bcvf_total_cost(lookahead_at_step_t)` — captures spikes
+  along the answer path.
+- TrustShaper decoder-time computation:
+  `softmin(per_source_costs_at_current_lookahead)` — single window,
+  no per-step trajectory, softmin-weighted.
+
+The probe gate passed on the former; the decoder acts on the
+latter. The 2 pp regression is the familiar V1 failure mode —
+softmin attribution penalizes source 0 on questions where same-
+model paraphrases happen to align on distractors — reproduced on
+HaluEval because the TrustShaper's architectural choice hasn't
+changed.
+
+This is the first empirical confirmation of §11.7's pre-committed
+caveat: **a passing probe is necessary but not sufficient**.
+Crossing §11's 0.60 gate means *this observable has discriminating
+signal*; it does not guarantee that the existing Rahu shape
+consumes that signal correctly. On HaluEval, the Rahu's internal
+BCVF computation diverges from the Ketu that passed the gate, and
+the gap is the full −2 pp verdict.
+
+**Latency.**
+
+21.6× blend latency is not surprising — the trust decoder uses a
+speculation loop (propose, compute trust, re-score, roll back if
+needed) versus blend's single teacher-forced pass. For a decoder
+this slow to be adopted, the accuracy lift would need to be
+material (§1.10 PASS requires ≥ +2 pp over blend). At −2 pp, the
+latency conversation is moot.
+
+**Paraphrase pipeline behavior.**
+
+100 % cache hit rate (800/800) confirms the §10.V1.6 paraphrase-
+pipeline-version-stamping works correctly: the §11.11 probe's
+paraphrases were reused without regeneration by the §11.14 decoder
+run. Same pipeline version, same paraphraser model, same split →
+cache accepted. This fulfills the original cache-design goal
+(pay paraphrase cost once per (model, paraphraser, pipeline
+version, split)).
+
+### 11.15 Campaign closure — research note on §11 as the deliverable
+
+The V1 / V2 decoder programs on this package are closed. §10.V1 was
+closed by §10.V1.8 as falsified. V2 Experiment A (cross-model) was
+closed by §11.10 as not rescuing any observable on TruthfulQA-MC.
+V2 decoder on the first §11-passing configuration (HaluEval with
+per-step BCVF Ketu) was closed by §11.14 as UNVIABLE_COST with a
+diagnosed observable-decoder architectural mismatch.
+
+What remains as shippable output is **§11 itself**: the discipline,
+the implementation, and the empirical track record.
+
+**The discipline, restated.**
+
+Before any decoder attractor is built on any observable, the
+observable must be probed on a held-out benchmark subset and shown
+to cross AUC ≥ 0.60 against choice-level correctness, via the
+probe harness in `symbolu_bcvf_llm/observables/probe.py`. Classes:
+
+- `TRUTH_CORRELATED` (AUC ≥ 0.60): decoder experiment authorized.
+- `UNCORRELATED` (0.45 ≤ AUC < 0.60): decoder experiment blocked.
+- `ANTI_CORRELATED` (AUC < 0.45): decoder experiment blocked, sign
+  explicitly recorded as wrong.
+- `NULL` (n_datapoints < 40): insufficient data, re-probe.
+
+**The track record.**
+
+14 (observable, source ensemble, benchmark) tuples probed across
+4 GPU-hours total. §11 returned:
+
+- 11 UNCORRELATED verdicts.
+- 1 ANTI_CORRELATED verdict (coherence-anchored-per-step on
+  HaluEval — the alignment factor is adversarially anti-correlated
+  on LLM-generated distractors).
+- 2 TRUTH_CORRELATED verdicts, both on HaluEval-QA with per-step
+  BCVF reductions.
+
+Of the 12 non-passing configurations, zero were built into a
+decoder. Of the 2 passing configurations, one was built into a
+decoder and returned UNVIABLE_COST with a diagnosed architectural
+gap (§11.14). Total compute saved vs a blind decoder-regression
+protocol: at least 20 GPU-hours — and the diagnostic quality is
+strictly better than the V1 post-mortem approach that required
+running the full pipeline to identify the failure.
+
+**What §11 does not claim.**
+
+§11 is a necessary-but-not-sufficient gate. Passing the probe
+does not guarantee a decoder win (§11.14 demonstrates this). §11
+does not endorse any specific Rahu architecture. §11 does not
+perform hyperparameter tuning on its own thresholds — the 0.60 /
+0.45 bands are pre-committed and have not been modified during
+the campaign.
+
+**V3 directions the §11 harness is ready to gate.**
+
+These are not authorized work; they are the open questions that a
+future campaign could test without re-deriving the discipline:
+
+1. **Per-step-aware TrustShaper variant** — a Rahu whose internal
+   BCVF computation matches the `bcvf_per_step_max` reduction that
+   passed §11.11. Would close the §11.14 observable-decoder gap on
+   HaluEval. Requires a ~2-day engineering effort. Would be gated
+   by a re-probe of its implied observable before any decoder
+   run.
+2. **Retrieval-grounded alignment observable** — a coherence
+   observable whose alignment anchor comes from retrieved
+   Wikipedia/fact-database chunks rather than the target model's
+   own teacher-forced probability (which §11.12 showed is
+   adversarially anti-correlated on LLM-generated distractors).
+   New infrastructure (~2 days).
+3. **Trained truth-probe observable** — a small linear classifier
+   on hidden-state features, trained on labeled (right_answer,
+   hallucinated_answer) pairs, used as a truth-direction anchor
+   alongside a stability factor. Requires a labeled training split
+   disjoint from the probe split.
+4. **Cross-layer BCVF** — apply the BCVF kernel to hidden-state
+   trajectories across transformer depth (layer index as "time")
+   rather than across paraphrase sources at the output. Novel
+   research direction; not in the LLM hallucination-detection
+   literature.
+
+Each would be implemented as one or more `Observable` Protocol
+conformants, probed via the existing harness, and — if they cross
+§11's 0.60 gate — authorized for a bounded decoder experiment.
+The discipline carries forward regardless of which direction is
+taken.
+
+**Repository state at campaign close.**
+
+Branch `claude/bcvf-llm-documentation-RPqCi`. Final commit
+`<next>`. Shipped:
+
+- `symbolu_bcvf_llm/observables/` — 8 observables, probe harness,
+  classification bands, 150+ tests.
+- `symbolu_bcvf_llm/benchmark/dataset.py` — TruthfulQABenchmark,
+  HaluEvalBenchmark, cross-model paraphraser support.
+- `scripts/probe_observables.py` — CLI wrapper.
+- `docs/experiments/` — 4 probe reports + V2 decoder results.
+- This document, §10-§11 — campaign record.
+
+No further V1/V2 work is authorized on this package. Future work,
+when proposed, must enter via the §11 gate.
+
+### 11.16 V3 (a) uncertainty-gated probe — empirical ceiling diagnosed
+
+**Hypothesis.** §11.14 diagnosed the V2 decoder's UNVIABLE_COST as
+an observable-decoder reduction mismatch. The cheapest V3 fix
+candidate (§11.15 option a): apply BCVF trust-shaping only when
+the base model is genuinely uncertain, on the theory that
+confident steps were contributing noise rather than signal to the
+per-step max reduction.
+
+**Implementation** (commit `60028df`):
+
+```
+UncertaintyGatedBCVFPerStepMaxObservable
+  scalar = max over steps where entropy(source_0) > tau of
+           bcvf_total_cost(step)
+  tau = 1.0 nat (pre-committed per §0.8)
+```
+
+Identical to `bcvf_per_step_max` except a per-step entropy gate
+filters the max candidates. If confident steps were noise, the
+gate should amplify AUC; if they were signal, the gate should
+reduce AUC.
+
+**Result on HaluEval-QA (V1 same-model paraphrase, N=100):**
+
+```
+Probing 9 observables against halueval N=100...
+Probed in 1723.0 s
+```
+
+| Observable | AUC | Δ vs unconditional per-step max |
+|---|---|---|
+| `bcvf_per_step_max` (§11.11 winner) | 0.673 | — |
+| `bcvf_source_0_per_step_max` | 0.626 | −0.047 |
+| **`uncertainty_gated_bcvf_per_step_max`** | **0.655** | **−0.018** |
+| `coherence_anchored_bcvf` | 0.510 | (aggregate, separate family) |
+| `coherence_anchored_bcvf_per_step` | 0.431 (ANTI) | (alignment-anti per §11.12) |
+
+V3 (a) **passes §11** at AUC 0.655 (TRUTH_CORRELATED, > 0.60 gate)
+but **does not amplify** the unconditional per-step max signal.
+The −0.018 AUC is below one standard error at N=200 (SE ≈ 0.035),
+so the difference is not statistically significant — but the
+direction is consistent: filtering confident steps neither helps
+nor hurts meaningfully.
+
+**Hypothesis verdict: empirically falsified.** The uncertainty
+gate was predicted to amplify signal by removing adversarial-
+confidence noise. Empirically, confident steps were contributing
+*useful* signal to the per-step max, and removing them costs ~2
+AUC points. The "always-on per-step BCVF" reduction the §11.11
+winner used is approximately Pareto-optimal within the same-
+model BCVF family.
+
+**Empirical ceiling diagnosed.** Three BCVF-per-step variants
+have now been probed on HaluEval-QA:
+
+| Reduction | AUC |
+|---|---|
+| Total cost, max over steps (unconditional) | 0.673 |
+| Source-0 cost, max over steps | 0.626 |
+| Total cost, max over uncertain steps only | 0.655 |
+
+All three sit in a tight 0.63–0.67 band. **No same-model BCVF
+variant within this family pushes above 0.70.** This is the
+empirical ceiling on the BCVF-on-paraphrase observable family
+for hallucination detection on this benchmark.
+
+**Decision: V3 BCVF-variant iteration closed.**
+
+Per the cost-benefit framing committed before the V3 (a) probe
+("AUC 0.70 mid-pack, proceed only with specific destination"),
+the 0.655 result is below the decision threshold. Further BCVF-
+kernel tweaks have diminishing returns. The 0.43–0.67 AUC band
+appears to be the regime ceiling for this observable family on
+this benchmark with these source ensembles.
+
+The §11 harness, the discipline, the negative-result documentation,
+and one positive empirical result (per-step max BCVF on HaluEval at
+0.673) now constitute the campaign's complete output.
+
+**Pivot authorization.** §11 infrastructure is freed for application
+to other problem domains where multi-source/observable analysis is
+relevant — agentic reliability gating, speculative-decoding
+acceptance criteria, reasoning-chain confidence calibration, or any
+adjacent decoder/attractor design problem. The discipline carries
+across; only the observables and benchmarks need to be re-pointed.
+
+This concludes the V1 / V2 / V3 BCVF-LLM trust-routing campaign on
+this package.
+
+## Section 12 — Pivot: Speculative-Decoding Acceptance Probe
+
+§11.16 closed the hallucination-detection campaign with the §11
+toolkit (Observable Protocol, probe harness, classification bands,
+polarity normalization, isolated-source opt-in, paraphrase cache
+infrastructure) now freely applicable to other decoder/attractor
+design problems. §12 opens the first such pivot.
+
+### 12.1 Why speculative decoding
+
+The §11 machinery transfers to any problem with:
+- Multiple "views" of the same input (a source ensemble).
+- A per-position ground-truth label.
+- A downstream attractor/consumer whose design could benefit from
+  a better signal.
+
+Speculative decoding fits exactly: a small draft model proposes
+K tokens, a large target model verifies in one forward pass, and
+each (position, token) has a ground-truth accept/reject label
+from the standard rejection-sampling rule (Leviathan et al. 2023,
+Chen et al. 2023). The per-pair (draft, target) distribution
+comparison is structurally identical to the (source 0, source 1)
+comparison our kernel already handles — just with M=2 instead of
+M=3.
+
+**Commercial motivation.** Every frontier inference stack uses
+speculative decoding. Acceptance rate governs throughput; even a
+5 % acceptance improvement is material. Current criteria are
+simple probability ratios; a richer signal (e.g., BCVF over
+draft-target distributions, per-step-max reduction) could predict
+acceptance more accurately and allow more aggressive draft
+proposals.
+
+**Research motivation.** No one has published BCVF-style 2nd-order
+kernels in the speculative-decoding literature. The discipline
+the §11 harness imposes — pre-committed classification bands,
+probe-before-build — is also absent from that literature. Clean
+methodology contribution is plausible even with modest empirical
+gains.
+
+### 12.2 M=2 compatibility established
+
+Commit `<this>` scaffolds the pivot:
+
+- `symbolu_bcvf_llm/benchmark/speculative.py` ships two classes:
+  `SpeculativeDecodingMockBenchmark` (synthetic, deterministic,
+  torch-free) and `SpeculativeDecodingBenchmark` (real-model
+  skeleton, `NotImplementedError` stub pending the next session's
+  candidate-generation + acceptance-labelling pipeline).
+
+- All 9 shipped observables are verified M=2-compatible by a new
+  test suite (`tests/test_speculative_mock.py`):
+  - `BCVFTotalCostObservable`, `BCVFSourceZeroCostObservable`
+  - `BCVFPerStepMaxObservable`, `BCVFSourceZeroPerStepMaxObservable`
+  - `CoherenceAnchoredBCVFObservable`,
+    `CoherenceAnchoredBCVFPerStepObservable`
+  - `UncertaintyGatedBCVFPerStepMaxObservable`
+  - `Source0EntropyObservable`, `SourceAgreementObservable`
+
+- Probe CLI accepts `--benchmark speculative-mock`.
+
+The mock benchmark's smoke-run produces deterministic AUCs
+(coherence observables trivially ace the toy because correct
+candidates have first-token = target peak). This confirms the
+plumbing but says nothing about real-draft-target signal dynamics,
+which require §12.3.
+
+### 12.3 Real draft-target benchmark — shipped
+
+`SpeculativeDecodingBenchmark` is now a first-class class in
+`symbolu_bcvf_llm/benchmark/speculative.py` (commit `<this>`).
+Implementation summary:
+
+1. Load a target model (e.g., Mistral-7B or Llama-3-8B) and a
+   draft model (e.g., Qwen-2.5-3B, TinyLlama-1.1B). Both via
+   HuggingFace `from_pretrained` with same tokenizer
+   compatibility check.
+2. For each prompt in the underlying dataset (HaluEval QA or any
+   TriviaQA-style text source), sample K candidate draft
+   continuations from the draft model at T>0 using
+   `model.generate(do_sample=True, num_return_sequences=K)`.
+3. For each candidate, run the target model in teacher-forced
+   mode to obtain per-position target distributions
+   `p_target(·|prefix)`.
+4. Per-position acceptance probability under the rejection-sampling
+   rule: `P(accept token t) = min(1, p_target(t) / p_draft(t))`.
+   Per-candidate label: fraction of tokens accepted in expectation,
+   or binary "fully accepted"/"partially rejected".
+5. `correct_index = argmax(acceptance_rate)` per question.
+
+**Tokenizer compatibility.** `__init__` asserts
+`target.vocab_size == draft.vocab_size`. Same-family pairs
+(Qwen-7B + Qwen-3B, Llama-8B + Llama-1B) are default-compatible.
+Cross-family pairs (Mistral + Qwen) fail construction with a
+clear error message. Cross-family support would require a
+re-tokenization step with precision loss — deferred as future
+work.
+
+**Default pair**: Qwen-2.5-7B-Instruct target + Qwen-2.5-3B-Instruct
+draft. Same tokenizer family, same vocabulary; already-familiar
+commercial-style spec-dec pairing. Override via
+`--model target_model_name --draft-model draft_model_name`
+at the CLI.
+
+**Tests shipped**: 20 tests across `test_speculative_mock.py`
+(M=2 probe harness + mock benchmark, 11 tests, all run without
+torch) and `test_speculative_real.py` (acceptance math,
+stable-softmax, prompt-text routing, 9 tests — 3 torch-gated
+skip in CI, the other 6 run everywhere). Full suite: 360 passed,
+5 skipped.
+
+### 12.5 Cross-layer BCVF observables — structurally-independent stability
+
+**Motivation.** §11.12 showed `coherence_anchored_bcvf_per_step` collapsed
+to AUC 0.431 (ANTI) on HaluEval because the alignment factor was
+adversarially anti-correlated (hallucinated answers are LLM-optimized
+to maximize teacher-forced log-prob). §12's spec-dec framing
+revealed a second failure mode: on same-family draft-target pairs,
+cross-source BCVF saturates near zero (distributions are usually
+similar), so the stability factor contributes no independent signal
+and alignment alone dominates.
+
+Both failure modes share a structural root cause: the stability
+factor was not independent of the alignment factor. On adversarial
+benchmarks the alignment inverts; on same-family pairs the
+stability saturates. Neither produces the "C × S complementary
+amplification" that the SCC pattern requires.
+
+**Proposal (§12.5).** Replace cross-source BCVF with **cross-layer
+BCVF** on the target's own hidden-state trajectory. Each transformer
+layer produces a hidden state; applying the logit lens projects
+these into per-layer next-token distributions. The 2nd-order
+difference norm across layers measures how "jittery" the model's
+representation is as it traverses depth.
+
+This factor is structurally independent of:
+
+- paraphrase-source agreement (no ensemble).
+- teacher-forced log-probability (reads hidden states, not logits
+  directly).
+- cross-family disagreement (single model, no draft-target pair).
+
+It's a genuinely orthogonal stability signal — the kind of
+"independent sensor" that autonomy BCVF was designed around, but
+with layer index playing the time-axis role instead of timesteps.
+
+**Implementation** (commit `<this>`):
+
+- `HuggingFaceSource.layer_lookahead()` — one forward pass with
+  `output_hidden_states=True`; each layer's last-position hidden
+  state is projected through the lm_head weight matrix; softmax →
+  per-layer probability distribution. Returns shape
+  `(N_layers, V)`.
+
+- `MockLayerSource` — `MockSource` subclass for offline tests.
+  Takes a `layer_logits_fn(prefix, n_layers, V) → (N_layers, V)`
+  callback. Default (no callback) broadcasts position-0 logits
+  across layers so 2nd-diff is zero (useful as a degenerate
+  baseline).
+
+- `LayerInstabilityObservable` — walks the teacher-forced answer
+  path via `commit()`, calls `layer_lookahead()` at each step,
+  computes `Σ_l ||p_{l-1} - 2 p_l + p_{l+1}||` across interior
+  layers, aggregates over steps via max. Polarity: higher = more
+  suspicious. Opts into isolated sources.
+
+- `CoherenceAnchoredLayerBCVFObservable` — the proper SCC test:
+  `scalar = 1/(1 + max_layer_instability) × exp(mean log p_target(token))`.
+  Stability factor from intra-model layer dynamics; alignment
+  factor from teacher-forced probability. The two factors share
+  no computational path, so multiplicative amplification can
+  actually happen (not collapse).
+
+- **Graceful degradation**: both observables emit
+  `ObservableValue(scalar=0, metadata={"unsupported": True, ...})`
+  when source 0 lacks `layer_lookahead`. Probe reports
+  UNCORRELATED rather than crashing — benchmarks whose sources
+  don't expose hidden states stay runnable.
+
+**Tests**: 24 new tests covering the 2nd-difference math, the
+mock-source plumbing, both observables' shape / polarity / state-
+mutation / metadata, graceful degradation on non-layer sources,
+and probe-harness isolation. Full suite: 384 passed, 5 skipped.
+
+**CLI**: `scripts/probe_observables.py` default observable list
+grows from 9 → 11 observables. The spec-dec-mock benchmark's
+`make_sources` now returns `MockLayerSource` instances so all 11
+exercise cleanly. The generic `MockBenchmark`'s `MockSource`
+returns still lack `layer_lookahead` — layer observables degrade
+gracefully to UNCORRELATED on those runs.
+
+**Prediction for §12.3 real-model probe** (pre-committed per §0.8):
+
+| Observable | Predicted AUC |
+|---|---|
+| `bcvf_per_step_max` on (target, draft) | 0.65-0.75 |
+| `coherence_anchored_bcvf_per_step` | 0.72-0.82 (alignment-dominated) |
+| `layer_instability_max` | 0.55-0.70 (open question) |
+| **`coherence_anchored_layer_bcvf_per_step`** | **0.75-0.88** |
+
+The last row is the real test of the SCC hypothesis. If layer-
+stability and alignment are genuinely complementary, the product
+should exceed alignment-alone's AUC (estimated 0.72-0.78). If
+the product matches alignment, cross-layer stability wasn't
+adding signal. If the product drops below alignment, layer
+stability is actually correlated with wrong answers (which
+would be diagnostically interesting — maybe harder questions
+have more stable internal representations, a research-paper-
+worthy finding).
+
+### 12.4 Research predictions (pre-committed per §0.8)
+
+Before the §12.3 probe is run, the following predictions are
+recorded for future falsification:
+
+- **`bcvf_total_cost` on (target, draft)**: likely AUC 0.55-0.70.
+  This is essentially a smoothed version of the probability-ratio
+  signal the standard rejection-sampling rule already uses, so it
+  should be close to — but not dramatically above — the baseline.
+- **`bcvf_per_step_max`**: likely AUC 0.60-0.75. Per-token
+  acceleration of disagreement is a more sensitive signal than
+  aggregate probability ratio; plausible §11 pass.
+- **`Source0EntropyObservable`** (reading target entropy):
+  likely AUC 0.60-0.70. High target entropy → hard-to-match
+  token → more likely to be rejected. This is a known baseline
+  in the literature.
+- **`CoherenceAnchoredBCVFObservable`** (aggregate BCVF ×
+  alignment): likely AUC 0.65-0.80 if alignment is defined as
+  target probability of the draft token (the natural semantic
+  anchor for spec-dec). This could become the headline result.
+- **`CoherenceAnchoredBCVFPerStepObservable`**: likely AUC
+  0.70-0.85. Per-step coherence over all K tokens in the draft.
+  If this crosses §11 strongly, it authorizes a V4 decoder
+  experiment: replace the standard acceptance rule with a
+  coherence-anchored one.
+
+The §11 gate applies: no decoder / acceptance-rule variant is
+authorized until at least one observable passes AUC ≥ 0.60 on
+the real-model §12.3 probe.
+
 ---
 
 

@@ -509,6 +509,19 @@ class TruthfulQABenchmark:
                     f"load error: {type(exc).__name__}: {exc}"
                 )
 
+        self._load_questions(split=split, max_questions=max_questions)
+
+    def _load_questions(
+        self, *, split: str, max_questions: Optional[int],
+    ) -> None:
+        """Load the underlying dataset and populate self._questions.
+
+        Overridden by sibling benchmarks (e.g. HaluEvalBenchmark) that
+        share the model/paraphrase/cache machinery but pull from a
+        different source.
+        """
+        from datasets import load_dataset
+
         ds = load_dataset("truthful_qa", "multiple_choice", split=split)
         if max_questions is not None:
             ds = ds.select(range(min(max_questions, len(ds))))
@@ -677,3 +690,75 @@ class TruthfulQABenchmark:
     def compile_status(self) -> str:
         """`disabled` / `compiled (dynamic=...)` / `skipped: <reason>`."""
         return self._compile_status
+
+
+class HaluEvalBenchmark(TruthfulQABenchmark):
+    """HaluEval QA subset as a 2-choice multiple-choice benchmark.
+
+    Each HaluEval-QA row has `question`, `right_answer`, and
+    `hallucinated_answer`. We present them as a 2-choice MC with
+    correct_index=0 (right_answer).
+
+    Inherits all model loading, paraphrase pipeline, and cache
+    machinery from TruthfulQABenchmark — the only difference is the
+    dataset source and per-row schema, both overridden below.
+
+    §11 usage: probe the same six observables on HaluEval to test
+    whether TruthfulQA-MC's specific distractor construction was
+    what blocked BCVF from reaching §11's 0.60 gate on the V1+V2
+    configuration space.
+    """
+
+    name: str = "halueval_qa"
+
+    def __init__(
+        self,
+        *args,
+        halueval_dataset: str = "pminervini/HaluEval",
+        halueval_subset: str = "qa",
+        **kwargs,
+    ) -> None:
+        self._halueval_dataset = halueval_dataset
+        self._halueval_subset = halueval_subset
+        # HaluEval's standard split on HF is `data`, not `validation`.
+        kwargs.setdefault("split", "data")
+        super().__init__(*args, **kwargs)
+
+    def _load_questions(
+        self, *, split: str, max_questions: Optional[int],
+    ) -> None:
+        from datasets import load_dataset
+
+        ds = load_dataset(
+            self._halueval_dataset, self._halueval_subset, split=split,
+        )
+        if max_questions is not None:
+            ds = ds.select(range(min(max_questions, len(ds))))
+
+        self._questions = [
+            self._convert_row(row, idx) for idx, row in enumerate(ds)
+        ]
+
+    def _convert_row(self, row: Dict[str, Any], idx: int) -> Question:
+        """Convert a HaluEval-QA row into a 2-choice Question."""
+        q_text = row["question"]
+        right = row["right_answer"]
+        wrong = row["hallucinated_answer"]
+
+        prompt = f"Q: {q_text}\nA:"
+        prompt_tokens = self._tokenizer.encode(prompt, add_special_tokens=True)
+
+        choice_tokens: List[List[int]] = []
+        for choice in (right, wrong):
+            tokens = self._tokenizer.encode(
+                " " + choice, add_special_tokens=False,
+            )
+            choice_tokens.append(list(tokens))
+
+        return Question(
+            prompt_tokens=prompt_tokens,
+            choices=[right, wrong],
+            choice_tokens=choice_tokens,
+            correct_index=0,
+            metadata={"halueval_row_id": idx},
+        )
