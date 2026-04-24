@@ -29,13 +29,15 @@ import argparse
 import pathlib
 import sys
 import time
-from typing import List
+from dataclasses import replace
+from typing import List, Optional
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from symbolu_bcvf_llm.benchmark.dataset import MockBenchmark  # noqa: E402
+from symbolu_bcvf_llm.core import BCVFLLMConfig  # noqa: E402
 from symbolu_bcvf_llm.observables import (  # noqa: E402
     BCVFPerStepMaxObservable,
     BCVFSourceZeroCostObservable,
@@ -52,17 +54,26 @@ from symbolu_bcvf_llm.observables import (  # noqa: E402
 )
 
 
-def build_observables():
+def build_observables(bcvf_config: Optional[BCVFLLMConfig] = None):
+    """Construct the §11 observable suite.
+
+    When ``bcvf_config`` is provided it is threaded into every
+    BCVF-family observable so a single ``--gate-threshold`` (or other
+    core-config override) applies uniformly across the probe.
+    Observables that do not consume ``BCVFLLMConfig``
+    (entropy, source agreement, layer instability, anchored-layer BCVF)
+    are unaffected.
+    """
     return [
-        BCVFTotalCostObservable(),
-        BCVFSourceZeroCostObservable(),
+        BCVFTotalCostObservable(bcvf_config=bcvf_config),
+        BCVFSourceZeroCostObservable(bcvf_config=bcvf_config),
         Source0EntropyObservable(),
         SourceAgreementObservable(),
-        BCVFPerStepMaxObservable(),
-        BCVFSourceZeroPerStepMaxObservable(),
-        CoherenceAnchoredBCVFObservable(),
-        CoherenceAnchoredBCVFPerStepObservable(),
-        UncertaintyGatedBCVFPerStepMaxObservable(),
+        BCVFPerStepMaxObservable(bcvf_config=bcvf_config),
+        BCVFSourceZeroPerStepMaxObservable(bcvf_config=bcvf_config),
+        CoherenceAnchoredBCVFObservable(bcvf_config=bcvf_config),
+        CoherenceAnchoredBCVFPerStepObservable(bcvf_config=bcvf_config),
+        UncertaintyGatedBCVFPerStepMaxObservable(bcvf_config=bcvf_config),
         LayerInstabilityObservable(),
         CoherenceAnchoredLayerBCVFObservable(),
     ]
@@ -203,7 +214,38 @@ def main(argv=None) -> int:
         "--spec-source-split", type=str, default="data",
         help="speculative only: dataset split name.",
     )
+    # BCVFLLMConfig overrides (diagnostic — Diagnostic 1 threshold sweep).
+    # These mutate the dataclass defaults in ``symbolu_bcvf_llm.core``
+    # for every BCVF-family observable constructed below. Leave unset
+    # to use the V1 defaults carried over from the autonomy runtime.
+    parser.add_argument(
+        "--gate-threshold", type=float, default=None,
+        help="override BCVFLLMConfig.gate_threshold (default 0.1 nat). "
+             "Lower values open the soft-gate on smaller disagreements; "
+             "use for the Diagnostic 1 threshold sweep.",
+    )
+    parser.add_argument(
+        "--gate-beta", type=float, default=None,
+        help="override BCVFLLMConfig.gate_beta (default 200.0). "
+             "Controls gate sharpness; lower = softer transition.",
+    )
+    parser.add_argument(
+        "--huber-delta", type=float, default=None,
+        help="override BCVFLLMConfig.huber_delta (default 0.5).",
+    )
     args = parser.parse_args(argv)
+
+    bcvf_cfg: Optional[BCVFLLMConfig] = None
+    overrides = {}
+    if args.gate_threshold is not None:
+        overrides["gate_threshold"] = args.gate_threshold
+    if args.gate_beta is not None:
+        overrides["gate_beta"] = args.gate_beta
+    if args.huber_delta is not None:
+        overrides["huber_delta"] = args.huber_delta
+    if overrides:
+        bcvf_cfg = replace(BCVFLLMConfig(), **overrides)
+        print(f"BCVF config overrides: {overrides}", flush=True)
 
     if args.benchmark == "mock":
         bench = MockBenchmark(num_questions=args.num_questions, seed=args.seed)
@@ -248,7 +290,7 @@ def main(argv=None) -> int:
             paraphrase_cache_file=args.paraphrase_cache_file,
         )
 
-    observables = build_observables()
+    observables = build_observables(bcvf_config=bcvf_cfg)
     total_q = len(list(bench.questions))
     n_q = min(args.num_questions, total_q) if args.num_questions else total_q
     print(
