@@ -71,6 +71,7 @@ if str(_REPO_ROOT) not in sys.path:
 @dataclass
 class QuestionResult:
     q_idx: int
+    question: str  # raw question text (without "Q: ... A:" framing)
     prompt: str
     correct_choice: str
     distractors: List[str]
@@ -83,11 +84,15 @@ class QuestionResult:
     label: int  # 1 = correct, 0 = wrong
 
 
-def build_nli_checker(nli_model, nli_tokenizer, device: str):
-    """Return a function (premise, hypothesis) -> bool that tests entailment.
+def build_nli_checker(nli_model, nli_tokenizer, device: str, batch_size: int = 32):
+    """Return a function (premises, hypotheses) -> List[bool] for batched
+    entailment checks.
 
     Uses the standard MNLI 3-class (entailment / neutral / contradiction)
-    head; returns True iff argmax class is "entailment".
+    head; returns True at position i iff argmax class for pair i is
+    "entailment". Batches inputs so K×(K-1) clustering pairs or
+    (1 + num_distractors) correctness-label pairs fit in a handful of
+    forward passes rather than one call per pair.
     """
     import torch
 
@@ -101,26 +106,66 @@ def build_nli_checker(nli_model, nli_tokenizer, device: str):
         ent_idx = 0
 
     @torch.inference_mode()
-    def check(premise: str, hypothesis: str) -> bool:
-        enc = nli_tokenizer(
-            premise, hypothesis,
-            return_tensors="pt", truncation=True, max_length=512,
-        ).to(device)
-        logits = nli_model(**enc).logits[0]
-        return int(torch.argmax(logits).item()) == ent_idx
+    def check_batch(premises: List[str], hypotheses: List[str]) -> List[bool]:
+        assert len(premises) == len(hypotheses)
+        if not premises:
+            return []
+        verdicts: List[bool] = []
+        for start in range(0, len(premises), batch_size):
+            end = min(start + batch_size, len(premises))
+            enc = nli_tokenizer(
+                premises[start:end], hypotheses[start:end],
+                return_tensors="pt", truncation=True, max_length=512,
+                padding=True,
+            ).to(device)
+            logits = nli_model(**enc).logits
+            preds = torch.argmax(logits, dim=-1).tolist()
+            verdicts.extend(int(p) == ent_idx for p in preds)
+        return verdicts
 
-    return check
+    return check_batch
 
 
 def cluster_by_entailment(
-    samples: List[str], check_entailment,
+    samples: List[str], check_batch, question: str,
 ) -> List[int]:
-    """Union-find clustering by bidirectional NLI entailment.
+    """Union-find clustering by question-conditioned bidirectional NLI
+    entailment.
 
-    Two samples are in the same cluster iff each entails the other.
-    Returns a cluster-id list aligned with `samples`.
+    Per Farquhar et al. 2024, semantic equivalence is evaluated with the
+    question concatenated to each generation. Short generations like
+    ``"Paris"`` and ``"It's Paris"`` fail to entail each other in
+    isolation but do when prefixed with the question ``"What is the
+    capital of France? Paris"``. Skipping the question context causes
+    systematic over-clustering (every sample looks unique), which
+    inflates semantic entropy and depresses AUC — a known failure
+    mode if omitted.
+
+    All K×(K-1) directional NLI pairs for a question are submitted as a
+    single batch to the NLI model (inside ``check_batch``) instead of
+    one call per pair.
     """
     n = len(samples)
+    if n == 0:
+        return []
+    contextualized = [f"{question} {s}" for s in samples]
+
+    # Build every ordered pair (i, j) with i != j so we can test both
+    # directions of entailment per unordered pair in one batched call.
+    pairs: List[Tuple[int, int]] = []
+    premises: List[str] = []
+    hypotheses: List[str] = []
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            pairs.append((i, j))
+            premises.append(contextualized[i])
+            hypotheses.append(contextualized[j])
+
+    verdicts = check_batch(premises, hypotheses)
+    entail = {pair: v for pair, v in zip(pairs, verdicts)}
+
     parent = list(range(n))
 
     def find(x: int) -> int:
@@ -136,11 +181,9 @@ def cluster_by_entailment(
 
     for i in range(n):
         for j in range(i + 1, n):
-            if check_entailment(samples[i], samples[j]) and \
-               check_entailment(samples[j], samples[i]):
+            if entail.get((i, j)) and entail.get((j, i)):
                 union(i, j)
 
-    # Normalize cluster ids to 0..num_clusters-1.
     roots = [find(i) for i in range(n)]
     canon = {r: idx for idx, r in enumerate(sorted(set(roots)))}
     return [canon[r] for r in roots]
@@ -211,14 +254,26 @@ def generate_greedy(
 
 def label_correctness(
     greedy_gen: str, correct_choice: str, distractors: List[str],
-    check_entailment,
+    check_batch, question: str,
 ) -> bool:
-    """Greedy generation is correct iff it entails the correct choice
-    but does not entail any distractor."""
-    entails_correct = check_entailment(greedy_gen, correct_choice)
-    entails_any_distractor = any(
-        check_entailment(greedy_gen, d) for d in distractors
+    """Question-conditioned correctness: greedy generation is correct iff
+    (question + greedy) entails (question + correct_choice) AND does not
+    entail (question + distractor) for any distractor.
+
+    Same question-context rationale as ``cluster_by_entailment`` — bare
+    NLI on short MC choices is unreliable; question prefix stabilizes
+    the entailment signal. All (1 + num_distractors) entailment checks
+    run in a single batched NLI call.
+    """
+    premise = f"{question} {greedy_gen}"
+    candidates = [correct_choice] + list(distractors)
+    contextualized_candidates = [f"{question} {c}" for c in candidates]
+    verdicts = check_batch(
+        [premise] * len(candidates),
+        contextualized_candidates,
     )
+    entails_correct = verdicts[0]
+    entails_any_distractor = any(verdicts[1:])
     return bool(entails_correct and not entails_any_distractor)
 
 
@@ -307,17 +362,18 @@ def main() -> int:
     print(f"Loading target model: {args.model}", flush=True)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, torch_dtype=torch.float16, device_map=device,
-    )
+        args.model, torch_dtype=torch.float16,
+    ).to(device)
     model.eval()
 
     print(f"Loading NLI model: {args.nli_model}", flush=True)
     nli_tokenizer = AutoTokenizer.from_pretrained(args.nli_model)
+    nli_dtype = torch.float16 if device == "cuda" else torch.float32
     nli_model = AutoModelForSequenceClassification.from_pretrained(
-        args.nli_model,
+        args.nli_model, torch_dtype=nli_dtype,
     ).to(device)
     nli_model.eval()
-    check_entailment = build_nli_checker(nli_model, nli_tokenizer, device)
+    check_batch = build_nli_checker(nli_model, nli_tokenizer, device)
 
     print("Loading TruthfulQA (multiple_choice, validation) ...", flush=True)
     ds = load_dataset("truthful_qa", "multiple_choice", split="validation")
@@ -347,14 +403,14 @@ def main() -> int:
             max_new_tokens=args.max_new_tokens, device=device,
         )
 
-        cluster_ids = cluster_by_entailment(samples, check_entailment)
+        cluster_ids = cluster_by_entailment(samples, check_batch, q_text)
         sem_entropy = semantic_entropy_nats(cluster_ids)
         is_correct = label_correctness(
-            greedy, correct_choice, distractors, check_entailment,
+            greedy, correct_choice, distractors, check_batch, q_text,
         )
 
         results.append(QuestionResult(
-            q_idx=q_idx, prompt=prompt,
+            q_idx=q_idx, question=q_text, prompt=prompt,
             correct_choice=correct_choice, distractors=distractors,
             samples=samples, greedy=greedy,
             cluster_ids=cluster_ids,
@@ -461,8 +517,10 @@ def main() -> int:
             json.dump([
                 {
                     "q_idx": r.q_idx,
+                    "question": r.question,
                     "prompt": r.prompt,
                     "correct_choice": r.correct_choice,
+                    "distractors": r.distractors,
                     "greedy": r.greedy,
                     "samples": r.samples,
                     "cluster_ids": r.cluster_ids,

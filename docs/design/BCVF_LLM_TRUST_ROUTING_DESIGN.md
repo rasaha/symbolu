@@ -5685,12 +5685,19 @@ tested, not of BCVF-for-LLM in general:
    benchmarks, same target+draft predictor pair, same null.
 3. **Pre-committed predictions (§12.4) were wrong by the
    amount the literature would predict.** §12.4 anticipated
-   AUC 0.55–0.85 across observables; actual was 0.476–0.527.
-   This ~0.10-point shortfall matches the independently-
-   reported AUROC for same-family logit-space signals in
-   Kadavath 2022 (AUROC 0.55–0.62), Xiong 2024 (0.50–0.58),
-   and Fadeeva 2024 (AUROC < 0.60 for simplex-style
-   estimators on TriviaQA/TruthfulQA). See §13.6.
+   AUC 0.55–0.85 across the five observables with explicit
+   lower bounds. Observed shortfalls from the respective
+   §12.4 lower bound: `bcvf_total_cost` 0.043,
+   `source_0_entropy` 0.078, `bcvf_per_step_max` 0.099,
+   `coherence_anchored_bcvf` 0.174, and
+   `coherence_anchored_bcvf_per_step` 0.178. Four of five
+   missed their lower bound by ≥ 0.05 AUC; the fifth
+   (`bcvf_total_cost`) by ≥ 0.04. The ~0.05–0.18 shortfall
+   band matches the independently-reported AUROC for same-
+   family logit-space signals in Kadavath 2022 (AUROC 0.55–
+   0.62), Xiong 2024 (0.50–0.58), and Fadeeva 2024 (AUROC
+   < 0.60 for simplex-style estimators on TriviaQA/
+   TruthfulQA). See §13.6.
 
 ### 13.5 Scope of the null — precisely what is and is not rejected
 
@@ -5865,6 +5872,48 @@ can test whether `d²(semantic_entropy)/dk²` across outer
 decoding steps (the true BCVF-shaped signal) improves on the
 static entropy scalar. That follow-up is NOT pre-committed
 here; it depends on §13.7 passing.
+
+**Known simplifications vs Farquhar 2024** (disclosed so the
+expected AUC from this probe is compared against a realistic
+baseline rather than the paper's headline numbers):
+
+- **Discrete semantic entropy**, not continuous. Farquhar
+  2024 reports both `H = -Σ p_c log p_c` over cluster-count
+  probabilities (discrete; ~0.72 AUROC on TriviaQA) and a
+  continuous variant weighted by per-generation sequence
+  log-probabilities (~0.76 AUROC). The script implements
+  discrete only — simpler, fewer moving parts, but gives up
+  ~0.04 AUC vs continuous.
+- **DeBERTa-v3-base MNLI**, not DeBERTa-large. The default
+  NLI classifier is ~30% smaller than what Farquhar uses.
+  Expected AUROC penalty: modest (~0.02), but material near
+  the 0.60 threshold. Configurable via `--nli-model` if a
+  larger model is available.
+- **K=10 at T=1.0, max_new_tokens=32**. K matches Farquhar;
+  T=1.0 is the paper's recommendation; max_new_tokens is
+  conservative and may truncate longer answers. Follow-up
+  at max_new_tokens=64 or 128 would eliminate truncation
+  as a confound if §13.7 lands in the NOISE_BAND_LIFT range.
+- **Correctness label via question-conditioned NLI**
+  (greedy generation entails correct MC choice AND does
+  not entail any distractor, with question prefix for
+  context). Farquhar uses either gold-answer string match
+  or SBERT similarity against reference answers. The NLI-
+  only labeling is a deliberate simplification — it avoids
+  an additional model download but could produce more
+  label noise on MC questions where multiple choices are
+  partially entailed. If the AUC lands near the bands'
+  boundaries, a string-match fallback label is the first
+  robustness check.
+
+These simplifications together suggest the §13.7 discrete-
+base implementation should land at AUROC **~0.65–0.72** on
+TruthfulQA if the BCVF-for-LLM transfer is real — that is:
+enough to clear the 0.60 marginal bar, potentially enough
+to clear the 0.70 strong bar, but not guaranteed to replicate
+the paper's 0.75–0.79 headline. A result below 0.60 is a
+genuine signal against the transfer hypothesis even after
+accounting for these simplifications.
 
 ### 13.8 Authorization gate — what §13 leaves open vs paused
 
