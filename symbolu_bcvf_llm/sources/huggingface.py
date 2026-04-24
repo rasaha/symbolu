@@ -292,7 +292,7 @@ class HuggingFaceSource:
         """Per-layer next-token distributions at the current position.
 
         Runs one forward pass on the committed prefix with
-        `output_hidden_states=True`. Each layer's hidden state at the
+        ``output_hidden_states=True``. Each layer's hidden state at the
         last input position is projected through the output embedding
         matrix (logit lens; Nostalgebraist 2020), softmax-normalized,
         returning an ``(N_layers, V)`` array.
@@ -316,19 +316,22 @@ class HuggingFaceSource:
                 use_cache=False,
             )
 
-        # Output projection matrix (V, hidden_dim).
-        lm_head = self._model.get_output_embeddings()
-        W = lm_head.weight.to(torch.float32)
+            # Output projection matrix (V, hidden_dim). The matmul and
+            # numpy conversion must happen INSIDE inference_mode so
+            # the parameter's requires_grad doesn't propagate to the
+            # result and break .numpy().
+            lm_head = self._model.get_output_embeddings()
+            W = lm_head.weight.to(torch.float32)
 
-        per_layer = []
-        for h in out.hidden_states:
-            # h: (1, seq_len, hidden_dim). Last position's hidden state.
-            h_last = h[0, -1, :].to(torch.float32)
-            logits = (h_last @ W.t()).cpu().numpy()
-            # Stable softmax
-            shifted = logits - logits.max()
-            exp = np.exp(shifted)
-            per_layer.append(exp / exp.sum())
+            per_layer = []
+            for h in out.hidden_states:
+                # h: (1, seq_len, hidden_dim). Last position's hidden state.
+                h_last = h[0, -1, :].to(torch.float32)
+                logits = (h_last @ W.t()).cpu().numpy()
+                # Stable softmax
+                shifted = logits - logits.max()
+                exp = np.exp(shifted)
+                per_layer.append(exp / exp.sum())
         arr = np.stack(per_layer, axis=0)  # (N_layers, full_vocab)
         if self._slice_vocab:
             arr = arr[:, : self.vocab_size]
