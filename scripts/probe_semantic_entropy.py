@@ -327,6 +327,21 @@ def classify(auc: float) -> Tuple[str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--num-questions", type=int, default=100)
+    parser.add_argument(
+        "--benchmark", choices=("truthfulqa_mc", "halueval_qa"),
+        default="truthfulqa_mc",
+        help="truthfulqa_mc: TruthfulQA multiple-choice validation split "
+             "(MC correct vs distractors). halueval_qa: HaluEval QA split "
+             "(right_answer vs hallucinated_answer). "
+             "Both benchmarks run the same semantic-entropy pipeline; only "
+             "the data-source differs.",
+    )
+    parser.add_argument(
+        "--include-context", action="store_true",
+        help="halueval_qa only: prepend the HaluEval 'knowledge' passage "
+             "to the prompt. Default False to mirror the TruthfulQA "
+             "closed-book setting for AUC comparability.",
+    )
     parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     parser.add_argument(
         "--nli-model",
@@ -375,22 +390,40 @@ def main() -> int:
     nli_model.eval()
     check_batch = build_nli_checker(nli_model, nli_tokenizer, device)
 
-    print("Loading TruthfulQA (multiple_choice, validation) ...", flush=True)
-    ds = load_dataset("truthful_qa", "multiple_choice", split="validation")
+    if args.benchmark == "truthfulqa_mc":
+        print("Loading TruthfulQA (multiple_choice, validation) ...", flush=True)
+        ds = load_dataset(
+            "truthful_qa", "multiple_choice", split="validation",
+        )
+    elif args.benchmark == "halueval_qa":
+        print("Loading HaluEval (qa, data) ...", flush=True)
+        ds = load_dataset("pminervini/HaluEval", "qa", split="data")
+    else:
+        raise ValueError(f"unsupported benchmark: {args.benchmark}")
     ds = ds.select(range(min(args.num_questions, len(ds))))
 
     results: List[QuestionResult] = []
     t_start = time.perf_counter()
 
     for q_idx, row in enumerate(ds):
-        q_text = row["question"]
-        choices = list(row["mc1_targets"]["choices"])
-        labels = list(row["mc1_targets"]["labels"])
-        correct_index = int(labels.index(1))
-        correct_choice = choices[correct_index]
-        distractors = [c for i, c in enumerate(choices) if i != correct_index]
-
-        prompt = f"Q: {q_text}\nA:"
+        if args.benchmark == "truthfulqa_mc":
+            q_text = row["question"]
+            choices = list(row["mc1_targets"]["choices"])
+            labels = list(row["mc1_targets"]["labels"])
+            correct_index = int(labels.index(1))
+            correct_choice = choices[correct_index]
+            distractors = [
+                c for i, c in enumerate(choices) if i != correct_index
+            ]
+            prompt = f"Q: {q_text}\nA:"
+        else:  # halueval_qa
+            q_text = row["question"]
+            correct_choice = row["right_answer"]
+            distractors = [row["hallucinated_answer"]]
+            if args.include_context and row.get("knowledge"):
+                prompt = f"{row['knowledge']}\n\nQ: {q_text}\nA:"
+            else:
+                prompt = f"Q: {q_text}\nA:"
 
         samples = generate_samples(
             model, tokenizer, prompt,
@@ -468,14 +501,26 @@ def main() -> int:
 
     # --- Markdown report --- #
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    md_path = args.out_dir / f"probe_semantic_entropy{args.suffix}.md"
+    # Prefix filename with benchmark so halueval and truthfulqa runs
+    # don't overwrite each other when --suffix is left at its default.
+    md_path = args.out_dir / (
+        f"probe_semantic_entropy_{args.benchmark}{args.suffix}.md"
+    )
     lines = [
         "# §13 Revision Experiment — Semantic-Entropy Probe on TruthfulQA-MC\n",
         "Reference: Farquhar, Kossen, Kuhn, Gal (2024). Nature 630, 625–630.\n",
         "## Configuration\n",
         f"- **Target model:** `{args.model}`",
         f"- **NLI model:** `{args.nli_model}`",
-        f"- **Dataset:** `truthful_qa / multiple_choice / validation`",
+        f"- **Benchmark:** `{args.benchmark}`",
+        (
+            "- **Dataset:** `truthful_qa / multiple_choice / validation`"
+            if args.benchmark == "truthfulqa_mc"
+            else (
+                "- **Dataset:** `pminervini/HaluEval / qa / data` "
+                f"(include_context={args.include_context})"
+            )
+        ),
         f"- **N questions:** {len(results)}",
         f"- **Samples per question (K):** {args.k_samples}",
         f"- **Sampling temperature:** {args.temperature}",
@@ -512,7 +557,9 @@ def main() -> int:
     print(f"\nMarkdown report: {md_path}")
 
     if args.dump_json:
-        json_path = args.out_dir / f"probe_semantic_entropy{args.suffix}.json"
+        json_path = args.out_dir / (
+            f"probe_semantic_entropy_{args.benchmark}{args.suffix}.json"
+        )
         with json_path.open("w", encoding="utf-8") as f:
             json.dump([
                 {
