@@ -156,13 +156,14 @@ def test_probe_reports_finite_auc_on_all_observables():
 
 
 # --------------------------------------------------------------------------- #
-# Real-model benchmark is stubbed
+# Real-model benchmark — torch-gated sanity check (no model load)
 # --------------------------------------------------------------------------- #
 
 
-def test_real_spec_dec_benchmark_raises_not_implemented():
-    """The real-model class is deliberately a NotImplementedError stub
-    until the candidate-generation + acceptance-label pipeline lands
-    in a future session."""
-    with pytest.raises(NotImplementedError, match="next-session"):
-        SpeculativeDecodingBenchmark()
+def test_real_spec_dec_benchmark_class_exists():
+    """The real-model class is no longer a stub — it loads models.
+    Here we just verify the symbol is importable and is a class
+    (actual loading tests are runtime-gated on torch+transformers+
+    datasets, see test_speculative_real.py)."""
+    assert isinstance(SpeculativeDecodingBenchmark, type)
+    assert SpeculativeDecodingBenchmark.name == "spec_dec"

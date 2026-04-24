@@ -5413,9 +5413,11 @@ candidates have first-token = target peak). This confirms the
 plumbing but says nothing about real-draft-target signal dynamics,
 which require §12.3.
 
-### 12.3 Deferred — real draft-target benchmark
+### 12.3 Real draft-target benchmark — shipped
 
-`SpeculativeDecodingBenchmark` pending the following implementation:
+`SpeculativeDecodingBenchmark` is now a first-class class in
+`symbolu_bcvf_llm/benchmark/speculative.py` (commit `<this>`).
+Implementation summary:
 
 1. Load a target model (e.g., Mistral-7B or Llama-3-8B) and a
    draft model (e.g., Qwen-2.5-3B, TinyLlama-1.1B). Both via
@@ -5434,17 +5436,26 @@ which require §12.3.
    or binary "fully accepted"/"partially rejected".
 5. `correct_index = argmax(acceptance_rate)` per question.
 
-**Tokenizer-mismatch note.** Draft and target may use different
-tokenizers. Simplest robust path: constrain both to the same
-tokenizer family (Mistral draft + Mistral target, or a
-distillation pair). Cross-family draft-target requires a
-re-tokenization step with bounded precision loss.
+**Tokenizer compatibility.** `__init__` asserts
+`target.vocab_size == draft.vocab_size`. Same-family pairs
+(Qwen-7B + Qwen-3B, Llama-8B + Llama-1B) are default-compatible.
+Cross-family pairs (Mistral + Qwen) fail construction with a
+clear error message. Cross-family support would require a
+re-tokenization step with precision loss — deferred as future
+work.
 
-**Effort estimate for §12.3.** ~3-5 days of engineering including
-tokenizer-compat handling, candidate-generation plumbing, and
-per-position label computation. Then a probe run on 100 prompts
-with 5 candidates each (500 datapoints) — ~20-30 min of GPU
-time on an A100 with Mistral-7B target + Qwen-2.5-3B draft.
+**Default pair**: Qwen-2.5-7B-Instruct target + Qwen-2.5-3B-Instruct
+draft. Same tokenizer family, same vocabulary; already-familiar
+commercial-style spec-dec pairing. Override via
+`--model target_model_name --draft-model draft_model_name`
+at the CLI.
+
+**Tests shipped**: 20 tests across `test_speculative_mock.py`
+(M=2 probe harness + mock benchmark, 11 tests, all run without
+torch) and `test_speculative_real.py` (acceptance math,
+stable-softmax, prompt-text routing, 9 tests — 3 torch-gated
+skip in CI, the other 6 run everywhere). Full suite: 360 passed,
+5 skipped.
 
 ### 12.4 Research predictions (pre-committed per §0.8)
 

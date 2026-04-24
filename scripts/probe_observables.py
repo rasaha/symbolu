@@ -131,7 +131,8 @@ def main(argv=None) -> int:
     )
     parser.add_argument(
         "--benchmark",
-        choices=("mock", "truthfulqa", "halueval", "speculative-mock"),
+        choices=("mock", "truthfulqa", "halueval", "speculative-mock",
+                 "speculative"),
         default="mock",
     )
     parser.add_argument(
@@ -168,6 +169,36 @@ def main(argv=None) -> int:
             "pipeline version) change."
         ),
     )
+    # speculative-decoding-only
+    parser.add_argument(
+        "--draft-model", type=str, default="Qwen/Qwen2.5-3B-Instruct",
+        help="speculative only: HF draft model. Must share tokenizer "
+             "family with --model for rejection-sampling compatibility.",
+    )
+    parser.add_argument(
+        "--num-candidates", type=int, default=4,
+        help="speculative only: number of draft candidates per prompt.",
+    )
+    parser.add_argument(
+        "--candidate-length", type=int, default=16,
+        help="speculative only: K tokens per draft candidate.",
+    )
+    parser.add_argument(
+        "--draft-temperature", type=float, default=0.8,
+        help="speculative only: sampling temperature for draft.generate.",
+    )
+    parser.add_argument(
+        "--spec-source-dataset", type=str, default="pminervini/HaluEval",
+        help="speculative only: HF dataset path to draw prompts from.",
+    )
+    parser.add_argument(
+        "--spec-source-subset", type=str, default="qa",
+        help="speculative only: dataset subset name.",
+    )
+    parser.add_argument(
+        "--spec-source-split", type=str, default="data",
+        help="speculative only: dataset split name.",
+    )
     args = parser.parse_args(argv)
 
     if args.benchmark == "mock":
@@ -178,6 +209,23 @@ def main(argv=None) -> int:
         )
         bench = SpeculativeDecodingMockBenchmark(
             num_questions=args.num_questions, seed=args.seed,
+        )
+    elif args.benchmark == "speculative":
+        from symbolu_bcvf_llm.benchmark.speculative import (
+            SpeculativeDecodingBenchmark,
+        )
+        bench = SpeculativeDecodingBenchmark(
+            target_model_name=args.model,
+            draft_model_name=args.draft_model,
+            source_dataset=args.spec_source_dataset,
+            source_subset=args.spec_source_subset,
+            split=args.spec_source_split,
+            max_questions=args.num_questions,
+            num_candidates=args.num_candidates,
+            candidate_length=args.candidate_length,
+            draft_temperature=args.draft_temperature,
+            draft_seed=args.seed,
+            compile_model=not args.no_compile,
         )
     else:
         if args.benchmark == "truthfulqa":
