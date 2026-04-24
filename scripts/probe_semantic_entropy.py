@@ -508,12 +508,12 @@ def main() -> int:
         "should reach AUC 0.70–0.79 on free-form generation "
         "benchmarks with K=10 at T=1.0.\n",
     ]
-    md_path.write_text("\n".join(lines) + "\n")
+    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"\nMarkdown report: {md_path}")
 
     if args.dump_json:
         json_path = args.out_dir / f"probe_semantic_entropy{args.suffix}.json"
-        with json_path.open("w") as f:
+        with json_path.open("w", encoding="utf-8") as f:
             json.dump([
                 {
                     "q_idx": r.q_idx,
