@@ -171,6 +171,18 @@ class QuestionResult:
     mean_abs_accel: float
     sum_squared_accel: float
     peak_position_index: int  # index into accelerations of the peak
+    # --- EOS-reuse diagnostics (added post-§13.16 spec; pure
+    # instrumentation, do NOT affect primary_scalar or band
+    # classification). Surface whether late-position hidden-state
+    # reuse — when sample_lengths[k] < t, the script reuses the
+    # sample's last hidden state at all later grid positions —
+    # could be confounding the per-position EigenScore series.
+    # Justified pre-run because EOS reuse is structurally similar
+    # to the NLI-on-long-text confound that §13.15 identified as
+    # the cause of §13.14's text-level null.
+    min_sample_length: int   # min over K of sample_lengths
+    n_eos_reuse_positions: int  # |{t in grid : min_sample_length < t}|
+    eos_reuse_fraction: float  # n_eos_reuse_positions / |grid|
     greedy_matches_correct: bool
     label: int  # 1 = correct, 0 = wrong
 
@@ -816,6 +828,22 @@ def main() -> int:
             greedy, correct_choice, distractors, check_batch, q_text,
         )
 
+        # --- EOS-reuse diagnostics (pure instrumentation; do NOT
+        # affect primary_scalar or band classification). A grid
+        # position t is in "EOS reuse" mode if at least one sample
+        # has terminated by then, i.e. min_k(sample_lengths[k]) < t.
+        # When that's true, the script's σ(t,k) = min(t, length[k]) - 1
+        # rule reuses the terminated sample's last hidden state at
+        # that grid position, which can structurally bias the
+        # per-position EigenScore at late positions. See §13.16
+        # narrowing notes for why this is the strongest currently-
+        # known confound.
+        min_sample_len = min(sample_lengths) if sample_lengths else 0
+        n_reuse = sum(1 for t in grid_positions if min_sample_len < t)
+        reuse_fraction = (
+            n_reuse / len(grid_positions) if grid_positions else 0.0
+        )
+
         results.append(QuestionResult(
             q_idx=q_idx, question=q_text, prompt=prompt,
             correct_choice=correct_choice, distractors=distractors,
@@ -829,6 +857,9 @@ def main() -> int:
             mean_abs_accel=mean_abs,
             sum_squared_accel=sum_squared,
             peak_position_index=peak_idx,
+            min_sample_length=min_sample_len,
+            n_eos_reuse_positions=n_reuse,
+            eos_reuse_fraction=reuse_fraction,
             greedy_matches_correct=is_correct,
             label=1 if is_correct else 0,
         ))
@@ -896,6 +927,44 @@ def main() -> int:
         r.eigenscore_series[0] for r in results if r.eigenscore_series
     ])) if results else 0.0
 
+    # --- EOS-reuse aggregate diagnostics (added post-§13.16 spec;
+    # pure instrumentation, do NOT affect classification). Used to
+    # evaluate whether late-position hidden-state reuse confounds
+    # the per-position EigenScore series. The HEAVY_REUSE_THRESHOLD
+    # is a reporting bucket only — pinned at 0.5 (≥ half the grid
+    # positions in EOS-reuse mode) for a clear "this question's
+    # signal is dominated by reused states" cut.
+    HEAVY_REUSE_THRESHOLD = 0.5
+    n_no_reuse = sum(
+        1 for r in results if r.eos_reuse_fraction == 0.0
+    )
+    n_some_reuse = sum(
+        1 for r in results if 0.0 < r.eos_reuse_fraction < HEAVY_REUSE_THRESHOLD
+    )
+    n_heavy_reuse = sum(
+        1 for r in results if r.eos_reuse_fraction >= HEAVY_REUSE_THRESHOLD
+    )
+    min_lengths = (
+        np.array([r.min_sample_length for r in results], dtype=np.int64)
+        if results else np.array([], dtype=np.int64)
+    )
+    n_reuse_positions = (
+        np.array(
+            [r.n_eos_reuse_positions for r in results], dtype=np.int64,
+        )
+        if results else np.array([], dtype=np.int64)
+    )
+    mean_min_length = float(min_lengths.mean()) if len(min_lengths) else 0.0
+    median_min_length = (
+        float(np.median(min_lengths)) if len(min_lengths) else 0.0
+    )
+    mean_n_reuse_positions = (
+        float(n_reuse_positions.mean()) if len(n_reuse_positions) else 0.0
+    )
+    median_n_reuse_positions = (
+        float(np.median(n_reuse_positions)) if len(n_reuse_positions) else 0.0
+    )
+
     # --- Console report --- #
     print()
     print(f"{'metric':<48} {'value':>20}")
@@ -927,6 +996,15 @@ def main() -> int:
     print(f"{'vs §13.10 baseline (0.661)':<48} "
           f"{auc_primary - BASELINE_AUC:>+20.3f}")
     print(f"{'Classification (primary scalar)':<48} {classification:>20}")
+    print()
+    print("EOS-reuse diagnostics (instrumentation only — do NOT affect classification):")
+    print(f"  {'Questions with NO EOS reuse':<46} {n_no_reuse:>20}")
+    print(f"  {'Questions with some EOS reuse (frac < 0.5)':<46} {n_some_reuse:>20}")
+    print(f"  {'Questions with HEAVY reuse (frac >= 0.5)':<46} {n_heavy_reuse:>20}")
+    print(f"  {'Mean min_sample_length across questions':<46} {mean_min_length:>20.2f}")
+    print(f"  {'Median min_sample_length across questions':<46} {median_min_length:>20.2f}")
+    print(f"  {'Mean n_eos_reuse_positions':<46} {mean_n_reuse_positions:>20.2f}")
+    print(f"  {'Median n_eos_reuse_positions':<46} {median_n_reuse_positions:>20.2f}")
     print()
     print(f"Recommendation: {recommendation}")
 
@@ -1012,6 +1090,38 @@ def main() -> int:
         "|---|---|",
         f"| `mean_i \\|accel_i\\|` | {auc_mean_abs:.3f} |",
         f"| `Σ_i accel_i²` | {auc_sum_squared:.3f} |",
+        "",
+        "## EOS-reuse diagnostics (instrumentation only)\n",
+        "Surfaced to evaluate whether late-position hidden-state "
+        "reuse — when `sample_lengths[k] < t`, the per-position "
+        "extraction rule reuses sample `k`'s last hidden state at "
+        "all later grid positions — could be confounding the "
+        "per-position EigenScore series. **These do NOT alter the "
+        "primary scalar or pre-committed classification logic.** "
+        "Justified pre-run because EOS reuse is structurally "
+        "similar to the NLI-on-long-text confound that §13.15 "
+        "identified as the cause of §13.14's text-level null.\n",
+        "Per-question definitions (also in JSON dump):\n",
+        "- `min_sample_length` = $\\min_k \\text{sample\\_lengths}[k]$",
+        "- `n_eos_reuse_positions` = $|\\{t \\in \\mathcal{T} : "
+        "\\min_k \\text{sample\\_lengths}[k] < t\\}|$",
+        "- `eos_reuse_fraction` = "
+        "`n_eos_reuse_positions / |grid|`\n",
+        "Aggregate summary across N questions "
+        "(HEAVY_REUSE_THRESHOLD = 0.5):\n",
+        "| Diagnostic | Value |",
+        "|---|---|",
+        f"| Questions with NO EOS reuse | {n_no_reuse} / {len(results)} |",
+        f"| Questions with some EOS reuse "
+        f"(`eos_reuse_fraction` < 0.5) | {n_some_reuse} / {len(results)} |",
+        f"| Questions with HEAVY EOS reuse "
+        f"(`eos_reuse_fraction` ≥ 0.5) | {n_heavy_reuse} / {len(results)} |",
+        f"| Mean `min_sample_length` | {mean_min_length:.2f} |",
+        f"| Median `min_sample_length` | {median_min_length:.2f} |",
+        f"| Mean `n_eos_reuse_positions` | "
+        f"{mean_n_reuse_positions:.2f} |",
+        f"| Median `n_eos_reuse_positions` | "
+        f"{median_n_reuse_positions:.2f} |",
         "",
         "## §13.16 pre-committed bands\n",
         f"- `AUC ≥ {STRONG_THRESHOLD}` → **HSEIG_2DIFF_STRONG** — "
@@ -1111,6 +1221,17 @@ def main() -> int:
                     "baseline_auc_s13_10": BASELINE_AUC,
                     "auc_delta_vs_baseline": auc_primary - BASELINE_AUC,
                     "classification": classification,
+                    # EOS-reuse aggregate diagnostics — instrumentation
+                    # only; do NOT affect classification. See markdown
+                    # report's "EOS-reuse diagnostics" section.
+                    "eos_reuse_heavy_threshold": HEAVY_REUSE_THRESHOLD,
+                    "n_questions_no_eos_reuse": n_no_reuse,
+                    "n_questions_some_eos_reuse": n_some_reuse,
+                    "n_questions_heavy_eos_reuse": n_heavy_reuse,
+                    "mean_min_sample_length": mean_min_length,
+                    "median_min_sample_length": median_min_length,
+                    "mean_n_eos_reuse_positions": mean_n_reuse_positions,
+                    "median_n_eos_reuse_positions": median_n_reuse_positions,
                 },
                 "questions": [
                     {
@@ -1129,6 +1250,12 @@ def main() -> int:
                         "mean_abs_accel": r.mean_abs_accel,
                         "sum_squared_accel": r.sum_squared_accel,
                         "peak_position_index": r.peak_position_index,
+                        # EOS-reuse per-question diagnostics —
+                        # instrumentation only; do NOT affect
+                        # classification.
+                        "min_sample_length": r.min_sample_length,
+                        "n_eos_reuse_positions": r.n_eos_reuse_positions,
+                        "eos_reuse_fraction": r.eos_reuse_fraction,
                         "greedy_matches_correct": r.greedy_matches_correct,
                     }
                     for r in results
