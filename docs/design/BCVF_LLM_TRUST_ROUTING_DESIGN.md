@@ -6060,14 +6060,160 @@ rule. **No further single-axis probes are authorized in §13.**
 a fresh §0.8-style commitment in a new top-level section if
 pursued; none are pre-committed by §13.17):
 
-- **Single-trajectory temporal observable.** Per-token logit
-  entropy (or analogous within-sample temporal signal) along a
-  single greedy or sampled trajectory, with the BCVF 2nd-
-  difference operator applied across token positions WITHIN a
-  trajectory rather than across K-sample-divergence. This is the
-  signal class §13.17's narrowing leaves explicitly open — it
-  does not depend on K-sample-divergence dynamics that produce
-  the smooth-monotonic series §13.14 + §13.16 both ran into.
+- **Single-trajectory forced-allocation-gap observable.** The
+  signal class §13.17's narrowing leaves explicitly open — does
+  not depend on K-sample-divergence dynamics that produced the
+  smooth-monotonic series §13.14 and §13.16 both ran into. NOT
+  pre-committed by this entry; the math below documents what a
+  fresh §0.8 commitment in a future top-level section (§14, §15,
+  or new chapter) would specify if pursued. Numerical AUC bands
+  and acceptance rules are deferred to that commitment.
+
+  **Mechanism rationale (re-stating ChatGPT's framing of where
+  hallucination enters in autoregressive LLMs):**
+
+  Softmax loses the absolute magnitude of the underlying logits.
+  Two scenarios with raw logits $[10, 1, 0.5]$ and $[-100, -100.1,
+  -100.2]$ produce wildly different epistemic states (confident vs
+  clueless) but Softmax flattens both into probability vectors that
+  sum to 1.0. Cross-entropy training forbids the model from
+  expressing absolute ignorance. Autoregression then locks the
+  forced guess into the context for subsequent tokens, amplifying
+  the false premise. The hallucination signature is therefore the
+  moment Softmax forces an allocation despite low absolute logit
+  magnitude — a property of single-trajectory logit geometry, not
+  K-sample geometry.
+
+  This observable was not measured by §13.10–§13.16: every probe
+  in §13 looked at *between-sample* variance (decoding stochasticity
+  introduced by the temperature parameter), which is downstream of
+  the very mechanism that creates hallucination. K-sample variance
+  measures how the model's outputs spread; the actual hallucination
+  signature is in how the logit distribution committed to a guess
+  despite low absolute magnitude *upstream* of any sampling.
+
+  **Mathematical construction (would be pinned in the eventual
+  §0.8 commitment):**
+
+  For a single greedy or sampled generation, at each token position
+  $t \in [1, T]$ where $T$ is the number of generated tokens:
+
+  1. Capture the raw logits $\mathbf{z}_t \in \mathbb{R}^{|V|}$
+     before softmax (available in HuggingFace via
+     `model.generate(..., output_scores=True,
+     return_dict_in_generate=True)`).
+  2. Compute two complementary quantities per position:
+     - **Confidence magnitude:**
+       $M_t = \max_j z_t[j] - \frac{1}{|V|}\sum_j z_t[j]$
+       (max logit centered by mean — indicates whether *anything*
+       in the vocab strongly stands out from the bulk).
+     - **Forced entropy:**
+       $H_t = -\sum_j p_t[j] \log p_t[j]$ where $p_t =
+       \text{softmax}(\mathbf{z}_t)$.
+  3. Z-normalize both quantities across the trajectory:
+     $\tilde{M}_t = (M_t - \bar{M})/\sigma_M$,
+     $\tilde{H}_t = (H_t - \bar{H})/\sigma_H$.
+  4. Define the **forced-allocation gap**:
+     $$g_t = \tilde{H}_t - \alpha \cdot \tilde{M}_t$$
+     with $\alpha = 1.0$ as a defensible default (equal weighting
+     of normalized entropy and normalized confidence; pinning $\alpha$
+     would be part of the eventual §0.8 commitment).
+     - High $g_t$: high entropy AND low confidence magnitude — the
+       "Scenario B" forced-allocation case.
+     - Low $g_t$: high confidence magnitude OR low entropy — the
+       model has commitment its logits actually support.
+  5. Apply the BCVF 2nd-difference operator across positions
+     WITHIN the single trajectory:
+     $$\text{accel}_t = g_{t+1} - 2 g_t + g_{t-1}$$
+     for interior $t$.
+  6. Primary scalar candidate (would be pinned, with diagnostic
+     secondaries reported but not classification-bearing, mirroring
+     the §13.14 / §13.16 pattern):
+     $$\text{forced\_alloc\_2diff}(q) = \max_t |\text{accel}_t|$$
+  7. AUC sign convention: pre-committed direction is *higher
+     forced-allocation acceleration → moment the model's logit
+     distribution suddenly committed to a low-magnitude forced
+     guess → more likely the answer is wrong*. AUC computed on
+     $-\text{forced\_alloc\_2diff}$.
+
+  **Why this construction satisfies the structural requirements
+  §13 violated:**
+
+  | Requirement | §13 K-sample probes | This observable |
+  |---|---|---|
+  | Continuous, real-valued | mostly | yes |
+  | Direct from model internals | partial | yes (raw logits) |
+  | Smooth-with-rare-spikes structure | no (§13.14, §13.16 both monotonic) | **plausible by mechanism** |
+  | Independent of K-sample divergence | no | **yes** (single trajectory) |
+  | Captures the autoregressive-hallucination mechanism | no | **yes** (forced allocation IS Softmax flattening) |
+
+  The "plausible by mechanism" caveat on the smooth-with-spikes
+  property is critical and explicitly NOT empirically validated:
+  it is a prediction from ChatGPT's mechanical framing, not data.
+  A token where the model knows the answer should produce high
+  $M_t$ and low $H_t \to$ low $g_t$. A token where the model is
+  forced to guess (e.g., a specific date it doesn't know) should
+  produce low $M_t$ and high $H_t \to$ high $g_t$. Forced moments
+  should be sparse and local in well-formed generations — exactly
+  the shape the 2nd-difference operator exploits. Whether
+  empirical $g_t$ trajectories actually have this shape on
+  Qwen2.5-7B-Instruct + TruthfulQA-MC / HaluEval-QA is unknown
+  and would be the central question of the §14/§15 commitment.
+
+  **Three concrete tractable variants** (the eventual §0.8 commit
+  would pin one as primary; others as deviation flags or
+  follow-ups):
+
+  - **A — Simple per-token entropy 2nd-difference.** Just $H_t$,
+    no magnitude term. Cheaper, doesn't need $M_t$ z-normalization.
+    Some published 1st-derivative literature exists (Kadavath 2022
+    P(True) reported AUROC ~0.55–0.62 at the 1st-derivative level
+    on short-form QA); the 2nd-difference variant is novel.
+  - **B — Forced-allocation gap as defined above.** Combines $H_t$
+    and $M_t$. Closer to ChatGPT's mechanism. Most theoretically
+    motivated; least published anchor.
+  - **C — Logit-lens curvature.** Apply the unembedding matrix to
+    mid-layer hidden states (the "logit lens" technique from the
+    interpretability literature) to get layer-position-specific
+    predictions. Compute when the layer-wise prediction shifts
+    abruptly mid-generation. Catches "the moment the model's
+    internal pre-decision crystallized to the wrong answer" —
+    structurally distinct from variant B.
+
+  **Implementation cost estimate (if pursued):**
+
+  Cheapest: variants A and B require only `output_scores=True`
+  during generation; per-token logits are already computed by the
+  model. Implementation ~300 lines (similar shape to §13.14 /
+  §13.16 minus the per-position NLI clustering or hidden-state
+  extraction passes). Runtime ~1–3 min at N=100 on a 24+ GB GPU
+  (no per-position clustering, no per-position EigenScore — just
+  per-position scalar arithmetic on the captured logits). NLI is
+  used only for the correctness label, ~3 calls per question, same
+  as §13.10–§13.16.
+
+  Variant C requires capturing and unembedding mid-layer hidden
+  states — slightly more expensive memory and code, but still much
+  cheaper than §13.16's per-position EigenScore.
+
+  **What this entry does NOT pre-commit:**
+
+  - No script implementation on-branch.
+  - No `classify()` thresholds in code.
+  - No benchmark runs.
+  - No AUC bands (numerical bands would be specified in the
+    eventual §0.8 commitment, with the same partition-around-§13.10
+    structure as §13.11–§13.16 if the §13.10 baseline is used as
+    the comparison anchor, OR a different anchor if a fresh
+    baseline is pinned at that time).
+  - Specific value of $\alpha$ — defaulted at 1.0 above as a
+    documentation convenience but the eventual commitment would
+    re-pin this with explicit reasoning (or commit to a sweep with
+    pre-committed selection rule).
+
+  **Status:** Documented as the most promising single-axis
+  observable §13.17 leaves open. Not authorized for implementation
+  without a fresh §0.8 commitment.
 - **System-level integration (would become §14).** The §4 source-
   framework + §5 integration-layer machinery has never been
   exercised on LLMs in this codebase. The §13 program tested
