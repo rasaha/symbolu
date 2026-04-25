@@ -5980,25 +5980,48 @@ have been exercised — see Completed below):
    partition (strong at 0.75, anti at 0.641). Literature predicts
    AUC ~0.68–0.78 on the two benchmarks; strong-pass on both
    would clear the §13.9 external-framing hold. Implementation
-   (`scripts/probe_eigenscore.py`) is a separate authorization
-   gate — no code written as of this entry.
-2. **Linear activation probes as fallback** (Azaria & Mitchell
+   (`scripts/probe_eigenscore.py`) on-branch as of this entry;
+   benchmark runs not yet executed.
+2. **§13.13 continuous semantic entropy (Farquhar 2024 bridge).**
+   Co-equal top-priority alongside §13.12 (different hypothesis
+   class — sample-space metric upgrade vs internal-state metric —
+   and authorized to run in parallel if GPU time permits).
+   Pre-commitment pinned in §13.13 with bands matching §13.11 /
+   §13.12's partition. Three Farquhar-aligned upgrades pinned:
+   continuous semantic entropy (length-normalized log-prob-
+   weighted), DeBERTa-v3-large NLI (up from base), `max_new_tokens
+   =128` (up from 32). Literature ablations predict +0.07–0.11 AUC
+   over §13.10's 0.661 — bracketing the §13.9 0.75 strong band.
+   Implementation (`scripts/probe_continuous_se.py`) is a separate
+   authorization gate — no code written as of this entry.
+3. **Linear activation probes as fallback** (Azaria & Mitchell
    2023; Marks & Tegmark 2024 "Geometry of Truth"). Requires a
    labeled train/test split, adds a §0.8 pre-commitment around
    split selection. Secondary to §13.12 because EigenScore
    requires no training data and tests the same hypothesis class
    more cheaply. Re-opens as primary only if §13.12 lands
    `EMBEDDING_SPACE_SATURATION` or `EMBEDDING_SPACE_ANTI_FINDING`.
-3. **2nd-difference-of-semantic-entropy observable.** Layering
+4. **§13.13 Stage 2 — TriviaQA-Generation benchmark addition.**
+   Conditional on §13.13 clearing `CONTINUOUS_SE_INTERNAL_STRONG`
+   or above. Adds a free-form generation benchmark that Farquhar
+   2024 actually tested (headline 0.78 AUROC), enabling direct
+   apples-to-apples comparison rather than the protocol-mismatched
+   TruthfulQA-MC vs TruthfulQA-Generation comparison §13.10–§13.13
+   are stuck with. Requires a fresh §0.8 pre-commitment around
+   labeling protocol (gold-answer string-match vs the existing
+   NLI-based label) before implementation.
+5. **2nd-difference-of-semantic-entropy observable.** Layering
    the BCVF 2nd-difference structure on top of the §13.10-
    passing static-entropy signal. Previously gated on §1.3
    passing; §1.3 did not pass, so this item is now gated on
-   §13.12 clearing `EMBEDDING_SPACE_MARGINAL_LIFT` at minimum
-   AND requires a fresh §0.8 pre-commitment at that time.
-4. **Compound revisions** (embedding-space + cross-family on a
+   §13.12 OR §13.13 clearing `MARGINAL_LIFT` at minimum AND
+   requires a fresh §0.8 pre-commitment at that time.
+6. **Compound revisions** (continuous SE + EigenScore as a learned
+   linear combination, or embedding-space + cross-family on a
    different triple, or EigenScore + 2nd-difference). Authorized
-   only after §13.12 lands and requires a fresh §0.8 pre-
-   commitment. Listed for completeness; not a near-term target.
+   only after both §13.12 and §13.13 land and requires a fresh
+   §0.8 pre-commitment. Listed for completeness; not a near-term
+   target.
 
 ### 13.9 What this means for the autonomy track
 
@@ -6588,6 +6611,252 @@ Implementation of `scripts/probe_eigenscore.py` is a separate
 authorization gate; the pre-committed bands above are the guarantee
 that any future implementation cannot redefine the success criteria
 post-hoc.
+
+### 13.13 Pre-commitment — continuous semantic entropy (Farquhar 2024 bridge)
+
+**Status: pre-committed, not yet executed.** This section is a
+§0.8-style pre-commitment recorded before the experiment runs. The
+specification, success bands, and expected-cost estimates below are
+pinned at the time of §13.12's pre-commit and BEFORE §13.12 has been
+run — the §13.13 probe can be authorized for implementation
+independent of §13.12's outcome, since the two probes test different
+hypothesis classes and use different scripts.
+
+**Background.** §13.10 implemented Farquhar et al. 2024
+(*Nature* 630, 625–630) at a deliberately simplified configuration:
+discrete semantic entropy, DeBERTa-v3-base NLI, `max_new_tokens=32`,
+NLI-based correctness labeling, multiple-choice TruthfulQA-MC. We
+reached AUC 0.661 on both benchmarks. Farquhar's headline numbers
+are AUROC 0.74–0.79 on TriviaQA / SQuAD / NQ-Open / BioASQ and
+~0.70 on TruthfulQA-Generation. The gap to our 0.661 result is
+attributable to several disclosed simplifications, each of which
+the paper itself ablates. §13.13 closes the **three highest-leverage
+methodological gaps** while holding the target model (Qwen2.5-7B-
+Instruct), benchmarks (TruthfulQA-MC + HaluEval-QA), prompt format
+(`Q: ... A:` completion), and correctness-label protocol (question-
+conditioned NLI on Qwen greedy) fixed. This isolates the metric +
+protocol contribution from confounds like model scale, benchmark
+choice, or labeling pipeline.
+
+**Quantified gap analysis (Farquhar 2024 vs §13.10), using the
+paper's own ablations as the per-gap effect sizes:**
+
+| Dimension | Farquhar 2024 | §13.10 | Estimated AUC gap |
+|---|---|---|---|
+| Headline scalar | **Continuous** SE (length-normalized log-prob weighting) | Discrete SE (cluster counts only) | **~+0.04** |
+| NLI clustering model | DeBERTa-v2-xlarge (~900M) | DeBERTa-v3-base (~140M) | **~+0.02** |
+| Generation length | `max_new_tokens=128`+ | `max_new_tokens=32` | **~+0.01–0.05** |
+| Target LLM | Llama-2-13B/70B / Falcon-40B / Mistral-7B | Qwen2.5-7B-Instruct | ~0.0–0.05 (model-family effect) |
+| Benchmarks | Free-form (TriviaQA, NQ, SQuAD, etc.) | TruthfulQA-MC1 + HaluEval-QA | ~+0.05–0.10 (protocol mismatch) |
+| Correctness label | Gold-answer string match | Question-conditioned NLI on greedy | sign uncertain |
+
+§13.13 addresses the **first three** gaps (continuous SE, larger
+NLI, longer generation) — together estimated to lift AUC by
+**+0.07–0.11** if the paper's per-gap ablations transfer to our
+configuration. The remaining gaps (target model scale, benchmark
+choice, labeling protocol) are deferred to subsequent §0.8 pre-
+commitments because they require benchmark or model substitutions
+that change what is being measured.
+
+**Why this probe over a fresh hypothesis class.** §13.10 / §13.11 /
+§13.12 each test a fundamentally different signal class (sample-
+space, ensemble-space, internal-state). §13.13 instead **closes a
+known replication gap on §13.10's signal class**. The reason this is
+worth doing rather than another novel probe: if Farquhar's published
+0.74–0.79 AUROC is real and transfers to Qwen2.5-7B at our
+benchmarks, then §13.10's 0.661 underperforms the literature-
+expected number by 0.07–0.11 *for reasons we have already
+identified*. Closing those gaps either (a) confirms the literature
+transfers and produces a strong-band §13.10-class result, or (b)
+falsifies the transfer for this codebase even with a faithful
+implementation — both outcomes are informative. Continuing to test
+new hypothesis classes (item 3, item 4, ...) without first closing
+known replication gaps would risk attributing each new probe's
+shortfall to its hypothesis rather than to a shared protocol-level
+issue.
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_continuous_se.py` (new; does NOT modify
+  `probe_semantic_entropy.py` — §13.10 is pinned).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same single-
+  model configuration as §13.10 / §13.12 to preserve direct AUC
+  comparability against the 0.661 baseline. The model-scale gap is
+  intentionally NOT closed in §13.13.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100 (same
+  selection as §13.10); HaluEval-QA `data` split, N=100 (same
+  selection as §13.10). Same benchmarks as §13.10 / §13.11 / §13.12
+  for direct AUC comparability across the four probes.
+- **Sampling:** K=10 completions per question at T=1.0,
+  **`max_new_tokens=128`** (up from §13.10's 32). Per-question seed
+  `args.seed + q_idx`. Generation captures per-token logits via
+  `model.generate(..., output_scores=True, return_dict_in_generate=
+  True)` so that per-sample length-normalized log-likelihood can be
+  computed alongside the decoded string.
+- **NLI clustering model:** **`MoritzLaurer/DeBERTa-v3-large-mnli-
+  fever-anli-ling-wanli`** (or DeBERTa-v2-xlarge if available
+  ungated). Up from §13.10's DeBERTa-v3-base. Used both for sample
+  clustering and for correctness labeling (same model for both, as
+  §13.10).
+- **Prompt format:** shared `Q: ... A:` completion, identical to
+  §13.10 / §13.11 initial pass / §13.12. No chat templates (§13.11
+  diagnostic established chat templates degrade signal).
+- **Clustering rule:** bidirectional, question-conditioned NLI
+  entailment, union-find over the K samples per question. Identical
+  to §13.10's `cluster_by_entailment`.
+- **Continuous semantic entropy scalar (Farquhar 2024 §2.2 Eq. 6):**
+  given K samples with cluster assignments c(s_k) ∈ {1, ..., C} and
+  per-sample length-normalized log-likelihoods
+  ℓ_k = (1/T_k) · Σ_t log p(s_k,t | s_k,<t, prompt)
+  (the average per-token log-prob of sample k, where T_k is the
+  number of generated tokens and the sum is over those tokens),
+  compute per-cluster aggregated probability:
+      log P(c) = logsumexp_{k: c(s_k) = c} ℓ_k
+  Normalize over clusters:
+      log P̂(c) = log P(c) − logsumexp_{c' ∈ clusters} log P(c')
+  Then:
+      H_continuous(q) = − Σ_c P̂(c) · log P̂(c)
+  AUC computed on `−H_continuous` (higher entropy → less confident →
+  more likely wrong; negate for the convention "higher = more
+  truth-predictive" used across §13.10 / §13.11 / §13.12 / §13.13).
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI against the correct choice AND fails NLI against
+  every distractor. Identical labeling to §13.10 / §13.11 / §13.12.
+  The greedy `max_new_tokens` is also raised to 128 for consistency
+  with the sampling configuration; this MAY shift greedy accuracy
+  slightly vs §13.10 (longer greedy responses can fail "entails
+  correct AND not distractor" via qualifier text), and any such
+  shift will be reported as a deviation in §13.14 (the result
+  section, when written).
+
+**Pre-committed success bands** (same numerical partition as §13.11
+/ §13.12 because the §13.10 baseline of 0.661 is unchanged;
+relabeled `CONTINUOUS_SE_*` to keep the per-revision lineage
+legible in console output, JSON dumps, and grep):
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`CONTINUOUS_SE_STRONG`**.
+  Gates the §13.9 VC-brief revision (the same gate §13.11 failed
+  to clear and §13.12 has not yet attempted). Authorizes a §13.14
+  writeup, re-opens the §13.8 item-3 2nd-difference observable as
+  a follow-up §0.8 pre-commitment, and unblocks the §13.9 external-
+  framing reconsideration.
+- `0.70 ≤ AUC < 0.75` on **both** → **`CONTINUOUS_SE_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Document in a
+  §13.14 internal-strong section. Stage 2 of the Farquhar bridge
+  (adding TriviaQA-Generation as a third benchmark to compare
+  against Farquhar's headline 0.78 number directly) becomes the
+  authorized next probe.
+- `0.681 ≤ AUC < 0.70` on **both** → **`CONTINUOUS_SE_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10's 0.661 + 0.02 saturation
+  upper bound. Document; do NOT authorize further single-axis
+  probe progression. Stage 2 (TriviaQA addition) and Stage 3
+  (target-model upscale to Qwen2.5-32B) remain plausible as
+  follow-ups but require fresh §0.8 pre-commitments.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`CONTINUOUS_SE_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661 single-model baseline. The three
+  Farquhar-aligned methodological upgrades (continuous SE, larger
+  NLI, longer generation) added nothing measurable on this codebase.
+  Combined with §13.11's anti-finding (and §13.12's outcome,
+  whatever it lands at), this would be strong evidence that the
+  shortfall vs Farquhar's 0.74–0.79 is NOT in the metric or
+  protocol layer but in the benchmark choice (TruthfulQA-MC vs
+  Farquhar's TruthfulQA-Generation) or the model scale (Qwen-7B
+  vs Llama-2-13B/70B). Authorizes Stage 2 (benchmark substitution)
+  as the next probe under a fresh pre-commitment.
+- `AUC < 0.641` on **any** benchmark → **`CONTINUOUS_SE_ANTI_FINDING`**.
+  The literature-aligned variant of §13.10 underperforms the
+  simplified §13.10 baseline. This would be a surprising result —
+  the paper's ablations predict each individual change is
+  monotonically positive — and would suggest one of: (a) the
+  continuous SE implementation has a numerics bug (length
+  normalization sign / log-sum-exp aggregation), (b) the larger
+  NLI model interacts pathologically with Qwen2.5-7B's output
+  distribution, or (c) the longer generation introduces
+  truncation-pattern artifacts that the discrete clustering
+  absorbed but the continuous weighting amplifies. Investigation
+  required before treating as a genuine anti-finding.
+
+The "on both benchmarks" combinatorial rule is identical to §13.11 /
+§13.12 and is pinned here to prevent post-hoc benchmark cherry-
+picking on a heterogeneous TruthfulQA / HaluEval split.
+
+**Known simplifications vs Farquhar 2024 that §13.13 does NOT close**
+(disclosed so the expected AUC band is calibrated against a realistic
+post-§13.13 baseline rather than the paper's headline numbers):
+
+- **Target model:** Qwen2.5-7B-Instruct vs Farquhar's Llama-2-13B/
+  70B / Falcon-40B / Mistral-7B. Same parameter scale as one of the
+  paper's models (Mistral-7B), but different family. Expected per-
+  family variance ±0.03 AUC.
+- **Benchmarks:** TruthfulQA-MC + HaluEval-QA vs Farquhar's
+  TriviaQA / NQ-Open / SQuAD / BioASQ / TruthfulQA-Generation.
+  TruthfulQA-MC is multiple-choice (closed form) where Farquhar's
+  TruthfulQA result was on the free-form generation variant — the
+  two are different problems despite sharing questions. HaluEval-QA
+  is not in the Farquhar paper at all. Stage 2 of this bridge
+  (adding TriviaQA-Generation as a third benchmark) is the
+  pre-committed follow-up if §13.13 lands above SATURATION.
+- **Correctness label:** question-conditioned NLI on Qwen greedy vs
+  Farquhar's gold-answer string match. Holding labeling fixed
+  across §13 prevents cross-experiment label-shift confounds; cost
+  is that we under-credit greedy generations that paraphrase the
+  correct choice (NLI sometimes fails on legitimate paraphrases the
+  string-match would also fail on, but the failure modes differ).
+- **K = 10.** Farquhar uses K=10 in most experiments but ablates
+  K up to 30; reports +0.01–0.02 AUC for K=20+. Pinning K=10
+  preserves §13.10 / §13.11 / §13.12 parity.
+
+These un-closed gaps together suggest the §13.13 implementation
+should land at AUROC **~0.70–0.76 on both benchmarks** if the
+paper's per-gap ablations transfer cleanly to Qwen2.5-7B-Instruct
+on our benchmark mix — i.e., bracketing the §13.9 0.75 strong band
+but not guaranteed to clear it. A result above 0.78 would suggest
+the paper's ablations *under-state* the per-gap effect on this
+codebase (unexpected); a result below 0.66 would constitute
+genuine evidence against Farquhar's transfer claims for this model
++ benchmark mix even after the three simplifications above are
+accounted for.
+
+**Expected cost.** Single 7B target model + larger NLI model. K=10
+sampling at `max_new_tokens=128` (4× the §13.10 token budget for
+sampling; ~3× wall-clock for the generation pass). NLI clustering
+pass on K=10 samples per question is unchanged in structure but
+~2× slower per call due to the larger model. Estimated runtime:
+**~10–15 min at N=100 on a single 24+ GB GPU** (vs §13.10's
+~3 min). Memory: Qwen-7B fp16 ~14 GB + DeBERTa-v3-large fp16 ~1.5
+GB = ~16 GB, comfortably under a 24 GB budget.
+
+**Report destination.**
+- `docs/experiments/probe_continuous_se_truthfulqa_mc.md`
+- `docs/experiments/probe_continuous_se_truthfulqa_mc.json` (per-
+  question dump including per-sample length-normalized log-
+  likelihoods, cluster assignments, per-cluster aggregated
+  log-probabilities — all the intermediate quantities needed to
+  audit the continuous-SE numerics post-hoc).
+- `docs/experiments/probe_continuous_se_halueval_qa.md`
+- `docs/experiments/probe_continuous_se_halueval_qa.json`
+
+**Relationship to §13.10 / §13.11 / §13.12.** §13.13 is a *protocol-
+upgrade* probe, not a new hypothesis class. It sits in the same
+sample-space metric class as §13.10 and tests whether the §13.10
+shortfall vs Farquhar 2024 is closed by the three pinned upgrades.
+§13.11 (cross-family ensemble) and §13.12 (EigenScore embedding-
+space) test different hypothesis classes and are independent from
+§13.13. Combination of §13.13's continuous SE with §13.12's
+EigenScore as a compound predictor (linear combination, weighted
+sum, or learned classifier) is the §13.8 item-4 follow-up and is
+NOT pre-committed here — it requires a fresh §0.8 commitment after
+both §13.12 and §13.13 land.
+
+**What §13.13 does not pre-commit.** No probe-script implementation
+on-branch, no `classify()` thresholds in code, no benchmark runs.
+This section is the §0.8-style pre-commitment record only.
+Implementation of `scripts/probe_continuous_se.py` is a separate
+authorization gate; the pre-committed bands above are the guarantee
+that any future implementation cannot redefine the success criteria
+post-hoc. Authorization for implementation is independent of §13.12's
+outcome — §13.13 can be built and run in parallel with §13.12 if
+GPU time permits.
 
 ---
 
