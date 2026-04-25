@@ -5627,6 +5627,19 @@ MARGINAL). The §2.2 metric revision is therefore authorized to
 land, and the next authorized probe is the §1.3 cross-family
 ensemble revision. See §13.10 for the detailed result.
 
+**Update — §1.3 executed, combined anti-finding.** The §13.8
+item-1 cross-family ensemble probe has been run at N=100 on both
+benchmarks with Qwen2.5-7B-Instruct + Llama-3.1-8B-Instruct +
+Mistral-7B-Instruct-v0.3. Initial pass: TruthfulQA-MC **AUC 0.633**
+(−0.028 vs §13.10) / HaluEval-QA **AUC 0.716** (+0.055 vs §13.10) —
+heterogeneous split resolving to `CROSS_FAMILY_ANTI_FINDING` under
+the pre-committed worst-benchmark rule. A chat-template diagnostic
+on TruthfulQA-MC falsified the prompt-format confound hypothesis
+(AUC dropped further to 0.567). Combined anti-finding stands. See
+§13.11 for the detailed result. The §13.8 item-2 embedding-space /
+activation-probe revision is now the top-priority authorized probe;
+see §13.12 for the pre-commitment.
+
 ### 13.2 Experiment specification
 
 - **Script**: `scripts/probe_observables.py` at commit `a5ace72`
@@ -5924,51 +5937,68 @@ accounting for these simplifications.
 
 ### 13.8 Authorization gate — what §13 leaves open vs paused
 
-**Paused** (no compute authorized until the §13.7 or §1.3
-revisions land a positive result):
+**Paused** (no compute authorized until the §13.12
+embedding-space revision lands a positive result; §13.7 and §1.3
+have been exercised — see Completed below):
 
 - Section 4 (Phase 2 — Source Framework) extensions beyond
   the two sources already exercised at simplex+same-family.
 - Section 5 (Phase 3 — Integration Layer) Rahu-trust
-  deployment. With no §11-passing Ketu observable yet, there
-  is nothing for §5 to consume.
-- Section 6 (Phase 4 — Benchmark, Metrics) scale-out at the
-  simplex+same-family configuration. No larger-N probe is
-  authorized there; §13.4 evidence shows marginal cost does
-  not buy a different answer.
+  deployment. With no §11-strong-passing Ketu observable
+  yet, there is nothing for §5 to consume.
+- Section 6 (Phase 4 — Benchmark, Metrics) scale-out at
+  any single-axis configuration that has not cleared the
+  §13.9 0.75 bar. §13.10 and §13.11 HaluEval-only results
+  do not unlock scale-out.
 - Section 7 (Phase 5 — Packaging & Reproducibility) for any
   component that has not passed §11.
 - Section 12 speculative-decoding integration. The §12.3
   probe shares §13's configuration and inherits §13's null.
 
-**Completed** (§13.10):
+**Completed** (chronological):
 
-- **§13.7 semantic-entropy probe.** Run at N=100 on both
-  TruthfulQA-MC and HaluEval-QA. Both returned AUC = 0.661
-  (TRUTH_CORRELATED_MARGINAL). §2.2 metric revision
-  authorized to land.
+- **§13.7 semantic-entropy probe (§2.2 metric revision).** Run at
+  N=100 on both TruthfulQA-MC and HaluEval-QA. Both returned AUC
+  = 0.661 (TRUTH_CORRELATED_MARGINAL). §2.2 metric revision
+  authorized to land; see §13.10.
+- **§1.3 cross-family ensemble revision.** Run at N=100 on both
+  benchmarks with Qwen2.5-7B-Instruct + Llama-3.1-8B-Instruct +
+  Mistral-7B-Instruct-v0.3 (M=3, K=10, completion-style prompt).
+  TruthfulQA-MC 0.633 / HaluEval-QA 0.716 → combined
+  `CROSS_FAMILY_ANTI_FINDING` under the worst-benchmark rule.
+  Chat-template diagnostic on TruthfulQA-MC falsified the prompt-
+  format confound (AUC 0.567). No external-framing unlock. See
+  §13.11.
 
-**Open and authorized** (in priority order):
+**Open and authorized** (in priority order, post-§13.11):
 
-1. **§1.3 cross-family ensemble revision (Qwen + Llama +
-   Mistral).** Now the top-priority next probe given the
-   §13.10 marginal pass. Requires extending
-   `Benchmark.make_sources` to support M=3 heterogeneous
-   tokenizer families (~1–2 days of vocab-alignment work).
-   Literature predicts a ~0.05–0.10 AUC lift on top of
-   §13.10's 0.661 — a strong pass (≥ 0.70 on both
-   benchmarks) would authorize the full §13.7 → §13.11
-   progression and revisit the §13.9 external-framing hold.
-2. **Embedding-space metric (alternative to semantic
-   entropy).** Activation probes or hidden-state
-   covariance (INSIDE / EigenScore). Secondary to the §1.3
-   revision given §13.10's marginal pass makes §1.3 the
-   cheaper next test; listed for completeness.
-3. **2nd-difference-of-semantic-entropy observable.**
-   Layering the BCVF 2nd-difference structure on top of
-   the §13.10-passing static-entropy signal. Authorized
-   only as a follow-up to §1.3 and requires a fresh §0.8
-   pre-commitment at that time.
+1. **§13.12 EigenScore embedding-space probe (§13.8 item 2).**
+   Promoted to top priority by §13.11's combined anti-finding.
+   Chen et al. 2024 ICLR INSIDE/EigenScore on Qwen2.5-7B-Instruct
+   mid-layer hidden states, K=10, no training data required.
+   Pre-commitment pinned in §13.12 with bands matching §13.11's
+   partition (strong at 0.75, anti at 0.641). Literature predicts
+   AUC ~0.68–0.78 on the two benchmarks; strong-pass on both
+   would clear the §13.9 external-framing hold. Implementation
+   (`scripts/probe_eigenscore.py`) is a separate authorization
+   gate — no code written as of this entry.
+2. **Linear activation probes as fallback** (Azaria & Mitchell
+   2023; Marks & Tegmark 2024 "Geometry of Truth"). Requires a
+   labeled train/test split, adds a §0.8 pre-commitment around
+   split selection. Secondary to §13.12 because EigenScore
+   requires no training data and tests the same hypothesis class
+   more cheaply. Re-opens as primary only if §13.12 lands
+   `EMBEDDING_SPACE_SATURATION` or `EMBEDDING_SPACE_ANTI_FINDING`.
+3. **2nd-difference-of-semantic-entropy observable.** Layering
+   the BCVF 2nd-difference structure on top of the §13.10-
+   passing static-entropy signal. Previously gated on §1.3
+   passing; §1.3 did not pass, so this item is now gated on
+   §13.12 clearing `EMBEDDING_SPACE_MARGINAL_LIFT` at minimum
+   AND requires a fresh §0.8 pre-commitment at that time.
+4. **Compound revisions** (embedding-space + cross-family on a
+   different triple, or EigenScore + 2nd-difference). Authorized
+   only after §13.12 lands and requires a fresh §0.8 pre-
+   commitment. Listed for completeness; not a near-term target.
 
 ### 13.9 What this means for the autonomy track
 
@@ -5981,16 +6011,20 @@ invalidate the autonomy result.
 
 For VC / investor communication, the autonomy track should
 continue to be presented on its own merits. The LLM design
-doc is an internal research artifact; the §13.7 revision
-probe is work-in-progress and is not positioned as a
-deliverable. `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest
-scope caveats" already reflects the current external-facing
-framing ("BCVF is not positioned as an LLM hallucination
-detector"). That framing remains accurate under the §13.10
-marginal pass; it will be revisited only if §1.3 cross-family
-lifts AUC to the TRUTH_CORRELATED_STRONG band (≥ 0.70) on
-both benchmarks. No VC-facing material is updated on the
-basis of §13.10 alone.
+doc is an internal research artifact; the §13.7 and §1.3
+revision probes are work-in-progress (both now executed, with
+§13.10 marginal pass and §13.11 combined anti-finding) and
+none of them is positioned as a deliverable.
+`AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest scope caveats"
+already reflects the current external-facing framing
+("BCVF is not positioned as an LLM hallucination detector"),
+and that framing is *strengthened*, not weakened, by §13.11's
+anti-finding. It will be revisited only if a future probe
+(the §13.12 EigenScore pre-commitment is the current candidate)
+lifts AUC to the 0.75 strong band on BOTH TruthfulQA-MC and
+HaluEval-QA — a bar that §13.10 (marginal) and §13.11 (anti)
+did not clear. No VC-facing material is updated on the basis
+of §13.10 or §13.11 alone, either in isolation or combined.
 
 ### 13.10 Revision experiment results — semantic-entropy on TruthfulQA + HaluEval
 
