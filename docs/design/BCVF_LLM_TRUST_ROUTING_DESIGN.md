@@ -6010,18 +6010,54 @@ have been exercised — see Completed below):
    are stuck with. Requires a fresh §0.8 pre-commitment around
    labeling protocol (gold-answer string-match vs the existing
    NLI-based label) before implementation.
-5. **2nd-difference-of-semantic-entropy observable.** Layering
-   the BCVF 2nd-difference structure on top of the §13.10-
-   passing static-entropy signal. Previously gated on §1.3
-   passing; §1.3 did not pass, so this item is now gated on
-   §13.12 OR §13.13 clearing `MARGINAL_LIFT` at minimum AND
-   requires a fresh §0.8 pre-commitment at that time.
-6. **Compound revisions** (continuous SE + EigenScore as a learned
-   linear combination, or embedding-space + cross-family on a
-   different triple, or EigenScore + 2nd-difference). Authorized
-   only after both §13.12 and §13.13 land and requires a fresh
-   §0.8 pre-commitment. Listed for completeness; not a near-term
-   target.
+5. **§13.14 BCVF-faithful 2nd-difference observable (load-
+   bearing for the BCVF-for-LLMs transfer claim).** Co-equal top-
+   priority alongside §13.12 and §13.13 (different hypothesis
+   class — temporal evolution of the agent-environment coupling
+   failure rather than a single-snapshot agent-only measurement).
+   Pre-commitment pinned in §13.14 with bands matching §13.11 /
+   §13.12 / §13.13's partition. Per-position semantic entropy
+   computed at a stride-4 token grid over `max_new_tokens=128`
+   generations; primary scalar `max_i |H_{t_{i+1}} − 2·H_{t_i} +
+   H_{t_{i−1}}|` mirroring the autonomy-domain `S3_map_error_accel`
+   peak that passed §6.1. **This is the first probe in the §13
+   ladder that is shaped like the BCVF observable that actually
+   passed in the autonomy domain.** §13.10–§13.13 are first-
+   derivative-class literature replications and bridges; §13.14
+   tests whether the BCVF formalism itself transfers. No literature
+   anchor for the AUC forecast — best estimate is a wide 0.62–0.78
+   band. SATURATION or ANTI here would be the first direct
+   evidence in this codebase that BCVF does not transfer to LLMs
+   on its native observable, narrowing the BCVF-for-LLMs honest
+   scope substantially. Implementation (`scripts/probe_bcvf_2diff.
+   py`) is a separate authorization gate — no code written as of
+   this entry.
+6. **Linear activation probes as fallback** (Azaria & Mitchell
+   2023; Marks & Tegmark 2024 "Geometry of Truth"). Requires a
+   labeled train/test split, adds a §0.8 pre-commitment around
+   split selection. Secondary to §13.12 because EigenScore
+   requires no training data and tests the same hypothesis class
+   more cheaply. Re-opens as primary only if §13.12 lands
+   `EMBEDDING_SPACE_SATURATION` or `EMBEDDING_SPACE_ANTI_FINDING`.
+7. **§13.13 Stage 2 — TriviaQA-Generation benchmark addition.**
+   Conditional on §13.13 clearing `CONTINUOUS_SE_INTERNAL_STRONG`
+   or above. Adds a free-form generation benchmark that Farquhar
+   2024 actually tested (headline 0.78 AUROC), enabling direct
+   apples-to-apples comparison rather than the protocol-mismatched
+   TruthfulQA-MC vs TruthfulQA-Generation comparison §13.10–§13.14
+   are stuck with. Requires a fresh §0.8 pre-commitment around
+   labeling protocol (gold-answer string-match vs the existing
+   NLI-based label) before implementation.
+8. **Compound revisions** (continuous SE + EigenScore as a
+   learned linear combination, BCVF 2nd-difference + EigenScore,
+   embedding-space + cross-family on a different triple, etc.).
+   Authorized only after §13.12, §13.13, and §13.14 have all
+   landed and requires a fresh §0.8 pre-commitment. The most
+   theoretically interesting compound is BCVF 2nd-difference (the
+   coupling-failure axis) combined with EigenScore (the internal-
+   state axis) — two genuinely independent signal classes that
+   plausibly add information rather than overlap. Listed for
+   completeness; not a near-term target.
 
 ### 13.9 What this means for the autonomy track
 
@@ -6857,6 +6893,332 @@ that any future implementation cannot redefine the success criteria
 post-hoc. Authorization for implementation is independent of §13.12's
 outcome — §13.13 can be built and run in parallel with §13.12 if
 GPU time permits.
+
+### 13.14 Pre-commitment — BCVF-faithful 2nd-difference observable
+
+**Status: pre-committed, not yet executed.** This section is a
+§0.8-style pre-commitment recorded before the experiment runs.
+Specification, success bands, and expected-cost estimates are
+pinned at this point and cannot be redefined post-hoc. §13.14 is
+authorized to be built and run in parallel with §13.12 / §13.13;
+its outcome is independent of theirs.
+
+**Background — and why this probe is structurally different from
+§13.10–§13.13.** The BCVF framework's autonomy-domain validation
+(`symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.1, §6.7) cleared
+its pre-committed gates on `S3_map_error_accel` — *the second
+derivative of the divergence between the robot's internal map and
+ground truth, evaluated as the robot moves through its
+environment*. Three things matter about that signal:
+
+1. **It is relational, not agent-only.** Not a measurement of the
+   robot's confidence in isolation; not a measurement of the road
+   in isolation. It is the *acceleration of the agent-environment
+   coupling failure* — fault information lives in how that coupling
+   evolves, not in either side alone.
+2. **It requires temporal evolution.** A single snapshot has no
+   2nd derivative. The robot must be acting over time, the
+   perception must update across steps, and the gap must be
+   measurable as a function of step index.
+3. **The 2nd derivative specifically catches accelerating
+   failures** — a constant or shrinking gap is fine; an
+   accelerating gap is the fault signature.
+
+§13.10 (single-model semantic entropy), §13.11 (cross-family
+ensemble), §13.12 (EigenScore over hidden states), and §13.13
+(continuous SE) are all **single-snapshot agent-only** measurements.
+Each samples K completions, computes one scalar per question, and
+classifies. None of them takes a derivative over the model's
+evolving generation state. They are first-derivative-class
+constructions at best, and they each translate the BCVF idea by
+*changing what is measured about the agent* (more samples, more
+families, internal states, weighted entropy). None of them is
+shaped like the autonomy-domain BCVF observable that actually
+passed §6.1.
+
+§13.14 is the first probe in the §13 ladder that is **shaped like
+the autonomy-domain BCVF observable**. It takes a 2nd derivative
+of the model's evolving uncertainty during a single generation, as
+a function of token position within that generation. The token
+sequence is the LLM's analogue of "robot moving through environment
+over time" — it is the only sequential evolution available within
+a single inference. Per-position semantic entropy is the analogue
+of "robot's map at time t". The 2nd difference of per-position
+entropy across the sequence is the analogue of `S3_map_error_accel`
+— *the acceleration of the model's evolving uncertainty as it
+constructs an answer*.
+
+This makes §13.14 the **load-bearing probe for the BCVF-for-LLMs
+transfer claim**. §13.10–§13.13 audit literature methods; §13.14
+tests whether BCVF's actual native observable transfers. A
+positive result here would be the first novel construction in this
+codebase that is BCVF-shaped rather than literature-shaped; a
+negative result would constitute the first real evidence that the
+BCVF formalism itself does not carry the load on the LLM domain
+(a stronger, multi-axis null than §13.10–§13.13's combined evidence
+because those probes were not BCVF-faithful in the first place).
+
+**The car / road / coupling framing.** §13.10–§13.13 measure
+properties of the LLM (the "car"). The road (input difficulty,
+question ambiguity, knowledge-boundary distance) is held fixed
+across all probes by holding the benchmark fixed. The framework's
+actual claim is that fault information lives in *how the coupling
+between the two evolves under load* — the analogue of the robot's
+map error accelerating as terrain becomes harder. Within a single
+LLM inference, the only "load" axis available is sequence position:
+the question is presented at t=0, and the model must construct an
+answer over t=1..T. Per-position semantic divergence across K
+samples is the LLM analogue of "how is the agent's internal world-
+model evolving as it engages the environment", and the 2nd
+difference is the analogue of "is that evolution accelerating
+into divergence."
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_bcvf_2diff.py` (new; does NOT modify
+  any §13.10–§13.13 script — those results are pinned).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same single-
+  model configuration as §13.10 / §13.12 / §13.13 to preserve direct
+  AUC comparability against the 0.661 baseline.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100 (same
+  selection as §13.10); HaluEval-QA `data` split, N=100 (same
+  selection as §13.10). Same benchmarks as §13.10 / §13.11 / §13.12
+  / §13.13 for direct AUC comparability across the five probes.
+- **Sampling:** K=10 completions per question at T=1.0,
+  **`max_new_tokens=128`** (4× §13.10's 32; necessary so the
+  generation has enough sequence length for a 2nd-difference signal
+  to evolve). Per-question seed `args.seed + q_idx`. No hidden-state
+  capture (this probe operates on decoded text, not internals — the
+  signal class is "agent's evolving outputs", paralleling the
+  robotics-domain signal class "agent's evolving map").
+- **Prompt format:** shared `Q: ... A:` completion, identical to
+  §13.10 / §13.11 / §13.12 / §13.13. No chat templates.
+- **NLI clustering model:** `MoritzLaurer/DeBERTa-v3-base-mnli-fever-
+  anli` for §13.14 v1 (matches §13.10 / §13.11 / §13.12 default;
+  preserves AUC comparability with §13.10's 0.661). A `--nli-model`
+  flag enables substituting in the §13.13-pinned DeBERTa-v3-large
+  for a §13.14-v2 variant if v1 lands at SATURATION or below.
+- **Position grid (pinned):** entropy is computed at sequence
+  positions `t ∈ {position_min, position_min + position_stride,
+  position_min + 2·position_stride, ..., max_new_tokens}`, with
+  defaults:
+  - `position_min = 8` — skip the first 8 generated tokens because
+    those positions are dominated by leading "The", "A", whitespace,
+    and other low-information tokens that produce noisy NLI
+    clustering signal.
+  - `position_stride = 4` — compute entropy every 4 tokens, giving
+    `(128 − 8) / 4 + 1 = 31` measured positions per question. Sub-
+    Nyquist sampling of the per-token sequence; chosen for
+    computational tractability while preserving 2nd-difference
+    structure on natural English answer construction.
+  Both configurable via `--position-min` and `--position-stride`
+  flags; non-default values are flagged in the report as deviations.
+- **Per-position semantic entropy** (the 1st-derivative-class
+  signal, computed at each grid position):
+  - At each grid position `t`, take the K samples *truncated to
+    length t generated tokens*. Decode each truncated sample to
+    text; question-condition by prepending the question; cluster by
+    bidirectional NLI entailment via union-find. Compute Shannon
+    entropy `H_t` (nats) over the cluster-size distribution.
+    Identical clustering rule to §13.10 — only the input strings
+    differ (truncated rather than full).
+- **2nd-difference scalar (the BCVF-shaped observable):** with
+  per-question entropy series `H_{t₀}, H_{t₁}, ..., H_{t_N}` at the
+  pinned grid positions:
+  - Per-position 2nd difference (centered, stride-aware):
+    `accel_i = H_{t_{i+1}} − 2·H_{t_i} + H_{t_{i−1}}`
+    for `i ∈ [1, N−1]` (the i=0 and i=N positions are dropped
+    because they have no centered neighbor).
+  - **Primary scalar** (pinned for AUC and band classification):
+    `bcvf_2diff(q) = max_i |accel_i|` — peak |entropy acceleration|
+    across the generation. Mirrors `S3_map_error_accel` peak in the
+    robotics domain.
+  - **Secondary diagnostic scalars** (reported but NOT in the band
+    classification): `mean_i |accel_i|`, `Σ_i accel_i²`, position
+    `i*` of the peak. These exist purely to support post-hoc
+    interpretation; changing the primary scalar after the run is a
+    §0.8 violation.
+  - AUC computed on `−bcvf_2diff(q)` so the convention "higher =
+    more truth-predictive" is preserved. Hypothesis: questions
+    where the model's evolving uncertainty *accelerates* are
+    questions where the model is failing to commit to a stable
+    answer — analogous to map error accelerating when the robot's
+    perception is failing — and these are the questions more likely
+    to be wrong.
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI against the correct choice AND fails NLI against
+  every distractor. Identical labeling protocol to §13.10 / §13.11
+  / §13.12 / §13.13. Greedy `max_new_tokens=128` to match the
+  sampling configuration.
+
+**Pre-committed success bands** (same numerical partition as §13.11
+/ §13.12 / §13.13 because the §13.10 baseline of 0.661 is unchanged
+across all five probes; relabeled `BCVF_2DIFF_*` so the per-revision
+lineage stays legible in console output, JSON dumps, and grep):
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`BCVF_2DIFF_STRONG`**.
+  Gates the §13.9 VC-brief revision. Authorizes a §13.15 result
+  writeup positioning §13.14 as **the first BCVF-faithful LLM
+  result in this codebase** — distinct framing from any §13.10–
+  §13.13 outcome because §13.14 is the only probe in the ladder
+  that is shaped like the autonomy-domain BCVF observable that
+  passed §6.1. STRONG here would constitute the load-bearing
+  evidence for the BCVF-for-LLMs transfer claim.
+- `0.70 ≤ AUC < 0.75` on **both** → **`BCVF_2DIFF_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Document in a
+  §13.15 internal-strong section. The 2nd-difference observable
+  produces signal but doesn't clear the §13.9 bar; consider
+  follow-ups: (a) NLI upgrade to DeBERTa-v3-large (§13.14-v2
+  variant), (b) finer position grid (`position_stride=2` or `=1`),
+  (c) target-model upscale to Qwen2.5-32B.
+- `0.681 ≤ AUC < 0.70` on **both** → **`BCVF_2DIFF_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10 + 0.02. Document; do NOT
+  authorize further single-axis probe progression. The BCVF-shaped
+  signal exists but is not strong enough to change the §13.9
+  external framing.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`BCVF_2DIFF_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661. The BCVF 2nd-difference
+  observable adds nothing measurable beyond the static-snapshot
+  semantic entropy of §13.10. **This would be a substantive
+  internal finding** — it would suggest that for LLM hallucination
+  detection the second-derivative-of-coupling-failure structure
+  that powered the autonomy-domain validation does not transfer
+  to the token-sequence-as-temporal-axis analogue. Honest scope
+  for the BCVF-for-LLMs transfer claim narrows to "BCVF concepts
+  inspired the §13 metric exploration but the native BCVF observable
+  does not improve on the literature's first-derivative methods on
+  this codebase".
+- `AUC < 0.641` on **any** benchmark → **`BCVF_2DIFF_ANTI_FINDING`**.
+  The 2nd-difference signal is *worse than* the static §13.10
+  baseline. Combined with §13.11 + (whichever of §13.12 / §13.13
+  has landed), this would be 3-of-3 single-axis revisions failing
+  to improve on §13.10. The honest external framing under this
+  outcome: **BCVF-for-LLMs as a hallucination detector is not
+  supported by direct measurement on this codebase**. Pause the
+  LLM track; the autonomy-domain BCVF claim stands independently
+  on its own §6.1 evidence and is unaffected by this null. Items
+  4–6 in §13.8's authorized list (TriviaQA addition, 2nd-difference,
+  compound revisions) all need fresh §0.8 pre-commitments before
+  any further LLM compute is authorized.
+
+The "on both benchmarks" combinatorial rule is identical to §13.11
+/ §13.12 / §13.13 and is pinned here to prevent post-hoc benchmark
+cherry-picking on a heterogeneous TruthfulQA / HaluEval split.
+
+**Why the SATURATION and ANTI bands matter MORE for §13.14 than
+they did for §13.10–§13.13.** The earlier probes were literature
+audits — a saturation result there says "this published method
+doesn't transfer cleanly" but doesn't directly bear on the BCVF
+formalism (because the methods being tested were not BCVF-shaped
+in the first place). §13.14 IS the BCVF-shaped probe. A saturation
+or anti result here is direct evidence about the BCVF transfer
+claim itself, not just about a literature method. The honest
+internal framing must therefore update accordingly: a §13.14
+SATURATION is a real (if narrow) negative for the BCVF-for-LLMs
+hypothesis, even though it is not a §13.9 VC-bar failure (which
+already failed under §13.11 alone).
+
+**Known simplifications and risks specific to §13.14** (disclosed
+so the expected AUC band is calibrated against a realistic
+post-§13.14 baseline; §13.14 is novel construction with no direct
+literature reference, so the AUC forecast is more uncertain than
+§13.10 / §13.13 which had paper-derived numbers):
+
+- **NLI on truncated generations is noisier than NLI on full
+  generations.** Truncated samples may end mid-sentence ("Paris
+  was the capital of"); the MNLI-trained classifier was not
+  trained on incomplete-sentence pairs. Question-conditioning
+  partially mitigates this (the question stays well-formed) but
+  the per-position entropy values are noisier than §13.10's whole-
+  generation entropy. Net effect on AUC: probably slightly negative
+  for short truncations (small `t`), neutral for mid-sequence
+  truncations, neutral for full-length ones. The `position_min=8`
+  default exists to cap the worst of this effect; if §13.14 lands
+  at SATURATION, raising `position_min` to 16 or 24 is the first
+  diagnostic follow-up.
+- **Position-stride sub-sampling drops information.** Computing
+  every 4 tokens (stride=4) means we discretely sample a continuous
+  evolution. The 2nd-difference at stride S approximates the
+  underlying continuous 2nd derivative with truncation error
+  O(S²). Stride=4 was chosen for compute tractability; stride=1 is
+  the gold-standard approximation but ~4× more expensive. If §13.14
+  lands at MARGINAL_LIFT or SATURATION, stride=2 or stride=1 sweeps
+  are the natural follow-up.
+- **`max_i |accel_i|` is one of several reasonable scalar choices.**
+  Other defensible primary scalars include `mean_i |accel_i|` (less
+  outlier-sensitive but smears the fault signature) and
+  `Σ_i accel_i²` (energy-style, weights large peaks more strongly).
+  The `max_i |accel_i|` choice was pinned because it most directly
+  mirrors the robotics-domain `S3_map_error_accel` peak that passed
+  §6.1. If §13.14 lands at SATURATION with the primary scalar but
+  one of the secondary diagnostics shows clear correct/wrong
+  separation, that constitutes evidence the BCVF-shaped signal
+  exists but the wrong aggregation was pinned — a fresh §0.8 re-
+  commitment with a different primary scalar would be authorized.
+- **Single target model (Qwen2.5-7B-Instruct).** As in §13.10–§13.13.
+  Larger-model scaling effects are deferred to a separate §0.8 pre-
+  commitment.
+- **No literature anchor for the AUC forecast.** §13.10 had
+  Farquhar 2024's headline 0.70–0.79 to anchor expectations;
+  §13.12 had Chen 2024's 0.74–0.81; §13.13 had a quantified
+  per-gap ablation table. §13.14 has none of these — there is no
+  published paper running 2nd-difference of per-position semantic
+  entropy at this exact construction. Best estimate: AUC band
+  **0.62–0.78**, very wide because the prior is genuinely
+  uncertain. A clean clear of 0.75 on both benchmarks would be a
+  novel positive result; a clear miss below 0.65 would be the first
+  direct disconfirmation of the BCVF-for-LLMs transfer claim on its
+  native observable. Both outcomes are publishable; the former more
+  exciting, the latter more rigorous.
+
+**Expected cost.** Single 7B target model + DeBERTa-v3-base NLI
+(same as §13.10). K=10 sampling at `max_new_tokens=128` (≈3× §13.10
+generation cost). NLI clustering pass at each of ~31 grid positions
+per question, each with K(K−1)=90 NLI pairs → ≈2,800 NLI calls per
+question, batched → ≈90 forward passes per question at
+batch_size=32. Estimated runtime: **~8–12 min at N=100 on a 24+ GB
+GPU** — comparable to §13.13. Memory unchanged from §13.10
+configuration.
+
+**Report destination.**
+- `docs/experiments/probe_bcvf_2diff_truthfulqa_mc.md`
+- `docs/experiments/probe_bcvf_2diff_truthfulqa_mc.json` (per-
+  question dump including the full per-position entropy series
+  `H_t`, the per-position 2nd differences `accel_i`, the primary
+  and secondary scalars, position of peak — all the intermediate
+  quantities needed to audit the construction post-hoc and to
+  support the secondary-scalar fallback authorization above).
+- `docs/experiments/probe_bcvf_2diff_halueval_qa.md`
+- `docs/experiments/probe_bcvf_2diff_halueval_qa.json`
+
+**Relationship to §13.10–§13.13 and to the autonomy-domain result.**
+§13.10 (single-snapshot SE), §13.11 (cross-family), §13.12
+(EigenScore), §13.13 (continuous SE) are first-derivative-class
+literature replications and bridges. §13.14 is the first probe in
+the ladder that is **shaped like the autonomy-domain BCVF
+observable** — `S3_map_error_accel` per §6.1 / §6.7 — applied to
+the LLM domain by reading "agent moving through environment over
+time" as "model constructing answer over token positions". A
+positive §13.14 result would constitute evidence that the BCVF
+formalism produces useful observables in a second domain (LLMs)
+beyond its origin domain (autonomous robotics); a negative result
+would be the first direct evidence in this codebase that the
+formalism does not transfer at this analogue. **Crucially, neither
+outcome retroactively affects the autonomy-domain result.** §6.1's
+N=21 sign-test on `S3_map_error_accel` is a separate experiment
+on a separate dataset with its own pre-committed gates met; §13.14's
+outcome bears only on the LLM-domain transfer claim, not on the
+robotics-domain validation that already passed.
+
+**What §13.14 does not pre-commit.** No probe-script implementation
+on-branch, no `classify()` thresholds in code, no benchmark runs.
+This section is the §0.8-style pre-commitment record only.
+Implementation of `scripts/probe_bcvf_2diff.py` is a separate
+authorization gate. No VC-brief / §13.9 changes here — those remain
+gated on `BCVF_2DIFF_STRONG` (or any other §13 probe's STRONG band)
+on both benchmarks. §13.14 is authorized to be built and run in
+parallel with §13.12 / §13.13 if GPU and engineering time permit;
+its outcome is mathematically independent of theirs.
 
 ---
 
