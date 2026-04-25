@@ -5655,20 +5655,39 @@ implemented over per-position semantic entropy of NLI-clustered
 truncations, has been run at N=100 on both benchmarks. TruthfulQA-
 MC AUC 0.574; HaluEval-QA AUC 0.363 (signal *inverted* on HaluEval).
 Combined `BCVF_2DIFF_ANTI_FINDING`. The result narrows the BCVF
-transfer claim to *this specific text-level construction*; it does
-not reject BCVF over model-internal continuous state trajectories,
-which §13.16 (next pre-commitment) tests. See §13.15 for the
-detailed result section and the three-reason failure analysis.
+transfer claim to *this specific text-level construction*; the
+hidden-state-internal variant tested in §13.16 below also returned
+ANTI on both benchmarks. See §13.15 for the §13.14 result section
+and the three-reason failure analysis.
 
-**Status of the §13 program after §13.15.** Three single-axis
-revisions tested across both benchmarks (§13.11, §13.12, §13.14).
-None lifts AUC above §13.10's 0.661 marginal baseline on the
-combined-classification rule. §13.10 remains the strongest result
-in this codebase. The next authorized probe is §13.16 (hidden-
-state EigenScore over positions), which tests the construction
-§13.15's narrowing leaves explicitly open: BCVF 2nd-difference
-applied to model-internal continuous state geometry rather than
-text-level NLI clustering.
+**Update — §13.16 executed, BCVF hidden-state construction also
+did not transfer.** The §13.16 hidden-state EigenScore 2nd-
+difference observable — the construction §13.15's narrowing left
+explicitly open — has been run at N=100 on both benchmarks.
+TruthfulQA-MC AUC 0.462; HaluEval-QA AUC 0.449. **Both benchmarks
+inverted** (signal direction opposite the pre-committed AUC sign).
+Combined `HSEIG_2DIFF_ANTI_FINDING`. §13.15's diagnosis transferred:
+the per-position EigenScore series is smooth-monotonic on both
+benchmarks (rising as K samples naturally diverge over generation),
+not smooth-with-rare-spikes — so the 2nd-difference operator has
+no fault-onset structure to detect. Moving from text-level to
+model-internal continuous state did not fix the structural problem.
+See §13.17 for the result section and the further-tightened
+narrowing of the BCVF-for-LLMs transfer claim.
+
+**Status of the §13 program after §13.17 — single-axis program
+closed.** Four single-axis revisions tested across both benchmarks
+(§13.11 cross-family, §13.12 EigenScore, §13.14 BCVF text-level,
+§13.16 BCVF hidden-state). **None lifts AUC above §13.10's 0.661
+marginal baseline on the combined-classification rule.** §13.10
+single-snapshot semantic entropy remains the strongest result in
+this codebase. The §13 single-axis program is closed at the Qwen-
+7B + DeBERTa-v3-base + N=100 configuration. Any future LLM-domain
+work on the BCVF transfer claim would test a fundamentally
+different hypothesis class (system-level integration of BCVF
+scalars in a multi-source Q&A pipeline, single-trajectory
+temporal observables that don't depend on K-sample divergence, or
+model-scale upgrade) under a fresh §0.8 pre-commitment.
 
 ### 13.2 Experiment specification
 
@@ -5967,9 +5986,9 @@ accounting for these simplifications.
 
 ### 13.8 Authorization gate — what §13 leaves open vs paused
 
-**Paused** (no compute authorized until the §13.12
-embedding-space revision lands a positive result; §13.7 and §1.3
-have been exercised — see Completed below):
+**Paused** (the §13 single-axis program is closed post-§13.17;
+no further single-axis probe compute is authorized at this
+codebase's Qwen-7B + base-NLI configuration):
 
 - Section 4 (Phase 2 — Source Framework) extensions beyond
   the two sources already exercised at simplex+same-family.
@@ -6013,72 +6032,76 @@ have been exercised — see Completed below):
   0.574 / HaluEval-QA 0.363 (signal *inverted* on HaluEval) →
   combined `BCVF_2DIFF_ANTI_FINDING`. Per-position semantic-
   entropy curves were monotonic (not smooth-with-spikes), trend
-  direction flipped across benchmarks, and the four-step text-
-  level projection (decode → truncate → NLI → cluster) smeared the
-  signal. Result narrows the BCVF transfer claim to *this specific
-  text-level construction*; the hidden-state-internal variant is
-  pre-committed in §13.16 and not yet executed. See §13.15 for
-  the result section.
+  direction flipped across benchmarks. Result narrows the BCVF
+  transfer claim to *this specific text-level construction*. See
+  §13.15 for the detailed result section.
+- **§13.16 hidden-state EigenScore 2nd-difference observable.**
+  Run at N=100 on both benchmarks with per-position EigenScore at
+  Qwen-7B layer 14, stride-4 grid, primary scalar `max|accel|`.
+  TruthfulQA-MC 0.462 / HaluEval-QA 0.449 — **both inverted**.
+  Combined `HSEIG_2DIFF_ANTI_FINDING`. The §13.15 diagnosis
+  transferred: hidden-state EigenScore series are smooth-monotonic
+  rising on both benchmarks (K samples diverge over generation),
+  not smooth-with-spikes — so the 2nd-difference operator has no
+  fault-onset structure to detect. Moving from text-level to model-
+  internal continuous state did not fix the structural problem.
+  See §13.17 for the result section and the further-tightened
+  narrowing.
 
-**Open and authorized** (in priority order, post-§13.15):
+**§13 single-axis program closed (post-§13.17).** The four single-
+axis revisions above (cross-family, EigenScore, BCVF text-level,
+BCVF hidden-state) exhaust the literature-aligned single-axis
+hypothesis classes available at this codebase's Qwen-7B + DeBERTa-
+v3-base + N=100 configuration. None of the four lifts AUC above
+§13.10's 0.661 marginal baseline on the combined-classification
+rule. **No further single-axis probes are authorized in §13.**
 
-1. **§13.16 hidden-state EigenScore over positions
-   (`HSEIG_2DIFF_*`).** New top priority. The hidden-state-internal
-   construction of the BCVF 2nd-difference operator that §13.15's
-   text-level null leaves explicitly open. Per-position EigenScore
-   $S_t = (1/K)\log\det\Sigma_t$ at the §13.12-pinned mid-layer
-   (Qwen-7B layer 14), computed at a stride-4 grid identical to
-   §13.14, then 2nd-differenced; primary scalar
-   $\max_i |S_{t_{i+1}} − 2 S_{t_i} + S_{t_{i−1}}|$. Same pinned
-   bands partition as §13.11–§13.14. No literature anchor — wide
-   AUC forecast. Implementation (`scripts/probe_eigenscore_2diff
-   .py`) is a separate authorization gate — no code written as of
-   this entry. Pre-commitment in §13.16.
-2. **§13.13 continuous semantic entropy (Farquhar 2024 bridge).**
-   Pre-commitment pinned in §13.13. Closes a known replication gap
-   to Farquhar 2024 via three pinned upgrades (continuous SE,
-   DeBERTa-v3-large NLI, `max_new_tokens=128`). Demoted from co-
-   equal top priority to second priority because §13.12 + §13.14
-   results show that single-axis revisions on the same Qwen-7B +
-   base-NLI configuration saturate at the §13.10 0.661 baseline,
-   and §13.13's three upgrades (still single-axis) are at higher
-   risk of saturation than initially forecast. Implementation
-   (`scripts/probe_continuous_se.py`) not written.
-3. **§13.13 Stage 2 — TriviaQA-Generation benchmark addition.**
-   Conditional on §13.13 clearing `CONTINUOUS_SE_INTERNAL_STRONG`
-   or above. Adds a free-form generation benchmark that Farquhar
-   2024 actually tested (headline 0.78 AUROC), enabling direct
-   apples-to-apples comparison rather than the protocol-mismatched
-   TruthfulQA-MC vs TruthfulQA-Generation comparison §13.10–§13.16
-   are stuck with. Requires a fresh §0.8 pre-commitment around
-   labeling protocol (gold-answer string-match vs the existing
-   NLI-based label) before implementation.
-4. **Model-scale probe — re-run §13.10 with Qwen2.5-32B-Instruct +
-   DeBERTa-v3-large.** New, motivated by §13.12 + §13.14 saturation
-   pattern. Tests whether the §13.10 baseline lifts at literature-
-   typical scale. If §13.10 itself reaches 0.72+ at this scale,
-   all single-axis revisions get reconsidered at the bigger scale;
-   if §13.10 stays at ~0.66, the saturation is fundamental to
-   these benchmarks at 7B class. Requires a fresh §0.8 pre-
-   commitment with revised baseline before any new probe-vs-
-   baseline comparisons.
-5. **Linear activation probes as fallback** (Azaria & Mitchell
-   2023; Marks & Tegmark 2024 "Geometry of Truth"). Requires a
-   labeled train/test split, adds a §0.8 pre-commitment around
-   split selection. Re-opens as primary only if §13.16 lands
-   `HSEIG_2DIFF_SATURATION` or `HSEIG_2DIFF_ANTI_FINDING` and
-   §13.13 also fails to clear `CONTINUOUS_SE_INTERNAL_STRONG`.
-6. **Compound revisions** (continuous SE + EigenScore as a
-   learned linear combination, hidden-state EigenScore + 2nd-
-   difference at multiple layer choices, embedding-space + cross-
-   family on a different triple, etc.). Authorized only after
-   §13.13 and §13.16 have both landed and requires a fresh §0.8
-   pre-commitment. Note that the §13.12 HaluEval saturation result
-   suggests EigenScore and semantic entropy measure correlated
-   underlying epistemic uncertainty rather than orthogonal signals,
-   which weakens the "naive linear combination" version of the
-   compound revision; an orthogonality test would precede any
-   combiner experiment.
+**Open as future-work pre-commitments outside §13** (each requires
+a fresh §0.8-style commitment in a new top-level section if
+pursued; none are pre-committed by §13.17):
+
+- **Single-trajectory temporal observable.** Per-token logit
+  entropy (or analogous within-sample temporal signal) along a
+  single greedy or sampled trajectory, with the BCVF 2nd-
+  difference operator applied across token positions WITHIN a
+  trajectory rather than across K-sample-divergence. This is the
+  signal class §13.17's narrowing leaves explicitly open — it
+  does not depend on K-sample-divergence dynamics that produce
+  the smooth-monotonic series §13.14 + §13.16 both ran into.
+- **System-level integration (would become §14).** The §4 source-
+  framework + §5 integration-layer machinery has never been
+  exercised on LLMs in this codebase. The §13 program tested
+  observables in isolation against ground truth (AUC); it did not
+  test multi-source LLM Q&A systems that consume BCVF scalars to
+  weight or filter sources. ChatGPT/external-review noted that
+  the autonomy-domain §6.1 result that passed was a system-level
+  result (multi-source robotic system using BCVF-shaped routing),
+  not an isolated-observable result, so the analogue system-level
+  test is the natural next experiment if any is pursued.
+- **Model-scale probe.** Re-run §13.10 with Qwen2.5-32B-Instruct
+  + DeBERTa-v3-large. Tests whether the §13.10 baseline lifts at
+  literature-typical scale. If §13.10 itself reaches 0.72+ at
+  this scale, all four §13 single-axis revisions could be
+  reconsidered. If §13.10 stays at ~0.66, the saturation is
+  fundamental to these benchmarks at 7B class.
+- **Continuous semantic entropy bridge (§13.13 pre-commitment,
+  not implemented).** Three Farquhar-2024-aligned upgrades
+  (continuous SE, DeBERTa-v3-large NLI, max_new_tokens=128) on
+  §13.10's protocol. Pre-committed in §13.13 but not implemented.
+  Demoted in priority because the four §13 single-axis nulls
+  collectively suggest single-axis variants saturate at the
+  §13.10 baseline regardless of which axis is changed.
+- **Linear activation probes** (Azaria & Mitchell 2023; Marks &
+  Tegmark 2024 "Geometry of Truth"). Requires a labeled train/
+  test split. Tests a different hypothesis class than the four
+  §13 probes (supervised rather than unsupervised). Would require
+  a fresh §0.8 pre-commitment around split selection.
+- **Benchmark substitution.** Adding TriviaQA-Generation as a
+  free-form benchmark Farquhar 2024 actually tested would resolve
+  the protocol-mismatch confound that affected §13.10–§13.16
+  (TruthfulQA-MC vs Farquhar's TruthfulQA-Generation). Requires
+  a fresh §0.8 pre-commitment around labeling protocol (gold-
+  answer string-match vs the existing NLI-based label).
 
 ### 13.9 What this means for the autonomy track
 
@@ -6091,20 +6114,24 @@ invalidate the autonomy result.
 
 For VC / investor communication, the autonomy track should
 continue to be presented on its own merits. The LLM design
-doc is an internal research artifact; the §13.7 and §1.3
-revision probes are work-in-progress (both now executed, with
-§13.10 marginal pass and §13.11 combined anti-finding) and
-none of them is positioned as a deliverable.
+doc is an internal research artifact; all four single-axis
+revision probes (§13.7 / §1.3 / §13.12 / §13.14 / §13.16)
+have now been executed and none lifts AUC above §13.10's
+0.661 marginal baseline on the combined-classification rule.
+None is positioned as a deliverable.
+
 `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest scope caveats"
 already reflects the current external-facing framing
 ("BCVF is not positioned as an LLM hallucination detector"),
-and that framing is *strengthened*, not weakened, by §13.11's
-anti-finding. It will be revisited only if a future probe
-(the §13.12 EigenScore pre-commitment is the current candidate)
-lifts AUC to the 0.75 strong band on BOTH TruthfulQA-MC and
-HaluEval-QA — a bar that §13.10 (marginal) and §13.11 (anti)
-did not clear. No VC-facing material is updated on the basis
-of §13.10 or §13.11 alone, either in isolation or combined.
+and that framing is *strengthened*, not weakened, by the
+combined §13 evidence. The §13 single-axis program is closed
+post-§13.17. The framing will be revisited only if some future
+out-of-§13 probe (system-level integration, single-trajectory
+temporal observable, or model-scale upgrade — see §13.8 future-
+work list) lifts AUC to the 0.75 strong band on BOTH TruthfulQA-
+MC and HaluEval-QA. No probe in the §13 program has cleared
+this bar. No VC-facing material is updated on the basis of any
+§13 result, either in isolation or combined.
 
 ### 13.10 Revision experiment results — semantic-entropy on TruthfulQA + HaluEval
 
@@ -7615,6 +7642,289 @@ Implementation of `scripts/probe_eigenscore_2diff.py` is a separate
 authorization gate. No VC-brief / §13.9 changes here — those remain
 gated on `HSEIG_2DIFF_STRONG` on both benchmarks (or any §13
 probe's STRONG on both, which has not yet been observed).
+
+### 13.17 Result — Hidden-state EigenScore 2nd-difference also did not transfer; §13 single-axis program closed
+
+The §13.16 pre-committed probe has been executed at N=100 on both
+benchmarks. Combined classification: **`HSEIG_2DIFF_ANTI_FINDING`**,
+with the additional substantive finding that **the signal inverts
+on BOTH benchmarks** — the only §13 probe to do so. This is the
+fourth and final single-axis revision in the §13 program; with it,
+the literature-aligned single-axis path is exhausted at this
+codebase's Qwen-7B + DeBERTa-v3-base + N=100 configuration.
+
+The §13.16 result narrows the BCVF-for-LLMs transfer claim further
+than §13.15 did. §13.15 narrowed the §13.14 null to *text-level*
+constructions and explicitly left open the hidden-state-internal
+construction. §13.16 now closes that opening: per-position
+EigenScore over hidden-state geometry exhibits the same structural
+shape problem as per-position semantic entropy did in §13.14 —
+smooth-monotonic underlying signal with no fault-onset structure
+for the 2nd-difference operator to detect. Moving from text-level
+to model-internal continuous state did not fix the issue; the
+structural problem is **the K-sample-divergence dynamics of the
+underlying signal class**, not the lossy projection chain §13.15
+hypothesized.
+
+**Result table:**
+
+| Benchmark | N | Greedy acc | Mean S first (t=8) | Mean S last (t=128) | AUC primary | AUC mean\|accel\| | AUC Σaccel² | Δ vs §13.10 | Per-run band |
+|---|---|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC | 100 | 0.320 | −3.72 | −1.20 | **0.462** | 0.432 | 0.453 | −0.199 | `HSEIG_2DIFF_ANTI_FINDING` |
+| HaluEval-QA | 100 | 0.320 | −4.68 | −1.88 | **0.449** | 0.425 | 0.440 | −0.212 | `HSEIG_2DIFF_ANTI_FINDING` |
+
+Combined classification under the §13.16 worst-benchmark rule:
+ANTI on both. **All six AUCs (3 scalars × 2 benchmarks) cluster
+in the narrow range [0.425, 0.462] — robustly inverted. The signal
+is real and consistent in the wrong direction; it is not noise
+around 0.5.**
+
+Per-class means:
+
+| Benchmark | Mean primary correct | Mean primary wrong | Δ (correct − wrong) |
+|---|---|---|---|
+| TruthfulQA-MC | 1.3691 | 1.2247 | **+0.144** (correct higher) |
+| HaluEval-QA | 1.3971 | 1.3386 | **+0.058** (correct higher) |
+
+Both benchmarks show *correct* answers having *higher* `max|accel|`
+than wrong answers — opposite of the pre-committed direction.
+
+**Math used (the construction that failed).** For each question $q$
+with K=10 sampled completions at T=1.0, max_new_tokens=128:
+
+1. Single batched `generate()` call with
+   `output_hidden_states=True, return_dict_in_generate=True` so
+   that per-step layer-$L^*$ hidden states are captured during one
+   forward pass, where $L^* = \lfloor \text{num\_hidden\_layers}/2
+   \rfloor = 14$ for Qwen-7B.
+2. At each grid position $t \in \{8, 12, 16, \ldots, 128\}$ (31
+   positions), for each sample $k$, extract
+   $h^{(k)}_t = \text{out.hidden\_states}[\sigma(t,k)][L^*][k, -1, :]$
+   where $\sigma(t,k) = \min(t, \text{sample\_lengths}[k]) - 1$
+   (capped at the sample's actual non-pad length; falls back to
+   step 0 if the sample emitted zero non-pad tokens).
+3. Stack into $X_t \in \mathbb{R}^{K \times H}$ with $H = 3584$.
+4. Per-position EigenScore (Chen 2024 K×K Gram form):
+   $\Sigma_t = (1/H) X_t^c (X_t^c)^\top + \alpha I_K$ with
+   $\alpha = 10^{-3}$; then
+   $S_t = (1/K) \log \det \Sigma_t$ via `np.linalg.slogdet` for
+   numerical stability.
+5. Centered second difference:
+   $\text{accel}_i = S_{t_{i+1}} - 2 S_{t_i} + S_{t_{i-1}}$ for
+   interior $i$.
+6. Primary scalar (pinned per §13.16):
+   $\text{bcvf\_eig\_2diff}(q) = \max_i |\text{accel}_i|$.
+7. AUC computed on $-\text{bcvf\_eig\_2diff}$, pre-committed
+   direction *higher acceleration → less stable evolving internal-
+   state geometry → more likely wrong*.
+
+The two diagnostic secondary scalars
+$\text{mean}_i |\text{accel}_i|$ and
+$\sum_i \text{accel}_i^2$ were reported but not used for
+classification (per §13.16's §0.8 pinning of the primary). All
+three scalar AUCs cluster within 0.04 on both benchmarks.
+
+**Three reasons the signal failed at this construction** (mapping
+§13.15's diagnostic structure onto §13.16's data):
+
+**(a) The per-position EigenScore curves are smooth and
+monotonically rising on both benchmarks** — same shape problem
+§13.14's text-level entropy curves had. TruthfulQA-MC mean
+$S_t = -3.72 \to -1.20$ over $t = 8 \to 128$ (rise of 2.52 nats);
+HaluEval-QA mean $S_t = -4.68 \to -1.88$ (rise of 2.80 nats). These
+are smooth, large monotonic trends across 31 positions. The 2nd
+derivative of a smooth monotonic curve has small magnitude
+dominated by local trend curvature, not fault onsets. `max|accel|`
+on such a series picks an outlier in a smoothly-bending trend,
+not the moment of an epistemic event. Neither curve has the
+smooth-with-rare-spikes structure BCVF's 2nd-derivative operator
+needs.
+
+The mechanism for the monotonic rise: at early grid positions, the
+K=10 samples have barely diverged — their hidden states cluster
+tightly, $\det \Sigma_t$ is small, $S_t$ is very negative. As
+generation proceeds, the K samples explore different paths and
+their hidden states pull apart — $\det \Sigma_t$ grows, $S_t$
+becomes less negative. **This is a structural property of K-
+sample-divergence dynamics, not an epistemic property of the
+model**. It happens whether the model is confident or uncertain,
+correct or wrong.
+
+**(b) The signal direction is consistently inverted on BOTH
+benchmarks.** §13.14 had asymmetric inversion (TruthfulQA in
+expected direction at AUC 0.574, HaluEval inverted at 0.363).
+§13.16 inverts on both (0.462 and 0.449), and three different
+aggregations on each benchmark (`max|accel|`, `mean|accel|`,
+`Σaccel²`) all show the same anti-correlated direction. The
+inversion is robust across benchmark choice and aggregation
+choice. It is the most consistent qualitative finding in the §13
+program.
+
+The mechanism for the inversion (hypothesis with empirical
+support, not pre-committed): when Qwen is confident on a question,
+it elaborates the answer with diverse phrasings, reasoning steps,
+and qualifications mid-generation. The K=10 samples explore that
+diverse semantic neighborhood, so hidden-state acceleration is
+high. When Qwen is wrong with confidence, it commits to a single
+confabulated story — K=10 samples follow similar trajectories,
+hidden-state acceleration is low. The 2nd-difference observable
+therefore measures something like "mid-generation semantic
+exploration intensity" rather than "epistemic uncertainty."
+Exploration intensity anti-correlates with hallucination on these
+benchmarks.
+
+**(c) Moving from text-level to model-internal continuous state
+did not fix the structural problem §13.15 identified.** §13.15
+hypothesized that §13.14's failure was the four-step lossy
+projection chain (decode → truncate → NLI → cluster) smearing the
+underlying epistemic signal. §13.16 removed three of those four
+projections (no decode, no NLI, no cluster — only layer + position
+selection on raw hidden states). The signal is still
+structurally smooth-monotonic, the 2nd-difference operator still
+has nothing to detect, and the result still inverts. **The lossy
+projection chain was not the dominant cause**; the dominant cause
+is that K-sample-divergence dynamics produce monotonic curves
+across token positions regardless of which signal class
+(text-level or hidden-state) is computed from those K samples.
+
+This tightens the §13.15 narrowing substantially:
+
+> **The §13.16 null further narrows the BCVF-for-LLMs transfer
+> claim: BCVF's 2nd-difference operator does not produce a fault-
+> onset-shaped signal at any K-sample-divergence-based observable
+> tested in this codebase, whether the underlying signal class is
+> text-level (semantic entropy of NLI clusters) or model-internal
+> (per-position EigenScore over hidden-state geometry). The
+> structural failure mode — smooth-monotonic underlying series with
+> no rare-spike structure — is a property of K-sample-divergence
+> dynamics, not of any specific projection from samples to scalars.**
+
+This does not reject BCVF over signal classes that do not depend
+on K-sample divergence — for example, per-token logit entropy
+along a single greedy or sampled trajectory, which has within-
+sample temporal evolution rather than cross-sample geometric
+evolution. Such constructions have not been tested in this
+codebase and are not pre-committed by §13.17.
+
+**EOS-reuse diagnostic findings.** §13.16 was instrumented with
+EOS-reuse diagnostics (commit `557f0f6`, pure logging) to test
+whether late-position hidden-state reuse — when
+$\text{sample\_lengths}[k] < t$, the per-position extraction
+reuses sample $k$'s last hidden state at later grid positions —
+was confounding the per-position EigenScore series. The
+instrumentation surfaced the following:
+
+| EOS-reuse bucket | TruthfulQA-MC | HaluEval-QA |
+|---|---|---|
+| Questions with no EOS reuse | 37 / 100 | 24 / 100 |
+| Questions with some reuse (`fraction < 0.5`) | 29 / 100 | 24 / 100 |
+| Questions with heavy reuse (`fraction ≥ 0.5`) | 34 / 100 | 52 / 100 |
+| Mean `min_sample_length` (tokens) | 84.4 | 61.8 |
+| Median `min_sample_length` | 102.5 | 66.5 |
+| Mean `n_eos_reuse_positions` (of 31) | 11.1 (36%) | 16.7 (54%) |
+
+HaluEval has substantially more EOS reuse than TruthfulQA (52 vs
+34 heavy-reuse questions; 54% vs 36% mean reuse fraction). But
+**both benchmarks invert with similar magnitude** — TruthfulQA AUC
+0.462, HaluEval AUC 0.449. If EOS reuse were the dominant driver,
+HaluEval would invert more strongly than TruthfulQA. It does not.
+EOS reuse contributes some noise but is not the primary cause of
+the inversion. The structural cause identified in reason (a)
+above — smooth-monotonic K-sample-divergence dynamics — is the
+dominant mechanism.
+
+A post-hoc EOS-reuse stratification analysis on the JSON dumps
+could further confirm this by computing AUC on the no-reuse subset
+only (37 TFQA, 24 HaluEval questions). That analysis is not
+required to support the §13.17 conclusion (the cross-benchmark
+similarity already rules out EOS-reuse as the primary driver) but
+would tighten the post-hoc evidence if performed; it is logged here
+as an optional follow-up rather than a §0.8 commitment.
+
+**What this authorizes** (per §13.16 pre-commitment + §13.17
+result):
+
+- **Closing the §13 single-axis program.** Four single-axis
+  revisions — §13.11 cross-family ensemble, §13.12 EigenScore
+  single-snapshot, §13.14 BCVF text-level 2nd-difference, §13.16
+  BCVF hidden-state 2nd-difference — have all been executed and
+  classified. None lifts AUC above §13.10's 0.661 marginal
+  baseline on the combined-classification rule. The §13 single-
+  axis path is exhausted at this codebase's Qwen-7B + DeBERTa-v3-
+  base + N=100 configuration.
+- **Authorizing the §13-program closing statement.** The honest
+  external framing is: *on Qwen2.5-7B-Instruct + DeBERTa-v3-base +
+  N=100, no literature-aligned single-axis hallucination-detection
+  method tested in this codebase clears the §13.10 marginal
+  baseline of AUC 0.661 on both TruthfulQA-MC and HaluEval-QA.
+  The 2nd-difference operator specifically produces inverted
+  signals at both text-level and hidden-state-level constructions,
+  indicating that BCVF's native observable does not transfer to
+  LLMs at the K-sample-divergence-as-temporal-axis analogue.*
+- **Promoting §13.10 as the strongest §13 result on record.** The
+  single-snapshot semantic-entropy probe at §13.10 remains the
+  best-performing observable in the codebase at this scale and is
+  the result of record for any §13-related referencing.
+- **Documenting the qualitative inversion finding.** §13.14 +
+  §13.16 together show that the 2nd-difference operator on K-
+  sample-divergence signals produces an anti-correlated signal on
+  these benchmarks. This is itself a substantive methodological
+  finding worth referencing in any §13-program writeup, even
+  though it does not unlock any pre-committed band.
+
+**What this does NOT authorize:**
+
+- **Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.** Per
+  §13.9, external-framing revision requires `STRONG` on both
+  benchmarks at any §13 probe. No probe in §13 has cleared this.
+  The §13.9 hold remains in force and is *strengthened* by
+  §13.17's 4-of-4 confirmation.
+- **Any single-axis follow-up probe in the §13 program.** The
+  saturation pattern across four hypothesis classes (sample-space
+  ensemble, internal-state, temporal-evolution at text-level,
+  temporal-evolution at hidden-state) is robust enough that
+  another single-axis variant is not authorized without a fresh
+  §0.8 pre-commitment that explicitly identifies what new
+  hypothesis class it tests.
+- **Post-hoc reinterpretation of the §13.16 inversion as a
+  positive result.** The pre-committed AUC sign was
+  *higher acceleration → more likely wrong*. The data falsified
+  that direction. Renaming the scalar post-hoc to "exploration
+  intensity" and reporting AUC of $+\text{bcvf\_eig\_2diff}$ as a
+  positive finding would be a §0.8 violation. The inversion is
+  documented as a substantive observation, not retrofitted as a
+  pass.
+- **Any claim that BCVF does not transfer to LLMs in general.**
+  §13.17 narrows the negative claim to *K-sample-divergence-based
+  observables under the BCVF 2nd-difference operator at the
+  constructions tested*. Signal classes that do not depend on
+  K-sample divergence (e.g., per-token logit entropy along a
+  single trajectory) are not tested and are not foreclosed.
+  System-level integration tests that consume BCVF scalars in a
+  multi-source Q&A pipeline (rather than treating them as
+  standalone observables vs ground truth) are also not tested and
+  are not foreclosed; if pursued, they would be a separate §14
+  pre-commitment outside the §13 single-axis program.
+- **Any claim that affects the autonomy-domain BCVF result.**
+  §6.1's N=21 sign-test on `S3_map_error_accel` passed
+  independently and stands. §13.17's outcome bears only on the
+  LLM-domain transfer claim at the constructions tested, not on
+  the robotics-domain validation.
+
+**Status of the §13 program after §13.17.** Closed at the single-
+axis level. The §13.10 baseline (AUC 0.661 on both benchmarks,
+TRUTH_CORRELATED_MARGINAL) is the strongest result of record. Any
+future LLM-domain work on the BCVF transfer claim would need to
+test a fundamentally different hypothesis class (e.g., system-
+level integration, single-trajectory temporal observable, or
+model-scale upgrade) under a fresh §0.8 pre-commitment.
+
+**Artifacts:**
+
+- `scripts/probe_eigenscore_2diff.py` (commits `15306c2` initial,
+  `557f0f6` EOS-reuse diagnostics).
+- `docs/experiments/probe_eigenscore_2diff_truthfulqa_mc.md` and `.json`.
+- `docs/experiments/probe_eigenscore_2diff_halueval_qa.md` and `.json`.
 
 ---
 
