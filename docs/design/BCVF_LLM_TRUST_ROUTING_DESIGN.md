@@ -6322,6 +6322,239 @@ priority list):
   (chat-template diagnostic).
 - `docs/experiments/probe_cross_family_entropy_truthfulqa_mc_chat.json`.
 
+### 13.12 Pre-commitment — EigenScore embedding-space probe (§13.8 item 2)
+
+**Status: pre-committed, not yet executed.** This section is a
+§0.8-style pre-commitment recorded before the experiment runs. The
+probe specification, success bands, and expected-cost estimates
+below are pinned at the time of §13.11's anti-finding write-up; any
+deviation at run time must be flagged in the result section as a
+deviation rather than a band-shift.
+
+**Background.** §13.10 established that meaning-space semantic
+entropy (Farquhar 2024) on a single Qwen2.5-7B-Instruct target
+clears the §11 0.60 marginal bar at AUC 0.661 on both benchmarks
+but does not clear the §13.9 0.75 external-framing bar. §13.11
+attempted to lift that result via the §13.8 item-1 cross-family
+ensemble revision (Yoffe 2024 / Feng 2024, Qwen + Llama + Mistral
+M=3 pool) and landed `CROSS_FAMILY_ANTI_FINDING` — a heterogeneous
+benchmark split (TruthfulQA 0.633 / HaluEval 0.716) whose worst
+benchmark falls below the §13.10 baseline minus the saturation
+window. The §13.8 item-2 embedding-space / activation-probe
+revision is therefore the next authorized probe.
+
+The literature class targeted here — Azaria & Mitchell 2023 (SAPLMA);
+Marks & Tegmark 2024 ("The Geometry of Truth"); Chen et al. 2024
+ICLR ("INSIDE: LLMs' Internal States Retain the Power of
+Hallucination Detection") — operates on the model's hidden states
+rather than its sampled outputs. Reported AUROCs on TruthfulQA /
+HaluEval / SAPLMA are in the **0.71–0.83** band, with INSIDE /
+EigenScore (Chen 2024) reporting **0.74–0.81** on HaluEval-QA and
+TruthfulQA — i.e., literature predicts a result band that brackets
+the §13.9 0.75 external-framing bar from both sides. A clean
+positive on this probe therefore would meaningfully test §13.9 in
+a way §13.11 could not.
+
+EigenScore is selected over the linear-probe variants (SAPLMA,
+Geometry of Truth) for three reasons specific to this codebase:
+
+1. **No labeled training set required.** EigenScore is computed per
+   question from K samples' hidden states; it has no learned
+   parameters beyond a regularization scalar. Linear probes need a
+   train/test split with truth labels, which would force a separate
+   §0.8 pre-commitment around split selection and risk train/test
+   contamination across our two benchmarks.
+2. **Direct K=10 protocol parity with §13.10.** EigenScore reuses
+   the same K=10 sampling already exercised in
+   `probe_semantic_entropy.py`; only the per-sample artifact
+   captured is different (last-token hidden state instead of decoded
+   string). AUC bands across §13.10 / §13.11 / §13.12 stay directly
+   comparable.
+3. **Falsifies a different hypothesis class.** Semantic entropy is
+   a sample-space metric; cross-family is an ensemble metric.
+   EigenScore is an internal-state metric. A positive result here
+   would not be a "more of the same" lift; a negative result would
+   triangulate the §13 null toward a stronger, multi-axis claim.
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_eigenscore.py` (new; does NOT modify
+  `probe_semantic_entropy.py` — §13.10's result is pinned — and does
+  NOT modify `probe_cross_family_entropy.py` — §13.11's result is
+  pinned).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same single-
+  family configuration as §13.10 to preserve direct AUC
+  comparability against the 0.661 baseline. M=1 by construction —
+  EigenScore is a within-model signal.
+- **Hidden-state extraction layer:** `model.config.num_hidden_layers
+  // 2` (Qwen2.5-7B-Instruct has 28 transformer blocks, so
+  layer 14, the middle layer). Pinned for the headline result; a
+  `--layer` CLI flag enables follow-up sweeps but the §13.12 band
+  classification refers exclusively to layer 14.
+- **Hidden-state extraction position:** the LAST generated token's
+  hidden state for each of the K samples (i.e., the residual-stream
+  vector at the final non-EOS position of the sample). Captured via
+  `model.generate(..., output_hidden_states=True)` and indexed as
+  `outputs.hidden_states[-1][layer_idx][:, -1, :]` — last-step's
+  hidden states tuple, middle-layer entry, final batch position.
+- **Scalar (Chen 2024 formulation):** for each question with K
+  samples and hidden-state matrix `X ∈ ℝ^{K × H}` (H = 3584 for
+  Qwen2.5-7B-Instruct), compute the centered Gram-matrix variant
+  used in the original paper (well-conditioned even when H ≫ K):
+
+  ```
+  X_c   = X - X.mean(axis=0, keepdims=True)        # K × H, centered
+  Σ_K   = (X_c @ X_c.T) / H + α · I_K              # K × K
+  EigenScore(q) = (1.0 / K) · log(det(Σ_K))
+  ```
+
+  with regularization `α = 1e-3` (Chen 2024 default). Higher
+  EigenScore = more spread in the K hidden states = more uncertainty.
+  AUC computed on `−EigenScore` so the convention "higher = more
+  truth-predictive" is preserved across §13.10 / §13.11 / §13.12.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100 (same
+  selection as §13.10); HaluEval-QA `data` split, N=100 (same
+  selection as §13.10).
+- **Sampling protocol:** K=10 completions per question at T=1.0,
+  `max_new_tokens=32`. Identical to §13.10. Per-question seed
+  `args.seed + q_idx`. No greedy from a separate model — the same
+  Qwen target produces both the sampled completions (for hidden
+  states) and the greedy completion (for the correctness label).
+- **Prompt format:** shared `Q: ... A:` completion, identical to
+  §13.10 / §13.11 initial pass. No chat templates (the §13.11
+  diagnostic already established that chat templates degrade the
+  signal on this codebase).
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI (DeBERTa-v3-base-mnli-fever-anli) against the
+  correct choice AND fails NLI against every distractor. Identical
+  labeling to §13.10 / §13.11. Direct AUC comparability.
+
+**Pre-committed success bands** (same numerical partition as §13.11
+because the §13.10 baseline of 0.661 is unchanged; relabeled
+`EMBEDDING_SPACE_*` to keep the per-revision lineage legible in
+search and in `classify()` output):
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`EMBEDDING_SPACE_STRONG`**.
+  Gates the §13.9 VC-brief revision (the same gate §13.11 failed
+  to clear). Authorizes a full §13.13 writeup, re-opens the §13.8
+  item-3 2nd-difference observable as a follow-up §0.8 pre-
+  commitment, and unblocks the §13.9 external-framing reconsideration.
+- `0.70 ≤ AUC < 0.75` on **both** → **`EMBEDDING_SPACE_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Document in a
+  §13.13 internal-strong section; consider whether layer or α
+  sweep closes the 0.05-AUC gap to the strong band.
+- `0.681 ≤ AUC < 0.70` on **both** → **`EMBEDDING_SPACE_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10's 0.661 + 0.02 saturation
+  upper bound. Document; do NOT authorize further probe progression.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`EMBEDDING_SPACE_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661 single-model baseline. Internal-
+  state representation adds nothing beyond meaning-space semantic
+  entropy at this configuration. Together with §13.11's combined
+  ANTI_FINDING, this would constitute strong evidence that a single-
+  axis revision (metric class change) cannot clear the §13.9 bar
+  and that compound revisions (e.g., embedding-space + 2nd-
+  difference, or embedding-space + cross-family on a different
+  triple) are required.
+- `AUC < 0.641` on **any** benchmark → **`EMBEDDING_SPACE_ANTI_FINDING`**.
+  Combined with §13.11, this would be a 2-of-2 anti-finding across
+  the two literature-backed revision classes available to this
+  codebase. Pause LLM track. Re-frame the §13 closure as "the
+  literature-backed single-axis revisions tested in this codebase
+  do not lift Qwen2.5-7B-Instruct AUC into the 0.75 band on both
+  benchmarks at N=100." A combined-revision §0.8 pre-commitment
+  becomes the only remaining authorized path.
+
+The "on both benchmarks" combinatorial rule is identical to §13.11's
+worst-benchmark rule and is pinned here so that a heterogeneous
+TruthfulQA / HaluEval split (which is plausible given §13.11's 0.083-
+wide split and Farquhar 2024's reported per-benchmark variance)
+does not get rescued post-hoc by single-benchmark cherry-picking.
+
+**Known simplifications vs Chen et al. 2024** (disclosed so the
+expected AUC band is calibrated against a realistic baseline rather
+than the paper's headline numbers):
+
+- **Single fixed layer (L/2 = 14).** Chen 2024 sweeps multiple
+  layers and reports best-of-sweep AUROC. Selecting a single layer
+  before running gives up the best-of-sweep margin. Expected AUC
+  penalty: small (~0.01–0.03) but material near the 0.75 boundary.
+  Configurable via `--layer` for follow-up sweeps if §13.12 lands
+  in the marginal or saturation band.
+- **Single hidden-state position (last generated token).** The paper
+  evaluates last-token, mean-pool, and last-prompt-token positions
+  and reports modest variance across them. Last-token is the
+  paper's default for generative QA. Expected penalty: <0.01 AUC.
+- **Fixed regularization α = 1e-3.** Chen 2024 reports robustness
+  to α in the [1e-4, 1e-2] range; outside that range AUC degrades.
+  Pinning to the paper default is a reasonable §0.8 default but
+  introduces a small confound if Qwen2.5-7B's hidden-state scale
+  differs from the OPT/Llama-2 models used in the paper. Configurable
+  via `--alpha` for follow-up.
+- **K = 10, T = 1.0, max_new_tokens = 32.** Identical to §13.10 /
+  §13.11. The paper's K is typically 10 as well.
+- **Same correctness label as §13.10 / §13.11** (question-conditioned
+  NLI on Qwen greedy). The paper uses gold-answer string match for
+  TruthfulQA in some configurations, which would flag fewer correct
+  generations as "correct" and shift n_pos / n_neg. Holding the
+  label fixed across §13 prevents a labeling-pipeline confound but
+  carries forward §13.10's labeling assumption. A string-match
+  fallback label is a §13.13 robustness check if the result lands
+  near a band boundary.
+- **Single target model (Qwen2.5-7B-Instruct).** The paper uses
+  Llama-2 / OPT in its headline numbers. Qwen2.5-7B's hidden-state
+  geometry may differ; the literature predicts the method
+  generalizes but the specific AUC is not pre-tested on Qwen.
+  Expected AUC may land slightly below the paper's 0.74–0.81 range
+  for this reason. The §13.12 strong band at 0.75 is therefore at
+  the lower edge of what the literature predicts for this exact
+  model — a clean strong-band pass would be a meaningful positive
+  result, not a guaranteed replication.
+
+These simplifications together suggest the §13.12 implementation
+should land at AUROC **~0.68–0.78** on the two benchmarks if the
+EigenScore signal transfers to Qwen2.5-7B-Instruct as the literature
+predicts — i.e., bracketing the strong band but not guaranteed to
+clear it. A result below 0.65 on both benchmarks would constitute
+a genuine signal against the embedding-space hypothesis on this
+codebase even after accounting for the simplifications above; a
+result above 0.78 would suggest Qwen2.5-7B's hidden states carry a
+stronger truth signal than the literature's Llama-2 / OPT baseline.
+
+**Expected cost.** Single 7B target model, K=10 sampling identical
+to §13.10, no NLI clustering pass on the K samples (NLI is used only
+for the correctness label, ~3 calls per question). Hidden-state
+extraction during generation adds ~2× memory but no substantial
+wall-time. Estimated runtime: **~3–5 min at N=100 on a single 24+
+GB GPU**. Cheaper than §13.10's clustering-bound runtime and much
+cheaper than §13.11's M=3 co-resident loading.
+
+**Report destination.**
+- `docs/experiments/probe_eigenscore_truthfulqa_mc.md`
+- `docs/experiments/probe_eigenscore_truthfulqa_mc.json` (per-question
+  dump including hidden-state shape, EigenScore, sample IDs, cluster
+  assignments are not applicable here — there is no clustering step).
+- `docs/experiments/probe_eigenscore_halueval_qa.md`
+- `docs/experiments/probe_eigenscore_halueval_qa.json`
+
+**Relationship to BCVF 2nd-difference core.** EigenScore as
+specified is a static scalar — first-difference structure (one
+scalar per question). It does not yet introduce the BCVF 2nd-
+difference observable. If §13.12 lands in `EMBEDDING_SPACE_STRONG`
+or `EMBEDDING_SPACE_INTERNAL_STRONG`, a follow-up §13.13
+pre-commitment can test whether `d²(EigenScore)/dk²` across outer
+decoding steps (the true BCVF-shaped signal applied to internal
+states) improves on the static scalar. That follow-up is NOT pre-
+committed here; its authorization is conditional on §13.12 clearing
+the marginal-lift bar AT MINIMUM.
+
+**What §13.12 does not pre-commit.** No probe-script implementation
+on-branch, no `classify()` thresholds in code, no benchmark runs.
+This section is the §0.8-style pre-commitment record only.
+Implementation of `scripts/probe_eigenscore.py` is a separate
+authorization gate; the pre-committed bands above are the guarantee
+that any future implementation cannot redefine the success criteria
+post-hoc.
+
 ---
 
 
