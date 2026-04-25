@@ -5675,19 +5675,33 @@ model-internal continuous state did not fix the structural problem.
 See §13.17 for the result section and the further-tightened
 narrowing of the BCVF-for-LLMs transfer claim.
 
-**Status of the §13 program after §13.17 — single-axis program
-closed.** Four single-axis revisions tested across both benchmarks
-(§13.11 cross-family, §13.12 EigenScore, §13.14 BCVF text-level,
-§13.16 BCVF hidden-state). **None lifts AUC above §13.10's 0.661
-marginal baseline on the combined-classification rule.** §13.10
-single-snapshot semantic entropy remains the strongest result in
-this codebase. The §13 single-axis program is closed at the Qwen-
-7B + DeBERTa-v3-base + N=100 configuration. Any future LLM-domain
-work on the BCVF transfer claim would test a fundamentally
-different hypothesis class (system-level integration of BCVF
-scalars in a multi-source Q&A pipeline, single-trajectory
-temporal observables that don't depend on K-sample divergence, or
-model-scale upgrade) under a fresh §0.8 pre-commitment.
+**Status of the §13 program after §13.17 — K-sample-divergence
+single-axis program closed.** Four K-sample-divergence single-
+axis revisions tested across both benchmarks (§13.11 cross-family,
+§13.12 EigenScore, §13.14 BCVF text-level, §13.16 BCVF hidden-
+state). **None lifts AUC above §13.10's 0.661 marginal baseline
+on the combined-classification rule.** §13.10 single-snapshot
+semantic entropy remains the strongest result in this codebase.
+The K-sample-divergence single-axis program is closed at the
+Qwen-7B + DeBERTa-v3-base + N=100 configuration.
+
+**Update — §13.18 pre-committed (single-trajectory observable
+class).** The §13.17 narrowing explicitly left open the single-
+trajectory observable class — observables computed across token
+positions WITHIN one greedy trajectory rather than across multiple
+sampled trajectories. §13.18 pre-commits a single-trajectory
+forced-allocation-gap probe that measures the moment Softmax
+forces an allocation despite low absolute logit magnitude (the
+mechanical seam where hallucination enters per ChatGPT framing
+referenced in §13.17). Pinned bands `FORCED_ALLOC_2DIFF_*` use
+the same numerical partition as §13.11–§13.16 since the §13.10
+baseline is unchanged. Implementation
+(`scripts/probe_forced_alloc_2diff.py`) is a separate
+authorization gate. See §13.18 for the full pinned specification.
+This is a different hypothesis class than §13.10–§13.16's K-
+sample-divergence-based probes and does NOT violate the §13.17
+program closure (which was scoped specifically to K-sample-
+divergence-based observables).
 
 ### 13.2 Experiment specification
 
@@ -6060,14 +6074,15 @@ rule. **No further single-axis probes are authorized in §13.**
 a fresh §0.8-style commitment in a new top-level section if
 pursued; none are pre-committed by §13.17):
 
-- **Single-trajectory forced-allocation-gap observable.** The
-  signal class §13.17's narrowing leaves explicitly open — does
-  not depend on K-sample-divergence dynamics that produced the
-  smooth-monotonic series §13.14 and §13.16 both ran into. NOT
-  pre-committed by this entry; the math below documents what a
-  fresh §0.8 commitment in a future top-level section (§14, §15,
-  or new chapter) would specify if pursued. Numerical AUC bands
-  and acceptance rules are deferred to that commitment.
+- **Single-trajectory forced-allocation-gap observable
+  (PROMOTED to pre-commitment as §13.18).** The signal class
+  §13.17's narrowing leaves explicitly open — does not depend on
+  K-sample-divergence dynamics that produced the smooth-monotonic
+  series §13.14 and §13.16 both ran into. **§13.18 is now the
+  authoritative source for this construction**; the math below is
+  retained as background documentation for the rationale, but the
+  pinned specification, AUC bands, and acceptance rules are in
+  §13.18.
 
   **Mechanism rationale (re-stating ChatGPT's framing of where
   hallucination enters in autoregressive LLMs):**
@@ -8071,6 +8086,329 @@ model-scale upgrade) under a fresh §0.8 pre-commitment.
   `557f0f6` EOS-reuse diagnostics).
 - `docs/experiments/probe_eigenscore_2diff_truthfulqa_mc.md` and `.json`.
 - `docs/experiments/probe_eigenscore_2diff_halueval_qa.md` and `.json`.
+
+### 13.18 Pre-commitment — Single-trajectory forced-allocation-gap probe
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before implementation. Specification, success
+bands, and pinned parameters below cannot be redefined post-hoc.
+
+**Relationship to §13.17's closure.** §13.17 closed the §13 K-
+sample-divergence-based single-axis program (cross-family,
+EigenScore single-snapshot, BCVF text-level 2nd-difference, BCVF
+hidden-state 2nd-difference). The narrowing in §13.17 was:
+
+> *BCVF's 2nd-difference operator does not produce a fault-onset-
+> shaped signal at any K-sample-divergence-based observable tested
+> in this codebase. The structural failure mode is a property of
+> K-sample-divergence dynamics, not of any specific projection.
+> Signal classes that do not depend on K-sample divergence are
+> not foreclosed.*
+
+§13.18 tests **the un-rejected signal class** identified in that
+narrowing: a single-trajectory observable computed across token
+positions WITHIN one greedy generation, rather than across
+multiple sampled generations. Same chapter (§13) for continuity;
+distinct hypothesis class from §13.10–§13.16 (single-trajectory
+logit geometry, not K-sample-divergence). Does NOT violate the
+§13.17 closure because that closure was specifically scoped to
+K-sample-divergence-based observables.
+
+**Hypothesis (the mechanism §13 didn't measure).** Hallucinations
+in autoregressive LLMs enter through a specific mechanical seam:
+
+1. **Softmax flattens absolute logit magnitude.** The function
+   $p_t = \text{softmax}(\mathbf{z}_t)$ maps any logit vector to
+   a probability distribution summing to 1.0. Two scenarios with
+   raw logits $[10, 1, 0.5]$ (model knows the answer) and
+   $[-100, -100.1, -100.2]$ (model has no idea) produce wildly
+   different epistemic states but Softmax flattens both into
+   probability vectors that sum to 1.0. Absolute magnitude
+   information is lost in the normalization step.
+2. **Cross-entropy training forbids expressing absolute ignorance.**
+   The model is optimized on next-token prediction over static
+   text, where humans rarely interrupt to write "[I don't know]".
+   The objective penalizes refusing to continue. The model is
+   conditioned to always emit a continuation, even when its
+   underlying activations support nothing strongly.
+3. **Autoregression locks the forced guess into context.** Every
+   token output becomes part of the input for the next step. Once
+   Softmax forces an allocation at position $t$ despite low
+   absolute logit magnitude, that forced guess becomes the
+   conditioning context for position $t+1$, propagating the false
+   premise.
+
+**The hallucination signature is therefore the moment Softmax
+forces an allocation despite low absolute logit magnitude** — a
+property of *single-trajectory logit geometry*, not K-sample
+geometry. This is the signal §13.10–§13.16 systematically did not
+measure. Every probe in §13 looked at *between-sample* variance
+(decoding stochasticity introduced by temperature), which is
+downstream of the very mechanism that creates hallucination.
+
+§13.18 therefore measures the forced-allocation gap directly. For
+each token position in a single greedy generation, it computes:
+
+- The **post-softmax entropy** $H_t$ — how spread the distribution
+  is after the normalization step.
+- The **pre-softmax confidence magnitude** $M_t$ — whether anything
+  in the vocab strongly stands out from the bulk before softmax.
+
+A high $H_t$ with a low $M_t$ is the "Scenario B" forced allocation
+— the model is committing without evidence. Low $H_t$ or high
+$M_t$ indicates a commitment its logits actually support.
+
+The BCVF 2nd-difference operator is then applied across positions
+WITHIN the trajectory. Sparse, sudden moments of widening forced-
+allocation gap are the analogue of `S3_map_error_accel` peaks in
+the autonomy domain — moments when the agent's internal map
+(logit distribution) suddenly fails to track the territory (its
+actual knowledge support).
+
+**Why this might satisfy the smooth-with-rare-spikes structural
+requirement that §13.14 and §13.16 violated.** The hypothesis is
+mechanism-based, not data-based: a token where the model knows the
+answer should produce high $M_t$ and low $H_t$ → low forced-
+allocation gap. A token where the model is forced to guess (e.g.,
+a specific date it doesn't know) should produce low $M_t$ and high
+$H_t$ → high forced-allocation gap. Forced moments should be
+sparse and local in well-formed generations — exactly the shape
+the 2nd-difference operator exploits. Whether empirical
+trajectories on Qwen2.5-7B-Instruct + TruthfulQA-MC / HaluEval-QA
+actually have this shape is unknown and is the central question
+of §13.18.
+
+If the hypothesis holds, this is the first §13 single-axis probe
+positioned to satisfy all five structural requirements §13.14 /
+§13.16 violated: continuous real-valued signal, direct provenance
+from model internals (raw logits), plausibly smooth-with-rare-
+spikes shape, independent of K-sample divergence, captures the
+autoregressive-hallucination mechanism. If it doesn't hold,
+§13.18 produces a 5-of-5 single-axis null and tightens the §13.17
+narrowing to also exclude single-trajectory forced-allocation-gap
+observables on this codebase.
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_forced_alloc_2diff.py` (new; does NOT
+  modify any §13.10–§13.16 script — those results are pinned).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same single-
+  model configuration as §13.10 / §13.12 / §13.14 / §13.16 for
+  direct AUC comparability against the §13.10 baseline of 0.661.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100; HaluEval-
+  QA `data` split, N=100. Same selections as §13.10–§13.16.
+- **Generation:** **single greedy completion per question**
+  (T=0, deterministic, K=1 effectively). Captures per-token logits
+  via `model.generate(..., output_scores=True,
+  return_dict_in_generate=True)`. NOT K-sample stochastic — the
+  hypothesis is single-trajectory by design; sampling would
+  reintroduce the K-sample-divergence dynamics §13.17 ruled out as
+  the failure mode.
+- **max_new_tokens:** 128 (parity with §13.14 / §13.16; needed for
+  trajectory length to evolve a 2nd-difference signal).
+- **Prompt format:** shared `Q: ... A:` completion, identical to
+  §13.10–§13.16. No chat templates.
+- **Position grid:** **stride 1, every token** in the generated
+  trajectory (no sub-sampling; single-trajectory observables don't
+  have the per-position computational cost K-sample probes did).
+  - `position_min = 4` — skip first 4 generated tokens. Lower than
+    §13.14 / §13.16's 8 because there is no NLI-on-truncations
+    noise concern at single-trajectory logit level; the floor exists
+    only to avoid leading-token prompt-conditioning artifacts.
+  - `position_max = T_actual` — the actual non-pad length of the
+    greedy generation, capped at `max_new_tokens=128`.
+  Both configurable; non-default flagged as §13.18 deviation.
+
+**Pinned mathematical object (the forced-allocation-gap series and
+its 2nd-difference scalar).** For each question $q$ with greedy
+trajectory of length $T$ generated tokens, at each token position
+$t \in [\text{position\_min}, T]$:
+
+1. Capture raw logits $\mathbf{z}_t \in \mathbb{R}^{|V|}$ before
+   softmax (vocab size $|V| = 151{,}936$ for Qwen2.5-7B).
+2. Compute the **confidence magnitude**:
+   $$M_t = \max_j z_t[j] - \frac{1}{|V|}\sum_j z_t[j]$$
+   (max logit centered by mean — indicates whether any token
+   strongly stands out from the bulk).
+3. Compute the **post-softmax entropy**:
+   $$H_t = -\sum_j p_t[j] \log p_t[j]
+   \quad \text{where} \quad
+   p_t = \text{softmax}(\mathbf{z}_t).$$
+4. Z-normalize both quantities across the trajectory:
+   $$\tilde{M}_t = \frac{M_t - \bar{M}}{\sigma_M}, \qquad
+   \tilde{H}_t = \frac{H_t - \bar{H}}{\sigma_H}$$
+   (means and standard deviations computed over the position-grid
+   range $[\text{position\_min}, T]$ for that question's
+   trajectory).
+5. **Forced-allocation gap:**
+   $$g_t = \tilde{H}_t - \alpha \cdot \tilde{M}_t,
+   \qquad \alpha = 1.0 \text{ (pinned).}$$
+   Equal weighting of normalized entropy and normalized confidence
+   magnitude. The $\alpha$ value is pinned at 1.0 for the §13.18
+   classification; configurable via `--alpha` for follow-up
+   sweeps with non-default flagged as §13.18 deviation.
+   - High $g_t$: high $\tilde{H}_t$ AND low $\tilde{M}_t$ — forced
+     allocation moment.
+   - Low $g_t$: low $\tilde{H}_t$ OR high $\tilde{M}_t$ — supported
+     commitment.
+6. Centered second difference at each interior $t$:
+   $$\text{accel}_t = g_{t+1} - 2 g_t + g_{t-1}.$$
+7. **Primary scalar (pinned for AUC + bands):**
+   $$\boxed{\text{forced\_alloc\_2diff}(q) = \max_t |\text{accel}_t|}$$
+   Mirrors `S3_map_error_accel` peak in the autonomy domain.
+8. **Pinned diagnostic secondary scalars** (reported but NOT used
+   for band classification — pinning prevents post-hoc swap, same
+   §0.8 pattern as §13.14 / §13.16):
+   - $\text{mean}_t |\text{accel}_t|$ (averaged absolute
+     acceleration on the gap series).
+   - $\sum_t \text{accel}_t^2$ (energy-style aggregation on the
+     gap series).
+   - **Variant-A entropy-only diagnostic:** $\max_t |a^H_t|$ where
+     $a^H_t = H_{t+1} - 2 H_t + H_{t-1}$ — the 2nd difference of
+     raw post-softmax entropy without the confidence-magnitude
+     term. Tests whether $M_t$ contributes any signal beyond
+     entropy alone. If primary saturates but Variant A's AUC
+     differs materially, the $M_t$ component is either helping
+     or hurting; if both are similar, $M_t$ is irrelevant on
+     this codebase.
+   - Position $t^*$ of the peak.
+9. AUC computed on $-\text{forced\_alloc\_2diff}$, pre-committed
+   direction *higher forced-allocation acceleration → moment the
+   model's distribution committed to a low-magnitude forced guess
+   → more likely the answer is wrong*. Same sign convention as
+   §13.14 / §13.16 (negate the scalar so "higher = more truth-
+   predictive").
+10. **Correctness label:** Qwen greedy generation passes question-
+    conditioned NLI (`MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli`)
+    against the correct choice AND fails NLI against every
+    distractor. Identical labeling to §13.10–§13.16. Direct AUC
+    comparability.
+
+**Pre-committed success bands** (`FORCED_ALLOC_2DIFF_*`, same
+numerical partition as §13.11–§13.16 because the §13.10 baseline
+of 0.661 is unchanged across all six probes; relabeled
+`FORCED_ALLOC_2DIFF_*` so the per-revision lineage stays legible):
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`FORCED_ALLOC_2DIFF_STRONG`**.
+  Gates the §13.9 VC-brief revision AND constitutes the first
+  load-bearing positive evidence for BCVF-for-LLMs at any single-
+  axis construction in this codebase. Authorizes a §13.19 result
+  writeup positioning §13.18 as the first probe to satisfy all
+  five structural requirements §13.14 / §13.16 violated.
+- `0.70 ≤ AUC < 0.75` on **both** → **`FORCED_ALLOC_2DIFF_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Diagnostic
+  follow-ups: $\alpha$ sweep (`--alpha`), Variant C logit-lens
+  curvature, longer trajectories (`--max-new-tokens 256`).
+- `0.681 ≤ AUC < 0.70` on **both** → **`FORCED_ALLOC_2DIFF_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10 + 0.02. Document; do NOT
+  authorize further single-axis probe progression.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`FORCED_ALLOC_2DIFF_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661 baseline. Combined with §13.11 /
+  §13.12 / §13.14 / §13.16 anti-findings, would establish that
+  the entire literature-aligned single-axis class — across both
+  K-sample-divergence and single-trajectory observables — saturates
+  at the §13.10 ceiling on Qwen-7B + base-NLI at N=100. **5-of-5
+  single-axis null.** Conclusive evidence single-axis methods
+  saturate; further lift requires either system-level integration
+  (§14 outlined in §13.8) or model-scale upgrade.
+- `AUC < 0.641` on **any** benchmark → **`FORCED_ALLOC_2DIFF_ANTI_FINDING`**.
+  The forced-allocation-gap signal underperforms the §13.10 baseline.
+  5-of-5 anti across literature-backed paths. Pause LLM track at
+  the single-axis level. The autonomy-domain BCVF claim stands
+  independently on §6.1 evidence.
+
+The "on both benchmarks" combinatorial rule is identical to §13.11–
+§13.16 and is pinned here to prevent post-hoc benchmark cherry-
+picking on a heterogeneous TruthfulQA / HaluEval split.
+
+**Acceptance / rejection rules (explicit, non-vague):**
+
+- **PASS:** AUC ≥ 0.75 on both benchmarks (FORCED_ALLOC_2DIFF_STRONG).
+- **CONDITIONAL PASS for internal research:** AUC ∈ [0.681, 0.75)
+  on both benchmarks (INTERNAL_STRONG or MARGINAL_LIFT). Documented
+  but does not unlock §13.9 VC-brief.
+- **NULL (consistent with §13.10 ceiling):** AUC ∈ [0.641, 0.681]
+  on both (SATURATION). Documented as final evidence single-axis
+  methods saturate.
+- **REGRESSION:** AUC < 0.641 on any benchmark (ANTI_FINDING).
+  Documented as the strongest negative finding in the §13 program.
+
+**Disclosed simplifications and risks specific to §13.18** (no
+literature anchor for the construction; the AUC forecast is
+correspondingly uncertain):
+
+- **Greedy-only single trajectory (K=1).** No sampling diversity.
+  If the greedy trajectory happens to be unrepresentative for some
+  questions (e.g., greedy gets stuck on a confident wrong answer
+  with low entropy throughout), the forced-allocation gap may be
+  uniformly small and the 2nd-difference signal weak. Sampling
+  variants (small K, looking at $g_t$ averaged across K
+  trajectories) are not pre-committed but are a defensible §13.x
+  follow-up if §13.18 lands at SATURATION.
+- **Fixed $\alpha = 1.0$.** Equal z-normalized weighting of $H_t$
+  and $M_t$. Defensible default but not empirically tuned.
+  Configurable via `--alpha`; non-default flagged as deviation.
+- **Z-normalization is per-question, not global.** Each
+  trajectory's $\tilde{M}_t$ and $\tilde{H}_t$ are computed
+  relative to that trajectory's own mean/std. This makes $g_t$
+  scale-invariant per question but couples the within-question
+  values. Alternative (global normalization across all questions)
+  is not pre-committed.
+- **Single fixed model (Qwen2.5-7B-Instruct).** Same scaling
+  caveat as §13.10–§13.16.
+- **Same correctness label as §13.10–§13.16** (NLI on Qwen
+  greedy). Holds the labeling pipeline fixed across all six
+  probes for direct AUC comparability.
+- **Stride 1 grid covers every token, but the position floor
+  (`position_min=4`) excludes the very first generated tokens.**
+  If forced allocations happen reliably at exactly token 1 or 2
+  (e.g., the model commits to a wrong answer immediately), the
+  signal at those positions is excluded. Configurable via
+  `--position-min`; non-default flagged as deviation.
+- **No literature anchor for the AUC forecast.** Variant A's 1st-
+  derivative version (per-token entropy) has Kadavath 2022
+  AUROC ~0.55–0.62 reported on short-form QA. The 2nd-difference
+  variant is novel; the forced-allocation-gap construction is
+  novel. Best estimate: AUC band **0.55–0.75**, very wide because
+  the prior is genuinely uncertain. A clean clear of 0.75 on
+  both benchmarks would be a novel positive result; a clear miss
+  below 0.65 would be the first direct disconfirmation of the
+  forced-allocation-gap mechanism on this codebase.
+
+**Expected cost.** Single Qwen-7B greedy generation per question
+(no K-sample sampling, no per-position NLI clustering, no per-
+position EigenScore extraction). Per-token logits are already
+computed during generation; capturing them adds ~30% memory
+overhead but no significant wall-clock cost. Per-position scalar
+arithmetic ($H_t$, $M_t$, $g_t$, $\text{accel}_t$) is negligible
+relative to generation. **Estimated runtime: ~2–4 min at N=100 on
+a single 24+ GB GPU**, the cheapest §13 probe to date.
+
+**Report destination.**
+- `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.md`
+- `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.json`
+  (per-question dump including the full per-position $H_t$, $M_t$,
+  $g_t$ series, the accelerations, and all scalars — required for
+  post-hoc audit if the primary saturates).
+- `docs/experiments/probe_forced_alloc_2diff_halueval_qa.md`
+- `docs/experiments/probe_forced_alloc_2diff_halueval_qa.json`
+
+**Scope.** §13.18 is a new bounded experiment under the same §0.8
+discipline as §13.12 / §13.13 / §13.14 / §13.16. It tests the
+single-trajectory observable §13.17's narrowing leaves explicitly
+open, NOT a continuation of any K-sample-divergence-based probe.
+The pre-committed bands above are the binding success criteria;
+any deviation at run time must be flagged as a §0.8 deviation in
+the result section, not absorbed silently.
+
+**What §13.18 does not pre-commit.** This section is the §0.8-
+style pre-commitment record only. Implementation of
+`scripts/probe_forced_alloc_2diff.py` is a separate authorization
+gate. No VC-brief / §13.9 changes here — those remain gated on
+`FORCED_ALLOC_2DIFF_STRONG` (or any §13 probe's STRONG band) on
+both benchmarks. Nothing in §13.18 retroactively modifies §13.10–
+§13.17 results, the §13 program closure for K-sample-divergence
+observables, or the autonomy-domain §6.1 result.
 
 ---
 
