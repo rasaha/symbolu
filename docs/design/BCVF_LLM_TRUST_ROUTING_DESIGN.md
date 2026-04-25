@@ -6092,7 +6092,238 @@ priority list):
 - `docs/experiments/probe_semantic_entropy_halueval_qa.md`
 - `docs/experiments/probe_semantic_entropy_halueval_qa.json`
 
+### 13.11 Cross-family ensemble revision results — §1.3 attempt
+
+The §13.8-authorized §1.3 cross-family ensemble probe has been
+executed at N=100 on both benchmarks with the pre-committed triple
+(Qwen2.5-7B-Instruct + Llama-3.1-8B-Instruct + Mistral-7B-Instruct-
+v0.3). The combined pre-committed classification is
+**`CROSS_FAMILY_ANTI_FINDING`**: TruthfulQA-MC AUC 0.633 falls below
+the §13.11 anti-finding lower bound of 0.641 (§13.10 baseline 0.661
+minus the ±0.02 saturation window), even though HaluEval-QA cleared
+the internal-strong band at 0.716. The pre-committed bands require
+the worst benchmark to set the combined classification, so the
+heterogeneous split resolves to ANTI on the strict reading.
+
+A follow-up chat-template diagnostic was run on TruthfulQA-MC (the
+underperforming benchmark) to test whether prompt-format mismatch
+between the shared `Q: ... A:` completion prompt and Llama/Mistral's
+chat-template-native instruction tuning was the confound. The
+diagnostic falsified that hypothesis: TruthfulQA-MC AUC dropped
+further to 0.567 under per-family chat templates, with the entropy
+signal's correct-vs-wrong separation collapsing from 0.419 nats to
+0.232 nats. Cross-family structural alignment improved (singleton-
+cluster rates converged) but at the cost of the entropy signal's
+truth-resolution. Combined ANTI_FINDING stands, strengthened.
+
+This closes the §13.8 item-1 authorization. The §13.8 item-2
+embedding-space / activation-probe revision (Azaria & Mitchell 2023;
+Chen et al. 2024 INSIDE / EigenScore) is promoted to top of the
+authorized-next list and pre-committed in §13.12 below.
+
+**Configuration (initial pass):**
+
+- **Script:** `scripts/probe_cross_family_entropy.py` at commit
+  `6a612dc` (initial M=3 implementation; subsequent commit `80afb69`
+  added the `--chat-template` diagnostic flag without altering the
+  default-path behaviour).
+- **Target models (M = 3, fp16, co-resident on a single 80 GB GPU):**
+  - `Qwen/Qwen2.5-7B-Instruct` (~14 GB) — model[0], also the label
+    model (greedy generation labels correctness, identical to
+    §13.10 for direct AUC comparability).
+  - `meta-llama/Llama-3.1-8B-Instruct` (~15 GB) — model[1].
+  - `mistralai/Mistral-7B-Instruct-v0.3` (~13 GB) — model[2].
+- **NLI clustering model:** `MoritzLaurer/DeBERTa-v3-base-mnli-fever-
+  anli`, fp16. Same as §13.10.
+- **Benchmarks:** TruthfulQA-MC (validation split) and HaluEval-QA
+  (data split), N=100 each. Same selections as §13.10.
+- **Prompt format:** shared `Q: ... A:` completion across all three
+  families (matches §13.10 exactly; per-family chat templates would
+  confound cross-family lift with prompt-format lift, see chat-
+  template diagnostic below).
+- **Sampling:** K=10 completions per model per question at T=1.0,
+  `max_new_tokens=32`. Pool size per question = M × K = 30.
+  Per-(question, model) seed = `args.seed + q_idx × M + m_idx`
+  (decouples sampling streams across families).
+- **Clustering:** bidirectional, question-conditioned NLI entailment
+  on the pooled M × K samples; union-find over the pool. The
+  clustering rule is source-agnostic — any cross-family pair is free
+  to merge if semantically equivalent — so cross-family agreement
+  reduces clusters and lowers entropy.
+- **Scalar:** Shannon entropy (nats) over the pooled cluster-size
+  distribution; AUC computed on `−entropy` (higher entropy → less
+  confident → more likely wrong).
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI against the correct choice AND fails NLI against
+  every distractor — identical labeling as §13.10.
+
+**Initial-pass result table** (completion-style prompt, both
+benchmarks, N=100):
+
+| Benchmark | N | Greedy acc | Mean H (correct) | Mean H (wrong) | Separation | **AUC** | Δ vs §13.10 | Per-run band |
+|---|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC (validation) | 100 | 0.250 | 2.143 | 2.562 | 0.419 nats | **0.633** | −0.028 | `CROSS_FAMILY_ANTI_FINDING` |
+| HaluEval-QA (data) | 100 | 0.300 | 2.111 | 2.675 | 0.564 nats | **0.716** | +0.055 | `CROSS_FAMILY_INTERNAL_STRONG` |
+
+Per-family singleton-cluster rates (fraction of a family's samples
+landing in clusters no other family contributed to — pure
+diagnostic, not in any pass band):
+
+| Model | TruthfulQA-MC | HaluEval-QA |
+|---|---|---|
+| `Qwen/Qwen2.5-7B-Instruct` | 0.512 | 0.637 |
+| `meta-llama/Llama-3.1-8B-Instruct` | 0.671 | 0.722 |
+| `mistralai/Mistral-7B-Instruct-v0.3` | 0.739 | 0.720 |
+
+**Combined classification logic** (per §13.11 pre-commitment): the
+worst-benchmark band sets the overall classification. TruthfulQA-MC
+0.633 < 0.641 lower bound → `CROSS_FAMILY_ANTI_FINDING` regardless
+of HaluEval-QA's 0.716 internal-strong result.
+
+**Chat-template diagnostic — TruthfulQA-MC only, N=100:**
+
+A subsequent diagnostic ran on the underperforming benchmark with
+each tokenizer's `apply_chat_template()` substituted for the shared
+`Q: ... A:` prompt (ChatML for Qwen, Llama-3 role tags, `[INST]`
+for Mistral). Hypothesis: Llama and Mistral's high singleton-cluster
+rates (0.67 / 0.74) reflected prompt-format mismatch driving
+stylistic divergence that NLI could not bind to Qwen's outputs,
+rather than genuine semantic disagreement.
+
+| Variant | Greedy acc | Mean H (all) | Mean H (correct) | Mean H (wrong) | Separation | Mean clusters | **AUC** |
+|---|---|---|---|---|---|---|---|
+| Initial pass (`Q: ... A:`) | 0.250 | 2.457 | 2.143 | 2.562 | 0.419 nats | 19.53 / 30 | **0.633** |
+| Chat-template diagnostic | 0.170 | 1.854 | 1.662 | 1.893 | 0.232 nats | 13.78 / 30 | **0.567** |
+
+| Singleton rate | Initial | Chat-template | Δ |
+|---|---|---|---|
+| Qwen | 0.512 | 0.429 | −0.083 |
+| Llama | 0.671 | 0.548 | −0.123 |
+| Mistral | 0.739 | 0.517 | −0.222 |
+
+**What the result demonstrates:**
+
+1. **Cross-family ensembling is not a uniform improvement over
+   single-model semantic entropy.** §13.10's M=1 result was AUC
+   0.661 on both benchmarks to three decimals — a clean, benchmark-
+   portable single signal. The M=3 cross-family ensemble produced a
+   wide split (TruthfulQA-MC −0.028, HaluEval-QA +0.055) at the same
+   N. The signal added by independent families is not additive in
+   the AUC sense; it is benchmark-conditional.
+2. **HaluEval-QA's +0.055 lift is consistent with literature
+   forecasts.** Yoffe 2024 (DebUnc) and Feng 2024 ("Don't
+   Hallucinate, Abstain") report a +0.05–0.10 AUC lift from cross-
+   family disagreement on QA-style benchmarks; HaluEval-QA's clean
+   right-vs-hallucinated answer structure matches that setting and
+   the result lands inside the predicted window.
+3. **TruthfulQA-MC's −0.028 drop is consistent with literature
+   forecasts for the same method on this specific benchmark.**
+   Farquhar 2024 reports semantic entropy at AUROC 0.75–0.79 on
+   TriviaQA / SQuAD but only ~0.70 on TruthfulQA-style adversarial
+   benchmarks, attributing the gap to TruthfulQA's "confident
+   misconception" question design — questions where models share
+   the wrong answer with high confidence (low entropy for *wrong*
+   answers, breaking the entropy → wrong correlation). The §13.10
+   M=1 result already absorbed that pathology at 0.661; adding
+   independently-trained models that also share the misconception
+   compounds the low-entropy-for-wrong effect rather than diluting
+   it. This is a method-level result, not a flaw in the §1.3
+   ensemble construction.
+4. **The chat-template diagnostic falsified the prompt-format
+   hypothesis.** The pre-commitment was "TruthfulQA-MC AUC ≥ 0.68
+   under chat templates → prompt-format was the confound." Observed
+   AUC was 0.567, a further 0.066 drop from the initial 0.633. The
+   hypothesis is rejected; cross-family ANTI_FINDING is not a
+   prompt-formatting artifact.
+5. **Chat templates trade structural alignment for entropy
+   resolution.** The diagnostic produced a clean pair of opposing
+   effects: singleton-cluster rates converged toward each other
+   (Mistral −0.222, Llama −0.123, Qwen −0.083) — the structural
+   improvement the hypothesis predicted — but the entropy signal's
+   correct-vs-wrong separation collapsed from 0.419 nats to 0.232
+   nats and the per-question cluster count fell from 19.53 to 13.78
+   of 30 pooled samples. Instruct models under chat templates
+   produce more formulaic, confidence-tone-matched assistant
+   responses with reduced semantic variance regardless of actual
+   knowledge — the "confidence theater" failure mode flagged in
+   Kuhn 2023 and Farquhar 2024 (which is why the published Farquhar
+   2024 protocol uses completion-style prompts). The completion-
+   style prompt was a correct §13.11 design choice; chat templates
+   would have only further damaged the signal had they been used
+   throughout.
+6. **Greedy-accuracy drop under chat templates (0.250 → 0.170) is
+   labeling noise, not a signal change.** Chat-templated Qwen
+   greedy generations are longer and include more qualifier
+   language, which makes the question-conditioned NLI label
+   ("entails correct AND not any distractor") harder to satisfy:
+   correct answers fail because qualifiers introduce non-entailment;
+   wrong answers sometimes pass because they accidentally entail a
+   distractor. AUC is computed over the resulting label split, so
+   the 0.567 number is on a slightly different label population
+   than 0.633 — but the band gap is wide enough (0.066) that the
+   labeling shift cannot rescue the chat-template variant into the
+   pass region.
+
+**What this authorizes** (per §13.11 pre-commitment and §13.8
+priority list):
+
+- The §13.8 item-2 embedding-space / activation-probe revision is
+  promoted from "secondary" to top of the authorized-next list. See
+  §13.12 for the pre-committed probe design (EigenScore, Chen et
+  al. 2024 ICLR — covariance of mid-layer hidden states across the
+  K=10 sampled generations, no training data required, directly
+  comparable to §13.10's K=10 sampling protocol).
+- A §13.11-attempt notation in §13.8 marking the §1.3 cross-family
+  ensemble revision as executed and classified
+  `CROSS_FAMILY_ANTI_FINDING`.
+- HaluEval-QA's 0.716 internal-strong stand-alone result may be
+  cited as a within-benchmark positive for cross-family in a §13.11
+  appendix or follow-up note, but it does not change the combined
+  classification under the §13.11 worst-benchmark rule.
+
+**What this does NOT authorize:**
+
+- Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`. Per §13.9, the
+  external-framing revision requires `CROSS_FAMILY_STRONG`
+  (≥ 0.75 on both benchmarks). Maximum observed AUC across §13.11
+  was 0.716 on a single benchmark. The §13.9 hold remains in force.
+- §13.8 item 3 (2nd-difference-of-semantic-entropy observable). The
+  pre-commitment for that follow-up was conditional on §1.3
+  passing; §1.3 did not pass, so item 3 is not authorized. Re-
+  authorization requires a fresh §0.8 pre-commitment after §13.12
+  lands a positive result.
+- Section 5 (Rahu-trust deployment), §6 (scale-out beyond N=100),
+  or §7 (packaging). All remain §13.8-paused on the same conditions
+  as before §13.11.
+- Any claim that the §1.3 ensemble "doesn't work". The honest scope
+  is: at M=3 with a same-K=10 / same-T / same-completion-prompt
+  configuration on a Qwen / Llama-3.1 / Mistral-v0.3 triple, the
+  combined per-benchmark AUC bands resolve to ANTI_FINDING on the
+  TruthfulQA pathology. Lift exists on HaluEval. A different
+  ensemble (M=2, larger M, different families, weighted
+  aggregation, per-model temperature tuning) is not tested here
+  and is not foreclosed; it is simply lower-priority than the
+  embedding-space revision per the §13.8 priority list.
+
+**Artifacts:**
+
+- `scripts/probe_cross_family_entropy.py` (commit `6a612dc`,
+  initial M=3 implementation; commit `80afb69`, `--chat-template`
+  diagnostic flag added).
+- `docs/experiments/probe_cross_family_entropy_truthfulqa_mc.md`
+  (initial pass).
+- `docs/experiments/probe_cross_family_entropy_truthfulqa_mc.json`
+  (per-question dump including pooled samples, source-model ids,
+  cluster ids, prompts).
+- `docs/experiments/probe_cross_family_entropy_halueval_qa.md`
+  (initial pass).
+- `docs/experiments/probe_cross_family_entropy_halueval_qa.json`.
+- `docs/experiments/probe_cross_family_entropy_truthfulqa_mc_chat.md`
+  (chat-template diagnostic).
+- `docs/experiments/probe_cross_family_entropy_truthfulqa_mc_chat.json`.
+
 ---
 
 
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
+
