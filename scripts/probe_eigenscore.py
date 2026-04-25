@@ -342,24 +342,37 @@ def generate_samples_with_hidden_states(
         else:
             last_indices.append(int(non_pad_pos[-1].item()))
 
-    # hidden_states: tuple length T_new+1; entry 0 is the prompt's
-    # forward, entries 1..T_new are per-new-token steps.
-    # For sample k with last_indices[k] = t (in [0, T_new-1]):
-    #   - The new token AT generated position t was produced at step
-    #     t+1 (because step 0 is the prompt forward).
-    #   - Its hidden state at layer L is
-    #     out.hidden_states[t + 1][L][k, 0, :].
-    # For last_indices[k] = -1 (zero non-pad generated):
-    #   - Use out.hidden_states[0][L][k, prompt_len - 1, :] (prompt's
-    #     last token).
+    # hidden_states: tuple of length T_new (one entry per generated
+    # token). Entry t is the forward pass that produced the token at
+    # generated position t:
+    #   - Entry 0 has shape (k, prompt_len, H) — the prompt's full
+    #     forward; its LAST sequence position is the hidden state used
+    #     to predict the first new token.
+    #   - Entries 1..T_new-1 have shape (k, 1, H) — single-token
+    #     forwards, where position 0 (the only position) is the hidden
+    #     state used to predict the (t+1)-th new token.
+    # So the hidden state that "produced" the token at generated
+    # position t is at hidden_states[t][L][k, -1, :] uniformly:
+    # for t=0 this is the prompt's last token, for t>0 this is the
+    # only position of step t. The earlier `t + 1` indexing was an
+    # off-by-one assumption that hidden_states had a separate prompt
+    # entry at index 0; HF actually folds the prompt forward INTO the
+    # first generation step.
     H_rows: List[np.ndarray] = []
     for k_idx in range(k):
         t = last_indices[k_idx]
         if t == -1:
-            # Fallback: prompt's last token at chosen layer.
-            h = out.hidden_states[0][layer_idx][k_idx, prompt_len - 1, :]
+            # Sample emitted zero non-pad tokens (immediate EOS).
+            # Fall back to the prompt's last-token representation,
+            # which is the same hidden state that predicted the EOS.
+            h = out.hidden_states[0][layer_idx][k_idx, -1, :]
         else:
-            h = out.hidden_states[t + 1][layer_idx][k_idx, 0, :]
+            # Last non-pad token of sample k is at generated position
+            # t; its producing hidden state lives at hidden_states[t]'s
+            # last sequence position (regardless of whether t == 0,
+            # where seq_len == prompt_len, or t > 0, where seq_len
+            # == 1).
+            h = out.hidden_states[t][layer_idx][k_idx, -1, :]
         H_rows.append(h.detach().to(torch.float32).cpu().numpy())
     hidden_X = np.stack(H_rows, axis=0)                     # (k, H), float32
 
