@@ -12282,24 +12282,43 @@ it makes no new claim about whether V1 *succeeds* at answer
 selection (V1's lift over Baseline-B was §14a.2's measurement,
 closed at `SCOUT_SATURATION`).
 
-**Reuse from §15 (primitives copied, NOT imported).** The
-metric primitives in `scripts/probe_selective_abstention.py`
-(threshold sweep, discrete AURC, cov@α with $n_\min$ floor,
-bootstrap CI on a single scalar, JSON+markdown writers) are
-reused by **copying their implementations** into the §15.3
-script — NOT importing them. §15.1's script is closed under
-§15.2's verdict-of-record; importing from it would couple
-§15.3's outputs to any future drift in §15.1's codepath,
-compromising §15.1's reproducibility chain. §15.3 carries
-its own copied primitives.
+**Reuse from §15 (the abstention *machinery pattern*, not the
+whole §15.1 experiment).** §15.3 reuses §15.1's *abstention
+machinery* — the threshold rule, the bootstrap convention,
+the JSON+markdown artifact style, the discrete AURC formulation,
+the cov@α with $n_\min$ floor — by **copying** the relevant
+primitives from `scripts/probe_selective_abstention.py` into
+the §15.3 script. **§15.3 does NOT reuse §15.1's experiment-
+level pins:** §15.1 was two-benchmark with worst-benchmark
+combination, used a 2D $(\delta, \kappa)$ cascade, and
+compared against random-abstain as the central baseline.
+§15.3 is single-benchmark, uses a 1D $\Delta\kappa$ cascade,
+and compares against §15.1's HaluEval $\kappa@\alpha_2 = 0.26$
+as the central baseline. Primitives are copied, not imported,
+because §15.1's script is closed under §15.2's verdict-of-
+record; importing from it would couple §15.3's outputs to any
+future drift in §15.1's codepath, compromising §15.1's
+reproducibility chain.
 
-**New code (the integration layer).**
+**New code — glue layer + hybrid evaluator + single-benchmark
+report writer.**
 
 One new script: `scripts/probe_hybrid_selective_abstention.py`
 (numpy + stdlib only, CPU-only post-processor; structurally
-parallel to `probe_selective_abstention.py`).
+parallel to `probe_selective_abstention.py`). The script
+decomposes into three small components by responsibility:
 
-The new script implements:
+- **Glue layer** — §14a.2 dump loader, schema validator,
+  parity gate, and Stage A handoff extraction (items 1–3
+  below).
+- **Hybrid evaluator** — threshold sweep, operating-point
+  computation, $\kappa_\text{hybrid}$, $\Delta\kappa$,
+  bootstrap CI, the new 1D cascade, and the STRONG-only
+  demotion rule (items 4–10 below).
+- **Single-benchmark report writer** — `--self-test` gate
+  plus JSON+markdown artifact writers (items 11–12 below).
+
+Numbered components:
 
 1. **§14a.2 dump loader** with schema validation against the
    pinned field list (q_idx, per-source semantic entropies,
