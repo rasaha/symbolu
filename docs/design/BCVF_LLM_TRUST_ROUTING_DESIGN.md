@@ -10402,6 +10402,63 @@ threshold's metrics are computed mechanically; the §15
 verdict reads off the pre-committed bands from the resulting
 per-benchmark risk-coverage curves.
 
+**Operational metrics (pinned; metrics 1–3 in this block,
+metrics 4–5 in the next).**
+
+For benchmark $\mathcal{B} \in \{\text{TruthfulQA-MC},
+\text{HaluEval-QA}\}$ at threshold $\tau$, with $N = 100$
+questions, per-question correctness $c(q) \in \{0, 1\}$ (from
+the §13.10 NLI label) and risk score $r(q) = H(q)$:
+
+- **Answered set:** $A_\tau = \{q : r(q) < \tau\}$;
+  $|A_\tau|$ is the number answered.
+- **Coverage primitive:**
+  $\text{cov}(\tau) = |A_\tau| / N \in [0, 1]$.
+- **Greedy total-wrong (constant per benchmark):**
+  $W = N - \sum_q c(q)$. From §13.10 greedy accuracies:
+  $W = 75$ on TruthfulQA-MC (greedy acc 0.250),
+  $W = 70$ on HaluEval-QA (greedy acc 0.300).
+
+**Metric 1 — Residual accuracy** (accuracy on the answered
+subset):
+$$\text{acc}(\tau) = \frac{1}{|A_\tau|} \sum_{q \in A_\tau} c(q) \quad \text{for } |A_\tau| > 0$$
+$\text{NaN}$ when $|A_\tau| = 0$; excluded from accuracy-
+conditioned reductions. Range $[0, 1]$.
+
+**Metric 2 — Coverage at target accuracy** (the headline
+operational lever — "how much can the policy answer while
+maintaining accuracy at least $\alpha$?"):
+$$\text{cov}@\alpha = \max\{\text{cov}(\tau) : \text{acc}(\tau) \ge \alpha \text{ and } |A_\tau| \ge n_{\min}\}$$
+with $n_{\min} = 10$ (pinned floor, 10% of N=100; prevents
+the trivial-high-accuracy-at-tiny-coverage degeneracy).
+$\text{cov}@\alpha := 0$ deterministically if no $\tau$ in the
+sweep grid satisfies both conditions.
+
+Reported at three pinned target accuracies per benchmark:
+
+| Target | TruthfulQA-MC | HaluEval-QA | Operational meaning |
+|---|---|---|---|
+| $\alpha_1$ = baseline + 10pp | 0.350 | 0.400 | noticeable lift over no-abstain |
+| $\alpha_2$ = 0.50 | 0.500 | 0.500 | absolute majority correct on answered subset |
+| $\alpha_3$ = 0.75 | 0.750 | 0.750 | deployment-grade accuracy on answered subset |
+
+(Greedy baselines 0.250 / 0.300 per §13.10's result table.)
+
+**Metric 3 — Error capture rate** (fraction of greedy
+mistakes the policy successfully abstained away):
+$$\text{ecr}(\tau) = \frac{1}{W} \sum_{q \notin A_\tau} (1 - c(q)) \quad \text{for } W > 0$$
+Range $[0, 1]$. $\text{ecr} = 1$ means every wrong greedy
+answer was abstained; $\text{ecr} = 0$ means no wrong greedy
+answer was abstained. Undefined when $W = 0$; both pinned
+benchmarks have $W > 0$ so this case does not arise in §15.
+
+Reported at the same three target accuracies as Metric 2,
+evaluated at the threshold $\tau^*$ that achieves
+$\text{cov}@\alpha$. The operational pair
+$(\text{cov}@\alpha, \text{ecr}(\tau^*))$ characterizes the
+policy's value at each target: how much it answers and how
+many wrong answers it caught at that operating point.
+
 ---
 
 
