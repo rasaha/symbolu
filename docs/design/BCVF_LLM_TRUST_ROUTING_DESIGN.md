@@ -10661,6 +10661,58 @@ regardless of $\kappa$ once the cascade fires on rule 1.
 Future revisits should be able to verify the script's
 classification matches this table exactly on these inputs.
 
+**Acceptance / rejection rules (pinned, mapped one-to-one to
+the verdict cascade).**
+
+| Verdict | Authorizes | Forecloses |
+|---|---|---|
+| **STRONG** | Drafting a §15.2 implementation pre-commitment for an abstention/escalation product layer (separate §0.8 commitment). | VC-brief changes; cross-domain claims; auto-deployment without §15.2. |
+| **USEFUL_INTERNAL** | Documenting internal-research operational value of the §13.10 score for selective prediction at this configuration. | §15.2 product investment; VC-brief changes; cross-domain claims. |
+| **MARGINAL** | Recording §15 as an acknowledged but unactionable signal. | §15.2 follow-up; internal-research operational claims; product investment; VC-brief changes. |
+| **SATURATION** | Documenting §15 as operational null; extending LLM transfer-line closure to "answer-selection AND selective-prediction both saturated." | §15.2 follow-up at any observable; product investment; VC-brief changes. |
+| **REGRESSION** | Closing §13.10-as-selective-prediction-risk-score line. The §13.10 AUC=0.661 baseline of record is unaffected (different metric class). | §15.2 follow-up at this observable; product investment; VC-brief changes. |
+
+**Statistical confirmation (pinned).** Per benchmark, paired
+bootstrap over question indices, $B = 1000$ resamples,
+deterministic seed (`numpy.random.SeedSequence(entropy=15)`).
+For each resample, recompute $\delta_b$ on the resampled
+question set and report the 2.5th and 97.5th percentiles as
+the two-sided 95% CI on $\delta_b$. Equivalent computation
+for $\kappa_b$.
+
+The headline confirmation question is whether $\delta_b > 0$
+is supported by the data after sampling variance is
+accounted for. Pinned reporting in the §15 result section:
+each benchmark's
+$\big(\hat\delta_b,\;\text{CI}_{0.025}^{0.975}(\delta_b),\;\hat\kappa_b,\;\text{CI}_{0.025}^{0.975}(\kappa_b)\big)$
+tuple alongside the verdict.
+
+**Pinned demotion rule (statistical safeguard for the
+highest-stakes verdict only).** If the verdict cascade
+returns **STRONG**, the bootstrap CI lower bound on
+$\delta_b$ must be $> 0$ on **both** benchmarks. If either
+benchmark's CI lower bound is $\le 0$, the verdict is
+demoted to **USEFUL_INTERNAL** with explicit
+`STRONG_BUT_CI_DEMOTION` annotation in the result section.
+
+USEFUL_INTERNAL, MARGINAL, SATURATION, and REGRESSION
+verdicts are NOT subject to bootstrap-CI demotion. Their
+operational scope does not require external statistical
+confirmation: USEFUL_INTERNAL and MARGINAL are documentation-
+only with explicit no-investment scope; SATURATION and
+REGRESSION are themselves rejection verdicts. Pinning the
+demotion rule narrowly to STRONG keeps the cascade
+exhaustive and deterministic while preventing a noise-driven
+STRONG point estimate from authorizing §15.2 investment.
+
+**No sign-test analogue.** Per-question paired sign testing
+on the §15 metric class does not yield information beyond the
+bootstrap CI on $\delta_b$ — selective prediction's unit of
+analysis is the (answered, abstained) partition, not a per-
+question paired comparison against an explicit alternative.
+The bootstrap CI on $\delta_b$ is the pinned statistical
+confirmation; no sign-test is computed for the §15 verdict.
+
 ---
 
 
