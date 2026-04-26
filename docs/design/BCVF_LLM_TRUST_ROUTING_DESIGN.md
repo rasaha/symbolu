@@ -10163,6 +10163,115 @@ exploratory evidence rather than weakened.
 
 ---
 
+## §15 Selective prediction / abstention from existing §13 signals (new chapter)
+
+§13.19 closed the §13 single-axis program exhaustively across
+five hypothesis classes. §14b and §14c closed the §14 system-
+level scout program at `SCOUT_SATURATION` under both the
+string-matched and NLI-clustered selector configurations.
+**Both chapters asked the same question in different
+experimental shapes: can BCVF-derived signals improve answer
+selection?** The answer at this codebase's configuration was
+no, eight different ways.
+
+§15 asks a deliberately narrower, operational question:
+
+> *§13 and §14 asked whether BCVF-derived signals could
+> improve answer selection. §15 asks a narrower, operational
+> question: whether the strongest surviving signal can support
+> useful abstention behavior even when it is not strong enough
+> to drive answer replacement.*
+
+The strongest surviving signal of record is §13.10 single-
+snapshot semantic entropy: AUC 0.661 on both TruthfulQA-MC
+and HaluEval-QA at N=100. §13's combined-classification rule
+treated this as `TRUTH_CORRELATED_MARGINAL` — above the §13
+0.60 marginal bar but below the §13.9 0.75 STRONG bar that
+gates external framing. §15 takes the same scalar and asks a
+different question of it: thresholded into an answer/abstain
+policy, does it move risk-coverage metrics relative to never-
+abstain and random-abstain baselines on these two benchmarks?
+
+This is a different metric class, a different acceptance
+rule, and a different operational meaning from §13/§14:
+
+| Program | Question | Metric class | Pass bar |
+|---|---|---|---|
+| §13 | does observable X correlate with correctness? | AUC vs ground truth | 0.60 marginal / 0.75 STRONG |
+| §14 | does BCVF-shaped routing lift end-to-end accuracy? | Δ accuracy vs naive aggregation | +5pp + sign-test p<0.05 |
+| **§15** | **does the §13.10 score support a useful abstain/answer policy?** | **AURC, coverage at target accuracy, error capture, false abstention** | **see §15.1 bands** |
+
+§15 is therefore **not** a reinterpretation of §13/§14. The §13
+single-axis verdicts and the §14 system-level scout verdicts
+remain binding under §0.8 and are not retroactively reframed.
+Per §14c's explicit prohibition ("do not reframe the §14
+result as operational lift via abstention"), the §14 program's
+accuracy-lift results are not blended into §15's operational
+claims; §15 opens a fresh top-level chapter with its own
+pinned hypothesis, primary observable, metrics, bands,
+baselines, and acceptance/rejection rules.
+
+**Why operational, not methodological.** §13.9's external-
+framing hold is gated on STRONG-band lift in *answer-selection*
+metrics (AUC ≥ 0.75 on both benchmarks, or §14-class accuracy
+delta ≥ +5pp with sign-test significance). §15 cannot satisfy
+that gate by construction — its metrics are a different class
+entirely. §15 is explicitly *not* a research chapter on whether
+BCVF transfers to LLMs; it is an operational chapter on whether
+a known-marginal answer-correlation signal can be turned into a
+useful abstention policy. A clean §15 STRONG would justify
+internal investment in an abstention/escalation product layer
+on top of §13.10-grade signals; a §15 SATURATION would
+document that the AUC 0.661 ceiling does not even support a
+useful abstention policy at this scale — itself a publishable
+operational null. Either outcome is binding under §0.8.
+
+**Compute scope.** §15 uses *only* already-computed per-question
+scores from the §13.10 runs (TruthfulQA-MC and HaluEval-QA,
+N=100 each, Qwen2.5-7B-Instruct + DeBERTa-v3-base, K=10
+samples per question, semantic entropy via question-conditioned
+NLI clustering, per-question correctness label via question-
+conditioned NLI). **No new generation, no new benchmarks, no
+new large-model runs, no new model downloads are authorized by
+§15.** Risk-thresholding over per-question scalars and per-
+question correctness labels that already exist in the §13.10
+JSON dumps is the entire compute footprint. Wall-clock cost is
+seconds, not minutes.
+
+**§15 explicitly does NOT authorize:**
+
+- New generation runs, new benchmarks, or new model loads.
+- Re-running §13.10 at any other model / NLI / N configuration.
+- Reopening any §13 or §14 hypothesis class.
+- Updating `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`. The §13.9
+  hold is gated on STRONG-band lift in answer-selection
+  metrics on both benchmarks; §15 is a different metric class
+  and cannot satisfy that gate by construction. The §13.9 hold
+  remains in force regardless of §15 outcome.
+- Production deployment claims. §15 is an internal-research
+  scout to determine whether the existing signal carries
+  operational abstention value at all.
+- A §15.2 follow-up scout on any other observable (§13.11
+  cross-family, §13.12 EigenScore, §13.18 Variant A forced-
+  allocation entropy, §14a.2 V1 softmin trust score, etc.)
+  without a fresh §0.8 commitment. §15 pins exactly one
+  primary observable and one secondary comparator; nothing
+  else is in scope.
+
+**Confirmation: no data inspection prior to this pre-
+commitment.** No §13.10 / §13.11 / §13.12 / §13.14 / §13.16 /
+§13.18 / §14a / §14a.2 JSON dump has been opened during the
+drafting of §15. The protocol, primary observable, metrics,
+and bands in §15.1 below are pinned from the §13.10 prose
+(specifically the §13.10 configuration block, result table,
+and disclosed schema of `probe_semantic_entropy_*.json`)
+only. Risk-coverage analysis on the existing dumps is gated
+on this pre-commitment landing first; per §0.8, looking at the
+data before the bands are pinned would be exactly the
+discipline-erosion failure mode §15 exists to avoid.
+
+---
+
 
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
