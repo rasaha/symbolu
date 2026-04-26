@@ -11293,6 +11293,68 @@ analogous discussion at $\delta$. A larger-N re-run would
 likely tighten this band; that re-run is NOT authorized by
 §15.1 and would require a fresh §0.8 commitment.
 
+**Per-benchmark asymmetry under the worst-benchmark rule.**
+
+The combined verdict is MARGINAL because the worst-benchmark
+rule pulls TruthfulQA-MC's MARGINAL-grade $(\delta, \kappa)$
+through. Each benchmark's own per-benchmark verdict, computed
+by feeding only its own $(\delta_b, \kappa_b)$ through the
+§15.1 cascade, is *higher* than the combined verdict:
+
+| benchmark | $\delta_b$ | $\kappa_b$ | per-benchmark verdict (Chunk 4a / 4b cascade applied to that benchmark alone) |
+|---|---|---|---|
+| TruthfulQA-MC | +0.1159 | 0.1400 | **MARGINAL** (rule 4: $\delta \ge +0.02$ AND $\kappa \ge 0.10$, both cleared; rule 3 fails on $\kappa < 0.20$) |
+| HaluEval-QA  | +0.1391 | 0.2600 | **USEFUL_INTERNAL** (rule 3: $\delta \ge +0.05$ AND $\kappa \ge 0.20$, both cleared; rule 2 fails on $\kappa < 0.30$) |
+| **combined (min)** | **+0.1159** | **0.1400** | **MARGINAL** |
+
+This is the canonical Chunk 6 §(3) failure-mode signature
+"benchmark asymmetry under worst-benchmark rule" pinned
+ex ante in §15.1. The asymmetry is **documented but
+non-promotable**: per the §15.1 worst-benchmark rule (Chunk
+4a) and per Chunk 6 §(3)'s explicit "intentional and matches
+§13/§14's worst-benchmark discipline" guidance, the combined
+classification is MARGINAL and is binding.
+
+**TruthfulQA-MC's structural role across all three §13 / §14 /
+§15 programs.** TruthfulQA-MC has now defeated three distinct
+metric classes under the same worst-benchmark rule:
+
+- **§13** (AUC of observable vs ground truth, Chunks 13.10–
+  13.18): TruthfulQA-MC capped 5 of 5 single-axis hypothesis
+  classes; the §13.18 Variant A entropy 2nd-difference scored
+  AUC 0.701 on HaluEval-QA but 0.536 on TruthfulQA-MC, forcing
+  combined ANTI.
+- **§14** (Δ accuracy vs naive aggregation; deferred to full
+  §14 conditional on scout STRONG): the scout never reached
+  full §14, so TruthfulQA-MC was never independently evaluated
+  at the system level — but the scout-level saturation on
+  HaluEval-QA was already enough to foreclose full §14.
+- **§15** (AURC lift + κ at α₂; this section): TruthfulQA-MC
+  $\kappa = 0.14$ pulls combined classification one band below
+  HaluEval-QA's per-benchmark USEFUL_INTERNAL.
+
+The pattern is consistent: TruthfulQA-MC's adversarial
+distractor structure (designed to match common false-belief
+patterns) compresses entropy distributions in a way that
+limits both AUC-based and AURC-based discrimination at the
+7B + DeBERTa-v3-base configuration. **§15 does not falsify
+or weaken this pattern; it adds a third metric-class data
+point that confirms it.**
+
+**Why this asymmetry is not a defect of §15.1's bands.** The
+§15.1 worst-benchmark rule was pinned ex ante in Chunk 4a
+specifically to mirror the §13 / §14 disciplines. Per-
+benchmark splits where one benchmark would clear a higher
+band and the other would not is **exactly** the case the
+worst-benchmark rule was designed to handle uniformly. A
+benchmark-conditional verdict (HaluEval-QA USEFUL_INTERNAL,
+TruthfulQA-MC MARGINAL) would require a fresh §0.8 commitment
+with a different combined-classification rule (e.g., per-
+benchmark verdicts as the primary unit, or a pareto-frontier
+structure across the two benchmarks). It is NOT authorized by
+§15.1 and would not retroactively re-classify the §15.1
+verdict-of-record reported in §15.2.
+
 ---
 
 
