@@ -10780,6 +10780,106 @@ question indices.
   point on the same risk-coverage curve, not a meaningfully
   different baseline.
 
+**Disclosed simplifications and risks (pinned).**
+
+Three categories: scope exclusions, load-bearing assumptions,
+and failure-mode interpretations. Pinned in advance so the
+result section reads off them mechanically.
+
+**(1) What §15 is explicitly NOT testing.**
+
+- **Not answer-selection.** §15 never substitutes the §13.10
+  greedy completion. A §15 STRONG does not retroactively
+  reopen any §13/§14 answer-selection hypothesis class; per
+  §14c those verdicts remain binding. A §15 SATURATION does
+  not weaken §13.10's marginal-pass — it only documents that
+  the same signal does not transfer to the abstention metric
+  class either.
+- **Not retrieval augmentation.** §15 introduces no retrieval,
+  search, or external knowledge source. The policy's only
+  action when triggered by high $r(q)$ is to abstain — never
+  to fetch additional context, query a tool, or escalate to a
+  different model. Retrieval-augmented selective prediction is
+  a strictly larger hypothesis class requiring a fresh §0.8.
+- **Not cross-model routing.** §15 consumes no §13.11 / §14a /
+  §14a.2 cross-model material. Higher-capability fallback
+  (Qwen-32B, GPT-4-class) on the abstained questions is a
+  different policy and would require the model-scale future-
+  work item from §13.8 to land first.
+- **Not calibration beyond the pinned entropy policy.** No
+  isotonic calibration, no Platt scaling, no conformal
+  wrapping, no post-hoc transform of $r(q)$. The threshold
+  $\tau$ is the only fitted parameter, and it is fitted only
+  via the deterministic empirical-support sweep — not via
+  held-out tuning.
+
+**(2) Load-bearing assumptions.**
+
+- **Correctness labels inherited from §13.10.** $c(q)$ is the
+  §13.10 NLI-derived label (entails right_answer AND not any
+  distractor). §15 inherits any labeling artifacts §13.10
+  carries — over-strict NLI on TruthfulQA-MC, missed
+  paraphrases on HaluEval-QA, etc. A §15 verdict reflects the
+  policy's selective behavior *under §13.10's labeling*, not
+  an independent test of label quality.
+- **Fixed dump schema.** Per Chunk 2b, §15 reads only the
+  three pinned fields and fails fast on schema drift. Any
+  field-set change requires fresh §0.8 review before §15 re-
+  runs.
+- **Threshold sweep over empirical support only.** $\tau$
+  varies across the sorted unique $r(q)$ values per benchmark.
+  $\delta$ is reported with bootstrap CI but $\text{cov}@\alpha$
+  is computed on the discrete grid only; verdict resolution
+  depends on the empirical support being dense enough at
+  N=100 to bracket the pinned $\alpha$ targets.
+- **Benchmark-local operating points.** Each benchmark's sweep
+  is independent. There is no single operational $\tau$ that
+  applies to both, and §15 STRONG does NOT authorize deploying
+  any single $\tau$ — choice of a deployment threshold is a
+  separate calibration exercise with its own pre-commitment
+  (and would land in a §15.2 if STRONG fires).
+
+**(3) Failure-mode interpretations.**
+
+- **High AURC lift but tiny coverage.** Signature: large
+  $\delta$ but $\kappa < 0.10$. Cascade verdict: SATURATION
+  (rule 4 fails on $\kappa$; rule 5 catches). Even with
+  STRONG-range $\delta$, this is the "Pyrrhic" outcome where
+  the policy identifies a small high-confidence subset but
+  cannot deliver useful coverage. The cascade is intentionally
+  designed to reject this mode — operational value requires
+  both AURC lift AND meaningful coverage.
+- **Good coverage but weak error capture.** Signature:
+  $\kappa$ in STRONG/USEFUL range but $\delta$ in MARGINAL/
+  SATURATION. The policy sustains coverage at the target
+  accuracy but reaches it by rejecting questions roughly at
+  the random rate — i.e., the entropy threshold lands on a
+  high-coverage operating point on a benchmark where greedy
+  accuracy is already near target, not because the policy
+  selectively catches errors. Cascade produces MARGINAL or
+  SATURATION; operational read: "the answered subset is
+  acceptable but the policy is not the source of the lift."
+- **Benchmark asymmetry under worst-benchmark rule.** If one
+  benchmark lands STRONG and the other SATURATION, combined
+  classification is SATURATION (or whichever lower band
+  applies). Intentional and mirrors §13/§14's worst-benchmark
+  discipline. The result section must report per-benchmark
+  $(\delta_b, \kappa_b)$ alongside the combined $(\delta,
+  \kappa)$ so any asymmetry is visible — that is itself a
+  publishable diagnostic finding (selective prediction
+  transfers on benchmark X but not benchmark Y at this
+  configuration).
+- **STRONG blocked by CI demotion.** If point estimates
+  satisfy STRONG but either benchmark's bootstrap CI on
+  $\delta_b$ fails to clear zero, the verdict demotes to
+  USEFUL_INTERNAL with `STRONG_BUT_CI_DEMOTION` annotation
+  (Chunk 4c). Operational read: the policy may have a
+  population-level effect, but at N=100 the data does not
+  yet support a confident lift estimate; §15.2 product
+  pre-commitment is not authorized until a re-run at larger
+  N (a separate fresh §0.8 commitment) clears CI on both
+  benchmarks.
+
 ---
 
 
