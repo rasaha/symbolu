@@ -11768,6 +11768,76 @@ classification of §13.10). §15.2's MARGINAL verdict and
 §13.10's marginal-pass-of-record both stand at their pinned
 configurations.
 
+### 15.3 Pre-commitment — Hybrid §14-selector + §15-abstention scout (new chapter, not a continuation)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any §14a.2 / §15 / §13.x dump is
+opened in hybrid form. Specification, primary risk signal,
+success bands, baselines, and acceptance/rejection rules
+below cannot be redefined post-hoc.
+
+**Position in the §13 / §14 / §15 program — three closed
+chapters at three distinct metric classes:**
+
+- **§13** closed the **single-axis observable** line in
+  §13.19 at combined ANTI on all five tested hypothesis
+  classes under worst-benchmark.
+- **§14** closed the **system-level answer-selection scout**
+  line at `SCOUT_SATURATION` on both §14a (string-matched
+  selector) and §14a.2 (NLI-clustered selector).
+- **§15** closed the **single-source abstention** line at
+  `MARGINAL` (§15.2). Per the §15.2 Postscript, that
+  verdict-of-record is binding at N=100; §13.20's N=200
+  observation does not re-classify it.
+
+§15.3 tests the one structurally distinct combination none
+of the three prior chapters tested:
+
+> *Use the §14 answer-producing system to choose an answer,
+> then apply a §15-style abstention gate on top of that
+> answer. §14 decides which answer to give. §15 decides
+> whether it is safe enough to return.*
+
+**This is a new claim, not a re-test of any prior claim.**
+Specifically:
+
+- Not "BCVF-style routing alone selects the right answer"
+  (§14a.2 closed `SCOUT_SATURATION`).
+- Not "the §13.10 entropy alone supports useful abstention
+  on the single-source Qwen greedy answer" (§15.2 closed
+  `MARGINAL`).
+- **But** "§14's selector + a §15-style abstention gate on
+  §14's selected answer may produce a different
+  answer/abstain operating frontier than either alone."
+
+**Why this is a new metric class.** §14a.2 measured Δ
+accuracy of V1 vs Baseline-B at full coverage (no
+abstention). §15.1 measured AURC + cov@α of the §13.10
+score on the Qwen greedy answer (no §14 selector). §15.3
+measures risk-coverage operational metrics applied to
+**§14's selected answer**, with the abstention gate fed by
+a risk signal computed over §14's selector context. The
+unit of analysis is the joint behavior of (Stage A: §14
+selector × Stage B: §15-style abstention) on the same per-
+question stream — neither §14 nor §15 alone exercised that
+joint object.
+
+**§15.3 is a fresh §0.8 commitment.** All §13 / §14 /
+§15.1 / §15.2 / §13.20 verdicts remain binding under §0.8
+and are NOT retroactively reframed by §15.3 work. A §15.3
+STRONG would authorize a separate §15.4-as-implementation
+pre-commitment for an answer-selection-plus-abstention
+product layer; it would NOT re-classify §14's
+`SCOUT_SATURATION` or §15.2's `MARGINAL`.
+
+**Confirmation: no data inspection prior to this pre-
+commitment.** No §14a.2 / §15 / §13.x dump has been opened
+in hybrid form during the drafting of §15.3. The protocol,
+primary risk signal, metrics, and bands in the §15.3
+chunks below are pinned from §13 / §14 / §15 prose only.
+Looking at the data before the bands are pinned would be
+the §0.8 violation pattern §15.3 is designed to prevent.
+
 ---
 
 
