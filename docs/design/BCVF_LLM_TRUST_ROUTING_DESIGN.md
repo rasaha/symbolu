@@ -12261,6 +12261,112 @@ boundary inclusivity precisely: $\Delta\kappa = -0.020$ is NOT
 regression (rule is strict-less-than), but $\Delta\kappa =
 -0.021$ is.
 
+**Implementation scope (pinned, framed as a small integration
+layer over closed components).**
+
+§15.3 is structurally a small integration layer that **reuses
+closed §14 and §15 components without reopening either**. The
+hybrid is built by composing existing artifacts, not by re-
+running their pinned experiments.
+
+**Reuse from §14 (data, not code).** The §14a.2 on-disk dump
+`docs/experiments/probe_system_level_scout_v2_halueval_qa.json`
+serves as Stage A's input. Per §14a.2 prose, the dump records
+per-source greedies, per-source semantic entropies, V1 softmin
+weights, NLI-clustered selector outputs (winning cluster,
+representative source, selected_answer), and per-question
+correctness labels for each candidate. **§14a.2 is NOT re-run.**
+The §14a.2 `SCOUT_SATURATION` verdict-of-record (§14c) is
+unchanged. §15.3 reads the dump as Stage A's pinned output;
+it makes no new claim about whether V1 *succeeds* at answer
+selection (V1's lift over Baseline-B was §14a.2's measurement,
+closed at `SCOUT_SATURATION`).
+
+**Reuse from §15 (primitives copied, NOT imported).** The
+metric primitives in `scripts/probe_selective_abstention.py`
+(threshold sweep, discrete AURC, cov@α with $n_\min$ floor,
+bootstrap CI on a single scalar, JSON+markdown writers) are
+reused by **copying their implementations** into the §15.3
+script — NOT importing them. §15.1's script is closed under
+§15.2's verdict-of-record; importing from it would couple
+§15.3's outputs to any future drift in §15.1's codepath,
+compromising §15.1's reproducibility chain. §15.3 carries
+its own copied primitives.
+
+**New code (the integration layer).**
+
+One new script: `scripts/probe_hybrid_selective_abstention.py`
+(numpy + stdlib only, CPU-only post-processor; structurally
+parallel to `probe_selective_abstention.py`).
+
+The new script implements:
+
+1. **§14a.2 dump loader** with schema validation against the
+   pinned field list (q_idx, per-source semantic entropies,
+   winning_source_id, selected_answer correctness label).
+   Fail-fast on schema mismatch (no fallback).
+2. **Parity gate** on $N=100$ on HaluEval-QA. Aborts on
+   mismatch.
+3. **Stage A handoff extraction** — derives $r(q) =
+   H_{\text{src}_{i^*}}(q)$ and $c(q)$ = correctness of
+   `selected_answer(q)` directly from the dump's fields.
+4. **Threshold sweep** (sorted unique $r(q)$ plus $\pm\infty$)
+   with per-threshold $(\text{cov}, \text{acc}, \text{ecr},
+   \text{far})$ computation. Copied from §15.1.
+5. **Operating-point computation** at $\alpha \in \{0.40,
+   0.50, 0.75\}$, $n_\min = 10$. Copied from §15.1.
+6. **$\kappa_\text{hybrid}$ computation** at $\alpha_2 = 0.50$.
+7. **$\Delta\kappa$ computation** ($\kappa_\text{hybrid} - 0.26$).
+8. **Bootstrap CI on $\Delta\kappa$** (paired over question
+   indices, $B=1000$, `SeedSequence(entropy=15)` — same
+   convention as §15.1 to keep the audit trail consistent).
+9. **1D cascade** driven by $\Delta\kappa$ alone (Chunk 3g).
+   **New** `verdict_cascade` function specific to §15.3
+   (NOT the §15.1 2D cascade).
+10. **STRONG-only demotion rule** on bootstrap CI lower
+    bound of $\Delta\kappa$.
+11. **`--self-test` gate** verifying the 1D cascade against
+    Chunk 3g's 4-row boundary-case audit table and the
+    STRONG-only demotion rule.
+12. **JSON + markdown writers** matching the §15.3 output
+    schema (`schema_version = "15.3"`, single-benchmark
+    block under `benchmark`, `combined` block with `verdict`,
+    `verdict_annotations`, `delta_kappa`, `kappa_hybrid`,
+    `kappa_§15.1_baseline`).
+
+**Engineering cost (estimated).**
+
+- ~400–600 lines of new code (smaller than §15.1's 1112; the
+  cascade is 1D and primitives are copy-pasted).
+- CPU only; numpy + Python stdlib only; no GPU, no model
+  loads, no NLI, no network.
+- Wall-clock cost of real-data run: under 30 seconds at
+  $N=100$ with $B=1000$ bootstrap.
+- Implementation effort: roughly half §15.1's; the new work
+  is the integration layer, not the metric primitives.
+
+**Output paths (pinned).**
+
+- `docs/experiments/probe_hybrid_selective_abstention.json`
+  (machine-readable, `schema_version` `"15.3"`).
+- `docs/experiments/probe_hybrid_selective_abstention.md`
+  (human-readable summary).
+
+**What §15.3 implementation explicitly does NOT authorize.**
+
+- Re-running §14a.2 (the §14a.2 dump is the pinned Stage A
+  input; §14c verdict unchanged).
+- Modifying `scripts/probe_selective_abstention.py` (§15.1's
+  pinned codepath; preserved verbatim per §15.2 Postscript).
+- Adding TruthfulQA-MC or any other benchmark.
+- Adding consumers or selectors beyond §14a.2's pinned
+  configuration.
+- Adding observables beyond $H_{\text{src}_{i^*}}$.
+- Importing from the §15.1 script (primitives copied for
+  independence).
+- Auto-promoting any verdict to §15.4 (any §15.4 work
+  requires its own §0.8 commitment).
+
 ---
 
 
