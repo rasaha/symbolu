@@ -12042,6 +12042,66 @@ per-source semantic entropy $H_{\text{src}_{i^*}}(q)$. No
 primary-plus-secondary, no ensemble, no fallback. Adding any
 alternative would require a fresh §0.8 amendment to §15.3.
 
+**Benchmark scope pin (single benchmark; HaluEval-QA only).**
+
+§15.3 is a single-benchmark scout on **HaluEval-QA**, $N=100$,
+identical to the §14a.2 dump's coverage. TruthfulQA-MC is
+explicitly out of scope for the §15.3 scout.
+
+**Three reasons HaluEval-QA-only is pinned, not a tunable
+choice:**
+
+1. **The §14a.2 dump exists only on HaluEval-QA.** §14a.2
+   was pre-committed and executed on HaluEval-QA only;
+   TruthfulQA-MC was explicitly deferred to "full §14"
+   conditional on §14a.2 STRONG, which was never reached
+   (§14c closed at `SCOUT_SATURATION`). The Stage A on-disk
+   artifact §15.3 reads from
+   (`probe_system_level_scout_v2_halueval_qa.json`)
+   contains no TruthfulQA-MC data. Adding TruthfulQA-MC is
+   therefore a *new generation step*, not a parameter
+   change.
+
+2. **HaluEval-QA is where the §14 BCVF-shaped signal was most
+   alive.** V1 softmin produced the +4pp lift over Baseline-B
+   on HaluEval-QA at N=100 in §14a.2 — the strongest BCVF-
+   shaped lift in the entire §13 / §14 program (per §14c).
+   TruthfulQA-MC across §13 / §14 / §15 has consistently
+   acted as the worst-benchmark cap; if §15.3 has any chance
+   of producing operational lift, HaluEval-QA is where to
+   detect it first.
+
+3. **Cost/benefit favors single-benchmark for the scout.**
+   Adding TruthfulQA-MC to §15.3 would require (a) re-running
+   the §14a.2 protocol on TruthfulQA-MC to produce the missing
+   dump (~50–60 min on the existing GPU, identical cost to
+   §14a.2's pinned cost), and (b) extending §15.3's bands to
+   handle two-benchmark combined classification under a
+   worst-benchmark rule. Both are outside §15.3 scope as a
+   pure post-processing scout. The §15.3 scout's job is to
+   detect signal where signal is most likely first; if it
+   lands STRONG, a fresh §15.4 commitment can pre-commit the
+   TruthfulQA-MC extension.
+
+**Implication for the verdict bands.** Because §15.3 is
+single-benchmark, **no worst-benchmark rule applies in
+§15.3**. The verdict cascade pinned in Chunk 3g operates on
+the single benchmark's $(\delta, \kappa)$ point estimates
+directly. This is structurally distinct from §15.1's two-
+benchmark cascade that combined $\delta = \min_b \delta_b$
+and $\kappa = \min_b \kappa_b$ before applying the cascade.
+
+**Cherry-picking caveat (acknowledged ex ante).** Pinning
+HaluEval-QA-only is a deliberate scope choice, not a cherry-
+pick: it follows the §14a.2 dump's existing coverage. A §15.3
+STRONG on HaluEval-QA would NOT support an external claim
+about §15.3's cross-benchmark behavior — that would require
+the TruthfulQA-MC extension as a separate §15.4 commitment.
+**The §15.3 verdict authorizes only what its single-benchmark
+scope tests.** External-framing changes (VC-brief, etc.) are
+foreclosed regardless of §15.3 outcome — same §13.9 hold rule
+that bound §15.1 / §15.2.
+
 ---
 
 
