@@ -5713,11 +5713,40 @@ because TruthfulQA-MC defeats every confidence-based scalar
 construction tested.** §13.10 single-snapshot semantic entropy
 (AUC 0.661 on both benchmarks) remains the strongest result in
 this codebase across all five tested hypothesis classes. The §13
-single-axis program is now exhaustively closed. Any future LLM-
-domain work would need to test a fundamentally different
-experimental structure (system-level integration, model-scale
-upgrade, or benchmark substitution) under a fresh §0.8
-pre-commitment in a new top-level section (§14 or beyond).
+single-axis program is now exhaustively closed.
+
+**Update — §14a / §14a.2 executed, system-level scouts both
+returned SCOUT_SATURATION.** §14a (string-matched selector,
+§14b result section) ran at N=100 on HaluEval-QA: V1 softmin +3pp,
+V2 thresholded +0pp, both vs string-matched Baseline-B that was
+empirically degenerate due to M=3 cross-family selector tie-
+breaking ($\text{acc}(\text{Baseline-A}) = \text{acc}(\text{Baseline-B}) = 0.300$
+exactly). Post-§14b audit caught the structural issue. §14a.2
+(NLI-clustered selector, selector-spec fix; §14c result section)
+ran at the same configuration with the corrected selector: V1
+softmin +4pp, V2 thresholded +1pp, vs the new NLI-clustered
+Baseline-B (acc 0.290 — now genuinely different from Baseline-A's
+0.300). Both scouts returned SCOUT_SATURATION per pre-committed
+bands. **Full §14 explicitly NOT authorized; promotion was
+conditional on STRONG or DIRECTIONAL outcome which was not
+achieved.** See §14b and §14c for the result sections.
+
+**Final status of the §13 + §14 LLM-track program — closed at all
+tested experimental structures.** Five §13 single-axis hypothesis
+classes tested (cross-family, EigenScore, BCVF text-level, BCVF
+hidden-state, single-trajectory forced-allocation), plus two §14
+system-level scout configurations (string-matched selector, NLI-
+clustered selector), totaling 7 distinct experimental structures
+beyond §13.10's marginal-pass baseline. **All 7 collapse under
+the combined-classification rule.** §13.10 single-snapshot
+semantic entropy (AUC 0.661 on both benchmarks) remains the
+strongest result in this codebase. The §13/§14 LLM-track program
+is exhaustively closed. Any future LLM-domain work would need a
+fundamentally different reframing under a fresh §0.8 commitment
+(model-scale upgrade, benchmark substitution, selective-prediction
+abstention, supervised activation probes, or cross-domain
+transfer); none are pre-committed. The autonomy-domain BCVF claim
+(§6.1) stands wholly independent and is unaffected.
 
 ### 13.2 Experiment specification
 
@@ -6123,18 +6152,24 @@ new top-level section if pursued):
   binding under §0.8 for the §14a-pinned configuration; the
   selector-spec fix is tested in §14a.2 below.
 - **§14a.2 system-level scout with NLI-clustered selector
-  (PRE-COMMITTED).** Selector-spec fix replacing string-identity
-  majority vote with NLI-clustered weighted majority vote (the
-  §13.10 cluster_by_entailment mechanism applied to M=3
-  candidate answers). Same sources, same per-source scalar, same
-  consumer variants, same benchmark, same N, same pre-committed
-  bands as §14a — only the selector and Baseline-B change to the
-  semantically-correct version. Pre-committed bands STRONG /
-  DIRECTIONAL / MARGINAL / SATURATION / REGRESSION (same
-  numerical thresholds applied to Δ vs the new NLI-clustered
-  Baseline-B). See §14a.2 for the full pinned specification.
-  Implementation (`scripts/probe_system_level_scout_v2.py`) is
-  a separate authorization gate.
+  (EXECUTED in §14a.2 / §14c; combined `SCOUT_SATURATION`).**
+  Selector-spec fix replacing string-identity majority vote with
+  NLI-clustered weighted majority vote (the §13.10
+  cluster_by_entailment mechanism applied to M=3 candidate
+  answers). Selector fix succeeded structurally:
+  $\text{acc}(\text{Baseline-A}) = 0.300$ vs
+  $\text{acc}(\text{Baseline-B}) = 0.290$ — genuinely different
+  numbers, no longer the §14a degenerate equality. But pinned
+  primary verdict still SCOUT_SATURATION:
+  $\Delta_{V_1} = +4\text{pp}$ (5/1 wins/losses, p=0.219),
+  $\Delta_{V_2} = +1\text{pp}$ (1/0, p=1.000). V1 softmin
+  produced the strongest BCVF-shaped lift in the entire §13/§14
+  program but did not clear pre-committed STRONG (+5pp + p<0.05)
+  or DIRECTIONAL (V2 ≥+3pp ∧ V1 ≤0pp) thresholds. Full §14 NOT
+  authorized. ChatGPT's predicted DIRECTIONAL pattern (V1 harmful,
+  V2 helpful) was empirically falsified — the opposite was
+  observed. See §14c for the result section, the band-coverage
+  gap analysis, and the 5-section LLM-track post-mortem.
 - **Single-trajectory forced-allocation-gap observable
   (EXECUTED in §13.18 / §13.19; combined `ANTI_FINDING`).** The
   signal class §13.17's narrowing left explicitly open has now
@@ -6349,28 +6384,46 @@ invalidate the autonomy result.
 
 For VC / investor communication, the autonomy track should
 continue to be presented on its own merits. The LLM design
-doc is an internal research artifact; all five single-axis
+doc is an internal research artifact; all five §13 single-axis
 revision probes (§13.7 / §1.3 / §13.12 / §13.14 / §13.16 /
-§13.18) have now been executed and none lifts AUC above
-§13.10's 0.661 marginal baseline on the combined-classification
-rule. None is positioned as a deliverable.
+§13.18) AND both §14 system-level scouts (§14a string-matched
+selector, §14a.2 NLI-clustered selector) have now been executed.
+**None lifts above §13.10's 0.661 marginal baseline on the
+combined-classification rule, and neither §14 scout produces
+sufficient lift to clear pre-committed STRONG promotion thresholds.**
+None is positioned as a deliverable.
 
 `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest scope caveats"
 already reflects the current external-facing framing
 ("BCVF is not positioned as an LLM hallucination detector"),
 and that framing is *strengthened*, not weakened, by the
-combined §13 evidence: 5-of-5 single-axis hypothesis classes
-tested produce combined `ANTI_FINDING` under the worst-benchmark
-rule, with TruthfulQA-MC defeating every confidence-based scalar
-construction tested. The §13 single-axis program is exhausted
-post-§13.19. The framing will be revisited only if some future
-out-of-§13 probe (system-level integration in the §6.1-style
-configuration, model-scale upgrade, or benchmark substitution
-to a less hostile second benchmark — see §13.8 future-work list)
-lifts AUC to the 0.75 strong band on BOTH benchmarks (or on a
-fresh pre-committed benchmark pair). No probe in the §13 program
-has cleared this bar. No VC-facing material is updated on the
-basis of any §13 result, either in isolation or combined.
+combined §13 + §14 evidence:
+
+- **§13** — 5-of-5 single-axis hypothesis classes tested
+  produce combined `ANTI_FINDING` under the worst-benchmark
+  rule, with TruthfulQA-MC defeating every confidence-based
+  scalar construction tested.
+- **§14a / §14a.2** — both system-level scouts return
+  `SCOUT_SATURATION` on HaluEval-QA. The §14a.2 selector-spec
+  fix succeeded structurally (Baseline-A ≠ Baseline-B with
+  NLI-clustered semantic-equivalence aggregation) but the
+  system layer still does not produce lift above pre-committed
+  promotion thresholds.
+
+The §13 single-axis program is exhausted post-§13.19. The §14
+system-level scout program is closed post-§14c. Together this
+is **7 distinct experimental structures tested beyond §13.10's
+marginal-pass baseline; none clears the §13.9 0.75 strong band
+on the combined-classification rule.** The framing will be
+revisited only if some future out-of-§13/§14 probe (model-scale
+upgrade to Qwen-32B+, benchmark substitution to a less hostile
+benchmark family, selective-prediction abstention rather than
+answer selection, supervised activation probes, or cross-domain
+transfer — none pre-committed) lifts AUC or accuracy delta to
+the 0.75 strong band on BOTH benchmarks (or on a fresh pre-
+committed benchmark pair). No probe in the §13/§14 program has
+cleared this bar. No VC-facing material is updated on the basis
+of any §13 or §14 result, either in isolation or combined.
 
 ### 13.10 Revision experiment results — semantic-entropy on TruthfulQA + HaluEval
 
@@ -9668,6 +9721,445 @@ on STRONG / DIRECTIONAL promotion):
 - Highest-weight-source-takes-all selector (deferred).
 - Variant A entropy 2nd-difference per-source scalar (alternative
   scout in §14a.3 conditional on §14a.2 MARGINAL).
+
+### 14c Result — System-level scout with NLI-clustered selector also returned SCOUT_SATURATION; LLM transfer line closed at all tested experimental structures
+
+The §14a.2 pre-committed scout has been executed at N=100 on
+HaluEval-QA. Combined classification per pre-committed bands:
+**`SCOUT_SATURATION`**. The selector-spec fix to NLI-clustered
+weighted majority vote worked structurally — Baseline-A and
+Baseline-B are now genuinely different (0.300 vs 0.290) — but the
+system layer still does not produce sufficient lift to clear any
+of the pre-committed promotion thresholds.
+
+Combined with §14a's SCOUT_SATURATION (string-matched selector)
+and §13.19's 5-of-5 single-axis null, this is the **methodologically
+clean closure of the LLM transfer line** that §14a's structural
+issue had made unavailable. The autonomy-domain BCVF claim stands
+independently on §6.1 evidence and is unaffected.
+
+**Result table (primary scalar — V1/V2 vs the new NLI-clustered
+Baseline-B):**
+
+| Variant | Accuracy | Δ vs Baseline-B (pp) | Sign-test wins/losses | p |
+|---|---|---|---|---|
+| Baseline-A (Qwen single-greedy) | 0.300 | — | — | — |
+| **Baseline-B (NLI-clustered uniform majority)** | **0.290** | reference | — | — |
+| V1 (softmin trust, τ=0.5) | 0.330 | **+4.00** | 5/1 | 0.219 |
+| V2 (thresholded exclusion + uniform survivors) | 0.300 | +1.00 | 1/0 | 1.000 |
+
+**Side-by-side comparison with §14a (string-matched selector):**
+
+| Quantity | §14a | §14a.2 | Direction |
+|---|---|---|---|
+| acc(Baseline-A) | 0.300 | 0.300 | unchanged |
+| acc(Baseline-B) | 0.300 | 0.290 | **now genuinely different from A** |
+| acc(V1) | 0.330 | 0.330 | unchanged numerically |
+| acc(V2) | 0.300 | 0.300 | unchanged numerically |
+| Δ_V1 vs Baseline-B | +3.00pp | **+4.00pp** | larger lift under fixed selector |
+| Δ_V2 vs Baseline-B | +0.00pp | +1.00pp | small lift now visible |
+| V1 sign-test wins/losses | 4/1 | 5/1 | one more non-tied difference |
+| V2 sign-test wins/losses | 0/0 | 1/0 | one non-tied difference now appears |
+
+The §14a.2 selector fix succeeded at its narrow methodological
+goal: Baseline-B is no longer a degenerate "always pick Qwen via
+tiebreaker." On 5 questions for V1 and 1 question for V2, the
+NLI-clustered selector produced a different answer than NLI-
+clustered Baseline-B — i.e., the BCVF-shaped weighting actually
+shifted the cluster choice. **But the magnitudes are not large
+enough to clear the pre-committed STRONG (+5pp + p<0.05) or
+DIRECTIONAL (V2 ≥+3pp ∧ V1 ≤0pp) thresholds.**
+
+**Math used (the construction tested at the pinned-primary level).**
+For each question $q$ at N=100:
+
+1. M=3 sources (Qwen + Llama + Mistral, all cached from §13.11).
+2. Per source, K=10 stochastic samples + 1 greedy at T=1.0,
+   max_new_tokens=32, prompt format `Q: ... A:`.
+3. Per-source semantic entropy $H_{\text{src}}(q)$ via question-
+   conditioned bidirectional NLI clustering of the K samples
+   (DeBERTa-v3-base-mnli-fever-anli, identical to §13.10 / §13.11).
+4. Two consumer variants:
+   - V1 softmin: $w_i^{V1} \propto \exp(-H_{\text{src}_i}(q) / \tau)$,
+     $\tau = 0.5$ pinned.
+   - V2 thresholded exclusion: $S = \{i : H_{\text{src}_i}(q) \le
+     \theta\}$, $w_i^{V2} = 1/|S|$ for survivors with $\theta = $
+     per-question median entropy.
+5. **NEW selector** (the §14a.2 spec fix):
+   a. Cluster M source greedies $a_1, a_2, a_3$ via question-
+      conditioned bidirectional NLI entailment using union-find
+      (same `cluster_by_entailment` mechanism §13.10 uses on K=10
+      samples). Result: partition into $K \le M$ semantic-
+      equivalence classes.
+   b. Aggregate weights within each cluster: $W_k = \sum_{i \in
+      C_k} w_i$.
+   c. Pick winning cluster $k^* = \arg\max_k W_k$, ties broken by
+      lowest cluster index.
+   d. Within winning cluster, pick representative source by highest
+      individual weight, ties broken by lowest source index.
+6. **NEW Baseline-B** uses the same NLI-clustered selector but
+   with uniform weights $w_i = 1/M$. This replaces §14a's
+   string-matched Baseline-B which was empirically degenerate.
+7. Per-question correctness label for each candidate answer
+   (V1 selected, V2 selected, Baseline-A = Qwen greedy,
+   Baseline-B selected): question-conditioned NLI must entail
+   `right_answer` AND not entail `hallucinated_answer`. Identical
+   to §13.10–§13.18 protocol.
+8. $\Delta_v = \text{acc}(v) - \text{acc}(\text{Baseline-B}_{V2})$
+   for $v \in \{V1, V2\}$, in percentage points.
+9. Sign-test for $v$ vs $\text{Baseline-B}_{V2}$: count wins
+   ($v$ correct AND Baseline-B wrong) and losses ($v$ wrong AND
+   Baseline-B correct); two-sided binomial test on win count vs
+   total non-ties at $\alpha = 0.05$.
+
+**Band-coverage gap exposed by §14a.2 — honest §0.8 audit point.**
+The §14a.2 pre-committed bands defined:
+- STRONG: $\Delta_v \ge +5\text{pp}$ for **both** + sign-test
+  $p < 0.05$ for at least one.
+- DIRECTIONAL: $\Delta_{V2} \ge +3\text{pp}$ AND $\Delta_{V1} \le 0$.
+- MARGINAL: $\Delta_v \in (0, +3]$ for **both**.
+- SATURATION: $\Delta_v \in [-3, 0]$ for **both**.
+- REGRESSION: $\Delta_v < -3$ for either.
+
+The observed result $(\Delta_{V1}, \Delta_{V2}) = (+4.00, +1.00)$
+falls in **none** of these bands strictly:
+- STRONG fails ($\Delta_{V1} = 4 < 5$).
+- DIRECTIONAL fails ($\Delta_{V1} = 4 \not\le 0$).
+- MARGINAL fails ($\Delta_{V1} = 4$ is outside $(0, 3]$).
+- SATURATION fails (both $\Delta_v > 0$, not in $[-3, 0]$).
+- REGRESSION fails (no $\Delta_v < -3$).
+
+The implementation's `classify()` function falls through to
+`SCOUT_SATURATION` as a catch-all (the last `return` statement in
+the band cascade). **This is a code-level decision, not a strict
+pre-committed-band decision** — the bands as written had a
+coverage gap for cases where one variant lifts above MARGINAL but
+below STRONG while the other variant lifts only marginally.
+
+The strictest §0.8 reading of the result is "borderline MARGINAL+
+on V1 and MARGINAL on V2; no pre-committed band cleanly applies;
+the script's catch-all fallthrough returned SCOUT_SATURATION." For
+operational purposes, SCOUT_SATURATION is the binding outcome —
+§14a.2's promotion rules treat MARGINAL and SATURATION the same
+way (no promotion to full §14; one more scout authorized at
+MARGINAL but the §14a.2 prose explicitly closed the LLM track on
+SATURATION/REGRESSION combined with §14a's prior result).
+
+This band-coverage gap is documented as an analytical observation
+about how §0.8 pre-commitments should be written. Future bands in
+this codebase should partition $\mathbb{R}^M$ exhaustively to
+prevent fall-through ambiguity.
+
+**Four analytical observations the result supports:**
+
+**(a) The selector-spec fix succeeded at its narrow methodological
+goal.** §14a's empirical degeneracy ($\text{acc}(\text{Baseline-A})
+= \text{acc}(\text{Baseline-B}) = 0.300$ exactly across N=100) is
+gone. §14a.2 produces $\text{acc}(\text{Baseline-A}) = 0.300$ vs
+$\text{acc}(\text{Baseline-B}) = 0.290$ — genuinely different
+numbers reflecting NLI-clustered semantic-equivalence aggregation
+rather than string-matched-tiebreaker degeneracy. **The §14a.2
+selector-spec audit was the right move regardless of outcome.**
+A hypothetical §14a.2 STRONG would have validated the system-
+level hypothesis cleanly; the actual SCOUT_SATURATION still
+documents the closure under the methodologically-correct
+configuration. Either way, the §14a.2 commitment was a §0.8-
+discipline win.
+
+A small numerical surprise: $\text{acc}(\text{Baseline-B}) = 0.290$
+is *lower* than $\text{acc}(\text{Baseline-A}) = 0.300$ on this
+N=100 sample. Naive 3-source NLI-clustered ensembling slightly
+hurts vs single-source Qwen on HaluEval-QA at this scale. The 1pp
+difference is well within noise (sign-test p $\approx 0.5$ for a
+single per-question swap), but the direction is consistent with
+the §13 finding that the cross-family triple sometimes pulls Qwen
+in wrong-answer directions when Llama and Mistral agree on a
+hallucinated answer (HaluEval's distractors are designed to be
+plausible).
+
+**(b) V1 softmin trust shaping is the most persistently lifting
+construct in the entire §13/§14 program.** The combined evidence:
+
+| Probe | Selector | $\Delta_{V1}$ vs Baseline-B |
+|---|---|---|
+| §14a | string-matched | +3.00 pp |
+| §14a.2 | NLI-clustered | **+4.00 pp** |
+
+Persistent +3 to +4pp lift across two different selector
+configurations is qualitatively different from §13's per-probe
+results, where most variants saturated at the §13.10 baseline or
+inverted. **This suggests softmin trust shaping at $\tau = 0.5$
+on per-source semantic entropy is doing real work** — sharpening
+the contribution of the lowest-entropy (most-confident) source's
+answer in a way that occasionally produces a correct answer
+where naive uniform aggregation produces a wrong one.
+
+But the magnitude is small enough that:
+- It does not clear the pre-committed STRONG threshold (+5pp).
+- The sign-test on 5–6 non-tied questions out of 100 is severely
+  under-powered ($p = 0.219$ in §14a.2). At N=200 with the same
+  effect size, $p$ would still likely be $> 0.05$.
+- Two consecutive scouts under different selectors landing in
+  the +3 to +4pp range strongly suggests this is the *true*
+  effect size for V1 softmin at this configuration, not a noise
+  fluctuation. The honest read is "real but small, not enough to
+  promote."
+
+**(c) V2 thresholded exclusion saturates cleanly under both
+selectors.** §14a: +0.00pp. §14a.2: +1.00pp (1 win / 0 losses).
+At M=3 the median-entropy threshold + uniform survivors structure
+has very limited bandwidth — it can only differentiate from
+Baseline-B when the highest-entropy source happens to be in
+clusterminority position. Empirically this rarely fires, and when
+it does, the lift is a single question. **V2's null result is
+robust to selector choice and is the cleanest "no-effect" finding
+in §14.**
+
+**(d) ChatGPT's predicted DIRECTIONAL pattern was falsified.**
+Pre-§14a, ChatGPT's analysis predicted that softmin trust shaping
+(V1) would be *harmful* and thresholded exclusion (V2) would be
+*helpful* — the autonomy-domain "softmin amplifies the wrong
+source" critique. The DIRECTIONAL band was specifically constructed
+to detect this pattern: $\Delta_{V2} \ge +3\text{pp}$ AND
+$\Delta_{V1} \le 0\text{pp}$.
+
+The actual data:
+- V1 (softmin) consistently lifts (+3 / +4pp across §14a / §14a.2).
+- V2 (thresholded) is essentially inert (+0 / +1pp).
+
+The opposite of the predicted pattern. This is empirical evidence
+that softmin trust shaping is *not* the mathematically harmful
+piece in this LLM-domain configuration; the autonomy-domain
+softmin default is at minimum not actively dangerous here, and
+plausibly is doing useful work that the more-conservative
+thresholded variant doesn't capture. ChatGPT's general "softmin
+only as good as the scalar it sharpens" intuition remains
+correct, but the specific prediction "softmin amplifies wrong
+source on cross-family LLM ensembles" was falsified. Worth
+flagging in any future revisit: the autonomy-domain softmin
+construct should not be removed from candidate consumer designs
+based on §13/§14 evidence — if anything, it earned its place.
+
+**Five-section post-mortem on the §13 + §14 LLM-track program.**
+
+Distilling the empirical pattern across all 7 hypothesis classes
+tested (§13.10–§13.18 single-axis + §14a / §14a.2 system-level)
+into the cleanest structural reading:
+
+**(1) Proxy thinness at scale.**
+Each §13 probe applied a literature-anchored construction
+(Farquhar 2024 semantic entropy, Yoffe 2024 cross-family, Chen
+2024 EigenScore, BCVF text-level + hidden-state 2nd-difference,
+ChatGPT's forced-allocation gap). All produced AUCs in the
+0.46–0.72 range, with §13.10's baseline at 0.661 marginal-pass.
+The literature-typical 0.74–0.81 AUROC range did *not* transfer
+to our 7B-class + DeBERTa-v3-base + N=100 + completion-style-
+prompt configuration. The proxy classes have a real ceiling at
+this scale — likely close to §13.10's 0.66 — and the §13.9 0.75
+external-framing bar is above it. Whether this is "wrong proxies"
+or "right proxies at insufficient scale" is a real ambiguity that
+required the model-scale upgrade probe (§13.8 future-work item,
+never executed) to disambiguate. The honest framing: **proxy
+thinness at our specific scale, not categorical wrongness of the
+proxy class**.
+
+**(2) Consumer-class evidence is mixed (not "softmin always
+harmful").**
+§14a / §14a.2's V1 softmin trust shaping produced the strongest
+BCVF-shaped lift in the entire program (+3 / +4pp across two
+selector configurations). V2 thresholded exclusion saturated
+cleanly. ChatGPT's pre-§14a "softmin amplifies the wrong source"
+critique was falsified by the data; the autonomy-domain softmin
+default is doing useful work in this configuration, just at an
+effect size below the pre-committed STRONG threshold. **The
+softmin-as-harmful-construct framing should not carry forward
+to any future LLM-domain BCVF work in this codebase based on §14
+evidence**; the harmful-or-not question is empirically
+unresolved and the surface-level evidence runs the *other* way
+than ChatGPT's mechanism prediction.
+
+**(3) Selector-spec audit.**
+§14a's pinned selector (string-matched weighted majority vote)
+degenerated at M=3 cross-family — Baseline-B was empirically
+identical to Baseline-A because of 3-way string ties broken by
+source order. Caught in the post-§14b audit. §14a.2 fixed it
+with NLI-clustered weighted majority vote. The selector fix
+worked structurally (Baseline-A and Baseline-B are now genuinely
+different), but the system-level lift remained below promotion
+thresholds even under the corrected spec. **The selector-spec
+fix was the right §0.8-discipline move regardless of outcome**;
+it eliminated a real measurement artifact and let §14a.2's
+SCOUT_SATURATION verdict be the methodologically-clean closure
+that §14a's structural issue had made unavailable.
+
+**(4) TruthfulQA-MC pathology.**
+The consistent failure benchmark across all 5 §13 single-axis
+probes plus both §14 scouts. AUCs on TruthfulQA-MC ranged from
+0.462 (§13.16, inverted) to 0.661 (§13.10) across §13; §14
+didn't run on TruthfulQA-MC (deferred to full §14 conditional
+on scout STRONG). The combined-classification rule (worst
+benchmark sets the band) means TruthfulQA-MC's hostile
+geometry — adversarial misconception distractors that match
+common confidence patterns — floors every probe to ANTI/SATURATION
+combined, even when HaluEval-QA results are reasonable. **Any
+future LLM-domain probe at this scale should explicitly justify
+how it expects to clear TruthfulQA-MC** (e.g., by switching to
+TruthfulQA-Generation, which Farquhar 2024 reports as the more
+permissive variant, or by abandoning combined-classification on
+this benchmark pair).
+
+**(5) What remains plausible (not pre-committed by §14c).**
+Three out-of-§13/§14 directions documented in §13.8 future-work
+list, each requires a fresh §0.8 commitment:
+
+- **Model-scale upgrade.** Re-run §13.10 with Qwen-32B + DeBERTa-
+  v3-large. Tests whether §13.10's 0.66 ceiling is a 7B artifact
+  or fundamental.
+- **Benchmark substitution.** TriviaQA-Generation (Farquhar 2024
+  headline benchmark) instead of TruthfulQA-MC. Tests the proxy-
+  thinness vs benchmark-pathology disambiguation.
+- **Different formal structure.** Cross-domain transfer (BCVF
+  trained in one domain applied in another), supervised
+  activation probes (Azaria & Mitchell 2023; Marks & Tegmark
+  2024) requiring labeled training data, or system-level
+  abstention rather than answer selection. Each is a different
+  research program with its own metrics.
+
+None of these is authorized by §14c. They are plausible next
+investments that would each require a deliberate §0.8 pre-
+commitment with explicit hypothesis, metrics, bands, and
+acceptance/rejection rules.
+
+**Combined picture across §13 and §14 — full LLM transfer line
+now closed at all tested experimental structures.**
+
+| Program | Hypothesis class | Status |
+|---|---|---|
+| §13.10 | sample-space, single-model SE | MARGINAL_PASS (0.661 / 0.661, baseline of record) |
+| §13.11 | sample-space, cross-family ensemble | combined ANTI |
+| §13.12 | internal-state, single-snapshot EigenScore | combined ANTI |
+| §13.14 | temporal, K-sample text-level 2nd-diff | combined ANTI |
+| §13.16 | temporal, K-sample hidden-state 2nd-diff | combined ANTI (both inverted) |
+| §13.18 | temporal, single-trajectory forced-allocation | combined ANTI |
+| §14a | system-level, string-matched selector | SCOUT_SATURATION |
+| **§14a.2** | **system-level, NLI-clustered selector** | **SCOUT_SATURATION** |
+
+**7 of 8 distinct hypothesis classes ANTI or saturated; §13.10
+remains the strongest result on record across both single-axis
+and system-level programs.** The honest external framing for any
+internal-research referencing of §13/§14 is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100 + the cross-
+> family triple (Qwen + Llama + Mistral), no literature-aligned,
+> mechanism-motivated, or system-level BCVF construction tested
+> in this codebase clears the §13.10 marginal baseline of AUC
+> 0.661 (single-axis) or the corresponding accuracy ceiling
+> around 0.30 on HaluEval-QA's NLI-clustered uniform majority
+> vote (system-level). The LLM transfer line is closed at all
+> eight tested experimental structures.*
+
+**What §14c authorizes (per §14a.2 pre-commitment + §14c result):**
+
+- **Closing the §13/§14 LLM-track program at the exhaustive
+  level.** §13.19 closed §13's single-axis sub-program; §14b
+  closed §14a's string-matched-selector scout; §14c closes
+  §14a.2's NLI-clustered-selector scout. **No further §13/§14
+  single-axis or scout-level probes are authorized.** The §13.10
+  baseline is the strongest result of record; reaffirmed by all
+  7 comparison probes.
+- **Preserving the §14a.2 selector-spec fix as a methodological
+  win.** The audit + fresh §0.8 commitment with corrected spec
+  + clean re-run is the discipline pattern future LLM-domain
+  work should replicate.
+- **Documenting V1 softmin's persistent +3 to +4pp lift as
+  analytical observation** (NOT as a band-clearing pass).
+  Persistent across two different selector configurations
+  (§14a, §14a.2). Below STRONG threshold and below sign-test
+  significance at N=100. Worth flagging in future revisits; not
+  worth current promotion.
+- **Documenting the band-coverage gap as a §0.8-discipline
+  lesson.** §14a.2's pre-committed bands didn't strictly cover
+  the observed $(\Delta_{V1}, \Delta_{V2}) = (+4, +1)$ outcome.
+  Future pre-commitments should partition the outcome space
+  exhaustively to prevent fall-through ambiguity.
+
+**What §14c does NOT authorize:**
+
+- **Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.** §13.9
+  hold remains in force, strengthened by §14c's saturation under
+  the methodologically-correct selector.
+- **Any post-hoc renegotiation of §14a.2 bands** to recategorize
+  the V1 +4pp as MARGINAL or DIRECTIONAL. Bands were pre-
+  committed; rebucketing post-hoc would be a §0.8 violation.
+- **Promotion to full §14.** SCOUT_SATURATION explicitly
+  forecloses the multi-week full §14 investment per §14a.2's
+  promotion rules.
+- **Reframing the §14 result as "operational lift via abstention"
+  or selective prediction.** The §14 program tested system-level
+  *answer selection*, not selective prediction. Reframing what
+  success means inside the §14c writeup would be the discipline-
+  erosion failure mode §0.8 is designed to prevent. If selective
+  prediction is interesting as a future direction, it should be
+  pre-committed as a separate top-level chapter with its own
+  pinned metrics — not blended into §14c.
+- **Any further LLM-domain probe** in §13 or §14 without a
+  fundamentally different reframing under a fresh §0.8 commitment.
+- **Any claim that affects the autonomy-domain BCVF result.**
+  §6.1 stands independently. §14c's outcome bears only on the
+  LLM-domain transfer claim, not on the robotics-domain
+  validation.
+
+**Final scope statement — §13 and §14 chapters now closed.**
+
+- **§13** closed in §13.19 across all five tested single-axis
+  hypothesis classes.
+- **§14a** scout closed in §14b at SCOUT_SATURATION (string-
+  matched selector).
+- **§14a.2** scout closed in §14c at SCOUT_SATURATION (NLI-
+  clustered selector). Selector-spec fix succeeded structurally
+  but did not lift the system layer past pre-committed promotion
+  thresholds.
+- **Full §14** explicitly NOT authorized. Promotion to full §14
+  was conditional on §14a.2 STRONG or DIRECTIONAL; §14a.2
+  SCOUT_SATURATION forecloses that path.
+
+The §13.8 future-work list documents three remaining out-of-§13/
+§14 directions, none pre-committed:
+- (a) Single-trajectory forced-allocation observable — executed
+  in §13.18 / §13.19 (combined ANTI).
+- (b) System-level integration with NLI-clustered selector —
+  executed in §14a.2 / §14c (SCOUT_SATURATION).
+- (c) Model-scale upgrade — never executed; only remaining §13.8
+  item not yet tested. Requires a fresh §0.8 commitment with
+  revised baseline at the new scale.
+
+**§13/§14 closure scope.** The §13/§14 LLM-track program tested
+whether the BCVF formalism transfers to LLM hallucination
+detection at our specific scale (Qwen2.5-7B-Instruct + DeBERTa-
+v3-base + N=100 + cross-family triple where applicable + HaluEval-
+QA + TruthfulQA-MC where applicable). The answer at this
+configuration is **no**, eight different ways across single-axis
+observable AUC and system-level routing accuracy. That is itself
+a clean, publishable methodological null — a contribution to the
+LLM hallucination-detection literature about which combinations
+of literature-aligned single-axis methods + system-integration
+configurations do AND do not transfer cleanly to 7B-class LLMs
+with practical NLI scoring at modest N.
+
+The autonomy-domain BCVF claim (§6.1's N=21 sign-test passed)
+stands wholly independent of any §13 or §14 outcome. The §13/§14
+LLM-domain program tested whether the BCVF formalism transfers
+to an adjacent domain at a specific scale; the answer at this
+configuration is no, eight different ways. The §13.9 external
+framing remains "BCVF is not positioned as an LLM hallucination
+detector"; that framing is now strengthened by exhaustive
+exploratory evidence rather than weakened.
+
+**Artifacts:**
+
+- `scripts/probe_system_level_scout_v2.py` (commit `be0a5a3`).
+- `docs/experiments/probe_system_level_scout_v2_halueval_qa.md`
+  and `.json`.
 
 ---
 
