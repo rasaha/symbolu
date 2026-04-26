@@ -12102,6 +12102,80 @@ scope tests.** External-framing changes (VC-brief, etc.) are
 foreclosed regardless of §15.3 outcome — same §13.9 hold rule
 that bound §15.1 / §15.2.
 
+**Operational metrics pin.**
+
+§15.3's metric set is structurally similar to §15.1's but
+single-benchmark (no worst-benchmark min) and pinned around
+a different **primary decision metric** — chosen to make the
+hybrid's claim operationally meaningful relative to §15.1's
+verdict-of-record, not just relative to random abstention.
+
+**Notation (single benchmark, $N=100$).** For each question
+$q$ on HaluEval-QA at threshold $\tau$:
+
+- $A_\tau = \{q : r(q) < \tau\}$ (Stage B answered set);
+  $\text{cov}(\tau) = |A_\tau|/N$.
+- $\text{acc}(\tau) = (1/|A_\tau|) \sum_{q \in A_\tau} c(q)$,
+  where $c(q)$ is the correctness label of Stage A's
+  `selected_answer(q)` per Chunk 3c (NOT Qwen-greedy
+  correctness).
+- $\text{ecr}(\tau), \text{far}(\tau)$ — identical formulas
+  to §15.1 Chunks 3a / 3b applied to the new $c(q)$.
+- $W_\text{hybrid} = N - \sum_q c(q)$ — total wrong selected
+  answers; observed empirically at run time (NOT pinned ex
+  ante like §15.1's $W$, since Stage A's selected-answer
+  correctness count is not a pinned constant).
+
+**Primary decision metric (single scalar):**
+$$
+\Delta\kappa \;=\; \kappa_\text{hybrid} - \kappa_{\S15.1,\text{HaluEval}}
+$$
+where:
+
+- $\kappa_\text{hybrid} = \max\{\text{cov}(\tau) :
+  \text{acc}(\tau) \ge \alpha_2 \text{ AND } |A_\tau| \ge n_\min\}$
+  on HaluEval-QA, with $\alpha_2 = 0.50$ and $n_\min = 10$
+  (identical floor to §15.1 Chunk 3a).
+- $\kappa_{\S15.1,\text{HaluEval}} = 0.26$ — pinned constant
+  from §15.2's verdict-of-record HaluEval $\kappa$ at $\alpha_2$
+  (recorded in `docs/experiments/probe_selective_abstention.json`).
+
+$\Delta\kappa > 0$ means the hybrid produces operationally
+meaningful lift over §15.1's single-source abstention at the
+absolute-majority target. $\Delta\kappa \le 0$ means it does
+not improve over §15.1 at that target.
+
+**Secondary diagnostic metrics** (reported, NOT band-driving).
+
+- $\delta_\text{AURC,hybrid} = W_\text{hybrid}/N -
+  \text{AURC}_\text{hybrid}$ — integrated lift over random
+  abstention on Stage A's selected answers (single-benchmark
+  analogue of §15.1's $\delta$).
+- $(\text{cov}, \text{ecr}, \text{far})$ triples at three
+  target accuracies $\alpha \in \{0.40, 0.50, 0.75\}$ — same
+  $\alpha$ set §15.1 used on HaluEval-QA.
+- Bootstrap CI (two-sided 95%, $B = 1000$, paired over
+  question indices, deterministic seed
+  `SeedSequence(entropy=15)` per §15.1 convention) on
+  $\Delta\kappa$. Statistical demotion rule pinned in
+  Chunk 3g.
+
+**Baselines (pinned, three; all from existing artifacts; no
+new generation).**
+
+| Baseline | Source | Role |
+|---|---|---|
+| §15.1 HaluEval $\kappa@\alpha_2 = 0.26$ | §15.2 verdict-of-record | Primary comparator (drives $\Delta\kappa$) |
+| §14a.2 V1 full-coverage point $(\text{cov}=1.0, \text{acc}=0.330)$ | §14a.2 dump | "Stage A without abstention" reference; documents whether the hybrid even needs Stage B |
+| Random-abstain matched-coverage on Stage A's answers | Closed-form: $\mathbb{E}[\text{acc}_\text{random}(\text{cov})] = (N - W_\text{hybrid})/N$ | Random baseline for $\delta_\text{AURC,hybrid}$ |
+
+§15.1's HaluEval $\kappa@\alpha_2$ is the central comparator
+because §15.1 is the closest non-hybrid analogue (single-
+source abstention at the same metric class on the same
+benchmark). A §15.3 STRONG must demonstrate that adding Stage
+A's selector produces operationally meaningful lift over the
+single-source policy — not merely lift over random abstention.
+
 ---
 
 
