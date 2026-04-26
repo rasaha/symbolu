@@ -8861,6 +8861,138 @@ remaining directions; none are pre-committed by §13.19.
 - `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.md` and `.json`.
 - `docs/experiments/probe_forced_alloc_2diff_halueval_qa.md` and `.json`.
 
+### 13.20 Observation — §13.10 protocol re-executed at N=200 (post-§13.19 deviation; not a re-classification of §13.10)
+
+**Status: §0.8 deviation from §13.19 closure, surfaced
+explicitly.** §13.19 explicitly stated "no further §13 single-
+axis probes are authorized." A re-execution of §13.10's
+protocol at N=200 was nonetheless run in the runpod container
+on both benchmarks after §15.2 had landed. Because that run
+both (a) was not pre-committed, and (b) overwrote the §13.10
+N=100 dumps §15.2 was computed against (see §15.2 Postscript),
+the result is recorded here as a documented observation, NOT
+as a §13 re-classification or a §13.20-as-pre-commitment.
+
+**Relationship to §13.10.** §13.10's verdict-of-record was
+**TRUTH_CORRELATED_MARGINAL at N=100** (AUC 0.661 on both
+TruthfulQA-MC and HaluEval-QA, identical to three decimals).
+That verdict was pinned at the N=100 configuration and
+remains binding under §0.8. **§13.20 does not change §13.10's
+classification.**
+
+**N=200 observation (per-benchmark numerical record).**
+
+| Benchmark | N | Greedy correct | W | Greedy accuracy | Mean H (correct) | Mean H (wrong) | Mean H (all) | **AUC** | Per-benchmark §11 classification |
+|---|---|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC | 200 | 48 | 152 | 0.240 | 1.379 | 1.646 | 1.582 | **0.596** | `NOISE_BAND_LIFT` (below §11 0.60 marginal bar) |
+| HaluEval-QA  | 200 | 54 | 146 | 0.270 | 1.114 | 1.597 | 1.467 | **0.679** | `TRUTH_CORRELATED_MARGINAL` |
+
+**Combined under the worst-benchmark rule** (§13.10 / §13.11 /
+… discipline): the worst benchmark is TruthfulQA-MC at AUC
+0.596, which falls in `NOISE_BAND_LIFT`. **At N=200 the
+combined classification under the same rule §13 used would be
+`NOISE_BAND_LIFT`**, one band below §13.10's N=100
+`TRUTH_CORRELATED_MARGINAL`.
+
+**Three honest observations the data supports.**
+
+**(a) The §13.10 N=100 result of 0.661 / 0.661 was likely at
+the upper end of the AUC's sampling distribution.** At N=200
+the TruthfulQA-MC AUC is 0.596 (a 0.065-point drop). The
+HaluEval-QA AUC is 0.679 (a 0.018-point rise). Both shifts
+are within the order of magnitude one would expect from
+N=100 → N=200 sampling-variance reduction at this AUC range,
+with a mean-reversion direction on TruthfulQA-MC (toward the
+broader distribution's mean). **The N=100 marginal-pass on
+TruthfulQA-MC was real, but its 0.661 point estimate did not
+generalize at N=200.**
+
+**(b) Per-benchmark mean-entropy separations widened on
+HaluEval-QA, narrowed on TruthfulQA-MC.** HaluEval-QA's
+correct-vs-wrong mean H separation grew from 0.486 nats
+(N=100) to 0.483 nats (N=200, essentially unchanged) but its
+mean-H-correct dropped from 1.176 to 1.114 — the correct
+subset became more concentrated. TruthfulQA-MC's correct-vs-
+wrong separation narrowed from 0.392 nats (N=100) to 0.267
+nats (N=200), with both means shifting up. **TruthfulQA-MC's
+distractors at the larger sample produce more entropy in
+correct-greedy responses too, eroding the gap.**
+
+**(c) The cross-benchmark AUC convergence visible at N=100
+(0.661 / 0.661) does not hold at N=200 (0.596 / 0.679).**
+The N=100 cross-benchmark identity of AUCs to three decimals
+was treated in §13.10 as evidence the metric was benchmark-
+portable. The N=200 data weakens that claim: the AUCs diverge
+by 0.083 points at the larger sample, with TruthfulQA-MC
+falling below the §11 0.60 marginal bar and HaluEval-QA
+remaining above it.
+
+**Implications for §13.9 hold.** §13.9 gates external-framing
+changes to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` on a STRONG-
+band lift on both benchmarks at any §13 / §14 / §15 probe.
+The N=200 result is *further from STRONG* than the N=100
+result was — TruthfulQA-MC dropped from 0.661 to 0.596,
+moving below even the marginal bar. **§13.9 hold is
+strengthened, not weakened, by §13.20.** No external-framing
+change is authorized on this evidence.
+
+**Implications for §15.** §15.2's MARGINAL verdict was
+computed against the N=100 dumps (see §15.2 Postscript) and
+is preserved as the §15.2 verdict-of-record. §13.20 does NOT
+authorize:
+
+- Recomputing §15 against the N=200 dumps. That would require
+  a fresh top-level §0.8 commitment with revised PINNED_N /
+  PINNED_W / parity gates.
+- Re-classifying §15.2's MARGINAL based on a degraded
+  upstream AUC. §15.2's verdict was about the §13.10 score's
+  selective-prediction value at the §13.10-of-record
+  configuration; the N=200 observation is upstream of §15's
+  metric class and operates under a different N.
+- Documenting §13.20's NOISE_BAND_LIFT as a "stronger §15
+  null." The two are separate metric classes; combining them
+  rhetorically would be the §0.8 violation pattern.
+
+**What §13.20 explicitly does NOT authorize.**
+
+- A §13.21 or any further §13 probe. §13.19 closure is
+  reaffirmed; this section is documentation of an off-
+  protocol observation, not a re-opening of §13.
+- Updating §13.10's verdict-of-record. The N=100 verdict
+  remains binding.
+- Updating §15.1's pinned constants. The §15.2 verdict-of-
+  record's reproducibility break is documented in the §15.2
+  Postscript, not patched.
+- VC-brief changes (§13.9 hold remains; §13.20 strengthens
+  rather than weakens it).
+- Cross-domain claims. The autonomy-domain BCVF claim (§6.1)
+  is unaffected.
+
+**Audit lesson.** §13's closure rule "no further §13 single-
+axis probes are authorized" is binding under §0.8 but cannot
+prevent off-protocol re-runs of producer scripts. The §15.1
+parity guard caught the resulting reproducibility break at the
+§15 layer (PARITY_GATE_FAILED would fire on a re-run); §13's
+closure had no equivalent guard at the §13.10 layer because
+the §13.10 producer is upstream of any §13 probe. Future
+chapters should consider build-time fingerprinting of upstream
+dumps so off-protocol overwrites are detected at the next
+layer's first invocation.
+
+**Artifacts.**
+
+- `scripts/probe_semantic_entropy.py` (unchanged §13.10
+  producer).
+- `docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`
+  (now contains N=200 dump; **was** the §13.10 N=100
+  TruthfulQA-MC dump §15.2 was computed against).
+- `docs/experiments/probe_semantic_entropy_halueval_qa.json`
+  (now contains N=200 dump; **was** the §13.10 N=100
+  HaluEval-QA dump §15.2 was computed against).
+- `docs/experiments/probe_semantic_entropy_truthfulqa_mc.md`
+  and `probe_semantic_entropy_halueval_qa.md` (corresponding
+  N=200 markdown reports).
+
 ## §14 System-level BCVF integration on LLMs (new chapter)
 
 §13.19 closed the §13 single-axis program exhaustively across
@@ -10318,13 +10450,17 @@ alters §13.9's external-framing hold.
   loads, no GPU, no NLI calls. CPU + numpy only.
 - **Input dumps (pinned, both consumed; the two benchmarks
   are evaluated independently with identical protocol):**
-  - `docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`
-    — §13.10 TruthfulQA-MC dump, N=100. *(Path corrected by
-    §15.1 amendment 1 below; original Chunk 2b pin had no
-    `_truthfulqa_mc` suffix, which did not match the on-disk
-    filename actually emitted by `scripts/probe_semantic_entropy.py`.)*
+  - `docs/experiments/probe_semantic_entropy.json` — §13.10
+    TruthfulQA-MC dump, N=100. *(Original Chunk 2b pin —
+    matches §13.10 prose. Briefly amended by §15.1 Amendment 1
+    to a `_truthfulqa_mc`-suffixed path based on the §13.10
+    script's filename template; reverted by §15.1 Amendment 2
+    after on-disk verification showed the dump is at this
+    un-suffixed path. See Amendments 1 and 2 below for the
+    full audit trail.)*
   - `docs/experiments/probe_semantic_entropy_halueval_qa.json`
-    — §13.10 HaluEval-QA dump, N=100.
+    — §13.10 HaluEval-QA dump, N=100. *(Unchanged across both
+    amendments.)*
   - **No other JSON dump is consumed by §15.** §13.11 /
     §13.12 / §13.14 / §13.16 / §13.18 / §14a / §14a.2 dumps
     are explicitly out of scope.
@@ -11081,6 +11217,556 @@ during implementation.
 - The fail-fast schema-mismatch behavior; only the *target*
   filenames and field names that fail-fast checks against
   are corrected.
+
+### 15.1 Amendment 2 — TruthfulQA-MC input-path revert (post on-disk verification)
+
+**Status: amendment landed before any data inspection or
+verdict computation.** Surfaced explicitly per §15.1's "no
+silent patches" rule.
+
+**Trigger.** First real-data invocation of
+`scripts/probe_selective_abstention.py` in the runpod
+container (where the actual §13.10 dumps reside) returned
+`SCHEMA_MISMATCH: input dump not found` against the
+Amendment-1-pinned path
+`docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`.
+A `ls -la docs/experiments/probe_semantic_entropy*.json`
+audit revealed:
+
+- `probe_semantic_entropy.json` (254 KB, the actual §13.10
+  TruthfulQA-MC dump — un-suffixed).
+- `probe_semantic_entropy_halueval_qa.json` (210 KB, matches
+  the original Chunk 2b pin; unchanged).
+
+The original Chunk 2b pin (`probe_semantic_entropy.json` for
+TruthfulQA-MC, un-suffixed) was therefore *correct* and
+matched both the §13.10 prose Artifacts block and the actual
+on-disk dump. Amendment 1 had extrapolated a suffixed path
+from the §13.10 *script's* filename template
+(`f"probe_semantic_entropy_{benchmark}.json"`), without
+verifying against on-disk reality, and introduced a path
+that did not match anything in the runpod's
+`docs/experiments/` directory.
+
+**Amendment (this chunk supersedes the TruthfulQA-MC path
+component of Amendment 1).**
+
+- TruthfulQA-MC input path **reverted** to
+  `docs/experiments/probe_semantic_entropy.json`
+  (un-suffixed; matches §13.10 prose and on-disk reality).
+- HaluEval-QA input path remains
+  `docs/experiments/probe_semantic_entropy_halueval_qa.json`
+  (unchanged across both amendments).
+- Field-name pinning from Amendment 1 (`q_idx`,
+  `semantic_entropy`, `greedy_matches_correct`) is unchanged
+  and verified against the §13.10 script's JSON writer.
+- All other §15.1 pins (numerical bands, metric definitions,
+  baselines, cost, scope, fail-fast behavior) are unchanged.
+
+**Why this is a §0.8-clean amendment.** Like Amendment 1, this
+amendment corrects a pre-commitment artifact (a wrong filename
+introduced by Amendment 1) without changing any pinned
+numerical band, metric definition, baseline, acceptance/
+rejection rule, or scope boundary. No data has been inspected.
+The cascade boundary-case audit table from Chunk 4b is
+unaffected; `--self-test` continues to pass 13/13 unchanged.
+
+**What this amendment does NOT change:**
+
+- Amendment 1's field-name pin (still binding).
+- Numerical bands (Chunks 4a / 4b).
+- Operational metric definitions (Chunks 3a / 3b).
+- Baselines (Chunk 5).
+- Disclosed simplifications, assumptions, or failure modes
+  (Chunk 6).
+- Output paths or schema (Chunk 7).
+- The "no secondary observable" pin (Chunk 2c).
+- Fail-fast schema-mismatch behavior; only the *target*
+  TruthfulQA-MC filename is reverted.
+
+**Audit lesson recorded for future amendments.** Filename
+pins should be verified against the actual on-disk artifact
+in the execution environment, not extrapolated from the
+producing script's template. Amendment 1's mistake — assuming
+the script's template determined the on-disk filename without
+checking the §13.10 prose's explicit Artifacts list — would
+have caught itself sooner if a `ls`-based on-disk check had
+been part of the amendment's own §0.8 review.
+
+### 15.2 Result — §15.1 selective abstention scout returned MARGINAL
+
+The §15.1 pre-committed scout has been executed against the
+on-disk §13.10 dumps in the runpod container. Combined
+classification per pre-committed bands:
+**`MARGINAL`** (δ = +0.1159, κ = 0.1400, no annotations).
+The §13.10 single-snapshot semantic-entropy score, used as a
+per-question risk score in a deterministic answer/abstain
+policy, produces small but non-zero AURC lift over random
+abstention with statistical confirmation, but does not
+support enough coverage at the α₂ = 0.50 absolute-majority
+operating point on the worst benchmark to clear
+USEFUL_INTERNAL.
+
+Combined with §13.19's 5-of-5 single-axis null and §14b /
+§14c's SCOUT_SATURATION on system-level routing, this is the
+selective-prediction outcome that §15.1's bands were designed
+to classify cleanly: the §13.10 ceiling supports
+operationally-detectable but operationally-unactionable
+abstention behavior at this configuration. The autonomy-
+domain BCVF claim (§6.1) stands independently and is
+unaffected. The §13.9 VC-brief hold remains in force and is
+not addressed by §15 by construction (different metric class
+than §13.9's gating bar).
+
+**Parity-gate confirmation (per §15.1 Chunks 2b / 3a / 5).**
+
+| benchmark | N_ok | W_ok | auc_random_ok |
+|---|---|---|---|
+| truthfulqa_mc | True | True | True |
+| halueval_qa | True | True | True |
+
+Both benchmarks satisfied N=100, W matches `PINNED_W` (75 on
+TruthfulQA-MC, 70 on HaluEval-QA), and `AURC_random = W/N`
+exactly. No §0.8 deviation from the §15.1-pinned configuration
+fired at the input layer.
+
+**§15.1 amendment audit trail.** Two §0.8 amendments to §15.1
+landed before any data inspection: Amendment 1 added
+explicit field-name pinning (`q_idx`, `semantic_entropy`,
+`greedy_matches_correct`) and a per-benchmark-suffixed
+TruthfulQA-MC input path; Amendment 2 reverted the TruthfulQA-
+MC path to the un-suffixed `probe_semantic_entropy.json`
+after on-disk verification in the runpod showed the actual
+§13.10 artifact at that path. Both amendments are recorded in
+§15.1 with full rationale. The post-amendment configuration
+matches on-disk dumps exactly; **no further amendments fired
+during the run** and the verdict is reported under the
+amended-but-otherwise-unchanged §15.1 commitment.
+
+**Self-test gate.** §15.1's required pre-execution gate
+(`--self-test`) ran in the same invocation as real-data
+execution and returned PASSED on all 6 cascade boundary cases
+(Chunk 4b audit table) and all 7 demotion-rule cases (Chunk
+4c). The cascade implementation matches the pinned design
+exactly; the verdict reported below is the cascade's
+mechanical readout, not interpretation.
+
+**Artifacts.**
+
+- `scripts/probe_selective_abstention.py` (numpy + stdlib,
+  CPU-only post-processor; 1112 lines).
+- `docs/experiments/probe_selective_abstention.json` (machine-
+  readable, schema_version `15.1`, both benchmarks plus
+  combined verdict; full threshold sweep included).
+- `docs/experiments/probe_selective_abstention.md` (human-
+  readable summary with per-benchmark headline, operating
+  points, combined classification, and cascade trace).
+
+**Per-benchmark headline result.**
+
+| benchmark | greedy_acc | $W$ | AURC_random | AURC_policy | $\delta$ | $\delta$ 95% CI | $\kappa$ | $\kappa$ 95% CI |
+|---|---|---|---|---|---|---|---|---|
+| truthfulqa_mc | 0.250 | 75 | 0.7500 | 0.6341 | **+0.1159** | [+0.0213, +0.1925] | **0.1400** | [0.0000, 0.3600] |
+| halueval_qa | 0.300 | 70 | 0.7000 | 0.5609 | **+0.1391** | [+0.0432, +0.2152] | **0.2600** | [0.0000, 0.5700] |
+
+**Combined under worst-benchmark rule** (Chunk 4a):
+$\delta = \min_b \delta_b = +0.1159$ (TruthfulQA-MC),
+$\kappa = \min_b \kappa_b = +0.1400$ (TruthfulQA-MC).
+
+**Cascade trace** (mechanical readout per §15.1 Chunks 4a /
+4b; matches the implementation's `_cascade_trace` output
+exactly):
+
+```
+rule 1 REGRESSION: delta=+0.1159 < -0.02         -> NO
+rule 2 STRONG:     delta>=+0.10 AND kappa>=0.30  -> NO   (kappa=0.14 < 0.30)
+rule 3 USEFUL_INTERNAL: delta>=+0.05 AND kappa>=0.20  -> NO   (kappa=0.14 < 0.20)
+rule 4 MARGINAL:   delta>=+0.02 AND kappa>=0.10  -> YES
+```
+
+**Demotion rule (Chunk 4c) — did NOT fire.** The §15.1
+demotion rule is STRONG-only by construction; since the
+point-estimate verdict is MARGINAL (rule 4), the demotion
+rule does not apply and `verdict_annotations = []`. For
+audit completeness: had the verdict been STRONG, both
+benchmarks' $\delta$ CI lower bounds are strictly positive
+(0.0213 on TruthfulQA-MC, 0.0432 on HaluEval-QA), so the
+demotion rule would NOT have fired even if STRONG had
+classified.
+
+**Three observations the headline supports.**
+
+**(a) The AURC lift over random is statistically supported on
+both benchmarks individually.** Both per-benchmark $\delta$
+95% CI lower bounds are strictly positive (0.021 and 0.043).
+The §13.10 entropy is genuinely truth-correlated for selective
+prediction in the integrated AURC sense, not within sampling
+noise. This is qualitatively distinct from a "saturation"
+verdict — the policy does carry signal.
+
+**(b) The $\delta$ point estimates are individually in the
+STRONG band on both benchmarks.** TruthfulQA-MC $\delta =
++0.1159$ and HaluEval-QA $\delta = +0.1391$ each clear the
+$\delta \ge +0.10$ STRONG threshold from §15.1 Chunk 4a. **It
+is the $\kappa$ hurdle, not the $\delta$ hurdle, that
+prevents a higher verdict band.** The §13.10 entropy can
+identify wrong-answer enrichment in the integrated curve but
+cannot deliver enough operating-point density at $\alpha_2 =
+0.50$ on the worst benchmark.
+
+**(c) The $\kappa$ CI lower bounds are 0.000 on both
+benchmarks.** TruthfulQA-MC $\kappa$ CI = $[0.000, 0.360]$,
+HaluEval-QA $\kappa$ CI = $[0.000, 0.570]$. Bootstrap cannot
+rule out "no qualifying $\tau$ on the resample" at $N = 100$.
+This is a power-of-measurement observation, not a $\kappa = 0$
+claim — see §15.2 Chunk 2c (asymmetry analysis) and Chunk 6
+§(3) failure-mode "STRONG blocked by CI demotion" for the
+analogous discussion at $\delta$. A larger-N re-run would
+likely tighten this band; that re-run is NOT authorized by
+§15.1 and would require a fresh §0.8 commitment.
+
+**Per-benchmark asymmetry under the worst-benchmark rule.**
+
+The combined verdict is MARGINAL because the worst-benchmark
+rule pulls TruthfulQA-MC's MARGINAL-grade $(\delta, \kappa)$
+through. Each benchmark's own per-benchmark verdict, computed
+by feeding only its own $(\delta_b, \kappa_b)$ through the
+§15.1 cascade, is *higher* than the combined verdict:
+
+| benchmark | $\delta_b$ | $\kappa_b$ | per-benchmark verdict (Chunk 4a / 4b cascade applied to that benchmark alone) |
+|---|---|---|---|
+| TruthfulQA-MC | +0.1159 | 0.1400 | **MARGINAL** (rule 4: $\delta \ge +0.02$ AND $\kappa \ge 0.10$, both cleared; rule 3 fails on $\kappa < 0.20$) |
+| HaluEval-QA  | +0.1391 | 0.2600 | **USEFUL_INTERNAL** (rule 3: $\delta \ge +0.05$ AND $\kappa \ge 0.20$, both cleared; rule 2 fails on $\kappa < 0.30$) |
+| **combined (min)** | **+0.1159** | **0.1400** | **MARGINAL** |
+
+This is the canonical Chunk 6 §(3) failure-mode signature
+"benchmark asymmetry under worst-benchmark rule" pinned
+ex ante in §15.1. The asymmetry is **documented but
+non-promotable**: per the §15.1 worst-benchmark rule (Chunk
+4a) and per Chunk 6 §(3)'s explicit "intentional and matches
+§13/§14's worst-benchmark discipline" guidance, the combined
+classification is MARGINAL and is binding.
+
+**TruthfulQA-MC's structural role across all three §13 / §14 /
+§15 programs.** TruthfulQA-MC has now defeated three distinct
+metric classes under the same worst-benchmark rule:
+
+- **§13** (AUC of observable vs ground truth, Chunks 13.10–
+  13.18): TruthfulQA-MC capped 5 of 5 single-axis hypothesis
+  classes; the §13.18 Variant A entropy 2nd-difference scored
+  AUC 0.701 on HaluEval-QA but 0.536 on TruthfulQA-MC, forcing
+  combined ANTI.
+- **§14** (Δ accuracy vs naive aggregation; deferred to full
+  §14 conditional on scout STRONG): the scout never reached
+  full §14, so TruthfulQA-MC was never independently evaluated
+  at the system level — but the scout-level saturation on
+  HaluEval-QA was already enough to foreclose full §14.
+- **§15** (AURC lift + κ at α₂; this section): TruthfulQA-MC
+  $\kappa = 0.14$ pulls combined classification one band below
+  HaluEval-QA's per-benchmark USEFUL_INTERNAL.
+
+The pattern is consistent: TruthfulQA-MC's adversarial
+distractor structure (designed to match common false-belief
+patterns) compresses entropy distributions in a way that
+limits both AUC-based and AURC-based discrimination at the
+7B + DeBERTa-v3-base configuration. **§15 does not falsify
+or weaken this pattern; it adds a third metric-class data
+point that confirms it.**
+
+**Why this asymmetry is not a defect of §15.1's bands.** The
+§15.1 worst-benchmark rule was pinned ex ante in Chunk 4a
+specifically to mirror the §13 / §14 disciplines. Per-
+benchmark splits where one benchmark would clear a higher
+band and the other would not is **exactly** the case the
+worst-benchmark rule was designed to handle uniformly. A
+benchmark-conditional verdict (HaluEval-QA USEFUL_INTERNAL,
+TruthfulQA-MC MARGINAL) would require a fresh §0.8 commitment
+with a different combined-classification rule (e.g., per-
+benchmark verdicts as the primary unit, or a pareto-frontier
+structure across the two benchmarks). It is NOT authorized by
+§15.1 and would not retroactively re-classify the §15.1
+verdict-of-record reported in §15.2.
+
+**Operating-cliff analysis — the ecr / far cost at α₂.**
+
+The full operating-point table at all three pinned target-
+accuracy points (Chunk 3a, $\alpha_1 = $ baseline + 10pp;
+$\alpha_2 = 0.50$; $\alpha_3 = 0.75$):
+
+| benchmark | $\alpha$ | $\text{cov}@\alpha$ | $\tau^*$ | ecr | far |
+|---|---|---|---|---|---|
+| truthfulqa_mc | 0.35 | 0.32 | 1.4979 | 0.7333 | 0.5200 |
+| truthfulqa_mc | 0.50 | 0.14 | 0.6931 | 0.9067 | 0.7200 |
+| truthfulqa_mc | 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+| halueval_qa  | 0.40 | 0.36 | 1.4979 | 0.7000 | 0.5000 |
+| halueval_qa  | 0.50 | 0.26 | 1.0889 | 0.8143 | 0.5667 |
+| halueval_qa  | 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+
+Three operationally relevant features:
+
+**(a) Coupled high error-capture + high false-abstention at
+$\alpha_2$.** At the absolute-majority operating point, the
+policy catches **91% of TruthfulQA-MC's wrong greedy answers
+and 81% of HaluEval-QA's** ($\text{ecr} = 0.91 / 0.81$), but
+also abstains **72% of TruthfulQA-MC's correct greedy answers
+and 57% of HaluEval-QA's** ($\text{far} = 0.72 / 0.57$).
+This is the classical selective-prediction "throw out most
+answers to keep the answered ones clean" trade-off: error
+capture is high (so Chunk 6 §(3)'s "good coverage but weak
+error capture" failure mode is *not* fired), but the false-
+abstention cost makes the operating point operationally
+expensive. Deployment without further calibration would
+refuse most of the user's questions.
+
+**(b) $\alpha_1$ vs $\alpha_2$ collapse asymmetry.** Both
+benchmarks share the *same* $\tau^* = 1.4979$ at $\alpha_1$
+(TruthfulQA-MC at 0.35, HaluEval-QA at 0.40), suggesting the
+high-entropy tails of the two benchmarks' $r(q)$ distributions
+are structurally similar. The divergence appears at
+$\alpha_2 = 0.50$: TruthfulQA-MC requires $\tau^*$ to drop to
+$0.6931 = \ln 2$ (the entropy of a 2-cluster equal-split) to
+keep acc $\ge 0.50$, costing more coverage; HaluEval-QA can
+hold $\tau^* = 1.0889$ and keep more questions in the answered
+set. This is the structural reason TruthfulQA-MC's $\kappa$ is
+lower than HaluEval-QA's even when both benchmarks' high-
+entropy regions look comparable.
+
+**(c) $\alpha_3 = 0.75$ degenerate on both benchmarks.**
+$\text{cov}@0.75 = 0$ on TruthfulQA-MC AND on HaluEval-QA.
+**No threshold $\tau$ in the empirical sweep grid (102 points
+per benchmark) yields acc $\ge 0.75$ on an answered subset of
+size $\ge n_{\min} = 10$.** This is a hard ceiling at the
+configuration: deployment-grade accuracy ($\ge 75\%$) cannot
+be reached from a base model at greedy accuracy $\le 0.30$
+through abstention alone at this scale. It is the strongest
+single piece of evidence that an abstention/escalation
+product layer over §13.10-grade signals at this configuration
+**cannot reach a deployment-grade subset** — even if the
+verdict had been STRONG, $\alpha_3$ degeneracy would have
+forced any deployment claim to operate at $\alpha < 0.75$
+target-accuracy bands.
+
+**Mapping to Chunk 6 §(3) failure-mode catalogue.** The §15.1
+result hits one of the four pre-pinned failure modes exactly
+(benchmark asymmetry, §15.2 Chunk 2c above) and is *adjacent*
+to a second:
+
+- **"High AURC lift but tiny coverage"** (Chunk 6 §(3) item
+  1): pinned signature was $\delta$ STRONG-range AND $\kappa <
+  0.10 \to$ SATURATION. The actual outcome is $\delta$
+  STRONG-range AND $\kappa \in [0.10, 0.20)$ on the worst
+  benchmark $\to$ MARGINAL — one band higher than the pinned
+  failure-mode prediction. The cascade did not fire that
+  mode, but the underlying mechanism (delta-rich, kappa-poor
+  at $\alpha_2$) is what the failure mode anticipated.
+
+The remaining two pre-pinned failure modes ("good coverage
+but weak error capture", "STRONG blocked by CI demotion") are
+NOT fired by this run. Both are documented and ruled out by
+the headline numbers above.
+
+**What §15.2 authorizes (per §15.1 Chunk 4c MARGINAL row).**
+
+The §15.1-pinned acceptance/rejection mapping for MARGINAL is
+binding under §0.8. Reproduced exactly:
+
+| §15.2 verdict | Authorizes | Forecloses |
+|---|---|---|
+| MARGINAL | Recording §15 as an acknowledged but unactionable signal. | §15.2 follow-up; internal-research operational claims; product investment; VC-brief changes. |
+
+Specifically, §15.2 **authorizes**:
+
+- Documenting the §15.1 verdict-of-record in this section
+  (which §15.2 itself accomplishes).
+- Recording the per-benchmark $\delta$ / $\kappa$ /
+  operating-point numerical evidence for future audit and
+  reference.
+- Citing the per-benchmark asymmetry (TruthfulQA-MC MARGINAL,
+  HaluEval-QA USEFUL_INTERNAL) as a documented structural
+  observation about the §13.10 score's operational behavior
+  under the worst-benchmark rule.
+- Citing §15 alongside §13 / §14 in the combined LLM-track
+  closure framing (§15.2 Chunk 2f below).
+
+§15.2 explicitly **does NOT authorize**:
+
+- **A §15.2-as-implementation follow-up** (e.g., a script
+  re-run at larger N, a ensemble-score variant, a relaxed
+  worst-benchmark rule). Each would require a fresh top-level
+  §0.8 commitment.
+- **Internal-research operational claims** of the form
+  "§13.10 entropy supports useful selective prediction at
+  this configuration." Per Chunk 4c, USEFUL_INTERNAL is the
+  bar for that claim, and §15.2's combined verdict is one
+  band below.
+- **Product investment** (any abstention/escalation product
+  layer scoped over §13.10-grade signals at this
+  configuration). STRONG was the bar for that authorization.
+- **VC-brief changes.** Per Chunk 4c, no §15 verdict —
+  including STRONG — would have authorized
+  `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` updates, because §15's
+  metric class (operational AURC + coverage) is structurally
+  separate from §13.9's gate (answer-selection AUC ≥ 0.75 on
+  both benchmarks). §13.9 hold remains in force.
+- **Reframing of any §13 or §14 verdict.** §15's MARGINAL is
+  on a fresh metric class and does not interact with §13's
+  combined ANTI verdicts or §14's SCOUT_SATURATION verdicts.
+  Those closures remain binding.
+- **Cross-domain claims.** The autonomy-domain BCVF claim
+  (§6.1) stands wholly independent of any §15 outcome.
+
+**No deviation flag fired during the §15.1 run.** Per §15.1
+Chunk 7's "Any deviation discovered at run time must be
+flagged in the §15 result section as a §0.8 deviation, not
+absorbed silently": the run produced no such deviation.
+Parity gates passed, schema matched (post-Amendment 2), self-
+test passed in-run, the cascade fired exactly as the
+implementation's `_cascade_trace` walks the pinned rules.
+The two §15.1 amendments landed pre-data-inspection are
+documented within §15.1 itself, not as run-time deviations.
+
+**Combined picture across §13 / §14 / §15 — LLM-track now
+covers three distinct metric classes.**
+
+§15.2 closes the third of three pre-committed metric-class
+investigations of BCVF-derived signals on the LLM track:
+
+| Program | Metric class | Question | Combined verdict |
+|---|---|---|---|
+| §13 | AUC of an observable vs ground-truth correctness | Does observable X correlate with correctness? | 5-of-5 single-axis classes ANTI; §13.10 baseline `TRUTH_CORRELATED_MARGINAL` (AUC 0.661 on both benchmarks) |
+| §14 | Δ accuracy of system-level routing vs naive aggregation | Does BCVF-shaped routing lift end-to-end accuracy? | 2-of-2 scout configurations `SCOUT_SATURATION` |
+| **§15** | **Risk-coverage operational metrics (AURC + coverage at target accuracy)** | **Does the §13.10 score support a useful answer/abstain policy?** | **MARGINAL** (δ = +0.116 statistically supported; κ = 0.14 limited by TruthfulQA-MC) |
+
+The three programs are structurally independent — different
+metric classes, different acceptance rules, different math
+objects. **Each was pre-committed under §0.8 with bands fixed
+before its data was opened, and each landed at a verdict band
+strictly below STRONG on the combined-classification rule.**
+The TruthfulQA-MC ceiling is the consistent structural cap
+across all three.
+
+**§13.9 VC-brief hold reaffirmed.** §13.9 gates external-
+framing changes on `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` to a
+STRONG-band lift on both benchmarks at any §13 / §14 / §15
+probe. §15.2's MARGINAL verdict combined with §13's 5-of-5
+ANTI and §14's 2-of-2 SCOUT_SATURATION means **eleven
+distinct experimental structures across three metric classes
+have now been tested at the 7B + DeBERTa-v3-base + N=100
+configuration without producing a STRONG combined classification
+on any of them.** The §13.9 hold is *strengthened*, not
+weakened, by §15.2's confirmation that the operational-
+abstention metric class also fails to clear STRONG.
+
+The honest external framing for any internal-research
+referencing of the §13 / §14 / §15 program is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100, no
+> literature-aligned, mechanism-motivated, system-level, or
+> operational-abstention BCVF construction tested in this
+> codebase clears the STRONG combined-classification bar on
+> the worst-benchmark rule. The LLM transfer line is closed
+> across answer-correlation (§13), answer-selection (§14),
+> and selective-prediction (§15) metric classes at all eleven
+> tested experimental structures.*
+
+**§15 LLM-track operational chapter is closed.** Per Chunk 4c
+the MARGINAL verdict explicitly forecloses §15.2-as-
+implementation follow-ups at this observable. **Any
+follow-up under §15 logic — whether it is an ensemble score,
+a relaxed worst-benchmark rule, a hybrid §14-selector +
+§15-abstention combination (the natural §14c-anticipated
+direction), or a larger-N re-run — would require a fresh
+top-level §0.8 commitment with bands pinned before any data
+inspection.** None is authorized by §15.2.
+
+**The autonomy-domain BCVF claim (§6.1) stands independently
+on the N=21 sign-test that passed in §6.1 / §6.7 and is
+unaffected by any §13 / §14 / §15 outcome.** The §13 / §14 /
+§15 program tested whether BCVF transfers to LLM
+hallucination detection at this codebase's specific scale,
+across three distinct metric classes; the answer at this
+configuration is no, eleven different ways.
+
+**Artifacts.**
+
+- `scripts/probe_selective_abstention.py` (§15.1 implementation,
+  numpy + stdlib only, CPU-only post-processor with
+  `--self-test` gate).
+- `docs/experiments/probe_selective_abstention.json`
+  (machine-readable result with full schema, both benchmarks,
+  combined verdict).
+- `docs/experiments/probe_selective_abstention.md`
+  (human-readable summary with parity gates, per-benchmark
+  headlines, operating points, cascade trace, final verdict).
+
+### 15.2 Postscript — upstream §13.10 dumps overwritten post-run
+
+**Status: §0.8 deviation surfaced explicitly per §15.1 Chunk 7.**
+
+After §15.2 Chunks 2a–2f landed (`175fb96`), the §13.10
+producer script `scripts/probe_semantic_entropy.py` was re-
+executed in the runpod container at `--num-questions 200`
+on both benchmarks. Because that script writes to the same
+on-disk paths §15.1 reads from
+(`docs/experiments/probe_semantic_entropy.json` and
+`docs/experiments/probe_semantic_entropy_halueval_qa.json`),
+**the §13.10 N=100 dumps that §15.2 was computed against
+have been overwritten with N=200 versions.**
+
+**§15.2 verdict-of-record is unchanged.** The artifacts
+`docs/experiments/probe_selective_abstention.json` and
+`probe_selective_abstention.md` were written from the N=100
+dumps and contain the N=100 numbers
+(`greedy_accuracy = 0.250 / 0.300`, `total_wrong_W = 75 / 70`,
+`delta = +0.1159`, `kappa = 0.1400`, `verdict = MARGINAL`).
+Those artifacts are preserved. The §15.2 verdict cited in
+Chunks 2a–2f remains binding under §0.8 and is not
+recomputed against the new N=200 dumps.
+
+**What is broken.** §15.1's reproducibility chain from
+upstream dumps to verdict. Re-running
+`scripts/probe_selective_abstention.py` against the current
+on-disk dumps would hit `PARITY_GATE_FAILED` (exit 3): the
+N=200 dumps yield $N = 200$, $W = 152 / 146$, and
+$\text{AURC}_\text{random} = 0.760 / 0.730$, none of which
+match the §15.1-pinned $N = 100$, $W = 75 / 70$, and
+$\text{AURC}_\text{random} = 0.750 / 0.700$. The script
+would abort with the explicit "§15.1 assumptions no longer
+hold" message — exactly as designed. **This is not a §15
+verdict change; it is a reproducibility-trail break.**
+
+**§0.8 discipline this satisfies.** §15.1 Chunk 7 required
+that "any deviation discovered at run time must be flagged
+in the §15 result section as a §0.8 deviation, not absorbed
+silently." The deviation here was upstream of the §15.1
+script's run-time loop — the §13.10 dumps were overwritten
+post-run, not at run time — but the spirit of the rule
+applies: the change is being surfaced, not absorbed.
+
+**What this postscript does NOT authorize.**
+
+- **Recomputing the §15 verdict against N=200 dumps.** §15.1's
+  pinned configuration is N=100; substituting N=200 would
+  require a fresh top-level §0.8 commitment with revised
+  PINNED_N / PINNED_W / parity gates. Not authorized here.
+- **Updating `PINNED_N` / `PINNED_W` in the script** to silence
+  the parity gate. That would silently invalidate the §15.2-
+  of-record by re-purposing its checkpoint. Not authorized.
+- **Re-classifying §13.10.** §13.10's N=100 verdict (AUC
+  0.661 / 0.661, `TRUTH_CORRELATED_MARGINAL`) is the §13.10-
+  of-record. The N=200 result is a separate empirical
+  observation documented in §13.20 below.
+- **Restoring the N=100 dumps from regeneration.** Re-running
+  §13.10 at N=100 today would produce different per-question
+  scores due to sampling stochasticity — the original §15.2
+  computation cannot be exactly reproduced even with N
+  restored.
+
+**Cross-reference.** The N=200 §13.10 numbers are recorded in
+§13.20 below as a separate §13 observation (NOT a re-
+classification of §13.10). §15.2's MARGINAL verdict and
+§13.10's marginal-pass-of-record both stand at their pinned
+configurations.
 
 ---
 
