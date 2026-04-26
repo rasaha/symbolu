@@ -11493,6 +11493,80 @@ implementation's `_cascade_trace` walks the pinned rules.
 The two §15.1 amendments landed pre-data-inspection are
 documented within §15.1 itself, not as run-time deviations.
 
+**Combined picture across §13 / §14 / §15 — LLM-track now
+covers three distinct metric classes.**
+
+§15.2 closes the third of three pre-committed metric-class
+investigations of BCVF-derived signals on the LLM track:
+
+| Program | Metric class | Question | Combined verdict |
+|---|---|---|---|
+| §13 | AUC of an observable vs ground-truth correctness | Does observable X correlate with correctness? | 5-of-5 single-axis classes ANTI; §13.10 baseline `TRUTH_CORRELATED_MARGINAL` (AUC 0.661 on both benchmarks) |
+| §14 | Δ accuracy of system-level routing vs naive aggregation | Does BCVF-shaped routing lift end-to-end accuracy? | 2-of-2 scout configurations `SCOUT_SATURATION` |
+| **§15** | **Risk-coverage operational metrics (AURC + coverage at target accuracy)** | **Does the §13.10 score support a useful answer/abstain policy?** | **MARGINAL** (δ = +0.116 statistically supported; κ = 0.14 limited by TruthfulQA-MC) |
+
+The three programs are structurally independent — different
+metric classes, different acceptance rules, different math
+objects. **Each was pre-committed under §0.8 with bands fixed
+before its data was opened, and each landed at a verdict band
+strictly below STRONG on the combined-classification rule.**
+The TruthfulQA-MC ceiling is the consistent structural cap
+across all three.
+
+**§13.9 VC-brief hold reaffirmed.** §13.9 gates external-
+framing changes on `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` to a
+STRONG-band lift on both benchmarks at any §13 / §14 / §15
+probe. §15.2's MARGINAL verdict combined with §13's 5-of-5
+ANTI and §14's 2-of-2 SCOUT_SATURATION means **eleven
+distinct experimental structures across three metric classes
+have now been tested at the 7B + DeBERTa-v3-base + N=100
+configuration without producing a STRONG combined classification
+on any of them.** The §13.9 hold is *strengthened*, not
+weakened, by §15.2's confirmation that the operational-
+abstention metric class also fails to clear STRONG.
+
+The honest external framing for any internal-research
+referencing of the §13 / §14 / §15 program is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100, no
+> literature-aligned, mechanism-motivated, system-level, or
+> operational-abstention BCVF construction tested in this
+> codebase clears the STRONG combined-classification bar on
+> the worst-benchmark rule. The LLM transfer line is closed
+> across answer-correlation (§13), answer-selection (§14),
+> and selective-prediction (§15) metric classes at all eleven
+> tested experimental structures.*
+
+**§15 LLM-track operational chapter is closed.** Per Chunk 4c
+the MARGINAL verdict explicitly forecloses §15.2-as-
+implementation follow-ups at this observable. **Any
+follow-up under §15 logic — whether it is an ensemble score,
+a relaxed worst-benchmark rule, a hybrid §14-selector +
+§15-abstention combination (the natural §14c-anticipated
+direction), or a larger-N re-run — would require a fresh
+top-level §0.8 commitment with bands pinned before any data
+inspection.** None is authorized by §15.2.
+
+**The autonomy-domain BCVF claim (§6.1) stands independently
+on the N=21 sign-test that passed in §6.1 / §6.7 and is
+unaffected by any §13 / §14 / §15 outcome.** The §13 / §14 /
+§15 program tested whether BCVF transfers to LLM
+hallucination detection at this codebase's specific scale,
+across three distinct metric classes; the answer at this
+configuration is no, eleven different ways.
+
+**Artifacts.**
+
+- `scripts/probe_selective_abstention.py` (§15.1 implementation,
+  numpy + stdlib only, CPU-only post-processor with
+  `--self-test` gate).
+- `docs/experiments/probe_selective_abstention.json`
+  (machine-readable result with full schema, both benchmarks,
+  combined verdict).
+- `docs/experiments/probe_selective_abstention.md`
+  (human-readable summary with parity gates, per-benchmark
+  headlines, operating points, cascade trace, final verdict).
+
 ---
 
 
