@@ -10318,13 +10318,17 @@ alters §13.9's external-framing hold.
   loads, no GPU, no NLI calls. CPU + numpy only.
 - **Input dumps (pinned, both consumed; the two benchmarks
   are evaluated independently with identical protocol):**
-  - `docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`
-    — §13.10 TruthfulQA-MC dump, N=100. *(Path corrected by
-    §15.1 amendment 1 below; original Chunk 2b pin had no
-    `_truthfulqa_mc` suffix, which did not match the on-disk
-    filename actually emitted by `scripts/probe_semantic_entropy.py`.)*
+  - `docs/experiments/probe_semantic_entropy.json` — §13.10
+    TruthfulQA-MC dump, N=100. *(Original Chunk 2b pin —
+    matches §13.10 prose. Briefly amended by §15.1 Amendment 1
+    to a `_truthfulqa_mc`-suffixed path based on the §13.10
+    script's filename template; reverted by §15.1 Amendment 2
+    after on-disk verification showed the dump is at this
+    un-suffixed path. See Amendments 1 and 2 below for the
+    full audit trail.)*
   - `docs/experiments/probe_semantic_entropy_halueval_qa.json`
-    — §13.10 HaluEval-QA dump, N=100.
+    — §13.10 HaluEval-QA dump, N=100. *(Unchanged across both
+    amendments.)*
   - **No other JSON dump is consumed by §15.** §13.11 /
     §13.12 / §13.14 / §13.16 / §13.18 / §14a / §14a.2 dumps
     are explicitly out of scope.
@@ -11081,6 +11085,81 @@ during implementation.
 - The fail-fast schema-mismatch behavior; only the *target*
   filenames and field names that fail-fast checks against
   are corrected.
+
+### 15.1 Amendment 2 — TruthfulQA-MC input-path revert (post on-disk verification)
+
+**Status: amendment landed before any data inspection or
+verdict computation.** Surfaced explicitly per §15.1's "no
+silent patches" rule.
+
+**Trigger.** First real-data invocation of
+`scripts/probe_selective_abstention.py` in the runpod
+container (where the actual §13.10 dumps reside) returned
+`SCHEMA_MISMATCH: input dump not found` against the
+Amendment-1-pinned path
+`docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`.
+A `ls -la docs/experiments/probe_semantic_entropy*.json`
+audit revealed:
+
+- `probe_semantic_entropy.json` (254 KB, the actual §13.10
+  TruthfulQA-MC dump — un-suffixed).
+- `probe_semantic_entropy_halueval_qa.json` (210 KB, matches
+  the original Chunk 2b pin; unchanged).
+
+The original Chunk 2b pin (`probe_semantic_entropy.json` for
+TruthfulQA-MC, un-suffixed) was therefore *correct* and
+matched both the §13.10 prose Artifacts block and the actual
+on-disk dump. Amendment 1 had extrapolated a suffixed path
+from the §13.10 *script's* filename template
+(`f"probe_semantic_entropy_{benchmark}.json"`), without
+verifying against on-disk reality, and introduced a path
+that did not match anything in the runpod's
+`docs/experiments/` directory.
+
+**Amendment (this chunk supersedes the TruthfulQA-MC path
+component of Amendment 1).**
+
+- TruthfulQA-MC input path **reverted** to
+  `docs/experiments/probe_semantic_entropy.json`
+  (un-suffixed; matches §13.10 prose and on-disk reality).
+- HaluEval-QA input path remains
+  `docs/experiments/probe_semantic_entropy_halueval_qa.json`
+  (unchanged across both amendments).
+- Field-name pinning from Amendment 1 (`q_idx`,
+  `semantic_entropy`, `greedy_matches_correct`) is unchanged
+  and verified against the §13.10 script's JSON writer.
+- All other §15.1 pins (numerical bands, metric definitions,
+  baselines, cost, scope, fail-fast behavior) are unchanged.
+
+**Why this is a §0.8-clean amendment.** Like Amendment 1, this
+amendment corrects a pre-commitment artifact (a wrong filename
+introduced by Amendment 1) without changing any pinned
+numerical band, metric definition, baseline, acceptance/
+rejection rule, or scope boundary. No data has been inspected.
+The cascade boundary-case audit table from Chunk 4b is
+unaffected; `--self-test` continues to pass 13/13 unchanged.
+
+**What this amendment does NOT change:**
+
+- Amendment 1's field-name pin (still binding).
+- Numerical bands (Chunks 4a / 4b).
+- Operational metric definitions (Chunks 3a / 3b).
+- Baselines (Chunk 5).
+- Disclosed simplifications, assumptions, or failure modes
+  (Chunk 6).
+- Output paths or schema (Chunk 7).
+- The "no secondary observable" pin (Chunk 2c).
+- Fail-fast schema-mismatch behavior; only the *target*
+  TruthfulQA-MC filename is reverted.
+
+**Audit lesson recorded for future amendments.** Filename
+pins should be verified against the actual on-disk artifact
+in the execution environment, not extrapolated from the
+producing script's template. Amendment 1's mistake — assuming
+the script's template determined the on-disk filename without
+checking the §13.10 prose's explicit Artifacts list — would
+have caught itself sooner if a `ls`-based on-disk check had
+been part of the amendment's own §0.8 review.
 
 ---
 

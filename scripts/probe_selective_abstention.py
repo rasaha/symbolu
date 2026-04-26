@@ -57,9 +57,10 @@ import numpy as np
 
 SCHEMA_VERSION = "15.1"
 
-# Chunk 2b (as amended by Amendment 1) — input paths.
+# Chunk 2b (as amended by Amendment 1, then partially reverted by
+# Amendment 2 for the TruthfulQA-MC path) — input paths.
 PINNED_INPUT_PATHS: dict[str, str] = {
-    "truthfulqa_mc": "docs/experiments/probe_semantic_entropy_truthfulqa_mc.json",
+    "truthfulqa_mc": "docs/experiments/probe_semantic_entropy.json",
     "halueval_qa": "docs/experiments/probe_semantic_entropy_halueval_qa.json",
 }
 BENCHMARKS: tuple[str, ...] = ("truthfulqa_mc", "halueval_qa")
