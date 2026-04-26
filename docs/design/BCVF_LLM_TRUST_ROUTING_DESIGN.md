@@ -10318,19 +10318,27 @@ alters §13.9's external-framing hold.
   loads, no GPU, no NLI calls. CPU + numpy only.
 - **Input dumps (pinned, both consumed; the two benchmarks
   are evaluated independently with identical protocol):**
-  - `docs/experiments/probe_semantic_entropy.json` — §13.10
-    TruthfulQA-MC dump, N=100.
+  - `docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`
+    — §13.10 TruthfulQA-MC dump, N=100. *(Path corrected by
+    §15.1 amendment 1 below; original Chunk 2b pin had no
+    `_truthfulqa_mc` suffix, which did not match the on-disk
+    filename actually emitted by `scripts/probe_semantic_entropy.py`.)*
   - `docs/experiments/probe_semantic_entropy_halueval_qa.json`
     — §13.10 HaluEval-QA dump, N=100.
   - **No other JSON dump is consumed by §15.** §13.11 /
     §13.12 / §13.14 / §13.16 / §13.18 / §14a / §14a.2 dumps
     are explicitly out of scope.
 - **Per-question fields consumed (pinned, schema documented
-  in §13.10):**
-  - the per-question semantic entropy scalar (nats),
-  - the per-question greedy-answer correctness label
-    (boolean, NLI-derived per §13.10), and
-  - the per-question identifier (for deterministic ordering).
+  in §13.10's `scripts/probe_semantic_entropy.py` JSON
+  writer; see §15.1 amendment 1 for the explicit field-name
+  mapping):**
+  - `q_idx` — the per-question identifier (for deterministic
+    ordering).
+  - `semantic_entropy` — the per-question semantic-entropy
+    scalar in nats.
+  - `greedy_matches_correct` — the per-question greedy-
+    answer correctness label (boolean, NLI-derived per
+    §13.10).
   - **No other field is read.** If any of the above is
     missing from a dump, §15 fails fast with a
     `SCHEMA_MISMATCH` exit rather than substituting a derived
@@ -11006,6 +11014,73 @@ boundary).**
 Any deviation discovered at run time must be flagged in the
 §15 result section as a §0.8 deviation, not absorbed
 silently.
+
+### 15.1 Amendment 1 — Input-path correction and explicit field-name pinning (pre-implementation)
+
+**Status: amendment landed before any data inspection or
+script execution.** Surfaced explicitly per §15.1's own "no
+silent patches" rule.
+
+**Trigger.** Pre-implementation audit of
+`scripts/probe_semantic_entropy.py` (the §13.10 data-
+producing script) revealed two §0.8 issues with the original
+Chunk 2b pin:
+
+1. **Input filename mismatch.** Chunk 2b pinned the
+   TruthfulQA-MC dump path as
+   `docs/experiments/probe_semantic_entropy.json` (matching
+   §13.10's prose). The §13.10 script in fact emits per-
+   benchmark filenames suffixed with the benchmark id:
+   `probe_semantic_entropy_truthfulqa_mc.json` and
+   `probe_semantic_entropy_halueval_qa.json`. A strict
+   reading of the original Chunk 2b pin would have caused
+   §15's fail-fast loader to abort with `SCHEMA_MISMATCH:
+   file not found` against the actual on-disk filename.
+2. **Field-name underspecification.** Chunk 2b named the
+   three consumed fields by description (semantic entropy
+   nats, correctness label, question id) but did not pin the
+   exact JSON key names. Implementation requires the exact
+   keys; leaving them implicit invites silent fallback to
+   alternative field names.
+
+**Amendment (this chunk supersedes the affected lines in
+Chunk 2b).**
+
+- TruthfulQA-MC input path is corrected to
+  `docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`.
+- HaluEval-QA input path is unchanged
+  (`docs/experiments/probe_semantic_entropy_halueval_qa.json`,
+  already correct).
+- Pinned field-name mapping:
+  - `q_idx` → question identifier.
+  - `semantic_entropy` → risk score $r(q) = H(q)$ in nats.
+  - `greedy_matches_correct` → correctness label $c(q)$.
+- All other §15.1 pins (primary observable definition,
+  threshold-sweep protocol, metrics, bands, baselines, cost,
+  scope) are unchanged.
+
+**Why this is a §0.8-clean amendment, not a substantive
+revision.** The amendment corrects a pre-commitment artifact
+(filename and field-name underspecification) without changing
+any pinned numerical band, metric definition, baseline,
+acceptance/rejection rule, or scope boundary. No data has been
+inspected. The cascade boundary-case audit table from Chunk 4b
+is unaffected. The amendment is recorded explicitly here so
+the audit trail shows the revision rather than a silent rename
+during implementation.
+
+**What this amendment does NOT change:**
+
+- Numerical bands (Chunks 4a / 4b).
+- Operational metric definitions (Chunks 3a / 3b).
+- Baselines (Chunk 5).
+- Disclosed simplifications, assumptions, or failure modes
+  (Chunk 6).
+- Output paths or schema (Chunk 7).
+- The "no secondary observable" pin (Chunk 2c).
+- The fail-fast schema-mismatch behavior; only the *target*
+  filenames and field names that fail-fast checks against
+  are corrected.
 
 ---
 
