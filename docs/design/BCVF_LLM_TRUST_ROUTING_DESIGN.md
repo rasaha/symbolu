@@ -12386,6 +12386,92 @@ Numbered components:
 - Auto-promoting any verdict to §15.4 (any §15.4 work
   requires its own §0.8 commitment).
 
+**What §15.3 explicitly does NOT test.**
+
+The hybrid scout's claim is narrowed deliberately to keep the
+§0.8 commitment tight. §15.3's verdict — whatever band the
+cascade returns — bears only on this single configuration's
+operational behavior. Specifically, §15.3 is NOT testing:
+
+- **Retrieval augmentation.** No retrieval, search, web
+  access, or external knowledge source enters Stage A or
+  Stage B. The policy's only response options are ANSWER
+  `selected_answer(q)` or ABSTAIN.
+- **Verifier ensembles.** No external verifier model, no
+  judge-model, no critique pass, no second-LLM fact-checking
+  layer. The risk signal is exclusively the §13.10 / §14a.2
+  semantic-entropy scalar of V1's selected source.
+- **Cross-benchmark generalization.** §15.3 runs on HaluEval-QA
+  only. A §15.3 STRONG would NOT support claims about
+  TruthfulQA-MC behavior; that is the explicit §15.4 future-
+  work scope.
+- **A new §13 observable program.** §15.3 reuses the §13.10
+  semantic-entropy scalar verbatim, applied to V1's selected
+  source. No new §13 hypothesis class is opened. The §13.19
+  single-axis closure remains binding.
+- **A new §14 system-level program.** Stage A is fixed to
+  §14a.2's pinned configuration; §15.3 makes no claim about
+  whether different selectors, consumers, source sets, or
+  $M$ values would produce different answer-selection lift.
+  §14c's `SCOUT_SATURATION` verdict on V1 / V2 vs Baseline-B
+  is unchanged.
+- **Product readiness.** Even a §15.3 STRONG result would
+  require §15.4 (full hybrid pre-commitment with TruthfulQA-
+  MC extension and product-layer scope) before any
+  deployment-grade claim. §15.3 is a scout, not a deployable
+  system.
+- **Re-classification of any prior §13 / §14 / §15 verdict.**
+  §13.19 (single-axis ANTI), §14b / §14c (`SCOUT_SATURATION`),
+  §15.2 (`MARGINAL`), and §13.20 (N=200 `NOISE_BAND_LIFT`
+  observation, not a re-classification of §13.10) are all
+  closed under §0.8 at their pinned configurations. §15.3
+  cannot revisit any of them.
+
+**Reduced-form authorization rationale — §15.3 only exists
+because upstream artifacts already exist.**
+
+§15.3's compactness (single benchmark, single observable,
+single selector, single consumer, no fresh model calls) is
+authorized **only because the necessary upstream artifacts
+already exist on disk**:
+
+- The §14a.2 HaluEval-QA dump
+  (`docs/experiments/probe_system_level_scout_v2_halueval_qa.json`)
+  exists per §14a.2 / §14c's artifacts list.
+- §13.10's semantic-entropy scalar definition is pinned by
+  §13.10's verdict-of-record (and is not invalidated by the
+  §13.20 N=200 observation, which does not re-classify
+  §13.10).
+- §15.1's abstention machinery exists and is validated in
+  `scripts/probe_selective_abstention.py` per §15.2's
+  verdict-of-record.
+
+**If any of these upstream artifacts did not already exist,
+this chapter would not be authorized in this reduced form.**
+A from-scratch hybrid program would require fresh §14-class
+and §15-class generation runs as their own §0.8 commitments
+before any hybrid scout could land. §15.3 is structurally a
+post-processing composition of three closed predecessors;
+it is not an attempt to reopen them.
+
+**§15.3 chunk roll-up — pre-commitment now complete.**
+
+| Chunk | Content |
+|---|---|
+| 3a | Opening framing — fresh top-level chapter, new claim, new metric class |
+| 3b | Stage A architecture pin (§14a.2 NLI-clustered selector + V1 softmin) |
+| 3c | Stage B architecture pin (single threshold rule, ties to ABSTAIN) |
+| 3d | Risk signal pin ($r(q) = H_{\text{src}_{i^*}}(q)$, single scalar) |
+| 3e | Benchmark scope pin (HaluEval-QA only, scout-level) |
+| 3f | Operational metrics pin ($\Delta\kappa$ primary; secondary diagnostics) |
+| 3g | Verdict bands (1D cascade subordinated to $\Delta\kappa$) |
+| 3h | Implementation scope (small integration layer over closed §14/§15) |
+| 3i | What §15.3 does NOT test + reduced-form authorization rationale + roll-up |
+
+Implementation of `scripts/probe_hybrid_selective_abstention.py`
+is a separate §0.8 authorization gate. §15.3.x (the result
+section, parallel to §15.2) follows the real-data run.
+
 ---
 
 
