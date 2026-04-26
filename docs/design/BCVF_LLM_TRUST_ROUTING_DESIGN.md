@@ -10459,6 +10459,48 @@ $(\text{cov}@\alpha, \text{ecr}(\tau^*))$ characterizes the
 policy's value at each target: how much it answers and how
 many wrong answers it caught at that operating point.
 
+**Operational metrics 4 and 5 (pinned).**
+
+**Metric 4 — Area under the risk-coverage curve (AURC)**
+(integrated selective-error metric; the standard selective-
+prediction headline number, lower is better):
+
+Sort questions by ascending risk score $r(q)$, breaking ties
+by ascending question identifier. Let $c_{(i)}$ be the
+correctness label of the $i$-th lowest-risk question. The
+cumulative selective error at coverage $k/N$ is
+$$e_k = \frac{1}{k} \sum_{i=1}^{k} \big(1 - c_{(i)}\big)$$
+and the §15 AURC is the discrete (Geifman–El-Yaniv 2017)
+$$\text{AURC} = \frac{1}{N} \sum_{k=1}^{N} e_k$$
+with uniform weighting over the $N$ coverage levels. Range
+$[0, 1]$, lower is better.
+
+**Random-matched AURC baseline** (uniform random selection
+at matched coverage): a question selected uniformly at random
+has expected wrong rate $W/N$ for any $k$, so
+$\text{AURC}^{\text{random}} = W/N$ — the §13.10 greedy
+error rate ($0.750$ on TruthfulQA-MC, $0.700$ on HaluEval-QA).
+The §15 lift is
+$$\Delta\text{AURC} = \text{AURC}^{\text{random}} - \text{AURC}^{\text{policy}}$$
+positive when the policy outperforms random abstention.
+
+**Metric 5 — False abstention rate** (fraction of correct
+greedy answers the policy mistakenly abstained):
+$$\text{far}(\tau) = \frac{1}{C} \sum_{q \notin A_\tau} c(q) \quad \text{for } C > 0$$
+where $C = \sum_q c(q) = N - W$ is the total correct greedy
+count ($C = 25$ on TruthfulQA-MC, $C = 30$ on HaluEval-QA per
+§13.10). Range $[0, 1]$. $\text{far} = 0$ means no correct
+greedy answer was abstained; $\text{far} = 1$ means all were.
+
+Reported at the same three target-accuracy operating points
+as Metrics 2 and 3, evaluated at the threshold $\tau^*$ that
+achieves $\text{cov}@\alpha$. The pinned operational triple
+at each target is
+$$\big(\text{cov}@\alpha,\;\text{ecr}(\tau^*),\;\text{far}(\tau^*)\big)$$
+which together capture selective-prediction quality: high
+ecr + low far at meaningful coverage is the operational win
+condition.
+
 ---
 
 
