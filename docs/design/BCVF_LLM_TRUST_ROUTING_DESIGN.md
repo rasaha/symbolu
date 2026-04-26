@@ -11161,6 +11161,75 @@ checking the §13.10 prose's explicit Artifacts list — would
 have caught itself sooner if a `ls`-based on-disk check had
 been part of the amendment's own §0.8 review.
 
+### 15.2 Result — §15.1 selective abstention scout returned MARGINAL
+
+The §15.1 pre-committed scout has been executed against the
+on-disk §13.10 dumps in the runpod container. Combined
+classification per pre-committed bands:
+**`MARGINAL`** (δ = +0.1159, κ = 0.1400, no annotations).
+The §13.10 single-snapshot semantic-entropy score, used as a
+per-question risk score in a deterministic answer/abstain
+policy, produces small but non-zero AURC lift over random
+abstention with statistical confirmation, but does not
+support enough coverage at the α₂ = 0.50 absolute-majority
+operating point on the worst benchmark to clear
+USEFUL_INTERNAL.
+
+Combined with §13.19's 5-of-5 single-axis null and §14b /
+§14c's SCOUT_SATURATION on system-level routing, this is the
+selective-prediction outcome that §15.1's bands were designed
+to classify cleanly: the §13.10 ceiling supports
+operationally-detectable but operationally-unactionable
+abstention behavior at this configuration. The autonomy-
+domain BCVF claim (§6.1) stands independently and is
+unaffected. The §13.9 VC-brief hold remains in force and is
+not addressed by §15 by construction (different metric class
+than §13.9's gating bar).
+
+**Parity-gate confirmation (per §15.1 Chunks 2b / 3a / 5).**
+
+| benchmark | N_ok | W_ok | auc_random_ok |
+|---|---|---|---|
+| truthfulqa_mc | True | True | True |
+| halueval_qa | True | True | True |
+
+Both benchmarks satisfied N=100, W matches `PINNED_W` (75 on
+TruthfulQA-MC, 70 on HaluEval-QA), and `AURC_random = W/N`
+exactly. No §0.8 deviation from the §15.1-pinned configuration
+fired at the input layer.
+
+**§15.1 amendment audit trail.** Two §0.8 amendments to §15.1
+landed before any data inspection: Amendment 1 added
+explicit field-name pinning (`q_idx`, `semantic_entropy`,
+`greedy_matches_correct`) and a per-benchmark-suffixed
+TruthfulQA-MC input path; Amendment 2 reverted the TruthfulQA-
+MC path to the un-suffixed `probe_semantic_entropy.json`
+after on-disk verification in the runpod showed the actual
+§13.10 artifact at that path. Both amendments are recorded in
+§15.1 with full rationale. The post-amendment configuration
+matches on-disk dumps exactly; **no further amendments fired
+during the run** and the verdict is reported under the
+amended-but-otherwise-unchanged §15.1 commitment.
+
+**Self-test gate.** §15.1's required pre-execution gate
+(`--self-test`) ran in the same invocation as real-data
+execution and returned PASSED on all 6 cascade boundary cases
+(Chunk 4b audit table) and all 7 demotion-rule cases (Chunk
+4c). The cascade implementation matches the pinned design
+exactly; the verdict reported below is the cascade's
+mechanical readout, not interpretation.
+
+**Artifacts.**
+
+- `scripts/probe_selective_abstention.py` (numpy + stdlib,
+  CPU-only post-processor; 1112 lines).
+- `docs/experiments/probe_selective_abstention.json` (machine-
+  readable, schema_version `15.1`, both benchmarks plus
+  combined verdict; full threshold sweep included).
+- `docs/experiments/probe_selective_abstention.md` (human-
+  readable summary with per-benchmark headline, operating
+  points, combined classification, and cascade trace).
+
 ---
 
 
