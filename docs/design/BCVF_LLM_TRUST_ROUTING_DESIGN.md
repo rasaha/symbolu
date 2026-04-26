@@ -6107,9 +6107,22 @@ statement and combined-matrix analysis.
 
 **Open as future-work pre-commitments outside the §13 single-
 axis program** (each requires a fresh §0.8-style commitment in a
-new top-level section if pursued; none are pre-committed by
-§13.17 or §13.19):
+new top-level section if pursued):
 
+- **§14a system-level integration scout (PRE-COMMITTED).** The
+  un-tested experimental structure §13.17 / §13.19 left open:
+  multi-source LLM Q&A system using BCVF-shaped routing with end-
+  to-end accuracy as the metric (the §6.1-style configuration
+  that passed in the autonomy domain). Scout-bounded to HaluEval-
+  QA only at N=100 with two consumer variants (V1 softmin trust,
+  V2 thresholded exclusion) and one selector (weighted majority
+  vote), per-source semantic entropy as the BCVF scalar.
+  Pre-committed bands STRONG / DIRECTIONAL / MARGINAL /
+  SATURATION / REGRESSION with explicit promotion rules to the
+  full §14 (or LLM-track closure on REGRESSION). See §14a for
+  the full pinned specification. Implementation
+  (`scripts/probe_system_level_scout.py`) is a separate
+  authorization gate.
 - **Single-trajectory forced-allocation-gap observable
   (EXECUTED in §13.18 / §13.19; combined `ANTI_FINDING`).** The
   signal class §13.17's narrowing left explicitly open has now
@@ -8782,6 +8795,340 @@ remaining directions; none are pre-committed by §13.19.
 - `scripts/probe_forced_alloc_2diff.py` (commit `d5b7b65`).
 - `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.md` and `.json`.
 - `docs/experiments/probe_forced_alloc_2diff_halueval_qa.md` and `.json`.
+
+## §14 System-level BCVF integration on LLMs (new chapter)
+
+§13.19 closed the §13 single-axis program exhaustively across
+five hypothesis classes. The remaining literature-aligned LLM-
+domain question — articulated in the §13.8 future-work list and
+in §13.17 / §13.19 — is whether the §6.1-style configuration
+(multi-source agent system using BCVF-shaped routing, end-to-end
+performance metric) transfers to LLMs. §13's program tested
+observables in isolation against ground-truth correctness via
+AUC; §14 tests an entirely different experimental structure.
+
+§14 is bounded into a scout (§14a) and a conditional full
+experiment (§14, the chapter). The scout exists to gate the
+multi-week investment of the full experiment behind a cheap pre-
+committed test on the most permissive benchmark.
+
+### 14a Pre-commitment — System-level scout
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before implementation. Specification, success
+bands, promotion rules, and pinned parameters cannot be redefined
+post-hoc.
+
+**Relationship to §13's closure.** §13.10–§13.19 tested
+observables in isolation: per-question, compute a BCVF-shaped
+scalar, AUC against ground-truth correctness label. §6.1's
+autonomy-domain validation that passed is a fundamentally
+different experimental shape: multiple sources are weighted /
+filtered / routed by BCVF scores, the routed answer is compared
+against ground truth, and a sign test on per-question wins
+determines significance. §14a tests whether that experimental
+shape transfers to LLMs. **It is not a continuation of §13's
+single-axis program; it is a new program with a different
+metric (end-to-end accuracy delta vs naive aggregation,
+sign-test) and a different math object (consumer + selector +
+end-to-end answer, not isolated scalar vs ground truth).**
+
+**Why a scout, not full §14 directly.** Three reasons:
+
+1. **§13's TruthfulQA-MC pathology cleanly predicts that
+   running the full experiment on TruthfulQA-MC + HaluEval-QA
+   would land in saturation/anti combined regardless of how
+   well the system layer works.** Five §13 single-axis probes
+   established that TruthfulQA-MC defeats every confidence-based
+   scalar. A direct full §14 on both benchmarks therefore has a
+   high ex-ante probability of combined-classification ANTI even
+   if the system layer is genuinely useful on HaluEval-QA. The
+   scout tests where signal is most likely first — HaluEval-QA
+   alone — and only commits to the full experiment after seeing
+   life on the cheaper test.
+2. **Full §14 is a multi-week implementation** (~1500 lines of
+   new code: source-runner, four consumer variants, two
+   selectors, end-to-end harness with sign-test, ablation
+   runners). The scout reuses §13.11's cross-family
+   infrastructure + §13.10's semantic-entropy scalar + adds only
+   two consumer variants and one selector. Implementation cost
+   ~2-3 days vs ~2-3 weeks.
+3. **Pre-committed promotion rules let §14a make a clean
+   binary decision about whether to invest in full §14.** A
+   scout STRONG promotes to full §14 with high prior on success.
+   A scout REGRESSION closes the LLM transfer line with strong
+   evidence (system-level integration *also* fails after the
+   single-axis program closed exhaustively). Either is
+   actionable; neither requires the full investment.
+
+**The scout's role in the broader §13/§14 program.** §14a is
+explicitly a gate, not a deliverable. Its job is to inform the
+go/no-go decision on the full §14 (which would add TruthfulQA-MC,
+add the remaining two consumer variants, add the highest-weight
+source selector, add ablation runners, and run sign-tests at
+N=300+ for higher statistical power). A §14a STRONG result is the
+prerequisite for full §14 authorization; a §14a REGRESSION
+forecloses full §14 entirely.
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_system_level_scout.py` (new; does
+  NOT modify any §13.10–§13.18 script — those results pinned).
+- **Sources (M = 3, all already cached from §13.11):**
+  - `Qwen/Qwen2.5-7B-Instruct`
+  - `meta-llama/Llama-3.1-8B-Instruct`
+  - `mistralai/Mistral-7B-Instruct-v0.3`
+  - All loaded co-resident on the 80 GB GPU (~45 GB total in
+    fp16, identical to §13.11 setup).
+- **Per-source BCVF scalar (pinned):** **semantic entropy** per
+  §13.10's protocol — for each source, sample K=10 completions
+  at T=1.0 with `max_new_tokens=32`, cluster by question-
+  conditioned bidirectional NLI entailment (DeBERTa-v3-base-mnli-
+  fever-anli, identical to §13.10 / §13.11), Shannon entropy
+  $H_{\text{src}}(q) = -\sum_c \frac{|c|}{K} \log \frac{|c|}{K}$
+  over cluster sizes. Pinned this scalar (not Variant A entropy
+  2nd-difference, which scored 0.701 on HaluEval per-source for
+  Qwen) because: (a) §13.10/§13.11 already proved cross-model
+  implementation; (b) failure attribution is cleaner — a §14a
+  regression cleanly indicts the system-integration layer
+  rather than per-source-scalar transfer; (c) §13.10 is the
+  strongest §13 result of record. The scalar is interpreted as
+  *trust cost*: high entropy → uncertain source → low trust.
+- **Per-source greedy answer:** each source's deterministic T=0
+  greedy completion at `max_new_tokens=32`. Same prompt format as
+  §13.10 / §13.11 (`Q: ... A:` completion, no chat templates).
+  This is the candidate answer that source contributes to the
+  weighted majority vote.
+- **Consumer variants (pinned, both run, results compared):**
+  - **V1 — Softmin trust shaping** (autonomy-domain default; the
+    construct ChatGPT flagged as harmful):
+    $w_i^{V1} = \frac{\exp(-d_i / \tau)}{\sum_j \exp(-d_j / \tau)}$
+    with $d_i = H_{\text{src}_i}(q)$ (per-source semantic
+    entropy) and $\tau = 0.5$ (pinned; default temperature for
+    softmin trust shaping in autonomy-domain BCVF). High-entropy
+    sources get sharply down-weighted; low-entropy sources get
+    sharply amplified.
+  - **V2 — Thresholded exclusion + uniform survivors** (ChatGPT's
+    recommended replacement):
+    $S = \{i : d_i \le \theta\}$, $w_i^{V2} = \mathbb{1}[i \in S] /
+    |S|$. If $|S| < 1$, fall back to all sources with uniform
+    weights ($w_i = 1/M$). Threshold $\theta = $ median of
+    $\{d_1, d_2, d_3\}$ (pinned per-question; uses 50th-percentile
+    of the source costs as the cut-point). Sources above the
+    median entropy are excluded; survivors are uniform-averaged.
+- **Selector (pinned, single choice):** **weighted majority vote**
+  of per-source greedy answers. For each candidate answer string
+  $a$ produced by some source, its score is
+  $\sum_i w_i \cdot \mathbb{1}[\text{greedy}_i = a]$ (sum of
+  weights of sources that emitted $a$). The candidate with the
+  maximum score wins. Ties broken by argmax of cumulative weight
+  in source-list order (deterministic).
+- **Benchmark (pinned, single choice):** HaluEval-QA `data` split,
+  N = 100 (same selection as §13.10–§13.18 for direct comparison).
+  No second benchmark in §14a; TruthfulQA-MC is explicitly
+  reserved for full §14 conditional on §14a STRONG.
+- **Greedy "is correct" labeling (pinned):** identical protocol
+  to §13.10–§13.18 — for each candidate answer (selector output,
+  baseline-A, baseline-B), pass it through question-conditioned
+  NLI (DeBERTa-v3-base-mnli-fever-anli) against the correct
+  choice AND against the hallucinated answer; correct iff
+  entails correct AND does not entail hallucinated. Holding
+  labeling fixed across §13/§14a preserves combined-classification
+  comparability if §14 ever adds TruthfulQA-MC under the same
+  rule.
+
+**Pinned baselines for the accuracy delta:**
+
+- **Baseline-A — Single-source Qwen greedy.** The simplest
+  possible LLM answer: just `Qwen/Qwen2.5-7B-Instruct` greedy
+  output, no ensembling, no BCVF, no consumer. Tests "does the
+  system add anything over the strongest single source?"
+- **Baseline-B — Uniform majority vote across all 3 source
+  greedies.** No BCVF scoring or weighting; each source's greedy
+  contributes one vote, the most-voted answer wins (ties broken
+  same way as the selector). Tests "does BCVF-shaped weighting
+  add anything over naive ensembling?"
+
+The §14a primary comparison is V1 / V2 vs Baseline-B (does
+BCVF-shaped consumer beat uniform aggregation?). V1 / V2 vs
+Baseline-A is reported as a secondary comparison (does the
+system add anything over single-source-Qwen?). Both must be
+reported for honest accounting.
+
+**Pre-committed success bands** (different metric from §13:
+accuracy delta in percentage points, not AUC; sign-test as
+secondary statistical confirmation).
+
+Define $\Delta_v = \text{acc}(v) - \text{acc}(\text{Baseline-B})$
+for each consumer variant $v \in \{V1, V2\}$, where $\text{acc}$
+is fraction of N=100 questions where the candidate answer's NLI
+label is correct.
+
+- **STRONG (PROMOTE TO FULL §14):** $\Delta_v \ge +5$ percentage
+  points for *both* V1 and V2, with sign-test p-value < 0.05 on
+  per-question wins for at least one of V1, V2 vs Baseline-B.
+  Authorizes drafting full §14 pre-commitment with both
+  benchmarks (TruthfulQA-MC + HaluEval-QA), all four consumer
+  variants, both selectors (weighted majority + highest-weight),
+  and ablation runners.
+- **DIRECTIONAL (PROMOTE TO FULL §14 WITH V2 PRIORITY):**
+  $\Delta_{V2} \ge +3$ percentage points AND $\Delta_{V1} \le 0$
+  (V2 lifts, V1 does not). This is the specific outcome ChatGPT
+  predicted: softmin trust shaping (V1) is harmful while
+  thresholded exclusion (V2) is helpful. If observed, full §14
+  is authorized but with V1 deprioritized and V2 / V3 (veto-only)
+  / V4 (deadband) as the consumer variants in scope.
+- **MARGINAL (UNDECIDED, ONE ADDITIONAL SCOUT AUTHORIZED):**
+  $\Delta_v \in (0, +3)$ for both V1 and V2 (small lift, no
+  significance). One more §14a-class scout authorized — likely
+  candidates: swap per-source scalar to Variant A entropy
+  2nd-difference (the §13.18 diagnostic that scored 0.701 on
+  HaluEval), OR add veto-only and deadband consumer variants.
+  Pre-commitment for that additional scout would be a fresh §0.8
+  commitment in §14a.2 (or similar). Full §14 NOT authorized
+  until either MARGINAL or STRONG is reached on a follow-up scout.
+- **SATURATION (NO PROMOTION; DOCUMENT AS NULL):**
+  $\Delta_v \in [-3, 0]$ for both V1 and V2. The system layer
+  adds nothing measurable on top of naive 3-source majority
+  voting. Document §14a as a null result; do NOT promote to
+  full §14. The honest external framing becomes: "single-axis
+  observables saturate (5-of-5 §13 nulls); system-level
+  integration on the most permissive benchmark also saturates;
+  the LLM transfer line is closed at all tested experimental
+  structures."
+- **REGRESSION (CLOSE LLM TRANSFER LINE):**
+  $\Delta_v < -3$ for *either* V1 or V2 (system-level integration
+  actively hurts compared to naive majority voting on the most
+  permissive benchmark). The LLM transfer line is closed with
+  strong evidence: the failure isn't only at the observable
+  level (§13) but also at the system-integration level (§14a).
+  The autonomy-domain BCVF claim stands independently on §6.1.
+  No further LLM-domain probes authorized in this codebase
+  without a fundamental reframing (different model class,
+  different benchmark family, or different formal structure
+  entirely).
+
+**Acceptance / rejection rules (explicit, non-vague):**
+
+- **PROMOTE to full §14:** STRONG or DIRECTIONAL.
+- **AUTHORIZE one more scout:** MARGINAL.
+- **DOCUMENT as null, do NOT promote:** SATURATION.
+- **CLOSE LLM transfer line:** REGRESSION.
+
+**Statistical test (pinned).** Per-question sign test for
+$v$ vs Baseline-B: count the questions where $v$'s answer is
+correct AND Baseline-B's answer is wrong (a "win" for $v$),
+versus questions where $v$ is wrong AND Baseline-B is correct
+(a "loss" for $v$). Ignore ties (both correct or both wrong).
+Binomial test on win count vs total non-ties at $\alpha = 0.05$.
+
+The pre-committed bands above use $\Delta_v$ thresholds rather
+than sign-test p-values directly, because $\Delta_v$ is the
+practically meaningful number (the actual accuracy lift). The
+sign-test p-value is a secondary confirmation that the lift is
+not noise. **A STRONG result requires BOTH $\Delta_v \ge +5pp$
+AND sign-test p < 0.05.** The two conditions together prevent
+both Type I (random fluctuation labeled STRONG) and the inverse
+case where the lift exists but is so small the sign-test
+disagrees.
+
+**Disclosed simplifications and risks specific to §14a:**
+
+- **HaluEval-QA only.** The most permissive §13 benchmark; the
+  one where multiple methods showed life (§13.10 0.661, §13.11
+  0.716, §13.12 0.652, §13.18 Variant A 0.701). The scout's
+  job is to detect signal where signal is most likely; if it
+  fails here, full §14 with TruthfulQA-MC added almost certainly
+  fails the worst-benchmark rule. Cherry-picking risk is real
+  but acknowledged: a §14a STRONG followed by full §14 anti on
+  TruthfulQA-MC would be the same per-benchmark pattern §13
+  showed (HaluEval permissive, TruthfulQA hostile). The scout
+  is gating compute investment, not making external claims; the
+  full §14 would re-test on TruthfulQA-MC with full pre-committed
+  bands.
+- **Two consumer variants only.** V3 (veto-only) and V4 (deadband
+  fallback) are deferred to full §14 conditional on §14a STRONG.
+  This means §14a cannot detect the case where V3 or V4 lifts
+  while V1 and V2 don't. Acceptable risk because: V1 and V2 are
+  the polar choices (most aggressive sharpening vs most
+  conservative inclusion-or-exclusion); intermediate variants
+  V3/V4 are unlikely to lift if both polar variants regress.
+- **One selector only.** Highest-weight-source selector deferred
+  to full §14. Weighted majority vote is the more conservative
+  selector (less sensitive to a single source dominating);
+  highest-weight is more aggressive. If §14a STRONG, the full
+  §14 could test both.
+- **N=100.** Statistical power: ~85% to detect a true 60% sign-
+  test win rate at α=0.05 (a $\Delta \approx 5pp$ effect). Smaller
+  N (e.g., N=50) would be cheaper but reduces power below the
+  acceptance threshold; larger N would be costlier without
+  strengthening the scout's promotion-rule decisions.
+- **Pinned softmin temperature τ = 0.5.** Autonomy-domain
+  default. Different τ values would change V1's sharpening
+  intensity. If §14a lands MARGINAL, a τ sweep is a defensible
+  follow-up scout.
+- **Pinned threshold θ = median entropy** for V2. Per-question
+  median, not global. Alternatives (global percentile, fixed
+  numeric threshold) not pre-committed. Median was chosen
+  because it adapts to per-question difficulty and is robust
+  to outlier source entropies.
+- **No NLI quality control on per-source answers.** All three
+  source greedies are accepted as candidate answers regardless
+  of length, format, or apparent quality. If a source emits
+  malformed text consistently (rare but possible for chat-
+  template-native models given completion-style prompts), it
+  contaminates the weighted majority vote. Defensible if §13.11
+  showed this didn't happen at scale; problematic if it did.
+
+**Expected cost.**
+
+- 3 sources × 100 questions × K=10 stochastic generations =
+  3,000 sampling calls (~30 min on the cached GPU).
+- 3 sources × 100 questions × 1 greedy generation =
+  300 deterministic generations (~5 min).
+- Per-source NLI clustering: 3 × 100 = 300 clustering operations
+  × 90 NLI pairs × ~50 ms batched ≈ ~10 min total.
+- Per-question NLI labeling (one call per candidate answer
+  against correct + hallucinated): 4 candidates per question
+  × 100 questions × 2 NLI calls = 800 calls (~5 min batched).
+- Consumer / selector / accuracy / sign-test computation:
+  trivial (per-question scalar arithmetic).
+
+**Estimated total runtime: ~50–60 min on the existing 80 GB GPU.**
+Memory: same ~45 GB co-resident as §13.11. No new model downloads.
+
+**Report destination.**
+
+- `docs/experiments/probe_system_level_scout_halueval_qa.md`
+- `docs/experiments/probe_system_level_scout_halueval_qa.json`
+  (per-question dump including each source's greedy + entropy,
+  per-question consumer weights, selected answer for each
+  variant, per-question correctness label for each candidate,
+  per-question wins/losses for sign-test).
+
+**Scope.**
+
+§14a is a bounded scout under §0.8 discipline. The pre-committed
+bands and promotion rules above are the binding gate to full §14.
+Any deviation at run time must be flagged in the result section
+as a §0.8 deviation, not absorbed silently.
+
+§14a does NOT pre-commit:
+- Implementation of `scripts/probe_system_level_scout.py` —
+  separate authorization gate.
+- Full §14 — explicitly conditional on §14a STRONG or
+  DIRECTIONAL outcome.
+- Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` — §13.9
+  hold remains, gated on STRONG band on both benchmarks at any
+  §13 or §14 probe.
+
+**What §14a scope explicitly excludes:**
+- TruthfulQA-MC (deferred to full §14 conditional on §14a STRONG).
+- V3 (veto-only) and V4 (deadband) consumer variants (deferred).
+- Highest-weight-source selector (deferred).
+- Ablation table and statistical decomposition (deferred to full §14).
+- Variant A entropy 2nd-difference per-source scalar (alternative
+  scout in §14a.2 conditional on §14a MARGINAL).
 
 ---
 
