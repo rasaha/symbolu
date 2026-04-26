@@ -11433,6 +11433,66 @@ but weak error capture", "STRONG blocked by CI demotion") are
 NOT fired by this run. Both are documented and ruled out by
 the headline numbers above.
 
+**What §15.2 authorizes (per §15.1 Chunk 4c MARGINAL row).**
+
+The §15.1-pinned acceptance/rejection mapping for MARGINAL is
+binding under §0.8. Reproduced exactly:
+
+| §15.2 verdict | Authorizes | Forecloses |
+|---|---|---|
+| MARGINAL | Recording §15 as an acknowledged but unactionable signal. | §15.2 follow-up; internal-research operational claims; product investment; VC-brief changes. |
+
+Specifically, §15.2 **authorizes**:
+
+- Documenting the §15.1 verdict-of-record in this section
+  (which §15.2 itself accomplishes).
+- Recording the per-benchmark $\delta$ / $\kappa$ /
+  operating-point numerical evidence for future audit and
+  reference.
+- Citing the per-benchmark asymmetry (TruthfulQA-MC MARGINAL,
+  HaluEval-QA USEFUL_INTERNAL) as a documented structural
+  observation about the §13.10 score's operational behavior
+  under the worst-benchmark rule.
+- Citing §15 alongside §13 / §14 in the combined LLM-track
+  closure framing (§15.2 Chunk 2f below).
+
+§15.2 explicitly **does NOT authorize**:
+
+- **A §15.2-as-implementation follow-up** (e.g., a script
+  re-run at larger N, a ensemble-score variant, a relaxed
+  worst-benchmark rule). Each would require a fresh top-level
+  §0.8 commitment.
+- **Internal-research operational claims** of the form
+  "§13.10 entropy supports useful selective prediction at
+  this configuration." Per Chunk 4c, USEFUL_INTERNAL is the
+  bar for that claim, and §15.2's combined verdict is one
+  band below.
+- **Product investment** (any abstention/escalation product
+  layer scoped over §13.10-grade signals at this
+  configuration). STRONG was the bar for that authorization.
+- **VC-brief changes.** Per Chunk 4c, no §15 verdict —
+  including STRONG — would have authorized
+  `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` updates, because §15's
+  metric class (operational AURC + coverage) is structurally
+  separate from §13.9's gate (answer-selection AUC ≥ 0.75 on
+  both benchmarks). §13.9 hold remains in force.
+- **Reframing of any §13 or §14 verdict.** §15's MARGINAL is
+  on a fresh metric class and does not interact with §13's
+  combined ANTI verdicts or §14's SCOUT_SATURATION verdicts.
+  Those closures remain binding.
+- **Cross-domain claims.** The autonomy-domain BCVF claim
+  (§6.1) stands wholly independent of any §15 outcome.
+
+**No deviation flag fired during the §15.1 run.** Per §15.1
+Chunk 7's "Any deviation discovered at run time must be
+flagged in the §15 result section as a §0.8 deviation, not
+absorbed silently": the run produced no such deviation.
+Parity gates passed, schema matched (post-Amendment 2), self-
+test passed in-run, the cascade fired exactly as the
+implementation's `_cascade_trace` walks the pinned rules.
+The two §15.1 amendments landed pre-data-inspection are
+documented within §15.1 itself, not as run-time deviations.
+
 ---
 
 
