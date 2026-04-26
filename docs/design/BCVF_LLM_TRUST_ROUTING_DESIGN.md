@@ -5627,6 +5627,98 @@ MARGINAL). The §2.2 metric revision is therefore authorized to
 land, and the next authorized probe is the §1.3 cross-family
 ensemble revision. See §13.10 for the detailed result.
 
+**Update — §1.3 executed, combined anti-finding.** The §13.8
+item-1 cross-family ensemble probe has been run at N=100 on both
+benchmarks with Qwen2.5-7B-Instruct + Llama-3.1-8B-Instruct +
+Mistral-7B-Instruct-v0.3. Initial pass: TruthfulQA-MC **AUC 0.633**
+(−0.028 vs §13.10) / HaluEval-QA **AUC 0.716** (+0.055 vs §13.10) —
+heterogeneous split resolving to `CROSS_FAMILY_ANTI_FINDING` under
+the pre-committed worst-benchmark rule. A chat-template diagnostic
+on TruthfulQA-MC falsified the prompt-format confound hypothesis
+(AUC dropped further to 0.567). Combined anti-finding stands. See
+§13.11.
+
+**Update — §13.12 executed, internal-state revision saturates on
+HaluEval and underperforms on TruthfulQA.** The §13.8 item-2
+EigenScore embedding-space probe has been run at N=100. TruthfulQA-
+MC AUC 0.559 (`EMBEDDING_SPACE_ANTI_FINDING`); HaluEval-QA AUC
+0.652 (`EMBEDDING_SPACE_SATURATION`, statistical tie with §13.10's
+0.661 and signal in the expected direction with mean separation
+0.54 EigenScore units). Combined under worst-benchmark rule:
+`EMBEDDING_SPACE_ANTI_FINDING`. EigenScore reproduces §13.10's
+signal on HaluEval but does not lift it; TruthfulQA-MC underperforms
+§13.10 by 0.10 AUC.
+
+**Update — §13.14 executed, BCVF text-level construction did not
+transfer.** The §13.14 BCVF-faithful 2nd-difference observable,
+implemented over per-position semantic entropy of NLI-clustered
+truncations, has been run at N=100 on both benchmarks. TruthfulQA-
+MC AUC 0.574; HaluEval-QA AUC 0.363 (signal *inverted* on HaluEval).
+Combined `BCVF_2DIFF_ANTI_FINDING`. The result narrows the BCVF
+transfer claim to *this specific text-level construction*; the
+hidden-state-internal variant tested in §13.16 below also returned
+ANTI on both benchmarks. See §13.15 for the §13.14 result section
+and the three-reason failure analysis.
+
+**Update — §13.16 executed, BCVF hidden-state construction also
+did not transfer.** The §13.16 hidden-state EigenScore 2nd-
+difference observable — the construction §13.15's narrowing left
+explicitly open — has been run at N=100 on both benchmarks.
+TruthfulQA-MC AUC 0.462; HaluEval-QA AUC 0.449. **Both benchmarks
+inverted** (signal direction opposite the pre-committed AUC sign).
+Combined `HSEIG_2DIFF_ANTI_FINDING`. §13.15's diagnosis transferred:
+the per-position EigenScore series is smooth-monotonic on both
+benchmarks (rising as K samples naturally diverge over generation),
+not smooth-with-rare-spikes — so the 2nd-difference operator has
+no fault-onset structure to detect. Moving from text-level to
+model-internal continuous state did not fix the structural problem.
+See §13.17 for the result section and the further-tightened
+narrowing of the BCVF-for-LLMs transfer claim.
+
+**Status of the §13 program after §13.17 — K-sample-divergence
+single-axis program closed.** Four K-sample-divergence single-
+axis revisions tested across both benchmarks (§13.11 cross-family,
+§13.12 EigenScore, §13.14 BCVF text-level, §13.16 BCVF hidden-
+state). **None lifts AUC above §13.10's 0.661 marginal baseline
+on the combined-classification rule.** §13.10 single-snapshot
+semantic entropy remains the strongest result in this codebase.
+The K-sample-divergence single-axis program is closed at the
+Qwen-7B + DeBERTa-v3-base + N=100 configuration.
+
+**Update — §13.18 pre-committed and §13.19 result landed.** The
+single-trajectory forced-allocation-gap probe (§13.18) — testing
+the un-rejected single-trajectory observable class §13.17 left
+open — has been executed at N=100 on both benchmarks. Combined
+classification on the pinned primary scalar:
+`FORCED_ALLOC_2DIFF_ANTI_FINDING` (TruthfulQA-MC AUC 0.549,
+HaluEval-QA AUC 0.571). A separately notable diagnostic finding:
+the Variant-A entropy-only 2nd-difference reached AUC 0.701 on
+HaluEval-QA (second-best HaluEval result of the §13 program,
+behind only §13.11's 0.716), but TruthfulQA-MC at 0.536 still
+forces the combined classification to ANTI under the worst-
+benchmark rule even if Variant A were used as primary. See §13.19
+for the result section, the Variant A finding analysis, and the
+full combined-matrix discussion.
+
+**Status of the §13 program after §13.19 — single-axis program
+exhausted across all hypothesis classes.** §13.17 closed the
+K-sample-divergence single-axis sub-program. §13.19 closes the
+single-trajectory single-axis sub-program. Five literature-
+aligned and mechanism-motivated single-axis hypothesis classes
+have been tested (sample-space single-model, sample-space cross-
+family, internal-state single-snapshot, K-sample temporal evolution
+at text-level and hidden-state-level, single-trajectory forced-
+allocation). **All five collapse under the worst-benchmark rule
+because TruthfulQA-MC defeats every confidence-based scalar
+construction tested.** §13.10 single-snapshot semantic entropy
+(AUC 0.661 on both benchmarks) remains the strongest result in
+this codebase across all five tested hypothesis classes. The §13
+single-axis program is now exhaustively closed. Any future LLM-
+domain work would need to test a fundamentally different
+experimental structure (system-level integration, model-scale
+upgrade, or benchmark substitution) under a fresh §0.8
+pre-commitment in a new top-level section (§14 or beyond).
+
 ### 13.2 Experiment specification
 
 - **Script**: `scripts/probe_observables.py` at commit `a5ace72`
@@ -5924,51 +6016,327 @@ accounting for these simplifications.
 
 ### 13.8 Authorization gate — what §13 leaves open vs paused
 
-**Paused** (no compute authorized until the §13.7 or §1.3
-revisions land a positive result):
+**Paused** (the §13 single-axis program is closed post-§13.17;
+no further single-axis probe compute is authorized at this
+codebase's Qwen-7B + base-NLI configuration):
 
 - Section 4 (Phase 2 — Source Framework) extensions beyond
   the two sources already exercised at simplex+same-family.
 - Section 5 (Phase 3 — Integration Layer) Rahu-trust
-  deployment. With no §11-passing Ketu observable yet, there
-  is nothing for §5 to consume.
-- Section 6 (Phase 4 — Benchmark, Metrics) scale-out at the
-  simplex+same-family configuration. No larger-N probe is
-  authorized there; §13.4 evidence shows marginal cost does
-  not buy a different answer.
+  deployment. With no §11-strong-passing Ketu observable
+  yet, there is nothing for §5 to consume.
+- Section 6 (Phase 4 — Benchmark, Metrics) scale-out at
+  any single-axis configuration that has not cleared the
+  §13.9 0.75 bar. §13.10 and §13.11 HaluEval-only results
+  do not unlock scale-out.
 - Section 7 (Phase 5 — Packaging & Reproducibility) for any
   component that has not passed §11.
 - Section 12 speculative-decoding integration. The §12.3
   probe shares §13's configuration and inherits §13's null.
 
-**Completed** (§13.10):
+**Completed** (chronological):
 
-- **§13.7 semantic-entropy probe.** Run at N=100 on both
-  TruthfulQA-MC and HaluEval-QA. Both returned AUC = 0.661
-  (TRUTH_CORRELATED_MARGINAL). §2.2 metric revision
-  authorized to land.
+- **§13.7 semantic-entropy probe (§2.2 metric revision).** Run at
+  N=100 on both TruthfulQA-MC and HaluEval-QA. Both returned AUC
+  = 0.661 (TRUTH_CORRELATED_MARGINAL). §2.2 metric revision
+  authorized to land; see §13.10.
+- **§1.3 cross-family ensemble revision.** Run at N=100 on both
+  benchmarks with Qwen2.5-7B-Instruct + Llama-3.1-8B-Instruct +
+  Mistral-7B-Instruct-v0.3 (M=3, K=10, completion-style prompt).
+  TruthfulQA-MC 0.633 / HaluEval-QA 0.716 → combined
+  `CROSS_FAMILY_ANTI_FINDING` under the worst-benchmark rule.
+  Chat-template diagnostic on TruthfulQA-MC falsified the prompt-
+  format confound (AUC 0.567). No external-framing unlock. See
+  §13.11.
+- **§13.12 EigenScore embedding-space probe.** Run at N=100 on
+  both benchmarks. TruthfulQA-MC 0.559 (`EMBEDDING_SPACE_ANTI_
+  FINDING`) / HaluEval-QA 0.652 (`EMBEDDING_SPACE_SATURATION`,
+  within ±0.02 of §13.10 baseline, signal in expected direction
+  with mean separation 0.54 EigenScore units). Combined under
+  worst-benchmark rule: `EMBEDDING_SPACE_ANTI_FINDING`. Read:
+  EigenScore reproduces §13.10's signal on HaluEval but does not
+  lift it; on TruthfulQA-MC it underperforms §13.10. Internal-
+  state hypothesis class explored at the single-snapshot level.
+- **§13.14 BCVF-faithful 2nd-difference observable (text-level
+  construction).** Run at N=100 on both benchmarks. TruthfulQA-MC
+  0.574 / HaluEval-QA 0.363 (signal *inverted* on HaluEval) →
+  combined `BCVF_2DIFF_ANTI_FINDING`. Per-position semantic-
+  entropy curves were monotonic (not smooth-with-spikes), trend
+  direction flipped across benchmarks. Result narrows the BCVF
+  transfer claim to *this specific text-level construction*. See
+  §13.15 for the detailed result section.
+- **§13.16 hidden-state EigenScore 2nd-difference observable.**
+  Run at N=100 on both benchmarks with per-position EigenScore at
+  Qwen-7B layer 14, stride-4 grid, primary scalar `max|accel|`.
+  TruthfulQA-MC 0.462 / HaluEval-QA 0.449 — **both inverted**.
+  Combined `HSEIG_2DIFF_ANTI_FINDING`. The §13.15 diagnosis
+  transferred: hidden-state EigenScore series are smooth-monotonic
+  rising on both benchmarks (K samples diverge over generation),
+  not smooth-with-spikes — so the 2nd-difference operator has no
+  fault-onset structure to detect. Moving from text-level to model-
+  internal continuous state did not fix the structural problem.
+  See §13.17 for the result section and the further-tightened
+  narrowing.
+- **§13.18 single-trajectory forced-allocation-gap observable.**
+  Run at N=100 on both benchmarks with per-token greedy logit
+  capture, stride-1 grid, primary scalar
+  `max_t |accel(g_t)|` where
+  $g_t = \tilde{H}_t - \alpha \tilde{M}_t$ at α=1.0. TruthfulQA-MC
+  0.549 / HaluEval-QA 0.571 → combined
+  `FORCED_ALLOC_2DIFF_ANTI_FINDING`. Notable Variant-A diagnostic
+  (entropy-only 2nd-difference, no $M_t$ term, no z-norm) reached
+  HaluEval-QA AUC 0.701 — second-best HaluEval result of the §13
+  program — but TruthfulQA-MC at 0.536 keeps the worst-benchmark
+  combined classification at ANTI for any scalar choice. The $M_t$
+  component as defined hurts the signal beyond raw entropy alone;
+  the mechanism analysis's underlying claim about absolute logit
+  magnitude is not falsified, only the specific operational
+  definition `max − global_mean` is ruled out. See §13.19 for the
+  result section and the Variant A finding analysis.
 
-**Open and authorized** (in priority order):
+**§13 single-axis program exhausted (post-§13.19).** The five
+single-axis revisions above (cross-family, EigenScore, BCVF text-
+level, BCVF hidden-state, single-trajectory forced-allocation)
+exhaust both hypothesis classes available to the §13 program: K-
+sample-divergence-based observables (§13.11/§13.12/§13.14/§13.16)
+and single-trajectory observables (§13.18). All five collapse
+under the worst-benchmark rule because TruthfulQA-MC defeats every
+confidence-based scalar construction tested. **No further §13
+single-axis probes are authorized.** See §13.19 for the closing
+statement and combined-matrix analysis.
 
-1. **§1.3 cross-family ensemble revision (Qwen + Llama +
-   Mistral).** Now the top-priority next probe given the
-   §13.10 marginal pass. Requires extending
-   `Benchmark.make_sources` to support M=3 heterogeneous
-   tokenizer families (~1–2 days of vocab-alignment work).
-   Literature predicts a ~0.05–0.10 AUC lift on top of
-   §13.10's 0.661 — a strong pass (≥ 0.70 on both
-   benchmarks) would authorize the full §13.7 → §13.11
-   progression and revisit the §13.9 external-framing hold.
-2. **Embedding-space metric (alternative to semantic
-   entropy).** Activation probes or hidden-state
-   covariance (INSIDE / EigenScore). Secondary to the §1.3
-   revision given §13.10's marginal pass makes §1.3 the
-   cheaper next test; listed for completeness.
-3. **2nd-difference-of-semantic-entropy observable.**
-   Layering the BCVF 2nd-difference structure on top of
-   the §13.10-passing static-entropy signal. Authorized
-   only as a follow-up to §1.3 and requires a fresh §0.8
-   pre-commitment at that time.
+**Open as future-work pre-commitments outside the §13 single-
+axis program** (each requires a fresh §0.8-style commitment in a
+new top-level section if pursued):
+
+- **§14a system-level integration scout (EXECUTED in §14a /
+  §14b; combined `SCOUT_SATURATION`).** The un-tested
+  experimental structure §13.17 / §13.19 left open. Scout-
+  bounded to HaluEval-QA only at N=100 with V1 softmin trust /
+  V2 thresholded exclusion consumers and weighted majority vote
+  selector; semantic entropy as per-source BCVF scalar. Pinned
+  primary verdict per pre-committed bands: SCOUT_SATURATION
+  (Δ_V1=+3pp non-significant, Δ_V2=+0pp). Post-§14b audit
+  revealed structural issue in the §14a-pinned selector spec
+  (string-identity grouping degenerates at M=3 cross-family →
+  Baseline-B = Baseline-A). §14a SCOUT_SATURATION verdict is
+  binding under §0.8 for the §14a-pinned configuration; the
+  selector-spec fix is tested in §14a.2 below.
+- **§14a.2 system-level scout with NLI-clustered selector
+  (PRE-COMMITTED).** Selector-spec fix replacing string-identity
+  majority vote with NLI-clustered weighted majority vote (the
+  §13.10 cluster_by_entailment mechanism applied to M=3
+  candidate answers). Same sources, same per-source scalar, same
+  consumer variants, same benchmark, same N, same pre-committed
+  bands as §14a — only the selector and Baseline-B change to the
+  semantically-correct version. Pre-committed bands STRONG /
+  DIRECTIONAL / MARGINAL / SATURATION / REGRESSION (same
+  numerical thresholds applied to Δ vs the new NLI-clustered
+  Baseline-B). See §14a.2 for the full pinned specification.
+  Implementation (`scripts/probe_system_level_scout_v2.py`) is
+  a separate authorization gate.
+- **Single-trajectory forced-allocation-gap observable
+  (EXECUTED in §13.18 / §13.19; combined `ANTI_FINDING`).** The
+  signal class §13.17's narrowing left explicitly open has now
+  been tested. Pinned primary scalar produced TruthfulQA-MC AUC
+  0.549 / HaluEval-QA AUC 0.571, combined `ANTI_FINDING` per the
+  worst-benchmark rule. **§13.18 is the pre-commitment;
+  §13.19 is the result section.** The math below is retained as
+  background documentation for the rationale; the pinned
+  specification, AUC bands, and acceptance rules remain in §13.18.
+  No further single-trajectory single-axis probe is authorized
+  without a fresh §0.8 commitment.
+
+  Notable Variant-A diagnostic finding (entropy-only 2nd-difference
+  without the $M_t$ component): HaluEval-QA AUC reached 0.701 —
+  second-best HaluEval result of the §13 program — but TruthfulQA-
+  MC at 0.536 keeps the worst-benchmark combined classification at
+  ANTI even if Variant A had been the pinned primary. The Variant
+  A finding is documented in §13.19 as analytical evidence about
+  which component of the forced-allocation-gap construction
+  carried signal vs noise; it does NOT constitute a §13.18 pass
+  and does NOT authorize a §13.20 follow-up without a fresh §0.8
+  commitment.
+
+  **Mechanism rationale (re-stating ChatGPT's framing of where
+  hallucination enters in autoregressive LLMs):**
+
+  Softmax loses the absolute magnitude of the underlying logits.
+  Two scenarios with raw logits $[10, 1, 0.5]$ and $[-100, -100.1,
+  -100.2]$ produce wildly different epistemic states (confident vs
+  clueless) but Softmax flattens both into probability vectors that
+  sum to 1.0. Cross-entropy training forbids the model from
+  expressing absolute ignorance. Autoregression then locks the
+  forced guess into the context for subsequent tokens, amplifying
+  the false premise. The hallucination signature is therefore the
+  moment Softmax forces an allocation despite low absolute logit
+  magnitude — a property of single-trajectory logit geometry, not
+  K-sample geometry.
+
+  This observable was not measured by §13.10–§13.16: every probe
+  in §13 looked at *between-sample* variance (decoding stochasticity
+  introduced by the temperature parameter), which is downstream of
+  the very mechanism that creates hallucination. K-sample variance
+  measures how the model's outputs spread; the actual hallucination
+  signature is in how the logit distribution committed to a guess
+  despite low absolute magnitude *upstream* of any sampling.
+
+  **Mathematical construction (would be pinned in the eventual
+  §0.8 commitment):**
+
+  For a single greedy or sampled generation, at each token position
+  $t \in [1, T]$ where $T$ is the number of generated tokens:
+
+  1. Capture the raw logits $\mathbf{z}_t \in \mathbb{R}^{|V|}$
+     before softmax (available in HuggingFace via
+     `model.generate(..., output_scores=True,
+     return_dict_in_generate=True)`).
+  2. Compute two complementary quantities per position:
+     - **Confidence magnitude:**
+       $M_t = \max_j z_t[j] - \frac{1}{|V|}\sum_j z_t[j]$
+       (max logit centered by mean — indicates whether *anything*
+       in the vocab strongly stands out from the bulk).
+     - **Forced entropy:**
+       $H_t = -\sum_j p_t[j] \log p_t[j]$ where $p_t =
+       \text{softmax}(\mathbf{z}_t)$.
+  3. Z-normalize both quantities across the trajectory:
+     $\tilde{M}_t = (M_t - \bar{M})/\sigma_M$,
+     $\tilde{H}_t = (H_t - \bar{H})/\sigma_H$.
+  4. Define the **forced-allocation gap**:
+     $$g_t = \tilde{H}_t - \alpha \cdot \tilde{M}_t$$
+     with $\alpha = 1.0$ as a defensible default (equal weighting
+     of normalized entropy and normalized confidence; pinning $\alpha$
+     would be part of the eventual §0.8 commitment).
+     - High $g_t$: high entropy AND low confidence magnitude — the
+       "Scenario B" forced-allocation case.
+     - Low $g_t$: high confidence magnitude OR low entropy — the
+       model has commitment its logits actually support.
+  5. Apply the BCVF 2nd-difference operator across positions
+     WITHIN the single trajectory:
+     $$\text{accel}_t = g_{t+1} - 2 g_t + g_{t-1}$$
+     for interior $t$.
+  6. Primary scalar candidate (would be pinned, with diagnostic
+     secondaries reported but not classification-bearing, mirroring
+     the §13.14 / §13.16 pattern):
+     $$\text{forced\_alloc\_2diff}(q) = \max_t |\text{accel}_t|$$
+  7. AUC sign convention: pre-committed direction is *higher
+     forced-allocation acceleration → moment the model's logit
+     distribution suddenly committed to a low-magnitude forced
+     guess → more likely the answer is wrong*. AUC computed on
+     $-\text{forced\_alloc\_2diff}$.
+
+  **Why this construction satisfies the structural requirements
+  §13 violated:**
+
+  | Requirement | §13 K-sample probes | This observable |
+  |---|---|---|
+  | Continuous, real-valued | mostly | yes |
+  | Direct from model internals | partial | yes (raw logits) |
+  | Smooth-with-rare-spikes structure | no (§13.14, §13.16 both monotonic) | **plausible by mechanism** |
+  | Independent of K-sample divergence | no | **yes** (single trajectory) |
+  | Captures the autoregressive-hallucination mechanism | no | **yes** (forced allocation IS Softmax flattening) |
+
+  The "plausible by mechanism" caveat on the smooth-with-spikes
+  property is critical and explicitly NOT empirically validated:
+  it is a prediction from ChatGPT's mechanical framing, not data.
+  A token where the model knows the answer should produce high
+  $M_t$ and low $H_t \to$ low $g_t$. A token where the model is
+  forced to guess (e.g., a specific date it doesn't know) should
+  produce low $M_t$ and high $H_t \to$ high $g_t$. Forced moments
+  should be sparse and local in well-formed generations — exactly
+  the shape the 2nd-difference operator exploits. Whether
+  empirical $g_t$ trajectories actually have this shape on
+  Qwen2.5-7B-Instruct + TruthfulQA-MC / HaluEval-QA is unknown
+  and would be the central question of the §14/§15 commitment.
+
+  **Three concrete tractable variants** (the eventual §0.8 commit
+  would pin one as primary; others as deviation flags or
+  follow-ups):
+
+  - **A — Simple per-token entropy 2nd-difference.** Just $H_t$,
+    no magnitude term. Cheaper, doesn't need $M_t$ z-normalization.
+    Some published 1st-derivative literature exists (Kadavath 2022
+    P(True) reported AUROC ~0.55–0.62 at the 1st-derivative level
+    on short-form QA); the 2nd-difference variant is novel.
+  - **B — Forced-allocation gap as defined above.** Combines $H_t$
+    and $M_t$. Closer to ChatGPT's mechanism. Most theoretically
+    motivated; least published anchor.
+  - **C — Logit-lens curvature.** Apply the unembedding matrix to
+    mid-layer hidden states (the "logit lens" technique from the
+    interpretability literature) to get layer-position-specific
+    predictions. Compute when the layer-wise prediction shifts
+    abruptly mid-generation. Catches "the moment the model's
+    internal pre-decision crystallized to the wrong answer" —
+    structurally distinct from variant B.
+
+  **Implementation cost estimate (if pursued):**
+
+  Cheapest: variants A and B require only `output_scores=True`
+  during generation; per-token logits are already computed by the
+  model. Implementation ~300 lines (similar shape to §13.14 /
+  §13.16 minus the per-position NLI clustering or hidden-state
+  extraction passes). Runtime ~1–3 min at N=100 on a 24+ GB GPU
+  (no per-position clustering, no per-position EigenScore — just
+  per-position scalar arithmetic on the captured logits). NLI is
+  used only for the correctness label, ~3 calls per question, same
+  as §13.10–§13.16.
+
+  Variant C requires capturing and unembedding mid-layer hidden
+  states — slightly more expensive memory and code, but still much
+  cheaper than §13.16's per-position EigenScore.
+
+  **What this entry does NOT pre-commit:**
+
+  - No script implementation on-branch.
+  - No `classify()` thresholds in code.
+  - No benchmark runs.
+  - No AUC bands (numerical bands would be specified in the
+    eventual §0.8 commitment, with the same partition-around-§13.10
+    structure as §13.11–§13.16 if the §13.10 baseline is used as
+    the comparison anchor, OR a different anchor if a fresh
+    baseline is pinned at that time).
+  - Specific value of $\alpha$ — defaulted at 1.0 above as a
+    documentation convenience but the eventual commitment would
+    re-pin this with explicit reasoning (or commit to a sweep with
+    pre-committed selection rule).
+
+  **Status:** Documented as the most promising single-axis
+  observable §13.17 leaves open. Not authorized for implementation
+  without a fresh §0.8 commitment.
+- **System-level integration (would become §14).** The §4 source-
+  framework + §5 integration-layer machinery has never been
+  exercised on LLMs in this codebase. The §13 program tested
+  observables in isolation against ground truth (AUC); it did not
+  test multi-source LLM Q&A systems that consume BCVF scalars to
+  weight or filter sources. ChatGPT/external-review noted that
+  the autonomy-domain §6.1 result that passed was a system-level
+  result (multi-source robotic system using BCVF-shaped routing),
+  not an isolated-observable result, so the analogue system-level
+  test is the natural next experiment if any is pursued.
+- **Model-scale probe.** Re-run §13.10 with Qwen2.5-32B-Instruct
+  + DeBERTa-v3-large. Tests whether the §13.10 baseline lifts at
+  literature-typical scale. If §13.10 itself reaches 0.72+ at
+  this scale, all four §13 single-axis revisions could be
+  reconsidered. If §13.10 stays at ~0.66, the saturation is
+  fundamental to these benchmarks at 7B class.
+- **Continuous semantic entropy bridge (§13.13 pre-commitment,
+  not implemented).** Three Farquhar-2024-aligned upgrades
+  (continuous SE, DeBERTa-v3-large NLI, max_new_tokens=128) on
+  §13.10's protocol. Pre-committed in §13.13 but not implemented.
+  Demoted in priority because the four §13 single-axis nulls
+  collectively suggest single-axis variants saturate at the
+  §13.10 baseline regardless of which axis is changed.
+- **Linear activation probes** (Azaria & Mitchell 2023; Marks &
+  Tegmark 2024 "Geometry of Truth"). Requires a labeled train/
+  test split. Tests a different hypothesis class than the four
+  §13 probes (supervised rather than unsupervised). Would require
+  a fresh §0.8 pre-commitment around split selection.
+- **Benchmark substitution.** Adding TriviaQA-Generation as a
+  free-form benchmark Farquhar 2024 actually tested would resolve
+  the protocol-mismatch confound that affected §13.10–§13.16
+  (TruthfulQA-MC vs Farquhar's TruthfulQA-Generation). Requires
+  a fresh §0.8 pre-commitment around labeling protocol (gold-
+  answer string-match vs the existing NLI-based label).
 
 ### 13.9 What this means for the autonomy track
 
@@ -5981,16 +6349,28 @@ invalidate the autonomy result.
 
 For VC / investor communication, the autonomy track should
 continue to be presented on its own merits. The LLM design
-doc is an internal research artifact; the §13.7 revision
-probe is work-in-progress and is not positioned as a
-deliverable. `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest
-scope caveats" already reflects the current external-facing
-framing ("BCVF is not positioned as an LLM hallucination
-detector"). That framing remains accurate under the §13.10
-marginal pass; it will be revisited only if §1.3 cross-family
-lifts AUC to the TRUTH_CORRELATED_STRONG band (≥ 0.70) on
-both benchmarks. No VC-facing material is updated on the
-basis of §13.10 alone.
+doc is an internal research artifact; all five single-axis
+revision probes (§13.7 / §1.3 / §13.12 / §13.14 / §13.16 /
+§13.18) have now been executed and none lifts AUC above
+§13.10's 0.661 marginal baseline on the combined-classification
+rule. None is positioned as a deliverable.
+
+`AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest scope caveats"
+already reflects the current external-facing framing
+("BCVF is not positioned as an LLM hallucination detector"),
+and that framing is *strengthened*, not weakened, by the
+combined §13 evidence: 5-of-5 single-axis hypothesis classes
+tested produce combined `ANTI_FINDING` under the worst-benchmark
+rule, with TruthfulQA-MC defeating every confidence-based scalar
+construction tested. The §13 single-axis program is exhausted
+post-§13.19. The framing will be revisited only if some future
+out-of-§13 probe (system-level integration in the §6.1-style
+configuration, model-scale upgrade, or benchmark substitution
+to a less hostile second benchmark — see §13.8 future-work list)
+lifts AUC to the 0.75 strong band on BOTH benchmarks (or on a
+fresh pre-committed benchmark pair). No probe in the §13 program
+has cleared this bar. No VC-facing material is updated on the
+basis of any §13 result, either in isolation or combined.
 
 ### 13.10 Revision experiment results — semantic-entropy on TruthfulQA + HaluEval
 
@@ -6092,7 +6472,3205 @@ priority list):
 - `docs/experiments/probe_semantic_entropy_halueval_qa.md`
 - `docs/experiments/probe_semantic_entropy_halueval_qa.json`
 
+### 13.11 Cross-family ensemble revision results — §1.3 attempt
+
+The §13.8-authorized §1.3 cross-family ensemble probe has been
+executed at N=100 on both benchmarks with the pre-committed triple
+(Qwen2.5-7B-Instruct + Llama-3.1-8B-Instruct + Mistral-7B-Instruct-
+v0.3). The combined pre-committed classification is
+**`CROSS_FAMILY_ANTI_FINDING`**: TruthfulQA-MC AUC 0.633 falls below
+the §13.11 anti-finding lower bound of 0.641 (§13.10 baseline 0.661
+minus the ±0.02 saturation window), even though HaluEval-QA cleared
+the internal-strong band at 0.716. The pre-committed bands require
+the worst benchmark to set the combined classification, so the
+heterogeneous split resolves to ANTI on the strict reading.
+
+A follow-up chat-template diagnostic was run on TruthfulQA-MC (the
+underperforming benchmark) to test whether prompt-format mismatch
+between the shared `Q: ... A:` completion prompt and Llama/Mistral's
+chat-template-native instruction tuning was the confound. The
+diagnostic falsified that hypothesis: TruthfulQA-MC AUC dropped
+further to 0.567 under per-family chat templates, with the entropy
+signal's correct-vs-wrong separation collapsing from 0.419 nats to
+0.232 nats. Cross-family structural alignment improved (singleton-
+cluster rates converged) but at the cost of the entropy signal's
+truth-resolution. Combined ANTI_FINDING stands, strengthened.
+
+This closes the §13.8 item-1 authorization. The §13.8 item-2
+embedding-space / activation-probe revision (Azaria & Mitchell 2023;
+Chen et al. 2024 INSIDE / EigenScore) is promoted to top of the
+authorized-next list and pre-committed in §13.12 below.
+
+**Configuration (initial pass):**
+
+- **Script:** `scripts/probe_cross_family_entropy.py` at commit
+  `6a612dc` (initial M=3 implementation; subsequent commit `80afb69`
+  added the `--chat-template` diagnostic flag without altering the
+  default-path behaviour).
+- **Target models (M = 3, fp16, co-resident on a single 80 GB GPU):**
+  - `Qwen/Qwen2.5-7B-Instruct` (~14 GB) — model[0], also the label
+    model (greedy generation labels correctness, identical to
+    §13.10 for direct AUC comparability).
+  - `meta-llama/Llama-3.1-8B-Instruct` (~15 GB) — model[1].
+  - `mistralai/Mistral-7B-Instruct-v0.3` (~13 GB) — model[2].
+- **NLI clustering model:** `MoritzLaurer/DeBERTa-v3-base-mnli-fever-
+  anli`, fp16. Same as §13.10.
+- **Benchmarks:** TruthfulQA-MC (validation split) and HaluEval-QA
+  (data split), N=100 each. Same selections as §13.10.
+- **Prompt format:** shared `Q: ... A:` completion across all three
+  families (matches §13.10 exactly; per-family chat templates would
+  confound cross-family lift with prompt-format lift, see chat-
+  template diagnostic below).
+- **Sampling:** K=10 completions per model per question at T=1.0,
+  `max_new_tokens=32`. Pool size per question = M × K = 30.
+  Per-(question, model) seed = `args.seed + q_idx × M + m_idx`
+  (decouples sampling streams across families).
+- **Clustering:** bidirectional, question-conditioned NLI entailment
+  on the pooled M × K samples; union-find over the pool. The
+  clustering rule is source-agnostic — any cross-family pair is free
+  to merge if semantically equivalent — so cross-family agreement
+  reduces clusters and lowers entropy.
+- **Scalar:** Shannon entropy (nats) over the pooled cluster-size
+  distribution; AUC computed on `−entropy` (higher entropy → less
+  confident → more likely wrong).
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI against the correct choice AND fails NLI against
+  every distractor — identical labeling as §13.10.
+
+**Initial-pass result table** (completion-style prompt, both
+benchmarks, N=100):
+
+| Benchmark | N | Greedy acc | Mean H (correct) | Mean H (wrong) | Separation | **AUC** | Δ vs §13.10 | Per-run band |
+|---|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC (validation) | 100 | 0.250 | 2.143 | 2.562 | 0.419 nats | **0.633** | −0.028 | `CROSS_FAMILY_ANTI_FINDING` |
+| HaluEval-QA (data) | 100 | 0.300 | 2.111 | 2.675 | 0.564 nats | **0.716** | +0.055 | `CROSS_FAMILY_INTERNAL_STRONG` |
+
+Per-family singleton-cluster rates (fraction of a family's samples
+landing in clusters no other family contributed to — pure
+diagnostic, not in any pass band):
+
+| Model | TruthfulQA-MC | HaluEval-QA |
+|---|---|---|
+| `Qwen/Qwen2.5-7B-Instruct` | 0.512 | 0.637 |
+| `meta-llama/Llama-3.1-8B-Instruct` | 0.671 | 0.722 |
+| `mistralai/Mistral-7B-Instruct-v0.3` | 0.739 | 0.720 |
+
+**Combined classification logic** (per §13.11 pre-commitment): the
+worst-benchmark band sets the overall classification. TruthfulQA-MC
+0.633 < 0.641 lower bound → `CROSS_FAMILY_ANTI_FINDING` regardless
+of HaluEval-QA's 0.716 internal-strong result.
+
+**Chat-template diagnostic — TruthfulQA-MC only, N=100:**
+
+A subsequent diagnostic ran on the underperforming benchmark with
+each tokenizer's `apply_chat_template()` substituted for the shared
+`Q: ... A:` prompt (ChatML for Qwen, Llama-3 role tags, `[INST]`
+for Mistral). Hypothesis: Llama and Mistral's high singleton-cluster
+rates (0.67 / 0.74) reflected prompt-format mismatch driving
+stylistic divergence that NLI could not bind to Qwen's outputs,
+rather than genuine semantic disagreement.
+
+| Variant | Greedy acc | Mean H (all) | Mean H (correct) | Mean H (wrong) | Separation | Mean clusters | **AUC** |
+|---|---|---|---|---|---|---|---|
+| Initial pass (`Q: ... A:`) | 0.250 | 2.457 | 2.143 | 2.562 | 0.419 nats | 19.53 / 30 | **0.633** |
+| Chat-template diagnostic | 0.170 | 1.854 | 1.662 | 1.893 | 0.232 nats | 13.78 / 30 | **0.567** |
+
+| Singleton rate | Initial | Chat-template | Δ |
+|---|---|---|---|
+| Qwen | 0.512 | 0.429 | −0.083 |
+| Llama | 0.671 | 0.548 | −0.123 |
+| Mistral | 0.739 | 0.517 | −0.222 |
+
+**What the result demonstrates:**
+
+1. **Cross-family ensembling is not a uniform improvement over
+   single-model semantic entropy.** §13.10's M=1 result was AUC
+   0.661 on both benchmarks to three decimals — a clean, benchmark-
+   portable single signal. The M=3 cross-family ensemble produced a
+   wide split (TruthfulQA-MC −0.028, HaluEval-QA +0.055) at the same
+   N. The signal added by independent families is not additive in
+   the AUC sense; it is benchmark-conditional.
+2. **HaluEval-QA's +0.055 lift is consistent with literature
+   forecasts.** Yoffe 2024 (DebUnc) and Feng 2024 ("Don't
+   Hallucinate, Abstain") report a +0.05–0.10 AUC lift from cross-
+   family disagreement on QA-style benchmarks; HaluEval-QA's clean
+   right-vs-hallucinated answer structure matches that setting and
+   the result lands inside the predicted window.
+3. **TruthfulQA-MC's −0.028 drop is consistent with literature
+   forecasts for the same method on this specific benchmark.**
+   Farquhar 2024 reports semantic entropy at AUROC 0.75–0.79 on
+   TriviaQA / SQuAD but only ~0.70 on TruthfulQA-style adversarial
+   benchmarks, attributing the gap to TruthfulQA's "confident
+   misconception" question design — questions where models share
+   the wrong answer with high confidence (low entropy for *wrong*
+   answers, breaking the entropy → wrong correlation). The §13.10
+   M=1 result already absorbed that pathology at 0.661; adding
+   independently-trained models that also share the misconception
+   compounds the low-entropy-for-wrong effect rather than diluting
+   it. This is a method-level result, not a flaw in the §1.3
+   ensemble construction.
+4. **The chat-template diagnostic falsified the prompt-format
+   hypothesis.** The pre-commitment was "TruthfulQA-MC AUC ≥ 0.68
+   under chat templates → prompt-format was the confound." Observed
+   AUC was 0.567, a further 0.066 drop from the initial 0.633. The
+   hypothesis is rejected; cross-family ANTI_FINDING is not a
+   prompt-formatting artifact.
+5. **Chat templates trade structural alignment for entropy
+   resolution.** The diagnostic produced a clean pair of opposing
+   effects: singleton-cluster rates converged toward each other
+   (Mistral −0.222, Llama −0.123, Qwen −0.083) — the structural
+   improvement the hypothesis predicted — but the entropy signal's
+   correct-vs-wrong separation collapsed from 0.419 nats to 0.232
+   nats and the per-question cluster count fell from 19.53 to 13.78
+   of 30 pooled samples. Instruct models under chat templates
+   produce more formulaic, confidence-tone-matched assistant
+   responses with reduced semantic variance regardless of actual
+   knowledge — the "confidence theater" failure mode flagged in
+   Kuhn 2023 and Farquhar 2024 (which is why the published Farquhar
+   2024 protocol uses completion-style prompts). The completion-
+   style prompt was a correct §13.11 design choice; chat templates
+   would have only further damaged the signal had they been used
+   throughout.
+6. **Greedy-accuracy drop under chat templates (0.250 → 0.170) is
+   labeling noise, not a signal change.** Chat-templated Qwen
+   greedy generations are longer and include more qualifier
+   language, which makes the question-conditioned NLI label
+   ("entails correct AND not any distractor") harder to satisfy:
+   correct answers fail because qualifiers introduce non-entailment;
+   wrong answers sometimes pass because they accidentally entail a
+   distractor. AUC is computed over the resulting label split, so
+   the 0.567 number is on a slightly different label population
+   than 0.633 — but the band gap is wide enough (0.066) that the
+   labeling shift cannot rescue the chat-template variant into the
+   pass region.
+
+**What this authorizes** (per §13.11 pre-commitment and §13.8
+priority list):
+
+- The §13.8 item-2 embedding-space / activation-probe revision is
+  promoted from "secondary" to top of the authorized-next list. See
+  §13.12 for the pre-committed probe design (EigenScore, Chen et
+  al. 2024 ICLR — covariance of mid-layer hidden states across the
+  K=10 sampled generations, no training data required, directly
+  comparable to §13.10's K=10 sampling protocol).
+- A §13.11-attempt notation in §13.8 marking the §1.3 cross-family
+  ensemble revision as executed and classified
+  `CROSS_FAMILY_ANTI_FINDING`.
+- HaluEval-QA's 0.716 internal-strong stand-alone result may be
+  cited as a within-benchmark positive for cross-family in a §13.11
+  appendix or follow-up note, but it does not change the combined
+  classification under the §13.11 worst-benchmark rule.
+
+**What this does NOT authorize:**
+
+- Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`. Per §13.9, the
+  external-framing revision requires `CROSS_FAMILY_STRONG`
+  (≥ 0.75 on both benchmarks). Maximum observed AUC across §13.11
+  was 0.716 on a single benchmark. The §13.9 hold remains in force.
+- §13.8 item 3 (2nd-difference-of-semantic-entropy observable). The
+  pre-commitment for that follow-up was conditional on §1.3
+  passing; §1.3 did not pass, so item 3 is not authorized. Re-
+  authorization requires a fresh §0.8 pre-commitment after §13.12
+  lands a positive result.
+- Section 5 (Rahu-trust deployment), §6 (scale-out beyond N=100),
+  or §7 (packaging). All remain §13.8-paused on the same conditions
+  as before §13.11.
+- Any claim that the §1.3 ensemble "doesn't work". The honest scope
+  is: at M=3 with a same-K=10 / same-T / same-completion-prompt
+  configuration on a Qwen / Llama-3.1 / Mistral-v0.3 triple, the
+  combined per-benchmark AUC bands resolve to ANTI_FINDING on the
+  TruthfulQA pathology. Lift exists on HaluEval. A different
+  ensemble (M=2, larger M, different families, weighted
+  aggregation, per-model temperature tuning) is not tested here
+  and is not foreclosed; it is simply lower-priority than the
+  embedding-space revision per the §13.8 priority list.
+
+**Artifacts:**
+
+- `scripts/probe_cross_family_entropy.py` (commit `6a612dc`,
+  initial M=3 implementation; commit `80afb69`, `--chat-template`
+  diagnostic flag added).
+- `docs/experiments/probe_cross_family_entropy_truthfulqa_mc.md`
+  (initial pass).
+- `docs/experiments/probe_cross_family_entropy_truthfulqa_mc.json`
+  (per-question dump including pooled samples, source-model ids,
+  cluster ids, prompts).
+- `docs/experiments/probe_cross_family_entropy_halueval_qa.md`
+  (initial pass).
+- `docs/experiments/probe_cross_family_entropy_halueval_qa.json`.
+- `docs/experiments/probe_cross_family_entropy_truthfulqa_mc_chat.md`
+  (chat-template diagnostic).
+- `docs/experiments/probe_cross_family_entropy_truthfulqa_mc_chat.json`.
+
+### 13.12 Pre-commitment — EigenScore embedding-space probe (§13.8 item 2)
+
+**Status: pre-committed, not yet executed.** This section is a
+§0.8-style pre-commitment recorded before the experiment runs. The
+probe specification, success bands, and expected-cost estimates
+below are pinned at the time of §13.11's anti-finding write-up; any
+deviation at run time must be flagged in the result section as a
+deviation rather than a band-shift.
+
+**Background.** §13.10 established that meaning-space semantic
+entropy (Farquhar 2024) on a single Qwen2.5-7B-Instruct target
+clears the §11 0.60 marginal bar at AUC 0.661 on both benchmarks
+but does not clear the §13.9 0.75 external-framing bar. §13.11
+attempted to lift that result via the §13.8 item-1 cross-family
+ensemble revision (Yoffe 2024 / Feng 2024, Qwen + Llama + Mistral
+M=3 pool) and landed `CROSS_FAMILY_ANTI_FINDING` — a heterogeneous
+benchmark split (TruthfulQA 0.633 / HaluEval 0.716) whose worst
+benchmark falls below the §13.10 baseline minus the saturation
+window. The §13.8 item-2 embedding-space / activation-probe
+revision is therefore the next authorized probe.
+
+The literature class targeted here — Azaria & Mitchell 2023 (SAPLMA);
+Marks & Tegmark 2024 ("The Geometry of Truth"); Chen et al. 2024
+ICLR ("INSIDE: LLMs' Internal States Retain the Power of
+Hallucination Detection") — operates on the model's hidden states
+rather than its sampled outputs. Reported AUROCs on TruthfulQA /
+HaluEval / SAPLMA are in the **0.71–0.83** band, with INSIDE /
+EigenScore (Chen 2024) reporting **0.74–0.81** on HaluEval-QA and
+TruthfulQA — i.e., literature predicts a result band that brackets
+the §13.9 0.75 external-framing bar from both sides. A clean
+positive on this probe therefore would meaningfully test §13.9 in
+a way §13.11 could not.
+
+EigenScore is selected over the linear-probe variants (SAPLMA,
+Geometry of Truth) for three reasons specific to this codebase:
+
+1. **No labeled training set required.** EigenScore is computed per
+   question from K samples' hidden states; it has no learned
+   parameters beyond a regularization scalar. Linear probes need a
+   train/test split with truth labels, which would force a separate
+   §0.8 pre-commitment around split selection and risk train/test
+   contamination across our two benchmarks.
+2. **Direct K=10 protocol parity with §13.10.** EigenScore reuses
+   the same K=10 sampling already exercised in
+   `probe_semantic_entropy.py`; only the per-sample artifact
+   captured is different (last-token hidden state instead of decoded
+   string). AUC bands across §13.10 / §13.11 / §13.12 stay directly
+   comparable.
+3. **Falsifies a different hypothesis class.** Semantic entropy is
+   a sample-space metric; cross-family is an ensemble metric.
+   EigenScore is an internal-state metric. A positive result here
+   would not be a "more of the same" lift; a negative result would
+   triangulate the §13 null toward a stronger, multi-axis claim.
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_eigenscore.py` (new; does NOT modify
+  `probe_semantic_entropy.py` — §13.10's result is pinned — and does
+  NOT modify `probe_cross_family_entropy.py` — §13.11's result is
+  pinned).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same single-
+  family configuration as §13.10 to preserve direct AUC
+  comparability against the 0.661 baseline. M=1 by construction —
+  EigenScore is a within-model signal.
+- **Hidden-state extraction layer:** `model.config.num_hidden_layers
+  // 2` (Qwen2.5-7B-Instruct has 28 transformer blocks, so
+  layer 14, the middle layer). Pinned for the headline result; a
+  `--layer` CLI flag enables follow-up sweeps but the §13.12 band
+  classification refers exclusively to layer 14.
+- **Hidden-state extraction position:** the LAST generated token's
+  hidden state for each of the K samples (i.e., the residual-stream
+  vector at the final non-EOS position of the sample). Captured via
+  `model.generate(..., output_hidden_states=True)` and indexed as
+  `outputs.hidden_states[-1][layer_idx][:, -1, :]` — last-step's
+  hidden states tuple, middle-layer entry, final batch position.
+- **Scalar (Chen 2024 formulation):** for each question with K
+  samples and hidden-state matrix `X ∈ ℝ^{K × H}` (H = 3584 for
+  Qwen2.5-7B-Instruct), compute the centered Gram-matrix variant
+  used in the original paper (well-conditioned even when H ≫ K):
+
+  ```
+  X_c   = X - X.mean(axis=0, keepdims=True)        # K × H, centered
+  Σ_K   = (X_c @ X_c.T) / H + α · I_K              # K × K
+  EigenScore(q) = (1.0 / K) · log(det(Σ_K))
+  ```
+
+  with regularization `α = 1e-3` (Chen 2024 default). Higher
+  EigenScore = more spread in the K hidden states = more uncertainty.
+  AUC computed on `−EigenScore` so the convention "higher = more
+  truth-predictive" is preserved across §13.10 / §13.11 / §13.12.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100 (same
+  selection as §13.10); HaluEval-QA `data` split, N=100 (same
+  selection as §13.10).
+- **Sampling protocol:** K=10 completions per question at T=1.0,
+  `max_new_tokens=32`. Identical to §13.10. Per-question seed
+  `args.seed + q_idx`. No greedy from a separate model — the same
+  Qwen target produces both the sampled completions (for hidden
+  states) and the greedy completion (for the correctness label).
+- **Prompt format:** shared `Q: ... A:` completion, identical to
+  §13.10 / §13.11 initial pass. No chat templates (the §13.11
+  diagnostic already established that chat templates degrade the
+  signal on this codebase).
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI (DeBERTa-v3-base-mnli-fever-anli) against the
+  correct choice AND fails NLI against every distractor. Identical
+  labeling to §13.10 / §13.11. Direct AUC comparability.
+
+**Pre-committed success bands** (same numerical partition as §13.11
+because the §13.10 baseline of 0.661 is unchanged; relabeled
+`EMBEDDING_SPACE_*` to keep the per-revision lineage legible in
+search and in `classify()` output):
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`EMBEDDING_SPACE_STRONG`**.
+  Gates the §13.9 VC-brief revision (the same gate §13.11 failed
+  to clear). Authorizes a full §13.13 writeup, re-opens the §13.8
+  item-3 2nd-difference observable as a follow-up §0.8 pre-
+  commitment, and unblocks the §13.9 external-framing reconsideration.
+- `0.70 ≤ AUC < 0.75` on **both** → **`EMBEDDING_SPACE_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Document in a
+  §13.13 internal-strong section; consider whether layer or α
+  sweep closes the 0.05-AUC gap to the strong band.
+- `0.681 ≤ AUC < 0.70` on **both** → **`EMBEDDING_SPACE_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10's 0.661 + 0.02 saturation
+  upper bound. Document; do NOT authorize further probe progression.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`EMBEDDING_SPACE_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661 single-model baseline. Internal-
+  state representation adds nothing beyond meaning-space semantic
+  entropy at this configuration. Together with §13.11's combined
+  ANTI_FINDING, this would constitute strong evidence that a single-
+  axis revision (metric class change) cannot clear the §13.9 bar
+  and that compound revisions (e.g., embedding-space + 2nd-
+  difference, or embedding-space + cross-family on a different
+  triple) are required.
+- `AUC < 0.641` on **any** benchmark → **`EMBEDDING_SPACE_ANTI_FINDING`**.
+  Combined with §13.11, this would be a 2-of-2 anti-finding across
+  the two literature-backed revision classes available to this
+  codebase. Pause LLM track. Re-frame the §13 closure as "the
+  literature-backed single-axis revisions tested in this codebase
+  do not lift Qwen2.5-7B-Instruct AUC into the 0.75 band on both
+  benchmarks at N=100." A combined-revision §0.8 pre-commitment
+  becomes the only remaining authorized path.
+
+The "on both benchmarks" combinatorial rule is identical to §13.11's
+worst-benchmark rule and is pinned here so that a heterogeneous
+TruthfulQA / HaluEval split (which is plausible given §13.11's 0.083-
+wide split and Farquhar 2024's reported per-benchmark variance)
+does not get rescued post-hoc by single-benchmark cherry-picking.
+
+**Known simplifications vs Chen et al. 2024** (disclosed so the
+expected AUC band is calibrated against a realistic baseline rather
+than the paper's headline numbers):
+
+- **Single fixed layer (L/2 = 14).** Chen 2024 sweeps multiple
+  layers and reports best-of-sweep AUROC. Selecting a single layer
+  before running gives up the best-of-sweep margin. Expected AUC
+  penalty: small (~0.01–0.03) but material near the 0.75 boundary.
+  Configurable via `--layer` for follow-up sweeps if §13.12 lands
+  in the marginal or saturation band.
+- **Single hidden-state position (last generated token).** The paper
+  evaluates last-token, mean-pool, and last-prompt-token positions
+  and reports modest variance across them. Last-token is the
+  paper's default for generative QA. Expected penalty: <0.01 AUC.
+- **Fixed regularization α = 1e-3.** Chen 2024 reports robustness
+  to α in the [1e-4, 1e-2] range; outside that range AUC degrades.
+  Pinning to the paper default is a reasonable §0.8 default but
+  introduces a small confound if Qwen2.5-7B's hidden-state scale
+  differs from the OPT/Llama-2 models used in the paper. Configurable
+  via `--alpha` for follow-up.
+- **K = 10, T = 1.0, max_new_tokens = 32.** Identical to §13.10 /
+  §13.11. The paper's K is typically 10 as well.
+- **Same correctness label as §13.10 / §13.11** (question-conditioned
+  NLI on Qwen greedy). The paper uses gold-answer string match for
+  TruthfulQA in some configurations, which would flag fewer correct
+  generations as "correct" and shift n_pos / n_neg. Holding the
+  label fixed across §13 prevents a labeling-pipeline confound but
+  carries forward §13.10's labeling assumption. A string-match
+  fallback label is a §13.13 robustness check if the result lands
+  near a band boundary.
+- **Single target model (Qwen2.5-7B-Instruct).** The paper uses
+  Llama-2 / OPT in its headline numbers. Qwen2.5-7B's hidden-state
+  geometry may differ; the literature predicts the method
+  generalizes but the specific AUC is not pre-tested on Qwen.
+  Expected AUC may land slightly below the paper's 0.74–0.81 range
+  for this reason. The §13.12 strong band at 0.75 is therefore at
+  the lower edge of what the literature predicts for this exact
+  model — a clean strong-band pass would be a meaningful positive
+  result, not a guaranteed replication.
+
+These simplifications together suggest the §13.12 implementation
+should land at AUROC **~0.68–0.78** on the two benchmarks if the
+EigenScore signal transfers to Qwen2.5-7B-Instruct as the literature
+predicts — i.e., bracketing the strong band but not guaranteed to
+clear it. A result below 0.65 on both benchmarks would constitute
+a genuine signal against the embedding-space hypothesis on this
+codebase even after accounting for the simplifications above; a
+result above 0.78 would suggest Qwen2.5-7B's hidden states carry a
+stronger truth signal than the literature's Llama-2 / OPT baseline.
+
+**Expected cost.** Single 7B target model, K=10 sampling identical
+to §13.10, no NLI clustering pass on the K samples (NLI is used only
+for the correctness label, ~3 calls per question). Hidden-state
+extraction during generation adds ~2× memory but no substantial
+wall-time. Estimated runtime: **~3–5 min at N=100 on a single 24+
+GB GPU**. Cheaper than §13.10's clustering-bound runtime and much
+cheaper than §13.11's M=3 co-resident loading.
+
+**Report destination.**
+- `docs/experiments/probe_eigenscore_truthfulqa_mc.md`
+- `docs/experiments/probe_eigenscore_truthfulqa_mc.json` (per-question
+  dump including hidden-state shape, EigenScore, sample IDs, cluster
+  assignments are not applicable here — there is no clustering step).
+- `docs/experiments/probe_eigenscore_halueval_qa.md`
+- `docs/experiments/probe_eigenscore_halueval_qa.json`
+
+**Relationship to BCVF 2nd-difference core.** EigenScore as
+specified is a static scalar — first-difference structure (one
+scalar per question). It does not yet introduce the BCVF 2nd-
+difference observable. If §13.12 lands in `EMBEDDING_SPACE_STRONG`
+or `EMBEDDING_SPACE_INTERNAL_STRONG`, a follow-up §13.13
+pre-commitment can test whether `d²(EigenScore)/dk²` across outer
+decoding steps (the true BCVF-shaped signal applied to internal
+states) improves on the static scalar. That follow-up is NOT pre-
+committed here; its authorization is conditional on §13.12 clearing
+the marginal-lift bar AT MINIMUM.
+
+**What §13.12 does not pre-commit.** No probe-script implementation
+on-branch, no `classify()` thresholds in code, no benchmark runs.
+This section is the §0.8-style pre-commitment record only.
+Implementation of `scripts/probe_eigenscore.py` is a separate
+authorization gate; the pre-committed bands above are the guarantee
+that any future implementation cannot redefine the success criteria
+post-hoc.
+
+### 13.13 Pre-commitment — continuous semantic entropy (Farquhar 2024 bridge)
+
+**Status: pre-committed, not yet executed.** This section is a
+§0.8-style pre-commitment recorded before the experiment runs. The
+specification, success bands, and expected-cost estimates below are
+pinned at the time of §13.12's pre-commit and BEFORE §13.12 has been
+run — the §13.13 probe can be authorized for implementation
+independent of §13.12's outcome, since the two probes test different
+hypothesis classes and use different scripts.
+
+**Background.** §13.10 implemented Farquhar et al. 2024
+(*Nature* 630, 625–630) at a deliberately simplified configuration:
+discrete semantic entropy, DeBERTa-v3-base NLI, `max_new_tokens=32`,
+NLI-based correctness labeling, multiple-choice TruthfulQA-MC. We
+reached AUC 0.661 on both benchmarks. Farquhar's headline numbers
+are AUROC 0.74–0.79 on TriviaQA / SQuAD / NQ-Open / BioASQ and
+~0.70 on TruthfulQA-Generation. The gap to our 0.661 result is
+attributable to several disclosed simplifications, each of which
+the paper itself ablates. §13.13 closes the **three highest-leverage
+methodological gaps** while holding the target model (Qwen2.5-7B-
+Instruct), benchmarks (TruthfulQA-MC + HaluEval-QA), prompt format
+(`Q: ... A:` completion), and correctness-label protocol (question-
+conditioned NLI on Qwen greedy) fixed. This isolates the metric +
+protocol contribution from confounds like model scale, benchmark
+choice, or labeling pipeline.
+
+**Quantified gap analysis (Farquhar 2024 vs §13.10), using the
+paper's own ablations as the per-gap effect sizes:**
+
+| Dimension | Farquhar 2024 | §13.10 | Estimated AUC gap |
+|---|---|---|---|
+| Headline scalar | **Continuous** SE (length-normalized log-prob weighting) | Discrete SE (cluster counts only) | **~+0.04** |
+| NLI clustering model | DeBERTa-v2-xlarge (~900M) | DeBERTa-v3-base (~140M) | **~+0.02** |
+| Generation length | `max_new_tokens=128`+ | `max_new_tokens=32` | **~+0.01–0.05** |
+| Target LLM | Llama-2-13B/70B / Falcon-40B / Mistral-7B | Qwen2.5-7B-Instruct | ~0.0–0.05 (model-family effect) |
+| Benchmarks | Free-form (TriviaQA, NQ, SQuAD, etc.) | TruthfulQA-MC1 + HaluEval-QA | ~+0.05–0.10 (protocol mismatch) |
+| Correctness label | Gold-answer string match | Question-conditioned NLI on greedy | sign uncertain |
+
+§13.13 addresses the **first three** gaps (continuous SE, larger
+NLI, longer generation) — together estimated to lift AUC by
+**+0.07–0.11** if the paper's per-gap ablations transfer to our
+configuration. The remaining gaps (target model scale, benchmark
+choice, labeling protocol) are deferred to subsequent §0.8 pre-
+commitments because they require benchmark or model substitutions
+that change what is being measured.
+
+**Why this probe over a fresh hypothesis class.** §13.10 / §13.11 /
+§13.12 each test a fundamentally different signal class (sample-
+space, ensemble-space, internal-state). §13.13 instead **closes a
+known replication gap on §13.10's signal class**. The reason this is
+worth doing rather than another novel probe: if Farquhar's published
+0.74–0.79 AUROC is real and transfers to Qwen2.5-7B at our
+benchmarks, then §13.10's 0.661 underperforms the literature-
+expected number by 0.07–0.11 *for reasons we have already
+identified*. Closing those gaps either (a) confirms the literature
+transfers and produces a strong-band §13.10-class result, or (b)
+falsifies the transfer for this codebase even with a faithful
+implementation — both outcomes are informative. Continuing to test
+new hypothesis classes (item 3, item 4, ...) without first closing
+known replication gaps would risk attributing each new probe's
+shortfall to its hypothesis rather than to a shared protocol-level
+issue.
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_continuous_se.py` (new; does NOT modify
+  `probe_semantic_entropy.py` — §13.10 is pinned).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same single-
+  model configuration as §13.10 / §13.12 to preserve direct AUC
+  comparability against the 0.661 baseline. The model-scale gap is
+  intentionally NOT closed in §13.13.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100 (same
+  selection as §13.10); HaluEval-QA `data` split, N=100 (same
+  selection as §13.10). Same benchmarks as §13.10 / §13.11 / §13.12
+  for direct AUC comparability across the four probes.
+- **Sampling:** K=10 completions per question at T=1.0,
+  **`max_new_tokens=128`** (up from §13.10's 32). Per-question seed
+  `args.seed + q_idx`. Generation captures per-token logits via
+  `model.generate(..., output_scores=True, return_dict_in_generate=
+  True)` so that per-sample length-normalized log-likelihood can be
+  computed alongside the decoded string.
+- **NLI clustering model:** **`MoritzLaurer/DeBERTa-v3-large-mnli-
+  fever-anli-ling-wanli`** (or DeBERTa-v2-xlarge if available
+  ungated). Up from §13.10's DeBERTa-v3-base. Used both for sample
+  clustering and for correctness labeling (same model for both, as
+  §13.10).
+- **Prompt format:** shared `Q: ... A:` completion, identical to
+  §13.10 / §13.11 initial pass / §13.12. No chat templates (§13.11
+  diagnostic established chat templates degrade signal).
+- **Clustering rule:** bidirectional, question-conditioned NLI
+  entailment, union-find over the K samples per question. Identical
+  to §13.10's `cluster_by_entailment`.
+- **Continuous semantic entropy scalar (Farquhar 2024 §2.2 Eq. 6):**
+  given K samples with cluster assignments c(s_k) ∈ {1, ..., C} and
+  per-sample length-normalized log-likelihoods
+  ℓ_k = (1/T_k) · Σ_t log p(s_k,t | s_k,<t, prompt)
+  (the average per-token log-prob of sample k, where T_k is the
+  number of generated tokens and the sum is over those tokens),
+  compute per-cluster aggregated probability:
+      log P(c) = logsumexp_{k: c(s_k) = c} ℓ_k
+  Normalize over clusters:
+      log P̂(c) = log P(c) − logsumexp_{c' ∈ clusters} log P(c')
+  Then:
+      H_continuous(q) = − Σ_c P̂(c) · log P̂(c)
+  AUC computed on `−H_continuous` (higher entropy → less confident →
+  more likely wrong; negate for the convention "higher = more
+  truth-predictive" used across §13.10 / §13.11 / §13.12 / §13.13).
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI against the correct choice AND fails NLI against
+  every distractor. Identical labeling to §13.10 / §13.11 / §13.12.
+  The greedy `max_new_tokens` is also raised to 128 for consistency
+  with the sampling configuration; this MAY shift greedy accuracy
+  slightly vs §13.10 (longer greedy responses can fail "entails
+  correct AND not distractor" via qualifier text), and any such
+  shift will be reported as a deviation in §13.14 (the result
+  section, when written).
+
+**Pre-committed success bands** (same numerical partition as §13.11
+/ §13.12 because the §13.10 baseline of 0.661 is unchanged;
+relabeled `CONTINUOUS_SE_*` to keep the per-revision lineage
+legible in console output, JSON dumps, and grep):
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`CONTINUOUS_SE_STRONG`**.
+  Gates the §13.9 VC-brief revision (the same gate §13.11 failed
+  to clear and §13.12 has not yet attempted). Authorizes a §13.14
+  writeup, re-opens the §13.8 item-3 2nd-difference observable as
+  a follow-up §0.8 pre-commitment, and unblocks the §13.9 external-
+  framing reconsideration.
+- `0.70 ≤ AUC < 0.75` on **both** → **`CONTINUOUS_SE_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Document in a
+  §13.14 internal-strong section. Stage 2 of the Farquhar bridge
+  (adding TriviaQA-Generation as a third benchmark to compare
+  against Farquhar's headline 0.78 number directly) becomes the
+  authorized next probe.
+- `0.681 ≤ AUC < 0.70` on **both** → **`CONTINUOUS_SE_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10's 0.661 + 0.02 saturation
+  upper bound. Document; do NOT authorize further single-axis
+  probe progression. Stage 2 (TriviaQA addition) and Stage 3
+  (target-model upscale to Qwen2.5-32B) remain plausible as
+  follow-ups but require fresh §0.8 pre-commitments.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`CONTINUOUS_SE_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661 single-model baseline. The three
+  Farquhar-aligned methodological upgrades (continuous SE, larger
+  NLI, longer generation) added nothing measurable on this codebase.
+  Combined with §13.11's anti-finding (and §13.12's outcome,
+  whatever it lands at), this would be strong evidence that the
+  shortfall vs Farquhar's 0.74–0.79 is NOT in the metric or
+  protocol layer but in the benchmark choice (TruthfulQA-MC vs
+  Farquhar's TruthfulQA-Generation) or the model scale (Qwen-7B
+  vs Llama-2-13B/70B). Authorizes Stage 2 (benchmark substitution)
+  as the next probe under a fresh pre-commitment.
+- `AUC < 0.641` on **any** benchmark → **`CONTINUOUS_SE_ANTI_FINDING`**.
+  The literature-aligned variant of §13.10 underperforms the
+  simplified §13.10 baseline. This would be a surprising result —
+  the paper's ablations predict each individual change is
+  monotonically positive — and would suggest one of: (a) the
+  continuous SE implementation has a numerics bug (length
+  normalization sign / log-sum-exp aggregation), (b) the larger
+  NLI model interacts pathologically with Qwen2.5-7B's output
+  distribution, or (c) the longer generation introduces
+  truncation-pattern artifacts that the discrete clustering
+  absorbed but the continuous weighting amplifies. Investigation
+  required before treating as a genuine anti-finding.
+
+The "on both benchmarks" combinatorial rule is identical to §13.11 /
+§13.12 and is pinned here to prevent post-hoc benchmark cherry-
+picking on a heterogeneous TruthfulQA / HaluEval split.
+
+**Known simplifications vs Farquhar 2024 that §13.13 does NOT close**
+(disclosed so the expected AUC band is calibrated against a realistic
+post-§13.13 baseline rather than the paper's headline numbers):
+
+- **Target model:** Qwen2.5-7B-Instruct vs Farquhar's Llama-2-13B/
+  70B / Falcon-40B / Mistral-7B. Same parameter scale as one of the
+  paper's models (Mistral-7B), but different family. Expected per-
+  family variance ±0.03 AUC.
+- **Benchmarks:** TruthfulQA-MC + HaluEval-QA vs Farquhar's
+  TriviaQA / NQ-Open / SQuAD / BioASQ / TruthfulQA-Generation.
+  TruthfulQA-MC is multiple-choice (closed form) where Farquhar's
+  TruthfulQA result was on the free-form generation variant — the
+  two are different problems despite sharing questions. HaluEval-QA
+  is not in the Farquhar paper at all. Stage 2 of this bridge
+  (adding TriviaQA-Generation as a third benchmark) is the
+  pre-committed follow-up if §13.13 lands above SATURATION.
+- **Correctness label:** question-conditioned NLI on Qwen greedy vs
+  Farquhar's gold-answer string match. Holding labeling fixed
+  across §13 prevents cross-experiment label-shift confounds; cost
+  is that we under-credit greedy generations that paraphrase the
+  correct choice (NLI sometimes fails on legitimate paraphrases the
+  string-match would also fail on, but the failure modes differ).
+- **K = 10.** Farquhar uses K=10 in most experiments but ablates
+  K up to 30; reports +0.01–0.02 AUC for K=20+. Pinning K=10
+  preserves §13.10 / §13.11 / §13.12 parity.
+
+These un-closed gaps together suggest the §13.13 implementation
+should land at AUROC **~0.70–0.76 on both benchmarks** if the
+paper's per-gap ablations transfer cleanly to Qwen2.5-7B-Instruct
+on our benchmark mix — i.e., bracketing the §13.9 0.75 strong band
+but not guaranteed to clear it. A result above 0.78 would suggest
+the paper's ablations *under-state* the per-gap effect on this
+codebase (unexpected); a result below 0.66 would constitute
+genuine evidence against Farquhar's transfer claims for this model
++ benchmark mix even after the three simplifications above are
+accounted for.
+
+**Expected cost.** Single 7B target model + larger NLI model. K=10
+sampling at `max_new_tokens=128` (4× the §13.10 token budget for
+sampling; ~3× wall-clock for the generation pass). NLI clustering
+pass on K=10 samples per question is unchanged in structure but
+~2× slower per call due to the larger model. Estimated runtime:
+**~10–15 min at N=100 on a single 24+ GB GPU** (vs §13.10's
+~3 min). Memory: Qwen-7B fp16 ~14 GB + DeBERTa-v3-large fp16 ~1.5
+GB = ~16 GB, comfortably under a 24 GB budget.
+
+**Report destination.**
+- `docs/experiments/probe_continuous_se_truthfulqa_mc.md`
+- `docs/experiments/probe_continuous_se_truthfulqa_mc.json` (per-
+  question dump including per-sample length-normalized log-
+  likelihoods, cluster assignments, per-cluster aggregated
+  log-probabilities — all the intermediate quantities needed to
+  audit the continuous-SE numerics post-hoc).
+- `docs/experiments/probe_continuous_se_halueval_qa.md`
+- `docs/experiments/probe_continuous_se_halueval_qa.json`
+
+**Relationship to §13.10 / §13.11 / §13.12.** §13.13 is a *protocol-
+upgrade* probe, not a new hypothesis class. It sits in the same
+sample-space metric class as §13.10 and tests whether the §13.10
+shortfall vs Farquhar 2024 is closed by the three pinned upgrades.
+§13.11 (cross-family ensemble) and §13.12 (EigenScore embedding-
+space) test different hypothesis classes and are independent from
+§13.13. Combination of §13.13's continuous SE with §13.12's
+EigenScore as a compound predictor (linear combination, weighted
+sum, or learned classifier) is the §13.8 item-4 follow-up and is
+NOT pre-committed here — it requires a fresh §0.8 commitment after
+both §13.12 and §13.13 land.
+
+**What §13.13 does not pre-commit.** No probe-script implementation
+on-branch, no `classify()` thresholds in code, no benchmark runs.
+This section is the §0.8-style pre-commitment record only.
+Implementation of `scripts/probe_continuous_se.py` is a separate
+authorization gate; the pre-committed bands above are the guarantee
+that any future implementation cannot redefine the success criteria
+post-hoc. Authorization for implementation is independent of §13.12's
+outcome — §13.13 can be built and run in parallel with §13.12 if
+GPU time permits.
+
+### 13.14 Pre-commitment — BCVF-faithful 2nd-difference observable
+
+**Status: pre-committed, not yet executed.** This section is a
+§0.8-style pre-commitment recorded before the experiment runs.
+Specification, success bands, and expected-cost estimates are
+pinned at this point and cannot be redefined post-hoc. §13.14 is
+authorized to be built and run in parallel with §13.12 / §13.13;
+its outcome is independent of theirs.
+
+**Background — and why this probe is structurally different from
+§13.10–§13.13.** The BCVF framework's autonomy-domain validation
+(`symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.1, §6.7) cleared
+its pre-committed gates on `S3_map_error_accel` — *the second
+derivative of the divergence between the robot's internal map and
+ground truth, evaluated as the robot moves through its
+environment*. Three things matter about that signal:
+
+1. **It is relational, not agent-only.** Not a measurement of the
+   robot's confidence in isolation; not a measurement of the road
+   in isolation. It is the *acceleration of the agent-environment
+   coupling failure* — fault information lives in how that coupling
+   evolves, not in either side alone.
+2. **It requires temporal evolution.** A single snapshot has no
+   2nd derivative. The robot must be acting over time, the
+   perception must update across steps, and the gap must be
+   measurable as a function of step index.
+3. **The 2nd derivative specifically catches accelerating
+   failures** — a constant or shrinking gap is fine; an
+   accelerating gap is the fault signature.
+
+§13.10 (single-model semantic entropy), §13.11 (cross-family
+ensemble), §13.12 (EigenScore over hidden states), and §13.13
+(continuous SE) are all **single-snapshot agent-only** measurements.
+Each samples K completions, computes one scalar per question, and
+classifies. None of them takes a derivative over the model's
+evolving generation state. They are first-derivative-class
+constructions at best, and they each translate the BCVF idea by
+*changing what is measured about the agent* (more samples, more
+families, internal states, weighted entropy). None of them is
+shaped like the autonomy-domain BCVF observable that actually
+passed §6.1.
+
+§13.14 is the first probe in the §13 ladder that is **shaped like
+the autonomy-domain BCVF observable**. It takes a 2nd derivative
+of the model's evolving uncertainty during a single generation, as
+a function of token position within that generation. The token
+sequence is the LLM's analogue of "robot moving through environment
+over time" — it is the only sequential evolution available within
+a single inference. Per-position semantic entropy is the analogue
+of "robot's map at time t". The 2nd difference of per-position
+entropy across the sequence is the analogue of `S3_map_error_accel`
+— *the acceleration of the model's evolving uncertainty as it
+constructs an answer*.
+
+This makes §13.14 the **load-bearing probe for the BCVF-for-LLMs
+transfer claim**. §13.10–§13.13 audit literature methods; §13.14
+tests whether BCVF's actual native observable transfers. A
+positive result here would be the first novel construction in this
+codebase that is BCVF-shaped rather than literature-shaped; a
+negative result would constitute the first real evidence that the
+BCVF formalism itself does not carry the load on the LLM domain
+(a stronger, multi-axis null than §13.10–§13.13's combined evidence
+because those probes were not BCVF-faithful in the first place).
+
+**The car / road / coupling framing.** §13.10–§13.13 measure
+properties of the LLM (the "car"). The road (input difficulty,
+question ambiguity, knowledge-boundary distance) is held fixed
+across all probes by holding the benchmark fixed. The framework's
+actual claim is that fault information lives in *how the coupling
+between the two evolves under load* — the analogue of the robot's
+map error accelerating as terrain becomes harder. Within a single
+LLM inference, the only "load" axis available is sequence position:
+the question is presented at t=0, and the model must construct an
+answer over t=1..T. Per-position semantic divergence across K
+samples is the LLM analogue of "how is the agent's internal world-
+model evolving as it engages the environment", and the 2nd
+difference is the analogue of "is that evolution accelerating
+into divergence."
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_bcvf_2diff.py` (new; does NOT modify
+  any §13.10–§13.13 script — those results are pinned).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same single-
+  model configuration as §13.10 / §13.12 / §13.13 to preserve direct
+  AUC comparability against the 0.661 baseline.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100 (same
+  selection as §13.10); HaluEval-QA `data` split, N=100 (same
+  selection as §13.10). Same benchmarks as §13.10 / §13.11 / §13.12
+  / §13.13 for direct AUC comparability across the five probes.
+- **Sampling:** K=10 completions per question at T=1.0,
+  **`max_new_tokens=128`** (4× §13.10's 32; necessary so the
+  generation has enough sequence length for a 2nd-difference signal
+  to evolve). Per-question seed `args.seed + q_idx`. No hidden-state
+  capture (this probe operates on decoded text, not internals — the
+  signal class is "agent's evolving outputs", paralleling the
+  robotics-domain signal class "agent's evolving map").
+- **Prompt format:** shared `Q: ... A:` completion, identical to
+  §13.10 / §13.11 / §13.12 / §13.13. No chat templates.
+- **NLI clustering model:** `MoritzLaurer/DeBERTa-v3-base-mnli-fever-
+  anli` for §13.14 v1 (matches §13.10 / §13.11 / §13.12 default;
+  preserves AUC comparability with §13.10's 0.661). A `--nli-model`
+  flag enables substituting in the §13.13-pinned DeBERTa-v3-large
+  for a §13.14-v2 variant if v1 lands at SATURATION or below.
+- **Position grid (pinned):** entropy is computed at sequence
+  positions `t ∈ {position_min, position_min + position_stride,
+  position_min + 2·position_stride, ..., max_new_tokens}`, with
+  defaults:
+  - `position_min = 8` — skip the first 8 generated tokens because
+    those positions are dominated by leading "The", "A", whitespace,
+    and other low-information tokens that produce noisy NLI
+    clustering signal.
+  - `position_stride = 4` — compute entropy every 4 tokens, giving
+    `(128 − 8) / 4 + 1 = 31` measured positions per question. Sub-
+    Nyquist sampling of the per-token sequence; chosen for
+    computational tractability while preserving 2nd-difference
+    structure on natural English answer construction.
+  Both configurable via `--position-min` and `--position-stride`
+  flags; non-default values are flagged in the report as deviations.
+- **Per-position semantic entropy** (the 1st-derivative-class
+  signal, computed at each grid position):
+  - At each grid position `t`, take the K samples *truncated to
+    length t generated tokens*. Decode each truncated sample to
+    text; question-condition by prepending the question; cluster by
+    bidirectional NLI entailment via union-find. Compute Shannon
+    entropy `H_t` (nats) over the cluster-size distribution.
+    Identical clustering rule to §13.10 — only the input strings
+    differ (truncated rather than full).
+- **2nd-difference scalar (the BCVF-shaped observable):** with
+  per-question entropy series `H_{t₀}, H_{t₁}, ..., H_{t_N}` at the
+  pinned grid positions:
+  - Per-position 2nd difference (centered, stride-aware):
+    `accel_i = H_{t_{i+1}} − 2·H_{t_i} + H_{t_{i−1}}`
+    for `i ∈ [1, N−1]` (the i=0 and i=N positions are dropped
+    because they have no centered neighbor).
+  - **Primary scalar** (pinned for AUC and band classification):
+    `bcvf_2diff(q) = max_i |accel_i|` — peak |entropy acceleration|
+    across the generation. Mirrors `S3_map_error_accel` peak in the
+    robotics domain.
+  - **Secondary diagnostic scalars** (reported but NOT in the band
+    classification): `mean_i |accel_i|`, `Σ_i accel_i²`, position
+    `i*` of the peak. These exist purely to support post-hoc
+    interpretation; changing the primary scalar after the run is a
+    §0.8 violation.
+  - AUC computed on `−bcvf_2diff(q)` so the convention "higher =
+    more truth-predictive" is preserved. Hypothesis: questions
+    where the model's evolving uncertainty *accelerates* are
+    questions where the model is failing to commit to a stable
+    answer — analogous to map error accelerating when the robot's
+    perception is failing — and these are the questions more likely
+    to be wrong.
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI against the correct choice AND fails NLI against
+  every distractor. Identical labeling protocol to §13.10 / §13.11
+  / §13.12 / §13.13. Greedy `max_new_tokens=128` to match the
+  sampling configuration.
+
+**Pre-committed success bands** (same numerical partition as §13.11
+/ §13.12 / §13.13 because the §13.10 baseline of 0.661 is unchanged
+across all five probes; relabeled `BCVF_2DIFF_*` so the per-revision
+lineage stays legible in console output, JSON dumps, and grep):
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`BCVF_2DIFF_STRONG`**.
+  Gates the §13.9 VC-brief revision. Authorizes a §13.15 result
+  writeup positioning §13.14 as **the first BCVF-faithful LLM
+  result in this codebase** — distinct framing from any §13.10–
+  §13.13 outcome because §13.14 is the only probe in the ladder
+  that is shaped like the autonomy-domain BCVF observable that
+  passed §6.1. STRONG here would constitute the load-bearing
+  evidence for the BCVF-for-LLMs transfer claim.
+- `0.70 ≤ AUC < 0.75` on **both** → **`BCVF_2DIFF_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Document in a
+  §13.15 internal-strong section. The 2nd-difference observable
+  produces signal but doesn't clear the §13.9 bar; consider
+  follow-ups: (a) NLI upgrade to DeBERTa-v3-large (§13.14-v2
+  variant), (b) finer position grid (`position_stride=2` or `=1`),
+  (c) target-model upscale to Qwen2.5-32B.
+- `0.681 ≤ AUC < 0.70` on **both** → **`BCVF_2DIFF_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10 + 0.02. Document; do NOT
+  authorize further single-axis probe progression. The BCVF-shaped
+  signal exists but is not strong enough to change the §13.9
+  external framing.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`BCVF_2DIFF_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661. The BCVF 2nd-difference
+  observable adds nothing measurable beyond the static-snapshot
+  semantic entropy of §13.10. **This would be a substantive
+  internal finding** — it would suggest that for LLM hallucination
+  detection the second-derivative-of-coupling-failure structure
+  that powered the autonomy-domain validation does not transfer
+  to the token-sequence-as-temporal-axis analogue. Honest scope
+  for the BCVF-for-LLMs transfer claim narrows to "BCVF concepts
+  inspired the §13 metric exploration but the native BCVF observable
+  does not improve on the literature's first-derivative methods on
+  this codebase".
+- `AUC < 0.641` on **any** benchmark → **`BCVF_2DIFF_ANTI_FINDING`**.
+  The 2nd-difference signal is *worse than* the static §13.10
+  baseline. Combined with §13.11 + (whichever of §13.12 / §13.13
+  has landed), this would be 3-of-3 single-axis revisions failing
+  to improve on §13.10. The honest external framing under this
+  outcome: **BCVF-for-LLMs as a hallucination detector is not
+  supported by direct measurement on this codebase**. Pause the
+  LLM track; the autonomy-domain BCVF claim stands independently
+  on its own §6.1 evidence and is unaffected by this null. Items
+  4–6 in §13.8's authorized list (TriviaQA addition, 2nd-difference,
+  compound revisions) all need fresh §0.8 pre-commitments before
+  any further LLM compute is authorized.
+
+The "on both benchmarks" combinatorial rule is identical to §13.11
+/ §13.12 / §13.13 and is pinned here to prevent post-hoc benchmark
+cherry-picking on a heterogeneous TruthfulQA / HaluEval split.
+
+**Why the SATURATION and ANTI bands matter MORE for §13.14 than
+they did for §13.10–§13.13.** The earlier probes were literature
+audits — a saturation result there says "this published method
+doesn't transfer cleanly" but doesn't directly bear on the BCVF
+formalism (because the methods being tested were not BCVF-shaped
+in the first place). §13.14 IS the BCVF-shaped probe. A saturation
+or anti result here is direct evidence about the BCVF transfer
+claim itself, not just about a literature method. The honest
+internal framing must therefore update accordingly: a §13.14
+SATURATION is a real (if narrow) negative for the BCVF-for-LLMs
+hypothesis, even though it is not a §13.9 VC-bar failure (which
+already failed under §13.11 alone).
+
+**Known simplifications and risks specific to §13.14** (disclosed
+so the expected AUC band is calibrated against a realistic
+post-§13.14 baseline; §13.14 is novel construction with no direct
+literature reference, so the AUC forecast is more uncertain than
+§13.10 / §13.13 which had paper-derived numbers):
+
+- **NLI on truncated generations is noisier than NLI on full
+  generations.** Truncated samples may end mid-sentence ("Paris
+  was the capital of"); the MNLI-trained classifier was not
+  trained on incomplete-sentence pairs. Question-conditioning
+  partially mitigates this (the question stays well-formed) but
+  the per-position entropy values are noisier than §13.10's whole-
+  generation entropy. Net effect on AUC: probably slightly negative
+  for short truncations (small `t`), neutral for mid-sequence
+  truncations, neutral for full-length ones. The `position_min=8`
+  default exists to cap the worst of this effect; if §13.14 lands
+  at SATURATION, raising `position_min` to 16 or 24 is the first
+  diagnostic follow-up.
+- **Position-stride sub-sampling drops information.** Computing
+  every 4 tokens (stride=4) means we discretely sample a continuous
+  evolution. The 2nd-difference at stride S approximates the
+  underlying continuous 2nd derivative with truncation error
+  O(S²). Stride=4 was chosen for compute tractability; stride=1 is
+  the gold-standard approximation but ~4× more expensive. If §13.14
+  lands at MARGINAL_LIFT or SATURATION, stride=2 or stride=1 sweeps
+  are the natural follow-up.
+- **`max_i |accel_i|` is one of several reasonable scalar choices.**
+  Other defensible primary scalars include `mean_i |accel_i|` (less
+  outlier-sensitive but smears the fault signature) and
+  `Σ_i accel_i²` (energy-style, weights large peaks more strongly).
+  The `max_i |accel_i|` choice was pinned because it most directly
+  mirrors the robotics-domain `S3_map_error_accel` peak that passed
+  §6.1. If §13.14 lands at SATURATION with the primary scalar but
+  one of the secondary diagnostics shows clear correct/wrong
+  separation, that constitutes evidence the BCVF-shaped signal
+  exists but the wrong aggregation was pinned — a fresh §0.8 re-
+  commitment with a different primary scalar would be authorized.
+- **Single target model (Qwen2.5-7B-Instruct).** As in §13.10–§13.13.
+  Larger-model scaling effects are deferred to a separate §0.8 pre-
+  commitment.
+- **No literature anchor for the AUC forecast.** §13.10 had
+  Farquhar 2024's headline 0.70–0.79 to anchor expectations;
+  §13.12 had Chen 2024's 0.74–0.81; §13.13 had a quantified
+  per-gap ablation table. §13.14 has none of these — there is no
+  published paper running 2nd-difference of per-position semantic
+  entropy at this exact construction. Best estimate: AUC band
+  **0.62–0.78**, very wide because the prior is genuinely
+  uncertain. A clean clear of 0.75 on both benchmarks would be a
+  novel positive result; a clear miss below 0.65 would be the first
+  direct disconfirmation of the BCVF-for-LLMs transfer claim on its
+  native observable. Both outcomes are publishable; the former more
+  exciting, the latter more rigorous.
+
+**Expected cost.** Single 7B target model + DeBERTa-v3-base NLI
+(same as §13.10). K=10 sampling at `max_new_tokens=128` (≈3× §13.10
+generation cost). NLI clustering pass at each of ~31 grid positions
+per question, each with K(K−1)=90 NLI pairs → ≈2,800 NLI calls per
+question, batched → ≈90 forward passes per question at
+batch_size=32. Estimated runtime: **~8–12 min at N=100 on a 24+ GB
+GPU** — comparable to §13.13. Memory unchanged from §13.10
+configuration.
+
+**Report destination.**
+- `docs/experiments/probe_bcvf_2diff_truthfulqa_mc.md`
+- `docs/experiments/probe_bcvf_2diff_truthfulqa_mc.json` (per-
+  question dump including the full per-position entropy series
+  `H_t`, the per-position 2nd differences `accel_i`, the primary
+  and secondary scalars, position of peak — all the intermediate
+  quantities needed to audit the construction post-hoc and to
+  support the secondary-scalar fallback authorization above).
+- `docs/experiments/probe_bcvf_2diff_halueval_qa.md`
+- `docs/experiments/probe_bcvf_2diff_halueval_qa.json`
+
+**Relationship to §13.10–§13.13 and to the autonomy-domain result.**
+§13.10 (single-snapshot SE), §13.11 (cross-family), §13.12
+(EigenScore), §13.13 (continuous SE) are first-derivative-class
+literature replications and bridges. §13.14 is the first probe in
+the ladder that is **shaped like the autonomy-domain BCVF
+observable** — `S3_map_error_accel` per §6.1 / §6.7 — applied to
+the LLM domain by reading "agent moving through environment over
+time" as "model constructing answer over token positions". A
+positive §13.14 result would constitute evidence that the BCVF
+formalism produces useful observables in a second domain (LLMs)
+beyond its origin domain (autonomous robotics); a negative result
+would be the first direct evidence in this codebase that the
+formalism does not transfer at this analogue. **Crucially, neither
+outcome retroactively affects the autonomy-domain result.** §6.1's
+N=21 sign-test on `S3_map_error_accel` is a separate experiment
+on a separate dataset with its own pre-committed gates met; §13.14's
+outcome bears only on the LLM-domain transfer claim, not on the
+robotics-domain validation that already passed.
+
+**What §13.14 does not pre-commit.** No probe-script implementation
+on-branch, no `classify()` thresholds in code, no benchmark runs.
+This section is the §0.8-style pre-commitment record only.
+Implementation of `scripts/probe_bcvf_2diff.py` is a separate
+authorization gate. No VC-brief / §13.9 changes here — those remain
+gated on `BCVF_2DIFF_STRONG` (or any other §13 probe's STRONG band)
+on both benchmarks. §13.14 is authorized to be built and run in
+parallel with §13.12 / §13.13 if GPU and engineering time permit;
+its outcome is mathematically independent of theirs.
+
+### 13.15 Result — BCVF 2nd-difference observable did not transfer at this construction
+
+The §13.14 pre-committed probe has been executed at N=100 on both
+benchmarks. Combined classification:
+**`BCVF_2DIFF_ANTI_FINDING`**.
+
+This result is not a broad rejection of BCVF-for-LLMs. It is a
+rejection of **one specific text-level construction** of the
+BCVF 2nd-difference observable — per-position semantic entropy over
+NLI-clustered truncations, aggregated as `max_i |accel_i|`. The
+transfer claim narrows to: *BCVF over text-level semantic-entropy
+trajectories is not supported by the present evidence.* It does
+not bear on BCVF over model-internal continuous state trajectories,
+which remains untested as of this entry.
+
+**Result table:**
+
+| Benchmark | N | Greedy acc | Mean H first (t=8) | Mean H last (t=128) | AUC primary | AUC mean\|accel\| | AUC Σaccel² | Δ vs §13.10 | Per-run band |
+|---|---|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC | 100 | 0.320 | 1.064 | 0.444 | **0.574** | 0.594 | 0.583 | −0.087 | `BCVF_2DIFF_ANTI_FINDING` |
+| HaluEval-QA | 100 | 0.320 | 0.806 | 1.123 | **0.363** | 0.414 | 0.388 | −0.298 | `BCVF_2DIFF_ANTI_FINDING` |
+
+Combined classification under the §13.14 worst-benchmark rule:
+ANTI on both benchmarks. The HaluEval AUC of 0.363 is below the
+0.500 random-classifier line, indicating not noise but a signal in
+the *opposite* direction from the pre-committed AUC sign.
+
+**Math used (the construction that failed).** For each question $q$
+with K=10 sampled completions at T=1.0, max_new_tokens=128:
+
+1. At each grid position $t \in \{8, 12, 16, \ldots, 128\}$
+   (position_min=8, position_stride=4 → 31 positions), each of the
+   K samples is truncated to its first $t$ generated tokens (capped
+   at the sample's actual non-pad length).
+2. The K truncated strings are clustered by question-conditioned
+   bidirectional NLI entailment using DeBERTa-v3-base-MNLI, via
+   union-find on the 90 directional pairs per position.
+3. Per-position semantic entropy:
+   $H_t = -\sum_{j} \frac{|c_j|}{K}\log\frac{|c_j|}{K}$ over the
+   resulting cluster sizes.
+4. Centered second difference at each interior grid index $i$:
+   $\text{accel}_i = H_{t_{i+1}} - 2 H_{t_i} + H_{t_{i-1}}$.
+5. Primary scalar (pinned for AUC + bands per §13.14):
+   $\text{bcvf\_2diff}(q) = \max_i |\text{accel}_i|$.
+6. AUC computed on $-\text{bcvf\_2diff}$, pre-committed direction
+   *higher acceleration → less stable evolving uncertainty → more
+   likely wrong*.
+
+The two diagnostic secondary scalars $\text{mean}_i |\text{accel}_i|$
+and $\sum_i \text{accel}_i^2$ were reported but not used for
+classification (per §13.14's §0.8 pinning of the primary scalar).
+All three scalar AUCs cluster within 0.05 on both benchmarks,
+confirming the result is not a primary-scalar pinning artifact.
+
+**Three reasons the signal failed at this construction:**
+
+**(a) The per-position entropy curves were monotonic, not "smooth-
+with-rare-spikes."** The autonomy-domain `S3_map_error_accel` works
+because $e(t)$ is mostly slow-varying with sparse fault-onset
+spikes, so $\frac{d^2 e}{dt^2}$ has high signal-to-noise. The
+empirical $H_t$ curves are different shape: TruthfulQA-MC trends
+$H_t = 1.06 \to 0.44$ over $t = 8 \to 128$ (samples *converge*
+under longer NLI clustering); HaluEval-QA trends $H_t = 0.81 \to
+1.12$ (samples *diverge*). Either trend is smooth and roughly
+monotonic. The 2nd derivative of a smooth monotonic curve picks
+out *local curvature*, not fault-onset moments — and local
+curvature in this data does not correlate with truth.
+
+**(b) The trend direction flipped across benchmarks.** TruthfulQA's
+$H_t$ decreases with $t$; HaluEval's increases. This benchmark-
+direction inversion is structural evidence that $H_t$ is dominated
+by **NLI behavior on truncations of varying length**, not by the
+model's evolving epistemic state. NLI-on-long-text becomes more
+permissive (driving cluster merging on TruthfulQA where Qwen's
+verbose answers acquire shared boilerplate). NLI-on-cumulative-
+proposition becomes less permissive (driving cluster splitting on
+HaluEval where each new sentence in the generated answer adds a
+new claim for NLI to disagree on). Both are properties of NLI +
+truncation, not of the LLM's truth state. The AUC inversion on
+HaluEval (0.363 — sample-tighter when correct) is the same
+artifact at the labeling boundary: longer correct answers explore
+more semantic space mid-generation, longer wrong answers commit
+confidently to a single wrong elaboration, so the BCVF-shape
+signal runs the wrong way.
+
+**(c) The signal is text-level / NLI-level, not model-state-level.**
+The chain in §13.14's construction is: hidden state → sampled
+token sequence → truncated decoded text → NLI clustering →
+entropy → 2nd difference. Four lossy projections separate the
+model's epistemic state from the scalar we score. Even when the
+underlying state evolves smoothly with sparse fault onsets (the
+shape BCVF needs), each downstream projection adds variance and
+loses temporal precision. By the time the 2nd derivative is
+computed, the original smooth-with-spikes structure (if it exists
+at all in the model) has been smeared into the monotonic NLI
+trends observed in (a).
+
+**Narrowing of the transfer claim.** §13.15 narrows the §13.14
+result to its specific construction:
+
+> **The null narrows the BCVF-for-LLMs transfer claim to this
+> specific observable construction: BCVF over text-level
+> semantic-entropy trajectories is not supported by the present
+> evidence. It does not reject BCVF over model-internal continuous
+> state trajectories.**
+
+The next step explicitly tests the un-rejected version. The
+failure in §13.14 was not the 2nd-difference idea itself, but the
+choice of text-level semantic entropy as the evolving state
+variable. §13.16 therefore moves the BCVF operator onto a
+continuous model-internal representation (per-position EigenScore
+over hidden states) — the construction the §13.14 null leaves
+open.
+
+**Value preserved by §13.14.** The probe was not wasted compute.
+It eliminated the most obvious text-level analogue of the BCVF
+observable, sharpened the diagnostic understanding of why text-
+level proxies fail (the three reasons above), and produced the
+empirical evidence that constrains §13.16's design — specifically:
+the next probe must operate on a signal class with continuous
+real-valued geometry and direct provenance from the model's
+internal state, not on NLI-clustered text. Without §13.14's
+explicit failure data we would not be able to argue for §13.16's
+construction with the evidence base now available.
+
+**Status of the §13 program after §13.15.** Three single-axis
+revisions tested across both benchmarks (§13.11 cross-family,
+§13.12 EigenScore single-snapshot, §13.14 BCVF text-level 2nd-
+difference) all underperform §13.10's 0.661 marginal baseline on
+TruthfulQA-MC, with mixed results on HaluEval-QA. The §13.10
+single-snapshot semantic entropy remains the strongest result in
+this codebase. §13.16 (next section) is the only remaining
+literature-aligned probe path that has not been tested and is
+explicitly motivated by §13.15's narrowing.
+
+**Artifacts:**
+
+- `scripts/probe_bcvf_2diff.py` (commit `cebdd49`).
+- `docs/experiments/probe_bcvf_2diff_truthfulqa_mc.md` and `.json`.
+- `docs/experiments/probe_bcvf_2diff_halueval_qa.md` and `.json`.
+
+### 13.16 Pre-commitment — Hidden-state EigenScore over positions
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before implementation. Specification, success
+bands, and expected-cost estimates pinned at this point and cannot
+be redefined post-hoc.
+
+**Hypothesis (the one §13.15 leaves un-rejected).** BCVF may
+transfer when the 2nd-difference operator is applied to a
+**continuous model-internal representation** rather than to a
+text-level clustering proxy. The failure in §13.14 was not the
+2nd-difference idea itself, but the choice of text-level semantic
+entropy as the evolving state variable. §13.16 moves the BCVF
+operator onto the model's own hidden-state geometry, evaluated as
+EigenScore (Chen 2024) at each position in the generated sequence.
+This satisfies the three structural requirements that §13.14's
+text-level construction violated (continuous real-valued signal,
+direct provenance from model's internal state, smooth-with-rare-
+inflections shape compatible with 2nd-derivative analysis — see
+§13.15 reasons (a)–(c)).
+
+**Exact mathematical object.** For each question $q$ with K=10
+sampled completions at T=1.0, max_new_tokens=128:
+
+1. Generate the K samples with `output_hidden_states=True,
+   return_dict_in_generate=True` so that per-step layer-L hidden
+   states for all K samples are captured during a single batched
+   `generate` call. Layer index pinned to
+   $L^* = \lfloor \text{num\_hidden\_layers} / 2 \rfloor = 14$
+   (Qwen2.5-7B-Instruct mid-layer; identical to §13.12's pinned
+   default and the Chen 2024 convention). Hidden dimension
+   $H = 3584$ for Qwen-7B.
+2. At each grid position $t \in \{8, 12, 16, \ldots, 128\}$
+   (position_min=8, position_stride=4 → 31 positions, identical
+   to §13.14's grid for direct comparability with §13.15's null),
+   for each sample $k$, take the hidden state at the model-step
+   that produced the token at generated position $t$, capped at
+   the sample's actual non-pad length (same fallback rule as
+   §13.12). Stack the K hidden states into
+   $X_t \in \mathbb{R}^{K \times H}$.
+3. Per-position EigenScore (Chen 2024 K×K Gram form, well-
+   conditioned when $H \gg K$):
+   $$
+   X_t^c = X_t - \overline{X_t},
+   \qquad
+   \Sigma_t = \frac{1}{H} X_t^c (X_t^c)^\top + \alpha I_K,
+   \qquad
+   S_t = \frac{1}{K} \log \det \Sigma_t.
+   $$
+   With regularization $\alpha = 10^{-3}$ (Chen 2024 default;
+   identical to §13.12 pinned). Computed via `np.linalg.slogdet`
+   for numerical stability; defensive assertion that
+   $\text{sign}(\det \Sigma_t) > 0$ at every position.
+4. Centered second difference at each interior grid index $i$:
+   $$
+   \text{accel}_i = S_{t_{i+1}} - 2 S_{t_i} + S_{t_{i-1}}.
+   $$
+5. **Primary scalar (pinned for AUC + bands):**
+   $$
+   \text{bcvf\_eig\_2diff}(q) = \max_i |\text{accel}_i|.
+   $$
+   Mirrors the §13.14 / §6.1 peak structure but on continuous
+   internal-state geometry instead of text-level entropy.
+6. **Pinned secondary diagnostic scalars** (reported but NOT used
+   for band classification — pinning prevents post-hoc swap, same
+   §0.8 pattern as §13.14):
+   - $\text{mean}_i |\text{accel}_i|$
+   - $\sum_i \text{accel}_i^2$
+   - position $i^*$ of the peak.
+7. AUC computed on $-\text{bcvf\_eig\_2diff}$, pre-committed
+   direction *higher EigenScore acceleration → less stable
+   evolving internal-state geometry → more likely wrong*. This
+   sign is identical to the §13.12 single-snapshot convention
+   (where $-S_t$ at the final position was the truth predictor).
+
+**Why this is a structurally better BCVF analogue than §13.14.**
+Direct mapping to the three §13.15 failure reasons:
+
+- **Continuous real-valued signal.** $S_t = \frac{1}{K}\log\det
+  \Sigma_t$ ranges over $\mathbb{R}$ and varies smoothly with $X_t$.
+  Discrete cluster-count entropy (§13.14) was bounded by $\log K
+  \approx 2.30$ with only ~$K$ distinct reachable values per
+  question. EigenScore has dynamic range and continuous variation
+  compatible with 2nd-derivative analysis.
+- **Direct provenance from model's internal state.** $X_t$ is the
+  layer-$L^*$ residual-stream activation, captured during the
+  model's own forward pass. No NLI step, no token-decoding step,
+  no clustering. The chain is one projection (layer pick + position
+  pick) rather than four (decode → truncate → NLI → cluster). The
+  smearing argument from §13.15(c) does not apply.
+- **Better match to "evolving world model."** The hidden-state
+  distribution across K samples at position $t$ is the *literal*
+  representation of the model's joint epistemic state at that step
+  of answer construction. Evolution of $\Sigma_t$ across $t$ is the
+  evolution of that joint distribution's geometry. The autonomy-
+  domain signal `S3_map_error_accel` is the rate of change of an
+  agent's internal map's coupling failure; per-position EigenScore
+  acceleration is the closest LLM-domain analogue with direct
+  internal-state grounding.
+
+**Pre-committed configuration (pinned, all per §13.16):**
+
+- **Script:** `scripts/probe_eigenscore_2diff.py` (new; does NOT
+  modify §13.10–§13.14 scripts).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same as
+  §13.10 / §13.12 / §13.14 for direct AUC comparability.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100;
+  HaluEval-QA `data` split, N=100. Same as §13.10–§13.14.
+- **Sampling:** K=10, T=1.0, max_new_tokens=128, per-question seed
+  `args.seed + q_idx`. Identical to §13.14.
+- **Hidden-state extraction:** layer $L^* = 14$ (mid-layer of
+  Qwen-7B's 28 transformer blocks), position-aligned with grid
+  positions defined below. Layer is configurable via `--layer` for
+  follow-up sweeps but the §13.16 band classification refers
+  exclusively to layer 14. A non-default value is a §13.16
+  deviation flagged in the result section.
+- **Position grid:** position_min=8, position_stride=4,
+  max_new_tokens=128 → 31 measured positions. Identical to §13.14
+  for direct comparability with §13.15's null. Configurable via
+  `--position-min` and `--position-stride`; non-default flagged as
+  deviation.
+- **EigenScore α:** $10^{-3}$. Identical to §13.12 pinning.
+  Configurable via `--alpha` for follow-up; non-default flagged as
+  deviation.
+- **Prompt format:** shared `Q: ... A:` completion. No chat
+  templates (per §13.11 diagnostic finding that chat templates
+  degrade signal on this codebase).
+- **Correctness label:** Qwen greedy generation passes question-
+  conditioned NLI (DeBERTa-v3-base-mnli-fever-anli) against correct
+  AND fails NLI against every distractor. Identical labeling to
+  §13.10 / §13.11 / §13.12 / §13.14. Greedy `max_new_tokens=128`
+  to match sampling configuration.
+- **Pinned primary scalar:** $\max_i |\text{accel}_i|$.
+- **Pinned diagnostic secondaries:** mean$|\text{accel}|$,
+  $\sum \text{accel}^2$, peak position. Reported but not used for
+  band classification.
+
+**Pre-committed success bands** (`HSEIG_2DIFF_*`, same numerical
+partition as §13.11 / §13.12 / §13.13 / §13.14 since the §13.10
+baseline of 0.661 is unchanged across all probes). The "on both
+benchmarks" worst-benchmark rule applies, identical to §13.14:
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`HSEIG_2DIFF_STRONG`**.
+  Gates the §13.9 VC-brief revision AND constitutes the first
+  load-bearing positive evidence for BCVF-for-LLMs at any
+  construction in this codebase. Authorizes a §13.17 result
+  writeup positioning §13.16 as the first BCVF-faithful LLM result
+  and triggers re-examination of §13.9 external framing.
+- `0.70 ≤ AUC < 0.75` on **both** → **`HSEIG_2DIFF_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Diagnostic
+  follow-ups: layer sweep (`--layer`), finer position grid
+  (`--position-stride 1` or 2), α sweep (`--alpha`).
+- `0.681 ≤ AUC < 0.70` on **both** → **`HSEIG_2DIFF_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10 + 0.02. Document; do not
+  authorize further single-axis probe progression on this codebase.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`HSEIG_2DIFF_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661. Combined with §13.11 / §13.12 /
+  §13.14 anti-findings, this would establish that *every*
+  literature-aligned single-axis probe — across sample-space,
+  ensemble, internal-state, and temporal-evolution variants —
+  saturates at the §13.10 ceiling on Qwen-7B with base-NLI at
+  N=100. Conclusive evidence that further lift requires either
+  model-scale upgrade or compound-revision construction.
+- `AUC < 0.641` on **any** benchmark →
+  **`HSEIG_2DIFF_ANTI_FINDING`**. The hidden-state-internal
+  variant of the BCVF 2nd-difference observable underperforms the
+  §13.10 baseline. Would constitute a 4-of-4 anti-finding across
+  the literature-backed paths; pause LLM track. The autonomy-
+  domain BCVF claim stands independently on §6.1 evidence.
+
+**Acceptance / rejection rules (explicit, non-vague):**
+
+- **PASS:** AUC ≥ 0.75 on both benchmarks (HSEIG_2DIFF_STRONG).
+- **CONDITIONAL PASS for internal research:** AUC ∈ [0.681, 0.75)
+  on both benchmarks (INTERNAL_STRONG or MARGINAL_LIFT). Documented
+  but does not unlock §13.9 VC-brief.
+- **NULL (consistent with §13.10 ceiling):** AUC ∈ [0.641, 0.681]
+  on both (SATURATION). Documented as final evidence that single-
+  axis methods saturate.
+- **REGRESSION:** AUC < 0.641 on any benchmark (ANTI_FINDING).
+  Documented as the strongest negative finding in the §13 program.
+
+**Disclosed simplifications (NOT closed by §13.16):**
+
+- Single layer ($L^* = 14$) vs the per-model layer sweep some
+  Chen 2024 configurations use. Configurable via `--layer` for
+  follow-up but the §13.16 classification is at the pinned default.
+- Last non-pad token position used at each grid index (same as
+  §13.12). Mean-pool or last-prompt-token alternatives are not
+  tested.
+- Fixed α = $10^{-3}$. Configurable but pinned for classification.
+- Single target model (Qwen2.5-7B-Instruct). Same scaling caveat
+  as §13.10–§13.14.
+- Same correctness label as §13.10 / §13.11 / §13.12 / §13.14
+  (NLI on Qwen greedy). Holding labeling fixed prevents cross-
+  experiment label-shift confounds.
+
+**Expected cost.** Single 7B target model + DeBERTa-v3-base NLI
+(used only for the correctness label, ~3 calls per question — no
+NLI clustering of K samples at any position). K=10 sampling at
+max_new_tokens=128 with `output_hidden_states=True` increases
+generation memory by ~30% but no significant wall-clock cost.
+Per-position EigenScore is a small CPU/GPU operation
+($O(K^2 H)$ per position; negligible vs generation cost).
+Estimated runtime: **~3–5 min at N=100 on a 24+ GB GPU**, faster
+than §13.14 because no per-position NLI clustering pass.
+
+**Report destination.**
+- `docs/experiments/probe_eigenscore_2diff_truthfulqa_mc.md`
+- `docs/experiments/probe_eigenscore_2diff_truthfulqa_mc.json`
+  (per-question dump including the full per-position EigenScore
+  series $S_t$, the per-position accelerations, and all four
+  scalars — required for post-hoc secondary-scalar audits if
+  primary saturates).
+- `docs/experiments/probe_eigenscore_2diff_halueval_qa.md`
+- `docs/experiments/probe_eigenscore_2diff_halueval_qa.json`
+
+**Scope.** §13.16 is a new bounded experiment under the same §0.8
+discipline as §13.12 / §13.13 / §13.14. It is not an open-ended
+continuation of §13.14 — the §13.14 result stands as written in
+§13.15 and is not re-litigated. §13.16 tests an *adjacent*
+construction that the §13.15 narrowing left explicitly open. The
+pre-committed bands above are the binding success criteria; any
+deviation at run time must be flagged as a §0.8 deviation in the
+result section, not absorbed silently.
+
+**What §13.16 does not pre-commit.** No probe-script implementation
+on-branch, no `classify()` thresholds in code, no benchmark runs.
+This section is the §0.8-style pre-commitment record only.
+Implementation of `scripts/probe_eigenscore_2diff.py` is a separate
+authorization gate. No VC-brief / §13.9 changes here — those remain
+gated on `HSEIG_2DIFF_STRONG` on both benchmarks (or any §13
+probe's STRONG on both, which has not yet been observed).
+
+### 13.17 Result — Hidden-state EigenScore 2nd-difference also did not transfer; §13 single-axis program closed
+
+The §13.16 pre-committed probe has been executed at N=100 on both
+benchmarks. Combined classification: **`HSEIG_2DIFF_ANTI_FINDING`**,
+with the additional substantive finding that **the signal inverts
+on BOTH benchmarks** — the only §13 probe to do so. This is the
+fourth and final single-axis revision in the §13 program; with it,
+the literature-aligned single-axis path is exhausted at this
+codebase's Qwen-7B + DeBERTa-v3-base + N=100 configuration.
+
+The §13.16 result narrows the BCVF-for-LLMs transfer claim further
+than §13.15 did. §13.15 narrowed the §13.14 null to *text-level*
+constructions and explicitly left open the hidden-state-internal
+construction. §13.16 now closes that opening: per-position
+EigenScore over hidden-state geometry exhibits the same structural
+shape problem as per-position semantic entropy did in §13.14 —
+smooth-monotonic underlying signal with no fault-onset structure
+for the 2nd-difference operator to detect. Moving from text-level
+to model-internal continuous state did not fix the issue; the
+structural problem is **the K-sample-divergence dynamics of the
+underlying signal class**, not the lossy projection chain §13.15
+hypothesized.
+
+**Result table:**
+
+| Benchmark | N | Greedy acc | Mean S first (t=8) | Mean S last (t=128) | AUC primary | AUC mean\|accel\| | AUC Σaccel² | Δ vs §13.10 | Per-run band |
+|---|---|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC | 100 | 0.320 | −3.72 | −1.20 | **0.462** | 0.432 | 0.453 | −0.199 | `HSEIG_2DIFF_ANTI_FINDING` |
+| HaluEval-QA | 100 | 0.320 | −4.68 | −1.88 | **0.449** | 0.425 | 0.440 | −0.212 | `HSEIG_2DIFF_ANTI_FINDING` |
+
+Combined classification under the §13.16 worst-benchmark rule:
+ANTI on both. **All six AUCs (3 scalars × 2 benchmarks) cluster
+in the narrow range [0.425, 0.462] — robustly inverted. The signal
+is real and consistent in the wrong direction; it is not noise
+around 0.5.**
+
+Per-class means:
+
+| Benchmark | Mean primary correct | Mean primary wrong | Δ (correct − wrong) |
+|---|---|---|---|
+| TruthfulQA-MC | 1.3691 | 1.2247 | **+0.144** (correct higher) |
+| HaluEval-QA | 1.3971 | 1.3386 | **+0.058** (correct higher) |
+
+Both benchmarks show *correct* answers having *higher* `max|accel|`
+than wrong answers — opposite of the pre-committed direction.
+
+**Math used (the construction that failed).** For each question $q$
+with K=10 sampled completions at T=1.0, max_new_tokens=128:
+
+1. Single batched `generate()` call with
+   `output_hidden_states=True, return_dict_in_generate=True` so
+   that per-step layer-$L^*$ hidden states are captured during one
+   forward pass, where $L^* = \lfloor \text{num\_hidden\_layers}/2
+   \rfloor = 14$ for Qwen-7B.
+2. At each grid position $t \in \{8, 12, 16, \ldots, 128\}$ (31
+   positions), for each sample $k$, extract
+   $h^{(k)}_t = \text{out.hidden\_states}[\sigma(t,k)][L^*][k, -1, :]$
+   where $\sigma(t,k) = \min(t, \text{sample\_lengths}[k]) - 1$
+   (capped at the sample's actual non-pad length; falls back to
+   step 0 if the sample emitted zero non-pad tokens).
+3. Stack into $X_t \in \mathbb{R}^{K \times H}$ with $H = 3584$.
+4. Per-position EigenScore (Chen 2024 K×K Gram form):
+   $\Sigma_t = (1/H) X_t^c (X_t^c)^\top + \alpha I_K$ with
+   $\alpha = 10^{-3}$; then
+   $S_t = (1/K) \log \det \Sigma_t$ via `np.linalg.slogdet` for
+   numerical stability.
+5. Centered second difference:
+   $\text{accel}_i = S_{t_{i+1}} - 2 S_{t_i} + S_{t_{i-1}}$ for
+   interior $i$.
+6. Primary scalar (pinned per §13.16):
+   $\text{bcvf\_eig\_2diff}(q) = \max_i |\text{accel}_i|$.
+7. AUC computed on $-\text{bcvf\_eig\_2diff}$, pre-committed
+   direction *higher acceleration → less stable evolving internal-
+   state geometry → more likely wrong*.
+
+The two diagnostic secondary scalars
+$\text{mean}_i |\text{accel}_i|$ and
+$\sum_i \text{accel}_i^2$ were reported but not used for
+classification (per §13.16's §0.8 pinning of the primary). All
+three scalar AUCs cluster within 0.04 on both benchmarks.
+
+**Three reasons the signal failed at this construction** (mapping
+§13.15's diagnostic structure onto §13.16's data):
+
+**(a) The per-position EigenScore curves are smooth and
+monotonically rising on both benchmarks** — same shape problem
+§13.14's text-level entropy curves had. TruthfulQA-MC mean
+$S_t = -3.72 \to -1.20$ over $t = 8 \to 128$ (rise of 2.52 nats);
+HaluEval-QA mean $S_t = -4.68 \to -1.88$ (rise of 2.80 nats). These
+are smooth, large monotonic trends across 31 positions. The 2nd
+derivative of a smooth monotonic curve has small magnitude
+dominated by local trend curvature, not fault onsets. `max|accel|`
+on such a series picks an outlier in a smoothly-bending trend,
+not the moment of an epistemic event. Neither curve has the
+smooth-with-rare-spikes structure BCVF's 2nd-derivative operator
+needs.
+
+The mechanism for the monotonic rise: at early grid positions, the
+K=10 samples have barely diverged — their hidden states cluster
+tightly, $\det \Sigma_t$ is small, $S_t$ is very negative. As
+generation proceeds, the K samples explore different paths and
+their hidden states pull apart — $\det \Sigma_t$ grows, $S_t$
+becomes less negative. **This is a structural property of K-
+sample-divergence dynamics, not an epistemic property of the
+model**. It happens whether the model is confident or uncertain,
+correct or wrong.
+
+**(b) The signal direction is consistently inverted on BOTH
+benchmarks.** §13.14 had asymmetric inversion (TruthfulQA in
+expected direction at AUC 0.574, HaluEval inverted at 0.363).
+§13.16 inverts on both (0.462 and 0.449), and three different
+aggregations on each benchmark (`max|accel|`, `mean|accel|`,
+`Σaccel²`) all show the same anti-correlated direction. The
+inversion is robust across benchmark choice and aggregation
+choice. It is the most consistent qualitative finding in the §13
+program.
+
+The mechanism for the inversion (hypothesis with empirical
+support, not pre-committed): when Qwen is confident on a question,
+it elaborates the answer with diverse phrasings, reasoning steps,
+and qualifications mid-generation. The K=10 samples explore that
+diverse semantic neighborhood, so hidden-state acceleration is
+high. When Qwen is wrong with confidence, it commits to a single
+confabulated story — K=10 samples follow similar trajectories,
+hidden-state acceleration is low. The 2nd-difference observable
+therefore measures something like "mid-generation semantic
+exploration intensity" rather than "epistemic uncertainty."
+Exploration intensity anti-correlates with hallucination on these
+benchmarks.
+
+**(c) Moving from text-level to model-internal continuous state
+did not fix the structural problem §13.15 identified.** §13.15
+hypothesized that §13.14's failure was the four-step lossy
+projection chain (decode → truncate → NLI → cluster) smearing the
+underlying epistemic signal. §13.16 removed three of those four
+projections (no decode, no NLI, no cluster — only layer + position
+selection on raw hidden states). The signal is still
+structurally smooth-monotonic, the 2nd-difference operator still
+has nothing to detect, and the result still inverts. **The lossy
+projection chain was not the dominant cause**; the dominant cause
+is that K-sample-divergence dynamics produce monotonic curves
+across token positions regardless of which signal class
+(text-level or hidden-state) is computed from those K samples.
+
+This tightens the §13.15 narrowing substantially:
+
+> **The §13.16 null further narrows the BCVF-for-LLMs transfer
+> claim: BCVF's 2nd-difference operator does not produce a fault-
+> onset-shaped signal at any K-sample-divergence-based observable
+> tested in this codebase, whether the underlying signal class is
+> text-level (semantic entropy of NLI clusters) or model-internal
+> (per-position EigenScore over hidden-state geometry). The
+> structural failure mode — smooth-monotonic underlying series with
+> no rare-spike structure — is a property of K-sample-divergence
+> dynamics, not of any specific projection from samples to scalars.**
+
+This does not reject BCVF over signal classes that do not depend
+on K-sample divergence — for example, per-token logit entropy
+along a single greedy or sampled trajectory, which has within-
+sample temporal evolution rather than cross-sample geometric
+evolution. Such constructions have not been tested in this
+codebase and are not pre-committed by §13.17.
+
+**EOS-reuse diagnostic findings.** §13.16 was instrumented with
+EOS-reuse diagnostics (commit `557f0f6`, pure logging) to test
+whether late-position hidden-state reuse — when
+$\text{sample\_lengths}[k] < t$, the per-position extraction
+reuses sample $k$'s last hidden state at later grid positions —
+was confounding the per-position EigenScore series. The
+instrumentation surfaced the following:
+
+| EOS-reuse bucket | TruthfulQA-MC | HaluEval-QA |
+|---|---|---|
+| Questions with no EOS reuse | 37 / 100 | 24 / 100 |
+| Questions with some reuse (`fraction < 0.5`) | 29 / 100 | 24 / 100 |
+| Questions with heavy reuse (`fraction ≥ 0.5`) | 34 / 100 | 52 / 100 |
+| Mean `min_sample_length` (tokens) | 84.4 | 61.8 |
+| Median `min_sample_length` | 102.5 | 66.5 |
+| Mean `n_eos_reuse_positions` (of 31) | 11.1 (36%) | 16.7 (54%) |
+
+HaluEval has substantially more EOS reuse than TruthfulQA (52 vs
+34 heavy-reuse questions; 54% vs 36% mean reuse fraction). But
+**both benchmarks invert with similar magnitude** — TruthfulQA AUC
+0.462, HaluEval AUC 0.449. If EOS reuse were the dominant driver,
+HaluEval would invert more strongly than TruthfulQA. It does not.
+EOS reuse contributes some noise but is not the primary cause of
+the inversion. The structural cause identified in reason (a)
+above — smooth-monotonic K-sample-divergence dynamics — is the
+dominant mechanism.
+
+A post-hoc EOS-reuse stratification analysis on the JSON dumps
+could further confirm this by computing AUC on the no-reuse subset
+only (37 TFQA, 24 HaluEval questions). That analysis is not
+required to support the §13.17 conclusion (the cross-benchmark
+similarity already rules out EOS-reuse as the primary driver) but
+would tighten the post-hoc evidence if performed; it is logged here
+as an optional follow-up rather than a §0.8 commitment.
+
+**What this authorizes** (per §13.16 pre-commitment + §13.17
+result):
+
+- **Closing the §13 single-axis program.** Four single-axis
+  revisions — §13.11 cross-family ensemble, §13.12 EigenScore
+  single-snapshot, §13.14 BCVF text-level 2nd-difference, §13.16
+  BCVF hidden-state 2nd-difference — have all been executed and
+  classified. None lifts AUC above §13.10's 0.661 marginal
+  baseline on the combined-classification rule. The §13 single-
+  axis path is exhausted at this codebase's Qwen-7B + DeBERTa-v3-
+  base + N=100 configuration.
+- **Authorizing the §13-program closing statement.** The honest
+  external framing is: *on Qwen2.5-7B-Instruct + DeBERTa-v3-base +
+  N=100, no literature-aligned single-axis hallucination-detection
+  method tested in this codebase clears the §13.10 marginal
+  baseline of AUC 0.661 on both TruthfulQA-MC and HaluEval-QA.
+  The 2nd-difference operator specifically produces inverted
+  signals at both text-level and hidden-state-level constructions,
+  indicating that BCVF's native observable does not transfer to
+  LLMs at the K-sample-divergence-as-temporal-axis analogue.*
+- **Promoting §13.10 as the strongest §13 result on record.** The
+  single-snapshot semantic-entropy probe at §13.10 remains the
+  best-performing observable in the codebase at this scale and is
+  the result of record for any §13-related referencing.
+- **Documenting the qualitative inversion finding.** §13.14 +
+  §13.16 together show that the 2nd-difference operator on K-
+  sample-divergence signals produces an anti-correlated signal on
+  these benchmarks. This is itself a substantive methodological
+  finding worth referencing in any §13-program writeup, even
+  though it does not unlock any pre-committed band.
+
+**What this does NOT authorize:**
+
+- **Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.** Per
+  §13.9, external-framing revision requires `STRONG` on both
+  benchmarks at any §13 probe. No probe in §13 has cleared this.
+  The §13.9 hold remains in force and is *strengthened* by
+  §13.17's 4-of-4 confirmation.
+- **Any single-axis follow-up probe in the §13 program.** The
+  saturation pattern across four hypothesis classes (sample-space
+  ensemble, internal-state, temporal-evolution at text-level,
+  temporal-evolution at hidden-state) is robust enough that
+  another single-axis variant is not authorized without a fresh
+  §0.8 pre-commitment that explicitly identifies what new
+  hypothesis class it tests.
+- **Post-hoc reinterpretation of the §13.16 inversion as a
+  positive result.** The pre-committed AUC sign was
+  *higher acceleration → more likely wrong*. The data falsified
+  that direction. Renaming the scalar post-hoc to "exploration
+  intensity" and reporting AUC of $+\text{bcvf\_eig\_2diff}$ as a
+  positive finding would be a §0.8 violation. The inversion is
+  documented as a substantive observation, not retrofitted as a
+  pass.
+- **Any claim that BCVF does not transfer to LLMs in general.**
+  §13.17 narrows the negative claim to *K-sample-divergence-based
+  observables under the BCVF 2nd-difference operator at the
+  constructions tested*. Signal classes that do not depend on
+  K-sample divergence (e.g., per-token logit entropy along a
+  single trajectory) are not tested and are not foreclosed.
+  System-level integration tests that consume BCVF scalars in a
+  multi-source Q&A pipeline (rather than treating them as
+  standalone observables vs ground truth) are also not tested and
+  are not foreclosed; if pursued, they would be a separate §14
+  pre-commitment outside the §13 single-axis program.
+- **Any claim that affects the autonomy-domain BCVF result.**
+  §6.1's N=21 sign-test on `S3_map_error_accel` passed
+  independently and stands. §13.17's outcome bears only on the
+  LLM-domain transfer claim at the constructions tested, not on
+  the robotics-domain validation.
+
+**Status of the §13 program after §13.17.** Closed at the single-
+axis level. The §13.10 baseline (AUC 0.661 on both benchmarks,
+TRUTH_CORRELATED_MARGINAL) is the strongest result of record. Any
+future LLM-domain work on the BCVF transfer claim would need to
+test a fundamentally different hypothesis class (e.g., system-
+level integration, single-trajectory temporal observable, or
+model-scale upgrade) under a fresh §0.8 pre-commitment.
+
+**Artifacts:**
+
+- `scripts/probe_eigenscore_2diff.py` (commits `15306c2` initial,
+  `557f0f6` EOS-reuse diagnostics).
+- `docs/experiments/probe_eigenscore_2diff_truthfulqa_mc.md` and `.json`.
+- `docs/experiments/probe_eigenscore_2diff_halueval_qa.md` and `.json`.
+
+### 13.18 Pre-commitment — Single-trajectory forced-allocation-gap probe
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before implementation. Specification, success
+bands, and pinned parameters below cannot be redefined post-hoc.
+
+**Relationship to §13.17's closure.** §13.17 closed the §13 K-
+sample-divergence-based single-axis program (cross-family,
+EigenScore single-snapshot, BCVF text-level 2nd-difference, BCVF
+hidden-state 2nd-difference). The narrowing in §13.17 was:
+
+> *BCVF's 2nd-difference operator does not produce a fault-onset-
+> shaped signal at any K-sample-divergence-based observable tested
+> in this codebase. The structural failure mode is a property of
+> K-sample-divergence dynamics, not of any specific projection.
+> Signal classes that do not depend on K-sample divergence are
+> not foreclosed.*
+
+§13.18 tests **the un-rejected signal class** identified in that
+narrowing: a single-trajectory observable computed across token
+positions WITHIN one greedy generation, rather than across
+multiple sampled generations. Same chapter (§13) for continuity;
+distinct hypothesis class from §13.10–§13.16 (single-trajectory
+logit geometry, not K-sample-divergence). Does NOT violate the
+§13.17 closure because that closure was specifically scoped to
+K-sample-divergence-based observables.
+
+**Hypothesis (the mechanism §13 didn't measure).** Hallucinations
+in autoregressive LLMs enter through a specific mechanical seam:
+
+1. **Softmax flattens absolute logit magnitude.** The function
+   $p_t = \text{softmax}(\mathbf{z}_t)$ maps any logit vector to
+   a probability distribution summing to 1.0. Two scenarios with
+   raw logits $[10, 1, 0.5]$ (model knows the answer) and
+   $[-100, -100.1, -100.2]$ (model has no idea) produce wildly
+   different epistemic states but Softmax flattens both into
+   probability vectors that sum to 1.0. Absolute magnitude
+   information is lost in the normalization step.
+2. **Cross-entropy training forbids expressing absolute ignorance.**
+   The model is optimized on next-token prediction over static
+   text, where humans rarely interrupt to write "[I don't know]".
+   The objective penalizes refusing to continue. The model is
+   conditioned to always emit a continuation, even when its
+   underlying activations support nothing strongly.
+3. **Autoregression locks the forced guess into context.** Every
+   token output becomes part of the input for the next step. Once
+   Softmax forces an allocation at position $t$ despite low
+   absolute logit magnitude, that forced guess becomes the
+   conditioning context for position $t+1$, propagating the false
+   premise.
+
+**The hallucination signature is therefore the moment Softmax
+forces an allocation despite low absolute logit magnitude** — a
+property of *single-trajectory logit geometry*, not K-sample
+geometry. This is the signal §13.10–§13.16 systematically did not
+measure. Every probe in §13 looked at *between-sample* variance
+(decoding stochasticity introduced by temperature), which is
+downstream of the very mechanism that creates hallucination.
+
+§13.18 therefore measures the forced-allocation gap directly. For
+each token position in a single greedy generation, it computes:
+
+- The **post-softmax entropy** $H_t$ — how spread the distribution
+  is after the normalization step.
+- The **pre-softmax confidence magnitude** $M_t$ — whether anything
+  in the vocab strongly stands out from the bulk before softmax.
+
+A high $H_t$ with a low $M_t$ is the "Scenario B" forced allocation
+— the model is committing without evidence. Low $H_t$ or high
+$M_t$ indicates a commitment its logits actually support.
+
+The BCVF 2nd-difference operator is then applied across positions
+WITHIN the trajectory. Sparse, sudden moments of widening forced-
+allocation gap are the analogue of `S3_map_error_accel` peaks in
+the autonomy domain — moments when the agent's internal map
+(logit distribution) suddenly fails to track the territory (its
+actual knowledge support).
+
+**Why this might satisfy the smooth-with-rare-spikes structural
+requirement that §13.14 and §13.16 violated.** The hypothesis is
+mechanism-based, not data-based: a token where the model knows the
+answer should produce high $M_t$ and low $H_t$ → low forced-
+allocation gap. A token where the model is forced to guess (e.g.,
+a specific date it doesn't know) should produce low $M_t$ and high
+$H_t$ → high forced-allocation gap. Forced moments should be
+sparse and local in well-formed generations — exactly the shape
+the 2nd-difference operator exploits. Whether empirical
+trajectories on Qwen2.5-7B-Instruct + TruthfulQA-MC / HaluEval-QA
+actually have this shape is unknown and is the central question
+of §13.18.
+
+If the hypothesis holds, this is the first §13 single-axis probe
+positioned to satisfy all five structural requirements §13.14 /
+§13.16 violated: continuous real-valued signal, direct provenance
+from model internals (raw logits), plausibly smooth-with-rare-
+spikes shape, independent of K-sample divergence, captures the
+autoregressive-hallucination mechanism. If it doesn't hold,
+§13.18 produces a 5-of-5 single-axis null and tightens the §13.17
+narrowing to also exclude single-trajectory forced-allocation-gap
+observables on this codebase.
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_forced_alloc_2diff.py` (new; does NOT
+  modify any §13.10–§13.16 script — those results are pinned).
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct`, fp16. Same single-
+  model configuration as §13.10 / §13.12 / §13.14 / §13.16 for
+  direct AUC comparability against the §13.10 baseline of 0.661.
+- **Benchmarks:** TruthfulQA-MC validation split, N=100; HaluEval-
+  QA `data` split, N=100. Same selections as §13.10–§13.16.
+- **Generation:** **single greedy completion per question**
+  (T=0, deterministic, K=1 effectively). Captures per-token logits
+  via `model.generate(..., output_scores=True,
+  return_dict_in_generate=True)`. NOT K-sample stochastic — the
+  hypothesis is single-trajectory by design; sampling would
+  reintroduce the K-sample-divergence dynamics §13.17 ruled out as
+  the failure mode.
+- **max_new_tokens:** 128 (parity with §13.14 / §13.16; needed for
+  trajectory length to evolve a 2nd-difference signal).
+- **Prompt format:** shared `Q: ... A:` completion, identical to
+  §13.10–§13.16. No chat templates.
+- **Position grid:** **stride 1, every token** in the generated
+  trajectory (no sub-sampling; single-trajectory observables don't
+  have the per-position computational cost K-sample probes did).
+  - `position_min = 4` — skip first 4 generated tokens. Lower than
+    §13.14 / §13.16's 8 because there is no NLI-on-truncations
+    noise concern at single-trajectory logit level; the floor exists
+    only to avoid leading-token prompt-conditioning artifacts.
+  - `position_max = T_actual` — the actual non-pad length of the
+    greedy generation, capped at `max_new_tokens=128`.
+  Both configurable; non-default flagged as §13.18 deviation.
+
+**Pinned mathematical object (the forced-allocation-gap series and
+its 2nd-difference scalar).** For each question $q$ with greedy
+trajectory of length $T$ generated tokens, at each token position
+$t \in [\text{position\_min}, T]$:
+
+1. Capture raw logits $\mathbf{z}_t \in \mathbb{R}^{|V|}$ before
+   softmax (vocab size $|V| = 151{,}936$ for Qwen2.5-7B).
+2. Compute the **confidence magnitude**:
+   $$M_t = \max_j z_t[j] - \frac{1}{|V|}\sum_j z_t[j]$$
+   (max logit centered by mean — indicates whether any token
+   strongly stands out from the bulk).
+3. Compute the **post-softmax entropy**:
+   $$H_t = -\sum_j p_t[j] \log p_t[j]
+   \quad \text{where} \quad
+   p_t = \text{softmax}(\mathbf{z}_t).$$
+4. Z-normalize both quantities across the trajectory:
+   $$\tilde{M}_t = \frac{M_t - \bar{M}}{\sigma_M}, \qquad
+   \tilde{H}_t = \frac{H_t - \bar{H}}{\sigma_H}$$
+   (means and standard deviations computed over the position-grid
+   range $[\text{position\_min}, T]$ for that question's
+   trajectory).
+5. **Forced-allocation gap:**
+   $$g_t = \tilde{H}_t - \alpha \cdot \tilde{M}_t,
+   \qquad \alpha = 1.0 \text{ (pinned).}$$
+   Equal weighting of normalized entropy and normalized confidence
+   magnitude. The $\alpha$ value is pinned at 1.0 for the §13.18
+   classification; configurable via `--alpha` for follow-up
+   sweeps with non-default flagged as §13.18 deviation.
+   - High $g_t$: high $\tilde{H}_t$ AND low $\tilde{M}_t$ — forced
+     allocation moment.
+   - Low $g_t$: low $\tilde{H}_t$ OR high $\tilde{M}_t$ — supported
+     commitment.
+6. Centered second difference at each interior $t$:
+   $$\text{accel}_t = g_{t+1} - 2 g_t + g_{t-1}.$$
+7. **Primary scalar (pinned for AUC + bands):**
+   $$\boxed{\text{forced\_alloc\_2diff}(q) = \max_t |\text{accel}_t|}$$
+   Mirrors `S3_map_error_accel` peak in the autonomy domain.
+8. **Pinned diagnostic secondary scalars** (reported but NOT used
+   for band classification — pinning prevents post-hoc swap, same
+   §0.8 pattern as §13.14 / §13.16):
+   - $\text{mean}_t |\text{accel}_t|$ (averaged absolute
+     acceleration on the gap series).
+   - $\sum_t \text{accel}_t^2$ (energy-style aggregation on the
+     gap series).
+   - **Variant-A entropy-only diagnostic:** $\max_t |a^H_t|$ where
+     $a^H_t = H_{t+1} - 2 H_t + H_{t-1}$ — the 2nd difference of
+     raw post-softmax entropy without the confidence-magnitude
+     term. Tests whether $M_t$ contributes any signal beyond
+     entropy alone. If primary saturates but Variant A's AUC
+     differs materially, the $M_t$ component is either helping
+     or hurting; if both are similar, $M_t$ is irrelevant on
+     this codebase.
+   - Position $t^*$ of the peak.
+9. AUC computed on $-\text{forced\_alloc\_2diff}$, pre-committed
+   direction *higher forced-allocation acceleration → moment the
+   model's distribution committed to a low-magnitude forced guess
+   → more likely the answer is wrong*. Same sign convention as
+   §13.14 / §13.16 (negate the scalar so "higher = more truth-
+   predictive").
+10. **Correctness label:** Qwen greedy generation passes question-
+    conditioned NLI (`MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli`)
+    against the correct choice AND fails NLI against every
+    distractor. Identical labeling to §13.10–§13.16. Direct AUC
+    comparability.
+
+**Pre-committed success bands** (`FORCED_ALLOC_2DIFF_*`, same
+numerical partition as §13.11–§13.16 because the §13.10 baseline
+of 0.661 is unchanged across all six probes; relabeled
+`FORCED_ALLOC_2DIFF_*` so the per-revision lineage stays legible):
+
+- `AUC ≥ 0.75` on **both** benchmarks → **`FORCED_ALLOC_2DIFF_STRONG`**.
+  Gates the §13.9 VC-brief revision AND constitutes the first
+  load-bearing positive evidence for BCVF-for-LLMs at any single-
+  axis construction in this codebase. Authorizes a §13.19 result
+  writeup positioning §13.18 as the first probe to satisfy all
+  five structural requirements §13.14 / §13.16 violated.
+- `0.70 ≤ AUC < 0.75` on **both** → **`FORCED_ALLOC_2DIFF_INTERNAL_STRONG`**.
+  Strong for internal research; VC-brief still held. Diagnostic
+  follow-ups: $\alpha$ sweep (`--alpha`), Variant C logit-lens
+  curvature, longer trajectories (`--max-new-tokens 256`).
+- `0.681 ≤ AUC < 0.70` on **both** → **`FORCED_ALLOC_2DIFF_MARGINAL_LIFT`**.
+  Modest but real lift above §13.10 + 0.02. Document; do NOT
+  authorize further single-axis probe progression.
+- `0.641 ≤ AUC ≤ 0.681` on **both** → **`FORCED_ALLOC_2DIFF_SATURATION`**.
+  Within ±0.02 of §13.10's 0.661 baseline. Combined with §13.11 /
+  §13.12 / §13.14 / §13.16 anti-findings, would establish that
+  the entire literature-aligned single-axis class — across both
+  K-sample-divergence and single-trajectory observables — saturates
+  at the §13.10 ceiling on Qwen-7B + base-NLI at N=100. **5-of-5
+  single-axis null.** Conclusive evidence single-axis methods
+  saturate; further lift requires either system-level integration
+  (§14 outlined in §13.8) or model-scale upgrade.
+- `AUC < 0.641` on **any** benchmark → **`FORCED_ALLOC_2DIFF_ANTI_FINDING`**.
+  The forced-allocation-gap signal underperforms the §13.10 baseline.
+  5-of-5 anti across literature-backed paths. Pause LLM track at
+  the single-axis level. The autonomy-domain BCVF claim stands
+  independently on §6.1 evidence.
+
+The "on both benchmarks" combinatorial rule is identical to §13.11–
+§13.16 and is pinned here to prevent post-hoc benchmark cherry-
+picking on a heterogeneous TruthfulQA / HaluEval split.
+
+**Acceptance / rejection rules (explicit, non-vague):**
+
+- **PASS:** AUC ≥ 0.75 on both benchmarks (FORCED_ALLOC_2DIFF_STRONG).
+- **CONDITIONAL PASS for internal research:** AUC ∈ [0.681, 0.75)
+  on both benchmarks (INTERNAL_STRONG or MARGINAL_LIFT). Documented
+  but does not unlock §13.9 VC-brief.
+- **NULL (consistent with §13.10 ceiling):** AUC ∈ [0.641, 0.681]
+  on both (SATURATION). Documented as final evidence single-axis
+  methods saturate.
+- **REGRESSION:** AUC < 0.641 on any benchmark (ANTI_FINDING).
+  Documented as the strongest negative finding in the §13 program.
+
+**Disclosed simplifications and risks specific to §13.18** (no
+literature anchor for the construction; the AUC forecast is
+correspondingly uncertain):
+
+- **Greedy-only single trajectory (K=1).** No sampling diversity.
+  If the greedy trajectory happens to be unrepresentative for some
+  questions (e.g., greedy gets stuck on a confident wrong answer
+  with low entropy throughout), the forced-allocation gap may be
+  uniformly small and the 2nd-difference signal weak. Sampling
+  variants (small K, looking at $g_t$ averaged across K
+  trajectories) are not pre-committed but are a defensible §13.x
+  follow-up if §13.18 lands at SATURATION.
+- **Fixed $\alpha = 1.0$.** Equal z-normalized weighting of $H_t$
+  and $M_t$. Defensible default but not empirically tuned.
+  Configurable via `--alpha`; non-default flagged as deviation.
+- **Z-normalization is per-question, not global.** Each
+  trajectory's $\tilde{M}_t$ and $\tilde{H}_t$ are computed
+  relative to that trajectory's own mean/std. This makes $g_t$
+  scale-invariant per question but couples the within-question
+  values. Alternative (global normalization across all questions)
+  is not pre-committed.
+- **Single fixed model (Qwen2.5-7B-Instruct).** Same scaling
+  caveat as §13.10–§13.16.
+- **Same correctness label as §13.10–§13.16** (NLI on Qwen
+  greedy). Holds the labeling pipeline fixed across all six
+  probes for direct AUC comparability.
+- **Stride 1 grid covers every token, but the position floor
+  (`position_min=4`) excludes the very first generated tokens.**
+  If forced allocations happen reliably at exactly token 1 or 2
+  (e.g., the model commits to a wrong answer immediately), the
+  signal at those positions is excluded. Configurable via
+  `--position-min`; non-default flagged as deviation.
+- **No literature anchor for the AUC forecast.** Variant A's 1st-
+  derivative version (per-token entropy) has Kadavath 2022
+  AUROC ~0.55–0.62 reported on short-form QA. The 2nd-difference
+  variant is novel; the forced-allocation-gap construction is
+  novel. Best estimate: AUC band **0.55–0.75**, very wide because
+  the prior is genuinely uncertain. A clean clear of 0.75 on
+  both benchmarks would be a novel positive result; a clear miss
+  below 0.65 would be the first direct disconfirmation of the
+  forced-allocation-gap mechanism on this codebase.
+
+**Expected cost.** Single Qwen-7B greedy generation per question
+(no K-sample sampling, no per-position NLI clustering, no per-
+position EigenScore extraction). Per-token logits are already
+computed during generation; capturing them adds ~30% memory
+overhead but no significant wall-clock cost. Per-position scalar
+arithmetic ($H_t$, $M_t$, $g_t$, $\text{accel}_t$) is negligible
+relative to generation. **Estimated runtime: ~2–4 min at N=100 on
+a single 24+ GB GPU**, the cheapest §13 probe to date.
+
+**Report destination.**
+- `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.md`
+- `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.json`
+  (per-question dump including the full per-position $H_t$, $M_t$,
+  $g_t$ series, the accelerations, and all scalars — required for
+  post-hoc audit if the primary saturates).
+- `docs/experiments/probe_forced_alloc_2diff_halueval_qa.md`
+- `docs/experiments/probe_forced_alloc_2diff_halueval_qa.json`
+
+**Scope.** §13.18 is a new bounded experiment under the same §0.8
+discipline as §13.12 / §13.13 / §13.14 / §13.16. It tests the
+single-trajectory observable §13.17's narrowing leaves explicitly
+open, NOT a continuation of any K-sample-divergence-based probe.
+The pre-committed bands above are the binding success criteria;
+any deviation at run time must be flagged as a §0.8 deviation in
+the result section, not absorbed silently.
+
+**What §13.18 does not pre-commit.** This section is the §0.8-
+style pre-commitment record only. Implementation of
+`scripts/probe_forced_alloc_2diff.py` is a separate authorization
+gate. No VC-brief / §13.9 changes here — those remain gated on
+`FORCED_ALLOC_2DIFF_STRONG` (or any §13 probe's STRONG band) on
+both benchmarks. Nothing in §13.18 retroactively modifies §13.10–
+§13.17 results, the §13 program closure for K-sample-divergence
+observables, or the autonomy-domain §6.1 result.
+
+### 13.19 Result — Forced-allocation gap also did not transfer; §13 single-axis program now exhausted across all hypothesis classes
+
+The §13.18 pre-committed probe has been executed at N=100 on both
+benchmarks. Combined classification on the pinned primary scalar:
+**`FORCED_ALLOC_2DIFF_ANTI_FINDING`**. Combined with §13.11 / §13.12
+/ §13.14 / §13.16, this is the **5-of-5 single-axis null** across
+both hypothesis classes the §13 program could test (K-sample-
+divergence-based observables in §13.10–§13.16; single-trajectory
+forced-allocation-gap observable in §13.18). The §13 single-axis
+program is now exhausted at this codebase's Qwen-7B + DeBERTa-v3-
+base + N=100 configuration across every literature-aligned and
+mechanism-motivated single-axis construction tested.
+
+A separately notable diagnostic finding is documented below
+(§13.19's "Variant A entropy-only diagnostic" subsection): the
+entropy-only 2nd-difference on HaluEval-QA reached AUC 0.701 —
+the second-best HaluEval result across the entire §13 program,
+behind only §13.11's cross-family 0.716. This does NOT change
+the pre-committed §13.18 classification (which is bound to the
+pinned primary scalar) but is informative about which component
+of the forced-allocation-gap construction was carrying signal
+versus noise. The combined-classification rule across both
+benchmarks would still resolve to `ANTI_FINDING` even if Variant A
+were used as the primary, because TruthfulQA-MC at AUC 0.536
+sits well below the 0.641 boundary regardless of which scalar is
+chosen — a finding consistent with the broader pattern that
+TruthfulQA-MC has defeated every §13 single-axis method tested.
+
+**Result table (primary scalar):**
+
+| Benchmark | N | Greedy acc | Mean greedy length (non-pad tokens) | Trajectories too short | AUC primary | Δ vs §13.10 | Per-run band |
+|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC | 100 | 0.320 | 116.6 | 1 | **0.549** | −0.112 | `FORCED_ALLOC_2DIFF_ANTI_FINDING` |
+| HaluEval-QA | 100 | 0.320 | 100.9 | 11 | **0.571** | −0.090 | `FORCED_ALLOC_2DIFF_ANTI_FINDING` |
+
+Combined classification under the §13.18 worst-benchmark rule:
+ANTI on both. Primary scalar means by class:
+
+| Benchmark | Mean primary correct | Mean primary wrong | Δ (correct − wrong) |
+|---|---|---|---|
+| TruthfulQA-MC | 10.8969 | 11.0854 | −0.188 (wrong higher, expected direction, weak) |
+| HaluEval-QA | 9.7695 | 10.5236 | −0.754 (wrong higher, expected direction, weak) |
+
+Note that on the primary scalar the means are in the *expected*
+direction (wrong > correct, indicating higher acceleration
+correlates with wrong answers as the pre-committed sign predicted)
+on both benchmarks — but the rank-based AUC is only 0.549 / 0.571
+because within-class variance dominates the mean separation.
+
+**Math used (the construction that failed at the pinned-primary
+level).** For each question $q$ with greedy trajectory of length
+$T$ (T_actual = min(128, generated non-pad tokens), median 128,
+mean 116.6 on TruthfulQA-MC and 100.9 on HaluEval-QA), at each
+token position $t \in [\text{position\_min}, T]$ with stride 1:
+
+1. Capture raw pre-softmax logits $\mathbf{z}_t \in \mathbb{R}^{|V|}$
+   ($|V| = 152{,}064$ for Qwen2.5-7B).
+2. Confidence magnitude
+   $M_t = \max_j z_t[j] - \frac{1}{|V|}\sum_j z_t[j]$.
+3. Post-softmax entropy
+   $H_t = -\sum_j p_t[j] \log p_t[j]$ where
+   $p_t = \text{softmax}(\mathbf{z}_t)$.
+4. Per-trajectory z-normalize both:
+   $\tilde{M}_t = (M_t - \bar{M})/\sigma_M$,
+   $\tilde{H}_t = (H_t - \bar{H})/\sigma_H$.
+5. Forced-allocation gap
+   $g_t = \tilde{H}_t - \alpha \cdot \tilde{M}_t$ with $\alpha = 1.0$
+   pinned.
+6. Centered second difference
+   $\text{accel}_t = g_{t+1} - 2 g_t + g_{t-1}$.
+7. Primary scalar (pinned per §13.18):
+   $\text{forced\_alloc\_2diff}(q) = \max_t |\text{accel}_t|$.
+8. AUC computed on $-\text{forced\_alloc\_2diff}$, pre-committed
+   direction *higher acceleration → forced-guess moment → more
+   likely wrong*.
+
+Three diagnostic secondary scalars were reported but not used for
+classification: $\text{mean}_t |\text{accel}_t|$,
+$\sum_t \text{accel}_t^2$, and the **Variant A entropy-only**
+diagnostic $\max_t |a^H_t|$ where
+$a^H_t = H_{t+1} - 2 H_t + H_{t-1}$ — the same 2nd-difference
+operator applied to raw entropy without the $M_t$ component or
+z-normalization. This was pinned in §13.18 explicitly to test
+whether the $M_t$ component contributes any signal beyond entropy
+alone.
+
+**Variant A entropy-only diagnostic — substantive surprise.**
+The four scalar AUCs measured per benchmark:
+
+| Scalar | TruthfulQA-MC AUC | HaluEval-QA AUC |
+|---|---|---|
+| Primary `max\|accel(g)\|` (forced-allocation gap) | 0.549 | 0.571 |
+| Diagnostic `mean\|accel(g)\|` | 0.364 | 0.486 |
+| Diagnostic `Σ accel(g)²` | 0.381 | 0.600 |
+| **Variant A** `max\|accel(H)\|` (entropy only, no $M_t$, no z-norm) | **0.536** | **0.701** |
+
+The Variant A HaluEval AUC of **0.701** is the second-best
+HaluEval result across the entire §13 program, behind only
+§13.11's cross-family ensemble at 0.716. It clears the per-run
+`INTERNAL_STRONG` band on HaluEval-QA. **This is a genuine and
+unexpected finding**: a much simpler scalar (raw 2nd difference
+of per-token entropy, no z-normalization, no confidence-magnitude
+component) outperforms the mechanism-motivated forced-allocation
+gap on HaluEval-QA. On TruthfulQA-MC the Variant A AUC of 0.536
+is essentially the same as the primary's 0.549 — both noisy near
+random, both well below the ANTI threshold.
+
+**The Variant A finding does NOT change the §13.18 pre-committed
+classification.** Per §0.8 discipline, the primary scalar was
+pinned BEFORE the run. The classification follows the primary,
+not the diagnostics. The Variant A AUC is reported here as
+analytical data about which component carried signal, not as a
+post-hoc band override.
+
+**The Variant A finding ALSO does not unlock §13.9 even on its
+own merits.** The combined-classification rule across both
+benchmarks would resolve to ANTI even if Variant A were used as
+the primary, because TruthfulQA-MC at AUC 0.536 sits well below
+the 0.641 boundary for any scalar choice. The pattern across all
+five §13 single-axis probes is consistent: TruthfulQA-MC defeats
+every method tested, and the worst-benchmark rule then forces the
+combined classification to ANTI regardless of how strong the
+HaluEval-QA result is on the same probe. This is itself the most
+robust finding of the §13 program — a benchmark-pathology pattern
+that no scalar choice within the single-axis program reaches past.
+
+**Why the $M_t$ component hurt the signal — mechanism analysis
+partially falsified at this construction.**
+
+The §13.18 pre-commitment was motivated by the ChatGPT mechanism
+analysis: hallucination is forced allocation by Softmax despite
+low absolute logit magnitude, so a signal that combines high
+entropy ($H_t$) AND low confidence magnitude ($M_t$) should be
+strictly more truth-correlated than entropy alone. The Variant A
+data falsifies that prediction at this construction: removing
+$M_t$ entirely (and removing the z-normalization) *improves* the
+signal on HaluEval (0.701 vs 0.571 primary) and is roughly
+equivalent on TruthfulQA (0.536 vs 0.549 primary).
+
+A plausible mechanical explanation for why $M_t$ as defined hurts:
+the centering by mean over the full vocab,
+$M_t = \max_j z_t[j] - \frac{1}{|V|}\sum_j z_t[j]$, has $|V| =
+152{,}064$ tokens. Most of those tokens have very negative
+pre-softmax logits at any given step (Qwen's vocabulary is
+dominated by long-tail entries that rarely fire). The mean over
+all logits is therefore dominated by that long tail, making $M_t$
+mostly a measure of *global logit-distribution shape* rather than
+*local "is the top token strongly preferred"*. Z-normalizing $M_t$
+within the trajectory then amplifies whatever within-question
+fluctuation that long-tail-bulk shape exhibits — fluctuation that
+has no obvious connection to per-position epistemic state.
+
+The mechanism analysis's underlying claim (that absolute logit
+magnitude information is lost in Softmax and that loss is
+mechanically connected to hallucination) is not falsified by this
+result — it is only the *specific operational definition* of
+$M_t$ as `max − global_mean` that is ruled out. Alternative $M_t$
+definitions that the §13.18 pre-commitment did not test:
+
+- $M_t = \max_j z_t[j] - \text{second\_max}_j z_t[j]$
+  (gap to runner-up — local "preference strength")
+- $M_t = \max_j z_t[j] - \text{quantile}_{0.99}(z_t)$
+  (top vs the 99th percentile — robust to long-tail bulk)
+- $M_t = \max_j z_t[j]$ (raw max logit, no centering)
+- $M_t = \log \sum_j e^{z_t[j]}$ (logsumexp / partition function
+  log — directly captures absolute logit-distribution scale)
+
+Any of these would be a separate §0.8 commitment if pursued. They
+are explicitly NOT pre-committed by §13.19 — listed only to
+document that the §13.18 result rules out one specific operational
+definition of $M_t$, not the broader mechanism-analysis claim
+about absolute logit magnitude.
+
+**This is the §0.8-discipline pattern working as designed.** The
+§13.18 pre-commitment fixed both the primary scalar and a
+diagnostic specifically for this case (that one component of the
+primary might be hurting beyond raw entropy). The diagnostic
+fired exactly the way its docstring said it would. We cannot
+post-hoc swap to Variant A, but we can report the finding cleanly
+and use it to inform any future §0.8 commitment that returns to
+this signal class.
+
+**Combined picture across all five §13 single-axis probes.**
+
+| Probe | Hypothesis class | TruthfulQA-MC | HaluEval-QA | Combined band |
+|---|---|---|---|---|
+| §13.10 baseline | sample-space, single model | **0.661** | **0.661** | `TRUTH_CORRELATED_MARGINAL` |
+| §13.11 cross-family | sample-space, ensemble | 0.633 | 0.716 | `CROSS_FAMILY_ANTI_FINDING` |
+| §13.12 EigenScore | internal-state, single-snapshot | 0.559 | 0.652 | `EMBEDDING_SPACE_ANTI_FINDING` |
+| §13.14 BCVF text-level 2nd-diff | temporal, K-sample text | 0.574 | 0.363 (inv) | `BCVF_2DIFF_ANTI_FINDING` |
+| §13.16 BCVF hidden-state 2nd-diff | temporal, K-sample internal | 0.462 (inv) | 0.449 (inv) | `HSEIG_2DIFF_ANTI_FINDING` |
+| §13.18 forced-allocation gap (primary) | temporal, single-trajectory logit | 0.549 | 0.571 | `FORCED_ALLOC_2DIFF_ANTI_FINDING` |
+| §13.18 Variant A entropy-only (diagnostic) | temporal, single-trajectory entropy | 0.536 | 0.701 | (not a pre-committed primary; reported) |
+
+Three robust patterns visible in this combined matrix:
+
+**Pattern 1 — §13.10 is the ceiling, not the floor.** Every
+single-axis revision underperforms §13.10's marginal baseline on
+the combined-classification rule. None lift above it. **5-of-5
+single-axis null at the combined level.** §13.10 single-snapshot
+semantic entropy remains the strongest result in this codebase
+across all five tested hypothesis classes.
+
+**Pattern 2 — TruthfulQA-MC consistently defeats every method.**
+Across all six measured AUCs (five primary + Variant A
+diagnostic), TruthfulQA-MC ranges from 0.462 to 0.661 with the
+non-§13.10 entries clustered in [0.462, 0.633]. Every revision
+loses ground vs §13.10 on this benchmark. The most plausible
+mechanism (consistent with literature; Farquhar 2024 reports the
+same TruthfulQA-vs-other-benchmarks pattern with semantic
+entropy): **TruthfulQA-MC's adversarial design — questions where
+models confidently share wrong answers — breaks confidence-based
+detection regardless of the specific scalar construction**.
+Every method we tested is some variant of "measure the model's
+confidence-related uncertainty"; questions where the model is
+wrong AND confident are by construction the hardest cases for any
+such method.
+
+**Pattern 3 — HaluEval-QA is more permissive but still does not
+unlock combined classification.** Two methods cleared the
+`INTERNAL_STRONG` per-run band on HaluEval-QA: §13.11 cross-family
+at 0.716 and §13.18 Variant A at 0.701. But the worst-benchmark
+combined-classification rule means the TruthfulQA-MC failure
+floors the combined band to ANTI for both. The pattern is
+substantive enough that ANY future probe seriously aiming for
+combined STRONG would need to either (a) clear TruthfulQA-MC
+specifically (which has not happened in any §13 probe), or (b)
+substitute a different second benchmark whose pathology is less
+hostile to confidence-based methods (TriviaQA-Generation is the
+literature-anchored candidate per Farquhar 2024's headline 0.78
+on it).
+
+**What this authorizes** (per §13.18 pre-commitment + §13.19
+result):
+
+- **Closing the §13 single-axis program at the exhaustive
+  level.** §13.17 closed the K-sample-divergence single-axis
+  sub-program. §13.19 now closes the single-trajectory single-
+  axis sub-program. Every literature-aligned and mechanism-
+  motivated single-axis hypothesis class available to this
+  codebase at Qwen-7B + DeBERTa-v3-base + N=100 has been tested
+  and produced ANTI under the combined-classification rule.
+  **No further §13 single-axis probes are authorized.**
+- **Authorizing the §13-program closing statement.** The honest
+  external framing is now: *on Qwen2.5-7B-Instruct + DeBERTa-v3-
+  base + N=100, no literature-aligned or mechanism-motivated
+  single-axis hallucination-detection method tested in this
+  codebase clears the §13.10 marginal baseline of AUC 0.661 on
+  both TruthfulQA-MC and HaluEval-QA. The five tested hypothesis
+  classes (sample-space single-model, sample-space cross-family,
+  internal-state single-snapshot, K-sample temporal evolution at
+  text-level and hidden-state-level, single-trajectory forced-
+  allocation) all collapse under the worst-benchmark rule because
+  TruthfulQA-MC defeats every confidence-based scalar construction
+  tested. The §13.10 baseline appears to be a saturation ceiling
+  for this configuration class, not a starting point.*
+- **Documenting the Variant A finding as a substantive analytical
+  observation.** Per-token entropy 2nd-difference on HaluEval-QA
+  reached AUC 0.701, comparable to §13.11's 0.716 and Farquhar
+  2024's reported ~0.70 on TruthfulQA-Generation. The finding is
+  reportable as evidence that the §13 single-axis ceiling on
+  HaluEval-QA specifically is around 0.70–0.72, not lower.
+- **Promoting §13.10 as the strongest §13 result on record.**
+  Confirmed by 5-of-5 single-axis comparisons. Any §13-related
+  external referencing should cite §13.10's marginal pass as the
+  strongest combined-classification result.
+
+**What this does NOT authorize:**
+
+- **Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.** Per
+  §13.9, external-framing revision requires `STRONG` on both
+  benchmarks at any §13 probe. No probe in §13 has cleared this.
+  The §13.9 hold remains in force and is *strengthened* by §13.19's
+  5-of-5 confirmation across five hypothesis classes.
+- **Post-hoc reinterpretation of §13.18 as a Variant-A pass.**
+  The pre-committed primary scalar was the forced-allocation gap
+  with α=1.0. Variant A is a diagnostic, not the pre-committed
+  primary. Reporting Variant A's HaluEval 0.701 as if it were
+  the §13.18 result would be a §0.8 violation. The classification
+  follows the primary; the diagnostic informs the analytical
+  narrative.
+- **Any single-axis follow-up probe in the §13 program.**
+  Five hypothesis classes tested; all combined-classification
+  ANTI. Another single-axis variant on the same benchmarks is
+  not authorized without a fresh §0.8 pre-commitment that
+  explicitly identifies what new hypothesis class it tests AND
+  what pathway around the TruthfulQA-MC pathology it proposes.
+- **Any claim about BCVF-for-LLMs in general.** §13.19 narrows
+  the negative claim to *single-axis observables under the BCVF
+  2nd-difference operator (and related single-snapshot scalars)
+  at the constructions tested*. System-level integration
+  (multi-source consumer with BCVF-shaped routing, the §6.1-style
+  configuration) is not tested and is not foreclosed; if pursued
+  it would be a separate §14 pre-commitment outside the §13
+  single-axis program.
+- **Any claim that affects the autonomy-domain BCVF result.**
+  §6.1's N=21 sign-test on `S3_map_error_accel` passed
+  independently and stands. §13.19's outcome bears only on the
+  LLM-domain transfer claim at the constructions tested, not on
+  the robotics-domain validation.
+
+**Status of the §13 program after §13.19.** Closed exhaustively
+at the single-axis level across five tested hypothesis classes.
+The §13.10 baseline (AUC 0.661 on both benchmarks,
+TRUTH_CORRELATED_MARGINAL) is the strongest result of record. Any
+future LLM-domain work on the BCVF transfer claim would need to
+test a fundamentally different experimental structure — specifically
+system-level integration (the §6.1-style configuration where
+BCVF-shaped routing decides among multiple sources and end-to-end
+accuracy is the metric, not isolated-observable AUC) — under a
+fresh §0.8 pre-commitment in a new top-level section (§14 or
+beyond). The §13.8 future-work list documents three honest
+remaining directions; none are pre-committed by §13.19.
+
+**Artifacts:**
+
+- `scripts/probe_forced_alloc_2diff.py` (commit `d5b7b65`).
+- `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.md` and `.json`.
+- `docs/experiments/probe_forced_alloc_2diff_halueval_qa.md` and `.json`.
+
+## §14 System-level BCVF integration on LLMs (new chapter)
+
+§13.19 closed the §13 single-axis program exhaustively across
+five hypothesis classes. The remaining literature-aligned LLM-
+domain question — articulated in the §13.8 future-work list and
+in §13.17 / §13.19 — is whether the §6.1-style configuration
+(multi-source agent system using BCVF-shaped routing, end-to-end
+performance metric) transfers to LLMs. §13's program tested
+observables in isolation against ground-truth correctness via
+AUC; §14 tests an entirely different experimental structure.
+
+§14 is bounded into a scout (§14a) and a conditional full
+experiment (§14, the chapter). The scout exists to gate the
+multi-week investment of the full experiment behind a cheap pre-
+committed test on the most permissive benchmark.
+
+### 14a Pre-commitment — System-level scout
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before implementation. Specification, success
+bands, promotion rules, and pinned parameters cannot be redefined
+post-hoc.
+
+**Relationship to §13's closure.** §13.10–§13.19 tested
+observables in isolation: per-question, compute a BCVF-shaped
+scalar, AUC against ground-truth correctness label. §6.1's
+autonomy-domain validation that passed is a fundamentally
+different experimental shape: multiple sources are weighted /
+filtered / routed by BCVF scores, the routed answer is compared
+against ground truth, and a sign test on per-question wins
+determines significance. §14a tests whether that experimental
+shape transfers to LLMs. **It is not a continuation of §13's
+single-axis program; it is a new program with a different
+metric (end-to-end accuracy delta vs naive aggregation,
+sign-test) and a different math object (consumer + selector +
+end-to-end answer, not isolated scalar vs ground truth).**
+
+**Why a scout, not full §14 directly.** Three reasons:
+
+1. **§13's TruthfulQA-MC pathology cleanly predicts that
+   running the full experiment on TruthfulQA-MC + HaluEval-QA
+   would land in saturation/anti combined regardless of how
+   well the system layer works.** Five §13 single-axis probes
+   established that TruthfulQA-MC defeats every confidence-based
+   scalar. A direct full §14 on both benchmarks therefore has a
+   high ex-ante probability of combined-classification ANTI even
+   if the system layer is genuinely useful on HaluEval-QA. The
+   scout tests where signal is most likely first — HaluEval-QA
+   alone — and only commits to the full experiment after seeing
+   life on the cheaper test.
+2. **Full §14 is a multi-week implementation** (~1500 lines of
+   new code: source-runner, four consumer variants, two
+   selectors, end-to-end harness with sign-test, ablation
+   runners). The scout reuses §13.11's cross-family
+   infrastructure + §13.10's semantic-entropy scalar + adds only
+   two consumer variants and one selector. Implementation cost
+   ~2-3 days vs ~2-3 weeks.
+3. **Pre-committed promotion rules let §14a make a clean
+   binary decision about whether to invest in full §14.** A
+   scout STRONG promotes to full §14 with high prior on success.
+   A scout REGRESSION closes the LLM transfer line with strong
+   evidence (system-level integration *also* fails after the
+   single-axis program closed exhaustively). Either is
+   actionable; neither requires the full investment.
+
+**The scout's role in the broader §13/§14 program.** §14a is
+explicitly a gate, not a deliverable. Its job is to inform the
+go/no-go decision on the full §14 (which would add TruthfulQA-MC,
+add the remaining two consumer variants, add the highest-weight
+source selector, add ablation runners, and run sign-tests at
+N=300+ for higher statistical power). A §14a STRONG result is the
+prerequisite for full §14 authorization; a §14a REGRESSION
+forecloses full §14 entirely.
+
+**Specification (pinned):**
+
+- **Script:** `scripts/probe_system_level_scout.py` (new; does
+  NOT modify any §13.10–§13.18 script — those results pinned).
+- **Sources (M = 3, all already cached from §13.11):**
+  - `Qwen/Qwen2.5-7B-Instruct`
+  - `meta-llama/Llama-3.1-8B-Instruct`
+  - `mistralai/Mistral-7B-Instruct-v0.3`
+  - All loaded co-resident on the 80 GB GPU (~45 GB total in
+    fp16, identical to §13.11 setup).
+- **Per-source BCVF scalar (pinned):** **semantic entropy** per
+  §13.10's protocol — for each source, sample K=10 completions
+  at T=1.0 with `max_new_tokens=32`, cluster by question-
+  conditioned bidirectional NLI entailment (DeBERTa-v3-base-mnli-
+  fever-anli, identical to §13.10 / §13.11), Shannon entropy
+  $H_{\text{src}}(q) = -\sum_c \frac{|c|}{K} \log \frac{|c|}{K}$
+  over cluster sizes. Pinned this scalar (not Variant A entropy
+  2nd-difference, which scored 0.701 on HaluEval per-source for
+  Qwen) because: (a) §13.10/§13.11 already proved cross-model
+  implementation; (b) failure attribution is cleaner — a §14a
+  regression cleanly indicts the system-integration layer
+  rather than per-source-scalar transfer; (c) §13.10 is the
+  strongest §13 result of record. The scalar is interpreted as
+  *trust cost*: high entropy → uncertain source → low trust.
+- **Per-source greedy answer:** each source's deterministic T=0
+  greedy completion at `max_new_tokens=32`. Same prompt format as
+  §13.10 / §13.11 (`Q: ... A:` completion, no chat templates).
+  This is the candidate answer that source contributes to the
+  weighted majority vote.
+- **Consumer variants (pinned, both run, results compared):**
+  - **V1 — Softmin trust shaping** (autonomy-domain default; the
+    construct ChatGPT flagged as harmful):
+    $w_i^{V1} = \frac{\exp(-d_i / \tau)}{\sum_j \exp(-d_j / \tau)}$
+    with $d_i = H_{\text{src}_i}(q)$ (per-source semantic
+    entropy) and $\tau = 0.5$ (pinned; default temperature for
+    softmin trust shaping in autonomy-domain BCVF). High-entropy
+    sources get sharply down-weighted; low-entropy sources get
+    sharply amplified.
+  - **V2 — Thresholded exclusion + uniform survivors** (ChatGPT's
+    recommended replacement):
+    $S = \{i : d_i \le \theta\}$, $w_i^{V2} = \mathbb{1}[i \in S] /
+    |S|$. If $|S| < 1$, fall back to all sources with uniform
+    weights ($w_i = 1/M$). Threshold $\theta = $ median of
+    $\{d_1, d_2, d_3\}$ (pinned per-question; uses 50th-percentile
+    of the source costs as the cut-point). Sources above the
+    median entropy are excluded; survivors are uniform-averaged.
+- **Selector (pinned, single choice):** **weighted majority vote**
+  of per-source greedy answers. For each candidate answer string
+  $a$ produced by some source, its score is
+  $\sum_i w_i \cdot \mathbb{1}[\text{greedy}_i = a]$ (sum of
+  weights of sources that emitted $a$). The candidate with the
+  maximum score wins. Ties broken by argmax of cumulative weight
+  in source-list order (deterministic).
+- **Benchmark (pinned, single choice):** HaluEval-QA `data` split,
+  N = 100 (same selection as §13.10–§13.18 for direct comparison).
+  No second benchmark in §14a; TruthfulQA-MC is explicitly
+  reserved for full §14 conditional on §14a STRONG.
+- **Greedy "is correct" labeling (pinned):** identical protocol
+  to §13.10–§13.18 — for each candidate answer (selector output,
+  baseline-A, baseline-B), pass it through question-conditioned
+  NLI (DeBERTa-v3-base-mnli-fever-anli) against the correct
+  choice AND against the hallucinated answer; correct iff
+  entails correct AND does not entail hallucinated. Holding
+  labeling fixed across §13/§14a preserves combined-classification
+  comparability if §14 ever adds TruthfulQA-MC under the same
+  rule.
+
+**Pinned baselines for the accuracy delta:**
+
+- **Baseline-A — Single-source Qwen greedy.** The simplest
+  possible LLM answer: just `Qwen/Qwen2.5-7B-Instruct` greedy
+  output, no ensembling, no BCVF, no consumer. Tests "does the
+  system add anything over the strongest single source?"
+- **Baseline-B — Uniform majority vote across all 3 source
+  greedies.** No BCVF scoring or weighting; each source's greedy
+  contributes one vote, the most-voted answer wins (ties broken
+  same way as the selector). Tests "does BCVF-shaped weighting
+  add anything over naive ensembling?"
+
+The §14a primary comparison is V1 / V2 vs Baseline-B (does
+BCVF-shaped consumer beat uniform aggregation?). V1 / V2 vs
+Baseline-A is reported as a secondary comparison (does the
+system add anything over single-source-Qwen?). Both must be
+reported for honest accounting.
+
+**Pre-committed success bands** (different metric from §13:
+accuracy delta in percentage points, not AUC; sign-test as
+secondary statistical confirmation).
+
+Define $\Delta_v = \text{acc}(v) - \text{acc}(\text{Baseline-B})$
+for each consumer variant $v \in \{V1, V2\}$, where $\text{acc}$
+is fraction of N=100 questions where the candidate answer's NLI
+label is correct.
+
+- **STRONG (PROMOTE TO FULL §14):** $\Delta_v \ge +5$ percentage
+  points for *both* V1 and V2, with sign-test p-value < 0.05 on
+  per-question wins for at least one of V1, V2 vs Baseline-B.
+  Authorizes drafting full §14 pre-commitment with both
+  benchmarks (TruthfulQA-MC + HaluEval-QA), all four consumer
+  variants, both selectors (weighted majority + highest-weight),
+  and ablation runners.
+- **DIRECTIONAL (PROMOTE TO FULL §14 WITH V2 PRIORITY):**
+  $\Delta_{V2} \ge +3$ percentage points AND $\Delta_{V1} \le 0$
+  (V2 lifts, V1 does not). This is the specific outcome ChatGPT
+  predicted: softmin trust shaping (V1) is harmful while
+  thresholded exclusion (V2) is helpful. If observed, full §14
+  is authorized but with V1 deprioritized and V2 / V3 (veto-only)
+  / V4 (deadband) as the consumer variants in scope.
+- **MARGINAL (UNDECIDED, ONE ADDITIONAL SCOUT AUTHORIZED):**
+  $\Delta_v \in (0, +3)$ for both V1 and V2 (small lift, no
+  significance). One more §14a-class scout authorized — likely
+  candidates: swap per-source scalar to Variant A entropy
+  2nd-difference (the §13.18 diagnostic that scored 0.701 on
+  HaluEval), OR add veto-only and deadband consumer variants.
+  Pre-commitment for that additional scout would be a fresh §0.8
+  commitment in §14a.2 (or similar). Full §14 NOT authorized
+  until either MARGINAL or STRONG is reached on a follow-up scout.
+- **SATURATION (NO PROMOTION; DOCUMENT AS NULL):**
+  $\Delta_v \in [-3, 0]$ for both V1 and V2. The system layer
+  adds nothing measurable on top of naive 3-source majority
+  voting. Document §14a as a null result; do NOT promote to
+  full §14. The honest external framing becomes: "single-axis
+  observables saturate (5-of-5 §13 nulls); system-level
+  integration on the most permissive benchmark also saturates;
+  the LLM transfer line is closed at all tested experimental
+  structures."
+- **REGRESSION (CLOSE LLM TRANSFER LINE):**
+  $\Delta_v < -3$ for *either* V1 or V2 (system-level integration
+  actively hurts compared to naive majority voting on the most
+  permissive benchmark). The LLM transfer line is closed with
+  strong evidence: the failure isn't only at the observable
+  level (§13) but also at the system-integration level (§14a).
+  The autonomy-domain BCVF claim stands independently on §6.1.
+  No further LLM-domain probes authorized in this codebase
+  without a fundamental reframing (different model class,
+  different benchmark family, or different formal structure
+  entirely).
+
+**Acceptance / rejection rules (explicit, non-vague):**
+
+- **PROMOTE to full §14:** STRONG or DIRECTIONAL.
+- **AUTHORIZE one more scout:** MARGINAL.
+- **DOCUMENT as null, do NOT promote:** SATURATION.
+- **CLOSE LLM transfer line:** REGRESSION.
+
+**Statistical test (pinned).** Per-question sign test for
+$v$ vs Baseline-B: count the questions where $v$'s answer is
+correct AND Baseline-B's answer is wrong (a "win" for $v$),
+versus questions where $v$ is wrong AND Baseline-B is correct
+(a "loss" for $v$). Ignore ties (both correct or both wrong).
+Binomial test on win count vs total non-ties at $\alpha = 0.05$.
+
+The pre-committed bands above use $\Delta_v$ thresholds rather
+than sign-test p-values directly, because $\Delta_v$ is the
+practically meaningful number (the actual accuracy lift). The
+sign-test p-value is a secondary confirmation that the lift is
+not noise. **A STRONG result requires BOTH $\Delta_v \ge +5pp$
+AND sign-test p < 0.05.** The two conditions together prevent
+both Type I (random fluctuation labeled STRONG) and the inverse
+case where the lift exists but is so small the sign-test
+disagrees.
+
+**Disclosed simplifications and risks specific to §14a:**
+
+- **HaluEval-QA only.** The most permissive §13 benchmark; the
+  one where multiple methods showed life (§13.10 0.661, §13.11
+  0.716, §13.12 0.652, §13.18 Variant A 0.701). The scout's
+  job is to detect signal where signal is most likely; if it
+  fails here, full §14 with TruthfulQA-MC added almost certainly
+  fails the worst-benchmark rule. Cherry-picking risk is real
+  but acknowledged: a §14a STRONG followed by full §14 anti on
+  TruthfulQA-MC would be the same per-benchmark pattern §13
+  showed (HaluEval permissive, TruthfulQA hostile). The scout
+  is gating compute investment, not making external claims; the
+  full §14 would re-test on TruthfulQA-MC with full pre-committed
+  bands.
+- **Two consumer variants only.** V3 (veto-only) and V4 (deadband
+  fallback) are deferred to full §14 conditional on §14a STRONG.
+  This means §14a cannot detect the case where V3 or V4 lifts
+  while V1 and V2 don't. Acceptable risk because: V1 and V2 are
+  the polar choices (most aggressive sharpening vs most
+  conservative inclusion-or-exclusion); intermediate variants
+  V3/V4 are unlikely to lift if both polar variants regress.
+- **One selector only.** Highest-weight-source selector deferred
+  to full §14. Weighted majority vote is the more conservative
+  selector (less sensitive to a single source dominating);
+  highest-weight is more aggressive. If §14a STRONG, the full
+  §14 could test both.
+- **N=100.** Statistical power: ~85% to detect a true 60% sign-
+  test win rate at α=0.05 (a $\Delta \approx 5pp$ effect). Smaller
+  N (e.g., N=50) would be cheaper but reduces power below the
+  acceptance threshold; larger N would be costlier without
+  strengthening the scout's promotion-rule decisions.
+- **Pinned softmin temperature τ = 0.5.** Autonomy-domain
+  default. Different τ values would change V1's sharpening
+  intensity. If §14a lands MARGINAL, a τ sweep is a defensible
+  follow-up scout.
+- **Pinned threshold θ = median entropy** for V2. Per-question
+  median, not global. Alternatives (global percentile, fixed
+  numeric threshold) not pre-committed. Median was chosen
+  because it adapts to per-question difficulty and is robust
+  to outlier source entropies.
+- **No NLI quality control on per-source answers.** All three
+  source greedies are accepted as candidate answers regardless
+  of length, format, or apparent quality. If a source emits
+  malformed text consistently (rare but possible for chat-
+  template-native models given completion-style prompts), it
+  contaminates the weighted majority vote. Defensible if §13.11
+  showed this didn't happen at scale; problematic if it did.
+
+**Expected cost.**
+
+- 3 sources × 100 questions × K=10 stochastic generations =
+  3,000 sampling calls (~30 min on the cached GPU).
+- 3 sources × 100 questions × 1 greedy generation =
+  300 deterministic generations (~5 min).
+- Per-source NLI clustering: 3 × 100 = 300 clustering operations
+  × 90 NLI pairs × ~50 ms batched ≈ ~10 min total.
+- Per-question NLI labeling (one call per candidate answer
+  against correct + hallucinated): 4 candidates per question
+  × 100 questions × 2 NLI calls = 800 calls (~5 min batched).
+- Consumer / selector / accuracy / sign-test computation:
+  trivial (per-question scalar arithmetic).
+
+**Estimated total runtime: ~50–60 min on the existing 80 GB GPU.**
+Memory: same ~45 GB co-resident as §13.11. No new model downloads.
+
+**Report destination.**
+
+- `docs/experiments/probe_system_level_scout_halueval_qa.md`
+- `docs/experiments/probe_system_level_scout_halueval_qa.json`
+  (per-question dump including each source's greedy + entropy,
+  per-question consumer weights, selected answer for each
+  variant, per-question correctness label for each candidate,
+  per-question wins/losses for sign-test).
+
+**Scope.**
+
+§14a is a bounded scout under §0.8 discipline. The pre-committed
+bands and promotion rules above are the binding gate to full §14.
+Any deviation at run time must be flagged in the result section
+as a §0.8 deviation, not absorbed silently.
+
+§14a does NOT pre-commit:
+- Implementation of `scripts/probe_system_level_scout.py` —
+  separate authorization gate.
+- Full §14 — explicitly conditional on §14a STRONG or
+  DIRECTIONAL outcome.
+- Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` — §13.9
+  hold remains, gated on STRONG band on both benchmarks at any
+  §13 or §14 probe.
+
+**What §14a scope explicitly excludes:**
+- TruthfulQA-MC (deferred to full §14 conditional on §14a STRONG).
+- V3 (veto-only) and V4 (deadband) consumer variants (deferred).
+- Highest-weight-source selector (deferred).
+- Ablation table and statistical decomposition (deferred to full §14).
+- Variant A entropy 2nd-difference per-source scalar (alternative
+  scout in §14a.2 conditional on §14a MARGINAL).
+
+### 14b Result — system-level scout returned SCOUT_SATURATION; LLM transfer line closed at all tested experimental structures
+
+The §14a pre-committed scout has been executed at N=100 on
+HaluEval-QA. Combined classification per pre-committed bands:
+**`SCOUT_SATURATION`**. The system layer adds nothing measurable
+on top of naive 3-source majority voting at this configuration.
+Combined with §13.19's 5-of-5 single-axis null, this is
+comprehensive evidence that BCVF-for-LLMs does not transfer at
+any tested experimental structure on this codebase. The autonomy-
+domain BCVF claim stands independently on §6.1 evidence and is
+unaffected.
+
+**Result table:**
+
+| Variant | Accuracy | Δ vs Baseline-B (pp) | Sign-test wins/losses | Sign-test p |
+|---|---|---|---|---|
+| Baseline-A (Qwen single-greedy) | 0.300 | — | — | — |
+| Baseline-B (uniform majority vote) | 0.300 | 0.00 (reference) | — | — |
+| **V1 (softmin trust, τ = 0.5)** | **0.330** | **+3.00** | 4/1 | 0.3750 |
+| **V2 (thresholded exclusion + uniform survivors)** | **0.300** | **+0.00** | 0/0 | 1.0000 |
+
+**Combined classification under §14a's pre-committed bands:**
+
+- STRONG (Δ ≥ +5pp for both AND p < 0.05 for at least one): **NO**
+  — V1 is +3pp (below 5pp), V2 is 0pp.
+- DIRECTIONAL (Δ_V2 ≥ +3pp AND Δ_V1 ≤ 0pp): **NO** — V2 is 0pp,
+  V1 is +3pp.
+- MARGINAL (Δ_v in (0, +3] for both): **NO** — V2 is 0pp, not in
+  open lower bound.
+- REGRESSION (Δ_v < −3 for either): **NO**.
+- Falls through to **SATURATION** by partition definition.
+
+The classification follows the pre-committed bands exactly. Per
+§0.8 discipline, the bands cannot be retroactively renegotiated;
+SCOUT_SATURATION is the binding outcome.
+
+**Sign-test analysis.** The "ties" (questions where the variant's
+selected answer agrees with Baseline-B's selected answer) dominate
+both comparisons:
+
+- **V1 vs Baseline-B:** 5 questions where the answers differed
+  (4 V1-wins, 1 V1-loss); 95 questions where V1 and Baseline-B
+  selected the same answer. Two-sided binomial test on 4/1 wins/
+  losses gives p = 0.375. Not significant at α = 0.05.
+- **V2 vs Baseline-B:** 0 questions where the answers differed
+  (V2 picked the same answer as Baseline-B on all 100 questions
+  in this run). Sign-test p = 1.0 trivially.
+
+**The structural read:** At this configuration (M = 3 cross-
+family sources, semantic-entropy scalar, weighted majority vote
+selector), the *majority-vote-itself* dominates the outcome
+across nearly every question. The BCVF-shaped weighting (V1) and
+the BCVF-shaped exclusion (V2) only produce different answers
+than naive majority voting when:
+
+1. The 3 sources do NOT have a clear 2-of-3 majority answer
+   (otherwise majority wins regardless of weight), AND
+2. The BCVF-shaped weights or exclusion shifts which candidate
+   answer wins the weighted vote.
+
+Empirically, that joint condition fired on 5 questions for V1
+and 0 questions for V2 across N=100. **The system layer
+genuinely has very little leverage at M=3 with weighted majority
+vote, regardless of how the BCVF scalar weights are computed.**
+
+**Statistical-power caveat.** Sign-test on 5 non-tied questions
+is severely under-powered. A true 80% V1 win-rate (against
+Baseline-B on differences) would still produce a non-significant
+p-value at this n. The 4/1 result is consistent with both "V1
+slightly better" and "noise around 50%." We cannot distinguish
+those two hypotheses from §14a alone. Running with M=5 sources
+(more disagreement opportunities), or with highest-weight-source
+selector (more sensitive to weight differences), or at N=500
+(more statistical power for any per-question lift) would all
+provide larger non-tied samples for a more powerful sign test —
+but none of those are pre-committed by §14a, and per the §14a
+SCOUT_SATURATION verdict, no follow-up is authorized without a
+fresh §0.8 commitment.
+
+**Three analytical observations the result supports:**
+
+**(a) V1 (softmin trust) shows a small numerical lift but not a
+statistically significant one.** Δ_V1 = +3pp is below the
+DIRECTIONAL +3pp threshold's strict-inequality (V1's pre-
+committed bound was Δ_V1 ≤ 0pp for DIRECTIONAL, so V1 lifting
+*disqualifies* DIRECTIONAL even if V2 had also lifted). The
+sign-test 4/1 result on 5 differences cannot statistically
+distinguish "V1 slightly better" from "noise." Per §0.8, the
+small numerical lift does not unlock any band more permissive
+than SATURATION because the strict band partition treats
+$\Delta_V \in (0, +3]$ and $\Delta_V \in [-3, 0]$ as different
+buckets, and the mixed-bucket case (one variant in MARGINAL,
+one in SATURATION) falls through to SATURATION by code
+construction.
+
+**(b) V2 (thresholded exclusion) is structurally degenerate at
+M = 3.** With three sources and per-question median entropy as
+threshold $\theta$, V2 always either:
+
+- excludes exactly one source (the highest-entropy one) and
+  uniform-averages the other two — equivalent to a 2-of-3
+  vote where the excluded source's vote is dropped, OR
+- in tied-at-median cases, falls back to all-three uniform —
+  identical to Baseline-B.
+
+In both cases, the resulting majority winner is the same answer
+as Baseline-B's 3-source uniform majority *whenever the
+remaining 2 sources have a 2-of-2 majority on the same answer
+that Baseline-B picked*. With M = 3 and 3 sources usually
+producing 2-of-3 majorities, this overlap is near-total. Hence
+$\Delta_V_2 = 0$ on N=100 is not surprising — it is structurally
+near-inevitable. **V2's null result at M = 3 is largely an
+artifact of the consumer-selector interaction, not a clean test
+of "thresholded exclusion adds nothing."** A fairer test of V2
+would require M = 5 sources (more degrees of freedom for the
+threshold to bite) or a highest-weight-source selector (which is
+more sensitive to V2's weight differences). Neither is pre-
+committed by §14a.
+
+**(c) System-layer bandwidth is severely limited at M = 3 +
+weighted-majority-vote.** On 95 of 100 questions, V1 and
+Baseline-B selected the same answer; on 100 of 100, V2 and
+Baseline-B selected the same answer. The system layer can only
+differentiate from naive majority voting when there is no clear
+majority among the 3 sources. With 3 instruction-tuned sources
+on factual QA, that joint condition fires on a small fraction
+of questions. **The result is consistent with "BCVF-shaped
+routing has the right idea but limited leverage at this
+ensemble scale" — not with "BCVF-shaped routing actively
+hurts."** REGRESSION was the band that would have indicted
+BCVF-as-routing; SATURATION is the band that says "indistinguishable
+from naive aggregation at this scale."
+
+These three observations together support a precise narrowing
+of the negative finding: *§14a does not falsify BCVF-shaped
+routing in general; it falsifies BCVF-shaped routing as a
+useful lift over naive 3-source majority voting on HaluEval-QA
+with the §14a-pinned configuration (semantic-entropy scalar,
+softmin τ=0.5 or median-threshold exclusion, weighted majority
+vote selector, N=100).*
+
+**Combined picture across §13 and §14a — LLM transfer line now
+closed at all tested experimental structures.**
+
+| Program | Hypothesis class | Status |
+|---|---|---|
+| §13.10 | sample-space, single-model SE | MARGINAL_PASS (0.661 / 0.661, baseline of record) |
+| §13.11 | sample-space, cross-family ensemble | combined ANTI |
+| §13.12 | internal-state, single-snapshot EigenScore | combined ANTI |
+| §13.14 | temporal, K-sample text-level 2nd-diff | combined ANTI |
+| §13.16 | temporal, K-sample hidden-state 2nd-diff | combined ANTI (both inverted) |
+| §13.18 | temporal, single-trajectory forced-allocation | combined ANTI |
+| **§14a** | **system-level, multi-source BCVF routing** | **SCOUT_SATURATION** |
+
+**6 of 7 distinct hypothesis classes ANTI or saturated; §13.10
+remains the strongest single result on record, and §14a's
+saturation confirms the system-level structure does not lift
+the §13.10 ceiling either.** The honest external framing is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100 + the cross-
+> family triple (Qwen + Llama + Mistral), no literature-aligned,
+> mechanism-motivated, or system-level BCVF construction tested
+> in this codebase clears the §13.10 marginal baseline of AUC
+> 0.661 (or, for system-level, the corresponding accuracy
+> baseline of 0.300 on HaluEval-QA's uniform majority vote) at
+> the combined-classification rule. The LLM transfer line is
+> closed at all six tested experimental structures.*
+
+**What §14a authorizes (per pre-commitment):**
+
+- **Documenting §14a as the closing scout for the LLM track.**
+  The §14a SCOUT_SATURATION result is binding under §0.8.
+  Together with §13.19's exhaustive single-axis closure, this
+  is comprehensive null-finding evidence.
+- **Promoting §13.10 as the strongest result of record across
+  both §13 and §14.** Reaffirmed by 6-of-7 comparisons; no
+  single-axis or system-level construction has lifted it.
+- **The honest "BCVF for LLMs at this configuration does not
+  produce a usable hallucination detector" framing** for any
+  internal-research referencing (still with §13.9 holding the
+  external framing unchanged).
+
+**What §14a does NOT authorize:**
+
+- **Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.** Per
+  §13.9, external-framing revision requires STRONG band on both
+  benchmarks at any §13 or §14 probe. SCOUT_SATURATION is the
+  opposite of that gate. The §13.9 hold remains in force and is
+  *strengthened* by §14a's confirmation of saturation at the
+  system-integration level.
+- **Promotion to full §14.** SCOUT_SATURATION explicitly
+  forecloses the full §14 investment per the §14a promotion
+  rules. Full §14 was only authorized on STRONG or DIRECTIONAL.
+- **Any post-hoc renegotiation of the §14a bands to recategorize
+  the V1 +3pp result as MARGINAL or DIRECTIONAL.** The bands
+  were pre-committed; the V1 strict-inequality on DIRECTIONAL
+  ($\Delta_{V_1} \le 0$) and the V2 strict-inequality on
+  MARGINAL (both deltas $> 0$) were both written explicitly into
+  §14a. Attempting to rebucket the result post-hoc would be a
+  §0.8 violation.
+- **Any further LLM-domain probe in §13 or §14 without a
+  fundamentally different reframing.** Specifically: a fresh
+  §0.8 commitment that justifies why a different model class
+  (Qwen-32B+, GPT-4-class, multi-modal), different benchmark
+  family (TriviaQA-Generation, NQ-Open, CNN/DM summarization),
+  or different formal structure (cross-domain transfer rather
+  than within-domain probe) would be expected to produce a
+  different outcome from what 6 hypothesis classes have already
+  shown. Without that, no further LLM compute is authorized.
+- **Any claim that affects the autonomy-domain BCVF result.**
+  §6.1 stands independently. §14a's outcome bears only on the
+  LLM-domain transfer claim at the constructions tested, not on
+  the robotics-domain validation.
+
+**Final scope statement — both §13 and §14 chapters now closed.**
+
+- **§13** closed in §13.19 across all tested single-axis
+  hypothesis classes (§13.11 cross-family, §13.12 EigenScore,
+  §13.14 BCVF text-level 2nd-diff, §13.16 BCVF hidden-state
+  2nd-diff, §13.18 single-trajectory forced-allocation gap).
+- **§14** closed in §14b at the scout level. The full §14
+  was explicitly conditional on §14a STRONG or DIRECTIONAL;
+  §14a SCOUT_SATURATION forecloses the full investment.
+
+The §13.8 future-work list documented three remaining out-of-§13
+directions: (a) single-trajectory observable (executed in §13.18),
+(b) system-level integration (executed in §14a), and (c) model-
+scale upgrade. (a) and (b) have now been tested and produced ANTI
+or saturated combined classifications. **Only (c) — model-scale
+upgrade — remains untested**, and the §13.8 documentation
+explicitly states it requires a fresh §0.8 commitment with
+revised baseline before any new probe-vs-baseline comparisons.
+None of (a), (b), or (c) was guaranteed to find a positive result
+ex ante; the §13/§14 program was designed to test the cheapest,
+most literature-aligned options first and exhaustively.
+
+The autonomy-domain BCVF claim (§6.1's N=21 sign-test passed)
+stands wholly independent of any §13 or §14 outcome. The §13/§14
+LLM-domain program tested whether the BCVF formalism transfers
+to an adjacent domain at a specific scale; the answer at this
+configuration is no, six different ways. That is itself a clean,
+publishable methodological null — a contribution to the LLM
+hallucination-detection literature about which combinations of
+literature-aligned single-axis methods do AND do not transfer
+cleanly to 7B-class LLMs with practical NLI scoring at N=100.
+
+**Artifacts:**
+
+- `scripts/probe_system_level_scout.py` (commit `975e99c`).
+- `docs/experiments/probe_system_level_scout_halueval_qa.md`
+  and `.json`.
+
+### 14a.2 Pre-commitment — System-level scout with NLI-clustered selector (selector-spec fix)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before implementation. Specification, success
+bands, and pinned parameters cannot be redefined post-hoc.
+
+**Relationship to §14a / §14b — what's being fixed and what isn't.**
+§14b documented §14a's `SCOUT_SATURATION` per pre-committed bands.
+Post-§14b audit revealed a structural issue in the §14a-pinned
+selector: weighted majority vote with **string-identity grouping**
+degenerates at M=3 cross-family because Qwen, Llama, and Mistral
+emit stylistically different greedy strings even when they
+semantically agree. With 3 distinct strings, all majority votes
+become 3-way string ties broken by source-list order → always
+picks Qwen. Empirical confirmation in the §14a JSON dump:
+$\text{acc}(\text{Baseline-A}) = \text{acc}(\text{Baseline-B}) =
+0.300$ exactly across N=100 — Baseline-B's "uniform majority of 3
+sources" was effectively identical to Baseline-A's single-source
+Qwen because the selector never grouped semantically equivalent
+answers from different sources.
+
+**§14a's SCOUT_SATURATION verdict remains binding** under §0.8.
+Bands cannot be retroactively renegotiated; the pre-committed
+result stands as the §14a outcome and §14b's framing is binding
+for that specific selector configuration.
+
+**§14a.2 tests the same hypothesis with the spec fixed.** Same
+sources, same per-source scalar, same consumer variants (V1
+softmin, V2 thresholded exclusion), same benchmark, same N — only
+the selector changes. The fix replaces string-identity grouping
+with **question-conditioned bidirectional NLI clustering** of the
+3 candidate answers (the §13.10 / §13.11 mechanism applied here
+to the M=3 source greedies, not to K stochastic samples). This
+groups semantically equivalent answers regardless of stylistic
+divergence, then aggregates weights within each cluster, then
+picks the cluster with maximum total weight.
+
+The same fix also applies to **Baseline-B**, which is critical:
+§14a's Baseline-B was a degenerate "always pick Qwen" comparison.
+§14a.2's Baseline-B is a genuine semantic-majority baseline using
+NLI-clustering with uniform weights. **This is the comparison §14a
+should have made.**
+
+**Scope of the §14a.2 commitment.** §14a.2 fixes ONLY the selector
+spec. It does NOT change:
+
+- Per-source scalar (still semantic entropy via §13.10 method).
+- Consumer variants (still V1 softmin τ=0.5 and V2 thresholded
+  exclusion at per-question median entropy).
+- Benchmark (still HaluEval-QA only at N=100; TruthfulQA-MC still
+  reserved for full §14 conditional on §14a.2 STRONG / DIRECTIONAL).
+- Sources (still Qwen + Llama + Mistral cross-family triple).
+- Sampling (still K=10, T=1.0, max_new_tokens=32).
+- NLI model (still DeBERTa-v3-base-mnli-fever-anli).
+- Correctness label protocol (still question-conditioned NLI vs
+  right_answer + hallucinated_answer).
+- Pre-committed bands (same numerical thresholds — STRONG ≥+5pp,
+  DIRECTIONAL Δ_V2 ≥+3pp ∧ Δ_V1 ≤0pp, MARGINAL (0,+3], SATURATION
+  [-3,0], REGRESSION <-3 — applied to Δ vs the *new* Baseline-B).
+
+The hypothesis tested is unchanged: "does BCVF-shaped routing
+produce measurable accuracy lift over naive aggregation on
+HaluEval-QA?" The answer can now be tested cleanly because both
+the BCVF-shaped variants AND the naive baseline are aggregating
+on semantic equivalence classes rather than string identity.
+
+**Specification (pinned — only the selector and Baseline-B change
+from §14a; everything else inherits §14a verbatim):**
+
+- **Script:** `scripts/probe_system_level_scout_v2.py` (new; does
+  NOT modify `probe_system_level_scout.py` — the §14a result is
+  pinned).
+- **Sources:** Qwen2.5-7B-Instruct + Llama-3.1-8B-Instruct +
+  Mistral-7B-Instruct-v0.3 (unchanged from §14a).
+- **Per-source BCVF scalar:** semantic entropy (§13.10 method,
+  K=10 samples, question-conditioned NLI clustering, Shannon
+  entropy over cluster sizes — unchanged from §14a).
+- **Consumer variants (unchanged):** V1 softmin trust at τ=0.5
+  and V2 thresholded exclusion at per-question median entropy.
+- **Per-source greedy answer:** unchanged.
+- **Benchmark + N:** HaluEval-QA `data` split, N=100 (unchanged).
+- **NLI model:** DeBERTa-v3-base-mnli-fever-anli (unchanged).
+- **Correctness label:** unchanged.
+
+**Pinned NEW selector — NLI-clustered weighted majority vote.**
+Given M source greedies $a_1, \ldots, a_M$ and weights
+$w_1, \ldots, w_M$ produced by a consumer variant:
+
+1. **Cluster the M candidate answers via question-conditioned
+   bidirectional NLI entailment** using union-find (the §13.10
+   `cluster_by_entailment` mechanism, applied here to M=3 source
+   greedies instead of K=10 stochastic samples). For each pair
+   $(i, j)$, the NLI classifier checks both directions
+   $\text{NLI}(q + a_i, q + a_j)$ and $\text{NLI}(q + a_j,
+   q + a_i)$; sources are union-merged when both directions
+   produce entailment. Result: a partition
+   $\{C_1, C_2, \ldots, C_K\}$ of the M sources into $K \le M$
+   semantic-equivalence classes.
+2. **Aggregate weights within each cluster:**
+   $W_k = \sum_{i \in C_k} w_i$.
+3. **Pick the winning cluster** $k^* = \arg\max_k W_k$. Ties
+   broken by lowest cluster index (deterministic).
+4. **Pick a representative answer from the winning cluster:** the
+   answer from the source with the highest individual weight in
+   $C_{k^*}$. Ties broken by lowest source index in $C_{k^*}$.
+5. **Return** the representative answer string.
+
+**Pinned NEW Baseline-B — NLI-clustered uniform majority.**
+Same algorithm as the new selector but with weights
+$w_i = 1/M$ for all sources. This is the "naive ensembling"
+baseline §14a should have used; the §14a SCOUT_SATURATION result
+was generated against a Baseline-B that didn't actually do
+ensembling because of the string-matching degeneracy.
+
+**Baseline-A unchanged.** Single-source Qwen greedy. Same as §14a.
+
+**Why both V1/V2 AND Baseline-B receive the same selector fix.**
+The §14a structural issue affected both BCVF-shaped variants
+(V1, V2) AND the naive baseline (Baseline-B) symmetrically — all
+three were grouped by string identity. Fixing only the BCVF-shaped
+variants while leaving Baseline-B as string-matched would
+artificially inflate the BCVF-shaped variants' deltas (because
+Baseline-B would still be degenerate "always pick Qwen"). The
+fix must apply to both for the comparison to be fair. **The
+hypothesis is "BCVF-shaped weighting beats uniform weighting
+when both aggregate on semantic equivalence classes"** — not
+"BCVF-shaped weighting beats string-matched naive aggregation."
+
+**What this changes about the result interpretation.** §14a's
+empirical $\text{acc}(\text{Baseline-A}) = \text{acc}(\text{Baseline-B})
+= 0.300$ was diagnostic: string-matched majority on M=3 cross-
+family was equivalent to single-source Qwen. §14a.2's Baseline-B
+should produce a *different* number — specifically, $\ge 0.300$ if
+NLI clustering captures real semantic agreement that string-
+matching missed. The Δ vs Baseline-B in §14a.2 is therefore on
+a properly higher (or at least different) base; the test of
+"does BCVF-shaped routing add lift" becomes a real test rather
+than a degenerate one.
+
+**Pre-committed success bands (identical partition to §14a; same
+band labels because the metric — accuracy delta vs Baseline-B in
+percentage points — is structurally the same; only the *meaning*
+of Baseline-B changes between §14a and §14a.2):**
+
+Define $\Delta_v = \text{acc}(v) - \text{acc}(\text{Baseline-B}_{V2})$
+for each consumer variant $v \in \{V1, V2\}$, where
+$\text{Baseline-B}_{V2}$ is the new NLI-clustered uniform majority
+defined above and $\text{acc}$ is the fraction of N=100 questions
+where the candidate answer is labeled correct.
+
+- **STRONG (PROMOTE TO FULL §14):** $\Delta_v \ge +5\text{pp}$ for
+  *both* V1 and V2, with sign-test p-value < 0.05 on per-question
+  wins for at least one of V1, V2 vs $\text{Baseline-B}_{V2}$.
+- **DIRECTIONAL (PROMOTE TO FULL §14 WITH V2 PRIORITY):**
+  $\Delta_{V2} \ge +3\text{pp}$ AND $\Delta_{V1} \le 0$. ChatGPT's
+  pre-§14a-predicted pattern (softmin trust shaping is harmful
+  while thresholded exclusion is helpful).
+- **MARGINAL (UNDECIDED, ONE ADDITIONAL SCOUT AUTHORIZED):**
+  $\Delta_v \in (0, +3)$ for both V1 and V2. Likely follow-up
+  scout: V3 veto-only + V4 deadband consumer variants, OR
+  Variant A entropy 2nd-difference per-source scalar.
+- **SATURATION (NO PROMOTION; DOCUMENT AS NULL):**
+  $\Delta_v \in [-3, 0]$ for both V1 and V2. Combined with §14a's
+  SCOUT_SATURATION and §13.19's 5-of-5 single-axis null, a §14a.2
+  SATURATION would constitute the cleanest possible closure of
+  the LLM transfer line in this codebase: same hypothesis tested
+  under the methodologically correct selector, same null result.
+- **REGRESSION (CLOSE LLM TRANSFER LINE WITH STRONG EVIDENCE):**
+  $\Delta_v < -3\text{pp}$ for *either* V1 or V2.
+
+**Acceptance / rejection rules (explicit, non-vague):**
+
+- **PROMOTE to full §14:** STRONG or DIRECTIONAL.
+- **AUTHORIZE one more scout:** MARGINAL.
+- **CLOSE LLM TRANSFER LINE with comprehensive evidence:**
+  SATURATION or REGRESSION. This is the methodologically clean
+  closure §14a's structural issue made unavailable.
+
+**Statistical test (pinned, identical to §14a):** Per-question
+sign test for $v$ vs $\text{Baseline-B}_{V2}$ — count wins (v
+correct AND Baseline-B$_{V2}$ wrong) and losses (v wrong AND
+Baseline-B$_{V2}$ correct). Ignore ties. Two-sided binomial test
+on win count vs total non-ties at $\alpha = 0.05$. STRONG
+requires both $\Delta_v \ge +5\text{pp}$ AND sign-test $p < 0.05$
+for at least one variant.
+
+**Disclosed simplifications and risks specific to §14a.2:**
+
+- **All §14a simplifications still apply.** HaluEval-QA only
+  (cherry-pick risk acknowledged), 2 consumer variants (V3/V4
+  deferred), 1 selector class (highest-weight-source-takes-all
+  deferred to full §14), N=100, pinned softmin τ=0.5, pinned
+  threshold θ=median entropy. These are the same as §14a; §14a.2
+  only adds the NLI-clustered selector layer on top.
+- **NLI-clustered selector inherits NLI noise.** Question-
+  conditioned NLI on M=3 candidate answers can mis-cluster — two
+  semantically equivalent answers might fail bidirectional
+  entailment (false negative; clusters split incorrectly), or two
+  semantically distinct answers might pass bidirectional
+  entailment (false positive; clusters merge incorrectly).
+  DeBERTa-v3-base's known limitations on multi-domain inference
+  apply. The §13.10 / §13.18 protocol with bidirectional
+  entailment + question-conditioning is the most robust default
+  available in this codebase, but is not perfect.
+- **Cluster-tie tiebreaker preference.** When two clusters tie
+  on aggregated weight, the lowest-cluster-index (deterministic
+  via union-find canonicalization order) wins. This is a
+  defensible default but introduces a small bias toward
+  whichever sources happen to merge first in the union-find
+  pass. Alternatives (random tiebreaker, source-order tiebreaker)
+  not pre-committed.
+- **Within-cluster representative selection.** The selector
+  returns the answer string from the source with the highest
+  individual weight in the winning cluster. Alternatives (random
+  representative, source-order) not pre-committed. For V1 softmin
+  with non-uniform weights this matters; for uniform-weights
+  Baseline-B and for V2 within-survivor uniform weights, the
+  representative is selected by source-order tiebreaker — same
+  as §14a's behavior within a string-equivalence class.
+
+**Expected cost.**
+
+- Per-source K=10 sampling: 3 × 100 × 10 = 3,000 calls (~30 min).
+- Per-source greedy: 3 × 100 = 300 calls (~5 min).
+- Per-source NLI clustering of K=10 samples: 3 × 100 × 90 NLI
+  pairs ≈ ~10 min batched.
+- **NEW** — per-question NLI clustering of M=3 candidate
+  answers: 100 × M(M−1) = 100 × 6 = 600 NLI pairs. Cost ≈ 1 min
+  (negligible vs the K=10 clustering cost).
+- Per-question NLI labeling vs (right_answer, hallucinated_answer):
+  4 candidates × 100 questions × 2 NLI calls = 800 calls
+  (~5 min batched).
+- Consumer / selector / accuracy / sign-test: trivial.
+
+**Estimated total runtime: ~50–60 min** (essentially identical
+to §14a — the new NLI-cluster step on M=3 answers per question
+is a small marginal cost). Memory unchanged. No new model
+downloads.
+
+**Report destination.**
+
+- `docs/experiments/probe_system_level_scout_v2_halueval_qa.md`
+- `docs/experiments/probe_system_level_scout_v2_halueval_qa.json`
+  (per-question dump including each source's greedy + entropy +
+  cluster ID assigned by the answer-clustering step, per-variant
+  weights, per-cluster aggregated weights, selected answer, and
+  candidate correctness labels for full post-hoc audit).
+
+**Scope.**
+
+§14a.2 is a bounded scout under §0.8 discipline. The pre-committed
+bands and promotion rules above are the binding gate to full §14.
+Any deviation at run time must be flagged in the result section
+as a §0.8 deviation, not absorbed silently.
+
+§14a.2 does NOT:
+- Modify §14a's `SCOUT_SATURATION` verdict (binding under §0.8
+  for the §14a-pinned configuration).
+- Modify §14b's prose (§14b is the §14a result section; §14a.2's
+  result section will be §14c when written).
+- Pre-commit a `scripts/probe_system_level_scout_v2.py`
+  implementation — that is a separate authorization gate.
+- Authorize any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.
+  Per §13.9, external-framing revision still requires STRONG band
+  on both benchmarks at any §13 or §14 probe; §14a.2 is HaluEval-
+  only by design.
+
+**What §14a.2 explicitly excludes** (still deferred to full §14
+on STRONG / DIRECTIONAL promotion):
+- TruthfulQA-MC (deferred).
+- V3 (veto-only) and V4 (deadband) consumer variants (deferred).
+- Highest-weight-source-takes-all selector (deferred).
+- Variant A entropy 2nd-difference per-source scalar (alternative
+  scout in §14a.3 conditional on §14a.2 MARGINAL).
+
 ---
 
 
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
+
