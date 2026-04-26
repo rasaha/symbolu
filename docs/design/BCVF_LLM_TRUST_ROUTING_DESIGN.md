@@ -6109,20 +6109,32 @@ statement and combined-matrix analysis.
 axis program** (each requires a fresh §0.8-style commitment in a
 new top-level section if pursued):
 
-- **§14a system-level integration scout (PRE-COMMITTED).** The
-  un-tested experimental structure §13.17 / §13.19 left open:
-  multi-source LLM Q&A system using BCVF-shaped routing with end-
-  to-end accuracy as the metric (the §6.1-style configuration
-  that passed in the autonomy domain). Scout-bounded to HaluEval-
-  QA only at N=100 with two consumer variants (V1 softmin trust,
-  V2 thresholded exclusion) and one selector (weighted majority
-  vote), per-source semantic entropy as the BCVF scalar.
-  Pre-committed bands STRONG / DIRECTIONAL / MARGINAL /
-  SATURATION / REGRESSION with explicit promotion rules to the
-  full §14 (or LLM-track closure on REGRESSION). See §14a for
-  the full pinned specification. Implementation
-  (`scripts/probe_system_level_scout.py`) is a separate
-  authorization gate.
+- **§14a system-level integration scout (EXECUTED in §14a /
+  §14b; combined `SCOUT_SATURATION`).** The un-tested
+  experimental structure §13.17 / §13.19 left open. Scout-
+  bounded to HaluEval-QA only at N=100 with V1 softmin trust /
+  V2 thresholded exclusion consumers and weighted majority vote
+  selector; semantic entropy as per-source BCVF scalar. Pinned
+  primary verdict per pre-committed bands: SCOUT_SATURATION
+  (Δ_V1=+3pp non-significant, Δ_V2=+0pp). Post-§14b audit
+  revealed structural issue in the §14a-pinned selector spec
+  (string-identity grouping degenerates at M=3 cross-family →
+  Baseline-B = Baseline-A). §14a SCOUT_SATURATION verdict is
+  binding under §0.8 for the §14a-pinned configuration; the
+  selector-spec fix is tested in §14a.2 below.
+- **§14a.2 system-level scout with NLI-clustered selector
+  (PRE-COMMITTED).** Selector-spec fix replacing string-identity
+  majority vote with NLI-clustered weighted majority vote (the
+  §13.10 cluster_by_entailment mechanism applied to M=3
+  candidate answers). Same sources, same per-source scalar, same
+  consumer variants, same benchmark, same N, same pre-committed
+  bands as §14a — only the selector and Baseline-B change to the
+  semantically-correct version. Pre-committed bands STRONG /
+  DIRECTIONAL / MARGINAL / SATURATION / REGRESSION (same
+  numerical thresholds applied to Δ vs the new NLI-clustered
+  Baseline-B). See §14a.2 for the full pinned specification.
+  Implementation (`scripts/probe_system_level_scout_v2.py`) is
+  a separate authorization gate.
 - **Single-trajectory forced-allocation-gap observable
   (EXECUTED in §13.18 / §13.19; combined `ANTI_FINDING`).** The
   signal class §13.17's narrowing left explicitly open has now
@@ -9381,6 +9393,281 @@ cleanly to 7B-class LLMs with practical NLI scoring at N=100.
 - `scripts/probe_system_level_scout.py` (commit `975e99c`).
 - `docs/experiments/probe_system_level_scout_halueval_qa.md`
   and `.json`.
+
+### 14a.2 Pre-commitment — System-level scout with NLI-clustered selector (selector-spec fix)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before implementation. Specification, success
+bands, and pinned parameters cannot be redefined post-hoc.
+
+**Relationship to §14a / §14b — what's being fixed and what isn't.**
+§14b documented §14a's `SCOUT_SATURATION` per pre-committed bands.
+Post-§14b audit revealed a structural issue in the §14a-pinned
+selector: weighted majority vote with **string-identity grouping**
+degenerates at M=3 cross-family because Qwen, Llama, and Mistral
+emit stylistically different greedy strings even when they
+semantically agree. With 3 distinct strings, all majority votes
+become 3-way string ties broken by source-list order → always
+picks Qwen. Empirical confirmation in the §14a JSON dump:
+$\text{acc}(\text{Baseline-A}) = \text{acc}(\text{Baseline-B}) =
+0.300$ exactly across N=100 — Baseline-B's "uniform majority of 3
+sources" was effectively identical to Baseline-A's single-source
+Qwen because the selector never grouped semantically equivalent
+answers from different sources.
+
+**§14a's SCOUT_SATURATION verdict remains binding** under §0.8.
+Bands cannot be retroactively renegotiated; the pre-committed
+result stands as the §14a outcome and §14b's framing is binding
+for that specific selector configuration.
+
+**§14a.2 tests the same hypothesis with the spec fixed.** Same
+sources, same per-source scalar, same consumer variants (V1
+softmin, V2 thresholded exclusion), same benchmark, same N — only
+the selector changes. The fix replaces string-identity grouping
+with **question-conditioned bidirectional NLI clustering** of the
+3 candidate answers (the §13.10 / §13.11 mechanism applied here
+to the M=3 source greedies, not to K stochastic samples). This
+groups semantically equivalent answers regardless of stylistic
+divergence, then aggregates weights within each cluster, then
+picks the cluster with maximum total weight.
+
+The same fix also applies to **Baseline-B**, which is critical:
+§14a's Baseline-B was a degenerate "always pick Qwen" comparison.
+§14a.2's Baseline-B is a genuine semantic-majority baseline using
+NLI-clustering with uniform weights. **This is the comparison §14a
+should have made.**
+
+**Scope of the §14a.2 commitment.** §14a.2 fixes ONLY the selector
+spec. It does NOT change:
+
+- Per-source scalar (still semantic entropy via §13.10 method).
+- Consumer variants (still V1 softmin τ=0.5 and V2 thresholded
+  exclusion at per-question median entropy).
+- Benchmark (still HaluEval-QA only at N=100; TruthfulQA-MC still
+  reserved for full §14 conditional on §14a.2 STRONG / DIRECTIONAL).
+- Sources (still Qwen + Llama + Mistral cross-family triple).
+- Sampling (still K=10, T=1.0, max_new_tokens=32).
+- NLI model (still DeBERTa-v3-base-mnli-fever-anli).
+- Correctness label protocol (still question-conditioned NLI vs
+  right_answer + hallucinated_answer).
+- Pre-committed bands (same numerical thresholds — STRONG ≥+5pp,
+  DIRECTIONAL Δ_V2 ≥+3pp ∧ Δ_V1 ≤0pp, MARGINAL (0,+3], SATURATION
+  [-3,0], REGRESSION <-3 — applied to Δ vs the *new* Baseline-B).
+
+The hypothesis tested is unchanged: "does BCVF-shaped routing
+produce measurable accuracy lift over naive aggregation on
+HaluEval-QA?" The answer can now be tested cleanly because both
+the BCVF-shaped variants AND the naive baseline are aggregating
+on semantic equivalence classes rather than string identity.
+
+**Specification (pinned — only the selector and Baseline-B change
+from §14a; everything else inherits §14a verbatim):**
+
+- **Script:** `scripts/probe_system_level_scout_v2.py` (new; does
+  NOT modify `probe_system_level_scout.py` — the §14a result is
+  pinned).
+- **Sources:** Qwen2.5-7B-Instruct + Llama-3.1-8B-Instruct +
+  Mistral-7B-Instruct-v0.3 (unchanged from §14a).
+- **Per-source BCVF scalar:** semantic entropy (§13.10 method,
+  K=10 samples, question-conditioned NLI clustering, Shannon
+  entropy over cluster sizes — unchanged from §14a).
+- **Consumer variants (unchanged):** V1 softmin trust at τ=0.5
+  and V2 thresholded exclusion at per-question median entropy.
+- **Per-source greedy answer:** unchanged.
+- **Benchmark + N:** HaluEval-QA `data` split, N=100 (unchanged).
+- **NLI model:** DeBERTa-v3-base-mnli-fever-anli (unchanged).
+- **Correctness label:** unchanged.
+
+**Pinned NEW selector — NLI-clustered weighted majority vote.**
+Given M source greedies $a_1, \ldots, a_M$ and weights
+$w_1, \ldots, w_M$ produced by a consumer variant:
+
+1. **Cluster the M candidate answers via question-conditioned
+   bidirectional NLI entailment** using union-find (the §13.10
+   `cluster_by_entailment` mechanism, applied here to M=3 source
+   greedies instead of K=10 stochastic samples). For each pair
+   $(i, j)$, the NLI classifier checks both directions
+   $\text{NLI}(q + a_i, q + a_j)$ and $\text{NLI}(q + a_j,
+   q + a_i)$; sources are union-merged when both directions
+   produce entailment. Result: a partition
+   $\{C_1, C_2, \ldots, C_K\}$ of the M sources into $K \le M$
+   semantic-equivalence classes.
+2. **Aggregate weights within each cluster:**
+   $W_k = \sum_{i \in C_k} w_i$.
+3. **Pick the winning cluster** $k^* = \arg\max_k W_k$. Ties
+   broken by lowest cluster index (deterministic).
+4. **Pick a representative answer from the winning cluster:** the
+   answer from the source with the highest individual weight in
+   $C_{k^*}$. Ties broken by lowest source index in $C_{k^*}$.
+5. **Return** the representative answer string.
+
+**Pinned NEW Baseline-B — NLI-clustered uniform majority.**
+Same algorithm as the new selector but with weights
+$w_i = 1/M$ for all sources. This is the "naive ensembling"
+baseline §14a should have used; the §14a SCOUT_SATURATION result
+was generated against a Baseline-B that didn't actually do
+ensembling because of the string-matching degeneracy.
+
+**Baseline-A unchanged.** Single-source Qwen greedy. Same as §14a.
+
+**Why both V1/V2 AND Baseline-B receive the same selector fix.**
+The §14a structural issue affected both BCVF-shaped variants
+(V1, V2) AND the naive baseline (Baseline-B) symmetrically — all
+three were grouped by string identity. Fixing only the BCVF-shaped
+variants while leaving Baseline-B as string-matched would
+artificially inflate the BCVF-shaped variants' deltas (because
+Baseline-B would still be degenerate "always pick Qwen"). The
+fix must apply to both for the comparison to be fair. **The
+hypothesis is "BCVF-shaped weighting beats uniform weighting
+when both aggregate on semantic equivalence classes"** — not
+"BCVF-shaped weighting beats string-matched naive aggregation."
+
+**What this changes about the result interpretation.** §14a's
+empirical $\text{acc}(\text{Baseline-A}) = \text{acc}(\text{Baseline-B})
+= 0.300$ was diagnostic: string-matched majority on M=3 cross-
+family was equivalent to single-source Qwen. §14a.2's Baseline-B
+should produce a *different* number — specifically, $\ge 0.300$ if
+NLI clustering captures real semantic agreement that string-
+matching missed. The Δ vs Baseline-B in §14a.2 is therefore on
+a properly higher (or at least different) base; the test of
+"does BCVF-shaped routing add lift" becomes a real test rather
+than a degenerate one.
+
+**Pre-committed success bands (identical partition to §14a; same
+band labels because the metric — accuracy delta vs Baseline-B in
+percentage points — is structurally the same; only the *meaning*
+of Baseline-B changes between §14a and §14a.2):**
+
+Define $\Delta_v = \text{acc}(v) - \text{acc}(\text{Baseline-B}_{V2})$
+for each consumer variant $v \in \{V1, V2\}$, where
+$\text{Baseline-B}_{V2}$ is the new NLI-clustered uniform majority
+defined above and $\text{acc}$ is the fraction of N=100 questions
+where the candidate answer is labeled correct.
+
+- **STRONG (PROMOTE TO FULL §14):** $\Delta_v \ge +5\text{pp}$ for
+  *both* V1 and V2, with sign-test p-value < 0.05 on per-question
+  wins for at least one of V1, V2 vs $\text{Baseline-B}_{V2}$.
+- **DIRECTIONAL (PROMOTE TO FULL §14 WITH V2 PRIORITY):**
+  $\Delta_{V2} \ge +3\text{pp}$ AND $\Delta_{V1} \le 0$. ChatGPT's
+  pre-§14a-predicted pattern (softmin trust shaping is harmful
+  while thresholded exclusion is helpful).
+- **MARGINAL (UNDECIDED, ONE ADDITIONAL SCOUT AUTHORIZED):**
+  $\Delta_v \in (0, +3)$ for both V1 and V2. Likely follow-up
+  scout: V3 veto-only + V4 deadband consumer variants, OR
+  Variant A entropy 2nd-difference per-source scalar.
+- **SATURATION (NO PROMOTION; DOCUMENT AS NULL):**
+  $\Delta_v \in [-3, 0]$ for both V1 and V2. Combined with §14a's
+  SCOUT_SATURATION and §13.19's 5-of-5 single-axis null, a §14a.2
+  SATURATION would constitute the cleanest possible closure of
+  the LLM transfer line in this codebase: same hypothesis tested
+  under the methodologically correct selector, same null result.
+- **REGRESSION (CLOSE LLM TRANSFER LINE WITH STRONG EVIDENCE):**
+  $\Delta_v < -3\text{pp}$ for *either* V1 or V2.
+
+**Acceptance / rejection rules (explicit, non-vague):**
+
+- **PROMOTE to full §14:** STRONG or DIRECTIONAL.
+- **AUTHORIZE one more scout:** MARGINAL.
+- **CLOSE LLM TRANSFER LINE with comprehensive evidence:**
+  SATURATION or REGRESSION. This is the methodologically clean
+  closure §14a's structural issue made unavailable.
+
+**Statistical test (pinned, identical to §14a):** Per-question
+sign test for $v$ vs $\text{Baseline-B}_{V2}$ — count wins (v
+correct AND Baseline-B$_{V2}$ wrong) and losses (v wrong AND
+Baseline-B$_{V2}$ correct). Ignore ties. Two-sided binomial test
+on win count vs total non-ties at $\alpha = 0.05$. STRONG
+requires both $\Delta_v \ge +5\text{pp}$ AND sign-test $p < 0.05$
+for at least one variant.
+
+**Disclosed simplifications and risks specific to §14a.2:**
+
+- **All §14a simplifications still apply.** HaluEval-QA only
+  (cherry-pick risk acknowledged), 2 consumer variants (V3/V4
+  deferred), 1 selector class (highest-weight-source-takes-all
+  deferred to full §14), N=100, pinned softmin τ=0.5, pinned
+  threshold θ=median entropy. These are the same as §14a; §14a.2
+  only adds the NLI-clustered selector layer on top.
+- **NLI-clustered selector inherits NLI noise.** Question-
+  conditioned NLI on M=3 candidate answers can mis-cluster — two
+  semantically equivalent answers might fail bidirectional
+  entailment (false negative; clusters split incorrectly), or two
+  semantically distinct answers might pass bidirectional
+  entailment (false positive; clusters merge incorrectly).
+  DeBERTa-v3-base's known limitations on multi-domain inference
+  apply. The §13.10 / §13.18 protocol with bidirectional
+  entailment + question-conditioning is the most robust default
+  available in this codebase, but is not perfect.
+- **Cluster-tie tiebreaker preference.** When two clusters tie
+  on aggregated weight, the lowest-cluster-index (deterministic
+  via union-find canonicalization order) wins. This is a
+  defensible default but introduces a small bias toward
+  whichever sources happen to merge first in the union-find
+  pass. Alternatives (random tiebreaker, source-order tiebreaker)
+  not pre-committed.
+- **Within-cluster representative selection.** The selector
+  returns the answer string from the source with the highest
+  individual weight in the winning cluster. Alternatives (random
+  representative, source-order) not pre-committed. For V1 softmin
+  with non-uniform weights this matters; for uniform-weights
+  Baseline-B and for V2 within-survivor uniform weights, the
+  representative is selected by source-order tiebreaker — same
+  as §14a's behavior within a string-equivalence class.
+
+**Expected cost.**
+
+- Per-source K=10 sampling: 3 × 100 × 10 = 3,000 calls (~30 min).
+- Per-source greedy: 3 × 100 = 300 calls (~5 min).
+- Per-source NLI clustering of K=10 samples: 3 × 100 × 90 NLI
+  pairs ≈ ~10 min batched.
+- **NEW** — per-question NLI clustering of M=3 candidate
+  answers: 100 × M(M−1) = 100 × 6 = 600 NLI pairs. Cost ≈ 1 min
+  (negligible vs the K=10 clustering cost).
+- Per-question NLI labeling vs (right_answer, hallucinated_answer):
+  4 candidates × 100 questions × 2 NLI calls = 800 calls
+  (~5 min batched).
+- Consumer / selector / accuracy / sign-test: trivial.
+
+**Estimated total runtime: ~50–60 min** (essentially identical
+to §14a — the new NLI-cluster step on M=3 answers per question
+is a small marginal cost). Memory unchanged. No new model
+downloads.
+
+**Report destination.**
+
+- `docs/experiments/probe_system_level_scout_v2_halueval_qa.md`
+- `docs/experiments/probe_system_level_scout_v2_halueval_qa.json`
+  (per-question dump including each source's greedy + entropy +
+  cluster ID assigned by the answer-clustering step, per-variant
+  weights, per-cluster aggregated weights, selected answer, and
+  candidate correctness labels for full post-hoc audit).
+
+**Scope.**
+
+§14a.2 is a bounded scout under §0.8 discipline. The pre-committed
+bands and promotion rules above are the binding gate to full §14.
+Any deviation at run time must be flagged in the result section
+as a §0.8 deviation, not absorbed silently.
+
+§14a.2 does NOT:
+- Modify §14a's `SCOUT_SATURATION` verdict (binding under §0.8
+  for the §14a-pinned configuration).
+- Modify §14b's prose (§14b is the §14a result section; §14a.2's
+  result section will be §14c when written).
+- Pre-commit a `scripts/probe_system_level_scout_v2.py`
+  implementation — that is a separate authorization gate.
+- Authorize any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.
+  Per §13.9, external-framing revision still requires STRONG band
+  on both benchmarks at any §13 or §14 probe; §14a.2 is HaluEval-
+  only by design.
+
+**What §14a.2 explicitly excludes** (still deferred to full §14
+on STRONG / DIRECTIONAL promotion):
+- TruthfulQA-MC (deferred).
+- V3 (veto-only) and V4 (deadband) consumer variants (deferred).
+- Highest-weight-source-takes-all selector (deferred).
+- Variant A entropy 2nd-difference per-source scalar (alternative
+  scout in §14a.3 conditional on §14a.2 MARGINAL).
 
 ---
 
