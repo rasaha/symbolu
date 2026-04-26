@@ -10309,6 +10309,50 @@ SATURATION documents that the §13.10 ceiling does not even
 support useful abstention at this scale. Neither outcome
 alters §13.9's external-framing hold.
 
+**Specification — script and inputs (pinned).**
+
+- **Script:** `scripts/probe_selective_abstention.py` (new;
+  does NOT modify any §13.10–§14a.2 script — those results
+  remain pinned). Pure post-processing: reads existing JSON
+  dumps, computes per-threshold operational metrics. No model
+  loads, no GPU, no NLI calls. CPU + numpy only.
+- **Input dumps (pinned, both consumed; the two benchmarks
+  are evaluated independently with identical protocol):**
+  - `docs/experiments/probe_semantic_entropy.json` — §13.10
+    TruthfulQA-MC dump, N=100.
+  - `docs/experiments/probe_semantic_entropy_halueval_qa.json`
+    — §13.10 HaluEval-QA dump, N=100.
+  - **No other JSON dump is consumed by §15.** §13.11 /
+    §13.12 / §13.14 / §13.16 / §13.18 / §14a / §14a.2 dumps
+    are explicitly out of scope.
+- **Per-question fields consumed (pinned, schema documented
+  in §13.10):**
+  - the per-question semantic entropy scalar (nats),
+  - the per-question greedy-answer correctness label
+    (boolean, NLI-derived per §13.10), and
+  - the per-question identifier (for deterministic ordering).
+  - **No other field is read.** If any of the above is
+    missing from a dump, §15 fails fast with a
+    `SCHEMA_MISMATCH` exit rather than substituting a derived
+    quantity.
+
+**Primary observable / risk score (pinned).** §13.10 single-
+snapshot semantic entropy, exactly as defined in §13.10:
+$$H(q) = -\sum_c \frac{|c|}{K} \log \frac{|c|}{K}$$
+over NLI-clustered K=10 samples, units of nats. The §15 risk
+score is $r(q) = H(q)$ — higher entropy means higher per-
+question hallucination risk and higher abstain priority. §15
+inherits §13.10's sign convention by reference; no re-
+derivation, no alternative scalar definition.
+
+**Answer candidate (pinned).** When the §15 policy delivers
+an answer, the answer delivered is the §13.10 greedy
+completion of `Qwen/Qwen2.5-7B-Instruct` whose correctness
+label is already recorded in the input dump. §15 never
+substitutes, re-decodes, or rewrites that answer. The
+policy's only degree of freedom is the per-question
+answer/abstain decision.
+
 ---
 
 
