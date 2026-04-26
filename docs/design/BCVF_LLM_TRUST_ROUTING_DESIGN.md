@@ -10163,6 +10163,927 @@ exploratory evidence rather than weakened.
 
 ---
 
+## §15 Selective prediction / abstention from existing §13 signals (new chapter)
+
+§13.19 closed the §13 single-axis program exhaustively across
+five hypothesis classes. §14b and §14c closed the §14 system-
+level scout program at `SCOUT_SATURATION` under both the
+string-matched and NLI-clustered selector configurations.
+**Both chapters asked the same question in different
+experimental shapes: can BCVF-derived signals improve answer
+selection?** The answer at this codebase's configuration was
+no, eight different ways.
+
+§15 asks a deliberately narrower, operational question:
+
+> *§13 and §14 asked whether BCVF-derived signals could
+> improve answer selection. §15 asks a narrower, operational
+> question: whether the strongest surviving signal can support
+> useful abstention behavior even when it is not strong enough
+> to drive answer replacement.*
+
+The strongest surviving signal of record is §13.10 single-
+snapshot semantic entropy: AUC 0.661 on both TruthfulQA-MC
+and HaluEval-QA at N=100. §13's combined-classification rule
+treated this as `TRUTH_CORRELATED_MARGINAL` — above the §13
+0.60 marginal bar but below the §13.9 0.75 STRONG bar that
+gates external framing. §15 takes the same scalar and asks a
+different question of it: thresholded into an answer/abstain
+policy, does it move risk-coverage metrics relative to never-
+abstain and random-abstain baselines on these two benchmarks?
+
+This is a different metric class, a different acceptance
+rule, and a different operational meaning from §13/§14:
+
+| Program | Question | Metric class | Pass bar |
+|---|---|---|---|
+| §13 | does observable X correlate with correctness? | AUC vs ground truth | 0.60 marginal / 0.75 STRONG |
+| §14 | does BCVF-shaped routing lift end-to-end accuracy? | Δ accuracy vs naive aggregation | +5pp + sign-test p<0.05 |
+| **§15** | **does the §13.10 score support a useful abstain/answer policy?** | **AURC, coverage at target accuracy, error capture, false abstention** | **see §15.1 bands** |
+
+§15 is therefore **not** a reinterpretation of §13/§14. The §13
+single-axis verdicts and the §14 system-level scout verdicts
+remain binding under §0.8 and are not retroactively reframed.
+Per §14c's explicit prohibition ("do not reframe the §14
+result as operational lift via abstention"), the §14 program's
+accuracy-lift results are not blended into §15's operational
+claims; §15 opens a fresh top-level chapter with its own
+pinned hypothesis, primary observable, metrics, bands,
+baselines, and acceptance/rejection rules.
+
+**Why operational, not methodological.** §13.9's external-
+framing hold is gated on STRONG-band lift in *answer-selection*
+metrics (AUC ≥ 0.75 on both benchmarks, or §14-class accuracy
+delta ≥ +5pp with sign-test significance). §15 cannot satisfy
+that gate by construction — its metrics are a different class
+entirely. §15 is explicitly *not* a research chapter on whether
+BCVF transfers to LLMs; it is an operational chapter on whether
+a known-marginal answer-correlation signal can be turned into a
+useful abstention policy. A clean §15 STRONG would justify
+internal investment in an abstention/escalation product layer
+on top of §13.10-grade signals; a §15 SATURATION would
+document that the AUC 0.661 ceiling does not even support a
+useful abstention policy at this scale — itself a publishable
+operational null. Either outcome is binding under §0.8.
+
+**Compute scope.** §15 uses *only* already-computed per-question
+scores from the §13.10 runs (TruthfulQA-MC and HaluEval-QA,
+N=100 each, Qwen2.5-7B-Instruct + DeBERTa-v3-base, K=10
+samples per question, semantic entropy via question-conditioned
+NLI clustering, per-question correctness label via question-
+conditioned NLI). **No new generation, no new benchmarks, no
+new large-model runs, no new model downloads are authorized by
+§15.** Risk-thresholding over per-question scalars and per-
+question correctness labels that already exist in the §13.10
+JSON dumps is the entire compute footprint. Wall-clock cost is
+seconds, not minutes.
+
+**§15 explicitly does NOT authorize:**
+
+- New generation runs, new benchmarks, or new model loads.
+- Re-running §13.10 at any other model / NLI / N configuration.
+- Reopening any §13 or §14 hypothesis class.
+- Updating `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`. The §13.9
+  hold is gated on STRONG-band lift in answer-selection
+  metrics on both benchmarks; §15 is a different metric class
+  and cannot satisfy that gate by construction. The §13.9 hold
+  remains in force regardless of §15 outcome.
+- Production deployment claims. §15 is an internal-research
+  scout to determine whether the existing signal carries
+  operational abstention value at all.
+- A §15.2 follow-up scout on any other observable (§13.11
+  cross-family, §13.12 EigenScore, §13.18 Variant A forced-
+  allocation entropy, §14a.2 V1 softmin trust score, etc.)
+  without a fresh §0.8 commitment. §15 pins exactly one
+  primary observable and one secondary comparator; nothing
+  else is in scope.
+
+**Confirmation: no data inspection prior to this pre-
+commitment.** No §13.10 / §13.11 / §13.12 / §13.14 / §13.16 /
+§13.18 / §14a / §14a.2 JSON dump has been opened during the
+drafting of §15. The protocol, primary observable, metrics,
+and bands in §15.1 below are pinned from the §13.10 prose
+(specifically the §13.10 configuration block, result table,
+and disclosed schema of `probe_semantic_entropy_*.json`)
+only. Risk-coverage analysis on the existing dumps is gated
+on this pre-commitment landing first; per §0.8, looking at the
+data before the bands are pinned would be exactly the
+discipline-erosion failure mode §15 exists to avoid.
+
+### 15.1 Pre-commitment — Selective abstention scout on existing §13.10 dumps
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any inspection of
+`probe_semantic_entropy.json` or
+`probe_semantic_entropy_halueval_qa.json`. Specification,
+primary observable, operational metrics, success bands,
+baselines, and acceptance/rejection rules below cannot be
+redefined post-hoc once the data is opened.
+
+**Relationship to §13/§14 — what §15 is and is not.** §15 is
+not a continuation of §13's single-axis program (closed in
+§13.19) nor of §14's system-level scout program (closed in
+§14c). It is a fresh top-level chapter under §0.8 with a
+different question, different metric class, and different
+acceptance rule:
+
+- §13 measured AUC of an observable against per-question
+  ground-truth correctness. §15 takes the §13.10 observable
+  *as given* (AUC 0.661) and measures whether thresholding
+  it into an answer/abstain policy yields operational value.
+- §14 measured end-to-end accuracy delta of a BCVF-shaped
+  *answer selector* against naive aggregation. §15 does not
+  change the answer at all — it only decides whether the
+  pinned greedy answer is delivered or abstained.
+- §15 produces no new claim about whether BCVF transfers to
+  LLMs. It produces a claim about whether the §13.10 score,
+  which already exists, supports a useful answer/abstain
+  policy at this configuration.
+
+§15's outcome cannot reopen §13 or §14 hypothesis classes by
+construction — no new observable is introduced, no answer
+replacement is performed, no new model is run. A §15 STRONG
+result authorizes internal investment in an abstention /
+escalation product layer over §13.10-grade signals; a §15
+SATURATION documents that the §13.10 ceiling does not even
+support useful abstention at this scale. Neither outcome
+alters §13.9's external-framing hold.
+
+**Specification — script and inputs (pinned).**
+
+- **Script:** `scripts/probe_selective_abstention.py` (new;
+  does NOT modify any §13.10–§14a.2 script — those results
+  remain pinned). Pure post-processing: reads existing JSON
+  dumps, computes per-threshold operational metrics. No model
+  loads, no GPU, no NLI calls. CPU + numpy only.
+- **Input dumps (pinned, both consumed; the two benchmarks
+  are evaluated independently with identical protocol):**
+  - `docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`
+    — §13.10 TruthfulQA-MC dump, N=100. *(Path corrected by
+    §15.1 amendment 1 below; original Chunk 2b pin had no
+    `_truthfulqa_mc` suffix, which did not match the on-disk
+    filename actually emitted by `scripts/probe_semantic_entropy.py`.)*
+  - `docs/experiments/probe_semantic_entropy_halueval_qa.json`
+    — §13.10 HaluEval-QA dump, N=100.
+  - **No other JSON dump is consumed by §15.** §13.11 /
+    §13.12 / §13.14 / §13.16 / §13.18 / §14a / §14a.2 dumps
+    are explicitly out of scope.
+- **Per-question fields consumed (pinned, schema documented
+  in §13.10's `scripts/probe_semantic_entropy.py` JSON
+  writer; see §15.1 amendment 1 for the explicit field-name
+  mapping):**
+  - `q_idx` — the per-question identifier (for deterministic
+    ordering).
+  - `semantic_entropy` — the per-question semantic-entropy
+    scalar in nats.
+  - `greedy_matches_correct` — the per-question greedy-
+    answer correctness label (boolean, NLI-derived per
+    §13.10).
+  - **No other field is read.** If any of the above is
+    missing from a dump, §15 fails fast with a
+    `SCHEMA_MISMATCH` exit rather than substituting a derived
+    quantity.
+
+**Primary observable / risk score (pinned).** §13.10 single-
+snapshot semantic entropy, exactly as defined in §13.10:
+$$H(q) = -\sum_c \frac{|c|}{K} \log \frac{|c|}{K}$$
+over NLI-clustered K=10 samples, units of nats. The §15 risk
+score is $r(q) = H(q)$ — higher entropy means higher per-
+question hallucination risk and higher abstain priority. §15
+inherits §13.10's sign convention by reference; no re-
+derivation, no alternative scalar definition.
+
+**Answer candidate (pinned).** When the §15 policy delivers
+an answer, the answer delivered is the §13.10 greedy
+completion of `Qwen/Qwen2.5-7B-Instruct` whose correctness
+label is already recorded in the input dump. §15 never
+substitutes, re-decodes, or rewrites that answer. The
+policy's only degree of freedom is the per-question
+answer/abstain decision.
+
+**Secondary observable (pinned: none).** §15.1 explicitly does
+NOT pin a secondary observable. Rationale: every candidate
+alternative scalar (cluster count, max-cluster fraction,
+normalized entropy by $\ln K$, greedy-answer log-probability,
+§13.11 / §13.12 / §13.18 scores, §14a / §14a.2 V1 trust
+weights) either requires reading dump fields that the §15
+pinned schema in the previous block does not include, or is a
+monotone transform of $H(q)$ producing identical risk-coverage
+rankings. The "one primary, optional one secondary" allowance
+collapses under §15's pinned-input constraint to *one primary
+only*. The sanity-check role a secondary observable would
+play is filled by the random-abstain matched-coverage baseline
+pinned in §15.1's baselines block below. Adding a true second
+observable would require a fresh §0.8 commitment in a §15.2.
+
+**Risk policy (pinned).** Per-question deterministic threshold
+rule:
+$$\text{policy}_\tau(q) = \begin{cases} \text{ANSWER } a(q) & \text{if } r(q) < \tau \\ \text{ABSTAIN} & \text{if } r(q) \ge \tau \end{cases}$$
+where $r(q) = H(q)$ is the pinned risk score and $a(q)$ is the
+pinned §13.10 greedy completion. The threshold $\tau$ is the
+policy's only free parameter. Ties at $r(q) = \tau$ resolve to
+ABSTAIN (deterministic, conservative — the rare-tie case does
+not change combined-classification outcomes at N=100).
+
+**Threshold-sweep protocol (pinned).** §15 evaluates the policy
+across the full operational range by sweeping $\tau$ over the
+empirical risk-score distribution per benchmark:
+
+- The sweep grid is the **sorted unique values of $r(q)$ on
+  the benchmark**, plus $\tau = -\infty$ (always abstain
+  trivially: empty answered subset) and $\tau = +\infty$
+  (always answer: full answered subset). At N=100 this yields
+  at most 102 evaluation points per benchmark.
+- All operational metrics (residual accuracy, coverage, error
+  capture, false abstention, AURC) are computed at every
+  point on this grid. No grid is hand-picked; no $\tau$ is
+  hand-picked.
+- The sweep is computed independently per benchmark.
+  Combined classification across the two benchmarks happens
+  at the metric level (per §15.1's bands block), not at the
+  threshold level — there is no "merged $\tau$" that applies
+  to both benchmarks.
+
+Pinning the sweep this way prevents post-hoc threshold
+selection on the data. Once the dumps are opened, every
+threshold's metrics are computed mechanically; the §15
+verdict reads off the pre-committed bands from the resulting
+per-benchmark risk-coverage curves.
+
+**Operational metrics (pinned; metrics 1–3 in this block,
+metrics 4–5 in the next).**
+
+For benchmark $\mathcal{B} \in \{\text{TruthfulQA-MC},
+\text{HaluEval-QA}\}$ at threshold $\tau$, with $N = 100$
+questions, per-question correctness $c(q) \in \{0, 1\}$ (from
+the §13.10 NLI label) and risk score $r(q) = H(q)$:
+
+- **Answered set:** $A_\tau = \{q : r(q) < \tau\}$;
+  $|A_\tau|$ is the number answered.
+- **Coverage primitive:**
+  $\text{cov}(\tau) = |A_\tau| / N \in [0, 1]$.
+- **Greedy total-wrong (constant per benchmark):**
+  $W = N - \sum_q c(q)$. From §13.10 greedy accuracies:
+  $W = 75$ on TruthfulQA-MC (greedy acc 0.250),
+  $W = 70$ on HaluEval-QA (greedy acc 0.300).
+
+**Metric 1 — Residual accuracy** (accuracy on the answered
+subset):
+$$\text{acc}(\tau) = \frac{1}{|A_\tau|} \sum_{q \in A_\tau} c(q) \quad \text{for } |A_\tau| > 0$$
+$\text{NaN}$ when $|A_\tau| = 0$; excluded from accuracy-
+conditioned reductions. Range $[0, 1]$.
+
+**Metric 2 — Coverage at target accuracy** (the headline
+operational lever — "how much can the policy answer while
+maintaining accuracy at least $\alpha$?"):
+$$\text{cov}@\alpha = \max\{\text{cov}(\tau) : \text{acc}(\tau) \ge \alpha \text{ and } |A_\tau| \ge n_{\min}\}$$
+with $n_{\min} = 10$ (pinned floor, 10% of N=100; prevents
+the trivial-high-accuracy-at-tiny-coverage degeneracy).
+$\text{cov}@\alpha := 0$ deterministically if no $\tau$ in the
+sweep grid satisfies both conditions.
+
+Reported at three pinned target accuracies per benchmark:
+
+| Target | TruthfulQA-MC | HaluEval-QA | Operational meaning |
+|---|---|---|---|
+| $\alpha_1$ = baseline + 10pp | 0.350 | 0.400 | noticeable lift over no-abstain |
+| $\alpha_2$ = 0.50 | 0.500 | 0.500 | absolute majority correct on answered subset |
+| $\alpha_3$ = 0.75 | 0.750 | 0.750 | deployment-grade accuracy on answered subset |
+
+(Greedy baselines 0.250 / 0.300 per §13.10's result table.)
+
+**Metric 3 — Error capture rate** (fraction of greedy
+mistakes the policy successfully abstained away):
+$$\text{ecr}(\tau) = \frac{1}{W} \sum_{q \notin A_\tau} (1 - c(q)) \quad \text{for } W > 0$$
+Range $[0, 1]$. $\text{ecr} = 1$ means every wrong greedy
+answer was abstained; $\text{ecr} = 0$ means no wrong greedy
+answer was abstained. Undefined when $W = 0$; both pinned
+benchmarks have $W > 0$ so this case does not arise in §15.
+
+Reported at the same three target accuracies as Metric 2,
+evaluated at the threshold $\tau^*$ that achieves
+$\text{cov}@\alpha$. The operational pair
+$(\text{cov}@\alpha, \text{ecr}(\tau^*))$ characterizes the
+policy's value at each target: how much it answers and how
+many wrong answers it caught at that operating point.
+
+**Operational metrics 4 and 5 (pinned).**
+
+**Metric 4 — Area under the risk-coverage curve (AURC)**
+(integrated selective-error metric; the standard selective-
+prediction headline number, lower is better):
+
+Sort questions by ascending risk score $r(q)$, breaking ties
+by ascending question identifier. Let $c_{(i)}$ be the
+correctness label of the $i$-th lowest-risk question. The
+cumulative selective error at coverage $k/N$ is
+$$e_k = \frac{1}{k} \sum_{i=1}^{k} \big(1 - c_{(i)}\big)$$
+and the §15 AURC is the discrete (Geifman–El-Yaniv 2017)
+$$\text{AURC} = \frac{1}{N} \sum_{k=1}^{N} e_k$$
+with uniform weighting over the $N$ coverage levels. Range
+$[0, 1]$, lower is better.
+
+**Random-matched AURC baseline** (uniform random selection
+at matched coverage): a question selected uniformly at random
+has expected wrong rate $W/N$ for any $k$, so
+$\text{AURC}^{\text{random}} = W/N$ — the §13.10 greedy
+error rate ($0.750$ on TruthfulQA-MC, $0.700$ on HaluEval-QA).
+The §15 lift is
+$$\Delta\text{AURC} = \text{AURC}^{\text{random}} - \text{AURC}^{\text{policy}}$$
+positive when the policy outperforms random abstention.
+
+**Metric 5 — False abstention rate** (fraction of correct
+greedy answers the policy mistakenly abstained):
+$$\text{far}(\tau) = \frac{1}{C} \sum_{q \notin A_\tau} c(q) \quad \text{for } C > 0$$
+where $C = \sum_q c(q) = N - W$ is the total correct greedy
+count ($C = 25$ on TruthfulQA-MC, $C = 30$ on HaluEval-QA per
+§13.10). Range $[0, 1]$. $\text{far} = 0$ means no correct
+greedy answer was abstained; $\text{far} = 1$ means all were.
+
+Reported at the same three target-accuracy operating points
+as Metrics 2 and 3, evaluated at the threshold $\tau^*$ that
+achieves $\text{cov}@\alpha$. The pinned operational triple
+at each target is
+$$\big(\text{cov}@\alpha,\;\text{ecr}(\tau^*),\;\text{far}(\tau^*)\big)$$
+which together capture selective-prediction quality: high
+ecr + low far at meaningful coverage is the operational win
+condition.
+
+**Pre-committed bands (pinned; exhaustive partition).**
+
+§14a.2 exposed a band-coverage gap when the pre-committed
+band list did not strictly cover the observed outcome
+$(\Delta_{V_1}, \Delta_{V_2}) = (+4, +1)$ and the script's
+catch-all returned `SCOUT_SATURATION`. To prevent recurrence,
+§15's bands are pinned as an **ordered cascade with an
+explicit residual catch-all**: every possible outcome matches
+exactly one band by construction.
+
+**Headline statistics (pinned).** For benchmark
+$b \in \{\text{TruthfulQA-MC}, \text{HaluEval-QA}\}$:
+
+- $\delta_b = \Delta\text{AURC}_b$ (per-benchmark AURC lift
+  over the random-matched baseline; Metric 4).
+- $\kappa_b = \text{cov}@\alpha_2 \text{ on benchmark } b$
+  (per-benchmark coverage at $\alpha_2 = 0.50$, the absolute-
+  majority-correct target; Metric 2).
+
+**Combined classification (worst-benchmark rule):**
+$$\delta = \min_b \delta_b, \qquad \kappa = \min_b \kappa_b$$
+Both headline statistics combine across benchmarks by
+worst-benchmark, mirroring §13's worst-benchmark rule that
+prevented combined classification from being driven by a
+single-benchmark anomaly.
+
+**Verdict cascade (pinned, ordered, exhaustive).** The §15
+verdict is the **first** matching rule in the ordered list
+below. The final rule (SATURATION, defined in the next
+chunk) has no positive condition and explicitly catches
+every $(\delta, \kappa) \in \mathbb{R}^2$ not matching rules
+1–4.
+
+1. **REGRESSION** — $\delta < -0.02$.
+2. **STRONG** — $\delta \ge +0.10$ AND $\kappa \ge 0.30$.
+3. **USEFUL_INTERNAL** — $\delta \ge +0.05$ AND $\kappa \ge 0.20$.
+4. **MARGINAL** — $\delta \ge +0.02$ AND $\kappa \ge 0.10$.
+5. **SATURATION** — explicit residual catch-all.
+
+Rules 1–4 are mutually exclusive by ordering: once an outcome
+matches rule $k$, rules $k+1, \ldots$ do not fire. Rule 5 has
+no condition, so the cascade is exhaustive over $\mathbb{R}^2$.
+REGRESSION is placed first (not last) so that any $\delta < -0.02$
+outcome is classified as a regression even if $\kappa$ happens
+to be high — a policy that hurts AURC is a regression
+regardless of coverage behavior.
+
+**STRONG (rule 2; promotes §15 to product / abstention-layer
+investment).** $\delta \ge +0.10$ AND $\kappa \ge 0.30$.
+
+Operational meaning: the §13.10 risk score, used as an
+abstain threshold, integrates to at least 10 AURC points of
+error suppression over random abstention on the worst
+benchmark AND supports answering at least 30% of questions
+at $\ge 50\%$ residual accuracy on the worst benchmark.
+
+Authorizes drafting a §15.2 implementation pre-commitment for
+an abstention/escalation product layer over §13.10-grade
+signals (a separate §0.8 commitment, not auto-promoted by §15.1).
+Does NOT authorize external-framing changes to
+`AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` (per §13.9 hold; §15's
+metric class is operational, not answer-selection — the §13.9
+gate is unchanged by §15 outcome).
+
+**USEFUL_INTERNAL (rule 3; documents internal-research
+operational value, no product investment).**
+$\delta \ge +0.05$ AND $\kappa \ge 0.20$.
+
+Operational meaning: the policy yields measurable but modest
+abstention value — at least 5 AURC points of error suppression
+AND $\ge 20\%$ answered at $\ge 50\%$ accuracy on the worst
+benchmark.
+
+Authorizes documenting the §13.10 score as having known
+internal-research operational value for selective prediction
+at this configuration. Does NOT authorize a §15.2 product
+investment, external-framing changes, or any cross-domain
+claim. The §13.9 hold remains in force.
+
+**MARGINAL (rule 4; documents small but non-zero operational
+signal, no investment).** $\delta \ge +0.02$ AND $\kappa \ge 0.10$
+(and not matching rules 1–3 above).
+
+Operational meaning: the policy yields a small detectable
+abstention signal — at least 2 AURC points of error
+suppression AND $\ge 10\%$ answered at $\ge 50\%$ accuracy on
+the worst benchmark — but the lift is below the threshold
+where internal-research documentation as a usable selective-
+prediction signal is warranted.
+
+Authorizes recording the §15 result as an acknowledged but
+unactionable signal. Does NOT authorize a §15.2 follow-up,
+internal-research operational claims, product investment, or
+external-framing changes. The §13.9 hold remains.
+
+**SATURATION (rule 5; explicit residual catch-all; documents
+null operational result).** Any $(\delta, \kappa)$ not
+matching rules 1–4. Specifically the residual covers:
+$\delta \in [-0.02, +0.02)$ for any $\kappa$, or
+$\delta \ge +0.02$ but $\kappa < 0.10$, or any other case
+the prior rules do not catch.
+
+Operational meaning: the §13.10 score, used as an abstain
+threshold, is operationally indistinguishable from random
+abstention at the worst benchmark on the integrated AURC
+metric, OR yields some AURC lift that cannot meaningfully
+support coverage at $\ge 50\%$ accuracy. The selective-
+prediction policy adds nothing measurable on top of random
+abstention at this configuration.
+
+Authorizes documenting §15 as an operational null. Does NOT
+authorize a §15.2 follow-up, any product investment,
+internal-research operational claims, or external-framing
+changes. Combined with §13/§14's prior closures, a §15
+SATURATION extends the LLM transfer line's closure from
+"answer-selection saturated" to "answer-selection AND
+selective-prediction both saturated at this configuration."
+
+**REGRESSION (rule 1; closes §13.10-as-selective-prediction-
+risk-score line).** $\delta < -0.02$.
+
+Operational meaning: the §13.10 score is anti-correlated with
+correctness in the selective-prediction operational sense —
+abstaining the high-entropy questions actively hurts AURC
+relative to random abstention by more than 2 AURC points on
+the worst benchmark.
+
+The §13.10 baseline of record's AUC = 0.661 against ground-
+truth correctness remains unaffected (REGRESSION here is on a
+different metric class), but the operational route through
+selective abstention is foreclosed at this configuration.
+Does NOT authorize any external-framing changes; the §13.9
+hold remains for the same reason it does in §15 SATURATION.
+
+**Boundary-case audit table (illustrative, deterministic).**
+
+The cascade is pinned with strict numerical thresholds. The
+three specific cases flagged in §0.8 review plus three
+additional edge cases, each traced through the cascade
+mechanically:
+
+| $\delta$ | $\kappa$ | Cascade trace | Verdict |
+|---|---|---|---|
+| $+0.10$ | $0.29$ | rule 1 NO; rule 2 NO ($\kappa < 0.30$); rule 3 YES | **USEFUL_INTERNAL** |
+| $+0.049$ | $0.25$ | rule 1 NO; rule 2 NO; rule 3 NO ($\delta < +0.05$); rule 4 YES | **MARGINAL** |
+| $-0.019$ | $0.40$ | rule 1 NO ($\delta \not< -0.02$); rules 2–4 NO; rule 5 catches | **SATURATION** |
+| $+0.10$ | $0.30$ | rule 1 NO; rule 2 YES (both boundaries inclusive) | **STRONG** |
+| $+0.15$ | $0.10$ | rule 1 NO; rule 2 NO ($\kappa < 0.30$); rule 3 NO ($\kappa < 0.20$); rule 4 YES | **MARGINAL** |
+| $-0.025$ | $0.50$ | rule 1 YES; remaining rules not evaluated | **REGRESSION** |
+
+The first three rows match the cases §0.8 review explicitly
+called out. Rows 4–6 record additional anchors: row 4
+documents that the STRONG boundary at $(+0.10, 0.30)$ is
+inclusive on both axes; row 5 documents that high $\delta$
+with low $\kappa$ cascades down to MARGINAL through the
+$\kappa$ hurdles; row 6 documents that REGRESSION wins
+regardless of $\kappa$ once the cascade fires on rule 1.
+Future revisits should be able to verify the script's
+classification matches this table exactly on these inputs.
+
+**Acceptance / rejection rules (pinned, mapped one-to-one to
+the verdict cascade).**
+
+| Verdict | Authorizes | Forecloses |
+|---|---|---|
+| **STRONG** | Drafting a §15.2 implementation pre-commitment for an abstention/escalation product layer (separate §0.8 commitment). | VC-brief changes; cross-domain claims; auto-deployment without §15.2. |
+| **USEFUL_INTERNAL** | Documenting internal-research operational value of the §13.10 score for selective prediction at this configuration. | §15.2 product investment; VC-brief changes; cross-domain claims. |
+| **MARGINAL** | Recording §15 as an acknowledged but unactionable signal. | §15.2 follow-up; internal-research operational claims; product investment; VC-brief changes. |
+| **SATURATION** | Documenting §15 as operational null; extending LLM transfer-line closure to "answer-selection AND selective-prediction both saturated." | §15.2 follow-up at any observable; product investment; VC-brief changes. |
+| **REGRESSION** | Closing §13.10-as-selective-prediction-risk-score line. The §13.10 AUC=0.661 baseline of record is unaffected (different metric class). | §15.2 follow-up at this observable; product investment; VC-brief changes. |
+
+**Statistical confirmation (pinned).** Per benchmark, paired
+bootstrap over question indices, $B = 1000$ resamples,
+deterministic seed (`numpy.random.SeedSequence(entropy=15)`).
+For each resample, recompute $\delta_b$ on the resampled
+question set and report the 2.5th and 97.5th percentiles as
+the two-sided 95% CI on $\delta_b$. Equivalent computation
+for $\kappa_b$.
+
+The headline confirmation question is whether $\delta_b > 0$
+is supported by the data after sampling variance is
+accounted for. Pinned reporting in the §15 result section:
+each benchmark's
+$\big(\hat\delta_b,\;\text{CI}_{0.025}^{0.975}(\delta_b),\;\hat\kappa_b,\;\text{CI}_{0.025}^{0.975}(\kappa_b)\big)$
+tuple alongside the verdict.
+
+**Pinned demotion rule (statistical safeguard for the
+highest-stakes verdict only).** If the verdict cascade
+returns **STRONG**, the bootstrap CI lower bound on
+$\delta_b$ must be $> 0$ on **both** benchmarks. If either
+benchmark's CI lower bound is $\le 0$, the verdict is
+demoted to **USEFUL_INTERNAL** with explicit
+`STRONG_BUT_CI_DEMOTION` annotation in the result section.
+
+USEFUL_INTERNAL, MARGINAL, SATURATION, and REGRESSION
+verdicts are NOT subject to bootstrap-CI demotion. Their
+operational scope does not require external statistical
+confirmation: USEFUL_INTERNAL and MARGINAL are documentation-
+only with explicit no-investment scope; SATURATION and
+REGRESSION are themselves rejection verdicts. Pinning the
+demotion rule narrowly to STRONG keeps the cascade
+exhaustive and deterministic while preventing a noise-driven
+STRONG point estimate from authorizing §15.2 investment.
+
+**No sign-test analogue.** Per-question paired sign testing
+on the §15 metric class does not yield information beyond the
+bootstrap CI on $\delta_b$ — selective prediction's unit of
+analysis is the (answered, abstained) partition, not a per-
+question paired comparison against an explicit alternative.
+The bootstrap CI on $\delta_b$ is the pinned statistical
+confirmation; no sign-test is computed for the §15 verdict.
+
+**Operational baselines (pinned).**
+
+§15 compares against two operational baselines. Both yield
+concrete answer/abstain decisions on the same questions;
+neither is a renaming of the §13.10 risk score that drives
+the §15 policy.
+
+**Baseline 1 — Never-abstain ($B_\text{never}$).** Always
+answer the §13.10 greedy completion; never abstain.
+
+- Coverage: $1.0$ by construction.
+- Residual accuracy: equals §13.10 greedy ($0.250$ on
+  TruthfulQA-MC, $0.300$ on HaluEval-QA per §13.10).
+- AURC contribution: single sweep endpoint at
+  $(\text{cov} = 1, e = W/N) = (1, 0.750)$ on TruthfulQA-MC,
+  $(1, 0.700)$ on HaluEval-QA.
+- Role: documents the operational floor at full coverage —
+  what doing nothing gets you.
+
+**Baseline 2 — Random-abstain at matched coverage
+($B_\text{random}$).** At each operating point $\tau$ with
+$\text{cov}(\tau) = |A_\tau| / N$, the matched-coverage
+random comparator answers a uniformly random subset of size
+$|A_\tau|$ and abstains the rest.
+
+By linearity of expectation, $B_\text{random}$ has closed-form
+expected operational metrics independent of which random
+subset is drawn:
+
+- $\mathbb{E}[\text{acc}_{B_\text{random}}(\text{cov})] = (N - W) / N$
+  (= the greedy accuracy; constant in $\text{cov}$).
+- $\mathbb{E}[\text{AURC}_{B_\text{random}}] = W / N$
+  (the $\Delta\text{AURC}$ baseline already pinned in
+  Metric 4 and used by the verdict cascade in chunks 4a / 4b).
+
+§15 reports the **analytic expectation** for $B_\text{random}$;
+no empirical resampling is performed (the expectation is
+closed-form and exact). Bootstrap CIs from §15's statistical
+confirmation are computed on
+$\delta_b = \text{AURC}^{B_\text{random}}_b - \text{AURC}^{\text{policy}}_b$
+and capture both quantities' joint sampling variance over
+question indices.
+
+- Role: documents what selective-prediction value the §15
+  policy adds beyond random abstention at matched coverage.
+  This is the central quantity the §15 verdict bands
+  threshold against (the headline statistic $\delta$).
+
+**Explicitly NOT a §15 baseline.**
+
+- **No oracle baseline.** A perfect-information abstainer
+  (always abstains the wrong answers, always answers the
+  right ones) is an upper bound (AURC = 0), not an operational
+  comparator. Not pinned; does not participate in the verdict
+  cascade. It may be reported as a diagnostic upper-bound
+  number alongside the verdict but is not load-bearing.
+- **No alternative-observable comparator.** Per Chunk 2c, §15
+  pins exactly one observable. Any "BCVF-specific structure"
+  comparator (e.g., 2nd-difference variants from §13.14 /
+  §13.16 / §13.18) is out of scope at this commitment;
+  would require a fresh §0.8 in a separate §15.2.
+- **No alternative-threshold comparator on the same observable.**
+  $r(q) = H(q)$ used at any threshold $\tau$ IS the §15
+  policy, parameterized by $\tau$ — just a different operating
+  point on the same risk-coverage curve, not a meaningfully
+  different baseline.
+
+**Disclosed simplifications and risks (pinned).**
+
+Three categories: scope exclusions, load-bearing assumptions,
+and failure-mode interpretations. Pinned in advance so the
+result section reads off them mechanically.
+
+**(1) What §15 is explicitly NOT testing.**
+
+- **Not answer-selection.** §15 never substitutes the §13.10
+  greedy completion. A §15 STRONG does not retroactively
+  reopen any §13/§14 answer-selection hypothesis class; per
+  §14c those verdicts remain binding. A §15 SATURATION does
+  not weaken §13.10's marginal-pass — it only documents that
+  the same signal does not transfer to the abstention metric
+  class either.
+- **Not retrieval augmentation.** §15 introduces no retrieval,
+  search, or external knowledge source. The policy's only
+  action when triggered by high $r(q)$ is to abstain — never
+  to fetch additional context, query a tool, or escalate to a
+  different model. Retrieval-augmented selective prediction is
+  a strictly larger hypothesis class requiring a fresh §0.8.
+- **Not cross-model routing.** §15 consumes no §13.11 / §14a /
+  §14a.2 cross-model material. Higher-capability fallback
+  (Qwen-32B, GPT-4-class) on the abstained questions is a
+  different policy and would require the model-scale future-
+  work item from §13.8 to land first.
+- **Not calibration beyond the pinned entropy policy.** No
+  isotonic calibration, no Platt scaling, no conformal
+  wrapping, no post-hoc transform of $r(q)$. The threshold
+  $\tau$ is the only fitted parameter, and it is fitted only
+  via the deterministic empirical-support sweep — not via
+  held-out tuning.
+
+**(2) Load-bearing assumptions.**
+
+- **Correctness labels inherited from §13.10.** $c(q)$ is the
+  §13.10 NLI-derived label (entails right_answer AND not any
+  distractor). §15 inherits any labeling artifacts §13.10
+  carries — over-strict NLI on TruthfulQA-MC, missed
+  paraphrases on HaluEval-QA, etc. A §15 verdict reflects the
+  policy's selective behavior *under §13.10's labeling*, not
+  an independent test of label quality.
+- **Fixed dump schema.** Per Chunk 2b, §15 reads only the
+  three pinned fields and fails fast on schema drift. Any
+  field-set change requires fresh §0.8 review before §15 re-
+  runs.
+- **Threshold sweep over empirical support only.** $\tau$
+  varies across the sorted unique $r(q)$ values per benchmark.
+  $\delta$ is reported with bootstrap CI but $\text{cov}@\alpha$
+  is computed on the discrete grid only; verdict resolution
+  depends on the empirical support being dense enough at
+  N=100 to bracket the pinned $\alpha$ targets.
+- **Benchmark-local operating points.** Each benchmark's sweep
+  is independent. There is no single operational $\tau$ that
+  applies to both, and §15 STRONG does NOT authorize deploying
+  any single $\tau$ — choice of a deployment threshold is a
+  separate calibration exercise with its own pre-commitment
+  (and would land in a §15.2 if STRONG fires).
+
+**(3) Failure-mode interpretations.**
+
+- **High AURC lift but tiny coverage.** Signature: large
+  $\delta$ but $\kappa < 0.10$. Cascade verdict: SATURATION
+  (rule 4 fails on $\kappa$; rule 5 catches). Even with
+  STRONG-range $\delta$, this is the "Pyrrhic" outcome where
+  the policy identifies a small high-confidence subset but
+  cannot deliver useful coverage. The cascade is intentionally
+  designed to reject this mode — operational value requires
+  both AURC lift AND meaningful coverage.
+- **Good coverage but weak error capture.** Signature:
+  $\kappa$ in STRONG/USEFUL range but $\delta$ in MARGINAL/
+  SATURATION. The policy sustains coverage at the target
+  accuracy but reaches it by rejecting questions roughly at
+  the random rate — i.e., the entropy threshold lands on a
+  high-coverage operating point on a benchmark where greedy
+  accuracy is already near target, not because the policy
+  selectively catches errors. Cascade produces MARGINAL or
+  SATURATION; operational read: "the answered subset is
+  acceptable but the policy is not the source of the lift."
+- **Benchmark asymmetry under worst-benchmark rule.** If one
+  benchmark lands STRONG and the other SATURATION, combined
+  classification is SATURATION (or whichever lower band
+  applies). Intentional and mirrors §13/§14's worst-benchmark
+  discipline. The result section must report per-benchmark
+  $(\delta_b, \kappa_b)$ alongside the combined $(\delta,
+  \kappa)$ so any asymmetry is visible — that is itself a
+  publishable diagnostic finding (selective prediction
+  transfers on benchmark X but not benchmark Y at this
+  configuration).
+- **STRONG blocked by CI demotion.** If point estimates
+  satisfy STRONG but either benchmark's bootstrap CI on
+  $\delta_b$ fails to clear zero, the verdict demotes to
+  USEFUL_INTERNAL with `STRONG_BUT_CI_DEMOTION` annotation
+  (Chunk 4c). Operational read: the policy may have a
+  population-level effect, but at N=100 the data does not
+  yet support a confident lift estimate; §15.2 product
+  pre-commitment is not authorized until a re-run at larger
+  N (a separate fresh §0.8 commitment) clears CI on both
+  benchmarks.
+
+**Expected cost (pinned).**
+
+§15.1 is a **pure post-processing selective-prediction
+analysis** over already-computed §13.10 dumps. Reinforcing
+the framing: this is not a fresh experiment family in
+disguise.
+
+- **Compute:** CPU only. No GPU, no model loads, no NLI
+  forward passes, no generation calls of any kind.
+- **Inputs:** the two pinned dumps from Chunk 2b. Disk read
+  only; ~200 KB combined order of magnitude.
+- **Wall clock (estimated):** under 30 seconds total for
+  both benchmarks, including $B = 1000$ bootstrap resamples
+  per benchmark. Threshold sweep at $N=100$ yields ≤102 grid
+  points; bootstrap over 100 indices is sub-millisecond per
+  resample in numpy.
+- **External dependencies:** `numpy` + Python stdlib only. No
+  `transformers`, no `torch`, no HuggingFace cache, no
+  network access. `HF_HOME` / `HF_TOKEN` not consumed.
+
+**Report destination (pinned).**
+
+Two output artifacts, exactly:
+
+1. `docs/experiments/probe_selective_abstention.json` — single
+   machine-readable artifact covering both benchmarks.
+2. `docs/experiments/probe_selective_abstention.md` — single
+   human-readable summary report.
+
+**Mandatory JSON schema (top-level keys; each benchmark
+contributes one nested block):**
+
+```
+{
+  "schema_version": "15.1",
+  "n_questions": 100,
+  "bootstrap_B": 1000,
+  "bootstrap_seed": "SeedSequence(entropy=15)",
+  "benchmarks": {
+    "truthfulqa_mc": {
+      "greedy_accuracy": <float>,
+      "total_wrong_W": <int>,
+      "auc_random": <float>,
+      "auc_policy": <float>,
+      "delta_auc": <float>,
+      "delta_auc_ci": [<lo>, <hi>],
+      "kappa": <float>,
+      "kappa_ci": [<lo>, <hi>],
+      "operating_points": [
+        {"alpha": 0.35, "cov": <float>, "tau_star": <float>,
+         "ecr": <float>, "far": <float>},
+        {"alpha": 0.50, ...},
+        {"alpha": 0.75, ...}
+      ],
+      "threshold_sweep": [
+        {"tau": <float>, "cov": <float>, "acc": <float>,
+         "ecr": <float>, "far": <float>}, ...
+      ]
+    },
+    "halueval_qa": { ... same shape, alpha_1 = 0.40 ... }
+  },
+  "combined": {
+    "delta": <float>,
+    "kappa": <float>,
+    "verdict": "STRONG" | "USEFUL_INTERNAL" | "MARGINAL"
+             | "SATURATION" | "REGRESSION",
+    "verdict_annotations": []
+  }
+}
+```
+
+**Mandatory markdown report contents:**
+
+- Per-benchmark headline table:
+  $(\hat\delta_b, \text{CI}(\delta_b), \hat\kappa_b, \text{CI}(\kappa_b))$.
+- Per-benchmark operating-point table at all three $\alpha$:
+  $(\text{cov}@\alpha, \text{ecr}(\tau^*), \text{far}(\tau^*))$.
+- Combined $(\delta, \kappa)$ under the worst-benchmark rule.
+- Cascade trace mapping $(\delta, \kappa)$ to a verdict
+  (the same kind of explicit walk-through used in Chunk 4b's
+  audit table).
+- Final `verdict` and any `verdict_annotations`.
+
+**Pinned final verdict fields (in both JSON and markdown):**
+
+- `verdict` ∈ `{STRONG, USEFUL_INTERNAL, MARGINAL,
+  SATURATION, REGRESSION}` (exactly one).
+- `verdict_annotations`: list (possibly empty); may include
+  `STRONG_BUT_CI_DEMOTION` per Chunk 4c.
+
+**Implementation scope (pinned — the §15.1 execution
+boundary).**
+
+§15.1 **authorizes**:
+
+- Implementing `scripts/probe_selective_abstention.py` per
+  Chunks 2b–6.
+- Reading the two pinned input dumps.
+- Computing the pinned five operational metrics.
+- Running the verdict cascade and bootstrap CI exactly as
+  pinned.
+- Writing the two pinned output artifacts.
+
+§15.1 **does NOT authorize**:
+
+- Regenerating any §13.10 dump or any other §13/§14 dump.
+- Changing the correctness labeling protocol or rerunning
+  NLI on the dumps.
+- Substituting another benchmark for TruthfulQA-MC or
+  HaluEval-QA, or adding a third benchmark.
+- Changing the risk score $r(q)$ from §13.10 semantic
+  entropy to anything else.
+- Adding a secondary observable comparator (Chunk 2c pin).
+- Adding retrieval, routing, selector, or any consumer
+  logic beyond the pinned threshold rule.
+- Changing the threshold sweep grid, the $n_{\min}$ floor,
+  the pinned $\alpha$ targets, or any band threshold.
+- Auto-promoting any verdict to §15.2 — any §15.2 work
+  requires a fresh §0.8 commitment per Chunks 4a / 4c.
+- Updating `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` (per §13.9
+  hold; §15's metric class cannot satisfy the §13.9 gate by
+  construction).
+
+Any deviation discovered at run time must be flagged in the
+§15 result section as a §0.8 deviation, not absorbed
+silently.
+
+### 15.1 Amendment 1 — Input-path correction and explicit field-name pinning (pre-implementation)
+
+**Status: amendment landed before any data inspection or
+script execution.** Surfaced explicitly per §15.1's own "no
+silent patches" rule.
+
+**Trigger.** Pre-implementation audit of
+`scripts/probe_semantic_entropy.py` (the §13.10 data-
+producing script) revealed two §0.8 issues with the original
+Chunk 2b pin:
+
+1. **Input filename mismatch.** Chunk 2b pinned the
+   TruthfulQA-MC dump path as
+   `docs/experiments/probe_semantic_entropy.json` (matching
+   §13.10's prose). The §13.10 script in fact emits per-
+   benchmark filenames suffixed with the benchmark id:
+   `probe_semantic_entropy_truthfulqa_mc.json` and
+   `probe_semantic_entropy_halueval_qa.json`. A strict
+   reading of the original Chunk 2b pin would have caused
+   §15's fail-fast loader to abort with `SCHEMA_MISMATCH:
+   file not found` against the actual on-disk filename.
+2. **Field-name underspecification.** Chunk 2b named the
+   three consumed fields by description (semantic entropy
+   nats, correctness label, question id) but did not pin the
+   exact JSON key names. Implementation requires the exact
+   keys; leaving them implicit invites silent fallback to
+   alternative field names.
+
+**Amendment (this chunk supersedes the affected lines in
+Chunk 2b).**
+
+- TruthfulQA-MC input path is corrected to
+  `docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`.
+- HaluEval-QA input path is unchanged
+  (`docs/experiments/probe_semantic_entropy_halueval_qa.json`,
+  already correct).
+- Pinned field-name mapping:
+  - `q_idx` → question identifier.
+  - `semantic_entropy` → risk score $r(q) = H(q)$ in nats.
+  - `greedy_matches_correct` → correctness label $c(q)$.
+- All other §15.1 pins (primary observable definition,
+  threshold-sweep protocol, metrics, bands, baselines, cost,
+  scope) are unchanged.
+
+**Why this is a §0.8-clean amendment, not a substantive
+revision.** The amendment corrects a pre-commitment artifact
+(filename and field-name underspecification) without changing
+any pinned numerical band, metric definition, baseline,
+acceptance/rejection rule, or scope boundary. No data has been
+inspected. The cascade boundary-case audit table from Chunk 4b
+is unaffected. The amendment is recorded explicitly here so
+the audit trail shows the revision rather than a silent rename
+during implementation.
+
+**What this amendment does NOT change:**
+
+- Numerical bands (Chunks 4a / 4b).
+- Operational metric definitions (Chunks 3a / 3b).
+- Baselines (Chunk 5).
+- Disclosed simplifications, assumptions, or failure modes
+  (Chunk 6).
+- Output paths or schema (Chunk 7).
+- The "no secondary observable" pin (Chunk 2c).
+- The fail-fast schema-mismatch behavior; only the *target*
+  filenames and field names that fail-fast checks against
+  are corrected.
+
+---
+
 
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
