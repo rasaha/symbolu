@@ -10501,6 +10501,85 @@ which together capture selective-prediction quality: high
 ecr + low far at meaningful coverage is the operational win
 condition.
 
+**Pre-committed bands (pinned; exhaustive partition).**
+
+§14a.2 exposed a band-coverage gap when the pre-committed
+band list did not strictly cover the observed outcome
+$(\Delta_{V_1}, \Delta_{V_2}) = (+4, +1)$ and the script's
+catch-all returned `SCOUT_SATURATION`. To prevent recurrence,
+§15's bands are pinned as an **ordered cascade with an
+explicit residual catch-all**: every possible outcome matches
+exactly one band by construction.
+
+**Headline statistics (pinned).** For benchmark
+$b \in \{\text{TruthfulQA-MC}, \text{HaluEval-QA}\}$:
+
+- $\delta_b = \Delta\text{AURC}_b$ (per-benchmark AURC lift
+  over the random-matched baseline; Metric 4).
+- $\kappa_b = \text{cov}@\alpha_2 \text{ on benchmark } b$
+  (per-benchmark coverage at $\alpha_2 = 0.50$, the absolute-
+  majority-correct target; Metric 2).
+
+**Combined classification (worst-benchmark rule):**
+$$\delta = \min_b \delta_b, \qquad \kappa = \min_b \kappa_b$$
+Both headline statistics combine across benchmarks by
+worst-benchmark, mirroring §13's worst-benchmark rule that
+prevented combined classification from being driven by a
+single-benchmark anomaly.
+
+**Verdict cascade (pinned, ordered, exhaustive).** The §15
+verdict is the **first** matching rule in the ordered list
+below. The final rule (SATURATION, defined in the next
+chunk) has no positive condition and explicitly catches
+every $(\delta, \kappa) \in \mathbb{R}^2$ not matching rules
+1–4.
+
+1. **REGRESSION** — $\delta < -0.02$.
+2. **STRONG** — $\delta \ge +0.10$ AND $\kappa \ge 0.30$.
+3. **USEFUL_INTERNAL** — $\delta \ge +0.05$ AND $\kappa \ge 0.20$.
+4. **MARGINAL** — $\delta \ge +0.02$ AND $\kappa \ge 0.10$.
+5. **SATURATION** — explicit residual catch-all.
+
+Rules 1–4 are mutually exclusive by ordering: once an outcome
+matches rule $k$, rules $k+1, \ldots$ do not fire. Rule 5 has
+no condition, so the cascade is exhaustive over $\mathbb{R}^2$.
+REGRESSION is placed first (not last) so that any $\delta < -0.02$
+outcome is classified as a regression even if $\kappa$ happens
+to be high — a policy that hurts AURC is a regression
+regardless of coverage behavior.
+
+**STRONG (rule 2; promotes §15 to product / abstention-layer
+investment).** $\delta \ge +0.10$ AND $\kappa \ge 0.30$.
+
+Operational meaning: the §13.10 risk score, used as an
+abstain threshold, integrates to at least 10 AURC points of
+error suppression over random abstention on the worst
+benchmark AND supports answering at least 30% of questions
+at $\ge 50\%$ residual accuracy on the worst benchmark.
+
+Authorizes drafting a §15.2 implementation pre-commitment for
+an abstention/escalation product layer over §13.10-grade
+signals (a separate §0.8 commitment, not auto-promoted by §15.1).
+Does NOT authorize external-framing changes to
+`AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` (per §13.9 hold; §15's
+metric class is operational, not answer-selection — the §13.9
+gate is unchanged by §15 outcome).
+
+**USEFUL_INTERNAL (rule 3; documents internal-research
+operational value, no product investment).**
+$\delta \ge +0.05$ AND $\kappa \ge 0.20$.
+
+Operational meaning: the policy yields measurable but modest
+abstention value — at least 5 AURC points of error suppression
+AND $\ge 20\%$ answered at $\ge 50\%$ accuracy on the worst
+benchmark.
+
+Authorizes documenting the §13.10 score as having known
+internal-research operational value for selective prediction
+at this configuration. Does NOT authorize a §15.2 product
+investment, external-framing changes, or any cross-domain
+claim. The §13.9 hold remains in force.
+
 ---
 
 
