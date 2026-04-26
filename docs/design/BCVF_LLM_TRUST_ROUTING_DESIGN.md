@@ -10713,6 +10713,73 @@ question paired comparison against an explicit alternative.
 The bootstrap CI on $\delta_b$ is the pinned statistical
 confirmation; no sign-test is computed for the §15 verdict.
 
+**Operational baselines (pinned).**
+
+§15 compares against two operational baselines. Both yield
+concrete answer/abstain decisions on the same questions;
+neither is a renaming of the §13.10 risk score that drives
+the §15 policy.
+
+**Baseline 1 — Never-abstain ($B_\text{never}$).** Always
+answer the §13.10 greedy completion; never abstain.
+
+- Coverage: $1.0$ by construction.
+- Residual accuracy: equals §13.10 greedy ($0.250$ on
+  TruthfulQA-MC, $0.300$ on HaluEval-QA per §13.10).
+- AURC contribution: single sweep endpoint at
+  $(\text{cov} = 1, e = W/N) = (1, 0.750)$ on TruthfulQA-MC,
+  $(1, 0.700)$ on HaluEval-QA.
+- Role: documents the operational floor at full coverage —
+  what doing nothing gets you.
+
+**Baseline 2 — Random-abstain at matched coverage
+($B_\text{random}$).** At each operating point $\tau$ with
+$\text{cov}(\tau) = |A_\tau| / N$, the matched-coverage
+random comparator answers a uniformly random subset of size
+$|A_\tau|$ and abstains the rest.
+
+By linearity of expectation, $B_\text{random}$ has closed-form
+expected operational metrics independent of which random
+subset is drawn:
+
+- $\mathbb{E}[\text{acc}_{B_\text{random}}(\text{cov})] = (N - W) / N$
+  (= the greedy accuracy; constant in $\text{cov}$).
+- $\mathbb{E}[\text{AURC}_{B_\text{random}}] = W / N$
+  (the $\Delta\text{AURC}$ baseline already pinned in
+  Metric 4 and used by the verdict cascade in chunks 4a / 4b).
+
+§15 reports the **analytic expectation** for $B_\text{random}$;
+no empirical resampling is performed (the expectation is
+closed-form and exact). Bootstrap CIs from §15's statistical
+confirmation are computed on
+$\delta_b = \text{AURC}^{B_\text{random}}_b - \text{AURC}^{\text{policy}}_b$
+and capture both quantities' joint sampling variance over
+question indices.
+
+- Role: documents what selective-prediction value the §15
+  policy adds beyond random abstention at matched coverage.
+  This is the central quantity the §15 verdict bands
+  threshold against (the headline statistic $\delta$).
+
+**Explicitly NOT a §15 baseline.**
+
+- **No oracle baseline.** A perfect-information abstainer
+  (always abstains the wrong answers, always answers the
+  right ones) is an upper bound (AURC = 0), not an operational
+  comparator. Not pinned; does not participate in the verdict
+  cascade. It may be reported as a diagnostic upper-bound
+  number alongside the verdict but is not load-bearing.
+- **No alternative-observable comparator.** Per Chunk 2c, §15
+  pins exactly one observable. Any "BCVF-specific structure"
+  comparator (e.g., 2nd-difference variants from §13.14 /
+  §13.16 / §13.18) is out of scope at this commitment;
+  would require a fresh §0.8 in a separate §15.2.
+- **No alternative-threshold comparator on the same observable.**
+  $r(q) = H(q)$ used at any threshold $\tau$ IS the §15
+  policy, parameterized by $\tau$ — just a different operating
+  point on the same risk-coverage curve, not a meaningfully
+  different baseline.
+
 ---
 
 
