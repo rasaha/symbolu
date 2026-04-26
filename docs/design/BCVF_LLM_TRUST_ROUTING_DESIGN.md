@@ -11355,6 +11355,84 @@ structure across the two benchmarks). It is NOT authorized by
 §15.1 and would not retroactively re-classify the §15.1
 verdict-of-record reported in §15.2.
 
+**Operating-cliff analysis — the ecr / far cost at α₂.**
+
+The full operating-point table at all three pinned target-
+accuracy points (Chunk 3a, $\alpha_1 = $ baseline + 10pp;
+$\alpha_2 = 0.50$; $\alpha_3 = 0.75$):
+
+| benchmark | $\alpha$ | $\text{cov}@\alpha$ | $\tau^*$ | ecr | far |
+|---|---|---|---|---|---|
+| truthfulqa_mc | 0.35 | 0.32 | 1.4979 | 0.7333 | 0.5200 |
+| truthfulqa_mc | 0.50 | 0.14 | 0.6931 | 0.9067 | 0.7200 |
+| truthfulqa_mc | 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+| halueval_qa  | 0.40 | 0.36 | 1.4979 | 0.7000 | 0.5000 |
+| halueval_qa  | 0.50 | 0.26 | 1.0889 | 0.8143 | 0.5667 |
+| halueval_qa  | 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+
+Three operationally relevant features:
+
+**(a) Coupled high error-capture + high false-abstention at
+$\alpha_2$.** At the absolute-majority operating point, the
+policy catches **91% of TruthfulQA-MC's wrong greedy answers
+and 81% of HaluEval-QA's** ($\text{ecr} = 0.91 / 0.81$), but
+also abstains **72% of TruthfulQA-MC's correct greedy answers
+and 57% of HaluEval-QA's** ($\text{far} = 0.72 / 0.57$).
+This is the classical selective-prediction "throw out most
+answers to keep the answered ones clean" trade-off: error
+capture is high (so Chunk 6 §(3)'s "good coverage but weak
+error capture" failure mode is *not* fired), but the false-
+abstention cost makes the operating point operationally
+expensive. Deployment without further calibration would
+refuse most of the user's questions.
+
+**(b) $\alpha_1$ vs $\alpha_2$ collapse asymmetry.** Both
+benchmarks share the *same* $\tau^* = 1.4979$ at $\alpha_1$
+(TruthfulQA-MC at 0.35, HaluEval-QA at 0.40), suggesting the
+high-entropy tails of the two benchmarks' $r(q)$ distributions
+are structurally similar. The divergence appears at
+$\alpha_2 = 0.50$: TruthfulQA-MC requires $\tau^*$ to drop to
+$0.6931 = \ln 2$ (the entropy of a 2-cluster equal-split) to
+keep acc $\ge 0.50$, costing more coverage; HaluEval-QA can
+hold $\tau^* = 1.0889$ and keep more questions in the answered
+set. This is the structural reason TruthfulQA-MC's $\kappa$ is
+lower than HaluEval-QA's even when both benchmarks' high-
+entropy regions look comparable.
+
+**(c) $\alpha_3 = 0.75$ degenerate on both benchmarks.**
+$\text{cov}@0.75 = 0$ on TruthfulQA-MC AND on HaluEval-QA.
+**No threshold $\tau$ in the empirical sweep grid (102 points
+per benchmark) yields acc $\ge 0.75$ on an answered subset of
+size $\ge n_{\min} = 10$.** This is a hard ceiling at the
+configuration: deployment-grade accuracy ($\ge 75\%$) cannot
+be reached from a base model at greedy accuracy $\le 0.30$
+through abstention alone at this scale. It is the strongest
+single piece of evidence that an abstention/escalation
+product layer over §13.10-grade signals at this configuration
+**cannot reach a deployment-grade subset** — even if the
+verdict had been STRONG, $\alpha_3$ degeneracy would have
+forced any deployment claim to operate at $\alpha < 0.75$
+target-accuracy bands.
+
+**Mapping to Chunk 6 §(3) failure-mode catalogue.** The §15.1
+result hits one of the four pre-pinned failure modes exactly
+(benchmark asymmetry, §15.2 Chunk 2c above) and is *adjacent*
+to a second:
+
+- **"High AURC lift but tiny coverage"** (Chunk 6 §(3) item
+  1): pinned signature was $\delta$ STRONG-range AND $\kappa <
+  0.10 \to$ SATURATION. The actual outcome is $\delta$
+  STRONG-range AND $\kappa \in [0.10, 0.20)$ on the worst
+  benchmark $\to$ MARGINAL — one band higher than the pinned
+  failure-mode prediction. The cascade did not fire that
+  mode, but the underlying mechanism (delta-rich, kappa-poor
+  at $\alpha_2$) is what the failure mode anticipated.
+
+The remaining two pre-pinned failure modes ("good coverage
+but weak error capture", "STRONG blocked by CI demotion") are
+NOT fired by this run. Both are documented and ruled out by
+the headline numbers above.
+
 ---
 
 
