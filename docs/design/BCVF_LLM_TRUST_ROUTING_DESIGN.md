@@ -11977,6 +11977,71 @@ There is no "merged $\tau$" anywhere in §15.3.
   trust at intermediate $r(q)$), that would be a distinct
   policy and require a fresh §0.8 commitment.
 
+**Risk signal pin (the central §15.3 design decision).**
+
+Per the user-pinned constraint that §15.3 use a single risk
+scalar and that the §15-style entropy be preferred absent a
+strong reason otherwise, the §15.3 risk signal is pinned as:
+$$
+r(q) \;=\; H_{\text{src}_{i^*}}(q)
+$$
+where $i^*$ is Stage A's `winning_source_id(q)` (the source
+whose greedy is the winning cluster's representative) and
+$H_{\text{src}_{i^*}}(q)$ is that source's semantic-entropy
+scalar from the §13.10 / §14a.2 pre-computed K=10 NLI-
+clustered protocol. **Higher $H$ means higher per-question
+hallucination risk on Stage A's selected answer; Stage B's
+policy abstains when the risk exceeds $\tau$.**
+
+This is a §15.1-analogue applied to V1's selected source
+rather than to Qwen's greedy: when V1 picks Qwen, $r(q)$
+equals §15.1's risk signal; when V1 picks Llama or Mistral,
+$r(q)$ equals that source's per-source entropy. The novel
+content of §15.3 is the joint behavior on questions where
+V1 selects a different source than Qwen — that joint object
+was not exercised by §13 / §14 / §15.
+
+**Why this pin is defensible** (positive answers to the three
+§0.8 questions a non-default risk signal would have to
+answer; recorded here for the default too).
+
+- **Why more defensible than alternatives?** $H_{\text{src}}$
+  is the only LLM-domain scalar in this codebase that has
+  cleared the §11 0.60 marginal bar on both benchmarks at
+  N=100 (§13.10's verdict-of-record). Other candidate signals
+  (winning-cluster weight margin, min-entropy across all 3
+  sources) lack this prior validation.
+- **Why does it not reopen §13 in disguise?** §13 measured
+  AUC of $H_{\text{src}}$ against ground-truth correctness
+  (a correlation-of-observable claim). §15.3 uses the same
+  scalar as a per-question risk score driving an answer/
+  abstain policy applied to **Stage A's selected answer** (a
+  different metric class). The structurally novel content is
+  the joint $(r(q), c(q))$ distribution on V1-selects-non-
+  Qwen questions, which §13 did not exercise.
+- **Why is it implementable without new infrastructure?**
+  All required quantities are pre-computed in the §14a.2 on-
+  disk dump per §14a.2's prose (`each source's greedy +
+  entropy, per-question consumer weights, selected answer for
+  each variant, per-question correctness label for each
+  candidate`). No new model loads, no new NLI calls, no new
+  generation. Pure CPU post-processing, mirroring §15.1.
+
+**Alternative signals considered and explicitly NOT pinned.**
+
+| Candidate | What it measures | Reason not pinned |
+|---|---|---|
+| $\min_i H_{\text{src}_i}(q)$ | most-confident source's entropy | Independent of which source V1 actually selected; weakly tied to Stage A's decision |
+| $W_{k^*} - W_{k_{\text{runner}}}$ | winning-cluster margin (selector decisiveness) | Pure selector-level signal; lacks §13/§15 prior validation |
+| $W_{k^*} / \sum_k W_k$ | winning-cluster fraction (consensus strength) | Same lack-of-validation issue; range $[1/M, 1]$ at M=3 |
+| Cross-source NLI disagreement (§13.11-style) | inter-source agreement on V1's answer | Closer to §13.11 reframed; would require fresh §0.8 to justify reopening that closed hypothesis class |
+| Any ensemble of two of the above | hybrid scalar | Forbidden by §15.3 Chunk 3c's "no ensemble" pin |
+
+§15.3 uses **exactly one scalar**: the winning-source's
+per-source semantic entropy $H_{\text{src}_{i^*}}(q)$. No
+primary-plus-secondary, no ensemble, no fallback. Adding any
+alternative would require a fresh §0.8 amendment to §15.3.
+
 ---
 
 
