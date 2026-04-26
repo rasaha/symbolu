@@ -12176,6 +12176,91 @@ benchmark). A §15.3 STRONG must demonstrate that adding Stage
 A's selector produces operationally meaningful lift over the
 single-source policy — not merely lift over random abstention.
 
+**Verdict bands (pinned; exhaustive partition over $\Delta\kappa$).**
+
+Per the user-pinned constraint that the §15.3 verdict
+subordinate everything to $\Delta\kappa$ as the primary
+scalar, the partition is **one-dimensional**: a single
+ordered cascade driven by $\Delta\kappa$, with all secondary
+diagnostics ($\delta_\text{AURC}$, operating-point triples,
+the §14a.2 V1 full-coverage reference) explicitly **not
+band-influencing**.
+
+This is structurally simpler than §15.1's 2D $(\delta,
+\kappa)$ cascade. The simpler cascade is justified because
+§15.3 has already inherited Stage A's V1-vs-Baseline-B
+accuracy lift from §14a.2 (a fixed configuration choice, not
+a §15.3 measurement), and the remaining operational question
+is binary: *does adding Stage B's abstention layer to V1's
+selected answer beat §15.1's single-source abstention at the
+same $\alpha_2$ target on the same benchmark?* $\Delta\kappa$
+is the cleanest single scalar that answers it.
+
+**Verdict cascade (pinned, ordered, exhaustive).** The §15.3
+verdict is the **first** matching rule below. Rule 5 has no
+positive condition; the cascade is exhaustive over $\mathbb{R}$
+by construction.
+
+1. **REGRESSION** — $\Delta\kappa < -0.02$.
+2. **STRONG** — $\Delta\kappa \ge +0.10$.
+3. **USEFUL_INTERNAL** — $\Delta\kappa \ge +0.05$.
+4. **MARGINAL** — $\Delta\kappa \ge +0.02$.
+5. **SATURATION** — explicit residual catch-all
+   ($\Delta\kappa \in [-0.02, +0.02)$).
+
+Rules 1–4 are mutually exclusive by ordering. Rule 5 catches
+the residual deterministically. **No secondary metric
+participates in the cascade.** Secondary diagnostics
+($\delta_\text{AURC}$, $\text{ecr}$, $\text{far}$, the
+$(\text{cov}, \text{ecr}, \text{far})$ triples) are reported
+in the result section but never re-classify the verdict.
+
+**Operational meanings per band** (assuming the pinned
+$\kappa_{\S15.1} = 0.26$ baseline):
+
+| Verdict | $\Delta\kappa$ range | Implied $\kappa_\text{hybrid}$ | Meaning |
+|---|---|---|---|
+| STRONG | $\ge +0.10$ | $\ge 0.36$ | Substantively higher cov@$\alpha_2$ than §15.1; product-relevant lift |
+| USEFUL_INTERNAL | $[+0.05, +0.10)$ | $[0.31, 0.36)$ | Visibly better than §15.1; internal-research value |
+| MARGINAL | $[+0.02, +0.05)$ | $[0.28, 0.31)$ | Small detectable lift |
+| SATURATION | $[-0.02, +0.02)$ | $[0.24, 0.28)$ | Operationally equivalent to §15.1 |
+| REGRESSION | $< -0.02$ | $< 0.24$ | Actively worse than §15.1 |
+
+**Acceptance / rejection rules** (one-to-one mapped to the
+cascade; mirrors §15.1 Chunk 4c structure).
+
+| Verdict | Authorizes | Forecloses |
+|---|---|---|
+| **STRONG** | Drafting §15.4 — full hybrid pre-commitment with TruthfulQA-MC extension and product-layer scope (separate §0.8). | VC-brief changes (§13.9 hold remains); auto-deployment without §15.4; cross-benchmark claims absent §15.4. |
+| **USEFUL_INTERNAL** | Documenting the §14+§15 hybrid as having internal-research operational value at this single-benchmark scale. | §15.4 product investment; cross-benchmark claims; VC-brief changes. |
+| **MARGINAL** | Recording §15.3 as acknowledged but unactionable. | §15.4 follow-up; internal-research operational claims; product investment; VC-brief changes. |
+| **SATURATION** | Documenting §15.3 as operational null; extending the §13/§14/§15 closure prose to cover the §14+§15 hybrid metric class. | Same as MARGINAL. |
+| **REGRESSION** | Closing the §14+§15 hybrid construct at this configuration. §13.9 hold remains; the closure prose extends to "answer-selection AND single-source abstention AND hybrid all saturated/regressed." | Same as SATURATION. |
+
+**Demotion rule (STRONG-only, bootstrap CI on $\Delta\kappa$).**
+If the cascade returns STRONG but the bootstrap CI lower
+bound on $\Delta\kappa$ is $\le 0$, the verdict is demoted to
+**USEFUL_INTERNAL** with explicit `STRONG_BUT_CI_DEMOTION`
+annotation. Mirrors §15.1 Chunk 4c's STRONG-only demotion
+exactly. USEFUL_INTERNAL / MARGINAL / SATURATION / REGRESSION
+are NOT subject to demotion — same operational-scope
+reasoning as §15.1.
+
+**Boundary-case audit table (illustrative, deterministic).**
+
+| $\Delta\kappa$ | Cascade trace | Verdict |
+|---|---|---|
+| $+0.099$ | rule 1 NO; rule 2 NO ($\Delta\kappa < +0.10$); rule 3 YES | **USEFUL_INTERNAL** |
+| $+0.019$ | rules 1–3 NO; rule 4 NO ($\Delta\kappa < +0.02$); rule 5 catches | **SATURATION** |
+| $-0.020$ | rule 1 NO ($\Delta\kappa \not< -0.02$ at boundary); rules 2–4 NO; rule 5 catches | **SATURATION** |
+| $-0.021$ | rule 1 YES; remaining rules not evaluated | **REGRESSION** |
+
+The first two rows mirror §15.1's near-boundary demotion
+pattern. The third and fourth rows document the REGRESSION
+boundary inclusivity precisely: $\Delta\kappa = -0.020$ is NOT
+regression (rule is strict-less-than), but $\Delta\kappa =
+-0.021$ is.
+
 ---
 
 
