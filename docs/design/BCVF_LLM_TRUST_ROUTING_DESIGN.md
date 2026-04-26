@@ -10353,6 +10353,55 @@ substitutes, re-decodes, or rewrites that answer. The
 policy's only degree of freedom is the per-question
 answer/abstain decision.
 
+**Secondary observable (pinned: none).** §15.1 explicitly does
+NOT pin a secondary observable. Rationale: every candidate
+alternative scalar (cluster count, max-cluster fraction,
+normalized entropy by $\ln K$, greedy-answer log-probability,
+§13.11 / §13.12 / §13.18 scores, §14a / §14a.2 V1 trust
+weights) either requires reading dump fields that the §15
+pinned schema in the previous block does not include, or is a
+monotone transform of $H(q)$ producing identical risk-coverage
+rankings. The "one primary, optional one secondary" allowance
+collapses under §15's pinned-input constraint to *one primary
+only*. The sanity-check role a secondary observable would
+play is filled by the random-abstain matched-coverage baseline
+pinned in §15.1's baselines block below. Adding a true second
+observable would require a fresh §0.8 commitment in a §15.2.
+
+**Risk policy (pinned).** Per-question deterministic threshold
+rule:
+$$\text{policy}_\tau(q) = \begin{cases} \text{ANSWER } a(q) & \text{if } r(q) < \tau \\ \text{ABSTAIN} & \text{if } r(q) \ge \tau \end{cases}$$
+where $r(q) = H(q)$ is the pinned risk score and $a(q)$ is the
+pinned §13.10 greedy completion. The threshold $\tau$ is the
+policy's only free parameter. Ties at $r(q) = \tau$ resolve to
+ABSTAIN (deterministic, conservative — the rare-tie case does
+not change combined-classification outcomes at N=100).
+
+**Threshold-sweep protocol (pinned).** §15 evaluates the policy
+across the full operational range by sweeping $\tau$ over the
+empirical risk-score distribution per benchmark:
+
+- The sweep grid is the **sorted unique values of $r(q)$ on
+  the benchmark**, plus $\tau = -\infty$ (always abstain
+  trivially: empty answered subset) and $\tau = +\infty$
+  (always answer: full answered subset). At N=100 this yields
+  at most 102 evaluation points per benchmark.
+- All operational metrics (residual accuracy, coverage, error
+  capture, false abstention, AURC) are computed at every
+  point on this grid. No grid is hand-picked; no $\tau$ is
+  hand-picked.
+- The sweep is computed independently per benchmark.
+  Combined classification across the two benchmarks happens
+  at the metric level (per §15.1's bands block), not at the
+  threshold level — there is no "merged $\tau$" that applies
+  to both benchmarks.
+
+Pinning the sweep this way prevents post-hoc threshold
+selection on the data. Once the dumps are opened, every
+threshold's metrics are computed mechanically; the §15
+verdict reads off the pre-committed bands from the resulting
+per-benchmark risk-coverage curves.
+
 ---
 
 
