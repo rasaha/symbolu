@@ -10270,6 +10270,45 @@ on this pre-commitment landing first; per §0.8, looking at the
 data before the bands are pinned would be exactly the
 discipline-erosion failure mode §15 exists to avoid.
 
+### 15.1 Pre-commitment — Selective abstention scout on existing §13.10 dumps
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any inspection of
+`probe_semantic_entropy.json` or
+`probe_semantic_entropy_halueval_qa.json`. Specification,
+primary observable, operational metrics, success bands,
+baselines, and acceptance/rejection rules below cannot be
+redefined post-hoc once the data is opened.
+
+**Relationship to §13/§14 — what §15 is and is not.** §15 is
+not a continuation of §13's single-axis program (closed in
+§13.19) nor of §14's system-level scout program (closed in
+§14c). It is a fresh top-level chapter under §0.8 with a
+different question, different metric class, and different
+acceptance rule:
+
+- §13 measured AUC of an observable against per-question
+  ground-truth correctness. §15 takes the §13.10 observable
+  *as given* (AUC 0.661) and measures whether thresholding
+  it into an answer/abstain policy yields operational value.
+- §14 measured end-to-end accuracy delta of a BCVF-shaped
+  *answer selector* against naive aggregation. §15 does not
+  change the answer at all — it only decides whether the
+  pinned greedy answer is delivered or abstained.
+- §15 produces no new claim about whether BCVF transfers to
+  LLMs. It produces a claim about whether the §13.10 score,
+  which already exists, supports a useful answer/abstain
+  policy at this configuration.
+
+§15's outcome cannot reopen §13 or §14 hypothesis classes by
+construction — no new observable is introduced, no answer
+replacement is performed, no new model is run. A §15 STRONG
+result authorizes internal investment in an abstention /
+escalation product layer over §13.10-grade signals; a §15
+SATURATION documents that the §13.10 ceiling does not even
+support useful abstention at this scale. Neither outcome
+alters §13.9's external-framing hold.
+
 ---
 
 
