@@ -9130,6 +9130,258 @@ as a §0.8 deviation, not absorbed silently.
 - Variant A entropy 2nd-difference per-source scalar (alternative
   scout in §14a.2 conditional on §14a MARGINAL).
 
+### 14b Result — system-level scout returned SCOUT_SATURATION; LLM transfer line closed at all tested experimental structures
+
+The §14a pre-committed scout has been executed at N=100 on
+HaluEval-QA. Combined classification per pre-committed bands:
+**`SCOUT_SATURATION`**. The system layer adds nothing measurable
+on top of naive 3-source majority voting at this configuration.
+Combined with §13.19's 5-of-5 single-axis null, this is
+comprehensive evidence that BCVF-for-LLMs does not transfer at
+any tested experimental structure on this codebase. The autonomy-
+domain BCVF claim stands independently on §6.1 evidence and is
+unaffected.
+
+**Result table:**
+
+| Variant | Accuracy | Δ vs Baseline-B (pp) | Sign-test wins/losses | Sign-test p |
+|---|---|---|---|---|
+| Baseline-A (Qwen single-greedy) | 0.300 | — | — | — |
+| Baseline-B (uniform majority vote) | 0.300 | 0.00 (reference) | — | — |
+| **V1 (softmin trust, τ = 0.5)** | **0.330** | **+3.00** | 4/1 | 0.3750 |
+| **V2 (thresholded exclusion + uniform survivors)** | **0.300** | **+0.00** | 0/0 | 1.0000 |
+
+**Combined classification under §14a's pre-committed bands:**
+
+- STRONG (Δ ≥ +5pp for both AND p < 0.05 for at least one): **NO**
+  — V1 is +3pp (below 5pp), V2 is 0pp.
+- DIRECTIONAL (Δ_V2 ≥ +3pp AND Δ_V1 ≤ 0pp): **NO** — V2 is 0pp,
+  V1 is +3pp.
+- MARGINAL (Δ_v in (0, +3] for both): **NO** — V2 is 0pp, not in
+  open lower bound.
+- REGRESSION (Δ_v < −3 for either): **NO**.
+- Falls through to **SATURATION** by partition definition.
+
+The classification follows the pre-committed bands exactly. Per
+§0.8 discipline, the bands cannot be retroactively renegotiated;
+SCOUT_SATURATION is the binding outcome.
+
+**Sign-test analysis.** The "ties" (questions where the variant's
+selected answer agrees with Baseline-B's selected answer) dominate
+both comparisons:
+
+- **V1 vs Baseline-B:** 5 questions where the answers differed
+  (4 V1-wins, 1 V1-loss); 95 questions where V1 and Baseline-B
+  selected the same answer. Two-sided binomial test on 4/1 wins/
+  losses gives p = 0.375. Not significant at α = 0.05.
+- **V2 vs Baseline-B:** 0 questions where the answers differed
+  (V2 picked the same answer as Baseline-B on all 100 questions
+  in this run). Sign-test p = 1.0 trivially.
+
+**The structural read:** At this configuration (M = 3 cross-
+family sources, semantic-entropy scalar, weighted majority vote
+selector), the *majority-vote-itself* dominates the outcome
+across nearly every question. The BCVF-shaped weighting (V1) and
+the BCVF-shaped exclusion (V2) only produce different answers
+than naive majority voting when:
+
+1. The 3 sources do NOT have a clear 2-of-3 majority answer
+   (otherwise majority wins regardless of weight), AND
+2. The BCVF-shaped weights or exclusion shifts which candidate
+   answer wins the weighted vote.
+
+Empirically, that joint condition fired on 5 questions for V1
+and 0 questions for V2 across N=100. **The system layer
+genuinely has very little leverage at M=3 with weighted majority
+vote, regardless of how the BCVF scalar weights are computed.**
+
+**Statistical-power caveat.** Sign-test on 5 non-tied questions
+is severely under-powered. A true 80% V1 win-rate (against
+Baseline-B on differences) would still produce a non-significant
+p-value at this n. The 4/1 result is consistent with both "V1
+slightly better" and "noise around 50%." We cannot distinguish
+those two hypotheses from §14a alone. Running with M=5 sources
+(more disagreement opportunities), or with highest-weight-source
+selector (more sensitive to weight differences), or at N=500
+(more statistical power for any per-question lift) would all
+provide larger non-tied samples for a more powerful sign test —
+but none of those are pre-committed by §14a, and per the §14a
+SCOUT_SATURATION verdict, no follow-up is authorized without a
+fresh §0.8 commitment.
+
+**Three analytical observations the result supports:**
+
+**(a) V1 (softmin trust) shows a small numerical lift but not a
+statistically significant one.** Δ_V1 = +3pp is below the
+DIRECTIONAL +3pp threshold's strict-inequality (V1's pre-
+committed bound was Δ_V1 ≤ 0pp for DIRECTIONAL, so V1 lifting
+*disqualifies* DIRECTIONAL even if V2 had also lifted). The
+sign-test 4/1 result on 5 differences cannot statistically
+distinguish "V1 slightly better" from "noise." Per §0.8, the
+small numerical lift does not unlock any band more permissive
+than SATURATION because the strict band partition treats
+$\Delta_V \in (0, +3]$ and $\Delta_V \in [-3, 0]$ as different
+buckets, and the mixed-bucket case (one variant in MARGINAL,
+one in SATURATION) falls through to SATURATION by code
+construction.
+
+**(b) V2 (thresholded exclusion) is structurally degenerate at
+M = 3.** With three sources and per-question median entropy as
+threshold $\theta$, V2 always either:
+
+- excludes exactly one source (the highest-entropy one) and
+  uniform-averages the other two — equivalent to a 2-of-3
+  vote where the excluded source's vote is dropped, OR
+- in tied-at-median cases, falls back to all-three uniform —
+  identical to Baseline-B.
+
+In both cases, the resulting majority winner is the same answer
+as Baseline-B's 3-source uniform majority *whenever the
+remaining 2 sources have a 2-of-2 majority on the same answer
+that Baseline-B picked*. With M = 3 and 3 sources usually
+producing 2-of-3 majorities, this overlap is near-total. Hence
+$\Delta_V_2 = 0$ on N=100 is not surprising — it is structurally
+near-inevitable. **V2's null result at M = 3 is largely an
+artifact of the consumer-selector interaction, not a clean test
+of "thresholded exclusion adds nothing."** A fairer test of V2
+would require M = 5 sources (more degrees of freedom for the
+threshold to bite) or a highest-weight-source selector (which is
+more sensitive to V2's weight differences). Neither is pre-
+committed by §14a.
+
+**(c) System-layer bandwidth is severely limited at M = 3 +
+weighted-majority-vote.** On 95 of 100 questions, V1 and
+Baseline-B selected the same answer; on 100 of 100, V2 and
+Baseline-B selected the same answer. The system layer can only
+differentiate from naive majority voting when there is no clear
+majority among the 3 sources. With 3 instruction-tuned sources
+on factual QA, that joint condition fires on a small fraction
+of questions. **The result is consistent with "BCVF-shaped
+routing has the right idea but limited leverage at this
+ensemble scale" — not with "BCVF-shaped routing actively
+hurts."** REGRESSION was the band that would have indicted
+BCVF-as-routing; SATURATION is the band that says "indistinguishable
+from naive aggregation at this scale."
+
+These three observations together support a precise narrowing
+of the negative finding: *§14a does not falsify BCVF-shaped
+routing in general; it falsifies BCVF-shaped routing as a
+useful lift over naive 3-source majority voting on HaluEval-QA
+with the §14a-pinned configuration (semantic-entropy scalar,
+softmin τ=0.5 or median-threshold exclusion, weighted majority
+vote selector, N=100).*
+
+**Combined picture across §13 and §14a — LLM transfer line now
+closed at all tested experimental structures.**
+
+| Program | Hypothesis class | Status |
+|---|---|---|
+| §13.10 | sample-space, single-model SE | MARGINAL_PASS (0.661 / 0.661, baseline of record) |
+| §13.11 | sample-space, cross-family ensemble | combined ANTI |
+| §13.12 | internal-state, single-snapshot EigenScore | combined ANTI |
+| §13.14 | temporal, K-sample text-level 2nd-diff | combined ANTI |
+| §13.16 | temporal, K-sample hidden-state 2nd-diff | combined ANTI (both inverted) |
+| §13.18 | temporal, single-trajectory forced-allocation | combined ANTI |
+| **§14a** | **system-level, multi-source BCVF routing** | **SCOUT_SATURATION** |
+
+**6 of 7 distinct hypothesis classes ANTI or saturated; §13.10
+remains the strongest single result on record, and §14a's
+saturation confirms the system-level structure does not lift
+the §13.10 ceiling either.** The honest external framing is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100 + the cross-
+> family triple (Qwen + Llama + Mistral), no literature-aligned,
+> mechanism-motivated, or system-level BCVF construction tested
+> in this codebase clears the §13.10 marginal baseline of AUC
+> 0.661 (or, for system-level, the corresponding accuracy
+> baseline of 0.300 on HaluEval-QA's uniform majority vote) at
+> the combined-classification rule. The LLM transfer line is
+> closed at all six tested experimental structures.*
+
+**What §14a authorizes (per pre-commitment):**
+
+- **Documenting §14a as the closing scout for the LLM track.**
+  The §14a SCOUT_SATURATION result is binding under §0.8.
+  Together with §13.19's exhaustive single-axis closure, this
+  is comprehensive null-finding evidence.
+- **Promoting §13.10 as the strongest result of record across
+  both §13 and §14.** Reaffirmed by 6-of-7 comparisons; no
+  single-axis or system-level construction has lifted it.
+- **The honest "BCVF for LLMs at this configuration does not
+  produce a usable hallucination detector" framing** for any
+  internal-research referencing (still with §13.9 holding the
+  external framing unchanged).
+
+**What §14a does NOT authorize:**
+
+- **Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.** Per
+  §13.9, external-framing revision requires STRONG band on both
+  benchmarks at any §13 or §14 probe. SCOUT_SATURATION is the
+  opposite of that gate. The §13.9 hold remains in force and is
+  *strengthened* by §14a's confirmation of saturation at the
+  system-integration level.
+- **Promotion to full §14.** SCOUT_SATURATION explicitly
+  forecloses the full §14 investment per the §14a promotion
+  rules. Full §14 was only authorized on STRONG or DIRECTIONAL.
+- **Any post-hoc renegotiation of the §14a bands to recategorize
+  the V1 +3pp result as MARGINAL or DIRECTIONAL.** The bands
+  were pre-committed; the V1 strict-inequality on DIRECTIONAL
+  ($\Delta_{V_1} \le 0$) and the V2 strict-inequality on
+  MARGINAL (both deltas $> 0$) were both written explicitly into
+  §14a. Attempting to rebucket the result post-hoc would be a
+  §0.8 violation.
+- **Any further LLM-domain probe in §13 or §14 without a
+  fundamentally different reframing.** Specifically: a fresh
+  §0.8 commitment that justifies why a different model class
+  (Qwen-32B+, GPT-4-class, multi-modal), different benchmark
+  family (TriviaQA-Generation, NQ-Open, CNN/DM summarization),
+  or different formal structure (cross-domain transfer rather
+  than within-domain probe) would be expected to produce a
+  different outcome from what 6 hypothesis classes have already
+  shown. Without that, no further LLM compute is authorized.
+- **Any claim that affects the autonomy-domain BCVF result.**
+  §6.1 stands independently. §14a's outcome bears only on the
+  LLM-domain transfer claim at the constructions tested, not on
+  the robotics-domain validation.
+
+**Final scope statement — both §13 and §14 chapters now closed.**
+
+- **§13** closed in §13.19 across all tested single-axis
+  hypothesis classes (§13.11 cross-family, §13.12 EigenScore,
+  §13.14 BCVF text-level 2nd-diff, §13.16 BCVF hidden-state
+  2nd-diff, §13.18 single-trajectory forced-allocation gap).
+- **§14** closed in §14b at the scout level. The full §14
+  was explicitly conditional on §14a STRONG or DIRECTIONAL;
+  §14a SCOUT_SATURATION forecloses the full investment.
+
+The §13.8 future-work list documented three remaining out-of-§13
+directions: (a) single-trajectory observable (executed in §13.18),
+(b) system-level integration (executed in §14a), and (c) model-
+scale upgrade. (a) and (b) have now been tested and produced ANTI
+or saturated combined classifications. **Only (c) — model-scale
+upgrade — remains untested**, and the §13.8 documentation
+explicitly states it requires a fresh §0.8 commitment with
+revised baseline before any new probe-vs-baseline comparisons.
+None of (a), (b), or (c) was guaranteed to find a positive result
+ex ante; the §13/§14 program was designed to test the cheapest,
+most literature-aligned options first and exhaustively.
+
+The autonomy-domain BCVF claim (§6.1's N=21 sign-test passed)
+stands wholly independent of any §13 or §14 outcome. The §13/§14
+LLM-domain program tested whether the BCVF formalism transfers
+to an adjacent domain at a specific scale; the answer at this
+configuration is no, six different ways. That is itself a clean,
+publishable methodological null — a contribution to the LLM
+hallucination-detection literature about which combinations of
+literature-aligned single-axis methods do AND do not transfer
+cleanly to 7B-class LLMs with practical NLI scoring at N=100.
+
+**Artifacts:**
+
+- `scripts/probe_system_level_scout.py` (commit `975e99c`).
+- `docs/experiments/probe_system_level_scout_halueval_qa.md`
+  and `.json`.
+
 ---
 
 
