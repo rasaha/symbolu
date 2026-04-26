@@ -10580,6 +10580,87 @@ at this configuration. Does NOT authorize a §15.2 product
 investment, external-framing changes, or any cross-domain
 claim. The §13.9 hold remains in force.
 
+**MARGINAL (rule 4; documents small but non-zero operational
+signal, no investment).** $\delta \ge +0.02$ AND $\kappa \ge 0.10$
+(and not matching rules 1–3 above).
+
+Operational meaning: the policy yields a small detectable
+abstention signal — at least 2 AURC points of error
+suppression AND $\ge 10\%$ answered at $\ge 50\%$ accuracy on
+the worst benchmark — but the lift is below the threshold
+where internal-research documentation as a usable selective-
+prediction signal is warranted.
+
+Authorizes recording the §15 result as an acknowledged but
+unactionable signal. Does NOT authorize a §15.2 follow-up,
+internal-research operational claims, product investment, or
+external-framing changes. The §13.9 hold remains.
+
+**SATURATION (rule 5; explicit residual catch-all; documents
+null operational result).** Any $(\delta, \kappa)$ not
+matching rules 1–4. Specifically the residual covers:
+$\delta \in [-0.02, +0.02)$ for any $\kappa$, or
+$\delta \ge +0.02$ but $\kappa < 0.10$, or any other case
+the prior rules do not catch.
+
+Operational meaning: the §13.10 score, used as an abstain
+threshold, is operationally indistinguishable from random
+abstention at the worst benchmark on the integrated AURC
+metric, OR yields some AURC lift that cannot meaningfully
+support coverage at $\ge 50\%$ accuracy. The selective-
+prediction policy adds nothing measurable on top of random
+abstention at this configuration.
+
+Authorizes documenting §15 as an operational null. Does NOT
+authorize a §15.2 follow-up, any product investment,
+internal-research operational claims, or external-framing
+changes. Combined with §13/§14's prior closures, a §15
+SATURATION extends the LLM transfer line's closure from
+"answer-selection saturated" to "answer-selection AND
+selective-prediction both saturated at this configuration."
+
+**REGRESSION (rule 1; closes §13.10-as-selective-prediction-
+risk-score line).** $\delta < -0.02$.
+
+Operational meaning: the §13.10 score is anti-correlated with
+correctness in the selective-prediction operational sense —
+abstaining the high-entropy questions actively hurts AURC
+relative to random abstention by more than 2 AURC points on
+the worst benchmark.
+
+The §13.10 baseline of record's AUC = 0.661 against ground-
+truth correctness remains unaffected (REGRESSION here is on a
+different metric class), but the operational route through
+selective abstention is foreclosed at this configuration.
+Does NOT authorize any external-framing changes; the §13.9
+hold remains for the same reason it does in §15 SATURATION.
+
+**Boundary-case audit table (illustrative, deterministic).**
+
+The cascade is pinned with strict numerical thresholds. The
+three specific cases flagged in §0.8 review plus three
+additional edge cases, each traced through the cascade
+mechanically:
+
+| $\delta$ | $\kappa$ | Cascade trace | Verdict |
+|---|---|---|---|
+| $+0.10$ | $0.29$ | rule 1 NO; rule 2 NO ($\kappa < 0.30$); rule 3 YES | **USEFUL_INTERNAL** |
+| $+0.049$ | $0.25$ | rule 1 NO; rule 2 NO; rule 3 NO ($\delta < +0.05$); rule 4 YES | **MARGINAL** |
+| $-0.019$ | $0.40$ | rule 1 NO ($\delta \not< -0.02$); rules 2–4 NO; rule 5 catches | **SATURATION** |
+| $+0.10$ | $0.30$ | rule 1 NO; rule 2 YES (both boundaries inclusive) | **STRONG** |
+| $+0.15$ | $0.10$ | rule 1 NO; rule 2 NO ($\kappa < 0.30$); rule 3 NO ($\kappa < 0.20$); rule 4 YES | **MARGINAL** |
+| $-0.025$ | $0.50$ | rule 1 YES; remaining rules not evaluated | **REGRESSION** |
+
+The first three rows match the cases §0.8 review explicitly
+called out. Rows 4–6 record additional anchors: row 4
+documents that the STRONG boundary at $(+0.10, 0.30)$ is
+inclusive on both axes; row 5 documents that high $\delta$
+with low $\kappa$ cascades down to MARGINAL through the
+$\kappa$ hurdles; row 6 documents that REGRESSION wins
+regardless of $\kappa$ once the cascade fires on rule 1.
+Future revisits should be able to verify the script's
+classification matches this table exactly on these inputs.
+
 ---
 
 
