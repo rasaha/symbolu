@@ -12386,6 +12386,33 @@ Numbered components:
 - Auto-promoting any verdict to §15.4 (any §15.4 work
   requires its own §0.8 commitment).
 
+**Reduced-form authorization rationale — §15.3 only exists
+because upstream artifacts already exist.**
+
+§15.3's compactness (single benchmark, single observable,
+single selector, single consumer, no fresh model calls) is
+authorized **only because the necessary upstream artifacts
+already exist on disk**:
+
+- The §14a.2 HaluEval-QA dump
+  (`docs/experiments/probe_system_level_scout_v2_halueval_qa.json`)
+  exists per §14a.2 / §14c's artifacts list.
+- §13.10's semantic-entropy scalar definition is pinned by
+  §13.10's verdict-of-record (and is not invalidated by the
+  §13.20 N=200 observation, which does not re-classify
+  §13.10).
+- §15.1's abstention machinery exists and is validated in
+  `scripts/probe_selective_abstention.py` per §15.2's
+  verdict-of-record.
+
+**If any of these upstream artifacts did not already exist,
+this chapter would not be authorized in this reduced form.**
+A from-scratch hybrid program would require fresh §14-class
+and §15-class generation runs as their own §0.8 commitments
+before any hybrid scout could land. §15.3 is structurally a
+post-processing composition of three closed predecessors;
+it is not an attempt to reopen them.
+
 **What §15.3 explicitly does NOT test.**
 
 The hybrid scout's claim is narrowed deliberately to keep the
@@ -12426,33 +12453,6 @@ operational behavior. Specifically, §15.3 is NOT testing:
   observation, not a re-classification of §13.10) are all
   closed under §0.8 at their pinned configurations. §15.3
   cannot revisit any of them.
-
-**Reduced-form authorization rationale — §15.3 only exists
-because upstream artifacts already exist.**
-
-§15.3's compactness (single benchmark, single observable,
-single selector, single consumer, no fresh model calls) is
-authorized **only because the necessary upstream artifacts
-already exist on disk**:
-
-- The §14a.2 HaluEval-QA dump
-  (`docs/experiments/probe_system_level_scout_v2_halueval_qa.json`)
-  exists per §14a.2 / §14c's artifacts list.
-- §13.10's semantic-entropy scalar definition is pinned by
-  §13.10's verdict-of-record (and is not invalidated by the
-  §13.20 N=200 observation, which does not re-classify
-  §13.10).
-- §15.1's abstention machinery exists and is validated in
-  `scripts/probe_selective_abstention.py` per §15.2's
-  verdict-of-record.
-
-**If any of these upstream artifacts did not already exist,
-this chapter would not be authorized in this reduced form.**
-A from-scratch hybrid program would require fresh §14-class
-and §15-class generation runs as their own §0.8 commitments
-before any hybrid scout could land. §15.3 is structurally a
-post-processing composition of three closed predecessors;
-it is not an attempt to reopen them.
 
 **§15.3 chunk roll-up — pre-commitment now complete.**
 
