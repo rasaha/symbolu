@@ -11230,6 +11230,69 @@ mechanical readout, not interpretation.
   readable summary with per-benchmark headline, operating
   points, combined classification, and cascade trace).
 
+**Per-benchmark headline result.**
+
+| benchmark | greedy_acc | $W$ | AURC_random | AURC_policy | $\delta$ | $\delta$ 95% CI | $\kappa$ | $\kappa$ 95% CI |
+|---|---|---|---|---|---|---|---|---|
+| truthfulqa_mc | 0.250 | 75 | 0.7500 | 0.6341 | **+0.1159** | [+0.0213, +0.1925] | **0.1400** | [0.0000, 0.3600] |
+| halueval_qa | 0.300 | 70 | 0.7000 | 0.5609 | **+0.1391** | [+0.0432, +0.2152] | **0.2600** | [0.0000, 0.5700] |
+
+**Combined under worst-benchmark rule** (Chunk 4a):
+$\delta = \min_b \delta_b = +0.1159$ (TruthfulQA-MC),
+$\kappa = \min_b \kappa_b = +0.1400$ (TruthfulQA-MC).
+
+**Cascade trace** (mechanical readout per §15.1 Chunks 4a /
+4b; matches the implementation's `_cascade_trace` output
+exactly):
+
+```
+rule 1 REGRESSION: delta=+0.1159 < -0.02         -> NO
+rule 2 STRONG:     delta>=+0.10 AND kappa>=0.30  -> NO   (kappa=0.14 < 0.30)
+rule 3 USEFUL_INTERNAL: delta>=+0.05 AND kappa>=0.20  -> NO   (kappa=0.14 < 0.20)
+rule 4 MARGINAL:   delta>=+0.02 AND kappa>=0.10  -> YES
+```
+
+**Demotion rule (Chunk 4c) — did NOT fire.** The §15.1
+demotion rule is STRONG-only by construction; since the
+point-estimate verdict is MARGINAL (rule 4), the demotion
+rule does not apply and `verdict_annotations = []`. For
+audit completeness: had the verdict been STRONG, both
+benchmarks' $\delta$ CI lower bounds are strictly positive
+(0.0213 on TruthfulQA-MC, 0.0432 on HaluEval-QA), so the
+demotion rule would NOT have fired even if STRONG had
+classified.
+
+**Three observations the headline supports.**
+
+**(a) The AURC lift over random is statistically supported on
+both benchmarks individually.** Both per-benchmark $\delta$
+95% CI lower bounds are strictly positive (0.021 and 0.043).
+The §13.10 entropy is genuinely truth-correlated for selective
+prediction in the integrated AURC sense, not within sampling
+noise. This is qualitatively distinct from a "saturation"
+verdict — the policy does carry signal.
+
+**(b) The $\delta$ point estimates are individually in the
+STRONG band on both benchmarks.** TruthfulQA-MC $\delta =
++0.1159$ and HaluEval-QA $\delta = +0.1391$ each clear the
+$\delta \ge +0.10$ STRONG threshold from §15.1 Chunk 4a. **It
+is the $\kappa$ hurdle, not the $\delta$ hurdle, that
+prevents a higher verdict band.** The §13.10 entropy can
+identify wrong-answer enrichment in the integrated curve but
+cannot deliver enough operating-point density at $\alpha_2 =
+0.50$ on the worst benchmark.
+
+**(c) The $\kappa$ CI lower bounds are 0.000 on both
+benchmarks.** TruthfulQA-MC $\kappa$ CI = $[0.000, 0.360]$,
+HaluEval-QA $\kappa$ CI = $[0.000, 0.570]$. Bootstrap cannot
+rule out "no qualifying $\tau$ on the resample" at $N = 100$.
+This is a power-of-measurement observation, not a $\kappa = 0$
+claim — see §15.2 Chunk 2c (asymmetry analysis) and Chunk 6
+§(3) failure-mode "STRONG blocked by CI demotion" for the
+analogous discussion at $\delta$. A larger-N re-run would
+likely tighten this band; that re-run is NOT authorized by
+§15.1 and would require a fresh §0.8 commitment.
+
 ---
 
 
