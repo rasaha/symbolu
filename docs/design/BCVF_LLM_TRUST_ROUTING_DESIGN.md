@@ -8861,6 +8861,138 @@ remaining directions; none are pre-committed by §13.19.
 - `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.md` and `.json`.
 - `docs/experiments/probe_forced_alloc_2diff_halueval_qa.md` and `.json`.
 
+### 13.20 Observation — §13.10 protocol re-executed at N=200 (post-§13.19 deviation; not a re-classification of §13.10)
+
+**Status: §0.8 deviation from §13.19 closure, surfaced
+explicitly.** §13.19 explicitly stated "no further §13 single-
+axis probes are authorized." A re-execution of §13.10's
+protocol at N=200 was nonetheless run in the runpod container
+on both benchmarks after §15.2 had landed. Because that run
+both (a) was not pre-committed, and (b) overwrote the §13.10
+N=100 dumps §15.2 was computed against (see §15.2 Postscript),
+the result is recorded here as a documented observation, NOT
+as a §13 re-classification or a §13.20-as-pre-commitment.
+
+**Relationship to §13.10.** §13.10's verdict-of-record was
+**TRUTH_CORRELATED_MARGINAL at N=100** (AUC 0.661 on both
+TruthfulQA-MC and HaluEval-QA, identical to three decimals).
+That verdict was pinned at the N=100 configuration and
+remains binding under §0.8. **§13.20 does not change §13.10's
+classification.**
+
+**N=200 observation (per-benchmark numerical record).**
+
+| Benchmark | N | Greedy correct | W | Greedy accuracy | Mean H (correct) | Mean H (wrong) | Mean H (all) | **AUC** | Per-benchmark §11 classification |
+|---|---|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC | 200 | 48 | 152 | 0.240 | 1.379 | 1.646 | 1.582 | **0.596** | `NOISE_BAND_LIFT` (below §11 0.60 marginal bar) |
+| HaluEval-QA  | 200 | 54 | 146 | 0.270 | 1.114 | 1.597 | 1.467 | **0.679** | `TRUTH_CORRELATED_MARGINAL` |
+
+**Combined under the worst-benchmark rule** (§13.10 / §13.11 /
+… discipline): the worst benchmark is TruthfulQA-MC at AUC
+0.596, which falls in `NOISE_BAND_LIFT`. **At N=200 the
+combined classification under the same rule §13 used would be
+`NOISE_BAND_LIFT`**, one band below §13.10's N=100
+`TRUTH_CORRELATED_MARGINAL`.
+
+**Three honest observations the data supports.**
+
+**(a) The §13.10 N=100 result of 0.661 / 0.661 was likely at
+the upper end of the AUC's sampling distribution.** At N=200
+the TruthfulQA-MC AUC is 0.596 (a 0.065-point drop). The
+HaluEval-QA AUC is 0.679 (a 0.018-point rise). Both shifts
+are within the order of magnitude one would expect from
+N=100 → N=200 sampling-variance reduction at this AUC range,
+with a mean-reversion direction on TruthfulQA-MC (toward the
+broader distribution's mean). **The N=100 marginal-pass on
+TruthfulQA-MC was real, but its 0.661 point estimate did not
+generalize at N=200.**
+
+**(b) Per-benchmark mean-entropy separations widened on
+HaluEval-QA, narrowed on TruthfulQA-MC.** HaluEval-QA's
+correct-vs-wrong mean H separation grew from 0.486 nats
+(N=100) to 0.483 nats (N=200, essentially unchanged) but its
+mean-H-correct dropped from 1.176 to 1.114 — the correct
+subset became more concentrated. TruthfulQA-MC's correct-vs-
+wrong separation narrowed from 0.392 nats (N=100) to 0.267
+nats (N=200), with both means shifting up. **TruthfulQA-MC's
+distractors at the larger sample produce more entropy in
+correct-greedy responses too, eroding the gap.**
+
+**(c) The cross-benchmark AUC convergence visible at N=100
+(0.661 / 0.661) does not hold at N=200 (0.596 / 0.679).**
+The N=100 cross-benchmark identity of AUCs to three decimals
+was treated in §13.10 as evidence the metric was benchmark-
+portable. The N=200 data weakens that claim: the AUCs diverge
+by 0.083 points at the larger sample, with TruthfulQA-MC
+falling below the §11 0.60 marginal bar and HaluEval-QA
+remaining above it.
+
+**Implications for §13.9 hold.** §13.9 gates external-framing
+changes to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` on a STRONG-
+band lift on both benchmarks at any §13 / §14 / §15 probe.
+The N=200 result is *further from STRONG* than the N=100
+result was — TruthfulQA-MC dropped from 0.661 to 0.596,
+moving below even the marginal bar. **§13.9 hold is
+strengthened, not weakened, by §13.20.** No external-framing
+change is authorized on this evidence.
+
+**Implications for §15.** §15.2's MARGINAL verdict was
+computed against the N=100 dumps (see §15.2 Postscript) and
+is preserved as the §15.2 verdict-of-record. §13.20 does NOT
+authorize:
+
+- Recomputing §15 against the N=200 dumps. That would require
+  a fresh top-level §0.8 commitment with revised PINNED_N /
+  PINNED_W / parity gates.
+- Re-classifying §15.2's MARGINAL based on a degraded
+  upstream AUC. §15.2's verdict was about the §13.10 score's
+  selective-prediction value at the §13.10-of-record
+  configuration; the N=200 observation is upstream of §15's
+  metric class and operates under a different N.
+- Documenting §13.20's NOISE_BAND_LIFT as a "stronger §15
+  null." The two are separate metric classes; combining them
+  rhetorically would be the §0.8 violation pattern.
+
+**What §13.20 explicitly does NOT authorize.**
+
+- A §13.21 or any further §13 probe. §13.19 closure is
+  reaffirmed; this section is documentation of an off-
+  protocol observation, not a re-opening of §13.
+- Updating §13.10's verdict-of-record. The N=100 verdict
+  remains binding.
+- Updating §15.1's pinned constants. The §15.2 verdict-of-
+  record's reproducibility break is documented in the §15.2
+  Postscript, not patched.
+- VC-brief changes (§13.9 hold remains; §13.20 strengthens
+  rather than weakens it).
+- Cross-domain claims. The autonomy-domain BCVF claim (§6.1)
+  is unaffected.
+
+**Audit lesson.** §13's closure rule "no further §13 single-
+axis probes are authorized" is binding under §0.8 but cannot
+prevent off-protocol re-runs of producer scripts. The §15.1
+parity guard caught the resulting reproducibility break at the
+§15 layer (PARITY_GATE_FAILED would fire on a re-run); §13's
+closure had no equivalent guard at the §13.10 layer because
+the §13.10 producer is upstream of any §13 probe. Future
+chapters should consider build-time fingerprinting of upstream
+dumps so off-protocol overwrites are detected at the next
+layer's first invocation.
+
+**Artifacts.**
+
+- `scripts/probe_semantic_entropy.py` (unchanged §13.10
+  producer).
+- `docs/experiments/probe_semantic_entropy_truthfulqa_mc.json`
+  (now contains N=200 dump; **was** the §13.10 N=100
+  TruthfulQA-MC dump §15.2 was computed against).
+- `docs/experiments/probe_semantic_entropy_halueval_qa.json`
+  (now contains N=200 dump; **was** the §13.10 N=100
+  HaluEval-QA dump §15.2 was computed against).
+- `docs/experiments/probe_semantic_entropy_truthfulqa_mc.md`
+  and `probe_semantic_entropy_halueval_qa.md` (corresponding
+  N=200 markdown reports).
+
 ## §14 System-level BCVF integration on LLMs (new chapter)
 
 §13.19 closed the §13 single-axis program exhaustively across
