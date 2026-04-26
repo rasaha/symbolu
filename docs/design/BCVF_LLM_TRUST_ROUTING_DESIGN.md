@@ -11567,6 +11567,75 @@ configuration is no, eleven different ways.
   (human-readable summary with parity gates, per-benchmark
   headlines, operating points, cascade trace, final verdict).
 
+### 15.2 Postscript — upstream §13.10 dumps overwritten post-run
+
+**Status: §0.8 deviation surfaced explicitly per §15.1 Chunk 7.**
+
+After §15.2 Chunks 2a–2f landed (`175fb96`), the §13.10
+producer script `scripts/probe_semantic_entropy.py` was re-
+executed in the runpod container at `--num-questions 200`
+on both benchmarks. Because that script writes to the same
+on-disk paths §15.1 reads from
+(`docs/experiments/probe_semantic_entropy.json` and
+`docs/experiments/probe_semantic_entropy_halueval_qa.json`),
+**the §13.10 N=100 dumps that §15.2 was computed against
+have been overwritten with N=200 versions.**
+
+**§15.2 verdict-of-record is unchanged.** The artifacts
+`docs/experiments/probe_selective_abstention.json` and
+`probe_selective_abstention.md` were written from the N=100
+dumps and contain the N=100 numbers
+(`greedy_accuracy = 0.250 / 0.300`, `total_wrong_W = 75 / 70`,
+`delta = +0.1159`, `kappa = 0.1400`, `verdict = MARGINAL`).
+Those artifacts are preserved. The §15.2 verdict cited in
+Chunks 2a–2f remains binding under §0.8 and is not
+recomputed against the new N=200 dumps.
+
+**What is broken.** §15.1's reproducibility chain from
+upstream dumps to verdict. Re-running
+`scripts/probe_selective_abstention.py` against the current
+on-disk dumps would hit `PARITY_GATE_FAILED` (exit 3): the
+N=200 dumps yield $N = 200$, $W = 152 / 146$, and
+$\text{AURC}_\text{random} = 0.760 / 0.730$, none of which
+match the §15.1-pinned $N = 100$, $W = 75 / 70$, and
+$\text{AURC}_\text{random} = 0.750 / 0.700$. The script
+would abort with the explicit "§15.1 assumptions no longer
+hold" message — exactly as designed. **This is not a §15
+verdict change; it is a reproducibility-trail break.**
+
+**§0.8 discipline this satisfies.** §15.1 Chunk 7 required
+that "any deviation discovered at run time must be flagged
+in the §15 result section as a §0.8 deviation, not absorbed
+silently." The deviation here was upstream of the §15.1
+script's run-time loop — the §13.10 dumps were overwritten
+post-run, not at run time — but the spirit of the rule
+applies: the change is being surfaced, not absorbed.
+
+**What this postscript does NOT authorize.**
+
+- **Recomputing the §15 verdict against N=200 dumps.** §15.1's
+  pinned configuration is N=100; substituting N=200 would
+  require a fresh top-level §0.8 commitment with revised
+  PINNED_N / PINNED_W / parity gates. Not authorized here.
+- **Updating `PINNED_N` / `PINNED_W` in the script** to silence
+  the parity gate. That would silently invalidate the §15.2-
+  of-record by re-purposing its checkpoint. Not authorized.
+- **Re-classifying §13.10.** §13.10's N=100 verdict (AUC
+  0.661 / 0.661, `TRUTH_CORRELATED_MARGINAL`) is the §13.10-
+  of-record. The N=200 result is a separate empirical
+  observation documented in §13.20 below.
+- **Restoring the N=100 dumps from regeneration.** Re-running
+  §13.10 at N=100 today would produce different per-question
+  scores due to sampling stochasticity — the original §15.2
+  computation cannot be exactly reproduced even with N
+  restored.
+
+**Cross-reference.** The N=200 §13.10 numbers are recorded in
+§13.20 below as a separate §13 observation (NOT a re-
+classification of §13.10). §15.2's MARGINAL verdict and
+§13.10's marginal-pass-of-record both stand at their pinned
+configurations.
+
 ---
 
 
