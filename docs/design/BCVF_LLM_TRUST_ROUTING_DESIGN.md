@@ -5685,23 +5685,39 @@ semantic entropy remains the strongest result in this codebase.
 The K-sample-divergence single-axis program is closed at the
 Qwen-7B + DeBERTa-v3-base + N=100 configuration.
 
-**Update — §13.18 pre-committed (single-trajectory observable
-class).** The §13.17 narrowing explicitly left open the single-
-trajectory observable class — observables computed across token
-positions WITHIN one greedy trajectory rather than across multiple
-sampled trajectories. §13.18 pre-commits a single-trajectory
-forced-allocation-gap probe that measures the moment Softmax
-forces an allocation despite low absolute logit magnitude (the
-mechanical seam where hallucination enters per ChatGPT framing
-referenced in §13.17). Pinned bands `FORCED_ALLOC_2DIFF_*` use
-the same numerical partition as §13.11–§13.16 since the §13.10
-baseline is unchanged. Implementation
-(`scripts/probe_forced_alloc_2diff.py`) is a separate
-authorization gate. See §13.18 for the full pinned specification.
-This is a different hypothesis class than §13.10–§13.16's K-
-sample-divergence-based probes and does NOT violate the §13.17
-program closure (which was scoped specifically to K-sample-
-divergence-based observables).
+**Update — §13.18 pre-committed and §13.19 result landed.** The
+single-trajectory forced-allocation-gap probe (§13.18) — testing
+the un-rejected single-trajectory observable class §13.17 left
+open — has been executed at N=100 on both benchmarks. Combined
+classification on the pinned primary scalar:
+`FORCED_ALLOC_2DIFF_ANTI_FINDING` (TruthfulQA-MC AUC 0.549,
+HaluEval-QA AUC 0.571). A separately notable diagnostic finding:
+the Variant-A entropy-only 2nd-difference reached AUC 0.701 on
+HaluEval-QA (second-best HaluEval result of the §13 program,
+behind only §13.11's 0.716), but TruthfulQA-MC at 0.536 still
+forces the combined classification to ANTI under the worst-
+benchmark rule even if Variant A were used as primary. See §13.19
+for the result section, the Variant A finding analysis, and the
+full combined-matrix discussion.
+
+**Status of the §13 program after §13.19 — single-axis program
+exhausted across all hypothesis classes.** §13.17 closed the
+K-sample-divergence single-axis sub-program. §13.19 closes the
+single-trajectory single-axis sub-program. Five literature-
+aligned and mechanism-motivated single-axis hypothesis classes
+have been tested (sample-space single-model, sample-space cross-
+family, internal-state single-snapshot, K-sample temporal evolution
+at text-level and hidden-state-level, single-trajectory forced-
+allocation). **All five collapse under the worst-benchmark rule
+because TruthfulQA-MC defeats every confidence-based scalar
+construction tested.** §13.10 single-snapshot semantic entropy
+(AUC 0.661 on both benchmarks) remains the strongest result in
+this codebase across all five tested hypothesis classes. The §13
+single-axis program is now exhaustively closed. Any future LLM-
+domain work would need to test a fundamentally different
+experimental structure (system-level integration, model-scale
+upgrade, or benchmark substitution) under a fresh §0.8
+pre-commitment in a new top-level section (§14 or beyond).
 
 ### 13.2 Experiment specification
 
@@ -6061,28 +6077,61 @@ codebase's Qwen-7B + base-NLI configuration):
   internal continuous state did not fix the structural problem.
   See §13.17 for the result section and the further-tightened
   narrowing.
+- **§13.18 single-trajectory forced-allocation-gap observable.**
+  Run at N=100 on both benchmarks with per-token greedy logit
+  capture, stride-1 grid, primary scalar
+  `max_t |accel(g_t)|` where
+  $g_t = \tilde{H}_t - \alpha \tilde{M}_t$ at α=1.0. TruthfulQA-MC
+  0.549 / HaluEval-QA 0.571 → combined
+  `FORCED_ALLOC_2DIFF_ANTI_FINDING`. Notable Variant-A diagnostic
+  (entropy-only 2nd-difference, no $M_t$ term, no z-norm) reached
+  HaluEval-QA AUC 0.701 — second-best HaluEval result of the §13
+  program — but TruthfulQA-MC at 0.536 keeps the worst-benchmark
+  combined classification at ANTI for any scalar choice. The $M_t$
+  component as defined hurts the signal beyond raw entropy alone;
+  the mechanism analysis's underlying claim about absolute logit
+  magnitude is not falsified, only the specific operational
+  definition `max − global_mean` is ruled out. See §13.19 for the
+  result section and the Variant A finding analysis.
 
-**§13 single-axis program closed (post-§13.17).** The four single-
-axis revisions above (cross-family, EigenScore, BCVF text-level,
-BCVF hidden-state) exhaust the literature-aligned single-axis
-hypothesis classes available at this codebase's Qwen-7B + DeBERTa-
-v3-base + N=100 configuration. None of the four lifts AUC above
-§13.10's 0.661 marginal baseline on the combined-classification
-rule. **No further single-axis probes are authorized in §13.**
+**§13 single-axis program exhausted (post-§13.19).** The five
+single-axis revisions above (cross-family, EigenScore, BCVF text-
+level, BCVF hidden-state, single-trajectory forced-allocation)
+exhaust both hypothesis classes available to the §13 program: K-
+sample-divergence-based observables (§13.11/§13.12/§13.14/§13.16)
+and single-trajectory observables (§13.18). All five collapse
+under the worst-benchmark rule because TruthfulQA-MC defeats every
+confidence-based scalar construction tested. **No further §13
+single-axis probes are authorized.** See §13.19 for the closing
+statement and combined-matrix analysis.
 
-**Open as future-work pre-commitments outside §13** (each requires
-a fresh §0.8-style commitment in a new top-level section if
-pursued; none are pre-committed by §13.17):
+**Open as future-work pre-commitments outside the §13 single-
+axis program** (each requires a fresh §0.8-style commitment in a
+new top-level section if pursued; none are pre-committed by
+§13.17 or §13.19):
 
 - **Single-trajectory forced-allocation-gap observable
-  (PROMOTED to pre-commitment as §13.18).** The signal class
-  §13.17's narrowing leaves explicitly open — does not depend on
-  K-sample-divergence dynamics that produced the smooth-monotonic
-  series §13.14 and §13.16 both ran into. **§13.18 is now the
-  authoritative source for this construction**; the math below is
-  retained as background documentation for the rationale, but the
-  pinned specification, AUC bands, and acceptance rules are in
-  §13.18.
+  (EXECUTED in §13.18 / §13.19; combined `ANTI_FINDING`).** The
+  signal class §13.17's narrowing left explicitly open has now
+  been tested. Pinned primary scalar produced TruthfulQA-MC AUC
+  0.549 / HaluEval-QA AUC 0.571, combined `ANTI_FINDING` per the
+  worst-benchmark rule. **§13.18 is the pre-commitment;
+  §13.19 is the result section.** The math below is retained as
+  background documentation for the rationale; the pinned
+  specification, AUC bands, and acceptance rules remain in §13.18.
+  No further single-trajectory single-axis probe is authorized
+  without a fresh §0.8 commitment.
+
+  Notable Variant-A diagnostic finding (entropy-only 2nd-difference
+  without the $M_t$ component): HaluEval-QA AUC reached 0.701 —
+  second-best HaluEval result of the §13 program — but TruthfulQA-
+  MC at 0.536 keeps the worst-benchmark combined classification at
+  ANTI even if Variant A had been the pinned primary. The Variant
+  A finding is documented in §13.19 as analytical evidence about
+  which component of the forced-allocation-gap construction
+  carried signal vs noise; it does NOT constitute a §13.18 pass
+  and does NOT authorize a §13.20 follow-up without a fresh §0.8
+  commitment.
 
   **Mechanism rationale (re-stating ChatGPT's framing of where
   hallucination enters in autoregressive LLMs):**
@@ -6275,24 +6324,28 @@ invalidate the autonomy result.
 
 For VC / investor communication, the autonomy track should
 continue to be presented on its own merits. The LLM design
-doc is an internal research artifact; all four single-axis
-revision probes (§13.7 / §1.3 / §13.12 / §13.14 / §13.16)
-have now been executed and none lifts AUC above §13.10's
-0.661 marginal baseline on the combined-classification rule.
-None is positioned as a deliverable.
+doc is an internal research artifact; all five single-axis
+revision probes (§13.7 / §1.3 / §13.12 / §13.14 / §13.16 /
+§13.18) have now been executed and none lifts AUC above
+§13.10's 0.661 marginal baseline on the combined-classification
+rule. None is positioned as a deliverable.
 
 `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` "Honest scope caveats"
 already reflects the current external-facing framing
 ("BCVF is not positioned as an LLM hallucination detector"),
 and that framing is *strengthened*, not weakened, by the
-combined §13 evidence. The §13 single-axis program is closed
-post-§13.17. The framing will be revisited only if some future
-out-of-§13 probe (system-level integration, single-trajectory
-temporal observable, or model-scale upgrade — see §13.8 future-
-work list) lifts AUC to the 0.75 strong band on BOTH TruthfulQA-
-MC and HaluEval-QA. No probe in the §13 program has cleared
-this bar. No VC-facing material is updated on the basis of any
-§13 result, either in isolation or combined.
+combined §13 evidence: 5-of-5 single-axis hypothesis classes
+tested produce combined `ANTI_FINDING` under the worst-benchmark
+rule, with TruthfulQA-MC defeating every confidence-based scalar
+construction tested. The §13 single-axis program is exhausted
+post-§13.19. The framing will be revisited only if some future
+out-of-§13 probe (system-level integration in the §6.1-style
+configuration, model-scale upgrade, or benchmark substitution
+to a less hostile second benchmark — see §13.8 future-work list)
+lifts AUC to the 0.75 strong band on BOTH benchmarks (or on a
+fresh pre-committed benchmark pair). No probe in the §13 program
+has cleared this bar. No VC-facing material is updated on the
+basis of any §13 result, either in isolation or combined.
 
 ### 13.10 Revision experiment results — semantic-entropy on TruthfulQA + HaluEval
 
@@ -8409,6 +8462,326 @@ gate. No VC-brief / §13.9 changes here — those remain gated on
 both benchmarks. Nothing in §13.18 retroactively modifies §13.10–
 §13.17 results, the §13 program closure for K-sample-divergence
 observables, or the autonomy-domain §6.1 result.
+
+### 13.19 Result — Forced-allocation gap also did not transfer; §13 single-axis program now exhausted across all hypothesis classes
+
+The §13.18 pre-committed probe has been executed at N=100 on both
+benchmarks. Combined classification on the pinned primary scalar:
+**`FORCED_ALLOC_2DIFF_ANTI_FINDING`**. Combined with §13.11 / §13.12
+/ §13.14 / §13.16, this is the **5-of-5 single-axis null** across
+both hypothesis classes the §13 program could test (K-sample-
+divergence-based observables in §13.10–§13.16; single-trajectory
+forced-allocation-gap observable in §13.18). The §13 single-axis
+program is now exhausted at this codebase's Qwen-7B + DeBERTa-v3-
+base + N=100 configuration across every literature-aligned and
+mechanism-motivated single-axis construction tested.
+
+A separately notable diagnostic finding is documented below
+(§13.19's "Variant A entropy-only diagnostic" subsection): the
+entropy-only 2nd-difference on HaluEval-QA reached AUC 0.701 —
+the second-best HaluEval result across the entire §13 program,
+behind only §13.11's cross-family 0.716. This does NOT change
+the pre-committed §13.18 classification (which is bound to the
+pinned primary scalar) but is informative about which component
+of the forced-allocation-gap construction was carrying signal
+versus noise. The combined-classification rule across both
+benchmarks would still resolve to `ANTI_FINDING` even if Variant A
+were used as the primary, because TruthfulQA-MC at AUC 0.536
+sits well below the 0.641 boundary regardless of which scalar is
+chosen — a finding consistent with the broader pattern that
+TruthfulQA-MC has defeated every §13 single-axis method tested.
+
+**Result table (primary scalar):**
+
+| Benchmark | N | Greedy acc | Mean greedy length (non-pad tokens) | Trajectories too short | AUC primary | Δ vs §13.10 | Per-run band |
+|---|---|---|---|---|---|---|---|
+| TruthfulQA-MC | 100 | 0.320 | 116.6 | 1 | **0.549** | −0.112 | `FORCED_ALLOC_2DIFF_ANTI_FINDING` |
+| HaluEval-QA | 100 | 0.320 | 100.9 | 11 | **0.571** | −0.090 | `FORCED_ALLOC_2DIFF_ANTI_FINDING` |
+
+Combined classification under the §13.18 worst-benchmark rule:
+ANTI on both. Primary scalar means by class:
+
+| Benchmark | Mean primary correct | Mean primary wrong | Δ (correct − wrong) |
+|---|---|---|---|
+| TruthfulQA-MC | 10.8969 | 11.0854 | −0.188 (wrong higher, expected direction, weak) |
+| HaluEval-QA | 9.7695 | 10.5236 | −0.754 (wrong higher, expected direction, weak) |
+
+Note that on the primary scalar the means are in the *expected*
+direction (wrong > correct, indicating higher acceleration
+correlates with wrong answers as the pre-committed sign predicted)
+on both benchmarks — but the rank-based AUC is only 0.549 / 0.571
+because within-class variance dominates the mean separation.
+
+**Math used (the construction that failed at the pinned-primary
+level).** For each question $q$ with greedy trajectory of length
+$T$ (T_actual = min(128, generated non-pad tokens), median 128,
+mean 116.6 on TruthfulQA-MC and 100.9 on HaluEval-QA), at each
+token position $t \in [\text{position\_min}, T]$ with stride 1:
+
+1. Capture raw pre-softmax logits $\mathbf{z}_t \in \mathbb{R}^{|V|}$
+   ($|V| = 152{,}064$ for Qwen2.5-7B).
+2. Confidence magnitude
+   $M_t = \max_j z_t[j] - \frac{1}{|V|}\sum_j z_t[j]$.
+3. Post-softmax entropy
+   $H_t = -\sum_j p_t[j] \log p_t[j]$ where
+   $p_t = \text{softmax}(\mathbf{z}_t)$.
+4. Per-trajectory z-normalize both:
+   $\tilde{M}_t = (M_t - \bar{M})/\sigma_M$,
+   $\tilde{H}_t = (H_t - \bar{H})/\sigma_H$.
+5. Forced-allocation gap
+   $g_t = \tilde{H}_t - \alpha \cdot \tilde{M}_t$ with $\alpha = 1.0$
+   pinned.
+6. Centered second difference
+   $\text{accel}_t = g_{t+1} - 2 g_t + g_{t-1}$.
+7. Primary scalar (pinned per §13.18):
+   $\text{forced\_alloc\_2diff}(q) = \max_t |\text{accel}_t|$.
+8. AUC computed on $-\text{forced\_alloc\_2diff}$, pre-committed
+   direction *higher acceleration → forced-guess moment → more
+   likely wrong*.
+
+Three diagnostic secondary scalars were reported but not used for
+classification: $\text{mean}_t |\text{accel}_t|$,
+$\sum_t \text{accel}_t^2$, and the **Variant A entropy-only**
+diagnostic $\max_t |a^H_t|$ where
+$a^H_t = H_{t+1} - 2 H_t + H_{t-1}$ — the same 2nd-difference
+operator applied to raw entropy without the $M_t$ component or
+z-normalization. This was pinned in §13.18 explicitly to test
+whether the $M_t$ component contributes any signal beyond entropy
+alone.
+
+**Variant A entropy-only diagnostic — substantive surprise.**
+The four scalar AUCs measured per benchmark:
+
+| Scalar | TruthfulQA-MC AUC | HaluEval-QA AUC |
+|---|---|---|
+| Primary `max\|accel(g)\|` (forced-allocation gap) | 0.549 | 0.571 |
+| Diagnostic `mean\|accel(g)\|` | 0.364 | 0.486 |
+| Diagnostic `Σ accel(g)²` | 0.381 | 0.600 |
+| **Variant A** `max\|accel(H)\|` (entropy only, no $M_t$, no z-norm) | **0.536** | **0.701** |
+
+The Variant A HaluEval AUC of **0.701** is the second-best
+HaluEval result across the entire §13 program, behind only
+§13.11's cross-family ensemble at 0.716. It clears the per-run
+`INTERNAL_STRONG` band on HaluEval-QA. **This is a genuine and
+unexpected finding**: a much simpler scalar (raw 2nd difference
+of per-token entropy, no z-normalization, no confidence-magnitude
+component) outperforms the mechanism-motivated forced-allocation
+gap on HaluEval-QA. On TruthfulQA-MC the Variant A AUC of 0.536
+is essentially the same as the primary's 0.549 — both noisy near
+random, both well below the ANTI threshold.
+
+**The Variant A finding does NOT change the §13.18 pre-committed
+classification.** Per §0.8 discipline, the primary scalar was
+pinned BEFORE the run. The classification follows the primary,
+not the diagnostics. The Variant A AUC is reported here as
+analytical data about which component carried signal, not as a
+post-hoc band override.
+
+**The Variant A finding ALSO does not unlock §13.9 even on its
+own merits.** The combined-classification rule across both
+benchmarks would resolve to ANTI even if Variant A were used as
+the primary, because TruthfulQA-MC at AUC 0.536 sits well below
+the 0.641 boundary for any scalar choice. The pattern across all
+five §13 single-axis probes is consistent: TruthfulQA-MC defeats
+every method tested, and the worst-benchmark rule then forces the
+combined classification to ANTI regardless of how strong the
+HaluEval-QA result is on the same probe. This is itself the most
+robust finding of the §13 program — a benchmark-pathology pattern
+that no scalar choice within the single-axis program reaches past.
+
+**Why the $M_t$ component hurt the signal — mechanism analysis
+partially falsified at this construction.**
+
+The §13.18 pre-commitment was motivated by the ChatGPT mechanism
+analysis: hallucination is forced allocation by Softmax despite
+low absolute logit magnitude, so a signal that combines high
+entropy ($H_t$) AND low confidence magnitude ($M_t$) should be
+strictly more truth-correlated than entropy alone. The Variant A
+data falsifies that prediction at this construction: removing
+$M_t$ entirely (and removing the z-normalization) *improves* the
+signal on HaluEval (0.701 vs 0.571 primary) and is roughly
+equivalent on TruthfulQA (0.536 vs 0.549 primary).
+
+A plausible mechanical explanation for why $M_t$ as defined hurts:
+the centering by mean over the full vocab,
+$M_t = \max_j z_t[j] - \frac{1}{|V|}\sum_j z_t[j]$, has $|V| =
+152{,}064$ tokens. Most of those tokens have very negative
+pre-softmax logits at any given step (Qwen's vocabulary is
+dominated by long-tail entries that rarely fire). The mean over
+all logits is therefore dominated by that long tail, making $M_t$
+mostly a measure of *global logit-distribution shape* rather than
+*local "is the top token strongly preferred"*. Z-normalizing $M_t$
+within the trajectory then amplifies whatever within-question
+fluctuation that long-tail-bulk shape exhibits — fluctuation that
+has no obvious connection to per-position epistemic state.
+
+The mechanism analysis's underlying claim (that absolute logit
+magnitude information is lost in Softmax and that loss is
+mechanically connected to hallucination) is not falsified by this
+result — it is only the *specific operational definition* of
+$M_t$ as `max − global_mean` that is ruled out. Alternative $M_t$
+definitions that the §13.18 pre-commitment did not test:
+
+- $M_t = \max_j z_t[j] - \text{second\_max}_j z_t[j]$
+  (gap to runner-up — local "preference strength")
+- $M_t = \max_j z_t[j] - \text{quantile}_{0.99}(z_t)$
+  (top vs the 99th percentile — robust to long-tail bulk)
+- $M_t = \max_j z_t[j]$ (raw max logit, no centering)
+- $M_t = \log \sum_j e^{z_t[j]}$ (logsumexp / partition function
+  log — directly captures absolute logit-distribution scale)
+
+Any of these would be a separate §0.8 commitment if pursued. They
+are explicitly NOT pre-committed by §13.19 — listed only to
+document that the §13.18 result rules out one specific operational
+definition of $M_t$, not the broader mechanism-analysis claim
+about absolute logit magnitude.
+
+**This is the §0.8-discipline pattern working as designed.** The
+§13.18 pre-commitment fixed both the primary scalar and a
+diagnostic specifically for this case (that one component of the
+primary might be hurting beyond raw entropy). The diagnostic
+fired exactly the way its docstring said it would. We cannot
+post-hoc swap to Variant A, but we can report the finding cleanly
+and use it to inform any future §0.8 commitment that returns to
+this signal class.
+
+**Combined picture across all five §13 single-axis probes.**
+
+| Probe | Hypothesis class | TruthfulQA-MC | HaluEval-QA | Combined band |
+|---|---|---|---|---|
+| §13.10 baseline | sample-space, single model | **0.661** | **0.661** | `TRUTH_CORRELATED_MARGINAL` |
+| §13.11 cross-family | sample-space, ensemble | 0.633 | 0.716 | `CROSS_FAMILY_ANTI_FINDING` |
+| §13.12 EigenScore | internal-state, single-snapshot | 0.559 | 0.652 | `EMBEDDING_SPACE_ANTI_FINDING` |
+| §13.14 BCVF text-level 2nd-diff | temporal, K-sample text | 0.574 | 0.363 (inv) | `BCVF_2DIFF_ANTI_FINDING` |
+| §13.16 BCVF hidden-state 2nd-diff | temporal, K-sample internal | 0.462 (inv) | 0.449 (inv) | `HSEIG_2DIFF_ANTI_FINDING` |
+| §13.18 forced-allocation gap (primary) | temporal, single-trajectory logit | 0.549 | 0.571 | `FORCED_ALLOC_2DIFF_ANTI_FINDING` |
+| §13.18 Variant A entropy-only (diagnostic) | temporal, single-trajectory entropy | 0.536 | 0.701 | (not a pre-committed primary; reported) |
+
+Three robust patterns visible in this combined matrix:
+
+**Pattern 1 — §13.10 is the ceiling, not the floor.** Every
+single-axis revision underperforms §13.10's marginal baseline on
+the combined-classification rule. None lift above it. **5-of-5
+single-axis null at the combined level.** §13.10 single-snapshot
+semantic entropy remains the strongest result in this codebase
+across all five tested hypothesis classes.
+
+**Pattern 2 — TruthfulQA-MC consistently defeats every method.**
+Across all six measured AUCs (five primary + Variant A
+diagnostic), TruthfulQA-MC ranges from 0.462 to 0.661 with the
+non-§13.10 entries clustered in [0.462, 0.633]. Every revision
+loses ground vs §13.10 on this benchmark. The most plausible
+mechanism (consistent with literature; Farquhar 2024 reports the
+same TruthfulQA-vs-other-benchmarks pattern with semantic
+entropy): **TruthfulQA-MC's adversarial design — questions where
+models confidently share wrong answers — breaks confidence-based
+detection regardless of the specific scalar construction**.
+Every method we tested is some variant of "measure the model's
+confidence-related uncertainty"; questions where the model is
+wrong AND confident are by construction the hardest cases for any
+such method.
+
+**Pattern 3 — HaluEval-QA is more permissive but still does not
+unlock combined classification.** Two methods cleared the
+`INTERNAL_STRONG` per-run band on HaluEval-QA: §13.11 cross-family
+at 0.716 and §13.18 Variant A at 0.701. But the worst-benchmark
+combined-classification rule means the TruthfulQA-MC failure
+floors the combined band to ANTI for both. The pattern is
+substantive enough that ANY future probe seriously aiming for
+combined STRONG would need to either (a) clear TruthfulQA-MC
+specifically (which has not happened in any §13 probe), or (b)
+substitute a different second benchmark whose pathology is less
+hostile to confidence-based methods (TriviaQA-Generation is the
+literature-anchored candidate per Farquhar 2024's headline 0.78
+on it).
+
+**What this authorizes** (per §13.18 pre-commitment + §13.19
+result):
+
+- **Closing the §13 single-axis program at the exhaustive
+  level.** §13.17 closed the K-sample-divergence single-axis
+  sub-program. §13.19 now closes the single-trajectory single-
+  axis sub-program. Every literature-aligned and mechanism-
+  motivated single-axis hypothesis class available to this
+  codebase at Qwen-7B + DeBERTa-v3-base + N=100 has been tested
+  and produced ANTI under the combined-classification rule.
+  **No further §13 single-axis probes are authorized.**
+- **Authorizing the §13-program closing statement.** The honest
+  external framing is now: *on Qwen2.5-7B-Instruct + DeBERTa-v3-
+  base + N=100, no literature-aligned or mechanism-motivated
+  single-axis hallucination-detection method tested in this
+  codebase clears the §13.10 marginal baseline of AUC 0.661 on
+  both TruthfulQA-MC and HaluEval-QA. The five tested hypothesis
+  classes (sample-space single-model, sample-space cross-family,
+  internal-state single-snapshot, K-sample temporal evolution at
+  text-level and hidden-state-level, single-trajectory forced-
+  allocation) all collapse under the worst-benchmark rule because
+  TruthfulQA-MC defeats every confidence-based scalar construction
+  tested. The §13.10 baseline appears to be a saturation ceiling
+  for this configuration class, not a starting point.*
+- **Documenting the Variant A finding as a substantive analytical
+  observation.** Per-token entropy 2nd-difference on HaluEval-QA
+  reached AUC 0.701, comparable to §13.11's 0.716 and Farquhar
+  2024's reported ~0.70 on TruthfulQA-Generation. The finding is
+  reportable as evidence that the §13 single-axis ceiling on
+  HaluEval-QA specifically is around 0.70–0.72, not lower.
+- **Promoting §13.10 as the strongest §13 result on record.**
+  Confirmed by 5-of-5 single-axis comparisons. Any §13-related
+  external referencing should cite §13.10's marginal pass as the
+  strongest combined-classification result.
+
+**What this does NOT authorize:**
+
+- **Any update to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`.** Per
+  §13.9, external-framing revision requires `STRONG` on both
+  benchmarks at any §13 probe. No probe in §13 has cleared this.
+  The §13.9 hold remains in force and is *strengthened* by §13.19's
+  5-of-5 confirmation across five hypothesis classes.
+- **Post-hoc reinterpretation of §13.18 as a Variant-A pass.**
+  The pre-committed primary scalar was the forced-allocation gap
+  with α=1.0. Variant A is a diagnostic, not the pre-committed
+  primary. Reporting Variant A's HaluEval 0.701 as if it were
+  the §13.18 result would be a §0.8 violation. The classification
+  follows the primary; the diagnostic informs the analytical
+  narrative.
+- **Any single-axis follow-up probe in the §13 program.**
+  Five hypothesis classes tested; all combined-classification
+  ANTI. Another single-axis variant on the same benchmarks is
+  not authorized without a fresh §0.8 pre-commitment that
+  explicitly identifies what new hypothesis class it tests AND
+  what pathway around the TruthfulQA-MC pathology it proposes.
+- **Any claim about BCVF-for-LLMs in general.** §13.19 narrows
+  the negative claim to *single-axis observables under the BCVF
+  2nd-difference operator (and related single-snapshot scalars)
+  at the constructions tested*. System-level integration
+  (multi-source consumer with BCVF-shaped routing, the §6.1-style
+  configuration) is not tested and is not foreclosed; if pursued
+  it would be a separate §14 pre-commitment outside the §13
+  single-axis program.
+- **Any claim that affects the autonomy-domain BCVF result.**
+  §6.1's N=21 sign-test on `S3_map_error_accel` passed
+  independently and stands. §13.19's outcome bears only on the
+  LLM-domain transfer claim at the constructions tested, not on
+  the robotics-domain validation.
+
+**Status of the §13 program after §13.19.** Closed exhaustively
+at the single-axis level across five tested hypothesis classes.
+The §13.10 baseline (AUC 0.661 on both benchmarks,
+TRUTH_CORRELATED_MARGINAL) is the strongest result of record. Any
+future LLM-domain work on the BCVF transfer claim would need to
+test a fundamentally different experimental structure — specifically
+system-level integration (the §6.1-style configuration where
+BCVF-shaped routing decides among multiple sources and end-to-end
+accuracy is the metric, not isolated-observable AUC) — under a
+fresh §0.8 pre-commitment in a new top-level section (§14 or
+beyond). The §13.8 future-work list documents three honest
+remaining directions; none are pre-committed by §13.19.
+
+**Artifacts:**
+
+- `scripts/probe_forced_alloc_2diff.py` (commit `d5b7b65`).
+- `docs/experiments/probe_forced_alloc_2diff_truthfulqa_mc.md` and `.json`.
+- `docs/experiments/probe_forced_alloc_2diff_halueval_qa.md` and `.json`.
 
 ---
 
