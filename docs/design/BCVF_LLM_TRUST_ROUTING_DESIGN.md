@@ -11838,6 +11838,85 @@ chunks below are pinned from §13 / §14 / §15 prose only.
 Looking at the data before the bands are pinned would be
 the §0.8 violation pattern §15.3 is designed to prevent.
 
+**Stage A — answer-selection architecture (pinned).**
+
+Stage A is the §14a.2 NLI-clustered selector + V1 softmin
+trust consumer, fixed identical to the §14a.2 pinned
+configuration. Pinned because:
+
+- V1 softmin $\tau = 0.5$ produced the strongest BCVF-shaped
+  lift in the entire §13 / §14 program (+4pp accuracy over
+  Baseline-B on HaluEval-QA at N=100, per §14c).
+- The §14a.2 NLI-clustered selector is the post-§14a-audit
+  version that fixed the string-identity tie-breaking
+  degeneracy. It is the only §14 selector that produced
+  genuinely different Baseline-A vs Baseline-B numbers.
+- §15.3 is a hybrid scout, not a multi-selector comparison.
+  Pinning Stage A to one configuration keeps the
+  experimental variable narrow (Stage B's abstention layer).
+
+**Stage A specification (pinned):**
+
+- **Source set (M = 3, cross-family, all cached from §13.11
+  / §14a.2):** `Qwen/Qwen2.5-7B-Instruct`,
+  `meta-llama/Llama-3.1-8B-Instruct`,
+  `mistralai/Mistral-7B-Instruct-v0.3`.
+- **Per-source K = 10 stochastic samples** at T=1.0,
+  max_new_tokens=32, prompt `Q: ... A:`. Identical to
+  §13.10 / §13.11 / §14a.2 protocols.
+- **Per-source greedy answer** at T=0, max_new_tokens=32,
+  same prompt format.
+- **Per-source semantic entropy** $H_{\text{src}_i}(q)$ via
+  question-conditioned bidirectional NLI clustering of the
+  K=10 samples (DeBERTa-v3-base-mnli-fever-anli).
+- **V1 softmin consumer (pinned, single):**
+  $w_i^{V1} \propto \exp(-H_{\text{src}_i}(q) / \tau)$ with
+  $\tau = 0.5$ (autonomy default; §14a.2 pin).
+- **NLI-clustered selector (pinned, single):** cluster the
+  M=3 source greedies by question-conditioned bidirectional
+  NLI entailment, aggregate weights within each cluster,
+  pick winning cluster $k^* = \arg\max_k W_k$ (ties broken
+  by lowest cluster index), pick representative source
+  within winning cluster by highest individual weight (ties
+  by lowest source index). Identical to §14a.2's selector.
+
+**Stage A output (the per-question handoff to Stage B).**
+
+For each question $q$, Stage A produces:
+
+- `selected_answer(q)` — the answer string Stage A delivers
+  (winning cluster's representative-source greedy).
+- `winning_source_id(q)` $\in$ {Qwen, Llama, Mistral} —
+  which source's greedy was picked.
+- All three per-source semantic entropies
+  $\{H_{\text{src}_i}(q)\}_{i=1}^{3}$, including the winning
+  source's $H_{\text{src}_{i^*}}(q)$.
+- The winning cluster's aggregated weight $W_{k^*}$ and the
+  runner-up cluster's aggregated weight
+  $W_{k_{\text{runner}}}$.
+
+Stage A makes no abstention decision and consumes no
+threshold parameter. Its output is purely the answer plus
+the per-question selector context that Stage B can inspect.
+
+**What Stage A explicitly does NOT pin.**
+
+- Multiple consumers (V2 thresholded exclusion, V3 veto-only,
+  V4 deadband fallback). All deferred — V1 is pinned single.
+- Multiple selectors (highest-weight-source, string-matched,
+  uniform majority). Deferred.
+- Different source sets. M=3 cross-family is pinned; no
+  larger $M$, no model substitution, no single-source
+  fallback.
+- Re-running §14a.2 from scratch. The on-disk §14a.2 dump
+  at `docs/experiments/probe_system_level_scout_v2_halueval_qa.json`
+  is the pinned Stage A input. If that dump does not contain
+  the fields Stage B requires (`winning_source_id`, per-
+  source entropies, per-question correctness labels), §15.3
+  fails fast with `SCHEMA_MISMATCH` and requires a fresh
+  §0.8 amendment — mirroring §15.1's schema-mismatch
+  discipline.
+
 ---
 
 
