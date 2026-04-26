@@ -10880,6 +10880,133 @@ result section reads off them mechanically.
   N (a separate fresh §0.8 commitment) clears CI on both
   benchmarks.
 
+**Expected cost (pinned).**
+
+§15.1 is a **pure post-processing selective-prediction
+analysis** over already-computed §13.10 dumps. Reinforcing
+the framing: this is not a fresh experiment family in
+disguise.
+
+- **Compute:** CPU only. No GPU, no model loads, no NLI
+  forward passes, no generation calls of any kind.
+- **Inputs:** the two pinned dumps from Chunk 2b. Disk read
+  only; ~200 KB combined order of magnitude.
+- **Wall clock (estimated):** under 30 seconds total for
+  both benchmarks, including $B = 1000$ bootstrap resamples
+  per benchmark. Threshold sweep at $N=100$ yields ≤102 grid
+  points; bootstrap over 100 indices is sub-millisecond per
+  resample in numpy.
+- **External dependencies:** `numpy` + Python stdlib only. No
+  `transformers`, no `torch`, no HuggingFace cache, no
+  network access. `HF_HOME` / `HF_TOKEN` not consumed.
+
+**Report destination (pinned).**
+
+Two output artifacts, exactly:
+
+1. `docs/experiments/probe_selective_abstention.json` — single
+   machine-readable artifact covering both benchmarks.
+2. `docs/experiments/probe_selective_abstention.md` — single
+   human-readable summary report.
+
+**Mandatory JSON schema (top-level keys; each benchmark
+contributes one nested block):**
+
+```
+{
+  "schema_version": "15.1",
+  "n_questions": 100,
+  "bootstrap_B": 1000,
+  "bootstrap_seed": "SeedSequence(entropy=15)",
+  "benchmarks": {
+    "truthfulqa_mc": {
+      "greedy_accuracy": <float>,
+      "total_wrong_W": <int>,
+      "auc_random": <float>,
+      "auc_policy": <float>,
+      "delta_auc": <float>,
+      "delta_auc_ci": [<lo>, <hi>],
+      "kappa": <float>,
+      "kappa_ci": [<lo>, <hi>],
+      "operating_points": [
+        {"alpha": 0.35, "cov": <float>, "tau_star": <float>,
+         "ecr": <float>, "far": <float>},
+        {"alpha": 0.50, ...},
+        {"alpha": 0.75, ...}
+      ],
+      "threshold_sweep": [
+        {"tau": <float>, "cov": <float>, "acc": <float>,
+         "ecr": <float>, "far": <float>}, ...
+      ]
+    },
+    "halueval_qa": { ... same shape, alpha_1 = 0.40 ... }
+  },
+  "combined": {
+    "delta": <float>,
+    "kappa": <float>,
+    "verdict": "STRONG" | "USEFUL_INTERNAL" | "MARGINAL"
+             | "SATURATION" | "REGRESSION",
+    "verdict_annotations": []
+  }
+}
+```
+
+**Mandatory markdown report contents:**
+
+- Per-benchmark headline table:
+  $(\hat\delta_b, \text{CI}(\delta_b), \hat\kappa_b, \text{CI}(\kappa_b))$.
+- Per-benchmark operating-point table at all three $\alpha$:
+  $(\text{cov}@\alpha, \text{ecr}(\tau^*), \text{far}(\tau^*))$.
+- Combined $(\delta, \kappa)$ under the worst-benchmark rule.
+- Cascade trace mapping $(\delta, \kappa)$ to a verdict
+  (the same kind of explicit walk-through used in Chunk 4b's
+  audit table).
+- Final `verdict` and any `verdict_annotations`.
+
+**Pinned final verdict fields (in both JSON and markdown):**
+
+- `verdict` ∈ `{STRONG, USEFUL_INTERNAL, MARGINAL,
+  SATURATION, REGRESSION}` (exactly one).
+- `verdict_annotations`: list (possibly empty); may include
+  `STRONG_BUT_CI_DEMOTION` per Chunk 4c.
+
+**Implementation scope (pinned — the §15.1 execution
+boundary).**
+
+§15.1 **authorizes**:
+
+- Implementing `scripts/probe_selective_abstention.py` per
+  Chunks 2b–6.
+- Reading the two pinned input dumps.
+- Computing the pinned five operational metrics.
+- Running the verdict cascade and bootstrap CI exactly as
+  pinned.
+- Writing the two pinned output artifacts.
+
+§15.1 **does NOT authorize**:
+
+- Regenerating any §13.10 dump or any other §13/§14 dump.
+- Changing the correctness labeling protocol or rerunning
+  NLI on the dumps.
+- Substituting another benchmark for TruthfulQA-MC or
+  HaluEval-QA, or adding a third benchmark.
+- Changing the risk score $r(q)$ from §13.10 semantic
+  entropy to anything else.
+- Adding a secondary observable comparator (Chunk 2c pin).
+- Adding retrieval, routing, selector, or any consumer
+  logic beyond the pinned threshold rule.
+- Changing the threshold sweep grid, the $n_{\min}$ floor,
+  the pinned $\alpha$ targets, or any band threshold.
+- Auto-promoting any verdict to §15.2 — any §15.2 work
+  requires a fresh §0.8 commitment per Chunks 4a / 4c.
+- Updating `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` (per §13.9
+  hold; §15's metric class cannot satisfy the §13.9 gate by
+  construction).
+
+Any deviation discovered at run time must be flagged in the
+§15 result section as a §0.8 deviation, not absorbed
+silently.
+
 ---
 
 
