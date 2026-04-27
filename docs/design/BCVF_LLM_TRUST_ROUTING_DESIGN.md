@@ -14806,6 +14806,127 @@ In all three cases, the §15.6 cascade verdict (REGRESSION)
 remains binding under §0.8. §15.7's hypothesis test informs
 the **interpretation** of that verdict, not the verdict itself.
 
+**Interpretation framework (pinned, §0.8-style; the
+verdict-binding vs interpretive-caveat distinction).**
+
+§15.7 produces diagnostic content. To prevent informal
+narrative from drifting into verdict-override territory
+(the failure mode §0.8 is designed to prevent), §15.7 pins
+**three classes of statements** §15.7 may emit, each with
+explicit constraints on what they can claim.
+
+**Class 1 — Numerical observations (always permitted).**
+
+§15.7 may report any of the diagnostic numbers from Chunks
+7c–7e verbatim:
+
+- "$\rho(\tau^*) = X$ vs $\rho^*(\alpha_2, \pi) = Y$ → local
+  condition $\rho \ge \rho^*$ [met / not met]."
+- "Stage A $|D| = X$ out of 100; V1 selected Qwen on $X$ /
+  100 questions."
+- "KS p-value = X; mean difference = Y nats; HYPOTHESIS
+  classification: [SUPPORTED / REFUTED / PARTIAL]."
+- "Number of distinct $r(q)$ values: $X$. Operating-point
+  collapse at $\alpha \in \{0.40, 0.50\}$: [yes / no]."
+
+These are direct readouts of pinned computations with no
+inferential content beyond them.
+
+**Class 2 — Interpretive narrative (permitted with explicit
+verdict-binding caveat).**
+
+§15.7 may interpret the numerical observations into mechanism
+narrative, subject to the binding-verdict caveat:
+
+> **Allowed interpretive form:** *"The §15.6 REGRESSION
+> verdict-of-record (binding under §0.8) is consistent with
+> [A-DEGENERATE / B-INSUFFICIENT / C-MISMATCHED / MIXED]
+> failure mode. Specifically, [evidence from Class 1
+> observations]. This sharpens the diagnosis without
+> overriding the cascade verdict; the verdict remains
+> REGRESSION regardless of the diagnostic mechanism."*
+
+The constraint: every interpretive statement that bears on
+§15.6 must explicitly include "the verdict remains
+REGRESSION regardless." Same constraint applies to §15.4
+USEFUL_INTERNAL — interpretive content may sharpen the
+mechanism, but the verdict band cannot shift.
+
+**Class 3 — Forbidden statements (§0.8-blocked).**
+
+§15.7 may NOT emit any of the following:
+
+- "§15.6's REGRESSION verdict was wrong" — overrides binding
+  verdict.
+- "Δκ should be re-classified as SATURATION because the
+  hypothesis test showed sampling-noise" — overrides band
+  cascade.
+- "§15.4's USEFUL_INTERNAL is invalid because composition
+  failure mode (iii) fired" — overrides binding verdict.
+- "The §13.9 hold should be relaxed because §15.7 found
+  diagnostic value" — overrides external-framing gate.
+- "§15.8 follow-up is authorized because the diagnostic
+  shows where to fix" — §15.8 requires fresh §0.8 commitment.
+- "The autonomy result (§6.1) is strengthened by §15.7" —
+  cross-domain claim outside §15.7 scope.
+
+If §15.7's emitted content contains any of these, the script
+must abort with `INTERPRETATION_VIOLATION` and refuse to
+write artifacts. (This is enforced in implementation; pinned
+in Chunk 7g.)
+
+**Pinned narrative templates (§0.8 style).**
+
+The §15.7 result section's mechanism narrative MUST follow
+one of these templates per benchmark, parameterized by the
+diagnostic decision-tree classification:
+
+- **A-DEGENERATE template:** *"On [benchmark], §15.6's
+  REGRESSION verdict-of-record (binding) reflects Stage A
+  degeneration. V1 selected [source] on [N/100] questions;
+  the hybrid reduced to single-source plus stochastic
+  sampling. The [Δκ value] differs from §15.1's baseline
+  [κ value] within [statistical / practical] equivalence
+  bounds (KS p = X; mean drift = Y nats; HYPOTHESIS_SUPPORTED).
+  The verdict band remains REGRESSION; the substantive
+  reading is sampling-bounded, not 'hybrid actively hurts'."*
+- **B-INSUFFICIENT template:** *"On [benchmark], §15.6's
+  REGRESSION (or §15.4's USEFUL_INTERNAL) verdict-of-record
+  (binding) is anchored by Stage B's score-separability
+  failure. The risk score's local condition $\rho(\tau^*) =
+  X$ falls below the base-rate-adjusted threshold
+  $\rho^*(\alpha_2, \pi_S) = Y$ near the operating point.
+  The verdict band remains [REGRESSION / USEFUL_INTERNAL];
+  the mechanism is local discriminability, not Stage A
+  degeneration."*
+- **C-MISMATCHED template:** *"On [benchmark], §15.[X]'s
+  verdict-of-record is anchored by composition failure: the
+  per-source winning-source entropy $R_S$ correlates with
+  $1 - Y_S$ at $\rho_\text{Pearson} = X$ on $\bar{D}$ but
+  only $Y$ on $D$ (V1-divergent questions). The hybrid's
+  risk-to-correctness mapping breaks on exactly the
+  questions where Stage A's selector matters. The verdict
+  band remains [REGRESSION / USEFUL_INTERNAL]; the
+  mechanism is hybrid-specific."*
+- **MIXED / OTHER template:** *"On [benchmark], the
+  decomposition does not cleanly resolve to a single
+  failure mode. [Specific evidence]. The verdict band
+  remains [X]; the mechanism is multi-component."*
+
+§15.7's result section MUST use exactly one of these
+templates per benchmark + verdict pair. No free-form
+narrative substitutions.
+
+**§0.8 enforcement summary.**
+
+| Statement type | Allowed | Constraint |
+|---|---|---|
+| Class 1 (numerical) | Yes | Must be direct readout of pinned computation |
+| Class 2 (interpretive narrative) | Yes | Must use one of four pinned templates AND include explicit "verdict band remains [X]" caveat |
+| Class 3 (verdict override) | **No** | Triggers INTERPRETATION_VIOLATION abort |
+
+This is the §15.7 firewall against soft-override drift.
+
 ---
 
 
