@@ -15236,6 +15236,122 @@ and §15.7 inputs is zero (within float precision).
 - `docs/experiments/probe_audit_15_7.md` (human-readable
   diagnostic report; rendered through interpretation firewall).
 
+**Headline numerical findings.**
+
+**(A) Stage A / Stage B / Composition decomposition per
+benchmark.**
+
+| Quantity | HaluEval-QA | TruthfulQA-MC |
+|---|---|---|
+| V1 selection: Qwen | 69 / 100 | **76 / 100** |
+| V1 selection: Llama | 12 / 100 | **17 / 100** |
+| V1 selection: Mistral | 19 / 100 | **7 / 100** |
+| $\|D\|$ (V1-divergent set) | 31 | **24** |
+| $\|D\|/N$ | 0.31 | **0.24** |
+| $\pi_S$ (V1 acc, full coverage) | 0.330 | 0.250 |
+| $\pi_A$ (Baseline-A acc) | 0.300 | 0.250 |
+| $\Delta_A = \pi_S - \pi_A$ | $+0.030$ | $\boldsymbol{0.000}$ |
+| $\Delta$ on $D$ subset | $+0.097$ | $\boldsymbol{0.000}$ |
+| $\rho(\tau^*)$ at $\alpha_2 = 0.50$ | 2.150 | **5.250** |
+| $\rho^*$ at $\alpha_2 = 0.50$ | 2.030 | **3.000** |
+| $\rho \ge \rho^*$? (local condition met) | **yes** (barely) | **yes** (comfortably) |
+| Pearson $r(R_S, 1-Y_S)$ overall | $+0.364$ | $+0.193$ |
+| Pearson $r$ on $\bar{D}$ (Qwen-picked) | $+0.439$ | $+0.264$ |
+| Pearson $r$ on $D$ (V1-divergent) | $+0.191$ | $\boldsymbol{-0.156}$ |
+| Composition gap $r_{\bar{D}} - r_D$ | $+0.248$ | $\boldsymbol{+0.421}$ |
+| **Decision-tree classification** | **MIXED** | **C-MISMATCHED** |
+
+**Three substantive numerical findings the table supports.**
+
+**(a) The local condition $\rho(\tau^*) \ge \rho^*$ is met on
+both benchmarks** — including on TruthfulQA-MC, where the
+§15.6 cascade returned REGRESSION. This is operationally
+striking: the score has *sufficient local discriminative
+power* at the operating point on both benchmarks. On
+TruthfulQA-MC, $\rho(\tau^*) = 5.25$ versus $\rho^* = 3.0$ —
+the score discriminates more than the base-rate-adjusted
+threshold requires. The reason §15.6 still returned REGRESSION
+is that the τ* delivering $\rho \ge \rho^*$ also delivers
+**only $\kappa = 0.11$ coverage**, below §15.1's
+TruthfulQA-MC baseline of 0.14. **Sufficient discrimination
+on a tiny subset, not insufficient discrimination overall.**
+
+**(b) Composition correlation flips sign on TruthfulQA-MC's
+V1-divergent subset.** $r_{\bar{D}} = +0.264$ (Qwen-picked,
+expected direction: high entropy → wrong) versus $r_D =
+-0.156$ (V1-divergent, **inverted direction: high entropy
+→ correct**). Gap of 0.421 places this comfortably in the
+C-MISMATCHED band (threshold 0.30). On the 24 questions
+where V1's selector matters most, the per-source winning-
+source entropy is **anti-correlated** with selected-answer
+correctness. The hybrid's risk score breaks specifically on
+the questions where the hybrid adds value.
+
+**(c) HaluEval composition gap is sub-threshold but real.**
+$r_{\bar{D}} - r_D = 0.248$ on HaluEval, below the C-MISMATCHED
+threshold of 0.30 but visibly non-zero. The HaluEval correlation
+on $D$ stays positive ($+0.191$), unlike TruthfulQA-MC's
+sign-flip. Combined with $\Delta_A = +0.030$ Stage A lift and
+$\rho \ge \rho^*$ Stage B condition met, none of A/B/C fires
+cleanly → MIXED.
+
+**(B) Operating-point analysis (curves and collapse).**
+
+| Benchmark | $\alpha$ | cov@$\alpha$ | $\tau^*$ | $\rho(\tau^*)$ | $\rho^*$ | meets? |
+|---|---|---|---|---|---|---|
+| HaluEval-QA | 0.40 | 0.63 | 1.9730 | 1.523 | 1.354 | ✓ |
+| HaluEval-QA | 0.50 | 0.35 | 1.2275 | 2.150 | 2.030 | ✓ |
+| HaluEval-QA | 0.75 | **0.00** | $+\infty$ | NaN | 6.091 | ✗ |
+| TruthfulQA-MC | 0.35 | **0.11** | **0.6390** | 5.250 | 1.615 | ✓ |
+| TruthfulQA-MC | 0.50 | **0.11** | **0.6390** | 5.250 | 3.000 | ✓ |
+| TruthfulQA-MC | 0.75 | **0.00** | $+\infty$ | NaN | 9.000 | ✗ |
+
+**Operating-point collapse audit:**
+
+| Benchmark | $\alpha$ pair | same $\tau^*$? |
+|---|---|---|
+| HaluEval-QA | (0.40, 0.50) | distinct |
+| HaluEval-QA | (0.50, 0.75) | distinct (latter degenerate) |
+| TruthfulQA-MC | (0.35, 0.50) | **collapsed** ($\tau^* = 0.6390$, cov = 0.11, $\rho = 5.25$ identical) |
+| TruthfulQA-MC | (0.50, 0.75) | distinct (latter degenerate) |
+
+**The §15.6 Chunk 6b "stepped curve" finding is empirically
+confirmed.** The α₁/α₂ collapse on TruthfulQA-MC is a
+property of the entropy distribution's empirical support
+shape, not a measurement artifact. $\alpha_3 = 0.75$ remains
+unreachable on both benchmarks (consistent with §15.4 / §15.6
+findings).
+
+**(C) Sampling-noise hypothesis test (TruthfulQA-MC).**
+
+| Quantity | Value |
+|---|---|
+| KS statistic | 0.180 |
+| KS p-value | 0.0691 |
+| Mean drift (§15.6 R_S − §13.10 reference) | $-0.178$ nats |
+| Stdev drift | $+0.003$ nats |
+| N (§15.5 Phase 1) | 100 |
+| N (§13.10 reference, on-disk this runpod) | 100 |
+| **Classification** | **`HYPOTHESIS_PARTIAL`** |
+
+Rationale (per Chunk 7e pinned interpretation rules): KS p =
+0.0691 > 0.05 (statistically equivalent at α=0.05) BUT
+$|$mean drift$| = 0.178$ nats falls in the
+$[0.10, 0.20]$ PARTIAL band (above the SUPPORTED bound of
+0.10 nats but below the REFUTED bound of 0.20 nats). The
+distributions are not pure-sampling-noise (rejected as
+SUPPORTED) and not pure-substantive-shift (rejected as
+REFUTED) — they are practically drifted by ~0.18 nats with
+shape preserved.
+
+**Mechanism read on the drift direction.** The negative
+mean drift means §15.6's R_S is on average **lower** than
+§13.10's pure-Qwen reference. Consistent with V1 occasionally
+picking non-Qwen sources whose K=10 entropies are tighter
+than Qwen's: when V1 picks Llama or Mistral (24/100 questions),
+$R_S$ comes from those sources, which have on average
+modestly lower entropy than Qwen on TruthfulQA-MC.
+
 ---
 
 
