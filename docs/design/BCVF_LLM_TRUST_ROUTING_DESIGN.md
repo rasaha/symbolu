@@ -15120,6 +15120,122 @@ Implementation of `scripts/probe_audit_15_7.py` is a separate
 itself a §0.8 chunked drafting exercise with the
 interpretation firewall (Chunk 7f) enforced.
 
+### 15.8 Result — §15.7 audit produced three classifications; §15.6 mechanism narrative corrected (binding verdict unchanged)
+
+The §15.7 pre-committed diagnostic audit has been executed
+against the four pinned on-disk artifacts in the runpod
+container. Three diagnostic classifications:
+
+- **HaluEval-QA decomposition: `MIXED`** (no single failure
+  mode fires cleanly).
+- **TruthfulQA-MC decomposition: `C-MISMATCHED`** (composition
+  failure: per-source winning-source entropy is sign-flipped
+  on V1-divergent questions).
+- **TruthfulQA-MC sampling-noise: `HYPOTHESIS_PARTIAL`**
+  (distributions statistically equivalent at $\alpha=0.05$
+  but practically drifted by ~0.18 nats).
+
+**Critical §15.6 mechanism correction (verdict band
+unchanged).** §15.7 has empirically **refuted** an informal
+mechanism claim that appeared in §15.6 Chunk 6c's analytical
+discussion — namely the working hypothesis that "V1 picked
+Qwen on all 100 TruthfulQA-MC questions." The §15.7 audit
+finds **V1 selected Qwen on 76/100, Llama on 17/100, Mistral
+on 7/100**; the V1-divergent set $|D| = 24$, well above the
+A-DEGENERATE small-divergence threshold. Per §15.7 Chunk 7f's
+interpretation firewall, this correction:
+
+- **Does not alter §15.6's binding `REGRESSION` verdict-of-
+  record.** The cascade fired on the pinned $\Delta\kappa$
+  point estimate; that verdict band remains REGRESSION
+  regardless of the §15.7 mechanism finding.
+- **Sharpens the mechanism narrative from "Stage A
+  degeneracy" to "composition failure (C-MISMATCHED)".**
+  The §15.7 audit identifies the correct underlying
+  mechanism: the per-source winning-source entropy is a
+  sign-flipped proxy for selected-answer correctness on
+  V1-divergent questions ($r_{\bar{D}} = +0.264$, $r_D =
+  -0.156$, gap = 0.421 above the 0.30 C-MISMATCHED
+  threshold).
+- **Is recorded here as §15.7-discovered evidence**, not
+  back-applied as a silent edit to §15.6's text. §15.6
+  Chunks 6a–6f remain the verdict-of-record for the §15.5
+  scout; §15.8 documents the §15.7 mechanism correction in
+  the audit trail.
+
+**§13.9 VC-brief hold remains in force**, autonomy-domain
+BCVF claim (§6.1) unaffected. **Both §15.4 USEFUL_INTERNAL
+and §15.6 REGRESSION verdict-of-record bands remain
+binding** — neither raised, neither lowered, neither
+re-classified.
+
+**Parity-gate / schema-validation confirmation (per §15.7
+Chunk 7b).**
+
+| Input artifact | Status |
+|---|---|
+| `probe_system_level_scout_v2_halueval_qa.json` (§14a.2) | loaded; 100 questions; schema validated |
+| `probe_system_level_scout_v2_truthfulqa_mc.json` (§15.5 Phase 1) | loaded; 100 questions; schema validated |
+| `probe_selective_abstention.json` (§15.2 verdict-of-record) | `schema_version == "15.1"` validated; pinned $\kappa$ extracted |
+| `probe_semantic_entropy.json` (§13.10 TruthfulQA-MC reference) | loaded; 100 questions on disk in this runpod (`n_13_10_overwritten = False`); used as distributional reference for sampling-noise test only |
+
+No `SCHEMA_MISMATCH` fired at the input layer.
+
+**§13.10 N status — runpod-specific note.** The §15.7
+runpod's on-disk §13.10 TruthfulQA-MC dump is **N=100, not
+N=200**. This is a different runpod environment than the one
+where §13.20's N=200 overwrite occurred (different container
+hostname `49064e65c30d`). The §15.7 audit's `n_13_10_overwritten`
+flag returned `False`. The sampling-noise test therefore
+compared §15.6's N=100 R_S distribution against an N=100
+§13.10 Qwen reference — the most direct comparison possible
+under the pinned protocol. **§15.2's pinned $\kappa$
+baselines are unchanged regardless** (those came from the
+§15.2 verdict-of-record artifact, not from any §13.10 dump).
+
+**Self-test gate.** §15.7's required pre-execution gate
+(`--self-test`) ran in the same invocation as real-data
+execution and returned PASSED on all 17 pinned cases:
+- 4 decision-tree boundary cases (Chunk 7d).
+- 6 sampling-noise classifier cases (Chunk 7e).
+- 7 interpretation-firewall cases (Chunk 7f).
+
+**Interpretation firewall confirmation.** The rendered
+markdown report was scanned for Class-3 forbidden statements
+before write per §15.7 Chunk 7f. **No `INTERPRETATION_VIOLATION`
+fired**; output was written cleanly. The interpretation
+firewall is empirically functional under real-data
+conditions.
+
+**Cross-program consistency check.**
+
+| Quantity | §15.4 / §15.6 reported | §15.7 audit observed | Match? |
+|---|---|---|---|
+| HaluEval V1 acc | 0.330 (§14c) | $\pi_S = 0.33$ | ✓ |
+| HaluEval Baseline-A acc | 0.300 (§14c) | $\pi_A = 0.30$ | ✓ |
+| HaluEval $\Delta_A$ (= V1 − BA) | +0.030 (per §15.4 Chunk 4a) | $+0.030$ | ✓ |
+| TruthfulQA-MC V1 acc | 0.250 (§15.6 Chunk 6a) | $\pi_S = 0.25$ | ✓ |
+| TruthfulQA-MC Baseline-A acc | 0.250 (§15.6 Phase 1) | $\pi_A = 0.25$ | ✓ |
+| TruthfulQA-MC κ at α₂ (hybrid) | 0.11 (§15.6 verdict-of-record) | cov@α₂ = 0.11 | ✓ |
+| TruthfulQA-MC operating-point collapse at α₁/α₂ | reported in §15.6 Chunk 6b | empirically confirmed (same τ*=0.6390) | ✓ |
+| §15.2 HaluEval $\kappa$ baseline | 0.26 (§15.2 verdict-of-record) | 0.26 | ✓ |
+| §15.2 TruthfulQA-MC $\kappa$ baseline | 0.14 (§15.2 verdict-of-record) | 0.14 | ✓ |
+
+All cross-program consistency checks pass. The §15.7 audit
+operates over the same per-question state §15.4 / §15.6 / §15.2
+classified; numerical drift between §15.x verdict-of-records
+and §15.7 inputs is zero (within float precision).
+
+**Artifacts.**
+
+- `scripts/probe_audit_15_7.py` (§15.7 implementation; numpy
+  + stdlib + optional scipy.stats; ~1967 lines).
+- `docs/experiments/probe_audit_15_7.json` (machine-readable
+  diagnostic, `schema_version "15.7-diagnostic"`; flagged at
+  top as NOT a verdict-of-record).
+- `docs/experiments/probe_audit_15_7.md` (human-readable
+  diagnostic report; rendered through interpretation firewall).
+
 ---
 
 
