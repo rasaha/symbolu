@@ -14033,6 +14033,74 @@ confirmation that the §14+§15 hybrid does not generalize
 cross-benchmark when Stage A's selector cannot extract
 non-Qwen leverage on the harder benchmark.
 
+**$\delta_\text{AURC}$ vs $\Delta\kappa$ tension —
+operationally meaningful vs integrated diagnostic.**
+
+§15.6's diagnostic and primary scalars **disagree in sign**:
+
+| Metric | Value | What it says |
+|---|---|---|
+| $\delta_\text{AURC}$ (diagnostic; Chunk 5f secondary) | $+0.1175$ | Hybrid's integrated risk-coverage curve beats random abstention by ~12pp. |
+| $\Delta\kappa$ (PRIMARY; Chunk 5g cascade-driver) | $-0.0300$ | Hybrid's coverage at $\alpha_2 = 0.50$ is 3pp worse than §15.1's single-source baseline. |
+
+**Reconciliation.** The two metrics measure structurally
+different things and answer different operational questions:
+
+- $\delta_\text{AURC}$ asks: "Does the entropy score, used
+  to rank answers, identify wrong answers more reliably than
+  random selection?" The hybrid's answer: yes — the AURC
+  curve dominates random abstention across the threshold
+  sweep. The hybrid IS truth-correlated in the integrated
+  sense.
+- $\Delta\kappa$ asks: "At the absolute-majority operating
+  target ($\alpha_2 = 0.50$), can the hybrid policy answer
+  more questions than §15.1's single-source policy?" The
+  hybrid's answer: no — the hybrid policy is *more
+  selective* (catches a higher fraction of errors per unit
+  answer; ecr=0.95) but cannot deliver enough coverage at
+  $\alpha_2 \ge 0.50$ to beat §15.1's $\kappa = 0.14$.
+
+**The §15.5 cascade pinned $\Delta\kappa$ as primary
+(operationally meaningful) and $\delta_\text{AURC}$ as
+secondary (integrated diagnostic) precisely to prevent this
+class of disagreement from confusing the verdict.** Per
+§15.5 Chunk 5g: "No secondary metric participates in the
+cascade." The verdict reads off $\Delta\kappa$ alone; the
+positive $\delta_\text{AURC}$ is reported as a diagnostic
+but does NOT re-classify the verdict.
+
+This is the design pattern that §14a.2's band-coverage gap
+recovery (§14c) made into a §0.8 lesson: future bands should
+partition the outcome space exhaustively along ONE primary
+scalar, with secondary metrics reported as informational
+only. §15.6 surfaces the diagnostic-vs-primary tension
+explicitly and lets the cascade fire deterministically.
+
+**$\alpha_3 = 0.75$ degeneracy carries over from §15.4 and
+§15.2.**
+
+The §15.6 operating point at $\alpha_3 = 0.75$:
+$\text{cov} = 0.00$, $\tau^* = +\infty$, ecr/far NaN.
+Identical to §15.4's HaluEval $\alpha_3$ degeneracy and
+§15.2's both-benchmarks $\alpha_3$ degeneracy. **No
+threshold $\tau$ in the §15.6 sweep grid yields acc $\ge
+0.75$ on an answered subset of size $\ge n_\min = 10$.**
+The deployment-grade ceiling persists across all four
+metric-class configurations on TruthfulQA-MC. Whether the
+hybrid is REGRESSION (here) or USEFUL_INTERNAL (§15.4),
+$\alpha_3$ is unreachable; abstention alone — with or
+without V1's selector — cannot deliver a $\ge 75\%$-accurate
+subset from a base model at greedy accuracy 0.250.
+
+This bounds any hypothetical future product layer: even if a
+fresh §0.8 commitment with different bands or different
+scaling reopened the §14+§15 hybrid line and produced a
+non-REGRESSION verdict on TruthfulQA-MC, the $\alpha_3$
+ceiling would still cap deployment-grade claims. **Reaching
+$\alpha_3$ requires a higher base-model accuracy floor
+(model-scale upgrade per §13.8 future-work, never
+authorized), not abstention-layer tuning.**
+
 ---
 
 
