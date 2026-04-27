@@ -15030,6 +15030,96 @@ indicating they are §15.7 diagnostic-only outputs and do
 NOT constitute a new verdict-of-record. The interpretation
 firewall (Chunk 7f) is enforced at write time.
 
+**What §15.7 explicitly does NOT test, NOT authorize, NOT do.**
+
+§15.7 is a deliberately narrowed diagnostic post-processing
+audit. The scope boundary is tightly drawn to prevent it from
+sliding into a new probe, a new verdict-class, or a follow-up
+authorization. Specifically:
+
+- **Not a new probe.** §15.7 reads existing artifacts; runs no
+  new generation, no new model loads, no new NLI calls, no
+  new GPU compute. If §15.7 implementation reaches for any
+  resource outside the pinned four input artifacts, it is
+  out of scope and aborts.
+- **Not a re-classification of any §13 / §14 / §15.x verdict.**
+  §15.4 USEFUL_INTERNAL, §15.6 REGRESSION, §15.2 MARGINAL,
+  §13.20 NOISE_BAND_LIFT observation, §13.19 single-axis ANTI
+  closure, §14b / §14c SCOUT_SATURATION verdicts — all remain
+  binding under §0.8 regardless of §15.7 outputs.
+- **Not a relaxation of the §13.9 VC-brief hold.** §13.9
+  remains in force and is not addressed by §15.7 by
+  construction (different metric class). The interpretation
+  firewall (Chunk 7f) blocks any §15.7 statement claiming
+  §13.9 should be reconsidered.
+- **Not an authorization for §15.8 or beyond.** Any follow-up
+  experimental probe (model-scale upgrade, supervised
+  activation probe, benchmark substitution, ensemble risk
+  score, alternative selector, deadband consumer, etc.)
+  requires a fresh top-level §0.8 commitment. §15.7 produces
+  diagnostic content that may inform the choice of follow-up,
+  but does not authorize any specific follow-up.
+- **Not a representation-level fix.** §15.7 audits the
+  existing risk-score-to-correctness mapping; it does not
+  propose new risk scores, new selector configurations, or
+  new threshold policies. Per the multi-round critique that
+  motivated §15.7, the transfer thesis was under-specified
+  at the representation level — §15.7 confirms or refutes
+  specific failure-mode hypotheses but does NOT propose a
+  new representation.
+- **Not a strengthening of §15.4 or §15.6.** §15.7 may sharpen
+  the *mechanism* narrative for either verdict but cannot
+  upgrade either to a higher band. The interpretation
+  firewall blocks any "actually §15.4 should be STRONG"
+  claim.
+- **Not a cross-domain claim.** Autonomy-domain BCVF (§6.1)
+  is wholly independent of §15.7. The interpretation firewall
+  blocks any cross-domain claim.
+- **Not a re-derivation of §15.2's verdict-of-record.** Per
+  Chunk 7b's §0.8 caveat, the §13.10 dumps on disk are now
+  N=200 per §13.20; §15.7 uses them only for distributional
+  shape comparison in the sampling-noise hypothesis test
+  (Chunk 7e), NOT to re-compute §15.2's pinned $\kappa$
+  baselines.
+
+**Reduced-form authorization rationale.**
+
+§15.7 exists at all because the four input artifacts already
+exist, the §15.5 / §15.4 closure cascades produced binding
+verdicts that §15.7 may interpret without overriding, and
+the multi-round informal critique surfaced specific
+empirical questions answerable from the existing data. **If
+any of the four artifacts had been missing, §15.7 would not
+be authorized in this reduced form.** A from-scratch
+diagnostic audit would require fresh §14a.2-class dumps,
+fresh §15.x-class verdicts, or fresh §13.10 dumps at the
+original N=100 — none of which §15.7 generates.
+
+§15.7 is therefore authorized **only as a pure post-
+processing layer over closed §13.10 / §14a.2 / §15.5 Phase 1
+/ §15.2 artifacts**, with the explicit constraint that
+§15.7's outputs are diagnostic narrative content for the
+§15 closure, not new verdicts.
+
+**§15.7 chunk roll-up — pre-commitment now complete.**
+
+| Chunk | Content |
+|---|---|
+| 7a | Opening framing — pure-diagnostic post-processing; not a new probe; does not re-classify any verdict |
+| 7b | Inputs and architecture (four on-disk artifacts; pure post-processing; no new compute; §0.8 caveat on §13.10 N=200 status) |
+| 7c | Diagnostic curves pin (full audit spec): F₁, F₀, Δ(τ), ρ(τ), ρ*(α,π) base-rate-adjusted thresholds, p(τ), c(τ), step-size audit |
+| 7d | Stage A / Stage B / Composition decomposition with three pinned failure modes; diagnostic decision-tree classifier |
+| 7e | §15.6 sampling-noise hypothesis test — pinned KS + distance metrics; three pinned outcomes; explicit "does NOT change verdict" boundary |
+| 7f | Interpretation framework — three statement classes; four pinned narrative templates; interpretation firewall against soft-override drift |
+| 7g | Implementation scope — `scripts/probe_audit_15_7.py`, 11-component spec, self-test gate, INTERPRETATION_VIOLATION enforcement at write time |
+| 7h | What §15.7 does NOT test + reduced-form rationale + roll-up |
+
+Implementation of `scripts/probe_audit_15_7.py` is a separate
+§0.8 authorization gate. §15.7's result section (parallel to
+§15.6 / §15.4 / §15.2) follows the real-data run — and is
+itself a §0.8 chunked drafting exercise with the
+interpretation firewall (Chunk 7f) enforced.
+
 ---
 
 
