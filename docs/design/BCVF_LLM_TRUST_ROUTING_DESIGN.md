@@ -13366,6 +13366,86 @@ adding Stage A's selector produces operationally meaningful
 lift over the single-source policy on TruthfulQA-MC — not
 merely lift over random abstention.
 
+**Verdict bands (pinned; identical 1D $\Delta\kappa$ cascade
+to §15.3 Chunk 3g — B1 framing locked).**
+
+Per the user-pinned B1 framing (bands identical to §15.3,
+not recalibrated for TruthfulQA-MC), §15.5's verdict cascade
+is the **same 1D ordered cascade** §15.3 used, applied to
+TruthfulQA-MC's $\Delta\kappa$. Numerical thresholds are
+unchanged:
+
+1. **REGRESSION** — $\Delta\kappa < -0.02$.
+2. **STRONG** — $\Delta\kappa \ge +0.10$.
+3. **USEFUL_INTERNAL** — $\Delta\kappa \ge +0.05$.
+4. **MARGINAL** — $\Delta\kappa \ge +0.02$.
+5. **SATURATION** — explicit residual catch-all
+   ($\Delta\kappa \in [-0.02, +0.02)$).
+
+Rules 1–4 are mutually exclusive by ordering; rule 5 catches
+the residual deterministically. **No secondary metric
+participates in the cascade**; secondary diagnostics
+($\delta_\text{AURC}$, ecr, far, operating-point triples) are
+reported but never re-classify the verdict — same discipline
+as §15.3.
+
+**Why bands are NOT recalibrated for TruthfulQA-MC.** §15.1's
+TruthfulQA-MC baseline ($\kappa = 0.14$) is structurally
+lower than HaluEval's (0.26), so the same $\Delta\kappa$
+threshold corresponds to a lower implied $\kappa_\text{hybrid}$
+on TruthfulQA-MC. But the pinned B1 framing tests cross-
+benchmark transfer at the **same operational threshold** —
+i.e., does the hybrid clear the same operational bar on the
+harder benchmark, not "does it clear a TruthfulQA-MC-specific
+relaxed bar." Recalibrating the bands would be band-tuning
+to expectations and is foreclosed.
+
+**Operational meanings per band on TruthfulQA-MC** (assuming
+the pinned $\kappa_{\S15.1,\text{TruthfulQA-MC}} = 0.14$):
+
+| Verdict | $\Delta\kappa$ range | Implied $\kappa_\text{hybrid}$ | Meaning |
+|---|---|---|---|
+| STRONG | $\ge +0.10$ | $\ge 0.24$ | Substantively higher cov@$\alpha_2$ than §15.1 on the harder benchmark; cross-benchmark generalization confirmed |
+| USEFUL_INTERNAL | $[+0.05, +0.10)$ | $[0.19, 0.24)$ | Visibly better than §15.1 on TruthfulQA-MC; internal-research value at this benchmark |
+| MARGINAL | $[+0.02, +0.05)$ | $[0.16, 0.19)$ | Small detectable lift |
+| SATURATION | $[-0.02, +0.02)$ | $[0.12, 0.16)$ | Operationally equivalent to §15.1 on TruthfulQA-MC |
+| REGRESSION | $< -0.02$ | $< 0.12$ | Actively worse than §15.1 on TruthfulQA-MC |
+
+**Acceptance / rejection rules** (one-to-one mapped to the
+cascade; mirrors §15.3 Chunk 3g but with §15.5-specific
+authorizations).
+
+| Verdict | Authorizes | Forecloses |
+|---|---|---|
+| **STRONG** | Drafting §15.6 — full hybrid pre-commitment with both benchmarks combined and product-layer scope (separate §0.8). | VC-brief changes (§13.9 hold remains); auto-deployment without §15.6. |
+| **USEFUL_INTERNAL** | Documenting the §14+§15 hybrid as having internal-research operational value on TruthfulQA-MC at this single-benchmark scale. Authorizes §15.6 conditional on cross-benchmark synthesis (Chunk 5e diagnostic) also landing USEFUL_INTERNAL. | §15.6 product investment (without cross-benchmark synthesis confirmation); cross-benchmark claims; VC-brief changes. |
+| **MARGINAL** | Recording §15.5 as acknowledged but unactionable on TruthfulQA-MC. | §15.6 follow-up; product investment; VC-brief changes. |
+| **SATURATION** | Documenting §15.5 as operational null on TruthfulQA-MC. Bounds §15.4's HaluEval USEFUL_INTERNAL as a HaluEval-only artifact under cross-benchmark synthesis. | Same as MARGINAL. |
+| **REGRESSION** | Closing the §14+§15 hybrid construct on TruthfulQA-MC. The §13/§14/§15 closure prose extends to "answer-selection AND single-source abstention AND hybrid all saturated/regressed on TruthfulQA-MC at this configuration." | Same as SATURATION. |
+
+**Demotion rule (STRONG-only, identical to §15.3 Chunk 3g).**
+If the cascade returns STRONG but the bootstrap CI lower
+bound on $\Delta\kappa$ is $\le 0$, the verdict is demoted
+to **USEFUL_INTERNAL** with explicit `STRONG_BUT_CI_DEMOTION`
+annotation. USEFUL_INTERNAL / MARGINAL / SATURATION /
+REGRESSION are NOT subject to demotion.
+
+**Boundary-case audit table (illustrative, deterministic;
+identical to §15.3 Chunk 3g modulo benchmark labels).** The
+cascade behavior is identical to §15.3's at the same
+$\Delta\kappa$ values:
+
+| $\Delta\kappa$ | Cascade trace | Verdict |
+|---|---|---|
+| $+0.099$ | rules 1–2 NO; rule 3 YES | **USEFUL_INTERNAL** |
+| $+0.019$ | rules 1–4 NO; rule 5 catches | **SATURATION** |
+| $-0.020$ | rule 1 NO at boundary; rule 5 catches | **SATURATION** |
+| $-0.021$ | rule 1 YES | **REGRESSION** |
+
+The boundary-inclusivity precisions match §15.3 exactly:
+$\Delta\kappa = -0.020$ is SATURATION; $\Delta\kappa = -0.021$
+is REGRESSION.
+
 ---
 
 
