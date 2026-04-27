@@ -12640,6 +12640,67 @@ re-run would tighten this band; that re-run is NOT
 authorized by §15.3 and would require a fresh §0.8
 commitment.
 
+**Comparison to §15.2 single-source abstention at the same
+$\alpha_2$ target.**
+
+§15.2's verdict-of-record on HaluEval-QA was MARGINAL with
+$\kappa_{\S15.1,\text{HaluEval}}@\alpha_2 = 0.26$ at
+$\alpha_2 = 0.50$. §15.4's hybrid policy on the same
+benchmark at the same target produces $\kappa_\text{hybrid} =
+0.35$. The operating-point comparison at $\alpha_2$:
+
+| metric | §15.2 single-source (HaluEval) | §15.4 hybrid (HaluEval) | Δ |
+|---|---|---|---|
+| $\text{cov}@\alpha_2$ | 0.26 | **0.35** | **+0.09 = $\Delta\kappa$** |
+| $\tau^*$ at $\alpha_2$ | 1.0889 | 1.2275 | +0.139 |
+| ecr at $\tau^*$ | 0.8143 | 0.7463 | $-0.068$ |
+| far at $\tau^*$ | 0.5667 | 0.4545 | $-0.112$ |
+
+Three operationally relevant features of this comparison.
+
+**(a) Coverage lift at the same accuracy target — the
+headline operational signal.** The hybrid policy answers
+35% of HaluEval-QA at $\text{acc} \ge 0.50$ where §15.1
+single-source could only answer 26%. **At absolute terms
+that is 9 more questions answered per 100 at the same
+absolute-majority operating target.** Per §15.3 Chunk 3g
+this is the band-driving primary.
+
+**(b) ecr / far rebalancing.** The hybrid abstains fewer
+questions overall than §15.1 (lower far) AND catches a
+slightly smaller fraction of wrong V1 answers (lower ecr).
+Together these produce higher net coverage at the same
+accuracy bar. **Mechanism read:** V1's selector occasionally
+picks Llama or Mistral on questions where Qwen would have
+been wrong; the per-source-entropy of that winning source
+captures the question's risk more accurately than Qwen's
+own entropy did under §15.1. The hybrid trades a small
+amount of V1-wrong-error capture for a larger reduction
+in V1-correct-false-abstention.
+
+**(c) The threshold $\tau^*$ that achieves $\kappa_\text{hybrid}$
+is higher than §15.1's $\tau^*$ at the same $\alpha_2$
+target ($1.2275$ vs $1.0889$).** A higher threshold means
+the hybrid is willing to ANSWER on higher-entropy questions
+than §15.1 was — i.e., the hybrid's per-question risk score
+is shifted in distribution relative to Qwen-greedy entropy.
+Mechanically consistent with V1 sometimes selecting non-Qwen
+sources whose entropy distributions differ from Qwen's. **The
+hybrid's risk score is not just §15.1's signal renamed; it
+is structurally a different per-question scalar on the
+divergent-V1-selection subset.**
+
+**Cross-program consistency note (operating point at
+$\alpha_1$).** §15.4's $\alpha_1 = 0.40$ point: cov $=0.63$,
+$\tau^* = 1.9730$, ecr $=0.46$, far $=0.18$. §15.2's
+HaluEval $\alpha_1 = 0.40$ point: cov $=0.36$, $\tau^* =
+1.4979$, ecr $=0.70$, far $=0.50$. **The hybrid more than
+$1.7\times$ the coverage at the modest-accuracy operating
+target.** The pattern is consistent at $\alpha_1$ and
+$\alpha_2$: the hybrid extends the operational frontier
+across the lower-$\alpha$ range. The improvement
+disappears at $\alpha_3 = 0.75$ (next chunk).
+
 ---
 
 
