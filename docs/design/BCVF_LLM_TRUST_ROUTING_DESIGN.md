@@ -13077,6 +13077,68 @@ Chunk 3b's non-pin list):
   HaluEval dump §15.3 used remains the §15.4 verdict-of-
   record artifact and is NOT touched by §15.5.
 
+**Stage B — abstention architecture (pinned, identical to
+§15.3 Chunk 3c).**
+
+Stage B sits downstream of Stage A and reads the §14a.2-on-
+TruthfulQA-MC dump's per-question records (once produced by
+the Stage A GPU run). For each question $q$, Stage B
+consumes:
+
+- `selected_answer(q)` from Stage A's V1 softmin + NLI-
+  clustered selector;
+- $c(q)$ — the correctness label of `selected_answer(q)`
+  per the §14a.2 NLI labeling protocol applied to
+  TruthfulQA-MC (entails right_answer AND not any
+  distractor); **note this is the correctness of Stage A's
+  selected answer, NOT Qwen-greedy correctness on
+  TruthfulQA-MC; structurally distinct from §15.1's
+  TruthfulQA-MC $c(q)$ on questions where V1 selects a
+  different answer than Qwen-greedy**;
+- a per-question identifier for deterministic ordering.
+
+These plus the §15.5 risk signal (pinned in Chunk 5d) drive
+Stage B's per-question answer-or-abstain decision.
+
+**Decision rule (pinned, single, identical to §15.3 Chunk 3c).**
+Per-question deterministic threshold rule:
+$$
+\text{policy}_\tau(q) = \begin{cases}
+\text{ANSWER selected\_answer}(q) & \text{if } r(q) < \tau \\
+\text{ABSTAIN} & \text{if } r(q) \ge \tau
+\end{cases}
+$$
+where $r(q)$ is the §15.5 risk signal pinned in Chunk 5d.
+Ties at $r(q) = \tau$ resolve to ABSTAIN — identical
+deterministic, conservative tie-handling as §15.1 / §15.3.
+
+**Threshold-sweep protocol (pinned, identical to §15.3
+Chunk 3c).** $\tau$ is swept across the sorted unique values
+of $r(q)$ on TruthfulQA-MC plus $-\infty$ (always-abstain)
+and $+\infty$ (always-answer). At $N=100$ this yields at most
+102 grid points. All operational metrics (pinned in Chunk 5f)
+are computed at every grid point. No grid is hand-picked; no
+$\tau$ is hand-picked.
+
+**What Stage B explicitly does NOT pin** (identical to §15.3
+Chunk 3c).
+
+- **Multiple abstention policies.** No deadband, no veto-only
+  mode, no cluster-margin rule. One threshold rule, single
+  $\tau$.
+- **Multiple risk signals.** One scalar (pinned in Chunk 5d).
+  No primary-plus-secondary, no ensemble.
+- **Held-out calibration of $\tau$.** $\tau$ is fitted only
+  via the deterministic empirical-support sweep — same rule
+  §15.1 / §15.3 used. No held-out tuning, no isotonic /
+  Platt / conformal wrapping of $r(q)$.
+- **Re-decoding or rewriting `selected_answer(q)`.** Stage B's
+  only degree of freedom is the answer/abstain decision; the
+  answer itself is whatever Stage A produced.
+- **Cascading multiple abstention layers.** If the risk
+  signal were split across multiple thresholds, that would be
+  a distinct policy and require a fresh §0.8 commitment.
+
 ---
 
 
