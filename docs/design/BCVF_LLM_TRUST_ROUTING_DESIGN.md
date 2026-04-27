@@ -12472,6 +12472,97 @@ Implementation of `scripts/probe_hybrid_selective_abstention.py`
 is a separate §0.8 authorization gate. §15.3.x (the result
 section, parallel to §15.2) follows the real-data run.
 
+### 15.4 Result — §15.3 hybrid scout returned USEFUL_INTERNAL
+
+The §15.3 pre-committed hybrid scout has been executed against
+the on-disk §14a.2 dump in the runpod container. Combined
+classification per pre-committed bands:
+**`USEFUL_INTERNAL`** ($\Delta\kappa = +0.0900$,
+$\kappa_\text{hybrid} = 0.35$, no annotations). The §14a.2
+V1-selected answer plus a §15-style abstention gate on the
+V1-winning-source's semantic-entropy risk score produces
+operationally meaningful lift over §15.1's single-source
+abstention baseline ($\kappa_{\S15.1} = 0.26$) at the
+$\alpha_2 = 0.50$ absolute-majority operating target on
+HaluEval-QA, clearing the USEFUL_INTERNAL band but missing
+the STRONG band by 0.01 on the point estimate of $\Delta\kappa$.
+
+This is the **first non-MARGINAL/SATURATION verdict in the
+entire §13 / §14 / §15 LLM-track program.** §13's five single-
+axis classes returned ANTI under worst-benchmark; §14's two
+system-level scouts returned `SCOUT_SATURATION`; §15.2's
+single-source abstention scout returned `MARGINAL`. The §15.3
+hybrid is the structurally distinct combination §14c
+anticipated (selector + abstention layer on the selected
+answer); it produced the first measurable USEFUL_INTERNAL-band
+lift in the program, on a single benchmark, at this scale.
+
+Per §15.3 Chunk 3g's pinned acceptance/rejection table:
+
+> USEFUL_INTERNAL — Authorizes documenting the §14+§15 hybrid
+> as having internal-research operational value at this
+> single-benchmark scale. Forecloses §15.5 product investment,
+> cross-benchmark claims, VC-brief changes.
+
+Operationally: the §13.10-grade semantic-entropy scalar
+applied to V1's winning-source K=10 samples is enough to
+drive a useful abstention/answer policy on HaluEval-QA, but
+not enough to clear STRONG nor to support deployment-grade
+claims. **§13.9 VC-brief hold remains in force; §15.4 does
+not address §13.9's gate by construction** (different metric
+class). The autonomy-domain BCVF claim (§6.1) stands
+independently and is unaffected.
+
+**Parity-gate confirmation (per §15.3 Chunk 3h).**
+
+| benchmark | N_ok |
+|---|---|
+| halueval_qa | True |
+
+The §14a.2 dump satisfied $N=100$ on HaluEval-QA. The §15.3
+schema validation (`q_idx`, `sources` / per-source
+`semantic_entropy`, `answer_cluster_ids`, `v1_weights`,
+`v1_winning_cluster`, `v1_correct`) all passed; no fields
+were missing. No §0.8 deviation fired at the input layer.
+
+**Self-test gate.** §15.3's required pre-execution gate
+(`--self-test`) ran in the same invocation as real-data
+execution and returned PASSED on all 7 cascade boundary cases
+(Chunk 3g audit table + 3 boundary-inclusivity anchors) and
+all 7 demotion-rule cases. The 1D cascade implementation
+matches Chunk 3g exactly; the verdict reported in §15.4 is
+the cascade's mechanical readout, not interpretation.
+
+**Cross-program consistency check.** $W_\text{hybrid} = 67$
+implies V1 accuracy on HaluEval-QA $= 33/100 = 0.330$,
+matching §14a.2's V1 accuracy of 0.330 exactly. The §14a.2
+dump's V1 selected-answer correctness count is preserved
+through Stage A handoff into §15.4 without drift.
+
+**Artifacts.**
+
+- `scripts/probe_hybrid_selective_abstention.py` (numpy +
+  stdlib, CPU-only post-processor; the §15.3 implementation).
+- `docs/experiments/probe_hybrid_selective_abstention.json`
+  (machine-readable, `schema_version` `"15.3"`; single-
+  benchmark block, combined block with verdict).
+- `docs/experiments/probe_hybrid_selective_abstention.md`
+  (human-readable summary with parity gate, Stage A
+  configuration, headline table, operating points, cascade
+  trace, final verdict).
+
+**Section naming clarification.** §15.3 Chunk 3g's STRONG row
+referenced "§15.4 — full hybrid pre-commitment with
+TruthfulQA-MC extension and product-layer scope" as the
+hypothetical authorization for STRONG. STRONG did NOT fire
+(USEFUL_INTERNAL did), so the §15.4-as-future-full-hybrid
+path is moot. §15.4 is therefore used here as the §15.3
+result section (mirroring §15.1 → §15.2 convention). Any
+future full-hybrid pre-commitment — which §15.3's
+USEFUL_INTERNAL explicitly does NOT authorize per Chunk 3g
+— would land at §15.5 or higher under its own §0.8
+commitment.
+
 ---
 
 
