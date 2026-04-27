@@ -1287,3 +1287,101 @@ def run_self_test() -> int:
         return 3
     print("\nSELF_TEST_PASSED — proceed.", flush=True)
     return 0
+
+
+# ===========================================================================
+# §15.11 Chunk I-4c — JSON output writer.
+#
+# Schema pinned per §15.11 design-doc Chunk 5; schema_version = "15.11".
+# ===========================================================================
+
+
+def _coherence_summary_to_dict(s: CoherenceMatrixSummary) -> dict:
+    return {
+        "off_diag_min": s.off_diag_min,
+        "off_diag_mean": s.off_diag_mean,
+        "off_diag_max": s.off_diag_max,
+        "off_diag_std": s.off_diag_std,
+        "n_off_diag_entries": s.n_off_diag_entries,
+    }
+
+
+def _phase_result_to_dict(pr: PhaseCoherenceResult) -> dict:
+    return {
+        "benchmark": pr.benchmark,
+        "n_questions": pr.n_questions,
+        "n_correct": pr.n_correct,
+        "n_wrong": pr.n_wrong,
+        "pi_observed": pr.pi_observed,
+        "auc_phase": pr.auc_phase,
+        "auc_baseline": pr.auc_baseline,
+        "dauc_phase": pr.dauc_phase,
+        "auc_supervised_phase_1": pr.auc_supervised_phase_1,
+        "dauc_phase_vs_supervised": pr.dauc_phase_vs_supervised,
+        "direction_held": pr.direction_held,
+        "f_per_question": list(pr.f_per_question),
+        "coherence_matrix_summary": _coherence_summary_to_dict(
+            pr.coherence_matrix_summary
+        ),
+        "selective_prediction_operating_points": list(pr.operating_points),
+        "kappa_at_alpha_primary": pr.kappa_at_alpha_primary,
+        "tau_star_at_alpha_primary": pr.tau_star_at_alpha_primary,
+        "alpha_primary": ALPHA_PRIMARY,
+    }
+
+
+def _cascade_verdict_to_dict(cv: CascadeVerdict) -> dict:
+    return {
+        "label": cv.label,
+        "auc_halueval": cv.auc_halueval,
+        "auc_truthfulqa": cv.auc_truthfulqa,
+        "dauc_halueval": cv.dauc_halueval,
+        "dauc_truthfulqa": cv.dauc_truthfulqa,
+        "direction_held_halueval": cv.direction_held_halueval,
+        "direction_held_truthfulqa": cv.direction_held_truthfulqa,
+        "rationale": cv.rationale,
+    }
+
+
+def write_json_output(outputs: PhaseAuditOutputs, path: str) -> None:
+    """Serialize PhaseAuditOutputs to a JSON file (schema_version "15.11")."""
+    payload = {
+        "alpha_targets_per_benchmark": {
+            bench: list(alphas)
+            for bench, alphas in ALPHA_TARGETS_PER_BENCHMARK.items()
+        },
+        "baseline_auc_per_benchmark": BASELINE_AUC_PER_BENCHMARK,
+        "cascade_thresholds": {
+            "strong_auc": STRONG_AUC_THRESHOLD,
+            "strong_delta_auc": STRONG_DELTA_AUC_THRESHOLD,
+            "partial_auc": PARTIAL_AUC_THRESHOLD,
+            "direction_gate_threshold": DIRECTION_GATE_THRESHOLD,
+            "entropy_baseline_auc": ENTROPY_BASELINE_AUC,
+        },
+        "cascade_verdict": _cascade_verdict_to_dict(outputs.cascade_verdict),
+        "extraction_layer": "all_29",
+        "halueval_qa": _phase_result_to_dict(outputs.halueval_result),
+        "hidden_dim": outputs.hidden_dim,
+        "n_layers_used": outputs.n_layers_used,
+        "phase_coherence_config": {
+            "fft_n": FFT_N,
+            "n_freq_bins_total": N_FREQ_BINS_TOTAL,
+            "n_freq_bins_used": W,
+            "bin_range_excluded": "DC (k=0) and Nyquist (k=1792)",
+            "windowing": WINDOWING,
+            "detrending": DETRENDING,
+            "feature_aggregation": FEATURE_AGGREGATION,
+            "direction_convention": DIRECTION_CONVENTION,
+        },
+        "pinned_N": PINNED_N,
+        "pinned_pi": PINNED_PI,
+        "qwen_model_id": outputs.qwen_model_id,
+        "schema_version": outputs.schema_version,
+        "supervised_auc_per_benchmark_phase_1": (
+            SUPERVISED_AUC_PER_BENCHMARK_PHASE_1
+        ),
+        "truthfulqa_mc": _phase_result_to_dict(outputs.truthfulqa_result),
+    }
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, sort_keys=True)
