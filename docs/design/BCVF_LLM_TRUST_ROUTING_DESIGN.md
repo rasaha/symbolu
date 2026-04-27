@@ -12930,6 +12930,82 @@ not externally, per Chunk 3g.
 §15.4 result section now complete (chunks 4a–4f, 6 commits
 on top of the §15.3 pre-commitment + implementation).
 
+### 15.5 Pre-commitment — Hybrid scout on TruthfulQA-MC (cross-benchmark companion to §15.3)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any §14a.2-on-TruthfulQA-MC dump
+is opened in hybrid form, and indeed before that dump even
+exists on disk (the GPU run that produces it follows §15.5's
+landing, not precedes it). Specification, primary risk
+signal, success bands, baselines, and acceptance/rejection
+rules below cannot be redefined post-hoc.
+
+**Position in the §13 / §14 / §15 program — what §15.5 is and
+what it is not.** §15.5 is the cross-benchmark companion to
+§15.3, not a continuation, reframe, or extension of §15.4's
+verdict. Specifically:
+
+- **§15.3** was a single-benchmark scout on **HaluEval-QA**;
+  §15.4 returned `USEFUL_INTERNAL` ($\Delta\kappa = +0.0900$,
+  $\kappa_\text{hybrid} = 0.35$ vs §15.1 baseline
+  $\kappa = 0.26$).
+- **§15.5** is a **single-benchmark scout on TruthfulQA-MC**
+  — the benchmark §15.3 explicitly excluded (per §15.3
+  Chunk 3e) because the §14a.2 dump did not exist for
+  TruthfulQA-MC.
+- §15.5 produces its own per-benchmark verdict on TruthfulQA-
+  MC alone. The §15.5 verdict cascade fires on TruthfulQA-MC's
+  $\Delta\kappa$ alone (per Chunk 5g, identical structure to
+  §15.3 Chunk 3g).
+- A **cross-benchmark synthesis** (§15.4 HaluEval verdict +
+  §15.5 TruthfulQA-MC verdict under worst-benchmark rule) is
+  computed in §15.5's result section as a **diagnostic**,
+  NOT as the cascade band-driver. This keeps §15.5 a clean
+  single-benchmark scout structurally parallel to §15.3.
+
+**This is a new claim, not a reframe of §15.4.**
+
+- Not "§15.4's USEFUL_INTERNAL extends to TruthfulQA-MC"
+  (that would presume the answer; §15.5 tests it).
+- Not "§14+§15 hybrid achieves cross-benchmark
+  generalization" (the cross-benchmark synthesis is a
+  derived diagnostic, not a §15.5 verdict).
+- **But** "the §14+§15 hybrid construct, transplanted to
+  TruthfulQA-MC at the same single-benchmark scout structure
+  §15.3 used on HaluEval-QA, lands in cascade band X" —
+  where X is determined by the §15.5 cascade applied to
+  TruthfulQA-MC's numbers alone.
+
+**§15.5 is a fresh §0.8 commitment.** All §13 / §14 / §15.1 /
+§15.2 / §15.3 / §15.4 / §13.20 verdicts remain binding and
+are NOT retroactively reframed. A §15.5 STRONG would authorize
+drafting §15.6 (full hybrid pre-commitment with both
+benchmarks combined and product-layer scope) as a separate
+§0.8 commitment; it would NOT re-classify §15.4's single-
+benchmark USEFUL_INTERNAL.
+
+**Why this is a new metric class.** §15.4 measured
+$\Delta\kappa$ on HaluEval-QA against the §15.1 HaluEval
+baseline ($\kappa = 0.26$). §15.5 measures $\Delta\kappa$ on
+TruthfulQA-MC against the §15.1 TruthfulQA-MC baseline
+($\kappa = 0.14$, recorded in §15.2's verdict-of-record). The
+two benchmarks have different greedy accuracies, different
+distractor structures, and different §15.1 baseline values;
+the per-benchmark $\Delta\kappa$ scalar is benchmark-local
+by construction. **The cross-benchmark synthesis is a
+derived comparator over two independent §0.8 commitments,
+not a single combined-classification rule.**
+
+**Confirmation: no data inspection prior to this pre-
+commitment.** No §14a.2-on-TruthfulQA-MC dump exists on disk
+yet. The §15.4 HaluEval-QA result was inspected only through
+its pinned numerical record (Δκ=+0.090, κ=0.35 from
+`probe_hybrid_selective_abstention.json`); no per-question
+field of the §14a.2-on-HaluEval dump has been opened in §15.5
+form. The protocol, primary signal, metrics, and bands in
+the §15.5 chunks below are pinned from §13 / §14 / §15 prose
+only.
+
 ---
 
 
