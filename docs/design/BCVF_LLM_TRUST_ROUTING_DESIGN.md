@@ -13571,6 +13571,86 @@ either.
   beyond TruthfulQA-MC.
 - Auto-promoting any verdict to §15.6.
 
+**Reduced-form authorization rationale — §15.5 is partially
+reduced-form, partially fresh-compute.**
+
+Unlike §15.3 (which was pure post-processing because the
+§14a.2 HaluEval-QA dump already existed), §15.5 requires a
+genuinely new GPU run (Phase 1) before any post-processing
+can begin. **§15.5 is therefore NOT in the same "reduced-form
+post-processing only" category as §15.3.** Its compactness
+is bounded by:
+
+- **The §14a.2 producer script exists and is closed.** §15.5
+  reuses it as-is on TruthfulQA-MC; no producer-script
+  modifications.
+- **§15.3's abstention machinery exists and is closed.**
+  §15.5's Phase 2 copies §15.3's primitives.
+- **§13.10's semantic-entropy scalar definition exists** and
+  is not invalidated by §13.20's N=200 observation (which
+  does not re-classify §13.10's N=100 verdict-of-record).
+- **§15.1's TruthfulQA-MC κ baseline (0.14) exists** in
+  §15.2's verdict-of-record artifact and is binding under
+  §0.8 regardless of §13.20's upstream-dump overwrite.
+
+**If §14a.2's producer script did not exist, §15.5's Phase 1
+cost would be substantially higher** (writing a new producer
+from scratch is multi-day work, not a 50–60-min run). The
+~1-hour total wall-clock figure is contingent on the existing
+§14a.2 producer being directly reusable.
+
+**What §15.5 explicitly does NOT test.**
+
+- **Retrieval augmentation.** No retrieval, search, or
+  external knowledge source. The hybrid's only response
+  options are ANSWER `selected_answer(q)` or ABSTAIN.
+- **Verifier ensembles.** No external verifier model, no
+  judge-model, no critique pass.
+- **Multi-benchmark generalization beyond {HaluEval-QA,
+  TruthfulQA-MC}.** §15.5's cross-benchmark synthesis is
+  explicitly bounded to the §13.10 / §14a.2 / §15.1 / §15.3
+  benchmark pair. Any third benchmark requires a fresh §0.8.
+- **Larger-N stability.** §15.5 runs at N=100 to match §15.3
+  / §15.4. A larger-N re-run would require its own §0.8.
+- **A new §13 observable program.** §15.5 reuses §13.10's
+  semantic-entropy scalar verbatim on TruthfulQA-MC. §13.19
+  closure remains binding.
+- **A new §14 system-level program.** §15.5 reuses §14a.2's
+  pinned configuration on TruthfulQA-MC; this is the first
+  on-TruthfulQA-MC §14a.2 run, but §15.5 does NOT classify
+  the result against §14a.2's pre-committed bands (different
+  metric class). §14c's `SCOUT_SATURATION` verdict on
+  HaluEval-QA is unchanged.
+- **Product readiness.** Even §15.5 STRONG would require
+  §15.6 (full hybrid pre-commitment with both benchmarks
+  combined and product-layer scope) before any deployment-
+  grade claim. §15.5 is a single-benchmark scout.
+- **Re-classification of any prior §13 / §14 / §15.x
+  verdict.** §13.19 (single-axis ANTI), §14b / §14c
+  (`SCOUT_SATURATION`), §15.2 (`MARGINAL`), §15.4
+  (`USEFUL_INTERNAL`), and §13.20 (N=200 `NOISE_BAND_LIFT`
+  observation) are all closed under §0.8 at their pinned
+  configurations. §15.5 cannot revisit any of them.
+
+**§15.5 chunk roll-up — pre-commitment now complete.**
+
+| Chunk | Content |
+|---|---|
+| 5a | Opening framing — cross-benchmark companion to §15.3 (A1 framing) |
+| 5b | Stage A architecture pin (§14a.2 protocol applied to TruthfulQA-MC) |
+| 5c | Stage B architecture pin (single threshold rule, ties to ABSTAIN) |
+| 5d | Risk signal pin ($r(q) = H_{\text{src}_{i^*}}(q)$, identical to §15.3) |
+| 5e | Benchmark scope pin (TruthfulQA-MC only; cross-benchmark synthesis as diagnostic) |
+| 5f | Operational metrics pin ($\Delta\kappa$ primary against $\kappa_{\S15.1} = 0.14$) |
+| 5g | Verdict bands (1D $\Delta\kappa$ cascade, identical thresholds to §15.3; B1 framing) |
+| 5h | Implementation scope (Phase 1 GPU re-run + Phase 2 CPU post-processor) |
+| 5i | What §15.5 does NOT test + reduced-form rationale + roll-up |
+
+Phase 1 (GPU re-run of §14a.2 on TruthfulQA-MC) is a separate
+§0.8 authorization gate. Phase 2 (new CPU post-processor) is
+also a separate gate. §15.5.x (the result section, parallel
+to §15.4) follows both phases completing.
+
 ---
 
 
