@@ -14564,6 +14564,129 @@ informs whether the §13.10 entropy is operationally useful at
 the pinned operating point, but the §15.6 cascade verdict on
 $\Delta\kappa$ remains binding regardless.
 
+**Stage A / Stage B / Composition decomposition (pinned).**
+
+The hybrid scout's Δκ verdict mixes three distinct failure
+modes that the §15.4 / §15.6 cascades did not separate.
+§15.7 decomposes them.
+
+Notation:
+
+- $S(q)$ — Stage A's selected source identity for question
+  $q$ (Qwen / Llama / Mistral).
+- $a_S(q)$ — Stage A's selected answer (the V1-NLI-clustered
+  selector winner's greedy).
+- $Y_S(q) \in \{0, 1\}$ — correctness of $a_S(q)$ per the
+  §14a.2 NLI labeling protocol.
+- $R_S(q) = H_{\text{src}_{S(q)}}(q)$ — per-source semantic
+  entropy of the source whose answer V1 selected.
+- $\pi_S = \Pr(Y_S = 1)$ — Stage A's answer-stream accuracy
+  at full coverage.
+- $\pi_A = \Pr(Y_\text{Baseline-A} = 1)$ — Qwen-greedy
+  accuracy at full coverage (the §13.10 single-source
+  reference).
+
+**Stage A audit (answer-stream quality + selector identity).**
+
+Computed quantities per benchmark:
+
+1. **V1 selection identity histogram.** Count of questions
+   where $S(q) \in \{$Qwen, Llama, Mistral$\}$. **Pinned
+   diagnostic question:** does V1 select Qwen on all 100
+   TruthfulQA-MC questions? (Hypothesis from §15.6 Chunk 6c
+   informational analysis; §15.7 confirms or refutes
+   empirically.)
+2. **V1-divergent question set $D = \{q : S(q) \ne \text{Qwen}\}$.**
+   Per benchmark, $|D|$ and the per-question correctness
+   delta on $D$:
+   $$\Delta_D = \Pr(Y_S = 1 \mid q \in D) - \Pr(Y_\text{Baseline-A} = 1 \mid q \in D)$$
+   This isolates Stage A's actual lift contribution to the
+   subset of questions where V1 makes a non-Qwen choice.
+3. **Stage A net lift:** $\Delta_A = \pi_S - \pi_A$, computed
+   over all $N=100$ questions. Reports whether V1 added
+   accuracy at full coverage.
+
+**Stage A failure mode (i):** $\Delta_A \approx 0$ AND
+$|D|$ small → V1 contributed no answer-stream lift; the
+hybrid degenerates to single-source plus stochastic noise.
+This is the §15.6 Chunk 6c hypothesis for TruthfulQA-MC.
+
+**Stage B audit (score separability over Stage A's
+selected-answer correctness).**
+
+Computed quantities per benchmark:
+
+1. **Class-conditional risk distributions** $\Pr(R_S \mid Y_S=1)$
+   and $\Pr(R_S \mid Y_S=0)$ summary statistics: mean, stdev,
+   min, max, percentiles (10/25/50/75/90).
+2. **Separation diagnostic on Stage A labels:** $\Delta_S(\tau)$
+   and $\rho_S(\tau)$ as in Chunk 7c, but evaluated
+   against $Y_S$ (Stage A's selected-answer correctness),
+   not against $Y_\text{Baseline-A}$.
+3. **Local condition test at the pinned operating point:**
+   does $\rho_S(\tau^*) \ge \rho^*(\alpha_2, \pi_S)$ for any
+   $\tau^*$ with $|A_{\tau^*}| \ge n_\min = 10$?
+
+**Stage B failure mode (ii):** Stage A's $\pi_S$ is decent
+but $R_S$ does not separate $Y_S = 1$ from $Y_S = 0$ (i.e.,
+the score has no information about whether Stage A's choice
+was correct). This is structurally different from (i): Stage
+A has produced a usable answer stream, but Stage B's risk
+score is uninformative about it.
+
+**Composition audit (Stage B risk score's proxy quality for
+Stage A's selected answer).**
+
+Computed quantities per benchmark:
+
+1. **Per-question correlation:** $\text{corr}(R_S(q), 1 - Y_S(q))$
+   (Pearson and Spearman; the latter robust to monotone
+   transforms).
+2. **V1-divergent vs Qwen-only correlation comparison:**
+   compute the correlation separately on $D$ (V1 picked
+   non-Qwen) and on $\bar{D}$ (V1 picked Qwen). If the
+   correlation is substantially worse on $D$, the hybrid's
+   risk score is a poor proxy on exactly the questions where
+   Stage A's selection diverges from baseline — which is the
+   composition failure mode.
+3. **Cross-source proxy quality:** for each source $i$,
+   compute $\text{corr}(H_{\text{src}_i}, 1 - Y_S)$ on the
+   subset where $S(q) = i$. If the diagonal correlations are
+   all roughly equal but cross-source effects are missing,
+   the per-source entropy is a "self-proxy" only — informative
+   about its own source's wrongness but not transferable as
+   a Stage A-aware proxy.
+
+**Composition failure mode (iii):** Stage A's $\pi_S$ is
+decent AND $R_S$ has some separation overall, but the
+per-question proxy $R_S \to (1 - Y_S)$ is worse on the
+V1-divergent questions $D$ than on $\bar{D}$. This means the
+hybrid's risk-score-to-correctness mapping breaks on exactly
+the questions where the hybrid's selector matters — a
+specifically hybrid pathology that does not exist in §15.1's
+single-source scenario.
+
+**Diagnostic decision tree (pinned).** Once §15.7 computes
+the three audits, each benchmark's failure mode is classified
+into one of:
+
+- **A-DEGENERATE:** Stage A failure (i) — V1 contributes
+  nothing. The hybrid reduces to single-source. §15.6's
+  Δκ ≈ 0 in expectation; observed −0.030 is sampling noise.
+- **B-INSUFFICIENT:** Stage B failure (ii) — score
+  separability is below the $\rho \ge \rho^*$ threshold near
+  the operating point.
+- **C-MISMATCHED:** Composition failure (iii) — score
+  works on $\bar{D}$ but fails on $D$.
+- **MIXED / OTHER:** Two or more failure modes co-fire, or
+  none of the three fits.
+
+**§0.8 boundary:** the decision-tree classification is
+diagnostic only. It does NOT re-classify §15.4 USEFUL_INTERNAL
+or §15.6 REGRESSION. It produces interpretive content for
+the §15.7 result section's narrative explanation of WHY the
+verdicts came out as they did.
+
 ---
 
 
