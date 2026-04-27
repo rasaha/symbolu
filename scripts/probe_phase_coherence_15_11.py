@@ -685,3 +685,382 @@ def load_hidden_states_cache(path: str) -> dict[str, HiddenStateExtraction]:
             d=d_cached,
         )
     return extractions
+
+
+# ===========================================================================
+# §15.11 Chunk I-3 — Phase-coherence formula, F aggregation, AUC,
+# selective-prediction κ@α, cascade classifier with direction gate.
+#
+# Formula (PINNED per §15.11 design-doc Chunk 2):
+#   For each pair of layers (i, j):
+#     C[i, j] = (1/W) · Σ_{k=1}^{1791} cos(φ_i[k] - φ_j[k])
+#   where φ_i[k] = angle(rfft(h_i)[k]) and W = 1791.
+#
+# Vectorized identity (used in the implementation for speed and
+# numerical stability):
+#   cos(a - b) = cos(a)·cos(b) + sin(a)·sin(b)
+#   ⇒ C = (A · A^T + B · B^T) / W, where
+#     A[i, k] = cos(φ_i[k]),  B[i, k] = sin(φ_i[k]),
+#     A and B are each shape (n_layers, W).
+# This produces an exact equivalent result without an explicit
+# pairwise loop over (i, j) and (i, j) is full 29x29.
+# ===========================================================================
+
+
+def _lazy_import_sklearn():
+    """Lazy import of sklearn (only roc_auc_score is needed for §15.11)."""
+    try:
+        from sklearn.metrics import roc_auc_score  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "§15.11 phase-coherence probe requires scikit-learn for "
+            "roc_auc_score. Install before running."
+        ) from exc
+    from sklearn.metrics import roc_auc_score
+
+    return roc_auc_score
+
+
+def compute_phase_coherence_matrix(
+    hidden_states_per_question: np.ndarray,
+) -> np.ndarray:
+    """Compute the 29x29 phase-coherence matrix C for one question.
+
+    Args:
+        hidden_states_per_question: shape (n_layers, d) = (29, 3584),
+            real-valued layer-i last-token hidden state per row.
+
+    Returns:
+        C: shape (29, 29), real symmetric, C[i,i] = 1, C[i,j] ∈ [-1, +1].
+    """
+    if hidden_states_per_question.ndim != 2:
+        raise ValueError(
+            f"expected 2-D hidden states (n_layers, d); got shape "
+            f"{hidden_states_per_question.shape}"
+        )
+    n_layers, d = hidden_states_per_question.shape
+    if n_layers != N_LAYERS or d != HIDDEN_DIM:
+        raise ValueError(
+            f"expected shape ({N_LAYERS}, {HIDDEN_DIM}); got "
+            f"({n_layers}, {d})"
+        )
+
+    # rfft along the hidden dim → (n_layers, 1793) complex.
+    H = np.fft.rfft(hidden_states_per_question.astype(np.float64), axis=1)
+    # Bins used: k=1..1791 (exclude DC k=0 and Nyquist k=1792).
+    H_used = H[:, BIN_RANGE_USED[0] : BIN_RANGE_USED[1]]  # (n_layers, W)
+    if H_used.shape[1] != W:
+        raise RuntimeError(
+            f"FFT_BIN_MISMATCH: got W={H_used.shape[1]}, expected {W}."
+        )
+    phi = np.angle(H_used)  # (n_layers, W)
+    cos_phi = np.cos(phi)
+    sin_phi = np.sin(phi)
+    # C[i,j] = (1/W) · Σ_k [cos(φ_i[k]) cos(φ_j[k]) + sin(φ_i[k]) sin(φ_j[k])]
+    C = (cos_phi @ cos_phi.T + sin_phi @ sin_phi.T) / float(W)
+    # Numerical hygiene: clip to [-1, +1] (rounding can push diagonal
+    # imperceptibly outside that range).
+    C = np.clip(C, -1.0, 1.0)
+    return C
+
+
+def aggregate_F(C: np.ndarray) -> float:
+    """Aggregate the 29x29 coherence matrix into a single scalar F.
+
+    F = mean over the upper-triangular off-diagonal entries (i < j).
+    """
+    if C.shape != (N_LAYERS, N_LAYERS):
+        raise ValueError(
+            f"C must be shape ({N_LAYERS},{N_LAYERS}); got {C.shape}"
+        )
+    iu = np.triu_indices(N_LAYERS, k=1)
+    off_diag = C[iu]
+    if off_diag.size != N_OFF_DIAG_ENTRIES:
+        raise RuntimeError(
+            f"OFF_DIAG_COUNT_MISMATCH: got {off_diag.size}, expected "
+            f"{N_OFF_DIAG_ENTRIES}."
+        )
+    return float(off_diag.mean())
+
+
+def coherence_matrix_summary(C: np.ndarray) -> CoherenceMatrixSummary:
+    """Min/mean/max/std of the 406 upper-triangular off-diagonal entries."""
+    iu = np.triu_indices(N_LAYERS, k=1)
+    off_diag = C[iu]
+    return CoherenceMatrixSummary(
+        off_diag_min=float(off_diag.min()),
+        off_diag_mean=float(off_diag.mean()),
+        off_diag_max=float(off_diag.max()),
+        off_diag_std=float(off_diag.std(ddof=1)) if off_diag.size > 1 else 0.0,
+        n_off_diag_entries=int(off_diag.size),
+    )
+
+
+def compute_F_per_question(
+    extraction: HiddenStateExtraction,
+) -> tuple[np.ndarray, CoherenceMatrixSummary]:
+    """Compute F for all N questions of a benchmark.
+
+    Returns:
+        F: shape (N,) float64, one phase-coherence scalar per question.
+        agg_summary: CoherenceMatrixSummary computed over the *aggregate*
+            of all per-question off-diagonal entries (N · 406 values).
+            Useful as a single sanity check across the run.
+    """
+    n = extraction.hidden_states.shape[0]
+    F = np.full(n, np.nan, dtype=np.float64)
+    all_off_diag: list[np.ndarray] = []
+    iu = np.triu_indices(N_LAYERS, k=1)
+    for q in range(n):
+        C = compute_phase_coherence_matrix(extraction.hidden_states[q])
+        F[q] = float(C[iu].mean())
+        all_off_diag.append(C[iu])
+    if np.isnan(F).any():
+        raise RuntimeError(
+            f"PROBE_INTERNAL: F contains NaN for benchmark "
+            f"{extraction.benchmark}."
+        )
+    aggregate = np.concatenate(all_off_diag)
+    agg_summary = CoherenceMatrixSummary(
+        off_diag_min=float(aggregate.min()),
+        off_diag_mean=float(aggregate.mean()),
+        off_diag_max=float(aggregate.max()),
+        off_diag_std=float(aggregate.std(ddof=1)) if aggregate.size > 1 else 0.0,
+        n_off_diag_entries=int(N_OFF_DIAG_ENTRIES),
+    )
+    return F, agg_summary
+
+
+# ---------------------------------------------------------------------------
+# Selective-prediction κ@α (mirrors §15.10's _selective_kappa_at_alpha).
+# ---------------------------------------------------------------------------
+
+
+def _selective_kappa_at_alpha(
+    score: np.ndarray, y: np.ndarray, alpha: float, pi: float
+) -> tuple[float, float, dict]:
+    """κ@α: max coverage with conditional accuracy ≥ α at threshold τ*.
+
+    score = F (higher → admit; per §15.11's BCVF-faithful direction).
+    """
+    n = len(score)
+    if n != len(y):
+        raise ValueError("score and y length mismatch")
+    thresholds = sorted(set([float(score.min() - 1.0)] + [float(v) for v in score]))
+    best_kappa = 0.0
+    operating_point: dict = {
+        "alpha": float(alpha),
+        "pi": float(pi),
+        "tau_star": float("nan"),
+        "kappa_at_alpha": 0.0,
+        "coverage_at_tau_star": 0.0,
+        "conditional_accuracy_at_tau_star": float("nan"),
+        "n_admitted_at_tau_star": 0,
+        "eligible": False,
+    }
+    for tau in thresholds:
+        admitted = score >= tau
+        n_adm = int(admitted.sum())
+        if n_adm < N_MIN:
+            continue
+        cond_acc = float(y[admitted].mean())
+        if cond_acc < alpha:
+            continue
+        coverage = n_adm / n
+        if coverage > best_kappa:
+            best_kappa = coverage
+            operating_point.update(
+                tau_star=float(tau),
+                kappa_at_alpha=float(coverage),
+                coverage_at_tau_star=float(coverage),
+                conditional_accuracy_at_tau_star=float(cond_acc),
+                n_admitted_at_tau_star=int(n_adm),
+                eligible=True,
+            )
+    return best_kappa, operating_point["tau_star"], operating_point
+
+
+# ---------------------------------------------------------------------------
+# Per-benchmark phase-coherence run.
+# ---------------------------------------------------------------------------
+
+
+def run_phase_coherence_for_benchmark(
+    extraction: HiddenStateExtraction,
+) -> PhaseCoherenceResult:
+    """Compute F per question, AUC, ΔAUC, selective-prediction operating points."""
+    roc_auc_score = _lazy_import_sklearn()
+
+    bench = extraction.benchmark
+    y = extraction.correctness.astype(np.int64)
+    n = y.shape[0]
+    if n != PINNED_N:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: extraction for {bench} has N={n}, expected "
+            f"{PINNED_N}."
+        )
+    n_correct = int(y.sum())
+    n_wrong = int(n - n_correct)
+    pi_observed = float(n_correct / n)
+
+    F, agg_summary = compute_F_per_question(extraction)
+
+    auc_phase = float(roc_auc_score(y, F))
+    auc_baseline = ENTROPY_BASELINE_AUC
+    dauc_phase = auc_phase - auc_baseline
+    auc_supervised_phase_1 = SUPERVISED_AUC_PER_BENCHMARK_PHASE_1[bench]
+    dauc_phase_vs_supervised = auc_phase - auc_supervised_phase_1
+    direction_held = bool(auc_phase >= DIRECTION_GATE_THRESHOLD)
+
+    # Selective-prediction at pinned alphas.
+    alphas = ALPHA_TARGETS_PER_BENCHMARK[bench]
+    operating_points: list[dict] = []
+    primary_kappa = 0.0
+    primary_tau = float("nan")
+    pi_pinned = PINNED_PI[bench]
+    for alpha in alphas:
+        kappa, tau, op = _selective_kappa_at_alpha(F, y, alpha, pi_pinned)
+        operating_points.append(op)
+        if math.isclose(alpha, ALPHA_PRIMARY, abs_tol=1e-9):
+            primary_kappa = kappa
+            primary_tau = tau
+
+    if not any(
+        math.isclose(op["alpha"], ALPHA_PRIMARY, abs_tol=1e-9)
+        for op in operating_points
+    ):
+        kappa, tau, op = _selective_kappa_at_alpha(F, y, ALPHA_PRIMARY, pi_pinned)
+        operating_points.append(op)
+        primary_kappa = kappa
+        primary_tau = tau
+
+    return PhaseCoherenceResult(
+        benchmark=bench,
+        n_questions=n,
+        n_correct=n_correct,
+        n_wrong=n_wrong,
+        pi_observed=pi_observed,
+        auc_phase=auc_phase,
+        auc_baseline=auc_baseline,
+        dauc_phase=dauc_phase,
+        auc_supervised_phase_1=auc_supervised_phase_1,
+        dauc_phase_vs_supervised=dauc_phase_vs_supervised,
+        direction_held=direction_held,
+        f_per_question=tuple(float(v) for v in F),
+        coherence_matrix_summary=agg_summary,
+        operating_points=tuple(operating_points),
+        kappa_at_alpha_primary=primary_kappa,
+        tau_star_at_alpha_primary=primary_tau,
+    )
+
+
+# ---------------------------------------------------------------------------
+# §15.11 cascade classifier with direction gate (PINNED per design-doc Chunk 4).
+# ---------------------------------------------------------------------------
+
+
+def classify_cascade_phase(
+    auc_halueval: float,
+    auc_truthfulqa: float,
+    dauc_halueval: float,
+    dauc_truthfulqa: float,
+) -> CascadeVerdict:
+    """Apply §15.11 cascade. Direction gate first, then STRONG/PARTIAL.
+
+    Step 1: direction gate. If either AUC < 0.5 → NO_MATERIAL automatic.
+    Step 2: STRONG. Both AUC ≥ 0.75 AND both ΔAUC ≥ +0.05.
+    Step 3: PARTIAL. Not STRONG, AND (any AUC ≥ 0.66) AND (any ΔAUC > 0).
+    Step 4: NO_MATERIAL (default).
+    """
+    direction_held_h = bool(auc_halueval >= DIRECTION_GATE_THRESHOLD)
+    direction_held_t = bool(auc_truthfulqa >= DIRECTION_GATE_THRESHOLD)
+
+    # Step 1: direction gate.
+    if not (direction_held_h and direction_held_t):
+        rationale = (
+            f"NO_MATERIAL (direction gate): wrong-direction failure on at "
+            f"least one benchmark. BCVF-faithful direction (higher F "
+            f"predicts correct) did not hold. "
+            f"(HaluEval={auc_halueval:.3f} {'≥' if direction_held_h else '<'} 0.5; "
+            f"TruthfulQA-MC={auc_truthfulqa:.3f} "
+            f"{'≥' if direction_held_t else '<'} 0.5)."
+        )
+        return CascadeVerdict(
+            label="NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE",
+            auc_halueval=float(auc_halueval),
+            auc_truthfulqa=float(auc_truthfulqa),
+            dauc_halueval=float(dauc_halueval),
+            dauc_truthfulqa=float(dauc_truthfulqa),
+            direction_held_halueval=direction_held_h,
+            direction_held_truthfulqa=direction_held_t,
+            rationale=rationale,
+        )
+
+    aucs = (auc_halueval, auc_truthfulqa)
+    dauces = (dauc_halueval, dauc_truthfulqa)
+
+    # Step 2: STRONG check.
+    is_strong = all(a >= STRONG_AUC_THRESHOLD for a in aucs) and all(
+        d >= STRONG_DELTA_AUC_THRESHOLD for d in dauces
+    )
+    if is_strong:
+        rationale = (
+            f"STRONG: AUC ≥ {STRONG_AUC_THRESHOLD} on both "
+            f"(HaluEval={auc_halueval:.3f}, TruthfulQA-MC={auc_truthfulqa:.3f}) "
+            f"AND ΔAUC ≥ +{STRONG_DELTA_AUC_THRESHOLD} on both "
+            f"(ΔHaluEval={dauc_halueval:+.3f}, "
+            f"ΔTruthfulQA-MC={dauc_truthfulqa:+.3f})."
+        )
+        return CascadeVerdict(
+            label="STRONG_SIGNAL_IN_PHASE_COHERENCE",
+            auc_halueval=float(auc_halueval),
+            auc_truthfulqa=float(auc_truthfulqa),
+            dauc_halueval=float(dauc_halueval),
+            dauc_truthfulqa=float(dauc_truthfulqa),
+            direction_held_halueval=direction_held_h,
+            direction_held_truthfulqa=direction_held_t,
+            rationale=rationale,
+        )
+
+    # Step 3: PARTIAL check.
+    is_partial = any(a >= PARTIAL_AUC_THRESHOLD for a in aucs) and any(
+        d > 0.0 for d in dauces
+    )
+    if is_partial:
+        rationale = (
+            f"PARTIAL: not STRONG; AUC ≥ {PARTIAL_AUC_THRESHOLD} on at least "
+            f"one benchmark (HaluEval={auc_halueval:.3f}, "
+            f"TruthfulQA-MC={auc_truthfulqa:.3f}) AND ΔAUC > 0 on at least "
+            f"one benchmark (ΔHaluEval={dauc_halueval:+.3f}, "
+            f"ΔTruthfulQA-MC={dauc_truthfulqa:+.3f})."
+        )
+        return CascadeVerdict(
+            label="PARTIAL_SIGNAL_IN_PHASE_COHERENCE",
+            auc_halueval=float(auc_halueval),
+            auc_truthfulqa=float(auc_truthfulqa),
+            dauc_halueval=float(dauc_halueval),
+            dauc_truthfulqa=float(dauc_truthfulqa),
+            direction_held_halueval=direction_held_h,
+            direction_held_truthfulqa=direction_held_t,
+            rationale=rationale,
+        )
+
+    # Step 4: default.
+    rationale = (
+        f"NO_MATERIAL: direction held on both benchmarks, but neither STRONG "
+        f"nor PARTIAL conditions met. AUCs (HaluEval={auc_halueval:.3f}, "
+        f"TruthfulQA-MC={auc_truthfulqa:.3f}) and ΔAUCs "
+        f"(ΔHaluEval={dauc_halueval:+.3f}, "
+        f"ΔTruthfulQA-MC={dauc_truthfulqa:+.3f}) fail the cascade entry "
+        f"conditions."
+    )
+    return CascadeVerdict(
+        label="NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE",
+        auc_halueval=float(auc_halueval),
+        auc_truthfulqa=float(auc_truthfulqa),
+        dauc_halueval=float(dauc_halueval),
+        dauc_truthfulqa=float(dauc_truthfulqa),
+        direction_held_halueval=direction_held_h,
+        direction_held_truthfulqa=direction_held_t,
+        rationale=rationale,
+    )
