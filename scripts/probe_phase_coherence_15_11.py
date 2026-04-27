@@ -1110,3 +1110,180 @@ def enforce_firewall_or_exit(text: str, output_path: str) -> None:
             flush=True,
         )
         sys.exit(4)
+
+
+# ===========================================================================
+# §15.11 Chunk I-4b — Self-test gate.
+#
+# Three required sub-tests (per §15.11 design-doc Chunk 5):
+#   1. 12 cascade boundary cases.
+#   2. Phase-coherence formula smoke test (identical / random / opposite-phase).
+#   3. Firewall coverage (26 positive + clean negative).
+#
+# Any failure exits 3 (SELF_TEST_FAILED).
+# ===========================================================================
+
+
+def _self_test_cascade() -> list[str]:
+    """Run all SELF_TEST_CASCADE_CASES; return list of failure messages."""
+    failures: list[str] = []
+    for i, (auc_h, auc_t, dauc_h, dauc_t, expected) in enumerate(
+        SELF_TEST_CASCADE_CASES
+    ):
+        verdict = classify_cascade_phase(auc_h, auc_t, dauc_h, dauc_t)
+        if verdict.label != expected:
+            failures.append(
+                f"  case {i + 1}: AUC=({auc_h:.3f},{auc_t:.3f}) "
+                f"ΔAUC=({dauc_h:+.3f},{dauc_t:+.3f}) → "
+                f"got {verdict.label!r}, expected {expected!r}"
+            )
+    return failures
+
+
+def _self_test_phase_coherence_formula() -> list[str]:
+    """Three pinned formula smoke tests (per §15.11 design-doc Chunk 5).
+
+    1. Two identical hidden states → C[i,j] = 1 (within tolerance).
+    2. Two random hidden states (independent normal) → mean |C[i,j]| < 0.1.
+    3. Two opposite-phase hidden states (h_b = -h_a) → C[i,j] = -1.
+
+    Each test exercises the full compute_phase_coherence_matrix path.
+    """
+    failures: list[str] = []
+    rng = np.random.default_rng(SEED_ENTROPY)
+    base = rng.normal(0, 1, HIDDEN_DIM).astype(np.float32)
+
+    # Test 1: identical → C[i,j] = 1.
+    hs_identical = np.tile(base[None, :], (N_LAYERS, 1))
+    C_id = compute_phase_coherence_matrix(hs_identical)
+    iu = np.triu_indices(N_LAYERS, k=1)
+    if not np.allclose(C_id[iu], 1.0, atol=1e-9):
+        failures.append(
+            f"  identical-layers: max |C[i,j] - 1| on off-diagonal = "
+            f"{float(np.max(np.abs(C_id[iu] - 1.0))):.2e} (expect ≤ 1e-9)"
+        )
+
+    # Test 2: independent random → mean |C[i,j]| small (large-N law over
+    # W=1791 bins; CLT gives std ~ 1/sqrt(W) ≈ 0.024). Threshold 0.1 is
+    # a generous 4-sigma envelope.
+    hs_rand = rng.normal(0, 1, (N_LAYERS, HIDDEN_DIM)).astype(np.float32)
+    C_rand = compute_phase_coherence_matrix(hs_rand)
+    mean_abs_off = float(np.mean(np.abs(C_rand[iu])))
+    if mean_abs_off >= 0.1:
+        failures.append(
+            f"  random-layers: mean |C[i,j]| on off-diagonal = "
+            f"{mean_abs_off:.4f} (expect < 0.1)"
+        )
+
+    # Test 3: opposite-phase (h_b = -h_a). rfft is linear, so phase shifts
+    # by exactly π and cos(phi_a - phi_b) = cos(-π) = -1.
+    # Construct: layer 0 = base; layers 1..28 = -base.
+    hs_opp = np.empty((N_LAYERS, HIDDEN_DIM), dtype=np.float32)
+    hs_opp[0] = base
+    hs_opp[1:] = -base
+    C_opp = compute_phase_coherence_matrix(hs_opp)
+    # C[0, j] for j>0 should equal -1; C[i, j] for i,j > 0 should equal +1.
+    if not np.allclose(C_opp[0, 1:], -1.0, atol=1e-9):
+        failures.append(
+            f"  opposite-phase: max |C[0, 1:] - (-1)| = "
+            f"{float(np.max(np.abs(C_opp[0, 1:] + 1.0))):.2e} (expect ≤ 1e-9)"
+        )
+    if N_LAYERS > 2 and not np.allclose(C_opp[1:, 1:][np.triu_indices(N_LAYERS - 1, k=1)], 1.0, atol=1e-9):
+        failures.append(
+            f"  opposite-phase: layers 1..28 should be mutually +1; "
+            f"got max deviation "
+            f"{float(np.max(np.abs(C_opp[1:, 1:][np.triu_indices(N_LAYERS - 1, k=1)] - 1.0))):.2e}"
+        )
+
+    return failures
+
+
+def _self_test_firewall() -> list[str]:
+    """Verify firewall flags all 26 Class-3 patterns + clean text passes."""
+    failures: list[str] = []
+    for pattern in CLASS_3_FORBIDDEN_PATTERNS:
+        sample = f"Some innocuous text. {pattern} more text."
+        if not scan_for_forbidden_patterns(sample):
+            failures.append(
+                f"  firewall failed to detect pattern: {pattern!r}"
+            )
+    clean = (
+        "The phase-coherence AUC is 0.61 on HaluEval-QA, ΔAUC = -0.05. "
+        "The cascade label is NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE by "
+        "mechanical readout. The §13.9 hold remains binding. §15.10's "
+        "PARTIAL_SIGNAL_IN_Z verdict is preserved."
+    )
+    if scan_for_forbidden_patterns(clean):
+        failures.append(
+            "  firewall false-positive on clean text: "
+            f"{scan_for_forbidden_patterns(clean)!r}"
+        )
+    return failures
+
+
+def run_self_test() -> int:
+    """Execute the §15.11 self-test gate; return 0 on success, 3 on failure."""
+    print("§15.11 self-test gate", flush=True)
+    print(f"  schema_version: {SCHEMA_VERSION}", flush=True)
+    print(f"  benchmarks: {BENCHMARKS}", flush=True)
+    print(f"  pinned_N: {PINNED_N}", flush=True)
+    print(f"  baseline AUCs: {BASELINE_AUC_PER_BENCHMARK}", flush=True)
+    print(
+        f"  cascade thresholds: STRONG_AUC≥{STRONG_AUC_THRESHOLD}, "
+        f"STRONG_dAUC≥+{STRONG_DELTA_AUC_THRESHOLD}, "
+        f"PARTIAL_AUC≥{PARTIAL_AUC_THRESHOLD}, "
+        f"DIRECTION_GATE={DIRECTION_GATE_THRESHOLD}",
+        flush=True,
+    )
+    print(
+        f"  phase-coherence: W={W} (bins {BIN_RANGE_USED[0]}..{BIN_RANGE_USED[1] - 1}); "
+        f"n_layers={N_LAYERS}; n_off_diag={N_OFF_DIAG_ENTRIES}",
+        flush=True,
+    )
+
+    all_failures: list[str] = []
+
+    print("  [1/3] cascade boundary cases (12)...", flush=True)
+    cascade_fail = _self_test_cascade()
+    if cascade_fail:
+        all_failures.append("CASCADE FAILURES:")
+        all_failures.extend(cascade_fail)
+    else:
+        print(
+            f"    OK: {len(SELF_TEST_CASCADE_CASES)} boundary cases pass.",
+            flush=True,
+        )
+
+    print("  [2/3] phase-coherence formula smoke tests (3)...", flush=True)
+    formula_fail = _self_test_phase_coherence_formula()
+    if formula_fail:
+        all_failures.append("FORMULA FAILURES:")
+        all_failures.extend(formula_fail)
+    else:
+        print(
+            "    OK: identical→1, random→~0, opposite-phase→-1.",
+            flush=True,
+        )
+
+    print(
+        f"  [3/3] interpretation firewall ({len(CLASS_3_FORBIDDEN_PATTERNS)} patterns)...",
+        flush=True,
+    )
+    firewall_fail = _self_test_firewall()
+    if firewall_fail:
+        all_failures.append("FIREWALL FAILURES:")
+        all_failures.extend(firewall_fail)
+    else:
+        print(
+            f"    OK: firewall flags all {len(CLASS_3_FORBIDDEN_PATTERNS)} "
+            f"Class-3 patterns; clean text passes.",
+            flush=True,
+        )
+
+    if all_failures:
+        print("\nSELF_TEST_FAILED:", flush=True)
+        for line in all_failures:
+            print(line, flush=True)
+        return 3
+    print("\nSELF_TEST_PASSED — proceed.", flush=True)
+    return 0
