@@ -16385,5 +16385,141 @@ implementation requires a fresh §0.8 amendment.
 ---
 
 
+### 15.11 Pre-commitment (continued) — Pinned evaluation
+
+**Pinned primary statistic.**
+
+For each benchmark independently:
+
+> **AUC_phase = roc_auc_score(y, F)**
+
+where `y ∈ {0, 1}^N` is the §13.10 correctness vector (first
+PINNED_N = 100 records per benchmark, `greedy_matches_correct`),
+and `F ∈ R^N` is the per-question phase-coherence scalar.
+
+No CV is performed — F is a deterministic, parameter-free
+function of the hidden states, so there is nothing to fit.
+AUC is computed once on the full N = 100 sample per benchmark.
+
+**Pinned baseline and ΔAUC.**
+
+The cascade-defining baseline is the **§13.10 entropy AUC**,
+identical to §15.10's convention:
+
+> **AUC_baseline = 0.661** (per §13.10 verdict-of-record,
+> both benchmarks)
+> **ΔAUC_phase = AUC_phase − 0.661**
+
+This makes §15.11's cascade directly comparable to §15.10's:
+same baseline, same ΔAUC frame, same statistical reference
+point. **The §13.10 baseline is the canonical reference; no
+other baseline is used to define the cascade. PINNED.**
+
+**Pinned secondary readout (§15.10 comparison).**
+
+For transparency, the markdown report records — but **does
+not** use to define the cascade — the difference vs §15.10's
+per-benchmark supervised probe AUCs:
+
+> **ΔAUC_phase_vs_supervised = AUC_phase − AUC_supervised**, where
+> AUC_supervised = 0.6686 on HaluEval-QA, 0.6224 on
+> TruthfulQA-MC (per §15.10 JSON).
+
+This secondary readout answers "did phase coherence beat the
+supervised probe?" but is **disclosure only**. The cascade
+label is fixed by ΔAUC vs §13.10 entropy baseline, not vs
+§15.10 supervised AUC. PINNED.
+
+**Pinned selective-prediction operating points.**
+
+For each benchmark, κ@α is computed using **F directly as
+the abstention score** (higher F → more confident in
+correctness, per the pinned direction):
+
+- Threshold sweep: `τ ∈ sorted(set(F)) ∪ {min(F) − 1}`
+  (admit-all sentinel).
+- Admit set at threshold τ: `{i : F[i] ≥ τ}`.
+- Eligibility: `|admit set| ≥ N_MIN = 10` AND conditional
+  accuracy `≥ α`.
+- κ@α = max coverage among eligible thresholds; τ\* =
+  argmax τ.
+
+**Pinned alphas per benchmark** (matches §15.10):
+
+- HaluEval-QA: α ∈ {0.40, 0.50, 0.75}.
+- TruthfulQA-MC: α ∈ {0.35, 0.50, 0.75}.
+- Primary alpha: α = 0.50 (matches §15.10
+  `ALPHA_PRIMARY`).
+
+The selective-prediction table is **disclosure only**; it
+does not enter the cascade. The cascade is on AUC and ΔAUC.
+PINNED.
+
+**Pinned direction handling.**
+
+AUC is computed with the BCVF-faithful direction (higher F
+predicts correct). If AUC_phase < 0.5, the empirical signal
+is in the opposite direction.
+
+**Mechanical handling** (PINNED):
+
+- AUC_phase ≥ 0.5 → cascade evaluates STRONG / PARTIAL /
+  NO_MATERIAL bands per the cascade block below.
+- AUC_phase < 0.5 → cascade lands automatically in
+  `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE` with rationale
+  "wrong-direction signal under BCVF-faithful pinned
+  direction; no signal in the predicted direction." No
+  directional flipping, no absolute-value rescue, no
+  re-evaluation under the inverted convention.
+
+This is conservative and preserves §0.8's no-iteration
+discipline: the BCVF-faithful direction was the
+pre-committed hypothesis; failing it is a failure, not a
+sign-flip opportunity.
+
+**What is NOT computed.**
+
+- No bootstrap confidence intervals for AUC (matches §15.10).
+- No alternative aggregations of C (no max, no top-K, no
+  row-mean, no per-pair features). Only the pinned F.
+- No alternative direction conventions or two-sided AUC.
+- No layer-pair scatter analysis or §15.7-style mechanism
+  decomposition. §15.11 is a single-feature test by
+  construction; if the cascade lands in NO_MATERIAL, that is
+  the verdict and §15.11 closes.
+- No re-classification of §15.10's `PARTIAL_SIGNAL_IN_Z`.
+  The Phase 1 and Phase 2 cascades are independent
+  §0.8-binding readouts.
+
+**What enters the per-benchmark JSON.**
+
+For each benchmark:
+
+- `auc_phase`, `auc_baseline`, `dauc_phase` (vs §13.10);
+- `auc_supervised_phase_1`, `dauc_phase_vs_supervised`
+  (disclosure);
+- `f_per_question`: the 100-element scalar feature vector;
+- `coherence_matrix_summary`: min, mean, max, std of the
+  406 off-diagonal upper-triangular entries — for sanity
+  checking the F aggregation;
+- `direction_held`: boolean (True if AUC_phase ≥ 0.5);
+- `selective_prediction_operating_points`: list of dicts at
+  each pinned α;
+- `n_questions`, `n_correct`, `n_wrong`, `pi_observed`.
+
+**What enters the per-run JSON.**
+
+- All §15.11 pinned constants (W, layer subset, alphas,
+  thresholds);
+- §13.10 baseline AUCs and §15.10 supervised AUCs for
+  cross-reference;
+- Both per-benchmark blocks above;
+- Final `cascade_verdict` block with label, AUCs, ΔAUCs,
+  rationale;
+- `schema_version = "15.11"`.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
