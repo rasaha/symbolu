@@ -15352,6 +15352,103 @@ than Qwen's: when V1 picks Llama or Mistral (24/100 questions),
 $R_S$ comes from those sources, which have on average
 modestly lower entropy than Qwen on TruthfulQA-MC.
 
+**TruthfulQA-MC narrative — C-MISMATCHED classification (§15.6
+mechanism corrected; verdict band remains REGRESSION).**
+
+On truthfulqa-mc, §15.6's `REGRESSION` verdict-of-record
+(binding under §0.8) is anchored by composition failure. The
+per-source winning-source entropy $R_S$ correlates with
+$1 - Y_S$ at Pearson $r_{\bar{D}} = +0.2643$ on the Qwen-
+picked subset $\bar{D}$ (76 questions) but at $r_D = -0.1564$
+on the V1-divergent subset $D$ (24 questions; $|D|/N = 0.24$).
+The hybrid's risk-to-correctness mapping breaks on exactly
+the questions where Stage A's selector matters — a
+hybrid-specific pathology that does not exist in the single-
+source scenario. The verdict band remains `REGRESSION`
+regardless of this diagnostic mechanism.
+
+**Explicit §15.6 mechanism correction recorded (per Chunk 7f
+firewall constraints).** §15.6 Chunk 6c presented an informal
+analytical hypothesis that V1 selected Qwen on all 100
+TruthfulQA-MC questions, supporting a "Stage A degeneracy
+plus sampling stochasticity" interpretation of the §15.6
+REGRESSION verdict. **The §15.7 audit empirically refutes
+this informal hypothesis**: V1 selected Qwen on 76/100,
+Llama on 17/100, Mistral on 7/100; the V1-divergent set
+$|D| = 24$ — well above the A-DEGENERATE threshold of
+$|D|/N < 0.05$. The §15.6 Chunk 6c claim was not part of
+§15.6's pinned cascade verdict; it was analytical commentary
+that turned out to be empirically wrong. Per §15.7 Chunk 7f's
+interpretation firewall:
+
+- **The §15.6 `REGRESSION` cascade verdict-of-record remains
+  binding under §0.8.** The cascade fired on the pinned
+  $\Delta\kappa = -0.030$ point estimate; that classification
+  is unchanged.
+- **The §15.6 Chunk 6c analytical narrative is corrected
+  here in §15.8**, not silently rewritten in §15.6. The audit
+  trail preserves the original §15.6 Chunk 6c text alongside
+  this §15.8 correction.
+- **The corrected mechanism is C-MISMATCHED (composition
+  failure)**, not A-DEGENERATE (Stage A degeneracy). The
+  hybrid's risk score is sign-flipped on V1-divergent
+  questions, which is structurally different from "the
+  hybrid reduces to single-source."
+
+**Operationally what C-MISMATCHED means on TruthfulQA-MC.**
+On the 76 Qwen-picked questions, the per-source winning-
+source entropy works as expected: high entropy → wrong
+($r_{\bar{D}} = +0.26$). On the 24 V1-divergent questions,
+the relationship inverts: high entropy of the winning source
+is **anti-correlated** with whether V1's selected answer is
+right ($r_D = -0.16$). Mechanically, this can happen if:
+
+- When V1 picks a non-Qwen source on TruthfulQA-MC, that
+  source's K=10 stochastic samples cluster tightly around an
+  *incorrect* answer (low entropy, but wrong) — making low
+  entropy a misleading proxy on those questions.
+- Conversely, when V1 picks a non-Qwen source whose samples
+  are diverse (high entropy), the V1-clustered selector may
+  pick a representative whose answer happens to be correct —
+  making high entropy weakly indicative of correctness on
+  this small subset.
+
+Either pattern produces sign-flipped correlation on $D$.
+**§15.7 does not pin a single mechanical explanation; it
+identifies the diagnostic signature and pins the
+classification.** The narrative correction is a §15.8
+finding, not a §15.6 amendment.
+
+**Why $\Delta_A = 0$ is not A-DEGENERATE.** A-DEGENERATE
+requires both $|\Delta_A| <$ threshold AND $|D|/N <$
+threshold. TruthfulQA-MC has $\Delta_A = 0$ exactly (V1
+swapped the same number of right-becomes-wrong as
+wrong-becomes-right) but $|D|/N = 0.24 \gg 0.05$. The decision
+tree (Chunk 7d, _classify_decision_tree) correctly does not
+classify as A-DEGENERATE because the divergent set is
+substantial. **§15.6's "V1 swapped sources but the net
+accuracy was unchanged" pattern is real; the inference that
+"V1 must have picked Qwen on all 100" was the wrong
+conclusion to draw from that pattern.**
+
+**Audit-trail integrity.** Per §15.7 Chunk 7f and the
+no-silent-edit discipline, §15.6 Chunks 6a–6f text is
+preserved unchanged. §15.8 records the §15.7 mechanism
+correction as new §0.8-binding diagnostic content. Future
+readers tracing the §15 program audit trail see:
+
+1. §15.6 Chunk 6c's original informal hypothesis.
+2. §15.8 (this section) recording the §15.7 audit's empirical
+   refutation of that hypothesis and the corrected C-MISMATCHED
+   mechanism.
+3. Both §15.6 REGRESSION and §15.7 C-MISMATCHED diagnostic
+   classification standing as binding §0.8 content at their
+   respective levels (verdict cascade vs diagnostic
+   decomposition).
+
+The verdict band remains `REGRESSION`. The mechanism is now
+correctly characterized.
+
 ---
 
 
