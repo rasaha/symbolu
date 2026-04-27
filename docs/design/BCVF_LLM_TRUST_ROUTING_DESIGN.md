@@ -14175,6 +14175,111 @@ deferred to §15.4, sibling-producer creation per Amendment 1)
 landed pre-execution and are documented within §15.5 itself,
 not as run-time deviations.
 
+**Combined picture across §13 / §14 / §15 — full LLM-track
+program now closed across four metric classes and two
+benchmarks; cross-benchmark hybrid REGRESSION is the
+terminal verdict.**
+
+§15.6 closes the §15 LLM-track operational program. The
+full §13 / §14 / §15 testing matrix at this codebase's
+Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100 configuration:
+
+| Program | Metric class | TruthfulQA-MC | HaluEval-QA | Combined |
+|---|---|---|---|---|
+| §13.10 | AUC vs ground truth (single-axis SE baseline) | 0.661 | 0.661 | TRUTH_CORRELATED_MARGINAL |
+| §13.11–§13.18 | AUC, 4 single-axis revisions | various | various | 5/5 ANTI |
+| §14a / §14a.2 | Δ accuracy, system-level | (deferred) | SCOUT_SATURATION | SCOUT_SATURATION |
+| §15.1 / §15.2 | AURC + cov@α, single-source abstention | $\kappa = 0.14$ | $\kappa = 0.26$ | MARGINAL (worst-benchmark min) |
+| §15.3 / §15.4 | $\Delta\kappa$ vs §15.1 baseline, hybrid | (deferred to §15.5) | $\Delta\kappa = +0.090$ | USEFUL_INTERNAL (single-benchmark) |
+| **§15.5 / §15.6** | $\Delta\kappa$ vs §15.1 baseline, hybrid | $\boldsymbol{\Delta\kappa = -0.030}$ | (§15.4 verdict-of-record, +0.090) | **REGRESSION** (cross-benchmark synthesis worst-benchmark min) |
+
+**Thirteen distinct experimental structures across four
+metric classes have now been tested.** None clears STRONG on
+the worst-benchmark rule. §15.4 is the only single-benchmark
+verdict that cleared USEFUL_INTERNAL; §15.6 bounds it as a
+HaluEval-only artifact. The cross-benchmark hybrid is
+REGRESSION.
+
+**§13.9 VC-brief hold reaffirmed and strengthened.** §13.9
+gates external-framing changes to
+`AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` on a STRONG-band lift
+on both benchmarks at any §13 / §14 / §15 probe. §15.6 adds
+the strongest possible negative result yet — REGRESSION on
+the cross-benchmark hybrid synthesis. Combined with §13's
+5/5 ANTI, §14's 2/2 `SCOUT_SATURATION`, §13.20's
+NOISE_BAND_LIFT, §15.2's MARGINAL, §15.4's single-benchmark
+USEFUL_INTERNAL, and §15.6's REGRESSION:
+
+- **Thirteen experimental structures total.**
+- **Zero clear STRONG on the combined-classification rule.**
+- **One clears USEFUL_INTERNAL on a single benchmark only;
+  cross-benchmark synthesis on that hybrid is REGRESSION.**
+
+The §13.9 hold is unchanged in policy, but materially
+*strengthened* by the cumulative evidence.
+
+The honest external framing for any internal-research
+referencing of the §13 / §14 / §15 program is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100, no
+> literature-aligned, mechanism-motivated, system-level,
+> single-source-abstention, hybrid-abstention, or cross-
+> benchmark-hybrid-abstention BCVF construction tested in
+> this codebase clears the STRONG combined-classification
+> bar on the worst-benchmark rule. The §15.4 hybrid scout
+> cleared USEFUL_INTERNAL on HaluEval-QA single-benchmark,
+> but the §15.6 cross-benchmark companion on TruthfulQA-MC
+> returned REGRESSION, bounding §15.4 as a single-benchmark
+> artifact under the worst-benchmark rule. The LLM
+> hallucination-detection track is closed across thirteen
+> experimental structures and four metric classes.*
+
+**§15.6 closes the §15 LLM-track program at the cross-
+benchmark hybrid level.** Per Chunk 5g, REGRESSION
+explicitly forecloses §15.7+-as-implementation follow-ups
+at this configuration. Any follow-up under §15-style logic
+— cross-benchmark larger-N re-run, ensemble risk score,
+alternative selector configurations, alternative consumer
+configurations, relaxed worst-benchmark rule, model-scale
+upgrade per §13.8 future-work — would require a fresh
+top-level §0.8 commitment with bands pinned before any
+data inspection. None is authorized by §15.6.
+
+**The autonomy-domain BCVF claim (§6.1) stands independently
+on the N=21 sign-test that passed in §6.1 / §6.7 and is
+unaffected by any §13 / §14 / §15 outcome.** The §13 / §14 /
+§15 program tested whether BCVF transfers to LLM
+hallucination detection at this codebase's specific scale
+across four distinct metric classes; the answer at this
+configuration is mixed — twelve of thirteen experimental
+structures returned strict non-promotion verdicts; one
+(§15.4 hybrid on HaluEval) cleared USEFUL_INTERNAL on a
+single benchmark; one (§15.6 cross-benchmark) returned
+REGRESSION; **the cross-benchmark synthesis is REGRESSION
+under the worst-benchmark rule.** The §13.9 external-
+framing hold remains binding; §15.6 verdict and synthesis
+are documented internally, not externally, per Chunk 5g.
+
+**Artifacts.**
+
+- `scripts/probe_system_level_scout_v2_truthfulqa.py`
+  (§15.5 Phase 1 sibling producer; numpy + transformers +
+  GPU; ~50–60 min runtime per N=100 invocation).
+- `scripts/probe_hybrid_selective_abstention_truthfulqa.py`
+  (§15.5 Phase 2 post-processor; numpy + stdlib only; under
+  30 sec wall clock).
+- `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+  (Phase 1 per-question dump; consumed by Phase 2).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.json`
+  (machine-readable §15.5 result, schema_version `"15.5"`,
+  with cross_benchmark_synthesis block).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.md`
+  (human-readable summary).
+
+§15.6 result section now complete (chunks 6a–6f, 6 commits
+on top of the §15.5 pre-commitment + Amendment 1 +
+implementation). §15 LLM-track program is closed.
+
 ---
 
 
