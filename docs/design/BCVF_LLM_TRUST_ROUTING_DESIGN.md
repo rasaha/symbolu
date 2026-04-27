@@ -14461,6 +14461,109 @@ include explicit `schema_version: "15.7-diagnostic"` and a
 top-level field flagging that §15.7 is **diagnostic-only**
 content, not a new verdict-of-record.
 
+**Diagnostic computations (pinned, full audit spec).**
+
+For each of the two hybrid configurations (§15.4 HaluEval +
+§15.6 TruthfulQA-MC), §15.7 computes the following over the
+existing per-question $(r(q), c(q))$ extracted from the
+pinned §14a.2 / §15.5 Phase 1 dumps. Notation per §15.5
+Chunk 5f.
+
+**(A) Class-conditional CDFs.** For each benchmark, sort
+questions by ascending $r(q)$ with question-id tiebreak.
+At each threshold $\tau$ in the sorted unique-$r$ grid plus
+$\pm\infty$:
+
+$$F_1(\tau) = \Pr(R<\tau \mid Y=1) = \frac{|\{q : r(q)<\tau \text{ AND } c(q)=1\}|}{|\{q : c(q)=1\}|}$$
+$$F_0(\tau) = \Pr(R<\tau \mid Y=0) = \frac{|\{q : r(q)<\tau \text{ AND } c(q)=0\}|}{|\{q : c(q)=0\}|}$$
+
+These are the class-conditional CDFs of the risk score under
+the pinned correctness label.
+
+**(B) Separation diagnostic** (the cruder local-discrimination
+form):
+$$\Delta(\tau) = F_1(\tau) - F_0(\tau)$$
+Range $[-1, +1]$. Reported as a curve over $\tau$.
+
+**(C) Likelihood-ratio condition** (the operationally-correct
+local condition for selective prediction):
+$$\rho(\tau) = \frac{F_1(\tau)}{F_0(\tau)} \quad \text{(when } F_0(\tau) > 0\text{)}$$
+At each $\tau$, compute and report $\rho(\tau)$.
+
+**(D) Base-rate-adjusted threshold target.** Per the
+selective-prediction precision condition derived in
+§15.7's pinned interpretation framework, $\Pr(Y=1\mid R<\tau)
+\ge \alpha$ if and only if
+$$\rho(\tau) \ge \rho^*(\alpha, \pi) \;\equiv\; \frac{\alpha(1-\pi)}{(1-\alpha)\pi}$$
+
+For each benchmark, compute $\rho^*(\alpha_2, \pi)$ using
+$\pi$ = empirical V1 (or single-source) accuracy on that
+benchmark, and report whether $\rho(\tau)$ exceeds $\rho^*$
+in any τ region with $|A_\tau| \ge n_\min = 10$. **This is
+the sharpest single diagnostic** for whether the score
+supports useful selective prediction at the $\alpha_2 = 0.50$
+operating point.
+
+Pinned $\rho^*$ targets (computable ex-ante from §13.10
+prose / §14a.2 evidence):
+
+| Configuration | $\pi$ (Stage A or single-source acc) | $\rho^*$ at $\alpha_2 = 0.50$ |
+|---|---|---|
+| §15.4 HaluEval hybrid | 0.330 (V1 acc per §14c) | $\frac{0.5 \cdot 0.67}{0.5 \cdot 0.33} \approx 2.03$ |
+| §15.6 TruthfulQA-MC hybrid | 0.250 (V1 acc per §15.6 Chunk 6c) | $\frac{0.5 \cdot 0.75}{0.5 \cdot 0.25} = 3.0$ |
+| §15.2 HaluEval single-source | 0.300 (Qwen greedy per §13.10) | $\frac{0.5 \cdot 0.70}{0.5 \cdot 0.30} \approx 2.33$ |
+| §15.2 TruthfulQA-MC single-source | 0.250 (Qwen greedy per §13.10) | $3.0$ |
+
+The base-rate asymmetry is itself documented as a §15.7
+finding: TruthfulQA-MC requires $\rho \ge 3.0$ while HaluEval
+requires only $\sim 2.03$ — a 50% steeper bar from base rate
+alone before any score-quality consideration.
+
+**(E) Precision and coverage curves.**
+$$p(\tau) = \Pr(Y=1 \mid R<\tau), \quad c(\tau) = \Pr(R<\tau)$$
+Reported alongside $F_1, F_0, \Delta, \rho$ at every grid
+point.
+
+**(F) Step-size audit (where the policy curve is "stepped").**
+
+Per §15.6 Chunk 6b observation (b), the §15.6 hybrid's α₁
+and α₂ operating points were identical (same $\tau^*$, same
+coverage). §15.7 quantifies the step-geometry of each
+benchmark's risk-coverage curve:
+
+- **Number of distinct $r(q)$ values** in the empirical
+  support (≤ N).
+- **Empirical jump sizes:** for each adjacent pair of
+  thresholds in the sorted-unique-$r$ grid, compute
+  $\Delta_\text{jump,k} = c(\tau_{k+1}) - c(\tau_k)$.
+  Report mean, max, and number of "large jumps" (defined as
+  jumps $\ge 1/N$, i.e., a single question or more shifting
+  classification at one threshold).
+- **Operating-point collapse audit:** for each pinned $\alpha
+  \in \{\alpha_1, \alpha_2, \alpha_3\}$, compute the
+  achieving threshold $\tau^*(\alpha)$ and flag whether any
+  pair of adjacent $\alpha$ values resolves to the same
+  $\tau^*$ — directly testing the §15.6 Chunk 6b "stepped
+  curve" finding empirically.
+
+**Reporting format (pinned).** All curves are emitted as
+arrays in the §15.7 JSON artifact. The markdown report
+includes a per-benchmark table summarizing:
+
+- $\rho(\tau^*)$ at the operating-point threshold for each
+  $\alpha$ target,
+- $\rho^*(\alpha, \pi)$ pinned target,
+- whether the condition $\rho \ge \rho^*$ is met,
+- $\Delta(\tau^*)$ separation,
+- step-size summary statistics.
+
+**Critical §0.8 distinction:** all of these computations are
+**diagnostic only**. None re-classifies any §15.4 / §15.5 /
+§15.6 / §13.20 verdict-of-record. The $\rho \ge \rho^*$ test
+informs whether the §13.10 entropy is operationally useful at
+the pinned operating point, but the §15.6 cascade verdict on
+$\Delta\kappa$ remains binding regardless.
+
 ---
 
 
