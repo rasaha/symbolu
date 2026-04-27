@@ -16521,5 +16521,132 @@ For each benchmark:
 ---
 
 
+### 15.11 Pre-commitment (continued) — Pinned cascade bands and self-test boundary cases
+
+**Pinned cascade labels.**
+
+§15.11's cascade lands in exactly one of three exhaustive
+bands:
+
+- `STRONG_SIGNAL_IN_PHASE_COHERENCE`,
+- `PARTIAL_SIGNAL_IN_PHASE_COHERENCE`,
+- `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`.
+
+Labels are **§15.11-specific** (do not collide with §15.10's
+`*_IN_Z` labels) so any future cross-reference is
+unambiguous about which mechanism class produced the verdict.
+
+**Pinned cascade decision (mechanical, in order).**
+
+Inputs: `auc_h`, `auc_t`, `dauc_h`, `dauc_t` where
+`dauc = auc − 0.661` (the §13.10 entropy baseline).
+
+**Step 1 — Direction gate (PINNED).**
+
+> If `auc_h < 0.5` OR `auc_t < 0.5` →
+> label = `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`,
+> rationale = "wrong-direction failure on at least one
+> benchmark; BCVF-faithful direction (higher F predicts
+> correct) did not hold." Skip remaining steps.
+
+This is the §0.8 enforcement of the pinned direction. The
+hypothesis was BCVF-faithful direction; failing it on either
+benchmark is a hypothesis failure, not a sign-flip
+opportunity.
+
+**Step 2 — STRONG check.**
+
+> If `auc_h ≥ 0.75` AND `auc_t ≥ 0.75` AND
+> `dauc_h ≥ +0.05` AND `dauc_t ≥ +0.05` →
+> label = `STRONG_SIGNAL_IN_PHASE_COHERENCE`.
+
+(Numerical thresholds are deliberately identical to §15.10's
+STRONG conditions to make Phase 1 / Phase 2 cascades
+directly comparable.)
+
+**Step 3 — PARTIAL check.**
+
+> If not STRONG, AND `(auc_h ≥ 0.66 OR auc_t ≥ 0.66)`,
+> AND `(dauc_h > 0 OR dauc_t > 0)` →
+> label = `PARTIAL_SIGNAL_IN_PHASE_COHERENCE`.
+
+**Step 4 — Default.**
+
+> Otherwise → label = `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`.
+
+**Pinned threshold constants (matches §15.10 numerically).**
+
+```
+STRONG_AUC_THRESHOLD          = 0.75   # inclusive
+STRONG_DELTA_AUC_THRESHOLD    = 0.05   # inclusive
+PARTIAL_AUC_THRESHOLD         = 0.66   # inclusive
+DIRECTION_GATE_THRESHOLD      = 0.5    # strict (AUC < 0.5 fails)
+ENTROPY_BASELINE_AUC          = 0.661  # both benchmarks (per §13.10)
+```
+
+**Pinned self-test boundary cases (12 cases).**
+
+Each tuple is `(auc_h, auc_t, dauc_h, dauc_t,
+expected_label)`. The §15.11 implementation script must
+pass all 12 at the self-test gate before any data
+inspection:
+
+| #   | auc_h | auc_t | dauc_h | dauc_t | expected     |
+|-----|-------|-------|--------|--------|--------------|
+|  1  | 0.80  | 0.78  | +0.139 | +0.119 | STRONG       |
+|  2  | 0.75  | 0.75  | +0.089 | +0.089 | STRONG (boundary inclusive)               |
+|  3  | 0.74  | 0.78  | +0.079 | +0.119 | PARTIAL (auc_h just below STRONG)         |
+|  4  | 0.70  | 0.62  | +0.039 | −0.041 | PARTIAL (one benchmark passes both)       |
+|  5  | 0.66  | 0.55  | +0.001 | −0.111 | PARTIAL (auc_h = 0.66 inclusive)          |
+|  6  | 0.65  | 0.65  | −0.011 | −0.011 | NO_MATERIAL (both AUC < 0.66)             |
+|  7  | 0.661 | 0.661 | 0.0    | 0.0    | NO_MATERIAL (dAUC not > 0)                |
+|  8  | 0.49  | 0.78  | −0.171 | +0.119 | NO_MATERIAL (direction gate trips)        |
+|  9  | 0.45  | 0.40  | −0.211 | −0.261 | NO_MATERIAL (direction gate trips on both)|
+| 10  | 0.50  | 0.78  | −0.161 | +0.119 | PARTIAL (direction gate inclusive at 0.5) |
+| 11  | 0.499 | 0.80  | −0.162 | +0.139 | NO_MATERIAL (direction gate strict)       |
+| 12  | 0.55  | 0.55  | −0.111 | −0.111 | NO_MATERIAL (direction holds; both fail)  |
+
+These cover: STRONG-clean and STRONG-boundary; PARTIAL via
+just-below-STRONG, single-benchmark-passes, and
+exact-AUC-boundary; NO_MATERIAL via both-AUC-fail,
+exact-baseline, single-direction-fail, both-direction-fail,
+direction-gate-inclusive-pass, direction-gate-strict-fail,
+and middling-no-signal.
+
+**Why these thresholds (§0.8-disclosed).**
+
+- **Numerical identity with §15.10** (0.75 / 0.05 / 0.66 /
+  0.5 / 0.661) is intentional. Phase 1 and Phase 2 are
+  testing different mechanism classes against the same
+  baseline; harmonizing thresholds makes the cross-phase
+  comparison clean.
+- **Direction gate at 0.5 strict** (AUC = 0.5 passes)
+  reflects §0.8's "BCVF-faithful direction was
+  pre-committed" — AUC = 0.5 is the no-information point,
+  not the wrong-direction point. Wrong-direction is strict
+  AUC < 0.5.
+- **Inclusive at 0.75 and 0.66**, strict at 0 for ΔAUC,
+  mirrors §15.10 exactly. No drift.
+- **Three-band exhaustive partition** is a feature, not a
+  bug: every (auc_h, auc_t, dauc_h, dauc_t) tuple maps to
+  exactly one label by mechanical inspection. No
+  interpretive grey zone.
+
+**What the cascade does NOT consider.**
+
+- Cross-phase comparison vs §15.10 supervised AUC.
+  (Disclosure-only; never in the cascade decision.)
+- Selective-prediction κ@α values. (Disclosure-only; never
+  in the cascade decision.)
+- CV variance, fold-AUC spread, or any per-question
+  diagnostic. The cascade is on two scalars per benchmark
+  (AUC, ΔAUC) and nothing else.
+- Per-layer-pair coherence values from C. The cascade is on
+  F via AUC; the matrix C is logged for sanity but not for
+  cascade input.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
