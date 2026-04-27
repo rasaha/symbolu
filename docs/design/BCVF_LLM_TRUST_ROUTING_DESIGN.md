@@ -15554,6 +15554,92 @@ signatures. Both contribute to §15.6's REGRESSION:
 §15.6's REGRESSION verdict band remains binding regardless
 of how these mechanism components are weighted.
 
+**Authorization mapping per §15.7 Chunk 7f.**
+
+§15.7's pre-committed Class-1 / Class-2 / Class-3 statement
+rules govern what §15.8 may emit. Reproduced exactly:
+
+| Class | Statement type | §15.8 usage in Chunks 8a–8d | Compliance |
+|---|---|---|---|
+| Class 1 | Numerical observations | All decomposition tables, operating-point tables, sampling-noise statistics, V1 selection histograms, correlation values | ✓ direct readouts of pinned computations |
+| Class 2 | Interpretive narrative | TruthfulQA-MC C-MISMATCHED template (Chunk 8c); HaluEval MIXED template (Chunk 8d); sampling-noise PARTIAL dual-reading interpretation (Chunk 8d) | ✓ uses pinned templates; each statement includes "verdict band remains [X]" caveat |
+| Class 3 | Verdict overrides | (none) | ✓ none emitted; firewall scan passed at write time |
+
+**§15.8 specifically authorizes:**
+
+- Documenting the §15.7 audit's three diagnostic
+  classifications.
+- Recording the empirical refutation of §15.6 Chunk 6c's
+  "V1 picked Qwen on all 100" informal hypothesis.
+- Sharpening §15.6's mechanism narrative from "Stage A
+  degeneracy" to "composition failure (C-MISMATCHED)".
+- Citing the §15.7 audit as confirmation of §15.6 Chunk 6b's
+  "stepped curve" finding.
+- Reporting the sampling-noise PARTIAL classification with
+  both readings.
+
+**§15.8 explicitly does NOT authorize:**
+
+- **Re-classifying §15.6 from REGRESSION to any other band.**
+  The cascade fired on the pinned $\Delta\kappa$ point
+  estimate; that classification is binding under §0.8.
+  §15.8's mechanism correction does NOT change the band.
+- **Re-classifying §15.4 from USEFUL_INTERNAL to any other
+  band.** The MIXED diagnostic classification is on a
+  different layer (mechanism decomposition) than the §15.4
+  cascade verdict (operational $\Delta\kappa$). The §15.4
+  band is binding under §0.8 regardless of mechanism
+  detail.
+- **Strengthening or weakening §13.9's VC-brief hold based
+  on §15.7 findings.** §13.9 gates external-framing on
+  STRONG-band lift on both benchmarks; the §15.7 audit
+  produces no STRONG-band evidence and does not address
+  §13.9's gate by construction. §13.9 hold remains in
+  force.
+- **Authorizing a §15.8.x or §15.9 follow-up probe.** Any
+  further LLM-track work (e.g., a fresh-§0.8 commitment to
+  test a different risk score on the C-MISMATCHED-identified
+  V1-divergent questions) requires its own top-level §0.8
+  commitment. §15.8 records §15.7's diagnostic findings as
+  part of the §15 closure narrative; it does not auto-promote
+  any direction.
+- **Cross-domain claims about §6.1 autonomy.** Autonomy-
+  domain BCVF stands wholly independent of §15.7 / §15.8.
+- **Silent edits to §15.6 text.** Per Chunk 7f's no-silent-
+  edit discipline, §15.6 Chunks 6a–6f remain unchanged.
+  The audit trail preserves the original §15.6 Chunk 6c
+  hypothesis alongside §15.8's empirical refutation.
+
+**Interpretation firewall confirmation under real-data
+conditions.** The §15.7 implementation
+(`scripts/probe_audit_15_7.py`) renders the diagnostic
+markdown report and scans it for the 12 pinned Class-3
+forbidden-statement patterns *before* writing the artifact.
+**On this run, no `INTERPRETATION_VIOLATION` fired**: the
+markdown was written cleanly, with no Class-3 patterns
+detected. The firewall is empirically functional on the
+real-data outputs. Future §15.x result-section drafting
+should apply the same firewall pattern to prevent
+interpretive drift.
+
+**Run-time §0.8 deviation check.** Per §15.7 Chunk 7g, any
+deviation discovered at run time must be flagged in the
+§15.8 result section as a §0.8 deviation, not absorbed
+silently. The §15.7 run produced **no such deviation**.
+Schema validation passed on all four input artifacts; the
+parity gates are implicit in §15.7's pinned configuration
+(no parity guard is required at the §15.7 layer, as the
+audit is descriptive over already-classified §0.8 outputs);
+the self-test gate passed 17/17 in-run; the firewall passed
+at write time.
+
+The §15.6 Chunk 6c mechanism correction recorded above is
+**not a run-time deviation** in §15.7's sense. It is a
+diagnostic finding that the §15.7 audit was specifically
+designed (per Chunk 7d's Stage A / B / Composition decomposition
+spec) to surface. The correction is the §15.7 audit working
+as intended.
+
 ---
 
 
