@@ -13457,10 +13457,18 @@ Chunk 3h. Two distinct execution phases:
 **Phase 1 — Stage A GPU re-run (~50–60 min on existing
 80 GB GPU).**
 
-Re-run `scripts/probe_system_level_scout_v2.py` with
-benchmark flag set to `truthfulqa_mc`, identical to its
-HaluEval-QA invocation modulo benchmark. Pinned protocol
-(matches §14a.2's pinned cost estimate exactly):
+Run a **new sibling producer**
+`scripts/probe_system_level_scout_v2_truthfulqa.py` — a copy
+of §14a.2's `probe_system_level_scout_v2.py` with only the
+dataset-loading block swapped to load TruthfulQA-MC instead
+of HaluEval-QA (using §13.11's `--benchmark truthfulqa_mc`
+loading pattern). All other §14a.2 pinned configuration is
+preserved verbatim. Sibling-producer pattern documented in
+§15.5 Amendment 1 below; the §14a.2 producer
+`scripts/probe_system_level_scout_v2.py` is preserved
+pristine (§14c verdict-of-record reproducibility chain
+unchanged). Pinned protocol (matches §14a.2's pinned cost
+estimate exactly):
 
 - 3 sources × 100 questions × K=10 stochastic generations =
   3,000 sampling calls (~30 min on the cached GPU).
@@ -13650,6 +13658,94 @@ Phase 1 (GPU re-run of §14a.2 on TruthfulQA-MC) is a separate
 §0.8 authorization gate. Phase 2 (new CPU post-processor) is
 also a separate gate. §15.5.x (the result section, parallel
 to §15.4) follows both phases completing.
+
+### 15.5 Amendment 1 — sibling producer for §14a.2 protocol on TruthfulQA-MC (pre-execution)
+
+**Status: amendment landed before any GPU run.** Surfaced
+explicitly per §15.5's "no silent patches" rule.
+
+**Trigger.** Pre-execution audit of
+`scripts/probe_system_level_scout_v2.py` (the §14a.2 producer
+script Chunk 5h pinned for re-use) revealed that **the
+producer is hardcoded to HaluEval-QA at line 715**
+(`load_dataset("pminervini/HaluEval", "qa", split="data")`).
+There is no `--benchmark` flag. §15.5 Chunk 5h's pin to
+"re-run `scripts/probe_system_level_scout_v2.py` with
+benchmark flag set to `truthfulqa_mc`" is therefore not
+literally executable — the pinned producer cannot run on
+TruthfulQA-MC as-is.
+
+**Two recovery options considered.**
+
+- **(A) Modify the existing §14a.2 producer** to add a
+  `--benchmark` flag (mirroring §13.11's pattern at lines
+  501–503 / 626–635 of `probe_cross_family_entropy.py`).
+  §0.8 cost: changes the script that produced §14a.2's
+  verdict-of-record artifacts. Even a small flag addition
+  reaches into closed territory.
+- **(B) Create a sibling producer script** that copies
+  `probe_system_level_scout_v2.py` verbatim and swaps only
+  the dataset-loading block. §0.8 benefit: §14a.2's producer
+  stays pristine; §14c's verdict-of-record reproducibility
+  chain unchanged.
+
+**Amendment (this block supersedes the affected lines in
+Chunk 5h).** Option B is pinned.
+
+- **New script:** `scripts/probe_system_level_scout_v2_truthfulqa.py`
+  — copy of `probe_system_level_scout_v2.py` with the
+  dataset-loading block (line ~715 of the original) swapped
+  to load TruthfulQA-MC validation split, mirroring §13.11's
+  TruthfulQA-MC loading pattern.
+- **All other §14a.2 pinned configuration preserved verbatim:**
+  same M=3 cross-family sources, same K=10, same T=1.0, same
+  max_new_tokens=32, same NLI model, same V1 softmin τ=0.5,
+  same NLI-clustered selector, same dataclass schema for the
+  per-question record. Only the benchmark loader differs.
+- **Output filename:** the new script writes to
+  `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+  (per Chunk 5h's pinned output path).
+- **§14a.2's existing producer
+  `scripts/probe_system_level_scout_v2.py` is NOT modified.**
+  The §14a.2 verdict-of-record reproducibility chain is
+  preserved.
+
+**Why this is a §0.8-clean amendment.** The amendment
+corrects a pre-commitment artifact (an executable
+assumption that didn't hold) without changing any pinned
+numerical band, metric definition, baseline,
+acceptance/rejection rule, or scope boundary. No data has
+been inspected. The §15.5 cascade boundary-case audit table,
+verdict bands, primary metric, baseline constant, and
+benchmark scope are all unchanged.
+
+**What this amendment does NOT change.**
+
+- Numerical bands (Chunk 5g identical to §15.3 Chunk 3g).
+- Operational metric definitions (Chunk 5f).
+- Baselines (Chunk 5f's three pinned baselines).
+- Cross-benchmark synthesis as diagnostic (Chunk 5e).
+- Output paths for Phase 2 / Stage B
+  (`probe_hybrid_selective_abstention_truthfulqa.{json,md}`).
+- The "does not test" list (Chunk 5i).
+- The §14a.2 producer or its closed §14c verdict-of-record.
+- The §15.4 verdict-of-record (HaluEval USEFUL_INTERNAL).
+
+**Implementation step (separate authorization).** Drafting
+`scripts/probe_system_level_scout_v2_truthfulqa.py` is a
+mechanical copy-with-one-swap operation. The new file would
+be ~1100 lines (matching §14a.2 producer's size). I can draft
+it in this sandbox; the user runs it on the runpod (50–60
+min GPU). This is a separate §0.8 authorization step from
+landing the amendment itself.
+
+**Audit lesson recorded.** §15.5's Chunk 5h pin "re-run
+`scripts/probe_system_level_scout_v2.py` with benchmark
+flag" was based on assumed CLI surface, not verified CLI
+surface. Future "reuse existing producer" pins should
+explicitly cite the producer's flag list (or its absence)
+to prevent assumption-vs-reality drift surfacing at
+execution time.
 
 ---
 
