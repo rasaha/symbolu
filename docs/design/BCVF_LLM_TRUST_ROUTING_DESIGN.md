@@ -14382,6 +14382,85 @@ specification in §15.7 Chunks 7c–7e below is pinned from §15
 prose only; the actual quantities will be computed only after
 §15.7 implementation lands.
 
+**Inputs and architecture (pinned).**
+
+§15.7 reads four on-disk artifacts. All four exist as
+verdicts-of-record from prior §0.8-binding chapters; §15.7
+modifies none of them.
+
+| Artifact | Source chapter | Used for |
+|---|---|---|
+| `docs/experiments/probe_system_level_scout_v2_halueval_qa.json` | §14a.2 (per §14c verdict-of-record) | Stage A/B decomposition for §15.4 HaluEval hybrid: per-question V1 source identity, selected_answer correctness, per-source semantic entropies |
+| `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json` | §15.5 Phase 1 (per §15.6 verdict-of-record) | Stage A/B decomposition for §15.6 TruthfulQA-MC hybrid: same field set |
+| `docs/experiments/probe_selective_abstention.json` | §15.2 verdict-of-record | Single-source baseline κ values per benchmark (HaluEval κ@α₂=0.26; TruthfulQA-MC κ@α₂=0.14); pinned constants only |
+| `docs/experiments/probe_semantic_entropy.json` and `docs/experiments/probe_semantic_entropy_halueval_qa.json` | §13.10 producer (currently at N=200 per §13.20 dump-overwrite) | Distributional comparison ONLY for the §15.6 sampling-noise hypothesis test (Chunk 7e); see §0.8 caveat below |
+
+**§0.8 caveat on the §13.10 dumps (per §15.2 Postscript and
+§13.20).** The §13.10 dumps on disk are now N=200, having
+been overwritten after §15.2 landed. §15.7 uses them ONLY
+for the Chunk 7e sampling-noise hypothesis test, where the
+quantity of interest is the **distributional shape** of Qwen
+per-question K=10 semantic entropy — invariant to N=100 vs
+N=200 sampling depth. **§15.7 does NOT re-derive §15.2's
+verdict-of-record from these dumps.** The κ=0.14 (TruthfulQA-
+MC) and κ=0.26 (HaluEval) baselines remain the pinned values
+from §15.2's preserved artifact regardless of any §13.20
+upstream overwrite. The N=200 status is documented inline in
+the §15.7 result section as an interpretive caveat — same
+pattern §15.2 Postscript established.
+
+**Architecture pin: pure post-processing, no new compute.**
+
+- **No new generation calls.** No model loads. No NLI scoring
+  beyond what already exists in the pinned dumps.
+- **No GPU.** numpy + Python stdlib only.
+- **No network.** No HF cache reads. No HF_TOKEN consumed.
+- **Wall-clock cost:** under 60 seconds total.
+- **Modification footprint on existing artifacts:** zero.
+
+**Schema validation (fail-fast, identical discipline to
+§15.1 / §15.3 / §15.5).**
+
+§15.7's loader validates each input artifact against pinned
+field expectations. Any missing field, malformed JSON, or
+duplicate question identifier triggers `SCHEMA_MISMATCH` exit
+with explicit reference to §15.7 Chunk 7b — no fallback path,
+no silent substitution.
+
+Per-artifact pinned field expectations:
+
+- **§14a.2 dumps** (both benchmarks): `questions[*].q_idx`,
+  `questions[*].sources[i].semantic_entropy`,
+  `questions[*].answer_cluster_ids`,
+  `questions[*].v1_weights`,
+  `questions[*].v1_winning_cluster`,
+  `questions[*].v1_correct`,
+  `questions[*].baseline_a_correct`,
+  `questions[*].sources[i].source_name` (NEW vs §15.3/§15.5
+  Phase 2 — needed for V1 source-identity audit).
+- **§15.2 verdict-of-record artifact:** `schema_version == "15.1"`,
+  `benchmarks.{truthfulqa_mc,halueval_qa}.kappa` (drives the
+  pinned baselines).
+- **§13.10 dumps:** `[*].q_idx`, `[*].semantic_entropy`,
+  `[*].greedy_matches_correct` (matches §15.1 Amendment 1
+  pinned field names; consumed only for distributional
+  comparison).
+
+**What §15.7 does NOT modify.**
+
+- §14a.2 dumps (both benchmarks) — preserved unchanged.
+- §15.2 verdict-of-record artifact — preserved unchanged.
+- §13.10 dumps — read-only; the §13.20 N=200 status is
+  inherited as-is.
+- Any §13/§14/§15.x verdict-of-record markdown or JSON
+  artifact other than the four §15.7 outputs.
+
+§15.7 produces exactly two output artifacts (pinned in Chunk
+7g): a JSON diagnostic dump and a markdown report. Both
+include explicit `schema_version: "15.7-diagnostic"` and a
+top-level field flagging that §15.7 is **diagnostic-only**
+content, not a new verdict-of-record.
+
 ---
 
 
