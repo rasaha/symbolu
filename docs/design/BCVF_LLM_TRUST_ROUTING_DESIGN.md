@@ -12756,6 +12756,92 @@ metric overreading. The $\alpha_3$ degeneracy is reported
 as a diagnostic and bounds the operational claim, but does
 not re-classify the verdict.
 
+**What §15.4 authorizes (per §15.3 Chunk 3g USEFUL_INTERNAL row).**
+
+The §15.3-pinned acceptance/rejection mapping for
+USEFUL_INTERNAL is binding under §0.8. Reproduced exactly:
+
+| §15.4 verdict | Authorizes | Forecloses |
+|---|---|---|
+| USEFUL_INTERNAL | Documenting the §14+§15 hybrid as having internal-research operational value at this single-benchmark scale. | §15.5 product investment; cross-benchmark claims; VC-brief changes. |
+
+Specifically, §15.4 **authorizes**:
+
+- Documenting the §15.3 verdict-of-record in this section
+  (which §15.4 itself accomplishes).
+- Recording the per-question $\Delta\kappa = +0.0900$,
+  $\kappa_\text{hybrid} = 0.35$, the operating-point triples,
+  and the bootstrap CI as the §15.4 verdict-of-record.
+- Citing §15.4 as the **first** USEFUL_INTERNAL-grade
+  empirical evidence in the §13 / §14 / §15 program at the
+  pinned configuration.
+- Citing the §14c-anticipated direction as empirically
+  validated at this single-benchmark scale (V1 selector +
+  Stage B abstention produces lift over §15.1's single-
+  source policy at $\alpha_1$ and $\alpha_2$).
+
+§15.4 explicitly **does NOT authorize**:
+
+- **§15.5 follow-up.** A full hybrid pre-commitment with
+  TruthfulQA-MC extension and product-layer scope was the
+  §15.3 Chunk 3g STRONG-band authorization; STRONG did not
+  fire. §15.5 requires a fresh top-level §0.8 commitment.
+- **Cross-benchmark claims.** §15.4 ran on HaluEval-QA only.
+  No claim about TruthfulQA-MC behavior is supported. Per
+  §15.3 Chunk 3e's cherry-picking caveat: "The §15.3 verdict
+  authorizes only what its single-benchmark scope tests."
+- **Product-readiness claims.** USEFUL_INTERNAL is internal-
+  research grade, not deployment grade. The $\alpha_3 = 0.75$
+  degeneracy further bounds what could be claimed.
+- **VC-brief updates.** §13.9 hold remains in force; §15.4's
+  metric class (Δκ vs §15.1 baseline) is structurally
+  separate from §13.9's gate (STRONG-band lift in answer-
+  selection AUC or accuracy). The hold is not addressed by
+  §15.4 by construction.
+- **Reframing of any §13 / §14 / §15.x verdict.** §15.4 is
+  on a fresh metric class and does not interact with §13's
+  ANTI verdicts, §14's SCOUT_SATURATION, §15.2's MARGINAL,
+  or §13.20's NOISE_BAND_LIFT observation.
+- **Cross-domain claims.** Autonomy-domain BCVF (§6.1)
+  stands wholly independent of any §15.4 outcome.
+
+**§0.8 implementation transparency — line-count drift on the
+§15.3 script.**
+
+§15.3 Chunk 3h estimated `scripts/probe_hybrid_selective_abstention.py`
+at $\sim$400–600 lines; the as-implemented script is
+$\sim$1098 lines, roughly equivalent to §15.1's $\sim$1112
+lines rather than half. Surfaced explicitly per §15.3 Chunk
+3h's discipline rather than absorbed:
+
+- The "copy primitives, do NOT import" rule (§15.3 Chunk 3h)
+  duplicated $\sim$150 lines of §15.1 metric primitives into
+  the §15.3 script.
+- The §14a.2 schema validation is more elaborate than
+  §15.1's (nested per-source structure, M=3 source-list
+  validation, winning-cluster argmax extraction).
+- Output writers are similar size to §15.1's, not smaller.
+
+**The 1D verdict cascade IS smaller than §15.1's 2D
+cascade, as Chunk 3h promised; the surrounding
+infrastructure simply did not shrink proportionally.** This
+drift is documented as an audit-lesson observation about
+§0.8 cost-estimation discipline; it does NOT change the
+§15.4 verdict (which is driven by $\Delta\kappa$ alone, not
+by code complexity). Future "small integration layer over
+closed components" estimates should account for the
+copy-not-import rule's duplication cost up front.
+
+**No deviation flag fired during the §15.3 run.** Per §15.3
+Chunk 3h's "Any deviation discovered at run time must be
+flagged in the §15.4 result section as a §0.8 deviation":
+the run produced no such deviation. Parity gates passed,
+schema matched, self-test passed in-run, the cascade fired
+exactly as the implementation's `_cascade_trace_15_3` walks
+the pinned rules. The line-count drift is documented inside
+§15.4 (here) rather than as a run-time deviation, since it
+was a pre-run estimation artifact.
+
 ---
 
 
