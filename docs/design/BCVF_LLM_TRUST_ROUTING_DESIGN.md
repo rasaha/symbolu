@@ -13006,6 +13006,77 @@ form. The protocol, primary signal, metrics, and bands in
 the §15.5 chunks below are pinned from §13 / §14 / §15 prose
 only.
 
+**Stage A — answer-selection architecture (pinned, identical
+to §15.3 Chunk 3b modulo benchmark substitution).**
+
+Stage A is the §14a.2 NLI-clustered selector + V1 softmin
+trust consumer **applied to TruthfulQA-MC** at the same
+configuration §14a.2 / §15.3 used on HaluEval-QA. Pinned for
+the same reasons §15.3 pinned this configuration: V1 softmin
+$\tau = 0.5$ produced the +4pp lift in §14a.2 (the strongest
+BCVF-shaped lift in the §13 / §14 program); the NLI-clustered
+selector is the post-§14a-audit version that fixed the
+string-identity tie-breaking degeneracy. Single configuration
+in this scout — no multi-selector or multi-consumer sweep.
+
+**Stage A specification (pinned).**
+
+- **Source set (M = 3, cross-family, all cached from §13.11
+  / §14a.2):** `Qwen/Qwen2.5-7B-Instruct`,
+  `meta-llama/Llama-3.1-8B-Instruct`,
+  `mistralai/Mistral-7B-Instruct-v0.3`.
+- **Per-source K = 10 stochastic samples** at T=1.0,
+  max_new_tokens=32, prompt `Q: ... A:`. Identical to
+  §13.10 / §13.11 / §14a.2 protocols.
+- **Per-source greedy answer** at T=0, max_new_tokens=32,
+  same prompt format.
+- **Per-source semantic entropy** $H_{\text{src}_i}(q)$ via
+  question-conditioned bidirectional NLI clustering of the
+  K=10 samples (DeBERTa-v3-base-mnli-fever-anli, identical
+  NLI model to §13.10 / §14a.2).
+- **V1 softmin consumer (pinned, single):**
+  $w_i^{V1} \propto \exp(-H_{\text{src}_i}(q) / \tau)$ with
+  $\tau = 0.5$.
+- **NLI-clustered selector (pinned, single):** identical
+  spec to §14a.2 / §15.3 Chunk 3b (cluster M=3 source
+  greedies by question-conditioned bidirectional NLI
+  entailment, aggregate weights within each cluster, pick
+  winning cluster $k^*$ by max aggregated weight with
+  lowest-cluster-index tiebreak, pick representative source
+  by max individual weight with lowest-source-index
+  tiebreak).
+- **Benchmark (pinned, single):** **TruthfulQA-MC**
+  validation split, $N = 100$. Identical to §13.10 /
+  §13.11's TruthfulQA-MC question subset.
+
+**Stage A output (the per-question handoff to Stage B).**
+Identical structure to §15.3 Chunk 3b — `selected_answer(q)`,
+`winning_source_id(q) ∈ {Qwen, Llama, Mistral}`, all three
+per-source semantic entropies including the winner's, the
+winning cluster's aggregated weight, and the runner-up's.
+Stage A makes no abstention decision and consumes no
+threshold parameter.
+
+**The §14a.2-on-TruthfulQA-MC dump does not exist yet.** The
+GPU run that produces it (~50–60 min on the existing 80 GB
+GPU per §14a.2's pinned cost estimate) follows §15.5's
+landing as a separate authorization step. Implementation
+chunk (5h) details the pinned re-run protocol.
+
+**What Stage A explicitly does NOT pin** (identical to §15.3
+Chunk 3b's non-pin list):
+
+- Multiple consumers (V2 thresholded exclusion, V3 veto-only,
+  V4 deadband fallback). All deferred — V1 is pinned single.
+- Multiple selectors (highest-weight-source, string-matched,
+  uniform majority). Deferred.
+- Different source sets. M=3 cross-family is pinned; no
+  larger $M$, no model substitution, no single-source
+  fallback.
+- Re-running §14a.2 on HaluEval-QA. The on-disk §14a.2-on-
+  HaluEval dump §15.3 used remains the §15.4 verdict-of-
+  record artifact and is NOT touched by §15.5.
+
 ---
 
 
