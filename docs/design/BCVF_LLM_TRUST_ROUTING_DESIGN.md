@@ -13275,6 +13275,97 @@ program**, not an artifact of §15.5's setup. The §15.5 bands
 (Chunk 5g) are pinned identical to §15.3's, not relaxed —
 the same operational threshold applies.
 
+**Operational metrics pin (identical structure to §15.3
+Chunk 3f modulo benchmark and baseline).**
+
+§15.5's metric set is structurally identical to §15.3's,
+with two pinned differences: the benchmark is TruthfulQA-MC
+and the §15.1 baseline is $\kappa_{\S15.1,\text{TruthfulQA-MC}}
+= 0.14$ (not 0.26).
+
+**Notation (single benchmark, $N = 100$).** For each
+question $q$ on TruthfulQA-MC at threshold $\tau$:
+
+- $A_\tau = \{q : r(q) < \tau\}$;
+  $\text{cov}(\tau) = |A_\tau|/N$.
+- $\text{acc}(\tau) = (1/|A_\tau|) \sum_{q \in A_\tau} c(q)$
+  where $c(q)$ is correctness of Stage A's
+  `selected_answer(q)` per Chunk 5c (NOT Qwen-greedy
+  correctness on TruthfulQA-MC).
+- $\text{ecr}(\tau), \text{far}(\tau)$ — identical formulas
+  to §15.3 / §15.1 applied to the new $c(q)$.
+- $W_\text{hybrid} = N - \sum_q c(q)$ — total wrong V1-
+  selected answers on TruthfulQA-MC; observed empirically at
+  run time (NOT pinned ex ante; same convention as §15.3).
+
+**Primary decision metric (single scalar; identical
+structure to §15.3 Chunk 3f).**
+$$
+\Delta\kappa \;=\; \kappa_\text{hybrid} - \kappa_{\S15.1,\text{TruthfulQA-MC}}
+$$
+where:
+
+- $\kappa_\text{hybrid} = \max\{\text{cov}(\tau) :
+  \text{acc}(\tau) \ge \alpha_2 \text{ AND } |A_\tau| \ge n_\min\}$
+  on TruthfulQA-MC, with $\alpha_2 = 0.50$ and
+  $n_\min = 10$ (identical floor to §15.1 / §15.3).
+- $\kappa_{\S15.1,\text{TruthfulQA-MC}} = 0.14$ — pinned
+  constant from §15.2's verdict-of-record TruthfulQA-MC
+  $\kappa$ at $\alpha_2$, recorded in
+  `docs/experiments/probe_selective_abstention.json`.
+
+$\Delta\kappa > 0$ means the hybrid produces operationally
+meaningful lift over §15.1's single-source abstention on
+TruthfulQA-MC at the absolute-majority target.
+$\Delta\kappa \le 0$ means it does not.
+
+**§0.8 caveat on the baseline constant.** The
+$\kappa_{\S15.1,\text{TruthfulQA-MC}} = 0.14$ value was
+computed at N=100 against §13.10 dumps that have since been
+overwritten with N=200 versions per §13.20 / §15.2 Postscript.
+The recorded value persists in the §15.2 verdict-of-record
+artifact and is binding under §0.8 regardless of the upstream
+overwrite. **§15.5 does NOT re-run §15.1 on TruthfulQA-MC**
+to "refresh" the baseline; doing so would require its own
+§0.8 commitment and would conflate two N-configurations.
+
+**Pinned three target accuracies (identical to §15.3 / §15.2
+TruthfulQA-MC operating points).**
+$\alpha \in \{0.35, 0.50, 0.75\}$, where $\alpha_1 = 0.35$ is
+the TruthfulQA-MC greedy baseline (0.250 per §13.10) plus
+10pp. (HaluEval used $\alpha_1 = 0.40$ because its greedy
+baseline is 0.300; TruthfulQA-MC's lower greedy means
+$\alpha_1$ is correspondingly lower.)
+
+**Secondary diagnostic metrics** (reported, NOT band-driving).
+
+- $\delta_\text{AURC,hybrid} = W_\text{hybrid}/N -
+  \text{AURC}_\text{hybrid}$ — integrated lift over random
+  abstention on Stage A's TruthfulQA-MC selected answers.
+- $(\text{cov}, \text{ecr}, \text{far})$ triples at each of
+  the three $\alpha$ values.
+- Bootstrap CI (two-sided 95%, $B = 1000$, paired over
+  question indices, deterministic seed
+  `SeedSequence(entropy=15)` per §15.1 / §15.3 convention)
+  on $\Delta\kappa$. Statistical demotion rule pinned in
+  Chunk 5g.
+
+**Baselines (pinned, three; all from existing artifacts; no
+new generation beyond Stage A).**
+
+| Baseline | Source | Role |
+|---|---|---|
+| §15.1 TruthfulQA-MC $\kappa@\alpha_2 = 0.14$ | §15.2 verdict-of-record | Primary comparator (drives $\Delta\kappa$) |
+| §14a.2-on-TruthfulQA-MC V1 full-coverage point | (computed from the §14a.2-on-TruthfulQA-MC dump once produced) | "Stage A without abstention" reference; documents whether the hybrid even needs Stage B |
+| Random-abstain matched-coverage on Stage A's answers | Closed-form: $\mathbb{E}[\text{acc}_\text{random}(\text{cov})] = (N - W_\text{hybrid})/N$ | Random baseline for $\delta_\text{AURC,hybrid}$ |
+
+§15.1's TruthfulQA-MC $\kappa@\alpha_2 = 0.14$ is the central
+comparator because §15.1 is the closest non-hybrid analogue
+on TruthfulQA-MC. A §15.5 STRONG must demonstrate that
+adding Stage A's selector produces operationally meaningful
+lift over the single-source policy on TruthfulQA-MC — not
+merely lift over random abstention.
+
 ---
 
 
