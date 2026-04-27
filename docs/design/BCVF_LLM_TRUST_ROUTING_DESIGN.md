@@ -15449,6 +15449,111 @@ readers tracing the §15 program audit trail see:
 The verdict band remains `REGRESSION`. The mechanism is now
 correctly characterized.
 
+**HaluEval-QA narrative — MIXED classification (no single
+clean failure mode; verdict band remains USEFUL_INTERNAL).**
+
+On halueval-qa, the §15.7 decomposition does not cleanly
+resolve to a single failure mode. Stage A net lift
+$\Delta_A = +0.030$; V1-divergent set size 31 ($|D|/N =
+0.31$); $\rho(\tau^*) = 2.150$ vs $\rho^* = 2.030$ at
+$\alpha_2 = 0.50$ (local condition met, but barely);
+composition Pearson correlation gap $r_{\bar{D}} - r_D =
++0.248$ (visibly non-zero but below the 0.30 C-MISMATCHED
+threshold). None of the three single-mode signatures fires
+cleanly. The verdict band remains `USEFUL_INTERNAL`
+regardless of this diagnostic mechanism; the §15.7 audit
+flags HaluEval-QA's hybrid as multi-component rather than
+asserting a single clean driver.
+
+**Operationally what MIXED means on HaluEval-QA.** The §15.4
+USEFUL_INTERNAL verdict is real but its mechanism is
+distributed across all three components:
+
+- **Stage A contributes ~3pp lift, concentrated on $D$.**
+  V1's net accuracy lift over Baseline-A is $+0.030$ on the
+  full 100 questions; on the 31 V1-divergent questions, V1's
+  selected-answer accuracy minus Baseline-A's accuracy is
+  $+0.097$ (a 9.7pp lift on the divergent subset). Stage A
+  is doing real work where the selector chooses non-Qwen.
+- **Stage B's local condition $\rho \ge \rho^*$ is met,
+  marginally.** $\rho(\tau^*) = 2.150$ vs $\rho^* = 2.030$ —
+  cleared by 0.12 (about 6% margin). Tighter than
+  TruthfulQA-MC's 5.25 vs 3.0 (75% margin) but technically
+  on the right side of the threshold.
+- **Composition shows partial mismatch but stays sub-
+  threshold.** Correlation drops from $r_{\bar{D}} = +0.439$
+  on Qwen-picked questions to $r_D = +0.191$ on V1-divergent —
+  a real degradation (factor of ~2), but the gap of 0.248
+  doesn't quite cross the 0.30 C-MISMATCHED threshold AND
+  the sign doesn't flip (both correlations stay positive,
+  unlike TruthfulQA-MC's flip).
+
+**What the MIXED classification implies about §15.4.** The
+USEFUL_INTERNAL verdict is *real but fragile*. It survives
+because all three components contribute small-positive
+effects that compound to clear the $\Delta\kappa \ge +0.05$
+USEFUL_INTERNAL threshold. None of the three components is
+individually doing dominant work; conversely, none is
+individually broken. **A §15.4 STRONG would have required
+substantially stronger contribution from at least one
+component**, which the data does not show.
+
+**Sampling-noise interpretation: PARTIAL, leaning toward
+modest substantive drift.**
+
+The TruthfulQA-MC sampling-noise test classified
+`HYPOTHESIS_PARTIAL`. Pinned interpretation rules (§15.7
+Chunk 7e) classify this as "ambiguous"; both readings must
+be reported.
+
+**Reading 1 — modest drift toward sampling-noise side.** KS
+p-value 0.0691 narrowly clears the $\alpha = 0.05$ threshold
+of statistical equivalence; mean drift 0.178 nats narrowly
+clears the SUPPORTED bound of 0.10 nats. The distributions
+are statistically indistinguishable and the practical drift
+is bounded. Under this reading, §15.6's $\Delta\kappa =
+-0.030$ contains a substantial sampling-stochasticity
+component, even if not dominantly noise-bound.
+
+**Reading 2 — modest drift toward substantive shift.** Mean
+drift 0.178 nats falls in the upper half of the PARTIAL band
+$[0.10, 0.20]$; KS p-value 0.0691 sits just above the
+rejection threshold. The shift direction is structurally
+explained (V1 picks tighter-clustered non-Qwen sources on
+24% of questions); the drift is real, not random. Under
+this reading, §15.6's $\Delta\kappa = -0.030$ contains a
+substantial composition-mismatch component, with the C-MISMATCHED
+classification (Chunk 8c) carrying the dominant weight.
+
+**Pinned interpretation per §15.7 Chunk 7e:** both readings
+are reported; neither is privileged. The PARTIAL classification
+means the data does not adjudicate cleanly between them. **The
+§15.6 REGRESSION verdict band remains `REGRESSION` regardless
+of which reading is privileged interpretively.** The §15.7
+audit's value at the sampling-noise layer is showing that the
+question is ambiguous — it is not a clean noise artifact, and
+it is not a clean substantive shift; it is a small distributional
+shift with mixed interpretation.
+
+**Combining sampling-noise PARTIAL with TruthfulQA-MC
+C-MISMATCHED.** The C-MISMATCHED classification captures the
+*sign-flip on V1-divergent questions* mechanism, which is
+distinct from distributional drift in $R_S$ overall. The
+sampling-noise drift (-0.178 nats) and the composition
+sign-flip (correlation $+0.26 \to -0.16$) are independent
+signatures. Both contribute to §15.6's REGRESSION:
+
+- C-MISMATCHED dominates the **mechanism** explanation: the
+  hybrid's risk score is structurally broken on V1-divergent
+  questions.
+- PARTIAL sampling-noise contributes a **distributional**
+  caveat: §15.6's R_S is also shifted modestly relative to
+  §13.10's pure-Qwen reference, consistent with V1 picking
+  non-Qwen sources with tighter K=10 clusters.
+
+§15.6's REGRESSION verdict band remains binding regardless
+of how these mechanism components are weighted.
+
 ---
 
 
