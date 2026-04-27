@@ -531,9 +531,8 @@ def extract_hidden_states(
         model = AutoModelForCausalLM.from_pretrained(
             QWEN_MODEL_ID,
             torch_dtype=torch.float16,
-            device_map=device,
             output_hidden_states=True,
-        )
+        ).to(device)
         model.eval()
 
     n = len(labels.questions)
@@ -1349,9 +1348,8 @@ def _run_extraction(verbose: bool = True) -> dict[str, HiddenStateExtraction]:
     model = AutoModelForCausalLM.from_pretrained(
         QWEN_MODEL_ID,
         torch_dtype=torch.float16,
-        device_map=device,
         output_hidden_states=True,
-    )
+    ).to(device)
     model.eval()
 
     for bench in BENCHMARKS:
