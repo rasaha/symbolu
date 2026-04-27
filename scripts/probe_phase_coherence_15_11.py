@@ -332,3 +332,356 @@ class PhaseAuditOutputs:
     n_layers_used: int
     hidden_dim: int
     qwen_model_id: str
+
+
+# ===========================================================================
+# §15.11 Chunk I-2 — Schema validators, §13.10 label loader (HF fallback),
+# all-29-layer hidden-state extraction with .npz caching.
+#
+# Mirrors §15.10's tightenings F1 (question optional + HF fallback) and
+# F2 (duplicate-q_idx check). The extraction differs from §15.10 only
+# in that it collects all 29 layers per question instead of layer -1.
+# ===========================================================================
+
+
+class SchemaMismatchError(RuntimeError):
+    """Raised when a §13.10 dump or §15.11 cache fails schema validation."""
+
+
+def _validate_s13_10_dump(payload: object, source_path: str) -> list[dict]:
+    """Validate top-level shape of a §13.10 dump and return per-question records.
+
+    Required fields per record: q_idx (int) + greedy_matches_correct (bool).
+    The 'question' field is optional (matches §15.7's lighter loader);
+    if missing on any record, load_benchmark_labels falls back to the
+    HuggingFace dataset by q_idx alignment.
+
+    Duplicate q_idx triggers SCHEMA_MISMATCH (matches §15.7 hardening).
+    """
+    if isinstance(payload, list):
+        records = payload
+    elif isinstance(payload, dict):
+        for key in ("per_question", "records", "questions"):
+            if key in payload and isinstance(payload[key], list):
+                records = payload[key]
+                break
+        else:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} top-level dict has no "
+                f"'per_question'/'records'/'questions' list."
+            )
+    else:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: {source_path} top-level is "
+            f"{type(payload).__name__}, expected list or dict."
+        )
+
+    if len(records) < PINNED_N:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: {source_path} has {len(records)} records, "
+            f"need at least {PINNED_N}."
+        )
+
+    seen_qids: set[int] = set()
+    for i, rec in enumerate(records[:PINNED_N]):
+        if not isinstance(rec, dict):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} is "
+                f"{type(rec).__name__}, expected dict."
+            )
+        for required in (FIELD_QID, FIELD_CORRECT):
+            if required not in rec:
+                raise SchemaMismatchError(
+                    f"SCHEMA_MISMATCH: {source_path} record {i} missing "
+                    f"required field '{required}'."
+                )
+        if not isinstance(rec[FIELD_QID], int):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                f"'{FIELD_QID}' is {type(rec[FIELD_QID]).__name__}, "
+                f"expected int."
+            )
+        if not isinstance(rec[FIELD_CORRECT], bool):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                f"'{FIELD_CORRECT}' is {type(rec[FIELD_CORRECT]).__name__}, "
+                f"expected bool."
+            )
+        if FIELD_QUESTION in rec and not isinstance(rec[FIELD_QUESTION], str):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                f"'{FIELD_QUESTION}' is "
+                f"{type(rec[FIELD_QUESTION]).__name__}, expected str."
+            )
+        qid = int(rec[FIELD_QID])
+        if qid in seen_qids:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} duplicate "
+                f"q_idx={qid}; ascending alignment would be ambiguous."
+            )
+        seen_qids.add(qid)
+    return records
+
+
+def _load_questions_from_hf_dataset(
+    benchmark: str, q_ids: tuple[int, ...]
+) -> tuple[str, ...]:
+    """Load question text from HuggingFace dataset by q_idx alignment.
+
+    Mirrors §13.10 producer's enumerate-after-select indexing
+    (`scripts/probe_semantic_entropy.py`): q_idx corresponds to row index
+    in the first N rows of the benchmark dataset.
+    """
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise ImportError(
+            "§15.11 question-text fallback requires the `datasets` library. "
+            "Either ensure §13.10 dump records contain a 'question' field "
+            "or install `datasets` on the runpod."
+        ) from exc
+
+    if benchmark == "halueval_qa":
+        ds = load_dataset("pminervini/HaluEval", "qa", split="data")
+    elif benchmark == "truthfulqa_mc":
+        ds = load_dataset("truthful_qa", "multiple_choice", split="validation")
+    else:
+        raise ValueError(f"Unknown benchmark: {benchmark!r}")
+
+    n_max = max(q_ids) + 1 if q_ids else 0
+    if len(ds) < n_max:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: HF dataset for {benchmark} has only "
+            f"{len(ds)} rows; need at least {n_max} for q_idx alignment."
+        )
+    ds = ds.select(range(n_max))
+    return tuple(str(ds[int(q_id)]["question"]) for q_id in q_ids)
+
+
+def load_benchmark_labels(benchmark: str) -> BenchmarkLabels:
+    """Load first PINNED_N records from the §13.10 dump for `benchmark`.
+
+    Returns BenchmarkLabels with q_ids/questions/correctness aligned by
+    record order in the dump. Question text from dump field if all
+    records have it, else HF dataset fallback.
+    """
+    if benchmark == "halueval_qa":
+        path = INPUT_S13_10_HALUEVAL
+    elif benchmark == "truthfulqa_mc":
+        path = INPUT_S13_10_TRUTHFULQA
+    else:
+        raise ValueError(f"Unknown benchmark: {benchmark!r}")
+
+    dump_path = Path(path)
+    if not dump_path.exists():
+        raise FileNotFoundError(
+            f"§13.10 dump not found: {dump_path}. "
+            f"Required for §15.11 Phase 2 label loading."
+        )
+
+    with dump_path.open("r", encoding="utf-8") as f:
+        payload = json.load(f)
+
+    records = _validate_s13_10_dump(payload, str(dump_path))
+    head = records[:PINNED_N]
+    q_ids = tuple(int(r[FIELD_QID]) for r in head)
+    correctness = tuple(bool(r[FIELD_CORRECT]) for r in head)
+
+    has_dump_questions = all(
+        FIELD_QUESTION in r
+        and isinstance(r[FIELD_QUESTION], str)
+        and r[FIELD_QUESTION]
+        for r in head
+    )
+    if has_dump_questions:
+        questions = tuple(str(r[FIELD_QUESTION]) for r in head)
+    else:
+        print(
+            f"  {benchmark}: dump lacks 'question' on at least one record; "
+            f"loading question text from HuggingFace dataset by q_idx.",
+            flush=True,
+        )
+        questions = _load_questions_from_hf_dataset(benchmark, q_ids)
+
+    return BenchmarkLabels(
+        benchmark=benchmark,
+        q_ids=q_ids,
+        questions=questions,
+        correctness=correctness,
+    )
+
+
+# ---------------------------------------------------------------------------
+# All-29-layer hidden-state extraction (Qwen2.5-7B-Instruct forward pass).
+# ---------------------------------------------------------------------------
+
+
+def _lazy_import_torch_and_transformers():
+    """Lazy import of torch + transformers; raises with a clear message."""
+    try:
+        import torch  # noqa: F401
+        from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "§15.11 hidden-state extraction requires torch + transformers. "
+            "Install on the runpod GPU node before --extract-only or "
+            "default --run."
+        ) from exc
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    return torch, AutoModelForCausalLM, AutoTokenizer
+
+
+def extract_hidden_states_all_layers(
+    labels: BenchmarkLabels,
+    *,
+    model=None,
+    tokenizer=None,
+    device: Optional[str] = None,
+) -> HiddenStateExtraction:
+    """Forward-pass each prompt through Qwen-7B; collect ALL 29 layers'
+    last-token hidden states.
+
+    Per question:
+      * Build prompt = `Q: {question}\\nA:` (PROMPT_FORMAT).
+      * Run forward pass with output_hidden_states=True.
+      * out.hidden_states is a tuple of length n_layers + 1 = 29
+        (index 0 = embedding output; 1..28 = post-each-layer).
+      * For each layer, take the LAST-TOKEN hidden state → R^3584.
+      * Stack: per question, shape (29, 3584).
+
+    Stored cast to fp32 for cache portability. Total cache shape per
+    benchmark: (100, 29, 3584) → ~41 MB fp32.
+    """
+    torch, AutoModelForCausalLM, AutoTokenizer = _lazy_import_torch_and_transformers()
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    if tokenizer is None:
+        tokenizer = AutoTokenizer.from_pretrained(QWEN_MODEL_ID)
+    if model is None:
+        model = AutoModelForCausalLM.from_pretrained(
+            QWEN_MODEL_ID,
+            torch_dtype=torch.float16,
+            output_hidden_states=True,
+        ).to(device)
+        model.eval()
+
+    n = len(labels.questions)
+    per_question: list[np.ndarray] = []
+    with torch.no_grad():
+        for i, question in enumerate(labels.questions):
+            prompt = PROMPT_FORMAT.format(question=question)
+            enc = tokenizer(prompt, return_tensors="pt").to(device)
+            out = model(**enc, output_hidden_states=True)
+            # hidden_states is a tuple of length (n_layers + 1) = 29.
+            hs_tuple = out.hidden_states
+            if len(hs_tuple) != N_LAYERS:
+                raise RuntimeError(
+                    f"EXTRACTION_MISMATCH: expected {N_LAYERS} hidden_states "
+                    f"layers, got {len(hs_tuple)} for question {i} of "
+                    f"benchmark {labels.benchmark}."
+                )
+            # Per-layer last-token hidden state → (29, 3584).
+            stacked = np.stack(
+                [
+                    h[0, -1, :].detach().to("cpu").float().numpy()
+                    for h in hs_tuple
+                ],
+                axis=0,
+            )
+            if stacked.shape != (N_LAYERS, HIDDEN_DIM):
+                raise RuntimeError(
+                    f"EXTRACTION_MISMATCH: question {i} produced shape "
+                    f"{stacked.shape}, expected {(N_LAYERS, HIDDEN_DIM)}."
+                )
+            per_question.append(stacked)
+            if (i + 1) % 10 == 0:
+                print(
+                    f"  [extract:{labels.benchmark}] {i + 1}/{n} questions "
+                    f"(all 29 layers)",
+                    flush=True,
+                )
+
+    hidden_states = np.stack(per_question, axis=0).astype(np.float32)
+    if hidden_states.shape != (n, N_LAYERS, HIDDEN_DIM):
+        raise RuntimeError(
+            f"EXTRACTION_MISMATCH: expected ({n}, {N_LAYERS}, {HIDDEN_DIM}) "
+            f"hidden states, got {hidden_states.shape} for benchmark "
+            f"{labels.benchmark}."
+        )
+
+    return HiddenStateExtraction(
+        benchmark=labels.benchmark,
+        q_ids=np.asarray(labels.q_ids, dtype=np.int64),
+        hidden_states=hidden_states,
+        correctness=np.asarray(labels.correctness, dtype=np.bool_),
+        n_layers=N_LAYERS,
+        d=HIDDEN_DIM,
+    )
+
+
+def save_hidden_states_cache(
+    extractions: dict[str, HiddenStateExtraction], path: str
+) -> None:
+    """Persist per-benchmark all-layer extractions to a single .npz file."""
+    out: dict[str, np.ndarray] = {}
+    for bench, ext in extractions.items():
+        out[f"{bench}__q_ids"] = ext.q_ids
+        out[f"{bench}__hidden_states"] = ext.hidden_states
+        out[f"{bench}__correctness"] = ext.correctness
+        out[f"{bench}__n_layers"] = np.asarray(ext.n_layers, dtype=np.int64)
+        out[f"{bench}__d"] = np.asarray(ext.d, dtype=np.int64)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    np.savez(path, **out)
+
+
+def load_hidden_states_cache(path: str) -> dict[str, HiddenStateExtraction]:
+    """Load per-benchmark all-layer extractions from a .npz file."""
+    cache_path = Path(path)
+    if not cache_path.exists():
+        raise FileNotFoundError(
+            f"Hidden-state cache not found: {cache_path}. "
+            f"Run --extract-only first or default --run to populate."
+        )
+    npz = np.load(cache_path, allow_pickle=False)
+    extractions: dict[str, HiddenStateExtraction] = {}
+    for bench in BENCHMARKS:
+        for suffix in ("q_ids", "hidden_states", "correctness", "n_layers", "d"):
+            key = f"{bench}__{suffix}"
+            if key not in npz.files:
+                raise SchemaMismatchError(
+                    f"SCHEMA_MISMATCH: cache {cache_path} missing key {key!r}."
+                )
+        hidden_states = npz[f"{bench}__hidden_states"]
+        if hidden_states.ndim != 3 or hidden_states.shape[0] != PINNED_N:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache {cache_path} key "
+                f"'{bench}__hidden_states' has shape {hidden_states.shape}, "
+                f"expected ({PINNED_N}, n_layers, d)."
+            )
+        n_layers_cached = int(npz[f"{bench}__n_layers"])
+        d_cached = int(npz[f"{bench}__d"])
+        if n_layers_cached != N_LAYERS or d_cached != HIDDEN_DIM:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache {cache_path} {bench} "
+                f"n_layers={n_layers_cached} d={d_cached}; "
+                f"expected n_layers={N_LAYERS}, d={HIDDEN_DIM}."
+            )
+        if hidden_states.shape[1] != N_LAYERS or hidden_states.shape[2] != HIDDEN_DIM:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache {cache_path} {bench} "
+                f"hidden_states shape {hidden_states.shape}, "
+                f"expected (*, {N_LAYERS}, {HIDDEN_DIM})."
+            )
+        extractions[bench] = HiddenStateExtraction(
+            benchmark=bench,
+            q_ids=npz[f"{bench}__q_ids"],
+            hidden_states=hidden_states.astype(np.float32),
+            correctness=npz[f"{bench}__correctness"].astype(np.bool_),
+            n_layers=n_layers_cached,
+            d=d_cached,
+        )
+    return extractions
