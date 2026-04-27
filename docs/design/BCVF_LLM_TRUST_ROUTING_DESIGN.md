@@ -15957,6 +15957,208 @@ The §15 LLM-track program remains closed at the §15.8
 mechanism-decomposed level. §15.9 sits as a documented
 candidate for future reopening; it is not a continuation.
 
+### 15.10 Pre-commitment — Phase 1 of final-resolution sprint: supervised linear truth-probe (DAY-LONG; bounded; one shot)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any hidden-state extraction or
+probe training. Specification, primary metrics, success bands,
+baselines, and decision rules below cannot be redefined
+post-hoc.
+
+**Position — what §15.10 is and is not.**
+
+§15.10 is **Phase 1 of a bounded 3-phase final-resolution
+sprint** for the LLM track, not a new long research program.
+It is the §13.8 future-work item "linear activation probes
+(Azaria & Mitchell 2023; Marks & Tegmark 2024)" being fired
+explicitly under §0.8, with all bands pinned ex-ante. The
+sprint structure is:
+
+- §15.10 (Phase 1) — supervised truth-probe on hidden states.
+- §15.11 (Phase 2) — phase-coherence probe (the §15.9
+  documented candidate, fired with one pinned phase
+  definition).
+- §15.12 (Phase 3) — final synthesis + autonomy handoff,
+  conditional on §15.10 / §15.11 results.
+
+**§15.10 does NOT:**
+- Reopen any §13 / §14 / §15.x verdict-of-record. All
+  verdicts remain binding.
+- Re-classify §15.4 USEFUL_INTERNAL or §15.6 REGRESSION.
+- Modify the §13.9 VC-brief hold by construction.
+- Authorize any longer probe-engineering program; it is one
+  shot at one architecture (linear) on one feature set
+  (final-layer last-token hidden state, optionally one mid-
+  layer pool). No iterative search.
+- Authorize source-construction redesign, retrieval, judge
+  models, or 32B-class models. Same constraints as
+  §13/§14/§15.
+
+**The single load-bearing question §15.10 answers.**
+
+> **Do Qwen2.5-7B-Instruct's hidden representations contain
+> truth signal that the unsupervised BCVF-style score family
+> failed to extract?**
+
+Three pinned outcomes (exhaustive partition; mutually
+exclusive):
+
+- **`STRONG_SIGNAL_IN_Z`**: probe AUC $\ge 0.75$ on **both**
+  benchmarks AND probe-AUC minus best-existing-unsupervised-
+  baseline-AUC $\ge +0.05$ on **both** benchmarks.
+- **`PARTIAL_SIGNAL_IN_Z`**: probe AUC $\ge 0.66$ (matches
+  §13.10 baseline) on at least one benchmark AND probe AUC
+  exceeds the best existing unsupervised baseline by any
+  positive margin on at least one benchmark, but does NOT
+  meet the STRONG bar.
+- **`NO_MATERIAL_SIGNAL_IN_Z`**: probe AUC fails to exceed
+  the best existing unsupervised baseline on either
+  benchmark, OR probe AUC $< 0.60$ on both.
+
+These bands cover $\mathbb{R}^2$ exhaustively over the
+(HaluEval-AUC, TruthfulQA-AUC) pair without fall-through.
+
+**Specification (pinned).**
+
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct` (matches
+  §13.10 / §14a.2 / §15.x). No 32B; no other model class.
+- **Benchmarks:** HaluEval-QA `data` split, N=100; TruthfulQA-
+  MC `validation` split, N=100. Same question subsets as
+  §13.10. **No new benchmarks.**
+- **Question subset alignment:** the probe trains and
+  evaluates on the same 100 questions per benchmark that
+  §13.10 / §15.2 used. Question IDs pinned to match the
+  §13.10 dump's `q_idx` field.
+- **Per-question correctness label:** the §13.10
+  `greedy_matches_correct` boolean from the existing dumps.
+  Same NLI labeling protocol; no relabeling.
+- **Hidden-state feature (pinned, single primary):** Qwen-7B
+  greedy-decode forward pass over the question prompt
+  `Q: ... A:`; extract the **final-layer last-token hidden
+  state** (the residual-stream vector at position immediately
+  before the model would generate its first answer token).
+  This produces a single $d$-dimensional vector per question,
+  $d = 3584$ for Qwen-7B. **No prompt re-engineering, no
+  pooling across positions, no attention-head selection.**
+- **Optional secondary feature (only if it requires zero
+  extra engineering):** mid-layer last-token hidden state at
+  layer 14 (the §13.16 layer; ~midway through the 28-layer
+  stack). If extraction adds non-trivial code, skip it.
+- **Probe architecture (pinned, single):** scikit-learn
+  `LogisticRegression` with `penalty='l2'`, `C=1.0`, default
+  solver, max 1000 iterations. **No MLP, no kernel methods,
+  no feature search, no hyperparameter sweep beyond the
+  defaults.** L2-regularized linear logistic regression on
+  raw hidden-state vectors.
+- **Train/test protocol (pinned):** **5-fold stratified
+  cross-validation per benchmark**, deterministic seed
+  `numpy.random.SeedSequence(entropy=15)` matching §15.x
+  convention. Out-of-fold predictions used for AUC and
+  selective-prediction metrics. **No held-out probe
+  training data leaks across folds.**
+- **Per-benchmark pi (base rate) for selective-prediction
+  comparisons:** Qwen-greedy accuracy from §13.10
+  (TruthfulQA-MC: 0.250; HaluEval-QA: 0.300). Pinned
+  constants, not re-derived.
+
+**Metrics (pinned).**
+
+For each benchmark, primary:
+
+- **Probe AUC** on out-of-fold predictions (sklearn
+  `roc_auc_score`).
+- **Probe selective-prediction $\kappa@\alpha_2 = 0.50$** —
+  treating the probe's predicted probability $\hat{p}$ as a
+  "trust score" and using $1 - \hat{p}$ as the abstention
+  risk score. Same $n_{\min} = 10$ floor as §15.x.
+- **$\Delta\text{AUC}_\text{vs-entropy}$** = probe AUC −
+  best existing unsupervised baseline AUC. The "best
+  existing baseline" per benchmark:
+  - HaluEval-QA: §13.10 entropy (AUC 0.661).
+  - TruthfulQA-MC: §13.10 entropy (AUC 0.661 from §15.2-
+    of-record; we do not consult the now-N=200 §13.10 dump
+    for this comparison).
+
+Secondary diagnostics (reported, non-band-driving):
+
+- Probe accuracy (out-of-fold).
+- Per-fold AUC variance (bootstrap-equivalent CI proxy).
+- Calibration (Brier score, ECE).
+
+**Pinned baselines for the comparison table.**
+
+| Baseline | Source | AUC anchor |
+|---|---|---|
+| §13.10 semantic entropy (HaluEval) | §13.10 verdict-of-record | 0.661 |
+| §13.10 semantic entropy (TruthfulQA-MC) | §13.10 verdict-of-record (N=100, pre-§13.20) | 0.661 |
+| §15.4 hybrid Δκ on HaluEval | §15.4 verdict-of-record | $\Delta\kappa = +0.090$ at $\alpha_2 = 0.50$ |
+| §15.6 hybrid Δκ on TruthfulQA-MC | §15.6 verdict-of-record | $\Delta\kappa = -0.030$ at $\alpha_2 = 0.50$ |
+
+**Decision rule (mechanical, no soft override).**
+
+After probe runs on both benchmarks:
+
+1. Compute probe AUC and $\Delta\text{AUC}_\text{vs-entropy}$
+   per benchmark.
+2. Compute probe $\kappa@\alpha_2$ per benchmark; compare to
+   §15.x baselines (§15.2's $\kappa = 0.26$ HaluEval, $\kappa
+   = 0.14$ TruthfulQA-MC).
+3. Apply the three-band cascade:
+   - **STRONG_SIGNAL_IN_Z** if probe AUC ≥ 0.75 on both AND
+     ΔAUC ≥ +0.05 on both.
+   - **PARTIAL_SIGNAL_IN_Z** if probe AUC ≥ 0.66 on at least
+     one benchmark AND ΔAUC > 0 on at least one, AND not
+     STRONG.
+   - **NO_MATERIAL_SIGNAL_IN_Z** otherwise.
+
+The cascade is exhaustive; every (HaluEval-AUC, TruthfulQA-AUC,
+ΔAUC pair) outcome maps to exactly one band.
+
+**Implementation scope (pinned).**
+
+- New script: `scripts/probe_supervised_15_10.py` (numpy +
+  scikit-learn + transformers; minimal). One file, ~600–900
+  lines target.
+- Two-phase: (1) hidden-state extraction (~10–15 min on
+  cached Qwen-7B, GPU), (2) probe training + evaluation
+  (CPU only, sub-minute per benchmark with sklearn).
+- Self-test gate (`--self-test`) verifying probe + cascade
+  classifier on synthetic boundary cases.
+- Output paths:
+  - `docs/experiments/probe_supervised_15_10.json`
+    (`schema_version "15.10"`).
+  - `docs/experiments/probe_supervised_15_10.md`.
+- §15.7-pattern interpretation firewall against soft-override
+  language in the markdown report (Class-3 forbidden patterns
+  scanned at write time; abort on detection).
+
+**What §15.10 explicitly does NOT authorize.**
+
+- Iterative probe-architecture search. Linear only; one shot.
+- Feature engineering beyond the pinned final-layer-last-token
+  + optional mid-layer.
+- Re-training Qwen-7B; no fine-tuning; no LoRA.
+- Cross-benchmark training (probe is trained per-benchmark to
+  avoid label-distribution leakage).
+- Modification of any §15.x script or verdict-of-record
+  artifact.
+- Phase 2 / Phase 3 implementation. Each requires its own
+  pre-commitment after Phase 1 results land.
+- Auto-promotion of any §15.10 outcome to a verdict-of-record
+  status. §15.10 produces a sprint-internal classification,
+  not a §13.10-class AUC verdict.
+
+**Time / compute budget.**
+
+- Hidden-state extraction: ~10–15 min GPU on cached Qwen-7B
+  (~15 GB, already loaded for §13.10 / §14a.2 / §15.5).
+- Probe training + eval: <1 min CPU per benchmark.
+- Total wall clock: ~20–30 min.
+
+§15.10 implementation (`scripts/probe_supervised_15_10.py`)
+is a separate §0.8 authorization gate. The §15.10 result
+section follows the real-data run.
+
 ---
 
 
