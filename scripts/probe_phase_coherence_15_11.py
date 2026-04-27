@@ -1589,3 +1589,293 @@ def write_markdown_output(outputs: PhaseAuditOutputs, path: str) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with Path(path).open("w", encoding="utf-8") as f:
         f.write(text)
+
+
+# ===========================================================================
+# §15.11 Chunk I-5 — main() orchestration + CLI.
+#
+# Modes:
+#   --self-test    : run gate only, exit 0/3
+#   --extract-only : labels + Qwen-7B all-29-layer forward pass + .npz cache
+#   --probe-only   : load .npz cache + phase-coherence + write outputs
+#   (default)      : self-test → extract (or load cache) → probe → write
+#
+# Exit codes:
+#   0  success
+#   2  CLI / argument error (handled by argparse)
+#   3  SELF_TEST_FAILED
+#   4  INTERPRETATION_VIOLATION
+#   5  SCHEMA_MISMATCH (label dump or cache)
+#   6  EXTRACTION_FAILED (torch / transformers stack error)
+#   7  PROBE_FAILED (numpy / sklearn / NaN in F)
+# ===========================================================================
+
+
+def _run_extraction(verbose: bool = True) -> dict[str, HiddenStateExtraction]:
+    """Load labels + run Qwen-7B all-29-layer forward pass per benchmark."""
+    extractions: dict[str, HiddenStateExtraction] = {}
+    torch, AutoModelForCausalLM, AutoTokenizer = _lazy_import_torch_and_transformers()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if verbose:
+        print(f"  device: {device}", flush=True)
+        print(f"  loading tokenizer + model: {QWEN_MODEL_ID}", flush=True)
+    tokenizer = AutoTokenizer.from_pretrained(QWEN_MODEL_ID)
+    model = AutoModelForCausalLM.from_pretrained(
+        QWEN_MODEL_ID,
+        torch_dtype=torch.float16,
+        output_hidden_states=True,
+    ).to(device)
+    model.eval()
+
+    for bench in BENCHMARKS:
+        if verbose:
+            print(f"  loading labels: {bench}", flush=True)
+        labels = load_benchmark_labels(bench)
+        if verbose:
+            print(
+                f"  extracting all-{N_LAYERS}-layer hidden states: {bench} "
+                f"(N={len(labels.questions)})",
+                flush=True,
+            )
+        ext = extract_hidden_states_all_layers(
+            labels, model=model, tokenizer=tokenizer, device=device
+        )
+        extractions[bench] = ext
+        if verbose:
+            print(
+                f"    {bench}: hidden_states shape={ext.hidden_states.shape}, "
+                f"d={ext.d}, n_layers={ext.n_layers}",
+                flush=True,
+            )
+    return extractions
+
+
+def _run_probes(
+    extractions: dict[str, HiddenStateExtraction],
+) -> PhaseAuditOutputs:
+    """Run phase coherence per benchmark; classify cascade; return outputs."""
+    pr_h = run_phase_coherence_for_benchmark(extractions["halueval_qa"])
+    pr_t = run_phase_coherence_for_benchmark(extractions["truthfulqa_mc"])
+    cv = classify_cascade_phase(
+        pr_h.auc_phase, pr_t.auc_phase, pr_h.dauc_phase, pr_t.dauc_phase
+    )
+
+    if extractions["halueval_qa"].d != extractions["truthfulqa_mc"].d:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: hidden_dim differs across benchmarks: "
+            f"HaluEval={extractions['halueval_qa'].d}, "
+            f"TruthfulQA-MC={extractions['truthfulqa_mc'].d}."
+        )
+    if (
+        extractions["halueval_qa"].n_layers
+        != extractions["truthfulqa_mc"].n_layers
+    ):
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: n_layers differs across benchmarks: "
+            f"HaluEval={extractions['halueval_qa'].n_layers}, "
+            f"TruthfulQA-MC={extractions['truthfulqa_mc'].n_layers}."
+        )
+
+    return PhaseAuditOutputs(
+        schema_version=SCHEMA_VERSION,
+        halueval_result=pr_h,
+        truthfulqa_result=pr_t,
+        cascade_verdict=cv,
+        n_layers_used=extractions["halueval_qa"].n_layers,
+        hidden_dim=extractions["halueval_qa"].d,
+        qwen_model_id=QWEN_MODEL_ID,
+    )
+
+
+def _print_verdict_banner(outputs: PhaseAuditOutputs) -> None:
+    """Emit a one-screen mechanical-readout banner."""
+    cv = outputs.cascade_verdict
+    print("", flush=True)
+    print("=" * 76, flush=True)
+    print(f"§15.11 cascade verdict: {cv.label}", flush=True)
+    print("-" * 76, flush=True)
+    print(
+        f"  HaluEval-QA   AUC = {cv.auc_halueval:.3f}  "
+        f"(baseline {ENTROPY_BASELINE_AUC:.3f}; "
+        f"ΔAUC {cv.dauc_halueval:+.3f}; "
+        f"direction_held={'yes' if cv.direction_held_halueval else 'no'})",
+        flush=True,
+    )
+    print(
+        f"  TruthfulQA-MC AUC = {cv.auc_truthfulqa:.3f}  "
+        f"(baseline {ENTROPY_BASELINE_AUC:.3f}; "
+        f"ΔAUC {cv.dauc_truthfulqa:+.3f}; "
+        f"direction_held={'yes' if cv.direction_held_truthfulqa else 'no'})",
+        flush=True,
+    )
+    print(
+        f"  §15.10 supervised AUCs (disclosure): "
+        f"HaluEval={SUPERVISED_AUC_PER_BENCHMARK_PHASE_1['halueval_qa']:.4f}; "
+        f"TruthfulQA-MC={SUPERVISED_AUC_PER_BENCHMARK_PHASE_1['truthfulqa_mc']:.4f}",
+        flush=True,
+    )
+    print("-" * 76, flush=True)
+    print(f"  rationale: {cv.rationale}", flush=True)
+    print("=" * 76, flush=True)
+
+
+def _build_argparser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="probe_phase_coherence_15_11",
+        description=(
+            "§15.11 Phase 2 — layer-wise phase-coherence probe over Qwen-7B's "
+            "29 per-layer last-token hidden states. Single-shot, pinned "
+            "configuration, mechanical readout."
+        ),
+    )
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--self-test",
+        action="store_true",
+        help=(
+            "Run self-test gate only (12 cascade boundary cases + 3 phase-"
+            "coherence formula smoke tests + 26-pattern firewall)."
+        ),
+    )
+    mode.add_argument(
+        "--extract-only",
+        action="store_true",
+        help=(
+            "Run all-29-layer hidden-state extraction only; write .npz cache. "
+            "Skips probe + outputs."
+        ),
+    )
+    mode.add_argument(
+        "--probe-only",
+        action="store_true",
+        help=(
+            "Run phase-coherence probe from existing .npz cache; skip "
+            "extraction. Self-test gate still runs first."
+        ),
+    )
+    p.add_argument(
+        "--cache-path",
+        default=HIDDEN_STATES_CACHE_PATH,
+        help=(
+            f"Path to all-layer hidden-states .npz cache "
+            f"(default: {HIDDEN_STATES_CACHE_PATH})"
+        ),
+    )
+    p.add_argument(
+        "--json-out",
+        default=OUTPUT_JSON_PATH,
+        help=f"Path to JSON output (default: {OUTPUT_JSON_PATH})",
+    )
+    p.add_argument(
+        "--md-out",
+        default=OUTPUT_MD_PATH,
+        help=f"Path to markdown output (default: {OUTPUT_MD_PATH})",
+    )
+    p.add_argument(
+        "--force-extract",
+        action="store_true",
+        help=(
+            "Force re-extraction even if --cache-path exists "
+            "(default: skip extraction when cache present)."
+        ),
+    )
+    return p
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    args = _build_argparser().parse_args(argv)
+
+    # Self-test gate is required for every mode except explicit --self-test.
+    if args.self_test:
+        return run_self_test()
+
+    rc = run_self_test()
+    if rc != 0:
+        return rc
+
+    cache_path = args.cache_path
+
+    # Extraction phase.
+    if args.probe_only:
+        print(
+            f"\n--probe-only: loading hidden-state cache from {cache_path}",
+            flush=True,
+        )
+        try:
+            extractions = load_hidden_states_cache(cache_path)
+        except SchemaMismatchError as e:
+            print(f"SCHEMA_MISMATCH: {e}", flush=True)
+            return 5
+        except FileNotFoundError as e:
+            print(f"CACHE_MISSING: {e}", flush=True)
+            return 5
+    else:
+        cache_exists = Path(cache_path).exists()
+        if cache_exists and not args.force_extract:
+            print(
+                f"\nCache already present at {cache_path}; "
+                f"loading instead of re-extracting "
+                f"(use --force-extract to override).",
+                flush=True,
+            )
+            try:
+                extractions = load_hidden_states_cache(cache_path)
+            except SchemaMismatchError as e:
+                print(f"SCHEMA_MISMATCH: {e}", flush=True)
+                return 5
+        else:
+            print(
+                "\nExtraction phase — Qwen2.5-7B-Instruct all-29-layer "
+                "forward pass.",
+                flush=True,
+            )
+            try:
+                extractions = _run_extraction(verbose=True)
+            except (ImportError, RuntimeError) as e:
+                print(f"EXTRACTION_FAILED: {e}", flush=True)
+                return 6
+            try:
+                save_hidden_states_cache(extractions, cache_path)
+                print(f"  cache written: {cache_path}", flush=True)
+            except OSError as e:
+                print(f"CACHE_WRITE_FAILED: {e}", flush=True)
+                return 6
+
+        if args.extract_only:
+            print(
+                "\n--extract-only: extraction complete; skipping probe.",
+                flush=True,
+            )
+            return 0
+
+    # Probe phase.
+    print(
+        "\nProbe phase — phase coherence per benchmark "
+        "(formula + AUC + cascade).",
+        flush=True,
+    )
+    try:
+        outputs = _run_probes(extractions)
+    except SchemaMismatchError as e:
+        print(f"SCHEMA_MISMATCH: {e}", flush=True)
+        return 5
+    except RuntimeError as e:
+        print(f"PROBE_FAILED: {e}", flush=True)
+        return 7
+    except ImportError as e:
+        print(f"PROBE_FAILED: {e}", flush=True)
+        return 7
+
+    # Output phase.
+    print("\nOutput phase — JSON + markdown.", flush=True)
+    write_json_output(outputs, args.json_out)
+    print(f"  wrote: {args.json_out}", flush=True)
+    write_markdown_output(outputs, args.md_out)
+    print(f"  wrote: {args.md_out}", flush=True)
+
+    _print_verdict_banner(outputs)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
