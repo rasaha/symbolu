@@ -16264,5 +16264,126 @@ coherence as the BCVF-faithful transfer mechanism.
 ---
 
 
+### 15.11 Pre-commitment (continued) — Pinned formula, FFT, layer subset, feature derivation
+
+**Pinned per-layer extraction.**
+
+For each question, the model is run forward on the prompt
+`Q: {question}\nA:`. We capture **all 29 hidden states**
+(`out.hidden_states[0..28]`):
+
+- index 0 = embedding output;
+- indices 1..28 = output of each of the 28 transformer
+  layers (Qwen2.5-7B has 28 hidden layers).
+
+For each layer i ∈ {0, 1, …, 28}, we take the **last-token**
+position, yielding `h_i ∈ R^3584` per question. This is the
+same prompt template and last-token convention as §15.10,
+just extracting all layers instead of layer −1 only. PINNED.
+
+**Pinned FFT (no windowing, no detrending).**
+
+For each layer i, compute the **real-input FFT** along the
+hidden dimension:
+
+- `H_i = numpy.fft.rfft(h_i)` → complex array of length
+  `floor(3584/2) + 1 = 1793`.
+- No windowing is applied (rectangular window).
+- No detrending or mean-subtraction is applied.
+- The vector is treated as the canonical "signal" represented
+  by the layer-i last-token hidden state, taken as-is from
+  the model output.
+
+The phase per bin is:
+
+> `φ_i[k] = angle(H_i[k])`, for k ∈ {0, 1, …, 1792}.
+
+**Pinned bin selection.**
+
+For phase coherence we **exclude DC (k = 0) and Nyquist
+(k = 1792)** because their phases are constrained to {0, π}
+for real-input signals and would inflate coherence
+trivially. Used bins: `k ∈ {1, 2, …, 1791}`.
+
+> **W = 1791** (number of frequency bins used). PINNED.
+
+**Pinned phase-coherence formula.**
+
+For each ordered pair of layers (i, j) with i, j ∈ {0, …, 28}:
+
+> **C[i, j] = (1 / W) · Σ_{k=1}^{1791} cos(φ_i[k] − φ_j[k])**
+
+where φ_i[k] is the phase of the rfft of layer-i's last-token
+hidden state at bin k.
+
+**Properties** (mechanical, no interpretation):
+
+- `C[i, i] = 1` for all i (trivially).
+- `C[i, j] = C[j, i]` (symmetric).
+- `C[i, j] ∈ [−1, +1]`.
+- `C` is a 29×29 real symmetric matrix per question.
+
+**Pinned feature aggregation.**
+
+Per question, the **global cross-layer phase coherence**
+scalar is:
+
+> **F = (2 / (29 · 28)) · Σ_{0 ≤ i < j ≤ 28} C[i, j]**
+
+i.e., the mean over the 29 · 28 / 2 = **406 upper-triangular
+off-diagonal entries** of C. F ∈ [−1, +1].
+
+This is the single scalar feature evaluated against
+correctness. **No other features are derived. No layer
+subsets, no per-layer-pair features, no spectral-bandwidth
+features. PINNED.**
+
+**Pinned direction convention.**
+
+We test the BCVF-faithful direction:
+
+> **Higher F predicts correct (y = 1).**
+
+This matches the autonomy domain's relationship from §6.1
+(high phase coherence between bidirectional check streams
+identifies correct decisions). AUC is computed as
+`roc_auc_score(y, F)` directly under this convention.
+
+If AUC < 0.5, the empirical signal is in the **opposite**
+direction (lower F predicts correct). Per §0.8, this counts
+as "no signal in the expected BCVF-faithful direction" and
+the cascade lands in `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`
+regardless of how negative AUC is. **No directional
+flipping. No "absolute" or "two-sided" AUC variants.
+PINNED.**
+
+**Why this exact formula (§0.8-disclosed).**
+
+- **rfft + cosine of phase difference** is the literal LLM
+  analog of the formula
+  `C[i,j] = (1/W) · Σ_k cos(φ_i[k] − φ_j[k])`. No
+  alternative parameterization is considered.
+- **All 29 layers** is the most BCVF-faithful choice: every
+  internal representation participates equally in the
+  coherence scalar. No theoretically-motivated layer subset
+  (e.g., "last 12") is used because such a choice would be
+  a free hyperparameter without §0.8 justification.
+- **Mean off-diagonal aggregation** is the natural N-stream
+  extension of the 2-stream BCVF coherence statistic. No
+  max, no top-K, no early/mid/late partition is considered.
+- **Excluding DC + Nyquist** removes phases that are not
+  free parameters of the signal. No alternative bin range
+  is considered.
+- **No windowing** is consistent with treating the hidden-
+  state vector as a single canonical signal, not a time
+  series of indeterminate windowing convention.
+
+These choices are pinned to make §15.11 a **single-shot**
+test of one specific mechanism. Any deviation in
+implementation requires a fresh §0.8 amendment.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
