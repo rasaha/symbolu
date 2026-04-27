@@ -12842,6 +12842,94 @@ the pinned rules. The line-count drift is documented inside
 §15.4 (here) rather than as a run-time deviation, since it
 was a pre-run estimation artifact.
 
+**Combined picture across §13 / §14 / §15 — LLM-track now
+covers four metric classes; one cleared USEFUL_INTERNAL.**
+
+§15.4 closes the fourth of four pre-committed metric-class
+investigations of BCVF-derived signals on the LLM track:
+
+| Program | Metric class | Question | Combined verdict |
+|---|---|---|---|
+| §13 | AUC of an observable vs ground-truth correctness | Does observable X correlate with correctness? | 5-of-5 single-axis classes ANTI; §13.10 baseline `TRUTH_CORRELATED_MARGINAL` (AUC 0.661 / 0.661 at N=100) |
+| §14 | Δ accuracy of system-level routing vs naive aggregation | Does BCVF-shaped routing lift end-to-end accuracy? | 2-of-2 scout configurations `SCOUT_SATURATION` |
+| §15 (single-source) | Risk-coverage operational metrics on Qwen greedy | Does the §13.10 score support a useful answer/abstain policy on a single source? | `MARGINAL` (§15.2; δ=+0.116 statistically supported, κ=0.14 limited by TruthfulQA-MC) |
+| **§15 (hybrid)** | **Δκ vs §15.1 baseline on V1's selected answer** | **Does a §14-selector + §15-abstention hybrid lift the operating frontier over single-source abstention?** | **`USEFUL_INTERNAL`** (§15.4; Δκ = +0.090; the only program-level lift to clear USEFUL_INTERNAL) |
+
+The four programs are structurally independent — different
+metric classes, different acceptance rules, different math
+objects. **Each was pre-committed under §0.8 with bands
+fixed before its data was opened.** Three returned strict
+non-promotion verdicts (ANTI / SCOUT_SATURATION / MARGINAL);
+§15.4 returned the program's first USEFUL_INTERNAL.
+
+**§13.9 VC-brief hold reaffirmed.** §13.9 gates external-
+framing changes to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` on
+a STRONG-band lift on both benchmarks at any §13 / §14 /
+§15 probe. §15.4's USEFUL_INTERNAL is below STRONG by
+construction (1D cascade rule 3 is the band immediately
+below STRONG) and is single-benchmark — neither condition
+satisfies §13.9's gate. Combined with §13's 5/5 ANTI,
+§14's 2/2 SCOUT_SATURATION, §15.2's MARGINAL, §13.20's
+N=200 `NOISE_BAND_LIFT`, and §15.4's single-benchmark
+USEFUL_INTERNAL, **twelve distinct experimental structures
+have now been tested across four metric classes at the 7B +
+DeBERTa-v3-base + N=100/200 configuration without producing
+a STRONG combined classification on any of them.** The
+§13.9 hold is unchanged; §15.4 strengthens it by adding
+another metric class that did not clear STRONG.
+
+The honest external framing for any internal-research
+referencing of the §13 / §14 / §15 program is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100, no
+> literature-aligned, mechanism-motivated, system-level,
+> single-source-abstention, or hybrid-abstention BCVF
+> construction tested in this codebase clears the STRONG
+> combined-classification bar on the worst-benchmark rule.
+> The §15.3 hybrid scout did clear USEFUL_INTERNAL on
+> HaluEval-QA single-benchmark — internal-research
+> operational evidence that adding §14a.2's V1 selector in
+> front of a §15-style abstention gate produces measurable
+> lift over single-source abstention at the absolute-
+> majority operating target — but this single-benchmark
+> USEFUL_INTERNAL does NOT clear the §13.9 STRONG-band-on-
+> both-benchmarks external-framing bar.*
+
+**§15.4 closes the §15 LLM-track operational chapter at the
+hybrid level.** Per Chunk 3g the USEFUL_INTERNAL verdict
+explicitly forecloses §15.5-as-implementation follow-ups at
+this configuration. Any follow-up under §15 logic — cross-
+benchmark extension to TruthfulQA-MC, larger-N re-run,
+ensemble risk score, alternative selector configurations,
+relaxed worst-benchmark rule — would require a fresh top-
+level §0.8 commitment with bands pinned before any data
+inspection. None is authorized by §15.4.
+
+**The autonomy-domain BCVF claim (§6.1) stands independently
+on the N=21 sign-test that passed in §6.1 / §6.7 and is
+unaffected by any §13 / §14 / §15 outcome.** The §13 / §14 /
+§15 program tested whether BCVF transfers to LLM
+hallucination detection at this codebase's specific scale,
+across four distinct metric classes; the answer at this
+configuration is mixed — eleven of twelve experimental
+structures returned strict non-promotion verdicts; one
+(§15.3 hybrid) cleared USEFUL_INTERNAL on a single
+benchmark. The §13.9 external-framing hold remains binding;
+the §15.4 USEFUL_INTERNAL verdict is documented internally,
+not externally, per Chunk 3g.
+
+**Artifacts.**
+
+- `scripts/probe_hybrid_selective_abstention.py` (the §15.3
+  implementation; numpy + stdlib only).
+- `docs/experiments/probe_hybrid_selective_abstention.json`
+  (machine-readable result, schema_version `15.3`).
+- `docs/experiments/probe_hybrid_selective_abstention.md`
+  (human-readable summary).
+
+§15.4 result section now complete (chunks 4a–4f, 6 commits
+on top of the §15.3 pre-commitment + implementation).
+
 ---
 
 
