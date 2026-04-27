@@ -15748,6 +15748,215 @@ diagnostic outputs.
 level. §15.8 result section complete (chunks 8a–8f, 6 commits
 on top of the §15.7 pre-commitment + implementation).
 
+### 15.9 Future-work entry (documented, NOT pre-committed) — phase coherence as a theoretically-faithful autonomy-LLM transfer attempt
+
+**Status: DOCUMENTED, NOT pre-committed.** §15.9 is the
+§15-track analogue of §13.8's "future-work, requires fresh
+§0.8 commitment" list. It records phase coherence as the
+single most theoretically-defensible LLM-track direction
+that has NOT been undertaken in this codebase, alongside
+explicit constraints and prior estimates. **§15.9 does NOT
+authorize implementation.** Any future phase-coherence
+experiment requires a fresh top-level §0.8 commitment with
+bands pinned ex-ante, structurally analogous to §15.3 /
+§15.5 / §15.7's chunked pre-commitment discipline.
+
+**The candidate formula and what it measures.**
+
+The pinned candidate is the standard pairwise phase-coherence
+metric over a windowed average of phase differences:
+
+$$
+C[i, j] \;=\; \frac{1}{W} \sum_{k} \cos(\phi_i[k] - \phi_j[k])
+$$
+
+where $\phi_i[k]$ is the phase of signal $i$ at index $k$
+within window $W$, and the metric measures pairwise
+agreement between any two signals $i, j$ over that window.
+$C \in [-1, +1]$; $C = +1$ at perfect phase alignment,
+$C = 0$ at orthogonal phases, $C = -1$ at perfect
+anti-alignment.
+
+This is structurally distinct from the §13/§14/§15 entropy-
+based observables in three ways:
+
+- **Continuous** rather than discrete (cosine of an angle vs
+  Shannon entropy over discrete cluster sizes from K=10
+  stochastic samples).
+- **Pairwise** rather than scalar (produces a matrix
+  $C[i, j]$ over signal pairs that can be aggregated, not a
+  single per-question scalar).
+- **Operates on internal phase structure** rather than
+  output meaning space (downstream of the model's internals,
+  not downstream of NLI clustering of sample texts).
+
+**Why §15.9 is the most theoretically-faithful
+autonomy-LLM transfer attempt available.**
+
+The §6.1 autonomy-domain BCVF result that passed (N=21
+sign-test p=0.0072) operated on **continuous phase-quad
+signals** (`map_error_accel`) with the C2 vector-path
+invariance property empirically validated. That is:
+continuous geometric signals with meaningful temporal
+evolution and physically grounded divergence.
+
+The §13/§14/§15 LLM-track program mapped BCVF onto:
+- §13.10 semantic entropy of cluster-size histograms over
+  K=10 discrete stochastic samples,
+- §13.14 BCVF 2nd-difference over per-position semantic
+  entropy of NLI-clustered truncations,
+- §13.16 BCVF 2nd-difference over per-position EigenScore
+  of hidden-state stride grids,
+- §13.18 forced-allocation gap from per-token logit
+  centering,
+- §14a / §14a.2 cross-source weighted majority vote with
+  per-source semantic entropy as trust scalar,
+- §15.x abstention threshold over per-source semantic
+  entropy of the V1-winning source.
+
+**None of these are continuous phase-like signals in the
+§6.1 sense.** They are mathematically convenient analogues
+that approximate the BCVF construction at the text-output
+or token-logit layer rather than at the underlying
+representational geometry. The §13.14 / §13.16 BCVF
+2nd-difference observables came closest (per-position
+continuous-curve operators) and both returned ANTI under
+worst-benchmark; per the §13.15 / §13.17 narrowing analysis,
+the per-position curves were monotonic-rising rather than
+smooth-with-rare-spikes, so the 2nd-difference operator had
+no fault-onset structure to detect.
+
+**Phase coherence is the candidate that most directly tests
+whether the §13/§14/§15 program failed because BCVF doesn't
+transfer to LLMs OR because we mapped BCVF onto the wrong
+substrate.** It addresses ChatGPT's representation-level
+under-theorization critique surfaced during the §15.8
+informal review.
+
+**Three phase-definition options (each would need its own
+§0.8 sub-pin).**
+
+The candidate formula assumes phases exist. Phases are not
+native to LLMs; defining them is itself a hypothesis-class
+commitment. Three plausible candidates, each with different
+priors and different engineering costs:
+
+1. **Hilbert-transform phase of hidden-state magnitudes
+   across token positions.** For each layer $\ell$ and
+   sequence of token positions $1..T$, treat the
+   $L^2$-norm $\|h_\ell[t]\|$ as a quasi-oscillatory
+   signal; apply Hilbert transform to recover instantaneous
+   phase. Then $\phi_i[k]$ becomes per-source per-position
+   per-layer phase. Computationally cheap; requires no new
+   model training.
+2. **Fourier decomposition of per-layer activation
+   trajectories across the K=10 stochastic samples.** For
+   each layer and each token position, compute the FFT of
+   the activation pattern across the K samples; extract
+   dominant-frequency phases. More complex but more
+   theoretically grounded — the K=10 samples form a discrete
+   "time series" over the model's stochastic decoding
+   variability.
+3. **Rotary-embedding-derived phases.** Most modern LLMs
+   (Qwen2.5, Llama-3.1, Mistral-7B-v0.3) use rotary positional
+   embeddings (RoPE), which encode positional information
+   as sin/cos pairs. Extract per-position rotary phases
+   directly from the model's positional embedding matrix
+   without additional transforms. Cheapest and most natively
+   model-grounded.
+
+**Each option is a different §0.8 sub-pin.** A full §15.9
+pre-commitment would need to pin exactly one phase
+definition before any data inspection, using the §15.3 /
+§15.5 chunked-charter discipline.
+
+**What §15.9 explicitly does NOT authorize.**
+
+- Implementation of any phase-coherence script. The §15.9
+  entry is a future-work *placeholder*, not an authorization.
+- Re-classification of any §13 / §14 / §15.x verdict-of-
+  record. All bands remain binding under §0.8 regardless of
+  any future §15.9-pre-committed result.
+- Updating `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`. The §13.9
+  hold remains in force and would not be addressed by §15.9
+  results except via STRONG-band lift on both benchmarks.
+- Auto-promotion to §15.10 or beyond. Each follow-up needs
+  its own fresh §0.8.
+- Any claim that the autonomy-domain BCVF result (§6.1) is
+  affected by §15.9 future work. §6.1 stands wholly
+  independent.
+
+**What a §15.9-pre-committed test would need to address.**
+
+If §15.9 is ever fired, the pre-commitment must directly
+engage with the structural failure modes §15.7 identified:
+
+- **TruthfulQA-MC's adversarial distractor structure.** The
+  benchmark produces correlated wrongness across model
+  families. Phase coherence applied to the same source set
+  would face the same correlated-wrongness issue. The
+  pre-commitment should specify either (a) a benchmark
+  substitution that escapes this pattern, or (b) explicit
+  acknowledgment that cross-benchmark generalization remains
+  conditional on the benchmark structure.
+- **C-MISMATCHED composition failure on V1-divergent
+  questions.** §15.7 found the per-source winning-source
+  entropy is sign-flipped on V1-divergent questions. Phase
+  coherence on the same Stage A configuration faces the
+  same composition risk. The pre-commitment should specify
+  whether Stage A is also redesigned (engineered diversity)
+  or held fixed.
+- **The $\rho \ge \rho^*$ met but coverage too low pattern.**
+  Even with sufficient discrimination, the operating-point
+  geometry on TruthfulQA-MC delivers tiny coverage. Phase
+  coherence at the same N=100 may face the same sparse-
+  support issue. The pre-commitment should specify a
+  larger-N target or document the expected coverage
+  ceiling.
+- **The $\alpha_3 = 0.75$ deployment-grade ceiling.** Phase
+  coherence cannot lift this from greedy accuracy 0.25–0.30.
+  The pre-commitment should explicitly bound deployment
+  claims at $\alpha < 0.75$ or specify a model-scale
+  upgrade as part of the same commitment.
+
+**Estimated cost (rough, not §0.8-binding).**
+
+- Phase-definition engineering: 2–5 days depending on
+  option (RoPE-derived cheapest, Fourier-of-stochastic-
+  samples most complex).
+- Phase coherence computation over existing §14a.2-class
+  dumps: pure post-processing if hidden states are cached;
+  ~hours if not (requires forward-pass replay through
+  cached models).
+- §0.8 chunked pre-commitment drafting: ~1–2 days per the
+  §15.3 / §15.5 / §15.7 pattern.
+- Self-test gate, output writers, interpretation framework:
+  ~1 day reusing §15.7's primitives.
+- Real-data run: depends on whether new generation is
+  needed. If existing dumps include cached hidden states:
+  CPU-only post-processing, <1 hour. Otherwise: GPU
+  forward-pass replay, several hours.
+
+Total: roughly 1–2 weeks for a complete §15.9 pre-commitment
++ implementation + result section, with the largest
+uncertainty in the phase-definition engineering. Cheaper
+than the §15.5 hybrid scout was, but more conceptually
+demanding.
+
+**§15.9 documentation-only status reaffirmed.** This entry
+records the future-work item; it does not authorize work.
+Per §0.8 discipline, any future §15.9 pre-commitment must
+be drafted in chunked form before any data is inspected
+under the phase-coherence framing, with bands pinned
+ex-ante. The documentation here exists so that future
+revisits can pick up the cleanest available "if reopening
+LLMs" candidate without re-deriving the rationale from
+informal commentary.
+
+The §15 LLM-track program remains closed at the §15.8
+mechanism-decomposed level. §15.9 sits as a documented
+candidate for future reopening; it is not a continuation.
+
 ---
 
 
