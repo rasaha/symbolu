@@ -16844,5 +16844,141 @@ All three must pass before any data inspection. PINNED.
 ---
 
 
+### 15.11 Pre-commitment (continued) — Caveats, transfer-thesis disclosure, Phase 3 authorization mapping, closing §0.8
+
+**Caveats (§0.8-disclosed) — §15.11-specific.**
+
+- **Single mechanism within the phase-coherence class.** We
+  test ONE specific phase-coherence formula: layer-wise,
+  mean off-diagonal, BCVF-faithful direction. A negative
+  result rules out **this** instantiation; it does not rule
+  out sample-wise (multi-decode), paraphrase-wise
+  (multi-prompt), or alternative aggregations (max-pair,
+  top-K, layer-block triplet, etc.) of phase coherence.
+  These are explicitly out of scope for Phase 2; Phase 3
+  will record them as untested-but-known alternatives.
+- **Layer-wise was selected over sample-wise /
+  paraphrase-wise** because (a) it is the cheapest
+  re-extraction (single forward pass per question vs K
+  samples or M paraphrases) and (b) it has the cleanest
+  BCVF analog (layers as N "streams" vs the 2-stream
+  autonomy original). It is **not** claimed to be the most
+  powerful instantiation.
+- **Direction is pinned BCVF-faithful (higher F predicts
+  correct).** Wrong-direction failures count as failures;
+  no sign-flip rescue. This is conservative by §0.8 design
+  and may understate signal that exists in the inverted
+  direction.
+- **N = 100 per benchmark** (same as §15.10/§13.10).
+  Statistical power is bounded; AUC standard error at AUC
+  ≈ 0.66 with N = 100 is ~0.05–0.06. Bands at 0.66 and 0.75
+  are hit/miss-able by sampling noise alone. The cascade
+  reports point estimates and pinned bands; no bootstrap CI
+  is computed (mirroring §15.10).
+- **Single model size: Qwen2.5-7B-Instruct.** Does not
+  speak to scaling behavior at 13B / 32B / 70B. Phase 3
+  will explicitly record this as a scope limit.
+
+**Caveats inherited from §15.10 (apply identically to §15.11).**
+
+- Prompt-format vs §13.10 labeling regime: pinned
+  `Q: {question}\nA:` regardless of which mode produced the
+  §13.10 dump. Caveat carries forward unchanged.
+- Question text source: dump's `question` field if present,
+  else HuggingFace dataset by `q_idx`. Same fallback policy.
+
+**Transfer-thesis disclosure (mechanical reading per cascade outcome).**
+
+§15.11's cascade outcome contributes to the **joint state
+of pre-committed mechanism classes** for the BCVF-autonomy
+→ LLM transfer thesis. As of the close of Phase 1, the joint
+state is:
+
+| mechanism class                              | status                                                       |
+|----------------------------------------------|--------------------------------------------------------------|
+| §13.10 unsupervised entropy                  | AUC = 0.661 both benchmarks (saturated at chance-corrected ceiling) |
+| §15.10 supervised linear (Phase 1)           | PARTIAL_SIGNAL_IN_Z (HaluEval ΔAUC = +0.008; TruthfulQA-MC ΔAUC = −0.039) |
+| §15.11 layer-wise phase coherence (Phase 2)  | **PENDING**                                                  |
+
+The mechanical reading of each Phase 2 outcome (no spin, no
+override of §15.10):
+
+- `STRONG_SIGNAL_IN_PHASE_COHERENCE` → phase coherence is
+  identified as a transfer mechanism that linear extraction
+  (§15.10) and unsupervised entropy (§13.10) failed to
+  capture. Substantive positive update on the BCVF-faithful
+  transfer thesis at the 7B scale. Phase 3 will document
+  this as a confirmed mechanism class and propose downstream
+  validation.
+- `PARTIAL_SIGNAL_IN_PHASE_COHERENCE` → phase coherence
+  carries some signal beyond entropy baseline on at least
+  one benchmark, in the BCVF-faithful direction, but does
+  not dominate. Joint with §15.10's PARTIAL: at least one
+  mechanism class has weak signal in the BCVF-faithful
+  direction. Phase 3 will document mixed evidence and the
+  asymmetry profile across benchmarks.
+- `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE` → layer-wise
+  phase coherence does not transfer at the 7B scale in the
+  BCVF-faithful direction. Joint with §15.10's
+  PARTIAL-by-hair: all three pre-committed canonical
+  mechanism classes (entropy / supervised linear /
+  phase-coherence) have produced near-null or null results.
+  Phase 3 will document this as **strong joint evidence
+  against transfer at the 7B scale under the canonical
+  mechanism classes**, and will propose Phase 3's closure
+  outcome from the four pre-committed bands (see below).
+
+**Phase 3 (`§15.12`) authorization mapping (PINNED).**
+
+§15.11 mechanically authorizes — but does not execute —
+Phase 3 work. The eligible §15.12 closure outcomes per
+§15.11 cascade label:
+
+| §15.11 outcome                            | §15.12 closure outcomes mechanically eligible                                                                                                                                            |
+|-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `STRONG_SIGNAL_IN_PHASE_COHERENCE`        | `REOPEN_LATER_UNDER_NEW_HYPOTHESIS_CLASS` (with positive update; phase coherence becomes the new hypothesis class)                                                                       |
+| `PARTIAL_SIGNAL_IN_PHASE_COHERENCE`       | `CLOSED_OPERATIONALLY_BUT_BCVF_FAITHFUL_REOPENING_POSSIBLE`                                                                                                                              |
+| `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`   | `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE` (because §15.10 was PARTIAL — supervised retains a residual reopening path) **or** `FULLY_CLOSED` (only if Phase 3's ChatGPT cross-bridge analysis converges to closure) |
+
+Phase 3 (§15.12) will get its own pre-commitment chunked
+draft; the closure-outcome decision rule will be pinned
+there. The **set** of eligible outcomes per §15.11 label is
+pinned **here**, ex ante, so Phase 3 cannot retroactively
+choose an outcome outside the §15.11-authorized set.
+
+This is the §0.8-binding constraint that prevents Phase 3
+from being a re-litigation of Phase 2.
+
+**What §15.11 does NOT do, restated.**
+
+- Does NOT modify §15.10's `PARTIAL_SIGNAL_IN_Z`
+  verdict-of-record.
+- Does NOT modify §13.9's hold or any §13/§14/§15.x
+  verdict-of-record.
+- Does NOT execute Phase 3. Phase 3 requires its own §0.8
+  commitment.
+- Does NOT iterate on the formula or features after this
+  section is sealed.
+- Does NOT permit selecting from §15.12 closure outcomes
+  outside the table above.
+
+**Closing §0.8 declaration.**
+
+This pre-commitment (the chunks under §15.11 above) is
+**§0.8-binding**. Once committed to the design document,
+the §15.11 mechanism, formula, evaluation, cascade,
+outputs, firewall, self-test gate, caveats, and Phase 3
+authorization mapping are all frozen. Implementation chunks
+(script-side `scripts/probe_phase_coherence_15_11.py`) will
+follow this pre-commitment exactly. Any deviation requires
+a fresh §0.8 amendment surfaced in the design document.
+
+Phase 2 enters execution only after this pre-commitment is
+committed to the branch and the implementation script's
+self-test gate passes.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
