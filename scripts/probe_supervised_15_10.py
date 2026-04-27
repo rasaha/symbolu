@@ -74,11 +74,22 @@ import argparse
 import json
 import math
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
+
+# Targeted suppression of sklearn 1.8+ FutureWarning for the `penalty` kwarg.
+# We keep `penalty='l2'` explicit for audit-trail symmetry with the pinned
+# PROBE_PENALTY constant; sklearn 1.8 still accepts it (with a warning),
+# and sklearn 1.10 will remove it (caught at runtime as TypeError if so).
+warnings.filterwarnings(
+    "ignore",
+    message=r".*'penalty'.*",
+    category=FutureWarning,
+)
 
 # ===========================================================================
 # §15.10 PINNED CONSTANTS — DO NOT CHANGE during implementation.
@@ -325,13 +336,18 @@ def _validate_s13_10_dump(payload: object, source_path: str) -> list[dict]:
             f"need at least {PINNED_N}."
         )
 
+    # Required fields per §15.7's lighter loader: q_idx + greedy_matches_correct.
+    # The 'question' field was added to the §13.10 producer in commit f2291fc
+    # ("§13 audit fixes"); pre-f2291fc dumps lack it. We tolerate that here
+    # and let load_benchmark_labels fall back to the HF dataset by q_idx.
+    seen_qids: set[int] = set()
     for i, rec in enumerate(records[:PINNED_N]):
         if not isinstance(rec, dict):
             raise SchemaMismatchError(
                 f"SCHEMA_MISMATCH: {source_path} record {i} is "
                 f"{type(rec).__name__}, expected dict."
             )
-        for required in (FIELD_QID, FIELD_QUESTION, FIELD_CORRECT):
+        for required in (FIELD_QID, FIELD_CORRECT):
             if required not in rec:
                 raise SchemaMismatchError(
                     f"SCHEMA_MISMATCH: {source_path} record {i} missing "
@@ -343,19 +359,63 @@ def _validate_s13_10_dump(payload: object, source_path: str) -> list[dict]:
                 f"'{FIELD_QID}' is {type(rec[FIELD_QID]).__name__}, "
                 f"expected int."
             )
-        if not isinstance(rec[FIELD_QUESTION], str):
-            raise SchemaMismatchError(
-                f"SCHEMA_MISMATCH: {source_path} record {i} field "
-                f"'{FIELD_QUESTION}' is {type(rec[FIELD_QUESTION]).__name__}, "
-                f"expected str."
-            )
         if not isinstance(rec[FIELD_CORRECT], bool):
             raise SchemaMismatchError(
                 f"SCHEMA_MISMATCH: {source_path} record {i} field "
                 f"'{FIELD_CORRECT}' is {type(rec[FIELD_CORRECT]).__name__}, "
                 f"expected bool."
             )
+        # Optional question field: validate type if present.
+        if FIELD_QUESTION in rec and not isinstance(rec[FIELD_QUESTION], str):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                f"'{FIELD_QUESTION}' is "
+                f"{type(rec[FIELD_QUESTION]).__name__}, expected str."
+            )
+        # Duplicate q_idx → ambiguous alignment; abort early (matches §15.7).
+        qid = int(rec[FIELD_QID])
+        if qid in seen_qids:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} duplicate "
+                f"q_idx={qid}; ascending alignment would be ambiguous."
+            )
+        seen_qids.add(qid)
     return records
+
+
+def _load_questions_from_hf_dataset(
+    benchmark: str, q_ids: tuple[int, ...]
+) -> tuple[str, ...]:
+    """Load question text from HuggingFace dataset by q_idx alignment.
+
+    Mirrors §13.10 producer's enumerate-after-select indexing
+    (`scripts/probe_semantic_entropy.py`): q_idx corresponds to row index
+    in the first N rows of the benchmark dataset.
+    """
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise ImportError(
+            "§15.10 question-text fallback requires the `datasets` library. "
+            "Either ensure §13.10 dump records contain a 'question' field "
+            "or install `datasets` on the runpod."
+        ) from exc
+
+    if benchmark == "halueval_qa":
+        ds = load_dataset("pminervini/HaluEval", "qa", split="data")
+    elif benchmark == "truthfulqa_mc":
+        ds = load_dataset("truthful_qa", "multiple_choice", split="validation")
+    else:
+        raise ValueError(f"Unknown benchmark: {benchmark!r}")
+
+    n_max = max(q_ids) + 1 if q_ids else 0
+    if len(ds) < n_max:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: HF dataset for {benchmark} has only "
+            f"{len(ds)} rows; need at least {n_max} for q_idx alignment."
+        )
+    ds = ds.select(range(n_max))
+    return tuple(str(ds[int(q_id)]["question"]) for q_id in q_ids)
 
 
 def load_benchmark_labels(benchmark: str) -> BenchmarkLabels:
@@ -364,6 +424,10 @@ def load_benchmark_labels(benchmark: str) -> BenchmarkLabels:
     Returns BenchmarkLabels with q_ids/questions/correctness aligned by
     record order in the dump. We deliberately do NOT re-sort by q_idx;
     the dump's record order is canonical (matches §15.1/§15.7 convention).
+
+    Question text source: dump's `question` field if present on every
+    record (post-§13-audit-fix dumps); else HF dataset by q_idx alignment
+    (pre-audit-fix or partial dumps).
     """
     if benchmark == "halueval_qa":
         path = INPUT_S13_10_HALUEVAL
@@ -385,8 +449,23 @@ def load_benchmark_labels(benchmark: str) -> BenchmarkLabels:
     records = _validate_s13_10_dump(payload, str(dump_path))
     head = records[:PINNED_N]
     q_ids = tuple(int(r[FIELD_QID]) for r in head)
-    questions = tuple(str(r[FIELD_QUESTION]) for r in head)
     correctness = tuple(bool(r[FIELD_CORRECT]) for r in head)
+
+    has_dump_questions = all(
+        FIELD_QUESTION in r
+        and isinstance(r[FIELD_QUESTION], str)
+        and r[FIELD_QUESTION]
+        for r in head
+    )
+    if has_dump_questions:
+        questions = tuple(str(r[FIELD_QUESTION]) for r in head)
+    else:
+        print(
+            f"  {benchmark}: dump lacks 'question' on at least one record; "
+            f"loading question text from HuggingFace dataset by q_idx.",
+            flush=True,
+        )
+        questions = _load_questions_from_hf_dataset(benchmark, q_ids)
 
     return BenchmarkLabels(
         benchmark=benchmark,
@@ -1192,6 +1271,28 @@ def render_markdown_report(outputs: SupervisedAuditOutputs) -> str:
         f"AND ΔAUC≥+{STRONG_DELTA_AUC_THRESHOLD} (both benchmarks); "
         f"PARTIAL AUC≥{PARTIAL_AUC_THRESHOLD} AND ΔAUC>0 (at least one); "
         f"otherwise NO_MATERIAL\n"
+    )
+
+    lines.append("## Caveats (§0.8-disclosed)\n")
+    lines.append(
+        "- **Prompt format vs §13.10 labeling regime.** §15.10 pinned "
+        "`Q: {question}\\nA:` regardless of how §13.10 generated the "
+        "correctness labels. §13.10's HaluEval producer defaults to "
+        "no-context (matches the pinned format), but `--include-context` "
+        "would prepend the HaluEval `knowledge` passage. Without an "
+        "explicit pin to the §13.10 invocation, we cannot rule out a "
+        "prompt-template mismatch on HaluEval. This is the standard linear "
+        "truth-probe convention; the cascade verdict is binding regardless.\n"
+        "- **Question text source.** Question text used for the Qwen-7B "
+        "forward pass is read from the §13.10 dump's `question` field "
+        "when present on every record, else loaded from the HuggingFace "
+        "dataset by `q_idx` alignment.\n"
+        "- **sklearn API surface.** The probe call passes `penalty='l2'` "
+        "explicitly; sklearn 1.8 deprecated this kwarg (still accepted), "
+        "and sklearn 1.10 will remove it. A targeted FutureWarning filter "
+        "is installed at module load; if the runpod's sklearn ≥ 1.10, the "
+        "script will exit 7 (PROBE_FAILED) with a clear TypeError, "
+        "unambiguously diagnosable.\n"
     )
 
     lines.append("## Audit-trail integrity\n")
