@@ -1385,3 +1385,207 @@ def write_json_output(outputs: PhaseAuditOutputs, path: str) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with Path(path).open("w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, sort_keys=True)
+
+
+# ===========================================================================
+# §15.11 Chunk I-4d — Markdown rendering + firewall-scanned writer.
+#
+# 8-section structure pinned per §15.11 design-doc Chunk 5.
+# ===========================================================================
+
+
+def _format_operating_points_table(ops: tuple[dict, ...]) -> str:
+    lines = [
+        "| α | τ* | κ@α | coverage | cond. acc. | n_admitted | eligible |",
+        "|---|----|-----|----------|------------|------------|----------|",
+    ]
+    for op in ops:
+        tau_str = (
+            f"{op['tau_star']:.4f}"
+            if not math.isnan(op.get("tau_star", float("nan")))
+            else "—"
+        )
+        cond_str = (
+            f"{op['conditional_accuracy_at_tau_star']:.3f}"
+            if not math.isnan(
+                op.get("conditional_accuracy_at_tau_star", float("nan"))
+            )
+            else "—"
+        )
+        lines.append(
+            f"| {op['alpha']:.2f} | {tau_str} | {op['kappa_at_alpha']:.3f} | "
+            f"{op['coverage_at_tau_star']:.3f} | {cond_str} | "
+            f"{op['n_admitted_at_tau_star']} | "
+            f"{'yes' if op['eligible'] else 'no'} |"
+        )
+    return "\n".join(lines)
+
+
+def render_markdown_report(outputs: PhaseAuditOutputs) -> str:
+    """Render the §15.11 markdown report. Output is firewall-scanned by
+    the caller before write."""
+    cv = outputs.cascade_verdict
+    h = outputs.halueval_result
+    t = outputs.truthfulqa_result
+    base = ENTROPY_BASELINE_AUC
+    sup_h = SUPERVISED_AUC_PER_BENCHMARK_PHASE_1["halueval_qa"]
+    sup_t = SUPERVISED_AUC_PER_BENCHMARK_PHASE_1["truthfulqa_mc"]
+    prompt_repr = PROMPT_FORMAT.replace("\n", "\\n")
+
+    lines: list[str] = []
+
+    # Section 1: header.
+    lines.append("# §15.11 Phase 2 — Layer-wise phase-coherence probe (result)\n")
+    lines.append(
+        f"_Schema version: `{outputs.schema_version}`._  \n"
+        f"_Model: `{outputs.qwen_model_id}`; "
+        f"layers used: {outputs.n_layers_used} (embedding + 28 transformer); "
+        f"hidden dim: `{outputs.hidden_dim}`; "
+        f"FFT bins used: W={W} of {N_FREQ_BINS_TOTAL} (DC and Nyquist excluded); "
+        f"prompt format: `{prompt_repr}`._\n"
+    )
+
+    # Section 2: cascade verdict.
+    lines.append("## Cascade verdict (mechanical readout)\n")
+    lines.append(f"**Label:** `{cv.label}`\n")
+    lines.append(f"**Rationale:** {cv.rationale}\n")
+    lines.append(
+        "| benchmark | phase AUC | §13.10 baseline | ΔAUC vs §13.10 | "
+        "§15.10 supervised | ΔAUC vs §15.10 | direction held |\n"
+        "|---|---|---|---|---|---|---|\n"
+        f"| HaluEval-QA | {cv.auc_halueval:.3f} | {base:.3f} | "
+        f"{cv.dauc_halueval:+.3f} | {sup_h:.3f} | "
+        f"{(cv.auc_halueval - sup_h):+.3f} | "
+        f"{'yes' if cv.direction_held_halueval else 'no'} |\n"
+        f"| TruthfulQA-MC | {cv.auc_truthfulqa:.3f} | {base:.3f} | "
+        f"{cv.dauc_truthfulqa:+.3f} | {sup_t:.3f} | "
+        f"{(cv.auc_truthfulqa - sup_t):+.3f} | "
+        f"{'yes' if cv.direction_held_truthfulqa else 'no'} |\n"
+    )
+
+    # Sections 3 & 4: per-benchmark probe details.
+    for label, pr, sup in (
+        ("HaluEval-QA", h, sup_h),
+        ("TruthfulQA-MC", t, sup_t),
+    ):
+        s = pr.coherence_matrix_summary
+        lines.append(f"## Probe details — {label}\n")
+        lines.append(
+            f"- N questions: {pr.n_questions} "
+            f"(correct: {pr.n_correct}, wrong: {pr.n_wrong})\n"
+            f"- π observed: {pr.pi_observed:.3f} "
+            f"(pinned: {PINNED_PI[pr.benchmark]:.3f})\n"
+            f"- Phase-coherence AUC: **{pr.auc_phase:.3f}** "
+            f"(§13.10 baseline: {base:.3f}; "
+            f"ΔAUC vs §13.10: {pr.dauc_phase:+.3f})\n"
+            f"- §15.10 supervised AUC (disclosure): {sup:.3f} "
+            f"(ΔAUC vs §15.10: {pr.dauc_phase_vs_supervised:+.3f})\n"
+            f"- Direction held (AUC ≥ 0.5): "
+            f"**{'yes' if pr.direction_held else 'no'}**\n"
+            f"- Coherence matrix summary (over {s.n_off_diag_entries} "
+            f"off-diagonal entries × {pr.n_questions} questions):\n"
+            f"  - off-diagonal min:  {s.off_diag_min:+.4f}\n"
+            f"  - off-diagonal mean: {s.off_diag_mean:+.4f}\n"
+            f"  - off-diagonal max:  {s.off_diag_max:+.4f}\n"
+            f"  - off-diagonal std:  {s.off_diag_std:.4f}\n"
+        )
+        lines.append("**Selective-prediction operating points (disclosure only):**\n")
+        lines.append(_format_operating_points_table(pr.operating_points))
+        lines.append("")
+
+    # Section 5: pinned configuration.
+    lines.append("## Pinned configuration (§15.11 §0.8-binding)\n")
+    lines.append(
+        f"- **Model:** `{outputs.qwen_model_id}`; all "
+        f"{outputs.n_layers_used} per-layer last-token hidden states "
+        f"(embedding + 28 transformer layers).\n"
+        f"- **Prompt format:** `{prompt_repr}` "
+        f"(matches §15.10 PROMPT_FORMAT).\n"
+        f"- **FFT:** `numpy.fft.rfft` along hidden dim "
+        f"(N={FFT_N} → {N_FREQ_BINS_TOTAL} complex bins); "
+        f"used bins k ∈ [{BIN_RANGE_USED[0]}, {BIN_RANGE_USED[1] - 1}] "
+        f"(W={W}; excludes DC k=0 and Nyquist k={FFT_N // 2}).\n"
+        f"- **Windowing:** {WINDOWING}.\n"
+        f"- **Detrending:** {DETRENDING}.\n"
+        f"- **Coherence formula:** "
+        f"C[i, j] = (1/W) · Σ_k cos(φ_i[k] − φ_j[k]).\n"
+        f"- **Feature aggregation:** {FEATURE_AGGREGATION}.\n"
+        f"- **Direction convention:** {DIRECTION_CONVENTION}.\n"
+        f"- **Cascade thresholds:** STRONG AUC≥{STRONG_AUC_THRESHOLD} "
+        f"AND ΔAUC≥+{STRONG_DELTA_AUC_THRESHOLD} (both benchmarks); "
+        f"PARTIAL AUC≥{PARTIAL_AUC_THRESHOLD} AND ΔAUC>0 (at least one); "
+        f"otherwise NO_MATERIAL. Direction gate: AUC<{DIRECTION_GATE_THRESHOLD} "
+        f"on either benchmark → NO_MATERIAL automatic.\n"
+        f"- **Selective-prediction floor:** N_MIN={N_MIN}; primary "
+        f"alpha = {ALPHA_PRIMARY}.\n"
+    )
+
+    # Section 6: caveats.
+    lines.append("## Caveats (§0.8-disclosed)\n")
+    lines.append(
+        "- **Single mechanism within the phase-coherence class.** This "
+        "tests ONE phase-coherence formula: layer-wise, mean off-diagonal, "
+        "BCVF-faithful direction. A negative result rules out THIS "
+        "instantiation; sample-wise (multi-decode), paraphrase-wise "
+        "(multi-prompt), and alternative aggregations remain untested but "
+        "known.\n"
+        "- **Layer-wise was selected over sample-wise / paraphrase-wise** "
+        "for cost (single forward pass per question) and BCVF-analog "
+        "cleanness (layers as N streams). It is not claimed to be the most "
+        "powerful instantiation.\n"
+        "- **Direction is pinned BCVF-faithful (higher F predicts correct).** "
+        "Wrong-direction outcomes count as failures; no sign-flip rescue.\n"
+        "- **N = 100 per benchmark** (matches §15.10/§13.10). AUC standard "
+        "error at AUC ≈ 0.66 with N=100 is ~0.05–0.06; bands at 0.66 and "
+        "0.75 are hit/miss-able by sampling noise.\n"
+        "- **Single model size: Qwen2.5-7B-Instruct.** Does not speak to "
+        "scaling at 13B / 32B / 70B.\n"
+        "- **Inherited from §15.10:** prompt-format vs §13.10 labeling "
+        f"regime (pinned `{prompt_repr}` regardless of how §13.10 generated "
+        "labels); question-text source (dump field if present, else HF "
+        "dataset by `q_idx`).\n"
+        "- **sklearn API surface (precautionary).** Module-level filter "
+        "for the `penalty` FutureWarning is installed even though §15.11 "
+        "uses only `roc_auc_score` (no LogisticRegression).\n"
+    )
+
+    # Section 7: cross-phase comparison (disclosure only).
+    lines.append("## Cross-phase comparison (disclosure only)\n")
+    lines.append(
+        "Phase 1 (§15.10) verdict-of-record: `PARTIAL_SIGNAL_IN_Z` "
+        "(HaluEval-QA AUC=0.6686, ΔAUC=+0.008; TruthfulQA-MC AUC=0.6224, "
+        "ΔAUC=−0.039 vs §13.10 entropy baseline 0.661).  \n"
+        f"Phase 2 (§15.11) cascade outcome: `{cv.label}` "
+        f"(HaluEval-QA AUC={cv.auc_halueval:.3f}, ΔAUC={cv.dauc_halueval:+.3f}; "
+        f"TruthfulQA-MC AUC={cv.auc_truthfulqa:.3f}, ΔAUC={cv.dauc_truthfulqa:+.3f} "
+        "vs the same baseline).  \n"
+        "This subsection is disclosure only and does not enter either "
+        "phase's cascade decision. Both verdicts are independent §0.8-"
+        "binding mechanical readouts; neither modifies the other.\n"
+    )
+
+    # Section 8: audit-trail integrity.
+    lines.append("## Audit-trail integrity\n")
+    lines.append(
+        "This result is a mechanical readout of the §15.11 cascade applied "
+        "to the per-question phase-coherence scalar F over Qwen-7B's 29 "
+        "per-layer last-token hidden states. Per §0.8 discipline, the "
+        "cascade label is binding regardless of any post-hoc "
+        "interpretation. §15.11 outputs do NOT modify any "
+        "§13/§14/§15.x verdict-of-record (including §13.9's hold and "
+        "§15.10's `PARTIAL_SIGNAL_IN_Z`); those are preserved. The "
+        "interpretation firewall scanned this document for "
+        f"{len(CLASS_3_FORBIDDEN_PATTERNS)} Class-3 forbidden statements "
+        "before write.\n"
+    )
+
+    return "\n".join(lines)
+
+
+def write_markdown_output(outputs: PhaseAuditOutputs, path: str) -> None:
+    """Render markdown, run interpretation firewall, then write."""
+    text = render_markdown_report(outputs)
+    enforce_firewall_or_exit(text, path)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("w", encoding="utf-8") as f:
+        f.write(text)
