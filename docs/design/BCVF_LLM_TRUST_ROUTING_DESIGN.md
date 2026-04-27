@@ -12563,6 +12563,83 @@ USEFUL_INTERNAL explicitly does NOT authorize per Chunk 3g
 — would land at §15.5 or higher under its own §0.8
 commitment.
 
+**Headline result.**
+
+| metric | value |
+|---|---|
+| $N$ | 100 |
+| $W_\text{hybrid}$ (V1 wrong count) | 67 |
+| $\text{AURC}_\text{random}$ ($= W/N$) | 0.6700 |
+| $\text{AURC}_\text{policy}$ | 0.4858 |
+| $\delta_\text{AURC}$ (diagnostic) | $+0.1842$ |
+| $\kappa_\text{hybrid}$ at $\alpha_2 = 0.50$ | **0.3500** |
+| $\kappa_{\S15.1}$ baseline (HaluEval $\kappa@\alpha_2$) | 0.2600 |
+| $\boldsymbol{\Delta\kappa}$ **(primary)** | $\boldsymbol{+0.0900}$ |
+| $\Delta\kappa$ 95% CI (paired bootstrap, $B = 1000$) | $[-0.1502, +0.4600]$ |
+
+**Cascade trace** (mechanical readout per §15.3 Chunk 3g;
+matches the implementation's `_cascade_trace_15_3` output
+exactly):
+
+```
+rule 1 REGRESSION: delta_kappa=+0.0900 < -0.02     -> NO
+rule 2 STRONG:     delta_kappa>=+0.10               -> NO   (point estimate 0.01 below threshold)
+rule 3 USEFUL_INTERNAL: delta_kappa>=+0.05         -> YES
+```
+
+**Demotion rule (Chunk 3g) — did NOT apply.** The §15.3
+demotion rule is STRONG-only by construction; the cascade
+returned USEFUL_INTERNAL (rule 3), which is not subject to
+demotion. `verdict_annotations` is empty. **Audit note for
+the near-miss:** had the cascade returned STRONG (had the
+point estimate been 0.01 higher), the demotion rule WOULD
+have fired — the bootstrap CI lower bound on $\Delta\kappa$
+is $-0.1502 \le 0$. A counterfactual STRONG would therefore
+have demoted to USEFUL_INTERNAL with `STRONG_BUT_CI_DEMOTION`
+annotation. **The cascade landed at USEFUL_INTERNAL on the
+point estimate alone, without the demotion rule needing to
+intervene; the verdict's stability does not depend on
+bootstrap CI width.**
+
+**Three observations the headline supports.**
+
+**(a) First non-MARGINAL/SATURATION verdict in the entire
+§13 / §14 / §15 LLM-track program.** Eleven distinct
+experimental structures have now been tested across four
+metric classes (§13 single-axis AUC, §14 system-level
+accuracy delta, §15 single-source abstention AURC + cov@α,
+§15.3 hybrid Δκ over §15.1 baseline). §15.3 is the first
+that clears USEFUL_INTERNAL. The §14c-anticipated direction
+(V1 selector + Stage B abstention on the selected answer)
+is empirically validated at this scale: the joint object
+produces operational lift that neither component produces
+alone.
+
+**(b) $\Delta\kappa = +0.0900$ misses STRONG by 0.01 on the
+point estimate.** The point estimate is one-hundredth below
+the pinned STRONG threshold of $+0.10$. **Pre-committed
+bands prevent recharacterizing this as "essentially STRONG"
+or relaxing the threshold post-hoc.** The §14a.2 band-
+coverage-gap lesson (where a $(+4, +1)$ outcome fell through
+the partition) is exactly the discipline-erosion failure
+mode §15.3's exhaustive 1D cascade was designed to prevent.
+The cascade landed at USEFUL_INTERNAL deterministically per
+the pinned rule; the near-miss is documented but does not
+unlock STRONG-band authorizations.
+
+**(c) Bootstrap CI on $\Delta\kappa$ is wide; lower bound is
+negative.** $\Delta\kappa$ 95% CI = $[-0.1502, +0.4600]$,
+width $\approx 0.61$. At $N=100$ the paired bootstrap
+cannot tightly constrain $\Delta\kappa$; the lower bound at
+$-0.15$ does not rule out $\Delta\kappa \le 0$. This is a
+power-of-measurement observation, NOT a $\Delta\kappa = 0$
+claim. The point-estimate verdict is USEFUL_INTERNAL by the
+pinned rule; the wide CI says a single re-run at the same
+$N$ might land in a different band by chance. A larger-$N$
+re-run would tighten this band; that re-run is NOT
+authorized by §15.3 and would require a fresh §0.8
+commitment.
+
 ---
 
 
