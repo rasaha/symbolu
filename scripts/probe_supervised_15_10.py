@@ -540,3 +540,302 @@ def load_hidden_states_cache(path: str) -> dict[str, HiddenStateExtraction]:
             d=int(npz[f"{bench}__d"]),
         )
     return extractions
+
+
+# ===========================================================================
+# §15.10 Chunk I-3 — Linear probe (L2 LogisticRegression), 5-fold stratified
+# CV with out-of-fold predictions, AUC + selective-prediction κ@α,
+# cascade classifier.
+#
+# Discipline: probe configuration is pinned (PROBE_PENALTY/PROBE_C/
+# PROBE_MAX_ITER/PROBE_SOLVER). No grid search. No alternative architectures.
+# Single-shot per §15.10.
+# ===========================================================================
+
+
+def _lazy_import_sklearn():
+    """Lazy import of sklearn (StratifiedKFold, LogisticRegression, AUC)."""
+    try:
+        from sklearn.linear_model import LogisticRegression  # noqa: F401
+        from sklearn.metrics import roc_auc_score  # noqa: F401
+        from sklearn.model_selection import StratifiedKFold  # noqa: F401
+        from sklearn.preprocessing import StandardScaler  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "§15.10 probe requires scikit-learn. Install before running."
+        ) from exc
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import roc_auc_score
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.preprocessing import StandardScaler
+
+    return StratifiedKFold, LogisticRegression, StandardScaler, roc_auc_score
+
+
+def _compute_brier(p: np.ndarray, y: np.ndarray) -> float:
+    """Brier score = mean((p - y)^2). Lower is better."""
+    return float(np.mean((p - y.astype(np.float64)) ** 2))
+
+
+def _selective_kappa_at_alpha(
+    p: np.ndarray, y: np.ndarray, alpha: float, pi: float
+) -> tuple[float, float, dict]:
+    """Compute κ@α: max coverage with conditional accuracy ≥ α at the threshold τ*.
+
+    For probe probability p (= P[correct|x]), we sweep candidate thresholds
+    over the unique p values; for each τ we admit {i : p_i ≥ τ} and compute:
+       coverage = |admitted| / N
+       conditional_accuracy = sum(y_i for i in admitted) / |admitted|
+       eligible if |admitted| >= N_MIN AND conditional_accuracy >= alpha
+    κ@α = best coverage among eligible thresholds; tau* = argmax τ.
+
+    The base-rate-adjusted κ-frame matches §15.x convention: the alpha
+    parameter is the *target conditional accuracy* (not the LLR threshold).
+    pi is the population correctness rate (only logged, not used in the
+    eligibility test, since the eligibility test is on conditional
+    accuracy directly).
+    """
+    n = len(p)
+    if n != len(y):
+        raise ValueError("p and y length mismatch")
+    # Candidate thresholds: every observed p plus 0.0 (admit-all sentinel).
+    thresholds = sorted(set([float(0.0)] + [float(v) for v in p]))
+    best_kappa = 0.0
+    best_tau = float("nan")
+    best_cov = 0.0
+    best_cond_acc = float("nan")
+    operating_point: dict = {
+        "alpha": float(alpha),
+        "pi": float(pi),
+        "tau_star": float("nan"),
+        "kappa_at_alpha": 0.0,
+        "coverage_at_tau_star": 0.0,
+        "conditional_accuracy_at_tau_star": float("nan"),
+        "n_admitted_at_tau_star": 0,
+        "eligible": False,
+    }
+    for tau in thresholds:
+        admitted = p >= tau
+        n_adm = int(admitted.sum())
+        if n_adm < N_MIN:
+            continue
+        cond_acc = float(y[admitted].mean())
+        if cond_acc < alpha:
+            continue
+        coverage = n_adm / n
+        if coverage > best_kappa:
+            best_kappa = coverage
+            best_tau = float(tau)
+            best_cov = coverage
+            best_cond_acc = cond_acc
+            operating_point.update(
+                tau_star=float(tau),
+                kappa_at_alpha=float(coverage),
+                coverage_at_tau_star=float(coverage),
+                conditional_accuracy_at_tau_star=float(cond_acc),
+                n_admitted_at_tau_star=int(n_adm),
+                eligible=True,
+            )
+    return best_kappa, best_tau, operating_point
+
+
+def run_probe_for_benchmark(extraction: HiddenStateExtraction) -> ProbeResult:
+    """Train L2 LogisticRegression with 5-fold stratified CV; collect OOF preds.
+
+    Per §15.10:
+      * Penalty L2, C=1.0, lbfgs, max_iter=1000.
+      * 5-fold stratified CV (shuffle=True, random_state=SEED_ENTROPY).
+      * StandardScaler fit per fold on train, applied to val.
+      * OOF predictions used for AUC, accuracy, Brier, κ@α.
+      * Per-fold AUCs collected for cv_std diagnostic.
+    """
+    StratifiedKFold, LogisticRegression, StandardScaler, roc_auc_score = (
+        _lazy_import_sklearn()
+    )
+
+    bench = extraction.benchmark
+    X = extraction.hidden_states.astype(np.float64)  # (N, d)
+    y = extraction.correctness.astype(np.int64)  # (N,)
+    n = X.shape[0]
+
+    if n != PINNED_N:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: extraction for {bench} has N={n}, expected "
+            f"{PINNED_N}."
+        )
+    n_correct = int(y.sum())
+    n_wrong = int(n - n_correct)
+    pi_observed = float(n_correct / n)
+
+    if n_correct < N_FOLDS or n_wrong < N_FOLDS:
+        raise RuntimeError(
+            f"PROBE_INFEASIBLE: {bench} has n_correct={n_correct}, "
+            f"n_wrong={n_wrong}; need at least {N_FOLDS} of each class for "
+            f"{N_FOLDS}-fold stratified CV."
+        )
+
+    skf = StratifiedKFold(
+        n_splits=N_FOLDS, shuffle=True, random_state=SEED_ENTROPY
+    )
+    p_oof = np.full(n, np.nan, dtype=np.float64)
+    fold_aucs: list[float] = []
+
+    for fold_idx, (train_idx, val_idx) in enumerate(skf.split(X, y)):
+        scaler = StandardScaler()
+        X_tr = scaler.fit_transform(X[train_idx])
+        X_va = scaler.transform(X[val_idx])
+        clf = LogisticRegression(
+            penalty=PROBE_PENALTY,
+            C=PROBE_C,
+            solver=PROBE_SOLVER,
+            max_iter=PROBE_MAX_ITER,
+            random_state=SEED_ENTROPY,
+        )
+        clf.fit(X_tr, y[train_idx])
+        p_va = clf.predict_proba(X_va)[:, 1]
+        p_oof[val_idx] = p_va
+        # Per-fold AUC (val-only).
+        try:
+            fold_auc = float(roc_auc_score(y[val_idx], p_va))
+        except ValueError:
+            # Single-class fold val set — should not happen with stratified
+            # splitting, but guard.
+            fold_auc = float("nan")
+        fold_aucs.append(fold_auc)
+
+    if np.isnan(p_oof).any():
+        raise RuntimeError(
+            f"PROBE_INTERNAL: OOF predictions contain NaN for {bench}."
+        )
+
+    auc_oof = float(roc_auc_score(y, p_oof))
+    finite_fold_aucs = [a for a in fold_aucs if not math.isnan(a)]
+    auc_cv_std = float(np.std(finite_fold_aucs, ddof=1)) if len(finite_fold_aucs) >= 2 else float("nan")
+    yhat = (p_oof >= 0.5).astype(np.int64)
+    accuracy_oof = float((yhat == y).mean())
+    brier_oof = _compute_brier(p_oof, y)
+
+    # Operating points: all pinned alphas, plus the §15.10 primary alpha=0.50.
+    alphas = ALPHA_TARGETS_PER_BENCHMARK[bench]
+    operating_points: list[dict] = []
+    primary_kappa = 0.0
+    primary_tau = float("nan")
+    pi_pinned = PINNED_PI[bench]
+    for alpha in alphas:
+        kappa, tau, op = _selective_kappa_at_alpha(p_oof, y, alpha, pi_pinned)
+        operating_points.append(op)
+        if math.isclose(alpha, ALPHA_PRIMARY, abs_tol=1e-9):
+            primary_kappa = kappa
+            primary_tau = tau
+
+    if not any(math.isclose(op["alpha"], ALPHA_PRIMARY, abs_tol=1e-9) for op in operating_points):
+        # Primary alpha not in pinned list for this benchmark — compute
+        # separately so cascade has a value to cite.
+        kappa, tau, op = _selective_kappa_at_alpha(p_oof, y, ALPHA_PRIMARY, pi_pinned)
+        operating_points.append(op)
+        primary_kappa = kappa
+        primary_tau = tau
+
+    return ProbeResult(
+        benchmark=bench,
+        n_questions=n,
+        n_correct=n_correct,
+        n_wrong=n_wrong,
+        pi_observed=pi_observed,
+        auc_oof=auc_oof,
+        fold_aucs=tuple(fold_aucs),
+        auc_cv_std=auc_cv_std,
+        accuracy_oof=accuracy_oof,
+        brier_oof=brier_oof,
+        kappa_at_alpha2=primary_kappa,
+        tau_star_at_alpha2=primary_tau,
+        operating_points=tuple(operating_points),
+        p_oof=tuple(float(v) for v in p_oof),
+    )
+
+
+# ---------------------------------------------------------------------------
+# §15.10 cascade classifier (pinned exhaustive partition).
+# ---------------------------------------------------------------------------
+
+
+def classify_cascade(
+    auc_halueval: float,
+    auc_truthfulqa: float,
+    dauc_halueval: float,
+    dauc_truthfulqa: float,
+) -> CascadeVerdict:
+    """Apply §15.10 cascade. Inclusive thresholds; exhaustive partition.
+
+    STRONG_SIGNAL_IN_Z:
+        AUC ≥ STRONG_AUC_THRESHOLD (0.75) on BOTH benchmarks
+        AND ΔAUC ≥ STRONG_DELTA_AUC_THRESHOLD (+0.05) on BOTH benchmarks.
+
+    PARTIAL_SIGNAL_IN_Z:
+        Not STRONG, AND
+        AUC ≥ PARTIAL_AUC_THRESHOLD (0.66) on at least one benchmark, AND
+        ΔAUC > 0 on at least one benchmark.
+
+    NO_MATERIAL_SIGNAL_IN_Z:
+        Otherwise (the strict complement of the above two).
+    """
+    aucs = (auc_halueval, auc_truthfulqa)
+    dauces = (dauc_halueval, dauc_truthfulqa)
+
+    is_strong = (
+        all(a >= STRONG_AUC_THRESHOLD for a in aucs)
+        and all(d >= STRONG_DELTA_AUC_THRESHOLD for d in dauces)
+    )
+    if is_strong:
+        rationale = (
+            f"STRONG: AUC ≥ {STRONG_AUC_THRESHOLD} on both "
+            f"(HaluEval={auc_halueval:.3f}, TruthfulQA-MC={auc_truthfulqa:.3f}) "
+            f"AND ΔAUC ≥ +{STRONG_DELTA_AUC_THRESHOLD} on both "
+            f"(ΔHaluEval={dauc_halueval:+.3f}, ΔTruthfulQA-MC={dauc_truthfulqa:+.3f})."
+        )
+        return CascadeVerdict(
+            label="STRONG_SIGNAL_IN_Z",
+            auc_halueval=float(auc_halueval),
+            auc_truthfulqa=float(auc_truthfulqa),
+            dauc_halueval=float(dauc_halueval),
+            dauc_truthfulqa=float(dauc_truthfulqa),
+            rationale=rationale,
+        )
+
+    is_partial = (
+        any(a >= PARTIAL_AUC_THRESHOLD for a in aucs)
+        and any(d > 0.0 for d in dauces)
+    )
+    if is_partial:
+        rationale = (
+            f"PARTIAL: not STRONG; AUC ≥ {PARTIAL_AUC_THRESHOLD} on at least "
+            f"one benchmark (HaluEval={auc_halueval:.3f}, "
+            f"TruthfulQA-MC={auc_truthfulqa:.3f}) AND ΔAUC > 0 on at least "
+            f"one benchmark (ΔHaluEval={dauc_halueval:+.3f}, "
+            f"ΔTruthfulQA-MC={dauc_truthfulqa:+.3f})."
+        )
+        return CascadeVerdict(
+            label="PARTIAL_SIGNAL_IN_Z",
+            auc_halueval=float(auc_halueval),
+            auc_truthfulqa=float(auc_truthfulqa),
+            dauc_halueval=float(dauc_halueval),
+            dauc_truthfulqa=float(dauc_truthfulqa),
+            rationale=rationale,
+        )
+
+    rationale = (
+        f"NO_MATERIAL: neither STRONG nor PARTIAL; "
+        f"AUCs (HaluEval={auc_halueval:.3f}, "
+        f"TruthfulQA-MC={auc_truthfulqa:.3f}) and ΔAUCs "
+        f"(ΔHaluEval={dauc_halueval:+.3f}, "
+        f"ΔTruthfulQA-MC={dauc_truthfulqa:+.3f}) fail the cascade entry "
+        f"conditions for STRONG and PARTIAL."
+    )
+    return CascadeVerdict(
+        label="NO_MATERIAL_SIGNAL_IN_Z",
+        auc_halueval=float(auc_halueval),
+        auc_truthfulqa=float(auc_truthfulqa),
+        dauc_halueval=float(dauc_halueval),
+        dauc_truthfulqa=float(dauc_truthfulqa),
+        rationale=rationale,
+    )
