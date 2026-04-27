@@ -15640,6 +15640,114 @@ designed (per Chunk 7d's Stage A / B / Composition decomposition
 spec) to surface. The correction is the §15.7 audit working
 as intended.
 
+**Combined picture across §13 / §14 / §15 + §15.7 audit —
+program now closed at fully-decomposed-mechanism level.**
+
+§15.8 closes the §15 LLM-track program at the diagnostic-
+audit layer. The full §13 / §14 / §15 testing matrix plus
+§15.7's diagnostic decomposition:
+
+| Layer | Program | Verdict | Mechanism (post-§15.7) |
+|---|---|---|---|
+| §13.10 | AUC, single-axis SE baseline | TRUTH_CORRELATED_MARGINAL | (n/a; baseline) |
+| §13.11–§13.18 | AUC, 4 single-axis revisions | 5/5 ANTI under worst-benchmark | (literature-aligned proxy thinness at scale) |
+| §14a / §14a.2 | Δ accuracy, system-level | 2/2 SCOUT_SATURATION | (system-level bandwidth limited at M=3) |
+| §13.20 | AUC, §13.10 N=200 observation | NOISE_BAND_LIFT (TruthfulQA-MC); MARGINAL (HaluEval) | (N=200 mean-reversion; not a §13.10 reclassification) |
+| §15.1 / §15.2 | AURC + cov@α, single-source | MARGINAL | (TruthfulQA-MC base-rate caps κ@α₂ at 0.14) |
+| §15.3 / §15.4 | Δκ vs §15.1 baseline, hybrid HaluEval | USEFUL_INTERNAL | **(§15.7: MIXED — multi-component; no single dominant driver)** |
+| §15.5 / §15.6 | Δκ vs §15.1 baseline, hybrid TruthfulQA-MC | REGRESSION | **(§15.7: C-MISMATCHED — composition failure with sign-flipped correlation on V1-divergent subset)** |
+| **§15.7 / §15.8** | **Diagnostic audit on existing dumps** | **(diagnostic-only; not a verdict)** | **§15.6 mechanism corrected from "Stage A degeneracy" to "composition failure"; §15.4 mechanism documented as MIXED multi-component; sampling-noise PARTIAL** |
+
+**Fourteen distinct experimental structures plus one
+diagnostic audit have now been tested at the 7B + DeBERTa-
+v3-base + N=100 / N=200 configuration.** Zero clear STRONG
+on the worst-benchmark rule. One cleared USEFUL_INTERNAL on
+a single benchmark (§15.4) with multi-component MIXED
+mechanism. One returned REGRESSION on the cross-benchmark
+(§15.6) with C-MISMATCHED composition-failure mechanism. The
+§15.7 diagnostic audit converted the multi-round informal
+critique of §15.6's interpretation into binding §0.8
+diagnostic content, including an explicit empirical
+refutation of one §15.6 informal mechanism hypothesis.
+
+**§13.9 VC-brief hold reaffirmed and strengthened by the
+§15.7 diagnostic finding.** The C-MISMATCHED classification
+on TruthfulQA-MC sharpens §13.9's framing: the cross-
+benchmark hybrid is not just "saturated/regressed at this
+configuration" but specifically "structurally broken on the
+questions where the hybrid's selector matters most." This
+adds mechanistic depth to the §13.9 hold without changing
+its policy. The autonomy-domain BCVF claim (§6.1) stands
+wholly independent of §15.7 / §15.8.
+
+The honest external framing for any internal-research
+referencing of the §13 / §14 / §15 + §15.7 program is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100, no
+> literature-aligned, mechanism-motivated, system-level,
+> single-source-abstention, hybrid-abstention, or cross-
+> benchmark-hybrid-abstention BCVF construction tested in
+> this codebase clears the STRONG combined-classification
+> bar on the worst-benchmark rule. The §15.4 hybrid scout
+> cleared USEFUL_INTERNAL on HaluEval-QA single-benchmark;
+> the §15.7 audit identifies its mechanism as MIXED
+> multi-component (no single dominant driver). The §15.6
+> cross-benchmark companion on TruthfulQA-MC returned
+> REGRESSION, with the §15.7 audit identifying the mechanism
+> as C-MISMATCHED composition failure (sign-flipped
+> correlation on V1-divergent questions). Both verdict-of-
+> records remain binding under §0.8; §15.7's diagnostic
+> findings sharpen the mechanism narrative without changing
+> any verdict band. The LLM hallucination-detection track is
+> closed across fourteen experimental structures and four
+> metric classes, with the §15.7 mechanism decomposition
+> providing the cleanest structural reading of the §13 / §14
+> / §15 program available.*
+
+**§15.8 closes the §15 LLM-track program at the diagnostic-
+audit layer.** Per §15.7 Chunk 7g and the firewall, no
+§15.8.x or §15.9 follow-up is authorized by §15.8. Any
+follow-up — model-scale upgrade, benchmark substitution,
+supervised activation probes, source-construction redesign,
+ensemble risk score, alternative selector, deadband consumer
+— requires a fresh top-level §0.8 commitment with bands
+pinned before any data inspection. None is authorized by
+§15.8.
+
+**The autonomy-domain BCVF claim (§6.1) stands independently
+on the N=21 sign-test that passed in §6.1 / §6.7 and is
+unaffected by any §13 / §14 / §15 / §15.7 outcome.**
+
+**§15.8 chunk roll-up — result section now complete.**
+
+| Chunk | Content |
+|---|---|
+| 8a | Header, three classifications, parity confirmation, §15.6 mechanism correction (verdict band unchanged), cross-program consistency check |
+| 8b | Headline numerical findings (decomposition + operating points + sampling-noise) with three substantive observations including unexpected ρ ≥ ρ* on both benchmarks |
+| 8c | TruthfulQA-MC C-MISMATCHED narrative + explicit §15.6 Chunk 6c hypothesis refutation with audit-trail integrity discipline |
+| 8d | HaluEval MIXED narrative + sampling-noise PARTIAL dual-reading interpretation + mechanism-component combination |
+| 8e | Authorization mapping (Class 1/2/3 compliance) + §0.8 firewall confirmation + run-time deviation check |
+| 8f | Combined §13/§14/§15 + §15.7 picture; §13.9 hold reaffirmed and mechanistically sharpened; §15 LLM-track program closed |
+
+§15.8 implementation source: `scripts/probe_audit_15_7.py`
+output artifacts (`docs/experiments/probe_audit_15_7.{json,md}`);
+all numerical evidence in this section traceable to those
+diagnostic outputs.
+
+**Artifacts.**
+
+- `scripts/probe_audit_15_7.py` (§15.7 implementation;
+  numpy + stdlib + scipy.stats; 1967 lines).
+- `docs/experiments/probe_audit_15_7.json` (machine-readable
+  diagnostic, `schema_version "15.7-diagnostic"`).
+- `docs/experiments/probe_audit_15_7.md` (human-readable
+  diagnostic report; rendered through interpretation
+  firewall).
+
+§15 LLM-track program closed at fully-decomposed-mechanism
+level. §15.8 result section complete (chunks 8a–8f, 6 commits
+on top of the §15.7 pre-commitment + implementation).
+
 ---
 
 
