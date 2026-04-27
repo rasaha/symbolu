@@ -1064,3 +1064,49 @@ def classify_cascade_phase(
         direction_held_truthfulqa=direction_held_t,
         rationale=rationale,
     )
+
+
+# ===========================================================================
+# §15.11 Chunk I-4a — Interpretation firewall (mirrors §15.10's design).
+#
+# Case-insensitive substring match for non-§ patterns; literal match for
+# §-anchored patterns to preserve precise §-numbering.
+# ===========================================================================
+
+
+def scan_for_forbidden_patterns(text: str) -> list[str]:
+    """Return Class-3 forbidden patterns found in `text`.
+
+    Case-insensitive for non-§ patterns; literal (case-sensitive) for
+    §-anchored patterns to preserve precise §-numbering.
+    """
+    found: list[str] = []
+    lowered = text.lower()
+    for pattern in CLASS_3_FORBIDDEN_PATTERNS:
+        if pattern.startswith("§"):
+            if pattern in text:
+                found.append(pattern)
+        else:
+            if pattern.lower() in lowered:
+                found.append(pattern)
+    return found
+
+
+def enforce_firewall_or_exit(text: str, output_path: str) -> None:
+    """Scan `text`; if any Class-3 forbidden patterns are found, print
+    INTERPRETATION_VIOLATION and exit 4 without writing."""
+    violations = scan_for_forbidden_patterns(text)
+    if violations:
+        print(
+            f"INTERPRETATION_VIOLATION: refused to write {output_path}.",
+            flush=True,
+        )
+        print("  detected Class-3 forbidden statement(s):", flush=True)
+        for v in violations:
+            print(f"    - {v!r}", flush=True)
+        print(
+            "  rewrite the offending sentence(s) to remove the override "
+            "language; the §15.11 cascade verdict is binding.",
+            flush=True,
+        )
+        sys.exit(4)
