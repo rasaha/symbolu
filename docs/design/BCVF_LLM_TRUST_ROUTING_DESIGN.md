@@ -13747,6 +13747,131 @@ explicitly cite the producer's flag list (or its absence)
 to prevent assumption-vs-reality drift surfacing at
 execution time.
 
+### 15.6 Result — §15.5 hybrid scout on TruthfulQA-MC returned REGRESSION; cross-benchmark synthesis also REGRESSION
+
+The §15.5 pre-committed hybrid scout has been executed
+end-to-end (Phase 1 GPU producer + Phase 2 CPU post-processor)
+in the runpod container against the TruthfulQA-MC benchmark.
+Combined classification per pre-committed bands:
+**`REGRESSION`** ($\Delta\kappa = -0.0300$,
+$\kappa_\text{hybrid} = 0.11$ vs §15.1 baseline
+$\kappa_{\S15.1,\text{TruthfulQA-MC}} = 0.14$, no
+annotations). The §14a.2-protocol Stage A applied to
+TruthfulQA-MC plus the §15-style abstention gate on V1's
+winning-source semantic-entropy risk score produces a policy
+that is **actively worse than §15.1's single-source
+abstention** on TruthfulQA-MC at the $\alpha_2 = 0.50$
+absolute-majority operating target.
+
+**Cross-benchmark synthesis (DIAGNOSTIC, per Chunk 5e) also
+returned REGRESSION:**
+$$\Delta\kappa_\text{combined} = \min\big(\Delta\kappa_{\S15.4,\text{HaluEval}}, \Delta\kappa_{\S15.5,\text{TruthfulQA-MC}}\big) = \min(+0.0900, -0.0300) = -0.0300$$
+The cross-benchmark verdict is dominated by §15.5's
+TruthfulQA-MC negative value. **This empirically bounds
+§15.4's HaluEval-only USEFUL_INTERNAL as a single-benchmark
+artifact** under the worst-benchmark rule — the hybrid
+construct does NOT generalize cross-benchmark.
+
+This is the **first REGRESSION verdict in the entire
+§13 / §14 / §15 LLM-track program**. §13 was 5/5 ANTI under
+worst-benchmark; §14 was 2/2 `SCOUT_SATURATION`; §15.2 was
+`MARGINAL`; §15.4 was `USEFUL_INTERNAL`. None of those four
+prior verdicts was *actively negative* relative to its
+comparator. §15.6 is.
+
+Per §15.5 Chunk 5g's pinned acceptance/rejection table:
+
+> REGRESSION — Authorizes: closing the §14+§15 hybrid
+> construct on TruthfulQA-MC. The §13 / §14 / §15 closure
+> prose extends to "answer-selection AND single-source
+> abstention AND hybrid all saturated/regressed on
+> TruthfulQA-MC at this configuration." Forecloses: §15.7+
+> follow-up at this observable; product investment;
+> VC-brief changes.
+
+**§13.9 VC-brief hold remains in force and is *strengthened*
+by §15.6.** §15.6 adds another metric class on TruthfulQA-MC
+where the BCVF-derived construction does not clear STRONG —
+in fact, it actively regresses below §15.1's single-source
+baseline. The §13.9 STRONG-band-on-both-benchmarks gate is
+unchanged. The autonomy-domain BCVF claim (§6.1) stands
+independently and is unaffected.
+
+**Parity-gate confirmation (per §15.5 Chunk 5h + Amendment 1).**
+
+| benchmark | N_ok |
+|---|---|
+| truthfulqa_mc | True |
+
+The §15.5 Phase 1 dump
+(`probe_system_level_scout_v2_truthfulqa_mc.json`, produced
+by `scripts/probe_system_level_scout_v2_truthfulqa.py`)
+satisfied $N=100$ on TruthfulQA-MC. Phase 2 schema
+validation (q_idx, sources / per-source semantic_entropy,
+answer_cluster_ids, v1_weights, v1_winning_cluster,
+v1_correct) all passed. The §15.4 verdict-of-record artifact
+read for cross-benchmark synthesis validated against
+`schema_version == "15.3"` AND `benchmark_name == "halueval_qa"`.
+No §0.8 deviation fired at the input layer.
+
+**Self-test gate.** §15.5 Phase 2's required pre-execution
+gate (`--self-test`) ran in the same invocation as real-data
+execution and returned PASSED on all 7 cascade boundary cases
+(Chunk 5g audit table identical to §15.3 Chunk 3g per B1
+framing) and all 7 demotion-rule cases. The 1D cascade
+implementation matches Chunk 5g exactly.
+
+**Cross-program consistency check.** Phase 1 reports
+$\text{acc}(V_1) = \text{acc}(\text{Baseline-A}) = 0.250$ on
+TruthfulQA-MC, matching §13.10's pinned TruthfulQA-MC greedy
+accuracy of 0.250 exactly (Qwen-only). $W_\text{hybrid} = 75$
+matches the §15.1 TruthfulQA-MC W=75 from §15.2's verdict-of-
+record. **V1 selector contributed zero net accuracy on
+TruthfulQA-MC** (Δ V1 vs Baseline-B = +0.00pp per Phase 1
+output) — first §14-domain finding that V1 produces no lift
+on the harder benchmark, in stark contrast to V1's +4pp on
+HaluEval-QA (§14c).
+
+**Phase 1 §14a.2-protocol classification — informational
+only.** `scripts/probe_system_level_scout_v2_truthfulqa.py`
+reported `SCOUT_SATURATION` per the §14a.2 producer's pinned
+`classify()` function. **Per §15.5 Chunk 5h and Amendment 1,
+this label is informational; §15.5 does NOT classify Phase
+1's output against §14a.2 bands.** The §14a.2-on-HaluEval
+verdict-of-record (§14c `SCOUT_SATURATION`) is unchanged;
+§15.6 reports the §14a.2-on-TruthfulQA-MC informational
+classification for cross-program consistency, not as a
+re-classification of §14.
+
+**Artifacts.**
+
+- `scripts/probe_system_level_scout_v2_truthfulqa.py`
+  (§15.5 Phase 1 sibling producer; §0.8 sibling of
+  `probe_system_level_scout_v2.py` with TruthfulQA-MC
+  dataset loading + multi-distractor labeling; §14a.2
+  producer preserved unchanged).
+- `scripts/probe_hybrid_selective_abstention_truthfulqa.py`
+  (§15.5 Phase 2 post-processor; numpy + stdlib only;
+  copies §15.1 / §15.3 metric primitives per §15.5 Chunk 5h).
+- `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+  (Phase 1 per-question dump).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.json`
+  (machine-readable §15.5 result, schema_version `"15.5"`,
+  with `cross_benchmark_synthesis` block).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.md`
+  (human-readable summary).
+
+**Section naming clarification.** §15.5 Chunk 5g's STRONG row
+referenced "§15.6 — full hybrid pre-commitment with both
+benchmarks combined and product-layer scope" as a hypothetical
+authorization for STRONG. STRONG did NOT fire (REGRESSION
+did). The §15.6-as-future-full-hybrid path is therefore moot.
+§15.6 is used here as the §15.5 result section (mirroring
+§15.3 → §15.4 convention). Any future LLM-track follow-up —
+which §15.6's REGRESSION explicitly does NOT authorize per
+Chunk 5g — would land at §15.7 or higher under its own §0.8
+commitment.
+
 ---
 
 
