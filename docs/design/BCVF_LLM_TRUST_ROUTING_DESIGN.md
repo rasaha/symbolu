@@ -14687,6 +14687,125 @@ or §15.6 REGRESSION. It produces interpretive content for
 the §15.7 result section's narrative explanation of WHY the
 verdicts came out as they did.
 
+**§15.6 sampling-noise hypothesis test (pinned, falsifiable).**
+
+The §15.6 verdict (REGRESSION, Δκ = −0.030) was discussed in
+informal critique as plausibly reflecting Stage A degeneracy
+(V1 selecting Qwen on all 100 TruthfulQA-MC questions) +
+sampling stochasticity rather than a substantive hybrid-hurts
+finding. §15.7 converts this informal hypothesis into a
+**pre-committed falsifiable test**.
+
+**The hypothesis (pinned).**
+
+If V1 selects Qwen on every TruthfulQA-MC question (Stage A
+audit confirms), then on TruthfulQA-MC the hybrid's risk
+score $R_S = H_\text{Qwen-K=10}(q)$ is computed from a fresh
+K=10 sample of Qwen on TruthfulQA-MC. §15.1's TruthfulQA-MC
+risk score (used to derive the §15.2-pinned $\kappa = 0.14$
+baseline) was likewise $H_\text{Qwen-K=10}(q)$ from a fresh
+K=10 sample of Qwen on TruthfulQA-MC. **The two scalars are
+the same protocol applied to fresh samples and should be
+distributionally equivalent in expectation.**
+
+**Falsifiable claim:** if the hypothesis is correct, the
+empirical distributions of $R_S$ (from §15.5 Phase 1 dump)
+and the §13.10 TruthfulQA-MC Qwen-K=10 entropies (from the
+now-N=200 §13.10 dump on disk) should be drawn from the same
+underlying distribution.
+
+**Pinned test (two-sample Kolmogorov-Smirnov + summary
+distance metrics).**
+
+Compute on TruthfulQA-MC only (HaluEval included as a
+control where V1 does diverge):
+
+1. **KS two-sample test.** Null hypothesis: §15.6's $R_S$
+   distribution and §13.10's Qwen-K=10 entropy distribution
+   are drawn from the same underlying distribution. Report
+   KS statistic and p-value at α=0.05.
+2. **Summary distance metrics.** Compute on the two
+   distributions:
+   - $|\bar{R}_{15.6} - \bar{R}_{13.10}|$ (mean difference)
+   - $|\sigma_{R_{15.6}} - \sigma_{R_{13.10}}|$ (stdev difference)
+   - $\max_\tau |F_{15.6}(\tau) - F_{13.10}(\tau)|$ (KS distance,
+     same as KS statistic)
+3. **Conditional comparison on Qwen-correctness label.** If
+   V1 selects Qwen on all 100 TruthfulQA-MC questions, then
+   $Y_S = Y_\text{Qwen-greedy}$. Compute the same three
+   distance metrics conditional on $Y = 1$ and on $Y = 0$
+   separately.
+
+**Pinned interpretation rules (§0.8-style; do not redefine
+post-hoc).**
+
+The KS test is reported with its p-value and the claim is
+read mechanically:
+
+- **p > 0.05 AND mean difference < 0.10 nats AND stdev
+  difference < 0.10 nats:** **HYPOTHESIS_SUPPORTED**. The
+  §15.6 risk score distribution is statistically
+  indistinguishable from the §13.10 reference. Combined with
+  a confirmed Stage A V1-picks-Qwen-on-all-100 finding, this
+  empirically confirms the §15.6 sampling-noise reading: the
+  hybrid degenerates to single-source on TruthfulQA-MC; the
+  3pp Δκ gap reflects fresh-sample stochasticity.
+- **p ≤ 0.05 OR either summary distance ≥ 0.10 nats:**
+  **HYPOTHESIS_REFUTED**. The §15.6 risk score distribution
+  is meaningfully different from §13.10's reference. The
+  REGRESSION reading then has a substantive component beyond
+  sampling stochasticity — possibly Stage A or Composition
+  effects.
+- **p > 0.05 AND ANY summary distance ≥ 0.10 nats AND
+  ≤ 0.20 nats:** **HYPOTHESIS_PARTIAL**. Distributions are
+  statistically equivalent at $\alpha = 0.05$ but show
+  modest practical drift; document inline as ambiguous.
+
+**Pinned numerical thresholds rationale.** 0.10 nats is the
+practical-drift bound — meaningful entropy distributions
+differ by 0.05–0.10 nats in §13.10 prose's reported
+between-benchmark mean separations (HaluEval 0.486 vs
+TruthfulQA-MC 0.392 is ~0.094 nats). 0.10 nats is the same
+order as those between-benchmark gaps; drift larger than this
+indicates a non-trivial distributional shift.
+
+**Caveat: §13.10 dumps are now N=200.** Per §13.20 / §15.2
+Postscript, the §13.10 TruthfulQA-MC dump on disk is N=200,
+not the N=100 §15.2 baseline computed against. §15.7's KS
+test uses the N=200 dump as the reference distribution
+because **the test is about distributional shape, not the
+specific N=100 sample**. Larger N gives a more powerful
+reference; if HYPOTHESIS_SUPPORTED fires against the N=200
+reference, it is more conservative than the same test
+against the original N=100 dump would have been. The N=200
+status is documented as an interpretive note in the §15.7
+result, not as a §0.8 deviation.
+
+**§0.8 boundary on the test outcome.**
+
+- **HYPOTHESIS_SUPPORTED** does NOT change the §15.6 verdict
+  from REGRESSION to anything else. The verdict cascade fired
+  on the pinned $\Delta\kappa$ point estimate; the
+  cascade's verdict is binding. HYPOTHESIS_SUPPORTED produces
+  interpretive content of the form: *"the REGRESSION verdict
+  is consistent with sampling-noise-bound stochasticity over
+  a Stage-A-degenerate hybrid; substantive 'hybrid hurts'
+  reading is not supported by the distributional evidence."*
+- **HYPOTHESIS_REFUTED** likewise does not strengthen the
+  §15.6 verdict to a worse band. The verdict remains
+  REGRESSION; HYPOTHESIS_REFUTED produces content of the
+  form: *"REGRESSION reflects substantive distributional
+  drift in the §15.6 risk score relative to §13.10's
+  reference; the hybrid does measurably differ from
+  single-source even on a benchmark where Stage A
+  degenerates."*
+- **HYPOTHESIS_PARTIAL** produces ambiguity-flagging content
+  with both readings explicitly stated.
+
+In all three cases, the §15.6 cascade verdict (REGRESSION)
+remains binding under §0.8. §15.7's hypothesis test informs
+the **interpretation** of that verdict, not the verdict itself.
+
 ---
 
 
