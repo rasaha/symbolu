@@ -13203,6 +13203,78 @@ No primary-plus-secondary, no ensemble, no fallback. Adding
 any alternative would require a fresh §0.8 amendment to
 §15.5.
 
+**Benchmark scope pin (single benchmark; TruthfulQA-MC only).**
+
+§15.5 is a single-benchmark scout on **TruthfulQA-MC** at
+$N = 100$ — the benchmark §15.3 explicitly excluded. Per the
+user-pinned A1 framing (cross-benchmark synthesis as
+diagnostic only), §15.5's verdict cascade fires on
+TruthfulQA-MC's $\Delta\kappa$ alone, structurally parallel
+to §15.3's HaluEval-only cascade.
+
+**Why TruthfulQA-MC, why now.**
+
+1. **§15.3 deferred TruthfulQA-MC by construction.** §15.3
+   Chunk 3e pinned HaluEval-QA-only because the §14a.2 dump
+   existed only on HaluEval. §15.5 closes that gap with a
+   fresh §14a.2 protocol run on TruthfulQA-MC.
+2. **TruthfulQA-MC is the consistent worst-benchmark cap
+   across §13 / §14 / §15.** It defeated 5/5 §13 single-axis
+   classes; §14 deferred it to "full §14 conditional on §14a.2
+   STRONG" which never landed; §15.2's combined-classification
+   was clamped to MARGINAL by TruthfulQA-MC's $\kappa = 0.14$.
+   §15.5 tests whether the §14+§15 hybrid construct that
+   produced §15.4's HaluEval USEFUL_INTERNAL also clears its
+   USEFUL_INTERNAL bar on the harder benchmark.
+3. **High prior of failure, but a clean answer either way.**
+   If §15.5 returns USEFUL_INTERNAL or higher, §15.4's
+   single-benchmark finding generalizes; the cross-benchmark
+   diagnostic synthesis would land USEFUL_INTERNAL or above
+   under the worst-benchmark rule. If §15.5 returns MARGINAL
+   or below, the §15.4 finding is bounded as a HaluEval-only
+   artifact; the cross-benchmark synthesis lands at the
+   worse of {§15.4, §15.5} per the worst-benchmark rule.
+
+**Cross-benchmark synthesis (diagnostic, not band-driving).**
+The §15.5 result section will compute and report the combined
+verdict across §15.4 (HaluEval) and §15.5 (TruthfulQA-MC)
+under the worst-benchmark rule:
+$$
+\Delta\kappa_\text{combined} = \min\big(\Delta\kappa_{\text{HaluEval}}, \Delta\kappa_{\text{TruthfulQA-MC}}\big)
+$$
+with the §15.3 / §15.5 cascade applied to
+$\Delta\kappa_\text{combined}$. **This combined verdict is a
+diagnostic only.** It does NOT re-classify §15.4's HaluEval-
+only USEFUL_INTERNAL or §15.5's TruthfulQA-MC-only verdict.
+It informs whether the §14+§15 hybrid clears USEFUL_INTERNAL
+on a worst-benchmark basis — the bar a future §15.6 product-
+layer commitment would care about — but it is NOT the §15.5
+band-driver under §0.8.
+
+**Implication for §15.6 / §13.9.** A §15.5 STRONG would
+authorize §15.6 (full hybrid pre-commitment with both
+benchmarks combined and product-layer scope). A §15.5
+USEFUL_INTERNAL whose cross-benchmark synthesis also lands
+USEFUL_INTERNAL would likewise unlock a §15.6 commitment as
+a separate §0.8 step. Lower verdicts on §15.5 (MARGINAL,
+SATURATION, REGRESSION) close the §14+§15 hybrid line at the
+configuration. **§13.9 hold remains in force regardless of
+§15.5 outcome** — §15.5's metric class (Δκ vs §15.1
+TruthfulQA-MC baseline of 0.14) is structurally separate
+from §13.9's answer-selection STRONG-band gate, exactly as
+§15.3 / §15.4 were.
+
+**Cherry-picking caveat (acknowledged ex ante).** TruthfulQA-
+MC is the harder of the two benchmarks; running it
+specifically AFTER §15.4's HaluEval USEFUL_INTERNAL could
+look like cherry-picking the second benchmark to confirm a
+positive signal. **§15.5 deliberately runs the harder
+benchmark second precisely because TruthfulQA-MC has been
+the consistent cap; the asymmetry is a known prior of the
+program**, not an artifact of §15.5's setup. The §15.5 bands
+(Chunk 5g) are pinned identical to §15.3's, not relaxed —
+the same operational threshold applies.
+
 ---
 
 
