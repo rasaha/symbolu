@@ -839,3 +839,378 @@ def classify_cascade(
         dauc_truthfulqa=float(dauc_truthfulqa),
         rationale=rationale,
     )
+
+
+# ===========================================================================
+# §15.10 Chunk I-4 — Self-test gate, interpretation firewall, output
+# writers (JSON + markdown).
+#
+# Discipline:
+#   * Self-test is a required pre-execution gate; any failure exits 3.
+#   * Interpretation firewall scans rendered markdown for Class-3 forbidden
+#     statements before write; detection exits 4 (INTERPRETATION_VIOLATION).
+#   * JSON schema_version pinned to "15.10" per §15.10 spec.
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# Self-test gate.
+# ---------------------------------------------------------------------------
+
+
+def _self_test_cascade() -> list[str]:
+    """Run all SELF_TEST_CASCADE_CASES; return list of failure messages."""
+    failures: list[str] = []
+    for i, (auc_h, auc_t, dauc_h, dauc_t, expected) in enumerate(
+        SELF_TEST_CASCADE_CASES
+    ):
+        verdict = classify_cascade(auc_h, auc_t, dauc_h, dauc_t)
+        if verdict.label != expected:
+            failures.append(
+                f"  case {i}: AUC=({auc_h:.3f},{auc_t:.3f}) "
+                f"ΔAUC=({dauc_h:+.3f},{dauc_t:+.3f}) → "
+                f"got {verdict.label!r}, expected {expected!r}"
+            )
+    return failures
+
+
+def _self_test_kappa_at_alpha() -> list[str]:
+    """Smoke-test selective-prediction κ@α on synthetic perfectly-separable
+    and pathological cases."""
+    failures: list[str] = []
+    rng = np.random.default_rng(SEED_ENTROPY)
+
+    # Perfectly separable: p in [0.6, 1.0] for y=1; p in [0.0, 0.4] for y=0.
+    n_each = 50
+    p_pos = rng.uniform(0.6, 1.0, size=n_each)
+    p_neg = rng.uniform(0.0, 0.4, size=n_each)
+    p = np.concatenate([p_pos, p_neg])
+    y = np.concatenate([np.ones(n_each, dtype=np.int64), np.zeros(n_each, dtype=np.int64)])
+    kappa, tau, op = _selective_kappa_at_alpha(p, y, alpha=0.99, pi=0.5)
+    if not (kappa >= 0.40 and op["eligible"]):
+        failures.append(
+            f"  perfectly-separable @ α=0.99: kappa={kappa:.3f}, "
+            f"eligible={op['eligible']} (expected kappa ≥ 0.40, eligible)"
+        )
+
+    # Pathological: random p, target α=0.99 with low base rate → infeasible.
+    p_rand = rng.uniform(0.0, 1.0, size=100)
+    y_low = (rng.uniform(0.0, 1.0, size=100) < 0.05).astype(np.int64)
+    kappa, tau, op = _selective_kappa_at_alpha(p_rand, y_low, alpha=0.99, pi=0.05)
+    if op["eligible"] and op["coverage_at_tau_star"] > 0.50:
+        failures.append(
+            f"  pathological random/low-base-rate @ α=0.99: "
+            f"kappa={kappa:.3f}, eligible={op['eligible']} (expected "
+            f"infeasible or very low coverage)"
+        )
+
+    return failures
+
+
+def _self_test_firewall() -> list[str]:
+    """Verify firewall flags every Class-3 forbidden pattern."""
+    failures: list[str] = []
+    for pattern in CLASS_3_FORBIDDEN_PATTERNS:
+        sample = f"Some innocuous text. {pattern} more text."
+        violations = scan_for_forbidden_patterns(sample)
+        if not violations:
+            failures.append(
+                f"  firewall failed to detect pattern: {pattern!r}"
+            )
+    # Negative case: clean text should produce zero violations.
+    clean = (
+        "The probe AUC is 0.61 on HaluEval-QA, ΔAUC = -0.05. The cascade "
+        "label is NO_MATERIAL_SIGNAL_IN_Z by mechanical readout. The §13.9 "
+        "hold remains binding."
+    )
+    if scan_for_forbidden_patterns(clean):
+        failures.append(
+            "  firewall false-positive on clean text: "
+            f"{scan_for_forbidden_patterns(clean)!r}"
+        )
+    return failures
+
+
+def run_self_test() -> int:
+    """Execute the §15.10 self-test gate; return 0 on success, 3 on failure."""
+    print("§15.10 self-test gate", flush=True)
+    print(f"  schema_version: {SCHEMA_VERSION}", flush=True)
+    print(f"  benchmarks: {BENCHMARKS}", flush=True)
+    print(f"  pinned_N: {PINNED_N}", flush=True)
+    print(f"  baseline AUCs: {BASELINE_AUC_PER_BENCHMARK}", flush=True)
+    print(
+        f"  cascade thresholds: STRONG_AUC≥{STRONG_AUC_THRESHOLD}, "
+        f"STRONG_dAUC≥+{STRONG_DELTA_AUC_THRESHOLD}, "
+        f"PARTIAL_AUC≥{PARTIAL_AUC_THRESHOLD}",
+        flush=True,
+    )
+
+    all_failures: list[str] = []
+
+    print("  [1/3] cascade boundary cases...", flush=True)
+    cascade_fail = _self_test_cascade()
+    if cascade_fail:
+        all_failures.append("CASCADE FAILURES:")
+        all_failures.extend(cascade_fail)
+    else:
+        print(
+            f"    OK: {len(SELF_TEST_CASCADE_CASES)} boundary cases pass.",
+            flush=True,
+        )
+
+    print("  [2/3] selective-prediction κ@α smoke test...", flush=True)
+    kappa_fail = _self_test_kappa_at_alpha()
+    if kappa_fail:
+        all_failures.append("KAPPA FAILURES:")
+        all_failures.extend(kappa_fail)
+    else:
+        print("    OK: κ@α behaves on separable + pathological inputs.", flush=True)
+
+    print("  [3/3] interpretation firewall...", flush=True)
+    firewall_fail = _self_test_firewall()
+    if firewall_fail:
+        all_failures.append("FIREWALL FAILURES:")
+        all_failures.extend(firewall_fail)
+    else:
+        print(
+            f"    OK: firewall flags all {len(CLASS_3_FORBIDDEN_PATTERNS)} "
+            f"Class-3 patterns; clean text passes.",
+            flush=True,
+        )
+
+    if all_failures:
+        print("\nSELF_TEST_FAILED:", flush=True)
+        for line in all_failures:
+            print(line, flush=True)
+        return 3
+    print("\nSELF_TEST_PASSED — proceed.", flush=True)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Interpretation firewall (§15.7-pattern reuse).
+# ---------------------------------------------------------------------------
+
+
+def scan_for_forbidden_patterns(text: str) -> list[str]:
+    """Return the Class-3 forbidden patterns found in `text` (case-insensitive
+    for the BCVF/discipline patterns; literal §-numbered patterns matched
+    case-sensitively to avoid noise)."""
+    found: list[str] = []
+    lowered = text.lower()
+    for pattern in CLASS_3_FORBIDDEN_PATTERNS:
+        if pattern.startswith("§"):
+            # §-anchored patterns: literal match (preserves precise §-numbering).
+            if pattern in text:
+                found.append(pattern)
+        else:
+            if pattern.lower() in lowered:
+                found.append(pattern)
+    return found
+
+
+def enforce_firewall_or_exit(text: str, output_path: str) -> None:
+    """Scan `text`; if any Class-3 forbidden patterns are found, print
+    INTERPRETATION_VIOLATION and exit 4 without writing."""
+    violations = scan_for_forbidden_patterns(text)
+    if violations:
+        print(
+            f"INTERPRETATION_VIOLATION: refused to write {output_path}.",
+            flush=True,
+        )
+        print("  detected Class-3 forbidden statement(s):", flush=True)
+        for v in violations:
+            print(f"    - {v!r}", flush=True)
+        print(
+            "  rewrite the offending sentence(s) to remove the override "
+            "language; the cascade verdict is binding.",
+            flush=True,
+        )
+        sys.exit(4)
+
+
+# ---------------------------------------------------------------------------
+# Output writers — JSON + markdown.
+# ---------------------------------------------------------------------------
+
+
+def _probe_result_to_dict(pr: ProbeResult) -> dict:
+    return {
+        "benchmark": pr.benchmark,
+        "n_questions": pr.n_questions,
+        "n_correct": pr.n_correct,
+        "n_wrong": pr.n_wrong,
+        "pi_observed": pr.pi_observed,
+        "auc_oof": pr.auc_oof,
+        "fold_aucs": list(pr.fold_aucs),
+        "auc_cv_std": pr.auc_cv_std,
+        "accuracy_oof": pr.accuracy_oof,
+        "brier_oof": pr.brier_oof,
+        "kappa_at_alpha_primary": pr.kappa_at_alpha2,
+        "tau_star_at_alpha_primary": pr.tau_star_at_alpha2,
+        "alpha_primary": ALPHA_PRIMARY,
+        "operating_points": list(pr.operating_points),
+        "p_oof": list(pr.p_oof),
+    }
+
+
+def _cascade_verdict_to_dict(cv: CascadeVerdict) -> dict:
+    return {
+        "label": cv.label,
+        "auc_halueval": cv.auc_halueval,
+        "auc_truthfulqa": cv.auc_truthfulqa,
+        "dauc_halueval": cv.dauc_halueval,
+        "dauc_truthfulqa": cv.dauc_truthfulqa,
+        "rationale": cv.rationale,
+    }
+
+
+def write_json_output(outputs: SupervisedAuditOutputs, path: str) -> None:
+    """Serialize SupervisedAuditOutputs to a JSON file."""
+    payload = {
+        "schema_version": outputs.schema_version,
+        "qwen_model_id": outputs.qwen_model_id,
+        "extraction_layer": outputs.extraction_layer,
+        "hidden_dim": outputs.hidden_dim,
+        "pinned_N": PINNED_N,
+        "baseline_auc_per_benchmark": BASELINE_AUC_PER_BENCHMARK,
+        "pinned_pi": PINNED_PI,
+        "cascade_thresholds": {
+            "strong_auc": STRONG_AUC_THRESHOLD,
+            "strong_delta_auc": STRONG_DELTA_AUC_THRESHOLD,
+            "partial_auc": PARTIAL_AUC_THRESHOLD,
+            "no_material_auc_floor": NO_MATERIAL_AUC_FLOOR,
+        },
+        "probe_config": {
+            "penalty": PROBE_PENALTY,
+            "C": PROBE_C,
+            "max_iter": PROBE_MAX_ITER,
+            "solver": PROBE_SOLVER,
+            "n_folds": N_FOLDS,
+            "seed_entropy": SEED_ENTROPY,
+            "n_min": N_MIN,
+            "prompt_format": PROMPT_FORMAT,
+        },
+        "halueval_qa": _probe_result_to_dict(outputs.halueval_probe),
+        "truthfulqa_mc": _probe_result_to_dict(outputs.truthfulqa_probe),
+        "cascade_verdict": _cascade_verdict_to_dict(outputs.cascade_verdict),
+    }
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, sort_keys=True)
+
+
+def _format_operating_points_table(ops: tuple[dict, ...]) -> str:
+    lines = [
+        "| α | τ* | κ@α | coverage | cond. acc. | n_admitted | eligible |",
+        "|---|----|-----|----------|------------|------------|----------|",
+    ]
+    for op in ops:
+        tau_str = (
+            f"{op['tau_star']:.4f}"
+            if not math.isnan(op.get("tau_star", float("nan")))
+            else "—"
+        )
+        cond_str = (
+            f"{op['conditional_accuracy_at_tau_star']:.3f}"
+            if not math.isnan(
+                op.get("conditional_accuracy_at_tau_star", float("nan"))
+            )
+            else "—"
+        )
+        lines.append(
+            f"| {op['alpha']:.2f} | {tau_str} | {op['kappa_at_alpha']:.3f} | "
+            f"{op['coverage_at_tau_star']:.3f} | {cond_str} | "
+            f"{op['n_admitted_at_tau_star']} | "
+            f"{'yes' if op['eligible'] else 'no'} |"
+        )
+    return "\n".join(lines)
+
+
+def render_markdown_report(outputs: SupervisedAuditOutputs) -> str:
+    """Render the §15.10 markdown report. Output is firewall-scanned by the
+    caller before write."""
+    cv = outputs.cascade_verdict
+    h = outputs.halueval_probe
+    t = outputs.truthfulqa_probe
+    base_h = BASELINE_AUC_PER_BENCHMARK["halueval_qa"]
+    base_t = BASELINE_AUC_PER_BENCHMARK["truthfulqa_mc"]
+
+    lines: list[str] = []
+    lines.append("# §15.10 Phase 1 — Supervised linear truth-probe (result)\n")
+    prompt_repr = PROMPT_FORMAT.replace("\n", "\\n")
+    lines.append(
+        f"_Schema version: `{outputs.schema_version}`._  \n"
+        f"_Model: `{outputs.qwen_model_id}`; "
+        f"layer index: `{outputs.extraction_layer}`; "
+        f"hidden dim: `{outputs.hidden_dim}`; "
+        f"prompt format: `{prompt_repr}`._\n"
+    )
+
+    lines.append("## Cascade verdict (mechanical readout)\n")
+    lines.append(f"**Label:** `{cv.label}`\n")
+    lines.append(f"**Rationale:** {cv.rationale}\n")
+    lines.append(
+        "| benchmark | probe AUC (OOF) | §13.10 baseline AUC | ΔAUC |\n"
+        "|---|---|---|---|\n"
+        f"| HaluEval-QA | {cv.auc_halueval:.3f} | {base_h:.3f} | "
+        f"{cv.dauc_halueval:+.3f} |\n"
+        f"| TruthfulQA-MC | {cv.auc_truthfulqa:.3f} | {base_t:.3f} | "
+        f"{cv.dauc_truthfulqa:+.3f} |\n"
+    )
+
+    for label, pr, base in (
+        ("HaluEval-QA", h, base_h),
+        ("TruthfulQA-MC", t, base_t),
+    ):
+        lines.append(f"## Probe details — {label}\n")
+        lines.append(
+            f"- N questions: {pr.n_questions} "
+            f"(correct: {pr.n_correct}, wrong: {pr.n_wrong})\n"
+            f"- π observed: {pr.pi_observed:.3f} "
+            f"(pinned: {PINNED_PI[pr.benchmark]:.3f})\n"
+            f"- Probe OOF AUC: **{pr.auc_oof:.3f}** "
+            f"(§13.10 baseline: {base:.3f}; ΔAUC: {pr.auc_oof - base:+.3f})\n"
+            f"- Per-fold AUCs: {[round(a, 3) for a in pr.fold_aucs]}\n"
+            f"- CV std (AUC): {pr.auc_cv_std:.3f}\n"
+            f"- OOF accuracy @ p≥0.5: {pr.accuracy_oof:.3f}\n"
+            f"- OOF Brier: {pr.brier_oof:.4f}\n"
+        )
+        lines.append("**Selective-prediction operating points:**\n")
+        lines.append(_format_operating_points_table(pr.operating_points))
+        lines.append("")
+
+    lines.append("## Pinned configuration (§15.10 §0.8-binding)\n")
+    lines.append(
+        f"- Probe: L2 LogisticRegression, C={PROBE_C}, solver={PROBE_SOLVER}, "
+        f"max_iter={PROBE_MAX_ITER}\n"
+        f"- CV: {N_FOLDS}-fold stratified, shuffle=True, "
+        f"random_state={SEED_ENTROPY}\n"
+        f"- Per-fold StandardScaler fit on train, applied to val\n"
+        f"- Selective-prediction floor: N_MIN={N_MIN}\n"
+        f"- Cascade thresholds: STRONG AUC≥{STRONG_AUC_THRESHOLD} "
+        f"AND ΔAUC≥+{STRONG_DELTA_AUC_THRESHOLD} (both benchmarks); "
+        f"PARTIAL AUC≥{PARTIAL_AUC_THRESHOLD} AND ΔAUC>0 (at least one); "
+        f"otherwise NO_MATERIAL\n"
+    )
+
+    lines.append("## Audit-trail integrity\n")
+    lines.append(
+        "This result is a mechanical readout of the §15.10 cascade applied "
+        "to OOF probe outputs. Per §0.8 discipline, the cascade label is "
+        "binding regardless of any post-hoc interpretation, and §15.10 "
+        "outputs do NOT modify any §13/§14/§15.x verdict-of-record. The "
+        "interpretation firewall scanned this document for Class-3 "
+        "forbidden statements before write.\n"
+    )
+
+    return "\n".join(lines)
+
+
+def write_markdown_output(outputs: SupervisedAuditOutputs, path: str) -> None:
+    """Render markdown, run interpretation firewall, then write."""
+    text = render_markdown_report(outputs)
+    enforce_firewall_or_exit(text, path)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("w", encoding="utf-8") as f:
+        f.write(text)
