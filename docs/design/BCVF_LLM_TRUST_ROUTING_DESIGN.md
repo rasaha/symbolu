@@ -13446,6 +13446,131 @@ The boundary-inclusivity precisions match §15.3 exactly:
 $\Delta\kappa = -0.020$ is SATURATION; $\Delta\kappa = -0.021$
 is REGRESSION.
 
+**Implementation scope (pinned, two phases: Stage A GPU re-
+run + Stage B CPU post-processor).**
+
+§15.5 reuses closed §14 / §15 components and pinned identical
+configuration to §15.3 modulo benchmark — same "small
+integration layer over closed components" framing as §15.3
+Chunk 3h. Two distinct execution phases:
+
+**Phase 1 — Stage A GPU re-run (~50–60 min on existing
+80 GB GPU).**
+
+Re-run `scripts/probe_system_level_scout_v2.py` with
+benchmark flag set to `truthfulqa_mc`, identical to its
+HaluEval-QA invocation modulo benchmark. Pinned protocol
+(matches §14a.2's pinned cost estimate exactly):
+
+- 3 sources × 100 questions × K=10 stochastic generations =
+  3,000 sampling calls (~30 min on the cached GPU).
+- 3 sources × 100 questions × 1 greedy generation = 300
+  deterministic generations (~5 min).
+- Per-source NLI clustering: 3 × 100 = 300 clustering
+  operations × 90 NLI pairs ≈ ~10 min.
+- Per-question NLI labeling: 4 candidates × 100 questions
+  × 2 NLI calls = 800 calls (~5 min batched).
+- Memory: ~45 GB co-resident in fp16, identical to §13.11 /
+  §14a.2 setup.
+
+Output: `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+(identical schema to the HaluEval-QA dump per
+`scripts/probe_system_level_scout_v2.py`'s JSON writer).
+
+**Phase 1 §0.8 caveat.** §14a.2's verdict-of-record (§14c
+`SCOUT_SATURATION`) was on HaluEval-QA only; running its
+protocol on TruthfulQA-MC is **the first time §14a.2's
+pinned configuration has been exercised on TruthfulQA-MC**.
+This is structurally close to "full §14" which §14c
+foreclosed conditional on §14a.2 STRONG. **§15.5 is NOT a
+"full §14" attempt** — it is using §14a.2's machinery as
+Stage A within the §15.5 selective-prediction metric class
+(operational AURC + cov@α), NOT measuring §14's answer-
+selection accuracy delta. The Phase 1 GPU run produces a
+TruthfulQA-MC dump but §15.5 does NOT classify against §14a.2
+bands; it classifies against §15.5's pinned $\Delta\kappa$
+cascade (Chunk 5g).
+
+**Phase 2 — Stage B CPU post-processor.**
+
+One new script: `scripts/probe_hybrid_selective_abstention_truthfulqa.py`
+(numpy + stdlib only, CPU-only post-processor; structurally
+parallel to `scripts/probe_hybrid_selective_abstention.py`
+modulo benchmark and baseline constant).
+
+Components 1–12 identical in shape to §15.3 Chunk 3h's
+specification, with these §15.5-specific modifications:
+
+1. **Input dump path** changed to
+   `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`.
+2. **Pinned baseline constant** changed to
+   `KAPPA_BASELINE_S15_1 = 0.14` (vs §15.3's 0.26).
+3. **Pinned $\alpha$ targets** changed to $\{0.35, 0.50,
+   0.75\}$ (vs §15.3's $\{0.40, 0.50, 0.75\}$).
+4. **Output paths** changed to
+   `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.{json,md}`.
+5. **`schema_version`** = `"15.5"` (vs §15.3's `"15.3"`).
+6. All other constants (cascade thresholds, bootstrap config,
+   demotion rule, $n_\min$) identical to §15.3.
+
+**Reuse from §15.3 (primitives copied, NOT imported).** Same
+copy-not-import discipline as §15.3 Chunk 3h: §15.5's script
+copies §15.3's metric primitives verbatim rather than
+importing from `probe_hybrid_selective_abstention.py`.
+§15.4's verdict-of-record artifacts are preserved unchanged.
+
+**Cross-benchmark synthesis (Stage B Phase 2 reporting).**
+The §15.5 result section will compute:
+
+$$
+\Delta\kappa_\text{combined} = \min(\Delta\kappa_{\text{HaluEval}}, \Delta\kappa_{\text{TruthfulQA-MC}})
+$$
+
+with the §15.3 / §15.5 cascade applied as a **diagnostic**.
+$\Delta\kappa_{\text{HaluEval}} = +0.0900$ is read from
+`docs/experiments/probe_hybrid_selective_abstention.json`
+(§15.4 verdict-of-record). $\Delta\kappa_{\text{TruthfulQA-MC}}$
+is computed by §15.5's Phase 2. Combined verdict reported
+alongside §15.5's per-benchmark verdict; does NOT re-classify
+either.
+
+**Engineering cost (estimated).**
+
+- **Phase 1:** ~50–60 min GPU on cached models. Identical to
+  §14a.2's pinned cost.
+- **Phase 2:** ~400–600 lines of new code (with the same
+  $\sim$1098-line audit-lesson caveat from §15.4 Chunk 4e —
+  copy-not-import duplication may push actual closer to
+  §15.3's size). CPU only; under 30 sec wall clock at N=100
+  with B=1000 bootstrap.
+- **Total wall clock end-to-end:** ~1 hour after §15.5
+  pre-commitment lands.
+
+**Output paths (pinned).**
+
+- `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+  (Stage A dump from Phase 1 GPU run).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.json`
+  (Stage B machine-readable, `schema_version` `"15.5"`).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.md`
+  (Stage B human-readable summary).
+
+**What §15.5 implementation explicitly does NOT authorize.**
+
+- Modifying `scripts/probe_system_level_scout_v2.py` (§14a.2's
+  pinned producer; preserved verbatim).
+- Modifying `scripts/probe_selective_abstention.py` (§15.1's
+  pinned codepath).
+- Modifying `scripts/probe_hybrid_selective_abstention.py`
+  (§15.3's pinned codepath; §15.4 verdict-of-record
+  artifact).
+- Re-running §14a.2 on HaluEval-QA (§15.4 dump preserved).
+- Re-running §15.1 on TruthfulQA-MC (§15.2 baseline κ=0.14
+  remains the pinned constant).
+- Adding TruthfulQA-Generation, TriviaQA, or any benchmark
+  beyond TruthfulQA-MC.
+- Auto-promoting any verdict to §15.6.
+
 ---
 
 
