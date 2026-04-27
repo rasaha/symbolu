@@ -16162,5 +16162,107 @@ section follows the real-data run.
 ---
 
 
+### 15.11 Pre-commitment — Phase 2 of final-resolution sprint: layer-wise phase-coherence probe (DAY-LONG; bounded; one shot)
+
+**§0.8 declaration.**
+
+§15.11 is Phase 2 of the bounded 3-phase final-resolution
+sprint authorized at the close of §15.10
+(`PARTIAL_SIGNAL_IN_Z`; HaluEval ΔAUC = +0.0076,
+TruthfulQA-MC ΔAUC = −0.0386; per
+`docs/experiments/probe_supervised_15_10.{json,md}`).
+
+This is a fresh §0.8 commitment. §15.11 outputs do **NOT**
+modify any §13/§14/§15.x verdict-of-record, including §15.10's
+PARTIAL readout, §15.6's REGRESSION, §15.8's MIXED +
+C-MISMATCHED, or the §13.9 hold. Bands, formula, features, and
+self-test boundary cases are pinned ex ante in this section;
+data inspection follows. Single shot — no iteration on the
+formula, layer subsets, FFT windows, or feature aggregations
+once this section is sealed.
+
+**Position — what §15.11 is and is not.**
+
+§15.11 tests whether **layer-wise phase coherence** over
+Qwen-7B's per-layer last-token hidden states distinguishes
+correct from incorrect answers in a way that:
+
+- the §13.10 entropy baseline (AUC = 0.661 on both benchmarks)
+  failed to extract, and
+- the §15.10 supervised linear probe (AUC = 0.669 / 0.622)
+  failed to extract.
+
+The mechanism class is **cross-layer spectral phase relationship**:
+at each question, the 29 per-layer last-token hidden states
+(embedding output + 28 transformer-layer outputs) are FFT'd along
+the hidden dimension, and a pairwise phase-coherence matrix is
+built per the formula
+
+> **C[i, j] = (1 / W) · Σ_k cos(φ_i[k] − φ_j[k])**
+
+where φ_i[k] is the phase at frequency-bin k of FFT(h_i) for
+layer i, and W is the number of frequency bins used (pinned
+in the formula block below). A single scalar feature per
+question is derived from C and tested against correctness.
+
+**Why this mechanism (§0.8-disclosed).**
+
+§15.10 tested whether truth signal is **linearly extractable
+from a single layer**. The PARTIAL-by-hair result with one
+benchmark regressing below baseline is consistent with — but
+does not prove — the hypothesis that truth signal in 7B
+hidden states is at-or-below the entropy ceiling under linear
+extraction.
+
+§15.11 tests a fundamentally **different mechanism class**:
+whether truth signal is encoded in the **non-linear, multi-
+scale phase relationship across layers**. This is the closest
+LLM analog to BCVF's autonomy-domain mechanism (§6.1, N=21
+sign-test): in autonomy, phase coherence between two
+bidirectional-check streams identified correct decisions; in
+LLMs, the analogous "streams" are the model's evolving
+representations across depth.
+
+This mechanism is **not reducible** to either §13.10 (which
+only used token-level entropy) or §15.10 (which used a single
+layer's linear projection). A negative result here, combined
+with §15.10's PARTIAL, would be strong joint evidence that 7B
+hidden states do not contain extractable truth signal under
+any of the canonical mechanism classes (entropy / linear /
+phase-coherence). A positive result would identify phase
+coherence as the BCVF-faithful transfer mechanism.
+
+**What §15.11 does NOT do.**
+
+- Does NOT re-classify §15.10's `PARTIAL_SIGNAL_IN_Z`,
+  §15.x's bands, or §13.9's hold.
+- Does NOT iterate on the formula, the FFT length, the
+  layer subset used, or the feature aggregation. All are
+  pinned in the formula block below.
+- Does NOT use any §15.11 data to amend Phase 1's outputs.
+- Does NOT authorize Phase 3 (`§15.12` final synthesis +
+  autonomy handoff). Phase 3 requires its own §0.8 commitment
+  and is gated on Phase 2's mechanical cascade output.
+
+**Dependencies and re-extraction note.**
+
+- **Model.** Qwen/Qwen2.5-7B-Instruct, same as §15.10.
+- **Labels.** Same §13.10 dumps, first PINNED_N = 100
+  records per benchmark.
+- **Prompt format.** `Q: {question}\nA:` (matches §15.10's
+  pinned PROMPT_FORMAT).
+- **Hidden-state cache.** §15.10's cache
+  (`hidden_states_qwen_15_10.npz`) is layer = −1 only and is
+  **insufficient** for §15.11 — phase coherence across layers
+  requires all 29 hidden states per question. **A new GPU
+  re-extraction is required**, producing a new cache
+  (`hidden_states_all_layers_qwen_15_11.npz`). Approximate
+  runtime on the same GPU: same as §15.10 extraction (~5–10
+  min per benchmark, 200 forward passes total). Storage:
+  ~41 MB per benchmark in fp32.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
