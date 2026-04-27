@@ -14101,6 +14101,80 @@ $\alpha_3$ requires a higher base-model accuracy floor
 (model-scale upgrade per §13.8 future-work, never
 authorized), not abstention-layer tuning.**
 
+**What §15.6 authorizes (per §15.5 Chunk 5g REGRESSION row).**
+
+The §15.5-pinned acceptance/rejection mapping for REGRESSION
+is binding under §0.8. Reproduced exactly:
+
+| §15.6 verdict | Authorizes | Forecloses |
+|---|---|---|
+| REGRESSION | Closing the §14+§15 hybrid construct on TruthfulQA-MC. The §13 / §14 / §15 closure prose extends to "answer-selection AND single-source abstention AND hybrid all saturated/regressed on TruthfulQA-MC at this configuration." | §15.7+ follow-up at this observable; product investment; VC-brief changes; cross-benchmark deployment claims. |
+
+Specifically, §15.6 **authorizes**:
+
+- Documenting the §15.5 verdict-of-record in this section
+  (which §15.6 itself accomplishes).
+- Recording $\Delta\kappa = -0.0300$, $\kappa_\text{hybrid} =
+  0.11$, the operating-point degeneracy at $\alpha_1 / \alpha_2$,
+  the bootstrap CI, and the cross-benchmark synthesis as the
+  §15.6 verdict-of-record.
+- Citing §15.6 as the **first REGRESSION verdict** in the
+  §13 / §14 / §15 program — bounding §15.4's HaluEval
+  USEFUL_INTERNAL as a single-benchmark artifact under the
+  worst-benchmark rule.
+- Closing the §14+§15 hybrid construct at this configuration
+  (single-benchmark scope on TruthfulQA-MC; cross-benchmark
+  synthesis combined REGRESSION).
+
+§15.6 explicitly **does NOT authorize**:
+
+- **§15.7+ follow-up.** No further §14+§15 hybrid probe at
+  this configuration. A cross-benchmark deployment claim
+  required §15.5 STRONG (or USEFUL_INTERNAL with combined
+  USEFUL_INTERNAL synthesis); both paths foreclosed.
+- **Product-readiness claims.** REGRESSION is below SATURATION;
+  the hybrid is *worse* than §15.1's single-source abstention
+  on TruthfulQA-MC. Product investment over a known-regressing
+  policy is not authorized.
+- **VC-brief updates.** §13.9 hold remains in force,
+  *strengthened* by §15.6's confirmation that the cross-
+  benchmark hybrid does not generalize. §15.6's metric class
+  is structurally separate from §13.9's gate (different
+  measurement object), but the substantive direction is
+  unambiguous: another metric class did not clear STRONG; one
+  actively regressed.
+- **Reframing of any §13 / §14 / §15.x verdict.** §15.6 is
+  on a fresh metric class and does not interact with §13's
+  ANTI verdicts, §14's SCOUT_SATURATION, §15.2's MARGINAL,
+  §15.4's USEFUL_INTERNAL, or §13.20's NOISE_BAND_LIFT
+  observation. Each remains binding at its pinned
+  configuration.
+- **Re-classifying §15.4 based on §15.6 cross-benchmark
+  synthesis.** The cross-benchmark synthesis is explicitly
+  diagnostic per Chunk 5e; §15.4's HaluEval-only
+  USEFUL_INTERNAL verdict-of-record is preserved unchanged.
+  §15.6 documents the cross-benchmark synthesis as a
+  derived comparator, not as a §15.4 amendment.
+- **Cross-domain claims.** Autonomy-domain BCVF (§6.1)
+  stands wholly independent of §15.6. The N=21 sign-test
+  result that passed in §6.1 / §6.7 is a robotics-domain
+  validation on a different dataset, different predictor
+  set, and different metric class entirely.
+
+**No deviation flag fired during the §15.5 run.** Per §15.5
+Chunk 5h's "Any deviation discovered at run time must be
+flagged in the §15.6 result section as a §0.8 deviation":
+the run produced no such deviation. Phase 1 (§14a.2 sibling
+producer on TruthfulQA-MC) ran cleanly, output schema matched
+the new sibling-producer's pinned schema, parity gate green;
+Phase 2 self-test passed in-run, schema validation on both
+the Phase 1 dump and the §15.4 cross-benchmark artifact
+green, the cascade fired exactly per `_cascade_trace_15_5`.
+The two §15.5 amendments (line-count drift acknowledgment
+deferred to §15.4, sibling-producer creation per Amendment 1)
+landed pre-execution and are documented within §15.5 itself,
+not as run-time deviations.
+
 ---
 
 
