@@ -14927,6 +14927,109 @@ narrative substitutions.
 
 This is the §15.7 firewall against soft-override drift.
 
+**Implementation scope (pinned).**
+
+§15.7 is implementable as a single CPU-only post-processing
+script with no new compute, mirroring the §15.1 / §15.3 /
+§15.5 Phase 2 pattern.
+
+**New script:** `scripts/probe_audit_15_7.py` (numpy +
+stdlib + scipy.stats only — scipy is added as a dependency
+ONLY for the KS two-sample test in Chunk 7e; if scipy is
+not available, fall back to a numpy-only KS implementation
+documented inline). No GPU, no transformers, no torch, no
+network access.
+
+**Reuse from §15.1 / §15.3 / §15.5 (primitives copied, NOT
+imported).** Same copy-not-import discipline as §15.5 Chunk
+5h: §15.7's script copies the relevant metric primitives
+from prior scripts (sweep grid, NaN-safe acc/cov computation,
+deterministic question-id sort with lexsort tiebreak)
+verbatim. Importing from prior scripts would couple §15.7
+to any future drift in those closed scripts.
+
+**Component spec (~700–1000 lines estimated):**
+
+1. **Schema validators** for the four input artifacts per
+   Chunk 7b's pinned field expectations.
+2. **§14a.2 dump loader** with Stage A handoff extraction
+   (per-question $S(q), Y_S(q), R_S(q), Y_\text{Baseline-A}(q)$).
+3. **§13.10 dump loader** for distributional comparison
+   (per-question Qwen entropy + correctness label).
+4. **§15.2 verdict-of-record loader** for pinned baseline
+   $\kappa$ values.
+5. **Diagnostic curve computation** (Chunk 7c): $F_1, F_0,
+   \Delta, \rho, p, c$ over the empirical threshold grid;
+   step-size audit; base-rate-adjusted $\rho^*$ per
+   configuration.
+6. **Stage A / B / Composition decomposition** (Chunk 7d):
+   V1 selection identity histogram; V1-divergent set $D$
+   metrics; Stage A net lift; Stage B class-conditional
+   stats; Composition correlation comparison on $D$ vs
+   $\bar{D}$.
+7. **Diagnostic decision-tree classifier** (Chunk 7d) that
+   maps the decomposition outputs into one of A-DEGENERATE
+   / B-INSUFFICIENT / C-MISMATCHED / MIXED per benchmark.
+8. **§15.6 sampling-noise hypothesis test** (Chunk 7e):
+   KS two-sample test, summary distance metrics,
+   conditional comparison; classify into HYPOTHESIS_SUPPORTED
+   / HYPOTHESIS_REFUTED / HYPOTHESIS_PARTIAL per pinned
+   thresholds.
+9. **Interpretation-firewall enforcement** (Chunk 7f): the
+   markdown report writer accepts only one of the four
+   pinned templates per (benchmark, verdict) pair; emits
+   `INTERPRETATION_VIOLATION` and aborts if Class-3
+   forbidden statements appear in the rendered output.
+10. **Self-test gate** (`--self-test`): verifies the
+    diagnostic decision-tree classifier and the sampling-
+    noise classifier on synthetic boundary cases mirroring
+    the §15.7 Chunks 7d / 7e pinned thresholds. Required
+    pre-execution gate.
+11. **Output writers:** JSON + markdown per Chunk 7g paths.
+
+**Self-test boundary cases (pinned).**
+
+For the diagnostic decision-tree classifier, pinned synthetic
+inputs:
+
+- A-DEGENERATE input: V1 selects same source on all 100
+  questions; $\Delta_A = 0$; $|D| = 0$ → expected verdict
+  A-DEGENERATE.
+- B-INSUFFICIENT input: $\rho_S(\tau^*) = 1.5$ vs
+  $\rho^*(\alpha_2, \pi=0.30) = 2.33$ at any qualifying
+  $\tau$ → expected B-INSUFFICIENT.
+- C-MISMATCHED input: correlation on $\bar{D}$ = +0.4,
+  correlation on $D$ = +0.05 (≥ 0.3 gap) → expected
+  C-MISMATCHED.
+- MIXED input: multiple criteria fire → expected MIXED.
+
+For the sampling-noise classifier:
+
+- SUPPORTED input: KS p = 0.5, mean_diff = 0.05, stdev_diff
+  = 0.05 → HYPOTHESIS_SUPPORTED.
+- REFUTED input: KS p = 0.001, mean_diff = 0.30 → REFUTED.
+- PARTIAL input: KS p = 0.5, mean_diff = 0.15 → PARTIAL.
+
+**Engineering cost:**
+
+- ~700–1000 lines of new code (with copy-from-§15.x
+  duplication accounted for, per the §15.4 Chunk 4e drift-
+  acknowledgment lesson).
+- numpy + Python stdlib + (optional) scipy.stats. CPU only.
+- Wall-clock cost of real-data run: under 60 seconds.
+
+**Output paths (pinned).**
+
+- `docs/experiments/probe_audit_15_7.json` (machine-readable;
+  `schema_version` `"15.7-diagnostic"`).
+- `docs/experiments/probe_audit_15_7.md` (human-readable
+  diagnostic report).
+
+Both artifacts are flagged at the top with explicit text
+indicating they are §15.7 diagnostic-only outputs and do
+NOT constitute a new verdict-of-record. The interpretation
+firewall (Chunk 7f) is enforced at write time.
+
 ---
 
 
