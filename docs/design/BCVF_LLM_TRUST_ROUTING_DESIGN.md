@@ -12701,6 +12701,61 @@ $\alpha_2$: the hybrid extends the operational frontier
 across the lower-$\alpha$ range. The improvement
 disappears at $\alpha_3 = 0.75$ (next chunk).
 
+**Deployment-grade ceiling — $\alpha_3 = 0.75$ degeneracy
+carries over from §15.2.**
+
+The §15.4 operating point at $\alpha_3 = 0.75$:
+
+| benchmark | $\alpha_3$ | $\text{cov}@\alpha_3$ | $\tau^*$ | ecr | far |
+|---|---|---|---|---|---|
+| §15.4 hybrid (HaluEval) | 0.75 | **0.00** | $+\infty$ | NaN | NaN |
+| §15.2 single-source (HaluEval) | 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+| §15.2 single-source (TruthfulQA-MC) | 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+
+**No threshold $\tau$ in the §15.4 sweep grid (102 points)
+yields acc $\ge 0.75$ on an answered subset of size $\ge
+n_\min = 10$.** Same hard ceiling §15.2 documented across
+both benchmarks — abstention alone, even with V1's selector
+in front of it, **cannot reach a deployment-grade $\alpha
+\ge 0.75$ subset** at this configuration.
+
+**Three implications.**
+
+**(a) The hybrid's USEFUL_INTERNAL verdict is real but
+operationally bounded.** The lift at $\alpha_1 = 0.40$ and
+$\alpha_2 = 0.50$ is genuine and measurable; the lift at
+$\alpha_3 = 0.75$ is identically zero (both policies fail).
+Any future product layer over this hybrid would have to
+operate at $\alpha < 0.75$ — i.e., accept a residual
+accuracy floor below 75% on the answered subset. **Whether
+that floor is operationally acceptable is a product
+question §15.3's USEFUL_INTERNAL does not answer and
+explicitly does NOT authorize §15 to opine on.**
+
+**(b) The mechanism §15.2 Chunk 2d documented persists.**
+At greedy accuracies in the 0.25–0.33 range, the entropy
+distribution does not contain a high-confidence subset
+dense enough to support both $\text{acc} \ge 0.75$ AND
+$|A_\tau| \ge 10$. Adding V1's selector (which lifts
+greedy from 0.30 to 0.33 on HaluEval per §14a.2) does not
+move the needle far enough to unlock $\alpha_3$. **A
+deployment-grade ceiling requires either a higher base-
+model accuracy floor (model-scale upgrade per §13.8 future-
+work) or a larger-$N$ target-accuracy subset that survives
+the entropy threshold.** Neither is in §15.3 / §15.4 scope.
+
+**(c) The §15 metric class is partially saturated even
+inside USEFUL_INTERNAL.** §15.4 USEFUL_INTERNAL covers
+$\alpha_1$ and $\alpha_2$; $\alpha_3$ is unreachable.
+Pre-committed bands do not distinguish "USEFUL_INTERNAL at
+two of three operating points" from "USEFUL_INTERNAL at
+all three" — the cascade is driven by $\Delta\kappa$ at
+$\alpha_2$ alone per Chunk 3g. **This is by design**: §15.3
+narrowed the verdict to one scalar to prevent secondary-
+metric overreading. The $\alpha_3$ degeneracy is reported
+as a diagnostic and bounds the operational claim, but does
+not re-classify the verdict.
+
 ---
 
 
