@@ -16648,5 +16648,201 @@ and middling-no-signal.
 ---
 
 
+### 15.11 Pre-commitment (continued) — Pinned outputs (paths, JSON, markdown, firewall, exit codes, self-test)
+
+**Pinned output paths.**
+
+```
+docs/experiments/hidden_states_all_layers_qwen_15_11.npz   # cache (re-extraction)
+docs/experiments/probe_phase_coherence_15_11.json          # machine-readable
+docs/experiments/probe_phase_coherence_15_11.md            # human-readable
+```
+
+The hidden-state cache is a **separate file** from §15.10's
+`hidden_states_qwen_15_10.npz` (which holds layer −1 only).
+§15.11's cache holds all 29 layers and is required for
+re-runs in `--probe-only` mode. PINNED.
+
+**Pinned JSON schema (`schema_version = "15.11"`).**
+
+Top-level keys (alphabetical for `sort_keys=True` parity with
+§15.10):
+
+```
+{
+  "alpha_targets_per_benchmark": {...},
+  "baseline_auc_per_benchmark": {"halueval_qa": 0.661,
+                                 "truthfulqa_mc": 0.661},
+  "cascade_thresholds": {
+    "strong_auc": 0.75,
+    "strong_delta_auc": 0.05,
+    "partial_auc": 0.66,
+    "direction_gate_threshold": 0.5,
+    "entropy_baseline_auc": 0.661
+  },
+  "cascade_verdict": {
+    "label": "<STRONG|PARTIAL|NO_MATERIAL>_SIGNAL_IN_PHASE_COHERENCE",
+    "auc_halueval": <float>,
+    "auc_truthfulqa": <float>,
+    "dauc_halueval": <float>,
+    "dauc_truthfulqa": <float>,
+    "direction_held_halueval": <bool>,
+    "direction_held_truthfulqa": <bool>,
+    "rationale": "<formatted prose>"
+  },
+  "extraction_layer": "all_29",
+  "halueval_qa": { ... },          // per-benchmark block, schema below
+  "hidden_dim": 3584,
+  "n_layers_used": 29,
+  "phase_coherence_config": {
+    "fft_n": 3584,
+    "n_freq_bins_total": 1793,
+    "n_freq_bins_used": 1791,
+    "bin_range_excluded": "DC (k=0) and Nyquist (k=1792)",
+    "windowing": "rectangular (none)",
+    "detrending": "none",
+    "feature_aggregation": "mean over upper-triangular off-diagonal of 29x29 C (406 entries)",
+    "direction_convention": "higher F predicts correct (BCVF-faithful)"
+  },
+  "pinned_N": 100,
+  "pinned_pi": {"halueval_qa": 0.3, "truthfulqa_mc": 0.25},
+  "qwen_model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "schema_version": "15.11",
+  "supervised_auc_per_benchmark_phase_1": {
+    "halueval_qa": 0.6685714285714286,
+    "truthfulqa_mc": 0.6224
+  },
+  "truthfulqa_mc": { ... }
+}
+```
+
+**Per-benchmark block** (schema for both `halueval_qa` and
+`truthfulqa_mc`):
+
+```
+{
+  "benchmark": "<benchmark>",
+  "n_questions": 100,
+  "n_correct": <int>,
+  "n_wrong": <int>,
+  "pi_observed": <float>,
+  "auc_phase": <float>,
+  "auc_baseline": 0.661,
+  "dauc_phase": <float>,
+  "auc_supervised_phase_1": <float>,            // disclosure only
+  "dauc_phase_vs_supervised": <float>,          // disclosure only
+  "direction_held": <bool>,                     // auc_phase >= 0.5
+  "f_per_question": [<100 floats>],
+  "coherence_matrix_summary": {
+    "off_diag_min": <float>,
+    "off_diag_mean": <float>,
+    "off_diag_max": <float>,
+    "off_diag_std": <float>,
+    "n_off_diag_entries": 406
+  },
+  "selective_prediction_operating_points": [...],
+  "kappa_at_alpha_primary": <float>,            // alpha = 0.50
+  "tau_star_at_alpha_primary": <float>,
+  "alpha_primary": 0.5
+}
+```
+
+PINNED. No additional keys; no key removal except for keys
+explicitly marked optional.
+
+**Pinned markdown structure (`probe_phase_coherence_15_11.md`).**
+
+Sections in order:
+
+1. `# §15.11 Phase 2 — Layer-wise phase-coherence probe (result)`
+   (header + schema version + model + extraction config one-liner).
+2. `## Cascade verdict (mechanical readout)` (label, rationale,
+   AUC table including ΔAUC vs §13.10 baseline AND vs §15.10
+   supervised, direction_held flags).
+3. `## Probe details — HaluEval-QA` (n, π, AUC, ΔAUC vs both
+   references, direction_held, F-distribution summary,
+   coherence matrix summary, selective-prediction
+   operating-points table).
+4. `## Probe details — TruthfulQA-MC` (same structure).
+5. `## Pinned configuration (§15.11 §0.8-binding)` (FFT, W,
+   layer subset, formula, feature aggregation, direction
+   convention, cascade thresholds).
+6. `## Caveats (§0.8-disclosed)` (see firewall patterns
+   below; also re-states the prompt-format / question-source
+   caveats from §15.10 since they apply identically to
+   Phase 2).
+7. `## Cross-phase comparison (disclosure only)` (one-line
+   summary of Phase 1 vs Phase 2 cascade outputs; no
+   override language).
+8. `## Audit-trail integrity` (firewall scan note, §0.8
+   binding statement, §13/§14/§15.x verdict-of-record
+   preservation).
+
+PINNED.
+
+**Pinned interpretation firewall — §15.11-specific Class-3
+forbidden patterns.**
+
+Inherits all §15.10 / §15.7 patterns (Class-3 set is
+monotone-growing). Adds the following §15.11-specific
+patterns to prevent post-hoc override of the Phase 2 cascade:
+
+```
+"actually STRONG_SIGNAL_IN_PHASE_COHERENCE despite"
+"should be STRONG_SIGNAL_IN_PHASE_COHERENCE"
+"actually PARTIAL_SIGNAL_IN_PHASE_COHERENCE despite"
+"should be classified as PARTIAL_SIGNAL_IN_PHASE_COHERENCE"
+"the wrong-direction failure should be flipped"
+"the direction gate should be relaxed"
+"the BCVF-faithful direction was wrong"
+"§15.10 PARTIAL is overturned"
+"§15.10 verdict is overturned"
+"§13.10 baseline should be replaced"
+```
+
+Combined with the §15.10/§15.7 inherited set, the firewall
+scans the rendered markdown for ~26 Class-3 patterns before
+write. PINNED.
+
+**Pinned exit codes (mirror §15.10).**
+
+```
+0  success
+2  CLI / argument error
+3  SELF_TEST_FAILED
+4  INTERPRETATION_VIOLATION
+5  SCHEMA_MISMATCH (label dump or cache)
+6  EXTRACTION_FAILED (torch / transformers stack)
+7  PROBE_FAILED (numpy / sklearn / NaN in F)
+```
+
+PINNED. Exit code 7 in §15.11 captures any unexpected NaN in
+F (e.g., from a degenerate hidden state with all-zero FFT) —
+by design, F should never be NaN given Qwen-7B's normal
+forward pass; if it occurs, the script aborts with the
+diagnostic.
+
+**Self-test gate composition.**
+
+Mirrors §15.10's three-stage self-test:
+
+1. Cascade boundary cases (12 cases per the cascade block) —
+   must all pass.
+2. Phase-coherence formula smoke test on synthetic inputs:
+   - Two identical hidden states → C[i, j] = 1 (within
+     numerical tolerance).
+   - Two random hidden states (independent normal) →
+     mean |C[i, j]| < 0.1 (large-N law).
+   - Two opposite-phase hidden states → C[i, j] = −1
+     (within tolerance).
+3. Interpretation firewall: each of the ~26 Class-3 patterns
+   must be flagged on a positive sample, and a clean §15.11
+   sample must produce zero violations.
+
+All three must pass before any data inspection. PINNED.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
