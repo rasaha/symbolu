@@ -13959,6 +13959,80 @@ verdict. A larger-$N$ re-run would tighten this band; that
 re-run is NOT authorized by §15.5 and would require a fresh
 §0.8 commitment.
 
+**Stage A informational findings — V1 selector contributes
+zero net accuracy on TruthfulQA-MC.**
+
+Phase 1 (`scripts/probe_system_level_scout_v2_truthfulqa.py`)
+reported the §14a.2-protocol classification table (per
+Chunk 5h, this is informational only; §15.5 does NOT
+classify against §14a.2 bands):
+
+| Variant | Accuracy | $\Delta$ vs Baseline-B (pp) | Sign-test wins/losses | $p$ |
+|---|---|---|---|---|
+| Baseline-A (Qwen single-greedy) | 0.250 | — | — | — |
+| Baseline-B (NLI-clustered uniform majority) | 0.250 | reference | — | — |
+| V1 (softmin trust, $\tau = 0.5$) | 0.250 | **+0.00** | 3/3 | 1.000 |
+| V2 (thresholded exclusion + uniform survivors) | 0.220 | **−3.00** | 0/3 | 0.250 |
+
+§14a.2-protocol classification (per the producer's `classify()`
+function, **informational**): `SCOUT_SATURATION`. Both
+$\Delta_{V_1} = +0.00\text{pp}$ and $\Delta_{V_2} = -3.00\text{pp}$
+fall in the §14a.2 SATURATION band (V2's $-3.00$ is on the
+SATURATION/REGRESSION boundary; the §14a.2 cascade catches
+it as SATURATION via the residual catch-all).
+
+**Cross-benchmark contrast with §14a.2-on-HaluEval (§14c
+verdict-of-record):**
+
+| Quantity | §14a.2 HaluEval (§14c) | §15.5 Phase 1 TruthfulQA-MC | Direction |
+|---|---|---|---|
+| $\Delta_{V_1}$ vs Baseline-B | +4.00pp | **+0.00pp** | V1 lift disappears on TruthfulQA-MC |
+| $\Delta_{V_2}$ vs Baseline-B | +1.00pp | **−3.00pp** | V2 *flips negative* on TruthfulQA-MC |
+| acc(Baseline-B) | 0.290 | 0.250 | Lower on TruthfulQA-MC (matches greedy 0.25) |
+
+**This is the first §14-domain finding that V1 produces no
+lift cross-benchmark.** V1's HaluEval +4pp does not
+generalize. V2 actively regresses by 3pp on TruthfulQA-MC,
+qualitatively different from V2's stable near-zero behavior
+on HaluEval.
+
+**Mechanism read (analytical observation, not load-bearing
+on the §15.6 verdict).** §15.5's Stage A inherits §14a.2's
+M=3 cross-family setup. On HaluEval-QA, V1's softmin
+sometimes correctly down-weights a hallucinating source on
+questions where another source is right — producing the +4pp
+lift. On TruthfulQA-MC, the adversarial-distractor structure
+(designed to match common false-belief patterns across many
+LLM families) appears to mean **all three sources are
+collectively wrong on the same questions** — i.e., when
+Qwen is wrong, Llama and Mistral tend to be wrong too on the
+same TruthfulQA-MC questions, so V1's selector has no
+non-Qwen "right" candidate to upweight. Confirmed
+empirically by V1's $\Delta = 0$: across all 100 questions,
+V1 delivered the same answer Baseline-A delivered.
+
+**Stage B's $\Delta\kappa = -0.0300$ on this Stage A
+foundation.** With Stage A delivering the Qwen-greedy answer
+on every question (V1 acc identically equals Baseline-A acc),
+Stage B's risk score $r(q) = H_{\text{src}_{i^*}}(q)$ collapses
+in expectation to "Qwen entropy on Qwen greedy" — structurally
+similar to §15.1's TruthfulQA-MC scalar that produced
+$\kappa = 0.14$. The 3pp deficit ($\kappa_\text{hybrid} =
+0.11$ vs $\kappa_{\S15.1} = 0.14$) reflects the small subset
+of questions where V1's softmin redistributes weight enough
+to change the winning-source identity, and on those few
+questions the V1-winning source's entropy distribution
+differs from Qwen's in a way that makes the threshold rule
+3pp worse on coverage at $\alpha_2$. **Stage A's failure to
+contribute lift compounds with Stage B's threshold-rule
+sensitivity to produce the REGRESSION.**
+
+This is exactly the failure mode §15.5 Chunk 5e
+"high prior of failure" anticipated, with empirical
+confirmation that the §14+§15 hybrid does not generalize
+cross-benchmark when Stage A's selector cannot extract
+non-Qwen leverage on the harder benchmark.
+
 ---
 
 
