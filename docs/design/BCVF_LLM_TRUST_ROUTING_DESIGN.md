@@ -13872,6 +13872,93 @@ which §15.6's REGRESSION explicitly does NOT authorize per
 Chunk 5g — would land at §15.7 or higher under its own §0.8
 commitment.
 
+**Headline result.**
+
+| metric | value |
+|---|---|
+| $N$ | 100 |
+| $W_\text{hybrid}$ (V1 wrong count) | 75 |
+| V1 accuracy at full coverage | 0.250 (= Baseline-A; identical to §13.10 Qwen greedy) |
+| $\text{AURC}_\text{random}$ ($= W/N$) | 0.7500 |
+| $\text{AURC}_\text{policy}$ | 0.6325 |
+| $\delta_\text{AURC}$ (diagnostic) | $+0.1175$ |
+| $\kappa_\text{hybrid}$ at $\alpha_2 = 0.50$ | **0.1100** |
+| $\kappa_{\S15.1,\text{TruthfulQA-MC}}$ baseline | 0.1400 |
+| $\boldsymbol{\Delta\kappa}$ **(primary)** | $\boldsymbol{-0.0300}$ |
+| $\Delta\kappa$ 95% CI (paired bootstrap, $B = 1000$) | $[-0.1400, +0.1202]$ |
+
+**Cascade trace** (mechanical readout per §15.5 Chunk 5g;
+matches the implementation's `_cascade_trace_15_5` output
+exactly):
+
+```
+rule 1 REGRESSION: delta_kappa=-0.0300 < -0.02   -> YES
+```
+
+Rule 1 fires; remaining rules not evaluated by cascade
+construction (REGRESSION first ordering per Chunk 5g).
+
+**Demotion rule (Chunk 5g) — does NOT apply.** The §15.5
+demotion rule is STRONG-only by construction. The cascade
+returned REGRESSION (rule 1), which is not subject to
+demotion. `verdict_annotations` is empty.
+
+**Operating-point table.**
+
+| $\alpha$ | $\text{cov}@\alpha$ | $\tau^*$ | ecr | far |
+|---|---|---|---|---|
+| 0.35 | **0.11** | 0.6390 | 0.9467 | 0.7200 |
+| 0.50 | **0.11** | 0.6390 | 0.9467 | 0.7200 |
+| 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+
+The $\alpha_1 = 0.35$ and $\alpha_2 = 0.50$ operating points
+are **identical** — same $\tau^*$, same coverage, same ecr,
+same far. Discussed under observation (b) below.
+
+**Three observations the headline supports.**
+
+**(a) First REGRESSION verdict in the §13 / §14 / §15 program.**
+Twelve prior experimental structures (§13's 5 single-axis
+classes + §14's 2 scouts + §15.2's single-source + §15.4's
+HaluEval hybrid + §13.20's N=200 observation + the §15.5
+Phase 1 informational SCOUT_SATURATION) returned ANTI,
+SCOUT_SATURATION, MARGINAL, or USEFUL_INTERNAL — none was
+*actively negative* relative to its comparator. §15.6 is the
+first verdict where the BCVF-derived policy is **worse than
+its baseline**. Operationally: the §14+§15 hybrid does NOT
+just fail to improve on §15.1 TruthfulQA-MC abstention; it
+makes it worse.
+
+**(b) Operating points at $\alpha_1$ and $\alpha_2$ are
+identical — the policy curve is "stepped" on TruthfulQA-MC.**
+Same $\tau^* = 0.6390$, $\text{cov} = 0.11$, $\text{ecr} =
+0.9467$, $\text{far} = 0.7200$ at both targets. Mechanically,
+the threshold sweep cannot deliver a coverage between
+$\kappa@\alpha_2$ and $\kappa@\alpha_1$ — there's no $\tau$
+in the empirical grid that produces an answered subset of
+size between 11 and 11 with accuracy in $[0.35, 0.50)$. The
+hybrid's risk-coverage curve has a discrete jump: at $\tau =
+0.6390$, accuracy on the 11-question answered subset is
+already $\ge 0.50$; at any lower $\tau$, accuracy drops
+below 0.35. This is qualitatively different from §15.4's
+HaluEval curve, which had distinct $\alpha_1$ and $\alpha_2$
+operating points with smooth coverage decline.
+
+**(c) Bootstrap CI is wide; spans REGRESSION through MARGINAL+
+upper bound.** $\Delta\kappa$ 95% CI = $[-0.1400, +0.1202]$,
+width $\approx 0.26$. **The CI does NOT rule out
+USEFUL_INTERNAL or even STRONG-territory upper bound at
+$N=100$.** The point estimate $-0.03$ fires the cascade at
+REGRESSION, but bootstrap cannot statistically distinguish
+REGRESSION from a wide range of alternatives at this sample
+size. This is a power-of-measurement observation (same
+caveat §15.4 surfaced for HaluEval at the opposite sign);
+the cascade's pinned rule operates on the point estimate
+alone per Chunk 5g, so the wide CI does NOT change the
+verdict. A larger-$N$ re-run would tighten this band; that
+re-run is NOT authorized by §15.5 and would require a fresh
+§0.8 commitment.
+
 ---
 
 
