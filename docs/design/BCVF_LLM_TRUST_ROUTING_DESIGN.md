@@ -13139,6 +13139,70 @@ Chunk 3c).
   signal were split across multiple thresholds, that would be
   a distinct policy and require a fresh §0.8 commitment.
 
+**Risk signal pin (identical to §15.3 Chunk 3d).**
+
+The §15.5 risk signal is pinned as:
+$$
+r(q) \;=\; H_{\text{src}_{i^*}}(q)
+$$
+where $i^*$ is Stage A's `winning_source_id(q)` on
+TruthfulQA-MC and $H_{\text{src}_{i^*}}(q)$ is that source's
+semantic-entropy scalar from the §13.10-protocol K=10 NLI-
+clustered samples (computed by the §14a.2-on-TruthfulQA-MC
+GPU run, identical protocol to §13.10 / §14a.2). **Higher
+$H$ means higher per-question hallucination risk on Stage A's
+selected answer; Stage B's policy abstains when $r$ exceeds
+$\tau$.**
+
+This is the same scalar §15.3 pinned, applied to the
+TruthfulQA-MC §14a.2 dump rather than the HaluEval-QA one.
+On questions where V1 picks Qwen on TruthfulQA-MC, $r(q)$
+equals Qwen's per-source entropy on TruthfulQA-MC at the §13.10
+protocol; on questions where V1 picks Llama or Mistral, $r(q)$
+equals that source's per-source entropy.
+
+**§15.5 reuses §15.3's risk-signal justification verbatim** —
+the three §0.8 questions §15.3 Chunk 3d answered for
+HaluEval-QA apply identically here:
+
+- **Why more defensible than alternatives?** $H_{\text{src}}$
+  inherits §13.10's marginal-pass-on-both-benchmarks pedigree
+  (AUC 0.661 on each at N=100). §15.5's TruthfulQA-MC scalar
+  is the same primitive at the same N=100, computed by the
+  same NLI clustering protocol.
+- **Why does it not reopen §13?** §13 measured AUC of
+  $H_{\text{src}}$ vs ground-truth correctness; §15.5 uses
+  the same scalar as a per-question risk score driving an
+  answer/abstain policy applied to **Stage A's TruthfulQA-MC
+  selected answer** — a different metric class. Novel content
+  is the joint $(r(q), c(q))$ distribution on V1-selects-non-
+  Qwen TruthfulQA-MC questions.
+- **Why is it implementable without new infrastructure?**
+  All quantities will be pre-computed in the §14a.2-on-
+  TruthfulQA-MC dump once that GPU run produces it
+  (per §14a.2's prose, dump records each source's greedy +
+  entropy + per-question correctness label). Pure CPU post-
+  processing in Stage B, mirroring §15.3.
+
+**Alternative signals considered and explicitly NOT pinned**
+(identical to §15.3 Chunk 3d):
+
+- $\min_i H_{\text{src}_i}(q)$ — independent of V1's actual
+  selection.
+- $W_{k^*} - W_{k_{\text{runner}}}$ — winning-cluster margin;
+  pure selector-level signal, lacks §13/§15 prior validation.
+- $W_{k^*} / \sum_k W_k$ — winning-cluster fraction; same
+  lack-of-validation issue.
+- Cross-source NLI disagreement (§13.11-style) — closer to
+  §13.11 reframed; would reopen that closed hypothesis class.
+- Any ensemble of the above — forbidden by §15.5 Chunk 5c's
+  "no ensemble" pin.
+
+§15.5 uses **exactly one scalar**: $H_{\text{src}_{i^*}}(q)$.
+No primary-plus-secondary, no ensemble, no fallback. Adding
+any alternative would require a fresh §0.8 amendment to
+§15.5.
+
 ---
 
 
