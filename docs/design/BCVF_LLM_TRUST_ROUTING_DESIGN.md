@@ -14280,6 +14280,108 @@ are documented internally, not externally, per Chunk 5g.
 on top of the §15.5 pre-commitment + Amendment 1 +
 implementation). §15 LLM-track program is closed.
 
+### 15.7 Pre-commitment — Diagnostic post-processing audit on existing dumps (no new compute)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any §15.4 / §15.6 / §15.2 dump is
+opened in §15.7 form. Specification, computed quantities,
+hypothesis tests, and interpretation framework below cannot
+be redefined post-hoc.
+
+**Position in the §13 / §14 / §15 program — what §15.7 is
+and explicitly is not.**
+
+§15.7 is a **pure-diagnostic post-processing chapter**, not a
+new experimental probe and not a re-execution of any prior
+program. It converts the empirical questions surfaced by a
+multi-round informal critique of §15.6's interpretation into
+a single binding §0.8 audit committed before any
+implementation. **§15.7 produces interpretive content for the
+§15 closure narrative; it explicitly does not re-classify any
+prior verdict.**
+
+Specifically, §15.7 is **NOT**:
+
+- A new probe authorized by §15.6 (which closed the §15
+  program at REGRESSION). §15.7 does not produce new
+  verdicts.
+- A re-execution of §13 / §14 / §15.x (no new GPU, no new
+  generation, no new model loads, no new NLI calls).
+- A re-classification of §15.4's HaluEval USEFUL_INTERNAL or
+  §15.6's TruthfulQA-MC REGRESSION. Both verdicts-of-record
+  remain binding under §0.8 regardless of any §15.7 finding.
+- A re-classification of §13.9's VC-brief hold. The hold
+  remains in force; §15.7 produces diagnostic content, not
+  external-framing-grade evidence.
+- An §15.8-authorizing chapter. No follow-up probe is
+  authorized by §15.7 unless and until a fresh top-level
+  §0.8 commitment lands.
+
+§15.7 **IS**:
+
+- A pre-committed diagnostic audit of three existing on-disk
+  artifacts: §15.4 (HaluEval hybrid), §15.6 (TruthfulQA-MC
+  hybrid), §15.2 (single-source baselines).
+- A formalization of the **base-rate-adjusted ratio
+  condition** for selective prediction (the operational
+  criterion $F_1(\tau)/F_0(\tau) \ge \alpha(1-\pi)/((1-\alpha)\pi)$,
+  not the cruder $F_1 - F_0$ separation), applied to existing
+  data.
+- A pinned **Stage A / Stage B / Composition decomposition**
+  of the hybrid scout's three possible failure modes:
+  (i) Stage A answer-stream failure, (ii) Stage B score-
+  separability failure, (iii) Composition failure where Stage
+  A's selected-answer correctness is poorly proxied by the
+  Stage B winning-source risk score.
+- A pinned falsifiable hypothesis test for whether §15.6's
+  Δκ = −0.030 reflects substantive hybrid regression on
+  TruthfulQA-MC versus stochastic equivalence to §15.1's
+  TruthfulQA-MC baseline (under the working hypothesis that
+  V1 selected Qwen on all 100 TruthfulQA-MC questions, the
+  hybrid reduces in expectation to single-source).
+- A pinned interpretation framework that maps each diagnostic
+  output to **non-binding** narrative content, with explicit
+  rules for what §15.7 may and may not say in the result
+  section.
+
+**Why §15.7 exists.** Three motivations, all surfaced through
+external critique of §15.6:
+
+1. **Diagnostic value:** the existing dumps contain
+   information that the §15.4 / §15.6 verdict cascades did
+   not extract (full risk-coverage curves, Stage-A/Stage-B
+   decomposition, sampling-noise tests). Computing this
+   information sharpens what §15 actually showed.
+2. **Substantive vs noise distinction:** §15.6 REGRESSION's
+   wide bootstrap CI [−0.14, +0.12] is consistent with both
+   a noise-bound result and a substantive negative; §15.7's
+   pinned hypothesis test resolves which.
+3. **§0.8 audit-trail integrity:** post-hoc informal
+   commentary on a verdict is not §0.8-binding. Converting
+   the load-bearing critiques into a single pre-committed
+   diagnostic audit lands the analysis under the same
+   discipline as the prior chapters.
+
+**§15.7 does NOT change the §15.6 verdict-of-record.** Per
+§0.8, §15.6's pinned cascade returned REGRESSION on the
+point estimate of Δκ on TruthfulQA-MC. That verdict is
+binding regardless of §15.7's diagnostic findings. §15.7
+may *interpretively weaken* the substantive reading (e.g.,
+"REGRESSION reflects sampling stochasticity over Stage A's
+Qwen-degenerate selection") but cannot *override* it. The
+distinction between binding verdict and interpretive caveat
+is pinned in §15.7 Chunk 7f below.
+
+**Confirmation: no data inspection prior to this pre-
+commitment.** The §15.4 / §15.6 / §15.2 artifacts have been
+inspected only via their pinned `combined.{verdict, delta_kappa,
+kappa_hybrid}` fields cited in the prior §0.8 chapters.
+Per-question fields, full threshold sweeps, and stage-wise
+records have NOT been opened in §15.7 form. The audit
+specification in §15.7 Chunks 7c–7e below is pinned from §15
+prose only; the actual quantities will be computed only after
+§15.7 implementation lands.
+
 ---
 
 
