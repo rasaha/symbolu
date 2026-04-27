@@ -16980,5 +16980,133 @@ self-test gate passes.
 ---
 
 
+### 15.12 Pre-commitment — Phase 3 of final-resolution sprint: final synthesis + autonomy handoff package (BOUNDED; one shot)
+
+**§0.8 declaration.**
+
+§15.12 is Phase 3 of the bounded 3-phase final-resolution
+sprint, authorized at the close of §15.11
+(`NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`; HaluEval AUC =
+0.4610 / ΔAUC = −0.2000; TruthfulQA-MC AUC = 0.4853 /
+ΔAUC = −0.1757; direction gate failed on both benchmarks;
+per `docs/experiments/probe_phase_coherence_15_11.{json,md}`
+at commit `b73e319`).
+
+This is a fresh §0.8 commitment. §15.12 outputs do **NOT**
+modify any §13/§14/§15.x verdict-of-record, including
+§15.10's `PARTIAL_SIGNAL_IN_Z`, §15.11's
+`NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`, §15.6's REGRESSION,
+§15.8's MIXED + C-MISMATCHED, or the §13.9 hold. **All
+upstream verdicts remain binding.**
+
+§15.12 is the **mechanical synthesis** step: it consumes
+the artifacts produced by Phases 1 and 2 (and the earlier
+§15.x verdicts), applies a **pre-committed closure decision
+rule**, and emits a final synthesis memo + autonomy handoff
+package. It does NOT rerun any experiment, retrain any
+probe, re-extract any hidden states, or re-classify any
+verdict.
+
+Bands, decision rule, output structure, and self-test cases
+are pinned **ex ante** in this section. Any deviation
+requires a fresh §0.8 amendment.
+
+**What §15.12 does.**
+
+1. **Synthesize the joint state of pre-committed mechanism
+classes.** Four classes have been tested:
+
+   - **§13.10 unsupervised entropy** (semantic-entropy
+     AUC, both benchmarks): saturated at AUC = 0.661.
+   - **§14a / §15.4 / §15.6 / §15.8 system-level
+     composition** (multi-source forced-allocation):
+     MIXED + C-MISMATCHED (per §15.8).
+   - **§15.10 supervised linear** (logistic regression on
+     layer −1 hidden states): `PARTIAL_SIGNAL_IN_Z`
+     (HaluEval ΔAUC = +0.008, TruthfulQA-MC ΔAUC = −0.039).
+   - **§15.11 layer-wise phase coherence** (29-layer rfft
+     phase coherence): `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`
+     (direction gate failed on both benchmarks).
+
+2. **Apply the pinned closure decision rule** (formula
+block below) to select a final closure outcome from the
+§15.11-authorized eligible set:
+`CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`
+(default) **or** `FULLY_CLOSED` (only if a pre-committed
+convergence criterion is met).
+
+3. **Produce three artifacts**:
+
+   - **Final LLM synthesis memo** (4-mechanism-class
+     comparison + closure rationale).
+   - **One-page LLM closure note** (executive summary +
+     final outcome).
+   - **Autonomy handoff package** (executive memo, claim
+     ladder, 90-day plan, narrative set) — preparing the
+     autonomy domain for any future BCVF-faithful
+     follow-on without inheriting unresolved LLM-transfer
+     ambiguity.
+
+**What §15.12 does NOT do.**
+
+- Does **NOT** rerun any §15.10 / §15.11 / §13.10
+  experiment.
+- Does **NOT** modify any §13/§14/§15.x verdict-of-record.
+- Does **NOT** iterate on the closure decision rule once
+  this section is sealed.
+- Does **NOT** select a closure outcome outside the
+  §15.11-authorized set
+  (`CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`
+  or `FULLY_CLOSED`). The other two pre-committed outcomes
+  from the original 3-phase sprint plan
+  (`CLOSED_OPERATIONALLY_BUT_BCVF_FAITHFUL_REOPENING_POSSIBLE`,
+  `REOPEN_LATER_UNDER_NEW_HYPOTHESIS_CLASS`) are
+  **mechanically ineligible** given the §15.11 outcome.
+- Does **NOT** authorize any Phase 4 / §15.13 / further
+  LLM experiment. Once §15.12 closes, the LLM
+  transfer-line is operationally closed in this branch;
+  any reopening requires a new top-level §0.8 commitment.
+
+**Dependencies.**
+
+- **§15.10 verdict-of-record.**
+  `docs/experiments/probe_supervised_15_10.json` and
+  `.md` (commit `a094e94`). Sealed
+  `PARTIAL_SIGNAL_IN_Z`.
+- **§15.11 verdict-of-record.**
+  `docs/experiments/probe_phase_coherence_15_11.json` and
+  `.md` (commit `b73e319`). Sealed
+  `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`.
+- **§13.10 / §13.20 baseline.** Entropy AUC = 0.661 both
+  benchmarks; π = 0.300 (HaluEval) / 0.250 (TruthfulQA-MC).
+- **§15.7 / §15.8 mechanism decomposition.**
+  `docs/experiments/probe_audit_15_7.{json,md}`; verdict
+  MIXED + C-MISMATCHED.
+- **Earlier §15.x verdicts.** §15.2 MARGINAL, §15.4
+  USEFUL_INTERNAL, §15.6 REGRESSION — all preserved as
+  part of the joint state, but **not used as cascade
+  input** (cascade is only on Phase 1 + Phase 2 outcomes
+  per the §15.11 mapping).
+
+No new GPU work, no new experiments, no model loads.
+§15.12 is pure synthesis + memo writing under §0.8
+discipline.
+
+**Time / compute budget.**
+
+- Total wall clock: <5 minutes (CPU-only, JSON parsing +
+  bootstrap CI on N=100 array + markdown rendering + file
+  writes).
+- Disk footprint: ~30–50 KB of new artifacts (no large
+  caches).
+
+§15.12 implementation
+(`scripts/probe_synthesis_15_12.py`) is a separate §0.8
+authorization gate and follows after this pre-commitment
+is sealed.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
