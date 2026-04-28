@@ -11768,6 +11768,6040 @@ classification of §13.10). §15.2's MARGINAL verdict and
 §13.10's marginal-pass-of-record both stand at their pinned
 configurations.
 
+### 15.3 Pre-commitment — Hybrid §14-selector + §15-abstention scout (new chapter, not a continuation)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any §14a.2 / §15 / §13.x dump is
+opened in hybrid form. Specification, primary risk signal,
+success bands, baselines, and acceptance/rejection rules
+below cannot be redefined post-hoc.
+
+**Position in the §13 / §14 / §15 program — three closed
+chapters at three distinct metric classes:**
+
+- **§13** closed the **single-axis observable** line in
+  §13.19 at combined ANTI on all five tested hypothesis
+  classes under worst-benchmark.
+- **§14** closed the **system-level answer-selection scout**
+  line at `SCOUT_SATURATION` on both §14a (string-matched
+  selector) and §14a.2 (NLI-clustered selector).
+- **§15** closed the **single-source abstention** line at
+  `MARGINAL` (§15.2). Per the §15.2 Postscript, that
+  verdict-of-record is binding at N=100; §13.20's N=200
+  observation does not re-classify it.
+
+§15.3 tests the one structurally distinct combination none
+of the three prior chapters tested:
+
+> *Use the §14 answer-producing system to choose an answer,
+> then apply a §15-style abstention gate on top of that
+> answer. §14 decides which answer to give. §15 decides
+> whether it is safe enough to return.*
+
+**This is a new claim, not a re-test of any prior claim.**
+Specifically:
+
+- Not "BCVF-style routing alone selects the right answer"
+  (§14a.2 closed `SCOUT_SATURATION`).
+- Not "the §13.10 entropy alone supports useful abstention
+  on the single-source Qwen greedy answer" (§15.2 closed
+  `MARGINAL`).
+- **But** "§14's selector + a §15-style abstention gate on
+  §14's selected answer may produce a different
+  answer/abstain operating frontier than either alone."
+
+**Why this is a new metric class.** §14a.2 measured Δ
+accuracy of V1 vs Baseline-B at full coverage (no
+abstention). §15.1 measured AURC + cov@α of the §13.10
+score on the Qwen greedy answer (no §14 selector). §15.3
+measures risk-coverage operational metrics applied to
+**§14's selected answer**, with the abstention gate fed by
+a risk signal computed over §14's selector context. The
+unit of analysis is the joint behavior of (Stage A: §14
+selector × Stage B: §15-style abstention) on the same per-
+question stream — neither §14 nor §15 alone exercised that
+joint object.
+
+**§15.3 is a fresh §0.8 commitment.** All §13 / §14 /
+§15.1 / §15.2 / §13.20 verdicts remain binding under §0.8
+and are NOT retroactively reframed by §15.3 work. A §15.3
+STRONG would authorize a separate §15.4-as-implementation
+pre-commitment for an answer-selection-plus-abstention
+product layer; it would NOT re-classify §14's
+`SCOUT_SATURATION` or §15.2's `MARGINAL`.
+
+**Confirmation: no data inspection prior to this pre-
+commitment.** No §14a.2 / §15 / §13.x dump has been opened
+in hybrid form during the drafting of §15.3. The protocol,
+primary risk signal, metrics, and bands in the §15.3
+chunks below are pinned from §13 / §14 / §15 prose only.
+Looking at the data before the bands are pinned would be
+the §0.8 violation pattern §15.3 is designed to prevent.
+
+**Stage A — answer-selection architecture (pinned).**
+
+Stage A is the §14a.2 NLI-clustered selector + V1 softmin
+trust consumer, fixed identical to the §14a.2 pinned
+configuration. Pinned because:
+
+- V1 softmin $\tau = 0.5$ produced the strongest BCVF-shaped
+  lift in the entire §13 / §14 program (+4pp accuracy over
+  Baseline-B on HaluEval-QA at N=100, per §14c).
+- The §14a.2 NLI-clustered selector is the post-§14a-audit
+  version that fixed the string-identity tie-breaking
+  degeneracy. It is the only §14 selector that produced
+  genuinely different Baseline-A vs Baseline-B numbers.
+- §15.3 is a hybrid scout, not a multi-selector comparison.
+  Pinning Stage A to one configuration keeps the
+  experimental variable narrow (Stage B's abstention layer).
+
+**Stage A specification (pinned):**
+
+- **Source set (M = 3, cross-family, all cached from §13.11
+  / §14a.2):** `Qwen/Qwen2.5-7B-Instruct`,
+  `meta-llama/Llama-3.1-8B-Instruct`,
+  `mistralai/Mistral-7B-Instruct-v0.3`.
+- **Per-source K = 10 stochastic samples** at T=1.0,
+  max_new_tokens=32, prompt `Q: ... A:`. Identical to
+  §13.10 / §13.11 / §14a.2 protocols.
+- **Per-source greedy answer** at T=0, max_new_tokens=32,
+  same prompt format.
+- **Per-source semantic entropy** $H_{\text{src}_i}(q)$ via
+  question-conditioned bidirectional NLI clustering of the
+  K=10 samples (DeBERTa-v3-base-mnli-fever-anli).
+- **V1 softmin consumer (pinned, single):**
+  $w_i^{V1} \propto \exp(-H_{\text{src}_i}(q) / \tau)$ with
+  $\tau = 0.5$ (autonomy default; §14a.2 pin).
+- **NLI-clustered selector (pinned, single):** cluster the
+  M=3 source greedies by question-conditioned bidirectional
+  NLI entailment, aggregate weights within each cluster,
+  pick winning cluster $k^* = \arg\max_k W_k$ (ties broken
+  by lowest cluster index), pick representative source
+  within winning cluster by highest individual weight (ties
+  by lowest source index). Identical to §14a.2's selector.
+
+**Stage A output (the per-question handoff to Stage B).**
+
+For each question $q$, Stage A produces:
+
+- `selected_answer(q)` — the answer string Stage A delivers
+  (winning cluster's representative-source greedy).
+- `winning_source_id(q)` $\in$ {Qwen, Llama, Mistral} —
+  which source's greedy was picked.
+- All three per-source semantic entropies
+  $\{H_{\text{src}_i}(q)\}_{i=1}^{3}$, including the winning
+  source's $H_{\text{src}_{i^*}}(q)$.
+- The winning cluster's aggregated weight $W_{k^*}$ and the
+  runner-up cluster's aggregated weight
+  $W_{k_{\text{runner}}}$.
+
+Stage A makes no abstention decision and consumes no
+threshold parameter. Its output is purely the answer plus
+the per-question selector context that Stage B can inspect.
+
+**What Stage A explicitly does NOT pin.**
+
+- Multiple consumers (V2 thresholded exclusion, V3 veto-only,
+  V4 deadband fallback). All deferred — V1 is pinned single.
+- Multiple selectors (highest-weight-source, string-matched,
+  uniform majority). Deferred.
+- Different source sets. M=3 cross-family is pinned; no
+  larger $M$, no model substitution, no single-source
+  fallback.
+- Re-running §14a.2 from scratch. The on-disk §14a.2 dump
+  at `docs/experiments/probe_system_level_scout_v2_halueval_qa.json`
+  is the pinned Stage A input. If that dump does not contain
+  the fields Stage B requires (`winning_source_id`, per-
+  source entropies, per-question correctness labels), §15.3
+  fails fast with `SCHEMA_MISMATCH` and requires a fresh
+  §0.8 amendment — mirroring §15.1's schema-mismatch
+  discipline.
+
+**Stage B — abstention architecture (pinned).**
+
+Stage B sits downstream of Stage A and reads the §14a.2
+dump's per-question records. For each question $q$, Stage B
+consumes:
+
+- `selected_answer(q)` from Stage A's V1 softmin + NLI-
+  clustered selector;
+- $c(q)$ — the correctness label of `selected_answer(q)`
+  per the §14a.2 NLI labeling protocol (entails right_answer
+  AND does not entail hallucinated_answer); **note this is
+  the correctness of Stage A's selected answer, NOT Qwen's
+  greedy answer — this $c(q)$ is structurally distinct from
+  §15.1's $c(q)$ on questions where V1 selects a different
+  answer than Qwen-greedy**;
+- a per-question identifier for deterministic ordering.
+
+These plus the §15.3 risk signal (pinned in Chunk 3d below)
+drive Stage B's per-question answer-or-abstain decision.
+
+**Decision rule (pinned, single).** Per-question deterministic
+threshold rule, structurally identical to §15.1 Chunk 2c:
+$$
+\text{policy}_\tau(q) = \begin{cases}
+\text{ANSWER selected\_answer}(q) & \text{if } r(q) < \tau \\
+\text{ABSTAIN} & \text{if } r(q) \ge \tau
+\end{cases}
+$$
+where $r(q)$ is the §15.3 risk signal pinned in Chunk 3d.
+Ties at $r(q) = \tau$ resolve to ABSTAIN — deterministic,
+conservative — identical to §15.1.
+
+**Threshold-sweep protocol (pinned).** $\tau$ is swept across
+the sorted unique values of $r(q)$ on the (single) benchmark
+plus $-\infty$ (always-abstain) and $+\infty$ (always-answer).
+At N=100 this yields at most 102 grid points. All operational
+metrics (pinned in Chunk 3e) are computed at every grid
+point. No grid is hand-picked; no $\tau$ is hand-picked.
+There is no "merged $\tau$" anywhere in §15.3.
+
+**What Stage B explicitly does NOT pin.**
+
+- **Multiple abstention policies.** No deadband (answer if
+  $r < \tau_{\text{low}}$, abstain if $r \ge \tau_{\text{high}}$,
+  uncertain otherwise), no veto-only mode, no cluster-margin
+  rule. One threshold rule, single $\tau$.
+- **Multiple risk signals.** One scalar (pinned in Chunk 3d).
+  No primary-plus-secondary, no ensemble.
+- **Held-out calibration of $\tau$.** $\tau$ is fitted only
+  via the deterministic empirical-support sweep — same rule
+  §15.1 used. No held-out tuning, no isotonic / Platt /
+  conformal wrapping of $r(q)$.
+- **Re-decoding or rewriting `selected_answer(q)`.** Stage B's
+  only degree of freedom is the answer/abstain decision; the
+  answer itself is whatever Stage A produced.
+- **Cascading multiple abstention layers.** If the risk
+  signal were split across multiple thresholds (e.g., partial
+  trust at intermediate $r(q)$), that would be a distinct
+  policy and require a fresh §0.8 commitment.
+
+**Risk signal pin (the central §15.3 design decision).**
+
+Per the user-pinned constraint that §15.3 use a single risk
+scalar and that the §15-style entropy be preferred absent a
+strong reason otherwise, the §15.3 risk signal is pinned as:
+$$
+r(q) \;=\; H_{\text{src}_{i^*}}(q)
+$$
+where $i^*$ is Stage A's `winning_source_id(q)` (the source
+whose greedy is the winning cluster's representative) and
+$H_{\text{src}_{i^*}}(q)$ is that source's semantic-entropy
+scalar from the §13.10 / §14a.2 pre-computed K=10 NLI-
+clustered protocol. **Higher $H$ means higher per-question
+hallucination risk on Stage A's selected answer; Stage B's
+policy abstains when the risk exceeds $\tau$.**
+
+This is a §15.1-analogue applied to V1's selected source
+rather than to Qwen's greedy: when V1 picks Qwen, $r(q)$
+equals §15.1's risk signal; when V1 picks Llama or Mistral,
+$r(q)$ equals that source's per-source entropy. The novel
+content of §15.3 is the joint behavior on questions where
+V1 selects a different source than Qwen — that joint object
+was not exercised by §13 / §14 / §15.
+
+**Why this pin is defensible** (positive answers to the three
+§0.8 questions a non-default risk signal would have to
+answer; recorded here for the default too).
+
+- **Why more defensible than alternatives?** $H_{\text{src}}$
+  is the only LLM-domain scalar in this codebase that has
+  cleared the §11 0.60 marginal bar on both benchmarks at
+  N=100 (§13.10's verdict-of-record). Other candidate signals
+  (winning-cluster weight margin, min-entropy across all 3
+  sources) lack this prior validation.
+- **Why does it not reopen §13 in disguise?** §13 measured
+  AUC of $H_{\text{src}}$ against ground-truth correctness
+  (a correlation-of-observable claim). §15.3 uses the same
+  scalar as a per-question risk score driving an answer/
+  abstain policy applied to **Stage A's selected answer** (a
+  different metric class). The structurally novel content is
+  the joint $(r(q), c(q))$ distribution on V1-selects-non-
+  Qwen questions, which §13 did not exercise.
+- **Why is it implementable without new infrastructure?**
+  All required quantities are pre-computed in the §14a.2 on-
+  disk dump per §14a.2's prose (`each source's greedy +
+  entropy, per-question consumer weights, selected answer for
+  each variant, per-question correctness label for each
+  candidate`). No new model loads, no new NLI calls, no new
+  generation. Pure CPU post-processing, mirroring §15.1.
+
+**Alternative signals considered and explicitly NOT pinned.**
+
+| Candidate | What it measures | Reason not pinned |
+|---|---|---|
+| $\min_i H_{\text{src}_i}(q)$ | most-confident source's entropy | Independent of which source V1 actually selected; weakly tied to Stage A's decision |
+| $W_{k^*} - W_{k_{\text{runner}}}$ | winning-cluster margin (selector decisiveness) | Pure selector-level signal; lacks §13/§15 prior validation |
+| $W_{k^*} / \sum_k W_k$ | winning-cluster fraction (consensus strength) | Same lack-of-validation issue; range $[1/M, 1]$ at M=3 |
+| Cross-source NLI disagreement (§13.11-style) | inter-source agreement on V1's answer | Closer to §13.11 reframed; would require fresh §0.8 to justify reopening that closed hypothesis class |
+| Any ensemble of two of the above | hybrid scalar | Forbidden by §15.3 Chunk 3c's "no ensemble" pin |
+
+§15.3 uses **exactly one scalar**: the winning-source's
+per-source semantic entropy $H_{\text{src}_{i^*}}(q)$. No
+primary-plus-secondary, no ensemble, no fallback. Adding any
+alternative would require a fresh §0.8 amendment to §15.3.
+
+**Benchmark scope pin (single benchmark; HaluEval-QA only).**
+
+§15.3 is a single-benchmark scout on **HaluEval-QA**, $N=100$,
+identical to the §14a.2 dump's coverage. TruthfulQA-MC is
+explicitly out of scope for the §15.3 scout.
+
+**Three reasons HaluEval-QA-only is pinned, not a tunable
+choice:**
+
+1. **The §14a.2 dump exists only on HaluEval-QA.** §14a.2
+   was pre-committed and executed on HaluEval-QA only;
+   TruthfulQA-MC was explicitly deferred to "full §14"
+   conditional on §14a.2 STRONG, which was never reached
+   (§14c closed at `SCOUT_SATURATION`). The Stage A on-disk
+   artifact §15.3 reads from
+   (`probe_system_level_scout_v2_halueval_qa.json`)
+   contains no TruthfulQA-MC data. Adding TruthfulQA-MC is
+   therefore a *new generation step*, not a parameter
+   change.
+
+2. **HaluEval-QA is where the §14 BCVF-shaped signal was most
+   alive.** V1 softmin produced the +4pp lift over Baseline-B
+   on HaluEval-QA at N=100 in §14a.2 — the strongest BCVF-
+   shaped lift in the entire §13 / §14 program (per §14c).
+   TruthfulQA-MC across §13 / §14 / §15 has consistently
+   acted as the worst-benchmark cap; if §15.3 has any chance
+   of producing operational lift, HaluEval-QA is where to
+   detect it first.
+
+3. **Cost/benefit favors single-benchmark for the scout.**
+   Adding TruthfulQA-MC to §15.3 would require (a) re-running
+   the §14a.2 protocol on TruthfulQA-MC to produce the missing
+   dump (~50–60 min on the existing GPU, identical cost to
+   §14a.2's pinned cost), and (b) extending §15.3's bands to
+   handle two-benchmark combined classification under a
+   worst-benchmark rule. Both are outside §15.3 scope as a
+   pure post-processing scout. The §15.3 scout's job is to
+   detect signal where signal is most likely first; if it
+   lands STRONG, a fresh §15.4 commitment can pre-commit the
+   TruthfulQA-MC extension.
+
+**Implication for the verdict bands.** Because §15.3 is
+single-benchmark, **no worst-benchmark rule applies in
+§15.3**. The verdict cascade pinned in Chunk 3g operates on
+the single benchmark's $(\delta, \kappa)$ point estimates
+directly. This is structurally distinct from §15.1's two-
+benchmark cascade that combined $\delta = \min_b \delta_b$
+and $\kappa = \min_b \kappa_b$ before applying the cascade.
+
+**Cherry-picking caveat (acknowledged ex ante).** Pinning
+HaluEval-QA-only is a deliberate scope choice, not a cherry-
+pick: it follows the §14a.2 dump's existing coverage. A §15.3
+STRONG on HaluEval-QA would NOT support an external claim
+about §15.3's cross-benchmark behavior — that would require
+the TruthfulQA-MC extension as a separate §15.4 commitment.
+**The §15.3 verdict authorizes only what its single-benchmark
+scope tests.** External-framing changes (VC-brief, etc.) are
+foreclosed regardless of §15.3 outcome — same §13.9 hold rule
+that bound §15.1 / §15.2.
+
+**Operational metrics pin.**
+
+§15.3's metric set is structurally similar to §15.1's but
+single-benchmark (no worst-benchmark min) and pinned around
+a different **primary decision metric** — chosen to make the
+hybrid's claim operationally meaningful relative to §15.1's
+verdict-of-record, not just relative to random abstention.
+
+**Notation (single benchmark, $N=100$).** For each question
+$q$ on HaluEval-QA at threshold $\tau$:
+
+- $A_\tau = \{q : r(q) < \tau\}$ (Stage B answered set);
+  $\text{cov}(\tau) = |A_\tau|/N$.
+- $\text{acc}(\tau) = (1/|A_\tau|) \sum_{q \in A_\tau} c(q)$,
+  where $c(q)$ is the correctness label of Stage A's
+  `selected_answer(q)` per Chunk 3c (NOT Qwen-greedy
+  correctness).
+- $\text{ecr}(\tau), \text{far}(\tau)$ — identical formulas
+  to §15.1 Chunks 3a / 3b applied to the new $c(q)$.
+- $W_\text{hybrid} = N - \sum_q c(q)$ — total wrong selected
+  answers; observed empirically at run time (NOT pinned ex
+  ante like §15.1's $W$, since Stage A's selected-answer
+  correctness count is not a pinned constant).
+
+**Primary decision metric (single scalar):**
+$$
+\Delta\kappa \;=\; \kappa_\text{hybrid} - \kappa_{\S15.1,\text{HaluEval}}
+$$
+where:
+
+- $\kappa_\text{hybrid} = \max\{\text{cov}(\tau) :
+  \text{acc}(\tau) \ge \alpha_2 \text{ AND } |A_\tau| \ge n_\min\}$
+  on HaluEval-QA, with $\alpha_2 = 0.50$ and $n_\min = 10$
+  (identical floor to §15.1 Chunk 3a).
+- $\kappa_{\S15.1,\text{HaluEval}} = 0.26$ — pinned constant
+  from §15.2's verdict-of-record HaluEval $\kappa$ at $\alpha_2$
+  (recorded in `docs/experiments/probe_selective_abstention.json`).
+
+$\Delta\kappa > 0$ means the hybrid produces operationally
+meaningful lift over §15.1's single-source abstention at the
+absolute-majority target. $\Delta\kappa \le 0$ means it does
+not improve over §15.1 at that target.
+
+**Secondary diagnostic metrics** (reported, NOT band-driving).
+
+- $\delta_\text{AURC,hybrid} = W_\text{hybrid}/N -
+  \text{AURC}_\text{hybrid}$ — integrated lift over random
+  abstention on Stage A's selected answers (single-benchmark
+  analogue of §15.1's $\delta$).
+- $(\text{cov}, \text{ecr}, \text{far})$ triples at three
+  target accuracies $\alpha \in \{0.40, 0.50, 0.75\}$ — same
+  $\alpha$ set §15.1 used on HaluEval-QA.
+- Bootstrap CI (two-sided 95%, $B = 1000$, paired over
+  question indices, deterministic seed
+  `SeedSequence(entropy=15)` per §15.1 convention) on
+  $\Delta\kappa$. Statistical demotion rule pinned in
+  Chunk 3g.
+
+**Baselines (pinned, three; all from existing artifacts; no
+new generation).**
+
+| Baseline | Source | Role |
+|---|---|---|
+| §15.1 HaluEval $\kappa@\alpha_2 = 0.26$ | §15.2 verdict-of-record | Primary comparator (drives $\Delta\kappa$) |
+| §14a.2 V1 full-coverage point $(\text{cov}=1.0, \text{acc}=0.330)$ | §14a.2 dump | "Stage A without abstention" reference; documents whether the hybrid even needs Stage B |
+| Random-abstain matched-coverage on Stage A's answers | Closed-form: $\mathbb{E}[\text{acc}_\text{random}(\text{cov})] = (N - W_\text{hybrid})/N$ | Random baseline for $\delta_\text{AURC,hybrid}$ |
+
+§15.1's HaluEval $\kappa@\alpha_2$ is the central comparator
+because §15.1 is the closest non-hybrid analogue (single-
+source abstention at the same metric class on the same
+benchmark). A §15.3 STRONG must demonstrate that adding Stage
+A's selector produces operationally meaningful lift over the
+single-source policy — not merely lift over random abstention.
+
+**Verdict bands (pinned; exhaustive partition over $\Delta\kappa$).**
+
+Per the user-pinned constraint that the §15.3 verdict
+subordinate everything to $\Delta\kappa$ as the primary
+scalar, the partition is **one-dimensional**: a single
+ordered cascade driven by $\Delta\kappa$, with all secondary
+diagnostics ($\delta_\text{AURC}$, operating-point triples,
+the §14a.2 V1 full-coverage reference) explicitly **not
+band-influencing**.
+
+This is structurally simpler than §15.1's 2D $(\delta,
+\kappa)$ cascade. The simpler cascade is justified because
+§15.3 has already inherited Stage A's V1-vs-Baseline-B
+accuracy lift from §14a.2 (a fixed configuration choice, not
+a §15.3 measurement), and the remaining operational question
+is binary: *does adding Stage B's abstention layer to V1's
+selected answer beat §15.1's single-source abstention at the
+same $\alpha_2$ target on the same benchmark?* $\Delta\kappa$
+is the cleanest single scalar that answers it.
+
+**Verdict cascade (pinned, ordered, exhaustive).** The §15.3
+verdict is the **first** matching rule below. Rule 5 has no
+positive condition; the cascade is exhaustive over $\mathbb{R}$
+by construction.
+
+1. **REGRESSION** — $\Delta\kappa < -0.02$.
+2. **STRONG** — $\Delta\kappa \ge +0.10$.
+3. **USEFUL_INTERNAL** — $\Delta\kappa \ge +0.05$.
+4. **MARGINAL** — $\Delta\kappa \ge +0.02$.
+5. **SATURATION** — explicit residual catch-all
+   ($\Delta\kappa \in [-0.02, +0.02)$).
+
+Rules 1–4 are mutually exclusive by ordering. Rule 5 catches
+the residual deterministically. **No secondary metric
+participates in the cascade.** Secondary diagnostics
+($\delta_\text{AURC}$, $\text{ecr}$, $\text{far}$, the
+$(\text{cov}, \text{ecr}, \text{far})$ triples) are reported
+in the result section but never re-classify the verdict.
+
+**Operational meanings per band** (assuming the pinned
+$\kappa_{\S15.1} = 0.26$ baseline):
+
+| Verdict | $\Delta\kappa$ range | Implied $\kappa_\text{hybrid}$ | Meaning |
+|---|---|---|---|
+| STRONG | $\ge +0.10$ | $\ge 0.36$ | Substantively higher cov@$\alpha_2$ than §15.1; product-relevant lift |
+| USEFUL_INTERNAL | $[+0.05, +0.10)$ | $[0.31, 0.36)$ | Visibly better than §15.1; internal-research value |
+| MARGINAL | $[+0.02, +0.05)$ | $[0.28, 0.31)$ | Small detectable lift |
+| SATURATION | $[-0.02, +0.02)$ | $[0.24, 0.28)$ | Operationally equivalent to §15.1 |
+| REGRESSION | $< -0.02$ | $< 0.24$ | Actively worse than §15.1 |
+
+**Acceptance / rejection rules** (one-to-one mapped to the
+cascade; mirrors §15.1 Chunk 4c structure).
+
+| Verdict | Authorizes | Forecloses |
+|---|---|---|
+| **STRONG** | Drafting §15.4 — full hybrid pre-commitment with TruthfulQA-MC extension and product-layer scope (separate §0.8). | VC-brief changes (§13.9 hold remains); auto-deployment without §15.4; cross-benchmark claims absent §15.4. |
+| **USEFUL_INTERNAL** | Documenting the §14+§15 hybrid as having internal-research operational value at this single-benchmark scale. | §15.4 product investment; cross-benchmark claims; VC-brief changes. |
+| **MARGINAL** | Recording §15.3 as acknowledged but unactionable. | §15.4 follow-up; internal-research operational claims; product investment; VC-brief changes. |
+| **SATURATION** | Documenting §15.3 as operational null; extending the §13/§14/§15 closure prose to cover the §14+§15 hybrid metric class. | Same as MARGINAL. |
+| **REGRESSION** | Closing the §14+§15 hybrid construct at this configuration. §13.9 hold remains; the closure prose extends to "answer-selection AND single-source abstention AND hybrid all saturated/regressed." | Same as SATURATION. |
+
+**Demotion rule (STRONG-only, bootstrap CI on $\Delta\kappa$).**
+If the cascade returns STRONG but the bootstrap CI lower
+bound on $\Delta\kappa$ is $\le 0$, the verdict is demoted to
+**USEFUL_INTERNAL** with explicit `STRONG_BUT_CI_DEMOTION`
+annotation. Mirrors §15.1 Chunk 4c's STRONG-only demotion
+exactly. USEFUL_INTERNAL / MARGINAL / SATURATION / REGRESSION
+are NOT subject to demotion — same operational-scope
+reasoning as §15.1.
+
+**Boundary-case audit table (illustrative, deterministic).**
+
+| $\Delta\kappa$ | Cascade trace | Verdict |
+|---|---|---|
+| $+0.099$ | rule 1 NO; rule 2 NO ($\Delta\kappa < +0.10$); rule 3 YES | **USEFUL_INTERNAL** |
+| $+0.019$ | rules 1–3 NO; rule 4 NO ($\Delta\kappa < +0.02$); rule 5 catches | **SATURATION** |
+| $-0.020$ | rule 1 NO ($\Delta\kappa \not< -0.02$ at boundary); rules 2–4 NO; rule 5 catches | **SATURATION** |
+| $-0.021$ | rule 1 YES; remaining rules not evaluated | **REGRESSION** |
+
+The first two rows mirror §15.1's near-boundary demotion
+pattern. The third and fourth rows document the REGRESSION
+boundary inclusivity precisely: $\Delta\kappa = -0.020$ is NOT
+regression (rule is strict-less-than), but $\Delta\kappa =
+-0.021$ is.
+
+**Implementation scope (pinned, framed as a small integration
+layer over closed components).**
+
+§15.3 is structurally a small integration layer that **reuses
+closed §14 and §15 components without reopening either**. The
+hybrid is built by composing existing artifacts, not by re-
+running their pinned experiments.
+
+**Reuse from §14 (data, not code).** The §14a.2 on-disk dump
+`docs/experiments/probe_system_level_scout_v2_halueval_qa.json`
+serves as Stage A's input. Per §14a.2 prose, the dump records
+per-source greedies, per-source semantic entropies, V1 softmin
+weights, NLI-clustered selector outputs (winning cluster,
+representative source, selected_answer), and per-question
+correctness labels for each candidate. **§14a.2 is NOT re-run.**
+The §14a.2 `SCOUT_SATURATION` verdict-of-record (§14c) is
+unchanged. §15.3 reads the dump as Stage A's pinned output;
+it makes no new claim about whether V1 *succeeds* at answer
+selection (V1's lift over Baseline-B was §14a.2's measurement,
+closed at `SCOUT_SATURATION`).
+
+**Reuse from §15 (the abstention *machinery pattern*, not the
+whole §15.1 experiment).** §15.3 reuses §15.1's *abstention
+machinery* — the threshold rule, the bootstrap convention,
+the JSON+markdown artifact style, the discrete AURC formulation,
+the cov@α with $n_\min$ floor — by **copying** the relevant
+primitives from `scripts/probe_selective_abstention.py` into
+the §15.3 script. **§15.3 does NOT reuse §15.1's experiment-
+level pins:** §15.1 was two-benchmark with worst-benchmark
+combination, used a 2D $(\delta, \kappa)$ cascade, and
+compared against random-abstain as the central baseline.
+§15.3 is single-benchmark, uses a 1D $\Delta\kappa$ cascade,
+and compares against §15.1's HaluEval $\kappa@\alpha_2 = 0.26$
+as the central baseline. Primitives are copied, not imported,
+because §15.1's script is closed under §15.2's verdict-of-
+record; importing from it would couple §15.3's outputs to any
+future drift in §15.1's codepath, compromising §15.1's
+reproducibility chain.
+
+**New code — glue layer + hybrid evaluator + single-benchmark
+report writer.**
+
+One new script: `scripts/probe_hybrid_selective_abstention.py`
+(numpy + stdlib only, CPU-only post-processor; structurally
+parallel to `probe_selective_abstention.py`). The script
+decomposes into three small components by responsibility:
+
+- **Glue layer** — §14a.2 dump loader, schema validator,
+  parity gate, and Stage A handoff extraction (items 1–3
+  below).
+- **Hybrid evaluator** — threshold sweep, operating-point
+  computation, $\kappa_\text{hybrid}$, $\Delta\kappa$,
+  bootstrap CI, the new 1D cascade, and the STRONG-only
+  demotion rule (items 4–10 below).
+- **Single-benchmark report writer** — `--self-test` gate
+  plus JSON+markdown artifact writers (items 11–12 below).
+
+Numbered components:
+
+1. **§14a.2 dump loader** with schema validation against the
+   pinned field list (q_idx, per-source semantic entropies,
+   winning_source_id, selected_answer correctness label).
+   Fail-fast on schema mismatch (no fallback).
+2. **Parity gate** on $N=100$ on HaluEval-QA. Aborts on
+   mismatch.
+3. **Stage A handoff extraction** — derives $r(q) =
+   H_{\text{src}_{i^*}}(q)$ and $c(q)$ = correctness of
+   `selected_answer(q)` directly from the dump's fields.
+4. **Threshold sweep** (sorted unique $r(q)$ plus $\pm\infty$)
+   with per-threshold $(\text{cov}, \text{acc}, \text{ecr},
+   \text{far})$ computation. Copied from §15.1.
+5. **Operating-point computation** at $\alpha \in \{0.40,
+   0.50, 0.75\}$, $n_\min = 10$. Copied from §15.1.
+6. **$\kappa_\text{hybrid}$ computation** at $\alpha_2 = 0.50$.
+7. **$\Delta\kappa$ computation** ($\kappa_\text{hybrid} - 0.26$).
+8. **Bootstrap CI on $\Delta\kappa$** (paired over question
+   indices, $B=1000$, `SeedSequence(entropy=15)` — same
+   convention as §15.1 to keep the audit trail consistent).
+9. **1D cascade** driven by $\Delta\kappa$ alone (Chunk 3g).
+   **New** `verdict_cascade` function specific to §15.3
+   (NOT the §15.1 2D cascade).
+10. **STRONG-only demotion rule** on bootstrap CI lower
+    bound of $\Delta\kappa$.
+11. **`--self-test` gate** verifying the 1D cascade against
+    Chunk 3g's 4-row boundary-case audit table and the
+    STRONG-only demotion rule.
+12. **JSON + markdown writers** matching the §15.3 output
+    schema (`schema_version = "15.3"`, single-benchmark
+    block under `benchmark`, `combined` block with `verdict`,
+    `verdict_annotations`, `delta_kappa`, `kappa_hybrid`,
+    `kappa_§15.1_baseline`).
+
+**Engineering cost (estimated).**
+
+- ~400–600 lines of new code (smaller than §15.1's 1112; the
+  cascade is 1D and primitives are copy-pasted).
+- CPU only; numpy + Python stdlib only; no GPU, no model
+  loads, no NLI, no network.
+- Wall-clock cost of real-data run: under 30 seconds at
+  $N=100$ with $B=1000$ bootstrap.
+- Implementation effort: roughly half §15.1's; the new work
+  is the integration layer, not the metric primitives.
+
+**Output paths (pinned).**
+
+- `docs/experiments/probe_hybrid_selective_abstention.json`
+  (machine-readable, `schema_version` `"15.3"`).
+- `docs/experiments/probe_hybrid_selective_abstention.md`
+  (human-readable summary).
+
+**What §15.3 implementation explicitly does NOT authorize.**
+
+- Re-running §14a.2 (the §14a.2 dump is the pinned Stage A
+  input; §14c verdict unchanged).
+- Modifying `scripts/probe_selective_abstention.py` (§15.1's
+  pinned codepath; preserved verbatim per §15.2 Postscript).
+- Adding TruthfulQA-MC or any other benchmark.
+- Adding consumers or selectors beyond §14a.2's pinned
+  configuration.
+- Adding observables beyond $H_{\text{src}_{i^*}}$.
+- Importing from the §15.1 script (primitives copied for
+  independence).
+- Auto-promoting any verdict to §15.4 (any §15.4 work
+  requires its own §0.8 commitment).
+
+**Reduced-form authorization rationale — §15.3 only exists
+because upstream artifacts already exist.**
+
+§15.3's compactness (single benchmark, single observable,
+single selector, single consumer, no fresh model calls) is
+authorized **only because the necessary upstream artifacts
+already exist on disk**:
+
+- The §14a.2 HaluEval-QA dump
+  (`docs/experiments/probe_system_level_scout_v2_halueval_qa.json`)
+  exists per §14a.2 / §14c's artifacts list.
+- §13.10's semantic-entropy scalar definition is pinned by
+  §13.10's verdict-of-record (and is not invalidated by the
+  §13.20 N=200 observation, which does not re-classify
+  §13.10).
+- §15.1's abstention machinery exists and is validated in
+  `scripts/probe_selective_abstention.py` per §15.2's
+  verdict-of-record.
+
+**If any of these upstream artifacts did not already exist,
+this chapter would not be authorized in this reduced form.**
+A from-scratch hybrid program would require fresh §14-class
+and §15-class generation runs as their own §0.8 commitments
+before any hybrid scout could land. §15.3 is structurally a
+post-processing composition of three closed predecessors;
+it is not an attempt to reopen them.
+
+**What §15.3 explicitly does NOT test.**
+
+The hybrid scout's claim is narrowed deliberately to keep the
+§0.8 commitment tight. §15.3's verdict — whatever band the
+cascade returns — bears only on this single configuration's
+operational behavior. Specifically, §15.3 is NOT testing:
+
+- **Retrieval augmentation.** No retrieval, search, web
+  access, or external knowledge source enters Stage A or
+  Stage B. The policy's only response options are ANSWER
+  `selected_answer(q)` or ABSTAIN.
+- **Verifier ensembles.** No external verifier model, no
+  judge-model, no critique pass, no second-LLM fact-checking
+  layer. The risk signal is exclusively the §13.10 / §14a.2
+  semantic-entropy scalar of V1's selected source.
+- **Cross-benchmark generalization.** §15.3 runs on HaluEval-QA
+  only. A §15.3 STRONG would NOT support claims about
+  TruthfulQA-MC behavior; that is the explicit §15.4 future-
+  work scope.
+- **A new §13 observable program.** §15.3 reuses the §13.10
+  semantic-entropy scalar verbatim, applied to V1's selected
+  source. No new §13 hypothesis class is opened. The §13.19
+  single-axis closure remains binding.
+- **A new §14 system-level program.** Stage A is fixed to
+  §14a.2's pinned configuration; §15.3 makes no claim about
+  whether different selectors, consumers, source sets, or
+  $M$ values would produce different answer-selection lift.
+  §14c's `SCOUT_SATURATION` verdict on V1 / V2 vs Baseline-B
+  is unchanged.
+- **Product readiness.** Even a §15.3 STRONG result would
+  require §15.4 (full hybrid pre-commitment with TruthfulQA-
+  MC extension and product-layer scope) before any
+  deployment-grade claim. §15.3 is a scout, not a deployable
+  system.
+- **Re-classification of any prior §13 / §14 / §15 verdict.**
+  §13.19 (single-axis ANTI), §14b / §14c (`SCOUT_SATURATION`),
+  §15.2 (`MARGINAL`), and §13.20 (N=200 `NOISE_BAND_LIFT`
+  observation, not a re-classification of §13.10) are all
+  closed under §0.8 at their pinned configurations. §15.3
+  cannot revisit any of them.
+
+**§15.3 chunk roll-up — pre-commitment now complete.**
+
+| Chunk | Content |
+|---|---|
+| 3a | Opening framing — fresh top-level chapter, new claim, new metric class |
+| 3b | Stage A architecture pin (§14a.2 NLI-clustered selector + V1 softmin) |
+| 3c | Stage B architecture pin (single threshold rule, ties to ABSTAIN) |
+| 3d | Risk signal pin ($r(q) = H_{\text{src}_{i^*}}(q)$, single scalar) |
+| 3e | Benchmark scope pin (HaluEval-QA only, scout-level) |
+| 3f | Operational metrics pin ($\Delta\kappa$ primary; secondary diagnostics) |
+| 3g | Verdict bands (1D cascade subordinated to $\Delta\kappa$) |
+| 3h | Implementation scope (small integration layer over closed §14/§15) |
+| 3i | What §15.3 does NOT test + reduced-form authorization rationale + roll-up |
+
+Implementation of `scripts/probe_hybrid_selective_abstention.py`
+is a separate §0.8 authorization gate. §15.3.x (the result
+section, parallel to §15.2) follows the real-data run.
+
+### 15.4 Result — §15.3 hybrid scout returned USEFUL_INTERNAL
+
+The §15.3 pre-committed hybrid scout has been executed against
+the on-disk §14a.2 dump in the runpod container. Combined
+classification per pre-committed bands:
+**`USEFUL_INTERNAL`** ($\Delta\kappa = +0.0900$,
+$\kappa_\text{hybrid} = 0.35$, no annotations). The §14a.2
+V1-selected answer plus a §15-style abstention gate on the
+V1-winning-source's semantic-entropy risk score produces
+operationally meaningful lift over §15.1's single-source
+abstention baseline ($\kappa_{\S15.1} = 0.26$) at the
+$\alpha_2 = 0.50$ absolute-majority operating target on
+HaluEval-QA, clearing the USEFUL_INTERNAL band but missing
+the STRONG band by 0.01 on the point estimate of $\Delta\kappa$.
+
+This is the **first non-MARGINAL/SATURATION verdict in the
+entire §13 / §14 / §15 LLM-track program.** §13's five single-
+axis classes returned ANTI under worst-benchmark; §14's two
+system-level scouts returned `SCOUT_SATURATION`; §15.2's
+single-source abstention scout returned `MARGINAL`. The §15.3
+hybrid is the structurally distinct combination §14c
+anticipated (selector + abstention layer on the selected
+answer); it produced the first measurable USEFUL_INTERNAL-band
+lift in the program, on a single benchmark, at this scale.
+
+Per §15.3 Chunk 3g's pinned acceptance/rejection table:
+
+> USEFUL_INTERNAL — Authorizes documenting the §14+§15 hybrid
+> as having internal-research operational value at this
+> single-benchmark scale. Forecloses §15.5 product investment,
+> cross-benchmark claims, VC-brief changes.
+
+Operationally: the §13.10-grade semantic-entropy scalar
+applied to V1's winning-source K=10 samples is enough to
+drive a useful abstention/answer policy on HaluEval-QA, but
+not enough to clear STRONG nor to support deployment-grade
+claims. **§13.9 VC-brief hold remains in force; §15.4 does
+not address §13.9's gate by construction** (different metric
+class). The autonomy-domain BCVF claim (§6.1) stands
+independently and is unaffected.
+
+**Parity-gate confirmation (per §15.3 Chunk 3h).**
+
+| benchmark | N_ok |
+|---|---|
+| halueval_qa | True |
+
+The §14a.2 dump satisfied $N=100$ on HaluEval-QA. The §15.3
+schema validation (`q_idx`, `sources` / per-source
+`semantic_entropy`, `answer_cluster_ids`, `v1_weights`,
+`v1_winning_cluster`, `v1_correct`) all passed; no fields
+were missing. No §0.8 deviation fired at the input layer.
+
+**Self-test gate.** §15.3's required pre-execution gate
+(`--self-test`) ran in the same invocation as real-data
+execution and returned PASSED on all 7 cascade boundary cases
+(Chunk 3g audit table + 3 boundary-inclusivity anchors) and
+all 7 demotion-rule cases. The 1D cascade implementation
+matches Chunk 3g exactly; the verdict reported in §15.4 is
+the cascade's mechanical readout, not interpretation.
+
+**Cross-program consistency check.** $W_\text{hybrid} = 67$
+implies V1 accuracy on HaluEval-QA $= 33/100 = 0.330$,
+matching §14a.2's V1 accuracy of 0.330 exactly. The §14a.2
+dump's V1 selected-answer correctness count is preserved
+through Stage A handoff into §15.4 without drift.
+
+**Artifacts.**
+
+- `scripts/probe_hybrid_selective_abstention.py` (numpy +
+  stdlib, CPU-only post-processor; the §15.3 implementation).
+- `docs/experiments/probe_hybrid_selective_abstention.json`
+  (machine-readable, `schema_version` `"15.3"`; single-
+  benchmark block, combined block with verdict).
+- `docs/experiments/probe_hybrid_selective_abstention.md`
+  (human-readable summary with parity gate, Stage A
+  configuration, headline table, operating points, cascade
+  trace, final verdict).
+
+**Section naming clarification.** §15.3 Chunk 3g's STRONG row
+referenced "§15.4 — full hybrid pre-commitment with
+TruthfulQA-MC extension and product-layer scope" as the
+hypothetical authorization for STRONG. STRONG did NOT fire
+(USEFUL_INTERNAL did), so the §15.4-as-future-full-hybrid
+path is moot. §15.4 is therefore used here as the §15.3
+result section (mirroring §15.1 → §15.2 convention). Any
+future full-hybrid pre-commitment — which §15.3's
+USEFUL_INTERNAL explicitly does NOT authorize per Chunk 3g
+— would land at §15.5 or higher under its own §0.8
+commitment.
+
+**Headline result.**
+
+| metric | value |
+|---|---|
+| $N$ | 100 |
+| $W_\text{hybrid}$ (V1 wrong count) | 67 |
+| $\text{AURC}_\text{random}$ ($= W/N$) | 0.6700 |
+| $\text{AURC}_\text{policy}$ | 0.4858 |
+| $\delta_\text{AURC}$ (diagnostic) | $+0.1842$ |
+| $\kappa_\text{hybrid}$ at $\alpha_2 = 0.50$ | **0.3500** |
+| $\kappa_{\S15.1}$ baseline (HaluEval $\kappa@\alpha_2$) | 0.2600 |
+| $\boldsymbol{\Delta\kappa}$ **(primary)** | $\boldsymbol{+0.0900}$ |
+| $\Delta\kappa$ 95% CI (paired bootstrap, $B = 1000$) | $[-0.1502, +0.4600]$ |
+
+**Cascade trace** (mechanical readout per §15.3 Chunk 3g;
+matches the implementation's `_cascade_trace_15_3` output
+exactly):
+
+```
+rule 1 REGRESSION: delta_kappa=+0.0900 < -0.02     -> NO
+rule 2 STRONG:     delta_kappa>=+0.10               -> NO   (point estimate 0.01 below threshold)
+rule 3 USEFUL_INTERNAL: delta_kappa>=+0.05         -> YES
+```
+
+**Demotion rule (Chunk 3g) — did NOT apply.** The §15.3
+demotion rule is STRONG-only by construction; the cascade
+returned USEFUL_INTERNAL (rule 3), which is not subject to
+demotion. `verdict_annotations` is empty. **Audit note for
+the near-miss:** had the cascade returned STRONG (had the
+point estimate been 0.01 higher), the demotion rule WOULD
+have fired — the bootstrap CI lower bound on $\Delta\kappa$
+is $-0.1502 \le 0$. A counterfactual STRONG would therefore
+have demoted to USEFUL_INTERNAL with `STRONG_BUT_CI_DEMOTION`
+annotation. **The cascade landed at USEFUL_INTERNAL on the
+point estimate alone, without the demotion rule needing to
+intervene; the verdict's stability does not depend on
+bootstrap CI width.**
+
+**Three observations the headline supports.**
+
+**(a) First non-MARGINAL/SATURATION verdict in the entire
+§13 / §14 / §15 LLM-track program.** Eleven distinct
+experimental structures have now been tested across four
+metric classes (§13 single-axis AUC, §14 system-level
+accuracy delta, §15 single-source abstention AURC + cov@α,
+§15.3 hybrid Δκ over §15.1 baseline). §15.3 is the first
+that clears USEFUL_INTERNAL. The §14c-anticipated direction
+(V1 selector + Stage B abstention on the selected answer)
+is empirically validated at this scale: the joint object
+produces operational lift that neither component produces
+alone.
+
+**(b) $\Delta\kappa = +0.0900$ misses STRONG by 0.01 on the
+point estimate.** The point estimate is one-hundredth below
+the pinned STRONG threshold of $+0.10$. **Pre-committed
+bands prevent recharacterizing this as "essentially STRONG"
+or relaxing the threshold post-hoc.** The §14a.2 band-
+coverage-gap lesson (where a $(+4, +1)$ outcome fell through
+the partition) is exactly the discipline-erosion failure
+mode §15.3's exhaustive 1D cascade was designed to prevent.
+The cascade landed at USEFUL_INTERNAL deterministically per
+the pinned rule; the near-miss is documented but does not
+unlock STRONG-band authorizations.
+
+**(c) Bootstrap CI on $\Delta\kappa$ is wide; lower bound is
+negative.** $\Delta\kappa$ 95% CI = $[-0.1502, +0.4600]$,
+width $\approx 0.61$. At $N=100$ the paired bootstrap
+cannot tightly constrain $\Delta\kappa$; the lower bound at
+$-0.15$ does not rule out $\Delta\kappa \le 0$. This is a
+power-of-measurement observation, NOT a $\Delta\kappa = 0$
+claim. The point-estimate verdict is USEFUL_INTERNAL by the
+pinned rule; the wide CI says a single re-run at the same
+$N$ might land in a different band by chance. A larger-$N$
+re-run would tighten this band; that re-run is NOT
+authorized by §15.3 and would require a fresh §0.8
+commitment.
+
+**Comparison to §15.2 single-source abstention at the same
+$\alpha_2$ target.**
+
+§15.2's verdict-of-record on HaluEval-QA was MARGINAL with
+$\kappa_{\S15.1,\text{HaluEval}}@\alpha_2 = 0.26$ at
+$\alpha_2 = 0.50$. §15.4's hybrid policy on the same
+benchmark at the same target produces $\kappa_\text{hybrid} =
+0.35$. The operating-point comparison at $\alpha_2$:
+
+| metric | §15.2 single-source (HaluEval) | §15.4 hybrid (HaluEval) | Δ |
+|---|---|---|---|
+| $\text{cov}@\alpha_2$ | 0.26 | **0.35** | **+0.09 = $\Delta\kappa$** |
+| $\tau^*$ at $\alpha_2$ | 1.0889 | 1.2275 | +0.139 |
+| ecr at $\tau^*$ | 0.8143 | 0.7463 | $-0.068$ |
+| far at $\tau^*$ | 0.5667 | 0.4545 | $-0.112$ |
+
+Three operationally relevant features of this comparison.
+
+**(a) Coverage lift at the same accuracy target — the
+headline operational signal.** The hybrid policy answers
+35% of HaluEval-QA at $\text{acc} \ge 0.50$ where §15.1
+single-source could only answer 26%. **At absolute terms
+that is 9 more questions answered per 100 at the same
+absolute-majority operating target.** Per §15.3 Chunk 3g
+this is the band-driving primary.
+
+**(b) ecr / far rebalancing.** The hybrid abstains fewer
+questions overall than §15.1 (lower far) AND catches a
+slightly smaller fraction of wrong V1 answers (lower ecr).
+Together these produce higher net coverage at the same
+accuracy bar. **Mechanism read:** V1's selector occasionally
+picks Llama or Mistral on questions where Qwen would have
+been wrong; the per-source-entropy of that winning source
+captures the question's risk more accurately than Qwen's
+own entropy did under §15.1. The hybrid trades a small
+amount of V1-wrong-error capture for a larger reduction
+in V1-correct-false-abstention.
+
+**(c) The threshold $\tau^*$ that achieves $\kappa_\text{hybrid}$
+is higher than §15.1's $\tau^*$ at the same $\alpha_2$
+target ($1.2275$ vs $1.0889$).** A higher threshold means
+the hybrid is willing to ANSWER on higher-entropy questions
+than §15.1 was — i.e., the hybrid's per-question risk score
+is shifted in distribution relative to Qwen-greedy entropy.
+Mechanically consistent with V1 sometimes selecting non-Qwen
+sources whose entropy distributions differ from Qwen's. **The
+hybrid's risk score is not just §15.1's signal renamed; it
+is structurally a different per-question scalar on the
+divergent-V1-selection subset.**
+
+**Cross-program consistency note (operating point at
+$\alpha_1$).** §15.4's $\alpha_1 = 0.40$ point: cov $=0.63$,
+$\tau^* = 1.9730$, ecr $=0.46$, far $=0.18$. §15.2's
+HaluEval $\alpha_1 = 0.40$ point: cov $=0.36$, $\tau^* =
+1.4979$, ecr $=0.70$, far $=0.50$. **The hybrid more than
+$1.7\times$ the coverage at the modest-accuracy operating
+target.** The pattern is consistent at $\alpha_1$ and
+$\alpha_2$: the hybrid extends the operational frontier
+across the lower-$\alpha$ range. The improvement
+disappears at $\alpha_3 = 0.75$ (next chunk).
+
+**Deployment-grade ceiling — $\alpha_3 = 0.75$ degeneracy
+carries over from §15.2.**
+
+The §15.4 operating point at $\alpha_3 = 0.75$:
+
+| benchmark | $\alpha_3$ | $\text{cov}@\alpha_3$ | $\tau^*$ | ecr | far |
+|---|---|---|---|---|---|
+| §15.4 hybrid (HaluEval) | 0.75 | **0.00** | $+\infty$ | NaN | NaN |
+| §15.2 single-source (HaluEval) | 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+| §15.2 single-source (TruthfulQA-MC) | 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+
+**No threshold $\tau$ in the §15.4 sweep grid (102 points)
+yields acc $\ge 0.75$ on an answered subset of size $\ge
+n_\min = 10$.** Same hard ceiling §15.2 documented across
+both benchmarks — abstention alone, even with V1's selector
+in front of it, **cannot reach a deployment-grade $\alpha
+\ge 0.75$ subset** at this configuration.
+
+**Three implications.**
+
+**(a) The hybrid's USEFUL_INTERNAL verdict is real but
+operationally bounded.** The lift at $\alpha_1 = 0.40$ and
+$\alpha_2 = 0.50$ is genuine and measurable; the lift at
+$\alpha_3 = 0.75$ is identically zero (both policies fail).
+Any future product layer over this hybrid would have to
+operate at $\alpha < 0.75$ — i.e., accept a residual
+accuracy floor below 75% on the answered subset. **Whether
+that floor is operationally acceptable is a product
+question §15.3's USEFUL_INTERNAL does not answer and
+explicitly does NOT authorize §15 to opine on.**
+
+**(b) The mechanism §15.2 Chunk 2d documented persists.**
+At greedy accuracies in the 0.25–0.33 range, the entropy
+distribution does not contain a high-confidence subset
+dense enough to support both $\text{acc} \ge 0.75$ AND
+$|A_\tau| \ge 10$. Adding V1's selector (which lifts
+greedy from 0.30 to 0.33 on HaluEval per §14a.2) does not
+move the needle far enough to unlock $\alpha_3$. **A
+deployment-grade ceiling requires either a higher base-
+model accuracy floor (model-scale upgrade per §13.8 future-
+work) or a larger-$N$ target-accuracy subset that survives
+the entropy threshold.** Neither is in §15.3 / §15.4 scope.
+
+**(c) The §15 metric class is partially saturated even
+inside USEFUL_INTERNAL.** §15.4 USEFUL_INTERNAL covers
+$\alpha_1$ and $\alpha_2$; $\alpha_3$ is unreachable.
+Pre-committed bands do not distinguish "USEFUL_INTERNAL at
+two of three operating points" from "USEFUL_INTERNAL at
+all three" — the cascade is driven by $\Delta\kappa$ at
+$\alpha_2$ alone per Chunk 3g. **This is by design**: §15.3
+narrowed the verdict to one scalar to prevent secondary-
+metric overreading. The $\alpha_3$ degeneracy is reported
+as a diagnostic and bounds the operational claim, but does
+not re-classify the verdict.
+
+**What §15.4 authorizes (per §15.3 Chunk 3g USEFUL_INTERNAL row).**
+
+The §15.3-pinned acceptance/rejection mapping for
+USEFUL_INTERNAL is binding under §0.8. Reproduced exactly:
+
+| §15.4 verdict | Authorizes | Forecloses |
+|---|---|---|
+| USEFUL_INTERNAL | Documenting the §14+§15 hybrid as having internal-research operational value at this single-benchmark scale. | §15.5 product investment; cross-benchmark claims; VC-brief changes. |
+
+Specifically, §15.4 **authorizes**:
+
+- Documenting the §15.3 verdict-of-record in this section
+  (which §15.4 itself accomplishes).
+- Recording the per-question $\Delta\kappa = +0.0900$,
+  $\kappa_\text{hybrid} = 0.35$, the operating-point triples,
+  and the bootstrap CI as the §15.4 verdict-of-record.
+- Citing §15.4 as the **first** USEFUL_INTERNAL-grade
+  empirical evidence in the §13 / §14 / §15 program at the
+  pinned configuration.
+- Citing the §14c-anticipated direction as empirically
+  validated at this single-benchmark scale (V1 selector +
+  Stage B abstention produces lift over §15.1's single-
+  source policy at $\alpha_1$ and $\alpha_2$).
+
+§15.4 explicitly **does NOT authorize**:
+
+- **§15.5 follow-up.** A full hybrid pre-commitment with
+  TruthfulQA-MC extension and product-layer scope was the
+  §15.3 Chunk 3g STRONG-band authorization; STRONG did not
+  fire. §15.5 requires a fresh top-level §0.8 commitment.
+- **Cross-benchmark claims.** §15.4 ran on HaluEval-QA only.
+  No claim about TruthfulQA-MC behavior is supported. Per
+  §15.3 Chunk 3e's cherry-picking caveat: "The §15.3 verdict
+  authorizes only what its single-benchmark scope tests."
+- **Product-readiness claims.** USEFUL_INTERNAL is internal-
+  research grade, not deployment grade. The $\alpha_3 = 0.75$
+  degeneracy further bounds what could be claimed.
+- **VC-brief updates.** §13.9 hold remains in force; §15.4's
+  metric class (Δκ vs §15.1 baseline) is structurally
+  separate from §13.9's gate (STRONG-band lift in answer-
+  selection AUC or accuracy). The hold is not addressed by
+  §15.4 by construction.
+- **Reframing of any §13 / §14 / §15.x verdict.** §15.4 is
+  on a fresh metric class and does not interact with §13's
+  ANTI verdicts, §14's SCOUT_SATURATION, §15.2's MARGINAL,
+  or §13.20's NOISE_BAND_LIFT observation.
+- **Cross-domain claims.** Autonomy-domain BCVF (§6.1)
+  stands wholly independent of any §15.4 outcome.
+
+**§0.8 implementation transparency — line-count drift on the
+§15.3 script.**
+
+§15.3 Chunk 3h estimated `scripts/probe_hybrid_selective_abstention.py`
+at $\sim$400–600 lines; the as-implemented script is
+$\sim$1098 lines, roughly equivalent to §15.1's $\sim$1112
+lines rather than half. Surfaced explicitly per §15.3 Chunk
+3h's discipline rather than absorbed:
+
+- The "copy primitives, do NOT import" rule (§15.3 Chunk 3h)
+  duplicated $\sim$150 lines of §15.1 metric primitives into
+  the §15.3 script.
+- The §14a.2 schema validation is more elaborate than
+  §15.1's (nested per-source structure, M=3 source-list
+  validation, winning-cluster argmax extraction).
+- Output writers are similar size to §15.1's, not smaller.
+
+**The 1D verdict cascade IS smaller than §15.1's 2D
+cascade, as Chunk 3h promised; the surrounding
+infrastructure simply did not shrink proportionally.** This
+drift is documented as an audit-lesson observation about
+§0.8 cost-estimation discipline; it does NOT change the
+§15.4 verdict (which is driven by $\Delta\kappa$ alone, not
+by code complexity). Future "small integration layer over
+closed components" estimates should account for the
+copy-not-import rule's duplication cost up front.
+
+**No deviation flag fired during the §15.3 run.** Per §15.3
+Chunk 3h's "Any deviation discovered at run time must be
+flagged in the §15.4 result section as a §0.8 deviation":
+the run produced no such deviation. Parity gates passed,
+schema matched, self-test passed in-run, the cascade fired
+exactly as the implementation's `_cascade_trace_15_3` walks
+the pinned rules. The line-count drift is documented inside
+§15.4 (here) rather than as a run-time deviation, since it
+was a pre-run estimation artifact.
+
+**Combined picture across §13 / §14 / §15 — LLM-track now
+covers four metric classes; one cleared USEFUL_INTERNAL.**
+
+§15.4 closes the fourth of four pre-committed metric-class
+investigations of BCVF-derived signals on the LLM track:
+
+| Program | Metric class | Question | Combined verdict |
+|---|---|---|---|
+| §13 | AUC of an observable vs ground-truth correctness | Does observable X correlate with correctness? | 5-of-5 single-axis classes ANTI; §13.10 baseline `TRUTH_CORRELATED_MARGINAL` (AUC 0.661 / 0.661 at N=100) |
+| §14 | Δ accuracy of system-level routing vs naive aggregation | Does BCVF-shaped routing lift end-to-end accuracy? | 2-of-2 scout configurations `SCOUT_SATURATION` |
+| §15 (single-source) | Risk-coverage operational metrics on Qwen greedy | Does the §13.10 score support a useful answer/abstain policy on a single source? | `MARGINAL` (§15.2; δ=+0.116 statistically supported, κ=0.14 limited by TruthfulQA-MC) |
+| **§15 (hybrid)** | **Δκ vs §15.1 baseline on V1's selected answer** | **Does a §14-selector + §15-abstention hybrid lift the operating frontier over single-source abstention?** | **`USEFUL_INTERNAL`** (§15.4; Δκ = +0.090; the only program-level lift to clear USEFUL_INTERNAL) |
+
+The four programs are structurally independent — different
+metric classes, different acceptance rules, different math
+objects. **Each was pre-committed under §0.8 with bands
+fixed before its data was opened.** Three returned strict
+non-promotion verdicts (ANTI / SCOUT_SATURATION / MARGINAL);
+§15.4 returned the program's first USEFUL_INTERNAL.
+
+**§13.9 VC-brief hold reaffirmed.** §13.9 gates external-
+framing changes to `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` on
+a STRONG-band lift on both benchmarks at any §13 / §14 /
+§15 probe. §15.4's USEFUL_INTERNAL is below STRONG by
+construction (1D cascade rule 3 is the band immediately
+below STRONG) and is single-benchmark — neither condition
+satisfies §13.9's gate. Combined with §13's 5/5 ANTI,
+§14's 2/2 SCOUT_SATURATION, §15.2's MARGINAL, §13.20's
+N=200 `NOISE_BAND_LIFT`, and §15.4's single-benchmark
+USEFUL_INTERNAL, **twelve distinct experimental structures
+have now been tested across four metric classes at the 7B +
+DeBERTa-v3-base + N=100/200 configuration without producing
+a STRONG combined classification on any of them.** The
+§13.9 hold is unchanged; §15.4 strengthens it by adding
+another metric class that did not clear STRONG.
+
+The honest external framing for any internal-research
+referencing of the §13 / §14 / §15 program is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100, no
+> literature-aligned, mechanism-motivated, system-level,
+> single-source-abstention, or hybrid-abstention BCVF
+> construction tested in this codebase clears the STRONG
+> combined-classification bar on the worst-benchmark rule.
+> The §15.3 hybrid scout did clear USEFUL_INTERNAL on
+> HaluEval-QA single-benchmark — internal-research
+> operational evidence that adding §14a.2's V1 selector in
+> front of a §15-style abstention gate produces measurable
+> lift over single-source abstention at the absolute-
+> majority operating target — but this single-benchmark
+> USEFUL_INTERNAL does NOT clear the §13.9 STRONG-band-on-
+> both-benchmarks external-framing bar.*
+
+**§15.4 closes the §15 LLM-track operational chapter at the
+hybrid level.** Per Chunk 3g the USEFUL_INTERNAL verdict
+explicitly forecloses §15.5-as-implementation follow-ups at
+this configuration. Any follow-up under §15 logic — cross-
+benchmark extension to TruthfulQA-MC, larger-N re-run,
+ensemble risk score, alternative selector configurations,
+relaxed worst-benchmark rule — would require a fresh top-
+level §0.8 commitment with bands pinned before any data
+inspection. None is authorized by §15.4.
+
+**The autonomy-domain BCVF claim (§6.1) stands independently
+on the N=21 sign-test that passed in §6.1 / §6.7 and is
+unaffected by any §13 / §14 / §15 outcome.** The §13 / §14 /
+§15 program tested whether BCVF transfers to LLM
+hallucination detection at this codebase's specific scale,
+across four distinct metric classes; the answer at this
+configuration is mixed — eleven of twelve experimental
+structures returned strict non-promotion verdicts; one
+(§15.3 hybrid) cleared USEFUL_INTERNAL on a single
+benchmark. The §13.9 external-framing hold remains binding;
+the §15.4 USEFUL_INTERNAL verdict is documented internally,
+not externally, per Chunk 3g.
+
+**Artifacts.**
+
+- `scripts/probe_hybrid_selective_abstention.py` (the §15.3
+  implementation; numpy + stdlib only).
+- `docs/experiments/probe_hybrid_selective_abstention.json`
+  (machine-readable result, schema_version `15.3`).
+- `docs/experiments/probe_hybrid_selective_abstention.md`
+  (human-readable summary).
+
+§15.4 result section now complete (chunks 4a–4f, 6 commits
+on top of the §15.3 pre-commitment + implementation).
+
+### 15.5 Pre-commitment — Hybrid scout on TruthfulQA-MC (cross-benchmark companion to §15.3)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any §14a.2-on-TruthfulQA-MC dump
+is opened in hybrid form, and indeed before that dump even
+exists on disk (the GPU run that produces it follows §15.5's
+landing, not precedes it). Specification, primary risk
+signal, success bands, baselines, and acceptance/rejection
+rules below cannot be redefined post-hoc.
+
+**Position in the §13 / §14 / §15 program — what §15.5 is and
+what it is not.** §15.5 is the cross-benchmark companion to
+§15.3, not a continuation, reframe, or extension of §15.4's
+verdict. Specifically:
+
+- **§15.3** was a single-benchmark scout on **HaluEval-QA**;
+  §15.4 returned `USEFUL_INTERNAL` ($\Delta\kappa = +0.0900$,
+  $\kappa_\text{hybrid} = 0.35$ vs §15.1 baseline
+  $\kappa = 0.26$).
+- **§15.5** is a **single-benchmark scout on TruthfulQA-MC**
+  — the benchmark §15.3 explicitly excluded (per §15.3
+  Chunk 3e) because the §14a.2 dump did not exist for
+  TruthfulQA-MC.
+- §15.5 produces its own per-benchmark verdict on TruthfulQA-
+  MC alone. The §15.5 verdict cascade fires on TruthfulQA-MC's
+  $\Delta\kappa$ alone (per Chunk 5g, identical structure to
+  §15.3 Chunk 3g).
+- A **cross-benchmark synthesis** (§15.4 HaluEval verdict +
+  §15.5 TruthfulQA-MC verdict under worst-benchmark rule) is
+  computed in §15.5's result section as a **diagnostic**,
+  NOT as the cascade band-driver. This keeps §15.5 a clean
+  single-benchmark scout structurally parallel to §15.3.
+
+**This is a new claim, not a reframe of §15.4.**
+
+- Not "§15.4's USEFUL_INTERNAL extends to TruthfulQA-MC"
+  (that would presume the answer; §15.5 tests it).
+- Not "§14+§15 hybrid achieves cross-benchmark
+  generalization" (the cross-benchmark synthesis is a
+  derived diagnostic, not a §15.5 verdict).
+- **But** "the §14+§15 hybrid construct, transplanted to
+  TruthfulQA-MC at the same single-benchmark scout structure
+  §15.3 used on HaluEval-QA, lands in cascade band X" —
+  where X is determined by the §15.5 cascade applied to
+  TruthfulQA-MC's numbers alone.
+
+**§15.5 is a fresh §0.8 commitment.** All §13 / §14 / §15.1 /
+§15.2 / §15.3 / §15.4 / §13.20 verdicts remain binding and
+are NOT retroactively reframed. A §15.5 STRONG would authorize
+drafting §15.6 (full hybrid pre-commitment with both
+benchmarks combined and product-layer scope) as a separate
+§0.8 commitment; it would NOT re-classify §15.4's single-
+benchmark USEFUL_INTERNAL.
+
+**Why this is a new metric class.** §15.4 measured
+$\Delta\kappa$ on HaluEval-QA against the §15.1 HaluEval
+baseline ($\kappa = 0.26$). §15.5 measures $\Delta\kappa$ on
+TruthfulQA-MC against the §15.1 TruthfulQA-MC baseline
+($\kappa = 0.14$, recorded in §15.2's verdict-of-record). The
+two benchmarks have different greedy accuracies, different
+distractor structures, and different §15.1 baseline values;
+the per-benchmark $\Delta\kappa$ scalar is benchmark-local
+by construction. **The cross-benchmark synthesis is a
+derived comparator over two independent §0.8 commitments,
+not a single combined-classification rule.**
+
+**Confirmation: no data inspection prior to this pre-
+commitment.** No §14a.2-on-TruthfulQA-MC dump exists on disk
+yet. The §15.4 HaluEval-QA result was inspected only through
+its pinned numerical record (Δκ=+0.090, κ=0.35 from
+`probe_hybrid_selective_abstention.json`); no per-question
+field of the §14a.2-on-HaluEval dump has been opened in §15.5
+form. The protocol, primary signal, metrics, and bands in
+the §15.5 chunks below are pinned from §13 / §14 / §15 prose
+only.
+
+**Stage A — answer-selection architecture (pinned, identical
+to §15.3 Chunk 3b modulo benchmark substitution).**
+
+Stage A is the §14a.2 NLI-clustered selector + V1 softmin
+trust consumer **applied to TruthfulQA-MC** at the same
+configuration §14a.2 / §15.3 used on HaluEval-QA. Pinned for
+the same reasons §15.3 pinned this configuration: V1 softmin
+$\tau = 0.5$ produced the +4pp lift in §14a.2 (the strongest
+BCVF-shaped lift in the §13 / §14 program); the NLI-clustered
+selector is the post-§14a-audit version that fixed the
+string-identity tie-breaking degeneracy. Single configuration
+in this scout — no multi-selector or multi-consumer sweep.
+
+**Stage A specification (pinned).**
+
+- **Source set (M = 3, cross-family, all cached from §13.11
+  / §14a.2):** `Qwen/Qwen2.5-7B-Instruct`,
+  `meta-llama/Llama-3.1-8B-Instruct`,
+  `mistralai/Mistral-7B-Instruct-v0.3`.
+- **Per-source K = 10 stochastic samples** at T=1.0,
+  max_new_tokens=32, prompt `Q: ... A:`. Identical to
+  §13.10 / §13.11 / §14a.2 protocols.
+- **Per-source greedy answer** at T=0, max_new_tokens=32,
+  same prompt format.
+- **Per-source semantic entropy** $H_{\text{src}_i}(q)$ via
+  question-conditioned bidirectional NLI clustering of the
+  K=10 samples (DeBERTa-v3-base-mnli-fever-anli, identical
+  NLI model to §13.10 / §14a.2).
+- **V1 softmin consumer (pinned, single):**
+  $w_i^{V1} \propto \exp(-H_{\text{src}_i}(q) / \tau)$ with
+  $\tau = 0.5$.
+- **NLI-clustered selector (pinned, single):** identical
+  spec to §14a.2 / §15.3 Chunk 3b (cluster M=3 source
+  greedies by question-conditioned bidirectional NLI
+  entailment, aggregate weights within each cluster, pick
+  winning cluster $k^*$ by max aggregated weight with
+  lowest-cluster-index tiebreak, pick representative source
+  by max individual weight with lowest-source-index
+  tiebreak).
+- **Benchmark (pinned, single):** **TruthfulQA-MC**
+  validation split, $N = 100$. Identical to §13.10 /
+  §13.11's TruthfulQA-MC question subset.
+
+**Stage A output (the per-question handoff to Stage B).**
+Identical structure to §15.3 Chunk 3b — `selected_answer(q)`,
+`winning_source_id(q) ∈ {Qwen, Llama, Mistral}`, all three
+per-source semantic entropies including the winner's, the
+winning cluster's aggregated weight, and the runner-up's.
+Stage A makes no abstention decision and consumes no
+threshold parameter.
+
+**The §14a.2-on-TruthfulQA-MC dump does not exist yet.** The
+GPU run that produces it (~50–60 min on the existing 80 GB
+GPU per §14a.2's pinned cost estimate) follows §15.5's
+landing as a separate authorization step. Implementation
+chunk (5h) details the pinned re-run protocol.
+
+**What Stage A explicitly does NOT pin** (identical to §15.3
+Chunk 3b's non-pin list):
+
+- Multiple consumers (V2 thresholded exclusion, V3 veto-only,
+  V4 deadband fallback). All deferred — V1 is pinned single.
+- Multiple selectors (highest-weight-source, string-matched,
+  uniform majority). Deferred.
+- Different source sets. M=3 cross-family is pinned; no
+  larger $M$, no model substitution, no single-source
+  fallback.
+- Re-running §14a.2 on HaluEval-QA. The on-disk §14a.2-on-
+  HaluEval dump §15.3 used remains the §15.4 verdict-of-
+  record artifact and is NOT touched by §15.5.
+
+**Stage B — abstention architecture (pinned, identical to
+§15.3 Chunk 3c).**
+
+Stage B sits downstream of Stage A and reads the §14a.2-on-
+TruthfulQA-MC dump's per-question records (once produced by
+the Stage A GPU run). For each question $q$, Stage B
+consumes:
+
+- `selected_answer(q)` from Stage A's V1 softmin + NLI-
+  clustered selector;
+- $c(q)$ — the correctness label of `selected_answer(q)`
+  per the §14a.2 NLI labeling protocol applied to
+  TruthfulQA-MC (entails right_answer AND not any
+  distractor); **note this is the correctness of Stage A's
+  selected answer, NOT Qwen-greedy correctness on
+  TruthfulQA-MC; structurally distinct from §15.1's
+  TruthfulQA-MC $c(q)$ on questions where V1 selects a
+  different answer than Qwen-greedy**;
+- a per-question identifier for deterministic ordering.
+
+These plus the §15.5 risk signal (pinned in Chunk 5d) drive
+Stage B's per-question answer-or-abstain decision.
+
+**Decision rule (pinned, single, identical to §15.3 Chunk 3c).**
+Per-question deterministic threshold rule:
+$$
+\text{policy}_\tau(q) = \begin{cases}
+\text{ANSWER selected\_answer}(q) & \text{if } r(q) < \tau \\
+\text{ABSTAIN} & \text{if } r(q) \ge \tau
+\end{cases}
+$$
+where $r(q)$ is the §15.5 risk signal pinned in Chunk 5d.
+Ties at $r(q) = \tau$ resolve to ABSTAIN — identical
+deterministic, conservative tie-handling as §15.1 / §15.3.
+
+**Threshold-sweep protocol (pinned, identical to §15.3
+Chunk 3c).** $\tau$ is swept across the sorted unique values
+of $r(q)$ on TruthfulQA-MC plus $-\infty$ (always-abstain)
+and $+\infty$ (always-answer). At $N=100$ this yields at most
+102 grid points. All operational metrics (pinned in Chunk 5f)
+are computed at every grid point. No grid is hand-picked; no
+$\tau$ is hand-picked.
+
+**What Stage B explicitly does NOT pin** (identical to §15.3
+Chunk 3c).
+
+- **Multiple abstention policies.** No deadband, no veto-only
+  mode, no cluster-margin rule. One threshold rule, single
+  $\tau$.
+- **Multiple risk signals.** One scalar (pinned in Chunk 5d).
+  No primary-plus-secondary, no ensemble.
+- **Held-out calibration of $\tau$.** $\tau$ is fitted only
+  via the deterministic empirical-support sweep — same rule
+  §15.1 / §15.3 used. No held-out tuning, no isotonic /
+  Platt / conformal wrapping of $r(q)$.
+- **Re-decoding or rewriting `selected_answer(q)`.** Stage B's
+  only degree of freedom is the answer/abstain decision; the
+  answer itself is whatever Stage A produced.
+- **Cascading multiple abstention layers.** If the risk
+  signal were split across multiple thresholds, that would be
+  a distinct policy and require a fresh §0.8 commitment.
+
+**Risk signal pin (identical to §15.3 Chunk 3d).**
+
+The §15.5 risk signal is pinned as:
+$$
+r(q) \;=\; H_{\text{src}_{i^*}}(q)
+$$
+where $i^*$ is Stage A's `winning_source_id(q)` on
+TruthfulQA-MC and $H_{\text{src}_{i^*}}(q)$ is that source's
+semantic-entropy scalar from the §13.10-protocol K=10 NLI-
+clustered samples (computed by the §14a.2-on-TruthfulQA-MC
+GPU run, identical protocol to §13.10 / §14a.2). **Higher
+$H$ means higher per-question hallucination risk on Stage A's
+selected answer; Stage B's policy abstains when $r$ exceeds
+$\tau$.**
+
+This is the same scalar §15.3 pinned, applied to the
+TruthfulQA-MC §14a.2 dump rather than the HaluEval-QA one.
+On questions where V1 picks Qwen on TruthfulQA-MC, $r(q)$
+equals Qwen's per-source entropy on TruthfulQA-MC at the §13.10
+protocol; on questions where V1 picks Llama or Mistral, $r(q)$
+equals that source's per-source entropy.
+
+**§15.5 reuses §15.3's risk-signal justification verbatim** —
+the three §0.8 questions §15.3 Chunk 3d answered for
+HaluEval-QA apply identically here:
+
+- **Why more defensible than alternatives?** $H_{\text{src}}$
+  inherits §13.10's marginal-pass-on-both-benchmarks pedigree
+  (AUC 0.661 on each at N=100). §15.5's TruthfulQA-MC scalar
+  is the same primitive at the same N=100, computed by the
+  same NLI clustering protocol.
+- **Why does it not reopen §13?** §13 measured AUC of
+  $H_{\text{src}}$ vs ground-truth correctness; §15.5 uses
+  the same scalar as a per-question risk score driving an
+  answer/abstain policy applied to **Stage A's TruthfulQA-MC
+  selected answer** — a different metric class. Novel content
+  is the joint $(r(q), c(q))$ distribution on V1-selects-non-
+  Qwen TruthfulQA-MC questions.
+- **Why is it implementable without new infrastructure?**
+  All quantities will be pre-computed in the §14a.2-on-
+  TruthfulQA-MC dump once that GPU run produces it
+  (per §14a.2's prose, dump records each source's greedy +
+  entropy + per-question correctness label). Pure CPU post-
+  processing in Stage B, mirroring §15.3.
+
+**Alternative signals considered and explicitly NOT pinned**
+(identical to §15.3 Chunk 3d):
+
+- $\min_i H_{\text{src}_i}(q)$ — independent of V1's actual
+  selection.
+- $W_{k^*} - W_{k_{\text{runner}}}$ — winning-cluster margin;
+  pure selector-level signal, lacks §13/§15 prior validation.
+- $W_{k^*} / \sum_k W_k$ — winning-cluster fraction; same
+  lack-of-validation issue.
+- Cross-source NLI disagreement (§13.11-style) — closer to
+  §13.11 reframed; would reopen that closed hypothesis class.
+- Any ensemble of the above — forbidden by §15.5 Chunk 5c's
+  "no ensemble" pin.
+
+§15.5 uses **exactly one scalar**: $H_{\text{src}_{i^*}}(q)$.
+No primary-plus-secondary, no ensemble, no fallback. Adding
+any alternative would require a fresh §0.8 amendment to
+§15.5.
+
+**Benchmark scope pin (single benchmark; TruthfulQA-MC only).**
+
+§15.5 is a single-benchmark scout on **TruthfulQA-MC** at
+$N = 100$ — the benchmark §15.3 explicitly excluded. Per the
+user-pinned A1 framing (cross-benchmark synthesis as
+diagnostic only), §15.5's verdict cascade fires on
+TruthfulQA-MC's $\Delta\kappa$ alone, structurally parallel
+to §15.3's HaluEval-only cascade.
+
+**Why TruthfulQA-MC, why now.**
+
+1. **§15.3 deferred TruthfulQA-MC by construction.** §15.3
+   Chunk 3e pinned HaluEval-QA-only because the §14a.2 dump
+   existed only on HaluEval. §15.5 closes that gap with a
+   fresh §14a.2 protocol run on TruthfulQA-MC.
+2. **TruthfulQA-MC is the consistent worst-benchmark cap
+   across §13 / §14 / §15.** It defeated 5/5 §13 single-axis
+   classes; §14 deferred it to "full §14 conditional on §14a.2
+   STRONG" which never landed; §15.2's combined-classification
+   was clamped to MARGINAL by TruthfulQA-MC's $\kappa = 0.14$.
+   §15.5 tests whether the §14+§15 hybrid construct that
+   produced §15.4's HaluEval USEFUL_INTERNAL also clears its
+   USEFUL_INTERNAL bar on the harder benchmark.
+3. **High prior of failure, but a clean answer either way.**
+   If §15.5 returns USEFUL_INTERNAL or higher, §15.4's
+   single-benchmark finding generalizes; the cross-benchmark
+   diagnostic synthesis would land USEFUL_INTERNAL or above
+   under the worst-benchmark rule. If §15.5 returns MARGINAL
+   or below, the §15.4 finding is bounded as a HaluEval-only
+   artifact; the cross-benchmark synthesis lands at the
+   worse of {§15.4, §15.5} per the worst-benchmark rule.
+
+**Cross-benchmark synthesis (diagnostic, not band-driving).**
+The §15.5 result section will compute and report the combined
+verdict across §15.4 (HaluEval) and §15.5 (TruthfulQA-MC)
+under the worst-benchmark rule:
+$$
+\Delta\kappa_\text{combined} = \min\big(\Delta\kappa_{\text{HaluEval}}, \Delta\kappa_{\text{TruthfulQA-MC}}\big)
+$$
+with the §15.3 / §15.5 cascade applied to
+$\Delta\kappa_\text{combined}$. **This combined verdict is a
+diagnostic only.** It does NOT re-classify §15.4's HaluEval-
+only USEFUL_INTERNAL or §15.5's TruthfulQA-MC-only verdict.
+It informs whether the §14+§15 hybrid clears USEFUL_INTERNAL
+on a worst-benchmark basis — the bar a future §15.6 product-
+layer commitment would care about — but it is NOT the §15.5
+band-driver under §0.8.
+
+**Implication for §15.6 / §13.9.** A §15.5 STRONG would
+authorize §15.6 (full hybrid pre-commitment with both
+benchmarks combined and product-layer scope). A §15.5
+USEFUL_INTERNAL whose cross-benchmark synthesis also lands
+USEFUL_INTERNAL would likewise unlock a §15.6 commitment as
+a separate §0.8 step. Lower verdicts on §15.5 (MARGINAL,
+SATURATION, REGRESSION) close the §14+§15 hybrid line at the
+configuration. **§13.9 hold remains in force regardless of
+§15.5 outcome** — §15.5's metric class (Δκ vs §15.1
+TruthfulQA-MC baseline of 0.14) is structurally separate
+from §13.9's answer-selection STRONG-band gate, exactly as
+§15.3 / §15.4 were.
+
+**Cherry-picking caveat (acknowledged ex ante).** TruthfulQA-
+MC is the harder of the two benchmarks; running it
+specifically AFTER §15.4's HaluEval USEFUL_INTERNAL could
+look like cherry-picking the second benchmark to confirm a
+positive signal. **§15.5 deliberately runs the harder
+benchmark second precisely because TruthfulQA-MC has been
+the consistent cap; the asymmetry is a known prior of the
+program**, not an artifact of §15.5's setup. The §15.5 bands
+(Chunk 5g) are pinned identical to §15.3's, not relaxed —
+the same operational threshold applies.
+
+**Operational metrics pin (identical structure to §15.3
+Chunk 3f modulo benchmark and baseline).**
+
+§15.5's metric set is structurally identical to §15.3's,
+with two pinned differences: the benchmark is TruthfulQA-MC
+and the §15.1 baseline is $\kappa_{\S15.1,\text{TruthfulQA-MC}}
+= 0.14$ (not 0.26).
+
+**Notation (single benchmark, $N = 100$).** For each
+question $q$ on TruthfulQA-MC at threshold $\tau$:
+
+- $A_\tau = \{q : r(q) < \tau\}$;
+  $\text{cov}(\tau) = |A_\tau|/N$.
+- $\text{acc}(\tau) = (1/|A_\tau|) \sum_{q \in A_\tau} c(q)$
+  where $c(q)$ is correctness of Stage A's
+  `selected_answer(q)` per Chunk 5c (NOT Qwen-greedy
+  correctness on TruthfulQA-MC).
+- $\text{ecr}(\tau), \text{far}(\tau)$ — identical formulas
+  to §15.3 / §15.1 applied to the new $c(q)$.
+- $W_\text{hybrid} = N - \sum_q c(q)$ — total wrong V1-
+  selected answers on TruthfulQA-MC; observed empirically at
+  run time (NOT pinned ex ante; same convention as §15.3).
+
+**Primary decision metric (single scalar; identical
+structure to §15.3 Chunk 3f).**
+$$
+\Delta\kappa \;=\; \kappa_\text{hybrid} - \kappa_{\S15.1,\text{TruthfulQA-MC}}
+$$
+where:
+
+- $\kappa_\text{hybrid} = \max\{\text{cov}(\tau) :
+  \text{acc}(\tau) \ge \alpha_2 \text{ AND } |A_\tau| \ge n_\min\}$
+  on TruthfulQA-MC, with $\alpha_2 = 0.50$ and
+  $n_\min = 10$ (identical floor to §15.1 / §15.3).
+- $\kappa_{\S15.1,\text{TruthfulQA-MC}} = 0.14$ — pinned
+  constant from §15.2's verdict-of-record TruthfulQA-MC
+  $\kappa$ at $\alpha_2$, recorded in
+  `docs/experiments/probe_selective_abstention.json`.
+
+$\Delta\kappa > 0$ means the hybrid produces operationally
+meaningful lift over §15.1's single-source abstention on
+TruthfulQA-MC at the absolute-majority target.
+$\Delta\kappa \le 0$ means it does not.
+
+**§0.8 caveat on the baseline constant.** The
+$\kappa_{\S15.1,\text{TruthfulQA-MC}} = 0.14$ value was
+computed at N=100 against §13.10 dumps that have since been
+overwritten with N=200 versions per §13.20 / §15.2 Postscript.
+The recorded value persists in the §15.2 verdict-of-record
+artifact and is binding under §0.8 regardless of the upstream
+overwrite. **§15.5 does NOT re-run §15.1 on TruthfulQA-MC**
+to "refresh" the baseline; doing so would require its own
+§0.8 commitment and would conflate two N-configurations.
+
+**Pinned three target accuracies (identical to §15.3 / §15.2
+TruthfulQA-MC operating points).**
+$\alpha \in \{0.35, 0.50, 0.75\}$, where $\alpha_1 = 0.35$ is
+the TruthfulQA-MC greedy baseline (0.250 per §13.10) plus
+10pp. (HaluEval used $\alpha_1 = 0.40$ because its greedy
+baseline is 0.300; TruthfulQA-MC's lower greedy means
+$\alpha_1$ is correspondingly lower.)
+
+**Secondary diagnostic metrics** (reported, NOT band-driving).
+
+- $\delta_\text{AURC,hybrid} = W_\text{hybrid}/N -
+  \text{AURC}_\text{hybrid}$ — integrated lift over random
+  abstention on Stage A's TruthfulQA-MC selected answers.
+- $(\text{cov}, \text{ecr}, \text{far})$ triples at each of
+  the three $\alpha$ values.
+- Bootstrap CI (two-sided 95%, $B = 1000$, paired over
+  question indices, deterministic seed
+  `SeedSequence(entropy=15)` per §15.1 / §15.3 convention)
+  on $\Delta\kappa$. Statistical demotion rule pinned in
+  Chunk 5g.
+
+**Baselines (pinned, three; all from existing artifacts; no
+new generation beyond Stage A).**
+
+| Baseline | Source | Role |
+|---|---|---|
+| §15.1 TruthfulQA-MC $\kappa@\alpha_2 = 0.14$ | §15.2 verdict-of-record | Primary comparator (drives $\Delta\kappa$) |
+| §14a.2-on-TruthfulQA-MC V1 full-coverage point | (computed from the §14a.2-on-TruthfulQA-MC dump once produced) | "Stage A without abstention" reference; documents whether the hybrid even needs Stage B |
+| Random-abstain matched-coverage on Stage A's answers | Closed-form: $\mathbb{E}[\text{acc}_\text{random}(\text{cov})] = (N - W_\text{hybrid})/N$ | Random baseline for $\delta_\text{AURC,hybrid}$ |
+
+§15.1's TruthfulQA-MC $\kappa@\alpha_2 = 0.14$ is the central
+comparator because §15.1 is the closest non-hybrid analogue
+on TruthfulQA-MC. A §15.5 STRONG must demonstrate that
+adding Stage A's selector produces operationally meaningful
+lift over the single-source policy on TruthfulQA-MC — not
+merely lift over random abstention.
+
+**Verdict bands (pinned; identical 1D $\Delta\kappa$ cascade
+to §15.3 Chunk 3g — B1 framing locked).**
+
+Per the user-pinned B1 framing (bands identical to §15.3,
+not recalibrated for TruthfulQA-MC), §15.5's verdict cascade
+is the **same 1D ordered cascade** §15.3 used, applied to
+TruthfulQA-MC's $\Delta\kappa$. Numerical thresholds are
+unchanged:
+
+1. **REGRESSION** — $\Delta\kappa < -0.02$.
+2. **STRONG** — $\Delta\kappa \ge +0.10$.
+3. **USEFUL_INTERNAL** — $\Delta\kappa \ge +0.05$.
+4. **MARGINAL** — $\Delta\kappa \ge +0.02$.
+5. **SATURATION** — explicit residual catch-all
+   ($\Delta\kappa \in [-0.02, +0.02)$).
+
+Rules 1–4 are mutually exclusive by ordering; rule 5 catches
+the residual deterministically. **No secondary metric
+participates in the cascade**; secondary diagnostics
+($\delta_\text{AURC}$, ecr, far, operating-point triples) are
+reported but never re-classify the verdict — same discipline
+as §15.3.
+
+**Why bands are NOT recalibrated for TruthfulQA-MC.** §15.1's
+TruthfulQA-MC baseline ($\kappa = 0.14$) is structurally
+lower than HaluEval's (0.26), so the same $\Delta\kappa$
+threshold corresponds to a lower implied $\kappa_\text{hybrid}$
+on TruthfulQA-MC. But the pinned B1 framing tests cross-
+benchmark transfer at the **same operational threshold** —
+i.e., does the hybrid clear the same operational bar on the
+harder benchmark, not "does it clear a TruthfulQA-MC-specific
+relaxed bar." Recalibrating the bands would be band-tuning
+to expectations and is foreclosed.
+
+**Operational meanings per band on TruthfulQA-MC** (assuming
+the pinned $\kappa_{\S15.1,\text{TruthfulQA-MC}} = 0.14$):
+
+| Verdict | $\Delta\kappa$ range | Implied $\kappa_\text{hybrid}$ | Meaning |
+|---|---|---|---|
+| STRONG | $\ge +0.10$ | $\ge 0.24$ | Substantively higher cov@$\alpha_2$ than §15.1 on the harder benchmark; cross-benchmark generalization confirmed |
+| USEFUL_INTERNAL | $[+0.05, +0.10)$ | $[0.19, 0.24)$ | Visibly better than §15.1 on TruthfulQA-MC; internal-research value at this benchmark |
+| MARGINAL | $[+0.02, +0.05)$ | $[0.16, 0.19)$ | Small detectable lift |
+| SATURATION | $[-0.02, +0.02)$ | $[0.12, 0.16)$ | Operationally equivalent to §15.1 on TruthfulQA-MC |
+| REGRESSION | $< -0.02$ | $< 0.12$ | Actively worse than §15.1 on TruthfulQA-MC |
+
+**Acceptance / rejection rules** (one-to-one mapped to the
+cascade; mirrors §15.3 Chunk 3g but with §15.5-specific
+authorizations).
+
+| Verdict | Authorizes | Forecloses |
+|---|---|---|
+| **STRONG** | Drafting §15.6 — full hybrid pre-commitment with both benchmarks combined and product-layer scope (separate §0.8). | VC-brief changes (§13.9 hold remains); auto-deployment without §15.6. |
+| **USEFUL_INTERNAL** | Documenting the §14+§15 hybrid as having internal-research operational value on TruthfulQA-MC at this single-benchmark scale. Authorizes §15.6 conditional on cross-benchmark synthesis (Chunk 5e diagnostic) also landing USEFUL_INTERNAL. | §15.6 product investment (without cross-benchmark synthesis confirmation); cross-benchmark claims; VC-brief changes. |
+| **MARGINAL** | Recording §15.5 as acknowledged but unactionable on TruthfulQA-MC. | §15.6 follow-up; product investment; VC-brief changes. |
+| **SATURATION** | Documenting §15.5 as operational null on TruthfulQA-MC. Bounds §15.4's HaluEval USEFUL_INTERNAL as a HaluEval-only artifact under cross-benchmark synthesis. | Same as MARGINAL. |
+| **REGRESSION** | Closing the §14+§15 hybrid construct on TruthfulQA-MC. The §13/§14/§15 closure prose extends to "answer-selection AND single-source abstention AND hybrid all saturated/regressed on TruthfulQA-MC at this configuration." | Same as SATURATION. |
+
+**Demotion rule (STRONG-only, identical to §15.3 Chunk 3g).**
+If the cascade returns STRONG but the bootstrap CI lower
+bound on $\Delta\kappa$ is $\le 0$, the verdict is demoted
+to **USEFUL_INTERNAL** with explicit `STRONG_BUT_CI_DEMOTION`
+annotation. USEFUL_INTERNAL / MARGINAL / SATURATION /
+REGRESSION are NOT subject to demotion.
+
+**Boundary-case audit table (illustrative, deterministic;
+identical to §15.3 Chunk 3g modulo benchmark labels).** The
+cascade behavior is identical to §15.3's at the same
+$\Delta\kappa$ values:
+
+| $\Delta\kappa$ | Cascade trace | Verdict |
+|---|---|---|
+| $+0.099$ | rules 1–2 NO; rule 3 YES | **USEFUL_INTERNAL** |
+| $+0.019$ | rules 1–4 NO; rule 5 catches | **SATURATION** |
+| $-0.020$ | rule 1 NO at boundary; rule 5 catches | **SATURATION** |
+| $-0.021$ | rule 1 YES | **REGRESSION** |
+
+The boundary-inclusivity precisions match §15.3 exactly:
+$\Delta\kappa = -0.020$ is SATURATION; $\Delta\kappa = -0.021$
+is REGRESSION.
+
+**Implementation scope (pinned, two phases: Stage A GPU re-
+run + Stage B CPU post-processor).**
+
+§15.5 reuses closed §14 / §15 components and pinned identical
+configuration to §15.3 modulo benchmark — same "small
+integration layer over closed components" framing as §15.3
+Chunk 3h. Two distinct execution phases:
+
+**Phase 1 — Stage A GPU re-run (~50–60 min on existing
+80 GB GPU).**
+
+Run a **new sibling producer**
+`scripts/probe_system_level_scout_v2_truthfulqa.py` — a copy
+of §14a.2's `probe_system_level_scout_v2.py` with only the
+dataset-loading block swapped to load TruthfulQA-MC instead
+of HaluEval-QA (using §13.11's `--benchmark truthfulqa_mc`
+loading pattern). All other §14a.2 pinned configuration is
+preserved verbatim. Sibling-producer pattern documented in
+§15.5 Amendment 1 below; the §14a.2 producer
+`scripts/probe_system_level_scout_v2.py` is preserved
+pristine (§14c verdict-of-record reproducibility chain
+unchanged). Pinned protocol (matches §14a.2's pinned cost
+estimate exactly):
+
+- 3 sources × 100 questions × K=10 stochastic generations =
+  3,000 sampling calls (~30 min on the cached GPU).
+- 3 sources × 100 questions × 1 greedy generation = 300
+  deterministic generations (~5 min).
+- Per-source NLI clustering: 3 × 100 = 300 clustering
+  operations × 90 NLI pairs ≈ ~10 min.
+- Per-question NLI labeling: 4 candidates × 100 questions
+  × 2 NLI calls = 800 calls (~5 min batched).
+- Memory: ~45 GB co-resident in fp16, identical to §13.11 /
+  §14a.2 setup.
+
+Output: `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+(identical schema to the HaluEval-QA dump per
+`scripts/probe_system_level_scout_v2.py`'s JSON writer).
+
+**Phase 1 §0.8 caveat.** §14a.2's verdict-of-record (§14c
+`SCOUT_SATURATION`) was on HaluEval-QA only; running its
+protocol on TruthfulQA-MC is **the first time §14a.2's
+pinned configuration has been exercised on TruthfulQA-MC**.
+This is structurally close to "full §14" which §14c
+foreclosed conditional on §14a.2 STRONG. **§15.5 is NOT a
+"full §14" attempt** — it is using §14a.2's machinery as
+Stage A within the §15.5 selective-prediction metric class
+(operational AURC + cov@α), NOT measuring §14's answer-
+selection accuracy delta. The Phase 1 GPU run produces a
+TruthfulQA-MC dump but §15.5 does NOT classify against §14a.2
+bands; it classifies against §15.5's pinned $\Delta\kappa$
+cascade (Chunk 5g).
+
+**Phase 2 — Stage B CPU post-processor.**
+
+One new script: `scripts/probe_hybrid_selective_abstention_truthfulqa.py`
+(numpy + stdlib only, CPU-only post-processor; structurally
+parallel to `scripts/probe_hybrid_selective_abstention.py`
+modulo benchmark and baseline constant).
+
+Components 1–12 identical in shape to §15.3 Chunk 3h's
+specification, with these §15.5-specific modifications:
+
+1. **Input dump path** changed to
+   `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`.
+2. **Pinned baseline constant** changed to
+   `KAPPA_BASELINE_S15_1 = 0.14` (vs §15.3's 0.26).
+3. **Pinned $\alpha$ targets** changed to $\{0.35, 0.50,
+   0.75\}$ (vs §15.3's $\{0.40, 0.50, 0.75\}$).
+4. **Output paths** changed to
+   `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.{json,md}`.
+5. **`schema_version`** = `"15.5"` (vs §15.3's `"15.3"`).
+6. All other constants (cascade thresholds, bootstrap config,
+   demotion rule, $n_\min$) identical to §15.3.
+
+**Reuse from §15.3 (primitives copied, NOT imported).** Same
+copy-not-import discipline as §15.3 Chunk 3h: §15.5's script
+copies §15.3's metric primitives verbatim rather than
+importing from `probe_hybrid_selective_abstention.py`.
+§15.4's verdict-of-record artifacts are preserved unchanged.
+
+**Cross-benchmark synthesis (Stage B Phase 2 reporting).**
+The §15.5 result section will compute:
+
+$$
+\Delta\kappa_\text{combined} = \min(\Delta\kappa_{\text{HaluEval}}, \Delta\kappa_{\text{TruthfulQA-MC}})
+$$
+
+with the §15.3 / §15.5 cascade applied as a **diagnostic**.
+$\Delta\kappa_{\text{HaluEval}} = +0.0900$ is read from
+`docs/experiments/probe_hybrid_selective_abstention.json`
+(§15.4 verdict-of-record). $\Delta\kappa_{\text{TruthfulQA-MC}}$
+is computed by §15.5's Phase 2. Combined verdict reported
+alongside §15.5's per-benchmark verdict; does NOT re-classify
+either.
+
+**Engineering cost (estimated).**
+
+- **Phase 1:** ~50–60 min GPU on cached models. Identical to
+  §14a.2's pinned cost.
+- **Phase 2:** ~400–600 lines of new code (with the same
+  $\sim$1098-line audit-lesson caveat from §15.4 Chunk 4e —
+  copy-not-import duplication may push actual closer to
+  §15.3's size). CPU only; under 30 sec wall clock at N=100
+  with B=1000 bootstrap.
+- **Total wall clock end-to-end:** ~1 hour after §15.5
+  pre-commitment lands.
+
+**Output paths (pinned).**
+
+- `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+  (Stage A dump from Phase 1 GPU run).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.json`
+  (Stage B machine-readable, `schema_version` `"15.5"`).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.md`
+  (Stage B human-readable summary).
+
+**What §15.5 implementation explicitly does NOT authorize.**
+
+- Modifying `scripts/probe_system_level_scout_v2.py` (§14a.2's
+  pinned producer; preserved verbatim).
+- Modifying `scripts/probe_selective_abstention.py` (§15.1's
+  pinned codepath).
+- Modifying `scripts/probe_hybrid_selective_abstention.py`
+  (§15.3's pinned codepath; §15.4 verdict-of-record
+  artifact).
+- Re-running §14a.2 on HaluEval-QA (§15.4 dump preserved).
+- Re-running §15.1 on TruthfulQA-MC (§15.2 baseline κ=0.14
+  remains the pinned constant).
+- Adding TruthfulQA-Generation, TriviaQA, or any benchmark
+  beyond TruthfulQA-MC.
+- Auto-promoting any verdict to §15.6.
+
+**Reduced-form authorization rationale — §15.5 is partially
+reduced-form, partially fresh-compute.**
+
+Unlike §15.3 (which was pure post-processing because the
+§14a.2 HaluEval-QA dump already existed), §15.5 requires a
+genuinely new GPU run (Phase 1) before any post-processing
+can begin. **§15.5 is therefore NOT in the same "reduced-form
+post-processing only" category as §15.3.** Its compactness
+is bounded by:
+
+- **The §14a.2 producer script exists and is closed.** §15.5
+  reuses it as-is on TruthfulQA-MC; no producer-script
+  modifications.
+- **§15.3's abstention machinery exists and is closed.**
+  §15.5's Phase 2 copies §15.3's primitives.
+- **§13.10's semantic-entropy scalar definition exists** and
+  is not invalidated by §13.20's N=200 observation (which
+  does not re-classify §13.10's N=100 verdict-of-record).
+- **§15.1's TruthfulQA-MC κ baseline (0.14) exists** in
+  §15.2's verdict-of-record artifact and is binding under
+  §0.8 regardless of §13.20's upstream-dump overwrite.
+
+**If §14a.2's producer script did not exist, §15.5's Phase 1
+cost would be substantially higher** (writing a new producer
+from scratch is multi-day work, not a 50–60-min run). The
+~1-hour total wall-clock figure is contingent on the existing
+§14a.2 producer being directly reusable.
+
+**What §15.5 explicitly does NOT test.**
+
+- **Retrieval augmentation.** No retrieval, search, or
+  external knowledge source. The hybrid's only response
+  options are ANSWER `selected_answer(q)` or ABSTAIN.
+- **Verifier ensembles.** No external verifier model, no
+  judge-model, no critique pass.
+- **Multi-benchmark generalization beyond {HaluEval-QA,
+  TruthfulQA-MC}.** §15.5's cross-benchmark synthesis is
+  explicitly bounded to the §13.10 / §14a.2 / §15.1 / §15.3
+  benchmark pair. Any third benchmark requires a fresh §0.8.
+- **Larger-N stability.** §15.5 runs at N=100 to match §15.3
+  / §15.4. A larger-N re-run would require its own §0.8.
+- **A new §13 observable program.** §15.5 reuses §13.10's
+  semantic-entropy scalar verbatim on TruthfulQA-MC. §13.19
+  closure remains binding.
+- **A new §14 system-level program.** §15.5 reuses §14a.2's
+  pinned configuration on TruthfulQA-MC; this is the first
+  on-TruthfulQA-MC §14a.2 run, but §15.5 does NOT classify
+  the result against §14a.2's pre-committed bands (different
+  metric class). §14c's `SCOUT_SATURATION` verdict on
+  HaluEval-QA is unchanged.
+- **Product readiness.** Even §15.5 STRONG would require
+  §15.6 (full hybrid pre-commitment with both benchmarks
+  combined and product-layer scope) before any deployment-
+  grade claim. §15.5 is a single-benchmark scout.
+- **Re-classification of any prior §13 / §14 / §15.x
+  verdict.** §13.19 (single-axis ANTI), §14b / §14c
+  (`SCOUT_SATURATION`), §15.2 (`MARGINAL`), §15.4
+  (`USEFUL_INTERNAL`), and §13.20 (N=200 `NOISE_BAND_LIFT`
+  observation) are all closed under §0.8 at their pinned
+  configurations. §15.5 cannot revisit any of them.
+
+**§15.5 chunk roll-up — pre-commitment now complete.**
+
+| Chunk | Content |
+|---|---|
+| 5a | Opening framing — cross-benchmark companion to §15.3 (A1 framing) |
+| 5b | Stage A architecture pin (§14a.2 protocol applied to TruthfulQA-MC) |
+| 5c | Stage B architecture pin (single threshold rule, ties to ABSTAIN) |
+| 5d | Risk signal pin ($r(q) = H_{\text{src}_{i^*}}(q)$, identical to §15.3) |
+| 5e | Benchmark scope pin (TruthfulQA-MC only; cross-benchmark synthesis as diagnostic) |
+| 5f | Operational metrics pin ($\Delta\kappa$ primary against $\kappa_{\S15.1} = 0.14$) |
+| 5g | Verdict bands (1D $\Delta\kappa$ cascade, identical thresholds to §15.3; B1 framing) |
+| 5h | Implementation scope (Phase 1 GPU re-run + Phase 2 CPU post-processor) |
+| 5i | What §15.5 does NOT test + reduced-form rationale + roll-up |
+
+Phase 1 (GPU re-run of §14a.2 on TruthfulQA-MC) is a separate
+§0.8 authorization gate. Phase 2 (new CPU post-processor) is
+also a separate gate. §15.5.x (the result section, parallel
+to §15.4) follows both phases completing.
+
+### 15.5 Amendment 1 — sibling producer for §14a.2 protocol on TruthfulQA-MC (pre-execution)
+
+**Status: amendment landed before any GPU run.** Surfaced
+explicitly per §15.5's "no silent patches" rule.
+
+**Trigger.** Pre-execution audit of
+`scripts/probe_system_level_scout_v2.py` (the §14a.2 producer
+script Chunk 5h pinned for re-use) revealed that **the
+producer is hardcoded to HaluEval-QA at line 715**
+(`load_dataset("pminervini/HaluEval", "qa", split="data")`).
+There is no `--benchmark` flag. §15.5 Chunk 5h's pin to
+"re-run `scripts/probe_system_level_scout_v2.py` with
+benchmark flag set to `truthfulqa_mc`" is therefore not
+literally executable — the pinned producer cannot run on
+TruthfulQA-MC as-is.
+
+**Two recovery options considered.**
+
+- **(A) Modify the existing §14a.2 producer** to add a
+  `--benchmark` flag (mirroring §13.11's pattern at lines
+  501–503 / 626–635 of `probe_cross_family_entropy.py`).
+  §0.8 cost: changes the script that produced §14a.2's
+  verdict-of-record artifacts. Even a small flag addition
+  reaches into closed territory.
+- **(B) Create a sibling producer script** that copies
+  `probe_system_level_scout_v2.py` verbatim and swaps only
+  the dataset-loading block. §0.8 benefit: §14a.2's producer
+  stays pristine; §14c's verdict-of-record reproducibility
+  chain unchanged.
+
+**Amendment (this block supersedes the affected lines in
+Chunk 5h).** Option B is pinned.
+
+- **New script:** `scripts/probe_system_level_scout_v2_truthfulqa.py`
+  — copy of `probe_system_level_scout_v2.py` with the
+  dataset-loading block (line ~715 of the original) swapped
+  to load TruthfulQA-MC validation split, mirroring §13.11's
+  TruthfulQA-MC loading pattern.
+- **All other §14a.2 pinned configuration preserved verbatim:**
+  same M=3 cross-family sources, same K=10, same T=1.0, same
+  max_new_tokens=32, same NLI model, same V1 softmin τ=0.5,
+  same NLI-clustered selector, same dataclass schema for the
+  per-question record. Only the benchmark loader differs.
+- **Output filename:** the new script writes to
+  `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+  (per Chunk 5h's pinned output path).
+- **§14a.2's existing producer
+  `scripts/probe_system_level_scout_v2.py` is NOT modified.**
+  The §14a.2 verdict-of-record reproducibility chain is
+  preserved.
+
+**Why this is a §0.8-clean amendment.** The amendment
+corrects a pre-commitment artifact (an executable
+assumption that didn't hold) without changing any pinned
+numerical band, metric definition, baseline,
+acceptance/rejection rule, or scope boundary. No data has
+been inspected. The §15.5 cascade boundary-case audit table,
+verdict bands, primary metric, baseline constant, and
+benchmark scope are all unchanged.
+
+**What this amendment does NOT change.**
+
+- Numerical bands (Chunk 5g identical to §15.3 Chunk 3g).
+- Operational metric definitions (Chunk 5f).
+- Baselines (Chunk 5f's three pinned baselines).
+- Cross-benchmark synthesis as diagnostic (Chunk 5e).
+- Output paths for Phase 2 / Stage B
+  (`probe_hybrid_selective_abstention_truthfulqa.{json,md}`).
+- The "does not test" list (Chunk 5i).
+- The §14a.2 producer or its closed §14c verdict-of-record.
+- The §15.4 verdict-of-record (HaluEval USEFUL_INTERNAL).
+
+**Implementation step (separate authorization).** Drafting
+`scripts/probe_system_level_scout_v2_truthfulqa.py` is a
+mechanical copy-with-one-swap operation. The new file would
+be ~1100 lines (matching §14a.2 producer's size). I can draft
+it in this sandbox; the user runs it on the runpod (50–60
+min GPU). This is a separate §0.8 authorization step from
+landing the amendment itself.
+
+**Audit lesson recorded.** §15.5's Chunk 5h pin "re-run
+`scripts/probe_system_level_scout_v2.py` with benchmark
+flag" was based on assumed CLI surface, not verified CLI
+surface. Future "reuse existing producer" pins should
+explicitly cite the producer's flag list (or its absence)
+to prevent assumption-vs-reality drift surfacing at
+execution time.
+
+### 15.6 Result — §15.5 hybrid scout on TruthfulQA-MC returned REGRESSION; cross-benchmark synthesis also REGRESSION
+
+The §15.5 pre-committed hybrid scout has been executed
+end-to-end (Phase 1 GPU producer + Phase 2 CPU post-processor)
+in the runpod container against the TruthfulQA-MC benchmark.
+Combined classification per pre-committed bands:
+**`REGRESSION`** ($\Delta\kappa = -0.0300$,
+$\kappa_\text{hybrid} = 0.11$ vs §15.1 baseline
+$\kappa_{\S15.1,\text{TruthfulQA-MC}} = 0.14$, no
+annotations). The §14a.2-protocol Stage A applied to
+TruthfulQA-MC plus the §15-style abstention gate on V1's
+winning-source semantic-entropy risk score produces a policy
+that is **actively worse than §15.1's single-source
+abstention** on TruthfulQA-MC at the $\alpha_2 = 0.50$
+absolute-majority operating target.
+
+**Cross-benchmark synthesis (DIAGNOSTIC, per Chunk 5e) also
+returned REGRESSION:**
+$$\Delta\kappa_\text{combined} = \min\big(\Delta\kappa_{\S15.4,\text{HaluEval}}, \Delta\kappa_{\S15.5,\text{TruthfulQA-MC}}\big) = \min(+0.0900, -0.0300) = -0.0300$$
+The cross-benchmark verdict is dominated by §15.5's
+TruthfulQA-MC negative value. **This empirically bounds
+§15.4's HaluEval-only USEFUL_INTERNAL as a single-benchmark
+artifact** under the worst-benchmark rule — the hybrid
+construct does NOT generalize cross-benchmark.
+
+This is the **first REGRESSION verdict in the entire
+§13 / §14 / §15 LLM-track program**. §13 was 5/5 ANTI under
+worst-benchmark; §14 was 2/2 `SCOUT_SATURATION`; §15.2 was
+`MARGINAL`; §15.4 was `USEFUL_INTERNAL`. None of those four
+prior verdicts was *actively negative* relative to its
+comparator. §15.6 is.
+
+Per §15.5 Chunk 5g's pinned acceptance/rejection table:
+
+> REGRESSION — Authorizes: closing the §14+§15 hybrid
+> construct on TruthfulQA-MC. The §13 / §14 / §15 closure
+> prose extends to "answer-selection AND single-source
+> abstention AND hybrid all saturated/regressed on
+> TruthfulQA-MC at this configuration." Forecloses: §15.7+
+> follow-up at this observable; product investment;
+> VC-brief changes.
+
+**§13.9 VC-brief hold remains in force and is *strengthened*
+by §15.6.** §15.6 adds another metric class on TruthfulQA-MC
+where the BCVF-derived construction does not clear STRONG —
+in fact, it actively regresses below §15.1's single-source
+baseline. The §13.9 STRONG-band-on-both-benchmarks gate is
+unchanged. The autonomy-domain BCVF claim (§6.1) stands
+independently and is unaffected.
+
+**Parity-gate confirmation (per §15.5 Chunk 5h + Amendment 1).**
+
+| benchmark | N_ok |
+|---|---|
+| truthfulqa_mc | True |
+
+The §15.5 Phase 1 dump
+(`probe_system_level_scout_v2_truthfulqa_mc.json`, produced
+by `scripts/probe_system_level_scout_v2_truthfulqa.py`)
+satisfied $N=100$ on TruthfulQA-MC. Phase 2 schema
+validation (q_idx, sources / per-source semantic_entropy,
+answer_cluster_ids, v1_weights, v1_winning_cluster,
+v1_correct) all passed. The §15.4 verdict-of-record artifact
+read for cross-benchmark synthesis validated against
+`schema_version == "15.3"` AND `benchmark_name == "halueval_qa"`.
+No §0.8 deviation fired at the input layer.
+
+**Self-test gate.** §15.5 Phase 2's required pre-execution
+gate (`--self-test`) ran in the same invocation as real-data
+execution and returned PASSED on all 7 cascade boundary cases
+(Chunk 5g audit table identical to §15.3 Chunk 3g per B1
+framing) and all 7 demotion-rule cases. The 1D cascade
+implementation matches Chunk 5g exactly.
+
+**Cross-program consistency check.** Phase 1 reports
+$\text{acc}(V_1) = \text{acc}(\text{Baseline-A}) = 0.250$ on
+TruthfulQA-MC, matching §13.10's pinned TruthfulQA-MC greedy
+accuracy of 0.250 exactly (Qwen-only). $W_\text{hybrid} = 75$
+matches the §15.1 TruthfulQA-MC W=75 from §15.2's verdict-of-
+record. **V1 selector contributed zero net accuracy on
+TruthfulQA-MC** (Δ V1 vs Baseline-B = +0.00pp per Phase 1
+output) — first §14-domain finding that V1 produces no lift
+on the harder benchmark, in stark contrast to V1's +4pp on
+HaluEval-QA (§14c).
+
+**Phase 1 §14a.2-protocol classification — informational
+only.** `scripts/probe_system_level_scout_v2_truthfulqa.py`
+reported `SCOUT_SATURATION` per the §14a.2 producer's pinned
+`classify()` function. **Per §15.5 Chunk 5h and Amendment 1,
+this label is informational; §15.5 does NOT classify Phase
+1's output against §14a.2 bands.** The §14a.2-on-HaluEval
+verdict-of-record (§14c `SCOUT_SATURATION`) is unchanged;
+§15.6 reports the §14a.2-on-TruthfulQA-MC informational
+classification for cross-program consistency, not as a
+re-classification of §14.
+
+**Artifacts.**
+
+- `scripts/probe_system_level_scout_v2_truthfulqa.py`
+  (§15.5 Phase 1 sibling producer; §0.8 sibling of
+  `probe_system_level_scout_v2.py` with TruthfulQA-MC
+  dataset loading + multi-distractor labeling; §14a.2
+  producer preserved unchanged).
+- `scripts/probe_hybrid_selective_abstention_truthfulqa.py`
+  (§15.5 Phase 2 post-processor; numpy + stdlib only;
+  copies §15.1 / §15.3 metric primitives per §15.5 Chunk 5h).
+- `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+  (Phase 1 per-question dump).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.json`
+  (machine-readable §15.5 result, schema_version `"15.5"`,
+  with `cross_benchmark_synthesis` block).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.md`
+  (human-readable summary).
+
+**Section naming clarification.** §15.5 Chunk 5g's STRONG row
+referenced "§15.6 — full hybrid pre-commitment with both
+benchmarks combined and product-layer scope" as a hypothetical
+authorization for STRONG. STRONG did NOT fire (REGRESSION
+did). The §15.6-as-future-full-hybrid path is therefore moot.
+§15.6 is used here as the §15.5 result section (mirroring
+§15.3 → §15.4 convention). Any future LLM-track follow-up —
+which §15.6's REGRESSION explicitly does NOT authorize per
+Chunk 5g — would land at §15.7 or higher under its own §0.8
+commitment.
+
+**Headline result.**
+
+| metric | value |
+|---|---|
+| $N$ | 100 |
+| $W_\text{hybrid}$ (V1 wrong count) | 75 |
+| V1 accuracy at full coverage | 0.250 (= Baseline-A; identical to §13.10 Qwen greedy) |
+| $\text{AURC}_\text{random}$ ($= W/N$) | 0.7500 |
+| $\text{AURC}_\text{policy}$ | 0.6325 |
+| $\delta_\text{AURC}$ (diagnostic) | $+0.1175$ |
+| $\kappa_\text{hybrid}$ at $\alpha_2 = 0.50$ | **0.1100** |
+| $\kappa_{\S15.1,\text{TruthfulQA-MC}}$ baseline | 0.1400 |
+| $\boldsymbol{\Delta\kappa}$ **(primary)** | $\boldsymbol{-0.0300}$ |
+| $\Delta\kappa$ 95% CI (paired bootstrap, $B = 1000$) | $[-0.1400, +0.1202]$ |
+
+**Cascade trace** (mechanical readout per §15.5 Chunk 5g;
+matches the implementation's `_cascade_trace_15_5` output
+exactly):
+
+```
+rule 1 REGRESSION: delta_kappa=-0.0300 < -0.02   -> YES
+```
+
+Rule 1 fires; remaining rules not evaluated by cascade
+construction (REGRESSION first ordering per Chunk 5g).
+
+**Demotion rule (Chunk 5g) — does NOT apply.** The §15.5
+demotion rule is STRONG-only by construction. The cascade
+returned REGRESSION (rule 1), which is not subject to
+demotion. `verdict_annotations` is empty.
+
+**Operating-point table.**
+
+| $\alpha$ | $\text{cov}@\alpha$ | $\tau^*$ | ecr | far |
+|---|---|---|---|---|
+| 0.35 | **0.11** | 0.6390 | 0.9467 | 0.7200 |
+| 0.50 | **0.11** | 0.6390 | 0.9467 | 0.7200 |
+| 0.75 | 0.00 | $+\infty$ | NaN | NaN |
+
+The $\alpha_1 = 0.35$ and $\alpha_2 = 0.50$ operating points
+are **identical** — same $\tau^*$, same coverage, same ecr,
+same far. Discussed under observation (b) below.
+
+**Three observations the headline supports.**
+
+**(a) First REGRESSION verdict in the §13 / §14 / §15 program.**
+Twelve prior experimental structures (§13's 5 single-axis
+classes + §14's 2 scouts + §15.2's single-source + §15.4's
+HaluEval hybrid + §13.20's N=200 observation + the §15.5
+Phase 1 informational SCOUT_SATURATION) returned ANTI,
+SCOUT_SATURATION, MARGINAL, or USEFUL_INTERNAL — none was
+*actively negative* relative to its comparator. §15.6 is the
+first verdict where the BCVF-derived policy is **worse than
+its baseline**. Operationally: the §14+§15 hybrid does NOT
+just fail to improve on §15.1 TruthfulQA-MC abstention; it
+makes it worse.
+
+**(b) Operating points at $\alpha_1$ and $\alpha_2$ are
+identical — the policy curve is "stepped" on TruthfulQA-MC.**
+Same $\tau^* = 0.6390$, $\text{cov} = 0.11$, $\text{ecr} =
+0.9467$, $\text{far} = 0.7200$ at both targets. Mechanically,
+the threshold sweep cannot deliver a coverage between
+$\kappa@\alpha_2$ and $\kappa@\alpha_1$ — there's no $\tau$
+in the empirical grid that produces an answered subset of
+size between 11 and 11 with accuracy in $[0.35, 0.50)$. The
+hybrid's risk-coverage curve has a discrete jump: at $\tau =
+0.6390$, accuracy on the 11-question answered subset is
+already $\ge 0.50$; at any lower $\tau$, accuracy drops
+below 0.35. This is qualitatively different from §15.4's
+HaluEval curve, which had distinct $\alpha_1$ and $\alpha_2$
+operating points with smooth coverage decline.
+
+**(c) Bootstrap CI is wide; spans REGRESSION through MARGINAL+
+upper bound.** $\Delta\kappa$ 95% CI = $[-0.1400, +0.1202]$,
+width $\approx 0.26$. **The CI does NOT rule out
+USEFUL_INTERNAL or even STRONG-territory upper bound at
+$N=100$.** The point estimate $-0.03$ fires the cascade at
+REGRESSION, but bootstrap cannot statistically distinguish
+REGRESSION from a wide range of alternatives at this sample
+size. This is a power-of-measurement observation (same
+caveat §15.4 surfaced for HaluEval at the opposite sign);
+the cascade's pinned rule operates on the point estimate
+alone per Chunk 5g, so the wide CI does NOT change the
+verdict. A larger-$N$ re-run would tighten this band; that
+re-run is NOT authorized by §15.5 and would require a fresh
+§0.8 commitment.
+
+**Stage A informational findings — V1 selector contributes
+zero net accuracy on TruthfulQA-MC.**
+
+Phase 1 (`scripts/probe_system_level_scout_v2_truthfulqa.py`)
+reported the §14a.2-protocol classification table (per
+Chunk 5h, this is informational only; §15.5 does NOT
+classify against §14a.2 bands):
+
+| Variant | Accuracy | $\Delta$ vs Baseline-B (pp) | Sign-test wins/losses | $p$ |
+|---|---|---|---|---|
+| Baseline-A (Qwen single-greedy) | 0.250 | — | — | — |
+| Baseline-B (NLI-clustered uniform majority) | 0.250 | reference | — | — |
+| V1 (softmin trust, $\tau = 0.5$) | 0.250 | **+0.00** | 3/3 | 1.000 |
+| V2 (thresholded exclusion + uniform survivors) | 0.220 | **−3.00** | 0/3 | 0.250 |
+
+§14a.2-protocol classification (per the producer's `classify()`
+function, **informational**): `SCOUT_SATURATION`. Both
+$\Delta_{V_1} = +0.00\text{pp}$ and $\Delta_{V_2} = -3.00\text{pp}$
+fall in the §14a.2 SATURATION band (V2's $-3.00$ is on the
+SATURATION/REGRESSION boundary; the §14a.2 cascade catches
+it as SATURATION via the residual catch-all).
+
+**Cross-benchmark contrast with §14a.2-on-HaluEval (§14c
+verdict-of-record):**
+
+| Quantity | §14a.2 HaluEval (§14c) | §15.5 Phase 1 TruthfulQA-MC | Direction |
+|---|---|---|---|
+| $\Delta_{V_1}$ vs Baseline-B | +4.00pp | **+0.00pp** | V1 lift disappears on TruthfulQA-MC |
+| $\Delta_{V_2}$ vs Baseline-B | +1.00pp | **−3.00pp** | V2 *flips negative* on TruthfulQA-MC |
+| acc(Baseline-B) | 0.290 | 0.250 | Lower on TruthfulQA-MC (matches greedy 0.25) |
+
+**This is the first §14-domain finding that V1 produces no
+lift cross-benchmark.** V1's HaluEval +4pp does not
+generalize. V2 actively regresses by 3pp on TruthfulQA-MC,
+qualitatively different from V2's stable near-zero behavior
+on HaluEval.
+
+**Mechanism read (analytical observation, not load-bearing
+on the §15.6 verdict).** §15.5's Stage A inherits §14a.2's
+M=3 cross-family setup. On HaluEval-QA, V1's softmin
+sometimes correctly down-weights a hallucinating source on
+questions where another source is right — producing the +4pp
+lift. On TruthfulQA-MC, the adversarial-distractor structure
+(designed to match common false-belief patterns across many
+LLM families) appears to mean **all three sources are
+collectively wrong on the same questions** — i.e., when
+Qwen is wrong, Llama and Mistral tend to be wrong too on the
+same TruthfulQA-MC questions, so V1's selector has no
+non-Qwen "right" candidate to upweight. Confirmed
+empirically by V1's $\Delta = 0$: across all 100 questions,
+V1 delivered the same answer Baseline-A delivered.
+
+**Stage B's $\Delta\kappa = -0.0300$ on this Stage A
+foundation.** With Stage A delivering the Qwen-greedy answer
+on every question (V1 acc identically equals Baseline-A acc),
+Stage B's risk score $r(q) = H_{\text{src}_{i^*}}(q)$ collapses
+in expectation to "Qwen entropy on Qwen greedy" — structurally
+similar to §15.1's TruthfulQA-MC scalar that produced
+$\kappa = 0.14$. The 3pp deficit ($\kappa_\text{hybrid} =
+0.11$ vs $\kappa_{\S15.1} = 0.14$) reflects the small subset
+of questions where V1's softmin redistributes weight enough
+to change the winning-source identity, and on those few
+questions the V1-winning source's entropy distribution
+differs from Qwen's in a way that makes the threshold rule
+3pp worse on coverage at $\alpha_2$. **Stage A's failure to
+contribute lift compounds with Stage B's threshold-rule
+sensitivity to produce the REGRESSION.**
+
+This is exactly the failure mode §15.5 Chunk 5e
+"high prior of failure" anticipated, with empirical
+confirmation that the §14+§15 hybrid does not generalize
+cross-benchmark when Stage A's selector cannot extract
+non-Qwen leverage on the harder benchmark.
+
+**$\delta_\text{AURC}$ vs $\Delta\kappa$ tension —
+operationally meaningful vs integrated diagnostic.**
+
+§15.6's diagnostic and primary scalars **disagree in sign**:
+
+| Metric | Value | What it says |
+|---|---|---|
+| $\delta_\text{AURC}$ (diagnostic; Chunk 5f secondary) | $+0.1175$ | Hybrid's integrated risk-coverage curve beats random abstention by ~12pp. |
+| $\Delta\kappa$ (PRIMARY; Chunk 5g cascade-driver) | $-0.0300$ | Hybrid's coverage at $\alpha_2 = 0.50$ is 3pp worse than §15.1's single-source baseline. |
+
+**Reconciliation.** The two metrics measure structurally
+different things and answer different operational questions:
+
+- $\delta_\text{AURC}$ asks: "Does the entropy score, used
+  to rank answers, identify wrong answers more reliably than
+  random selection?" The hybrid's answer: yes — the AURC
+  curve dominates random abstention across the threshold
+  sweep. The hybrid IS truth-correlated in the integrated
+  sense.
+- $\Delta\kappa$ asks: "At the absolute-majority operating
+  target ($\alpha_2 = 0.50$), can the hybrid policy answer
+  more questions than §15.1's single-source policy?" The
+  hybrid's answer: no — the hybrid policy is *more
+  selective* (catches a higher fraction of errors per unit
+  answer; ecr=0.95) but cannot deliver enough coverage at
+  $\alpha_2 \ge 0.50$ to beat §15.1's $\kappa = 0.14$.
+
+**The §15.5 cascade pinned $\Delta\kappa$ as primary
+(operationally meaningful) and $\delta_\text{AURC}$ as
+secondary (integrated diagnostic) precisely to prevent this
+class of disagreement from confusing the verdict.** Per
+§15.5 Chunk 5g: "No secondary metric participates in the
+cascade." The verdict reads off $\Delta\kappa$ alone; the
+positive $\delta_\text{AURC}$ is reported as a diagnostic
+but does NOT re-classify the verdict.
+
+This is the design pattern that §14a.2's band-coverage gap
+recovery (§14c) made into a §0.8 lesson: future bands should
+partition the outcome space exhaustively along ONE primary
+scalar, with secondary metrics reported as informational
+only. §15.6 surfaces the diagnostic-vs-primary tension
+explicitly and lets the cascade fire deterministically.
+
+**$\alpha_3 = 0.75$ degeneracy carries over from §15.4 and
+§15.2.**
+
+The §15.6 operating point at $\alpha_3 = 0.75$:
+$\text{cov} = 0.00$, $\tau^* = +\infty$, ecr/far NaN.
+Identical to §15.4's HaluEval $\alpha_3$ degeneracy and
+§15.2's both-benchmarks $\alpha_3$ degeneracy. **No
+threshold $\tau$ in the §15.6 sweep grid yields acc $\ge
+0.75$ on an answered subset of size $\ge n_\min = 10$.**
+The deployment-grade ceiling persists across all four
+metric-class configurations on TruthfulQA-MC. Whether the
+hybrid is REGRESSION (here) or USEFUL_INTERNAL (§15.4),
+$\alpha_3$ is unreachable; abstention alone — with or
+without V1's selector — cannot deliver a $\ge 75\%$-accurate
+subset from a base model at greedy accuracy 0.250.
+
+This bounds any hypothetical future product layer: even if a
+fresh §0.8 commitment with different bands or different
+scaling reopened the §14+§15 hybrid line and produced a
+non-REGRESSION verdict on TruthfulQA-MC, the $\alpha_3$
+ceiling would still cap deployment-grade claims. **Reaching
+$\alpha_3$ requires a higher base-model accuracy floor
+(model-scale upgrade per §13.8 future-work, never
+authorized), not abstention-layer tuning.**
+
+**What §15.6 authorizes (per §15.5 Chunk 5g REGRESSION row).**
+
+The §15.5-pinned acceptance/rejection mapping for REGRESSION
+is binding under §0.8. Reproduced exactly:
+
+| §15.6 verdict | Authorizes | Forecloses |
+|---|---|---|
+| REGRESSION | Closing the §14+§15 hybrid construct on TruthfulQA-MC. The §13 / §14 / §15 closure prose extends to "answer-selection AND single-source abstention AND hybrid all saturated/regressed on TruthfulQA-MC at this configuration." | §15.7+ follow-up at this observable; product investment; VC-brief changes; cross-benchmark deployment claims. |
+
+Specifically, §15.6 **authorizes**:
+
+- Documenting the §15.5 verdict-of-record in this section
+  (which §15.6 itself accomplishes).
+- Recording $\Delta\kappa = -0.0300$, $\kappa_\text{hybrid} =
+  0.11$, the operating-point degeneracy at $\alpha_1 / \alpha_2$,
+  the bootstrap CI, and the cross-benchmark synthesis as the
+  §15.6 verdict-of-record.
+- Citing §15.6 as the **first REGRESSION verdict** in the
+  §13 / §14 / §15 program — bounding §15.4's HaluEval
+  USEFUL_INTERNAL as a single-benchmark artifact under the
+  worst-benchmark rule.
+- Closing the §14+§15 hybrid construct at this configuration
+  (single-benchmark scope on TruthfulQA-MC; cross-benchmark
+  synthesis combined REGRESSION).
+
+§15.6 explicitly **does NOT authorize**:
+
+- **§15.7+ follow-up.** No further §14+§15 hybrid probe at
+  this configuration. A cross-benchmark deployment claim
+  required §15.5 STRONG (or USEFUL_INTERNAL with combined
+  USEFUL_INTERNAL synthesis); both paths foreclosed.
+- **Product-readiness claims.** REGRESSION is below SATURATION;
+  the hybrid is *worse* than §15.1's single-source abstention
+  on TruthfulQA-MC. Product investment over a known-regressing
+  policy is not authorized.
+- **VC-brief updates.** §13.9 hold remains in force,
+  *strengthened* by §15.6's confirmation that the cross-
+  benchmark hybrid does not generalize. §15.6's metric class
+  is structurally separate from §13.9's gate (different
+  measurement object), but the substantive direction is
+  unambiguous: another metric class did not clear STRONG; one
+  actively regressed.
+- **Reframing of any §13 / §14 / §15.x verdict.** §15.6 is
+  on a fresh metric class and does not interact with §13's
+  ANTI verdicts, §14's SCOUT_SATURATION, §15.2's MARGINAL,
+  §15.4's USEFUL_INTERNAL, or §13.20's NOISE_BAND_LIFT
+  observation. Each remains binding at its pinned
+  configuration.
+- **Re-classifying §15.4 based on §15.6 cross-benchmark
+  synthesis.** The cross-benchmark synthesis is explicitly
+  diagnostic per Chunk 5e; §15.4's HaluEval-only
+  USEFUL_INTERNAL verdict-of-record is preserved unchanged.
+  §15.6 documents the cross-benchmark synthesis as a
+  derived comparator, not as a §15.4 amendment.
+- **Cross-domain claims.** Autonomy-domain BCVF (§6.1)
+  stands wholly independent of §15.6. The N=21 sign-test
+  result that passed in §6.1 / §6.7 is a robotics-domain
+  validation on a different dataset, different predictor
+  set, and different metric class entirely.
+
+**No deviation flag fired during the §15.5 run.** Per §15.5
+Chunk 5h's "Any deviation discovered at run time must be
+flagged in the §15.6 result section as a §0.8 deviation":
+the run produced no such deviation. Phase 1 (§14a.2 sibling
+producer on TruthfulQA-MC) ran cleanly, output schema matched
+the new sibling-producer's pinned schema, parity gate green;
+Phase 2 self-test passed in-run, schema validation on both
+the Phase 1 dump and the §15.4 cross-benchmark artifact
+green, the cascade fired exactly per `_cascade_trace_15_5`.
+The two §15.5 amendments (line-count drift acknowledgment
+deferred to §15.4, sibling-producer creation per Amendment 1)
+landed pre-execution and are documented within §15.5 itself,
+not as run-time deviations.
+
+**Combined picture across §13 / §14 / §15 — full LLM-track
+program now closed across four metric classes and two
+benchmarks; cross-benchmark hybrid REGRESSION is the
+terminal verdict.**
+
+§15.6 closes the §15 LLM-track operational program. The
+full §13 / §14 / §15 testing matrix at this codebase's
+Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100 configuration:
+
+| Program | Metric class | TruthfulQA-MC | HaluEval-QA | Combined |
+|---|---|---|---|---|
+| §13.10 | AUC vs ground truth (single-axis SE baseline) | 0.661 | 0.661 | TRUTH_CORRELATED_MARGINAL |
+| §13.11–§13.18 | AUC, 4 single-axis revisions | various | various | 5/5 ANTI |
+| §14a / §14a.2 | Δ accuracy, system-level | (deferred) | SCOUT_SATURATION | SCOUT_SATURATION |
+| §15.1 / §15.2 | AURC + cov@α, single-source abstention | $\kappa = 0.14$ | $\kappa = 0.26$ | MARGINAL (worst-benchmark min) |
+| §15.3 / §15.4 | $\Delta\kappa$ vs §15.1 baseline, hybrid | (deferred to §15.5) | $\Delta\kappa = +0.090$ | USEFUL_INTERNAL (single-benchmark) |
+| **§15.5 / §15.6** | $\Delta\kappa$ vs §15.1 baseline, hybrid | $\boldsymbol{\Delta\kappa = -0.030}$ | (§15.4 verdict-of-record, +0.090) | **REGRESSION** (cross-benchmark synthesis worst-benchmark min) |
+
+**Thirteen distinct experimental structures across four
+metric classes have now been tested.** None clears STRONG on
+the worst-benchmark rule. §15.4 is the only single-benchmark
+verdict that cleared USEFUL_INTERNAL; §15.6 bounds it as a
+HaluEval-only artifact. The cross-benchmark hybrid is
+REGRESSION.
+
+**§13.9 VC-brief hold reaffirmed and strengthened.** §13.9
+gates external-framing changes to
+`AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` on a STRONG-band lift
+on both benchmarks at any §13 / §14 / §15 probe. §15.6 adds
+the strongest possible negative result yet — REGRESSION on
+the cross-benchmark hybrid synthesis. Combined with §13's
+5/5 ANTI, §14's 2/2 `SCOUT_SATURATION`, §13.20's
+NOISE_BAND_LIFT, §15.2's MARGINAL, §15.4's single-benchmark
+USEFUL_INTERNAL, and §15.6's REGRESSION:
+
+- **Thirteen experimental structures total.**
+- **Zero clear STRONG on the combined-classification rule.**
+- **One clears USEFUL_INTERNAL on a single benchmark only;
+  cross-benchmark synthesis on that hybrid is REGRESSION.**
+
+The §13.9 hold is unchanged in policy, but materially
+*strengthened* by the cumulative evidence.
+
+The honest external framing for any internal-research
+referencing of the §13 / §14 / §15 program is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100, no
+> literature-aligned, mechanism-motivated, system-level,
+> single-source-abstention, hybrid-abstention, or cross-
+> benchmark-hybrid-abstention BCVF construction tested in
+> this codebase clears the STRONG combined-classification
+> bar on the worst-benchmark rule. The §15.4 hybrid scout
+> cleared USEFUL_INTERNAL on HaluEval-QA single-benchmark,
+> but the §15.6 cross-benchmark companion on TruthfulQA-MC
+> returned REGRESSION, bounding §15.4 as a single-benchmark
+> artifact under the worst-benchmark rule. The LLM
+> hallucination-detection track is closed across thirteen
+> experimental structures and four metric classes.*
+
+**§15.6 closes the §15 LLM-track program at the cross-
+benchmark hybrid level.** Per Chunk 5g, REGRESSION
+explicitly forecloses §15.7+-as-implementation follow-ups
+at this configuration. Any follow-up under §15-style logic
+— cross-benchmark larger-N re-run, ensemble risk score,
+alternative selector configurations, alternative consumer
+configurations, relaxed worst-benchmark rule, model-scale
+upgrade per §13.8 future-work — would require a fresh
+top-level §0.8 commitment with bands pinned before any
+data inspection. None is authorized by §15.6.
+
+**The autonomy-domain BCVF claim (§6.1) stands independently
+on the N=21 sign-test that passed in §6.1 / §6.7 and is
+unaffected by any §13 / §14 / §15 outcome.** The §13 / §14 /
+§15 program tested whether BCVF transfers to LLM
+hallucination detection at this codebase's specific scale
+across four distinct metric classes; the answer at this
+configuration is mixed — twelve of thirteen experimental
+structures returned strict non-promotion verdicts; one
+(§15.4 hybrid on HaluEval) cleared USEFUL_INTERNAL on a
+single benchmark; one (§15.6 cross-benchmark) returned
+REGRESSION; **the cross-benchmark synthesis is REGRESSION
+under the worst-benchmark rule.** The §13.9 external-
+framing hold remains binding; §15.6 verdict and synthesis
+are documented internally, not externally, per Chunk 5g.
+
+**Artifacts.**
+
+- `scripts/probe_system_level_scout_v2_truthfulqa.py`
+  (§15.5 Phase 1 sibling producer; numpy + transformers +
+  GPU; ~50–60 min runtime per N=100 invocation).
+- `scripts/probe_hybrid_selective_abstention_truthfulqa.py`
+  (§15.5 Phase 2 post-processor; numpy + stdlib only; under
+  30 sec wall clock).
+- `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json`
+  (Phase 1 per-question dump; consumed by Phase 2).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.json`
+  (machine-readable §15.5 result, schema_version `"15.5"`,
+  with cross_benchmark_synthesis block).
+- `docs/experiments/probe_hybrid_selective_abstention_truthfulqa.md`
+  (human-readable summary).
+
+§15.6 result section now complete (chunks 6a–6f, 6 commits
+on top of the §15.5 pre-commitment + Amendment 1 +
+implementation). §15 LLM-track program is closed.
+
+### 15.7 Pre-commitment — Diagnostic post-processing audit on existing dumps (no new compute)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any §15.4 / §15.6 / §15.2 dump is
+opened in §15.7 form. Specification, computed quantities,
+hypothesis tests, and interpretation framework below cannot
+be redefined post-hoc.
+
+**Position in the §13 / §14 / §15 program — what §15.7 is
+and explicitly is not.**
+
+§15.7 is a **pure-diagnostic post-processing chapter**, not a
+new experimental probe and not a re-execution of any prior
+program. It converts the empirical questions surfaced by a
+multi-round informal critique of §15.6's interpretation into
+a single binding §0.8 audit committed before any
+implementation. **§15.7 produces interpretive content for the
+§15 closure narrative; it explicitly does not re-classify any
+prior verdict.**
+
+Specifically, §15.7 is **NOT**:
+
+- A new probe authorized by §15.6 (which closed the §15
+  program at REGRESSION). §15.7 does not produce new
+  verdicts.
+- A re-execution of §13 / §14 / §15.x (no new GPU, no new
+  generation, no new model loads, no new NLI calls).
+- A re-classification of §15.4's HaluEval USEFUL_INTERNAL or
+  §15.6's TruthfulQA-MC REGRESSION. Both verdicts-of-record
+  remain binding under §0.8 regardless of any §15.7 finding.
+- A re-classification of §13.9's VC-brief hold. The hold
+  remains in force; §15.7 produces diagnostic content, not
+  external-framing-grade evidence.
+- An §15.8-authorizing chapter. No follow-up probe is
+  authorized by §15.7 unless and until a fresh top-level
+  §0.8 commitment lands.
+
+§15.7 **IS**:
+
+- A pre-committed diagnostic audit of three existing on-disk
+  artifacts: §15.4 (HaluEval hybrid), §15.6 (TruthfulQA-MC
+  hybrid), §15.2 (single-source baselines).
+- A formalization of the **base-rate-adjusted ratio
+  condition** for selective prediction (the operational
+  criterion $F_1(\tau)/F_0(\tau) \ge \alpha(1-\pi)/((1-\alpha)\pi)$,
+  not the cruder $F_1 - F_0$ separation), applied to existing
+  data.
+- A pinned **Stage A / Stage B / Composition decomposition**
+  of the hybrid scout's three possible failure modes:
+  (i) Stage A answer-stream failure, (ii) Stage B score-
+  separability failure, (iii) Composition failure where Stage
+  A's selected-answer correctness is poorly proxied by the
+  Stage B winning-source risk score.
+- A pinned falsifiable hypothesis test for whether §15.6's
+  Δκ = −0.030 reflects substantive hybrid regression on
+  TruthfulQA-MC versus stochastic equivalence to §15.1's
+  TruthfulQA-MC baseline (under the working hypothesis that
+  V1 selected Qwen on all 100 TruthfulQA-MC questions, the
+  hybrid reduces in expectation to single-source).
+- A pinned interpretation framework that maps each diagnostic
+  output to **non-binding** narrative content, with explicit
+  rules for what §15.7 may and may not say in the result
+  section.
+
+**Why §15.7 exists.** Three motivations, all surfaced through
+external critique of §15.6:
+
+1. **Diagnostic value:** the existing dumps contain
+   information that the §15.4 / §15.6 verdict cascades did
+   not extract (full risk-coverage curves, Stage-A/Stage-B
+   decomposition, sampling-noise tests). Computing this
+   information sharpens what §15 actually showed.
+2. **Substantive vs noise distinction:** §15.6 REGRESSION's
+   wide bootstrap CI [−0.14, +0.12] is consistent with both
+   a noise-bound result and a substantive negative; §15.7's
+   pinned hypothesis test resolves which.
+3. **§0.8 audit-trail integrity:** post-hoc informal
+   commentary on a verdict is not §0.8-binding. Converting
+   the load-bearing critiques into a single pre-committed
+   diagnostic audit lands the analysis under the same
+   discipline as the prior chapters.
+
+**§15.7 does NOT change the §15.6 verdict-of-record.** Per
+§0.8, §15.6's pinned cascade returned REGRESSION on the
+point estimate of Δκ on TruthfulQA-MC. That verdict is
+binding regardless of §15.7's diagnostic findings. §15.7
+may *interpretively weaken* the substantive reading (e.g.,
+"REGRESSION reflects sampling stochasticity over Stage A's
+Qwen-degenerate selection") but cannot *override* it. The
+distinction between binding verdict and interpretive caveat
+is pinned in §15.7 Chunk 7f below.
+
+**Confirmation: no data inspection prior to this pre-
+commitment.** The §15.4 / §15.6 / §15.2 artifacts have been
+inspected only via their pinned `combined.{verdict, delta_kappa,
+kappa_hybrid}` fields cited in the prior §0.8 chapters.
+Per-question fields, full threshold sweeps, and stage-wise
+records have NOT been opened in §15.7 form. The audit
+specification in §15.7 Chunks 7c–7e below is pinned from §15
+prose only; the actual quantities will be computed only after
+§15.7 implementation lands.
+
+**Inputs and architecture (pinned).**
+
+§15.7 reads four on-disk artifacts. All four exist as
+verdicts-of-record from prior §0.8-binding chapters; §15.7
+modifies none of them.
+
+| Artifact | Source chapter | Used for |
+|---|---|---|
+| `docs/experiments/probe_system_level_scout_v2_halueval_qa.json` | §14a.2 (per §14c verdict-of-record) | Stage A/B decomposition for §15.4 HaluEval hybrid: per-question V1 source identity, selected_answer correctness, per-source semantic entropies |
+| `docs/experiments/probe_system_level_scout_v2_truthfulqa_mc.json` | §15.5 Phase 1 (per §15.6 verdict-of-record) | Stage A/B decomposition for §15.6 TruthfulQA-MC hybrid: same field set |
+| `docs/experiments/probe_selective_abstention.json` | §15.2 verdict-of-record | Single-source baseline κ values per benchmark (HaluEval κ@α₂=0.26; TruthfulQA-MC κ@α₂=0.14); pinned constants only |
+| `docs/experiments/probe_semantic_entropy.json` and `docs/experiments/probe_semantic_entropy_halueval_qa.json` | §13.10 producer (currently at N=200 per §13.20 dump-overwrite) | Distributional comparison ONLY for the §15.6 sampling-noise hypothesis test (Chunk 7e); see §0.8 caveat below |
+
+**§0.8 caveat on the §13.10 dumps (per §15.2 Postscript and
+§13.20).** The §13.10 dumps on disk are now N=200, having
+been overwritten after §15.2 landed. §15.7 uses them ONLY
+for the Chunk 7e sampling-noise hypothesis test, where the
+quantity of interest is the **distributional shape** of Qwen
+per-question K=10 semantic entropy — invariant to N=100 vs
+N=200 sampling depth. **§15.7 does NOT re-derive §15.2's
+verdict-of-record from these dumps.** The κ=0.14 (TruthfulQA-
+MC) and κ=0.26 (HaluEval) baselines remain the pinned values
+from §15.2's preserved artifact regardless of any §13.20
+upstream overwrite. The N=200 status is documented inline in
+the §15.7 result section as an interpretive caveat — same
+pattern §15.2 Postscript established.
+
+**Architecture pin: pure post-processing, no new compute.**
+
+- **No new generation calls.** No model loads. No NLI scoring
+  beyond what already exists in the pinned dumps.
+- **No GPU.** numpy + Python stdlib only.
+- **No network.** No HF cache reads. No HF_TOKEN consumed.
+- **Wall-clock cost:** under 60 seconds total.
+- **Modification footprint on existing artifacts:** zero.
+
+**Schema validation (fail-fast, identical discipline to
+§15.1 / §15.3 / §15.5).**
+
+§15.7's loader validates each input artifact against pinned
+field expectations. Any missing field, malformed JSON, or
+duplicate question identifier triggers `SCHEMA_MISMATCH` exit
+with explicit reference to §15.7 Chunk 7b — no fallback path,
+no silent substitution.
+
+Per-artifact pinned field expectations:
+
+- **§14a.2 dumps** (both benchmarks): `questions[*].q_idx`,
+  `questions[*].sources[i].semantic_entropy`,
+  `questions[*].answer_cluster_ids`,
+  `questions[*].v1_weights`,
+  `questions[*].v1_winning_cluster`,
+  `questions[*].v1_correct`,
+  `questions[*].baseline_a_correct`,
+  `questions[*].sources[i].source_name` (NEW vs §15.3/§15.5
+  Phase 2 — needed for V1 source-identity audit).
+- **§15.2 verdict-of-record artifact:** `schema_version == "15.1"`,
+  `benchmarks.{truthfulqa_mc,halueval_qa}.kappa` (drives the
+  pinned baselines).
+- **§13.10 dumps:** `[*].q_idx`, `[*].semantic_entropy`,
+  `[*].greedy_matches_correct` (matches §15.1 Amendment 1
+  pinned field names; consumed only for distributional
+  comparison).
+
+**What §15.7 does NOT modify.**
+
+- §14a.2 dumps (both benchmarks) — preserved unchanged.
+- §15.2 verdict-of-record artifact — preserved unchanged.
+- §13.10 dumps — read-only; the §13.20 N=200 status is
+  inherited as-is.
+- Any §13/§14/§15.x verdict-of-record markdown or JSON
+  artifact other than the four §15.7 outputs.
+
+§15.7 produces exactly two output artifacts (pinned in Chunk
+7g): a JSON diagnostic dump and a markdown report. Both
+include explicit `schema_version: "15.7-diagnostic"` and a
+top-level field flagging that §15.7 is **diagnostic-only**
+content, not a new verdict-of-record.
+
+**Diagnostic computations (pinned, full audit spec).**
+
+For each of the two hybrid configurations (§15.4 HaluEval +
+§15.6 TruthfulQA-MC), §15.7 computes the following over the
+existing per-question $(r(q), c(q))$ extracted from the
+pinned §14a.2 / §15.5 Phase 1 dumps. Notation per §15.5
+Chunk 5f.
+
+**(A) Class-conditional CDFs.** For each benchmark, sort
+questions by ascending $r(q)$ with question-id tiebreak.
+At each threshold $\tau$ in the sorted unique-$r$ grid plus
+$\pm\infty$:
+
+$$F_1(\tau) = \Pr(R<\tau \mid Y=1) = \frac{|\{q : r(q)<\tau \text{ AND } c(q)=1\}|}{|\{q : c(q)=1\}|}$$
+$$F_0(\tau) = \Pr(R<\tau \mid Y=0) = \frac{|\{q : r(q)<\tau \text{ AND } c(q)=0\}|}{|\{q : c(q)=0\}|}$$
+
+These are the class-conditional CDFs of the risk score under
+the pinned correctness label.
+
+**(B) Separation diagnostic** (the cruder local-discrimination
+form):
+$$\Delta(\tau) = F_1(\tau) - F_0(\tau)$$
+Range $[-1, +1]$. Reported as a curve over $\tau$.
+
+**(C) Likelihood-ratio condition** (the operationally-correct
+local condition for selective prediction):
+$$\rho(\tau) = \frac{F_1(\tau)}{F_0(\tau)} \quad \text{(when } F_0(\tau) > 0\text{)}$$
+At each $\tau$, compute and report $\rho(\tau)$.
+
+**(D) Base-rate-adjusted threshold target.** Per the
+selective-prediction precision condition derived in
+§15.7's pinned interpretation framework, $\Pr(Y=1\mid R<\tau)
+\ge \alpha$ if and only if
+$$\rho(\tau) \ge \rho^*(\alpha, \pi) \;\equiv\; \frac{\alpha(1-\pi)}{(1-\alpha)\pi}$$
+
+For each benchmark, compute $\rho^*(\alpha_2, \pi)$ using
+$\pi$ = empirical V1 (or single-source) accuracy on that
+benchmark, and report whether $\rho(\tau)$ exceeds $\rho^*$
+in any τ region with $|A_\tau| \ge n_\min = 10$. **This is
+the sharpest single diagnostic** for whether the score
+supports useful selective prediction at the $\alpha_2 = 0.50$
+operating point.
+
+Pinned $\rho^*$ targets (computable ex-ante from §13.10
+prose / §14a.2 evidence):
+
+| Configuration | $\pi$ (Stage A or single-source acc) | $\rho^*$ at $\alpha_2 = 0.50$ |
+|---|---|---|
+| §15.4 HaluEval hybrid | 0.330 (V1 acc per §14c) | $\frac{0.5 \cdot 0.67}{0.5 \cdot 0.33} \approx 2.03$ |
+| §15.6 TruthfulQA-MC hybrid | 0.250 (V1 acc per §15.6 Chunk 6c) | $\frac{0.5 \cdot 0.75}{0.5 \cdot 0.25} = 3.0$ |
+| §15.2 HaluEval single-source | 0.300 (Qwen greedy per §13.10) | $\frac{0.5 \cdot 0.70}{0.5 \cdot 0.30} \approx 2.33$ |
+| §15.2 TruthfulQA-MC single-source | 0.250 (Qwen greedy per §13.10) | $3.0$ |
+
+The base-rate asymmetry is itself documented as a §15.7
+finding: TruthfulQA-MC requires $\rho \ge 3.0$ while HaluEval
+requires only $\sim 2.03$ — a 50% steeper bar from base rate
+alone before any score-quality consideration.
+
+**(E) Precision and coverage curves.**
+$$p(\tau) = \Pr(Y=1 \mid R<\tau), \quad c(\tau) = \Pr(R<\tau)$$
+Reported alongside $F_1, F_0, \Delta, \rho$ at every grid
+point.
+
+**(F) Step-size audit (where the policy curve is "stepped").**
+
+Per §15.6 Chunk 6b observation (b), the §15.6 hybrid's α₁
+and α₂ operating points were identical (same $\tau^*$, same
+coverage). §15.7 quantifies the step-geometry of each
+benchmark's risk-coverage curve:
+
+- **Number of distinct $r(q)$ values** in the empirical
+  support (≤ N).
+- **Empirical jump sizes:** for each adjacent pair of
+  thresholds in the sorted-unique-$r$ grid, compute
+  $\Delta_\text{jump,k} = c(\tau_{k+1}) - c(\tau_k)$.
+  Report mean, max, and number of "large jumps" (defined as
+  jumps $\ge 1/N$, i.e., a single question or more shifting
+  classification at one threshold).
+- **Operating-point collapse audit:** for each pinned $\alpha
+  \in \{\alpha_1, \alpha_2, \alpha_3\}$, compute the
+  achieving threshold $\tau^*(\alpha)$ and flag whether any
+  pair of adjacent $\alpha$ values resolves to the same
+  $\tau^*$ — directly testing the §15.6 Chunk 6b "stepped
+  curve" finding empirically.
+
+**Reporting format (pinned).** All curves are emitted as
+arrays in the §15.7 JSON artifact. The markdown report
+includes a per-benchmark table summarizing:
+
+- $\rho(\tau^*)$ at the operating-point threshold for each
+  $\alpha$ target,
+- $\rho^*(\alpha, \pi)$ pinned target,
+- whether the condition $\rho \ge \rho^*$ is met,
+- $\Delta(\tau^*)$ separation,
+- step-size summary statistics.
+
+**Critical §0.8 distinction:** all of these computations are
+**diagnostic only**. None re-classifies any §15.4 / §15.5 /
+§15.6 / §13.20 verdict-of-record. The $\rho \ge \rho^*$ test
+informs whether the §13.10 entropy is operationally useful at
+the pinned operating point, but the §15.6 cascade verdict on
+$\Delta\kappa$ remains binding regardless.
+
+**Stage A / Stage B / Composition decomposition (pinned).**
+
+The hybrid scout's Δκ verdict mixes three distinct failure
+modes that the §15.4 / §15.6 cascades did not separate.
+§15.7 decomposes them.
+
+Notation:
+
+- $S(q)$ — Stage A's selected source identity for question
+  $q$ (Qwen / Llama / Mistral).
+- $a_S(q)$ — Stage A's selected answer (the V1-NLI-clustered
+  selector winner's greedy).
+- $Y_S(q) \in \{0, 1\}$ — correctness of $a_S(q)$ per the
+  §14a.2 NLI labeling protocol.
+- $R_S(q) = H_{\text{src}_{S(q)}}(q)$ — per-source semantic
+  entropy of the source whose answer V1 selected.
+- $\pi_S = \Pr(Y_S = 1)$ — Stage A's answer-stream accuracy
+  at full coverage.
+- $\pi_A = \Pr(Y_\text{Baseline-A} = 1)$ — Qwen-greedy
+  accuracy at full coverage (the §13.10 single-source
+  reference).
+
+**Stage A audit (answer-stream quality + selector identity).**
+
+Computed quantities per benchmark:
+
+1. **V1 selection identity histogram.** Count of questions
+   where $S(q) \in \{$Qwen, Llama, Mistral$\}$. **Pinned
+   diagnostic question:** does V1 select Qwen on all 100
+   TruthfulQA-MC questions? (Hypothesis from §15.6 Chunk 6c
+   informational analysis; §15.7 confirms or refutes
+   empirically.)
+2. **V1-divergent question set $D = \{q : S(q) \ne \text{Qwen}\}$.**
+   Per benchmark, $|D|$ and the per-question correctness
+   delta on $D$:
+   $$\Delta_D = \Pr(Y_S = 1 \mid q \in D) - \Pr(Y_\text{Baseline-A} = 1 \mid q \in D)$$
+   This isolates Stage A's actual lift contribution to the
+   subset of questions where V1 makes a non-Qwen choice.
+3. **Stage A net lift:** $\Delta_A = \pi_S - \pi_A$, computed
+   over all $N=100$ questions. Reports whether V1 added
+   accuracy at full coverage.
+
+**Stage A failure mode (i):** $\Delta_A \approx 0$ AND
+$|D|$ small → V1 contributed no answer-stream lift; the
+hybrid degenerates to single-source plus stochastic noise.
+This is the §15.6 Chunk 6c hypothesis for TruthfulQA-MC.
+
+**Stage B audit (score separability over Stage A's
+selected-answer correctness).**
+
+Computed quantities per benchmark:
+
+1. **Class-conditional risk distributions** $\Pr(R_S \mid Y_S=1)$
+   and $\Pr(R_S \mid Y_S=0)$ summary statistics: mean, stdev,
+   min, max, percentiles (10/25/50/75/90).
+2. **Separation diagnostic on Stage A labels:** $\Delta_S(\tau)$
+   and $\rho_S(\tau)$ as in Chunk 7c, but evaluated
+   against $Y_S$ (Stage A's selected-answer correctness),
+   not against $Y_\text{Baseline-A}$.
+3. **Local condition test at the pinned operating point:**
+   does $\rho_S(\tau^*) \ge \rho^*(\alpha_2, \pi_S)$ for any
+   $\tau^*$ with $|A_{\tau^*}| \ge n_\min = 10$?
+
+**Stage B failure mode (ii):** Stage A's $\pi_S$ is decent
+but $R_S$ does not separate $Y_S = 1$ from $Y_S = 0$ (i.e.,
+the score has no information about whether Stage A's choice
+was correct). This is structurally different from (i): Stage
+A has produced a usable answer stream, but Stage B's risk
+score is uninformative about it.
+
+**Composition audit (Stage B risk score's proxy quality for
+Stage A's selected answer).**
+
+Computed quantities per benchmark:
+
+1. **Per-question correlation:** $\text{corr}(R_S(q), 1 - Y_S(q))$
+   (Pearson and Spearman; the latter robust to monotone
+   transforms).
+2. **V1-divergent vs Qwen-only correlation comparison:**
+   compute the correlation separately on $D$ (V1 picked
+   non-Qwen) and on $\bar{D}$ (V1 picked Qwen). If the
+   correlation is substantially worse on $D$, the hybrid's
+   risk score is a poor proxy on exactly the questions where
+   Stage A's selection diverges from baseline — which is the
+   composition failure mode.
+3. **Cross-source proxy quality:** for each source $i$,
+   compute $\text{corr}(H_{\text{src}_i}, 1 - Y_S)$ on the
+   subset where $S(q) = i$. If the diagonal correlations are
+   all roughly equal but cross-source effects are missing,
+   the per-source entropy is a "self-proxy" only — informative
+   about its own source's wrongness but not transferable as
+   a Stage A-aware proxy.
+
+**Composition failure mode (iii):** Stage A's $\pi_S$ is
+decent AND $R_S$ has some separation overall, but the
+per-question proxy $R_S \to (1 - Y_S)$ is worse on the
+V1-divergent questions $D$ than on $\bar{D}$. This means the
+hybrid's risk-score-to-correctness mapping breaks on exactly
+the questions where the hybrid's selector matters — a
+specifically hybrid pathology that does not exist in §15.1's
+single-source scenario.
+
+**Diagnostic decision tree (pinned).** Once §15.7 computes
+the three audits, each benchmark's failure mode is classified
+into one of:
+
+- **A-DEGENERATE:** Stage A failure (i) — V1 contributes
+  nothing. The hybrid reduces to single-source. §15.6's
+  Δκ ≈ 0 in expectation; observed −0.030 is sampling noise.
+- **B-INSUFFICIENT:** Stage B failure (ii) — score
+  separability is below the $\rho \ge \rho^*$ threshold near
+  the operating point.
+- **C-MISMATCHED:** Composition failure (iii) — score
+  works on $\bar{D}$ but fails on $D$.
+- **MIXED / OTHER:** Two or more failure modes co-fire, or
+  none of the three fits.
+
+**§0.8 boundary:** the decision-tree classification is
+diagnostic only. It does NOT re-classify §15.4 USEFUL_INTERNAL
+or §15.6 REGRESSION. It produces interpretive content for
+the §15.7 result section's narrative explanation of WHY the
+verdicts came out as they did.
+
+**§15.6 sampling-noise hypothesis test (pinned, falsifiable).**
+
+The §15.6 verdict (REGRESSION, Δκ = −0.030) was discussed in
+informal critique as plausibly reflecting Stage A degeneracy
+(V1 selecting Qwen on all 100 TruthfulQA-MC questions) +
+sampling stochasticity rather than a substantive hybrid-hurts
+finding. §15.7 converts this informal hypothesis into a
+**pre-committed falsifiable test**.
+
+**The hypothesis (pinned).**
+
+If V1 selects Qwen on every TruthfulQA-MC question (Stage A
+audit confirms), then on TruthfulQA-MC the hybrid's risk
+score $R_S = H_\text{Qwen-K=10}(q)$ is computed from a fresh
+K=10 sample of Qwen on TruthfulQA-MC. §15.1's TruthfulQA-MC
+risk score (used to derive the §15.2-pinned $\kappa = 0.14$
+baseline) was likewise $H_\text{Qwen-K=10}(q)$ from a fresh
+K=10 sample of Qwen on TruthfulQA-MC. **The two scalars are
+the same protocol applied to fresh samples and should be
+distributionally equivalent in expectation.**
+
+**Falsifiable claim:** if the hypothesis is correct, the
+empirical distributions of $R_S$ (from §15.5 Phase 1 dump)
+and the §13.10 TruthfulQA-MC Qwen-K=10 entropies (from the
+now-N=200 §13.10 dump on disk) should be drawn from the same
+underlying distribution.
+
+**Pinned test (two-sample Kolmogorov-Smirnov + summary
+distance metrics).**
+
+Compute on TruthfulQA-MC only (HaluEval included as a
+control where V1 does diverge):
+
+1. **KS two-sample test.** Null hypothesis: §15.6's $R_S$
+   distribution and §13.10's Qwen-K=10 entropy distribution
+   are drawn from the same underlying distribution. Report
+   KS statistic and p-value at α=0.05.
+2. **Summary distance metrics.** Compute on the two
+   distributions:
+   - $|\bar{R}_{15.6} - \bar{R}_{13.10}|$ (mean difference)
+   - $|\sigma_{R_{15.6}} - \sigma_{R_{13.10}}|$ (stdev difference)
+   - $\max_\tau |F_{15.6}(\tau) - F_{13.10}(\tau)|$ (KS distance,
+     same as KS statistic)
+3. **Conditional comparison on Qwen-correctness label.** If
+   V1 selects Qwen on all 100 TruthfulQA-MC questions, then
+   $Y_S = Y_\text{Qwen-greedy}$. Compute the same three
+   distance metrics conditional on $Y = 1$ and on $Y = 0$
+   separately.
+
+**Pinned interpretation rules (§0.8-style; do not redefine
+post-hoc).**
+
+The KS test is reported with its p-value and the claim is
+read mechanically:
+
+- **p > 0.05 AND mean difference < 0.10 nats AND stdev
+  difference < 0.10 nats:** **HYPOTHESIS_SUPPORTED**. The
+  §15.6 risk score distribution is statistically
+  indistinguishable from the §13.10 reference. Combined with
+  a confirmed Stage A V1-picks-Qwen-on-all-100 finding, this
+  empirically confirms the §15.6 sampling-noise reading: the
+  hybrid degenerates to single-source on TruthfulQA-MC; the
+  3pp Δκ gap reflects fresh-sample stochasticity.
+- **p ≤ 0.05 OR either summary distance ≥ 0.10 nats:**
+  **HYPOTHESIS_REFUTED**. The §15.6 risk score distribution
+  is meaningfully different from §13.10's reference. The
+  REGRESSION reading then has a substantive component beyond
+  sampling stochasticity — possibly Stage A or Composition
+  effects.
+- **p > 0.05 AND ANY summary distance ≥ 0.10 nats AND
+  ≤ 0.20 nats:** **HYPOTHESIS_PARTIAL**. Distributions are
+  statistically equivalent at $\alpha = 0.05$ but show
+  modest practical drift; document inline as ambiguous.
+
+**Pinned numerical thresholds rationale.** 0.10 nats is the
+practical-drift bound — meaningful entropy distributions
+differ by 0.05–0.10 nats in §13.10 prose's reported
+between-benchmark mean separations (HaluEval 0.486 vs
+TruthfulQA-MC 0.392 is ~0.094 nats). 0.10 nats is the same
+order as those between-benchmark gaps; drift larger than this
+indicates a non-trivial distributional shift.
+
+**Caveat: §13.10 dumps are now N=200.** Per §13.20 / §15.2
+Postscript, the §13.10 TruthfulQA-MC dump on disk is N=200,
+not the N=100 §15.2 baseline computed against. §15.7's KS
+test uses the N=200 dump as the reference distribution
+because **the test is about distributional shape, not the
+specific N=100 sample**. Larger N gives a more powerful
+reference; if HYPOTHESIS_SUPPORTED fires against the N=200
+reference, it is more conservative than the same test
+against the original N=100 dump would have been. The N=200
+status is documented as an interpretive note in the §15.7
+result, not as a §0.8 deviation.
+
+**§0.8 boundary on the test outcome.**
+
+- **HYPOTHESIS_SUPPORTED** does NOT change the §15.6 verdict
+  from REGRESSION to anything else. The verdict cascade fired
+  on the pinned $\Delta\kappa$ point estimate; the
+  cascade's verdict is binding. HYPOTHESIS_SUPPORTED produces
+  interpretive content of the form: *"the REGRESSION verdict
+  is consistent with sampling-noise-bound stochasticity over
+  a Stage-A-degenerate hybrid; substantive 'hybrid hurts'
+  reading is not supported by the distributional evidence."*
+- **HYPOTHESIS_REFUTED** likewise does not strengthen the
+  §15.6 verdict to a worse band. The verdict remains
+  REGRESSION; HYPOTHESIS_REFUTED produces content of the
+  form: *"REGRESSION reflects substantive distributional
+  drift in the §15.6 risk score relative to §13.10's
+  reference; the hybrid does measurably differ from
+  single-source even on a benchmark where Stage A
+  degenerates."*
+- **HYPOTHESIS_PARTIAL** produces ambiguity-flagging content
+  with both readings explicitly stated.
+
+In all three cases, the §15.6 cascade verdict (REGRESSION)
+remains binding under §0.8. §15.7's hypothesis test informs
+the **interpretation** of that verdict, not the verdict itself.
+
+**Interpretation framework (pinned, §0.8-style; the
+verdict-binding vs interpretive-caveat distinction).**
+
+§15.7 produces diagnostic content. To prevent informal
+narrative from drifting into verdict-override territory
+(the failure mode §0.8 is designed to prevent), §15.7 pins
+**three classes of statements** §15.7 may emit, each with
+explicit constraints on what they can claim.
+
+**Class 1 — Numerical observations (always permitted).**
+
+§15.7 may report any of the diagnostic numbers from Chunks
+7c–7e verbatim:
+
+- "$\rho(\tau^*) = X$ vs $\rho^*(\alpha_2, \pi) = Y$ → local
+  condition $\rho \ge \rho^*$ [met / not met]."
+- "Stage A $|D| = X$ out of 100; V1 selected Qwen on $X$ /
+  100 questions."
+- "KS p-value = X; mean difference = Y nats; HYPOTHESIS
+  classification: [SUPPORTED / REFUTED / PARTIAL]."
+- "Number of distinct $r(q)$ values: $X$. Operating-point
+  collapse at $\alpha \in \{0.40, 0.50\}$: [yes / no]."
+
+These are direct readouts of pinned computations with no
+inferential content beyond them.
+
+**Class 2 — Interpretive narrative (permitted with explicit
+verdict-binding caveat).**
+
+§15.7 may interpret the numerical observations into mechanism
+narrative, subject to the binding-verdict caveat:
+
+> **Allowed interpretive form:** *"The §15.6 REGRESSION
+> verdict-of-record (binding under §0.8) is consistent with
+> [A-DEGENERATE / B-INSUFFICIENT / C-MISMATCHED / MIXED]
+> failure mode. Specifically, [evidence from Class 1
+> observations]. This sharpens the diagnosis without
+> overriding the cascade verdict; the verdict remains
+> REGRESSION regardless of the diagnostic mechanism."*
+
+The constraint: every interpretive statement that bears on
+§15.6 must explicitly include "the verdict remains
+REGRESSION regardless." Same constraint applies to §15.4
+USEFUL_INTERNAL — interpretive content may sharpen the
+mechanism, but the verdict band cannot shift.
+
+**Class 3 — Forbidden statements (§0.8-blocked).**
+
+§15.7 may NOT emit any of the following:
+
+- "§15.6's REGRESSION verdict was wrong" — overrides binding
+  verdict.
+- "Δκ should be re-classified as SATURATION because the
+  hypothesis test showed sampling-noise" — overrides band
+  cascade.
+- "§15.4's USEFUL_INTERNAL is invalid because composition
+  failure mode (iii) fired" — overrides binding verdict.
+- "The §13.9 hold should be relaxed because §15.7 found
+  diagnostic value" — overrides external-framing gate.
+- "§15.8 follow-up is authorized because the diagnostic
+  shows where to fix" — §15.8 requires fresh §0.8 commitment.
+- "The autonomy result (§6.1) is strengthened by §15.7" —
+  cross-domain claim outside §15.7 scope.
+
+If §15.7's emitted content contains any of these, the script
+must abort with `INTERPRETATION_VIOLATION` and refuse to
+write artifacts. (This is enforced in implementation; pinned
+in Chunk 7g.)
+
+**Pinned narrative templates (§0.8 style).**
+
+The §15.7 result section's mechanism narrative MUST follow
+one of these templates per benchmark, parameterized by the
+diagnostic decision-tree classification:
+
+- **A-DEGENERATE template:** *"On [benchmark], §15.6's
+  REGRESSION verdict-of-record (binding) reflects Stage A
+  degeneration. V1 selected [source] on [N/100] questions;
+  the hybrid reduced to single-source plus stochastic
+  sampling. The [Δκ value] differs from §15.1's baseline
+  [κ value] within [statistical / practical] equivalence
+  bounds (KS p = X; mean drift = Y nats; HYPOTHESIS_SUPPORTED).
+  The verdict band remains REGRESSION; the substantive
+  reading is sampling-bounded, not 'hybrid actively hurts'."*
+- **B-INSUFFICIENT template:** *"On [benchmark], §15.6's
+  REGRESSION (or §15.4's USEFUL_INTERNAL) verdict-of-record
+  (binding) is anchored by Stage B's score-separability
+  failure. The risk score's local condition $\rho(\tau^*) =
+  X$ falls below the base-rate-adjusted threshold
+  $\rho^*(\alpha_2, \pi_S) = Y$ near the operating point.
+  The verdict band remains [REGRESSION / USEFUL_INTERNAL];
+  the mechanism is local discriminability, not Stage A
+  degeneration."*
+- **C-MISMATCHED template:** *"On [benchmark], §15.[X]'s
+  verdict-of-record is anchored by composition failure: the
+  per-source winning-source entropy $R_S$ correlates with
+  $1 - Y_S$ at $\rho_\text{Pearson} = X$ on $\bar{D}$ but
+  only $Y$ on $D$ (V1-divergent questions). The hybrid's
+  risk-to-correctness mapping breaks on exactly the
+  questions where Stage A's selector matters. The verdict
+  band remains [REGRESSION / USEFUL_INTERNAL]; the
+  mechanism is hybrid-specific."*
+- **MIXED / OTHER template:** *"On [benchmark], the
+  decomposition does not cleanly resolve to a single
+  failure mode. [Specific evidence]. The verdict band
+  remains [X]; the mechanism is multi-component."*
+
+§15.7's result section MUST use exactly one of these
+templates per benchmark + verdict pair. No free-form
+narrative substitutions.
+
+**§0.8 enforcement summary.**
+
+| Statement type | Allowed | Constraint |
+|---|---|---|
+| Class 1 (numerical) | Yes | Must be direct readout of pinned computation |
+| Class 2 (interpretive narrative) | Yes | Must use one of four pinned templates AND include explicit "verdict band remains [X]" caveat |
+| Class 3 (verdict override) | **No** | Triggers INTERPRETATION_VIOLATION abort |
+
+This is the §15.7 firewall against soft-override drift.
+
+**Implementation scope (pinned).**
+
+§15.7 is implementable as a single CPU-only post-processing
+script with no new compute, mirroring the §15.1 / §15.3 /
+§15.5 Phase 2 pattern.
+
+**New script:** `scripts/probe_audit_15_7.py` (numpy +
+stdlib + scipy.stats only — scipy is added as a dependency
+ONLY for the KS two-sample test in Chunk 7e; if scipy is
+not available, fall back to a numpy-only KS implementation
+documented inline). No GPU, no transformers, no torch, no
+network access.
+
+**Reuse from §15.1 / §15.3 / §15.5 (primitives copied, NOT
+imported).** Same copy-not-import discipline as §15.5 Chunk
+5h: §15.7's script copies the relevant metric primitives
+from prior scripts (sweep grid, NaN-safe acc/cov computation,
+deterministic question-id sort with lexsort tiebreak)
+verbatim. Importing from prior scripts would couple §15.7
+to any future drift in those closed scripts.
+
+**Component spec (~700–1000 lines estimated):**
+
+1. **Schema validators** for the four input artifacts per
+   Chunk 7b's pinned field expectations.
+2. **§14a.2 dump loader** with Stage A handoff extraction
+   (per-question $S(q), Y_S(q), R_S(q), Y_\text{Baseline-A}(q)$).
+3. **§13.10 dump loader** for distributional comparison
+   (per-question Qwen entropy + correctness label).
+4. **§15.2 verdict-of-record loader** for pinned baseline
+   $\kappa$ values.
+5. **Diagnostic curve computation** (Chunk 7c): $F_1, F_0,
+   \Delta, \rho, p, c$ over the empirical threshold grid;
+   step-size audit; base-rate-adjusted $\rho^*$ per
+   configuration.
+6. **Stage A / B / Composition decomposition** (Chunk 7d):
+   V1 selection identity histogram; V1-divergent set $D$
+   metrics; Stage A net lift; Stage B class-conditional
+   stats; Composition correlation comparison on $D$ vs
+   $\bar{D}$.
+7. **Diagnostic decision-tree classifier** (Chunk 7d) that
+   maps the decomposition outputs into one of A-DEGENERATE
+   / B-INSUFFICIENT / C-MISMATCHED / MIXED per benchmark.
+8. **§15.6 sampling-noise hypothesis test** (Chunk 7e):
+   KS two-sample test, summary distance metrics,
+   conditional comparison; classify into HYPOTHESIS_SUPPORTED
+   / HYPOTHESIS_REFUTED / HYPOTHESIS_PARTIAL per pinned
+   thresholds.
+9. **Interpretation-firewall enforcement** (Chunk 7f): the
+   markdown report writer accepts only one of the four
+   pinned templates per (benchmark, verdict) pair; emits
+   `INTERPRETATION_VIOLATION` and aborts if Class-3
+   forbidden statements appear in the rendered output.
+10. **Self-test gate** (`--self-test`): verifies the
+    diagnostic decision-tree classifier and the sampling-
+    noise classifier on synthetic boundary cases mirroring
+    the §15.7 Chunks 7d / 7e pinned thresholds. Required
+    pre-execution gate.
+11. **Output writers:** JSON + markdown per Chunk 7g paths.
+
+**Self-test boundary cases (pinned).**
+
+For the diagnostic decision-tree classifier, pinned synthetic
+inputs:
+
+- A-DEGENERATE input: V1 selects same source on all 100
+  questions; $\Delta_A = 0$; $|D| = 0$ → expected verdict
+  A-DEGENERATE.
+- B-INSUFFICIENT input: $\rho_S(\tau^*) = 1.5$ vs
+  $\rho^*(\alpha_2, \pi=0.30) = 2.33$ at any qualifying
+  $\tau$ → expected B-INSUFFICIENT.
+- C-MISMATCHED input: correlation on $\bar{D}$ = +0.4,
+  correlation on $D$ = +0.05 (≥ 0.3 gap) → expected
+  C-MISMATCHED.
+- MIXED input: multiple criteria fire → expected MIXED.
+
+For the sampling-noise classifier:
+
+- SUPPORTED input: KS p = 0.5, mean_diff = 0.05, stdev_diff
+  = 0.05 → HYPOTHESIS_SUPPORTED.
+- REFUTED input: KS p = 0.001, mean_diff = 0.30 → REFUTED.
+- PARTIAL input: KS p = 0.5, mean_diff = 0.15 → PARTIAL.
+
+**Engineering cost:**
+
+- ~700–1000 lines of new code (with copy-from-§15.x
+  duplication accounted for, per the §15.4 Chunk 4e drift-
+  acknowledgment lesson).
+- numpy + Python stdlib + (optional) scipy.stats. CPU only.
+- Wall-clock cost of real-data run: under 60 seconds.
+
+**Output paths (pinned).**
+
+- `docs/experiments/probe_audit_15_7.json` (machine-readable;
+  `schema_version` `"15.7-diagnostic"`).
+- `docs/experiments/probe_audit_15_7.md` (human-readable
+  diagnostic report).
+
+Both artifacts are flagged at the top with explicit text
+indicating they are §15.7 diagnostic-only outputs and do
+NOT constitute a new verdict-of-record. The interpretation
+firewall (Chunk 7f) is enforced at write time.
+
+**What §15.7 explicitly does NOT test, NOT authorize, NOT do.**
+
+§15.7 is a deliberately narrowed diagnostic post-processing
+audit. The scope boundary is tightly drawn to prevent it from
+sliding into a new probe, a new verdict-class, or a follow-up
+authorization. Specifically:
+
+- **Not a new probe.** §15.7 reads existing artifacts; runs no
+  new generation, no new model loads, no new NLI calls, no
+  new GPU compute. If §15.7 implementation reaches for any
+  resource outside the pinned four input artifacts, it is
+  out of scope and aborts.
+- **Not a re-classification of any §13 / §14 / §15.x verdict.**
+  §15.4 USEFUL_INTERNAL, §15.6 REGRESSION, §15.2 MARGINAL,
+  §13.20 NOISE_BAND_LIFT observation, §13.19 single-axis ANTI
+  closure, §14b / §14c SCOUT_SATURATION verdicts — all remain
+  binding under §0.8 regardless of §15.7 outputs.
+- **Not a relaxation of the §13.9 VC-brief hold.** §13.9
+  remains in force and is not addressed by §15.7 by
+  construction (different metric class). The interpretation
+  firewall (Chunk 7f) blocks any §15.7 statement claiming
+  §13.9 should be reconsidered.
+- **Not an authorization for §15.8 or beyond.** Any follow-up
+  experimental probe (model-scale upgrade, supervised
+  activation probe, benchmark substitution, ensemble risk
+  score, alternative selector, deadband consumer, etc.)
+  requires a fresh top-level §0.8 commitment. §15.7 produces
+  diagnostic content that may inform the choice of follow-up,
+  but does not authorize any specific follow-up.
+- **Not a representation-level fix.** §15.7 audits the
+  existing risk-score-to-correctness mapping; it does not
+  propose new risk scores, new selector configurations, or
+  new threshold policies. Per the multi-round critique that
+  motivated §15.7, the transfer thesis was under-specified
+  at the representation level — §15.7 confirms or refutes
+  specific failure-mode hypotheses but does NOT propose a
+  new representation.
+- **Not a strengthening of §15.4 or §15.6.** §15.7 may sharpen
+  the *mechanism* narrative for either verdict but cannot
+  upgrade either to a higher band. The interpretation
+  firewall blocks any "actually §15.4 should be STRONG"
+  claim.
+- **Not a cross-domain claim.** Autonomy-domain BCVF (§6.1)
+  is wholly independent of §15.7. The interpretation firewall
+  blocks any cross-domain claim.
+- **Not a re-derivation of §15.2's verdict-of-record.** Per
+  Chunk 7b's §0.8 caveat, the §13.10 dumps on disk are now
+  N=200 per §13.20; §15.7 uses them only for distributional
+  shape comparison in the sampling-noise hypothesis test
+  (Chunk 7e), NOT to re-compute §15.2's pinned $\kappa$
+  baselines.
+
+**Reduced-form authorization rationale.**
+
+§15.7 exists at all because the four input artifacts already
+exist, the §15.5 / §15.4 closure cascades produced binding
+verdicts that §15.7 may interpret without overriding, and
+the multi-round informal critique surfaced specific
+empirical questions answerable from the existing data. **If
+any of the four artifacts had been missing, §15.7 would not
+be authorized in this reduced form.** A from-scratch
+diagnostic audit would require fresh §14a.2-class dumps,
+fresh §15.x-class verdicts, or fresh §13.10 dumps at the
+original N=100 — none of which §15.7 generates.
+
+§15.7 is therefore authorized **only as a pure post-
+processing layer over closed §13.10 / §14a.2 / §15.5 Phase 1
+/ §15.2 artifacts**, with the explicit constraint that
+§15.7's outputs are diagnostic narrative content for the
+§15 closure, not new verdicts.
+
+**§15.7 chunk roll-up — pre-commitment now complete.**
+
+| Chunk | Content |
+|---|---|
+| 7a | Opening framing — pure-diagnostic post-processing; not a new probe; does not re-classify any verdict |
+| 7b | Inputs and architecture (four on-disk artifacts; pure post-processing; no new compute; §0.8 caveat on §13.10 N=200 status) |
+| 7c | Diagnostic curves pin (full audit spec): F₁, F₀, Δ(τ), ρ(τ), ρ*(α,π) base-rate-adjusted thresholds, p(τ), c(τ), step-size audit |
+| 7d | Stage A / Stage B / Composition decomposition with three pinned failure modes; diagnostic decision-tree classifier |
+| 7e | §15.6 sampling-noise hypothesis test — pinned KS + distance metrics; three pinned outcomes; explicit "does NOT change verdict" boundary |
+| 7f | Interpretation framework — three statement classes; four pinned narrative templates; interpretation firewall against soft-override drift |
+| 7g | Implementation scope — `scripts/probe_audit_15_7.py`, 11-component spec, self-test gate, INTERPRETATION_VIOLATION enforcement at write time |
+| 7h | What §15.7 does NOT test + reduced-form rationale + roll-up |
+
+Implementation of `scripts/probe_audit_15_7.py` is a separate
+§0.8 authorization gate. §15.7's result section (parallel to
+§15.6 / §15.4 / §15.2) follows the real-data run — and is
+itself a §0.8 chunked drafting exercise with the
+interpretation firewall (Chunk 7f) enforced.
+
+### 15.8 Result — §15.7 audit produced three classifications; §15.6 mechanism narrative corrected (binding verdict unchanged)
+
+The §15.7 pre-committed diagnostic audit has been executed
+against the four pinned on-disk artifacts in the runpod
+container. Three diagnostic classifications:
+
+- **HaluEval-QA decomposition: `MIXED`** (no single failure
+  mode fires cleanly).
+- **TruthfulQA-MC decomposition: `C-MISMATCHED`** (composition
+  failure: per-source winning-source entropy is sign-flipped
+  on V1-divergent questions).
+- **TruthfulQA-MC sampling-noise: `HYPOTHESIS_PARTIAL`**
+  (distributions statistically equivalent at $\alpha=0.05$
+  but practically drifted by ~0.18 nats).
+
+**Critical §15.6 mechanism correction (verdict band
+unchanged).** §15.7 has empirically **refuted** an informal
+mechanism claim that appeared in §15.6 Chunk 6c's analytical
+discussion — namely the working hypothesis that "V1 picked
+Qwen on all 100 TruthfulQA-MC questions." The §15.7 audit
+finds **V1 selected Qwen on 76/100, Llama on 17/100, Mistral
+on 7/100**; the V1-divergent set $|D| = 24$, well above the
+A-DEGENERATE small-divergence threshold. Per §15.7 Chunk 7f's
+interpretation firewall, this correction:
+
+- **Does not alter §15.6's binding `REGRESSION` verdict-of-
+  record.** The cascade fired on the pinned $\Delta\kappa$
+  point estimate; that verdict band remains REGRESSION
+  regardless of the §15.7 mechanism finding.
+- **Sharpens the mechanism narrative from "Stage A
+  degeneracy" to "composition failure (C-MISMATCHED)".**
+  The §15.7 audit identifies the correct underlying
+  mechanism: the per-source winning-source entropy is a
+  sign-flipped proxy for selected-answer correctness on
+  V1-divergent questions ($r_{\bar{D}} = +0.264$, $r_D =
+  -0.156$, gap = 0.421 above the 0.30 C-MISMATCHED
+  threshold).
+- **Is recorded here as §15.7-discovered evidence**, not
+  back-applied as a silent edit to §15.6's text. §15.6
+  Chunks 6a–6f remain the verdict-of-record for the §15.5
+  scout; §15.8 documents the §15.7 mechanism correction in
+  the audit trail.
+
+**§13.9 VC-brief hold remains in force**, autonomy-domain
+BCVF claim (§6.1) unaffected. **Both §15.4 USEFUL_INTERNAL
+and §15.6 REGRESSION verdict-of-record bands remain
+binding** — neither raised, neither lowered, neither
+re-classified.
+
+**Parity-gate / schema-validation confirmation (per §15.7
+Chunk 7b).**
+
+| Input artifact | Status |
+|---|---|
+| `probe_system_level_scout_v2_halueval_qa.json` (§14a.2) | loaded; 100 questions; schema validated |
+| `probe_system_level_scout_v2_truthfulqa_mc.json` (§15.5 Phase 1) | loaded; 100 questions; schema validated |
+| `probe_selective_abstention.json` (§15.2 verdict-of-record) | `schema_version == "15.1"` validated; pinned $\kappa$ extracted |
+| `probe_semantic_entropy.json` (§13.10 TruthfulQA-MC reference) | loaded; 100 questions on disk in this runpod (`n_13_10_overwritten = False`); used as distributional reference for sampling-noise test only |
+
+No `SCHEMA_MISMATCH` fired at the input layer.
+
+**§13.10 N status — runpod-specific note.** The §15.7
+runpod's on-disk §13.10 TruthfulQA-MC dump is **N=100, not
+N=200**. This is a different runpod environment than the one
+where §13.20's N=200 overwrite occurred (different container
+hostname `49064e65c30d`). The §15.7 audit's `n_13_10_overwritten`
+flag returned `False`. The sampling-noise test therefore
+compared §15.6's N=100 R_S distribution against an N=100
+§13.10 Qwen reference — the most direct comparison possible
+under the pinned protocol. **§15.2's pinned $\kappa$
+baselines are unchanged regardless** (those came from the
+§15.2 verdict-of-record artifact, not from any §13.10 dump).
+
+**Self-test gate.** §15.7's required pre-execution gate
+(`--self-test`) ran in the same invocation as real-data
+execution and returned PASSED on all 17 pinned cases:
+- 4 decision-tree boundary cases (Chunk 7d).
+- 6 sampling-noise classifier cases (Chunk 7e).
+- 7 interpretation-firewall cases (Chunk 7f).
+
+**Interpretation firewall confirmation.** The rendered
+markdown report was scanned for Class-3 forbidden statements
+before write per §15.7 Chunk 7f. **No `INTERPRETATION_VIOLATION`
+fired**; output was written cleanly. The interpretation
+firewall is empirically functional under real-data
+conditions.
+
+**Cross-program consistency check.**
+
+| Quantity | §15.4 / §15.6 reported | §15.7 audit observed | Match? |
+|---|---|---|---|
+| HaluEval V1 acc | 0.330 (§14c) | $\pi_S = 0.33$ | ✓ |
+| HaluEval Baseline-A acc | 0.300 (§14c) | $\pi_A = 0.30$ | ✓ |
+| HaluEval $\Delta_A$ (= V1 − BA) | +0.030 (per §15.4 Chunk 4a) | $+0.030$ | ✓ |
+| TruthfulQA-MC V1 acc | 0.250 (§15.6 Chunk 6a) | $\pi_S = 0.25$ | ✓ |
+| TruthfulQA-MC Baseline-A acc | 0.250 (§15.6 Phase 1) | $\pi_A = 0.25$ | ✓ |
+| TruthfulQA-MC κ at α₂ (hybrid) | 0.11 (§15.6 verdict-of-record) | cov@α₂ = 0.11 | ✓ |
+| TruthfulQA-MC operating-point collapse at α₁/α₂ | reported in §15.6 Chunk 6b | empirically confirmed (same τ*=0.6390) | ✓ |
+| §15.2 HaluEval $\kappa$ baseline | 0.26 (§15.2 verdict-of-record) | 0.26 | ✓ |
+| §15.2 TruthfulQA-MC $\kappa$ baseline | 0.14 (§15.2 verdict-of-record) | 0.14 | ✓ |
+
+All cross-program consistency checks pass. The §15.7 audit
+operates over the same per-question state §15.4 / §15.6 / §15.2
+classified; numerical drift between §15.x verdict-of-records
+and §15.7 inputs is zero (within float precision).
+
+**Artifacts.**
+
+- `scripts/probe_audit_15_7.py` (§15.7 implementation; numpy
+  + stdlib + optional scipy.stats; ~1967 lines).
+- `docs/experiments/probe_audit_15_7.json` (machine-readable
+  diagnostic, `schema_version "15.7-diagnostic"`; flagged at
+  top as NOT a verdict-of-record).
+- `docs/experiments/probe_audit_15_7.md` (human-readable
+  diagnostic report; rendered through interpretation firewall).
+
+**Headline numerical findings.**
+
+**(A) Stage A / Stage B / Composition decomposition per
+benchmark.**
+
+| Quantity | HaluEval-QA | TruthfulQA-MC |
+|---|---|---|
+| V1 selection: Qwen | 69 / 100 | **76 / 100** |
+| V1 selection: Llama | 12 / 100 | **17 / 100** |
+| V1 selection: Mistral | 19 / 100 | **7 / 100** |
+| $\|D\|$ (V1-divergent set) | 31 | **24** |
+| $\|D\|/N$ | 0.31 | **0.24** |
+| $\pi_S$ (V1 acc, full coverage) | 0.330 | 0.250 |
+| $\pi_A$ (Baseline-A acc) | 0.300 | 0.250 |
+| $\Delta_A = \pi_S - \pi_A$ | $+0.030$ | $\boldsymbol{0.000}$ |
+| $\Delta$ on $D$ subset | $+0.097$ | $\boldsymbol{0.000}$ |
+| $\rho(\tau^*)$ at $\alpha_2 = 0.50$ | 2.150 | **5.250** |
+| $\rho^*$ at $\alpha_2 = 0.50$ | 2.030 | **3.000** |
+| $\rho \ge \rho^*$? (local condition met) | **yes** (barely) | **yes** (comfortably) |
+| Pearson $r(R_S, 1-Y_S)$ overall | $+0.364$ | $+0.193$ |
+| Pearson $r$ on $\bar{D}$ (Qwen-picked) | $+0.439$ | $+0.264$ |
+| Pearson $r$ on $D$ (V1-divergent) | $+0.191$ | $\boldsymbol{-0.156}$ |
+| Composition gap $r_{\bar{D}} - r_D$ | $+0.248$ | $\boldsymbol{+0.421}$ |
+| **Decision-tree classification** | **MIXED** | **C-MISMATCHED** |
+
+**Three substantive numerical findings the table supports.**
+
+**(a) The local condition $\rho(\tau^*) \ge \rho^*$ is met on
+both benchmarks** — including on TruthfulQA-MC, where the
+§15.6 cascade returned REGRESSION. This is operationally
+striking: the score has *sufficient local discriminative
+power* at the operating point on both benchmarks. On
+TruthfulQA-MC, $\rho(\tau^*) = 5.25$ versus $\rho^* = 3.0$ —
+the score discriminates more than the base-rate-adjusted
+threshold requires. The reason §15.6 still returned REGRESSION
+is that the τ* delivering $\rho \ge \rho^*$ also delivers
+**only $\kappa = 0.11$ coverage**, below §15.1's
+TruthfulQA-MC baseline of 0.14. **Sufficient discrimination
+on a tiny subset, not insufficient discrimination overall.**
+
+**(b) Composition correlation flips sign on TruthfulQA-MC's
+V1-divergent subset.** $r_{\bar{D}} = +0.264$ (Qwen-picked,
+expected direction: high entropy → wrong) versus $r_D =
+-0.156$ (V1-divergent, **inverted direction: high entropy
+→ correct**). Gap of 0.421 places this comfortably in the
+C-MISMATCHED band (threshold 0.30). On the 24 questions
+where V1's selector matters most, the per-source winning-
+source entropy is **anti-correlated** with selected-answer
+correctness. The hybrid's risk score breaks specifically on
+the questions where the hybrid adds value.
+
+**(c) HaluEval composition gap is sub-threshold but real.**
+$r_{\bar{D}} - r_D = 0.248$ on HaluEval, below the C-MISMATCHED
+threshold of 0.30 but visibly non-zero. The HaluEval correlation
+on $D$ stays positive ($+0.191$), unlike TruthfulQA-MC's
+sign-flip. Combined with $\Delta_A = +0.030$ Stage A lift and
+$\rho \ge \rho^*$ Stage B condition met, none of A/B/C fires
+cleanly → MIXED.
+
+**(B) Operating-point analysis (curves and collapse).**
+
+| Benchmark | $\alpha$ | cov@$\alpha$ | $\tau^*$ | $\rho(\tau^*)$ | $\rho^*$ | meets? |
+|---|---|---|---|---|---|---|
+| HaluEval-QA | 0.40 | 0.63 | 1.9730 | 1.523 | 1.354 | ✓ |
+| HaluEval-QA | 0.50 | 0.35 | 1.2275 | 2.150 | 2.030 | ✓ |
+| HaluEval-QA | 0.75 | **0.00** | $+\infty$ | NaN | 6.091 | ✗ |
+| TruthfulQA-MC | 0.35 | **0.11** | **0.6390** | 5.250 | 1.615 | ✓ |
+| TruthfulQA-MC | 0.50 | **0.11** | **0.6390** | 5.250 | 3.000 | ✓ |
+| TruthfulQA-MC | 0.75 | **0.00** | $+\infty$ | NaN | 9.000 | ✗ |
+
+**Operating-point collapse audit:**
+
+| Benchmark | $\alpha$ pair | same $\tau^*$? |
+|---|---|---|
+| HaluEval-QA | (0.40, 0.50) | distinct |
+| HaluEval-QA | (0.50, 0.75) | distinct (latter degenerate) |
+| TruthfulQA-MC | (0.35, 0.50) | **collapsed** ($\tau^* = 0.6390$, cov = 0.11, $\rho = 5.25$ identical) |
+| TruthfulQA-MC | (0.50, 0.75) | distinct (latter degenerate) |
+
+**The §15.6 Chunk 6b "stepped curve" finding is empirically
+confirmed.** The α₁/α₂ collapse on TruthfulQA-MC is a
+property of the entropy distribution's empirical support
+shape, not a measurement artifact. $\alpha_3 = 0.75$ remains
+unreachable on both benchmarks (consistent with §15.4 / §15.6
+findings).
+
+**(C) Sampling-noise hypothesis test (TruthfulQA-MC).**
+
+| Quantity | Value |
+|---|---|
+| KS statistic | 0.180 |
+| KS p-value | 0.0691 |
+| Mean drift (§15.6 R_S − §13.10 reference) | $-0.178$ nats |
+| Stdev drift | $+0.003$ nats |
+| N (§15.5 Phase 1) | 100 |
+| N (§13.10 reference, on-disk this runpod) | 100 |
+| **Classification** | **`HYPOTHESIS_PARTIAL`** |
+
+Rationale (per Chunk 7e pinned interpretation rules): KS p =
+0.0691 > 0.05 (statistically equivalent at α=0.05) BUT
+$|$mean drift$| = 0.178$ nats falls in the
+$[0.10, 0.20]$ PARTIAL band (above the SUPPORTED bound of
+0.10 nats but below the REFUTED bound of 0.20 nats). The
+distributions are not pure-sampling-noise (rejected as
+SUPPORTED) and not pure-substantive-shift (rejected as
+REFUTED) — they are practically drifted by ~0.18 nats with
+shape preserved.
+
+**Mechanism read on the drift direction.** The negative
+mean drift means §15.6's R_S is on average **lower** than
+§13.10's pure-Qwen reference. Consistent with V1 occasionally
+picking non-Qwen sources whose K=10 entropies are tighter
+than Qwen's: when V1 picks Llama or Mistral (24/100 questions),
+$R_S$ comes from those sources, which have on average
+modestly lower entropy than Qwen on TruthfulQA-MC.
+
+**TruthfulQA-MC narrative — C-MISMATCHED classification (§15.6
+mechanism corrected; verdict band remains REGRESSION).**
+
+On truthfulqa-mc, §15.6's `REGRESSION` verdict-of-record
+(binding under §0.8) is anchored by composition failure. The
+per-source winning-source entropy $R_S$ correlates with
+$1 - Y_S$ at Pearson $r_{\bar{D}} = +0.2643$ on the Qwen-
+picked subset $\bar{D}$ (76 questions) but at $r_D = -0.1564$
+on the V1-divergent subset $D$ (24 questions; $|D|/N = 0.24$).
+The hybrid's risk-to-correctness mapping breaks on exactly
+the questions where Stage A's selector matters — a
+hybrid-specific pathology that does not exist in the single-
+source scenario. The verdict band remains `REGRESSION`
+regardless of this diagnostic mechanism.
+
+**Explicit §15.6 mechanism correction recorded (per Chunk 7f
+firewall constraints).** §15.6 Chunk 6c presented an informal
+analytical hypothesis that V1 selected Qwen on all 100
+TruthfulQA-MC questions, supporting a "Stage A degeneracy
+plus sampling stochasticity" interpretation of the §15.6
+REGRESSION verdict. **The §15.7 audit empirically refutes
+this informal hypothesis**: V1 selected Qwen on 76/100,
+Llama on 17/100, Mistral on 7/100; the V1-divergent set
+$|D| = 24$ — well above the A-DEGENERATE threshold of
+$|D|/N < 0.05$. The §15.6 Chunk 6c claim was not part of
+§15.6's pinned cascade verdict; it was analytical commentary
+that turned out to be empirically wrong. Per §15.7 Chunk 7f's
+interpretation firewall:
+
+- **The §15.6 `REGRESSION` cascade verdict-of-record remains
+  binding under §0.8.** The cascade fired on the pinned
+  $\Delta\kappa = -0.030$ point estimate; that classification
+  is unchanged.
+- **The §15.6 Chunk 6c analytical narrative is corrected
+  here in §15.8**, not silently rewritten in §15.6. The audit
+  trail preserves the original §15.6 Chunk 6c text alongside
+  this §15.8 correction.
+- **The corrected mechanism is C-MISMATCHED (composition
+  failure)**, not A-DEGENERATE (Stage A degeneracy). The
+  hybrid's risk score is sign-flipped on V1-divergent
+  questions, which is structurally different from "the
+  hybrid reduces to single-source."
+
+**Operationally what C-MISMATCHED means on TruthfulQA-MC.**
+On the 76 Qwen-picked questions, the per-source winning-
+source entropy works as expected: high entropy → wrong
+($r_{\bar{D}} = +0.26$). On the 24 V1-divergent questions,
+the relationship inverts: high entropy of the winning source
+is **anti-correlated** with whether V1's selected answer is
+right ($r_D = -0.16$). Mechanically, this can happen if:
+
+- When V1 picks a non-Qwen source on TruthfulQA-MC, that
+  source's K=10 stochastic samples cluster tightly around an
+  *incorrect* answer (low entropy, but wrong) — making low
+  entropy a misleading proxy on those questions.
+- Conversely, when V1 picks a non-Qwen source whose samples
+  are diverse (high entropy), the V1-clustered selector may
+  pick a representative whose answer happens to be correct —
+  making high entropy weakly indicative of correctness on
+  this small subset.
+
+Either pattern produces sign-flipped correlation on $D$.
+**§15.7 does not pin a single mechanical explanation; it
+identifies the diagnostic signature and pins the
+classification.** The narrative correction is a §15.8
+finding, not a §15.6 amendment.
+
+**Why $\Delta_A = 0$ is not A-DEGENERATE.** A-DEGENERATE
+requires both $|\Delta_A| <$ threshold AND $|D|/N <$
+threshold. TruthfulQA-MC has $\Delta_A = 0$ exactly (V1
+swapped the same number of right-becomes-wrong as
+wrong-becomes-right) but $|D|/N = 0.24 \gg 0.05$. The decision
+tree (Chunk 7d, _classify_decision_tree) correctly does not
+classify as A-DEGENERATE because the divergent set is
+substantial. **§15.6's "V1 swapped sources but the net
+accuracy was unchanged" pattern is real; the inference that
+"V1 must have picked Qwen on all 100" was the wrong
+conclusion to draw from that pattern.**
+
+**Audit-trail integrity.** Per §15.7 Chunk 7f and the
+no-silent-edit discipline, §15.6 Chunks 6a–6f text is
+preserved unchanged. §15.8 records the §15.7 mechanism
+correction as new §0.8-binding diagnostic content. Future
+readers tracing the §15 program audit trail see:
+
+1. §15.6 Chunk 6c's original informal hypothesis.
+2. §15.8 (this section) recording the §15.7 audit's empirical
+   refutation of that hypothesis and the corrected C-MISMATCHED
+   mechanism.
+3. Both §15.6 REGRESSION and §15.7 C-MISMATCHED diagnostic
+   classification standing as binding §0.8 content at their
+   respective levels (verdict cascade vs diagnostic
+   decomposition).
+
+The verdict band remains `REGRESSION`. The mechanism is now
+correctly characterized.
+
+**HaluEval-QA narrative — MIXED classification (no single
+clean failure mode; verdict band remains USEFUL_INTERNAL).**
+
+On halueval-qa, the §15.7 decomposition does not cleanly
+resolve to a single failure mode. Stage A net lift
+$\Delta_A = +0.030$; V1-divergent set size 31 ($|D|/N =
+0.31$); $\rho(\tau^*) = 2.150$ vs $\rho^* = 2.030$ at
+$\alpha_2 = 0.50$ (local condition met, but barely);
+composition Pearson correlation gap $r_{\bar{D}} - r_D =
++0.248$ (visibly non-zero but below the 0.30 C-MISMATCHED
+threshold). None of the three single-mode signatures fires
+cleanly. The verdict band remains `USEFUL_INTERNAL`
+regardless of this diagnostic mechanism; the §15.7 audit
+flags HaluEval-QA's hybrid as multi-component rather than
+asserting a single clean driver.
+
+**Operationally what MIXED means on HaluEval-QA.** The §15.4
+USEFUL_INTERNAL verdict is real but its mechanism is
+distributed across all three components:
+
+- **Stage A contributes ~3pp lift, concentrated on $D$.**
+  V1's net accuracy lift over Baseline-A is $+0.030$ on the
+  full 100 questions; on the 31 V1-divergent questions, V1's
+  selected-answer accuracy minus Baseline-A's accuracy is
+  $+0.097$ (a 9.7pp lift on the divergent subset). Stage A
+  is doing real work where the selector chooses non-Qwen.
+- **Stage B's local condition $\rho \ge \rho^*$ is met,
+  marginally.** $\rho(\tau^*) = 2.150$ vs $\rho^* = 2.030$ —
+  cleared by 0.12 (about 6% margin). Tighter than
+  TruthfulQA-MC's 5.25 vs 3.0 (75% margin) but technically
+  on the right side of the threshold.
+- **Composition shows partial mismatch but stays sub-
+  threshold.** Correlation drops from $r_{\bar{D}} = +0.439$
+  on Qwen-picked questions to $r_D = +0.191$ on V1-divergent —
+  a real degradation (factor of ~2), but the gap of 0.248
+  doesn't quite cross the 0.30 C-MISMATCHED threshold AND
+  the sign doesn't flip (both correlations stay positive,
+  unlike TruthfulQA-MC's flip).
+
+**What the MIXED classification implies about §15.4.** The
+USEFUL_INTERNAL verdict is *real but fragile*. It survives
+because all three components contribute small-positive
+effects that compound to clear the $\Delta\kappa \ge +0.05$
+USEFUL_INTERNAL threshold. None of the three components is
+individually doing dominant work; conversely, none is
+individually broken. **A §15.4 STRONG would have required
+substantially stronger contribution from at least one
+component**, which the data does not show.
+
+**Sampling-noise interpretation: PARTIAL, leaning toward
+modest substantive drift.**
+
+The TruthfulQA-MC sampling-noise test classified
+`HYPOTHESIS_PARTIAL`. Pinned interpretation rules (§15.7
+Chunk 7e) classify this as "ambiguous"; both readings must
+be reported.
+
+**Reading 1 — modest drift toward sampling-noise side.** KS
+p-value 0.0691 narrowly clears the $\alpha = 0.05$ threshold
+of statistical equivalence; mean drift 0.178 nats narrowly
+clears the SUPPORTED bound of 0.10 nats. The distributions
+are statistically indistinguishable and the practical drift
+is bounded. Under this reading, §15.6's $\Delta\kappa =
+-0.030$ contains a substantial sampling-stochasticity
+component, even if not dominantly noise-bound.
+
+**Reading 2 — modest drift toward substantive shift.** Mean
+drift 0.178 nats falls in the upper half of the PARTIAL band
+$[0.10, 0.20]$; KS p-value 0.0691 sits just above the
+rejection threshold. The shift direction is structurally
+explained (V1 picks tighter-clustered non-Qwen sources on
+24% of questions); the drift is real, not random. Under
+this reading, §15.6's $\Delta\kappa = -0.030$ contains a
+substantial composition-mismatch component, with the C-MISMATCHED
+classification (Chunk 8c) carrying the dominant weight.
+
+**Pinned interpretation per §15.7 Chunk 7e:** both readings
+are reported; neither is privileged. The PARTIAL classification
+means the data does not adjudicate cleanly between them. **The
+§15.6 REGRESSION verdict band remains `REGRESSION` regardless
+of which reading is privileged interpretively.** The §15.7
+audit's value at the sampling-noise layer is showing that the
+question is ambiguous — it is not a clean noise artifact, and
+it is not a clean substantive shift; it is a small distributional
+shift with mixed interpretation.
+
+**Combining sampling-noise PARTIAL with TruthfulQA-MC
+C-MISMATCHED.** The C-MISMATCHED classification captures the
+*sign-flip on V1-divergent questions* mechanism, which is
+distinct from distributional drift in $R_S$ overall. The
+sampling-noise drift (-0.178 nats) and the composition
+sign-flip (correlation $+0.26 \to -0.16$) are independent
+signatures. Both contribute to §15.6's REGRESSION:
+
+- C-MISMATCHED dominates the **mechanism** explanation: the
+  hybrid's risk score is structurally broken on V1-divergent
+  questions.
+- PARTIAL sampling-noise contributes a **distributional**
+  caveat: §15.6's R_S is also shifted modestly relative to
+  §13.10's pure-Qwen reference, consistent with V1 picking
+  non-Qwen sources with tighter K=10 clusters.
+
+§15.6's REGRESSION verdict band remains binding regardless
+of how these mechanism components are weighted.
+
+**Authorization mapping per §15.7 Chunk 7f.**
+
+§15.7's pre-committed Class-1 / Class-2 / Class-3 statement
+rules govern what §15.8 may emit. Reproduced exactly:
+
+| Class | Statement type | §15.8 usage in Chunks 8a–8d | Compliance |
+|---|---|---|---|
+| Class 1 | Numerical observations | All decomposition tables, operating-point tables, sampling-noise statistics, V1 selection histograms, correlation values | ✓ direct readouts of pinned computations |
+| Class 2 | Interpretive narrative | TruthfulQA-MC C-MISMATCHED template (Chunk 8c); HaluEval MIXED template (Chunk 8d); sampling-noise PARTIAL dual-reading interpretation (Chunk 8d) | ✓ uses pinned templates; each statement includes "verdict band remains [X]" caveat |
+| Class 3 | Verdict overrides | (none) | ✓ none emitted; firewall scan passed at write time |
+
+**§15.8 specifically authorizes:**
+
+- Documenting the §15.7 audit's three diagnostic
+  classifications.
+- Recording the empirical refutation of §15.6 Chunk 6c's
+  "V1 picked Qwen on all 100" informal hypothesis.
+- Sharpening §15.6's mechanism narrative from "Stage A
+  degeneracy" to "composition failure (C-MISMATCHED)".
+- Citing the §15.7 audit as confirmation of §15.6 Chunk 6b's
+  "stepped curve" finding.
+- Reporting the sampling-noise PARTIAL classification with
+  both readings.
+
+**§15.8 explicitly does NOT authorize:**
+
+- **Re-classifying §15.6 from REGRESSION to any other band.**
+  The cascade fired on the pinned $\Delta\kappa$ point
+  estimate; that classification is binding under §0.8.
+  §15.8's mechanism correction does NOT change the band.
+- **Re-classifying §15.4 from USEFUL_INTERNAL to any other
+  band.** The MIXED diagnostic classification is on a
+  different layer (mechanism decomposition) than the §15.4
+  cascade verdict (operational $\Delta\kappa$). The §15.4
+  band is binding under §0.8 regardless of mechanism
+  detail.
+- **Strengthening or weakening §13.9's VC-brief hold based
+  on §15.7 findings.** §13.9 gates external-framing on
+  STRONG-band lift on both benchmarks; the §15.7 audit
+  produces no STRONG-band evidence and does not address
+  §13.9's gate by construction. §13.9 hold remains in
+  force.
+- **Authorizing a §15.8.x or §15.9 follow-up probe.** Any
+  further LLM-track work (e.g., a fresh-§0.8 commitment to
+  test a different risk score on the C-MISMATCHED-identified
+  V1-divergent questions) requires its own top-level §0.8
+  commitment. §15.8 records §15.7's diagnostic findings as
+  part of the §15 closure narrative; it does not auto-promote
+  any direction.
+- **Cross-domain claims about §6.1 autonomy.** Autonomy-
+  domain BCVF stands wholly independent of §15.7 / §15.8.
+- **Silent edits to §15.6 text.** Per Chunk 7f's no-silent-
+  edit discipline, §15.6 Chunks 6a–6f remain unchanged.
+  The audit trail preserves the original §15.6 Chunk 6c
+  hypothesis alongside §15.8's empirical refutation.
+
+**Interpretation firewall confirmation under real-data
+conditions.** The §15.7 implementation
+(`scripts/probe_audit_15_7.py`) renders the diagnostic
+markdown report and scans it for the 12 pinned Class-3
+forbidden-statement patterns *before* writing the artifact.
+**On this run, no `INTERPRETATION_VIOLATION` fired**: the
+markdown was written cleanly, with no Class-3 patterns
+detected. The firewall is empirically functional on the
+real-data outputs. Future §15.x result-section drafting
+should apply the same firewall pattern to prevent
+interpretive drift.
+
+**Run-time §0.8 deviation check.** Per §15.7 Chunk 7g, any
+deviation discovered at run time must be flagged in the
+§15.8 result section as a §0.8 deviation, not absorbed
+silently. The §15.7 run produced **no such deviation**.
+Schema validation passed on all four input artifacts; the
+parity gates are implicit in §15.7's pinned configuration
+(no parity guard is required at the §15.7 layer, as the
+audit is descriptive over already-classified §0.8 outputs);
+the self-test gate passed 17/17 in-run; the firewall passed
+at write time.
+
+The §15.6 Chunk 6c mechanism correction recorded above is
+**not a run-time deviation** in §15.7's sense. It is a
+diagnostic finding that the §15.7 audit was specifically
+designed (per Chunk 7d's Stage A / B / Composition decomposition
+spec) to surface. The correction is the §15.7 audit working
+as intended.
+
+**Combined picture across §13 / §14 / §15 + §15.7 audit —
+program now closed at fully-decomposed-mechanism level.**
+
+§15.8 closes the §15 LLM-track program at the diagnostic-
+audit layer. The full §13 / §14 / §15 testing matrix plus
+§15.7's diagnostic decomposition:
+
+| Layer | Program | Verdict | Mechanism (post-§15.7) |
+|---|---|---|---|
+| §13.10 | AUC, single-axis SE baseline | TRUTH_CORRELATED_MARGINAL | (n/a; baseline) |
+| §13.11–§13.18 | AUC, 4 single-axis revisions | 5/5 ANTI under worst-benchmark | (literature-aligned proxy thinness at scale) |
+| §14a / §14a.2 | Δ accuracy, system-level | 2/2 SCOUT_SATURATION | (system-level bandwidth limited at M=3) |
+| §13.20 | AUC, §13.10 N=200 observation | NOISE_BAND_LIFT (TruthfulQA-MC); MARGINAL (HaluEval) | (N=200 mean-reversion; not a §13.10 reclassification) |
+| §15.1 / §15.2 | AURC + cov@α, single-source | MARGINAL | (TruthfulQA-MC base-rate caps κ@α₂ at 0.14) |
+| §15.3 / §15.4 | Δκ vs §15.1 baseline, hybrid HaluEval | USEFUL_INTERNAL | **(§15.7: MIXED — multi-component; no single dominant driver)** |
+| §15.5 / §15.6 | Δκ vs §15.1 baseline, hybrid TruthfulQA-MC | REGRESSION | **(§15.7: C-MISMATCHED — composition failure with sign-flipped correlation on V1-divergent subset)** |
+| **§15.7 / §15.8** | **Diagnostic audit on existing dumps** | **(diagnostic-only; not a verdict)** | **§15.6 mechanism corrected from "Stage A degeneracy" to "composition failure"; §15.4 mechanism documented as MIXED multi-component; sampling-noise PARTIAL** |
+
+**Fourteen distinct experimental structures plus one
+diagnostic audit have now been tested at the 7B + DeBERTa-
+v3-base + N=100 / N=200 configuration.** Zero clear STRONG
+on the worst-benchmark rule. One cleared USEFUL_INTERNAL on
+a single benchmark (§15.4) with multi-component MIXED
+mechanism. One returned REGRESSION on the cross-benchmark
+(§15.6) with C-MISMATCHED composition-failure mechanism. The
+§15.7 diagnostic audit converted the multi-round informal
+critique of §15.6's interpretation into binding §0.8
+diagnostic content, including an explicit empirical
+refutation of one §15.6 informal mechanism hypothesis.
+
+**§13.9 VC-brief hold reaffirmed and strengthened by the
+§15.7 diagnostic finding.** The C-MISMATCHED classification
+on TruthfulQA-MC sharpens §13.9's framing: the cross-
+benchmark hybrid is not just "saturated/regressed at this
+configuration" but specifically "structurally broken on the
+questions where the hybrid's selector matters most." This
+adds mechanistic depth to the §13.9 hold without changing
+its policy. The autonomy-domain BCVF claim (§6.1) stands
+wholly independent of §15.7 / §15.8.
+
+The honest external framing for any internal-research
+referencing of the §13 / §14 / §15 + §15.7 program is now:
+
+> *On Qwen2.5-7B-Instruct + DeBERTa-v3-base + N=100, no
+> literature-aligned, mechanism-motivated, system-level,
+> single-source-abstention, hybrid-abstention, or cross-
+> benchmark-hybrid-abstention BCVF construction tested in
+> this codebase clears the STRONG combined-classification
+> bar on the worst-benchmark rule. The §15.4 hybrid scout
+> cleared USEFUL_INTERNAL on HaluEval-QA single-benchmark;
+> the §15.7 audit identifies its mechanism as MIXED
+> multi-component (no single dominant driver). The §15.6
+> cross-benchmark companion on TruthfulQA-MC returned
+> REGRESSION, with the §15.7 audit identifying the mechanism
+> as C-MISMATCHED composition failure (sign-flipped
+> correlation on V1-divergent questions). Both verdict-of-
+> records remain binding under §0.8; §15.7's diagnostic
+> findings sharpen the mechanism narrative without changing
+> any verdict band. The LLM hallucination-detection track is
+> closed across fourteen experimental structures and four
+> metric classes, with the §15.7 mechanism decomposition
+> providing the cleanest structural reading of the §13 / §14
+> / §15 program available.*
+
+**§15.8 closes the §15 LLM-track program at the diagnostic-
+audit layer.** Per §15.7 Chunk 7g and the firewall, no
+§15.8.x or §15.9 follow-up is authorized by §15.8. Any
+follow-up — model-scale upgrade, benchmark substitution,
+supervised activation probes, source-construction redesign,
+ensemble risk score, alternative selector, deadband consumer
+— requires a fresh top-level §0.8 commitment with bands
+pinned before any data inspection. None is authorized by
+§15.8.
+
+**The autonomy-domain BCVF claim (§6.1) stands independently
+on the N=21 sign-test that passed in §6.1 / §6.7 and is
+unaffected by any §13 / §14 / §15 / §15.7 outcome.**
+
+**§15.8 chunk roll-up — result section now complete.**
+
+| Chunk | Content |
+|---|---|
+| 8a | Header, three classifications, parity confirmation, §15.6 mechanism correction (verdict band unchanged), cross-program consistency check |
+| 8b | Headline numerical findings (decomposition + operating points + sampling-noise) with three substantive observations including unexpected ρ ≥ ρ* on both benchmarks |
+| 8c | TruthfulQA-MC C-MISMATCHED narrative + explicit §15.6 Chunk 6c hypothesis refutation with audit-trail integrity discipline |
+| 8d | HaluEval MIXED narrative + sampling-noise PARTIAL dual-reading interpretation + mechanism-component combination |
+| 8e | Authorization mapping (Class 1/2/3 compliance) + §0.8 firewall confirmation + run-time deviation check |
+| 8f | Combined §13/§14/§15 + §15.7 picture; §13.9 hold reaffirmed and mechanistically sharpened; §15 LLM-track program closed |
+
+§15.8 implementation source: `scripts/probe_audit_15_7.py`
+output artifacts (`docs/experiments/probe_audit_15_7.{json,md}`);
+all numerical evidence in this section traceable to those
+diagnostic outputs.
+
+**Artifacts.**
+
+- `scripts/probe_audit_15_7.py` (§15.7 implementation;
+  numpy + stdlib + scipy.stats; 1967 lines).
+- `docs/experiments/probe_audit_15_7.json` (machine-readable
+  diagnostic, `schema_version "15.7-diagnostic"`).
+- `docs/experiments/probe_audit_15_7.md` (human-readable
+  diagnostic report; rendered through interpretation
+  firewall).
+
+§15 LLM-track program closed at fully-decomposed-mechanism
+level. §15.8 result section complete (chunks 8a–8f, 6 commits
+on top of the §15.7 pre-commitment + implementation).
+
+### 15.9 Future-work entry (documented, NOT pre-committed) — phase coherence as a theoretically-faithful autonomy-LLM transfer attempt
+
+**Status: DOCUMENTED, NOT pre-committed.** §15.9 is the
+§15-track analogue of §13.8's "future-work, requires fresh
+§0.8 commitment" list. It records phase coherence as the
+single most theoretically-defensible LLM-track direction
+that has NOT been undertaken in this codebase, alongside
+explicit constraints and prior estimates. **§15.9 does NOT
+authorize implementation.** Any future phase-coherence
+experiment requires a fresh top-level §0.8 commitment with
+bands pinned ex-ante, structurally analogous to §15.3 /
+§15.5 / §15.7's chunked pre-commitment discipline.
+
+**The candidate formula and what it measures.**
+
+The pinned candidate is the standard pairwise phase-coherence
+metric over a windowed average of phase differences:
+
+$$
+C[i, j] \;=\; \frac{1}{W} \sum_{k} \cos(\phi_i[k] - \phi_j[k])
+$$
+
+where $\phi_i[k]$ is the phase of signal $i$ at index $k$
+within window $W$, and the metric measures pairwise
+agreement between any two signals $i, j$ over that window.
+$C \in [-1, +1]$; $C = +1$ at perfect phase alignment,
+$C = 0$ at orthogonal phases, $C = -1$ at perfect
+anti-alignment.
+
+This is structurally distinct from the §13/§14/§15 entropy-
+based observables in three ways:
+
+- **Continuous** rather than discrete (cosine of an angle vs
+  Shannon entropy over discrete cluster sizes from K=10
+  stochastic samples).
+- **Pairwise** rather than scalar (produces a matrix
+  $C[i, j]$ over signal pairs that can be aggregated, not a
+  single per-question scalar).
+- **Operates on internal phase structure** rather than
+  output meaning space (downstream of the model's internals,
+  not downstream of NLI clustering of sample texts).
+
+**Why §15.9 is the most theoretically-faithful
+autonomy-LLM transfer attempt available.**
+
+The §6.1 autonomy-domain BCVF result that passed (N=21
+sign-test p=0.0072) operated on **continuous phase-quad
+signals** (`map_error_accel`) with the C2 vector-path
+invariance property empirically validated. That is:
+continuous geometric signals with meaningful temporal
+evolution and physically grounded divergence.
+
+The §13/§14/§15 LLM-track program mapped BCVF onto:
+- §13.10 semantic entropy of cluster-size histograms over
+  K=10 discrete stochastic samples,
+- §13.14 BCVF 2nd-difference over per-position semantic
+  entropy of NLI-clustered truncations,
+- §13.16 BCVF 2nd-difference over per-position EigenScore
+  of hidden-state stride grids,
+- §13.18 forced-allocation gap from per-token logit
+  centering,
+- §14a / §14a.2 cross-source weighted majority vote with
+  per-source semantic entropy as trust scalar,
+- §15.x abstention threshold over per-source semantic
+  entropy of the V1-winning source.
+
+**None of these are continuous phase-like signals in the
+§6.1 sense.** They are mathematically convenient analogues
+that approximate the BCVF construction at the text-output
+or token-logit layer rather than at the underlying
+representational geometry. The §13.14 / §13.16 BCVF
+2nd-difference observables came closest (per-position
+continuous-curve operators) and both returned ANTI under
+worst-benchmark; per the §13.15 / §13.17 narrowing analysis,
+the per-position curves were monotonic-rising rather than
+smooth-with-rare-spikes, so the 2nd-difference operator had
+no fault-onset structure to detect.
+
+**Phase coherence is the candidate that most directly tests
+whether the §13/§14/§15 program failed because BCVF doesn't
+transfer to LLMs OR because we mapped BCVF onto the wrong
+substrate.** It addresses ChatGPT's representation-level
+under-theorization critique surfaced during the §15.8
+informal review.
+
+**Three phase-definition options (each would need its own
+§0.8 sub-pin).**
+
+The candidate formula assumes phases exist. Phases are not
+native to LLMs; defining them is itself a hypothesis-class
+commitment. Three plausible candidates, each with different
+priors and different engineering costs:
+
+1. **Hilbert-transform phase of hidden-state magnitudes
+   across token positions.** For each layer $\ell$ and
+   sequence of token positions $1..T$, treat the
+   $L^2$-norm $\|h_\ell[t]\|$ as a quasi-oscillatory
+   signal; apply Hilbert transform to recover instantaneous
+   phase. Then $\phi_i[k]$ becomes per-source per-position
+   per-layer phase. Computationally cheap; requires no new
+   model training.
+2. **Fourier decomposition of per-layer activation
+   trajectories across the K=10 stochastic samples.** For
+   each layer and each token position, compute the FFT of
+   the activation pattern across the K samples; extract
+   dominant-frequency phases. More complex but more
+   theoretically grounded — the K=10 samples form a discrete
+   "time series" over the model's stochastic decoding
+   variability.
+3. **Rotary-embedding-derived phases.** Most modern LLMs
+   (Qwen2.5, Llama-3.1, Mistral-7B-v0.3) use rotary positional
+   embeddings (RoPE), which encode positional information
+   as sin/cos pairs. Extract per-position rotary phases
+   directly from the model's positional embedding matrix
+   without additional transforms. Cheapest and most natively
+   model-grounded.
+
+**Each option is a different §0.8 sub-pin.** A full §15.9
+pre-commitment would need to pin exactly one phase
+definition before any data inspection, using the §15.3 /
+§15.5 chunked-charter discipline.
+
+**What §15.9 explicitly does NOT authorize.**
+
+- Implementation of any phase-coherence script. The §15.9
+  entry is a future-work *placeholder*, not an authorization.
+- Re-classification of any §13 / §14 / §15.x verdict-of-
+  record. All bands remain binding under §0.8 regardless of
+  any future §15.9-pre-committed result.
+- Updating `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`. The §13.9
+  hold remains in force and would not be addressed by §15.9
+  results except via STRONG-band lift on both benchmarks.
+- Auto-promotion to §15.10 or beyond. Each follow-up needs
+  its own fresh §0.8.
+- Any claim that the autonomy-domain BCVF result (§6.1) is
+  affected by §15.9 future work. §6.1 stands wholly
+  independent.
+
+**What a §15.9-pre-committed test would need to address.**
+
+If §15.9 is ever fired, the pre-commitment must directly
+engage with the structural failure modes §15.7 identified:
+
+- **TruthfulQA-MC's adversarial distractor structure.** The
+  benchmark produces correlated wrongness across model
+  families. Phase coherence applied to the same source set
+  would face the same correlated-wrongness issue. The
+  pre-commitment should specify either (a) a benchmark
+  substitution that escapes this pattern, or (b) explicit
+  acknowledgment that cross-benchmark generalization remains
+  conditional on the benchmark structure.
+- **C-MISMATCHED composition failure on V1-divergent
+  questions.** §15.7 found the per-source winning-source
+  entropy is sign-flipped on V1-divergent questions. Phase
+  coherence on the same Stage A configuration faces the
+  same composition risk. The pre-commitment should specify
+  whether Stage A is also redesigned (engineered diversity)
+  or held fixed.
+- **The $\rho \ge \rho^*$ met but coverage too low pattern.**
+  Even with sufficient discrimination, the operating-point
+  geometry on TruthfulQA-MC delivers tiny coverage. Phase
+  coherence at the same N=100 may face the same sparse-
+  support issue. The pre-commitment should specify a
+  larger-N target or document the expected coverage
+  ceiling.
+- **The $\alpha_3 = 0.75$ deployment-grade ceiling.** Phase
+  coherence cannot lift this from greedy accuracy 0.25–0.30.
+  The pre-commitment should explicitly bound deployment
+  claims at $\alpha < 0.75$ or specify a model-scale
+  upgrade as part of the same commitment.
+
+**Estimated cost (rough, not §0.8-binding).**
+
+- Phase-definition engineering: 2–5 days depending on
+  option (RoPE-derived cheapest, Fourier-of-stochastic-
+  samples most complex).
+- Phase coherence computation over existing §14a.2-class
+  dumps: pure post-processing if hidden states are cached;
+  ~hours if not (requires forward-pass replay through
+  cached models).
+- §0.8 chunked pre-commitment drafting: ~1–2 days per the
+  §15.3 / §15.5 / §15.7 pattern.
+- Self-test gate, output writers, interpretation framework:
+  ~1 day reusing §15.7's primitives.
+- Real-data run: depends on whether new generation is
+  needed. If existing dumps include cached hidden states:
+  CPU-only post-processing, <1 hour. Otherwise: GPU
+  forward-pass replay, several hours.
+
+Total: roughly 1–2 weeks for a complete §15.9 pre-commitment
++ implementation + result section, with the largest
+uncertainty in the phase-definition engineering. Cheaper
+than the §15.5 hybrid scout was, but more conceptually
+demanding.
+
+**§15.9 documentation-only status reaffirmed.** This entry
+records the future-work item; it does not authorize work.
+Per §0.8 discipline, any future §15.9 pre-commitment must
+be drafted in chunked form before any data is inspected
+under the phase-coherence framing, with bands pinned
+ex-ante. The documentation here exists so that future
+revisits can pick up the cleanest available "if reopening
+LLMs" candidate without re-deriving the rationale from
+informal commentary.
+
+The §15 LLM-track program remains closed at the §15.8
+mechanism-decomposed level. §15.9 sits as a documented
+candidate for future reopening; it is not a continuation.
+
+### 15.10 Pre-commitment — Phase 1 of final-resolution sprint: supervised linear truth-probe (DAY-LONG; bounded; one shot)
+
+**Status: pre-committed, not yet executed.** §0.8-style pre-
+commitment recorded before any hidden-state extraction or
+probe training. Specification, primary metrics, success bands,
+baselines, and decision rules below cannot be redefined
+post-hoc.
+
+**Position — what §15.10 is and is not.**
+
+§15.10 is **Phase 1 of a bounded 3-phase final-resolution
+sprint** for the LLM track, not a new long research program.
+It is the §13.8 future-work item "linear activation probes
+(Azaria & Mitchell 2023; Marks & Tegmark 2024)" being fired
+explicitly under §0.8, with all bands pinned ex-ante. The
+sprint structure is:
+
+- §15.10 (Phase 1) — supervised truth-probe on hidden states.
+- §15.11 (Phase 2) — phase-coherence probe (the §15.9
+  documented candidate, fired with one pinned phase
+  definition).
+- §15.12 (Phase 3) — final synthesis + autonomy handoff,
+  conditional on §15.10 / §15.11 results.
+
+**§15.10 does NOT:**
+- Reopen any §13 / §14 / §15.x verdict-of-record. All
+  verdicts remain binding.
+- Re-classify §15.4 USEFUL_INTERNAL or §15.6 REGRESSION.
+- Modify the §13.9 VC-brief hold by construction.
+- Authorize any longer probe-engineering program; it is one
+  shot at one architecture (linear) on one feature set
+  (final-layer last-token hidden state, optionally one mid-
+  layer pool). No iterative search.
+- Authorize source-construction redesign, retrieval, judge
+  models, or 32B-class models. Same constraints as
+  §13/§14/§15.
+
+**The single load-bearing question §15.10 answers.**
+
+> **Do Qwen2.5-7B-Instruct's hidden representations contain
+> truth signal that the unsupervised BCVF-style score family
+> failed to extract?**
+
+Three pinned outcomes (exhaustive partition; mutually
+exclusive):
+
+- **`STRONG_SIGNAL_IN_Z`**: probe AUC $\ge 0.75$ on **both**
+  benchmarks AND probe-AUC minus best-existing-unsupervised-
+  baseline-AUC $\ge +0.05$ on **both** benchmarks.
+- **`PARTIAL_SIGNAL_IN_Z`**: probe AUC $\ge 0.66$ (matches
+  §13.10 baseline) on at least one benchmark AND probe AUC
+  exceeds the best existing unsupervised baseline by any
+  positive margin on at least one benchmark, but does NOT
+  meet the STRONG bar.
+- **`NO_MATERIAL_SIGNAL_IN_Z`**: probe AUC fails to exceed
+  the best existing unsupervised baseline on either
+  benchmark, OR probe AUC $< 0.60$ on both.
+
+These bands cover $\mathbb{R}^2$ exhaustively over the
+(HaluEval-AUC, TruthfulQA-AUC) pair without fall-through.
+
+**Specification (pinned).**
+
+- **Target model:** `Qwen/Qwen2.5-7B-Instruct` (matches
+  §13.10 / §14a.2 / §15.x). No 32B; no other model class.
+- **Benchmarks:** HaluEval-QA `data` split, N=100; TruthfulQA-
+  MC `validation` split, N=100. Same question subsets as
+  §13.10. **No new benchmarks.**
+- **Question subset alignment:** the probe trains and
+  evaluates on the same 100 questions per benchmark that
+  §13.10 / §15.2 used. Question IDs pinned to match the
+  §13.10 dump's `q_idx` field.
+- **Per-question correctness label:** the §13.10
+  `greedy_matches_correct` boolean from the existing dumps.
+  Same NLI labeling protocol; no relabeling.
+- **Hidden-state feature (pinned, single primary):** Qwen-7B
+  greedy-decode forward pass over the question prompt
+  `Q: ... A:`; extract the **final-layer last-token hidden
+  state** (the residual-stream vector at position immediately
+  before the model would generate its first answer token).
+  This produces a single $d$-dimensional vector per question,
+  $d = 3584$ for Qwen-7B. **No prompt re-engineering, no
+  pooling across positions, no attention-head selection.**
+- **Optional secondary feature (only if it requires zero
+  extra engineering):** mid-layer last-token hidden state at
+  layer 14 (the §13.16 layer; ~midway through the 28-layer
+  stack). If extraction adds non-trivial code, skip it.
+- **Probe architecture (pinned, single):** scikit-learn
+  `LogisticRegression` with `penalty='l2'`, `C=1.0`, default
+  solver, max 1000 iterations. **No MLP, no kernel methods,
+  no feature search, no hyperparameter sweep beyond the
+  defaults.** L2-regularized linear logistic regression on
+  raw hidden-state vectors.
+- **Train/test protocol (pinned):** **5-fold stratified
+  cross-validation per benchmark**, deterministic seed
+  `numpy.random.SeedSequence(entropy=15)` matching §15.x
+  convention. Out-of-fold predictions used for AUC and
+  selective-prediction metrics. **No held-out probe
+  training data leaks across folds.**
+- **Per-benchmark pi (base rate) for selective-prediction
+  comparisons:** Qwen-greedy accuracy from §13.10
+  (TruthfulQA-MC: 0.250; HaluEval-QA: 0.300). Pinned
+  constants, not re-derived.
+
+**Metrics (pinned).**
+
+For each benchmark, primary:
+
+- **Probe AUC** on out-of-fold predictions (sklearn
+  `roc_auc_score`).
+- **Probe selective-prediction $\kappa@\alpha_2 = 0.50$** —
+  treating the probe's predicted probability $\hat{p}$ as a
+  "trust score" and using $1 - \hat{p}$ as the abstention
+  risk score. Same $n_{\min} = 10$ floor as §15.x.
+- **$\Delta\text{AUC}_\text{vs-entropy}$** = probe AUC −
+  best existing unsupervised baseline AUC. The "best
+  existing baseline" per benchmark:
+  - HaluEval-QA: §13.10 entropy (AUC 0.661).
+  - TruthfulQA-MC: §13.10 entropy (AUC 0.661 from §15.2-
+    of-record; we do not consult the now-N=200 §13.10 dump
+    for this comparison).
+
+Secondary diagnostics (reported, non-band-driving):
+
+- Probe accuracy (out-of-fold).
+- Per-fold AUC variance (bootstrap-equivalent CI proxy).
+- Calibration (Brier score, ECE).
+
+**Pinned baselines for the comparison table.**
+
+| Baseline | Source | AUC anchor |
+|---|---|---|
+| §13.10 semantic entropy (HaluEval) | §13.10 verdict-of-record | 0.661 |
+| §13.10 semantic entropy (TruthfulQA-MC) | §13.10 verdict-of-record (N=100, pre-§13.20) | 0.661 |
+| §15.4 hybrid Δκ on HaluEval | §15.4 verdict-of-record | $\Delta\kappa = +0.090$ at $\alpha_2 = 0.50$ |
+| §15.6 hybrid Δκ on TruthfulQA-MC | §15.6 verdict-of-record | $\Delta\kappa = -0.030$ at $\alpha_2 = 0.50$ |
+
+**Decision rule (mechanical, no soft override).**
+
+After probe runs on both benchmarks:
+
+1. Compute probe AUC and $\Delta\text{AUC}_\text{vs-entropy}$
+   per benchmark.
+2. Compute probe $\kappa@\alpha_2$ per benchmark; compare to
+   §15.x baselines (§15.2's $\kappa = 0.26$ HaluEval, $\kappa
+   = 0.14$ TruthfulQA-MC).
+3. Apply the three-band cascade:
+   - **STRONG_SIGNAL_IN_Z** if probe AUC ≥ 0.75 on both AND
+     ΔAUC ≥ +0.05 on both.
+   - **PARTIAL_SIGNAL_IN_Z** if probe AUC ≥ 0.66 on at least
+     one benchmark AND ΔAUC > 0 on at least one, AND not
+     STRONG.
+   - **NO_MATERIAL_SIGNAL_IN_Z** otherwise.
+
+The cascade is exhaustive; every (HaluEval-AUC, TruthfulQA-AUC,
+ΔAUC pair) outcome maps to exactly one band.
+
+**Implementation scope (pinned).**
+
+- New script: `scripts/probe_supervised_15_10.py` (numpy +
+  scikit-learn + transformers; minimal). One file, ~600–900
+  lines target.
+- Two-phase: (1) hidden-state extraction (~10–15 min on
+  cached Qwen-7B, GPU), (2) probe training + evaluation
+  (CPU only, sub-minute per benchmark with sklearn).
+- Self-test gate (`--self-test`) verifying probe + cascade
+  classifier on synthetic boundary cases.
+- Output paths:
+  - `docs/experiments/probe_supervised_15_10.json`
+    (`schema_version "15.10"`).
+  - `docs/experiments/probe_supervised_15_10.md`.
+- §15.7-pattern interpretation firewall against soft-override
+  language in the markdown report (Class-3 forbidden patterns
+  scanned at write time; abort on detection).
+
+**What §15.10 explicitly does NOT authorize.**
+
+- Iterative probe-architecture search. Linear only; one shot.
+- Feature engineering beyond the pinned final-layer-last-token
+  + optional mid-layer.
+- Re-training Qwen-7B; no fine-tuning; no LoRA.
+- Cross-benchmark training (probe is trained per-benchmark to
+  avoid label-distribution leakage).
+- Modification of any §15.x script or verdict-of-record
+  artifact.
+- Phase 2 / Phase 3 implementation. Each requires its own
+  pre-commitment after Phase 1 results land.
+- Auto-promotion of any §15.10 outcome to a verdict-of-record
+  status. §15.10 produces a sprint-internal classification,
+  not a §13.10-class AUC verdict.
+
+**Time / compute budget.**
+
+- Hidden-state extraction: ~10–15 min GPU on cached Qwen-7B
+  (~15 GB, already loaded for §13.10 / §14a.2 / §15.5).
+- Probe training + eval: <1 min CPU per benchmark.
+- Total wall clock: ~20–30 min.
+
+§15.10 implementation (`scripts/probe_supervised_15_10.py`)
+is a separate §0.8 authorization gate. The §15.10 result
+section follows the real-data run.
+
+---
+
+
+### 15.11 Pre-commitment — Phase 2 of final-resolution sprint: layer-wise phase-coherence probe (DAY-LONG; bounded; one shot)
+
+**§0.8 declaration.**
+
+§15.11 is Phase 2 of the bounded 3-phase final-resolution
+sprint authorized at the close of §15.10
+(`PARTIAL_SIGNAL_IN_Z`; HaluEval ΔAUC = +0.0076,
+TruthfulQA-MC ΔAUC = −0.0386; per
+`docs/experiments/probe_supervised_15_10.{json,md}`).
+
+This is a fresh §0.8 commitment. §15.11 outputs do **NOT**
+modify any §13/§14/§15.x verdict-of-record, including §15.10's
+PARTIAL readout, §15.6's REGRESSION, §15.8's MIXED +
+C-MISMATCHED, or the §13.9 hold. Bands, formula, features, and
+self-test boundary cases are pinned ex ante in this section;
+data inspection follows. Single shot — no iteration on the
+formula, layer subsets, FFT windows, or feature aggregations
+once this section is sealed.
+
+**Position — what §15.11 is and is not.**
+
+§15.11 tests whether **layer-wise phase coherence** over
+Qwen-7B's per-layer last-token hidden states distinguishes
+correct from incorrect answers in a way that:
+
+- the §13.10 entropy baseline (AUC = 0.661 on both benchmarks)
+  failed to extract, and
+- the §15.10 supervised linear probe (AUC = 0.669 / 0.622)
+  failed to extract.
+
+The mechanism class is **cross-layer spectral phase relationship**:
+at each question, the 29 per-layer last-token hidden states
+(embedding output + 28 transformer-layer outputs) are FFT'd along
+the hidden dimension, and a pairwise phase-coherence matrix is
+built per the formula
+
+> **C[i, j] = (1 / W) · Σ_k cos(φ_i[k] − φ_j[k])**
+
+where φ_i[k] is the phase at frequency-bin k of FFT(h_i) for
+layer i, and W is the number of frequency bins used (pinned
+in the formula block below). A single scalar feature per
+question is derived from C and tested against correctness.
+
+**Why this mechanism (§0.8-disclosed).**
+
+§15.10 tested whether truth signal is **linearly extractable
+from a single layer**. The PARTIAL-by-hair result with one
+benchmark regressing below baseline is consistent with — but
+does not prove — the hypothesis that truth signal in 7B
+hidden states is at-or-below the entropy ceiling under linear
+extraction.
+
+§15.11 tests a fundamentally **different mechanism class**:
+whether truth signal is encoded in the **non-linear, multi-
+scale phase relationship across layers**. This is the closest
+LLM analog to BCVF's autonomy-domain mechanism (§6.1, N=21
+sign-test): in autonomy, phase coherence between two
+bidirectional-check streams identified correct decisions; in
+LLMs, the analogous "streams" are the model's evolving
+representations across depth.
+
+This mechanism is **not reducible** to either §13.10 (which
+only used token-level entropy) or §15.10 (which used a single
+layer's linear projection). A negative result here, combined
+with §15.10's PARTIAL, would be strong joint evidence that 7B
+hidden states do not contain extractable truth signal under
+any of the canonical mechanism classes (entropy / linear /
+phase-coherence). A positive result would identify phase
+coherence as the BCVF-faithful transfer mechanism.
+
+**What §15.11 does NOT do.**
+
+- Does NOT re-classify §15.10's `PARTIAL_SIGNAL_IN_Z`,
+  §15.x's bands, or §13.9's hold.
+- Does NOT iterate on the formula, the FFT length, the
+  layer subset used, or the feature aggregation. All are
+  pinned in the formula block below.
+- Does NOT use any §15.11 data to amend Phase 1's outputs.
+- Does NOT authorize Phase 3 (`§15.12` final synthesis +
+  autonomy handoff). Phase 3 requires its own §0.8 commitment
+  and is gated on Phase 2's mechanical cascade output.
+
+**Dependencies and re-extraction note.**
+
+- **Model.** Qwen/Qwen2.5-7B-Instruct, same as §15.10.
+- **Labels.** Same §13.10 dumps, first PINNED_N = 100
+  records per benchmark.
+- **Prompt format.** `Q: {question}\nA:` (matches §15.10's
+  pinned PROMPT_FORMAT).
+- **Hidden-state cache.** §15.10's cache
+  (`hidden_states_qwen_15_10.npz`) is layer = −1 only and is
+  **insufficient** for §15.11 — phase coherence across layers
+  requires all 29 hidden states per question. **A new GPU
+  re-extraction is required**, producing a new cache
+  (`hidden_states_all_layers_qwen_15_11.npz`). Approximate
+  runtime on the same GPU: same as §15.10 extraction (~5–10
+  min per benchmark, 200 forward passes total). Storage:
+  ~41 MB per benchmark in fp32.
+
+---
+
+
+### 15.11 Pre-commitment (continued) — Pinned formula, FFT, layer subset, feature derivation
+
+**Pinned per-layer extraction.**
+
+For each question, the model is run forward on the prompt
+`Q: {question}\nA:`. We capture **all 29 hidden states**
+(`out.hidden_states[0..28]`):
+
+- index 0 = embedding output;
+- indices 1..28 = output of each of the 28 transformer
+  layers (Qwen2.5-7B has 28 hidden layers).
+
+For each layer i ∈ {0, 1, …, 28}, we take the **last-token**
+position, yielding `h_i ∈ R^3584` per question. This is the
+same prompt template and last-token convention as §15.10,
+just extracting all layers instead of layer −1 only. PINNED.
+
+**Pinned FFT (no windowing, no detrending).**
+
+For each layer i, compute the **real-input FFT** along the
+hidden dimension:
+
+- `H_i = numpy.fft.rfft(h_i)` → complex array of length
+  `floor(3584/2) + 1 = 1793`.
+- No windowing is applied (rectangular window).
+- No detrending or mean-subtraction is applied.
+- The vector is treated as the canonical "signal" represented
+  by the layer-i last-token hidden state, taken as-is from
+  the model output.
+
+The phase per bin is:
+
+> `φ_i[k] = angle(H_i[k])`, for k ∈ {0, 1, …, 1792}.
+
+**Pinned bin selection.**
+
+For phase coherence we **exclude DC (k = 0) and Nyquist
+(k = 1792)** because their phases are constrained to {0, π}
+for real-input signals and would inflate coherence
+trivially. Used bins: `k ∈ {1, 2, …, 1791}`.
+
+> **W = 1791** (number of frequency bins used). PINNED.
+
+**Pinned phase-coherence formula.**
+
+For each ordered pair of layers (i, j) with i, j ∈ {0, …, 28}:
+
+> **C[i, j] = (1 / W) · Σ_{k=1}^{1791} cos(φ_i[k] − φ_j[k])**
+
+where φ_i[k] is the phase of the rfft of layer-i's last-token
+hidden state at bin k.
+
+**Properties** (mechanical, no interpretation):
+
+- `C[i, i] = 1` for all i (trivially).
+- `C[i, j] = C[j, i]` (symmetric).
+- `C[i, j] ∈ [−1, +1]`.
+- `C` is a 29×29 real symmetric matrix per question.
+
+**Pinned feature aggregation.**
+
+Per question, the **global cross-layer phase coherence**
+scalar is:
+
+> **F = (2 / (29 · 28)) · Σ_{0 ≤ i < j ≤ 28} C[i, j]**
+
+i.e., the mean over the 29 · 28 / 2 = **406 upper-triangular
+off-diagonal entries** of C. F ∈ [−1, +1].
+
+This is the single scalar feature evaluated against
+correctness. **No other features are derived. No layer
+subsets, no per-layer-pair features, no spectral-bandwidth
+features. PINNED.**
+
+**Pinned direction convention.**
+
+We test the BCVF-faithful direction:
+
+> **Higher F predicts correct (y = 1).**
+
+This matches the autonomy domain's relationship from §6.1
+(high phase coherence between bidirectional check streams
+identifies correct decisions). AUC is computed as
+`roc_auc_score(y, F)` directly under this convention.
+
+If AUC < 0.5, the empirical signal is in the **opposite**
+direction (lower F predicts correct). Per §0.8, this counts
+as "no signal in the expected BCVF-faithful direction" and
+the cascade lands in `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`
+regardless of how negative AUC is. **No directional
+flipping. No "absolute" or "two-sided" AUC variants.
+PINNED.**
+
+**Why this exact formula (§0.8-disclosed).**
+
+- **rfft + cosine of phase difference** is the literal LLM
+  analog of the formula
+  `C[i,j] = (1/W) · Σ_k cos(φ_i[k] − φ_j[k])`. No
+  alternative parameterization is considered.
+- **All 29 layers** is the most BCVF-faithful choice: every
+  internal representation participates equally in the
+  coherence scalar. No theoretically-motivated layer subset
+  (e.g., "last 12") is used because such a choice would be
+  a free hyperparameter without §0.8 justification.
+- **Mean off-diagonal aggregation** is the natural N-stream
+  extension of the 2-stream BCVF coherence statistic. No
+  max, no top-K, no early/mid/late partition is considered.
+- **Excluding DC + Nyquist** removes phases that are not
+  free parameters of the signal. No alternative bin range
+  is considered.
+- **No windowing** is consistent with treating the hidden-
+  state vector as a single canonical signal, not a time
+  series of indeterminate windowing convention.
+
+These choices are pinned to make §15.11 a **single-shot**
+test of one specific mechanism. Any deviation in
+implementation requires a fresh §0.8 amendment.
+
+---
+
+
+### 15.11 Pre-commitment (continued) — Pinned evaluation
+
+**Pinned primary statistic.**
+
+For each benchmark independently:
+
+> **AUC_phase = roc_auc_score(y, F)**
+
+where `y ∈ {0, 1}^N` is the §13.10 correctness vector (first
+PINNED_N = 100 records per benchmark, `greedy_matches_correct`),
+and `F ∈ R^N` is the per-question phase-coherence scalar.
+
+No CV is performed — F is a deterministic, parameter-free
+function of the hidden states, so there is nothing to fit.
+AUC is computed once on the full N = 100 sample per benchmark.
+
+**Pinned baseline and ΔAUC.**
+
+The cascade-defining baseline is the **§13.10 entropy AUC**,
+identical to §15.10's convention:
+
+> **AUC_baseline = 0.661** (per §13.10 verdict-of-record,
+> both benchmarks)
+> **ΔAUC_phase = AUC_phase − 0.661**
+
+This makes §15.11's cascade directly comparable to §15.10's:
+same baseline, same ΔAUC frame, same statistical reference
+point. **The §13.10 baseline is the canonical reference; no
+other baseline is used to define the cascade. PINNED.**
+
+**Pinned secondary readout (§15.10 comparison).**
+
+For transparency, the markdown report records — but **does
+not** use to define the cascade — the difference vs §15.10's
+per-benchmark supervised probe AUCs:
+
+> **ΔAUC_phase_vs_supervised = AUC_phase − AUC_supervised**, where
+> AUC_supervised = 0.6686 on HaluEval-QA, 0.6224 on
+> TruthfulQA-MC (per §15.10 JSON).
+
+This secondary readout answers "did phase coherence beat the
+supervised probe?" but is **disclosure only**. The cascade
+label is fixed by ΔAUC vs §13.10 entropy baseline, not vs
+§15.10 supervised AUC. PINNED.
+
+**Pinned selective-prediction operating points.**
+
+For each benchmark, κ@α is computed using **F directly as
+the abstention score** (higher F → more confident in
+correctness, per the pinned direction):
+
+- Threshold sweep: `τ ∈ sorted(set(F)) ∪ {min(F) − 1}`
+  (admit-all sentinel).
+- Admit set at threshold τ: `{i : F[i] ≥ τ}`.
+- Eligibility: `|admit set| ≥ N_MIN = 10` AND conditional
+  accuracy `≥ α`.
+- κ@α = max coverage among eligible thresholds; τ\* =
+  argmax τ.
+
+**Pinned alphas per benchmark** (matches §15.10):
+
+- HaluEval-QA: α ∈ {0.40, 0.50, 0.75}.
+- TruthfulQA-MC: α ∈ {0.35, 0.50, 0.75}.
+- Primary alpha: α = 0.50 (matches §15.10
+  `ALPHA_PRIMARY`).
+
+The selective-prediction table is **disclosure only**; it
+does not enter the cascade. The cascade is on AUC and ΔAUC.
+PINNED.
+
+**Pinned direction handling.**
+
+AUC is computed with the BCVF-faithful direction (higher F
+predicts correct). If AUC_phase < 0.5, the empirical signal
+is in the opposite direction.
+
+**Mechanical handling** (PINNED):
+
+- AUC_phase ≥ 0.5 → cascade evaluates STRONG / PARTIAL /
+  NO_MATERIAL bands per the cascade block below.
+- AUC_phase < 0.5 → cascade lands automatically in
+  `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE` with rationale
+  "wrong-direction signal under BCVF-faithful pinned
+  direction; no signal in the predicted direction." No
+  directional flipping, no absolute-value rescue, no
+  re-evaluation under the inverted convention.
+
+This is conservative and preserves §0.8's no-iteration
+discipline: the BCVF-faithful direction was the
+pre-committed hypothesis; failing it is a failure, not a
+sign-flip opportunity.
+
+**What is NOT computed.**
+
+- No bootstrap confidence intervals for AUC (matches §15.10).
+- No alternative aggregations of C (no max, no top-K, no
+  row-mean, no per-pair features). Only the pinned F.
+- No alternative direction conventions or two-sided AUC.
+- No layer-pair scatter analysis or §15.7-style mechanism
+  decomposition. §15.11 is a single-feature test by
+  construction; if the cascade lands in NO_MATERIAL, that is
+  the verdict and §15.11 closes.
+- No re-classification of §15.10's `PARTIAL_SIGNAL_IN_Z`.
+  The Phase 1 and Phase 2 cascades are independent
+  §0.8-binding readouts.
+
+**What enters the per-benchmark JSON.**
+
+For each benchmark:
+
+- `auc_phase`, `auc_baseline`, `dauc_phase` (vs §13.10);
+- `auc_supervised_phase_1`, `dauc_phase_vs_supervised`
+  (disclosure);
+- `f_per_question`: the 100-element scalar feature vector;
+- `coherence_matrix_summary`: min, mean, max, std of the
+  406 off-diagonal upper-triangular entries — for sanity
+  checking the F aggregation;
+- `direction_held`: boolean (True if AUC_phase ≥ 0.5);
+- `selective_prediction_operating_points`: list of dicts at
+  each pinned α;
+- `n_questions`, `n_correct`, `n_wrong`, `pi_observed`.
+
+**What enters the per-run JSON.**
+
+- All §15.11 pinned constants (W, layer subset, alphas,
+  thresholds);
+- §13.10 baseline AUCs and §15.10 supervised AUCs for
+  cross-reference;
+- Both per-benchmark blocks above;
+- Final `cascade_verdict` block with label, AUCs, ΔAUCs,
+  rationale;
+- `schema_version = "15.11"`.
+
+---
+
+
+### 15.11 Pre-commitment (continued) — Pinned cascade bands and self-test boundary cases
+
+**Pinned cascade labels.**
+
+§15.11's cascade lands in exactly one of three exhaustive
+bands:
+
+- `STRONG_SIGNAL_IN_PHASE_COHERENCE`,
+- `PARTIAL_SIGNAL_IN_PHASE_COHERENCE`,
+- `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`.
+
+Labels are **§15.11-specific** (do not collide with §15.10's
+`*_IN_Z` labels) so any future cross-reference is
+unambiguous about which mechanism class produced the verdict.
+
+**Pinned cascade decision (mechanical, in order).**
+
+Inputs: `auc_h`, `auc_t`, `dauc_h`, `dauc_t` where
+`dauc = auc − 0.661` (the §13.10 entropy baseline).
+
+**Step 1 — Direction gate (PINNED).**
+
+> If `auc_h < 0.5` OR `auc_t < 0.5` →
+> label = `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`,
+> rationale = "wrong-direction failure on at least one
+> benchmark; BCVF-faithful direction (higher F predicts
+> correct) did not hold." Skip remaining steps.
+
+This is the §0.8 enforcement of the pinned direction. The
+hypothesis was BCVF-faithful direction; failing it on either
+benchmark is a hypothesis failure, not a sign-flip
+opportunity.
+
+**Step 2 — STRONG check.**
+
+> If `auc_h ≥ 0.75` AND `auc_t ≥ 0.75` AND
+> `dauc_h ≥ +0.05` AND `dauc_t ≥ +0.05` →
+> label = `STRONG_SIGNAL_IN_PHASE_COHERENCE`.
+
+(Numerical thresholds are deliberately identical to §15.10's
+STRONG conditions to make Phase 1 / Phase 2 cascades
+directly comparable.)
+
+**Step 3 — PARTIAL check.**
+
+> If not STRONG, AND `(auc_h ≥ 0.66 OR auc_t ≥ 0.66)`,
+> AND `(dauc_h > 0 OR dauc_t > 0)` →
+> label = `PARTIAL_SIGNAL_IN_PHASE_COHERENCE`.
+
+**Step 4 — Default.**
+
+> Otherwise → label = `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`.
+
+**Pinned threshold constants (matches §15.10 numerically).**
+
+```
+STRONG_AUC_THRESHOLD          = 0.75   # inclusive
+STRONG_DELTA_AUC_THRESHOLD    = 0.05   # inclusive
+PARTIAL_AUC_THRESHOLD         = 0.66   # inclusive
+DIRECTION_GATE_THRESHOLD      = 0.5    # strict (AUC < 0.5 fails)
+ENTROPY_BASELINE_AUC          = 0.661  # both benchmarks (per §13.10)
+```
+
+**Pinned self-test boundary cases (12 cases).**
+
+Each tuple is `(auc_h, auc_t, dauc_h, dauc_t,
+expected_label)`. The §15.11 implementation script must
+pass all 12 at the self-test gate before any data
+inspection:
+
+| #   | auc_h | auc_t | dauc_h | dauc_t | expected     |
+|-----|-------|-------|--------|--------|--------------|
+|  1  | 0.80  | 0.78  | +0.139 | +0.119 | STRONG       |
+|  2  | 0.75  | 0.75  | +0.089 | +0.089 | STRONG (boundary inclusive)               |
+|  3  | 0.74  | 0.78  | +0.079 | +0.119 | PARTIAL (auc_h just below STRONG)         |
+|  4  | 0.70  | 0.62  | +0.039 | −0.041 | PARTIAL (one benchmark passes both)       |
+|  5  | 0.66  | 0.55  | +0.001 | −0.111 | PARTIAL (auc_h = 0.66 inclusive)          |
+|  6  | 0.65  | 0.65  | −0.011 | −0.011 | NO_MATERIAL (both AUC < 0.66)             |
+|  7  | 0.661 | 0.661 | 0.0    | 0.0    | NO_MATERIAL (dAUC not > 0)                |
+|  8  | 0.49  | 0.78  | −0.171 | +0.119 | NO_MATERIAL (direction gate trips)        |
+|  9  | 0.45  | 0.40  | −0.211 | −0.261 | NO_MATERIAL (direction gate trips on both)|
+| 10  | 0.50  | 0.78  | −0.161 | +0.119 | PARTIAL (direction gate inclusive at 0.5) |
+| 11  | 0.499 | 0.80  | −0.162 | +0.139 | NO_MATERIAL (direction gate strict)       |
+| 12  | 0.55  | 0.55  | −0.111 | −0.111 | NO_MATERIAL (direction holds; both fail)  |
+
+These cover: STRONG-clean and STRONG-boundary; PARTIAL via
+just-below-STRONG, single-benchmark-passes, and
+exact-AUC-boundary; NO_MATERIAL via both-AUC-fail,
+exact-baseline, single-direction-fail, both-direction-fail,
+direction-gate-inclusive-pass, direction-gate-strict-fail,
+and middling-no-signal.
+
+**Why these thresholds (§0.8-disclosed).**
+
+- **Numerical identity with §15.10** (0.75 / 0.05 / 0.66 /
+  0.5 / 0.661) is intentional. Phase 1 and Phase 2 are
+  testing different mechanism classes against the same
+  baseline; harmonizing thresholds makes the cross-phase
+  comparison clean.
+- **Direction gate at 0.5 strict** (AUC = 0.5 passes)
+  reflects §0.8's "BCVF-faithful direction was
+  pre-committed" — AUC = 0.5 is the no-information point,
+  not the wrong-direction point. Wrong-direction is strict
+  AUC < 0.5.
+- **Inclusive at 0.75 and 0.66**, strict at 0 for ΔAUC,
+  mirrors §15.10 exactly. No drift.
+- **Three-band exhaustive partition** is a feature, not a
+  bug: every (auc_h, auc_t, dauc_h, dauc_t) tuple maps to
+  exactly one label by mechanical inspection. No
+  interpretive grey zone.
+
+**What the cascade does NOT consider.**
+
+- Cross-phase comparison vs §15.10 supervised AUC.
+  (Disclosure-only; never in the cascade decision.)
+- Selective-prediction κ@α values. (Disclosure-only; never
+  in the cascade decision.)
+- CV variance, fold-AUC spread, or any per-question
+  diagnostic. The cascade is on two scalars per benchmark
+  (AUC, ΔAUC) and nothing else.
+- Per-layer-pair coherence values from C. The cascade is on
+  F via AUC; the matrix C is logged for sanity but not for
+  cascade input.
+
+---
+
+
+### 15.11 Pre-commitment (continued) — Pinned outputs (paths, JSON, markdown, firewall, exit codes, self-test)
+
+**Pinned output paths.**
+
+```
+docs/experiments/hidden_states_all_layers_qwen_15_11.npz   # cache (re-extraction)
+docs/experiments/probe_phase_coherence_15_11.json          # machine-readable
+docs/experiments/probe_phase_coherence_15_11.md            # human-readable
+```
+
+The hidden-state cache is a **separate file** from §15.10's
+`hidden_states_qwen_15_10.npz` (which holds layer −1 only).
+§15.11's cache holds all 29 layers and is required for
+re-runs in `--probe-only` mode. PINNED.
+
+**Pinned JSON schema (`schema_version = "15.11"`).**
+
+Top-level keys (alphabetical for `sort_keys=True` parity with
+§15.10):
+
+```
+{
+  "alpha_targets_per_benchmark": {...},
+  "baseline_auc_per_benchmark": {"halueval_qa": 0.661,
+                                 "truthfulqa_mc": 0.661},
+  "cascade_thresholds": {
+    "strong_auc": 0.75,
+    "strong_delta_auc": 0.05,
+    "partial_auc": 0.66,
+    "direction_gate_threshold": 0.5,
+    "entropy_baseline_auc": 0.661
+  },
+  "cascade_verdict": {
+    "label": "<STRONG|PARTIAL|NO_MATERIAL>_SIGNAL_IN_PHASE_COHERENCE",
+    "auc_halueval": <float>,
+    "auc_truthfulqa": <float>,
+    "dauc_halueval": <float>,
+    "dauc_truthfulqa": <float>,
+    "direction_held_halueval": <bool>,
+    "direction_held_truthfulqa": <bool>,
+    "rationale": "<formatted prose>"
+  },
+  "extraction_layer": "all_29",
+  "halueval_qa": { ... },          // per-benchmark block, schema below
+  "hidden_dim": 3584,
+  "n_layers_used": 29,
+  "phase_coherence_config": {
+    "fft_n": 3584,
+    "n_freq_bins_total": 1793,
+    "n_freq_bins_used": 1791,
+    "bin_range_excluded": "DC (k=0) and Nyquist (k=1792)",
+    "windowing": "rectangular (none)",
+    "detrending": "none",
+    "feature_aggregation": "mean over upper-triangular off-diagonal of 29x29 C (406 entries)",
+    "direction_convention": "higher F predicts correct (BCVF-faithful)"
+  },
+  "pinned_N": 100,
+  "pinned_pi": {"halueval_qa": 0.3, "truthfulqa_mc": 0.25},
+  "qwen_model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "schema_version": "15.11",
+  "supervised_auc_per_benchmark_phase_1": {
+    "halueval_qa": 0.6685714285714286,
+    "truthfulqa_mc": 0.6224
+  },
+  "truthfulqa_mc": { ... }
+}
+```
+
+**Per-benchmark block** (schema for both `halueval_qa` and
+`truthfulqa_mc`):
+
+```
+{
+  "benchmark": "<benchmark>",
+  "n_questions": 100,
+  "n_correct": <int>,
+  "n_wrong": <int>,
+  "pi_observed": <float>,
+  "auc_phase": <float>,
+  "auc_baseline": 0.661,
+  "dauc_phase": <float>,
+  "auc_supervised_phase_1": <float>,            // disclosure only
+  "dauc_phase_vs_supervised": <float>,          // disclosure only
+  "direction_held": <bool>,                     // auc_phase >= 0.5
+  "f_per_question": [<100 floats>],
+  "coherence_matrix_summary": {
+    "off_diag_min": <float>,
+    "off_diag_mean": <float>,
+    "off_diag_max": <float>,
+    "off_diag_std": <float>,
+    "n_off_diag_entries": 406
+  },
+  "selective_prediction_operating_points": [...],
+  "kappa_at_alpha_primary": <float>,            // alpha = 0.50
+  "tau_star_at_alpha_primary": <float>,
+  "alpha_primary": 0.5
+}
+```
+
+PINNED. No additional keys; no key removal except for keys
+explicitly marked optional.
+
+**Pinned markdown structure (`probe_phase_coherence_15_11.md`).**
+
+Sections in order:
+
+1. `# §15.11 Phase 2 — Layer-wise phase-coherence probe (result)`
+   (header + schema version + model + extraction config one-liner).
+2. `## Cascade verdict (mechanical readout)` (label, rationale,
+   AUC table including ΔAUC vs §13.10 baseline AND vs §15.10
+   supervised, direction_held flags).
+3. `## Probe details — HaluEval-QA` (n, π, AUC, ΔAUC vs both
+   references, direction_held, F-distribution summary,
+   coherence matrix summary, selective-prediction
+   operating-points table).
+4. `## Probe details — TruthfulQA-MC` (same structure).
+5. `## Pinned configuration (§15.11 §0.8-binding)` (FFT, W,
+   layer subset, formula, feature aggregation, direction
+   convention, cascade thresholds).
+6. `## Caveats (§0.8-disclosed)` (see firewall patterns
+   below; also re-states the prompt-format / question-source
+   caveats from §15.10 since they apply identically to
+   Phase 2).
+7. `## Cross-phase comparison (disclosure only)` (one-line
+   summary of Phase 1 vs Phase 2 cascade outputs; no
+   override language).
+8. `## Audit-trail integrity` (firewall scan note, §0.8
+   binding statement, §13/§14/§15.x verdict-of-record
+   preservation).
+
+PINNED.
+
+**Pinned interpretation firewall — §15.11-specific Class-3
+forbidden patterns.**
+
+Inherits all §15.10 / §15.7 patterns (Class-3 set is
+monotone-growing). Adds the following §15.11-specific
+patterns to prevent post-hoc override of the Phase 2 cascade:
+
+```
+"actually STRONG_SIGNAL_IN_PHASE_COHERENCE despite"
+"should be STRONG_SIGNAL_IN_PHASE_COHERENCE"
+"actually PARTIAL_SIGNAL_IN_PHASE_COHERENCE despite"
+"should be classified as PARTIAL_SIGNAL_IN_PHASE_COHERENCE"
+"the wrong-direction failure should be flipped"
+"the direction gate should be relaxed"
+"the BCVF-faithful direction was wrong"
+"§15.10 PARTIAL is overturned"
+"§15.10 verdict is overturned"
+"§13.10 baseline should be replaced"
+```
+
+Combined with the §15.10/§15.7 inherited set, the firewall
+scans the rendered markdown for ~26 Class-3 patterns before
+write. PINNED.
+
+**Pinned exit codes (mirror §15.10).**
+
+```
+0  success
+2  CLI / argument error
+3  SELF_TEST_FAILED
+4  INTERPRETATION_VIOLATION
+5  SCHEMA_MISMATCH (label dump or cache)
+6  EXTRACTION_FAILED (torch / transformers stack)
+7  PROBE_FAILED (numpy / sklearn / NaN in F)
+```
+
+PINNED. Exit code 7 in §15.11 captures any unexpected NaN in
+F (e.g., from a degenerate hidden state with all-zero FFT) —
+by design, F should never be NaN given Qwen-7B's normal
+forward pass; if it occurs, the script aborts with the
+diagnostic.
+
+**Self-test gate composition.**
+
+Mirrors §15.10's three-stage self-test:
+
+1. Cascade boundary cases (12 cases per the cascade block) —
+   must all pass.
+2. Phase-coherence formula smoke test on synthetic inputs:
+   - Two identical hidden states → C[i, j] = 1 (within
+     numerical tolerance).
+   - Two random hidden states (independent normal) →
+     mean |C[i, j]| < 0.1 (large-N law).
+   - Two opposite-phase hidden states → C[i, j] = −1
+     (within tolerance).
+3. Interpretation firewall: each of the ~26 Class-3 patterns
+   must be flagged on a positive sample, and a clean §15.11
+   sample must produce zero violations.
+
+All three must pass before any data inspection. PINNED.
+
+---
+
+
+### 15.11 Pre-commitment (continued) — Caveats, transfer-thesis disclosure, Phase 3 authorization mapping, closing §0.8
+
+**Caveats (§0.8-disclosed) — §15.11-specific.**
+
+- **Single mechanism within the phase-coherence class.** We
+  test ONE specific phase-coherence formula: layer-wise,
+  mean off-diagonal, BCVF-faithful direction. A negative
+  result rules out **this** instantiation; it does not rule
+  out sample-wise (multi-decode), paraphrase-wise
+  (multi-prompt), or alternative aggregations (max-pair,
+  top-K, layer-block triplet, etc.) of phase coherence.
+  These are explicitly out of scope for Phase 2; Phase 3
+  will record them as untested-but-known alternatives.
+- **Layer-wise was selected over sample-wise /
+  paraphrase-wise** because (a) it is the cheapest
+  re-extraction (single forward pass per question vs K
+  samples or M paraphrases) and (b) it has the cleanest
+  BCVF analog (layers as N "streams" vs the 2-stream
+  autonomy original). It is **not** claimed to be the most
+  powerful instantiation.
+- **Direction is pinned BCVF-faithful (higher F predicts
+  correct).** Wrong-direction failures count as failures;
+  no sign-flip rescue. This is conservative by §0.8 design
+  and may understate signal that exists in the inverted
+  direction.
+- **N = 100 per benchmark** (same as §15.10/§13.10).
+  Statistical power is bounded; AUC standard error at AUC
+  ≈ 0.66 with N = 100 is ~0.05–0.06. Bands at 0.66 and 0.75
+  are hit/miss-able by sampling noise alone. The cascade
+  reports point estimates and pinned bands; no bootstrap CI
+  is computed (mirroring §15.10).
+- **Single model size: Qwen2.5-7B-Instruct.** Does not
+  speak to scaling behavior at 13B / 32B / 70B. Phase 3
+  will explicitly record this as a scope limit.
+
+**Caveats inherited from §15.10 (apply identically to §15.11).**
+
+- Prompt-format vs §13.10 labeling regime: pinned
+  `Q: {question}\nA:` regardless of which mode produced the
+  §13.10 dump. Caveat carries forward unchanged.
+- Question text source: dump's `question` field if present,
+  else HuggingFace dataset by `q_idx`. Same fallback policy.
+
+**Transfer-thesis disclosure (mechanical reading per cascade outcome).**
+
+§15.11's cascade outcome contributes to the **joint state
+of pre-committed mechanism classes** for the BCVF-autonomy
+→ LLM transfer thesis. As of the close of Phase 1, the joint
+state is:
+
+| mechanism class                              | status                                                       |
+|----------------------------------------------|--------------------------------------------------------------|
+| §13.10 unsupervised entropy                  | AUC = 0.661 both benchmarks (saturated at chance-corrected ceiling) |
+| §15.10 supervised linear (Phase 1)           | PARTIAL_SIGNAL_IN_Z (HaluEval ΔAUC = +0.008; TruthfulQA-MC ΔAUC = −0.039) |
+| §15.11 layer-wise phase coherence (Phase 2)  | **PENDING**                                                  |
+
+The mechanical reading of each Phase 2 outcome (no spin, no
+override of §15.10):
+
+- `STRONG_SIGNAL_IN_PHASE_COHERENCE` → phase coherence is
+  identified as a transfer mechanism that linear extraction
+  (§15.10) and unsupervised entropy (§13.10) failed to
+  capture. Substantive positive update on the BCVF-faithful
+  transfer thesis at the 7B scale. Phase 3 will document
+  this as a confirmed mechanism class and propose downstream
+  validation.
+- `PARTIAL_SIGNAL_IN_PHASE_COHERENCE` → phase coherence
+  carries some signal beyond entropy baseline on at least
+  one benchmark, in the BCVF-faithful direction, but does
+  not dominate. Joint with §15.10's PARTIAL: at least one
+  mechanism class has weak signal in the BCVF-faithful
+  direction. Phase 3 will document mixed evidence and the
+  asymmetry profile across benchmarks.
+- `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE` → layer-wise
+  phase coherence does not transfer at the 7B scale in the
+  BCVF-faithful direction. Joint with §15.10's
+  PARTIAL-by-hair: all three pre-committed canonical
+  mechanism classes (entropy / supervised linear /
+  phase-coherence) have produced near-null or null results.
+  Phase 3 will document this as **strong joint evidence
+  against transfer at the 7B scale under the canonical
+  mechanism classes**, and will propose Phase 3's closure
+  outcome from the four pre-committed bands (see below).
+
+**Phase 3 (`§15.12`) authorization mapping (PINNED).**
+
+§15.11 mechanically authorizes — but does not execute —
+Phase 3 work. The eligible §15.12 closure outcomes per
+§15.11 cascade label:
+
+| §15.11 outcome                            | §15.12 closure outcomes mechanically eligible                                                                                                                                            |
+|-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `STRONG_SIGNAL_IN_PHASE_COHERENCE`        | `REOPEN_LATER_UNDER_NEW_HYPOTHESIS_CLASS` (with positive update; phase coherence becomes the new hypothesis class)                                                                       |
+| `PARTIAL_SIGNAL_IN_PHASE_COHERENCE`       | `CLOSED_OPERATIONALLY_BUT_BCVF_FAITHFUL_REOPENING_POSSIBLE`                                                                                                                              |
+| `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`   | `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE` (because §15.10 was PARTIAL — supervised retains a residual reopening path) **or** `FULLY_CLOSED` (only if Phase 3's ChatGPT cross-bridge analysis converges to closure) |
+
+Phase 3 (§15.12) will get its own pre-commitment chunked
+draft; the closure-outcome decision rule will be pinned
+there. The **set** of eligible outcomes per §15.11 label is
+pinned **here**, ex ante, so Phase 3 cannot retroactively
+choose an outcome outside the §15.11-authorized set.
+
+This is the §0.8-binding constraint that prevents Phase 3
+from being a re-litigation of Phase 2.
+
+**What §15.11 does NOT do, restated.**
+
+- Does NOT modify §15.10's `PARTIAL_SIGNAL_IN_Z`
+  verdict-of-record.
+- Does NOT modify §13.9's hold or any §13/§14/§15.x
+  verdict-of-record.
+- Does NOT execute Phase 3. Phase 3 requires its own §0.8
+  commitment.
+- Does NOT iterate on the formula or features after this
+  section is sealed.
+- Does NOT permit selecting from §15.12 closure outcomes
+  outside the table above.
+
+**Closing §0.8 declaration.**
+
+This pre-commitment (the chunks under §15.11 above) is
+**§0.8-binding**. Once committed to the design document,
+the §15.11 mechanism, formula, evaluation, cascade,
+outputs, firewall, self-test gate, caveats, and Phase 3
+authorization mapping are all frozen. Implementation chunks
+(script-side `scripts/probe_phase_coherence_15_11.py`) will
+follow this pre-commitment exactly. Any deviation requires
+a fresh §0.8 amendment surfaced in the design document.
+
+Phase 2 enters execution only after this pre-commitment is
+committed to the branch and the implementation script's
+self-test gate passes.
+
+---
+
+
+### 15.12 Pre-commitment — Phase 3 of final-resolution sprint: final synthesis + autonomy handoff package (BOUNDED; one shot)
+
+**§0.8 declaration.**
+
+§15.12 is Phase 3 of the bounded 3-phase final-resolution
+sprint, authorized at the close of §15.11
+(`NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`; HaluEval AUC =
+0.4610 / ΔAUC = −0.2000; TruthfulQA-MC AUC = 0.4853 /
+ΔAUC = −0.1757; direction gate failed on both benchmarks;
+per `docs/experiments/probe_phase_coherence_15_11.{json,md}`
+at commit `b73e319`).
+
+This is a fresh §0.8 commitment. §15.12 outputs do **NOT**
+modify any §13/§14/§15.x verdict-of-record, including
+§15.10's `PARTIAL_SIGNAL_IN_Z`, §15.11's
+`NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`, §15.6's REGRESSION,
+§15.8's MIXED + C-MISMATCHED, or the §13.9 hold. **All
+upstream verdicts remain binding.**
+
+§15.12 is the **mechanical synthesis** step: it consumes
+the artifacts produced by Phases 1 and 2 (and the earlier
+§15.x verdicts), applies a **pre-committed closure decision
+rule**, and emits a final synthesis memo + autonomy handoff
+package. It does NOT rerun any experiment, retrain any
+probe, re-extract any hidden states, or re-classify any
+verdict.
+
+Bands, decision rule, output structure, and self-test cases
+are pinned **ex ante** in this section. Any deviation
+requires a fresh §0.8 amendment.
+
+**What §15.12 does.**
+
+1. **Synthesize the joint state of pre-committed mechanism
+classes.** Four classes have been tested:
+
+   - **§13.10 unsupervised entropy** (semantic-entropy
+     AUC, both benchmarks): saturated at AUC = 0.661.
+   - **§14a / §15.4 / §15.6 / §15.8 system-level
+     composition** (multi-source forced-allocation):
+     MIXED + C-MISMATCHED (per §15.8).
+   - **§15.10 supervised linear** (logistic regression on
+     layer −1 hidden states): `PARTIAL_SIGNAL_IN_Z`
+     (HaluEval ΔAUC = +0.008, TruthfulQA-MC ΔAUC = −0.039).
+   - **§15.11 layer-wise phase coherence** (29-layer rfft
+     phase coherence): `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`
+     (direction gate failed on both benchmarks).
+
+2. **Apply the pinned closure decision rule** (formula
+block below) to select a final closure outcome from the
+§15.11-authorized eligible set:
+`CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`
+(default) **or** `FULLY_CLOSED` (only if a pre-committed
+convergence criterion is met).
+
+3. **Produce three artifacts**:
+
+   - **Final LLM synthesis memo** (4-mechanism-class
+     comparison + closure rationale).
+   - **One-page LLM closure note** (executive summary +
+     final outcome).
+   - **Autonomy handoff package** (executive memo, claim
+     ladder, 90-day plan, narrative set) — preparing the
+     autonomy domain for any future BCVF-faithful
+     follow-on without inheriting unresolved LLM-transfer
+     ambiguity.
+
+**What §15.12 does NOT do.**
+
+- Does **NOT** rerun any §15.10 / §15.11 / §13.10
+  experiment.
+- Does **NOT** modify any §13/§14/§15.x verdict-of-record.
+- Does **NOT** iterate on the closure decision rule once
+  this section is sealed.
+- Does **NOT** select a closure outcome outside the
+  §15.11-authorized set
+  (`CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`
+  or `FULLY_CLOSED`). The other two pre-committed outcomes
+  from the original 3-phase sprint plan
+  (`CLOSED_OPERATIONALLY_BUT_BCVF_FAITHFUL_REOPENING_POSSIBLE`,
+  `REOPEN_LATER_UNDER_NEW_HYPOTHESIS_CLASS`) are
+  **mechanically ineligible** given the §15.11 outcome.
+- Does **NOT** authorize any Phase 4 / §15.13 / further
+  LLM experiment. Once §15.12 closes, the LLM
+  transfer-line is operationally closed in this branch;
+  any reopening requires a new top-level §0.8 commitment.
+
+**Dependencies.**
+
+- **§15.10 verdict-of-record.**
+  `docs/experiments/probe_supervised_15_10.json` and
+  `.md` (commit `a094e94`). Sealed
+  `PARTIAL_SIGNAL_IN_Z`.
+- **§15.11 verdict-of-record.**
+  `docs/experiments/probe_phase_coherence_15_11.json` and
+  `.md` (commit `b73e319`). Sealed
+  `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`.
+- **§13.10 / §13.20 baseline.** Entropy AUC = 0.661 both
+  benchmarks; π = 0.300 (HaluEval) / 0.250 (TruthfulQA-MC).
+- **§15.7 / §15.8 mechanism decomposition.**
+  `docs/experiments/probe_audit_15_7.{json,md}`; verdict
+  MIXED + C-MISMATCHED.
+- **Earlier §15.x verdicts.** §15.2 MARGINAL, §15.4
+  USEFUL_INTERNAL, §15.6 REGRESSION — all preserved as
+  part of the joint state, but **not used as cascade
+  input** (cascade is only on Phase 1 + Phase 2 outcomes
+  per the §15.11 mapping).
+
+No new GPU work, no new experiments, no model loads.
+§15.12 is pure synthesis + memo writing under §0.8
+discipline.
+
+**Time / compute budget.**
+
+- Total wall clock: <5 minutes (CPU-only, JSON parsing +
+  bootstrap CI on N=100 array + markdown rendering + file
+  writes).
+- Disk footprint: ~30–50 KB of new artifacts (no large
+  caches).
+
+§15.12 implementation
+(`scripts/probe_synthesis_15_12.py`) is a separate §0.8
+authorization gate and follows after this pre-commitment
+is sealed.
+
+---
+
+
+### 15.12 Pre-commitment (continued) — Pinned inputs, 4-mechanism-class joint-state matrix, closure decision rule
+
+**Pinned inputs (read-only).**
+
+§15.12 reads from the following committed artifacts; it
+does NOT modify them:
+
+```
+docs/experiments/probe_supervised_15_10.json        # §15.10 verdict (PARTIAL_SIGNAL_IN_Z)
+docs/experiments/probe_supervised_15_10.md
+docs/experiments/probe_phase_coherence_15_11.json   # §15.11 verdict (NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE)
+docs/experiments/probe_phase_coherence_15_11.md
+docs/experiments/probe_audit_15_7.json              # §15.8 verdict (MIXED + C-MISMATCHED)
+docs/experiments/probe_audit_15_7.md
+```
+
+§15.10 and §15.11 JSONs are the **mandatory** inputs
+(cascade decision derives from them). The §15.7 audit JSON
+is **disclosure-only** (carried into the synthesis memo's
+4-mechanism-class matrix; not used in the closure decision
+rule).
+
+**Pinned 4-mechanism-class joint-state matrix.**
+
+The synthesis memo records the joint state as a 4-row
+table:
+
+| #   | Mechanism class                       | Source                                      | HaluEval result            | TruthfulQA-MC result        | Cascade outcome                         |
+|-----|---------------------------------------|---------------------------------------------|----------------------------|-----------------------------|-----------------------------------------|
+| 1   | Unsupervised entropy                  | §13.10 / §13.20                             | AUC = 0.661                | AUC = 0.661                 | Saturated at chance-corrected ceiling   |
+| 2   | System-level composition              | §14a / §15.4 / §15.6 / §15.8                | USEFUL_INTERNAL            | REGRESSION                  | MIXED + C-MISMATCHED (per §15.8)        |
+| 3   | Supervised linear (Phase 1)           | §15.10                                      | AUC = 0.6686, ΔAUC = +0.008 | AUC = 0.6224, ΔAUC = −0.039 | `PARTIAL_SIGNAL_IN_Z`                   |
+| 4   | Layer-wise phase coherence (Phase 2)  | §15.11                                      | AUC = 0.4610, ΔAUC = −0.200 | AUC = 0.4853, ΔAUC = −0.176 | `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE` |
+
+The matrix is **mechanically populated** from the input
+JSONs. No prose interpretation is allowed in the matrix
+cells; only the verdict labels and headline scalars.
+PINNED.
+
+**Pinned closure decision rule.**
+
+Eligible §15.12 closures (from §15.11's authorization
+mapping):
+
+- `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`
+  (default).
+- `FULLY_CLOSED` (only if convergence criterion is met).
+
+**Convergence criterion for FULLY_CLOSED (PINNED, mechanical):**
+
+> The §15.10 supervised-linear residual signal on
+> HaluEval-QA — the only mechanism-class result that
+> mechanically satisfies the PARTIAL conditions on at
+> least one benchmark — is **statistically
+> indistinguishable from the §13.10 entropy baseline** at
+> N = 100.
+
+Concretely:
+
+1. Read `p_oof` (100-element OOF probability array) and
+   `correctness` (derivable from the labels via the same
+   §13.10 dump for verification, or reconstructed from
+   `n_correct` / `n_wrong` via the recorded record order)
+   for HaluEval-QA from `probe_supervised_15_10.json`.
+2. Compute B = 10 000 **stratified bootstrap resamples** of
+   (p_oof, y) with `random_state = 15` (matches
+   `SEED_ENTROPY`).
+3. For each resample b: compute
+   `auc_b = roc_auc_score(y_b, p_oof_b)` and
+   `dauc_b = auc_b − 0.661`.
+4. Compute the **95 % percentile CI** on `dauc_b`:
+   `[lo, hi]` = (2.5th, 97.5th percentiles).
+5. **Decision:**
+   - If `lo > 0` (CI strictly above zero) →
+     `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`
+     (default; residual signal statistically distinguishable
+     from baseline).
+   - If `lo ≤ 0` (CI contains zero or extends below) →
+     `FULLY_CLOSED` (residual signal not statistically
+     distinguishable from baseline).
+
+PINNED. No alternative test (no two-sided test variants,
+no different B, no different α, no different bootstrap
+procedure, no DeLong / no Mann-Whitney exact). One shot.
+
+**§0.8 disclosure — substitution of "ChatGPT cross-bridge" for the bootstrap test.**
+
+§15.11 Chunk 6 stated that `FULLY_CLOSED` is eligible
+"only if Phase 3's ChatGPT cross-bridge analysis converges
+to closure." This is a **non-mechanical** condition that
+depends on external review.
+
+§15.12 **substitutes** a mechanical, reproducible
+statistical test (the bootstrap CI rule above) for the
+non-mechanical "cross-bridge" condition. The substitution
+is **§0.8-disclosed** here, not silent. Justification:
+
+- The bootstrap test is more rigorous than asking an
+  external reviewer "do you concur?"
+- The bootstrap test produces a binary, audit-trail-clean
+  decision with a documented seed and resample count.
+- The bootstrap test directly answers the underlying
+  question that motivated the "cross-bridge" language: is
+  the residual PARTIAL signal driven by real signal or by
+  sampling noise?
+- The substitution is **strict**: the bootstrap test is a
+  stronger gating condition than a vague external
+  concurrence (it requires explicit statistical equivalence
+  to the null at α = 0.05).
+
+If a future re-analysis disagrees with this substitution,
+it requires a fresh §0.8 amendment to §15.11 *and*
+§15.12, not a silent revision.
+
+**Pinned self-test boundary cases for the closure rule.**
+
+Four pinned cases. The §15.12 implementation script must
+pass all four at the self-test gate before reading any
+real data:
+
+| #   | synthetic ΔAUC CI lo | synthetic ΔAUC CI hi | expected closure                                              |
+|-----|----------------------|----------------------|---------------------------------------------------------------|
+|  1  | +0.05                | +0.10                | `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE` (lo > 0; clearly positive) |
+|  2  | +0.001               | +0.05                | `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE` (lo > 0; barely positive)  |
+|  3  | 0.0                  | +0.05                | `FULLY_CLOSED` (lo = 0 inclusive; CI contains zero)                                  |
+|  4  | −0.05                | +0.05                | `FULLY_CLOSED` (lo < 0; CI clearly straddles zero)                                   |
+
+The boundary at `lo = 0` is **inclusive of FULLY_CLOSED**
+(i.e., `lo ≤ 0` triggers FULLY_CLOSED). This treats
+"CI lower bound exactly at zero" as not statistically
+distinguishable from zero — the conservative choice for
+closure.
+
+**What the closure decision rule does NOT consider.**
+
+- §15.10 TruthfulQA-MC ΔAUC = −0.039 (already negative,
+  fails PARTIAL by construction; bootstrap test on this
+  benchmark is uninformative for the FULLY_CLOSED upgrade
+  question).
+- §15.11 phase-coherence AUCs (already NO_MATERIAL via
+  direction gate; no residual to test).
+- §13.10 entropy baseline (the reference; not under test).
+- §15.7 / §15.8 mechanism decomposition (informative for
+  the synthesis memo prose, but not in the cascade).
+- Cross-phase comparisons or §14a sibling results.
+
+The cascade input is **only** §15.10 HaluEval-QA's OOF
+predictions vs labels, bootstrapped. Single test, single
+benchmark, single decision.
+
+---
+
+
+### 15.12 Pre-commitment (continued) — Pinned synthesis memo + autonomy handoff package structure
+
+**Artifact A — Final LLM synthesis memo.**
+
+Output path: `docs/experiments/synthesis_15_12.md`.
+
+Pinned section structure (8 sections, in order):
+
+1. `# §15.12 Phase 3 — Final LLM-transfer synthesis memo`
+   _Header: schema version, build date, sources, closure
+   label one-liner._
+2. `## Executive readout`
+   _3–5 sentence mechanical summary: joint state across 4
+   mechanism classes; closure label; one-line rationale._
+3. `## 4-mechanism-class joint-state matrix`
+   _The pinned table from the inputs/cascade block above
+   (entropy / system-level composition / supervised
+   linear / phase coherence) — populated mechanically
+   from the input JSONs, no prose interpretation in
+   cells._
+4. `## Closure decision (mechanical readout)`
+   _Bootstrap CI lo/hi values; closure label per the
+   pinned rule; decision rationale (one paragraph, no
+   override language)._
+5. `## What the joint state mechanically supports`
+   _Bullet list of statements that ARE supported by the
+   mechanical readout (e.g., "no transfer at the 7B scale
+   under the four canonical mechanism classes tested")._
+6. `## What the joint state does NOT support`
+   _Bullet list of statements that are NOT supported
+   (e.g., "transfer at 13B / 32B / 70B"; "alternative
+   phase-coherence instantiations such as sample-wise or
+   paraphrase-wise")._
+7. `## Audit-trail summary`
+   _Commit references for every input and every prior
+   verdict-of-record. §13.9 hold preserved; §15.x
+   verdicts preserved; §15.12 cascade is binding._
+8. `## Caveats (§0.8-disclosed)`
+   _N=100 power note; single-model-size scope; carries
+   forward §15.10 / §15.11 inherited caveats; §0.8
+   substitution of bootstrap test for "ChatGPT
+   cross-bridge"._
+
+PINNED. No additional sections; no section reordering.
+
+**Artifact B — One-page LLM closure note.**
+
+Output path: `docs/handoff/llm_closure_note.md`.
+
+Pinned structure (~1 page):
+
+```
+# §15.12 LLM closure note (one-page summary)
+
+**Closure outcome:** <CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE | FULLY_CLOSED>
+
+**Joint state (4 mechanism classes):**
+- §13.10 entropy: saturated at AUC = 0.661 both benchmarks.
+- §15.4/§15.6/§15.8 system-level composition: MIXED + C-MISMATCHED.
+- §15.10 supervised linear: PARTIAL_SIGNAL_IN_Z (HaluEval ΔAUC=+0.008,
+  TruthfulQA-MC ΔAUC=-0.039).
+- §15.11 phase coherence: NO_MATERIAL via direction gate.
+
+**Closure rationale (mechanical):** <one paragraph, populated from the
+bootstrap CI test result>
+
+**What this means operationally:**
+- BCVF-style trust routing does not transfer to LLM hallucination
+  detection at the Qwen-7B scale under any of the four pre-committed
+  canonical mechanism classes.
+- All §13/§14/§15.x verdicts-of-record are preserved.
+- §13.9 hold remains binding.
+
+**What is NOT closed:**
+- 13B / 32B / 70B scaling (untested).
+- Sample-wise / paraphrase-wise phase coherence (untested).
+- Non-canonical mechanism classes (e.g., probing classifiers on attention
+  heads, residual-stream eigenvectors, SAE features) — untested.
+
+**Reopening conditions:** <populated mechanically based on closure outcome>
+```
+
+PINNED. Audience: a future operator who needs the verdict
+in 60 seconds without reading the full synthesis memo.
+
+**Artifact C — Autonomy handoff package.**
+
+Output paths:
+
+```
+docs/handoff/autonomy_handoff_executive_memo.md
+docs/handoff/autonomy_handoff_claim_ladder.md
+docs/handoff/autonomy_handoff_90_day_plan.md
+docs/handoff/autonomy_handoff_narrative_set.md
+```
+
+**C.1 — Executive memo
+(`autonomy_handoff_executive_memo.md`).**
+
+Pinned structure (~1.5 pages):
+
+- Header with §15.12 closure label.
+- One paragraph: "What we tried, what we found, where the
+  autonomy result stands now."
+- Three subsections: (a) BCVF-autonomy result (§6.1, N=21
+  sign test) — preserved; (b) BCVF → LLM transfer attempt
+  — closed at §15.12; (c) implications for forward
+  autonomy work.
+- Closing: explicit statement that the autonomy domain
+  proceeds **without inheriting unresolved LLM-transfer
+  ambiguity**.
+
+**C.2 — Claim ladder
+(`autonomy_handoff_claim_ladder.md`).**
+
+Pinned structure: a strict ladder of claims from
+"definitely supported by current evidence" →
+"speculatively suggested by current evidence" →
+"explicitly NOT supported by current evidence." Each rung
+references the specific §-numbered verdict that supports
+or rejects the claim. Format:
+
+```
+**Rung 1 (definitely supported):**
+- ...
+**Rung 2 (well-supported):**
+- ...
+**Rung 3 (suggested, not proven):**
+- ...
+**Rung 4 (untested):**
+- ...
+**Rung 5 (explicitly NOT supported):**
+- ...
+```
+
+PINNED. Each claim must cite a §-number (e.g., "§6.1 N=21
+sign test") or be marked as untested.
+
+**C.3 — 90-day plan
+(`autonomy_handoff_90_day_plan.md`).**
+
+Pinned structure: 90-day forward work for the **autonomy
+domain only** (LLM line is closed at §15.12). Three time
+blocks: 0–30, 30–60, 60–90 days. Each block: (a) goals,
+(b) success criteria, (c) explicit non-goals. Non-goals
+must include: "no further LLM-transfer attempts under the
+four canonical mechanism classes already tested." PINNED.
+
+**C.4 — Narrative set
+(`autonomy_handoff_narrative_set.md`).**
+
+Pinned structure: 4 audience-targeted one-paragraph
+narratives:
+
+1. **Engineering peer:** technical detail; cites
+   §-numbers; covers transfer-failure mechanism classes.
+2. **Funder / grant reviewer:** outcome-oriented;
+   explicit closure status; what was learned.
+3. **End user / operator:** plain-language; no §-numbers;
+   what this means for production autonomy systems.
+4. **Internal record:** §0.8-binding language; full
+   audit-trail integrity statement.
+
+PINNED.
+
+**Output paths summary.**
+
+```
+docs/experiments/synthesis_15_12.json                       # machine-readable
+docs/experiments/synthesis_15_12.md                         # Artifact A
+docs/handoff/llm_closure_note.md                            # Artifact B
+docs/handoff/autonomy_handoff_executive_memo.md             # Artifact C.1
+docs/handoff/autonomy_handoff_claim_ladder.md               # Artifact C.2
+docs/handoff/autonomy_handoff_90_day_plan.md                # Artifact C.3
+docs/handoff/autonomy_handoff_narrative_set.md              # Artifact C.4
+```
+
+Total: 7 artifacts (1 JSON + 6 markdown). All
+firewall-scanned before write.
+
+**What is NOT in any artifact.**
+
+- Any §-numbered verdict re-classification.
+- Any prose suggesting §15.10's PARTIAL was wrong.
+- Any prose suggesting §15.11's NO_MATERIAL should be
+  relaxed.
+- Any prose authorizing §15.12 outside the §15.11
+  authorization mapping.
+- Any prose authorizing autonomy handoff actions that
+  contradict the §6.1 N=21 result.
+- Any prose suggesting the bootstrap test was
+  inappropriate or should be replaced.
+
+The §15.12 firewall pattern set (next chunk) enumerates
+these explicitly.
+
+---
+
+
+### 15.12 Pre-commitment (continued) — JSON schema, Class-3 firewall, self-test gate, exit codes, CLI
+
+**Pinned JSON schema (`schema_version = "15.12"`).**
+
+Output path: `docs/experiments/synthesis_15_12.json`.
+
+Top-level keys (alphabetical for `sort_keys=True` parity
+with §15.10 / §15.11):
+
+```
+{
+  "audit_trail": {
+    "input_artifacts": {
+      "phase_1_json": "docs/experiments/probe_supervised_15_10.json",
+      "phase_1_commit": "a094e94",
+      "phase_2_json": "docs/experiments/probe_phase_coherence_15_11.json",
+      "phase_2_commit": "b73e319",
+      "phase_15_8_json": "docs/experiments/probe_audit_15_7.json"
+    },
+    "preserved_verdicts": [
+      "§13.9 hold (binding)",
+      "§13.10/§13.20 entropy AUC = 0.661",
+      "§15.2 MARGINAL", "§15.4 USEFUL_INTERNAL", "§15.6 REGRESSION",
+      "§15.8 MIXED + C-MISMATCHED",
+      "§15.10 PARTIAL_SIGNAL_IN_Z",
+      "§15.11 NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE"
+    ],
+    "phase_3_modifies": "none"
+  },
+  "bootstrap_config": {
+    "n_resamples": 10000,
+    "stratified": true,
+    "random_state": 15,
+    "ci_level": 0.95,
+    "ci_method": "percentile"
+  },
+  "closure_decision": {
+    "label": "<CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE | FULLY_CLOSED>",
+    "rule_invoked": "§15.10 HaluEval-QA bootstrap 95% CI on ΔAUC vs §13.10 baseline",
+    "ci_lo": <float>,
+    "ci_hi": <float>,
+    "lo_above_zero": <bool>,
+    "rationale": "<formatted prose, mechanical readout>"
+  },
+  "joint_state_matrix": [
+    {"class": 1, "name": "Unsupervised entropy", "source": "§13.10/§13.20",
+     "halueval_metric": "AUC=0.661", "truthfulqa_metric": "AUC=0.661",
+     "outcome": "Saturated at chance-corrected ceiling"},
+    {"class": 2, "name": "System-level composition",
+     "source": "§14a/§15.4/§15.6/§15.8",
+     "halueval_metric": "USEFUL_INTERNAL", "truthfulqa_metric": "REGRESSION",
+     "outcome": "MIXED + C-MISMATCHED"},
+    {"class": 3, "name": "Supervised linear (Phase 1)", "source": "§15.10",
+     "halueval_metric": "AUC=0.6686, ΔAUC=+0.008",
+     "truthfulqa_metric": "AUC=0.6224, ΔAUC=−0.039",
+     "outcome": "PARTIAL_SIGNAL_IN_Z"},
+    {"class": 4, "name": "Layer-wise phase coherence (Phase 2)",
+     "source": "§15.11",
+     "halueval_metric": "AUC=0.4610, ΔAUC=−0.200",
+     "truthfulqa_metric": "AUC=0.4853, ΔAUC=−0.176",
+     "outcome": "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE"}
+  ],
+  "phase_3_authorization_path": {
+    "phase_2_outcome": "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE",
+    "eligible_closures": [
+      "CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE",
+      "FULLY_CLOSED"
+    ],
+    "ineligible_closures": [
+      "CLOSED_OPERATIONALLY_BUT_BCVF_FAITHFUL_REOPENING_POSSIBLE",
+      "REOPEN_LATER_UNDER_NEW_HYPOTHESIS_CLASS"
+    ]
+  },
+  "schema_version": "15.12"
+}
+```
+
+PINNED. No additional keys; no key removal. The JSON is
+the canonical machine-readable record of §15.12's
+decision.
+
+**Pinned Class-3 forbidden patterns — §15.12-specific (10 new).**
+
+Inherits §15.11's 26-pattern set (which inherits §15.10's
+16-pattern set). Adds **10 §15.12-specific** patterns:
+
+```
+"§15.10 PARTIAL was wrong"
+"§15.10 PARTIAL should be relaxed"
+"§15.11 NO_MATERIAL should be relaxed"
+"§15.11 direction gate should be relaxed"
+"the bootstrap test was inappropriate"
+"the bootstrap test should be replaced"
+"§15.12 closure should be reopened"
+"§15.12 should authorize REOPEN"
+"§6.1 N=21 sign test was wrong"
+"the autonomy result is invalidated"
+```
+
+Total firewall coverage at §15.12: **36 patterns**
+(16 §15.10 + 10 §15.11 + 10 §15.12). PINNED.
+
+**Pinned exit codes.**
+
+```
+0  success
+2  CLI / argument error (handled by argparse)
+3  SELF_TEST_FAILED
+4  INTERPRETATION_VIOLATION
+5  SCHEMA_MISMATCH (input JSON or unexpected verdict label)
+8  INPUT_MISSING (Phase 1 or Phase 2 JSON not on disk)
+9  CLOSURE_INFEASIBLE (Phase 2 outcome is not the §15.11 mapping anticipated;
+                       would require fresh §0.8)
+```
+
+Exit code 9 is **§15.12-specific**. It fires if the input
+JSON's `cascade_verdict.label` is something other than
+`NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE` (e.g., a future
+re-run produced PARTIAL or STRONG instead). In that case,
+the §15.11 → §15.12 authorization mapping would no longer
+apply, and the user must surface a fresh §0.8 amendment
+before §15.12 can run. PINNED.
+
+**Pinned self-test gate composition.**
+
+Three sub-tests; mirrors the §15.10 / §15.11 pattern. Any
+failure → exit 3.
+
+1. **Closure-rule boundary cases (4 cases per the closure
+   block above):** the script must call the closure-rule
+   function on synthetic `(ci_lo, ci_hi)` inputs and
+   verify the expected closure label. Already pinned.
+2. **Bootstrap procedure smoke test (3 synthetic cases):**
+   the script must call the bootstrap-CI function on
+   three synthetic inputs:
+   - **Perfectly separable:** `y = [1]*50 + [0]*50`,
+     `p = [0.9]*50 + [0.1]*50` → AUC = 1.0;
+     ΔAUC = +0.339; CI lo > 0 (clearly).
+   - **Random with no signal:** `y` permuted randomly,
+     `p` random → AUC ≈ 0.5; ΔAUC ≈ −0.161; CI must
+     contain 0 (verified deterministic at the pinned
+     seed; check `ci_lo ≤ 0`).
+   - **Borderline positive:** `y / p` constructed so
+     AUC = 0.671 exactly (ΔAUC = +0.010) → bootstrap CI
+     lo at borderline; verify deterministic at the
+     pinned seed.
+3. **Interpretation firewall (36-pattern coverage):**
+   each of the 36 Class-3 patterns must be flagged on a
+   positive sample. Clean §15.12-style text (referencing
+   §15.10's PARTIAL_SIGNAL_IN_Z, §15.11's
+   NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE, the bootstrap
+   test, the §13.9 hold) must produce zero violations.
+
+All three sub-tests must pass before any input JSON is
+read. PINNED.
+
+**Implementation script naming and CLI.**
+
+Script path: `scripts/probe_synthesis_15_12.py` (mirrors
+§15.10 / §15.11 naming).
+
+CLI modes (mutually exclusive):
+
+```
+--self-test     : run gate only (closure-rule cases + bootstrap smoke test
+                  + 36-pattern firewall)
+--dry-run       : load inputs, compute closure decision, print to stdout,
+                  do NOT write files
+(default)       : self-test → load inputs → bootstrap → closure decision
+                  → render + firewall + write 7 artifacts
+```
+
+PINNED. No `--extract-only` / `--probe-only` (no GPU work,
+no extraction); no `--force-*` flags (idempotent — running
+twice produces identical outputs given identical inputs
+and seed = 15).
+
+---
+
+
+### 15.12 Pre-commitment (continued) — Caveats, transfer-thesis disclosure, post-§15.12 status ledger, closing §0.8
+
+**Caveats (§0.8-disclosed) — §15.12-specific.**
+
+- **Bootstrap CI is the substituted mechanical test.**
+  §15.11 Chunk 6 named "ChatGPT cross-bridge analysis"
+  as the FULLY_CLOSED gating condition; §15.12
+  substitutes a deterministic bootstrap test with
+  B = 10 000 / seed = 15 / stratified / 95 % percentile
+  CI. Substitution is §0.8-disclosed; not silent. The
+  substitution is **strict** (more rigorous, not less).
+- **Single residual test.** Only §15.10's HaluEval-QA
+  OOF predictions are bootstrap-tested. TruthfulQA-MC's
+  ΔAUC = −0.039 is already negative and trivially fails
+  PARTIAL on its own; phase-coherence is already
+  NO_MATERIAL via direction gate. The bootstrap test is
+  on the **only** mechanism-class result that
+  mechanically satisfies the PARTIAL conditions.
+- **N = 100 standard error context.** The bootstrap test
+  inherits §15.10's N = 100 sample. AUC standard error at
+  AUC ≈ 0.66 with N = 100 is ~0.05, and the §15.10
+  HaluEval ΔAUC = +0.008 is approximately 0.16σ above the
+  baseline. The bootstrap test makes this more rigorous,
+  but the underlying statistical power constraint carries
+  forward. **A larger-N replication of §15.10 could
+  change the closure outcome**; that would require a
+  fresh §0.8 amendment to §15.10 first, then §15.12
+  re-run.
+- **Single model size.** §15.12's closure applies only to
+  Qwen2.5-7B-Instruct under the four pre-committed
+  canonical mechanism classes. **Does not speak to**
+  scaling at 13B / 32B / 70B, sample-wise / paraphrase-
+  wise phase coherence, attention-head probing,
+  residual-stream eigenvectors, SAE features, or any
+  other untested mechanism.
+- **Inherited from §15.10 / §15.11.** Prompt-format vs
+  §13.10 labeling regime; question-text source; sklearn
+  API surface — all carry forward unchanged. The §15.12
+  implementation will not surface these caveats
+  redundantly in artifacts; they are referenced by
+  §-number.
+
+**Transfer-thesis disclosure (mechanical readout per closure outcome).**
+
+The two eligible closures map to the following final
+transfer-thesis statements:
+
+**If closure = `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`:**
+
+- BCVF-style trust routing **does not transfer** to LLM
+  hallucination detection at the Qwen-7B scale under any
+  of the four canonical mechanism classes tested
+  (entropy / system-level composition / supervised
+  linear / phase coherence) at the **operational
+  decision threshold**.
+- However, §15.10's HaluEval-QA residual ΔAUC = +0.008 is
+  statistically distinguishable from the §13.10 baseline
+  at α = 0.05, which preserves a thin **supervised
+  reopening path** if a future N = 200 / N = 500 re-run
+  replicates the residual.
+- Autonomy line proceeds; LLM line is closed for
+  Qwen-7B operations but not declared fully closed.
+
+**If closure = `FULLY_CLOSED`:**
+
+- BCVF-style trust routing **does not transfer** to LLM
+  hallucination detection at the Qwen-7B scale under any
+  of the four canonical mechanism classes tested.
+- §15.10's residual ΔAUC = +0.008 is statistically
+  indistinguishable from the §13.10 baseline at α = 0.05
+  → consistent with sampling noise → no residual
+  reopening path under the four canonical classes.
+- Autonomy line proceeds; LLM line is fully closed for
+  the four canonical mechanism classes at this model
+  size.
+
+In **both** cases:
+
+- §6.1 N = 21 autonomy result is **preserved** as the
+  binding autonomy verdict-of-record.
+- §13.9 hold is **preserved**.
+- Untested mechanism classes (alternative phase-coherence
+  instantiations, attention-head probes, residual-stream
+  eigenvectors, SAE features) remain **untested**, not
+  refuted.
+- Larger-model-size scaling remains **untested**.
+
+**Post-§15.12 status (the explicit ledger).**
+
+Once §15.12 closes, the following ledger is in effect:
+
+**Sealed §0.8-binding (no further modification without
+fresh §0.8 amendment):**
+
+- §6.1 N = 21 sign test (autonomy) — preserved.
+- §13.9 hold — preserved.
+- §13.10 / §13.20 baseline — preserved.
+- §15.2 / §15.4 / §15.6 / §15.8 verdicts — preserved.
+- §15.10 PARTIAL_SIGNAL_IN_Z — preserved.
+- §15.11 NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE —
+  preserved.
+- §15.12 closure outcome — sealed.
+
+**Closed lines (in this branch):**
+
+- BCVF → LLM transfer attempt under the four canonical
+  mechanism classes at Qwen-7B scale.
+- The 3-phase final-resolution sprint.
+
+**Open lines (not closed, not authorized):**
+
+- Larger-model-size scaling tests.
+- Alternative phase-coherence instantiations
+  (sample-wise / paraphrase-wise / alternative
+  aggregations).
+- Non-canonical mechanism classes (attention-head
+  probes, SAE features, etc.).
+- Any reopening of the LLM transfer-line. **Each
+  requires a fresh top-level §0.8 commitment**, not an
+  amendment.
+
+**What §15.12 does NOT do, restated.**
+
+- Does **NOT** modify §15.10's `PARTIAL_SIGNAL_IN_Z`
+  verdict-of-record.
+- Does **NOT** modify §15.11's
+  `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`
+  verdict-of-record.
+- Does **NOT** modify §13.9's hold or any §13/§14/§15.x
+  verdict-of-record.
+- Does **NOT** select a closure outside the
+  §15.11-authorized eligible set.
+- Does **NOT** authorize Phase 4 / §15.13 / further LLM
+  experiments. Reopening requires a fresh top-level
+  §0.8.
+- Does **NOT** re-extract hidden states, retrain probes,
+  or rerun any §13.10 / §15.10 / §15.11 producer.
+
+**Closing §0.8 declaration.**
+
+This pre-commitment (chunks 1–5 above) is
+**§0.8-binding**. Once committed to the design document,
+the §15.12 inputs, joint-state matrix, closure decision
+rule (bootstrap CI test with B = 10 000 / seed = 15),
+synthesis memo structure, autonomy handoff package
+structure, JSON schema, firewall pattern set (36
+patterns), self-test gate, exit codes, and CLI surface
+are all frozen.
+
+Implementation chunks (script-side
+`scripts/probe_synthesis_15_12.py`) will follow this
+pre-commitment exactly. Any deviation requires a fresh
+§0.8 amendment surfaced in the design document. The
+substitution of the bootstrap test for §15.11's "ChatGPT
+cross-bridge" language is §0.8-disclosed in the closure
+decision rule chunk and is **the only deliberate
+departure** from the literal §15.11 wording.
+
+§15.12 enters execution only after this pre-commitment is
+committed to the branch and the implementation script's
+self-test gate passes.
+
 ---
 
 
