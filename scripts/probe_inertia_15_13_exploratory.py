@@ -208,3 +208,303 @@ def label_counts(labels: tuple[str, ...]) -> dict[str, int]:
             )
     counts["TOTAL"] = len(labels)
     return counts
+
+
+# ===========================================================================
+# Pairwise AUC helper (tie-aware Mann-Whitney U). Pure numpy; matches
+# sklearn's roc_auc_score on the same scores/labels. Used here instead of
+# importing sklearn to keep this exploratory script CPU-only and dependency-
+# light. The §15.13 primary probe still uses sklearn for its binding AUCs.
+# ===========================================================================
+
+
+def _auc_tieaware(scores: np.ndarray, labels: np.ndarray) -> float:
+    """Tie-aware AUC = (#pos>neg + 0.5*#tie) / (n_pos*n_neg).
+
+    Pos class: labels == 1; neg class: labels == 0. Returns NaN if
+    either class is empty.
+    """
+    if scores.shape != labels.shape:
+        raise ValueError(
+            f"_auc_tieaware shape mismatch: scores={scores.shape} vs "
+            f"labels={labels.shape}"
+        )
+    pos = scores[labels.astype(bool)]
+    neg = scores[~labels.astype(bool)]
+    n_pos, n_neg = int(pos.size), int(neg.size)
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    diff = pos[:, None] - neg[None, :]
+    win = float((diff > 0).sum())
+    tie = float((diff == 0).sum())
+    return (win + 0.5 * tie) / float(n_pos * n_neg)
+
+
+# ===========================================================================
+# Per-subset AUC record + computation. Each subset is a binary
+# classification: pos_class is the class that "should be ranked higher"
+# under the BCVF-faithful direction (lower R_inertia → predicts pos_class).
+# We negate the score so AUC > 0.5 means R_inertia separates pos from neg
+# in the BCVF-faithful direction.
+#
+# Disclosure subsets (per spec sub-chunk):
+#   1. all_stimuli_sanity        : CORRECT vs (REFUSAL ∪ CONFIDENT_WRONG)
+#                                  (must reproduce §15.13's 0.6300)
+#   2. correct_vs_confident_wrong: CORRECT vs CONFIDENT_WRONG
+#                                  (drop refusals — does inertia separate
+#                                   hallucinations from correct?)
+#   3. correct_vs_refusal        : CORRECT vs REFUSAL
+#                                  (drop confident-wrong — does inertia
+#                                   separate refusals from correct?)
+#   4. confident_wrong_vs_refusal: CONFIDENT_WRONG vs REFUSAL
+#                                  (correct excluded — does inertia
+#                                   distinguish the two failure modes?)
+#
+# Each subset is gated on MIN_CLASS_SIZE_FOR_AUC = 10 per class. Below
+# that, the subset reports INSUFFICIENT_N rather than a small-sample AUC.
+# ===========================================================================
+
+
+@dataclass(frozen=True)
+class SubsetSummary:
+    """Per-subset AUC + class counts + R distribution (disclosure only).
+
+    `eligible` flags whether the subset met the MIN_CLASS_SIZE_FOR_AUC
+    floor on both classes; if False, AUC fields are NaN and `rationale`
+    explains the gating.
+    """
+
+    name: str
+    pos_label: str          # the "ranked-higher-by-low-R" class
+    neg_label: str          # the comparator class
+    n_pos: int
+    n_neg: int
+    eligible: bool
+    auc_inertia: float      # AUC(-R_inertia, pos==1); NaN if not eligible
+    auc_sim: float          # AUC(-R_sim,     pos==1); NaN if not eligible
+    dauc_inertia_vs_chance: float
+    dauc_inertia_vs_sim: float
+    r_inertia_pos_mean: float
+    r_inertia_pos_std: float
+    r_inertia_neg_mean: float
+    r_inertia_neg_std: float
+    rationale: str          # "ELIGIBLE" or "INSUFFICIENT_N (...)"
+
+
+def _label_in(label: str, allowed: tuple[str, ...]) -> bool:
+    return label in allowed
+
+
+def compute_subset_summary(
+    name: str,
+    pos_classes: tuple[str, ...],
+    neg_classes: tuple[str, ...],
+    features: tuple[StimulusFeatures, ...],
+    labels: tuple[str, ...],
+) -> SubsetSummary:
+    """Build a SubsetSummary for the (pos vs neg) binary classification.
+
+    `pos_classes` and `neg_classes` are tuples of label names so a "subset"
+    can group multiple labels (e.g., the all-stimuli sanity check groups
+    REFUSAL ∪ CONFIDENT_WRONG as the negative class).
+
+    The score is `-feature.r_inertia` (BCVF-faithful direction: lower
+    R_inertia predicts the positive class). `auc_sim` mirrors the §15.13
+    cascade's comparator and uses `-feature.r_sim`.
+    """
+    pos_inertia: list[float] = []
+    pos_sim: list[float] = []
+    neg_inertia: list[float] = []
+    neg_sim: list[float] = []
+    for f, lbl in zip(features, labels):
+        if _label_in(lbl, pos_classes):
+            pos_inertia.append(float(f.r_inertia))
+            pos_sim.append(float(f.r_sim))
+        elif _label_in(lbl, neg_classes):
+            neg_inertia.append(float(f.r_inertia))
+            neg_sim.append(float(f.r_sim))
+    n_pos, n_neg = len(pos_inertia), len(neg_inertia)
+    pos_label = "+".join(pos_classes)
+    neg_label = "+".join(neg_classes)
+
+    if n_pos < MIN_CLASS_SIZE_FOR_AUC or n_neg < MIN_CLASS_SIZE_FOR_AUC:
+        return SubsetSummary(
+            name=name,
+            pos_label=pos_label,
+            neg_label=neg_label,
+            n_pos=n_pos,
+            n_neg=n_neg,
+            eligible=False,
+            auc_inertia=float("nan"),
+            auc_sim=float("nan"),
+            dauc_inertia_vs_chance=float("nan"),
+            dauc_inertia_vs_sim=float("nan"),
+            r_inertia_pos_mean=float("nan"),
+            r_inertia_pos_std=float("nan"),
+            r_inertia_neg_mean=float("nan"),
+            r_inertia_neg_std=float("nan"),
+            rationale=(
+                f"INSUFFICIENT_N (n_pos={n_pos}, n_neg={n_neg}; "
+                f"require ≥{MIN_CLASS_SIZE_FOR_AUC} per class)"
+            ),
+        )
+
+    inertia_scores = np.asarray(
+        [-v for v in pos_inertia] + [-v for v in neg_inertia],
+        dtype=np.float64,
+    )
+    sim_scores = np.asarray(
+        [-v for v in pos_sim] + [-v for v in neg_sim],
+        dtype=np.float64,
+    )
+    y_arr = np.asarray([1] * n_pos + [0] * n_neg, dtype=np.int64)
+
+    auc_inertia = _auc_tieaware(inertia_scores, y_arr)
+    auc_sim = _auc_tieaware(sim_scores, y_arr)
+    pos_inertia_arr = np.asarray(pos_inertia, dtype=np.float64)
+    neg_inertia_arr = np.asarray(neg_inertia, dtype=np.float64)
+
+    return SubsetSummary(
+        name=name,
+        pos_label=pos_label,
+        neg_label=neg_label,
+        n_pos=n_pos,
+        n_neg=n_neg,
+        eligible=True,
+        auc_inertia=float(auc_inertia),
+        auc_sim=float(auc_sim),
+        dauc_inertia_vs_chance=float(auc_inertia - CHANCE_BASELINE_AUC),
+        dauc_inertia_vs_sim=float(auc_inertia - auc_sim),
+        r_inertia_pos_mean=float(pos_inertia_arr.mean()),
+        r_inertia_pos_std=(
+            float(pos_inertia_arr.std(ddof=1))
+            if pos_inertia_arr.size > 1
+            else 0.0
+        ),
+        r_inertia_neg_mean=float(neg_inertia_arr.mean()),
+        r_inertia_neg_std=(
+            float(neg_inertia_arr.std(ddof=1))
+            if neg_inertia_arr.size > 1
+            else 0.0
+        ),
+        rationale="ELIGIBLE",
+    )
+
+
+# ===========================================================================
+# Counts-first orchestrator.
+#
+# Per the user's Fix-2: report class counts FIRST, then compute pairwise
+# AUC ONLY for subsets that pass MIN_CLASS_SIZE_FOR_AUC. Subsets that
+# don't pass return SubsetSummary(eligible=False, rationale="INSUFFICIENT_N
+# (...)").
+# ===========================================================================
+
+
+@dataclass(frozen=True)
+class ExploratoryRun:
+    """Top-level exploratory result for the JSON / MD writers."""
+
+    exploratory_schema_version: str
+    primary_phase_schema_version: str
+    primary_phase_verdict_unchanged: str
+    primary_phase_verdict_commit: str
+    benchmark: str
+    n_stimuli: int
+    label_counts: dict[str, int]
+    subsets: tuple[SubsetSummary, ...]
+    per_stimulus_labels: tuple[str, ...]
+    per_stimulus_r_inertia: tuple[float, ...]
+    per_stimulus_r_sim: tuple[float, ...]
+
+
+def run_exploratory_analysis(
+    extractions: tuple[StimulusExtraction, ...],
+) -> ExploratoryRun:
+    """Counts-first exploratory pipeline.
+
+    1. Compute features (R_inertia + R_sim) per stimulus via the §15.13
+       module's compute_features_per_stimulus.
+    2. Apply the 3-way label.
+    3. Print + record class counts BEFORE any AUC.
+    4. Compute the 4 pre-committed pairwise AUC subsets, each gated on
+       MIN_CLASS_SIZE_FOR_AUC = 10 per class.
+    """
+    n = len(extractions)
+    if n == 0:
+        raise SchemaMismatchError(
+            "EXPLORATORY: empty extraction list; nothing to analyse."
+        )
+    features = tuple(compute_features_per_stimulus(e) for e in extractions)
+    labels = classify_all(extractions)
+    counts = label_counts(labels)
+
+    print(
+        f"  exploratory class counts (before any AUC):",
+        flush=True,
+    )
+    print(f"    TOTAL          : {counts['TOTAL']}", flush=True)
+    print(f"    CORRECT        : {counts[LABEL_CORRECT]}", flush=True)
+    print(f"    REFUSAL        : {counts[LABEL_REFUSAL]}", flush=True)
+    print(
+        f"    CONFIDENT_WRONG: {counts[LABEL_CONFIDENT_WRONG]}",
+        flush=True,
+    )
+
+    # Pre-committed subsets (PINNED).
+    subset_specs = (
+        (
+            "all_stimuli_sanity",
+            (LABEL_CORRECT,),
+            (LABEL_REFUSAL, LABEL_CONFIDENT_WRONG),
+        ),
+        (
+            "correct_vs_confident_wrong",
+            (LABEL_CORRECT,),
+            (LABEL_CONFIDENT_WRONG,),
+        ),
+        (
+            "correct_vs_refusal",
+            (LABEL_CORRECT,),
+            (LABEL_REFUSAL,),
+        ),
+        (
+            "confident_wrong_vs_refusal",
+            (LABEL_CONFIDENT_WRONG,),
+            (LABEL_REFUSAL,),
+        ),
+    )
+    summaries: list[SubsetSummary] = []
+    for name, pos_classes, neg_classes in subset_specs:
+        s = compute_subset_summary(
+            name, pos_classes, neg_classes, features, labels
+        )
+        summaries.append(s)
+        if s.eligible:
+            print(
+                f"    [{name}] n_pos={s.n_pos}, n_neg={s.n_neg}, "
+                f"AUC(inertia)={s.auc_inertia:.4f} "
+                f"(ΔAUC chance {s.dauc_inertia_vs_chance:+.4f}; "
+                f"ΔAUC sim {s.dauc_inertia_vs_sim:+.4f}) | "
+                f"AUC(sim)={s.auc_sim:.4f}",
+                flush=True,
+            )
+        else:
+            print(
+                f"    [{name}] {s.rationale}",
+                flush=True,
+            )
+
+    return ExploratoryRun(
+        exploratory_schema_version=EXPLORATORY_SCHEMA_VERSION,
+        primary_phase_schema_version=PRIMARY_SCHEMA_VERSION,
+        primary_phase_verdict_unchanged=PRIMARY_VERDICT,
+        primary_phase_verdict_commit=PRIMARY_VERDICT_COMMIT,
+        benchmark=BENCHMARK,
+        n_stimuli=n,
+        label_counts=counts,
+        subsets=tuple(summaries),
+        per_stimulus_labels=labels,
+        per_stimulus_r_inertia=tuple(float(f.r_inertia) for f in features),
+        per_stimulus_r_sim=tuple(float(f.r_sim) for f in features),
+    )
