@@ -923,15 +923,52 @@ NLI_MODEL_ID = "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli"
 # ---------------------------------------------------------------------------
 
 
+def _normalize_chat_template_output(out, *, device):
+    """Normalize `apply_chat_template` output to a 2-D LongTensor on `device`.
+
+    Across transformers versions, `apply_chat_template(..., tokenize=True,
+    return_tensors='pt')` may return either a raw Tensor (older default)
+    or a BatchEncoding / dict containing 'input_ids' (newer default when
+    return_dict is implicit). This helper accepts both shapes and yields
+    the input_ids tensor moved to `device`.
+    """
+    import torch
+
+    if isinstance(out, torch.Tensor):
+        ids = out
+    elif hasattr(out, "input_ids") and isinstance(
+        out.input_ids, torch.Tensor
+    ):
+        ids = out.input_ids
+    else:
+        try:
+            candidate = out["input_ids"]
+        except (KeyError, TypeError) as exc:
+            raise RuntimeError(
+                f"EXTRACTION_FAILED: apply_chat_template returned "
+                f"unexpected type {type(out).__name__}; expected Tensor "
+                f"or BatchEncoding/dict with 'input_ids'."
+            ) from exc
+        if not isinstance(candidate, torch.Tensor):
+            raise RuntimeError(
+                f"EXTRACTION_FAILED: apply_chat_template 'input_ids' is "
+                f"{type(candidate).__name__}, expected torch.Tensor."
+            )
+        ids = candidate
+    if ids.dim() == 1:
+        ids = ids.unsqueeze(0)
+    return ids.to(device)
+
+
 def _build_chat_prompt_q_only_ids(tokenizer, q_text: str, *, device):
     """Tokenize chat-template prompt for [SYS][USER]q_text[ASSISTANT]_."""
     msgs = [{"role": "user", "content": q_text}]
-    input_ids = tokenizer.apply_chat_template(
+    out = tokenizer.apply_chat_template(
         msgs,
         add_generation_prompt=True,
         return_tensors="pt",
-    ).to(device)
-    return input_ids
+    )
+    return _normalize_chat_template_output(out, device=device)
 
 
 def _build_chat_prompt_multiturn_ids(
@@ -946,12 +983,12 @@ def _build_chat_prompt_multiturn_ids(
         {"role": "assistant", "content": r_a_text},
         {"role": "user", "content": q_b_text},
     ]
-    input_ids = tokenizer.apply_chat_template(
+    out = tokenizer.apply_chat_template(
         msgs,
         add_generation_prompt=True,
         return_tensors="pt",
-    ).to(device)
-    return input_ids
+    )
+    return _normalize_chat_template_output(out, device=device)
 
 
 def _resolve_chat_end_token_ids(tokenizer) -> set[int]:
