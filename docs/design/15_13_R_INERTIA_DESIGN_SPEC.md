@@ -594,3 +594,167 @@ Approximate size: 4 × 100 × 3584 × 4 bytes ≈ 5.6 MB + text overhead.
    firewall-scanned).
 
 ---
+
+## Class-3 firewall patterns (44 total)
+
+The firewall scans rendered markdown for forbidden override-language before
+write. Each pattern is matched case-insensitively for non-§ patterns and
+case-sensitively / literal for §-anchored patterns (preserves precise §-
+numbering). Detection → exit code 4 (`INTERPRETATION_VIOLATION`) without
+writing.
+
+### Inherited from §15.10 / §15.7 (16 patterns)
+
+```
+"verdict was wrong"
+"verdict is wrong"
+"should be re-classified"
+"should be reclassified"
+"is invalid because"
+"§13.9 should be relaxed"
+"§13.9 hold should be"
+"§13.9 hold can be"
+"§15.8 authorized"
+"§15.8 is authorized"
+"§6.1 is strengthened"
+"autonomy result is strengthened"
+"actually STRONG"
+"should be classified as STRONG"
+"actually PARTIAL despite"
+"STRONG despite the cascade"
+```
+
+### Inherited from §15.11 (10 patterns)
+
+```
+"actually STRONG_SIGNAL_IN_PHASE_COHERENCE despite"
+"should be STRONG_SIGNAL_IN_PHASE_COHERENCE"
+"actually PARTIAL_SIGNAL_IN_PHASE_COHERENCE despite"
+"should be classified as PARTIAL_SIGNAL_IN_PHASE_COHERENCE"
+"the wrong-direction failure should be flipped"
+"the direction gate should be relaxed"
+"the BCVF-faithful direction was wrong"
+"§15.10 PARTIAL is overturned"
+"§15.10 verdict is overturned"
+"§13.10 baseline should be replaced"
+```
+
+### Inherited from §15.12 (10 patterns)
+
+```
+"§15.10 PARTIAL was wrong"
+"§15.10 PARTIAL should be relaxed"
+"§15.11 NO_MATERIAL should be relaxed"
+"§15.11 direction gate should be relaxed"
+"the bootstrap test was inappropriate"
+"the bootstrap test should be replaced"
+"§15.12 closure should be reopened"
+"§15.12 should authorize REOPEN"
+"§6.1 N=21 sign test was wrong"
+"the autonomy result is invalidated"
+```
+
+### §15.13-specific (8 patterns)
+
+```
+"actually STRONG_SIGNAL_IN_INERTIA despite"
+"should be STRONG_SIGNAL_IN_INERTIA"
+"actually PARTIAL_SIGNAL_IN_INERTIA despite"
+"should be classified as PARTIAL_SIGNAL_IN_INERTIA"
+"the R_sim comparator should be ignored"
+"the same-family pairing was a mistake"
+"the pooling over R_A tokens was wrong"
+"the chance baseline alone is sufficient"
+```
+
+**Total: 44 patterns.** PINNED. The implementation script must include all
+44; the self-test gate must verify each is flagged on a positive sample
+and clean §15.13-style text produces zero false positives.
+
+---
+
+## Implementation chunk plan
+
+The implementation should follow the established §15.10 / §15.11 chunked
+pattern: each chunk a separate commit, each with its own verification step.
+
+### Recommended file path
+
+```
+scripts/probe_inertia_15_13.py
+```
+
+### Chunked plan
+
+| Chunk | Content | Approximate size |
+|-------|---------|------------------|
+| **I-1** | Module docstring (embedded §0.8 declaration), pinned constants block (matching this spec exactly), 5 dataclasses (`StimulusPair`, `StimulusExtraction`, `StimulusFeatures`, `InertiaProbeResult`, `InertiaCascadeVerdict`, `InertiaAuditOutputs`), 12 self-test cascade boundary cases. | ~350 lines |
+| **I-2** | `SchemaMismatchError`, `_validate_s13_10_dump` (mirrors §15.10/§15.11 with optional `question` field + duplicate-q_idx check), `_load_questions_and_gold_from_hf_dataset`, `load_truthfulqa_labels`, `construct_stimulus_pairs` (applies pairing rule), lazy torch+transformers import, `extract_stimulus_three_passes` (Pass 1 + Pass 2 + Pass 3), `save/load_extractions_cache`. | ~400 lines |
+| **I-3** | `compute_features_per_stimulus` (R_inertia + R_sim + cosine extracts), `_lazy_import_sklearn`, `_selective_kappa_at_alpha` (matches §15.11), `run_inertia_probe` (full per-run pipeline producing `InertiaProbeResult`), `classify_cascade_inertia` (3-step cascade with direction gate + 2-comparator STRONG/PARTIAL). | ~300 lines |
+| **I-4a** | `scan_for_forbidden_patterns` (case-insensitive non-§; literal §-anchored), `enforce_firewall_or_exit` (exits 4 with diagnostic). | ~50 lines |
+| **I-4b** | Self-test gate: `_self_test_cascade` (12 cases), `_self_test_cosine_invariants` (cosine identity + symmetry on synthetic data), `_self_test_firewall` (44-pattern coverage + clean negative), `run_self_test` (orchestrates 3 sub-tests, returns 0/3). | ~150 lines |
+| **I-4c** | JSON output writer: `_dataclass_to_dict` helpers, `write_json_output` with full schema_version "15.13" payload. | ~100 lines |
+| **I-4d** | Markdown rendering: `render_markdown_report` (8 sections per spec), `write_markdown_output` (firewall-scanned before write), `_format_operating_points_table`. | ~250 lines |
+| **I-5** | `_run_extraction` (orchestrates all 100 stimuli with shared model load), `_run_probes` (computes features + cascade), `_print_verdict_banner`, `_build_argparser`, `main(argv)` (CLI: `--self-test` / `--extract-only` / `--probe-only` / default). | ~250 lines |
+
+**Total: ~1850 lines** (slightly less than `probe_phase_coherence_15_11.py`).
+
+### Exit codes (PINNED)
+
+```
+0  success
+2  CLI / argument error (handled by argparse)
+3  SELF_TEST_FAILED
+4  INTERPRETATION_VIOLATION
+5  SCHEMA_MISMATCH (label dump or cache)
+6  EXTRACTION_FAILED (torch / transformers stack)
+7  PROBE_FAILED (sklearn / NaN in features)
+8  NLI_SCORING_FAILED (DeBERTa scoring stack failure)
+```
+
+Exit code 8 is §15.13-specific — captures NLI scoring failures distinct
+from generic probe failures. The §13.10-style NLI machinery is loaded
+during Pass 2 label scoring; if it fails, the diagnostic is unambiguous.
+
+### CLI modes (PINNED)
+
+```
+--self-test     : run gate only (12 cascade + cosine invariants + 44-pattern firewall)
+--extract-only  : labels + 3-pass extraction per stimulus + write .npz cache
+--probe-only    : load cache + compute features + cascade + write outputs
+(default)       : self-test → extract (or load cache) → probe → write
+--cache-path    : override default cache path
+--json-out      : override default JSON output path
+--md-out        : override default markdown output path
+--force-extract : force re-extraction even if cache exists
+```
+
+---
+
+## Cost / timeline
+
+### Sandbox + design work
+- Spec writing (this document): done.
+- Implementation chunks I-1 through I-5: estimated 8 commits, similar pace
+  to §15.11 implementation. ~1 working session including verification
+  between chunks.
+
+### Runpod execution
+- Per stimulus: 3 forward passes + 2 generations of 64 tokens.
+- Total: ~300 forwards + ~12,800 token-generations.
+- Wall time on a 24GB GPU: **~15–20 min**, comparable to §15.10's full
+  pipeline.
+- Cache size: **~5.6 MB** (4 hidden-state arrays + 2 text arrays).
+- DeBERTa-v3 NLI scoring: ~1 sec per stimulus × 100 = ~2 min additional.
+
+### Total wall time
+~20–25 min runpod time for the full pipeline. Cheaper than §15.11.
+
+### Disk footprint
+- Cache: ~5.6 MB.
+- JSON output: ~10 KB.
+- Markdown output: ~6 KB.
+- Total new artifacts on disk: ~5.6 MB committable, plus ~16 KB committable
+  documentation.
+
+---
