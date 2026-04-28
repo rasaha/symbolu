@@ -376,3 +376,221 @@ For the pinned alphas `α ∈ {0.35, 0.50, 0.75}`, compute κ@α using
 output for transparency but do NOT enter the cascade decision.**
 
 ---
+
+## Cascade structure
+
+### Pinned thresholds (numerically identical to §15.10 / §15.11)
+
+```
+STRONG_AUC_THRESHOLD          = 0.75   # inclusive
+STRONG_DELTA_AUC_THRESHOLD    = 0.05   # inclusive (vs both chance and R_sim)
+PARTIAL_AUC_THRESHOLD         = 0.66   # inclusive
+DIRECTION_GATE_THRESHOLD      = 0.5    # strict (auc_inertia < 0.5 fails)
+CHANCE_BASELINE_AUC           = 0.5
+```
+
+The threshold values match §15.10 / §15.11 for cross-phase comparability.
+
+### Cascade decision (mechanical, in order)
+
+Inputs: `auc_inertia`, `auc_sim`. Both are `AUC(-R_*, y)` form (higher =
+better signal in the BCVF-faithful direction).
+
+**Step 1 — Direction gate (PINNED).**
+
+> If `auc_inertia < 0.5` → label = `NO_MATERIAL_SIGNAL_IN_INERTIA`,
+> rationale = "wrong-direction failure: BCVF-faithful direction (lower
+> R_inertia predicts correct) did not hold (auc_inertia = X < 0.5)".
+> Skip remaining steps.
+
+This is the §0.8 enforcement of the pinned BCVF-faithful direction. Failing
+it on the only benchmark is a hypothesis failure, not a sign-flip
+opportunity. Mirrors §15.11.
+
+**Step 2 — STRONG check.**
+
+> If
+> - `auc_inertia ≥ 0.75` AND
+> - `(auc_inertia − 0.5) ≥ 0.05` AND
+> - `(auc_inertia − auc_sim) ≥ 0.05`
+>
+> → label = `STRONG_SIGNAL_IN_INERTIA`.
+
+The third condition is the strict-comparator requirement: R_inertia must
+beat the topic-similarity baseline by the cascade margin.
+
+**Step 3 — PARTIAL check.**
+
+> If not STRONG, AND
+> - `auc_inertia ≥ 0.66` AND
+> - `(auc_inertia − 0.5) > 0` AND
+> - `(auc_inertia − auc_sim) > 0`
+>
+> → label = `PARTIAL_SIGNAL_IN_INERTIA`.
+
+The second condition is automatically satisfied by `auc_inertia ≥ 0.66 >
+0.5`, but is stated explicitly for symmetry with §15.10 / §15.11.
+
+**Step 4 — Default.**
+
+> Otherwise → label = `NO_MATERIAL_SIGNAL_IN_INERTIA`.
+
+### What the cascade does NOT consider
+
+- The κ@α selective-prediction operating points (disclosure only).
+- Any per-stimulus diagnostic (R_inertia distribution, individual cosine
+  values, etc.).
+- §15.10's HaluEval-QA / TruthfulQA-MC AUCs or §15.11's phase-coherence
+  AUCs (different mechanism classes; not comparable input).
+- Whether `R_sim` itself clears chance — only the *difference*
+  `(auc_inertia − auc_sim)` matters.
+
+### Pinned self-test boundary cases (12 cases)
+
+Each entry: `(auc_inertia, auc_sim, expected_label)`. The implementation
+script must pass all 12 at the self-test gate before any data inspection.
+
+| #   | auc_inertia | auc_sim | rationale                                              | expected                         |
+|-----|-------------|---------|--------------------------------------------------------|----------------------------------|
+|  1  | 0.80        | 0.65    | STRONG clean (clears all 3 conditions)                 | STRONG_SIGNAL_IN_INERTIA         |
+|  2  | 0.75        | 0.70    | STRONG boundary at AUC=0.75 + ΔAUC sim=0.05 inclusive  | STRONG_SIGNAL_IN_INERTIA         |
+|  3  | 0.78        | 0.20    | STRONG well above sim                                  | STRONG_SIGNAL_IN_INERTIA         |
+|  4  | 0.74        | 0.65    | PARTIAL via AUC just below 0.75; ΔAUC sim=0.09>0       | PARTIAL_SIGNAL_IN_INERTIA        |
+|  5  | 0.78        | 0.74    | PARTIAL via ΔAUC sim=0.04<0.05 but >0                  | PARTIAL_SIGNAL_IN_INERTIA        |
+|  6  | 0.66        | 0.65    | PARTIAL boundary at AUC=0.66 inclusive; ΔAUC sim=0.01  | PARTIAL_SIGNAL_IN_INERTIA        |
+|  7  | 0.65        | 0.50    | NO_MATERIAL: AUC < 0.66                                | NO_MATERIAL_SIGNAL_IN_INERTIA    |
+|  8  | 0.70        | 0.70    | NO_MATERIAL: ΔAUC sim = 0 (not > 0)                    | NO_MATERIAL_SIGNAL_IN_INERTIA    |
+|  9  | 0.70        | 0.72    | NO_MATERIAL: ΔAUC sim < 0 (R_inertia worse than sim)   | NO_MATERIAL_SIGNAL_IN_INERTIA    |
+| 10  | 0.50        | 0.30    | NO_MATERIAL: direction gate inclusive at 0.5; AUC<0.66 | NO_MATERIAL_SIGNAL_IN_INERTIA    |
+| 11  | 0.49        | 0.65    | NO_MATERIAL: direction gate strict (auc_inertia<0.5)   | NO_MATERIAL_SIGNAL_IN_INERTIA    |
+| 12  | 0.40        | 0.40    | NO_MATERIAL: direction gate (both wrong-direction)     | NO_MATERIAL_SIGNAL_IN_INERTIA    |
+
+Coverage rationale:
+- Cases 1–3: STRONG band entries (clean, two boundary inclusive at 0.75 +
+  0.05, well-separated from sim).
+- Cases 4–6: PARTIAL band entries (AUC just-below-STRONG; ΔAUC sim
+  just-below-STRONG; AUC=0.66 boundary inclusive).
+- Cases 7–9: NO_MATERIAL via cascade-condition failure (AUC<0.66; ΔAUC sim
+  =0 strictly; ΔAUC sim<0).
+- Cases 10–12: NO_MATERIAL via direction-gate failure (inclusive at 0.5;
+  strict below 0.5; both wrong-direction).
+
+---
+
+## Output schema
+
+### `docs/experiments/probe_inertia_15_13.json` (`schema_version = "15.13"`)
+
+Top-level keys (alphabetical for `sort_keys=True` parity with §15.10 /
+§15.11 / §15.12):
+
+```
+{
+  "benchmark": "truthfulqa_mc",
+  "cascade_thresholds": {
+    "strong_auc": 0.75,
+    "strong_delta_auc": 0.05,
+    "partial_auc": 0.66,
+    "direction_gate_threshold": 0.5,
+    "chance_baseline_auc": 0.5
+  },
+  "cascade_verdict": {
+    "label": "<STRONG|PARTIAL|NO_MATERIAL>_SIGNAL_IN_INERTIA",
+    "auc_inertia": <float>,
+    "auc_sim": <float>,
+    "dauc_vs_chance": <float>,
+    "dauc_vs_sim": <float>,
+    "direction_held": <bool>,
+    "rationale": "<formatted prose>"
+  },
+  "cross_phase_disclosure": {
+    "phase_1_§15_10_verdict": "PARTIAL_SIGNAL_IN_Z",
+    "phase_2_§15_11_verdict": "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE",
+    "phase_3_§15_12_status": "sealed (closure outcome pending implementation)",
+    "this_phase_modifies": "none"
+  },
+  "extraction_config": {
+    "layer_idx": -1,
+    "hidden_dim": 3584,
+    "max_new_tokens": 64,
+    "decode_temperature": 0.0,
+    "r_a_pooling": "mean_over_decoded_assistant_tokens",
+    "s_t_extraction": "last_token_pre_decode_at_second_assistant_tag",
+    "q_b_extraction": "last_token_pre_decode_standalone_with_chat_template"
+  },
+  "n_stimuli": 100,
+  "pairing_rule": "(Q_A_idx, Q_B_idx) = (i, (i + 50) mod 100) for i in 0..99",
+  "phase_4_eligible_outcomes": [
+    "STRONG_SIGNAL_IN_INERTIA",
+    "PARTIAL_SIGNAL_IN_INERTIA",
+    "NO_MATERIAL_SIGNAL_IN_INERTIA"
+  ],
+  "probe_result": {
+    "n_stimuli": 100,
+    "n_correct": <int>,
+    "n_wrong": <int>,
+    "auc_inertia": <float>,
+    "auc_sim": <float>,
+    "dauc_inertia_vs_chance": <float>,
+    "dauc_inertia_vs_sim": <float>,
+    "direction_held": <bool>,
+    "r_inertia_per_stimulus": [<100 floats>],
+    "r_sim_per_stimulus": [<100 floats>],
+    "y_per_stimulus": [<100 bools>],
+    "selective_prediction_operating_points": [
+      {"alpha": 0.35, "kappa_at_alpha": <float>, "tau_star": <float>,
+       "coverage_at_tau_star": <float>,
+       "conditional_accuracy_at_tau_star": <float>,
+       "n_admitted_at_tau_star": <int>, "eligible": <bool>},
+      {"alpha": 0.50, ...},
+      {"alpha": 0.75, ...}
+    ],
+    "kappa_at_alpha_primary": <float>,
+    "tau_star_at_alpha_primary": <float>,
+    "alpha_primary": 0.5
+  },
+  "qwen_model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "schema_version": "15.13"
+}
+```
+
+PINNED. No additional keys; no key removal.
+
+### `docs/experiments/inertia_15_13_extractions.npz` (cache file)
+
+Per-stimulus arrays, allows `--probe-only` re-runs:
+
+```
+pair_idx          int64,   shape (100,)
+q_a_idx           int64,   shape (100,)
+q_b_idx           int64,   shape (100,)
+q_a_repr          float32, shape (100, 3584)
+r_a_repr          float32, shape (100, 3584)
+s_t               float32, shape (100, 3584)
+q_b_repr          float32, shape (100, 3584)
+y                 bool,    shape (100,)
+r_a_text          object,  shape (100,)   # variable-length strings
+q_b_response_text object,  shape (100,)   # variable-length strings
+```
+
+Approximate size: 4 × 100 × 3584 × 4 bytes ≈ 5.6 MB + text overhead.
+
+### `docs/experiments/probe_inertia_15_13.md`
+
+8-section markdown report (mirrors §15.11 structure):
+
+1. Header + schema/model/extraction config one-liner.
+2. Cascade verdict (label, rationale, AUC table with chance + sim baselines).
+3. Probe details (n, AUC, ΔAUC vs both baselines, direction-held flag,
+   F-distribution summary).
+4. Selective-prediction operating points table (disclosure only).
+5. Pinned configuration block (formula, pairing rule, extraction protocol,
+   cascade thresholds, direction convention).
+6. Caveats (§0.8-disclosed; carries forward §15.10/§15.11 caveats by
+   §-reference; §15.13-specific caveats listed inline).
+7. Cross-phase comparison (Phase 1 / Phase 2 / Phase 3 / Phase 4 status
+   table, disclosure only — does not modify any phase).
+8. Audit-trail integrity (§0.8-binding; §13/§14/§15.x verdicts preserved;
+   firewall-scanned).
+
+---
