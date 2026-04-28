@@ -1832,3 +1832,208 @@ def enforce_firewall_or_exit(text: str, output_path: str) -> None:
             flush=True,
         )
         sys.exit(4)
+
+
+# ===========================================================================
+# §15.13 Chunk I-4b — self-test gate.
+#
+# Three required sub-tests (per spec §15.13 Chunk plan I-4b):
+#   1. 12 cascade boundary cases against classify_cascade_inertia.
+#   2. Cosine invariants on synthetic data (identity, symmetry,
+#      anti-parallel, orthogonality).
+#   3. Firewall coverage (44 positive + clean §15.13-style negative).
+#
+# Any failure exits 3 (SELF_TEST_FAILED). Required pre-execution gate:
+# the runpod must run `--self-test` and see exit code 0 before
+# `--extract-only` or default full pipeline per §15.13 §0.8 discipline.
+# ===========================================================================
+
+
+def _self_test_cascade() -> list[str]:
+    """Run all SELF_TEST_CASCADE_CASES; return list of failure messages."""
+    failures: list[str] = []
+    for i, (auc_inertia, auc_sim, expected) in enumerate(
+        SELF_TEST_CASCADE_CASES
+    ):
+        verdict = classify_cascade_inertia(auc_inertia, auc_sim)
+        if verdict.label != expected:
+            failures.append(
+                f"  case {i + 1}: AUC=({auc_inertia:.3f}, {auc_sim:.3f}) → "
+                f"got {verdict.label!r}, expected {expected!r}"
+            )
+    return failures
+
+
+def _self_test_cosine_invariants() -> list[str]:
+    """Synthetic cosine invariants exercised through `_cosine_fp64`.
+
+    1. Identity: cos(v, v) = 1 for non-zero v.
+    2. Anti-parallel: cos(v, -v) = -1.
+    3. Orthogonal: cos(e_i, e_j) = 0 for i != j on the standard basis.
+    4. Symmetry: cos(a, b) == cos(b, a) numerically.
+
+    These exercise the same code path used to compute cos_st_ra,
+    cos_st_qb, and cos_qa_qb on real LM hidden states. Tolerance is
+    1e-9 to match §15.11's strictness on a similar surface.
+    """
+    failures: list[str] = []
+    rng = np.random.default_rng(SEED_ENTROPY)
+
+    # 1. Identity.
+    v = rng.normal(0.0, 1.0, HIDDEN_DIM).astype(np.float32)
+    if v.dot(v) <= 0.0:
+        failures.append("  identity: synthetic vector has zero norm")
+    c_ii = _cosine_fp64(v, v)
+    if not (abs(c_ii - 1.0) <= 1e-9):
+        failures.append(
+            f"  identity: cos(v, v) = {c_ii} (expected 1; tol 1e-9)"
+        )
+
+    # 2. Anti-parallel.
+    c_anti = _cosine_fp64(v, -v)
+    if not (abs(c_anti + 1.0) <= 1e-9):
+        failures.append(
+            f"  anti-parallel: cos(v, -v) = {c_anti} (expected -1; tol 1e-9)"
+        )
+
+    # 3. Orthogonality (standard-basis vectors).
+    e_i = np.zeros(HIDDEN_DIM, dtype=np.float32)
+    e_j = np.zeros(HIDDEN_DIM, dtype=np.float32)
+    e_i[7] = 1.0
+    e_j[42] = 1.0
+    c_orth = _cosine_fp64(e_i, e_j)
+    if not (abs(c_orth) <= 1e-12):
+        failures.append(
+            f"  orthogonal: cos(e_7, e_42) = {c_orth} (expected 0; tol 1e-12)"
+        )
+
+    # 4. Symmetry.
+    a = rng.normal(0.0, 1.0, HIDDEN_DIM).astype(np.float32)
+    b = rng.normal(0.0, 1.0, HIDDEN_DIM).astype(np.float32)
+    c_ab = _cosine_fp64(a, b)
+    c_ba = _cosine_fp64(b, a)
+    if not (abs(c_ab - c_ba) <= 1e-12):
+        failures.append(
+            f"  symmetry: cos(a, b) = {c_ab} vs cos(b, a) = {c_ba} "
+            f"(expected equal; tol 1e-12)"
+        )
+    # Bonus: random pair should land within [-1, 1] up to fp epsilon.
+    if not (-1.0 - 1e-9 <= c_ab <= 1.0 + 1e-9):
+        failures.append(
+            f"  range: cos(a, b) = {c_ab} outside [-1, 1] (random pair)"
+        )
+
+    return failures
+
+
+def _self_test_firewall() -> list[str]:
+    """Verify firewall flags all 44 Class-3 patterns + clean text passes.
+
+    Positive: each pattern triggers detection when embedded in plain text.
+    Negative: a clean §15.13-style report (cascade prose + preserved-
+    verdict cross-phase references + pinned-formula expression) passes
+    without false positives.
+    """
+    failures: list[str] = []
+    if len(CLASS_3_FORBIDDEN_PATTERNS) != 44:
+        failures.append(
+            f"  pattern count: got {len(CLASS_3_FORBIDDEN_PATTERNS)}, "
+            f"expected 44 (spec §15.13 §0.8-binding)"
+        )
+    for pattern in CLASS_3_FORBIDDEN_PATTERNS:
+        sample = f"Some innocuous text. {pattern} more text."
+        if not scan_for_forbidden_patterns(sample):
+            failures.append(
+                f"  firewall failed to detect pattern: {pattern!r}"
+            )
+    clean = (
+        "The §15.13 cascade verdict is NO_MATERIAL_SIGNAL_IN_INERTIA "
+        "by mechanical readout: auc_inertia ≈ 0.51, auc_sim ≈ 0.52, "
+        "ΔAUC vs chance = +0.01, ΔAUC vs R_sim = -0.01; direction held. "
+        "§15.10 PARTIAL_SIGNAL_IN_Z preserved. §15.11 "
+        "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE preserved. §15.12 closure "
+        "preserved. §13.9 hold remains binding. §6.1 N=21 autonomy "
+        "result preserved. Pinned formula: R_inertia = cos(s_t, r_A) - "
+        "cos(s_t, q_B); BCVF-faithful direction (lower R_inertia "
+        "predicts correct). Same-family pairing is the spec's pinned "
+        "rule. The R_sim comparator entered the cascade as required."
+    )
+    spurious = scan_for_forbidden_patterns(clean)
+    if spurious:
+        failures.append(
+            f"  firewall false-positive on clean §15.13-style text: "
+            f"{spurious!r}"
+        )
+    return failures
+
+
+def run_self_test() -> int:
+    """Execute the §15.13 self-test gate; return 0 on success, 3 on failure.
+
+    Required pre-execution gate per spec: the runpod must run
+    `--self-test` and see exit 0 before `--extract-only` or default
+    full pipeline.
+    """
+    print("§15.13 self-test gate", flush=True)
+    print(f"  schema_version: {SCHEMA_VERSION}", flush=True)
+    print(f"  benchmark: {BENCHMARK}", flush=True)
+    print(f"  pinned_N: {PINNED_N}", flush=True)
+    print(f"  pairing rule: {PAIRING_RULE_DESCRIPTION}", flush=True)
+    print(
+        f"  cascade thresholds: STRONG_AUC≥{STRONG_AUC_THRESHOLD}, "
+        f"STRONG_dAUC≥+{STRONG_DELTA_AUC_THRESHOLD}, "
+        f"PARTIAL_AUC≥{PARTIAL_AUC_THRESHOLD}, "
+        f"DIRECTION_GATE={DIRECTION_GATE_THRESHOLD}",
+        flush=True,
+    )
+    print(f"  hidden_dim: {HIDDEN_DIM}, layer_idx: {LAYER_IDX}", flush=True)
+    print(f"  direction convention: {DIRECTION_CONVENTION}", flush=True)
+
+    all_failures: list[str] = []
+
+    print("  [1/3] cascade boundary cases (12)...", flush=True)
+    cascade_fail = _self_test_cascade()
+    if cascade_fail:
+        all_failures.append("CASCADE FAILURES:")
+        all_failures.extend(cascade_fail)
+    else:
+        print(
+            f"    OK: {len(SELF_TEST_CASCADE_CASES)} boundary cases pass.",
+            flush=True,
+        )
+
+    print("  [2/3] cosine invariants on synthetic data...", flush=True)
+    cosine_fail = _self_test_cosine_invariants()
+    if cosine_fail:
+        all_failures.append("COSINE FAILURES:")
+        all_failures.extend(cosine_fail)
+    else:
+        print(
+            "    OK: identity → 1, anti-parallel → -1, orthogonal → 0, "
+            "symmetry holds.",
+            flush=True,
+        )
+
+    print(
+        f"  [3/3] interpretation firewall ({len(CLASS_3_FORBIDDEN_PATTERNS)} "
+        f"patterns)...",
+        flush=True,
+    )
+    firewall_fail = _self_test_firewall()
+    if firewall_fail:
+        all_failures.append("FIREWALL FAILURES:")
+        all_failures.extend(firewall_fail)
+    else:
+        print(
+            f"    OK: firewall flags all {len(CLASS_3_FORBIDDEN_PATTERNS)} "
+            f"Class-3 patterns; clean §15.13 text passes.",
+            flush=True,
+        )
+
+    if all_failures:
+        print("\nSELF_TEST_FAILED:", flush=True)
+        for line in all_failures:
+            print(line, flush=True)
+        return 3
+    print("\nSELF_TEST_PASSED — proceed.", flush=True)
+    return 0
