@@ -17460,5 +17460,185 @@ these explicitly.
 ---
 
 
+### 15.12 Pre-commitment (continued) — JSON schema, Class-3 firewall, self-test gate, exit codes, CLI
+
+**Pinned JSON schema (`schema_version = "15.12"`).**
+
+Output path: `docs/experiments/synthesis_15_12.json`.
+
+Top-level keys (alphabetical for `sort_keys=True` parity
+with §15.10 / §15.11):
+
+```
+{
+  "audit_trail": {
+    "input_artifacts": {
+      "phase_1_json": "docs/experiments/probe_supervised_15_10.json",
+      "phase_1_commit": "a094e94",
+      "phase_2_json": "docs/experiments/probe_phase_coherence_15_11.json",
+      "phase_2_commit": "b73e319",
+      "phase_15_8_json": "docs/experiments/probe_audit_15_7.json"
+    },
+    "preserved_verdicts": [
+      "§13.9 hold (binding)",
+      "§13.10/§13.20 entropy AUC = 0.661",
+      "§15.2 MARGINAL", "§15.4 USEFUL_INTERNAL", "§15.6 REGRESSION",
+      "§15.8 MIXED + C-MISMATCHED",
+      "§15.10 PARTIAL_SIGNAL_IN_Z",
+      "§15.11 NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE"
+    ],
+    "phase_3_modifies": "none"
+  },
+  "bootstrap_config": {
+    "n_resamples": 10000,
+    "stratified": true,
+    "random_state": 15,
+    "ci_level": 0.95,
+    "ci_method": "percentile"
+  },
+  "closure_decision": {
+    "label": "<CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE | FULLY_CLOSED>",
+    "rule_invoked": "§15.10 HaluEval-QA bootstrap 95% CI on ΔAUC vs §13.10 baseline",
+    "ci_lo": <float>,
+    "ci_hi": <float>,
+    "lo_above_zero": <bool>,
+    "rationale": "<formatted prose, mechanical readout>"
+  },
+  "joint_state_matrix": [
+    {"class": 1, "name": "Unsupervised entropy", "source": "§13.10/§13.20",
+     "halueval_metric": "AUC=0.661", "truthfulqa_metric": "AUC=0.661",
+     "outcome": "Saturated at chance-corrected ceiling"},
+    {"class": 2, "name": "System-level composition",
+     "source": "§14a/§15.4/§15.6/§15.8",
+     "halueval_metric": "USEFUL_INTERNAL", "truthfulqa_metric": "REGRESSION",
+     "outcome": "MIXED + C-MISMATCHED"},
+    {"class": 3, "name": "Supervised linear (Phase 1)", "source": "§15.10",
+     "halueval_metric": "AUC=0.6686, ΔAUC=+0.008",
+     "truthfulqa_metric": "AUC=0.6224, ΔAUC=−0.039",
+     "outcome": "PARTIAL_SIGNAL_IN_Z"},
+    {"class": 4, "name": "Layer-wise phase coherence (Phase 2)",
+     "source": "§15.11",
+     "halueval_metric": "AUC=0.4610, ΔAUC=−0.200",
+     "truthfulqa_metric": "AUC=0.4853, ΔAUC=−0.176",
+     "outcome": "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE"}
+  ],
+  "phase_3_authorization_path": {
+    "phase_2_outcome": "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE",
+    "eligible_closures": [
+      "CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE",
+      "FULLY_CLOSED"
+    ],
+    "ineligible_closures": [
+      "CLOSED_OPERATIONALLY_BUT_BCVF_FAITHFUL_REOPENING_POSSIBLE",
+      "REOPEN_LATER_UNDER_NEW_HYPOTHESIS_CLASS"
+    ]
+  },
+  "schema_version": "15.12"
+}
+```
+
+PINNED. No additional keys; no key removal. The JSON is
+the canonical machine-readable record of §15.12's
+decision.
+
+**Pinned Class-3 forbidden patterns — §15.12-specific (10 new).**
+
+Inherits §15.11's 26-pattern set (which inherits §15.10's
+16-pattern set). Adds **10 §15.12-specific** patterns:
+
+```
+"§15.10 PARTIAL was wrong"
+"§15.10 PARTIAL should be relaxed"
+"§15.11 NO_MATERIAL should be relaxed"
+"§15.11 direction gate should be relaxed"
+"the bootstrap test was inappropriate"
+"the bootstrap test should be replaced"
+"§15.12 closure should be reopened"
+"§15.12 should authorize REOPEN"
+"§6.1 N=21 sign test was wrong"
+"the autonomy result is invalidated"
+```
+
+Total firewall coverage at §15.12: **36 patterns**
+(16 §15.10 + 10 §15.11 + 10 §15.12). PINNED.
+
+**Pinned exit codes.**
+
+```
+0  success
+2  CLI / argument error (handled by argparse)
+3  SELF_TEST_FAILED
+4  INTERPRETATION_VIOLATION
+5  SCHEMA_MISMATCH (input JSON or unexpected verdict label)
+8  INPUT_MISSING (Phase 1 or Phase 2 JSON not on disk)
+9  CLOSURE_INFEASIBLE (Phase 2 outcome is not the §15.11 mapping anticipated;
+                       would require fresh §0.8)
+```
+
+Exit code 9 is **§15.12-specific**. It fires if the input
+JSON's `cascade_verdict.label` is something other than
+`NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE` (e.g., a future
+re-run produced PARTIAL or STRONG instead). In that case,
+the §15.11 → §15.12 authorization mapping would no longer
+apply, and the user must surface a fresh §0.8 amendment
+before §15.12 can run. PINNED.
+
+**Pinned self-test gate composition.**
+
+Three sub-tests; mirrors the §15.10 / §15.11 pattern. Any
+failure → exit 3.
+
+1. **Closure-rule boundary cases (4 cases per the closure
+   block above):** the script must call the closure-rule
+   function on synthetic `(ci_lo, ci_hi)` inputs and
+   verify the expected closure label. Already pinned.
+2. **Bootstrap procedure smoke test (3 synthetic cases):**
+   the script must call the bootstrap-CI function on
+   three synthetic inputs:
+   - **Perfectly separable:** `y = [1]*50 + [0]*50`,
+     `p = [0.9]*50 + [0.1]*50` → AUC = 1.0;
+     ΔAUC = +0.339; CI lo > 0 (clearly).
+   - **Random with no signal:** `y` permuted randomly,
+     `p` random → AUC ≈ 0.5; ΔAUC ≈ −0.161; CI must
+     contain 0 (verified deterministic at the pinned
+     seed; check `ci_lo ≤ 0`).
+   - **Borderline positive:** `y / p` constructed so
+     AUC = 0.671 exactly (ΔAUC = +0.010) → bootstrap CI
+     lo at borderline; verify deterministic at the
+     pinned seed.
+3. **Interpretation firewall (36-pattern coverage):**
+   each of the 36 Class-3 patterns must be flagged on a
+   positive sample. Clean §15.12-style text (referencing
+   §15.10's PARTIAL_SIGNAL_IN_Z, §15.11's
+   NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE, the bootstrap
+   test, the §13.9 hold) must produce zero violations.
+
+All three sub-tests must pass before any input JSON is
+read. PINNED.
+
+**Implementation script naming and CLI.**
+
+Script path: `scripts/probe_synthesis_15_12.py` (mirrors
+§15.10 / §15.11 naming).
+
+CLI modes (mutually exclusive):
+
+```
+--self-test     : run gate only (closure-rule cases + bootstrap smoke test
+                  + 36-pattern firewall)
+--dry-run       : load inputs, compute closure decision, print to stdout,
+                  do NOT write files
+(default)       : self-test → load inputs → bootstrap → closure decision
+                  → render + firewall + write 7 artifacts
+```
+
+PINNED. No `--extract-only` / `--probe-only` (no GPU work,
+no extraction); no `--force-*` flags (idempotent — running
+twice produces identical outputs given identical inputs
+and seed = 15).
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
