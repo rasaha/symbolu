@@ -175,6 +175,9 @@ FIELD_QUESTION = "question"
 # Optional gold-answer field name in the §13.10 dump (per §13.10 producer).
 # If absent, fall back to HF dataset's mc1_targets.
 FIELD_CORRECT_CHOICE = "correct_choice"
+# Optional distractors field name in the §13.10 dump. Required by §13.10
+# label_correctness (the NLI scoring helper); falls back to HF mc1_targets.
+FIELD_DISTRACTORS = "distractors"
 
 # Pinned cross-phase disclosure values (verdicts-of-record from prior
 # §15.x phases; carried forward for the cross-phase-comparison section
@@ -333,6 +336,7 @@ class StimulusPair:
     q_a_text: str
     q_b_text: str
     q_b_correct_choice: str
+    q_b_distractors: tuple[str, ...]   # required by §13.10 label_correctness
     s13_10_correct_q_a: bool  # disclosure-only sanity
     s13_10_correct_q_b: bool  # disclosure-only sanity
 
@@ -489,3 +493,884 @@ assert len(SELF_TEST_CASCADE_CASES) == 12, (
     f"§15.13 spec pins 12 self-test cascade cases; got "
     f"{len(SELF_TEST_CASCADE_CASES)}."
 )
+
+
+# ===========================================================================
+# §15.13 Chunk I-2 — schema validators, label/question/gold loader,
+# stimulus-pair construction, lazy torch+transformers import, three-pass
+# extraction (Pass 1 generate R_A + extract q_A,r_A; Pass 2 multi-turn
+# forward + extract s_t + decode Q_B response + NLI score y; Pass 3
+# standalone Q_B forward + extract q_B), .npz cache I/O.
+#
+# Mirrors §15.10/§15.11 schema-validation tightenings F1 (question
+# optional + HF fallback) and F2 (duplicate-q_idx check). Extraction
+# differs from §15.11 in that it gathers four hidden-state vectors per
+# stimulus (q_A, r_A, s_t, q_B) at LAYER_IDX = -1 only, plus generates
+# Q_B's response and runs §13.10-style NLI for the y label.
+# ===========================================================================
+
+
+class SchemaMismatchError(RuntimeError):
+    """Raised when a §13.10 dump or §15.13 cache fails schema validation."""
+
+
+def _validate_s13_10_dump(payload: object, source_path: str) -> list[dict]:
+    """Validate top-level shape of a §13.10 dump and return per-question records.
+
+    Required fields per record: q_idx (int) + greedy_matches_correct (bool).
+    Optional fields: 'question' (str) and 'correct_choice' (str). If absent
+    on any record, load_truthfulqa_labels falls back to the HuggingFace
+    dataset by q_idx alignment.
+
+    Duplicate q_idx triggers SCHEMA_MISMATCH (matches §15.7/§15.10/§15.11
+    hardening; ascending alignment would be ambiguous).
+    """
+    if isinstance(payload, list):
+        records = payload
+    elif isinstance(payload, dict):
+        for key in ("per_question", "records", "questions"):
+            if key in payload and isinstance(payload[key], list):
+                records = payload[key]
+                break
+        else:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} top-level dict has no "
+                f"'per_question'/'records'/'questions' list."
+            )
+    else:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: {source_path} top-level is "
+            f"{type(payload).__name__}, expected list or dict."
+        )
+
+    if len(records) < PINNED_N:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: {source_path} has {len(records)} records, "
+            f"need at least {PINNED_N}."
+        )
+
+    seen_qids: set[int] = set()
+    for i, rec in enumerate(records[:PINNED_N]):
+        if not isinstance(rec, dict):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} is "
+                f"{type(rec).__name__}, expected dict."
+            )
+        for required in (FIELD_QID, FIELD_CORRECT):
+            if required not in rec:
+                raise SchemaMismatchError(
+                    f"SCHEMA_MISMATCH: {source_path} record {i} missing "
+                    f"required field '{required}'."
+                )
+        if not isinstance(rec[FIELD_QID], int):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                f"'{FIELD_QID}' is {type(rec[FIELD_QID]).__name__}, "
+                f"expected int."
+            )
+        if not isinstance(rec[FIELD_CORRECT], bool):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                f"'{FIELD_CORRECT}' is "
+                f"{type(rec[FIELD_CORRECT]).__name__}, expected bool."
+            )
+        if FIELD_QUESTION in rec and not isinstance(rec[FIELD_QUESTION], str):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                f"'{FIELD_QUESTION}' is "
+                f"{type(rec[FIELD_QUESTION]).__name__}, expected str."
+            )
+        if FIELD_CORRECT_CHOICE in rec and not isinstance(
+            rec[FIELD_CORRECT_CHOICE], str
+        ):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                f"'{FIELD_CORRECT_CHOICE}' is "
+                f"{type(rec[FIELD_CORRECT_CHOICE]).__name__}, expected str."
+            )
+        if FIELD_DISTRACTORS in rec:
+            distractors = rec[FIELD_DISTRACTORS]
+            if not isinstance(distractors, list) or not all(
+                isinstance(d, str) for d in distractors
+            ):
+                raise SchemaMismatchError(
+                    f"SCHEMA_MISMATCH: {source_path} record {i} field "
+                    f"'{FIELD_DISTRACTORS}' must be a list[str]; got "
+                    f"{type(distractors).__name__}."
+                )
+        qid = int(rec[FIELD_QID])
+        if qid in seen_qids:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: {source_path} record {i} duplicate "
+                f"q_idx={qid}; ascending alignment would be ambiguous."
+            )
+        seen_qids.add(qid)
+    return records
+
+
+def _load_questions_and_gold_from_hf_dataset(
+    q_ids: tuple[int, ...],
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[tuple[str, ...], ...]]:
+    """Load TruthfulQA-MC question text + gold mc1 choice + distractors by
+    q_idx alignment.
+
+    Mirrors §13.10 producer's enumerate-after-select indexing
+    (`scripts/probe_semantic_entropy.py`): q_idx corresponds to row index
+    in the validation split.
+
+    Returns (questions, gold_choices, distractors) tuples aligned with
+    `q_ids`. Gold choice is `mc1_targets["choices"][i]` where
+    `i = labels.index(1)`. Distractors are all OTHER mc1 choices (i.e.,
+    those with label 0), matching §13.10's `label_correctness`
+    distractor list semantics.
+    """
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise ImportError(
+            "§15.13 question/gold-text fallback requires the `datasets` "
+            "library. Either ensure §13.10 dump records contain "
+            f"'{FIELD_QUESTION}', '{FIELD_CORRECT_CHOICE}', and "
+            f"'{FIELD_DISTRACTORS}', or install `datasets` on the runpod."
+        ) from exc
+
+    ds = load_dataset(
+        "truthful_qa", "multiple_choice", split="validation"
+    )
+    n_max = max(q_ids) + 1 if q_ids else 0
+    if len(ds) < n_max:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: HF TruthfulQA-MC validation has only "
+            f"{len(ds)} rows; need at least {n_max} for q_idx alignment."
+        )
+    ds = ds.select(range(n_max))
+    questions: list[str] = []
+    gold_choices: list[str] = []
+    distractors_per: list[tuple[str, ...]] = []
+    for q_id in q_ids:
+        row = ds[int(q_id)]
+        questions.append(str(row["question"]))
+        mc1 = row.get("mc1_targets") or {}
+        choices = mc1.get("choices") or []
+        labels = mc1.get("labels") or []
+        if len(choices) != len(labels) or 1 not in labels:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: HF TruthfulQA-MC q_idx={q_id} has no "
+                f"single mc1 correct label; choices={len(choices)}, "
+                f"labels={labels!r}."
+            )
+        gold_idx = labels.index(1)
+        gold_choices.append(str(choices[gold_idx]))
+        distractors_per.append(
+            tuple(str(c) for c, lb in zip(choices, labels) if lb == 0)
+        )
+    return tuple(questions), tuple(gold_choices), tuple(distractors_per)
+
+
+def load_truthfulqa_labels() -> tuple[
+    tuple[int, ...],
+    tuple[str, ...],
+    tuple[str, ...],
+    tuple[tuple[str, ...], ...],
+    tuple[bool, ...],
+]:
+    """Load first PINNED_N records from the §13.10 TruthfulQA-MC dump.
+
+    Returns (q_ids, questions, gold_choices, distractors_per, s13_10_
+    correctness) tuples, each of length PINNED_N, aligned by record
+    order in the dump.
+
+    Question text, gold choice, and distractors come from the dump
+    fields if all records have them; missing fields fall back to the
+    HuggingFace TruthfulQA-MC validation split by q_idx alignment. A
+    single HF load covers all missing fields when needed.
+
+    The s13_10_correctness booleans are carried forward as disclosure-
+    only sanity values; the actual y label used by the cascade is
+    recomputed per spec via §13.10-style NLI on the Q_B response in
+    Pass 2 (premise = Q_B + response; hypotheses = Q_B + correct,
+    Q_B + each distractor).
+    """
+    dump_path = Path(INPUT_S13_10_TRUTHFULQA)
+    if not dump_path.exists():
+        raise FileNotFoundError(
+            f"§13.10 TruthfulQA-MC dump not found: {dump_path}. "
+            f"Required for §15.13 q_idx alignment."
+        )
+    with dump_path.open("r", encoding="utf-8") as f:
+        payload = json.load(f)
+    records = _validate_s13_10_dump(payload, str(dump_path))
+    head = records[:PINNED_N]
+    q_ids = tuple(int(r[FIELD_QID]) for r in head)
+    correctness = tuple(bool(r[FIELD_CORRECT]) for r in head)
+
+    has_dump_questions = all(
+        FIELD_QUESTION in r
+        and isinstance(r[FIELD_QUESTION], str)
+        and r[FIELD_QUESTION]
+        for r in head
+    )
+    has_dump_gold = all(
+        FIELD_CORRECT_CHOICE in r
+        and isinstance(r[FIELD_CORRECT_CHOICE], str)
+        and r[FIELD_CORRECT_CHOICE]
+        for r in head
+    )
+    has_dump_distractors = all(
+        FIELD_DISTRACTORS in r
+        and isinstance(r[FIELD_DISTRACTORS], list)
+        and all(isinstance(d, str) for d in r[FIELD_DISTRACTORS])
+        for r in head
+    )
+
+    if has_dump_questions and has_dump_gold and has_dump_distractors:
+        questions = tuple(str(r[FIELD_QUESTION]) for r in head)
+        gold_choices = tuple(str(r[FIELD_CORRECT_CHOICE]) for r in head)
+        distractors_per = tuple(
+            tuple(str(d) for d in r[FIELD_DISTRACTORS]) for r in head
+        )
+    else:
+        missing = []
+        if not has_dump_questions:
+            missing.append(f"'{FIELD_QUESTION}'")
+        if not has_dump_gold:
+            missing.append(f"'{FIELD_CORRECT_CHOICE}'")
+        if not has_dump_distractors:
+            missing.append(f"'{FIELD_DISTRACTORS}'")
+        print(
+            f"  truthfulqa_mc: dump lacks {', '.join(missing)} on at least "
+            f"one record; loading from HuggingFace dataset by q_idx.",
+            flush=True,
+        )
+        hf_questions, hf_gold, hf_distractors = (
+            _load_questions_and_gold_from_hf_dataset(q_ids)
+        )
+        questions = (
+            tuple(str(r[FIELD_QUESTION]) for r in head)
+            if has_dump_questions
+            else hf_questions
+        )
+        gold_choices = (
+            tuple(str(r[FIELD_CORRECT_CHOICE]) for r in head)
+            if has_dump_gold
+            else hf_gold
+        )
+        distractors_per = (
+            tuple(
+                tuple(str(d) for d in r[FIELD_DISTRACTORS]) for r in head
+            )
+            if has_dump_distractors
+            else hf_distractors
+        )
+
+    return q_ids, questions, gold_choices, distractors_per, correctness
+
+
+def construct_stimulus_pairs(
+    q_ids: tuple[int, ...],
+    questions: tuple[str, ...],
+    gold_choices: tuple[str, ...],
+    distractors_per: tuple[tuple[str, ...], ...],
+    s13_10_correctness: tuple[bool, ...],
+) -> tuple[StimulusPair, ...]:
+    """Build PINNED_N stimulus pairs by the pinned pairing rule.
+
+    For i in 0..PINNED_N-1:
+        pair_idx = i
+        q_a_position = i
+        q_b_position = (i + PAIRING_OFFSET) mod PINNED_N
+
+    `q_a_position` and `q_b_position` index into the input arrays
+    (which are already aligned with §13.10 dump record order).
+    `q_a_idx` and `q_b_idx` on the resulting StimulusPair are the
+    underlying §13.10 q_idx values at those positions.
+
+    Properties (per spec):
+        * PINNED_N unique pairs.
+        * Each input position appears exactly once as Q_A and once as Q_B.
+        * The +PAIRING_OFFSET offset randomizes topical adjacency without
+          requiring a random seed.
+    """
+    if (
+        len(q_ids) != PINNED_N
+        or len(questions) != PINNED_N
+        or len(gold_choices) != PINNED_N
+        or len(distractors_per) != PINNED_N
+        or len(s13_10_correctness) != PINNED_N
+    ):
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: construct_stimulus_pairs expected "
+            f"PINNED_N={PINNED_N} on all five input tuples; got "
+            f"q_ids={len(q_ids)}, questions={len(questions)}, "
+            f"gold_choices={len(gold_choices)}, "
+            f"distractors_per={len(distractors_per)}, "
+            f"s13_10_correctness={len(s13_10_correctness)}."
+        )
+    pairs: list[StimulusPair] = []
+    for i in range(PINNED_N):
+        a = i
+        b = (i + PAIRING_OFFSET) % PINNED_N
+        pairs.append(
+            StimulusPair(
+                pair_idx=i,
+                q_a_idx=int(q_ids[a]),
+                q_b_idx=int(q_ids[b]),
+                q_a_text=str(questions[a]),
+                q_b_text=str(questions[b]),
+                q_b_correct_choice=str(gold_choices[b]),
+                q_b_distractors=tuple(str(d) for d in distractors_per[b]),
+                s13_10_correct_q_a=bool(s13_10_correctness[a]),
+                s13_10_correct_q_b=bool(s13_10_correctness[b]),
+            )
+        )
+    return tuple(pairs)
+
+
+# ---------------------------------------------------------------------------
+# Lazy imports for the GPU-side stack (torch + transformers; §13.10 NLI
+# helper). Kept lazy so --self-test and --probe-only can run on CPU without
+# requiring the heavy stack to be present.
+# ---------------------------------------------------------------------------
+
+
+def _lazy_import_torch_and_transformers():
+    """Lazy import of torch + transformers; raises with a clear message."""
+    try:
+        import torch  # noqa: F401
+        from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "§15.13 hidden-state extraction requires torch + transformers. "
+            "Install on the runpod GPU node before --extract-only or default."
+        ) from exc
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    return torch, AutoModelForCausalLM, AutoTokenizer
+
+
+def _lazy_import_nli_helper():
+    """Lazy import of `build_nli_checker` + `label_correctness` from
+    §13.10's `scripts/probe_semantic_entropy.py`.
+
+    Per spec Risk 1: reuse the §13.10 scoring helper directly rather than
+    reimplementing — same behavior as the original phase, including its
+    known limitations (cross-phase comparability of the y label).
+    """
+    try:
+        from transformers import (  # noqa: F401
+            AutoModelForSequenceClassification,
+            AutoTokenizer,
+        )
+    except ImportError as exc:
+        raise ImportError(
+            "§15.13 NLI scoring requires transformers (for the §13.10 "
+            "DeBERTa NLI scorer). Install on the runpod GPU node."
+        ) from exc
+
+    # Add repo-root to sys.path so the §13.10 module can be imported by
+    # name even when this script is invoked via `python scripts/...`.
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    try:
+        from scripts.probe_semantic_entropy import (
+            build_nli_checker,
+            label_correctness,
+        )
+    except ImportError as exc:
+        raise ImportError(
+            "§15.13 expected to import build_nli_checker + label_correctness "
+            "from scripts/probe_semantic_entropy.py (the §13.10 producer). "
+            "Verify the repo layout."
+        ) from exc
+
+    from transformers import (
+        AutoModelForSequenceClassification,
+        AutoTokenizer,
+    )
+
+    return (
+        build_nli_checker,
+        label_correctness,
+        AutoModelForSequenceClassification,
+        AutoTokenizer,
+    )
+
+
+# NLI model id pinned per §13.10; reused for §15.13 y label scoring per
+# spec Risk 1 mitigation.
+NLI_MODEL_ID = "MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli"
+
+
+# ---------------------------------------------------------------------------
+# Three-pass extraction helpers.
+#
+# Pass 1: chat-template prompt over Q_A → greedy decode 64 tokens.
+#         Extracts q_a_repr (last-token, layer −1, pre-decode) and
+#         r_a_repr (mean over generated assistant token positions).
+#
+# Pass 2: chat-template multi-turn prompt over Q_A + verbatim Pass-1
+#         r_a_text + Q_B → greedy decode 64 tokens.
+#         Extracts s_t (last-token, layer −1, at the second [ASSISTANT]
+#         tag position pre-decode) and decodes q_b_response_text.
+#
+# Pass 3: chat-template prompt over Q_B alone (standalone, no decode).
+#         Extracts q_b_repr (last-token, layer −1).
+#
+# Splicing Pass-1's verbatim r_a_text into Pass-2's prompt guarantees
+# byte-identical R_A across passes (Risk 3 mitigation per spec).
+# ---------------------------------------------------------------------------
+
+
+def _build_chat_prompt_q_only_ids(tokenizer, q_text: str, *, device):
+    """Tokenize chat-template prompt for [SYS][USER]q_text[ASSISTANT]_."""
+    msgs = [{"role": "user", "content": q_text}]
+    input_ids = tokenizer.apply_chat_template(
+        msgs,
+        add_generation_prompt=True,
+        return_tensors="pt",
+    ).to(device)
+    return input_ids
+
+
+def _build_chat_prompt_multiturn_ids(
+    tokenizer, q_a_text: str, r_a_text: str, q_b_text: str, *, device
+):
+    """Tokenize multi-turn chat prompt with Q_A → R_A → Q_B → assistant tag.
+
+    Pass 1's decoded r_a_text is spliced verbatim (Risk 3 mitigation).
+    """
+    msgs = [
+        {"role": "user", "content": q_a_text},
+        {"role": "assistant", "content": r_a_text},
+        {"role": "user", "content": q_b_text},
+    ]
+    input_ids = tokenizer.apply_chat_template(
+        msgs,
+        add_generation_prompt=True,
+        return_tensors="pt",
+    ).to(device)
+    return input_ids
+
+
+def _resolve_chat_end_token_ids(tokenizer) -> set[int]:
+    """Return the set of token ids that mark end-of-assistant-turn for
+    Qwen's chat template.
+
+    Includes the tokenizer's eos_token_id and the Qwen `<|im_end|>` id
+    when it is distinct. Used to truncate the generated portion before
+    the chat-end marker so r_a_repr pools only over actual generated
+    content (Risk 6 mitigation).
+    """
+    end_ids: set[int] = set()
+    if tokenizer.eos_token_id is not None:
+        end_ids.add(int(tokenizer.eos_token_id))
+    try:
+        im_end_id = tokenizer.convert_tokens_to_ids("<|im_end|>")
+        if (
+            isinstance(im_end_id, int)
+            and im_end_id >= 0
+            and im_end_id != tokenizer.unk_token_id
+        ):
+            end_ids.add(int(im_end_id))
+    except Exception:
+        pass
+    return end_ids
+
+
+def _greedy_decode_and_collect(
+    model,
+    tokenizer,
+    prompt_input_ids,
+    *,
+    device,
+    max_new_tokens: int,
+):
+    """Greedy-decode `max_new_tokens` from the prompt, then forward over
+    the (truncated) prompt+generated sequence with output_hidden_states.
+
+    Returns:
+        prompt_repr   : np.ndarray fp32 (HIDDEN_DIM,) — last-layer hidden
+                        state at the last prompt-token position (the
+                        "ready-to-answer" anchor).
+        generated_repr: np.ndarray fp32 (HIDDEN_DIM,) — mean over
+                        last-layer hidden states at the generated token
+                        positions.
+        generated_text: str — decoded generated tokens (truncated at
+                        first chat-end / eos token; skip_special_tokens).
+        n_generated   : int — |T_A|; count of non-end generated tokens
+                        used for pooling.
+    """
+    import torch
+
+    prompt_len = int(prompt_input_ids.shape[1])
+    pad_id = tokenizer.pad_token_id
+    if pad_id is None:
+        pad_id = tokenizer.eos_token_id
+    with torch.inference_mode():
+        gen_out = model.generate(
+            input_ids=prompt_input_ids,
+            attention_mask=torch.ones_like(prompt_input_ids),
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            num_beams=1,
+            pad_token_id=pad_id,
+        )
+        full_ids = gen_out  # (1, prompt_len + n_gen_raw)
+        if full_ids.shape[0] != 1:
+            raise RuntimeError(
+                f"EXTRACTION_FAILED: greedy generate returned batch dim "
+                f"{full_ids.shape[0]}, expected 1."
+            )
+        gen_ids = full_ids[0, prompt_len:].tolist()
+        end_ids = _resolve_chat_end_token_ids(tokenizer)
+        n_generated = len(gen_ids)
+        for i, tid in enumerate(gen_ids):
+            if int(tid) in end_ids:
+                n_generated = i
+                break
+        if n_generated == 0:
+            raise RuntimeError(
+                "EXTRACTION_FAILED: greedy decode produced 0 non-end "
+                "tokens before chat-end marker; cannot pool generated_repr."
+            )
+        truncated_ids = full_ids[:, : prompt_len + n_generated]
+        generated_text = tokenizer.decode(
+            truncated_ids[0, prompt_len:], skip_special_tokens=True
+        )
+
+        out = model(
+            input_ids=truncated_ids,
+            attention_mask=torch.ones_like(truncated_ids),
+            output_hidden_states=True,
+        )
+        hs_last = out.hidden_states[LAYER_IDX]  # (1, L, HIDDEN_DIM)
+        if hs_last.shape != (1, prompt_len + n_generated, HIDDEN_DIM):
+            raise RuntimeError(
+                f"EXTRACTION_FAILED: layer{LAYER_IDX} hidden state shape "
+                f"{tuple(hs_last.shape)} != expected "
+                f"(1, {prompt_len + n_generated}, {HIDDEN_DIM})."
+            )
+        prompt_repr = (
+            hs_last[0, prompt_len - 1, :].detach().to("cpu").float().numpy()
+        )
+        gen_block = hs_last[0, prompt_len : prompt_len + n_generated, :]
+        generated_repr = (
+            gen_block.mean(dim=0).detach().to("cpu").float().numpy()
+        )
+
+    return (
+        prompt_repr.astype(np.float32),
+        generated_repr.astype(np.float32),
+        str(generated_text),
+        int(n_generated),
+    )
+
+
+def _forward_only_last_token_repr(
+    model, tokenizer, prompt_input_ids, *, device
+):
+    """Forward pass over prompt only (no decoding); return the last-token
+    last-layer hidden state as fp32 np.ndarray (HIDDEN_DIM,).
+    """
+    import torch
+
+    with torch.inference_mode():
+        out = model(
+            input_ids=prompt_input_ids,
+            attention_mask=torch.ones_like(prompt_input_ids),
+            output_hidden_states=True,
+        )
+    hs_last = out.hidden_states[LAYER_IDX]
+    if hs_last.shape[-1] != HIDDEN_DIM:
+        raise RuntimeError(
+            f"EXTRACTION_FAILED: layer{LAYER_IDX} hidden state hidden_dim "
+            f"{hs_last.shape[-1]} != expected {HIDDEN_DIM}."
+        )
+    last_repr = hs_last[0, -1, :].detach().to("cpu").float().numpy()
+    return last_repr.astype(np.float32)
+
+
+def extract_stimulus_three_passes(
+    pair: StimulusPair,
+    *,
+    model,
+    tokenizer,
+    nli_check_batch,
+    label_correctness_fn,
+    device: str,
+) -> StimulusExtraction:
+    """Run the three pinned forward passes for one stimulus.
+
+    Pass 1: Q_A-only chat prompt → greedy decode (≤MAX_NEW_TOKENS) →
+            extracts q_a_repr (prompt-end last-token) and r_a_repr (mean
+            over generated assistant token positions); records r_a_text.
+    Pass 2: multi-turn chat prompt with Pass-1's verbatim r_a_text
+            spliced in → greedy decode (≤MAX_NEW_TOKENS) → extracts s_t
+            (prompt-end last-token at the second [ASSISTANT] tag) and
+            records q_b_response_text.
+    Pass 3: Q_B-only chat prompt → forward only (no decode) → extracts
+            q_b_repr (prompt-end last-token).
+
+    NLI scoring (y label): premise = `q_b_text + " " + q_b_response_text`;
+    hypotheses = `q_b_text + " " + each candidate (gold + distractors)`.
+    y = entails(gold) AND NOT entails(any distractor) — exactly §13.10's
+    `label_correctness` semantics.
+    """
+    # Pass 1.
+    p1_ids = _build_chat_prompt_q_only_ids(
+        tokenizer, pair.q_a_text, device=device
+    )
+    q_a_repr, r_a_repr, r_a_text, n_r_a_tokens = _greedy_decode_and_collect(
+        model, tokenizer, p1_ids, device=device, max_new_tokens=MAX_NEW_TOKENS
+    )
+
+    # Pass 2 — splice Pass 1's verbatim r_a_text into the multi-turn prompt
+    # (Risk 3 mitigation: byte-identical R_A across passes).
+    p2_ids = _build_chat_prompt_multiturn_ids(
+        tokenizer,
+        pair.q_a_text,
+        r_a_text,
+        pair.q_b_text,
+        device=device,
+    )
+    s_t, _q_b_resp_traj_unused, q_b_response_text, n_q_b_response_tokens = (
+        _greedy_decode_and_collect(
+            model,
+            tokenizer,
+            p2_ids,
+            device=device,
+            max_new_tokens=MAX_NEW_TOKENS,
+        )
+    )
+
+    # Pass 3 — standalone Q_B (no decoding).
+    p3_ids = _build_chat_prompt_q_only_ids(
+        tokenizer, pair.q_b_text, device=device
+    )
+    q_b_repr = _forward_only_last_token_repr(
+        model, tokenizer, p3_ids, device=device
+    )
+
+    # NLI scoring of the Q_B response (y label) — §13.10-style.
+    y_bool = bool(
+        label_correctness_fn(
+            q_b_response_text,
+            pair.q_b_correct_choice,
+            list(pair.q_b_distractors),
+            nli_check_batch,
+            pair.q_b_text,
+        )
+    )
+
+    # Shape sanity (defensive — the per-helper checks should have
+    # already failed earlier if these don't hold).
+    for name, vec in (
+        ("q_a_repr", q_a_repr),
+        ("r_a_repr", r_a_repr),
+        ("s_t", s_t),
+        ("q_b_repr", q_b_repr),
+    ):
+        if vec.shape != (HIDDEN_DIM,):
+            raise RuntimeError(
+                f"EXTRACTION_FAILED: pair {pair.pair_idx} {name} shape "
+                f"{vec.shape}, expected ({HIDDEN_DIM},)."
+            )
+        if vec.dtype != np.float32:
+            raise RuntimeError(
+                f"EXTRACTION_FAILED: pair {pair.pair_idx} {name} dtype "
+                f"{vec.dtype}, expected float32."
+            )
+
+    return StimulusExtraction(
+        pair_idx=int(pair.pair_idx),
+        q_a_idx=int(pair.q_a_idx),
+        q_b_idx=int(pair.q_b_idx),
+        q_a_repr=q_a_repr,
+        r_a_repr=r_a_repr,
+        s_t=s_t,
+        q_b_repr=q_b_repr,
+        r_a_text=str(r_a_text),
+        q_b_response_text=str(q_b_response_text),
+        n_r_a_tokens=int(n_r_a_tokens),
+        n_q_b_response_tokens=int(n_q_b_response_tokens),
+        y=y_bool,
+    )
+
+
+# ---------------------------------------------------------------------------
+# .npz cache I/O.
+#
+# Schema (PINNED per spec output schema):
+#   pair_idx          int64,   shape (PINNED_N,)
+#   q_a_idx           int64,   shape (PINNED_N,)
+#   q_b_idx           int64,   shape (PINNED_N,)
+#   q_a_repr          float32, shape (PINNED_N, HIDDEN_DIM)
+#   r_a_repr          float32, shape (PINNED_N, HIDDEN_DIM)
+#   s_t               float32, shape (PINNED_N, HIDDEN_DIM)
+#   q_b_repr          float32, shape (PINNED_N, HIDDEN_DIM)
+#   y                 bool,    shape (PINNED_N,)
+#   r_a_text          object,  shape (PINNED_N,)
+#   q_b_response_text object,  shape (PINNED_N,)
+#   n_r_a_tokens          int64, shape (PINNED_N,)  # disclosure-only
+#   n_q_b_response_tokens int64, shape (PINNED_N,)  # disclosure-only
+#
+# Approximate size: 4 × 100 × 3584 × 4 bytes ≈ 5.6 MB + text overhead.
+# ---------------------------------------------------------------------------
+
+_CACHE_HIDDEN_KEYS = ("q_a_repr", "r_a_repr", "s_t", "q_b_repr")
+_CACHE_TEXT_KEYS = ("r_a_text", "q_b_response_text")
+_CACHE_INT_KEYS = (
+    "pair_idx",
+    "q_a_idx",
+    "q_b_idx",
+    "n_r_a_tokens",
+    "n_q_b_response_tokens",
+)
+_CACHE_BOOL_KEYS = ("y",)
+
+
+def save_extractions_cache(
+    extractions: tuple[StimulusExtraction, ...], path: str
+) -> None:
+    """Persist per-stimulus extractions to a single .npz file (spec schema)."""
+    if len(extractions) != PINNED_N:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: expected {PINNED_N} extractions, got "
+            f"{len(extractions)} for cache write."
+        )
+
+    pair_idx = np.asarray([e.pair_idx for e in extractions], dtype=np.int64)
+    q_a_idx = np.asarray([e.q_a_idx for e in extractions], dtype=np.int64)
+    q_b_idx = np.asarray([e.q_b_idx for e in extractions], dtype=np.int64)
+    q_a_repr = np.stack([e.q_a_repr for e in extractions], axis=0).astype(
+        np.float32
+    )
+    r_a_repr = np.stack([e.r_a_repr for e in extractions], axis=0).astype(
+        np.float32
+    )
+    s_t = np.stack([e.s_t for e in extractions], axis=0).astype(np.float32)
+    q_b_repr = np.stack([e.q_b_repr for e in extractions], axis=0).astype(
+        np.float32
+    )
+    y = np.asarray([e.y for e in extractions], dtype=np.bool_)
+    r_a_text = np.asarray(
+        [e.r_a_text for e in extractions], dtype=object
+    )
+    q_b_response_text = np.asarray(
+        [e.q_b_response_text for e in extractions], dtype=object
+    )
+    n_r_a_tokens = np.asarray(
+        [e.n_r_a_tokens for e in extractions], dtype=np.int64
+    )
+    n_q_b_response_tokens = np.asarray(
+        [e.n_q_b_response_tokens for e in extractions], dtype=np.int64
+    )
+
+    expected_hidden_shape = (PINNED_N, HIDDEN_DIM)
+    for name, arr in (
+        ("q_a_repr", q_a_repr),
+        ("r_a_repr", r_a_repr),
+        ("s_t", s_t),
+        ("q_b_repr", q_b_repr),
+    ):
+        if arr.shape != expected_hidden_shape:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache write {name} shape {arr.shape}, "
+                f"expected {expected_hidden_shape}."
+            )
+
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    np.savez(
+        path,
+        pair_idx=pair_idx,
+        q_a_idx=q_a_idx,
+        q_b_idx=q_b_idx,
+        q_a_repr=q_a_repr,
+        r_a_repr=r_a_repr,
+        s_t=s_t,
+        q_b_repr=q_b_repr,
+        y=y,
+        r_a_text=r_a_text,
+        q_b_response_text=q_b_response_text,
+        n_r_a_tokens=n_r_a_tokens,
+        n_q_b_response_tokens=n_q_b_response_tokens,
+    )
+
+
+def load_extractions_cache(path: str) -> tuple[StimulusExtraction, ...]:
+    """Load per-stimulus extractions from an .npz file written by
+    save_extractions_cache. Validates pinned shapes / dtypes / counts."""
+    cache_path = Path(path)
+    if not cache_path.exists():
+        raise FileNotFoundError(
+            f"§15.13 extractions cache not found: {cache_path}. "
+            f"Run --extract-only first or default to populate."
+        )
+    npz = np.load(cache_path, allow_pickle=True)
+    required = (
+        _CACHE_HIDDEN_KEYS
+        + _CACHE_TEXT_KEYS
+        + _CACHE_INT_KEYS
+        + _CACHE_BOOL_KEYS
+    )
+    for key in required:
+        if key not in npz.files:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache {cache_path} missing key {key!r}."
+            )
+
+    expected_hidden_shape = (PINNED_N, HIDDEN_DIM)
+    for key in _CACHE_HIDDEN_KEYS:
+        arr = npz[key]
+        if arr.shape != expected_hidden_shape:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache {cache_path} {key} shape "
+                f"{arr.shape}, expected {expected_hidden_shape}."
+            )
+        if arr.dtype != np.float32:
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache {cache_path} {key} dtype "
+                f"{arr.dtype}, expected float32."
+            )
+
+    for key in _CACHE_INT_KEYS:
+        arr = npz[key]
+        if arr.shape != (PINNED_N,):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache {cache_path} {key} shape "
+                f"{arr.shape}, expected ({PINNED_N},)."
+            )
+    if npz["y"].shape != (PINNED_N,):
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: cache {cache_path} 'y' shape "
+            f"{npz['y'].shape}, expected ({PINNED_N},)."
+        )
+    for key in _CACHE_TEXT_KEYS:
+        arr = npz[key]
+        if arr.shape != (PINNED_N,):
+            raise SchemaMismatchError(
+                f"SCHEMA_MISMATCH: cache {cache_path} {key} shape "
+                f"{arr.shape}, expected ({PINNED_N},)."
+            )
+
+    extractions: list[StimulusExtraction] = []
+    for i in range(PINNED_N):
+        extractions.append(
+            StimulusExtraction(
+                pair_idx=int(npz["pair_idx"][i]),
+                q_a_idx=int(npz["q_a_idx"][i]),
+                q_b_idx=int(npz["q_b_idx"][i]),
+                q_a_repr=np.asarray(npz["q_a_repr"][i], dtype=np.float32),
+                r_a_repr=np.asarray(npz["r_a_repr"][i], dtype=np.float32),
+                s_t=np.asarray(npz["s_t"][i], dtype=np.float32),
+                q_b_repr=np.asarray(npz["q_b_repr"][i], dtype=np.float32),
+                r_a_text=str(npz["r_a_text"][i]),
+                q_b_response_text=str(npz["q_b_response_text"][i]),
+                n_r_a_tokens=int(npz["n_r_a_tokens"][i]),
+                n_q_b_response_tokens=int(npz["n_q_b_response_tokens"][i]),
+                y=bool(npz["y"][i]),
+            )
+        )
+    return tuple(extractions)
