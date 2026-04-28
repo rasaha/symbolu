@@ -820,3 +820,373 @@ def write_exploratory_markdown(run: ExploratoryRun, path: str) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with Path(path).open("w", encoding="utf-8") as f:
         f.write(text)
+
+
+# ===========================================================================
+# §15.13 exploratory Chunk E-4 — self-test gate + CLI orchestration.
+#
+# Self-test gate (required before any subset analysis):
+#   1. Refusal classifier on hand-pinned synthetic cases (CORRECT short
+#      answer protected, refusal markers detected, confident-wrong text
+#      stays CONFIDENT_WRONG).
+#   2. Firewall coverage: 44 (§15.13) + 5 (exploratory-extra) = 49
+#      positive detections; clean §15.13-style text passes.
+#   3. AUC helper sanity: identical pos/neg → AUC=0.5; perfectly-
+#      separable pos/neg → AUC=1.0; reversed → AUC=0.0.
+#
+# CLI modes:
+#   --self-test     : run gate only.
+#   --cache-path    : override input cache path.
+#   --json-out      : override output JSON path.
+#   --md-out        : override output markdown path.
+#   (default)       : self-test → load cache → analyse → write outputs.
+#
+# Exit codes:
+#   0  success
+#   2  CLI / argument error (handled by argparse)
+#   3  SELF_TEST_FAILED
+#   4  INTERPRETATION_VIOLATION
+#   5  SCHEMA_MISMATCH (cache load)
+#   7  ANALYSIS_FAILED (numpy / non-finite features)
+# ===========================================================================
+
+
+# Synthetic test fixtures for the refusal classifier — pre-committed.
+# Each entry: (y, response_text, expected_label).
+_REFUSAL_CLASSIFIER_FIXTURES: tuple[tuple[bool, str, str], ...] = (
+    (True, "Paris", LABEL_CORRECT),
+    (True, "I don't know — but Paris.", LABEL_CORRECT),
+    (False, "Paris", LABEL_REFUSAL),  # short + y=0 → REFUSAL by length
+    (False, "", LABEL_REFUSAL),
+    (False, "I don't know.", LABEL_REFUSAL),
+    (False, "I do not know the answer.", LABEL_REFUSAL),
+    (False, "I'm not sure about that.", LABEL_REFUSAL),
+    (False, "I am not sure.", LABEL_REFUSAL),
+    (False, "I can't tell you.", LABEL_REFUSAL),
+    (False, "I cannot answer this.", LABEL_REFUSAL),
+    (False, "I'm unable to answer.", LABEL_REFUSAL),
+    (False, "I am unable to determine.", LABEL_REFUSAL),
+    (False, "As an AI language model, I cannot.", LABEL_REFUSAL),
+    (False, "I don't have information on that.", LABEL_REFUSAL),
+    (False, "I do not have access to that data.", LABEL_REFUSAL),
+    (False, "The capital of France is London.", LABEL_CONFIDENT_WRONG),
+    (False, "It depends on the context, probably 42.", LABEL_CONFIDENT_WRONG),
+    (False, "Sorry but the answer is 42.", LABEL_CONFIDENT_WRONG),
+    (False, "Unknown territories of Atlantis.", LABEL_CONFIDENT_WRONG),
+    (False, "Hard to say, but my guess is X.", LABEL_CONFIDENT_WRONG),
+)
+
+
+def _self_test_refusal_classifier() -> list[str]:
+    """Run all _REFUSAL_CLASSIFIER_FIXTURES; return failure messages."""
+    failures: list[str] = []
+    for i, (y, text, expected) in enumerate(_REFUSAL_CLASSIFIER_FIXTURES):
+        # Build a minimal stimulus shape that classify_exploratory_label
+        # only reads y and q_b_response_text from.
+        ext = StimulusExtraction(
+            pair_idx=i,
+            q_a_idx=0,
+            q_b_idx=0,
+            q_a_repr=np.zeros(1, dtype=np.float32),
+            r_a_repr=np.zeros(1, dtype=np.float32),
+            s_t=np.zeros(1, dtype=np.float32),
+            q_b_repr=np.zeros(1, dtype=np.float32),
+            r_a_text="",
+            q_b_response_text=text,
+            n_r_a_tokens=0,
+            n_q_b_response_tokens=0,
+            y=bool(y),
+        )
+        got = classify_exploratory_label(ext)
+        if got != expected:
+            failures.append(
+                f"  fixture {i + 1}: y={y}, text={text!r:50s} → "
+                f"got {got!r}, expected {expected!r}"
+            )
+    return failures
+
+
+def _self_test_firewall_extras() -> list[str]:
+    """Verify firewall flags 44 (§15.13) + 5 (extra) = 49 patterns +
+    clean §15.13-style text passes."""
+    failures: list[str] = []
+    total_expected = 44 + len(EXPLORATORY_EXTRA_FIREWALL_PATTERNS)
+    if total_expected != 49:
+        failures.append(
+            f"  pattern count: 44 + "
+            f"{len(EXPLORATORY_EXTRA_FIREWALL_PATTERNS)} = "
+            f"{total_expected} (expected 49)"
+        )
+    for pattern in CLASS_3_FORBIDDEN_PATTERNS:
+        sample = f"text {pattern} text"
+        if not scan_with_extra_patterns(sample):
+            failures.append(
+                f"  §15.13 pattern not detected: {pattern!r}"
+            )
+    for pattern in EXPLORATORY_EXTRA_FIREWALL_PATTERNS:
+        sample = f"text {pattern} text"
+        if not scan_with_extra_patterns(sample):
+            failures.append(
+                f"  exploratory-extra pattern not detected: {pattern!r}"
+            )
+    clean = (
+        "Exploratory subset AUCs at α∈{0.35, 0.50, 0.75} are reported "
+        "as disclosure only; the §15.13 cascade verdict "
+        "NO_MATERIAL_SIGNAL_IN_INERTIA stays binding. §15.10 PARTIAL_"
+        "SIGNAL_IN_Z preserved; §15.11 NO_MATERIAL_SIGNAL_IN_PHASE_"
+        "COHERENCE preserved; §15.12 closure preserved. §13.9 hold "
+        "remains binding. §6.1 N=21 autonomy result preserved. The "
+        "R_sim comparator is included for parity with the cascade."
+    )
+    spurious = scan_with_extra_patterns(clean)
+    if spurious:
+        failures.append(
+            f"  firewall false-positive on clean text: {spurious!r}"
+        )
+    return failures
+
+
+def _self_test_auc_helper() -> list[str]:
+    """Verify _auc_tieaware on three pinned cases.
+
+    1. All ties → AUC = 0.5.
+    2. Perfectly separable (all pos > all neg) → AUC = 1.0.
+    3. Perfectly anti-separable (all pos < all neg) → AUC = 0.0.
+    """
+    failures: list[str] = []
+    scores = np.asarray([0.5] * 6, dtype=np.float64)
+    labels = np.asarray([1, 1, 1, 0, 0, 0], dtype=np.int64)
+    auc_tied = _auc_tieaware(scores, labels)
+    if not (abs(auc_tied - 0.5) < 1e-12):
+        failures.append(f"  ties: AUC={auc_tied} (expected 0.5)")
+
+    scores = np.asarray([1.0, 1.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    auc_perfect = _auc_tieaware(scores, labels)
+    if not (abs(auc_perfect - 1.0) < 1e-12):
+        failures.append(f"  perfect: AUC={auc_perfect} (expected 1.0)")
+
+    scores = np.asarray([0.0, 0.0, 0.0, 1.0, 1.0, 1.0], dtype=np.float64)
+    auc_anti = _auc_tieaware(scores, labels)
+    if not (abs(auc_anti) < 1e-12):
+        failures.append(f"  anti-perfect: AUC={auc_anti} (expected 0.0)")
+
+    return failures
+
+
+def run_self_test() -> int:
+    """Execute the §15.13 exploratory self-test gate; return 0 / 3."""
+    print("§15.13 exploratory self-test gate", flush=True)
+    print(
+        f"  exploratory schema: {EXPLORATORY_SCHEMA_VERSION}", flush=True
+    )
+    print(f"  primary §15.13 schema: {PRIMARY_SCHEMA_VERSION}", flush=True)
+    print(
+        f"  primary verdict (unchanged): {PRIMARY_VERDICT} "
+        f"(commit {PRIMARY_VERDICT_COMMIT})",
+        flush=True,
+    )
+    print(
+        f"  refusal markers (pre-committed): "
+        f"{len(REFUSAL_MARKERS)}",
+        flush=True,
+    )
+    print(
+        f"  short-response floor (y=0 only): "
+        f"{SHORT_RESPONSE_FLOOR_FOR_Y0}",
+        flush=True,
+    )
+    print(
+        f"  min class size for AUC: "
+        f"{MIN_CLASS_SIZE_FOR_AUC}",
+        flush=True,
+    )
+    print(
+        f"  firewall: {len(CLASS_3_FORBIDDEN_PATTERNS)} (§15.13) + "
+        f"{len(EXPLORATORY_EXTRA_FIREWALL_PATTERNS)} (extra) = "
+        f"{len(CLASS_3_FORBIDDEN_PATTERNS) + len(EXPLORATORY_EXTRA_FIREWALL_PATTERNS)}",
+        flush=True,
+    )
+
+    all_failures: list[str] = []
+
+    print("  [1/3] refusal classifier on pinned fixtures...", flush=True)
+    cls_fail = _self_test_refusal_classifier()
+    if cls_fail:
+        all_failures.append("CLASSIFIER FAILURES:")
+        all_failures.extend(cls_fail)
+    else:
+        print(
+            f"    OK: {len(_REFUSAL_CLASSIFIER_FIXTURES)} fixtures "
+            f"(CORRECT/REFUSAL/CONFIDENT_WRONG) classify as expected.",
+            flush=True,
+        )
+
+    print("  [2/3] firewall coverage (44 + 5 = 49)...", flush=True)
+    fw_fail = _self_test_firewall_extras()
+    if fw_fail:
+        all_failures.append("FIREWALL FAILURES:")
+        all_failures.extend(fw_fail)
+    else:
+        print(
+            f"    OK: 49 patterns flagged on positives; clean "
+            f"§15.13/exploratory text passes.",
+            flush=True,
+        )
+
+    print("  [3/3] AUC helper (ties / perfect / anti-perfect)...", flush=True)
+    auc_fail = _self_test_auc_helper()
+    if auc_fail:
+        all_failures.append("AUC HELPER FAILURES:")
+        all_failures.extend(auc_fail)
+    else:
+        print(
+            "    OK: ties → 0.5; perfect-sep → 1.0; anti-perfect → 0.0.",
+            flush=True,
+        )
+
+    if all_failures:
+        print("\nSELF_TEST_FAILED:", flush=True)
+        for line in all_failures:
+            print(line, flush=True)
+        return 3
+    print("\nSELF_TEST_PASSED — proceed.", flush=True)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# CLI + main.
+# ---------------------------------------------------------------------------
+
+
+def _build_argparser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="probe_inertia_15_13_exploratory",
+        description=(
+            "§15.13 exploratory analysis — refusal/confident-wrong subset "
+            "AUCs over the §15.13 extraction cache. EXPLORATORY ONLY: the "
+            "§15.13 cascade verdict NO_MATERIAL_SIGNAL_IN_INERTIA "
+            "(commit b817a98) stays binding; subset findings here are "
+            "hypothesis-generating, not verdict-amending."
+        ),
+    )
+    p.add_argument(
+        "--self-test",
+        action="store_true",
+        help=(
+            "Run self-test gate only (refusal classifier on 20 pinned "
+            "fixtures + 49-pattern firewall + AUC helper sanity)."
+        ),
+    )
+    p.add_argument(
+        "--cache-path",
+        default=EXTRACTIONS_CACHE_PATH,
+        help=(
+            f"Path to the §15.13 extraction cache .npz "
+            f"(default: {EXTRACTIONS_CACHE_PATH})"
+        ),
+    )
+    p.add_argument(
+        "--json-out",
+        default=OUTPUT_JSON_PATH,
+        help=f"Path to JSON output (default: {OUTPUT_JSON_PATH})",
+    )
+    p.add_argument(
+        "--md-out",
+        default=OUTPUT_MD_PATH,
+        help=f"Path to markdown output (default: {OUTPUT_MD_PATH})",
+    )
+    return p
+
+
+def _print_exploratory_banner(run: ExploratoryRun) -> None:
+    """One-screen summary banner of exploratory subset readouts."""
+    print("", flush=True)
+    print("=" * 76, flush=True)
+    print(
+        f"§15.13 exploratory subset AUCs (binding §15.13 verdict: "
+        f"{run.primary_phase_verdict_unchanged} preserved)",
+        flush=True,
+    )
+    print("-" * 76, flush=True)
+    counts = run.label_counts
+    print(
+        f"  class counts: CORRECT={counts[LABEL_CORRECT]}, "
+        f"REFUSAL={counts[LABEL_REFUSAL]}, "
+        f"CONFIDENT_WRONG={counts[LABEL_CONFIDENT_WRONG]} "
+        f"(TOTAL={counts['TOTAL']})",
+        flush=True,
+    )
+    print("-" * 76, flush=True)
+    for s in run.subsets:
+        if s.eligible:
+            print(
+                f"  {s.name:30s}  n_pos={s.n_pos:3d}, n_neg={s.n_neg:3d} | "
+                f"AUC(inertia)={s.auc_inertia:.4f} "
+                f"(ΔAUC chance {s.dauc_inertia_vs_chance:+.4f}; "
+                f"ΔAUC sim {s.dauc_inertia_vs_sim:+.4f}) | "
+                f"AUC(sim)={s.auc_sim:.4f}",
+                flush=True,
+            )
+        else:
+            print(
+                f"  {s.name:30s}  n_pos={s.n_pos:3d}, n_neg={s.n_neg:3d} | "
+                f"{s.rationale}",
+                flush=True,
+            )
+    print("=" * 76, flush=True)
+    print(
+        f"  reminder: §15.13 cascade verdict "
+        f"{run.primary_phase_verdict_unchanged} (commit "
+        f"{run.primary_phase_verdict_commit}) stays binding. The "
+        f"subset AUCs above are disclosure-only and do not amend "
+        f"§15.13.",
+        flush=True,
+    )
+    print("=" * 76, flush=True)
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    args = _build_argparser().parse_args(argv)
+
+    if args.self_test:
+        return run_self_test()
+
+    rc = run_self_test()
+    if rc != 0:
+        return rc
+
+    print(
+        f"\nLoading §15.13 extraction cache from {args.cache_path}",
+        flush=True,
+    )
+    try:
+        extractions = load_extractions_cache(args.cache_path)
+    except SchemaMismatchError as e:
+        print(f"SCHEMA_MISMATCH: {e}", flush=True)
+        return 5
+    except FileNotFoundError as e:
+        print(f"CACHE_MISSING: {e}", flush=True)
+        return 5
+
+    print(f"\nExploratory subset analysis (counts-first, AUC second).", flush=True)
+    try:
+        run = run_exploratory_analysis(extractions)
+    except SchemaMismatchError as e:
+        print(f"SCHEMA_MISMATCH: {e}", flush=True)
+        return 5
+    except RuntimeError as e:
+        print(f"ANALYSIS_FAILED: {e}", flush=True)
+        return 7
+
+    print("\nOutput phase — JSON + firewall-scanned markdown.", flush=True)
+    write_exploratory_json(run, args.json_out)
+    print(f"  wrote: {args.json_out}", flush=True)
+    write_exploratory_markdown(run, args.md_out)
+    print(f"  wrote: {args.md_out}", flush=True)
+
+    _print_exploratory_banner(run)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
