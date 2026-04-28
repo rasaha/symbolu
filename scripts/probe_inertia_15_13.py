@@ -2129,7 +2129,13 @@ def _probe_result_to_dict(pr: InertiaProbeResult) -> dict:
         "selective_prediction_operating_points": [
             {
                 "alpha": float(op["alpha"]),
-                "tau_star": float(op["tau_star"]),
+                "tau_star": (
+                    float(op["tau_star"])
+                    if not math.isnan(
+                        op.get("tau_star", float("nan"))
+                    )
+                    else None
+                ),
                 "kappa_at_alpha": float(op["kappa_at_alpha"]),
                 "coverage_at_tau_star": float(op["coverage_at_tau_star"]),
                 "conditional_accuracy_at_tau_star": float(
