@@ -2183,3 +2183,322 @@ def write_json_output(outputs: InertiaAuditOutputs, path: str) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with Path(path).open("w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, sort_keys=True)
+
+
+# ===========================================================================
+# §15.13 Chunk I-4d — markdown rendering + firewall-scanned writer.
+#
+# 8-section structure pinned per spec output schema markdown bullet:
+#   1. Header + schema/model/extraction config one-liner.
+#   2. Cascade verdict (label, rationale, AUC table with chance + sim).
+#   3. Probe details (n, AUC, ΔAUC vs both baselines, direction-held,
+#      R_inertia distribution summary).
+#   4. Selective-prediction operating points table (disclosure only).
+#   5. Pinned configuration block (formula, pairing rule, extraction
+#      protocol, cascade thresholds, direction convention).
+#   6. Caveats (§0.8-disclosed; carries forward §15.10/§15.11 caveats by
+#      §-reference; §15.13-specific caveats listed inline).
+#   7. Cross-phase comparison (Phase 1/2/3/4 status; disclosure only).
+#   8. Audit-trail integrity (§0.8-binding; §13/§14/§15.x verdicts
+#      preserved; firewall-scanned).
+#
+# Firewall is enforced before write (Chunk I-4a's enforce_firewall_or_exit).
+# ===========================================================================
+
+
+def _r_inertia_summary(values: tuple[float, ...]) -> dict:
+    """Min/median/mean/std/max of the per-stimulus R_inertia distribution.
+
+    Reported in section 3 for transparency. Pure numpy; no leak into
+    cascade decision.
+    """
+    arr = np.asarray(values, dtype=np.float64)
+    return {
+        "n": int(arr.size),
+        "min": float(arr.min()) if arr.size else float("nan"),
+        "max": float(arr.max()) if arr.size else float("nan"),
+        "mean": float(arr.mean()) if arr.size else float("nan"),
+        "median": float(np.median(arr)) if arr.size else float("nan"),
+        "std": (
+            float(arr.std(ddof=1)) if arr.size > 1 else 0.0
+        ),
+    }
+
+
+def _format_operating_points_table(ops: tuple[dict, ...]) -> str:
+    """Markdown table of κ@α operating points (disclosure only)."""
+    lines = [
+        "| α | τ* | κ@α | coverage | cond. acc. | n_admitted | eligible |",
+        "|---|----|-----|----------|------------|------------|----------|",
+    ]
+    for op in ops:
+        tau_str = (
+            f"{op['tau_star']:.4f}"
+            if not math.isnan(op.get("tau_star", float("nan")))
+            else "—"
+        )
+        cond_str = (
+            f"{op['conditional_accuracy_at_tau_star']:.3f}"
+            if not math.isnan(
+                op.get("conditional_accuracy_at_tau_star", float("nan"))
+            )
+            else "—"
+        )
+        lines.append(
+            f"| {op['alpha']:.2f} | {tau_str} | {op['kappa_at_alpha']:.3f} | "
+            f"{op['coverage_at_tau_star']:.3f} | {cond_str} | "
+            f"{op['n_admitted_at_tau_star']} | "
+            f"{'yes' if op['eligible'] else 'no'} |"
+        )
+    return "\n".join(lines)
+
+
+def render_markdown_report(outputs: InertiaAuditOutputs) -> str:
+    """Render the §15.13 markdown report.
+
+    Output is firewall-scanned by `write_markdown_output` before write;
+    any Class-3 forbidden statement triggers exit code 4
+    (INTERPRETATION_VIOLATION) without writing.
+    """
+    cv = outputs.cascade_verdict
+    pr = outputs.probe_result
+    summary = _r_inertia_summary(pr.r_inertia_per_stimulus)
+    sim_summary = _r_inertia_summary(pr.r_sim_per_stimulus)
+
+    n_r_a_min = (
+        min(pr.n_r_a_tokens_per_stimulus)
+        if pr.n_r_a_tokens_per_stimulus
+        else 0
+    )
+    n_r_a_max = (
+        max(pr.n_r_a_tokens_per_stimulus)
+        if pr.n_r_a_tokens_per_stimulus
+        else 0
+    )
+    n_r_a_mean = (
+        sum(pr.n_r_a_tokens_per_stimulus)
+        / max(1, len(pr.n_r_a_tokens_per_stimulus))
+    )
+
+    lines: list[str] = []
+
+    # ---- Section 1: header ---------------------------------------------
+    lines.append(
+        "# §15.13 Phase 4 — Continuation-inertia probe (result)\n"
+    )
+    lines.append(
+        f"_Schema version: `{outputs.schema_version}`._  \n"
+        f"_Model: `{outputs.qwen_model_id}`; "
+        f"benchmark: `{outputs.benchmark}`; "
+        f"layer used: {LAYER_IDX} (final); hidden dim: `{HIDDEN_DIM}`; "
+        f"max_new_tokens: {MAX_NEW_TOKENS} (greedy); "
+        f"NLI scorer: `{NLI_MODEL_ID}`._\n"
+    )
+
+    # ---- Section 2: cascade verdict ------------------------------------
+    lines.append("## Cascade verdict (mechanical readout)\n")
+    lines.append(f"**Label:** `{cv.label}`\n")
+    lines.append(f"**Rationale:** {cv.rationale}\n")
+    lines.append(
+        "| metric | value |\n"
+        "|---|---|\n"
+        f"| auc_inertia (AUC(−R_inertia, y)) | {cv.auc_inertia:.4f} |\n"
+        f"| auc_sim    (AUC(−R_sim,     y)) | {cv.auc_sim:.4f} |\n"
+        f"| ΔAUC vs chance (0.5) | {cv.dauc_vs_chance:+.4f} |\n"
+        f"| ΔAUC vs R_sim         | {cv.dauc_vs_sim:+.4f} |\n"
+        f"| direction held (auc_inertia ≥ 0.5) | "
+        f"**{'yes' if cv.direction_held else 'no'}** |\n"
+    )
+
+    # ---- Section 3: probe details --------------------------------------
+    lines.append("## Probe details\n")
+    lines.append(
+        f"- N stimuli: {pr.n_stimuli} "
+        f"(correct: {pr.n_correct}, wrong: {pr.n_wrong}; "
+        f"observed accuracy = {pr.n_correct / max(1, pr.n_stimuli):.3f})\n"
+        f"- auc_inertia = **{pr.auc_inertia:.4f}** "
+        f"(ΔAUC vs chance: {pr.dauc_inertia_vs_chance:+.4f}; "
+        f"ΔAUC vs R_sim: {pr.dauc_inertia_vs_sim:+.4f})\n"
+        f"- auc_sim     = {pr.auc_sim:.4f} (R_sim comparator baseline)\n"
+        f"- direction held (auc_inertia ≥ {DIRECTION_GATE_THRESHOLD}): "
+        f"**{'yes' if pr.direction_held else 'no'}**\n"
+        "- R_inertia distribution (per-stimulus, fp64):\n"
+        f"  - min:    {summary['min']:+.4f}\n"
+        f"  - median: {summary['median']:+.4f}\n"
+        f"  - mean:   {summary['mean']:+.4f}\n"
+        f"  - std:    {summary['std']:.4f}\n"
+        f"  - max:    {summary['max']:+.4f}\n"
+        "- R_sim distribution (per-stimulus, fp64):\n"
+        f"  - min:    {sim_summary['min']:+.4f}\n"
+        f"  - median: {sim_summary['median']:+.4f}\n"
+        f"  - mean:   {sim_summary['mean']:+.4f}\n"
+        f"  - std:    {sim_summary['std']:.4f}\n"
+        f"  - max:    {sim_summary['max']:+.4f}\n"
+        f"- |T_A| (decoded R_A token count) per stimulus: "
+        f"min {n_r_a_min}, mean {n_r_a_mean:.1f}, max {n_r_a_max} "
+        f"(MAX_NEW_TOKENS = {MAX_NEW_TOKENS}; Risk-6 disclosure)\n"
+    )
+
+    # ---- Section 4: selective-prediction operating points --------------
+    lines.append("## Selective-prediction operating points (disclosure only)\n")
+    lines.append(
+        "These κ@α operating points report what the −R_inertia abstention "
+        "score achieves at the pinned alphas (0.35, 0.50, 0.75) under the "
+        f"N_MIN={N_MIN} eligibility floor. They are reported for "
+        "transparency and do NOT enter the §15.13 cascade decision.\n"
+    )
+    lines.append(_format_operating_points_table(pr.operating_points))
+    lines.append("")
+    primary_tau_str = (
+        f"{pr.tau_star_at_alpha_primary:.4f}"
+        if not math.isnan(pr.tau_star_at_alpha_primary)
+        else "—"
+    )
+    lines.append(
+        f"At α_primary = {ALPHA_PRIMARY:.2f}: κ@α = "
+        f"{pr.kappa_at_alpha_primary:.3f}; τ* = {primary_tau_str}.\n"
+    )
+
+    # ---- Section 5: pinned configuration -------------------------------
+    lines.append("## Pinned configuration (§15.13 §0.8-binding)\n")
+    lines.append(
+        f"- **Model:** `{outputs.qwen_model_id}`; layer `{LAYER_IDX}` "
+        f"(final layer only); hidden dim `{HIDDEN_DIM}`.\n"
+        f"- **Benchmark:** `{outputs.benchmark}` (single benchmark for "
+        "v1; HaluEval is a v2 follow-up only if v1 shows signal).\n"
+        f"- **Pairing rule:** `{PAIRING_RULE_DESCRIPTION}` "
+        f"({PINNED_N} unique pairs; each question appears once as Q_A "
+        "and once as Q_B).\n"
+        "- **Pinned formula:** `R_inertia = cos(s_t, r_A) − cos(s_t, q_B)`.\n"
+        "- **Comparator baseline:** `R_sim = cos(q_A, q_B)`.\n"
+        f"- **Direction convention:** {DIRECTION_CONVENTION}.\n"
+        f"- **Decoding:** greedy (temperature {DECODE_TEMPERATURE}); "
+        f"`max_new_tokens = {MAX_NEW_TOKENS}`.\n"
+        "- **Per-stimulus extraction protocol (3 forward passes):**\n"
+        "  - Pass 1: `[SYS][USER]Q_A[ASSISTANT]_` → greedy decode → "
+        "extract `q_A` (last-token, layer −1, pre-decode) + `r_A` "
+        "(mean over decoded assistant token positions, layer −1).\n"
+        "  - Pass 2: `[SYS][USER]Q_A[ASSISTANT]r_A_text[USER]Q_B"
+        "[ASSISTANT]_` → greedy decode → extract `s_t` (last-token, "
+        "layer −1, pre-decode at second `[ASSISTANT]` tag); decode "
+        "Q_B response for NLI label scoring.\n"
+        "  - Pass 3: `[SYS][USER]Q_B[ASSISTANT]_` → forward only → "
+        "extract `q_B` (last-token, layer −1).\n"
+        "  - Pass 1's verbatim `r_a_text` is spliced into Pass 2's "
+        "prompt (Risk-3 mitigation: byte-identical R_A across passes).\n"
+        f"- **NLI scoring (y label):** `{NLI_MODEL_ID}` via the §13.10 "
+        "`label_correctness` helper (premise = Q_B + response; "
+        "hypotheses = Q_B + each candidate; "
+        "y = entails(gold) AND NOT entails(any distractor)).\n"
+        f"- **Cascade thresholds:** STRONG AUC ≥ {STRONG_AUC_THRESHOLD} "
+        f"AND ΔAUC ≥ +{STRONG_DELTA_AUC_THRESHOLD} vs BOTH chance and "
+        f"R_sim; PARTIAL AUC ≥ {PARTIAL_AUC_THRESHOLD} AND ΔAUC > 0 vs "
+        "BOTH; otherwise NO_MATERIAL. Direction gate: "
+        f"auc_inertia < {DIRECTION_GATE_THRESHOLD} → NO_MATERIAL "
+        "automatic.\n"
+        f"- **Selective-prediction:** alphas {ALPHA_TARGETS}; "
+        f"primary alpha = {ALPHA_PRIMARY}; floor N_MIN = {N_MIN}; "
+        "disclosure only — does NOT enter cascade.\n"
+    )
+
+    # ---- Section 6: caveats --------------------------------------------
+    lines.append("## Caveats (§0.8-disclosed)\n")
+    lines.append(
+        "- **One mechanism within the multi-turn class.** §15.13 tests "
+        "ONE instantiation of continuation inertia: the pinned R_inertia "
+        "formula at layer −1, on TruthfulQA-MC, with the +50 same-family "
+        "pairing rule. A null result rules out THIS instantiation; H1 "
+        "(state coherence) and H2 (intent competition) remain in the "
+        "open-but-untested column for future top-level §0.X work.\n"
+        "- **Direction is pinned BCVF-faithful (lower R_inertia predicts "
+        "correct).** A failure of the direction gate is a hypothesis "
+        "failure (NO_MATERIAL automatic), not a sign-flip opportunity. "
+        "Mirrors §15.11's enforcement.\n"
+        "- **R_sim controls for topical-overlap confound.** R_inertia "
+        "must beat R_sim by the cascade margin to clear STRONG/PARTIAL; "
+        "if same-family pairing is too topically clustered to separate "
+        "inertia from topic similarity, the dual-comparator cascade "
+        "lands NO_MATERIAL.\n"
+        f"- **N = {PINNED_N} stimuli.** AUC standard error at AUC ≈ 0.66 "
+        "with N=100 is ~0.05–0.06; cascade bands at 0.66 and 0.75 are "
+        "hit/miss-able by sampling noise. Mirrors §15.10/§15.11 power "
+        "constraint.\n"
+        "- **Single model size: Qwen2.5-7B-Instruct.** Does not speak "
+        "to scaling at 13B / 32B / 70B.\n"
+        "- **Greedy refusals.** Hedged or refusal Q_B responses score "
+        "as non-entailment under §13.10 NLI semantics. If the model "
+        "refuses more on Q_B questions where it is stuck on R_A, that "
+        "is treated as genuine signal, not noise (Risk 2 disclosure).\n"
+        "- **|T_A| variability.** Pass 1 may emit an end token before "
+        f"MAX_NEW_TOKENS = {MAX_NEW_TOKENS}; r_A pooling averages only "
+        "over actually-generated non-end token positions (Risk 6 "
+        "disclosure). The |T_A| distribution is reported in section 3.\n"
+        "- **NLI cost.** DeBERTa-v3-base-mnli-fever-anli is loaded for "
+        "y label scoring; ~5 GB peak memory + ~2 min wall time at N=100 "
+        "(Risk 8 disclosure).\n"
+        "- **No bootstrap CIs in v1.** Mirrors §15.10/§15.11; v1 reports "
+        "point estimates against pinned bands.\n"
+        f"- **Inherited from §15.10:** prompt-format vs §13.10 labelling "
+        f"regime (pinned chat-template `{outputs.qwen_model_id}` "
+        "regardless of §13.10's `Q: ... A:` raw-text labelling); "
+        "question-text source (dump field if present, else HF dataset "
+        "by `q_idx`).\n"
+        "- **Inherited from §15.11:** sklearn `penalty` FutureWarning "
+        "filter installed precautionarily even though §15.13 uses only "
+        "`roc_auc_score`.\n"
+    )
+
+    # ---- Section 7: cross-phase comparison -----------------------------
+    lines.append("## Cross-phase comparison (disclosure only)\n")
+    lines.append(
+        "| phase | mechanism class | verdict | this row modifies |\n"
+        "|---|---|---|---|\n"
+        "| §15.10 (Phase 1) | supervised linear (single-turn) | "
+        f"`{PHASE_1_VERDICT}` | no |\n"
+        "| §15.11 (Phase 2) | layer-wise phase coherence (single-turn) | "
+        f"`{PHASE_2_VERDICT}` | no |\n"
+        "| §15.12 (Phase 3) | synthesis + closure | "
+        f"{PHASE_3_STATUS} | no |\n"
+        "| §15.13 (Phase 4) | continuation inertia (multi-turn) | "
+        f"`{cv.label}` | n/a (this row is the result) |\n"
+    )
+    lines.append(
+        "This subsection is disclosure only and does not enter any "
+        "phase's cascade decision. Each phase's verdict is an "
+        "independent §0.8-binding mechanical readout; §15.13 does not "
+        "reopen any prior phase.\n"
+    )
+
+    # ---- Section 8: audit-trail integrity ------------------------------
+    lines.append("## Audit-trail integrity\n")
+    lines.append(
+        "This result is a mechanical readout of the §15.13 cascade "
+        "applied to per-stimulus R_inertia + R_sim cosines computed "
+        "from Qwen-7B's last-layer hidden states across the three "
+        "pinned forward passes. Per §0.8 discipline, the cascade label "
+        "is binding regardless of any post-hoc interpretation.\n\n"
+        "§15.13 does not modify any §13/§14/§15.x verdict-of-record. "
+        "The §13.9 hold remains binding. The §6.1 N=21 autonomy result "
+        "is preserved. §15.10 PARTIAL_SIGNAL_IN_Z is preserved. §15.11 "
+        "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE is preserved. §15.12 "
+        "closure is preserved. §15.13 is a fresh top-level §0.X testing "
+        "a different mechanism class (multi-turn continuation inertia); "
+        "its outcome is independent of the four single-turn canonical "
+        "mechanism classes covered by §15.10 / §15.11 / §15.12.\n\n"
+        "The interpretation firewall scanned this document for "
+        f"{len(CLASS_3_FORBIDDEN_PATTERNS)} Class-3 forbidden statements "
+        "before write. Detection would have triggered "
+        "INTERPRETATION_VIOLATION (exit 4) without writing. The cascade "
+        "verdict above is the binding §15.13 readout.\n"
+    )
+
+    return "\n".join(lines)
+
+
+def write_markdown_output(outputs: InertiaAuditOutputs, path: str) -> None:
+    """Render markdown, run interpretation firewall, then write."""
+    text = render_markdown_report(outputs)
+    enforce_firewall_or_exit(text, path)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("w", encoding="utf-8") as f:
+        f.write(text)
