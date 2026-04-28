@@ -90,3 +90,120 @@ In either case, §13.9 hold and §6.1 N=21 autonomy result are preserved.
 - Does **NOT** authorize Phase 5+ or further §15.x work.
 
 ---
+
+## Pinned mechanism
+
+### Core formula
+
+$$R_{\text{inertia}} = \cos(s_t, r_A) - \cos(s_t, q_B)$$
+
+Where:
+- `s_t` ∈ R^3584 = LM's hidden state at the moment it's about to generate a
+  response to Q_B (last-token, layer −1, taken from the full-context forward
+  pass).
+- `r_A` ∈ R^3584 = pooled hidden state over the actual generated assistant
+  tokens of R_A (mean across token positions, layer −1).
+- `q_B` ∈ R^3584 = LM's hidden state for Q_B in isolation (last-token,
+  layer −1, from a separate forward pass with chat template but no Q_A
+  history).
+
+All three live in Qwen-7B's 3584-dim residual stream; cosine similarities
+are geometrically meaningful.
+
+### The five pinned choice points
+
+These were the unresolved degrees of freedom in the initial proposal. Each
+has exactly one answer that cannot drift during implementation.
+
+**Choice 1: Source of all three representations** → Qwen hidden states only.
+No external sentence encoder. No projection between geometries. The
+mechanism under test is the *LM's* internal state dynamics; an external
+encoder would weaken the claim. (Discussed alternative: external sentence
+encoder for geometric parity. Rejected: weakens the BCVF-faithful
+interpretation.)
+
+**Choice 2: Standalone Q_B representation** → forward pass with the standard
+chat template `[SYS][USER]Q_B[ASSISTANT]_`, no Q_A history. The "what would
+the model be doing if Q_B were a fresh standalone question?" anchor.
+(Discussed alternative: raw `Q_B` text without chat template. Rejected:
+diverges from how the model is actually prompted.)
+
+**Choice 3: Temporal extraction point for s_t** → last-token, layer −1, at
+the position of the second `[ASSISTANT]` tag (just before the model decodes
+the Q_B response). The "ready-to-answer" state.
+(Discussed alternatives: pooled over Q_B tokens; first generated response
+token. Rejected: less direct, more hyperparameter surface.)
+
+**Choice 4: Layer index** → layer −1 (final layer) only. No layer subsets,
+no multi-layer aggregation. Mirrors §15.10. (Discussed alternative: all 29
+layers, multi-layer aggregation. Rejected: opens hyperparameter trap that
+bit §15.11.)
+
+**Choice 5: r_A pooling scope** → mean over the actual decoded R_A token
+positions (the assistant's generated answer span), layer −1. NOT a single
+terminal token after R_A.
+
+> $$r_A = \frac{1}{|T_A|}\sum_{t \in T_A} h_t^{(-1)}$$
+
+where `T_A` is the set of token positions corresponding to R_A in the
+generation pass. `s_t` and `q_B` remain single-token anchors; the asymmetry
+is intentional (r_A is the *trajectory*; s_t and q_B are *moments*).
+(Discussed alternative: single-token state at end of R_A. Rejected: collapses
+the answer trajectory into one summary point; user-flagged as a real
+methodological gap before sealing.)
+
+### R_sim comparator baseline
+
+$$R_{\text{sim}} = \cos(q_A, q_B)$$
+
+Where:
+- `q_A` ∈ R^3584 = LM's hidden state at end of `[SYS][USER]Q_A[ASSISTANT]_`,
+  pre-decode (already computed for free in Pass 1; see Chunk 3).
+- `q_B` ∈ R^3584 = same as in R_inertia (already computed in Pass 3).
+
+R_sim measures pure topical similarity between the two questions in the LM's
+geometry. It controls for the confound: if R_inertia just tracks "how similar
+are the topics," it provides no evidence about continuation inertia
+specifically.
+
+**The cascade requires R_inertia to beat BOTH chance (0.5) AND R_sim's AUC by
+the cascade margin** to clear STRONG / PARTIAL bands. This is the strict-
+comparator requirement, not just chance-vs-zero.
+
+### Direction convention (PINNED, BCVF-faithful)
+
+> Lower R_inertia predicts CORRECT (i.e., the model has pivoted to Q_B and
+> answers it correctly).
+
+Test statistic: `AUC(−R_inertia, y)`. Higher = better signal in the
+hypothesized direction.
+
+**No sign-flip rescue.** If `AUC(−R_inertia, y) < 0.5`, the BCVF-faithful
+direction failed; the cascade lands in NO_MATERIAL automatically (Step 1
+direction gate). The empirical signal in the inverted direction (i.e.,
+*higher* R_inertia predicting correct) is NOT considered. This mirrors
+§15.11's direction-gate enforcement; the pre-committed hypothesis was the
+specific BCVF-faithful direction, and failing it is a hypothesis failure,
+not a sign-flip opportunity.
+
+### What is NOT pinned in v1 (and stays out)
+
+- No combination with other H-class signals (no R_total).
+- No bootstrap CI on the AUCs (mirrors §15.10/§15.11; v1 reports point
+  estimates against pinned bands).
+- No alternative pairing rules beyond `(i, (i + 50) mod 100)`.
+- No second benchmark in v1 (HaluEval is a v2 follow-up only if v1 shows
+  signal).
+- No probe training (pure feature, no fitting).
+
+### Why these specific pinnings (§0.8-disclosed rationale)
+
+Every pinning is a deliberate choice to minimize hyperparameter surface area.
+§15.11 was bitten by static phase-coherence having layer-aggregation,
+binning, and direction-convention degrees of freedom that compounded into a
+brittle direction-gate failure. §15.13 was designed to hold all five major
+choice points fixed before any data is inspected. If the pinned configuration
+fails to show signal, that is the verdict; tweaking the configuration after
+seeing data is forbidden.
+
+---
