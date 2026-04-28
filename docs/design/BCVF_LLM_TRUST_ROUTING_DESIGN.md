@@ -17261,5 +17261,204 @@ benchmark, single decision.
 ---
 
 
+### 15.12 Pre-commitment (continued) — Pinned synthesis memo + autonomy handoff package structure
+
+**Artifact A — Final LLM synthesis memo.**
+
+Output path: `docs/experiments/synthesis_15_12.md`.
+
+Pinned section structure (8 sections, in order):
+
+1. `# §15.12 Phase 3 — Final LLM-transfer synthesis memo`
+   _Header: schema version, build date, sources, closure
+   label one-liner._
+2. `## Executive readout`
+   _3–5 sentence mechanical summary: joint state across 4
+   mechanism classes; closure label; one-line rationale._
+3. `## 4-mechanism-class joint-state matrix`
+   _The pinned table from the inputs/cascade block above
+   (entropy / system-level composition / supervised
+   linear / phase coherence) — populated mechanically
+   from the input JSONs, no prose interpretation in
+   cells._
+4. `## Closure decision (mechanical readout)`
+   _Bootstrap CI lo/hi values; closure label per the
+   pinned rule; decision rationale (one paragraph, no
+   override language)._
+5. `## What the joint state mechanically supports`
+   _Bullet list of statements that ARE supported by the
+   mechanical readout (e.g., "no transfer at the 7B scale
+   under the four canonical mechanism classes tested")._
+6. `## What the joint state does NOT support`
+   _Bullet list of statements that are NOT supported
+   (e.g., "transfer at 13B / 32B / 70B"; "alternative
+   phase-coherence instantiations such as sample-wise or
+   paraphrase-wise")._
+7. `## Audit-trail summary`
+   _Commit references for every input and every prior
+   verdict-of-record. §13.9 hold preserved; §15.x
+   verdicts preserved; §15.12 cascade is binding._
+8. `## Caveats (§0.8-disclosed)`
+   _N=100 power note; single-model-size scope; carries
+   forward §15.10 / §15.11 inherited caveats; §0.8
+   substitution of bootstrap test for "ChatGPT
+   cross-bridge"._
+
+PINNED. No additional sections; no section reordering.
+
+**Artifact B — One-page LLM closure note.**
+
+Output path: `docs/handoff/llm_closure_note.md`.
+
+Pinned structure (~1 page):
+
+```
+# §15.12 LLM closure note (one-page summary)
+
+**Closure outcome:** <CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE | FULLY_CLOSED>
+
+**Joint state (4 mechanism classes):**
+- §13.10 entropy: saturated at AUC = 0.661 both benchmarks.
+- §15.4/§15.6/§15.8 system-level composition: MIXED + C-MISMATCHED.
+- §15.10 supervised linear: PARTIAL_SIGNAL_IN_Z (HaluEval ΔAUC=+0.008,
+  TruthfulQA-MC ΔAUC=-0.039).
+- §15.11 phase coherence: NO_MATERIAL via direction gate.
+
+**Closure rationale (mechanical):** <one paragraph, populated from the
+bootstrap CI test result>
+
+**What this means operationally:**
+- BCVF-style trust routing does not transfer to LLM hallucination
+  detection at the Qwen-7B scale under any of the four pre-committed
+  canonical mechanism classes.
+- All §13/§14/§15.x verdicts-of-record are preserved.
+- §13.9 hold remains binding.
+
+**What is NOT closed:**
+- 13B / 32B / 70B scaling (untested).
+- Sample-wise / paraphrase-wise phase coherence (untested).
+- Non-canonical mechanism classes (e.g., probing classifiers on attention
+  heads, residual-stream eigenvectors, SAE features) — untested.
+
+**Reopening conditions:** <populated mechanically based on closure outcome>
+```
+
+PINNED. Audience: a future operator who needs the verdict
+in 60 seconds without reading the full synthesis memo.
+
+**Artifact C — Autonomy handoff package.**
+
+Output paths:
+
+```
+docs/handoff/autonomy_handoff_executive_memo.md
+docs/handoff/autonomy_handoff_claim_ladder.md
+docs/handoff/autonomy_handoff_90_day_plan.md
+docs/handoff/autonomy_handoff_narrative_set.md
+```
+
+**C.1 — Executive memo
+(`autonomy_handoff_executive_memo.md`).**
+
+Pinned structure (~1.5 pages):
+
+- Header with §15.12 closure label.
+- One paragraph: "What we tried, what we found, where the
+  autonomy result stands now."
+- Three subsections: (a) BCVF-autonomy result (§6.1, N=21
+  sign test) — preserved; (b) BCVF → LLM transfer attempt
+  — closed at §15.12; (c) implications for forward
+  autonomy work.
+- Closing: explicit statement that the autonomy domain
+  proceeds **without inheriting unresolved LLM-transfer
+  ambiguity**.
+
+**C.2 — Claim ladder
+(`autonomy_handoff_claim_ladder.md`).**
+
+Pinned structure: a strict ladder of claims from
+"definitely supported by current evidence" →
+"speculatively suggested by current evidence" →
+"explicitly NOT supported by current evidence." Each rung
+references the specific §-numbered verdict that supports
+or rejects the claim. Format:
+
+```
+**Rung 1 (definitely supported):**
+- ...
+**Rung 2 (well-supported):**
+- ...
+**Rung 3 (suggested, not proven):**
+- ...
+**Rung 4 (untested):**
+- ...
+**Rung 5 (explicitly NOT supported):**
+- ...
+```
+
+PINNED. Each claim must cite a §-number (e.g., "§6.1 N=21
+sign test") or be marked as untested.
+
+**C.3 — 90-day plan
+(`autonomy_handoff_90_day_plan.md`).**
+
+Pinned structure: 90-day forward work for the **autonomy
+domain only** (LLM line is closed at §15.12). Three time
+blocks: 0–30, 30–60, 60–90 days. Each block: (a) goals,
+(b) success criteria, (c) explicit non-goals. Non-goals
+must include: "no further LLM-transfer attempts under the
+four canonical mechanism classes already tested." PINNED.
+
+**C.4 — Narrative set
+(`autonomy_handoff_narrative_set.md`).**
+
+Pinned structure: 4 audience-targeted one-paragraph
+narratives:
+
+1. **Engineering peer:** technical detail; cites
+   §-numbers; covers transfer-failure mechanism classes.
+2. **Funder / grant reviewer:** outcome-oriented;
+   explicit closure status; what was learned.
+3. **End user / operator:** plain-language; no §-numbers;
+   what this means for production autonomy systems.
+4. **Internal record:** §0.8-binding language; full
+   audit-trail integrity statement.
+
+PINNED.
+
+**Output paths summary.**
+
+```
+docs/experiments/synthesis_15_12.json                       # machine-readable
+docs/experiments/synthesis_15_12.md                         # Artifact A
+docs/handoff/llm_closure_note.md                            # Artifact B
+docs/handoff/autonomy_handoff_executive_memo.md             # Artifact C.1
+docs/handoff/autonomy_handoff_claim_ladder.md               # Artifact C.2
+docs/handoff/autonomy_handoff_90_day_plan.md                # Artifact C.3
+docs/handoff/autonomy_handoff_narrative_set.md              # Artifact C.4
+```
+
+Total: 7 artifacts (1 JSON + 6 markdown). All
+firewall-scanned before write.
+
+**What is NOT in any artifact.**
+
+- Any §-numbered verdict re-classification.
+- Any prose suggesting §15.10's PARTIAL was wrong.
+- Any prose suggesting §15.11's NO_MATERIAL should be
+  relaxed.
+- Any prose authorizing §15.12 outside the §15.11
+  authorization mapping.
+- Any prose authorizing autonomy handoff actions that
+  contradict the §6.1 N=21 result.
+- Any prose suggesting the bootstrap test was
+  inappropriate or should be replaced.
+
+The §15.12 firewall pattern set (next chunk) enumerates
+these explicitly.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
