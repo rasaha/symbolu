@@ -508,3 +508,315 @@ def run_exploratory_analysis(
         per_stimulus_r_inertia=tuple(float(f.r_inertia) for f in features),
         per_stimulus_r_sim=tuple(float(f.r_sim) for f in features),
     )
+
+
+# ===========================================================================
+# Firewall — inherits §15.13's 44-pattern Class-3 list and adds 5
+# exploratory-specific patterns that block accidental cascade-amendment
+# language. Match policy preserved: case-insensitive substring for non-§
+# patterns; literal (case-sensitive) substring for §-anchored patterns.
+# ===========================================================================
+
+
+def scan_with_extra_patterns(text: str) -> list[str]:
+    """Run §15.13's 44-pattern firewall, then check the 5 exploratory
+    extras. Returns combined list of detected patterns."""
+    found = scan_for_forbidden_patterns(text)
+    lowered = text.lower()
+    for pattern in EXPLORATORY_EXTRA_FIREWALL_PATTERNS:
+        if pattern.startswith("§"):
+            if pattern in text:
+                found.append(pattern)
+        else:
+            if pattern.lower() in lowered:
+                found.append(pattern)
+    return found
+
+
+def enforce_exploratory_firewall_or_exit(text: str, output_path: str) -> None:
+    """Scan with the §15.13 + exploratory pattern set; exit 4 on detection."""
+    violations = scan_with_extra_patterns(text)
+    if violations:
+        print(
+            f"INTERPRETATION_VIOLATION: refused to write {output_path}.",
+            flush=True,
+        )
+        print("  detected forbidden statement(s):", flush=True)
+        for v in violations:
+            print(f"    - {v!r}", flush=True)
+        print(
+            "  rewrite the offending sentence(s); the §15.13 cascade "
+            "verdict is binding, and exploratory subset findings cannot "
+            "amend it.",
+            flush=True,
+        )
+        sys.exit(4)
+
+
+# ===========================================================================
+# JSON output writer.
+#
+# The schema is distinct from §15.13's primary JSON: a different
+# schema_version string ("15.13.exploratory.v1") and an explicit
+# `non_amendment_declaration` top-level key. Top-level keys are
+# alphabetical (sort_keys=True parity with the primary script).
+# ===========================================================================
+
+
+def _subset_to_dict(s: SubsetSummary) -> dict:
+    def _maybe(v: float) -> Optional[float]:
+        return None if math.isnan(v) else float(v)
+
+    return {
+        "name": s.name,
+        "pos_label": s.pos_label,
+        "neg_label": s.neg_label,
+        "n_pos": int(s.n_pos),
+        "n_neg": int(s.n_neg),
+        "eligible": bool(s.eligible),
+        "auc_inertia": _maybe(s.auc_inertia),
+        "auc_sim": _maybe(s.auc_sim),
+        "dauc_inertia_vs_chance": _maybe(s.dauc_inertia_vs_chance),
+        "dauc_inertia_vs_sim": _maybe(s.dauc_inertia_vs_sim),
+        "r_inertia_pos_mean": _maybe(s.r_inertia_pos_mean),
+        "r_inertia_pos_std": _maybe(s.r_inertia_pos_std),
+        "r_inertia_neg_mean": _maybe(s.r_inertia_neg_mean),
+        "r_inertia_neg_std": _maybe(s.r_inertia_neg_std),
+        "rationale": str(s.rationale),
+    }
+
+
+def _build_exploratory_payload(run: ExploratoryRun) -> dict:
+    """Construct the §15.13 exploratory JSON payload."""
+    return {
+        "benchmark": str(run.benchmark),
+        "exploratory_schema_version": str(run.exploratory_schema_version),
+        "label_counts": dict(run.label_counts),
+        "label_scheme": {
+            "primary_label_source": "§13.10 NLI binary y (entails gold AND not entails any distractor)",
+            "exploratory_3way_label": "CORRECT / REFUSAL / CONFIDENT_WRONG",
+            "refusal_markers": list(REFUSAL_MARKERS),
+            "short_response_floor_for_y0": int(SHORT_RESPONSE_FLOOR_FOR_Y0),
+            "min_class_size_for_auc": int(MIN_CLASS_SIZE_FOR_AUC),
+            "note": (
+                "Refusal labels are heuristic text-based labels layered "
+                "on top of the primary correctness label and are not "
+                "equivalent to a prevalidated refusal benchmark."
+            ),
+        },
+        "n_stimuli": int(run.n_stimuli),
+        "non_amendment_declaration": (
+            "EXPLORATORY ONLY. The §15.13 cascade verdict "
+            f"{run.primary_phase_verdict_unchanged} (commit "
+            f"{run.primary_phase_verdict_commit}) STAYS BINDING. "
+            "Subset findings here are hypothesis-generating; turning "
+            "any of them into a binding claim requires a fresh "
+            "pre-committed §0.X — not an amendment to §15.13."
+        ),
+        "per_stimulus_labels": list(run.per_stimulus_labels),
+        "per_stimulus_r_inertia": [float(v) for v in run.per_stimulus_r_inertia],
+        "per_stimulus_r_sim": [float(v) for v in run.per_stimulus_r_sim],
+        "primary_phase_schema_version": str(run.primary_phase_schema_version),
+        "primary_phase_verdict_commit": str(run.primary_phase_verdict_commit),
+        "primary_phase_verdict_unchanged": str(
+            run.primary_phase_verdict_unchanged
+        ),
+        "qwen_model_id": QWEN_MODEL_ID,
+        "subsets": [_subset_to_dict(s) for s in run.subsets],
+    }
+
+
+def write_exploratory_json(run: ExploratoryRun, path: str) -> None:
+    """Serialize to JSON (indent=2, sort_keys=True)."""
+    payload = _build_exploratory_payload(run)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, sort_keys=True)
+
+
+# ===========================================================================
+# Markdown rendering + firewall-scanned writer.
+#
+# The first paragraph carries the explicit non-amendment declaration. The
+# subset table renders ineligible subsets with "—" / INSUFFICIENT_N rather
+# than dropping them — eligibility itself is information.
+# ===========================================================================
+
+
+def _format_subsets_table(subsets: tuple[SubsetSummary, ...]) -> str:
+    lines = [
+        "| subset | pos | neg | n_pos | n_neg | AUC(inertia) | ΔAUC vs chance | AUC(sim) | ΔAUC vs sim | eligible |",
+        "|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for s in subsets:
+        if s.eligible:
+            lines.append(
+                f"| {s.name} | {s.pos_label} | {s.neg_label} | "
+                f"{s.n_pos} | {s.n_neg} | "
+                f"{s.auc_inertia:.4f} | {s.dauc_inertia_vs_chance:+.4f} | "
+                f"{s.auc_sim:.4f} | {s.dauc_inertia_vs_sim:+.4f} | yes |"
+            )
+        else:
+            lines.append(
+                f"| {s.name} | {s.pos_label} | {s.neg_label} | "
+                f"{s.n_pos} | {s.n_neg} | — | — | — | — | "
+                f"no ({s.rationale}) |"
+            )
+    return "\n".join(lines)
+
+
+def render_exploratory_markdown(run: ExploratoryRun) -> str:
+    """Render the §15.13 exploratory markdown (firewall-scanned by caller).
+
+    Section structure:
+      1. Header + explicit non-amendment declaration.
+      2. Label scheme (primary + exploratory) with the disclosure note.
+      3. Class counts (pre-AUC).
+      4. Subset AUC table.
+      5. Per-subset detail (R_inertia distribution per class for
+         eligible subsets; INSUFFICIENT_N message for ineligible).
+      6. Method notes + caveats.
+    """
+    counts = run.label_counts
+    subsets = run.subsets
+
+    lines: list[str] = []
+
+    # Section 1 — header + non-amendment declaration.
+    lines.append(
+        "# §15.13 exploratory analysis — refusal / confident-wrong "
+        "subset AUCs\n"
+    )
+    lines.append(
+        f"_Exploratory schema: `{run.exploratory_schema_version}`; "
+        f"primary §15.13 schema: `{run.primary_phase_schema_version}`; "
+        f"benchmark: `{run.benchmark}`; N = {run.n_stimuli}._\n"
+    )
+    lines.append(
+        "**EXPLORATORY ONLY.** The §15.13 cascade verdict "
+        f"`{run.primary_phase_verdict_unchanged}` "
+        f"(commit `{run.primary_phase_verdict_commit}`) stays binding. "
+        "Subset findings below are hypothesis-generating; turning any "
+        "of them into a binding claim requires a fresh pre-committed "
+        "§0.X — not an amendment to §15.13.\n"
+    )
+    lines.append(
+        "**Refusal labels in this artifact are heuristic text-based "
+        "labels layered on top of the primary §13.10-style correctness "
+        "label and are NOT equivalent to a prevalidated refusal "
+        "benchmark.**\n"
+    )
+
+    # Section 2 — label scheme.
+    lines.append("## Label scheme\n")
+    lines.append(
+        "- **Primary label (binding for §15.13):** §13.10 NLI binary y\n"
+        "  (entails gold AND not entails any distractor).\n"
+        "- **Exploratory 3-way label (this artifact only):**\n"
+        "  - `CORRECT`         when y == 1.\n"
+        "  - `REFUSAL`         when y == 0 AND "
+        f"(`len(response.strip()) < {SHORT_RESPONSE_FLOOR_FOR_Y0}` "
+        "OR response_lower contains a refusal marker).\n"
+        "  - `CONFIDENT_WRONG` when y == 0 AND not REFUSAL.\n"
+        f"- **Refusal markers ({len(REFUSAL_MARKERS)}, pre-committed):**\n"
+    )
+    for marker in REFUSAL_MARKERS:
+        lines.append(f"    - `{marker}`")
+    lines.append("")
+    lines.append(
+        f"- **Min class size for AUC:** "
+        f"`MIN_CLASS_SIZE_FOR_AUC = {MIN_CLASS_SIZE_FOR_AUC}`. Below "
+        "this floor a subset reports `INSUFFICIENT_N` rather than a "
+        "small-sample AUC.\n"
+    )
+
+    # Section 3 — class counts (pre-AUC).
+    lines.append("## Class counts (reported before any AUC)\n")
+    lines.append(
+        "| class | count |\n"
+        "|---|---|\n"
+        f"| `CORRECT`         | {counts[LABEL_CORRECT]} |\n"
+        f"| `REFUSAL`         | {counts[LABEL_REFUSAL]} |\n"
+        f"| `CONFIDENT_WRONG` | {counts[LABEL_CONFIDENT_WRONG]} |\n"
+        f"| **TOTAL**         | **{counts['TOTAL']}** |\n"
+    )
+
+    # Section 4 — subset AUC table.
+    lines.append("## Subset AUCs (disclosure only — not §15.13 cascade inputs)\n")
+    lines.append(_format_subsets_table(subsets))
+    lines.append("")
+    lines.append(
+        "Score in all subsets is `−R_inertia` (BCVF-faithful direction: "
+        "lower R_inertia predicts the positive class). `AUC(sim)` uses "
+        "`−R_sim` over the same subset for the topical-similarity "
+        "comparator. The §15.13 cascade is NOT applied to any subset "
+        "above; cascade application is §15.13-binding only.\n"
+    )
+
+    # Section 5 — per-subset R_inertia distribution per class.
+    lines.append("## Per-subset R_inertia distribution\n")
+    for s in subsets:
+        if not s.eligible:
+            lines.append(
+                f"### `{s.name}`\n"
+                f"_{s.rationale}._ (n_pos={s.n_pos}, n_neg={s.n_neg}; "
+                f"require ≥{MIN_CLASS_SIZE_FOR_AUC} per class.)\n"
+            )
+            continue
+        lines.append(
+            f"### `{s.name}` — pos = `{s.pos_label}` / neg = `{s.neg_label}`\n"
+            f"- pos (n={s.n_pos}): R_inertia mean = "
+            f"{s.r_inertia_pos_mean:+.4f}, std = {s.r_inertia_pos_std:.4f}\n"
+            f"- neg (n={s.n_neg}): R_inertia mean = "
+            f"{s.r_inertia_neg_mean:+.4f}, std = {s.r_inertia_neg_std:.4f}\n"
+            f"- AUC(inertia) = **{s.auc_inertia:.4f}**; "
+            f"ΔAUC vs chance = {s.dauc_inertia_vs_chance:+.4f}; "
+            f"AUC(sim) = {s.auc_sim:.4f}; "
+            f"ΔAUC vs sim = {s.dauc_inertia_vs_sim:+.4f}\n"
+        )
+
+    # Section 6 — method notes + caveats.
+    lines.append("## Method notes\n")
+    lines.append(
+        "- This artifact is generated post-hoc from the §15.13 "
+        "extraction cache; no model reload, no re-extraction. The "
+        "per-stimulus `R_inertia` and `R_sim` values are byte-for-byte "
+        "identical to those used by the §15.13 primary probe.\n"
+        "- Class counts are reported BEFORE any AUC. Subsets failing "
+        f"the `MIN_CLASS_SIZE_FOR_AUC = {MIN_CLASS_SIZE_FOR_AUC}` floor "
+        "report INSUFFICIENT_N to avoid meaningless small-sample AUC.\n"
+        "- The pinned refusal-marker list, short-response floor, and "
+        "minimum-class-size floor were committed BEFORE any subset AUC "
+        "was inspected. Modifying them after seeing data here would be "
+        "HARKing and is forbidden.\n"
+        "- A subset clearing AUC ≥ 0.75 here would be a candidate for a "
+        "fresh pre-committed §0.X — not an automatic upgrade of §15.13. "
+        "The §15.13 cascade rule, direction convention, and threshold "
+        "set are §15.13-binding only.\n"
+        f"- Heuristic refusal classification is a coarse proxy. A "
+        "future §0.X with a hand-validated refusal benchmark could "
+        "yield different counts and shift any subset AUC by a few "
+        "points; v1 reports the heuristic as-is.\n"
+    )
+    lines.append(
+        "## §15.13 audit-trail integrity\n"
+        f"§15.13 cascade verdict `{run.primary_phase_verdict_unchanged}` "
+        f"(commit `{run.primary_phase_verdict_commit}`) is preserved. "
+        "§13.9 hold remains binding. §6.1 N=21 autonomy result is "
+        "preserved. §15.10 PARTIAL_SIGNAL_IN_Z is preserved. §15.11 "
+        "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE is preserved. §15.12 "
+        "closure is preserved. This exploratory artifact is "
+        "non-binding and does not modify any §13/§14/§15.x "
+        "verdict-of-record.\n"
+    )
+
+    return "\n".join(lines)
+
+
+def write_exploratory_markdown(run: ExploratoryRun, path: str) -> None:
+    """Render markdown, run the firewall (44 + 5 patterns), then write."""
+    text = render_exploratory_markdown(run)
+    enforce_exploratory_firewall_or_exit(text, path)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("w", encoding="utf-8") as f:
+        f.write(text)
