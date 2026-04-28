@@ -1374,3 +1374,405 @@ def load_extractions_cache(path: str) -> tuple[StimulusExtraction, ...]:
             )
         )
     return tuple(extractions)
+
+
+# ===========================================================================
+# §15.13 Chunk I-3 — derived features (R_inertia, R_sim, cosines), selective-
+# prediction κ@α at the pinned alphas (disclosure-only), aggregate probe run
+# (run_inertia_probe), and the §15.13 cascade classifier with direction gate
+# + dual-comparator (chance + R_sim) STRONG/PARTIAL bands.
+#
+# Formula recap (PINNED):
+#     R_inertia = cos(s_t, r_a) - cos(s_t, q_b)        # primary signal
+#     R_sim     = cos(q_a, q_b)                        # comparator
+#     auc_inertia = AUC(-R_inertia, y)
+#     auc_sim     = AUC(-R_sim,     y)
+# Higher AUC → better signal in the BCVF-faithful direction
+# (lower R_* predicts correct).
+#
+# Cosines computed in fp64 from fp32 cache values. No clipping required
+# since inputs are real-valued LM hidden states (no FFT).
+# ===========================================================================
+
+
+def _cosine_fp64(a: np.ndarray, b: np.ndarray) -> float:
+    """Numerically-stable cosine similarity between two 1-D vectors.
+
+    Casts to fp64 before computing dot/norm to limit accumulation error
+    on 3584-dim residual-stream vectors. Returns NaN if either norm is
+    zero (caller should treat that as PROBE_FAILED — pinned hidden states
+    should never be exactly zero).
+    """
+    if a.shape != b.shape:
+        raise ValueError(
+            f"_cosine_fp64 shape mismatch: {a.shape} vs {b.shape}"
+        )
+    if a.ndim != 1:
+        raise ValueError(
+            f"_cosine_fp64 expected 1-D vectors; got {a.ndim}-D"
+        )
+    a64 = a.astype(np.float64, copy=False)
+    b64 = b.astype(np.float64, copy=False)
+    na = float(np.linalg.norm(a64))
+    nb = float(np.linalg.norm(b64))
+    if na == 0.0 or nb == 0.0:
+        return float("nan")
+    return float(np.dot(a64, b64) / (na * nb))
+
+
+def compute_features_per_stimulus(
+    extraction: StimulusExtraction,
+) -> StimulusFeatures:
+    """Derive the §15.13 per-stimulus scalars.
+
+    cos_st_ra = cos(s_t, r_a_repr)           # alignment with prior answer
+    cos_st_qb = cos(s_t, q_b_repr)           # alignment with new question
+    cos_qa_qb = cos(q_a_repr, q_b_repr)      # baseline question-similarity
+    R_inertia = cos_st_ra - cos_st_qb        # primary signal
+    R_sim     = cos_qa_qb                    # comparator baseline
+    """
+    cos_st_ra = _cosine_fp64(extraction.s_t, extraction.r_a_repr)
+    cos_st_qb = _cosine_fp64(extraction.s_t, extraction.q_b_repr)
+    cos_qa_qb = _cosine_fp64(extraction.q_a_repr, extraction.q_b_repr)
+    if not all(math.isfinite(v) for v in (cos_st_ra, cos_st_qb, cos_qa_qb)):
+        raise RuntimeError(
+            f"PROBE_FAILED: pair {extraction.pair_idx} produced non-finite "
+            f"cosine "
+            f"(cos_st_ra={cos_st_ra}, cos_st_qb={cos_st_qb}, "
+            f"cos_qa_qb={cos_qa_qb}); a hidden state may be the zero vector."
+        )
+    r_inertia = cos_st_ra - cos_st_qb
+    return StimulusFeatures(
+        pair_idx=int(extraction.pair_idx),
+        q_a_idx=int(extraction.q_a_idx),
+        q_b_idx=int(extraction.q_b_idx),
+        cos_st_ra=float(cos_st_ra),
+        cos_st_qb=float(cos_st_qb),
+        cos_qa_qb=float(cos_qa_qb),
+        r_inertia=float(r_inertia),
+        r_sim=float(cos_qa_qb),
+        y=bool(extraction.y),
+    )
+
+
+def compute_features_all(
+    extractions: tuple[StimulusExtraction, ...],
+) -> tuple[StimulusFeatures, ...]:
+    """Vectorize compute_features_per_stimulus over all PINNED_N stimuli."""
+    if len(extractions) != PINNED_N:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: compute_features_all expected {PINNED_N} "
+            f"extractions; got {len(extractions)}."
+        )
+    return tuple(compute_features_per_stimulus(e) for e in extractions)
+
+
+# ---------------------------------------------------------------------------
+# Lazy sklearn import + selective-prediction κ@α (mirrors §15.11). Operating
+# points are reported in the JSON / MD output for transparency but do NOT
+# enter the cascade decision per spec.
+# ---------------------------------------------------------------------------
+
+
+def _lazy_import_sklearn():
+    """Lazy import of `roc_auc_score` from sklearn."""
+    try:
+        from sklearn.metrics import roc_auc_score  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "§15.13 inertia probe requires scikit-learn for "
+            "roc_auc_score. Install before --probe-only or default."
+        ) from exc
+    from sklearn.metrics import roc_auc_score
+
+    return roc_auc_score
+
+
+def _selective_kappa_at_alpha(
+    score: np.ndarray, y: np.ndarray, alpha: float
+) -> tuple[float, float, dict]:
+    """κ@α: maximum coverage achieved at threshold τ* with conditional
+    accuracy ≥ α and at least N_MIN admitted.
+
+    score is the abstention score; admit iff score >= τ. Per §15.13 spec
+    the score for selective prediction is `-R_inertia` (higher = more
+    confident the model will be correct). `y` is the boolean correctness
+    label cast to int.
+
+    Returns (best_kappa, tau_star, operating_point_dict). The dict matches
+    the §15.10 / §15.11 selective-prediction operating-point schema and
+    is what gets serialized into the JSON output.
+    """
+    n = int(len(score))
+    if n != int(len(y)):
+        raise ValueError("score and y length mismatch")
+    thresholds = sorted(
+        set([float(score.min() - 1.0)] + [float(v) for v in score])
+    )
+    operating_point: dict = {
+        "alpha": float(alpha),
+        "tau_star": float("nan"),
+        "kappa_at_alpha": 0.0,
+        "coverage_at_tau_star": 0.0,
+        "conditional_accuracy_at_tau_star": float("nan"),
+        "n_admitted_at_tau_star": 0,
+        "eligible": False,
+    }
+    best_kappa = 0.0
+    for tau in thresholds:
+        admitted = score >= tau
+        n_adm = int(admitted.sum())
+        if n_adm < N_MIN:
+            continue
+        cond_acc = float(y[admitted].mean())
+        if cond_acc < alpha:
+            continue
+        coverage = n_adm / n
+        if coverage > best_kappa:
+            best_kappa = coverage
+            operating_point.update(
+                tau_star=float(tau),
+                kappa_at_alpha=float(coverage),
+                coverage_at_tau_star=float(coverage),
+                conditional_accuracy_at_tau_star=float(cond_acc),
+                n_admitted_at_tau_star=int(n_adm),
+                eligible=True,
+            )
+    return best_kappa, operating_point["tau_star"], operating_point
+
+
+# ---------------------------------------------------------------------------
+# Aggregate-level §15.13 probe run.
+# ---------------------------------------------------------------------------
+
+
+def run_inertia_probe(
+    extractions: tuple[StimulusExtraction, ...],
+    features: Optional[tuple[StimulusFeatures, ...]] = None,
+) -> InertiaProbeResult:
+    """Compute per-stimulus features (if not provided), aggregate AUCs vs
+    chance and vs R_sim, and selective-prediction operating points.
+
+    Aggregate computations (per spec):
+        auc_inertia = roc_auc_score(y, -R_inertia_array)
+        auc_sim     = roc_auc_score(y, -R_sim_array)
+        dauc_vs_chance = auc_inertia - 0.5
+        dauc_vs_sim    = auc_inertia - auc_sim
+        direction_held = (auc_inertia >= 0.5)
+
+    The negation in `roc_auc_score(y, -R_*)` reflects the BCVF-faithful
+    direction convention: lower R_* predicts correct, so the score for
+    AUC must be flipped sign. After negation: higher score → predicts
+    correct.
+
+    Selective-prediction operating points are computed at the pinned
+    alphas (0.35, 0.50, 0.75) using `-R_inertia` as the abstention score.
+    These are disclosure-only — they do NOT enter the cascade decision.
+    """
+    roc_auc_score = _lazy_import_sklearn()
+
+    if features is None:
+        features = compute_features_all(extractions)
+    if len(features) != PINNED_N:
+        raise SchemaMismatchError(
+            f"SCHEMA_MISMATCH: run_inertia_probe expected {PINNED_N} "
+            f"features; got {len(features)}."
+        )
+
+    r_inertia = np.asarray(
+        [f.r_inertia for f in features], dtype=np.float64
+    )
+    r_sim = np.asarray([f.r_sim for f in features], dtype=np.float64)
+    y_arr = np.asarray([f.y for f in features], dtype=np.int64)
+    if not np.all(np.isfinite(r_inertia)) or not np.all(np.isfinite(r_sim)):
+        raise RuntimeError(
+            "PROBE_FAILED: non-finite R_inertia or R_sim entry; "
+            "investigate before running cascade."
+        )
+
+    n_stimuli = int(y_arr.shape[0])
+    n_correct = int(y_arr.sum())
+    n_wrong = int(n_stimuli - n_correct)
+    if n_correct == 0 or n_wrong == 0:
+        raise RuntimeError(
+            f"PROBE_FAILED: degenerate label distribution "
+            f"(n_correct={n_correct}, n_wrong={n_wrong}); AUC undefined."
+        )
+
+    auc_inertia = float(roc_auc_score(y_arr, -r_inertia))
+    auc_sim = float(roc_auc_score(y_arr, -r_sim))
+    dauc_vs_chance = float(auc_inertia - CHANCE_BASELINE_AUC)
+    dauc_vs_sim = float(auc_inertia - auc_sim)
+    direction_held = bool(auc_inertia >= DIRECTION_GATE_THRESHOLD)
+
+    # Selective-prediction κ@α at the pinned alphas (disclosure only).
+    score_for_kappa = -r_inertia
+    operating_points: list[dict] = []
+    primary_kappa = 0.0
+    primary_tau = float("nan")
+    for alpha in ALPHA_TARGETS:
+        kappa, tau, op = _selective_kappa_at_alpha(
+            score_for_kappa, y_arr, float(alpha)
+        )
+        operating_points.append(op)
+        if math.isclose(alpha, ALPHA_PRIMARY, abs_tol=1e-9):
+            primary_kappa = kappa
+            primary_tau = tau
+
+    if not any(
+        math.isclose(op["alpha"], ALPHA_PRIMARY, abs_tol=1e-9)
+        for op in operating_points
+    ):
+        kappa, tau, op = _selective_kappa_at_alpha(
+            score_for_kappa, y_arr, float(ALPHA_PRIMARY)
+        )
+        operating_points.append(op)
+        primary_kappa = kappa
+        primary_tau = tau
+
+    return InertiaProbeResult(
+        benchmark=BENCHMARK,
+        n_stimuli=n_stimuli,
+        n_correct=n_correct,
+        n_wrong=n_wrong,
+        auc_inertia=auc_inertia,
+        auc_sim=auc_sim,
+        dauc_inertia_vs_chance=dauc_vs_chance,
+        dauc_inertia_vs_sim=dauc_vs_sim,
+        direction_held=direction_held,
+        r_inertia_per_stimulus=tuple(float(v) for v in r_inertia),
+        r_sim_per_stimulus=tuple(float(v) for v in r_sim),
+        y_per_stimulus=tuple(bool(v) for v in y_arr),
+        operating_points=tuple(operating_points),
+        kappa_at_alpha_primary=float(primary_kappa),
+        tau_star_at_alpha_primary=float(primary_tau),
+        n_r_a_tokens_per_stimulus=tuple(
+            int(e.n_r_a_tokens) for e in extractions
+        ),
+        n_q_b_response_tokens_per_stimulus=tuple(
+            int(e.n_q_b_response_tokens) for e in extractions
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# §15.13 cascade classifier. Three steps in mechanical order
+# (PINNED per spec §15.13 cascade structure):
+#
+#   Step 1 — Direction gate (PINNED):
+#     If auc_inertia < 0.5 → NO_MATERIAL_SIGNAL_IN_INERTIA. Skip rest.
+#     (BCVF-faithful direction failure; no sign-flip rescue.)
+#
+#   Step 2 — STRONG check:
+#     If auc_inertia ≥ 0.75 AND
+#        (auc_inertia − 0.5) ≥ 0.05 AND
+#        (auc_inertia − auc_sim) ≥ 0.05
+#     → STRONG_SIGNAL_IN_INERTIA.
+#
+#   Step 3 — PARTIAL check:
+#     If not STRONG, AND
+#        auc_inertia ≥ 0.66 AND
+#        (auc_inertia − 0.5) > 0 AND
+#        (auc_inertia − auc_sim) > 0
+#     → PARTIAL_SIGNAL_IN_INERTIA.
+#
+#   Step 4 — Default:
+#     Otherwise → NO_MATERIAL_SIGNAL_IN_INERTIA.
+#
+# The dual-comparator requirement (chance + R_sim) is the strict version
+# enforced per spec — R_inertia must beat the topic-similarity baseline,
+# not merely chance.
+# ---------------------------------------------------------------------------
+
+
+def classify_cascade_inertia(
+    auc_inertia: float, auc_sim: float
+) -> InertiaCascadeVerdict:
+    """Apply the §15.13 3-step cascade. Inputs are AUC(-R_*, y) values."""
+    auc_inertia = float(auc_inertia)
+    auc_sim = float(auc_sim)
+    dauc_vs_chance = auc_inertia - CHANCE_BASELINE_AUC
+    dauc_vs_sim = auc_inertia - auc_sim
+    direction_held = bool(auc_inertia >= DIRECTION_GATE_THRESHOLD)
+
+    # Step 1 — Direction gate.
+    if not direction_held:
+        rationale = (
+            f"NO_MATERIAL (direction gate): wrong-direction failure. "
+            f"BCVF-faithful direction (lower R_inertia predicts correct) "
+            f"did not hold (auc_inertia = {auc_inertia:.3f} < "
+            f"{DIRECTION_GATE_THRESHOLD}). No sign-flip rescue per §0.8."
+        )
+        return InertiaCascadeVerdict(
+            label="NO_MATERIAL_SIGNAL_IN_INERTIA",
+            auc_inertia=auc_inertia,
+            auc_sim=auc_sim,
+            dauc_vs_chance=float(dauc_vs_chance),
+            dauc_vs_sim=float(dauc_vs_sim),
+            direction_held=direction_held,
+            rationale=rationale,
+        )
+
+    # Step 2 — STRONG check (dual comparator inclusive).
+    is_strong = (
+        auc_inertia >= STRONG_AUC_THRESHOLD
+        and dauc_vs_chance >= STRONG_DELTA_AUC_THRESHOLD
+        and dauc_vs_sim >= STRONG_DELTA_AUC_THRESHOLD
+    )
+    if is_strong:
+        rationale = (
+            f"STRONG: auc_inertia = {auc_inertia:.3f} ≥ "
+            f"{STRONG_AUC_THRESHOLD}; ΔAUC vs chance = "
+            f"{dauc_vs_chance:+.3f} ≥ +{STRONG_DELTA_AUC_THRESHOLD}; "
+            f"ΔAUC vs R_sim = {dauc_vs_sim:+.3f} ≥ "
+            f"+{STRONG_DELTA_AUC_THRESHOLD} (auc_sim = {auc_sim:.3f})."
+        )
+        return InertiaCascadeVerdict(
+            label="STRONG_SIGNAL_IN_INERTIA",
+            auc_inertia=auc_inertia,
+            auc_sim=auc_sim,
+            dauc_vs_chance=float(dauc_vs_chance),
+            dauc_vs_sim=float(dauc_vs_sim),
+            direction_held=direction_held,
+            rationale=rationale,
+        )
+
+    # Step 3 — PARTIAL check (dual comparator strictly positive).
+    is_partial = (
+        auc_inertia >= PARTIAL_AUC_THRESHOLD
+        and dauc_vs_chance > 0.0
+        and dauc_vs_sim > 0.0
+    )
+    if is_partial:
+        rationale = (
+            f"PARTIAL: not STRONG; auc_inertia = {auc_inertia:.3f} ≥ "
+            f"{PARTIAL_AUC_THRESHOLD}; ΔAUC vs chance = "
+            f"{dauc_vs_chance:+.3f} > 0; ΔAUC vs R_sim = "
+            f"{dauc_vs_sim:+.3f} > 0 (auc_sim = {auc_sim:.3f})."
+        )
+        return InertiaCascadeVerdict(
+            label="PARTIAL_SIGNAL_IN_INERTIA",
+            auc_inertia=auc_inertia,
+            auc_sim=auc_sim,
+            dauc_vs_chance=float(dauc_vs_chance),
+            dauc_vs_sim=float(dauc_vs_sim),
+            direction_held=direction_held,
+            rationale=rationale,
+        )
+
+    # Step 4 — Default.
+    rationale = (
+        f"NO_MATERIAL: direction held (auc_inertia = {auc_inertia:.3f} ≥ "
+        f"{DIRECTION_GATE_THRESHOLD}), but neither STRONG nor PARTIAL "
+        f"conditions met. ΔAUC vs chance = {dauc_vs_chance:+.3f}; "
+        f"ΔAUC vs R_sim = {dauc_vs_sim:+.3f} (auc_sim = {auc_sim:.3f})."
+    )
+    return InertiaCascadeVerdict(
+        label="NO_MATERIAL_SIGNAL_IN_INERTIA",
+        auc_inertia=auc_inertia,
+        auc_sim=auc_sim,
+        dauc_vs_chance=float(dauc_vs_chance),
+        dauc_vs_sim=float(dauc_vs_sim),
+        direction_held=direction_held,
+        rationale=rationale,
+    )
