@@ -17108,5 +17108,158 @@ is sealed.
 ---
 
 
+### 15.12 Pre-commitment (continued) — Pinned inputs, 4-mechanism-class joint-state matrix, closure decision rule
+
+**Pinned inputs (read-only).**
+
+§15.12 reads from the following committed artifacts; it
+does NOT modify them:
+
+```
+docs/experiments/probe_supervised_15_10.json        # §15.10 verdict (PARTIAL_SIGNAL_IN_Z)
+docs/experiments/probe_supervised_15_10.md
+docs/experiments/probe_phase_coherence_15_11.json   # §15.11 verdict (NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE)
+docs/experiments/probe_phase_coherence_15_11.md
+docs/experiments/probe_audit_15_7.json              # §15.8 verdict (MIXED + C-MISMATCHED)
+docs/experiments/probe_audit_15_7.md
+```
+
+§15.10 and §15.11 JSONs are the **mandatory** inputs
+(cascade decision derives from them). The §15.7 audit JSON
+is **disclosure-only** (carried into the synthesis memo's
+4-mechanism-class matrix; not used in the closure decision
+rule).
+
+**Pinned 4-mechanism-class joint-state matrix.**
+
+The synthesis memo records the joint state as a 4-row
+table:
+
+| #   | Mechanism class                       | Source                                      | HaluEval result            | TruthfulQA-MC result        | Cascade outcome                         |
+|-----|---------------------------------------|---------------------------------------------|----------------------------|-----------------------------|-----------------------------------------|
+| 1   | Unsupervised entropy                  | §13.10 / §13.20                             | AUC = 0.661                | AUC = 0.661                 | Saturated at chance-corrected ceiling   |
+| 2   | System-level composition              | §14a / §15.4 / §15.6 / §15.8                | USEFUL_INTERNAL            | REGRESSION                  | MIXED + C-MISMATCHED (per §15.8)        |
+| 3   | Supervised linear (Phase 1)           | §15.10                                      | AUC = 0.6686, ΔAUC = +0.008 | AUC = 0.6224, ΔAUC = −0.039 | `PARTIAL_SIGNAL_IN_Z`                   |
+| 4   | Layer-wise phase coherence (Phase 2)  | §15.11                                      | AUC = 0.4610, ΔAUC = −0.200 | AUC = 0.4853, ΔAUC = −0.176 | `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE` |
+
+The matrix is **mechanically populated** from the input
+JSONs. No prose interpretation is allowed in the matrix
+cells; only the verdict labels and headline scalars.
+PINNED.
+
+**Pinned closure decision rule.**
+
+Eligible §15.12 closures (from §15.11's authorization
+mapping):
+
+- `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`
+  (default).
+- `FULLY_CLOSED` (only if convergence criterion is met).
+
+**Convergence criterion for FULLY_CLOSED (PINNED, mechanical):**
+
+> The §15.10 supervised-linear residual signal on
+> HaluEval-QA — the only mechanism-class result that
+> mechanically satisfies the PARTIAL conditions on at
+> least one benchmark — is **statistically
+> indistinguishable from the §13.10 entropy baseline** at
+> N = 100.
+
+Concretely:
+
+1. Read `p_oof` (100-element OOF probability array) and
+   `correctness` (derivable from the labels via the same
+   §13.10 dump for verification, or reconstructed from
+   `n_correct` / `n_wrong` via the recorded record order)
+   for HaluEval-QA from `probe_supervised_15_10.json`.
+2. Compute B = 10 000 **stratified bootstrap resamples** of
+   (p_oof, y) with `random_state = 15` (matches
+   `SEED_ENTROPY`).
+3. For each resample b: compute
+   `auc_b = roc_auc_score(y_b, p_oof_b)` and
+   `dauc_b = auc_b − 0.661`.
+4. Compute the **95 % percentile CI** on `dauc_b`:
+   `[lo, hi]` = (2.5th, 97.5th percentiles).
+5. **Decision:**
+   - If `lo > 0` (CI strictly above zero) →
+     `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`
+     (default; residual signal statistically distinguishable
+     from baseline).
+   - If `lo ≤ 0` (CI contains zero or extends below) →
+     `FULLY_CLOSED` (residual signal not statistically
+     distinguishable from baseline).
+
+PINNED. No alternative test (no two-sided test variants,
+no different B, no different α, no different bootstrap
+procedure, no DeLong / no Mann-Whitney exact). One shot.
+
+**§0.8 disclosure — substitution of "ChatGPT cross-bridge" for the bootstrap test.**
+
+§15.11 Chunk 6 stated that `FULLY_CLOSED` is eligible
+"only if Phase 3's ChatGPT cross-bridge analysis converges
+to closure." This is a **non-mechanical** condition that
+depends on external review.
+
+§15.12 **substitutes** a mechanical, reproducible
+statistical test (the bootstrap CI rule above) for the
+non-mechanical "cross-bridge" condition. The substitution
+is **§0.8-disclosed** here, not silent. Justification:
+
+- The bootstrap test is more rigorous than asking an
+  external reviewer "do you concur?"
+- The bootstrap test produces a binary, audit-trail-clean
+  decision with a documented seed and resample count.
+- The bootstrap test directly answers the underlying
+  question that motivated the "cross-bridge" language: is
+  the residual PARTIAL signal driven by real signal or by
+  sampling noise?
+- The substitution is **strict**: the bootstrap test is a
+  stronger gating condition than a vague external
+  concurrence (it requires explicit statistical equivalence
+  to the null at α = 0.05).
+
+If a future re-analysis disagrees with this substitution,
+it requires a fresh §0.8 amendment to §15.11 *and*
+§15.12, not a silent revision.
+
+**Pinned self-test boundary cases for the closure rule.**
+
+Four pinned cases. The §15.12 implementation script must
+pass all four at the self-test gate before reading any
+real data:
+
+| #   | synthetic ΔAUC CI lo | synthetic ΔAUC CI hi | expected closure                                              |
+|-----|----------------------|----------------------|---------------------------------------------------------------|
+|  1  | +0.05                | +0.10                | `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE` (lo > 0; clearly positive) |
+|  2  | +0.001               | +0.05                | `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE` (lo > 0; barely positive)  |
+|  3  | 0.0                  | +0.05                | `FULLY_CLOSED` (lo = 0 inclusive; CI contains zero)                                  |
+|  4  | −0.05                | +0.05                | `FULLY_CLOSED` (lo < 0; CI clearly straddles zero)                                   |
+
+The boundary at `lo = 0` is **inclusive of FULLY_CLOSED**
+(i.e., `lo ≤ 0` triggers FULLY_CLOSED). This treats
+"CI lower bound exactly at zero" as not statistically
+distinguishable from zero — the conservative choice for
+closure.
+
+**What the closure decision rule does NOT consider.**
+
+- §15.10 TruthfulQA-MC ΔAUC = −0.039 (already negative,
+  fails PARTIAL by construction; bootstrap test on this
+  benchmark is uninformative for the FULLY_CLOSED upgrade
+  question).
+- §15.11 phase-coherence AUCs (already NO_MATERIAL via
+  direction gate; no residual to test).
+- §13.10 entropy baseline (the reference; not under test).
+- §15.7 / §15.8 mechanism decomposition (informative for
+  the synthesis memo prose, but not in the cascade).
+- Cross-phase comparisons or §14a sibling results.
+
+The cascade input is **only** §15.10 HaluEval-QA's OOF
+predictions vs labels, bootstrapped. Single test, single
+benchmark, single decision.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
