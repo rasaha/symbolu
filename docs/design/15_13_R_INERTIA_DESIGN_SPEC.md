@@ -207,3 +207,172 @@ fails to show signal, that is the verdict; tweaking the configuration after
 seeing data is forbidden.
 
 ---
+
+## Stimulus construction
+
+### Benchmark
+
+**Single benchmark: TruthfulQA-MC** (specifically `truthful_qa /
+multiple_choice / validation` from HuggingFace, matching §13.10's source).
+
+Choice rationale: §15.10 showed HaluEval has *some* residual signal at the
+supervised-linear level. If R_inertia were tested on HaluEval, a positive
+result could confound with the §15.10 effect. TruthfulQA-MC has been the
+cleaner null benchmark across §15.x. Signal there is harder to confound with
+prior phases and is a stronger first test.
+
+A v2 follow-up on HaluEval is authorized only if v1 shows signal.
+
+### Pairing rule (PINNED, deterministic)
+
+For `i ∈ {0, 1, …, 99}`:
+
+> **(Q_A_idx, Q_B_idx) = (i, (i + 50) mod 100)**
+
+Properties:
+- 100 unique pairs.
+- Each question appears exactly once as Q_A and once as Q_B.
+- The +50 offset randomizes topical adjacency without requiring a random
+  seed (TruthfulQA-MC's validation split is not topic-sorted, so this
+  approximates a topical shuffle).
+- Same-family pairing (both from TruthfulQA-MC) — eliminates benchmark-
+  family asymmetry as a confound.
+
+Discussed alternatives:
+- `(i, (i+1) mod 100)`: keeps adjacent questions paired; topical adjacency
+  too strong.
+- Random shuffle with pinned seed: deterministic but introduces seed-
+  dependent variance.
+- `(i, (N-1)-i)` reverse pairing: only 50 unique pairs.
+
+The +50 offset is the simplest scheme that satisfies all three properties.
+
+### Inputs
+
+- `docs/experiments/probe_semantic_entropy.json` — §13.10 TruthfulQA-MC dump
+  (commit pinned by §15.x history); first 100 records used for q_idx
+  alignment and label cross-check.
+- HuggingFace dataset `truthful_qa / multiple_choice / validation` —
+  question text and gold answers (`mc1_targets`).
+- Qwen/Qwen2.5-7B-Instruct — model under test.
+
+### Question text source policy
+
+Per the §15.10 / §15.11 pattern: prefer the §13.10 dump's `question` field
+if present on every record; fall back to HuggingFace dataset by `q_idx`
+alignment if not. The dump's `correct_choice` field provides the gold
+answer; if missing, fall back to `ds[q_idx]["mc1_targets"]["choices"][i]`
+where `i` is the index where `labels[i] == 1`.
+
+---
+
+## Per-stimulus pipeline (3 forward passes)
+
+For each stimulus `(q_a_idx, q_b_idx)`:
+
+### Pass 1 — generate R_A and extract q_A, r_A representations
+
+Input: chat-template-formatted prompt
+```
+[SYS] (default Qwen system prompt or empty)
+[USER] {q_a_text}
+[ASSISTANT] _
+```
+
+Forward pass + greedy decode for `MAX_NEW_TOKENS = 64` tokens.
+
+Extract:
+- `q_a_repr` ∈ R^3584 = last-token hidden state at the position immediately
+  before generation begins (i.e., the final tokenized [ASSISTANT] tag's last
+  token), layer −1.
+- `r_a_text` = decoded assistant tokens (stop early on EOS / chat-template
+  end token).
+- `r_a_repr` ∈ R^3584 = mean over the hidden states at the *generated*
+  assistant token positions (length-`|T_A|` set), layer −1.
+
+Note: `r_a_repr` is computed during decoding by accumulating the hidden
+state at each generated position; no second forward pass is required.
+
+### Pass 2 — generate Q_B response, extract s_t, score y
+
+Input: chat-template-formatted multi-turn prompt
+```
+[SYS] (same as Pass 1)
+[USER] {q_a_text}
+[ASSISTANT] {r_a_text}
+[USER] {q_b_text}
+[ASSISTANT] _
+```
+
+Forward pass + greedy decode for `MAX_NEW_TOKENS = 64` tokens.
+
+Extract:
+- `s_t` ∈ R^3584 = last-token hidden state at the position immediately
+  before Q_B response generation begins (second [ASSISTANT] tag's last
+  token), layer −1.
+- `q_b_response_text` = decoded assistant tokens for the Q_B response.
+
+Label scoring (`y` ∈ {0, 1}):
+- Reuse §13.10-style NLI scoring (DeBERTa-v3-base-mnli-fever-anli).
+- Score: does `q_b_response_text` entail `q_b_correct_choice`?
+- `y = 1` if entailment, `y = 0` otherwise.
+- This matches the `greedy_matches_correct` semantics of §13.10's
+  `correctness` field.
+
+### Pass 3 — extract q_B standalone representation
+
+Input: chat-template-formatted prompt
+```
+[SYS] (same as Pass 1)
+[USER] {q_b_text}
+[ASSISTANT] _
+```
+
+No decoding. Single forward pass.
+
+Extract:
+- `q_b_repr` ∈ R^3584 = last-token hidden state at the position immediately
+  before generation would begin, layer −1.
+
+---
+
+## Computed per-stimulus features
+
+```
+cos_st_ra = cos(s_t, r_a_repr)        # alignment of state with prior answer
+cos_st_qb = cos(s_t, q_b_repr)        # alignment of state with new question
+cos_qa_qb = cos(q_a_repr, q_b_repr)   # baseline question-similarity
+
+R_inertia = cos_st_ra - cos_st_qb     # primary signal
+R_sim     = cos_qa_qb                 # comparator baseline
+y         = q_b_correct ∈ {0, 1}      # label
+```
+
+All cosines computed in fp64 from fp32 cache values; no clipping required
+since all inputs are real-valued LM hidden states (no FFT).
+
+### Aggregate-level computations (after all stimuli)
+
+```
+auc_inertia = roc_auc_score(y, -R_inertia_array)
+auc_sim     = roc_auc_score(y, -R_sim_array)
+
+dauc_inertia_vs_chance = auc_inertia - 0.5
+dauc_inertia_vs_sim    = auc_inertia - auc_sim
+
+direction_held = (auc_inertia >= 0.5)
+```
+
+The negation in `roc_auc_score(y, -R_*)` reflects the direction convention:
+*lower* R_* predicts correct, so the score for the AUC computation must be
+flipped sign. After negation: higher score → predicts correct.
+
+### Selective-prediction (disclosure only)
+
+For the pinned alphas `α ∈ {0.35, 0.50, 0.75}`, compute κ@α using
+`-R_inertia` as the abstention score and `y` as the label. Eligibility:
+`n_admitted >= 10` AND conditional accuracy `>= α`. Same construction as
+§15.10 / §15.11. **These operating points are reported in the JSON / MD
+output for transparency but do NOT enter the cascade decision.**
+
+---
