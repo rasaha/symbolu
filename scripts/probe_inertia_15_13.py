@@ -2502,3 +2502,346 @@ def write_markdown_output(outputs: InertiaAuditOutputs, path: str) -> None:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with Path(path).open("w", encoding="utf-8") as f:
         f.write(text)
+
+
+# ===========================================================================
+# §15.13 Chunk I-5 — main() orchestration + CLI.
+#
+# Modes (PINNED per spec):
+#   --self-test     : run gate only (12 cascade + cosine invariants +
+#                     44-pattern firewall); exit 0/3.
+#   --extract-only  : labels + 3-pass extraction per stimulus + write
+#                     .npz cache; skips probe + outputs.
+#   --probe-only    : load cache + compute features + cascade + write
+#                     JSON + markdown; skip extraction. Self-test runs
+#                     first.
+#   (default)       : self-test → extract (or load cache) → probe →
+#                     write.
+#
+# Exit codes (PINNED per spec):
+#   0  success
+#   2  CLI / argument error (handled by argparse)
+#   3  SELF_TEST_FAILED
+#   4  INTERPRETATION_VIOLATION
+#   5  SCHEMA_MISMATCH (label dump or cache)
+#   6  EXTRACTION_FAILED (torch / transformers stack)
+#   7  PROBE_FAILED (sklearn / NaN in features)
+#   8  NLI_SCORING_FAILED (DeBERTa scoring stack failure)
+# ===========================================================================
+
+
+class NLIScoringFailedError(RuntimeError):
+    """Raised when the §13.10 DeBERTa NLI scoring stack fails."""
+
+
+def _run_extraction(
+    pairs: tuple[StimulusPair, ...], verbose: bool = True
+) -> tuple[StimulusExtraction, ...]:
+    """Load Qwen-7B + DeBERTa NLI scorer once; run 3-pass extraction per
+    stimulus. Returns a tuple of StimulusExtraction (length PINNED_N).
+    """
+    torch, AutoModelForCausalLM, AutoTokenizer = (
+        _lazy_import_torch_and_transformers()
+    )
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if verbose:
+        print(f"  device: {device}", flush=True)
+        print(
+            f"  loading Qwen tokenizer + model: {QWEN_MODEL_ID}",
+            flush=True,
+        )
+    tokenizer = AutoTokenizer.from_pretrained(QWEN_MODEL_ID)
+    model = AutoModelForCausalLM.from_pretrained(
+        QWEN_MODEL_ID,
+        torch_dtype=torch.float16,
+        output_hidden_states=True,
+    ).to(device)
+    model.eval()
+
+    if verbose:
+        print(
+            f"  loading NLI scorer (§13.10 helper): {NLI_MODEL_ID}",
+            flush=True,
+        )
+    try:
+        (
+            build_nli_checker,
+            label_correctness,
+            AutoModelForSequenceClassification,
+            AutoTokenizerForNli,
+        ) = _lazy_import_nli_helper()
+        nli_tokenizer = AutoTokenizerForNli.from_pretrained(NLI_MODEL_ID)
+        nli_model = AutoModelForSequenceClassification.from_pretrained(
+            NLI_MODEL_ID
+        ).to(device)
+        nli_model.eval()
+        nli_check_batch = build_nli_checker(
+            nli_model, nli_tokenizer, device, batch_size=32
+        )
+    except Exception as exc:
+        raise NLIScoringFailedError(
+            f"NLI_SCORING_FAILED: failed to initialize §13.10 NLI scorer "
+            f"({NLI_MODEL_ID}): {exc!r}"
+        ) from exc
+
+    extractions: list[StimulusExtraction] = []
+    for i, pair in enumerate(pairs):
+        ext = extract_stimulus_three_passes(
+            pair,
+            model=model,
+            tokenizer=tokenizer,
+            nli_check_batch=nli_check_batch,
+            label_correctness_fn=label_correctness,
+            device=device,
+        )
+        extractions.append(ext)
+        if verbose and (i + 1) % 10 == 0:
+            print(
+                f"  [extract] {i + 1}/{len(pairs)} stimuli "
+                f"(latest |T_A|={ext.n_r_a_tokens}, |T_QB|="
+                f"{ext.n_q_b_response_tokens}, y={int(ext.y)})",
+                flush=True,
+            )
+    if verbose:
+        print(f"  extraction complete: {len(extractions)} stimuli", flush=True)
+    return tuple(extractions)
+
+
+def _run_probes(
+    extractions: tuple[StimulusExtraction, ...],
+) -> InertiaAuditOutputs:
+    """Compute per-stimulus features, run aggregate probe, classify cascade."""
+    features = compute_features_all(extractions)
+    pr = run_inertia_probe(extractions, features)
+    cv = classify_cascade_inertia(pr.auc_inertia, pr.auc_sim)
+    return InertiaAuditOutputs(
+        schema_version=SCHEMA_VERSION,
+        benchmark=BENCHMARK,
+        qwen_model_id=QWEN_MODEL_ID,
+        probe_result=pr,
+        cascade_verdict=cv,
+        n_stimuli=PINNED_N,
+    )
+
+
+def _print_verdict_banner(outputs: InertiaAuditOutputs) -> None:
+    """Emit a one-screen mechanical-readout banner."""
+    cv = outputs.cascade_verdict
+    pr = outputs.probe_result
+    print("", flush=True)
+    print("=" * 76, flush=True)
+    print(f"§15.13 cascade verdict: {cv.label}", flush=True)
+    print("-" * 76, flush=True)
+    print(
+        f"  benchmark:          {outputs.benchmark} (N = {pr.n_stimuli}; "
+        f"correct={pr.n_correct}, wrong={pr.n_wrong})",
+        flush=True,
+    )
+    print(
+        f"  auc_inertia:        {cv.auc_inertia:.4f}   "
+        f"(ΔAUC vs chance {cv.dauc_vs_chance:+.4f}; "
+        f"ΔAUC vs R_sim {cv.dauc_vs_sim:+.4f})",
+        flush=True,
+    )
+    print(
+        f"  auc_sim:            {cv.auc_sim:.4f}   (R_sim comparator)",
+        flush=True,
+    )
+    print(
+        f"  direction held:     "
+        f"{'yes' if cv.direction_held else 'no'} "
+        f"(threshold = {DIRECTION_GATE_THRESHOLD})",
+        flush=True,
+    )
+    print("-" * 76, flush=True)
+    print(f"  rationale: {cv.rationale}", flush=True)
+    print("=" * 76, flush=True)
+
+
+def _build_argparser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="probe_inertia_15_13",
+        description=(
+            "§15.13 Phase 4 — continuation-inertia probe over Qwen-7B's "
+            "multi-turn residual stream. Pure feature, pinned configuration, "
+            "mechanical readout."
+        ),
+    )
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--self-test",
+        action="store_true",
+        help=(
+            "Run self-test gate only (12 cascade boundary cases + cosine "
+            "invariants + 44-pattern firewall coverage). Exit 0/3."
+        ),
+    )
+    mode.add_argument(
+        "--extract-only",
+        action="store_true",
+        help=(
+            "Run labels + 3-pass extraction only; write .npz cache. "
+            "Skips probe + JSON/MD outputs."
+        ),
+    )
+    mode.add_argument(
+        "--probe-only",
+        action="store_true",
+        help=(
+            "Load .npz cache + compute features + cascade + write outputs. "
+            "Skips extraction. Self-test gate still runs first."
+        ),
+    )
+    p.add_argument(
+        "--cache-path",
+        default=EXTRACTIONS_CACHE_PATH,
+        help=f"Path to per-stimulus .npz cache (default: {EXTRACTIONS_CACHE_PATH})",
+    )
+    p.add_argument(
+        "--json-out",
+        default=OUTPUT_JSON_PATH,
+        help=f"Path to JSON output (default: {OUTPUT_JSON_PATH})",
+    )
+    p.add_argument(
+        "--md-out",
+        default=OUTPUT_MD_PATH,
+        help=f"Path to markdown output (default: {OUTPUT_MD_PATH})",
+    )
+    p.add_argument(
+        "--force-extract",
+        action="store_true",
+        help=(
+            "Force re-extraction even if --cache-path exists "
+            "(default: skip extraction when cache present)."
+        ),
+    )
+    return p
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    args = _build_argparser().parse_args(argv)
+
+    # Self-test gate is required for every mode.
+    if args.self_test:
+        return run_self_test()
+
+    rc = run_self_test()
+    if rc != 0:
+        return rc
+
+    cache_path = args.cache_path
+
+    # Extraction phase.
+    if args.probe_only:
+        print(
+            f"\n--probe-only: loading extraction cache from {cache_path}",
+            flush=True,
+        )
+        try:
+            extractions = load_extractions_cache(cache_path)
+        except SchemaMismatchError as e:
+            print(f"SCHEMA_MISMATCH: {e}", flush=True)
+            return 5
+        except FileNotFoundError as e:
+            print(f"CACHE_MISSING: {e}", flush=True)
+            return 5
+    else:
+        cache_exists = Path(cache_path).exists()
+        if cache_exists and not args.force_extract:
+            print(
+                f"\nCache already present at {cache_path}; loading instead "
+                f"of re-extracting (use --force-extract to override).",
+                flush=True,
+            )
+            try:
+                extractions = load_extractions_cache(cache_path)
+            except SchemaMismatchError as e:
+                print(f"SCHEMA_MISMATCH: {e}", flush=True)
+                return 5
+        else:
+            print(
+                "\nExtraction phase — Qwen2.5-7B-Instruct 3-pass extraction "
+                "+ §13.10 NLI y scoring.",
+                flush=True,
+            )
+            try:
+                print(
+                    "  loading TruthfulQA-MC labels + question text + "
+                    "gold + distractors",
+                    flush=True,
+                )
+                q_ids, questions, gold, distractors, s13_corr = (
+                    load_truthfulqa_labels()
+                )
+                pairs = construct_stimulus_pairs(
+                    q_ids, questions, gold, distractors, s13_corr
+                )
+                print(
+                    f"  constructed {len(pairs)} stimulus pairs by pinned "
+                    f"rule {PAIRING_RULE_DESCRIPTION}",
+                    flush=True,
+                )
+            except SchemaMismatchError as e:
+                print(f"SCHEMA_MISMATCH: {e}", flush=True)
+                return 5
+            except FileNotFoundError as e:
+                print(f"INPUT_MISSING: {e}", flush=True)
+                return 5
+
+            try:
+                extractions = _run_extraction(pairs, verbose=True)
+            except NLIScoringFailedError as e:
+                print(f"NLI_SCORING_FAILED: {e}", flush=True)
+                return 8
+            except (ImportError, RuntimeError) as e:
+                print(f"EXTRACTION_FAILED: {e}", flush=True)
+                return 6
+
+            try:
+                save_extractions_cache(extractions, cache_path)
+                print(f"  cache written: {cache_path}", flush=True)
+            except OSError as e:
+                print(f"CACHE_WRITE_FAILED: {e}", flush=True)
+                return 6
+            except SchemaMismatchError as e:
+                print(f"SCHEMA_MISMATCH: {e}", flush=True)
+                return 5
+
+        if args.extract_only:
+            print(
+                "\n--extract-only: extraction complete; skipping probe.",
+                flush=True,
+            )
+            return 0
+
+    # Probe phase.
+    print(
+        "\nProbe phase — features + AUC + cascade.",
+        flush=True,
+    )
+    try:
+        outputs = _run_probes(extractions)
+    except SchemaMismatchError as e:
+        print(f"SCHEMA_MISMATCH: {e}", flush=True)
+        return 5
+    except RuntimeError as e:
+        print(f"PROBE_FAILED: {e}", flush=True)
+        return 7
+    except ImportError as e:
+        print(f"PROBE_FAILED: {e}", flush=True)
+        return 7
+
+    # Output phase.
+    print("\nOutput phase — JSON + markdown.", flush=True)
+    write_json_output(outputs, args.json_out)
+    print(f"  wrote: {args.json_out}", flush=True)
+    write_markdown_output(outputs, args.md_out)  # firewall-scanned before write
+    print(f"  wrote: {args.md_out}", flush=True)
+
+    _print_verdict_banner(outputs)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
