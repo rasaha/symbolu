@@ -2037,3 +2037,149 @@ def run_self_test() -> int:
         return 3
     print("\nSELF_TEST_PASSED — proceed.", flush=True)
     return 0
+
+
+# ===========================================================================
+# §15.13 Chunk I-4c — JSON output writer.
+#
+# Top-level keys PINNED per spec output schema (alphabetical for
+# sort_keys=True parity with §15.10 / §15.11 / §15.12):
+#   benchmark, cascade_thresholds, cascade_verdict,
+#   cross_phase_disclosure, extraction_config, n_stimuli, pairing_rule,
+#   phase_4_eligible_outcomes, probe_result, qwen_model_id,
+#   schema_version.
+#
+# No additional keys; no key removal. schema_version = "15.13".
+# ===========================================================================
+
+
+def _cascade_verdict_to_dict(cv: InertiaCascadeVerdict) -> dict:
+    return {
+        "label": cv.label,
+        "auc_inertia": float(cv.auc_inertia),
+        "auc_sim": float(cv.auc_sim),
+        "dauc_vs_chance": float(cv.dauc_vs_chance),
+        "dauc_vs_sim": float(cv.dauc_vs_sim),
+        "direction_held": bool(cv.direction_held),
+        "rationale": str(cv.rationale),
+    }
+
+
+def _probe_result_to_dict(pr: InertiaProbeResult) -> dict:
+    """Serialize InertiaProbeResult to the spec-pinned JSON shape.
+
+    Top-level probe_result fields per spec:
+      n_stimuli, n_correct, n_wrong,
+      auc_inertia, auc_sim,
+      dauc_inertia_vs_chance, dauc_inertia_vs_sim,
+      direction_held,
+      r_inertia_per_stimulus, r_sim_per_stimulus, y_per_stimulus,
+      selective_prediction_operating_points,
+      kappa_at_alpha_primary, tau_star_at_alpha_primary, alpha_primary.
+    """
+    return {
+        "n_stimuli": int(pr.n_stimuli),
+        "n_correct": int(pr.n_correct),
+        "n_wrong": int(pr.n_wrong),
+        "auc_inertia": float(pr.auc_inertia),
+        "auc_sim": float(pr.auc_sim),
+        "dauc_inertia_vs_chance": float(pr.dauc_inertia_vs_chance),
+        "dauc_inertia_vs_sim": float(pr.dauc_inertia_vs_sim),
+        "direction_held": bool(pr.direction_held),
+        "r_inertia_per_stimulus": [float(v) for v in pr.r_inertia_per_stimulus],
+        "r_sim_per_stimulus": [float(v) for v in pr.r_sim_per_stimulus],
+        "y_per_stimulus": [bool(v) for v in pr.y_per_stimulus],
+        "selective_prediction_operating_points": [
+            {
+                "alpha": float(op["alpha"]),
+                "tau_star": float(op["tau_star"]),
+                "kappa_at_alpha": float(op["kappa_at_alpha"]),
+                "coverage_at_tau_star": float(op["coverage_at_tau_star"]),
+                "conditional_accuracy_at_tau_star": float(
+                    op["conditional_accuracy_at_tau_star"]
+                )
+                if not math.isnan(
+                    op.get("conditional_accuracy_at_tau_star", float("nan"))
+                )
+                else None,
+                "n_admitted_at_tau_star": int(op["n_admitted_at_tau_star"]),
+                "eligible": bool(op["eligible"]),
+            }
+            for op in pr.operating_points
+        ],
+        "kappa_at_alpha_primary": float(pr.kappa_at_alpha_primary),
+        "tau_star_at_alpha_primary": (
+            float(pr.tau_star_at_alpha_primary)
+            if not math.isnan(pr.tau_star_at_alpha_primary)
+            else None
+        ),
+        "alpha_primary": float(ALPHA_PRIMARY),
+        "n_r_a_tokens_per_stimulus": [
+            int(v) for v in pr.n_r_a_tokens_per_stimulus
+        ],
+        "n_q_b_response_tokens_per_stimulus": [
+            int(v) for v in pr.n_q_b_response_tokens_per_stimulus
+        ],
+    }
+
+
+def _build_json_payload(outputs: InertiaAuditOutputs) -> dict:
+    """Construct the §15.13 JSON payload with the spec-pinned top-level keys.
+
+    The keyset is exactly:
+      benchmark, cascade_thresholds, cascade_verdict,
+      cross_phase_disclosure, extraction_config, n_stimuli,
+      pairing_rule, phase_4_eligible_outcomes, probe_result,
+      qwen_model_id, schema_version.
+    """
+    return {
+        "benchmark": str(outputs.benchmark),
+        "cascade_thresholds": {
+            "strong_auc": float(STRONG_AUC_THRESHOLD),
+            "strong_delta_auc": float(STRONG_DELTA_AUC_THRESHOLD),
+            "partial_auc": float(PARTIAL_AUC_THRESHOLD),
+            "direction_gate_threshold": float(DIRECTION_GATE_THRESHOLD),
+            "chance_baseline_auc": float(CHANCE_BASELINE_AUC),
+        },
+        "cascade_verdict": _cascade_verdict_to_dict(outputs.cascade_verdict),
+        "cross_phase_disclosure": {
+            "phase_1_§15_10_verdict": PHASE_1_VERDICT,
+            "phase_2_§15_11_verdict": PHASE_2_VERDICT,
+            "phase_3_§15_12_status": PHASE_3_STATUS,
+            "this_phase_modifies": "none",
+        },
+        "extraction_config": {
+            "layer_idx": int(LAYER_IDX),
+            "hidden_dim": int(HIDDEN_DIM),
+            "max_new_tokens": int(MAX_NEW_TOKENS),
+            "decode_temperature": float(DECODE_TEMPERATURE),
+            "r_a_pooling": R_A_POOLING_DESCRIPTION,
+            "s_t_extraction": S_T_EXTRACTION_DESCRIPTION,
+            "q_b_extraction": Q_B_EXTRACTION_DESCRIPTION,
+            "q_a_extraction": Q_A_EXTRACTION_DESCRIPTION,
+            "direction_convention": DIRECTION_CONVENTION,
+            "nli_model_id": NLI_MODEL_ID,
+        },
+        "n_stimuli": int(outputs.n_stimuli),
+        "pairing_rule": PAIRING_RULE_DESCRIPTION,
+        "phase_4_eligible_outcomes": [
+            "STRONG_SIGNAL_IN_INERTIA",
+            "PARTIAL_SIGNAL_IN_INERTIA",
+            "NO_MATERIAL_SIGNAL_IN_INERTIA",
+        ],
+        "probe_result": _probe_result_to_dict(outputs.probe_result),
+        "qwen_model_id": str(outputs.qwen_model_id),
+        "schema_version": str(outputs.schema_version),
+    }
+
+
+def write_json_output(outputs: InertiaAuditOutputs, path: str) -> None:
+    """Serialize InertiaAuditOutputs to JSON (schema_version "15.13").
+
+    Uses sort_keys=True for deterministic top-level alphabetical ordering
+    (parity with §15.10 / §15.11 / §15.12 outputs). indent=2.
+    """
+    payload = _build_json_payload(outputs)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with Path(path).open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, sort_keys=True)
