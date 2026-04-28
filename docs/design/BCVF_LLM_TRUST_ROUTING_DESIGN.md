@@ -17640,5 +17640,170 @@ and seed = 15).
 ---
 
 
+### 15.12 Pre-commitment (continued) — Caveats, transfer-thesis disclosure, post-§15.12 status ledger, closing §0.8
+
+**Caveats (§0.8-disclosed) — §15.12-specific.**
+
+- **Bootstrap CI is the substituted mechanical test.**
+  §15.11 Chunk 6 named "ChatGPT cross-bridge analysis"
+  as the FULLY_CLOSED gating condition; §15.12
+  substitutes a deterministic bootstrap test with
+  B = 10 000 / seed = 15 / stratified / 95 % percentile
+  CI. Substitution is §0.8-disclosed; not silent. The
+  substitution is **strict** (more rigorous, not less).
+- **Single residual test.** Only §15.10's HaluEval-QA
+  OOF predictions are bootstrap-tested. TruthfulQA-MC's
+  ΔAUC = −0.039 is already negative and trivially fails
+  PARTIAL on its own; phase-coherence is already
+  NO_MATERIAL via direction gate. The bootstrap test is
+  on the **only** mechanism-class result that
+  mechanically satisfies the PARTIAL conditions.
+- **N = 100 standard error context.** The bootstrap test
+  inherits §15.10's N = 100 sample. AUC standard error at
+  AUC ≈ 0.66 with N = 100 is ~0.05, and the §15.10
+  HaluEval ΔAUC = +0.008 is approximately 0.16σ above the
+  baseline. The bootstrap test makes this more rigorous,
+  but the underlying statistical power constraint carries
+  forward. **A larger-N replication of §15.10 could
+  change the closure outcome**; that would require a
+  fresh §0.8 amendment to §15.10 first, then §15.12
+  re-run.
+- **Single model size.** §15.12's closure applies only to
+  Qwen2.5-7B-Instruct under the four pre-committed
+  canonical mechanism classes. **Does not speak to**
+  scaling at 13B / 32B / 70B, sample-wise / paraphrase-
+  wise phase coherence, attention-head probing,
+  residual-stream eigenvectors, SAE features, or any
+  other untested mechanism.
+- **Inherited from §15.10 / §15.11.** Prompt-format vs
+  §13.10 labeling regime; question-text source; sklearn
+  API surface — all carry forward unchanged. The §15.12
+  implementation will not surface these caveats
+  redundantly in artifacts; they are referenced by
+  §-number.
+
+**Transfer-thesis disclosure (mechanical readout per closure outcome).**
+
+The two eligible closures map to the following final
+transfer-thesis statements:
+
+**If closure = `CLOSED_OPERATIONALLY_BUT_SUPERVISED_REOPENING_POSSIBLE`:**
+
+- BCVF-style trust routing **does not transfer** to LLM
+  hallucination detection at the Qwen-7B scale under any
+  of the four canonical mechanism classes tested
+  (entropy / system-level composition / supervised
+  linear / phase coherence) at the **operational
+  decision threshold**.
+- However, §15.10's HaluEval-QA residual ΔAUC = +0.008 is
+  statistically distinguishable from the §13.10 baseline
+  at α = 0.05, which preserves a thin **supervised
+  reopening path** if a future N = 200 / N = 500 re-run
+  replicates the residual.
+- Autonomy line proceeds; LLM line is closed for
+  Qwen-7B operations but not declared fully closed.
+
+**If closure = `FULLY_CLOSED`:**
+
+- BCVF-style trust routing **does not transfer** to LLM
+  hallucination detection at the Qwen-7B scale under any
+  of the four canonical mechanism classes tested.
+- §15.10's residual ΔAUC = +0.008 is statistically
+  indistinguishable from the §13.10 baseline at α = 0.05
+  → consistent with sampling noise → no residual
+  reopening path under the four canonical classes.
+- Autonomy line proceeds; LLM line is fully closed for
+  the four canonical mechanism classes at this model
+  size.
+
+In **both** cases:
+
+- §6.1 N = 21 autonomy result is **preserved** as the
+  binding autonomy verdict-of-record.
+- §13.9 hold is **preserved**.
+- Untested mechanism classes (alternative phase-coherence
+  instantiations, attention-head probes, residual-stream
+  eigenvectors, SAE features) remain **untested**, not
+  refuted.
+- Larger-model-size scaling remains **untested**.
+
+**Post-§15.12 status (the explicit ledger).**
+
+Once §15.12 closes, the following ledger is in effect:
+
+**Sealed §0.8-binding (no further modification without
+fresh §0.8 amendment):**
+
+- §6.1 N = 21 sign test (autonomy) — preserved.
+- §13.9 hold — preserved.
+- §13.10 / §13.20 baseline — preserved.
+- §15.2 / §15.4 / §15.6 / §15.8 verdicts — preserved.
+- §15.10 PARTIAL_SIGNAL_IN_Z — preserved.
+- §15.11 NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE —
+  preserved.
+- §15.12 closure outcome — sealed.
+
+**Closed lines (in this branch):**
+
+- BCVF → LLM transfer attempt under the four canonical
+  mechanism classes at Qwen-7B scale.
+- The 3-phase final-resolution sprint.
+
+**Open lines (not closed, not authorized):**
+
+- Larger-model-size scaling tests.
+- Alternative phase-coherence instantiations
+  (sample-wise / paraphrase-wise / alternative
+  aggregations).
+- Non-canonical mechanism classes (attention-head
+  probes, SAE features, etc.).
+- Any reopening of the LLM transfer-line. **Each
+  requires a fresh top-level §0.8 commitment**, not an
+  amendment.
+
+**What §15.12 does NOT do, restated.**
+
+- Does **NOT** modify §15.10's `PARTIAL_SIGNAL_IN_Z`
+  verdict-of-record.
+- Does **NOT** modify §15.11's
+  `NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE`
+  verdict-of-record.
+- Does **NOT** modify §13.9's hold or any §13/§14/§15.x
+  verdict-of-record.
+- Does **NOT** select a closure outside the
+  §15.11-authorized eligible set.
+- Does **NOT** authorize Phase 4 / §15.13 / further LLM
+  experiments. Reopening requires a fresh top-level
+  §0.8.
+- Does **NOT** re-extract hidden states, retrain probes,
+  or rerun any §13.10 / §15.10 / §15.11 producer.
+
+**Closing §0.8 declaration.**
+
+This pre-commitment (chunks 1–5 above) is
+**§0.8-binding**. Once committed to the design document,
+the §15.12 inputs, joint-state matrix, closure decision
+rule (bootstrap CI test with B = 10 000 / seed = 15),
+synthesis memo structure, autonomy handoff package
+structure, JSON schema, firewall pattern set (36
+patterns), self-test gate, exit codes, and CLI surface
+are all frozen.
+
+Implementation chunks (script-side
+`scripts/probe_synthesis_15_12.py`) will follow this
+pre-commitment exactly. Any deviation requires a fresh
+§0.8 amendment surfaced in the design document. The
+substitution of the bootstrap test for §15.11's "ChatGPT
+cross-bridge" language is §0.8-disclosed in the closure
+decision rule chunk and is **the only deliberate
+departure** from the literal §15.11 wording.
+
+§15.12 enters execution only after this pre-commitment is
+committed to the branch and the implementation script's
+self-test gate passes.
+
+---
+
+
 _End of skeleton. Each section to be filled in one at a time, on explicit authorization._
 
