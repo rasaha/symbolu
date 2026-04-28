@@ -758,3 +758,220 @@ during Pass 2 label scoring; if it fails, the diagnostic is unambiguous.
   documentation.
 
 ---
+
+## Risks and mitigations
+
+### Risk 1 — NLI scoring on Q_B response is asymmetric
+
+The §13.10 NLI scoring uses DeBERTa-v3-mnli-fever-anli to check entailment
+between the model's answer and gold. For multiple-choice questions, this
+treats the gold answer as the premise; the model's free-form response is
+the hypothesis. This may behave oddly when the model gives a refusal or
+hedged answer.
+
+**Mitigation:** import the §13.10 scoring helper directly from
+`scripts/probe_semantic_entropy.py` rather than reimplementing. Same
+behavior as the original phase, including its known limitations. This
+ensures cross-phase comparability of the `correctness` label.
+
+### Risk 2 — Greedy refusals game the correctness label
+
+Qwen-7B may produce hedged or refusal responses to TruthfulQA-MC questions
+("I'm not sure," "I don't know"). NLI scoring on these will produce
+non-entailment (label = 0). If the model refuses *more* on Q_B questions
+where it's "stuck" on R_A, this is genuine signal — not a flaw.
+
+**Mitigation:** disclose in the markdown caveats. The label is "answered
+Q_B correctly under greedy decoding," which is the most direct
+operationalization.
+
+### Risk 3 — Pass 2 generates a different R_A than Pass 1
+
+If decoding has any nondeterminism (unlikely with `temperature = 0.0`,
+but tokenizer / dtype edge cases exist), the R_A used in Pass 2's full-
+context prompt may differ from the R_A used in Pass 1's r_A_repr
+computation. This would corrupt the inertia signal.
+
+**Mitigation:** in Pass 2, splice the actual decoded `r_a_text` from Pass
+1 into the prompt rather than re-decoding. The `r_a_text` is recorded
+once in Pass 1 and injected verbatim into Pass 2's chat-template
+construction. This guarantees Pass 1's r_A and Pass 2's R_A are byte-
+identical.
+
+### Risk 4 — Same-family pairing might still be too topically similar
+
+The +50 offset randomizes adjacency, but TruthfulQA-MC has many topical
+clusters (medicine, law, history). Some pairs may still share topics by
+chance. R_inertia might pick up topical-overlap variance as if it were
+inertia.
+
+**Mitigation:** R_sim comparator. R_sim measures topic similarity
+directly. R_inertia must beat R_sim by the cascade margin to clear
+STRONG/PARTIAL — exactly the control the user identified.
+
+### Risk 5 — Direction-gate failure (auc_inertia < 0.5)
+
+§15.11 saw this on both benchmarks (the BCVF-faithful direction failed).
+§15.13 may produce the same outcome.
+
+**Mitigation:** acceptable per §0.8. NO_MATERIAL_SIGNAL_IN_INERTIA via
+direction gate is a valid verdict. The pinned hypothesis was the
+specific BCVF-faithful direction; failing it is a hypothesis failure,
+not a sign-flip opportunity. Mirrors §15.11's enforcement.
+
+### Risk 6 — Pass 1 R_A ends before MAX_NEW_TOKENS due to EOS
+
+Greedy decoding may emit EOS or chat-template end token before 64 tokens
+are generated. r_A pooling must average only over the actually-generated
+tokens (excluding any padding or post-EOS positions).
+
+**Mitigation:** track the actual generated token count `|T_A|` per
+stimulus during decoding; pool only over the first `|T_A|` positions.
+Document `|T_A|` distribution in the markdown caveats for transparency.
+
+### Risk 7 — N=100 statistical power
+
+AUC standard error at AUC ≈ 0.66 with N=100 is ~0.05. The cascade
+thresholds at 0.66 and 0.75 are within sampling noise of N=100
+distributions.
+
+**Mitigation:** known limitation; mirrors §15.10/§15.11 power constraint.
+v1 reports point estimates against pinned bands. If R_inertia clears
+PARTIAL on N=100, an N=200 / N=500 replication would be appropriate as
+a v2 follow-up — but v2 requires its own §0.8.
+
+### Risk 8 — DeBERTa NLI cost on the runpod
+
+If the §13.10 NLI machinery isn't already loaded, it adds ~5 GB to memory
+footprint plus model-load time.
+
+**Mitigation:** fall back to a simpler exact-match scoring if NLI loading
+fails, but only as a fallback — disclose explicitly in the JSON. Default
+behavior is NLI scoring identical to §13.10.
+
+---
+
+## Sealed §0.8-binding decisions
+
+The following decisions cannot be modified during implementation without
+a fresh §0.8 amendment to this spec:
+
+### Frozen parameters
+
+| Decision | Pinned value |
+|---|---|
+| SCHEMA_VERSION | "15.13" |
+| QWEN_MODEL_ID | "Qwen/Qwen2.5-7B-Instruct" |
+| BENCHMARK | "truthfulqa_mc" (single benchmark) |
+| PINNED_N | 100 |
+| PAIRING_OFFSET | 50 (i.e., (i, (i+50) mod 100)) |
+| PROMPT_FORMAT | Qwen chat template via `apply_chat_template` |
+| MAX_NEW_TOKENS | 64 |
+| DECODE_TEMPERATURE | 0.0 (greedy) |
+| LAYER_IDX | -1 (final layer only) |
+| HIDDEN_DIM | 3584 |
+| R_A_POOLING | mean over decoded assistant token positions |
+| s_t extraction | last-token, layer −1, pre-decode at 2nd `[ASSISTANT]` |
+| q_B extraction | last-token, layer −1, standalone with chat template |
+| q_A extraction | last-token, layer −1, pre-decode at 1st `[ASSISTANT]` |
+| Direction convention | lower R_inertia predicts correct (BCVF-faithful) |
+| STRONG_AUC_THRESHOLD | 0.75 (inclusive) |
+| STRONG_DELTA_AUC_THRESHOLD | 0.05 (inclusive, vs both chance and R_sim) |
+| PARTIAL_AUC_THRESHOLD | 0.66 (inclusive) |
+| DIRECTION_GATE_THRESHOLD | 0.5 (strict) |
+| ALPHA_TARGETS | (0.35, 0.50, 0.75) |
+| ALPHA_PRIMARY | 0.50 |
+| N_MIN | 10 (selective-prediction floor) |
+| SEED_ENTROPY | 15 |
+| Class-3 firewall pattern count | 44 |
+| Number of self-test cascade cases | 12 |
+
+### Frozen artifacts
+
+| Artifact | Path |
+|---|---|
+| Implementation script | `scripts/probe_inertia_15_13.py` |
+| Cache | `docs/experiments/inertia_15_13_extractions.npz` |
+| JSON output | `docs/experiments/probe_inertia_15_13.json` |
+| Markdown output | `docs/experiments/probe_inertia_15_13.md` |
+
+### Frozen behaviors
+
+- No combination with H1 (state coherence) or H2 (intent competition).
+- No bootstrap CI on AUCs in v1.
+- No second benchmark (HaluEval) in v1.
+- No probe training; R_inertia is a pure feature.
+- No sign-flip rescue if direction gate fails.
+- No retroactive amendment to any §13/§14/§15.x verdict-of-record.
+
+---
+
+## Notes for the implementing session
+
+If you are picking this up cold:
+
+1. **Start with this spec end-to-end.** Read all 6 sections before writing
+   any code. The spec is self-contained — you should not need to consult
+   the prior conversation or the main BCVF design doc.
+
+2. **Mirror §15.10 / §15.11 patterns where possible.** The script structure
+   (lazy imports, schema validation, cache .npz I/O, self-test gate,
+   firewall, JSON+MD writers, CLI modes) maps closely to those scripts.
+   Reuse the patterns; don't reinvent.
+
+3. **Run the self-test gate before any data inspection.** All 12 cascade
+   cases + cosine invariants + 44-pattern firewall must pass. Exit 3 on
+   failure.
+
+4. **Pre-commit cascade thresholds before looking at any AUC numbers.**
+   §0.8 discipline. The thresholds are pinned in this spec; the
+   implementation must apply them mechanically.
+
+5. **Output is firewall-scanned before write.** The 44-pattern firewall
+   is the last gate before any markdown lands on disk. INTERPRETATION_
+   VIOLATION exits 4 without writing.
+
+6. **The result is whatever it is.** STRONG, PARTIAL, or NO_MATERIAL —
+   each is a valid §0.8-binding readout. NO_MATERIAL via direction-gate
+   failure is the most likely outcome based on §15.11's pattern; that is
+   acceptable. Do NOT modify the cascade rule, the direction convention,
+   or the comparator requirement based on what the data shows.
+
+7. **After the runpod run produces JSON+MD artifacts**, verify firewall
+   compliance and cascade re-derivation locally before committing
+   (mirrors the §15.10 / §15.11 verification pattern).
+
+8. **The §15.12 closure is unaffected by §15.13's outcome.** Per the
+   §15.12 ledger, this is a fresh top-level §0.X testing a different
+   mechanism class. No retroactive reclassification.
+
+### Optional v2 follow-ups (NOT authorized by this spec)
+
+If v1 shows signal (PARTIAL or STRONG), the following v2 directions are
+candidates for a fresh §0.X commitment — none of them are authorized here:
+
+- HaluEval cross-benchmark replication.
+- N=200 / N=500 statistical-power upgrade.
+- 2nd-difference of phase coherence over turn boundaries (Tier 2 from the
+  prior prioritization).
+- H1 (state coherence) or H2 (intent competition) tested in isolation.
+- Hand-constructed labeled multi-turn topic-pivot benchmark.
+
+Each of these is a separate top-level §0.X, not a §15.13 amendment.
+
+---
+
+## End of spec
+
+This document, sealed §0.8-binding, defines §15.13 in full. Any
+implementation that follows it without deviation is a valid §15.13 run.
+Any deviation requires a fresh amendment to this document.
+
+The result is whatever the data shows — STRONG, PARTIAL, or NO_MATERIAL.
+The cascade rule is mechanical. The verdict is binding regardless of
+post-hoc interpretation.
+
+§13.9 hold preserved. §6.1 N=21 autonomy result preserved. §15.10 PARTIAL_
+SIGNAL_IN_Z preserved. §15.11 NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE
+preserved. §15.12 closure preserved. §15.13 result is independent of all
+of these.
