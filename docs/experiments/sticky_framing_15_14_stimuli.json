@@ -3,6 +3,7 @@
   "_calibration_severity_labels_status": "PENDING_ANNOTATION_PASS",
   "_curation_status": "C-5: framing pool + question pool + main_chains (full) + frame_positive_chains (PLACEHOLDER) + calibration_chains (structure complete, human_severity_label = null pending separate annotation pass); validator + SHA-256 lock TBD in C-6",
   "_frame_positive_curation_status": "PLACEHOLDER",
+  "_frame_positive_hand_authored_count": "4/20",
   "calibration_chains": [
     {
       "chain_idx": 0,
@@ -679,6 +680,662 @@
         }
       ],
       "frame_id": "F22"
+    },
+    {
+      "chain_idx": 4,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F04"
+    },
+    {
+      "chain_idx": 5,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F11"
+    },
+    {
+      "chain_idx": 6,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F18"
+    },
+    {
+      "chain_idx": 7,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F25"
+    },
+    {
+      "chain_idx": 8,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F07"
+    },
+    {
+      "chain_idx": 9,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F14"
+    },
+    {
+      "chain_idx": 10,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F21"
+    },
+    {
+      "chain_idx": 11,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F03"
+    },
+    {
+      "chain_idx": 12,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F10"
+    },
+    {
+      "chain_idx": 13,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F17"
+    },
+    {
+      "chain_idx": 14,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F24"
+    },
+    {
+      "chain_idx": 15,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F06"
+    },
+    {
+      "chain_idx": 16,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F13"
+    },
+    {
+      "chain_idx": 17,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F20"
+    },
+    {
+      "chain_idx": 18,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F02"
+    },
+    {
+      "chain_idx": 19,
+      "chain_questions": [
+        {
+          "gold": "Filter the list using str.startswith(prefix).",
+          "q_idx": 29,
+          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
+          "source": "humaneval",
+          "turn_idx": 2
+        },
+        {
+          "gold": "Use ''.join(strings).",
+          "q_idx": 28,
+          "question": "Implement concatenate(strings) joining a list into a single string.",
+          "source": "humaneval",
+          "turn_idx": 3
+        },
+        {
+          "gold": "Apply str.swapcase().",
+          "q_idx": 27,
+          "question": "Implement flip_case(string) swapping upper and lower case.",
+          "source": "humaneval",
+          "turn_idx": 4
+        },
+        {
+          "gold": "Count occurrences; keep elements whose count is one.",
+          "q_idx": 26,
+          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
+          "source": "humaneval",
+          "turn_idx": 5
+        },
+        {
+          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
+          "q_idx": 25,
+          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
+          "source": "humaneval",
+          "turn_idx": 6
+        }
+      ],
+      "frame_id": "F09"
     }
   ],
   "framing_pool": [

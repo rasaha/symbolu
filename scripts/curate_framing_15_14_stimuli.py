@@ -831,65 +831,92 @@ _HAND_AUTHORED_FRAME_POSITIVE: list[tuple[int, str, list[tuple[int, str, str]]]]
 
 def build_frame_positive_chains(
     pool: list[FramingPoolItem],
-    question_pool: list[QuestionPoolItem],  # unused after C-7; kept for API parity
-) -> list[StimulusChain]:
-    """Generate the 20 frame-positive chains from hand-authored data (C-7).
+    question_pool: list[QuestionPoolItem],
+) -> tuple[list[StimulusChain], int, int]:
+    """Generate the 20 frame-positive chains, mixing hand-authored + placeholder.
 
-    Per §15.14-A1 (EFFECTIVE), this builder consumes
-    `_HAND_AUTHORED_FRAME_POSITIVE` rather than the topical-disjointness
-    question pool. Each chain's source is "synthetic_frame_positive_v1"
-    with a curation-internal sequential q_idx.
+    Returns (chains, n_hand_authored, n_total). All 20 chain_idx slots
+    are always populated so the validator's count check passes during
+    incremental C-7a..C-7d builds.
 
-    During C-7a..C-7e the table is built up incrementally; chains not
-    yet hand-authored are skipped (the builder returns fewer than 20
-    chains and the caller surfaces the gap). On C-7e completion the
-    table contains all 20 chains and `_frame_positive_curation_status`
-    flips to FINAL.
+    Per §15.14-A1 (EFFECTIVE), hand-authored chains use source =
+    "synthetic_frame_positive_v1" with curation-internal sequential
+    q_idx. Placeholder chains (for slots not yet hand-authored) fall
+    back to the topical-disjointness pool generator with TQA/HumanEval
+    sources, identical to the C-4 placeholder behavior; the
+    `_frame_positive_curation_status` flag remains PLACEHOLDER until
+    n_hand_authored == 20 (set in C-7e).
     """
-    if not _HAND_AUTHORED_FRAME_POSITIVE:
-        return []
-
-    chains: list[StimulusChain] = []
-    seen_chain_indices: set[int] = set()
-    next_q_idx = 0
-
+    hand_authored_by_idx: dict[int, tuple[str, list[tuple[int, str, str]]]] = {}
     for chain_idx, expected_frame_id, questions in _HAND_AUTHORED_FRAME_POSITIVE:
-        if chain_idx in seen_chain_indices:
+        if chain_idx in hand_authored_by_idx:
             raise ValueError(f"duplicate hand-authored chain_idx: {chain_idx}")
-        seen_chain_indices.add(chain_idx)
         if not 0 <= chain_idx < 20:
             raise ValueError(f"hand-authored chain_idx out of range: {chain_idx}")
+        hand_authored_by_idx[chain_idx] = (expected_frame_id, questions)
 
+    chains: list[StimulusChain] = []
+    next_q_idx = 0
+    placeholder_used_per_frame: dict[str, set[tuple[QuestionSource, int]]] = {}
+
+    for chain_idx in range(20):
         actual_frame_idx = frame_positive_chain_frame_index(chain_idx)
         actual_frame = pool[actual_frame_idx]
-        if actual_frame.frame_id != expected_frame_id:
-            raise ValueError(
-                f"hand-authored chain {chain_idx} expects frame "
-                f"{expected_frame_id!r} but pairing rule yields "
-                f"{actual_frame.frame_id!r}"
-            )
 
-        if len(questions) != 5:
-            raise ValueError(
-                f"hand-authored chain {chain_idx} must have 5 questions; "
-                f"got {len(questions)}"
-            )
-
-        picked: list[ChainQuestion] = []
-        for j, (turn_idx, question, gold) in enumerate(questions):
-            if turn_idx != j + 2:
+        if chain_idx in hand_authored_by_idx:
+            expected_frame_id, questions = hand_authored_by_idx[chain_idx]
+            if actual_frame.frame_id != expected_frame_id:
                 raise ValueError(
-                    f"hand-authored chain {chain_idx} questions[{j}] turn_idx "
-                    f"mismatch: got {turn_idx}, expected {j+2}"
+                    f"hand-authored chain {chain_idx} expects frame "
+                    f"{expected_frame_id!r} but pairing rule yields "
+                    f"{actual_frame.frame_id!r}"
                 )
-            picked.append(ChainQuestion(
-                turn_idx=turn_idx,
-                source="synthetic_frame_positive_v1",
-                q_idx=next_q_idx,
-                question=question,
-                gold=gold,
-            ))
-            next_q_idx += 1
+            if len(questions) != 5:
+                raise ValueError(
+                    f"hand-authored chain {chain_idx} must have 5 questions; "
+                    f"got {len(questions)}"
+                )
+            picked: list[ChainQuestion] = []
+            for j, (turn_idx, question, gold) in enumerate(questions):
+                if turn_idx != j + 2:
+                    raise ValueError(
+                        f"hand-authored chain {chain_idx} questions[{j}] "
+                        f"turn_idx mismatch: got {turn_idx}, expected {j+2}"
+                    )
+                picked.append(ChainQuestion(
+                    turn_idx=turn_idx,
+                    source="synthetic_frame_positive_v1",
+                    q_idx=next_q_idx,
+                    question=question,
+                    gold=gold,
+                ))
+                next_q_idx += 1
+        else:
+            # Placeholder fallback (TQA/HumanEval pool, reverse iteration,
+            # topical-disjointness applied — identical to C-4 placeholder).
+            used = placeholder_used_per_frame.setdefault(actual_frame.frame_id, set())
+            picked = []
+            for q in reversed(question_pool):
+                if len(picked) == 5:
+                    break
+                qkey = (q.source, q.q_idx)
+                if qkey in used:
+                    continue
+                if not is_topically_disjoint(actual_frame, q.question):
+                    continue
+                picked.append(ChainQuestion(
+                    turn_idx=2 + len(picked),
+                    source=q.source,
+                    q_idx=q.q_idx,
+                    question=q.question,
+                    gold=q.gold,
+                ))
+                used.add(qkey)
+            if len(picked) != 5:
+                raise RuntimeError(
+                    f"frame-positive placeholder chain {chain_idx} "
+                    f"(frame {actual_frame.frame_id}): could not fill 5 turns"
+                )
 
         chains.append(StimulusChain(
             chain_idx=chain_idx,
@@ -897,7 +924,8 @@ def build_frame_positive_chains(
             chain_questions=tuple(picked),
         ))
 
-    return chains
+    n_hand_authored = len(hand_authored_by_idx)
+    return chains, n_hand_authored, 20
 
 
 def build_calibration_chains(
@@ -1137,13 +1165,17 @@ def main() -> None:
     print(f"  built: {len(main_chains)} chains × 5 turns = {5*len(main_chains)} rows")
 
     print()
-    print("Generating frame_positive_chains (20, PLACEHOLDER curation) ...")
-    fp_chains = build_frame_positive_chains(pool, question_pool)
+    print("Generating frame_positive_chains (20) ...")
+    fp_chains, fp_hand_authored, fp_total = build_frame_positive_chains(pool, question_pool)
+    fp_status = "FINAL" if fp_hand_authored == fp_total else "PLACEHOLDER"
     print(f"  built: {len(fp_chains)} chains × 5 turns = {5*len(fp_chains)} rows")
-    print("  ⚠  frame_positive_chains are STRUCTURAL PLACEHOLDERS using the")
-    print("     topical-disjointness pool. The implementation §0.X must")
-    print("     replace them with hand-authored topic-aligned questions per")
-    print("     §15.14 spec Chunk 2 Choice 7 before sealing.")
+    print(f"  hand-authored (synthetic_frame_positive_v1): "
+          f"{fp_hand_authored}/{fp_total} chains")
+    print(f"  status: {fp_status}")
+    if fp_status == "PLACEHOLDER":
+        print("  ⚠  Remaining slots use the topical-disjointness placeholder pool.")
+        print("     Status will flip to FINAL when all 20 chains are hand-authored")
+        print("     across C-7a..C-7e (per §15.14-A1 EFFECTIVE).")
 
     print()
     print("Generating calibration_chains (10) with placeholder severity labels ...")
@@ -1192,8 +1224,9 @@ def main() -> None:
             "(structure complete, human_severity_label = null pending "
             "separate annotation pass); validator + SHA-256 lock TBD in C-6"
         ),
-        "_frame_positive_curation_status": "PLACEHOLDER",
+        "_frame_positive_curation_status": fp_status,
         "_calibration_severity_labels_status": "PENDING_ANNOTATION_PASS",
+        "_frame_positive_hand_authored_count": f"{fp_hand_authored}/{fp_total}",
     }
     OUTPUT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True))
     print()
@@ -1201,7 +1234,8 @@ def main() -> None:
     print(f"  schema_version: {STIMULUS_SCHEMA_VERSION}")
     print(f"  framing_pool: 25 items")
     print(f"  main_chains: {len(main_chains)} chains")
-    print(f"  frame_positive_chains: {len(fp_chains)} chains (PLACEHOLDER)")
+    print(f"  frame_positive_chains: {len(fp_chains)} chains "
+          f"({fp_hand_authored} hand-authored, status={fp_status})")
     print(f"  calibration_chains: {len(cal_chains)} chains "
           f"(severity labels = null, PENDING annotation pass)")
 
