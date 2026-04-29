@@ -258,3 +258,302 @@ The proposal explicitly says the benchmark should NOT be:
 - just style consistency.
 
 ---
+
+## Part B — Adaptive context-governor framework
+
+### B.1 Headline framing
+
+The shift is from **detection** to **adaptive control**:
+
+> Not "detect whether the model is stuck," but "adaptively decide
+> how much prior context is still entitled to influence the next
+> answer."
+
+The governor is a state-update system that dynamically allocates
+influence between old frame, new input, and residual answer
+momentum, based on relevance, override pressure, inertia, and
+coherence.
+
+### B.2 Core objects
+
+At turn t:
+
+- `Q_t` — representation of the current user turn.
+- `F_t` — representation of the active prior frame ("what framing
+  is still alive").
+- `A_t` — representation of the last assistant trajectory / answer
+  residue ("what answer momentum is still alive").
+- `S_t` — the model's working state before producing the next
+  answer.
+
+### B.3 Three control weights
+
+At every turn, the governor computes:
+
+- `w_k(t)` — keep prior frame.
+- `w_d(t)` — decay prior frame / residue.
+- `w_o(t)` — override with new turn.
+
+Constrained as:
+
+```
+w_k(t) + w_d(t) + w_o(t) = 1,    w_k, w_d, w_o ∈ [0, 1]
+```
+
+### B.4 Four signals driving the weights
+
+#### B.4.1 Relevance
+
+How relevant is the old frame to the new turn?
+
+```
+R_t = cos(F_t, Q_t)
+```
+
+High R_t → old frame still relevant → retain more.
+Low R_t → old frame no longer relevant → decay more.
+
+#### B.4.2 Override
+
+How strongly does the new turn explicitly request a reset or
+redirection?
+
+```
+O_t ∈ [0, 1]
+```
+
+High O_t signals: "ignore earlier framing," "answer literally now,"
+"new topic," "forget the previous style." Computed from explicit
+trigger phrases, an instruction classifier, or a learned override
+probe.
+
+#### B.4.3 Inertia
+
+How strongly is the system still aligned to the prior answer
+trajectory rather than the new turn? This is structurally identical
+to §15.13's R_inertia:
+
+```
+I_t = cos(S_t, A_t) − cos(S_t, Q_t)
+```
+
+High I_t → still stuck on prior answer path.
+
+#### B.4.4 Coherence
+
+How internally stable is the current state?
+
+```
+C_t ∈ [0, 1]
+```
+
+One simple form (cross-layer residual coherence over the last m
+layers):
+
+```
+C_t = (1/(m−1)) * sum_{ℓ=L−m+1..L−1} cos(h_t^ℓ, h_t^{ℓ+1})
+```
+
+A more sophisticated phase-style coherence is the natural
+generalization. Low C_t = fragmented / conflicted state; the
+governor should not blindly trust either old or new state.
+
+### B.5 Governor equations
+
+Compute logits for keep / decay / override:
+
+```
+z_k = a_1·R_t − a_2·O_t − a_3·I_t + a_4·C_t
+z_d = b_1·(1−R_t) + b_2·O_t + b_3·I_t + b_4·(1−C_t)
+z_o = c_1·O_t + c_2·(1−R_t) + c_3·(1−I_t) + c_4·C_t
+```
+
+Normalize via softmax:
+
+```
+[w_k, w_d, w_o] = softmax([z_k, z_d, z_o])
+```
+
+This yields adaptive per-turn weights.
+
+### B.6 State update equations
+
+#### B.6.1 Frame update
+
+```
+F_{t+1} = w_k·F_t + w_o·Q_t
+```
+
+Equivalent decay form:
+
+```
+F_{t+1} = (1 − w_d)·F_t + w_o·Q_t
+```
+
+#### B.6.2 Answer-residue update
+
+```
+A_{t+1} = λ_A·A_t + (1 − λ_A)·Ŷ_t
+```
+
+where `Ŷ_t` is the current assistant output representation. Make
+λ_A adaptive:
+
+```
+λ_A = w_k − w_o
+```
+
+or more safely:
+
+```
+λ_A = σ(d_1·I_t − d_2·O_t + d_3·R_t)
+```
+
+So if override is strong, answer residue decays faster.
+
+#### B.6.3 Working-state update
+
+```
+S_{t+1} = α·F_{t+1} + β·Q_t + γ·A_{t+1}
+```
+
+Or, with the same governor weights driving the mix:
+
+```
+S_{t+1} = w_k·F_t + w_o·Q_t + (1 − w_d)·A_t
+```
+
+### B.7 Failure-mode mapping (H1 / H2 / H3)
+
+The framework rewrites the §15.x H-class hypotheses precisely:
+
+- **H1: Pre-state incoherence.** `C_t ≪ 1` before the new turn is
+  even processed; state is already unstable.
+- **H2: Intent competition.** Old frame and new turn both strongly
+  active: R_t moderate/high, O_t low/moderate, governor cannot
+  cleanly choose w_k vs. w_o.
+- **H3: Continuation inertia.** `I_t ≫ 0`; state more aligned with
+  old answer than new question. (This is the §15.13 R_inertia
+  hypothesis.)
+
+### B.8 Decision policy on top of the governor
+
+The signals support a discrete control policy. If I_t is high,
+R_t low, O_t high, C_t low:
+
+- do not answer immediately,
+- re-anchor first,
+- maybe internally summarize the new question,
+- maybe explicitly drop prior frame,
+- maybe ask a clarification.
+
+Available actions:
+
+- **answer**,
+- **answer with reset**,
+- **ask clarification**,
+- **abstain / defer**.
+
+This maps onto §15.10-style selective-prediction operating points,
+extended with two new branches (answer-with-reset; ask-
+clarification).
+
+### B.9 Application to LLM chat
+
+- `Q_t` = embedding / hidden-state summary of current user message.
+- `F_t` = rolling representation of prior active framing.
+- `A_t` = representation of prior assistant answer.
+- `S_t` = current last-token or pooled hidden state before
+  generating.
+
+The governor decides:
+
+- is the old metaphor still relevant?
+- should it decay?
+- should the new turn override?
+- is the system still stuck on prior continuation?
+
+Targets the same failure surface as §15.14 (sticky framing),
+§15.13 (continuation inertia), plus topic drift and persona
+overreach.
+
+### B.10 Application to autonomy
+
+The same framework transfers to autonomy stacks:
+
+- `Q_t` = new sensor / task input / scene update.
+- `F_t` = current maneuver / behavioral frame.
+- `A_t` = prior committed trajectory or plan residue.
+- `S_t` = current fused control state.
+
+With:
+
+- **Relevance** R_t = does prior plan still fit current scene?
+- **Override** O_t = does new evidence force replan?
+- **Inertia** I_t = is the controller still aligned to the old
+  trajectory rather than the new scene?
+- **Coherence** C_t = are the predictors / internal streams
+  mutually stable?
+
+The governor then governs how much the autonomy system keeps the
+old plan, decays it, or overrides it with new evidence.
+
+### B.11 Acceleration / jerk extension (BCVF-faithful)
+
+For any signal X_t, define:
+
+```
+ΔX_t  = X_t − X_{t−1}
+B_X(t) = |ΔX_t − ΔX_{t−1}|
+```
+
+Then:
+
+- B_I(t) — accelerating continuation inertia.
+- B_C(t) — accelerating coherence breakdown.
+- B_R(t) — accelerating relevance collapse.
+
+Folded into the governor:
+
+```
+z_d = b_1·(1−R_t) + b_2·O_t + b_3·I_t + b_4·(1−C_t)
+        + b_5·B_I(t) + b_6·B_C(t)
+```
+
+If inertia or incoherence is destabilizing rapidly, the governor
+shifts more aggressively into decay / override.
+
+### B.12 Minimal practical version
+
+Reduced to three signals:
+
+```
+R_t = cos(F_t, Q_t)
+I_t = cos(S_t, A_t) − cos(S_t, Q_t)
+O_t = override classifier score
+```
+
+Linear weights:
+
+```
+[z_k, z_d, z_o] = W·[R_t, I_t, O_t] + b
+[w_k, w_d, w_o] = softmax([z_k, z_d, z_o])
+```
+
+Updates:
+
+```
+F_{t+1} = w_k·F_t + w_o·Q_t
+A_{t+1} = λ_A·A_t + (1 − λ_A)·Ŷ_t
+S_{t+1} = w_k·F_t + w_o·Q_t + (1 − w_d)·A_t
+```
+
+### B.13 One-line summary
+
+> The adaptive governor is a system that dynamically allocates
+> influence between old frame, new input, and residual answer
+> momentum, based on relevance, override pressure, inertia, and
+> coherence.
+
+---
+
