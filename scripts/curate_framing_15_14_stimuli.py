@@ -822,6 +822,122 @@ def build_frame_positive_chains(
     return chains
 
 
+def build_calibration_chains(
+    pool: list[FramingPoolItem],
+    question_pool: list[QuestionPoolItem],
+) -> list[CalibrationChain]:
+    """Generate the 10 calibration chains × 5 turns = 50 rows.
+
+    Each row's `human_severity_label` is initialized to None — these
+    must be filled by a separate annotation pass per the procedure
+    documented in CALIBRATION_ANNOTATION_PROCEDURE below. Until labels
+    are filled, the §15.14 implementation script's Pass D κ-gate will
+    refuse to run (exit 9).
+
+    Iteration order: middle of the pool (skip first 60, take next 5
+    per chain) to reduce collision with both main_chains (forward
+    iteration) and frame_positive_chains (reverse iteration). All
+    three scopes thus tend to use disjoint subsets of the curation-
+    time question pool.
+    """
+    chains: list[CalibrationChain] = []
+    used_per_frame: dict[str, set[tuple[QuestionSource, int]]] = {}
+
+    # Mid-pool iteration window: start at len(pool)//2, then wrap.
+    n = len(question_pool)
+    mid_order = list(range(n // 2, n)) + list(range(0, n // 2))
+
+    for chain_idx in range(10):
+        frame_idx = calibration_chain_frame_index(chain_idx)
+        frame = pool[frame_idx]
+        used = used_per_frame.setdefault(frame.frame_id, set())
+
+        picked: list[CalibrationChainQuestion] = []
+        for q_pos in mid_order:
+            if len(picked) == 5:
+                break
+            q = question_pool[q_pos]
+            qkey = (q.source, q.q_idx)
+            if qkey in used:
+                continue
+            if not is_topically_disjoint(frame, q.question):
+                continue
+            picked.append(CalibrationChainQuestion(
+                turn_idx=2 + len(picked),
+                source=q.source,
+                q_idx=q.q_idx,
+                question=q.question,
+                gold=q.gold,
+                human_severity_label=None,
+                human_severity_rationale=None,
+            ))
+            used.add(qkey)
+
+        if len(picked) != 5:
+            raise RuntimeError(
+                f"calibration chain {chain_idx} (frame {frame.frame_id}): "
+                f"could not fill 5 turns; only got {len(picked)}."
+            )
+        chains.append(CalibrationChain(
+            chain_idx=chain_idx,
+            frame_id=frame.frame_id,
+            chain_questions=tuple(picked),
+        ))
+
+    return chains
+
+
+CALIBRATION_ANNOTATION_PROCEDURE = """\
+Calibration severity-label annotation procedure
+================================================
+
+The 10 calibration chains × 5 turns = 50 rows in this stimulus JSON
+have `human_severity_label = null` placeholders. Before the §15.14
+implementation script can run end-to-end, these placeholders must
+be filled by a human annotation pass.
+
+Per §15.14 spec Chunk 3, this enables the κ self-test gate (Cohen's
+κ ≥ 0.6 between LLM-judge and human labels). If labels are missing,
+the implementation script exits 9 (ANNOTATION_FAILED) before any
+cascade computation.
+
+Procedure (executed in a separate authorized session, not this one):
+
+  1. Load the stimulus JSON; iterate calibration_chains.
+
+  2. For each chain (10 total):
+     a. Construct a K=6 multi-turn prompt using the chain's
+        framing_question (turn 1) and the 5 turn-2..6 questions in
+        chain_questions order.
+     b. Run Qwen/Qwen2.5-7B-Instruct (the §15.14 subject model) with
+        greedy decode (temperature 0.0, max_new_tokens 64) to
+        generate the 5 assistant responses.
+
+  3. For each (chain, turn) pair (50 total), a human annotator
+     reviews the framing_question + framing_token_char_span +
+     turn-t question + assistant response and assigns:
+       - human_severity_label ∈ {0, 1, 2} per the §15.14 spec
+         Chunk 3 rubric:
+           0 = IGNORED   (framing convention absent from response)
+           1 = MENTIONED (framing alluded to / passing reference,
+                          not structurally driving the answer)
+           2 = STRUCTURED (framing organizes the answer; primary
+                           lens or substituted terminology)
+       - human_severity_rationale: one short sentence explaining
+         the call.
+
+  4. Write the labels back into the calibration_chains entries.
+
+  5. SHA-256 the updated stimulus JSON and pin in the implementation
+     §0.X.
+
+Inter-annotator note: if multiple annotators are used, the spec
+recommends κ ≥ 0.7 between annotators on a sub-sample before treating
+the labels as ground truth for the LLM-judge κ gate. v1 may use a
+single annotator with explicit disclosure.
+"""
+
+
 # ---------------------------------------------------------------------------
 # Serialization helpers
 # ---------------------------------------------------------------------------
@@ -838,6 +954,25 @@ def chain_to_dict(chain: StimulusChain) -> dict:
                 "q_idx": cq.q_idx,
                 "question": cq.question,
                 "gold": cq.gold,
+            }
+            for cq in chain.chain_questions
+        ],
+    }
+
+
+def calibration_chain_to_dict(chain: CalibrationChain) -> dict:
+    return {
+        "chain_idx": chain.chain_idx,
+        "frame_id": chain.frame_id,
+        "chain_questions": [
+            {
+                "turn_idx": cq.turn_idx,
+                "source": cq.source,
+                "q_idx": cq.q_idx,
+                "question": cq.question,
+                "gold": cq.gold,
+                "human_severity_label": cq.human_severity_label,
+                "human_severity_rationale": cq.human_severity_rationale,
             }
             for cq in chain.chain_questions
         ],
@@ -932,6 +1067,14 @@ def main() -> None:
     print("     replace them with hand-authored topic-aligned questions per")
     print("     §15.14 spec Chunk 2 Choice 7 before sealing.")
 
+    print()
+    print("Generating calibration_chains (10) with placeholder severity labels ...")
+    cal_chains = build_calibration_chains(pool, question_pool)
+    print(f"  built: {len(cal_chains)} chains × 5 turns = {5*len(cal_chains)} rows")
+    print("  ⚠  human_severity_label = null on all 50 calibration rows.")
+    print("     A separate annotation session must run Qwen-7B + human-label")
+    print("     each row (procedure documented in JSON _annotation_procedure).")
+
     # Sanity: per-frame uniqueness within main set.
     for item in pool:
         keys: list[tuple[str, int]] = []
@@ -963,13 +1106,16 @@ def main() -> None:
         "framing_pool": framing_pool_dict(pool),
         "main_chains": [chain_to_dict(c) for c in main_chains],
         "frame_positive_chains": [chain_to_dict(c) for c in fp_chains],
-        "calibration_chains": [],     # filled in C-5
+        "calibration_chains": [calibration_chain_to_dict(c) for c in cal_chains],
+        "_annotation_procedure": CALIBRATION_ANNOTATION_PROCEDURE,
         "_curation_status": (
-            "C-4: framing pool + question pool + main_chains (full) + "
-            "frame_positive_chains (PLACEHOLDER, see in-script note); "
-            "calibration_chains TBD in C-5"
+            "C-5: framing pool + question pool + main_chains (full) + "
+            "frame_positive_chains (PLACEHOLDER) + calibration_chains "
+            "(structure complete, human_severity_label = null pending "
+            "separate annotation pass); validator + SHA-256 lock TBD in C-6"
         ),
         "_frame_positive_curation_status": "PLACEHOLDER",
+        "_calibration_severity_labels_status": "PENDING_ANNOTATION_PASS",
     }
     OUTPUT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True))
     print()
@@ -978,7 +1124,8 @@ def main() -> None:
     print(f"  framing_pool: 25 items")
     print(f"  main_chains: {len(main_chains)} chains")
     print(f"  frame_positive_chains: {len(fp_chains)} chains (PLACEHOLDER)")
-    print(f"  calibration_chains: 0 (filled in C-5)")
+    print(f"  calibration_chains: {len(cal_chains)} chains "
+          f"(severity labels = null, PENDING annotation pass)")
 
 
 if __name__ == "__main__":
