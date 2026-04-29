@@ -1,0 +1,434 @@
+{
+  "_per_row_optional_keys": [
+    "model_response_id",
+    "run_id"
+  ],
+  "_per_row_required_keys": [
+    "chain_idx",
+    "turn_idx",
+    "human_severity_label",
+    "human_severity_rationale",
+    "annotator_id",
+    "annotation_timestamp"
+  ],
+  "_per_row_validation": {
+    "annotation_timestamp": "must be non-empty string (ISO 8601 UTC recommended)",
+    "annotator_id": "must be non-empty string",
+    "chain_idx": "must be int in [0, 10)",
+    "duplicates": "no two rows may share the same (chain_idx, turn_idx)",
+    "human_severity_label": "must be int in {0, 1, 2}",
+    "human_severity_rationale": "must be non-empty string",
+    "turn_idx": "must be int in [2, 6]"
+  },
+  "_severity_rubric": {
+    "0": "IGNORED \u2014 framing convention absent from the response",
+    "1": "MENTIONED \u2014 framing alluded to / passing reference, NOT structurally driving the answer",
+    "2": "STRUCTURED \u2014 framing organizes the answer; primary lens, substituted terminology, or formatting overrides content"
+  },
+  "_template_note": "All 50 entries have chain_idx and turn_idx pre-filled per the calibration_responses.json structure. The four annotation fields (human_severity_label, human_severity_rationale, annotator_id, annotation_timestamp) are null placeholders. Fill each row manually by referencing docs/experiments/sticky_framing_15_14_annotation_review.md or sticky_framing_15_14_calibration_responses.json. When all 50 are filled, set the top-level stimulus_sha256 to e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7 and either rename this file to sticky_framing_15_14_calibration_labels.json OR copy the labels array into the existing stub artifact.",
+  "_template_status": "FILL_IN_PLACE",
+  "labels": [
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 0,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 0,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 0,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 0,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 0,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 1,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 1,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 1,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 1,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 1,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 2,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 2,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 2,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 2,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 2,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 3,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 3,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 3,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 3,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 3,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 4,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 4,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 4,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 4,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 4,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 5,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 5,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 5,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 5,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 5,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 6,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 6,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 6,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 6,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 6,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 7,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 7,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 7,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 7,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 7,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 8,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 8,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 8,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 8,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 8,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 9,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 9,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 9,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 9,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": null,
+      "annotator_id": null,
+      "chain_idx": 9,
+      "human_severity_label": null,
+      "human_severity_rationale": null,
+      "turn_idx": 6
+    }
+  ],
+  "schema_version": "15.14-calibration-labels",
+  "stimulus_sha256": null
+}
