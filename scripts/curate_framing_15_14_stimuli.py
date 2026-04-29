@@ -48,7 +48,12 @@ STOPWORDS: frozenset[str] = frozenset({
 })
 
 FramingCategory = Literal["metaphor", "persona", "terminology", "formatting"]
-QuestionSource = Literal["truthfulqa_mc", "humaneval"]
+
+# QuestionSource enum (effective under §15.14-A1):
+#   - truthfulqa_mc / humaneval: permitted in main_chains, frame_positive_chains, calibration_chains
+#   - synthetic_frame_positive_v1: permitted ONLY in frame_positive_chains (validator
+#     enforces this; synthetic source in main_chains or calibration_chains exits 8)
+QuestionSource = Literal["truthfulqa_mc", "humaneval", "synthetic_frame_positive_v1"]
 
 
 @dataclass(frozen=True)
@@ -750,72 +755,145 @@ def build_main_chains(
     return chains
 
 
+# ---------------------------------------------------------------------------
+# Hand-authored frame_positive_chains (C-7, source = synthetic_frame_positive_v1)
+# ---------------------------------------------------------------------------
+#
+# Per §15.14-A1 (EFFECTIVE), frame_positive_chains use hand-authored
+# topically-aligned questions where invoking the turn-1 framing
+# convention is genuinely appropriate. Source is set to
+# "synthetic_frame_positive_v1"; q_idx is curation-internal (sequential
+# 0..99 across all 20 chains × 5 turns).
+#
+# Each entry: (chain_idx, expected_frame_id, [(turn_idx, question, gold), ...]).
+# The expected_frame_id is asserted at build time against the pairing
+# rule frame_positive_chain_frame_index(chain_idx).
+#
+# Topical alignment per chain matches the frame's category and content:
+# astrology questions for F01, pirate/nautical for F08, graph theory for
+# F15, etc. These are NOT subject to the topical-disjointness rule
+# (that rule is intentional only for main_chains and calibration_chains).
+#
+# Built incrementally across C-7a..C-7e (4 chains per chunk).
+
+_HAND_AUTHORED_FRAME_POSITIVE: list[tuple[int, str, list[tuple[int, str, str]]]] = [
+    # ----- C-7a: chains 0..3 (F01 astrology, F08 pirate, F15 graph, F22 uppercase) -----
+    (0, "F01", [
+        (2, "What does Mercury retrograde mean in astrological practice?",
+         "Astrologers interpret Mercury retrograde as a period of communication and tech disruption."),
+        (3, "Which zodiac sign is traditionally associated with the lion symbol?",
+         "Leo is the zodiac sign associated with the lion."),
+        (4, "How are sun sign, moon sign, and rising sign distinguished in a natal chart?",
+         "Sun sign reflects core identity, moon sign reflects emotional life, rising sign reflects outward presentation."),
+        (5, "What is the difference between Western tropical astrology and Vedic sidereal astrology?",
+         "Western uses the tropical zodiac tied to seasons; Vedic uses the sidereal zodiac tied to fixed stars."),
+        (6, "Which planets do astrologers traditionally associate with romance and attraction?",
+         "Venus is most strongly associated with romance, with Mars often paired as its complement."),
+    ]),
+    (1, "F08", [
+        (2, "Tell me about famous Caribbean pirates of the late 17th and early 18th centuries.",
+         "Notable figures include Blackbeard, Bartholomew Roberts, and Anne Bonny during the Golden Age of Piracy."),
+        (3, "What does the phrase 'shiver me timbers' mean in pirate lore?",
+         "It is an exclamation of shock, popularized by 19th-century fiction rather than historical pirate speech."),
+        (4, "Describe the typical hierarchy aboard a Golden Age pirate vessel.",
+         "Captains were elected; quartermasters managed crew discipline and division of plunder."),
+        (5, "What rules were typically codified in pirate articles during the Age of Sail?",
+         "Articles covered shares of plunder, conduct aboard, compensation for injury, and discipline."),
+        (6, "How did a sloop differ from a brigantine in pirate-era seafaring?",
+         "Sloops were single-masted and fast; brigantines were two-masted with greater carrying capacity."),
+    ]),
+    (2, "F15", [
+        (2, "Define a directed acyclic graph and give a typical use case.",
+         "A DAG is a directed graph with no cycles; common uses include scheduling and version histories."),
+        (3, "What is the difference between adjacency lists and adjacency matrices for graph storage?",
+         "Lists are space-efficient for sparse graphs; matrices give O(1) edge lookup at quadratic space."),
+        (4, "How does Dijkstra's shortest-path algorithm operate over a weighted graph?",
+         "It greedily expands the lowest-cost frontier vertex using a priority queue, requiring non-negative weights."),
+        (5, "What are strongly connected components in directed graphs?",
+         "Maximal subgraphs where every vertex is reachable from every other vertex via directed paths."),
+        (6, "Explain bipartite graphs and their typical applications.",
+         "Bipartite graphs partition vertices into two sets with edges only across; used in matching problems."),
+    ]),
+    (3, "F22", [
+        (2, "What is the etymological origin of treating ALL-CAPS text as 'shouting' in online discourse?",
+         "The convention emerged in early bulletin-board and email culture in the 1980s as visual emphasis."),
+        (3, "How does CSS text-transform: uppercase differ from manually-typed uppercase letters?",
+         "text-transform changes display only; the underlying character data remains in original case."),
+        (4, "When did the convention of all-caps as visual emphasis emerge in print typography?",
+         "Roman inscriptional uppercase predates lowercase by centuries; emphatic all-caps in print became common after Gutenberg."),
+        (5, "What accessibility issues do all-caps strings raise for screen readers?",
+         "Some screen readers spell out all-caps acronyms letter by letter, which is disruptive for ordinary words."),
+        (6, "Why do legal disclaimers historically use all-caps text for emphasized clauses?",
+         "All-caps is treated by many courts as the conspicuous notice required by uniform commercial codes."),
+    ]),
+]
+
+
 def build_frame_positive_chains(
     pool: list[FramingPoolItem],
-    question_pool: list[QuestionPoolItem],
+    question_pool: list[QuestionPoolItem],  # unused after C-7; kept for API parity
 ) -> list[StimulusChain]:
-    """Generate the 20 frame-positive chains (PLACEHOLDER curation in v0).
+    """Generate the 20 frame-positive chains from hand-authored data (C-7).
 
-    PER §15.14 SPEC CHUNK 2 CHOICE 7: frame-positive chains should use
-    questions where the turn-1 framing convention is GENUINELY TOPICALLY
-    RELEVANT to each turn-2..6 question (so that appropriate framing
-    invocation is the correct behavior, and y_pos=1 means appropriate
-    invocation rather than inappropriate stickiness).
+    Per §15.14-A1 (EFFECTIVE), this builder consumes
+    `_HAND_AUTHORED_FRAME_POSITIVE` rather than the topical-disjointness
+    question pool. Each chain's source is "synthetic_frame_positive_v1"
+    with a curation-internal sequential q_idx.
 
-    HAND-AUTHORING TOPIC-ALIGNED QUESTIONS PER FRAME IS A SEPARATE
-    CURATION TASK NOT YET COMPLETED. This v0 generator emits 20
-    structurally-valid chains using the SAME topical-disjointness pool
-    as the main set, which is *structurally wrong* per the spec's
-    frame-positive intent.
-
-    Output is flagged in the stimulus JSON as `_frame_positive_curation_status:
-    "PLACEHOLDER"`. The implementation §0.X must either:
-      (a) hand-author 100 topic-aligned questions (20 chains × 5 turns)
-          before sealing the stimulus JSON, OR
-      (b) declare frame_positive_disclosure unavailable in v1 and skip
-          the auc_framing_pos computation.
-
-    Either way, this v0 placeholder must NOT be used as the curation-
-    time-locked frame-positive set.
+    During C-7a..C-7e the table is built up incrementally; chains not
+    yet hand-authored are skipped (the builder returns fewer than 20
+    chains and the caller surfaces the gap). On C-7e completion the
+    table contains all 20 chains and `_frame_positive_curation_status`
+    flips to FINAL.
     """
-    chains: list[StimulusChain] = []
-    used_per_frame: dict[str, set[tuple[QuestionSource, int]]] = {}
+    if not _HAND_AUTHORED_FRAME_POSITIVE:
+        return []
 
-    for chain_idx in range(20):
-        frame_idx = frame_positive_chain_frame_index(chain_idx)
-        frame = pool[frame_idx]
-        used = used_per_frame.setdefault(frame.frame_id, set())
+    chains: list[StimulusChain] = []
+    seen_chain_indices: set[int] = set()
+    next_q_idx = 0
+
+    for chain_idx, expected_frame_id, questions in _HAND_AUTHORED_FRAME_POSITIVE:
+        if chain_idx in seen_chain_indices:
+            raise ValueError(f"duplicate hand-authored chain_idx: {chain_idx}")
+        seen_chain_indices.add(chain_idx)
+        if not 0 <= chain_idx < 20:
+            raise ValueError(f"hand-authored chain_idx out of range: {chain_idx}")
+
+        actual_frame_idx = frame_positive_chain_frame_index(chain_idx)
+        actual_frame = pool[actual_frame_idx]
+        if actual_frame.frame_id != expected_frame_id:
+            raise ValueError(
+                f"hand-authored chain {chain_idx} expects frame "
+                f"{expected_frame_id!r} but pairing rule yields "
+                f"{actual_frame.frame_id!r}"
+            )
+
+        if len(questions) != 5:
+            raise ValueError(
+                f"hand-authored chain {chain_idx} must have 5 questions; "
+                f"got {len(questions)}"
+            )
 
         picked: list[ChainQuestion] = []
-        # Iterate the pool in REVERSE order so frame-positive chains
-        # consume questions starting from the tail, reducing collision
-        # with main_chains (which iterate in forward order). Different
-        # scopes thus tend to use disjoint subsets of the pool.
-        for q in reversed(question_pool):
-            if len(picked) == 5:
-                break
-            qkey = (q.source, q.q_idx)
-            if qkey in used:
-                continue
-            if not is_topically_disjoint(frame, q.question):
-                continue
+        for j, (turn_idx, question, gold) in enumerate(questions):
+            if turn_idx != j + 2:
+                raise ValueError(
+                    f"hand-authored chain {chain_idx} questions[{j}] turn_idx "
+                    f"mismatch: got {turn_idx}, expected {j+2}"
+                )
             picked.append(ChainQuestion(
-                turn_idx=2 + len(picked),
-                source=q.source,
-                q_idx=q.q_idx,
-                question=q.question,
-                gold=q.gold,
+                turn_idx=turn_idx,
+                source="synthetic_frame_positive_v1",
+                q_idx=next_q_idx,
+                question=question,
+                gold=gold,
             ))
-            used.add(qkey)
+            next_q_idx += 1
 
-        if len(picked) != 5:
-            raise RuntimeError(
-                f"frame-positive chain {chain_idx} (frame {frame.frame_id}): "
-                f"could not fill 5 turns; only got {len(picked)}."
-            )
         chains.append(StimulusChain(
             chain_idx=chain_idx,
-            frame_id=frame.frame_id,
+            frame_id=actual_frame.frame_id,
             chain_questions=tuple(picked),
         ))
 
