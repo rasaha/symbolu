@@ -55,6 +55,38 @@ REQUIRED_TOP_KEYS = {
 }
 
 
+# ----- Calibration labels artifact (separate file; C-8 split) -----
+# Schema for docs/experiments/sticky_framing_15_14_calibration_labels.json.
+# The validator merges (chain_idx, turn_idx) -> label record into the
+# stimulus JSON's calibration_chains at validation time when the
+# --calibration-labels-json flag is supplied (added in C-8c).
+
+CALIBRATION_LABELS_SCHEMA_VERSION = "15.14-calibration-labels"
+
+CALIBRATION_LABELS_REQUIRED_TOP_KEYS = {
+    "schema_version",
+    "stimulus_sha256",
+    "labels",
+}
+
+CALIBRATION_LABELS_REQUIRED_ROW_KEYS = {
+    "chain_idx",
+    "turn_idx",
+    "human_severity_label",
+    "human_severity_rationale",
+    "annotator_id",
+    "annotation_timestamp",
+}
+
+# Optional row-level provenance keys (not required, but validated when
+# present to prevent typos). model_response_id and run_id are useful for
+# tracing labels back to a specific Qwen-7B inference run.
+CALIBRATION_LABELS_OPTIONAL_ROW_KEYS = {
+    "model_response_id",
+    "run_id",
+}
+
+
 def fail(exit_code: int, msg: str) -> None:
     print(f"VALIDATION FAILED ({exit_code}): {msg}", file=sys.stderr)
     sys.exit(exit_code)

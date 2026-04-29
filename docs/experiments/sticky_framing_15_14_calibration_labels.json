@@ -1,0 +1,7 @@
+{
+  "_artifact_status": "EMPTY_STUB",
+  "_curation_note": "Empty stub created in C-8b. The 50 calibration severity labels (10 chains x 5 turns 2..6) must be filled by a separate annotation pass per the procedure documented in docs/experiments/sticky_framing_15_14_stimuli.json under _annotation_procedure. This file is the C-8 artifact split target; it is consumed by scripts/validate_framing_15_14_stimuli.py via --calibration-labels-json.",
+  "labels": [],
+  "schema_version": "15.14-calibration-labels",
+  "stimulus_sha256": null
+}
