@@ -1138,3 +1138,227 @@ analogous frame-positive (~6 MB) + calibration (~3 MB) ≈ ~40 MB.
    block.
 
 ---
+
+## Class-3 firewall patterns (52 total)
+
+The firewall scans rendered markdown for forbidden override-language
+before write. Each pattern is matched case-insensitively for non-§
+patterns and case-sensitively / literal for §-anchored patterns
+(preserves precise §-numbering). Detection → exit code 4
+(`INTERPRETATION_VIOLATION`) without writing.
+
+### Inherited from §15.10 / §15.7 (16 patterns)
+
+```
+"verdict was wrong"
+"verdict is wrong"
+"should be re-classified"
+"should be reclassified"
+"is invalid because"
+"§13.9 should be relaxed"
+"§13.9 hold should be"
+"§13.9 hold can be"
+"§15.8 authorized"
+"§15.8 is authorized"
+"§6.1 is strengthened"
+"autonomy result is strengthened"
+"actually STRONG"
+"should be classified as STRONG"
+"actually PARTIAL despite"
+"STRONG despite the cascade"
+```
+
+### Inherited from §15.11 (10 patterns)
+
+```
+"actually STRONG_SIGNAL_IN_PHASE_COHERENCE despite"
+"should be STRONG_SIGNAL_IN_PHASE_COHERENCE"
+"actually PARTIAL_SIGNAL_IN_PHASE_COHERENCE despite"
+"should be classified as PARTIAL_SIGNAL_IN_PHASE_COHERENCE"
+"the wrong-direction failure should be flipped"
+"the direction gate should be relaxed"
+"the BCVF-faithful direction was wrong"
+"§15.10 PARTIAL is overturned"
+"§15.10 verdict is overturned"
+"§13.10 baseline should be replaced"
+```
+
+### Inherited from §15.12 (10 patterns)
+
+```
+"§15.10 PARTIAL was wrong"
+"§15.10 PARTIAL should be relaxed"
+"§15.11 NO_MATERIAL should be relaxed"
+"§15.11 direction gate should be relaxed"
+"the bootstrap test was inappropriate"
+"the bootstrap test should be replaced"
+"§15.12 closure should be reopened"
+"§15.12 should authorize REOPEN"
+"§6.1 N=21 sign test was wrong"
+"the autonomy result is invalidated"
+```
+
+### Inherited from §15.13 (8 patterns)
+
+```
+"actually STRONG_SIGNAL_IN_INERTIA despite"
+"should be STRONG_SIGNAL_IN_INERTIA"
+"actually PARTIAL_SIGNAL_IN_INERTIA despite"
+"should be classified as PARTIAL_SIGNAL_IN_INERTIA"
+"the R_sim comparator should be ignored"
+"the same-family pairing was a mistake"
+"the pooling over R_A tokens was wrong"
+"the chance baseline alone is sufficient"
+```
+
+### §15.14-specific (8 patterns)
+
+```
+"actually STRONG_SIGNAL_IN_FRAMING despite"
+"should be STRONG_SIGNAL_IN_FRAMING"
+"actually PARTIAL_SIGNAL_IN_FRAMING despite"
+"should be classified as PARTIAL_SIGNAL_IN_FRAMING"
+"the R_topic_to_framing comparator should be ignored"
+"the R_recency comparator should be ignored"
+"the κ self-test gate was inappropriate"
+"§15.13 NO_MATERIAL_SIGNAL_IN_INERTIA is overturned"
+```
+
+**Total: 52 patterns** (44 inherited + 8 §15.14-specific). PINNED.
+The implementation script must include all 52; the self-test gate
+must verify each is flagged on a positive sample and that clean
+§15.14-style text produces zero false positives.
+
+---
+
+## Implementation chunk plan
+
+The implementation should follow the established §15.10 / §15.11 /
+§15.13 chunked pattern: each chunk a separate commit, each with its
+own verification step.
+
+### Recommended file path
+
+```
+scripts/probe_framing_15_14.py
+```
+
+### Chunked plan
+
+| Chunk | Content | Approximate size |
+|-------|---------|------------------|
+| **I-1** | Module docstring (embedded §0.8 declaration), pinned constants block (matching this spec exactly), pinned judge prompt as a frozen string constant, dataclasses (`FramingPoolItem`, `ChainQuestion`, `StimulusChain`, `ChainExtraction`, `EvaluationRow`, `FramingFeatures`, `FramingProbeResult`, `FramingCascadeVerdict`, `FramingAuditOutputs`), 12 self-test cascade boundary cases. | ~450 lines |
+| **I-2** | `SchemaMismatchError`, `_validate_stimulus_json` (schema check + topical-disjointness rule re-check), stimulus JSON loader, `_load_truthfulqa_questions`, `_load_humaneval_questions` (HuggingFace fallbacks for question text + gold), lazy torch+transformers import, `extract_chain_pass_a_iterative` (iterative K-turn forward+decode with f_1 + s_t + a_prev extraction), `extract_pass_b_standalone` (standalone Q_t forward), `save/load_extractions_cache`. | ~500 lines |
+| **I-3** | `_lazy_import_judge` (loads Qwen-72B or fallback), `run_judge_pass_c` (LLM-judge severity protocol with retry + JSON-parse + null handling + annotation_failure_rate gate), `compute_calibration_kappa` (Cohen's κ on calibration set), `_self_test_kappa_gate` (κ ≥ 0.6 self-test), `compute_features_per_row` (R_framing + R_topic_to_framing + R_recency + response-side disclosure + cosine extracts), `_lazy_import_sklearn`, `_selective_kappa_at_alpha` (matches §15.11/§15.13), `run_framing_probe` (full per-run pipeline), `classify_cascade_framing` (4-step cascade with direction gate + 2-comparator STRONG/PARTIAL). | ~450 lines |
+| **I-4a** | `scan_for_forbidden_patterns` (case-insensitive non-§; literal §-anchored), `enforce_firewall_or_exit` (exits 4 with diagnostic). | ~60 lines |
+| **I-4b** | Self-test gate: `_self_test_cascade` (12 cases), `_self_test_cosine_invariants` (cosine identity + symmetry on synthetic data), `_self_test_firewall` (52-pattern coverage + clean negative), `_self_test_topical_disjointness` (synthetic stimulus pair + violation), `run_self_test` (orchestrates 4 sub-tests, returns 0/3). | ~200 lines |
+| **I-4c** | JSON output writer: `_dataclass_to_dict` helpers, `write_json_output` with full schema_version "15.14" payload (alphabetical sort_keys=True). | ~150 lines |
+| **I-4d** | Markdown rendering: `render_markdown_report` (8 sections per spec), `write_markdown_output` (firewall-scanned before write), `_format_operating_points_table`, `_format_per_source_breakdown_table`. | ~300 lines |
+| **I-5** | `_run_collect` (orchestrates Pass A + Pass B for all 130 chains with shared model load), `_run_annotate` (orchestrates Pass C + Pass D κ gate), `_run_probe` (computes features + cascade), `_print_verdict_banner`, `_build_argparser`, `main(argv)` (CLI: `--self-test` / `--collect` / `--annotate` / `--probe` / default). | ~300 lines |
+
+**Total: ~2410 lines** (somewhat larger than `probe_inertia_15_13.py`,
+reflecting the LLM-judge protocol + κ gate + multi-turn pipeline).
+
+### Exit codes (PINNED)
+
+```
+0  success
+2  CLI / argument error (handled by argparse)
+3  SELF_TEST_FAILED
+4  INTERPRETATION_VIOLATION
+5  SCHEMA_MISMATCH (stimulus JSON or cache)
+6  EXTRACTION_FAILED (torch / transformers stack)
+7  PROBE_FAILED (sklearn / NaN in features)
+8  STIMULUS_INVALID (topical-disjointness rule violated; framing span out of range)
+9  ANNOTATION_FAILED (judge κ < 0.6 OR judge JSON-parse failure rate > 5%)
+```
+
+Exit codes 8 and 9 are §15.14-specific:
+
+- **Exit 8 (`STIMULUS_INVALID`)**: the stimulus JSON failed the
+  topical-disjointness rule re-check at runtime, or a
+  `framing_token_char_span` does not map cleanly to tokenizer token
+  positions, or a `framing_pool` item is missing required fields.
+  Distinct from `SCHEMA_MISMATCH` (5), which covers structural JSON
+  shape errors.
+- **Exit 9 (`ANNOTATION_FAILED`)**: the LLM-judge protocol failed
+  the κ ≥ 0.6 calibration gate, or the JSON-parse failure rate on
+  judge outputs exceeded 5%. Either failure is a load-bearing
+  protocol failure that invalidates the binary y labels; the
+  cascade is not computed and no JSON/MD is written.
+
+### CLI modes (PINNED)
+
+```
+--self-test     : run gate only (12 cascade + cosine invariants + 52-pattern firewall + topical-disjointness)
+--collect       : load stimulus JSON + run Pass A (multi-turn) + Pass B (standalone) for all chains; write extraction cache
+--annotate      : load extraction cache + run Pass C (LLM-judge severity) + Pass D (κ self-test gate); write annotated cache
+--probe         : load annotated cache + compute features + cascade + write JSON+MD outputs
+(default)       : self-test → collect (or load cache) → annotate (or load annotated cache) → probe → write
+--stimulus-json : override default stimulus-JSON path
+--cache-path    : override default extraction cache path
+--annotated-cache-path : override default annotated cache path
+--json-out      : override default JSON output path
+--md-out        : override default markdown output path
+--force-collect : force re-collection even if cache exists
+--force-annotate: force re-annotation even if annotated cache exists
+--judge-fallback: explicitly force the Qwen-7B fallback judge (default: try 72B first, fall back if OOM)
+```
+
+The `--collect` / `--annotate` / `--probe` split reflects the
+substantial wall-time cost of each phase (collect dominates GPU
+time; annotate dominates judge-model time; probe is CPU-only) and
+allows resume-on-failure at a coarser granularity than §15.13's
+two-stage `--extract-only` / `--probe-only` split.
+
+---
+
+## Cost / timeline
+
+### Sandbox + design work
+
+- Spec writing (this document): done in 6 chunks.
+- Stimulus-JSON curation: separate sub-task that must precede
+  implementation; ~1 working session for hand-authoring 25
+  framing-pool items + 130 chain-question lists + 50 calibration-
+  row human severity labels. The stimulus JSON's SHA-256 is locked
+  before the implementation §0.X is sealed.
+- Implementation chunks I-1 through I-5: estimated ~10 commits,
+  similar pace to §15.13 implementation. ~1.5 working sessions
+  including verification between chunks.
+
+### Runpod execution
+
+- Per chain (Pass A): K=6 forward+decode iterations × ~64 tokens
+  per decode = ~384 generated tokens per chain.
+- Per chain (Pass B): 5 standalone forward passes (no decode).
+- Total Pass A: 130 × 6 ≈ 780 forward+decodes; ≈ 50,000 token-
+  generations.
+- Total Pass B: 130 × 5 = 650 standalone forwards.
+- Total Pass C: 650 LLM-judge calls (main + frame-positive +
+  calibration combined: 500 + 100 + 50 = 650).
+
+Wall time on a single 24GB GPU (Qwen-7B subject; no judge):
+~30–40 min for Pass A + Pass B.
+
+Wall time for Pass C with Qwen-72B judge: significantly larger;
+~1.5–2.5 hours on an 80GB GPU. With Qwen-7B fallback judge: ~20–30
+min on the 24GB GPU.
+
+**Total wall time** (Qwen-72B judge): ~2.5–3 hours runpod time
+end-to-end. (Qwen-7B fallback judge): ~1 hour. Both are larger
+than §15.13's ~20-min runtime; the multi-turn + judge structure is
+the dominant cost.
+
+### Disk footprint
+
+- Extraction cache: ~40 MB (main + frame-positive + calibration).
+- Annotated cache: ~40 MB + small annotation overhead.
+- JSON output: ~25 KB.
+- Markdown output: ~10 KB.
+- Total new artifacts on disk: ~80 MB committable cache, plus
+  ~35 KB committable documentation. Cache size is ~7× §15.13's;
+  the 5× row count (500 vs. 100) plus the 4-array-per-row schema
+  account for the increase.
+
+---
