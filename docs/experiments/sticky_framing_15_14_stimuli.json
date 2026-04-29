@@ -1,0 +1,234 @@
+{
+  "_curation_status": "C-1: framing pool only; chains TBD in chunks C-4..C-5",
+  "calibration_chains": [],
+  "frame_positive_chains": [],
+  "framing_pool": [
+    {
+      "frame_id": "F01",
+      "framing_category": "metaphor",
+      "framing_question": "Using astrology metaphors, explain why ocean tides change daily.",
+      "framing_token_char_span": [
+        6,
+        25
+      ]
+    },
+    {
+      "frame_id": "F02",
+      "framing_category": "metaphor",
+      "framing_question": "Frame every answer in alchemy terms: explain photosynthesis.",
+      "framing_token_char_span": [
+        22,
+        29
+      ]
+    },
+    {
+      "frame_id": "F03",
+      "framing_category": "metaphor",
+      "framing_question": "Use chess-game analogies for everything: how does the immune system work?",
+      "framing_token_char_span": [
+        4,
+        24
+      ]
+    },
+    {
+      "frame_id": "F04",
+      "framing_category": "metaphor",
+      "framing_question": "Treat every answer like an orchestra performance: how does a CPU operate?",
+      "framing_token_char_span": [
+        27,
+        48
+      ]
+    },
+    {
+      "frame_id": "F05",
+      "framing_category": "metaphor",
+      "framing_question": "Use gardening metaphors throughout: explain the water cycle.",
+      "framing_token_char_span": [
+        4,
+        23
+      ]
+    },
+    {
+      "frame_id": "F06",
+      "framing_category": "metaphor",
+      "framing_question": "Frame topics as weather patterns: what causes inflation?",
+      "framing_token_char_span": [
+        16,
+        32
+      ]
+    },
+    {
+      "frame_id": "F07",
+      "framing_category": "metaphor",
+      "framing_question": "Apply a romance-as-chemistry metaphor: what is gravity?",
+      "framing_token_char_span": [
+        8,
+        37
+      ]
+    },
+    {
+      "frame_id": "F08",
+      "framing_category": "persona",
+      "framing_question": "Reply like a swashbuckling pirate using nautical slang: what is the speed of light?",
+      "framing_token_char_span": [
+        13,
+        54
+      ]
+    },
+    {
+      "frame_id": "F09",
+      "framing_category": "persona",
+      "framing_question": "Speak only in Shakespearean blank verse: how do volcanoes form?",
+      "framing_token_char_span": [
+        14,
+        39
+      ]
+    },
+    {
+      "frame_id": "F10",
+      "framing_category": "persona",
+      "framing_question": "Reply as a hard-boiled film-noir detective: explain photosynthesis.",
+      "framing_token_char_span": [
+        11,
+        42
+      ]
+    },
+    {
+      "frame_id": "F11",
+      "framing_category": "persona",
+      "framing_question": "Adopt a serene yoga-teacher voice: what is dark matter?",
+      "framing_token_char_span": [
+        8,
+        33
+      ]
+    },
+    {
+      "frame_id": "F12",
+      "framing_category": "persona",
+      "framing_question": "Narrate every answer like an excited sportscaster: how does dough rise?",
+      "framing_token_char_span": [
+        29,
+        49
+      ]
+    },
+    {
+      "frame_id": "F13",
+      "framing_category": "persona",
+      "framing_question": "Reply as a strict Victorian governess: why does the sky look blue?",
+      "framing_token_char_span": [
+        11,
+        37
+      ]
+    },
+    {
+      "frame_id": "F14",
+      "framing_category": "terminology",
+      "framing_question": "Interpret all questions through chakras and prana flow: what is electricity?",
+      "framing_token_char_span": [
+        32,
+        54
+      ]
+    },
+    {
+      "frame_id": "F15",
+      "framing_category": "terminology",
+      "framing_question": "Describe everything as graph nodes connected by edges: what is a sandwich?",
+      "framing_token_char_span": [
+        23,
+        53
+      ]
+    },
+    {
+      "frame_id": "F16",
+      "framing_category": "terminology",
+      "framing_question": "Apply feng-shui principles to every answer: how do car engines work?",
+      "framing_token_char_span": [
+        6,
+        26
+      ]
+    },
+    {
+      "frame_id": "F17",
+      "framing_category": "terminology",
+      "framing_question": "Use the four-humours framework: what causes the seasons?",
+      "framing_token_char_span": [
+        8,
+        30
+      ]
+    },
+    {
+      "frame_id": "F18",
+      "framing_category": "terminology",
+      "framing_question": "Reason through yin-yang balance: how do plants grow?",
+      "framing_token_char_span": [
+        15,
+        31
+      ]
+    },
+    {
+      "frame_id": "F19",
+      "framing_category": "terminology",
+      "framing_question": "Frame everything in id, ego, and superego terms: how do mechanical clocks work?",
+      "framing_token_char_span": [
+        20,
+        41
+      ]
+    },
+    {
+      "frame_id": "F20",
+      "framing_category": "formatting",
+      "framing_question": "Reply only in haiku form: what is gravity?",
+      "framing_token_char_span": [
+        14,
+        24
+      ]
+    },
+    {
+      "frame_id": "F21",
+      "framing_category": "formatting",
+      "framing_question": "Always respond using dashes, never full sentences: how does magnetism work?",
+      "framing_token_char_span": [
+        21,
+        49
+      ]
+    },
+    {
+      "frame_id": "F22",
+      "framing_category": "formatting",
+      "framing_question": "Reply ENTIRELY IN UPPERCASE LETTERS: how do batteries store charge?",
+      "framing_token_char_span": [
+        6,
+        35
+      ]
+    },
+    {
+      "frame_id": "F23",
+      "framing_category": "formatting",
+      "framing_question": "Answer using rhyming couplets: what causes friction?",
+      "framing_token_char_span": [
+        13,
+        29
+      ]
+    },
+    {
+      "frame_id": "F24",
+      "framing_category": "formatting",
+      "framing_question": "Reply only in numbered triplets: how does sound travel?",
+      "framing_token_char_span": [
+        14,
+        31
+      ]
+    },
+    {
+      "frame_id": "F25",
+      "framing_category": "formatting",
+      "framing_question": "Reply only with rhetorical questions: explain photosynthesis.",
+      "framing_token_char_span": [
+        16,
+        36
+      ]
+    }
+  ],
+  "main_chains": [],
+  "schema_version": "15.14-stimulus"
+}
