@@ -87,6 +87,130 @@ CALIBRATION_LABELS_OPTIONAL_ROW_KEYS = {
 }
 
 
+def _check_calibration_labels_artifact(
+    labels_path: Path,
+    expected_keys: set[tuple[int, int]],
+    stimulus_sha: str,
+) -> tuple[dict[tuple[int, int], dict], int]:
+    """Load + validate the labels artifact; return (labels_by_key, n_filled).
+
+    `expected_keys` is the full set of (chain_idx, turn_idx) pairs that
+    the calibration_chains in the stimulus JSON expect — i.e., 50 pairs
+    for 10 chains × 5 turns 2..6. The loader verifies each label row's
+    chain_idx ∈ {0..9}, turn_idx ∈ {2..6}, label ∈ {0,1,2}, no
+    duplicates, and that no row references an unknown key.
+
+    Coverage (n_filled == len(expected_keys)) is checked by the caller
+    when --strict or --require-calibration-labels is in effect.
+
+    `stimulus_sha` is the canonical SHA of the current stimulus JSON;
+    if the labels artifact's `stimulus_sha256` field is non-null and
+    does not match, the load fails STIMULUS_INVALID — labels would be
+    stale relative to the current stimulus.
+    """
+    if not labels_path.exists():
+        fail(EXIT_SCHEMA_MISMATCH,
+             f"calibration labels artifact not found: {labels_path}")
+    payload = json.loads(labels_path.read_text())
+
+    missing_top = CALIBRATION_LABELS_REQUIRED_TOP_KEYS - set(payload.keys())
+    if missing_top:
+        fail(EXIT_SCHEMA_MISMATCH,
+             f"labels artifact missing top-level keys: {sorted(missing_top)}")
+    if payload["schema_version"] != CALIBRATION_LABELS_SCHEMA_VERSION:
+        fail(EXIT_SCHEMA_MISMATCH,
+             f"labels artifact schema_version mismatch: expected "
+             f"{CALIBRATION_LABELS_SCHEMA_VERSION!r}, got "
+             f"{payload['schema_version']!r}")
+
+    declared_stim_sha = payload.get("stimulus_sha256")
+    if declared_stim_sha is not None and declared_stim_sha != stimulus_sha:
+        fail(EXIT_STIMULUS_INVALID,
+             f"labels artifact references stimulus_sha256={declared_stim_sha} "
+             f"but current stimulus JSON has SHA-256 {stimulus_sha}; "
+             f"labels are stale relative to this stimulus")
+
+    labels_raw = payload["labels"]
+    if not isinstance(labels_raw, list):
+        fail(EXIT_SCHEMA_MISMATCH, "labels artifact 'labels' must be a list")
+
+    labels_by_key: dict[tuple[int, int], dict] = {}
+    for i, row in enumerate(labels_raw):
+        if not isinstance(row, dict):
+            fail(EXIT_SCHEMA_MISMATCH,
+                 f"labels[{i}] must be an object; got {type(row).__name__}")
+
+        missing = CALIBRATION_LABELS_REQUIRED_ROW_KEYS - set(row.keys())
+        if missing:
+            fail(EXIT_SCHEMA_MISMATCH,
+                 f"labels[{i}] missing required keys: {sorted(missing)}")
+
+        # Reject unknown keys (typos / drift).
+        unknown = (
+            set(row.keys())
+            - CALIBRATION_LABELS_REQUIRED_ROW_KEYS
+            - CALIBRATION_LABELS_OPTIONAL_ROW_KEYS
+        )
+        if unknown:
+            fail(EXIT_SCHEMA_MISMATCH,
+                 f"labels[{i}] contains unknown keys: {sorted(unknown)} "
+                 f"(permitted: required={sorted(CALIBRATION_LABELS_REQUIRED_ROW_KEYS)} "
+                 f"+ optional={sorted(CALIBRATION_LABELS_OPTIONAL_ROW_KEYS)})")
+
+        ci = row["chain_idx"]
+        ti = row["turn_idx"]
+        if not (isinstance(ci, int) and 0 <= ci < 10):
+            fail(EXIT_STIMULUS_INVALID,
+                 f"labels[{i}].chain_idx must be int in [0, 10); got {ci!r}")
+        if not (isinstance(ti, int) and 2 <= ti <= 6):
+            fail(EXIT_STIMULUS_INVALID,
+                 f"labels[{i}].turn_idx must be int in [2, 6]; got {ti!r}")
+
+        label = row["human_severity_label"]
+        if label not in (0, 1, 2):
+            fail(EXIT_STIMULUS_INVALID,
+                 f"labels[{i}].human_severity_label must be in {{0,1,2}}; "
+                 f"got {label!r}")
+
+        rationale = row["human_severity_rationale"]
+        if not isinstance(rationale, str) or not rationale.strip():
+            fail(EXIT_STIMULUS_INVALID,
+                 f"labels[{i}].human_severity_rationale must be a non-empty string")
+
+        annotator = row["annotator_id"]
+        if not isinstance(annotator, str) or not annotator.strip():
+            fail(EXIT_STIMULUS_INVALID,
+                 f"labels[{i}].annotator_id must be a non-empty string")
+
+        ts = row["annotation_timestamp"]
+        if not isinstance(ts, str) or not ts.strip():
+            fail(EXIT_STIMULUS_INVALID,
+                 f"labels[{i}].annotation_timestamp must be a non-empty string")
+
+        key = (ci, ti)
+        if key in labels_by_key:
+            fail(EXIT_STIMULUS_INVALID,
+                 f"labels[{i}] duplicates earlier row for (chain_idx={ci}, "
+                 f"turn_idx={ti})")
+        if key not in expected_keys:
+            fail(EXIT_STIMULUS_INVALID,
+                 f"labels[{i}] references unknown (chain_idx={ci}, turn_idx={ti}) "
+                 f"not present in stimulus calibration_chains")
+        labels_by_key[key] = row
+
+    return labels_by_key, len(labels_by_key)
+
+
+def _calibration_labels_artifact_sha(labels_path: Path) -> str:
+    """SHA-256 of the labels artifact's canonical form (excludes
+    underscore-prefixed metadata, mirroring the stimulus-JSON convention).
+    """
+    payload = json.loads(labels_path.read_text())
+    canonical = {k: v for k, v in payload.items() if not k.startswith("_")}
+    canonical_bytes = json.dumps(canonical, indent=2, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(canonical_bytes).hexdigest()
+
+
 def fail(exit_code: int, msg: str) -> None:
     print(f"VALIDATION FAILED ({exit_code}): {msg}", file=sys.stderr)
     sys.exit(exit_code)
@@ -301,16 +425,27 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to the stimulus JSON.",
     )
     parser.add_argument(
+        "--calibration-labels-json",
+        default=None,
+        help="Path to the calibration labels artifact "
+             "(docs/experiments/sticky_framing_15_14_calibration_labels.json). "
+             "When supplied, labels are loaded + validated + merged by "
+             "(chain_idx, turn_idx) into the calibration_chains structure "
+             "in memory. Required for --require-calibration-labels and --strict.",
+    )
+    parser.add_argument(
         "--require-calibration-labels",
         action="store_true",
-        help="Fail if any calibration row has human_severity_label = null. "
-             "Default: warn but pass (curation v0 expects null placeholders).",
+        help="Fail if calibration severity labels are not fully present. "
+             "Per §15.14-A1 follow-up (C-8), labels live in the separate "
+             "artifact and must be supplied via --calibration-labels-json. "
+             "Default: pass (labels not required).",
     )
     parser.add_argument(
         "--require-frame-positive-final",
         action="store_true",
         help="Fail if frame_positive_curation_status is PLACEHOLDER. "
-             "Default: warn but pass (curation v0 expects placeholders).",
+             "Default: pass (placeholders allowed during incremental curation).",
     )
     args = parser.parse_args(argv)
 
@@ -348,37 +483,67 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"  frame_positive_chains: 20 chains, structure ✓ — STATUS={fp_status}")
 
-    # 5. Calibration chains.
-    n_labelled, n_total = _check_calibration_chains(payload["calibration_chains"], pool)
+    # 5. Calibration chains (structure only).
+    _n_in_json, n_total = _check_calibration_chains(payload["calibration_chains"], pool)
     cal_status = payload.get("_calibration_label_status", "PENDING_ANNOTATION_PASS")
-    # n_labelled stays 0 here; the C-8c labels-artifact merger will set the
-    # actual count when --calibration-labels-json is supplied.
-    if n_labelled < n_total and args.require_calibration_labels:
-        fail(EXIT_STIMULUS_INVALID,
-             f"calibration_chains: only {n_labelled}/{n_total} severity labels filled "
-             f"and --require-calibration-labels was specified. Per §15.14-A1 "
-             f"follow-up (C-8), labels live in the separate artifact at "
-             f"{payload.get('_calibration_labels_artifact_path', '<not set>')} "
-             f"and must be supplied via --calibration-labels-json")
-    print(f"  calibration_chains: 10 chains × 5 turns = {n_total} rows, "
-          f"labels in stimulus JSON = {n_labelled}/{n_total} "
-          f"(status={cal_status}; labels artifact: separate file)")
 
-    # 6. SHA-256 of canonical form.
-    digest = _canonical_sha256(payload)
+    # 6. SHA-256 of canonical stimulus JSON form.
+    stimulus_digest = _canonical_sha256(payload)
+
+    # 7. (Optional) Calibration labels artifact merge.
+    n_labelled = 0
+    labels_sha: str | None = None
+    expected_keys: set[tuple[int, int]] = {
+        (chain["chain_idx"], cq["turn_idx"])
+        for chain in payload["calibration_chains"]
+        for cq in chain["chain_questions"]
+    }
+    if args.calibration_labels_json is not None:
+        labels_path = Path(args.calibration_labels_json)
+        labels_by_key, n_labelled = _check_calibration_labels_artifact(
+            labels_path, expected_keys, stimulus_digest,
+        )
+        labels_sha = _calibration_labels_artifact_sha(labels_path)
+        if n_labelled == len(expected_keys):
+            cal_status = "FILLED"
+        else:
+            cal_status = f"INCOMPLETE_{n_labelled}_OF_{len(expected_keys)}"
+
+    if n_labelled < n_total and args.require_calibration_labels:
+        if args.calibration_labels_json is None:
+            fail(EXIT_STIMULUS_INVALID,
+                 f"--require-calibration-labels was specified without "
+                 f"--calibration-labels-json. Labels live in the separate "
+                 f"artifact at "
+                 f"{payload.get('_calibration_labels_artifact_path', '<not set>')} "
+                 f"and must be supplied to be merged at validation time.")
+        fail(EXIT_STIMULUS_INVALID,
+             f"calibration labels: only {n_labelled}/{n_total} filled in the "
+             f"supplied artifact and --require-calibration-labels was specified")
+
+    print(f"  calibration_chains: 10 chains × 5 turns = {n_total} rows, "
+          f"labels merged from artifact = {n_labelled}/{n_total} "
+          f"(status={cal_status})")
+
     print()
-    print(f"SHA-256 (canonical, excludes underscore-prefixed metadata): {digest}")
+    print(f"SHA-256 stimulus  (canonical): {stimulus_digest}")
+    if labels_sha is not None:
+        print(f"SHA-256 labels    (canonical): {labels_sha}")
     print()
 
     if fp_status == "PLACEHOLDER" or n_labelled < n_total:
         print("Validation status: STRUCTURAL OK; PRE-LOCK")
-        print("  Curation v0 artifacts pass schema + disjointness checks.")
+        print("  Curation artifacts pass schema + disjointness checks.")
         print("  Implementation §0.X cannot proceed to --collect / --annotate / --probe")
-        print("  until: (a) frame_positive_chains are hand-curated for topic alignment,")
-        print("         (b) all 50 calibration severity labels are filled.")
+        print("  until: (a) frame_positive_chains status = FINAL,")
+        print("         (b) all 50 calibration severity labels are merged from the")
+        print("             external labels artifact (--calibration-labels-json).")
     else:
-        print("Validation status: FINAL — stimulus JSON ready for §15.14 implementation")
-        print(f"  Pin SHA-256 in implementation §0.X: {digest}")
+        print("Validation status: FINAL — stimulus JSON + labels artifact ready for §15.14 implementation")
+        print(f"  Pin in implementation §0.X:")
+        print(f"    final_stimulus_sha       = {stimulus_digest}")
+        if labels_sha is not None:
+            print(f"    calibration_labels_sha   = {labels_sha}")
 
     return EXIT_SUCCESS
 
