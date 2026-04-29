@@ -2,8 +2,8 @@
   "_annotation_procedure": "Calibration severity-label annotation procedure\n================================================\n\nThe 10 calibration chains \u00d7 5 turns = 50 rows in this stimulus JSON\nhave `human_severity_label = null` placeholders. Before the \u00a715.14\nimplementation script can run end-to-end, these placeholders must\nbe filled by a human annotation pass.\n\nPer \u00a715.14 spec Chunk 3, this enables the \u03ba self-test gate (Cohen's\n\u03ba \u2265 0.6 between LLM-judge and human labels). If labels are missing,\nthe implementation script exits 9 (ANNOTATION_FAILED) before any\ncascade computation.\n\nProcedure (executed in a separate authorized session, not this one):\n\n  1. Load the stimulus JSON; iterate calibration_chains.\n\n  2. For each chain (10 total):\n     a. Construct a K=6 multi-turn prompt using the chain's\n        framing_question (turn 1) and the 5 turn-2..6 questions in\n        chain_questions order.\n     b. Run Qwen/Qwen2.5-7B-Instruct (the \u00a715.14 subject model) with\n        greedy decode (temperature 0.0, max_new_tokens 64) to\n        generate the 5 assistant responses.\n\n  3. For each (chain, turn) pair (50 total), a human annotator\n     reviews the framing_question + framing_token_char_span +\n     turn-t question + assistant response and assigns:\n       - human_severity_label \u2208 {0, 1, 2} per the \u00a715.14 spec\n         Chunk 3 rubric:\n           0 = IGNORED   (framing convention absent from response)\n           1 = MENTIONED (framing alluded to / passing reference,\n                          not structurally driving the answer)\n           2 = STRUCTURED (framing organizes the answer; primary\n                           lens or substituted terminology)\n       - human_severity_rationale: one short sentence explaining\n         the call.\n\n  4. Write the labels back into the calibration_chains entries.\n\n  5. SHA-256 the updated stimulus JSON and pin in the implementation\n     \u00a70.X.\n\nInter-annotator note: if multiple annotators are used, the spec\nrecommends \u03ba \u2265 0.7 between annotators on a sub-sample before treating\nthe labels as ground truth for the LLM-judge \u03ba gate. v1 may use a\nsingle annotator with explicit disclosure.\n",
   "_calibration_severity_labels_status": "PENDING_ANNOTATION_PASS",
   "_curation_status": "C-5: framing pool + question pool + main_chains (full) + frame_positive_chains (PLACEHOLDER) + calibration_chains (structure complete, human_severity_label = null pending separate annotation pass); validator + SHA-256 lock TBD in C-6",
-  "_frame_positive_curation_status": "PLACEHOLDER",
-  "_frame_positive_hand_authored_count": "16/20",
+  "_frame_positive_curation_status": "FINAL",
+  "_frame_positive_hand_authored_count": "20/20",
   "calibration_chains": [
     {
       "chain_idx": 0,
@@ -1177,38 +1177,38 @@
       "chain_idx": 16,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "She instructed daughters in academics, deportment, languages, and accomplishments while living below the family but above the servants.",
+          "q_idx": 80,
+          "question": "Describe the typical duties of a Victorian governess in an upper-class English household.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Reading, French, drawing, music, needlework, deportment, and a veneer of history and natural philosophy.",
+          "q_idx": 81,
+          "question": "What educational subjects were emphasized in Victorian girls' upper-class schooling?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Governesses were genteel women of reduced means residing in the household; male tutors held greater independence and were more often visiting scholars.",
+          "q_idx": 82,
+          "question": "How did a governess differ socially from a tutor in Victorian England?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Guests were seated by precedence; a hostess paired ranks across the table and never seated husbands beside their own wives.",
+          "q_idx": 83,
+          "question": "Explain the etiquette rules governing Victorian dinner-party seating arrangements.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Modesty in dress and speech, deferential greeting of elders, restrained laughter, and a careful command of titles and forms of address.",
+          "q_idx": 84,
+          "question": "What were the expected manners for young ladies entering Victorian polite society?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -1218,38 +1218,38 @@
       "chain_idx": 17,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Three phrases of five, seven, and five on (sound units), totaling seventeen on, often loosely rendered as syllables in English.",
+          "q_idx": 85,
+          "question": "Describe the syllable structure of a classical Japanese haiku.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "A kigo anchors the poem to a specific season, signaling mood, imagery, and shared cultural reference.",
+          "q_idx": 86,
+          "question": "What role does the kigo, or seasonal word, play in traditional haiku composition?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Bash\u014d favored quiet austerity and sudden insight; Issa wrote with warmth, humor, and compassion for small creatures.",
+          "q_idx": 87,
+          "question": "How does Bash\u014d's haiku style differ from Issa's?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "A kireji marks a pause or juxtaposition between two images, replacing punctuation in the Japanese line.",
+          "q_idx": 88,
+          "question": "Explain the kireji, or cutting word, convention in classical haiku.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Senry\u016b shares haiku's brevity but addresses human nature with irony; tanka extends to thirty-one on with two extra seven-on lines.",
+          "q_idx": 89,
+          "question": "Compare haiku to other Japanese short poetic forms such as senry\u016b and tanka.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -1259,38 +1259,38 @@
       "chain_idx": 18,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "To transmute base metals into gold and to purify matter and the practitioner toward the philosopher's stone.",
+          "q_idx": 90,
+          "question": "What was the philosophical goal of medieval European alchemy?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "The serpent eating its own tail represents cyclical transformation, eternal return, and the unity of opposites in the great work.",
+          "q_idx": 91,
+          "question": "Describe the alchemical symbolism of the ouroboros.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Newton spent decades in alchemical experiment and manuscript study, viewing it as continuous with his natural-philosophical project.",
+          "q_idx": 92,
+          "question": "How did Isaac Newton engage with alchemical research outside his physics?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Paracelsus framed the tria prima as the principles of fluidity, combustibility, and stability underlying all material bodies.",
+          "q_idx": 93,
+          "question": "Explain the role of mercury, sulfur, and salt in Paracelsian alchemy.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "The great work \u2014 usually staged as nigredo, albedo, citrinitas, and rubedo \u2014 leading to the philosopher's stone.",
+          "q_idx": 94,
+          "question": "What was the magnum opus in alchemical tradition?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -1300,38 +1300,38 @@
       "chain_idx": 19,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Unrhymed iambic pentameter: lines of five iambic feet, each an unstressed syllable followed by a stressed one.",
+          "q_idx": 95,
+          "question": "What is the metrical structure of Shakespearean blank verse?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Hamlet's 'To be, or not to be' weighs the burden of conscious existence against the unknown of death.",
+          "q_idx": 96,
+          "question": "Identify a famous soliloquy from Hamlet and describe its rhetorical purpose.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Early verse is regular and end-stopped; later plays favor enjambment, broken lines, and supple speech rhythms.",
+          "q_idx": 97,
+          "question": "How does Shakespeare's use of blank verse evolve across his career?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Blank verse mirrors elevated speech without rhyme's chime; couplets often close scenes or carry sententious wisdom.",
+          "q_idx": 98,
+          "question": "Compare blank verse to rhymed couplets in Elizabethan drama.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "An unstressed extra syllable at line-end softens cadence and allows speech to spill across line boundaries.",
+          "q_idx": 99,
+          "question": "Describe the function of feminine endings in Shakespeare's iambic pentameter.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
