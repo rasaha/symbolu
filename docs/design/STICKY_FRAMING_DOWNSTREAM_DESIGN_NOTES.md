@@ -557,3 +557,206 @@ S_{t+1} = w_k·F_t + w_o·Q_t + (1 − w_d)·A_t
 
 ---
 
+## Part C — §15.x line boundary assessment
+
+This part is not a ChatGPT proposal; it is the §15.x line's
+internal assessment of where Parts A and B sit relative to the
+sealed §15.10 / §15.11 / §15.12 / §15.13 / §15.14 verdicts and
+the §0.8 discipline. Captured here so that any future implementer
+who picks up Parts A or B reads this section first.
+
+### C.1 Stage mismatch — measurement vs. control
+
+The §15.x line is a measurement / falsification pipeline: does
+residual-stream geometry *predict* a specific failure mode? Each
+phase is one mechanism class:
+
+| Phase | Mechanism | Verdict |
+|---|---|---|
+| §15.10 | Supervised linear (Z) | PARTIAL |
+| §15.11 | Layer-wise phase coherence | NO_MATERIAL |
+| §15.12 | Single-turn closure | sealed |
+| §15.13 | Continuation inertia (R_inertia) | NO_MATERIAL (AUC=0.6300) |
+| §15.14 | Framing-stickiness (R_framing) | PENDING |
+
+Part A is also at the **measurement** stage — a richer benchmark
+v2 that would test sticky-framing-class failures with pivot
+architecture, multi-label scoring, and difficulty ladder. It is a
+candidate downstream of §15.14 only if §15.14 lands signal.
+
+Part B is at the **control** stage — a runtime intervention
+framework. It builds on top of the assumption that R, I, O, C are
+all reliably predictive. Three of those four signals (I from
+§15.13, C from §15.11, plus the "intent competition" surface
+loosely corresponding to H2) are currently null, untested, or
+inside §15.14 itself pending. Stacking a control system on null
+signals is curve-fitting, not engineering.
+
+The §0.8 discipline that has held the line since §15.10 is:
+**measure first; only build control once the underlying signal is
+established.**
+
+### C.2 Architectural concern with the state-update equation
+
+Part B's load-bearing equation is:
+
+```
+S_{t+1} = w_k·F_t + w_o·Q_t + (1 − w_d)·A_t
+```
+
+In a transformer, the working state is not a vector that can be
+composed externally and injected as the next forward pass's
+starting point. The hidden state at turn t+1 is the deterministic
+output of a forward pass over the full prompt; you cannot write
+`S_{t+1} = α·something + β·something_else` and have the model
+behave as if its residual stream were that vector.
+
+Steering vectors and activation-patching can locally bias a
+forward pass, but they are not a general state-recomposition
+operator. Translating Part B's update equations into something a
+real transformer can run is itself a research program — orders of
+magnitude bigger than §15.14's measurement question, and not
+addressed in the proposal.
+
+This is a hard architectural blocker. Any §0.X authorizing Part B
+implementation must first resolve whether the update equations are
+- prompt-level (recompose `F_t`, `Q_t`, `A_t` as text and re-prompt
+  on every turn — coarse, plausible, but not actually adaptive in
+  the residual-stream sense), or
+- activation-level (a steering / patching layer atop the residual
+  stream — open research; not a direct fit), or
+- something more invasive (e.g., training a custom controller —
+  outside §15.x scope entirely).
+
+### C.3 Implicit re-import of H1 and H2
+
+§15.13 and §15.14 specs both explicitly keep H1 (state coherence)
+and H2 (intent competition) in the **open-but-untested** column.
+Part B's `C_t` is H1; its `R_t` / `O_t` mixture is H2. Any §0.X
+that tries to evaluate the governor must therefore first run H1
+and H2 isolation tests, since otherwise it is impossible to tell
+whether the governor's apparent behavior reflects real signals or
+artifacts of unconstrained free parameters
+(`a_1..a_4, b_1..b_5, c_1..c_4, d_1..d_3, λ_A`, etc.).
+
+Concretely, the prerequisite §0.X chain looks like:
+
+1. §15.14 R_framing v1 (this branch's spec; sealed, pending
+   implementation).
+2. §15.15 H1 state-coherence isolation (does not exist; would need
+   a fresh spec).
+3. §15.16 H2 intent-competition isolation (does not exist; would
+   need a fresh spec).
+4. *Only then* a measurement-stage test of the joint signal R ∧ I
+   ∧ O ∧ C as a predictor.
+5. *Only then* a control-stage authorization for any portion of
+   the Part B governor.
+
+Skipping any of these steps reintroduces the brittleness §15.11
+already paid for with a NO_MATERIAL verdict on a single mechanism
+class.
+
+### C.4 Genuinely valuable pieces
+
+Two pieces of the proposal are worth keeping in mind regardless of
+the broader framework:
+
+#### C.4.1 Acceleration / jerk signals
+
+The `B_X(t) = |ΔX_t − ΔX_{t−1}|` extension is BCVF-faithful in
+tone (second-difference style, parallel to a phase-coherence
+second-difference v2 candidate already noted in prior §15.x
+discussions). Could be cleanly grafted onto a future §15.14 v2 as
+a cross-check (e.g., does `B_R_framing(t)` predict a release
+failure better than `R_framing(t)` alone?). This would be one
+fresh §0.X, not part of the governor.
+
+#### C.4.2 Decision policy with new branches
+
+The four-action policy (answer / answer-with-reset / ask-
+clarification / abstain) maps onto §15.10-style selective-
+prediction operating points, with two genuinely new branches:
+
+- **Answer-with-reset.** Forces the model to explicitly drop the
+  prior frame before answering.
+- **Ask-clarification.** Defers an answer entirely in favor of a
+  scope-clarifying question.
+
+These are interesting because they are **interventions** that do
+not require state recomposition — they can be implemented at the
+prompt level by a controller that watches the measurement signals
+and rewrites the next prompt. A standalone §0.X testing whether
+those two branches improve sticky-framing release accuracy is
+possible without resolving the full Part B governor.
+
+### C.5 Why none of this modifies §15.14 v1
+
+§15.14 v1 is sealed at
+`docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md` and tests one
+mechanism class (state-side R_framing) on a single composite
+benchmark with one pinned annotation protocol. Folding any portion
+of Parts A or B into v1 would:
+
+- multiply the hyperparameter surface (4 pivot types × 4 categories
+  × 4 difficulty levels);
+- re-import H1 and H2 surfaces;
+- require either prompt-level state recomposition or activation
+  patching, neither of which is in §15.x scope;
+- break the parity-with-§15.13 discipline that has kept the
+  measurement column auditable across phases.
+
+§15.14 v1's "Optional v2 follow-ups (NOT authorized by this spec)"
+section already lists the pivot-architecture variant and the
+response-side classifier as v2 candidates. This document expands
+on those candidates in detail, but does not change v1's scope.
+
+### C.6 Future authorization path
+
+If §15.14 lands signal (PARTIAL or STRONG), each of the following
+becomes a candidate fresh §0.X. None is authorized by this
+document.
+
+| Candidate | Stage | Prerequisites |
+|---|---|---|
+| Pivot-architecture v2 (Part A.2–A.10) | Measurement | §15.14 PARTIAL or STRONG |
+| Frame-positive cascade input | Measurement | §15.14 PARTIAL or STRONG |
+| Response-side R_framing classifier | Measurement | §15.14 PARTIAL or STRONG |
+| Acceleration / jerk signals (C.4.1) | Measurement | §15.14 PARTIAL or STRONG |
+| Answer-with-reset / ask-clarification policy (C.4.2) | Intervention (prompt-level) | §15.14 PARTIAL or STRONG; well-defined release-accuracy metric |
+| H1 state-coherence isolation | Measurement | None beyond §15.x line continuing |
+| H2 intent-competition isolation | Measurement | None beyond §15.x line continuing |
+| Joint R ∧ I ∧ O ∧ C predictor | Measurement | §15.13, §15.14, H1-isolation, H2-isolation each landing signal |
+| Adaptive context-governor (Part B, prompt-level form) | Intervention | All four measurement components above signal-positive |
+| Adaptive context-governor (Part B, activation-level form) | Intervention + architecture research | All measurement prerequisites + architecture-research-program |
+| Autonomy transfer (B.10) | Intervention | LLM-side governor working + autonomy-domain replication §0.X |
+
+### C.7 What this document does NOT do
+
+- Does **NOT** authorize implementation of any portion of Part A
+  or Part B.
+- Does **NOT** modify the sealed §15.14 v1 design spec.
+- Does **NOT** modify any §13/§14/§15.x verdict-of-record.
+- Does **NOT** assert that the governor is the right framework for
+  sticky-framing remediation; it captures the proposal so that a
+  future implementer has the full thread on file.
+- Does **NOT** assert that the pivot-based benchmark is superior
+  to §15.14 v1's design; v1 was deliberately chosen for parity
+  with §15.13 and minimum hyperparameter surface.
+- Does **NOT** authorize any architectural surgery (steering
+  vectors, activation patching, custom controller training) on the
+  Qwen-7B subject model.
+
+---
+
+## Closing
+
+§13.9 hold preserved. §6.1 N=21 autonomy result preserved.
+§15.10 PARTIAL_SIGNAL_IN_Z preserved. §15.11
+NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE preserved. §15.12 closure
+preserved. §15.13 NO_MATERIAL_SIGNAL_IN_INERTIA preserved.
+§15.14 v1 sealed and pending implementation. All future work on
+the directions catalogued in this document requires fresh §0.X
+commitments with their own §0.8-binding specs. This document is
+archival; it does not authorize anything.
+
+
