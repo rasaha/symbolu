@@ -3,7 +3,7 @@
   "_calibration_severity_labels_status": "PENDING_ANNOTATION_PASS",
   "_curation_status": "C-5: framing pool + question pool + main_chains (full) + frame_positive_chains (PLACEHOLDER) + calibration_chains (structure complete, human_severity_label = null pending separate annotation pass); validator + SHA-256 lock TBD in C-6",
   "_frame_positive_curation_status": "PLACEHOLDER",
-  "_frame_positive_hand_authored_count": "8/20",
+  "_frame_positive_hand_authored_count": "12/20",
   "calibration_chains": [
     {
       "chain_idx": 0,
@@ -849,38 +849,38 @@
       "chain_idx": 8,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Writers borrow ideas like covalent bonding, activation energy, and equilibrium to dramatize attraction and commitment.",
+          "q_idx": 40,
+          "question": "How do popular-science writers describe falling in love using molecular-bond imagery?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Common borrowings include reaction sparks, catalysts, magnetism, and dopamine surges as metaphors for attraction.",
+          "q_idx": 41,
+          "question": "What scientific concepts are most often borrowed when describing romantic chemistry colloquially?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "A matchmaker is framed as a catalyst that lowers the activation energy needed for two parties to react and form a bond.",
+          "q_idx": 42,
+          "question": "Describe the metaphorical mapping between catalysis and matchmaking in pop romance writing.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "It captures the felt suddenness, energy release, and ignition risk of early infatuation in a vivid one-word image.",
+          "q_idx": 43,
+          "question": "Why has the 'spark' metaphor for attraction persisted in romantic discourse?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Chemistry suggests a transformative reaction once contact occurs; magnetism suggests an attractive force operating at distance.",
+          "q_idx": 44,
+          "question": "Compare the use of 'chemistry' and 'magnetism' as romantic metaphors in popular usage.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -890,38 +890,38 @@
       "chain_idx": 9,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Muladhara, Svadhishthana, Manipura, Anahata, Vishuddha, Ajna, and Sahasrara, ascending the spine.",
+          "q_idx": 45,
+          "question": "What are the seven chakras commonly described in classical kundalini yoga?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Prana is the vital life force that flows through nadis (subtle channels) animating the energy body.",
+          "q_idx": 46,
+          "question": "Describe the relationship between prana and the energy body in yogic philosophy.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Muladhara, the root center at the base of the spine, is the seat of stability and the focus of grounding meditations.",
+          "q_idx": 47,
+          "question": "How does the muladhara chakra relate to grounding practices?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Anahata is the center associated with love and compassion; many metta practices direct attention there.",
+          "q_idx": 48,
+          "question": "What is the role of the heart chakra (anahata) in compassion meditation?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Ajna represents intuitive insight and inner perception, often associated with the pineal region.",
+          "q_idx": 49,
+          "question": "Explain the symbolism of the third-eye chakra (ajna) in Hindu tantric tradition.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -931,38 +931,38 @@
       "chain_idx": 10,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Em dashes are wider and mark strong breaks; en dashes are narrower and indicate ranges or compound modifiers.",
+          "q_idx": 50,
+          "question": "Explain the typographic difference between em dashes and en dashes.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Dashes signal a sharper interruption than commas and a less parenthetical aside than parentheses.",
+          "q_idx": 51,
+          "question": "When should a writer use a dash instead of a comma or parentheses?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Dashes entered English print in the 17th century; conventions for em vs. en use stabilized in the 19th century.",
+          "q_idx": 52,
+          "question": "What is the history of dash usage in English punctuation?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "They may switch to en dashes with spaces, or use non-breaking thin spaces, to keep the dash anchored to its phrase.",
+          "q_idx": 53,
+          "question": "How do typographers handle dashes in tight column layouts to avoid awkward line breaks?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Newspaper style favors em dashes set tight to surrounding text for asides, attributions, and dramatic pauses.",
+          "q_idx": 54,
+          "question": "Describe the use of dashes in journalistic-style writing for emphasis.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -972,38 +972,38 @@
       "chain_idx": 11,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "It is a sharp asymmetric reply to 1.e4 played by black for unbalanced positions and winning chances.",
+          "q_idx": 55,
+          "question": "What is the Sicilian Defence and why is it popular at the elite level?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "White fianchettos the king-bishop and pressures the long diagonal, often ceding a c-pawn for activity.",
+          "q_idx": 56,
+          "question": "Describe the typical pawn structure that arises from the Catalan Opening.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "By square coverage, mobility, coordination, and proximity to weaknesses or the opposing king.",
+          "q_idx": 57,
+          "question": "How does a grandmaster evaluate piece activity in the middlegame?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Zugzwang is a position in which any move worsens the player's prospects; common in king-and-pawn endings.",
+          "q_idx": 58,
+          "question": "Explain the principle of zugzwang in chess endgames.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Najdorf plays 5...a6 for flexibility; Dragon fianchettos the king-bishop on g7 with sharp opposite-side castling fights.",
+          "q_idx": 59,
+          "question": "What is the difference between the Najdorf and Dragon variations of the Sicilian?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
