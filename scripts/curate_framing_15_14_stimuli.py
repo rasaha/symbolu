@@ -750,6 +750,100 @@ def build_main_chains(
     return chains
 
 
+def build_frame_positive_chains(
+    pool: list[FramingPoolItem],
+    question_pool: list[QuestionPoolItem],
+) -> list[StimulusChain]:
+    """Generate the 20 frame-positive chains (PLACEHOLDER curation in v0).
+
+    PER §15.14 SPEC CHUNK 2 CHOICE 7: frame-positive chains should use
+    questions where the turn-1 framing convention is GENUINELY TOPICALLY
+    RELEVANT to each turn-2..6 question (so that appropriate framing
+    invocation is the correct behavior, and y_pos=1 means appropriate
+    invocation rather than inappropriate stickiness).
+
+    HAND-AUTHORING TOPIC-ALIGNED QUESTIONS PER FRAME IS A SEPARATE
+    CURATION TASK NOT YET COMPLETED. This v0 generator emits 20
+    structurally-valid chains using the SAME topical-disjointness pool
+    as the main set, which is *structurally wrong* per the spec's
+    frame-positive intent.
+
+    Output is flagged in the stimulus JSON as `_frame_positive_curation_status:
+    "PLACEHOLDER"`. The implementation §0.X must either:
+      (a) hand-author 100 topic-aligned questions (20 chains × 5 turns)
+          before sealing the stimulus JSON, OR
+      (b) declare frame_positive_disclosure unavailable in v1 and skip
+          the auc_framing_pos computation.
+
+    Either way, this v0 placeholder must NOT be used as the curation-
+    time-locked frame-positive set.
+    """
+    chains: list[StimulusChain] = []
+    used_per_frame: dict[str, set[tuple[QuestionSource, int]]] = {}
+
+    for chain_idx in range(20):
+        frame_idx = frame_positive_chain_frame_index(chain_idx)
+        frame = pool[frame_idx]
+        used = used_per_frame.setdefault(frame.frame_id, set())
+
+        picked: list[ChainQuestion] = []
+        # Iterate the pool in REVERSE order so frame-positive chains
+        # consume questions starting from the tail, reducing collision
+        # with main_chains (which iterate in forward order). Different
+        # scopes thus tend to use disjoint subsets of the pool.
+        for q in reversed(question_pool):
+            if len(picked) == 5:
+                break
+            qkey = (q.source, q.q_idx)
+            if qkey in used:
+                continue
+            if not is_topically_disjoint(frame, q.question):
+                continue
+            picked.append(ChainQuestion(
+                turn_idx=2 + len(picked),
+                source=q.source,
+                q_idx=q.q_idx,
+                question=q.question,
+                gold=q.gold,
+            ))
+            used.add(qkey)
+
+        if len(picked) != 5:
+            raise RuntimeError(
+                f"frame-positive chain {chain_idx} (frame {frame.frame_id}): "
+                f"could not fill 5 turns; only got {len(picked)}."
+            )
+        chains.append(StimulusChain(
+            chain_idx=chain_idx,
+            frame_id=frame.frame_id,
+            chain_questions=tuple(picked),
+        ))
+
+    return chains
+
+
+# ---------------------------------------------------------------------------
+# Serialization helpers
+# ---------------------------------------------------------------------------
+
+
+def chain_to_dict(chain: StimulusChain) -> dict:
+    return {
+        "chain_idx": chain.chain_idx,
+        "frame_id": chain.frame_id,
+        "chain_questions": [
+            {
+                "turn_idx": cq.turn_idx,
+                "source": cq.source,
+                "q_idx": cq.q_idx,
+                "question": cq.question,
+                "gold": cq.gold,
+            }
+            for cq in chain.chain_questions
+        ],
+    }
+
+
 def _self_test_pairing_and_disjointness(pool: list[FramingPoolItem]) -> None:
     """C-2 self-test: verify pairing rule + disjointness checker on synthetics."""
     # Pairing rule: each frame used exactly 4 times across main set.
@@ -824,20 +918,67 @@ def main() -> None:
         print(f"  {item.frame_id} [{item.framing_category:>11}] "
               f"compatible_questions={n_compatible:3d} {flag}")
 
+    print()
+    print("Generating main_chains (100) ...")
+    main_chains = build_main_chains(pool, question_pool)
+    print(f"  built: {len(main_chains)} chains × 5 turns = {5*len(main_chains)} rows")
+
+    print()
+    print("Generating frame_positive_chains (20, PLACEHOLDER curation) ...")
+    fp_chains = build_frame_positive_chains(pool, question_pool)
+    print(f"  built: {len(fp_chains)} chains × 5 turns = {5*len(fp_chains)} rows")
+    print("  ⚠  frame_positive_chains are STRUCTURAL PLACEHOLDERS using the")
+    print("     topical-disjointness pool. The implementation §0.X must")
+    print("     replace them with hand-authored topic-aligned questions per")
+    print("     §15.14 spec Chunk 2 Choice 7 before sealing.")
+
+    # Sanity: per-frame uniqueness within main set.
+    for item in pool:
+        keys: list[tuple[str, int]] = []
+        for c in main_chains:
+            if c.frame_id == item.frame_id:
+                for cq in c.chain_questions:
+                    keys.append((cq.source, cq.q_idx))
+        if len(set(keys)) != len(keys):
+            raise RuntimeError(
+                f"frame {item.frame_id}: main_chains has duplicate questions "
+                f"within the same frame_id"
+            )
+
+    # Sanity: every main_chain question is topically disjoint from its frame.
+    for c in main_chains:
+        frame = next(p for p in pool if p.frame_id == c.frame_id)
+        for cq in c.chain_questions:
+            if not is_topically_disjoint(frame, cq.question):
+                raise RuntimeError(
+                    f"chain {c.chain_idx} (frame {c.frame_id}): question "
+                    f"({cq.source}, {cq.q_idx}) violates topical-disjointness"
+                )
+    print("  topical-disjointness re-verified on all 100×5=500 main rows ✓")
+    print("  per-frame uniqueness re-verified on main_chains ✓")
+
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "schema_version": STIMULUS_SCHEMA_VERSION,
         "framing_pool": framing_pool_dict(pool),
-        "main_chains": [],            # filled in C-4
-        "frame_positive_chains": [],  # filled in C-4
+        "main_chains": [chain_to_dict(c) for c in main_chains],
+        "frame_positive_chains": [chain_to_dict(c) for c in fp_chains],
         "calibration_chains": [],     # filled in C-5
         "_curation_status": (
-            "C-2: framing pool + pairing/disjointness logic; question pool TBD in C-3, "
-            "chains TBD in C-4..C-5"
+            "C-4: framing pool + question pool + main_chains (full) + "
+            "frame_positive_chains (PLACEHOLDER, see in-script note); "
+            "calibration_chains TBD in C-5"
         ),
+        "_frame_positive_curation_status": "PLACEHOLDER",
     }
     OUTPUT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True))
-    print(f"Wrote partial stimulus JSON: {OUTPUT_PATH}")
+    print()
+    print(f"Wrote stimulus JSON: {OUTPUT_PATH}")
+    print(f"  schema_version: {STIMULUS_SCHEMA_VERSION}")
+    print(f"  framing_pool: 25 items")
+    print(f"  main_chains: {len(main_chains)} chains")
+    print(f"  frame_positive_chains: {len(fp_chains)} chains (PLACEHOLDER)")
+    print(f"  calibration_chains: 0 (filled in C-5)")
 
 
 if __name__ == "__main__":
