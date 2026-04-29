@@ -64,6 +64,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import traceback
 import uuid
 from pathlib import Path
 
@@ -179,26 +180,38 @@ def _load_model_and_tokenizer():
 
 
 def _greedy_decode(tokenizer, model, messages: list[dict]) -> str:
-    """Apply chat template + greedy decode MAX_NEW_TOKENS, return decoded text."""
+    """Apply chat template + greedy decode MAX_NEW_TOKENS, return decoded text.
+
+    Uses `return_dict=True` so apply_chat_template returns input_ids AND
+    attention_mask; recent transformers versions can fail or warn loudly
+    on generate() without an attention_mask, especially with sharded
+    models. Drops the `temperature` kwarg from generate(): when
+    do_sample=False (greedy), temperature is ignored and recent
+    transformers versions emit a warning that's distracting for
+    debugging real failures.
+    """
     import torch
 
-    prompt_ids = tokenizer.apply_chat_template(
+    inputs = tokenizer.apply_chat_template(
         messages,
         add_generation_prompt=True,
         return_tensors="pt",
+        return_dict=True,
     )
-    if hasattr(model, "device"):
-        prompt_ids = prompt_ids.to(model.device)
+    # Move to the model's first parameter device (handles sharded
+    # device_map="auto" cases where model.device may not be defined).
+    target_device = next(model.parameters()).device
+    inputs = {k: v.to(target_device) for k, v in inputs.items()}
 
     with torch.no_grad():
         output_ids = model.generate(
-            prompt_ids,
+            **inputs,
             max_new_tokens=MAX_NEW_TOKENS,
             do_sample=False,
-            temperature=DECODE_TEMPERATURE,
             pad_token_id=tokenizer.eos_token_id,
         )
-    new_tokens = output_ids[0, prompt_ids.shape[1]:]
+    input_len = inputs["input_ids"].shape[1]
+    new_tokens = output_ids[0, input_len:]
     return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
 
@@ -249,7 +262,10 @@ def _collect_calibration_responses(
                 turn_1_response = _greedy_decode(tokenizer, model, messages)
             except Exception as e:
                 print(
-                    f"EXTRACTION_FAILED: chain {chain_idx} turn 1 inference: {e}",
+                    f"EXTRACTION_FAILED: chain {chain_idx} turn 1 inference\n"
+                    f"  exception type:    {type(e).__name__}\n"
+                    f"  exception str:     {e!r}\n"
+                    f"  full traceback:\n{traceback.format_exc()}",
                     file=sys.stderr,
                 )
                 sys.exit(EXIT_EXTRACTION_FAILED)
@@ -269,8 +285,10 @@ def _collect_calibration_responses(
                     turn_t_response = _greedy_decode(tokenizer, model, messages)
                 except Exception as e:
                     print(
-                        f"EXTRACTION_FAILED: chain {chain_idx} turn {turn_idx} "
-                        f"inference: {e}",
+                        f"EXTRACTION_FAILED: chain {chain_idx} turn {turn_idx} inference\n"
+                        f"  exception type:    {type(e).__name__}\n"
+                        f"  exception str:     {e!r}\n"
+                        f"  full traceback:\n{traceback.format_exc()}",
                         file=sys.stderr,
                     )
                     sys.exit(EXIT_EXTRACTION_FAILED)
