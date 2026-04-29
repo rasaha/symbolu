@@ -832,3 +832,309 @@ points are reported in the JSON / MD output for transparency but do
 NOT enter the cascade decision.**
 
 ---
+
+## Cascade structure
+
+### Pinned thresholds (numerically identical to §15.10 / §15.11 / §15.13)
+
+```
+STRONG_AUC_THRESHOLD          = 0.75   # inclusive
+STRONG_DELTA_AUC_THRESHOLD    = 0.05   # inclusive (vs chance, vs topic, vs recency)
+PARTIAL_AUC_THRESHOLD         = 0.66   # inclusive
+DIRECTION_GATE_THRESHOLD      = 0.5    # strict (auc_framing < 0.5 fails)
+CHANCE_BASELINE_AUC           = 0.5
+```
+
+The threshold values match §15.10 / §15.11 / §15.13 for cross-phase
+comparability. The §15.14-specific structural difference is the
+**two-comparator strict-margin requirement**: R_framing must beat
+*both* R_topic_to_framing and R_recency, not just one comparator
+(§15.13 had only one: R_sim).
+
+### Cascade decision (mechanical, in order)
+
+Inputs: `auc_framing`, `auc_topic_to_framing`, `auc_recency`. All
+three are `AUC(-R_*, y)` form (higher = better signal in the BCVF-
+faithful direction).
+
+**Step 1 — Direction gate (PINNED).**
+
+> If `auc_framing < 0.5` → label = `NO_MATERIAL_SIGNAL_IN_FRAMING`,
+> rationale = "wrong-direction failure: BCVF-faithful direction
+> (lower R_framing predicts appropriate non-invocation) did not hold
+> (auc_framing = X < 0.5)". Skip remaining steps.
+
+This is the §0.8 enforcement of the pinned BCVF-faithful direction.
+Failing it on the only benchmark is a hypothesis failure, not a sign-
+flip opportunity. Mirrors §15.11 / §15.13.
+
+**Step 2 — STRONG check.**
+
+> If
+> - `auc_framing ≥ 0.75` AND
+> - `(auc_framing − 0.5) ≥ 0.05` AND
+> - `(auc_framing − auc_topic_to_framing) ≥ 0.05` AND
+> - `(auc_framing − auc_recency) ≥ 0.05`
+>
+> → label = `STRONG_SIGNAL_IN_FRAMING`.
+
+The third and fourth conditions are the strict-comparator
+requirement: R_framing must beat both the topic-overlap and content-
+recency baselines by the cascade margin.
+
+**Step 3 — PARTIAL check.**
+
+> If not STRONG, AND
+> - `auc_framing ≥ 0.66` AND
+> - `(auc_framing − 0.5) > 0` AND
+> - `(auc_framing − auc_topic_to_framing) > 0` AND
+> - `(auc_framing − auc_recency) > 0`
+>
+> → label = `PARTIAL_SIGNAL_IN_FRAMING`.
+
+The second condition is automatically satisfied by `auc_framing ≥
+0.66 > 0.5`, but is stated explicitly for symmetry with §15.10 /
+§15.11 / §15.13.
+
+**Step 4 — Default.**
+
+> Otherwise → label = `NO_MATERIAL_SIGNAL_IN_FRAMING`.
+
+### What the cascade does NOT consider
+
+- The κ@α selective-prediction operating points (disclosure only).
+- The frame-positive AUC `auc_framing_pos` (disclosure only;
+  Choice 7 in Chunk 2).
+- The response-side variant `auc_framing_response_side` (disclosure
+  only; v2 candidate).
+- Any per-stimulus diagnostic (R_framing distribution, individual
+  cosine values, etc.).
+- §15.10 / §15.11 / §15.13 AUCs (different mechanism classes; not
+  comparable input).
+- Whether `R_topic_to_framing` or `R_recency` themselves clear
+  chance — only the *differences* `(auc_framing − auc_topic_to_framing)`
+  and `(auc_framing − auc_recency)` matter for the strict-comparator
+  step.
+- Per-source breakdowns (TruthfulQA-MC vs HumanEval); reported in
+  the markdown but not part of the cascade decision.
+
+### Pinned self-test boundary cases (12 cases)
+
+Each entry: `(auc_framing, auc_topic_to_framing, auc_recency,
+expected_label)`. The implementation script must pass all 12 at the
+self-test gate before any data inspection.
+
+| #   | auc_framing | auc_topic | auc_recency | rationale                                                              | expected                       |
+|-----|-------------|-----------|-------------|------------------------------------------------------------------------|--------------------------------|
+|  1  | 0.80        | 0.65      | 0.65        | STRONG clean (clears all 4 conditions)                                 | STRONG_SIGNAL_IN_FRAMING       |
+|  2  | 0.75        | 0.70      | 0.70        | STRONG boundary at AUC=0.75 + ΔAUC=0.05 inclusive on both comparators  | STRONG_SIGNAL_IN_FRAMING       |
+|  3  | 0.78        | 0.20      | 0.20        | STRONG well above both comparators                                     | STRONG_SIGNAL_IN_FRAMING       |
+|  4  | 0.74        | 0.65      | 0.65        | PARTIAL via AUC just below 0.75; ΔAUC vs both =0.09>0                  | PARTIAL_SIGNAL_IN_FRAMING      |
+|  5  | 0.78        | 0.74      | 0.65        | PARTIAL via ΔAUC vs topic =0.04<0.05 but >0; passes vs recency         | PARTIAL_SIGNAL_IN_FRAMING      |
+|  6  | 0.78        | 0.65      | 0.74        | PARTIAL via ΔAUC vs recency =0.04<0.05 but >0; passes vs topic         | PARTIAL_SIGNAL_IN_FRAMING      |
+|  7  | 0.66        | 0.65      | 0.65        | PARTIAL boundary at AUC=0.66 inclusive; ΔAUC vs both =0.01>0           | PARTIAL_SIGNAL_IN_FRAMING      |
+|  8  | 0.65        | 0.50      | 0.50        | NO_MATERIAL: AUC < 0.66                                                | NO_MATERIAL_SIGNAL_IN_FRAMING  |
+|  9  | 0.70        | 0.70      | 0.50        | NO_MATERIAL: ΔAUC vs topic = 0 strictly (not > 0)                      | NO_MATERIAL_SIGNAL_IN_FRAMING  |
+| 10  | 0.70        | 0.50      | 0.72        | NO_MATERIAL: ΔAUC vs recency < 0 (R_framing worse than recency)        | NO_MATERIAL_SIGNAL_IN_FRAMING  |
+| 11  | 0.50        | 0.30      | 0.30        | NO_MATERIAL: direction gate inclusive at 0.5; AUC<0.66                 | NO_MATERIAL_SIGNAL_IN_FRAMING  |
+| 12  | 0.49        | 0.65      | 0.65        | NO_MATERIAL: direction gate strict (auc_framing<0.5)                   | NO_MATERIAL_SIGNAL_IN_FRAMING  |
+
+Coverage rationale:
+
+- Cases 1–3: STRONG band entries (clean, boundary inclusive at
+  AUC=0.75 + ΔAUC=0.05 on *both* comparators, well-separated).
+- Cases 4–7: PARTIAL band entries (AUC just-below-STRONG; one-
+  sided ΔAUC just-below-STRONG on topic; one-sided ΔAUC just-below-
+  STRONG on recency; AUC=0.66 boundary inclusive with both ΔAUCs
+  positive).
+- Cases 8–10: NO_MATERIAL via cascade-condition failure (AUC<0.66;
+  ΔAUC topic =0 strictly; ΔAUC recency<0).
+- Cases 11–12: NO_MATERIAL via direction-gate failure (inclusive
+  at 0.5; strict below 0.5).
+
+The 12 cases are pinned numerically identical at the boundary-
+inclusive thresholds. The implementation script must encode this
+table verbatim and the self-test gate must pass all 12 before any
+data inspection.
+
+---
+
+## Output schema
+
+### `docs/experiments/probe_framing_15_14.json` (`schema_version = "15.14"`)
+
+Top-level keys (alphabetical for `sort_keys=True` parity with §15.10
+/ §15.11 / §15.12 / §15.13):
+
+```
+{
+  "annotation_protocol": {
+    "judge_model_id": "Qwen/Qwen2.5-72B-Instruct",
+    "judge_prompt_sha256": "<hex sha256 of the pinned judge prompt>",
+    "judge_temperature": 0.0,
+    "judge_max_tokens": 128,
+    "calibration_kappa": <float>,
+    "calibration_kappa_threshold": 0.6,
+    "calibration_n_rows": 50,
+    "annotation_failure_rate": <float>,
+    "annotation_failure_rate_threshold": 0.05
+  },
+  "benchmark": "sticky_framing_15_14_composite",
+  "cascade_thresholds": {
+    "strong_auc": 0.75,
+    "strong_delta_auc": 0.05,
+    "partial_auc": 0.66,
+    "direction_gate_threshold": 0.5,
+    "chance_baseline_auc": 0.5
+  },
+  "cascade_verdict": {
+    "label": "<STRONG|PARTIAL|NO_MATERIAL>_SIGNAL_IN_FRAMING",
+    "auc_framing": <float>,
+    "auc_topic_to_framing": <float>,
+    "auc_recency": <float>,
+    "dauc_vs_chance": <float>,
+    "dauc_vs_topic_to_framing": <float>,
+    "dauc_vs_recency": <float>,
+    "direction_held": <bool>,
+    "rationale": "<formatted prose>"
+  },
+  "cross_phase_disclosure": {
+    "phase_1_§15_10_verdict": "PARTIAL_SIGNAL_IN_Z",
+    "phase_2_§15_11_verdict": "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE",
+    "phase_3_§15_12_status": "sealed (closure outcome)",
+    "phase_4_§15_13_verdict": "NO_MATERIAL_SIGNAL_IN_INERTIA",
+    "this_phase_modifies": "none"
+  },
+  "extraction_config": {
+    "layer_idx": -1,
+    "hidden_dim": 3584,
+    "max_new_tokens": 64,
+    "decode_temperature": 0.0,
+    "f_1_pooling": "mean_over_framing_token_positions_layer_minus_1_full_context_pass",
+    "s_t_extraction": "last_token_pre_decode_at_t_th_assistant_tag_full_context",
+    "q_t_extraction": "last_token_pre_decode_standalone_with_chat_template",
+    "a_prev_pooling": "mean_over_decoded_assistant_tokens_layer_minus_1_full_context_pass",
+    "k_turns": 6
+  },
+  "frame_positive_disclosure": {
+    "n_frame_positive_chains": 20,
+    "n_frame_positive_rows": 100,
+    "auc_framing_pos": <float>,
+    "auc_framing_pos_direction_consistent": <bool>,
+    "note": "Disclosure-only sign-consistency cross-check; NOT a cascade input."
+  },
+  "judge_fallback_used": <bool>,
+  "n_chains": 100,
+  "n_evaluation_rows": 500,
+  "pairing_rule": "K=6 chains; turn-1 = framing_pool[(i*7) mod 25]; turns 2..6 = curated_chain_questions[i] under topical-disjointness rule",
+  "phase_5_eligible_outcomes": [
+    "STRONG_SIGNAL_IN_FRAMING",
+    "PARTIAL_SIGNAL_IN_FRAMING",
+    "NO_MATERIAL_SIGNAL_IN_FRAMING"
+  ],
+  "probe_result": {
+    "n_evaluation_rows": 500,
+    "n_severity_zero": <int>,
+    "n_severity_one": <int>,
+    "n_severity_two": <int>,
+    "n_severity_null": <int>,
+    "n_y_one": <int>,
+    "n_y_zero": <int>,
+    "auc_framing": <float>,
+    "auc_topic_to_framing": <float>,
+    "auc_recency": <float>,
+    "dauc_framing_vs_chance": <float>,
+    "dauc_framing_vs_topic_to_framing": <float>,
+    "dauc_framing_vs_recency": <float>,
+    "auc_framing_response_side_disclosure": <float>,
+    "direction_held": <bool>,
+    "r_framing_per_row": [<500 floats>],
+    "r_topic_to_framing_per_row": [<500 floats>],
+    "r_recency_per_row": [<500 floats>],
+    "severity_per_row": [<500 ints in {0,1,2} or null>],
+    "y_per_row": [<500 bools>],
+    "chain_idx_per_row": [<500 ints>],
+    "turn_idx_per_row": [<500 ints in {2..6}>],
+    "source_per_row": [<500 strings in {"truthfulqa_mc","humaneval"}>],
+    "selective_prediction_operating_points": [
+      {"alpha": 0.35, "kappa_at_alpha": <float>, "tau_star": <float>,
+       "coverage_at_tau_star": <float>,
+       "conditional_accuracy_at_tau_star": <float>,
+       "n_admitted_at_tau_star": <int>, "eligible": <bool>},
+      {"alpha": 0.50, ...},
+      {"alpha": 0.75, ...}
+    ],
+    "kappa_at_alpha_primary": <float>,
+    "tau_star_at_alpha_primary": <float>,
+    "alpha_primary": 0.5
+  },
+  "qwen_model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "schema_version": "15.14",
+  "stimulus_json_sha256": "<hex sha256 of sticky_framing_15_14_stimuli.json>"
+}
+```
+
+PINNED. No additional keys; no key removal.
+
+### `docs/experiments/framing_15_14_extractions.npz` (cache file)
+
+Per-evaluation-row arrays + per-chain arrays for `--probe-only`
+re-runs:
+
+Per-chain arrays (shape (100,) for the main set; analogous shapes
+for the 20-chain frame-positive and 10-chain calibration sets):
+
+```
+chain_idx           int64,   shape (100,)
+frame_id            object,  shape (100,)        # variable-length string
+f_1                 float32, shape (100, 3584)   # one f_1 per chain (computed at t=1)
+turn_1_response     object,  shape (100,)        # decoded turn-1 assistant text
+framing_token_ids   object,  shape (100,)        # variable-length int array per chain
+```
+
+Per-evaluation-row arrays (shape (500,) for the main set):
+
+```
+row_idx             int64,   shape (500,)
+chain_idx_per_row   int64,   shape (500,)
+turn_idx_per_row    int64,   shape (500,)        # values in {2,3,4,5,6}
+source_per_row      object,  shape (500,)        # "truthfulqa_mc" or "humaneval"
+q_t_idx             int64,   shape (500,)        # benchmark-internal index
+s_t                 float32, shape (500, 3584)
+q_t_repr            float32, shape (500, 3584)
+a_prev              float32, shape (500, 3584)
+r_t_response_pool   float32, shape (500, 3584)   # for response-side disclosure variant
+turn_t_response     object,  shape (500,)        # variable-length string
+severity            int8,    shape (500,)        # values in {0,1,2}; -1 sentinel for null
+y                   bool,    shape (500,)
+```
+
+Approximate size per main-set chain: ~1 × 3584 × 4 bytes (f_1) +
+5 × 4 × 3584 × 4 bytes (s_t, q_t_repr, a_prev, r_t_response_pool) ≈
+300 KB. Total across 100 chains: ~30 MB + text overhead +
+analogous frame-positive (~6 MB) + calibration (~3 MB) ≈ ~40 MB.
+
+### `docs/experiments/probe_framing_15_14.md`
+
+8-section markdown report (mirrors §15.11 / §15.13 structure):
+
+1. Header + schema/model/extraction/judge config one-liner.
+2. Cascade verdict (label, rationale, AUC table with chance + topic
+   + recency baselines, direction-held flag).
+3. Probe details (n_evaluation_rows, severity histogram, y balance,
+   AUC, ΔAUC vs all 3 baselines, per-source breakdown disclosure-
+   only).
+4. Annotation protocol details (judge model, judge prompt SHA-256,
+   calibration κ, judge fallback flag, annotation-failure rate).
+5. Frame-positive disclosure-only block (auc_framing_pos, sign-
+   consistency note).
+6. Selective-prediction operating points table (disclosure only).
+7. Pinned configuration block (formula, K=6 pairing rule,
+   extraction protocol, cascade thresholds, direction convention,
+   firewall pattern count).
+8. Caveats (§0.8-disclosed; carries forward §15.10 / §15.11 /
+   §15.13 caveats by §-reference; §15.14-specific caveats listed
+   inline) + Cross-phase comparison table + Audit-trail integrity
+   block.
+
+---
