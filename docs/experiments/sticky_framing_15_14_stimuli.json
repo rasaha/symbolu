@@ -3,7 +3,7 @@
   "_calibration_severity_labels_status": "PENDING_ANNOTATION_PASS",
   "_curation_status": "C-5: framing pool + question pool + main_chains (full) + frame_positive_chains (PLACEHOLDER) + calibration_chains (structure complete, human_severity_label = null pending separate annotation pass); validator + SHA-256 lock TBD in C-6",
   "_frame_positive_curation_status": "PLACEHOLDER",
-  "_frame_positive_hand_authored_count": "4/20",
+  "_frame_positive_hand_authored_count": "8/20",
   "calibration_chains": [
     {
       "chain_idx": 0,
@@ -685,38 +685,38 @@
       "chain_idx": 4,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Strings front, woodwinds middle, brass behind, percussion at back; conductor centered facing the players.",
+          "q_idx": 20,
+          "question": "Describe the typical seating arrangement of a modern symphony orchestra on stage.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "The conductor sets tempo, cues entrances, shapes dynamics, and unifies interpretation across sections.",
+          "q_idx": 21,
+          "question": "What role does the conductor play during an orchestral performance?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Brass provides power and weight using lip-buzzed tone; woodwinds offer agile, varied colors via reeds and air-jets.",
+          "q_idx": 22,
+          "question": "How do brass and woodwind sections differ in their orchestral function and timbre?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "It evolved from the Italian sinfonia and was codified in the Classical period by Haydn and Mozart.",
+          "q_idx": 23,
+          "question": "What is the historical origin of the symphony as a four-movement form?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "A quartet relies on four soloistic voices in dialogue; a symphony orchestra uses massed sections for sustained color and power.",
+          "q_idx": 24,
+          "question": "Compare a chamber ensemble such as a string quartet to a full symphony orchestra in scope.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -726,38 +726,38 @@
       "chain_idx": 5,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Front knee tracks over the ankle, back foot grounded, hips squared, arms extended parallel to the floor, gaze over the front hand.",
+          "q_idx": 25,
+          "question": "Describe the proper alignment for warrior pose (Virabhadrasana II) in hatha yoga.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Pranayama uses controlled breath to regulate the nervous system and prepare the mind for meditation.",
+          "q_idx": 26,
+          "question": "What is the role of breath awareness in pranayama practice?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
+          "gold": "Ashtanga follows a fixed sequence at a steady pace; vinyasa flows are teacher-designed and vary in shape and tempo.",
           "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "question": "How does vinyasa flow differ from a traditional ashtanga sequence?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Regular practice is associated with reduced cortisol, improved attention, and easier emotional regulation.",
+          "q_idx": 28,
+          "question": "What benefits does daily meditation offer for stress regulation?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Yin holds passive postures to stress connective tissue; restorative uses props for full support and deep relaxation.",
+          "q_idx": 29,
+          "question": "Explain the difference between yin yoga and restorative yoga styles.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -767,38 +767,38 @@
       "chain_idx": 6,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Yin-yang represents the interdependent, complementary polarities whose dynamic interplay underlies all phenomena.",
+          "q_idx": 30,
+          "question": "What does yin-yang represent in Daoist cosmology?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Wu xing extends yin-yang into five phases (wood, fire, earth, metal, water) that generate and control one another.",
+          "q_idx": 31,
+          "question": "How are the five elements (wu xing) related to yin and yang in classical Chinese thought?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Each half contains a seed of the other, depicting that opposites are mutually arising and never absolute.",
+          "q_idx": 32,
+          "question": "Describe the philosophical meaning of the taijitu (the yin-yang symbol).",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Health is framed as dynamic yin-yang equilibrium across organ systems; illness as imbalance to be restored.",
+          "q_idx": 33,
+          "question": "What role do yin and yang play in traditional Chinese medicine theory?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Tai chi alternates soft and firm, empty and full, slow and quick, embodying yin-yang flow through the body.",
+          "q_idx": 34,
+          "question": "How does tai chi practice express yin-yang principles in physical movement?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -808,38 +808,38 @@
       "chain_idx": 7,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Hypophora poses a question and immediately answers it, guiding the audience through the speaker's reasoning.",
+          "q_idx": 35,
+          "question": "What is the rhetorical purpose of a hypophora in classical oratory?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "He named ethos (character), pathos (emotion), and logos (logic) as the three artistic proofs.",
+          "q_idx": 36,
+          "question": "How did Aristotle classify the modes of persuasion in his Rhetoric?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Epideictic praises or blames in ceremonial settings; forensic addresses past actions in legal disputes.",
+          "q_idx": 37,
+          "question": "Explain the difference between epideictic and forensic rhetoric.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "They engage the reader's reasoning, sharpen contrast, and frame the writer's argument without explicit assertion.",
+          "q_idx": 38,
+          "question": "What role do rhetorical questions play in persuasive essay writing?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Apostrophe directly addresses an absent person, abstraction, or object as if present, heightening emotional appeal.",
+          "q_idx": 39,
+          "question": "Describe the structure of an apostrophe as a rhetorical device.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
