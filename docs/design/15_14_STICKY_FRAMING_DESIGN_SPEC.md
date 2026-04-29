@@ -15,6 +15,104 @@
   §13.9 hold, or §6.1 N=21 autonomy result). All upstream verdicts
   remain binding.
 
+## §0.8 Amendments
+
+This section records §0.8-binding amendments to this sealed spec
+since its initial seal. Each amendment is dated, numbered, and
+scoped narrowly. Amendments do not retroactively modify any
+§13/§14/§15.x verdict-of-record.
+
+### §15.14-A1 — frame_positive_chains source enum extension
+
+**Status:** PROPOSED, awaiting sign-off (will be marked EFFECTIVE
+upon explicit user sign-off and recorded in commit metadata).
+**Scope:** stimulus JSON schema only.
+
+**Change.** Extend the permitted values of `chain_question.source`
+inside `frame_positive_chains[*].chain_questions[*]` to additionally
+allow:
+
+> `"synthetic_frame_positive_v1"`
+
+This source enum value is permitted **only** inside
+`frame_positive_chains`. `main_chains` and `calibration_chains`
+remain restricted to `{"truthfulqa_mc", "humaneval"}` exactly as
+originally sealed.
+
+**Rationale.** The original spec required all chain_question entries
+to use `source ∈ {"truthfulqa_mc", "humaneval"}`. This is appropriate
+for `main_chains` and `calibration_chains`, where turn-2..K questions
+must be neutral downstream technical content under the topical-
+disjointness rule. It is structurally incompatible with
+`frame_positive_chains`, which per Choice 7 (Pinned mechanism
+section) requires **topically-aligned** questions where appropriate
+framing invocation is the correct behavior. TruthfulQA-MC and
+HumanEval do not naturally contain topic-aligned questions for
+hand-authored framing conventions (astrology, alchemy, chess
+strategy, Shakespearean English, chakras, etc.), so forcing weak
+alignment from those sources would make `auc_framing_pos` a noisy
+and scientifically meaningless quantity. The amendment introduces
+a third source category restricted to `frame_positive_chains`,
+allowing topic-aligned questions to be hand-authored at curation
+time.
+
+**What this amendment does NOT change.**
+
+- `main_chains` source enum: unchanged. `{"truthfulqa_mc", "humaneval"}`.
+- `calibration_chains` source enum: unchanged. `{"truthfulqa_mc", "humaneval"}`.
+- Severity rubric (0/1/2 = ignored / mentioned / structured): unchanged.
+- `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+- `KAPPA_GATE_THRESHOLD` (0.6, inclusive): unchanged.
+- Cascade structure, `R_framing` formula, `R_topic_to_framing`
+  comparator, `R_recency` comparator, direction convention,
+  STRONG/PARTIAL/NO_MATERIAL thresholds, 12 self-test boundary
+  cases: all unchanged.
+- Frame-positive disclosure-only status (NOT a cascade input):
+  unchanged.
+- 52-pattern Class-3 firewall: unchanged.
+- All §13/§14/§15.x verdicts-of-record: preserved.
+
+**Provenance requirements for `synthetic_frame_positive_v1`.**
+
+- Each `frame_positive_chains` chain_question with `source =
+  "synthetic_frame_positive_v1"` MUST be hand-authored at curation
+  time and recorded with its full text in the `question` field of
+  the stimulus JSON.
+- `q_idx` for synthetic items is curation-internal: an integer
+  ≥ 0 that is unique within the `"synthetic_frame_positive_v1"`
+  source category. The implementation script does NOT validate
+  `q_idx` against any HuggingFace dataset for this source category;
+  the question text is the canonical artifact.
+- `gold` is hand-authored alongside; for frame-positive disclosure-
+  only purposes, `gold` is recorded but is NOT used by the cascade
+  (frame-positive labels are derived from severity judgement of the
+  model's response, not from question correctness).
+- `frame_positive_chains` MAY mix `synthetic_frame_positive_v1`
+  questions with `truthfulqa_mc` / `humaneval` questions in the
+  same chain, where the latter are topically aligned with the
+  frame.
+
+**Pinned per-scope source enum (added to §0.8 frozen parameters
+table; see Sealed §0.8-binding decisions section below).**
+
+| Scope | `chain_question.source` enum |
+|---|---|
+| `main_chains` | `{"truthfulqa_mc", "humaneval"}` |
+| `calibration_chains` | `{"truthfulqa_mc", "humaneval"}` |
+| `frame_positive_chains` | `{"truthfulqa_mc", "humaneval", "synthetic_frame_positive_v1"}` |
+
+**Schema diff.** The stimulus JSON schema example in the Stimulus
+construction section is updated to reference this per-scope rule;
+see the inline note adjacent to the `frame_positive_chains` line.
+
+**Validator obligations.** The stimulus JSON validator
+(`scripts/validate_framing_15_14_stimuli.py`) must enforce the
+per-scope rule: a `synthetic_frame_positive_v1` source value
+appearing inside `main_chains` or `calibration_chains` is a
+`STIMULUS_INVALID` (exit 8) error.
+
+---
+
 ## Research question
 
 > Does the LM's residual alignment toward a **framing convention**
@@ -562,7 +660,7 @@ loads the JSON, validates schema (Chunk 4), and proceeds.
       "chain_idx": <int 0..99>,
       "frame_id": "<str from framing_pool>",
       "chain_questions": [
-        {"turn_idx": 2, "source": "truthfulqa_mc|humaneval", "q_idx": <int>, "question": "<str>", "gold": "<str>"},
+        {"turn_idx": 2, "source": "<truthfulqa_mc|humaneval>", "q_idx": <int>, "question": "<str>", "gold": "<str>"},
         {"turn_idx": 3, ...},
         {"turn_idx": 4, ...},
         {"turn_idx": 5, ...},
@@ -571,8 +669,8 @@ loads the JSON, validates schema (Chunk 4), and proceeds.
     },
     ...
   ],
-  "frame_positive_chains": [<same shape, 20 entries>],
-  "calibration_chains": [<same shape, 10 entries, plus per-row human_severity_label>]
+  "frame_positive_chains": [<same shape, 20 entries; per §15.14-A1 amendment, source enum extended to {"truthfulqa_mc", "humaneval", "synthetic_frame_positive_v1"}>],
+  "calibration_chains": [<same shape, 10 entries, plus per-row human_severity_label; source enum unchanged: {"truthfulqa_mc", "humaneval"}>]
 }
 ```
 
@@ -1520,6 +1618,9 @@ without a fresh §0.8 amendment to this spec:
 | PAIRING_RULE | "turn_1 = framing_pool[(i*7) mod 25]; turns 2..6 from curated chain_questions[i] under topical-disjointness rule" |
 | TOPICAL_DISJOINTNESS_RULE | non-stopword token-set disjointness between framing-span tokens and turn-2..K question tokens |
 | STOPWORD_LIST_SIZE | 24 (pinned list in Chunk 3) |
+| SOURCE_ENUM (main_chains) | `{"truthfulqa_mc", "humaneval"}` (per §15.14-A1) |
+| SOURCE_ENUM (calibration_chains) | `{"truthfulqa_mc", "humaneval"}` (per §15.14-A1) |
+| SOURCE_ENUM (frame_positive_chains) | `{"truthfulqa_mc", "humaneval", "synthetic_frame_positive_v1"}` (per §15.14-A1) |
 | PROMPT_FORMAT | Qwen chat template via `apply_chat_template` |
 | MAX_NEW_TOKENS (subject) | 64 |
 | MAX_NEW_TOKENS (judge) | 128 |
