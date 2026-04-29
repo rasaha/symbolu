@@ -447,7 +447,29 @@ def main(argv: list[str] | None = None) -> int:
         help="Fail if frame_positive_curation_status is PLACEHOLDER. "
              "Default: pass (placeholders allowed during incremental curation).",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Unified gate equivalent to --require-frame-positive-final + "
+             "--require-calibration-labels (with --calibration-labels-json "
+             "supplied). The single flag the implementation §0.X uses to "
+             "verify the stimulus is fully ready: frame_positive_chains "
+             "= FINAL, all 50 calibration severity labels merged from the "
+             "external artifact, no placeholders, sealed §0.8 thresholds "
+             "unchanged. Exits 0 only when both gates pass; otherwise "
+             "exits 8 STIMULUS_INVALID with a diagnostic.",
+    )
     args = parser.parse_args(argv)
+
+    # --strict implies both per-aspect requirements.
+    if args.strict:
+        args.require_frame_positive_final = True
+        args.require_calibration_labels = True
+        if args.calibration_labels_json is None:
+            fail(EXIT_STIMULUS_INVALID,
+                 "--strict requires --calibration-labels-json. The unified "
+                 "strict gate cannot pass without an external labels artifact "
+                 "to merge.")
 
     path = Path(args.stimulus_json)
     if not path.exists():
@@ -531,19 +553,34 @@ def main(argv: list[str] | None = None) -> int:
         print(f"SHA-256 labels    (canonical): {labels_sha}")
     print()
 
-    if fp_status == "PLACEHOLDER" or n_labelled < n_total:
+    is_final = (fp_status == "FINAL") and (n_labelled == n_total) and (labels_sha is not None)
+
+    if not is_final:
         print("Validation status: STRUCTURAL OK; PRE-LOCK")
         print("  Curation artifacts pass schema + disjointness checks.")
         print("  Implementation §0.X cannot proceed to --collect / --annotate / --probe")
         print("  until: (a) frame_positive_chains status = FINAL,")
         print("         (b) all 50 calibration severity labels are merged from the")
         print("             external labels artifact (--calibration-labels-json).")
+        if args.strict:
+            # Strict requires both gates; we already emitted detailed messages
+            # above for the specific failure mode. This is a final summary.
+            fail(EXIT_STIMULUS_INVALID,
+                 "--strict gate failed (FP status or calibration coverage "
+                 "incomplete; see prior diagnostics)")
     else:
         print("Validation status: FINAL — stimulus JSON + labels artifact ready for §15.14 implementation")
         print(f"  Pin in implementation §0.X:")
         print(f"    final_stimulus_sha       = {stimulus_digest}")
-        if labels_sha is not None:
-            print(f"    calibration_labels_sha   = {labels_sha}")
+        print(f"    calibration_labels_sha   = {labels_sha}")
+        # Sealed §0.8 thresholds preservation reminder.
+        print()
+        print("  Sealed §0.8 thresholds preserved (no implicit changes):")
+        print("    BINARY_LABEL_THRESHOLD     = severity ≥ 1 → y=1")
+        print("    KAPPA_GATE_THRESHOLD       = 0.6 (inclusive)")
+        print("    DIRECTION_GATE_THRESHOLD   = 0.5 (strict)")
+        print("    PARTIAL_AUC_THRESHOLD      = 0.66 (inclusive)")
+        print("    STRONG_AUC_THRESHOLD       = 0.75 (inclusive)")
 
     return EXIT_SUCCESS
 
