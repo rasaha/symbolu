@@ -1,5 +1,5 @@
 {
-  "_curation_status": "C-1: framing pool only; chains TBD in chunks C-4..C-5",
+  "_curation_status": "C-2: framing pool + pairing/disjointness logic; question pool TBD in C-3, chains TBD in C-4..C-5",
   "calibration_chains": [],
   "frame_positive_chains": [],
   "framing_pool": [

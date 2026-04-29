@@ -48,6 +48,7 @@ STOPWORDS: frozenset[str] = frozenset({
 })
 
 FramingCategory = Literal["metaphor", "persona", "terminology", "formatting"]
+QuestionSource = Literal["truthfulqa_mc", "humaneval"]
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,54 @@ class FramingPoolItem:
     framing_question: str
     framing_token_char_span: tuple[int, int]  # (start_char, end_char_exclusive)
     framing_category: FramingCategory
+
+
+@dataclass(frozen=True)
+class QuestionPoolItem:
+    """A reference to a single TruthfulQA-MC or HumanEval item.
+
+    The implementation script (scripts/probe_framing_15_14.py) resolves
+    `question` and `gold` against the actual HF dataset at runtime; this
+    artifact is the canonical curation-time text stored for reproducibility.
+    """
+    source: QuestionSource
+    q_idx: int
+    question: str
+    gold: str
+
+
+@dataclass(frozen=True)
+class ChainQuestion:
+    turn_idx: int  # 2..6
+    source: QuestionSource
+    q_idx: int
+    question: str
+    gold: str
+
+
+@dataclass(frozen=True)
+class StimulusChain:
+    chain_idx: int
+    frame_id: str
+    chain_questions: tuple[ChainQuestion, ...]  # length 5 (turns 2..6)
+
+
+@dataclass(frozen=True)
+class CalibrationChainQuestion:
+    turn_idx: int
+    source: QuestionSource
+    q_idx: int
+    question: str
+    gold: str
+    human_severity_label: int | None  # 0|1|2 or None placeholder
+    human_severity_rationale: str | None
+
+
+@dataclass(frozen=True)
+class CalibrationChain:
+    chain_idx: int
+    frame_id: str
+    chain_questions: tuple[CalibrationChainQuestion, ...]
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +288,186 @@ def framing_pool_dict(pool: list[FramingPoolItem]) -> list[dict]:
     ]
 
 
+# ---------------------------------------------------------------------------
+# Topical-disjointness checker (§15.14 spec Chunk 3, PINNED rule)
+# ---------------------------------------------------------------------------
+
+
+def _tokenize_for_disjointness(text: str) -> set[str]:
+    """Lowercased, punct-stripped non-stopword token set for disjointness.
+
+    Matches `framing_span_tokens()` so that the framing-pool's firewall
+    vocabulary and the candidate-question vocabulary are computed under
+    the same tokenization.
+    """
+    raw = text.lower()
+    for ch in ",.:;!?\"'()[]{}<>/\\":
+        raw = raw.replace(ch, " ")
+    raw = raw.replace("-", " ").replace("_", " ")
+    tokens = {tok for tok in raw.split() if tok}
+    return tokens - STOPWORDS
+
+
+def is_topically_disjoint(
+    framing_pool_item: FramingPoolItem,
+    candidate_question: str,
+) -> bool:
+    """Return True iff candidate_question contains none of the firewall tokens.
+
+    Per the §15.14 spec Chunk 3 PINNED topical-disjointness rule:
+    no turn-2..K technical question may contain any non-stopword token
+    from the framing-pool item's framing-token span.
+    """
+    firewall_tokens = framing_span_tokens(framing_pool_item)
+    candidate_tokens = _tokenize_for_disjointness(candidate_question)
+    return not (firewall_tokens & candidate_tokens)
+
+
+# ---------------------------------------------------------------------------
+# Pairing-rule helpers (§15.14 spec Chunk 3, PINNED)
+# ---------------------------------------------------------------------------
+
+
+def main_chain_frame_index(chain_idx: int) -> int:
+    """Return the framing-pool index for main_chains[chain_idx].
+
+    Per the PINNED rule: turn_1 = framing_pool[(i*7) mod 25].
+    7 is coprime with 25, so this is a permutation; each frame is
+    used exactly 100 / 25 = 4 times across the main set.
+    """
+    if not 0 <= chain_idx < 100:
+        raise ValueError(f"chain_idx out of range [0, 100): {chain_idx}")
+    return (chain_idx * 7) % 25
+
+
+def frame_positive_chain_frame_index(chain_idx: int) -> int:
+    """Return the framing-pool index for frame_positive_chains[chain_idx].
+
+    The frame-positive set has 20 chains. We use a (i*7) mod 25 rule
+    parallel to the main set, which gives each frame 0 or 1 frame-
+    positive chains (deterministic, no clustering).
+    """
+    if not 0 <= chain_idx < 20:
+        raise ValueError(f"frame-positive chain_idx out of range [0, 20): {chain_idx}")
+    return (chain_idx * 7) % 25
+
+
+def calibration_chain_frame_index(chain_idx: int) -> int:
+    """Return the framing-pool index for calibration_chains[chain_idx].
+
+    The calibration set has 10 chains; we deterministically span the
+    4 categories by stepping through frame indices 0, 5, 10, 15, 20,
+    1, 6, 11, 16, 21 — gives 10 frames covering all 4 categories.
+    """
+    if not 0 <= chain_idx < 10:
+        raise ValueError(f"calibration chain_idx out of range [0, 10): {chain_idx}")
+    pattern = [0, 5, 10, 15, 20, 1, 6, 11, 16, 21]
+    return pattern[chain_idx]
+
+
+# ---------------------------------------------------------------------------
+# Chain-builder (skeleton; question pool filled in C-3, called in C-4/C-5)
+# ---------------------------------------------------------------------------
+
+
+def build_main_chains(
+    pool: list[FramingPoolItem],
+    question_pool: list[QuestionPoolItem],
+) -> list[StimulusChain]:
+    """Generate the 100 main chains under the PINNED pairing rules.
+
+    For each chain_idx 0..99:
+      - turn_1 = pool[(chain_idx * 7) % 25]
+      - turns 2..6 = first 5 questions from question_pool that
+        (a) satisfy topical-disjointness against the chain's frame, AND
+        (b) have not been used in any earlier chain that shares the
+        same frame_id (per-frame uniqueness within the main set).
+
+    The deterministic order of question_pool is the iteration order;
+    the pool itself is ordered at C-3 with TruthfulQA-MC items first
+    by ascending q_idx, then HumanEval items by ascending q_idx.
+    """
+    if len(question_pool) == 0:
+        # Skeleton mode: no question pool yet (filled in C-3); return
+        # empty, allowing the script to run end-to-end at the C-2 stage.
+        return []
+
+    chains: list[StimulusChain] = []
+    used_per_frame: dict[str, set[tuple[QuestionSource, int]]] = {}
+
+    for chain_idx in range(100):
+        frame_idx = main_chain_frame_index(chain_idx)
+        frame = pool[frame_idx]
+        used = used_per_frame.setdefault(frame.frame_id, set())
+
+        picked: list[ChainQuestion] = []
+        for q in question_pool:
+            if len(picked) == 5:
+                break
+            qkey = (q.source, q.q_idx)
+            if qkey in used:
+                continue
+            if not is_topically_disjoint(frame, q.question):
+                continue
+            picked.append(ChainQuestion(
+                turn_idx=2 + len(picked),
+                source=q.source,
+                q_idx=q.q_idx,
+                question=q.question,
+                gold=q.gold,
+            ))
+            used.add(qkey)
+
+        if len(picked) != 5:
+            raise RuntimeError(
+                f"chain {chain_idx} (frame {frame.frame_id}): could not fill "
+                f"5 turns; only got {len(picked)}. Question pool depleted "
+                f"or topical-disjointness rule rejected too many candidates."
+            )
+        chains.append(StimulusChain(
+            chain_idx=chain_idx,
+            frame_id=frame.frame_id,
+            chain_questions=tuple(picked),
+        ))
+
+    return chains
+
+
+def _self_test_pairing_and_disjointness(pool: list[FramingPoolItem]) -> None:
+    """C-2 self-test: verify pairing rule + disjointness checker on synthetics."""
+    # Pairing rule: each frame used exactly 4 times across main set.
+    counts: dict[int, int] = {}
+    for chain_idx in range(100):
+        idx = main_chain_frame_index(chain_idx)
+        counts[idx] = counts.get(idx, 0) + 1
+    assert all(c == 4 for c in counts.values()), f"main pairing not uniform: {counts}"
+    assert set(counts.keys()) == set(range(25)), "main pairing missing frames"
+    print("  pairing rule: each of 25 frames used exactly 4× across main set ✓")
+
+    # Frame-positive: each frame index used 0 or 1 times across 20 chains.
+    fp_counts: dict[int, int] = {}
+    for chain_idx in range(20):
+        idx = frame_positive_chain_frame_index(chain_idx)
+        fp_counts[idx] = fp_counts.get(idx, 0) + 1
+    assert max(fp_counts.values()) <= 1, f"frame-positive pairing clusters: {fp_counts}"
+    print("  frame-positive pairing: 20 unique frame slots ✓")
+
+    # Calibration: 10 distinct frames covering all 4 categories.
+    cal_indices = [calibration_chain_frame_index(i) for i in range(10)]
+    assert len(set(cal_indices)) == 10, f"calibration repeats frames: {cal_indices}"
+    cal_categories = {pool[i].framing_category for i in cal_indices}
+    assert cal_categories == {"metaphor", "persona", "terminology", "formatting"}, \
+        f"calibration missing categories: {cal_categories}"
+    print(f"  calibration pairing: 10 distinct frames covering all 4 categories ✓")
+
+    # Disjointness positive case: F01 ('astrology', 'metaphors') vs. unrelated question.
+    f01 = next(p for p in pool if p.frame_id == "F01")
+    assert is_topically_disjoint(f01, "What is the boiling point of water?")
+    # Disjointness negative case: F01 vs. astrology-mentioning question.
+    assert not is_topically_disjoint(f01, "Do astrology charts predict personality?")
+    print("  topical-disjointness: positive + negative cases ✓")
+
+
 def main() -> None:
     pool = build_framing_pool()
     print(f"Built framing pool: {len(pool)} items")
@@ -248,24 +477,32 @@ def main() -> None:
     for cat in sorted(by_cat):
         print(f"  {cat}: {by_cat[cat]}")
 
-    # Sanity: every span resolves and every span has at least one
-    # non-stopword token (the topical-disjointness firewall vocabulary).
     for item in pool:
         toks = framing_span_tokens(item)
         if not toks:
             raise ValueError(f"frame {item.frame_id} has empty firewall vocabulary")
-        print(f"  {item.frame_id} [{item.framing_category}] firewall tokens: {sorted(toks)}")
 
-    # C-1 drop: write a partial stimulus JSON containing only the framing pool.
-    # Subsequent chunks will replace this with the full schema.
+    print()
+    print("C-2 self-tests:")
+    _self_test_pairing_and_disjointness(pool)
+
+    # C-2 drop: write the same partial stimulus JSON as C-1; chain
+    # generation is wired up but the question pool is empty until C-3.
+    main_chains = build_main_chains(pool, question_pool=[])  # empty pool → []
+    print()
+    print(f"main_chains generated (skeleton): {len(main_chains)} (will be 100 after C-3)")
+
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "schema_version": STIMULUS_SCHEMA_VERSION,
         "framing_pool": framing_pool_dict(pool),
-        "main_chains": [],            # C-4
-        "frame_positive_chains": [],  # C-4
-        "calibration_chains": [],     # C-5
-        "_curation_status": "C-1: framing pool only; chains TBD in chunks C-4..C-5",
+        "main_chains": [],            # filled in C-4
+        "frame_positive_chains": [],  # filled in C-4
+        "calibration_chains": [],     # filled in C-5
+        "_curation_status": (
+            "C-2: framing pool + pairing/disjointness logic; question pool TBD in C-3, "
+            "chains TBD in C-4..C-5"
+        ),
     }
     OUTPUT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True))
     print(f"Wrote partial stimulus JSON: {OUTPUT_PATH}")
