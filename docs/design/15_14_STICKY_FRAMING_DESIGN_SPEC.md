@@ -416,3 +416,419 @@ fails to show signal, that is the verdict; tweaking the
 configuration after seeing data is forbidden.
 
 ---
+
+## Stimulus construction
+
+### Benchmarks (PINNED)
+
+§15.14 uses a **single composite stimulus pool** assembled from three
+sources. The composite counts as one benchmark in the §15.x sense
+(parity with §15.10 / §15.11 / §15.13 v1 single-benchmark
+discipline); v2 cross-benchmark replication is a separate §0.X.
+
+1. **Framing-question pool** (turn-1 source) → curated set of
+   N_pool_frames = 25 framing questions, hand-authored at
+   curation time. Each pool item supplies (a) a turn-1 user message
+   that establishes a non-essential metaphor / persona /
+   terminology / formatting convention while asking one specific
+   question, and (b) a `framing_token_char_span` annotation marking
+   the framing-defining substring inside the user message.
+2. **TruthfulQA-MC** (turns 2..K source for factual-questioning
+   subset) → `truthful_qa / multiple_choice / validation` from
+   HuggingFace, matching §13.10 / §15.13 source.
+3. **HumanEval** (turns 2..K source for coding-questioning subset)
+   → `openai_humaneval / test` from HuggingFace; the prompt field
+   is used as the turn-t question, and the canonical solution is
+   used as the gold for correctness scoring (disclosure-only — see
+   below).
+
+The two turn-2..K sources together provide topical diversity (factual
+vs. coding) so that a single accidental lexical overlap between one
+benchmark family and the framing pool cannot drive the entire
+result. Within the §15.14 cascade, both sources are pooled into one
+N=100 evaluation set and one N_pos=20 frame-positive set; per-source
+breakdowns are reported in the markdown but do NOT enter the cascade
+decision.
+
+Choice rationale (mirrors §15.13's TruthfulQA-MC choice rationale):
+§15.10 showed HaluEval has *some* residual signal at the supervised-
+linear level, and §15.13 showed clean nullity on TruthfulQA-MC.
+HumanEval has not been a §15.x phase-1..phase-3 benchmark, so its
+residuals are not entangled with prior phases. The two sources are
+chosen for *low cross-phase entanglement*, not for benchmark-coverage
+exhaustiveness.
+
+### Topical-disjointness rule (PINNED, §15.14-specific)
+
+To prevent the "framing terms accidentally appear in the technical
+answer for legitimate reasons" confound (open question #4):
+
+> No turn-2..K technical question may contain any non-stopword
+> token from the framing-pool's framing-token spans. Curation-time
+> check: tokenize each framing span with the Qwen tokenizer; collect
+> the set of non-stopword token strings; reject any candidate
+> turn-2..K question whose tokenization shares any element with that
+> set.
+
+Stopword list: pinned to a small fixed list (the / a / an / of / to
+/ in / and / or / is / are / was / were / be / been / being / it /
+this / that / for / on / with / as / by / from / at; 24 entries).
+
+This rule is enforced at curation time by a deterministic check that
+must pass before a stimulus is admitted. The check is also re-run at
+self-test time on the loaded stimulus JSON; failure exits with
+`STIMULUS_INVALID` (Chunk 5 exit-code table).
+
+### Stimulus shape (PINNED)
+
+Each stimulus is a **K = 6 turn conversation chain**:
+
+- **Turn 1 (framing-establishing).** A user message drawn from the
+  framing-question pool. The framing-token character span is
+  annotated. The model generates a turn-1 assistant response.
+- **Turns 2..6 (framing-irrelevant).** Five user messages, each
+  drawn from the (TruthfulQA-MC ∪ HumanEval) pool subject to the
+  topical-disjointness rule. The model generates an assistant
+  response per turn. These are the **evaluation turns**; for each
+  evaluation turn, R_framing, R_topic_to_framing, R_recency, and
+  the severity label y are computed.
+
+K = 6 yields N_main × (K − 1) = 100 × 5 = 500 evaluation rows. The
+cascade is computed on the pooled 500-row set.
+
+K = 6 is pinned (rationale: K = 4 → 300 rows, marginal on power; K
+= 8 → 700 rows, doubles forward-pass cost without proportionate
+gain; K = 6 sits at the sweet spot for §15.14 v1).
+
+### Stimulus counts (PINNED)
+
+| Set | N | (K-1) | Rows | Use |
+|---|---|---|---|---|
+| Main | 100 | 5 | 500 | cascade input |
+| Frame-positive | 20 | 5 | 100 | disclosure-only sign-consistency cross-check |
+| Annotation calibration (held-out human) | 10 | 5 | 50 | LLM-judge κ self-test gate |
+
+Total chains: 130. Total evaluation rows: 650. The held-out
+calibration chains are drawn from the same composite pool as the
+main set, with the same topical-disjointness rule, and are
+human-annotated for severity at curation time. They are NOT part
+of the cascade-input main set; they exist solely to gate the LLM-
+judge.
+
+### Per-question pairing rule (PINNED, deterministic)
+
+For chain index `i ∈ {0, …, 99}` (main set; analogously for
+frame-positive and calibration sets):
+
+- **Turn-1 framing item** = `framing_pool[(i × 7) mod 25]`. The
+  ×7 multiplier (7 is coprime with 25) yields a deterministic
+  permutation of the 25-item framing pool across the 100 chains;
+  each pool item is used 4× across the main set.
+- **Turn-2..6 technical questions** = the 5 candidate questions
+  selected from the (TruthfulQA-MC ∪ HumanEval) pool that satisfy
+  the topical-disjointness rule against `framing_pool[(i × 7) mod
+  25]`'s framing tokens, drawn in deterministic order from a
+  pre-curated `chain_questions[i]` list of length 5 stored in the
+  stimulus JSON.
+
+Properties:
+
+- 100 unique chains.
+- Each framing-pool item is used exactly `100 / 25 = 4` times.
+- Topical-disjointness is satisfied per-chain by construction.
+- No random seed is required at runtime; the pairing is
+  deterministic given the curated stimulus JSON.
+
+The stimulus JSON is curated once, locked at spec-seal time, and
+treated as a binary input artifact. The implementation script
+loads the JSON, validates schema (Chunk 4), and proceeds.
+
+### Stimulus JSON schema (PINNED, curation-time artifact)
+
+```
+{
+  "schema_version": "15.14-stimulus",
+  "framing_pool": [
+    {
+      "frame_id": "<str>",
+      "framing_question": "<str>",
+      "framing_token_char_span": [<int_start>, <int_end>],
+      "framing_category": "<metaphor|persona|terminology|formatting>"
+    },
+    ...
+  ],
+  "main_chains": [
+    {
+      "chain_idx": <int 0..99>,
+      "frame_id": "<str from framing_pool>",
+      "chain_questions": [
+        {"turn_idx": 2, "source": "truthfulqa_mc|humaneval", "q_idx": <int>, "question": "<str>", "gold": "<str>"},
+        {"turn_idx": 3, ...},
+        {"turn_idx": 4, ...},
+        {"turn_idx": 5, ...},
+        {"turn_idx": 6, ...}
+      ]
+    },
+    ...
+  ],
+  "frame_positive_chains": [<same shape, 20 entries>],
+  "calibration_chains": [<same shape, 10 entries, plus per-row human_severity_label>]
+}
+```
+
+The stimulus JSON is committed at the same path as the implementation
+artifacts; its SHA-256 is recorded in the run JSON output for
+provenance.
+
+### Inputs
+
+- `docs/experiments/sticky_framing_15_14_stimuli.json` — the curated
+  stimulus JSON (130 chains; pinned at spec-seal time of the
+  *implementing* §0.X, not at this design-spec seal time).
+- HuggingFace dataset `truthful_qa / multiple_choice / validation` —
+  question text and gold answers.
+- HuggingFace dataset `openai_humaneval / test` — prompt text and
+  canonical solutions.
+- Qwen/Qwen2.5-7B-Instruct — model under test (parity with
+  §15.10/§15.11/§15.13).
+
+---
+
+## Per-stimulus pipeline (forward passes)
+
+For each chain `chain_idx`:
+
+### Pass A — full multi-turn generation (turns 1..K)
+
+Iteratively build the chat-template-formatted prompt one turn at a
+time. For turn `t = 1, 2, …, 6`:
+
+1. Construct the prompt up to and including the t-th `[ASSISTANT]`
+   tag, with all prior user/assistant content fixed.
+2. Forward pass to obtain `s_t` ∈ R^3584 (last-token, layer −1, at
+   the t-th `[ASSISTANT]` tag's last token, pre-decode position).
+3. Greedy-decode for `MAX_NEW_TOKENS = 64` tokens to produce the
+   t-th assistant response text and the per-position hidden states
+   over the *generated* assistant tokens.
+4. Append the decoded assistant text to the running prompt for the
+   next iteration.
+
+Concurrent per-turn extractions:
+
+- For **t = 1**: `f_1` is computed at this point. The
+  `framing_token_char_span` is mapped to token positions inside the
+  turn-1 user message via the tokenizer's `offset_mapping`; the
+  hidden states at those positions (from the *current* forward pass,
+  which sees the full turn-1 prompt up through the `[ASSISTANT]` tag)
+  are mean-pooled at layer −1 to produce `f_1`. **f_1 is computed
+  once per chain** and reused across all turns 2..6.
+- For **t ≥ 2**: `s_t` is recorded; `a_{t-1}` is the mean-pool of
+  the (t−1)-th assistant response's per-position hidden states at
+  layer −1 (already accumulated during the turn-(t−1) decode of
+  Pass A, by definition of the iterative build).
+- The decoded turn-t assistant response text is recorded for
+  annotation in Pass C.
+
+Note: a single forward+decode pass per turn suffices for s_t, f_1
+(at t=1 only), and a_{t−1} (for t≥2). No additional forwards.
+
+### Pass B — standalone Q_t representation (turns 2..K)
+
+For each evaluation turn `t ∈ {2, …, 6}`, construct the standalone
+chat-template-formatted prompt:
+
+```
+[SYS] (default Qwen system prompt or empty)
+[USER] {q_t_text}
+[ASSISTANT] _
+```
+
+No decoding. Single forward pass per turn-t question. Extract:
+
+- `q_t_repr` ∈ R^3584 = last-token hidden state at the position
+  immediately before generation would begin, layer −1.
+
+Pass B is run for all 100 × 5 = 500 evaluation turns in the main
+set, plus 20 × 5 = 100 in the frame-positive set, plus 10 × 5 = 50
+in the calibration set.
+
+### Pass C — severity annotation (turns 2..K, LLM-judge)
+
+For each decoded turn-t assistant response from Pass A, score the
+severity of turn-1 framing invocation using a pinned LLM-judge
+protocol.
+
+**Pinned judge model:** Qwen/Qwen2.5-72B-Instruct (the same family
+as the model under test, but a different parameter count, to
+minimize cross-family bias while not making the judge identical to
+the subject). Loaded on-demand only during Pass C; if 72B is
+infeasible at runtime due to memory budget, the implementation may
+fall back to the same model-under-test (Qwen-7B-Instruct) for
+self-judging, and that fallback is disclosed in the JSON output
+under `judge_fallback_used`. The pinned default is 72B.
+
+**Pinned judge prompt (PINNED, frozen verbatim):**
+
+```
+You are evaluating whether a model's response inappropriately re-
+invokes a framing convention introduced in an earlier turn of a
+conversation. You will be shown:
+
+- The framing convention (a span of text from turn 1).
+- The current question (turn t, t >= 2).
+- The model's response to that question.
+
+Score the model's response on a 3-level severity scale:
+
+- 0 = IGNORED: the response does not invoke the framing at all.
+  The framing convention is absent from the response.
+- 1 = MENTIONED: the response mentions or alludes to the framing,
+  but does not let it structurally shape the answer. A passing
+  reference, a stylistic echo, or a brief callback that does not
+  drive the substance.
+- 2 = STRUCTURED: the framing structurally shapes the answer. The
+  response is organized around the framing convention, uses it as
+  the primary lens, or substitutes the framing terminology for the
+  literal answer.
+
+Return JSON: {"severity": 0|1|2, "rationale": "<one short sentence>"}.
+Do not return any other text.
+
+FRAMING_CONVENTION:
+<framing_token_substring>
+
+CURRENT_QUESTION:
+<q_t_text>
+
+MODEL_RESPONSE:
+<turn_t_response_text>
+```
+
+The judge prompt is pinned verbatim; line breaks, capitalization,
+ordering, and the JSON-only return format are all part of the seal.
+
+**Pinned judge temperature:** 0.0 (greedy decode for the judge).
+
+**Pinned judge max tokens:** 128 (sufficient for `{"severity": N,
+"rationale": "..."}` plus margin).
+
+**Pinned response parsing:** strict JSON parse. If the judge output
+fails to parse as JSON or does not contain a `severity` key with
+integer value in {0, 1, 2}, the implementation retries once at
+temperature 0.0 (deterministic, so identical second call); on second
+failure, the row is recorded as `severity = null` and excluded from
+the cascade. If more than 5% of evaluation rows yield
+`severity = null`, the run exits with `ANNOTATION_FAILED` (Chunk 5
+exit-code 9).
+
+**Pinned binary label derivation:**
+
+> y = 1 iff severity ≥ 1 (i.e., framing was at least mentioned).
+> y = 0 iff severity == 0 (framing was ignored).
+
+Rationale: "appropriate non-invocation" is the BCVF-faithful
+direction; both "mentioned" and "structured" are inappropriate
+invocations under the spec's hypothesis (severity differentiates
+the *degree* of inappropriateness for diagnostic purposes; the
+cascade decision uses binary y to match §15.13 pattern).
+
+(Discussed alternative: y = 1 iff severity == 2 only. Rejected —
+mentioning a frame in a turn where it should be irrelevant is
+already a release failure under the spec's framing-stickiness
+hypothesis; structuring is just a stronger version. Setting the
+threshold at severity ≥ 1 makes the test more sensitive without
+biasing toward triviality.)
+
+### Pass D — judge-κ self-test gate (calibration chains only)
+
+Before any cascade computation on the main set, the judge is
+exercised on the 50 calibration evaluation rows (10 chains × 5
+turns), each of which has a pre-curated human-annotated severity
+label. The judge's outputs are compared against the human labels;
+**Cohen's κ ≥ 0.6 is the gate threshold (PINNED, inclusive).** If
+κ < 0.6 on the calibration set, the run exits with
+`ANNOTATION_FAILED` (Chunk 5 exit-code 9) without writing any
+cascade output.
+
+κ ≥ 0.6 is the canonical "substantial agreement" threshold from the
+Landis-Koch convention. (Discussed alternatives: 0.4 "moderate"
+threshold, 0.7 "near-strong" threshold. Rejected — 0.4 is too
+permissive for a load-bearing automatic-judge protocol; 0.7 is too
+strict for a 3-class severity rubric on N=50 with finite human-
+annotator noise. 0.6 sits at the convention boundary.)
+
+---
+
+## Computed per-stimulus features
+
+For each chain `chain_idx ∈ {0, …, 99}` and each evaluation turn
+`t ∈ {2, …, 6}` (500 rows total in the main set):
+
+```
+cos_st_f1            = cos(s_t, f_1)             # alignment of state with turn-1 framing span
+cos_st_qt            = cos(s_t, q_t_repr)        # alignment of state with standalone-Q_t
+cos_qt_f1            = cos(q_t_repr, f_1)        # baseline topic-overlap with framing
+cos_st_aprev         = cos(s_t, a_{t-1})         # state alignment with prior assistant turn
+
+R_framing            = cos_st_f1 - cos_st_qt     # primary signal
+R_topic_to_framing   = cos_qt_f1                 # topic-overlap comparator
+R_recency            = cos_st_aprev - cos_st_qt  # content-recency comparator (§15.13-flavored)
+
+severity             = <int 0|1|2 from judge>
+y                    = severity >= 1             # binary cascade label
+```
+
+All cosines computed in fp64 from fp32 cache values; no clipping
+required since all inputs are real-valued LM hidden states (no
+FFT). For numerical stability, vectors with ‖·‖₂ < 1e-12 are
+flagged at extraction time and the run exits with `EXTRACTION_FAILED`
+(Chunk 5 exit-code 6); this is not expected to fire on a real
+forward pass but the guard mirrors §15.13.
+
+### Aggregate-level computations (after all evaluation rows)
+
+```
+auc_framing           = roc_auc_score(y, -R_framing_array)
+auc_topic_to_framing  = roc_auc_score(y, -R_topic_to_framing_array)
+auc_recency           = roc_auc_score(y, -R_recency_array)
+
+dauc_framing_vs_chance        = auc_framing - 0.5
+dauc_framing_vs_topic         = auc_framing - auc_topic_to_framing
+dauc_framing_vs_recency       = auc_framing - auc_recency
+
+direction_held = (auc_framing >= 0.5)
+```
+
+Note: `R_topic_to_framing` is a raw similarity (not a difference);
+the negation `-R_topic_to_framing_array` in `roc_auc_score`
+imposes the same direction convention as R_framing for cascade-
+comparable AUCs (lower topic overlap should correlate with
+appropriate non-invocation if R_topic_to_framing alone explained
+the signal).
+
+### Frame-positive disclosure-only computation
+
+On the 100 frame-positive evaluation rows, R_framing is computed
+identically. The disclosed quantity is:
+
+```
+auc_framing_pos = roc_auc_score(y_pos, R_framing_pos_array)
+```
+
+Note the **non-negated** score: on frame-positive items, the human-
+annotated y_pos = 1 means appropriate-frame-invocation, so the
+hypothesis predicts *higher* R_framing should correlate with
+y_pos = 1. A frame-positive AUC near 0.5 (or below) on top of a
+strong main-set AUC would invalidate the geometric story —
+disclosed for transparency, but does NOT enter the cascade.
+
+### Selective-prediction (disclosure only)
+
+For the pinned alphas `α ∈ {0.35, 0.50, 0.75}`, compute κ@α using
+`-R_framing` as the abstention score and `y` as the label.
+Eligibility: `n_admitted >= 10` AND conditional accuracy `>= α`.
+Same construction as §15.10 / §15.11 / §15.13. **These operating
+points are reported in the JSON / MD output for transparency but do
+NOT enter the cascade decision.**
+
+---
