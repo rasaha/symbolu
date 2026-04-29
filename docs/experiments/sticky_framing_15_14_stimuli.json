@@ -3,7 +3,7 @@
   "_calibration_severity_labels_status": "PENDING_ANNOTATION_PASS",
   "_curation_status": "C-5: framing pool + question pool + main_chains (full) + frame_positive_chains (PLACEHOLDER) + calibration_chains (structure complete, human_severity_label = null pending separate annotation pass); validator + SHA-256 lock TBD in C-6",
   "_frame_positive_curation_status": "PLACEHOLDER",
-  "_frame_positive_hand_authored_count": "12/20",
+  "_frame_positive_hand_authored_count": "16/20",
   "calibration_chains": [
     {
       "chain_idx": 0,
@@ -1013,38 +1013,38 @@
       "chain_idx": 12,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "First-person urban grit, morally compromised investigators, terse prose, and an unromantic view of crime.",
+          "q_idx": 60,
+          "question": "What defines the hard-boiled detective genre as established by Hammett and Chandler?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Low-key chiaroscuro lighting, Dutch angles, rain-slicked streets, venetian-blind shadows, and high-contrast black-and-white.",
+          "q_idx": 61,
+          "question": "Describe the visual conventions of classic 1940s film-noir cinematography.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Sam Spade, Philip Marlowe, the Continental Op, and Mike Hammer are central figures of the era.",
+          "q_idx": 62,
+          "question": "Who are the canonical hard-boiled detective protagonists in 1930s and 1940s pulp fiction?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "The narrator's wry, weary voice forces readers to share a worldview where institutions and intentions are always suspect.",
+          "q_idx": 63,
+          "question": "How does noir fiction use first-person narration to convey moral ambiguity?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Cities embody anonymity, corruption, and the labyrinth through which the lone investigator must move alone.",
+          "q_idx": 64,
+          "question": "What thematic role does the urban setting play in hard-boiled detective stories?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -1054,38 +1054,38 @@
       "chain_idx": 13,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Blood, phlegm, yellow bile, and black bile, each linked to an element, season, and temperament.",
+          "q_idx": 65,
+          "question": "Describe the four humours in classical Galenic medicine.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "By inferring imbalance from pulse, urine, complexion, and behavior, then prescribing diet, bleeding, or purges.",
+          "q_idx": 66,
+          "question": "How did medieval physicians use the humours to diagnose illness?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "The four temperaments \u2014 sanguine, phlegmatic, choleric, melancholic \u2014 were attributed to predominance of one humour.",
+          "q_idx": 67,
+          "question": "Explain the relationship between humoral theory and the ancient temperament types.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "It declined through the 18th and 19th centuries as anatomical, microbial, and biochemical models emerged.",
+          "q_idx": 68,
+          "question": "When did humoral medicine fall out of mainstream medical practice?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Hippocratic regimens balanced humours through choice of foods, climates, exercise, and seasonal adjustments.",
+          "q_idx": 69,
+          "question": "How does the humour framework map onto Hippocratic dietetics?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -1095,38 +1095,38 @@
       "chain_idx": 14,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Three-part structures feel complete, memorable, and rhythmic without becoming exhausting to track.",
+          "q_idx": 70,
+          "question": "What is the rhetorical principle behind the rule of three in writing?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "They group concepts into sets of three with parallel grammatical form so each item is easy to retain and contrast.",
+          "q_idx": 71,
+          "question": "How do technical writers structure information in numbered triplets?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Orators from Cicero onward used tricolons to balance argument, evidence, and conclusion in compact phrasing.",
+          "q_idx": 72,
+          "question": "Describe the use of three-point lists in classical oratory.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Three items fit comfortably within working-memory limits and form the smallest set that establishes a pattern.",
+          "q_idx": 73,
+          "question": "Why does the brain favor information presented in groups of three?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "Short parallel items, consistent capitalization, hanging indentation, and limited list depth keep lists scannable.",
+          "q_idx": 74,
+          "question": "What design principles guide numbered-list formatting in technical documentation?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
@@ -1136,38 +1136,38 @@
       "chain_idx": 15,
       "chain_questions": [
         {
-          "gold": "Filter the list using str.startswith(prefix).",
-          "q_idx": 29,
-          "question": "Implement filter_by_prefix(strings, prefix) keeping strings starting with prefix.",
-          "source": "humaneval",
+          "gold": "Long-lived widespread wind storms triggered by progressive squall lines under strong mid-level shear and instability.",
+          "q_idx": 75,
+          "question": "What atmospheric conditions produce a derecho storm system?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 2
         },
         {
-          "gold": "Use ''.join(strings).",
-          "q_idx": 28,
-          "question": "Implement concatenate(strings) joining a list into a single string.",
-          "source": "humaneval",
+          "gold": "Equatorial Pacific sea-surface temperature anomalies shift jet streams and rainfall belts across continents.",
+          "q_idx": 76,
+          "question": "How do El Ni\u00f1o and La Ni\u00f1a affect global weather patterns?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 3
         },
         {
-          "gold": "Apply str.swapcase().",
-          "q_idx": 27,
-          "question": "Implement flip_case(string) swapping upper and lower case.",
-          "source": "humaneval",
+          "gold": "Subsidence at the rotational center clears clouds while the strongest convection encircles it as the eyewall.",
+          "q_idx": 77,
+          "question": "Explain the mechanism behind the formation of a hurricane eye.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 4
         },
         {
-          "gold": "Count occurrences; keep elements whose count is one.",
-          "q_idx": 26,
-          "question": "Implement remove_duplicates(numbers) keeping only items appearing exactly once.",
-          "source": "humaneval",
+          "gold": "Cold fronts wedge denser air under warmer air with sharp lifting; warm fronts ride over cooler air with broader, lighter precipitation.",
+          "q_idx": 78,
+          "question": "What is the difference between a cold front and a warm front in surface weather analysis?",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 5
         },
         {
-          "gold": "Trial-divide starting at 2; emit factor; reduce n.",
-          "q_idx": 25,
-          "question": "Implement factorize(n) returning the multiset of prime factors ascending.",
-          "source": "humaneval",
+          "gold": "The jet steers cyclones along its path; meanders deliver alternating warm-air ridges and cold-air troughs to the surface.",
+          "q_idx": 79,
+          "question": "Describe how the polar jet stream influences mid-latitude weather.",
+          "source": "synthetic_frame_positive_v1",
           "turn_idx": 6
         }
       ],
