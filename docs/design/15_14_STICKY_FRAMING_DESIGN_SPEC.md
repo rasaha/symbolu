@@ -24,8 +24,9 @@ scoped narrowly. Amendments do not retroactively modify any
 
 ### §15.14-A1 — frame_positive_chains source enum extension
 
-**Status:** PROPOSED, awaiting sign-off (will be marked EFFECTIVE
-upon explicit user sign-off and recorded in commit metadata).
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/sticky-framing-spec-r6U1j`).
 **Scope:** stimulus JSON schema only.
 
 **Change.** Extend the permitted values of `chain_question.source`
@@ -1618,9 +1619,9 @@ without a fresh §0.8 amendment to this spec:
 | PAIRING_RULE | "turn_1 = framing_pool[(i*7) mod 25]; turns 2..6 from curated chain_questions[i] under topical-disjointness rule" |
 | TOPICAL_DISJOINTNESS_RULE | non-stopword token-set disjointness between framing-span tokens and turn-2..K question tokens |
 | STOPWORD_LIST_SIZE | 24 (pinned list in Chunk 3) |
-| SOURCE_ENUM (main_chains) | `{"truthfulqa_mc", "humaneval"}` (per §15.14-A1) |
-| SOURCE_ENUM (calibration_chains) | `{"truthfulqa_mc", "humaneval"}` (per §15.14-A1) |
-| SOURCE_ENUM (frame_positive_chains) | `{"truthfulqa_mc", "humaneval", "synthetic_frame_positive_v1"}` (per §15.14-A1) |
+| SOURCE_ENUM (main_chains) | `{"truthfulqa_mc", "humaneval"}` (effective under §15.14-A1) |
+| SOURCE_ENUM (calibration_chains) | `{"truthfulqa_mc", "humaneval"}` (effective under §15.14-A1) |
+| SOURCE_ENUM (frame_positive_chains) | `{"truthfulqa_mc", "humaneval", "synthetic_frame_positive_v1"}` (effective under §15.14-A1) |
 | PROMPT_FORMAT | Qwen chat template via `apply_chat_template` |
 | MAX_NEW_TOKENS (subject) | 64 |
 | MAX_NEW_TOKENS (judge) | 128 |

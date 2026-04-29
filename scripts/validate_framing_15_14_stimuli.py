@@ -118,6 +118,18 @@ def _check_framing_pool(pool_raw: list) -> list[FramingPoolItem]:
     return pool
 
 
+# Per-scope source enum (effective under §15.14-A1).
+# main_chains and calibration_chains are restricted to the original
+# enum; frame_positive_chains additionally permits the synthetic source.
+_SOURCE_ENUM_PER_SCOPE: dict[str, frozenset[str]] = {
+    "main_chains": frozenset({"truthfulqa_mc", "humaneval"}),
+    "calibration_chains": frozenset({"truthfulqa_mc", "humaneval"}),
+    "frame_positive_chains": frozenset({
+        "truthfulqa_mc", "humaneval", "synthetic_frame_positive_v1",
+    }),
+}
+
+
 def _check_chain_shape(chain_raw: dict, chain_position: int, scope: str) -> None:
     for k in ("chain_idx", "frame_id", "chain_questions"):
         if k not in chain_raw:
@@ -130,15 +142,21 @@ def _check_chain_shape(chain_raw: dict, chain_position: int, scope: str) -> None
         fail(EXIT_SCHEMA_MISMATCH,
              f"{scope}[{chain_position}] chain_questions must have 5 entries; "
              f"got {len(chain_raw['chain_questions'])}")
+    permitted_sources = _SOURCE_ENUM_PER_SCOPE.get(scope)
+    if permitted_sources is None:
+        fail(EXIT_SCHEMA_MISMATCH,
+             f"unknown scope {scope!r}; per-scope enum not defined")
     for j, cq in enumerate(chain_raw["chain_questions"]):
         if cq["turn_idx"] != j + 2:
             fail(EXIT_SCHEMA_MISMATCH,
                  f"{scope}[{chain_position}].chain_questions[{j}].turn_idx mismatch: "
                  f"got {cq['turn_idx']}, expected {j+2}")
-        if cq["source"] not in {"truthfulqa_mc", "humaneval"}:
+        if cq["source"] not in permitted_sources:
             fail(EXIT_STIMULUS_INVALID,
-                 f"{scope}[{chain_position}].chain_questions[{j}].source invalid: "
-                 f"{cq['source']!r}")
+                 f"{scope}[{chain_position}].chain_questions[{j}].source "
+                 f"invalid: {cq['source']!r}; permitted in {scope}: "
+                 f"{sorted(permitted_sources)} "
+                 f"(per §15.14-A1 source-enum scoping)")
 
 
 def _check_main_chains(chains_raw: list, pool: list[FramingPoolItem]) -> None:
