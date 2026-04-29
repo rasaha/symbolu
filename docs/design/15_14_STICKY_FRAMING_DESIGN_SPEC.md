@@ -1362,3 +1362,343 @@ the dominant cost.
   account for the increase.
 
 ---
+
+## Risks and mitigations
+
+### Risk 1 — LLM-judge model availability / drift
+
+The pinned judge (Qwen/Qwen2.5-72B-Instruct) may be unavailable at
+runtime due to memory budget, model-hub access, or HuggingFace API
+changes. A judge swap mid-run would break severity-label
+comparability across rows.
+
+**Mitigation:** the implementation pins a single fallback (Qwen-7B-
+Instruct as self-judge), and `judge_fallback_used` is recorded in
+the JSON output. The κ self-test gate (Pass D) is run regardless of
+which judge is used, so the substantive falsifiability of the y
+labels is guaranteed by the κ ≥ 0.6 threshold rather than by a
+specific judge identity. If both 72B and 7B fall below κ = 0.6, the
+run exits 9 (`ANNOTATION_FAILED`) without writing cascade output.
+
+### Risk 2 — Framing-span hand-annotation noise
+
+The `framing_token_char_span` is hand-annotated at curation time.
+Different annotators may pick slightly different boundaries (e.g.,
+including or excluding a determiner), and f_1's pooled value
+depends on which token positions are included.
+
+**Mitigation:** stimulus-curation discipline pins the span per item
+before extraction; the curated JSON is locked by SHA-256 in the
+output. The 12 self-test cascade cases use synthetic AUC pairs
+(not real f_1 vectors), so annotation noise does not affect self-
+test gate behavior. v2 candidate: dual-annotator + Cohen's κ on
+spans themselves.
+
+### Risk 3 — Topical-disjointness rule too strict
+
+The non-stopword token-overlap rule may deplete the candidate
+turn-2..K pool below what's needed to fill 130 chains × 5 turns =
+650 distinct technical questions across TruthfulQA-MC + HumanEval.
+
+**Mitigation:** TruthfulQA-MC validation has 817 items;
+HumanEval test has 164 items; combined pool ≈ 981. With 25
+framing-pool items, the worst-case rejection rate would have to
+exceed ~33% to deplete below 650. Curation-time monitoring of the
+rejection rate per framing-pool item is recommended; if depletion
+is observed during curation, the framing-pool item is reworded to
+narrow its non-stopword token set rather than relaxing the rule.
+The rule itself stays pinned.
+
+### Risk 4 — Per-chain f_1 reuse across turns 2..6
+
+f_1 is computed once per chain (at t=1's forward pass) and reused
+for all evaluation turns 2..6. In principle, the f_1 *hidden state*
+at the framing-span positions could drift as the multi-turn context
+accumulates around it. A fixed f_1 from t=1 may be a less accurate
+representation of "the model's current framing-span representation"
+at turn 5 or 6 than at turn 2.
+
+**Mitigation:** acceptable per §0.8. The pinned f_1 is "the
+framing-span representation at the moment the model first
+encountered it," which is the cleaner geometric object — the
+hypothesis is that *this* representation is what the model's later-
+turn state is sticky toward. Recomputing f_1 at each turn would
+introduce a hyperparameter (which forward pass to source f_1 from)
+and break parity with §15.13's pinning of r_A from a single source.
+v2 candidate: a `R_framing_dynamic` variant that recomputes f_1 per
+turn, disclosed as a v2 cross-check.
+
+### Risk 5 — Direction-gate failure (auc_framing < 0.5)
+
+§15.11 saw direction-gate failure on both benchmarks. §15.13 held
+direction (auc_inertia = 0.6300). §15.14 may go either way.
+
+**Mitigation:** acceptable per §0.8. NO_MATERIAL_SIGNAL_IN_FRAMING
+via direction gate is a valid verdict. The pinned hypothesis was
+the specific BCVF-faithful direction; failing it is a hypothesis
+failure, not a sign-flip opportunity. Mirrors §15.11 / §15.13.
+
+### Risk 6 — Cost / wall-time blow-up
+
+End-to-end runtime estimated at 2.5–3 hours with the Qwen-72B
+judge. If the runpod budget is constrained, the implementation
+session may time out partway through Pass C, leaving the cascade
+uncomputed.
+
+**Mitigation:** the `--collect` / `--annotate` / `--probe` CLI
+split allows resume-on-failure at coarse granularity. The
+extraction cache is written after Pass A + Pass B and re-read by
+`--annotate`; the annotated cache is written after Pass C and re-
+read by `--probe`. A failed annotation pass does not require re-
+running Pass A. Disclose realistic wall-time bounds before
+authorizing the implementation §0.X.
+
+### Risk 7 — Frame-positive set size N_pos = 20
+
+The frame-positive set is small (20 chains × 5 turns = 100 rows).
+A sign-consistency cross-check at this N has high variance; a
+spurious low auc_framing_pos could occur even if the main-set
+result is genuine.
+
+**Mitigation:** disclosure-only. The frame-positive AUC is
+reported but does NOT enter the cascade decision; its role is
+qualitative cross-check, not quantitative gate. Pinning N_pos = 20
+balances curation cost against the cross-check's interpretability.
+v2 candidate: N_pos ≥ 50 in a follow-up.
+
+### Risk 8 — Severity-rubric noise on K=6 chains
+
+Severity scoring at turn 5 or turn 6 may be noisier than at turn 2:
+the model has more accumulated context, and the judge has to factor
+in turns 2..t−1 to decide whether framing-mention is appropriate
+under "this question is technically unrelated." The judge prompt
+shows only turn t's question and response, not the intermediate
+turns; the per-turn judgement is local.
+
+**Mitigation:** the κ self-test gate operates over all 50
+calibration rows including late-turn rows, so the gate captures
+whether the judge can score reliably across all turn indices. Per-
+turn AUC breakdowns are reported in the markdown for diagnostic
+transparency but do NOT enter the cascade. v2 candidate: per-turn-
+index cascades as a follow-up.
+
+### Risk 9 — Stimulus-JSON dependency lock
+
+The stimulus JSON is a curation-time artifact whose SHA-256 is
+recorded in the output. If the curation is partially redone after
+the implementation §0.X is sealed, the JSON's SHA-256 changes and
+the cascade output is no longer comparable to any earlier run on
+the same JSON.
+
+**Mitigation:** the implementing §0.X seals the stimulus JSON SHA-
+256 alongside the implementation script; any change to the
+stimulus JSON requires a fresh §0.X (e.g., §15.14b). The
+discipline mirrors §13.10's `probe_semantic_entropy.json` lock.
+
+---
+
+## Sealed §0.8-binding decisions
+
+The following decisions cannot be modified during implementation
+without a fresh §0.8 amendment to this spec:
+
+### Frozen parameters
+
+| Decision | Pinned value |
+|---|---|
+| SCHEMA_VERSION | "15.14" |
+| QWEN_MODEL_ID (subject) | "Qwen/Qwen2.5-7B-Instruct" |
+| JUDGE_MODEL_ID (default) | "Qwen/Qwen2.5-72B-Instruct" |
+| JUDGE_MODEL_ID (fallback) | "Qwen/Qwen2.5-7B-Instruct" |
+| BENCHMARK | "sticky_framing_15_14_composite" (TruthfulQA-MC + HumanEval pooled, single composite in §15.x sense) |
+| K_TURNS | 6 |
+| N_MAIN_CHAINS | 100 |
+| N_FRAME_POSITIVE_CHAINS | 20 |
+| N_CALIBRATION_CHAINS | 10 |
+| N_FRAMING_POOL_ITEMS | 25 |
+| EVALUATION_ROWS_MAIN | 500 (= 100 × 5) |
+| PAIRING_RULE | "turn_1 = framing_pool[(i*7) mod 25]; turns 2..6 from curated chain_questions[i] under topical-disjointness rule" |
+| TOPICAL_DISJOINTNESS_RULE | non-stopword token-set disjointness between framing-span tokens and turn-2..K question tokens |
+| STOPWORD_LIST_SIZE | 24 (pinned list in Chunk 3) |
+| PROMPT_FORMAT | Qwen chat template via `apply_chat_template` |
+| MAX_NEW_TOKENS (subject) | 64 |
+| MAX_NEW_TOKENS (judge) | 128 |
+| DECODE_TEMPERATURE (subject) | 0.0 (greedy) |
+| DECODE_TEMPERATURE (judge) | 0.0 (greedy) |
+| LAYER_IDX | -1 (final layer only) |
+| HIDDEN_DIM | 3584 |
+| f_1 pooling | mean over framing-span token positions, layer −1, full-context turn-1 forward pass |
+| s_t extraction | last-token, layer −1, pre-decode at t-th `[ASSISTANT]` tag, full-context multi-turn pass |
+| q_t extraction | last-token, layer −1, standalone with chat template, no history |
+| a_{t-1} pooling | mean over decoded turn-(t−1) assistant token positions, layer −1, full-context pass |
+| Direction convention | lower R_framing predicts appropriate non-invocation (BCVF-faithful) |
+| STRONG_AUC_THRESHOLD | 0.75 (inclusive) |
+| STRONG_DELTA_AUC_THRESHOLD | 0.05 (inclusive, vs chance, vs R_topic_to_framing, vs R_recency) |
+| PARTIAL_AUC_THRESHOLD | 0.66 (inclusive) |
+| DIRECTION_GATE_THRESHOLD | 0.5 (strict) |
+| ALPHA_TARGETS | (0.35, 0.50, 0.75) |
+| ALPHA_PRIMARY | 0.50 |
+| N_MIN | 10 (selective-prediction floor) |
+| SEVERITY_RUBRIC | 3-level (0=ignored, 1=mentioned, 2=structured) |
+| BINARY_LABEL_THRESHOLD | y=1 iff severity ≥ 1 |
+| KAPPA_GATE_THRESHOLD | 0.6 (inclusive, calibration κ) |
+| ANNOTATION_FAILURE_RATE_THRESHOLD | 0.05 (5% max judge JSON-parse failure) |
+| Class-3 firewall pattern count | 52 (44 inherited + 8 §15.14-specific) |
+| Number of self-test cascade cases | 12 |
+
+### Frozen artifacts
+
+| Artifact | Path |
+|---|---|
+| Implementation script | `scripts/probe_framing_15_14.py` |
+| Stimulus JSON (curation-time) | `docs/experiments/sticky_framing_15_14_stimuli.json` |
+| Extraction cache | `docs/experiments/framing_15_14_extractions.npz` |
+| Annotated cache | `docs/experiments/framing_15_14_annotated.npz` |
+| JSON output | `docs/experiments/probe_framing_15_14.json` |
+| Markdown output | `docs/experiments/probe_framing_15_14.md` |
+
+### Frozen behaviors
+
+- No combination with §15.13's R_inertia, with H1 (state coherence),
+  or with H2 (intent competition). No R_total.
+- No bootstrap CI on AUCs in v1.
+- No second technical-question benchmark beyond TruthfulQA-MC +
+  HumanEval composite in v1.
+- No probe training; R_framing is a pure feature.
+- No sign-flip rescue if direction gate fails.
+- No frame-positive AUC in the cascade (disclosure only).
+- No response-side variant in the cascade (disclosure only; v2
+  candidate).
+- No pivot-architecture variants in v1 (v2 candidate).
+- No retroactive amendment to any §13/§14/§15.x verdict-of-record,
+  including §15.13's NO_MATERIAL_SIGNAL_IN_INERTIA.
+
+### Frozen judge protocol
+
+- Judge prompt: pinned verbatim in Chunk 3; SHA-256 recorded in
+  output JSON.
+- Judge temperature: 0.0.
+- Judge max tokens: 128.
+- Judge fallback: Qwen-7B self-judge if 72B unavailable; usage
+  recorded in `judge_fallback_used` flag.
+- κ gate: Cohen's κ ≥ 0.6 on 50 calibration rows; failure → exit 9.
+- JSON-parse failure rate: ≤ 5% on judge outputs; failure → exit 9.
+- Annotation retry policy: one retry on JSON-parse failure (same
+  temperature 0.0); second failure → severity = null for that row.
+
+---
+
+## Notes for the implementing session
+
+If you are picking this up cold:
+
+1. **Start with this spec end-to-end.** Read all 6 sections before
+   writing any code. The spec is self-contained — you should not
+   need to consult the prior conversation, the §15.13 spec, or the
+   main BCVF design doc beyond cross-referencing pinned thresholds.
+
+2. **Curate the stimulus JSON before implementation.** The 130
+   chains (25 framing-pool + 100 main + 20 frame-positive + 10
+   calibration) are a precondition. Hand-author framing items;
+   draw turn-2..K candidates from TruthfulQA-MC + HumanEval; apply
+   the topical-disjointness rule; hand-annotate severity on the
+   50 calibration rows. SHA-256 the JSON before sealing the
+   implementation §0.X.
+
+3. **Mirror §15.10 / §15.11 / §15.13 patterns where possible.** The
+   script structure (lazy imports, schema validation, cache .npz
+   I/O, self-test gate, firewall, JSON+MD writers, CLI modes) maps
+   closely to those scripts. Reuse the patterns; don't reinvent.
+   The new pieces are: K-turn iterative extraction in Pass A, the
+   LLM-judge protocol in Pass C, and the κ self-test gate in Pass D.
+
+4. **Run the self-test gate before any data inspection.** All 12
+   cascade cases + cosine invariants + 52-pattern firewall +
+   topical-disjointness re-check must pass. Exit 3 on failure.
+
+5. **Pre-commit cascade thresholds before looking at any AUC
+   numbers.** §0.8 discipline. The thresholds are pinned in this
+   spec; the implementation must apply them mechanically.
+
+6. **Run the κ calibration gate before computing any cascade
+   output.** The 50 calibration rows are a load-bearing
+   precondition. If κ < 0.6, exit 9 without writing cascade
+   output. The cascade is never computed on unreliable y labels.
+
+7. **Output is firewall-scanned before write.** The 52-pattern
+   firewall is the last gate before any markdown lands on disk.
+   `INTERPRETATION_VIOLATION` exits 4 without writing.
+
+8. **The result is whatever it is.** STRONG, PARTIAL, or
+   NO_MATERIAL — each is a valid §0.8-binding readout. NO_MATERIAL
+   via direction-gate failure is one possible outcome; NO_MATERIAL
+   via κ-gate failure (exit 9) is a different one and means the
+   v1 design did not produce a comparable y signal at all. Do NOT
+   modify the cascade rule, the direction convention, the κ
+   threshold, or the comparator requirements based on what the
+   data shows.
+
+9. **After the runpod run produces JSON+MD artifacts**, verify
+   firewall compliance and cascade re-derivation locally before
+   committing (mirrors the §15.10 / §15.11 / §15.13 verification
+   pattern).
+
+10. **§15.13's NO_MATERIAL on R_inertia is unaffected by §15.14's
+    outcome.** Per the §15.13 ledger, this is a fresh top-level
+    §0.X testing a different mechanism class within the same
+    multi-turn dynamics column. R_recency is used here only as a
+    firewall comparator, not as a re-test of §15.13's hypothesis.
+    No retroactive reclassification of any §15.x verdict.
+
+### Optional v2 follow-ups (NOT authorized by this spec)
+
+If v1 shows signal (PARTIAL or STRONG), the following v2 directions
+are candidates for a fresh §0.X commitment — none of them are
+authorized here:
+
+- **Pivot-architecture variant**: explicit Segment A (induce) →
+  Segment B (reinforce) → Segment C (pivot) → Segment D (probe)
+  stimuli, with multiple pivot types (hard reset, topic pivot,
+  instruction override, partial carryover) and a Pivot Release
+  Accuracy headline metric.
+- **Frame-category breakdown**: per-category cascades for
+  metaphor / persona / terminology / formatting framing classes.
+- **Difficulty-ladder variant**: levels 1–4 (obvious pivot →
+  adversarial pivot) as the structural axis.
+- **Frame-positive AUC as cascade input**: require a 3rd strict-
+  margin constraint that auc_framing_pos clears chance.
+- **Response-side classifier**: `R_framing_response_side =
+  cos(r_t, f_1) − cos(r_t, p_t)` as a cascade input; comparison
+  against state-side R_framing tests "geometry foretells the
+  response."
+- **R_framing_dynamic**: f_1 recomputed per turn from the full-
+  context pass at that turn, rather than reused from t=1.
+- **Cross-model replication**: same stimuli + cascade applied to
+  Llama-3-8B-Instruct or Mistral-7B-Instruct.
+- **N=200 / N=500 statistical-power upgrade**.
+- **Hand-curated dual-annotator stimulus JSON with span κ ≥ 0.7.**
+- **HaluEval cross-benchmark replication** (parity with §15.13's
+  v2 candidate).
+- **H1 (state coherence) or H2 (intent competition) tested in
+  isolation** within the multi-turn dynamics column.
+
+Each of these is a separate top-level §0.X, not a §15.14 amendment.
+
+---
+
+## End of spec
+
+This document, sealed §0.8-binding, defines §15.14 in full. Any
+implementation that follows it without deviation is a valid §15.14
+run. Any deviation requires a fresh amendment to this document.
+
+The result is whatever the data shows — STRONG, PARTIAL, or
+NO_MATERIAL (via cascade-condition failure, direction-gate failure,
+or annotation-gate failure). The cascade rule is mechanical. The
+verdict is binding regardless of post-hoc interpretation.
+
+§13.9 hold preserved. §6.1 N=21 autonomy result preserved. §15.10
+PARTIAL_SIGNAL_IN_Z preserved. §15.11
+NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE preserved. §15.12 closure
+preserved. §15.13 NO_MATERIAL_SIGNAL_IN_INERTIA preserved. §15.14
+result is independent of all of these.
