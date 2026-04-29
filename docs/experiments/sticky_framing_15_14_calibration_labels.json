@@ -1,0 +1,13 @@
+{
+  "_artifact_status": "EMPTY_STUB",
+  "_curation_note": "Empty stub created in C-8b. The 50 calibration severity labels (10 chains x 5 turns 2..6) must be filled by a separate annotation pass per the procedure documented in docs/experiments/sticky_framing_15_14_stimuli.json under _annotation_procedure. This file is the C-8 artifact split target; it is consumed by scripts/validate_framing_15_14_stimuli.py via --calibration-labels-json.",
+  "_handoff_state": "READY_FOR_CALIBRATION_ANNOTATION_PASS",
+  "_handoff_state_recorded_at_commit": "post-C-8e",
+  "_target_stimulus_sha256": "e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7",
+  "_target_stimulus_sha256_note": "When the annotation pass fills this artifact, set the top-level stimulus_sha256 field to this value to pin the labels to the post-C-8 stimulus JSON. If the stimulus JSON changes (e.g., a new spec amendment), the target SHA must be recomputed and the labels artifact re-validated against it.",
+  "_do_not_fabricate_labels": "Per the §15.x §0.8 discipline, calibration labels MUST be produced by an actual Qwen-7B-in-K=6-chains run + human annotation. Do NOT placeholder-fill, do NOT generate from an LLM-judge, do NOT use synthetic labels. If labels are not available, leave the labels array empty and final_stimulus_sha remains null.",
+  "labels": [],
+  "schema_version": "15.14-calibration-labels",
+  "stimulus_sha256": null
+}
+

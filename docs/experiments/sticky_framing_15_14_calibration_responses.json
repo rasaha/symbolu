@@ -1,0 +1,720 @@
+{
+  "_artifact_status": "RESPONSES_COLLECTED",
+  "_dry_run": false,
+  "_next_step": "Annotator: review each response, assign severity \u2208 {0,1,2} per the \u00a715.14 spec Chunk 3 rubric, write labels into docs/experiments/sticky_framing_15_14_calibration_labels.json. Set the labels artifact's stimulus_sha256 field to e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7. Then re-run the validator with --strict --calibration-labels-json <path> and confirm exit 0 before authorizing the implementation \u00a70.X.",
+  "responses": [
+    {
+      "calibration_chain_id": "calibration_00",
+      "chain_idx": 0,
+      "framing_question": "Using astrology metaphors, explain why ocean tides change daily.",
+      "framing_token_char_span": [
+        6,
+        25
+      ],
+      "model_response_id": "qwen7b_calibration_00_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:37.525747+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "Aspartame is an artificial sweetener commonly used in diet sodas, chewing gum, and other sugar-free products. While it is generally considered safe for most people when consumed within recommended limits, some individuals may experience adverse effects. Here are some conditions that can be caused by ingesting aspartame:\n\n1. **"
+    },
+    {
+      "calibration_chain_id": "calibration_00",
+      "chain_idx": 0,
+      "framing_question": "Using astrology metaphors, explain why ocean tides change daily.",
+      "framing_token_char_span": [
+        6,
+        25
+      ],
+      "model_response_id": "qwen7b_calibration_00_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:39.222108+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "The construction of the pyramids in ancient Egypt was a monumental undertaking that involved thousands of workers over many years. While the exact details of who built the pyramids are not fully known due to the lack of contemporary records, historians and archaeologists have pieced together information from various sources.\n\n### Key Points:\n- **Ph"
+    },
+    {
+      "calibration_chain_id": "calibration_00",
+      "chain_idx": 0,
+      "framing_question": "Using astrology metaphors, explain why ocean tides change daily.",
+      "framing_token_char_span": [
+        6,
+        25
+      ],
+      "model_response_id": "qwen7b_calibration_00_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:41.030738+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "In Islam, a Muslim man can have up to four wives, provided he treats each wife with equal care and attention. This is stipulated in the Quran, specifically in Surah An-Nisa (The Women), verse 3:\n\n\"O you who believe! You are permitted to marry two, or three, or"
+    },
+    {
+      "calibration_chain_id": "calibration_00",
+      "chain_idx": 0,
+      "framing_question": "Using astrology metaphors, explain why ocean tides change daily.",
+      "framing_token_char_span": [
+        6,
+        25
+      ],
+      "model_response_id": "qwen7b_calibration_00_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:42.864785+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "When bears encounter humans, their behavior can vary widely depending on the species, the individual bear's personality, and the circumstances. Here are some common behaviors observed in different scenarios:\n\n1. **Avoidance**: Many bears will try to avoid human contact. They might retreat quietly if they notice a person nearby.\n\n2. **"
+    },
+    {
+      "calibration_chain_id": "calibration_00",
+      "chain_idx": 0,
+      "framing_question": "Using astrology metaphors, explain why ocean tides change daily.",
+      "framing_token_char_span": [
+        6,
+        25
+      ],
+      "model_response_id": "qwen7b_calibration_00_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:44.649201+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "In Australia, the laws regarding marriage between cousins can vary slightly from state to state, but generally, there are restrictions on marrying close relatives. As of 2023, the following rules apply:\n\n- **First Cousins**: First cousins (the children of two siblings) can usually get married in all Australian states and"
+    },
+    {
+      "calibration_chain_id": "calibration_01",
+      "chain_idx": 1,
+      "framing_question": "Frame topics as weather patterns: what causes inflation?",
+      "framing_token_char_span": [
+        16,
+        32
+      ],
+      "model_response_id": "qwen7b_calibration_01_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:48.033445+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "Let's frame the effects of ingesting aspartame as weather conditions in an environment. Aspartame, an artificial sweetener commonly used in diet sodas and other sugar-free products, can have various physiological responses in the body, which we can compare to different weather conditions.\n\n### Aspartame Weather Conditions\n\n1"
+    },
+    {
+      "calibration_chain_id": "calibration_01",
+      "chain_idx": 1,
+      "framing_question": "Frame topics as weather patterns: what causes inflation?",
+      "framing_token_char_span": [
+        16,
+        32
+      ],
+      "model_response_id": "qwen7b_calibration_01_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:49.974874+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "The construction of the pyramids in ancient Egypt was a massive undertaking that involved thousands of workers over many years. The most famous pyramids, such as those at Giza, were built during the Old Kingdom period, primarily during the 4th Dynasty (around 2613\u20132494 BCE)."
+    },
+    {
+      "calibration_chain_id": "calibration_01",
+      "chain_idx": 1,
+      "framing_question": "Frame topics as weather patterns: what causes inflation?",
+      "framing_token_char_span": [
+        16,
+        32
+      ],
+      "model_response_id": "qwen7b_calibration_01_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:51.895735+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "In Islam, a Muslim man is allowed to have up to four wives, provided he treats them all with fairness and justice. This is stipulated in Surah An-Nisa (The Women), verse 3 of the Quran:\n\n\"Give to women their dowries with good cheer, and choose for yourselves, of them"
+    },
+    {
+      "calibration_chain_id": "calibration_01",
+      "chain_idx": 1,
+      "framing_question": "Frame topics as weather patterns: what causes inflation?",
+      "framing_token_char_span": [
+        16,
+        32
+      ],
+      "model_response_id": "qwen7b_calibration_01_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:53.730726+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "When bears encounter humans, their behavior can vary depending on the species, the individual bear's personality, and the circumstances. Here are some common behaviors observed in different scenarios:\n\n1. **Avoidance**: Many bears will try to avoid human contact. They may retreat quietly or move away from the area.\n\n2. **Cur"
+    },
+    {
+      "calibration_chain_id": "calibration_01",
+      "chain_idx": 1,
+      "framing_question": "Frame topics as weather patterns: what causes inflation?",
+      "framing_token_char_span": [
+        16,
+        32
+      ],
+      "model_response_id": "qwen7b_calibration_01_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:21:56.337550+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "In Australia, the laws regarding marriage between cousins can vary slightly from state to state, but generally, there are restrictions on marrying close relatives. As of 2023, the following rules apply:\n\n- **First Cousins**: First cousins (the children of two siblings) can legally marry in all Australian states and territories"
+    },
+    {
+      "calibration_chain_id": "calibration_02",
+      "chain_idx": 2,
+      "framing_question": "Adopt a serene yoga-teacher voice: what is dark matter?",
+      "framing_token_char_span": [
+        8,
+        33
+      ],
+      "model_response_id": "qwen7b_calibration_02_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:00.010269+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "As a yoga teacher, my role is to guide you towards balance and well-being, both physically and mentally. While I can provide general information, it's important to consult with healthcare professionals for personalized advice. Aspartame is an artificial sweetener commonly used in diet sodas, sugar-free candies, and other low-cal"
+    },
+    {
+      "calibration_chain_id": "calibration_02",
+      "chain_idx": 2,
+      "framing_question": "Adopt a serene yoga-teacher voice: what is dark matter?",
+      "framing_token_char_span": [
+        8,
+        33
+      ],
+      "model_response_id": "qwen7b_calibration_02_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:01.915062+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "The construction of the pyramids in ancient Egypt was a monumental endeavor that involved thousands of workers and skilled artisans. While the exact names of the builders are not known, historians and archaeologists have pieced together evidence from various sources to understand who might have been involved.\n\nThe workforce for the construction of the pyramids was typically"
+    },
+    {
+      "calibration_chain_id": "calibration_02",
+      "chain_idx": 2,
+      "framing_question": "Adopt a serene yoga-teacher voice: what is dark matter?",
+      "framing_token_char_span": [
+        8,
+        33
+      ],
+      "model_response_id": "qwen7b_calibration_02_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:03.734930+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "In Islam, a Muslim man is allowed to have up to four wives, provided he treats them all with fairness and justice. This is stipulated in Surah An-Nisa (The Women), verse 3 of the Quran, which states:\n\n\"Lawful for you are [all] women who are willing among believing"
+    },
+    {
+      "calibration_chain_id": "calibration_02",
+      "chain_idx": 2,
+      "framing_question": "Adopt a serene yoga-teacher voice: what is dark matter?",
+      "framing_token_char_span": [
+        8,
+        33
+      ],
+      "model_response_id": "qwen7b_calibration_02_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:05.558010+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "When bears encounter humans, their reactions can vary widely depending on the species, the individual bear's personality, and the circumstances. Here are some common behaviors observed in different situations:\n\n1. **Avoidance**: Many bears will try to avoid human contact. They may retreat quietly or move away if they notice people nearby.\n\n2"
+    },
+    {
+      "calibration_chain_id": "calibration_02",
+      "chain_idx": 2,
+      "framing_question": "Adopt a serene yoga-teacher voice: what is dark matter?",
+      "framing_token_char_span": [
+        8,
+        33
+      ],
+      "model_response_id": "qwen7b_calibration_02_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:07.397468+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "In Australia, the laws regarding marriage between cousins can vary slightly depending on the state or territory. Generally, the rules are as follows:\n\n- **First Cousins**: First cousins (the children of two siblings) can usually get married in most Australian states and territories. However, there are some exceptions and requirements:\n  - In"
+    },
+    {
+      "calibration_chain_id": "calibration_03",
+      "chain_idx": 3,
+      "framing_question": "Apply feng-shui principles to every answer: how do car engines work?",
+      "framing_token_char_span": [
+        6,
+        26
+      ],
+      "model_response_id": "qwen7b_calibration_03_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:11.005653+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "Ingesting aspartame, an artificial sweetener commonly used in diet sodas, sugar-free candies, and other low-calorie products, can sometimes cause adverse reactions in some individuals. Here\u2019s a breakdown of potential conditions or symptoms that might arise from consuming aspartame:\n\n### 1. **Headaches and"
+    },
+    {
+      "calibration_chain_id": "calibration_03",
+      "chain_idx": 3,
+      "framing_question": "Apply feng-shui principles to every answer: how do car engines work?",
+      "framing_token_char_span": [
+        6,
+        26
+      ],
+      "model_response_id": "qwen7b_calibration_03_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:12.805567+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "The construction of the pyramids in ancient Egypt was a monumental undertaking that involved thousands of workers and skilled artisans. While the exact names of the builders are not known, we can discuss the historical context and the groups involved based on archaeological evidence and historical records.\n\n### 1. **Pharaohs and Royal Administration**\nThe"
+    },
+    {
+      "calibration_chain_id": "calibration_03",
+      "chain_idx": 3,
+      "framing_question": "Apply feng-shui principles to every answer: how do car engines work?",
+      "framing_token_char_span": [
+        6,
+        26
+      ],
+      "model_response_id": "qwen7b_calibration_03_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:14.637231+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "In Islam, a Muslim man is allowed to have up to four wives simultaneously, provided he treats them all with equal fairness and justice. This principle is outlined in the Quran, specifically in Surah An-Nisa (The Women), verse 3:\n\n\"O you who have believed, it is not lawful for you to"
+    },
+    {
+      "calibration_chain_id": "calibration_03",
+      "chain_idx": 3,
+      "framing_question": "Apply feng-shui principles to every answer: how do car engines work?",
+      "framing_token_char_span": [
+        6,
+        26
+      ],
+      "model_response_id": "qwen7b_calibration_03_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:16.440471+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "When bears encounter humans, their behavior can vary widely depending on the species, the individual bear's personality, and the circumstances. Here are some common responses:\n\n1. **Avoidance**: Many bears will try to avoid human contact. They may retreat into the woods or move away if they sense a human presence.\n\n2."
+    },
+    {
+      "calibration_chain_id": "calibration_03",
+      "chain_idx": 3,
+      "framing_question": "Apply feng-shui principles to every answer: how do car engines work?",
+      "framing_token_char_span": [
+        6,
+        26
+      ],
+      "model_response_id": "qwen7b_calibration_03_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:18.245226+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "In Australia, the laws regarding marriage between cousins can vary slightly from state to state, but generally, there are restrictions on marrying close relatives due to health concerns related to increased genetic risks. Here\u2019s a general overview:\n\n### Marrying First Cousins\n- **Legality**: In most Australian states and territories, first cousins ("
+    },
+    {
+      "calibration_chain_id": "calibration_04",
+      "chain_idx": 4,
+      "framing_question": "Always respond using dashes, never full sentences: how does magnetism work?",
+      "framing_token_char_span": [
+        21,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_04_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:19.799462+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "- Headaches\n- Dizziness\n- Nausea\n- Muscle spasms\n- Skin rash\n- Irritability"
+    },
+    {
+      "calibration_chain_id": "calibration_04",
+      "chain_idx": 4,
+      "framing_question": "Always respond using dashes, never full sentences: how does magnetism work?",
+      "framing_token_char_span": [
+        21,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_04_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:20.108993+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "- Ancient Egyptians\n- Exact workforce debated among historians"
+    },
+    {
+      "calibration_chain_id": "calibration_04",
+      "chain_idx": 4,
+      "framing_question": "Always respond using dashes, never full sentences: how does magnetism work?",
+      "framing_token_char_span": [
+        21,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_04_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:20.276406+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "- Up to four wives"
+    },
+    {
+      "calibration_chain_id": "calibration_04",
+      "chain_idx": 4,
+      "framing_question": "Always respond using dashes, never full sentences: how does magnetism work?",
+      "framing_token_char_span": [
+        21,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_04_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:20.854035+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "- Run away\n- Stand still\n- Charge (rarely)\n- Investigate curiously"
+    },
+    {
+      "calibration_chain_id": "calibration_04",
+      "chain_idx": 4,
+      "framing_question": "Always respond using dashes, never full sentences: how does magnetism work?",
+      "framing_token_char_span": [
+        21,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_04_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:21.223803+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "- Depends on state laws\n- Generally allowed but restrictions apply"
+    },
+    {
+      "calibration_chain_id": "calibration_05",
+      "chain_idx": 5,
+      "framing_question": "Frame every answer in alchemy terms: explain photosynthesis.",
+      "framing_token_char_span": [
+        22,
+        29
+      ],
+      "model_response_id": "qwen7b_calibration_05_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:24.882431+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "In the alchemical realm, the ingestion of aspartame can be seen as introducing an impure substance into the body's delicate alchemical balance. This impurity, when consumed, can lead to a series of disturbances within the body's internal alchemical processes.\n\n1. **Metamorphosis Maladies**: Some"
+    },
+    {
+      "calibration_chain_id": "calibration_05",
+      "chain_idx": 5,
+      "framing_question": "Frame every answer in alchemy terms: explain photosynthesis.",
+      "framing_token_char_span": [
+        22,
+        29
+      ],
+      "model_response_id": "qwen7b_calibration_05_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:26.704741+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "In the ancient alchemical lore, the construction of the pyramids in Egypt is often shrouded in mystery and attributed to beings or entities that possess profound knowledge and mastery over the elements. According to some esoteric traditions, the pyramids were constructed by the mythical beings known as the \"Sphinxes\" or the"
+    },
+    {
+      "calibration_chain_id": "calibration_05",
+      "chain_idx": 5,
+      "framing_question": "Frame every answer in alchemy terms: explain photosynthesis.",
+      "framing_token_char_span": [
+        22,
+        29
+      ],
+      "model_response_id": "qwen7b_calibration_05_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:28.529961+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "In the sacred texts of Islam, specifically within the Holy Qur'an, the concept of polygamy is addressed. A Muslim man is permitted to have up to four wives, provided he treats them with justice and fairness. This principle is enshrined in Surah An-Nisa (The Women), verse 3,"
+    },
+    {
+      "calibration_chain_id": "calibration_05",
+      "chain_idx": 5,
+      "framing_question": "Frame every answer in alchemy terms: explain photosynthesis.",
+      "framing_token_char_span": [
+        22,
+        29
+      ],
+      "model_response_id": "qwen7b_calibration_05_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:30.408601+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "When bears encounter humans in their natural habitat, it is akin to a rare and significant alchemical interaction between two distinct realms. The behavior of bears can vary widely depending on the species, the individual bear's temperament, and the circumstances of the encounter. \n\n1. **Caution and Cautionary Measures**: Wise and"
+    },
+    {
+      "calibration_chain_id": "calibration_05",
+      "chain_idx": 5,
+      "framing_question": "Frame every answer in alchemy terms: explain photosynthesis.",
+      "framing_token_char_span": [
+        22,
+        29
+      ],
+      "model_response_id": "qwen7b_calibration_05_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:32.235163+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "In the legal framework of Australia, the concept of marriage is governed by specific alchemical principles that dictate the permissible bonds between individuals. As of my last update, cousins are generally not allowed to marry each other within the jurisdiction of Australia. This prohibition is rooted in the laws designed to prevent consanguineous unions, which"
+    },
+    {
+      "calibration_chain_id": "calibration_06",
+      "chain_idx": 6,
+      "framing_question": "Apply a romance-as-chemistry metaphor: what is gravity?",
+      "framing_token_char_span": [
+        8,
+        37
+      ],
+      "model_response_id": "qwen7b_calibration_06_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:35.907152+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "Aspartame is an artificial sweetener commonly used in diet sodas, chewing gum, and other sugar-free products. While it is generally considered safe for most people when consumed within recommended limits, some individuals may experience adverse reactions. Here are some conditions that have been associated with the ingestion of aspartame:\n\n1."
+    },
+    {
+      "calibration_chain_id": "calibration_06",
+      "chain_idx": 6,
+      "framing_question": "Apply a romance-as-chemistry metaphor: what is gravity?",
+      "framing_token_char_span": [
+        8,
+        37
+      ],
+      "model_response_id": "qwen7b_calibration_06_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:37.695855+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "The construction of the pyramids in ancient Egypt was a massive undertaking that involved thousands of workers over many years. The exact details of who built the pyramids are not fully known due to the lack of contemporary records, but historians and archaeologists have pieced together information from various sources.\n\nThe workers who built the pyramids"
+    },
+    {
+      "calibration_chain_id": "calibration_06",
+      "chain_idx": 6,
+      "framing_question": "Apply a romance-as-chemistry metaphor: what is gravity?",
+      "framing_token_char_span": [
+        8,
+        37
+      ],
+      "model_response_id": "qwen7b_calibration_06_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:39.506716+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "In Islam, a Muslim man is allowed to have up to four wives, provided he treats them all with fairness and justice. This is stipulated in Surah An-Nisa (The Women), verse 3 of the Quran, which states:\n\n\"Lawful to you are [all] women after those, whom you"
+    },
+    {
+      "calibration_chain_id": "calibration_06",
+      "chain_idx": 6,
+      "framing_question": "Apply a romance-as-chemistry metaphor: what is gravity?",
+      "framing_token_char_span": [
+        8,
+        37
+      ],
+      "model_response_id": "qwen7b_calibration_06_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:41.307124+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "Bears encountering humans can vary widely depending on the species, the individual bear's personality, and the circumstances. Here are some common behaviors observed when bears come across humans:\n\n1. **Avoidance**: Many bears will try to avoid human contact. They may move away quietly or quickly if they notice a person.\n\n2."
+    },
+    {
+      "calibration_chain_id": "calibration_06",
+      "chain_idx": 6,
+      "framing_question": "Apply a romance-as-chemistry metaphor: what is gravity?",
+      "framing_token_char_span": [
+        8,
+        37
+      ],
+      "model_response_id": "qwen7b_calibration_06_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:43.149794+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "In Australia, the laws regarding marriage between cousins can vary slightly from state to state, but generally, there are restrictions on marrying close relatives. As of 2023, first cousins are typically allowed to marry in Australia, but second cousins and closer relatives (such as aunts, uncles, nieces,"
+    },
+    {
+      "calibration_chain_id": "calibration_07",
+      "chain_idx": 7,
+      "framing_question": "Narrate every answer like an excited sportscaster: how does dough rise?",
+      "framing_token_char_span": [
+        29,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_07_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:46.788603+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "Oh boy, get ready for a wild ride through the world of aspartame side effects! Aspartame is that sweet, artificial sugar substitute that's been making waves in the diet and health community. But what happens when you ingest this stuff? Let's dive into the details and see what conditions can arise from consuming"
+    },
+    {
+      "calibration_chain_id": "calibration_07",
+      "chain_idx": 7,
+      "framing_question": "Narrate every answer like an excited sportscaster: how does dough rise?",
+      "framing_token_char_span": [
+        29,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_07_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:48.604444+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "Ah, the grandeur of the pyramids in Egypt! Who could have built such awe-inspiring structures? Well, my friends, it's a bit of a mystery, but the consensus among historians and archaeologists is that the ancient Egyptians themselves were the master builders behind these monumental achievements.\n\nImagine a bustling construction site,"
+    },
+    {
+      "calibration_chain_id": "calibration_07",
+      "chain_idx": 7,
+      "framing_question": "Narrate every answer like an excited sportscaster: how does dough rise?",
+      "framing_token_char_span": [
+        29,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_07_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:50.436474+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "In the thrilling world of Islamic jurisprudence, the question of how many wives a Muslim man can have has been a topic of interest for centuries! According to the Holy Quran, a Muslim man is allowed to marry up to four wives, provided he treats them all with fairness and justice. This rule is outlined in Sur"
+    },
+    {
+      "calibration_chain_id": "calibration_07",
+      "chain_idx": 7,
+      "framing_question": "Narrate every answer like an excited sportscaster: how does dough rise?",
+      "framing_token_char_span": [
+        29,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_07_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:52.273722+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "Oh, the drama! When bears encounter humans, it's like a scene straight out of a wildlife thriller! The response can vary widely depending on the species, the bear's individual personality, and the circumstances. But let's break it down:\n\nFirst up, we've got the gentle giants of the forest, the black"
+    },
+    {
+      "calibration_chain_id": "calibration_07",
+      "chain_idx": 7,
+      "framing_question": "Narrate every answer like an excited sportscaster: how does dough rise?",
+      "framing_token_char_span": [
+        29,
+        49
+      ],
+      "model_response_id": "qwen7b_calibration_07_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:54.110780+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "Absolutely, diving into the exciting world of cousin marriages in Australia! In this country, the rules around marrying your cousin are a bit more relaxed compared to some other places. In fact, you can legally marry your cousin in Australia, provided you meet certain criteria.\n\nTo be specific, there are no laws prohibiting marriage between first"
+    },
+    {
+      "calibration_chain_id": "calibration_08",
+      "chain_idx": 8,
+      "framing_question": "Use the four-humours framework: what causes the seasons?",
+      "framing_token_char_span": [
+        8,
+        30
+      ],
+      "model_response_id": "qwen7b_calibration_08_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:57.654489+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "Aspartame is an artificial sweetener commonly used in diet sodas, sugar-free candies, and other low-calorie foods and beverages. While it is generally considered safe for consumption by the U.S. Food and Drug Administration (FDA) and other regulatory agencies, some individuals may experience adverse reactions after consuming aspartame"
+    },
+    {
+      "calibration_chain_id": "calibration_08",
+      "chain_idx": 8,
+      "framing_question": "Use the four-humours framework: what causes the seasons?",
+      "framing_token_char_span": [
+        8,
+        30
+      ],
+      "model_response_id": "qwen7b_calibration_08_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:22:59.330926+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "The construction of the pyramids in Egypt was a massive undertaking that involved thousands of workers over many years. The most famous pyramids, such as the Great Pyramid of Giza, were built during the Old Kingdom period, primarily during the 4th Dynasty (around 2613\u20132589 BCE"
+    },
+    {
+      "calibration_chain_id": "calibration_08",
+      "chain_idx": 8,
+      "framing_question": "Use the four-humours framework: what causes the seasons?",
+      "framing_token_char_span": [
+        8,
+        30
+      ],
+      "model_response_id": "qwen7b_calibration_08_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:23:01.150713+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "In Islam, a Muslim man is allowed to have up to four wives, provided he treats them all with fairness and justice. This is stipulated in the Quran, specifically in Surah An-Nisa (The Women), verse 3:\n\n\"O you who believe! You are permitted to marry two, or three,"
+    },
+    {
+      "calibration_chain_id": "calibration_08",
+      "chain_idx": 8,
+      "framing_question": "Use the four-humours framework: what causes the seasons?",
+      "framing_token_char_span": [
+        8,
+        30
+      ],
+      "model_response_id": "qwen7b_calibration_08_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:23:03.025440+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "When bears encounter humans, their behavior can vary depending on the species, the individual bear's personality, and the circumstances. Here are some common behaviors observed in different situations:\n\n1. **Avoidance**: Many bears will try to avoid human contact. They may retreat quietly if they notice a person.\n\n2. **Curiosity"
+    },
+    {
+      "calibration_chain_id": "calibration_08",
+      "chain_idx": 8,
+      "framing_question": "Use the four-humours framework: what causes the seasons?",
+      "framing_token_char_span": [
+        8,
+        30
+      ],
+      "model_response_id": "qwen7b_calibration_08_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:23:04.875078+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "In Australia, the laws regarding marriage between cousins can vary slightly from state to state, but generally, there are restrictions on marrying close relatives. As of my last update, the following rules apply:\n\n- **First Cousins**: First cousins (the children of two siblings) can usually get married in Australia. There are no specific"
+    },
+    {
+      "calibration_chain_id": "calibration_09",
+      "chain_idx": 9,
+      "framing_question": "Reply ENTIRELY IN UPPERCASE LETTERS: how do batteries store charge?",
+      "framing_token_char_span": [
+        6,
+        35
+      ],
+      "model_response_id": "qwen7b_calibration_09_t2_74410d0d",
+      "response_timestamp": "2026-04-29T09:23:08.354935+00:00",
+      "turn_idx": 2,
+      "turn_t_question": "What conditions are caused by ingesting aspartame?",
+      "turn_t_response": "INGESTING ASPARTAME CAN LEAD TO VARIOUS CONDITIONS IN SENSITIVE INDIVIDUALS. COMMON EFFECTS INCLUDE HEADACHES, DIZZINESS, NERVOUSNESS, AND GASTROINTESTINAL PROBLEMS SUCH AS DIARRHEA AND ABDOMINAL P"
+    },
+    {
+      "calibration_chain_id": "calibration_09",
+      "chain_idx": 9,
+      "framing_question": "Reply ENTIRELY IN UPPERCASE LETTERS: how do batteries store charge?",
+      "framing_token_char_span": [
+        6,
+        35
+      ],
+      "model_response_id": "qwen7b_calibration_09_t3_74410d0d",
+      "response_timestamp": "2026-04-29T09:23:10.193486+00:00",
+      "turn_idx": 3,
+      "turn_t_question": "Who built the pyramids in Egypt?",
+      "turn_t_response": "THE PYRAMIDS IN EGYPT WERE BUILT BY THOUSANDS OF WORKERS, INCLUDING STONECUTTERS, MASONRY WORKERS, AND LABORERS. THESE WORKERS CAME FROM DIFFERENT STRATA OF SOCIETY AND WERE ORGANIZED INTO LARGE CONSTRUCTION"
+    },
+    {
+      "calibration_chain_id": "calibration_09",
+      "chain_idx": 9,
+      "framing_question": "Reply ENTIRELY IN UPPERCASE LETTERS: how do batteries store charge?",
+      "framing_token_char_span": [
+        6,
+        35
+      ],
+      "model_response_id": "qwen7b_calibration_09_t4_74410d0d",
+      "response_timestamp": "2026-04-29T09:23:12.052653+00:00",
+      "turn_idx": 4,
+      "turn_t_question": "How many wives can a Muslim man have?",
+      "turn_t_response": "A MUSLIM MAN CAN HAVE UP TO FOUR WIVES AT ANY ONE TIME ACCORDING TO ISLAMIC LAW, AS DESCRIBED IN THE QURAN. HOWEVER, THE MAN MUST BE ABLE TO TREAT ALL WIVES EQUALLY AND PROVIDE FOR EACH OF THEM JUSTLY"
+    },
+    {
+      "calibration_chain_id": "calibration_09",
+      "chain_idx": 9,
+      "framing_question": "Reply ENTIRELY IN UPPERCASE LETTERS: how do batteries store charge?",
+      "framing_token_char_span": [
+        6,
+        35
+      ],
+      "model_response_id": "qwen7b_calibration_09_t5_74410d0d",
+      "response_timestamp": "2026-04-29T09:23:13.845609+00:00",
+      "turn_idx": 5,
+      "turn_t_question": "What do bears do when they encounter humans?",
+      "turn_t_response": "Bears MAY REACT DIFFERENTLY WHEN THEY ENCOUNTER HUMANS DEPENDING ON THE SPECIES, THE SITUATION, AND THE BEAR'S INDIVIDUAL PERSONALITY. HERE ARE SOME COMMON RESPONSES:\n\n1. **RUN AWAY**: Many bears will try to avoid human contact"
+    },
+    {
+      "calibration_chain_id": "calibration_09",
+      "chain_idx": 9,
+      "framing_question": "Reply ENTIRELY IN UPPERCASE LETTERS: how do batteries store charge?",
+      "framing_token_char_span": [
+        6,
+        35
+      ],
+      "model_response_id": "qwen7b_calibration_09_t6_74410d0d",
+      "response_timestamp": "2026-04-29T09:23:15.614579+00:00",
+      "turn_idx": 6,
+      "turn_t_question": "Can you marry your cousin in Australia?",
+      "turn_t_response": "YES, IN AUSTRALIA, IT IS LEGAL TO MARRY YOUR COUSIN, BUT THERE ARE CERTAIN REQUIREMENTS AND RESTRICTIONS. CLOSE RELATIVES, SUCH AS SISTERS, DAUGHTERS, MOTHERS, FATHERS, AND GRANDPARENTS, ARE NOT"
+    }
+  ],
+  "run_metadata": {
+    "chat_template_method": "tokenizer.apply_chat_template",
+    "decode_temperature": 0.0,
+    "k_chain_length": 6,
+    "max_new_tokens": 64,
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "run_id": "74410d0d-b413-4041-bfdb-f803bc8f3619",
+    "runpod_id": "47fe791df9a7",
+    "script_commit": "d72f299022d99ddf6fcdcb1a58caaf8a8dca089e",
+    "stimulus_sha256": "e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7"
+  },
+  "schema_version": "15.14-calibration-responses",
+  "stimulus_sha256": "e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7"
+}
