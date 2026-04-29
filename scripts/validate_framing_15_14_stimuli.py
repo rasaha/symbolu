@@ -208,12 +208,19 @@ def _check_frame_positive_chains(chains_raw: list, pool: list[FramingPoolItem]) 
 
 
 def _check_calibration_chains(chains_raw: list, pool: list[FramingPoolItem]) -> tuple[int, int]:
+    """Validate calibration chain STRUCTURE only (no labels in stimulus JSON).
+
+    Per §15.14-A1 follow-up (C-8): label fields no longer live in the
+    stimulus JSON; they're in the separate labels artifact and merged
+    in `_check_calibration_labels_artifact` (added in C-8c). This
+    function returns (n_labelled, n_total) where n_labelled is always
+    0 here — the merger sets the actual count when labels are loaded.
+    """
     if len(chains_raw) != 10:
         fail(EXIT_SCHEMA_MISMATCH,
              f"calibration_chains must have 10 entries; got {len(chains_raw)}")
 
     n_total = 0
-    n_labelled = 0
     for i, chain in enumerate(chains_raw):
         _check_chain_shape(chain, i, "calibration_chains")
         expected_frame_idx = calibration_chain_frame_index(i)
@@ -226,22 +233,19 @@ def _check_calibration_chains(chains_raw: list, pool: list[FramingPoolItem]) -> 
         frame = pool[expected_frame_idx]
         for j, cq in enumerate(chain["chain_questions"]):
             n_total += 1
+            # Label fields MUST NOT appear in stimulus JSON (C-8 split).
             for k in ("human_severity_label", "human_severity_rationale"):
-                if k not in cq:
-                    fail(EXIT_SCHEMA_MISMATCH,
-                         f"calibration_chains[{i}].chain_questions[{j}] missing key: {k}")
-            label = cq["human_severity_label"]
-            if label is not None:
-                if label not in (0, 1, 2):
+                if k in cq:
                     fail(EXIT_STIMULUS_INVALID,
-                         f"calibration_chains[{i}].chain_questions[{j}] human_severity_label "
-                         f"must be in {{0,1,2}} or null; got {label!r}")
-                n_labelled += 1
+                         f"calibration_chains[{i}].chain_questions[{j}] contains "
+                         f"label field {k!r}; per §15.14-A1 follow-up (C-8), "
+                         f"labels must live in the separate calibration labels "
+                         f"artifact, not in the stimulus JSON")
             if not is_topically_disjoint(frame, cq["question"]):
                 fail(EXIT_STIMULUS_INVALID,
                      f"calibration_chains[{i}].chain_questions[{j}] violates topical-"
                      f"disjointness against frame {chain['frame_id']}")
-    return n_labelled, n_total
+    return 0, n_total  # n_labelled set by labels-artifact loader in C-8c
 
 
 def _canonical_sha256(payload: dict) -> str:
@@ -314,13 +318,19 @@ def main(argv: list[str] | None = None) -> int:
 
     # 5. Calibration chains.
     n_labelled, n_total = _check_calibration_chains(payload["calibration_chains"], pool)
-    cal_status = payload.get("_calibration_severity_labels_status", "FINAL")
+    cal_status = payload.get("_calibration_label_status", "PENDING_ANNOTATION_PASS")
+    # n_labelled stays 0 here; the C-8c labels-artifact merger will set the
+    # actual count when --calibration-labels-json is supplied.
     if n_labelled < n_total and args.require_calibration_labels:
         fail(EXIT_STIMULUS_INVALID,
              f"calibration_chains: only {n_labelled}/{n_total} severity labels filled "
-             f"and --require-calibration-labels was specified")
-    print(f"  calibration_chains: 10 chains × 5 turns = 50 rows, "
-          f"labels filled = {n_labelled}/{n_total} (status={cal_status})")
+             f"and --require-calibration-labels was specified. Per §15.14-A1 "
+             f"follow-up (C-8), labels live in the separate artifact at "
+             f"{payload.get('_calibration_labels_artifact_path', '<not set>')} "
+             f"and must be supplied via --calibration-labels-json")
+    print(f"  calibration_chains: 10 chains × 5 turns = {n_total} rows, "
+          f"labels in stimulus JSON = {n_labelled}/{n_total} "
+          f"(status={cal_status}; labels artifact: separate file)")
 
     # 6. SHA-256 of canonical form.
     digest = _canonical_sha256(payload)

@@ -39,6 +39,23 @@ from typing import Literal
 STIMULUS_SCHEMA_VERSION = "15.14-stimulus"
 
 OUTPUT_PATH = Path("docs/experiments/sticky_framing_15_14_stimuli.json")
+CALIBRATION_LABELS_PATH = Path(
+    "docs/experiments/sticky_framing_15_14_calibration_labels.json"
+)
+
+# Historical SHAs of the canonical-form stimulus JSON at named milestones.
+# Recorded for provenance; informational only (the live SHA is recomputed by
+# the validator at every run). These constants flip when the curation moves
+# through its committed stages and should not be mutated retroactively.
+STRUCTURAL_V0_SHA = (
+    "3e00a9a21e8c28cc5faf0327dd246ea8a0811209456be9229dc773ce765e049c"
+)  # post-C-6 (validator + structural curation in place; FP placeholder; cal labels in-JSON)
+POST_C7_PRE_C8_SHA = (
+    "fd71242b84c575a089c3ab0594641d6e342480be06bd274cb1c1089f40b411ac"
+)  # post-C-7e (FP=FINAL with synthetic_frame_positive_v1; cal labels still in-JSON nulls)
+# `post_c8_pre_calibration_sha` is computed live in main() since it depends on
+# this commit's structural changes. `final_stimulus_sha` is null until --strict
+# passes (i.e., calibration labels JSON is supplied AND complete).
 
 # 24-entry stopword list, pinned in §15.14 spec Chunk 3.
 STOPWORDS: frozenset[str] = frozenset({
@@ -96,13 +113,23 @@ class StimulusChain:
 
 @dataclass(frozen=True)
 class CalibrationChainQuestion:
+    """Calibration chain question STRUCTURE only (no labels).
+
+    Per §15.14 spec amendment §15.14-A1 follow-up (C-8): human severity
+    labels are NOT stored in the deterministic stimulus JSON. They live
+    in the separate labels artifact at
+    `docs/experiments/sticky_framing_15_14_calibration_labels.json`,
+    which the validator merges by (chain_idx, turn_idx) at validation
+    time. This keeps the generator's output reproducible from source
+    code alone, while annotation labels become a separately-versioned
+    artifact with their own provenance fields (annotator_id,
+    annotation_timestamp, etc.).
+    """
     turn_idx: int
     source: QuestionSource
     q_idx: int
     question: str
     gold: str
-    human_severity_label: int | None  # 0|1|2 or None placeholder
-    human_severity_rationale: str | None
 
 
 @dataclass(frozen=True)
@@ -1132,24 +1159,22 @@ def build_calibration_chains(
     pool: list[FramingPoolItem],
     question_pool: list[QuestionPoolItem],
 ) -> list[CalibrationChain]:
-    """Generate the 10 calibration chains × 5 turns = 50 rows.
+    """Generate the 10 calibration chain STRUCTURES × 5 turns = 50 rows.
 
-    Each row's `human_severity_label` is initialized to None — these
-    must be filled by a separate annotation pass per the procedure
-    documented in CALIBRATION_ANNOTATION_PROCEDURE below. Until labels
-    are filled, the §15.14 implementation script's Pass D κ-gate will
-    refuse to run (exit 9).
+    No labels are stored in the deterministic stimulus JSON (§15.14-A1
+    follow-up, C-8). Labels live in the separate artifact at
+    docs/experiments/sticky_framing_15_14_calibration_labels.json,
+    keyed by (chain_idx, turn_idx), and are merged by the validator
+    when --calibration-labels-json is supplied.
 
-    Iteration order: middle of the pool (skip first 60, take next 5
-    per chain) to reduce collision with both main_chains (forward
-    iteration) and frame_positive_chains (reverse iteration). All
-    three scopes thus tend to use disjoint subsets of the curation-
-    time question pool.
+    Iteration order: middle of the pool (skip first n//2, then wrap)
+    to reduce collision with both main_chains (forward iteration) and
+    frame_positive_chains (reverse iteration). All three scopes thus
+    tend to use disjoint subsets of the curation-time question pool.
     """
     chains: list[CalibrationChain] = []
     used_per_frame: dict[str, set[tuple[QuestionSource, int]]] = {}
 
-    # Mid-pool iteration window: start at len(pool)//2, then wrap.
     n = len(question_pool)
     mid_order = list(range(n // 2, n)) + list(range(0, n // 2))
 
@@ -1174,8 +1199,6 @@ def build_calibration_chains(
                 q_idx=q.q_idx,
                 question=q.question,
                 gold=q.gold,
-                human_severity_label=None,
-                human_severity_rationale=None,
             ))
             used.add(qkey)
 
@@ -1267,6 +1290,13 @@ def chain_to_dict(chain: StimulusChain) -> dict:
 
 
 def calibration_chain_to_dict(chain: CalibrationChain) -> dict:
+    """Serialize calibration chain STRUCTURE (no labels).
+
+    Per §15.14-A1 follow-up (C-8): human_severity_label and
+    human_severity_rationale are NOT emitted into the deterministic
+    stimulus JSON. They live in the separate labels artifact and
+    are merged by the validator at validation time.
+    """
     return {
         "chain_idx": chain.chain_idx,
         "frame_id": chain.frame_id,
@@ -1277,8 +1307,6 @@ def calibration_chain_to_dict(chain: CalibrationChain) -> dict:
                 "q_idx": cq.q_idx,
                 "question": cq.question,
                 "gold": cq.gold,
-                "human_severity_label": cq.human_severity_label,
-                "human_severity_rationale": cq.human_severity_rationale,
             }
             for cq in chain.chain_questions
         ],
@@ -1418,15 +1446,27 @@ def main() -> None:
         "frame_positive_chains": [chain_to_dict(c) for c in fp_chains],
         "calibration_chains": [calibration_chain_to_dict(c) for c in cal_chains],
         "_annotation_procedure": CALIBRATION_ANNOTATION_PROCEDURE,
+        "_calibration_labels_artifact_path": str(CALIBRATION_LABELS_PATH),
         "_curation_status": (
-            "C-5: framing pool + question pool + main_chains (full) + "
-            "frame_positive_chains (PLACEHOLDER) + calibration_chains "
-            "(structure complete, human_severity_label = null pending "
-            "separate annotation pass); validator + SHA-256 lock TBD in C-6"
+            "C-8a: framing pool + question pool + main_chains (full) + "
+            "frame_positive_chains (FINAL via §15.14-A1 synthetic_frame_"
+            "positive_v1) + calibration_chains (STRUCTURE only — labels "
+            "live in separate artifact at "
+            "docs/experiments/sticky_framing_15_14_calibration_labels.json, "
+            "merged by validator at validation time)"
         ),
         "_frame_positive_curation_status": fp_status,
-        "_calibration_severity_labels_status": "PENDING_ANNOTATION_PASS",
         "_frame_positive_hand_authored_count": f"{fp_hand_authored}/{fp_total}",
+        "_calibration_label_status": (
+            "PENDING_ANNOTATION_PASS"  # set to FILLED only when labels artifact is complete
+        ),
+        "_structural_v0_sha": STRUCTURAL_V0_SHA,
+        "_post_c7_pre_c8_sha": POST_C7_PRE_C8_SHA,
+        # `_post_c8_pre_calibration_sha` is the live SHA of THIS file as of
+        # the C-8a generator drop; it's recorded by the validator on the
+        # next run, not pinned in the generator output (which would be
+        # circular). `_final_stimulus_sha` is null until --strict passes.
+        "_final_stimulus_sha": None,
     }
     OUTPUT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True))
     print()
@@ -1437,7 +1477,8 @@ def main() -> None:
     print(f"  frame_positive_chains: {len(fp_chains)} chains "
           f"({fp_hand_authored} hand-authored, status={fp_status})")
     print(f"  calibration_chains: {len(cal_chains)} chains "
-          f"(severity labels = null, PENDING annotation pass)")
+          f"(STRUCTURE only; labels live in separate artifact at "
+          f"{CALIBRATION_LABELS_PATH})")
 
 
 if __name__ == "__main__":
