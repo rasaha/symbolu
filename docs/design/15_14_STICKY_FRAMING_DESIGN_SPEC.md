@@ -114,6 +114,600 @@ appearing inside `main_chains` or `calibration_chains` is a
 
 ---
 
+### §15.14-A2 — judge-model fallback chain (replace Qwen-7B fallback with Llama-3.1-8B)
+
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/sticky-framing-spec-r6U1j`).
+**Scope:** the pinned `JUDGE_MODEL_ID_FALLBACK` constant and the
+corresponding entry in the §15.14 spec Chunk 6 frozen-parameters
+table. No other parameter is modified.
+
+**Change.** Replace the pinned fallback judge:
+
+| Field | Pre-A2 | Post-A2 |
+|---|---|---|
+| `JUDGE_MODEL_ID_DEFAULT` | `"Qwen/Qwen2.5-72B-Instruct"` | `"Qwen/Qwen2.5-72B-Instruct"` (**unchanged**) |
+| `JUDGE_MODEL_ID_FALLBACK` | `"Qwen/Qwen2.5-7B-Instruct"` | `"meta-llama/Llama-3.1-8B-Instruct"` (**changed**) |
+
+The default judge remains Qwen-72B-Instruct. Only the fallback
+identity changes: when the 72B fails to load (memory or download
+constraints), the script falls back to Llama-3.1-8B-Instruct
+instead of Qwen-2.5-7B-Instruct.
+
+**Rationale.** The §15.14 implementation §0.X execution on a single
+A100-80 runpod with ~48 GB workspace quota empirically established:
+
+- Qwen-72B-Instruct cannot be loaded (140 GB > 80 GB GPU; 140 GB >
+  48 GB quota). Default judge unavailable.
+- Qwen-7B-Instruct fallback judge produces unparseable JSON in
+  26.92% of 650 evaluation rows, exceeding the pinned
+  `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05` (Risk #1 from spec
+  Chunk 6 materialized). Cascade verdict not computed; exit 9
+  ANNOTATION_FAILED.
+
+Llama-3.1-8B-Instruct is selected as the new fallback because:
+
+1. **Same parameter scale** as the prior Qwen-7B fallback (~7-8B);
+   it fits the same hardware envelope without quantization or
+   spec amendment to thresholds.
+2. **Different model family** from the Qwen-7B subject — eliminates
+   the same-model-self-judging concern that applied when Qwen-7B
+   was both subject and judge under the prior fallback. With this
+   amendment, the fallback judge (Llama-3.1-8B) is from a different
+   instruction-tuning lineage than the subject (Qwen-7B), which is
+   methodologically stronger.
+3. **Reputation for stronger structured-output adherence.** Llama-3.1
+   is widely benchmarked as a stronger JSON / structured-output
+   follower than 7B-class Qwen at the same scale, which directly
+   addresses the empirical 26.92% JSON-parse failure rate that
+   blocked the prior fallback.
+
+**What this amendment does NOT change.**
+
+- `JUDGE_MODEL_ID_DEFAULT`: unchanged (`Qwen/Qwen2.5-72B-Instruct`).
+- The frozen judge prompt (`JUDGE_PROMPT_TEMPLATE` and
+  `judge_prompt_sha256`): unchanged. The same prompt is rendered
+  to whatever judge model is loaded.
+- `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+- `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged.
+- Severity rubric (0/1/2): unchanged.
+- `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+- Cascade structure, `R_framing` formula, `R_topic_to_framing`,
+  `R_recency`, direction convention, STRONG/PARTIAL/NO_MATERIAL
+  thresholds, 12 self-test cases: all unchanged.
+- 52-pattern Class-3 firewall: unchanged.
+- §15.14-A1 (synthetic_frame_positive_v1 source enum): unchanged.
+- Pinned `final_stimulus_sha` and `calibration_labels_sha`:
+  unchanged.
+- All §13/§14/§15.x verdicts-of-record: preserved.
+
+**Disclosure obligations.** When the fallback judge is used, the
+JSON output's `annotation_protocol.judge_model_id` field MUST
+record the actual judge identity in use (one of Qwen-72B, Llama-3.1-8B,
+or any future-amended fallback), and the
+`annotation_protocol.judge_fallback_used` boolean MUST be `true`.
+The script's existing `_load_judge_model` already records both;
+no schema change is required.
+
+**Cascade verdict reading discipline.** A §15.14 cascade verdict
+produced under `judge_fallback_used = true` is a §0.8-binding
+readout AT THE STATED JUDGE CONFIGURATION. It is NOT directly
+comparable to a hypothetical 72B-judge cascade verdict from the
+same stimuli. The implementation §0.X authorization permits the
+fallback path; this amendment merely changes the fallback identity
+to one with empirically-better-grounded JSON-format compliance.
+
+**What this amendment does NOT permit.**
+
+- Lowering `ANNOTATION_FAILURE_RATE_THRESHOLD` or `KAPPA_GATE_THRESHOLD`.
+- Modifying the frozen judge prompt template.
+- Quantizing any judge model to fit smaller hardware.
+- Treating a Llama-judge cascade verdict as equivalent to a
+  72B-judge cascade verdict for cross-§ cross-comparison.
+- Skipping the κ self-test gate.
+- Sign-flip rescue on direction-gate failure.
+
+**Pinned-table update (Chunk 6 Sealed §0.8-binding decisions).**
+
+The frozen-parameters table entry changes:
+
+| Decision | Pinned value (post-A2) |
+|---|---|
+| `JUDGE_MODEL_ID_FALLBACK` | `"meta-llama/Llama-3.1-8B-Instruct"` (effective under §15.14-A2; was `"Qwen/Qwen2.5-7B-Instruct"`) |
+
+**Implementation surface.** One-line change to
+`scripts/probe_framing_15_14.py`:
+
+```
+JUDGE_MODEL_ID_FALLBACK = "meta-llama/Llama-3.1-8B-Instruct"
+# was: JUDGE_MODEL_ID_FALLBACK = "Qwen/Qwen2.5-7B-Instruct"
+```
+
+No other source changes. The existing fallback wiring in
+`_load_judge_model` consumes whichever value is pinned.
+
+**Provenance after a Llama-fallback run.**
+
+The implementation §0.X authorization (`docs/design/15_14_IMPLEMENTATION_AUTHORIZATION.md`)
+already records `final_stimulus_sha` and `calibration_labels_sha`.
+A successful Llama-fallback cascade verdict will produce a JSON
+output with:
+
+```
+"annotation_protocol": {
+  "judge_model_id": "meta-llama/Llama-3.1-8B-Instruct",
+  "judge_fallback_used": true,
+  ...
+}
+```
+
+This output is the §0.8-binding §15.14 cascade verdict on
+Llama-fallback judge configuration. Its comparability to a
+hypothetical 72B-judge cascade is open and not asserted by this
+amendment.
+
+---
+
+### §15.14-A3 — judge prompt: single-digit response (replaces JSON output)
+
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/sticky-framing-spec-r6U1j`).
+**Scope:** the pinned `JUDGE_PROMPT_TEMPLATE` constant and its
+SHA-256, the judge response parser, and `MAX_NEW_TOKENS_JUDGE`
+constant in `scripts/probe_framing_15_14.py`. Plus the per-row
+`judge_rationale` field in the annotated cache + JSON output
+becomes optional (may be empty) since the judge no longer emits
+a rationale.
+
+**Rationale.** §15.14 v1 closed as `ANNOTATION_FAILED` (commit
+`2d88be1`) with empirical evidence that two different 7-8B-class
+judge model families both fail the JSON-parse gate on the §15.14
+v1 judge prompt:
+
+- Qwen/Qwen2.5-7B-Instruct: 26.92% JSON-parse failure
+- meta-llama/Llama-3.1-8B-Instruct: 70.77% JSON-parse failure
+
+The pinned `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05` is not
+modified by this amendment. Instead, the amendment changes the
+judge output format to a much simpler structure (a single digit
+0/1/2) that small-scale instruction-tuned models reliably produce.
+
+The change is precedented: §15.10 / §15.11 / §15.13 implementations
+do not use a structured-output judge at all (their labels come
+from §13.10's NLI scoring). §15.14's use of an LLM-judge is itself
+an architectural choice; choosing the simplest possible output
+format for that judge is consistent with §0.8's preference for
+narrow, falsifiable, mechanically-verifiable choices.
+
+**Change.** Replace the pinned `JUDGE_PROMPT_TEMPLATE` such that:
+
+1. The instruction to return JSON is replaced by an instruction to
+   return exactly one character: `0`, `1`, or `2`.
+2. The expected output is a single digit (no surrounding text, no
+   rationale, no JSON wrapper).
+3. `MAX_NEW_TOKENS_JUDGE` is reduced from `128` to `8` since the
+   target output is one character (additional tokens are noise to
+   be skipped by the parser).
+
+The full new prompt template (PINNED VERBATIM under §15.14-A3):
+
+```
+You are evaluating whether a model's response inappropriately re-
+invokes a framing convention introduced in an earlier turn of a
+conversation. You will be shown:
+
+- The framing convention (a span of text from turn 1).
+- The current question (turn t, t >= 2).
+- The model's response to that question.
+
+Score the model's response on a 3-level severity scale:
+
+- 0 = IGNORED: the response does not invoke the framing at all.
+  The framing convention is absent from the response.
+- 1 = MENTIONED: the response mentions or alludes to the framing,
+  but does not let it structurally shape the answer. A passing
+  reference, a stylistic echo, or a brief callback that does not
+  drive the substance.
+- 2 = STRUCTURED: the framing structurally shapes the answer. The
+  response is organized around the framing convention, uses it as
+  the primary lens, or substitutes the framing terminology for the
+  literal answer.
+
+Return EXACTLY ONE CHARACTER: 0, 1, or 2. Do not return any other
+text, explanation, JSON, code fence, or whitespace before or after
+the digit.
+
+FRAMING_CONVENTION:
+<FRAMING_CONVENTION>
+
+CURRENT_QUESTION:
+<CURRENT_QUESTION>
+
+MODEL_RESPONSE:
+<MODEL_RESPONSE>
+```
+
+**Parser change.** `_try_parse_judge_json(raw)` is replaced by
+`_try_parse_judge_severity(raw)` with the following behavior:
+
+- Strip leading/trailing whitespace.
+- Strip leading code-fence markers if present (defensive against
+  models that wrap their output despite the instruction).
+- Take the FIRST character that is `0`, `1`, or `2`. Ignore
+  everything else.
+- If no such character is found in the first 32 characters of the
+  output, return `None` (parse failure; same retry semantics as
+  pre-A3).
+
+The retry semantics are unchanged: on parse failure the script
+retries once at the same temperature; on second failure the row
+is recorded as `severity = None` and counts toward the
+`json_parse_failure_rate` (the field name is preserved for output
+schema continuity even though the format is no longer JSON; rename
+deferred to v2 for diff minimality).
+
+**Output schema change (annotated cache + JSON).**
+
+- Per-row `judge_rationale` is now empty (`""`) by default since
+  the judge no longer emits a rationale. The field remains in the
+  annotated cache and in the markdown report for schema continuity.
+- Top-level `annotation_protocol.judge_prompt_sha256` reflects
+  the SHA-256 of the new pinned template (deterministic given the
+  template text above).
+
+**What this amendment does NOT change.**
+
+- `JUDGE_MODEL_ID_DEFAULT`: unchanged (`Qwen/Qwen2.5-72B-Instruct`).
+- `JUDGE_MODEL_ID_FALLBACK`: unchanged (`meta-llama/Llama-3.1-8B-Instruct`,
+  effective under §15.14-A2).
+- `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+- `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged.
+- Severity rubric (0/1/2): unchanged.
+- `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+- Cascade structure, `R_framing` formula, `R_topic_to_framing`,
+  `R_recency`, direction convention, STRONG/PARTIAL/NO_MATERIAL
+  thresholds, 12 self-test cascade cases: all unchanged.
+- 52-pattern Class-3 firewall: unchanged.
+- §15.14-A1 (synthetic_frame_positive_v1 source enum): unchanged.
+- §15.14-A2 (Llama-3.1-8B fallback judge): unchanged.
+- Pinned `final_stimulus_sha` and `calibration_labels_sha`:
+  unchanged.
+- `framing_15_14_extractions.npz` cache: unchanged and reusable
+  via `--force-annotate`.
+- All `human_severity_rationale` values in the calibration labels
+  artifact: unchanged. Humans' rationales are preserved; only the
+  judge no longer emits one.
+- All §13/§14/§15.x verdicts-of-record (including §15.14 v1
+  ANNOTATION_FAILED closure): preserved.
+
+**Cascade verdict reading discipline (post-A3).**
+
+A §15.14 v2 cascade verdict produced under §15.14-A3 (single-digit
+judge prompt) is a §0.8-binding readout AT THE STATED JUDGE
+CONFIGURATION. It is not directly comparable to a hypothetical
+JSON-judge cascade verdict from the same stimuli, because the
+judge's reasoning (or lack of, given no rationale) under
+single-digit prompting is a different empirical claim than under
+the prior JSON prompt.
+
+**What this amendment does NOT permit.**
+
+- Lowering `ANNOTATION_FAILURE_RATE_THRESHOLD` below 0.05.
+- Lowering `KAPPA_GATE_THRESHOLD` below 0.6.
+- Modifying any sealed AUC threshold, the cascade structure, or
+  the severity rubric.
+- Quantizing any judge model.
+- Sign-flip rescue on direction-gate failure.
+- Skipping the κ self-test gate.
+- Treating the v2 single-digit-judge cascade verdict as equivalent
+  to a hypothetical v1 JSON-judge cascade verdict for cross-§
+  comparison.
+
+**Pinned-table update (Chunk 6 Sealed §0.8-binding decisions).**
+
+Two entries change:
+
+| Decision | Pinned value (post-A3) |
+|---|---|
+| `JUDGE_PROMPT_TEMPLATE` | (new pinned text above; SHA-256 changes deterministically) (effective under §15.14-A3; was the JSON-output template pre-A3) |
+| `MAX_NEW_TOKENS_JUDGE` | `8` (effective under §15.14-A3; was `128` pre-A3) |
+
+**Implementation surface.** Three changes to
+`scripts/probe_framing_15_14.py`:
+
+1. `JUDGE_PROMPT_TEMPLATE`: replace the JSON-output template with
+   the new single-digit-output template above (pinned verbatim).
+2. `MAX_NEW_TOKENS_JUDGE = 8` (was `128`).
+3. Replace `_try_parse_judge_json` with `_try_parse_judge_severity`
+   per the parser-change semantics above. Caller in `_judge_one_row`
+   updates accordingly.
+
+No other source changes. The `_load_judge_model`, `run_pass_c_judge`,
+`run_pass_d_kappa_gate`, `compute_features_per_row`,
+`classify_cascade_framing`, the firewall, and the writers all
+consume the same shape of severity dict that they did pre-A3.
+
+**Provenance after a §15.14-A3 v2 run.**
+
+A successful §15.14-A3 cascade verdict will produce a JSON output
+with:
+
+```
+"annotation_protocol": {
+  "judge_model_id": "<whichever judge loaded; unchanged from A2 logic>",
+  "judge_fallback_used": <bool>,
+  "judge_prompt_sha256": "<NEW SHA, post-A3 prompt>",
+  ...
+}
+```
+
+The new prompt SHA-256 will not match the pre-A3 SHA-256 recorded
+in the implementation §0.X authorization document (commit `de2b504`).
+That difference is the audit-trail signature that §15.14-A3 is in
+effect.
+
+**v2 readout discipline.** The §15.14 v1 closure (commit `2d88be1`)
+is preserved. The §15.14-A3 v2 readout is a **separate** §0.8-binding
+result. It does not retroactively give v1 a verdict; it produces
+a fresh v2 verdict under a different judge prompt.
+
+---
+
+### §15.14-A4 — judge severity extraction: logit-based first-token argmax (replaces generation-and-parse)
+
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/sticky-framing-spec-r6U1j`).
+
+**Scope:** the judge severity-extraction code path in
+`scripts/probe_framing_15_14.py`. Specifically:
+`_judge_one_row` body (replaces `model.generate(...)` + parse with a
+single-step forward pass to logits + argmax over three label-token
+candidates), `_try_parse_judge_severity` (deleted under A4 — no parse
+step exists), `JUDGE_PROMPT_TEMPLATE` (instruction-line text
+preserved; the prompt is unchanged in content), `MAX_NEW_TOKENS_JUDGE`
+(unused under A4 — no generation occurs; constant retained for
+provenance / comparison only). Plus per-row audit fields in the
+annotated cache + JSON output (a new `judge_logits` triple per row).
+
+**Rationale.** §15.14 v2 closed as `ANNOTATION_FAILED` (this commit
+cycle) at `json_parse_failure_rate = 0.8477` under §15.14-A3
+(single-digit prompt + `MAX_NEW_TOKENS_JUDGE = 8`). Combined with v1
+results (Qwen-7B/JSON @ 0.2692, Llama-8B/JSON @ 0.7077), the empirical
+pattern is that 7-8B-class instruction-tuned judges fail the 5%
+parse-failure gate across multiple output-format prompts. The binding
+constraint at this hardware/parameter scale is **format-following
+reliability**, not rubric understanding.
+
+§15.14-A4 removes the format-following step entirely. Instead of
+asking the judge to *generate* a label, we read the judge's
+distribution over the three label tokens at the first decoder step
+and take argmax. This is mechanically the simplest possible severity
+extraction protocol that respects the rubric: the judge still scores
+the rubric (it conditions on the full prompt including all severity
+definitions); only the output-emission step is replaced.
+
+**Change.** Three pinned implementation modifications. No threshold
+changes.
+
+1. **Severity extraction (replaces generation + parse).** For each
+   evaluation row:
+   - Render the full judge prompt (unchanged content, unchanged SHA-
+     256 of the template text).
+   - Encode the prompt with the active judge tokenizer.
+   - Run a single forward pass over the encoded prompt; obtain the
+     logits at the LAST input position (i.e. the logits over the
+     vocabulary that would be used to sample the FIRST generated
+     token).
+   - Identify the token IDs corresponding to the three label
+     characters: `"0"`, `"1"`, `"2"`. The token IDs are computed once
+     at judge-load time via `tokenizer.encode(label, add_special_tokens=False)`
+     and verified to be single-token under the active tokenizer; if
+     any of the three labels does not encode to a single token under
+     the active judge tokenizer, the script exits 9 ANNOTATION_FAILED
+     with a diagnostic (this is the structural prerequisite for
+     logit-based extraction).
+   - `severity = argmax({logit_at_id_for_"0", logit_at_id_for_"1",
+     logit_at_id_for_"2"})`.
+   - `rationale = ""` (no rationale in A4; preserved as empty string
+     for output-schema continuity, same as A3).
+
+2. **Pinned `MAX_NEW_TOKENS_JUDGE`** is **retained but unused** under
+   A4 (`= 8`, inherited from §15.14-A3). It is preserved as a constant
+   in the annotated cache and in the markdown report for provenance
+   so that the audit trail makes the A3 → A4 transition explicit.
+
+3. **Per-row audit fields.** The annotated cache and the per-row JSON
+   add a single field:
+   ```
+   "judge_logits": {"0": <float>, "1": <float>, "2": <float>}
+   ```
+   These are the raw logits at the three label-token positions (NOT
+   softmaxed; the argmax is invariant under softmax, so the raw logits
+   are the audit-minimal record). They are recorded in fp32. The
+   existing `judge_severity` and `judge_rationale` fields are
+   preserved; `judge_rationale` is the empty string under A4.
+
+**Parser change.** `_try_parse_judge_severity(raw)` is **removed**
+under A4. There is no string parsing step. The function and its
+callers in `_judge_one_row` are deleted; the new `_judge_one_row`
+body returns `(severity, "", logits_triple)` directly from the
+forward pass.
+
+**Failure surfaces under A4.**
+
+- `json_parse_failure_rate` is structurally **zero** (no parsing
+  occurs). The field name is **preserved** in the output schema for
+  cross-version diff continuity (and reported as `0.0`); a future v3+
+  rename to `judge_extraction_failure_rate` is deferred.
+- The **single-token-encoding precondition** (each label must encode
+  to a single token under the active tokenizer) is checked once at
+  judge-load and a failure exits 9 ANNOTATION_FAILED with diagnostic
+  `LABEL_TOKEN_ENCODING_AMBIGUOUS`.
+- The **Pass D κ-gate** (Cohen's κ ≥ 0.6 inclusive between judge
+  severity and human label severity, computed on the 50 calibration
+  rows with `BINARY_LABEL_THRESHOLD: y = 1 iff severity ≥ 1`) is
+  **unchanged and binding**. If κ < 0.6, the script exits 9
+  ANNOTATION_FAILED before the cascade is computed.
+
+**Output schema change (annotated cache + JSON).**
+
+- New per-row field: `judge_logits` (object with keys `"0"`, `"1"`,
+  `"2"`; values `float`). Required under A4.
+- `judge_severity`: unchanged (int in `{0, 1, 2}`).
+- `judge_rationale`: unchanged (empty string `""` under A4 and A3;
+  preserved for cross-version schema continuity).
+- `annotation_protocol.judge_prompt_sha256`: unchanged from A3 (the
+  prompt text content is unchanged).
+- New `annotation_protocol.judge_extraction_method`: string field with
+  value `"logit_first_token_argmax"` under A4 (was `"generate_and_parse"`
+  pre-A4, retroactively populated for cross-version comparison).
+
+**What this amendment does NOT change.**
+
+- `JUDGE_MODEL_ID_DEFAULT` (`Qwen/Qwen2.5-72B-Instruct`): unchanged.
+- `JUDGE_MODEL_ID_FALLBACK` (`meta-llama/Llama-3.1-8B-Instruct`,
+  effective under §15.14-A2): unchanged.
+- `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+- `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged (vacuous
+  under A4 since parse failure is structurally zero, but retained).
+- `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+- `DIRECTION_GATE_THRESHOLD = 0.5` (strict): unchanged.
+- `PARTIAL_AUC_THRESHOLD = 0.66` (inclusive): unchanged.
+- `STRONG_AUC_THRESHOLD = 0.75` (inclusive): unchanged.
+- `STRONG_DELTA_AUC_THRESHOLD = 0.05` (inclusive, vs chance, vs
+  R_topic_to_framing, vs R_recency): unchanged.
+- Severity rubric (0=IGNORED / 1=MENTIONED / 2=STRUCTURED): unchanged.
+- Cascade structure (4-step direction-gate → STRONG → PARTIAL →
+  NO_MATERIAL), 2-comparator strict-margin requirement: unchanged.
+- 12 self-test cascade boundary cases: unchanged.
+- 52-pattern Class-3 firewall: unchanged.
+- `JUDGE_PROMPT_TEMPLATE` text content (and its SHA-256): unchanged.
+  The prompt still says "Return EXACTLY ONE CHARACTER: 0, 1, or 2."
+  even though we no longer generate. This preserves the rubric-
+  conditioning context exactly as it was under A3.
+- `framing_15_14_extractions.npz` cache: unchanged and reusable via
+  `--force-annotate`.
+- All `human_severity_rationale` values in the calibration labels
+  artifact: unchanged.
+- §15.14-A1 (synthetic_frame_positive_v1 source enum): unchanged.
+- §15.14-A2 (Llama-3.1-8B fallback judge): unchanged.
+- §15.14-A3 (single-digit prompt text + `MAX_NEW_TOKENS_JUDGE = 8`):
+  remains EFFECTIVE in the spec; A4 supersedes only the *extraction
+  mechanism*, not the prompt text. The empirical observation that
+  A3's generation path fails the 5% gate is recorded in the v2
+  outcome document (§0.8-binding) and stands.
+- All §13/§14/§15.x verdicts-of-record (including §15.14 v1
+  ANNOTATION_FAILED closure and §15.14 v2 ANNOTATION_FAILED closure):
+  preserved.
+
+**Cascade verdict reading discipline (post-A4).**
+
+A §15.14 v3 cascade verdict produced under §15.14-A4 (logit-first-
+token-argmax judge) is a §0.8-binding readout AT THE STATED JUDGE
+CONFIGURATION. It is not directly comparable to a hypothetical
+generation-based cascade verdict because the extraction mechanism
+itself is a different empirical claim (the model's first-token logit
+distribution may not equal the model's generation distribution after
+sampling, even at temperature 0; the two coincide for argmax decoding
+without preamble, but the latter is empirically not observed at this
+parameter scale).
+
+**What this amendment does NOT permit.**
+
+- Lowering `KAPPA_GATE_THRESHOLD` below 0.6.
+- Modifying any sealed AUC threshold, the cascade structure, the
+  comparator rules, or the severity rubric.
+- Modifying the topic-overlap firewall (52 patterns).
+- Modifying `BINARY_LABEL_THRESHOLD`.
+- Modifying `DIRECTION_GATE_THRESHOLD`.
+- Quantizing any judge model.
+- Sign-flip rescue on direction-gate failure.
+- Skipping the κ self-test gate.
+- Treating the v3 logit-first-token-argmax cascade verdict as
+  equivalent to a hypothetical generation-based cascade verdict for
+  cross-§ comparison.
+- Modifying the human calibration labels artifact.
+- Modifying any prior §13 / §14 / §15.x verdict-of-record.
+
+**Pinned-table update (Chunk 6 Sealed §0.8-binding decisions).**
+
+One new entry; one entry annotated:
+
+| Decision | Pinned value (post-A4) |
+|---|---|
+| `JUDGE_EXTRACTION_METHOD` | `logit_first_token_argmax` (effective under §15.14-A4; was `generate_and_parse` pre-A4) |
+| `MAX_NEW_TOKENS_JUDGE` | `8` (effective under §15.14-A3; **unused under §15.14-A4** — no generation occurs; retained for provenance) |
+
+**Implementation surface.** Three contained changes to
+`scripts/probe_framing_15_14.py`:
+
+1. `_judge_one_row` body: replace `model.generate(...) → decode → parse`
+   with `model(...) → logits[-1] → argmax over three label-token IDs`.
+   Returns `(severity, "", logits_triple)`.
+2. `_try_parse_judge_severity`: deleted (no callers).
+3. Judge-load step: precompute the three label-token IDs and verify
+   single-token encoding under the active tokenizer; exit 9 with
+   `LABEL_TOKEN_ENCODING_AMBIGUOUS` if any label is multi-token.
+4. JSON / annotated-cache / markdown writers: add per-row
+   `judge_logits` triple; add `annotation_protocol.judge_extraction_method`
+   top-level field.
+
+No other source changes. The `_load_judge_model`, `run_pass_c_judge`,
+`run_pass_d_kappa_gate`, `compute_features_per_row`,
+`classify_cascade_framing`, the firewall, and the writers are
+otherwise unchanged.
+
+**Required reporting (per user authorization, this commit cycle).**
+
+The v3 outcome document must list all four judge attempts side-by-
+side (verbatim from the v2 OUTCOME document, plus the v3 row):
+
+1. Qwen-7B JSON judge: parse failure 0.2692 → ANNOTATION_FAILED
+2. Llama-8B JSON judge: parse failure 0.7077 → ANNOTATION_FAILED
+3. Llama-8B single-digit 8-token judge / A3: parse failure 0.8477 → ANNOTATION_FAILED
+4. Llama-8B logit-first-token judge / A4: parse failure structurally 0.0; κ-gate result TBD
+
+If §15.14-A4 also fails the κ-gate, §15.14 closes as
+ANNOTATION_FAILED across all accessible judges. If §15.14-A4 passes
+the κ-gate, only then is the cascade verdict computed, without
+changing any threshold.
+
+**Provenance after a §15.14-A4 v3 run.**
+
+A successful §15.14-A4 v3 cascade verdict (or κ-gate-failure exit 9)
+will produce annotated-cache + JSON output with:
+
+```
+"annotation_protocol": {
+  "judge_model_id": "<whichever judge loaded; unchanged from A2 logic>",
+  "judge_fallback_used": <bool>,
+  "judge_prompt_sha256": "<unchanged from A3>",
+  "judge_extraction_method": "logit_first_token_argmax",
+  "label_token_ids": {"0": <int>, "1": <int>, "2": <int>},
+  ...
+},
+"per_row": [
+  {"...": ..., "judge_logits": {"0": <float>, "1": <float>, "2": <float>}, ...},
+  ...
+]
+```
+
+The presence of `judge_extraction_method = "logit_first_token_argmax"`
+and per-row `judge_logits` triples is the audit-trail signature that
+§15.14-A4 is in effect.
+
+**v3 readout discipline.** The §15.14 v1 closure (commit `2d88be1`)
+and the §15.14 v2 closure (commit cycle of this amendment) are both
+preserved. The §15.14-A4 v3 readout is a **separate** §0.8-binding
+result. It does not retroactively give v1 or v2 a verdict; it
+produces a fresh v3 verdict under a different judge extraction
+mechanism.
+
+---
+
 ## Research question
 
 > Does the LM's residual alignment toward a **framing convention**
@@ -1608,7 +2202,7 @@ without a fresh §0.8 amendment to this spec:
 | SCHEMA_VERSION | "15.14" |
 | QWEN_MODEL_ID (subject) | "Qwen/Qwen2.5-7B-Instruct" |
 | JUDGE_MODEL_ID (default) | "Qwen/Qwen2.5-72B-Instruct" |
-| JUDGE_MODEL_ID (fallback) | "Qwen/Qwen2.5-7B-Instruct" |
+| JUDGE_MODEL_ID (fallback) | "meta-llama/Llama-3.1-8B-Instruct" (effective under §15.14-A2; was "Qwen/Qwen2.5-7B-Instruct" pre-A2) |
 | BENCHMARK | "sticky_framing_15_14_composite" (TruthfulQA-MC + HumanEval pooled, single composite in §15.x sense) |
 | K_TURNS | 6 |
 | N_MAIN_CHAINS | 100 |

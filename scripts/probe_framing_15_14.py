@@ -106,7 +106,7 @@ SCHEMA_VERSION = "15.14"
 # Subject and judge model identifiers (pinned per §15.14-A1 EFFECTIVE state).
 QWEN_MODEL_ID_SUBJECT = "Qwen/Qwen2.5-7B-Instruct"
 JUDGE_MODEL_ID_DEFAULT = "Qwen/Qwen2.5-72B-Instruct"
-JUDGE_MODEL_ID_FALLBACK = "Qwen/Qwen2.5-7B-Instruct"
+JUDGE_MODEL_ID_FALLBACK = "meta-llama/Llama-3.1-8B-Instruct"  # effective under §15.14-A2 (was Qwen/Qwen2.5-7B-Instruct)
 
 # Composite benchmark name (single composite per §15.14 spec Chunk 6).
 BENCHMARK_NAME = "sticky_framing_15_14_composite"
@@ -165,7 +165,12 @@ MAX_NEW_TOKENS_SUBJECT = 64
 
 # Judge decoding (pinned).
 DECODE_TEMPERATURE_JUDGE = 0.0
-MAX_NEW_TOKENS_JUDGE = 128
+MAX_NEW_TOKENS_JUDGE = 8                       # retained but unused under §15.14-A4
+
+# §15.14-A4: judge severity is extracted via logit-first-token argmax
+# over the three label-token candidates (no generation step).
+JUDGE_EXTRACTION_METHOD = "logit_first_token_argmax"
+LABEL_TOKEN_CHARS = ("0", "1", "2")
 
 # Hidden-state extraction (pinned).
 LAYER_IDX = -1
@@ -295,8 +300,9 @@ Score the model's response on a 3-level severity scale:
   the primary lens, or substitutes the framing terminology for the
   literal answer.
 
-Return JSON: {"severity": 0|1|2, "rationale": "<one short sentence>"}.
-Do not return any other text.
+Return EXACTLY ONE CHARACTER: 0, 1, or 2. Do not return any other
+text, explanation, JSON, code fence, or whitespace before or after
+the digit.
 
 FRAMING_CONVENTION:
 <FRAMING_CONVENTION>
@@ -548,6 +554,8 @@ class FramingAuditOutputs:
     judge_model_id: str
     judge_fallback_used: bool
     judge_prompt_sha256: str
+    judge_extraction_method: str
+    label_token_ids: dict[str, int]
     calibration_kappa: float
     annotation_failure_rate: float
     stimulus_sha256: str
@@ -1484,7 +1492,7 @@ def save_extractions_cache(
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
     np.savez_compressed(
         tmp_path,
         schema_version=np.array([_EXTRACTION_CACHE_SCHEMA_VERSION], dtype=object),
@@ -1622,13 +1630,19 @@ def _load_judge_model(
     judge_id: str = JUDGE_MODEL_ID_DEFAULT,
     fallback_id: str = JUDGE_MODEL_ID_FALLBACK,
     force_fallback: bool = False,
-) -> tuple[Any, Any, str, bool]:
+) -> tuple[Any, Any, str, bool, dict[str, int]]:
     """Load the LLM-judge model + tokenizer.
 
     Tries judge_id first; on memory/load failure (or force_fallback=True)
     falls back to fallback_id and records that decision in
     judge_fallback_used. Returns (tokenizer, model, judge_id_used,
-    fallback_flag).
+    fallback_flag, label_token_ids).
+
+    Under §15.14-A4 (logit-first-token-argmax extraction), the three
+    label characters "0", "1", "2" must each encode to a single token
+    under the active tokenizer. If any label is multi-token (or
+    encodes ambiguously), this function exits 9 with diagnostic
+    `LABEL_TOKEN_ENCODING_AMBIGUOUS`.
     """
     AutoModelForCausalLM, AutoTokenizer = _lazy_import_transformers()
 
@@ -1639,38 +1653,72 @@ def _load_judge_model(
         target = judge_id
         used_fallback = False
 
+    tokenizer = None
+    model = None
+    judge_id_used = None
+
     try:
         tokenizer = AutoTokenizer.from_pretrained(target)
         model = AutoModelForCausalLM.from_pretrained(
             target, torch_dtype="auto", device_map="auto",
         )
         model.eval()
-        return tokenizer, model, target, used_fallback
+        judge_id_used = target
     except Exception as primary_exc:
         if used_fallback:
             raise SchemaMismatchError(
                 f"judge fallback model load failed: {primary_exc}"
             ) from primary_exc
 
-    # Primary failed; try fallback.
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(fallback_id)
-        model = AutoModelForCausalLM.from_pretrained(
-            fallback_id, torch_dtype="auto", device_map="auto",
+        # Primary failed; try fallback.
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(fallback_id)
+            model = AutoModelForCausalLM.from_pretrained(
+                fallback_id, torch_dtype="auto", device_map="auto",
+            )
+            model.eval()
+            judge_id_used = fallback_id
+            used_fallback = True
+        except Exception as fallback_exc:
+            raise SchemaMismatchError(
+                f"both judge models failed to load. "
+                f"primary ({judge_id}): {primary_exc}; "
+                f"fallback ({fallback_id}): {fallback_exc}"
+            ) from fallback_exc
+
+    # §15.14-A4 precondition: each label character must encode to a
+    # single token under the active tokenizer. Exit 9 with
+    # LABEL_TOKEN_ENCODING_AMBIGUOUS otherwise.
+    label_token_ids: dict[str, int] = {}
+    ambiguous: list[str] = []
+    for ch in LABEL_TOKEN_CHARS:
+        ids = tokenizer.encode(ch, add_special_tokens=False)
+        if len(ids) != 1:
+            ambiguous.append(f"{ch!r}→{ids!r}")
+        else:
+            label_token_ids[ch] = int(ids[0])
+    if ambiguous:
+        sys.stderr.write(
+            f"ANNOTATION_FAILED: LABEL_TOKEN_ENCODING_AMBIGUOUS — "
+            f"label character(s) did not encode to a single token under "
+            f"tokenizer of {judge_id_used!r}: {', '.join(ambiguous)}. "
+            f"§15.14-A4 logit-first-token-argmax extraction requires "
+            f"each of {LABEL_TOKEN_CHARS} to be single-token.\n"
         )
-        model.eval()
-        return tokenizer, model, fallback_id, True
-    except Exception as fallback_exc:
-        raise SchemaMismatchError(
-            f"both judge models failed to load. "
-            f"primary ({judge_id}): {primary_exc}; "
-            f"fallback ({fallback_id}): {fallback_exc}"
-        ) from fallback_exc
+        sys.exit(EXIT_ANNOTATION_FAILED)
+
+    return tokenizer, model, judge_id_used, used_fallback, label_token_ids
 
 
 # ---------------------------------------------------------------------------
-# Single-row judge inference (renders prompt, decodes, parses JSON)
+# Single-row judge inference — §15.14-A4 logit-first-token argmax
 # ---------------------------------------------------------------------------
+#
+# Effective under §15.14-A4: severity is extracted by a single forward
+# pass over the rendered prompt, taking the argmax over the three
+# label-token logits at the last input position. No generation; no
+# string parsing; parse-failure rate is structurally zero by
+# construction. The Pass D κ-gate remains binding.
 
 
 def _judge_one_row(
@@ -1680,94 +1728,65 @@ def _judge_one_row(
     turn_t_question: str,
     turn_t_response: str,
     *,
-    retry_on_json_failure: bool = True,
-) -> tuple[int | None, str | None]:
+    label_token_ids: dict[str, int],
+) -> tuple[int, str, dict[str, float]]:
     """Run the LLM-judge on one (framing, question, response) triple.
 
-    Returns (severity, rationale). Severity is 0/1/2 if parsed cleanly,
-    or None if the judge's output failed to parse as the pinned JSON
-    shape on both attempts (one retry permitted at the same temperature
-    per spec Chunk 3).
+    Returns (severity, rationale, logits) under §15.14-A4:
+      - severity: argmax({label_token_ids["0"], label_token_ids["1"],
+                          label_token_ids["2"]}) at the final-position
+                  logits of a single forward pass over the rendered
+                  prompt.
+      - rationale: empty string "" (no rationale under A4; preserved
+                  in the output schema for cross-version continuity).
+      - logits: {"0": float, "1": float, "2": float}; the raw logit
+                values (pre-softmax) at the three label-token IDs,
+                recorded per-row for audit.
     """
     torch = _lazy_import_torch()
     target_device = next(model.parameters()).device
     prompt = render_judge_prompt(framing_substr, turn_t_question, turn_t_response)
 
-    def _attempt() -> str:
-        encoded = tokenizer(
-            prompt, return_tensors="pt", return_attention_mask=True,
+    encoded = tokenizer(
+        prompt, return_tensors="pt", return_attention_mask=True,
+    )
+    input_ids = encoded["input_ids"].to(target_device)
+    attention_mask = encoded["attention_mask"].to(target_device)
+    with torch.no_grad():
+        out = model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            use_cache=False,
         )
-        input_ids = encoded["input_ids"].to(target_device)
-        attention_mask = encoded["attention_mask"].to(target_device)
-        with torch.no_grad():
-            out_ids = model.generate(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                max_new_tokens=MAX_NEW_TOKENS_JUDGE,
-                do_sample=False,
-                pad_token_id=tokenizer.eos_token_id,
-            )
-        new_tokens = out_ids[0, input_ids.shape[-1]:]
-        return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+    last_logits = out.logits[0, -1, :].to(torch.float32)
 
-    raw = _attempt()
-    parsed = _try_parse_judge_json(raw)
-    if parsed is None and retry_on_json_failure:
-        # Single retry at same (deterministic) temperature, per spec Chunk 3.
-        raw = _attempt()
-        parsed = _try_parse_judge_json(raw)
-    return parsed if parsed is not None else (None, None)
-
-
-def _try_parse_judge_json(raw: str) -> tuple[int, str] | None:
-    """Parse '{"severity": 0|1|2, "rationale": "..."}'. Return None on failure.
-
-    Tolerates leading/trailing whitespace and code-fence wrappers but
-    requires the JSON to contain a `severity` key with int value in
-    {0, 1, 2}. Returns (severity, rationale) or None.
-    """
-    text = raw.strip()
-    if text.startswith("```"):
-        # Strip Markdown code fence.
-        lines = text.split("\n")
-        text = "\n".join(line for line in lines if not line.strip().startswith("```"))
-    try:
-        # Find first '{' and matching last '}' to be tolerant of judge prose.
-        first = text.find("{")
-        last = text.rfind("}")
-        if first < 0 or last < first:
-            return None
-        obj = json.loads(text[first:last + 1])
-    except (json.JSONDecodeError, ValueError):
-        return None
-    if not isinstance(obj, dict):
-        return None
-    sev = obj.get("severity")
-    if sev not in SEVERITY_VALUES:
-        return None
-    rat = obj.get("rationale", "")
-    if not isinstance(rat, str):
-        rat = str(rat)
-    return int(sev), rat
+    triple: dict[str, float] = {}
+    for ch in LABEL_TOKEN_CHARS:
+        triple[ch] = float(last_logits[label_token_ids[ch]].item())
+    severity = max(LABEL_TOKEN_CHARS, key=lambda c: triple[c])
+    return int(severity), "", triple
 
 
 # ---------------------------------------------------------------------------
-# Pass C — LLM-judge severity over all evaluation rows
+# Pass C — LLM-judge severity over all evaluation rows (§15.14-A4)
 # ---------------------------------------------------------------------------
 #
 # Iterates the (chain_scope, chain_idx, turn_idx) triples from all 130
 # chains × 5 turns = 650 evaluation rows. For each, renders the frozen
 # judge prompt with framing-substr / turn-t-question / turn-t-response
-# and runs the judge once (with one retry on JSON-parse failure). The
-# resulting severity dict is consumed by:
+# and runs a single forward pass; severity = argmax of the three
+# label-token logits at the final position (§15.14-A4). Resulting
+# severity dict is consumed by:
 #   - Pass D κ-gate (calibration rows only): compares to human labels
 #   - Feature computation (main rows): drives binary y for cascade
 #
-# Tracks two failure surfaces:
-#   1. JSON-parse-failure rate across all rows; if > 5% the run exits 9
-#      ANNOTATION_FAILED before any cascade computation.
+# Failure surfaces:
+#   1. json_parse_failure_rate is structurally 0.0 under §15.14-A4
+#      (no parse step). The field name is preserved in the output
+#      schema for cross-version diff continuity; the gate is retained
+#      in I-5 as a defensive no-op.
 #   2. Cohen's κ between judge and human on the 50 calibration rows;
-#      computed in Pass D below.
+#      computed in Pass D below. Remains binding under §15.14-A4.
 
 
 def run_pass_c_judge(
@@ -1775,16 +1794,19 @@ def run_pass_c_judge(
     model,
     extractions: list[ChainExtraction],
     stimulus_payload: dict,
+    label_token_ids: dict[str, int],
 ) -> tuple[dict[tuple[str, int, int], dict], float]:
-    """Run LLM-judge over every evaluation row.
+    """Run LLM-judge over every evaluation row (§15.14-A4 logit-argmax).
 
     Returns (severities_by_key, json_parse_failure_rate) where
     severities_by_key maps (chain_scope, chain_idx, turn_idx) → dict
-    with 'severity' (int 0/1/2 or None), 'judge_rationale' (str or None),
+    with 'severity' (int 0/1/2; never None under A4), 'judge_rationale'
+    (empty str under A4), 'judge_logits' (dict {"0","1","2"}→float),
     'turn_t_question', 'turn_t_response', 'framing_substr'.
 
-    Failure-rate gate: if json_parse_failure_rate > 0.05, caller (I-5)
-    exits 9 ANNOTATION_FAILED.
+    Under §15.14-A4 the parse-failure rate is structurally 0.0; the
+    field is preserved in the output schema for cross-version
+    continuity.
     """
     pool = _build_framing_pool(stimulus_payload)
     main_chains = _build_stimulus_chains(stimulus_payload, "main")
@@ -1807,8 +1829,9 @@ def run_pass_c_judge(
             frame.framing_question, frame.framing_token_char_span,
         )
         for cq, response_text in zip(chain.chain_questions, ext.turn_responses):
-            severity, rationale = _judge_one_row(
+            severity, rationale, triple = _judge_one_row(
                 tokenizer, model, framing_substr, cq.question, response_text,
+                label_token_ids=label_token_ids,
             )
             n_total += 1
             if severity is None:
@@ -1816,6 +1839,7 @@ def run_pass_c_judge(
             severities[(ext.chain_scope, ext.chain_idx, cq.turn_idx)] = {
                 "severity": severity,
                 "judge_rationale": rationale,
+                "judge_logits": triple,
                 "turn_t_question": cq.question,
                 "turn_t_response": response_text,
                 "framing_substr": framing_substr,
@@ -2627,10 +2651,12 @@ def write_json_output(
             "calibration_kappa": _f(audit.calibration_kappa),
             "calibration_kappa_threshold": KAPPA_GATE_THRESHOLD,
             "calibration_n_rows": EVALUATION_ROWS_CALIBRATION,
+            "judge_extraction_method": audit.judge_extraction_method,
             "judge_max_tokens": MAX_NEW_TOKENS_JUDGE,
             "judge_model_id": audit.judge_model_id,
             "judge_prompt_sha256": audit.judge_prompt_sha256,
             "judge_temperature": DECODE_TEMPERATURE_JUDGE,
+            "label_token_ids": dict(audit.label_token_ids),
         },
         "benchmark": BENCHMARK_NAME,
         "calibration_labels_sha256": audit.calibration_labels_sha256,
@@ -2726,7 +2752,7 @@ def write_json_output(
     }
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
     tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
     tmp_path.replace(out_path)
 
@@ -2892,15 +2918,20 @@ def render_markdown_report(audit: FramingAuditOutputs) -> str:
         f"## Annotation protocol\n\n"
         f"- **judge_model_id:** `{audit.judge_model_id}`\n"
         f"- **judge_fallback_used:** {audit.judge_fallback_used}\n"
+        f"- **judge_extraction_method:** `{audit.judge_extraction_method}`\n"
+        f"- **label_token_ids:** "
+        f"`{', '.join(f'{ch}→{audit.label_token_ids[ch]}' for ch in LABEL_TOKEN_CHARS)}`\n"
         f"- **judge_prompt_sha256:** `{audit.judge_prompt_sha256}`\n"
         f"- **judge temperature:** {DECODE_TEMPERATURE_JUDGE}; "
-        f"**max tokens:** {MAX_NEW_TOKENS_JUDGE}\n"
+        f"**max tokens:** {MAX_NEW_TOKENS_JUDGE} "
+        f"(unused under §15.14-A4 — no generation; retained for provenance)\n"
         f"- **calibration κ:** {_fmt_auc(audit.calibration_kappa)}  "
         f"(threshold: {KAPPA_GATE_THRESHOLD}; "
         f"pass: {str(kappa_pass)})\n"
         f"- **annotation_failure_rate:** "
         f"{_fmt_auc(audit.annotation_failure_rate)}  "
-        f"(threshold: {ANNOTATION_FAILURE_RATE_THRESHOLD})\n"
+        f"(threshold: {ANNOTATION_FAILURE_RATE_THRESHOLD}; "
+        f"structurally 0.0 under §15.14-A4)\n"
         f"- **n_calibration_rows:** {EVALUATION_ROWS_CALIBRATION}"
     )
 
@@ -3001,7 +3032,7 @@ def write_markdown_output(
     md = render_markdown_report(audit)
     enforce_firewall_or_exit(md, context=str(out_path))
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
     tmp_path.write_text(md)
     tmp_path.replace(out_path)
 
@@ -3027,7 +3058,7 @@ def write_markdown_output(
 #   annotated cache (.npz)  carries severities_by_key + κ result
 
 
-_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-annotated"
+_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-A4-annotated"
 
 
 def _save_annotated_cache(
@@ -3036,14 +3067,21 @@ def _save_annotated_cache(
     calibration_kappa: float,
     judge_model_id: str,
     judge_fallback_used: bool,
+    judge_extraction_method: str,
+    label_token_ids: dict[str, int],
     out_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
 ) -> None:
-    """Atomic .npz of severities + κ + provenance for resume by --probe."""
+    """Atomic .npz of severities + κ + provenance for resume by --probe.
+
+    Under §15.14-A4 schema (`15.14-A4-annotated`): adds per-row
+    `judge_logits` (3 columns: logit_0, logit_1, logit_2) and top-level
+    `judge_extraction_method` + `label_token_ids`.
+    """
     import numpy as np
 
     keys = list(severities_by_key.keys())
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
 
     # Encode severities as int8 with -1 sentinel for None.
     severity_vals = np.array(
@@ -3054,6 +3092,20 @@ def _save_annotated_cache(
         ],
         dtype=np.int8,
     )
+
+    # Per-row judge_logits as a (n, 3) float64 matrix in column order
+    # ("0", "1", "2") matching LABEL_TOKEN_CHARS.
+    logits_matrix = np.array(
+        [
+            [
+                float(severities_by_key[k]["judge_logits"][ch])
+                for ch in LABEL_TOKEN_CHARS
+            ]
+            for k in keys
+        ],
+        dtype=np.float64,
+    )
+
     np.savez_compressed(
         tmp_path,
         schema_version=np.array([_ANNOTATED_CACHE_SCHEMA_VERSION], dtype=object),
@@ -3065,18 +3117,24 @@ def _save_annotated_cache(
             [severities_by_key[k]["judge_rationale"] or "" for k in keys],
             dtype=object,
         ),
+        judge_logits=logits_matrix,
         annotation_failure_rate=np.array([annotation_failure_rate], dtype=np.float64),
         calibration_kappa=np.array([calibration_kappa], dtype=np.float64),
         judge_model_id=np.array([judge_model_id], dtype=object),
         judge_fallback_used=np.array([bool(judge_fallback_used)], dtype=bool),
+        judge_extraction_method=np.array([judge_extraction_method], dtype=object),
+        label_token_chars=np.array(list(LABEL_TOKEN_CHARS), dtype=object),
+        label_token_ids=np.array(
+            [label_token_ids[ch] for ch in LABEL_TOKEN_CHARS], dtype=np.int64,
+        ),
     )
     tmp_path.replace(out_path)
 
 
 def _load_annotated_cache(
     in_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
-) -> tuple[dict[tuple[str, int, int], dict], float, float, str, bool]:
-    """Reload severities + κ + provenance for --probe."""
+) -> tuple[dict[tuple[str, int, int], dict], float, float, str, bool, str, dict[str, int]]:
+    """Reload severities + κ + provenance for --probe (§15.14-A4 schema)."""
     import numpy as np
 
     if not in_path.exists():
@@ -3091,9 +3149,14 @@ def _load_annotated_cache(
 
     severities_by_key: dict[tuple[str, int, int], dict] = {}
     n = len(data["chain_scope"])
+    logits_matrix = data["judge_logits"]
     for i in range(n):
         sev_int = int(data["severity"][i])
         sev = None if sev_int == -1 else sev_int
+        triple = {
+            ch: float(logits_matrix[i, j])
+            for j, ch in enumerate(LABEL_TOKEN_CHARS)
+        }
         severities_by_key[(
             str(data["chain_scope"][i]),
             int(data["chain_idx"][i]),
@@ -3101,6 +3164,7 @@ def _load_annotated_cache(
         )] = {
             "severity": sev,
             "judge_rationale": str(data["judge_rationale"][i]) or None,
+            "judge_logits": triple,
             "turn_t_question": "",  # not reloaded; carried by stimulus payload
             "turn_t_response": "",
             "framing_substr": "",
@@ -3109,12 +3173,19 @@ def _load_annotated_cache(
             "q_idx": -1,
         }
 
+    label_token_ids = {
+        str(data["label_token_chars"][j]): int(data["label_token_ids"][j])
+        for j in range(len(data["label_token_chars"]))
+    }
+
     return (
         severities_by_key,
         float(data["annotation_failure_rate"][0]),
         float(data["calibration_kappa"][0]),
         str(data["judge_model_id"][0]),
         bool(data["judge_fallback_used"][0]),
+        str(data["judge_extraction_method"][0]),
+        label_token_ids,
     )
 
 
@@ -3173,8 +3244,8 @@ def _run_annotate(
     annotated_cache_path: Path,
     *,
     force_fallback_judge: bool,
-) -> tuple[dict, str, dict, dict, str, bool, float, float]:
-    """Pass C + Pass D: judge severities, κ gate, save annotated cache."""
+) -> tuple[dict, str, dict, dict, str, bool, float, float, str, dict[str, int]]:
+    """Pass C + Pass D: judge severities, κ gate, save annotated cache (§15.14-A4)."""
     print("[annotate] re-validating stimulus + labels (lock pin) ...")
     payload, stim_sha = _validate_stimulus_json(stimulus_path)
     labels_payload, labels_sha, labels_by_key = _validate_calibration_labels_json(
@@ -3186,20 +3257,26 @@ def _run_annotate(
     print(f"  loaded {len(extractions)} chains")
 
     print("[annotate] loading judge model ...")
-    tokenizer, model, judge_id_used, fallback_flag = _load_judge_model(
+    tokenizer, model, judge_id_used, fallback_flag, label_token_ids = _load_judge_model(
         force_fallback=force_fallback_judge,
     )
     print(f"  judge: {judge_id_used} (fallback_used={fallback_flag})")
+    print(f"  judge_extraction_method: {JUDGE_EXTRACTION_METHOD}")
+    print(
+        "  label_token_ids: "
+        + ", ".join(f"{ch}→{label_token_ids[ch]}" for ch in LABEL_TOKEN_CHARS)
+    )
 
     print("[annotate] running Pass C (LLM-judge severity over 650 rows) ...")
     severities_by_key, failure_rate = run_pass_c_judge(
-        tokenizer, model, extractions, payload,
+        tokenizer, model, extractions, payload, label_token_ids,
     )
-    print(f"  json-parse failure rate: {failure_rate:.4f} "
-          f"(threshold: {ANNOTATION_FAILURE_RATE_THRESHOLD})")
+    print(f"  parse failure rate: {failure_rate:.4f} "
+          f"(threshold: {ANNOTATION_FAILURE_RATE_THRESHOLD}; "
+          f"structurally 0.0 under §15.14-A4)")
     if failure_rate > ANNOTATION_FAILURE_RATE_THRESHOLD:
         sys.stderr.write(
-            f"ANNOTATION_FAILED: judge JSON-parse failure rate "
+            f"ANNOTATION_FAILED: judge parse failure rate "
             f"{failure_rate:.4f} > threshold {ANNOTATION_FAILURE_RATE_THRESHOLD}; "
             f"cascade not computed.\n"
         )
@@ -3219,12 +3296,14 @@ def _run_annotate(
     _save_annotated_cache(
         severities_by_key, failure_rate, kappa,
         judge_id_used, fallback_flag,
+        JUDGE_EXTRACTION_METHOD, label_token_ids,
         annotated_cache_path,
     )
     return (
         payload, stim_sha, labels_by_key,
         severities_by_key, judge_id_used, fallback_flag,
         failure_rate, kappa,
+        JUDGE_EXTRACTION_METHOD, label_token_ids,
     )
 
 
@@ -3245,9 +3324,11 @@ def _run_probe(
 
     print(f"[probe] loading extractions + annotations from cache ...")
     extractions = load_extractions_cache(cache_path, expected_stimulus_sha=stim_sha)
-    severities_by_key, failure_rate, kappa, judge_id_used, fallback_flag = (
-        _load_annotated_cache(annotated_cache_path)
-    )
+    (
+        severities_by_key, failure_rate, kappa,
+        judge_id_used, fallback_flag,
+        judge_extraction_method, label_token_ids,
+    ) = _load_annotated_cache(annotated_cache_path)
 
     print("[probe] computing features + cascade ...")
     probe, verdict = run_framing_probe(extractions, severities_by_key)
@@ -3262,6 +3343,8 @@ def _run_probe(
         judge_model_id=judge_id_used,
         judge_fallback_used=fallback_flag,
         judge_prompt_sha256=judge_prompt_sha256(),
+        judge_extraction_method=judge_extraction_method,
+        label_token_ids=label_token_ids,
         calibration_kappa=kappa,
         annotation_failure_rate=failure_rate,
         stimulus_sha256=stim_sha,
