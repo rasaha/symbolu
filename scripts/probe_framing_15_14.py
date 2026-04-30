@@ -3004,3 +3004,375 @@ def write_markdown_output(
     tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
     tmp_path.write_text(md)
     tmp_path.replace(out_path)
+
+
+# ===========================================================================
+# I-5: CLI orchestration + main()
+# ===========================================================================
+#
+# Five modes:
+#   --self-test            run gate only (12 cascade + cosine + 52-firewall +
+#                           topical-disjointness)
+#   --collect              load stimulus JSON + labels JSON; run Pass A
+#                           (multi-turn) + Pass B (standalone) for all
+#                           chains; write extraction cache
+#   --annotate             load extraction cache; run Pass C (LLM-judge) +
+#                           Pass D (κ self-test gate); write annotated cache
+#   --probe                load annotated cache; compute features + cascade
+#                           + write JSON+MD outputs
+#   (default)              self-test → collect → annotate → probe → write
+#
+# Cache layout:
+#   extractions cache (.npz) carries Pass A/B output (~40 MB)
+#   annotated cache (.npz)  carries severities_by_key + κ result
+
+
+_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-annotated"
+
+
+def _save_annotated_cache(
+    severities_by_key: dict[tuple[str, int, int], dict],
+    annotation_failure_rate: float,
+    calibration_kappa: float,
+    judge_model_id: str,
+    judge_fallback_used: bool,
+    out_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
+) -> None:
+    """Atomic .npz of severities + κ + provenance for resume by --probe."""
+    import numpy as np
+
+    keys = list(severities_by_key.keys())
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+
+    # Encode severities as int8 with -1 sentinel for None.
+    severity_vals = np.array(
+        [
+            (-1 if severities_by_key[k]["severity"] is None
+             else int(severities_by_key[k]["severity"]))
+            for k in keys
+        ],
+        dtype=np.int8,
+    )
+    np.savez_compressed(
+        tmp_path,
+        schema_version=np.array([_ANNOTATED_CACHE_SCHEMA_VERSION], dtype=object),
+        chain_scope=np.array([k[0] for k in keys], dtype=object),
+        chain_idx=np.array([k[1] for k in keys], dtype=np.int64),
+        turn_idx=np.array([k[2] for k in keys], dtype=np.int64),
+        severity=severity_vals,
+        judge_rationale=np.array(
+            [severities_by_key[k]["judge_rationale"] or "" for k in keys],
+            dtype=object,
+        ),
+        annotation_failure_rate=np.array([annotation_failure_rate], dtype=np.float64),
+        calibration_kappa=np.array([calibration_kappa], dtype=np.float64),
+        judge_model_id=np.array([judge_model_id], dtype=object),
+        judge_fallback_used=np.array([bool(judge_fallback_used)], dtype=bool),
+    )
+    tmp_path.replace(out_path)
+
+
+def _load_annotated_cache(
+    in_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
+) -> tuple[dict[tuple[str, int, int], dict], float, float, str, bool]:
+    """Reload severities + κ + provenance for --probe."""
+    import numpy as np
+
+    if not in_path.exists():
+        raise SchemaMismatchError(f"annotated cache not found: {in_path}")
+    data = np.load(in_path, allow_pickle=True)
+    sv = str(data["schema_version"][0])
+    if sv != _ANNOTATED_CACHE_SCHEMA_VERSION:
+        raise SchemaMismatchError(
+            f"annotated cache schema_version mismatch: expected "
+            f"{_ANNOTATED_CACHE_SCHEMA_VERSION!r}, got {sv!r}"
+        )
+
+    severities_by_key: dict[tuple[str, int, int], dict] = {}
+    n = len(data["chain_scope"])
+    for i in range(n):
+        sev_int = int(data["severity"][i])
+        sev = None if sev_int == -1 else sev_int
+        severities_by_key[(
+            str(data["chain_scope"][i]),
+            int(data["chain_idx"][i]),
+            int(data["turn_idx"][i]),
+        )] = {
+            "severity": sev,
+            "judge_rationale": str(data["judge_rationale"][i]) or None,
+            "turn_t_question": "",  # not reloaded; carried by stimulus payload
+            "turn_t_response": "",
+            "framing_substr": "",
+            "frame_id": "",
+            "source": "",
+            "q_idx": -1,
+        }
+
+    return (
+        severities_by_key,
+        float(data["annotation_failure_rate"][0]),
+        float(data["calibration_kappa"][0]),
+        str(data["judge_model_id"][0]),
+        bool(data["judge_fallback_used"][0]),
+    )
+
+
+def _run_collect(
+    stimulus_path: Path,
+    labels_path: Path,
+    cache_path: Path,
+) -> tuple[dict, str, dict]:
+    """Pass A + Pass B: extract for all chains, save .npz, return (payload, sha, labels_by_key)."""
+    print("[collect] validating stimulus + labels artifacts ...")
+    payload, stim_sha = _validate_stimulus_json(stimulus_path)
+    labels_payload, labels_sha, labels_by_key = _validate_calibration_labels_json(
+        labels_path, expected_sha=EXPECTED_LABELS_SHA, stimulus_sha=stim_sha,
+    )
+    print(f"  stimulus_sha256:           {stim_sha}")
+    print(f"  calibration_labels_sha256: {labels_sha}")
+    print()
+
+    print("[collect] loading subject model (Qwen-7B) ...")
+    tokenizer, model = _load_subject_model()
+
+    pool = _build_framing_pool(payload)
+    all_extractions: list[ChainExtraction] = []
+
+    for scope, chains in (
+        ("main", _build_stimulus_chains(payload, "main")),
+        ("frame_positive", _build_stimulus_chains(payload, "frame_positive")),
+        ("calibration", _build_stimulus_chains(payload, "calibration")),
+    ):
+        print(f"[collect] scope={scope}: extracting {len(chains)} chains ...")
+        for chain in chains:
+            frame = pool[chain.frame_id]
+            ext = extract_pass_a_iterative(tokenizer, model, chain, frame, scope)
+            q_t_arr = extract_pass_b_standalone(tokenizer, model, chain)
+            ext_with_qt = ChainExtraction(
+                chain_idx=ext.chain_idx, frame_id=ext.frame_id,
+                chain_scope=ext.chain_scope,
+                s_t=ext.s_t, q_t=q_t_arr, a_prev=ext.a_prev,
+                f_1=ext.f_1, r_t_response=ext.r_t_response,
+                turn_responses=ext.turn_responses,
+                turn_1_response=ext.turn_1_response,
+                framing_token_ids=ext.framing_token_ids,
+            )
+            all_extractions.append(ext_with_qt)
+        print(f"  done; cumulative extractions: {len(all_extractions)}")
+
+    print(f"[collect] saving extractions cache → {cache_path} ...")
+    save_extractions_cache(all_extractions, stim_sha, cache_path)
+    return payload, stim_sha, labels_by_key
+
+
+def _run_annotate(
+    cache_path: Path,
+    stimulus_path: Path,
+    labels_path: Path,
+    annotated_cache_path: Path,
+    *,
+    force_fallback_judge: bool,
+) -> tuple[dict, str, dict, dict, str, bool, float, float]:
+    """Pass C + Pass D: judge severities, κ gate, save annotated cache."""
+    print("[annotate] re-validating stimulus + labels (lock pin) ...")
+    payload, stim_sha = _validate_stimulus_json(stimulus_path)
+    labels_payload, labels_sha, labels_by_key = _validate_calibration_labels_json(
+        labels_path, expected_sha=EXPECTED_LABELS_SHA, stimulus_sha=stim_sha,
+    )
+
+    print(f"[annotate] loading extractions cache from {cache_path} ...")
+    extractions = load_extractions_cache(cache_path, expected_stimulus_sha=stim_sha)
+    print(f"  loaded {len(extractions)} chains")
+
+    print("[annotate] loading judge model ...")
+    tokenizer, model, judge_id_used, fallback_flag = _load_judge_model(
+        force_fallback=force_fallback_judge,
+    )
+    print(f"  judge: {judge_id_used} (fallback_used={fallback_flag})")
+
+    print("[annotate] running Pass C (LLM-judge severity over 650 rows) ...")
+    severities_by_key, failure_rate = run_pass_c_judge(
+        tokenizer, model, extractions, payload,
+    )
+    print(f"  json-parse failure rate: {failure_rate:.4f} "
+          f"(threshold: {ANNOTATION_FAILURE_RATE_THRESHOLD})")
+    if failure_rate > ANNOTATION_FAILURE_RATE_THRESHOLD:
+        sys.stderr.write(
+            f"ANNOTATION_FAILED: judge JSON-parse failure rate "
+            f"{failure_rate:.4f} > threshold {ANNOTATION_FAILURE_RATE_THRESHOLD}; "
+            f"cascade not computed.\n"
+        )
+        sys.exit(EXIT_ANNOTATION_FAILED)
+
+    print("[annotate] running Pass D (Cohen's κ over 50 calibration rows) ...")
+    kappa = run_pass_d_kappa_gate(severities_by_key, labels_by_key)
+    print(f"  κ = {kappa:.4f} (threshold: {KAPPA_GATE_THRESHOLD})")
+    if kappa < KAPPA_GATE_THRESHOLD:
+        sys.stderr.write(
+            f"ANNOTATION_FAILED: κ = {kappa:.4f} < {KAPPA_GATE_THRESHOLD} "
+            f"(inclusive); cascade not computed.\n"
+        )
+        sys.exit(EXIT_ANNOTATION_FAILED)
+
+    print(f"[annotate] saving annotated cache → {annotated_cache_path} ...")
+    _save_annotated_cache(
+        severities_by_key, failure_rate, kappa,
+        judge_id_used, fallback_flag,
+        annotated_cache_path,
+    )
+    return (
+        payload, stim_sha, labels_by_key,
+        severities_by_key, judge_id_used, fallback_flag,
+        failure_rate, kappa,
+    )
+
+
+def _run_probe(
+    cache_path: Path,
+    annotated_cache_path: Path,
+    stimulus_path: Path,
+    labels_path: Path,
+    json_out: Path,
+    md_out: Path,
+) -> tuple[FramingProbeResult, FramingCascadeVerdict]:
+    """Compute features + cascade + write JSON + MD."""
+    print("[probe] re-validating stimulus + labels (lock pin) ...")
+    payload, stim_sha = _validate_stimulus_json(stimulus_path)
+    _, labels_sha, _ = _validate_calibration_labels_json(
+        labels_path, expected_sha=EXPECTED_LABELS_SHA, stimulus_sha=stim_sha,
+    )
+
+    print(f"[probe] loading extractions + annotations from cache ...")
+    extractions = load_extractions_cache(cache_path, expected_stimulus_sha=stim_sha)
+    severities_by_key, failure_rate, kappa, judge_id_used, fallback_flag = (
+        _load_annotated_cache(annotated_cache_path)
+    )
+
+    print("[probe] computing features + cascade ...")
+    probe, verdict = run_framing_probe(extractions, severities_by_key)
+
+    pairing_rule_text = (
+        "K=6 chains; turn-1 = framing_pool[(i*7) mod 25]; "
+        "turns 2..6 from curated chain_questions[i] under topical-disjointness rule"
+    )
+    audit = FramingAuditOutputs(
+        probe_result=probe,
+        cascade_verdict=verdict,
+        judge_model_id=judge_id_used,
+        judge_fallback_used=fallback_flag,
+        judge_prompt_sha256=judge_prompt_sha256(),
+        calibration_kappa=kappa,
+        annotation_failure_rate=failure_rate,
+        stimulus_sha256=stim_sha,
+        calibration_labels_sha256=labels_sha,
+        pairing_rule_text=pairing_rule_text,
+    )
+
+    print(f"[probe] writing JSON output → {json_out} ...")
+    write_json_output(audit, json_out)
+    print(f"[probe] writing markdown output → {md_out} (firewall-scanned) ...")
+    write_markdown_output(audit, md_out)
+
+    print()
+    _print_verdict_banner(verdict)
+    return probe, verdict
+
+
+def _print_verdict_banner(verdict: FramingCascadeVerdict) -> None:
+    """Single-line cascade verdict banner (printed at end of every run)."""
+    print("=" * 70)
+    print(f"§15.14 CASCADE VERDICT: {verdict.label.value}")
+    print("=" * 70)
+    print(f"  auc_framing             = {verdict.auc_framing:.4f}")
+    print(f"  auc_topic_to_framing    = {verdict.auc_topic_to_framing:.4f}")
+    print(f"  auc_recency             = {verdict.auc_recency:.4f}")
+    print(f"  ΔAUC vs chance          = {verdict.dauc_vs_chance:+.4f}")
+    print(f"  ΔAUC vs topic           = {verdict.dauc_vs_topic_to_framing:+.4f}")
+    print(f"  ΔAUC vs recency         = {verdict.dauc_vs_recency:+.4f}")
+    print(f"  direction_held          = {verdict.direction_held}")
+    print()
+    print(f"  rationale: {verdict.rationale}")
+    print("=" * 70)
+
+
+def _build_argparser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description="§15.14 framing-stickiness probe (implementation §0.X).",
+    )
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--self-test", action="store_true",
+                      help="Run self-test gate only (12 cascade + cosine + "
+                           "52-pattern firewall + topical-disjointness).")
+    mode.add_argument("--collect", action="store_true",
+                      help="Pass A + Pass B extraction; write extraction cache.")
+    mode.add_argument("--annotate", action="store_true",
+                      help="Pass C judge + Pass D κ gate; write annotated cache.")
+    mode.add_argument("--probe", action="store_true",
+                      help="Compute features + cascade; write JSON + MD outputs.")
+    p.add_argument("--stimulus-json", default=str(DEFAULT_STIMULUS_JSON_PATH))
+    p.add_argument("--labels-json", default=str(DEFAULT_LABELS_JSON_PATH))
+    p.add_argument("--cache-path", default=str(DEFAULT_EXTRACTIONS_NPZ_PATH))
+    p.add_argument("--annotated-cache-path", default=str(DEFAULT_ANNOTATED_NPZ_PATH))
+    p.add_argument("--json-out", default=str(DEFAULT_PROBE_JSON_PATH))
+    p.add_argument("--md-out", default=str(DEFAULT_PROBE_MD_PATH))
+    p.add_argument("--force-collect", action="store_true",
+                   help="Force re-collection even if cache exists.")
+    p.add_argument("--force-annotate", action="store_true",
+                   help="Force re-annotation even if annotated cache exists.")
+    p.add_argument("--judge-fallback", action="store_true",
+                   help="Force the Qwen-7B fallback judge (skip 72B attempt).")
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_argparser().parse_args(argv)
+
+    # Self-test gate runs first in EVERY mode (per §0.8 discipline).
+    run_self_test_gate(verbose=True)
+    if args.self_test:
+        return EXIT_SUCCESS
+
+    stimulus_path = Path(args.stimulus_json)
+    labels_path = Path(args.labels_json)
+    cache_path = Path(args.cache_path)
+    annotated_cache_path = Path(args.annotated_cache_path)
+    json_out = Path(args.json_out)
+    md_out = Path(args.md_out)
+
+    do_collect = args.collect or (
+        not (args.annotate or args.probe)
+        and (args.force_collect or not cache_path.exists())
+    )
+    do_annotate = args.annotate or (
+        not (args.collect or args.probe)
+        and (args.force_annotate or not annotated_cache_path.exists())
+    )
+    do_probe = args.probe or not (args.collect or args.annotate)
+
+    if do_collect:
+        _run_collect(stimulus_path, labels_path, cache_path)
+        if args.collect:
+            return EXIT_SUCCESS
+
+    if do_annotate:
+        _run_annotate(
+            cache_path, stimulus_path, labels_path,
+            annotated_cache_path,
+            force_fallback_judge=args.judge_fallback,
+        )
+        if args.annotate:
+            return EXIT_SUCCESS
+
+    if do_probe:
+        _run_probe(
+            cache_path, annotated_cache_path,
+            stimulus_path, labels_path,
+            json_out, md_out,
+        )
+
+    return EXIT_SUCCESS
+
+
+if __name__ == "__main__":
+    sys.exit(main())
