@@ -455,6 +455,258 @@ a fresh v2 verdict under a different judge prompt.
 
 ---
 
+### §15.14-A4 — judge severity extraction: logit-based first-token argmax (replaces generation-and-parse)
+
+**Status:** PROPOSED, awaiting sign-off (will be marked EFFECTIVE
+upon explicit user sign-off and recorded in commit metadata).
+
+**Scope:** the judge severity-extraction code path in
+`scripts/probe_framing_15_14.py`. Specifically:
+`_judge_one_row` body (replaces `model.generate(...)` + parse with a
+single-step forward pass to logits + argmax over three label-token
+candidates), `_try_parse_judge_severity` (deleted under A4 — no parse
+step exists), `JUDGE_PROMPT_TEMPLATE` (instruction-line text
+preserved; the prompt is unchanged in content), `MAX_NEW_TOKENS_JUDGE`
+(unused under A4 — no generation occurs; constant retained for
+provenance / comparison only). Plus per-row audit fields in the
+annotated cache + JSON output (a new `judge_logits` triple per row).
+
+**Rationale.** §15.14 v2 closed as `ANNOTATION_FAILED` (this commit
+cycle) at `json_parse_failure_rate = 0.8477` under §15.14-A3
+(single-digit prompt + `MAX_NEW_TOKENS_JUDGE = 8`). Combined with v1
+results (Qwen-7B/JSON @ 0.2692, Llama-8B/JSON @ 0.7077), the empirical
+pattern is that 7-8B-class instruction-tuned judges fail the 5%
+parse-failure gate across multiple output-format prompts. The binding
+constraint at this hardware/parameter scale is **format-following
+reliability**, not rubric understanding.
+
+§15.14-A4 removes the format-following step entirely. Instead of
+asking the judge to *generate* a label, we read the judge's
+distribution over the three label tokens at the first decoder step
+and take argmax. This is mechanically the simplest possible severity
+extraction protocol that respects the rubric: the judge still scores
+the rubric (it conditions on the full prompt including all severity
+definitions); only the output-emission step is replaced.
+
+**Change.** Three pinned implementation modifications. No threshold
+changes.
+
+1. **Severity extraction (replaces generation + parse).** For each
+   evaluation row:
+   - Render the full judge prompt (unchanged content, unchanged SHA-
+     256 of the template text).
+   - Encode the prompt with the active judge tokenizer.
+   - Run a single forward pass over the encoded prompt; obtain the
+     logits at the LAST input position (i.e. the logits over the
+     vocabulary that would be used to sample the FIRST generated
+     token).
+   - Identify the token IDs corresponding to the three label
+     characters: `"0"`, `"1"`, `"2"`. The token IDs are computed once
+     at judge-load time via `tokenizer.encode(label, add_special_tokens=False)`
+     and verified to be single-token under the active tokenizer; if
+     any of the three labels does not encode to a single token under
+     the active judge tokenizer, the script exits 9 ANNOTATION_FAILED
+     with a diagnostic (this is the structural prerequisite for
+     logit-based extraction).
+   - `severity = argmax({logit_at_id_for_"0", logit_at_id_for_"1",
+     logit_at_id_for_"2"})`.
+   - `rationale = ""` (no rationale in A4; preserved as empty string
+     for output-schema continuity, same as A3).
+
+2. **Pinned `MAX_NEW_TOKENS_JUDGE`** is **retained but unused** under
+   A4 (`= 8`, inherited from §15.14-A3). It is preserved as a constant
+   in the annotated cache and in the markdown report for provenance
+   so that the audit trail makes the A3 → A4 transition explicit.
+
+3. **Per-row audit fields.** The annotated cache and the per-row JSON
+   add a single field:
+   ```
+   "judge_logits": {"0": <float>, "1": <float>, "2": <float>}
+   ```
+   These are the raw logits at the three label-token positions (NOT
+   softmaxed; the argmax is invariant under softmax, so the raw logits
+   are the audit-minimal record). They are recorded in fp32. The
+   existing `judge_severity` and `judge_rationale` fields are
+   preserved; `judge_rationale` is the empty string under A4.
+
+**Parser change.** `_try_parse_judge_severity(raw)` is **removed**
+under A4. There is no string parsing step. The function and its
+callers in `_judge_one_row` are deleted; the new `_judge_one_row`
+body returns `(severity, "", logits_triple)` directly from the
+forward pass.
+
+**Failure surfaces under A4.**
+
+- `json_parse_failure_rate` is structurally **zero** (no parsing
+  occurs). The field name is **preserved** in the output schema for
+  cross-version diff continuity (and reported as `0.0`); a future v3+
+  rename to `judge_extraction_failure_rate` is deferred.
+- The **single-token-encoding precondition** (each label must encode
+  to a single token under the active tokenizer) is checked once at
+  judge-load and a failure exits 9 ANNOTATION_FAILED with diagnostic
+  `LABEL_TOKEN_ENCODING_AMBIGUOUS`.
+- The **Pass D κ-gate** (Cohen's κ ≥ 0.6 inclusive between judge
+  severity and human label severity, computed on the 50 calibration
+  rows with `BINARY_LABEL_THRESHOLD: y = 1 iff severity ≥ 1`) is
+  **unchanged and binding**. If κ < 0.6, the script exits 9
+  ANNOTATION_FAILED before the cascade is computed.
+
+**Output schema change (annotated cache + JSON).**
+
+- New per-row field: `judge_logits` (object with keys `"0"`, `"1"`,
+  `"2"`; values `float`). Required under A4.
+- `judge_severity`: unchanged (int in `{0, 1, 2}`).
+- `judge_rationale`: unchanged (empty string `""` under A4 and A3;
+  preserved for cross-version schema continuity).
+- `annotation_protocol.judge_prompt_sha256`: unchanged from A3 (the
+  prompt text content is unchanged).
+- New `annotation_protocol.judge_extraction_method`: string field with
+  value `"logit_first_token_argmax"` under A4 (was `"generate_and_parse"`
+  pre-A4, retroactively populated for cross-version comparison).
+
+**What this amendment does NOT change.**
+
+- `JUDGE_MODEL_ID_DEFAULT` (`Qwen/Qwen2.5-72B-Instruct`): unchanged.
+- `JUDGE_MODEL_ID_FALLBACK` (`meta-llama/Llama-3.1-8B-Instruct`,
+  effective under §15.14-A2): unchanged.
+- `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+- `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged (vacuous
+  under A4 since parse failure is structurally zero, but retained).
+- `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+- `DIRECTION_GATE_THRESHOLD = 0.5` (strict): unchanged.
+- `PARTIAL_AUC_THRESHOLD = 0.66` (inclusive): unchanged.
+- `STRONG_AUC_THRESHOLD = 0.75` (inclusive): unchanged.
+- `STRONG_DELTA_AUC_THRESHOLD = 0.05` (inclusive, vs chance, vs
+  R_topic_to_framing, vs R_recency): unchanged.
+- Severity rubric (0=IGNORED / 1=MENTIONED / 2=STRUCTURED): unchanged.
+- Cascade structure (4-step direction-gate → STRONG → PARTIAL →
+  NO_MATERIAL), 2-comparator strict-margin requirement: unchanged.
+- 12 self-test cascade boundary cases: unchanged.
+- 52-pattern Class-3 firewall: unchanged.
+- `JUDGE_PROMPT_TEMPLATE` text content (and its SHA-256): unchanged.
+  The prompt still says "Return EXACTLY ONE CHARACTER: 0, 1, or 2."
+  even though we no longer generate. This preserves the rubric-
+  conditioning context exactly as it was under A3.
+- `framing_15_14_extractions.npz` cache: unchanged and reusable via
+  `--force-annotate`.
+- All `human_severity_rationale` values in the calibration labels
+  artifact: unchanged.
+- §15.14-A1 (synthetic_frame_positive_v1 source enum): unchanged.
+- §15.14-A2 (Llama-3.1-8B fallback judge): unchanged.
+- §15.14-A3 (single-digit prompt text + `MAX_NEW_TOKENS_JUDGE = 8`):
+  remains EFFECTIVE in the spec; A4 supersedes only the *extraction
+  mechanism*, not the prompt text. The empirical observation that
+  A3's generation path fails the 5% gate is recorded in the v2
+  outcome document (§0.8-binding) and stands.
+- All §13/§14/§15.x verdicts-of-record (including §15.14 v1
+  ANNOTATION_FAILED closure and §15.14 v2 ANNOTATION_FAILED closure):
+  preserved.
+
+**Cascade verdict reading discipline (post-A4).**
+
+A §15.14 v3 cascade verdict produced under §15.14-A4 (logit-first-
+token-argmax judge) is a §0.8-binding readout AT THE STATED JUDGE
+CONFIGURATION. It is not directly comparable to a hypothetical
+generation-based cascade verdict because the extraction mechanism
+itself is a different empirical claim (the model's first-token logit
+distribution may not equal the model's generation distribution after
+sampling, even at temperature 0; the two coincide for argmax decoding
+without preamble, but the latter is empirically not observed at this
+parameter scale).
+
+**What this amendment does NOT permit.**
+
+- Lowering `KAPPA_GATE_THRESHOLD` below 0.6.
+- Modifying any sealed AUC threshold, the cascade structure, the
+  comparator rules, or the severity rubric.
+- Modifying the topic-overlap firewall (52 patterns).
+- Modifying `BINARY_LABEL_THRESHOLD`.
+- Modifying `DIRECTION_GATE_THRESHOLD`.
+- Quantizing any judge model.
+- Sign-flip rescue on direction-gate failure.
+- Skipping the κ self-test gate.
+- Treating the v3 logit-first-token-argmax cascade verdict as
+  equivalent to a hypothetical generation-based cascade verdict for
+  cross-§ comparison.
+- Modifying the human calibration labels artifact.
+- Modifying any prior §13 / §14 / §15.x verdict-of-record.
+
+**Pinned-table update (Chunk 6 Sealed §0.8-binding decisions).**
+
+One new entry; one entry annotated:
+
+| Decision | Pinned value (post-A4) |
+|---|---|
+| `JUDGE_EXTRACTION_METHOD` | `logit_first_token_argmax` (effective under §15.14-A4; was `generate_and_parse` pre-A4) |
+| `MAX_NEW_TOKENS_JUDGE` | `8` (effective under §15.14-A3; **unused under §15.14-A4** — no generation occurs; retained for provenance) |
+
+**Implementation surface.** Three contained changes to
+`scripts/probe_framing_15_14.py`:
+
+1. `_judge_one_row` body: replace `model.generate(...) → decode → parse`
+   with `model(...) → logits[-1] → argmax over three label-token IDs`.
+   Returns `(severity, "", logits_triple)`.
+2. `_try_parse_judge_severity`: deleted (no callers).
+3. Judge-load step: precompute the three label-token IDs and verify
+   single-token encoding under the active tokenizer; exit 9 with
+   `LABEL_TOKEN_ENCODING_AMBIGUOUS` if any label is multi-token.
+4. JSON / annotated-cache / markdown writers: add per-row
+   `judge_logits` triple; add `annotation_protocol.judge_extraction_method`
+   top-level field.
+
+No other source changes. The `_load_judge_model`, `run_pass_c_judge`,
+`run_pass_d_kappa_gate`, `compute_features_per_row`,
+`classify_cascade_framing`, the firewall, and the writers are
+otherwise unchanged.
+
+**Required reporting (per user authorization, this commit cycle).**
+
+The v3 outcome document must list all four judge attempts side-by-
+side (verbatim from the v2 OUTCOME document, plus the v3 row):
+
+1. Qwen-7B JSON judge: parse failure 0.2692 → ANNOTATION_FAILED
+2. Llama-8B JSON judge: parse failure 0.7077 → ANNOTATION_FAILED
+3. Llama-8B single-digit 8-token judge / A3: parse failure 0.8477 → ANNOTATION_FAILED
+4. Llama-8B logit-first-token judge / A4: parse failure structurally 0.0; κ-gate result TBD
+
+If §15.14-A4 also fails the κ-gate, §15.14 closes as
+ANNOTATION_FAILED across all accessible judges. If §15.14-A4 passes
+the κ-gate, only then is the cascade verdict computed, without
+changing any threshold.
+
+**Provenance after a §15.14-A4 v3 run.**
+
+A successful §15.14-A4 v3 cascade verdict (or κ-gate-failure exit 9)
+will produce annotated-cache + JSON output with:
+
+```
+"annotation_protocol": {
+  "judge_model_id": "<whichever judge loaded; unchanged from A2 logic>",
+  "judge_fallback_used": <bool>,
+  "judge_prompt_sha256": "<unchanged from A3>",
+  "judge_extraction_method": "logit_first_token_argmax",
+  "label_token_ids": {"0": <int>, "1": <int>, "2": <int>},
+  ...
+},
+"per_row": [
+  {"...": ..., "judge_logits": {"0": <float>, "1": <float>, "2": <float>}, ...},
+  ...
+]
+```
+
+The presence of `judge_extraction_method = "logit_first_token_argmax"`
+and per-row `judge_logits` triples is the audit-trail signature that
+§15.14-A4 is in effect.
+
+**v3 readout discipline.** The §15.14 v1 closure (commit `2d88be1`)
+and the §15.14 v2 closure (commit cycle of this amendment) are both
+preserved. The §15.14-A4 v3 readout is a **separate** §0.8-binding
+result. It does not retroactively give v1 or v2 a verdict; it
+produces a fresh v3 verdict under a different judge extraction
+mechanism.
+
+---
+
 ## Research question
 
 > Does the LM's residual alignment toward a **framing convention**
