@@ -708,7 +708,464 @@ mechanism.
 
 ---
 
-## Research question
+### §15.14-A5 — judge prompt rendering: chat-template + dual-form (isolated + space-prefixed) label-token candidate set
+
+**Status:** PROPOSED. The status field will flip to EFFECTIVE only
+after the user replies with the literal phrase
+`Sign off §15.14-A5. Push the EFFECTIVE follow-up.` and a separate
+EFFECTIVE follow-up commit is pushed that flips this status field
+and applies the implementation surface enumerated below. This
+two-phase discipline mirrors §15.14-A1 / A2 / A3 / A4.
+
+**Scope.** Two surgical code changes inside
+`scripts/probe_framing_15_14.py`:
+
+1. The `_judge_one_row` body — replace the raw-string tokenization
+   step with a chat-template render of the existing rendered judge
+   prompt as the single user message, with
+   `add_generation_prompt=True`. The frozen `JUDGE_PROMPT_TEMPLATE`
+   text and its SHA-256 are unchanged; the template is **wrapped**,
+   not edited.
+2. The `_load_judge_model` label-token-encoding step — alongside
+   the existing isolated-form `label_token_ids` (`"0"→15`, `"1"→16`,
+   `"2"→17` under Llama-3.1-8B-Instruct), additionally compute
+   `label_token_ids_space_prefixed` via
+   `tokenizer.encode(" " + ch, add_special_tokens=False)`. Each
+   variant must be single-token under the active tokenizer; if any
+   variant is multi-token, the script exits 9 with diagnostic
+   `LABEL_TOKEN_ENCODING_AMBIGUOUS_SPACE_PREFIXED` (parallel to the
+   existing `LABEL_TOKEN_ENCODING_AMBIGUOUS` precondition under
+   §15.14-A4).
+
+Plus the implied annotated-cache schema bump
+(`15.14-A4-annotated → 15.14-A5-annotated`), the corresponding
+widening of the per-row `judge_logits` matrix from `(n, 3)` to
+`(n, 6)`, the addition of a per-row `judge_label_form_used` enum
+field, and one new top-level provenance field
+`annotation_protocol.judge_prompt_render =
+"apply_chat_template_user_only(add_generation_prompt=True)"` (was
+implicitly `"raw_string"` pre-A5; retroactively populated for cross-
+version diff continuity).
+
+**No other source change.** `_load_subject_model`, Pass A
+(multi-turn extraction), Pass B (standalone Q_t extraction), Pass D
+(κ-gate computation), the cascade comparator, the firewall, the
+self-test gate, the writers, and the calibration labels artifact
+are otherwise unchanged.
+
+**Rationale.** §15.14 v3 closed as `ANNOTATION_FAILED` (commit
+`257dd24`) at Cohen's κ = `−0.0776 < 0.6 inclusive` under §15.14-A4
+logit-first-token-argmax extraction. The format-following confound
+is structurally removed under A4 (parse failure = 0.0); the residual
+κ readout was approximately uncorrelated with the human rubric.
+Two leading mechanistic hypotheses about the A4 readout are
+diagnostically separable from the rubric-discrimination hypothesis
+without changing any threshold or any verdict-of-record:
+
+- **H1 (rendering-protocol mismatch).** `_judge_one_row` calls
+  `tokenizer(prompt, return_tensors="pt", return_attention_mask=True)`
+  on the raw rendered judge prompt
+  (`scripts/probe_framing_15_14.py:1750` post-`dc10d78`). The judge
+  model is `meta-llama/Llama-3.1-8B-Instruct`, an instruction-tuned
+  chat model whose first-token logit distribution is calibrated for
+  the post-`<|end_header_id|>\n\n` position of the Llama-3.1 chat
+  template — not for the raw text-tail position the script feeds
+  it. Pass A and Pass B (subject side, scripts/probe_framing_15_14.py:1263
+  and scripts/probe_framing_15_14.py:1421) both render their prompts
+  via `tokenizer.apply_chat_template(..., add_generation_prompt=True)`.
+  The judge side does not; the asymmetry is the §15.14-A5 H1 test.
+- **H2 (label-token locus mismatch).** Under §15.14-A4,
+  `_load_judge_model` (`scripts/probe_framing_15_14.py:1695`) encodes
+  label characters in **isolated form** (`tokenizer.encode("0",
+  add_special_tokens=False) → [15]`, similarly `[16]`, `[17]`).
+  After a chat template's assistant header, the natural continuation
+  distribution lives over **space-prefixed** (or punctuation-
+  prefixed) variants. Llama-3.1's tiktoken-style BPE merges `" 0"`,
+  `" 1"`, `" 2"` into distinct token IDs from the isolated `15/16/17`,
+  so the §15.14-A4 argmax-over-{15,16,17} samples the wrong three
+  loci of the post-header logit row. Adding the space-prefixed
+  variants to the candidate set restores parity with the model's
+  natural first-token distribution.
+
+Both hypotheses are ~5-line code changes in `_judge_one_row` and
+`_load_judge_model`, and they jointly produce a measurable κ delta
+without changing the prompt text, the rubric, the calibration
+labels, the cascade structure, or any sealed threshold. If A5
+clears the κ-gate, the §15.14 v4 cascade verdict is computed without
+any threshold change. If A5 also fails the κ-gate, then H1 and H2
+are ruled out as the binding constraints at 7-8B scale, and the
+residual diagnosis routes to H3 (global-mass diagnostic on GPU) and
+ultimately to a 70B+ judge escalation per the user's separate
+authorization channel.
+
+§15.14-A5 does NOT pre-judge the outcome: it reduces two specific
+mechanism candidates to a single binary κ readout under the same
+sealed `KAPPA_GATE_THRESHOLD = 0.6 inclusive` gate that bound v1 /
+v2 / v3.
+
+**Change.** Three pinned implementation modifications. No threshold
+changes.
+
+1. **Judge prompt rendering (H1 fix; replaces raw-string
+   tokenization).** Inside `_judge_one_row`, after rendering the
+   frozen `JUDGE_PROMPT_TEMPLATE` via the unchanged `render_judge_prompt`
+   function, encode the resulting text through the active tokenizer's
+   chat template as a single user message:
+
+   ```
+   encoded = tokenizer.apply_chat_template(
+       [{"role": "user", "content": prompt}],
+       add_generation_prompt=True,
+       return_tensors="pt",
+       return_dict=True,
+   )
+   ```
+
+   The final-position logits readout is unchanged (still
+   `out.logits[0, -1, :]` at fp32 over the active vocabulary). The
+   final position now corresponds to the immediate-next-token slot
+   after the chat template's assistant-header generation prompt
+   (i.e., immediately after `<|end_header_id|>\n\n` for Llama-3.1),
+   which is the position the model's first-token distribution is
+   calibrated for.
+
+   The frozen `JUDGE_PROMPT_TEMPLATE` text content and its SHA-256
+   are **unchanged**: the prompt is wrapped by the chat template,
+   not edited. The recorded
+   `annotation_protocol.judge_prompt_sha256` continues to refer to
+   the unwrapped template content (preserved for cross-version diff
+   continuity); the new `annotation_protocol.judge_prompt_render`
+   field records the rendering protocol.
+
+2. **Label-token candidate set (H2 fix; widens the argmax surface).**
+   Inside `_load_judge_model`, alongside the existing isolated-form
+   `label_token_ids`, additionally compute the space-prefixed form:
+
+   ```
+   label_token_ids_space_prefixed: dict[str, int] = {}
+   ambiguous_sp: list[str] = []
+   for ch in LABEL_TOKEN_CHARS:
+       ids_sp = tokenizer.encode(" " + ch, add_special_tokens=False)
+       if len(ids_sp) != 1:
+           ambiguous_sp.append(f"{(' ' + ch)!r}→{ids_sp!r}")
+       else:
+           label_token_ids_space_prefixed[ch] = int(ids_sp[0])
+   if ambiguous_sp:
+       sys.stderr.write(
+           "ANNOTATION_FAILED: LABEL_TOKEN_ENCODING_AMBIGUOUS_SPACE_PREFIXED — "
+           f"space-prefixed label character(s) did not encode to a "
+           f"single token under tokenizer of {judge_id_used!r}: "
+           f"{', '.join(ambiguous_sp)}. §15.14-A5 requires each of "
+           f"' 0', ' 1', ' 2' to be single-token.\n"
+       )
+       sys.exit(EXIT_ANNOTATION_FAILED)
+   ```
+
+   Inside `_judge_one_row`, the argmax is taken over the **6-element
+   candidate set**:
+
+   ```
+   candidates: list[tuple[str, str, int]] = [
+       ("isolated",       "0", label_token_ids["0"]),
+       ("isolated",       "1", label_token_ids["1"]),
+       ("isolated",       "2", label_token_ids["2"]),
+       ("space_prefixed", "0", label_token_ids_space_prefixed["0"]),
+       ("space_prefixed", "1", label_token_ids_space_prefixed["1"]),
+       ("space_prefixed", "2", label_token_ids_space_prefixed["2"]),
+   ]
+   logits_by_form: dict[str, dict[str, float]] = {
+       "isolated":       {ch: 0.0 for ch in LABEL_TOKEN_CHARS},
+       "space_prefixed": {ch: 0.0 for ch in LABEL_TOKEN_CHARS},
+   }
+   for form, ch, tok_id in candidates:
+       logits_by_form[form][ch] = float(last_logits[tok_id].item())
+   form_used, severity_char, _ = max(
+       candidates, key=lambda t: logits_by_form[t[0]][t[1]],
+   )
+   ```
+
+   The chosen severity is the digit (`{0, 1, 2}`) of the winning
+   candidate; the form (`"isolated"` or `"space_prefixed"`) is
+   recorded per row but does **not** participate in the severity
+   value. This collapses the 6-candidate argmax back into a 3-class
+   severity for downstream Pass D κ and feature computation
+   exactly as under A4.
+
+3. **Per-row audit fields (annotated cache + JSON).** The annotated
+   cache schema bumps from `15.14-A4-annotated` to
+   `15.14-A5-annotated`. Per-row fields:
+   - `judge_logits` (renamed in serialized layout): now an object
+     with two sub-objects keyed by form:
+     ```
+     "judge_logits": {
+       "isolated":       {"0": <float>, "1": <float>, "2": <float>},
+       "space_prefixed": {"0": <float>, "1": <float>, "2": <float>}
+     }
+     ```
+     On disk in `.npz`, `judge_logits` becomes a `(n, 6)` float64
+     matrix with column order pinned `(iso_0, iso_1, iso_2, sp_0,
+     sp_1, sp_2)`.
+   - `judge_label_form_used` (new): string in
+     `{"isolated", "space_prefixed"}`. On disk in `.npz`, a
+     `(n,)` object array.
+   - `judge_severity`: unchanged (int in `{0, 1, 2}`).
+   - `judge_rationale`: unchanged (empty string `""` under A5; same
+     as A3 / A4).
+
+   Top-level provenance fields in JSON output and the annotated
+   cache:
+   - `annotation_protocol.judge_prompt_render`: new; value
+     `"apply_chat_template_user_only(add_generation_prompt=True)"`
+     under A5 (retroactively populated as `"raw_string"` for any
+     pre-A5 cache loaded for diff comparison; pre-A5 caches are
+     not recomputed).
+   - `annotation_protocol.label_token_ids`: unchanged (isolated-form
+     IDs; preserved for cross-version diff).
+   - `annotation_protocol.label_token_ids_space_prefixed`: new
+     under A5 (single-token IDs for `" 0"`, `" 1"`, `" 2"` under
+     the active tokenizer).
+   - `annotation_protocol.judge_extraction_method`: unchanged
+     (`"logit_first_token_argmax"`; the mechanism is structurally
+     the same, only the input position and the candidate set
+     change).
+
+**Failure surfaces under A5.**
+
+- `json_parse_failure_rate` is structurally **zero** (no parsing
+  step; A4 inheritance). The field name is **preserved** in the
+  output schema for cross-version diff continuity.
+- `LABEL_TOKEN_ENCODING_AMBIGUOUS` (isolated-form precondition,
+  introduced under A4): unchanged.
+- `LABEL_TOKEN_ENCODING_AMBIGUOUS_SPACE_PREFIXED` (new under A5):
+  fires iff any of `" 0"`, `" 1"`, `" 2"` does not encode to a
+  single token under the active tokenizer. Under
+  `meta-llama/Llama-3.1-8B-Instruct` (the post-A2 fallback),
+  Llama's tiktoken-style BPE merges `" 0"`, `" 1"`, `" 2"` into
+  single tokens; this precondition is expected to PASS at judge-
+  load. If a future judge is wired in whose tokenizer does not
+  share this property, the precondition correctly exits 9 with a
+  diagnostic instead of silently mis-locating the candidate logits.
+- The Pass D **κ-gate at `KAPPA_GATE_THRESHOLD = 0.6` inclusive**
+  remains **unchanged and binding**. If κ < 0.6 on the 50
+  calibration rows under the A5 candidate set, the script exits 9
+  ANNOTATION_FAILED before the cascade is computed, exactly as
+  under A4.
+
+**What this amendment does NOT change.**
+
+- `JUDGE_MODEL_ID_DEFAULT` (`Qwen/Qwen2.5-72B-Instruct`): unchanged.
+- `JUDGE_MODEL_ID_FALLBACK` (`meta-llama/Llama-3.1-8B-Instruct`,
+  effective under §15.14-A2): unchanged.
+- `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+- `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged (vacuous
+  under A4 / A5 since parse failure is structurally zero, but
+  retained).
+- `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+- `DIRECTION_GATE_THRESHOLD = 0.5` (strict): unchanged.
+- `PARTIAL_AUC_THRESHOLD = 0.66` (inclusive): unchanged.
+- `STRONG_AUC_THRESHOLD = 0.75` (inclusive): unchanged.
+- `STRONG_DELTA_AUC_THRESHOLD = 0.05` (inclusive, vs chance, vs
+  R_topic_to_framing, vs R_recency): unchanged.
+- Severity rubric (0=IGNORED / 1=MENTIONED / 2=STRUCTURED):
+  unchanged.
+- Sign direction (BCVF-faithful: `R_framing` higher → more
+  framing-stickiness): unchanged.
+- Cascade structure (4-step direction-gate → STRONG → PARTIAL →
+  NO_MATERIAL), 2-comparator strict-margin requirement: unchanged.
+- 12 self-test cascade boundary cases: unchanged.
+- 52-pattern Class-3 firewall: unchanged.
+- `JUDGE_PROMPT_TEMPLATE` text content (and its SHA-256): unchanged.
+  The prompt is wrapped by the chat template, not edited. The
+  rubric-conditioning context that the judge reads is identical.
+- `MAX_NEW_TOKENS_JUDGE = 8`: retained but unused (A4 inheritance).
+- `framing_15_14_extractions.npz` extraction cache: unchanged and
+  reusable via `--force-annotate`.
+- All `human_severity` / `human_severity_rationale` values in the
+  calibration labels artifact: unchanged. The locked labels SHA
+  (`e9776ff223ef913b2e404d2cf90203e9615c01640bc8fc5c42ffabf2d49b0d6c`,
+  50/50 by `rasaha-2026-04-30`) is unchanged.
+- Locked stimulus SHA
+  (`e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7`):
+  unchanged.
+- Stimulus geometry (130 chains × 5 evaluation turns = 650 rows,
+  100/20/10 main/frame_positive/calibration split): unchanged.
+- §15.14-A1 (synthetic_frame_positive_v1 source enum): unchanged.
+- §15.14-A2 (Llama-3.1-8B fallback judge): unchanged.
+- §15.14-A3 (single-digit prompt text + `MAX_NEW_TOKENS_JUDGE = 8`):
+  unchanged in the spec; A5 supersedes only the *prompt-render
+  protocol* and the *candidate set*, not the prompt text content
+  or any constant.
+- §15.14-A4 (logit-first-token-argmax extraction mechanism):
+  unchanged. A5 generalizes A4's argmax surface from 3 candidates
+  to 6 (3 isolated + 3 space-prefixed) and changes the input
+  position from raw text-tail to chat-template assistant-header.
+  The extraction method label `"logit_first_token_argmax"` covers
+  both A4 and A5; the per-row `judge_label_form_used` field plus
+  the `annotation_protocol.judge_prompt_render` field disambiguate.
+- All §13/§14/§15.x verdicts-of-record (including §15.14 v1
+  ANNOTATION_FAILED closure, §15.14 v2 ANNOTATION_FAILED closure,
+  and §15.14 v3 ANNOTATION_FAILED closure across all four tested
+  judge configurations): preserved.
+
+**What this amendment does NOT permit.**
+
+- Lowering `KAPPA_GATE_THRESHOLD` below 0.6.
+- Modifying any sealed AUC threshold, the cascade structure, the
+  comparator rules, or the severity rubric.
+- Modifying the topic-overlap firewall (52 patterns).
+- Modifying `BINARY_LABEL_THRESHOLD`.
+- Modifying `DIRECTION_GATE_THRESHOLD`.
+- Modifying the sign convention (BCVF-faithful direction).
+- Editing `JUDGE_PROMPT_TEMPLATE` text content (the prompt is
+  wrapped, not edited).
+- Re-collapsing the 3-class κ to a binary κ (binary-collapse κ may
+  appear in diagnostic output as a side metric per
+  `BINARY_LABEL_THRESHOLD_DESCRIPTION`, but the binding gate
+  remains the 3-class Cohen's κ).
+- Sign-flip rescue on direction-gate failure.
+- Skipping the κ self-test gate.
+- Treating the v4 cascade verdict as equivalent to a hypothetical
+  generation-based or A4-extraction-surface cascade verdict for
+  cross-§ comparison.
+- Modifying the human calibration labels artifact.
+- Modifying any prior §13 / §14 / §15.x verdict-of-record.
+- Quantizing any judge model.
+- Escalating the judge model identity (no 70B+ swap under A5; A5
+  is restricted to the post-A2 `meta-llama/Llama-3.1-8B-Instruct`
+  fallback).
+
+**Cascade verdict reading discipline (post-A5).**
+
+A §15.14 v4 cascade verdict produced under §15.14-A5 (chat-
+template-rendered prompt + 6-candidate argmax) is a §0.8-binding
+readout AT THE STATED JUDGE CONFIGURATION. It is not directly
+comparable to the §15.14-A4 v3 cascade verdict (which was never
+computed; v3 closed at κ-gate failure) because the input position
+and the candidate set are different empirical claims about which
+locus of the model's logit row encodes the rubric-conditioned
+severity. The two readouts share only the prompt text content and
+the judge model identity.
+
+**Pinned-table update (Chunk 6 Sealed §0.8-binding decisions).**
+
+One new pinned entry; one entry annotated:
+
+| Decision | Pinned value (post-A5) |
+|---|---|
+| `JUDGE_PROMPT_RENDER` | `apply_chat_template_user_only(add_generation_prompt=True)` (effective under §15.14-A5; was implicit `raw_string` pre-A5) |
+| `JUDGE_LABEL_TOKEN_CANDIDATE_SET` | `{isolated_0, isolated_1, isolated_2, space_prefixed_0, space_prefixed_1, space_prefixed_2}` (effective under §15.14-A5; was `{isolated_0, isolated_1, isolated_2}` under §15.14-A4) |
+
+**Implementation surface (post-sign-off, EFFECTIVE follow-up).**
+
+Three contained changes to `scripts/probe_framing_15_14.py`:
+
+1. `_judge_one_row` body: replace `tokenizer(prompt, return_tensors=
+   "pt", return_attention_mask=True)` with the chat-template render
+   sketched above; widen the per-row return tuple to carry the
+   6-cell logit record and the chosen form.
+2. `_load_judge_model`: add the parallel encoding + precondition
+   check for the space-prefixed variant; widen the returned dict
+   to include `label_token_ids_space_prefixed`.
+3. `_save_annotated_cache` / `_load_annotated_cache`: schema bump
+   `15.14-A4-annotated → 15.14-A5-annotated`; widen `judge_logits`
+   matrix shape `(n, 3) → (n, 6)`; add `judge_label_form_used`
+   column; add top-level `judge_prompt_render` and
+   `label_token_ids_space_prefixed` fields.
+
+Plus per-row block extension and one new provenance line in:
+
+4. The JSON writer (`_save_probe_json` / equivalent): per-row
+   `judge_logits` widened object; per-row `judge_label_form_used`;
+   top-level `annotation_protocol.judge_prompt_render` and
+   `annotation_protocol.label_token_ids_space_prefixed`.
+5. The markdown writer (`_render_probe_markdown` / equivalent):
+   one new line in the audit-trail section reporting
+   `judge_prompt_render` and the per-form label token IDs; the
+   per-row table is unchanged in shape (severity is still a single
+   integer column).
+
+No other source change. `_load_subject_model`, `extract_pass_a_iterative`,
+`extract_pass_b_standalone`, `run_pass_c_judge` (other than the
+return-tuple widening), `run_pass_d_kappa_gate`,
+`compute_features_per_row`, `classify_cascade_framing`, the
+firewall, and the self-test gate are unchanged.
+
+**Required reporting (under v4 EFFECTIVE follow-up).**
+
+The §15.14 v4 outcome document must list all five judge attempts
+side-by-side (the four from v3 OUTCOME plus the v4 row):
+
+1. Qwen-7B JSON judge: parse failure 0.2692 → ANNOTATION_FAILED
+2. Llama-8B JSON judge: parse failure 0.7077 → ANNOTATION_FAILED
+3. Llama-8B single-digit 8-token judge / A3: parse failure 0.8477 → ANNOTATION_FAILED
+4. Llama-8B logit-first-token judge / A4 (raw-string render, 3 candidates): parse failure 0.0; κ = −0.0776 → ANNOTATION_FAILED
+5. Llama-8B logit-first-token judge / A5 (chat-template render, 6 candidates): parse failure 0.0; κ = TBD
+
+If §15.14-A5 also fails the κ-gate, §15.14 closes as
+ANNOTATION_FAILED with H1 + H2 ruled out as the binding
+constraints; the residual diagnosis routes to H3 (global-mass
+diagnostic on GPU) and ultimately to a 70B+ judge escalation under
+a separate authorization. If §15.14-A5 passes the κ-gate, the v4
+cascade verdict is computed without changing any threshold.
+
+**Provenance after a §15.14-A5 v4 run.**
+
+A successful §15.14-A5 v4 cascade verdict (or κ-gate-failure exit
+9) will produce annotated-cache + JSON output with:
+
+```
+"annotation_protocol": {
+  "judge_model_id": "<whichever judge loaded; unchanged from A2 logic>",
+  "judge_fallback_used": <bool>,
+  "judge_prompt_sha256": "<unchanged from A3>",
+  "judge_prompt_render": "apply_chat_template_user_only(add_generation_prompt=True)",
+  "judge_extraction_method": "logit_first_token_argmax",
+  "label_token_ids":               {"0": <int>, "1": <int>, "2": <int>},
+  "label_token_ids_space_prefixed": {"0": <int>, "1": <int>, "2": <int>},
+  ...
+},
+"per_row": [
+  {
+    "...": ...,
+    "judge_logits": {
+      "isolated":       {"0": <float>, "1": <float>, "2": <float>},
+      "space_prefixed": {"0": <float>, "1": <float>, "2": <float>}
+    },
+    "judge_label_form_used": "isolated" | "space_prefixed",
+    ...
+  },
+  ...
+]
+```
+
+The simultaneous presence of
+`judge_prompt_render = "apply_chat_template_user_only(add_generation_prompt=True)"`,
+the per-row 6-cell `judge_logits` object, and the per-row
+`judge_label_form_used` field is the audit-trail signature that
+§15.14-A5 is in effect.
+
+**v4 readout discipline.** The §15.14 v1 closure (commit `2d88be1`),
+the §15.14 v2 closure (commit `198378e`), and the §15.14 v3 closure
+(commit `257dd24`) are all preserved. The §15.14-A5 v4 readout is
+a **separate** §0.8-binding result. It does not retroactively give
+v1, v2, or v3 a verdict; it produces a fresh v4 verdict under a
+different judge prompt-render protocol and a different first-token
+candidate set.
+
+**Two-phase discipline (per A1–A4 precedent; explicit).**
+
+1. **PROPOSED commit** (this commit cycle): the spec amendment
+   block above is added with `Status: PROPOSED`. No code is touched
+   in `scripts/probe_framing_15_14.py`. No status flip. No cache
+   schema bump. No annotated-cache write.
+2. **EFFECTIVE follow-up** (separate commit, only after the user
+   replies with the literal phrase
+   `Sign off §15.14-A5. Push the EFFECTIVE follow-up.`): flips
+   this status field from `PROPOSED` to `EFFECTIVE`, applies the
+   five-item implementation surface enumerated above, and bumps
+   the annotated-cache schema string. The runpod execution under
+   the EFFECTIVE follow-up is a **separate** user authorization;
+   it is not implied by the EFFECTIVE flip itself.
 
 > Does the LM's residual alignment toward a **framing convention**
 > introduced in turn 1 — relative to the new turn-t question in
