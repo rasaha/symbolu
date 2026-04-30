@@ -1484,7 +1484,7 @@ def save_extractions_cache(
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
     np.savez_compressed(
         tmp_path,
         schema_version=np.array([_EXTRACTION_CACHE_SCHEMA_VERSION], dtype=object),
@@ -2726,7 +2726,7 @@ def write_json_output(
     }
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
     tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
     tmp_path.replace(out_path)
 
@@ -3001,7 +3001,7 @@ def write_markdown_output(
     md = render_markdown_report(audit)
     enforce_firewall_or_exit(md, context=str(out_path))
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
     tmp_path.write_text(md)
     tmp_path.replace(out_path)
 
@@ -3043,7 +3043,7 @@ def _save_annotated_cache(
 
     keys = list(severities_by_key.keys())
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
 
     # Encode severities as int8 with -1 sentinel for None.
     severity_vals = np.array(
