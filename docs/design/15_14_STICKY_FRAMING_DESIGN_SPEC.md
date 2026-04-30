@@ -457,8 +457,9 @@ a fresh v2 verdict under a different judge prompt.
 
 ### §15.14-A4 — judge severity extraction: logit-based first-token argmax (replaces generation-and-parse)
 
-**Status:** PROPOSED, awaiting sign-off (will be marked EFFECTIVE
-upon explicit user sign-off and recorded in commit metadata).
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/sticky-framing-spec-r6U1j`).
 
 **Scope:** the judge severity-extraction code path in
 `scripts/probe_framing_15_14.py`. Specifically:
