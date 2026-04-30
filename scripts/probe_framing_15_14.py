@@ -655,3 +655,893 @@ def _self_test_cascade_count_assertion() -> None:
 
 
 _self_test_cascade_count_assertion()
+
+
+# ===========================================================================
+# I-2: Stimulus + labels validators, HF loaders, Pass A/B extraction, .npz I/O
+# ===========================================================================
+
+
+class SchemaMismatchError(RuntimeError):
+    """Raised when the on-disk artifact diverges from the pinned spec.
+
+    Translated to exit code 5 (SCHEMA_MISMATCH) by the CLI orchestrator.
+    Distinct from STIMULUS_INVALID (exit 8), which is raised when the
+    artifact's structure is fine but its content violates a §15.14 rule
+    (topical-disjointness, source-enum scoping, label range, etc.).
+    """
+
+
+# ---------------------------------------------------------------------------
+# Canonical-form SHA-256 (mirrors validate_framing_15_14_stimuli.py)
+# ---------------------------------------------------------------------------
+#
+# The validator's canonical form excludes underscore-prefixed top-level
+# metadata keys; we reproduce that exactly so the SHAs computed here
+# match the pinned EXPECTED_STIMULUS_SHA / EXPECTED_LABELS_SHA values.
+
+
+def _canonical_top_level_sha256(payload: dict) -> str:
+    """Canonical-form SHA-256: excludes underscore-prefixed top-level keys."""
+    canonical = {k: v for k, v in payload.items() if not k.startswith("_")}
+    canonical_bytes = json.dumps(canonical, indent=2, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(canonical_bytes).hexdigest()
+
+
+def _read_json_with_sha(path: Path) -> tuple[dict, str]:
+    """Load JSON from disk, return (payload, canonical_sha256)."""
+    if not path.exists():
+        raise SchemaMismatchError(f"file not found: {path}")
+    try:
+        payload = json.loads(path.read_text())
+    except json.JSONDecodeError as e:
+        raise SchemaMismatchError(f"{path}: invalid JSON: {e}") from e
+    if not isinstance(payload, dict):
+        raise SchemaMismatchError(
+            f"{path}: top level must be a JSON object; got {type(payload).__name__}"
+        )
+    return payload, _canonical_top_level_sha256(payload)
+
+
+# ---------------------------------------------------------------------------
+# Stopword list (PINNED, 24 entries; per §15.14 spec Chunk 3 + curate script)
+# ---------------------------------------------------------------------------
+
+_STOPWORDS: frozenset[str] = frozenset({
+    "the", "a", "an", "of", "to", "in", "and", "or", "is", "are",
+    "was", "were", "be", "been", "being", "it", "this", "that",
+    "for", "on", "with", "as", "by", "from", "at",
+})
+
+
+def _tokenize_for_disjointness(text: str) -> set[str]:
+    """Lowercase + punct-strip + remove stopwords. Mirrors curation script."""
+    raw = text.lower()
+    for ch in ",.:;!?\"'()[]{}<>/\\":
+        raw = raw.replace(ch, " ")
+    raw = raw.replace("-", " ").replace("_", " ")
+    tokens = {tok for tok in raw.split() if tok}
+    return tokens - _STOPWORDS
+
+
+def _framing_span_substring(framing_question: str, span: tuple[int, int]) -> str:
+    if not (0 <= span[0] < span[1] <= len(framing_question)):
+        raise SchemaMismatchError(
+            f"framing_token_char_span {span} out of bounds for question of "
+            f"length {len(framing_question)}"
+        )
+    return framing_question[span[0]:span[1]]
+
+
+# ---------------------------------------------------------------------------
+# Stimulus JSON validator (per §15.14 spec Chunk 3 + §15.14-A1 source enum)
+# ---------------------------------------------------------------------------
+
+
+_STIMULUS_REQUIRED_TOP_KEYS = {
+    "schema_version", "framing_pool", "main_chains",
+    "frame_positive_chains", "calibration_chains",
+}
+
+_STIMULUS_SCHEMA_VERSION = "15.14-stimulus"
+
+_VALID_FRAMING_CATEGORIES = {"metaphor", "persona", "terminology", "formatting"}
+
+
+def _validate_stimulus_json(
+    path: Path = DEFAULT_STIMULUS_JSON_PATH,
+    expected_sha: str = EXPECTED_STIMULUS_SHA,
+) -> tuple[dict, str]:
+    """Load + validate the stimulus JSON; return (payload, canonical_sha256).
+
+    Raises SchemaMismatchError on schema drift; raises ValueError (which
+    the CLI maps to exit 8 STIMULUS_INVALID) on content violations.
+    Per spec Chunk 4 cascade-eligibility, this validator is run at the
+    boundary of --collect (and its result re-checked by self-test on
+    every run).
+    """
+    payload, sha = _read_json_with_sha(path)
+
+    if sha != expected_sha:
+        raise SchemaMismatchError(
+            f"stimulus JSON SHA mismatch.\n"
+            f"  path:     {path}\n"
+            f"  actual:   {sha}\n"
+            f"  expected: {expected_sha}\n"
+            f"  The implementation §0.X is pinned to a specific stimulus "
+            f"state. If the stimulus was intentionally updated, "
+            f"EXPECTED_STIMULUS_SHA must be updated under fresh "
+            f"authorization."
+        )
+
+    missing = _STIMULUS_REQUIRED_TOP_KEYS - set(payload.keys())
+    if missing:
+        raise SchemaMismatchError(
+            f"stimulus JSON missing top-level keys: {sorted(missing)}"
+        )
+    if payload["schema_version"] != _STIMULUS_SCHEMA_VERSION:
+        raise SchemaMismatchError(
+            f"stimulus schema_version mismatch: expected "
+            f"{_STIMULUS_SCHEMA_VERSION!r}, got {payload['schema_version']!r}"
+        )
+
+    # framing_pool: 25 items, 4 categories, char-span valid, non-empty firewall.
+    pool_raw = payload["framing_pool"]
+    if len(pool_raw) != N_FRAMING_POOL_ITEMS:
+        raise SchemaMismatchError(
+            f"framing_pool must have {N_FRAMING_POOL_ITEMS} items; "
+            f"got {len(pool_raw)}"
+        )
+    seen_frame_ids: set[str] = set()
+    pool: list[FramingPoolItem] = []
+    for i, raw in enumerate(pool_raw):
+        for k in ("frame_id", "framing_question", "framing_token_char_span",
+                  "framing_category"):
+            if k not in raw:
+                raise SchemaMismatchError(f"framing_pool[{i}] missing key {k!r}")
+        if raw["frame_id"] in seen_frame_ids:
+            raise ValueError(f"framing_pool[{i}] duplicate frame_id {raw['frame_id']!r}")
+        if raw["framing_category"] not in _VALID_FRAMING_CATEGORIES:
+            raise ValueError(
+                f"framing_pool[{i}] invalid category {raw['framing_category']!r}; "
+                f"must be in {sorted(_VALID_FRAMING_CATEGORIES)}"
+            )
+        seen_frame_ids.add(raw["frame_id"])
+        span_raw = raw["framing_token_char_span"]
+        if not (isinstance(span_raw, list) and len(span_raw) == 2
+                and all(isinstance(x, int) for x in span_raw)):
+            raise SchemaMismatchError(
+                f"framing_pool[{i}].framing_token_char_span shape invalid: "
+                f"{span_raw!r}"
+            )
+        framing_substr = _framing_span_substring(
+            raw["framing_question"], (span_raw[0], span_raw[1]),
+        )
+        firewall_tokens = _tokenize_for_disjointness(framing_substr)
+        if not firewall_tokens:
+            raise ValueError(
+                f"framing_pool[{i}] empty firewall vocabulary at span"
+            )
+        pool.append(FramingPoolItem(
+            frame_id=raw["frame_id"],
+            framing_question=raw["framing_question"],
+            framing_token_char_span=(span_raw[0], span_raw[1]),
+            framing_category=raw["framing_category"],
+        ))
+
+    # main_chains and calibration_chains topical-disjointness re-check.
+    pool_by_frame_id = {p.frame_id: p for p in pool}
+    for scope_name, chain_count, allowed_sources in [
+        ("main_chains", N_MAIN_CHAINS, SOURCE_ENUM_MAIN),
+        ("calibration_chains", N_CALIBRATION_CHAINS, SOURCE_ENUM_CALIBRATION),
+    ]:
+        chains_raw = payload[scope_name]
+        if len(chains_raw) != chain_count:
+            raise SchemaMismatchError(
+                f"{scope_name} must have {chain_count} chains; got {len(chains_raw)}"
+            )
+        for c in chains_raw:
+            frame = pool_by_frame_id.get(c["frame_id"])
+            if frame is None:
+                raise ValueError(
+                    f"{scope_name}[{c.get('chain_idx')}] references unknown "
+                    f"frame_id {c.get('frame_id')!r}"
+                )
+            firewall = _tokenize_for_disjointness(
+                _framing_span_substring(frame.framing_question,
+                                        frame.framing_token_char_span)
+            )
+            for cq in c["chain_questions"]:
+                if cq["source"] not in allowed_sources:
+                    raise ValueError(
+                        f"{scope_name}[{c['chain_idx']}].chain_questions"
+                        f"[turn={cq.get('turn_idx')}] source {cq['source']!r} "
+                        f"not permitted in {scope_name}; allowed: "
+                        f"{sorted(allowed_sources)} (per §15.14-A1)"
+                    )
+                qtokens = _tokenize_for_disjointness(cq["question"])
+                shared = firewall & qtokens
+                if shared:
+                    raise ValueError(
+                        f"{scope_name}[{c['chain_idx']}].chain_questions"
+                        f"[turn={cq['turn_idx']}] violates topical-disjointness "
+                        f"against frame {c['frame_id']}; shared tokens: "
+                        f"{sorted(shared)}"
+                    )
+
+    # frame_positive_chains source enum check (no disjointness; per §15.14-A1
+    # frame_positive_chains MAY use synthetic_frame_positive_v1).
+    fp_raw = payload["frame_positive_chains"]
+    if len(fp_raw) != N_FRAME_POSITIVE_CHAINS:
+        raise SchemaMismatchError(
+            f"frame_positive_chains must have {N_FRAME_POSITIVE_CHAINS} chains; "
+            f"got {len(fp_raw)}"
+        )
+    for c in fp_raw:
+        for cq in c["chain_questions"]:
+            if cq["source"] not in SOURCE_ENUM_FRAME_POSITIVE:
+                raise ValueError(
+                    f"frame_positive_chains[{c['chain_idx']}].chain_questions"
+                    f"[turn={cq.get('turn_idx')}] source {cq['source']!r} not "
+                    f"permitted; allowed: {sorted(SOURCE_ENUM_FRAME_POSITIVE)}"
+                )
+
+    return payload, sha
+
+
+# ---------------------------------------------------------------------------
+# Calibration labels JSON validator (cross-SHA against current stimulus)
+# ---------------------------------------------------------------------------
+
+
+_LABELS_REQUIRED_TOP_KEYS = {"schema_version", "stimulus_sha256", "labels"}
+
+_LABELS_SCHEMA_VERSION = "15.14-calibration-labels"
+
+_LABELS_REQUIRED_ROW_KEYS = {
+    "chain_idx", "turn_idx", "human_severity_label",
+    "human_severity_rationale", "annotator_id", "annotation_timestamp",
+}
+_LABELS_OPTIONAL_ROW_KEYS = {"model_response_id", "run_id"}
+
+
+def _validate_calibration_labels_json(
+    path: Path = DEFAULT_LABELS_JSON_PATH,
+    expected_sha: str = EXPECTED_LABELS_SHA,
+    stimulus_sha: str = EXPECTED_STIMULUS_SHA,
+) -> tuple[dict, str, dict[tuple[int, int], dict]]:
+    """Load + validate the labels artifact.
+
+    Returns (payload, canonical_sha256, labels_by_key) where
+    labels_by_key maps (chain_idx, turn_idx) → label-record dict for
+    O(1) lookup during Pass C / Pass D.
+
+    Raises SchemaMismatchError on shape drift or SHA mismatch.
+    Raises ValueError on content violations (out-of-range label,
+    duplicate (chain, turn), unknown row keys, etc.) — caller maps
+    to exit 8.
+    """
+    payload, sha = _read_json_with_sha(path)
+
+    if sha != expected_sha:
+        raise SchemaMismatchError(
+            f"calibration labels SHA mismatch.\n"
+            f"  path:     {path}\n"
+            f"  actual:   {sha}\n"
+            f"  expected: {expected_sha}\n"
+            f"  Implementation §0.X is pinned to a specific labels state."
+        )
+
+    missing = _LABELS_REQUIRED_TOP_KEYS - set(payload.keys())
+    if missing:
+        raise SchemaMismatchError(
+            f"labels JSON missing top-level keys: {sorted(missing)}"
+        )
+    if payload["schema_version"] != _LABELS_SCHEMA_VERSION:
+        raise SchemaMismatchError(
+            f"labels schema_version mismatch: expected "
+            f"{_LABELS_SCHEMA_VERSION!r}, got {payload['schema_version']!r}"
+        )
+    declared_stim_sha = payload.get("stimulus_sha256")
+    if declared_stim_sha != stimulus_sha:
+        raise SchemaMismatchError(
+            f"labels artifact references stimulus_sha256={declared_stim_sha} "
+            f"but pinned stimulus SHA is {stimulus_sha}; labels are stale "
+            f"or refer to a different stimulus state."
+        )
+
+    labels_raw = payload["labels"]
+    if not isinstance(labels_raw, list):
+        raise SchemaMismatchError("labels must be a JSON array")
+    if len(labels_raw) != EVALUATION_ROWS_CALIBRATION:
+        raise ValueError(
+            f"labels must have {EVALUATION_ROWS_CALIBRATION} entries "
+            f"(10 chains × 5 turns); got {len(labels_raw)}"
+        )
+
+    labels_by_key: dict[tuple[int, int], dict] = {}
+    for i, row in enumerate(labels_raw):
+        if not isinstance(row, dict):
+            raise SchemaMismatchError(f"labels[{i}] must be an object")
+        missing_row = _LABELS_REQUIRED_ROW_KEYS - set(row.keys())
+        if missing_row:
+            raise SchemaMismatchError(
+                f"labels[{i}] missing required keys: {sorted(missing_row)}"
+            )
+        unknown_row = (
+            set(row.keys())
+            - _LABELS_REQUIRED_ROW_KEYS
+            - _LABELS_OPTIONAL_ROW_KEYS
+        )
+        if unknown_row:
+            raise SchemaMismatchError(
+                f"labels[{i}] contains unknown keys: {sorted(unknown_row)}"
+            )
+        ci, ti = row["chain_idx"], row["turn_idx"]
+        if not (isinstance(ci, int) and 0 <= ci < N_CALIBRATION_CHAINS):
+            raise ValueError(
+                f"labels[{i}].chain_idx must be int in [0, "
+                f"{N_CALIBRATION_CHAINS}); got {ci!r}"
+            )
+        if not (isinstance(ti, int) and 2 <= ti <= K_TURNS):
+            raise ValueError(
+                f"labels[{i}].turn_idx must be int in [2, {K_TURNS}]; "
+                f"got {ti!r}"
+            )
+        sev = row["human_severity_label"]
+        if sev not in SEVERITY_VALUES:
+            raise ValueError(
+                f"labels[{i}].human_severity_label must be in {SEVERITY_VALUES}; "
+                f"got {sev!r}"
+            )
+        rationale = row["human_severity_rationale"]
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise ValueError(
+                f"labels[{i}].human_severity_rationale must be a non-empty string"
+            )
+        annotator = row["annotator_id"]
+        if not isinstance(annotator, str) or not annotator.strip():
+            raise ValueError(
+                f"labels[{i}].annotator_id must be a non-empty string"
+            )
+        ts = row["annotation_timestamp"]
+        if not isinstance(ts, str) or not ts.strip():
+            raise ValueError(
+                f"labels[{i}].annotation_timestamp must be a non-empty string"
+            )
+        key = (ci, ti)
+        if key in labels_by_key:
+            raise ValueError(
+                f"labels[{i}] duplicates (chain_idx={ci}, turn_idx={ti})"
+            )
+        labels_by_key[key] = row
+
+    if len(labels_by_key) != EVALUATION_ROWS_CALIBRATION:
+        raise ValueError(
+            f"after de-duplication labels has only {len(labels_by_key)} unique "
+            f"(chain_idx, turn_idx) pairs; expected {EVALUATION_ROWS_CALIBRATION}"
+        )
+    return payload, sha, labels_by_key
+
+
+# ---------------------------------------------------------------------------
+# Stimulus → typed structures (consumed by Pass A / Pass B)
+# ---------------------------------------------------------------------------
+
+
+def _build_framing_pool(payload: dict) -> dict[str, FramingPoolItem]:
+    """Map frame_id → FramingPoolItem from the validated stimulus JSON."""
+    pool: dict[str, FramingPoolItem] = {}
+    for raw in payload["framing_pool"]:
+        span = raw["framing_token_char_span"]
+        pool[raw["frame_id"]] = FramingPoolItem(
+            frame_id=raw["frame_id"],
+            framing_question=raw["framing_question"],
+            framing_token_char_span=(span[0], span[1]),
+            framing_category=raw["framing_category"],
+        )
+    return pool
+
+
+def _build_stimulus_chains(payload: dict, scope: str) -> list[StimulusChain]:
+    """Build StimulusChain[] for a given scope ∈ {main, frame_positive, calibration}."""
+    scope_to_key = {
+        "main": "main_chains",
+        "frame_positive": "frame_positive_chains",
+        "calibration": "calibration_chains",
+    }
+    if scope not in scope_to_key:
+        raise ValueError(f"unknown scope: {scope!r}")
+    chains_raw = payload[scope_to_key[scope]]
+    chains: list[StimulusChain] = []
+    for c in chains_raw:
+        chain_questions = tuple(
+            ChainQuestion(
+                turn_idx=cq["turn_idx"],
+                source=cq["source"],
+                q_idx=cq["q_idx"],
+                question=cq["question"],
+                gold=cq["gold"],
+            )
+            for cq in c["chain_questions"]
+        )
+        chains.append(StimulusChain(
+            chain_idx=c["chain_idx"],
+            frame_id=c["frame_id"],
+            chain_questions=chain_questions,
+        ))
+    return chains
+
+
+# ---------------------------------------------------------------------------
+# HuggingFace dataset loaders (lazy-imported; for q_idx ↔ text validation)
+# ---------------------------------------------------------------------------
+#
+# Per spec Chunk 3, the stimulus JSON's question/gold strings are the
+# canonical curation-time text. The HF datasets are loaded only as a
+# cross-check to flag drift (warning, not fatal) and to re-resolve text
+# if a curation-internal q_idx (e.g., synthetic_frame_positive_v1) is
+# absent. Lazy import avoids a hard `datasets` dependency for
+# --self-test runs.
+
+
+def _lazy_import_datasets():
+    try:
+        from datasets import load_dataset
+    except ImportError as e:
+        raise SchemaMismatchError(
+            f"`datasets` package not installed: {e}. "
+            f"Required for --collect; not required for --self-test."
+        ) from e
+    return load_dataset
+
+
+def _load_hf_truthfulqa_mc():
+    """Load TruthfulQA-MC validation split. Returns the HF dataset object."""
+    load_dataset = _lazy_import_datasets()
+    return load_dataset("truthful_qa", "multiple_choice", split="validation")
+
+
+def _load_hf_humaneval():
+    """Load HumanEval test split. Returns the HF dataset object."""
+    load_dataset = _lazy_import_datasets()
+    return load_dataset("openai_humaneval", split="test")
+
+
+# ---------------------------------------------------------------------------
+# Lazy torch + transformers loader (used only by --collect)
+# ---------------------------------------------------------------------------
+
+
+def _lazy_import_torch():
+    try:
+        import torch
+    except ImportError as e:
+        raise SchemaMismatchError(
+            f"`torch` not installed: {e}. Required for --collect."
+        ) from e
+    return torch
+
+
+def _lazy_import_transformers():
+    try:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+    except ImportError as e:
+        raise SchemaMismatchError(
+            f"`transformers` not installed: {e}. Required for --collect."
+        ) from e
+    return AutoModelForCausalLM, AutoTokenizer
+
+
+def _load_subject_model(model_id: str = QWEN_MODEL_ID_SUBJECT):
+    """Load Qwen-7B subject model + tokenizer; return (tokenizer, model)."""
+    AutoModelForCausalLM, AutoTokenizer = _lazy_import_transformers()
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id,
+        torch_dtype="auto",
+        device_map="auto",
+        output_hidden_states=False,  # turned on per-call in extraction passes
+    )
+    model.eval()
+    return tokenizer, model
+
+
+# ---------------------------------------------------------------------------
+# Framing-token resolver (char_span → tokenizer token positions)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_framing_token_positions(
+    tokenizer,
+    framing_question: str,
+    framing_token_char_span: tuple[int, int],
+    full_prompt_text: str,
+    full_prompt_input_ids,
+) -> tuple[int, int]:
+    """Return (start_tok_idx, end_tok_idx_exclusive) of framing span in
+    the full chat-template prompt's token sequence.
+
+    Strategy: locate the framing_question's character offset within the
+    full prompt text (via str.find), add the char_span offsets, then
+    re-tokenize the prefix segments to find token boundaries. This is
+    robust to chat-template chrome ([SYS] / [USER] markers, etc.) that
+    surround the user message.
+    """
+    fq_pos = full_prompt_text.find(framing_question)
+    if fq_pos < 0:
+        raise ValueError(
+            "framing_question not found verbatim in chat-template prompt; "
+            "tokenizer chat-template may be applying transformations"
+        )
+    char_start = fq_pos + framing_token_char_span[0]
+    char_end = fq_pos + framing_token_char_span[1]
+
+    # Tokenize prefix-up-to-char_start and prefix-up-to-char_end without
+    # special-token additions, count tokens.
+    prefix_to_start = full_prompt_text[:char_start]
+    prefix_to_end = full_prompt_text[:char_end]
+    n_tok_to_start = len(tokenizer.encode(prefix_to_start, add_special_tokens=False))
+    n_tok_to_end = len(tokenizer.encode(prefix_to_end, add_special_tokens=False))
+
+    # Sanity: end must be after start, and within full prompt length.
+    if not (n_tok_to_start < n_tok_to_end <= full_prompt_input_ids.shape[-1]):
+        raise ValueError(
+            f"framing-token resolution out of bounds: "
+            f"start={n_tok_to_start}, end={n_tok_to_end}, "
+            f"prompt_len={full_prompt_input_ids.shape[-1]}"
+        )
+    return n_tok_to_start, n_tok_to_end
+
+
+# ---------------------------------------------------------------------------
+# Pass A — iterative K=6 multi-turn extraction
+# ---------------------------------------------------------------------------
+#
+# For each chain, builds the K=6 chat-template prompt iteratively. At
+# each turn t ∈ {1, .., 6}:
+#   1. Apply chat template to the current messages list.
+#   2. Forward pass with output_hidden_states=True → capture s_t at
+#      the last token of the prompt (pre-decode position at the t-th
+#      [ASSISTANT] tag).
+#   3. If t == 1: also capture f_1 by pooling layer-(-1) hidden states
+#      over the framing-token positions inside the turn-1 user message.
+#   4. If t >= 2: capture a_prev by pooling layer-(-1) hidden states
+#      over the previous turn's assistant token positions in the prompt.
+#   5. Generate the t-th assistant response (greedy, max 64 tokens).
+#   6. Append to messages list.
+#
+# After all 6 turns, run a separate single forward pass per turn 2..6
+# with the prompt+generated response combined to capture r_t_response
+# (mean-pooled response tokens, layer -1, fp32) for the disclosure-only
+# response-side variant.
+
+
+def extract_pass_a_iterative(
+    tokenizer,
+    model,
+    chain: StimulusChain,
+    framing: FramingPoolItem,
+    chain_scope: str,
+) -> ChainExtraction:
+    """K=6 iterative multi-turn forward+decode for one chain.
+
+    Returns a ChainExtraction with all 4 vector arrays + decoded text.
+    Caller (orchestrator in I-5) is responsible for batching across chains.
+    """
+    import numpy as np
+    torch = _lazy_import_torch()
+
+    n_eval = K_TURNS - 1  # 5 evaluation turns (turn 2..6)
+    s_t_arr = np.zeros((n_eval, HIDDEN_DIM), dtype=np.float32)
+    q_t_arr_placeholder = np.zeros((n_eval, HIDDEN_DIM), dtype=np.float32)  # filled in Pass B
+    a_prev_arr = np.zeros((n_eval, HIDDEN_DIM), dtype=np.float32)
+    f_1_arr = np.zeros((HIDDEN_DIM,), dtype=np.float32)
+    r_t_response_arr = np.zeros((n_eval, HIDDEN_DIM), dtype=np.float32)
+
+    turn_responses_list: list[str] = []
+    turn_1_response = ""
+    framing_token_ids: tuple[int, ...] = ()
+
+    # Build messages iteratively.
+    messages: list[dict] = [{"role": "user", "content": framing.framing_question}]
+    target_device = next(model.parameters()).device
+
+    # Decoded turn-(t-1) assistant text positions in the rolling prompt are
+    # tracked by re-tokenizing prefixes; simpler than parsing chat-template
+    # internals. Each iteration re-applies the chat template fresh.
+
+    for t in range(1, K_TURNS + 1):
+        prompt_text = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True,
+        )
+        encoded = tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True,
+            return_tensors="pt", return_dict=True,
+        )
+        input_ids = encoded["input_ids"].to(target_device)
+        attention_mask = encoded["attention_mask"].to(target_device)
+        prompt_len = input_ids.shape[-1]
+
+        with torch.no_grad():
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                use_cache=False,
+            )
+        # Last layer's hidden state at last (pre-decode) position.
+        hidden_last = outputs.hidden_states[LAYER_IDX][0]  # (seq_len, HIDDEN_DIM)
+        s_t_full_context = hidden_last[-1].detach().to(torch.float32).cpu().numpy()
+
+        if t == 1:
+            f1_start, f1_end = _resolve_framing_token_positions(
+                tokenizer,
+                framing.framing_question,
+                framing.framing_token_char_span,
+                prompt_text,
+                input_ids,
+            )
+            f_1_arr[:] = (
+                hidden_last[f1_start:f1_end]
+                .mean(dim=0)
+                .detach().to(torch.float32).cpu().numpy()
+            )
+            framing_token_ids = tuple(
+                int(x) for x in input_ids[0, f1_start:f1_end].tolist()
+            )
+
+        if t >= 2:
+            # s_t goes into row (t-2) of the n_eval=5 array.
+            s_t_arr[t - 2] = s_t_full_context
+
+            # a_prev: pool over the previous turn's assistant message tokens.
+            # Find them by tokenizing the prompt up to the start of the
+            # previous assistant message, then up to the end.
+            prev_assistant_text = messages[-1]["content"]
+            prev_pos = prompt_text.rfind(prev_assistant_text)
+            if prev_pos < 0:
+                raise ValueError(
+                    f"chain {chain.chain_idx} turn {t}: previous assistant "
+                    f"text not located in prompt (chat-template drift?)"
+                )
+            n_tok_to_prev_start = len(
+                tokenizer.encode(prompt_text[:prev_pos], add_special_tokens=False)
+            )
+            n_tok_to_prev_end = len(
+                tokenizer.encode(
+                    prompt_text[:prev_pos + len(prev_assistant_text)],
+                    add_special_tokens=False,
+                )
+            )
+            n_tok_to_prev_end = min(n_tok_to_prev_end, prompt_len)
+            if n_tok_to_prev_start >= n_tok_to_prev_end:
+                raise ValueError(
+                    f"chain {chain.chain_idx} turn {t}: a_prev token range "
+                    f"degenerate ({n_tok_to_prev_start}..{n_tok_to_prev_end})"
+                )
+            a_prev_arr[t - 2] = (
+                hidden_last[n_tok_to_prev_start:n_tok_to_prev_end]
+                .mean(dim=0)
+                .detach().to(torch.float32).cpu().numpy()
+            )
+
+        # Decode the t-th assistant response.
+        with torch.no_grad():
+            out_ids = model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                max_new_tokens=MAX_NEW_TOKENS_SUBJECT,
+                do_sample=False,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        new_tokens = out_ids[0, prompt_len:]
+        response_text = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+        if t == 1:
+            turn_1_response = response_text
+        else:
+            turn_responses_list.append(response_text)
+
+            # r_t_response disclosure: a forward pass over (prompt + response)
+            # to pool layer-(-1) over the response token positions.
+            full_ids = out_ids[:, :prompt_len + new_tokens.shape[0]].to(target_device)
+            full_attn = torch.ones_like(full_ids)
+            with torch.no_grad():
+                resp_outputs = model(
+                    input_ids=full_ids,
+                    attention_mask=full_attn,
+                    output_hidden_states=True,
+                    use_cache=False,
+                )
+            resp_hidden = resp_outputs.hidden_states[LAYER_IDX][0]
+            if new_tokens.shape[0] >= 1:
+                r_t_response_arr[t - 2] = (
+                    resp_hidden[prompt_len:prompt_len + new_tokens.shape[0]]
+                    .mean(dim=0)
+                    .detach().to(torch.float32).cpu().numpy()
+                )
+
+        messages.append({"role": "assistant", "content": response_text})
+
+    return ChainExtraction(
+        chain_idx=chain.chain_idx,
+        frame_id=chain.frame_id,
+        chain_scope=chain_scope,
+        s_t=s_t_arr,
+        q_t=q_t_arr_placeholder,
+        a_prev=a_prev_arr,
+        f_1=f_1_arr,
+        r_t_response=r_t_response_arr,
+        turn_responses=tuple(turn_responses_list),
+        turn_1_response=turn_1_response,
+        framing_token_ids=framing_token_ids,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pass B — standalone Q_t hidden state (q_t)
+# ---------------------------------------------------------------------------
+#
+# For each (chain, turn t ∈ 2..6), build a fresh chat-template prompt
+# with ONLY the standalone turn-t question (no turn-1 framing, no prior
+# assistant turns). Forward pass; capture last-token hidden state at
+# layer -1 — this is q_t per spec Chunk 2 Choice 2.
+
+
+def extract_pass_b_standalone(
+    tokenizer,
+    model,
+    chain: StimulusChain,
+) -> Any:
+    """Run K-1 = 5 standalone forward passes for one chain.
+
+    Returns a numpy array of shape (5, HIDDEN_DIM) holding the q_t
+    vectors for turns 2..6 of this chain. Caller wires these into
+    the chain's ChainExtraction.q_t field, replacing the placeholder
+    written by Pass A.
+    """
+    import numpy as np
+    torch = _lazy_import_torch()
+
+    n_eval = K_TURNS - 1
+    q_t_arr = np.zeros((n_eval, HIDDEN_DIM), dtype=np.float32)
+    target_device = next(model.parameters()).device
+
+    for cq in chain.chain_questions:
+        messages = [{"role": "user", "content": cq.question}]
+        encoded = tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True,
+            return_tensors="pt", return_dict=True,
+        )
+        input_ids = encoded["input_ids"].to(target_device)
+        attention_mask = encoded["attention_mask"].to(target_device)
+
+        with torch.no_grad():
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                use_cache=False,
+            )
+        hidden_last = outputs.hidden_states[LAYER_IDX][0]  # (seq_len, HIDDEN_DIM)
+        q_t_arr[cq.turn_idx - 2] = (
+            hidden_last[-1].detach().to(torch.float32).cpu().numpy()
+        )
+
+    return q_t_arr
+
+
+# ---------------------------------------------------------------------------
+# Cache I/O — save/load extractions as .npz (~40 MB, see spec Chunk 5)
+# ---------------------------------------------------------------------------
+#
+# Layout:
+#   schema_version              str          "15.14-extractions"
+#   stimulus_sha256             str          (pinned)
+#   chain_scope                 (N,) object  per-chain scope
+#   chain_idx                   (N,) int64
+#   frame_id                    (N,) object
+#   s_t                         (N, 5, HIDDEN_DIM) float32
+#   q_t                         (N, 5, HIDDEN_DIM) float32
+#   a_prev                      (N, 5, HIDDEN_DIM) float32
+#   f_1                         (N, HIDDEN_DIM) float32
+#   r_t_response                (N, 5, HIDDEN_DIM) float32
+#   turn_1_response             (N,) object   variable-length string
+#   turn_responses              (N, 5) object variable-length strings
+#   framing_token_ids           (N,) object   variable-length int tuples
+#
+# Chains are flattened across all three scopes in the same arrays;
+# chain_scope distinguishes them.
+
+
+_EXTRACTION_CACHE_SCHEMA_VERSION = "15.14-extractions"
+
+
+def save_extractions_cache(
+    extractions: list[ChainExtraction],
+    stimulus_sha: str,
+    out_path: Path = DEFAULT_EXTRACTIONS_NPZ_PATH,
+) -> None:
+    """Atomic .npz write: serialize all extractions for resume on Pass C."""
+    import numpy as np
+
+    n = len(extractions)
+    chain_scope = np.array([e.chain_scope for e in extractions], dtype=object)
+    chain_idx = np.array([e.chain_idx for e in extractions], dtype=np.int64)
+    frame_id = np.array([e.frame_id for e in extractions], dtype=object)
+    s_t = np.stack([e.s_t for e in extractions], axis=0).astype(np.float32)
+    q_t = np.stack([e.q_t for e in extractions], axis=0).astype(np.float32)
+    a_prev = np.stack([e.a_prev for e in extractions], axis=0).astype(np.float32)
+    f_1 = np.stack([e.f_1 for e in extractions], axis=0).astype(np.float32)
+    r_t_response = np.stack([e.r_t_response for e in extractions], axis=0).astype(np.float32)
+    turn_1_response = np.array([e.turn_1_response for e in extractions], dtype=object)
+    turn_responses = np.array(
+        [list(e.turn_responses) for e in extractions], dtype=object,
+    )
+    framing_token_ids = np.array(
+        [list(e.framing_token_ids) for e in extractions], dtype=object,
+    )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    np.savez_compressed(
+        tmp_path,
+        schema_version=np.array([_EXTRACTION_CACHE_SCHEMA_VERSION], dtype=object),
+        stimulus_sha256=np.array([stimulus_sha], dtype=object),
+        n_chains=np.array([n], dtype=np.int64),
+        chain_scope=chain_scope,
+        chain_idx=chain_idx,
+        frame_id=frame_id,
+        s_t=s_t,
+        q_t=q_t,
+        a_prev=a_prev,
+        f_1=f_1,
+        r_t_response=r_t_response,
+        turn_1_response=turn_1_response,
+        turn_responses=turn_responses,
+        framing_token_ids=framing_token_ids,
+    )
+    tmp_path.replace(out_path)
+
+
+def load_extractions_cache(
+    in_path: Path = DEFAULT_EXTRACTIONS_NPZ_PATH,
+    expected_stimulus_sha: str = EXPECTED_STIMULUS_SHA,
+) -> list[ChainExtraction]:
+    """Load + validate extractions cache; return list[ChainExtraction]."""
+    import numpy as np
+
+    if not in_path.exists():
+        raise SchemaMismatchError(f"extractions cache not found: {in_path}")
+    data = np.load(in_path, allow_pickle=True)
+    sv = str(data["schema_version"][0])
+    if sv != _EXTRACTION_CACHE_SCHEMA_VERSION:
+        raise SchemaMismatchError(
+            f"extractions cache schema_version mismatch: expected "
+            f"{_EXTRACTION_CACHE_SCHEMA_VERSION!r}, got {sv!r}"
+        )
+    cache_stim_sha = str(data["stimulus_sha256"][0])
+    if cache_stim_sha != expected_stimulus_sha:
+        raise SchemaMismatchError(
+            f"extractions cache stimulus_sha256 mismatch: "
+            f"got {cache_stim_sha}, expected {expected_stimulus_sha}"
+        )
+
+    n = int(data["n_chains"][0])
+    extractions: list[ChainExtraction] = []
+    for i in range(n):
+        extractions.append(ChainExtraction(
+            chain_idx=int(data["chain_idx"][i]),
+            frame_id=str(data["frame_id"][i]),
+            chain_scope=str(data["chain_scope"][i]),
+            s_t=data["s_t"][i],
+            q_t=data["q_t"][i],
+            a_prev=data["a_prev"][i],
+            f_1=data["f_1"][i],
+            r_t_response=data["r_t_response"][i],
+            turn_responses=tuple(data["turn_responses"][i]),
+            turn_1_response=str(data["turn_1_response"][i]),
+            framing_token_ids=tuple(int(x) for x in data["framing_token_ids"][i]),
+        ))
+    return extractions
