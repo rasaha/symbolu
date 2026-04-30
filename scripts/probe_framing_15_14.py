@@ -2424,3 +2424,170 @@ def enforce_firewall_or_exit(text: str, context: str = "<markdown>") -> None:
             "was written.\n"
         )
         sys.exit(EXIT_INTERPRETATION_VIOLATION)
+
+
+# ===========================================================================
+# I-4b: Self-test gate orchestrator
+# ===========================================================================
+#
+# Runs four sub-tests before any data inspection. Any failure → exit 3
+# SELF_TEST_FAILED. The gate is invoked by the CLI under --self-test
+# and as the first step of the default end-to-end flow (in I-5).
+#
+#   1. _self_test_cascade        — all 12 SELF_TEST_CASCADE_CASES produce
+#                                   the expected verdict via
+#                                   classify_cascade_framing.
+#   2. _self_test_cosine_invariants — synthetic cosine identities:
+#                                   cos(u, u) = 1, cos(u, -u) = -1,
+#                                   cos(u, orthogonal) = 0 (within fp64
+#                                   tolerance).
+#   3. _self_test_firewall       — 52-pattern coverage: every pattern is
+#                                   flagged on a positive sample; clean
+#                                   §15.14-style text produces zero
+#                                   false positives.
+#   4. _self_test_topical_disjointness — synthetic stimulus pairs:
+#                                   confirm the validator's rule fires
+#                                   on a vocabulary-overlapping question
+#                                   and clears on a disjoint one.
+#
+# Returns 0 on full pass; raises SystemExit(3) on any failure.
+
+
+def _self_test_cascade() -> None:
+    """Run all 12 cascade self-test cases; assert each produces expected label."""
+    for c in SELF_TEST_CASCADE_CASES:
+        v = classify_cascade_framing(
+            c.auc_framing, c.auc_topic_to_framing, c.auc_recency,
+        )
+        if v.label != c.expected:
+            sys.stderr.write(
+                f"SELF_TEST_FAILED: cascade case {c.case_idx} mismatch.\n"
+                f"  inputs: auc_framing={c.auc_framing}, "
+                f"topic={c.auc_topic_to_framing}, recency={c.auc_recency}\n"
+                f"  expected: {c.expected.value}\n"
+                f"  got:      {v.label.value}\n"
+                f"  rationale: {c.rationale}\n"
+            )
+            sys.exit(EXIT_SELF_TEST_FAILED)
+
+
+def _self_test_cosine_invariants() -> None:
+    """Sanity-check fp64 cosine: identity, anti-parallel, orthogonal."""
+    import numpy as np
+
+    rng = np.random.default_rng(seed=15_14_0)
+    u = rng.standard_normal(HIDDEN_DIM)
+    v_orth = np.zeros(HIDDEN_DIM)
+    # Build an orthogonal vector by Gram-Schmidt.
+    w = rng.standard_normal(HIDDEN_DIM)
+    v_orth = w - (w @ u) / (u @ u) * u
+
+    cases = [
+        ("cos(u, u)", _cosine_fp64(u, u), 1.0),
+        ("cos(u, -u)", _cosine_fp64(u, -u), -1.0),
+        ("cos(u, orthogonal)", _cosine_fp64(u, v_orth), 0.0),
+    ]
+    for label, got, expected in cases:
+        if not (abs(got - expected) < 1e-9):
+            sys.stderr.write(
+                f"SELF_TEST_FAILED: cosine invariant '{label}' = {got} "
+                f"(expected {expected}; tolerance 1e-9)\n"
+            )
+            sys.exit(EXIT_SELF_TEST_FAILED)
+
+
+def _self_test_firewall() -> None:
+    """Verify each of 52 patterns is detected; verify clean text passes."""
+    # 52-pattern coverage: each pattern must flag on a positive sample.
+    for p in ALL_FIREWALL_PATTERNS:
+        # Surround with prose so we test substring match, not exact match.
+        sample = f"prelude {p} postlude"
+        found = scan_for_forbidden_patterns(sample)
+        if not any(p == m or p.lower() == m.lower() for m in found):
+            sys.stderr.write(
+                f"SELF_TEST_FAILED: firewall pattern not detected on positive "
+                f"sample.\n  pattern: {p!r}\n  sample:  {sample!r}\n"
+                f"  matched: {found}\n"
+            )
+            sys.exit(EXIT_SELF_TEST_FAILED)
+
+    # Clean §15.14-style markdown with NONE of the forbidden patterns.
+    clean_samples = [
+        "## §15.14 cascade verdict\n\nNO_MATERIAL_SIGNAL_IN_FRAMING. Direction held.",
+        "Per §15.14 spec Chunk 4, the cascade lands NO_MATERIAL_SIGNAL_IN_FRAMING.",
+        "auc_framing = 0.5300; the BCVF-faithful direction held. R_topic_to_framing was the comparator.",
+        "§15.13 NO_MATERIAL_SIGNAL_IN_INERTIA preserved. §15.14 result is independent.",
+    ]
+    for s in clean_samples:
+        found = scan_for_forbidden_patterns(s)
+        if found:
+            sys.stderr.write(
+                f"SELF_TEST_FAILED: firewall false-positive on clean sample.\n"
+                f"  sample: {s!r}\n  matched: {found}\n"
+            )
+            sys.exit(EXIT_SELF_TEST_FAILED)
+
+
+def _self_test_topical_disjointness() -> None:
+    """Synthetic disjointness check: rule fires on overlap, clears on disjoint."""
+    overlap_question = "Does astrology predict ocean tides?"
+    framing_question = "Using astrology metaphors, explain why ocean tides change daily."
+    framing_substr = "astrology metaphors"
+    firewall = _tokenize_for_disjointness(framing_substr)
+
+    overlap_tokens = _tokenize_for_disjointness(overlap_question)
+    overlap_shared = firewall & overlap_tokens
+    if not overlap_shared:
+        sys.stderr.write(
+            f"SELF_TEST_FAILED: disjointness rule did not flag obvious overlap.\n"
+            f"  framing firewall tokens: {sorted(firewall)}\n"
+            f"  question tokens: {sorted(overlap_tokens)}\n"
+        )
+        sys.exit(EXIT_SELF_TEST_FAILED)
+
+    disjoint_question = "What is the boiling point of water?"
+    disjoint_tokens = _tokenize_for_disjointness(disjoint_question)
+    disjoint_shared = firewall & disjoint_tokens
+    if disjoint_shared:
+        sys.stderr.write(
+            f"SELF_TEST_FAILED: disjointness rule false-positive on disjoint "
+            f"question.\n"
+            f"  shared tokens: {sorted(disjoint_shared)}\n"
+        )
+        sys.exit(EXIT_SELF_TEST_FAILED)
+
+
+def run_self_test_gate(*, verbose: bool = True) -> int:
+    """Run all four sub-tests; return 0 on pass, sys.exit(3) on fail."""
+    if verbose:
+        print("§15.14 self-test gate")
+        print("=" * 50)
+
+    if verbose:
+        print("[1/4] cascade boundary cases (12) ...")
+    _self_test_cascade()
+    if verbose:
+        print("       PASS ✓ all 12 cascade cases produce expected verdicts")
+
+    if verbose:
+        print("[2/4] cosine fp64 invariants (3) ...")
+    _self_test_cosine_invariants()
+    if verbose:
+        print("       PASS ✓ cos(u,u)=1, cos(u,-u)=-1, cos(u,⊥)=0 within 1e-9")
+
+    if verbose:
+        print(f"[3/4] firewall pattern coverage (52) + clean negative ...")
+    _self_test_firewall()
+    if verbose:
+        print(f"       PASS ✓ all 52 patterns flagged; 4 clean samples produce 0 matches")
+
+    if verbose:
+        print("[4/4] topical-disjointness rule (positive + negative) ...")
+    _self_test_topical_disjointness()
+    if verbose:
+        print("       PASS ✓ rule fires on overlap, clears on disjoint")
+
+    if verbose:
+        print("=" * 50)
+        print(f"SELF-TEST GATE: ALL PASS ({EXPECTED_FIREWALL_PATTERN_COUNT}-pattern firewall + 12 cascade + 3 cosine + disjointness)")
+    return EXIT_SUCCESS
