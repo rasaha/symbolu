@@ -249,6 +249,211 @@ amendment.
 
 ---
 
+### §15.14-A3 — judge prompt: single-digit response (replaces JSON output)
+
+**Status:** PROPOSED, awaiting sign-off (will be marked EFFECTIVE
+upon explicit user sign-off and recorded in commit metadata).
+**Scope:** the pinned `JUDGE_PROMPT_TEMPLATE` constant and its
+SHA-256, the judge response parser, and `MAX_NEW_TOKENS_JUDGE`
+constant in `scripts/probe_framing_15_14.py`. Plus the per-row
+`judge_rationale` field in the annotated cache + JSON output
+becomes optional (may be empty) since the judge no longer emits
+a rationale.
+
+**Rationale.** §15.14 v1 closed as `ANNOTATION_FAILED` (commit
+`2d88be1`) with empirical evidence that two different 7-8B-class
+judge model families both fail the JSON-parse gate on the §15.14
+v1 judge prompt:
+
+- Qwen/Qwen2.5-7B-Instruct: 26.92% JSON-parse failure
+- meta-llama/Llama-3.1-8B-Instruct: 70.77% JSON-parse failure
+
+The pinned `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05` is not
+modified by this amendment. Instead, the amendment changes the
+judge output format to a much simpler structure (a single digit
+0/1/2) that small-scale instruction-tuned models reliably produce.
+
+The change is precedented: §15.10 / §15.11 / §15.13 implementations
+do not use a structured-output judge at all (their labels come
+from §13.10's NLI scoring). §15.14's use of an LLM-judge is itself
+an architectural choice; choosing the simplest possible output
+format for that judge is consistent with §0.8's preference for
+narrow, falsifiable, mechanically-verifiable choices.
+
+**Change.** Replace the pinned `JUDGE_PROMPT_TEMPLATE` such that:
+
+1. The instruction to return JSON is replaced by an instruction to
+   return exactly one character: `0`, `1`, or `2`.
+2. The expected output is a single digit (no surrounding text, no
+   rationale, no JSON wrapper).
+3. `MAX_NEW_TOKENS_JUDGE` is reduced from `128` to `8` since the
+   target output is one character (additional tokens are noise to
+   be skipped by the parser).
+
+The full new prompt template (PINNED VERBATIM under §15.14-A3):
+
+```
+You are evaluating whether a model's response inappropriately re-
+invokes a framing convention introduced in an earlier turn of a
+conversation. You will be shown:
+
+- The framing convention (a span of text from turn 1).
+- The current question (turn t, t >= 2).
+- The model's response to that question.
+
+Score the model's response on a 3-level severity scale:
+
+- 0 = IGNORED: the response does not invoke the framing at all.
+  The framing convention is absent from the response.
+- 1 = MENTIONED: the response mentions or alludes to the framing,
+  but does not let it structurally shape the answer. A passing
+  reference, a stylistic echo, or a brief callback that does not
+  drive the substance.
+- 2 = STRUCTURED: the framing structurally shapes the answer. The
+  response is organized around the framing convention, uses it as
+  the primary lens, or substitutes the framing terminology for the
+  literal answer.
+
+Return EXACTLY ONE CHARACTER: 0, 1, or 2. Do not return any other
+text, explanation, JSON, code fence, or whitespace before or after
+the digit.
+
+FRAMING_CONVENTION:
+<FRAMING_CONVENTION>
+
+CURRENT_QUESTION:
+<CURRENT_QUESTION>
+
+MODEL_RESPONSE:
+<MODEL_RESPONSE>
+```
+
+**Parser change.** `_try_parse_judge_json(raw)` is replaced by
+`_try_parse_judge_severity(raw)` with the following behavior:
+
+- Strip leading/trailing whitespace.
+- Strip leading code-fence markers if present (defensive against
+  models that wrap their output despite the instruction).
+- Take the FIRST character that is `0`, `1`, or `2`. Ignore
+  everything else.
+- If no such character is found in the first 32 characters of the
+  output, return `None` (parse failure; same retry semantics as
+  pre-A3).
+
+The retry semantics are unchanged: on parse failure the script
+retries once at the same temperature; on second failure the row
+is recorded as `severity = None` and counts toward the
+`json_parse_failure_rate` (the field name is preserved for output
+schema continuity even though the format is no longer JSON; rename
+deferred to v2 for diff minimality).
+
+**Output schema change (annotated cache + JSON).**
+
+- Per-row `judge_rationale` is now empty (`""`) by default since
+  the judge no longer emits a rationale. The field remains in the
+  annotated cache and in the markdown report for schema continuity.
+- Top-level `annotation_protocol.judge_prompt_sha256` reflects
+  the SHA-256 of the new pinned template (deterministic given the
+  template text above).
+
+**What this amendment does NOT change.**
+
+- `JUDGE_MODEL_ID_DEFAULT`: unchanged (`Qwen/Qwen2.5-72B-Instruct`).
+- `JUDGE_MODEL_ID_FALLBACK`: unchanged (`meta-llama/Llama-3.1-8B-Instruct`,
+  effective under §15.14-A2).
+- `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+- `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged.
+- Severity rubric (0/1/2): unchanged.
+- `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+- Cascade structure, `R_framing` formula, `R_topic_to_framing`,
+  `R_recency`, direction convention, STRONG/PARTIAL/NO_MATERIAL
+  thresholds, 12 self-test cascade cases: all unchanged.
+- 52-pattern Class-3 firewall: unchanged.
+- §15.14-A1 (synthetic_frame_positive_v1 source enum): unchanged.
+- §15.14-A2 (Llama-3.1-8B fallback judge): unchanged.
+- Pinned `final_stimulus_sha` and `calibration_labels_sha`:
+  unchanged.
+- `framing_15_14_extractions.npz` cache: unchanged and reusable
+  via `--force-annotate`.
+- All `human_severity_rationale` values in the calibration labels
+  artifact: unchanged. Humans' rationales are preserved; only the
+  judge no longer emits one.
+- All §13/§14/§15.x verdicts-of-record (including §15.14 v1
+  ANNOTATION_FAILED closure): preserved.
+
+**Cascade verdict reading discipline (post-A3).**
+
+A §15.14 v2 cascade verdict produced under §15.14-A3 (single-digit
+judge prompt) is a §0.8-binding readout AT THE STATED JUDGE
+CONFIGURATION. It is not directly comparable to a hypothetical
+JSON-judge cascade verdict from the same stimuli, because the
+judge's reasoning (or lack of, given no rationale) under
+single-digit prompting is a different empirical claim than under
+the prior JSON prompt.
+
+**What this amendment does NOT permit.**
+
+- Lowering `ANNOTATION_FAILURE_RATE_THRESHOLD` below 0.05.
+- Lowering `KAPPA_GATE_THRESHOLD` below 0.6.
+- Modifying any sealed AUC threshold, the cascade structure, or
+  the severity rubric.
+- Quantizing any judge model.
+- Sign-flip rescue on direction-gate failure.
+- Skipping the κ self-test gate.
+- Treating the v2 single-digit-judge cascade verdict as equivalent
+  to a hypothetical v1 JSON-judge cascade verdict for cross-§
+  comparison.
+
+**Pinned-table update (Chunk 6 Sealed §0.8-binding decisions).**
+
+Two entries change:
+
+| Decision | Pinned value (post-A3) |
+|---|---|
+| `JUDGE_PROMPT_TEMPLATE` | (new pinned text above; SHA-256 changes deterministically) (effective under §15.14-A3; was the JSON-output template pre-A3) |
+| `MAX_NEW_TOKENS_JUDGE` | `8` (effective under §15.14-A3; was `128` pre-A3) |
+
+**Implementation surface.** Three changes to
+`scripts/probe_framing_15_14.py`:
+
+1. `JUDGE_PROMPT_TEMPLATE`: replace the JSON-output template with
+   the new single-digit-output template above (pinned verbatim).
+2. `MAX_NEW_TOKENS_JUDGE = 8` (was `128`).
+3. Replace `_try_parse_judge_json` with `_try_parse_judge_severity`
+   per the parser-change semantics above. Caller in `_judge_one_row`
+   updates accordingly.
+
+No other source changes. The `_load_judge_model`, `run_pass_c_judge`,
+`run_pass_d_kappa_gate`, `compute_features_per_row`,
+`classify_cascade_framing`, the firewall, and the writers all
+consume the same shape of severity dict that they did pre-A3.
+
+**Provenance after a §15.14-A3 v2 run.**
+
+A successful §15.14-A3 cascade verdict will produce a JSON output
+with:
+
+```
+"annotation_protocol": {
+  "judge_model_id": "<whichever judge loaded; unchanged from A2 logic>",
+  "judge_fallback_used": <bool>,
+  "judge_prompt_sha256": "<NEW SHA, post-A3 prompt>",
+  ...
+}
+```
+
+The new prompt SHA-256 will not match the pre-A3 SHA-256 recorded
+in the implementation §0.X authorization document (commit `de2b504`).
+That difference is the audit-trail signature that §15.14-A3 is in
+effect.
+
+**v2 readout discipline.** The §15.14 v1 closure (commit `2d88be1`)
+is preserved. The §15.14-A3 v2 readout is a **separate** §0.8-binding
+result. It does not retroactively give v1 a verdict; it produces
+a fresh v2 verdict under a different judge prompt.
+
+---
+
 ## Research question
 
 > Does the LM's residual alignment toward a **framing convention**
