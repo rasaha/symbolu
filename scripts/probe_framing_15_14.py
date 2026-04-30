@@ -2248,3 +2248,179 @@ def run_framing_probe(
     )
     verdict = classify_cascade_framing(auc_framing, auc_topic, auc_recency)
     return probe, verdict
+
+
+# ===========================================================================
+# I-4a: Class-3 firewall scanner (52 patterns; per §15.14 spec Chunk 5)
+# ===========================================================================
+#
+# The firewall scans rendered markdown for forbidden override-language
+# BEFORE the markdown is written to disk. Detection → exit code 4
+# INTERPRETATION_VIOLATION; nothing is written. Every pattern is matched
+# case-insensitively for non-§ patterns and case-sensitively / literal
+# for §-anchored patterns (preserves precise §-numbering semantics).
+#
+# Pattern inventory (PINNED VERBATIM from §15.14 spec Chunk 5 firewall):
+#   16 inherited from §15.10 / §15.7
+#   10 inherited from §15.11
+#   10 inherited from §15.12
+#    8 inherited from §15.13
+#    8 §15.14-specific
+#  ----
+#   52 total → must match EXPECTED_FIREWALL_PATTERN_COUNT
+
+
+_FIREWALL_PATTERNS_INHERITED_15_10_15_7: tuple[str, ...] = (
+    "verdict was wrong",
+    "verdict is wrong",
+    "should be re-classified",
+    "should be reclassified",
+    "is invalid because",
+    "§13.9 should be relaxed",
+    "§13.9 hold should be",
+    "§13.9 hold can be",
+    "§15.8 authorized",
+    "§15.8 is authorized",
+    "§6.1 is strengthened",
+    "autonomy result is strengthened",
+    "actually STRONG",
+    "should be classified as STRONG",
+    "actually PARTIAL despite",
+    "STRONG despite the cascade",
+)
+
+_FIREWALL_PATTERNS_INHERITED_15_11: tuple[str, ...] = (
+    "actually STRONG_SIGNAL_IN_PHASE_COHERENCE despite",
+    "should be STRONG_SIGNAL_IN_PHASE_COHERENCE",
+    "actually PARTIAL_SIGNAL_IN_PHASE_COHERENCE despite",
+    "should be classified as PARTIAL_SIGNAL_IN_PHASE_COHERENCE",
+    "the wrong-direction failure should be flipped",
+    "the direction gate should be relaxed",
+    "the BCVF-faithful direction was wrong",
+    "§15.10 PARTIAL is overturned",
+    "§15.10 verdict is overturned",
+    "§13.10 baseline should be replaced",
+)
+
+_FIREWALL_PATTERNS_INHERITED_15_12: tuple[str, ...] = (
+    "§15.10 PARTIAL was wrong",
+    "§15.10 PARTIAL should be relaxed",
+    "§15.11 NO_MATERIAL should be relaxed",
+    "§15.11 direction gate should be relaxed",
+    "the bootstrap test was inappropriate",
+    "the bootstrap test should be replaced",
+    "§15.12 closure should be reopened",
+    "§15.12 should authorize REOPEN",
+    "§6.1 N=21 sign test was wrong",
+    "the autonomy result is invalidated",
+)
+
+_FIREWALL_PATTERNS_INHERITED_15_13: tuple[str, ...] = (
+    "actually STRONG_SIGNAL_IN_INERTIA despite",
+    "should be STRONG_SIGNAL_IN_INERTIA",
+    "actually PARTIAL_SIGNAL_IN_INERTIA despite",
+    "should be classified as PARTIAL_SIGNAL_IN_INERTIA",
+    "the R_sim comparator should be ignored",
+    "the same-family pairing was a mistake",
+    "the pooling over R_A tokens was wrong",
+    "the chance baseline alone is sufficient",
+)
+
+_FIREWALL_PATTERNS_15_14_SPECIFIC: tuple[str, ...] = (
+    "actually STRONG_SIGNAL_IN_FRAMING despite",
+    "should be STRONG_SIGNAL_IN_FRAMING",
+    "actually PARTIAL_SIGNAL_IN_FRAMING despite",
+    "should be classified as PARTIAL_SIGNAL_IN_FRAMING",
+    "the R_topic_to_framing comparator should be ignored",
+    "the R_recency comparator should be ignored",
+    "the κ self-test gate was inappropriate",
+    "§15.13 NO_MATERIAL_SIGNAL_IN_INERTIA is overturned",
+)
+
+# Patterns that must be matched LITERALLY (case-sensitive) — these contain
+# §-numbers whose precise capitalization is part of the audit trail.
+_FIREWALL_LITERAL_PATTERNS: frozenset[str] = frozenset(
+    p for p in (
+        _FIREWALL_PATTERNS_INHERITED_15_10_15_7
+        + _FIREWALL_PATTERNS_INHERITED_15_11
+        + _FIREWALL_PATTERNS_INHERITED_15_12
+        + _FIREWALL_PATTERNS_INHERITED_15_13
+        + _FIREWALL_PATTERNS_15_14_SPECIFIC
+    ) if "§" in p
+)
+
+# Patterns that match case-insensitively (no §-anchored language).
+_FIREWALL_ICASE_PATTERNS: frozenset[str] = frozenset(
+    p for p in (
+        _FIREWALL_PATTERNS_INHERITED_15_10_15_7
+        + _FIREWALL_PATTERNS_INHERITED_15_11
+        + _FIREWALL_PATTERNS_INHERITED_15_12
+        + _FIREWALL_PATTERNS_INHERITED_15_13
+        + _FIREWALL_PATTERNS_15_14_SPECIFIC
+    ) if "§" not in p
+)
+
+ALL_FIREWALL_PATTERNS: tuple[str, ...] = (
+    _FIREWALL_PATTERNS_INHERITED_15_10_15_7
+    + _FIREWALL_PATTERNS_INHERITED_15_11
+    + _FIREWALL_PATTERNS_INHERITED_15_12
+    + _FIREWALL_PATTERNS_INHERITED_15_13
+    + _FIREWALL_PATTERNS_15_14_SPECIFIC
+)
+
+
+def _firewall_pattern_count_assertion() -> None:
+    """Module-load-time invariant: exactly 52 patterns."""
+    if len(ALL_FIREWALL_PATTERNS) != EXPECTED_FIREWALL_PATTERN_COUNT:
+        raise AssertionError(
+            f"§15.14 spec Chunk 5 pins exactly "
+            f"{EXPECTED_FIREWALL_PATTERN_COUNT} firewall patterns; "
+            f"got {len(ALL_FIREWALL_PATTERNS)}"
+        )
+    if len(set(ALL_FIREWALL_PATTERNS)) != EXPECTED_FIREWALL_PATTERN_COUNT:
+        raise AssertionError(
+            f"firewall patterns contain duplicates"
+        )
+
+
+_firewall_pattern_count_assertion()
+
+
+def scan_for_forbidden_patterns(text: str) -> list[str]:
+    """Return list of forbidden patterns found in `text`.
+
+    Empty list = clean. Caller (markdown writer in I-4d) calls
+    enforce_firewall_or_exit on the rendered markdown before write.
+    """
+    found: list[str] = []
+    text_lower = text.lower()
+    for p in _FIREWALL_ICASE_PATTERNS:
+        if p.lower() in text_lower:
+            found.append(p)
+    for p in _FIREWALL_LITERAL_PATTERNS:
+        if p in text:
+            found.append(p)
+    return found
+
+
+def enforce_firewall_or_exit(text: str, context: str = "<markdown>") -> None:
+    """Raise SystemExit(EXIT_INTERPRETATION_VIOLATION) on any forbidden match.
+
+    The diagnostic identifies WHICH patterns matched so that the
+    operator can locate the offending sentence(s) before any artifact
+    lands on disk.
+    """
+    found = scan_for_forbidden_patterns(text)
+    if found:
+        sys.stderr.write(
+            f"INTERPRETATION_VIOLATION: forbidden override-language "
+            f"detected in {context}.\n"
+            f"  matched patterns ({len(found)}):\n"
+        )
+        for p in sorted(set(found)):
+            sys.stderr.write(f"    - {p!r}\n")
+        sys.stderr.write(
+            "  See §15.14 spec Chunk 5 firewall pattern set; nothing "
+            "was written.\n"
+        )
+        sys.exit(EXIT_INTERPRETATION_VIOLATION)
