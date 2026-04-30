@@ -114,6 +114,140 @@ appearing inside `main_chains` or `calibration_chains` is a
 
 ---
 
+### §15.14-A2 — judge-model fallback chain (replace Qwen-7B fallback with Llama-3.1-8B)
+
+**Status:** PROPOSED, awaiting sign-off (will be marked EFFECTIVE
+upon explicit user sign-off and recorded in commit metadata).
+**Scope:** the pinned `JUDGE_MODEL_ID_FALLBACK` constant and the
+corresponding entry in the §15.14 spec Chunk 6 frozen-parameters
+table. No other parameter is modified.
+
+**Change.** Replace the pinned fallback judge:
+
+| Field | Pre-A2 | Post-A2 |
+|---|---|---|
+| `JUDGE_MODEL_ID_DEFAULT` | `"Qwen/Qwen2.5-72B-Instruct"` | `"Qwen/Qwen2.5-72B-Instruct"` (**unchanged**) |
+| `JUDGE_MODEL_ID_FALLBACK` | `"Qwen/Qwen2.5-7B-Instruct"` | `"meta-llama/Llama-3.1-8B-Instruct"` (**changed**) |
+
+The default judge remains Qwen-72B-Instruct. Only the fallback
+identity changes: when the 72B fails to load (memory or download
+constraints), the script falls back to Llama-3.1-8B-Instruct
+instead of Qwen-2.5-7B-Instruct.
+
+**Rationale.** The §15.14 implementation §0.X execution on a single
+A100-80 runpod with ~48 GB workspace quota empirically established:
+
+- Qwen-72B-Instruct cannot be loaded (140 GB > 80 GB GPU; 140 GB >
+  48 GB quota). Default judge unavailable.
+- Qwen-7B-Instruct fallback judge produces unparseable JSON in
+  26.92% of 650 evaluation rows, exceeding the pinned
+  `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05` (Risk #1 from spec
+  Chunk 6 materialized). Cascade verdict not computed; exit 9
+  ANNOTATION_FAILED.
+
+Llama-3.1-8B-Instruct is selected as the new fallback because:
+
+1. **Same parameter scale** as the prior Qwen-7B fallback (~7-8B);
+   it fits the same hardware envelope without quantization or
+   spec amendment to thresholds.
+2. **Different model family** from the Qwen-7B subject — eliminates
+   the same-model-self-judging concern that applied when Qwen-7B
+   was both subject and judge under the prior fallback. With this
+   amendment, the fallback judge (Llama-3.1-8B) is from a different
+   instruction-tuning lineage than the subject (Qwen-7B), which is
+   methodologically stronger.
+3. **Reputation for stronger structured-output adherence.** Llama-3.1
+   is widely benchmarked as a stronger JSON / structured-output
+   follower than 7B-class Qwen at the same scale, which directly
+   addresses the empirical 26.92% JSON-parse failure rate that
+   blocked the prior fallback.
+
+**What this amendment does NOT change.**
+
+- `JUDGE_MODEL_ID_DEFAULT`: unchanged (`Qwen/Qwen2.5-72B-Instruct`).
+- The frozen judge prompt (`JUDGE_PROMPT_TEMPLATE` and
+  `judge_prompt_sha256`): unchanged. The same prompt is rendered
+  to whatever judge model is loaded.
+- `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+- `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged.
+- Severity rubric (0/1/2): unchanged.
+- `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+- Cascade structure, `R_framing` formula, `R_topic_to_framing`,
+  `R_recency`, direction convention, STRONG/PARTIAL/NO_MATERIAL
+  thresholds, 12 self-test cases: all unchanged.
+- 52-pattern Class-3 firewall: unchanged.
+- §15.14-A1 (synthetic_frame_positive_v1 source enum): unchanged.
+- Pinned `final_stimulus_sha` and `calibration_labels_sha`:
+  unchanged.
+- All §13/§14/§15.x verdicts-of-record: preserved.
+
+**Disclosure obligations.** When the fallback judge is used, the
+JSON output's `annotation_protocol.judge_model_id` field MUST
+record the actual judge identity in use (one of Qwen-72B, Llama-3.1-8B,
+or any future-amended fallback), and the
+`annotation_protocol.judge_fallback_used` boolean MUST be `true`.
+The script's existing `_load_judge_model` already records both;
+no schema change is required.
+
+**Cascade verdict reading discipline.** A §15.14 cascade verdict
+produced under `judge_fallback_used = true` is a §0.8-binding
+readout AT THE STATED JUDGE CONFIGURATION. It is NOT directly
+comparable to a hypothetical 72B-judge cascade verdict from the
+same stimuli. The implementation §0.X authorization permits the
+fallback path; this amendment merely changes the fallback identity
+to one with empirically-better-grounded JSON-format compliance.
+
+**What this amendment does NOT permit.**
+
+- Lowering `ANNOTATION_FAILURE_RATE_THRESHOLD` or `KAPPA_GATE_THRESHOLD`.
+- Modifying the frozen judge prompt template.
+- Quantizing any judge model to fit smaller hardware.
+- Treating a Llama-judge cascade verdict as equivalent to a
+  72B-judge cascade verdict for cross-§ cross-comparison.
+- Skipping the κ self-test gate.
+- Sign-flip rescue on direction-gate failure.
+
+**Pinned-table update (Chunk 6 Sealed §0.8-binding decisions).**
+
+The frozen-parameters table entry changes:
+
+| Decision | Pinned value (post-A2) |
+|---|---|
+| `JUDGE_MODEL_ID_FALLBACK` | `"meta-llama/Llama-3.1-8B-Instruct"` (effective under §15.14-A2; was `"Qwen/Qwen2.5-7B-Instruct"`) |
+
+**Implementation surface.** One-line change to
+`scripts/probe_framing_15_14.py`:
+
+```
+JUDGE_MODEL_ID_FALLBACK = "meta-llama/Llama-3.1-8B-Instruct"
+# was: JUDGE_MODEL_ID_FALLBACK = "Qwen/Qwen2.5-7B-Instruct"
+```
+
+No other source changes. The existing fallback wiring in
+`_load_judge_model` consumes whichever value is pinned.
+
+**Provenance after a Llama-fallback run.**
+
+The implementation §0.X authorization (`docs/design/15_14_IMPLEMENTATION_AUTHORIZATION.md`)
+already records `final_stimulus_sha` and `calibration_labels_sha`.
+A successful Llama-fallback cascade verdict will produce a JSON
+output with:
+
+```
+"annotation_protocol": {
+  "judge_model_id": "meta-llama/Llama-3.1-8B-Instruct",
+  "judge_fallback_used": true,
+  ...
+}
+```
+
+This output is the §0.8-binding §15.14 cascade verdict on
+Llama-fallback judge configuration. Its comparability to a
+hypothetical 72B-judge cascade is open and not asserted by this
+amendment.
+
+---
+
 ## Research question
 
 > Does the LM's residual alignment toward a **framing convention**
