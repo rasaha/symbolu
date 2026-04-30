@@ -36,8 +36,9 @@ Usage:
     python3 scripts/diagnose_a4_kappa.py
     python3 scripts/diagnose_a4_kappa.py --tokenizer-only
     python3 scripts/diagnose_a4_kappa.py \
-        --annotated-cache-path docs/experiments/framing_15_14_annotated.npz \
-        --labels-path docs/experiments/sticky_framing_15_14_calibration_labels.json
+        --annotated-cache docs/experiments/framing_15_14_annotated.npz \
+        --labels-json    docs/experiments/sticky_framing_15_14_calibration_labels.json \
+        --tokenizer-id   meta-llama/Llama-3.1-8B-Instruct
 """
 
 from __future__ import annotations
@@ -383,12 +384,16 @@ def main(argv: list[str] | None = None) -> int:
         description="§15.14-A4 κ-failure diagnostic (DIAGNOSTIC ONLY)."
     )
     parser.add_argument(
+        "--annotated-cache",
         "--annotated-cache-path",
+        dest="annotated_cache",
         default=str(DEFAULT_ANNOTATED_NPZ_PATH),
         help="Path to §15.14-A4 annotated cache .npz (default: %(default)s).",
     )
     parser.add_argument(
+        "--labels-json",
         "--labels-path",
+        dest="labels_json",
         default=str(DEFAULT_LABELS_JSON_PATH),
         help="Path to calibration labels JSON (default: %(default)s).",
     )
@@ -421,10 +426,10 @@ def main(argv: list[str] | None = None) -> int:
     print("    H5 binary-collapse κ          — block 4")
 
     cache = None if args.tokenizer_only else _load_annotated_cache(
-        Path(args.annotated_cache_path)
+        Path(args.annotated_cache)
     )
     labels_by_key: dict[tuple[int, int], int] = (
-        {} if args.tokenizer_only else _load_human_labels(Path(args.labels_path))
+        {} if args.tokenizer_only else _load_human_labels(Path(args.labels_json))
     )
 
     _print_provenance(cache, labels_by_key)
