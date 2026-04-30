@@ -116,8 +116,9 @@ appearing inside `main_chains` or `calibration_chains` is a
 
 ### §15.14-A2 — judge-model fallback chain (replace Qwen-7B fallback with Llama-3.1-8B)
 
-**Status:** PROPOSED, awaiting sign-off (will be marked EFFECTIVE
-upon explicit user sign-off and recorded in commit metadata).
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/sticky-framing-spec-r6U1j`).
 **Scope:** the pinned `JUDGE_MODEL_ID_FALLBACK` constant and the
 corresponding entry in the §15.14 spec Chunk 6 frozen-parameters
 table. No other parameter is modified.
@@ -1742,7 +1743,7 @@ without a fresh §0.8 amendment to this spec:
 | SCHEMA_VERSION | "15.14" |
 | QWEN_MODEL_ID (subject) | "Qwen/Qwen2.5-7B-Instruct" |
 | JUDGE_MODEL_ID (default) | "Qwen/Qwen2.5-72B-Instruct" |
-| JUDGE_MODEL_ID (fallback) | "Qwen/Qwen2.5-7B-Instruct" |
+| JUDGE_MODEL_ID (fallback) | "meta-llama/Llama-3.1-8B-Instruct" (effective under §15.14-A2; was "Qwen/Qwen2.5-7B-Instruct" pre-A2) |
 | BENCHMARK | "sticky_framing_15_14_composite" (TruthfulQA-MC + HumanEval pooled, single composite in §15.x sense) |
 | K_TURNS | 6 |
 | N_MAIN_CHAINS | 100 |
