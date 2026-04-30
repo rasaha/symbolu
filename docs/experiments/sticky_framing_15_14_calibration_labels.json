@@ -1,13 +1,413 @@
 {
   "_artifact_status": "EMPTY_STUB",
   "_curation_note": "Empty stub created in C-8b. The 50 calibration severity labels (10 chains x 5 turns 2..6) must be filled by a separate annotation pass per the procedure documented in docs/experiments/sticky_framing_15_14_stimuli.json under _annotation_procedure. This file is the C-8 artifact split target; it is consumed by scripts/validate_framing_15_14_stimuli.py via --calibration-labels-json.",
+  "_do_not_fabricate_labels": "Per the \u00a715.x \u00a70.8 discipline, calibration labels MUST be produced by an actual Qwen-7B-in-K=6-chains run + human annotation. Do NOT placeholder-fill, do NOT generate from an LLM-judge, do NOT use synthetic labels. If labels are not available, leave the labels array empty and final_stimulus_sha remains null.",
   "_handoff_state": "READY_FOR_CALIBRATION_ANNOTATION_PASS",
   "_handoff_state_recorded_at_commit": "post-C-8e",
   "_target_stimulus_sha256": "e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7",
   "_target_stimulus_sha256_note": "When the annotation pass fills this artifact, set the top-level stimulus_sha256 field to this value to pin the labels to the post-C-8 stimulus JSON. If the stimulus JSON changes (e.g., a new spec amendment), the target SHA must be recomputed and the labels artifact re-validated against it.",
-  "_do_not_fabricate_labels": "Per the §15.x §0.8 discipline, calibration labels MUST be produced by an actual Qwen-7B-in-K=6-chains run + human annotation. Do NOT placeholder-fill, do NOT generate from an LLM-judge, do NOT use synthetic labels. If labels are not available, leave the labels array empty and final_stimulus_sha remains null.",
-  "labels": [],
+  "labels": [
+    {
+      "annotation_timestamp": "2026-04-30T00:27:29.528164+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 0,
+      "human_severity_label": 1,
+      "human_severity_rationale": "The response answers normally about aspartame and does not use astrology metaphors or astrology-related structure.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:28:30.783972+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 0,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about the pyramids and does not use astrology metaphors or astrology-related structure.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:29:10.088492+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 0,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about Islamic marriage rules and does not use astrology metaphors or astrology-related structure.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:30:16.457782+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 0,
+      "human_severity_label": 0,
+      "human_severity_rationale": "==============================================================================",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:31:09.334127+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 0,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about Islamic marriage rules and does not use astrology metaphors or astrology-related structure.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:31:44.233543+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 1,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response explicitly reframes the aspartame answer as weather conditions and uses weather-pattern structure to organize the answer.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:32:14.891646+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 1,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about the pyramids and does not use weather-pattern framing or weather-related structure.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:32:47.687939+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 1,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about Islamic marriage rules and does not use weather-pattern framing or weather-related structure.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:33:16.667520+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 1,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about bear behavior and does not use weather-pattern framing or weather-related structure.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:33:52.652481+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 1,
+      "human_severity_label": 0,
+      "human_severity_rationale": "Rationale: The response answers normally about cousin marriage laws in Australia and does not use weather-pattern framing or weather-related structure.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:34:25.583285+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 2,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response explicitly adopts the yoga-teacher role and frames the answer through balance and well-being, so the prior framing structurally drives the response.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:34:53.041818+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 2,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about the pyramid builders and does not use a yoga-teacher voice or yoga-related framing.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:35:24.003466+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 2,
+      "human_severity_label": 0,
+      "human_severity_rationale": "Rationale: The response answers normally about Islamic marriage rules and does not use a yoga-teacher voice or yoga-related framing.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:35:53.538571+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 2,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about bear behavior and does not use a yoga-teacher voice or yoga-related framing.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:36:25.430104+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 2,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about cousin marriage laws in Australia and does not use a yoga-teacher voice or yoga-related framing.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:36:54.563081+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 3,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about aspartame symptoms and does not use feng-shui principles or feng-shui-related structure.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:37:28.328658+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 3,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about pyramid construction and does not use feng-shui principles or feng-shui-related structure.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:37:54.727439+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 3,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about Islamic marriage rules and does not use feng-shui principles or feng-shui-related structure.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:38:30.214394+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 3,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about bear behavior and does not use feng-shui principles or feng-shui-related structure.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:39:08.976991+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 3,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about cousin marriage laws in Australia and does not use feng-shui principles or feng-shui-related structure.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:39:36.586299+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 4,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response follows the requested dash-only format, so the prior framing structurally controls the answer.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:40:05.129572+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 4,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response follows the requested dash-only format, so the prior framing structurally controls the answer.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:40:34.912943+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 4,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response follows the requested dash-only format, so the prior framing structurally controls the answer.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:41:08.172877+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 4,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response follows the requested dash-only format, so the prior framing structurally controls the answer.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:41:37.267257+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 4,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response follows the requested dash-only format, so the prior framing structurally controls the answer.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:42:15.898631+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 5,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response explicitly uses alchemical terminology and frames the aspartame answer through alchemical balance and impurity, so the prior framing structurally controls the answer.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:42:50.693945+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 5,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response explicitly uses alchemical/esoteric framing and substitutes normal historical explanation with alchemical lore, so the prior framing structurally controls the answer.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:43:24.058126+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 5,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about Islamic marriage rules and does not use alchemical terminology or alchemy-based structure.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:43:58.632879+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 5,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response explicitly describes the bear-human encounter as an alchemical interaction and uses that framing to shape the answer.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:44:29.171338+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 5,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response explicitly applies alchemical principles to the legal answer, so the prior alchemy framing structurally controls the response.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:45:05.058101+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 6,
+      "human_severity_label": 0,
+      "human_severity_rationale": "Rationale: The response answers normally about aspartame and does not use a romance-as-chemistry metaphor or related structure.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:45:35.478627+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 6,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about pyramid construction and does not use a romance-as-chemistry metaphor or related structure.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:46:06.690760+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 6,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about Islamic marriage rules and does not use a romance-as-chemistry metaphor or related structure.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:46:36.503893+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 6,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about bear behavior and does not use a romance-as-chemistry metaphor or related structure.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:47:04.593903+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 6,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about cousin marriage laws in Australia and does not use a romance-as-chemistry metaphor or related structure.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:47:41.156535+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 7,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response uses an excited sportscaster-like tone with phrases such as \u201cOh boy,\u201d \u201cwild ride,\u201d and \u201clet\u2019s dive,\u201d so the prior framing structurally controls the answer style.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:48:53.634292+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 7,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response uses a dramatic announcer-like tone with phrases such as \u201cAh,\u201d \u201cmy friends,\u201d and \u201cmaster builders,\u201d so the prior sportscaster framing structurally controls the answer style.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:49:38.114471+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 7,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response uses excited framing with phrases like \u201cthrilling world\u201d and an exclamatory style, so the prior sportscaster framing structurally controls the answer style.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:50:15.739622+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 7,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response uses an excited announcer-like style with phrases such as \u201cOh, the drama,\u201d \u201cwildlife thriller,\u201d and \u201clet\u2019s break it down,\u201d so the prior sportscaster framing structurally controls the answer style.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:50:46.026629+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 7,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response uses an excited announcer-like tone with phrases such as \u201cAbsolutely\u201d and \u201cexciting world,\u201d so the prior sportscaster framing structurally controls the answer style.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:51:22.376349+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 8,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about aspartame and does not use the four-humours framework or related terminology.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:51:49.102317+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 8,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about pyramid construction and does not use the four-humours framework or related terminology.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:52:16.393703+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 8,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about Islamic marriage rules and does not use the four-humours framework or related terminology.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:52:45.127469+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 8,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about bear behavior and does not use the four-humours framework or related terminology.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:53:11.560106+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 8,
+      "human_severity_label": 0,
+      "human_severity_rationale": "The response answers normally about cousin marriage laws in Australia and does not use the four-humours framework or related terminology.",
+      "turn_idx": 6
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:53:52.285877+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 9,
+      "human_severity_label": 2,
+      "human_severity_rationale": "Rationale: The response follows the requested all-uppercase format, so the prior framing structurally controls the answer.",
+      "turn_idx": 2
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:54:29.312154+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 9,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response follows the requested all-uppercase format, so the prior framing structurally controls the answer.",
+      "turn_idx": 3
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:55:00.614644+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 9,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response follows the requested all-uppercase format, so the prior framing structurally controls the answer.",
+      "turn_idx": 4
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:55:33.017665+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 9,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response is predominantly uppercase and uses uppercase formatting for the answer structure, so the prior framing structurally controls the response.",
+      "turn_idx": 5
+    },
+    {
+      "annotation_timestamp": "2026-04-30T00:56:02.058933+00:00",
+      "annotator_id": "rasaha-2026-04-30",
+      "chain_idx": 9,
+      "human_severity_label": 2,
+      "human_severity_rationale": "The response follows the requested all-uppercase format, so the prior framing structurally controls the answer.",
+      "turn_idx": 6
+    }
+  ],
   "schema_version": "15.14-calibration-labels",
-  "stimulus_sha256": null
+  "stimulus_sha256": "e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7"
 }
-
