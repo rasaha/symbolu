@@ -1545,3 +1545,706 @@ def load_extractions_cache(
             framing_token_ids=tuple(int(x) for x in data["framing_token_ids"][i]),
         ))
     return extractions
+
+
+# ===========================================================================
+# I-3: Judge loader + severity protocol + κ gate + features + cascade
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# Lazy sklearn + numpy helpers (cosine similarity, AUC, Cohen's κ)
+# ---------------------------------------------------------------------------
+
+
+def _lazy_import_sklearn():
+    try:
+        from sklearn.metrics import cohen_kappa_score, roc_auc_score
+    except ImportError as e:
+        raise SchemaMismatchError(
+            f"`sklearn` not installed: {e}. Required for --probe / --annotate."
+        ) from e
+    return cohen_kappa_score, roc_auc_score
+
+
+def _cosine_fp64(u: Any, v: Any) -> float:
+    """Cosine similarity computed in fp64 from any-dtype inputs.
+
+    Returns 0.0 if either input has zero norm (defensive; shouldn't
+    occur on real Qwen hidden states but the guard keeps PROBE_FAILED
+    in the right exit code domain if it does).
+    """
+    import numpy as np
+    u64 = np.asarray(u, dtype=np.float64)
+    v64 = np.asarray(v, dtype=np.float64)
+    nu = float((u64 @ u64) ** 0.5)
+    nv = float((v64 @ v64) ** 0.5)
+    if nu < 1e-12 or nv < 1e-12:
+        return 0.0
+    return float((u64 @ v64) / (nu * nv))
+
+
+def _auc_negated(y: list[bool], scores: list[float]) -> float:
+    """Compute AUC(-scores, y).
+
+    Per spec Chunk 4 direction convention: lower R_* predicts the
+    BCVF-faithful "appropriate non-invocation" target; the AUC is
+    therefore against the NEGATED score so that higher AUC means
+    better signal in the predicted direction.
+    """
+    import numpy as np
+    cohen_kappa_score, roc_auc_score = _lazy_import_sklearn()
+    y_arr = np.asarray(y, dtype=bool)
+    s_arr = np.asarray(scores, dtype=np.float64)
+    if y_arr.sum() == 0 or y_arr.sum() == len(y_arr):
+        # Degenerate single-class case: AUC undefined.
+        return float("nan")
+    return float(roc_auc_score(y_arr, -s_arr))
+
+
+def _auc_raw(y: list[bool], scores: list[float]) -> float:
+    """Compute AUC(scores, y), no negation (used for frame-positive disclosure)."""
+    import numpy as np
+    cohen_kappa_score, roc_auc_score = _lazy_import_sklearn()
+    y_arr = np.asarray(y, dtype=bool)
+    s_arr = np.asarray(scores, dtype=np.float64)
+    if y_arr.sum() == 0 or y_arr.sum() == len(y_arr):
+        return float("nan")
+    return float(roc_auc_score(y_arr, s_arr))
+
+
+# ---------------------------------------------------------------------------
+# Judge model loader (Qwen-72B default; Qwen-7B fallback)
+# ---------------------------------------------------------------------------
+
+
+def _load_judge_model(
+    judge_id: str = JUDGE_MODEL_ID_DEFAULT,
+    fallback_id: str = JUDGE_MODEL_ID_FALLBACK,
+    force_fallback: bool = False,
+) -> tuple[Any, Any, str, bool]:
+    """Load the LLM-judge model + tokenizer.
+
+    Tries judge_id first; on memory/load failure (or force_fallback=True)
+    falls back to fallback_id and records that decision in
+    judge_fallback_used. Returns (tokenizer, model, judge_id_used,
+    fallback_flag).
+    """
+    AutoModelForCausalLM, AutoTokenizer = _lazy_import_transformers()
+
+    if force_fallback:
+        target = fallback_id
+        used_fallback = True
+    else:
+        target = judge_id
+        used_fallback = False
+
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(target)
+        model = AutoModelForCausalLM.from_pretrained(
+            target, torch_dtype="auto", device_map="auto",
+        )
+        model.eval()
+        return tokenizer, model, target, used_fallback
+    except Exception as primary_exc:
+        if used_fallback:
+            raise SchemaMismatchError(
+                f"judge fallback model load failed: {primary_exc}"
+            ) from primary_exc
+
+    # Primary failed; try fallback.
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(fallback_id)
+        model = AutoModelForCausalLM.from_pretrained(
+            fallback_id, torch_dtype="auto", device_map="auto",
+        )
+        model.eval()
+        return tokenizer, model, fallback_id, True
+    except Exception as fallback_exc:
+        raise SchemaMismatchError(
+            f"both judge models failed to load. "
+            f"primary ({judge_id}): {primary_exc}; "
+            f"fallback ({fallback_id}): {fallback_exc}"
+        ) from fallback_exc
+
+
+# ---------------------------------------------------------------------------
+# Single-row judge inference (renders prompt, decodes, parses JSON)
+# ---------------------------------------------------------------------------
+
+
+def _judge_one_row(
+    tokenizer,
+    model,
+    framing_substr: str,
+    turn_t_question: str,
+    turn_t_response: str,
+    *,
+    retry_on_json_failure: bool = True,
+) -> tuple[int | None, str | None]:
+    """Run the LLM-judge on one (framing, question, response) triple.
+
+    Returns (severity, rationale). Severity is 0/1/2 if parsed cleanly,
+    or None if the judge's output failed to parse as the pinned JSON
+    shape on both attempts (one retry permitted at the same temperature
+    per spec Chunk 3).
+    """
+    torch = _lazy_import_torch()
+    target_device = next(model.parameters()).device
+    prompt = render_judge_prompt(framing_substr, turn_t_question, turn_t_response)
+
+    def _attempt() -> str:
+        encoded = tokenizer(
+            prompt, return_tensors="pt", return_attention_mask=True,
+        )
+        input_ids = encoded["input_ids"].to(target_device)
+        attention_mask = encoded["attention_mask"].to(target_device)
+        with torch.no_grad():
+            out_ids = model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                max_new_tokens=MAX_NEW_TOKENS_JUDGE,
+                do_sample=False,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        new_tokens = out_ids[0, input_ids.shape[-1]:]
+        return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+    raw = _attempt()
+    parsed = _try_parse_judge_json(raw)
+    if parsed is None and retry_on_json_failure:
+        # Single retry at same (deterministic) temperature, per spec Chunk 3.
+        raw = _attempt()
+        parsed = _try_parse_judge_json(raw)
+    return parsed if parsed is not None else (None, None)
+
+
+def _try_parse_judge_json(raw: str) -> tuple[int, str] | None:
+    """Parse '{"severity": 0|1|2, "rationale": "..."}'. Return None on failure.
+
+    Tolerates leading/trailing whitespace and code-fence wrappers but
+    requires the JSON to contain a `severity` key with int value in
+    {0, 1, 2}. Returns (severity, rationale) or None.
+    """
+    text = raw.strip()
+    if text.startswith("```"):
+        # Strip Markdown code fence.
+        lines = text.split("\n")
+        text = "\n".join(line for line in lines if not line.strip().startswith("```"))
+    try:
+        # Find first '{' and matching last '}' to be tolerant of judge prose.
+        first = text.find("{")
+        last = text.rfind("}")
+        if first < 0 or last < first:
+            return None
+        obj = json.loads(text[first:last + 1])
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(obj, dict):
+        return None
+    sev = obj.get("severity")
+    if sev not in SEVERITY_VALUES:
+        return None
+    rat = obj.get("rationale", "")
+    if not isinstance(rat, str):
+        rat = str(rat)
+    return int(sev), rat
+
+
+# ---------------------------------------------------------------------------
+# Pass C — LLM-judge severity over all evaluation rows
+# ---------------------------------------------------------------------------
+#
+# Iterates the (chain_scope, chain_idx, turn_idx) triples from all 130
+# chains × 5 turns = 650 evaluation rows. For each, renders the frozen
+# judge prompt with framing-substr / turn-t-question / turn-t-response
+# and runs the judge once (with one retry on JSON-parse failure). The
+# resulting severity dict is consumed by:
+#   - Pass D κ-gate (calibration rows only): compares to human labels
+#   - Feature computation (main rows): drives binary y for cascade
+#
+# Tracks two failure surfaces:
+#   1. JSON-parse-failure rate across all rows; if > 5% the run exits 9
+#      ANNOTATION_FAILED before any cascade computation.
+#   2. Cohen's κ between judge and human on the 50 calibration rows;
+#      computed in Pass D below.
+
+
+def run_pass_c_judge(
+    tokenizer,
+    model,
+    extractions: list[ChainExtraction],
+    stimulus_payload: dict,
+) -> tuple[dict[tuple[str, int, int], dict], float]:
+    """Run LLM-judge over every evaluation row.
+
+    Returns (severities_by_key, json_parse_failure_rate) where
+    severities_by_key maps (chain_scope, chain_idx, turn_idx) → dict
+    with 'severity' (int 0/1/2 or None), 'judge_rationale' (str or None),
+    'turn_t_question', 'turn_t_response', 'framing_substr'.
+
+    Failure-rate gate: if json_parse_failure_rate > 0.05, caller (I-5)
+    exits 9 ANNOTATION_FAILED.
+    """
+    pool = _build_framing_pool(stimulus_payload)
+    main_chains = _build_stimulus_chains(stimulus_payload, "main")
+    fp_chains = _build_stimulus_chains(stimulus_payload, "frame_positive")
+    cal_chains = _build_stimulus_chains(stimulus_payload, "calibration")
+    chains_by_scope = {
+        "main": {c.chain_idx: c for c in main_chains},
+        "frame_positive": {c.chain_idx: c for c in fp_chains},
+        "calibration": {c.chain_idx: c for c in cal_chains},
+    }
+
+    severities: dict[tuple[str, int, int], dict] = {}
+    n_total = 0
+    n_null = 0
+
+    for ext in extractions:
+        chain = chains_by_scope[ext.chain_scope][ext.chain_idx]
+        frame = pool[ext.frame_id]
+        framing_substr = _framing_span_substring(
+            frame.framing_question, frame.framing_token_char_span,
+        )
+        for cq, response_text in zip(chain.chain_questions, ext.turn_responses):
+            severity, rationale = _judge_one_row(
+                tokenizer, model, framing_substr, cq.question, response_text,
+            )
+            n_total += 1
+            if severity is None:
+                n_null += 1
+            severities[(ext.chain_scope, ext.chain_idx, cq.turn_idx)] = {
+                "severity": severity,
+                "judge_rationale": rationale,
+                "turn_t_question": cq.question,
+                "turn_t_response": response_text,
+                "framing_substr": framing_substr,
+                "frame_id": ext.frame_id,
+                "source": cq.source,
+                "q_idx": cq.q_idx,
+            }
+
+    failure_rate = n_null / n_total if n_total else 0.0
+    return severities, failure_rate
+
+
+# ---------------------------------------------------------------------------
+# Pass D — κ self-test gate (Cohen's κ on 50 calibration rows)
+# ---------------------------------------------------------------------------
+#
+# Compares the LLM-judge's severity (from Pass C) against the human-
+# annotated severity (from labels artifact, validated by I-2's
+# _validate_calibration_labels_json). If κ < 0.6, exit 9
+# ANNOTATION_FAILED — the cascade is not computed on labels that
+# can't be reliably reproduced by the judge.
+
+
+def run_pass_d_kappa_gate(
+    severities_by_key: dict[tuple[str, int, int], dict],
+    labels_by_key: dict[tuple[int, int], dict],
+) -> float:
+    """Compute Cohen's κ between LLM-judge and human on calibration rows.
+
+    Caller (I-5 orchestrator) compares κ against KAPPA_GATE_THRESHOLD
+    (0.6 inclusive) and exits 9 ANNOTATION_FAILED if it falls short.
+    Returns the κ value; raises SchemaMismatchError on missing rows.
+    """
+    cohen_kappa_score, _roc_auc_score = _lazy_import_sklearn()
+
+    judge_arr: list[int] = []
+    human_arr: list[int] = []
+    for (chain_idx, turn_idx), human_row in labels_by_key.items():
+        key = ("calibration", chain_idx, turn_idx)
+        judge_row = severities_by_key.get(key)
+        if judge_row is None:
+            raise SchemaMismatchError(
+                f"Pass C did not produce a judge severity for calibration "
+                f"row (chain_idx={chain_idx}, turn_idx={turn_idx})"
+            )
+        judge_sev = judge_row["severity"]
+        if judge_sev is None:
+            # Pass C JSON-parse failure → cannot enter κ computation.
+            # Treat as κ-incompatible: skip this pair (caller's gate
+            # decides if remaining N is sufficient).
+            continue
+        judge_arr.append(int(judge_sev))
+        human_arr.append(int(human_row["human_severity_label"]))
+
+    if len(judge_arr) < EVALUATION_ROWS_CALIBRATION // 2:
+        # Fewer than 25 usable pairs: gate cannot be computed reliably.
+        # Return -inf so caller's κ < 0.6 check fires.
+        return float("-inf")
+
+    kappa = float(cohen_kappa_score(human_arr, judge_arr))
+    return kappa
+
+
+# ---------------------------------------------------------------------------
+# Feature computation — R_framing, R_topic_to_framing, R_recency, plus
+# disclosure-only response-side variant
+# ---------------------------------------------------------------------------
+#
+# Per spec Chunk 2 sealed formulas:
+#   R_framing            = cos(s_t, f_1) - cos(s_t, q_t)
+#   R_topic_to_framing   = cos(q_t, f_1)
+#   R_recency            = cos(s_t, a_prev) - cos(s_t, q_t)
+#   R_framing_response_side (disclosure-only) =
+#                          cos(r_t_response, f_1) - cos(r_t_response, q_t)
+
+
+def compute_features_per_row(
+    extractions: list[ChainExtraction],
+    severities_by_key: dict[tuple[str, int, int], dict],
+    *,
+    scope_filter: str | None = None,
+) -> list[FramingFeatures]:
+    """Build FramingFeatures[] for all evaluation rows.
+
+    Caller (run_framing_probe) typically calls with scope_filter='main'
+    for the cascade input set; with scope_filter='frame_positive' for
+    the disclosure-only frame-positive AUC; etc.
+
+    severity and y are taken from severities_by_key (the LLM-judge's
+    severities from Pass C, since the cascade target on the main set
+    is the judge's binary y).
+    """
+    rows: list[FramingFeatures] = []
+    row_idx = 0
+    for ext in extractions:
+        if scope_filter is not None and ext.chain_scope != scope_filter:
+            continue
+        for j in range(K_TURNS - 1):
+            turn_idx = j + 2
+            key = (ext.chain_scope, ext.chain_idx, turn_idx)
+            sev_row = severities_by_key.get(key, {})
+            severity = sev_row.get("severity")
+            y_val = (severity is not None and severity >= 1) if severity is not None else None
+
+            cos_st_f1 = _cosine_fp64(ext.s_t[j], ext.f_1)
+            cos_st_qt = _cosine_fp64(ext.s_t[j], ext.q_t[j])
+            cos_qt_f1 = _cosine_fp64(ext.q_t[j], ext.f_1)
+            cos_st_aprev = _cosine_fp64(ext.s_t[j], ext.a_prev[j])
+
+            r_framing = cos_st_f1 - cos_st_qt
+            r_topic_to_framing = cos_qt_f1
+            r_recency = cos_st_aprev - cos_st_qt
+
+            cos_rt_f1 = _cosine_fp64(ext.r_t_response[j], ext.f_1)
+            cos_rt_qt = _cosine_fp64(ext.r_t_response[j], ext.q_t[j])
+            r_framing_response_side = cos_rt_f1 - cos_rt_qt
+
+            rows.append(FramingFeatures(
+                row_idx=row_idx,
+                chain_idx=ext.chain_idx,
+                turn_idx=turn_idx,
+                chain_scope=ext.chain_scope,
+                source=sev_row.get("source", ""),
+                cos_st_f1=cos_st_f1,
+                cos_st_qt=cos_st_qt,
+                cos_qt_f1=cos_qt_f1,
+                cos_st_aprev=cos_st_aprev,
+                r_framing=r_framing,
+                r_topic_to_framing=r_topic_to_framing,
+                r_recency=r_recency,
+                r_framing_response_side=r_framing_response_side,
+                severity=severity,
+                y=y_val,
+            ))
+            row_idx += 1
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Cascade classifier (4-step, per spec Chunk 4)
+# ---------------------------------------------------------------------------
+#
+# Step 1: direction gate. auc_framing < 0.5 (strict) → NO_MATERIAL.
+# Step 2: STRONG. auc_framing ≥ 0.75 AND ΔAUC ≥ 0.05 vs chance, topic, recency.
+# Step 3: PARTIAL. auc_framing ≥ 0.66 AND ΔAUC > 0 vs chance, topic, recency.
+# Step 4: default NO_MATERIAL.
+#
+# All AUCs supplied to this function are AUC(-R_*, y) form (higher is
+# better signal in the BCVF-faithful direction); chance baseline is 0.5.
+#
+# No sign-flip rescue. This function is referenced by the 12 self-test
+# cases (I-4b) that pin its behavior on synthetic boundary inputs.
+
+
+def classify_cascade_framing(
+    auc_framing: float,
+    auc_topic_to_framing: float,
+    auc_recency: float,
+) -> FramingCascadeVerdict:
+    """Mechanical 4-step cascade. Returns FramingCascadeVerdict."""
+    direction_held = auc_framing >= DIRECTION_GATE_THRESHOLD
+    dauc_chance = auc_framing - CHANCE_BASELINE_AUC
+    dauc_topic = auc_framing - auc_topic_to_framing
+    dauc_recency = auc_framing - auc_recency
+
+    # Step 1: direction gate (strict < 0.5 fails).
+    if not direction_held:
+        return FramingCascadeVerdict(
+            label=CascadeVerdict.NO_MATERIAL,
+            auc_framing=auc_framing,
+            auc_topic_to_framing=auc_topic_to_framing,
+            auc_recency=auc_recency,
+            dauc_vs_chance=dauc_chance,
+            dauc_vs_topic_to_framing=dauc_topic,
+            dauc_vs_recency=dauc_recency,
+            direction_held=False,
+            rationale=(
+                f"wrong-direction failure: BCVF-faithful direction (lower "
+                f"R_framing predicts appropriate non-invocation) did not hold "
+                f"(auc_framing = {auc_framing:.4f} < "
+                f"{DIRECTION_GATE_THRESHOLD})."
+            ),
+        )
+
+    # Step 2: STRONG.
+    if (
+        auc_framing >= STRONG_AUC_THRESHOLD
+        and dauc_chance >= STRONG_DELTA_AUC_THRESHOLD
+        and dauc_topic >= STRONG_DELTA_AUC_THRESHOLD
+        and dauc_recency >= STRONG_DELTA_AUC_THRESHOLD
+    ):
+        return FramingCascadeVerdict(
+            label=CascadeVerdict.STRONG,
+            auc_framing=auc_framing,
+            auc_topic_to_framing=auc_topic_to_framing,
+            auc_recency=auc_recency,
+            dauc_vs_chance=dauc_chance,
+            dauc_vs_topic_to_framing=dauc_topic,
+            dauc_vs_recency=dauc_recency,
+            direction_held=True,
+            rationale=(
+                f"STRONG: auc_framing = {auc_framing:.4f} >= "
+                f"{STRONG_AUC_THRESHOLD}; ΔAUC vs chance = {dauc_chance:.4f}, "
+                f"vs topic = {dauc_topic:.4f}, vs recency = {dauc_recency:.4f} "
+                f"all >= {STRONG_DELTA_AUC_THRESHOLD}."
+            ),
+        )
+
+    # Step 3: PARTIAL.
+    if (
+        auc_framing >= PARTIAL_AUC_THRESHOLD
+        and dauc_chance > 0
+        and dauc_topic > 0
+        and dauc_recency > 0
+    ):
+        return FramingCascadeVerdict(
+            label=CascadeVerdict.PARTIAL,
+            auc_framing=auc_framing,
+            auc_topic_to_framing=auc_topic_to_framing,
+            auc_recency=auc_recency,
+            dauc_vs_chance=dauc_chance,
+            dauc_vs_topic_to_framing=dauc_topic,
+            dauc_vs_recency=dauc_recency,
+            direction_held=True,
+            rationale=(
+                f"PARTIAL: auc_framing = {auc_framing:.4f} >= "
+                f"{PARTIAL_AUC_THRESHOLD} but did not clear the STRONG bar "
+                f"(0.75 + 0.05 ΔAUCs); ΔAUC vs chance = {dauc_chance:.4f}, "
+                f"vs topic = {dauc_topic:.4f}, vs recency = {dauc_recency:.4f} "
+                f"all > 0 (strict)."
+            ),
+        )
+
+    # Step 4: default NO_MATERIAL.
+    return FramingCascadeVerdict(
+        label=CascadeVerdict.NO_MATERIAL,
+        auc_framing=auc_framing,
+        auc_topic_to_framing=auc_topic_to_framing,
+        auc_recency=auc_recency,
+        dauc_vs_chance=dauc_chance,
+        dauc_vs_topic_to_framing=dauc_topic,
+        dauc_vs_recency=dauc_recency,
+        direction_held=True,
+        rationale=(
+            f"NO_MATERIAL: direction held (auc_framing = {auc_framing:.4f} >= "
+            f"{DIRECTION_GATE_THRESHOLD}) but cascade conditions not met. "
+            f"AUC threshold check (>= {PARTIAL_AUC_THRESHOLD}): "
+            f"{auc_framing >= PARTIAL_AUC_THRESHOLD}; ΔAUCs vs (chance, topic, "
+            f"recency) = ({dauc_chance:.4f}, {dauc_topic:.4f}, "
+            f"{dauc_recency:.4f}); strict-> requires all > 0 (PARTIAL) or "
+            f"all >= 0.05 (STRONG)."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Selective-prediction κ@α (disclosure-only; per spec Chunk 4)
+# ---------------------------------------------------------------------------
+#
+# Mirrors §15.10/§15.11/§15.13's selective-prediction operating points.
+# For each α ∈ {0.35, 0.50, 0.75}, find the threshold τ on -R_framing
+# such that the admitted subset has conditional accuracy >= α with
+# n_admitted >= N_MIN_SELECTIVE; record (α, τ, coverage, conditional
+# accuracy, κ@α). These are reported in the JSON output but DO NOT
+# enter the cascade decision.
+
+
+def selective_kappa_at_alpha(
+    r_framing_array: list[float],
+    y_array: list[bool],
+    alpha: float,
+    *,
+    n_min: int = N_MIN_SELECTIVE,
+) -> dict:
+    """Compute κ@α + diagnostic ops for one α.
+
+    Returns dict with alpha, kappa_at_alpha, tau_star, coverage_at_tau_star,
+    conditional_accuracy_at_tau_star, n_admitted_at_tau_star, eligible.
+    """
+    import numpy as np
+    n = len(y_array)
+    if n == 0:
+        return {
+            "alpha": alpha, "kappa_at_alpha": float("nan"),
+            "tau_star": None, "coverage_at_tau_star": float("nan"),
+            "conditional_accuracy_at_tau_star": float("nan"),
+            "n_admitted_at_tau_star": 0, "eligible": False,
+        }
+    r_arr = np.asarray(r_framing_array, dtype=np.float64)
+    y_arr = np.asarray(y_array, dtype=bool)
+    # Lower R_framing predicts y=0 (appropriate non-invocation); abstention
+    # score is -R_framing (so admitted = scoring above τ).
+    score = -r_arr
+
+    sorted_idx = np.argsort(-score)  # descending in score
+    best_tau = None
+    best_n_admitted = 0
+    best_cond_acc = 0.0
+    best_kappa_at = 0.0
+    for cut in range(1, n + 1):
+        admitted_idx = sorted_idx[:cut]
+        admitted_y = y_arr[admitted_idx]
+        # Predicted label: y_hat = 0 (admitted means we predict appropriate
+        # non-invocation, the BCVF-faithful direction).
+        y_hat = np.zeros(cut, dtype=bool)
+        n_correct = int((y_hat == admitted_y).sum())
+        cond_acc = n_correct / cut
+        if cond_acc < alpha:
+            continue
+        if cut < n_min:
+            continue
+        # Eligible operating point. κ@α = (cond_acc - α) / (1 - α) ∈ [0, 1].
+        kappa_at = (cond_acc - alpha) / (1 - alpha) if alpha < 1 else 0.0
+        if cut > best_n_admitted or (cut == best_n_admitted and kappa_at > best_kappa_at):
+            best_tau = float(score[admitted_idx[-1]])
+            best_n_admitted = cut
+            best_cond_acc = cond_acc
+            best_kappa_at = kappa_at
+    eligible = best_n_admitted >= n_min and best_cond_acc >= alpha
+    return {
+        "alpha": alpha,
+        "kappa_at_alpha": float(best_kappa_at) if eligible else float("nan"),
+        "tau_star": best_tau if eligible else None,
+        "coverage_at_tau_star": (best_n_admitted / n) if eligible else float("nan"),
+        "conditional_accuracy_at_tau_star": float(best_cond_acc) if eligible else float("nan"),
+        "n_admitted_at_tau_star": int(best_n_admitted) if eligible else 0,
+        "eligible": bool(eligible),
+    }
+
+
+# ---------------------------------------------------------------------------
+# run_framing_probe — aggregate features → AUCs → cascade verdict
+# ---------------------------------------------------------------------------
+
+
+def run_framing_probe(
+    extractions: list[ChainExtraction],
+    severities_by_key: dict[tuple[str, int, int], dict],
+) -> tuple[FramingProbeResult, FramingCascadeVerdict]:
+    """Build the §15.14 probe result + cascade verdict.
+
+    Pipeline:
+      1. Compute per-row features for the main set (cascade input).
+      2. Filter to rows with severity != None (judge-parseable).
+      3. Compute AUC(-R_framing, y), AUC(-R_topic_to_framing, y),
+         AUC(-R_recency, y).
+      4. Compute disclosure-only frame-positive AUC (raw direction).
+      5. Compute disclosure-only response-side AUC (negated direction).
+      6. Compute κ@α at three α values.
+      7. Run cascade classifier.
+    """
+    main_rows = compute_features_per_row(extractions, severities_by_key,
+                                          scope_filter="main")
+    fp_rows = compute_features_per_row(extractions, severities_by_key,
+                                        scope_filter="frame_positive")
+
+    valid_main = [r for r in main_rows if r.severity is not None]
+    if len(valid_main) == 0:
+        raise SchemaMismatchError(
+            "run_framing_probe: no main-set rows have judge-parseable severity"
+        )
+
+    y_arr = [bool(r.y) for r in valid_main]
+    r_framing_arr = [r.r_framing for r in valid_main]
+    r_topic_arr = [r.r_topic_to_framing for r in valid_main]
+    r_recency_arr = [r.r_recency for r in valid_main]
+    r_resp_arr = [r.r_framing_response_side for r in valid_main]
+
+    n_sev_zero = sum(1 for r in main_rows if r.severity == 0)
+    n_sev_one = sum(1 for r in main_rows if r.severity == 1)
+    n_sev_two = sum(1 for r in main_rows if r.severity == 2)
+    n_sev_null = sum(1 for r in main_rows if r.severity is None)
+
+    auc_framing = _auc_negated(y_arr, r_framing_arr)
+    auc_topic = _auc_negated(y_arr, r_topic_arr)
+    auc_recency = _auc_negated(y_arr, r_recency_arr)
+    auc_response_side = _auc_negated(y_arr, r_resp_arr)
+
+    # Frame-positive disclosure: y_pos ≡ severity ≥ 1; raw (non-negated) AUC.
+    valid_fp = [r for r in fp_rows if r.severity is not None]
+    if valid_fp:
+        y_fp = [bool(r.y) for r in valid_fp]
+        r_fp = [r.r_framing for r in valid_fp]
+        auc_framing_pos = _auc_raw(y_fp, r_fp)
+    else:
+        auc_framing_pos = None
+
+    direction_held = (
+        auc_framing == auc_framing  # not NaN
+        and auc_framing >= DIRECTION_GATE_THRESHOLD
+    )
+
+    selective_pts = tuple(
+        selective_kappa_at_alpha(r_framing_arr, y_arr, a)
+        for a in ALPHA_TARGETS
+    )
+    primary_pt = next(
+        (p for p in selective_pts if p["alpha"] == ALPHA_PRIMARY),
+        {"kappa_at_alpha": float("nan"), "tau_star": None},
+    )
+
+    probe = FramingProbeResult(
+        n_evaluation_rows=len(main_rows),
+        n_severity_zero=n_sev_zero,
+        n_severity_one=n_sev_one,
+        n_severity_two=n_sev_two,
+        n_severity_null=n_sev_null,
+        n_y_zero=sum(1 for v in y_arr if not v),
+        n_y_one=sum(1 for v in y_arr if v),
+        auc_framing=auc_framing,
+        auc_topic_to_framing=auc_topic,
+        auc_recency=auc_recency,
+        dauc_framing_vs_chance=auc_framing - CHANCE_BASELINE_AUC,
+        dauc_framing_vs_topic_to_framing=auc_framing - auc_topic,
+        dauc_framing_vs_recency=auc_framing - auc_recency,
+        auc_framing_response_side_disclosure=auc_response_side,
+        auc_framing_pos=auc_framing_pos,
+        direction_held=bool(direction_held),
+        r_framing_per_row=tuple(r_framing_arr),
+        r_topic_to_framing_per_row=tuple(r_topic_arr),
+        r_recency_per_row=tuple(r_recency_arr),
+        severity_per_row=tuple(r.severity for r in valid_main),
+        y_per_row=tuple(y_arr),
+        chain_idx_per_row=tuple(r.chain_idx for r in valid_main),
+        turn_idx_per_row=tuple(r.turn_idx for r in valid_main),
+        source_per_row=tuple(r.source for r in valid_main),
+        selective_prediction_operating_points=selective_pts,
+        kappa_at_alpha_primary=primary_pt["kappa_at_alpha"],
+        tau_star_at_alpha_primary=primary_pt["tau_star"],
+    )
+    verdict = classify_cascade_framing(auc_framing, auc_topic, auc_recency)
+    return probe, verdict
