@@ -2734,3 +2734,273 @@ def write_json_output(
 def math_isnan(x: float) -> bool:
     """Local NaN check (avoids polluting top-level namespace with `import math`)."""
     return x != x
+
+
+# ===========================================================================
+# I-4d: Markdown report renderer + firewall-scanned writer (8 sections)
+# ===========================================================================
+#
+# Structure (per spec Chunk 4):
+#   1. Header + schema/model/extraction/judge config one-liner
+#   2. Cascade verdict (label, rationale, AUC table)
+#   3. Probe details (n, severity histogram, AUC + ΔAUCs, per-source breakdown)
+#   4. Annotation protocol details (judge model, κ, fallback flag, failure rate)
+#   5. Frame-positive disclosure-only block
+#   6. Selective-prediction operating points table
+#   7. Pinned configuration block (formula, pairing rule, thresholds)
+#   8. Caveats + cross-phase comparison + audit-trail integrity
+#
+# write_markdown_output runs enforce_firewall_or_exit on the rendered
+# text BEFORE writing to disk. Any forbidden override-language → exit 4.
+
+
+def _fmt_auc(x: Any) -> str:
+    """Format an AUC for display: 4 dp, 'NaN' on non-finite, 'None' on None."""
+    if x is None:
+        return "None"
+    try:
+        xf = float(x)
+    except (TypeError, ValueError):
+        return "?"
+    if math_isnan(xf) or xf != xf:
+        return "NaN"
+    return f"{xf:.4f}"
+
+
+def _fmt_kappa_at_alpha_table(points: tuple[dict, ...]) -> str:
+    """Markdown table for the 3 selective-prediction operating points."""
+    rows = [
+        "| α    | eligible | n_admitted | coverage | conditional_acc | κ@α     | τ*      |",
+        "|------|----------|------------|----------|-----------------|---------|---------|",
+    ]
+    for pt in points:
+        rows.append(
+            f"| {pt['alpha']:.2f} | {str(pt['eligible']):>8} | "
+            f"{pt['n_admitted_at_tau_star']:>10} | "
+            f"{_fmt_auc(pt['coverage_at_tau_star']):>8} | "
+            f"{_fmt_auc(pt['conditional_accuracy_at_tau_star']):>15} | "
+            f"{_fmt_auc(pt['kappa_at_alpha']):>7} | "
+            f"{_fmt_auc(pt['tau_star']):>7} |"
+        )
+    return "\n".join(rows)
+
+
+def _fmt_per_source_breakdown(
+    source_per_row: tuple[str, ...],
+    severity_per_row: tuple[int | None, ...],
+    y_per_row: tuple[bool, ...],
+) -> str:
+    """Markdown table: per-source severity + y distribution."""
+    sources: dict[str, dict[str, int]] = {}
+    for src, sev, y in zip(source_per_row, severity_per_row, y_per_row):
+        bucket = sources.setdefault(src, {
+            "n": 0, "n_sev_0": 0, "n_sev_1": 0, "n_sev_2": 0,
+            "n_sev_null": 0, "n_y_1": 0,
+        })
+        bucket["n"] += 1
+        if sev is None:
+            bucket["n_sev_null"] += 1
+        elif sev == 0:
+            bucket["n_sev_0"] += 1
+        elif sev == 1:
+            bucket["n_sev_1"] += 1
+        else:
+            bucket["n_sev_2"] += 1
+        if y:
+            bucket["n_y_1"] += 1
+    rows = [
+        "| source            | n   | sev=0 | sev=1 | sev=2 | sev=null | y=1 |",
+        "|-------------------|-----|-------|-------|-------|----------|-----|",
+    ]
+    for src in sorted(sources.keys()):
+        b = sources[src]
+        rows.append(
+            f"| {src:<17} | {b['n']:>3} | {b['n_sev_0']:>5} | "
+            f"{b['n_sev_1']:>5} | {b['n_sev_2']:>5} | "
+            f"{b['n_sev_null']:>8} | {b['n_y_1']:>3} |"
+        )
+    return "\n".join(rows)
+
+
+def render_markdown_report(audit: FramingAuditOutputs) -> str:
+    """Render the 8-section markdown report. Caller firewall-scans it."""
+    probe = audit.probe_result
+    verdict = audit.cascade_verdict
+
+    sections: list[str] = []
+
+    # Section 1: header + one-liner config.
+    sections.append(
+        f"# §15.14 framing-stickiness probe — cascade verdict\n\n"
+        f"- **schema_version:** `{SCHEMA_VERSION}`\n"
+        f"- **benchmark:** `{BENCHMARK_NAME}`\n"
+        f"- **subject:** `{QWEN_MODEL_ID_SUBJECT}`  "
+        f"**judge:** `{audit.judge_model_id}`"
+        f"{' (fallback used)' if audit.judge_fallback_used else ''}\n"
+        f"- **K_TURNS:** {K_TURNS}  "
+        f"**N_main:** {N_MAIN_CHAINS}  "
+        f"**N_frame_positive:** {N_FRAME_POSITIVE_CHAINS}  "
+        f"**N_calibration:** {N_CALIBRATION_CHAINS}\n"
+        f"- **stimulus_sha256:** `{audit.stimulus_sha256}`\n"
+        f"- **calibration_labels_sha256:** `{audit.calibration_labels_sha256}`\n"
+        f"- **judge_prompt_sha256:** `{audit.judge_prompt_sha256}`"
+    )
+
+    # Section 2: cascade verdict.
+    sections.append(
+        f"## Cascade verdict\n\n"
+        f"**Label:** `{verdict.label.value}`\n\n"
+        f"| metric                  | value     |\n"
+        f"|-------------------------|-----------|\n"
+        f"| auc_framing             | {_fmt_auc(verdict.auc_framing)}   |\n"
+        f"| auc_topic_to_framing    | {_fmt_auc(verdict.auc_topic_to_framing)}   |\n"
+        f"| auc_recency             | {_fmt_auc(verdict.auc_recency)}   |\n"
+        f"| ΔAUC vs chance (0.5)    | {_fmt_auc(verdict.dauc_vs_chance)}   |\n"
+        f"| ΔAUC vs topic           | {_fmt_auc(verdict.dauc_vs_topic_to_framing)}   |\n"
+        f"| ΔAUC vs recency         | {_fmt_auc(verdict.dauc_vs_recency)}   |\n"
+        f"| direction_held          | {str(verdict.direction_held)}     |\n\n"
+        f"**Rationale.** {verdict.rationale}"
+    )
+
+    # Section 3: probe details.
+    severity_total = (
+        probe.n_severity_zero + probe.n_severity_one
+        + probe.n_severity_two + probe.n_severity_null
+    )
+    sections.append(
+        f"## Probe details\n\n"
+        f"- **n_evaluation_rows:** {probe.n_evaluation_rows}\n"
+        f"- **severity histogram (judge):** "
+        f"0={probe.n_severity_zero}, 1={probe.n_severity_one}, "
+        f"2={probe.n_severity_two}, null={probe.n_severity_null}  "
+        f"(total {severity_total})\n"
+        f"- **y balance (severity ≥ 1):** "
+        f"y=0: {probe.n_y_zero}, y=1: {probe.n_y_one}\n"
+        f"- **disclosure: response-side AUC** "
+        f"(`R_framing_response_side`): "
+        f"{_fmt_auc(probe.auc_framing_response_side_disclosure)}\n\n"
+        f"### Per-source breakdown (disclosure-only)\n\n"
+        f"{_fmt_per_source_breakdown(probe.source_per_row, probe.severity_per_row, probe.y_per_row)}"
+    )
+
+    # Section 4: annotation protocol.
+    kappa_pass = (
+        not math_isnan(audit.calibration_kappa)
+        and audit.calibration_kappa >= KAPPA_GATE_THRESHOLD
+    )
+    sections.append(
+        f"## Annotation protocol\n\n"
+        f"- **judge_model_id:** `{audit.judge_model_id}`\n"
+        f"- **judge_fallback_used:** {audit.judge_fallback_used}\n"
+        f"- **judge_prompt_sha256:** `{audit.judge_prompt_sha256}`\n"
+        f"- **judge temperature:** {DECODE_TEMPERATURE_JUDGE}; "
+        f"**max tokens:** {MAX_NEW_TOKENS_JUDGE}\n"
+        f"- **calibration κ:** {_fmt_auc(audit.calibration_kappa)}  "
+        f"(threshold: {KAPPA_GATE_THRESHOLD}; "
+        f"pass: {str(kappa_pass)})\n"
+        f"- **annotation_failure_rate:** "
+        f"{_fmt_auc(audit.annotation_failure_rate)}  "
+        f"(threshold: {ANNOTATION_FAILURE_RATE_THRESHOLD})\n"
+        f"- **n_calibration_rows:** {EVALUATION_ROWS_CALIBRATION}"
+    )
+
+    # Section 5: frame-positive disclosure.
+    fp_dir_consistent = (
+        probe.auc_framing_pos is not None
+        and not math_isnan(probe.auc_framing_pos)
+        and probe.auc_framing_pos >= 0.5
+    )
+    sections.append(
+        f"## Frame-positive disclosure (NOT a cascade input)\n\n"
+        f"- **n_frame_positive_chains:** {N_FRAME_POSITIVE_CHAINS}\n"
+        f"- **n_frame_positive_rows:** {EVALUATION_ROWS_FRAME_POSITIVE}\n"
+        f"- **auc_framing_pos:** {_fmt_auc(probe.auc_framing_pos)}\n"
+        f"- **direction_consistent (raw direction):** {fp_dir_consistent}\n\n"
+        f"Per spec Chunk 2 Choice 7: this is a sign-consistency cross-check, "
+        f"not a cascade input. Frame-positive items are stimuli where "
+        f"appropriate framing invocation IS the correct behavior."
+    )
+
+    # Section 6: selective-prediction operating points (disclosure-only).
+    sections.append(
+        f"## Selective-prediction operating points (disclosure-only)\n\n"
+        f"{_fmt_kappa_at_alpha_table(probe.selective_prediction_operating_points)}\n\n"
+        f"**alpha_primary:** {ALPHA_PRIMARY}  "
+        f"**κ@α_primary:** {_fmt_auc(probe.kappa_at_alpha_primary)}  "
+        f"**τ\\***: {_fmt_auc(probe.tau_star_at_alpha_primary)}"
+    )
+
+    # Section 7: pinned configuration.
+    sections.append(
+        f"## Pinned configuration\n\n"
+        f"- **formula:** "
+        f"`R_framing = cos(s_t, f_1) - cos(s_t, q_t)`\n"
+        f"- **comparators:** "
+        f"`R_topic_to_framing = cos(q_t, f_1)`; "
+        f"`R_recency = cos(s_t, a_prev) - cos(s_t, q_t)`\n"
+        f"- **pairing rule:** {audit.pairing_rule_text}\n"
+        f"- **direction convention:** lower R_framing predicts "
+        f"appropriate non-invocation; AUC(-R_framing, y).\n"
+        f"- **cascade thresholds:** "
+        f"DIRECTION_GATE={DIRECTION_GATE_THRESHOLD} (strict); "
+        f"PARTIAL_AUC={PARTIAL_AUC_THRESHOLD} (inclusive); "
+        f"STRONG_AUC={STRONG_AUC_THRESHOLD} (inclusive); "
+        f"STRONG_ΔAUC={STRONG_DELTA_AUC_THRESHOLD} (inclusive vs all 3 baselines).\n"
+        f"- **κ gate:** {KAPPA_GATE_THRESHOLD} (inclusive)  "
+        f"**y rule:** y=1 iff severity ≥ 1\n"
+        f"- **firewall:** {EXPECTED_FIREWALL_PATTERN_COUNT} patterns "
+        f"({len(_FIREWALL_ICASE_PATTERNS)} icase + {len(_FIREWALL_LITERAL_PATTERNS)} literal)\n"
+        f"- **§15.14-A1 EFFECTIVE:** source enum scoping pinned per spec amendment."
+    )
+
+    # Section 8: caveats + cross-phase + audit trail.
+    sections.append(
+        f"## Caveats and audit trail\n\n"
+        f"### Caveats (§0.8-disclosed)\n\n"
+        f"- N=500 main-set rows; AUC standard error at AUC≈0.66 with N=500 is ~0.02. "
+        f"Cascade thresholds at 0.66 / 0.75 are within sampling noise of finite "
+        f"distributions; v1 reports point estimates against pinned bands.\n"
+        f"- Carries forward §15.10 / §15.11 / §15.13 caveats by §-reference.\n"
+        f"- Frame-positive set is curation-time hand-authored "
+        f"(synthetic_frame_positive_v1 source under §15.14-A1); "
+        f"auc_framing_pos is disclosure-only.\n"
+        f"- κ gate is the only protection against LLM-judge / human "
+        f"label drift; passing κ does not guarantee the labels are correct, "
+        f"only that judge and human substantially agree.\n\n"
+        f"### Cross-phase status table\n\n"
+        f"| phase  | mechanism                   | verdict / status           |\n"
+        f"|--------|-----------------------------|----------------------------|\n"
+        f"| §13.10 | unsupervised entropy        | AUC=0.661 (saturated)      |\n"
+        f"| §15.10 | supervised linear           | PARTIAL_SIGNAL_IN_Z        |\n"
+        f"| §15.11 | layer-wise phase coherence  | NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE |\n"
+        f"| §15.12 | synthesis + closure         | sealed                     |\n"
+        f"| §15.13 | continuation inertia        | NO_MATERIAL_SIGNAL_IN_INERTIA (AUC=0.6300) |\n"
+        f"| §15.14 | framing-stickiness          | `{verdict.label.value}` (this run) |\n\n"
+        f"### Audit-trail integrity (§0.8-binding)\n\n"
+        f"§13.9 hold preserved. §6.1 N=21 autonomy result preserved. "
+        f"§15.10 PARTIAL preserved. §15.11 NO_MATERIAL preserved. "
+        f"§15.12 closure preserved. §15.13 NO_MATERIAL preserved. "
+        f"This run is independent of all of these. The cascade rule is "
+        f"mechanical; the verdict is binding regardless of post-hoc "
+        f"interpretation. Firewall-scanned ({EXPECTED_FIREWALL_PATTERN_COUNT} patterns) "
+        f"before write."
+    )
+
+    return "\n\n".join(sections) + "\n"
+
+
+def write_markdown_output(
+    audit: FramingAuditOutputs,
+    out_path: Path = DEFAULT_PROBE_MD_PATH,
+) -> None:
+    """Render markdown, run firewall scan, write atomically.
+
+    Firewall match → exit EXIT_INTERPRETATION_VIOLATION (4). Nothing
+    is written when the firewall fires.
+    """
+    md = render_markdown_report(audit)
+    enforce_firewall_or_exit(md, context=str(out_path))
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path.write_text(md)
+    tmp_path.replace(out_path)
