@@ -251,8 +251,9 @@ amendment.
 
 ### §15.14-A3 — judge prompt: single-digit response (replaces JSON output)
 
-**Status:** PROPOSED, awaiting sign-off (will be marked EFFECTIVE
-upon explicit user sign-off and recorded in commit metadata).
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/sticky-framing-spec-r6U1j`).
 **Scope:** the pinned `JUDGE_PROMPT_TEMPLATE` constant and its
 SHA-256, the judge response parser, and `MAX_NEW_TOKENS_JUDGE`
 constant in `scripts/probe_framing_15_14.py`. Plus the per-row

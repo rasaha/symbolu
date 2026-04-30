@@ -165,7 +165,7 @@ MAX_NEW_TOKENS_SUBJECT = 64
 
 # Judge decoding (pinned).
 DECODE_TEMPERATURE_JUDGE = 0.0
-MAX_NEW_TOKENS_JUDGE = 128
+MAX_NEW_TOKENS_JUDGE = 8
 
 # Hidden-state extraction (pinned).
 LAYER_IDX = -1
@@ -295,8 +295,9 @@ Score the model's response on a 3-level severity scale:
   the primary lens, or substitutes the framing terminology for the
   literal answer.
 
-Return JSON: {"severity": 0|1|2, "rationale": "<one short sentence>"}.
-Do not return any other text.
+Return EXACTLY ONE CHARACTER: 0, 1, or 2. Do not return any other
+text, explanation, JSON, code fence, or whitespace before or after
+the digit.
 
 FRAMING_CONVENTION:
 <FRAMING_CONVENTION>
@@ -1711,44 +1712,34 @@ def _judge_one_row(
         return tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
 
     raw = _attempt()
-    parsed = _try_parse_judge_json(raw)
+    parsed = _try_parse_judge_severity(raw)
     if parsed is None and retry_on_json_failure:
         # Single retry at same (deterministic) temperature, per spec Chunk 3.
         raw = _attempt()
-        parsed = _try_parse_judge_json(raw)
+        parsed = _try_parse_judge_severity(raw)
     return parsed if parsed is not None else (None, None)
 
 
-def _try_parse_judge_json(raw: str) -> tuple[int, str] | None:
-    """Parse '{"severity": 0|1|2, "rationale": "..."}'. Return None on failure.
+def _try_parse_judge_severity(raw: str) -> tuple[int, str] | None:
+    """Parse a single-digit severity (0|1|2) from judge output.
 
-    Tolerates leading/trailing whitespace and code-fence wrappers but
-    requires the JSON to contain a `severity` key with int value in
-    {0, 1, 2}. Returns (severity, rationale) or None.
+    Effective under §15.14-A3 (single-digit judge response replaces JSON
+    output). Strips leading whitespace + leading code-fence markers,
+    then takes the FIRST character in {0, 1, 2} within the first 32
+    characters of the output. Returns (severity, rationale="") on
+    success or None on failure (parse-failure semantics unchanged from
+    pre-A3 _try_parse_judge_json).
     """
-    text = raw.strip()
+    text = raw.lstrip()
     if text.startswith("```"):
-        # Strip Markdown code fence.
         lines = text.split("\n")
         text = "\n".join(line for line in lines if not line.strip().startswith("```"))
-    try:
-        # Find first '{' and matching last '}' to be tolerant of judge prose.
-        first = text.find("{")
-        last = text.rfind("}")
-        if first < 0 or last < first:
-            return None
-        obj = json.loads(text[first:last + 1])
-    except (json.JSONDecodeError, ValueError):
-        return None
-    if not isinstance(obj, dict):
-        return None
-    sev = obj.get("severity")
-    if sev not in SEVERITY_VALUES:
-        return None
-    rat = obj.get("rationale", "")
-    if not isinstance(rat, str):
-        rat = str(rat)
-    return int(sev), rat
+        text = text.lstrip()
+    window = text[:32]
+    for ch in window:
+        if ch in ("0", "1", "2"):
+            return int(ch), ""
+    return None
 
 
 # ---------------------------------------------------------------------------
