@@ -2591,3 +2591,146 @@ def run_self_test_gate(*, verbose: bool = True) -> int:
         print("=" * 50)
         print(f"SELF-TEST GATE: ALL PASS ({EXPECTED_FIREWALL_PATTERN_COUNT}-pattern firewall + 12 cascade + 3 cosine + disjointness)")
     return EXIT_SUCCESS
+
+
+# ===========================================================================
+# I-4c: JSON output writer (schema_version "15.14")
+# ===========================================================================
+#
+# Top-level keys are alphabetical (sort_keys=True parity with §15.10/
+# §15.11/§15.12/§15.13). The payload exactly matches the §15.14 spec
+# Chunk 4 output schema. No additional keys; no key removal.
+
+
+def _f(x: Any) -> Any:
+    """JSON-friendly float coercion: NaN/Inf → None for downstream tooling."""
+    import math
+    if isinstance(x, float):
+        if math.isnan(x) or math.isinf(x):
+            return None
+        return x
+    return x
+
+
+def write_json_output(
+    audit: FramingAuditOutputs,
+    out_path: Path = DEFAULT_PROBE_JSON_PATH,
+) -> None:
+    """Build + write the §15.14 cascade JSON output."""
+    probe = audit.probe_result
+    verdict = audit.cascade_verdict
+
+    payload = {
+        "annotation_protocol": {
+            "annotation_failure_rate": _f(audit.annotation_failure_rate),
+            "annotation_failure_rate_threshold": ANNOTATION_FAILURE_RATE_THRESHOLD,
+            "calibration_kappa": _f(audit.calibration_kappa),
+            "calibration_kappa_threshold": KAPPA_GATE_THRESHOLD,
+            "calibration_n_rows": EVALUATION_ROWS_CALIBRATION,
+            "judge_max_tokens": MAX_NEW_TOKENS_JUDGE,
+            "judge_model_id": audit.judge_model_id,
+            "judge_prompt_sha256": audit.judge_prompt_sha256,
+            "judge_temperature": DECODE_TEMPERATURE_JUDGE,
+        },
+        "benchmark": BENCHMARK_NAME,
+        "calibration_labels_sha256": audit.calibration_labels_sha256,
+        "cascade_thresholds": {
+            "chance_baseline_auc": CHANCE_BASELINE_AUC,
+            "direction_gate_threshold": DIRECTION_GATE_THRESHOLD,
+            "partial_auc": PARTIAL_AUC_THRESHOLD,
+            "strong_auc": STRONG_AUC_THRESHOLD,
+            "strong_delta_auc": STRONG_DELTA_AUC_THRESHOLD,
+        },
+        "cascade_verdict": {
+            "auc_framing": _f(verdict.auc_framing),
+            "auc_recency": _f(verdict.auc_recency),
+            "auc_topic_to_framing": _f(verdict.auc_topic_to_framing),
+            "dauc_vs_chance": _f(verdict.dauc_vs_chance),
+            "dauc_vs_recency": _f(verdict.dauc_vs_recency),
+            "dauc_vs_topic_to_framing": _f(verdict.dauc_vs_topic_to_framing),
+            "direction_held": bool(verdict.direction_held),
+            "label": verdict.label.value,
+            "rationale": verdict.rationale,
+        },
+        "cross_phase_disclosure": {
+            "phase_1_§15_10_verdict": "PARTIAL_SIGNAL_IN_Z",
+            "phase_2_§15_11_verdict": "NO_MATERIAL_SIGNAL_IN_PHASE_COHERENCE",
+            "phase_3_§15_12_status": "sealed (closure outcome)",
+            "phase_4_§15_13_verdict": "NO_MATERIAL_SIGNAL_IN_INERTIA",
+            "this_phase_modifies": "none",
+        },
+        "extraction_config": {
+            "a_prev_pooling": "mean_over_decoded_assistant_tokens_layer_minus_1_full_context_pass",
+            "decode_temperature": DECODE_TEMPERATURE_SUBJECT,
+            "f_1_pooling": "mean_over_framing_token_positions_layer_minus_1_full_context_pass",
+            "hidden_dim": HIDDEN_DIM,
+            "k_turns": K_TURNS,
+            "layer_idx": LAYER_IDX,
+            "max_new_tokens": MAX_NEW_TOKENS_SUBJECT,
+            "q_t_extraction": "last_token_pre_decode_standalone_with_chat_template",
+            "s_t_extraction": "last_token_pre_decode_at_t_th_assistant_tag_full_context",
+        },
+        "frame_positive_disclosure": {
+            "auc_framing_pos": _f(probe.auc_framing_pos),
+            "auc_framing_pos_direction_consistent": (
+                probe.auc_framing_pos is not None
+                and not math_isnan(probe.auc_framing_pos)
+                and probe.auc_framing_pos >= 0.5
+            ),
+            "n_frame_positive_chains": N_FRAME_POSITIVE_CHAINS,
+            "n_frame_positive_rows": EVALUATION_ROWS_FRAME_POSITIVE,
+            "note": "Disclosure-only sign-consistency cross-check; NOT a cascade input.",
+        },
+        "judge_fallback_used": bool(audit.judge_fallback_used),
+        "n_chains": N_MAIN_CHAINS,
+        "n_evaluation_rows": EVALUATION_ROWS_MAIN,
+        "pairing_rule": audit.pairing_rule_text,
+        "phase_5_eligible_outcomes": [v.value for v in CascadeVerdict],
+        "probe_result": {
+            "alpha_primary": ALPHA_PRIMARY,
+            "auc_framing": _f(probe.auc_framing),
+            "auc_framing_response_side_disclosure": _f(probe.auc_framing_response_side_disclosure),
+            "auc_recency": _f(probe.auc_recency),
+            "auc_topic_to_framing": _f(probe.auc_topic_to_framing),
+            "chain_idx_per_row": list(probe.chain_idx_per_row),
+            "dauc_framing_vs_chance": _f(probe.dauc_framing_vs_chance),
+            "dauc_framing_vs_recency": _f(probe.dauc_framing_vs_recency),
+            "dauc_framing_vs_topic_to_framing": _f(probe.dauc_framing_vs_topic_to_framing),
+            "direction_held": bool(probe.direction_held),
+            "kappa_at_alpha_primary": _f(probe.kappa_at_alpha_primary),
+            "n_evaluation_rows": probe.n_evaluation_rows,
+            "n_severity_null": probe.n_severity_null,
+            "n_severity_one": probe.n_severity_one,
+            "n_severity_two": probe.n_severity_two,
+            "n_severity_zero": probe.n_severity_zero,
+            "n_y_one": probe.n_y_one,
+            "n_y_zero": probe.n_y_zero,
+            "r_framing_per_row": [_f(x) for x in probe.r_framing_per_row],
+            "r_recency_per_row": [_f(x) for x in probe.r_recency_per_row],
+            "r_topic_to_framing_per_row": [_f(x) for x in probe.r_topic_to_framing_per_row],
+            "selective_prediction_operating_points": [
+                {k: _f(v) for k, v in pt.items()}
+                for pt in probe.selective_prediction_operating_points
+            ],
+            "severity_per_row": [
+                (None if s is None else int(s)) for s in probe.severity_per_row
+            ],
+            "source_per_row": list(probe.source_per_row),
+            "tau_star_at_alpha_primary": _f(probe.tau_star_at_alpha_primary),
+            "turn_idx_per_row": list(probe.turn_idx_per_row),
+            "y_per_row": [bool(y) for y in probe.y_per_row],
+        },
+        "qwen_model_id": QWEN_MODEL_ID_SUBJECT,
+        "schema_version": SCHEMA_VERSION,
+        "stimulus_sha256": audit.stimulus_sha256,
+    }
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    tmp_path.replace(out_path)
+
+
+def math_isnan(x: float) -> bool:
+    """Local NaN check (avoids polluting top-level namespace with `import math`)."""
+    return x != x
