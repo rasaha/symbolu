@@ -1595,6 +1595,376 @@ candidate set.
    the EFFECTIVE follow-up is a **separate** user authorization;
    it is not implied by the EFFECTIVE flip itself.
 
+---
+
+### §15.14-A6 — judge-model fallback chain (replace Llama-3.1-8B fallback with Mistral-7B-Instruct-v0.3; family-effect test at 7-8B scale)
+
+**Status:** PROPOSED. The status field will flip to EFFECTIVE only
+after the user replies with the literal phrase
+`Sign off §15.14-A6. Push the EFFECTIVE follow-up.` and a separate
+EFFECTIVE follow-up commit is pushed that flips this status field
+and applies the implementation surface enumerated below. This
+two-phase discipline mirrors §15.14-A1 / A2 / A3 / A4 / A5.
+
+**Scope.** One pinned constant in `scripts/probe_framing_15_14.py`:
+
+  - `JUDGE_MODEL_ID_FALLBACK`:
+    `"meta-llama/Llama-3.1-8B-Instruct"` (effective under §15.14-A2)
+    → `"mistralai/Mistral-7B-Instruct-v0.3"` (effective under §15.14-A6).
+
+Plus the corresponding entry in the §15.14 spec Chunk 6
+frozen-parameters table. No other parameter is modified.
+
+**No other source change.** `_load_subject_model`, `_load_judge_model`
+body (other than that it now points to a different fallback
+identity), `_judge_one_row` (still chat-template render under
+§15.14-A5; still logit-first-token-argmax over isolated `{"0",
+"1", "2"}` under §15.14-A4), Pass A, Pass B, Pass C orchestration,
+Pass D κ gate, the cascade comparator, the firewall, the
+self-test gate, the writers, the calibration labels artifact, the
+extraction cache, and all locked SHAs are unchanged.
+
+**Rationale.** §15.14 v1 / v2 / v3 / v4 closed as ANNOTATION_FAILED
+across five tested judge configurations, all sharing the
+characteristic that the judge model was a 7-8B-class instruction-
+tuned model from one of two families (Qwen-2.5 in v1's pre-A2
+fallback; Llama-3.1 in v1's post-A2 / v2 / v3 / v4 fallback).
+Across those five configurations, the failure modes were:
+
+  1. Qwen-7B / JSON: parse failure 0.2692 → ANNOTATION_FAILED
+  2. Llama-8B / JSON: parse failure 0.7077 → ANNOTATION_FAILED
+  3. Llama-8B / single-digit: parse failure 0.8477 → ANNOTATION_FAILED
+  4. Llama-8B / A4 raw-string logit: κ = −0.0776 → ANNOTATION_FAILED
+  5. Llama-8B / A5 chat-template logit: κ = −0.3840 → ANNOTATION_FAILED
+
+The two-family coverage at 7-8B (one Qwen, four Llama) leaves a
+structurally distinct hypothesis untested: **the failure may be
+specific to the Llama-3.1 family at this parameter scale**, rather
+than universal to all 7-8B instruction-tuned models. A
+single-amendment 7B-class judge from a third family (Mistral, with
+a SentencePiece-based tokenizer different from both Llama's BPE
+and Qwen's tiktoken-style BPE) can falsify or confirm that
+hypothesis cheaply (~5 min wall on the existing A100-80, no
+hardware envelope change, no quantization, no rubric change).
+
+§15.14-A6 makes that single-variable change. If A6 passes the κ
+gate (κ ≥ 0.6 inclusive on the 50 calibration rows under §15.14-A4
++ §15.14-A5 mechanics), the binding constraint at v1–v4 was
+**Llama-3.1-family-specific miscalibration**, not 7-8B scale or
+rubric design. The §15.14 v6 cascade verdict is then computed
+without changing any threshold. If A6 also fails the κ gate, the
+binding constraint is **either** the 7-8B scale itself **or** the
+LLM-as-judge rubric design (and the next amendment routes to
+either §15.14-A7 PROPOSED for rubric redesign on the existing 8B
+judge, or to a separately-authorized hardware/quantization
+amendment for a true 70B-class judge).
+
+**Why Mistral-7B-Instruct-v0.3 specifically.**
+
+  - Different tokenizer family. Mistral-7B uses a SentencePiece-
+    based tokenizer (tekken? actually Mistral's own SentencePiece
+    BPE). Different from Llama-3.x's tiktoken-style and from
+    Qwen-2.5's tiktoken-style. Any tokenizer-level structural
+    confound that affected the §15.14-A5 logit-first-token-argmax
+    surface on Llama-3.1's `{15, 16, 17}` IDs will likely have a
+    **different** structural manifestation on Mistral's
+    tokenizer; if Mistral passes κ, the structural confound
+    hypothesis is empirically weakened.
+  - Operationally reliable. The user's RunPod environment has had
+    documented operational issues with Qwen downloads (per §15.14
+    v1 OUTCOME: `OSError: [Errno 122] Disk quota exceeded` on
+    Qwen-72B; per session correspondence: family-level operational
+    unreliability). Mistral models are widely-mirrored on HF Hub
+    and have not exhibited the same operational pathology in this
+    environment.
+  - Hardware fits cleanly. Mistral-7B-Instruct-v0.3 at bf16 is
+    ~14 GB weights on disk and ~14 GB VRAM at load (plus KV cache
+    overhead ~few GB at the 650-row × ~1 KiB-prompt batch). Both
+    fit the existing A100-80 envelope (~80 GB VRAM, ~48 GB
+    workspace nominal) with comfortable margin. No hardware
+    expansion. No quantization. No `torch_dtype` change beyond the
+    existing `"auto"`.
+  - Same parameter scale as Llama-3.1-8B (7B vs 8B; ~13% fewer
+    parameters). Cleanly tests the family hypothesis at fixed
+    scale.
+  - Instruction-tuned variant `v0.3` is the latest stable
+    release in the Mistral-7B-Instruct line as of the spec
+    revision date and is well-evaluated on common
+    instruction-following benchmarks (MT-Bench, AlpacaEval).
+
+**Why NOT Mixtral-8x7B-Instruct-v0.1 in this PROPOSED block.**
+
+The user's authorization listed Mixtral-8x7B-Instruct-v0.1 as a
+secondary candidate, conditional on it being "available and
+loadable within the current hardware envelope." It is **not**
+loadable at bf16 within the current envelope:
+
+  - Mixtral-8x7B at bf16 is ~94 GB weights on disk and ~94 GB
+    VRAM at load (47B total parameters; sparse MoE, but full-
+    weight storage at inference time).
+  - 94 GB > 80 GB A100 VRAM (does not fit single A100-80 at bf16).
+  - 94 GB > ~48 GB workspace (cannot be downloaded into the
+    nominal RunPod workspace quota).
+  - This is structurally identical to the Qwen-72B problem from
+    §15.14 v1 (per OUTCOME doc: 140 GB > 80 GB; download crashed
+    with `OSError: [Errno 122] Disk quota exceeded`).
+
+Mixtral-8x7B is therefore deferred to a future amendment that
+(a) authorizes hardware expansion (e.g., 2× A100-80 = 160 GB
+VRAM, plus expanded workspace), or (b) authorizes quantization
+(currently §0.8-prohibited under §15.14-A4 and §15.14-A5: "No
+quantization of any judge model"). Neither is authorized by the
+user's §15.14-A6 PROPOSED scope, and neither is taken in this
+block.
+
+**Change.** One pinned implementation modification. No threshold
+changes.
+
+| Field | Pre-A6 | Post-A6 |
+|---|---|---|
+| `JUDGE_MODEL_ID_DEFAULT` | `"Qwen/Qwen2.5-72B-Instruct"` | `"Qwen/Qwen2.5-72B-Instruct"` (**unchanged**; still pinned default; not loadable on current envelope per v1 OUTCOME, fallback path remains operative) |
+| `JUDGE_MODEL_ID_FALLBACK` | `"meta-llama/Llama-3.1-8B-Instruct"` (effective under §15.14-A2) | `"mistralai/Mistral-7B-Instruct-v0.3"` (effective under §15.14-A6) |
+
+Inheritance chain unchanged:
+
+  - §15.14-A4 logit-first-token-argmax extraction over isolated
+    `{"0", "1", "2"}`: inherited.
+  - §15.14-A5 chat-template render via `tokenizer.apply_chat_template(...,
+    add_generation_prompt=True)`: inherited.
+  - `JUDGE_PROMPT_TEMPLATE` text content + SHA-256: unchanged.
+  - `LABEL_TOKEN_ENCODING_AMBIGUOUS` precondition: unchanged in
+    code; will be re-evaluated at judge-load against Mistral's
+    tokenizer (each of `"0"`, `"1"`, `"2"` must encode to a
+    single token under the active tokenizer; if not, exit 9
+    ANNOTATION_FAILED, parallel to the existing A4 precondition).
+  - `_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-A5-annotated"`:
+    unchanged (the on-disk per-row layout is structurally
+    identical to A5; only the judge identity changes; a future
+    amendment may bump the schema for cross-version diff
+    continuity but it is **not** required by A6 in this PROPOSED
+    block).
+
+**Failure surfaces under A6.**
+
+  - Pre-load precondition (new under A6, parallel to A2's
+    precedent): if `mistralai/Mistral-7B-Instruct-v0.3` is not
+    downloadable within the nominal workspace quota (~48 GB) or
+    not loadable at bf16 within the A100-80 VRAM envelope (~80
+    GB), the script exits with a `JUDGE_LOAD_FAILED` diagnostic
+    (existing path; no new code). **Pre-flight expectation: PASS.**
+  - `LABEL_TOKEN_ENCODING_AMBIGUOUS` precondition (inherited from
+    §15.14-A4): if Mistral's SentencePiece tokenizer encodes any
+    of `"0"`, `"1"`, `"2"` as multi-token, exit 9
+    ANNOTATION_FAILED. **Pre-flight expectation: PASS** — digits
+    `0`, `1`, `2` are typically single tokens in Mistral's
+    SentencePiece BPE; the post-§15.14-A4 inherited precondition
+    will mechanically verify at judge-load.
+  - `json_parse_failure_rate` (preserved name): structurally
+    `0.0000` under inherited §15.14-A4 logit extraction. Vacuous.
+  - Pass D **κ-gate at `KAPPA_GATE_THRESHOLD = 0.6` inclusive**:
+    **unchanged and binding**. If κ < 0.6 on the 50 calibration
+    rows under the A6 (Mistral) judge, the script exits 9
+    ANNOTATION_FAILED before the cascade is computed.
+
+**What this amendment does NOT change.**
+
+  - `JUDGE_MODEL_ID_DEFAULT` (`Qwen/Qwen2.5-72B-Instruct`):
+    unchanged. Not loadable on the current envelope per v1 OUTCOME
+    (140 GB > 80 GB). The fallback path remains operative for the
+    same reason.
+  - `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+  - `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged
+    (vacuous under §15.14-A4 inheritance).
+  - `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1): unchanged.
+  - `DIRECTION_GATE_THRESHOLD = 0.5` (strict): unchanged.
+  - `PARTIAL_AUC_THRESHOLD = 0.66` (inclusive): unchanged.
+  - `STRONG_AUC_THRESHOLD = 0.75` (inclusive): unchanged.
+  - `STRONG_DELTA_AUC_THRESHOLD = 0.05` (inclusive, vs chance,
+    vs R_topic_to_framing, vs R_recency): unchanged.
+  - Severity rubric (0=IGNORED / 1=MENTIONED / 2=STRUCTURED):
+    unchanged.
+  - Sign direction (BCVF-faithful: R_framing higher → more
+    framing-stickiness): unchanged.
+  - Cascade structure (4-step direction-gate → STRONG → PARTIAL →
+    NO_MATERIAL), 2-comparator strict-margin requirement: unchanged.
+  - 12 self-test cascade boundary cases: unchanged.
+  - 52-pattern Class-3 firewall: unchanged.
+  - `JUDGE_PROMPT_TEMPLATE` text content + SHA-256: unchanged.
+  - `JUDGE_EXTRACTION_METHOD = "logit_first_token_argmax"`:
+    unchanged (§15.14-A4 inheritance).
+  - `JUDGE_PROMPT_RENDER = "apply_chat_template_user_only(add_generation_prompt=True)"`:
+    unchanged (§15.14-A5 inheritance).
+  - `LABEL_TOKEN_CHARS = ("0", "1", "2")`: unchanged.
+  - `framing_15_14_extractions.npz` extraction cache: unchanged
+    and reusable via `--force-annotate`.
+  - All `human_severity` / `human_severity_rationale` values in
+    the calibration labels artifact: unchanged. The locked labels
+    SHA (`e9776ff223ef913b2e404d2cf90203e9615c01640bc8fc5c42ffabf2d49b0d6c`,
+    50/50 by `rasaha-2026-04-30`) is unchanged.
+  - Locked stimulus SHA
+    (`e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7`):
+    unchanged.
+  - Stimulus geometry (130 chains × 5 evaluation turns = 650
+    rows): unchanged.
+  - The §15.14-A4 diagnostic annotated cache
+    (`framing_15_14_annotated_A4_diagnostic.npz` on RunPod, with
+    `diagnostic_only=True` marker): unchanged and preserved.
+  - §15.14-A1 / A2 / A3 / A4 / A5: unchanged.
+  - All §13/§14/§15.x verdicts-of-record (including §15.14 v1
+    ANNOTATION_FAILED closure, §15.14 v2 ANNOTATION_FAILED
+    closure, §15.14 v3 ANNOTATION_FAILED closure, and §15.14 v4
+    ANNOTATION_FAILED closure): preserved.
+
+**What this amendment does NOT permit.**
+
+  - Lowering `KAPPA_GATE_THRESHOLD` below 0.6.
+  - Modifying any sealed AUC threshold, the cascade structure,
+    the comparator rules, or the severity rubric.
+  - Modifying the topic-overlap firewall (52 patterns).
+  - Modifying `BINARY_LABEL_THRESHOLD`.
+  - Modifying `DIRECTION_GATE_THRESHOLD`.
+  - Modifying the sign convention (BCVF-faithful direction).
+  - Editing `JUDGE_PROMPT_TEMPLATE` text content (the prompt is
+    inherited from §15.14-A3 and rendered via §15.14-A5
+    chat-template; not edited).
+  - Modifying the `JUDGE_EXTRACTION_METHOD` (`logit_first_token_argmax`
+    is inherited from §15.14-A4; unchanged).
+  - Modifying the `JUDGE_PROMPT_RENDER` (chat-template render is
+    inherited from §15.14-A5; unchanged).
+  - Adopting Mixtral-8x7B-Instruct-v0.1 as the fallback judge
+    (does not fit the current envelope; deferred to a future
+    amendment that authorizes hardware expansion or quantization).
+  - Loading any 70B-class judge (does not fit the current
+    envelope; deferred to a future amendment).
+  - Quantizing any judge model (the §0.8 prohibition under
+    §15.14-A4 / §15.14-A5 carries through to A6).
+  - Sign-flip rescue on direction-gate failure.
+  - Skipping the κ self-test gate.
+  - Modifying the human calibration labels artifact.
+  - Modifying any prior §13 / §14 / §15.x verdict-of-record.
+  - Authoring §15.14-A7 (rubric redesign; deferred to a separate
+    amendment cycle, conditional on A6 outcome).
+
+**Cascade verdict reading discipline (post-A6).**
+
+A §15.14 v6 cascade verdict produced under §15.14-A6 (Mistral-7B-
+Instruct-v0.3 fallback judge with §15.14-A4 + §15.14-A5 mechanics)
+is a §0.8-binding readout AT THE STATED JUDGE CONFIGURATION. It is
+not directly comparable to the §15.14-A4 v3 readout (raw-string
+render Llama-8B; κ = −0.0776) or the §15.14-A5 v4 readout
+(chat-template render Llama-8B; κ = −0.3840), because the judge
+identity is a different empirical claim about which family +
+parameter scale + tokenizer combination produces a κ-passing judge.
+The three readouts share the prompt text content, the prompt
+render protocol (post-A5 only for v4 / v6), the extraction
+mechanism, and the argmax candidate set.
+
+**Pinned-table update (Chunk 6 Sealed §0.8-binding decisions).**
+
+One entry annotated; no other entries added or modified by this
+amendment:
+
+| Decision | Pinned value (post-A6) |
+|---|---|
+| `JUDGE_MODEL_ID_FALLBACK` | `"mistralai/Mistral-7B-Instruct-v0.3"` (effective under §15.14-A6; was `"meta-llama/Llama-3.1-8B-Instruct"` under §15.14-A2) |
+
+**Implementation surface (post-sign-off, EFFECTIVE follow-up).**
+
+One contained change to `scripts/probe_framing_15_14.py`:
+
+  1. The pinned constant `JUDGE_MODEL_ID_FALLBACK` value is
+     updated from `"meta-llama/Llama-3.1-8B-Instruct"` to
+     `"mistralai/Mistral-7B-Instruct-v0.3"`. The inline comment is
+     updated to record the §15.14-A6 effective marker (parallel
+     to the existing §15.14-A2 marker).
+
+No other source change. `_load_judge_model` body, `_judge_one_row`
+(post-A5 chat-template render + post-A4 logit-first-token-argmax),
+the cache writer/loader, the JSON / markdown writers, the cascade
+comparator, the firewall, and the self-test gate are otherwise
+unchanged.
+
+**Required reporting (under v6 EFFECTIVE follow-up).**
+
+The §15.14 v6 outcome document must list all six judge attempts
+side-by-side (the five from v4 OUTCOME plus the v6 row):
+
+  1. Qwen-7B JSON judge: parse failure 0.2692 → ANNOTATION_FAILED
+  2. Llama-8B JSON judge: parse failure 0.7077 → ANNOTATION_FAILED
+  3. Llama-8B single-digit 8-token judge / A3: parse failure 0.8477 → ANNOTATION_FAILED
+  4. Llama-8B logit-first-token raw-string / A4: parse failure 0.0; κ = −0.0776 → ANNOTATION_FAILED
+  5. Llama-8B logit-first-token chat-template / A5: parse failure 0.0; κ = −0.3840 → ANNOTATION_FAILED
+  6. Mistral-7B logit-first-token chat-template / A6: parse failure 0.0; κ = TBD
+
+If §15.14-A6 also fails the κ gate, §15.14 closes as ANNOTATION_FAILED
+with both the 7-8B Llama-3.1 family AND the 7B Mistral family
+empirically falsified at the 7-8B scale on this stimulus + κ-gate.
+The residual diagnosis routes to either §15.14-A7 PROPOSED (rubric
+redesign on the existing 8B judge — binary collapse or two-stage)
+or to a separately-authorized hardware/quantization amendment that
+opens the door to a true 70B-class judge. Neither A7 nor a 70B
+escalation is authorized by this PROPOSED block; both require
+separate amendment cycles.
+
+If §15.14-A6 passes the κ gate, the v6 cascade verdict is computed
+under the unchanged §15.14 cascade rules, and the binding
+constraint at v1–v5 is empirically identified as Llama-3.1-family-
+specific judge miscalibration at 7-8B scale.
+
+**Provenance after a §15.14-A6 v6 run.**
+
+A successful §15.14-A6 v6 cascade verdict (or κ-gate-failure exit
+9) will produce annotated-cache + JSON output with:
+
+```
+"annotation_protocol": {
+  "judge_model_id":              "mistralai/Mistral-7B-Instruct-v0.3",
+  "judge_fallback_used":         true,
+  "judge_prompt_sha256":         "<unchanged from A3>",
+  "judge_prompt_render":         "apply_chat_template_user_only(add_generation_prompt=True)",
+  "judge_extraction_method":     "logit_first_token_argmax",
+  "label_token_ids":             {"0": <int>, "1": <int>, "2": <int>},
+  ...
+},
+"per_row": [
+  {
+    "...": ...,
+    "judge_logits": {"0": <float>, "1": <float>, "2": <float>},
+    ...
+  },
+  ...
+]
+```
+
+The presence of `judge_model_id = "mistralai/Mistral-7B-Instruct-v0.3"`
+is the audit-trail signature that §15.14-A6 is in effect. The
+per-row layout is otherwise identical to §15.14-A5 readouts.
+
+**v6 readout discipline.** The §15.14 v1 closure (commit `2d88be1`),
+the §15.14 v2 closure (commit `198378e`), the §15.14 v3 closure
+(commit `257dd24`), and the §15.14 v4 closure (commit `2bf65b7`)
+are all preserved. The §15.14-A6 v6 readout is a **separate**
+§0.8-binding result. It does not retroactively give v1, v2, v3, or
+v4 a verdict; it produces a fresh v6 verdict under a different
+judge family with the inherited A4 + A5 mechanics.
+
+**Two-phase discipline (per A1–A5 precedent; explicit).**
+
+  1. **PROPOSED commit** (this commit cycle): the spec amendment
+     block above is added with `Status: PROPOSED`. No code is
+     touched in `scripts/probe_framing_15_14.py`. No status flip.
+     No cache schema bump. No annotated-cache write.
+  2. **EFFECTIVE follow-up** (separate commit, only after the user
+     replies with the literal phrase
+     `Sign off §15.14-A6. Push the EFFECTIVE follow-up.`): flips
+     this status field from `PROPOSED` to `EFFECTIVE` and applies
+     the one-item implementation surface enumerated above. The
+     RunPod execution under the EFFECTIVE follow-up is a
+     **separate** user authorization; it is not implied by the
+     EFFECTIVE flip itself.
+
+---
+
 > Does the LM's residual alignment toward a **framing convention**
 > introduced in turn 1 — relative to the new turn-t question in
 > standalone form — predict whether the model will inappropriately
