@@ -108,6 +108,9 @@ class AgentRunTrace:
     sessions_expired: int = 0
     session_expired_reason: Optional[str] = None
 
+    # --- memory v2.5: retention counter ---
+    memory_evictions: int = 0
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a JSON-safe dict."""
         return {
@@ -142,6 +145,7 @@ class AgentRunTrace:
             "time_to_first_approval_s": self.time_to_first_approval_s,
             "sessions_expired": self.sessions_expired,
             "session_expired_reason": self.session_expired_reason,
+            "memory_evictions": self.memory_evictions,
             "events": [e.to_dict() for e in self.events],
         }
 
@@ -270,6 +274,19 @@ def _build_trace(events: List[AgentRunEvent]) -> AgentRunTrace:
 
     if trace.deadline_exceeded and trace.status == "unknown":
         trace.status = "deadline_exceeded"
+
+    # Memory v2.5 (M4) — read the per-run eviction counter from the
+    # RUN_COMPLETED payload.  No new event is introduced; the agent
+    # injects the value into the existing terminal payload.  Runs
+    # that do not reach RUN_COMPLETED leave the field at its default
+    # (0), which is the right answer for terminated runs where the
+    # eviction count is not surfaced.
+    for evt in events:
+        if evt.event_type == RUN_COMPLETED:
+            trace.memory_evictions = int(
+                evt.payload.get("memory_evictions", 0) or 0
+            )
+            break
 
     # Duration v2: approval expiry
     expired_evts = [e for e in events if e.event_type == APPROVAL_EXPIRED]

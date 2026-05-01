@@ -426,6 +426,11 @@ class AgenticLLMWrapper:
             raise SessionExpiredError(_ttl_payload)
         self._touch_session_clock()
 
+        # Memory v2.5 (M4) — reset the per-run eviction counter so any
+        # cleanup that fires during this run is attributed to it (and
+        # not bled in from a prior run).
+        self._memory.evictions_since_last_run = 0
+
         turn_id = self._memory.get_turn_count()
 
         # 1. Goal Decomposition
@@ -803,6 +808,10 @@ class AgenticLLMWrapper:
             yield _ev
             return
         self._touch_session_clock()
+
+        # Memory v2.5 (M4) — reset the per-run eviction counter at run
+        # start so cleanup attributable to this run is isolated.
+        self._memory.evictions_since_last_run = 0
 
         turn_id = self._memory.get_turn_count()
         session_id = self._memory.session_id
@@ -1214,7 +1223,10 @@ class AgenticLLMWrapper:
                 safety_contract=contract,
             )
 
-            yield _emit(_evt(RUN_COMPLETED, {"result": agent_result.to_dict()}))
+            yield _emit(_evt(RUN_COMPLETED, {
+                "result": agent_result.to_dict(),
+                "memory_evictions": self._memory.evictions_since_last_run,
+            }))
 
         except Exception as exc:
             yield _emit(_evt(RUN_ERROR, {"error": str(exc), "error_type": type(exc).__name__}))
@@ -1262,6 +1274,10 @@ class AgenticLLMWrapper:
             yield _ev
             return
         self._touch_session_clock()
+
+        # Memory v2.5 (M4) — reset the per-run eviction counter at run
+        # start so cleanup attributable to this run is isolated.
+        self._memory.evictions_since_last_run = 0
 
         turn_id = self._memory.get_turn_count()
         session_id = self._memory.session_id
@@ -1633,7 +1649,10 @@ class AgenticLLMWrapper:
                 safety_contract=contract,
             )
 
-            yield _emit(_evt(RUN_COMPLETED, {"result": agent_result.to_dict()}))
+            yield _emit(_evt(RUN_COMPLETED, {
+                "result": agent_result.to_dict(),
+                "memory_evictions": self._memory.evictions_since_last_run,
+            }))
 
         except Exception as exc:
             yield _emit(_evt(RUN_ERROR, {"error": str(exc), "error_type": type(exc).__name__}))

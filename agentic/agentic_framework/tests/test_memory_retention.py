@@ -8,9 +8,11 @@ Batches covered:
   ``max_items``; embedding-cache and ``last_accessed_at`` pruning;
   read-path access updates; backward compatibility with no policy or
   inactive policy; ``window_size`` vs ``max_items`` composition.
+- M4 — per-session eviction counter on ``AgentMemory`` and trace
+  surfacing via ``AgentRunTrace.memory_evictions``.
 
-Trace counters and ``MEMORY_EVICTED`` events are explicitly out of
-scope (deferred to M4 / never).
+A ``MEMORY_EVICTED`` streaming event is explicitly NOT shipped
+(per design §2 / §8).
 """
 
 import json
@@ -618,3 +620,250 @@ class TestM3Integration:
         # 1 evicted by item_ttl, 2 evicted by idle_ttl, then max_items
         # keeps the last 2 of [3, 4, 5] -> [4, 5].
         assert [t.turn_id for t in memory.history] == [4, 5]
+
+
+# ===================================================================
+# M4 — Per-session eviction counter + trace surfacing
+# ===================================================================
+#
+# The counter lives on AgentMemory.evictions_since_last_run and is
+# reset to 0 at the top of every public entry point (run / run_stream
+# / run_stream_async).  The trace reads it from the RUN_COMPLETED
+# payload and surfaces it as AgentRunTrace.memory_evictions.
+# ===================================================================
+
+
+def _make_runtime_agent(memory_retention_policy=None):
+    """Build a permissive agent for end-to-end run tests."""
+    from agentic.agentic_framework.safety_contract import (
+        SafetyContractEvaluator, SafetyGate,
+    )
+    llm = MockLLMAdapter(default_response=(
+        "A reasonably detailed response that should pass the rule-based "
+        "critic without revisions; long enough to satisfy the threshold."
+    ))
+    agent = AgenticLLMWrapper(
+        llm,
+        use_llm_for_decomposition=False,
+        max_revisions=0,
+        quality_threshold=0.3,
+        memory_retention_policy=memory_retention_policy,
+    )
+    agent.new_session()
+    agent.safety_gate = SafetyGate(
+        evaluator=SafetyContractEvaluator(
+            consistency_threshold=0.0,
+            alignment_threshold=0.0,
+            reversal_risk_threshold=1.0,
+            stability_threshold=0.0,
+        ),
+    )
+    return agent
+
+
+class TestM4CounterMechanics:
+    def test_default_counter_is_zero(self):
+        memory = create_memory("s")
+        assert memory.evictions_since_last_run == 0
+
+    def test_read_eviction_counted(self):
+        store = MemoryStore(
+            memory_retention_policy=MemoryRetentionPolicy(item_ttl_s=10.0),
+        )
+        memory = create_memory("s")
+        memory = _seed(store, memory, [1, 2, 3], age_s_each=60.0)
+        # append_turn left the counter at 0 (turns were fresh at append).
+        # Now the rewind makes them all expired; reading triggers
+        # eviction of all three.
+        assert memory.evictions_since_last_run == 0
+        store.get_summary_for_llm(memory, max_turns=10)
+        assert memory.evictions_since_last_run == 3
+
+    def test_write_eviction_counted(self):
+        store = MemoryStore(
+            memory_retention_policy=MemoryRetentionPolicy(item_ttl_s=10.0),
+        )
+        memory = create_memory("s")
+        memory = _seed(store, memory, [1, 2], age_s_each=60.0)
+        # append_turn evicts the two stale turns before adding turn 3.
+        memory = store.append_turn(
+            memory, create_turn_snapshot(3, "Q3", "A3"),
+        )
+        assert memory.evictions_since_last_run == 2
+
+    def test_max_items_drops_count(self):
+        store = MemoryStore(
+            memory_retention_policy=MemoryRetentionPolicy(max_items=2),
+        )
+        memory = create_memory("s")
+        for i in range(5):
+            memory = store.append_turn(
+                memory, create_turn_snapshot(i, f"Q{i}", f"A{i}"),
+            )
+        # Each append after the second one drops the oldest under
+        # max_items=2 -> three policy-driven cap drops total.
+        assert memory.evictions_since_last_run == 3
+
+    def test_window_size_drops_not_counted(self):
+        """Window-size positional rolloff is the pre-v2.5 behaviour
+        and must NOT be counted (only opted-in policy evictions are)."""
+        store = MemoryStore()  # no policy
+        memory = create_memory("s")
+        memory.window_size = 3
+        for i in range(6):
+            memory = store.append_turn(
+                memory, create_turn_snapshot(i, f"Q{i}", f"A{i}"),
+            )
+        # Three turns rolled off via window_size; counter unchanged.
+        assert memory.evictions_since_last_run == 0
+
+    def test_no_evictions_zero(self):
+        store = MemoryStore(
+            memory_retention_policy=MemoryRetentionPolicy(item_ttl_s=3600.0),
+        )
+        memory = create_memory("s")
+        memory = _seed(store, memory, [1, 2, 3])  # all fresh
+        store.get_summary_for_llm(memory, max_turns=10)
+        memory = store.append_turn(
+            memory, create_turn_snapshot(4, "Q4", "A4"),
+        )
+        assert memory.evictions_since_last_run == 0
+
+    def test_inactive_policy_zero(self):
+        store = MemoryStore(memory_retention_policy=MemoryRetentionPolicy())
+        memory = create_memory("s")
+        memory = _seed(store, memory, [1, 2, 3])
+        store.get_summary_for_llm(memory, max_turns=10)
+        assert memory.evictions_since_last_run == 0
+
+    def test_counter_accumulates_across_calls(self):
+        store = MemoryStore(
+            memory_retention_policy=MemoryRetentionPolicy(item_ttl_s=10.0),
+        )
+        memory = create_memory("s")
+        memory = _seed(store, memory, [1], age_s_each=60.0)
+        memory = store.append_turn(
+            memory, create_turn_snapshot(2, "Q2", "A2"),
+        )
+        # First write: 1 evicted.
+        assert memory.evictions_since_last_run == 1
+        # Age the survivor and read.
+        memory.history[0].timestamp = datetime.utcnow() - timedelta(seconds=60)
+        store.get_summary_for_llm(memory, max_turns=10)
+        # Second eviction adds.
+        assert memory.evictions_since_last_run == 2
+
+
+class TestM4ResetBetweenRuns:
+    def test_run_stream_resets_counter(self):
+        agent = _make_runtime_agent(
+            memory_retention_policy=MemoryRetentionPolicy(item_ttl_s=10.0),
+        )
+        # First run completes naturally.
+        list(agent.run_stream("first"))
+        # Pre-stage a stale turn so the next run will evict on append.
+        agent._memory.history[0].timestamp -= timedelta(seconds=60)
+
+        # Second run: at the top, counter resets to 0 BEFORE eviction
+        # fires inside the run.  Eviction during the run takes it back
+        # up.
+        list(agent.run_stream("second"))
+        # The first turn (now stale) was evicted somewhere during run 2
+        # — counter is whatever evictions ran for THIS run only.
+        assert agent._memory.evictions_since_last_run >= 1
+
+        # Third run starts; reset must wipe run-2's accumulation
+        # before any cleanup fires.  We capture the counter at the
+        # moment the reset would have happened by running with a
+        # passive setup (no eviction this run).
+        # Pre-stage: no expired turns — counter for run 3 should be 0.
+        list(agent.run_stream("third"))
+        # No turn is expired heading into run 3, so no eviction occurred
+        # during run 3 itself.
+        assert agent._memory.evictions_since_last_run == 0
+
+    def test_run_resets_counter(self):
+        agent = _make_runtime_agent(
+            memory_retention_policy=MemoryRetentionPolicy(item_ttl_s=10.0),
+        )
+        # Force the counter to be non-zero before the next run.
+        agent._memory.evictions_since_last_run = 7
+        agent.run("hello")
+        # run() resets at the top; no expired turns in this run, so
+        # counter stays 0 after reset.
+        assert agent._memory.evictions_since_last_run == 0
+
+    def test_async_run_stream_resets_counter(self):
+        agent = _make_runtime_agent(
+            memory_retention_policy=MemoryRetentionPolicy(item_ttl_s=10.0),
+        )
+        agent._memory.evictions_since_last_run = 9
+
+        async def _run():
+            out = []
+            async for evt in agent.run_stream_async("hello"):
+                out.append(evt)
+            return out
+
+        asyncio.run(_run())
+        assert agent._memory.evictions_since_last_run == 0
+
+
+class TestM4TraceSurface:
+    def test_trace_memory_evictions_zero_default(self):
+        from agentic.agentic_framework.tracing import TraceCollector
+        agent = _make_runtime_agent()  # no policy
+        collector = TraceCollector()
+        list(agent.run_stream("hello", trace_collector=collector))
+        trace = collector.build_trace()
+        assert trace.memory_evictions == 0
+
+    def test_trace_memory_evictions_counts_writes(self):
+        from agentic.agentic_framework.tracing import TraceCollector
+        agent = _make_runtime_agent(
+            memory_retention_policy=MemoryRetentionPolicy(item_ttl_s=10.0),
+        )
+        # Run once to seed an entry, then age it.
+        list(agent.run_stream("seed"))
+        agent._memory.history[0].timestamp -= timedelta(seconds=60)
+        # Second run: append_turn at the end evicts the stale turn.
+        collector = TraceCollector()
+        list(agent.run_stream("second", trace_collector=collector))
+        trace = collector.build_trace()
+        assert trace.memory_evictions >= 1
+
+    def test_trace_to_dict_includes_field(self):
+        from agentic.agentic_framework.tracing import TraceCollector
+        agent = _make_runtime_agent()
+        collector = TraceCollector()
+        list(agent.run_stream("hello", trace_collector=collector))
+        d = collector.build_trace().to_dict()
+        json.dumps(d)
+        assert "memory_evictions" in d
+        assert d["memory_evictions"] == 0
+
+    def test_trace_summary_includes_field(self):
+        from agentic.agentic_framework.tracing import TraceCollector
+        agent = _make_runtime_agent()
+        collector = TraceCollector()
+        list(agent.run_stream("hello", trace_collector=collector))
+        summary = collector.build_trace().summary
+        assert "memory_evictions" in summary
+
+    def test_trace_no_policy_unchanged(self):
+        """With no policy, trace.memory_evictions stays 0 even after
+        many turns rolled off via window_size."""
+        from agentic.agentic_framework.tracing import TraceCollector
+        agent = _make_runtime_agent()
+        agent._memory.window_size = 2
+        # Force several turns through window_size rolloff.
+        for i in range(5):
+            list(agent.run_stream(f"turn {i}"))
+        collector = TraceCollector()
+        list(agent.run_stream("final", trace_collector=collector))
+        trace = collector.build_trace()
+        assert trace.memory_evictions == 0
+
+
+# Module-level imports needed by the M4 runtime tests above.
+import asyncio  # noqa: E402

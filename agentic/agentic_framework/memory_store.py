@@ -115,6 +115,16 @@ class AgentMemory:
     # M3 wires read/write paths, the dict stays empty in practice.
     last_accessed_at: Dict[int, datetime] = field(default_factory=dict)
 
+    # Per-session, per-run counter of turns evicted by an active
+    # MemoryRetentionPolicy.  Reset to zero at the top of every public
+    # entry point on ``AgenticLLMWrapper`` (run / run_stream /
+    # run_stream_async).  The trace surfacing layer reads this value
+    # via the RUN_COMPLETED payload at run end.  Window-size positional
+    # rolloff (the pre-v2.5 behaviour, with no MemoryRetentionPolicy
+    # configured) is intentionally NOT counted here — only evictions
+    # caused by an opted-in retention policy.
+    evictions_since_last_run: int = 0
+
     def get_recent_turns(self, n: int = 5) -> List[TurnSnapshot]:
         """Get n most recent turns."""
         return self.history[-n:] if self.history else []
@@ -277,7 +287,9 @@ class MemoryStore:
         Used by read paths to keep their existing API contract
         (``-> List[TurnSnapshot]``).  Mutates ``memory.history``,
         ``memory.embedding_cache``, and ``memory.last_accessed_at``
-        if and only if eviction occurred.
+        if and only if eviction occurred.  Also increments
+        ``memory.evictions_since_last_run`` by the number of evicted
+        turns (M4 trace counter).
 
         This is the single in-place mutation surface introduced by
         v2.5 for read paths; ``TurnSnapshot`` objects themselves are
@@ -291,6 +303,7 @@ class MemoryStore:
         memory.embedding_cache.update(new_mem.embedding_cache)
         memory.last_accessed_at.clear()
         memory.last_accessed_at.update(new_mem.last_accessed_at)
+        memory.evictions_since_last_run += count
         return count
 
     def _touch(self, memory: "AgentMemory", turn_ids: List[int]) -> None:
@@ -339,7 +352,7 @@ class MemoryStore:
             New AgentMemory with turn appended
         """
         # 1. Evict from the existing history under policy (pure).
-        evicted_memory, _evicted_count = self._evict(memory)
+        evicted_memory, evicted_count = self._evict(memory)
 
         # 2. Append the new turn.
         new_history = list(evicted_memory.history)
@@ -347,11 +360,8 @@ class MemoryStore:
 
         # 3. Apply max_items if configured, otherwise window_size.
         policy = self.memory_retention_policy
-        cap = (
-            policy.max_items
-            if (policy is not None and policy.max_items is not None)
-            else memory.window_size
-        )
+        cap_from_policy = policy is not None and policy.max_items is not None
+        cap = policy.max_items if cap_from_policy else memory.window_size
         dropped_by_cap: List[int] = []
         if cap is not None and len(new_history) > cap:
             dropped = new_history[:-cap]
@@ -376,6 +386,13 @@ class MemoryStore:
         # 4. Stamp last_accessed_at for the newly appended turn.
         new_last[turn.turn_id] = datetime.utcnow()
 
+        # M4 — propagate the per-run eviction counter to the new
+        # AgentMemory.  Only policy-driven evictions count: TTL drops
+        # from _evict, plus drops caused by max_items.  Window-size
+        # rolloff is the pre-v2.5 positional behaviour and is NOT
+        # counted, so the counter stays zero for non-opted-in callers.
+        cap_count = len(dropped_by_cap) if cap_from_policy else 0
+
         return AgentMemory(
             session_id=memory.session_id,
             created_at=memory.created_at,
@@ -383,6 +400,9 @@ class MemoryStore:
             window_size=memory.window_size,
             embedding_cache=new_cache,
             last_accessed_at=new_last,
+            evictions_since_last_run=(
+                memory.evictions_since_last_run + evicted_count + cap_count
+            ),
         )
 
     def get_relevant_context(
@@ -600,6 +620,7 @@ def create_memory(
         window_size=window_size,
         embedding_cache={},
         last_accessed_at={},
+        evictions_since_last_run=0,
     )
 
 
