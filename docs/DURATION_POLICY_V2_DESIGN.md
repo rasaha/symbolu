@@ -90,6 +90,127 @@ property of the approval gate itself, not of execution.
 ---
 
 <!-- §3 approval expiry — coming in batch A1 -->
+## 3. Approval expiry
+
+### 3.1 Problem
+
+In v1, `ApprovalController.request_approval(pending)` invokes a callback
+*synchronously*. The callback may block (terminal prompt, network call, web
+UI wait) until a human responds. There is no upper bound on how long it
+blocks. The agent's run-level deadline (v1) does fire eventually, but it
+reports the failure as `DEADLINE_EXCEEDED`, which conflates two genuinely
+different operator concerns:
+
+- "the model / a tool stalled" → `DEADLINE_EXCEEDED` (correct in v1)
+- "we asked a human and they didn't answer" → should be `APPROVAL_EXPIRED`
+
+### 3.2 Policy field
+
+Add to `DurationPolicy` (the same frozen dataclass that holds
+`max_run_duration_s` and `max_action_duration_s`):
+
+```python
+approval_ttl_s: Optional[float] = None
+```
+
+Semantics: the maximum wall-clock seconds a single approval request may
+block before being treated as expired. `None` (default) preserves v1
+behaviour exactly — the controller blocks indefinitely.
+
+A small helper on the policy:
+
+```python
+def approval_exceeded(self, elapsed_s: float) -> Optional[str]:
+    """Return a human-readable reason if the approval wait exceeded the
+    TTL, or None if still within it."""
+```
+
+(Keeps the predicate-returning-reason style established by
+`run_exceeded` / `action_exceeded`.)
+
+### 3.3 Event
+
+```python
+APPROVAL_EXPIRED = "approval_expired"   # non-terminal, action-level
+```
+
+Payload:
+
+```jsonc
+{
+  "action_id": "...",
+  "action_type": "...",
+  "elapsed_s": 30.04,
+  "approval_ttl_s": 30.0,
+  "reason": "Approval wait 30.0s exceeds TTL 30.0s"
+}
+```
+
+### 3.4 Behaviour
+
+`APPROVAL_EXPIRED` is **non-terminal**. It resolves the *action*, not the
+run, mirroring how `ACTION_TIMEOUT` resolves a single action in v1:
+
+1. The runtime emits `APPROVAL_REQUESTED` as today.
+2. The runtime invokes the controller callback inside a wait-with-timeout
+   wrapper (`asyncio.wait_for(asyncio.to_thread(...), timeout=ttl)` on the
+   async path; `ThreadPoolExecutor.submit(...).result(timeout=ttl)` on the
+   sync path, with the same `shutdown(wait=False)` runaway-thread caveat
+   documented in v1).
+3. On timeout:
+   - emit `APPROVAL_EXPIRED` with the payload above
+   - mark `action.status = "denied"` and
+     `action.error = "Approval expired after {ttl}s"`
+   - emit `ACTION_COMPLETED` with `status="denied"` (existing event,
+     existing payload shape)
+   - **continue to the next action** — do *not* return from the run.
+4. If the callback returns *after* the timeout fired, the response is
+   discarded. The orphan thread leaks per the same v1 rule (Python cannot
+   kill threads); it cannot mutate the run's event stream because the
+   action has already moved past `ACTION_COMPLETED`.
+
+`APPROVAL_RESOLVED` is **not** emitted on expiry. The action goes
+`APPROVAL_REQUESTED → APPROVAL_EXPIRED → ACTION_COMPLETED`, parallel to
+the v1 timeout sequence `ACTION_STARTED → ACTION_TIMEOUT →
+ACTION_COMPLETED`. This keeps "approval was answered" and "approval timed
+out" cleanly separable in downstream consumers.
+
+### 3.5 Trace implications
+
+Two additive fields on `AgentRunTrace`:
+
+```python
+approvals_expired: int = 0       # count of APPROVAL_EXPIRED events
+max_approval_ttl_s: Optional[float] = None
+```
+
+`approvals_expired` increments per event; `max_approval_ttl_s` is lifted
+from the first `APPROVAL_EXPIRED` payload (or remains `None` if the policy
+never fired).
+
+The existing `approvals_denied` counter already includes the expired
+case (the action's terminal `ACTION_COMPLETED` carries `status="denied"`).
+v2 keeps that bucket as a superset and adds the dedicated
+`approvals_expired` so that "denied because human said no" and "denied
+because human didn't respond" can be distinguished without re-scanning the
+event list.
+
+### 3.6 Why not terminal
+
+A terminal `APPROVAL_EXPIRED` would be wrong for two reasons:
+
+- A run can have many actions, only some of which need approval. Killing
+  the whole run because *one* action's approver was AFK throws away the
+  rest of the work, including any already-completed actions and the
+  generation output.
+- It would collapse with `DEADLINE_EXCEEDED`. If the operator wants
+  "stop the run if any approval hangs," they already have v1's
+  `max_run_duration_s` — making `APPROVAL_EXPIRED` terminal would be
+  redundant and would force an unwanted choice.
+
+Per-action expiry composes cleanly with the run-level deadline: enough
+expired approvals will eventually trip `DEADLINE_EXCEEDED` anyway, but
+each individual expiry is recorded for forensic clarity.
 <!-- §4 session TTL — coming in batch A2 -->
 <!-- §5 memory TTL deferral note — coming in batch A3 -->
 <!-- §6 duration metrics — coming in batch A4 -->
