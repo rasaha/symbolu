@@ -440,7 +440,279 @@ A v2 caller who needs *any* form of time-bounded memory today should:
 
 These are escape hatches, not solutions; the proper solution is v2.5.
 <!-- §6 duration metrics — coming in batch A4 -->
-<!-- §7 defaults by tool/risk class — coming in batch A4 (deferral note) -->
-<!-- §8 runtime ordering / semantics — coming in batch A4 -->
-<!-- §9 backward compatibility — coming in batch A4 -->
-<!-- §10 recommended implementation order — coming in batch A4 -->
+## 6. Duration observability / metrics
+
+v1 added `elapsed_s`, `deadline_exceeded`, `action_timeouts`,
+`max_run_duration_s`, `max_action_duration_s` to `AgentRunTrace`. v2
+extends the surface so operators can answer SLO questions without
+re-scanning the event list.
+
+### 6.1 New trace fields
+
+Additive on `AgentRunTrace`:
+
+```python
+# v2 — approval expiry (§3)
+approvals_expired: int = 0
+max_approval_ttl_s: Optional[float] = None
+
+# v2 — session TTL (§4)
+sessions_expired: int = 0
+session_expired_reason: Optional[str] = None  # "idle" | "max" | "both" | None
+
+# v2 — duration observability
+time_to_first_action_s:   Optional[float] = None
+time_to_first_approval_s: Optional[float] = None
+```
+
+Derivation rules (in `_build_trace`):
+
+- `time_to_first_action_s` ← elapsed seconds from `RUN_STARTED` to the
+  first `ACTION_STARTED`; `None` if no action ever started (e.g. the
+  run terminated at `BUDGET_EXCEEDED` / `DEADLINE_EXCEEDED` /
+  `RUN_CANCELLED` before any action).
+- `time_to_first_approval_s` ← elapsed seconds from `RUN_STARTED` to
+  the first `APPROVAL_REQUESTED`; `None` if no approval was ever
+  requested.
+- Both are derived from event `timestamp` ISO strings, consistent with
+  the v1 fallback for `elapsed_s`. Monotonic precision is not required
+  here — these fields are observability, not gating.
+
+### 6.2 Summary surfacing
+
+`AgentRunTrace.summary` (which is `to_dict()` minus `events`) gains the
+same six keys. This is the surface that benchmark harnesses, dashboards,
+and structured-logging consumers rely on; including the new fields here
+is what makes them actually useful.
+
+### 6.3 No new events for metrics
+
+v2 does **not** add metric-only events. The information is derivable
+from the existing event stream; surfacing it on the trace is cheaper and
+keeps `streaming_events.py` focused on lifecycle, not telemetry.
+
+### 6.4 No benchmark thresholds in v2
+
+v2 makes the metrics *measurable*. It does **not** propose threshold
+values or a benchmark category for `time_to_first_action_s` etc. The v1
+spec's closing principle stands: implement first, gather distributions
+on real workloads, then anchor benchmarks against measured data rather
+than invented numbers.
+
+---
+
+## 7. Policy defaults by tool / risk class — deferred to v2.5
+
+The intuition is real — read-only tools should have looser timeouts than
+destructive tools, retrieval should be different from compute — but the
+implementation surface is not yet clean enough to ship.
+
+### 7.1 What it would look like
+
+A `DurationPolicyMap` keyed by `action_type`:
+
+```python
+DurationPolicyMap({
+    "search":      DurationPolicy(max_action_duration_s=30.0),
+    "compute":     DurationPolicy(max_action_duration_s=10.0),
+    "delete_file": DurationPolicy(max_action_duration_s=5.0,
+                                  approval_ttl_s=60.0),
+})
+```
+
+with a default policy that applies when no key matches. The runtime
+resolves the policy at the per-action check sites (Site B / Site C in
+v1's spec).
+
+### 7.2 Why it isn't in v2
+
+Three composition problems need agreement first:
+
+1. **Interaction with `ApprovalPolicy.require_approval_for`.** Today,
+   approval-required is a property of the action_type. A per-action
+   `approval_ttl_s` would let those two surfaces drift unless they share
+   a registry. The cleanest answer is "register `(action_type, policy)`
+   tuples once and let approval policy + duration policy read from the
+   same source," but that's a registry refactor, not a v2 add-on.
+2. **Interaction with the safety contract.** `SafetyContract` already
+   classifies actions by reversibility / blast radius. A "risk class"
+   abstraction probably belongs there, with `DurationPolicyMap`
+   reading off it — not as a parallel taxonomy.
+3. **Resolution semantics for unmapped action types.** Fall back to the
+   default? Refuse? Emit a warning? Emit a new event? Each is defensible
+   and each commits the framework to a posture.
+
+v2 keeps `DurationPolicy` as a single object. v2.5 can introduce the map
+once the safety-contract / approval-policy / duration-policy triad has
+a shared registry — that work is its own design pass.
+
+---
+
+## 8. Runtime ordering / semantics
+
+v1's invariant:
+
+```
+cancel  →  budget  →  deadline  →  approve  →  execute
+```
+
+v2's invariant:
+
+```
+session-expiry → cancel → budget → deadline → approval-expiry → approve → execute
+                                                ▲
+                                                │ (only when an approval is pending)
+```
+
+### 8.1 Where each new gate sits
+
+- **`session-expiry`** runs *first*, at the public entry point, before
+  even `RUN_STARTED`. A session that has already expired never produces
+  a normal run lifecycle (§4.6). It precedes `cancel` because cancelling
+  a dead session is meaningless — the more truthful failure is "the
+  session is gone."
+- **`approval-expiry`** is a property of the approval gate itself. It
+  fires *only* when an approval request is in flight, between
+  `APPROVAL_REQUESTED` and (would-be) `APPROVAL_RESOLVED`. In the
+  invariant chain it sits immediately before `approve` because it is a
+  failure mode of *waiting for approval*, not of executing.
+
+### 8.2 Why this ordering, in one sentence each
+
+- **session-expiry first** — a dead session can't honour any other gate.
+- **cancel** — explicit user intent always wins over runtime gates.
+- **budget** — established v1 ordering; preserves all existing tests.
+- **deadline** — established v1 ordering; same logic.
+- **approval-expiry** — failure mode of the approval wait itself,
+  resolves the action (not the run).
+- **approve** — established gate.
+- **execute** — actually do the side-effecting work.
+
+### 8.3 Interactions worth calling out
+
+- If a run-level deadline elapses *while* an approval is pending, the
+  approval-expiry timer is moot — `DEADLINE_EXCEEDED` fires and the
+  approval is abandoned. That's correct: deadline is the run-level
+  guarantee; approval expiry is per-action.
+- If both session-TTLs are set (idle + max) and a call straddles both,
+  the `SESSION_EXPIRED` payload's `reason` is `"both"` (§4.4), but only
+  one event fires.
+- `APPROVAL_EXPIRED` and `ACTION_TIMEOUT` are siblings: both
+  non-terminal, both resolve a single action, both leave the run free
+  to continue. They are intentionally orthogonal — an action can time
+  out *during* execution (`ACTION_TIMEOUT`) or *while waiting for
+  approval* (`APPROVAL_EXPIRED`), never both.
+
+---
+
+## 9. Backward compatibility
+
+All v2 additions are strictly opt-in. Default behaviour for any caller
+who does not set the new fields is byte-identical to v1.
+
+### 9.1 Field-level
+
+| New field | Default | Effect when default |
+|---|---|---|
+| `DurationPolicy.approval_ttl_s` | `None` | controller blocks indefinitely (v1 behaviour) |
+| `DurationPolicy.session_idle_ttl_s` | `None` | session never idles out |
+| `DurationPolicy.session_max_ttl_s` | `None` | session has no absolute lifetime |
+
+### 9.2 Event-level
+
+`APPROVAL_EXPIRED` and `SESSION_EXPIRED` are additive constants. The v1
+terminal-event tuple in `agent.py` (`run_stream_structured`) gains
+`SESSION_EXPIRED` (terminal w.r.t. *the call*); `APPROVAL_EXPIRED` is
+intentionally **not** added to that tuple because it is non-terminal.
+
+### 9.3 Trace-level
+
+Six new fields, all defaulting to safe zero / `None`. Any existing
+consumer of `AgentRunTrace.to_dict()` keeps working; new fields appear
+at the bottom of the dict and are ignorable.
+
+### 9.4 API-level
+
+- `run_stream(... duration_policy=None)` keeps its v1 signature; the
+  new behaviour ships through new fields on the `DurationPolicy` value
+  the caller already passes.
+- `new_session()` signature unchanged; resets the new monotonic
+  timestamps internally.
+- `touch_session()` is purely additive.
+- No deprecations; no config-file format changes.
+
+### 9.5 Test compatibility
+
+v1's `test_duration_policy.py` should pass untouched. v2 tests live in
+`test_duration_policy_v2.py` (or extend the existing file with v2
+classes — TBD at implementation time). No existing test should require
+modification; if one does, that is a regression and must be explained
+in the implementing commit.
+
+---
+
+## 10. Recommended implementation order
+
+Per the agreed batching, smallest- and most-localised-change first:
+
+### B1 — approval expiry (first)
+
+Smallest, most-localised, highest-value. Touches:
+
+- `duration_policy.py` — add `approval_ttl_s` + `approval_exceeded()`.
+- `streaming_events.py` — add `APPROVAL_EXPIRED`.
+- `agent.py` — wrap the controller callback at both approval-gate
+  call sites (sync at ~line 847; async at ~line 1155 — the line numbers
+  drift with v1; use the existing `_ac.request_approval(pending)` /
+  `await asyncio.to_thread(_ac.request_approval, pending)` calls as the
+  anchors).
+- `tracing.py` — `approvals_expired`, `max_approval_ttl_s`.
+- `tests/test_duration_policy_v2.py` — unit + runtime + ordering +
+  backward-compat.
+
+### B3 — duration metrics (second)
+
+Pure trace work. Zero runtime risk. Touches:
+
+- `tracing.py` — add `time_to_first_action_s`,
+  `time_to_first_approval_s`; populate in `_build_trace`; surface in
+  `summary`.
+- `tests/test_duration_policy_v2.py` — extend with metric-derivation
+  tests.
+
+(Batched second because it depends on `APPROVAL_EXPIRED` already
+existing for `time_to_first_approval_s` semantics to be complete; doing
+it before B1 would force a second pass.)
+
+### B2 — lazy session TTL (third)
+
+Largest semantic surface. Touches:
+
+- `duration_policy.py` — add `session_idle_ttl_s`,
+  `session_max_ttl_s`, `session_exceeded()`.
+- `streaming_events.py` — add `SESSION_EXPIRED`.
+- `agent.py` — record `_session_started_monotonic` and
+  `_session_last_touched_monotonic` in `new_session()`; check at the
+  top of `run`, `run_stream`, `run_stream_async`; add
+  `touch_session()`.
+- `tracing.py` — `sessions_expired`, `session_expired_reason`.
+- `tests/test_duration_policy_v2.py` — entry-point gating, idle vs
+  max vs both, recovery via `new_session()`, ordering.
+
+### B4 — memory TTL — **NOT in this round**
+
+Per §5. Re-evaluate in v2.5.
+
+### Stop conditions between batches
+
+After each of B1, B3, B2: pause for review. The implementing commit
+must include:
+
+1. plan executed (with line/file diff scope)
+2. exact files changed
+3. behaviour added
+4. tests added
+5. any deviations from this design
+6. regression check vs v1's `test_duration_policy.py`
+7. confirmation that the documented ordering invariant still holds
+   end-to-end
