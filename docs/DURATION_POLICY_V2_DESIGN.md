@@ -377,6 +377,68 @@ includes both fields; `to_dict()` includes them too.)
   per-request policies; a true per-session override needs the registry
   that v2.5 will introduce.
 <!-- §5 memory TTL deferral note — coming in batch A3 -->
+## 5. AgentMemory TTL / eviction (deferred to v2.5)
+
+`MemoryStore` today is a per-agent **sliding window** of `TurnSnapshot`s
+sized by `memory_window` (default 20). Eviction is purely positional:
+the oldest turn drops off when the (window + 1)-th turn lands. There is
+no notion of *time*, only of *order*.
+
+Adding a TTL surface here is **deliberately out of scope for v2** for
+three reasons:
+
+1. **It silently changes semantics for every existing user.** The window
+   model is what callers reason about today. A TTL would cause turns to
+   disappear "spontaneously" between calls (specifically, between the
+   last turn and the next entry point that performs the eviction
+   check), which is a different mental model.
+2. **The design space is wide and underspecified.** There are at least
+   four orthogonal TTL flavours, and each has different invariants:
+
+   | Flavour | What it means | Useful for |
+   |---|---|---|
+   | per-turn TTL | each turn dies N seconds after it was recorded | sliding-context use cases |
+   | idle TTL | the *oldest* turn dies if no new turn has landed for N seconds | cleanup of paused sessions |
+   | absolute TTL | every turn older than wall-clock T is gone | regulatory retention |
+   | size-based / LRU | bound bytes or tokens, not time | cost control |
+
+   Each interacts differently with `coherence_tracker`,
+   `goal_decomposition`, retrieval, and the eventual session registry.
+   Picking one without that interaction analysis would create a feature
+   that has to be reworked the moment any of those neighbours grows.
+3. **Session TTL (§4) already covers the high-value case for v2.** The
+   most common reason to want "stale memory" is a stale session — and a
+   stale session is reaped wholesale by `SESSION_EXPIRED`. Operators who
+   need finer-grained per-turn expiry can wait one release.
+
+### What v2.5 should answer before this lands
+
+- Which flavour (or composition) is the contract — per-turn, idle,
+  absolute, or LRU?
+- Is eviction lazy (next `append_turn` / next retrieval) or eager
+  (handled by the deferred session sweeper)?
+- Does eviction emit an event (`MEMORY_EVICTED`) or is it silent? An
+  event is consistent with the rest of `streaming_events.py`, but only
+  if it carries enough payload to be actionable.
+- What does `get_relevant_context()` do with a half-evicted history?
+- How does this compose with `embedding_model` / vector retrieval, if
+  any, when retrieved turns are already gone?
+
+Until those are answered, v2 leaves `MemoryStore` strictly alone.
+
+### What v2 does *not* do
+
+- Does not add `memory_ttl_s` / similar fields to `DurationPolicy`.
+- Does not add a `MEMORY_EVICTED` event to `streaming_events.py`.
+- Does not change `MemoryStore.append_turn` semantics in any way.
+
+A v2 caller who needs *any* form of time-bounded memory today should:
+1. set `session_idle_ttl_s` (§4) so the entire memory is reset when the
+   session goes idle, and/or
+2. shrink `memory_window` so the positional sliding-window eviction
+   approximates the desired retention.
+
+These are escape hatches, not solutions; the proper solution is v2.5.
 <!-- §6 duration metrics — coming in batch A4 -->
 <!-- §7 defaults by tool/risk class — coming in batch A4 (deferral note) -->
 <!-- §8 runtime ordering / semantics — coming in batch A4 -->
