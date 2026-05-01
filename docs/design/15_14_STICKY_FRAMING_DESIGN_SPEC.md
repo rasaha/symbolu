@@ -2556,6 +2556,620 @@ mechanism.
 
 ---
 
+### §15.14-A8 — rubric-redesign diagnostic: two-stage binary judging (replaces direct 3-class scoring)
+
+**Status:** PROPOSED. The status field will flip to EFFECTIVE only
+after the user replies with the literal phrase
+`Sign off §15.14-A8. Push the EFFECTIVE follow-up.` and a separate
+EFFECTIVE follow-up commit is pushed that flips this status field
+and applies the implementation surface enumerated below. This
+two-phase discipline mirrors §15.14-A1 / A2 / A3 / A4 / A5 / A6 /
+A7.
+
+**Frame.** §15.14-A8 is a **rubric-redesign diagnostic, NOT a
+repair of §15.14-A7.** §15.14-A7 (tokenizer-agnostic
+sequence-logprob logsumexp scoring) is preserved as EFFECTIVE
+(κ-falsified by v7 at κ = −0.0976). A8 tests a structurally
+distinct hypothesis: that the 7-8B-judge κ failures across v3 / v4
+/ v7 are caused by the **direct 3-class rubric** — specifically
+the unstable middle class `MENTIONED` — rather than by judge
+parameter scale, judge family, or any property of the §15.14
+stimulus or hidden-state hypothesis. If A8 passes the κ-gate,
+rubric design is identified as the binding constraint at 7-8B
+scale; if A8 fails the κ-gate, the accessible-small-judge path is
+exhausted and the only remaining serious options are 70B-class
+judge / hardware amendment or closing §15.14 as untestable under
+accessible judges.
+
+**Scope.** Multiple surgical code changes inside
+`scripts/probe_framing_15_14.py` to support two-stage binary
+judging while inheriting all §15.14-A4 / A5 / A6 / A7 mechanics
+that survive the rubric redesign. Plus the implied annotated-
+cache schema bump (`15.14-A7-annotated → 15.14-A8-annotated`),
+two new pinned prompt templates with their own SHA-256s, and
+new top-level provenance fields. No threshold change. No labels
+change. No cascade structure change. No firewall change. No
+sign-direction change. No verdict-of-record change. No
+modification of `LABEL_TOKEN_CHARS`, `KAPPA_GATE_THRESHOLD`, or
+`JUDGE_PROMPT_TEMPLATE` (the original 3-class template is
+**preserved** as a constant for cross-version provenance, but is
+no longer dispatched by `_judge_one_row` under A8).
+
+**Rationale.** §15.14 v7 closed as `ANNOTATION_FAILED` (commit
+`933459d`) with κ = `−0.0976` on Mistral-7B-Instruct-v0.3 +
+§15.14-A7 sequence-logprob logsumexp extraction. The 7-8B-class
+family-control hypothesis was empirically falsified across two
+families × decisive κ readouts (Llama-8B / A4: κ = `−0.0776`;
+Mistral-7B / A7: κ = `−0.0976`). Two natural mechanistic
+interpretations remain post-v7 (recorded in v7 OUTCOME):
+
+  1. **Scale is the binding constraint.** 7-8B is insufficient
+     regardless of family or extraction protocol. A 70B-class
+     judge under hardware/quantization amendment is indicated.
+  2. **Rubric design is the binding constraint.** The 3-class
+     IGNORED / MENTIONED / STRUCTURED rubric is mismatched to
+     the bimodal human distribution (28/1/21 over the 50
+     calibration rows). A binary or two-stage rubric on the
+     existing 7-8B envelope is indicated.
+
+§15.14-A8 tests interpretation (2) directly. Decisive evidence
+from prior phases motivates the test:
+
+  - **§15.14-A4 diagnostic block 1 (recorded on RunPod via
+    `framing_15_14_annotated_A4_diagnostic.npz`)**: judge picked
+    `MENTIONED` 34/50 calibration rows (68%) where humans picked
+    `MENTIONED` 1/50 (2%). The judge over-uses the middle class
+    by a factor of 34×.
+  - **§15.14-A4 diagnostic block 4**: binary-collapse κ
+    (`y = 1 iff severity ≥ 1`) was `+0.047` — also poor, but a
+    different failure mode from the 3-class `−0.08`.
+  - **Second-eyes review (correspondence record)**: the lone
+    `MENTIONED` label in the 50-row human distribution is
+    plausibly a clerical slip; the underlying human judgment is
+    essentially binary IGNORED-vs-STRUCTURED.
+  - **§15.14 v7 confirms**: replacing the family AND the
+    extraction mechanism (Llama → Mistral, single-token argmax →
+    sequence-logprob logsumexp) does not change the
+    judge-distribution-vs-human-distribution mismatch on the
+    middle class.
+
+The two-stage rubric A8 introduces decomposes the 3-class
+decision into two binary decisions that align with how humans
+appear to think about this rubric:
+
+  - **Stage 1 (binary):** "Is the framing present at all?"
+    Answers: `N` (no framing) → severity 0; `Y` (some framing) →
+    proceed to stage 2.
+  - **Stage 2 (binary, conditional):** "Among responses where
+    framing is present, is it structurally controlling?"
+    Answers: `M` (mentioned only) → severity 1; `S` (structurally
+    controlling) → severity 2.
+
+Each stage is a separate sequence-logprob logsumexp scoring under
+§15.14-A7 mechanics with §15.14-A5 chat-template render. The
+mapping from `(stage1, stage2)` outcome to the canonical severity
+in `{0, 1, 2}` is mechanical (pinned below). The κ-gate is
+unchanged (computes 3-class κ between mapped severity and human
+labels on the 50 calibration rows; threshold `0.6` inclusive).
+
+A8 **does not modify the human labels or collapse them.** The
+50 human labels remain the unchanged `(28 × 0, 1 × 1, 21 × 2)`
+distribution. The mapping is on the **judge** side only: it
+gives the judge a more tractable decision protocol; the human
+labels are the unchanged ground truth against which 3-class κ is
+computed.
+
+**Pinned mechanism (binding under A8 EFFECTIVE).**
+
+The following design choices are pinned in this PROPOSED block.
+They are §0.8-binding upon the EFFECTIVE flip and cannot be
+modified during a single A8 v8 run.
+
+  - **Stage 1 prompt template** (pinned verbatim; new top-level
+    constant `JUDGE_PROMPT_TEMPLATE_STAGE1`; SHA-256 sealed at
+    EFFECTIVE flip):
+
+    ```
+    You are evaluating whether a model's response invokes a
+    framing convention introduced in an earlier turn of a
+    conversation. You will be shown:
+
+    - The framing convention (a span of text from turn 1).
+    - The current question (turn t, t >= 2).
+    - The model's response to that question.
+
+    Decide: does the model's response invoke or carry over the
+    prior framing convention AT ALL?
+
+    - N = NO framing present. The response does not invoke the
+      framing in any way; the framing convention is absent from
+      the response.
+    - Y = SOME framing present. The response invokes the framing
+      in some form — whether as a passing mention, a stylistic
+      echo, a brief callback, or a structurally controlling lens.
+
+    Return EXACTLY ONE CHARACTER: N or Y. Do not return any other
+    text, explanation, JSON, code fence, or whitespace before or
+    after the letter.
+
+    FRAMING_CONVENTION:
+    <FRAMING_CONVENTION>
+
+    CURRENT_QUESTION:
+    <CURRENT_QUESTION>
+
+    MODEL_RESPONSE:
+    <MODEL_RESPONSE>
+    ```
+
+  - **Stage 2 prompt template** (pinned verbatim; new top-level
+    constant `JUDGE_PROMPT_TEMPLATE_STAGE2`; SHA-256 sealed at
+    EFFECTIVE flip):
+
+    ```
+    You are evaluating whether a model's response is STRUCTURALLY
+    CONTROLLED by a framing convention introduced in an earlier
+    turn of a conversation. You have already determined that the
+    framing is present in some form. You will be shown:
+
+    - The framing convention (a span of text from turn 1).
+    - The current question (turn t, t >= 2).
+    - The model's response to that question.
+
+    Decide: among responses where the framing is present, does
+    the framing STRUCTURALLY control the response?
+
+    - M = MENTIONED only. The framing appears as a passing
+      reference, a stylistic echo, or a brief callback that does
+      NOT drive the substance, the organization, or the
+      terminology of the answer.
+    - S = STRUCTURED. The framing structurally shapes the answer.
+      The response is organized around the framing, uses it as
+      the primary lens, or substitutes the framing terminology
+      for the literal answer.
+
+    Return EXACTLY ONE CHARACTER: M or S. Do not return any other
+    text, explanation, JSON, code fence, or whitespace before or
+    after the letter.
+
+    FRAMING_CONVENTION:
+    <FRAMING_CONVENTION>
+
+    CURRENT_QUESTION:
+    <CURRENT_QUESTION>
+
+    MODEL_RESPONSE:
+    <MODEL_RESPONSE>
+    ```
+
+    Both templates use the same three placeholders
+    (`<FRAMING_CONVENTION>`, `<CURRENT_QUESTION>`,
+    `<MODEL_RESPONSE>`) substituted by the existing
+    `render_judge_prompt`-style mechanism. Each template's
+    SHA-256 is recorded in the annotated cache + JSON output for
+    provenance.
+
+  - **Pinned per-stage label sets** (single-character labels;
+    parallel to LABEL_TOKEN_CHARS but with semantically
+    appropriate letters per stage):
+    ```
+    JUDGE_STAGE1_LABELS = ("N", "Y")
+    JUDGE_STAGE2_LABELS = ("M", "S")
+    ```
+
+  - **Pinned mapping** from `(stage1, stage2)` outcome to the
+    canonical severity in `LABEL_TOKEN_CHARS = ("0", "1", "2")`:
+    ```
+    def _map_two_stage(stage1: str, stage2: str | None) -> int:
+        if stage1 == "N":
+            return 0                       # severity 0 (IGNORED)
+        if stage1 == "Y" and stage2 == "M":
+            return 1                       # severity 1 (MENTIONED)
+        if stage1 == "Y" and stage2 == "S":
+            return 2                       # severity 2 (STRUCTURED)
+        raise ValueError(
+            f"unexpected stage outcomes: stage1={stage1!r}, "
+            f"stage2={stage2!r}"
+        )
+    ```
+
+  - **Pinned execution policy: conditional stage 2.** Stage 2 is
+    run **only when stage 1 picks Y**. When stage 1 picks N, the
+    severity is immediately set to 0; stage 2 is not run; the
+    cache records `stage2_pick = None` (sentinel) and stage-2
+    logprob columns receive a NaN sentinel. Rationale: stage 2's
+    decision is logically void when stage 1 says no framing is
+    present; saving the forward passes is operationally cleaner
+    and avoids spurious stage-2 logprobs influencing any
+    downstream metric.
+
+  - **Pinned per-stage extraction.** Each stage uses the
+    inherited §15.14-A7 mechanism (sequence-logprob logsumexp
+    over `JUDGE_LABEL_VARIANTS = ("", " ", "\n")` per label),
+    with the stage-appropriate label set. Per-row scoring:
+    - Stage 1: `2 labels × 3 variants = 6 forward passes`,
+      always run.
+    - Stage 2: `2 labels × 3 variants = 6 forward passes`,
+      conditional on stage 1 picking Y.
+
+    Worst-case wall cost per `--force-annotate` invocation:
+    `12 forward passes × 650 rows = 7800` short forward passes
+    (~13 min on A100-80). Best case (all rows pick N):
+    `6 × 650 = 3900` (~7 min). Expected, given the calibration
+    distribution: ~9-11 passes per row average → ~6500-7150
+    total (~11-12 min wall). This is comparable to A7's ~10 min.
+
+  - **Per-stage precondition.** The §15.14-A7
+    `LABEL_TOKEN_ENCODING_EMPTY` precondition is **extended** to
+    cover both stages: each `(label, variant)` surface string
+    across both `JUDGE_STAGE1_LABELS` and `JUDGE_STAGE2_LABELS`
+    must encode to ≥1 token under the active tokenizer
+    (`2 stages × 2 labels × 3 variants = 12` surface strings).
+    Trivially satisfied by any non-empty UTF-8 string. Defensive
+    check; does not gate any normal run.
+
+**Output schema change (annotated cache + JSON).**
+
+The annotated cache schema bumps from `15.14-A7-annotated` to
+`15.14-A8-annotated`. The on-disk per-row layout changes:
+
+  - `judge_logits` widens from `(n, 9)` (single 3-class × 3
+    variants under A7) to `(n, 12)` under A8: 2 stages × 2
+    labels × 3 variants. Pinned column order:
+    ```
+    [(1, "N", ""), (1, "N", " "), (1, "N", "\n"),
+     (1, "Y", ""), (1, "Y", " "), (1, "Y", "\n"),
+     (2, "M", ""), (2, "M", " "), (2, "M", "\n"),
+     (2, "S", ""), (2, "S", " "), (2, "S", "\n")]
+    ```
+    Stage-2 cells (columns 6..11) carry `NaN` for rows where
+    stage 1 picked N (stage 2 was not run).
+  - `judge_label_aggregated` widens from `(n, 3)` (per-label
+    A7 logsumexp over LABEL_TOKEN_CHARS) to `(n, 4)` under A8:
+    `(stage1_N, stage1_Y, stage2_M, stage2_S)`. Stage-2 cells
+    carry `NaN` when stage 1 picked N.
+  - New per-row column `judge_stage1_pick` `(n,)` of strings
+    `"N"` or `"Y"`.
+  - New per-row column `judge_stage2_pick` `(n,)` of strings
+    `"M"`, `"S"`, or `""` (empty-string sentinel for skipped
+    stage 2).
+  - `severity` column: unchanged shape, but values are now
+    derived from `_map_two_stage(stage1_pick, stage2_pick)`.
+  - `judge_rationale` column: unchanged (preserved as empty
+    string for cross-version continuity).
+  - Top-level provenance fields:
+    - `annotation_protocol.judge_extraction_method`:
+      `"two_stage_sequence_logprob_logsumexp"` (was
+      `"sequence_logprob_logsumexp_over_variants"` under A7).
+    - `annotation_protocol.judge_prompt_sha256`: REMOVED (the
+      original 3-class template's SHA is no longer the active
+      prompt; it is preserved as a const in the script for
+      cross-version provenance only). Replaced by:
+    - `annotation_protocol.judge_prompt_template_stage1_sha256`:
+      new under A8. SHA-256 of `JUDGE_PROMPT_TEMPLATE_STAGE1`.
+    - `annotation_protocol.judge_prompt_template_stage2_sha256`:
+      new under A8. SHA-256 of `JUDGE_PROMPT_TEMPLATE_STAGE2`.
+    - `annotation_protocol.judge_stage1_labels`: new under A8.
+      Value: `["N", "Y"]`.
+    - `annotation_protocol.judge_stage2_labels`: new under A8.
+      Value: `["M", "S"]`.
+    - All other provenance fields (`judge_model_id`,
+      `judge_fallback_used`, `judge_prompt_render`,
+      `judge_label_variants`, `judge_label_aggregation`,
+      `label_token_chars`, `label_token_ids`) unchanged.
+
+**Failure surfaces under A8.**
+
+  - `LABEL_TOKEN_ENCODING_EMPTY` (extended under A8 to cover both
+    stages): fires iff any of the 12 `(stage, label, variant)`
+    surface strings encodes to zero tokens. Pre-flight
+    expectation: PASS on Mistral-7B-Instruct-v0.3 and any
+    standard HF tokenizer.
+  - `json_parse_failure_rate` (preserved name): structurally
+    `0.0000` (no parsing step). Vacuous. Carries through from
+    A4 / A5 / A6 / A7.
+  - Pass D **κ-gate at `KAPPA_GATE_THRESHOLD = 0.6` inclusive**:
+    **unchanged and binding**. If 3-class κ < 0.6 on the 50
+    calibration rows under the two-stage-mapped severities, the
+    script exits 9 ANNOTATION_FAILED before the cascade is
+    computed.
+
+**What this amendment does NOT change.**
+
+  - `JUDGE_MODEL_ID_DEFAULT` (`Qwen/Qwen2.5-72B-Instruct`):
+    unchanged.
+  - `JUDGE_MODEL_ID_FALLBACK`
+    (`mistralai/Mistral-7B-Instruct-v0.3`, §15.14-A6 inherit):
+    unchanged.
+  - `JUDGE_PROMPT_RENDER`
+    (`apply_chat_template_user_only(add_generation_prompt=True)`,
+    §15.14-A5 inherit): unchanged.
+  - `JUDGE_LABEL_VARIANTS = ("", " ", "\n")` (§15.14-A7
+    inherit): unchanged. Used per-stage.
+  - `JUDGE_LABEL_AGGREGATION = "logsumexp"` (§15.14-A7
+    inherit): unchanged. Used per-stage.
+  - `LABEL_TOKEN_CHARS = ("0", "1", "2")`: unchanged. The
+    canonical severity output is still `0 / 1 / 2`; the
+    two-stage decomposition is internal to the judge.
+  - `KAPPA_GATE_THRESHOLD = 0.6` (inclusive): unchanged.
+  - `ANNOTATION_FAILURE_RATE_THRESHOLD = 0.05`: unchanged
+    (vacuous under §15.14-A4 / A7 inheritance).
+  - `BINARY_LABEL_THRESHOLD` (y = 1 iff severity ≥ 1):
+    unchanged.
+  - `DIRECTION_GATE_THRESHOLD = 0.5` (strict): unchanged.
+  - `PARTIAL_AUC_THRESHOLD = 0.66` (inclusive): unchanged.
+  - `STRONG_AUC_THRESHOLD = 0.75` (inclusive): unchanged.
+  - `STRONG_DELTA_AUC_THRESHOLD = 0.05` (inclusive): unchanged.
+  - Severity rubric (0=IGNORED / 1=MENTIONED / 2=STRUCTURED) at
+    the κ-evaluation surface: unchanged. The two-stage rubric
+    is the **judge's** decision protocol; the canonical
+    severity values that the κ-gate compares against the human
+    labels are unchanged.
+  - **Human calibration labels: unchanged.** The 50-row
+    `(28, 1, 21)` distribution is the unchanged ground truth.
+    A8 does NOT relabel, collapse, or otherwise modify the
+    labels artifact. Locked SHA
+    `e9776ff223ef913b2e404d2cf90203e9615c01640bc8fc5c42ffabf2d49b0d6c`
+    preserved.
+  - Locked stimulus SHA
+    (`e56cfe8c102f0520fd26b906bdd08377c243ac45bd9fbf80956006dddd1957c7`):
+    unchanged.
+  - Sign direction (BCVF-faithful: R_framing higher → more
+    framing-stickiness): unchanged.
+  - Cascade structure (4-step direction-gate → STRONG → PARTIAL
+    → NO_MATERIAL), 2-comparator strict-margin requirement:
+    unchanged.
+  - 12 self-test cascade boundary cases: unchanged.
+  - 52-pattern Class-3 firewall: unchanged.
+  - Original `JUDGE_PROMPT_TEMPLATE` (3-class) text content +
+    SHA-256: **preserved as a constant** in the script for
+    cross-version provenance, but no longer dispatched by
+    `_judge_one_row` under A8. Pre-A8 output JSON files reference
+    its SHA via `annotation_protocol.judge_prompt_sha256`; A8's
+    output JSON references the two new per-stage SHAs instead.
+  - `framing_15_14_extractions.npz` extraction cache: unchanged
+    and reusable via `--force-annotate`.
+  - `framing_15_14_annotated_A4_diagnostic.npz` on RunPod
+    (`diagnostic_only=True`): unchanged and preserved.
+  - §15.14-A1 / A2 / A3 / A4 / A5 / A6 / A7: unchanged. All
+    EFFECTIVE. A8 layers new per-stage prompt + per-stage
+    scoring + severity-mapping logic on top of A7's mechanism;
+    A4 / A5 / A6 / A7 mechanics are inherited where applicable
+    and preserved as EFFECTIVE.
+  - All §13/§14/§15.x verdicts-of-record (including §15.14 v1 /
+    v2 / v3 / v4 / v6 / v7 ANNOTATION_FAILED closures):
+    preserved.
+
+**What this amendment does NOT permit.**
+
+  - Lowering `KAPPA_GATE_THRESHOLD` below 0.6.
+  - Modifying any sealed AUC threshold, the cascade structure,
+    the comparator rules, or the canonical severity rubric
+    (0/1/2 at the κ-evaluation surface).
+  - Modifying the topic-overlap firewall (52 patterns).
+  - Modifying `BINARY_LABEL_THRESHOLD`.
+  - Modifying `DIRECTION_GATE_THRESHOLD`.
+  - Modifying the sign convention.
+  - Modifying the human calibration labels artifact.
+  - Collapsing the 3-class human labels to a binary human label
+    set. The κ-gate compares two-stage-mapped 3-class judge
+    severity against the unchanged 3-class human severity.
+  - Editing `JUDGE_PROMPT_TEMPLATE_STAGE1` or
+    `JUDGE_PROMPT_TEMPLATE_STAGE2` text content during a single
+    A8 EFFECTIVE run (both are pinned with sealed SHAs).
+  - Modifying `JUDGE_STAGE1_LABELS` or `JUDGE_STAGE2_LABELS`.
+  - Modifying the conditional stage-2 execution policy (stage 2
+    runs iff stage 1 picks Y).
+  - Modifying the `_map_two_stage` mapping function.
+  - Modifying the inherited §15.14-A7 mechanics
+    (`JUDGE_LABEL_VARIANTS`, `JUDGE_LABEL_AGGREGATION`).
+  - Modifying the inherited §15.14-A5 chat-template render.
+  - Modifying the inherited §15.14-A6 fallback judge identity
+    (Mistral-7B-Instruct-v0.3).
+  - Authorizing Mixtral-8x7B (does not fit envelope; deferred).
+  - Authorizing 70B-class judge (does not fit envelope;
+    deferred).
+  - Quantizing any judge model (carries forward the §15.14-A4 /
+    A5 / A6 / A7 prohibition).
+  - Sign-flip rescue on direction-gate failure.
+  - Skipping the κ self-test gate.
+  - Modifying any prior §13 / §14 / §15.x verdict-of-record.
+  - Reinterpreting §15.14 v1 / v2 / v3 / v4 / v6 / v7 outcomes.
+
+**Cascade verdict reading discipline (post-A8).**
+
+A §15.14 v8 cascade verdict produced under §15.14-A8 (two-stage
+binary judging with §15.14-A4 / A5 / A6 / A7 mechanics inherited)
+is a §0.8-binding readout AT THE STATED JUDGE CONFIGURATION. It
+is not directly comparable to any prior §15.14 readout, because
+the judge decision protocol is a different empirical claim about
+how to extract rubric-conditioned severity from the active 7-8B
+judge.
+
+**Pinned-table updates (Chunk 6 Sealed §0.8-binding decisions).**
+
+Six new pinned entries; one entry annotated:
+
+| Decision | Pinned value (post-A8) |
+|---|---|
+| `JUDGE_EXTRACTION_METHOD` | `two_stage_sequence_logprob_logsumexp` (effective under §15.14-A8; was `sequence_logprob_logsumexp_over_variants` under §15.14-A7) |
+| `JUDGE_PROMPT_TEMPLATE_STAGE1` | (the verbatim text above, pinned; SHA-256 sealed at EFFECTIVE flip) |
+| `JUDGE_PROMPT_TEMPLATE_STAGE2` | (the verbatim text above, pinned; SHA-256 sealed at EFFECTIVE flip) |
+| `JUDGE_STAGE1_LABELS` | `("N", "Y")` (new under §15.14-A8) |
+| `JUDGE_STAGE2_LABELS` | `("M", "S")` (new under §15.14-A8) |
+| `JUDGE_TWO_STAGE_MAPPING` | `(N→0, Y∧M→1, Y∧S→2)` (new under §15.14-A8) |
+| `JUDGE_TWO_STAGE_EXECUTION_POLICY` | `conditional_stage_2_iff_stage_1_y` (new under §15.14-A8) |
+
+The original `JUDGE_PROMPT_TEMPLATE` constant + its SHA-256 are
+preserved in the script for cross-version provenance but are
+**no longer dispatched** by `_judge_one_row` under A8.
+
+**Implementation surface (post-sign-off, EFFECTIVE follow-up).**
+
+Eight contained changes to `scripts/probe_framing_15_14.py`:
+
+  1. Two new top-level constants:
+     `JUDGE_PROMPT_TEMPLATE_STAGE1` and
+     `JUDGE_PROMPT_TEMPLATE_STAGE2` (the verbatim texts above).
+  2. Two new SHA helper functions:
+     `judge_prompt_template_stage1_sha256()` and
+     `judge_prompt_template_stage2_sha256()` (parallel to the
+     existing `judge_prompt_sha256()`).
+  3. Two new render functions:
+     `render_judge_prompt_stage1(framing_substr, q, r)` and
+     `render_judge_prompt_stage2(framing_substr, q, r)`
+     (parallel to the existing `render_judge_prompt`).
+  4. New top-level constants:
+     `JUDGE_STAGE1_LABELS = ("N", "Y")`,
+     `JUDGE_STAGE2_LABELS = ("M", "S")`. The existing
+     `LABEL_TOKEN_CHARS = ("0", "1", "2")` is unchanged and
+     remains the canonical severity-output enum.
+  5. New helper `_map_two_stage(stage1, stage2) -> int` per the
+     pinned mapping above.
+  6. `_judge_one_row` body: rewritten for two-stage logic.
+     Returns `(severity, "", per_stage_logprobs,
+     per_stage_aggregated, stage1_pick, stage2_pick)` —
+     widened from §15.14-A7's 4-tuple to a 6-tuple.
+  7. `_load_judge_model`: extend the
+     `LABEL_TOKEN_ENCODING_EMPTY` precondition to check all
+     `2 × 2 × 3 = 12` surface strings (2 stages × 2 labels × 3
+     variants).
+  8. `_save_annotated_cache` / `_load_annotated_cache`: schema
+     bump `15.14-A7-annotated → 15.14-A8-annotated`; widen
+     `judge_logits` matrix `(n, 9) → (n, 12)`; widen
+     `judge_label_aggregated` `(n, 3) → (n, 4)`; add
+     `judge_stage1_pick` and `judge_stage2_pick` per-row
+     columns; add top-level
+     `judge_prompt_template_stage1_sha256` /
+     `judge_prompt_template_stage2_sha256` /
+     `judge_stage1_labels` / `judge_stage2_labels` provenance
+     fields.
+
+Plus per-row block extension in:
+
+  9. `run_pass_c_judge` orchestrator: update the per-row dict to
+     thread the new fields through.
+  10. `FramingAuditOutputs` dataclass: add
+      `judge_prompt_template_stage1_sha256`,
+      `judge_prompt_template_stage2_sha256`,
+      `judge_stage1_labels`, `judge_stage2_labels` fields.
+      Drop or alias the existing `judge_prompt_sha256` field
+      (preserved for cross-version diff continuity but no longer
+      written under A8).
+  11. JSON / markdown writers: add per-stage SHAs and
+      per-stage labels to the audit-trail block; update
+      `judge_extraction_method` value.
+
+`Pass C` orchestration shape (still iterates rows, still calls
+`_judge_one_row`) is unchanged. `Pass D` (κ-gate) is unchanged.
+The cascade comparator, the firewall, the self-test gate, the
+calibration labels artifact, the extraction cache, the locked
+stimulus SHA, and the locked labels SHA are all unchanged.
+
+**Required reporting (under v8 EFFECTIVE follow-up).**
+
+The §15.14 v8 outcome document must list all eight judge attempts
+side-by-side (the seven from v7 OUTCOME plus the v8 row):
+
+  1. Qwen-7B JSON: parse 0.2692 → ANNOTATION_FAILED
+  2. Llama-8B JSON: parse 0.7077 → ANNOTATION_FAILED
+  3. Llama-8B single-digit / A3: parse 0.8477 → ANNOTATION_FAILED
+  4. Llama-8B / A4 raw-string single-token: parse 0.0; κ = −0.0776 → ANNOTATION_FAILED
+  5. Llama-8B / A5 chat-template single-token: parse 0.0; κ = −0.3840 → ANNOTATION_FAILED
+  6. Mistral-7B / A6 chat-template single-token: LABEL_TOKEN_ENCODING_AMBIGUOUS → ANNOTATION_FAILED
+  7. Mistral-7B / A7 chat-template seq-logprob: parse 0.0; κ = −0.0976 → ANNOTATION_FAILED
+  8. Mistral-7B / A8 chat-template two-stage seq-logprob: parse 0.0; κ = TBD
+
+If §15.14-A8 also fails the κ-gate, **§15.14 closes as
+ANNOTATION_FAILED with the accessible-small-judge path
+exhausted.** The only remaining serious options at that point
+are:
+
+  - a 70B-class judge / hardware amendment (separate
+    authorization), or
+  - closing §15.14 as untestable under accessible judges
+    (separate authorization).
+
+If §15.14-A8 passes the κ-gate, the v8 cascade verdict is
+computed under unchanged §15.14 cascade rules, and the binding
+constraint at v3 / v4 / v7 is empirically identified as
+**rubric design** (specifically the unstable middle class
+`MENTIONED` in the direct 3-class rubric). Scale-of-judge would
+then be empirically identified as NOT the binding constraint,
+and the §15.14 forward path would route to the cascade-verdict
+output rather than to a 70B+ amendment.
+
+**Provenance after a §15.14-A8 v8 run.**
+
+A successful §15.14-A8 v8 cascade verdict (or κ-gate-failure
+exit 9) will produce annotated-cache + JSON output with:
+
+```
+"annotation_protocol": {
+  "judge_model_id":                          "mistralai/Mistral-7B-Instruct-v0.3",
+  "judge_fallback_used":                     true,
+  "judge_prompt_template_stage1_sha256":     "<sha256 of JUDGE_PROMPT_TEMPLATE_STAGE1>",
+  "judge_prompt_template_stage2_sha256":     "<sha256 of JUDGE_PROMPT_TEMPLATE_STAGE2>",
+  "judge_prompt_render":                     "apply_chat_template_user_only(add_generation_prompt=True)",
+  "judge_extraction_method":                 "two_stage_sequence_logprob_logsumexp",
+  "judge_label_variants":                    ["", " ", "\n"],
+  "judge_label_aggregation":                 "logsumexp",
+  "judge_stage1_labels":                     ["N", "Y"],
+  "judge_stage2_labels":                     ["M", "S"],
+  "label_token_chars":                       ["0", "1", "2"],
+  "label_token_ids":                         {"0": -1, "1": -1, "2": -1},
+  ...
+},
+"per_row": [
+  {
+    "...": ...,
+    "judge_logits": {
+      "stage1": {"N": {"":  <f>, " ": <f>, "\n": <f>},
+                 "Y": {"":  <f>, " ": <f>, "\n": <f>}},
+      "stage2": {"M": {"":  <f>, " ": <f>, "\n": <f>}|null,
+                 "S": {"":  <f>, " ": <f>, "\n": <f>}|null}
+    },
+    "judge_label_aggregated": {
+      "stage1": {"N": <f>, "Y": <f>},
+      "stage2": {"M": <f>, "S": <f>} | null
+    },
+    "judge_stage1_pick": "N" | "Y",
+    "judge_stage2_pick": "M" | "S" | null,
+    ...
+  },
+  ...
+]
+```
+
+The simultaneous presence of
+`judge_extraction_method = "two_stage_sequence_logprob_logsumexp"`
+plus the per-row two-stage `judge_logits` object plus the per-row
+`judge_stage1_pick` / `judge_stage2_pick` fields is the
+audit-trail signature that §15.14-A8 is in effect.
+
+**v8 readout discipline.** §15.14 v1 / v2 / v3 / v4 / v6 / v7
+closures preserved. §15.14-A8 v8 readout is a **separate**
+§0.8-binding result. It does not retroactively give v1–v7 a
+verdict; it produces a fresh v8 verdict under a different judge
+decision protocol (two-stage binary instead of direct 3-class).
+
+**Two-phase discipline (per A1–A7 precedent; explicit).**
+
+  1. **PROPOSED commit** (this commit cycle): the spec amendment
+     block above is added with `Status: PROPOSED`. No code is
+     touched in `scripts/probe_framing_15_14.py`. No status flip.
+     No cache schema bump. No annotated-cache write.
+  2. **EFFECTIVE follow-up** (separate commit, only after the
+     user replies with the literal phrase
+     `Sign off §15.14-A8. Push the EFFECTIVE follow-up.`): flips
+     this status field from `PROPOSED` to `EFFECTIVE` and
+     applies the eleven-item implementation surface enumerated
+     above. The RunPod execution under the EFFECTIVE follow-up
+     is a **separate** user authorization; it is not implied by
+     the EFFECTIVE flip itself.
+
+---
+
 > Does the LM's residual alignment toward a **framing convention**
 > introduced in turn 1 — relative to the new turn-t question in
 > standalone form — predict whether the model will inappropriately
