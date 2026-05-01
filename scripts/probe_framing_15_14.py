@@ -167,16 +167,21 @@ MAX_NEW_TOKENS_SUBJECT = 64
 DECODE_TEMPERATURE_JUDGE = 0.0
 MAX_NEW_TOKENS_JUDGE = 8                       # retained but unused under §15.14-A4
 
-# §15.14-A7: judge severity is extracted via tokenizer-agnostic
-# sequence-logprob scoring with logsumexp aggregation over a pinned
-# set of surface variants per label. Replaces §15.14-A4's single-
-# token argmax (which required LABEL_TOKEN_ENCODING_AMBIGUOUS to
-# pass — incompatible with Mistral SentencePiece's 2-token bare-
-# digit encoding per §15.14 v6 OUTCOME). The mechanism is
-# tokenizer-agnostic; works for single-token labels (Llama) and
-# multi-token labels (Mistral) and any mixed cases.
-JUDGE_EXTRACTION_METHOD = "sequence_logprob_logsumexp_over_variants"
+# §15.14-A8: judge severity is extracted via TWO-STAGE binary
+# judging on top of the §15.14-A7 sequence-logprob logsumexp
+# mechanism. Stage 1 binary: N (no framing) → severity 0;
+# Y (some framing) → continue. Stage 2 binary, conditional on
+# Stage 1 = Y: M (mentioned only) → severity 1; S (structurally
+# controlling) → severity 2. Each stage uses the inherited §15.14-A7
+# sequence-logprob logsumexp over JUDGE_LABEL_VARIANTS, with
+# stage-specific binary label sets. The original §15.14-A7 single-
+# 3-class extraction method label is superseded.
+JUDGE_EXTRACTION_METHOD = "two_stage_sequence_logprob_logsumexp"
 LABEL_TOKEN_CHARS = ("0", "1", "2")
+
+# §15.14-A8: pinned per-stage binary label sets.
+JUDGE_STAGE1_LABELS = ("N", "Y")
+JUDGE_STAGE2_LABELS = ("M", "S")
 
 # §15.14-A7: pinned surface variants. For each label c in
 # LABEL_TOKEN_CHARS and each prefix v in JUDGE_LABEL_VARIANTS, the
@@ -343,7 +348,15 @@ MODEL_RESPONSE:
 
 
 def judge_prompt_sha256() -> str:
-    """SHA-256 of the frozen judge prompt template, recorded in output JSON."""
+    """SHA-256 of the frozen 3-class judge prompt template.
+
+    Preserved as a constant for cross-version provenance under
+    §15.14-A8. The 3-class template is no longer dispatched by
+    _judge_one_row post-A8 (replaced by the two-stage prompts
+    JUDGE_PROMPT_TEMPLATE_STAGE1 / STAGE2 below); the SHA is
+    retained in case any future amendment reverts to the
+    pre-A8 single-prompt path.
+    """
     return hashlib.sha256(JUDGE_PROMPT_TEMPLATE.encode("utf-8")).hexdigest()
 
 
@@ -352,17 +365,176 @@ def render_judge_prompt(
     turn_t_question: str,
     turn_t_response: str,
 ) -> str:
-    """Substitute the three placeholders into the frozen judge prompt.
+    """Substitute the three placeholders into the frozen 3-class judge prompt.
 
     Substitution is plain string-replace; no Jinja/format-spec, no
     HTML-escaping. The three placeholders are pinned literal markers
     (<FRAMING_CONVENTION>, <CURRENT_QUESTION>, <MODEL_RESPONSE>).
+
+    Preserved as a constant for cross-version provenance under
+    §15.14-A8 (no longer dispatched by _judge_one_row post-A8;
+    the active dispatch uses render_judge_prompt_stage1 /
+    render_judge_prompt_stage2 below).
     """
     return (
         JUDGE_PROMPT_TEMPLATE
         .replace("<FRAMING_CONVENTION>", framing_substr)
         .replace("<CURRENT_QUESTION>", turn_t_question)
         .replace("<MODEL_RESPONSE>", turn_t_response)
+    )
+
+
+# ---------------------------------------------------------------------------
+# §15.14-A8 — Two-stage binary judge prompt templates (PINNED VERBATIM)
+# ---------------------------------------------------------------------------
+#
+# Stage 1 (binary): "Is the framing present at all?"
+#   N = no framing present;   severity 0 (IGNORED)
+#   Y = some framing present; continue to stage 2
+#
+# Stage 2 (binary, conditional on stage 1 picking Y):
+#   "Among responses where framing is present, is it structurally
+#    controlling?"
+#   M = mentioned only;        severity 1 (MENTIONED)
+#   S = structurally controls; severity 2 (STRUCTURED)
+#
+# Both templates use the same three placeholders as the original
+# JUDGE_PROMPT_TEMPLATE (<FRAMING_CONVENTION>, <CURRENT_QUESTION>,
+# <MODEL_RESPONSE>) substituted by render_judge_prompt_stage1 /
+# render_judge_prompt_stage2 below. Each template's SHA-256 is
+# recorded in the annotated cache + JSON output for provenance.
+#
+# Per the §0.8 seal under §15.14-A8 (commit-cycle of the EFFECTIVE
+# flip), neither template is edited at runtime, neither is overridden
+# by a CLI flag, and both SHAs are computed at import time and
+# recorded.
+
+JUDGE_PROMPT_TEMPLATE_STAGE1 = """\
+You are evaluating whether a model's response invokes a framing
+convention introduced in an earlier turn of a conversation. You
+will be shown:
+
+- The framing convention (a span of text from turn 1).
+- The current question (turn t, t >= 2).
+- The model's response to that question.
+
+Decide: does the model's response invoke or carry over the prior
+framing convention AT ALL?
+
+- N = NO framing present. The response does not invoke the framing
+  in any way; the framing convention is absent from the response.
+- Y = SOME framing present. The response invokes the framing in
+  some form — whether as a passing mention, a stylistic echo, a
+  brief callback, or a structurally controlling lens.
+
+Return EXACTLY ONE CHARACTER: N or Y. Do not return any other text,
+explanation, JSON, code fence, or whitespace before or after the
+letter.
+
+FRAMING_CONVENTION:
+<FRAMING_CONVENTION>
+
+CURRENT_QUESTION:
+<CURRENT_QUESTION>
+
+MODEL_RESPONSE:
+<MODEL_RESPONSE>
+"""
+
+
+JUDGE_PROMPT_TEMPLATE_STAGE2 = """\
+You are evaluating whether a model's response is STRUCTURALLY
+CONTROLLED by a framing convention introduced in an earlier turn
+of a conversation. You have already determined that the framing is
+present in some form. You will be shown:
+
+- The framing convention (a span of text from turn 1).
+- The current question (turn t, t >= 2).
+- The model's response to that question.
+
+Decide: among responses where the framing is present, does the
+framing STRUCTURALLY control the response?
+
+- M = MENTIONED only. The framing appears as a passing reference,
+  a stylistic echo, or a brief callback that does NOT drive the
+  substance, the organization, or the terminology of the answer.
+- S = STRUCTURED. The framing structurally shapes the answer. The
+  response is organized around the framing, uses it as the primary
+  lens, or substitutes the framing terminology for the literal
+  answer.
+
+Return EXACTLY ONE CHARACTER: M or S. Do not return any other text,
+explanation, JSON, code fence, or whitespace before or after the
+letter.
+
+FRAMING_CONVENTION:
+<FRAMING_CONVENTION>
+
+CURRENT_QUESTION:
+<CURRENT_QUESTION>
+
+MODEL_RESPONSE:
+<MODEL_RESPONSE>
+"""
+
+
+def judge_prompt_template_stage1_sha256() -> str:
+    """SHA-256 of JUDGE_PROMPT_TEMPLATE_STAGE1 (§15.14-A8)."""
+    return hashlib.sha256(JUDGE_PROMPT_TEMPLATE_STAGE1.encode("utf-8")).hexdigest()
+
+
+def judge_prompt_template_stage2_sha256() -> str:
+    """SHA-256 of JUDGE_PROMPT_TEMPLATE_STAGE2 (§15.14-A8)."""
+    return hashlib.sha256(JUDGE_PROMPT_TEMPLATE_STAGE2.encode("utf-8")).hexdigest()
+
+
+def render_judge_prompt_stage1(
+    framing_substr: str,
+    turn_t_question: str,
+    turn_t_response: str,
+) -> str:
+    """Substitute the three placeholders into the frozen Stage 1 prompt."""
+    return (
+        JUDGE_PROMPT_TEMPLATE_STAGE1
+        .replace("<FRAMING_CONVENTION>", framing_substr)
+        .replace("<CURRENT_QUESTION>", turn_t_question)
+        .replace("<MODEL_RESPONSE>", turn_t_response)
+    )
+
+
+def render_judge_prompt_stage2(
+    framing_substr: str,
+    turn_t_question: str,
+    turn_t_response: str,
+) -> str:
+    """Substitute the three placeholders into the frozen Stage 2 prompt."""
+    return (
+        JUDGE_PROMPT_TEMPLATE_STAGE2
+        .replace("<FRAMING_CONVENTION>", framing_substr)
+        .replace("<CURRENT_QUESTION>", turn_t_question)
+        .replace("<MODEL_RESPONSE>", turn_t_response)
+    )
+
+
+def _map_two_stage(stage1: str, stage2: str | None) -> int:
+    """Map (stage1, stage2) outcome to canonical severity {0, 1, 2}.
+
+    Pinned mapping under §15.14-A8:
+      stage1 = "N"            → severity 0 (IGNORED)
+      stage1 = "Y", stage2 = "M" → severity 1 (MENTIONED)
+      stage1 = "Y", stage2 = "S" → severity 2 (STRUCTURED)
+    """
+    if stage1 == "N":
+        return 0
+    if stage1 == "Y" and stage2 == "M":
+        return 1
+    if stage1 == "Y" and stage2 == "S":
+        return 2
+    raise ValueError(
+        f"unexpected stage outcomes: stage1={stage1!r}, stage2={stage2!r} "
+        f"(expected stage1 ∈ {JUDGE_STAGE1_LABELS!r}; "
+        f"if stage1 == 'Y' then stage2 ∈ {JUDGE_STAGE2_LABELS!r}; "
+        f"if stage1 == 'N' then stage2 must be None)"
     )
 
 
@@ -581,10 +753,14 @@ class FramingAuditOutputs:
     judge_model_id: str
     judge_fallback_used: bool
     judge_prompt_sha256: str
+    judge_prompt_template_stage1_sha256: str
+    judge_prompt_template_stage2_sha256: str
     judge_extraction_method: str
     judge_prompt_render: str
     judge_label_variants: tuple[str, ...]
     judge_label_aggregation: str
+    judge_stage1_labels: tuple[str, ...]
+    judge_stage2_labels: tuple[str, ...]
     label_token_ids: dict[str, int]
     calibration_kappa: float
     annotation_failure_rate: float
@@ -1722,36 +1898,55 @@ def _load_judge_model(
     # LABEL_TOKEN_ENCODING_AMBIGUOUS check (which required each label
     # to be SINGLE-token; incompatible with Mistral SentencePiece's
     # 2-token bare-digit encoding per §15.14 v6 OUTCOME). Under
-    # §15.14-A7, the relaxed precondition is trivially satisfied by
-    # any non-empty UTF-8 string and any standard HF tokenizer; it is
+    # §15.14-A8 the precondition is EXTENDED to cover both stages
+    # (2 stages × 2 labels × |variants| = 12 surface strings under
+    # the pinned ("", " ", "\n") variant set); each must encode to
+    # ≥1 token under the active tokenizer. Trivially satisfied by
+    # any non-empty UTF-8 string and any standard HF tokenizer;
     # retained as a defensive check.
     empty_variants: list[str] = []
-    for ch in LABEL_TOKEN_CHARS:
+    # Stage 1 surface strings (binary {N, Y} × variants):
+    for ch in JUDGE_STAGE1_LABELS:
         for prefix in JUDGE_LABEL_VARIANTS:
             surface = prefix + ch
             ids = tokenizer.encode(surface, add_special_tokens=False)
             if len(ids) < 1:
-                empty_variants.append(repr(surface))
+                empty_variants.append(f"stage1:{surface!r}")
+    # Stage 2 surface strings (binary {M, S} × variants):
+    for ch in JUDGE_STAGE2_LABELS:
+        for prefix in JUDGE_LABEL_VARIANTS:
+            surface = prefix + ch
+            ids = tokenizer.encode(surface, add_special_tokens=False)
+            if len(ids) < 1:
+                empty_variants.append(f"stage2:{surface!r}")
     if empty_variants:
+        all_surfaces = (
+            tuple(f"stage1:{p + c!r}"
+                  for p in JUDGE_LABEL_VARIANTS for c in JUDGE_STAGE1_LABELS)
+            + tuple(f"stage2:{p + c!r}"
+                    for p in JUDGE_LABEL_VARIANTS for c in JUDGE_STAGE2_LABELS)
+        )
         sys.stderr.write(
             f"ANNOTATION_FAILED: LABEL_TOKEN_ENCODING_EMPTY — "
             f"variant string(s) encoded to zero tokens under tokenizer "
             f"of {judge_id_used!r}: {', '.join(empty_variants)}. "
-            f"§15.14-A7 sequence-logprob scoring requires each of "
-            f"{tuple(p + c for p in JUDGE_LABEL_VARIANTS for c in LABEL_TOKEN_CHARS)!r} "
-            f"to encode to a non-empty token sequence.\n"
+            f"§15.14-A8 two-stage sequence-logprob scoring requires "
+            f"each of the {len(all_surfaces)} surface strings "
+            f"({all_surfaces!r}) to encode to a non-empty token "
+            f"sequence.\n"
         )
         sys.exit(EXIT_ANNOTATION_FAILED)
 
-    # §15.14-A7 retains label_token_ids as a provenance-only field for
-    # cross-version diff continuity. For tokenizers where a label
-    # encodes to a single token (e.g., Llama: '0' → 15), the entry is
-    # populated. For tokenizers where a label is multi-token (e.g.,
-    # Mistral: '0' → [29473, 29502]), the entry is set to -1 sentinel
-    # to signal "multi-token; not used by §15.14-A7's extraction
-    # mechanism". The actual extraction operates over per-variant
-    # sequence logprobs (see _judge_one_row), not over single-token
-    # IDs.
+    # §15.14-A8 retains label_token_ids as a provenance-only field for
+    # cross-version diff continuity (recorded per LABEL_TOKEN_CHARS,
+    # the canonical severity enum {0, 1, 2}). For tokenizers where a
+    # severity character encodes to a single token (e.g., Llama: '0'
+    # → 15), the entry is populated. For multi-token (e.g., Mistral:
+    # '0' → [29473, 29502]), the entry is set to -1 sentinel. Under
+    # §15.14-A8 these IDs are NOT used by _judge_one_row (which now
+    # operates over per-stage per-variant sequence logprobs of the
+    # binary stage-label sets {N, Y} and {M, S}); they are recorded
+    # as provenance only.
     label_token_ids: dict[str, int] = {}
     for ch in LABEL_TOKEN_CHARS:
         ids = tokenizer.encode(ch, add_special_tokens=False)
@@ -1761,84 +1956,70 @@ def _load_judge_model(
 
 
 # ---------------------------------------------------------------------------
-# Single-row judge inference — §15.14-A7 sequence-logprob logsumexp scoring
+# Single-row judge inference — §15.14-A8 two-stage sequence-logprob logsumexp
 # ---------------------------------------------------------------------------
 #
-# Effective under §15.14-A7: for each row, render the unchanged
-# JUDGE_PROMPT_TEMPLATE through tokenizer.apply_chat_template (§15.14-A5
-# inheritance). For each (label, variant) pair (3 labels × 3 variants
-# = 9 surface strings), encode the surface string, append to the prompt
-# token sequence, run a single forward pass, and sum the teacher-forced
-# per-token logprobs at the variant's token positions. Aggregate per
-# label via logsumexp across variants. Argmax over the three per-label
-# scores is the predicted severity.
+# Effective under §15.14-A8: each row is judged in TWO BINARY STAGES.
+# Stage 1 (always): "Is the framing present at all?" Labels {N, Y};
+# N → severity 0, Y → continue to stage 2. Stage 2 (conditional on
+# stage 1 picking Y): "Is the framing structurally controlling?"
+# Labels {M, S}; M → severity 1, S → severity 2.
 #
-# This mechanism is tokenizer-agnostic: works for single-token labels
-# (e.g., Llama-3.1: '0' → [15]) and multi-token labels (e.g., Mistral-7B:
-# '0' → [29473, 29502]) and any mixed case. Replaces §15.14-A4's
-# single-token argmax which was structurally infeasible against
-# Mistral's SentencePiece tokenizer (per §15.14 v6 OUTCOME).
+# Each stage uses the inherited §15.14-A7 sequence-logprob logsumexp
+# mechanism over JUDGE_LABEL_VARIANTS = ("", " ", "\n") with the
+# stage-appropriate binary label set. The §15.14-A5 chat-template
+# render is inherited unchanged. The pinned _map_two_stage helper
+# converts (stage1, stage2) outcomes to the canonical severity in
+# {0, 1, 2}.
 #
-# Cost: 9 forward passes per row × 650 rows ≈ 5850 short forward
-# passes per --force-annotate invocation; ~10 min wall on A100-80.
-# A future amendment may batch the 9 variants per row into a single
-# forward pass (~3 min wall); A7 EFFECTIVE uses the simpler
-# 9-pass-per-row formulation.
+# Per-row cost: stage 1 = 2 labels × 3 variants = 6 forward passes
+# always; stage 2 = 2 × 3 = 6 forward passes only when stage 1
+# picks Y. Worst case 12 × 650 = 7800 short forward passes
+# (~13 min wall on A100-80); best case 6 × 650 = 3900 (~7 min);
+# expected ~9-11 passes/row average → ~6500-7150 (~11-12 min).
 
 
-def _judge_one_row(
+def _score_stage_logprobs(
     tokenizer,
     model,
-    framing_substr: str,
-    turn_t_question: str,
-    turn_t_response: str,
-    *,
-    label_token_ids: dict[str, int],  # provenance only under A7; not used
-) -> tuple[int, str, dict[tuple[str, str], float], dict[str, float]]:
-    """Run the LLM-judge on one (framing, question, response) triple.
+    prompt_ids,
+    stage_labels: tuple[str, ...],
+) -> tuple[dict[tuple[str, str], float], dict[str, float], str]:
+    """Score one binary stage's labels via §15.14-A7 sequence-logprob
+    logsumexp over JUDGE_LABEL_VARIANTS.
 
-    Returns (severity, rationale, per_variant_logprobs, per_label_aggregated)
-    under §15.14-A7:
-      - severity: argmax of per-label aggregated logsumexp scores.
-      - rationale: empty string "" (preserved in output schema for
-                   cross-version continuity).
-      - per_variant_logprobs: dict keyed by (label, variant_prefix) →
-                   teacher-forced sequence logprob of the surface
-                   string `variant_prefix + label`. 9 entries total
-                   (3 labels × 3 variants).
-      - per_label_aggregated: dict keyed by label → logsumexp over
-                   per-variant logprobs for that label. 3 entries total.
-                   The argmax of this dict is the returned severity.
+    Args:
+      tokenizer: HF tokenizer for the active judge.
+      model: HF causal-LM for the active judge; assumed already on
+             target_device with model.eval().
+      prompt_ids: pre-rendered, chat-template-wrapped prompt token IDs
+                  on target_device, shape (1, T_prompt). Caller is
+                  responsible for rendering the appropriate stage's
+                  prompt template (Stage 1 or Stage 2) before this call.
+      stage_labels: per-stage binary label set, e.g.,
+                    JUDGE_STAGE1_LABELS = ("N", "Y") or
+                    JUDGE_STAGE2_LABELS = ("M", "S").
 
-    The `label_token_ids` argument is preserved for signature
-    compatibility but is NOT used by §15.14-A7's extraction mechanism;
-    it is recorded in the annotated cache as provenance only.
+    Returns:
+      (per_variant_logprobs, per_label_aggregated, picked_label) where
+        - per_variant_logprobs is a dict keyed by (label, prefix) →
+          teacher-forced sequence logprob; |stage_labels| × |variants|
+          entries.
+        - per_label_aggregated is a dict keyed by label → logsumexp
+          over per-variant logprobs for that label. |stage_labels|
+          entries.
+        - picked_label is argmax(per_label_aggregated) ∈ stage_labels.
     """
     torch = _lazy_import_torch()
-    target_device = next(model.parameters()).device
-    prompt = render_judge_prompt(framing_substr, turn_t_question, turn_t_response)
-
-    # §15.14-A5 inheritance: render through chat template.
-    encoded = tokenizer.apply_chat_template(
-        [{"role": "user", "content": prompt}],
-        add_generation_prompt=True,
-        return_tensors="pt",
-        return_dict=True,
-    )
-    prompt_ids = encoded["input_ids"].to(target_device)
+    target_device = prompt_ids.device
     T_prompt = int(prompt_ids.shape[-1])
 
     per_variant_logprobs: dict[tuple[str, str], float] = {}
-
-    for ch in LABEL_TOKEN_CHARS:
+    for ch in stage_labels:
         for prefix in JUDGE_LABEL_VARIANTS:
             surface = prefix + ch
             v_ids_list = tokenizer.encode(surface, add_special_tokens=False)
-            # Precondition LABEL_TOKEN_ENCODING_EMPTY in _load_judge_model
-            # guarantees len(v_ids_list) >= 1; defensive check below.
             if len(v_ids_list) < 1:
-                # Should not occur given the precondition; skip with
-                # -inf logprob so logsumexp ignores this variant.
                 per_variant_logprobs[(ch, prefix)] = float("-inf")
                 continue
             v_ids = torch.tensor(
@@ -1849,26 +2030,115 @@ def _judge_one_row(
                 out = model(input_ids=full, use_cache=False)
             log_probs = torch.log_softmax(
                 out.logits[0].to(torch.float32), dim=-1,
-            )  # (T, V)
-            # Position p of variant token v_ids[i] is predicted by
-            # log_probs at row (T_prompt + i - 1) over column v_ids[i]:
+            )
             sum_logp = 0.0
             for i, tok in enumerate(v_ids_list):
                 row = T_prompt + i - 1
                 sum_logp += float(log_probs[row, int(tok)].item())
             per_variant_logprobs[(ch, prefix)] = sum_logp
 
-    # Per-label aggregation: logsumexp over per-variant logprobs.
     per_label_aggregated: dict[str, float] = {}
-    for ch in LABEL_TOKEN_CHARS:
+    for ch in stage_labels:
         variant_logps = [per_variant_logprobs[(ch, p)] for p in JUDGE_LABEL_VARIANTS]
         per_label_aggregated[ch] = float(
             torch.logsumexp(torch.tensor(variant_logps, dtype=torch.float32), dim=0)
             .item()
         )
 
-    severity_char = max(LABEL_TOKEN_CHARS, key=lambda c: per_label_aggregated[c])
-    return int(severity_char), "", per_variant_logprobs, per_label_aggregated
+    picked = max(stage_labels, key=lambda c: per_label_aggregated[c])
+    return per_variant_logprobs, per_label_aggregated, picked
+
+
+def _judge_one_row(
+    tokenizer,
+    model,
+    framing_substr: str,
+    turn_t_question: str,
+    turn_t_response: str,
+    *,
+    label_token_ids: dict[str, int],  # provenance only under A8; not used
+) -> tuple[
+    int,                                                  # severity
+    str,                                                  # rationale (empty)
+    dict[str, dict[tuple[str, str], float] | None],       # per-stage variant logprobs
+    dict[str, dict[str, float] | None],                   # per-stage aggregated
+    str,                                                  # stage1_pick: "N" | "Y"
+    str | None,                                           # stage2_pick: "M" | "S" | None
+]:
+    """Run the LLM-judge on one (framing, question, response) triple
+    under §15.14-A8 two-stage binary scoring.
+
+    Returns a 6-tuple:
+      severity                  — int in {0, 1, 2}, derived via
+                                  _map_two_stage(stage1_pick, stage2_pick).
+      rationale                 — empty string "" (preserved in output
+                                  schema for cross-version continuity).
+      per_stage_variant_logprobs — dict {"stage1": {(label, prefix) → logp},
+                                          "stage2": same | None}.
+                                   stage2 is None iff stage1_pick == "N"
+                                   (stage 2 not run).
+      per_stage_aggregated      — dict {"stage1": {label → logsumexp},
+                                         "stage2": same | None}.
+      stage1_pick               — argmax over stage 1 labels in
+                                  JUDGE_STAGE1_LABELS = ("N", "Y").
+      stage2_pick               — argmax over stage 2 labels in
+                                  JUDGE_STAGE2_LABELS = ("M", "S")
+                                  iff stage1_pick == "Y"; else None.
+
+    The `label_token_ids` argument is preserved for signature
+    compatibility but is NOT used by §15.14-A8's extraction mechanism;
+    it is recorded in the annotated cache as provenance only.
+    """
+    target_device = next(model.parameters()).device
+
+    # ---- Stage 1: render Stage 1 prompt; score binary {N, Y}. ----
+    prompt_s1 = render_judge_prompt_stage1(
+        framing_substr, turn_t_question, turn_t_response,
+    )
+    encoded_s1 = tokenizer.apply_chat_template(
+        [{"role": "user", "content": prompt_s1}],
+        add_generation_prompt=True,
+        return_tensors="pt",
+        return_dict=True,
+    )
+    prompt_ids_s1 = encoded_s1["input_ids"].to(target_device)
+    s1_per_variant, s1_per_label, stage1_pick = _score_stage_logprobs(
+        tokenizer, model, prompt_ids_s1, JUDGE_STAGE1_LABELS,
+    )
+
+    # ---- Stage 2 (conditional): only if stage 1 picked Y. ----
+    if stage1_pick == "Y":
+        prompt_s2 = render_judge_prompt_stage2(
+            framing_substr, turn_t_question, turn_t_response,
+        )
+        encoded_s2 = tokenizer.apply_chat_template(
+            [{"role": "user", "content": prompt_s2}],
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True,
+        )
+        prompt_ids_s2 = encoded_s2["input_ids"].to(target_device)
+        s2_per_variant, s2_per_label, stage2_pick_local = _score_stage_logprobs(
+            tokenizer, model, prompt_ids_s2, JUDGE_STAGE2_LABELS,
+        )
+        stage2_pick: str | None = stage2_pick_local
+        per_stage_variant: dict[str, dict[tuple[str, str], float] | None] = {
+            "stage1": s1_per_variant, "stage2": s2_per_variant,
+        }
+        per_stage_aggregated: dict[str, dict[str, float] | None] = {
+            "stage1": s1_per_label, "stage2": s2_per_label,
+        }
+    else:
+        # stage1_pick == "N": stage 2 is logically void; not run.
+        stage2_pick = None
+        per_stage_variant = {"stage1": s1_per_variant, "stage2": None}
+        per_stage_aggregated = {"stage1": s1_per_label, "stage2": None}
+
+    severity = _map_two_stage(stage1_pick, stage2_pick)
+    return (
+        severity, "", per_stage_variant, per_stage_aggregated,
+        stage1_pick, stage2_pick,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1935,7 +2205,8 @@ def run_pass_c_judge(
         for cq, response_text in zip(chain.chain_questions, ext.turn_responses):
             (
                 severity, rationale,
-                per_variant_logprobs, per_label_aggregated,
+                per_stage_variant_logprobs, per_stage_aggregated,
+                stage1_pick, stage2_pick,
             ) = _judge_one_row(
                 tokenizer, model, framing_substr, cq.question, response_text,
                 label_token_ids=label_token_ids,
@@ -1946,13 +2217,18 @@ def run_pass_c_judge(
             severities[(ext.chain_scope, ext.chain_idx, cq.turn_idx)] = {
                 "severity": severity,
                 "judge_rationale": rationale,
-                # §15.14-A7: per-variant logprobs (9 entries:
-                # (label, prefix) → float) replace A4's per-label
-                # logits triple. The per-row argmax operates on
-                # per_label_aggregated (3 entries; logsumexp over
-                # variants), recorded separately for audit.
-                "judge_logits": per_variant_logprobs,
-                "judge_label_aggregated": per_label_aggregated,
+                # §15.14-A8: per-stage per-variant logprobs (12 entries
+                # max: 2 stages × 2 labels × 3 variants; stage 2 entries
+                # are None when stage 1 picked N) replace A7's flat
+                # 9-entry dict. Per-stage aggregated logsumexp scores
+                # (4 entries max: 2 stages × 2 labels; stage 2 entries
+                # None when stage 1 picked N) similarly. The argmax that
+                # produced `severity` operates on per_stage_aggregated
+                # via _map_two_stage(stage1_pick, stage2_pick).
+                "judge_logits": per_stage_variant_logprobs,
+                "judge_label_aggregated": per_stage_aggregated,
+                "judge_stage1_pick": stage1_pick,
+                "judge_stage2_pick": stage2_pick,
                 "turn_t_question": cq.question,
                 "turn_t_response": response_text,
                 "framing_substr": framing_substr,
@@ -2768,6 +3044,10 @@ def write_json_output(
             "judge_prompt_render": audit.judge_prompt_render,
             "judge_label_variants": list(audit.judge_label_variants),
             "judge_label_aggregation": audit.judge_label_aggregation,
+            "judge_stage1_labels": list(audit.judge_stage1_labels),
+            "judge_stage2_labels": list(audit.judge_stage2_labels),
+            "judge_prompt_template_stage1_sha256": audit.judge_prompt_template_stage1_sha256,
+            "judge_prompt_template_stage2_sha256": audit.judge_prompt_template_stage2_sha256,
             "judge_max_tokens": MAX_NEW_TOKENS_JUDGE,
             "judge_model_id": audit.judge_model_id,
             "judge_prompt_sha256": audit.judge_prompt_sha256,
@@ -3039,10 +3319,19 @@ def render_markdown_report(audit: FramingAuditOutputs) -> str:
         f"- **judge_label_variants:** "
         f"`{tuple(audit.judge_label_variants)!r}`\n"
         f"- **judge_label_aggregation:** `{audit.judge_label_aggregation}`\n"
+        f"- **judge_stage1_labels:** `{tuple(audit.judge_stage1_labels)!r}` "
+        f"(§15.14-A8)\n"
+        f"- **judge_stage2_labels:** `{tuple(audit.judge_stage2_labels)!r}` "
+        f"(§15.14-A8)\n"
+        f"- **judge_prompt_template_stage1_sha256:** "
+        f"`{audit.judge_prompt_template_stage1_sha256}`\n"
+        f"- **judge_prompt_template_stage2_sha256:** "
+        f"`{audit.judge_prompt_template_stage2_sha256}`\n"
         f"- **label_token_ids:** "
         f"`{', '.join(f'{ch}→{audit.label_token_ids[ch]}' for ch in LABEL_TOKEN_CHARS)}` "
-        f"(`-1` sentinel = multi-token under active tokenizer; not used by §15.14-A7 extraction)\n"
-        f"- **judge_prompt_sha256:** `{audit.judge_prompt_sha256}`\n"
+        f"(`-1` sentinel = multi-token under active tokenizer; not used by §15.14-A7 / A8 extraction)\n"
+        f"- **judge_prompt_sha256 (3-class; preserved for cross-version provenance, not active under A8):** "
+        f"`{audit.judge_prompt_sha256}`\n"
         f"- **judge temperature:** {DECODE_TEMPERATURE_JUDGE}; "
         f"**max tokens:** {MAX_NEW_TOKENS_JUDGE} "
         f"(unused under §15.14-A4 — no generation; retained for provenance)\n"
@@ -3179,7 +3468,7 @@ def write_markdown_output(
 #   annotated cache (.npz)  carries severities_by_key + κ result
 
 
-_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-A7-annotated"
+_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-A8-annotated"
 
 
 def _save_annotated_cache(
@@ -3192,26 +3481,38 @@ def _save_annotated_cache(
     judge_prompt_render: str,
     judge_label_variants: tuple[str, ...],
     judge_label_aggregation: str,
+    judge_stage1_labels: tuple[str, ...],
+    judge_stage2_labels: tuple[str, ...],
+    judge_prompt_template_stage1_sha256: str,
+    judge_prompt_template_stage2_sha256: str,
     label_token_ids: dict[str, int],
     out_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
 ) -> None:
     """Atomic .npz of severities + κ + provenance for resume by --probe.
 
-    Under §15.14-A7 schema (`15.14-A7-annotated`): the on-disk per-row
-    layout WIDENS from §15.14-A5's (n, 3) single-token logits to
-    (n, |labels| × |variants|) = (n, 9) per-variant sequence-logprobs,
-    plus a new (n, 3) judge_label_aggregated matrix carrying the
-    post-aggregation per-label log-scores (the values the argmax
-    actually consumes). Two new top-level provenance fields:
-    judge_label_variants and judge_label_aggregation. The
-    judge_extraction_method value bumps from
-    "logit_first_token_argmax" (A4 / A5 / A6) to
-    "sequence_logprob_logsumexp_over_variants" (A7).
+    Under §15.14-A8 schema (`15.14-A8-annotated`): the on-disk per-row
+    layout WIDENS from §15.14-A7's (n, 9) single-stage 3-class
+    sequence-logprobs to (n, 12) two-stage binary sequence-logprobs.
+    Pinned column order:
+      [(1, "N", ""), (1, "N", " "), (1, "N", "\n"),
+       (1, "Y", ""), (1, "Y", " "), (1, "Y", "\n"),
+       (2, "M", ""), (2, "M", " "), (2, "M", "\n"),
+       (2, "S", ""), (2, "S", " "), (2, "S", "\n")]
+    Stage-2 cells (columns 6..11) carry NaN for rows where stage 1
+    picked N (stage 2 was not run). The new (n, 4)
+    judge_label_aggregated matrix carries the per-stage logsumexp
+    scores in column order
+      (stage1_N, stage1_Y, stage2_M, stage2_S);
+    stage-2 cells carry NaN for skipped rows. Two new (n,) per-row
+    columns: judge_stage1_pick ∈ {"N","Y"} and judge_stage2_pick ∈
+    {"M","S",""} (empty-string sentinel = stage 2 skipped). Four new
+    top-level provenance fields: judge_prompt_template_stage1_sha256,
+    judge_prompt_template_stage2_sha256, judge_stage1_labels,
+    judge_stage2_labels.
 
-    label_token_ids retains the canonical (n=|labels|) layout for
-    cross-version diff continuity. Multi-token labels (e.g., Mistral)
-    are recorded as -1 sentinel in label_token_ids; the actual
-    extraction operates over sequence logprobs (see _judge_one_row).
+    Severity is the canonical 3-class enum {0, 1, 2} derived via the
+    pinned _map_two_stage(stage1, stage2) mapping; the κ-gate compares
+    this against the unchanged 3-class human labels.
     """
     import numpy as np
 
@@ -3219,7 +3520,6 @@ def _save_annotated_cache(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
 
-    # Encode severities as int8 with -1 sentinel for None.
     severity_vals = np.array(
         [
             (-1 if severities_by_key[k]["severity"] is None
@@ -3229,40 +3529,80 @@ def _save_annotated_cache(
         dtype=np.int8,
     )
 
-    # Per-row judge_logits widens to (n, |labels| × |variants|) = (n, 9)
-    # under §15.14-A7. Column order pinned as
-    # [(label, variant) for label in LABEL_TOKEN_CHARS for variant in
-    # JUDGE_LABEL_VARIANTS]. Each cell carries the teacher-forced
-    # sequence logprob of the surface string `variant + label`.
-    n_labels = len(LABEL_TOKEN_CHARS)
-    n_variants = len(judge_label_variants)
-    n_cols = n_labels * n_variants
-    column_keys = [
-        (ch, prefix)
-        for ch in LABEL_TOKEN_CHARS
-        for prefix in judge_label_variants
-    ]
+    # §15.14-A8 per-row judge_logits: (n, |stages| × |stage_labels| ×
+    # |variants|) = (n, 2 × 2 × 3) = (n, 12). Pinned column order
+    # builds stage1 first (rows 0..5) then stage2 (rows 6..11), each
+    # stage's labels in declaration order × variants in declaration
+    # order. Stage-2 cells receive NaN for rows where stage 1 picked N.
+    column_keys: list[tuple[int, str, str]] = []
+    for ch in judge_stage1_labels:
+        for prefix in judge_label_variants:
+            column_keys.append((1, ch, prefix))
+    for ch in judge_stage2_labels:
+        for prefix in judge_label_variants:
+            column_keys.append((2, ch, prefix))
+
+    def _row_logits(k: tuple[str, int, int]) -> list[float]:
+        rec = severities_by_key[k]
+        s1 = rec["judge_logits"]["stage1"]
+        s2 = rec["judge_logits"]["stage2"]  # may be None
+        out = []
+        for stage, ch, prefix in column_keys:
+            if stage == 1:
+                out.append(float(s1[(ch, prefix)]))
+            else:
+                if s2 is None:
+                    out.append(float("nan"))
+                else:
+                    out.append(float(s2[(ch, prefix)]))
+        return out
+
     logits_matrix = np.array(
-        [
-            [
-                float(severities_by_key[k]["judge_logits"][col_key])
-                for col_key in column_keys
-            ]
-            for k in keys
-        ],
-        dtype=np.float64,
+        [_row_logits(k) for k in keys], dtype=np.float64,
     )
-    # Per-row aggregated per-label logsumexp scores: (n, 3) matrix in
-    # column order LABEL_TOKEN_CHARS.
+
+    # Per-row aggregated logsumexp scores: (n, |stage1_labels| +
+    # |stage2_labels|) = (n, 4). Pinned column order:
+    # (stage1_N, stage1_Y, stage2_M, stage2_S). Stage-2 cells receive
+    # NaN for skipped rows.
+    agg_column_keys: list[tuple[int, str]] = (
+        [(1, ch) for ch in judge_stage1_labels]
+        + [(2, ch) for ch in judge_stage2_labels]
+    )
+
+    def _row_aggregated(k: tuple[str, int, int]) -> list[float]:
+        rec = severities_by_key[k]
+        s1_agg = rec["judge_label_aggregated"]["stage1"]
+        s2_agg = rec["judge_label_aggregated"]["stage2"]  # may be None
+        out = []
+        for stage, ch in agg_column_keys:
+            if stage == 1:
+                out.append(float(s1_agg[ch]))
+            else:
+                if s2_agg is None:
+                    out.append(float("nan"))
+                else:
+                    out.append(float(s2_agg[ch]))
+        return out
+
     aggregated_matrix = np.array(
+        [_row_aggregated(k) for k in keys], dtype=np.float64,
+    )
+
+    # Per-row stage picks. Stage 2 pick uses empty-string sentinel for
+    # skipped rows (when stage 1 picked N).
+    stage1_pick_arr = np.array(
+        [str(severities_by_key[k]["judge_stage1_pick"]) for k in keys],
+        dtype=object,
+    )
+    stage2_pick_arr = np.array(
         [
-            [
-                float(severities_by_key[k]["judge_label_aggregated"][ch])
-                for ch in LABEL_TOKEN_CHARS
-            ]
+            str(severities_by_key[k]["judge_stage2_pick"])
+            if severities_by_key[k]["judge_stage2_pick"] is not None
+            else ""
             for k in keys
         ],
-        dtype=np.float64,
+        dtype=object,
     )
 
     np.savez_compressed(
@@ -3278,6 +3618,8 @@ def _save_annotated_cache(
         ),
         judge_logits=logits_matrix,
         judge_label_aggregated=aggregated_matrix,
+        judge_stage1_pick=stage1_pick_arr,
+        judge_stage2_pick=stage2_pick_arr,
         annotation_failure_rate=np.array([annotation_failure_rate], dtype=np.float64),
         calibration_kappa=np.array([calibration_kappa], dtype=np.float64),
         judge_model_id=np.array([judge_model_id], dtype=object),
@@ -3286,6 +3628,14 @@ def _save_annotated_cache(
         judge_prompt_render=np.array([judge_prompt_render], dtype=object),
         judge_label_variants=np.array(list(judge_label_variants), dtype=object),
         judge_label_aggregation=np.array([judge_label_aggregation], dtype=object),
+        judge_stage1_labels=np.array(list(judge_stage1_labels), dtype=object),
+        judge_stage2_labels=np.array(list(judge_stage2_labels), dtype=object),
+        judge_prompt_template_stage1_sha256=np.array(
+            [judge_prompt_template_stage1_sha256], dtype=object,
+        ),
+        judge_prompt_template_stage2_sha256=np.array(
+            [judge_prompt_template_stage2_sha256], dtype=object,
+        ),
         label_token_chars=np.array(list(LABEL_TOKEN_CHARS), dtype=object),
         label_token_ids=np.array(
             [int(label_token_ids[ch]) for ch in LABEL_TOKEN_CHARS],
@@ -3299,9 +3649,11 @@ def _load_annotated_cache(
     in_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
 ) -> tuple[
     dict[tuple[str, int, int], dict], float, float, str, bool,
-    str, str, tuple[str, ...], str, dict[str, int],
+    str, str, tuple[str, ...], str,
+    tuple[str, ...], tuple[str, ...], str, str,
+    dict[str, int],
 ]:
-    """Reload severities + κ + provenance for --probe (§15.14-A7 schema)."""
+    """Reload severities + κ + provenance for --probe (§15.14-A8 schema)."""
     import numpy as np
 
     if not in_path.exists():
@@ -3317,29 +3669,68 @@ def _load_annotated_cache(
     judge_label_variants = tuple(
         str(v) for v in data["judge_label_variants"]
     )
-    n_labels = len(LABEL_TOKEN_CHARS)
-    n_variants = len(judge_label_variants)
-    column_keys = [
-        (ch, prefix)
-        for ch in LABEL_TOKEN_CHARS
-        for prefix in judge_label_variants
-    ]
+    judge_stage1_labels = tuple(
+        str(v) for v in data["judge_stage1_labels"]
+    )
+    judge_stage2_labels = tuple(
+        str(v) for v in data["judge_stage2_labels"]
+    )
+
+    # Reconstruct the pinned column key order under §15.14-A8:
+    # stage 1 labels × variants first, then stage 2 labels × variants.
+    column_keys: list[tuple[int, str, str]] = []
+    for ch in judge_stage1_labels:
+        for prefix in judge_label_variants:
+            column_keys.append((1, ch, prefix))
+    for ch in judge_stage2_labels:
+        for prefix in judge_label_variants:
+            column_keys.append((2, ch, prefix))
+    agg_column_keys: list[tuple[int, str]] = (
+        [(1, ch) for ch in judge_stage1_labels]
+        + [(2, ch) for ch in judge_stage2_labels]
+    )
 
     severities_by_key: dict[tuple[str, int, int], dict] = {}
     n = len(data["chain_scope"])
     logits_matrix = data["judge_logits"]
     aggregated_matrix = data["judge_label_aggregated"]
+    stage1_pick_arr = data["judge_stage1_pick"]
+    stage2_pick_arr = data["judge_stage2_pick"]
+    import math
     for i in range(n):
         sev_int = int(data["severity"][i])
         sev = None if sev_int == -1 else sev_int
-        per_variant_logprobs = {
-            col_key: float(logits_matrix[i, j])
-            for j, col_key in enumerate(column_keys)
-        }
-        per_label_aggregated = {
-            ch: float(aggregated_matrix[i, j])
-            for j, ch in enumerate(LABEL_TOKEN_CHARS)
-        }
+
+        s1_per_variant: dict[tuple[str, str], float] = {}
+        s2_per_variant: dict[tuple[str, str], float] = {}
+        for j, (stage, ch, prefix) in enumerate(column_keys):
+            v = float(logits_matrix[i, j])
+            if stage == 1:
+                s1_per_variant[(ch, prefix)] = v
+            else:
+                s2_per_variant[(ch, prefix)] = v
+        s1_aggregated: dict[str, float] = {}
+        s2_aggregated: dict[str, float] = {}
+        for j, (stage, ch) in enumerate(agg_column_keys):
+            v = float(aggregated_matrix[i, j])
+            if stage == 1:
+                s1_aggregated[ch] = v
+            else:
+                s2_aggregated[ch] = v
+
+        stage1_pick = str(stage1_pick_arr[i])
+        stage2_pick_raw = str(stage2_pick_arr[i])
+        stage2_pick: str | None = stage2_pick_raw if stage2_pick_raw else None
+        # If stage 2 was skipped (stage1=N), the on-disk stage-2 cells
+        # are NaN; surface as None in the in-memory dict (consistent
+        # with the writer's inverse mapping).
+        if stage2_pick is None:
+            s2_per_variant_out: dict[tuple[str, str], float] | None = None
+            s2_aggregated_out: dict[str, float] | None = None
+        else:
+            s2_per_variant_out = s2_per_variant
+            s2_aggregated_out = s2_aggregated
+
         severities_by_key[(
             str(data["chain_scope"][i]),
             int(data["chain_idx"][i]),
@@ -3347,8 +3738,16 @@ def _load_annotated_cache(
         )] = {
             "severity": sev,
             "judge_rationale": str(data["judge_rationale"][i]) or None,
-            "judge_logits": per_variant_logprobs,
-            "judge_label_aggregated": per_label_aggregated,
+            "judge_logits": {
+                "stage1": s1_per_variant,
+                "stage2": s2_per_variant_out,
+            },
+            "judge_label_aggregated": {
+                "stage1": s1_aggregated,
+                "stage2": s2_aggregated_out,
+            },
+            "judge_stage1_pick": stage1_pick,
+            "judge_stage2_pick": stage2_pick,
             "turn_t_question": "",  # not reloaded; carried by stimulus payload
             "turn_t_response": "",
             "framing_substr": "",
@@ -3363,6 +3762,12 @@ def _load_annotated_cache(
     }
     judge_prompt_render = str(data["judge_prompt_render"][0])
     judge_label_aggregation = str(data["judge_label_aggregation"][0])
+    judge_prompt_template_stage1_sha256 = str(
+        data["judge_prompt_template_stage1_sha256"][0]
+    )
+    judge_prompt_template_stage2_sha256 = str(
+        data["judge_prompt_template_stage2_sha256"][0]
+    )
 
     return (
         severities_by_key,
@@ -3374,6 +3779,10 @@ def _load_annotated_cache(
         judge_prompt_render,
         judge_label_variants,
         judge_label_aggregation,
+        judge_stage1_labels,
+        judge_stage2_labels,
+        judge_prompt_template_stage1_sha256,
+        judge_prompt_template_stage2_sha256,
         label_token_ids,
     )
 
@@ -3435,9 +3844,11 @@ def _run_annotate(
     force_fallback_judge: bool,
 ) -> tuple[
     dict, str, dict, dict, str, bool, float, float,
-    str, str, tuple[str, ...], str, dict[str, int],
+    str, str, tuple[str, ...], str,
+    tuple[str, ...], tuple[str, ...], str, str,
+    dict[str, int],
 ]:
-    """Pass C + Pass D: judge severities, κ gate, save annotated cache (§15.14-A7)."""
+    """Pass C + Pass D: judge severities, κ gate, save annotated cache (§15.14-A8)."""
     print("[annotate] re-validating stimulus + labels (lock pin) ...")
     payload, stim_sha = _validate_stimulus_json(stimulus_path)
     labels_payload, labels_sha, labels_by_key = _validate_calibration_labels_json(
@@ -3490,6 +3901,9 @@ def _run_annotate(
         judge_id_used, fallback_flag,
         JUDGE_EXTRACTION_METHOD, JUDGE_PROMPT_RENDER,
         JUDGE_LABEL_VARIANTS, JUDGE_LABEL_AGGREGATION,
+        JUDGE_STAGE1_LABELS, JUDGE_STAGE2_LABELS,
+        judge_prompt_template_stage1_sha256(),
+        judge_prompt_template_stage2_sha256(),
         label_token_ids,
         annotated_cache_path,
     )
@@ -3499,6 +3913,9 @@ def _run_annotate(
         failure_rate, kappa,
         JUDGE_EXTRACTION_METHOD, JUDGE_PROMPT_RENDER,
         JUDGE_LABEL_VARIANTS, JUDGE_LABEL_AGGREGATION,
+        JUDGE_STAGE1_LABELS, JUDGE_STAGE2_LABELS,
+        judge_prompt_template_stage1_sha256(),
+        judge_prompt_template_stage2_sha256(),
         label_token_ids,
     )
 
@@ -3525,6 +3942,9 @@ def _run_probe(
         judge_id_used, fallback_flag,
         judge_extraction_method, judge_prompt_render,
         judge_label_variants, judge_label_aggregation,
+        judge_stage1_labels, judge_stage2_labels,
+        judge_prompt_template_stage1_sha256_loaded,
+        judge_prompt_template_stage2_sha256_loaded,
         label_token_ids,
     ) = _load_annotated_cache(annotated_cache_path)
 
@@ -3541,10 +3961,14 @@ def _run_probe(
         judge_model_id=judge_id_used,
         judge_fallback_used=fallback_flag,
         judge_prompt_sha256=judge_prompt_sha256(),
+        judge_prompt_template_stage1_sha256=judge_prompt_template_stage1_sha256_loaded,
+        judge_prompt_template_stage2_sha256=judge_prompt_template_stage2_sha256_loaded,
         judge_extraction_method=judge_extraction_method,
         judge_prompt_render=judge_prompt_render,
         judge_label_variants=judge_label_variants,
         judge_label_aggregation=judge_label_aggregation,
+        judge_stage1_labels=judge_stage1_labels,
+        judge_stage2_labels=judge_stage2_labels,
         label_token_ids=label_token_ids,
         calibration_kappa=kappa,
         annotation_failure_rate=failure_rate,

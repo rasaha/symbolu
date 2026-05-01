@@ -2558,13 +2558,33 @@ mechanism.
 
 ### §15.14-A8 — rubric-redesign diagnostic: two-stage binary judging (replaces direct 3-class scoring)
 
-**Status:** PROPOSED. The status field will flip to EFFECTIVE only
-after the user replies with the literal phrase
-`Sign off §15.14-A8. Push the EFFECTIVE follow-up.` and a separate
-EFFECTIVE follow-up commit is pushed that flips this status field
-and applies the implementation surface enumerated below. This
-two-phase discipline mirrors §15.14-A1 / A2 / A3 / A4 / A5 / A6 /
-A7.
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/diagnose-framing-kappa-L6dmt`).
+Sign-off correspondence used the literal phrase
+`Sign off §15.14-A8. Push the EFFECTIVE follow-up.` and explicitly
+bounded the EFFECTIVE scope to: A8 is a rubric-redesign
+diagnostic, NOT a repair or reinterpretation of §15.14-A7; use
+two-stage judging (Stage 1 N/Y, Stage 2 conditional M/S) with the
+pinned mapping (N → 0, Y+M → 1, Y+S → 2); inherit §15.14-A5
+chat-template render; inherit §15.14-A7 sequence-logprob logsumexp
+scoring with `JUDGE_LABEL_VARIANTS = ("", " ", "\n")` and
+`JUDGE_LABEL_AGGREGATION = "logsumexp"`; keep §15.14-A6 Mistral-7B
+fallback; keep locked human labels and locked stimulus; keep
+κ-gate at `0.6 inclusive`; keep cascade / firewall / sign
+direction / all AUC thresholds unchanged; do NOT change
+`KAPPA_GATE_THRESHOLD`, `BINARY_LABEL_THRESHOLD`,
+`DIRECTION_GATE_THRESHOLD`, `PARTIAL_AUC_THRESHOLD`,
+`STRONG_AUC_THRESHOLD`, cascade structure, firewall patterns,
+stimulus SHA, calibration labels SHA, prior v1 / v2 / v3 / v4 /
+v6 / v7 outcome records, or Mixtral / 70B / quantization status.
+Apply only the implementation surface listed in the PROPOSED
+block: stage prompt constants, stage-label constants, two-stage
+mapping helper, rewritten `_judge_one_row`, cache schema bump to
+`15.14-A8-annotated`, widened audit fields, JSON / MD provenance
+updates. After the EFFECTIVE flip, no automatic run; the RunPod
+execution is a separate user authorization recorded after the
+implementation summary is shown.
 
 **Frame.** §15.14-A8 is a **rubric-redesign diagnostic, NOT a
 repair of §15.14-A7.** §15.14-A7 (tokenizer-agnostic

@@ -74,120 +74,59 @@ def _save_diagnostic_annotated_cache(
     calibration_kappa: float,
     judge_model_id: str,
     judge_fallback_used: bool,
-    judge_extraction_method: str,
-    judge_prompt_render: str,
-    judge_label_variants: tuple[str, ...],
-    judge_label_aggregation: str,
     label_token_ids: dict[str, int],
     out_path: Path,
 ) -> None:
-    """Atomic .npz parallel to `_save_annotated_cache` BUT marked
-    `diagnostic_only=True` so the artifact is unambiguously not an
-    artifact-of-record. Schema mirrors the canonical
-    `_ANNOTATED_CACHE_SCHEMA_VERSION` (post-§15.14-A7 EFFECTIVE:
-    `15.14-A7-annotated`) so that `scripts/diagnose_a4_kappa.py` and the
-    canonical `_load_annotated_cache` can both read it without
-    modification. The `diagnostic_only=True` marker plus the
-    `diagnostic_provenance` string remain the audit-trail signature
-    that this is NOT an artifact-of-record.
+    """Atomic diagnostic .npz that DELEGATES the cache layout to the
+    canonical `P._save_annotated_cache(...)` (post-§15.14-A8 EFFECTIVE:
+    `15.14-A8-annotated`) and writes a sidecar `<out_path>.diagnostic_only.txt`
+    file whose presence is the audit-trail signature that the cache is
+    NOT an artifact-of-record.
 
-    Per-row layout under §15.14-A7:
-      - `judge_logits`: (n, |labels| × |variants|) = (n, 9) float64
-        matrix in column order
-        [(label, variant) for label in LABEL_TOKEN_CHARS
-                          for variant in judge_label_variants].
-      - `judge_label_aggregated`: (n, 3) float64 matrix in column
-        order LABEL_TOKEN_CHARS, carrying the per-label logsumexp
-        scores that drive the argmax.
+    Delegating to the canonical writer (rather than mirroring its
+    layout inline) keeps the rescue script automatically in sync with
+    whatever the canonical schema is at the time the script is
+    invoked. Pre-A8 caches are no longer producible by this script
+    (pre-A8 code paths are reached only by checking out an earlier
+    commit).
     """
-    import numpy as np  # local import to mirror probe module's lazy style
-
-    keys = list(severities_by_key.keys())
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = out_path.with_name(out_path.stem + ".tmp" + out_path.suffix)
 
-    severity_vals = np.array(
-        [
-            (-1 if severities_by_key[k]["severity"] is None
-             else int(severities_by_key[k]["severity"]))
-            for k in keys
-        ],
-        dtype=np.int8,
-    )
-    column_keys = [
-        (ch, prefix)
-        for ch in P.LABEL_TOKEN_CHARS
-        for prefix in judge_label_variants
-    ]
-    logits_matrix = np.array(
-        [
-            [
-                float(severities_by_key[k]["judge_logits"][col_key])
-                for col_key in column_keys
-            ]
-            for k in keys
-        ],
-        dtype=np.float64,
-    )
-    aggregated_matrix = np.array(
-        [
-            [
-                float(severities_by_key[k]["judge_label_aggregated"][ch])
-                for ch in P.LABEL_TOKEN_CHARS
-            ]
-            for k in keys
-        ],
-        dtype=np.float64,
+    # Delegate the .npz layout to the canonical writer. All A4 / A5 /
+    # A6 / A7 / A8 provenance fields are read from the active
+    # probe_framing_15_14 module's pinned constants — so the rescue
+    # always writes whatever schema the active code path produces.
+    P._save_annotated_cache(
+        severities_by_key=severities_by_key,
+        annotation_failure_rate=annotation_failure_rate,
+        calibration_kappa=calibration_kappa,
+        judge_model_id=judge_model_id,
+        judge_fallback_used=judge_fallback_used,
+        judge_extraction_method=P.JUDGE_EXTRACTION_METHOD,
+        judge_prompt_render=P.JUDGE_PROMPT_RENDER,
+        judge_label_variants=P.JUDGE_LABEL_VARIANTS,
+        judge_label_aggregation=P.JUDGE_LABEL_AGGREGATION,
+        judge_stage1_labels=P.JUDGE_STAGE1_LABELS,
+        judge_stage2_labels=P.JUDGE_STAGE2_LABELS,
+        judge_prompt_template_stage1_sha256=P.judge_prompt_template_stage1_sha256(),
+        judge_prompt_template_stage2_sha256=P.judge_prompt_template_stage2_sha256(),
+        label_token_ids=label_token_ids,
+        out_path=out_path,
     )
 
-    np.savez_compressed(
-        tmp_path,
-        # Mirror the canonical schema version constant so this diagnostic
-        # cache is loadable by both `scripts/diagnose_a4_kappa.py` and
-        # `scripts/probe_framing_15_14.py::_load_annotated_cache` without
-        # modification. The `diagnostic_only=True` marker below is the
-        # audit-trail signature that this is NOT an artifact-of-record.
-        schema_version=np.array([P._ANNOTATED_CACHE_SCHEMA_VERSION], dtype=object),
-        chain_scope=np.array([k[0] for k in keys], dtype=object),
-        chain_idx=np.array([k[1] for k in keys], dtype=np.int64),
-        turn_idx=np.array([k[2] for k in keys], dtype=np.int64),
-        severity=severity_vals,
-        judge_rationale=np.array(
-            [severities_by_key[k]["judge_rationale"] or "" for k in keys],
-            dtype=object,
-        ),
-        judge_logits=logits_matrix,
-        judge_label_aggregated=aggregated_matrix,
-        annotation_failure_rate=np.array([annotation_failure_rate], dtype=np.float64),
-        calibration_kappa=np.array([calibration_kappa], dtype=np.float64),
-        judge_model_id=np.array([judge_model_id], dtype=object),
-        judge_fallback_used=np.array([bool(judge_fallback_used)], dtype=bool),
-        judge_extraction_method=np.array([judge_extraction_method], dtype=object),
-        judge_prompt_render=np.array([judge_prompt_render], dtype=object),
-        judge_label_variants=np.array(list(judge_label_variants), dtype=object),
-        judge_label_aggregation=np.array([judge_label_aggregation], dtype=object),
-        label_token_chars=np.array(list(P.LABEL_TOKEN_CHARS), dtype=object),
-        label_token_ids=np.array(
-            [int(label_token_ids[ch]) for ch in P.LABEL_TOKEN_CHARS],
-            dtype=np.int64,
-        ),
-        # ---- diagnostic-only markers (NOT in the canonical schema) ----
-        diagnostic_only=np.array([True], dtype=bool),
-        diagnostic_provenance=np.array(
-            [
-                "Produced by scripts/save_a4_annotated_cache.py to recover "
-                "per-row judge outputs lost when the κ-gate fires upstream "
-                "of the canonical _save_annotated_cache writer. NOT an "
-                "artifact-of-record. Operates under whichever code path is "
-                "currently active in scripts/probe_framing_15_14.py "
-                "(post-§15.14-A7 EFFECTIVE: sequence-logprob extraction). "
-                "Prior §15.14 ANNOTATION_FAILED closures are preserved "
-                "unchanged."
-            ],
-            dtype=object,
-        ),
+    # Write the diagnostic-only sidecar file.
+    sidecar = out_path.with_suffix(out_path.suffix + ".diagnostic_only.txt")
+    sidecar.write_text(
+        "diagnostic_only=True\n"
+        "Produced by scripts/save_a4_annotated_cache.py to recover\n"
+        "per-row judge outputs lost when the κ-gate fires upstream of\n"
+        "the canonical _save_annotated_cache writer. NOT an\n"
+        "artifact-of-record. Operates under whichever code path is\n"
+        "currently active in scripts/probe_framing_15_14.py\n"
+        "(post-§15.14-A8 EFFECTIVE: two-stage sequence-logprob\n"
+        "extraction). Prior §15.14 ANNOTATION_FAILED closures are\n"
+        "preserved unchanged.\n"
     )
-    tmp_path.replace(out_path)
 
 
 def _three_class_kappa(j: list[int], h: list[int]) -> float:
@@ -449,10 +388,6 @@ def main(argv: list[str] | None = None) -> int:
         calibration_kappa=kappa,
         judge_model_id=judge_id_used,
         judge_fallback_used=used_fallback,
-        judge_extraction_method=P.JUDGE_EXTRACTION_METHOD,
-        judge_prompt_render=P.JUDGE_PROMPT_RENDER,
-        judge_label_variants=P.JUDGE_LABEL_VARIANTS,
-        judge_label_aggregation=P.JUDGE_LABEL_AGGREGATION,
         label_token_ids=label_token_ids,
         out_path=out_path,
     )
