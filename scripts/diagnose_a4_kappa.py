@@ -36,8 +36,9 @@ Usage:
     python3 scripts/diagnose_a4_kappa.py
     python3 scripts/diagnose_a4_kappa.py --tokenizer-only
     python3 scripts/diagnose_a4_kappa.py \
-        --annotated-cache-path docs/experiments/framing_15_14_annotated.npz \
-        --labels-path docs/experiments/sticky_framing_15_14_calibration_labels.json
+        --annotated-cache docs/experiments/framing_15_14_annotated.npz \
+        --labels-json    docs/experiments/sticky_framing_15_14_calibration_labels.json \
+        --tokenizer-id   meta-llama/Llama-3.1-8B-Instruct
 """
 
 from __future__ import annotations
@@ -90,19 +91,27 @@ def _five_number_summary(arr: np.ndarray) -> dict[str, float]:
     }
 
 
+_ACCEPTED_ANNOTATED_SCHEMAS = (
+    "15.14-A4-annotated",  # pre-§15.14-A5 (raw-string judge prompt render; (n,3) single-token logits)
+    "15.14-A5-annotated",  # post-§15.14-A5 EFFECTIVE (chat-template render; (n,3) single-token logits)
+    "15.14-A7-annotated",  # post-§15.14-A7 EFFECTIVE (sequence-logprob; (n,9) per-variant + (n,3) per-label aggregated)
+    "15.14-A8-annotated",  # post-§15.14-A8 EFFECTIVE (two-stage seq-logprob; (n,12) per-variant + (n,4) per-stage-aggregated)
+)
+
+
 def _load_annotated_cache(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     data = np.load(path, allow_pickle=True)
     sv = str(data["schema_version"][0])
-    if sv != "15.14-A4-annotated":
+    if sv not in _ACCEPTED_ANNOTATED_SCHEMAS:
         sys.stderr.write(
             f"[diagnose] WARNING: annotated cache schema_version is "
-            f"{sv!r}, expected '15.14-A4-annotated'. Diagnostics may "
-            f"be off; proceeding anyway.\n"
+            f"{sv!r}, expected one of {_ACCEPTED_ANNOTATED_SCHEMAS!r}. "
+            f"Diagnostics may be off; proceeding anyway.\n"
         )
     n = len(data["chain_scope"])
-    return {
+    out: dict[str, Any] = {
         "n":            n,
         "chain_scope":  np.array([str(x) for x in data["chain_scope"]]),
         "chain_idx":    np.array(data["chain_idx"]),
@@ -118,6 +127,18 @@ def _load_annotated_cache(path: Path) -> dict[str, Any] | None:
         "label_token_ids":   [int(x)  for x in data["label_token_ids"]],
         "schema_version":             sv,
     }
+    # §15.14-A7 cache widens judge_logits to (n, 9) and adds a (n, 3)
+    # judge_label_aggregated matrix. Block 5 (margin distribution) needs
+    # a (n, 3) array of per-label scores; pre-A7 caches expose it directly
+    # in `judge_logits`, while A7 exposes it in `judge_label_aggregated`.
+    # Carry both fields through; downstream blocks pick the right one.
+    if "judge_label_aggregated" in data.files:
+        out["judge_label_aggregated"] = np.array(data["judge_label_aggregated"])
+    if "judge_label_variants" in data.files:
+        out["judge_label_variants"] = [str(v) for v in data["judge_label_variants"]]
+    if "judge_label_aggregation" in data.files:
+        out["judge_label_aggregation"] = str(data["judge_label_aggregation"][0])
+    return out
 
 
 def _load_human_labels(path: Path) -> dict[tuple[int, int], int]:
@@ -291,15 +312,73 @@ def _block_4_kappa_binary(j: np.ndarray, h: np.ndarray) -> None:
 
 
 def _block_5_triple_margins(cache: dict[str, Any]) -> None:
-    _print_section("Block 5 — per-row triple-logit margin distribution (H3 PROXY)")
-    print("  NOTE: a true global-top vs {0,1,2}-mass comparison requires the")
-    print("        full vocab logit row at the final position, which the cache")
-    print("        does NOT carry. This block is a within-{0,1,2} margin proxy")
-    print("        only. A definitive H3 verdict requires a partial GPU rerun.")
+    _print_section("Block 5 — per-row decision-margin distribution (H3 PROXY)")
+    print("  NOTE: this block computes margin diagnostics on the per-label")
+    print("        score vector that drives the argmax. Layout depends on")
+    print("        the cache schema:")
+    print("          - A4 / A5 / A6: (n, 3) single-token 3-class logits")
+    print("          - A7:           (n, 3) 3-class logsumexp scores")
+    print("          - A8:           (n, 4) per-stage binary logsumexp scores")
+    print("                            (stage1_N, stage1_Y, stage2_M, stage2_S)")
+    print("        A true global-top vs {label}-mass comparison still requires a")
+    print("        partial GPU rerun and is OUT OF SCOPE for this diagnostic.")
 
-    triples = cache["judge_logits"]  # shape (n, 3)
+    sv = cache.get("schema_version", "")
+    if sv == "15.14-A8-annotated":
+        # §15.14-A8: per-stage binary margins. judge_label_aggregated is
+        # (n, 4) in column order (stage1_N, stage1_Y, stage2_M, stage2_S);
+        # stage 2 cells carry NaN for rows where stage 1 picked N.
+        m = cache.get("judge_label_aggregated")
+        if m is None or m.ndim != 2 or m.shape[1] != 4:
+            print(f"  (unexpected A8 judge_label_aggregated shape: "
+                  f"{None if m is None else m.shape}; skipped)")
+            return
+        print(f"  source: judge_label_aggregated  (per-stage logsumexp; A8 schema {sv!r})")
+        n = m.shape[0]
+        # Stage 1 margin = |Y - N| (both always present)
+        s1_margin = np.abs(m[:, 1] - m[:, 0])
+        # Stage 2 margin = |S - M|, masked to rows where stage 1 picked Y
+        # (i.e., rows where stage 2 entries are not NaN).
+        s2_valid = ~np.isnan(m[:, 2])
+        s2_margin = np.abs(m[s2_valid, 3] - m[s2_valid, 2])
+
+        print()
+        print(f"  stage1 |Y - N| margin  (always-run; n={n}):")
+        s = _five_number_summary(s1_margin)
+        print(f"    min={s['min']:.4f}  p25={s['p25']:.4f}  median={s['p50']:.4f}  "
+              f"p75={s['p75']:.4f}  max={s['max']:.4f}  mean={s['mean']:.4f}")
+        print()
+        print(f"  stage2 |S - M| margin  (conditional on stage1=Y; n={int(s2_valid.sum())}):")
+        if s2_margin.size == 0:
+            print("    (no rows; stage 1 never picked Y)")
+        else:
+            s = _five_number_summary(s2_margin)
+            print(f"    min={s['min']:.4f}  p25={s['p25']:.4f}  median={s['p50']:.4f}  "
+                  f"p75={s['p75']:.4f}  max={s['max']:.4f}  mean={s['mean']:.4f}")
+
+        print()
+        print("  stage1 margin-floor counts (suggestive of indecisive stage 1):")
+        for thr in (0.10, 0.50, 1.00, 2.00):
+            c = int(np.sum(s1_margin < thr))
+            print(f"    rows with |Y-N| < {thr:>5.2f}: {c:>4}/{n}  ({c/n:.2%})")
+        if s2_margin.size > 0:
+            print()
+            print("  stage2 margin-floor counts (conditional on stage1=Y):")
+            n2 = s2_margin.size
+            for thr in (0.10, 0.50, 1.00, 2.00):
+                c = int(np.sum(s2_margin < thr))
+                print(f"    rows with |S-M| < {thr:>5.2f}: {c:>4}/{n2}  ({c/n2:.2%})")
+        return
+
+    # Pre-A8 path: 3-class margin diagnostic on (n, 3) score matrix.
+    if "judge_label_aggregated" in cache:
+        triples = cache["judge_label_aggregated"]
+        print(f"  source: judge_label_aggregated  (per-label logsumexp; A7 schema {sv!r})")
+    else:
+        triples = cache["judge_logits"]
+        print(f"  source: judge_logits  (single-token logits; pre-A7 schema {sv!r})")
     if triples.ndim != 2 or triples.shape[1] != 3:
-        print(f"  (unexpected judge_logits shape: {triples.shape}; skipped)")
+        print(f"  (unexpected per-label score shape: {triples.shape}; skipped)")
         return
     sorted_desc = np.sort(triples, axis=1)[:, ::-1]
     spread     = sorted_desc[:, 0] - sorted_desc[:, 2]   # max - min
@@ -383,12 +462,16 @@ def main(argv: list[str] | None = None) -> int:
         description="§15.14-A4 κ-failure diagnostic (DIAGNOSTIC ONLY)."
     )
     parser.add_argument(
+        "--annotated-cache",
         "--annotated-cache-path",
+        dest="annotated_cache",
         default=str(DEFAULT_ANNOTATED_NPZ_PATH),
         help="Path to §15.14-A4 annotated cache .npz (default: %(default)s).",
     )
     parser.add_argument(
+        "--labels-json",
         "--labels-path",
+        dest="labels_json",
         default=str(DEFAULT_LABELS_JSON_PATH),
         help="Path to calibration labels JSON (default: %(default)s).",
     )
@@ -421,10 +504,10 @@ def main(argv: list[str] | None = None) -> int:
     print("    H5 binary-collapse κ          — block 4")
 
     cache = None if args.tokenizer_only else _load_annotated_cache(
-        Path(args.annotated_cache_path)
+        Path(args.annotated_cache)
     )
     labels_by_key: dict[tuple[int, int], int] = (
-        {} if args.tokenizer_only else _load_human_labels(Path(args.labels_path))
+        {} if args.tokenizer_only else _load_human_labels(Path(args.labels_json))
     )
 
     _print_provenance(cache, labels_by_key)
