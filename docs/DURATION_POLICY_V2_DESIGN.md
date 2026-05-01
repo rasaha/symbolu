@@ -212,6 +212,170 @@ Per-action expiry composes cleanly with the run-level deadline: enough
 expired approvals will eventually trip `DEADLINE_EXCEEDED` anyway, but
 each individual expiry is recorded for forensic clarity.
 <!-- §4 session TTL — coming in batch A2 -->
+## 4. Session TTL (lazy)
+
+### 4.1 Problem
+
+`AgenticLLMWrapper.new_session()` allocates a `session_id` and an
+`AgentMemory`. Nothing reaps either. A long-lived process — a chat
+backend, an evaluator, a benchmark harness — that calls `new_session()`
+on every request grows unbounded until the process restarts. There is no
+"this session went stale" signal, no way for an operator to enforce
+"close inactive sessions after N minutes."
+
+### 4.2 Scope (lazy-only)
+
+v2 does **not** add a session registry or background sweeper. The
+framework currently has neither, and adding them is its own design
+exercise (§7 of the v1 spec, deferred to v2.5). v2 ships:
+
+- two policy fields (idle TTL and absolute / max TTL),
+- one event (`SESSION_EXPIRED`),
+- a **lazy check** at session entry points — `run`, `run_stream`,
+  `run_stream_async`, and (a new) `touch_session()`.
+
+When the agent is invoked on a session that has elapsed its TTL, the
+runtime emits `SESSION_EXPIRED` *immediately* before doing any other
+work, and aborts the call. The caller is expected to allocate a fresh
+session via `new_session()` and retry.
+
+This trades cleanup latency (sessions linger in memory until next access)
+for a zero-infrastructure surface that fits the existing in-process
+single-agent model.
+
+### 4.3 Policy fields
+
+Add to `DurationPolicy`:
+
+```python
+session_idle_ttl_s: Optional[float] = None  # seconds since last access
+session_max_ttl_s:  Optional[float] = None  # seconds since session start
+```
+
+Both default to `None`. Either, both, or neither may be set:
+
+| `idle` | `max` | Behaviour |
+|---|---|---|
+| `None` | `None` | No session expiry (v1 behaviour) |
+| set | `None` | Idle expiry only |
+| `None` | set | Absolute expiry only |
+| set | set | Earliest of the two wins |
+
+`max` is most useful for "no run lasts longer than 24h"; `idle` is most
+useful for "a chat session that hasn't seen a turn in 30 minutes is
+done." Setting both gives the union, which is the safe default for
+operators who want either guarantee.
+
+### 4.4 Event
+
+```python
+SESSION_EXPIRED = "session_expired"   # terminal w.r.t. *this call*
+```
+
+Payload:
+
+```jsonc
+{
+  "session_id": "...",
+  "reason": "idle" | "max" | "both",
+  "idle_elapsed_s": 1834.2,
+  "max_elapsed_s":  3601.5,
+  "session_idle_ttl_s": 1800.0,
+  "session_max_ttl_s":  3600.0
+}
+```
+
+`reason` is `"idle"` if only the idle TTL fired, `"max"` if only the
+absolute TTL fired, `"both"` if the call happened to cross both
+simultaneously. Concrete elapsed values are reported regardless so the
+operator can see "how long past the limit" in either dimension.
+
+### 4.5 Storage / state
+
+The agent already holds the per-session state it needs:
+
+- `_memory.session_id` — exists (v1)
+- `_memory.created_at` (or equivalent) — derive from
+  `MemoryStore` if available; otherwise track a private
+  `_session_started_monotonic: float` set by `new_session()`
+- `_session_last_touched_monotonic: float` — new, updated at the start
+  of every public entry point
+
+Both timestamps are monotonic, consistent with v1's `RunClock`. ISO
+strings on the trace remain wall-clock for observability.
+
+### 4.6 Lifecycle / where the check runs
+
+```
+run / run_stream / run_stream_async / touch_session
+        │
+        ▼
+    [1] check session_idle_ttl_s and session_max_ttl_s
+            │
+            ├── expired ──► emit SESSION_EXPIRED, return early
+            │
+            └── ok       ──► update _session_last_touched_monotonic
+                              continue with normal pipeline
+```
+
+Step [1] runs **before** RUN_STARTED. A session-expired call therefore
+emits exactly one event (`SESSION_EXPIRED`) and nothing else; in
+particular, no `RUN_STARTED`, no `GENERATION_STARTED`, no
+`USAGE_UPDATED`. This is intentional: it lets downstream consumers
+distinguish "the session is dead" from "a run failed."
+
+`new_session()` resets both timestamps and is therefore the canonical
+way to recover from `SESSION_EXPIRED`. A `touch_session()` helper is
+added so external code can keep a session alive without doing real work.
+
+### 4.7 Behaviour after expiry
+
+After `SESSION_EXPIRED`, the agent's internal state (`_memory`,
+`_coherence_state`, `_goal_state`) is **not** discarded automatically.
+The call returns; the operator decides whether to call `new_session()`,
+`reset()`, or to log and discard the agent instance. This mirrors how
+the framework treats `RUN_ERROR` today — the runtime reports the failure
+and the caller owns recovery.
+
+If the caller invokes `run` again on the same expired session without
+calling `new_session()`, they get another `SESSION_EXPIRED`. There is no
+auto-reset.
+
+### 4.8 Trace implications
+
+`AgentRunTrace` does not currently span sessions — it represents a
+single run. A session-expired call still produces a trace, with:
+
+```python
+sessions_expired: int = 0    # 0 or 1 for a single trace
+session_expired_reason: Optional[str] = None
+```
+
+(Most non-zero values will be `1`, but the field is an integer for
+forward-compat with future per-session-event aggregation. `summary`
+includes both fields; `to_dict()` includes them too.)
+
+### 4.9 Backward compatibility
+
+- Both new policy fields default to `None`. Callers who do not set them
+  see zero behavioural change.
+- `new_session()` signature is unchanged; it transparently resets the
+  new monotonic timestamps.
+- `touch_session()` is purely additive.
+- The new `SESSION_EXPIRED` event is additive; existing callers that
+  match on terminal events will not be affected unless they explicitly
+  opt in.
+
+### 4.10 Out of scope (deferred to v2.5)
+
+- A session registry that would let an external sweeper enumerate
+  sessions and expire them proactively.
+- Cross-process session sharing / persistence.
+- Per-session policy overrides (e.g. "this session has TTL 5 minutes,
+  that one has TTL 1 hour"). v2's TTLs come from the per-call
+  `DurationPolicy`, which is enough to express both static and
+  per-request policies; a true per-session override needs the registry
+  that v2.5 will introduce.
 <!-- §5 memory TTL deferral note — coming in batch A3 -->
 <!-- §6 duration metrics — coming in batch A4 -->
 <!-- §7 defaults by tool/risk class — coming in batch A4 (deferral note) -->
