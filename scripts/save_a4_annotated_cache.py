@@ -349,7 +349,7 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print(f"[save-a4] loading extraction cache → {args.extraction_cache} ...")
     extractions = P.load_extractions_cache(
-        Path(args.extraction_cache), expected_stim_sha=stim_sha,
+        Path(args.extraction_cache), expected_stimulus_sha=stim_sha,
     )
     print(f"  loaded {len(extractions)} chains "
           f"(expected {P.N_MAIN_CHAINS + P.N_FRAME_POSITIVE_CHAINS + P.N_CALIBRATION_CHAINS})")
