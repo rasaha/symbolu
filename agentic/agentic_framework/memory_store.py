@@ -25,6 +25,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 
+from agentic.agentic_framework.memory_retention import MemoryRetentionPolicy
+
+
 class EmbeddingModel(Protocol):
     """Protocol for embedding model interface."""
 
@@ -104,6 +107,14 @@ class AgentMemory:
     # Embedding cache for retrieval (turn_id -> embedding)
     embedding_cache: Dict[int, List[float]] = field(default_factory=dict)
 
+    # Operational metadata, populated by MemoryRetentionPolicy (v2.5).
+    # Maps turn_id to the wall-clock UTC datetime that turn was last
+    # returned by any memory read.  Used by ``idle_ttl_s`` cleanup
+    # in ``MemoryStore``.  This is the only mutable field on
+    # AgentMemory: history and TurnSnapshot remain immutable.  Until
+    # M3 wires read/write paths, the dict stays empty in practice.
+    last_accessed_at: Dict[int, datetime] = field(default_factory=dict)
+
     def get_recent_turns(self, n: int = 5) -> List[TurnSnapshot]:
         """Get n most recent turns."""
         return self.history[-n:] if self.history else []
@@ -119,13 +130,27 @@ class AgentMemory:
         return sum(t.quality_score for t in self.history) / len(self.history)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary."""
+        """Serialize to dictionary.
+
+        The ``operational`` key carries metadata that is *not* part of
+        the immutable conversation history (e.g.
+        ``last_accessed_at`` populated by ``MemoryRetentionPolicy``
+        cleanup).  Operators inspecting durable session state should
+        rely on ``history`` for what was said and on ``operational`` for
+        how the runtime has been treating it.
+        """
         return {
             "session_id": self.session_id,
             "created_at": self.created_at.isoformat(),
             "turn_count": len(self.history),
             "window_size": self.window_size,
             "history": [t.to_dict() for t in self.history],
+            "operational": {
+                "last_accessed_at": {
+                    str(turn_id): ts.isoformat()
+                    for turn_id, ts in self.last_accessed_at.items()
+                },
+            },
         }
 
 
@@ -137,15 +162,26 @@ class MemoryStore:
     rather than mutating in place (functional/immutable pattern).
     """
 
-    def __init__(self, embedding_model: Optional[EmbeddingModel] = None):
+    def __init__(
+        self,
+        embedding_model: Optional[EmbeddingModel] = None,
+        memory_retention_policy: Optional[MemoryRetentionPolicy] = None,
+    ):
         """
         Initialize memory store.
 
         Args:
             embedding_model: Optional model for computing embeddings.
-                            If None, falls back to recency-based retrieval.
+                If None, falls back to recency-based retrieval.
+            memory_retention_policy: Optional ``MemoryRetentionPolicy``
+                governing time- and size-based eviction of memory items.
+                ``None`` (the default) preserves the existing append-only
+                + positional-window behaviour.  Cleanup logic is wired
+                into read and write paths in a separate batch (M3); for
+                now this argument is stored but not yet consulted.
         """
         self.embedding_model = embedding_model
+        self.memory_retention_policy = memory_retention_policy
 
     def append_turn(
         self,
@@ -181,13 +217,16 @@ class MemoryStore:
             except Exception:
                 pass  # Embedding computation failed, continue without
 
-        # Return new memory object (immutable pattern)
+        # Return new memory object (immutable pattern).
+        # ``last_accessed_at`` is forwarded as-is for now; M3 will add
+        # an entry for the new turn and prune entries for evicted ones.
         return AgentMemory(
             session_id=memory.session_id,
             created_at=memory.created_at,
             history=new_history,
             window_size=memory.window_size,
             embedding_cache=new_cache,
+            last_accessed_at=dict(memory.last_accessed_at),
         )
 
     def get_relevant_context(
@@ -386,6 +425,7 @@ def create_memory(
         history=[],
         window_size=window_size,
         embedding_cache={},
+        last_accessed_at={},
     )
 
 

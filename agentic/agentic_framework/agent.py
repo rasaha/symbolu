@@ -44,6 +44,7 @@ from agentic.agentic_framework.memory_store import (
     create_memory,
     create_turn_snapshot,
 )
+from agentic.agentic_framework.memory_retention import MemoryRetentionPolicy
 from agentic.agentic_framework.reflective_loop import (
     ReflectiveGenerator,
     QualityCritic,
@@ -205,6 +206,7 @@ class AgenticLLMWrapper:
         use_llm_for_decomposition: bool = True,
         dispatcher: Optional[Any] = None,
         action_type_to_tool: Optional[Dict[str, str]] = None,
+        memory_retention_policy: Optional["MemoryRetentionPolicy"] = None,
     ):
         """
         Initialize agentic wrapper.
@@ -230,13 +232,22 @@ class AgenticLLMWrapper:
                 registered on the dispatcher's gateway. Only action types
                 present in this mapping are routed through the dispatcher;
                 all others fall through to placeholder execution.
+            memory_retention_policy: Optional ``MemoryRetentionPolicy``
+                governing time- and size-based eviction of memory items.
+                ``None`` (default) preserves the existing append-only +
+                positional sliding-window behaviour.  Threaded into the
+                underlying ``MemoryStore``; cleanup logic itself lands
+                in a separate batch (M3).
         """
         # LLM client (black-box)
         self.llm = llm_client
         self.use_llm_for_decomposition = use_llm_for_decomposition
 
         # Components
-        self.memory_store = MemoryStore(embedding_model)
+        self.memory_store = MemoryStore(
+            embedding_model,
+            memory_retention_policy=memory_retention_policy,
+        )
         self.generator = ReflectiveGenerator(
             llm_client=llm_client,
             critic=critic or RuleBasedCritic(),
