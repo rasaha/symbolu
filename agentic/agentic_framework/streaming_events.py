@@ -14,6 +14,7 @@ Event categories:
     Approval (R4):   approval_requested, approval_resolved
     Structured (R6): structured_validation
     Budget (R9):     usage_updated, budget_exceeded
+    Duration:        deadline_exceeded, action_timeout
 """
 
 from __future__ import annotations
@@ -44,6 +45,8 @@ APPROVAL_REQUESTED = "approval_requested"
 APPROVAL_RESOLVED = "approval_resolved"
 USAGE_UPDATED = "usage_updated"
 BUDGET_EXCEEDED = "budget_exceeded"
+DEADLINE_EXCEEDED = "deadline_exceeded"
+ACTION_TIMEOUT = "action_timeout"
 
 
 # ---------------------------------------------------------------------------
