@@ -83,11 +83,22 @@ class DurationPolicy:
             with ``reason="expired"``, and continues to the next action.
             ``None`` (default) preserves v1 behaviour — the controller
             blocks indefinitely.
+        session_idle_ttl_s: Maximum wall-clock seconds since the session
+            was last accessed before it is considered expired.  Checked
+            lazily at every public session entry point (``run``,
+            ``run_stream``, ``run_stream_async``, ``touch_session``).
+            ``None`` (default) disables idle expiry.
+        session_max_ttl_s: Maximum wall-clock seconds since the session
+            was created (``new_session()``).  Checked at the same sites
+            as ``session_idle_ttl_s``; the earliest of the two wins when
+            both are set.  ``None`` (default) disables absolute expiry.
     """
 
     max_run_duration_s: Optional[float] = None
     max_action_duration_s: Optional[float] = None
     approval_ttl_s: Optional[float] = None
+    session_idle_ttl_s: Optional[float] = None
+    session_max_ttl_s: Optional[float] = None
 
     def run_exceeded(self, elapsed_s: float) -> Optional[str]:
         """Return a human-readable reason if the run-level deadline is
@@ -131,5 +142,50 @@ class DurationPolicy:
             )
         return None
 
+    def session_exceeded(
+        self,
+        idle_elapsed_s: float,
+        max_elapsed_s: float,
+    ) -> Optional[str]:
+        """Return ``"idle"``, ``"max"``, ``"both"``, or ``None``.
+
+        ``"both"`` means the call straddled both TTLs simultaneously
+        (only possible when both fields are set and both elapsed values
+        exceed their respective caps).
+        """
+        idle_hit = (
+            self.session_idle_ttl_s is not None
+            and idle_elapsed_s > self.session_idle_ttl_s
+        )
+        max_hit = (
+            self.session_max_ttl_s is not None
+            and max_elapsed_s > self.session_max_ttl_s
+        )
+        if idle_hit and max_hit:
+            return "both"
+        if idle_hit:
+            return "idle"
+        if max_hit:
+            return "max"
+        return None
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+class SessionExpiredError(Exception):
+    """Raised by non-streaming entry points when the session has expired.
+
+    The streaming variants (``run_stream`` / ``run_stream_async``) signal
+    expiry by emitting ``SESSION_EXPIRED`` and returning early.  The
+    non-streaming ``run`` and ``touch_session`` entry points have no
+    event channel, so they raise this exception instead.  The ``payload``
+    attribute carries the same fields the streaming event would emit
+    (``session_id``, ``reason``, ``idle_elapsed_s``, ``max_elapsed_s``,
+    ``session_idle_ttl_s``, ``session_max_ttl_s``).
+    """
+
+    def __init__(self, payload: Dict[str, Any]) -> None:
+        self.payload: Dict[str, Any] = payload
+        reason = payload.get("reason", "unknown")
+        super().__init__(f"Session expired (reason={reason})")

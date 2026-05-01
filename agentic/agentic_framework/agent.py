@@ -75,6 +75,7 @@ from agentic.agentic_framework.token_budget import (
 from agentic.agentic_framework.duration_policy import (
     DurationPolicy,
     RunClock,
+    SessionExpiredError,
 )
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
@@ -99,6 +100,7 @@ from agentic.agentic_framework.streaming_events import (
     DEADLINE_EXCEEDED,
     ACTION_TIMEOUT,
     APPROVAL_EXPIRED,
+    SESSION_EXPIRED,
 )
 from agentic.agentic_framework.coherence_tracker import (
     CoherenceState,
@@ -258,6 +260,12 @@ class AgenticLLMWrapper:
         self._coherence_state: Optional[CoherenceState] = None
         self._goal_state: Optional[GoalState] = None
 
+        # Duration v2 (B2) — per-session monotonic timestamps used by
+        # the lazy session-TTL check at every public entry point.
+        # Both ``None`` until ``new_session()`` runs.
+        self._session_started_monotonic: Optional[float] = None
+        self._session_last_touched_monotonic: Optional[float] = None
+
     def new_session(self, session_id: Optional[str] = None) -> str:
         """
         Initialize new session.
@@ -280,9 +288,93 @@ class AgenticLLMWrapper:
         self._goal_state = None
         self.safety_gate.reset()
 
+        # Duration v2 (B2) — reset both monotonic timestamps.  This is
+        # the canonical recovery path after ``SESSION_EXPIRED``.
+        _now = time.monotonic()
+        self._session_started_monotonic = _now
+        self._session_last_touched_monotonic = _now
+
         return session_id
 
-    def run(self, user_input: str) -> AgentResult:
+    # ------------------------------------------------------------------
+    # Duration v2 (B2) — session TTL helpers
+    # ------------------------------------------------------------------
+
+    def _session_ttl_payload(
+        self,
+        duration_policy: Optional[DurationPolicy],
+    ) -> Optional[Dict[str, Any]]:
+        """Return the ``SESSION_EXPIRED`` payload if the session has
+        elapsed its TTL under *duration_policy*, otherwise ``None``.
+
+        ``None`` is returned for any of:
+        - ``duration_policy`` is ``None``
+        - both session-TTL fields on the policy are ``None``
+        - no session has been started yet (timestamps unset)
+        - the elapsed values are within the configured TTLs
+        """
+        if duration_policy is None:
+            return None
+        if (
+            duration_policy.session_idle_ttl_s is None
+            and duration_policy.session_max_ttl_s is None
+        ):
+            return None
+        if (
+            self._session_started_monotonic is None
+            or self._session_last_touched_monotonic is None
+        ):
+            return None
+
+        _now = time.monotonic()
+        idle_elapsed = _now - self._session_last_touched_monotonic
+        max_elapsed = _now - self._session_started_monotonic
+        reason = duration_policy.session_exceeded(idle_elapsed, max_elapsed)
+        if reason is None:
+            return None
+
+        return {
+            "session_id": self._memory.session_id if self._memory else "",
+            "reason": reason,
+            "idle_elapsed_s": idle_elapsed,
+            "max_elapsed_s": max_elapsed,
+            "session_idle_ttl_s": duration_policy.session_idle_ttl_s,
+            "session_max_ttl_s": duration_policy.session_max_ttl_s,
+        }
+
+    def _touch_session_clock(self) -> None:
+        """Update ``_session_last_touched_monotonic`` to *now*.
+
+        Called by every successful (non-expired) entry point so the
+        idle TTL is reset.  No-op if no session has been started.
+        """
+        if self._session_started_monotonic is not None:
+            self._session_last_touched_monotonic = time.monotonic()
+
+    def touch_session(
+        self,
+        duration_policy: Optional[DurationPolicy] = None,
+    ) -> None:
+        """Keep the current session alive.
+
+        If *duration_policy* is supplied and the session has already
+        expired, raises :class:`SessionExpiredError` (consistent with
+        non-streaming entry points).  Otherwise updates the
+        last-touched timestamp.
+
+        Calling without a policy never raises and always extends the
+        session — the operator is asserting the session is alive.
+        """
+        payload = self._session_ttl_payload(duration_policy)
+        if payload is not None:
+            raise SessionExpiredError(payload)
+        self._touch_session_clock()
+
+    def run(
+        self,
+        user_input: str,
+        duration_policy: Optional[DurationPolicy] = None,
+    ) -> AgentResult:
         """
         Process user input through full agentic pipeline.
 
@@ -297,13 +389,31 @@ class AgenticLLMWrapper:
 
         Args:
             user_input: User's input text
+            duration_policy: Optional ``DurationPolicy``.  In the
+                non-streaming ``run()`` path only the session-TTL fields
+                (``session_idle_ttl_s`` / ``session_max_ttl_s``) are
+                consulted; the run-level deadline, per-action timeout,
+                and approval expiry require an event channel and are
+                only honoured by the streaming variants.  When the
+                session has expired, raises :class:`SessionExpiredError`.
 
         Returns:
             AgentResult with response, metrics, and actions
+
+        Raises:
+            SessionExpiredError: when *duration_policy* is set and the
+                session has elapsed its TTL.  Recover by calling
+                ``new_session()``.
         """
         # Ensure session exists
         if self._memory is None:
             self.new_session()
+
+        # Duration v2 (B2) — lazy session-TTL check before any work.
+        _ttl_payload = self._session_ttl_payload(duration_policy)
+        if _ttl_payload is not None:
+            raise SessionExpiredError(_ttl_payload)
+        self._touch_session_clock()
 
         turn_id = self._memory.get_turn_count()
 
@@ -663,6 +773,25 @@ class AgenticLLMWrapper:
         # Ensure session exists
         if self._memory is None:
             self.new_session()
+
+        # Duration v2 (B2) — lazy session-TTL check.  Emit
+        # SESSION_EXPIRED *before* RUN_STARTED and stop; the call
+        # produces exactly one event with no run lifecycle.  The trace
+        # collector still records the event so downstream consumers
+        # see the expiry in the trace.
+        _ttl_payload = self._session_ttl_payload(duration_policy)
+        if _ttl_payload is not None:
+            _ev = make_event(
+                SESSION_EXPIRED,
+                self._memory.get_turn_count(),
+                self._memory.session_id,
+                _ttl_payload,
+            )
+            if trace_collector is not None:
+                trace_collector.record(_ev)
+            yield _ev
+            return
+        self._touch_session_clock()
 
         turn_id = self._memory.get_turn_count()
         session_id = self._memory.session_id
@@ -1105,6 +1234,23 @@ class AgenticLLMWrapper:
         """
         if self._memory is None:
             self.new_session()
+
+        # Duration v2 (B2) — lazy session-TTL check.  See run_stream()
+        # for the full rationale: emit SESSION_EXPIRED before
+        # RUN_STARTED, record into the trace collector, and stop.
+        _ttl_payload = self._session_ttl_payload(duration_policy)
+        if _ttl_payload is not None:
+            _ev = make_event(
+                SESSION_EXPIRED,
+                self._memory.get_turn_count(),
+                self._memory.session_id,
+                _ttl_payload,
+            )
+            if trace_collector is not None:
+                trace_collector.record(_ev)
+            yield _ev
+            return
+        self._touch_session_clock()
 
         turn_id = self._memory.get_turn_count()
         session_id = self._memory.session_id

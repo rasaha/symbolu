@@ -43,6 +43,7 @@ from agentic.agentic_framework.streaming_events import (
     DEADLINE_EXCEEDED,
     ACTION_TIMEOUT,
     APPROVAL_EXPIRED,
+    SESSION_EXPIRED,
 )
 
 
@@ -103,6 +104,10 @@ class AgentRunTrace:
     time_to_first_action_s: Optional[float] = None
     time_to_first_approval_s: Optional[float] = None
 
+    # --- duration v2: session TTL ---
+    sessions_expired: int = 0
+    session_expired_reason: Optional[str] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a JSON-safe dict."""
         return {
@@ -135,6 +140,8 @@ class AgentRunTrace:
             "max_approval_ttl_s": self.max_approval_ttl_s,
             "time_to_first_action_s": self.time_to_first_action_s,
             "time_to_first_approval_s": self.time_to_first_approval_s,
+            "sessions_expired": self.sessions_expired,
+            "session_expired_reason": self.session_expired_reason,
             "events": [e.to_dict() for e in self.events],
         }
 
@@ -272,6 +279,18 @@ def _build_trace(events: List[AgentRunEvent]) -> AgentRunTrace:
         if ttl is not None:
             trace.max_approval_ttl_s = ttl
             break
+
+    # Duration v2: session TTL
+    expired_session_evts = [
+        e for e in events if e.event_type == SESSION_EXPIRED
+    ]
+    trace.sessions_expired = len(expired_session_evts)
+    if expired_session_evts:
+        trace.session_expired_reason = expired_session_evts[0].payload.get(
+            "reason"
+        )
+        if trace.status == "unknown":
+            trace.status = "session_expired"
 
     # Duration v2: observability metrics — wall-clock deltas from
     # RUN_STARTED to the first ACTION_STARTED / APPROVAL_REQUESTED.
