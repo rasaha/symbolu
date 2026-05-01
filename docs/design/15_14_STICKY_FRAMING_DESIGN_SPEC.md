@@ -1599,12 +1599,27 @@ candidate set.
 
 ### §15.14-A6 — judge-model fallback chain (replace Llama-3.1-8B fallback with Mistral-7B-Instruct-v0.3; family-effect test at 7-8B scale)
 
-**Status:** PROPOSED. The status field will flip to EFFECTIVE only
-after the user replies with the literal phrase
-`Sign off §15.14-A6. Push the EFFECTIVE follow-up.` and a separate
-EFFECTIVE follow-up commit is pushed that flips this status field
-and applies the implementation surface enumerated below. This
-two-phase discipline mirrors §15.14-A1 / A2 / A3 / A4 / A5.
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/diagnose-framing-kappa-L6dmt`).
+Sign-off correspondence used the literal phrase
+`Sign off §15.14-A6. Push the EFFECTIVE follow-up.` and explicitly
+bounded the EFFECTIVE scope to: a non-Llama 7B-class
+**family-control** test (NOT a scale-up test); replace
+`JUDGE_MODEL_ID_FALLBACK` with `mistralai/Mistral-7B-Instruct-v0.3`;
+keep `JUDGE_MODEL_ID_DEFAULT` unchanged; inherit §15.14-A4 logit-
+first-token-argmax mechanics; inherit §15.14-A5 chat-template
+rendering; keep isolated-token argmax over `"0"`, `"1"`, `"2"`;
+keep the locked human labels (SHA `e9776ff2…`) and locked stimulus
+(SHA `e56cfe8c…`); keep the same severity rubric, κ gate (0.6
+inclusive), cascade, firewall, thresholds, and BCVF-faithful sign
+direction; do NOT authorize Mixtral-8x7B; do NOT authorize 70B; do
+NOT authorize quantization; do NOT draft or implement §15.14-A7;
+do NOT modify any §15.14 v1 / v2 / v3 / v4 verdict-of-record. The
+EFFECTIVE scope further bounds the implementation surface to a
+single one-line `JUDGE_MODEL_ID_FALLBACK` constant change in
+`scripts/probe_framing_15_14.py` plus a parallel inline-comment
+update; no other code change.
 
 **Scope.** One pinned constant in `scripts/probe_framing_15_14.py`:
 

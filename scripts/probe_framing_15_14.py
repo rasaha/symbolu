@@ -106,7 +106,7 @@ SCHEMA_VERSION = "15.14"
 # Subject and judge model identifiers (pinned per §15.14-A1 EFFECTIVE state).
 QWEN_MODEL_ID_SUBJECT = "Qwen/Qwen2.5-7B-Instruct"
 JUDGE_MODEL_ID_DEFAULT = "Qwen/Qwen2.5-72B-Instruct"
-JUDGE_MODEL_ID_FALLBACK = "meta-llama/Llama-3.1-8B-Instruct"  # effective under §15.14-A2 (was Qwen/Qwen2.5-7B-Instruct)
+JUDGE_MODEL_ID_FALLBACK = "mistralai/Mistral-7B-Instruct-v0.3"  # effective under §15.14-A6 (was meta-llama/Llama-3.1-8B-Instruct under §15.14-A2; was Qwen/Qwen2.5-7B-Instruct pre-A2)
 
 # Composite benchmark name (single composite per §15.14 spec Chunk 6).
 BENCHMARK_NAME = "sticky_framing_15_14_composite"
