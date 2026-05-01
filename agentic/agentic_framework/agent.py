@@ -24,6 +24,8 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -70,6 +72,11 @@ from agentic.agentic_framework.token_budget import (
     BudgetPolicy,
     UsageStats,
 )
+from agentic.agentic_framework.duration_policy import (
+    DurationPolicy,
+    RunClock,
+    SessionExpiredError,
+)
 from agentic.agentic_framework.streaming_events import (
     AgentRunEvent,
     make_event,
@@ -90,6 +97,10 @@ from agentic.agentic_framework.streaming_events import (
     APPROVAL_RESOLVED,
     USAGE_UPDATED,
     BUDGET_EXCEEDED,
+    DEADLINE_EXCEEDED,
+    ACTION_TIMEOUT,
+    APPROVAL_EXPIRED,
+    SESSION_EXPIRED,
 )
 from agentic.agentic_framework.coherence_tracker import (
     CoherenceState,
@@ -249,6 +260,12 @@ class AgenticLLMWrapper:
         self._coherence_state: Optional[CoherenceState] = None
         self._goal_state: Optional[GoalState] = None
 
+        # Duration v2 (B2) — per-session monotonic timestamps used by
+        # the lazy session-TTL check at every public entry point.
+        # Both ``None`` until ``new_session()`` runs.
+        self._session_started_monotonic: Optional[float] = None
+        self._session_last_touched_monotonic: Optional[float] = None
+
     def new_session(self, session_id: Optional[str] = None) -> str:
         """
         Initialize new session.
@@ -271,9 +288,93 @@ class AgenticLLMWrapper:
         self._goal_state = None
         self.safety_gate.reset()
 
+        # Duration v2 (B2) — reset both monotonic timestamps.  This is
+        # the canonical recovery path after ``SESSION_EXPIRED``.
+        _now = time.monotonic()
+        self._session_started_monotonic = _now
+        self._session_last_touched_monotonic = _now
+
         return session_id
 
-    def run(self, user_input: str) -> AgentResult:
+    # ------------------------------------------------------------------
+    # Duration v2 (B2) — session TTL helpers
+    # ------------------------------------------------------------------
+
+    def _session_ttl_payload(
+        self,
+        duration_policy: Optional[DurationPolicy],
+    ) -> Optional[Dict[str, Any]]:
+        """Return the ``SESSION_EXPIRED`` payload if the session has
+        elapsed its TTL under *duration_policy*, otherwise ``None``.
+
+        ``None`` is returned for any of:
+        - ``duration_policy`` is ``None``
+        - both session-TTL fields on the policy are ``None``
+        - no session has been started yet (timestamps unset)
+        - the elapsed values are within the configured TTLs
+        """
+        if duration_policy is None:
+            return None
+        if (
+            duration_policy.session_idle_ttl_s is None
+            and duration_policy.session_max_ttl_s is None
+        ):
+            return None
+        if (
+            self._session_started_monotonic is None
+            or self._session_last_touched_monotonic is None
+        ):
+            return None
+
+        _now = time.monotonic()
+        idle_elapsed = _now - self._session_last_touched_monotonic
+        max_elapsed = _now - self._session_started_monotonic
+        reason = duration_policy.session_exceeded(idle_elapsed, max_elapsed)
+        if reason is None:
+            return None
+
+        return {
+            "session_id": self._memory.session_id if self._memory else "",
+            "reason": reason,
+            "idle_elapsed_s": idle_elapsed,
+            "max_elapsed_s": max_elapsed,
+            "session_idle_ttl_s": duration_policy.session_idle_ttl_s,
+            "session_max_ttl_s": duration_policy.session_max_ttl_s,
+        }
+
+    def _touch_session_clock(self) -> None:
+        """Update ``_session_last_touched_monotonic`` to *now*.
+
+        Called by every successful (non-expired) entry point so the
+        idle TTL is reset.  No-op if no session has been started.
+        """
+        if self._session_started_monotonic is not None:
+            self._session_last_touched_monotonic = time.monotonic()
+
+    def touch_session(
+        self,
+        duration_policy: Optional[DurationPolicy] = None,
+    ) -> None:
+        """Keep the current session alive.
+
+        If *duration_policy* is supplied and the session has already
+        expired, raises :class:`SessionExpiredError` (consistent with
+        non-streaming entry points).  Otherwise updates the
+        last-touched timestamp.
+
+        Calling without a policy never raises and always extends the
+        session — the operator is asserting the session is alive.
+        """
+        payload = self._session_ttl_payload(duration_policy)
+        if payload is not None:
+            raise SessionExpiredError(payload)
+        self._touch_session_clock()
+
+    def run(
+        self,
+        user_input: str,
+        duration_policy: Optional[DurationPolicy] = None,
+    ) -> AgentResult:
         """
         Process user input through full agentic pipeline.
 
@@ -288,13 +389,31 @@ class AgenticLLMWrapper:
 
         Args:
             user_input: User's input text
+            duration_policy: Optional ``DurationPolicy``.  In the
+                non-streaming ``run()`` path only the session-TTL fields
+                (``session_idle_ttl_s`` / ``session_max_ttl_s``) are
+                consulted; the run-level deadline, per-action timeout,
+                and approval expiry require an event channel and are
+                only honoured by the streaming variants.  When the
+                session has expired, raises :class:`SessionExpiredError`.
 
         Returns:
             AgentResult with response, metrics, and actions
+
+        Raises:
+            SessionExpiredError: when *duration_policy* is set and the
+                session has elapsed its TTL.  Recover by calling
+                ``new_session()``.
         """
         # Ensure session exists
         if self._memory is None:
             self.new_session()
+
+        # Duration v2 (B2) — lazy session-TTL check before any work.
+        _ttl_payload = self._session_ttl_payload(duration_policy)
+        if _ttl_payload is not None:
+            raise SessionExpiredError(_ttl_payload)
+        self._touch_session_clock()
 
         turn_id = self._memory.get_turn_count()
 
@@ -549,7 +668,12 @@ class AgenticLLMWrapper:
                 quality_score = rd.get("quality_score", 0.0)
                 revision_count = rd.get("revision_count", 0)
                 break
-            if evt.event_type in (RUN_ERROR, RUN_CANCELLED, BUDGET_EXCEEDED):
+            if evt.event_type in (
+                RUN_ERROR,
+                RUN_CANCELLED,
+                BUDGET_EXCEEDED,
+                DEADLINE_EXCEEDED,
+            ):
                 raw_text = ""
                 break
 
@@ -614,14 +738,15 @@ class AgenticLLMWrapper:
         trace_collector: Optional[TraceCollector] = None,
         approval_controller: Optional[ApprovalController] = None,
         budget_policy: Optional[BudgetPolicy] = None,
+        duration_policy: Optional[DurationPolicy] = None,
     ) -> Iterator[AgentRunEvent]:
         """
         Streaming variant of :meth:`run`.
 
         Yields ``AgentRunEvent`` instances as the agent progresses
         through its pipeline.  The final event is always
-        ``run_completed``, ``run_cancelled``, ``run_error``, or
-        ``budget_exceeded``.
+        ``run_completed``, ``run_cancelled``, ``run_error``,
+        ``budget_exceeded``, or ``deadline_exceeded``.
 
         Args:
             user_input: User's input text.
@@ -638,15 +763,42 @@ class AgenticLLMWrapper:
                 usage is checked after generation and before each
                 action.  Exceeding the budget emits ``budget_exceeded``
                 and stops the run.
+            duration_policy: Optional wall-clock policy.  When supplied,
+                the run-level deadline is checked at the same sites as
+                ``budget_policy`` and emits ``deadline_exceeded`` on
+                violation; per-action invocation is wrapped with a
+                timeout that emits ``action_timeout`` (non-terminal)
+                when exceeded.
         """
         # Ensure session exists
         if self._memory is None:
             self.new_session()
 
+        # Duration v2 (B2) — lazy session-TTL check.  Emit
+        # SESSION_EXPIRED *before* RUN_STARTED and stop; the call
+        # produces exactly one event with no run lifecycle.  The trace
+        # collector still records the event so downstream consumers
+        # see the expiry in the trace.
+        _ttl_payload = self._session_ttl_payload(duration_policy)
+        if _ttl_payload is not None:
+            _ev = make_event(
+                SESSION_EXPIRED,
+                self._memory.get_turn_count(),
+                self._memory.session_id,
+                _ttl_payload,
+            )
+            if trace_collector is not None:
+                trace_collector.record(_ev)
+            yield _ev
+            return
+        self._touch_session_clock()
+
         turn_id = self._memory.get_turn_count()
         session_id = self._memory.session_id
         token = cancellation_token
         _tc = trace_collector
+        _dp = duration_policy
+        clock = RunClock()
 
         def _evt(event_type: str, payload: dict | None = None) -> AgentRunEvent:
             return make_event(event_type, turn_id, session_id, payload)
@@ -747,6 +899,19 @@ class AgenticLLMWrapper:
                     }))
                     return
 
+            # --- deadline check: after generation ---
+            if _dp is not None:
+                _elapsed = clock.elapsed_s()
+                _exceeded = _dp.run_exceeded(_elapsed)
+                if _exceeded:
+                    yield _emit(_evt(DEADLINE_EXCEEDED, {
+                        "reason": _exceeded,
+                        "elapsed_s": _elapsed,
+                        "max_run_duration_s": _dp.max_run_duration_s,
+                        "phase": "after_generation",
+                    }))
+                    return
+
             # 4. Create turn snapshot
             turn = create_turn_snapshot(
                 turn_id=turn_id,
@@ -827,6 +992,19 @@ class AgenticLLMWrapper:
                             }))
                             return
 
+                    # --- deadline check: before each action ---
+                    if _dp is not None:
+                        _elapsed = clock.elapsed_s()
+                        _exceeded = _dp.run_exceeded(_elapsed)
+                        if _exceeded:
+                            yield _emit(_evt(DEADLINE_EXCEEDED, {
+                                "reason": _exceeded,
+                                "elapsed_s": _elapsed,
+                                "max_run_duration_s": _dp.max_run_duration_s,
+                                "phase": "before_action",
+                            }))
+                            return
+
                     # --- approval gate (R4) ---
                     if _ac and _ac.needs_approval(action.action_type):
                         pending = PendingApproval(
@@ -844,7 +1022,56 @@ class AgenticLLMWrapper:
                             "description": action.description,
                             "reason": pending.reason,
                         }))
-                        response = _ac.request_approval(pending)
+                        _approval_started = time.monotonic()
+                        _approval_expired = False
+                        if (
+                            _dp is not None
+                            and _dp.approval_ttl_s is not None
+                        ):
+                            # Mirrors the per-action timeout pattern: leak
+                            # the runaway thread on expiry; Python cannot
+                            # kill it, but its eventual response cannot
+                            # affect the run because we have already moved
+                            # on past ACTION_COMPLETED.
+                            _ap_pool = concurrent.futures.ThreadPoolExecutor(
+                                max_workers=1,
+                            )
+                            try:
+                                _ap_future = _ap_pool.submit(
+                                    _ac.request_approval, pending,
+                                )
+                                try:
+                                    response = _ap_future.result(
+                                        timeout=_dp.approval_ttl_s,
+                                    )
+                                except concurrent.futures.TimeoutError:
+                                    _approval_expired = True
+                                    response = None
+                            finally:
+                                _ap_pool.shutdown(wait=False)
+                        else:
+                            response = _ac.request_approval(pending)
+                        if _approval_expired:
+                            _ap_elapsed = time.monotonic() - _approval_started
+                            _ap_reason = _dp.approval_exceeded(_ap_elapsed) or (
+                                f"Approval wait exceeded "
+                                f"{_dp.approval_ttl_s}s"
+                            )
+                            yield _emit(_evt(APPROVAL_EXPIRED, {
+                                "action_id": action.action_id,
+                                "action_type": action.action_type,
+                                "elapsed_s": _ap_elapsed,
+                                "approval_ttl_s": _dp.approval_ttl_s,
+                                "reason": _ap_reason,
+                            }))
+                            action.status = "denied"
+                            action.error = "expired"
+                            yield _emit(_evt(ACTION_COMPLETED, {
+                                "action_id": action.action_id,
+                                "status": action.status,
+                                "error": action.error,
+                            }))
+                            continue
                         yield _emit(_evt(APPROVAL_RESOLVED, {
                             "action_id": action.action_id,
                             "action_type": action.action_type,
@@ -867,18 +1094,61 @@ class AgenticLLMWrapper:
                         "description": action.description,
                     }))
 
+                    _action_started = time.monotonic()
+                    _action_timed_out = False
                     try:
                         # NOTE: once _execute_single_action begins, the
                         # action runs to completion.  Cancellation does
                         # NOT preempt an already-started action or MCP
                         # tool handler — it only prevents the *next*
                         # action from starting.
-                        self._execute_single_action(action)
+                        if (
+                            _dp is not None
+                            and _dp.max_action_duration_s is not None
+                        ):
+                            # Python cannot kill a running thread; on
+                            # timeout we abandon it (shutdown(wait=False))
+                            # rather than block until it returns, and
+                            # snapshot ``action.status`` into the
+                            # ACTION_COMPLETED payload before the leaked
+                            # thread can mutate it further.
+                            _pool = concurrent.futures.ThreadPoolExecutor(
+                                max_workers=1,
+                            )
+                            try:
+                                _future = _pool.submit(
+                                    self._execute_single_action, action,
+                                )
+                                try:
+                                    _future.result(
+                                        timeout=_dp.max_action_duration_s,
+                                    )
+                                except concurrent.futures.TimeoutError:
+                                    _action_timed_out = True
+                                    action.status = "timed_out"
+                                    action.error = (
+                                        f"Action exceeded "
+                                        f"{_dp.max_action_duration_s}s"
+                                    )
+                            finally:
+                                _pool.shutdown(wait=False)
+                        else:
+                            self._execute_single_action(action)
                         if action.status == "completed":
                             actions_executed.append(action.description)
                     except Exception as exc:
                         action.status = "failed"
                         action.error = str(exc)
+
+                    if _action_timed_out:
+                        yield _emit(_evt(ACTION_TIMEOUT, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "elapsed_s": time.monotonic() - _action_started,
+                            "max_action_duration_s": (
+                                _dp.max_action_duration_s if _dp else None
+                            ),
+                        }))
 
                     yield _emit(_evt(ACTION_COMPLETED, {
                         "action_id": action.action_id,
@@ -949,6 +1219,7 @@ class AgenticLLMWrapper:
         trace_collector: Optional[TraceCollector] = None,
         approval_controller: Optional[ApprovalController] = None,
         budget_policy: Optional[BudgetPolicy] = None,
+        duration_policy: Optional[DurationPolicy] = None,
     ) -> AsyncIterator[AgentRunEvent]:
         """
         Async streaming variant of :meth:`run_stream`.
@@ -957,16 +1228,36 @@ class AgenticLLMWrapper:
         optional ``CancellationToken`` for cooperative cancellation,
         an optional ``TraceCollector`` for in-memory tracing,
         an optional ``ApprovalController`` for human-in-the-loop
-        approval gating, and an optional ``BudgetPolicy`` for
-        token/cost budget enforcement.
+        approval gating, an optional ``BudgetPolicy`` for token/cost
+        budget enforcement, and an optional ``DurationPolicy`` for
+        wall-clock deadline / per-action timeout enforcement.
         """
         if self._memory is None:
             self.new_session()
+
+        # Duration v2 (B2) — lazy session-TTL check.  See run_stream()
+        # for the full rationale: emit SESSION_EXPIRED before
+        # RUN_STARTED, record into the trace collector, and stop.
+        _ttl_payload = self._session_ttl_payload(duration_policy)
+        if _ttl_payload is not None:
+            _ev = make_event(
+                SESSION_EXPIRED,
+                self._memory.get_turn_count(),
+                self._memory.session_id,
+                _ttl_payload,
+            )
+            if trace_collector is not None:
+                trace_collector.record(_ev)
+            yield _ev
+            return
+        self._touch_session_clock()
 
         turn_id = self._memory.get_turn_count()
         session_id = self._memory.session_id
         token = cancellation_token
         _tc = trace_collector
+        _dp = duration_policy
+        clock = RunClock()
 
         def _evt(event_type: str, payload: dict | None = None) -> AgentRunEvent:
             return make_event(event_type, turn_id, session_id, payload)
@@ -1061,6 +1352,19 @@ class AgenticLLMWrapper:
                     }))
                     return
 
+            # --- deadline check: after generation ---
+            if _dp is not None:
+                _elapsed = clock.elapsed_s()
+                _exceeded = _dp.run_exceeded(_elapsed)
+                if _exceeded:
+                    yield _emit(_evt(DEADLINE_EXCEEDED, {
+                        "reason": _exceeded,
+                        "elapsed_s": _elapsed,
+                        "max_run_duration_s": _dp.max_run_duration_s,
+                        "phase": "after_generation",
+                    }))
+                    return
+
             turn = create_turn_snapshot(
                 turn_id=turn_id,
                 user_input=user_input,
@@ -1135,6 +1439,19 @@ class AgenticLLMWrapper:
                             }))
                             return
 
+                    # --- deadline check: before each action ---
+                    if _dp is not None:
+                        _elapsed = clock.elapsed_s()
+                        _exceeded = _dp.run_exceeded(_elapsed)
+                        if _exceeded:
+                            yield _emit(_evt(DEADLINE_EXCEEDED, {
+                                "reason": _exceeded,
+                                "elapsed_s": _elapsed,
+                                "max_run_duration_s": _dp.max_run_duration_s,
+                                "phase": "before_action",
+                            }))
+                            return
+
                     # --- approval gate (R4) ---
                     if _ac and _ac.needs_approval(action.action_type):
                         pending = PendingApproval(
@@ -1152,9 +1469,47 @@ class AgenticLLMWrapper:
                             "description": action.description,
                             "reason": pending.reason,
                         }))
-                        response = await asyncio.to_thread(
-                            _ac.request_approval, pending,
-                        )
+                        _approval_started = time.monotonic()
+                        _approval_expired = False
+                        if (
+                            _dp is not None
+                            and _dp.approval_ttl_s is not None
+                        ):
+                            try:
+                                response = await asyncio.wait_for(
+                                    asyncio.to_thread(
+                                        _ac.request_approval, pending,
+                                    ),
+                                    timeout=_dp.approval_ttl_s,
+                                )
+                            except asyncio.TimeoutError:
+                                _approval_expired = True
+                                response = None
+                        else:
+                            response = await asyncio.to_thread(
+                                _ac.request_approval, pending,
+                            )
+                        if _approval_expired:
+                            _ap_elapsed = time.monotonic() - _approval_started
+                            _ap_reason = _dp.approval_exceeded(_ap_elapsed) or (
+                                f"Approval wait exceeded "
+                                f"{_dp.approval_ttl_s}s"
+                            )
+                            yield _emit(_evt(APPROVAL_EXPIRED, {
+                                "action_id": action.action_id,
+                                "action_type": action.action_type,
+                                "elapsed_s": _ap_elapsed,
+                                "approval_ttl_s": _dp.approval_ttl_s,
+                                "reason": _ap_reason,
+                            }))
+                            action.status = "denied"
+                            action.error = "expired"
+                            yield _emit(_evt(ACTION_COMPLETED, {
+                                "action_id": action.action_id,
+                                "status": action.status,
+                                "error": action.error,
+                            }))
+                            continue
                         yield _emit(_evt(APPROVAL_RESOLVED, {
                             "action_id": action.action_id,
                             "action_type": action.action_type,
@@ -1177,13 +1532,46 @@ class AgenticLLMWrapper:
                         "description": action.description,
                     }))
 
+                    _action_started = time.monotonic()
+                    _action_timed_out = False
                     try:
-                        await asyncio.to_thread(self._execute_single_action, action)
+                        if (
+                            _dp is not None
+                            and _dp.max_action_duration_s is not None
+                        ):
+                            try:
+                                await asyncio.wait_for(
+                                    asyncio.to_thread(
+                                        self._execute_single_action, action,
+                                    ),
+                                    timeout=_dp.max_action_duration_s,
+                                )
+                            except asyncio.TimeoutError:
+                                _action_timed_out = True
+                                action.status = "timed_out"
+                                action.error = (
+                                    f"Action exceeded "
+                                    f"{_dp.max_action_duration_s}s"
+                                )
+                        else:
+                            await asyncio.to_thread(
+                                self._execute_single_action, action,
+                            )
                         if action.status == "completed":
                             actions_executed.append(action.description)
                     except Exception as exc:
                         action.status = "failed"
                         action.error = str(exc)
+
+                    if _action_timed_out:
+                        yield _emit(_evt(ACTION_TIMEOUT, {
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "elapsed_s": time.monotonic() - _action_started,
+                            "max_action_duration_s": (
+                                _dp.max_action_duration_s if _dp else None
+                            ),
+                        }))
 
                     yield _emit(_evt(ACTION_COMPLETED, {
                         "action_id": action.action_id,

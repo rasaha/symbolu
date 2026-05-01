@@ -33,12 +33,17 @@ from agentic.agentic_framework.streaming_events import (
     RUN_ERROR,
     RUN_CANCELLED,
     SAFETY_GATE_RESULT,
+    ACTION_STARTED,
     ACTION_COMPLETED,
     TEXT_CHUNK,
     APPROVAL_REQUESTED,
     APPROVAL_RESOLVED,
     USAGE_UPDATED,
     BUDGET_EXCEEDED,
+    DEADLINE_EXCEEDED,
+    ACTION_TIMEOUT,
+    APPROVAL_EXPIRED,
+    SESSION_EXPIRED,
 )
 
 
@@ -84,6 +89,25 @@ class AgentRunTrace:
     budget_exceeded: bool = False
     accounting_mode: str = "none"
 
+    # --- duration ---
+    deadline_exceeded: bool = False
+    action_timeouts: int = 0
+    elapsed_s: float = 0.0
+    max_run_duration_s: Optional[float] = None
+    max_action_duration_s: Optional[float] = None
+
+    # --- duration v2: approval expiry ---
+    approvals_expired: int = 0
+    max_approval_ttl_s: Optional[float] = None
+
+    # --- duration v2: observability metrics ---
+    time_to_first_action_s: Optional[float] = None
+    time_to_first_approval_s: Optional[float] = None
+
+    # --- duration v2: session TTL ---
+    sessions_expired: int = 0
+    session_expired_reason: Optional[str] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a JSON-safe dict."""
         return {
@@ -107,6 +131,17 @@ class AgentRunTrace:
             "estimated_cost": self.estimated_cost,
             "budget_exceeded": self.budget_exceeded,
             "accounting_mode": self.accounting_mode,
+            "deadline_exceeded": self.deadline_exceeded,
+            "action_timeouts": self.action_timeouts,
+            "elapsed_s": self.elapsed_s,
+            "max_run_duration_s": self.max_run_duration_s,
+            "max_action_duration_s": self.max_action_duration_s,
+            "approvals_expired": self.approvals_expired,
+            "max_approval_ttl_s": self.max_approval_ttl_s,
+            "time_to_first_action_s": self.time_to_first_action_s,
+            "time_to_first_approval_s": self.time_to_first_approval_s,
+            "sessions_expired": self.sessions_expired,
+            "session_expired_reason": self.session_expired_reason,
             "events": [e.to_dict() for e in self.events],
         }
 
@@ -198,7 +233,105 @@ def _build_trace(events: List[AgentRunEvent]) -> AgentRunTrace:
     if trace.budget_exceeded and trace.status == "unknown":
         trace.status = "budget_exceeded"
 
+    # Duration: deadline / action timeouts
+    deadline_evts = [e for e in events if e.event_type == DEADLINE_EXCEEDED]
+    timeout_evts = [e for e in events if e.event_type == ACTION_TIMEOUT]
+    trace.deadline_exceeded = bool(deadline_evts)
+    trace.action_timeouts = len(timeout_evts)
+
+    # max_run_duration_s — taken from any DEADLINE_EXCEEDED payload that
+    # carries it (the policy is otherwise opaque to the trace).
+    for evt in deadline_evts:
+        mrd = evt.payload.get("max_run_duration_s")
+        if mrd is not None:
+            trace.max_run_duration_s = mrd
+            break
+
+    # max_action_duration_s — taken from any ACTION_TIMEOUT payload.
+    for evt in timeout_evts:
+        mad = evt.payload.get("max_action_duration_s")
+        if mad is not None:
+            trace.max_action_duration_s = mad
+            break
+
+    # elapsed_s — prefer monotonic-precise value from a DEADLINE_EXCEEDED
+    # event when present; otherwise fall back to a wall-clock derivation
+    # from the first/last event ISO timestamps.
+    if deadline_evts:
+        trace.elapsed_s = float(deadline_evts[-1].payload.get("elapsed_s", 0.0))
+    elif trace.started_at and trace.ended_at:
+        try:
+            from datetime import datetime
+            _s = datetime.fromisoformat(trace.started_at)
+            _e = datetime.fromisoformat(trace.ended_at)
+            trace.elapsed_s = (_e - _s).total_seconds()
+        except (ValueError, TypeError):
+            trace.elapsed_s = 0.0
+
+    if trace.deadline_exceeded and trace.status == "unknown":
+        trace.status = "deadline_exceeded"
+
+    # Duration v2: approval expiry
+    expired_evts = [e for e in events if e.event_type == APPROVAL_EXPIRED]
+    trace.approvals_expired = len(expired_evts)
+    for evt in expired_evts:
+        ttl = evt.payload.get("approval_ttl_s")
+        if ttl is not None:
+            trace.max_approval_ttl_s = ttl
+            break
+
+    # Duration v2: session TTL
+    expired_session_evts = [
+        e for e in events if e.event_type == SESSION_EXPIRED
+    ]
+    trace.sessions_expired = len(expired_session_evts)
+    if expired_session_evts:
+        trace.session_expired_reason = expired_session_evts[0].payload.get(
+            "reason"
+        )
+        if trace.status == "unknown":
+            trace.status = "session_expired"
+
+    # Duration v2: observability metrics — wall-clock deltas from
+    # RUN_STARTED to the first ACTION_STARTED / APPROVAL_REQUESTED.
+    # Returns None when either anchor is missing. Negative values
+    # (malformed event ordering) are clamped to 0.0 rather than swallowed
+    # so the field still surfaces in dashboards; the caller can spot the
+    # clamp by comparing event timestamps directly.
+    trace.time_to_first_action_s = _first_event_delta_s(
+        events, RUN_STARTED, ACTION_STARTED,
+    )
+    trace.time_to_first_approval_s = _first_event_delta_s(
+        events, RUN_STARTED, APPROVAL_REQUESTED,
+    )
+
     return trace
+
+
+def _first_event_delta_s(
+    events: List[AgentRunEvent],
+    anchor_type: str,
+    target_type: str,
+) -> Optional[float]:
+    """Return seconds from the first ``anchor_type`` event to the first
+    ``target_type`` event, or ``None`` if either is absent.
+
+    Negative deltas (target stamped before anchor — possible only via
+    malformed event ordering) are clamped to 0.0. Unparseable ISO
+    timestamps return ``None``.
+    """
+    anchor = next((e for e in events if e.event_type == anchor_type), None)
+    target = next((e for e in events if e.event_type == target_type), None)
+    if anchor is None or target is None:
+        return None
+    try:
+        from datetime import datetime
+        a = datetime.fromisoformat(anchor.timestamp)
+        t = datetime.fromisoformat(target.timestamp)
+    except (ValueError, TypeError):
+        return None
+    delta = (t - a).total_seconds()
+    return delta if delta >= 0.0 else 0.0
 
 
 # ---------------------------------------------------------------------------
