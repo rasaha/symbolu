@@ -39,6 +39,8 @@ from agentic.agentic_framework.streaming_events import (
     APPROVAL_RESOLVED,
     USAGE_UPDATED,
     BUDGET_EXCEEDED,
+    DEADLINE_EXCEEDED,
+    ACTION_TIMEOUT,
 )
 
 
@@ -84,6 +86,13 @@ class AgentRunTrace:
     budget_exceeded: bool = False
     accounting_mode: str = "none"
 
+    # --- duration ---
+    deadline_exceeded: bool = False
+    action_timeouts: int = 0
+    elapsed_s: float = 0.0
+    max_run_duration_s: Optional[float] = None
+    max_action_duration_s: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a JSON-safe dict."""
         return {
@@ -107,6 +116,11 @@ class AgentRunTrace:
             "estimated_cost": self.estimated_cost,
             "budget_exceeded": self.budget_exceeded,
             "accounting_mode": self.accounting_mode,
+            "deadline_exceeded": self.deadline_exceeded,
+            "action_timeouts": self.action_timeouts,
+            "elapsed_s": self.elapsed_s,
+            "max_run_duration_s": self.max_run_duration_s,
+            "max_action_duration_s": self.max_action_duration_s,
             "events": [e.to_dict() for e in self.events],
         }
 
@@ -197,6 +211,44 @@ def _build_trace(events: List[AgentRunEvent]) -> AgentRunTrace:
     )
     if trace.budget_exceeded and trace.status == "unknown":
         trace.status = "budget_exceeded"
+
+    # Duration: deadline / action timeouts
+    deadline_evts = [e for e in events if e.event_type == DEADLINE_EXCEEDED]
+    timeout_evts = [e for e in events if e.event_type == ACTION_TIMEOUT]
+    trace.deadline_exceeded = bool(deadline_evts)
+    trace.action_timeouts = len(timeout_evts)
+
+    # max_run_duration_s — taken from any DEADLINE_EXCEEDED payload that
+    # carries it (the policy is otherwise opaque to the trace).
+    for evt in deadline_evts:
+        mrd = evt.payload.get("max_run_duration_s")
+        if mrd is not None:
+            trace.max_run_duration_s = mrd
+            break
+
+    # max_action_duration_s — taken from any ACTION_TIMEOUT payload.
+    for evt in timeout_evts:
+        mad = evt.payload.get("max_action_duration_s")
+        if mad is not None:
+            trace.max_action_duration_s = mad
+            break
+
+    # elapsed_s — prefer monotonic-precise value from a DEADLINE_EXCEEDED
+    # event when present; otherwise fall back to a wall-clock derivation
+    # from the first/last event ISO timestamps.
+    if deadline_evts:
+        trace.elapsed_s = float(deadline_evts[-1].payload.get("elapsed_s", 0.0))
+    elif trace.started_at and trace.ended_at:
+        try:
+            from datetime import datetime
+            _s = datetime.fromisoformat(trace.started_at)
+            _e = datetime.fromisoformat(trace.ended_at)
+            trace.elapsed_s = (_e - _s).total_seconds()
+        except (ValueError, TypeError):
+            trace.elapsed_s = 0.0
+
+    if trace.deadline_exceeded and trace.status == "unknown":
+        trace.status = "deadline_exceeded"
 
     return trace
 
