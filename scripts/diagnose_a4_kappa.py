@@ -91,16 +91,22 @@ def _five_number_summary(arr: np.ndarray) -> dict[str, float]:
     }
 
 
+_ACCEPTED_ANNOTATED_SCHEMAS = (
+    "15.14-A4-annotated",  # pre-§15.14-A5 (raw-string judge prompt render)
+    "15.14-A5-annotated",  # post-§15.14-A5 EFFECTIVE (chat-template judge prompt render)
+)
+
+
 def _load_annotated_cache(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     data = np.load(path, allow_pickle=True)
     sv = str(data["schema_version"][0])
-    if sv != "15.14-A4-annotated":
+    if sv not in _ACCEPTED_ANNOTATED_SCHEMAS:
         sys.stderr.write(
             f"[diagnose] WARNING: annotated cache schema_version is "
-            f"{sv!r}, expected '15.14-A4-annotated'. Diagnostics may "
-            f"be off; proceeding anyway.\n"
+            f"{sv!r}, expected one of {_ACCEPTED_ANNOTATED_SCHEMAS!r}. "
+            f"Diagnostics may be off; proceeding anyway.\n"
         )
     n = len(data["chain_scope"])
     return {

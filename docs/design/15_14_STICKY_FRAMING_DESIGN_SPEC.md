@@ -710,12 +710,21 @@ mechanism.
 
 ### §15.14-A5 — judge prompt rendering: chat-template (H1-only; revised after empirical falsification of the single-token H2 surface-variant design)
 
-**Status:** PROPOSED (revised). The status field will flip to
-EFFECTIVE only after the user replies with the literal phrase
-`Sign off §15.14-A5. Push the EFFECTIVE follow-up.` and a separate
-EFFECTIVE follow-up commit is pushed that flips this status field
-and applies the implementation surface enumerated below. This
-two-phase discipline mirrors §15.14-A1 / A2 / A3 / A4.
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/diagnose-framing-kappa-L6dmt`).
+Sign-off correspondence used the literal phrase
+`Sign off §15.14-A5. Push the EFFECTIVE follow-up.` and explicitly
+bounded the EFFECTIVE scope to: H1-only;
+`tokenizer.apply_chat_template(...)` for judge prompt rendering;
+unchanged isolated-token logit argmax over `"0"`, `"1"`, `"2"`; no
+H2 single-token surface-variant mechanism; no two-token marginal
+scoring; no §15.14-A6; no 70B escalation; no modification of any
+threshold, label, rubric, cascade, firewall, sign direction, or
+prior verdict-of-record. The EFFECTIVE readout discipline:
+κ ≥ 0.6 → cascade; κ < 0.6 → A5 ANNOTATION_FAILED with H1 ruled
+out for the accessible 8B judge, with no reinterpretation of v1 /
+v2 / v3 and no overwrite of A4 diagnostic findings.
 
 **Revision provenance.** A prior version of this PROPOSED block
 (committed in `6aa5a7e`) specified a 6-candidate logit argmax over

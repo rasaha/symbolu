@@ -75,14 +75,19 @@ def _save_diagnostic_annotated_cache(
     judge_model_id: str,
     judge_fallback_used: bool,
     judge_extraction_method: str,
+    judge_prompt_render: str,
     label_token_ids: dict[str, int],
     out_path: Path,
 ) -> None:
     """Atomic .npz parallel to `_save_annotated_cache` BUT marked
     `diagnostic_only=True` so the artifact is unambiguously not an
-    artifact-of-record. Schema is otherwise identical to
-    `15.14-A4-annotated` so that `scripts/diagnose_a4_kappa.py` can
-    read it without modification.
+    artifact-of-record. Schema mirrors the canonical
+    `_ANNOTATED_CACHE_SCHEMA_VERSION` (`15.14-A5-annotated` post-§15.14-A5
+    EFFECTIVE) so that `scripts/diagnose_a4_kappa.py` and the canonical
+    `_load_annotated_cache` can both read it without modification. The
+    `diagnostic_only=True` marker plus the `diagnostic_provenance`
+    string remain the audit-trail signature that this is NOT an
+    artifact-of-record.
     """
     import numpy as np  # local import to mirror probe module's lazy style
 
@@ -111,7 +116,12 @@ def _save_diagnostic_annotated_cache(
 
     np.savez_compressed(
         tmp_path,
-        schema_version=np.array(["15.14-A4-annotated"], dtype=object),
+        # Mirror the canonical schema version constant so this diagnostic
+        # cache is loadable by both `scripts/diagnose_a4_kappa.py` and
+        # `scripts/probe_framing_15_14.py::_load_annotated_cache` without
+        # modification. The `diagnostic_only=True` marker below is the
+        # audit-trail signature that this is NOT an artifact-of-record.
+        schema_version=np.array([P._ANNOTATED_CACHE_SCHEMA_VERSION], dtype=object),
         chain_scope=np.array([k[0] for k in keys], dtype=object),
         chain_idx=np.array([k[1] for k in keys], dtype=np.int64),
         turn_idx=np.array([k[2] for k in keys], dtype=np.int64),
@@ -126,6 +136,7 @@ def _save_diagnostic_annotated_cache(
         judge_model_id=np.array([judge_model_id], dtype=object),
         judge_fallback_used=np.array([bool(judge_fallback_used)], dtype=bool),
         judge_extraction_method=np.array([judge_extraction_method], dtype=object),
+        judge_prompt_render=np.array([judge_prompt_render], dtype=object),
         label_token_chars=np.array(list(P.LABEL_TOKEN_CHARS), dtype=object),
         label_token_ids=np.array(
             [label_token_ids[ch] for ch in P.LABEL_TOKEN_CHARS], dtype=np.int64,
@@ -326,14 +337,26 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print("=" * 78)
-    print("  §15.14-A4 annotated-cache rescue (DIAGNOSTIC ONLY)")
+    print("  Annotated-cache rescue (DIAGNOSTIC ONLY)")
     print("=" * 78)
-    print(f"  extraction cache:  {args.extraction_cache}")
-    print(f"  stimulus JSON:     {args.stimulus_json}")
-    print(f"  labels JSON:       {args.labels_json}")
-    print(f"  out path:          {args.out_path}  (DIAGNOSTIC ONLY)")
-    print(f"  force fallback:    {args.force_fallback_judge}")
-    print(f"  judge extraction:  {P.JUDGE_EXTRACTION_METHOD}  (§15.14-A4)")
+    print(f"  extraction cache:    {args.extraction_cache}")
+    print(f"  stimulus JSON:       {args.stimulus_json}")
+    print(f"  labels JSON:         {args.labels_json}")
+    print(f"  out path:            {args.out_path}  (DIAGNOSTIC ONLY)")
+    print(f"  force fallback:      {args.force_fallback_judge}")
+    print(f"  judge extraction:    {P.JUDGE_EXTRACTION_METHOD}")
+    print(f"  judge prompt render: {P.JUDGE_PROMPT_RENDER}")
+    print()
+    print("  WARNING: this script runs under the *currently-active*")
+    print("  probe_framing_15_14._judge_one_row code path. Post-§15.14-A5")
+    print("  EFFECTIVE flip, that path is chat-template render. To recover")
+    print("  the §15.14-A4 raw-string-render outputs that this script was")
+    print("  originally written for, check out the pre-A5 commit (e.g.,")
+    print("  07f6eea) before invoking this script. The output filename")
+    print("  default is unchanged for backward compatibility, but the")
+    print("  diagnostic_only=True marker plus the judge_prompt_render")
+    print("  field in the .npz unambiguously disambiguate which code path")
+    print("  produced the cache.")
 
     print()
     print("[save-a4] validating stimulus + labels (lock pin) ...")
@@ -390,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
         judge_model_id=judge_id_used,
         judge_fallback_used=used_fallback,
         judge_extraction_method=P.JUDGE_EXTRACTION_METHOD,
+        judge_prompt_render=P.JUDGE_PROMPT_RENDER,
         label_token_ids=label_token_ids,
         out_path=out_path,
     )

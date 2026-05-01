@@ -172,6 +172,13 @@ MAX_NEW_TOKENS_JUDGE = 8                       # retained but unused under §15.
 JUDGE_EXTRACTION_METHOD = "logit_first_token_argmax"
 LABEL_TOKEN_CHARS = ("0", "1", "2")
 
+# §15.14-A5: judge prompt is wrapped through the active tokenizer's
+# chat template (single user message, add_generation_prompt=True).
+# The frozen JUDGE_PROMPT_TEMPLATE text and its SHA-256 are unchanged;
+# only the input position of the first-token logit readout shifts to
+# immediately after the assistant-header generation prompt.
+JUDGE_PROMPT_RENDER = "apply_chat_template_user_only(add_generation_prompt=True)"
+
 # Hidden-state extraction (pinned).
 LAYER_IDX = -1
 HIDDEN_DIM = 3584
@@ -555,6 +562,7 @@ class FramingAuditOutputs:
     judge_fallback_used: bool
     judge_prompt_sha256: str
     judge_extraction_method: str
+    judge_prompt_render: str
     label_token_ids: dict[str, int]
     calibration_kappa: float
     annotation_failure_rate: float
@@ -1747,8 +1755,19 @@ def _judge_one_row(
     target_device = next(model.parameters()).device
     prompt = render_judge_prompt(framing_substr, turn_t_question, turn_t_response)
 
-    encoded = tokenizer(
-        prompt, return_tensors="pt", return_attention_mask=True,
+    # §15.14-A5: wrap the unchanged JUDGE_PROMPT_TEMPLATE through the
+    # active tokenizer's chat template as a single user message with
+    # add_generation_prompt=True. The frozen prompt text and its SHA-256
+    # are unchanged; only the input position of the first-token logit
+    # readout shifts to immediately after the assistant-header
+    # generation prompt (e.g., after `<|end_header_id|>\n\n` for
+    # Llama-3.1), which is the position the model's first-token
+    # distribution is calibrated for.
+    encoded = tokenizer.apply_chat_template(
+        [{"role": "user", "content": prompt}],
+        add_generation_prompt=True,
+        return_tensors="pt",
+        return_dict=True,
     )
     input_ids = encoded["input_ids"].to(target_device)
     attention_mask = encoded["attention_mask"].to(target_device)
@@ -2652,6 +2671,7 @@ def write_json_output(
             "calibration_kappa_threshold": KAPPA_GATE_THRESHOLD,
             "calibration_n_rows": EVALUATION_ROWS_CALIBRATION,
             "judge_extraction_method": audit.judge_extraction_method,
+            "judge_prompt_render": audit.judge_prompt_render,
             "judge_max_tokens": MAX_NEW_TOKENS_JUDGE,
             "judge_model_id": audit.judge_model_id,
             "judge_prompt_sha256": audit.judge_prompt_sha256,
@@ -2919,6 +2939,7 @@ def render_markdown_report(audit: FramingAuditOutputs) -> str:
         f"- **judge_model_id:** `{audit.judge_model_id}`\n"
         f"- **judge_fallback_used:** {audit.judge_fallback_used}\n"
         f"- **judge_extraction_method:** `{audit.judge_extraction_method}`\n"
+        f"- **judge_prompt_render:** `{audit.judge_prompt_render}`\n"
         f"- **label_token_ids:** "
         f"`{', '.join(f'{ch}→{audit.label_token_ids[ch]}' for ch in LABEL_TOKEN_CHARS)}`\n"
         f"- **judge_prompt_sha256:** `{audit.judge_prompt_sha256}`\n"
@@ -3058,7 +3079,7 @@ def write_markdown_output(
 #   annotated cache (.npz)  carries severities_by_key + κ result
 
 
-_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-A4-annotated"
+_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-A5-annotated"
 
 
 def _save_annotated_cache(
@@ -3068,14 +3089,19 @@ def _save_annotated_cache(
     judge_model_id: str,
     judge_fallback_used: bool,
     judge_extraction_method: str,
+    judge_prompt_render: str,
     label_token_ids: dict[str, int],
     out_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
 ) -> None:
     """Atomic .npz of severities + κ + provenance for resume by --probe.
 
-    Under §15.14-A4 schema (`15.14-A4-annotated`): adds per-row
-    `judge_logits` (3 columns: logit_0, logit_1, logit_2) and top-level
-    `judge_extraction_method` + `label_token_ids`.
+    Under §15.14-A5 schema (`15.14-A5-annotated`): the on-disk per-row
+    layout is structurally identical to §15.14-A4 — a (n, 3) judge_logits
+    matrix in iso-form column order ("0", "1", "2") plus per-row
+    severity, judge_rationale, and the existing top-level provenance
+    fields. The single new top-level field is `judge_prompt_render`
+    (records whether the judge prompt was rendered raw-string pre-A5
+    or via tokenizer.apply_chat_template post-A5).
     """
     import numpy as np
 
@@ -3123,6 +3149,7 @@ def _save_annotated_cache(
         judge_model_id=np.array([judge_model_id], dtype=object),
         judge_fallback_used=np.array([bool(judge_fallback_used)], dtype=bool),
         judge_extraction_method=np.array([judge_extraction_method], dtype=object),
+        judge_prompt_render=np.array([judge_prompt_render], dtype=object),
         label_token_chars=np.array(list(LABEL_TOKEN_CHARS), dtype=object),
         label_token_ids=np.array(
             [label_token_ids[ch] for ch in LABEL_TOKEN_CHARS], dtype=np.int64,
@@ -3133,8 +3160,8 @@ def _save_annotated_cache(
 
 def _load_annotated_cache(
     in_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
-) -> tuple[dict[tuple[str, int, int], dict], float, float, str, bool, str, dict[str, int]]:
-    """Reload severities + κ + provenance for --probe (§15.14-A4 schema)."""
+) -> tuple[dict[tuple[str, int, int], dict], float, float, str, bool, str, str, dict[str, int]]:
+    """Reload severities + κ + provenance for --probe (§15.14-A5 schema)."""
     import numpy as np
 
     if not in_path.exists():
@@ -3178,6 +3205,11 @@ def _load_annotated_cache(
         for j in range(len(data["label_token_chars"]))
     }
 
+    # `judge_prompt_render` is required under §15.14-A5; pre-A5 caches
+    # do not carry it. The schema_version check above already enforces
+    # 15.14-A5-annotated, so this lookup is unconditional.
+    judge_prompt_render = str(data["judge_prompt_render"][0])
+
     return (
         severities_by_key,
         float(data["annotation_failure_rate"][0]),
@@ -3185,6 +3217,7 @@ def _load_annotated_cache(
         str(data["judge_model_id"][0]),
         bool(data["judge_fallback_used"][0]),
         str(data["judge_extraction_method"][0]),
+        judge_prompt_render,
         label_token_ids,
     )
 
@@ -3244,8 +3277,8 @@ def _run_annotate(
     annotated_cache_path: Path,
     *,
     force_fallback_judge: bool,
-) -> tuple[dict, str, dict, dict, str, bool, float, float, str, dict[str, int]]:
-    """Pass C + Pass D: judge severities, κ gate, save annotated cache (§15.14-A4)."""
+) -> tuple[dict, str, dict, dict, str, bool, float, float, str, str, dict[str, int]]:
+    """Pass C + Pass D: judge severities, κ gate, save annotated cache (§15.14-A5)."""
     print("[annotate] re-validating stimulus + labels (lock pin) ...")
     payload, stim_sha = _validate_stimulus_json(stimulus_path)
     labels_payload, labels_sha, labels_by_key = _validate_calibration_labels_json(
@@ -3296,14 +3329,14 @@ def _run_annotate(
     _save_annotated_cache(
         severities_by_key, failure_rate, kappa,
         judge_id_used, fallback_flag,
-        JUDGE_EXTRACTION_METHOD, label_token_ids,
+        JUDGE_EXTRACTION_METHOD, JUDGE_PROMPT_RENDER, label_token_ids,
         annotated_cache_path,
     )
     return (
         payload, stim_sha, labels_by_key,
         severities_by_key, judge_id_used, fallback_flag,
         failure_rate, kappa,
-        JUDGE_EXTRACTION_METHOD, label_token_ids,
+        JUDGE_EXTRACTION_METHOD, JUDGE_PROMPT_RENDER, label_token_ids,
     )
 
 
@@ -3327,7 +3360,7 @@ def _run_probe(
     (
         severities_by_key, failure_rate, kappa,
         judge_id_used, fallback_flag,
-        judge_extraction_method, label_token_ids,
+        judge_extraction_method, judge_prompt_render, label_token_ids,
     ) = _load_annotated_cache(annotated_cache_path)
 
     print("[probe] computing features + cascade ...")
@@ -3344,6 +3377,7 @@ def _run_probe(
         judge_fallback_used=fallback_flag,
         judge_prompt_sha256=judge_prompt_sha256(),
         judge_extraction_method=judge_extraction_method,
+        judge_prompt_render=judge_prompt_render,
         label_token_ids=label_token_ids,
         calibration_kappa=kappa,
         annotation_failure_rate=failure_rate,
