@@ -139,6 +139,7 @@ from agentic.agentic_framework.token_budget import (
     UsageStats,
     estimate_tokens,
 )
+from agentic.agentic_framework.memory_retention import MemoryRetentionPolicy
 from agentic.agentic_framework.structured_output import (
     OutputSchema,
     SchemaTarget,
@@ -331,6 +332,8 @@ __all__ = [
     "BudgetPolicy",
     "UsageStats",
     "estimate_tokens",
+    # Memory Retention (v2.5)
+    "MemoryRetentionPolicy",
     # Approval / Human-in-the-Loop (R4)
     "ApprovalCallback",
     "ApprovalController",

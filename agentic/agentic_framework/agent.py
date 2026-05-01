@@ -44,6 +44,7 @@ from agentic.agentic_framework.memory_store import (
     create_memory,
     create_turn_snapshot,
 )
+from agentic.agentic_framework.memory_retention import MemoryRetentionPolicy
 from agentic.agentic_framework.reflective_loop import (
     ReflectiveGenerator,
     QualityCritic,
@@ -205,6 +206,7 @@ class AgenticLLMWrapper:
         use_llm_for_decomposition: bool = True,
         dispatcher: Optional[Any] = None,
         action_type_to_tool: Optional[Dict[str, str]] = None,
+        memory_retention_policy: Optional["MemoryRetentionPolicy"] = None,
     ):
         """
         Initialize agentic wrapper.
@@ -230,13 +232,22 @@ class AgenticLLMWrapper:
                 registered on the dispatcher's gateway. Only action types
                 present in this mapping are routed through the dispatcher;
                 all others fall through to placeholder execution.
+            memory_retention_policy: Optional ``MemoryRetentionPolicy``
+                governing time- and size-based eviction of memory items.
+                ``None`` (default) preserves the existing append-only +
+                positional sliding-window behaviour.  Threaded into the
+                underlying ``MemoryStore``; cleanup logic itself lands
+                in a separate batch (M3).
         """
         # LLM client (black-box)
         self.llm = llm_client
         self.use_llm_for_decomposition = use_llm_for_decomposition
 
         # Components
-        self.memory_store = MemoryStore(embedding_model)
+        self.memory_store = MemoryStore(
+            embedding_model,
+            memory_retention_policy=memory_retention_policy,
+        )
         self.generator = ReflectiveGenerator(
             llm_client=llm_client,
             critic=critic or RuleBasedCritic(),
@@ -414,6 +425,11 @@ class AgenticLLMWrapper:
         if _ttl_payload is not None:
             raise SessionExpiredError(_ttl_payload)
         self._touch_session_clock()
+
+        # Memory v2.5 (M4) — reset the per-run eviction counter so any
+        # cleanup that fires during this run is attributed to it (and
+        # not bled in from a prior run).
+        self._memory.evictions_since_last_run = 0
 
         turn_id = self._memory.get_turn_count()
 
@@ -792,6 +808,10 @@ class AgenticLLMWrapper:
             yield _ev
             return
         self._touch_session_clock()
+
+        # Memory v2.5 (M4) — reset the per-run eviction counter at run
+        # start so cleanup attributable to this run is isolated.
+        self._memory.evictions_since_last_run = 0
 
         turn_id = self._memory.get_turn_count()
         session_id = self._memory.session_id
@@ -1203,7 +1223,10 @@ class AgenticLLMWrapper:
                 safety_contract=contract,
             )
 
-            yield _emit(_evt(RUN_COMPLETED, {"result": agent_result.to_dict()}))
+            yield _emit(_evt(RUN_COMPLETED, {
+                "result": agent_result.to_dict(),
+                "memory_evictions": self._memory.evictions_since_last_run,
+            }))
 
         except Exception as exc:
             yield _emit(_evt(RUN_ERROR, {"error": str(exc), "error_type": type(exc).__name__}))
@@ -1251,6 +1274,10 @@ class AgenticLLMWrapper:
             yield _ev
             return
         self._touch_session_clock()
+
+        # Memory v2.5 (M4) — reset the per-run eviction counter at run
+        # start so cleanup attributable to this run is isolated.
+        self._memory.evictions_since_last_run = 0
 
         turn_id = self._memory.get_turn_count()
         session_id = self._memory.session_id
@@ -1622,7 +1649,10 @@ class AgenticLLMWrapper:
                 safety_contract=contract,
             )
 
-            yield _emit(_evt(RUN_COMPLETED, {"result": agent_result.to_dict()}))
+            yield _emit(_evt(RUN_COMPLETED, {
+                "result": agent_result.to_dict(),
+                "memory_evictions": self._memory.evictions_since_last_run,
+            }))
 
         except Exception as exc:
             yield _emit(_evt(RUN_ERROR, {"error": str(exc), "error_type": type(exc).__name__}))

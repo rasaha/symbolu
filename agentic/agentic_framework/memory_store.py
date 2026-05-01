@@ -25,6 +25,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 
+from agentic.agentic_framework.memory_retention import MemoryRetentionPolicy
+
+
 class EmbeddingModel(Protocol):
     """Protocol for embedding model interface."""
 
@@ -104,6 +107,24 @@ class AgentMemory:
     # Embedding cache for retrieval (turn_id -> embedding)
     embedding_cache: Dict[int, List[float]] = field(default_factory=dict)
 
+    # Operational metadata, populated by MemoryRetentionPolicy (v2.5).
+    # Maps turn_id to the wall-clock UTC datetime that turn was last
+    # returned by any memory read.  Used by ``idle_ttl_s`` cleanup
+    # in ``MemoryStore``.  This is the only mutable field on
+    # AgentMemory: history and TurnSnapshot remain immutable.  Until
+    # M3 wires read/write paths, the dict stays empty in practice.
+    last_accessed_at: Dict[int, datetime] = field(default_factory=dict)
+
+    # Per-session, per-run counter of turns evicted by an active
+    # MemoryRetentionPolicy.  Reset to zero at the top of every public
+    # entry point on ``AgenticLLMWrapper`` (run / run_stream /
+    # run_stream_async).  The trace surfacing layer reads this value
+    # via the RUN_COMPLETED payload at run end.  Window-size positional
+    # rolloff (the pre-v2.5 behaviour, with no MemoryRetentionPolicy
+    # configured) is intentionally NOT counted here — only evictions
+    # caused by an opted-in retention policy.
+    evictions_since_last_run: int = 0
+
     def get_recent_turns(self, n: int = 5) -> List[TurnSnapshot]:
         """Get n most recent turns."""
         return self.history[-n:] if self.history else []
@@ -119,13 +140,27 @@ class AgentMemory:
         return sum(t.quality_score for t in self.history) / len(self.history)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary."""
+        """Serialize to dictionary.
+
+        The ``operational`` key carries metadata that is *not* part of
+        the immutable conversation history (e.g.
+        ``last_accessed_at`` populated by ``MemoryRetentionPolicy``
+        cleanup).  Operators inspecting durable session state should
+        rely on ``history`` for what was said and on ``operational`` for
+        how the runtime has been treating it.
+        """
         return {
             "session_id": self.session_id,
             "created_at": self.created_at.isoformat(),
             "turn_count": len(self.history),
             "window_size": self.window_size,
             "history": [t.to_dict() for t in self.history],
+            "operational": {
+                "last_accessed_at": {
+                    str(turn_id): ts.isoformat()
+                    for turn_id, ts in self.last_accessed_at.items()
+                },
+            },
         }
 
 
@@ -137,15 +172,158 @@ class MemoryStore:
     rather than mutating in place (functional/immutable pattern).
     """
 
-    def __init__(self, embedding_model: Optional[EmbeddingModel] = None):
+    def __init__(
+        self,
+        embedding_model: Optional[EmbeddingModel] = None,
+        memory_retention_policy: Optional[MemoryRetentionPolicy] = None,
+    ):
         """
         Initialize memory store.
 
         Args:
             embedding_model: Optional model for computing embeddings.
-                            If None, falls back to recency-based retrieval.
+                If None, falls back to recency-based retrieval.
+            memory_retention_policy: Optional ``MemoryRetentionPolicy``
+                governing time- and size-based eviction of memory items.
+                ``None`` (default) preserves the existing append-only +
+                positional sliding-window behaviour.
+
+                When the policy is active (any field set), the
+                append-only invariant is *opt-in* relaxed: turns may be
+                evicted on read or on write.  ``TurnSnapshot`` objects
+                themselves remain immutable; the relaxation applies to
+                the ``AgentMemory.history`` list and to operational
+                metadata (``embedding_cache``, ``last_accessed_at``).
         """
         self.embedding_model = embedding_model
+        self.memory_retention_policy = memory_retention_policy
+
+    # ------------------------------------------------------------------
+    # Eviction (v2.5)
+    # ------------------------------------------------------------------
+
+    def _evict(
+        self,
+        memory: "AgentMemory",
+    ) -> Tuple["AgentMemory", int]:
+        """Compute the post-eviction memory state.
+
+        Pure: never mutates *memory*.  Returns the same instance when
+        no eviction was needed (count == 0) so callers can short-circuit.
+
+        Eviction order (load-bearing):
+          1. ``item_ttl_s`` against ``TurnSnapshot.timestamp`` (created_at).
+          2. ``idle_ttl_s`` against ``memory.last_accessed_at[turn_id]``,
+             falling back to ``turn.timestamp`` for turns that have
+             never been read (a never-accessed turn behaves as if its
+             last access were its creation).
+          3. ``max_items`` applied positionally to the post-TTL set,
+             keeping the most recent ``max_items`` turns.
+
+        ``embedding_cache`` and ``last_accessed_at`` are pruned for
+        every evicted ``turn_id``.
+        """
+        policy = self.memory_retention_policy
+        if policy is None or not policy.is_active():
+            return memory, 0
+
+        now = datetime.utcnow()
+        evicted_ids: set[int] = set()
+        survivors: List[TurnSnapshot] = []
+        for turn in memory.history:
+            # 1. item_ttl_s
+            if (
+                policy.item_ttl_s is not None
+                and (now - turn.timestamp).total_seconds() > policy.item_ttl_s
+            ):
+                evicted_ids.add(turn.turn_id)
+                continue
+            # 2. idle_ttl_s — fall back to created_at when never accessed
+            if policy.idle_ttl_s is not None:
+                last_seen = memory.last_accessed_at.get(
+                    turn.turn_id, turn.timestamp,
+                )
+                if (now - last_seen).total_seconds() > policy.idle_ttl_s:
+                    evicted_ids.add(turn.turn_id)
+                    continue
+            survivors.append(turn)
+
+        # 3. max_items applied AFTER TTL cleanup
+        if (
+            policy.max_items is not None
+            and len(survivors) > policy.max_items
+        ):
+            dropped = survivors[: -policy.max_items]
+            for turn in dropped:
+                evicted_ids.add(turn.turn_id)
+            survivors = survivors[-policy.max_items :]
+
+        if not evicted_ids:
+            return memory, 0
+
+        new_cache = {
+            tid: emb
+            for tid, emb in memory.embedding_cache.items()
+            if tid not in evicted_ids
+        }
+        new_last = {
+            tid: ts
+            for tid, ts in memory.last_accessed_at.items()
+            if tid not in evicted_ids
+        }
+        new_memory = AgentMemory(
+            session_id=memory.session_id,
+            created_at=memory.created_at,
+            history=survivors,
+            window_size=memory.window_size,
+            embedding_cache=new_cache,
+            last_accessed_at=new_last,
+        )
+        return new_memory, len(evicted_ids)
+
+    def _apply_eviction(self, memory: "AgentMemory") -> int:
+        """Apply ``_evict`` to *memory* in place and return the count.
+
+        Used by read paths to keep their existing API contract
+        (``-> List[TurnSnapshot]``).  Mutates ``memory.history``,
+        ``memory.embedding_cache``, and ``memory.last_accessed_at``
+        if and only if eviction occurred.  Also increments
+        ``memory.evictions_since_last_run`` by the number of evicted
+        turns (M4 trace counter).
+
+        This is the single in-place mutation surface introduced by
+        v2.5 for read paths; ``TurnSnapshot`` objects themselves are
+        never mutated.
+        """
+        new_mem, count = self._evict(memory)
+        if count == 0:
+            return 0
+        memory.history[:] = new_mem.history
+        memory.embedding_cache.clear()
+        memory.embedding_cache.update(new_mem.embedding_cache)
+        memory.last_accessed_at.clear()
+        memory.last_accessed_at.update(new_mem.last_accessed_at)
+        memory.evictions_since_last_run += count
+        return count
+
+    def _touch(self, memory: "AgentMemory", turn_ids: List[int]) -> None:
+        """Update ``last_accessed_at`` for *turn_ids* to ``utcnow()``.
+
+        Called by read paths after they decide which turns to return.
+        Mutates ``memory.last_accessed_at`` in place.
+
+        No-op when no ``MemoryRetentionPolicy`` is configured or the
+        policy is inactive — read paths preserve their pre-v2.5
+        behaviour exactly when retention is not opted in.
+        """
+        policy = self.memory_retention_policy
+        if policy is None or not policy.is_active():
+            return
+        if not turn_ids:
+            return
+        now = datetime.utcnow()
+        for tid in turn_ids:
+            memory.last_accessed_at[tid] = now
 
     def append_turn(
         self,
@@ -155,7 +333,16 @@ class MemoryStore:
         """
         Append turn to memory.
 
-        INVARIANT: Creates new memory object, never modifies input.
+        Returns a new ``AgentMemory`` with the turn appended.  Never
+        mutates *memory* (the input).  When ``MemoryRetentionPolicy`` is
+        active the order is:
+
+          1. evict expired turns from the existing history
+          2. append the new turn
+          3. apply ``max_items`` (when set) or ``window_size``
+             (otherwise) to the post-append history; the newly
+             appended turn counts toward the cap
+          4. set ``last_accessed_at[new_turn.turn_id]`` to *now*
 
         Args:
             memory: Current memory state
@@ -164,16 +351,25 @@ class MemoryStore:
         Returns:
             New AgentMemory with turn appended
         """
-        # Create new history with turn appended
-        new_history = list(memory.history)
+        # 1. Evict from the existing history under policy (pure).
+        evicted_memory, evicted_count = self._evict(memory)
+
+        # 2. Append the new turn.
+        new_history = list(evicted_memory.history)
         new_history.append(turn)
 
-        # Apply sliding window (keep most recent)
-        if len(new_history) > memory.window_size:
-            new_history = new_history[-memory.window_size :]
+        # 3. Apply max_items if configured, otherwise window_size.
+        policy = self.memory_retention_policy
+        cap_from_policy = policy is not None and policy.max_items is not None
+        cap = policy.max_items if cap_from_policy else memory.window_size
+        dropped_by_cap: List[int] = []
+        if cap is not None and len(new_history) > cap:
+            dropped = new_history[:-cap]
+            dropped_by_cap = [t.turn_id for t in dropped]
+            new_history = new_history[-cap:]
 
-        # Compute embedding for new turn
-        new_cache = dict(memory.embedding_cache)
+        # Compute embedding for the new turn.
+        new_cache = dict(evicted_memory.embedding_cache)
         if self.embedding_model is not None:
             try:
                 embedding = self.embedding_model.embed(turn.get_text_for_embedding())
@@ -181,13 +377,32 @@ class MemoryStore:
             except Exception:
                 pass  # Embedding computation failed, continue without
 
-        # Return new memory object (immutable pattern)
+        # Prune any turns dropped by the cap from the caches.
+        new_last = dict(evicted_memory.last_accessed_at)
+        for tid in dropped_by_cap:
+            new_cache.pop(tid, None)
+            new_last.pop(tid, None)
+
+        # 4. Stamp last_accessed_at for the newly appended turn.
+        new_last[turn.turn_id] = datetime.utcnow()
+
+        # M4 — propagate the per-run eviction counter to the new
+        # AgentMemory.  Only policy-driven evictions count: TTL drops
+        # from _evict, plus drops caused by max_items.  Window-size
+        # rolloff is the pre-v2.5 positional behaviour and is NOT
+        # counted, so the counter stays zero for non-opted-in callers.
+        cap_count = len(dropped_by_cap) if cap_from_policy else 0
+
         return AgentMemory(
             session_id=memory.session_id,
             created_at=memory.created_at,
             history=new_history,
             window_size=memory.window_size,
             embedding_cache=new_cache,
+            last_accessed_at=new_last,
+            evictions_since_last_run=(
+                memory.evictions_since_last_run + evicted_count + cap_count
+            ),
         )
 
     def get_relevant_context(
@@ -202,6 +417,10 @@ class MemoryStore:
         Uses cosine similarity on embeddings if available,
         otherwise falls back to most recent turns.
 
+        When ``MemoryRetentionPolicy`` is active, eviction runs *before*
+        selection (mutates *memory* in place) and ``last_accessed_at``
+        is updated for each returned turn.
+
         Args:
             memory: Memory to search
             query: Query string
@@ -210,18 +429,24 @@ class MemoryStore:
         Returns:
             List of k most relevant TurnSnapshots
         """
+        self._apply_eviction(memory)
+
         if not memory.history:
             return []
 
         # Fall back to recent if no embedding model
         if self.embedding_model is None:
-            return memory.history[-k:]
+            picked = memory.history[-k:]
+            self._touch(memory, [t.turn_id for t in picked])
+            return picked
 
         # Compute query embedding
         try:
             query_emb = self.embedding_model.embed(query)
         except Exception:
-            return memory.history[-k:]
+            picked = memory.history[-k:]
+            self._touch(memory, [t.turn_id for t in picked])
+            return picked
 
         # Compute similarities
         scores: List[Tuple[TurnSnapshot, float]] = []
@@ -236,7 +461,9 @@ class MemoryStore:
 
         # Sort by similarity, return top k
         scores.sort(key=lambda x: -x[1])
-        return [turn for turn, _ in scores[:k]]
+        picked = [turn for turn, _ in scores[:k]]
+        self._touch(memory, [t.turn_id for t in picked])
+        return picked
 
     def get_summary_for_llm(
         self,
@@ -258,10 +485,13 @@ class MemoryStore:
         Returns:
             Formatted summary string
         """
+        self._apply_eviction(memory)
+
         if not memory.history:
             return "New session, no conversation history."
 
         recent = memory.history[-max_turns:]
+        self._touch(memory, [t.turn_id for t in recent])
 
         # Compute statistics
         total_turns = len(memory.history)
@@ -338,6 +568,8 @@ class MemoryStore:
         Returns:
             List of matching TurnSnapshots
         """
+        self._apply_eviction(memory)
+
         keyword_lower = keyword.lower()
         matches = []
 
@@ -348,6 +580,7 @@ class MemoryStore:
             if len(matches) >= max_results:
                 break
 
+        self._touch(memory, [t.turn_id for t in matches])
         return matches
 
 
@@ -386,6 +619,8 @@ def create_memory(
         history=[],
         window_size=window_size,
         embedding_cache={},
+        last_accessed_at={},
+        evictions_since_last_run=0,
     )
 
 
