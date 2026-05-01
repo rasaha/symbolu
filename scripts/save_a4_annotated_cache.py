@@ -76,18 +76,29 @@ def _save_diagnostic_annotated_cache(
     judge_fallback_used: bool,
     judge_extraction_method: str,
     judge_prompt_render: str,
+    judge_label_variants: tuple[str, ...],
+    judge_label_aggregation: str,
     label_token_ids: dict[str, int],
     out_path: Path,
 ) -> None:
     """Atomic .npz parallel to `_save_annotated_cache` BUT marked
     `diagnostic_only=True` so the artifact is unambiguously not an
     artifact-of-record. Schema mirrors the canonical
-    `_ANNOTATED_CACHE_SCHEMA_VERSION` (`15.14-A5-annotated` post-§15.14-A5
-    EFFECTIVE) so that `scripts/diagnose_a4_kappa.py` and the canonical
-    `_load_annotated_cache` can both read it without modification. The
-    `diagnostic_only=True` marker plus the `diagnostic_provenance`
-    string remain the audit-trail signature that this is NOT an
-    artifact-of-record.
+    `_ANNOTATED_CACHE_SCHEMA_VERSION` (post-§15.14-A7 EFFECTIVE:
+    `15.14-A7-annotated`) so that `scripts/diagnose_a4_kappa.py` and the
+    canonical `_load_annotated_cache` can both read it without
+    modification. The `diagnostic_only=True` marker plus the
+    `diagnostic_provenance` string remain the audit-trail signature
+    that this is NOT an artifact-of-record.
+
+    Per-row layout under §15.14-A7:
+      - `judge_logits`: (n, |labels| × |variants|) = (n, 9) float64
+        matrix in column order
+        [(label, variant) for label in LABEL_TOKEN_CHARS
+                          for variant in judge_label_variants].
+      - `judge_label_aggregated`: (n, 3) float64 matrix in column
+        order LABEL_TOKEN_CHARS, carrying the per-label logsumexp
+        scores that drive the argmax.
     """
     import numpy as np  # local import to mirror probe module's lazy style
 
@@ -103,10 +114,25 @@ def _save_diagnostic_annotated_cache(
         ],
         dtype=np.int8,
     )
+    column_keys = [
+        (ch, prefix)
+        for ch in P.LABEL_TOKEN_CHARS
+        for prefix in judge_label_variants
+    ]
     logits_matrix = np.array(
         [
             [
-                float(severities_by_key[k]["judge_logits"][ch])
+                float(severities_by_key[k]["judge_logits"][col_key])
+                for col_key in column_keys
+            ]
+            for k in keys
+        ],
+        dtype=np.float64,
+    )
+    aggregated_matrix = np.array(
+        [
+            [
+                float(severities_by_key[k]["judge_label_aggregated"][ch])
                 for ch in P.LABEL_TOKEN_CHARS
             ]
             for k in keys
@@ -131,25 +157,32 @@ def _save_diagnostic_annotated_cache(
             dtype=object,
         ),
         judge_logits=logits_matrix,
+        judge_label_aggregated=aggregated_matrix,
         annotation_failure_rate=np.array([annotation_failure_rate], dtype=np.float64),
         calibration_kappa=np.array([calibration_kappa], dtype=np.float64),
         judge_model_id=np.array([judge_model_id], dtype=object),
         judge_fallback_used=np.array([bool(judge_fallback_used)], dtype=bool),
         judge_extraction_method=np.array([judge_extraction_method], dtype=object),
         judge_prompt_render=np.array([judge_prompt_render], dtype=object),
+        judge_label_variants=np.array(list(judge_label_variants), dtype=object),
+        judge_label_aggregation=np.array([judge_label_aggregation], dtype=object),
         label_token_chars=np.array(list(P.LABEL_TOKEN_CHARS), dtype=object),
         label_token_ids=np.array(
-            [label_token_ids[ch] for ch in P.LABEL_TOKEN_CHARS], dtype=np.int64,
+            [int(label_token_ids[ch]) for ch in P.LABEL_TOKEN_CHARS],
+            dtype=np.int64,
         ),
         # ---- diagnostic-only markers (NOT in the canonical schema) ----
         diagnostic_only=np.array([True], dtype=bool),
         diagnostic_provenance=np.array(
             [
                 "Produced by scripts/save_a4_annotated_cache.py to recover "
-                "per-row A4 judge outputs lost when the v3 κ-gate fired at "
-                "probe_framing_15_14.py:3293 upstream of the cache writer. "
-                "NOT an artifact-of-record. The §15.14 v3 ANNOTATION_FAILED "
-                "closure is preserved unchanged."
+                "per-row judge outputs lost when the κ-gate fires upstream "
+                "of the canonical _save_annotated_cache writer. NOT an "
+                "artifact-of-record. Operates under whichever code path is "
+                "currently active in scripts/probe_framing_15_14.py "
+                "(post-§15.14-A7 EFFECTIVE: sequence-logprob extraction). "
+                "Prior §15.14 ANNOTATION_FAILED closures are preserved "
+                "unchanged."
             ],
             dtype=object,
         ),
@@ -346,17 +379,21 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  force fallback:      {args.force_fallback_judge}")
     print(f"  judge extraction:    {P.JUDGE_EXTRACTION_METHOD}")
     print(f"  judge prompt render: {P.JUDGE_PROMPT_RENDER}")
+    print(f"  judge label variants: {P.JUDGE_LABEL_VARIANTS!r}")
+    print(f"  judge label aggregation: {P.JUDGE_LABEL_AGGREGATION!r}")
     print()
     print("  WARNING: this script runs under the *currently-active*")
-    print("  probe_framing_15_14._judge_one_row code path. Post-§15.14-A5")
-    print("  EFFECTIVE flip, that path is chat-template render. To recover")
-    print("  the §15.14-A4 raw-string-render outputs that this script was")
-    print("  originally written for, check out the pre-A5 commit (e.g.,")
-    print("  07f6eea) before invoking this script. The output filename")
-    print("  default is unchanged for backward compatibility, but the")
-    print("  diagnostic_only=True marker plus the judge_prompt_render")
-    print("  field in the .npz unambiguously disambiguate which code path")
-    print("  produced the cache.")
+    print("  probe_framing_15_14._judge_one_row code path. Post-§15.14-A7")
+    print("  EFFECTIVE flip, that path is sequence-logprob logsumexp over")
+    print("  variants. To recover the §15.14-A4 raw-string single-token")
+    print("  outputs that this script was originally written for, check")
+    print("  out the pre-A5 commit (e.g., 07f6eea) before invoking this")
+    print("  script. The output filename default is unchanged for backward")
+    print("  compatibility, but the diagnostic_only=True marker plus the")
+    print("  judge_extraction_method / judge_prompt_render /")
+    print("  judge_label_variants / judge_label_aggregation fields in the")
+    print("  .npz unambiguously disambiguate which code path produced the")
+    print("  cache.")
 
     print()
     print("[save-a4] validating stimulus + labels (lock pin) ...")
@@ -414,6 +451,8 @@ def main(argv: list[str] | None = None) -> int:
         judge_fallback_used=used_fallback,
         judge_extraction_method=P.JUDGE_EXTRACTION_METHOD,
         judge_prompt_render=P.JUDGE_PROMPT_RENDER,
+        judge_label_variants=P.JUDGE_LABEL_VARIANTS,
+        judge_label_aggregation=P.JUDGE_LABEL_AGGREGATION,
         label_token_ids=label_token_ids,
         out_path=out_path,
     )

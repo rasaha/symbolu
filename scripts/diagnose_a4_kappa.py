@@ -92,8 +92,9 @@ def _five_number_summary(arr: np.ndarray) -> dict[str, float]:
 
 
 _ACCEPTED_ANNOTATED_SCHEMAS = (
-    "15.14-A4-annotated",  # pre-§15.14-A5 (raw-string judge prompt render)
-    "15.14-A5-annotated",  # post-§15.14-A5 EFFECTIVE (chat-template judge prompt render)
+    "15.14-A4-annotated",  # pre-§15.14-A5 (raw-string judge prompt render; (n,3) single-token logits)
+    "15.14-A5-annotated",  # post-§15.14-A5 EFFECTIVE (chat-template render; (n,3) single-token logits)
+    "15.14-A7-annotated",  # post-§15.14-A7 EFFECTIVE (sequence-logprob; (n,9) per-variant + (n,3) per-label aggregated)
 )
 
 
@@ -109,7 +110,7 @@ def _load_annotated_cache(path: Path) -> dict[str, Any] | None:
             f"Diagnostics may be off; proceeding anyway.\n"
         )
     n = len(data["chain_scope"])
-    return {
+    out: dict[str, Any] = {
         "n":            n,
         "chain_scope":  np.array([str(x) for x in data["chain_scope"]]),
         "chain_idx":    np.array(data["chain_idx"]),
@@ -125,6 +126,18 @@ def _load_annotated_cache(path: Path) -> dict[str, Any] | None:
         "label_token_ids":   [int(x)  for x in data["label_token_ids"]],
         "schema_version":             sv,
     }
+    # §15.14-A7 cache widens judge_logits to (n, 9) and adds a (n, 3)
+    # judge_label_aggregated matrix. Block 5 (margin distribution) needs
+    # a (n, 3) array of per-label scores; pre-A7 caches expose it directly
+    # in `judge_logits`, while A7 exposes it in `judge_label_aggregated`.
+    # Carry both fields through; downstream blocks pick the right one.
+    if "judge_label_aggregated" in data.files:
+        out["judge_label_aggregated"] = np.array(data["judge_label_aggregated"])
+    if "judge_label_variants" in data.files:
+        out["judge_label_variants"] = [str(v) for v in data["judge_label_variants"]]
+    if "judge_label_aggregation" in data.files:
+        out["judge_label_aggregation"] = str(data["judge_label_aggregation"][0])
+    return out
 
 
 def _load_human_labels(path: Path) -> dict[tuple[int, int], int]:
@@ -298,15 +311,26 @@ def _block_4_kappa_binary(j: np.ndarray, h: np.ndarray) -> None:
 
 
 def _block_5_triple_margins(cache: dict[str, Any]) -> None:
-    _print_section("Block 5 — per-row triple-logit margin distribution (H3 PROXY)")
-    print("  NOTE: a true global-top vs {0,1,2}-mass comparison requires the")
-    print("        full vocab logit row at the final position, which the cache")
-    print("        does NOT carry. This block is a within-{0,1,2} margin proxy")
-    print("        only. A definitive H3 verdict requires a partial GPU rerun.")
+    _print_section("Block 5 — per-row 3-class margin distribution (H3 PROXY)")
+    print("  NOTE: this block computes within-{0,1,2} margin diagnostics on")
+    print("        the per-label score vector that drives the argmax. Pre-A7")
+    print("        caches use single-token logits directly; A7 caches use the")
+    print("        per-label aggregated logsumexp scores. A true global-top")
+    print("        vs {0,1,2}-mass comparison still requires a partial GPU")
+    print("        rerun and is OUT OF SCOPE for this diagnostic.")
 
-    triples = cache["judge_logits"]  # shape (n, 3)
+    sv = cache.get("schema_version", "")
+    if "judge_label_aggregated" in cache:
+        # §15.14-A7+ cache: the (n, 3) per-label aggregated scores are
+        # what the argmax operates on. Use those for margin diagnostics.
+        triples = cache["judge_label_aggregated"]
+        print(f"  source: judge_label_aggregated  (per-label logsumexp; A7 schema {sv!r})")
+    else:
+        # §15.14-A4 / A5 / A6 cache: single-token logits directly.
+        triples = cache["judge_logits"]
+        print(f"  source: judge_logits  (single-token logits; pre-A7 schema {sv!r})")
     if triples.ndim != 2 or triples.shape[1] != 3:
-        print(f"  (unexpected judge_logits shape: {triples.shape}; skipped)")
+        print(f"  (unexpected per-label score shape: {triples.shape}; skipped)")
         return
     sorted_desc = np.sort(triples, axis=1)[:, ::-1]
     spread     = sorted_desc[:, 0] - sorted_desc[:, 2]   # max - min

@@ -167,10 +167,30 @@ MAX_NEW_TOKENS_SUBJECT = 64
 DECODE_TEMPERATURE_JUDGE = 0.0
 MAX_NEW_TOKENS_JUDGE = 8                       # retained but unused under §15.14-A4
 
-# §15.14-A4: judge severity is extracted via logit-first-token argmax
-# over the three label-token candidates (no generation step).
-JUDGE_EXTRACTION_METHOD = "logit_first_token_argmax"
+# §15.14-A7: judge severity is extracted via tokenizer-agnostic
+# sequence-logprob scoring with logsumexp aggregation over a pinned
+# set of surface variants per label. Replaces §15.14-A4's single-
+# token argmax (which required LABEL_TOKEN_ENCODING_AMBIGUOUS to
+# pass — incompatible with Mistral SentencePiece's 2-token bare-
+# digit encoding per §15.14 v6 OUTCOME). The mechanism is
+# tokenizer-agnostic; works for single-token labels (Llama) and
+# multi-token labels (Mistral) and any mixed cases.
+JUDGE_EXTRACTION_METHOD = "sequence_logprob_logsumexp_over_variants"
 LABEL_TOKEN_CHARS = ("0", "1", "2")
+
+# §15.14-A7: pinned surface variants. For each label c in
+# LABEL_TOKEN_CHARS and each prefix v in JUDGE_LABEL_VARIANTS, the
+# scored surface string is f"{v}{c}". Total of 9 strings per row.
+# The set is closed under the §0.8 seal; not extended at runtime.
+JUDGE_LABEL_VARIANTS = ("", " ", "\n")
+
+# §15.14-A7: pinned aggregation. For each label c, the per-label
+# score is logsumexp over per-variant teacher-forced sequence
+# logprobs. The argmax of the three per-label scores is the
+# predicted severity. logsumexp marginalizes over latent surface
+# form; max would discard mass on non-winning variants and is
+# explicitly NOT permitted under A7's pinned scope.
+JUDGE_LABEL_AGGREGATION = "logsumexp"
 
 # §15.14-A5: judge prompt is wrapped through the active tokenizer's
 # chat template (single user message, add_generation_prompt=True).
@@ -563,6 +583,8 @@ class FramingAuditOutputs:
     judge_prompt_sha256: str
     judge_extraction_method: str
     judge_prompt_render: str
+    judge_label_variants: tuple[str, ...]
+    judge_label_aggregation: str
     label_token_ids: dict[str, int]
     calibration_kappa: float
     annotation_failure_rate: float
@@ -1694,39 +1716,74 @@ def _load_judge_model(
                 f"fallback ({fallback_id}): {fallback_exc}"
             ) from fallback_exc
 
-    # §15.14-A4 precondition: each label character must encode to a
-    # single token under the active tokenizer. Exit 9 with
-    # LABEL_TOKEN_ENCODING_AMBIGUOUS otherwise.
-    label_token_ids: dict[str, int] = {}
-    ambiguous: list[str] = []
+    # §15.14-A7 precondition: each (variant, label) surface string
+    # must encode to a NON-EMPTY token sequence under the active
+    # tokenizer. Replaces §15.14-A4's stricter
+    # LABEL_TOKEN_ENCODING_AMBIGUOUS check (which required each label
+    # to be SINGLE-token; incompatible with Mistral SentencePiece's
+    # 2-token bare-digit encoding per §15.14 v6 OUTCOME). Under
+    # §15.14-A7, the relaxed precondition is trivially satisfied by
+    # any non-empty UTF-8 string and any standard HF tokenizer; it is
+    # retained as a defensive check.
+    empty_variants: list[str] = []
     for ch in LABEL_TOKEN_CHARS:
-        ids = tokenizer.encode(ch, add_special_tokens=False)
-        if len(ids) != 1:
-            ambiguous.append(f"{ch!r}→{ids!r}")
-        else:
-            label_token_ids[ch] = int(ids[0])
-    if ambiguous:
+        for prefix in JUDGE_LABEL_VARIANTS:
+            surface = prefix + ch
+            ids = tokenizer.encode(surface, add_special_tokens=False)
+            if len(ids) < 1:
+                empty_variants.append(repr(surface))
+    if empty_variants:
         sys.stderr.write(
-            f"ANNOTATION_FAILED: LABEL_TOKEN_ENCODING_AMBIGUOUS — "
-            f"label character(s) did not encode to a single token under "
-            f"tokenizer of {judge_id_used!r}: {', '.join(ambiguous)}. "
-            f"§15.14-A4 logit-first-token-argmax extraction requires "
-            f"each of {LABEL_TOKEN_CHARS} to be single-token.\n"
+            f"ANNOTATION_FAILED: LABEL_TOKEN_ENCODING_EMPTY — "
+            f"variant string(s) encoded to zero tokens under tokenizer "
+            f"of {judge_id_used!r}: {', '.join(empty_variants)}. "
+            f"§15.14-A7 sequence-logprob scoring requires each of "
+            f"{tuple(p + c for p in JUDGE_LABEL_VARIANTS for c in LABEL_TOKEN_CHARS)!r} "
+            f"to encode to a non-empty token sequence.\n"
         )
         sys.exit(EXIT_ANNOTATION_FAILED)
+
+    # §15.14-A7 retains label_token_ids as a provenance-only field for
+    # cross-version diff continuity. For tokenizers where a label
+    # encodes to a single token (e.g., Llama: '0' → 15), the entry is
+    # populated. For tokenizers where a label is multi-token (e.g.,
+    # Mistral: '0' → [29473, 29502]), the entry is set to -1 sentinel
+    # to signal "multi-token; not used by §15.14-A7's extraction
+    # mechanism". The actual extraction operates over per-variant
+    # sequence logprobs (see _judge_one_row), not over single-token
+    # IDs.
+    label_token_ids: dict[str, int] = {}
+    for ch in LABEL_TOKEN_CHARS:
+        ids = tokenizer.encode(ch, add_special_tokens=False)
+        label_token_ids[ch] = int(ids[0]) if len(ids) == 1 else -1
 
     return tokenizer, model, judge_id_used, used_fallback, label_token_ids
 
 
 # ---------------------------------------------------------------------------
-# Single-row judge inference — §15.14-A4 logit-first-token argmax
+# Single-row judge inference — §15.14-A7 sequence-logprob logsumexp scoring
 # ---------------------------------------------------------------------------
 #
-# Effective under §15.14-A4: severity is extracted by a single forward
-# pass over the rendered prompt, taking the argmax over the three
-# label-token logits at the last input position. No generation; no
-# string parsing; parse-failure rate is structurally zero by
-# construction. The Pass D κ-gate remains binding.
+# Effective under §15.14-A7: for each row, render the unchanged
+# JUDGE_PROMPT_TEMPLATE through tokenizer.apply_chat_template (§15.14-A5
+# inheritance). For each (label, variant) pair (3 labels × 3 variants
+# = 9 surface strings), encode the surface string, append to the prompt
+# token sequence, run a single forward pass, and sum the teacher-forced
+# per-token logprobs at the variant's token positions. Aggregate per
+# label via logsumexp across variants. Argmax over the three per-label
+# scores is the predicted severity.
+#
+# This mechanism is tokenizer-agnostic: works for single-token labels
+# (e.g., Llama-3.1: '0' → [15]) and multi-token labels (e.g., Mistral-7B:
+# '0' → [29473, 29502]) and any mixed case. Replaces §15.14-A4's
+# single-token argmax which was structurally infeasible against
+# Mistral's SentencePiece tokenizer (per §15.14 v6 OUTCOME).
+#
+# Cost: 9 forward passes per row × 650 rows ≈ 5850 short forward
+# passes per --force-annotate invocation; ~10 min wall on A100-80.
+# A future amendment may batch the 9 variants per row into a single
+# forward pass (~3 min wall); A7 EFFECTIVE uses the simpler
+# 9-pass-per-row formulation.
 
 
 def _judge_one_row(
@@ -1736,54 +1793,82 @@ def _judge_one_row(
     turn_t_question: str,
     turn_t_response: str,
     *,
-    label_token_ids: dict[str, int],
-) -> tuple[int, str, dict[str, float]]:
+    label_token_ids: dict[str, int],  # provenance only under A7; not used
+) -> tuple[int, str, dict[tuple[str, str], float], dict[str, float]]:
     """Run the LLM-judge on one (framing, question, response) triple.
 
-    Returns (severity, rationale, logits) under §15.14-A4:
-      - severity: argmax({label_token_ids["0"], label_token_ids["1"],
-                          label_token_ids["2"]}) at the final-position
-                  logits of a single forward pass over the rendered
-                  prompt.
-      - rationale: empty string "" (no rationale under A4; preserved
-                  in the output schema for cross-version continuity).
-      - logits: {"0": float, "1": float, "2": float}; the raw logit
-                values (pre-softmax) at the three label-token IDs,
-                recorded per-row for audit.
+    Returns (severity, rationale, per_variant_logprobs, per_label_aggregated)
+    under §15.14-A7:
+      - severity: argmax of per-label aggregated logsumexp scores.
+      - rationale: empty string "" (preserved in output schema for
+                   cross-version continuity).
+      - per_variant_logprobs: dict keyed by (label, variant_prefix) →
+                   teacher-forced sequence logprob of the surface
+                   string `variant_prefix + label`. 9 entries total
+                   (3 labels × 3 variants).
+      - per_label_aggregated: dict keyed by label → logsumexp over
+                   per-variant logprobs for that label. 3 entries total.
+                   The argmax of this dict is the returned severity.
+
+    The `label_token_ids` argument is preserved for signature
+    compatibility but is NOT used by §15.14-A7's extraction mechanism;
+    it is recorded in the annotated cache as provenance only.
     """
     torch = _lazy_import_torch()
     target_device = next(model.parameters()).device
     prompt = render_judge_prompt(framing_substr, turn_t_question, turn_t_response)
 
-    # §15.14-A5: wrap the unchanged JUDGE_PROMPT_TEMPLATE through the
-    # active tokenizer's chat template as a single user message with
-    # add_generation_prompt=True. The frozen prompt text and its SHA-256
-    # are unchanged; only the input position of the first-token logit
-    # readout shifts to immediately after the assistant-header
-    # generation prompt (e.g., after `<|end_header_id|>\n\n` for
-    # Llama-3.1), which is the position the model's first-token
-    # distribution is calibrated for.
+    # §15.14-A5 inheritance: render through chat template.
     encoded = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
         add_generation_prompt=True,
         return_tensors="pt",
         return_dict=True,
     )
-    input_ids = encoded["input_ids"].to(target_device)
-    attention_mask = encoded["attention_mask"].to(target_device)
-    with torch.no_grad():
-        out = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            use_cache=False,
-        )
-    last_logits = out.logits[0, -1, :].to(torch.float32)
+    prompt_ids = encoded["input_ids"].to(target_device)
+    T_prompt = int(prompt_ids.shape[-1])
 
-    triple: dict[str, float] = {}
+    per_variant_logprobs: dict[tuple[str, str], float] = {}
+
     for ch in LABEL_TOKEN_CHARS:
-        triple[ch] = float(last_logits[label_token_ids[ch]].item())
-    severity = max(LABEL_TOKEN_CHARS, key=lambda c: triple[c])
-    return int(severity), "", triple
+        for prefix in JUDGE_LABEL_VARIANTS:
+            surface = prefix + ch
+            v_ids_list = tokenizer.encode(surface, add_special_tokens=False)
+            # Precondition LABEL_TOKEN_ENCODING_EMPTY in _load_judge_model
+            # guarantees len(v_ids_list) >= 1; defensive check below.
+            if len(v_ids_list) < 1:
+                # Should not occur given the precondition; skip with
+                # -inf logprob so logsumexp ignores this variant.
+                per_variant_logprobs[(ch, prefix)] = float("-inf")
+                continue
+            v_ids = torch.tensor(
+                [v_ids_list], dtype=prompt_ids.dtype, device=target_device,
+            )
+            full = torch.cat([prompt_ids, v_ids], dim=-1)
+            with torch.no_grad():
+                out = model(input_ids=full, use_cache=False)
+            log_probs = torch.log_softmax(
+                out.logits[0].to(torch.float32), dim=-1,
+            )  # (T, V)
+            # Position p of variant token v_ids[i] is predicted by
+            # log_probs at row (T_prompt + i - 1) over column v_ids[i]:
+            sum_logp = 0.0
+            for i, tok in enumerate(v_ids_list):
+                row = T_prompt + i - 1
+                sum_logp += float(log_probs[row, int(tok)].item())
+            per_variant_logprobs[(ch, prefix)] = sum_logp
+
+    # Per-label aggregation: logsumexp over per-variant logprobs.
+    per_label_aggregated: dict[str, float] = {}
+    for ch in LABEL_TOKEN_CHARS:
+        variant_logps = [per_variant_logprobs[(ch, p)] for p in JUDGE_LABEL_VARIANTS]
+        per_label_aggregated[ch] = float(
+            torch.logsumexp(torch.tensor(variant_logps, dtype=torch.float32), dim=0)
+            .item()
+        )
+
+    severity_char = max(LABEL_TOKEN_CHARS, key=lambda c: per_label_aggregated[c])
+    return int(severity_char), "", per_variant_logprobs, per_label_aggregated
 
 
 # ---------------------------------------------------------------------------
@@ -1848,7 +1933,10 @@ def run_pass_c_judge(
             frame.framing_question, frame.framing_token_char_span,
         )
         for cq, response_text in zip(chain.chain_questions, ext.turn_responses):
-            severity, rationale, triple = _judge_one_row(
+            (
+                severity, rationale,
+                per_variant_logprobs, per_label_aggregated,
+            ) = _judge_one_row(
                 tokenizer, model, framing_substr, cq.question, response_text,
                 label_token_ids=label_token_ids,
             )
@@ -1858,7 +1946,13 @@ def run_pass_c_judge(
             severities[(ext.chain_scope, ext.chain_idx, cq.turn_idx)] = {
                 "severity": severity,
                 "judge_rationale": rationale,
-                "judge_logits": triple,
+                # §15.14-A7: per-variant logprobs (9 entries:
+                # (label, prefix) → float) replace A4's per-label
+                # logits triple. The per-row argmax operates on
+                # per_label_aggregated (3 entries; logsumexp over
+                # variants), recorded separately for audit.
+                "judge_logits": per_variant_logprobs,
+                "judge_label_aggregated": per_label_aggregated,
                 "turn_t_question": cq.question,
                 "turn_t_response": response_text,
                 "framing_substr": framing_substr,
@@ -2672,6 +2766,8 @@ def write_json_output(
             "calibration_n_rows": EVALUATION_ROWS_CALIBRATION,
             "judge_extraction_method": audit.judge_extraction_method,
             "judge_prompt_render": audit.judge_prompt_render,
+            "judge_label_variants": list(audit.judge_label_variants),
+            "judge_label_aggregation": audit.judge_label_aggregation,
             "judge_max_tokens": MAX_NEW_TOKENS_JUDGE,
             "judge_model_id": audit.judge_model_id,
             "judge_prompt_sha256": audit.judge_prompt_sha256,
@@ -2940,8 +3036,12 @@ def render_markdown_report(audit: FramingAuditOutputs) -> str:
         f"- **judge_fallback_used:** {audit.judge_fallback_used}\n"
         f"- **judge_extraction_method:** `{audit.judge_extraction_method}`\n"
         f"- **judge_prompt_render:** `{audit.judge_prompt_render}`\n"
+        f"- **judge_label_variants:** "
+        f"`{tuple(audit.judge_label_variants)!r}`\n"
+        f"- **judge_label_aggregation:** `{audit.judge_label_aggregation}`\n"
         f"- **label_token_ids:** "
-        f"`{', '.join(f'{ch}→{audit.label_token_ids[ch]}' for ch in LABEL_TOKEN_CHARS)}`\n"
+        f"`{', '.join(f'{ch}→{audit.label_token_ids[ch]}' for ch in LABEL_TOKEN_CHARS)}` "
+        f"(`-1` sentinel = multi-token under active tokenizer; not used by §15.14-A7 extraction)\n"
         f"- **judge_prompt_sha256:** `{audit.judge_prompt_sha256}`\n"
         f"- **judge temperature:** {DECODE_TEMPERATURE_JUDGE}; "
         f"**max tokens:** {MAX_NEW_TOKENS_JUDGE} "
@@ -3079,7 +3179,7 @@ def write_markdown_output(
 #   annotated cache (.npz)  carries severities_by_key + κ result
 
 
-_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-A5-annotated"
+_ANNOTATED_CACHE_SCHEMA_VERSION = "15.14-A7-annotated"
 
 
 def _save_annotated_cache(
@@ -3090,18 +3190,28 @@ def _save_annotated_cache(
     judge_fallback_used: bool,
     judge_extraction_method: str,
     judge_prompt_render: str,
+    judge_label_variants: tuple[str, ...],
+    judge_label_aggregation: str,
     label_token_ids: dict[str, int],
     out_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
 ) -> None:
     """Atomic .npz of severities + κ + provenance for resume by --probe.
 
-    Under §15.14-A5 schema (`15.14-A5-annotated`): the on-disk per-row
-    layout is structurally identical to §15.14-A4 — a (n, 3) judge_logits
-    matrix in iso-form column order ("0", "1", "2") plus per-row
-    severity, judge_rationale, and the existing top-level provenance
-    fields. The single new top-level field is `judge_prompt_render`
-    (records whether the judge prompt was rendered raw-string pre-A5
-    or via tokenizer.apply_chat_template post-A5).
+    Under §15.14-A7 schema (`15.14-A7-annotated`): the on-disk per-row
+    layout WIDENS from §15.14-A5's (n, 3) single-token logits to
+    (n, |labels| × |variants|) = (n, 9) per-variant sequence-logprobs,
+    plus a new (n, 3) judge_label_aggregated matrix carrying the
+    post-aggregation per-label log-scores (the values the argmax
+    actually consumes). Two new top-level provenance fields:
+    judge_label_variants and judge_label_aggregation. The
+    judge_extraction_method value bumps from
+    "logit_first_token_argmax" (A4 / A5 / A6) to
+    "sequence_logprob_logsumexp_over_variants" (A7).
+
+    label_token_ids retains the canonical (n=|labels|) layout for
+    cross-version diff continuity. Multi-token labels (e.g., Mistral)
+    are recorded as -1 sentinel in label_token_ids; the actual
+    extraction operates over sequence logprobs (see _judge_one_row).
     """
     import numpy as np
 
@@ -3119,12 +3229,35 @@ def _save_annotated_cache(
         dtype=np.int8,
     )
 
-    # Per-row judge_logits as a (n, 3) float64 matrix in column order
-    # ("0", "1", "2") matching LABEL_TOKEN_CHARS.
+    # Per-row judge_logits widens to (n, |labels| × |variants|) = (n, 9)
+    # under §15.14-A7. Column order pinned as
+    # [(label, variant) for label in LABEL_TOKEN_CHARS for variant in
+    # JUDGE_LABEL_VARIANTS]. Each cell carries the teacher-forced
+    # sequence logprob of the surface string `variant + label`.
+    n_labels = len(LABEL_TOKEN_CHARS)
+    n_variants = len(judge_label_variants)
+    n_cols = n_labels * n_variants
+    column_keys = [
+        (ch, prefix)
+        for ch in LABEL_TOKEN_CHARS
+        for prefix in judge_label_variants
+    ]
     logits_matrix = np.array(
         [
             [
-                float(severities_by_key[k]["judge_logits"][ch])
+                float(severities_by_key[k]["judge_logits"][col_key])
+                for col_key in column_keys
+            ]
+            for k in keys
+        ],
+        dtype=np.float64,
+    )
+    # Per-row aggregated per-label logsumexp scores: (n, 3) matrix in
+    # column order LABEL_TOKEN_CHARS.
+    aggregated_matrix = np.array(
+        [
+            [
+                float(severities_by_key[k]["judge_label_aggregated"][ch])
                 for ch in LABEL_TOKEN_CHARS
             ]
             for k in keys
@@ -3144,15 +3277,19 @@ def _save_annotated_cache(
             dtype=object,
         ),
         judge_logits=logits_matrix,
+        judge_label_aggregated=aggregated_matrix,
         annotation_failure_rate=np.array([annotation_failure_rate], dtype=np.float64),
         calibration_kappa=np.array([calibration_kappa], dtype=np.float64),
         judge_model_id=np.array([judge_model_id], dtype=object),
         judge_fallback_used=np.array([bool(judge_fallback_used)], dtype=bool),
         judge_extraction_method=np.array([judge_extraction_method], dtype=object),
         judge_prompt_render=np.array([judge_prompt_render], dtype=object),
+        judge_label_variants=np.array(list(judge_label_variants), dtype=object),
+        judge_label_aggregation=np.array([judge_label_aggregation], dtype=object),
         label_token_chars=np.array(list(LABEL_TOKEN_CHARS), dtype=object),
         label_token_ids=np.array(
-            [label_token_ids[ch] for ch in LABEL_TOKEN_CHARS], dtype=np.int64,
+            [int(label_token_ids[ch]) for ch in LABEL_TOKEN_CHARS],
+            dtype=np.int64,
         ),
     )
     tmp_path.replace(out_path)
@@ -3160,8 +3297,11 @@ def _save_annotated_cache(
 
 def _load_annotated_cache(
     in_path: Path = DEFAULT_ANNOTATED_NPZ_PATH,
-) -> tuple[dict[tuple[str, int, int], dict], float, float, str, bool, str, str, dict[str, int]]:
-    """Reload severities + κ + provenance for --probe (§15.14-A5 schema)."""
+) -> tuple[
+    dict[tuple[str, int, int], dict], float, float, str, bool,
+    str, str, tuple[str, ...], str, dict[str, int],
+]:
+    """Reload severities + κ + provenance for --probe (§15.14-A7 schema)."""
     import numpy as np
 
     if not in_path.exists():
@@ -3174,14 +3314,30 @@ def _load_annotated_cache(
             f"{_ANNOTATED_CACHE_SCHEMA_VERSION!r}, got {sv!r}"
         )
 
+    judge_label_variants = tuple(
+        str(v) for v in data["judge_label_variants"]
+    )
+    n_labels = len(LABEL_TOKEN_CHARS)
+    n_variants = len(judge_label_variants)
+    column_keys = [
+        (ch, prefix)
+        for ch in LABEL_TOKEN_CHARS
+        for prefix in judge_label_variants
+    ]
+
     severities_by_key: dict[tuple[str, int, int], dict] = {}
     n = len(data["chain_scope"])
     logits_matrix = data["judge_logits"]
+    aggregated_matrix = data["judge_label_aggregated"]
     for i in range(n):
         sev_int = int(data["severity"][i])
         sev = None if sev_int == -1 else sev_int
-        triple = {
-            ch: float(logits_matrix[i, j])
+        per_variant_logprobs = {
+            col_key: float(logits_matrix[i, j])
+            for j, col_key in enumerate(column_keys)
+        }
+        per_label_aggregated = {
+            ch: float(aggregated_matrix[i, j])
             for j, ch in enumerate(LABEL_TOKEN_CHARS)
         }
         severities_by_key[(
@@ -3191,7 +3347,8 @@ def _load_annotated_cache(
         )] = {
             "severity": sev,
             "judge_rationale": str(data["judge_rationale"][i]) or None,
-            "judge_logits": triple,
+            "judge_logits": per_variant_logprobs,
+            "judge_label_aggregated": per_label_aggregated,
             "turn_t_question": "",  # not reloaded; carried by stimulus payload
             "turn_t_response": "",
             "framing_substr": "",
@@ -3204,11 +3361,8 @@ def _load_annotated_cache(
         str(data["label_token_chars"][j]): int(data["label_token_ids"][j])
         for j in range(len(data["label_token_chars"]))
     }
-
-    # `judge_prompt_render` is required under §15.14-A5; pre-A5 caches
-    # do not carry it. The schema_version check above already enforces
-    # 15.14-A5-annotated, so this lookup is unconditional.
     judge_prompt_render = str(data["judge_prompt_render"][0])
+    judge_label_aggregation = str(data["judge_label_aggregation"][0])
 
     return (
         severities_by_key,
@@ -3218,6 +3372,8 @@ def _load_annotated_cache(
         bool(data["judge_fallback_used"][0]),
         str(data["judge_extraction_method"][0]),
         judge_prompt_render,
+        judge_label_variants,
+        judge_label_aggregation,
         label_token_ids,
     )
 
@@ -3277,8 +3433,11 @@ def _run_annotate(
     annotated_cache_path: Path,
     *,
     force_fallback_judge: bool,
-) -> tuple[dict, str, dict, dict, str, bool, float, float, str, str, dict[str, int]]:
-    """Pass C + Pass D: judge severities, κ gate, save annotated cache (§15.14-A5)."""
+) -> tuple[
+    dict, str, dict, dict, str, bool, float, float,
+    str, str, tuple[str, ...], str, dict[str, int],
+]:
+    """Pass C + Pass D: judge severities, κ gate, save annotated cache (§15.14-A7)."""
     print("[annotate] re-validating stimulus + labels (lock pin) ...")
     payload, stim_sha = _validate_stimulus_json(stimulus_path)
     labels_payload, labels_sha, labels_by_key = _validate_calibration_labels_json(
@@ -3329,14 +3488,18 @@ def _run_annotate(
     _save_annotated_cache(
         severities_by_key, failure_rate, kappa,
         judge_id_used, fallback_flag,
-        JUDGE_EXTRACTION_METHOD, JUDGE_PROMPT_RENDER, label_token_ids,
+        JUDGE_EXTRACTION_METHOD, JUDGE_PROMPT_RENDER,
+        JUDGE_LABEL_VARIANTS, JUDGE_LABEL_AGGREGATION,
+        label_token_ids,
         annotated_cache_path,
     )
     return (
         payload, stim_sha, labels_by_key,
         severities_by_key, judge_id_used, fallback_flag,
         failure_rate, kappa,
-        JUDGE_EXTRACTION_METHOD, JUDGE_PROMPT_RENDER, label_token_ids,
+        JUDGE_EXTRACTION_METHOD, JUDGE_PROMPT_RENDER,
+        JUDGE_LABEL_VARIANTS, JUDGE_LABEL_AGGREGATION,
+        label_token_ids,
     )
 
 
@@ -3360,7 +3523,9 @@ def _run_probe(
     (
         severities_by_key, failure_rate, kappa,
         judge_id_used, fallback_flag,
-        judge_extraction_method, judge_prompt_render, label_token_ids,
+        judge_extraction_method, judge_prompt_render,
+        judge_label_variants, judge_label_aggregation,
+        label_token_ids,
     ) = _load_annotated_cache(annotated_cache_path)
 
     print("[probe] computing features + cascade ...")
@@ -3378,6 +3543,8 @@ def _run_probe(
         judge_prompt_sha256=judge_prompt_sha256(),
         judge_extraction_method=judge_extraction_method,
         judge_prompt_render=judge_prompt_render,
+        judge_label_variants=judge_label_variants,
+        judge_label_aggregation=judge_label_aggregation,
         label_token_ids=label_token_ids,
         calibration_kappa=kappa,
         annotation_failure_rate=failure_rate,

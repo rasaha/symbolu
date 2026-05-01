@@ -1982,12 +1982,31 @@ judge family with the inherited A4 + A5 mechanics.
 
 ### §15.14-A7 — tokenizer-agnostic sequence-logprob label scoring (replaces single-token argmax extraction)
 
-**Status:** PROPOSED. The status field will flip to EFFECTIVE only
-after the user replies with the literal phrase
-`Sign off §15.14-A7. Push the EFFECTIVE follow-up.` and a separate
-EFFECTIVE follow-up commit is pushed that flips this status field
-and applies the implementation surface enumerated below. This
-two-phase discipline mirrors §15.14-A1 / A2 / A3 / A4 / A5 / A6.
+**Status:** EFFECTIVE per user sign-off recorded in the commit that
+flipped this status field (the immediate predecessor of this
+document version on branch `claude/diagnose-framing-kappa-L6dmt`).
+Sign-off correspondence used the literal phrase
+`Sign off §15.14-A7. Push the EFFECTIVE follow-up.` and explicitly
+bounded the EFFECTIVE scope to: replace single-token label argmax
+with tokenizer-agnostic sequence-logprob scoring; pin
+`JUDGE_LABEL_VARIANTS = ("", " ", "\n")`; pin
+`JUDGE_LABEL_AGGREGATION = "logsumexp"`; pin
+`JUDGE_EXTRACTION_METHOD = "sequence_logprob_logsumexp_over_variants"`;
+keep §15.14-A5 chat-template rendering; keep §15.14-A6 Mistral-7B
+fallback judge identity; keep `LABEL_TOKEN_CHARS = ("0", "1", "2")`
+as the only severity labels; replace
+`LABEL_TOKEN_ENCODING_AMBIGUOUS` with a non-empty-token-sequence
+check; record per-row variant logprobs and aggregated label scores
+for audit; do NOT change human labels, locked SHAs, severity
+rubric, KAPPA_GATE_THRESHOLD = 0.6 inclusive, BINARY_LABEL_THRESHOLD,
+DIRECTION_GATE_THRESHOLD, AUC thresholds, cascade structure,
+firewall, sign direction, prior v1 / v2 / v3 / v4 / v6
+verdict-records, judge model identity, surface variants beyond
+("", " ", "\n"), aggregation method, or authorize Mixtral / 70B /
+quantization. After the EFFECTIVE flip, no automatic run; the
+RunPod execution under the EFFECTIVE follow-up is a **separate**
+user authorization recorded after the implementation summary is
+shown.
 
 **Scope.** Two surgical code changes inside
 `scripts/probe_framing_15_14.py`:
