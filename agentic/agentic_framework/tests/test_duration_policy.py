@@ -182,7 +182,9 @@ class TestPolicyUnit:
         p = DurationPolicy(max_run_duration_s=30.0, max_action_duration_s=5.0)
         d = p.to_dict()
         json.dumps(d)
-        assert d == {"max_run_duration_s": 30.0, "max_action_duration_s": 5.0}
+        # Assert the v1 fields without forbidding additive v2+ fields.
+        assert d["max_run_duration_s"] == 30.0
+        assert d["max_action_duration_s"] == 5.0
 
     def test_policy_frozen(self):
         p = DurationPolicy(max_run_duration_s=10.0)

@@ -47,6 +47,7 @@ USAGE_UPDATED = "usage_updated"
 BUDGET_EXCEEDED = "budget_exceeded"
 DEADLINE_EXCEEDED = "deadline_exceeded"
 ACTION_TIMEOUT = "action_timeout"
+APPROVAL_EXPIRED = "approval_expired"
 
 
 # ---------------------------------------------------------------------------

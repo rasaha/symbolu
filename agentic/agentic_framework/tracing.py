@@ -41,6 +41,7 @@ from agentic.agentic_framework.streaming_events import (
     BUDGET_EXCEEDED,
     DEADLINE_EXCEEDED,
     ACTION_TIMEOUT,
+    APPROVAL_EXPIRED,
 )
 
 
@@ -93,6 +94,10 @@ class AgentRunTrace:
     max_run_duration_s: Optional[float] = None
     max_action_duration_s: Optional[float] = None
 
+    # --- duration v2: approval expiry ---
+    approvals_expired: int = 0
+    max_approval_ttl_s: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialise to a JSON-safe dict."""
         return {
@@ -121,6 +126,8 @@ class AgentRunTrace:
             "elapsed_s": self.elapsed_s,
             "max_run_duration_s": self.max_run_duration_s,
             "max_action_duration_s": self.max_action_duration_s,
+            "approvals_expired": self.approvals_expired,
+            "max_approval_ttl_s": self.max_approval_ttl_s,
             "events": [e.to_dict() for e in self.events],
         }
 
@@ -249,6 +256,15 @@ def _build_trace(events: List[AgentRunEvent]) -> AgentRunTrace:
 
     if trace.deadline_exceeded and trace.status == "unknown":
         trace.status = "deadline_exceeded"
+
+    # Duration v2: approval expiry
+    expired_evts = [e for e in events if e.event_type == APPROVAL_EXPIRED]
+    trace.approvals_expired = len(expired_evts)
+    for evt in expired_evts:
+        ttl = evt.payload.get("approval_ttl_s")
+        if ttl is not None:
+            trace.max_approval_ttl_s = ttl
+            break
 
     return trace
 

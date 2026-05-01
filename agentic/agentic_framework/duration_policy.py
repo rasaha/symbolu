@@ -76,10 +76,18 @@ class DurationPolicy:
             as ``BudgetPolicy``.
         max_action_duration_s: Hard cap on wall-clock seconds for a single
             ``ACTION_STARTED`` -> ``ACTION_COMPLETED`` span.
+        approval_ttl_s: Hard cap on wall-clock seconds an
+            ``APPROVAL_REQUESTED`` may block waiting for the controller
+            callback.  When exceeded the runtime emits
+            ``APPROVAL_EXPIRED`` (non-terminal), marks the action denied
+            with ``reason="expired"``, and continues to the next action.
+            ``None`` (default) preserves v1 behaviour — the controller
+            blocks indefinitely.
     """
 
     max_run_duration_s: Optional[float] = None
     max_action_duration_s: Optional[float] = None
+    approval_ttl_s: Optional[float] = None
 
     def run_exceeded(self, elapsed_s: float) -> Optional[str]:
         """Return a human-readable reason if the run-level deadline is
@@ -106,6 +114,20 @@ class DurationPolicy:
             return (
                 f"Action elapsed {elapsed_s:.3f}s exceeds deadline "
                 f"{self.max_action_duration_s:.3f}s"
+            )
+        return None
+
+    def approval_exceeded(self, elapsed_s: float) -> Optional[str]:
+        """Return a human-readable reason if the approval wait exceeded
+        the TTL, or ``None`` if still within it.
+        """
+        if (
+            self.approval_ttl_s is not None
+            and elapsed_s > self.approval_ttl_s
+        ):
+            return (
+                f"Approval wait {elapsed_s:.3f}s exceeds TTL "
+                f"{self.approval_ttl_s:.3f}s"
             )
         return None
 

@@ -98,6 +98,7 @@ from agentic.agentic_framework.streaming_events import (
     BUDGET_EXCEEDED,
     DEADLINE_EXCEEDED,
     ACTION_TIMEOUT,
+    APPROVAL_EXPIRED,
 )
 from agentic.agentic_framework.coherence_tracker import (
     CoherenceState,
@@ -892,7 +893,56 @@ class AgenticLLMWrapper:
                             "description": action.description,
                             "reason": pending.reason,
                         }))
-                        response = _ac.request_approval(pending)
+                        _approval_started = time.monotonic()
+                        _approval_expired = False
+                        if (
+                            _dp is not None
+                            and _dp.approval_ttl_s is not None
+                        ):
+                            # Mirrors the per-action timeout pattern: leak
+                            # the runaway thread on expiry; Python cannot
+                            # kill it, but its eventual response cannot
+                            # affect the run because we have already moved
+                            # on past ACTION_COMPLETED.
+                            _ap_pool = concurrent.futures.ThreadPoolExecutor(
+                                max_workers=1,
+                            )
+                            try:
+                                _ap_future = _ap_pool.submit(
+                                    _ac.request_approval, pending,
+                                )
+                                try:
+                                    response = _ap_future.result(
+                                        timeout=_dp.approval_ttl_s,
+                                    )
+                                except concurrent.futures.TimeoutError:
+                                    _approval_expired = True
+                                    response = None
+                            finally:
+                                _ap_pool.shutdown(wait=False)
+                        else:
+                            response = _ac.request_approval(pending)
+                        if _approval_expired:
+                            _ap_elapsed = time.monotonic() - _approval_started
+                            _ap_reason = _dp.approval_exceeded(_ap_elapsed) or (
+                                f"Approval wait exceeded "
+                                f"{_dp.approval_ttl_s}s"
+                            )
+                            yield _emit(_evt(APPROVAL_EXPIRED, {
+                                "action_id": action.action_id,
+                                "action_type": action.action_type,
+                                "elapsed_s": _ap_elapsed,
+                                "approval_ttl_s": _dp.approval_ttl_s,
+                                "reason": _ap_reason,
+                            }))
+                            action.status = "denied"
+                            action.error = "expired"
+                            yield _emit(_evt(ACTION_COMPLETED, {
+                                "action_id": action.action_id,
+                                "status": action.status,
+                                "error": action.error,
+                            }))
+                            continue
                         yield _emit(_evt(APPROVAL_RESOLVED, {
                             "action_id": action.action_id,
                             "action_type": action.action_type,
@@ -1273,9 +1323,47 @@ class AgenticLLMWrapper:
                             "description": action.description,
                             "reason": pending.reason,
                         }))
-                        response = await asyncio.to_thread(
-                            _ac.request_approval, pending,
-                        )
+                        _approval_started = time.monotonic()
+                        _approval_expired = False
+                        if (
+                            _dp is not None
+                            and _dp.approval_ttl_s is not None
+                        ):
+                            try:
+                                response = await asyncio.wait_for(
+                                    asyncio.to_thread(
+                                        _ac.request_approval, pending,
+                                    ),
+                                    timeout=_dp.approval_ttl_s,
+                                )
+                            except asyncio.TimeoutError:
+                                _approval_expired = True
+                                response = None
+                        else:
+                            response = await asyncio.to_thread(
+                                _ac.request_approval, pending,
+                            )
+                        if _approval_expired:
+                            _ap_elapsed = time.monotonic() - _approval_started
+                            _ap_reason = _dp.approval_exceeded(_ap_elapsed) or (
+                                f"Approval wait exceeded "
+                                f"{_dp.approval_ttl_s}s"
+                            )
+                            yield _emit(_evt(APPROVAL_EXPIRED, {
+                                "action_id": action.action_id,
+                                "action_type": action.action_type,
+                                "elapsed_s": _ap_elapsed,
+                                "approval_ttl_s": _dp.approval_ttl_s,
+                                "reason": _ap_reason,
+                            }))
+                            action.status = "denied"
+                            action.error = "expired"
+                            yield _emit(_evt(ACTION_COMPLETED, {
+                                "action_id": action.action_id,
+                                "status": action.status,
+                                "error": action.error,
+                            }))
+                            continue
                         yield _emit(_evt(APPROVAL_RESOLVED, {
                             "action_id": action.action_id,
                             "action_type": action.action_type,
