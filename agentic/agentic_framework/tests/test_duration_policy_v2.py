@@ -1,22 +1,14 @@
 """
-Tests for DurationPolicy v2 — Batch B1 (approval expiry).
+Tests for DurationPolicy v2.
 
-Validates:
-1. Unit — `approval_ttl_s` field + `approval_exceeded()` semantics; back-
-   compat round-trip of `to_dict()`; frozen-dataclass invariant.
-2. Runtime — slow approval callback under `approval_ttl_s` emits one
-   `APPROVAL_EXPIRED` (and no `APPROVAL_RESOLVED`); marks the action
-   `denied` with `error="expired"`; the run continues to the next
-   action.
-3. Sync + async paths both honour the TTL.
-4. Trace counters — `approvals_expired` and `max_approval_ttl_s`
-   populated; existing `approvals_denied` still includes the expired
-   case (it counts denied-status `APPROVAL_RESOLVED` events; expired
-   approvals do NOT emit one — see test).
-5. Backward compatibility — `approval_ttl_s=None` produces an event
-   stream identical to v1's approval flow.
-6. Ordering — approval expiry resolves the action only, never
-   terminates the run.
+Batches covered:
+- B1 — approval expiry: policy field, APPROVAL_EXPIRED event, runtime
+  wrap of the controller callback (sync + async), trace counters,
+  ordering invariants.
+- B3 — duration observability metrics: `time_to_first_action_s` and
+  `time_to_first_approval_s` derived in `_build_trace` from event
+  timestamps; defensive handling of missing anchors and malformed
+  ordering.
 """
 
 import asyncio
@@ -48,8 +40,10 @@ from agentic.agentic_framework.streaming_events import (
     APPROVAL_REQUESTED,
     APPROVAL_RESOLVED,
     RUN_COMPLETED,
+    RUN_STARTED,
+    make_event,
 )
-from agentic.agentic_framework.tracing import TraceCollector
+from agentic.agentic_framework.tracing import TraceCollector, _build_trace
 
 
 _LONG = (
@@ -430,3 +424,191 @@ class TestApprovalExpiryOrdering:
         assert types.count(ACTION_STARTED) == 1
         # Run reached RUN_COMPLETED.
         assert types[-1] == RUN_COMPLETED
+
+
+# ===================================================================
+# B3 — Duration observability metrics
+# ===================================================================
+#
+# Pure trace-derivation tests: build event lists by hand and feed them
+# through `_build_trace`. No runtime/event-model changes are exercised
+# here — the runtime tests above already cover those.
+# ===================================================================
+
+
+def _evt(event_type: str, *, ts: str, turn_id: int = 0,
+         session_id: str = "s", payload=None):
+    """Build an AgentRunEvent with an explicit ISO timestamp."""
+    e = make_event(event_type, turn_id, session_id, payload or {})
+    e.timestamp = ts
+    return e
+
+
+class TestB3DurationMetricsUnit:
+    def test_time_to_first_action_basic(self):
+        events = [
+            _evt(RUN_STARTED, ts="2025-01-01T00:00:00+00:00"),
+            _evt(ACTION_STARTED, ts="2025-01-01T00:00:01.500000+00:00"),
+            _evt(ACTION_COMPLETED, ts="2025-01-01T00:00:02+00:00"),
+            _evt(RUN_COMPLETED, ts="2025-01-01T00:00:03+00:00"),
+        ]
+        trace = _build_trace(events)
+        assert trace.time_to_first_action_s == pytest.approx(1.5)
+        # No approval requested -> None
+        assert trace.time_to_first_approval_s is None
+
+    def test_time_to_first_approval_basic(self):
+        events = [
+            _evt(RUN_STARTED, ts="2025-01-01T00:00:00+00:00"),
+            _evt(APPROVAL_REQUESTED, ts="2025-01-01T00:00:00.250000+00:00"),
+            _evt(RUN_COMPLETED, ts="2025-01-01T00:00:05+00:00"),
+        ]
+        trace = _build_trace(events)
+        assert trace.time_to_first_approval_s == pytest.approx(0.25)
+        assert trace.time_to_first_action_s is None
+
+    def test_only_first_action_counts(self):
+        events = [
+            _evt(RUN_STARTED, ts="2025-01-01T00:00:00+00:00"),
+            _evt(ACTION_STARTED, ts="2025-01-01T00:00:01+00:00"),
+            _evt(ACTION_COMPLETED, ts="2025-01-01T00:00:02+00:00"),
+            _evt(ACTION_STARTED, ts="2025-01-01T00:00:10+00:00"),
+            _evt(ACTION_COMPLETED, ts="2025-01-01T00:00:11+00:00"),
+        ]
+        trace = _build_trace(events)
+        assert trace.time_to_first_action_s == pytest.approx(1.0)
+
+    def test_only_first_approval_counts(self):
+        events = [
+            _evt(RUN_STARTED, ts="2025-01-01T00:00:00+00:00"),
+            _evt(APPROVAL_REQUESTED, ts="2025-01-01T00:00:00.500000+00:00"),
+            _evt(APPROVAL_RESOLVED, ts="2025-01-01T00:00:01+00:00"),
+            _evt(APPROVAL_REQUESTED, ts="2025-01-01T00:00:05+00:00"),
+        ]
+        trace = _build_trace(events)
+        assert trace.time_to_first_approval_s == pytest.approx(0.5)
+
+    def test_missing_run_started_returns_none(self):
+        events = [
+            _evt(ACTION_STARTED, ts="2025-01-01T00:00:01+00:00"),
+            _evt(APPROVAL_REQUESTED, ts="2025-01-01T00:00:02+00:00"),
+        ]
+        trace = _build_trace(events)
+        assert trace.time_to_first_action_s is None
+        assert trace.time_to_first_approval_s is None
+
+    def test_missing_target_returns_none(self):
+        events = [
+            _evt(RUN_STARTED, ts="2025-01-01T00:00:00+00:00"),
+            _evt(RUN_COMPLETED, ts="2025-01-01T00:00:03+00:00"),
+        ]
+        trace = _build_trace(events)
+        assert trace.time_to_first_action_s is None
+        assert trace.time_to_first_approval_s is None
+
+    def test_empty_event_list_returns_none(self):
+        trace = _build_trace([])
+        assert trace.time_to_first_action_s is None
+        assert trace.time_to_first_approval_s is None
+
+    def test_negative_delta_clamped_to_zero(self):
+        # Malformed ordering: ACTION_STARTED stamped before RUN_STARTED.
+        # Defensive clamp — surfaces the field rather than swallowing it.
+        events = [
+            _evt(RUN_STARTED, ts="2025-01-01T00:00:05+00:00"),
+            _evt(ACTION_STARTED, ts="2025-01-01T00:00:00+00:00"),
+        ]
+        trace = _build_trace(events)
+        assert trace.time_to_first_action_s == 0.0
+
+    def test_unparseable_timestamp_returns_none(self):
+        events = [
+            _evt(RUN_STARTED, ts="not-a-real-timestamp"),
+            _evt(ACTION_STARTED, ts="2025-01-01T00:00:01+00:00"),
+        ]
+        trace = _build_trace(events)
+        assert trace.time_to_first_action_s is None
+
+
+class TestB3DurationMetricsTraceSurface:
+    def test_to_dict_includes_b3_fields(self):
+        agent = _make_agent()
+        collector = TraceCollector()
+        list(agent.run_stream("Hello", trace_collector=collector))
+        d = collector.build_trace().to_dict()
+        json.dumps(d)
+        assert "time_to_first_action_s" in d
+        assert "time_to_first_approval_s" in d
+
+    def test_summary_includes_b3_fields(self):
+        agent = _make_agent()
+        collector = TraceCollector()
+        list(agent.run_stream("Hello", trace_collector=collector))
+        summary = collector.build_trace().summary
+        assert "time_to_first_action_s" in summary
+        assert "time_to_first_approval_s" in summary
+
+    def test_no_action_no_approval_defaults_to_none(self):
+        # MockLLMAdapter produces a run with no actions and no approvals
+        # (fresh agent, no goal_state override) — but the rule-based
+        # decompose_goal_simple does inject one action. Use a permissive
+        # safety gate that blocks every action so none start.
+        from agentic.agentic_framework.safety_contract import (
+            SafetyContractEvaluator,
+            SafetyGate,
+        )
+        agent = _make_agent()
+        # Force the safety gate to deny all actions so ACTION_STARTED
+        # is never emitted.
+        agent.safety_gate = SafetyGate(
+            evaluator=SafetyContractEvaluator(
+                consistency_threshold=2.0,  # impossible
+                alignment_threshold=2.0,
+                reversal_risk_threshold=-1.0,
+                stability_threshold=2.0,
+            ),
+        )
+        collector = TraceCollector()
+        list(agent.run_stream("Hello", trace_collector=collector))
+        trace = collector.build_trace()
+        # Run completed but with safety_blocked, no actions, no approvals
+        assert trace.time_to_first_action_s is None
+        assert trace.time_to_first_approval_s is None
+
+    def test_real_run_populates_action_metric(self):
+        """A real run with a permissive gate emits ACTION_STARTED, so
+        time_to_first_action_s should be a non-negative float."""
+        agent = _make_agent()
+        agent._decompose_goal = lambda _u: _two_action_goal_state()
+        _install_fast_executor(agent)
+
+        collector = TraceCollector()
+        list(agent.run_stream("Hello", trace_collector=collector))
+        trace = collector.build_trace()
+        assert trace.time_to_first_action_s is not None
+        assert trace.time_to_first_action_s >= 0.0
+        # No approval was requested in this run.
+        assert trace.time_to_first_approval_s is None
+
+    def test_real_run_populates_approval_metric(self):
+        agent = _make_agent()
+        agent._decompose_goal = lambda _u: _two_action_goal_state()
+        _install_fast_executor(agent)
+
+        controller = ApprovalController(
+            policy=ApprovalPolicy(require_all=True),
+            callback=lambda _p: ApprovalResponse(approved=True),
+        )
+        collector = TraceCollector()
+        list(agent.run_stream(
+            "Hello",
+            approval_controller=controller,
+            trace_collector=collector,
+        ))
+        trace = collector.build_trace()
+        assert trace.time_to_first_approval_s is not None
+        assert trace.time_to_first_approval_s >= 0.0
+        # ACTION_STARTED also fired (after approval) so the action
+        # metric is populated too.
+        assert trace.time_to_first_action_s is not None
+        assert trace.time_to_first_action_s >= trace.time_to_first_approval_s
