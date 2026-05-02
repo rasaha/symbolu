@@ -8,13 +8,19 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from ..trust_diagnostics import TrustShapedEpisodeRecord
-from .flips import find_argmax_flips, find_v2_state_flips
-from .near_veto import find_near_vetoes
+from .flips import ArgmaxFlip, V2StateFlip, find_argmax_flips, find_v2_state_flips
+from .near_veto import NearVeto, find_near_vetoes
 
 
 @dataclass
 class EpisodeSummary:
-    """Per-episode aggregate of trust-pipeline behavior."""
+    """Per-episode aggregate of trust-pipeline behavior.
+
+    Carries the detected-event lists alongside the count summaries
+    so :func:`aggregate_fleet` can stitch a fleet view without
+    re-running the detectors. The lists carry the per-episode
+    ``metadata`` already merged in.
+    """
 
     episode_id: str
     classification: Optional[str]
@@ -30,6 +36,9 @@ class EpisodeSummary:
     deadband_fired_rate: float
     near_veto_peak_fraction: List[float]   # (M,)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    argmax_flips: List[ArgmaxFlip] = field(repr=False, default_factory=list)
+    v2_state_flips: List[V2StateFlip] = field(repr=False, default_factory=list)
+    near_vetoes: List[NearVeto] = field(repr=False, default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -52,6 +61,9 @@ class EpisodeSummary:
                 float(v) for v in self.near_veto_peak_fraction
             ],
             "metadata": dict(self.metadata),
+            "argmax_flips": [f.to_dict() for f in self.argmax_flips],
+            "v2_state_flips": [f.to_dict() for f in self.v2_state_flips],
+            "near_vetoes": [nv.to_dict() for nv in self.near_vetoes],
         }
 
 
@@ -62,15 +74,31 @@ def summarize_episode(
     near_veto_fraction: float = 0.7,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> EpisodeSummary:
-    """Roll one episode record into an :class:`EpisodeSummary`."""
+    """Roll one episode record into an :class:`EpisodeSummary`.
+
+    Detector outputs (argmax flips, V2 state flips, near-vetoes) are
+    cached on the returned summary so :func:`aggregate_fleet` can
+    stitch a fleet view without re-running the detectors. The
+    ``metadata`` dict is merged onto every event, so a SOTIF triage
+    tool gets vehicle-id / scenario / seed without re-joining
+    against the episode summary.
+    """
     T = record.n_steps
     M = record.M
+    meta = dict(metadata or {})
 
     flips = find_argmax_flips(record, episode_id)
     v2_flips = find_v2_state_flips(record, episode_id)
     near_vetoes = find_near_vetoes(
         record, episode_id, near_veto_fraction=near_veto_fraction
     )
+    if meta:
+        for f in flips:
+            f.metadata = dict(meta)
+        for f in v2_flips:
+            f.metadata = dict(meta)
+        for nv in near_vetoes:
+            nv.metadata = dict(meta)
 
     # Fraction engaged — defined only if V2 produced any state strings.
     states = record.per_step_v2_state
@@ -127,5 +155,8 @@ def summarize_episode(
         max_bcvf_total=max_bcvf,
         deadband_fired_rate=deadband_fired_rate,
         near_veto_peak_fraction=peak_fractions,
-        metadata=dict(metadata or {}),
+        metadata=meta,
+        argmax_flips=flips,
+        v2_state_flips=v2_flips,
+        near_vetoes=near_vetoes,
     )

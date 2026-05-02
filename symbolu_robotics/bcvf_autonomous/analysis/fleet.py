@@ -10,8 +10,8 @@ import numpy as np
 
 from ..trust_diagnostics import TrustShapedEpisodeRecord
 from .episode import EpisodeSummary, summarize_episode
-from .flips import ArgmaxFlip, V2StateFlip, find_argmax_flips, find_v2_state_flips
-from .near_veto import NearVeto, find_near_vetoes
+from .flips import ArgmaxFlip, V2StateFlip
+from .near_veto import NearVeto
 
 
 @dataclass
@@ -144,12 +144,11 @@ def aggregate_fleet(
             if ever.shape[0] <= M:
                 excluded_counts[: ever.shape[0]] += ever
 
-        near_vetoes_all.extend(
-            find_near_vetoes(
-                record, ep_id, near_veto_fraction=near_veto_fraction
-            )
-        )
-        v2_flips_all.extend(find_v2_state_flips(record, ep_id))
+        # Reuse the events cached on the summary instead of re-running
+        # the detectors. The cached events already carry the per-
+        # episode metadata.
+        near_vetoes_all.extend(ep.near_vetoes)
+        v2_flips_all.extend(ep.v2_state_flips)
 
     cls_counts = Counter(
         c for c in classifications if c is not None

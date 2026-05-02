@@ -306,12 +306,39 @@ class TrustWeightComputer:
             trajectories_list, c, return_per_predictor=True
         )
 
+        # Level-2 EMA mean centering. Runs before the §14a V2 gate so
+        # the EMA continues tracking the cost baseline even while V2
+        # is in UNIFORM mode — V2 suspends shaping, not learning. The
+        # canonical SOTIF case: a vehicle spends the first 30 ticks
+        # below the engage threshold; when the signal crosses the
+        # threshold we want the deadband / softmin to start with a
+        # warm baseline, not a cold start that cripples the first
+        # ENGAGED tick. (See CONSUMER_V2_DESIGN.md §2.)
+        ema_mean_pre_update: Optional[np.ndarray] = None
+        if self._ema_alpha > 0.0:
+            step_mean = per_pred_cost.mean(axis=0)
+            if self._ema_mean is None:
+                self._ema_mean = step_mean.copy()
+                if self._deadband_k_sigma > 0.0:
+                    self._ema_var = per_pred_cost.var(axis=0).copy()
+            # Snapshot the EMA before the update — this is the value
+            # used to form the residual that drives the deadband and
+            # softmin. Diagnostics consumers want this snapshot, not
+            # the post-update EMA.
+            ema_mean_pre_update = self._ema_mean.copy()
+            pred_signal = per_pred_cost - self._ema_mean[np.newaxis, :]
+            a = self._ema_alpha
+            if self._deadband_k_sigma > 0.0:
+                resid_sq = (pred_signal ** 2).mean(axis=0)
+                self._ema_var = a * resid_sq + (1.0 - a) * self._ema_var
+            self._ema_mean = a * step_mean + (1.0 - a) * self._ema_mean
+        else:
+            pred_signal = per_pred_cost
+
         # §14a V2 Schmitt-trigger gate. When enabled, the top-level
-        # state machine runs first; if it's in UNIFORM mode the V1
-        # pipeline is bypassed entirely and weights are forced to
-        # 1/M. Exclusion is suspended in UNIFORM mode so transient
-        # spikes don't accumulate toward veto while the consumer is
-        # already in safe-default territory.
+        # state machine decides whether the V1 *shaping* (deadband +
+        # softmin + exclusion) runs at all. EMA learning above
+        # already happened.
         v2_signal: Optional[float] = None
         v2_state_view: Optional[str] = None
         if self._v2_config is not None and self._v2_config.enabled:
@@ -340,7 +367,7 @@ class TrustWeightComputer:
                         self._is_excluded.copy()
                         if self._is_excluded is not None else None
                     ),
-                    ema_mean_pre_update=None,
+                    ema_mean_pre_update=ema_mean_pre_update,
                     v2_state=v2_state_view,
                     v2_signal=v2_signal,
                     consec_suspect=(
@@ -356,28 +383,6 @@ class TrustWeightComputer:
                         if self._exclusion_enabled else None
                     ),
                 )
-
-        # Level-2 EMA mean centering.
-        ema_mean_pre_update: Optional[np.ndarray] = None
-        if self._ema_alpha > 0.0:
-            step_mean = per_pred_cost.mean(axis=0)
-            if self._ema_mean is None:
-                self._ema_mean = step_mean.copy()
-                if self._deadband_k_sigma > 0.0:
-                    self._ema_var = per_pred_cost.var(axis=0).copy()
-            # Snapshot the EMA before the update — this is the value
-            # used to form the residual that drives the deadband and
-            # softmin. Diagnostics consumers want this snapshot, not
-            # the post-update EMA.
-            ema_mean_pre_update = self._ema_mean.copy()
-            pred_signal = per_pred_cost - self._ema_mean[np.newaxis, :]
-            a = self._ema_alpha
-            if self._deadband_k_sigma > 0.0:
-                resid_sq = (pred_signal ** 2).mean(axis=0)
-                self._ema_var = a * resid_sq + (1.0 - a) * self._ema_var
-            self._ema_mean = a * step_mean + (1.0 - a) * self._ema_mean
-        else:
-            pred_signal = per_pred_cost
 
         # Softmin (per-rollout min-shifted).
         tau_w = max(self._trust_temperature, 1e-9)

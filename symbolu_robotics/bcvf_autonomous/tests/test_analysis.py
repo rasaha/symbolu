@@ -415,6 +415,189 @@ def test_load_episode_from_json_rejects_missing_diagnostics_key(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
+# Audit fix: episode_record_from_dict must fail loudly on corrupt input
+# --------------------------------------------------------------------------- #
+
+
+def test_episode_record_from_dict_rejects_missing_keys():
+    """The pre-fix behavior silently produced all-zero records on
+    incomplete payloads — a SOTIF anti-pattern. The fix demands every
+    required key be present."""
+    with pytest.raises(ValueError, match="missing required keys"):
+        episode_record_from_dict({"n_steps": 50, "M": 4, "aggregation": "mean"})
+
+
+def test_episode_record_from_dict_rejects_shape_mismatch():
+    rec = _empty_record(n_steps=5, M=3)
+    payload = rec.to_dict()
+    # Sabotage the per_step_weights shape.
+    payload["per_step_weights"] = [[0.0] * 3] * 4   # (4, 3) ≠ (5, 3)
+    with pytest.raises(ValueError, match="per_step_weights shape"):
+        episode_record_from_dict(payload)
+
+
+def test_episode_record_from_dict_rejects_v2_state_length_mismatch():
+    rec = _empty_record(n_steps=5, M=3)
+    payload = rec.to_dict()
+    payload["per_step_v2_state"] = ["uniform"] * 4  # length 4 ≠ n_steps 5
+    with pytest.raises(ValueError, match="per_step_v2_state length"):
+        episode_record_from_dict(payload)
+
+
+def test_episode_record_from_dict_rejects_negative_dimensions():
+    rec = _empty_record(n_steps=3, M=3)
+    payload = rec.to_dict()
+    payload["n_steps"] = -1
+    with pytest.raises(ValueError):
+        episode_record_from_dict(payload)
+
+
+def test_episode_record_from_dict_rejects_non_dict_input():
+    with pytest.raises(ValueError):
+        episode_record_from_dict("not a dict")  # type: ignore[arg-type]
+
+
+def test_episode_record_from_dict_round_trips_after_validation():
+    """A clean payload produced by to_dict() must still round-trip after
+    the validation gates are added."""
+    rec = _empty_record(n_steps=3, M=3)
+    rec.per_step_v2_state = ["uniform", "engaged", "engaged"]
+    rec.per_step_v2_signal[:] = [0.1, 0.6, 0.7]
+    rec.exclusion_T = 5
+
+    payload = rec.to_dict()
+    rec_restored = episode_record_from_dict(payload)
+    assert rec_restored.n_steps == 3
+    assert rec_restored.exclusion_T == 5
+    np.testing.assert_array_equal(
+        rec_restored.per_step_v2_signal, rec.per_step_v2_signal
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Audit fix: weight_drop / max_abs_weight_delta on ArgmaxFlip
+# --------------------------------------------------------------------------- #
+
+
+def test_argmax_flip_weight_drop_on_clean_handover():
+    rec = _empty_record(n_steps=2, M=3)
+    rec.per_step_weights[0] = [1.0, 0.0, 0.0]
+    rec.per_step_weights[1] = [0.0, 1.0, 0.0]
+    flips = find_argmax_flips(rec, "ep")
+    assert len(flips) == 1
+    assert flips[0].weight_drop == pytest.approx(1.0)
+    assert flips[0].max_abs_weight_delta == pytest.approx(1.0)
+
+
+def test_argmax_flip_weight_drop_on_marginal_chatter():
+    rec = _empty_record(n_steps=2, M=3)
+    rec.per_step_weights[0] = [0.51, 0.49, 0.0]
+    rec.per_step_weights[1] = [0.49, 0.51, 0.0]
+    flips = find_argmax_flips(rec, "ep")
+    assert len(flips) == 1
+    # Predictor 0 lost 0.51 - 0.49 = 0.02 — small drop = chatter.
+    assert flips[0].weight_drop == pytest.approx(0.02)
+    assert flips[0].max_abs_weight_delta == pytest.approx(0.02)
+
+
+def test_argmax_flip_to_dict_includes_weight_drop():
+    rec = _empty_record(n_steps=2, M=3)
+    rec.per_step_weights[0] = [1.0, 0.0, 0.0]
+    rec.per_step_weights[1] = [0.0, 1.0, 0.0]
+    flips = find_argmax_flips(rec, "ep")
+    payload = flips[0].to_dict()
+    assert "weight_drop" in payload
+    assert "max_abs_weight_delta" in payload
+
+
+# --------------------------------------------------------------------------- #
+# Audit fix: per-episode metadata propagated onto events
+# --------------------------------------------------------------------------- #
+
+
+def test_summarize_episode_decorates_events_with_metadata():
+    rec = _empty_record(n_steps=3, M=3)
+    rec.per_step_weights[0] = [1.0, 0.0, 0.0]
+    rec.per_step_weights[1] = [0.0, 1.0, 0.0]
+    rec.per_step_weights[2] = [0.0, 0.0, 1.0]
+    rec.per_step_v2_state = ["uniform", "engaged", "uniform"]
+    rec.exclusion_T = 5
+    rec.per_step_consec_suspect = np.zeros((3, 3), dtype=np.int64)
+    rec.per_step_consec_suspect[:, 1] = [3, 4, 4]
+
+    summary = summarize_episode(
+        rec, episode_id="trip42", classification="no_collision",
+        metadata={"vehicle_id": "VIN-X", "scenario": "highway"},
+    )
+    for ev in summary.argmax_flips:
+        assert ev.metadata == {
+            "vehicle_id": "VIN-X", "scenario": "highway"
+        }
+    for ev in summary.v2_state_flips:
+        assert ev.metadata["vehicle_id"] == "VIN-X"
+    for nv in summary.near_vetoes:
+        assert nv.metadata["scenario"] == "highway"
+
+
+# --------------------------------------------------------------------------- #
+# Audit fix: aggregate_fleet stops double-detecting events
+# --------------------------------------------------------------------------- #
+
+
+def test_aggregate_fleet_reuses_cached_events_no_double_detection(monkeypatch):
+    """The pre-fix aggregator called find_near_vetoes / find_v2_state_flips
+    once inside summarize_episode and then again inside the aggregator
+    loop — 2x the detector cost on every record. The fix reuses the
+    cached lists. Verify by counting calls."""
+    from symbolu_robotics.bcvf_autonomous.analysis import (
+        episode as episode_module,
+    )
+
+    call_counts = {"argmax": 0, "v2": 0, "near_veto": 0}
+    real_argmax = episode_module.find_argmax_flips
+    real_v2 = episode_module.find_v2_state_flips
+    real_nv = episode_module.find_near_vetoes
+
+    def counted_argmax(*args, **kwargs):
+        call_counts["argmax"] += 1
+        return real_argmax(*args, **kwargs)
+
+    def counted_v2(*args, **kwargs):
+        call_counts["v2"] += 1
+        return real_v2(*args, **kwargs)
+
+    def counted_nv(*args, **kwargs):
+        call_counts["near_veto"] += 1
+        return real_nv(*args, **kwargs)
+
+    monkeypatch.setattr(episode_module, "find_argmax_flips", counted_argmax)
+    monkeypatch.setattr(episode_module, "find_v2_state_flips", counted_v2)
+    monkeypatch.setattr(episode_module, "find_near_vetoes", counted_nv)
+
+    records = [_empty_record(n_steps=5, M=3) for _ in range(4)]
+    aggregate_fleet(records)
+    # Each detector must run exactly once per episode.
+    assert call_counts == {"argmax": 4, "v2": 4, "near_veto": 4}
+
+
+def test_aggregate_fleet_propagates_metadata_to_event_lists():
+    rec = _empty_record(n_steps=3, M=3)
+    rec.exclusion_T = 5
+    rec.per_step_consec_suspect = np.zeros((3, 3), dtype=np.int64)
+    rec.per_step_consec_suspect[:, 0] = [4, 4, 4]
+    fleet = aggregate_fleet(
+        [rec],
+        episode_ids=["e1"],
+        classifications=["nominal"],
+        metadata=[{"vehicle_id": "VIN-A", "scenario": "urban"}],
+    )
+    assert len(fleet.near_vetoes) == 1
+    assert fleet.near_vetoes[0].metadata == {
+        "vehicle_id": "VIN-A", "scenario": "urban"
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Integration — exclusion counters captured through real planner
 # --------------------------------------------------------------------------- #
 

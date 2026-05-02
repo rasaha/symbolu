@@ -389,3 +389,180 @@ def test_runner_v2_disabled_keeps_v2_state_empty():
     assert diag is not None
     # V2 disabled ⇒ every per-step state is the empty marker.
     assert all(s == "" for s in diag.per_step_v2_state)
+
+
+# --------------------------------------------------------------------------- #
+# Audit fix: EMA learning continues during UNIFORM state
+# --------------------------------------------------------------------------- #
+
+
+def test_ema_updates_during_v2_uniform_state():
+    """V2 in UNIFORM must NOT freeze the EMA. The audit identified the
+    previous behavior (EMA frozen during UNIFORM) as a real safety
+    regression vs V1: it cold-started the deadband / softmin on the
+    first ENGAGED tick.
+
+    Construction: lock V2 in UNIFORM (engage threshold = +inf), feed
+    three ticks with different per-predictor costs, assert that the
+    EMA mean evolves between them.
+    """
+    c = TrustWeightComputer(BCVFConfig(lambda_c=1.0))
+    c.set_v2_consumer(
+        ConsumerV2Config(
+            enabled=True, engage_threshold=1e9,
+            disengage_threshold=1e8, T_engage=1,
+        )
+    )
+    c.set_ema_alpha(0.5)
+
+    H = 10
+    K = 4
+    ks = np.arange(H, dtype=np.float64)
+    base = np.zeros((H, 3), dtype=np.float64)
+    base[:, 0] = ks * 0.5
+
+    def make_trajs(accel: float) -> np.ndarray:
+        trajs = np.broadcast_to(base[None, None, :, :], (K, 3, H, 3)).copy()
+        trajs[:, 1, :, 1] += 0.5 * accel * ks * ks
+        return trajs
+
+    seen_means = []
+    for accel in (0.05, 0.20, 0.50):
+        res = c.compute(make_trajs(accel))
+        assert res.v2_state == "uniform"
+        assert res.ema_mean is not None
+        seen_means.append(res.ema_mean.copy())
+
+    # Different inputs ⇒ EMA must move between ticks.
+    assert not np.allclose(seen_means[0], seen_means[1])
+    assert not np.allclose(seen_means[1], seen_means[2])
+
+
+def test_ema_pre_update_carried_through_uniform_state():
+    """The pre-update snapshot must be populated on UNIFORM ticks too —
+    diagnostics consumers expect it whenever EMA is enabled, not just
+    on ENGAGED ticks."""
+    c = TrustWeightComputer(BCVFConfig(lambda_c=1.0))
+    c.set_v2_consumer(
+        ConsumerV2Config(
+            enabled=True, engage_threshold=1e9,
+            disengage_threshold=1e8, T_engage=1,
+        )
+    )
+    c.set_ema_alpha(0.1)
+    H = 10
+    K = 4
+    ks = np.arange(H, dtype=np.float64)
+    base = np.zeros((H, 3), dtype=np.float64)
+    base[:, 0] = ks * 0.5
+    trajs = np.broadcast_to(base[None, None, :, :], (K, 3, H, 3)).copy()
+    trajs[:, 1, :, 1] += 0.05 * ks * ks
+    c.compute(trajs)  # cold-start tick
+    res = c.compute(trajs)
+    assert res.v2_state == "uniform"
+    assert res.ema_mean_pre_update is not None
+    assert res.ema_mean is not None
+
+
+# --------------------------------------------------------------------------- #
+# Audit fix: V2 + EMA + exclusion combined integration test
+# --------------------------------------------------------------------------- #
+
+
+def test_v2_ema_exclusion_combined():
+    """V2 + EMA + exclusion all on at once. The audit flagged the
+    interaction was untested. Specifically:
+
+    - EMA must continue tracking during UNIFORM (Fix 1).
+    - Exclusion counters must FREEZE during UNIFORM (V2 design intent).
+    - On transition to ENGAGED, exclusion counters resume from where
+      they left off and EMA is warm.
+    """
+    c = TrustWeightComputer(BCVFConfig(lambda_c=1.0))
+    c.set_v2_consumer(
+        ConsumerV2Config(
+            enabled=True,
+            engage_threshold=0.5, disengage_threshold=0.2,
+            T_engage=2, T_disengage=2,
+        )
+    )
+    c.set_ema_alpha(0.1)
+    c.set_deadband_k_sigma(2.0)
+    c.set_exclusion(enabled=True, r=1.5, T_exclude=5, T_reinstate=5)
+
+    # Quiet trajectories first — V2 stays UNIFORM.
+    H, K = 10, 4
+    ks = np.arange(H, dtype=np.float64)
+    base = np.zeros((H, 3), dtype=np.float64)
+    base[:, 0] = ks * 0.5
+    quiet = np.broadcast_to(base[None, None, :, :], (K, 3, H, 3)).copy()
+
+    for _ in range(3):
+        res = c.compute(quiet)
+        assert res.v2_state == "uniform"
+
+    # Exclusion is suspended in UNIFORM mode — the consec arrays are
+    # never allocated, so the result reports None. EMA, in contrast,
+    # *is* active and the snapshot must be present (Fix 1).
+    assert res.consec_suspect is None
+    ema_after_uniform = res.ema_mean.copy() if res.ema_mean is not None else None
+    assert ema_after_uniform is not None
+
+    # Now flood with a strong outlier — V2 must engage and exclusion
+    # must start counting toward eviction.
+    loud = quiet.copy()
+    loud[:, 1, :, 1] += 0.5 * 5.0 * ks * ks  # heavy quadratic on pred 1
+
+    # First engage tick — pipeline runs, consec_suspect[1] starts climbing.
+    seen_engaged = False
+    for tick in range(15):
+        res = c.compute(loud)
+        if res.v2_state == "engaged":
+            seen_engaged = True
+            assert res.consec_suspect is not None
+            # Predictor 1 is the outlier; its consec_suspect must climb.
+            if res.consec_suspect[1] >= 5:
+                # Reached exclusion threshold ⇒ excluded.
+                assert res.is_excluded is not None
+                assert res.is_excluded[1]
+                break
+
+    assert seen_engaged, "V2 should have engaged given the loud outlier"
+
+
+def test_v2_engaged_uses_warm_ema_after_uniform_stretch():
+    """The whole point of Fix 1: when V2 finally engages after a long
+    UNIFORM stretch, the EMA already has a meaningful baseline and the
+    softmin produces sensible weights immediately — no cold-start
+    glitch on the first ENGAGED tick."""
+    c = TrustWeightComputer(BCVFConfig(lambda_c=1.0))
+    c.set_v2_consumer(
+        ConsumerV2Config(
+            enabled=True,
+            engage_threshold=0.5, disengage_threshold=0.2,
+            T_engage=1, T_disengage=1,
+        )
+    )
+    c.set_ema_alpha(0.5)
+
+    H, K = 10, 4
+    ks = np.arange(H, dtype=np.float64)
+    base = np.zeros((H, 3), dtype=np.float64)
+    base[:, 0] = ks * 0.5
+    quiet = np.broadcast_to(base[None, None, :, :], (K, 3, H, 3)).copy()
+
+    # Long UNIFORM stretch with EMA learning on the quiet baseline.
+    for _ in range(20):
+        res = c.compute(quiet)
+        assert res.v2_state == "uniform"
+    warm_ema = res.ema_mean.copy()
+    assert warm_ema is not None
+
+    # Cause a real outlier.
+    loud = quiet.copy()
+    loud[:, 1, :, 1] += 0.5 * 1.0 * ks * ks
+    res = c.compute(loud)
+    # On the first ENGAGED tick, ema_mean_pre_update is the warm
+    # snapshot from the previous tick — so the residual is meaningful.
+    assert res.v2_state == "engaged"
+    np.testing.assert_allclose(res.ema_mean_pre_update, warm_ema, atol=1e-12)

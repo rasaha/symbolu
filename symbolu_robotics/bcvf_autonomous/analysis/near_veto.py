@@ -10,7 +10,7 @@ is one bad day away from a real exclusion.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -23,7 +23,12 @@ _EXCLUSION_DISABLED_SENTINEL = -1
 
 @dataclass
 class NearVeto:
-    """One predictor that came close to exclusion in one episode."""
+    """One predictor that came close to exclusion in one episode.
+
+    ``metadata`` carries per-episode provenance (vehicle id, scenario,
+    seed) so a fleet-scale triage tool can group near-vetoes without
+    cross-referencing back through ``episode_id``.
+    """
 
     episode_id: str
     predictor: int
@@ -32,6 +37,7 @@ class NearVeto:
     threshold_T: int
     peak_fraction: float
     excluded_during_episode: bool
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -42,6 +48,7 @@ class NearVeto:
             "threshold_T": int(self.threshold_T),
             "peak_fraction": float(self.peak_fraction),
             "excluded_during_episode": bool(self.excluded_during_episode),
+            "metadata": dict(self.metadata),
         }
 
 

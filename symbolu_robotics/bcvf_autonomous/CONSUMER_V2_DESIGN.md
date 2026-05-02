@@ -32,9 +32,13 @@ exchange for monotonic actuator behavior.
 
 ## §2 V2 = V1 + one top-level state machine
 
-V2 does not replace any V1 mechanism. EMA centering, per-rollout
-deadband, and §6.6a exclusion all stay exactly as they are. V2 wraps
-the entire pipeline in a top-level state machine:
+V2 wraps the V1 *shaping* layer (deadband + softmin + §6.6a
+exclusion) in a top-level state machine. The EMA centering layer
+runs every tick regardless of state — V2 suspends shaping, not
+learning. Without that distinction the first ENGAGED tick after a
+sustained UNIFORM stretch would cold-start the EMA, crippling the
+deadband and softmin precisely when the signal first crosses the
+engage threshold.
 
 ```
 state ∈ {UNIFORM, ENGAGED}
