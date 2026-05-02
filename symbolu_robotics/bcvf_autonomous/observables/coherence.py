@@ -62,7 +62,7 @@ class CoherenceAnchoredBCVFObservable:
         trajectories: np.ndarray,
         ground_truth: Optional[np.ndarray] = None,
     ) -> ObservableValue:
-        arr = validate_trajectory_tensor(trajectories)
+        arr = validate_trajectory_tensor(trajectories, min_horizon=3)
         M, H, _ = arr.shape
 
         breakdown = compute_bcvf_per_step(arr, self._cfg)

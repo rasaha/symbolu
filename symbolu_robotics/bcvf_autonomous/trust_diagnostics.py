@@ -201,8 +201,17 @@ class TrustDiagnosticsRecorder:
             None if result.ema_std is None
             else np.asarray(result.ema_std, dtype=np.float64).copy()
         )
+        # Residual must be computed against the pre-update EMA — that's
+        # the value the trust shaper actually used to form the deadband
+        # / softmin signal this tick. Falling back to post-update EMA
+        # when pre-update isn't supplied keeps backward compat with
+        # callers building TrustWeightResult by hand, but logs a slight
+        # off-by-one EMA step in that case.
+        ema_pre = getattr(result, "ema_mean_pre_update", None)
         residual = None
-        if ema_mean is not None:
+        if ema_pre is not None:
+            residual = agg_cost - np.asarray(ema_pre, dtype=np.float64)
+        elif ema_mean is not None:
             residual = agg_cost - ema_mean
 
         deadband_count = int(getattr(result, "deadband_active_count", 0) or 0)

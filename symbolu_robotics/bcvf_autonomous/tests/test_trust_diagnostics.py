@@ -261,3 +261,184 @@ def test_planner_diagnostics_disabled_returns_none():
         [],
     )
     assert planner.get_trust_diagnostics() is None
+
+
+# --------------------------------------------------------------------------- #
+# Pre-update EMA exact-residual tests
+# --------------------------------------------------------------------------- #
+
+
+def test_pre_update_ema_residual_is_exact():
+    """The recorder's residual must equal cost - pre_update_ema, the
+    value the trust shaper used to drive the deadband / softmin.
+    Before the fix the recorder used the post-update EMA, which is
+    off by one ema_alpha step."""
+    from symbolu_robotics.bcvf_autonomous import BCVFConfig
+    from symbolu_robotics.bcvf_autonomous.trust import TrustWeightComputer
+
+    bcvf_config = BCVFConfig(lambda_c=1.0)
+    computer = TrustWeightComputer(bcvf_config)
+    computer.set_ema_alpha(0.1)
+    rec = TrustDiagnosticsRecorder(M=3)
+
+    H = 10
+    K = 4
+    ks = np.arange(H, dtype=np.float64)
+
+    def make_trajs(accel: float) -> np.ndarray:
+        base = np.zeros((H, 3), dtype=np.float64)
+        base[:, 0] = ks * 0.5
+        trajs = np.broadcast_to(base[None, None, :, :], (K, 3, H, 3)).copy()
+        trajs[:, 1, :, 1] += 0.5 * accel * ks * ks
+        return trajs
+
+    # Two ticks with *different* per-predictor costs — required for the
+    # EMA to actually move between snapshots. With identical trajectories
+    # tick-to-tick the cold-start EMA pins to the first observation and
+    # subsequent updates are no-ops, leaving pre-update == post-update.
+    accels = [0.05, 0.20]
+    for tick, accel in enumerate(accels):
+        result = computer.compute(make_trajs(accel))
+        record = rec.record(result)
+        if tick > 0:
+            assert result.ema_mean_pre_update is not None
+            expected_residual = (
+                result.per_pred_cost.mean(axis=0)
+                - result.ema_mean_pre_update
+            )
+            np.testing.assert_allclose(
+                record.residual, expected_residual, atol=1e-12
+            )
+            # Confirm post-update EMA differs from pre-update.
+            assert not np.allclose(
+                result.ema_mean, result.ema_mean_pre_update
+            )
+
+
+# --------------------------------------------------------------------------- #
+# End-to-end Runner integration with JSON dump
+# --------------------------------------------------------------------------- #
+
+
+def test_runner_emits_trust_diagnostics_json(tmp_path):
+    """Full Runner.run() with trust_diagnostics_path set must produce
+    a JSON artifact whose shape matches the in-memory record."""
+    import json
+    from symbolu_robotics.bcvf_autonomous import (
+        BCVFConfig,
+        MPPIConfig,
+        PerfCostConfig,
+        Runner,
+        SimConfig,
+    )
+    from symbolu_robotics.bcvf_autonomous.runner import RunConfig
+    from symbolu_robotics.bcvf_autonomous.simulator import (
+        make_straight_road,
+    )
+
+    diag_path = tmp_path / "trust_diag.json"
+    cfg = RunConfig(
+        sim=SimConfig(
+            dt=0.1,
+            max_steps=8,
+            road=make_straight_road(length=100.0),
+            obstacles=[],
+            seed=11,
+        ),
+        mppi=MPPIConfig(num_rollouts=64, horizon=10, dt=0.1),
+        perf=PerfCostConfig(),
+        bcvf=BCVFConfig(lambda_c=1.0, dt=0.1),
+        seed=11,
+        ema_alpha=0.1,
+        trust_diagnostics_enabled=True,
+        trust_diagnostics_path=str(diag_path),
+        trust_diagnostics_aggregation="mean",
+    )
+
+    runner = Runner(cfg)
+    result = runner.run()
+    assert result.total_steps > 0
+
+    # Compare in-memory record to JSON-on-disk record.
+    in_memory = runner.trust_diagnostics()
+    assert in_memory is not None
+    assert in_memory.n_steps > 0
+
+    assert diag_path.exists()
+    with open(diag_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    assert payload["seed"] == 11
+    diag = payload["diagnostics"]
+    assert diag["n_steps"] == in_memory.n_steps
+    assert diag["M"] == in_memory.M
+    assert len(diag["per_step_weights"]) == in_memory.n_steps
+    assert len(diag["per_step_weights"][0]) == in_memory.M
+    # Per-step rows sum to 1 (trust weights normalize).
+    for row in diag["per_step_weights"]:
+        assert abs(sum(row) - 1.0) < 1e-9
+
+
+def test_runner_diagnostics_aggregation_argmin_total(tmp_path):
+    """Argmin-total aggregation must produce a record across a real
+    Runner episode, not just synthetic TrustWeightResult fixtures."""
+    from symbolu_robotics.bcvf_autonomous import (
+        BCVFConfig,
+        MPPIConfig,
+        PerfCostConfig,
+        Runner,
+        SimConfig,
+    )
+    from symbolu_robotics.bcvf_autonomous.runner import RunConfig
+    from symbolu_robotics.bcvf_autonomous.simulator import (
+        make_straight_road,
+    )
+
+    cfg = RunConfig(
+        sim=SimConfig(
+            dt=0.1, max_steps=6,
+            road=make_straight_road(length=100.0),
+            obstacles=[], seed=3,
+        ),
+        mppi=MPPIConfig(num_rollouts=32, horizon=8, dt=0.1),
+        perf=PerfCostConfig(),
+        bcvf=BCVFConfig(lambda_c=1.0, dt=0.1),
+        seed=3,
+        trust_diagnostics_enabled=True,
+        trust_diagnostics_aggregation="argmin_total",
+    )
+    runner = Runner(cfg)
+    runner.run()
+    diag = runner.trust_diagnostics()
+    assert diag is not None
+    assert diag.n_steps > 0
+    assert diag.aggregation.value == "argmin_total"
+
+
+def test_runner_rejects_unknown_aggregation():
+    from symbolu_robotics.bcvf_autonomous import (
+        BCVFConfig,
+        MPPIConfig,
+        PerfCostConfig,
+        Runner,
+        SimConfig,
+    )
+    from symbolu_robotics.bcvf_autonomous.runner import RunConfig
+    from symbolu_robotics.bcvf_autonomous.simulator import (
+        make_straight_road,
+    )
+
+    cfg = RunConfig(
+        sim=SimConfig(
+            dt=0.1, max_steps=4,
+            road=make_straight_road(length=50.0),
+            obstacles=[], seed=0,
+        ),
+        mppi=MPPIConfig(num_rollouts=8, horizon=5, dt=0.1),
+        perf=PerfCostConfig(),
+        bcvf=BCVFConfig(lambda_c=1.0, dt=0.1),
+        seed=0,
+        trust_diagnostics_enabled=True,
+        trust_diagnostics_aggregation="not_a_real_mode",
+    )
+    with pytest.raises(ValueError):
+        Runner(cfg).run()

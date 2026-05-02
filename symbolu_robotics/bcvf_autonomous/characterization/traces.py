@@ -173,9 +173,15 @@ def generate_trace(
         dropped = int(family_params.get("dropped_predictor", 2))
         if outer == "sensor_dropout":
             raise ValueError("sensor_dropout cannot wrap itself")
-        if not (0 <= k_dropout < H):
+        # Reject the silent-no-op case: k_dropout = H - 1 freezes
+        # nothing (the slice [k_dropout + 1:] is empty) and produces a
+        # mask with zero invalid steps. Forcing k_dropout < H - 1
+        # guarantees the family actually exercises the dropout path.
+        if not (0 <= k_dropout < H - 1):
             raise ValueError(
-                f"k_dropout must lie in [0, {H}); got {k_dropout}"
+                f"k_dropout must lie in [0, {H - 1}); got {k_dropout}. "
+                "k_dropout = H - 1 freezes no steps and is rejected as a "
+                "silent no-op."
             )
         if not (0 <= dropped < M):
             raise ValueError(
@@ -198,10 +204,9 @@ def generate_trace(
         # Freeze the dropped predictor's pose at step k_dropout for all
         # subsequent steps — emulates a sensor whose stream stops and
         # whose downstream estimator holds the last valid pose.
-        if k_dropout < H - 1:
-            trajectories[dropped, k_dropout + 1:, :] = trajectories[
-                dropped, k_dropout, :
-            ]
+        trajectories[dropped, k_dropout + 1:, :] = trajectories[
+            dropped, k_dropout, :
+        ]
         valid_masks = np.ones((M, H), dtype=bool)
         valid_masks[dropped, k_dropout + 1:] = False
         # Truth label is the dropped predictor — that's where BCVF
@@ -215,7 +220,10 @@ def generate_trace(
             metadata["outer_truth_label"] = outer_bundle.truth_label
 
     # Wrap heading just in case any kwarg requested a heading offset.
-    trajectories[..., 2] = np.vectorize(wrap_angle)(trajectories[..., 2])
+    # Vectorized via atan2 — equivalent to the scalar wrap_angle but no
+    # Python loop.
+    th = trajectories[..., 2]
+    trajectories[..., 2] = np.arctan2(np.sin(th), np.cos(th))
 
     return TraceBundle(
         family=family,

@@ -292,9 +292,198 @@ def test_summarize_grid_shapes():
     )
 
 
+# --------------------------------------------------------------------------- #
+# Production-parity coverage — M = 4 (IMU + LiDAR + VO + GNSS)
+# --------------------------------------------------------------------------- #
+
+
+def test_primary_grid_passes_at_m_equals_4():
+    """The production autonomous stack runs four predictors. The
+    characterization suite must hold at M=4 too — anchor pairing
+    enumerates more pairs and per-predictor attribution dilutes
+    differently, so M=3 coverage doesn't carry over automatically.
+    """
+    cells = run_primary_grid(M=4)
+    summary = summarize_grid(cells)
+    assert summary["false_positive_rate"] == pytest.approx(0.0)
+    assert summary["false_negative_rate"] == pytest.approx(0.0)
+    for fam, rec in summary["per_family"].items():
+        assert rec["pass_rate"] == pytest.approx(1.0), (
+            f"M=4: family {fam} failed: {rec}"
+        )
+
+
+def test_outlier_attribution_at_m_equals_4():
+    """Outlier (truth_label=0) at M=4 must rank-1 the truth predictor
+    even though the kernel now distributes pair costs across three
+    non-truth predictors instead of two. This is the regression check
+    that anchor-pairing changes don't move the outlier off rank 1.
+    """
+    bundle = generate_trace("outlier", M=4, H=50, accel_mag=1.0)
+    cfg = _v1_config()
+    from symbolu_robotics.bcvf_autonomous.observables.kernel_per_step import (
+        compute_bcvf_per_step,
+    )
+    breakdown = compute_bcvf_per_step(bundle.trajectories, cfg)
+    per_pred = breakdown.per_step_per_predictor.sum(axis=1)
+    metrics = compute_alignment_metrics(per_pred, bundle.truth_label)
+    assert metrics is not None
+    assert metrics.hit == 1
+    assert metrics.rank == 1
+
+
+def test_sensor_dropout_at_m_equals_4_keeps_alignment_loose():
+    """At M=4 the sensor_dropout alignment criterion is "rank < 4"
+    (not last). With one outer outlier and one dropout on different
+    predictors, the dropped predictor should land in rank 1, 2, or 3
+    but not 4."""
+    bundle = generate_trace(
+        "sensor_dropout",
+        M=4,
+        H=50,
+        outer_family="outlier",
+        accel_mag=1.0,
+        k_dropout=20,
+        dropped_predictor=3,
+    )
+    cfg = _v1_config()
+    from symbolu_robotics.bcvf_autonomous.observables.kernel_per_step import (
+        compute_bcvf_per_step,
+    )
+    breakdown = compute_bcvf_per_step(bundle.trajectories, cfg)
+    per_pred = breakdown.per_step_per_predictor.sum(axis=1)
+    metrics = compute_alignment_metrics(per_pred, bundle.truth_label)
+    assert metrics is not None
+    assert metrics.rank < 4
+
+
 def test_family_pass_rate_per_family():
     cells = run_primary_grid()
     rates = family_pass_rate(cells)
     for fam in NOMINAL_FAMILIES + FAILURE_FAMILIES:
         assert fam in rates
         assert rates[fam]["total"] > 0
+
+
+# --------------------------------------------------------------------------- #
+# Kernel-sensitivity regression tests
+# (DESIGN.md §8 — confirms the sweep would FAIL if the kernel broke)
+# --------------------------------------------------------------------------- #
+
+
+def test_sweep_catches_silenced_gate():
+    """Sabotage: set gate_threshold absurdly high so the gate never opens.
+
+    Failure families should now register zero cost and miss every
+    threshold gate. If this test ever passes a failure-family cell,
+    the threshold tables in ``_evaluate_thresholds`` are vacuously
+    permissive and the sweep is not actually defending the kernel.
+    """
+    from symbolu_robotics.bcvf_autonomous.characterization.sweep import (
+        _eval_cell,
+    )
+    cell_accel = _eval_cell(
+        grid="sabotage_silenced_gate",
+        family="accelerating",
+        family_params={"accel_mag": 1.0},
+        T=1e9,  # gate never opens
+        beta=100.0,
+        delta=0.5,
+        seed=42,
+    )
+    assert not cell_accel.cell_pass
+    assert cell_accel.gate_activations == 0
+    # The "gate_open" threshold check must have fired.
+    assert any("gate_activations" in r for r in cell_accel.failure_reasons)
+
+    cell_outlier = _eval_cell(
+        grid="sabotage_silenced_gate",
+        family="outlier",
+        family_params={"accel_mag": 1.0},
+        T=1e9,
+        beta=100.0,
+        delta=0.5,
+        seed=42,
+    )
+    assert not cell_outlier.cell_pass
+
+
+def test_sweep_catches_zeroed_per_step_kernel(monkeypatch):
+    """Sabotage: replace ``compute_bcvf_per_step`` with one that always
+    returns zeros. Failure families should fail their cost-magnitude
+    threshold checks and outlier should fail alignment (truth predictor
+    can no longer be ranked above non-truth when every cost is zero).
+    """
+    import symbolu_robotics.bcvf_autonomous.characterization.sweep as sw
+    from symbolu_robotics.bcvf_autonomous.observables.kernel_per_step import (
+        BCVFPerStepBreakdown,
+    )
+
+    def fake_per_step(trajectories, config):
+        M, H, _ = trajectories.shape
+        if config.cost_order.value == 2:
+            stencil = H - 2
+        elif config.cost_order.value == 1:
+            stencil = H - 1
+        else:
+            stencil = H
+        return BCVFPerStepBreakdown(
+            per_step_total=np.zeros(stencil),
+            per_step_per_pair={},
+            per_step_per_predictor=np.zeros((M, stencil)),
+            gate_activations_per_step=np.zeros(stencil, dtype=np.int64),
+            signal_norm_max_per_step=np.zeros(stencil),
+        )
+
+    monkeypatch.setattr(sw, "compute_bcvf_per_step", fake_per_step)
+
+    cell_accel = sw._eval_cell(
+        grid="sabotage_zero_kernel",
+        family="accelerating",
+        family_params={"accel_mag": 1.0},
+        T=0.2,
+        beta=100.0,
+        delta=0.5,
+        seed=42,
+    )
+    # Per-predictor breakdown is zero ⇒ all four predictors tie for
+    # "lowest cost" and the alignment check picks index 0 by stable
+    # sort. The accelerating truth_label is 1, so alignment misses.
+    assert not cell_accel.cell_pass
+
+
+def test_sweep_catches_uniform_attribution(monkeypatch):
+    """Sabotage: ``compute_bcvf_per_step`` returns uniform per-predictor
+    cost. Outlier should miss its truth-ratio gate (>= 1.5)."""
+    import symbolu_robotics.bcvf_autonomous.characterization.sweep as sw
+    from symbolu_robotics.bcvf_autonomous.observables.kernel_per_step import (
+        BCVFPerStepBreakdown,
+    )
+
+    def uniform_per_step(trajectories, config):
+        M, H, _ = trajectories.shape
+        stencil = H - 2 if config.cost_order.value == 2 else H
+        return BCVFPerStepBreakdown(
+            per_step_total=np.ones(stencil),
+            per_step_per_pair={},
+            per_step_per_predictor=np.ones((M, stencil)),
+            gate_activations_per_step=np.full(stencil, M, dtype=np.int64),
+            signal_norm_max_per_step=np.ones(stencil),
+        )
+
+    monkeypatch.setattr(sw, "compute_bcvf_per_step", uniform_per_step)
+
+    cell = sw._eval_cell(
+        grid="sabotage_uniform",
+        family="outlier",
+        family_params={"accel_mag": 1.0},
+        T=0.2,
+        beta=100.0,
+        delta=0.5,
+        seed=42,
+    )
+    assert not cell.cell_pass
+    # Either the ratio gate or the alignment hit must have fired.
+    assert any(
+        "ratio" in r or "alignment" in r for r in cell.failure_reasons
+    )

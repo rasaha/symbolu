@@ -49,6 +49,13 @@ class TrustWeightResult:
     ``per_pred_cost`` are the raw kernel outputs before any consumer-
     layer processing; ``weights`` is the final trust distribution the
     caller should use for the consensus.
+
+    ``ema_mean`` is the *post-update* EMA (the state at the end of
+    this tick). ``ema_mean_pre_update`` is the EMA snapshot used to
+    compute this tick's residual — the value the deadband and trust-
+    softmin actually saw. Diagnostics that want the exact residual
+    the shaper used must subtract from ``ema_mean_pre_update``, not
+    ``ema_mean``.
     """
 
     weights: np.ndarray             # (K, M), rows sum to 1
@@ -58,6 +65,7 @@ class TrustWeightResult:
     ema_std: Optional[np.ndarray]   # (M,) or None if deadband not active
     deadband_active_count: int      # # rollouts below deadband threshold
     is_excluded: Optional[np.ndarray]  # (M,) bool or None
+    ema_mean_pre_update: Optional[np.ndarray] = None  # (M,) snapshot before update
 
 
 class TrustWeightComputer:
@@ -191,12 +199,18 @@ class TrustWeightComputer:
         )
 
         # Level-2 EMA mean centering.
+        ema_mean_pre_update: Optional[np.ndarray] = None
         if self._ema_alpha > 0.0:
             step_mean = per_pred_cost.mean(axis=0)
             if self._ema_mean is None:
                 self._ema_mean = step_mean.copy()
                 if self._deadband_k_sigma > 0.0:
                     self._ema_var = per_pred_cost.var(axis=0).copy()
+            # Snapshot the EMA before the update — this is the value
+            # used to form the residual that drives the deadband and
+            # softmin. Diagnostics consumers want this snapshot, not
+            # the post-update EMA.
+            ema_mean_pre_update = self._ema_mean.copy()
             pred_signal = per_pred_cost - self._ema_mean[np.newaxis, :]
             a = self._ema_alpha
             if self._deadband_k_sigma > 0.0:
@@ -272,4 +286,5 @@ class TrustWeightComputer:
             is_excluded=(
                 self._is_excluded.copy() if self._is_excluded is not None else None
             ),
+            ema_mean_pre_update=ema_mean_pre_update,
         )

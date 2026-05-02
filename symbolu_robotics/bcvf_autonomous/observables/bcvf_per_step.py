@@ -42,7 +42,7 @@ class BCVFPerStepMaxObservable:
         trajectories: np.ndarray,
         ground_truth: Optional[np.ndarray] = None,
     ) -> ObservableValue:
-        arr = validate_trajectory_tensor(trajectories)
+        arr = validate_trajectory_tensor(trajectories, min_horizon=3)
         breakdown = compute_bcvf_per_step(arr, self._cfg)
         per_step = breakdown.per_step_total
         n_steps = int(per_step.shape[0])
@@ -95,7 +95,7 @@ class BCVFPredictorPerStepMaxObservable:
         trajectories: np.ndarray,
         ground_truth: Optional[np.ndarray] = None,
     ) -> ObservableValue:
-        arr = validate_trajectory_tensor(trajectories)
+        arr = validate_trajectory_tensor(trajectories, min_horizon=3)
         if self._idx >= arr.shape[0]:
             raise IndexError(
                 f"predictor_index {self._idx} out of range for M={arr.shape[0]}"

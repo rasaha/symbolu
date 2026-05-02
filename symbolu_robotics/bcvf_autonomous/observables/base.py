@@ -210,8 +210,18 @@ def recommendation_for(classification: str, auc: float) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def validate_trajectory_tensor(trajectories: np.ndarray) -> np.ndarray:
-    """Coerce to ``float64`` and validate ``(M, H, 3)`` with ``M >= 2``, ``H >= 3``."""
+def validate_trajectory_tensor(
+    trajectories: np.ndarray,
+    min_horizon: int = 1,
+) -> np.ndarray:
+    """Coerce to ``float64`` and validate ``(M, H, 3)`` with ``M >= 2``.
+
+    ``min_horizon`` controls the minimum H. Observables that consume
+    the BCVF kernel (per-step max, predictor per-step max, coherence-
+    anchored, uncertainty-gated) pass ``min_horizon=3`` to enforce
+    the SECOND-order stencil. Pure ensemble-statistics observables
+    (agreement, spread, heading entropy) accept any ``H >= 1``.
+    """
     arr = np.asarray(trajectories, dtype=np.float64)
     if arr.ndim != 3 or arr.shape[-1] != 3:
         raise ValueError(
@@ -221,8 +231,8 @@ def validate_trajectory_tensor(trajectories: np.ndarray) -> np.ndarray:
         raise ValueError(
             f"observables require M >= 2 predictors; got M={arr.shape[0]}"
         )
-    if arr.shape[1] < 3:
+    if arr.shape[1] < min_horizon:
         raise ValueError(
-            f"observables require H >= 3 (BCVF stencil); got H={arr.shape[1]}"
+            f"observable requires H >= {min_horizon}; got H={arr.shape[1]}"
         )
     return arr

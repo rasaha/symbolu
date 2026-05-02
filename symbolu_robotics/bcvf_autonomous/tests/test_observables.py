@@ -363,5 +363,21 @@ def test_observable_rejects_too_few_predictors():
 
 def test_observable_rejects_too_short_horizon():
     trajs = np.zeros((2, 2, 3))
+    # Stencil-using observables require H >= 3.
     with pytest.raises(ValueError):
         BCVFPerStepMaxObservable().observe(trajs)
+
+
+def test_pure_ensemble_observables_accept_short_horizon():
+    """Agreement / spread / heading entropy do not consume the BCVF
+    stencil and must accept H=1 and H=2 horizons (a smoke-test check
+    or single-frame audit should not be blocked by validation tuned
+    for stencil-using observables)."""
+    short_h2 = np.zeros((3, 2, 3))
+    short_h1 = np.zeros((3, 1, 3))
+    PredictorAgreementObservable().observe(short_h2)
+    PredictorAgreementObservable().observe(short_h1)
+    EnsembleSpreadObservable().observe(short_h2)
+    EnsembleSpreadObservable().observe(short_h1)
+    EnsembleHeadingEntropyObservable().observe(short_h2)
+    EnsembleHeadingEntropyObservable().observe(short_h1)
