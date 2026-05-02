@@ -177,6 +177,20 @@ from symbolu_robotics.bcvf_autonomous.characterization import (
 from symbolu_robotics.bcvf_autonomous.characterization import (
     generate_trace as generate_trace_bundle,
 )
+from symbolu_robotics.bcvf_autonomous.analysis import (
+    ArgmaxFlip,
+    EpisodeSummary,
+    FleetSummary,
+    NearVeto,
+    V2StateFlip,
+    aggregate_fleet,
+    episode_record_from_dict,
+    find_argmax_flips,
+    find_near_vetoes,
+    find_v2_state_flips,
+    load_episode_from_json,
+    summarize_episode,
+)
 
 __version__ = "0.4.0"
 
@@ -312,4 +326,17 @@ __all__ = [
     "run_primary_grid",
     "run_sensitivity_grid",
     "summarize_grid",
+    # post-hoc analysis harness
+    "ArgmaxFlip",
+    "EpisodeSummary",
+    "FleetSummary",
+    "NearVeto",
+    "V2StateFlip",
+    "aggregate_fleet",
+    "episode_record_from_dict",
+    "find_argmax_flips",
+    "find_near_vetoes",
+    "find_v2_state_flips",
+    "load_episode_from_json",
+    "summarize_episode",
 ]

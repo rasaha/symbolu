@@ -69,6 +69,12 @@ class TrustStepRecord:
     # bypassed and weights forced to 1/M; "engaged" = V1 pipeline ran.
     v2_state: Optional[str] = None
     v2_signal: Optional[float] = None
+    # §6.6a exclusion counters (snapshot). None when exclusion is
+    # disabled. Used by analysis.find_near_vetoes to detect predictors
+    # that came close to being excluded but never crossed the threshold.
+    consec_suspect: Optional[np.ndarray] = None  # (M,) int
+    consec_ok: Optional[np.ndarray] = None       # (M,) int
+    exclusion_T: Optional[int] = None            # T_exclude in effect
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -102,6 +108,16 @@ class TrustShapedEpisodeRecord:
     per_step_v2_signal: np.ndarray = field(
         default_factory=lambda: np.zeros(0, dtype=np.float64)
     )
+    # §6.6a exclusion counters per tick. -1 sentinel where exclusion
+    # was disabled at the tick (so post-hoc tools can distinguish
+    # "counter was zero" from "counter was unavailable").
+    per_step_consec_suspect: np.ndarray = field(
+        default_factory=lambda: np.zeros((0, 0), dtype=np.int64)
+    )
+    per_step_consec_ok: np.ndarray = field(
+        default_factory=lambda: np.zeros((0, 0), dtype=np.int64)
+    )
+    exclusion_T: Optional[int] = None
     records: List[TrustStepRecord] = field(repr=False, default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -126,6 +142,9 @@ class TrustShapedEpisodeRecord:
             ),
             "per_step_v2_state": list(self.per_step_v2_state),
             "per_step_v2_signal": self.per_step_v2_signal.tolist(),
+            "per_step_consec_suspect": self.per_step_consec_suspect.tolist(),
+            "per_step_consec_ok": self.per_step_consec_ok.tolist(),
+            "exclusion_T": self.exclusion_T,
         }
 
 
@@ -244,6 +263,14 @@ class TrustDiagnosticsRecorder:
             else np.asarray(result.is_excluded, dtype=bool).copy()
         )
 
+        consec_suspect = (
+            None if getattr(result, "consec_suspect", None) is None
+            else np.asarray(result.consec_suspect, dtype=np.int64).copy()
+        )
+        consec_ok = (
+            None if getattr(result, "consec_ok", None) is None
+            else np.asarray(result.consec_ok, dtype=np.int64).copy()
+        )
         record = TrustStepRecord(
             step_index=self._step_index,
             aggregation=self._aggregation,
@@ -259,6 +286,9 @@ class TrustDiagnosticsRecorder:
             gate_activations=int(gate_activations),
             v2_state=getattr(result, "v2_state", None),
             v2_signal=getattr(result, "v2_signal", None),
+            consec_suspect=consec_suspect,
+            consec_ok=consec_ok,
+            exclusion_T=getattr(result, "exclusion_T", None),
             metadata=dict(metadata or {}),
         )
         self._records.append(record)
@@ -287,6 +317,9 @@ class TrustDiagnosticsRecorder:
                 per_step_gate_activations=np.zeros(0, dtype=np.int64),
                 per_step_v2_state=[],
                 per_step_v2_signal=np.zeros(0, dtype=np.float64),
+                per_step_consec_suspect=np.zeros((0, M), dtype=np.int64),
+                per_step_consec_ok=np.zeros((0, M), dtype=np.int64),
+                exclusion_T=None,
                 records=[],
             )
 
@@ -346,6 +379,31 @@ class TrustDiagnosticsRecorder:
             dtype=np.float64,
         )
 
+        # -1 sentinel where exclusion was disabled at the tick.
+        consec_suspect_stack = np.stack(
+            [
+                r.consec_suspect if r.consec_suspect is not None
+                else np.full(M, -1, dtype=np.int64)
+                for r in self._records
+            ],
+            axis=0,
+        )
+        consec_ok_stack = np.stack(
+            [
+                r.consec_ok if r.consec_ok is not None
+                else np.full(M, -1, dtype=np.int64)
+                for r in self._records
+            ],
+            axis=0,
+        )
+        exclusion_T_seen = next(
+            (
+                r.exclusion_T for r in self._records
+                if r.exclusion_T is not None
+            ),
+            None,
+        )
+
         return TrustShapedEpisodeRecord(
             n_steps=T,
             M=M,
@@ -362,6 +420,9 @@ class TrustDiagnosticsRecorder:
             per_step_gate_activations=gate_acts,
             per_step_v2_state=v2_states,
             per_step_v2_signal=v2_signals,
+            per_step_consec_suspect=consec_suspect_stack,
+            per_step_consec_ok=consec_ok_stack,
+            exclusion_T=exclusion_T_seen,
             records=list(self._records),
         )
 

@@ -137,6 +137,14 @@ class TrustWeightResult:
     # before.
     v2_state: Optional[str] = None        # "uniform" | "engaged" | None
     v2_signal: Optional[float] = None     # scalar engage signal this tick
+    # §6.6a exclusion counters (snapshot). None when exclusion is
+    # disabled. Surfaced for post-hoc near-veto analysis: a predictor
+    # whose ``consec_suspect`` reaches a high fraction of T_exclude
+    # without ever being excluded was a "near-miss" that a SOTIF
+    # recall-triage tool wants to flag.
+    consec_suspect: Optional[np.ndarray] = None  # (M,) int
+    consec_ok: Optional[np.ndarray] = None       # (M,) int
+    exclusion_T: Optional[int] = None            # T_exclude in effect
 
 
 class TrustWeightComputer:
@@ -335,6 +343,18 @@ class TrustWeightComputer:
                     ema_mean_pre_update=None,
                     v2_state=v2_state_view,
                     v2_signal=v2_signal,
+                    consec_suspect=(
+                        self._consec_suspect.copy()
+                        if self._consec_suspect is not None else None
+                    ),
+                    consec_ok=(
+                        self._consec_ok.copy()
+                        if self._consec_ok is not None else None
+                    ),
+                    exclusion_T=(
+                        int(self._exclusion_T)
+                        if self._exclusion_enabled else None
+                    ),
                 )
 
         # Level-2 EMA mean centering.
@@ -428,6 +448,18 @@ class TrustWeightComputer:
             ema_mean_pre_update=ema_mean_pre_update,
             v2_state=v2_state_view,
             v2_signal=v2_signal,
+            consec_suspect=(
+                self._consec_suspect.copy()
+                if self._consec_suspect is not None else None
+            ),
+            consec_ok=(
+                self._consec_ok.copy()
+                if self._consec_ok is not None else None
+            ),
+            exclusion_T=(
+                int(self._exclusion_T)
+                if self._exclusion_enabled else None
+            ),
         )
 
     # --- V2 state machine ---
