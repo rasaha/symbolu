@@ -22,6 +22,11 @@ import numpy as np
 
 from .core import BCVFConfig, CostOrder, compute_bcvf_cost_batch
 from .trust import TrustWeightComputer, TrustWeightResult
+from .trust_diagnostics import (
+    RolloutAggregation,
+    TrustDiagnosticsRecorder,
+    TrustShapedEpisodeRecord,
+)
 from .predictors.base import BasePredictor
 from .simulator import Obstacle, Road
 
@@ -216,6 +221,13 @@ class MPPIPlanner:
         self._trust_log_enabled: bool = False
         self._trust_log: List[Dict[str, Any]] = []
         self._trust_log_step: int = 0
+        # Typed per-step trust diagnostics — autonomous analog of BCVF
+        # LLM's TrustShapedDecodeResult. Built on top of
+        # TrustDiagnosticsRecorder; off by default. Coexists with the
+        # legacy dict-form trust log; the two record different shapes
+        # (compact summary dict vs typed (T, M) arrays).
+        self._diagnostics_enabled: bool = False
+        self._diagnostics_recorder: Optional[TrustDiagnosticsRecorder] = None
 
     # --- public API ---
 
@@ -225,6 +237,8 @@ class MPPIPlanner:
         self._trust_log_step = 0
         if self._trust_log_enabled:
             self._trust_log = []
+        if self._diagnostics_recorder is not None:
+            self._diagnostics_recorder.reset()
 
     def plan(self) -> MPPIResult:
         start = time.perf_counter()
@@ -401,6 +415,13 @@ class MPPIPlanner:
             })
             self._trust_log_step += 1
 
+        # Typed per-step trust diagnostics (TrustShapedEpisodeRecord).
+        # Records every tick, not just BCVF-active ones — a tick where
+        # ``lambda_c == 0`` still produces a uniform-weight record so
+        # the (T, M) arrays line up with the simulator's tick index.
+        if self._diagnostics_recorder is not None:
+            self._diagnostics_recorder.record(trust_result)
+
         # Weighted consensus — atan2-safe on heading.
         w_expand = weights[..., None, None]  # (K, M, 1, 1)
         xy_w = np.sum(all_trajs[..., :2] * w_expand, axis=1)                    # (K, H, 2)
@@ -551,3 +572,34 @@ class MPPIPlanner:
     def get_trust_log(self) -> List[Dict[str, Any]]:
         """Return the accumulated trust-state log (one dict per step)."""
         return list(self._trust_log)
+
+    def set_trust_diagnostics_enabled(
+        self,
+        enabled: bool,
+        aggregation: RolloutAggregation = RolloutAggregation.MEAN,
+    ) -> None:
+        """Enable typed per-step trust diagnostics.
+
+        When enabled, every ``plan()`` call appends a ``TrustStepRecord``
+        to an internal ``TrustDiagnosticsRecorder`` keyed by simulator
+        tick. Call :meth:`get_trust_diagnostics` after the episode to
+        retrieve the stacked ``TrustShapedEpisodeRecord``.
+
+        Coexists with :meth:`set_trust_log_enabled`: the legacy log
+        records compact summaries; the diagnostics recorder records
+        typed ``(T, M)`` arrays.
+        """
+        self._diagnostics_enabled = bool(enabled)
+        if enabled:
+            num_models = len(self.predictors)
+            self._diagnostics_recorder = TrustDiagnosticsRecorder(
+                M=num_models, aggregation=aggregation
+            )
+        else:
+            self._diagnostics_recorder = None
+
+    def get_trust_diagnostics(self) -> Optional[TrustShapedEpisodeRecord]:
+        """Finalize and return the typed per-step trust-diagnostics record."""
+        if self._diagnostics_recorder is None:
+            return None
+        return self._diagnostics_recorder.finalize()

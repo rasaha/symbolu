@@ -129,6 +129,31 @@ from symbolu_robotics.bcvf_autonomous.run_experiments import (
     ExperimentRunner,
     VARIANT_IDS,
 )
+from symbolu_robotics.bcvf_autonomous.observables import (
+    BCVFPerStepBreakdown,
+    BCVFPerStepMaxObservable,
+    BCVFPredictorPerStepMaxObservable,
+    CoherenceAnchoredBCVFObservable,
+    EnsembleHeadingEntropyObservable,
+    EnsembleSpreadObservable,
+    Observable,
+    ObservableValue,
+    PredictorAgreementObservable,
+    ProbeDatapoint,
+    ProbeReport,
+    UncertaintyGatedBCVFPerStepMaxObservable,
+    classify_observable,
+    compute_bcvf_per_step,
+    probe_observable,
+    probe_observables,
+    recommendation_for,
+)
+from symbolu_robotics.bcvf_autonomous.trust_diagnostics import (
+    RolloutAggregation,
+    TrustDiagnosticsRecorder,
+    TrustShapedEpisodeRecord,
+    TrustStepRecord,
+)
 
 __version__ = "0.4.0"
 
@@ -222,4 +247,27 @@ __all__ = [
     "ExperimentResult",
     "ExperimentRunner",
     "VARIANT_IDS",
+    # observables
+    "BCVFPerStepBreakdown",
+    "BCVFPerStepMaxObservable",
+    "BCVFPredictorPerStepMaxObservable",
+    "CoherenceAnchoredBCVFObservable",
+    "EnsembleHeadingEntropyObservable",
+    "EnsembleSpreadObservable",
+    "Observable",
+    "ObservableValue",
+    "PredictorAgreementObservable",
+    "ProbeDatapoint",
+    "ProbeReport",
+    "UncertaintyGatedBCVFPerStepMaxObservable",
+    "classify_observable",
+    "compute_bcvf_per_step",
+    "probe_observable",
+    "probe_observables",
+    "recommendation_for",
+    # trust diagnostics
+    "RolloutAggregation",
+    "TrustDiagnosticsRecorder",
+    "TrustShapedEpisodeRecord",
+    "TrustStepRecord",
 ]
