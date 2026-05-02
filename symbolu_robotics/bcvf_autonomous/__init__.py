@@ -154,6 +154,23 @@ from symbolu_robotics.bcvf_autonomous.trust_diagnostics import (
     TrustShapedEpisodeRecord,
     TrustStepRecord,
 )
+from symbolu_robotics.bcvf_autonomous.characterization import (
+    AlignmentAggregate,
+    AlignmentMetrics,
+    CellResult,
+    TraceBundle,
+    aggregate_alignment,
+    compute_alignment_metrics,
+    family_pass_rate,
+    pick_winner_tuple,
+    run_ablation_grid,
+    run_primary_grid,
+    run_sensitivity_grid,
+    summarize_grid,
+)
+from symbolu_robotics.bcvf_autonomous.characterization import (
+    generate_trace as generate_trace_bundle,
+)
 
 __version__ = "0.4.0"
 
@@ -270,4 +287,18 @@ __all__ = [
     "TrustDiagnosticsRecorder",
     "TrustShapedEpisodeRecord",
     "TrustStepRecord",
+    # characterization sweep
+    "AlignmentAggregate",
+    "AlignmentMetrics",
+    "CellResult",
+    "TraceBundle",
+    "aggregate_alignment",
+    "compute_alignment_metrics",
+    "family_pass_rate",
+    "generate_trace_bundle",
+    "pick_winner_tuple",
+    "run_ablation_grid",
+    "run_primary_grid",
+    "run_sensitivity_grid",
+    "summarize_grid",
 ]

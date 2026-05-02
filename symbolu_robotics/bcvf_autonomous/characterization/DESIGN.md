@@ -1,0 +1,204 @@
+# BCVF Autonomous — Characterization Sweep
+
+A regression suite that proves BCVF detects each canonical sensor-failure
+class. Ported from `symbolu_bcvf_llm.characterization` with autonomous
+semantics: SE(2) trajectory bundles instead of probability sequences,
+sensor dropout instead of EOS truncation, sensor-class failure thresholds
+instead of softmax invariance thresholds.
+
+The point of the suite is to make a SOTIF / ISO 26262 argument legible:
+*"For each named sensor failure class, the BCVF observer either rings
+the bell or it doesn't, and we have a numeric threshold on the relevant
+quantity that we can certify against."*
+
+## §1 Motivation
+
+The existing autonomous `traces.py` does parameter sweeps with two
+trajectories. That's enough to validate the gate / Huber / dt knobs but
+not enough to validate the kernel against the canonical failure
+taxonomy. Two gaps:
+
+* No `M = 3` bundle structure — outlier-attribution requires "two
+  healthy predictors plus one failing predictor" to test that BCVF
+  doesn't just notice disagreement, it points at the right offender.
+* No noise floor / dropout families — these are the families that
+  most often blow up safety arguments, because a system that fires on
+  noise is as bad as a system that misses real failures.
+
+This module fills both gaps by porting the seven-family LLM design.
+
+## §2 Family taxonomy
+
+| Family | Maps from LLM | Sensor-failure analog | Should fire BCVF? | Truth label? |
+| --- | --- | --- | --- | --- |
+| `baseline` | `baseline` | All predictors agree | No | No |
+| `constant_bias` | `constant_bias` | Sensor with miscalibrated origin | No (under SECOND order) | No |
+| `linear_drift` | `linear_drift` | IMU bias / GNSS clock drift | No (under SECOND order) | No |
+| `accelerating` | `accelerating` | Predictor diverging quadratically | Yes | Yes — predictor 1 |
+| `noise_floor` | `noise_floor` | All sensors noisy below threshold | No | No |
+| `outlier` | `outlier` | One predictor accelerating, others healthy | Yes | Yes — predictor 0 |
+| `sensor_dropout` | `eos_truncation` | One sensor freezes (LiDAR / GNSS dropout) | Yes | Yes — dropped predictor |
+
+The `M = 3` bundle is canonical for outlier attribution: two healthy
+predictors form a "majority truth" and the kernel must put more cost
+on the third. `M = 4` is supported for parity with the production
+autonomous predictor set (IMU + LiDAR + VO + GNSS).
+
+## §3 Polarity convention
+
+* `nominal` families (`baseline`, `constant_bias`, `linear_drift`,
+  `noise_floor`) MUST stay below their per-family cost / activation
+  thresholds. Failing here is a false-positive — the observer is
+  jumpy.
+* `failure` families (`accelerating`, `outlier`, `sensor_dropout`)
+  MUST exceed their per-family cost / gate / alignment thresholds.
+  Failing here is a false-negative — the observer is asleep.
+
+The sweep harness reports both sides, by family and by parameter
+cell, so a SOTIF audit can read the table directly.
+
+## §4 Per-family acceptance tables
+
+Each family has its own pass criterion. The sweep returns a
+`failure_reasons` tuple per cell so an auditor can see exactly
+which gate fired.
+
+### 4.1 baseline
+* `total_cost < 1e-6`
+* `max_acceleration_norm < 1e-6`
+* `gate_activations == 0`
+* `per_predictor_cost[i] < 1e-6` for all `i`
+
+### 4.2 constant_bias
+* `total_cost <= 1e-9` (fp64 precision)
+* `max_acceleration_norm <= 1e-9`
+* `per_predictor_cost[i] <= 1e-9` for all `i`
+
+### 4.3 linear_drift
+* Same as `constant_bias` — second derivative of a linear function
+  is zero, so SECOND-order BCVF must register zero cost up to fp64
+  noise.
+
+### 4.4 accelerating
+* For magnitude `>= 0.3`: `total_cost > 1e-3` AND
+  `gate_activations > 0`.
+* `total_cost` finite and bounded (Huber upper bound at `1e8`).
+* Alignment: truth predictor (the accelerating one) is rank 1, or
+  rank 2 with margin `>= 1.0`.
+
+### 4.5 noise_floor
+* For `sigma_noise <= 0.01`: `total_cost < 1e-2`.
+* For `sigma_noise <= 0.005`: `std(per_predictor_cost) /
+  mean(per_predictor_cost) < 0.5` — every predictor should attract
+  a similar share of the (small) cost; lopsided attribution on a
+  pure noise input is a bug.
+
+### 4.6 outlier
+* Truth predictor cost / max(non-truth predictor cost) `>= 1.5`.
+* `gate_activations > 0`.
+* `total_cost > 1e-3`.
+* Alignment (strict): truth predictor must be rank 1.
+
+### 4.7 sensor_dropout
+* `total_cost` finite.
+* For `0 <= k_dropout < H - 5`: `gate_activations > 0` AND
+  `total_cost > 1e-3`. The frozen predictor's pose stops moving
+  while others continue, so the disagreement velocity grows
+  linearly post-dropout and the gate fires.
+* Alignment (loose): dropped predictor is **not last** in the
+  per-predictor cost ranking. The default sweep wraps `outlier`
+  with dropout on a different predictor, so the outer outlier can
+  legitimately dominate the BCVF attribution; the dropout's only
+  requirement is that its own predictor doesn't sink to the
+  bottom of the rank table.
+
+## §5 Sweep grids
+
+### 5.1 Primary grid
+
+Every family × magnitude × seed at the V1 default `(T, β, δ) =
+(0.2, 100.0, 0.5)`. Magnitudes per family in
+`FAMILY_MAGNITUDES`. Three seeds (`42, 43, 44`) per cell.
+
+Total cells per default invocation:
+
+| Family | Magnitudes | Seeds | Cells |
+| --- | ---: | ---: | ---: |
+| baseline | 1 | 3 | 3 |
+| constant_bias | 4 | 3 | 12 |
+| linear_drift | 4 | 3 | 12 |
+| accelerating | 4 | 3 | 12 |
+| noise_floor | 4 | 3 | 12 |
+| outlier | 1 | 3 | 3 |
+| sensor_dropout | 4 | 3 | 12 |
+| **Total** | | | **66** |
+
+A pass requires every cell to satisfy its family's threshold table
+and (where applicable) the alignment criterion.
+
+### 5.2 Sensitivity grid
+
+Canonical magnitude per family × `(T, β, δ)` cube.
+
+* `T ∈ {0.1, 0.2, 0.5}`
+* `β ∈ {50, 100, 200}`
+* `δ ∈ {0.25, 0.5, 1.0}`
+
+Three seeds × seven families × 27 parameter cells = 567 cells per
+default invocation. The winner-tuple selector
+(`pick_winner_tuple`) returns the `(T, β, δ)` closest to the V1
+defaults that produces an all-pass row.
+
+### 5.3 Ablation grid
+
+`linear_drift` × `CostOrder ∈ {ZEROTH, FIRST, SECOND}` × seeds.
+Confirms only `SECOND` rejects linear drift — the other two orders
+must fire on it. This is the kernel's order-of-derivative claim
+distilled into a regression test.
+
+## §6 Aggregate diagnostics
+
+`summarize_grid(cells)` returns:
+
+* `n_cells` — sweep size.
+* `per_family` — per-family pass rate + alignment summary.
+* `false_positive_rate` — fraction of nominal-family cells that
+  failed (BCVF fired on a quiet input).
+* `false_negative_rate` — fraction of failure-family cells that
+  failed (BCVF stayed quiet on a real failure).
+
+`pick_winner_tuple(sensitivity_cells)` returns the winner config
+plus the full candidate list, ordered by Euclidean distance to the
+V1 defaults with tiebreakers (lowest T, highest β, lowest δ) to
+match the LLM tiebreaker convention.
+
+## §7 What is intentionally not in scope
+
+* No CSV / report writer — the sweep returns dataclass cells; a
+  caller can pipe them to CSV or markdown via `dataclasses.asdict`.
+  Adding that here ties the suite to a particular reporting flow.
+* No simulator integration — the families synthesize trajectories
+  directly. A future port can wire an MPPI rollout into the cell
+  evaluator if a closed-loop characterization is ever needed.
+* No valid-mask support in the BCVF kernel itself — the
+  `sensor_dropout` family models dropout via pose freezing rather
+  than logical masking. Real autonomous SLAM stacks behave the same
+  way; logical masking would require a kernel change.
+* No automatic acceptance-table tuning — the per-family thresholds
+  are hand-set against the SE(2) magnitudes that match the
+  autonomous stack's nominal motion (5 m/s straight line). Tuning
+  for other dynamic regimes is a caller responsibility.
+
+## §8 Acceptance criteria for the suite itself
+
+The port lands when:
+
+1. Every nominal family passes at the V1 default cell.
+2. Every failure family passes at the V1 default cell, including
+   the alignment criterion for outlier / sensor_dropout.
+3. The ablation grid shows ZEROTH and FIRST cost orders fire on
+   linear_drift while SECOND rejects it.
+4. The sensitivity grid yields at least one all-pass winner tuple
+   close to the V1 defaults.
+
+Tests in `tests/test_characterization.py` enforce (1)–(4) directly.
