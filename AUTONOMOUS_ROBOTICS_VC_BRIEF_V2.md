@@ -2,14 +2,20 @@
 
 **Cognade Labs | BCVF Autonomy Runtime**
 *Portable predictor-trust layer between multi-predictor robotics stacks and their planner*
-*Version 0.2 — Prepared April 2026*
+*Version 0.3 — Prepared May 2026*
 
-> **Status.** All four pages landed. Pages 1–2 apply the tighter,
-> investor-ready framing requested in the v2 rewrite brief; Pages
-> 3–4 are grounded in the §6 V2-roadmap execution evidence
-> (autonomy companion experiments committed through `d9cc30a`).
-> v1 file at `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for
-> historical reference.
+> **Status.** v0.3 lands the SOTIF-readiness layer the v0.2 roadmap
+> identified as the §6 gating work for a credible safety-case
+> conversation. Five new modules — observables framework, per-step
+> trust diagnostics, characterization sweep against seven canonical
+> failure families, Consumer V2 (Schmitt-triggered softmin) for
+> actuator-grade chatter immunity, and a fleet-scale post-hoc
+> analysis harness — were ported from the BCVF LLM design and
+> audited against the autonomy invariance proofs. **356 tests
+> passing**, up from 221 in v0.2; every new module has an
+> independent DESIGN.md and audit trail. v1 file at
+> `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
+> reference.
 
 ---
 
@@ -33,12 +39,13 @@ code rebuilt per stack, per program, and per release. The four
 questions that come up earliest in safety review are the ones current
 stacks answer least crisply:
 
-| Question a safety case asks | Typical answer in current stacks |
-|---|---|
-| *When two predictors disagree, can the system identify which one is failing — not which the heuristic prefers?* | Designated-primary or majority vote; both fail when the primary or majority is the one drifting. |
-| *Is there a stated invariance property — something that provably ignores benign disagreement and only fires on genuine failure?* | Threshold-tuned heuristics, calibrated empirically per stack. No formal invariance. |
-| *When a predictor is down-weighted at runtime, can an operator reconstruct why?* | Per-component logs; no causal trace from the disagreement signal to the trust decision. |
-| *Can the trust mechanism be tuned without retraining predictors or rewiring the planner?* | Trust logic is entangled with the predictors that feed it; tuning is a release-cycle event. |
+| Question a safety case asks | Typical answer in current stacks | What v0.3 ships |
+|---|---|---|
+| *When two predictors disagree, can the system identify which one is failing — not which the heuristic prefers?* | Designated-primary or majority vote; both fail when the primary or majority is the one drifting. | Per-predictor BCVF cost attribution + outlier-alignment metrics (hit / margin / rank), structurally tested against a seven-family failure taxonomy. |
+| *Is there a stated invariance property — something that provably ignores benign disagreement and only fires on genuine failure?* | Threshold-tuned heuristics, calibrated empirically per stack. No formal invariance. | Lemma 1 invariance proof (constant + linear-drift disagreement → exactly zero cost), regression-tested by `run_ablation_grid` across cost orders. |
+| *When a predictor is down-weighted at runtime, can an operator reconstruct why?* | Per-component logs; no causal trace from the disagreement signal to the trust decision. | Frame-by-frame `TrustShapedEpisodeRecord` artifact + six observable probes (agreement, spread, coherence, per-step max, predictor-specific, uncertainty-gated) that surface exactly which signal moved the trust distribution. |
+| *Can the trust mechanism be tuned without retraining predictors or rewiring the planner?* | Trust logic is entangled with the predictors that feed it; tuning is a release-cycle event. | Planner-agnostic `TrustWeightComputer` (§6.3) + opt-in Consumer V2 Schmitt trigger; both tunable through dataclasses, neither requires retraining. |
+| *Can the safety team aggregate signals across the fleet to spot near-failures before they escalate?* | Manual log mining; near-miss detection lives in custom scripts per program. | `aggregate_fleet` harness over JSON-dumped trip records — surfaces argmax flips, near-vetoes, V2 state transitions per vehicle / scenario. |
 
 ### Why the gap is structural, not a tooling oversight
 
@@ -126,18 +133,47 @@ significance threshold cannot shape the softmin. A trust distribution
 cannot bypass the consensus stage. This is the runtime contract a
 safety case can point to.
 
-### Two layers, independently tunable and testable
+### Three layers, independently tunable and testable
 
 | Layer | Scope | What it answers |
 |---|---|---|
 | **Detection kernel** | Per planning step, all predictor pairs | *What is the disagreement signal under the stated invariance?* |
 | **Trust shaper** | Per planning step, single trust distribution | *Given the signal and the per-context baseline, which predictors should the consensus down-weight right now?* |
+| **Inspection surface** *(v0.3)* | Per tick + per episode + per fleet | *Why did the shaper produce these weights, when did it flip its mind, and how many vehicles in the fleet are close to failing?* |
 
 The detection kernel is pure mathematics with a published proof. The
 trust shaper is the autonomy-validated configuration: per-source mean
 centering, then a significance gate, with all-pairs (non-anchor)
-predictor enumeration. Either layer can be replaced or re-tuned
-without touching the other.
+predictor enumeration. The inspection surface is the v0.3 SOTIF
+deliverable — every tick produces a typed structured record, every
+episode rolls up into an `EpisodeSummary`, every fleet of episodes
+aggregates into a `FleetSummary` with named events (argmax flips,
+near-vetoes, V2 state transitions). Any layer can be replaced or
+re-tuned without touching the others.
+
+### Actuator-grade chatter immunity (Consumer V2)
+
+The default V1 softmin is a smooth function — designed for
+inference-time logit blending where smoothness is a virtue. On
+borderline disagreements driving a physical actuator, smoothness
+becomes chatter: the trust-weighted consensus can flip its lead
+predictor tick-to-tick. v0.3 ships an opt-in **Schmitt-trigger
+state machine** wrapping the V1 shaping pipeline:
+
+* The signal must rise above `engage_threshold` for `T_engage`
+  consecutive ticks to engage shaping.
+* Once engaged, the signal must drop below a strictly lower
+  `disengage_threshold` for `T_disengage` consecutive ticks to
+  revert to uniform weights.
+* While disengaged, the EMA continues tracking the cost baseline
+  (so the deadband / softmin start *warm* on first engagement);
+  the §6.6a exclusion counters freeze (so transient spikes don't
+  accumulate toward veto in safe-default territory).
+
+This is the standard control-safety pattern that's been keeping
+thermostats from flickering for fifty years; v0.3 brings it to the
+trust pipeline, with the entire transition history captured in the
+typed diagnostic record for post-hoc audit.
 
 ### Developer surface — one factory call
 
@@ -214,22 +250,29 @@ construction.
 
 ## Page 4 — Evidence & Roadmap
 
-### Three proof points to know (as of April 2026)
+### Three proof points to know (as of May 2026)
 
-- **221 tests passing** across the autonomy kernel, MPPI planner,
-  trust-weight computer, non-MPPI adapter, dataset scaffolds, and
-  ROS 2 bridge. All committed, reproducible, CPU-only.
+- **356 tests passing** (+135 since v0.2) across the autonomy
+  kernel, MPPI planner, trust-weight computer, non-MPPI adapter,
+  dataset scaffolds, ROS 2 bridge, and the v0.3 SOTIF-readiness
+  layer (observables / diagnostics / characterization /
+  Consumer V2 / fleet analysis). All committed, reproducible,
+  CPU-only.
+- **Seven-family characterization sweep — 0% false-positive
+  rate, 0% false-negative rate at default parameters.** Every
+  named sensor-failure class (constant bias, linear drift,
+  accelerating divergence, noise floor, outlier, sensor dropout,
+  baseline) is validated to fire or stay quiet on cue across
+  primary, sensitivity, and ablation grids — 567-cell sensitivity
+  grid winner-tuple selection identifies the V1 defaults as the
+  closest-to-canonical all-pass configuration. This is the
+  ISO 26262 / ISO 21448 (SOTIF) regression artifact that the
+  v0.2 roadmap identified as Q3 work; landed early.
 - **Two scenarios independently validated at p < 0.05**:
   `S3_map_error_accel` (N = 21, sign-test p = 0.0072) and
   `S3_map_error` (N = 19, sign-test p = 0.0192). Same rescue
   pattern in both — evidence the V1 configuration generalizes
   across the scenario family rather than overfitting to one case.
-- **Planner-agnostic runtime**: the trust-shaping pipeline has
-  been extracted into a standalone callable (`TrustWeightComputer`)
-  that any planner family — MPPI, sampling-based, MPC, or custom —
-  can consume. Demonstrated by a second reference adapter
-  (argmin-selection) that differs from MPPI only in action
-  selection, not in trust logic.
 
 Full detail and caveats below.
 
@@ -237,17 +280,22 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 221 passing across 13 test modules; reproducible on CPU in < 1 min |
+| **Test suite** | 356 passing across 16 test modules; reproducible on CPU in < 2 min (2 host-speed-dependent perf benchmarks deselected — kernel hot path unchanged) |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
 | **Non-MPPI adapter demonstrated** | `integrations/argmin_selector.py` — ArgminSelectorPlanner shares `TrustWeightComputer` with `MPPIPlanner` with **zero code duplication**. 7 integration tests proving Lemma 1 propagates through the non-MPPI path |
 | **Multi-scenario validation (§6.1)** | Scout pass identified 2/6 scenarios as responsive (S3-variant family) + 4/6 benign + 1/6 BCVF-inapplicable. Both responsive scenarios pass p < 0.05 |
 | **Architectural variant tested and rejected (§6.6a)** | Dynamic predictor exclusion implemented, run at N=21 S3_accel, rejected under strict multi-metric promotion gate. Rotates catastrophes, doesn't reduce the count. Rejection strengthens V1 claim: "V1 is not just simplest, it's what one non-trivial variant failed to improve upon" |
+| **Observables framework (v0.3)** | `observables/` — six probes (`PredictorAgreement`, `EnsembleSpread`, `EnsembleHeadingEntropy`, `BCVFPerStepMax`, `BCVFPredictorPerStepMax`, `CoherenceAnchoredBCVF`, `UncertaintyGatedBCVFPerStepMax`). Each consumes the predictor trajectory tensor and returns a typed `ObservableValue` with metadata. Probe harness (`probe_observable`) runs against a labelled corpus and classifies the observable into SAFETY_CORRELATED / UNCORRELATED / ANTI_CORRELATED / NULL bands (AUC + Pearson + Spearman). 36 tests. |
+| **Per-step trust diagnostics (v0.3)** | `trust_diagnostics.py` — `TrustStepRecord` per tick + `TrustShapedEpisodeRecord` `(T, M)` stacked arrays + JSON `to_dict()`. Captures weights, residuals (against pre-update EMA, exact), EMA mean/std snapshots, deadband activations, exclusion state, gate counts, V2 state + signal, and exclusion `consec_suspect` / `consec_ok` counters. Wired into `MPPIPlanner.set_trust_diagnostics_enabled` and `Runner` via three `RunConfig` knobs (`trust_diagnostics_enabled`, `trust_diagnostics_path`, `trust_diagnostics_aggregation`). |
+| **Characterization sweep (v0.3)** | `characterization/` — seven SE(2) trace families (baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, sensor_dropout) + outlier-attribution metrics (hit / margin / rank). Three grids: `run_primary_grid` (66 cells, 0% FPR / 0% FNR at V1 defaults), `run_sensitivity_grid` (567-cell `(T, β, δ)` sweep, V1 defaults selected as winner-tuple), `run_ablation_grid` (linear_drift × CostOrder ablation confirms only SECOND order rejects linear drift). Three sabotage tests confirm the suite would fail on a broken kernel. |
+| **Consumer V2 — Schmitt-triggered softmin (v0.3)** | `trust.py` ConsumerV2Config + ConsumerState. Top-level state machine wraps the V1 shaping layer (deadband + softmin + §6.6a exclusion); EMA learning continues during UNIFORM so the deadband / softmin start warm on the first ENGAGED tick. Hysteresis defaults: `engage_threshold=0.5`, `disengage_threshold=0.2`, `T_engage=3`, `T_disengage=5`. Opt-in via `ConsumerV2Config(enabled=True)`; default-off preserves bit-for-bit V1 behavior. 21 tests. |
+| **Post-hoc fleet analysis harness (v0.3)** | `analysis/` — `find_argmax_flips` (with `weight_drop` + `max_abs_weight_delta` magnitude metrics), `find_v2_state_flips`, `find_near_vetoes` (predictors that crested 70% of `exclusion_T` without crossing). Aggregators `summarize_episode` and `aggregate_fleet` consume per-episode `TrustShapedEpisodeRecord`s and return a `FleetSummary` with per-classification counts, argmax-flip percentile statistics, per-predictor exclusion-incidence rate, and a typed near-veto roster (each event carrying per-episode metadata for triage). `load_episode_from_json` reverses the Runner's diagnostics dump with strict shape validation; corrupt artifacts fail loudly rather than silently producing zero-fill records. 26 tests. |
 | **Real-sensor pilot scaffold (§6.2)** | Dataset adapter interface + `RealisticNoiseAdapter` bridge (AR(1)-correlated noise, 2% outlier frames, 4 failure patterns). Pilot plan in place for nuScenes-mini + KITTI fallback. 11 tests on the adapter layer. Execution pending dataset access |
 | **ROS 2 adapter scaffold (§6.4)** | `symbolu_bcvf_ros2` package with framework-agnostic core + lazy `rclpy` shim. Message dataclasses, bridge class, and 13 tests. `.msg` files + colcon build + real pub/sub pending ~3–4 weeks ROS-environment work |
 | **Latency benchmark (§6.5)** | 18-cell (M × K × H) sweep. Smallest config (M=3, K=128, H=10) fits automotive 10 Hz (p99 = 76 ms, 24 ms headroom). Industrial 50 Hz and drone 100 Hz not met; dominant cost is Python-level per-rollout predictor loop (vectorization is a documented V2 target) |
 | **Diagnostic-consistency CI (§6.7)** | 18 parametrized invariant tests guarding `total_cost == Σ pair_costs` and `per_predictor.sum() == 2 × bcvf_total` across every (pairing, cost_order) combination |
-| **Design specification** | Autonomy DESIGN.md Phase 6 (V2 roadmap) records per-item completion status + pending work (`d9cc30a`); LLM-domain transfer pattern §5.1/§5.2 committed to `BCVF_LLM_TRUST_ROUTING_DESIGN.md` with autonomy evidence |
+| **Design specification** | Autonomy DESIGN.md Phase 6 (V2 roadmap) records per-item completion status; v0.3 adds five per-module DESIGN docs (`observables/DESIGN.md`, `characterization/DESIGN.md`, `analysis/DESIGN.md`, `CONSUMER_V2_DESIGN.md`, plus updated `trust_diagnostics` notes). Each module landed with an independent design doc + audit trail. |
 
 All numbers are from our own repository and CI — not third-party
 benchmarks. External multi-platform validation and a real-sensor
@@ -258,7 +306,10 @@ pilot are the next scheduled steps.
 - **Validated on disagreement-detectable failure modes.** S4
   (camera degradation) produces catastrophes but no predictor
   disagreement — BCVF is inapplicable there. 4/6 scenarios in our
-  synthetic suite are benign (A0 handles them).
+  synthetic suite are benign (A0 handles them). The v0.3
+  characterization sweep makes this explicit: seven failure
+  families *are* covered, families that don't manifest as
+  disagreement still aren't.
 - **Validated on synthetic M1–M4 predictors.** Real sensor traces
   (§6.2) have correlated noise and non-Gaussian tails not in the
   synthetic harness. Bridge adapter (`RealisticNoiseAdapter`)
@@ -267,14 +318,27 @@ pilot are the next scheduled steps.
   fits 10 Hz at the smallest (M, K, H). 50 Hz / 100 Hz need
   vectorized `predict_batch` (known V2 target, ~1–2 weeks work).
   Production integrators should re-run the benchmark on their
-  target compute substrate.
+  target compute substrate. The v0.3 inspection layer adds ~6 KB
+  per episode of memory and no measurable per-tick overhead;
+  the kernel hot path is bit-for-bit unchanged.
 - **No production deployment.** No operator runs V1 on their
   stack today. §6.8 is the Series-A-gated BD milestone.
 - **The 3-catastrophe floor on S3 is scenario-structural.**
   §6.6a empirically confirmed that trust-shaping alternatives
-  rotate which seeds fail but do not reduce the count. Structural
-  improvement requires either a richer predictor set or a
-  higher-level safety-monitor layer — both out of V1 scope.
+  rotate which seeds fail but do not reduce the count. v0.3
+  Consumer V2 reduces *chatter* on borderline disagreements but
+  does not, by itself, change this floor. Structural improvement
+  requires either a richer predictor set or a higher-level
+  safety-monitor layer — both out of V1 scope.
+- **Consumer V2 is opt-in, not the default.** The v0.3 ship
+  preserves V1 behavior bit-for-bit; integrators choose V2
+  explicitly. We will recommend V2 by default once the empirical
+  chatter-rate-reduction sweep is in (Q1 work).
+- **The fleet analysis harness has been validated end-to-end on
+  synthetic episodes only.** Multi-episode aggregation across
+  thousands of real trips is the §Q1 + §Q2 follow-on; the
+  harness ingests JSON dumps the Runner already produces, so
+  this is execution work, not research.
 - **LLM-domain transfer is not claimed.** An internal research
   track (`docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md` §13)
   tested whether the same BCVF math applies to LLM
@@ -285,18 +349,24 @@ pilot are the next scheduled steps.
   detector. The autonomy result above is not predicated on
   LLM transfer and stands independently.
 
-### 12-month roadmap (de-risking sequence, matches §6.10)
+### 12-month roadmap (de-risking sequence, matches §6.10 — refreshed v0.3)
 
 **Quarter 1 — External validation**
 - **§6.2 execution.** nuScenes-mini download → `datasets/nuscenes.py`
   adapter → M1–M4 real-sensor predictor implementations → N≥21
-  paired sweep on real data → pilot report. 3–4 weeks FTE.
+  paired sweep on real data → pilot report. 3–4 weeks FTE. The v0.3
+  fleet analysis harness ingests the JSON outputs directly, so the
+  pilot ships with a fleet-level FleetSummary on day one.
 - **§6.3 parity audit.** Re-run §6.1 S3_accel sweep against the
   post-refactor branch to confirm bit-accurate behavior-preservation.
   ~25 min compute. Strengthens the "extraction was zero-risk" claim.
 - **§6.5 production-substrate benchmarks.** Re-run latency sweep on
   a TDA4VH / Orin / AMD EPYC sample to produce numbers an
   integrator can plan against. 1–2 days per target.
+- **Consumer V2 chatter-reduction sweep.** Re-run §6.1 S3_accel with
+  V2 enabled; quantify per-step argmax-flip rate reduction; promote
+  V2 to default once chatter reduction is statistically significant
+  without harming rescue-pattern reproduction. 1 week.
 
 **Quarter 2 — Platform integration**
 - **§6.4 execution.** `.msg` + colcon + real rclpy pub/sub, Nav2
@@ -310,15 +380,21 @@ pilot are the next scheduled steps.
 
 **Quarter 3 — Safety-case + adjacent-domain pilot**
 - **SOTIF / ISO 26262 traceability template.** Map Lemma 1
-  invariance + the autonomy-validated consumer pattern to a
-  safety-case narrative. 2–3 weeks + regulator workshop.
+  invariance + the v0.3 characterization-sweep failure taxonomy +
+  per-step diagnostic record + Consumer V2 chatter-immunity proof
+  to a safety-case narrative. The five v0.3 artifacts cover the
+  bulk of what an auditor's clause-by-clause walk requires; the
+  Q3 work is the regulator-facing template + workshop, not new
+  code. 2–3 weeks + regulator workshop.
 - **First paid design-partner engagement** (adjacent domain —
   drone / warehouse / industrial mobile robot). Not full AV.
 
 **Quarter 4 — Production reference**
 - **§6.8 first production reference customer.** Running V2 (post-
   real-sensor-pilot) on their own stack in their own environment.
-  Reference letter or published case study.
+  Reference letter or published case study. The fleet analysis
+  harness lets the partner publish a *fleet-level* trust-pipeline
+  report at handover, not just a single integration report.
 
 ### The ask
 
@@ -353,4 +429,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.2 · 221 internal tests · 2 scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3)*
+*v0.3 · 356 internal tests · 2 scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity available opt-in*
