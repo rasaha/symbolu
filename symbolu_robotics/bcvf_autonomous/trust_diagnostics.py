@@ -65,6 +65,10 @@ class TrustStepRecord:
     deadband_fired: bool             # whether this tick's chosen rollout fell in deadband
     is_excluded: Optional[np.ndarray]  # (M,) bool exclusion state, or None
     gate_activations: int            # diagnostic — only set if recorder has access
+    # §14a V2 state — None if V2 is disabled. "uniform" = softmin
+    # bypassed and weights forced to 1/M; "engaged" = V1 pipeline ran.
+    v2_state: Optional[str] = None
+    v2_signal: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -74,7 +78,7 @@ class TrustShapedEpisodeRecord:
 
     Stacks every ``TrustStepRecord`` into ``(T, M)`` arrays. Mirrors
     BCVF LLM's ``TrustShapedDecodeResult``: per-step weights, costs,
-    residuals, BCVF totals, gate activations.
+    residuals, BCVF totals, gate activations, and §14a V2 state.
     """
 
     n_steps: int
@@ -90,6 +94,14 @@ class TrustShapedEpisodeRecord:
     per_step_deadband_fired: np.ndarray  # (T,) bool
     per_step_is_excluded: np.ndarray     # (T, M) bool
     per_step_gate_activations: np.ndarray  # (T,) int
+    # §14a V2 state per tick. ``per_step_v2_state`` carries the string
+    # state ("uniform" | "engaged") or "" when V2 was disabled at the
+    # tick. ``per_step_v2_signal`` carries the engage-signal value or
+    # NaN when V2 was disabled.
+    per_step_v2_state: List[str] = field(default_factory=list)
+    per_step_v2_signal: np.ndarray = field(
+        default_factory=lambda: np.zeros(0, dtype=np.float64)
+    )
     records: List[TrustStepRecord] = field(repr=False, default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -112,6 +124,8 @@ class TrustShapedEpisodeRecord:
             "per_step_gate_activations": (
                 self.per_step_gate_activations.tolist()
             ),
+            "per_step_v2_state": list(self.per_step_v2_state),
+            "per_step_v2_signal": self.per_step_v2_signal.tolist(),
         }
 
 
@@ -243,6 +257,8 @@ class TrustDiagnosticsRecorder:
             deadband_fired=deadband_fired,
             is_excluded=is_excluded,
             gate_activations=int(gate_activations),
+            v2_state=getattr(result, "v2_state", None),
+            v2_signal=getattr(result, "v2_signal", None),
             metadata=dict(metadata or {}),
         )
         self._records.append(record)
@@ -269,6 +285,8 @@ class TrustDiagnosticsRecorder:
                 per_step_deadband_fired=np.zeros(0, dtype=bool),
                 per_step_is_excluded=np.zeros((0, M), dtype=bool),
                 per_step_gate_activations=np.zeros(0, dtype=np.int64),
+                per_step_v2_state=[],
+                per_step_v2_signal=np.zeros(0, dtype=np.float64),
                 records=[],
             )
 
@@ -319,6 +337,15 @@ class TrustDiagnosticsRecorder:
             axis=0,
         )
 
+        v2_states = [r.v2_state if r.v2_state is not None else "" for r in self._records]
+        v2_signals = np.array(
+            [
+                r.v2_signal if r.v2_signal is not None else float("nan")
+                for r in self._records
+            ],
+            dtype=np.float64,
+        )
+
         return TrustShapedEpisodeRecord(
             n_steps=T,
             M=M,
@@ -333,6 +360,8 @@ class TrustDiagnosticsRecorder:
             per_step_deadband_fired=deadband_fired,
             per_step_is_excluded=is_excluded,
             per_step_gate_activations=gate_acts,
+            per_step_v2_state=v2_states,
+            per_step_v2_signal=v2_signals,
             records=list(self._records),
         )
 

@@ -34,11 +34,77 @@ Design notes:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
 
 import numpy as np
 
 from .core import BCVFConfig, compute_bcvf_cost_batch
+
+
+class ConsumerState(str, Enum):
+    """Top-level state of the §14a V2 Schmitt-triggered consumer.
+
+    ``UNIFORM`` — softmin disengaged; weights are 1/M for every
+    rollout. The engage signal must rise above
+    ``ConsumerV2Config.engage_threshold`` for ``T_engage`` consecutive
+    ticks to transition to ``ENGAGED``.
+
+    ``ENGAGED`` — V1 shaping pipeline runs (EMA centering, per-rollout
+    deadband, softmin, optional exclusion). The engage signal must
+    drop below ``ConsumerV2Config.disengage_threshold`` for
+    ``T_disengage`` consecutive ticks to transition back to
+    ``UNIFORM``.
+    """
+
+    UNIFORM = "uniform"
+    ENGAGED = "engaged"
+
+
+@dataclass
+class ConsumerV2Config:
+    """§14a V2 consumer pattern — Schmitt-triggered softmin.
+
+    See ``CONSUMER_V2_DESIGN.md`` for the full motivation and
+    threshold-selection rationale.
+
+    Attributes:
+        enabled: master switch. When False the consumer is exactly V1.
+        engage_threshold: scalar threshold on the engage signal (default
+            ``bcvf_total.mean()``). Engages shaping when the signal
+            stays at or above this value for ``T_engage`` consecutive
+            ticks.
+        disengage_threshold: strictly less than ``engage_threshold``.
+            Reverts to uniform when the signal stays at or below this
+            value for ``T_disengage`` consecutive ticks. The
+            hysteresis gap ``engage_threshold - disengage_threshold``
+            kills chatter at the threshold boundary.
+        T_engage: consecutive-tick count required to engage. Defaults
+            to 3 (≈ 0.3 s at dt = 0.1 s).
+        T_disengage: consecutive-tick count required to disengage.
+            Defaults to 5 — slightly slower than engage so the safety
+            mode stays active a bit longer once a real signal appears.
+    """
+
+    enabled: bool = False
+    engage_threshold: float = 0.5
+    disengage_threshold: float = 0.2
+    T_engage: int = 3
+    T_disengage: int = 5
+
+    def __post_init__(self) -> None:
+        if self.engage_threshold <= self.disengage_threshold:
+            raise ValueError(
+                f"engage_threshold ({self.engage_threshold}) must be "
+                f"strictly greater than disengage_threshold "
+                f"({self.disengage_threshold}) so the Schmitt trigger "
+                f"has hysteresis"
+            )
+        if self.T_engage < 1 or self.T_disengage < 1:
+            raise ValueError(
+                f"T_engage and T_disengage must be >= 1; got "
+                f"T_engage={self.T_engage}, T_disengage={self.T_disengage}"
+            )
 
 
 @dataclass
@@ -66,6 +132,11 @@ class TrustWeightResult:
     deadband_active_count: int      # # rollouts below deadband threshold
     is_excluded: Optional[np.ndarray]  # (M,) bool or None
     ema_mean_pre_update: Optional[np.ndarray] = None  # (M,) snapshot before update
+    # §14a V2 Schmitt-triggered consumer diagnostics. None when V2 is
+    # disabled (the default), so V1 callers see the same field set as
+    # before.
+    v2_state: Optional[str] = None        # "uniform" | "engaged" | None
+    v2_signal: Optional[float] = None     # scalar engage signal this tick
 
 
 class TrustWeightComputer:
@@ -106,6 +177,15 @@ class TrustWeightComputer:
         self._consec_suspect: Optional[np.ndarray] = None
         self._consec_ok: Optional[np.ndarray] = None
         self._is_excluded: Optional[np.ndarray] = None
+        # §14a V2 Schmitt-triggered consumer — disabled by default.
+        # When enabled the engage signal (default: bcvf_total.mean())
+        # gates the entire shaping pipeline: in UNIFORM state the
+        # softmin is bypassed and weights are 1/M; in ENGAGED state
+        # the V1 pipeline runs unchanged.
+        self._v2_config: Optional[ConsumerV2Config] = None
+        self._v2_state: ConsumerState = ConsumerState.UNIFORM
+        self._v2_above_count: int = 0
+        self._v2_below_count: int = 0
 
     # --- lifecycle ---
 
@@ -116,6 +196,9 @@ class TrustWeightComputer:
         self._consec_suspect = None
         self._consec_ok = None
         self._is_excluded = None
+        self._v2_state = ConsumerState.UNIFORM
+        self._v2_above_count = 0
+        self._v2_below_count = 0
 
     # --- setters ---
 
@@ -135,6 +218,23 @@ class TrustWeightComputer:
         if k_sigma < 0.0:
             raise ValueError(f"deadband k_sigma must be >= 0; got {k_sigma}")
         self._deadband_k_sigma = k_sigma
+
+    def set_v2_consumer(self, config: ConsumerV2Config) -> None:
+        """Install or replace the §14a V2 consumer config.
+
+        Resets the V2 state machine — calling mid-episode flushes
+        the engage / disengage tick counters so the new config takes
+        effect from a known starting state (UNIFORM).
+        """
+        self._v2_config = config
+        self._v2_state = ConsumerState.UNIFORM
+        self._v2_above_count = 0
+        self._v2_below_count = 0
+
+    @property
+    def v2_state(self) -> ConsumerState:
+        """Current §14a V2 state — UNIFORM or ENGAGED."""
+        return self._v2_state
 
     def set_exclusion(
         self,
@@ -197,6 +297,45 @@ class TrustWeightComputer:
         bcvf_total, per_pred_cost = compute_bcvf_cost_batch(
             trajectories_list, c, return_per_predictor=True
         )
+
+        # §14a V2 Schmitt-trigger gate. When enabled, the top-level
+        # state machine runs first; if it's in UNIFORM mode the V1
+        # pipeline is bypassed entirely and weights are forced to
+        # 1/M. Exclusion is suspended in UNIFORM mode so transient
+        # spikes don't accumulate toward veto while the consumer is
+        # already in safe-default territory.
+        v2_signal: Optional[float] = None
+        v2_state_view: Optional[str] = None
+        if self._v2_config is not None and self._v2_config.enabled:
+            v2_signal = (
+                float(bcvf_total.mean()) if bcvf_total.size > 0 else 0.0
+            )
+            self._update_v2_state(v2_signal)
+            v2_state_view = self._v2_state.value
+            if self._v2_state == ConsumerState.UNIFORM:
+                weights = np.full(
+                    (k_batch, num_models),
+                    1.0 / num_models,
+                    dtype=np.float64,
+                )
+                return TrustWeightResult(
+                    weights=weights,
+                    bcvf_total=bcvf_total,
+                    per_pred_cost=per_pred_cost,
+                    ema_mean=(
+                        self._ema_mean.copy()
+                        if self._ema_mean is not None else None
+                    ),
+                    ema_std=None,
+                    deadband_active_count=0,
+                    is_excluded=(
+                        self._is_excluded.copy()
+                        if self._is_excluded is not None else None
+                    ),
+                    ema_mean_pre_update=None,
+                    v2_state=v2_state_view,
+                    v2_signal=v2_signal,
+                )
 
         # Level-2 EMA mean centering.
         ema_mean_pre_update: Optional[np.ndarray] = None
@@ -287,4 +426,42 @@ class TrustWeightComputer:
                 self._is_excluded.copy() if self._is_excluded is not None else None
             ),
             ema_mean_pre_update=ema_mean_pre_update,
+            v2_state=v2_state_view,
+            v2_signal=v2_signal,
         )
+
+    # --- V2 state machine ---
+
+    def _update_v2_state(self, signal: float) -> None:
+        """Advance the §14a V2 Schmitt trigger by one tick.
+
+        UNIFORM → ENGAGED when ``signal >= engage_threshold`` for
+        ``T_engage`` consecutive ticks.
+        ENGAGED → UNIFORM when ``signal <= disengage_threshold`` for
+        ``T_disengage`` consecutive ticks.
+
+        The two counters are reset on any tick that breaks the streak,
+        and on every state transition, so half-counted streaks don't
+        leak across boundaries.
+        """
+        cfg = self._v2_config
+        if cfg is None:
+            return
+        if self._v2_state == ConsumerState.UNIFORM:
+            if signal >= cfg.engage_threshold:
+                self._v2_above_count += 1
+                if self._v2_above_count >= cfg.T_engage:
+                    self._v2_state = ConsumerState.ENGAGED
+                    self._v2_above_count = 0
+                    self._v2_below_count = 0
+            else:
+                self._v2_above_count = 0
+        else:  # ENGAGED
+            if signal <= cfg.disengage_threshold:
+                self._v2_below_count += 1
+                if self._v2_below_count >= cfg.T_disengage:
+                    self._v2_state = ConsumerState.UNIFORM
+                    self._v2_above_count = 0
+                    self._v2_below_count = 0
+            else:
+                self._v2_below_count = 0

@@ -64,6 +64,13 @@ class RunConfig:
     trust_diagnostics_enabled: bool = False
     trust_diagnostics_path: Optional[str] = None
     trust_diagnostics_aggregation: str = "mean"  # "mean" | "argmin_total"
+    # §14a V2 Schmitt-triggered consumer — disabled by default; the
+    # planner stays on V1 softmin until v2_enabled is set True.
+    v2_enabled: bool = False
+    v2_engage_threshold: float = 0.5
+    v2_disengage_threshold: float = 0.2
+    v2_T_engage: int = 3
+    v2_T_disengage: int = 5
 
 
 @dataclass
@@ -199,6 +206,18 @@ class Runner:
                     f"{[a.value for a in RolloutAggregation]}; got {agg_name!r}"
                 ) from exc
             planner.set_trust_diagnostics_enabled(True, aggregation=aggregation)
+
+        if getattr(cfg, "v2_enabled", False):
+            from .trust import ConsumerV2Config
+            planner.set_v2_consumer(
+                ConsumerV2Config(
+                    enabled=True,
+                    engage_threshold=float(cfg.v2_engage_threshold),
+                    disengage_threshold=float(cfg.v2_disengage_threshold),
+                    T_engage=int(cfg.v2_T_engage),
+                    T_disengage=int(cfg.v2_T_disengage),
+                )
+            )
         self._planner = planner
 
         sim.reset()

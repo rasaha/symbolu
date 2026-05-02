@@ -148,6 +148,12 @@ from symbolu_robotics.bcvf_autonomous.observables import (
     probe_observables,
     recommendation_for,
 )
+from symbolu_robotics.bcvf_autonomous.trust import (
+    ConsumerState,
+    ConsumerV2Config,
+    TrustWeightComputer,
+    TrustWeightResult,
+)
 from symbolu_robotics.bcvf_autonomous.trust_diagnostics import (
     RolloutAggregation,
     TrustDiagnosticsRecorder,
@@ -282,6 +288,11 @@ __all__ = [
     "probe_observable",
     "probe_observables",
     "recommendation_for",
+    # trust + V2 consumer
+    "ConsumerState",
+    "ConsumerV2Config",
+    "TrustWeightComputer",
+    "TrustWeightResult",
     # trust diagnostics
     "RolloutAggregation",
     "TrustDiagnosticsRecorder",

@@ -21,7 +21,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from .core import BCVFConfig, CostOrder, compute_bcvf_cost_batch
-from .trust import TrustWeightComputer, TrustWeightResult
+from .trust import (
+    ConsumerV2Config,
+    TrustWeightComputer,
+    TrustWeightResult,
+)
 from .trust_diagnostics import (
     RolloutAggregation,
     TrustDiagnosticsRecorder,
@@ -603,3 +607,14 @@ class MPPIPlanner:
         if self._diagnostics_recorder is None:
             return None
         return self._diagnostics_recorder.finalize()
+
+    def set_v2_consumer(self, config: ConsumerV2Config) -> None:
+        """Install the §14a V2 Schmitt-triggered consumer.
+
+        Forwards to :meth:`TrustWeightComputer.set_v2_consumer`. With
+        ``config.enabled = False`` the planner's behavior is exactly
+        V1 (default). With ``enabled = True`` the trust computer
+        gates the entire shaping pipeline through the engage /
+        disengage state machine.
+        """
+        self._trust_computer.set_v2_consumer(config)
