@@ -297,13 +297,10 @@ class TrustWeightComputer:
                 is_excluded=None,
             )
 
-        # BCVF kernel (stays in core.py).
-        trajectories_list = [
-            [trajectories[k, m] for m in range(num_models)]
-            for k in range(k_batch)
-        ]
+        # BCVF kernel (stays in core.py). v0.4: pass the (K, M, H, 3)
+        # tensor directly; the kernel skips the list-of-lists round trip.
         bcvf_total, per_pred_cost = compute_bcvf_cost_batch(
-            trajectories_list, c, return_per_predictor=True
+            trajectories, c, return_per_predictor=True
         )
 
         # Level-2 EMA mean centering. Runs before the §14a V2 gate so

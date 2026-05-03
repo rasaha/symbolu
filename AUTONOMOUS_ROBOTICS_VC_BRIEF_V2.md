@@ -2,20 +2,19 @@
 
 **Cognade Labs | BCVF Autonomy Runtime**
 *Portable predictor-trust layer between multi-predictor robotics stacks and their planner*
-*Version 0.3 — Prepared May 2026*
+*Version 0.4 — Prepared May 2026*
 
-> **Status.** v0.3 lands the SOTIF-readiness layer the v0.2 roadmap
-> identified as the §6 gating work for a credible safety-case
-> conversation. Five new modules — observables framework, per-step
-> trust diagnostics, characterization sweep against seven canonical
-> failure families, Consumer V2 (Schmitt-triggered softmin) for
-> actuator-grade chatter immunity, and a fleet-scale post-hoc
-> analysis harness — were ported from the BCVF LLM design and
-> audited against the autonomy invariance proofs. **356 tests
-> passing**, up from 221 in v0.2; every new module has an
-> independent DESIGN.md and audit trail. v1 file at
-> `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
-> reference.
+> **Status.** v0.4 closes the highest-leverage performance caveat
+> the v0.3 audit identified — `predict_batch` vectorization on all
+> four reference predictors (M1–M4) — with **52–77× per-predictor
+> speedup** at K=1000, H=50 vs the prior per-rollout Python loop
+> and bit-for-bit equivalence (asserted by 11 parametrized tests
+> across every failure mode). v0.3's SOTIF-readiness layer
+> (observables, per-step diagnostics, 7-family characterization
+> sweep, Consumer V2, fleet analysis harness) is preserved
+> unchanged. **373 tests passing**, up from 221 in v0.2 / 356 in
+> v0.3. v1 file at `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved
+> for historical reference.
 
 ---
 
@@ -280,7 +279,7 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 356 passing across 16 test modules; reproducible on CPU in < 2 min (2 host-speed-dependent perf benchmarks deselected — kernel hot path unchanged) |
+| **Test suite** | 373 passing across 17 test modules; reproducible on CPU in < 2 min (3 host-speed-dependent perf benchmarks deselected — kernel hot path unchanged) |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
 | **Non-MPPI adapter demonstrated** | `integrations/argmin_selector.py` — ArgminSelectorPlanner shares `TrustWeightComputer` with `MPPIPlanner` with **zero code duplication**. 7 integration tests proving Lemma 1 propagates through the non-MPPI path |
@@ -293,7 +292,8 @@ Full detail and caveats below.
 | **Post-hoc fleet analysis harness (v0.3)** | `analysis/` — `find_argmax_flips` (with `weight_drop` + `max_abs_weight_delta` magnitude metrics), `find_v2_state_flips`, `find_near_vetoes` (predictors that crested 70% of `exclusion_T` without crossing). Aggregators `summarize_episode` and `aggregate_fleet` consume per-episode `TrustShapedEpisodeRecord`s and return a `FleetSummary` with per-classification counts, argmax-flip percentile statistics, per-predictor exclusion-incidence rate, and a typed near-veto roster (each event carrying per-episode metadata for triage). `load_episode_from_json` reverses the Runner's diagnostics dump with strict shape validation; corrupt artifacts fail loudly rather than silently producing zero-fill records. 26 tests. |
 | **Real-sensor pilot scaffold (§6.2)** | Dataset adapter interface + `RealisticNoiseAdapter` bridge (AR(1)-correlated noise, 2% outlier frames, 4 failure patterns). Pilot plan in place for nuScenes-mini + KITTI fallback. 11 tests on the adapter layer. Execution pending dataset access |
 | **ROS 2 adapter scaffold (§6.4)** | `symbolu_bcvf_ros2` package with framework-agnostic core + lazy `rclpy` shim. Message dataclasses, bridge class, and 13 tests. `.msg` files + colcon build + real pub/sub pending ~3–4 weeks ROS-environment work |
-| **Latency benchmark (§6.5)** | 18-cell (M × K × H) sweep. Smallest config (M=3, K=128, H=10) fits automotive 10 Hz (p99 = 76 ms, 24 ms headroom). Industrial 50 Hz and drone 100 Hz not met; dominant cost is Python-level per-rollout predictor loop (vectorization is a documented V2 target) |
+| **Latency benchmark (§6.5)** | 18-cell (M × K × H) sweep, plus a v0.4 re-run after `predict_batch` vectorization. Smallest config (M=4, K=128, H=10) now p99 ≈ 38 ms (was 76). Per-predictor rollout cost dropped 52–77× across M1–M4 at K=1000, H=50; the new dominant cost is the BCVF kernel and perf-cost evaluation — the next vectorization targets. Production integrators should re-run on their substrate. |
+| **`predict_batch` vectorization (v0.4)** | All four reference predictors (M1 IMU, M2 LiDAR, M3 VO, M4 GNSS — including all four GNSS failure modes and M3's tracking-loss freeze branch) ship with vectorized `predict_batch` overrides; default `BasePredictor.predict_batch` falls back to a per-rollout loop so custom predictors without an override still work. Bit-for-bit equivalent to the per-rollout loop (asserted by 11 parametrized tests + 4 ≥ 2× speedup gates). 18 new tests; bumps the per-predictor speedup the audit recommended item #1 from "1–2 weeks of work" to "landed." |
 | **Diagnostic-consistency CI (§6.7)** | 18 parametrized invariant tests guarding `total_cost == Σ pair_costs` and `per_predictor.sum() == 2 × bcvf_total` across every (pairing, cost_order) combination |
 | **Design specification** | Autonomy DESIGN.md Phase 6 (V2 roadmap) records per-item completion status; v0.3 adds five per-module DESIGN docs (`observables/DESIGN.md`, `characterization/DESIGN.md`, `analysis/DESIGN.md`, `CONSUMER_V2_DESIGN.md`, plus updated `trust_diagnostics` notes). Each module landed with an independent design doc + audit trail. |
 
@@ -314,13 +314,23 @@ pilot are the next scheduled steps.
   (§6.2) have correlated noise and non-Gaussian tails not in the
   synthetic harness. Bridge adapter (`RealisticNoiseAdapter`)
   partially covers this; full nuScenes validation pending.
-- **Latency is not yet at drone / industrial-robot rates.** V1
-  fits 10 Hz at the smallest (M, K, H). 50 Hz / 100 Hz need
-  vectorized `predict_batch` (known V2 target, ~1–2 weeks work).
-  Production integrators should re-run the benchmark on their
-  target compute substrate. The v0.3 inspection layer adds ~6 KB
-  per episode of memory and no measurable per-tick overhead;
-  the kernel hot path is bit-for-bit unchanged.
+- **Predictor rollout vectorization landed (v0.4).** All four
+  reference predictors (M1–M4) ship with `predict_batch` overrides
+  that run K rollouts through the H sequential dynamics steps with
+  `(K,)`-shaped state arrays — observed **52–77× per-predictor
+  speedup** at K=1000, H=50 vs the prior per-rollout Python loop,
+  bit-for-bit equivalent to the reference loop (asserted by 11
+  parametrized equivalence tests across all failure modes).
+  Custom predictors without an override fall back to the default
+  loop. The audit caveat in v0.2/v0.3 ("dominant cost is the
+  Python-level per-rollout predictor loop") is now resolved; the
+  remaining latency budget is the BCVF kernel and the MPPI
+  perf-cost evaluation, which are the next vectorization targets.
+- **Drone / industrial rates remain partially out of reach on the
+  largest configs.** Automotive 10 Hz now fits at the small config
+  (K=128, H=10, p99 ≈ 38 ms). 50 Hz / 100 Hz still need kernel-
+  side vectorization; production integrators should re-run the
+  benchmark on their target compute substrate.
 - **No production deployment.** No operator runs V1 on their
   stack today. §6.8 is the Series-A-gated BD milestone.
 - **The 3-catastrophe floor on S3 is scenario-structural.**
@@ -375,8 +385,10 @@ pilot are the next scheduled steps.
 - **First external-integrator confirmation.** OSS contributor or
   design-partner drops the package into their Nav2 / Autoware
   stack and confirms install + run. Required for §6.4 acceptance.
-- **`predict_batch` vectorization** (unblocks drone / industrial
-  rates). 1–2 weeks.
+- ~~**`predict_batch` vectorization** (unblocks drone / industrial
+  rates). 1–2 weeks.~~ **Landed in v0.4 — per-predictor cost down
+  52–77× at K=1000, H=50.** Follow-on: kernel-side vectorization
+  for the now-dominant BCVF + perf-cost evaluation cost.
 
 **Quarter 3 — Safety-case + adjacent-domain pilot**
 - **SOTIF / ISO 26262 traceability template.** Map Lemma 1
@@ -429,4 +441,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.3 · 356 internal tests · 2 scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity available opt-in*
+*v0.4 · 373 internal tests · 2 scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity available opt-in · `predict_batch` vectorization 52–77× per-predictor speedup*

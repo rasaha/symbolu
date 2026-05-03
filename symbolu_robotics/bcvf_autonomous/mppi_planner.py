@@ -339,11 +339,18 @@ class MPPIPlanner:
         num_models = len(model_ids)
         anchor_idx = model_ids.index(c.anchor)
 
-        # Always roll out every predictor.
+        # Always roll out every predictor. v0.4 vectorization: each
+        # predictor's ``predict_batch(controls_batch)`` runs all K
+        # rollouts through the H sequential dynamics steps with
+        # ``(K,)``-shaped state arrays — replacing the per-rollout
+        # Python loop. The default ``BasePredictor.predict_batch``
+        # falls back to a per-rollout loop, so any custom predictor
+        # without an override still works (just without the speedup).
         all_trajs = np.zeros((k_batch, num_models, c.horizon, 3), dtype=np.float64)
-        for k in range(k_batch):
-            for m_idx, name in enumerate(model_ids):
-                all_trajs[k, m_idx] = self.predictors[name].predict(controls_batch[k])
+        for m_idx, name in enumerate(model_ids):
+            all_trajs[:, m_idx] = self.predictors[name].predict_batch(
+                controls_batch
+            )
 
         # §6.3: delegate consumer-layer trust-weight computation to
         # the shared TrustWeightComputer. The computer handles EMA

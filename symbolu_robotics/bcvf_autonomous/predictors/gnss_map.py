@@ -15,6 +15,8 @@ from __future__ import annotations
 import math
 from typing import Optional
 
+import numpy as np
+
 from .base import BasePredictor, BicycleConfig, PredictorState
 
 
@@ -130,3 +132,97 @@ class GNSSMap(BasePredictor):
         # so J_BCVF = 0 while J_ZEROTH / J_FIRST see the bias.
         state.x += self.constant_bias_x
         return state
+
+    # --- vectorized batch path ---
+
+    def predict_batch(self, controls_batch: np.ndarray) -> np.ndarray:
+        """Vectorized K-rollout forward simulation.
+
+        All four failure modes are state-mutating but per-step scalar:
+
+        - ``multipath`` consumes 1 ``rng.random()`` per step plus 2 more
+          (exponential + uniform angle) if the jump triggers. Same
+          jump magnitude / angle applied to all K rollouts.
+        - ``map_error`` is deterministic — adds a state-dependent
+          lateral offset perpendicular to the per-rollout heading.
+        - ``map_error_accel`` is the same shape with quadratic-in-time
+          magnitude.
+        - ``constant_bias`` adds a fixed scalar to ``state.x``.
+
+        The lateral-offset modes use ``state.theta`` to compute the
+        offset direction, so the offset is per-rollout (different
+        thetas), not scalar. Implementation handles that via vector
+        ``cos(state_th + π/2)`` etc.
+        """
+        ctrl = np.asarray(controls_batch, dtype=np.float64)
+        if ctrl.ndim != 3 or ctrl.shape[2] != 2:
+            raise ValueError(
+                f"controls_batch must have shape (K, H, 2); got {ctrl.shape}"
+            )
+        K, H, _ = ctrl.shape
+
+        self._reset_call_context()
+        cfg = self.bicycle_config
+        dt = cfg.dt
+        s = self._state
+        state_x = np.full(K, s.x, dtype=np.float64)
+        state_y = np.full(K, s.y, dtype=np.float64)
+        state_th = np.full(K, s.theta, dtype=np.float64)
+
+        out = np.zeros((K, H, 3), dtype=np.float64)
+        rng = self._rng
+        f = self._failure
+
+        for h in range(H):
+            state_x, state_y, state_th = self.bicycle_step_batch(
+                state_x, state_y, state_th, ctrl[:, h, 0], ctrl[:, h, 1],
+            )
+            # apply_failure — branched by failure_type.
+            time = self._state.timestamp + (h + 1) * dt
+            if f.active and time >= f.onset_time:
+                elapsed = time - f.onset_time
+                progress = 1.0
+                if f.ramp_duration > 1e-9:
+                    progress = min(1.0, elapsed / f.ramp_duration)
+                scale = progress * f.severity
+
+                if self.failure_type == "multipath":
+                    if rng.random() < scale * self.MULTIPATH_JUMP_PROB_MAX:
+                        jump_mag = self.MULTIPATH_BASE_JUMP_M + float(
+                            rng.exponential(
+                                scale * self.MULTIPATH_EXPONENTIAL_SCALE
+                            )
+                        )
+                        jump_angle = float(rng.uniform(0.0, 2.0 * math.pi))
+                        state_x = state_x + jump_mag * math.cos(jump_angle)
+                        state_y = state_y + jump_mag * math.sin(jump_angle)
+                elif self.failure_type == "constant_bias":
+                    state_x = state_x + self.constant_bias_x
+                elif self.failure_type == "map_error_accel":
+                    lateral = (
+                        scale
+                        * self.MAP_ERROR_ACCEL_RATE
+                        * elapsed
+                        * elapsed
+                    )
+                    lateral_heading = state_th + math.pi / 2.0
+                    state_x = state_x + lateral * np.cos(lateral_heading)
+                    state_y = state_y + lateral * np.sin(lateral_heading)
+                else:  # map_error
+                    lateral = scale * elapsed * self.MAP_ERROR_RATE
+                    lateral_heading = state_th + math.pi / 2.0
+                    state_x = state_x + lateral * np.cos(lateral_heading)
+                    state_y = state_y + lateral * np.sin(lateral_heading)
+
+            # apply_noise — per-step observation noise.
+            mult = self._noise_multiplier
+            nx = float(rng.normal(0.0, self.NOMINAL_POSITION_STD * mult))
+            ny = float(rng.normal(0.0, self.NOMINAL_POSITION_STD * mult))
+            nth = float(rng.normal(0.0, self.NOMINAL_HEADING_STD * mult))
+            obs_th = state_th + nth
+            obs_th = np.arctan2(np.sin(obs_th), np.cos(obs_th))
+            out[:, h, 0] = state_x + nx
+            out[:, h, 1] = state_y + ny
+            out[:, h, 2] = obs_th
+
+        return out
