@@ -645,6 +645,14 @@ investor or safety auditor.
 
 ## §10 What "done" looks like
 
+> **Verification protocol.** This runbook is the *execution* path.
+> The matching *verification* checklist — preflight gates, predictor
+> contract checks, acceptance gates G-01 through G-06, sign-off
+> procedure — lives in
+> `symbolu_robotics/bcvf_autonomous/pilot/DESIGN.md` §7. Run that
+> protocol after this runbook completes; record observed values in
+> the §7.2 tables before claiming the pilot passed.
+
 A reportable §6.2 result has these three artifacts on disk:
 
 1. **`phase_6_2_real_paired_comparison.csv`** — one row per scene
