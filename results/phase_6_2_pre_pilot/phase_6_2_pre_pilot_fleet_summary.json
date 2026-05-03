@@ -1,0 +1,1058 @@
+{
+  "n_episodes": 21,
+  "n_total_steps": 8400,
+  "classification_counts": {
+    "gps_multipath": 6,
+    "map_misalignment": 5,
+    "camera_degradation": 5,
+    "constant_bias_sanity": 5
+  },
+  "argmax_flips_per_step": {
+    "mean": 0.0019047619047619048,
+    "p50": 0.0,
+    "p95": 0.01,
+    "p99": 0.01
+  },
+  "v2_engaged_fraction": null,
+  "deadband_fired_rate": 0.9960714285714286,
+  "per_predictor_excluded_rate": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "near_vetoes": [],
+  "v2_state_flips": [],
+  "episodes": [
+    {
+      "episode_id": "scene_72_000_gps_multipath",
+      "classification": "gps_multipath",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "gps_multipath",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_001_map_misalignment",
+      "classification": "map_misalignment",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "map_misalignment",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_002_camera_degradation",
+      "classification": "camera_degradation",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 2,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 126.36680208156993,
+      "max_bcvf_total": 1508.4012251043553,
+      "deadband_fired_rate": 0.9825,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "camera_degradation",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [
+        {
+          "episode_id": "scene_72_002_camera_degradation",
+          "tick": 100,
+          "from_predictor": 0,
+          "to_predictor": 3,
+          "weights_before": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weights_after": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weight_drop": 0.25,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_002_camera_degradation",
+          "tick": 102,
+          "from_predictor": 3,
+          "to_predictor": 0,
+          "weights_before": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weights_after": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weight_drop": 0.75,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        }
+      ],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_003_constant_bias_sanity",
+      "classification": "constant_bias_sanity",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "constant_bias_sanity",
+        "onset_step": null,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_004_gps_multipath",
+      "classification": "gps_multipath",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "gps_multipath",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_005_map_misalignment",
+      "classification": "map_misalignment",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "map_misalignment",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_006_camera_degradation",
+      "classification": "camera_degradation",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 4,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 119.18739609163613,
+      "max_bcvf_total": 1339.8321368598993,
+      "deadband_fired_rate": 0.985,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "camera_degradation",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [
+        {
+          "episode_id": "scene_72_006_camera_degradation",
+          "tick": 54,
+          "from_predictor": 0,
+          "to_predictor": 1,
+          "weights_before": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weights_after": [
+            0.3333333237122184,
+            0.33333333814389077,
+            0.33333333814389077,
+            6.429166252663346e-23
+          ],
+          "weight_drop": -0.08333332371221841,
+          "max_abs_weight_delta": 0.25,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_006_camera_degradation",
+          "tick": 55,
+          "from_predictor": 1,
+          "to_predictor": 0,
+          "weights_before": [
+            0.3333333237122184,
+            0.33333333814389077,
+            0.33333333814389077,
+            6.429166252663346e-23
+          ],
+          "weights_after": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weight_drop": 0.08333333814389077,
+          "max_abs_weight_delta": 0.25,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_006_camera_degradation",
+          "tick": 100,
+          "from_predictor": 0,
+          "to_predictor": 3,
+          "weights_before": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weights_after": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weight_drop": 0.25,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_006_camera_degradation",
+          "tick": 102,
+          "from_predictor": 3,
+          "to_predictor": 0,
+          "weights_before": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weights_after": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weight_drop": 0.75,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        }
+      ],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_007_constant_bias_sanity",
+      "classification": "constant_bias_sanity",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "constant_bias_sanity",
+        "onset_step": null,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_008_gps_multipath",
+      "classification": "gps_multipath",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "gps_multipath",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_009_map_misalignment",
+      "classification": "map_misalignment",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "map_misalignment",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_010_camera_degradation",
+      "classification": "camera_degradation",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 2,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 119.70763098076988,
+      "max_bcvf_total": 1351.2824096101472,
+      "deadband_fired_rate": 0.9825,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "camera_degradation",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [
+        {
+          "episode_id": "scene_72_010_camera_degradation",
+          "tick": 100,
+          "from_predictor": 0,
+          "to_predictor": 3,
+          "weights_before": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weights_after": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weight_drop": 0.25,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_010_camera_degradation",
+          "tick": 102,
+          "from_predictor": 3,
+          "to_predictor": 0,
+          "weights_before": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weights_after": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weight_drop": 0.75,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        }
+      ],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_011_constant_bias_sanity",
+      "classification": "constant_bias_sanity",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "constant_bias_sanity",
+        "onset_step": null,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_012_gps_multipath",
+      "classification": "gps_multipath",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "gps_multipath",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_013_map_misalignment",
+      "classification": "map_misalignment",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "map_misalignment",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_014_camera_degradation",
+      "classification": "camera_degradation",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 4,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 124.46337341192321,
+      "max_bcvf_total": 1334.7534831318467,
+      "deadband_fired_rate": 0.985,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "camera_degradation",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [
+        {
+          "episode_id": "scene_72_014_camera_degradation",
+          "tick": 50,
+          "from_predictor": 0,
+          "to_predictor": 1,
+          "weights_before": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weights_after": [
+            0.33333333333332704,
+            0.33333333333334597,
+            0.33333333333332704,
+            6.42916615987997e-23
+          ],
+          "weight_drop": -0.08333333333332704,
+          "max_abs_weight_delta": 0.25,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_014_camera_degradation",
+          "tick": 51,
+          "from_predictor": 1,
+          "to_predictor": 0,
+          "weights_before": [
+            0.33333333333332704,
+            0.33333333333334597,
+            0.33333333333332704,
+            6.42916615987997e-23
+          ],
+          "weights_after": [
+            0.33333333333333964,
+            0.33333333333333964,
+            0.3333333333333207,
+            6.429166159879848e-23
+          ],
+          "weight_drop": 6.328271240363392e-15,
+          "max_abs_weight_delta": 1.2601031329495527e-14,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_014_camera_degradation",
+          "tick": 100,
+          "from_predictor": 0,
+          "to_predictor": 3,
+          "weights_before": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weights_after": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weight_drop": 0.25,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_014_camera_degradation",
+          "tick": 102,
+          "from_predictor": 3,
+          "to_predictor": 0,
+          "weights_before": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weights_after": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weight_drop": 0.75,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        }
+      ],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_015_constant_bias_sanity",
+      "classification": "constant_bias_sanity",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "constant_bias_sanity",
+        "onset_step": null,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_016_gps_multipath",
+      "classification": "gps_multipath",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "gps_multipath",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_017_map_misalignment",
+      "classification": "map_misalignment",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "map_misalignment",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_018_camera_degradation",
+      "classification": "camera_degradation",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 4,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 126.20983679462681,
+      "max_bcvf_total": 1400.2922959056168,
+      "deadband_fired_rate": 0.9825,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "camera_degradation",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [
+        {
+          "episode_id": "scene_72_018_camera_degradation",
+          "tick": 51,
+          "from_predictor": 0,
+          "to_predictor": 1,
+          "weights_before": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333,
+            6.429166159879726e-23
+          ],
+          "weights_after": [
+            0.33333333333330806,
+            0.33333333333334597,
+            0.33333333333334597,
+            6.42916615987997e-23
+          ],
+          "weight_drop": 2.525757381022231e-14,
+          "max_abs_weight_delta": 2.525757381022231e-14,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_018_camera_degradation",
+          "tick": 52,
+          "from_predictor": 1,
+          "to_predictor": 0,
+          "weights_before": [
+            0.33333333333330806,
+            0.33333333333334597,
+            0.33333333333334597,
+            6.42916615987997e-23
+          ],
+          "weights_after": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333,
+            6.429166159879726e-23
+          ],
+          "weight_drop": 1.2656542480726785e-14,
+          "max_abs_weight_delta": 2.525757381022231e-14,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_018_camera_degradation",
+          "tick": 100,
+          "from_predictor": 0,
+          "to_predictor": 3,
+          "weights_before": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weights_after": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weight_drop": 0.25,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        },
+        {
+          "episode_id": "scene_72_018_camera_degradation",
+          "tick": 102,
+          "from_predictor": 3,
+          "to_predictor": 0,
+          "weights_before": [
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.9287498479639178e-22,
+            1.0
+          ],
+          "weights_after": [
+            0.25,
+            0.25,
+            0.25,
+            0.25
+          ],
+          "weight_drop": 0.75,
+          "max_abs_weight_delta": 0.75,
+          "metadata": {
+            "type": "camera_degradation",
+            "onset_step": 50,
+            "duration_steps": 50,
+            "ground_truth_failing_predictor": "M4"
+          }
+        }
+      ],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_019_constant_bias_sanity",
+      "classification": "constant_bias_sanity",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "constant_bias_sanity",
+        "onset_step": null,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    },
+    {
+      "episode_id": "scene_72_020_gps_multipath",
+      "classification": "gps_multipath",
+      "n_steps": 400,
+      "M": 4,
+      "n_argmax_flips": 0,
+      "n_v2_state_flips": 0,
+      "n_near_vetoes": 0,
+      "fraction_engaged": null,
+      "excluded_ever_count": 0,
+      "mean_bcvf_total": 0.0,
+      "max_bcvf_total": 0.0,
+      "deadband_fired_rate": 1.0,
+      "near_veto_peak_fraction": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "metadata": {
+        "type": "gps_multipath",
+        "onset_step": 50,
+        "duration_steps": 50,
+        "ground_truth_failing_predictor": "M4"
+      },
+      "argmax_flips": [],
+      "v2_state_flips": [],
+      "near_vetoes": []
+    }
+  ]
+}

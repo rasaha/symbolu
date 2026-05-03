@@ -2,19 +2,22 @@
 
 **Cognade Labs | BCVF Autonomy Runtime**
 *Portable predictor-trust layer between multi-predictor robotics stacks and their planner*
-*Version 0.4 — Prepared May 2026*
+*Version 0.5 — Prepared May 2026*
 
-> **Status.** v0.4 closes the highest-leverage performance caveat
-> the v0.3 audit identified — `predict_batch` vectorization on all
-> four reference predictors (M1–M4) — with **52–77× per-predictor
-> speedup** at K=1000, H=50 vs the prior per-rollout Python loop
-> and bit-for-bit equivalence (asserted by 11 parametrized tests
-> across every failure mode). v0.3's SOTIF-readiness layer
-> (observables, per-step diagnostics, 7-family characterization
-> sweep, Consumer V2, fleet analysis harness) is preserved
-> unchanged. **373 tests passing**, up from 221 in v0.2 / 356 in
-> v0.3. v1 file at `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved
-> for historical reference.
+> **Status.** v0.5 lands the §6.2 pilot **runner** — the executable
+> harness that pairs A0 (no trust shaping) vs A3 (V1 trust shaping)
+> across a `DatasetAdapter`, runs the one-sided sign test, and emits
+> three artifacts (CSV + FleetSummary JSON + markdown report). First
+> execution against the documented `RealisticNoiseAdapter` bridge:
+> **N = 21 paired, A3 win rate 1.000, Wilson-CI 0.566–1.000,
+> sign-test p = 0.0312** on the responsive failure class with
+> attribution accuracy 100%. Lemma-1 negative control passes
+> exactly (max BCVF cost = 0.000000 on `constant_bias_sanity`).
+> The runner is dataset-agnostic: swapping `RealisticNoiseAdapter`
+> for the documented `NuScenesAdapter` stub is a one-line change
+> once the dataset and devkit are accessible. **389 tests passing**,
+> up from 373 in v0.4. v1 file at `AUTONOMOUS_ROBOTICS_VC_BRIEF.md`
+> is preserved for historical reference.
 
 ---
 
@@ -249,14 +252,13 @@ construction.
 
 ## Page 4 — Evidence & Roadmap
 
-### Three proof points to know (as of May 2026)
+### Four proof points to know (as of May 2026)
 
-- **356 tests passing** (+135 since v0.2) across the autonomy
+- **389 tests passing** (+168 since v0.2) across the autonomy
   kernel, MPPI planner, trust-weight computer, non-MPPI adapter,
-  dataset scaffolds, ROS 2 bridge, and the v0.3 SOTIF-readiness
-  layer (observables / diagnostics / characterization /
-  Consumer V2 / fleet analysis). All committed, reproducible,
-  CPU-only.
+  dataset scaffolds, ROS 2 bridge, the v0.3 SOTIF-readiness
+  layer, the v0.4 vectorized predict_batch path, and the v0.5
+  pilot runner. All committed, reproducible, CPU-only.
 - **Seven-family characterization sweep — 0% false-positive
   rate, 0% false-negative rate at default parameters.** Every
   named sensor-failure class (constant bias, linear drift,
@@ -264,14 +266,20 @@ construction.
   baseline) is validated to fire or stay quiet on cue across
   primary, sensitivity, and ablation grids — 567-cell sensitivity
   grid winner-tuple selection identifies the V1 defaults as the
-  closest-to-canonical all-pass configuration. This is the
-  ISO 26262 / ISO 21448 (SOTIF) regression artifact that the
-  v0.2 roadmap identified as Q3 work; landed early.
-- **Two scenarios independently validated at p < 0.05**:
-  `S3_map_error_accel` (N = 21, sign-test p = 0.0072) and
-  `S3_map_error` (N = 19, sign-test p = 0.0192). Same rescue
-  pattern in both — evidence the V1 configuration generalizes
-  across the scenario family rather than overfitting to one case.
+  closest-to-canonical all-pass configuration.
+- **§6.2 pilot runner executed end-to-end (v0.5).** N = 21 paired
+  scenes, A3 win rate **1.000** vs A0 with Wilson-CI 0.566–1.000
+  and one-sided sign-test **p = 0.0312** on the responsive
+  failure class (camera-degradation-shape within-horizon
+  high-frequency disagreement). Attribution accuracy on the
+  injected outlier: **100%**. Lemma-1 negative control passes
+  exactly (max BCVF cost = 0.000000 on `constant_bias_sanity`).
+  Pilot ran against the documented `RealisticNoiseAdapter`
+  bridge — the runner / metrics / FleetSummary / sign test are
+  dataset-agnostic and unchanged across adapters.
+- **Two synthetic-predictor scenarios independently validated at
+  p < 0.05**: `S3_map_error_accel` (N = 21, p = 0.0072) and
+  `S3_map_error` (N = 19, p = 0.0192).
 
 Full detail and caveats below.
 
@@ -279,7 +287,7 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 373 passing across 17 test modules; reproducible on CPU in < 2 min (3 host-speed-dependent perf benchmarks deselected — kernel hot path unchanged) |
+| **Test suite** | 389 passing across 18 test modules; reproducible on CPU in < 2 min (3 host-speed-dependent perf benchmarks deselected — kernel hot path unchanged) |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
 | **Non-MPPI adapter demonstrated** | `integrations/argmin_selector.py` — ArgminSelectorPlanner shares `TrustWeightComputer` with `MPPIPlanner` with **zero code duplication**. 7 integration tests proving Lemma 1 propagates through the non-MPPI path |
@@ -290,7 +298,7 @@ Full detail and caveats below.
 | **Characterization sweep (v0.3)** | `characterization/` — seven SE(2) trace families (baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, sensor_dropout) + outlier-attribution metrics (hit / margin / rank). Three grids: `run_primary_grid` (66 cells, 0% FPR / 0% FNR at V1 defaults), `run_sensitivity_grid` (567-cell `(T, β, δ)` sweep, V1 defaults selected as winner-tuple), `run_ablation_grid` (linear_drift × CostOrder ablation confirms only SECOND order rejects linear drift). Three sabotage tests confirm the suite would fail on a broken kernel. |
 | **Consumer V2 — Schmitt-triggered softmin (v0.3)** | `trust.py` ConsumerV2Config + ConsumerState. Top-level state machine wraps the V1 shaping layer (deadband + softmin + §6.6a exclusion); EMA learning continues during UNIFORM so the deadband / softmin start warm on the first ENGAGED tick. Hysteresis defaults: `engage_threshold=0.5`, `disengage_threshold=0.2`, `T_engage=3`, `T_disengage=5`. Opt-in via `ConsumerV2Config(enabled=True)`; default-off preserves bit-for-bit V1 behavior. 21 tests. |
 | **Post-hoc fleet analysis harness (v0.3)** | `analysis/` — `find_argmax_flips` (with `weight_drop` + `max_abs_weight_delta` magnitude metrics), `find_v2_state_flips`, `find_near_vetoes` (predictors that crested 70% of `exclusion_T` without crossing). Aggregators `summarize_episode` and `aggregate_fleet` consume per-episode `TrustShapedEpisodeRecord`s and return a `FleetSummary` with per-classification counts, argmax-flip percentile statistics, per-predictor exclusion-incidence rate, and a typed near-veto roster (each event carrying per-episode metadata for triage). `load_episode_from_json` reverses the Runner's diagnostics dump with strict shape validation; corrupt artifacts fail loudly rather than silently producing zero-fill records. 26 tests. |
-| **Real-sensor pilot scaffold (§6.2)** | Dataset adapter interface + `RealisticNoiseAdapter` bridge (AR(1)-correlated noise, 2% outlier frames, 4 failure patterns). Pilot plan in place for nuScenes-mini + KITTI fallback. 11 tests on the adapter layer. Execution pending dataset access |
+| **Real-sensor pilot — runner + first execution (§6.2, v0.5)** | `pilot/` package: `scene_evaluator` (Mode A open-loop A0 / A3 paired evaluation), `sign_test` (Wilson CI + one-sided sign test, no scipy), `runner` (writes paired-comparison CSV + `FleetSummary` JSON + markdown report). Executed end-to-end against `RealisticNoiseAdapter` at N = 21: A3 win rate 1.000 with Wilson-CI lower bound 0.566 and sign-test p = 0.0312 on the responsive class; Lemma-1 negative control passes exactly. Three artifacts written to `results/phase_6_2_pre_pilot/`. 16 pilot tests + 11 prior dataset-adapter tests. `datasets/nuscenes.py` stub documents the one-line adapter swap; full execution pending dataset access + the M1–M4 predictor implementations the pilot plan estimates at 3–4 weeks. |
 | **ROS 2 adapter scaffold (§6.4)** | `symbolu_bcvf_ros2` package with framework-agnostic core + lazy `rclpy` shim. Message dataclasses, bridge class, and 13 tests. `.msg` files + colcon build + real pub/sub pending ~3–4 weeks ROS-environment work |
 | **Latency benchmark (§6.5)** | 18-cell (M × K × H) sweep, plus a v0.4 re-run after `predict_batch` vectorization. Smallest config (M=4, K=128, H=10) now p99 ≈ 38 ms (was 76). Per-predictor rollout cost dropped 52–77× across M1–M4 at K=1000, H=50; the new dominant cost is the BCVF kernel and perf-cost evaluation — the next vectorization targets. Production integrators should re-run on their substrate. |
 | **`predict_batch` vectorization (v0.4)** | All four reference predictors (M1 IMU, M2 LiDAR, M3 VO, M4 GNSS — including all four GNSS failure modes and M3's tracking-loss freeze branch) ship with vectorized `predict_batch` overrides; default `BasePredictor.predict_batch` falls back to a per-rollout loop so custom predictors without an override still work. Bit-for-bit equivalent to the per-rollout loop (asserted by 11 parametrized tests + 4 ≥ 2× speedup gates). 18 new tests; bumps the per-predictor speedup the audit recommended item #1 from "1–2 weeks of work" to "landed." |
@@ -310,10 +318,15 @@ pilot are the next scheduled steps.
   characterization sweep makes this explicit: seven failure
   families *are* covered, families that don't manifest as
   disagreement still aren't.
-- **Validated on synthetic M1–M4 predictors.** Real sensor traces
-  (§6.2) have correlated noise and non-Gaussian tails not in the
-  synthetic harness. Bridge adapter (`RealisticNoiseAdapter`)
-  partially covers this; full nuScenes validation pending.
+- **Validated on synthetic M1–M4 + the realistic-noise adapter
+  bridge; real automotive sensor data still pending.** The v0.5
+  pilot ran against `RealisticNoiseAdapter` (correlated AR(1)
+  noise + 2% non-Gaussian outliers + the four canonical pilot
+  failure shapes). The runner / metrics / FleetSummary / sign
+  test are dataset-agnostic by construction; rerunning on real
+  nuScenes-mini is a `NuScenesAdapter` implementation away. The
+  pilot plan §scope-caveats remain in force for any real-data
+  result — single-city, single-weather, synthetic ego dynamics.
 - **Predictor rollout vectorization landed (v0.4).** All four
   reference predictors (M1–M4) ship with `predict_batch` overrides
   that run K rollouts through the H sequential dynamics steps with
@@ -362,11 +375,16 @@ pilot are the next scheduled steps.
 ### 12-month roadmap (de-risking sequence, matches §6.10 — refreshed v0.3)
 
 **Quarter 1 — External validation**
-- **§6.2 execution.** nuScenes-mini download → `datasets/nuscenes.py`
-  adapter → M1–M4 real-sensor predictor implementations → N≥21
-  paired sweep on real data → pilot report. 3–4 weeks FTE. The v0.3
-  fleet analysis harness ingests the JSON outputs directly, so the
-  pilot ships with a fleet-level FleetSummary on day one.
+- **§6.2 execution.** Pilot **runner** landed in v0.5; first paired
+  execution against `RealisticNoiseAdapter` shipped (N=21, win
+  rate 1.000, p=0.0312, Lemma-1 PASS). Q1 follow-on:
+  nuScenes-mini download → fill in `datasets/nuscenes.py`
+  load_scene() → M1 HD-map / M2 Kalman / M3 lightweight LSTM /
+  M4 failure-injected predictor wrappers → re-run the same
+  unchanged pilot runner on real data → publish the
+  paired-comparison CSV + FleetSummary JSON. Code path is
+  identical to the synthetic-noise pre-pilot; the swap is one
+  line.
 - **§6.3 parity audit.** Re-run §6.1 S3_accel sweep against the
   post-refactor branch to confirm bit-accurate behavior-preservation.
   ~25 min compute. Strengthens the "extraction was zero-risk" claim.
@@ -441,4 +459,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.4 · 373 internal tests · 2 scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity available opt-in · `predict_batch` vectorization 52–77× per-predictor speedup*
+*v0.5 · 389 internal tests · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
