@@ -2,22 +2,24 @@
 
 **Cognade Labs | BCVF Autonomy Runtime**
 *Portable predictor-trust layer between multi-predictor robotics stacks and their planner*
-*Version 0.5 — Prepared May 2026*
+*Version 0.6 — Prepared May 2026*
 
-> **Status.** v0.5 lands the §6.2 pilot **runner** — the executable
-> harness that pairs A0 (no trust shaping) vs A3 (V1 trust shaping)
-> across a `DatasetAdapter`, runs the one-sided sign test, and emits
-> three artifacts (CSV + FleetSummary JSON + markdown report). First
-> execution against the documented `RealisticNoiseAdapter` bridge:
-> **N = 21 paired, A3 win rate 1.000, Wilson-CI 0.566–1.000,
-> sign-test p = 0.0312** on the responsive failure class with
-> attribution accuracy 100%. Lemma-1 negative control passes
-> exactly (max BCVF cost = 0.000000 on `constant_bias_sanity`).
-> The runner is dataset-agnostic: swapping `RealisticNoiseAdapter`
-> for the documented `NuScenesAdapter` stub is a one-line change
-> once the dataset and devkit are accessible. **389 tests passing**,
-> up from 373 in v0.4. v1 file at `AUTONOMOUS_ROBOTICS_VC_BRIEF.md`
-> is preserved for historical reference.
+> **Status.** v0.6 lands the **V2 promotion-gate sweep harness**
+> (`v2_chatter_sweep.py`) — the executable test for the audit's
+> #3 next-step recommendation, "promote V2 to default if chatter
+> reduction is material AND rescue is preserved." First paired
+> execution at N=5 on `S1_normal_driving` measured median chatter
+> reduction of **0.6%** — well below the 50% promotion threshold —
+> because BCVF kernel cost on autonomy scenarios exceeds V2's
+> engage threshold even at 50×-lower tunings, so V2 stays ENGAGED
+> ~99% of ticks and reduces to V1 in practice. **V2 is not
+> promoted; the empirical finding upgrades the v0.5 caveat from
+> defensive to evidence-backed.** Threshold recalibration against
+> measured autonomy BCVF magnitudes is now a scoped Q2 followup.
+> v0.5's §6.2 pilot runner + result is preserved unchanged. **400
+> tests passing**, up from 389 in v0.5. v1 file at
+> `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
+> reference.
 
 ---
 
@@ -254,11 +256,12 @@ construction.
 
 ### Four proof points to know (as of May 2026)
 
-- **389 tests passing** (+168 since v0.2) across the autonomy
+- **400 tests passing** (+179 since v0.2) across the autonomy
   kernel, MPPI planner, trust-weight computer, non-MPPI adapter,
   dataset scaffolds, ROS 2 bridge, the v0.3 SOTIF-readiness
-  layer, the v0.4 vectorized predict_batch path, and the v0.5
-  pilot runner. All committed, reproducible, CPU-only.
+  layer, the v0.4 vectorized predict_batch path, the v0.5 pilot
+  runner, and the v0.6 V2 promotion-gate sweep. All committed,
+  reproducible, CPU-only.
 - **Seven-family characterization sweep — 0% false-positive
   rate, 0% false-negative rate at default parameters.** Every
   named sensor-failure class (constant bias, linear drift,
@@ -287,7 +290,7 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 389 passing across 18 test modules; reproducible on CPU in < 2 min (3 host-speed-dependent perf benchmarks deselected — kernel hot path unchanged) |
+| **Test suite** | 400 passing across 19 test modules; reproducible on CPU in < 3 min (3 host-speed-dependent perf benchmarks + 1 long-running sweep test deselected) |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
 | **Non-MPPI adapter demonstrated** | `integrations/argmin_selector.py` — ArgminSelectorPlanner shares `TrustWeightComputer` with `MPPIPlanner` with **zero code duplication**. 7 integration tests proving Lemma 1 propagates through the non-MPPI path |
@@ -299,6 +302,7 @@ Full detail and caveats below.
 | **Consumer V2 — Schmitt-triggered softmin (v0.3)** | `trust.py` ConsumerV2Config + ConsumerState. Top-level state machine wraps the V1 shaping layer (deadband + softmin + §6.6a exclusion); EMA learning continues during UNIFORM so the deadband / softmin start warm on the first ENGAGED tick. Hysteresis defaults: `engage_threshold=0.5`, `disengage_threshold=0.2`, `T_engage=3`, `T_disengage=5`. Opt-in via `ConsumerV2Config(enabled=True)`; default-off preserves bit-for-bit V1 behavior. 21 tests. |
 | **Post-hoc fleet analysis harness (v0.3)** | `analysis/` — `find_argmax_flips` (with `weight_drop` + `max_abs_weight_delta` magnitude metrics), `find_v2_state_flips`, `find_near_vetoes` (predictors that crested 70% of `exclusion_T` without crossing). Aggregators `summarize_episode` and `aggregate_fleet` consume per-episode `TrustShapedEpisodeRecord`s and return a `FleetSummary` with per-classification counts, argmax-flip percentile statistics, per-predictor exclusion-incidence rate, and a typed near-veto roster (each event carrying per-episode metadata for triage). `load_episode_from_json` reverses the Runner's diagnostics dump with strict shape validation; corrupt artifacts fail loudly rather than silently producing zero-fill records. 26 tests. |
 | **Real-sensor pilot — runner + first execution (§6.2, v0.5)** | `pilot/` package: `scene_evaluator` (Mode A open-loop A0 / A3 paired evaluation), `sign_test` (Wilson CI + one-sided sign test, no scipy), `runner` (writes paired-comparison CSV + `FleetSummary` JSON + markdown report). Executed end-to-end against `RealisticNoiseAdapter` at N = 21: A3 win rate 1.000 with Wilson-CI lower bound 0.566 and sign-test p = 0.0312 on the responsive class; Lemma-1 negative control passes exactly. Three artifacts written to `results/phase_6_2_pre_pilot/`. 16 pilot tests + 11 prior dataset-adapter tests. `datasets/nuscenes.py` stub documents the one-line adapter swap; full execution pending dataset access + the M1–M4 predictor implementations the pilot plan estimates at 3–4 weeks. |
+| **V2 promotion-gate sweep + decision (v0.6)** | `v2_chatter_sweep.py`: paired V1 vs V2 runner with two-gate decision logic (chatter-reduction Wilson + rescue-preservation McNemar). Executed at N=5 on `S1_normal_driving` (chatter scenario) and `S3_map_error_accel` (rescue scenario), at default thresholds and at 50×-lower thresholds. **Finding: V2 reduces chatter by ≤ 0.6% on autonomy data because BCVF kernel cost exceeds V2's engage threshold even on nominal scenarios → V2 stays ENGAGED → V1 pipeline runs unchanged.** Honest non-promotion. The empirical result upgrades the v0.5 "V2 is opt-in" caveat from defensive to evidence-backed; threshold recalibration is a scoped Q2 followup. 12 sweep-module tests + artifacts in `results/v2_chatter_S1_n5/` and `results/v2_rescue_S3_n5/`. |
 | **ROS 2 adapter scaffold (§6.4)** | `symbolu_bcvf_ros2` package with framework-agnostic core + lazy `rclpy` shim. Message dataclasses, bridge class, and 13 tests. `.msg` files + colcon build + real pub/sub pending ~3–4 weeks ROS-environment work |
 | **Latency benchmark (§6.5)** | 18-cell (M × K × H) sweep, plus a v0.4 re-run after `predict_batch` vectorization. Smallest config (M=4, K=128, H=10) now p99 ≈ 38 ms (was 76). Per-predictor rollout cost dropped 52–77× across M1–M4 at K=1000, H=50; the new dominant cost is the BCVF kernel and perf-cost evaluation — the next vectorization targets. Production integrators should re-run on their substrate. |
 | **`predict_batch` vectorization (v0.4)** | All four reference predictors (M1 IMU, M2 LiDAR, M3 VO, M4 GNSS — including all four GNSS failure modes and M3's tracking-loss freeze branch) ship with vectorized `predict_batch` overrides; default `BasePredictor.predict_batch` falls back to a per-rollout loop so custom predictors without an override still work. Bit-for-bit equivalent to the per-rollout loop (asserted by 11 parametrized tests + 4 ≥ 2× speedup gates). 18 new tests; bumps the per-predictor speedup the audit recommended item #1 from "1–2 weeks of work" to "landed." |
@@ -353,10 +357,22 @@ pilot are the next scheduled steps.
   does not, by itself, change this floor. Structural improvement
   requires either a richer predictor set or a higher-level
   safety-monitor layer — both out of V1 scope.
-- **Consumer V2 is opt-in, not the default.** The v0.3 ship
-  preserves V1 behavior bit-for-bit; integrators choose V2
-  explicitly. We will recommend V2 by default once the empirical
-  chatter-rate-reduction sweep is in (Q1 work).
+- **Consumer V2 is opt-in, not the default — empirically
+  validated as the right call.** The v0.6 chatter-reduction
+  sweep (`v2_chatter_sweep.py`, N=5 paired) measured V1 vs V2 on
+  `S1_normal_driving`. Median per-seed flip-rate reduction:
+  **0.6%** at the default thresholds, **0.5%** at 50×-lower
+  thresholds (`engage_threshold=0.01`). Reason: BCVF kernel cost
+  on autonomy scenarios — even nominal ones — exceeds V2's
+  engage threshold across K=64+ rollouts, so V2 stays ENGAGED
+  ~99% of ticks and the V1 pipeline runs unchanged. **The V2
+  Schmitt-trigger design is correct (UNIFORM forces uniform
+  weights → zero argmax flips); the threshold calibration is
+  wrong for the autonomy domain.** Promotion deferred until the
+  engage signal / threshold are recalibrated against measured
+  autonomy BCVF magnitudes — a Q2 followup, scoped at ~1 week.
+  V2 stays an opt-in safety feature for integrators whose
+  BCVF magnitudes match the LLM-domain hysteresis design.
 - **The fleet analysis harness has been validated end-to-end on
   synthetic episodes only.** Multi-episode aggregation across
   thousands of real trips is the §Q1 + §Q2 follow-on; the
@@ -391,10 +407,21 @@ pilot are the next scheduled steps.
 - **§6.5 production-substrate benchmarks.** Re-run latency sweep on
   a TDA4VH / Orin / AMD EPYC sample to produce numbers an
   integrator can plan against. 1–2 days per target.
-- **Consumer V2 chatter-reduction sweep.** Re-run §6.1 S3_accel with
+- ~~**Consumer V2 chatter-reduction sweep.** Re-run §6.1 S3_accel with
   V2 enabled; quantify per-step argmax-flip rate reduction; promote
   V2 to default once chatter reduction is statistically significant
-  without harming rescue-pattern reproduction. 1 week.
+  without harming rescue-pattern reproduction. 1 week.~~ **Landed in
+  v0.6 — non-promotion result. The threshold recalibration follow-on
+  moves to Q2.**
+
+**Q2 — V2 threshold recalibration (new, was Q1's V2 promotion).**
+The v0.6 sweep showed V2's engage threshold doesn't correspond to
+autonomy BCVF cost magnitudes. Recalibration paths to investigate:
+(a) drive engage signal off `bcvf_total.min(axis=0)` instead of
+the mean — least-noisy rollout instead of population view;
+(b) threshold against per-tick BCVF distribution mean over a
+trailing window instead of a fixed magnitude; (c) ladder of
+thresholds calibrated per-scenario class. ~1 week.
 
 **Quarter 2 — Platform integration**
 - **§6.4 execution.** `.msg` + colcon + real rclpy pub/sub, Nav2
@@ -459,4 +486,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.5 · 389 internal tests · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
+*v0.6 · 400 internal tests · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*

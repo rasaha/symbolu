@@ -1,0 +1,117 @@
+{
+  "config": {
+    "scenario_name": "S3_map_error_accel",
+    "N": 5,
+    "base_seed": 1000,
+    "output_dir": "/home/user/symbolu/results/v2_rescue_S3_n5",
+    "v2_engage_threshold": 0.5,
+    "v2_disengage_threshold": 0.2,
+    "v2_T_engage": 3,
+    "v2_T_disengage": 5,
+    "chatter_min_median_reduction": 0.5,
+    "chatter_min_v2_win_rate": 0.7,
+    "mppi_rollouts": 128,
+    "mppi_horizon": null
+  },
+  "n_seeds": 5,
+  "median_v1_flip_rate": 0.7994987468671679,
+  "median_v2_flip_rate": 0.7969924812030075,
+  "median_flip_rate_reduction": 0.0,
+  "v2_wins_per_seed": 2,
+  "v2_win_rate": 0.4,
+  "chatter_gate_pass": false,
+  "v1_collision_count": 0,
+  "v2_collision_count": 0,
+  "v1_rescue_v2_collide": 0,
+  "v1_collide_v2_rescue": 0,
+  "rescue_gate_pass": true,
+  "mcnemar_p_v2_worse": 1.0,
+  "promotion_recommended": false,
+  "per_seed": [
+    {
+      "seed": 1000,
+      "v1_argmax_flips": 334,
+      "v2_argmax_flips": 335,
+      "v1_total_steps": 400,
+      "v2_total_steps": 400,
+      "v1_collision": false,
+      "v2_collision": false,
+      "v1_flip_rate": 0.8370927318295739,
+      "v2_flip_rate": 0.8395989974937343,
+      "flip_rate_reduction": -0.0029940119760479703,
+      "v2_state_distribution": {
+        "uniform": 2,
+        "engaged": 398,
+        "": 0
+      }
+    },
+    {
+      "seed": 1001,
+      "v1_argmax_flips": 218,
+      "v2_argmax_flips": 218,
+      "v1_total_steps": 400,
+      "v2_total_steps": 400,
+      "v1_collision": false,
+      "v2_collision": false,
+      "v1_flip_rate": 0.5463659147869674,
+      "v2_flip_rate": 0.5463659147869674,
+      "flip_rate_reduction": 0.0,
+      "v2_state_distribution": {
+        "uniform": 2,
+        "engaged": 398,
+        "": 0
+      }
+    },
+    {
+      "seed": 1002,
+      "v1_argmax_flips": 291,
+      "v2_argmax_flips": 291,
+      "v1_total_steps": 400,
+      "v2_total_steps": 400,
+      "v1_collision": false,
+      "v2_collision": false,
+      "v1_flip_rate": 0.7293233082706767,
+      "v2_flip_rate": 0.7293233082706767,
+      "flip_rate_reduction": 0.0,
+      "v2_state_distribution": {
+        "uniform": 2,
+        "engaged": 398,
+        "": 0
+      }
+    },
+    {
+      "seed": 1003,
+      "v1_argmax_flips": 319,
+      "v2_argmax_flips": 318,
+      "v1_total_steps": 400,
+      "v2_total_steps": 400,
+      "v1_collision": false,
+      "v2_collision": false,
+      "v1_flip_rate": 0.7994987468671679,
+      "v2_flip_rate": 0.7969924812030075,
+      "flip_rate_reduction": 0.0031347962382445834,
+      "v2_state_distribution": {
+        "uniform": 2,
+        "engaged": 398,
+        "": 0
+      }
+    },
+    {
+      "seed": 1004,
+      "v1_argmax_flips": 328,
+      "v2_argmax_flips": 327,
+      "v1_total_steps": 400,
+      "v2_total_steps": 400,
+      "v1_collision": false,
+      "v2_collision": false,
+      "v1_flip_rate": 0.8220551378446115,
+      "v2_flip_rate": 0.8195488721804511,
+      "flip_rate_reduction": 0.0030487804878048105,
+      "v2_state_distribution": {
+        "uniform": 2,
+        "engaged": 398,
+        "": 0
+      }
+    }
+  ]
+}
