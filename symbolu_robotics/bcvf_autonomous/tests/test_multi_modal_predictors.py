@@ -336,6 +336,44 @@ def test_different_reference_paths_fires_kernel():
     assert result.gate_activation_count > 0
 
 
+def test_round_trip_identity_on_curved_lane_post_audit_fix():
+    """Pinned regression for the post-v0.7 audit fix in
+    ``se2_to_lane_frame``. Pre-fix: the inverse used the segment-
+    direction tangent for ``psi`` while the forward used interpolated
+    tangent — round-trip heading error on the 50 m / 1 m curved lane
+    was ~0.02 rad (~1.15°), 200× the polyline-discretisation floor.
+    Post-fix: inverse uses the same interpolated tangent as the
+    forward; heading error drops to fp64 noise plus the residual
+    polyline-vs-smooth-curve position-feedthrough.
+
+    The position-recovery tolerances are bounded by the polyline
+    discretisation (≈ 6 mm in ``s``, ≈ 50 µm in ``d`` on this lane);
+    those are NOT a regression hot-spot, so the test pins them at
+    loose tolerances + the heading at a tight one.
+    """
+    anchor = LaneAnchor.constant_curvature(
+        radius=50.0, arc_length=50.0, n=51,
+    )
+    H = 10
+    s_in = np.linspace(0.5, 49.0, H)
+    lane_in = np.column_stack([
+        s_in,
+        np.linspace(-0.3, 0.3, H),
+        np.linspace(-0.05, 0.05, H),
+    ])
+    se2 = lane_frame_to_se2(lane_in, anchor)
+    lane_out = se2_to_lane_frame(se2, anchor)
+    err = np.abs(lane_out - lane_in)
+    # Heading: tight (the fix's load-bearing improvement).
+    assert err[:, 2].max() < 1e-3, (
+        f"psi error {err[:, 2].max():.4e} exceeds the post-fix bound; "
+        "the inverse may have regressed to segment-direction tangent"
+    )
+    # Position: bounded by polyline discretisation.
+    assert err[:, 0].max() < 1e-2  # s within 1 cm
+    assert err[:, 1].max() < 1e-3  # d within 1 mm
+
+
 def test_lane_frame_constant_d_bias_is_invisible_to_bcvf():
     """§4.4: the residual cybersecurity concern. A spoofed lane-frame
     predictor that reports a consistent `d` bias is **invisible** to

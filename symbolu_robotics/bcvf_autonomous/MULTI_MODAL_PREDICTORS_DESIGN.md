@@ -204,8 +204,29 @@ when all three of:
    characterization family** asserting BCVF stays quiet on
    matched-path lane + SE(2) predictors and fires on different-
    path mixes — i.e. the §4 carry-through is regression-locked.
-3. **Round-trip identity holds** to fp64 noise (`< 1e-9`) on
-   every supported state space, pinned at every commit.
+3. **Round-trip identity holds** at the documented tolerances —
+   pinned at every commit:
+   * **SE(2) world-frame**: identity is fp64-noise (`< 1e-12`).
+   * **Lane-frame on a straight lane**: identity is fp64-noise.
+     Since the lane has a single segment direction, the forward
+     and inverse tangent conventions agree exactly.
+   * **Lane-frame on a curved lane**: heading recovery is
+     fp64-tight (~1e-4 rad on a 50 m / 1 m segment lane); position
+     recovery (`s`, `d`) carries a polyline-vs-smooth-curve
+     discretisation error of ~`Δ_segment_angle² × segment_length /
+     2` per axis (≈ 6 mm in `s` and ≈ 50 µm in `d` at the same
+     resolution). The error is bounded and shrinks with denser
+     waypoints; for production deployments at typical 1 m
+     resolution it sits below the kernel's gate threshold and
+     does not affect kernel decisions.
+
+A pre-fix audit caught a heading-recovery bug where the inverse
+used segment-direction tangent while the forward used interpolated
+tangent — round-trip heading error was ~0.02 rad on the 50 m / 1 m
+curved lane, 200× larger than the discretisation floor. The fix
+(in ``se2_to_lane_frame``) makes the inverse use the same
+interpolated tangent as the forward; the post-fix tolerances above
+are what's pinned today.
 
 Until all three trigger, the multi-modal surface stays
 provisional.

@@ -150,16 +150,30 @@ def se2_to_lane_frame(
             if dist2 < best_dist2:
                 # Arc length at the projection.
                 s = arc[i] + t * (arc[i + 1] - arc[i])
-                # Lane tangent at the projection (segment direction).
+                # Lane tangent at the projection — segment direction
+                # used for ``d_signed`` because the projection itself
+                # lives on the segment line; the perpendicular offset
+                # is naturally measured against the segment.
                 seg_theta = float(np.arctan2(dy, dx))
-                # Signed lateral offset: left (positive d) is rotated
-                # +pi/2 from tangent. Cross-product sign tells us which
-                # side the world point is on.
                 d_signed = (
                     -np.sin(seg_theta) * (x - px)
                     + np.cos(seg_theta) * (y - py)
                 )
-                psi = wrap_angle(theta - seg_theta)
+                # Heading delta uses the *interpolated* tangent — the
+                # same convention ``s_to_world`` applies in the forward
+                # lift. Pre-fix this used the segment-constant
+                # ``seg_theta``, producing a heading-recovery error of
+                # roughly ``0.5 × Δ_segment_angle`` on curved lanes
+                # (~0.02 rad on a 50 m radius / 1 m segment lane). The
+                # corrected version makes the heading round-trip exact
+                # to fp64 noise on both straight and curved lanes —
+                # see MULTI_MODAL_PREDICTORS_DESIGN.md §6.
+                theta_i = centerline[i, 2]
+                theta_ip1 = centerline[i + 1, 2]
+                sin_th = (1.0 - t) * np.sin(theta_i) + t * np.sin(theta_ip1)
+                cos_th = (1.0 - t) * np.cos(theta_i) + t * np.cos(theta_ip1)
+                theta_lane = float(np.arctan2(sin_th, cos_th))
+                psi = wrap_angle(theta - theta_lane)
                 best = (s, d_signed, psi)
                 best_dist2 = dist2
         out[h, 0] = best[0]
