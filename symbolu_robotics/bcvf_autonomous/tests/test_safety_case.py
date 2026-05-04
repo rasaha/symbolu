@@ -114,6 +114,22 @@ def test_every_artifact_is_referenced_by_at_least_one_clause():
         assert len(reverse[art.reference]) >= 1
 
 
+def test_no_duplicate_evidence_within_a_clause():
+    """Defensive pin: an evidence artifact must appear at most once
+    in any single clause's evidence tuple. A copy-paste error that
+    listed the same artifact twice would silently double-count it
+    in the reverse index ("this artifact serves clause X twice")
+    and inflate evidence-count metrics; the test catches the
+    malformed clause loudly."""
+    matrix = build_traceability_matrix()
+    for clause in matrix.all_clauses():
+        refs = [a.reference for a in clause.evidence]
+        assert len(refs) == len(set(refs)), (
+            f"clause {clause.standard.name}::{clause.clause_id} lists "
+            f"a duplicate evidence artifact: {refs}"
+        )
+
+
 def test_artifact_resolve_failure_is_explicit():
     art = EvidenceArtifact(
         module_path="symbolu_robotics.bcvf_autonomous.core",
