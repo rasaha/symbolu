@@ -922,6 +922,47 @@ def test_adversarial_generator_rejects_invalid_target():
         )
 
 
+def test_adversarial_generator_rejects_unknown_axis():
+    """Pinned regression for the post-v0.7 audit fix. Pre-fix the
+    branch ``col = 1 if bias_axis == "y" else 0`` silently mapped
+    any non-``"y"`` string (e.g. a typo like ``"lateral"``) to the
+    x-axis, producing a bias on the wrong coordinate. The
+    cybersecurity-grade family must fail loud on mis-specified
+    inputs."""
+    with pytest.raises(ValueError):
+        generate_trace(
+            "adversarial_consistent_bias", M=3, H=50,
+            bias=0.5, axis="lateral",
+        )
+    with pytest.raises(ValueError):
+        generate_trace(
+            "adversarial_consistent_bias", M=3, H=50,
+            bias=0.5, axis="z",
+        )
+    # Both documented axes still accepted.
+    bundle = generate_trace(
+        "adversarial_consistent_bias", M=3, H=50,
+        bias=0.5, axis="x", sigma_noise=0.0,
+    )
+    assert bundle.trajectories[0, 5, 0] != 0.0   # bias landed on x
+    bundle = generate_trace(
+        "adversarial_consistent_bias", M=3, H=50,
+        bias=0.5, axis="y", sigma_noise=0.0,
+    )
+    assert bundle.trajectories[0, 5, 1] != 0.0   # bias landed on y
+
+
+def test_adversarial_generator_handles_negative_bias():
+    """Spoofing in either direction is supported. Pinned because the
+    cybersecurity narrative covers attackers shifting consensus
+    leftward (negative ``d``) symmetrically with rightward."""
+    bundle = generate_trace(
+        "adversarial_consistent_bias", M=3, H=50,
+        bias=-0.3, sigma_noise=0.0,
+    )
+    np.testing.assert_allclose(bundle.trajectories[0, :, 1], -0.3, atol=1e-12)
+
+
 def test_adversarial_stealth_regime_keeps_bcvf_quiet():
     """At bias well below the gate threshold T=0.05, BCVF stays
     quiet — the constant-bias signal doesn't open the gate, so the

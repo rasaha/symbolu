@@ -259,6 +259,16 @@ def generate_trace(
         target = int(family_params.get("target_predictor", 0))
         sigma = float(family_params.get("sigma_noise", 0.01))
         bias_axis = str(family_params.get("axis", "y"))
+        # Validate explicitly. The pre-fix branch
+        # (``col = 1 if bias_axis == "y" else 0``) silently mapped any
+        # non-"y" string (e.g. a typo like "lateral") to the x-axis,
+        # producing a bias on a different coordinate than the caller
+        # intended. The cybersecurity-grade family must fail loud on
+        # mis-specified inputs.
+        if bias_axis not in ("x", "y"):
+            raise ValueError(
+                f"axis must be 'x' or 'y'; got {bias_axis!r}"
+            )
         col = 1 if bias_axis == "y" else 0
         if not (0 <= target < M):
             raise ValueError(
