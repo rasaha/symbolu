@@ -19,8 +19,10 @@
 > EKF is 1.1, BCVF is 0.0. **EKF's Mahalanobis gate also misses
 > the heavy-quadratic outlier** (0.0 hit rate vs BCVF / Majority's
 > 1.0). BCVF is 8–19× faster per tick than EKF / Majority. v0.6's
-> V2 chatter-reduction sweep result is preserved unchanged. **419
-> tests passing**, up from 400 in v0.6. v1 file at
+> V2 chatter-reduction sweep result is preserved unchanged. **428
+> tests passing**, up from 400 in v0.6 (12 pinning tests added by
+> the post-v0.7 audit pass; published numerical results unchanged).
+> v1 file at
 > `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
 > reference.
 
@@ -259,7 +261,7 @@ construction.
 
 ### Four proof points to know (as of May 2026)
 
-- **419 tests passing** (+198 since v0.2) across the autonomy
+- **428 tests passing** (+207 since v0.2; +12 pinning tests added by the post-v0.7 audit pass — published numerical results unchanged) across the autonomy
   kernel, MPPI planner, trust-weight computer, non-MPPI adapter,
   dataset scaffolds, ROS 2 bridge, the v0.3 SOTIF-readiness
   layer, the v0.4 vectorized predict_batch path, the v0.5 pilot
@@ -306,7 +308,7 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 419 passing across 20 test modules; reproducible on CPU in < 3 min (3 host-speed-dependent perf benchmarks + 2 long-running sweep tests deselected) |
+| **Test suite** | 428 passing across 20 test modules (+12 pinning tests added by the post-v0.7 audit pass: 7 covering the `_binomial_tail_geq` k=1 off-by-one fix in both copies, 3 covering the `attribution_within_top_half` ceil-vs-floor fix and the sign-test single-decisive-win regression, 2 covering the documented `_cluster_majority` greedy-non-transitive contract); reproducible on CPU in < 3 min (4 host-speed-dependent perf benchmarks + 4 long-running sweep / timing tests deselected) |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
 | **Non-MPPI adapter demonstrated** | `integrations/argmin_selector.py` — ArgminSelectorPlanner shares `TrustWeightComputer` with `MPPIPlanner` with **zero code duplication**. 7 integration tests proving Lemma 1 propagates through the non-MPPI path |
@@ -503,4 +505,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.7 · 419 internal tests · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
+*v0.7 · 428 internal tests (audit pinning tests included; published numbers unchanged) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
