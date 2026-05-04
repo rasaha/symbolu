@@ -530,3 +530,98 @@ def test_windowed_fleet_summary_to_dict_round_trips(base_time):
     assert payload["n_observed_in_window"] == 1
     assert payload["fleet"]["n_episodes"] == 1
     assert "window_start" in payload and "window_end" in payload
+
+
+# --------------------------------------------------------------------------- #
+# Audit fixes — out-of-order ingest + bool-metric rejection
+# --------------------------------------------------------------------------- #
+
+
+def test_latest_observed_at_returns_max_by_timestamp_not_insertion_order(base_time):
+    """Pinned regression: pre-fix ``latest_observed_at`` returned the
+    *last inserted* observation's timestamp, so an out-of-order
+    arrival (typical under network jitter on a production fleet)
+    silently anchored ``summary(window=...)`` on a stale wall-clock
+    time and dropped the genuinely-newest data from the window.
+    """
+    mon = StreamingFleetMonitor()
+    mon.observe_episode(_make_record(), "first", observed_at=base_time)
+    mon.observe_episode(
+        _make_record(),
+        "newest",
+        observed_at=base_time + timedelta(hours=1),
+    )
+    # Late-arriving observation, *older* by wall time than "newest".
+    mon.observe_episode(
+        _make_record(),
+        "late_old",
+        observed_at=base_time - timedelta(minutes=10),
+    )
+    # Pre-fix this returned base_time - 10min (last inserted); post-fix
+    # it returns base_time + 1h (max by timestamp).
+    assert mon.latest_observed_at == base_time + timedelta(hours=1)
+    assert mon.earliest_observed_at == base_time - timedelta(minutes=10)
+
+
+def test_summary_default_now_uses_max_observed_at_under_out_of_order_ingest(base_time):
+    """The window end-time defaults to the latest *by timestamp*. With
+    out-of-order ingest, the genuinely-newest observation must remain
+    inside the window."""
+    mon = StreamingFleetMonitor()
+    newest = base_time + timedelta(hours=1)
+    mon.observe_episode(_make_record(), "newest", observed_at=newest)
+    mon.observe_episode(
+        _make_record(),
+        "late_old",
+        observed_at=base_time - timedelta(minutes=30),
+    )
+    ws = mon.summary(window=timedelta(hours=2))
+    # Window covers [newest - 2h, newest]; both observations land inside.
+    assert ws.window_end == newest
+    assert ws.n_observed_in_window == 2
+
+
+def test_eviction_refreshes_max_observed_at_when_max_was_evicted(base_time):
+    """Out-of-order ingest can park the timestamp-max in the
+    insertion-oldest slot, which FIFO eviction pops first. The
+    monitor must rebuild ``_max_observed_at`` from the survivors so
+    a subsequent ``latest_observed_at`` doesn't return a ghost time."""
+    mon = StreamingFleetMonitor(max_retained=2)
+    # Insert order: [t+10min (oldest), t+5min, t+1min] with max_retained=2.
+    # After third insert, eviction pops t+10min (the timestamp-max).
+    mon.observe_episode(
+        _make_record(), "max", observed_at=base_time + timedelta(minutes=10),
+    )
+    mon.observe_episode(
+        _make_record(), "mid", observed_at=base_time + timedelta(minutes=5),
+    )
+    mon.observe_episode(
+        _make_record(), "young", observed_at=base_time + timedelta(minutes=1),
+    )
+    # Surviving max observed_at is t+5min.
+    assert mon.latest_observed_at == base_time + timedelta(minutes=5)
+
+
+def test_alert_rule_rejects_metric_resolving_to_bool(base_time):
+    """Pinned regression: pre-fix ``_resolve_metric_path`` accepted
+    bool as numeric (``isinstance(True, int)`` is True), so a future
+    bool field in ``FleetSummary.to_dict()`` would silently become a
+    numeric metric. Now bool is explicitly rejected.
+    """
+    from symbolu_robotics.bcvf_autonomous.analysis.streaming import (
+        _resolve_metric_path,
+    )
+    view = {"meets_certification_floor": True}
+    with pytest.raises(TypeError) as exc_info:
+        _resolve_metric_path(view, "meets_certification_floor")
+    assert "bool" in str(exc_info.value)
+
+
+def test_resolve_metric_path_accepts_int_and_float(base_time):
+    """Sanity: numeric metrics still resolve cleanly post-fix."""
+    from symbolu_robotics.bcvf_autonomous.analysis.streaming import (
+        _resolve_metric_path,
+    )
+    assert _resolve_metric_path({"x": 7}, "x") == 7.0
+    assert _resolve_metric_path({"x": 7.5}, "x") == 7.5
+    assert _resolve_metric_path({"x": {"y": 0.25}}, "x.y") == 0.25

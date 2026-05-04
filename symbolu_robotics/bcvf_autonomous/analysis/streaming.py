@@ -193,6 +193,12 @@ class StreamingFleetMonitor:
         # a stable width. Per-predictor vectors are right-padded /
         # truncated when shorter / longer.
         self._fleet_M: int = 0
+        # Max ``observed_at`` across stored observations, tracked
+        # separately so out-of-order ingest (network jitter is typical
+        # in production fleets) doesn't cause ``latest_observed_at``
+        # to return a wall-clock-stale timestamp. Updated on every
+        # ``_append`` and recomputed on every eviction.
+        self._max_observed_at: Optional[datetime] = None
 
     # ----- ingestion ----- #
 
@@ -254,18 +260,39 @@ class StreamingFleetMonitor:
     def _append(self, obs: _Observation) -> None:
         self._observations.append(obs)
         self._fleet_M = max(self._fleet_M, obs.summary.M)
+        if (self._max_observed_at is None
+                or obs.observed_at > self._max_observed_at):
+            self._max_observed_at = obs.observed_at
         self._evict_if_needed(now=obs.observed_at)
 
     # ----- eviction ----- #
 
     def _evict_if_needed(self, now: datetime) -> None:
+        evicted: List[_Observation] = []
         if self._retention is not None:
             cutoff = now - self._retention
             while self._observations and self._observations[0].observed_at < cutoff:
-                self._observations.popleft()
+                evicted.append(self._observations.popleft())
         if self._max_retained is not None:
             while len(self._observations) > self._max_retained:
-                self._observations.popleft()
+                evicted.append(self._observations.popleft())
+        if not evicted:
+            return
+        # ``_max_observed_at`` may have referred to one of the evicted
+        # observations (out-of-order ingest can park the max in the
+        # *insertion-oldest* slot, which the FIFO eviction pops first).
+        # Refresh only when an eviction actually happened — and only
+        # when the pre-eviction max was among the evicted set, so the
+        # common monotone-ingest path stays O(1) per insert.
+        if not self._observations:
+            self._max_observed_at = None
+            return
+        evicted_max = max(o.observed_at for o in evicted)
+        if (self._max_observed_at is None
+                or evicted_max >= self._max_observed_at):
+            self._max_observed_at = max(
+                o.observed_at for o in self._observations
+            )
 
     def prune(self, older_than: datetime) -> int:
         """Evict observations strictly older than ``older_than``.
@@ -287,15 +314,27 @@ class StreamingFleetMonitor:
 
     @property
     def latest_observed_at(self) -> Optional[datetime]:
-        if not self._observations:
-            return None
-        return self._observations[-1].observed_at
+        """Largest ``observed_at`` across stored observations.
+
+        Returned by-timestamp rather than by-insertion-order so an
+        out-of-order ingest (one episode arrives late after a newer
+        one was already observed — typical of network-jittered
+        production fleet uploads) doesn't cause the rolling window
+        in ``summary(...)`` to anchor on a stale wall-clock time and
+        silently drop the genuinely-newest data.
+        """
+        return self._max_observed_at
 
     @property
     def earliest_observed_at(self) -> Optional[datetime]:
         if not self._observations:
             return None
-        return self._observations[0].observed_at
+        # Smallest observed_at across stored observations. Computed
+        # from the buffer rather than tracked separately because
+        # eviction prunes the *insertion-oldest* head, not necessarily
+        # the *timestamp-oldest*; the value is informational and
+        # cheap (deque length is bounded by retention/max_retained).
+        return min(o.observed_at for o in self._observations)
 
     # ----- windowed summary ----- #
 
@@ -477,6 +516,15 @@ def _resolve_metric_path(view: Dict[str, Any], path: str) -> Optional[float]:
         cursor = cursor[part]
     if cursor is None:
         return None
+    # ``bool`` is a subclass of ``int`` — reject it explicitly so a
+    # boolean field added to FleetSummary (e.g. a future
+    # ``meets_certification_floor`` flag) doesn't silently become a
+    # numeric metric a threshold rule fires on as if it were a rate.
+    if isinstance(cursor, bool):
+        raise TypeError(
+            f"metric path {path!r} resolves to bool; alert rules "
+            "require a numeric metric"
+        )
     if not isinstance(cursor, (int, float)):
         raise TypeError(
             f"metric path {path!r} resolves to non-numeric "
