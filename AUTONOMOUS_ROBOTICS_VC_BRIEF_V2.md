@@ -36,10 +36,14 @@
 > a 38-symbol `STABLE_API` registry + 14-symbol `PROVISIONAL_API`,
 > a deprecation cycle in `API_STABILITY.md`, and machine-checked
 > tests pinning every entry's resolution + top-level reachability.
-> **586 tests passing**, up from 400 in v0.6 (12 audit pinning
+> **Hierarchical / group-level BCVF design proposal landed
+> post-v0.7** as `HIERARCHICAL_BCVF_DESIGN.md` — research-tier,
+> design-only today, gated on three ship-when-ready criteria.
+> **595 tests passing**, up from 400 in v0.6 (12 audit pinning
 > tests + 15 statistical-significance tests + 20 safety-case-
 > traceability tests + 29 streaming-monitor tests + 16 report-
-> writer tests + 71 API-stability tests added post-v0.7). v1 file at
+> writer tests + 71 API-stability tests + 9 hierarchical-BCVF
+> design-doc pins added post-v0.7). v1 file at
 > `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
 > reference.
 
@@ -278,7 +282,7 @@ construction.
 
 ### Four proof points to know (as of May 2026)
 
-- **586 tests passing** (+365 since v0.2; +12 audit pinning tests + 15 statistical-significance tests + 20 SOTIF / ISO 26262 traceability tests + 29 streaming-monitor tests + 16 CSV/Markdown report-writer tests + 71 API-stability tests added post-v0.7 — the **0.4.0 release ratifies a public-API stability policy** with a 38-symbol `STABLE_API` registry, a 14-symbol `PROVISIONAL_API`, and `API_STABILITY.md` documenting the deprecation cycle that makes the v0.2 "tested integration contract" promise machine-checkable) across the autonomy
+- **595 tests passing** (+374 since v0.2; +12 audit pinning tests + 15 statistical-significance tests + 20 SOTIF / ISO 26262 traceability tests + 29 streaming-monitor tests + 16 CSV/Markdown report-writer tests + 71 API-stability tests + 9 hierarchical-BCVF design-doc pins added post-v0.7 — the **0.4.0 release ratifies a public-API stability policy** with a 38-symbol `STABLE_API` registry, a 14-symbol `PROVISIONAL_API`, and `API_STABILITY.md` documenting the deprecation cycle that makes the v0.2 "tested integration contract" promise machine-checkable; longer-horizon research items land as design docs gated on explicit ship-when-ready criteria) across the autonomy
   kernel, MPPI planner, trust-weight computer, non-MPPI adapter,
   dataset scaffolds, ROS 2 bridge, the v0.3 SOTIF-readiness
   layer, the v0.4 vectorized predict_batch path, the v0.5 pilot
@@ -333,7 +337,7 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 586 passing across 23 test modules (+12 pinning tests from the post-v0.7 audit pass; +15 statistical-significance tests; +20 SOTIF / ISO 26262 traceability tests; +29 StreamingFleetMonitor tests; +16 CSV/Markdown report-writer tests; **+71 public-API-stability tests** [38 stable-symbol resolution + 14 provisional-symbol resolution + 19 hand-written: version semver / count locks / top-level reachability / object-identity-with-submodule / disjoint-tier / no-internal-underscores / helper predicates / policy-doc presence]); reproducible on CPU in < 4 min (4 host-speed-dependent perf benchmarks + 4 long-running sweep / timing tests deselected) |
+| **Test suite** | 595 passing across 24 test modules (+12 pinning tests from the post-v0.7 audit pass; +15 statistical-significance tests; +20 SOTIF / ISO 26262 traceability tests; +29 StreamingFleetMonitor tests; +16 CSV/Markdown report-writer tests; +71 public-API-stability tests; **+9 hierarchical-BCVF design-doc pins** [doc presence / required section headers / explicit "design only" framing / ship-when-ready criteria enumerated / non-promotion to STABLE_API / non-promotion to PROVISIONAL_API / Lemma 1 carry-through coverage / three representative options enumerated / correlated-within-group failure-mode acknowledged]); reproducible on CPU in < 4 min (4 host-speed-dependent perf benchmarks + 4 long-running sweep / timing tests deselected) |
 | **Public-API stability commitment (v0.4.0)** | `_api.py` registry — 38-symbol `STABLE_API` + 14-symbol `PROVISIONAL_API`, both as flat tuples of canonical `submodule.Symbol` paths machine-checked at every commit. `API_STABILITY.md` documents the three tiers (stable / provisional / internal), the semver mapping (patch / minor / major triggers), and the deprecation cycle (post-1.0 stable removal requires one-minor-version notice + `DeprecationWarning` + release-note line). `__version__ = "0.4.0"` and `VERSION_INFO = (0, 4, 0)` agree by test pin. Top-level `from bcvf_autonomous import X` continues to work for the 129 existing re-exports, but the contract is the explicit 38-symbol registry — the v0.2 brief's "tested integration contract" promise becomes the machine-checkable thing the test suite enforces. |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
@@ -506,6 +510,29 @@ thresholds calibrated per-scenario class. ~1 week.
   harness lets the partner publish a *fleet-level* trust-pipeline
   report at handover, not just a single integration report.
 
+### Longer-horizon research (design-only today)
+
+- **Hierarchical / group-level BCVF.** When `M` scales beyond 4–6
+  predictors (a full sensor suite with multiple LiDARs + cameras +
+  radar + IMU + GNSS), the all-pairs cost grows quadratically and
+  per-predictor attribution dilutes. A two-level kernel — first
+  within a sensor group, then across group representatives — would
+  scale better. Landed post-v0.7 as
+  `HIERARCHICAL_BCVF_DESIGN.md`: motivation, two-level structure,
+  three representative options (trust-weighted / arithmetic /
+  winner-take-all) with Lemma-1 carry-through analysis,
+  per-predictor attribution, the new failure modes the hierarchy
+  catches (cross-group correlated drift) and *can't* fully solve
+  (within-group correlated failure), certification implications
+  (~5 new families on the 1320-cell grid), backward-compatibility
+  contract (`groups=None` falls through to flat BCVF), and the
+  three ship-when-ready criteria gating promotion to a deliverable.
+  9 tests pin the doc presence + content + non-promotion of any
+  hypothetical hierarchical surface to `STABLE_API` /
+  `PROVISIONAL_API`. **No implementation today** — the flat
+  `M = 3 / M = 4` kernel remains the production default and the
+  certification target.
+
 ### The ask
 
 Seed capital to convert a CI-validated research prototype with one
@@ -542,4 +569,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.7 · 586 internal tests (audit pinning tests included; published numbers unchanged; characterization primary grid now certification-grade at 1320 cells with Wilson 95% CI lower-bound floor 0.90 per (family, magnitude) config — current min ≈ 0.940; Q3 SOTIF / ISO 26262 traceability template pulled forward — 12 clauses across SOTIF 5/6/7/8/9/10 and ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11, 25 indexed BCVF artifacts, machine-checked snapshot in `safety_case/SOTIF_TRACEABILITY.md`; `StreamingFleetMonitor` with rolling-window summaries + threshold alerts lifts the fleet harness from triage to runtime; the two deferred CSV / Markdown report writers landed — `GridSummary.to_csv` / `to_markdown_report` and `FleetSummary.to_csv` / `to_markdown_report` emit the frozen auditor-facing artifacts a SOTIF audit pack depends on; **0.4.0 release ratifies a public-API stability policy** — 38-symbol `STABLE_API` + 14-symbol `PROVISIONAL_API`, deprecation cycle in `API_STABILITY.md`) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
+*v0.7 · 595 internal tests (audit pinning tests included; published numbers unchanged; characterization primary grid now certification-grade at 1320 cells with Wilson 95% CI lower-bound floor 0.90 per (family, magnitude) config — current min ≈ 0.940; Q3 SOTIF / ISO 26262 traceability template pulled forward — 12 clauses across SOTIF 5/6/7/8/9/10 and ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11, 25 indexed BCVF artifacts, machine-checked snapshot in `safety_case/SOTIF_TRACEABILITY.md`; `StreamingFleetMonitor` with rolling-window summaries + threshold alerts lifts the fleet harness from triage to runtime; the two deferred CSV / Markdown report writers landed — `GridSummary.to_csv` / `to_markdown_report` and `FleetSummary.to_csv` / `to_markdown_report` emit the frozen auditor-facing artifacts a SOTIF audit pack depends on; **0.4.0 release ratifies a public-API stability policy** — 38-symbol `STABLE_API` + 14-symbol `PROVISIONAL_API`, deprecation cycle in `API_STABILITY.md`; **hierarchical / group-level BCVF design proposal** lands as a design-only doc gated on three ship-when-ready criteria — research-tier, no implementation today) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
