@@ -155,3 +155,100 @@ serialization.
   CI; not the hot path.
 * The harness allocates one EpisodeSummary per episode plus one
   FleetSummary; memory bounded by the input records.
+
+## §7 StreamingFleetMonitor — online aggregation + alerting
+
+`aggregate_fleet` answers *"summarise these N records"*. Production
+SRE asks the harder question: *"what did the last 24 hours look
+like across the whole fleet, and alert me if a metric crossed a
+threshold."* `StreamingFleetMonitor` (in `analysis/streaming.py`)
+serves that question.
+
+### §7.1 What the streaming monitor stores
+
+For every observed episode, the monitor keeps:
+
+* `observed_at: datetime` — the wall-clock time the episode landed.
+* The `EpisodeSummary` (a few KB) — already carries the cached
+  detector outputs (argmax flips, V2 state flips, near-vetoes).
+* A small per-predictor exclusion vector `(M,) int 0/1` — the only
+  field `aggregate_fleet` needs that isn't on `EpisodeSummary`.
+
+The raw `TrustShapedEpisodeRecord` (potentially MB) is **not**
+retained — that's the whole point of streaming. A monitor running
+on a 10k-trip-per-day fleet stores roughly 10 MB of summaries per
+day, not 10 GB of records.
+
+### §7.2 Ingestion paths
+
+* `observe_episode(record, ...)` — convenience: take a raw record,
+  summarise on the way in, store. Returns the `EpisodeSummary` so
+  the caller can persist / inspect without re-summarising.
+* `observe_summary(summary, per_predictor_excluded_ever, ...)` —
+  fast path for distributed deployments. Each vehicle (or regional
+  aggregator) summarises locally and ships the small payload to the
+  central monitor; the central monitor never sees the raw record.
+
+Both paths accept an optional `observed_at: datetime`; absent that
+the configured `clock` callable is invoked. The clock is injectable
+so tests don't need to monkey-patch wall time.
+
+### §7.3 Eviction policy
+
+Two independent caps, both default off:
+
+* `retention: timedelta` — drop observations older than
+  `now - retention` on every ingest. Bounds memory by time.
+* `max_retained: int` — drop the oldest observation when the count
+  exceeds the cap. Bounds memory by row count.
+
+`prune(older_than)` lets a caller drive its own retention without
+configuring the monitor (e.g. mirroring an external store's TTL).
+
+### §7.4 Windowed summary — batch parity invariant
+
+`summary(window=timedelta(hours=24))` returns a
+`WindowedFleetSummary` covering `[now - window, now]`. `now`
+defaults to the latest observation's timestamp (so tests don't
+need a clock fake). `window=None` returns the entire retained
+buffer.
+
+The streaming monitor's load-bearing contract is **batch parity
+within the window**: for any sequence of episodes fed to both the
+monitor (`observe_episode` × N) and `aggregate_fleet` (batch),
+the resulting `FleetSummary` is byte-identical. A buyer comparing
+rolling-window numbers to historical batch numbers must see the
+same aggregation logic — `tests/test_streaming_fleet.py` pins
+this invariant directly.
+
+### §7.5 Alert rules
+
+```python
+rule = AlertRule(
+    name="chatter_p95_high",
+    metric="argmax_flips_per_step.p95",   # dotted path into FleetSummary.to_dict()
+    threshold=0.10,
+    direction="above",        # or "below"
+    min_episodes=20,          # suppress on undersampled windows
+)
+alerts = monitor.evaluate_alerts([rule], window=timedelta(hours=24))
+```
+
+`metric` is a dotted-path key into `WindowedFleetSummary.to_dict()`'s
+`"fleet"` block — the same shape a downstream Prometheus textfile
+exporter or alertmanager rule would index. A typo'd path raises
+`KeyError` at evaluation time so a misconfigured rule fails loudly
+rather than silently never firing. A path that legitimately resolves
+to `None` (e.g. `v2_engaged_fraction.mean` when V2 was never
+enabled in the window) is treated as a data-availability issue —
+the rule simply doesn't fire.
+
+### §7.6 What the streaming monitor is NOT
+
+* Not multi-writer-safe. One ingest thread per monitor; multi-vehicle
+  ingest fans summaries through `observe_summary` from one writer.
+* Not a time-series database. The monitor keeps summaries; long-term
+  history goes to an external TSDB / log warehouse.
+* Not an alertmanager. The monitor evaluates rules and returns
+  `Alert` objects with `to_dict()` payloads; routing /
+  rate-limiting / deduplication is the caller's job.

@@ -89,8 +89,10 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 * `symbolu_robotics.bcvf_autonomous.trust_diagnostics::TrustShapedEpisodeRecord` — Per-step trust diagnostic record — every tick's weights, BCVF cost, V2 state, near-veto incidence; the post-incident trace a recall investigator opens
 * `symbolu_robotics.bcvf_autonomous.analysis::FleetSummary` — Fleet-scale aggregator over episode records — argmax-flips per step, near-vetoes, V2 state distribution, per-predictor exclusion incidence; the field-monitoring evidence pack
 * `symbolu_robotics.bcvf_autonomous.analysis.near_veto::find_near_vetoes` — Near-veto detector — flags ticks where a predictor approached but did not cross the exclusion threshold; the SOTIF triggering-condition near-miss surface
+* `symbolu_robotics.bcvf_autonomous.analysis::StreamingFleetMonitor` — Online fleet monitor with rolling-window summaries + threshold alerts — converts the post-hoc harness into an SRE-grade runtime monitoring surface (24-hour rolling argmax-flip rate, near-veto rate, V2 engaged fraction)
+* `symbolu_robotics.bcvf_autonomous.analysis::AlertRule` — Threshold-based alert specification on a rolling window — the runtime triggering-condition surface a deployment partner wires into alertmanager / Grafana / pager rotations
 
-**Notes.** Per-tick ``TrustShapedEpisodeRecord`` is the structured post-incident trace a recall investigator opens. ``FleetSummary`` aggregates across episodes — argmax-flips, near-vetoes, V2 state distribution, per-predictor exclusion incidence — exactly the surface a fleet-scale safety-monitoring tool consumes. Dataset ingest is strict (no silent zero-fill on incomplete payloads) so a corrupt episode surfaces as ``ValueError`` at load time rather than as a quiet metric drift.
+**Notes.** Per-tick ``TrustShapedEpisodeRecord`` is the structured post-incident trace a recall investigator opens. ``FleetSummary`` aggregates across episodes — argmax-flips, near-vetoes, V2 state distribution, per-predictor exclusion incidence — exactly the surface a fleet-scale safety-monitoring tool consumes. ``StreamingFleetMonitor`` plus ``AlertRule`` lift the harness from triage-time to runtime: rolling-window summaries (e.g. 24-hour argmax-flip rate) drive threshold alerts that route into the deployment partner's pager / alertmanager pipeline. Dataset ingest is strict (no silent zero-fill on incomplete payloads) so a corrupt episode surfaces as ``ValueError`` at load time rather than as a quiet metric drift.
 
 ## ISO 26262 Part 6 (Software)
 
@@ -166,7 +168,9 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 | Artifact | Clauses |
 |---|---|
 | `symbolu_robotics.bcvf_autonomous.analysis.near_veto::find_near_vetoes` | 7, 10 |
+| `symbolu_robotics.bcvf_autonomous.analysis::AlertRule` | 10 |
 | `symbolu_robotics.bcvf_autonomous.analysis::FleetSummary` | 10, Part 6 §11 |
+| `symbolu_robotics.bcvf_autonomous.analysis::StreamingFleetMonitor` | 10 |
 | `symbolu_robotics.bcvf_autonomous.baselines::run_shootout` | 9, Part 6 §10 |
 | `symbolu_robotics.bcvf_autonomous.characterization.stats::wilson_ci` | 9, Part 6 §9.4.4 |
 | `symbolu_robotics.bcvf_autonomous.characterization.sweep::FAMILY_MAGNITUDES` | 7 |

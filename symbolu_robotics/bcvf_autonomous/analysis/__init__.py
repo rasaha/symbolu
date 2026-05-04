@@ -36,13 +36,23 @@ from .flips import (
 )
 from .io import episode_record_from_dict, load_episode_from_json
 from .near_veto import NearVeto, find_near_vetoes
+from .streaming import (
+    Alert,
+    AlertRule,
+    StreamingFleetMonitor,
+    WindowedFleetSummary,
+)
 
 __all__ = [
+    "Alert",
+    "AlertRule",
     "ArgmaxFlip",
     "EpisodeSummary",
     "FleetSummary",
     "NearVeto",
+    "StreamingFleetMonitor",
     "V2StateFlip",
+    "WindowedFleetSummary",
     "aggregate_fleet",
     "episode_record_from_dict",
     "find_argmax_flips",

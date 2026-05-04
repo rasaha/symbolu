@@ -207,6 +207,23 @@ _FLEET = EvidenceArtifact(
                 "per-predictor exclusion incidence; the field-monitoring "
                 "evidence pack",
 )
+_STREAMING_MONITOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.analysis",
+    symbol="StreamingFleetMonitor",
+    description="Online fleet monitor with rolling-window summaries + "
+                "threshold alerts — converts the post-hoc harness into "
+                "an SRE-grade runtime monitoring surface (24-hour "
+                "rolling argmax-flip rate, near-veto rate, V2 engaged "
+                "fraction)",
+)
+_ALERT_RULE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.analysis",
+    symbol="AlertRule",
+    description="Threshold-based alert specification on a rolling "
+                "window — the runtime triggering-condition surface a "
+                "deployment partner wires into alertmanager / "
+                "Grafana / pager rotations",
+)
 _NEAR_VETO = EvidenceArtifact(
     module_path="symbolu_robotics.bcvf_autonomous.analysis.near_veto",
     symbol="find_near_vetoes",
@@ -396,14 +413,22 @@ def iso_21448_clauses() -> List[Clause]:
                 "the field and feeding observed triggering conditions "
                 "back into hazard analysis."
             ),
-            evidence=(_TRUST_DIAG, _FLEET, _NEAR_VETO),
+            evidence=(
+                _TRUST_DIAG, _FLEET, _NEAR_VETO,
+                _STREAMING_MONITOR, _ALERT_RULE,
+            ),
             notes=(
                 "Per-tick ``TrustShapedEpisodeRecord`` is the structured "
                 "post-incident trace a recall investigator opens. "
                 "``FleetSummary`` aggregates across episodes — argmax-"
                 "flips, near-vetoes, V2 state distribution, per-"
                 "predictor exclusion incidence — exactly the surface a "
-                "fleet-scale safety-monitoring tool consumes. Dataset "
+                "fleet-scale safety-monitoring tool consumes. "
+                "``StreamingFleetMonitor`` plus ``AlertRule`` lift the "
+                "harness from triage-time to runtime: rolling-window "
+                "summaries (e.g. 24-hour argmax-flip rate) drive "
+                "threshold alerts that route into the deployment "
+                "partner's pager / alertmanager pipeline. Dataset "
                 "ingest is strict (no silent zero-fill on incomplete "
                 "payloads) so a corrupt episode surfaces as ``ValueError`` "
                 "at load time rather than as a quiet metric drift."
