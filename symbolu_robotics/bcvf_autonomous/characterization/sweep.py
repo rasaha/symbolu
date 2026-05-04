@@ -39,6 +39,11 @@ from .alignment import (
     aggregate_alignment,
     compute_alignment_metrics,
 )
+from .stats import (
+    CERTIFICATION_FLOOR,
+    WILSON_Z_95,
+    wilson_ci,
+)
 from .traces import (
     FAILURE_FAMILIES,
     NOMINAL_FAMILIES,
@@ -61,12 +66,32 @@ FAMILY_MAGNITUDES: Dict[str, Tuple[str, Tuple[float, ...]]] = {
     "sensor_dropout": ("k_dropout", (5, 15, 25, 35)),
 }
 
-PRIMARY_SEEDS: Tuple[int, ...] = (42, 43, 44)
+# Primary-grid seeds. 60 deterministic seeds give 22 configs × 60
+# seeds = 1320 cells per ``run_primary_grid`` invocation. The audit
+# flagged the prior 3-seed-per-cell coverage as too narrow for a
+# certification-grade statistical bound — at the threshold-edge
+# magnitudes (e.g. ``accelerating`` at ``accel_mag = 0.3``) a single
+# kernel regression can flip a 3-of-3 pass into a 0-of-3 fail
+# without the suite catching it. 60 seeds + a per-config Wilson 95%
+# CI lower-bound floor (see ``stats.CERTIFICATION_FLOOR``) ties the
+# regression suite to a stated statistical bound.
+PRIMARY_SEEDS: Tuple[int, ...] = tuple(range(42, 102))
+
+# Three-seed legacy tuple kept for callers that explicitly want the
+# prior smoke-grade smoke run; no internal call site uses it.
+LEGACY_PRIMARY_SEEDS: Tuple[int, ...] = (42, 43, 44)
 
 V1_DEFAULTS = {"T": 0.2, "beta": 100.0, "delta": 0.5}
 SENSITIVITY_T = (0.1, 0.2, 0.5)
 SENSITIVITY_BETA = (50.0, 100.0, 200.0)
 SENSITIVITY_DELTA = (0.25, 0.5, 1.0)
+# Sensitivity / ablation grids stay at 3 seeds — those grids exist
+# to validate the (T, β, δ) cube, not to certify per-config pass-rate
+# bounds. Tying them to the 60-seed primary cadence would push the
+# default test suite past its time budget without buying additional
+# certification signal.
+SENSITIVITY_SEEDS: Tuple[int, ...] = (42, 43, 44)
+ABLATION_SEEDS: Tuple[int, ...] = (42, 43, 44)
 
 
 # --------------------------------------------------------------------------- #
@@ -395,7 +420,7 @@ def run_sensitivity_grid(
     M: int = 3,
     H: int = 50,
     dt: float = 0.1,
-    seeds: Tuple[int, ...] = PRIMARY_SEEDS,
+    seeds: Tuple[int, ...] = SENSITIVITY_SEEDS,
 ) -> List[CellResult]:
     """Canonical magnitude × (T, β, δ) sweep."""
     cells: List[CellResult] = []
@@ -425,7 +450,7 @@ def run_ablation_grid(
     M: int = 3,
     H: int = 50,
     dt: float = 0.1,
-    seeds: Tuple[int, ...] = PRIMARY_SEEDS,
+    seeds: Tuple[int, ...] = ABLATION_SEEDS,
 ) -> List[CellResult]:
     """``linear_drift`` × cost-order ablation.
 
@@ -489,6 +514,98 @@ def pick_winner_tuple(
     return candidates_sorted[0], candidates_sorted
 
 
+@dataclass
+class PerConfigPassStat:
+    """Pass-rate tally + Wilson 95% CI for one (family, magnitude) cell.
+
+    A "config" here is the natural grouping the audit asked for: every
+    combination of family and family-parameter magnitude that appears
+    in the primary grid. ``magnitude_label`` is a stable string key
+    suitable for CSV / JSON output and table headers (e.g.
+    ``"accelerating[accel_mag=0.3]"`` or ``"baseline"``).
+    """
+
+    family: str
+    magnitude_label: str
+    family_params: Dict[str, Any]
+    n: int
+    passed: int
+    pass_rate: float
+    ci_low: float
+    ci_high: float
+    meets_certification_floor: bool
+
+
+def _magnitude_label(family: str, family_params: Dict[str, Any]) -> str:
+    """Stable string key for (family, magnitude) suitable for grouping.
+
+    For families with a scalar magnitude parameter (e.g. ``constant_bias``
+    with ``bias=0.5``) we emit ``"family[param=value]"``. ``baseline``
+    and ``outlier`` collapse to just the family name (one config each).
+    ``sensor_dropout`` is keyed by ``k_dropout`` since the outer family
+    + dropped-predictor are fixed across the primary grid.
+    """
+    if family == "baseline":
+        return "baseline"
+    if family == "outlier":
+        return "outlier"
+    if family == "sensor_dropout":
+        k = family_params.get("k_dropout", "?")
+        return f"sensor_dropout[k_dropout={k}]"
+    # The remaining families (constant_bias, linear_drift, accelerating,
+    # noise_floor) each carry a single scalar magnitude under
+    # ``FAMILY_MAGNITUDES``.
+    name, _ = FAMILY_MAGNITUDES.get(family, (None, ()))
+    if name and name in family_params:
+        return f"{family}[{name}={family_params[name]}]"
+    # Fallback: serialise the params dict deterministically.
+    items = ",".join(f"{k}={v}" for k, v in sorted(family_params.items()))
+    return f"{family}[{items}]" if items else family
+
+
+def per_config_pass_stats(
+    cells: List[CellResult],
+    z: float = WILSON_Z_95,
+    certification_floor: float = CERTIFICATION_FLOOR,
+) -> List[PerConfigPassStat]:
+    """Aggregate sweep cells into per-(family, magnitude) pass tallies
+    with Wilson confidence intervals.
+
+    The Wilson 95% CI is computed at each config independently —
+    ``ci_low`` is the per-config lower bound a SOTIF auditor would
+    quote ("with 95% confidence the true pass rate at this magnitude
+    is at least X"). ``meets_certification_floor`` is the per-config
+    boolean the regression suite asserts on; ``False`` means the cell
+    is the regression hot-spot.
+    """
+    grouped: Dict[Tuple[str, str], List[CellResult]] = defaultdict(list)
+    for c in cells:
+        key = (c.family, _magnitude_label(c.family, c.family_params))
+        grouped[key].append(c)
+
+    out: List[PerConfigPassStat] = []
+    for (family, label), group in grouped.items():
+        n = len(group)
+        passed = sum(1 for c in group if c.cell_pass)
+        rate = passed / n if n else 0.0
+        ci_low, ci_high = wilson_ci(passed, n, z=z)
+        out.append(PerConfigPassStat(
+            family=family,
+            magnitude_label=label,
+            family_params=dict(group[0].family_params),
+            n=n,
+            passed=passed,
+            pass_rate=rate,
+            ci_low=ci_low,
+            ci_high=ci_high,
+            meets_certification_floor=ci_low >= certification_floor,
+        ))
+    # Stable ordering: family group, then magnitude label. Keeps CSV /
+    # markdown rendering deterministic across runs.
+    out.sort(key=lambda s: (s.family, s.magnitude_label))
+    return out
+
+
 def family_pass_rate(cells: List[CellResult]) -> Dict[str, Dict[str, Any]]:
     """Per-family pass tally with alignment summary."""
     per_family: Dict[str, List[CellResult]] = defaultdict(list)
@@ -525,9 +642,38 @@ def split_nominal_failure(
     return nominal, failure
 
 
-def summarize_grid(cells: List[CellResult]) -> Dict[str, Any]:
-    """Top-level grid summary: per-family pass rates + FP / FN counts."""
+def summarize_grid(
+    cells: List[CellResult],
+    z: float = WILSON_Z_95,
+    certification_floor: float = CERTIFICATION_FLOOR,
+) -> Dict[str, Any]:
+    """Top-level grid summary: per-family pass rates + FP / FN counts.
+
+    Also exposes per-(family, magnitude) Wilson confidence intervals so
+    a SOTIF audit can quote a per-config statistical bound rather than
+    a point estimate. The relevant fields:
+
+    * ``per_config`` — list of dicts (one per config) with ``family``,
+      ``magnitude_label``, ``n``, ``passed``, ``pass_rate``, ``ci_low``,
+      ``ci_high``, ``meets_certification_floor``.
+    * ``min_ci_lower_bound`` — the worst per-config CI lower bound
+      across the grid (the "weakest cell" gauge).
+    * ``cells_below_certification_floor`` — labels of any configs whose
+      CI lower bound undershoots ``certification_floor``.
+    * ``certification_floor`` — the floor in effect for this summary.
+    * ``wilson_z`` — the z-score used for the CIs.
+    """
     nominal, failure = split_nominal_failure(cells)
+    config_stats = per_config_pass_stats(
+        cells, z=z, certification_floor=certification_floor,
+    )
+    min_ci_lower = (
+        min(s.ci_low for s in config_stats) if config_stats else 0.0
+    )
+    below_floor = [
+        s.magnitude_label for s in config_stats
+        if not s.meets_certification_floor
+    ]
     return {
         "n_cells": len(cells),
         "per_family": family_pass_rate(cells),
@@ -539,4 +685,9 @@ def summarize_grid(cells: List[CellResult]) -> Dict[str, Any]:
             sum(1 for c in failure if not c.cell_pass) / len(failure)
             if failure else 0.0
         ),
+        "per_config": [asdict(s) for s in config_stats],
+        "min_ci_lower_bound": min_ci_lower,
+        "cells_below_certification_floor": below_floor,
+        "certification_floor": certification_floor,
+        "wilson_z": z,
     }

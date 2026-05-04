@@ -14,17 +14,25 @@ from symbolu_robotics.bcvf_autonomous import (
 )
 from symbolu_robotics.bcvf_autonomous.characterization import (
     AlignmentMetrics,
+    CERTIFICATION_FLOOR,
     FAILURE_FAMILIES,
+    LEGACY_PRIMARY_SEEDS,
     NOMINAL_FAMILIES,
+    PRIMARY_SEEDS,
+    PerConfigPassStat,
+    WILSON_Z_95,
     aggregate_alignment,
     compute_alignment_metrics,
     family_pass_rate,
     generate_trace,
+    per_config_pass_stats,
     pick_winner_tuple,
     run_ablation_grid,
     run_primary_grid,
     run_sensitivity_grid,
     summarize_grid,
+    wilson_ci,
+    wilson_lower_bound,
 )
 
 
@@ -487,3 +495,186 @@ def test_sweep_catches_uniform_attribution(monkeypatch):
     assert any(
         "ratio" in r or "alignment" in r for r in cell.failure_reasons
     )
+
+
+# --------------------------------------------------------------------------- #
+# Statistical-significance gate — Wilson CIs on the 1320-cell primary grid
+# (DESIGN §5.1 + §6.1 — ties the regression suite to a stated bound)
+# --------------------------------------------------------------------------- #
+
+
+def test_primary_seeds_default_count_is_60():
+    """The audit fixed the seed count at 60 — 22 configs × 60 seeds =
+    1320 cells. Pinned so a future tweak that quietly halves the seeds
+    fails the suite instead of silently halving the certification bar."""
+    assert len(PRIMARY_SEEDS) == 60
+    assert len(set(PRIMARY_SEEDS)) == 60   # deterministic + unique
+    assert PRIMARY_SEEDS[0] == 42 and PRIMARY_SEEDS[-1] == 101
+
+
+def test_legacy_primary_seeds_is_three():
+    """Legacy 3-seed tuple is preserved for callers that explicitly want a
+    smoke run (e.g. CI sanity checks). No internal call site uses it."""
+    assert LEGACY_PRIMARY_SEEDS == (42, 43, 44)
+
+
+def test_primary_grid_default_emits_1320_cells():
+    cells = run_primary_grid()
+    assert len(cells) == 1320
+
+
+def test_wilson_ci_zero_total_returns_unit_interval():
+    low, high = wilson_ci(0, 0)
+    assert (low, high) == (0.0, 1.0)
+
+
+def test_wilson_ci_textbook_n_60_perfect_pass():
+    """At n=60 with 60-of-60 pass and z=WILSON_Z_95, the Wilson lower
+    bound is ~0.940. Pinned: this is the cleanest-kernel ceiling on
+    what the primary-grid regression suite can certify at the current N."""
+    low, high = wilson_ci(60, 60)
+    assert low == pytest.approx(0.93982814785791, abs=1e-9)
+    assert high == pytest.approx(1.0, abs=1e-9)
+
+
+def test_wilson_ci_textbook_n_60_one_failure():
+    """One statistical failure (59/60 pass) keeps the lower bound at
+    ~0.9114 — the floor is calibrated so this stays ABOVE 0.90."""
+    low, _ = wilson_ci(59, 60)
+    assert low == pytest.approx(0.9114487027240993, abs=1e-9)
+    assert low > CERTIFICATION_FLOOR
+
+
+def test_wilson_ci_textbook_n_60_two_failures_drops_below_floor():
+    """Two failures (58/60) takes the lower bound to ~0.8864, BELOW the
+    0.90 floor. The floor is calibrated so the second failure is the
+    one that trips the alarm — exactly the regime the audit asked the
+    suite to detect ("kernel flips pass→fail with a small kernel
+    change")."""
+    low, _ = wilson_ci(58, 60)
+    assert low == pytest.approx(0.886362257256914, abs=1e-9)
+    assert low < CERTIFICATION_FLOOR
+
+
+def test_wilson_ci_rejects_invalid_successes():
+    with pytest.raises(ValueError):
+        wilson_ci(-1, 10)
+    with pytest.raises(ValueError):
+        wilson_ci(11, 10)
+
+
+def test_wilson_lower_bound_matches_full_ci():
+    successes, total = 47, 50
+    low_full, _ = wilson_ci(successes, total)
+    assert wilson_lower_bound(successes, total) == low_full
+
+
+def test_per_config_pass_stats_groups_by_family_magnitude():
+    """22 configs out of the primary grid: 1 baseline + 4 constant_bias +
+    4 linear_drift + 4 accelerating + 4 noise_floor + 1 outlier +
+    4 sensor_dropout. Each carries 60 seeds → n == 60."""
+    cells = run_primary_grid()
+    stats = per_config_pass_stats(cells)
+    assert len(stats) == 22
+    for s in stats:
+        assert s.n == 60
+        assert isinstance(s, PerConfigPassStat)
+        # Magnitude labels are deterministic + non-empty.
+        assert s.magnitude_label
+        # Pass rate matches passed / n.
+        assert s.pass_rate == pytest.approx(s.passed / s.n)
+        # CI lower bound never exceeds upper bound.
+        assert s.ci_low <= s.ci_high
+
+
+def test_per_config_pass_stats_threshold_edge_accel_03_clears_floor():
+    """The audit explicitly called out ``accelerating[accel_mag=0.3]``
+    as the threshold-edge magnitude where the kernel is most likely to
+    flip pass→fail under a small change. Pin the per-config CI lower
+    bound for that specific cell so a regression registers as a tight
+    statistical signal, not a vague aggregate slip."""
+    cells = run_primary_grid()
+    stats = per_config_pass_stats(cells)
+    edge = next(
+        s for s in stats if s.magnitude_label == "accelerating[accel_mag=0.3]"
+    )
+    assert edge.n == 60
+    assert edge.passed == 60
+    assert edge.ci_low > CERTIFICATION_FLOOR
+
+
+def test_summarize_grid_exposes_per_config_ci_fields():
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    for key in (
+        "per_config",
+        "min_ci_lower_bound",
+        "cells_below_certification_floor",
+        "certification_floor",
+        "wilson_z",
+    ):
+        assert key in summary
+    assert summary["certification_floor"] == CERTIFICATION_FLOOR
+    assert summary["wilson_z"] == WILSON_Z_95
+    # Each per_config entry serialises to a dict with the documented keys.
+    sample = summary["per_config"][0]
+    expected_keys = {
+        "family", "magnitude_label", "family_params",
+        "n", "passed", "pass_rate", "ci_low", "ci_high",
+        "meets_certification_floor",
+    }
+    assert expected_keys.issubset(sample.keys())
+
+
+def test_primary_grid_meets_certification_floor():
+    """The suite's stated statistical bound: every (family, magnitude)
+    config's Wilson 95% CI lower bound must clear ``CERTIFICATION_FLOOR``.
+
+    This is the §6.1 contract a SOTIF auditor would quote: "with 95%
+    confidence, the true pass rate at every primary-grid config is at
+    least 0.90." If a kernel change flips a config's empirical
+    pass-count below the floor (e.g. 57/60 → ci_low ~0.86), this
+    assertion fires with the offending magnitude label.
+    """
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    below = summary["cells_below_certification_floor"]
+    assert below == [], (
+        f"{len(below)} config(s) below floor "
+        f"{summary['certification_floor']}: {below}; "
+        f"min_ci_lower_bound = {summary['min_ci_lower_bound']:.4f}"
+    )
+    # Belt and suspenders: at clean-kernel 60/60 the minimum Wilson
+    # lower bound across the grid sits at ~0.94 (well clear of 0.90).
+    assert summary["min_ci_lower_bound"] >= 0.93
+
+
+def test_summarize_grid_stricter_floor_can_flag_clean_kernel():
+    """The bound is configurable: lifting the floor to 0.95 (a stricter
+    SOTIF programme) flags every config under the current N=60 cadence,
+    because the 60/60 ceiling is ~0.94. This test pins that the floor
+    actually binds — i.e. it is not vacuous."""
+    cells = run_primary_grid()
+    summary = summarize_grid(cells, certification_floor=0.95)
+    assert len(summary["cells_below_certification_floor"]) == 22
+    assert summary["min_ci_lower_bound"] < 0.95
+
+
+def test_summarize_grid_flags_synthetic_below_floor_cell():
+    """Sabotage: mark every accelerating[accel_mag=0.3] cell as failed.
+    Empirical pass rate drops from 60/60 to 0/60 on that single config;
+    every other config stays at 60/60. ``cells_below_certification_floor``
+    must list exactly the sabotaged label.
+    """
+    cells = run_primary_grid()
+    label = "accelerating[accel_mag=0.3]"
+    for c in cells:
+        if c.family == "accelerating" and c.family_params.get("accel_mag") == 0.3:
+            c.cell_pass = False
+    summary = summarize_grid(cells)
+    assert summary["cells_below_certification_floor"] == [label]
+    sabotaged = next(
+        s for s in summary["per_config"] if s["magnitude_label"] == label
+    )
+    assert sabotaged["passed"] == 0
+    assert sabotaged["ci_low"] < CERTIFICATION_FLOOR

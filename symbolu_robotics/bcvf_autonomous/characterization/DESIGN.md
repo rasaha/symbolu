@@ -118,23 +118,37 @@ which gate fired.
 
 Every family × magnitude × seed at the V1 default `(T, β, δ) =
 (0.2, 100.0, 0.5)`. Magnitudes per family in
-`FAMILY_MAGNITUDES`. Three seeds (`42, 43, 44`) per cell.
+`FAMILY_MAGNITUDES`. **60 deterministic seeds (`range(42, 102)`)
+per cell** — the audit flagged the prior 3-seed-per-cell coverage
+as too narrow for a certification-grade statistical bound. At
+the threshold-edge magnitudes (e.g. `accelerating` at `accel_mag
+= 0.3`, where the kernel is most likely to flip pass→fail with a
+small kernel change) a 3-of-3 pass / 0-of-3 fail flip can land
+without the suite catching it. 60 seeds + a per-config Wilson
+95% CI lower-bound floor (see §6.1) gives the suite an explicit
+statistical contract a SOTIF auditor can quote.
 
 Total cells per default invocation:
 
 | Family | Magnitudes | Seeds | Cells |
 | --- | ---: | ---: | ---: |
-| baseline | 1 | 3 | 3 |
-| constant_bias | 4 | 3 | 12 |
-| linear_drift | 4 | 3 | 12 |
-| accelerating | 4 | 3 | 12 |
-| noise_floor | 4 | 3 | 12 |
-| outlier | 1 | 3 | 3 |
-| sensor_dropout | 4 | 3 | 12 |
-| **Total** | | | **66** |
+| baseline | 1 | 60 | 60 |
+| constant_bias | 4 | 60 | 240 |
+| linear_drift | 4 | 60 | 240 |
+| accelerating | 4 | 60 | 240 |
+| noise_floor | 4 | 60 | 240 |
+| outlier | 1 | 60 | 60 |
+| sensor_dropout | 4 | 60 | 240 |
+| **Total** | | | **1320** |
 
 A pass requires every cell to satisfy its family's threshold table
-and (where applicable) the alignment criterion.
+and (where applicable) the alignment criterion. Beyond the per-cell
+gate, every (family, magnitude) **config** must additionally meet
+the §6.1 Wilson CI floor.
+
+The legacy 3-seed tuple (`LEGACY_PRIMARY_SEEDS = (42, 43, 44)`) is
+retained as an exported constant for callers that explicitly want a
+smoke-grade smoke run; no internal call site uses it.
 
 ### 5.2 Sensitivity grid
 
@@ -144,10 +158,13 @@ Canonical magnitude per family × `(T, β, δ)` cube.
 * `β ∈ {50, 100, 200}`
 * `δ ∈ {0.25, 0.5, 1.0}`
 
-Three seeds × seven families × 27 parameter cells = 567 cells per
-default invocation. The winner-tuple selector
-(`pick_winner_tuple`) returns the `(T, β, δ)` closest to the V1
-defaults that produces an all-pass row.
+`SENSITIVITY_SEEDS = (42, 43, 44)` × seven families × 27
+parameter cells = 567 cells per default invocation. The winner-
+tuple selector (`pick_winner_tuple`) returns the `(T, β, δ)`
+closest to the V1 defaults that produces an all-pass row. The
+sensitivity grid intentionally keeps a 3-seed cadence — its job
+is to cover the parameter cube, not to certify per-config
+pass-rate confidence intervals (the primary grid does that).
 
 ### 5.3 Ablation grid
 
@@ -166,11 +183,49 @@ distilled into a regression test.
   failed (BCVF fired on a quiet input).
 * `false_negative_rate` — fraction of failure-family cells that
   failed (BCVF stayed quiet on a real failure).
+* `per_config` — list of `PerConfigPassStat` records (one per
+  (family, magnitude) cell) with `n`, `passed`, `pass_rate`,
+  Wilson-CI `ci_low` / `ci_high`, and a
+  `meets_certification_floor` boolean (see §6.1).
+* `min_ci_lower_bound` — the worst per-config Wilson lower bound
+  in the grid.
+* `cells_below_certification_floor` — list of magnitude labels
+  whose CI lower bound undershoots the floor; empty list ≡ pass.
+* `certification_floor` and `wilson_z` — the bound and z-score in
+  effect for this summary.
 
 `pick_winner_tuple(sensitivity_cells)` returns the winner config
 plus the full candidate list, ordered by Euclidean distance to the
 V1 defaults with tiebreakers (lowest T, highest β, lowest δ) to
 match the LLM tiebreaker convention.
+
+### 6.1 Certification floor — Wilson 95% CI lower bound
+
+Every (family, magnitude) cell — i.e. every entry in
+`summarize_grid(cells)["per_config"]` — must satisfy
+
+```
+ci_low(passed, n, z = 1.96) >= CERTIFICATION_FLOOR  # default 0.90
+```
+
+where `ci_low` is the Wilson score lower bound at 95% (two-sided).
+At `n = 60` and a clean kernel (60-of-60 pass) the lower bound is
+`~0.940`, so the floor of `0.90` leaves the ~5 percentage points of
+headroom needed for one statistical failure (`59 / 60 → ~0.911`,
+still above the floor) without admitting two failures
+(`58 / 60 → ~0.886`, under the floor).
+
+The floor is the regression suite's stated statistical contract:
+*"with 95% confidence, the true pass rate at every primary-grid
+config is at least 0.90."* If a kernel change pushes any single
+config below that bound, `tests/test_characterization.py` fails
+loudly with the offending config's magnitude label and observed
+CI in the assertion message.
+
+The bound is configurable per-summarisation via
+`summarize_grid(cells, z=..., certification_floor=...)` for
+callers that want to quote a stricter contract (e.g. 99% CI low
+≥ 0.95 for a fully-funded SOTIF programme).
 
 ## §7 What is intentionally not in scope
 
@@ -200,5 +255,12 @@ The port lands when:
    linear_drift while SECOND rejects it.
 4. The sensitivity grid yields at least one all-pass winner tuple
    close to the V1 defaults.
+5. Every per-config Wilson 95% CI lower bound on the 1320-cell
+   primary grid clears `CERTIFICATION_FLOOR = 0.90` (§6.1). The
+   minimum lower bound across the grid (the "weakest cell") is
+   reported in `summarize_grid(...)["min_ci_lower_bound"]`.
 
-Tests in `tests/test_characterization.py` enforce (1)–(4) directly.
+Tests in `tests/test_characterization.py` enforce (1)–(5) directly.
+The §6.1 certification gate is the statistical-significance bar the
+audit asked the suite to anchor; (1)–(4) remain the
+correctness-of-direction gates.
