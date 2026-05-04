@@ -119,6 +119,17 @@ PROVISIONAL_API: Tuple[str, ...] = (
     # V2 promotion-decision sweep
     "v2_chatter_sweep.V2PromotionDecisionResult",
     "v2_chatter_sweep.run_v2_promotion_decision",
+    # Multi-modal predictor inputs (post-v0.7 — the lift adapter that
+    # carries the kernel's Lemma 1 invariance through to lane-frame
+    # predictors; see MULTI_MODAL_PREDICTORS_DESIGN.md). Provisional
+    # because the geometry-input shape (LaneAnchor) may evolve once
+    # an integrator wires their HD-map provider against it.
+    "predictors.LaneAnchor",
+    "predictors.MultiModalPredictor",
+    "predictors.PredictorStateSpace",
+    "predictors.lane_frame_to_se2",
+    "predictors.se2_to_lane_frame",
+    "predictors.unify_to_se2_bundle",
 )
 
 

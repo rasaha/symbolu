@@ -33,8 +33,10 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 * `symbolu_robotics.bcvf_autonomous.core::BCVFConfig` — Kernel configuration dataclass — gate threshold, β, Huber δ, lever arm, cost order
 * `symbolu_robotics.bcvf_autonomous.manifold::body_frame_error_trajectory` — SE(2) body-frame error primitive — the kernel's signal definition
 * `symbolu_robotics.bcvf_autonomous.predictors.base::BicycleConfig` — Vehicle dynamics + predictor interface — the system boundary the kernel arbitrates over
+* `symbolu_robotics.bcvf_autonomous.predictors::MultiModalPredictor` — Predictor wrapper for non-SE(2) state spaces (lane-frame, future map-frame). Pairs the native trajectory with the geometry needed to lift it to SE(2) at the kernel boundary; preserves Lemma 1 invariance via the body-frame primitive transforming correctly with lane curvature (see MULTI_MODAL_PREDICTORS_DESIGN.md §4)
+* `symbolu_robotics.bcvf_autonomous.predictors::LaneAnchor` — Lane geometry primitive — polyline of SE(2) waypoints + cumulative arc lengths; the metadata a lane-frame predictor pairs with to round-trip through SE(2)
 
-**Notes.** BCVF is specified as an arbitration function over M predictor SE(2) trajectories on a fixed horizon H. Inputs: ``(M, H, 3)`` predictor tensor. Outputs: ``(H, 3)`` consensus + ``(M,)`` per-predictor attribution. The kernel is dimensionally explicit (weight matrix in m / rad), deterministic, and fp64-stable — see DESIGN.md §1 + §2.
+**Notes.** BCVF is specified as an arbitration function over M predictor SE(2) trajectories on a fixed horizon H. Inputs: ``(M, H, 3)`` predictor tensor. Outputs: ``(H, 3)`` consensus + ``(M,)`` per-predictor attribution. The kernel is dimensionally explicit (weight matrix in m / rad), deterministic, and fp64-stable — see DESIGN.md §1 + §2. **Multi-modal extension**: predictors with non-SE(2) native output (lane-frame ``(s, d, psi)``) lift to SE(2) at the kernel boundary via ``MultiModalPredictor`` + ``LaneAnchor``; Lemma 1 invariance carries through the lift (proven empirically on straight + curved lanes, pinned by the multi-modal test suite). See ``MULTI_MODAL_PREDICTORS_DESIGN.md`` for the carry-through analysis.
 
 ### Clause 6 — Hazard identification and risk evaluation (HARA)
 
@@ -197,6 +199,8 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 | `symbolu_robotics.bcvf_autonomous.manifold::body_frame_error_trajectory` | 5 |
 | `symbolu_robotics.bcvf_autonomous.pilot::run_pilot` | 9, Part 6 §10, Part 6 §11 |
 | `symbolu_robotics.bcvf_autonomous.predictors.base::BicycleConfig` | 5 |
+| `symbolu_robotics.bcvf_autonomous.predictors::LaneAnchor` | 5 |
+| `symbolu_robotics.bcvf_autonomous.predictors::MultiModalPredictor` | 5 |
 | `symbolu_robotics.bcvf_autonomous.runner::Runner` | Part 6 §8, Part 6 §10 |
 | `symbolu_robotics.bcvf_autonomous.trust::ConsumerV2Config` | 8, Part 6 §8, Part 6 §9 |
 | `symbolu_robotics.bcvf_autonomous.trust_diagnostics::TrustShapedEpisodeRecord` | 10, Part 6 §9, Part 6 §11 |

@@ -36,7 +36,7 @@ from symbolu_robotics.bcvf_autonomous._version import (
 # symbol must update these, which forces the reviewer to acknowledge
 # the contract change in the diff.
 EXPECTED_STABLE_COUNT = 38
-EXPECTED_PROVISIONAL_COUNT = 14
+EXPECTED_PROVISIONAL_COUNT = 20
 EXPECTED_VERSION = "0.4.0"
 EXPECTED_VERSION_INFO = (0, 4, 0)
 

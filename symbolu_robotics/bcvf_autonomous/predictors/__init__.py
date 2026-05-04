@@ -26,6 +26,13 @@ from .base import (
 from .gnss_map import GNSSMap
 from .imu_odometry import IMUOdometry
 from .lidar_slam import LidarSLAM
+from .multi_modal import (
+    MultiModalPredictor,
+    lane_frame_to_se2,
+    se2_to_lane_frame,
+    unify_to_se2_bundle,
+)
+from .state_space import LaneAnchor, PredictorStateSpace
 from .visual_odometry import VisualOdometry
 
 
@@ -53,10 +60,16 @@ __all__ = [
     "BicycleConfig",
     "ControlInput",
     "FailureConfig",
-    "PredictorState",
-    "IMUOdometry",
-    "LidarSLAM",
-    "VisualOdometry",
     "GNSSMap",
+    "IMUOdometry",
+    "LaneAnchor",
+    "LidarSLAM",
+    "MultiModalPredictor",
+    "PredictorState",
+    "PredictorStateSpace",
+    "VisualOdometry",
     "create_predictor_set",
+    "lane_frame_to_se2",
+    "se2_to_lane_frame",
+    "unify_to_se2_bundle",
 ]

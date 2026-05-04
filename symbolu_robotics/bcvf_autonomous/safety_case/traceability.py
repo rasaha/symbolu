@@ -307,6 +307,24 @@ _BICYCLE = EvidenceArtifact(
     description="Vehicle dynamics + predictor interface — the system "
                 "boundary the kernel arbitrates over",
 )
+_MULTI_MODAL_PREDICTOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.predictors",
+    symbol="MultiModalPredictor",
+    description="Predictor wrapper for non-SE(2) state spaces "
+                "(lane-frame, future map-frame). Pairs the native "
+                "trajectory with the geometry needed to lift it to "
+                "SE(2) at the kernel boundary; preserves Lemma 1 "
+                "invariance via the body-frame primitive transforming "
+                "correctly with lane curvature (see "
+                "MULTI_MODAL_PREDICTORS_DESIGN.md §4)",
+)
+_LANE_ANCHOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.predictors",
+    symbol="LaneAnchor",
+    description="Lane geometry primitive — polyline of SE(2) waypoints "
+                "+ cumulative arc lengths; the metadata a lane-frame "
+                "predictor pairs with to round-trip through SE(2)",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -345,6 +363,7 @@ def iso_21448_clauses() -> List[Clause]:
             ),
             evidence=(
                 _BCVF_KERNEL, _BCVF_CONFIG, _MANIFOLD, _BICYCLE,
+                _MULTI_MODAL_PREDICTOR, _LANE_ANCHOR,
             ),
             notes=(
                 "BCVF is specified as an arbitration function over M "
@@ -353,7 +372,15 @@ def iso_21448_clauses() -> List[Clause]:
                 "``(H, 3)`` consensus + ``(M,)`` per-predictor "
                 "attribution. The kernel is dimensionally explicit "
                 "(weight matrix in m / rad), deterministic, and "
-                "fp64-stable — see DESIGN.md §1 + §2."
+                "fp64-stable — see DESIGN.md §1 + §2. **Multi-modal "
+                "extension**: predictors with non-SE(2) native output "
+                "(lane-frame ``(s, d, psi)``) lift to SE(2) at the "
+                "kernel boundary via ``MultiModalPredictor`` + "
+                "``LaneAnchor``; Lemma 1 invariance carries through "
+                "the lift (proven empirically on straight + curved "
+                "lanes, pinned by the multi-modal test suite). See "
+                "``MULTI_MODAL_PREDICTORS_DESIGN.md`` for the "
+                "carry-through analysis."
             ),
         ),
         Clause(
