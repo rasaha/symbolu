@@ -1,9 +1,13 @@
 """Majority-vote arbitrator — clusters predictors per tick, takes the mode.
 
 At each horizon step:
-  1. Cluster the M predictor positions using a distance threshold
-     (default 0.5 m). Predictors within ``cluster_radius`` of each
-     other join the same cluster.
+  1. Cluster the M predictor positions with a single-pass greedy
+     pivot rule (see :func:`_cluster_majority`): the lowest-index
+     unclustered predictor seeds a cluster and pulls in every
+     higher-index predictor within ``cluster_radius`` of *itself*.
+     This is a cheap, deterministic alternative to DBSCAN and is
+     **not** transitive — A and C can land in different clusters
+     even if both fall within the radius of B.
   2. Identify the *largest* cluster; ties broken by lowest
      predictor index.
   3. Consensus position = mean of largest cluster.
@@ -28,6 +32,16 @@ from .base import ArbitrationResult, Arbitrator, validate_trajectories
 
 def _cluster_majority(positions: np.ndarray, radius: float) -> np.ndarray:
     """Greedy single-pass clustering on a (M, 2) position array.
+
+    For each unclustered predictor ``i`` (in ascending order), assign
+    it a fresh cluster id and pull every later unclustered predictor
+    ``j > i`` whose distance to ``i`` is at most ``radius``. The
+    operation is deterministic, ``O(M^2)``, and **not transitive**:
+    if ``d(A, B) <= radius`` and ``d(B, C) <= radius`` but
+    ``d(A, C) > radius``, the function produces clusters ``{A, B}``
+    and ``{C}`` rather than ``{A, B, C}``. Callers that need
+    transitive (single-link / DBSCAN-style) clusters should compose
+    a union-find pass on top of the pairwise mask instead.
 
     Returns an (M,) int array of cluster IDs.
     """
