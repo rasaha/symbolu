@@ -19,10 +19,14 @@
 > EKF is 1.1, BCVF is 0.0. **EKF's Mahalanobis gate also misses
 > the heavy-quadratic outlier** (0.0 hit rate vs BCVF / Majority's
 > 1.0). BCVF is 8–19× faster per tick than EKF / Majority. v0.6's
-> V2 chatter-reduction sweep result is preserved unchanged. **428
-> tests passing**, up from 400 in v0.6 (12 pinning tests added by
-> the post-v0.7 audit pass; published numerical results unchanged).
-> v1 file at
+> V2 chatter-reduction sweep result is preserved unchanged. The
+> characterization primary grid is now certification-grade — 22
+> configs × 60 seeds = 1320 cells, every per-config Wilson 95% CI
+> lower bound ≥ 0.90 (current min ≈ 0.940). **443 tests passing**,
+> up from 400 in v0.6 (12 audit pinning tests + 15 statistical-
+> significance tests added post-v0.7 — the 7-family characterization
+> sweep is now anchored to a stated SOTIF bound, not a 3-seed point
+> estimate). v1 file at
 > `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
 > reference.
 
@@ -261,20 +265,28 @@ construction.
 
 ### Four proof points to know (as of May 2026)
 
-- **428 tests passing** (+207 since v0.2; +12 pinning tests added by the post-v0.7 audit pass — published numerical results unchanged) across the autonomy
+- **443 tests passing** (+222 since v0.2; +12 audit pinning tests + 15 statistical-significance tests added post-v0.7 — the 1320-cell primary grid carries a Wilson 95% CI lower-bound floor of 0.90 per (family, magnitude) config) across the autonomy
   kernel, MPPI planner, trust-weight computer, non-MPPI adapter,
   dataset scaffolds, ROS 2 bridge, the v0.3 SOTIF-readiness
   layer, the v0.4 vectorized predict_batch path, the v0.5 pilot
   runner, the v0.6 V2 promotion-gate sweep, and the v0.7
   apples-to-apples baseline shootout. All committed,
   reproducible, CPU-only.
-- **Seven-family characterization sweep — 0% false-positive
-  rate, 0% false-negative rate at default parameters.** Every
-  named sensor-failure class (constant bias, linear drift,
-  accelerating divergence, noise floor, outlier, sensor dropout,
-  baseline) is validated to fire or stay quiet on cue across
-  primary, sensitivity, and ablation grids — 567-cell sensitivity
-  grid winner-tuple selection identifies the V1 defaults as the
+- **Seven-family characterization sweep — 0% FPR / 0% FNR with a
+  Wilson 95% CI lower-bound floor of 0.90 across 22 configs ×
+  60 seeds (1320 cells).** Every named sensor-failure class
+  (constant bias, linear drift, accelerating divergence, noise
+  floor, outlier, sensor dropout, baseline) is validated to fire
+  or stay quiet on cue across primary, sensitivity, and ablation
+  grids. The primary grid is now sized for a stated statistical
+  contract: per-(family, magnitude) Wilson 95% CI lower bound
+  must clear 0.90 — the floor is calibrated so two of 60 seed
+  failures at any single config trip the alarm, exactly the
+  threshold-edge regime (e.g. `accelerating[accel_mag=0.3]`)
+  where a small kernel change is most likely to flip pass→fail.
+  Current min-CI-lower-bound across the grid: **~0.940** at
+  60-of-60 pass; floor headroom: **0.04**. The 567-cell
+  sensitivity grid still winner-tuples the V1 defaults as the
   closest-to-canonical all-pass configuration.
 - **Apples-to-apples baseline shootout (v0.7).** Four arbitrators
   at the same predictor-arbitration interface (BCVF, EKF with
@@ -308,7 +320,7 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 428 passing across 20 test modules (+12 pinning tests added by the post-v0.7 audit pass: 7 covering the `_binomial_tail_geq` k=1 off-by-one fix in both copies, 3 covering the `attribution_within_top_half` ceil-vs-floor fix and the sign-test single-decisive-win regression, 2 covering the documented `_cluster_majority` greedy-non-transitive contract); reproducible on CPU in < 3 min (4 host-speed-dependent perf benchmarks + 4 long-running sweep / timing tests deselected) |
+| **Test suite** | 443 passing across 20 test modules (+12 pinning tests from the post-v0.7 audit pass: 7 covering the `_binomial_tail_geq` k=1 off-by-one fix in both copies, 3 covering the `attribution_within_top_half` ceil-vs-floor fix and the sign-test single-decisive-win regression, 2 covering the documented `_cluster_majority` greedy-non-transitive contract; +15 statistical-significance tests for the certification-grade primary grid: 5 Wilson CI primitives, 3 pinning the 60-seed cadence + magnitude grouping, 2 pinning the 0.94 / 0.91 / 0.886 textbook bounds at 60-of-60, 59-of-60, 58-of-60, 1 binding the threshold-edge `accelerating[accel_mag=0.3]` config, 4 covering `summarize_grid` exposure + sabotage of a single config); reproducible on CPU in < 4 min (4 host-speed-dependent perf benchmarks + 4 long-running sweep / timing tests deselected) |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
 | **Non-MPPI adapter demonstrated** | `integrations/argmin_selector.py` — ArgminSelectorPlanner shares `TrustWeightComputer` with `MPPIPlanner` with **zero code duplication**. 7 integration tests proving Lemma 1 propagates through the non-MPPI path |
@@ -316,7 +328,7 @@ Full detail and caveats below.
 | **Architectural variant tested and rejected (§6.6a)** | Dynamic predictor exclusion implemented, run at N=21 S3_accel, rejected under strict multi-metric promotion gate. Rotates catastrophes, doesn't reduce the count. Rejection strengthens V1 claim: "V1 is not just simplest, it's what one non-trivial variant failed to improve upon" |
 | **Observables framework (v0.3)** | `observables/` — six probes (`PredictorAgreement`, `EnsembleSpread`, `EnsembleHeadingEntropy`, `BCVFPerStepMax`, `BCVFPredictorPerStepMax`, `CoherenceAnchoredBCVF`, `UncertaintyGatedBCVFPerStepMax`). Each consumes the predictor trajectory tensor and returns a typed `ObservableValue` with metadata. Probe harness (`probe_observable`) runs against a labelled corpus and classifies the observable into SAFETY_CORRELATED / UNCORRELATED / ANTI_CORRELATED / NULL bands (AUC + Pearson + Spearman). 36 tests. |
 | **Per-step trust diagnostics (v0.3)** | `trust_diagnostics.py` — `TrustStepRecord` per tick + `TrustShapedEpisodeRecord` `(T, M)` stacked arrays + JSON `to_dict()`. Captures weights, residuals (against pre-update EMA, exact), EMA mean/std snapshots, deadband activations, exclusion state, gate counts, V2 state + signal, and exclusion `consec_suspect` / `consec_ok` counters. Wired into `MPPIPlanner.set_trust_diagnostics_enabled` and `Runner` via three `RunConfig` knobs (`trust_diagnostics_enabled`, `trust_diagnostics_path`, `trust_diagnostics_aggregation`). |
-| **Characterization sweep (v0.3)** | `characterization/` — seven SE(2) trace families (baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, sensor_dropout) + outlier-attribution metrics (hit / margin / rank). Three grids: `run_primary_grid` (66 cells, 0% FPR / 0% FNR at V1 defaults), `run_sensitivity_grid` (567-cell `(T, β, δ)` sweep, V1 defaults selected as winner-tuple), `run_ablation_grid` (linear_drift × CostOrder ablation confirms only SECOND order rejects linear drift). Three sabotage tests confirm the suite would fail on a broken kernel. |
+| **Characterization sweep (v0.3, certification-grade in v0.7)** | `characterization/` — seven SE(2) trace families (baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, sensor_dropout) + outlier-attribution metrics (hit / margin / rank). Three grids: `run_primary_grid` (**1320 cells = 22 configs × 60 seeds**, 0% FPR / 0% FNR at V1 defaults, every per-config Wilson 95% CI lower bound ≥ 0.90 with min observed ≈ 0.940), `run_sensitivity_grid` (567-cell `(T, β, δ)` sweep, V1 defaults selected as winner-tuple), `run_ablation_grid` (linear_drift × CostOrder ablation confirms only SECOND order rejects linear drift). Per-config Wilson CIs are exposed in `summarize_grid(...)["per_config"]` plus a `min_ci_lower_bound` and a `cells_below_certification_floor` list — the suite's stated SOTIF contract is now machine-checkable per cell. Three sabotage tests confirm the suite would fail on a broken kernel; one additional sabotage test confirms a synthetic-failure injection at a single config trips `cells_below_certification_floor`. |
 | **Consumer V2 — Schmitt-triggered softmin (v0.3)** | `trust.py` ConsumerV2Config + ConsumerState. Top-level state machine wraps the V1 shaping layer (deadband + softmin + §6.6a exclusion); EMA learning continues during UNIFORM so the deadband / softmin start warm on the first ENGAGED tick. Hysteresis defaults: `engage_threshold=0.5`, `disengage_threshold=0.2`, `T_engage=3`, `T_disengage=5`. Opt-in via `ConsumerV2Config(enabled=True)`; default-off preserves bit-for-bit V1 behavior. 21 tests. |
 | **Post-hoc fleet analysis harness (v0.3)** | `analysis/` — `find_argmax_flips` (with `weight_drop` + `max_abs_weight_delta` magnitude metrics), `find_v2_state_flips`, `find_near_vetoes` (predictors that crested 70% of `exclusion_T` without crossing). Aggregators `summarize_episode` and `aggregate_fleet` consume per-episode `TrustShapedEpisodeRecord`s and return a `FleetSummary` with per-classification counts, argmax-flip percentile statistics, per-predictor exclusion-incidence rate, and a typed near-veto roster (each event carrying per-episode metadata for triage). `load_episode_from_json` reverses the Runner's diagnostics dump with strict shape validation; corrupt artifacts fail loudly rather than silently producing zero-fill records. 26 tests. |
 | **Real-sensor pilot — runner + first execution (§6.2, v0.5)** | `pilot/` package: `scene_evaluator` (Mode A open-loop A0 / A3 paired evaluation), `sign_test` (Wilson CI + one-sided sign test, no scipy), `runner` (writes paired-comparison CSV + `FleetSummary` JSON + markdown report). Executed end-to-end against `RealisticNoiseAdapter` at N = 21: A3 win rate 1.000 with Wilson-CI lower bound 0.566 and sign-test p = 0.0312 on the responsive class; Lemma-1 negative control passes exactly. Three artifacts written to `results/phase_6_2_pre_pilot/`. 16 pilot tests + 11 prior dataset-adapter tests. `datasets/nuscenes.py` stub documents the one-line adapter swap; full execution pending dataset access + the M1–M4 predictor implementations the pilot plan estimates at 3–4 weeks. |
@@ -505,4 +517,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.7 · 428 internal tests (audit pinning tests included; published numbers unchanged) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
+*v0.7 · 443 internal tests (audit pinning tests included; published numbers unchanged; characterization primary grid now certification-grade at 1320 cells with Wilson 95% CI lower-bound floor 0.90 per (family, magnitude) config — current min ≈ 0.940) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
