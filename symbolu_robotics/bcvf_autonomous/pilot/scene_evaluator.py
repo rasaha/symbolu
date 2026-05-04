@@ -157,7 +157,13 @@ def _attribution_metrics(
     # rank position of failing predictor
     pos = np.argmax(ranks_desc == failing_predictor_idx, axis=1) + 1   # 1..M
     hit = float(np.mean(pos == 1))
-    top_half = float(np.mean(pos <= max(1, M // 2)))
+    # Top half uses the ceil convention ((M + 1) // 2) so it matches
+    # the shootout's _attribution_top_half: M=3 → top 2, M=4 → top 2,
+    # M=5 → top 3. The previous floor convention (M // 2) collapsed
+    # to rank-1-only for odd M, making the field a duplicate of
+    # ``hit_rate`` rather than the documented top-half measure.
+    top_k = max(1, (M + 1) // 2)
+    top_half = float(np.mean(pos <= top_k))
     return {"hit_rate": hit, "within_top_half": top_half}
 
 
