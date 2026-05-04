@@ -169,6 +169,28 @@ def test_resolve_qualified_raises_on_unknown_submodule():
         resolve_qualified("not_a_real_submodule.Symbol")
 
 
+def test_resolve_qualified_rejects_empty_string():
+    """Defensive pin caught in the post-v0.7 audit pass — an empty
+    qualified name should fail loud rather than fall through to the
+    ``submodule.Symbol`` parser."""
+    with pytest.raises((ValueError, AttributeError, ImportError)):
+        resolve_qualified("")
+
+
+def test_resolve_qualified_rejects_trailing_dot():
+    """Trailing-dot input parses to an empty symbol; ``hasattr`` then
+    fails. Pinned as a defensive sanity check on the parser."""
+    with pytest.raises((AttributeError, ImportError)):
+        resolve_qualified("core.")
+
+
+def test_resolve_qualified_rejects_leading_dot():
+    """Leading-dot input parses to an empty submodule path; the
+    import then fails. Pinned alongside the trailing-dot case."""
+    with pytest.raises((ImportError, AttributeError, ValueError)):
+        resolve_qualified(".BCVFConfig")
+
+
 # --------------------------------------------------------------------------- #
 # Top-level reachability — `from bcvf_autonomous import X` works for stable X
 # --------------------------------------------------------------------------- #
