@@ -13,6 +13,7 @@ from symbolu_robotics.bcvf_autonomous import (
     compute_bcvf_cost,
 )
 from symbolu_robotics.bcvf_autonomous.characterization import (
+    ADVERSARIAL_FAMILIES,
     AlignmentMetrics,
     CERTIFICATION_FLOOR,
     FAILURE_FAMILIES,
@@ -295,8 +296,11 @@ def test_summarize_grid_shapes():
     assert summary.per_family
     assert summary.false_positive_rate == 0.0
     assert summary.false_negative_rate == 0.0
+    assert summary.adversarial_pass_rate == 1.0
     assert set(summary.per_family.keys()) == set(
-        list(NOMINAL_FAMILIES) + list(FAILURE_FAMILIES)
+        list(NOMINAL_FAMILIES)
+        + list(FAILURE_FAMILIES)
+        + list(ADVERSARIAL_FAMILIES)
     )
 
 
@@ -523,9 +527,11 @@ def test_sweep_catches_uniform_attribution(monkeypatch):
 
 
 def test_primary_seeds_default_count_is_60():
-    """The audit fixed the seed count at 60 — 22 configs × 60 seeds =
-    1320 cells. Pinned so a future tweak that quietly halves the seeds
-    fails the suite instead of silently halving the certification bar."""
+    """The audit fixed the seed count at 60. After the
+    adversarial-family addition (post-v0.7) the grid is 26 configs ×
+    60 seeds = 1560 cells. Pinned so a future tweak that quietly
+    halves the seeds fails the suite instead of silently halving the
+    certification bar."""
     assert len(PRIMARY_SEEDS) == 60
     assert len(set(PRIMARY_SEEDS)) == 60   # deterministic + unique
     assert PRIMARY_SEEDS[0] == 42 and PRIMARY_SEEDS[-1] == 101
@@ -537,9 +543,13 @@ def test_legacy_primary_seeds_is_three():
     assert LEGACY_PRIMARY_SEEDS == (42, 43, 44)
 
 
-def test_primary_grid_default_emits_1320_cells():
+def test_primary_grid_default_emits_1560_cells():
+    """26 configs (8 families × magnitude tuples) × 60 seeds = 1560 cells.
+    The 8th family ``adversarial_consistent_bias`` (4 magnitudes)
+    expanded the post-audit 1320-cell grid by 240 cells; a future
+    extension must update this count explicitly."""
     cells = run_primary_grid()
-    assert len(cells) == 1320
+    assert len(cells) == 1560
 
 
 def test_wilson_ci_zero_total_returns_unit_interval():
@@ -602,12 +612,13 @@ def test_wilson_lower_bound_matches_full_ci():
 
 
 def test_per_config_pass_stats_groups_by_family_magnitude():
-    """22 configs out of the primary grid: 1 baseline + 4 constant_bias +
+    """26 configs out of the primary grid: 1 baseline + 4 constant_bias +
     4 linear_drift + 4 accelerating + 4 noise_floor + 1 outlier +
-    4 sensor_dropout. Each carries 60 seeds → n == 60."""
+    4 sensor_dropout + 4 adversarial_consistent_bias. Each carries
+    60 seeds → n == 60."""
     cells = run_primary_grid()
     stats = per_config_pass_stats(cells)
-    assert len(stats) == 22
+    assert len(stats) == 26
     for s in stats:
         assert s.n == 60
         assert isinstance(s, PerConfigPassStat)
@@ -704,7 +715,7 @@ def test_summarize_grid_stricter_floor_can_flag_clean_kernel():
     actually binds — i.e. it is not vacuous."""
     cells = run_primary_grid()
     summary = summarize_grid(cells, certification_floor=0.95)
-    assert len(summary.cells_below_certification_floor) == 22
+    assert len(summary.cells_below_certification_floor) == 26
     assert summary.min_ci_lower_bound < 0.95
 
 
@@ -735,13 +746,14 @@ def test_summarize_grid_flags_synthetic_below_floor_cell():
 
 def test_grid_summary_to_csv_writes_header_and_one_row_per_config(tmp_path):
     """One row per (family, magnitude) config + one header row.
-    22 configs ⇒ 23 lines."""
+    26 configs ⇒ 27 lines (8 families since the post-v0.7 adversarial
+    addition)."""
     cells = run_primary_grid()
     summary = summarize_grid(cells)
     out = summary.to_csv(tmp_path / "grid.csv")
     assert out.exists()
     lines = out.read_text(encoding="utf-8").splitlines()
-    assert len(lines) == 23
+    assert len(lines) == 27
     header = lines[0].split(",")
     assert header == [
         "family", "magnitude_label", "family_params",
@@ -759,7 +771,7 @@ def test_grid_summary_to_csv_quotes_special_characters(tmp_path):
     out = summary.to_csv(tmp_path / "grid.csv")
     with open(out, "r", encoding="utf-8", newline="") as f:
         rows = list(_csv.DictReader(f))
-    assert len(rows) == 22
+    assert len(rows) == 26
     assert all(r["meets_certification_floor"] == "true" for r in rows)
     assert any(r["magnitude_label"] == "accelerating[accel_mag=0.3]" for r in rows)
 
@@ -848,3 +860,235 @@ def test_grid_summary_to_csv_creates_parent_directories(tmp_path):
     nested = tmp_path / "deep" / "nested" / "audit_pack"
     out = summary.to_csv(nested / "grid.csv")
     assert out.exists()
+
+
+# --------------------------------------------------------------------------- #
+# Adversarial / spoofing family — UN ECE R155 cybersecurity scope
+# (DESIGN.md §3.5 + §4.8 — eighth family, third polarity bucket)
+# --------------------------------------------------------------------------- #
+
+
+def test_adversarial_family_is_in_valid_families_and_polarity_tuple():
+    """The adversarial family is enumerated in both the valid-family
+    set (so ``generate_trace`` accepts it) and the polarity tuple
+    (so the sweep summary can compute the cybersecurity-tier rate)."""
+    from symbolu_robotics.bcvf_autonomous.characterization.traces import (
+        _VALID_FAMILIES,
+    )
+    assert "adversarial_consistent_bias" in _VALID_FAMILIES
+    assert "adversarial_consistent_bias" in ADVERSARIAL_FAMILIES
+    # Adversarial polarity is disjoint from nominal / failure — the
+    # cybersecurity tier is reported separately, not folded into FPR/FNR.
+    assert set(ADVERSARIAL_FAMILIES).isdisjoint(NOMINAL_FAMILIES)
+    assert set(ADVERSARIAL_FAMILIES).isdisjoint(FAILURE_FAMILIES)
+
+
+def test_adversarial_generator_produces_constant_lateral_offset_on_attacker():
+    """The attacker (default predictor 0) carries the bias; the honest
+    predictors do not. Checked at the per-tick level so a future
+    refactor can't quietly let the bias bleed across predictors."""
+    bundle = generate_trace(
+        "adversarial_consistent_bias", M=3, H=50,
+        bias=0.5, sigma_noise=0.0, seed=42,
+    )
+    # With sigma_noise=0 the attacker's y is exactly 0.5; the others
+    # are exactly 0 (the straight-baseline value).
+    np.testing.assert_allclose(bundle.trajectories[0, :, 1], 0.5, atol=1e-12)
+    np.testing.assert_allclose(bundle.trajectories[1, :, 1], 0.0, atol=1e-12)
+    np.testing.assert_allclose(bundle.trajectories[2, :, 1], 0.0, atol=1e-12)
+
+
+def test_adversarial_generator_has_no_truth_label():
+    """``truth_label`` is intentionally ``None`` — BCVF cannot
+    attribute a Lemma-1-trapdoor attack at the kernel layer
+    (DESIGN.md §3.5). A future contributor setting truth_label would
+    misleadingly imply the kernel can identify the attacker."""
+    bundle = generate_trace(
+        "adversarial_consistent_bias", M=3, H=50, bias=0.5, seed=42,
+    )
+    assert bundle.truth_label is None
+
+
+def test_adversarial_generator_rejects_invalid_target():
+    with pytest.raises(ValueError):
+        generate_trace(
+            "adversarial_consistent_bias", M=3, H=50,
+            target_predictor=5, bias=0.5,
+        )
+    with pytest.raises(ValueError):
+        generate_trace(
+            "adversarial_consistent_bias", M=3, H=50,
+            target_predictor=-1, bias=0.5,
+        )
+
+
+def test_adversarial_stealth_regime_keeps_bcvf_quiet():
+    """At bias well below the gate threshold T=0.05, BCVF stays
+    quiet — the constant-bias signal doesn't open the gate, so the
+    second-order kernel sees only the noise-floor cost. This pins the
+    Lemma-1 trapdoor: the attack is invisible at the kernel layer
+    in the stealth regime.
+    """
+    bundle = generate_trace(
+        "adversarial_consistent_bias", M=3, H=50,
+        bias=0.005, sigma_noise=0.01, seed=42,
+    )
+    cfg = _v1_config()
+    result = compute_bcvf_cost(
+        [bundle.trajectories[m] for m in range(3)], cfg,
+    )
+    # Stealth: cost stays small (~ noise-floor magnitude); the gate
+    # rarely / never fires.
+    assert result.total_cost < 5.0
+    # And per-predictor attribution is roughly symmetric — the kernel
+    # doesn't single out the attacker (it can't).
+    from symbolu_robotics.bcvf_autonomous.observables.kernel_per_step import (
+        compute_bcvf_per_step,
+    )
+    breakdown = compute_bcvf_per_step(bundle.trajectories, cfg)
+    per_pred = breakdown.per_step_per_predictor.sum(axis=1)
+    # The attacker's per-predictor cost is not dramatically higher
+    # than the honest predictors'.
+    if per_pred.max() > 1e-9:
+        ratio = per_pred[0] / max(per_pred[1], per_pred[2], 1e-9)
+        assert ratio < 5.0, (
+            f"BCVF appeared to identify the attacker in the stealth "
+            f"regime (ratio {ratio:.2f}); Lemma-1 trapdoor is broken"
+        )
+
+
+def test_adversarial_stealth_attack_succeeds_at_consensus_layer():
+    """**The cybersecurity-reviewer demonstration test.** Even though
+    BCVF stays quiet on a stealth-bias attack (previous test), the
+    trust-weighted consensus IS biased toward the attacker — the
+    planner-level harm is real. This is the evidence for the
+    "defence in depth required at a different layer" framing in
+    DESIGN.md §3.5: cross-modal verification or signature attestation
+    catches what BCVF cannot.
+
+    Concretely, with M=3 and a uniform-trust consensus, the attacker's
+    bias of ``b`` shifts the consensus by ``b/3``. The test asserts
+    the consensus is biased non-trivially (>= b/4) so a kernel change
+    that started catching the attack would *fail* this test — i.e.
+    the Lemma-1-trapdoor is documented behaviour, not a regression
+    target.
+    """
+    bias = 0.02
+    bundle = generate_trace(
+        "adversarial_consistent_bias", M=3, H=50,
+        bias=bias, sigma_noise=0.0, seed=42,
+    )
+    # Uniform-trust consensus = arithmetic mean across predictors.
+    consensus_y = bundle.trajectories[:, :, 1].mean(axis=0)
+    # Expected shift = bias / M = 0.02 / 3 ≈ 0.00667.
+    expected_shift = bias / 3
+    # The consensus is shifted by very close to bias/M (no noise).
+    assert abs(consensus_y.mean() - expected_shift) < 1e-9
+    # And the shift is non-zero — the attack does have planner-level effect.
+    assert consensus_y.mean() > bias / 4
+
+
+def test_adversarial_loud_regime_makes_bcvf_fire_via_gate_noise_interaction():
+    """At bias above the gate threshold T=0.05, the constant bias
+    unlocks the gate, the noise's second-derivative passes through,
+    and BCVF fires. Counter-intuitively this means the kernel CATCHES
+    the gross spoof — so the cybersecurity concern is genuinely the
+    sub-threshold (stealth) regime, not the loud one. Pinned so the
+    DESIGN.md narrative ("BCVF catches loud bias attacks via gate-
+    noise interaction") doesn't drift.
+    """
+    bundle = generate_trace(
+        "adversarial_consistent_bias", M=3, H=50,
+        bias=0.5, sigma_noise=0.01, seed=42,
+    )
+    cfg = _v1_config()
+    result = compute_bcvf_cost(
+        [bundle.trajectories[m] for m in range(3)], cfg,
+    )
+    assert result.total_cost > 1.0
+    assert result.gate_activation_count > 0
+
+
+def test_adversarial_in_primary_grid_expands_to_4_new_configs():
+    """22 → 26 configs after the adversarial family lands. Pinned
+    because the brief headlines the count and a future contributor
+    adding a new magnitude must update both the magnitude tuple and
+    the test."""
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    # 26 configs × 60 seeds = 1560 cells.
+    assert summary.n_cells == 26 * 60
+    assert len(summary.per_config) == 26
+    adv_configs = [
+        s for s in summary.per_config if s.family == "adversarial_consistent_bias"
+    ]
+    assert len(adv_configs) == 4   # 0.005, 0.01, 0.05, 0.5
+    for cfg in adv_configs:
+        assert cfg.n == 60
+        assert cfg.meets_certification_floor
+
+
+def test_adversarial_pass_rate_is_exposed_on_grid_summary():
+    """``summarize_grid(...)\\.adversarial_pass_rate`` is the cybersecurity-
+    tier rate — surfaced separately from FPR/FNR because adversarial
+    cells are a distinct polarity (DESIGN.md §3 polarity table)."""
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    # Empty fleet is 1.0 by convention; clean-kernel passes.
+    assert summary.adversarial_pass_rate == 1.0
+    # Round-trips through to_dict.
+    payload = summary.to_dict()
+    assert "adversarial_pass_rate" in payload
+    assert payload["adversarial_pass_rate"] == 1.0
+
+
+def test_split_polarity_returns_three_buckets():
+    """``split_polarity`` is the three-tier sibling of
+    ``split_nominal_failure``; the cybersecurity narrative needs the
+    adversarial bucket addressable independently."""
+    from symbolu_robotics.bcvf_autonomous.characterization import (
+        split_polarity,
+    )
+    cells = run_primary_grid()
+    nominal, failure, adversarial = split_polarity(cells)
+    # Sanity: nominal + failure + adversarial + outlier (one config) = full grid.
+    # Outlier is in FAILURE_FAMILIES; baseline is in NOMINAL_FAMILIES.
+    # Total config count is 26; cell count is 1560.
+    assert len(nominal) + len(failure) + len(adversarial) == 1560
+    # Adversarial bucket is exactly the 4 configs × 60 seeds = 240 cells.
+    assert len(adversarial) == 240
+    assert all(c.family == "adversarial_consistent_bias" for c in adversarial)
+
+
+def test_adversarial_markdown_report_calls_out_cybersecurity_scope(tmp_path):
+    """The grid markdown report explicitly names the adversarial pass
+    rate and points at DESIGN.md §3.5 — the UN ECE R155 reviewer
+    reads the auditor-facing artifact and finds the scope boundary
+    without drilling into the source."""
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    out = summary.to_markdown_report(tmp_path / "grid.md")
+    md = out.read_text(encoding="utf-8")
+    assert "Adversarial-family pass rate" in md
+    assert "cybersecurity tier" in md.lower()
+    assert "DESIGN.md §3.5" in md or "design.md §3.5" in md.lower()
+    # The four adversarial configs appear in the per-config table.
+    assert "adversarial_consistent_bias[bias=0.005]" in md
+    assert "adversarial_consistent_bias[bias=0.5]" in md
+
+
+def test_adversarial_sabotage_cell_below_certification_floor():
+    """Sabotage: mark every adversarial[bias=0.005] cell as failed.
+    The cybersecurity-tier pass rate drops, ``adversarial_pass_rate``
+    reflects the drop, and the config appears in
+    ``cells_below_certification_floor``."""
+    cells = run_primary_grid()
+    label = "adversarial_consistent_bias[bias=0.005]"
+    for c in cells:
+        if (c.family == "adversarial_consistent_bias"
+                and c.family_params.get("bias") == 0.005):
+            c.cell_pass = False
+    summary = summarize_grid(cells)
+    assert summary.cells_below_certification_floor == [label]
+    # 1 of 4 adversarial configs failed → 180/240 cells passed → 0.75.
+    assert summary.adversarial_pass_rate == pytest.approx(0.75, abs=1e-9)

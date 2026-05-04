@@ -69,9 +69,11 @@ from .sweep import (
     run_primary_grid,
     run_sensitivity_grid,
     split_nominal_failure,
+    split_polarity,
     summarize_grid,
 )
 from .traces import (
+    ADVERSARIAL_FAMILIES,
     FAILURE_FAMILIES,
     NOMINAL_FAMILIES,
     TraceBundle,
@@ -80,6 +82,7 @@ from .traces import (
 
 __all__ = [
     "ABLATION_SEEDS",
+    "ADVERSARIAL_FAMILIES",
     "AlignmentAggregate",
     "AlignmentMetrics",
     "CERTIFICATION_FLOOR",
@@ -111,6 +114,7 @@ __all__ = [
     "run_primary_grid",
     "run_sensitivity_grid",
     "split_nominal_failure",
+    "split_polarity",
     "summarize_grid",
     "wilson_ci",
     "wilson_lower_bound",

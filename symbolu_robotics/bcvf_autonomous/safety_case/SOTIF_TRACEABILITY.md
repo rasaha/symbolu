@@ -41,10 +41,11 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 **Requirement.** Enumerate the named classes of inputs whose mishandling could lead to hazardous behaviour, and assess the associated risk.
 
 **Evidence artifacts.**
-* `symbolu_robotics.bcvf_autonomous.characterization.traces::generate_trace` — Seven-family synthetic SE(2) trace generator — the named hazards (baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, sensor_dropout)
+* `symbolu_robotics.bcvf_autonomous.characterization.traces::generate_trace` — Eight-family synthetic SE(2) trace generator — the named hazards (baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, sensor_dropout) plus the cybersecurity-tier adversarial_consistent_bias family
+* `symbolu_robotics.bcvf_autonomous.characterization::ADVERSARIAL_FAMILIES` — Cybersecurity-tier polarity bucket — names the attack-class families the kernel cannot fully detect (stealth-bias spoofs); pairs with the §3.5 DESIGN.md scope-boundary documentation
 * `symbolu_robotics.bcvf_autonomous.characterization::run_primary_grid` — Characterization DESIGN.md §4 (per-family thresholds) + §6.1 (Wilson CI floor) — the readable safety contract
 
-**Notes.** The seven characterization families ARE the named hazard inputs at the predictor-arbitration interface: ``baseline``, ``constant_bias``, ``linear_drift``, ``accelerating``, ``noise_floor``, ``outlier``, ``sensor_dropout``. Each has an explicit polarity (must-be-quiet vs must-fire) and a formal generator in ``characterization/traces.py`` so a HARA reviewer can re-execute and inspect every input class.
+**Notes.** The eight characterization families ARE the named hazard inputs at the predictor-arbitration interface: ``baseline``, ``constant_bias``, ``linear_drift``, ``accelerating``, ``noise_floor``, ``outlier``, ``sensor_dropout`` (honest-failure modes, polarity = nominal or failure) plus ``adversarial_consistent_bias`` (UN ECE R155 cybersecurity-tier attack class, polarity = adversarial). Each carries an explicit polarity and a formal generator in ``characterization/traces.py`` so a HARA reviewer can re-execute and inspect every input class. The cybersecurity scope-boundary is documented in ``characterization/DESIGN.md`` §3.5.
 
 ### Clause 7 — Identification and evaluation of triggering conditions
 
@@ -64,8 +65,9 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 **Evidence artifacts.**
 * `symbolu_robotics.bcvf_autonomous.trust::ConsumerV2Config` — Schmitt-trigger consumer V2 — engage / disengage thresholds + dwell-time hysteresis (chatter-immunity argument)
 * `symbolu_robotics.bcvf_autonomous.v2_chatter_sweep::run_v2_promotion_decision` — Paired V1-vs-V2 promotion-gate sweep — Wilson CI on chatter rate + exact one-sided McNemar on rescue preservation; documents the chatter-immunity claim
+* `symbolu_robotics.bcvf_autonomous.characterization::ADVERSARIAL_FAMILIES` — Cybersecurity-tier polarity bucket — names the attack-class families the kernel cannot fully detect (stealth-bias spoofs); pairs with the §3.5 DESIGN.md scope-boundary documentation
 
-**Notes.** Insufficiency #1 — Lemma 1 invariance (intentional): the SECOND-order kernel does not fire on constant offset or linear drift. Documented as a desired specification property; the ablation grid confirms the invariance is exact (ZEROTH / FIRST orders fire, SECOND does not). Insufficiency #2 — per-tick chatter on borderline disagreements where V1 softmin can flip argmax across consecutive ticks. Mitigation: V2 Schmitt-trigger consumer (``ConsumerV2Config``) with engage / disengage thresholds + dwell-time hysteresis. The v0.6 V2 promotion-decision sweep documents the non-promotion finding and the Q2 recalibration scope.
+**Notes.** Insufficiency #1 — Lemma 1 invariance (intentional): the SECOND-order kernel does not fire on constant offset or linear drift. Documented as a desired specification property; the ablation grid confirms the invariance is exact (ZEROTH / FIRST orders fire, SECOND does not). Insufficiency #2 — per-tick chatter on borderline disagreements where V1 softmin can flip argmax across consecutive ticks. Mitigation: V2 Schmitt-trigger consumer (``ConsumerV2Config``) with engage / disengage thresholds + dwell-time hysteresis. The v0.6 V2 promotion-decision sweep documents the non-promotion finding and the Q2 recalibration scope. Insufficiency #3 — Lemma-1 trapdoor for cybersecurity: an attacker who spoofs a sensor with a stealth-tier constant-bias signature is invisible to the kernel by construction (the same Lemma-1 invariance that's a specification property in #1 is the attack surface). Documented mitigation is **out-of-scope of the kernel** and lives at the deployment-partner layer: cross-modal sensor attestation, cross-class redundancy, calibration drift monitoring (UN ECE R155 §7.3.4). The ``adversarial_consistent_bias`` family + DESIGN.md §3.5 make the boundary explicit so the safety-case narrative doesn't overclaim.
 
 ### Clause 9 — Verification and validation of SOTIF
 
@@ -186,6 +188,7 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 | `symbolu_robotics.bcvf_autonomous.characterization.sweep::run_primary_grid` | 7, 9, Part 6 §9.4.4 |
 | `symbolu_robotics.bcvf_autonomous.characterization.sweep::summarize_grid` | 9, Part 6 §9.4.4, Part 6 §11 |
 | `symbolu_robotics.bcvf_autonomous.characterization.traces::generate_trace` | 6 |
+| `symbolu_robotics.bcvf_autonomous.characterization::ADVERSARIAL_FAMILIES` | 6, 8 |
 | `symbolu_robotics.bcvf_autonomous.characterization::run_primary_grid` | 6, Part 6 §7 |
 | `symbolu_robotics.bcvf_autonomous.characterization::write_grid_csv` | 9 |
 | `symbolu_robotics.bcvf_autonomous.characterization::write_grid_markdown` | 9, Part 6 §11 |

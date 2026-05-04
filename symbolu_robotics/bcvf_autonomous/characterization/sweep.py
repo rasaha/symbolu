@@ -47,6 +47,7 @@ from .stats import (
     wilson_ci,
 )
 from .traces import (
+    ADVERSARIAL_FAMILIES,
     FAILURE_FAMILIES,
     NOMINAL_FAMILIES,
     TraceBundle,
@@ -66,6 +67,17 @@ FAMILY_MAGNITUDES: Dict[str, Tuple[str, Tuple[float, ...]]] = {
     "noise_floor": ("sigma_noise", (0.005, 0.01, 0.02, 0.05)),
     "outlier": ("accel_mag", (1.0,)),  # canonical magnitude
     "sensor_dropout": ("k_dropout", (5, 15, 25, 35)),
+    # Cybersecurity-grade adversarial input — the magnitudes span the
+    # full stealth→transition→loud arc relative to the V1 default gate
+    # threshold T=0.05. Stealth (0.005, 0.01) keeps the gate closed
+    # most ticks → BCVF is invisible-to-the-attack → consensus is
+    # biased ≈ ``bias × weight_attacker`` → planner-level harm is real.
+    # Loud (0.5) opens the gate every tick → kernel detects via the
+    # gate-noise interaction. The transition magnitude (0.05) sits
+    # exactly at the gate threshold and surfaces the kernel's
+    # detection-onset behaviour. See DESIGN.md §3.5 + §4.8 for the
+    # acceptance criterion + the UN ECE R155 cybersecurity scope.
+    "adversarial_consistent_bias": ("bias", (0.005, 0.01, 0.05, 0.5)),
 }
 
 # Primary-grid seeds. 60 deterministic seeds give 22 configs × 60
@@ -232,6 +244,27 @@ def _evaluate_thresholds(
         if 0 <= k < int(family_params.get("H", 50)) - 5:
             need(gate_activations > 0, "dropout.gate_activations>0")
             need(total_cost > 1e-3, "dropout.total_cost>1e-3")
+
+    elif family == "adversarial_consistent_bias":
+        # Cybersecurity-grade attack — see DESIGN.md §3.5 / §4.8.
+        # Per-cell pass criterion is deliberately permissive: the
+        # family's purpose is to expose the kernel's *behaviour* across
+        # the stealth → transition → loud bias regime, not to gate the
+        # kernel's correctness. The reviewer-facing evidence is the
+        # per-config Wilson stats (cost percentiles + gate-activation
+        # rate per magnitude) rendered into the auditor markdown by
+        # ``GridSummary.to_markdown_report``; per-cell pass simply
+        # asserts the kernel is bounded + dimensionally well-behaved.
+        need(math.isfinite(total_cost), "adversarial.total_cost_finite")
+        need(total_cost < 1e8, "adversarial.total_cost<1e8(huber_bound)")
+        bias = float(family_params.get("bias", 0.0))
+        # Stealth regime — bias well below the V1 default gate threshold
+        # T = 0.05 — must keep BCVF below an order of magnitude of the
+        # noise-floor cost. Pinned at total_cost < 5.0 (~10x the
+        # noise-only floor at sigma=0.01) so a kernel that suddenly
+        # over-reacts on stealth bias trips the gate.
+        if bias <= 0.01:
+            need(total_cost < 5.0, "adversarial.stealth_total_cost<5.0")
 
     threshold_pass = len(reasons) == 0
 
@@ -643,10 +676,28 @@ def family_pass_rate(cells: List[CellResult]) -> Dict[str, Dict[str, Any]]:
 def split_nominal_failure(
     cells: List[CellResult],
 ) -> Tuple[List[CellResult], List[CellResult]]:
-    """Split cells by family polarity — useful for SOTIF FP/FN tallies."""
+    """Split cells by family polarity — useful for SOTIF FP/FN tallies.
+
+    Returns ``(nominal, failure)``. Adversarial-family cells are
+    intentionally not in either bucket; consume them via
+    :func:`split_polarity` if the cybersecurity-tier rate matters.
+    """
     nominal = [c for c in cells if c.family in NOMINAL_FAMILIES]
     failure = [c for c in cells if c.family in FAILURE_FAMILIES]
     return nominal, failure
+
+
+def split_polarity(
+    cells: List[CellResult],
+) -> Tuple[List[CellResult], List[CellResult], List[CellResult]]:
+    """Split cells across all three polarity buckets — nominal /
+    failure / adversarial. Used by :func:`summarize_grid` to compute
+    the cybersecurity-tier pass rate alongside the SOTIF FP/FN rates.
+    """
+    nominal = [c for c in cells if c.family in NOMINAL_FAMILIES]
+    failure = [c for c in cells if c.family in FAILURE_FAMILIES]
+    adversarial = [c for c in cells if c.family in ADVERSARIAL_FAMILIES]
+    return nominal, failure, adversarial
 
 
 def summarize_grid(
@@ -676,7 +727,7 @@ def summarize_grid(
     ``to_dict()`` produces a JSON-friendly view with the same shape
     callers used to read off the legacy dict return.
     """
-    nominal, failure = split_nominal_failure(cells)
+    nominal, failure, adversarial = split_polarity(cells)
     config_stats = per_config_pass_stats(
         cells, z=z, certification_floor=certification_floor,
     )
@@ -695,11 +746,16 @@ def summarize_grid(
         sum(1 for c in failure if not c.cell_pass) / len(failure)
         if failure else 0.0
     )
+    adv_pass_rate = (
+        sum(1 for c in adversarial if c.cell_pass) / len(adversarial)
+        if adversarial else 1.0
+    )
     return GridSummary(
         n_cells=len(cells),
         per_family=family_pass_rate(cells),
         false_positive_rate=fpr,
         false_negative_rate=fnr,
+        adversarial_pass_rate=adv_pass_rate,
         per_config=list(config_stats),
         min_ci_lower_bound=min_ci_lower,
         cells_below_certification_floor=below_floor,
@@ -729,6 +785,7 @@ class GridSummary:
     per_family: Dict[str, Dict[str, Any]]
     false_positive_rate: float
     false_negative_rate: float
+    adversarial_pass_rate: float
     per_config: List[PerConfigPassStat]
     min_ci_lower_bound: float
     cells_below_certification_floor: List[str]
@@ -741,6 +798,7 @@ class GridSummary:
             "per_family": dict(self.per_family),
             "false_positive_rate": float(self.false_positive_rate),
             "false_negative_rate": float(self.false_negative_rate),
+            "adversarial_pass_rate": float(self.adversarial_pass_rate),
             "per_config": [asdict(s) for s in self.per_config],
             "min_ci_lower_bound": float(self.min_ci_lower_bound),
             "cells_below_certification_floor": list(

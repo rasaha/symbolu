@@ -145,9 +145,19 @@ _MANIFOLD = EvidenceArtifact(
 _TRACES = EvidenceArtifact(
     module_path="symbolu_robotics.bcvf_autonomous.characterization.traces",
     symbol="generate_trace",
-    description="Seven-family synthetic SE(2) trace generator — the "
+    description="Eight-family synthetic SE(2) trace generator — the "
                 "named hazards (baseline, constant_bias, linear_drift, "
-                "accelerating, noise_floor, outlier, sensor_dropout)",
+                "accelerating, noise_floor, outlier, sensor_dropout) "
+                "plus the cybersecurity-tier adversarial_consistent_bias "
+                "family",
+)
+_ADVERSARIAL_FAMILIES = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.characterization",
+    symbol="ADVERSARIAL_FAMILIES",
+    description="Cybersecurity-tier polarity bucket — names the "
+                "attack-class families the kernel cannot fully detect "
+                "(stealth-bias spoofs); pairs with the §3.5 "
+                "DESIGN.md scope-boundary documentation",
 )
 _FAMILY_MAGNITUDES = EvidenceArtifact(
     module_path="symbolu_robotics.bcvf_autonomous.characterization.sweep",
@@ -355,16 +365,20 @@ def iso_21448_clauses() -> List[Clause]:
                 "could lead to hazardous behaviour, and assess the "
                 "associated risk."
             ),
-            evidence=(_TRACES, _CHARACTERIZATION_DESIGN),
+            evidence=(_TRACES, _ADVERSARIAL_FAMILIES, _CHARACTERIZATION_DESIGN),
             notes=(
-                "The seven characterization families ARE the named "
+                "The eight characterization families ARE the named "
                 "hazard inputs at the predictor-arbitration interface: "
                 "``baseline``, ``constant_bias``, ``linear_drift``, "
                 "``accelerating``, ``noise_floor``, ``outlier``, "
-                "``sensor_dropout``. Each has an explicit polarity "
-                "(must-be-quiet vs must-fire) and a formal generator "
-                "in ``characterization/traces.py`` so a HARA reviewer "
-                "can re-execute and inspect every input class."
+                "``sensor_dropout`` (honest-failure modes, polarity = "
+                "nominal or failure) plus ``adversarial_consistent_bias`` "
+                "(UN ECE R155 cybersecurity-tier attack class, polarity = "
+                "adversarial). Each carries an explicit polarity and a "
+                "formal generator in ``characterization/traces.py`` so a "
+                "HARA reviewer can re-execute and inspect every input "
+                "class. The cybersecurity scope-boundary is documented "
+                "in ``characterization/DESIGN.md`` §3.5."
             ),
         ),
         Clause(
@@ -397,7 +411,7 @@ def iso_21448_clauses() -> List[Clause]:
                 "function (cases where it does not respond as required) "
                 "and document mitigations."
             ),
-            evidence=(_CONSUMER_V2, _V2_SWEEP),
+            evidence=(_CONSUMER_V2, _V2_SWEEP, _ADVERSARIAL_FAMILIES),
             notes=(
                 "Insufficiency #1 — Lemma 1 invariance (intentional): "
                 "the SECOND-order kernel does not fire on constant "
@@ -410,7 +424,19 @@ def iso_21448_clauses() -> List[Clause]:
                 "Schmitt-trigger consumer (``ConsumerV2Config``) with "
                 "engage / disengage thresholds + dwell-time hysteresis. "
                 "The v0.6 V2 promotion-decision sweep documents the "
-                "non-promotion finding and the Q2 recalibration scope."
+                "non-promotion finding and the Q2 recalibration scope. "
+                "Insufficiency #3 — Lemma-1 trapdoor for cybersecurity: "
+                "an attacker who spoofs a sensor with a stealth-tier "
+                "constant-bias signature is invisible to the kernel by "
+                "construction (the same Lemma-1 invariance that's a "
+                "specification property in #1 is the attack surface). "
+                "Documented mitigation is **out-of-scope of the kernel** "
+                "and lives at the deployment-partner layer: cross-modal "
+                "sensor attestation, cross-class redundancy, calibration "
+                "drift monitoring (UN ECE R155 §7.3.4). The "
+                "``adversarial_consistent_bias`` family + DESIGN.md §3.5 "
+                "make the boundary explicit so the safety-case narrative "
+                "doesn't overclaim."
             ),
         ),
         Clause(

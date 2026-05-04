@@ -127,6 +127,7 @@ def render_grid_markdown(
     z = float(s.wilson_z)
     fpr = float(s.false_positive_rate)
     fnr = float(s.false_negative_rate)
+    adv_pass = float(getattr(s, "adversarial_pass_rate", 1.0))
     min_ci = float(s.min_ci_lower_bound)
     below_floor = list(s.cells_below_certification_floor)
     floor_pass = len(below_floor) == 0
@@ -154,6 +155,13 @@ def render_grid_markdown(
     )
     lines.append(
         f"* **False-negative rate (failure-family cells):** {fnr:.3f}"
+    )
+    lines.append(
+        f"* **Adversarial-family pass rate (cybersecurity tier):** "
+        f"{adv_pass:.3f} — see DESIGN.md §3.5 for the kernel-layer "
+        "scope boundary; defence in depth (cross-modal verification, "
+        "signature attestation) is the layer that addresses the "
+        "stealth attacks BCVF cannot detect."
     )
     lines.append(
         f"* **Minimum CI lower bound across the grid:** {min_ci:.4f}"
