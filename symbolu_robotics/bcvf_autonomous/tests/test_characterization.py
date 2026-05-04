@@ -582,6 +582,19 @@ def test_wilson_ci_rejects_invalid_successes():
         wilson_ci(11, 10)
 
 
+def test_wilson_ci_rejects_negative_total():
+    """Pinned regression: pre-fix ``wilson_ci(0, -5)`` returned
+    ``(0.0, 1.0)`` silently — treating a negative trial count as
+    "no observations" instead of as nonsensical input. Negative
+    totals now raise."""
+    with pytest.raises(ValueError):
+        wilson_ci(0, -5)
+    with pytest.raises(ValueError):
+        wilson_ci(0, -1)
+    # Zero total still legitimately maps to the unit interval.
+    assert wilson_ci(0, 0) == (0.0, 1.0)
+
+
 def test_wilson_lower_bound_matches_full_ci():
     successes, total = 47, 50
     low_full, _ = wilson_ci(successes, total)
@@ -604,6 +617,27 @@ def test_per_config_pass_stats_groups_by_family_magnitude():
         assert s.pass_rate == pytest.approx(s.passed / s.n)
         # CI lower bound never exceeds upper bound.
         assert s.ci_low <= s.ci_high
+
+
+def test_outlier_magnitude_label_is_parametrized():
+    """Pinned regression: pre-fix ``_magnitude_label("outlier", ...)``
+    collapsed every outlier magnitude to the literal ``"outlier"``,
+    inconsistent with ``accelerating[accel_mag=0.5]`` etc. and
+    silently merging distinct magnitudes into one Wilson-CI group
+    if a caller extended the outlier magnitudes tuple. The label now
+    follows the general parametrized form.
+    """
+    from symbolu_robotics.bcvf_autonomous.characterization.sweep import (
+        _magnitude_label,
+    )
+    assert (
+        _magnitude_label("outlier", {"accel_mag": 1.0})
+        == "outlier[accel_mag=1.0]"
+    )
+    # Different magnitudes must yield distinct labels (the bug case).
+    label_a = _magnitude_label("outlier", {"accel_mag": 0.5})
+    label_b = _magnitude_label("outlier", {"accel_mag": 2.0})
+    assert label_a != label_b
 
 
 def test_per_config_pass_stats_threshold_edge_accel_03_clears_floor():

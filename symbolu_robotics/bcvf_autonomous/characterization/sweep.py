@@ -542,21 +542,26 @@ def _magnitude_label(family: str, family_params: Dict[str, Any]) -> str:
     """Stable string key for (family, magnitude) suitable for grouping.
 
     For families with a scalar magnitude parameter (e.g. ``constant_bias``
-    with ``bias=0.5``) we emit ``"family[param=value]"``. ``baseline``
-    and ``outlier`` collapse to just the family name (one config each).
-    ``sensor_dropout`` is keyed by ``k_dropout`` since the outer family
-    + dropped-predictor are fixed across the primary grid.
+    with ``bias=0.5``) we emit ``"family[param=value]"`` so two cells
+    with different magnitudes always carry distinct labels — a
+    pre-fix special case for ``outlier`` collapsed every magnitude to
+    just ``"outlier"``, which silently merged distinct configs into
+    one Wilson-CI group when the outlier magnitude tuple was extended.
+    ``baseline`` is keyed by family name (no magnitude parameter is
+    defined for it). ``sensor_dropout`` is keyed by ``k_dropout``
+    since the outer family + dropped-predictor are fixed across the
+    primary grid.
     """
     if family == "baseline":
         return "baseline"
-    if family == "outlier":
-        return "outlier"
     if family == "sensor_dropout":
         k = family_params.get("k_dropout", "?")
         return f"sensor_dropout[k_dropout={k}]"
-    # The remaining families (constant_bias, linear_drift, accelerating,
-    # noise_floor) each carry a single scalar magnitude under
-    # ``FAMILY_MAGNITUDES``.
+    # Every other family carries a single scalar magnitude under
+    # ``FAMILY_MAGNITUDES``: constant_bias, linear_drift, accelerating,
+    # noise_floor, and outlier (all use a named param + a magnitude
+    # tuple). Distinct magnitudes therefore always yield distinct
+    # labels.
     name, _ = FAMILY_MAGNITUDES.get(family, (None, ()))
     if name and name in family_params:
         return f"{family}[{name}={family_params[name]}]"

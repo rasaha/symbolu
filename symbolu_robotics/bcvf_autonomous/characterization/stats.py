@@ -54,8 +54,14 @@ def wilson_ci(
         ``(low, high)`` clamped to ``[0, 1]``. Returns ``(0.0, 1.0)``
         if ``total == 0``: with no observations the entire interval
         is feasible.
+
+    Raises:
+        ValueError: if ``total`` is negative (nonsensical) or if
+            ``successes`` falls outside ``[0, total]``.
     """
-    if total <= 0:
+    if total < 0:
+        raise ValueError(f"total must be >= 0; got {total}")
+    if total == 0:
         return 0.0, 1.0
     if successes < 0 or successes > total:
         raise ValueError(
