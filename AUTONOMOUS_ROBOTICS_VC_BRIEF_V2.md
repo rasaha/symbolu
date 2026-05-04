@@ -22,11 +22,12 @@
 > V2 chatter-reduction sweep result is preserved unchanged. The
 > characterization primary grid is now certification-grade — 22
 > configs × 60 seeds = 1320 cells, every per-config Wilson 95% CI
-> lower bound ≥ 0.90 (current min ≈ 0.940). **443 tests passing**,
-> up from 400 in v0.6 (12 audit pinning tests + 15 statistical-
-> significance tests added post-v0.7 — the 7-family characterization
-> sweep is now anchored to a stated SOTIF bound, not a 3-seed point
-> estimate). v1 file at
+> lower bound ≥ 0.90 (current min ≈ 0.940). The Q3 SOTIF / ISO
+> 26262 traceability template (12 clauses, 19 indexed BCVF
+> artifacts, machine-checked snapshot) landed early in
+> `safety_case/`. **463 tests passing**, up from 400 in v0.6 (12
+> audit pinning tests + 15 statistical-significance tests + 20
+> safety-case-traceability tests added post-v0.7). v1 file at
 > `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
 > reference.
 
@@ -265,7 +266,7 @@ construction.
 
 ### Four proof points to know (as of May 2026)
 
-- **443 tests passing** (+222 since v0.2; +12 audit pinning tests + 15 statistical-significance tests added post-v0.7 — the 1320-cell primary grid carries a Wilson 95% CI lower-bound floor of 0.90 per (family, magnitude) config) across the autonomy
+- **463 tests passing** (+242 since v0.2; +12 audit pinning tests + 15 statistical-significance tests + 20 SOTIF / ISO 26262 traceability tests added post-v0.7 — the Q3 traceability template was pulled forward; 12 clauses × 19 indexed BCVF artifacts × machine-checked markdown snapshot) across the autonomy
   kernel, MPPI planner, trust-weight computer, non-MPPI adapter,
   dataset scaffolds, ROS 2 bridge, the v0.3 SOTIF-readiness
   layer, the v0.4 vectorized predict_batch path, the v0.5 pilot
@@ -320,7 +321,7 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 443 passing across 20 test modules (+12 pinning tests from the post-v0.7 audit pass: 7 covering the `_binomial_tail_geq` k=1 off-by-one fix in both copies, 3 covering the `attribution_within_top_half` ceil-vs-floor fix and the sign-test single-decisive-win regression, 2 covering the documented `_cluster_majority` greedy-non-transitive contract; +15 statistical-significance tests for the certification-grade primary grid: 5 Wilson CI primitives, 3 pinning the 60-seed cadence + magnitude grouping, 2 pinning the 0.94 / 0.91 / 0.886 textbook bounds at 60-of-60, 59-of-60, 58-of-60, 1 binding the threshold-edge `accelerating[accel_mag=0.3]` config, 4 covering `summarize_grid` exposure + sabotage of a single config); reproducible on CPU in < 4 min (4 host-speed-dependent perf benchmarks + 4 long-running sweep / timing tests deselected) |
+| **Test suite** | 463 passing across 21 test modules (+12 pinning tests from the post-v0.7 audit pass: 7 covering the `_binomial_tail_geq` k=1 off-by-one fix in both copies, 3 covering the `attribution_within_top_half` ceil-vs-floor fix and the sign-test single-decisive-win regression, 2 covering the documented `_cluster_majority` greedy-non-transitive contract; +15 statistical-significance tests for the certification-grade primary grid: 5 Wilson CI primitives, 3 pinning the 60-seed cadence + magnitude grouping, 2 pinning the 0.94 / 0.91 / 0.886 textbook bounds at 60-of-60, 59-of-60, 58-of-60, 1 binding the threshold-edge `accelerating[accel_mag=0.3]` config, 4 covering `summarize_grid` exposure + sabotage of a single config; +20 SOTIF / ISO 26262 traceability tests: 3 matrix-shape pins, 5 per-clause hygiene + artifact resolution, 6 audit-priority clause pins (HA inputs, triggering-condition table, V2 chatter-immunity, V&V grid, post-incident trace + fleet harness, unit-verification grid), 4 snapshot-parity + reverse-index pins, 2 markdown-render determinism); reproducible on CPU in < 4 min (4 host-speed-dependent perf benchmarks + 4 long-running sweep / timing tests deselected) |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
 | **Non-MPPI adapter demonstrated** | `integrations/argmin_selector.py` — ArgminSelectorPlanner shares `TrustWeightComputer` with `MPPIPlanner` with **zero code duplication**. 7 integration tests proving Lemma 1 propagates through the non-MPPI path |
@@ -333,6 +334,7 @@ Full detail and caveats below.
 | **Post-hoc fleet analysis harness (v0.3)** | `analysis/` — `find_argmax_flips` (with `weight_drop` + `max_abs_weight_delta` magnitude metrics), `find_v2_state_flips`, `find_near_vetoes` (predictors that crested 70% of `exclusion_T` without crossing). Aggregators `summarize_episode` and `aggregate_fleet` consume per-episode `TrustShapedEpisodeRecord`s and return a `FleetSummary` with per-classification counts, argmax-flip percentile statistics, per-predictor exclusion-incidence rate, and a typed near-veto roster (each event carrying per-episode metadata for triage). `load_episode_from_json` reverses the Runner's diagnostics dump with strict shape validation; corrupt artifacts fail loudly rather than silently producing zero-fill records. 26 tests. |
 | **Real-sensor pilot — runner + first execution (§6.2, v0.5)** | `pilot/` package: `scene_evaluator` (Mode A open-loop A0 / A3 paired evaluation), `sign_test` (Wilson CI + one-sided sign test, no scipy), `runner` (writes paired-comparison CSV + `FleetSummary` JSON + markdown report). Executed end-to-end against `RealisticNoiseAdapter` at N = 21: A3 win rate 1.000 with Wilson-CI lower bound 0.566 and sign-test p = 0.0312 on the responsive class; Lemma-1 negative control passes exactly. Three artifacts written to `results/phase_6_2_pre_pilot/`. 16 pilot tests + 11 prior dataset-adapter tests. `datasets/nuscenes.py` stub documents the one-line adapter swap; full execution pending dataset access + the M1–M4 predictor implementations the pilot plan estimates at 3–4 weeks. |
 | **Apples-to-apples baseline shootout (v0.7)** | `baselines/` package: `BCVFArbitrator`, `EKFArbitrator` (with `robot_localization`-style Mahalanobis 3-sigma outlier rejection), `MajorityVoteArbitrator` (cluster-mode), `AnchorArbitrator` (null floor), all sharing the same `Arbitrator` protocol consuming `(M, H, 3)` predictor trajectories. Shootout runs every arbitrator × every characterization family × N seeds. Three artifacts (`shootout.csv`, `shootout.json`, `shootout_report.md`) in `results/baseline_shootout/`. The Lemma-1 false-attribution differentiator is the BD-grade headline; the EKF Mahalanobis miss on outlier is the *"this isn't a solved problem with the existing toolkit"* finding. 19 baseline tests, including pinned BD assertions (BCVF false-attr < 1e-6 on constant_bias, EKF > 0.1, Majority > 1.0). |
+| **SOTIF / ISO 26262 traceability template (Q3 pulled to post-v0.7)** | `safety_case/` — `traceability.py` builds a clause-by-clause `TraceabilityMatrix` mapping 19 BCVF artifacts (kernel, characterization sweep, V2 hysteresis, fleet harness, per-step diagnostic record, baseline shootout, pilot runner, Wilson CI primitive, ...) to 12 standard clauses: SOTIF (ISO 21448) clauses 5/6/7/8/9/10 and ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11. The on-disk `SOTIF_TRACEABILITY.md` is a deterministic snapshot of the matrix (the test suite pins byte-equality between snapshot and renderer so the doc cannot drift). Every evidence reference is import-time-resolved by the test suite (`module_path::symbol` must exist, or the test fails loudly). The template is the Q3 "regulator-facing template" half of the brief item; the regulator workshop remains a Q3 deliverable. **The artifact half is now BD-callable on day one of a diligence engagement** instead of waiting for "after the safety case is ready." 20 traceability tests. |
 | **V2 promotion-gate sweep + decision (v0.6)** | `v2_chatter_sweep.py`: paired V1 vs V2 runner with two-gate decision logic (chatter-reduction Wilson + rescue-preservation McNemar). Executed at N=5 on `S1_normal_driving` (chatter scenario) and `S3_map_error_accel` (rescue scenario), at default thresholds and at 50×-lower thresholds. **Finding: V2 reduces chatter by ≤ 0.6% on autonomy data because BCVF kernel cost exceeds V2's engage threshold even on nominal scenarios → V2 stays ENGAGED → V1 pipeline runs unchanged.** Honest non-promotion. The empirical result upgrades the v0.5 "V2 is opt-in" caveat from defensive to evidence-backed; threshold recalibration is a scoped Q2 followup. 12 sweep-module tests + artifacts in `results/v2_chatter_S1_n5/` and `results/v2_rescue_S3_n5/`. |
 | **ROS 2 adapter scaffold (§6.4)** | `symbolu_bcvf_ros2` package with framework-agnostic core + lazy `rclpy` shim. Message dataclasses, bridge class, and 13 tests. `.msg` files + colcon build + real pub/sub pending ~3–4 weeks ROS-environment work |
 | **Latency benchmark (§6.5)** | 18-cell (M × K × H) sweep, plus a v0.4 re-run after `predict_batch` vectorization. Smallest config (M=4, K=128, H=10) now p99 ≈ 38 ms (was 76). Per-predictor rollout cost dropped 52–77× across M1–M4 at K=1000, H=50; the new dominant cost is the BCVF kernel and perf-cost evaluation — the next vectorization targets. Production integrators should re-run on their substrate. |
@@ -466,14 +468,21 @@ thresholds calibrated per-scenario class. ~1 week.
   52–77× at K=1000, H=50.** Follow-on: kernel-side vectorization
   for the now-dominant BCVF + perf-cost evaluation cost.
 
-**Quarter 3 — Safety-case + adjacent-domain pilot**
-- **SOTIF / ISO 26262 traceability template.** Map Lemma 1
+**Quarter 2 — Pulled forward from Q3**
+- ~~**SOTIF / ISO 26262 traceability template.** Map Lemma 1
   invariance + the v0.3 characterization-sweep failure taxonomy +
   per-step diagnostic record + Consumer V2 chatter-immunity proof
   to a safety-case narrative. The five v0.3 artifacts cover the
   bulk of what an auditor's clause-by-clause walk requires; the
   Q3 work is the regulator-facing template + workshop, not new
-  code. 2–3 weeks + regulator workshop.
+  code. 2–3 weeks + regulator workshop.~~ **Template half landed
+  post-v0.7 in `safety_case/` — 12 clauses (SOTIF 5/6/7/8/9/10 +
+  ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11), 19 indexed BCVF
+  artifacts, machine-checked snapshot in
+  `safety_case/SOTIF_TRACEABILITY.md`. Regulator workshop remains
+  a Q3 deliverable; the artifact-half is now BD-callable on day one.**
+
+**Quarter 3 — Safety-case + adjacent-domain pilot**
 - **First paid design-partner engagement** (adjacent domain —
   drone / warehouse / industrial mobile robot). Not full AV.
 
@@ -505,7 +514,10 @@ Capital is earmarked for:
    `predict_batch` vectorization (Q2) + Autoware / Apollo
    reference integrations (Q2–Q3).
 3. **Safety-case readiness** — SOTIF / ISO 26262 traceability
-   template (Q3) + regulator engagement (Q3).
+   template **landed post-v0.7** (12 clauses, 19 indexed
+   artifacts, machine-checked snapshot in
+   `safety_case/SOTIF_TRACEABILITY.md`); regulator engagement
+   stays Q3.
 4. **First production reference** — adjacent-domain design partner
    (Q3) + production reference (Q4).
 
@@ -517,4 +529,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.7 · 443 internal tests (audit pinning tests included; published numbers unchanged; characterization primary grid now certification-grade at 1320 cells with Wilson 95% CI lower-bound floor 0.90 per (family, magnitude) config — current min ≈ 0.940) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
+*v0.7 · 463 internal tests (audit pinning tests included; published numbers unchanged; characterization primary grid now certification-grade at 1320 cells with Wilson 95% CI lower-bound floor 0.90 per (family, magnitude) config — current min ≈ 0.940; Q3 SOTIF / ISO 26262 traceability template pulled forward — 12 clauses across SOTIF 5/6/7/8/9/10 and ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11, 19 indexed BCVF artifacts, machine-checked snapshot in `safety_case/SOTIF_TRACEABILITY.md`) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
