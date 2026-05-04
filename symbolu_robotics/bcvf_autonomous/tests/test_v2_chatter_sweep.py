@@ -62,6 +62,58 @@ def test_mcnemar_v2_strictly_worse_p_is_low():
 
 
 # --------------------------------------------------------------------------- #
+# Direct binomial-tail unit tests — pin the k=1 off-by-one fix
+# --------------------------------------------------------------------------- #
+
+
+def test_binomial_tail_k_zero_is_one():
+    """P(X >= 0) is identically 1 for any n, p."""
+    assert _binomial_tail_geq(0, 0) == 1.0
+    assert _binomial_tail_geq(0, 5) == 1.0
+    assert _binomial_tail_geq(-1, 5) == 1.0
+
+
+def test_binomial_tail_k_greater_than_n_is_zero():
+    assert _binomial_tail_geq(2, 1) == 0.0
+    assert _binomial_tail_geq(6, 5) == 0.0
+
+
+def test_binomial_tail_k_one_n_one_is_one_half():
+    """Pinned regression: prior implementation returned 0.0 for k=1.
+
+    P(X >= 1) for X ~ Bin(1, 0.5) = 1 - P(X = 0) = 1 - 0.5 = 0.5.
+    """
+    assert _binomial_tail_geq(1, 1) == pytest.approx(0.5, abs=1e-12)
+
+
+def test_binomial_tail_k_one_matches_textbook_for_n_5():
+    """k=1, n=5: P(X >= 1) = 1 - (1/2)^5 = 31/32 = 0.96875."""
+    assert _binomial_tail_geq(1, 5) == pytest.approx(31.0 / 32.0, abs=1e-12)
+
+
+def test_binomial_tail_full_pmf_matches_textbook_for_n_5():
+    """k=2..5 against textbook complementary CDF for Bin(5, 0.5)."""
+    # P(X = 0..5) for Bin(5, 0.5) = (1, 5, 10, 10, 5, 1) / 32.
+    assert _binomial_tail_geq(2, 5) == pytest.approx(26.0 / 32.0, abs=1e-12)
+    assert _binomial_tail_geq(3, 5) == pytest.approx(16.0 / 32.0, abs=1e-12)
+    assert _binomial_tail_geq(4, 5) == pytest.approx(6.0 / 32.0, abs=1e-12)
+    assert _binomial_tail_geq(5, 5) == pytest.approx(1.0 / 32.0, abs=1e-12)
+
+
+def test_binomial_tail_loaded_coin_p_07():
+    """Sanity check at p != 0.5: P(X >= 1 | n=2, p=0.7) = 1 - 0.3^2 = 0.91."""
+    assert _binomial_tail_geq(1, 2, 0.7) == pytest.approx(0.91, abs=1e-12)
+
+
+def test_mcnemar_one_sided_b_one_c_zero_is_one_half():
+    """Pinned regression: with b=1, c=0 the pre-fix code returned p=0.0
+    (false significant). The exact one-sided McNemar p-value for one
+    discordant pair is 0.5."""
+    p = _mcnemar_one_sided_v2_worse(b=1, c=0)
+    assert p == pytest.approx(0.5, abs=1e-12)
+
+
+# --------------------------------------------------------------------------- #
 # End-to-end small sweep — hits the actual planner, takes ~30-60 s
 # --------------------------------------------------------------------------- #
 

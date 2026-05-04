@@ -210,7 +210,15 @@ def _v2_state_counts(states: List[str]) -> Dict[str, int]:
 
 def _binomial_tail_geq(k: int, n: int, p: float = 0.5) -> float:
     """Same primitive used in pilot/sign_test.py — kept local to avoid a
-    cross-package import (pilot is a sibling, not an upstream)."""
+    cross-package import (pilot is a sibling, not an upstream).
+
+    Returns ``P(X >= k)`` for ``X ~ Binomial(n, p)`` via the log-PMF
+    recurrence; the loop accumulates ``P(X=1)..P(X=k-1)`` so that for
+    ``k == 1`` the range is empty and ``cdf`` stays at ``P(X = 0)``.
+    The previous implementation placed the break at the end of the
+    loop body, which never fired for ``k == 1`` and silently returned
+    ``P(X >= 1) = 0.0`` instead of the correct tail.
+    """
     if n <= 0:
         return 1.0 if k <= 0 else 0.0
     if k <= 0:
@@ -220,14 +228,10 @@ def _binomial_tail_geq(k: int, n: int, p: float = 0.5) -> float:
     log_p = math.log(p)
     log_q = math.log(1.0 - p) if p < 1.0 else float("-inf")
     log_pmf = n * log_q
-    cdf = math.exp(log_pmf)
-    if k == 0:
-        return 1.0
-    for i in range(1, n + 1):
+    cdf = math.exp(log_pmf)   # P(X = 0)
+    for i in range(1, k):
         log_pmf = log_pmf + math.log((n - i + 1) / i) + log_p - log_q
         cdf += math.exp(log_pmf)
-        if i == k - 1:
-            break
     return max(0.0, min(1.0, 1.0 - cdf))
 
 
