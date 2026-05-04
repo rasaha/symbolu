@@ -116,6 +116,30 @@ class BasePredictor(ABC):
             x=x, y=y, theta=theta, velocity=v, timestamp=state.timestamp + dt
         )
 
+    def bicycle_step_batch(
+        self,
+        state_x: np.ndarray,
+        state_y: np.ndarray,
+        state_th: np.ndarray,
+        control_v: np.ndarray,
+        control_delta: np.ndarray,
+    ) -> tuple:
+        """Vectorized one-step bicycle update for K rollouts.
+
+        All inputs are ``(K,)`` ``float64`` arrays. Returns updated
+        ``(state_x, state_y, state_th)`` triple. Heading is wrapped via
+        ``arctan2(sin, cos)`` to match :func:`wrap_angle` exactly.
+        """
+        cfg = self.bicycle_config
+        v = np.clip(control_v, -cfg.max_velocity, cfg.max_velocity)
+        delta = np.clip(control_delta, -cfg.max_steering, cfg.max_steering)
+        dt = cfg.dt
+        new_x = state_x + v * np.cos(state_th) * dt
+        new_y = state_y + v * np.sin(state_th) * dt
+        raw_th = state_th + (v / cfg.wheelbase) * np.tan(delta) * dt
+        new_th = np.arctan2(np.sin(raw_th), np.cos(raw_th))
+        return new_x, new_y, new_th
+
     # --- subclass hooks ---
 
     @abstractmethod
@@ -187,6 +211,40 @@ class BasePredictor(ABC):
             trajectory[k, 2] = wrap_angle(observation.theta)
 
         return trajectory
+
+    def predict_batch(self, controls_batch: np.ndarray) -> np.ndarray:
+        """Forward-simulate ``K`` trajectories in parallel.
+
+        ``controls_batch`` has shape ``(K, H, 2)``; returns ``(K, H, 3)``.
+
+        The default implementation is a Python loop over ``K`` calls to
+        :meth:`predict`. Subclasses MAY override with a vectorized
+        implementation that runs the H sequential dynamics steps with
+        ``(K,)``-shaped state arrays. Any override **must** produce
+        numerically identical output to the default loop so that the
+        existing test suite and downstream BCVF / trust-shaper behavior
+        are bit-for-bit preserved.
+
+        The numeric-equivalence contract relies on the fact that
+        ``predict()`` resets the predictor's RNG at the top of every
+        call, so all K rollouts of the same predictor at the same
+        planning tick already receive identical noise streams. The
+        only across-rollout variation comes from the differing control
+        inputs and the resulting state evolution. A vectorized
+        implementation can therefore draw each H-step's noise once
+        (consuming the same RNG sequence the default loop consumes)
+        and broadcast it across the K rollouts.
+        """
+        ctrl = np.asarray(controls_batch, dtype=np.float64)
+        if ctrl.ndim != 3 or ctrl.shape[2] != 2:
+            raise ValueError(
+                f"controls_batch must have shape (K, H, 2); got {ctrl.shape}"
+            )
+        K, H, _ = ctrl.shape
+        out = np.zeros((K, H, 3), dtype=np.float64)
+        for k in range(K):
+            out[k] = self.predict(ctrl[k])
+        return out
 
     def update_state(
         self, ground_truth: PredictorState, noise_std: float = 0.0

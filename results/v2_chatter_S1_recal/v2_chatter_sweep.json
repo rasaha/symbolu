@@ -1,0 +1,83 @@
+{
+  "config": {
+    "scenario_name": "S1_normal_driving",
+    "N": 3,
+    "base_seed": 1000,
+    "output_dir": "/home/user/symbolu/results/v2_chatter_S1_recal",
+    "v2_engage_threshold": 0.01,
+    "v2_disengage_threshold": 0.005,
+    "v2_T_engage": 3,
+    "v2_T_disengage": 5,
+    "chatter_min_median_reduction": 0.5,
+    "chatter_min_v2_win_rate": 0.7,
+    "mppi_rollouts": 64,
+    "mppi_horizon": null
+  },
+  "n_seeds": 3,
+  "median_v1_flip_rate": 0.7688442211055276,
+  "median_v2_flip_rate": 0.7738693467336684,
+  "median_flip_rate_reduction": 0.005494505494505397,
+  "v2_wins_per_seed": 2,
+  "v2_win_rate": 0.6666666666666666,
+  "chatter_gate_pass": false,
+  "v1_collision_count": 0,
+  "v2_collision_count": 0,
+  "v1_rescue_v2_collide": 0,
+  "v1_collide_v2_rescue": 0,
+  "rescue_gate_pass": true,
+  "mcnemar_p_v2_worse": 1.0,
+  "promotion_recommended": false,
+  "per_seed": [
+    {
+      "seed": 1000,
+      "v1_argmax_flips": 182,
+      "v2_argmax_flips": 181,
+      "v1_total_steps": 200,
+      "v2_total_steps": 200,
+      "v1_collision": false,
+      "v2_collision": false,
+      "v1_flip_rate": 0.914572864321608,
+      "v2_flip_rate": 0.9095477386934674,
+      "flip_rate_reduction": 0.005494505494505397,
+      "v2_state_distribution": {
+        "uniform": 2,
+        "engaged": 198,
+        "": 0
+      }
+    },
+    {
+      "seed": 1001,
+      "v1_argmax_flips": 148,
+      "v2_argmax_flips": 147,
+      "v1_total_steps": 200,
+      "v2_total_steps": 200,
+      "v1_collision": false,
+      "v2_collision": false,
+      "v1_flip_rate": 0.7437185929648241,
+      "v2_flip_rate": 0.7386934673366834,
+      "flip_rate_reduction": 0.006756756756756786,
+      "v2_state_distribution": {
+        "uniform": 2,
+        "engaged": 198,
+        "": 0
+      }
+    },
+    {
+      "seed": 1002,
+      "v1_argmax_flips": 153,
+      "v2_argmax_flips": 154,
+      "v1_total_steps": 200,
+      "v2_total_steps": 200,
+      "v1_collision": false,
+      "v2_collision": false,
+      "v1_flip_rate": 0.7688442211055276,
+      "v2_flip_rate": 0.7738693467336684,
+      "flip_rate_reduction": -0.006535947712418329,
+      "v2_state_distribution": {
+        "uniform": 2,
+        "engaged": 198,
+        "": 0
+      }
+    }
+  ]
+}

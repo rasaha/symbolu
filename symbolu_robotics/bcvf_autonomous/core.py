@@ -251,14 +251,25 @@ def compute_bcvf_cost_batch(
     softmax. Each predictor's cost is the sum over pairs containing that
     predictor of the per-pair BCVF cost.
     """
-    if len(trajectories_batch) == 0:
-        zeros = np.zeros(0, dtype=np.float64)
-        if return_per_predictor:
-            return zeros, np.zeros((0, 0), dtype=np.float64)
-        return zeros
-
-    # Stack to a (K, M, H, 3) tensor.
-    stacked = np.asarray(trajectories_batch, dtype=np.float64)
+    # v0.4: accept either a List[List[ndarray]] or a pre-stacked
+    # ``(K, M, H, 3)`` ndarray. The planner already builds the tensor
+    # via ``predict_batch``, so paying for a list-of-lists round trip
+    # is pure overhead. Pre-stacked input skips the reflattening
+    # step entirely.
+    if isinstance(trajectories_batch, np.ndarray):
+        stacked = np.asarray(trajectories_batch, dtype=np.float64)
+        if stacked.size == 0:
+            zeros = np.zeros(0, dtype=np.float64)
+            if return_per_predictor:
+                return zeros, np.zeros((0, 0), dtype=np.float64)
+            return zeros
+    else:
+        if len(trajectories_batch) == 0:
+            zeros = np.zeros(0, dtype=np.float64)
+            if return_per_predictor:
+                return zeros, np.zeros((0, 0), dtype=np.float64)
+            return zeros
+        stacked = np.asarray(trajectories_batch, dtype=np.float64)
     if stacked.ndim != 4 or stacked.shape[-1] != 3:
         raise ValueError(
             f"trajectories_batch must stack to (K, M, H, 3); got {stacked.shape}"

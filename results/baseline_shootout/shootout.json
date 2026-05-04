@@ -1,0 +1,257 @@
+{
+  "summaries": [
+    {
+      "arbitrator": "BCVF",
+      "family": "baseline",
+      "n_seeds": 10,
+      "median_consensus_error": 1.3322676295501878e-16,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 3.901080000332513
+    },
+    {
+      "arbitrator": "BCVF",
+      "family": "constant_bias",
+      "n_seeds": 10,
+      "median_consensus_error": 0.16666666666666663,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 3.6814399999229863
+    },
+    {
+      "arbitrator": "BCVF",
+      "family": "linear_drift",
+      "n_seeds": 10,
+      "median_consensus_error": 0.04083333333333334,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 3.633969999441433
+    },
+    {
+      "arbitrator": "BCVF",
+      "family": "accelerating",
+      "n_seeds": 10,
+      "median_consensus_error": 0.48649507215932225,
+      "attribution_hit_rate": 1.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 3.729850000127044
+    },
+    {
+      "arbitrator": "BCVF",
+      "family": "noise_floor",
+      "n_seeds": 10,
+      "median_consensus_error": 0.007393914336500952,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.13283479016221422,
+      "median_per_tick_us": 3.835290000324676
+    },
+    {
+      "arbitrator": "BCVF",
+      "family": "outlier",
+      "n_seeds": 10,
+      "median_consensus_error": 0.44599613075960903,
+      "attribution_hit_rate": 1.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 3.6811600000419276
+    },
+    {
+      "arbitrator": "BCVF",
+      "family": "sensor_dropout",
+      "n_seeds": 10,
+      "median_consensus_error": 0.2561279727946808,
+      "attribution_hit_rate": 1.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 3.6077400000067428
+    },
+    {
+      "arbitrator": "EKF",
+      "family": "baseline",
+      "n_seeds": 10,
+      "median_consensus_error": 0.0002778937314590679,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.3940552031195503,
+      "median_per_tick_us": 70.8462499972029
+    },
+    {
+      "arbitrator": "EKF",
+      "family": "constant_bias",
+      "n_seeds": 10,
+      "median_consensus_error": 0.1666736867962454,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 1.1145291364426246,
+      "median_per_tick_us": 70.97825000812463
+    },
+    {
+      "arbitrator": "EKF",
+      "family": "linear_drift",
+      "n_seeds": 10,
+      "median_consensus_error": 0.04105064954821369,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.5413577234611827,
+      "median_per_tick_us": 68.96175000292715
+    },
+    {
+      "arbitrator": "EKF",
+      "family": "accelerating",
+      "n_seeds": 10,
+      "median_consensus_error": 0.07304358137076193,
+      "attribution_hit_rate": 1.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 69.26750000957327
+    },
+    {
+      "arbitrator": "EKF",
+      "family": "noise_floor",
+      "n_seeds": 10,
+      "median_consensus_error": 0.007139769160048354,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.38898090477220104,
+      "median_per_tick_us": 69.59249996896233
+    },
+    {
+      "arbitrator": "EKF",
+      "family": "outlier",
+      "n_seeds": 10,
+      "median_consensus_error": 3.9303057395333996,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 56.20224997926471
+    },
+    {
+      "arbitrator": "EKF",
+      "family": "sensor_dropout",
+      "n_seeds": 10,
+      "median_consensus_error": 3.9303057395333996,
+      "attribution_hit_rate": 1.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 55.81325000036941
+    },
+    {
+      "arbitrator": "MajorityVote",
+      "family": "baseline",
+      "n_seeds": 10,
+      "median_consensus_error": 0.0,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 27.427249989386837
+    },
+    {
+      "arbitrator": "MajorityVote",
+      "family": "constant_bias",
+      "n_seeds": 10,
+      "median_consensus_error": 0.16666666666666663,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 16.666666666666675,
+      "median_per_tick_us": 27.30424999697334
+    },
+    {
+      "arbitrator": "MajorityVote",
+      "family": "linear_drift",
+      "n_seeds": 10,
+      "median_consensus_error": 0.04083333333333334,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 4.083333333333334,
+      "median_per_tick_us": 28.56900000836049
+    },
+    {
+      "arbitrator": "MajorityVote",
+      "family": "accelerating",
+      "n_seeds": 10,
+      "median_consensus_error": 0.01691666666666667,
+      "attribution_hit_rate": 1.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 28.372000016929633
+    },
+    {
+      "arbitrator": "MajorityVote",
+      "family": "noise_floor",
+      "n_seeds": 10,
+      "median_consensus_error": 0.007345899249302583,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.5374714209765059,
+      "median_per_tick_us": 28.558750017282364
+    },
+    {
+      "arbitrator": "MajorityVote",
+      "family": "outlier",
+      "n_seeds": 10,
+      "median_consensus_error": 0.012833333333333337,
+      "attribution_hit_rate": 1.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 30.299499996999657
+    },
+    {
+      "arbitrator": "MajorityVote",
+      "family": "sensor_dropout",
+      "n_seeds": 10,
+      "median_consensus_error": 3.4402333333333335,
+      "attribution_hit_rate": 1.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 28.339250008002637
+    },
+    {
+      "arbitrator": "Anchor",
+      "family": "baseline",
+      "n_seeds": 10,
+      "median_consensus_error": 0.0,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 0.01661999988300522
+    },
+    {
+      "arbitrator": "Anchor",
+      "family": "constant_bias",
+      "n_seeds": 10,
+      "median_consensus_error": 0.0,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 0.012970000398127013
+    },
+    {
+      "arbitrator": "Anchor",
+      "family": "linear_drift",
+      "n_seeds": 10,
+      "median_consensus_error": 0.0,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 0.012300000094001007
+    },
+    {
+      "arbitrator": "Anchor",
+      "family": "accelerating",
+      "n_seeds": 10,
+      "median_consensus_error": 0.0,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 0.013060000014775142
+    },
+    {
+      "arbitrator": "Anchor",
+      "family": "noise_floor",
+      "n_seeds": 10,
+      "median_consensus_error": 0.011876795398424924,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 0.01378999911594292
+    },
+    {
+      "arbitrator": "Anchor",
+      "family": "outlier",
+      "n_seeds": 10,
+      "median_consensus_error": 4.0425,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 0.012919999790028669
+    },
+    {
+      "arbitrator": "Anchor",
+      "family": "sensor_dropout",
+      "n_seeds": 10,
+      "median_consensus_error": 4.0425,
+      "attribution_hit_rate": 0.0,
+      "median_false_attribution": 0.0,
+      "median_per_tick_us": 0.014200000464370532
+    }
+  ],
+  "n_cells": 280
+}

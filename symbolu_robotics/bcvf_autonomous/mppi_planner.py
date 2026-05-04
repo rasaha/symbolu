@@ -21,7 +21,16 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from .core import BCVFConfig, CostOrder, compute_bcvf_cost_batch
-from .trust import TrustWeightComputer, TrustWeightResult
+from .trust import (
+    ConsumerV2Config,
+    TrustWeightComputer,
+    TrustWeightResult,
+)
+from .trust_diagnostics import (
+    RolloutAggregation,
+    TrustDiagnosticsRecorder,
+    TrustShapedEpisodeRecord,
+)
 from .predictors.base import BasePredictor
 from .simulator import Obstacle, Road
 
@@ -216,6 +225,13 @@ class MPPIPlanner:
         self._trust_log_enabled: bool = False
         self._trust_log: List[Dict[str, Any]] = []
         self._trust_log_step: int = 0
+        # Typed per-step trust diagnostics — autonomous analog of BCVF
+        # LLM's TrustShapedDecodeResult. Built on top of
+        # TrustDiagnosticsRecorder; off by default. Coexists with the
+        # legacy dict-form trust log; the two record different shapes
+        # (compact summary dict vs typed (T, M) arrays).
+        self._diagnostics_enabled: bool = False
+        self._diagnostics_recorder: Optional[TrustDiagnosticsRecorder] = None
 
     # --- public API ---
 
@@ -225,6 +241,8 @@ class MPPIPlanner:
         self._trust_log_step = 0
         if self._trust_log_enabled:
             self._trust_log = []
+        if self._diagnostics_recorder is not None:
+            self._diagnostics_recorder.reset()
 
     def plan(self) -> MPPIResult:
         start = time.perf_counter()
@@ -321,11 +339,18 @@ class MPPIPlanner:
         num_models = len(model_ids)
         anchor_idx = model_ids.index(c.anchor)
 
-        # Always roll out every predictor.
+        # Always roll out every predictor. v0.4 vectorization: each
+        # predictor's ``predict_batch(controls_batch)`` runs all K
+        # rollouts through the H sequential dynamics steps with
+        # ``(K,)``-shaped state arrays — replacing the per-rollout
+        # Python loop. The default ``BasePredictor.predict_batch``
+        # falls back to a per-rollout loop, so any custom predictor
+        # without an override still works (just without the speedup).
         all_trajs = np.zeros((k_batch, num_models, c.horizon, 3), dtype=np.float64)
-        for k in range(k_batch):
-            for m_idx, name in enumerate(model_ids):
-                all_trajs[k, m_idx] = self.predictors[name].predict(controls_batch[k])
+        for m_idx, name in enumerate(model_ids):
+            all_trajs[:, m_idx] = self.predictors[name].predict_batch(
+                controls_batch
+            )
 
         # §6.3: delegate consumer-layer trust-weight computation to
         # the shared TrustWeightComputer. The computer handles EMA
@@ -400,6 +425,13 @@ class MPPIPlanner:
                 },
             })
             self._trust_log_step += 1
+
+        # Typed per-step trust diagnostics (TrustShapedEpisodeRecord).
+        # Records every tick, not just BCVF-active ones — a tick where
+        # ``lambda_c == 0`` still produces a uniform-weight record so
+        # the (T, M) arrays line up with the simulator's tick index.
+        if self._diagnostics_recorder is not None:
+            self._diagnostics_recorder.record(trust_result)
 
         # Weighted consensus — atan2-safe on heading.
         w_expand = weights[..., None, None]  # (K, M, 1, 1)
@@ -551,3 +583,45 @@ class MPPIPlanner:
     def get_trust_log(self) -> List[Dict[str, Any]]:
         """Return the accumulated trust-state log (one dict per step)."""
         return list(self._trust_log)
+
+    def set_trust_diagnostics_enabled(
+        self,
+        enabled: bool,
+        aggregation: RolloutAggregation = RolloutAggregation.MEAN,
+    ) -> None:
+        """Enable typed per-step trust diagnostics.
+
+        When enabled, every ``plan()`` call appends a ``TrustStepRecord``
+        to an internal ``TrustDiagnosticsRecorder`` keyed by simulator
+        tick. Call :meth:`get_trust_diagnostics` after the episode to
+        retrieve the stacked ``TrustShapedEpisodeRecord``.
+
+        Coexists with :meth:`set_trust_log_enabled`: the legacy log
+        records compact summaries; the diagnostics recorder records
+        typed ``(T, M)`` arrays.
+        """
+        self._diagnostics_enabled = bool(enabled)
+        if enabled:
+            num_models = len(self.predictors)
+            self._diagnostics_recorder = TrustDiagnosticsRecorder(
+                M=num_models, aggregation=aggregation
+            )
+        else:
+            self._diagnostics_recorder = None
+
+    def get_trust_diagnostics(self) -> Optional[TrustShapedEpisodeRecord]:
+        """Finalize and return the typed per-step trust-diagnostics record."""
+        if self._diagnostics_recorder is None:
+            return None
+        return self._diagnostics_recorder.finalize()
+
+    def set_v2_consumer(self, config: ConsumerV2Config) -> None:
+        """Install the §14a V2 Schmitt-triggered consumer.
+
+        Forwards to :meth:`TrustWeightComputer.set_v2_consumer`. With
+        ``config.enabled = False`` the planner's behavior is exactly
+        V1 (default). With ``enabled = True`` the trust computer
+        gates the entire shaping pipeline through the engage /
+        disengage state machine.
+        """
+        self._trust_computer.set_v2_consumer(config)

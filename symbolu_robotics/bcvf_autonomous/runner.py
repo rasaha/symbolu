@@ -60,6 +60,17 @@ class RunConfig:
     exclusion_r: float = 1.5
     exclusion_T: int = 20
     exclusion_T_reinstate: int = 20
+    # Typed per-step trust diagnostics (TrustShapedEpisodeRecord).
+    trust_diagnostics_enabled: bool = False
+    trust_diagnostics_path: Optional[str] = None
+    trust_diagnostics_aggregation: str = "mean"  # "mean" | "argmin_total"
+    # §14a V2 Schmitt-triggered consumer — disabled by default; the
+    # planner stays on V1 softmin until v2_enabled is set True.
+    v2_enabled: bool = False
+    v2_engage_threshold: float = 0.5
+    v2_disengage_threshold: float = 0.2
+    v2_T_engage: int = 3
+    v2_T_disengage: int = 5
 
 
 @dataclass
@@ -136,6 +147,7 @@ class Runner:
 
     def __init__(self, config: RunConfig) -> None:
         self._config = config
+        self._planner: Optional[MPPIPlanner] = None
 
     def run(self) -> RunResult:
         cfg = self._config
@@ -179,6 +191,35 @@ class Runner:
         if trust_log_path:
             planner.set_trust_log_enabled(True)
 
+        diagnostics_enabled = (
+            getattr(cfg, "trust_diagnostics_enabled", False)
+            or getattr(cfg, "trust_diagnostics_path", None) is not None
+        )
+        if diagnostics_enabled:
+            from .trust_diagnostics import RolloutAggregation
+            agg_name = getattr(cfg, "trust_diagnostics_aggregation", "mean")
+            try:
+                aggregation = RolloutAggregation(agg_name)
+            except ValueError as exc:
+                raise ValueError(
+                    f"trust_diagnostics_aggregation must be one of "
+                    f"{[a.value for a in RolloutAggregation]}; got {agg_name!r}"
+                ) from exc
+            planner.set_trust_diagnostics_enabled(True, aggregation=aggregation)
+
+        if getattr(cfg, "v2_enabled", False):
+            from .trust import ConsumerV2Config
+            planner.set_v2_consumer(
+                ConsumerV2Config(
+                    enabled=True,
+                    engage_threshold=float(cfg.v2_engage_threshold),
+                    disengage_threshold=float(cfg.v2_disengage_threshold),
+                    T_engage=int(cfg.v2_T_engage),
+                    T_disengage=int(cfg.v2_T_disengage),
+                )
+            )
+        self._planner = planner
+
         sim.reset()
         solve_times: List[float] = []
         effective: List[float] = []
@@ -210,6 +251,18 @@ class Runner:
             with open(trust_log_path, "w", encoding="utf-8") as f:
                 json.dump({"seed": cfg.seed, "log": log}, f)
 
+        diagnostics_path = getattr(cfg, "trust_diagnostics_path", None)
+        if diagnostics_path:
+            episode_record = planner.get_trust_diagnostics()
+            if episode_record is not None:
+                from pathlib import Path as _P
+                _P(diagnostics_path).parent.mkdir(parents=True, exist_ok=True)
+                with open(diagnostics_path, "w", encoding="utf-8") as f:
+                    json.dump(
+                        {"seed": cfg.seed, "diagnostics": episode_record.to_dict()},
+                        f,
+                    )
+
         return RunResult(
             history=history,
             collision=collision,
@@ -230,6 +283,13 @@ class Runner:
         """Run the episode and return the full structured diagnostics."""
         result = self.run()
         return _build_diagnostics(self._config, result)
+
+    def trust_diagnostics(self):
+        """Return the typed per-step trust-diagnostics record from the
+        most recent ``run()``, or ``None`` if diagnostics were disabled."""
+        if self._planner is None:
+            return None
+        return self._planner.get_trust_diagnostics()
 
 
 def _inherit_bcvf(mppi_cfg: MPPIConfig, bcvf_cfg: BCVFConfig) -> MPPIConfig:

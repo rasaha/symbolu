@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+import numpy as np
+
 from ..manifold import wrap_angle
 from .base import BasePredictor, BicycleConfig, PredictorState
 
@@ -87,3 +89,107 @@ class VisualOdometry(BasePredictor):
             state.theta = fs.theta
             self._noise_multiplier = self.FROZEN_WALK_STD / self.NOMINAL_POSITION_STD
         return state
+
+    # --- vectorized batch path ---
+
+    def predict_batch(self, controls_batch: np.ndarray) -> np.ndarray:
+        """Vectorized K-rollout forward simulation.
+
+        Tricky cases for VO:
+
+        - The cumulative drift in :meth:`evolve_state` is a scalar
+          random-walk (broadcast across K — same as M1).
+        - Tracking loss freezes ``state`` at the first H-step where
+          ``scale >= 0.5``. The freeze step is the *same* across
+          rollouts (depends only on time), so we capture the per-
+          rollout state at that step into ``(K,)`` frozen arrays.
+          Subsequent steps replace the propagated state with the
+          per-rollout frozen state.
+        - The degradation-phase heading jump uses one ``rng.random()``
+          and (if triggered) one ``rng.normal()`` — both scalar; the
+          jump is applied to all K headings identically. This matches
+          the per-rollout loop because each rollout's reset RNG sees
+          the same draws at the same H-step.
+        """
+        ctrl = np.asarray(controls_batch, dtype=np.float64)
+        if ctrl.ndim != 3 or ctrl.shape[2] != 2:
+            raise ValueError(
+                f"controls_batch must have shape (K, H, 2); got {ctrl.shape}"
+            )
+        K, H, _ = ctrl.shape
+
+        self._reset_call_context()
+        cfg = self.bicycle_config
+        dt = cfg.dt
+        s = self._state
+        state_x = np.full(K, s.x, dtype=np.float64)
+        state_y = np.full(K, s.y, dtype=np.float64)
+        state_th = np.full(K, s.theta, dtype=np.float64)
+
+        out = np.zeros((K, H, 3), dtype=np.float64)
+        rng = self._rng
+        f = self._failure
+        # Per-rollout frozen state, captured at the first tracking-loss
+        # step. None until then.
+        frozen_x: Optional[np.ndarray] = None
+        frozen_y: Optional[np.ndarray] = None
+        frozen_th: Optional[np.ndarray] = None
+
+        for h in range(H):
+            state_x, state_y, state_th = self.bicycle_step_batch(
+                state_x, state_y, state_th, ctrl[:, h, 0], ctrl[:, h, 1],
+            )
+            # evolve_state — cumulative drift random walk (scalar
+            # accumulator, broadcast across K).
+            self._drift_x += float(rng.normal(0.0, self.NOMINAL_DRIFT_RATE))
+            self._drift_y += float(rng.normal(0.0, self.NOMINAL_DRIFT_RATE))
+            state_x = state_x + self._drift_x
+            state_y = state_y + self._drift_y
+
+            # apply_failure
+            time = self._state.timestamp + (h + 1) * dt
+            if not f.active or time < f.onset_time:
+                self._noise_multiplier = 1.0
+            else:
+                elapsed = time - f.onset_time
+                progress = 1.0
+                if f.ramp_duration > 1e-9:
+                    progress = min(1.0, elapsed / f.ramp_duration)
+                scale = progress * f.severity
+
+                if scale < 0.5:
+                    self._noise_multiplier = (
+                        1.0 + scale * self.DEGRADATION_NOISE_MULT
+                    )
+                    # Heading-jump branch — consumes 1 rng.random() per
+                    # step, plus 1 rng.normal() if triggered.
+                    if rng.random() < scale * self.HEADING_JUMP_PROB_MAX:
+                        jump = float(
+                            rng.normal(0.0, self.HEADING_JUMP_STD)
+                        )
+                        raw = state_th + jump
+                        state_th = np.arctan2(np.sin(raw), np.cos(raw))
+                else:
+                    if frozen_x is None:
+                        frozen_x = state_x.copy()
+                        frozen_y = state_y.copy()
+                        frozen_th = state_th.copy()
+                    state_x = frozen_x
+                    state_y = frozen_y
+                    state_th = frozen_th
+                    self._noise_multiplier = (
+                        self.FROZEN_WALK_STD / self.NOMINAL_POSITION_STD
+                    )
+
+            # apply_noise — per-step observation noise.
+            mult = self._noise_multiplier
+            nx = float(rng.normal(0.0, self.NOMINAL_POSITION_STD * mult))
+            ny = float(rng.normal(0.0, self.NOMINAL_POSITION_STD * mult))
+            nth = float(rng.normal(0.0, self.NOMINAL_HEADING_STD * mult))
+            obs_th = state_th + nth
+            obs_th = np.arctan2(np.sin(obs_th), np.cos(obs_th))
+            out[:, h, 0] = state_x + nx
+            out[:, h, 1] = state_y + ny
+            out[:, h, 2] = obs_th
+
+        return out
