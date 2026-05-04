@@ -42,6 +42,13 @@ from .stats import (
     wilson_ci,
     wilson_lower_bound,
 )
+from .reports import (
+    GRID_CSV_FIELDS,
+    render_grid_csv,
+    render_grid_markdown,
+    write_grid_csv,
+    write_grid_markdown,
+)
 from .sweep import (
     ABLATION_SEEDS,
     FAMILY_MAGNITUDES,
@@ -53,6 +60,7 @@ from .sweep import (
     SENSITIVITY_T,
     V1_DEFAULTS,
     CellResult,
+    GridSummary,
     PerConfigPassStat,
     family_pass_rate,
     per_config_pass_stats,
@@ -78,6 +86,8 @@ __all__ = [
     "CellResult",
     "FAILURE_FAMILIES",
     "FAMILY_MAGNITUDES",
+    "GRID_CSV_FIELDS",
+    "GridSummary",
     "LEGACY_PRIMARY_SEEDS",
     "NOMINAL_FAMILIES",
     "PerConfigPassStat",
@@ -95,6 +105,8 @@ __all__ = [
     "generate_trace",
     "per_config_pass_stats",
     "pick_winner_tuple",
+    "render_grid_csv",
+    "render_grid_markdown",
     "run_ablation_grid",
     "run_primary_grid",
     "run_sensitivity_grid",
@@ -102,4 +114,6 @@ __all__ = [
     "summarize_grid",
     "wilson_ci",
     "wilson_lower_bound",
+    "write_grid_csv",
+    "write_grid_markdown",
 ]

@@ -110,11 +110,16 @@ canonical use cases are:
 
 ## §4 What is intentionally not in scope
 
-* No CSV / Markdown writer. The report is a dataclass; writing it
-  to a particular regulator's format ties the module to that
-  regulator's spec. The tests show the dataclass-to-dict pattern.
-* No real-time alerting. The harness is offline / batch. A
-  streaming version is a separate project.
+* ~~No CSV / Markdown writer.~~ **Landed post-v0.7 (see §8).**
+  ``FleetSummary.to_csv(path)`` and
+  ``FleetSummary.to_markdown_report(path)`` emit auditor-facing
+  frozen artifacts; both are pure stdlib and operate on either the
+  batch ``aggregate_fleet`` output or
+  ``StreamingFleetMonitor.summary(window=...).fleet``.
+* ~~No real-time alerting. The harness is offline / batch. A
+  streaming version is a separate project.~~ **Landed post-v0.7
+  (see §7).** `StreamingFleetMonitor` provides rolling-window
+  summaries and threshold alert rules.
 * No statistical-significance testing on the deltas (e.g.,
   "is the flip rate significantly higher this week than last
   week?"). The aggregator returns rates; the caller picks a test.
@@ -252,3 +257,33 @@ the rule simply doesn't fire.
 * Not an alertmanager. The monitor evaluates rules and returns
   `Alert` objects with `to_dict()` payloads; routing /
   rate-limiting / deduplication is the caller's job.
+
+## §8 Frozen artifacts — FleetSummary CSV + Markdown writers
+
+`FleetSummary` exposes two regulator-facing writers so the SOTIF
+clause-10 (operational design + field monitoring) audit pack ships
+frozen deliverables, not a Python dataclass:
+
+* `fleet_summary.to_csv(path)` — one row per episode with the
+  headline metrics (id, classification, n_steps, M, argmax-flips +
+  flip rate, V2 state flips, near-vetoes, fraction engaged,
+  deadband-fired rate, BCVF totals, excluded-ever count). RFC-4180
+  quoted via stdlib `csv`; column order pinned in
+  `analysis.FLEET_CSV_FIELDS`.
+* `fleet_summary.to_markdown_report(path, label=..., generated_at=...)`
+  — fleet-level narrative with six sections: headline aggregates,
+  classification breakdown, per-predictor exclusion incidence,
+  near-veto roster, V2 state-flip roster, and a top-K per-episode
+  index sorted by argmax-flip rate. Deterministic up to
+  `generated_at`.
+
+`render_fleet_csv` / `render_fleet_markdown` produce strings without
+writing to disk; `write_fleet_csv` / `write_fleet_markdown` write
+files (and `mkdir(parents=True, exist_ok=True)` on the way down).
+
+Both writers are pure stdlib (no extra dependencies) and operate
+on duck-typed inputs — the same renderer works on a `FleetSummary`
+returned by `aggregate_fleet` or by
+`StreamingFleetMonitor.summary(window=...).fleet`. SOTIF audits of
+both batch (recall triage) and streaming (live SRE) pipelines emit
+identically-shaped artifacts.

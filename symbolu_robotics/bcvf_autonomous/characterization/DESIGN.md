@@ -227,11 +227,42 @@ The bound is configurable per-summarisation via
 callers that want to quote a stricter contract (e.g. 99% CI low
 ≥ 0.95 for a fully-funded SOTIF programme).
 
+## §6.2 Frozen artifacts — CSV + Markdown report writers
+
+`GridSummary` exposes two regulator-facing writers so a SOTIF /
+ISO 26262 audit pack ships frozen deliverables instead of a Python
+dataclass. Both are pure stdlib (no extra dependencies):
+
+* `summary.to_csv(path)` — one row per (family, magnitude) config
+  with the per-config Wilson 95% CI, pass count, pass rate, and
+  ``meets_certification_floor`` boolean. RFC-4180-quoted via the
+  stdlib `csv` module so a downstream Excel / pandas / audit
+  script consumer can rely on the column order
+  (`GRID_CSV_FIELDS`).
+* `summary.to_markdown_report(path)` — regulator-friendly markdown
+  with five sections: headline gate, per-(family, magnitude)
+  results, per-family roll-up, configs below the certification
+  floor (explicitly named, even if empty), and a methodology
+  block (Wilson z, certification floor, source). Deterministic
+  up to the `generated_at` timestamp; pass an explicit
+  `datetime` for byte-stable snapshots.
+
+`render_grid_csv` / `render_grid_markdown` produce the strings
+without writing to disk — useful for piping to a fluentd / Kafka /
+S3 sink directly. `write_grid_csv` / `write_grid_markdown` write
+files (and `mkdir(parents=True, exist_ok=True)` on the way).
+
+The writers were explicitly deferred in the v0.3 design comment
+*"the sweep returns dataclass cells; a caller can pipe them to
+CSV or markdown via dataclasses.asdict"*. Post-v0.7 the SOTIF
+clause-9 V&V evidence pack and the ISO 26262 Part 6 §11
+verification-of-software-safety-requirements artifact are
+explicitly auditor-facing — a regulator wants a frozen deliverable,
+not an expectation that a caller will write one. The deferral is
+retired.
+
 ## §7 What is intentionally not in scope
 
-* No CSV / report writer — the sweep returns dataclass cells; a
-  caller can pipe them to CSV or markdown via `dataclasses.asdict`.
-  Adding that here ties the suite to a particular reporting flow.
 * No simulator integration — the families synthesize trajectories
   directly. A future port can wire an MPPI rollout into the cell
   evaluator if a closed-loop characterization is ever needed.

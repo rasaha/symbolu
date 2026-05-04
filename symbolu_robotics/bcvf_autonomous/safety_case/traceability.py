@@ -224,6 +224,40 @@ _ALERT_RULE = EvidenceArtifact(
                 "deployment partner wires into alertmanager / "
                 "Grafana / pager rotations",
 )
+_GRID_REPORT_WRITER = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.characterization",
+    symbol="write_grid_markdown",
+    description="Markdown report writer for ``GridSummary`` — emits "
+                "the regulator-facing certification report (headline "
+                "gate, per-(family, magnitude) Wilson-CI table, "
+                "per-family roll-up, failed-config list, "
+                "methodology block)",
+)
+_GRID_CSV_WRITER = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.characterization",
+    symbol="write_grid_csv",
+    description="CSV writer for ``GridSummary`` — one row per "
+                "(family, magnitude) config with Wilson 95% CI "
+                "low/high, pass count, and certification-floor "
+                "verdict; RFC-4180 quoted for spreadsheet consumers",
+)
+_FLEET_REPORT_WRITER = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.analysis",
+    symbol="write_fleet_markdown",
+    description="Markdown report writer for ``FleetSummary`` — emits "
+                "the field-monitoring narrative (headline aggregates, "
+                "classification breakdown, per-predictor exclusion "
+                "incidence, near-veto + V2-state-flip rosters, "
+                "top-K per-episode index)",
+)
+_FLEET_CSV_WRITER = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.analysis",
+    symbol="write_fleet_csv",
+    description="CSV writer for ``FleetSummary`` — one row per "
+                "episode with classification, flip rates, near-veto "
+                "count, fraction engaged, BCVF totals; pinned column "
+                "order for downstream audit-script ingest",
+)
 _NEAR_VETO = EvidenceArtifact(
     module_path="symbolu_robotics.bcvf_autonomous.analysis.near_veto",
     symbol="find_near_vetoes",
@@ -391,6 +425,7 @@ def iso_21448_clauses() -> List[Clause]:
             evidence=(
                 _PRIMARY_GRID, _SUMMARIZE_GRID, _WILSON_CI,
                 _BASELINES, _PILOT, _ACCEPTANCE_TABLE,
+                _GRID_REPORT_WRITER, _GRID_CSV_WRITER,
             ),
             notes=(
                 "V&V is layered: (i) deterministic threshold gates "
@@ -401,7 +436,12 @@ def iso_21448_clauses() -> List[Clause]:
                 "Majority / Anchor; (iv) §6.2 paired A0 vs A3 pilot "
                 "with one-sided sign test + Wilson CI on win rate. "
                 "Three sabotage tests in the suite confirm V&V would "
-                "fail on a broken kernel rather than silently passing."
+                "fail on a broken kernel rather than silently passing. "
+                "``write_grid_markdown`` / ``write_grid_csv`` emit the "
+                "certification report as a frozen audit artifact "
+                "(headline gate, per-(family, magnitude) Wilson-CI "
+                "table, methodology block) — what an auditor reads "
+                "instead of a Python dataclass."
             ),
         ),
         Clause(
@@ -416,6 +456,7 @@ def iso_21448_clauses() -> List[Clause]:
             evidence=(
                 _TRUST_DIAG, _FLEET, _NEAR_VETO,
                 _STREAMING_MONITOR, _ALERT_RULE,
+                _FLEET_REPORT_WRITER, _FLEET_CSV_WRITER,
             ),
             notes=(
                 "Per-tick ``TrustShapedEpisodeRecord`` is the structured "
@@ -566,6 +607,7 @@ def iso_26262_part6_clauses() -> List[Clause]:
             ),
             evidence=(
                 _SUMMARIZE_GRID, _PILOT, _FLEET, _TRUST_DIAG,
+                _GRID_REPORT_WRITER, _FLEET_REPORT_WRITER,
             ),
             notes=(
                 "Requirement-by-requirement traceability: each "

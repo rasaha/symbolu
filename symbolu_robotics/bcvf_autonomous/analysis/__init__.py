@@ -36,6 +36,13 @@ from .flips import (
 )
 from .io import episode_record_from_dict, load_episode_from_json
 from .near_veto import NearVeto, find_near_vetoes
+from .reports import (
+    FLEET_CSV_FIELDS,
+    render_fleet_csv,
+    render_fleet_markdown,
+    write_fleet_csv,
+    write_fleet_markdown,
+)
 from .streaming import (
     Alert,
     AlertRule,
@@ -48,6 +55,7 @@ __all__ = [
     "AlertRule",
     "ArgmaxFlip",
     "EpisodeSummary",
+    "FLEET_CSV_FIELDS",
     "FleetSummary",
     "NearVeto",
     "StreamingFleetMonitor",
@@ -59,5 +67,9 @@ __all__ = [
     "find_near_vetoes",
     "find_v2_state_flips",
     "load_episode_from_json",
+    "render_fleet_csv",
+    "render_fleet_markdown",
     "summarize_episode",
+    "write_fleet_csv",
+    "write_fleet_markdown",
 ]

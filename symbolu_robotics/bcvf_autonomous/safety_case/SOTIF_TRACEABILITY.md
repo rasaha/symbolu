@@ -78,8 +78,10 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 * `symbolu_robotics.bcvf_autonomous.baselines::run_shootout` — Apples-to-apples baseline shootout — BCVF vs EKF (Mahalanobis-rejection) vs Majority-Vote vs Anchor across the seven families
 * `symbolu_robotics.bcvf_autonomous.pilot::run_pilot` — §6.2 paired A0 vs A3 pilot runner — sign test + Wilson CI + FleetSummary + Lemma-1 negative-control gate
 * `symbolu_robotics.bcvf_autonomous.characterization.sweep::_evaluate_thresholds` — Per-family acceptance thresholds — pass / fail rule table the sweep enforces (DESIGN.md §4)
+* `symbolu_robotics.bcvf_autonomous.characterization::write_grid_markdown` — Markdown report writer for ``GridSummary`` — emits the regulator-facing certification report (headline gate, per-(family, magnitude) Wilson-CI table, per-family roll-up, failed-config list, methodology block)
+* `symbolu_robotics.bcvf_autonomous.characterization::write_grid_csv` — CSV writer for ``GridSummary`` — one row per (family, magnitude) config with Wilson 95% CI low/high, pass count, and certification-floor verdict; RFC-4180 quoted for spreadsheet consumers
 
-**Notes.** V&V is layered: (i) deterministic threshold gates per family (``_evaluate_thresholds``); (ii) per-config Wilson 95% CI lower bound floor of 0.90 across the 1320-cell grid (``CERTIFICATION_FLOOR``); (iii) apples-to-apples baseline shootout against EKF / Majority / Anchor; (iv) §6.2 paired A0 vs A3 pilot with one-sided sign test + Wilson CI on win rate. Three sabotage tests in the suite confirm V&V would fail on a broken kernel rather than silently passing.
+**Notes.** V&V is layered: (i) deterministic threshold gates per family (``_evaluate_thresholds``); (ii) per-config Wilson 95% CI lower bound floor of 0.90 across the 1320-cell grid (``CERTIFICATION_FLOOR``); (iii) apples-to-apples baseline shootout against EKF / Majority / Anchor; (iv) §6.2 paired A0 vs A3 pilot with one-sided sign test + Wilson CI on win rate. Three sabotage tests in the suite confirm V&V would fail on a broken kernel rather than silently passing. ``write_grid_markdown`` / ``write_grid_csv`` emit the certification report as a frozen audit artifact (headline gate, per-(family, magnitude) Wilson-CI table, methodology block) — what an auditor reads instead of a Python dataclass.
 
 ### Clause 10 — Methodology — operational design and field monitoring
 
@@ -91,6 +93,8 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 * `symbolu_robotics.bcvf_autonomous.analysis.near_veto::find_near_vetoes` — Near-veto detector — flags ticks where a predictor approached but did not cross the exclusion threshold; the SOTIF triggering-condition near-miss surface
 * `symbolu_robotics.bcvf_autonomous.analysis::StreamingFleetMonitor` — Online fleet monitor with rolling-window summaries + threshold alerts — converts the post-hoc harness into an SRE-grade runtime monitoring surface (24-hour rolling argmax-flip rate, near-veto rate, V2 engaged fraction)
 * `symbolu_robotics.bcvf_autonomous.analysis::AlertRule` — Threshold-based alert specification on a rolling window — the runtime triggering-condition surface a deployment partner wires into alertmanager / Grafana / pager rotations
+* `symbolu_robotics.bcvf_autonomous.analysis::write_fleet_markdown` — Markdown report writer for ``FleetSummary`` — emits the field-monitoring narrative (headline aggregates, classification breakdown, per-predictor exclusion incidence, near-veto + V2-state-flip rosters, top-K per-episode index)
+* `symbolu_robotics.bcvf_autonomous.analysis::write_fleet_csv` — CSV writer for ``FleetSummary`` — one row per episode with classification, flip rates, near-veto count, fraction engaged, BCVF totals; pinned column order for downstream audit-script ingest
 
 **Notes.** Per-tick ``TrustShapedEpisodeRecord`` is the structured post-incident trace a recall investigator opens. ``FleetSummary`` aggregates across episodes — argmax-flips, near-vetoes, V2 state distribution, per-predictor exclusion incidence — exactly the surface a fleet-scale safety-monitoring tool consumes. ``StreamingFleetMonitor`` plus ``AlertRule`` lift the harness from triage-time to runtime: rolling-window summaries (e.g. 24-hour argmax-flip rate) drive threshold alerts that route into the deployment partner's pager / alertmanager pipeline. Dataset ingest is strict (no silent zero-fill on incomplete payloads) so a corrupt episode surfaces as ``ValueError`` at load time rather than as a quiet metric drift.
 
@@ -160,6 +164,8 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 * `symbolu_robotics.bcvf_autonomous.pilot::run_pilot` — §6.2 paired A0 vs A3 pilot runner — sign test + Wilson CI + FleetSummary + Lemma-1 negative-control gate
 * `symbolu_robotics.bcvf_autonomous.analysis::FleetSummary` — Fleet-scale aggregator over episode records — argmax-flips per step, near-vetoes, V2 state distribution, per-predictor exclusion incidence; the field-monitoring evidence pack
 * `symbolu_robotics.bcvf_autonomous.trust_diagnostics::TrustShapedEpisodeRecord` — Per-step trust diagnostic record — every tick's weights, BCVF cost, V2 state, near-veto incidence; the post-incident trace a recall investigator opens
+* `symbolu_robotics.bcvf_autonomous.characterization::write_grid_markdown` — Markdown report writer for ``GridSummary`` — emits the regulator-facing certification report (headline gate, per-(family, magnitude) Wilson-CI table, per-family roll-up, failed-config list, methodology block)
+* `symbolu_robotics.bcvf_autonomous.analysis::write_fleet_markdown` — Markdown report writer for ``FleetSummary`` — emits the field-monitoring narrative (headline aggregates, classification breakdown, per-predictor exclusion incidence, near-veto + V2-state-flip rosters, top-K per-episode index)
 
 **Notes.** Requirement-by-requirement traceability: each per-family threshold maps to a passing test in ``test_characterization.py``; each pilot-level acceptance gate (Lemma-1 negative control, responsive-class win rate, attribution accuracy) maps to a passing test in ``test_pilot.py``; each fleet-level metric is round-trip-tested via ``analysis.io`` strict serialisation.
 
@@ -171,6 +177,8 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 | `symbolu_robotics.bcvf_autonomous.analysis::AlertRule` | 10 |
 | `symbolu_robotics.bcvf_autonomous.analysis::FleetSummary` | 10, Part 6 §11 |
 | `symbolu_robotics.bcvf_autonomous.analysis::StreamingFleetMonitor` | 10 |
+| `symbolu_robotics.bcvf_autonomous.analysis::write_fleet_csv` | 10 |
+| `symbolu_robotics.bcvf_autonomous.analysis::write_fleet_markdown` | 10, Part 6 §11 |
 | `symbolu_robotics.bcvf_autonomous.baselines::run_shootout` | 9, Part 6 §10 |
 | `symbolu_robotics.bcvf_autonomous.characterization.stats::wilson_ci` | 9, Part 6 §9.4.4 |
 | `symbolu_robotics.bcvf_autonomous.characterization.sweep::FAMILY_MAGNITUDES` | 7 |
@@ -179,6 +187,8 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 | `symbolu_robotics.bcvf_autonomous.characterization.sweep::summarize_grid` | 9, Part 6 §9.4.4, Part 6 §11 |
 | `symbolu_robotics.bcvf_autonomous.characterization.traces::generate_trace` | 6 |
 | `symbolu_robotics.bcvf_autonomous.characterization::run_primary_grid` | 6, Part 6 §7 |
+| `symbolu_robotics.bcvf_autonomous.characterization::write_grid_csv` | 9 |
+| `symbolu_robotics.bcvf_autonomous.characterization::write_grid_markdown` | 9, Part 6 §11 |
 | `symbolu_robotics.bcvf_autonomous.core::BCVFConfig` | 5 |
 | `symbolu_robotics.bcvf_autonomous.core::compute_bcvf_cost` | 5, Part 6 §8, Part 6 §9 |
 | `symbolu_robotics.bcvf_autonomous.manifold::body_frame_error_trajectory` | 5 |

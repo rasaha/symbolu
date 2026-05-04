@@ -28,7 +28,9 @@ import itertools
 import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -646,22 +648,28 @@ def summarize_grid(
     cells: List[CellResult],
     z: float = WILSON_Z_95,
     certification_floor: float = CERTIFICATION_FLOOR,
-) -> Dict[str, Any]:
+) -> "GridSummary":
     """Top-level grid summary: per-family pass rates + FP / FN counts.
 
     Also exposes per-(family, magnitude) Wilson confidence intervals so
     a SOTIF audit can quote a per-config statistical bound rather than
-    a point estimate. The relevant fields:
+    a point estimate. The returned :class:`GridSummary` carries:
 
-    * ``per_config`` — list of dicts (one per config) with ``family``,
-      ``magnitude_label``, ``n``, ``passed``, ``pass_rate``, ``ci_low``,
-      ``ci_high``, ``meets_certification_floor``.
+    * ``per_config`` — list of :class:`PerConfigPassStat` (one per
+      config) with ``family``, ``magnitude_label``, ``n``, ``passed``,
+      ``pass_rate``, ``ci_low``, ``ci_high``, ``meets_certification_floor``.
     * ``min_ci_lower_bound`` — the worst per-config CI lower bound
       across the grid (the "weakest cell" gauge).
     * ``cells_below_certification_floor`` — labels of any configs whose
       CI lower bound undershoots ``certification_floor``.
-    * ``certification_floor`` — the floor in effect for this summary.
-    * ``wilson_z`` — the z-score used for the CIs.
+    * ``certification_floor`` and ``wilson_z`` — the bound and z-score
+      in effect for this summary.
+
+    Auditor-facing artifacts: :meth:`GridSummary.to_csv` and
+    :meth:`GridSummary.to_markdown_report` emit frozen deliverables
+    suitable for a SOTIF / ISO 26262 documentation pack.
+    ``to_dict()`` produces a JSON-friendly view with the same shape
+    callers used to read off the legacy dict return.
     """
     nominal, failure = split_nominal_failure(cells)
     config_stats = per_config_pass_stats(
@@ -674,20 +682,88 @@ def summarize_grid(
         s.magnitude_label for s in config_stats
         if not s.meets_certification_floor
     ]
-    return {
-        "n_cells": len(cells),
-        "per_family": family_pass_rate(cells),
-        "false_positive_rate": (
-            sum(1 for c in nominal if not c.cell_pass) / len(nominal)
-            if nominal else 0.0
-        ),
-        "false_negative_rate": (
-            sum(1 for c in failure if not c.cell_pass) / len(failure)
-            if failure else 0.0
-        ),
-        "per_config": [asdict(s) for s in config_stats],
-        "min_ci_lower_bound": min_ci_lower,
-        "cells_below_certification_floor": below_floor,
-        "certification_floor": certification_floor,
-        "wilson_z": z,
-    }
+    fpr = (
+        sum(1 for c in nominal if not c.cell_pass) / len(nominal)
+        if nominal else 0.0
+    )
+    fnr = (
+        sum(1 for c in failure if not c.cell_pass) / len(failure)
+        if failure else 0.0
+    )
+    return GridSummary(
+        n_cells=len(cells),
+        per_family=family_pass_rate(cells),
+        false_positive_rate=fpr,
+        false_negative_rate=fnr,
+        per_config=list(config_stats),
+        min_ci_lower_bound=min_ci_lower,
+        cells_below_certification_floor=below_floor,
+        certification_floor=certification_floor,
+        wilson_z=z,
+    )
+
+
+@dataclass
+class GridSummary:
+    """Top-level grid summary — per-family pass rates, per-config
+    Wilson CIs, and the certification-floor verdict.
+
+    Auditor-facing writers:
+
+    * :meth:`to_csv` — one row per (family, magnitude) config.
+    * :meth:`to_markdown_report` — regulator-friendly layout with
+      headline gate, per-config table, per-family roll-up,
+      methodology block, and a failed-config section.
+    * :meth:`to_dict` — JSON-friendly view; matches the shape of
+      the legacy ``summarize_grid`` dict return so existing
+      consumers can read ``GridSummary.to_dict()["per_config"]``
+      unchanged.
+    """
+
+    n_cells: int
+    per_family: Dict[str, Dict[str, Any]]
+    false_positive_rate: float
+    false_negative_rate: float
+    per_config: List[PerConfigPassStat]
+    min_ci_lower_bound: float
+    cells_below_certification_floor: List[str]
+    certification_floor: float
+    wilson_z: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "n_cells": int(self.n_cells),
+            "per_family": dict(self.per_family),
+            "false_positive_rate": float(self.false_positive_rate),
+            "false_negative_rate": float(self.false_negative_rate),
+            "per_config": [asdict(s) for s in self.per_config],
+            "min_ci_lower_bound": float(self.min_ci_lower_bound),
+            "cells_below_certification_floor": list(
+                self.cells_below_certification_floor
+            ),
+            "certification_floor": float(self.certification_floor),
+            "wilson_z": float(self.wilson_z),
+        }
+
+    def to_csv(self, path: "Union[str, Path]") -> "Path":
+        """Write the per-config CSV to ``path``. Returns the Path."""
+        from .reports import write_grid_csv
+        return write_grid_csv(self, path)
+
+    def to_markdown_report(
+        self,
+        path: "Union[str, Path]",
+        *,
+        title: str = "BCVF Characterization Grid — Certification Report",
+        grid_label: str = "primary",
+        generated_at: "Optional[datetime]" = None,
+    ) -> "Path":
+        """Write the regulator-friendly markdown report to ``path``."""
+        from .reports import write_grid_markdown
+        return write_grid_markdown(
+            self,
+            path,
+            title=title,
+            grid_label=grid_label,
+            generated_at=generated_at,
+        )

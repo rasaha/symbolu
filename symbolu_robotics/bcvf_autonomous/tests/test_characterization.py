@@ -234,9 +234,9 @@ def test_primary_grid_zero_false_positives_or_negatives():
     """DESIGN §8.1 + §8.2: every nominal family quiet, every failure family fires."""
     cells = run_primary_grid()
     summary = summarize_grid(cells)
-    assert summary["false_positive_rate"] == pytest.approx(0.0)
-    assert summary["false_negative_rate"] == pytest.approx(0.0)
-    for fam, rec in summary["per_family"].items():
+    assert summary.false_positive_rate == pytest.approx(0.0)
+    assert summary.false_negative_rate == pytest.approx(0.0)
+    for fam, rec in summary.per_family.items():
         assert rec["pass_rate"] == pytest.approx(1.0), (
             f"family {fam} failed: {rec}"
         )
@@ -291,13 +291,32 @@ def test_pick_winner_returns_none_when_no_all_pass():
 def test_summarize_grid_shapes():
     cells = run_primary_grid()
     summary = summarize_grid(cells)
-    assert "n_cells" in summary
-    assert "per_family" in summary
-    assert "false_positive_rate" in summary
-    assert "false_negative_rate" in summary
-    assert set(summary["per_family"].keys()) == set(
+    assert summary.n_cells > 0
+    assert summary.per_family
+    assert summary.false_positive_rate == 0.0
+    assert summary.false_negative_rate == 0.0
+    assert set(summary.per_family.keys()) == set(
         list(NOMINAL_FAMILIES) + list(FAILURE_FAMILIES)
     )
+
+
+def test_summarize_grid_to_dict_matches_legacy_shape():
+    """``GridSummary.to_dict()`` mirrors the dict shape callers used to
+    read off the legacy ``summarize_grid`` return — preserves the JSON
+    contract for downstream consumers (artifact archives, dashboards)."""
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    payload = summary.to_dict()
+    expected_keys = {
+        "n_cells", "per_family",
+        "false_positive_rate", "false_negative_rate",
+        "per_config", "min_ci_lower_bound",
+        "cells_below_certification_floor",
+        "certification_floor", "wilson_z",
+    }
+    assert expected_keys.issubset(payload.keys())
+    assert payload["n_cells"] == summary.n_cells
+    assert payload["false_positive_rate"] == summary.false_positive_rate
 
 
 # --------------------------------------------------------------------------- #
@@ -313,9 +332,9 @@ def test_primary_grid_passes_at_m_equals_4():
     """
     cells = run_primary_grid(M=4)
     summary = summarize_grid(cells)
-    assert summary["false_positive_rate"] == pytest.approx(0.0)
-    assert summary["false_negative_rate"] == pytest.approx(0.0)
-    for fam, rec in summary["per_family"].items():
+    assert summary.false_positive_rate == pytest.approx(0.0)
+    assert summary.false_negative_rate == pytest.approx(0.0)
+    for fam, rec in summary.per_family.items():
         assert rec["pass_rate"] == pytest.approx(1.0), (
             f"M=4: family {fam} failed: {rec}"
         )
@@ -606,24 +625,19 @@ def test_per_config_pass_stats_threshold_edge_accel_03_clears_floor():
 def test_summarize_grid_exposes_per_config_ci_fields():
     cells = run_primary_grid()
     summary = summarize_grid(cells)
-    for key in (
-        "per_config",
-        "min_ci_lower_bound",
-        "cells_below_certification_floor",
-        "certification_floor",
-        "wilson_z",
-    ):
-        assert key in summary
-    assert summary["certification_floor"] == CERTIFICATION_FLOOR
-    assert summary["wilson_z"] == WILSON_Z_95
-    # Each per_config entry serialises to a dict with the documented keys.
-    sample = summary["per_config"][0]
-    expected_keys = {
+    assert summary.certification_floor == CERTIFICATION_FLOOR
+    assert summary.wilson_z == WILSON_Z_95
+    assert summary.min_ci_lower_bound > 0.0
+    assert isinstance(summary.cells_below_certification_floor, list)
+    assert len(summary.per_config) > 0
+    # Each per_config entry is a PerConfigPassStat with the documented attributes.
+    sample = summary.per_config[0]
+    for attr in (
         "family", "magnitude_label", "family_params",
         "n", "passed", "pass_rate", "ci_low", "ci_high",
         "meets_certification_floor",
-    }
-    assert expected_keys.issubset(sample.keys())
+    ):
+        assert hasattr(sample, attr)
 
 
 def test_primary_grid_meets_certification_floor():
@@ -638,15 +652,15 @@ def test_primary_grid_meets_certification_floor():
     """
     cells = run_primary_grid()
     summary = summarize_grid(cells)
-    below = summary["cells_below_certification_floor"]
+    below = summary.cells_below_certification_floor
     assert below == [], (
         f"{len(below)} config(s) below floor "
-        f"{summary['certification_floor']}: {below}; "
-        f"min_ci_lower_bound = {summary['min_ci_lower_bound']:.4f}"
+        f"{summary.certification_floor}: {below}; "
+        f"min_ci_lower_bound = {summary.min_ci_lower_bound:.4f}"
     )
     # Belt and suspenders: at clean-kernel 60/60 the minimum Wilson
     # lower bound across the grid sits at ~0.94 (well clear of 0.90).
-    assert summary["min_ci_lower_bound"] >= 0.93
+    assert summary.min_ci_lower_bound >= 0.93
 
 
 def test_summarize_grid_stricter_floor_can_flag_clean_kernel():
@@ -656,8 +670,8 @@ def test_summarize_grid_stricter_floor_can_flag_clean_kernel():
     actually binds — i.e. it is not vacuous."""
     cells = run_primary_grid()
     summary = summarize_grid(cells, certification_floor=0.95)
-    assert len(summary["cells_below_certification_floor"]) == 22
-    assert summary["min_ci_lower_bound"] < 0.95
+    assert len(summary.cells_below_certification_floor) == 22
+    assert summary.min_ci_lower_bound < 0.95
 
 
 def test_summarize_grid_flags_synthetic_below_floor_cell():
@@ -672,9 +686,131 @@ def test_summarize_grid_flags_synthetic_below_floor_cell():
         if c.family == "accelerating" and c.family_params.get("accel_mag") == 0.3:
             c.cell_pass = False
     summary = summarize_grid(cells)
-    assert summary["cells_below_certification_floor"] == [label]
+    assert summary.cells_below_certification_floor == [label]
     sabotaged = next(
-        s for s in summary["per_config"] if s["magnitude_label"] == label
+        s for s in summary.per_config if s.magnitude_label == label
     )
-    assert sabotaged["passed"] == 0
-    assert sabotaged["ci_low"] < CERTIFICATION_FLOOR
+    assert sabotaged.passed == 0
+    assert sabotaged.ci_low < CERTIFICATION_FLOOR
+
+
+# --------------------------------------------------------------------------- #
+# Report writers — CSV + Markdown frozen artifacts (DESIGN §6.2)
+# --------------------------------------------------------------------------- #
+
+
+def test_grid_summary_to_csv_writes_header_and_one_row_per_config(tmp_path):
+    """One row per (family, magnitude) config + one header row.
+    22 configs ⇒ 23 lines."""
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    out = summary.to_csv(tmp_path / "grid.csv")
+    assert out.exists()
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 23
+    header = lines[0].split(",")
+    assert header == [
+        "family", "magnitude_label", "family_params",
+        "n", "passed", "pass_rate", "ci_low", "ci_high",
+        "meets_certification_floor",
+    ]
+
+
+def test_grid_summary_to_csv_quotes_special_characters(tmp_path):
+    """Magnitude labels carry ``[`` and ``=`` — the CSV must round-trip
+    cleanly through stdlib csv.reader."""
+    import csv as _csv
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    out = summary.to_csv(tmp_path / "grid.csv")
+    with open(out, "r", encoding="utf-8", newline="") as f:
+        rows = list(_csv.DictReader(f))
+    assert len(rows) == 22
+    assert all(r["meets_certification_floor"] == "true" for r in rows)
+    assert any(r["magnitude_label"] == "accelerating[accel_mag=0.3]" for r in rows)
+
+
+def test_grid_summary_to_csv_records_failed_config(tmp_path):
+    """A sabotaged config writes ``meets_certification_floor=false``
+    in the CSV — the auditor can grep the failure without parsing markdown."""
+    import csv as _csv
+    cells = run_primary_grid()
+    label = "accelerating[accel_mag=0.3]"
+    for c in cells:
+        if c.family == "accelerating" and c.family_params.get("accel_mag") == 0.3:
+            c.cell_pass = False
+    summary = summarize_grid(cells)
+    out = summary.to_csv(tmp_path / "grid.csv")
+    with open(out, "r", encoding="utf-8", newline="") as f:
+        rows = list(_csv.DictReader(f))
+    sabotaged = next(r for r in rows if r["magnitude_label"] == label)
+    assert sabotaged["meets_certification_floor"] == "false"
+    assert sabotaged["passed"] == "0"
+
+
+def test_grid_summary_to_markdown_report_has_required_sections(tmp_path):
+    """A regulator-friendly markdown report must include the headline
+    gate, the per-config table, the per-family roll-up, the failed-
+    config section, and the methodology block."""
+    from datetime import datetime, timezone
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    out = summary.to_markdown_report(
+        tmp_path / "report.md",
+        generated_at=datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+    )
+    md = out.read_text(encoding="utf-8")
+    for section in (
+        "# BCVF Characterization Grid",
+        "## Headline gate",
+        "## Per-(family, magnitude) results",
+        "## Per-family roll-up",
+        "## Configs below the certification floor",
+        "## Methodology",
+    ):
+        assert section in md, f"missing section: {section}"
+    # Headline numbers appear in plain text.
+    assert "PASS" in md
+    assert "0.90" in md   # certification floor
+    assert "0.9398" in md or "0.9399" in md   # min CI lower bound (~0.940)
+
+
+def test_grid_summary_to_markdown_report_lists_failing_config(tmp_path):
+    """The failed-config section explicitly names the offending
+    magnitude — an auditor can read the failure without re-running
+    the sweep."""
+    cells = run_primary_grid()
+    label = "accelerating[accel_mag=0.3]"
+    for c in cells:
+        if c.family == "accelerating" and c.family_params.get("accel_mag") == 0.3:
+            c.cell_pass = False
+    summary = summarize_grid(cells)
+    out = summary.to_markdown_report(tmp_path / "report.md")
+    md = out.read_text(encoding="utf-8")
+    assert label in md
+    # The headline gate flips to FAIL when at least one config is below.
+    assert "FAIL" in md
+
+
+def test_grid_summary_markdown_render_is_deterministic():
+    """Same summary + same generated_at ⇒ byte-identical markdown."""
+    from datetime import datetime, timezone
+    from symbolu_robotics.bcvf_autonomous.characterization import (
+        render_grid_markdown,
+    )
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    ts = datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc)
+    a = render_grid_markdown(summary, generated_at=ts)
+    b = render_grid_markdown(summary, generated_at=ts)
+    assert a == b
+
+
+def test_grid_summary_to_csv_creates_parent_directories(tmp_path):
+    """The writer must mkdir parents on the way down — auditors don't
+    pre-create result directories before invoking the writer."""
+    cells = run_primary_grid()
+    summary = summarize_grid(cells)
+    nested = tmp_path / "deep" / "nested" / "audit_pack"
+    out = summary.to_csv(nested / "grid.csv")
+    assert out.exists()
