@@ -407,6 +407,36 @@ _REAL_TIME_BUDGET = EvidenceArtifact(
                 "rationale; §9 for the five ship-when-ready criteria "
                 "gating STABLE_API graduation.",
 )
+_CALIBRATION_SET = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.calibration",
+    symbol="CalibrationSet",
+    description="Versioned, hash-identified, kernel-version-"
+                "validated calibration bundle — bundles per-"
+                "deployment tuning knobs (BCVFConfig + "
+                "ConsumerV2Config + BicycleConfig + RealTimeBudget + "
+                "DDSQoSProfile + SafetyStateMachineConfig + per-"
+                "predictor FailureConfig + expected_metrics range "
+                "map) into a single JSON-serialisable artifact a "
+                "fleet operator distributes, signs, and version-"
+                "controls. SHA-256 digest over canonical JSON is "
+                "the bundle's identity; ``kernel_version`` field is "
+                "validated against ``bcvf_autonomous.__version__`` "
+                "at load. See CALIBRATION_DESIGN.md §2 + §3 for the "
+                "bundle contract + integrity discipline.",
+)
+_CALIBRATION_DRIFT_DETECTOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.calibration",
+    symbol="CalibrationDriftDetector",
+    description="Live-fleet vs deployed-calibration drift signal "
+                "— compares ``WindowedFleetSummary`` aggregates "
+                "against the calibration's ``expected_metrics`` "
+                "ranges and emits typed ``CalibrationDriftAlert`` "
+                "records per range violation. Composes with "
+                "``StreamingFleetMonitor`` via the same dotted-path "
+                "metric surface ``AlertRule`` walks; the deployment "
+                "partner unions both alert streams. See "
+                "CALIBRATION_DESIGN.md §4 + §6.",
+)
 _LATENCY_MONITOR = EvidenceArtifact(
     module_path="symbolu_robotics.bcvf_autonomous.realtime",
     symbol="LatencyMonitor",
@@ -705,9 +735,13 @@ def iso_21448_clauses() -> List[Clause]:
                 "(SBOM) of every dependency the runtime composition "
                 "carries into the field."
             ),
-            evidence=(_SBOM_GENERATOR,),
+            evidence=(
+                _SBOM_GENERATOR,
+                _CALIBRATION_SET,
+                _CALIBRATION_DRIFT_DETECTOR,
+            ),
             notes=(
-                "**Configuration-management deliverable**: "
+                "**Configuration-management deliverable (SBOM)**: "
                 "``safety_case/SBOM.cdx.json`` is a CycloneDX 1.5 "
                 "manifest enumerating every runtime dependency with "
                 "version + SPDX license. Generated deterministically "
@@ -722,7 +756,23 @@ def iso_21448_clauses() -> List[Clause]:
                 "covers the ``bcvf_autonomous`` import graph only. "
                 "An OEM's full vehicle-stack SBOM aggregates this "
                 "manifest alongside their own. See "
-                "``ROS2_DDS_SBOM_DESIGN.md`` §6 for design rationale."
+                "``ROS2_DDS_SBOM_DESIGN.md`` §6 for design rationale. "
+                "**Configuration-management deliverable (calibration)**: "
+                "``CalibrationSet`` is the sibling deployment artifact "
+                "— a JSON-serialisable bundle of per-deployment tuning "
+                "knobs (BCVFConfig + ConsumerV2Config + BicycleConfig + "
+                "RealTimeBudget + DDSQoSProfile + SafetyStateMachineConfig "
+                "+ per-predictor FailureConfig + expected_metrics ranges) "
+                "with SHA-256 digest identity + kernel_version validation. "
+                "``CalibrationDriftDetector`` walks the calibration's "
+                "expected_metrics against a live ``WindowedFleetSummary`` "
+                "and emits typed ``CalibrationDriftAlert`` records per "
+                "range violation. The drift surface composes with "
+                "``StreamingFleetMonitor``'s existing AlertRule via the "
+                "same dotted-path metric resolver. See "
+                "``CALIBRATION_DESIGN.md`` for the full design, "
+                "including the strict-validation discipline that "
+                "rejects tampered bundles at load time."
             ),
         ),
     ]
