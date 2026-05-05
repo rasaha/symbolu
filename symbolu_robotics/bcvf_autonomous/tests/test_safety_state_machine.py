@@ -958,6 +958,287 @@ def test_state_transition_consistency_fault_to_failsafe(seed):
     )
 
 
+# --------------------------------------------------------------------------- #
+# Audit-fix regression pins (post-v0.7 critical-audit pass)
+# --------------------------------------------------------------------------- #
+#
+# The first wave of audit-fix pins for the safety_state surface
+# — each pins a contract the original implementation violated.
+# A future refactor that reverts the fix re-fails the suite.
+
+
+def test_audit_fix_single_near_veto_tick_does_not_transition_at_startup():
+    """Audit Finding 2: rate predicates must divide by capacity,
+    not by current window length. Otherwise a single near-veto
+    tick at startup gives rate 1/1 = 1.0 → instant NORMAL →
+    DEGRADED, defeating the §3 single-tick chatter-immunity claim.
+    """
+    machine = SafetyStateMachine()  # default config (window=200)
+    machine.observe(_tick(consec_suspect=(3, 0, 0, 0)))
+    assert machine.state == SafetyState.NORMAL, (
+        "single near-veto tick at startup transitioned NORMAL→DEGRADED "
+        "— rate predicate is dividing by len() not capacity"
+    )
+
+
+def test_audit_fix_single_high_bcvf_tick_does_not_satisfy_active_rate():
+    """Audit Finding 2 (companion): bcvf_active_rate must also
+    divide by capacity, not current length."""
+    win = RollingWindow(capacity=100)
+    win.append(_tick(bcvf_total=10.0))
+    # One high-BCVF tick out of capacity 100 → rate 0.01.
+    assert win.bcvf_active_rate(threshold=0.05) == pytest.approx(0.01)
+
+
+def test_audit_fix_near_veto_rate_uses_capacity_not_length():
+    win = RollingWindow(capacity=200)
+    win.append(_tick(consec_suspect=(5, 0, 0, 0)))
+    assert win.near_veto_rate(consec_floor=3) == pytest.approx(1.0 / 200)
+
+
+def test_audit_fix_manual_reset_clears_rolling_window_for_failsafe():
+    """Audit Finding 1: reset_with_diagnostic_clear must clear the
+    rolling window. Otherwise the very next observe()-on-quiet-tick
+    re-fires FAULT → FAILSAFE because the window still satisfies
+    distinct_excluded_predictors ≥ 2.
+    """
+    machine = SafetyStateMachine()
+    _drive_to_failsafe(machine)
+    machine.reset_with_diagnostic_clear(
+        operator="alice", reason="vehicle inspected"
+    )
+    assert machine.state == SafetyState.FAULT
+    # Feed many quiet ticks — should NOT re-escalate since the
+    # window was cleared on reset.
+    for _ in range(500):
+        machine.observe(_tick())
+    assert machine.state == SafetyState.FAULT, (
+        "machine re-escalated to FAILSAFE after manual reset — "
+        "rolling window was not cleared on reset"
+    )
+
+
+def test_audit_fix_manual_reset_clears_rolling_window_for_fault():
+    """Audit Finding 1 (companion): same discipline for FAULT →
+    DEGRADED reset. Without window clear, sustained-bad telemetry
+    still in the window re-fires DEGRADED → FAULT."""
+    machine = SafetyStateMachine()
+    _drive_to_fault(machine)
+    machine.reset_with_diagnostic_clear(
+        operator="bob", reason="diagnostic checked + cleared"
+    )
+    assert machine.state == SafetyState.DEGRADED
+    # Feed many quiet ticks — should NOT re-escalate.
+    for _ in range(500):
+        machine.observe(_tick())
+    # Eventually recovers DEGRADED → NORMAL on sustained dwell.
+    # Either DEGRADED or NORMAL is fine — what must NOT happen is
+    # re-escalation back to FAULT.
+    assert machine.state in (SafetyState.DEGRADED, SafetyState.NORMAL)
+
+
+def test_audit_fix_manual_reset_rejects_whitespace_only_operator():
+    """Audit Finding 4: whitespace-only operator name destroys the
+    audit-trail identity-attribution discipline."""
+    machine = SafetyStateMachine()
+    _drive_to_fault(machine)
+    with pytest.raises(ValueError, match="non-whitespace"):
+        machine.reset_with_diagnostic_clear("   ", "valid reason")
+
+
+def test_audit_fix_manual_reset_rejects_whitespace_only_reason():
+    machine = SafetyStateMachine()
+    _drive_to_fault(machine)
+    with pytest.raises(ValueError, match="non-whitespace"):
+        machine.reset_with_diagnostic_clear("op", "\n\t  ")
+
+
+def test_audit_fix_transition_log_entries_returns_immutable_tuple():
+    """Audit Finding 3: entries() must return a tuple, not the
+    underlying list — otherwise a caller can mutate the audit
+    trail."""
+    machine = SafetyStateMachine()
+    _drive_to_degraded(machine)
+    entries = machine.transition_log.entries()
+    assert isinstance(entries, tuple)
+    # Tuples are immutable — no .append, .clear, .pop, etc.
+    with pytest.raises(AttributeError):
+        entries.append("garbage")  # type: ignore[attr-defined]
+
+
+def test_audit_fix_transition_log_clear_requires_force_kwarg():
+    """Audit Finding 3 (companion): clear() must require force=True
+    so a casual caller cannot wipe the audit trail accidentally."""
+    machine = SafetyStateMachine()
+    _drive_to_degraded(machine)
+    n_before = len(machine.transition_log)
+    assert n_before > 0
+    with pytest.raises(SafetyStateMachineError, match="destructive"):
+        machine.transition_log.clear()
+    # Still has the entries — clear() refused.
+    assert len(machine.transition_log) == n_before
+    # Explicit force=True works.
+    machine.transition_log.clear(force=True)
+    assert len(machine.transition_log) == 0
+
+
+# --------------------------------------------------------------------------- #
+# Coverage gaps (Findings 5, 6, 7) — pinning under-tested contracts
+# --------------------------------------------------------------------------- #
+
+
+def test_failsafe_state_has_no_automatic_transitions():
+    """Audit Finding 5: design doc §4 says 'There is intentionally
+    no automatic recovery from FAULT or FAILSAFE.' Pinned by
+    feeding every shape of tick into a FAILSAFE machine — state
+    must remain FAILSAFE and the transition log must not gain
+    automatic entries.
+    """
+    machine = SafetyStateMachine()
+    _drive_to_failsafe(machine)
+    n_log_entries_before = len(machine.transition_log)
+    rng = np.random.default_rng(42)
+    # Feed 1000 ticks of mixed shapes — quiet, near-veto, high-
+    # BCVF, single-excluded, multi-excluded, fully-clean.
+    for i in range(1000):
+        kind = i % 6
+        if kind == 0:
+            machine.observe(_tick())  # quiet
+        elif kind == 1:
+            machine.observe(_tick(consec_suspect=(5, 0, 0, 0)))
+        elif kind == 2:
+            machine.observe(_tick(bcvf_total=float(rng.uniform(0.0, 1.0))))
+        elif kind == 3:
+            machine.observe(_tick(excluded=(True, False, False, False)))
+        elif kind == 4:
+            machine.observe(_tick(excluded=(True, True, True, True)))
+        else:
+            machine.observe(
+                _tick(bcvf_total=0.5, excluded=(True, True, False, False))
+            )
+        assert machine.state == SafetyState.FAILSAFE, (
+            f"FAILSAFE auto-transitioned at tick {i} to {machine.state}"
+        )
+    # No new transition log entries (only manual resets can add).
+    assert len(machine.transition_log) == n_log_entries_before
+
+
+def test_escalation_wins_over_recovery_on_same_tick():
+    """Audit Finding 6: the dispatcher checks escalation first,
+    returning early on transition. The §6 direct-jump prohibition
+    relies on this: a tick that simultaneously satisfies the
+    recovery predicate AND the escalation predicate must
+    escalate, not recover.
+
+    Setup: drive into DEGRADED via near-veto ticks, then feed
+    high-BCVF ticks (no near-veto) to push the rate below
+    threshold and grow the recovery dwell counter, then add
+    exclusion to the trailing ticks so the persistence + BCVF
+    predicate fires on the same tick the recovery predicate
+    crosses T_recovery. Escalation must win.
+    """
+    cfg = SafetyStateMachineConfig(
+        rolling_window_ticks=20,
+        near_veto_rate_threshold=0.50,
+        near_veto_consec_floor=3,
+        bcvf_active_threshold=0.05,
+        bcvf_active_rate_threshold=0.50,
+        exclusion_persistence_ticks=5,
+        t_recovery_ticks=10,
+    )
+    machine = SafetyStateMachine(cfg)
+    # Phase 1: drive to DEGRADED. 11 near-veto ticks → window
+    # has 11 near-veto, n_near/cap = 11/20 = 0.55 > 0.50.
+    for _ in range(11):
+        machine.observe(_tick(consec_suspect=(3, 0, 0, 0)))
+    assert machine.state == SafetyState.DEGRADED
+    # Phase 2: 6 ticks of high-BCVF + no-exclusion + no-near-veto.
+    # These push the recovery dwell counter up while satisfying
+    # the bcvf_active_rate predicate but not the persistence one.
+    for _ in range(6):
+        machine.observe(_tick(bcvf_total=0.5))
+    assert machine.state == SafetyState.DEGRADED
+    # Phase 3: 4 ticks of high-BCVF + excluded[0]=True + no-near-
+    # veto. These build up the exclusion persistence to 4 (one
+    # short of the 5-tick requirement). At this point the recovery
+    # dwell counter is also building.
+    for _ in range(4):
+        machine.observe(
+            _tick(bcvf_total=0.5, excluded=(True, False, False, False))
+        )
+    assert machine.state == SafetyState.DEGRADED
+    # Phase 4: ONE more tick that simultaneously crosses the
+    # exclusion-persistence threshold (now 5 consecutive at tail)
+    # AND would trigger recovery if escalation didn't win
+    # (near-veto rate < 0.50 and below-threshold dwell ≥
+    # t_recovery_ticks=10).
+    machine.observe(
+        _tick(bcvf_total=0.5, excluded=(True, False, False, False))
+    )
+    # Escalation must win: state is FAULT, not NORMAL.
+    assert machine.state == SafetyState.FAULT, (
+        f"escalation lost to recovery on simultaneous-trigger tick; "
+        f"state={machine.state}. The §6 direct-jump prohibition "
+        f"relies on escalation-first dispatch order."
+    )
+
+
+def test_observe_record_walks_transitions_at_correct_tick_indices():
+    """Audit Finding 7: batch-mode replay of a TrustShapedEpisodeRecord
+    must walk transitions at the row indices where triggers cross.
+    Pinned by constructing a record whose first half is quiet and
+    second half is near-veto; the resulting transition log must
+    record the NORMAL → DEGRADED edge with a tick_index in the
+    expected band.
+    """
+    M = 4
+    n_quiet = 30
+    n_near_veto = 50
+    T = n_quiet + n_near_veto
+    consec = np.zeros((T, M), dtype=np.int64)
+    consec[n_quiet:, 0] = 5  # near-veto on predictor 0 throughout the bad half
+    record = TrustShapedEpisodeRecord(
+        n_steps=T,
+        M=M,
+        aggregation=RolloutAggregation.MEAN,
+        per_step_weights=np.full((T, M), 1.0 / M),
+        per_step_costs=np.zeros((T, M)),
+        per_step_residuals=np.zeros((T, M)),
+        per_step_ema_mean=np.zeros((T, M)),
+        per_step_ema_std=np.zeros((T, M)),
+        per_step_bcvf_total=np.zeros(T),
+        per_step_deadband_active_count=np.zeros(T, dtype=np.int64),
+        per_step_deadband_fired=np.zeros(T, dtype=bool),
+        per_step_is_excluded=np.zeros((T, M), dtype=bool),
+        per_step_gate_activations=np.zeros(T, dtype=np.int64),
+        per_step_consec_suspect=consec,
+    )
+    cfg = SafetyStateMachineConfig(
+        rolling_window_ticks=20,
+        near_veto_rate_threshold=0.50,
+        near_veto_consec_floor=3,
+    )
+    machine = SafetyStateMachine(cfg)
+    final_state = machine.observe(record, tick_index=0)
+    assert final_state == SafetyState.DEGRADED
+    log = machine.transition_log.entries()
+    assert len(log) == 1
+    entry = log[0]
+    assert entry.transition.from_state == SafetyState.NORMAL
+    assert entry.transition.to_state == SafetyState.DEGRADED
+    # Transition must fire somewhere in the near-veto half (≥ n_quiet)
+    # and within capacity ticks of it (since the rate must clear the
+    # 0.50 threshold = 11 near-veto ticks in window 20 = 11 ticks
+    # into the near-veto section).
+    assert entry.tick_index >= n_quiet, (
+        f"transition fired before the near-veto section: "
+        f"tick_index={entry.tick_index}, n_quiet={n_quiet}"
+    )
+    assert entry.tick_index <= n_quiet + cfg.rolling_window_ticks, (
+        f"transition took too long to fire: tick_index={entry.tick_index}"
+    )
+
+
 def test_state_transition_consistency_grid_covers_all_asil_d_transitions():
     """Meta-pin: every ASIL-D transition has a state_transition_
     consistency family above. A future contributor adding an

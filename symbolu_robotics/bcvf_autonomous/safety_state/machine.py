@@ -139,12 +139,21 @@ def _utc_now() -> datetime:
 
 @dataclass
 class StateTransitionLog:
-    """Append-only log of transition entries.
+    """Append-only audit log of transition entries.
 
-    Wraps a list with a typed read-only view. Tests assert on the
-    list contents directly via :meth:`entries`; production callers
-    read :meth:`as_tuple` for an immutable snapshot they can
-    serialize without worrying about concurrent mutation.
+    The log is the load-bearing audit-trail evidence for §5
+    ASIL-B manual-reset bookkeeping. The machine's
+    :meth:`SafetyStateMachine._transition` method is the only
+    documented append path; callers consume the log via
+    :meth:`entries` (immutable tuple) or
+    :meth:`as_tuple` (alias).
+
+    Audit-fix: previously :meth:`entries` returned the underlying
+    ``List[StateTransitionLogEntry]`` — a caller could
+    ``.entries().clear()`` and silently destroy the audit trail.
+    The method now returns ``tuple(self._entries)``, and the
+    public :meth:`clear` is gated behind an explicit ``force=True``
+    kwarg so a casual call can't wipe the log.
     """
 
     _entries: List[StateTransitionLogEntry] = field(default_factory=list)
@@ -152,9 +161,15 @@ class StateTransitionLog:
     def append(self, entry: StateTransitionLogEntry) -> None:
         self._entries.append(entry)
 
-    def entries(self) -> List[StateTransitionLogEntry]:
-        """Live list — caller must not mutate (machine appends)."""
-        return self._entries
+    def entries(self) -> Tuple[StateTransitionLogEntry, ...]:
+        """Immutable snapshot of every recorded transition.
+
+        Returns a tuple so a caller cannot mutate the underlying
+        log. For an iteration-friendly view that doesn't allocate
+        a new tuple each call, use ``as_tuple()`` (same return
+        type, retained for documentation symmetry).
+        """
+        return tuple(self._entries)
 
     def as_tuple(self) -> Tuple[StateTransitionLogEntry, ...]:
         return tuple(self._entries)
@@ -162,9 +177,23 @@ class StateTransitionLog:
     def __len__(self) -> int:
         return len(self._entries)
 
-    def clear(self) -> None:
-        """Clear the log. Used by tests + by an explicit
-        diagnostic clear that wants to wipe pre-incident history."""
+    def __iter__(self):
+        return iter(self._entries)
+
+    def clear(self, *, force: bool = False) -> None:
+        """Clear the log. Gated behind ``force=True`` because
+        wiping the audit trail is a destructive operation that
+        a casual caller should never trigger by accident.
+
+        Use cases for ``force=True``: test fixtures that need a
+        fresh log, an explicit operator-driven log roll-over
+        with the prior log persisted elsewhere first.
+        """
+        if not force:
+            raise SafetyStateMachineError(
+                "StateTransitionLog.clear() requires force=True — "
+                "wiping the audit trail is destructive"
+            )
         self._entries = []
 
 
@@ -418,12 +447,32 @@ class SafetyStateMachine:
         :class:`SafetyStateMachineError`.
 
         ``operator`` and ``reason`` are recorded on the transition
-        log for the audit trail.
+        log for the audit trail. Both must be non-empty + non-
+        whitespace — a whitespace-only operator name destroys the
+        identity-attribution discipline §4 relies on.
+
+        **Diagnostic-state clear semantics.** The reset CLEARS the
+        rolling window and the recovery dwell counter in addition
+        to walking the state. Without that clear, the next
+        ``observe()`` would re-derive the FAULT / FAILSAFE
+        conclusion from the same stale telemetry that produced it
+        in the first place — defeating the §4 safety case (which
+        argues the operator's diagnostic clear is an affirmative
+        acknowledgement of the cleared posture, not a state-graph
+        bookkeeping move). The diagnostic clear is structural:
+        the machine starts fresh observing post-reset telemetry.
+        Audit-fix: the original implementation left the window
+        intact, so a FAILSAFE → FAULT reset re-fired on the very
+        next benign tick.
         """
-        if not operator:
-            raise ValueError("operator must be a non-empty string")
-        if not reason:
-            raise ValueError("reason must be a non-empty string")
+        if not operator or not operator.strip():
+            raise ValueError(
+                "operator must be a non-empty, non-whitespace string"
+            )
+        if not reason or not reason.strip():
+            raise ValueError(
+                "reason must be a non-empty, non-whitespace string"
+            )
         if self._state == SafetyState.FAULT:
             target = SafetyState.DEGRADED
         elif self._state == SafetyState.FAILSAFE:
@@ -444,4 +493,9 @@ class SafetyStateMachine:
             tick_index=-1,
             operator=operator,
         )
+        # Audit-fix: clear diagnostic state. Without this, the
+        # rolling window still contains the FAULT-causing ticks
+        # and the next observe() re-escalates immediately.
+        self._window.clear()
+        self._below_threshold_ticks = 0
         return self._state

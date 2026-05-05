@@ -134,9 +134,22 @@ class RollingWindow:
     # ----- predicates used by triggers ----- #
 
     def near_veto_rate(self, consec_floor: int) -> float:
-        """Fraction of ticks in the window where any predictor's
-        consec_suspect counter ≥ ``consec_floor``. Returns 0.0 on
-        an empty window."""
+        """Fraction of capacity (NOT current length) where any
+        predictor's consec_suspect counter ≥ ``consec_floor``.
+
+        Dividing by ``capacity`` (rather than ``len(self._ticks)``)
+        honours the design doc §3 "rolling fraction" semantics: a
+        single near-veto tick against a window of capacity 200
+        produces ``rate = 1/200 = 0.005``, not ``rate = 1/1 =
+        1.0``. Until enough sustained signal accumulates to
+        cross the threshold over the whole window, no transition
+        fires — preserving the §3 single-tick chatter-immunity
+        claim across the cold-start window. Returns ``0.0`` on
+        an empty window. (Audit-fix: previously divided by
+        ``len(self._ticks)`` which let a single near-veto tick
+        immediately trigger NORMAL → DEGRADED at machine startup,
+        defeating the §3 contract.)
+        """
         if not self._ticks:
             return 0.0
         n_near = 0
@@ -145,15 +158,18 @@ class RollingWindow:
                 tick.consec_suspect >= consec_floor
             ).any():
                 n_near += 1
-        return n_near / len(self._ticks)
+        return n_near / self._capacity
 
     def bcvf_active_rate(self, threshold: float) -> float:
-        """Fraction of ticks in the window where bcvf_total >
-        threshold. Returns 0.0 on an empty window."""
+        """Fraction of capacity (NOT current length) where bcvf_total
+        > threshold. Same cold-start chatter-immunity discipline
+        as :meth:`near_veto_rate` — see that method's docstring
+        for the audit-fix rationale. Returns 0.0 on an empty
+        window."""
         if not self._ticks:
             return 0.0
         n_active = sum(1 for t in self._ticks if t.bcvf_total > threshold)
-        return n_active / len(self._ticks)
+        return n_active / self._capacity
 
     def any_excluded_persistence(self, persistence_ticks: int) -> bool:
         """``True`` if any single predictor is ``is_excluded == True``
