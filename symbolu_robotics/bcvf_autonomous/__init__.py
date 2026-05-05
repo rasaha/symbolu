@@ -200,6 +200,17 @@ from symbolu_robotics.bcvf_autonomous.analysis import (
     load_episode_from_json,
     summarize_episode,
 )
+from symbolu_robotics.bcvf_autonomous.safety_state import (
+    LEGAL_TRANSITIONS,
+    IllegalTransitionError,
+    SafetyState,
+    SafetyStateMachine,
+    SafetyStateMachineConfig,
+    SafetyStateMachineError,
+    StateTransition,
+    StateTransitionLog,
+    StateTransitionLogEntry,
+)
 
 # Public-API stability registry — see ``API_STABILITY.md``.
 from symbolu_robotics.bcvf_autonomous._api import (
@@ -376,4 +387,14 @@ __all__ = [
     "find_v2_state_flips",
     "load_episode_from_json",
     "summarize_episode",
+    # safety state machine
+    "SafetyState",
+    "SafetyStateMachine",
+    "SafetyStateMachineConfig",
+    "StateTransition",
+    "StateTransitionLog",
+    "StateTransitionLogEntry",
+    "LEGAL_TRANSITIONS",
+    "SafetyStateMachineError",
+    "IllegalTransitionError",
 ]
