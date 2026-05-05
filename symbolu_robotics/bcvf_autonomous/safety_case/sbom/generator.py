@@ -78,6 +78,18 @@ class SBOMComponent:
                 f"SBOMComponent.type {self.type!r} is not a valid "
                 "CycloneDX 1.5 component type"
             )
+        # Audit-fix Finding 4: an empty / whitespace-only license
+        # string would render as ``{"license": {"id": ""}}`` which
+        # fails CycloneDX 1.5 schema validation against the §9
+        # ship criterion #5 (external auditor SBOM validation).
+        # Reject loud rather than silently emit invalid manifest.
+        for lic in self.licenses:
+            if not lic or not lic.strip():
+                raise ValueError(
+                    "SBOMComponent.licenses entries must be "
+                    "non-empty non-whitespace strings; got "
+                    f"licenses={self.licenses!r}"
+                )
 
     def to_cyclonedx(self) -> Dict[str, Any]:
         """Render as a CycloneDX 1.5 component object."""
@@ -145,22 +157,36 @@ _KNOWN_LICENSES: Dict[str, Tuple[str, ...]] = {
 
 def _resolve_license(package_name: str) -> Tuple[str, ...]:
     """Resolve a package name to a tuple of SPDX license
-    identifiers. Tries package metadata first; falls back to the
-    hand-curated :data:`_KNOWN_LICENSES` map; returns ``()`` if
-    neither resolves."""
-    # importlib.metadata can return License-Expression (preferred,
-    # already SPDX) or License (free-form).
+    identifiers. Resolution order:
+
+    1. ``License-Expression`` (PEP 639 — already SPDX, preferred).
+    2. The hand-curated :data:`_KNOWN_LICENSES` map (an explicit
+       maintainer-audited override that takes precedence over
+       free-form metadata so a package that ships a non-standard
+       ``License:`` value can still surface a clean SPDX id).
+    3. The legacy ``License:`` PEP 314 field (free-form text — many
+       widely-used packages still ship only this; a missing fall-
+       back here would silently drop the legal attribution from
+       the SBOM, which is finding #5 of the post-landing audit
+       pass).
+    4. ``()`` if none resolve.
+    """
     try:
         meta = importlib.metadata.metadata(package_name)
     except importlib.metadata.PackageNotFoundError:
         return _KNOWN_LICENSES.get(package_name, ())
-    expr = meta.get("License-Expression") or ""
-    if expr.strip():
-        # Already SPDX.
-        return (expr.strip(),)
-    # Fall through to the curated map for free-form license
-    # fields that mention a known SPDX name.
-    return _KNOWN_LICENSES.get(package_name, ())
+    expr = (meta.get("License-Expression") or "").strip()
+    if expr:
+        return (expr,)
+    # Curated map next — a maintainer override wins over free-form
+    # metadata.
+    if package_name in _KNOWN_LICENSES:
+        return _KNOWN_LICENSES[package_name]
+    # Legacy License: field. Many packages still ship only this.
+    legacy = (meta.get("License") or "").strip()
+    if legacy and legacy != "UNKNOWN":
+        return (legacy,)
+    return ()
 
 
 def _resolve_version(package_name: str) -> Optional[str]:

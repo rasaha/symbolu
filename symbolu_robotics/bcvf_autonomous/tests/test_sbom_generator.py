@@ -247,3 +247,88 @@ def test_render_text_uses_sorted_keys_and_two_space_indent():
     # First component key should be sorted alphabetically — i.e.
     # `bomFormat` comes before `components` in the JSON ordering.
     assert text.index('"bomFormat"') < text.index('"components"')
+
+
+# --------------------------------------------------------------------------- #
+# Audit-fix regression pins (post-v0.7.x critical-audit pass)
+# --------------------------------------------------------------------------- #
+
+
+def test_audit_fix_empty_license_string_is_rejected_at_construction():
+    """Audit Finding 4: an empty / whitespace-only license string
+    used to render as ``{"license": {"id": ""}}`` — schema-invalid
+    CycloneDX 1.5. Now rejected at SBOMComponent construction so
+    the manifest can't be built with an invalid license entry."""
+    with pytest.raises(ValueError, match="non-empty"):
+        SBOMComponent(name="x", version="1", licenses=("",))
+    with pytest.raises(ValueError, match="non-empty"):
+        SBOMComponent(name="x", version="1", licenses=("   ",))
+    with pytest.raises(ValueError, match="non-empty"):
+        SBOMComponent(name="x", version="1", licenses=("MIT", ""))
+
+
+def test_audit_fix_legacy_license_field_is_resolved():
+    """Audit Finding 5: ``_resolve_license`` used to only read
+    ``License-Expression`` (PEP 639); packages that ship only the
+    legacy ``License:`` PEP 314 field would silently emit a row
+    with no license, breaking the procurement-gate manifest.
+
+    pyyaml is a real-world example: it ships ``License: MIT`` in
+    its metadata and no License-Expression. Verify the legacy
+    field is now consulted as a fallback.
+    """
+    from symbolu_robotics.bcvf_autonomous.safety_case.sbom.generator import (
+        _resolve_license,
+    )
+    # pyyaml is a runtime test dependency we know is installed.
+    licenses = _resolve_license("pyyaml")
+    assert licenses, (
+        "_resolve_license should fall back to the legacy License: "
+        "field when License-Expression is absent — pyyaml ships "
+        "only the legacy field"
+    )
+    # The legacy field's value is "MIT" for pyyaml.
+    assert any("MIT" in lic for lic in licenses)
+
+
+def test_audit_fix_resolve_license_prefers_curated_map_over_legacy():
+    """The resolution order is: License-Expression → curated map
+    → legacy License. A maintainer override in the curated map
+    must beat the free-form legacy field — this is how a package
+    with a non-standard License: value still gets a clean SPDX
+    id in the manifest."""
+    from unittest import mock
+    from symbolu_robotics.bcvf_autonomous.safety_case.sbom import generator
+    fake_meta = {"License-Expression": None, "License": "Free-form text"}
+    with mock.patch.object(
+        generator.importlib.metadata, "metadata", return_value=fake_meta
+    ), mock.patch.object(
+        generator, "_KNOWN_LICENSES", {"pkg": ("Apache-2.0",)}
+    ):
+        assert generator._resolve_license("pkg") == ("Apache-2.0",)
+
+
+def test_spdx_with_expression_renders_under_expression_field():
+    """Audit Finding 9 (coverage gap): a single license with an
+    SPDX exception (e.g. ``Apache-2.0 WITH LLVM-exception``)
+    contains ``WITH`` and is therefore an SPDX expression — must
+    render under the CycloneDX ``expression`` key, not
+    ``license.id``. Real ecosystem patterns: LLVM, OpenJDK."""
+    c = SBOMComponent(
+        name="x", version="1",
+        licenses=("Apache-2.0 WITH LLVM-exception",),
+    )
+    cdx = c.to_cyclonedx()
+    assert cdx["licenses"] == [
+        {"expression": "Apache-2.0 WITH LLVM-exception"}
+    ]
+
+
+def test_spdx_compound_or_expression_renders_under_expression():
+    """Single OR (without surrounding parens) — also a compound."""
+    c = SBOMComponent(
+        name="x", version="1",
+        licenses=("BSD-3-Clause OR MIT",),
+    )
+    cdx = c.to_cyclonedx()
+    assert cdx["licenses"] == [{"expression": "BSD-3-Clause OR MIT"}]

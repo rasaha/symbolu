@@ -192,11 +192,21 @@ def _asil_class_for(state: SafetyState) -> int:
 
 @dataclass
 class _PredictorBuffer:
-    """Per-predictor buffer: the latest message + arrival time."""
+    """Per-predictor buffer: the latest message + arrival time
+    + suspicion counters."""
 
     last_message: Optional[PredictorTrajectoryMessage] = None
     last_arrival: Optional[float] = None
     deadline_violated: bool = False
+    #: Audit-fix Finding 3: consecutive ticks the predictor has
+    #: been "suspect" (deadline-violated OR bridge-excluded OR
+    #: shape-rejected). Mirrors the per-predictor
+    #: ``consec_suspect`` counter that
+    #: ``TrustWeightComputer`` tracks internally for exclusion;
+    #: surfaces here so the safety state machine has a real
+    #: near-veto signal to fire NORMAL → DEGRADED on through
+    #: the BCVFNode path.
+    consec_suspect: int = 0
 
 
 class BCVFNodeBehaviour:
@@ -329,15 +339,21 @@ class BCVFNodeBehaviour:
         self._n_ticks += 1
         now = self._clock()
         # Update per-predictor deadline status. A predictor is
-        # deadline-violated if its latest arrival is older than
-        # the deadline OR if it has never published.
+        # deadline-violated if:
+        #   * it has never published, OR
+        #   * its latest arrival is older than the deadline, OR
+        #   * its latest arrival is in the FUTURE relative to
+        #     ``now`` (audit-fix Finding 2: a clock that steps
+        #     backwards — ROS sim-time reset, NTP step at boot,
+        #     container suspend/resume, GPS time sync — would
+        #     otherwise silently clear every deadline violation).
         deadline_s = self._config.predictor_deadline_ms / 1000.0
         for buf in self._buffers.values():
             if buf.last_arrival is None:
                 buf.deadline_violated = True
                 continue
             stale_for_s = now - buf.last_arrival
-            if stale_for_s > deadline_s:
+            if stale_for_s < 0 or stale_for_s > deadline_s:
                 buf.deadline_violated = True
             else:
                 # Fresh: clears the violation on the next tick
@@ -375,26 +391,34 @@ class BCVFNodeBehaviour:
         H = sample.horizon
         M = len(predictor_names)
         trajectories = np.zeros((K, M, H, 3), dtype=np.float64)
-        # Per-predictor exclusion mask (deadline-driven). A
-        # predictor that's deadline-violated OR has never
-        # published is excluded; its column stays zeros (a
-        # degenerate trajectory the kernel will assign high
-        # BCVF cost).
+        # Per-predictor exclusion mask. A predictor is excluded
+        # for THIS tick if any of:
+        #   * never published / deadline-violated
+        #   * shape-rejected (audit-fix Finding 1: refuse to
+        #     fabricate poses for rollouts the predictor never
+        #     produced — silently zero-padding mismatched (K, H)
+        #     used to route fake near-vehicle predictions into
+        #     consensus).
         deadline_excluded = np.zeros(M, dtype=bool)
+        shape_rejected = np.zeros(M, dtype=bool)
         for m, name in enumerate(predictor_names):
             buf = self._buffers[name]
             if buf.last_message is None or buf.deadline_violated:
                 deadline_excluded[m] = True
                 continue
             poses = buf.last_message.poses
-            # Defensive: tolerate predictors that publish slightly
-            # different (K, H) than the sample — clip / pad to
-            # the canonical shape. A real production deployment
-            # negotiates this at startup; the behaviour just
-            # avoids crashing on a transient mismatch.
-            k = min(K, poses.shape[0])
-            h = min(H, poses.shape[1])
-            trajectories[:k, m, :h, :] = poses[:k, :h, :]
+            if poses.shape != (K, H, 3):
+                # Shape doesn't match the canonical (K, H, 3) the
+                # consensus tensor expects. Reject the predictor
+                # for this tick rather than silently zero-padding
+                # — padding fabricates pose data the predictor
+                # never produced + the kernel sees the zero rows
+                # as "good" trajectories the predictor agrees
+                # with, which is a real consensus-injection
+                # vulnerability.
+                shape_rejected[m] = True
+                continue
+            trajectories[:, m, :, :] = poses
 
         # Run the bridge over the canonical tensor.
         bridge_input = PredictedTrajectories(
@@ -406,28 +430,37 @@ class BCVFNodeBehaviour:
         trust_msg: TrustDistribution = self._bridge.step(bridge_input)
 
         # Combine the bridge's exclusion bits with the deadline-
-        # exclusion mask: a predictor is excluded if EITHER the
-        # bridge flagged it OR the deadline tracker flagged it.
+        # exclusion mask AND the shape-rejected mask: a predictor
+        # is excluded if ANY of the three is true.
         bridge_excl = trust_msg.is_excluded
         if bridge_excl is not None:
-            combined_excluded = np.logical_or(
-                bridge_excl.astype(bool), deadline_excluded
+            combined_excluded = np.logical_or.reduce(
+                [bridge_excl.astype(bool), deadline_excluded, shape_rejected]
             )
         else:
-            combined_excluded = deadline_excluded
+            combined_excluded = np.logical_or(
+                deadline_excluded, shape_rejected
+            )
 
-        # Feed the safety state machine via the same
-        # TrustShapedEpisodeRecord → TickView path live data
-        # would take. The state machine consumes a per-tick view
-        # of (bcvf_total, is_excluded, consec_suspect); we
-        # synthesise the consec_suspect from the bridge's EMA-
-        # state + exclusion flags. (When the bridge has
-        # exclusion disabled, the consec counters are all
-        # zero — the state machine's near-veto rate is then
-        # always zero and only the FAULT path via sustained
-        # exclusion + sustained BCVF can fire. That's the
-        # documented composition behaviour.)
-        consec_suspect = np.zeros(M, dtype=np.int64)
+        # Audit-fix Finding 3: surface a real near-veto signal to
+        # the safety state machine. Per-predictor consec_suspect
+        # counts consecutive ticks the predictor was "suspect"
+        # (excluded by ANY mechanism — bridge, deadline, shape).
+        # Resets to 0 the tick the predictor is fresh + accepted
+        # by the bridge. This gives the state machine the
+        # near-veto signal it needs to fire NORMAL → DEGRADED
+        # via the BCVFNode path; without it the state machine
+        # was structurally unable to escalate (NORMAL only).
+        for m, name in enumerate(predictor_names):
+            buf = self._buffers[name]
+            if combined_excluded[m]:
+                buf.consec_suspect += 1
+            else:
+                buf.consec_suspect = 0
+        consec_suspect = np.array(
+            [self._buffers[n].consec_suspect for n in predictor_names],
+            dtype=np.int64,
+        )
         # Use the largest BCVF total across rollouts — the state
         # machine works on a single-tick scalar.
         bcvf_scalar = float(np.max(trust_msg.bcvf_total))
@@ -482,6 +515,7 @@ class BCVFNodeBehaviour:
             buf.last_message = None
             buf.last_arrival = None
             buf.deadline_violated = False
+            buf.consec_suspect = 0
         self._last_output = None
         self._n_ticks = 0
         self._n_published = 0

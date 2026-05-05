@@ -368,3 +368,143 @@ def test_predictor_trajectory_message_rejects_empty_name():
             horizon=5, num_rollouts=2,
             poses=np.zeros((2, 5, 3)),
         )
+
+
+# --------------------------------------------------------------------------- #
+# Audit-fix regression pins (post-v0.7.x critical-audit pass)
+# --------------------------------------------------------------------------- #
+#
+# Each test below pins a contract the original implementation
+# violated. A future refactor that reverts the fix re-fails the
+# suite.
+
+
+def test_audit_fix_shape_mismatched_predictor_is_excluded_not_zero_padded():
+    """Audit Finding 1: a predictor publishing a (K, H) shape
+    different from the canonical tensor shape used to be
+    silently zero-padded — fabricating pose data the predictor
+    never produced. Now: the predictor is rejected for the tick
+    and surfaces in is_excluded.
+    """
+    clock = _FakeClock()
+    node = BCVFNode(_node_config(), clock=clock)
+    # M1, M3 publish canonical (K=2, H=5) — sets the canonical shape.
+    node.on_predictor_trajectory(_make_msg("M1", K=2, H=5))
+    node.on_predictor_trajectory(_make_msg("M3", K=2, H=5))
+    # M2 publishes a different shape (K=2, H=3 — three steps
+    # short of the canonical horizon). Used to silently
+    # zero-pad steps 3, 4. Now: M2 is shape-rejected for the tick.
+    node.on_predictor_trajectory(
+        PredictorTrajectoryMessage(
+            stamp=1.0, frame_id="map",
+            predictor_name="M2",
+            horizon=3, num_rollouts=2,
+            poses=np.ones((2, 3, 3), dtype=np.float64),
+        )
+    )
+    clock.advance_ms(5.0)
+    out = node.tick()
+    assert out is not None
+    assert out.is_excluded is not None
+    # M2 (index 1) must be excluded for the tick.
+    assert bool(out.is_excluded[1]) is True
+    # M1 + M3 are not.
+    assert bool(out.is_excluded[0]) is False
+    assert bool(out.is_excluded[2]) is False
+
+
+def test_audit_fix_clock_backwards_does_not_clear_deadline_violations():
+    """Audit Finding 2: a clock that steps backwards (sim-time
+    reset, NTP step at boot, container suspend/resume) used to
+    silently clear every deadline-violated flag in one tick.
+    Now: a future-stamped last_arrival is treated as a violation.
+    """
+    clock = _FakeClock()
+    cfg = _node_config(predictor_deadline_ms=50)
+    node = BCVFNode(cfg, clock=clock)
+    # Publish at t=1.5s.
+    clock.now = 1.5
+    for name in ("M1", "M2", "M3"):
+        node.on_predictor_trajectory(_make_msg(name))
+    # First tick at t=1.51s — everyone fresh.
+    clock.now = 1.51
+    node.tick()
+    assert node.deadline_violations == ()
+    # Now mark them stale by advancing the clock (so deadline
+    # would normally fire). Tick at t=1.7s (200 ms later, > 50 ms
+    # deadline).
+    clock.now = 1.7
+    node.tick()
+    assert set(node.deadline_violations) == {"M1", "M2", "M3"}
+    # Now step the clock backwards to t=0.99s — earlier than every
+    # last_arrival timestamp. Used to clear all violations.
+    clock.now = 0.99
+    node.tick()
+    assert set(node.deadline_violations) == {"M1", "M2", "M3"}, (
+        "clock-backwards silently cleared deadline violations — "
+        "the audit-fix Finding 2 regression should keep them set"
+    )
+
+
+def test_audit_fix_state_machine_reaches_fault_via_node_path():
+    """Audit Finding 3: the BCVFNode used to feed
+    consec_suspect=zeros to the state machine, so NORMAL →
+    DEGRADED could never fire from this surface. Now:
+    consec_suspect is the per-predictor count of consecutive
+    excluded ticks.
+
+    This test drives multiple predictors into deadline-violated
+    state and confirms the safety_state escalates beyond NORMAL.
+    """
+    clock = _FakeClock()
+    cfg = BCVFNodeConfig(
+        bridge_config=_bridge_config(),
+        predictor_names=("M1", "M2", "M3"),
+        publish_rate_hz=100.0,
+        predictor_deadline_ms=50,
+        # Tune state machine for a fast test: small window, low
+        # threshold so 2-of-N excluded ticks transition.
+        state_machine_config=__import__(
+            "symbolu_robotics.bcvf_autonomous.safety_state",
+            fromlist=["SafetyStateMachineConfig"],
+        ).SafetyStateMachineConfig(
+            rolling_window_ticks=20,
+            near_veto_consec_floor=2,
+            near_veto_rate_threshold=0.50,
+        ),
+    )
+    node = BCVFNode(cfg, clock=clock)
+    # Publish M1 only — M2 + M3 never publish.
+    for _ in range(30):
+        node.on_predictor_trajectory(_make_msg("M1"))
+        clock.advance_ms(5.0)
+        node.tick()
+    # M2 + M3 have been deadline-violated every tick, so their
+    # consec_suspect counters should be ≥ 2 every tick. The state
+    # machine's near-veto rate should now exceed 0.50.
+    out = node.last_output
+    assert out is not None
+    # M2, M3 excluded; safety_state should have escalated past NORMAL.
+    assert out.safety_state != SafetyState.NORMAL, (
+        "BCVFNode → state machine signal path is broken — "
+        "deadline-driven exclusions should drive an escalation"
+    )
+
+
+def test_audit_fix_predictor_names_ordering_is_canonical():
+    """Audit Finding 8 (coverage gap): publishing in arrival
+    order should NOT scramble the M-axis in the bridge tensor;
+    canonical ordering comes from config.predictor_names.
+    """
+    clock = _FakeClock()
+    node = BCVFNode(_node_config(), clock=clock)
+    # Publish in reverse order: M3, M1, M2.
+    node.on_predictor_trajectory(_make_msg("M3"))
+    node.on_predictor_trajectory(_make_msg("M1"))
+    node.on_predictor_trajectory(_make_msg("M2"))
+    clock.advance_ms(5.0)
+    out = node.tick()
+    assert out is not None
+    # ConsensusOutput predictor_names must follow config order,
+    # not arrival order.
+    assert out.predictor_names == ["M1", "M2", "M3"]
