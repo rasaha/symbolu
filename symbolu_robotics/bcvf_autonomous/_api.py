@@ -197,6 +197,25 @@ PROVISIONAL_API: Tuple[str, ...] = (
     "replay.load_replay_bundle",
     "replay.replay_bundle",
     "replay.save_replay_bundle",
+    # Real-time / no-allocation hot path + p999 budget
+    # (post-v0.7.x — the §9 row-#4 industry-features-roadmap
+    # pick; see REAL_TIME_BUDGET_DESIGN.md). Typed budget
+    # contract (RealTimeBudget) + per-tick observer
+    # (LatencyMonitor) with mutually-exclusive tier counters,
+    # bounded over-budget audit trail, and percentile-
+    # availability discipline (p999/p9999 None below sample-
+    # count thresholds). Provisional until the five §9 ship-
+    # when-ready criteria land (AUTOSAR-class deployment
+    # partner one quarter, real 10⁶-tick load test, C++-port
+    # equivalence within 2×, external auditor sign-off,
+    # configurable persistence layer).
+    "realtime.AllocationTrace",
+    "realtime.BudgetSummary",
+    "realtime.BudgetViolationError",
+    "realtime.LatencyMonitor",
+    "realtime.OverBudgetTick",
+    "realtime.RealTimeBudget",
+    "realtime.RealTimeBudgetError",
 )
 
 

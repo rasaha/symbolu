@@ -133,12 +133,15 @@ def test_roadmap_acknowledges_existing_shipped_surfaces():
 #   post-v0.7.x once the §5 / §9-row-#3 design-doc + thin-shim
 #   implementation pair landed in ``replay/`` +
 #   ``REPLAY_FRAMEWORK_DESIGN.md``.
-# All three surfaces are now provisional (tracked by
+# * ``RealTimeBudget`` was on this list in v0.7.x — removed
+#   post-v0.7.x once the §2 / §9-row-#4 design-doc + thin-shim
+#   implementation pair landed in ``realtime/`` +
+#   ``REAL_TIME_BUDGET_DESIGN.md``.
+# All four surfaces are now provisional (tracked by
 # ``test_api_stability.py``); their §9 roadmap rows are struck
 # through with pointers to the corresponding design docs per the
 # §11 maturation path.
 _ROADMAP_TOKENS = (
-    "RealTimeBudget",
     "CalibrationSet",
     "SensorAttestation",
 )

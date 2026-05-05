@@ -59,7 +59,13 @@ EXPECTED_STABLE_COUNT = 38
 # compare_replay, load_replay_bundle, replay_bundle,
 # save_replay_bundle). Provisional until the five §9
 # ship-when-ready criteria of REPLAY_FRAMEWORK_DESIGN.md land.
-EXPECTED_PROVISIONAL_COUNT = 51
+# +7 fourth post-v0.7 wave for the real-time budget framework
+# (§9 row-#4 roadmap pick). 7 realtime.* symbols
+# (AllocationTrace, BudgetSummary, BudgetViolationError,
+# LatencyMonitor, OverBudgetTick, RealTimeBudget,
+# RealTimeBudgetError). Provisional until the five §9
+# ship-when-ready criteria of REAL_TIME_BUDGET_DESIGN.md land.
+EXPECTED_PROVISIONAL_COUNT = 58
 EXPECTED_VERSION = "0.4.0"
 EXPECTED_VERSION_INFO = (0, 4, 0)
 
