@@ -1,0 +1,136 @@
+name: BCVF Autonomous CI
+
+# Public CI for the open-source BCVF Autonomous module. Runs the
+# full test suite (1100+ tests) on every push and PR against the
+# designated development branches plus main.
+#
+# The framework is NumPy-stdlib only by design; this workflow
+# installs only numpy + pytest + pyyaml. No third-party crypto,
+# no scipy, no rclpy (the rclpy adapter is loaded lazily via a
+# shim and is not exercised in CI — that path is exercised in the
+# integrator's own ROS 2 environment).
+#
+# One host-speed-dependent test is deselected:
+# - tests/test_core.py::test_batch_timing_under_50ms
+#   (timing varies with GitHub Actions runner load; the property
+#   is exercised separately in the realtime-budget suite under
+#   tests/test_real_time_budget.py with explicit p99/p999/p9999
+#   tier classification.)
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/**"
+      - "feature/**"
+      - "audit/**"
+      - "fix/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bcvf-autonomous-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install runtime + test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "numpy>=1.23" "pyyaml>=6.0" "pytest>=7.4"
+
+      - name: Verify package importability
+        run: |
+          python -c "from symbolu_robotics.bcvf_autonomous import __version__, VERSION_INFO; print(f'bcvf_autonomous {__version__}')"
+
+      - name: Verify safety-case importability
+        run: |
+          python -c "from symbolu_robotics.bcvf_autonomous.safety_case.traceability import iso_21448_clauses, iso_26262_part6_clauses; \
+            n21 = sum(len(c.evidence) for c in iso_21448_clauses()); \
+            n26 = sum(len(c.evidence) for c in iso_26262_part6_clauses()); \
+            print(f'safety-case artifacts: ISO 21448={n21}, ISO 26262 Part 6={n26}')"
+
+      - name: Run BCVF Autonomous test suite
+        run: |
+          pytest symbolu_robotics/bcvf_autonomous/tests \
+            --deselect symbolu_robotics/bcvf_autonomous/tests/test_core.py::test_batch_timing_under_50ms \
+            -q --tb=short
+
+  api-stability:
+    name: API stability registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "numpy>=1.23" "pyyaml>=6.0" "pytest>=7.4"
+
+      - name: Verify STABLE_API + PROVISIONAL_API symbols all resolve
+        run: |
+          pytest symbolu_robotics/bcvf_autonomous/tests/test_api_stability.py -q --tb=short
+
+      - name: Verify INDUSTRY_FEATURES_ROADMAP doc pins
+        run: |
+          pytest symbolu_robotics/bcvf_autonomous/tests/test_industry_features_roadmap_doc.py -q --tb=short
+
+  safety-case:
+    name: Safety case + SBOM + traceability
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "numpy>=1.23" "pyyaml>=6.0" "pytest>=7.4"
+
+      - name: Verify safety-case traceability (every artifact is importable)
+        run: |
+          pytest symbolu_robotics/bcvf_autonomous/tests -k "safety_case" -q --tb=short
+
+      - name: Verify SBOM is deterministic + parseable
+        run: |
+          python -c "import json; \
+            data = json.load(open('symbolu_robotics/bcvf_autonomous/safety_case/SBOM.cdx.json')); \
+            assert data['bomFormat'] == 'CycloneDX'; \
+            assert data['specVersion'] == '1.5'; \
+            assert len(data['components']) > 0; \
+            print(f'SBOM OK: {len(data[\"components\"])} components')"

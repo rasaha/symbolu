@@ -238,6 +238,28 @@ PROVISIONAL_API: Tuple[str, ...] = (
     "calibration.build_calibration_set",
     "calibration.load_calibration_set",
     "calibration.save_calibration_set",
+    # Sensor attestation interface (post-v0.7.x — the §9
+    # row-#8 industry-features-roadmap pick; see
+    # SENSOR_ATTESTATION_DESIGN.md). Closes the UN ECE R155
+    # cybersecurity loop the adversarial family opened. Stdlib-
+    # only HMAC-SHA256; no PKI; no key-management — the
+    # integrator wires a key_resolver to their HSM / TPM.
+    # Provisional until the five §8 ship-when-ready criteria
+    # land (deployment partner one quarter against HSM,
+    # real attestation-failure across firmware regression,
+    # asymmetric-extension subclass, external auditor sign-off
+    # for UN ECE R155 §7.3.4 evidence, replay-cache persistence
+    # layer).
+    "attestation.AttestationError",
+    "attestation.AttestationResult",
+    "attestation.AttestationVerificationError",
+    "attestation.SensorAttestation",
+    "attestation.SensorAttestationPolicy",
+    "attestation.SensorAttestationVerifier",
+    "attestation.UnknownPredictorError",
+    "attestation.canonical_signing_payload",
+    "attestation.compute_data_digest",
+    "attestation.sign_attestation",
 )
 
 

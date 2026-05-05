@@ -243,6 +243,18 @@ from symbolu_robotics.bcvf_autonomous.calibration import (
     load_calibration_set,
     save_calibration_set,
 )
+from symbolu_robotics.bcvf_autonomous.attestation import (
+    AttestationError,
+    AttestationResult,
+    AttestationVerificationError,
+    SensorAttestation,
+    SensorAttestationPolicy,
+    SensorAttestationVerifier,
+    UnknownPredictorError,
+    canonical_signing_payload,
+    compute_data_digest,
+    sign_attestation,
+)
 
 # Public-API stability registry — see ``API_STABILITY.md``.
 from symbolu_robotics.bcvf_autonomous._api import (
@@ -458,4 +470,15 @@ __all__ = [
     "build_calibration_set",
     "load_calibration_set",
     "save_calibration_set",
+    # sensor attestation
+    "AttestationError",
+    "AttestationResult",
+    "AttestationVerificationError",
+    "SensorAttestation",
+    "SensorAttestationPolicy",
+    "SensorAttestationVerifier",
+    "UnknownPredictorError",
+    "canonical_signing_payload",
+    "compute_data_digest",
+    "sign_attestation",
 ]

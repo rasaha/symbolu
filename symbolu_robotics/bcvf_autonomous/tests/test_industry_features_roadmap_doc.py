@@ -141,13 +141,28 @@ def test_roadmap_acknowledges_existing_shipped_surfaces():
 #   post-v0.7.x once the §6 / §9-row-#6 design-doc + thin-shim
 #   implementation pair landed in ``calibration/`` +
 #   ``CALIBRATION_DESIGN.md``.
-# All five surfaces are now provisional (tracked by
+# * ``SensorAttestation`` was on this list in v0.7.x — removed
+#   post-v0.7.x once the §7 / §9-row-#8 design-doc + thin-shim
+#   implementation pair landed in ``attestation/`` +
+#   ``SENSOR_ATTESTATION_DESIGN.md``. This was the LAST token —
+#   every six §9-shippable rows (#1, #2, #3, #4, #6, #8) now
+#   landed; rows #5 (HD-map predictor) and #9 (domain-specific
+#   predictors) are hardware-adjacent + need real predictor-
+#   stack data, not sandbox-implementable. Row #7 (SBOM) shipped
+#   absorbed into row #2 (CycloneDX 1.5 manifest under
+#   ``safety_case/SBOM.cdx.json``).
+# All six surfaces are now provisional (tracked by
 # ``test_api_stability.py``); their §9 roadmap rows are struck
 # through with pointers to the corresponding design docs per the
 # §11 maturation path.
-_ROADMAP_TOKENS = (
-    "SensorAttestation",
-)
+#
+# The empty tuple is intentional: a future contributor adding a
+# new roadmap row should add a new token here. The non-promotion
+# gate tests (test_roadmap_surfaces_not_in_stable_api +
+# test_roadmap_surfaces_not_in_provisional_api) still run and
+# trivially pass when the tuple is empty — same discipline,
+# zero pending tokens.
+_ROADMAP_TOKENS: tuple = ()
 
 
 def test_roadmap_surfaces_not_in_stable_api():

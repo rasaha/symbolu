@@ -407,6 +407,32 @@ _REAL_TIME_BUDGET = EvidenceArtifact(
                 "rationale; §9 for the five ship-when-ready criteria "
                 "gating STABLE_API graduation.",
 )
+_SENSOR_ATTESTATION = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.attestation",
+    symbol="SensorAttestation",
+    description="Per-message sensor-attestation record — typed "
+                "(predictor_name + firmware_version + signature + "
+                "nonce + issued_at + data_digest + metadata) with "
+                "construction-time validation of every field. The "
+                "in-band attestation a sensor stack attaches to its "
+                "predictor's trajectory output. See "
+                "SENSOR_ATTESTATION_DESIGN.md §2 for the contract.",
+)
+_SENSOR_ATTESTATION_VERIFIER = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.attestation",
+    symbol="SensorAttestationVerifier",
+    description="The seven-check verification gate (policy lookup, "
+                "policy-enabled, firmware allowlist, freshness, "
+                "future-dating, replay, data binding, HMAC-SHA256 "
+                "signature with constant-time compare). Composes "
+                "with the existing per-predictor exclusion path: a "
+                "verification failure unions into the is_excluded "
+                "mask alongside deadline-driven and state-machine-"
+                "driven exclusions. The in-scope mitigation for SOTIF "
+                "clause 8 Insufficiency #3 (Lemma-1 trapdoor); UN ECE "
+                "R155 §7.3.4 evidence. See "
+                "SENSOR_ATTESTATION_DESIGN.md §4 + §5 for the design.",
+)
 _CALIBRATION_SET = EvidenceArtifact(
     module_path="symbolu_robotics.bcvf_autonomous.calibration",
     symbol="CalibrationSet",
@@ -595,6 +621,7 @@ def iso_21448_clauses() -> List[Clause]:
             evidence=(
                 _CONSUMER_V2, _V2_SWEEP, _ADVERSARIAL_FAMILIES,
                 _SAFETY_STATE_MACHINE, _SAFETY_STATE_TRANSITIONS,
+                _SENSOR_ATTESTATION, _SENSOR_ATTESTATION_VERIFIER,
             ),
             notes=(
                 "Insufficiency #1 — Lemma 1 invariance (intentional): "
@@ -620,7 +647,23 @@ def iso_21448_clauses() -> List[Clause]:
                 "drift monitoring (UN ECE R155 §7.3.4). The "
                 "``adversarial_consistent_bias`` family + DESIGN.md §3.5 "
                 "make the boundary explicit so the safety-case narrative "
-                "doesn't overclaim. **Insufficiency-handling layer** — "
+                "doesn't overclaim. **In-scope mitigation: sensor "
+                "attestation** — the ``SensorAttestation`` interface "
+                "(``attestation/`` package) + ``SensorAttestationVerifier`` "
+                "close the cybersecurity loop the adversarial family "
+                "opened. The verifier runs seven §4 checks per "
+                "attestation (policy lookup, policy-enabled, firmware "
+                "allowlist, freshness, future-dating, replay, data "
+                "binding, HMAC-SHA256 signature with constant-time "
+                "compare); a failed verification excludes the predictor "
+                "from the consensus via the same ``is_excluded`` mask "
+                "deadline + state-machine exclusions populate. The "
+                "attestation gate is upstream of the kernel — a stealth-"
+                "bias spoof that the kernel's Lemma-1 invariance can't "
+                "see is rejected before it reaches the kernel. See "
+                "``SENSOR_ATTESTATION_DESIGN.md`` §1 + §5 for the "
+                "in-scope-mitigation narrative. "
+                "**Insufficiency-handling layer** — "
                 "the per-tick V2 chatter mitigation composes into the "
                 "``SafetyStateMachine`` four-state behavioural contract "
                 "(NORMAL / DEGRADED / FAULT / FAILSAFE). The state "
