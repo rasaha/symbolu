@@ -216,6 +216,28 @@ PROVISIONAL_API: Tuple[str, ...] = (
     "realtime.OverBudgetTick",
     "realtime.RealTimeBudget",
     "realtime.RealTimeBudgetError",
+    # Calibration parameter management + drift detection
+    # (post-v0.7.x — the §9 row-#6 industry-features-roadmap
+    # pick; see CALIBRATION_DESIGN.md). Versioned, hash-
+    # identified, kernel-version-validated bundle of per-
+    # deployment tuning knobs (CalibrationSet) + drift detector
+    # (CalibrationDriftDetector) that composes with
+    # StreamingFleetMonitor via the same dotted-path metric
+    # resolver. Provisional until the five §9 ship-when-ready
+    # criteria of CALIBRATION_DESIGN.md land (deployment partner
+    # one quarter on a fleet ≥ 10 vehicles, real fleet drift
+    # detection across a known mismatch, signed bundle field,
+    # external auditor sign-off, expected_metrics schema
+    # stabilised across ≥ 3 deployment partners).
+    "calibration.CalibrationDigestError",
+    "calibration.CalibrationDriftAlert",
+    "calibration.CalibrationDriftDetector",
+    "calibration.CalibrationSet",
+    "calibration.CalibrationSetError",
+    "calibration.CalibrationVersionError",
+    "calibration.build_calibration_set",
+    "calibration.load_calibration_set",
+    "calibration.save_calibration_set",
 )
 
 
