@@ -1,0 +1,41 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0"
+        }
+      ],
+      "name": "numpy",
+      "purl": "pkg:pypi/numpy@2.4.4",
+      "type": "library",
+      "version": "2.4.4"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "description": "BCVF Autonomy Runtime",
+      "licenses": [
+        {
+          "license": {
+            "name": "BCVF Autonomy Runtime"
+          }
+        }
+      ],
+      "name": "symbolu_robotics.bcvf_autonomous",
+      "type": "library",
+      "version": "0.4.0"
+    },
+    "tools": [
+      {
+        "name": "bcvf_autonomous.safety_case.sbom",
+        "vendor": "symbolu_robotics",
+        "version": "0.4.0"
+      }
+    ]
+  },
+  "serialNumber": "urn:uuid:00000000-0000-0000-0000-000000000000",
+  "specVersion": "1.5",
+  "version": 1
+}
