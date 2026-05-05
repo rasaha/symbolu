@@ -193,7 +193,7 @@ multi-modal scaffold against a real predictor stack.
 
 | Rank | Feature | What it unlocks | Est. effort |
 |---|---|---|---|
-| **1** | Functional-safety state machine (§4) | The single biggest gate for automotive engagement. Without it, most safety teams won't read the technical doc. | 2–3 weeks |
+| **1** | ~~Functional-safety state machine (§4)~~ — design-doc + thin-shim implementation landed post-v0.7; see [`SAFETY_STATE_MACHINE_DESIGN.md`](SAFETY_STATE_MACHINE_DESIGN.md). Surface is `PROVISIONAL_API`; STABLE_API graduation gated on the three §9 ship-when-ready criteria (three deployment partners, characterization-grid `state_transition_consistency` family, external auditor review of the ASIL table). | The single biggest gate for automotive engagement. Without it, most safety teams won't read the technical doc. | ~~2–3 weeks~~ delivered |
 | **2** | ROS 2 node + message contracts + DDS QoS profile (§3) | Three first-call questions answered with code. Drone / industrial / mobile-robot partners need this faster than automotive. | 1–2 weeks |
 | **3** | Replay / record-and-replay framework (§5) | The recall investigator's tool. Composes cleanly with the existing post-hoc fleet harness. | 1 week |
 | **4** | Real-time / no-allocation hot path + p999 budget (§2) | Required for AUTOSAR Adaptive integration. Probably the AUTOSAR partner's first technical objection. | 1–2 weeks |

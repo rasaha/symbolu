@@ -121,11 +121,17 @@ def test_roadmap_acknowledges_existing_shipped_surfaces():
 # adds (e.g.) ``runtime.RealTimeBudget`` to PROVISIONAL_API without
 # first promoting the roadmap row to a real design doc would trip
 # one of these checks.
+#
+# Note: ``SafetyStateMachine`` was on this list in v0.7 — removed
+# post-v0.7 once the §4 / §9.1-recommended-pick design-doc + thin-
+# shim implementation pair landed in ``safety_state/``. It is now
+# a provisional surface (tracked by ``test_api_stability.py``); the
+# roadmap row in §9 is struck through with a pointer to
+# ``SAFETY_STATE_MACHINE_DESIGN.md`` per the §11 maturation path.
 _ROADMAP_TOKENS = (
     "RealTimeBudget",
     "BCVFNode",
     "ReplayBundle",
-    "SafetyStateMachine",
     "CalibrationSet",
     "SensorAttestation",
 )
