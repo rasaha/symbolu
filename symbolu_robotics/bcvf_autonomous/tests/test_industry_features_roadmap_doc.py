@@ -61,6 +61,10 @@ def test_roadmap_has_required_section_headers():
         "§10 What this is NOT",
         "§11 Maturation path",
         "§12 Test pin",
+        "§13 Implementation prompt",
+        "§13.1 Prompt",
+        "§13.2 Why the prompt lives in this doc",
+        "§13.3 Prompt template for future top-ranked items",
     ):
         assert header in text, f"roadmap missing section: {header!r}"
 
@@ -154,6 +158,45 @@ def test_roadmap_surfaces_not_in_provisional_api():
                 f"(token {token!r}) — research-tier surfaces stay out "
                 "of the API registry until implementation ships"
             )
+
+
+def test_roadmap_prompt_appendix_names_recommended_pick():
+    """§13.1 captures the implementation prompt for §9.1's
+    recommended next pick. The prompt must name SafetyStateMachine
+    + SAFETY_STATE_MACHINE_DESIGN.md so a contributor pasting the
+    prompt into a fresh session targets the right surface.
+    """
+    text = DOC_PATH.read_text(encoding="utf-8")
+    assert "SafetyStateMachine" in text
+    assert "SAFETY_STATE_MACHINE_DESIGN.md" in text
+
+
+def test_roadmap_prompt_appendix_enumerates_four_states():
+    """The four named safety states (NORMAL / DEGRADED / FAULT /
+    FAILSAFE) must all appear in §13.1 so a future contributor
+    reading the prompt can't accidentally drop one when adapting
+    the prompt for the implementation."""
+    text = DOC_PATH.read_text(encoding="utf-8")
+    for state in ("NORMAL", "DEGRADED", "FAULT", "FAILSAFE"):
+        assert state in text, f"prompt §13.1 must name state: {state}"
+
+
+def test_roadmap_prompt_template_documents_eleven_workflow_steps():
+    """§13.3 documents the prompt template for future top-ranked
+    items. The template names the load-bearing discipline pieces
+    a future contributor would otherwise drop (audit pass, design
+    doc first, ship-when-ready criteria, etc.)."""
+    text = DOC_PATH.read_text(encoding="utf-8")
+    for piece in (
+        "Design doc first",
+        "ship-when-ready criteria",
+        "Safety-case integration",
+        "API stability",
+        "Audit pass",
+    ):
+        assert piece in text, (
+            f"prompt template §13.3 must name: {piece!r}"
+        )
 
 
 def test_roadmap_test_pin_section_documents_invariants():
