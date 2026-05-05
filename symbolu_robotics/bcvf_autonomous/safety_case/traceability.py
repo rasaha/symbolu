@@ -394,6 +394,33 @@ _REPLAY_BUNDLE = EvidenceArtifact(
                 "validation discipline (corrupt artifacts fail "
                 "loud, never silently produce zero-fill replays).",
 )
+_REAL_TIME_BUDGET = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.realtime",
+    symbol="RealTimeBudget",
+    description="Typed real-time budget contract — target_hz + "
+                "per-tier ms thresholds (p99 / p999 / p9999 / max) + "
+                "sample-count gates protecting against statistically-"
+                "meaningless small-n percentile reports. The "
+                "AUTOSAR-Adaptive deal-unlock answer to *what's your "
+                "worst-case execution time?*. See "
+                "REAL_TIME_BUDGET_DESIGN.md §2 for the per-knob "
+                "rationale; §9 for the five ship-when-ready criteria "
+                "gating STABLE_API graduation.",
+)
+_LATENCY_MONITOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.realtime",
+    symbol="LatencyMonitor",
+    description="Per-tick latency observer + budget enforcer — "
+                "classifies each observation against the budget's "
+                "tier hierarchy with mutually-exclusive counters, "
+                "records over-budget violations in a bounded ring "
+                "buffer, computes p99 / p999 / p9999 / max stats on "
+                "demand. Composes with the existing "
+                "EpisodeDiagnostics.solve_times_ms via "
+                "observe_series; pairs with ReplayBundle for "
+                "bit-identity replay of an over-budget tick. See "
+                "REAL_TIME_BUDGET_DESIGN.md §3 + §4 + §5.",
+)
 _REPLAY_RECONSTRUCTOR = EvidenceArtifact(
     module_path="symbolu_robotics.bcvf_autonomous.replay",
     symbol="replay_bundle",
@@ -831,7 +858,10 @@ def iso_26262_part6_clauses() -> List[Clause]:
                 "design and verify the integrated software behaves "
                 "as specified."
             ),
-            evidence=(_RUNNER, _PILOT, _BASELINES),
+            evidence=(
+                _RUNNER, _PILOT, _BASELINES,
+                _REAL_TIME_BUDGET, _LATENCY_MONITOR,
+            ),
             notes=(
                 "End-to-end integration: ``Runner`` exercises kernel + "
                 "trust + V2 + planner across canonical scenarios "
@@ -839,7 +869,20 @@ def iso_26262_part6_clauses() -> List[Clause]:
                 "wires the same trust pipeline to a dataset adapter "
                 "for paired A0 vs A3 evaluation. ``run_shootout`` "
                 "integrates BCVF with three baseline arbitrators "
-                "(EKF, Majority, Anchor) over the seven families."
+                "(EKF, Majority, Anchor) over the seven families. "
+                "**Runtime-budget integration verification**: "
+                "``RealTimeBudget`` is the typed contract a "
+                "deployment partner copies into their config; "
+                "``LatencyMonitor`` enforces it at integration time "
+                "with mutually-exclusive per-tier (p99 / p999 / "
+                "p9999 / max) violation counters + a bounded over-"
+                "budget audit trail. The percentile-availability "
+                "discipline (p999 None below 1000 samples; p9999 "
+                "None below 10000) protects an ISO 26262 §10 "
+                "integration-verification report from including "
+                "statistically-meaningless small-n percentile "
+                "claims. See ``REAL_TIME_BUDGET_DESIGN.md`` §4 + §9 "
+                "for the full discipline + ship-when-ready criteria."
             ),
         ),
         Clause(

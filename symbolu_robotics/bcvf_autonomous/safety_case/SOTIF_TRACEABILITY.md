@@ -176,8 +176,10 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 * `symbolu_robotics.bcvf_autonomous.runner::Runner` — Closed-loop scenario runner — module integration test harness exercising kernel + planner + trust + V2
 * `symbolu_robotics.bcvf_autonomous.pilot::run_pilot` — §6.2 paired A0 vs A3 pilot runner — sign test + Wilson CI + FleetSummary + Lemma-1 negative-control gate
 * `symbolu_robotics.bcvf_autonomous.baselines::run_shootout` — Apples-to-apples baseline shootout — BCVF vs EKF (Mahalanobis-rejection) vs Majority-Vote vs Anchor across the seven families
+* `symbolu_robotics.bcvf_autonomous.realtime::RealTimeBudget` — Typed real-time budget contract — target_hz + per-tier ms thresholds (p99 / p999 / p9999 / max) + sample-count gates protecting against statistically-meaningless small-n percentile reports. The AUTOSAR-Adaptive deal-unlock answer to *what's your worst-case execution time?*. See REAL_TIME_BUDGET_DESIGN.md §2 for the per-knob rationale; §9 for the five ship-when-ready criteria gating STABLE_API graduation.
+* `symbolu_robotics.bcvf_autonomous.realtime::LatencyMonitor` — Per-tick latency observer + budget enforcer — classifies each observation against the budget's tier hierarchy with mutually-exclusive counters, records over-budget violations in a bounded ring buffer, computes p99 / p999 / p9999 / max stats on demand. Composes with the existing EpisodeDiagnostics.solve_times_ms via observe_series; pairs with ReplayBundle for bit-identity replay of an over-budget tick. See REAL_TIME_BUDGET_DESIGN.md §3 + §4 + §5.
 
-**Notes.** End-to-end integration: ``Runner`` exercises kernel + trust + V2 + planner across canonical scenarios (S1 nominal, S3 map-error-accel, etc.). ``run_pilot`` wires the same trust pipeline to a dataset adapter for paired A0 vs A3 evaluation. ``run_shootout`` integrates BCVF with three baseline arbitrators (EKF, Majority, Anchor) over the seven families.
+**Notes.** End-to-end integration: ``Runner`` exercises kernel + trust + V2 + planner across canonical scenarios (S1 nominal, S3 map-error-accel, etc.). ``run_pilot`` wires the same trust pipeline to a dataset adapter for paired A0 vs A3 evaluation. ``run_shootout`` integrates BCVF with three baseline arbitrators (EKF, Majority, Anchor) over the seven families. **Runtime-budget integration verification**: ``RealTimeBudget`` is the typed contract a deployment partner copies into their config; ``LatencyMonitor`` enforces it at integration time with mutually-exclusive per-tier (p99 / p999 / p9999 / max) violation counters + a bounded over-budget audit trail. The percentile-availability discipline (p999 None below 1000 samples; p9999 None below 10000) protects an ISO 26262 §10 integration-verification report from including statistically-meaningless small-n percentile claims. See ``REAL_TIME_BUDGET_DESIGN.md`` §4 + §9 for the full discipline + ship-when-ready criteria.
 
 ### Clause Part 6 §11 — Verification of software safety requirements
 
@@ -222,6 +224,8 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 | `symbolu_robotics.bcvf_autonomous.predictors.base::BicycleConfig` | 5 |
 | `symbolu_robotics.bcvf_autonomous.predictors::LaneAnchor` | 5 |
 | `symbolu_robotics.bcvf_autonomous.predictors::MultiModalPredictor` | 5 |
+| `symbolu_robotics.bcvf_autonomous.realtime::LatencyMonitor` | Part 6 §10 |
+| `symbolu_robotics.bcvf_autonomous.realtime::RealTimeBudget` | Part 6 §10 |
 | `symbolu_robotics.bcvf_autonomous.replay::ReplayBundle` | 10 |
 | `symbolu_robotics.bcvf_autonomous.replay::replay_bundle` | 10, Part 6 §11 |
 | `symbolu_robotics.bcvf_autonomous.runner::Runner` | Part 6 §8, Part 6 §10 |
