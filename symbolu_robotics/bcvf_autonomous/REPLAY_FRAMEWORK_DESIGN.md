@@ -103,7 +103,7 @@ is the canonical shipping unit.
 
 ## §4 Reconstruction
 
-`replay_bundle(bundle, *, runner=None) → ReplayResult` runs
+`replay_bundle(bundle, runner_factory) → ReplayResult` runs
 the bundle's `run_config` against the current code and
 compares the resulting `TrustShapedEpisodeRecord` to the
 recorded one.
@@ -322,8 +322,7 @@ class ReplayResult:
 
 def replay_bundle(
     bundle: ReplayBundle,
-    *,
-    runner_factory: Optional[Callable[[Any], Any]] = None,
+    runner_factory: Callable[[Dict[str, Any]], TrustShapedEpisodeRecord],
 ) -> ReplayResult: ...
 
 def build_replay_bundle(

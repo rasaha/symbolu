@@ -460,3 +460,263 @@ def test_bundle_validation_uses_episode_record_from_dict_validator():
             recorded_collision=False,
             recorded_total_steps=5,
         )
+
+
+# --------------------------------------------------------------------------- #
+# Audit-fix regression pins (post-v0.7.x critical-audit pass on §9-row-#3)
+# --------------------------------------------------------------------------- #
+
+
+def test_audit_fix_construction_rejects_unsupported_bundle_version():
+    """Audit Finding 1: __post_init__ used to only check
+    bundle_version is non-empty; from_dict checked it equals
+    BUNDLE_VERSION. The asymmetry let a caller construct an
+    in-memory bundle with bundle_version='99.0' that would later
+    refuse to round-trip. Now both code paths reject loud."""
+    record_dict = _make_record().to_dict()
+    with pytest.raises(ReplayBundleVersionError, match="99.0"):
+        ReplayBundle(
+            bundle_version="99.0",
+            package_version="0.4.0",
+            recorded_at="2026-05-05T12:00:00+00:00",
+            episode_id="ep",
+            run_config={},
+            recorded_record=record_dict,
+            recorded_collision=False,
+            recorded_total_steps=5,
+        )
+
+
+def test_audit_fix_dtype_drift_is_a_divergence():
+    """Audit Finding 2: np.array_equal(equal_nan=True) returns
+    True for arrays with same values but different dtypes. The
+    bit-identity contract should surface a kernel commit that
+    flips a per-step array from int64 to int32 — same values,
+    different bytes-on-disk + different downstream arithmetic
+    semantics. Now: dtype mismatch is a real divergence."""
+    record_a = _make_record()
+    record_b = _make_record()
+    # Flip dtype on per_step_gate_activations from int64 to int32
+    # (same numeric values).
+    record_b.per_step_gate_activations = (
+        record_b.per_step_gate_activations.astype(np.int32)
+    )
+    bundle = _build_bundle(record=record_a)
+    res = compare_replay(bundle, record_b)
+    assert res.matches_recorded is False
+    assert "per_step_gate_activations" in res.per_field_divergences
+
+
+def test_audit_fix_deepcopy_isolates_bundle_from_caller_mutation():
+    """Audit Finding 3: nested mutation of a caller's
+    run_config dict used to leak into the bundle's frozen
+    state via shallow-copy aliasing. Now: deepcopy isolates."""
+    cfg = {"failures": {"M1": {"active": False, "severity": 1.0}}}
+    bundle = build_replay_bundle(
+        run_config=cfg,
+        recorded_record=_make_record(),
+        episode_id="ep",
+        recorded_at="2026-05-05T12:00:00+00:00",
+    )
+    # Mutate the caller's nested object.
+    cfg["failures"]["M1"]["severity"] = 999.0
+    # Bundle's view must remain at the record-time value.
+    assert bundle.run_config["failures"]["M1"]["severity"] == 1.0
+
+
+def test_audit_fix_replay_bundle_factory_cannot_corrupt_run_config():
+    """Audit Finding 3 (companion): a runner_factory that
+    mutates its received dict used to corrupt the bundle's
+    record-time run_config because replay_bundle passed a
+    shallow copy. Now: the factory receives a deepcopy."""
+    bundle = build_replay_bundle(
+        run_config={"failures": {"M1": {"severity": 1.0}}},
+        recorded_record=_make_record(),
+        episode_id="ep",
+        recorded_at="2026-05-05T12:00:00+00:00",
+    )
+
+    def malicious_factory(received_cfg):
+        received_cfg["failures"]["M1"]["severity"] = 999.0
+        return _make_record()
+
+    replay_bundle(bundle, malicious_factory)
+    # Bundle's run_config must not have been mutated by the
+    # factory — the factory got a deepcopy.
+    assert bundle.run_config["failures"]["M1"]["severity"] == 1.0
+
+
+def test_audit_fix_zero_step_record_round_trips():
+    """Audit Finding 4: a TrustShapedEpisodeRecord with
+    n_steps=0 (collision in initial state, validation failure
+    before the first step) should bundle cleanly. The
+    pre-existing analysis/io.py:_check_shape rejected (0,)
+    arrays as not matching expected (0, M); the fix accepts
+    any 0-element array when expected shape's first axis is 0."""
+    M = 3
+    record = TrustShapedEpisodeRecord(
+        n_steps=0,
+        M=M,
+        aggregation=RolloutAggregation.MEAN,
+        per_step_weights=np.zeros((0, M)),
+        per_step_costs=np.zeros((0, M)),
+        per_step_residuals=np.zeros((0, M)),
+        per_step_ema_mean=np.zeros((0, M)),
+        per_step_ema_std=np.zeros((0, M)),
+        per_step_bcvf_total=np.zeros(0),
+        per_step_deadband_active_count=np.zeros(0, dtype=np.int64),
+        per_step_deadband_fired=np.zeros(0, dtype=bool),
+        per_step_is_excluded=np.zeros((0, M), dtype=bool),
+        per_step_gate_activations=np.zeros(0, dtype=np.int64),
+        per_step_v2_state=[],
+        per_step_v2_signal=np.zeros(0),
+        per_step_consec_suspect=np.zeros((0, M), dtype=np.int64),
+        per_step_consec_ok=np.zeros((0, M), dtype=np.int64),
+    )
+    bundle = build_replay_bundle(
+        run_config={},
+        recorded_record=record,
+        episode_id="ep_zero",
+        recorded_at="2026-05-05T12:00:00+00:00",
+    )
+    assert bundle.recorded_total_steps == 0
+    # Round-trip through from_dict.
+    bundle2 = ReplayBundle.from_dict(bundle.to_dict())
+    assert bundle2.recorded_total_steps == 0
+
+
+def test_audit_fix_recorded_at_must_be_iso_8601():
+    """Audit Finding 5: recorded_at used to accept any string
+    ('yesterday', 'TBD'). The §2 contract documents ISO 8601;
+    the implementation now enforces it via datetime.fromisoformat."""
+    with pytest.raises(ReplayBundleError, match="ISO 8601"):
+        _build_bundle(recorded_at="yesterday")
+    with pytest.raises(ReplayBundleError, match="ISO 8601"):
+        _build_bundle(recorded_at="not a date")
+
+
+def test_audit_fix_episode_id_rejects_whitespace_only():
+    """Audit Finding 5 (companion): a whitespace-only
+    episode_id used to pass the non-empty check. Recall vaults
+    keyed by (episode_id, recorded_at) need real identifiers."""
+    with pytest.raises(ReplayBundleError, match="non-whitespace"):
+        _build_bundle(episode_id="   ")
+    with pytest.raises(ReplayBundleError, match="non-whitespace"):
+        _build_bundle(episode_id="\t\n")
+
+
+def test_audit_fix_recorded_at_rejects_whitespace_only():
+    with pytest.raises(ReplayBundleError, match="non-whitespace"):
+        _build_bundle(recorded_at="   ")
+
+
+# --------------------------------------------------------------------------- #
+# Coverage gaps (Findings 6, 7, 8) — pinning under-tested contracts
+# --------------------------------------------------------------------------- #
+
+
+def test_per_step_array_fields_match_trust_shaped_episode_record():
+    """Audit Finding 7: _PER_STEP_ARRAY_FIELDS is hardcoded.
+    A future contributor adding a per-step ndarray field to
+    TrustShapedEpisodeRecord would silently bypass the
+    comparator. This test introspects the dataclass and asserts
+    every per_step_* ndarray-typed field is in the comparator's
+    list (or in an explicit-skip set for the list-type field).
+    """
+    from dataclasses import fields
+    from symbolu_robotics.bcvf_autonomous.replay.reconstructor import (
+        _PER_STEP_ARRAY_FIELDS,
+    )
+    record = _make_record()
+    explicit_skip = {"per_step_v2_state"}  # list of strings, not ndarray
+    actual_per_step_ndarray_fields = {
+        f.name
+        for f in fields(record)
+        if f.name.startswith("per_step_")
+        and isinstance(getattr(record, f.name), np.ndarray)
+    }
+    covered = set(_PER_STEP_ARRAY_FIELDS) | explicit_skip
+    missing = actual_per_step_ndarray_fields - covered
+    assert not missing, (
+        f"per-step ndarray fields not covered by comparator: {missing}. "
+        "Add them to _PER_STEP_ARRAY_FIELDS in replay/reconstructor.py "
+        "OR to explicit_skip in this test if intentionally non-comparable."
+    )
+
+
+def test_audit_fix_runner_factory_propagates_exception():
+    """Audit Finding 8: a runner_factory that raises must
+    propagate the exception uncaught — the framework cannot
+    silently swallow factory errors. Pinned so a future
+    "improvement" that wraps the factory call in try/except
+    breaks loud."""
+    bundle = _build_bundle()
+
+    class FactoryFailure(RuntimeError):
+        pass
+
+    def failing_factory(cfg):
+        raise FactoryFailure("simulated runner crash")
+
+    with pytest.raises(FactoryFailure):
+        replay_bundle(bundle, failing_factory)
+
+
+def test_audit_fix_runner_factory_returning_none_raises_replay_error():
+    """Audit Finding 8 (companion): a factory returning None is
+    a contract violation; replay_bundle must raise
+    ReplayBundleError naming the expected return type."""
+    bundle = _build_bundle()
+    with pytest.raises(ReplayBundleError, match="TrustShapedEpisodeRecord"):
+        replay_bundle(bundle, lambda cfg: None)
+
+
+# --------------------------------------------------------------------------- #
+# Snapshot / determinism (Finding 6)
+# --------------------------------------------------------------------------- #
+
+
+def test_canonical_json_shape_includes_all_top_level_fields():
+    """Audit Finding 6: the bundle JSON shape is the integration
+    contract. A regression that adds a default field, reorders
+    keys, or changes whitespace should fail loud. Pinned by
+    exhaustive top-level-key + value-shape assertions on a
+    deterministic bundle (fixed package_version, recorded_at)."""
+    record = _make_record(T=2, M=2)
+    bundle = build_replay_bundle(
+        run_config={"seed": 1},
+        recorded_record=record,
+        episode_id="snapshot_test",
+        package_version="0.4.0",
+        recorded_at="2026-05-05T12:00:00+00:00",
+        recorded_collision=False,
+        recorded_total_steps=2,
+        metadata={"vehicle_id": "veh_42"},
+    )
+    text = render_replay_bundle_text(bundle)
+    parsed = json.loads(text)
+    # Top-level keys MUST be exactly this set — no additions
+    # without bumping BUNDLE_VERSION.
+    assert set(parsed.keys()) == {
+        "bundle_version",
+        "package_version",
+        "recorded_at",
+        "episode_id",
+        "run_config",
+        "recorded_record",
+        "recorded_collision",
+        "recorded_total_steps",
+        "metadata",
+    }
+    # Pinned values prove the canonical shape:
+    assert parsed["bundle_version"] == "1.0"
+    assert parsed["package_version"] == "0.4.0"
+    assert parsed["recorded_at"] == "2026-05-05T12:00:00+00:00"
+    assert parsed["episode_id"] == "snapshot_test"
+    assert parsed["run_config"] == {"seed": 1}
+    assert parsed["recorded_collision"] is False
+    assert parsed["recorded_total_steps"] == 2
+    assert parsed["metadata"] == {"vehicle_id": "veh_42"}
+    # Trailing newline + sorted keys for diff-friendliness.
+    assert text.endswith("\n")
+    assert text.index('"bundle_version"') < text.index('"package_version"')

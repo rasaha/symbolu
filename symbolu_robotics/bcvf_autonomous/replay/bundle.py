@@ -14,6 +14,7 @@ design rationale.
 
 from __future__ import annotations
 
+import copy
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -98,6 +99,15 @@ class ReplayBundle:
     def __post_init__(self) -> None:
         if not self.bundle_version:
             raise ReplayBundleError("bundle_version must be non-empty")
+        # Audit-fix Finding 1: bundle_version was previously only
+        # checked in from_dict, so a caller could construct an
+        # in-memory bundle with bundle_version="99.0" that would
+        # later refuse to round-trip. Now both code paths agree.
+        if self.bundle_version != BUNDLE_VERSION:
+            raise ReplayBundleVersionError(
+                f"bundle_version {self.bundle_version!r} does not match "
+                f"this build's BUNDLE_VERSION {BUNDLE_VERSION!r}"
+            )
         if not self.package_version:
             raise ReplayBundleError("package_version must be non-empty")
         if not _SEMVER_PATTERN.match(self.package_version):
@@ -106,8 +116,28 @@ class ReplayBundle:
                 "semver string — replay surface needs a structured "
                 "version to compare across record / replay times"
             )
-        if not self.episode_id:
-            raise ReplayBundleError("episode_id must be non-empty")
+        # Audit-fix Finding 5: episode_id non-empty AFTER stripping
+        # whitespace. Otherwise "   " sneaks past and breaks
+        # downstream sorting / grouping in a recall vault keyed by
+        # (episode_id, recorded_at).
+        if not self.episode_id or not self.episode_id.strip():
+            raise ReplayBundleError(
+                "episode_id must be a non-empty, non-whitespace string"
+            )
+        # Audit-fix Finding 5: recorded_at must parse as ISO 8601.
+        # The §2 design contract documents this; the
+        # implementation now enforces it.
+        if not self.recorded_at or not self.recorded_at.strip():
+            raise ReplayBundleError(
+                "recorded_at must be a non-empty, non-whitespace ISO 8601 string"
+            )
+        try:
+            datetime.fromisoformat(self.recorded_at)
+        except ValueError as exc:
+            raise ReplayBundleError(
+                f"recorded_at {self.recorded_at!r} is not a valid ISO 8601 "
+                f"timestamp: {exc}"
+            ) from exc
         if not isinstance(self.run_config, dict):
             raise ReplayBundleError(
                 f"run_config must be a dict; got {type(self.run_config).__name__}"
@@ -141,17 +171,25 @@ class ReplayBundle:
     # ----- serialisation ----- #
 
     def to_dict(self) -> Dict[str, Any]:
-        """Plain-dict view for JSON serialisation."""
+        """Plain-dict view for JSON serialisation.
+
+        Audit-fix Finding 3: uses :func:`copy.deepcopy` for the
+        nested-dict fields. Previously a shallow ``dict(...)``
+        copy let a downstream caller mutate
+        ``run_config["nested"]["list"]`` and corrupt the bundle's
+        record-time view; the deepcopy isolates the bundle from
+        downstream mutation.
+        """
         return {
             "bundle_version": self.bundle_version,
             "package_version": self.package_version,
             "recorded_at": self.recorded_at,
             "episode_id": self.episode_id,
-            "run_config": dict(self.run_config),
-            "recorded_record": dict(self.recorded_record),
+            "run_config": copy.deepcopy(self.run_config),
+            "recorded_record": copy.deepcopy(self.recorded_record),
             "recorded_collision": bool(self.recorded_collision),
             "recorded_total_steps": int(self.recorded_total_steps),
-            "metadata": dict(self.metadata),
+            "metadata": copy.deepcopy(self.metadata),
         }
 
     @classmethod
@@ -177,16 +215,19 @@ class ReplayBundle:
                 f"bundle_version {payload['bundle_version']!r} does not "
                 f"match this loader's supported version {BUNDLE_VERSION!r}"
             )
+        # Audit-fix Finding 3: deepcopy nested dicts so a caller
+        # mutating their input payload after construction doesn't
+        # leak into the frozen bundle's internal state.
         return cls(
             bundle_version=str(payload["bundle_version"]),
             package_version=str(payload["package_version"]),
             recorded_at=str(payload["recorded_at"]),
             episode_id=str(payload["episode_id"]),
-            run_config=dict(payload["run_config"]),
-            recorded_record=dict(payload["recorded_record"]),
+            run_config=copy.deepcopy(payload["run_config"]),
+            recorded_record=copy.deepcopy(payload["recorded_record"]),
             recorded_collision=bool(payload["recorded_collision"]),
             recorded_total_steps=int(payload["recorded_total_steps"]),
-            metadata=dict(payload.get("metadata", {})),
+            metadata=copy.deepcopy(payload.get("metadata", {})),
         )
 
     @property
@@ -246,14 +287,17 @@ def build_replay_bundle(
         recorded_at = datetime.now(timezone.utc).isoformat()
     if recorded_total_steps is None:
         recorded_total_steps = int(recorded_record.n_steps)
+    # Audit-fix Finding 3: deepcopy the caller's run_config +
+    # metadata dicts so subsequent caller mutation doesn't corrupt
+    # the bundle's record-time view.
     return ReplayBundle(
         bundle_version=BUNDLE_VERSION,
         package_version=str(package_version),
         recorded_at=str(recorded_at),
         episode_id=str(episode_id),
-        run_config=dict(run_config),
+        run_config=copy.deepcopy(run_config),
         recorded_record=recorded_record.to_dict(),
         recorded_collision=bool(recorded_collision),
         recorded_total_steps=int(recorded_total_steps),
-        metadata=dict(metadata or {}),
+        metadata=copy.deepcopy(metadata or {}),
     )

@@ -56,6 +56,17 @@ _REQUIRED_KEYS: Tuple[str, ...] = (
 def _check_shape(
     name: str, arr: np.ndarray, expected: Tuple[int, ...],
 ) -> None:
+    # Audit-fix (replay framework Finding 4): a zero-step
+    # record's per_step arrays serialise as ``[]`` (an empty
+    # nested list collapses to a 1-D empty), which round-trips
+    # back as shape ``(0,)`` not the expected ``(0, M)``. A
+    # zero-step episode is a real recall-investigation case
+    # (collision in initial state, validation failure before the
+    # first step) that the framework documents as bundle-able.
+    # When the expected shape's first axis is 0, we accept any
+    # 0-element array regardless of rank.
+    if expected and expected[0] == 0 and arr.size == 0:
+        return
     if arr.shape != expected:
         raise ValueError(
             f"{name} shape {arr.shape} does not match expected {expected}"

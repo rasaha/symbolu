@@ -21,6 +21,7 @@ of bit-identity + the divergence taxonomy.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Tuple
 
@@ -97,10 +98,21 @@ _SCALAR_FIELDS: Tuple[str, ...] = (
 
 
 def _arrays_equal(a: np.ndarray, b: np.ndarray) -> bool:
-    """Bit-identity check for numpy arrays. Uses
-    ``np.array_equal`` (exact equality including dtype +
-    NaN-positions when ``equal_nan=True``)."""
+    """Bit-identity check for numpy arrays. Enforces shape, dtype,
+    and value equality (NaN-positions matched via ``equal_nan=True``).
+
+    Audit-fix Finding 2: ``np.array_equal`` alone is value-only
+    — an int64 → int32 dtype flip with the same numeric values
+    used to slip past undetected. Bit-identity is the framework's
+    contract; a kernel commit changing a per-step array's dtype
+    changes the bytes-on-disk and may change downstream
+    arithmetic (int32 overflow, etc.). The dtype check surfaces
+    the divergence loud, which is the §5 Class-A behaviour the
+    framework promises.
+    """
     if a.shape != b.shape:
+        return False
+    if a.dtype != b.dtype:
         return False
     return bool(np.array_equal(a, b, equal_nan=True))
 
@@ -231,7 +243,11 @@ def replay_bundle(
             "runner_factory must be callable (run_config_dict) -> "
             "TrustShapedEpisodeRecord"
         )
-    reconstructed = runner_factory(dict(bundle.run_config))
+    # Audit-fix Finding 3: deepcopy the run_config before handing
+    # it to the factory. A factory that mutates its input (path
+    # normalisation, default overrides) used to corrupt the
+    # bundle's record-time view via shallow-copy aliasing.
+    reconstructed = runner_factory(copy.deepcopy(bundle.run_config))
     if not isinstance(reconstructed, TrustShapedEpisodeRecord):
         raise ReplayBundleError(
             "runner_factory must return a TrustShapedEpisodeRecord; "
