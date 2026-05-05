@@ -129,13 +129,16 @@ def test_roadmap_acknowledges_existing_shipped_surfaces():
 # * ``BCVFNode`` was on this list in v0.7.x — removed post-v0.7.x
 #   once the §3 / §9-row-#2 design-doc + thin-shim implementation
 #   pair landed in ``bcvf_ros2/`` + ``ROS2_DDS_SBOM_DESIGN.md``.
-# Both surfaces are now provisional (tracked by
+# * ``ReplayBundle`` was on this list in v0.7.x — removed
+#   post-v0.7.x once the §5 / §9-row-#3 design-doc + thin-shim
+#   implementation pair landed in ``replay/`` +
+#   ``REPLAY_FRAMEWORK_DESIGN.md``.
+# All three surfaces are now provisional (tracked by
 # ``test_api_stability.py``); their §9 roadmap rows are struck
 # through with pointers to the corresponding design docs per the
 # §11 maturation path.
 _ROADMAP_TOKENS = (
     "RealTimeBudget",
-    "ReplayBundle",
     "CalibrationSet",
     "SensorAttestation",
 )

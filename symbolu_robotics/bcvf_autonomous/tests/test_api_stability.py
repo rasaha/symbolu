@@ -52,7 +52,14 @@ EXPECTED_STABLE_COUNT = 38
 # generate_cyclonedx_bom, runtime_components,
 # write_cyclonedx_bom). Provisional until the five §9 ship-when-
 # ready criteria of ROS2_DDS_SBOM_DESIGN.md land.
-EXPECTED_PROVISIONAL_COUNT = 41
+# +10 third post-v0.7 wave for the replay / record-and-replay
+# framework (§9 row-#3 roadmap pick). 10 replay.* symbols
+# (BUNDLE_VERSION, ReplayBundle, ReplayBundleError,
+# ReplayBundleVersionError, ReplayResult, build_replay_bundle,
+# compare_replay, load_replay_bundle, replay_bundle,
+# save_replay_bundle). Provisional until the five §9
+# ship-when-ready criteria of REPLAY_FRAMEWORK_DESIGN.md land.
+EXPECTED_PROVISIONAL_COUNT = 51
 EXPECTED_VERSION = "0.4.0"
 EXPECTED_VERSION_INFO = (0, 4, 0)
 

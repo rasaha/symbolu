@@ -173,6 +173,30 @@ PROVISIONAL_API: Tuple[str, ...] = (
     "safety_case.sbom.generate_cyclonedx_bom",
     "safety_case.sbom.runtime_components",
     "safety_case.sbom.write_cyclonedx_bom",
+    # Replay / record-and-replay framework (post-v0.7.x — the §9
+    # row-#3 industry-features-roadmap pick; see
+    # REPLAY_FRAMEWORK_DESIGN.md). The recall-investigator's
+    # bit-identity surface: ReplayBundle ties (RunConfig,
+    # recorded TrustShapedEpisodeRecord, package version, episode
+    # metadata) into a JSON artifact; replay_bundle runs the
+    # bundle's config through the current code and surfaces any
+    # divergence with field-level + tick-level localisation.
+    # Provisional until the five §9 ship-when-ready criteria
+    # land (deployment-partner usage for one quarter, bit-
+    # identity replay across a real recall case, Class-A
+    # divergence detection across a kernel change, signed bundle
+    # integrity field, external auditor sign-off on the bundle
+    # JSON shape).
+    "replay.BUNDLE_VERSION",
+    "replay.ReplayBundle",
+    "replay.ReplayBundleError",
+    "replay.ReplayBundleVersionError",
+    "replay.ReplayResult",
+    "replay.build_replay_bundle",
+    "replay.compare_replay",
+    "replay.load_replay_bundle",
+    "replay.replay_bundle",
+    "replay.save_replay_bundle",
 )
 
 
