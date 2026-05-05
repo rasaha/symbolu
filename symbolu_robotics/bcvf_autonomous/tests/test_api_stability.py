@@ -42,7 +42,17 @@ EXPECTED_STABLE_COUNT = 38
 # IllegalTransitionError, SafetyStateMachineError). Provisional
 # until the three §9 ship-when-ready criteria of
 # SAFETY_STATE_MACHINE_DESIGN.md land.
-EXPECTED_PROVISIONAL_COUNT = 29
+#
+# +12 second post-v0.7 wave for the ROS 2 / DDS / SBOM
+# integration contract (§9 row-#2 roadmap pick). 8 ros2.* symbols
+# (BCVFNode, BCVFNodeBehaviour, BCVFNodeConfig,
+# ConsensusOutputMessage, DDS_QOS_PROFILE, DDSQoSProfile,
+# PredictorTrajectoryMessage, build_rclpy_qos_profile) + 4
+# safety_case.sbom.* symbols (SBOMComponent,
+# generate_cyclonedx_bom, runtime_components,
+# write_cyclonedx_bom). Provisional until the five §9 ship-when-
+# ready criteria of ROS2_DDS_SBOM_DESIGN.md land.
+EXPECTED_PROVISIONAL_COUNT = 41
 EXPECTED_VERSION = "0.4.0"
 EXPECTED_VERSION_INFO = (0, 4, 0)
 

@@ -122,15 +122,19 @@ def test_roadmap_acknowledges_existing_shipped_surfaces():
 # first promoting the roadmap row to a real design doc would trip
 # one of these checks.
 #
-# Note: ``SafetyStateMachine`` was on this list in v0.7 — removed
-# post-v0.7 once the §4 / §9.1-recommended-pick design-doc + thin-
-# shim implementation pair landed in ``safety_state/``. It is now
-# a provisional surface (tracked by ``test_api_stability.py``); the
-# roadmap row in §9 is struck through with a pointer to
-# ``SAFETY_STATE_MACHINE_DESIGN.md`` per the §11 maturation path.
+# Notes on removed tokens:
+# * ``SafetyStateMachine`` was on this list in v0.7 — removed
+#   post-v0.7 once the §4 / §9.1-recommended-pick design-doc +
+#   thin-shim implementation pair landed in ``safety_state/``.
+# * ``BCVFNode`` was on this list in v0.7.x — removed post-v0.7.x
+#   once the §3 / §9-row-#2 design-doc + thin-shim implementation
+#   pair landed in ``bcvf_ros2/`` + ``ROS2_DDS_SBOM_DESIGN.md``.
+# Both surfaces are now provisional (tracked by
+# ``test_api_stability.py``); their §9 roadmap rows are struck
+# through with pointers to the corresponding design docs per the
+# §11 maturation path.
 _ROADMAP_TOKENS = (
     "RealTimeBudget",
-    "BCVFNode",
     "ReplayBundle",
     "CalibrationSet",
     "SensorAttestation",

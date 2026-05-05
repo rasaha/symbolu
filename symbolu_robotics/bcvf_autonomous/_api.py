@@ -148,6 +148,31 @@ PROVISIONAL_API: Tuple[str, ...] = (
     "safety_state.StateTransitionLogEntry",
     "safety_state.IllegalTransitionError",
     "safety_state.SafetyStateMachineError",
+    # ROS 2 / DDS integration contract (post-v0.7.x — the §9
+    # row-#2 industry-features-roadmap pick; see
+    # ROS2_DDS_SBOM_DESIGN.md). Symbols are re-exported via the
+    # bcvf_autonomous.ros2 shim because the canonical package
+    # (``symbolu_robotics.bcvf_ros2``) is a sibling, not a
+    # submodule. Provisional until the five §9 ship-when-ready
+    # criteria land (three deployment partners, SBOM accepted
+    # into procurement, DDS QoS exercised against RTI/FastDDS,
+    # colcon-buildable, external-auditor SBOM validation).
+    "ros2.BCVFNode",
+    "ros2.BCVFNodeBehaviour",
+    "ros2.BCVFNodeConfig",
+    "ros2.ConsensusOutputMessage",
+    "ros2.DDS_QOS_PROFILE",
+    "ros2.DDSQoSProfile",
+    "ros2.PredictorTrajectoryMessage",
+    "ros2.build_rclpy_qos_profile",
+    # CycloneDX SBOM generator (post-v0.7.x; lands paired with
+    # the ROS 2 integration contract per ROS2_DDS_SBOM_DESIGN.md
+    # §6 — the procurement-gate manifest enumerating runtime
+    # dependencies with version + SPDX license).
+    "safety_case.sbom.SBOMComponent",
+    "safety_case.sbom.generate_cyclonedx_bom",
+    "safety_case.sbom.runtime_components",
+    "safety_case.sbom.write_cyclonedx_bom",
 )
 
 
