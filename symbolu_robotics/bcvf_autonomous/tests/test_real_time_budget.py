@@ -320,15 +320,24 @@ def test_summary_meets_budget_false_on_any_violation():
     assert s.meets_budget is False
 
 
-def test_summary_on_empty_monitor_returns_zero_state():
+def test_summary_on_empty_monitor_returns_none_percentiles():
+    """Audit-fix Finding 6: empty-monitor percentiles must be
+    None (not 0.0). Returning 0.0 would silently pass a CI gate
+    of the form ``if summary.p99_ms > budget.p99_budget_ms``
+    when the planner crashed before the first observe() — the
+    "we shipped 0 ms p99" report is indistinguishable from
+    "we passed"."""
     mon = LatencyMonitor(_default_budget())
     s = mon.summary()
     assert s.n_observations == 0
-    assert s.mean_ms == 0.0
-    assert s.max_ms == 0.0
-    assert s.meets_budget is True  # vacuously
+    assert s.mean_ms is None
+    assert s.p50_ms is None
+    assert s.p95_ms is None
+    assert s.p99_ms is None
     assert s.p999_ms is None
     assert s.p9999_ms is None
+    assert s.max_ms is None
+    assert s.meets_budget is True  # vacuously
 
 
 # --------------------------------------------------------------------------- #
@@ -428,12 +437,15 @@ def test_budget_summary_to_dict_round_trips_keys():
     mon.observe(5.0, tick_index=0)
     mon.observe(20.0, tick_index=1)
     d = mon.summary().to_dict()
+    # Audit-fix Finding 1: allocation_trace is now in the dict
+    # (previously silently dropped).
     expected_keys = {
         "n_observations", "mean_ms", "p50_ms", "p95_ms", "p99_ms",
         "p999_ms", "p9999_ms", "max_ms",
         "n_p99_violations", "n_p999_violations",
         "n_p9999_violations", "n_max_violations",
         "over_budget_ticks", "budget", "meets_budget",
+        "allocation_trace",
     }
     assert set(d.keys()) == expected_keys
 
@@ -494,3 +506,233 @@ def test_budget_violation_error_is_real_time_budget_error_subclass():
     assert issubclass(BudgetViolationError, RealTimeBudgetError)
     err = BudgetViolationError("test")
     assert isinstance(err, RealTimeBudgetError)
+
+
+# --------------------------------------------------------------------------- #
+# Audit-fix regression pins (post-v0.7.x critical-audit pass on §9-row-#4)
+# --------------------------------------------------------------------------- #
+
+
+def test_audit_fix_observe_rejects_nan():
+    """Audit Finding 2 (CRITICAL): a NaN tick used to slip
+    past every guard. ``isinstance(nan, float)`` is True;
+    ``nan < 0`` is False. The NaN polluted every percentile
+    + the CI gate ``if not summary.meets_budget`` silently
+    passed because no tier counter incremented (NaN
+    comparisons are all False). The framework's whole point
+    is to surface budget violations — it must not silently
+    swallow NaN."""
+    mon = LatencyMonitor(_default_budget())
+    with pytest.raises(RealTimeBudgetError, match="finite"):
+        mon.observe(float("nan"), tick_index=0)
+
+
+def test_audit_fix_observe_rejects_positive_infinity():
+    """Audit Finding 2 (companion): +Inf must also be rejected
+    — ``inf > max_budget_ms`` is True so it would route to the
+    max counter, but the percentile fields would still be Inf.
+    Reject loud rather than poison the stats."""
+    mon = LatencyMonitor(_default_budget())
+    with pytest.raises(RealTimeBudgetError, match="finite"):
+        mon.observe(float("inf"), tick_index=0)
+
+
+def test_audit_fix_observe_rejects_negative_infinity():
+    mon = LatencyMonitor(_default_budget())
+    with pytest.raises(RealTimeBudgetError, match="finite"):
+        mon.observe(float("-inf"), tick_index=0)
+
+
+def test_audit_fix_observe_series_rejects_nan_in_array():
+    """Audit Finding 2 (companion): bulk-ingest must also
+    reject non-finite values. A single NaN in a 10⁶-tick series
+    used to silently corrupt every downstream percentile."""
+    mon = LatencyMonitor(_default_budget())
+    series = np.array([5.0, 6.0, float("nan"), 7.0])
+    with pytest.raises(RealTimeBudgetError, match="non-finite"):
+        mon.observe_series(series)
+
+
+def test_audit_fix_observe_rejects_bool():
+    """Audit Finding 4: ``True isinstance int`` is True in
+    Python. ``mon.observe(True, tick_index=i)`` used to slip
+    past the type guard and contribute 1.0 to the latency
+    series. A bug-prone caller writing
+    ``mon.observe(planner_did_succeed, tick_index=i)`` should
+    get a loud type error, not silent acceptance."""
+    mon = LatencyMonitor(_default_budget())
+    with pytest.raises(RealTimeBudgetError, match="number"):
+        mon.observe(True, tick_index=0)
+    with pytest.raises(RealTimeBudgetError, match="number"):
+        mon.observe(False, tick_index=0)
+
+
+def test_audit_fix_observe_accepts_numpy_scalars():
+    """Audit Finding 4 (companion): ``np.float64(5.0)`` and
+    ``np.int64(5)`` are what comes out of ``arr[i]`` when
+    iterating a numpy array. Both must be accepted (a
+    deployment partner feeding ``solve_times_ms[i]`` directly
+    shouldn't get a type error)."""
+    mon = LatencyMonitor(_default_budget())
+    mon.observe(np.float64(5.0), tick_index=0)
+    mon.observe(np.int64(7), tick_index=1)
+    mon.observe(np.float32(3.0), tick_index=2)
+    assert mon.n_observations == 3
+
+
+def test_audit_fix_validator_rejects_equal_p99_p999():
+    """Audit Finding 5: equal-tier budgets used to route a
+    violation to whichever tier was checked first in the
+    if/elif chain — silently dropping the tighter-tier
+    counter. Strict-monotone validator now forbids equal
+    tiers."""
+    with pytest.raises(RealTimeBudgetError, match="strictly looser"):
+        _default_budget(p99_budget_ms=8.0, p999_budget_ms=8.0)
+
+
+def test_audit_fix_validator_rejects_equal_max_p9999():
+    with pytest.raises(RealTimeBudgetError, match="bleeding-edge"):
+        _default_budget(p9999_budget_ms=10.0, max_budget_ms=10.0)
+
+
+def test_audit_fix_close_stops_tracemalloc_only_if_we_started_it():
+    """Audit Finding 3: tracemalloc.start() is global.
+    LatencyMonitor used to enable it without ever stopping —
+    a leak that left the whole interpreter paying tracemalloc
+    overhead for the rest of its lifetime. close() now
+    stops tracemalloc only if THIS monitor enabled it."""
+    import tracemalloc
+    # Ensure tracemalloc is not already running.
+    if tracemalloc.is_tracing():
+        tracemalloc.stop()
+    assert not tracemalloc.is_tracing()
+    mon = LatencyMonitor(_default_budget(), track_allocations=True)
+    assert tracemalloc.is_tracing()
+    mon.close()
+    assert not tracemalloc.is_tracing()
+
+
+def test_audit_fix_close_does_not_stop_externally_started_tracemalloc():
+    """Audit Finding 3 (companion): if tracemalloc was already
+    running when LatencyMonitor was constructed, close() must
+    NOT stop it — the external owner keeps theirs."""
+    import tracemalloc
+    if not tracemalloc.is_tracing():
+        tracemalloc.start()
+    try:
+        mon = LatencyMonitor(_default_budget(), track_allocations=True)
+        mon.close()
+        # Externally-started tracemalloc is still running.
+        assert tracemalloc.is_tracing()
+    finally:
+        tracemalloc.stop()
+
+
+def test_audit_fix_close_is_idempotent():
+    mon = LatencyMonitor(_default_budget())
+    mon.close()
+    mon.close()  # second call must not raise
+
+
+def test_audit_fix_context_manager_calls_close():
+    import tracemalloc
+    if tracemalloc.is_tracing():
+        tracemalloc.stop()
+    with LatencyMonitor(_default_budget(), track_allocations=True) as mon:
+        mon.observe(5.0, tick_index=0)
+        assert tracemalloc.is_tracing()
+    assert not tracemalloc.is_tracing()
+
+
+def test_audit_fix_allocation_trace_round_trips_through_to_dict():
+    """Audit Finding 1: BudgetSummary.to_dict used to silently
+    drop allocation_trace. A recall investigator opening the
+    JSON saw no allocation data even when track_allocations=True
+    was set."""
+    import tracemalloc
+    if tracemalloc.is_tracing():
+        tracemalloc.stop()
+    with LatencyMonitor(_default_budget(), track_allocations=True) as mon:
+        mon.observe(5.0, tick_index=0)
+        mon.observe(6.0, tick_index=1)
+        d = mon.summary().to_dict()
+    assert "allocation_trace" in d
+    if d["allocation_trace"] is not None:
+        # When tracemalloc captures any allocations, the trace
+        # serialises with the four documented fields.
+        assert set(d["allocation_trace"].keys()) == {
+            "n_observations",
+            "mean_bytes_per_tick",
+            "p99_bytes_per_tick",
+            "max_bytes_per_tick",
+        }
+
+
+def test_audit_fix_allocation_trace_is_none_when_disabled():
+    """When track_allocations=False, the trace is None and
+    the to_dict entry is None — not missing."""
+    mon = LatencyMonitor(_default_budget())
+    mon.observe(5.0, tick_index=0)
+    d = mon.summary().to_dict()
+    assert "allocation_trace" in d
+    assert d["allocation_trace"] is None
+
+
+def test_audit_fix_observe_works_after_reset():
+    """Coverage gap: reset() should leave the monitor usable.
+    Pinned so a future deque/list re-init bug regresses loud."""
+    mon = LatencyMonitor(_default_budget())
+    mon.observe(5.0, tick_index=0)
+    mon.observe(20.0, tick_index=1)
+    mon.reset()
+    # Use the monitor normally after reset.
+    mon.observe(7.0, tick_index=2)
+    mon.observe(8.5, tick_index=3)  # > p99
+    s = mon.summary()
+    assert s.n_observations == 2
+    assert s.n_p99_violations == 1
+
+
+def test_audit_fix_to_dict_preserves_none_for_empty_monitor():
+    """Audit Finding 6 (companion): empty-monitor's None
+    percentiles must round-trip through to_dict as None
+    (not 0.0). Downstream JSON consumers must distinguish
+    'no data' from 'p99 was zero'."""
+    mon = LatencyMonitor(_default_budget())
+    d = mon.summary().to_dict()
+    for key in ("mean_ms", "p50_ms", "p95_ms", "p99_ms",
+                "p999_ms", "p9999_ms", "max_ms"):
+        assert d[key] is None, f"{key} should be None on empty monitor"
+
+
+def test_audit_fix_canonical_to_dict_snapshot():
+    """Audit Finding 9 (coverage gap): a JSON snapshot pin
+    on BudgetSummary.to_dict surfaces shape regressions
+    (dropped key, renamed field, changed nesting) that
+    keys-only assertions miss."""
+    cfg = _default_budget(min_samples_for_p999=100)
+    mon = LatencyMonitor(cfg)
+    for i in range(105):
+        mon.observe(5.0, tick_index=i)
+    mon.observe(20.0, tick_index=200)  # one max violation
+    d = mon.summary().to_dict()
+
+    assert d["n_observations"] == 106
+    assert d["n_max_violations"] == 1
+    assert d["meets_budget"] is False
+    # Pin specific over_budget_tick shape.
+    assert len(d["over_budget_ticks"]) == 1
+    entry = d["over_budget_ticks"][0]
+    assert entry == {
+        "tick_index": 200,
+        "observed_ms": 20.0,
+        "budget_tier": "max",
+        "threshold_ms": 15.0,
+    }
+    # Pin budget shape: every documented knob present.
+    assert set(d["budget"].keys()) == {
+        "target_hz", "p99_budget_ms", "p999_budget_ms",
+        "p9999_budget_ms", "max_budget_ms",
+        "min_samples_for_p999", "min_samples_for_p9999",
+        "over_budget_log_capacity",
+    }

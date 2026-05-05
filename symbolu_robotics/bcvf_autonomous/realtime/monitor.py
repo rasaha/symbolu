@@ -13,6 +13,7 @@ internal hot path by default — the planner keeps its existing
 
 from __future__ import annotations
 
+import math
 from collections import deque
 from typing import Deque, List, Optional
 
@@ -79,10 +80,18 @@ class LatencyMonitor:
         # Allocation tracking — lazy-initialised tracemalloc
         # instance per monitor (don't enable globally).
         self._alloc_deltas: List[int] = []
+        # Audit-fix Finding 3: track whether THIS monitor enabled
+        # tracemalloc, so close() only stops it if we own it. A
+        # monitor that finds tracemalloc already running (started
+        # by the caller or another component) leaves it running
+        # on close.
+        self._we_started_tracemalloc: bool = False
         if self._track_allocations:
             import tracemalloc
             self._tracemalloc = tracemalloc
-            tracemalloc.start()
+            if not tracemalloc.is_tracing():
+                tracemalloc.start()
+                self._we_started_tracemalloc = True
             self._alloc_baseline = tracemalloc.get_traced_memory()[0]
         else:
             self._tracemalloc = None
@@ -118,16 +127,35 @@ class LatencyMonitor:
         :meth:`summary` ``meets_budget`` check + an explicit
         :class:`BudgetViolationError`).
         """
-        if not isinstance(elapsed_ms, (int, float)):
+        # Audit-fix Finding 4: reject bool — `True isinstance int`
+        # is True in Python, so the previous guard let
+        # ``mon.observe(True, tick_index=i)`` slip through and
+        # contribute 1.0 to the latency series. Accept numpy
+        # scalars (np.int64, np.floating) explicitly because
+        # ``arr[i]`` produces those when iterating an ndarray.
+        if isinstance(elapsed_ms, bool) or not isinstance(
+            elapsed_ms, (int, float, np.floating, np.integer)
+        ):
             raise RealTimeBudgetError(
                 f"elapsed_ms must be a number; got "
                 f"{type(elapsed_ms).__name__}"
+            )
+        elapsed_ms = float(elapsed_ms)
+        # Audit-fix Finding 2: reject NaN + ±Inf. NaN comparisons
+        # are all False, so a NaN tick used to pass every tier
+        # check + leave meets_budget=True while polluting
+        # mean_ms / max_ms / p99_ms with NaN. The CI gate would
+        # silently pass — exactly the failure mode the framework
+        # exists to prevent.
+        if not math.isfinite(elapsed_ms):
+            raise RealTimeBudgetError(
+                f"elapsed_ms must be finite; got {elapsed_ms} "
+                "(NaN / Inf would silently corrupt every percentile)"
             )
         if elapsed_ms < 0:
             raise RealTimeBudgetError(
                 f"elapsed_ms must be ≥ 0; got {elapsed_ms}"
             )
-        elapsed_ms = float(elapsed_ms)
         self._observations.append(elapsed_ms)
 
         # Classify against the most-strict tier first. Each
@@ -204,6 +232,14 @@ class LatencyMonitor:
             raise RealTimeBudgetError(
                 f"series must be 1-D; got shape {arr.shape}"
             )
+        # Audit-fix Finding 2 (companion): reject NaN / Inf at
+        # the bulk-ingest gate so a single bad sample doesn't
+        # silently pollute every downstream percentile.
+        if not np.isfinite(arr).all():
+            raise RealTimeBudgetError(
+                "series contains non-finite values (NaN / Inf); "
+                "latency must be finite"
+            )
         if (arr < 0).any():
             raise RealTimeBudgetError(
                 "series contains negative values; latency must be ≥ 0"
@@ -224,15 +260,23 @@ class LatencyMonitor:
         """
         n = len(self._observations)
         if n == 0:
+            # Audit-fix Finding 6: empty-monitor percentiles must
+            # be None (not 0.0). The %4 percentile-availability
+            # discipline already returns None for p999/p9999
+            # below the sample-count threshold; an empty monitor
+            # is a stronger version of the same case. Returning
+            # 0.0 used to silently pass a CI gate of the form
+            # ``if summary.p99_ms > budget.p99_budget_ms``
+            # when no observations had been recorded.
             return BudgetSummary(
                 n_observations=0,
-                mean_ms=0.0,
-                p50_ms=0.0,
-                p95_ms=0.0,
-                p99_ms=0.0,
+                mean_ms=None,
+                p50_ms=None,
+                p95_ms=None,
+                p99_ms=None,
                 p999_ms=None,
                 p9999_ms=None,
-                max_ms=0.0,
+                max_ms=None,
                 n_p99_violations=0,
                 n_p999_violations=0,
                 n_p9999_violations=0,
@@ -300,7 +344,8 @@ class LatencyMonitor:
         episode aggregates.
 
         Does NOT change the budget itself — re-instantiate the
-        monitor to swap budgets.
+        monitor to swap budgets. Does NOT stop tracemalloc — call
+        :meth:`close` for that.
         """
         self._observations = []
         self._n_p99_violations = 0
@@ -309,5 +354,38 @@ class LatencyMonitor:
         self._n_max_violations = 0
         self._over_budget.clear()
         self._alloc_deltas = []
-        if self._tracemalloc is not None:
+        if self._tracemalloc is not None and self._tracemalloc.is_tracing():
             self._alloc_baseline = self._tracemalloc.get_traced_memory()[0]
+        else:
+            self._alloc_baseline = 0
+
+    def close(self) -> None:
+        """Release the monitor's tracemalloc resource (if any).
+
+        Audit-fix Finding 3: ``tracemalloc.start()`` is a global
+        enable; without an explicit ``close()`` the tracer
+        stayed on for the rest of the process even after the
+        monitor went out of scope. ``close()`` stops tracemalloc
+        only if THIS monitor enabled it (other components that
+        had it running keep theirs).
+
+        Idempotent: calling ``close()`` twice is a no-op on the
+        second call. After ``close()``, ``observe()`` still
+        works but allocation tracking is disabled.
+        """
+        if (
+            self._we_started_tracemalloc
+            and self._tracemalloc is not None
+            and self._tracemalloc.is_tracing()
+        ):
+            self._tracemalloc.stop()
+        self._we_started_tracemalloc = False
+        self._tracemalloc = None
+        self._alloc_baseline = 0
+        self._track_allocations = False
+
+    def __enter__(self) -> "LatencyMonitor":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()

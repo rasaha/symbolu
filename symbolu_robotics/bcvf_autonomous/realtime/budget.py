@@ -9,7 +9,7 @@ construction; AUTOSAR partners override per their tier. See
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 from .errors import RealTimeBudgetError
 
@@ -68,24 +68,30 @@ class RealTimeBudget:
                 raise RealTimeBudgetError(
                     f"{name} must be positive; got {value}"
                 )
-        # Budgets must be monotone non-decreasing as the
-        # percentile becomes rarer: a tighter p999 than p99 is a
-        # configuration error (p999 includes p99's worst ticks
-        # plus the worst 9-in-1000 between them).
-        if self.p999_budget_ms < self.p99_budget_ms:
+        # Audit-fix Finding 5: budgets must be strictly monotone
+        # increasing across tiers. Equal tiers (e.g. p99 == p999)
+        # used to be accepted, but the monitor's mutually-exclusive
+        # if/elif classifier would then route a violation to
+        # whichever tier was checked first — silently dropping the
+        # tighter-tier counter. Strict > prevents that ambiguity:
+        # an integrator who needs degenerate config sets the
+        # tighter-tier knob to one less ms.
+        if self.p999_budget_ms <= self.p99_budget_ms:
             raise RealTimeBudgetError(
-                f"p999_budget_ms ({self.p999_budget_ms}) must be ≥ "
+                f"p999_budget_ms ({self.p999_budget_ms}) must be > "
                 f"p99_budget_ms ({self.p99_budget_ms}) — rarer "
-                "percentiles are at least as loose as more common ones"
+                "percentiles must be strictly looser than more "
+                "common ones to avoid mutually-exclusive-tier "
+                "classification ambiguity"
             )
-        if self.p9999_budget_ms < self.p999_budget_ms:
+        if self.p9999_budget_ms <= self.p999_budget_ms:
             raise RealTimeBudgetError(
-                f"p9999_budget_ms ({self.p9999_budget_ms}) must be ≥ "
+                f"p9999_budget_ms ({self.p9999_budget_ms}) must be > "
                 f"p999_budget_ms ({self.p999_budget_ms})"
             )
-        if self.max_budget_ms < self.p9999_budget_ms:
+        if self.max_budget_ms <= self.p9999_budget_ms:
             raise RealTimeBudgetError(
-                f"max_budget_ms ({self.max_budget_ms}) must be ≥ "
+                f"max_budget_ms ({self.max_budget_ms}) must be > "
                 f"p9999_budget_ms ({self.p9999_budget_ms}) — the "
                 "absolute worst-case must accommodate the bleeding-"
                 "edge percentile"
@@ -167,6 +173,18 @@ class AllocationTrace:
     p99_bytes_per_tick: float
     max_bytes_per_tick: int
 
+    def to_dict(self) -> dict:
+        """Plain-dict view for JSON serialisation. Audit-fix
+        Finding 1: previously the trace was silently dropped
+        from BudgetSummary.to_dict — a recall investigator
+        opening the JSON saw no allocation data at all."""
+        return {
+            "n_observations": int(self.n_observations),
+            "mean_bytes_per_tick": float(self.mean_bytes_per_tick),
+            "p99_bytes_per_tick": float(self.p99_bytes_per_tick),
+            "max_bytes_per_tick": int(self.max_bytes_per_tick),
+        }
+
 
 @dataclass(frozen=True)
 class BudgetSummary:
@@ -174,20 +192,29 @@ class BudgetSummary:
 
     Fields ``p999_ms`` / ``p9999_ms`` are ``None`` when the
     sample count is below the documented threshold —
-    intentional, see ``REAL_TIME_BUDGET_DESIGN.md`` §4. Downstream
-    code that ignores ``None`` gets a clear ``TypeError`` rather
-    than a fake number; this is the percentile-availability
-    discipline.
+    intentional, see ``REAL_TIME_BUDGET_DESIGN.md`` §4. Audit-fix
+    Finding 6: every percentile field (mean / p50 / p95 / p99 /
+    max included) is also ``None`` when ``n_observations == 0``
+    — the empty-monitor case used to return 0.0 and silently
+    pass a ``summary.p99_ms > budget.p99_budget_ms`` CI gate.
+
+    Downstream code that ignores ``None`` gets a clear
+    ``TypeError`` rather than a fake number; this is the
+    percentile-availability discipline.
     """
 
     n_observations: int
-    mean_ms: float
-    p50_ms: float
-    p95_ms: float
-    p99_ms: float
-    p999_ms: float  # may be None — see § note above (typed Optional below)
-    p9999_ms: float  # may be None — see § note above
-    max_ms: float
+    # Audit-fix Finding 7: every percentile field is
+    # Optional[float] — they're None when n_observations == 0
+    # (per Finding 6) and p999/p9999 also None below the
+    # min_samples gates.
+    mean_ms: Optional[float]
+    p50_ms: Optional[float]
+    p95_ms: Optional[float]
+    p99_ms: Optional[float]
+    p999_ms: Optional[float]
+    p9999_ms: Optional[float]
+    max_ms: Optional[float]
     n_p99_violations: int
     n_p999_violations: int
     n_p9999_violations: int
@@ -195,25 +222,33 @@ class BudgetSummary:
     over_budget_ticks: Tuple[OverBudgetTick, ...]
     budget: RealTimeBudget
     meets_budget: bool
-    allocation_trace: object = None  # AllocationTrace | None
+    # Audit-fix Finding 7: typed Optional[AllocationTrace] not
+    # bare object — IDEs / static analysers can resolve the
+    # AllocationTrace fields without users casting.
+    allocation_trace: Optional[AllocationTrace] = None
 
     def to_dict(self) -> dict:
         """Plain-dict view for JSON serialisation. Carries the
         budget contract + the violation roll-up + the over-
-        budget audit trail."""
+        budget audit trail + the advisory allocation trace.
+
+        Audit-fix Finding 1: ``allocation_trace`` is now in the
+        serialised dict (previously silently dropped — a
+        recall investigator opening the JSON saw no allocation
+        data even when ``track_allocations=True`` was set)."""
+
+        def _maybe_float(x):
+            return None if x is None else float(x)
+
         return {
             "n_observations": int(self.n_observations),
-            "mean_ms": float(self.mean_ms),
-            "p50_ms": float(self.p50_ms),
-            "p95_ms": float(self.p95_ms),
-            "p99_ms": float(self.p99_ms),
-            "p999_ms": (
-                None if self.p999_ms is None else float(self.p999_ms)
-            ),
-            "p9999_ms": (
-                None if self.p9999_ms is None else float(self.p9999_ms)
-            ),
-            "max_ms": float(self.max_ms),
+            "mean_ms": _maybe_float(self.mean_ms),
+            "p50_ms": _maybe_float(self.p50_ms),
+            "p95_ms": _maybe_float(self.p95_ms),
+            "p99_ms": _maybe_float(self.p99_ms),
+            "p999_ms": _maybe_float(self.p999_ms),
+            "p9999_ms": _maybe_float(self.p9999_ms),
+            "max_ms": _maybe_float(self.max_ms),
             "n_p99_violations": int(self.n_p99_violations),
             "n_p999_violations": int(self.n_p999_violations),
             "n_p9999_violations": int(self.n_p9999_violations),
@@ -229,4 +264,8 @@ class BudgetSummary:
             ],
             "budget": self.budget.to_dict(),
             "meets_budget": bool(self.meets_budget),
+            "allocation_trace": (
+                None if self.allocation_trace is None
+                else self.allocation_trace.to_dict()
+            ),
         }
