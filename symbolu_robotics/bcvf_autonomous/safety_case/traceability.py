@@ -381,6 +381,33 @@ _SBOM_GENERATOR = EvidenceArtifact(
                 "the manifest is refreshed. See ROS2_DDS_SBOM_DESIGN.md "
                 "§6 for design rationale.",
 )
+_REPLAY_BUNDLE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.replay",
+    symbol="ReplayBundle",
+    description="Recall-investigator's recording artifact — ties "
+                "(RunConfig, recorded TrustShapedEpisodeRecord, "
+                "package version, episode metadata) into a single "
+                "JSON-serialisable bundle. The bundle is the post-"
+                "incident replay surface a recall investigation "
+                "argues against. See REPLAY_FRAMEWORK_DESIGN.md §2 "
+                "for the bundle contract; §6 for the strict-"
+                "validation discipline (corrupt artifacts fail "
+                "loud, never silently produce zero-fill replays).",
+)
+_REPLAY_RECONSTRUCTOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.replay",
+    symbol="replay_bundle",
+    description="Bit-identity replay gate — runs the bundle's "
+                "RunConfig against the current code, compares the "
+                "freshly-recorded TrustShapedEpisodeRecord against "
+                "the bundle's recorded record byte-by-byte, and "
+                "returns a typed ReplayResult naming any per-field / "
+                "per-step divergences. Class-A divergence (kernel "
+                "diverged), Class-B divergence (config drift), and "
+                "Class-C divergence (host non-determinism) all "
+                "surface loud through the same comparison gate. See "
+                "REPLAY_FRAMEWORK_DESIGN.md §4 + §5 for the design.",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -610,6 +637,7 @@ def iso_21448_clauses() -> List[Clause]:
                 _TRUST_DIAG, _FLEET, _NEAR_VETO,
                 _STREAMING_MONITOR, _ALERT_RULE,
                 _FLEET_REPORT_WRITER, _FLEET_CSV_WRITER,
+                _REPLAY_BUNDLE, _REPLAY_RECONSTRUCTOR,
             ),
             notes=(
                 "Per-tick ``TrustShapedEpisodeRecord`` is the structured "
@@ -625,7 +653,19 @@ def iso_21448_clauses() -> List[Clause]:
                 "partner's pager / alertmanager pipeline. Dataset "
                 "ingest is strict (no silent zero-fill on incomplete "
                 "payloads) so a corrupt episode surfaces as ``ValueError`` "
-                "at load time rather than as a quiet metric drift."
+                "at load time rather than as a quiet metric drift. "
+                "**Recall-investigation surface**: the ``ReplayBundle`` "
+                "ties (RunConfig, recorded TrustShapedEpisodeRecord, "
+                "package version, episode metadata) into a single JSON "
+                "artifact a recall investigator opens; "
+                "``replay_bundle(bundle, runner_factory)`` runs the "
+                "bundle's config against the current code and surfaces "
+                "any divergence with field-level + tick-level "
+                "localisation. Class-A divergence (kernel diverged), "
+                "Class-B divergence (config drift), and Class-C "
+                "divergence (host non-determinism) all surface loud "
+                "through the same comparator. See "
+                "``REPLAY_FRAMEWORK_DESIGN.md`` for the full design."
             ),
         ),
         Clause(
@@ -813,6 +853,7 @@ def iso_26262_part6_clauses() -> List[Clause]:
             evidence=(
                 _SUMMARIZE_GRID, _PILOT, _FLEET, _TRUST_DIAG,
                 _GRID_REPORT_WRITER, _FLEET_REPORT_WRITER,
+                _REPLAY_RECONSTRUCTOR,
             ),
             notes=(
                 "Requirement-by-requirement traceability: each "
@@ -822,7 +863,21 @@ def iso_26262_part6_clauses() -> List[Clause]:
                 "responsive-class win rate, attribution accuracy) "
                 "maps to a passing test in ``test_pilot.py``; each "
                 "fleet-level metric is round-trip-tested via "
-                "``analysis.io`` strict serialisation."
+                "``analysis.io`` strict serialisation. "
+                "**Replay bit-identity contract**: "
+                "``replay_bundle(bundle, runner_factory)`` runs a "
+                "captured ``ReplayBundle``'s ``RunConfig`` against "
+                "the current code and verifies the freshly-recorded "
+                "``TrustShapedEpisodeRecord`` is bit-identical to "
+                "the bundle's recorded record (np.array_equal with "
+                "equal_nan=True over every per-step array). "
+                "Bit-identity is the V&V argument the recall "
+                "investigator argues against — the lab either "
+                "reproduces the field-recorded outputs exactly, or "
+                "the comparator localises the divergence to the "
+                "specific (field, tick) pair so the kernel diff "
+                "responsible can be pinpointed. See "
+                "``REPLAY_FRAMEWORK_DESIGN.md`` §4 for the design."
             ),
         ),
     ]
