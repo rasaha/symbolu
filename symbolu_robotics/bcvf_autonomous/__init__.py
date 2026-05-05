@@ -211,6 +211,18 @@ from symbolu_robotics.bcvf_autonomous.safety_state import (
     StateTransitionLog,
     StateTransitionLogEntry,
 )
+from symbolu_robotics.bcvf_autonomous.replay import (
+    BUNDLE_VERSION,
+    ReplayBundle,
+    ReplayBundleError,
+    ReplayBundleVersionError,
+    ReplayResult,
+    build_replay_bundle,
+    compare_replay,
+    load_replay_bundle,
+    replay_bundle,
+    save_replay_bundle,
+)
 
 # Public-API stability registry — see ``API_STABILITY.md``.
 from symbolu_robotics.bcvf_autonomous._api import (
@@ -397,4 +409,15 @@ __all__ = [
     "LEGAL_TRANSITIONS",
     "SafetyStateMachineError",
     "IllegalTransitionError",
+    # replay / record-and-replay framework
+    "BUNDLE_VERSION",
+    "ReplayBundle",
+    "ReplayBundleError",
+    "ReplayBundleVersionError",
+    "ReplayResult",
+    "build_replay_bundle",
+    "compare_replay",
+    "load_replay_bundle",
+    "replay_bundle",
+    "save_replay_bundle",
 ]
