@@ -232,6 +232,17 @@ from symbolu_robotics.bcvf_autonomous.realtime import (
     RealTimeBudget,
     RealTimeBudgetError,
 )
+from symbolu_robotics.bcvf_autonomous.calibration import (
+    CalibrationDigestError,
+    CalibrationDriftAlert,
+    CalibrationDriftDetector,
+    CalibrationSet,
+    CalibrationSetError,
+    CalibrationVersionError,
+    build_calibration_set,
+    load_calibration_set,
+    save_calibration_set,
+)
 
 # Public-API stability registry — see ``API_STABILITY.md``.
 from symbolu_robotics.bcvf_autonomous._api import (
@@ -437,4 +448,14 @@ __all__ = [
     "OverBudgetTick",
     "RealTimeBudget",
     "RealTimeBudgetError",
+    # calibration parameter management + drift detection
+    "CalibrationDigestError",
+    "CalibrationDriftAlert",
+    "CalibrationDriftDetector",
+    "CalibrationSet",
+    "CalibrationSetError",
+    "CalibrationVersionError",
+    "build_calibration_set",
+    "load_calibration_set",
+    "save_calibration_set",
 ]
