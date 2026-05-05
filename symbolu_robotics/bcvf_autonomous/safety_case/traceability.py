@@ -348,6 +348,39 @@ _SAFETY_STATE_TRANSITIONS = EvidenceArtifact(
                 "edge or change an ASIL classification without the PR "
                 "review noticing",
 )
+_BCVF_NODE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_ros2",
+    symbol="BCVFNodeBehaviour",
+    description="Framework-agnostic ROS 2 node behaviour — wraps the "
+                "BCVF trust-shaping bridge with rate-limited "
+                "publication, per-predictor deadline tracking + stale-"
+                "on-resume protection, and SafetyStateMachine "
+                "composition. See ROS2_DDS_SBOM_DESIGN.md §3.3 + §5 "
+                "for the integration contract; the rclpy-bound "
+                "subclass lands gated on §6.4 colcon-build execution.",
+)
+_DDS_QOS_PROFILE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_ros2.qos",
+    symbol="DDS_QOS_PROFILE",
+    description="Documented DDS QoS profile (RELIABLE / VOLATILE / "
+                "10 ms deadline / 100 ms liveliness / KEEP_LAST / "
+                "depth 1) — the `RELIABLE/VOLATILE/10ms/100ms` quad "
+                "an integrator copies into their RTI Connext or "
+                "FastDDS config. See ROS2_DDS_SBOM_DESIGN.md §4 for "
+                "the per-knob rationale.",
+)
+_SBOM_GENERATOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.safety_case.sbom",
+    symbol="generate_cyclonedx_bom",
+    description="CycloneDX 1.5 SBOM generator + on-disk snapshot at "
+                "safety_case/SBOM.cdx.json — the procurement-gate "
+                "deliverable enumerating every runtime dependency "
+                "with version + SPDX license. Deterministic + "
+                "byte-stable; pinned by a snapshot test so a "
+                "dependency add / version bump fails CI loudly until "
+                "the manifest is refreshed. See ROS2_DDS_SBOM_DESIGN.md "
+                "§6 for design rationale.",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -387,6 +420,7 @@ def iso_21448_clauses() -> List[Clause]:
             evidence=(
                 _BCVF_KERNEL, _BCVF_CONFIG, _MANIFOLD, _BICYCLE,
                 _MULTI_MODAL_PREDICTOR, _LANE_ANCHOR,
+                _BCVF_NODE, _DDS_QOS_PROFILE,
             ),
             notes=(
                 "BCVF is specified as an arbitration function over M "
@@ -403,7 +437,20 @@ def iso_21448_clauses() -> List[Clause]:
                 "the lift (proven empirically on straight + curved "
                 "lanes, pinned by the multi-modal test suite). See "
                 "``MULTI_MODAL_PREDICTORS_DESIGN.md`` for the "
-                "carry-through analysis."
+                "carry-through analysis. **ROS 2 / DDS integration "
+                "boundary**: the system boundary the kernel exchanges "
+                "messages across is the ROS 2 "
+                "``/bcvf/predictor/*/trajectory`` (input) and "
+                "``/bcvf/consensus`` (output) topic pair — typed by "
+                "``PredictorTrajectory.msg`` + ``ConsensusOutput.msg`` "
+                "(see ``bcvf_ros2/msg/``). The DDS QoS profile "
+                "(RELIABLE / VOLATILE / 10 ms deadline / 100 ms "
+                "liveliness, ``DDS_QOS_PROFILE`` constant) documents "
+                "the bus-level contract per "
+                "``ROS2_DDS_SBOM_DESIGN.md`` §4. ``BCVFNodeBehaviour`` "
+                "is the framework-agnostic core (testable without "
+                "rclpy); the rclpy-bound subclass lands gated on the "
+                "§6.4 colcon-build execution work."
             ),
         ),
         Clause(
@@ -581,6 +628,36 @@ def iso_21448_clauses() -> List[Clause]:
                 "at load time rather than as a quiet metric drift."
             ),
         ),
+        Clause(
+            standard=s,
+            clause_id="12",
+            title="Process — release to market + configuration management",
+            requirement=(
+                "Establish process-level evidence for release to "
+                "market, including the Software Bill of Materials "
+                "(SBOM) of every dependency the runtime composition "
+                "carries into the field."
+            ),
+            evidence=(_SBOM_GENERATOR,),
+            notes=(
+                "**Configuration-management deliverable**: "
+                "``safety_case/SBOM.cdx.json`` is a CycloneDX 1.5 "
+                "manifest enumerating every runtime dependency with "
+                "version + SPDX license. Generated deterministically "
+                "by ``safety_case.sbom.generate_cyclonedx_bom`` from "
+                "installed-package metadata; pinned to byte-equality "
+                "with the on-disk snapshot so a dependency add or "
+                "version bump fails CI loudly until the manifest is "
+                "refreshed. The runtime dependency set is small "
+                "(numpy + stdlib for the autonomy import graph); "
+                "optional dependencies (LLM-side anthropic / openai / "
+                "fastapi etc.) are out of scope — this manifest "
+                "covers the ``bcvf_autonomous`` import graph only. "
+                "An OEM's full vehicle-stack SBOM aggregates this "
+                "manifest alongside their own. See "
+                "``ROS2_DDS_SBOM_DESIGN.md`` §6 for design rationale."
+            ),
+        ),
     ]
 
 
@@ -633,23 +710,33 @@ def iso_26262_part6_clauses() -> List[Clause]:
             evidence=(
                 _BCVF_KERNEL, _RUNNER, _CONSUMER_V2,
                 _SAFETY_STATE_MACHINE,
+                _BCVF_NODE, _DDS_QOS_PROFILE, _SBOM_GENERATOR,
             ),
             notes=(
                 "Modules: kernel (``core.py``), trust shaping "
                 "(``trust.py``), planner (``mppi_planner.py``), "
                 "diagnostics (``trust_diagnostics.py``), runner "
                 "(``runner.py``), analysis (``analysis/``), "
-                "safety-state machine (``safety_state/``). Interfaces "
-                "are typed dataclasses (``BCVFConfig``, ``RunConfig``, "
-                "``ConsumerV2Config``, ``SafetyStateMachineConfig``); "
-                "each module ships a DESIGN.md. The "
-                "``SafetyStateMachine`` is the system-level "
-                "behavioural-contract module the per-tick runtime "
-                "composes into — its public surface is "
-                "``observe(record) → SafetyState`` plus the manual-"
-                "reset gate ``reset_with_diagnostic_clear(operator, "
-                "reason)``; see ``SAFETY_STATE_MACHINE_DESIGN.md`` "
-                "for the four-state contract."
+                "safety-state machine (``safety_state/``), ROS 2 "
+                "integration (``bcvf_ros2/``), SBOM generator "
+                "(``safety_case/sbom/``). Interfaces are typed "
+                "dataclasses (``BCVFConfig``, ``RunConfig``, "
+                "``ConsumerV2Config``, ``SafetyStateMachineConfig``, "
+                "``BCVFNodeConfig``, ``DDSQoSProfile``); each module "
+                "ships a DESIGN.md. The ``SafetyStateMachine`` is "
+                "the system-level behavioural-contract module the "
+                "per-tick runtime composes into. The "
+                "``BCVFNodeBehaviour`` (alias ``BCVFNode``) wraps "
+                "the trust-shaping bridge with the ROS 2 integration "
+                "contract (rate-limited publication, per-predictor "
+                "deadline tracking, ``DDS_QOS_PROFILE`` quad). The "
+                "``safety_case.sbom`` module emits the "
+                "configuration-management manifest enumerating "
+                "every runtime dependency. See "
+                "``SAFETY_STATE_MACHINE_DESIGN.md`` for the state "
+                "machine's four-state contract; "
+                "``ROS2_DDS_SBOM_DESIGN.md`` for the integration "
+                "contract."
             ),
         ),
         Clause(

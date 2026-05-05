@@ -43,9 +43,13 @@ SNAPSHOT_PATH = (
 # --------------------------------------------------------------------------- #
 
 
-def test_iso_21448_covers_clauses_5_through_10():
+def test_iso_21448_covers_documented_clauses():
+    """SOTIF coverage: clauses 5–10 + clause 12 (release to
+    market). Clause 12 was added when the CycloneDX SBOM landed
+    post-v0.7.x as the configuration-management deliverable; see
+    ``ROS2_DDS_SBOM_DESIGN.md`` §6."""
     clause_ids = [c.clause_id for c in iso_21448_clauses()]
-    assert clause_ids == ["5", "6", "7", "8", "9", "10"]
+    assert clause_ids == ["5", "6", "7", "8", "9", "10", "12"]
 
 
 def test_iso_26262_part6_covers_software_clauses():
@@ -65,7 +69,7 @@ def test_matrix_groups_by_standard():
     assert set(matrix.entries_by_standard.keys()) == {
         Standard.SOTIF_21448, Standard.ISO_26262_PART_6,
     }
-    assert len(matrix.entries_by_standard[Standard.SOTIF_21448]) == 6
+    assert len(matrix.entries_by_standard[Standard.SOTIF_21448]) == 7
     assert len(matrix.entries_by_standard[Standard.ISO_26262_PART_6]) == 6
 
 

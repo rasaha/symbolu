@@ -14,6 +14,7 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
   * Clause **8** — Identification of functional insufficiencies + mitigations
   * Clause **9** — Verification and validation of SOTIF
   * Clause **10** — Methodology — operational design and field monitoring
+  * Clause **12** — Process — release to market + configuration management
 * ISO 26262 Part 6 (Software)
   * Clause **Part 6 §7** — Specification of software safety requirements
   * Clause **Part 6 §8** — Software architectural design
@@ -35,8 +36,10 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 * `symbolu_robotics.bcvf_autonomous.predictors.base::BicycleConfig` — Vehicle dynamics + predictor interface — the system boundary the kernel arbitrates over
 * `symbolu_robotics.bcvf_autonomous.predictors::MultiModalPredictor` — Predictor wrapper for non-SE(2) state spaces (lane-frame, future map-frame). Pairs the native trajectory with the geometry needed to lift it to SE(2) at the kernel boundary; preserves Lemma 1 invariance via the body-frame primitive transforming correctly with lane curvature (see MULTI_MODAL_PREDICTORS_DESIGN.md §4)
 * `symbolu_robotics.bcvf_autonomous.predictors::LaneAnchor` — Lane geometry primitive — polyline of SE(2) waypoints + cumulative arc lengths; the metadata a lane-frame predictor pairs with to round-trip through SE(2)
+* `symbolu_robotics.bcvf_ros2::BCVFNodeBehaviour` — Framework-agnostic ROS 2 node behaviour — wraps the BCVF trust-shaping bridge with rate-limited publication, per-predictor deadline tracking + stale-on-resume protection, and SafetyStateMachine composition. See ROS2_DDS_SBOM_DESIGN.md §3.3 + §5 for the integration contract; the rclpy-bound subclass lands gated on §6.4 colcon-build execution.
+* `symbolu_robotics.bcvf_ros2.qos::DDS_QOS_PROFILE` — Documented DDS QoS profile (RELIABLE / VOLATILE / 10 ms deadline / 100 ms liveliness / KEEP_LAST / depth 1) — the `RELIABLE/VOLATILE/10ms/100ms` quad an integrator copies into their RTI Connext or FastDDS config. See ROS2_DDS_SBOM_DESIGN.md §4 for the per-knob rationale.
 
-**Notes.** BCVF is specified as an arbitration function over M predictor SE(2) trajectories on a fixed horizon H. Inputs: ``(M, H, 3)`` predictor tensor. Outputs: ``(H, 3)`` consensus + ``(M,)`` per-predictor attribution. The kernel is dimensionally explicit (weight matrix in m / rad), deterministic, and fp64-stable — see DESIGN.md §1 + §2. **Multi-modal extension**: predictors with non-SE(2) native output (lane-frame ``(s, d, psi)``) lift to SE(2) at the kernel boundary via ``MultiModalPredictor`` + ``LaneAnchor``; Lemma 1 invariance carries through the lift (proven empirically on straight + curved lanes, pinned by the multi-modal test suite). See ``MULTI_MODAL_PREDICTORS_DESIGN.md`` for the carry-through analysis.
+**Notes.** BCVF is specified as an arbitration function over M predictor SE(2) trajectories on a fixed horizon H. Inputs: ``(M, H, 3)`` predictor tensor. Outputs: ``(H, 3)`` consensus + ``(M,)`` per-predictor attribution. The kernel is dimensionally explicit (weight matrix in m / rad), deterministic, and fp64-stable — see DESIGN.md §1 + §2. **Multi-modal extension**: predictors with non-SE(2) native output (lane-frame ``(s, d, psi)``) lift to SE(2) at the kernel boundary via ``MultiModalPredictor`` + ``LaneAnchor``; Lemma 1 invariance carries through the lift (proven empirically on straight + curved lanes, pinned by the multi-modal test suite). See ``MULTI_MODAL_PREDICTORS_DESIGN.md`` for the carry-through analysis. **ROS 2 / DDS integration boundary**: the system boundary the kernel exchanges messages across is the ROS 2 ``/bcvf/predictor/*/trajectory`` (input) and ``/bcvf/consensus`` (output) topic pair — typed by ``PredictorTrajectory.msg`` + ``ConsensusOutput.msg`` (see ``bcvf_ros2/msg/``). The DDS QoS profile (RELIABLE / VOLATILE / 10 ms deadline / 100 ms liveliness, ``DDS_QOS_PROFILE`` constant) documents the bus-level contract per ``ROS2_DDS_SBOM_DESIGN.md`` §4. ``BCVFNodeBehaviour`` is the framework-agnostic core (testable without rclpy); the rclpy-bound subclass lands gated on the §6.4 colcon-build execution work.
 
 ### Clause 6 — Hazard identification and risk evaluation (HARA)
 
@@ -104,6 +107,15 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 
 **Notes.** Per-tick ``TrustShapedEpisodeRecord`` is the structured post-incident trace a recall investigator opens. ``FleetSummary`` aggregates across episodes — argmax-flips, near-vetoes, V2 state distribution, per-predictor exclusion incidence — exactly the surface a fleet-scale safety-monitoring tool consumes. ``StreamingFleetMonitor`` plus ``AlertRule`` lift the harness from triage-time to runtime: rolling-window summaries (e.g. 24-hour argmax-flip rate) drive threshold alerts that route into the deployment partner's pager / alertmanager pipeline. Dataset ingest is strict (no silent zero-fill on incomplete payloads) so a corrupt episode surfaces as ``ValueError`` at load time rather than as a quiet metric drift.
 
+### Clause 12 — Process — release to market + configuration management
+
+**Requirement.** Establish process-level evidence for release to market, including the Software Bill of Materials (SBOM) of every dependency the runtime composition carries into the field.
+
+**Evidence artifacts.**
+* `symbolu_robotics.bcvf_autonomous.safety_case.sbom::generate_cyclonedx_bom` — CycloneDX 1.5 SBOM generator + on-disk snapshot at safety_case/SBOM.cdx.json — the procurement-gate deliverable enumerating every runtime dependency with version + SPDX license. Deterministic + byte-stable; pinned by a snapshot test so a dependency add / version bump fails CI loudly until the manifest is refreshed. See ROS2_DDS_SBOM_DESIGN.md §6 for design rationale.
+
+**Notes.** **Configuration-management deliverable**: ``safety_case/SBOM.cdx.json`` is a CycloneDX 1.5 manifest enumerating every runtime dependency with version + SPDX license. Generated deterministically by ``safety_case.sbom.generate_cyclonedx_bom`` from installed-package metadata; pinned to byte-equality with the on-disk snapshot so a dependency add or version bump fails CI loudly until the manifest is refreshed. The runtime dependency set is small (numpy + stdlib for the autonomy import graph); optional dependencies (LLM-side anthropic / openai / fastapi etc.) are out of scope — this manifest covers the ``bcvf_autonomous`` import graph only. An OEM's full vehicle-stack SBOM aggregates this manifest alongside their own. See ``ROS2_DDS_SBOM_DESIGN.md`` §6 for design rationale.
+
 ## ISO 26262 Part 6 (Software)
 
 ### Clause Part 6 §7 — Specification of software safety requirements
@@ -125,8 +137,11 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 * `symbolu_robotics.bcvf_autonomous.runner::Runner` — Closed-loop scenario runner — module integration test harness exercising kernel + planner + trust + V2
 * `symbolu_robotics.bcvf_autonomous.trust::ConsumerV2Config` — Schmitt-trigger consumer V2 — engage / disengage thresholds + dwell-time hysteresis (chatter-immunity argument)
 * `symbolu_robotics.bcvf_autonomous.safety_state::SafetyStateMachine` — Functional-safety state machine — four-state behavioural contract (NORMAL / DEGRADED / FAULT / FAILSAFE) with documented per-transition triggers, ASIL decomposition (B for warnings + manual-resets, D for safety-critical escalations), direct-jump prohibition, and manual-reset audit trail. Composes the per-tick BCVF kernel + arbitration runtime into a system-level posture an ISO 26262 safety case can argue against; see SAFETY_STATE_MACHINE_DESIGN.md
+* `symbolu_robotics.bcvf_ros2::BCVFNodeBehaviour` — Framework-agnostic ROS 2 node behaviour — wraps the BCVF trust-shaping bridge with rate-limited publication, per-predictor deadline tracking + stale-on-resume protection, and SafetyStateMachine composition. See ROS2_DDS_SBOM_DESIGN.md §3.3 + §5 for the integration contract; the rclpy-bound subclass lands gated on §6.4 colcon-build execution.
+* `symbolu_robotics.bcvf_ros2.qos::DDS_QOS_PROFILE` — Documented DDS QoS profile (RELIABLE / VOLATILE / 10 ms deadline / 100 ms liveliness / KEEP_LAST / depth 1) — the `RELIABLE/VOLATILE/10ms/100ms` quad an integrator copies into their RTI Connext or FastDDS config. See ROS2_DDS_SBOM_DESIGN.md §4 for the per-knob rationale.
+* `symbolu_robotics.bcvf_autonomous.safety_case.sbom::generate_cyclonedx_bom` — CycloneDX 1.5 SBOM generator + on-disk snapshot at safety_case/SBOM.cdx.json — the procurement-gate deliverable enumerating every runtime dependency with version + SPDX license. Deterministic + byte-stable; pinned by a snapshot test so a dependency add / version bump fails CI loudly until the manifest is refreshed. See ROS2_DDS_SBOM_DESIGN.md §6 for design rationale.
 
-**Notes.** Modules: kernel (``core.py``), trust shaping (``trust.py``), planner (``mppi_planner.py``), diagnostics (``trust_diagnostics.py``), runner (``runner.py``), analysis (``analysis/``), safety-state machine (``safety_state/``). Interfaces are typed dataclasses (``BCVFConfig``, ``RunConfig``, ``ConsumerV2Config``, ``SafetyStateMachineConfig``); each module ships a DESIGN.md. The ``SafetyStateMachine`` is the system-level behavioural-contract module the per-tick runtime composes into — its public surface is ``observe(record) → SafetyState`` plus the manual-reset gate ``reset_with_diagnostic_clear(operator, reason)``; see ``SAFETY_STATE_MACHINE_DESIGN.md`` for the four-state contract.
+**Notes.** Modules: kernel (``core.py``), trust shaping (``trust.py``), planner (``mppi_planner.py``), diagnostics (``trust_diagnostics.py``), runner (``runner.py``), analysis (``analysis/``), safety-state machine (``safety_state/``), ROS 2 integration (``bcvf_ros2/``), SBOM generator (``safety_case/sbom/``). Interfaces are typed dataclasses (``BCVFConfig``, ``RunConfig``, ``ConsumerV2Config``, ``SafetyStateMachineConfig``, ``BCVFNodeConfig``, ``DDSQoSProfile``); each module ships a DESIGN.md. The ``SafetyStateMachine`` is the system-level behavioural-contract module the per-tick runtime composes into. The ``BCVFNodeBehaviour`` (alias ``BCVFNode``) wraps the trust-shaping bridge with the ROS 2 integration contract (rate-limited publication, per-predictor deadline tracking, ``DDS_QOS_PROFILE`` quad). The ``safety_case.sbom`` module emits the configuration-management manifest enumerating every runtime dependency. See ``SAFETY_STATE_MACHINE_DESIGN.md`` for the state machine's four-state contract; ``ROS2_DDS_SBOM_DESIGN.md`` for the integration contract.
 
 ### Clause Part 6 §9 — Software unit design and implementation
 
@@ -205,11 +220,14 @@ Do not hand-edit this file — update the matrix in ``traceability.py`` and the 
 | `symbolu_robotics.bcvf_autonomous.predictors::LaneAnchor` | 5 |
 | `symbolu_robotics.bcvf_autonomous.predictors::MultiModalPredictor` | 5 |
 | `symbolu_robotics.bcvf_autonomous.runner::Runner` | Part 6 §8, Part 6 §10 |
+| `symbolu_robotics.bcvf_autonomous.safety_case.sbom::generate_cyclonedx_bom` | 12, Part 6 §8 |
 | `symbolu_robotics.bcvf_autonomous.safety_state::LEGAL_TRANSITIONS` | 8 |
 | `symbolu_robotics.bcvf_autonomous.safety_state::SafetyStateMachine` | 8, Part 6 §8 |
 | `symbolu_robotics.bcvf_autonomous.trust::ConsumerV2Config` | 8, Part 6 §8, Part 6 §9 |
 | `symbolu_robotics.bcvf_autonomous.trust_diagnostics::TrustShapedEpisodeRecord` | 10, Part 6 §9, Part 6 §11 |
 | `symbolu_robotics.bcvf_autonomous.v2_chatter_sweep::run_v2_promotion_decision` | 8 |
+| `symbolu_robotics.bcvf_ros2.qos::DDS_QOS_PROFILE` | 5, Part 6 §8 |
+| `symbolu_robotics.bcvf_ros2::BCVFNodeBehaviour` | 5, Part 6 §8 |
 
 ## Out-of-scope clauses (intentionally not enumerated)
 
