@@ -540,3 +540,182 @@ def test_canonical_to_dict_includes_all_top_level_fields():
         "digest",
     }
     assert set(d.keys()) == expected
+
+
+# --------------------------------------------------------------------------- #
+# Audit-fix regression pins (post-v0.7.x critical-audit pass on §9-row-#6)
+# --------------------------------------------------------------------------- #
+
+
+def test_audit_fix_realtime_budget_error_caught_by_validator():
+    """Audit Finding 1 (HIGH): RealTimeBudget.__post_init__
+    raises RealTimeBudgetError on tier-monotone violation.
+    The previous narrow ``except (KeyError, TypeError,
+    ValueError)`` filter let it smuggle past the validator
+    uncaught — breaking the framework's "no malformed config
+    can ride into the bundle" contract. Now caught + wrapped
+    as CalibrationSetError."""
+    cs = _build()
+    payload = cs.to_dict()
+    # Tamper the realtime_budget to violate tier-monotonicity
+    # (p999 < p99). RealTimeBudget would raise
+    # RealTimeBudgetError on reconstruction.
+    payload["realtime_budget"]["p99_budget_ms"] = 9.0
+    payload["realtime_budget"]["p999_budget_ms"] = 8.0
+    # Re-derive the digest so the bundle reaches the embedded-
+    # config validator (not the digest gate).
+    from symbolu_robotics.bcvf_autonomous.calibration.bundle import (
+        _compute_digest,
+    )
+    payload["digest"] = _compute_digest(
+        {k: v for k, v in payload.items() if k != "digest"}
+    )
+    with pytest.raises(CalibrationSetError, match="realtime_budget"):
+        CalibrationSet.from_dict(payload)
+
+
+def test_audit_fix_from_dict_enforces_kernel_version_drift():
+    """Audit Finding 2 (MEDIUM): kernel-version validation now
+    fires from from_dict itself, not just load_calibration_set.
+    An in-memory caller using CalibrationSet.from_dict directly
+    on an HTTP / DB / IPC payload gets the same discipline as
+    a disk-loader — the version-drift check is path-independent."""
+    cs = _build(kernel_version="0.0.1-old")
+    payload = cs.to_dict()
+    with pytest.raises(CalibrationVersionError, match="kernel_version"):
+        CalibrationSet.from_dict(payload)
+
+
+def test_audit_fix_from_dict_allow_version_drift_kwarg():
+    """Audit Finding 2 (companion): the explicit-opt-in path on
+    from_dict matches the load_calibration_set discipline."""
+    cs = _build(kernel_version="0.0.1-old")
+    payload = cs.to_dict()
+    bundle = CalibrationSet.from_dict(payload, allow_version_drift=True)
+    assert bundle.kernel_version == "0.0.1-old"
+    assert bundle.matches_running_kernel is False
+
+
+def test_audit_fix_expected_metrics_rejects_nan_bounds():
+    """Audit Finding 3 (HIGH for safety semantics): NaN bounds
+    on expected_metrics used to slip past ``lo > hi`` (NaN
+    comparisons are all False) and silently disable drift
+    detection for the metric — an observed value of any size
+    against a NaN range produced no alert. Now rejected loud."""
+    nan = float("nan")
+    with pytest.raises(CalibrationSetError, match="finite"):
+        _build(expected_metrics={
+            "argmax_flips_per_step.p95": {"min": nan, "max": nan},
+        })
+    with pytest.raises(CalibrationSetError, match="finite"):
+        _build(expected_metrics={
+            "argmax_flips_per_step.p95": {"min": 0.0, "max": nan},
+        })
+
+
+def test_audit_fix_expected_metrics_rejects_inf_bounds():
+    """Audit Finding 3 (companion): +Inf / -Inf must also be
+    rejected — they would produce surprising drift semantics
+    (every observed value in-range against [-Inf, +Inf])."""
+    with pytest.raises(CalibrationSetError, match="finite"):
+        _build(expected_metrics={
+            "metric.p95": {"min": float("-inf"), "max": float("inf")},
+        })
+
+
+def test_audit_fix_canonical_json_rejects_nan_in_metadata():
+    """Audit Finding 3 (companion): allow_nan=False on the
+    canonical JSON serialisation rejects NaN/Inf anywhere in
+    the bundle. The default Python json.dumps would have
+    serialised NaN as the literal token "NaN" — non-RFC-8259
+    + would silently break a deployment partner's downstream
+    JSON tooling. Now any non-finite float anywhere in the
+    bundle raises at digest time."""
+    # NaN in metadata — exercises the canonical-JSON path.
+    nan = float("nan")
+    with pytest.raises((CalibrationSetError, ValueError)):
+        # The build factory computes the digest via canonical
+        # JSON; allow_nan=False raises ValueError from json,
+        # which Python wraps depending on path.
+        _build(metadata={"sensor_offset_x": nan})
+
+
+def test_audit_fix_drift_detector_returns_empty_on_zero_window():
+    """Audit Finding 4 (MEDIUM coverage): zero-observation
+    windows used to raise KeyError on the first metric path
+    walk. A cold-start poll firing before any vehicle has
+    reported is no-data, not drift. Now returns ()."""
+    class _Stub:
+        def to_dict(self):
+            return {
+                "fleet": {},  # empty — would key-error metric paths
+                "n_observed_in_window": 0,
+            }
+    cs = _build(expected_metrics={
+        "argmax_flips_per_step.p95": {"min": 0.0, "max": 0.10},
+    })
+    det = CalibrationDriftDetector(cs)
+    alerts = det.evaluate(_Stub())
+    assert alerts == ()
+
+
+def test_audit_fix_build_calibration_set_digest_matches_computed():
+    """Audit Finding 5 (companion): the factory's digest field
+    must equal computed_digest() on the resulting bundle. The
+    single-pass refactor would have surfaced any drift between
+    the digest-time payload and the construction-time payload."""
+    cs = _build()
+    assert cs.digest == cs.computed_digest()
+
+
+def test_audit_fix_metadata_dict_ordering_does_not_change_digest():
+    """Coverage gap (audit-prompt §12): canonical JSON uses
+    sort_keys=True so two bundles with the same content but
+    different metadata insertion order produce the same digest."""
+    cs1 = _build(metadata={"b": 1, "a": 2})
+    cs2 = _build(metadata={"a": 2, "b": 1})
+    assert cs1.digest == cs2.digest
+
+
+def test_audit_fix_metadata_changes_change_digest():
+    """Coverage gap: changing metadata content (not just order)
+    DOES change the digest — the bundle's digest covers
+    metadata, not just the configs."""
+    a = _build(metadata={"fleet": "A"})
+    b = _build(metadata={"fleet": "B"})
+    assert a.digest != b.digest
+
+
+def test_audit_fix_to_dict_caller_mutation_does_not_affect_bundle():
+    """Coverage gap: deepcopy in to_dict means a caller
+    mutating the returned dict can't leak back into the
+    frozen bundle's internal state."""
+    cs = _build()
+    d = cs.to_dict()
+    d["bcvf_config"]["lambda_c"] = 999.0
+    # Bundle's own bcvf_config still has the original value.
+    assert cs.bcvf_config["lambda_c"] != 999.0
+    # And the digest is unchanged.
+    assert cs.digest == cs.computed_digest()
+
+
+def test_audit_fix_canonical_json_snapshot():
+    """JSON byte-shape snapshot — pins the canonical bundle
+    serialisation against a known input. A regression that
+    flipped ensure_ascii or changed whitespace would slip
+    every existing test but break field-engineer audit
+    tooling. Mirrors the SBOM + replay snapshot discipline."""
+    cs = _build()
+    text = render_calibration_set_text(cs)
+    parsed = json.loads(text)
+    # Top-level keys appear in sorted order.
+    keys_in_order = list(parsed.keys())
+    assert keys_in_order == sorted(keys_in_order)
+    # Trailing newline + sorted-keys discipline are diff-friendly.
+    assert text.endswith("\n")
+    # The digest is a 64-hex string.
+    assert len(parsed["digest"]) == 64
+    # Pinned values prove canonical shape on the public fields.
+    assert parsed["calibration_id"] == "oem-test-fleet-A-v1"
+    assert parsed["created_at"] == "2026-05-05T12:00:00+00:00"
+    assert parsed["metadata"] == {"fleet": "A"}

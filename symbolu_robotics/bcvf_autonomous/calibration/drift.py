@@ -146,6 +146,16 @@ class CalibrationDriftDetector:
         ws_dict = windowed_fleet_summary.to_dict()
         view = ws_dict.get("fleet", {})
         n_episodes = int(ws_dict.get("n_observed_in_window", 0))
+        # Audit-fix Finding 4: zero-observation windows have an
+        # empty "fleet" dict (no metrics at all). Walking the
+        # expected_metrics map against that view raises KeyError
+        # on the first metric path — which is wrong: a cold-start
+        # poll firing before any vehicle has reported is not a
+        # drift signal, it's no-data. Mirrors
+        # ``StreamingFleetMonitor.evaluate_alerts``'s
+        # ``min_episodes`` gate.
+        if n_episodes == 0:
+            return ()
         out = []
         for metric, bounds in self._calibration.expected_metrics.items():
             value = _resolve_metric_path(view, metric)

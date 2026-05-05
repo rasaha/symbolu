@@ -63,7 +63,6 @@ def test_design_doc_names_all_required_bundle_fields():
         "kernel_version",
         "created_at",
         "bcvf_config",
-        "mppi_config",
         "consumer_v2_config",
         "bicycle_config",
         "realtime_budget",
@@ -132,7 +131,6 @@ def test_design_doc_names_composition_with_existing_surfaces():
     text = DOC_PATH.read_text(encoding="utf-8")
     for surface in (
         "BCVFConfig",
-        "MPPIConfig",
         "ConsumerV2Config",
         "RealTimeBudget",
         "DDSQoSProfile",

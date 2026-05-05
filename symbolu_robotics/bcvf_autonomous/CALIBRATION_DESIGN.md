@@ -13,15 +13,19 @@ ship-when-ready criteria explicit.
 
 ## §1 Why this exists
 
-The runtime today carries ~9 typed configuration dataclasses
-spread across the kernel (`BCVFConfig`), planner (`MPPIConfig`),
-trust shaper (`ConsumerV2Config`), predictors (`BicycleConfig`,
+The runtime today carries ~8 typed configuration dataclasses
+spread across the kernel (`BCVFConfig`), trust shaper
+(`ConsumerV2Config`), predictors (`BicycleConfig`,
 `FailureConfig`), real-time budget (`RealTimeBudget`), DDS
-(`DDSQoSProfile`), safety state machine
-(`SafetyStateMachineConfig`), and ROS 2 node
-(`BCVFNodeConfig`). A deployment partner picks values for each
-based on their hardware + scenario + tier requirements. The
-problem the roadmap §6 identifies:
+(`DDSQoSProfile`), and safety state machine
+(`SafetyStateMachineConfig`). A deployment partner picks
+values for each based on their hardware + scenario + tier
+requirements. (Planner-side `MPPIConfig` carries a nested
+`BCVFConfig` for runtime composition; the calibration bundle
+holds the kernel knobs once via `bcvf_config` and lets an
+integrator construct an `MPPIConfig` from those + their own
+planner-specific knobs at runtime.) The problem the roadmap
+§6 identifies:
 
 * **No bundling.** A "calibration" today is a tuple of nine
   separate dataclasses constructed at runtime. There's no
@@ -58,7 +62,6 @@ artifact bundling the per-deployment tuning knobs:
 | `kernel_version` | str | The `bcvf_autonomous.__version__` the calibration was tuned against. Validated on load. |
 | `created_at` | str (ISO 8601) | When the calibration was minted. |
 | `bcvf_config` | dict | Serialised `BCVFConfig` (kernel knobs). |
-| `mppi_config` | dict | Serialised `MPPIConfig` (planner knobs). |
 | `consumer_v2_config` | dict | Serialised `ConsumerV2Config` (V2 hysteresis). |
 | `bicycle_config` | dict | Serialised `BicycleConfig` (vehicle dynamics). |
 | `realtime_budget` | dict | Serialised `RealTimeBudget` (latency budget). |
@@ -268,7 +271,6 @@ class CalibrationSet:
     kernel_version: str
     created_at: str
     bcvf_config: Dict[str, Any]
-    mppi_config: Dict[str, Any]
     consumer_v2_config: Dict[str, Any]
     bicycle_config: Dict[str, Any]
     realtime_budget: Dict[str, Any]
@@ -292,7 +294,6 @@ def build_calibration_set(
     *,
     calibration_id: str,
     bcvf_config: BCVFConfig,
-    mppi_config: MPPIConfig,
     consumer_v2_config: ConsumerV2Config,
     bicycle_config: BicycleConfig,
     realtime_budget: RealTimeBudget,

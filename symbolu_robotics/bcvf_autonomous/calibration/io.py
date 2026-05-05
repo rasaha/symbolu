@@ -21,18 +21,28 @@ def save_calibration_set(
     path: Union[str, Path],
 ) -> None:
     """Write a :class:`CalibrationSet` to disk as canonical JSON
-    (sorted keys, 2-space indent, trailing newline) so the
-    output is diff-friendly and snapshot-stable.
+    (sorted keys, 2-space indent, trailing newline,
+    allow_nan=False) so the output is diff-friendly + snapshot-
+    stable + RFC-8259-compliant.
 
     The on-disk JSON is human-readable; the `digest` field
     in the file is the same as `bundle.digest`. A field engineer
     opening the file can recompute `sha256` over the rest of
     the bundle (sorted-keys / no-whitespace canonical form) and
     verify integrity by hand.
+
+    Audit-fix Finding 3: ``allow_nan=False`` matches the
+    digest-side canonical serialisation. A bundle whose
+    expected_metrics or any other field contains NaN / Inf
+    raises here rather than emitting a non-RFC-8259 token a
+    deployment partner's ``jq``/JS tooling would barf on.
     """
     path = Path(path)
     text = json.dumps(
-        calibration.to_dict(), indent=2, sort_keys=True
+        calibration.to_dict(),
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
     ) + "\n"
     path.write_text(text, encoding="utf-8")
 
@@ -45,7 +55,8 @@ def load_calibration_set(
 ) -> CalibrationSet:
     """Load a :class:`CalibrationSet` from disk.
 
-    Strict validation:
+    Strict validation (delegates to
+    :meth:`CalibrationSet.from_dict` for the field-level checks):
 
     * Missing path raises :class:`CalibrationSetError`.
     * Invalid JSON raises :class:`CalibrationSetError`.
@@ -57,6 +68,12 @@ def load_calibration_set(
       :class:`CalibrationVersionError` (subclass) — unless
       ``allow_version_drift=True`` for the explicit "I've
       verified the kernel changes don't affect my tuning" path.
+
+    Audit-fix Finding 2: the version-drift check is now
+    enforced inside ``from_dict`` itself; this function passes
+    the flag through. An in-memory caller using
+    ``CalibrationSet.from_dict`` directly gets the same
+    discipline.
     """
     path = Path(path)
     if not path.exists():
@@ -69,20 +86,20 @@ def load_calibration_set(
         raise CalibrationSetError(
             f"calibration bundle at {path} is not valid JSON: {exc}"
         ) from exc
-    bundle = CalibrationSet.from_dict(payload, verify_digest=verify_digest)
-    if not allow_version_drift and bundle.kernel_version != _autonomy_version:
-        raise CalibrationVersionError(
-            f"calibration kernel_version {bundle.kernel_version!r} "
-            f"does not match running bcvf_autonomous version "
-            f"{_autonomy_version!r}. Pass allow_version_drift=True if "
-            "you've verified the kernel changes between record-time "
-            "and load-time don't affect your tuning."
-        )
-    return bundle
+    return CalibrationSet.from_dict(
+        payload,
+        verify_digest=verify_digest,
+        allow_version_drift=allow_version_drift,
+    )
 
 
 def render_calibration_set_text(calibration: CalibrationSet) -> str:
     """Same canonical serialisation as :func:`save_calibration_set`
     but returns the string instead of writing. Used by tests +
     by callers wiring the bundle into other artifact pipelines."""
-    return json.dumps(calibration.to_dict(), indent=2, sort_keys=True) + "\n"
+    return json.dumps(
+        calibration.to_dict(),
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
+    ) + "\n"

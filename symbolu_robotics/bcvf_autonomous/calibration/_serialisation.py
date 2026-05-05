@@ -221,11 +221,26 @@ def validate_config_dict(name: str, payload: Dict[str, Any], reloader) -> None:
     dataclass via ``reloader(payload)``. Raises
     :class:`CalibrationSetError` on any reconstruction failure
     so the bundle never silently loads a malformed embedded
-    config."""
+    config.
+
+    Audit-fix Finding 1: catches the broad ``Exception`` (still
+    excluding ``BaseException`` subclasses like
+    ``KeyboardInterrupt`` so the program-level signals
+    propagate). The previous narrow ``(KeyError, TypeError,
+    ValueError)`` filter let domain-specific exceptions like
+    ``RealTimeBudgetError`` (raised by
+    ``RealTimeBudget.__post_init__`` on tier-monotone violation)
+    smuggle past the gate uncaught, breaking the framework's
+    "no malformed config can ride into the bundle" contract.
+    """
     from .errors import CalibrationSetError
     try:
         reloader(payload)
-    except (KeyError, TypeError, ValueError) as exc:
+    except CalibrationSetError:
+        # Don't double-wrap calibration errors raised by nested
+        # validators — propagate the original.
+        raise
+    except Exception as exc:
         raise CalibrationSetError(
             f"embedded {name} config fails reconstruction: {exc}"
         ) from exc
