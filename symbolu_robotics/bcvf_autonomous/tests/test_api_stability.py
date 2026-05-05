@@ -36,7 +36,44 @@ from symbolu_robotics.bcvf_autonomous._version import (
 # symbol must update these, which forces the reviewer to acknowledge
 # the contract change in the diff.
 EXPECTED_STABLE_COUNT = 38
-EXPECTED_PROVISIONAL_COUNT = 20
+# +9 post-v0.7 for the SafetyStateMachine surface (SafetyState,
+# SafetyStateMachine, SafetyStateMachineConfig, StateTransition,
+# StateTransitionLog, StateTransitionLogEntry, LEGAL_TRANSITIONS,
+# IllegalTransitionError, SafetyStateMachineError). Provisional
+# until the three §9 ship-when-ready criteria of
+# SAFETY_STATE_MACHINE_DESIGN.md land.
+#
+# +12 second post-v0.7 wave for the ROS 2 / DDS / SBOM
+# integration contract (§9 row-#2 roadmap pick). 8 ros2.* symbols
+# (BCVFNode, BCVFNodeBehaviour, BCVFNodeConfig,
+# ConsensusOutputMessage, DDS_QOS_PROFILE, DDSQoSProfile,
+# PredictorTrajectoryMessage, build_rclpy_qos_profile) + 4
+# safety_case.sbom.* symbols (SBOMComponent,
+# generate_cyclonedx_bom, runtime_components,
+# write_cyclonedx_bom). Provisional until the five §9 ship-when-
+# ready criteria of ROS2_DDS_SBOM_DESIGN.md land.
+# +10 third post-v0.7 wave for the replay / record-and-replay
+# framework (§9 row-#3 roadmap pick). 10 replay.* symbols
+# (BUNDLE_VERSION, ReplayBundle, ReplayBundleError,
+# ReplayBundleVersionError, ReplayResult, build_replay_bundle,
+# compare_replay, load_replay_bundle, replay_bundle,
+# save_replay_bundle). Provisional until the five §9
+# ship-when-ready criteria of REPLAY_FRAMEWORK_DESIGN.md land.
+# +7 fourth post-v0.7 wave for the real-time budget framework
+# (§9 row-#4 roadmap pick). 7 realtime.* symbols
+# (AllocationTrace, BudgetSummary, BudgetViolationError,
+# LatencyMonitor, OverBudgetTick, RealTimeBudget,
+# RealTimeBudgetError). Provisional until the five §9
+# ship-when-ready criteria of REAL_TIME_BUDGET_DESIGN.md land.
+# +9 fifth post-v0.7 wave for the calibration framework
+# (§9 row-#6 roadmap pick). 9 calibration.* symbols
+# (CalibrationDigestError, CalibrationDriftAlert,
+# CalibrationDriftDetector, CalibrationSet,
+# CalibrationSetError, CalibrationVersionError,
+# build_calibration_set, load_calibration_set,
+# save_calibration_set). Provisional until the five §9
+# ship-when-ready criteria of CALIBRATION_DESIGN.md land.
+EXPECTED_PROVISIONAL_COUNT = 67
 EXPECTED_VERSION = "0.4.0"
 EXPECTED_VERSION_INFO = (0, 4, 0)
 

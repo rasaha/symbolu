@@ -200,6 +200,49 @@ from symbolu_robotics.bcvf_autonomous.analysis import (
     load_episode_from_json,
     summarize_episode,
 )
+from symbolu_robotics.bcvf_autonomous.safety_state import (
+    LEGAL_TRANSITIONS,
+    IllegalTransitionError,
+    SafetyState,
+    SafetyStateMachine,
+    SafetyStateMachineConfig,
+    SafetyStateMachineError,
+    StateTransition,
+    StateTransitionLog,
+    StateTransitionLogEntry,
+)
+from symbolu_robotics.bcvf_autonomous.replay import (
+    BUNDLE_VERSION,
+    ReplayBundle,
+    ReplayBundleError,
+    ReplayBundleVersionError,
+    ReplayResult,
+    build_replay_bundle,
+    compare_replay,
+    load_replay_bundle,
+    replay_bundle,
+    save_replay_bundle,
+)
+from symbolu_robotics.bcvf_autonomous.realtime import (
+    AllocationTrace,
+    BudgetSummary,
+    BudgetViolationError,
+    LatencyMonitor,
+    OverBudgetTick,
+    RealTimeBudget,
+    RealTimeBudgetError,
+)
+from symbolu_robotics.bcvf_autonomous.calibration import (
+    CalibrationDigestError,
+    CalibrationDriftAlert,
+    CalibrationDriftDetector,
+    CalibrationSet,
+    CalibrationSetError,
+    CalibrationVersionError,
+    build_calibration_set,
+    load_calibration_set,
+    save_calibration_set,
+)
 
 # Public-API stability registry — see ``API_STABILITY.md``.
 from symbolu_robotics.bcvf_autonomous._api import (
@@ -376,4 +419,43 @@ __all__ = [
     "find_v2_state_flips",
     "load_episode_from_json",
     "summarize_episode",
+    # safety state machine
+    "SafetyState",
+    "SafetyStateMachine",
+    "SafetyStateMachineConfig",
+    "StateTransition",
+    "StateTransitionLog",
+    "StateTransitionLogEntry",
+    "LEGAL_TRANSITIONS",
+    "SafetyStateMachineError",
+    "IllegalTransitionError",
+    # replay / record-and-replay framework
+    "BUNDLE_VERSION",
+    "ReplayBundle",
+    "ReplayBundleError",
+    "ReplayBundleVersionError",
+    "ReplayResult",
+    "build_replay_bundle",
+    "compare_replay",
+    "load_replay_bundle",
+    "replay_bundle",
+    "save_replay_bundle",
+    # real-time / no-allocation hot path + p999 budget
+    "AllocationTrace",
+    "BudgetSummary",
+    "BudgetViolationError",
+    "LatencyMonitor",
+    "OverBudgetTick",
+    "RealTimeBudget",
+    "RealTimeBudgetError",
+    # calibration parameter management + drift detection
+    "CalibrationDigestError",
+    "CalibrationDriftAlert",
+    "CalibrationDriftDetector",
+    "CalibrationSet",
+    "CalibrationSetError",
+    "CalibrationVersionError",
+    "build_calibration_set",
+    "load_calibration_set",
+    "save_calibration_set",
 ]

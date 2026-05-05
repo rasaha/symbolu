@@ -325,6 +325,146 @@ _LANE_ANCHOR = EvidenceArtifact(
                 "+ cumulative arc lengths; the metadata a lane-frame "
                 "predictor pairs with to round-trip through SE(2)",
 )
+_SAFETY_STATE_MACHINE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.safety_state",
+    symbol="SafetyStateMachine",
+    description="Functional-safety state machine — four-state "
+                "behavioural contract (NORMAL / DEGRADED / FAULT / "
+                "FAILSAFE) with documented per-transition triggers, "
+                "ASIL decomposition (B for warnings + manual-resets, "
+                "D for safety-critical escalations), direct-jump "
+                "prohibition, and manual-reset audit trail. Composes "
+                "the per-tick BCVF kernel + arbitration runtime into "
+                "a system-level posture an ISO 26262 safety case can "
+                "argue against; see SAFETY_STATE_MACHINE_DESIGN.md",
+)
+_SAFETY_STATE_TRANSITIONS = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.safety_state",
+    symbol="LEGAL_TRANSITIONS",
+    description="Six-edge legal-transition table — the auditor-"
+                "readable §5 ASIL decomposition rendered as a typed "
+                "tuple of StateTransition rows; pinned by the test "
+                "suite so a future contributor cannot quietly add an "
+                "edge or change an ASIL classification without the PR "
+                "review noticing",
+)
+_BCVF_NODE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_ros2",
+    symbol="BCVFNodeBehaviour",
+    description="Framework-agnostic ROS 2 node behaviour — wraps the "
+                "BCVF trust-shaping bridge with rate-limited "
+                "publication, per-predictor deadline tracking + stale-"
+                "on-resume protection, and SafetyStateMachine "
+                "composition. See ROS2_DDS_SBOM_DESIGN.md §3.3 + §5 "
+                "for the integration contract; the rclpy-bound "
+                "subclass lands gated on §6.4 colcon-build execution.",
+)
+_DDS_QOS_PROFILE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_ros2.qos",
+    symbol="DDS_QOS_PROFILE",
+    description="Documented DDS QoS profile (RELIABLE / VOLATILE / "
+                "10 ms deadline / 100 ms liveliness / KEEP_LAST / "
+                "depth 1) — the `RELIABLE/VOLATILE/10ms/100ms` quad "
+                "an integrator copies into their RTI Connext or "
+                "FastDDS config. See ROS2_DDS_SBOM_DESIGN.md §4 for "
+                "the per-knob rationale.",
+)
+_SBOM_GENERATOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.safety_case.sbom",
+    symbol="generate_cyclonedx_bom",
+    description="CycloneDX 1.5 SBOM generator + on-disk snapshot at "
+                "safety_case/SBOM.cdx.json — the procurement-gate "
+                "deliverable enumerating every runtime dependency "
+                "with version + SPDX license. Deterministic + "
+                "byte-stable; pinned by a snapshot test so a "
+                "dependency add / version bump fails CI loudly until "
+                "the manifest is refreshed. See ROS2_DDS_SBOM_DESIGN.md "
+                "§6 for design rationale.",
+)
+_REPLAY_BUNDLE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.replay",
+    symbol="ReplayBundle",
+    description="Recall-investigator's recording artifact — ties "
+                "(RunConfig, recorded TrustShapedEpisodeRecord, "
+                "package version, episode metadata) into a single "
+                "JSON-serialisable bundle. The bundle is the post-"
+                "incident replay surface a recall investigation "
+                "argues against. See REPLAY_FRAMEWORK_DESIGN.md §2 "
+                "for the bundle contract; §6 for the strict-"
+                "validation discipline (corrupt artifacts fail "
+                "loud, never silently produce zero-fill replays).",
+)
+_REAL_TIME_BUDGET = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.realtime",
+    symbol="RealTimeBudget",
+    description="Typed real-time budget contract — target_hz + "
+                "per-tier ms thresholds (p99 / p999 / p9999 / max) + "
+                "sample-count gates protecting against statistically-"
+                "meaningless small-n percentile reports. The "
+                "AUTOSAR-Adaptive deal-unlock answer to *what's your "
+                "worst-case execution time?*. See "
+                "REAL_TIME_BUDGET_DESIGN.md §2 for the per-knob "
+                "rationale; §9 for the five ship-when-ready criteria "
+                "gating STABLE_API graduation.",
+)
+_CALIBRATION_SET = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.calibration",
+    symbol="CalibrationSet",
+    description="Versioned, hash-identified, kernel-version-"
+                "validated calibration bundle — bundles per-"
+                "deployment tuning knobs (BCVFConfig + "
+                "ConsumerV2Config + BicycleConfig + RealTimeBudget + "
+                "DDSQoSProfile + SafetyStateMachineConfig + per-"
+                "predictor FailureConfig + expected_metrics range "
+                "map) into a single JSON-serialisable artifact a "
+                "fleet operator distributes, signs, and version-"
+                "controls. SHA-256 digest over canonical JSON is "
+                "the bundle's identity; ``kernel_version`` field is "
+                "validated against ``bcvf_autonomous.__version__`` "
+                "at load. See CALIBRATION_DESIGN.md §2 + §3 for the "
+                "bundle contract + integrity discipline.",
+)
+_CALIBRATION_DRIFT_DETECTOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.calibration",
+    symbol="CalibrationDriftDetector",
+    description="Live-fleet vs deployed-calibration drift signal "
+                "— compares ``WindowedFleetSummary`` aggregates "
+                "against the calibration's ``expected_metrics`` "
+                "ranges and emits typed ``CalibrationDriftAlert`` "
+                "records per range violation. Composes with "
+                "``StreamingFleetMonitor`` via the same dotted-path "
+                "metric surface ``AlertRule`` walks; the deployment "
+                "partner unions both alert streams. See "
+                "CALIBRATION_DESIGN.md §4 + §6.",
+)
+_LATENCY_MONITOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.realtime",
+    symbol="LatencyMonitor",
+    description="Per-tick latency observer + budget enforcer — "
+                "classifies each observation against the budget's "
+                "tier hierarchy with mutually-exclusive counters, "
+                "records over-budget violations in a bounded ring "
+                "buffer, computes p99 / p999 / p9999 / max stats on "
+                "demand. Composes with the existing "
+                "EpisodeDiagnostics.solve_times_ms via "
+                "observe_series; pairs with ReplayBundle for "
+                "bit-identity replay of an over-budget tick. See "
+                "REAL_TIME_BUDGET_DESIGN.md §3 + §4 + §5.",
+)
+_REPLAY_RECONSTRUCTOR = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.replay",
+    symbol="replay_bundle",
+    description="Bit-identity replay gate — runs the bundle's "
+                "RunConfig against the current code, compares the "
+                "freshly-recorded TrustShapedEpisodeRecord against "
+                "the bundle's recorded record byte-by-byte, and "
+                "returns a typed ReplayResult naming any per-field / "
+                "per-step divergences. Class-A divergence (kernel "
+                "diverged), Class-B divergence (config drift), and "
+                "Class-C divergence (host non-determinism) all "
+                "surface loud through the same comparison gate. See "
+                "REPLAY_FRAMEWORK_DESIGN.md §4 + §5 for the design.",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -364,6 +504,7 @@ def iso_21448_clauses() -> List[Clause]:
             evidence=(
                 _BCVF_KERNEL, _BCVF_CONFIG, _MANIFOLD, _BICYCLE,
                 _MULTI_MODAL_PREDICTOR, _LANE_ANCHOR,
+                _BCVF_NODE, _DDS_QOS_PROFILE,
             ),
             notes=(
                 "BCVF is specified as an arbitration function over M "
@@ -380,7 +521,20 @@ def iso_21448_clauses() -> List[Clause]:
                 "the lift (proven empirically on straight + curved "
                 "lanes, pinned by the multi-modal test suite). See "
                 "``MULTI_MODAL_PREDICTORS_DESIGN.md`` for the "
-                "carry-through analysis."
+                "carry-through analysis. **ROS 2 / DDS integration "
+                "boundary**: the system boundary the kernel exchanges "
+                "messages across is the ROS 2 "
+                "``/bcvf/predictor/*/trajectory`` (input) and "
+                "``/bcvf/consensus`` (output) topic pair — typed by "
+                "``PredictorTrajectory.msg`` + ``ConsensusOutput.msg`` "
+                "(see ``bcvf_ros2/msg/``). The DDS QoS profile "
+                "(RELIABLE / VOLATILE / 10 ms deadline / 100 ms "
+                "liveliness, ``DDS_QOS_PROFILE`` constant) documents "
+                "the bus-level contract per "
+                "``ROS2_DDS_SBOM_DESIGN.md`` §4. ``BCVFNodeBehaviour`` "
+                "is the framework-agnostic core (testable without "
+                "rclpy); the rclpy-bound subclass lands gated on the "
+                "§6.4 colcon-build execution work."
             ),
         ),
         Clause(
@@ -438,7 +592,10 @@ def iso_21448_clauses() -> List[Clause]:
                 "function (cases where it does not respond as required) "
                 "and document mitigations."
             ),
-            evidence=(_CONSUMER_V2, _V2_SWEEP, _ADVERSARIAL_FAMILIES),
+            evidence=(
+                _CONSUMER_V2, _V2_SWEEP, _ADVERSARIAL_FAMILIES,
+                _SAFETY_STATE_MACHINE, _SAFETY_STATE_TRANSITIONS,
+            ),
             notes=(
                 "Insufficiency #1 — Lemma 1 invariance (intentional): "
                 "the SECOND-order kernel does not fire on constant "
@@ -463,7 +620,24 @@ def iso_21448_clauses() -> List[Clause]:
                 "drift monitoring (UN ECE R155 §7.3.4). The "
                 "``adversarial_consistent_bias`` family + DESIGN.md §3.5 "
                 "make the boundary explicit so the safety-case narrative "
-                "doesn't overclaim."
+                "doesn't overclaim. **Insufficiency-handling layer** — "
+                "the per-tick V2 chatter mitigation composes into the "
+                "``SafetyStateMachine`` four-state behavioural contract "
+                "(NORMAL / DEGRADED / FAULT / FAILSAFE). The state "
+                "machine is the system-level supervisor a safety case "
+                "argues against: each transition is ASIL-decomposed "
+                "(see ``LEGAL_TRANSITIONS`` for the six-edge table), "
+                "direct jumps from NORMAL to FAULT / FAILSAFE are "
+                "prohibited (the machine raises "
+                "``IllegalTransitionError``), and the FAULT / FAILSAFE "
+                "states latch behind a manual-reset gate so a quiet "
+                "kernel cannot auto-resolve a confirmed-failure "
+                "posture. See ``SAFETY_STATE_MACHINE_DESIGN.md`` for "
+                "the full design — ship-when-ready criteria for "
+                "STABLE_API graduation are gated on three deployment "
+                "partners, the characterization grid's "
+                "``state_transition_consistency`` cell family, and an "
+                "external auditor review of the §5 ASIL table."
             ),
         ),
         Clause(
@@ -494,7 +668,17 @@ def iso_21448_clauses() -> List[Clause]:
                 "certification report as a frozen audit artifact "
                 "(headline gate, per-(family, magnitude) Wilson-CI "
                 "table, methodology block) — what an auditor reads "
-                "instead of a Python dataclass."
+                "instead of a Python dataclass. **Behavioural-contract "
+                "layer** — the per-cell threshold gates compose into "
+                "the ``SafetyStateMachine`` four-state contract: a "
+                "passing per-cell gate is a per-tick property, the "
+                "state machine is the system-level posture those "
+                "per-tick properties accumulate into. The grid's "
+                "``state_transition_consistency`` cell family "
+                "(provisional, ship-when-ready criterion §9.2 of "
+                "``SAFETY_STATE_MACHINE_DESIGN.md``) extends V&V to "
+                "each documented transition with must-fire + must-be-"
+                "quiet pinning at adjacent thresholds."
             ),
         ),
         Clause(
@@ -510,6 +694,7 @@ def iso_21448_clauses() -> List[Clause]:
                 _TRUST_DIAG, _FLEET, _NEAR_VETO,
                 _STREAMING_MONITOR, _ALERT_RULE,
                 _FLEET_REPORT_WRITER, _FLEET_CSV_WRITER,
+                _REPLAY_BUNDLE, _REPLAY_RECONSTRUCTOR,
             ),
             notes=(
                 "Per-tick ``TrustShapedEpisodeRecord`` is the structured "
@@ -525,7 +710,69 @@ def iso_21448_clauses() -> List[Clause]:
                 "partner's pager / alertmanager pipeline. Dataset "
                 "ingest is strict (no silent zero-fill on incomplete "
                 "payloads) so a corrupt episode surfaces as ``ValueError`` "
-                "at load time rather than as a quiet metric drift."
+                "at load time rather than as a quiet metric drift. "
+                "**Recall-investigation surface**: the ``ReplayBundle`` "
+                "ties (RunConfig, recorded TrustShapedEpisodeRecord, "
+                "package version, episode metadata) into a single JSON "
+                "artifact a recall investigator opens; "
+                "``replay_bundle(bundle, runner_factory)`` runs the "
+                "bundle's config against the current code and surfaces "
+                "any divergence with field-level + tick-level "
+                "localisation. Class-A divergence (kernel diverged), "
+                "Class-B divergence (config drift), and Class-C "
+                "divergence (host non-determinism) all surface loud "
+                "through the same comparator. See "
+                "``REPLAY_FRAMEWORK_DESIGN.md`` for the full design."
+            ),
+        ),
+        Clause(
+            standard=s,
+            clause_id="12",
+            title="Process — release to market + configuration management",
+            requirement=(
+                "Establish process-level evidence for release to "
+                "market, including the Software Bill of Materials "
+                "(SBOM) of every dependency the runtime composition "
+                "carries into the field."
+            ),
+            evidence=(
+                _SBOM_GENERATOR,
+                _CALIBRATION_SET,
+                _CALIBRATION_DRIFT_DETECTOR,
+            ),
+            notes=(
+                "**Configuration-management deliverable (SBOM)**: "
+                "``safety_case/SBOM.cdx.json`` is a CycloneDX 1.5 "
+                "manifest enumerating every runtime dependency with "
+                "version + SPDX license. Generated deterministically "
+                "by ``safety_case.sbom.generate_cyclonedx_bom`` from "
+                "installed-package metadata; pinned to byte-equality "
+                "with the on-disk snapshot so a dependency add or "
+                "version bump fails CI loudly until the manifest is "
+                "refreshed. The runtime dependency set is small "
+                "(numpy + stdlib for the autonomy import graph); "
+                "optional dependencies (LLM-side anthropic / openai / "
+                "fastapi etc.) are out of scope — this manifest "
+                "covers the ``bcvf_autonomous`` import graph only. "
+                "An OEM's full vehicle-stack SBOM aggregates this "
+                "manifest alongside their own. See "
+                "``ROS2_DDS_SBOM_DESIGN.md`` §6 for design rationale. "
+                "**Configuration-management deliverable (calibration)**: "
+                "``CalibrationSet`` is the sibling deployment artifact "
+                "— a JSON-serialisable bundle of per-deployment tuning "
+                "knobs (BCVFConfig + ConsumerV2Config + BicycleConfig + "
+                "RealTimeBudget + DDSQoSProfile + SafetyStateMachineConfig "
+                "+ per-predictor FailureConfig + expected_metrics ranges) "
+                "with SHA-256 digest identity + kernel_version validation. "
+                "``CalibrationDriftDetector`` walks the calibration's "
+                "expected_metrics against a live ``WindowedFleetSummary`` "
+                "and emits typed ``CalibrationDriftAlert`` records per "
+                "range violation. The drift surface composes with "
+                "``StreamingFleetMonitor``'s existing AlertRule via the "
+                "same dotted-path metric resolver. See "
+                "``CALIBRATION_DESIGN.md`` for the full design, "
+                "including the strict-validation discipline that "
+                "rejects tampered bundles at load time."
             ),
         ),
     ]
@@ -577,14 +824,36 @@ def iso_26262_part6_clauses() -> List[Clause]:
                 "decomposition, interfaces between modules, and "
                 "dependencies between modules."
             ),
-            evidence=(_BCVF_KERNEL, _RUNNER, _CONSUMER_V2),
+            evidence=(
+                _BCVF_KERNEL, _RUNNER, _CONSUMER_V2,
+                _SAFETY_STATE_MACHINE,
+                _BCVF_NODE, _DDS_QOS_PROFILE, _SBOM_GENERATOR,
+            ),
             notes=(
                 "Modules: kernel (``core.py``), trust shaping "
                 "(``trust.py``), planner (``mppi_planner.py``), "
                 "diagnostics (``trust_diagnostics.py``), runner "
-                "(``runner.py``), analysis (``analysis/``). Interfaces "
-                "are typed dataclasses (``BCVFConfig``, ``RunConfig``, "
-                "``ConsumerV2Config``); each module ships a DESIGN.md."
+                "(``runner.py``), analysis (``analysis/``), "
+                "safety-state machine (``safety_state/``), ROS 2 "
+                "integration (``bcvf_ros2/``), SBOM generator "
+                "(``safety_case/sbom/``). Interfaces are typed "
+                "dataclasses (``BCVFConfig``, ``RunConfig``, "
+                "``ConsumerV2Config``, ``SafetyStateMachineConfig``, "
+                "``BCVFNodeConfig``, ``DDSQoSProfile``); each module "
+                "ships a DESIGN.md. The ``SafetyStateMachine`` is "
+                "the system-level behavioural-contract module the "
+                "per-tick runtime composes into. The "
+                "``BCVFNodeBehaviour`` (alias ``BCVFNode``) wraps "
+                "the trust-shaping bridge with the ROS 2 integration "
+                "contract (rate-limited publication, per-predictor "
+                "deadline tracking, ``DDS_QOS_PROFILE`` quad). The "
+                "``safety_case.sbom`` module emits the "
+                "configuration-management manifest enumerating "
+                "every runtime dependency. See "
+                "``SAFETY_STATE_MACHINE_DESIGN.md`` for the state "
+                "machine's four-state contract; "
+                "``ROS2_DDS_SBOM_DESIGN.md`` for the integration "
+                "contract."
             ),
         ),
         Clause(
@@ -639,7 +908,10 @@ def iso_26262_part6_clauses() -> List[Clause]:
                 "design and verify the integrated software behaves "
                 "as specified."
             ),
-            evidence=(_RUNNER, _PILOT, _BASELINES),
+            evidence=(
+                _RUNNER, _PILOT, _BASELINES,
+                _REAL_TIME_BUDGET, _LATENCY_MONITOR,
+            ),
             notes=(
                 "End-to-end integration: ``Runner`` exercises kernel + "
                 "trust + V2 + planner across canonical scenarios "
@@ -647,7 +919,20 @@ def iso_26262_part6_clauses() -> List[Clause]:
                 "wires the same trust pipeline to a dataset adapter "
                 "for paired A0 vs A3 evaluation. ``run_shootout`` "
                 "integrates BCVF with three baseline arbitrators "
-                "(EKF, Majority, Anchor) over the seven families."
+                "(EKF, Majority, Anchor) over the seven families. "
+                "**Runtime-budget integration verification**: "
+                "``RealTimeBudget`` is the typed contract a "
+                "deployment partner copies into their config; "
+                "``LatencyMonitor`` enforces it at integration time "
+                "with mutually-exclusive per-tier (p99 / p999 / "
+                "p9999 / max) violation counters + a bounded over-"
+                "budget audit trail. The percentile-availability "
+                "discipline (p999 None below 1000 samples; p9999 "
+                "None below 10000) protects an ISO 26262 §10 "
+                "integration-verification report from including "
+                "statistically-meaningless small-n percentile "
+                "claims. See ``REAL_TIME_BUDGET_DESIGN.md`` §4 + §9 "
+                "for the full discipline + ship-when-ready criteria."
             ),
         ),
         Clause(
@@ -661,6 +946,7 @@ def iso_26262_part6_clauses() -> List[Clause]:
             evidence=(
                 _SUMMARIZE_GRID, _PILOT, _FLEET, _TRUST_DIAG,
                 _GRID_REPORT_WRITER, _FLEET_REPORT_WRITER,
+                _REPLAY_RECONSTRUCTOR,
             ),
             notes=(
                 "Requirement-by-requirement traceability: each "
@@ -670,7 +956,21 @@ def iso_26262_part6_clauses() -> List[Clause]:
                 "responsive-class win rate, attribution accuracy) "
                 "maps to a passing test in ``test_pilot.py``; each "
                 "fleet-level metric is round-trip-tested via "
-                "``analysis.io`` strict serialisation."
+                "``analysis.io`` strict serialisation. "
+                "**Replay bit-identity contract**: "
+                "``replay_bundle(bundle, runner_factory)`` runs a "
+                "captured ``ReplayBundle``'s ``RunConfig`` against "
+                "the current code and verifies the freshly-recorded "
+                "``TrustShapedEpisodeRecord`` is bit-identical to "
+                "the bundle's recorded record (np.array_equal with "
+                "equal_nan=True over every per-step array). "
+                "Bit-identity is the V&V argument the recall "
+                "investigator argues against — the lab either "
+                "reproduces the field-recorded outputs exactly, or "
+                "the comparator localises the divergence to the "
+                "specific (field, tick) pair so the kernel diff "
+                "responsible can be pinpointed. See "
+                "``REPLAY_FRAMEWORK_DESIGN.md`` §4 for the design."
             ),
         ),
     ]

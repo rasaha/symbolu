@@ -121,12 +121,31 @@ def test_roadmap_acknowledges_existing_shipped_surfaces():
 # adds (e.g.) ``runtime.RealTimeBudget`` to PROVISIONAL_API without
 # first promoting the roadmap row to a real design doc would trip
 # one of these checks.
+#
+# Notes on removed tokens:
+# * ``SafetyStateMachine`` was on this list in v0.7 — removed
+#   post-v0.7 once the §4 / §9.1-recommended-pick design-doc +
+#   thin-shim implementation pair landed in ``safety_state/``.
+# * ``BCVFNode`` was on this list in v0.7.x — removed post-v0.7.x
+#   once the §3 / §9-row-#2 design-doc + thin-shim implementation
+#   pair landed in ``bcvf_ros2/`` + ``ROS2_DDS_SBOM_DESIGN.md``.
+# * ``ReplayBundle`` was on this list in v0.7.x — removed
+#   post-v0.7.x once the §5 / §9-row-#3 design-doc + thin-shim
+#   implementation pair landed in ``replay/`` +
+#   ``REPLAY_FRAMEWORK_DESIGN.md``.
+# * ``RealTimeBudget`` was on this list in v0.7.x — removed
+#   post-v0.7.x once the §2 / §9-row-#4 design-doc + thin-shim
+#   implementation pair landed in ``realtime/`` +
+#   ``REAL_TIME_BUDGET_DESIGN.md``.
+# * ``CalibrationSet`` was on this list in v0.7.x — removed
+#   post-v0.7.x once the §6 / §9-row-#6 design-doc + thin-shim
+#   implementation pair landed in ``calibration/`` +
+#   ``CALIBRATION_DESIGN.md``.
+# All five surfaces are now provisional (tracked by
+# ``test_api_stability.py``); their §9 roadmap rows are struck
+# through with pointers to the corresponding design docs per the
+# §11 maturation path.
 _ROADMAP_TOKENS = (
-    "RealTimeBudget",
-    "BCVFNode",
-    "ReplayBundle",
-    "SafetyStateMachine",
-    "CalibrationSet",
     "SensorAttestation",
 )
 

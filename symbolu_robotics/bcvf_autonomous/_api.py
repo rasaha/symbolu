@@ -130,6 +130,114 @@ PROVISIONAL_API: Tuple[str, ...] = (
     "predictors.lane_frame_to_se2",
     "predictors.se2_to_lane_frame",
     "predictors.unify_to_se2_bundle",
+    # Functional-safety state machine (post-v0.7 — the four-state
+    # behavioural-contract layer the runtime composes into; see
+    # SAFETY_STATE_MACHINE_DESIGN.md). Provisional because the
+    # state-graph + ASIL decomposition stay in PROVISIONAL_API
+    # until the three §9 ship-when-ready criteria land (three
+    # deployment partners exercising in production for one
+    # quarter, the characterization grid's state_transition_
+    # consistency cell family, and an external auditor review of
+    # the §5 ASIL table).
+    "safety_state.LEGAL_TRANSITIONS",
+    "safety_state.SafetyState",
+    "safety_state.SafetyStateMachine",
+    "safety_state.SafetyStateMachineConfig",
+    "safety_state.StateTransition",
+    "safety_state.StateTransitionLog",
+    "safety_state.StateTransitionLogEntry",
+    "safety_state.IllegalTransitionError",
+    "safety_state.SafetyStateMachineError",
+    # ROS 2 / DDS integration contract (post-v0.7.x — the §9
+    # row-#2 industry-features-roadmap pick; see
+    # ROS2_DDS_SBOM_DESIGN.md). Symbols are re-exported via the
+    # bcvf_autonomous.ros2 shim because the canonical package
+    # (``symbolu_robotics.bcvf_ros2``) is a sibling, not a
+    # submodule. Provisional until the five §9 ship-when-ready
+    # criteria land (three deployment partners, SBOM accepted
+    # into procurement, DDS QoS exercised against RTI/FastDDS,
+    # colcon-buildable, external-auditor SBOM validation).
+    "ros2.BCVFNode",
+    "ros2.BCVFNodeBehaviour",
+    "ros2.BCVFNodeConfig",
+    "ros2.ConsensusOutputMessage",
+    "ros2.DDS_QOS_PROFILE",
+    "ros2.DDSQoSProfile",
+    "ros2.PredictorTrajectoryMessage",
+    "ros2.build_rclpy_qos_profile",
+    # CycloneDX SBOM generator (post-v0.7.x; lands paired with
+    # the ROS 2 integration contract per ROS2_DDS_SBOM_DESIGN.md
+    # §6 — the procurement-gate manifest enumerating runtime
+    # dependencies with version + SPDX license).
+    "safety_case.sbom.SBOMComponent",
+    "safety_case.sbom.generate_cyclonedx_bom",
+    "safety_case.sbom.runtime_components",
+    "safety_case.sbom.write_cyclonedx_bom",
+    # Replay / record-and-replay framework (post-v0.7.x — the §9
+    # row-#3 industry-features-roadmap pick; see
+    # REPLAY_FRAMEWORK_DESIGN.md). The recall-investigator's
+    # bit-identity surface: ReplayBundle ties (RunConfig,
+    # recorded TrustShapedEpisodeRecord, package version, episode
+    # metadata) into a JSON artifact; replay_bundle runs the
+    # bundle's config through the current code and surfaces any
+    # divergence with field-level + tick-level localisation.
+    # Provisional until the five §9 ship-when-ready criteria
+    # land (deployment-partner usage for one quarter, bit-
+    # identity replay across a real recall case, Class-A
+    # divergence detection across a kernel change, signed bundle
+    # integrity field, external auditor sign-off on the bundle
+    # JSON shape).
+    "replay.BUNDLE_VERSION",
+    "replay.ReplayBundle",
+    "replay.ReplayBundleError",
+    "replay.ReplayBundleVersionError",
+    "replay.ReplayResult",
+    "replay.build_replay_bundle",
+    "replay.compare_replay",
+    "replay.load_replay_bundle",
+    "replay.replay_bundle",
+    "replay.save_replay_bundle",
+    # Real-time / no-allocation hot path + p999 budget
+    # (post-v0.7.x — the §9 row-#4 industry-features-roadmap
+    # pick; see REAL_TIME_BUDGET_DESIGN.md). Typed budget
+    # contract (RealTimeBudget) + per-tick observer
+    # (LatencyMonitor) with mutually-exclusive tier counters,
+    # bounded over-budget audit trail, and percentile-
+    # availability discipline (p999/p9999 None below sample-
+    # count thresholds). Provisional until the five §9 ship-
+    # when-ready criteria land (AUTOSAR-class deployment
+    # partner one quarter, real 10⁶-tick load test, C++-port
+    # equivalence within 2×, external auditor sign-off,
+    # configurable persistence layer).
+    "realtime.AllocationTrace",
+    "realtime.BudgetSummary",
+    "realtime.BudgetViolationError",
+    "realtime.LatencyMonitor",
+    "realtime.OverBudgetTick",
+    "realtime.RealTimeBudget",
+    "realtime.RealTimeBudgetError",
+    # Calibration parameter management + drift detection
+    # (post-v0.7.x — the §9 row-#6 industry-features-roadmap
+    # pick; see CALIBRATION_DESIGN.md). Versioned, hash-
+    # identified, kernel-version-validated bundle of per-
+    # deployment tuning knobs (CalibrationSet) + drift detector
+    # (CalibrationDriftDetector) that composes with
+    # StreamingFleetMonitor via the same dotted-path metric
+    # resolver. Provisional until the five §9 ship-when-ready
+    # criteria of CALIBRATION_DESIGN.md land (deployment partner
+    # one quarter on a fleet ≥ 10 vehicles, real fleet drift
+    # detection across a known mismatch, signed bundle field,
+    # external auditor sign-off, expected_metrics schema
+    # stabilised across ≥ 3 deployment partners).
+    "calibration.CalibrationDigestError",
+    "calibration.CalibrationDriftAlert",
+    "calibration.CalibrationDriftDetector",
+    "calibration.CalibrationSet",
+    "calibration.CalibrationSetError",
+    "calibration.CalibrationVersionError",
+    "calibration.build_calibration_set",
+    "calibration.load_calibration_set",
+    "calibration.save_calibration_set",
 )
 
 
