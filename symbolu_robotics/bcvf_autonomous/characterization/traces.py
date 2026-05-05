@@ -53,11 +53,24 @@ _VALID_FAMILIES: Tuple[str, ...] = (
     "noise_floor",
     "outlier",
     "sensor_dropout",
+    "adversarial_consistent_bias",
 )
 
-# Which families are nominal (BCVF should stay quiet) vs failure
-# (BCVF should fire). Used by the sweep summary to tally per-family
-# false-positive vs false-negative rates.
+# Three polarity buckets used by the sweep summary:
+#
+# * ``NOMINAL_FAMILIES`` — honest input where BCVF must stay quiet
+#   (false-positive otherwise).
+# * ``FAILURE_FAMILIES`` — honest failure where BCVF must fire
+#   (false-negative otherwise).
+# * ``ADVERSARIAL_FAMILIES`` — cybersecurity-grade attack input where
+#   the attacker has crafted a signature the kernel provably cannot
+#   detect (Lemma-1 trapdoor). The cell still passes if BCVF stays
+#   quiet (correct kernel behaviour); the family exists to make the
+#   detection-scope boundary explicit for a UN ECE R155 reviewer
+#   rather than to drive a kernel change. Defence in depth (cross-
+#   modal verification, signature attestation) is the layer that
+#   catches these — out of scope for the BCVF kernel itself but
+#   in scope for the safety-case + cybersecurity narrative.
 NOMINAL_FAMILIES: Tuple[str, ...] = (
     "baseline",
     "constant_bias",
@@ -68,6 +81,9 @@ FAILURE_FAMILIES: Tuple[str, ...] = (
     "accelerating",
     "outlier",
     "sensor_dropout",
+)
+ADVERSARIAL_FAMILIES: Tuple[str, ...] = (
+    "adversarial_consistent_bias",
 )
 
 
@@ -218,6 +234,59 @@ def generate_trace(
         metadata["dropped_predictor"] = dropped
         if outer_bundle.truth_label is not None:
             metadata["outer_truth_label"] = outer_bundle.truth_label
+
+    elif family == "adversarial_consistent_bias":
+        # Cybersecurity-grade attack input — see DESIGN.md §3.5 +
+        # ``ADVERSARIAL_FAMILIES`` polarity bucket. The attacker
+        # (``target_predictor``) feeds plausibly-noisy data with a
+        # constant lateral bias; honest predictors get matched IID
+        # noise so the attacker doesn't stand out by being noiseless.
+        #
+        # Key property: the attacker's disagreement from the honest
+        # predictors is a constant offset in the lateral coordinate.
+        # Under second-order BCVF, ``d²/dt² (constant)`` is exactly
+        # zero, so the kernel's gate stays closed and the attacker is
+        # invisible at the BCVF layer. The trust-weighted consensus,
+        # however, is dragged toward the attacker's biased trajectory
+        # by ``bias × weight_attacker`` — the planner-level harm is
+        # real even though BCVF correctly didn't fire.
+        #
+        # ``truth_label`` is left ``None``: BCVF cannot attribute this
+        # attack class at the kernel layer (Lemma-1 trapdoor). The
+        # documented out-of-scope mitigation is cross-modal sensor
+        # attestation at a different layer (UN ECE R155).
+        bias = float(family_params.get("bias", 0.5))
+        target = int(family_params.get("target_predictor", 0))
+        sigma = float(family_params.get("sigma_noise", 0.01))
+        bias_axis = str(family_params.get("axis", "y"))
+        # Validate explicitly. The pre-fix branch
+        # (``col = 1 if bias_axis == "y" else 0``) silently mapped any
+        # non-"y" string (e.g. a typo like "lateral") to the x-axis,
+        # producing a bias on a different coordinate than the caller
+        # intended. The cybersecurity-grade family must fail loud on
+        # mis-specified inputs.
+        if bias_axis not in ("x", "y"):
+            raise ValueError(
+                f"axis must be 'x' or 'y'; got {bias_axis!r}"
+            )
+        col = 1 if bias_axis == "y" else 0
+        if not (0 <= target < M):
+            raise ValueError(
+                f"target_predictor must lie in [0, {M}); got {target}"
+            )
+        # Constant offset on the attacker — invisible to second-order BCVF.
+        trajectories[target, :, col] += bias
+        # Matched IID noise on every predictor so the attacker's
+        # second-order signature mimics the honest noise floor exactly.
+        # Drawing a single (M, H, 2) tensor keeps the noise statistically
+        # symmetric — no per-predictor scale asymmetry the kernel could
+        # latch onto as a tell.
+        noise = rng.normal(loc=0.0, scale=sigma, size=(M, H, 2))
+        trajectories[:, :, :2] += noise
+        metadata["target_predictor"] = target
+        metadata["bias"] = bias
+        metadata["sigma_noise"] = sigma
+        metadata["bias_axis"] = bias_axis
 
     # Wrap heading just in case any kwarg requested a heading offset.
     # Vectorized via atan2 — equivalent to the scalar wrap_angle but no

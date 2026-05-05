@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -16,7 +18,18 @@ from .near_veto import NearVeto
 
 @dataclass
 class FleetSummary:
-    """Aggregate trust-pipeline behavior across many episodes."""
+    """Aggregate trust-pipeline behavior across many episodes.
+
+    Auditor-facing writers (frozen artifact emission):
+
+    * :meth:`to_csv` — one row per episode, RFC-4180-quoted.
+    * :meth:`to_markdown_report` — fleet-level narrative with
+      headline aggregates, classification breakdown, per-predictor
+      exclusion incidence, near-veto + V2-state-flip rosters, and a
+      top-K per-episode index.
+    * :meth:`to_dict` — JSON-friendly view for archive / dashboard
+      ingest (unchanged from v0.3).
+    """
 
     n_episodes: int
     n_total_steps: int
@@ -47,6 +60,31 @@ class FleetSummary:
             "v2_state_flips": [vf.to_dict() for vf in self.v2_state_flips],
             "episodes": [ep.to_dict() for ep in self.episodes],
         }
+
+    def to_csv(self, path: Union[str, Path]) -> Path:
+        """Write the per-episode CSV to ``path``. Returns the Path."""
+        from .reports import write_fleet_csv
+        return write_fleet_csv(self, path)
+
+    def to_markdown_report(
+        self,
+        path: Union[str, Path],
+        *,
+        title: str = "BCVF Fleet Summary",
+        label: Optional[str] = None,
+        generated_at: Optional[datetime] = None,
+        top_k_episodes: int = 25,
+    ) -> Path:
+        """Write the regulator-friendly fleet markdown report to ``path``."""
+        from .reports import write_fleet_markdown
+        return write_fleet_markdown(
+            self,
+            path,
+            title=title,
+            label=label,
+            generated_at=generated_at,
+            top_k_episodes=top_k_episodes,
+        )
 
 
 def _percentiles(values: np.ndarray) -> Dict[str, float]:

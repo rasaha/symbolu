@@ -19,8 +19,49 @@
 > EKF is 1.1, BCVF is 0.0. **EKF's Mahalanobis gate also misses
 > the heavy-quadratic outlier** (0.0 hit rate vs BCVF / Majority's
 > 1.0). BCVF is 8–19× faster per tick than EKF / Majority. v0.6's
-> V2 chatter-reduction sweep result is preserved unchanged. **419
-> tests passing**, up from 400 in v0.6. v1 file at
+> V2 chatter-reduction sweep result is preserved unchanged. The
+> characterization primary grid is now certification-grade — 22
+> configs × 60 seeds = 1320 cells, every per-config Wilson 95% CI
+> lower bound ≥ 0.90 (current min ≈ 0.940). The Q3 SOTIF / ISO
+> 26262 traceability template (12 clauses, **25 indexed BCVF
+> artifacts**, machine-checked snapshot) landed early in
+> `safety_case/`. The fleet harness gained a `StreamingFleetMonitor`
+> with rolling-window summaries + threshold alert rules, lifting
+> the post-hoc triage tool to a runtime SRE surface. The two
+> deferred CSV / Markdown report writers landed —
+> `GridSummary.to_csv` / `to_markdown_report` and
+> `FleetSummary.to_csv` / `to_markdown_report` emit the frozen
+> auditor-facing artifacts the safety-case workstream depends on.
+> **The 0.4.0 release ratifies the public-API stability policy** —
+> a 38-symbol `STABLE_API` registry + 14-symbol `PROVISIONAL_API`,
+> a deprecation cycle in `API_STABILITY.md`, and machine-checked
+> tests pinning every entry's resolution + top-level reachability.
+> **Hierarchical / group-level BCVF design proposal landed
+> post-v0.7** as `HIERARCHICAL_BCVF_DESIGN.md` — research-tier,
+> design-only today, gated on three ship-when-ready criteria.
+> **Adversarial / spoofing test family** (`adversarial_consistent_bias`)
+> added as the 8th characterization family — third polarity bucket
+> (`ADVERSARIAL_FAMILIES`), exposes the kernel's UN ECE R155
+> cybersecurity scope (Lemma-1 trapdoor at the stealth-bias regime,
+> kernel-detected at the loud regime via gate-noise interaction);
+> grid expands 1320 → 1560 cells with the same Wilson 95% CI floor
+> of 0.90 holding throughout. **Multi-modal predictor inputs** thin-
+> shim adapter landed (`predictors/state_space.py` +
+> `predictors/multi_modal.py`): lifts lane-frame ``(s, d, psi)``
+> predictors to SE(2) at the kernel boundary; the load-bearing
+> research finding (`MULTI_MODAL_PREDICTORS_DESIGN.md` §4) is that
+> **Lemma 1 invariance carries through the lift even on curved
+> lanes** because the body-frame error primitive transforms
+> correctly with lane curvature — pinned by
+> `test_lemma_1_carries_on_curved_lane`. **652 tests passing**
+> (post-audit; +9 industry-features-roadmap pins + 6 audit-fix
+> pins for the four post-v0.7 features),
+> up from 400 in v0.6 (12 audit pinning tests + 15 statistical-
+> significance tests + 20 safety-case-traceability tests + 29
+> streaming-monitor tests + 16 report-writer tests + 71 API-
+> stability tests + 9 hierarchical-BCVF design-doc pins + 12
+> adversarial-family tests + 30 multi-modal tests + 6 provisional-
+> resolution tests added post-v0.7). v1 file at
 > `AUTONOMOUS_ROBOTICS_VC_BRIEF.md` is preserved for historical
 > reference.
 
@@ -259,20 +300,28 @@ construction.
 
 ### Four proof points to know (as of May 2026)
 
-- **419 tests passing** (+198 since v0.2) across the autonomy
+- **652 tests passing** (+431 since v0.2; full post-v0.7 test breakdown above + 9 industry-features-roadmap pins + 6 audit-fix pins for the four post-v0.7 features (B2 adversarial axis validation; C7 multi-modal `psi` interpolated tangent; A1-A2 `resolve_qualified` edge cases) — the **0.4.0 release ratifies a public-API stability policy**, longer-horizon research items land as design docs gated on explicit ship-when-ready criteria, the 8th `adversarial_consistent_bias` characterization family makes the kernel's **UN ECE R155 cybersecurity scope-boundary** an explicit machine-checkable third polarity in the certification grid, the **multi-modal predictor adapter** lifts lane-frame predictors to SE(2) at the kernel boundary while preserving Lemma 1 invariance through to curved lanes, and `INDUSTRY_FEATURES_ROADMAP.md` enumerates the eight industry gap-fill items ranked by deal-unlock value with machine-checked non-promotion to the API registry) across the autonomy
   kernel, MPPI planner, trust-weight computer, non-MPPI adapter,
   dataset scaffolds, ROS 2 bridge, the v0.3 SOTIF-readiness
   layer, the v0.4 vectorized predict_batch path, the v0.5 pilot
   runner, the v0.6 V2 promotion-gate sweep, and the v0.7
   apples-to-apples baseline shootout. All committed,
   reproducible, CPU-only.
-- **Seven-family characterization sweep — 0% false-positive
-  rate, 0% false-negative rate at default parameters.** Every
-  named sensor-failure class (constant bias, linear drift,
-  accelerating divergence, noise floor, outlier, sensor dropout,
-  baseline) is validated to fire or stay quiet on cue across
-  primary, sensitivity, and ablation grids — 567-cell sensitivity
-  grid winner-tuple selection identifies the V1 defaults as the
+- **Seven-family characterization sweep — 0% FPR / 0% FNR with a
+  Wilson 95% CI lower-bound floor of 0.90 across 22 configs ×
+  60 seeds (1320 cells).** Every named sensor-failure class
+  (constant bias, linear drift, accelerating divergence, noise
+  floor, outlier, sensor dropout, baseline) is validated to fire
+  or stay quiet on cue across primary, sensitivity, and ablation
+  grids. The primary grid is now sized for a stated statistical
+  contract: per-(family, magnitude) Wilson 95% CI lower bound
+  must clear 0.90 — the floor is calibrated so two of 60 seed
+  failures at any single config trip the alarm, exactly the
+  threshold-edge regime (e.g. `accelerating[accel_mag=0.3]`)
+  where a small kernel change is most likely to flip pass→fail.
+  Current min-CI-lower-bound across the grid: **~0.940** at
+  60-of-60 pass; floor headroom: **0.04**. The 567-cell
+  sensitivity grid still winner-tuples the V1 defaults as the
   closest-to-canonical all-pass configuration.
 - **Apples-to-apples baseline shootout (v0.7).** Four arbitrators
   at the same predictor-arbitration interface (BCVF, EKF with
@@ -306,7 +355,10 @@ Full detail and caveats below.
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 419 passing across 20 test modules; reproducible on CPU in < 3 min (3 host-speed-dependent perf benchmarks + 2 long-running sweep tests deselected) |
+| **Test suite** | 637 passing across 25 test modules (+12 pinning tests from the post-v0.7 audit pass; +15 statistical-significance tests; +20 SOTIF / ISO 26262 traceability tests; +29 StreamingFleetMonitor tests; +16 CSV/Markdown report-writer tests; +77 public-API-stability tests [38 stable + 20 provisional resolutions + 19 hand-written]; +9 hierarchical-BCVF design-doc pins; +12 adversarial-family tests; **+24 multi-modal predictor tests** [LaneAnchor geometry primitives / round-trip identity straight + curved / Lift `(s, d, psi) → (x, y, theta)` / `MultiModalPredictor` validation / `unify_to_se2_bundle` mixed-mode + horizon-mismatch / **Lemma 1 carries on straight + curved lane** / different-reference-paths fires kernel / **lane-frame constant-d bias invisible to BCVF (same Lemma-1 trapdoor)**]); reproducible on CPU in < 4 min (4 host-speed-dependent perf benchmarks + 4 long-running sweep / timing tests deselected) |
+| **Adversarial / spoofing test family (post-v0.7)** | `characterization/traces.py` adds an 8th family `adversarial_consistent_bias` covering the UN ECE R155 attacker who feeds plausibly-noisy data with a hidden constant lateral bias. Third polarity bucket `ADVERSARIAL_FAMILIES` joins the existing nominal / failure tuples; the cell-level acceptance is permissive (kernel must be bounded + dimensionally well-behaved). The **cybersecurity-reviewer-facing evidence** is the per-config Wilson stats across magnitudes `(0.005, 0.01, 0.05, 0.5)` spanning the stealth → transition → loud regime, surfaced in `summarize_grid(...).per_config` and rendered into the auditor markdown by `GridSummary.to_markdown_report`. **The Lemma-1 trapdoor is documented behaviour**: stealth-bias spoofs (bias ≪ T) are invisible to the kernel by construction, with planner-layer harm pinned by `test_adversarial_stealth_attack_succeeds_at_consensus_layer` — defence in depth (cross-modal sensor attestation per UN ECE R155 §7.3.4, cross-class redundancy, calibration drift monitoring) is the layer that catches what BCVF cannot. SOTIF clause 6 (HARA) gains the family as a named hazard input; clause 8 (functional insufficiencies + mitigations) names the trapdoor + the deployment-partner-side mitigation registry. Grid expansion: 22 → 26 configs, 1320 → 1560 cells, every per-config Wilson 95% CI lower bound continues to clear the 0.90 floor. |
+| **Multi-modal predictor inputs (post-v0.7)** | `predictors/state_space.py` adds a `PredictorStateSpace` enum + `LaneAnchor` polyline geometry; `predictors/multi_modal.py` adds a thin-shim adapter (`MultiModalPredictor`, `lane_frame_to_se2`, `se2_to_lane_frame`, `unify_to_se2_bundle`) that lifts non-SE(2) predictor outputs to the kernel's canonical SE(2) world-frame at the boundary. **The load-bearing research finding** (`MULTI_MODAL_PREDICTORS_DESIGN.md` §4): a pre-implementation hypothesis predicted Lemma 1 invariance would break on curved lanes (constant lane-frame offset → curved SE(2) trajectory → non-zero second-derivative). Empirically the hypothesis is **wrong** — the body-frame error primitive transforms correctly with lane curvature, so a constant lane-frame offset becomes a constant body-frame offset between two predictors regardless of how the lane curves. **Lemma 1 invariance carries through the lift** on both straight and curved lanes; the test suite pins it at radii 50 m and 10 m. The genuine kernel-fire case is two predictors on **different reference paths** (SE(2) straight-line vs lane-frame on a curved lane) — desired behaviour, not an invariance violation. The residual cybersecurity concern (a constant `d` bias in a spoofed lane-frame predictor is invisible to BCVF — same Lemma-1 trapdoor as the SE(2) adversarial case) is pinned and points at the same UN ECE R155 §7.3.4 defence-in-depth mitigation. SOTIF clause 5 (functional spec) gains the multi-modal extension. All six new symbols are in `PROVISIONAL_API` (signature may evolve as a deployment partner exercises lane-frame predictors); `STABLE_API` graduation is gated on three explicit criteria in DESIGN.md §6. |
+| **Public-API stability commitment (v0.4.0)** | `_api.py` registry — 38-symbol `STABLE_API` + 14-symbol `PROVISIONAL_API`, both as flat tuples of canonical `submodule.Symbol` paths machine-checked at every commit. `API_STABILITY.md` documents the three tiers (stable / provisional / internal), the semver mapping (patch / minor / major triggers), and the deprecation cycle (post-1.0 stable removal requires one-minor-version notice + `DeprecationWarning` + release-note line). `__version__ = "0.4.0"` and `VERSION_INFO = (0, 4, 0)` agree by test pin. Top-level `from bcvf_autonomous import X` continues to work for the 129 existing re-exports, but the contract is the explicit 38-symbol registry — the v0.2 brief's "tested integration contract" promise becomes the machine-checkable thing the test suite enforces. |
 | **Kernel modules** | `core.py` (V3.1 §3.3–§3.5 + Lemma 1), `manifold.py`, `mppi_planner.py` (delegates to `trust.py`), `runner.py`, `scenarios.py` (S1–S6), `predictors/` (M1–M4 variants with failure injection), pure NumPy, ~4,700 LOC |
 | **Consumer-layer extraction (§6.3)** | `trust.py` — planner-agnostic `TrustWeightComputer`. `integrations/` package with `argmin_selector.py` reference adapter + API-contract README. Extraction preserves 190 pre-existing tests bit-identical (behavior-preserving refactor) |
 | **Non-MPPI adapter demonstrated** | `integrations/argmin_selector.py` — ArgminSelectorPlanner shares `TrustWeightComputer` with `MPPIPlanner` with **zero code duplication**. 7 integration tests proving Lemma 1 propagates through the non-MPPI path |
@@ -314,11 +366,12 @@ Full detail and caveats below.
 | **Architectural variant tested and rejected (§6.6a)** | Dynamic predictor exclusion implemented, run at N=21 S3_accel, rejected under strict multi-metric promotion gate. Rotates catastrophes, doesn't reduce the count. Rejection strengthens V1 claim: "V1 is not just simplest, it's what one non-trivial variant failed to improve upon" |
 | **Observables framework (v0.3)** | `observables/` — six probes (`PredictorAgreement`, `EnsembleSpread`, `EnsembleHeadingEntropy`, `BCVFPerStepMax`, `BCVFPredictorPerStepMax`, `CoherenceAnchoredBCVF`, `UncertaintyGatedBCVFPerStepMax`). Each consumes the predictor trajectory tensor and returns a typed `ObservableValue` with metadata. Probe harness (`probe_observable`) runs against a labelled corpus and classifies the observable into SAFETY_CORRELATED / UNCORRELATED / ANTI_CORRELATED / NULL bands (AUC + Pearson + Spearman). 36 tests. |
 | **Per-step trust diagnostics (v0.3)** | `trust_diagnostics.py` — `TrustStepRecord` per tick + `TrustShapedEpisodeRecord` `(T, M)` stacked arrays + JSON `to_dict()`. Captures weights, residuals (against pre-update EMA, exact), EMA mean/std snapshots, deadband activations, exclusion state, gate counts, V2 state + signal, and exclusion `consec_suspect` / `consec_ok` counters. Wired into `MPPIPlanner.set_trust_diagnostics_enabled` and `Runner` via three `RunConfig` knobs (`trust_diagnostics_enabled`, `trust_diagnostics_path`, `trust_diagnostics_aggregation`). |
-| **Characterization sweep (v0.3)** | `characterization/` — seven SE(2) trace families (baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, sensor_dropout) + outlier-attribution metrics (hit / margin / rank). Three grids: `run_primary_grid` (66 cells, 0% FPR / 0% FNR at V1 defaults), `run_sensitivity_grid` (567-cell `(T, β, δ)` sweep, V1 defaults selected as winner-tuple), `run_ablation_grid` (linear_drift × CostOrder ablation confirms only SECOND order rejects linear drift). Three sabotage tests confirm the suite would fail on a broken kernel. |
+| **Characterization sweep (v0.3, certification-grade in v0.7)** | `characterization/` — seven SE(2) trace families (baseline, constant_bias, linear_drift, accelerating, noise_floor, outlier, sensor_dropout) + outlier-attribution metrics (hit / margin / rank). Three grids: `run_primary_grid` (**1320 cells = 22 configs × 60 seeds**, 0% FPR / 0% FNR at V1 defaults, every per-config Wilson 95% CI lower bound ≥ 0.90 with min observed ≈ 0.940), `run_sensitivity_grid` (567-cell `(T, β, δ)` sweep, V1 defaults selected as winner-tuple), `run_ablation_grid` (linear_drift × CostOrder ablation confirms only SECOND order rejects linear drift). The summary returns a typed `GridSummary` exposing per-config Wilson CIs, `min_ci_lower_bound`, and `cells_below_certification_floor` — the stated SOTIF contract is machine-checkable per cell. **`GridSummary.to_csv(path)` and `GridSummary.to_markdown_report(path)`** emit the frozen audit-pack deliverables (the v0.3 deferral note in the DESIGN was retired); the markdown report carries headline gate / per-(family, magnitude) Wilson-CI table / per-family roll-up / failed-config list / methodology block, and renders deterministically up to the timestamp. Three sabotage tests confirm the suite would fail on a broken kernel; one additional sabotage test confirms a synthetic-failure injection at a single config trips `cells_below_certification_floor`. |
 | **Consumer V2 — Schmitt-triggered softmin (v0.3)** | `trust.py` ConsumerV2Config + ConsumerState. Top-level state machine wraps the V1 shaping layer (deadband + softmin + §6.6a exclusion); EMA learning continues during UNIFORM so the deadband / softmin start warm on the first ENGAGED tick. Hysteresis defaults: `engage_threshold=0.5`, `disengage_threshold=0.2`, `T_engage=3`, `T_disengage=5`. Opt-in via `ConsumerV2Config(enabled=True)`; default-off preserves bit-for-bit V1 behavior. 21 tests. |
-| **Post-hoc fleet analysis harness (v0.3)** | `analysis/` — `find_argmax_flips` (with `weight_drop` + `max_abs_weight_delta` magnitude metrics), `find_v2_state_flips`, `find_near_vetoes` (predictors that crested 70% of `exclusion_T` without crossing). Aggregators `summarize_episode` and `aggregate_fleet` consume per-episode `TrustShapedEpisodeRecord`s and return a `FleetSummary` with per-classification counts, argmax-flip percentile statistics, per-predictor exclusion-incidence rate, and a typed near-veto roster (each event carrying per-episode metadata for triage). `load_episode_from_json` reverses the Runner's diagnostics dump with strict shape validation; corrupt artifacts fail loudly rather than silently producing zero-fill records. 26 tests. |
+| **Post-hoc fleet analysis harness (v0.3, streaming-grade post-v0.7, audit-pack-grade post-v0.7)** | `analysis/` — `find_argmax_flips` (with `weight_drop` + `max_abs_weight_delta` magnitude metrics), `find_v2_state_flips`, `find_near_vetoes` (predictors that crested 70% of `exclusion_T` without crossing). Batch aggregators `summarize_episode` and `aggregate_fleet` consume per-episode `TrustShapedEpisodeRecord`s and return a `FleetSummary` with per-classification counts, argmax-flip percentile statistics, per-predictor exclusion-incidence rate, and a typed near-veto roster (each event carrying per-episode metadata for triage). `load_episode_from_json` reverses the Runner's diagnostics dump with strict shape validation; corrupt artifacts fail loudly rather than silently producing zero-fill records. **`StreamingFleetMonitor` (post-v0.7)** lifts the harness from triage-time to runtime: `.observe_episode(record)` / `.observe_summary(...)` ingest, `.summary(window=timedelta(hours=24))` returns rolling-window `WindowedFleetSummary`, `.evaluate_alerts([rule])` fires `AlertRule` threshold rules with dotted-path metric paths (`argmax_flips_per_step.p95`, `deadband_fired_rate`, ...) — the runtime SRE surface a deployment partner wires into alertmanager / Grafana. Batch parity is the load-bearing contract: a window-bounded streaming summary is byte-identical to `aggregate_fleet` over the same episodes. **`FleetSummary.to_csv(path)` and `FleetSummary.to_markdown_report(path)` (post-v0.7)** retire the v0.3 deferral note and emit the SOTIF clause-10 frozen artifacts: per-episode CSV (RFC-4180-quoted, pinned column order) and a fleet-level narrative markdown (headline aggregates / classification breakdown / per-predictor exclusion incidence / near-veto + V2-state-flip rosters / top-K per-episode index / methodology block); both work identically on batch and streaming-windowed summaries. 26 batch tests + 29 streaming tests + 8 report-writer tests. |
 | **Real-sensor pilot — runner + first execution (§6.2, v0.5)** | `pilot/` package: `scene_evaluator` (Mode A open-loop A0 / A3 paired evaluation), `sign_test` (Wilson CI + one-sided sign test, no scipy), `runner` (writes paired-comparison CSV + `FleetSummary` JSON + markdown report). Executed end-to-end against `RealisticNoiseAdapter` at N = 21: A3 win rate 1.000 with Wilson-CI lower bound 0.566 and sign-test p = 0.0312 on the responsive class; Lemma-1 negative control passes exactly. Three artifacts written to `results/phase_6_2_pre_pilot/`. 16 pilot tests + 11 prior dataset-adapter tests. `datasets/nuscenes.py` stub documents the one-line adapter swap; full execution pending dataset access + the M1–M4 predictor implementations the pilot plan estimates at 3–4 weeks. |
 | **Apples-to-apples baseline shootout (v0.7)** | `baselines/` package: `BCVFArbitrator`, `EKFArbitrator` (with `robot_localization`-style Mahalanobis 3-sigma outlier rejection), `MajorityVoteArbitrator` (cluster-mode), `AnchorArbitrator` (null floor), all sharing the same `Arbitrator` protocol consuming `(M, H, 3)` predictor trajectories. Shootout runs every arbitrator × every characterization family × N seeds. Three artifacts (`shootout.csv`, `shootout.json`, `shootout_report.md`) in `results/baseline_shootout/`. The Lemma-1 false-attribution differentiator is the BD-grade headline; the EKF Mahalanobis miss on outlier is the *"this isn't a solved problem with the existing toolkit"* finding. 19 baseline tests, including pinned BD assertions (BCVF false-attr < 1e-6 on constant_bias, EKF > 0.1, Majority > 1.0). |
+| **SOTIF / ISO 26262 traceability template (Q3 pulled to post-v0.7)** | `safety_case/` — `traceability.py` builds a clause-by-clause `TraceabilityMatrix` mapping 19 BCVF artifacts (kernel, characterization sweep, V2 hysteresis, fleet harness, per-step diagnostic record, baseline shootout, pilot runner, Wilson CI primitive, ...) to 12 standard clauses: SOTIF (ISO 21448) clauses 5/6/7/8/9/10 and ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11. The on-disk `SOTIF_TRACEABILITY.md` is a deterministic snapshot of the matrix (the test suite pins byte-equality between snapshot and renderer so the doc cannot drift). Every evidence reference is import-time-resolved by the test suite (`module_path::symbol` must exist, or the test fails loudly). The template is the Q3 "regulator-facing template" half of the brief item; the regulator workshop remains a Q3 deliverable. **The artifact half is now BD-callable on day one of a diligence engagement** instead of waiting for "after the safety case is ready." 20 traceability tests. |
 | **V2 promotion-gate sweep + decision (v0.6)** | `v2_chatter_sweep.py`: paired V1 vs V2 runner with two-gate decision logic (chatter-reduction Wilson + rescue-preservation McNemar). Executed at N=5 on `S1_normal_driving` (chatter scenario) and `S3_map_error_accel` (rescue scenario), at default thresholds and at 50×-lower thresholds. **Finding: V2 reduces chatter by ≤ 0.6% on autonomy data because BCVF kernel cost exceeds V2's engage threshold even on nominal scenarios → V2 stays ENGAGED → V1 pipeline runs unchanged.** Honest non-promotion. The empirical result upgrades the v0.5 "V2 is opt-in" caveat from defensive to evidence-backed; threshold recalibration is a scoped Q2 followup. 12 sweep-module tests + artifacts in `results/v2_chatter_S1_n5/` and `results/v2_rescue_S3_n5/`. |
 | **ROS 2 adapter scaffold (§6.4)** | `symbolu_bcvf_ros2` package with framework-agnostic core + lazy `rclpy` shim. Message dataclasses, bridge class, and 13 tests. `.msg` files + colcon build + real pub/sub pending ~3–4 weeks ROS-environment work |
 | **Latency benchmark (§6.5)** | 18-cell (M × K × H) sweep, plus a v0.4 re-run after `predict_batch` vectorization. Smallest config (M=4, K=128, H=10) now p99 ≈ 38 ms (was 76). Per-predictor rollout cost dropped 52–77× across M1–M4 at K=1000, H=50; the new dominant cost is the BCVF kernel and perf-cost evaluation — the next vectorization targets. Production integrators should re-run on their substrate. |
@@ -452,14 +505,21 @@ thresholds calibrated per-scenario class. ~1 week.
   52–77× at K=1000, H=50.** Follow-on: kernel-side vectorization
   for the now-dominant BCVF + perf-cost evaluation cost.
 
-**Quarter 3 — Safety-case + adjacent-domain pilot**
-- **SOTIF / ISO 26262 traceability template.** Map Lemma 1
+**Quarter 2 — Pulled forward from Q3**
+- ~~**SOTIF / ISO 26262 traceability template.** Map Lemma 1
   invariance + the v0.3 characterization-sweep failure taxonomy +
   per-step diagnostic record + Consumer V2 chatter-immunity proof
   to a safety-case narrative. The five v0.3 artifacts cover the
   bulk of what an auditor's clause-by-clause walk requires; the
   Q3 work is the regulator-facing template + workshop, not new
-  code. 2–3 weeks + regulator workshop.
+  code. 2–3 weeks + regulator workshop.~~ **Template half landed
+  post-v0.7 in `safety_case/` — 12 clauses (SOTIF 5/6/7/8/9/10 +
+  ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11), 19 indexed BCVF
+  artifacts, machine-checked snapshot in
+  `safety_case/SOTIF_TRACEABILITY.md`. Regulator workshop remains
+  a Q3 deliverable; the artifact-half is now BD-callable on day one.**
+
+**Quarter 3 — Safety-case + adjacent-domain pilot**
 - **First paid design-partner engagement** (adjacent domain —
   drone / warehouse / industrial mobile robot). Not full AV.
 
@@ -469,6 +529,29 @@ thresholds calibrated per-scenario class. ~1 week.
   Reference letter or published case study. The fleet analysis
   harness lets the partner publish a *fleet-level* trust-pipeline
   report at handover, not just a single integration report.
+
+### Longer-horizon research (design-only today)
+
+- **Hierarchical / group-level BCVF.** When `M` scales beyond 4–6
+  predictors (a full sensor suite with multiple LiDARs + cameras +
+  radar + IMU + GNSS), the all-pairs cost grows quadratically and
+  per-predictor attribution dilutes. A two-level kernel — first
+  within a sensor group, then across group representatives — would
+  scale better. Landed post-v0.7 as
+  `HIERARCHICAL_BCVF_DESIGN.md`: motivation, two-level structure,
+  three representative options (trust-weighted / arithmetic /
+  winner-take-all) with Lemma-1 carry-through analysis,
+  per-predictor attribution, the new failure modes the hierarchy
+  catches (cross-group correlated drift) and *can't* fully solve
+  (within-group correlated failure), certification implications
+  (~5 new families on the 1320-cell grid), backward-compatibility
+  contract (`groups=None` falls through to flat BCVF), and the
+  three ship-when-ready criteria gating promotion to a deliverable.
+  9 tests pin the doc presence + content + non-promotion of any
+  hypothetical hierarchical surface to `STABLE_API` /
+  `PROVISIONAL_API`. **No implementation today** — the flat
+  `M = 3 / M = 4` kernel remains the production default and the
+  certification target.
 
 ### The ask
 
@@ -491,7 +574,10 @@ Capital is earmarked for:
    `predict_batch` vectorization (Q2) + Autoware / Apollo
    reference integrations (Q2–Q3).
 3. **Safety-case readiness** — SOTIF / ISO 26262 traceability
-   template (Q3) + regulator engagement (Q3).
+   template **landed post-v0.7** (12 clauses, 19 indexed
+   artifacts, machine-checked snapshot in
+   `safety_case/SOTIF_TRACEABILITY.md`); regulator engagement
+   stays Q3.
 4. **First production reference** — adjacent-domain design partner
    (Q3) + production reference (Q4).
 
@@ -503,4 +589,4 @@ reachable.
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.7 · 419 internal tests · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · 7-family characterization sweep at 0% FPR / 0% FNR · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*
+*v0.7 · 652 internal tests (audit pinning tests included; published numbers unchanged; characterization primary grid now certification-grade at 1560 cells across 8 families × 26 configs with Wilson 95% CI lower-bound floor 0.90 per (family, magnitude) config — current min ≈ 0.940; Q3 SOTIF / ISO 26262 traceability template pulled forward — 12 clauses across SOTIF 5/6/7/8/9/10 and ISO 26262 Part 6 §7/§8/§9/§9.4.4/§10/§11, **28 indexed BCVF artifacts**, machine-checked snapshot in `safety_case/SOTIF_TRACEABILITY.md`; `StreamingFleetMonitor` with rolling-window summaries + threshold alerts lifts the fleet harness from triage to runtime; the two deferred CSV / Markdown report writers landed; **0.4.0 release ratifies a public-API stability policy** — 38-symbol `STABLE_API` + **20-symbol `PROVISIONAL_API`** (was 14, +6 multi-modal surfaces), deprecation cycle in `API_STABILITY.md`; **hierarchical / group-level BCVF design proposal** lands as a design-only doc gated on three ship-when-ready criteria; **adversarial / spoofing test family** lands as the 8th family and third polarity bucket — UN ECE R155 cybersecurity scope-boundary pinned via the Lemma-1-trapdoor; **multi-modal predictor inputs** thin-shim adapter lifts lane-frame predictors to SE(2) at the kernel boundary — Lemma 1 invariance verified to carry through curved lanes contrary to the pre-implementation hypothesis; **`INDUSTRY_FEATURES_ROADMAP.md`** documents the eight gap-fill items (functional-safety state machine + ROS 2 / DDS + replay framework + RT determinism + HD-map predictor + calibration drift + sensor attestation + domain-specific predictors) ranked by deal-unlock value with non-promotion gates against `STABLE_API` / `PROVISIONAL_API`) · apples-to-apples baseline shootout landed (BCVF zero false-attribution on Lemma-1 vs Majority 16.7 / EKF 1.1; EKF misses heavy-quadratic outlier; BCVF 8–19× faster per tick) · V2 promotion-gate sweep landed (median chatter reduction 0.6%, non-promotion, Q2 recalibration scoped) · §6.2 pilot runner executed end-to-end (N=21, win rate 1.000, p=0.0312 on responsive class, Lemma-1 negative control PASS, three artifacts on disk) · 2 synthetic-predictor scenarios p < 0.05 · planner-agnostic runtime extracted (§6.3) · per-step diagnostics + fleet analysis harness · Consumer V2 (Schmitt-triggered) chatter-immunity opt-in (evidence-backed) · `predict_batch` vectorization 52–77× per-predictor speedup · `NuScenesAdapter` stub documents one-line real-data swap*

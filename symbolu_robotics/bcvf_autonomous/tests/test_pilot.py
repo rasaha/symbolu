@@ -63,6 +63,31 @@ def test_sign_test_wilson_ci_within_unit_interval():
     assert 0.0 <= r.win_rate_ci_low <= r.win_rate_ci_high <= 1.0
 
 
+def test_sign_test_single_decisive_win_returns_textbook_p():
+    """Pinned regression for the k=1 off-by-one in ``_binomial_tail_geq``.
+
+    With one win and zero losses (n_decisive = 1), the exact one-sided
+    sign-test p-value is P(X >= 1 | X ~ Bin(1, 0.5)) = 0.5. The pre-fix
+    primitive returned 0.0, which would have flagged a single-win
+    sweep as significant at any alpha — exactly the silent failure
+    mode this test pins against.
+    """
+    r = one_sided_sign_test([+1.0])
+    assert r.n_a3_wins == 1
+    assert r.n_a0_wins == 0
+    assert r.win_rate == pytest.approx(1.0)
+    assert r.p_value_one_sided == pytest.approx(0.5, abs=1e-12)
+
+
+def test_sign_test_one_win_among_five_decisive_is_not_significant():
+    """k=1, n=5: P(X >= 1 | Bin(5, 0.5)) = 31/32 ~ 0.969 — clearly
+    non-significant. The pre-fix code returned 0.0 (false significant)."""
+    r = one_sided_sign_test([+1.0, -1.0, -1.0, -1.0, -1.0])
+    assert r.n_a3_wins == 1
+    assert r.n_a0_wins == 4
+    assert r.p_value_one_sided == pytest.approx(31.0 / 32.0, abs=1e-12)
+
+
 # --------------------------------------------------------------------------- #
 # Scene evaluator — A0 vs A3 numerical sanity
 # --------------------------------------------------------------------------- #
@@ -128,6 +153,33 @@ def test_evaluate_scene_a3_lemma1_invariance_on_constant_bias():
         f"Lemma-1 invariance violated on constant_bias_sanity: "
         f"max BCVF = {m.max_bcvf_total}"
     )
+
+
+def test_attribution_within_top_half_uses_ceil_convention_for_M3():
+    """Pinned regression: ``attribution_within_top_half`` must use the
+    ceil top-k convention (matching ``baselines/shootout._attribution_top_half``).
+
+    With M=3 and the failing predictor ranked 2nd-out-of-3, the
+    documented "top half" means top-2, so within_top_half must be 1.0.
+    The pre-fix implementation used ``M // 2`` (floor), which collapsed
+    to "rank 1 only" for odd M, giving 0.0 here and silently making
+    the field a duplicate of ``hit_rate``.
+    """
+    from symbolu_robotics.bcvf_autonomous.pilot.scene_evaluator import (
+        _attribution_metrics,
+    )
+    # One window step, M=3, costs ranked: predictor 2 → rank 1, predictor 0 → rank 2,
+    # predictor 1 → rank 3. Failing predictor is 0 (rank 2).
+    per_step_costs = np.array([[0.5, 0.1, 1.0]])   # (T=1, M=3)
+    metrics = _attribution_metrics(
+        per_step_costs,
+        failing_predictor_idx=0,
+        onset_step=0,
+        duration_steps=1,
+        M=3,
+    )
+    assert metrics["hit_rate"] == 0.0       # not rank 1
+    assert metrics["within_top_half"] == 1.0  # rank 2 is within top-2-of-3
 
 
 def test_evaluate_scene_a3_attribution_hits_failing_predictor_on_camera_degradation():

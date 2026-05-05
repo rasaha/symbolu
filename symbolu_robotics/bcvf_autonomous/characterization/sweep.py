@@ -28,7 +28,9 @@ import itertools
 import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -39,7 +41,13 @@ from .alignment import (
     aggregate_alignment,
     compute_alignment_metrics,
 )
+from .stats import (
+    CERTIFICATION_FLOOR,
+    WILSON_Z_95,
+    wilson_ci,
+)
 from .traces import (
+    ADVERSARIAL_FAMILIES,
     FAILURE_FAMILIES,
     NOMINAL_FAMILIES,
     TraceBundle,
@@ -59,14 +67,45 @@ FAMILY_MAGNITUDES: Dict[str, Tuple[str, Tuple[float, ...]]] = {
     "noise_floor": ("sigma_noise", (0.005, 0.01, 0.02, 0.05)),
     "outlier": ("accel_mag", (1.0,)),  # canonical magnitude
     "sensor_dropout": ("k_dropout", (5, 15, 25, 35)),
+    # Cybersecurity-grade adversarial input — the magnitudes span the
+    # full stealth→transition→loud arc relative to the V1 default gate
+    # threshold T=0.05. Stealth (0.005, 0.01) keeps the gate closed
+    # most ticks → BCVF is invisible-to-the-attack → consensus is
+    # biased ≈ ``bias × weight_attacker`` → planner-level harm is real.
+    # Loud (0.5) opens the gate every tick → kernel detects via the
+    # gate-noise interaction. The transition magnitude (0.05) sits
+    # exactly at the gate threshold and surfaces the kernel's
+    # detection-onset behaviour. See DESIGN.md §3.5 + §4.8 for the
+    # acceptance criterion + the UN ECE R155 cybersecurity scope.
+    "adversarial_consistent_bias": ("bias", (0.005, 0.01, 0.05, 0.5)),
 }
 
-PRIMARY_SEEDS: Tuple[int, ...] = (42, 43, 44)
+# Primary-grid seeds. 60 deterministic seeds give 22 configs × 60
+# seeds = 1320 cells per ``run_primary_grid`` invocation. The audit
+# flagged the prior 3-seed-per-cell coverage as too narrow for a
+# certification-grade statistical bound — at the threshold-edge
+# magnitudes (e.g. ``accelerating`` at ``accel_mag = 0.3``) a single
+# kernel regression can flip a 3-of-3 pass into a 0-of-3 fail
+# without the suite catching it. 60 seeds + a per-config Wilson 95%
+# CI lower-bound floor (see ``stats.CERTIFICATION_FLOOR``) ties the
+# regression suite to a stated statistical bound.
+PRIMARY_SEEDS: Tuple[int, ...] = tuple(range(42, 102))
+
+# Three-seed legacy tuple kept for callers that explicitly want the
+# prior smoke-grade smoke run; no internal call site uses it.
+LEGACY_PRIMARY_SEEDS: Tuple[int, ...] = (42, 43, 44)
 
 V1_DEFAULTS = {"T": 0.2, "beta": 100.0, "delta": 0.5}
 SENSITIVITY_T = (0.1, 0.2, 0.5)
 SENSITIVITY_BETA = (50.0, 100.0, 200.0)
 SENSITIVITY_DELTA = (0.25, 0.5, 1.0)
+# Sensitivity / ablation grids stay at 3 seeds — those grids exist
+# to validate the (T, β, δ) cube, not to certify per-config pass-rate
+# bounds. Tying them to the 60-seed primary cadence would push the
+# default test suite past its time budget without buying additional
+# certification signal.
+SENSITIVITY_SEEDS: Tuple[int, ...] = (42, 43, 44)
+ABLATION_SEEDS: Tuple[int, ...] = (42, 43, 44)
 
 
 # --------------------------------------------------------------------------- #
@@ -205,6 +244,27 @@ def _evaluate_thresholds(
         if 0 <= k < int(family_params.get("H", 50)) - 5:
             need(gate_activations > 0, "dropout.gate_activations>0")
             need(total_cost > 1e-3, "dropout.total_cost>1e-3")
+
+    elif family == "adversarial_consistent_bias":
+        # Cybersecurity-grade attack — see DESIGN.md §3.5 / §4.8.
+        # Per-cell pass criterion is deliberately permissive: the
+        # family's purpose is to expose the kernel's *behaviour* across
+        # the stealth → transition → loud bias regime, not to gate the
+        # kernel's correctness. The reviewer-facing evidence is the
+        # per-config Wilson stats (cost percentiles + gate-activation
+        # rate per magnitude) rendered into the auditor markdown by
+        # ``GridSummary.to_markdown_report``; per-cell pass simply
+        # asserts the kernel is bounded + dimensionally well-behaved.
+        need(math.isfinite(total_cost), "adversarial.total_cost_finite")
+        need(total_cost < 1e8, "adversarial.total_cost<1e8(huber_bound)")
+        bias = float(family_params.get("bias", 0.0))
+        # Stealth regime — bias well below the V1 default gate threshold
+        # T = 0.05 — must keep BCVF below an order of magnitude of the
+        # noise-floor cost. Pinned at total_cost < 5.0 (~10x the
+        # noise-only floor at sigma=0.01) so a kernel that suddenly
+        # over-reacts on stealth bias trips the gate.
+        if bias <= 0.01:
+            need(total_cost < 5.0, "adversarial.stealth_total_cost<5.0")
 
     threshold_pass = len(reasons) == 0
 
@@ -395,7 +455,7 @@ def run_sensitivity_grid(
     M: int = 3,
     H: int = 50,
     dt: float = 0.1,
-    seeds: Tuple[int, ...] = PRIMARY_SEEDS,
+    seeds: Tuple[int, ...] = SENSITIVITY_SEEDS,
 ) -> List[CellResult]:
     """Canonical magnitude × (T, β, δ) sweep."""
     cells: List[CellResult] = []
@@ -425,7 +485,7 @@ def run_ablation_grid(
     M: int = 3,
     H: int = 50,
     dt: float = 0.1,
-    seeds: Tuple[int, ...] = PRIMARY_SEEDS,
+    seeds: Tuple[int, ...] = ABLATION_SEEDS,
 ) -> List[CellResult]:
     """``linear_drift`` × cost-order ablation.
 
@@ -489,6 +549,103 @@ def pick_winner_tuple(
     return candidates_sorted[0], candidates_sorted
 
 
+@dataclass
+class PerConfigPassStat:
+    """Pass-rate tally + Wilson 95% CI for one (family, magnitude) cell.
+
+    A "config" here is the natural grouping the audit asked for: every
+    combination of family and family-parameter magnitude that appears
+    in the primary grid. ``magnitude_label`` is a stable string key
+    suitable for CSV / JSON output and table headers (e.g.
+    ``"accelerating[accel_mag=0.3]"`` or ``"baseline"``).
+    """
+
+    family: str
+    magnitude_label: str
+    family_params: Dict[str, Any]
+    n: int
+    passed: int
+    pass_rate: float
+    ci_low: float
+    ci_high: float
+    meets_certification_floor: bool
+
+
+def _magnitude_label(family: str, family_params: Dict[str, Any]) -> str:
+    """Stable string key for (family, magnitude) suitable for grouping.
+
+    For families with a scalar magnitude parameter (e.g. ``constant_bias``
+    with ``bias=0.5``) we emit ``"family[param=value]"`` so two cells
+    with different magnitudes always carry distinct labels — a
+    pre-fix special case for ``outlier`` collapsed every magnitude to
+    just ``"outlier"``, which silently merged distinct configs into
+    one Wilson-CI group when the outlier magnitude tuple was extended.
+    ``baseline`` is keyed by family name (no magnitude parameter is
+    defined for it). ``sensor_dropout`` is keyed by ``k_dropout``
+    since the outer family + dropped-predictor are fixed across the
+    primary grid.
+    """
+    if family == "baseline":
+        return "baseline"
+    if family == "sensor_dropout":
+        k = family_params.get("k_dropout", "?")
+        return f"sensor_dropout[k_dropout={k}]"
+    # Every other family carries a single scalar magnitude under
+    # ``FAMILY_MAGNITUDES``: constant_bias, linear_drift, accelerating,
+    # noise_floor, and outlier (all use a named param + a magnitude
+    # tuple). Distinct magnitudes therefore always yield distinct
+    # labels.
+    name, _ = FAMILY_MAGNITUDES.get(family, (None, ()))
+    if name and name in family_params:
+        return f"{family}[{name}={family_params[name]}]"
+    # Fallback: serialise the params dict deterministically.
+    items = ",".join(f"{k}={v}" for k, v in sorted(family_params.items()))
+    return f"{family}[{items}]" if items else family
+
+
+def per_config_pass_stats(
+    cells: List[CellResult],
+    z: float = WILSON_Z_95,
+    certification_floor: float = CERTIFICATION_FLOOR,
+) -> List[PerConfigPassStat]:
+    """Aggregate sweep cells into per-(family, magnitude) pass tallies
+    with Wilson confidence intervals.
+
+    The Wilson 95% CI is computed at each config independently —
+    ``ci_low`` is the per-config lower bound a SOTIF auditor would
+    quote ("with 95% confidence the true pass rate at this magnitude
+    is at least X"). ``meets_certification_floor`` is the per-config
+    boolean the regression suite asserts on; ``False`` means the cell
+    is the regression hot-spot.
+    """
+    grouped: Dict[Tuple[str, str], List[CellResult]] = defaultdict(list)
+    for c in cells:
+        key = (c.family, _magnitude_label(c.family, c.family_params))
+        grouped[key].append(c)
+
+    out: List[PerConfigPassStat] = []
+    for (family, label), group in grouped.items():
+        n = len(group)
+        passed = sum(1 for c in group if c.cell_pass)
+        rate = passed / n if n else 0.0
+        ci_low, ci_high = wilson_ci(passed, n, z=z)
+        out.append(PerConfigPassStat(
+            family=family,
+            magnitude_label=label,
+            family_params=dict(group[0].family_params),
+            n=n,
+            passed=passed,
+            pass_rate=rate,
+            ci_low=ci_low,
+            ci_high=ci_high,
+            meets_certification_floor=ci_low >= certification_floor,
+        ))
+    # Stable ordering: family group, then magnitude label. Keeps CSV /
+    # markdown rendering deterministic across runs.
+    out.sort(key=lambda s: (s.family, s.magnitude_label))
+    return out
+
+
 def family_pass_rate(cells: List[CellResult]) -> Dict[str, Dict[str, Any]]:
     """Per-family pass tally with alignment summary."""
     per_family: Dict[str, List[CellResult]] = defaultdict(list)
@@ -519,24 +676,157 @@ def family_pass_rate(cells: List[CellResult]) -> Dict[str, Dict[str, Any]]:
 def split_nominal_failure(
     cells: List[CellResult],
 ) -> Tuple[List[CellResult], List[CellResult]]:
-    """Split cells by family polarity — useful for SOTIF FP/FN tallies."""
+    """Split cells by family polarity — useful for SOTIF FP/FN tallies.
+
+    Returns ``(nominal, failure)``. Adversarial-family cells are
+    intentionally not in either bucket; consume them via
+    :func:`split_polarity` if the cybersecurity-tier rate matters.
+    """
     nominal = [c for c in cells if c.family in NOMINAL_FAMILIES]
     failure = [c for c in cells if c.family in FAILURE_FAMILIES]
     return nominal, failure
 
 
-def summarize_grid(cells: List[CellResult]) -> Dict[str, Any]:
-    """Top-level grid summary: per-family pass rates + FP / FN counts."""
-    nominal, failure = split_nominal_failure(cells)
-    return {
-        "n_cells": len(cells),
-        "per_family": family_pass_rate(cells),
-        "false_positive_rate": (
-            sum(1 for c in nominal if not c.cell_pass) / len(nominal)
-            if nominal else 0.0
-        ),
-        "false_negative_rate": (
-            sum(1 for c in failure if not c.cell_pass) / len(failure)
-            if failure else 0.0
-        ),
-    }
+def split_polarity(
+    cells: List[CellResult],
+) -> Tuple[List[CellResult], List[CellResult], List[CellResult]]:
+    """Split cells across all three polarity buckets — nominal /
+    failure / adversarial. Used by :func:`summarize_grid` to compute
+    the cybersecurity-tier pass rate alongside the SOTIF FP/FN rates.
+    """
+    nominal = [c for c in cells if c.family in NOMINAL_FAMILIES]
+    failure = [c for c in cells if c.family in FAILURE_FAMILIES]
+    adversarial = [c for c in cells if c.family in ADVERSARIAL_FAMILIES]
+    return nominal, failure, adversarial
+
+
+def summarize_grid(
+    cells: List[CellResult],
+    z: float = WILSON_Z_95,
+    certification_floor: float = CERTIFICATION_FLOOR,
+) -> "GridSummary":
+    """Top-level grid summary: per-family pass rates + FP / FN counts.
+
+    Also exposes per-(family, magnitude) Wilson confidence intervals so
+    a SOTIF audit can quote a per-config statistical bound rather than
+    a point estimate. The returned :class:`GridSummary` carries:
+
+    * ``per_config`` — list of :class:`PerConfigPassStat` (one per
+      config) with ``family``, ``magnitude_label``, ``n``, ``passed``,
+      ``pass_rate``, ``ci_low``, ``ci_high``, ``meets_certification_floor``.
+    * ``min_ci_lower_bound`` — the worst per-config CI lower bound
+      across the grid (the "weakest cell" gauge).
+    * ``cells_below_certification_floor`` — labels of any configs whose
+      CI lower bound undershoots ``certification_floor``.
+    * ``certification_floor`` and ``wilson_z`` — the bound and z-score
+      in effect for this summary.
+
+    Auditor-facing artifacts: :meth:`GridSummary.to_csv` and
+    :meth:`GridSummary.to_markdown_report` emit frozen deliverables
+    suitable for a SOTIF / ISO 26262 documentation pack.
+    ``to_dict()`` produces a JSON-friendly view with the same shape
+    callers used to read off the legacy dict return.
+    """
+    nominal, failure, adversarial = split_polarity(cells)
+    config_stats = per_config_pass_stats(
+        cells, z=z, certification_floor=certification_floor,
+    )
+    min_ci_lower = (
+        min(s.ci_low for s in config_stats) if config_stats else 0.0
+    )
+    below_floor = [
+        s.magnitude_label for s in config_stats
+        if not s.meets_certification_floor
+    ]
+    fpr = (
+        sum(1 for c in nominal if not c.cell_pass) / len(nominal)
+        if nominal else 0.0
+    )
+    fnr = (
+        sum(1 for c in failure if not c.cell_pass) / len(failure)
+        if failure else 0.0
+    )
+    adv_pass_rate = (
+        sum(1 for c in adversarial if c.cell_pass) / len(adversarial)
+        if adversarial else 1.0
+    )
+    return GridSummary(
+        n_cells=len(cells),
+        per_family=family_pass_rate(cells),
+        false_positive_rate=fpr,
+        false_negative_rate=fnr,
+        adversarial_pass_rate=adv_pass_rate,
+        per_config=list(config_stats),
+        min_ci_lower_bound=min_ci_lower,
+        cells_below_certification_floor=below_floor,
+        certification_floor=certification_floor,
+        wilson_z=z,
+    )
+
+
+@dataclass
+class GridSummary:
+    """Top-level grid summary — per-family pass rates, per-config
+    Wilson CIs, and the certification-floor verdict.
+
+    Auditor-facing writers:
+
+    * :meth:`to_csv` — one row per (family, magnitude) config.
+    * :meth:`to_markdown_report` — regulator-friendly layout with
+      headline gate, per-config table, per-family roll-up,
+      methodology block, and a failed-config section.
+    * :meth:`to_dict` — JSON-friendly view; matches the shape of
+      the legacy ``summarize_grid`` dict return so existing
+      consumers can read ``GridSummary.to_dict()["per_config"]``
+      unchanged.
+    """
+
+    n_cells: int
+    per_family: Dict[str, Dict[str, Any]]
+    false_positive_rate: float
+    false_negative_rate: float
+    adversarial_pass_rate: float
+    per_config: List[PerConfigPassStat]
+    min_ci_lower_bound: float
+    cells_below_certification_floor: List[str]
+    certification_floor: float
+    wilson_z: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "n_cells": int(self.n_cells),
+            "per_family": dict(self.per_family),
+            "false_positive_rate": float(self.false_positive_rate),
+            "false_negative_rate": float(self.false_negative_rate),
+            "adversarial_pass_rate": float(self.adversarial_pass_rate),
+            "per_config": [asdict(s) for s in self.per_config],
+            "min_ci_lower_bound": float(self.min_ci_lower_bound),
+            "cells_below_certification_floor": list(
+                self.cells_below_certification_floor
+            ),
+            "certification_floor": float(self.certification_floor),
+            "wilson_z": float(self.wilson_z),
+        }
+
+    def to_csv(self, path: "Union[str, Path]") -> "Path":
+        """Write the per-config CSV to ``path``. Returns the Path."""
+        from .reports import write_grid_csv
+        return write_grid_csv(self, path)
+
+    def to_markdown_report(
+        self,
+        path: "Union[str, Path]",
+        *,
+        title: str = "BCVF Characterization Grid — Certification Report",
+        grid_label: str = "primary",
+        generated_at: "Optional[datetime]" = None,
+    ) -> "Path":
+        """Write the regulator-friendly markdown report to ``path``."""
+        from .reports import write_grid_markdown
+        return write_grid_markdown(
+            self,
+            path,
+            title=title,
+            grid_label=grid_label,
+            generated_at=generated_at,
+        )

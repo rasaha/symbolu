@@ -91,6 +91,41 @@ def test_majority_vote_rejects_zero_radius():
         MajorityVoteArbitrator(cluster_radius=0.0)
 
 
+def test_cluster_majority_is_greedy_non_transitive():
+    """Pin the documented single-pass greedy semantics in
+    :func:`_cluster_majority`.
+
+    The A-B-C chain at distances (A→B=0.4, B→C=0.4, A→C=0.8) with
+    radius=0.5 must produce ``{A, B}`` and ``{C}`` — A's pivot pulls
+    in B (within 0.5) but **not** C (0.8 > 0.5), and B is already
+    clustered when its turn comes, so transitive closure does not run.
+    A reader expecting DBSCAN-style transitivity would mis-read the
+    arbitrator's output; this test pins the actual contract.
+    """
+    from symbolu_robotics.bcvf_autonomous.baselines.majority_vote import (
+        _cluster_majority,
+    )
+    positions = np.array(
+        [[0.0, 0.0], [0.4, 0.0], [0.8, 0.0]], dtype=np.float64,
+    )
+    cluster_ids = _cluster_majority(positions, radius=0.5)
+    assert cluster_ids[0] == cluster_ids[1]
+    assert cluster_ids[2] != cluster_ids[0]
+
+
+def test_cluster_majority_singletons_when_all_far():
+    """All-pairs distance > radius ⇒ each predictor is its own cluster
+    and ``argmax(counts)`` returns predictor 0 (lowest-index tiebreak)."""
+    from symbolu_robotics.bcvf_autonomous.baselines.majority_vote import (
+        _cluster_majority,
+    )
+    positions = np.array(
+        [[0.0, 0.0], [10.0, 0.0], [20.0, 0.0]], dtype=np.float64,
+    )
+    cluster_ids = _cluster_majority(positions, radius=0.5)
+    assert len(set(cluster_ids.tolist())) == 3
+
+
 # --------------------------------------------------------------------------- #
 # EKF arbitrator
 # --------------------------------------------------------------------------- #

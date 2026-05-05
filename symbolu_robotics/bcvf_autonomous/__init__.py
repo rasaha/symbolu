@@ -161,9 +161,13 @@ from symbolu_robotics.bcvf_autonomous.trust_diagnostics import (
     TrustStepRecord,
 )
 from symbolu_robotics.bcvf_autonomous.characterization import (
+    CERTIFICATION_FLOOR,
+    WILSON_Z_95,
     AlignmentAggregate,
     AlignmentMetrics,
     CellResult,
+    GridSummary,
+    PerConfigPassStat,
     TraceBundle,
     aggregate_alignment,
     compute_alignment_metrics,
@@ -173,16 +177,21 @@ from symbolu_robotics.bcvf_autonomous.characterization import (
     run_primary_grid,
     run_sensitivity_grid,
     summarize_grid,
+    wilson_ci,
 )
 from symbolu_robotics.bcvf_autonomous.characterization import (
     generate_trace as generate_trace_bundle,
 )
 from symbolu_robotics.bcvf_autonomous.analysis import (
+    Alert,
+    AlertRule,
     ArgmaxFlip,
     EpisodeSummary,
     FleetSummary,
     NearVeto,
+    StreamingFleetMonitor,
     V2StateFlip,
+    WindowedFleetSummary,
     aggregate_fleet,
     episode_record_from_dict,
     find_argmax_flips,
@@ -192,10 +201,29 @@ from symbolu_robotics.bcvf_autonomous.analysis import (
     summarize_episode,
 )
 
-__version__ = "0.4.0"
+# Public-API stability registry — see ``API_STABILITY.md``.
+from symbolu_robotics.bcvf_autonomous._api import (
+    PROVISIONAL_API,
+    STABLE_API,
+    is_provisional,
+    is_stable,
+    resolve_qualified,
+    stable_top_level_names,
+)
+from symbolu_robotics.bcvf_autonomous._version import (
+    VERSION_INFO,
+    __version__,
+)
 
 __all__ = [
     "__version__",
+    "VERSION_INFO",
+    "STABLE_API",
+    "PROVISIONAL_API",
+    "is_stable",
+    "is_provisional",
+    "resolve_qualified",
+    "stable_top_level_names",
     # core
     "BCVFConfig",
     "BCVFResult",
@@ -315,8 +343,12 @@ __all__ = [
     # characterization sweep
     "AlignmentAggregate",
     "AlignmentMetrics",
+    "CERTIFICATION_FLOOR",
     "CellResult",
+    "GridSummary",
+    "PerConfigPassStat",
     "TraceBundle",
+    "WILSON_Z_95",
     "aggregate_alignment",
     "compute_alignment_metrics",
     "family_pass_rate",
@@ -326,12 +358,17 @@ __all__ = [
     "run_primary_grid",
     "run_sensitivity_grid",
     "summarize_grid",
+    "wilson_ci",
     # post-hoc analysis harness
+    "Alert",
+    "AlertRule",
     "ArgmaxFlip",
     "EpisodeSummary",
     "FleetSummary",
     "NearVeto",
+    "StreamingFleetMonitor",
     "V2StateFlip",
+    "WindowedFleetSummary",
     "aggregate_fleet",
     "episode_record_from_dict",
     "find_argmax_flips",

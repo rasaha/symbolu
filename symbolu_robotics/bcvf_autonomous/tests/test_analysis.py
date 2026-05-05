@@ -630,3 +630,131 @@ def test_consec_counters_captured_through_real_episode():
     assert diag.per_step_consec_suspect.shape == (4, len(predictors))
     # Exclusion was enabled the whole episode — no -1 sentinels.
     assert (diag.per_step_consec_suspect >= 0).all()
+
+
+# --------------------------------------------------------------------------- #
+# Fleet report writers — CSV + Markdown frozen artifacts
+# --------------------------------------------------------------------------- #
+
+
+def _fleet_with_n_episodes(n: int = 3) -> FleetSummary:
+    """Build an aggregate_fleet over n hand-built records."""
+    records = []
+    classifications = []
+    ids = []
+    for i in range(n):
+        rec = _empty_record(n_steps=10, M=3)
+        records.append(rec)
+        classifications.append("collision" if i == 0 else "no_collision")
+        ids.append(f"trip_{i}")
+    return aggregate_fleet(records, ids, classifications)
+
+
+def test_fleet_summary_to_csv_writes_header_and_one_row_per_episode(tmp_path):
+    fleet = _fleet_with_n_episodes(3)
+    out = fleet.to_csv(tmp_path / "fleet.csv")
+    assert out.exists()
+    lines = out.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 4   # header + 3 episodes
+    header = lines[0].split(",")
+    expected = [
+        "episode_id", "classification", "n_steps", "M",
+        "n_argmax_flips", "argmax_flip_rate",
+        "n_v2_state_flips", "n_near_vetoes",
+        "fraction_engaged", "deadband_fired_rate",
+        "mean_bcvf_total", "max_bcvf_total",
+        "excluded_ever_count",
+    ]
+    assert header == expected
+
+
+def test_fleet_summary_to_csv_round_trips_through_csv_reader(tmp_path):
+    """The CSV must parse cleanly through stdlib csv.DictReader — a
+    SOTIF audit script reading via pandas / Excel must not trip on
+    quoting or escaping."""
+    import csv as _csv
+    fleet = _fleet_with_n_episodes(3)
+    out = fleet.to_csv(tmp_path / "fleet.csv")
+    with open(out, "r", encoding="utf-8", newline="") as f:
+        rows = list(_csv.DictReader(f))
+    assert len(rows) == 3
+    classifications = sorted(r["classification"] for r in rows)
+    assert classifications == ["collision", "no_collision", "no_collision"]
+    # n_steps round-trips as a string; cast and check.
+    assert all(int(r["n_steps"]) == 10 for r in rows)
+
+
+def test_fleet_summary_to_csv_emits_blank_for_none_fraction_engaged(tmp_path):
+    """V2-disabled episodes have fraction_engaged=None — render as
+    empty string in CSV (not "None" or "nan"), so a downstream
+    parser sees a missing value, not a literal."""
+    fleet = _fleet_with_n_episodes(2)
+    out = fleet.to_csv(tmp_path / "fleet.csv")
+    body = out.read_text(encoding="utf-8").splitlines()[1:]
+    for line in body:
+        cols = line.split(",")
+        # fraction_engaged is column 8 (0-indexed).
+        assert cols[8] == "", f"expected empty fraction_engaged, got {cols[8]!r}"
+
+
+def test_fleet_summary_to_markdown_report_has_required_sections(tmp_path):
+    from datetime import datetime, timezone
+    fleet = _fleet_with_n_episodes(3)
+    out = fleet.to_markdown_report(
+        tmp_path / "fleet_report.md",
+        label="nightly_2026-05-04",
+        generated_at=datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+    )
+    md = out.read_text(encoding="utf-8")
+    for section in (
+        "# BCVF Fleet Summary",
+        "## Headline aggregates",
+        "## Classification breakdown",
+        "## Per-predictor exclusion incidence",
+        "## Near-veto roster",
+        "## V2 state-flip roster",
+        "## Per-episode index",
+        "## Methodology",
+    ):
+        assert section in md, f"missing section: {section}"
+    # Label and timestamp present in the header.
+    assert "nightly_2026-05-04" in md
+    assert "2026-05-04T12:00:00" in md
+
+
+def test_fleet_summary_markdown_renders_classification_table(tmp_path):
+    fleet = _fleet_with_n_episodes(3)
+    out = fleet.to_markdown_report(tmp_path / "fleet_report.md")
+    md = out.read_text(encoding="utf-8")
+    # 1 collision + 2 no_collision out of the 3 hand-built episodes.
+    assert "| `collision` | 1 |" in md
+    assert "| `no_collision` | 2 |" in md
+
+
+def test_fleet_summary_markdown_handles_empty_rosters(tmp_path):
+    """When no near-vetoes / V2 flips were observed, the writer emits
+    an explicit "No ... events observed." sentinel rather than an
+    empty section — auditors see a deliberate negative result, not
+    an apparent omission."""
+    fleet = _fleet_with_n_episodes(2)
+    out = fleet.to_markdown_report(tmp_path / "fleet_report.md")
+    md = out.read_text(encoding="utf-8")
+    assert "_No near-veto events observed._" in md
+    assert "_No V2 state-flip events observed._" in md
+
+
+def test_fleet_summary_markdown_render_is_deterministic():
+    from datetime import datetime, timezone
+    from symbolu_robotics.bcvf_autonomous.analysis import render_fleet_markdown
+    fleet = _fleet_with_n_episodes(3)
+    ts = datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc)
+    a = render_fleet_markdown(fleet, generated_at=ts)
+    b = render_fleet_markdown(fleet, generated_at=ts)
+    assert a == b
+
+
+def test_fleet_summary_to_csv_creates_parent_directories(tmp_path):
+    fleet = _fleet_with_n_episodes(2)
+    nested = tmp_path / "audits" / "2026-05" / "nightly"
+    out = fleet.to_csv(nested / "fleet.csv")
+    assert out.exists()
