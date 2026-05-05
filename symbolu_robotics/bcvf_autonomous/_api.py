@@ -130,6 +130,24 @@ PROVISIONAL_API: Tuple[str, ...] = (
     "predictors.lane_frame_to_se2",
     "predictors.se2_to_lane_frame",
     "predictors.unify_to_se2_bundle",
+    # Functional-safety state machine (post-v0.7 — the four-state
+    # behavioural-contract layer the runtime composes into; see
+    # SAFETY_STATE_MACHINE_DESIGN.md). Provisional because the
+    # state-graph + ASIL decomposition stay in PROVISIONAL_API
+    # until the three §9 ship-when-ready criteria land (three
+    # deployment partners exercising in production for one
+    # quarter, the characterization grid's state_transition_
+    # consistency cell family, and an external auditor review of
+    # the §5 ASIL table).
+    "safety_state.LEGAL_TRANSITIONS",
+    "safety_state.SafetyState",
+    "safety_state.SafetyStateMachine",
+    "safety_state.SafetyStateMachineConfig",
+    "safety_state.StateTransition",
+    "safety_state.StateTransitionLog",
+    "safety_state.StateTransitionLogEntry",
+    "safety_state.IllegalTransitionError",
+    "safety_state.SafetyStateMachineError",
 )
 
 

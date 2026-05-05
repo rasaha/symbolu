@@ -36,7 +36,13 @@ from symbolu_robotics.bcvf_autonomous._version import (
 # symbol must update these, which forces the reviewer to acknowledge
 # the contract change in the diff.
 EXPECTED_STABLE_COUNT = 38
-EXPECTED_PROVISIONAL_COUNT = 20
+# +9 post-v0.7 for the SafetyStateMachine surface (SafetyState,
+# SafetyStateMachine, SafetyStateMachineConfig, StateTransition,
+# StateTransitionLog, StateTransitionLogEntry, LEGAL_TRANSITIONS,
+# IllegalTransitionError, SafetyStateMachineError). Provisional
+# until the three §9 ship-when-ready criteria of
+# SAFETY_STATE_MACHINE_DESIGN.md land.
+EXPECTED_PROVISIONAL_COUNT = 29
 EXPECTED_VERSION = "0.4.0"
 EXPECTED_VERSION_INFO = (0, 4, 0)
 
