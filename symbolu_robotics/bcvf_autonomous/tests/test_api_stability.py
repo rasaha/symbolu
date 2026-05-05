@@ -73,7 +73,17 @@ EXPECTED_STABLE_COUNT = 38
 # build_calibration_set, load_calibration_set,
 # save_calibration_set). Provisional until the five §9
 # ship-when-ready criteria of CALIBRATION_DESIGN.md land.
-EXPECTED_PROVISIONAL_COUNT = 67
+# +10 sixth post-v0.7 wave for the sensor-attestation interface
+# (§9 row-#8 roadmap pick). 10 attestation.* symbols
+# (AttestationError, AttestationResult,
+# AttestationVerificationError, SensorAttestation,
+# SensorAttestationPolicy, SensorAttestationVerifier,
+# UnknownPredictorError, canonical_signing_payload,
+# compute_data_digest, sign_attestation). Closes the LAST
+# entry in _ROADMAP_TOKENS — the §9 ranking is fully
+# struck-through except for hardware-adjacent rows #5 (HD-map
+# predictor) and #9 (domain-specific predictors).
+EXPECTED_PROVISIONAL_COUNT = 77
 EXPECTED_VERSION = "0.4.0"
 EXPECTED_VERSION_INFO = (0, 4, 0)
 
