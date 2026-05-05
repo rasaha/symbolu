@@ -325,6 +325,29 @@ _LANE_ANCHOR = EvidenceArtifact(
                 "+ cumulative arc lengths; the metadata a lane-frame "
                 "predictor pairs with to round-trip through SE(2)",
 )
+_SAFETY_STATE_MACHINE = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.safety_state",
+    symbol="SafetyStateMachine",
+    description="Functional-safety state machine — four-state "
+                "behavioural contract (NORMAL / DEGRADED / FAULT / "
+                "FAILSAFE) with documented per-transition triggers, "
+                "ASIL decomposition (B for warnings + manual-resets, "
+                "D for safety-critical escalations), direct-jump "
+                "prohibition, and manual-reset audit trail. Composes "
+                "the per-tick BCVF kernel + arbitration runtime into "
+                "a system-level posture an ISO 26262 safety case can "
+                "argue against; see SAFETY_STATE_MACHINE_DESIGN.md",
+)
+_SAFETY_STATE_TRANSITIONS = EvidenceArtifact(
+    module_path="symbolu_robotics.bcvf_autonomous.safety_state",
+    symbol="LEGAL_TRANSITIONS",
+    description="Six-edge legal-transition table — the auditor-"
+                "readable §5 ASIL decomposition rendered as a typed "
+                "tuple of StateTransition rows; pinned by the test "
+                "suite so a future contributor cannot quietly add an "
+                "edge or change an ASIL classification without the PR "
+                "review noticing",
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -438,7 +461,10 @@ def iso_21448_clauses() -> List[Clause]:
                 "function (cases where it does not respond as required) "
                 "and document mitigations."
             ),
-            evidence=(_CONSUMER_V2, _V2_SWEEP, _ADVERSARIAL_FAMILIES),
+            evidence=(
+                _CONSUMER_V2, _V2_SWEEP, _ADVERSARIAL_FAMILIES,
+                _SAFETY_STATE_MACHINE, _SAFETY_STATE_TRANSITIONS,
+            ),
             notes=(
                 "Insufficiency #1 — Lemma 1 invariance (intentional): "
                 "the SECOND-order kernel does not fire on constant "
@@ -463,7 +489,24 @@ def iso_21448_clauses() -> List[Clause]:
                 "drift monitoring (UN ECE R155 §7.3.4). The "
                 "``adversarial_consistent_bias`` family + DESIGN.md §3.5 "
                 "make the boundary explicit so the safety-case narrative "
-                "doesn't overclaim."
+                "doesn't overclaim. **Insufficiency-handling layer** — "
+                "the per-tick V2 chatter mitigation composes into the "
+                "``SafetyStateMachine`` four-state behavioural contract "
+                "(NORMAL / DEGRADED / FAULT / FAILSAFE). The state "
+                "machine is the system-level supervisor a safety case "
+                "argues against: each transition is ASIL-decomposed "
+                "(see ``LEGAL_TRANSITIONS`` for the six-edge table), "
+                "direct jumps from NORMAL to FAULT / FAILSAFE are "
+                "prohibited (the machine raises "
+                "``IllegalTransitionError``), and the FAULT / FAILSAFE "
+                "states latch behind a manual-reset gate so a quiet "
+                "kernel cannot auto-resolve a confirmed-failure "
+                "posture. See ``SAFETY_STATE_MACHINE_DESIGN.md`` for "
+                "the full design — ship-when-ready criteria for "
+                "STABLE_API graduation are gated on three deployment "
+                "partners, the characterization grid's "
+                "``state_transition_consistency`` cell family, and an "
+                "external auditor review of the §5 ASIL table."
             ),
         ),
         Clause(
@@ -494,7 +537,17 @@ def iso_21448_clauses() -> List[Clause]:
                 "certification report as a frozen audit artifact "
                 "(headline gate, per-(family, magnitude) Wilson-CI "
                 "table, methodology block) — what an auditor reads "
-                "instead of a Python dataclass."
+                "instead of a Python dataclass. **Behavioural-contract "
+                "layer** — the per-cell threshold gates compose into "
+                "the ``SafetyStateMachine`` four-state contract: a "
+                "passing per-cell gate is a per-tick property, the "
+                "state machine is the system-level posture those "
+                "per-tick properties accumulate into. The grid's "
+                "``state_transition_consistency`` cell family "
+                "(provisional, ship-when-ready criterion §9.2 of "
+                "``SAFETY_STATE_MACHINE_DESIGN.md``) extends V&V to "
+                "each documented transition with must-fire + must-be-"
+                "quiet pinning at adjacent thresholds."
             ),
         ),
         Clause(
@@ -577,14 +630,26 @@ def iso_26262_part6_clauses() -> List[Clause]:
                 "decomposition, interfaces between modules, and "
                 "dependencies between modules."
             ),
-            evidence=(_BCVF_KERNEL, _RUNNER, _CONSUMER_V2),
+            evidence=(
+                _BCVF_KERNEL, _RUNNER, _CONSUMER_V2,
+                _SAFETY_STATE_MACHINE,
+            ),
             notes=(
                 "Modules: kernel (``core.py``), trust shaping "
                 "(``trust.py``), planner (``mppi_planner.py``), "
                 "diagnostics (``trust_diagnostics.py``), runner "
-                "(``runner.py``), analysis (``analysis/``). Interfaces "
+                "(``runner.py``), analysis (``analysis/``), "
+                "safety-state machine (``safety_state/``). Interfaces "
                 "are typed dataclasses (``BCVFConfig``, ``RunConfig``, "
-                "``ConsumerV2Config``); each module ships a DESIGN.md."
+                "``ConsumerV2Config``, ``SafetyStateMachineConfig``); "
+                "each module ships a DESIGN.md. The "
+                "``SafetyStateMachine`` is the system-level "
+                "behavioural-contract module the per-tick runtime "
+                "composes into — its public surface is "
+                "``observe(record) → SafetyState`` plus the manual-"
+                "reset gate ``reset_with_diagnostic_clear(operator, "
+                "reason)``; see ``SAFETY_STATE_MACHINE_DESIGN.md`` "
+                "for the four-state contract."
             ),
         ),
         Clause(
