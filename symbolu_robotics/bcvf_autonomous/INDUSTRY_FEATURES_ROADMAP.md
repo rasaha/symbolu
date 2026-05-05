@@ -280,3 +280,286 @@ item §2-§8 promotes.
 3. None of the §2-§8 names have leaked into `STABLE_API` /
    `PROVISIONAL_API` — roadmap items carry no integration
    commitment until a design-doc + implementation pair ships.
+
+## §13 Implementation prompt — Item #1 (functional-safety state machine)
+
+This appendix captures a self-contained prompt a fresh Claude
+Code session can use to implement §9.1's recommended next pick
+(the functional-safety state machine). The prompt is **embedded
+in this doc** so the maturation path stays auditable: a future
+reader can see exactly what implementation guidance the roadmap
+generated, and a future contributor adding a new top-ranked item
+can mirror the prompt structure.
+
+### §13.1 Prompt (paste verbatim into a fresh Claude Code session)
+
+```text
+I'm working on the BCVF autonomous module in the rasaha/symbolu
+repo. The active branch is claude/audit-bcvf-features-Iajos.
+Total tests in default suite right now: 652 passing. v0.7 brief
+AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md is the active doc.
+
+INDUSTRY_FEATURES_ROADMAP.md §9 ranks the next industry features
+by deal-unlock value. §9.1 names Item #1 — the functional-safety
+state machine — as the recommended next pick. This prompt
+implements that item.
+
+IMPLEMENTATION TASK
+
+Build a SafetyStateMachine module that composes the existing
+runtime layer (kernel + arbitration + diagnostics) into a named
+behavioural contract an ISO 26262 safety case can argue against.
+Four states:
+
+  NORMAL    — every predictor agrees, BCVF quiet, planner gets
+              full-resolution consensus.
+  DEGRADED  — one predictor flagged near-veto, BCVF firing
+              intermittently. Planner reduces speed envelope.
+  FAULT     — BCVF fires sustained, exclusion logic triggered.
+              Planner enters minimum-risk maneuver (pull over).
+  FAILSAFE  — multiple predictors excluded, kernel unable to
+              form consensus. Planner enters emergency-stop.
+
+ASIL DECOMPOSITION
+
+  NORMAL → DEGRADED        ASIL-B  (warning, not safety-critical)
+  DEGRADED → NORMAL        ASIL-B
+  DEGRADED → FAULT         ASIL-D  (safety-critical action)
+  FAULT → FAILSAFE         ASIL-D
+  FAULT → DEGRADED         ASIL-B  (manual-reset path)
+  FAILSAFE → FAULT         ASIL-B  (manual-reset path)
+
+Direct-jump transitions (NORMAL → FAULT, NORMAL → FAILSAFE) are
+DISALLOWED — the machine must walk through DEGRADED. The state
+machine itself enforces this; an attempted illegal transition
+raises SafetyStateMachineError.
+
+DESIGN DOC FIRST
+
+Following the pattern from HIERARCHICAL_BCVF_DESIGN.md and
+MULTI_MODAL_PREDICTORS_DESIGN.md, write the design doc BEFORE
+the implementation. The doc lives at
+  symbolu_robotics/bcvf_autonomous/SAFETY_STATE_MACHINE_DESIGN.md
+and covers:
+  §1 Why this exists (kernel = runtime layer; state machine =
+     behavioural contract; the architectural piece that turns
+     "we have a kernel" into "we have a safety component").
+  §2 Four states + state-transition diagram.
+  §3 Trigger conditions per transition — drawn from the existing
+     TrustShapedEpisodeRecord fields (per_step_is_excluded,
+     per_step_consec_suspect, per_step_bcvf_total) over a
+     configurable rolling window.
+  §4 Recovery conditions — sustained-NORMAL dwell, manual reset,
+     diagnostic clear.
+  §5 ASIL decomposition (table + reasoning per row).
+  §6 Direct-jump prohibition (NORMAL cannot jump to FAULT or
+     FAILSAFE; machine raises on attempt).
+  §7 Composition with existing surfaces:
+     * StreamingFleetMonitor's AlertRules become state-transition
+       triggers.
+     * SOTIF traceability matrix gains clause-26262-Part-3 (system
+       safety concept) wiring with the state machine as evidence.
+     * Characterization grid validates each state's must-be-quiet
+       vs must-fire behaviour (per-state cells).
+  §8 What this is NOT (not a planner replacement; not a generic
+     state-machine library; not a substitute for the deployment
+     partner's safety case).
+  §9 Ship-when-ready criteria for STABLE_API graduation:
+     1. Three deployment partners exercise the state machine in
+        production for one quarter without a state-graph change
+        request.
+     2. The characterization grid extends with a state_transition
+        consistency family asserting each transition fires under
+        the documented trigger condition + does NOT fire under
+        adjacent conditions.
+     3. ASIL decomposition is reviewed by a TÜV / external
+        auditor (out-of-sandbox manual gate; pinned in §9 as the
+        promotion checkpoint).
+  §10 API sketch (no implementation in the doc, just the type
+      signatures the implementation will satisfy).
+
+IMPLEMENTATION
+
+After the design doc, ship:
+
+  symbolu_robotics/bcvf_autonomous/safety_state/
+    DESIGN.md            — pointer to top-level
+                           SAFETY_STATE_MACHINE_DESIGN.md
+    __init__.py          — public exports
+    state.py             — SafetyState enum + transition table
+    machine.py           — SafetyStateMachine class with
+                           .observe() / .state / .transition_log
+    triggers.py          — TriggerCondition primitives that read
+                           TrustShapedEpisodeRecord
+    errors.py            — SafetyStateMachineError +
+                           IllegalTransitionError
+
+Public API surface (provisional):
+  SafetyState (enum: NORMAL, DEGRADED, FAULT, FAILSAFE)
+  SafetyStateMachine(config) — observe(record, classification=None)
+    → SafetyState
+  StateTransition (frozen dataclass: from_state, to_state, trigger,
+    asil)
+  TriggerCondition (Protocol — evaluates against a rolling window)
+  StateTransitionLog (every transition timestamped + cause-named)
+  SafetyStateMachineConfig (rolling window length, dwell times,
+    per-transition thresholds — all exposed for calibration)
+
+PINNING TESTS (target ~25-30, in
+tests/test_safety_state_machine.py)
+
+  * 4-state enum + transition table machine-checked against the
+    design doc's §2 table.
+  * Direct-jump prohibition: every (s_from, s_to) pair NOT in
+    the documented transition table raises IllegalTransitionError.
+  * NORMAL → DEGRADED fires when the trigger condition crosses
+    threshold; doesn't fire below.
+  * DEGRADED → FAULT requires exclusion + sustained BCVF activity;
+    doesn't fire on a single-tick spike.
+  * FAULT → FAILSAFE requires ≥ 2 excluded predictors.
+  * Recovery: sustained NORMAL for T_recovery seconds returns
+    DEGRADED → NORMAL.
+  * Manual reset: FAULT → DEGRADED and FAILSAFE → FAULT only via
+    explicit reset_with_diagnostic_clear() call.
+  * StateTransitionLog records every transition with timestamp +
+    triggering condition name.
+  * Composition with StreamingFleetMonitor: an AlertRule on
+    DEGRADED-rate fires correctly when the state machine spends
+    > X% of ticks in DEGRADED.
+  * Composition with SOTIF clause 8 (functional insufficiencies):
+    each ASIL-D transition is referenced as evidence in the
+    traceability matrix.
+  * Characterization grid: a new state_transition_consistency
+    family with the per-transition trigger / non-trigger cells.
+
+SAFETY-CASE INTEGRATION
+
+  * safety_case/traceability.py: clause 8 (functional
+    insufficiencies + mitigations) gains the state machine as
+    evidence for the insufficiency-handling layer. New evidence
+    artifact _SAFETY_STATE_MACHINE.
+  * SOTIF_TRACEABILITY.md regenerated (28 → 30 indexed artifacts).
+  * Clause 9 (V&V) notes acknowledge the state machine as the
+    behavioural-contract layer the per-cell threshold gates
+    compose into.
+
+API STABILITY
+
+All new symbols enter PROVISIONAL_API per the §9 ship-when-ready
+criteria. _api.py PROVISIONAL_API count goes 20 → ~26. The count
+lock in test_api_stability.py (EXPECTED_PROVISIONAL_COUNT) gets
+bumped explicitly so the PR review has to acknowledge it.
+
+INDUSTRY_FEATURES_ROADMAP.md UPDATE
+
+§9 row #1 (Functional-safety state machine) gets struck through
+with a pointer to SAFETY_STATE_MACHINE_DESIGN.md per the
+maturation path documented in §11. The non-promotion gate test
+in test_industry_features_roadmap_doc.py needs the
+SafetyStateMachine token REMOVED from _ROADMAP_TOKENS since it's
+now a provisional surface (alternatively, leave it and add a
+narrow exception — your call, but document the reasoning).
+
+BRIEF UPDATE (only if a published number changes)
+
+Per the v0.7 / 0.4.0 maturation discipline: the brief stays at
+v0.7 unless a published number moves. Test count goes 652 → ~680;
+§1 capability list gains the state-machine bullet; the
+architecture-summary table gets a new row; the footer narrative
+blurb names SAFETY_STATE_MACHINE_DESIGN.md as the load-bearing
+new artifact. No headline number (BCVF 0.000 false-attribution,
+p=0.0312, win rate 1.000, etc.) moves.
+
+CONSTRAINT
+
+CPU-only sandbox. No internet, no nuscenes-devkit, no ROS, no
+GPU. All work must be doable with what's already in the repo +
+NumPy + stdlib.
+
+WORKFLOW
+
+1. Audit the existing surfaces the state machine composes with —
+   re-read TrustShapedEpisodeRecord, StreamingFleetMonitor,
+   AlertRule, the SOTIF clause 8 evidence list. Confirm the API
+   surfaces I'm proposing actually compose cleanly; flag any
+   mismatch.
+2. Write SAFETY_STATE_MACHINE_DESIGN.md first. Pin the doc with
+   section-header tests before writing the implementation.
+3. Implement state.py / machine.py / triggers.py / errors.py.
+4. Add tests/test_safety_state_machine.py with the contracts
+   above.
+5. Wire the safety_case clause-8 evidence + regenerate snapshot.
+6. Update PROVISIONAL_API + bump count lock.
+7. Strike through INDUSTRY_FEATURES_ROADMAP.md §9 row #1.
+8. Run full bcvf_autonomous suite (skip slow + perf benchmarks
+   per existing convention); confirm 652 → ~680 passing.
+9. Update the brief.
+10. Commit each logical piece as a self-contained commit
+    (design doc; implementation + tests; safety-case integration;
+    API stability bump; roadmap strike-through; brief).
+11. Push to claude/audit-bcvf-features-Iajos.
+
+After implementation lands, do an INDEPENDENT critical audit pass
+on the new code (same discipline as the prior audit-fix commits
+in this session — find at least one real bug or coverage gap and
+pin it). Real safety-component code shipped without an audit pass
+is not real safety-component code.
+```
+
+### §13.2 Why the prompt lives in this doc
+
+Three reasons the prompt is captured in-tree rather than emailed
+or pasted into a chat:
+
+1. **Auditability.** A future reviewer asking *"how did the
+   safety state machine get scoped?"* finds the original prompt
+   in this file alongside the §4 gap analysis it operationalises.
+2. **Reuse.** When §9 row #2 (ROS 2 / DDS / SBOM) becomes the
+   next pick, the contributor copies the §13 prompt structure —
+   audit existing surfaces → design doc first → ship-when-ready
+   criteria → safety-case integration → API stability bump →
+   roadmap strike-through → brief → audit pass — and adapts the
+   content. The discipline is the artifact, not the specific
+   prompt text.
+3. **Drift detection.** The prompt names specific surfaces
+   (`TrustShapedEpisodeRecord`, `StreamingFleetMonitor`,
+   `AlertRule`, SOTIF clause 8). If a future refactor renames any
+   of those, the implementer's first-step audit catches the drift
+   before writing code against stale references.
+
+### §13.3 Prompt template for future top-ranked items
+
+When §9 row N is promoted to "next pick," its implementation
+prompt should mirror §13.1's structure:
+
+  * **Context** — branch + commit + test-passing count + brief
+    version. Self-contained so a fresh session has no implicit
+    state.
+  * **Implementation task** — what's being built and why this
+    item now (deal-unlock framing from §9).
+  * **Design doc first** — the maturation path from §11 says
+    design doc precedes implementation. The prompt names the
+    target file path + required §-headers.
+  * **Implementation** — module structure + public API surface
+    sketch (provisional names in `PROVISIONAL_API`).
+  * **Pinning tests** — the regression locks the implementation
+    must ship with.
+  * **Safety-case integration** — which SOTIF / ISO 26262 clause
+    gains evidence; SOTIF_TRACEABILITY.md snapshot regeneration.
+  * **API stability** — PROVISIONAL_API entries + count-lock bump.
+  * **Roadmap update** — strike through the §9 row + maintain
+    the non-promotion gate test (or remove the token from
+    `_ROADMAP_TOKENS` per §13.1's note).
+  * **Brief update** — only if a published number moves.
+  * **Constraint** — sandbox limits.
+  * **Workflow** — numbered steps the implementer follows.
+  * **Audit pass** — the explicit discipline of finding at least
+    one real bug or coverage gap on the new code, even when CI
+    passes.
+
+Future contributors adding a new top-ranked item to §9 should
+add a sibling §13.N "Implementation prompt — Item #N" appendix
+following the same outline. The non-promotion gate in §12 +
+`test_industry_features_roadmap_doc.py` keeps the discipline
+honest: a token added to the prompt without an actual design-doc
++ implementation pair fails the gate.
