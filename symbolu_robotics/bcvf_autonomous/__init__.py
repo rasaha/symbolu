@@ -223,6 +223,15 @@ from symbolu_robotics.bcvf_autonomous.replay import (
     replay_bundle,
     save_replay_bundle,
 )
+from symbolu_robotics.bcvf_autonomous.realtime import (
+    AllocationTrace,
+    BudgetSummary,
+    BudgetViolationError,
+    LatencyMonitor,
+    OverBudgetTick,
+    RealTimeBudget,
+    RealTimeBudgetError,
+)
 
 # Public-API stability registry — see ``API_STABILITY.md``.
 from symbolu_robotics.bcvf_autonomous._api import (
@@ -420,4 +429,12 @@ __all__ = [
     "load_replay_bundle",
     "replay_bundle",
     "save_replay_bundle",
+    # real-time / no-allocation hot path + p999 budget
+    "AllocationTrace",
+    "BudgetSummary",
+    "BudgetViolationError",
+    "LatencyMonitor",
+    "OverBudgetTick",
+    "RealTimeBudget",
+    "RealTimeBudgetError",
 ]
