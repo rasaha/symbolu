@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
@@ -29,6 +30,51 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 
 from .errors import AttestationError
+
+
+# Audit-fix Finding 4: strict-hex validation. ``int(s, 16)``
+# accepts ``+``, ``-``, ``_`` (PEP 515 underscores) and other
+# non-canonical forms; the SHA-256 / HMAC-SHA256 digests are
+# specifically the 64-character lowercase-hex space. We reject
+# anything outside that set so a malformed encoding fails loud
+# at construction rather than as a silent mismatch later.
+_HEX_CHARS: frozenset = frozenset("0123456789abcdefABCDEF")
+
+
+# Audit-fix Finding 9: minimum HMAC-SHA256 key length. A
+# deployment partner using ``key=b"hunter12"`` (8 bytes) gets
+# only ~2^64 brute-force resistance — not the 2^256 they think
+# they have. UN ECE R155 §7.3.4 reviewers flag short keys.
+# 32 bytes matches the SHA-256 output length and is the
+# conventional HMAC-SHA256 key floor.
+_MIN_KEY_BYTES: int = 32
+
+
+def _is_strict_hex(s: str) -> bool:
+    """``True`` iff every character of ``s`` is in [0-9a-fA-F].
+    Stricter than ``int(s, 16)`` (which accepts +, -, _)."""
+    return bool(s) and all(c in _HEX_CHARS for c in s)
+
+
+def _reject_control_chars(field_name: str, value: str) -> None:
+    """Reject Unicode control + format characters in a field
+    value. Audit-fix Finding 6: NUL / newline / zero-width-
+    space in ``predictor_name`` / ``firmware_version`` /
+    ``nonce`` aren't forgery vectors (the HMAC binds the bytes)
+    but they cause downstream confusion (log truncation at
+    NUL, visually-identical-but-byte-different firmware names
+    appearing to fail an allowlist for unclear reasons).
+    Reject loud rather than allow ambiguous-looking strings.
+    """
+    for ch in value:
+        cat = unicodedata.category(ch)
+        if cat.startswith("C"):
+            raise AttestationError(
+                f"{field_name} contains control / format character "
+                f"{ch!r} (U+{ord(ch):04X}, category {cat!r}); "
+                "reject loud to avoid downstream log-truncation + "
+                "visually-identical-but-byte-different bypass surfaces"
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -105,6 +151,17 @@ def sign_attestation(
         )
     if not key:
         raise AttestationError("key must be non-empty")
+    # Audit-fix Finding 9: enforce minimum key length. An
+    # 8-byte key gives ~2^64 brute-force resistance, not the
+    # 2^256 a deployment partner using HMAC-SHA256 thinks
+    # they have. UN ECE R155 §7.3.4 reviewers flag short keys.
+    if len(key) < _MIN_KEY_BYTES:
+        raise AttestationError(
+            f"key must be at least {_MIN_KEY_BYTES} bytes for "
+            f"HMAC-SHA256 discipline; got {len(key)} bytes. A short "
+            "key reduces the effective security of every signature "
+            "below the 2^256 the SHA-256 output suggests."
+        )
     payload = canonical_signing_payload(
         predictor_name=predictor_name,
         firmware_version=firmware_version,
@@ -141,10 +198,12 @@ class SensorAttestation:
             raise AttestationError(
                 "predictor_name must be a non-empty, non-whitespace string"
             )
+        _reject_control_chars("predictor_name", self.predictor_name)
         if not self.firmware_version or not self.firmware_version.strip():
             raise AttestationError(
                 "firmware_version must be a non-empty, non-whitespace string"
             )
+        _reject_control_chars("firmware_version", self.firmware_version)
         if not self.signature or not self.signature.strip():
             raise AttestationError(
                 "signature must be a non-empty, non-whitespace string"
@@ -155,38 +214,55 @@ class SensorAttestation:
                 f"signature must be 64 hex characters (HMAC-SHA256); "
                 f"got {len(self.signature)} characters"
             )
-        try:
-            int(self.signature, 16)
-        except ValueError as exc:
+        # Audit-fix Finding 4: strict hex check, not int(s, 16).
+        # Rejects +, -, _, leading whitespace, and other non-
+        # canonical forms ``int()`` would accept.
+        if not _is_strict_hex(self.signature):
             raise AttestationError(
-                f"signature must be valid hex: {exc}"
-            ) from exc
+                f"signature must be 64 lowercase / uppercase hex "
+                f"characters [0-9a-fA-F]; got {self.signature!r}"
+            )
         if not self.nonce or not self.nonce.strip():
             raise AttestationError(
                 "nonce must be a non-empty, non-whitespace string"
             )
+        _reject_control_chars("nonce", self.nonce)
         if not self.issued_at or not self.issued_at.strip():
             raise AttestationError(
                 "issued_at must be a non-empty, non-whitespace ISO 8601 string"
             )
         try:
-            datetime.fromisoformat(self.issued_at)
+            parsed = datetime.fromisoformat(self.issued_at)
         except ValueError as exc:
             raise AttestationError(
                 f"issued_at {self.issued_at!r} is not a valid ISO 8601 "
                 f"timestamp: {exc}"
             ) from exc
+        # Audit-fix Finding 2: reject naive datetimes. Without
+        # an explicit timezone, ``.timestamp()`` interprets the
+        # value as host-local time — a verifier on UTC+05 sees
+        # a UTC-stamped attestation as 5h skewed, breaking
+        # freshness in a TZ-dependent way that fails-to-closed
+        # incorrectly. Force tz-aware ISO 8601 explicitly.
+        if parsed.tzinfo is None or parsed.tzinfo.utcoffset(parsed) is None:
+            raise AttestationError(
+                f"issued_at {self.issued_at!r} must include a timezone "
+                "offset (e.g. '+00:00' or 'Z'). Naive datetimes are "
+                "interpreted as host-local time and introduce "
+                "TZ-dependent freshness skew that breaks the §4 "
+                "freshness check on hosts whose TZ doesn't match the "
+                "signer's."
+            )
         if not self.data_digest or len(self.data_digest) != 64:
             raise AttestationError(
                 f"data_digest must be 64 hex characters (SHA-256); "
                 f"got {len(self.data_digest)} characters"
             )
-        try:
-            int(self.data_digest, 16)
-        except ValueError as exc:
+        if not _is_strict_hex(self.data_digest):
             raise AttestationError(
-                f"data_digest must be valid hex: {exc}"
-            ) from exc
+                f"data_digest must be 64 lowercase / uppercase hex "
+                f"characters [0-9a-fA-F]; got {self.data_digest!r}"
+            )
         if not isinstance(self.metadata, dict):
             raise AttestationError(
                 f"metadata must be a dict; got "
@@ -276,6 +352,24 @@ class SensorAttestationPolicy:
             raise AttestationError(
                 f"replay_window_seconds must be positive; got "
                 f"{self.replay_window_seconds}"
+            )
+        # Audit-fix Finding 1: enforce replay_window >=
+        # freshness_window. Otherwise a captured attestation
+        # can be replayed in the gap between cache eviction
+        # (at replay_window_seconds past first-seen) and
+        # freshness expiry (at freshness_window_seconds past
+        # issued_at) — the §4 replay check is the only thing
+        # protecting the consensus from captured-and-replayed
+        # attestations, and a misconfiguration silently
+        # disables it.
+        if self.replay_window_seconds < self.freshness_window_seconds:
+            raise AttestationError(
+                f"replay_window_seconds ({self.replay_window_seconds}) "
+                f"must be ≥ freshness_window_seconds "
+                f"({self.freshness_window_seconds}); otherwise a "
+                "captured attestation is replayable in the gap "
+                "between cache eviction and freshness expiry — see "
+                "SENSOR_ATTESTATION_DESIGN.md §3 for the invariant"
             )
 
     def to_dict(self) -> Dict[str, Any]:

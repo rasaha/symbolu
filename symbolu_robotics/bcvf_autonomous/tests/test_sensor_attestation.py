@@ -513,10 +513,13 @@ def test_replay_cache_evicts_old_entries():
     def fake_clock():
         return clock_t[0]
 
-    # 60-second replay window.
+    # 60-second replay window. Audit-fix Finding 1 requires
+    # replay_window_seconds >= freshness_window_seconds, so
+    # tighten freshness too.
     policy = SensorAttestationPolicy(
         predictor_name="M1",
         accepted_firmware_versions=(),
+        freshness_window_seconds=60.0,
         replay_window_seconds=60.0,
         key_id="test_key",
     )
@@ -735,12 +738,281 @@ def test_attestation_verification_error_is_attestation_error_subclass():
 def test_verifier_uses_constant_time_compare():
     """The verifier MUST use ``hmac.compare_digest`` (constant-
     time) rather than ``==`` (variable-time) for the signature
-    check — timing-attack discipline. This test inspects the
-    verifier source for the helper invocation."""
-    from symbolu_robotics.bcvf_autonomous.attestation import verifier
-    import inspect
-    source = inspect.getsource(verifier)
-    assert "hmac.compare_digest" in source, (
-        "verifier must use hmac.compare_digest for constant-time "
-        "signature comparison; using `==` is a timing-attack vector"
+    check — timing-attack discipline. Audit-fix Finding 7:
+    the previous test only inspected source for the substring
+    "hmac.compare_digest", which a refactor moving the call
+    into a helper module + still importing both ``hmac`` and
+    ``hmac.compare_digest`` could silently bypass. This
+    behaviour-based pin patches ``hmac.compare_digest`` and
+    asserts it was actually invoked during verify."""
+    import hmac as hmac_mod
+    from unittest import mock
+    verifier = _make_verifier()
+    att, digest = _make_attestation()
+    real_compare = hmac_mod.compare_digest
+    with mock.patch.object(
+        hmac_mod, "compare_digest", side_effect=real_compare
+    ) as patched:
+        verifier.verify(att, expected_data_digest=digest)
+        assert patched.called, (
+            "verifier must call hmac.compare_digest at runtime; "
+            "using `==` for signature comparison is a timing-attack "
+            "vector"
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Audit-fix regression pins (post-v0.7.x critical-audit pass on §9-row-#8)
+# --------------------------------------------------------------------------- #
+
+
+def test_audit_fix_replay_window_must_be_ge_freshness_window():
+    """Audit Finding 1 (HIGH): replay_window_seconds <
+    freshness_window_seconds opens a replay window — a
+    captured attestation is replayable in the gap between
+    cache eviction (replay-window past first-seen) and
+    freshness expiry (freshness-window past issued_at). The
+    §4 replay check is the only thing protecting consensus
+    from captured-and-replayed attestations; misconfiguration
+    silently disabled it."""
+    with pytest.raises(AttestationError, match="freshness_window"):
+        SensorAttestationPolicy(
+            predictor_name="M1",
+            freshness_window_seconds=300.0,
+            replay_window_seconds=60.0,  # < freshness — forbidden
+        )
+
+
+def test_audit_fix_naive_iso_timestamp_rejected():
+    """Audit Finding 2 (HIGH): naive ISO 8601 timestamps were
+    accepted but ``.timestamp()`` interprets them as host-
+    local time — a verifier on UTC+05 sees a UTC-stamped
+    attestation as 5h skewed, breaking freshness in a TZ-
+    dependent way. Reject naive at construction; require
+    timezone-aware ISO 8601."""
+    with pytest.raises(AttestationError, match="timezone offset"):
+        SensorAttestation(
+            predictor_name="M1",
+            firmware_version="v1.2",
+            signature="0" * 64,
+            nonce="n",
+            issued_at="2026-05-05T12:00:00",  # naive — no offset
+            data_digest="0" * 64,
+        )
+
+
+def test_audit_fix_aware_iso_timestamp_accepted():
+    """Audit Finding 2 (companion): explicit timezone offset
+    is accepted in multiple ISO 8601 formats."""
+    for tz_suffix in ("+00:00", "-05:00", "+05:00"):
+        SensorAttestation(
+            predictor_name="M1",
+            firmware_version="v1.2",
+            signature="0" * 64,
+            nonce="n",
+            issued_at=f"2026-05-05T12:00:00{tz_suffix}",
+            data_digest="0" * 64,
+        )
+
+
+def test_audit_fix_disabled_policy_records_nonce_in_replay_cache():
+    """Audit Finding 3 (HIGH): when policy.enabled=False the
+    verifier short-circuits to passed=True. Previously the
+    nonce was NOT recorded in the cache, so an attestation
+    captured during the disabled-rollout window could be
+    replayed once enabled=True flipped on. Now the cache is
+    updated even on disabled-policy passes."""
+    clock_t = [1000.0]
+    def fake_clock():
+        return clock_t[0]
+    issued_at = datetime.fromtimestamp(
+        1000.0, tz=timezone.utc
+    ).isoformat()
+    policy_disabled = SensorAttestationPolicy(
+        predictor_name="M1",
+        accepted_firmware_versions=(),
+        enabled=False,
+        key_id="test_key",
     )
+    verifier_disabled = _make_verifier(
+        policies={"M1": policy_disabled}, clock=fake_clock,
+    )
+    att, digest = _make_attestation(issued_at=issued_at)
+    # Pass under disabled policy.
+    r1 = verifier_disabled.verify(att, expected_data_digest=digest)
+    assert r1.passed is True
+    assert r1.policy_enabled is False
+    # The nonce must now be in the replay cache.
+    assert verifier_disabled.n_replay_cache_entries == 1
+
+
+def test_audit_fix_strict_hex_signature_rejected():
+    """Audit Finding 4 (MEDIUM): ``int(s, 16)`` accepts ``+``,
+    ``-``, ``_`` (PEP 515 underscores), leading whitespace —
+    none of which are canonical hex. The §2 contract says
+    "64 hex characters"; enforce that strictly."""
+    # Leading +
+    with pytest.raises(AttestationError, match="hex"):
+        SensorAttestation(
+            predictor_name="M1",
+            firmware_version="v1.2",
+            signature="+" + "0" * 63,
+            nonce="n",
+            issued_at="2026-05-05T12:00:00+00:00",
+            data_digest="0" * 64,
+        )
+    # PEP 515 underscore digit-separator
+    with pytest.raises(AttestationError, match="hex"):
+        SensorAttestation(
+            predictor_name="M1",
+            firmware_version="v1.2",
+            signature="0" * 32 + "_" + "0" * 31,
+            nonce="n",
+            issued_at="2026-05-05T12:00:00+00:00",
+            data_digest="0" * 64,
+        )
+
+
+def test_audit_fix_strict_hex_data_digest_rejected():
+    with pytest.raises(AttestationError, match="hex"):
+        SensorAttestation(
+            predictor_name="M1",
+            firmware_version="v1.2",
+            signature="0" * 64,
+            nonce="n",
+            issued_at="2026-05-05T12:00:00+00:00",
+            data_digest="0" * 32 + "_" + "0" * 31,
+        )
+
+
+def test_audit_fix_verified_at_uses_injected_clock():
+    """Audit Finding 5 (MEDIUM): verified_at used wall-clock
+    time, diverging from the freshness-math clock under tests
+    that injected a fake clock. Now the same clock value
+    drives freshness, replay, and verified_at — single
+    time-of-check."""
+    clock_t = [2000.0]
+    def fake_clock():
+        return clock_t[0]
+    verifier = _make_verifier(clock=fake_clock)
+    issued_at = datetime.fromtimestamp(
+        2000.0, tz=timezone.utc
+    ).isoformat()
+    att, digest = _make_attestation(issued_at=issued_at)
+    result = verifier.verify(att, expected_data_digest=digest)
+    # verified_at should round-trip back to the fake clock's
+    # timestamp.
+    parsed = datetime.fromisoformat(result.verified_at)
+    assert parsed.timestamp() == 2000.0
+
+
+def test_audit_fix_control_chars_rejected_in_predictor_name():
+    """Audit Finding 6: NUL byte in predictor_name causes
+    log truncation in C-string-backed log shippers. Reject
+    loud at construction."""
+    with pytest.raises(AttestationError, match="control"):
+        SensorAttestation(
+            predictor_name="M1\x00malicious",
+            firmware_version="v1.2",
+            signature="0" * 64,
+            nonce="n",
+            issued_at="2026-05-05T12:00:00+00:00",
+            data_digest="0" * 64,
+        )
+
+
+def test_audit_fix_zero_width_space_rejected_in_firmware_version():
+    """Audit Finding 6 (companion): zero-width space (U+200B)
+    in firmware_version is bytewise different from the
+    visually-identical version a deployment partner thinks
+    they put on the allowlist — would cause confusing
+    `firmware_version_not_in_allowlist` failures. Reject."""
+    with pytest.raises(AttestationError, match="control"):
+        SensorAttestation(
+            predictor_name="M1",
+            firmware_version="v1.2​",
+            signature="0" * 64,
+            nonce="n",
+            issued_at="2026-05-05T12:00:00+00:00",
+            data_digest="0" * 64,
+        )
+
+
+def test_audit_fix_short_key_rejected_by_signer():
+    """Audit Finding 9: an 8-byte HMAC-SHA256 key gives
+    ~2^64 brute-force resistance, not the 2^256 a deployment
+    partner thinks they have. Reject at sign_attestation
+    (sender side)."""
+    with pytest.raises(AttestationError, match="32 bytes"):
+        sign_attestation(
+            predictor_name="M1",
+            firmware_version="v1.2",
+            nonce="n",
+            issued_at="2026-05-05T12:00:00+00:00",
+            data_digest="0" * 64,
+            key=b"hunter12",  # 8 bytes — too short
+        )
+
+
+def test_audit_fix_short_key_rejected_by_verifier():
+    """Audit Finding 9 (companion): defence-in-depth. A
+    misconfigured key_resolver returning a short key is
+    rejected by the verifier even if the sender-side check
+    was bypassed (e.g., a custom subclass)."""
+    def short_key_resolver(key_id: str) -> bytes:
+        return b"hunter12"  # 8 bytes
+    policy = SensorAttestationPolicy(
+        predictor_name="M1",
+        accepted_firmware_versions=(),
+        key_id="weak_key",
+    )
+    verifier = SensorAttestationVerifier(
+        policies={"M1": policy},
+        key_resolver=short_key_resolver,
+    )
+    att, digest = _make_attestation()
+    with pytest.raises(AttestationError, match="32 bytes"):
+        verifier.verify(att, expected_data_digest=digest)
+
+
+def test_audit_fix_replay_cache_survives_clock_rewind():
+    """Audit Finding 7 (coverage): a clock rewind (NTP step
+    back) leaves cache entries timestamped from the future
+    that cannot evict until the clock catches up. Behaviour
+    is fail-safe (the entries STAY in the cache → replay
+    still detected) but not previously pinned."""
+    clock_t = [2000.0]
+    def fake_clock():
+        return clock_t[0]
+    verifier = _make_verifier(clock=fake_clock)
+    issued_at = datetime.fromtimestamp(
+        2000.0, tz=timezone.utc
+    ).isoformat()
+    att, digest = _make_attestation(issued_at=issued_at)
+    r1 = verifier.verify(att, expected_data_digest=digest)
+    assert r1.passed is True
+    # Rewind the clock by 500s.
+    clock_t[0] = 1500.0
+    # Same nonce — must still be rejected as replay (cache
+    # entry timestamped 2000 doesn't satisfy the eviction
+    # predicate cache_value < now - replay_window = 1500-600
+    # = 900). The fail-safe direction is correct: extra
+    # protection during a clock rewind, not less.
+    # We need a fresh issued_at for the freshness check to
+    # pass at the new clock.
+    new_issued = datetime.fromtimestamp(
+        1500.0, tz=timezone.utc
+    ).isoformat()
+    att_replayed = SensorAttestation(
+        predictor_name="M1",
+        firmware_version="v1.2",
+        signature=att.signature,
+        nonce=att.nonce,  # SAME nonce
+        issued_at=new_issued,
+        data_digest=att.data_digest,
+    )
+    # The signature won't match the new issued_at, but the
+    # replay check fires before signature — order matters.
+    r2 = verifier.verify(att_replayed, expected_data_digest=digest)
+    assert r2.passed is False
+    assert r2.failure_reason == "nonce_replayed"

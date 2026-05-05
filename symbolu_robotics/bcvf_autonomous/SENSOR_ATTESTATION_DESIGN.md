@@ -60,7 +60,7 @@ Three load-bearing fields:
 | `firmware_version` | str | The sensor firmware version that produced the data. Verified against a per-policy allowlist. |
 | `signature` | str | HMAC-SHA256 hex digest over the canonical payload (predictor_name + firmware_version + nonce + timestamp + data_digest). The integrator's trusted key (provisioned at manufacture) verifies this. |
 | `nonce` | str | Per-message nonce. Replay-protection — the verifier rejects nonces it has already seen within the configurable replay window. |
-| `issued_at` | str (ISO 8601) | When the attestation was minted. Verified against a configurable freshness window. |
+| `issued_at` | str (ISO 8601, **timezone-aware**) | When the attestation was minted. Verified against a configurable freshness window. Must include an explicit timezone offset (e.g. `'+00:00'` or `'Z'`) — naive datetimes are rejected at construction because `.timestamp()` interprets them as host-local time, which would shift freshness by hours on a verifier whose host TZ doesn't match the signer's. |
 | `data_digest` | str | SHA-256 hex digest over the predictor's actual trajectory payload (the `(K, H, 3)` tensor flattened canonically). Binds the attestation to the data — an attacker can't swap the trajectory for a different one with the same attestation. |
 | `metadata` | dict | Free-form caller annotations (sensor serial, lot number, region). Not interpreted by the verifier. |
 
@@ -74,6 +74,14 @@ asymmetric (X.509 + ECDSA) signatures, they ship a custom
 verifier subclass; the framework's HMAC-SHA256 verifier is
 the reference implementation.
 
+**Minimum key length.** Both `sign_attestation` (sender side)
+and the verifier's `key_resolver` return-value check enforce
+a 32-byte minimum. A shorter key reduces the effective
+security below the 2^256 the SHA-256 output suggests; UN ECE
+R155 §7.3.4 reviewers flag short keys. The 32-byte floor
+matches the SHA-256 output length and is the conventional
+HMAC-SHA256 key size.
+
 ## §3 The verification policy
 
 A `SensorAttestationPolicy` is a per-predictor configuration
@@ -86,7 +94,7 @@ Documented as a sibling of `per_predictor_failure_thresholds`
 | `predictor_name` | str | Must match the attestation's `predictor_name`. |
 | `accepted_firmware_versions` | tuple[str, ...] | Allowlist. Empty tuple = accept any version (test mode). Production policies pin specific versions. |
 | `freshness_window_seconds` | float | An attestation older than this is rejected. Default 300s (5 minutes); AUTOSAR partners may tighten to 1s. |
-| `replay_window_seconds` | float | Nonces seen within this window cannot be reused. Default 600s. |
+| `replay_window_seconds` | float | Nonces seen within this window cannot be reused. Default 600s. **Invariant**: must be ≥ `freshness_window_seconds` — otherwise a captured attestation can be replayed in the gap between cache eviction and freshness expiry. Validator enforces. |
 | `key_id` | str | Identifier for the verifying key. The verifier looks up the actual key bytes via a caller-supplied `key_resolver` callable (the framework never holds key material). |
 | `enabled` | bool | Default True. Setting False short-circuits to "always pass" — for test environments / staged rollouts. The verification result is still recorded so an audit can prove the policy was off. |
 
@@ -100,7 +108,8 @@ never enters this module.
 ## §4 The verification gate
 
 `SensorAttestationVerifier.verify(attestation, *, expected_data_digest) → AttestationResult`
-runs five checks in this order:
+runs seven checks in this order (the §6 disabled-policy
+short-circuit being the eighth gate):
 
 1. **Policy lookup.** `attestation.predictor_name` resolves
    to a known policy. Unknown predictor → `UnknownPredictorError`.

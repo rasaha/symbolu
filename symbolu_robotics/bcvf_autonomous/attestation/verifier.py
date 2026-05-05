@@ -36,8 +36,21 @@ from .interface import (
 )
 
 
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+# Audit-fix Finding 9 (companion): the verifier enforces the
+# same minimum key length as the sender-side helper. A
+# deployment partner whose key_resolver returns a short key
+# fails loud rather than silently accepting weak signatures.
+_MIN_KEY_BYTES: int = 32
+
+
+def _iso_from_clock(clock_value: float) -> str:
+    """Render a clock value (unix-time float) as a UTC-aware
+    ISO 8601 string. Audit-fix Finding 5: this replaces the
+    previous ``_utc_now_iso`` that used ``datetime.now(timezone.utc)``
+    directly — under tests with a fake clock, the wall-clock
+    ``verified_at`` diverged from the freshness-math clock,
+    making audit logs hard to reconcile."""
+    return datetime.fromtimestamp(clock_value, tz=timezone.utc).isoformat()
 
 
 class SensorAttestationVerifier:
@@ -146,7 +159,12 @@ class SensorAttestationVerifier:
                 f"expected_data_digest must be a str; got "
                 f"{type(expected_data_digest).__name__}"
             )
-        verified_at = _utc_now_iso()
+        # Audit-fix Finding 5: single time-of-check across
+        # freshness, replay, and verified_at. ``self._clock()``
+        # is sampled once; every downstream check + the audit-
+        # log timestamp use the same value.
+        now = self._clock()
+        verified_at = _iso_from_clock(now)
         # Check 1: policy lookup. Unknown predictor surfaces as
         # an exception (configuration bug, not a security
         # incident).
@@ -157,8 +175,20 @@ class SensorAttestationVerifier:
                 "verifier was constructed without this predictor in its "
                 "policy map"
             )
-        # Check 2: policy-disabled short-circuit.
+        # Check 2: policy-disabled short-circuit. Audit-fix
+        # Finding 3: even on a disabled-policy pass, record
+        # the nonce in the replay cache so a flip from
+        # enabled=False to enabled=True later cannot replay
+        # an attestation observed during the disabled window.
+        # Otherwise an attacker who captures an attestation
+        # during a staged-rollout disabled phase replays it
+        # the moment the policy flips on.
         if not policy.enabled:
+            cache = self._replay_cache[attestation.predictor_name]
+            cutoff = now - policy.replay_window_seconds
+            while cache and next(iter(cache.values())) < cutoff:
+                cache.popitem(last=False)
+            cache[attestation.nonce] = now
             return AttestationResult(
                 predictor_name=attestation.predictor_name,
                 passed=True,
@@ -179,7 +209,9 @@ class SensorAttestationVerifier:
                 policy_enabled=True,
                 verified_at=verified_at,
             )
-        # Check 4: freshness.
+        # Check 4: freshness. ``now`` was sampled at the top
+        # of verify() (audit-fix Finding 5) — same clock as
+        # ``verified_at`` and the replay cache.
         try:
             issued_at_ts = datetime.fromisoformat(
                 attestation.issued_at
@@ -192,7 +224,6 @@ class SensorAttestationVerifier:
                 policy_enabled=True,
                 verified_at=verified_at,
             )
-        now = self._clock()
         age_s = now - issued_at_ts
         if age_s > policy.freshness_window_seconds:
             return AttestationResult(
@@ -254,6 +285,19 @@ class SensorAttestationVerifier:
             raise AttestationError(
                 f"key_resolver returned empty key for key_id "
                 f"{policy.key_id!r}"
+            )
+        # Audit-fix Finding 9: minimum-length check on the
+        # verifier side too (defence-in-depth: the sender's
+        # ``sign_attestation`` enforces the same floor; this
+        # catches a misconfigured key_resolver that returns a
+        # short key).
+        if len(key) < _MIN_KEY_BYTES:
+            raise AttestationError(
+                f"key_resolver returned key of length {len(key)} "
+                f"for key_id {policy.key_id!r}; HMAC-SHA256 requires "
+                f"at least {_MIN_KEY_BYTES} bytes — a short key "
+                "reduces the effective security below the 2^256 the "
+                "SHA-256 output suggests"
             )
         payload = canonical_signing_payload(
             predictor_name=attestation.predictor_name,
