@@ -715,6 +715,36 @@ step lists what it does and does not validate.
 
 ### §13.1 #2 — vLLM 0.4 pin (code-only)
 
+**Update (May 2026 GPU validation):** the patch-install gate
+has been verified end-to-end on a RunPod A100 against vLLM
+0.4.0 + TinyLlama (commit `d3b3ecf`). Two findings:
+
+* **The CTM+ patch genuinely installs.**
+  `patch_vllm_engine` swaps vLLM's default `LRUEvictor` for
+  `CTMEvictor` cleanly. Verified by a two-step allocator probe
+  documented in `MODE_B_VLLM04_RUNBOOK.md` §1.2. This is the
+  first time CTM+ has been verified to actually wire into a
+  real serving stack — closes the "the patch was never tested
+  on real vLLM" claim risk at the install level.
+* **The patch's install is conditional on
+  `enable_prefix_caching=True`.** vLLM ≤ 0.6.x's default
+  `UncachedBlockAllocator` has no `evictor` attribute; the
+  patch only finds its target on the `CachedBlockAllocator`
+  path. The runner now defaults the flag for both `lru` and
+  `ctm_plus` cells; `MODE_B_VLLM04_RUNBOOK.md` §1.1 documents
+  the implications. Honest scope: with prefix caching, the
+  evictor decides which *cached-but-unreferenced* blocks to
+  release — a different operational question than the
+  simulator's *under-pressure swap*. Still real-attention
+  evidence; just on a different decision than Mode A models.
+
+What the patch-install probe does **not** do:
+
+* Run any workload — the "after: CTMEvictor" finding is install-
+  only, not policy-effect.
+* Validate any modern vLLM (still 0.5+ blocked).
+* Substitute for end-to-end CTM+ vs LRU numbers on a real model.
+
 * `Bench/scripts/run_mode_b_vllm04.sh` — sibling of
   `run_mode_b.sh`. Calls `ctm_bench.scripts.vllm_version_check`
   during pre-flight; aborts with actionable advice if vLLM is

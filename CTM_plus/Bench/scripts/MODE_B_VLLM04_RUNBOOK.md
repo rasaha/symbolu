@@ -1,15 +1,18 @@
 # Mode B on vLLM 0.4 — Validation Roadmap #2
 
 **Status:** code + runbook complete (this session). Patch
-compatibility verified on a RunPod A100 against vLLM 0.4.0 —
-the CTM+ evictor only installs when `enable_prefix_caching=True`
-(see §1.1 below). The runner now passes that flag by default
-(commit landing this fix; 147 tests pass including a regression
-test that pins the flag for both policies).
-**Execution:** the GPU smoke produced a valid CachedBlockAllocator
-+ LRUEvictor target on vLLM 0.4.0; full sweep deferred until a
-model that fits the canonical workloads (Mistral-v0.1 with
-rope_scaling fix, or a custom workload spec at smaller context).
+compatibility **verified end-to-end on a RunPod A100** against
+vLLM 0.4.0 (commit `d3b3ecf`): `patch_vllm_engine` swaps the
+default `LRUEvictor` for `CTMEvictor` cleanly, verified by the
+two-line allocator probe in §1.2. The runner now passes
+`enable_prefix_caching=True` by default (147 tests pass
+including a regression test that pins the flag for both
+policies).
+**Execution:** the patch-install probe was the first end-to-end
+GPU validation; the next-step full-sweep against a model that
+fits the canonical workloads (Mistral-v0.1 with rope_scaling
+fix → chat_32k via `--heavy-spillover`) is the gating run for
+CTM+ vs LRU policy-effect numbers.
 **Audience:** internal. The partner-facing version is the
 `PARTNER_VALIDATION_NOTE.md` §4 Path B specification.
 
@@ -30,6 +33,50 @@ model" as a claim risk** — at the cost of running on a vLLM
 version partners don't deploy. Modern-stack validation
 (roadmap #3 or Path B) remains gated on the allocator-architecture
 rewrite or a partner-specific serving harness.
+
+## §1.2 Patch-install probe — verifying the swap on real vLLM
+
+A two-step probe that boots vLLM with prefix caching, reads the
+default evictor, runs `patch_vllm_engine`, and re-reads the
+evictor. ~30 seconds wall, no workload, no model generation.
+
+```bash
+python3 - <<'PY'
+from vllm import LLM
+from kv_policy.vllm_evictor import patch_vllm_engine
+llm = LLM(
+    model="/path/to/your/tinyllama-or-similar",
+    gpu_memory_utilization=0.30,
+    swap_space=4,
+    enforce_eager=True,
+    max_model_len=2048,
+    enable_prefix_caching=True,
+    seed=42,
+)
+def _evictor_type(engine):
+    sched = engine.scheduler
+    if isinstance(sched, list):
+        sched = sched[0]
+    return type(sched.block_manager.gpu_allocator.evictor).__name__
+print(f"before: {_evictor_type(llm.llm_engine)}")
+patch_vllm_engine(llm.llm_engine, enable_logging=False)
+print(f"after:  {_evictor_type(llm.llm_engine)}")
+PY
+```
+
+**Pass criterion:**
+
+```
+before: LRUEvictor
+after:  CTMEvictor
+```
+
+Verified on a RunPod A100 against vLLM 0.4.0 + TinyLlama
+(May 2026, commit `d3b3ecf`). The patch swaps cleanly. This
+probe is the cheapest gate to run on any new vLLM-pinned
+environment before committing to a longer workload sweep — if
+"after" still reads `LRUEvictor`, the rest of the runbook is a
+silent no-op and not worth running.
 
 ## §1.1 Prefix-caching dependency (May 2026 GPU finding)
 
