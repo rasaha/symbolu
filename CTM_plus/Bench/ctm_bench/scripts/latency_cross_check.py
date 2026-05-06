@@ -146,16 +146,37 @@ def load_mode_a_predictions(summary_path: Path) -> List[ModeAPrediction]:
     return out
 
 
+# Cells with n_decode_tokens below this floor are treated as
+# truncated / setup-dominated outliers and excluded from the
+# wall-clock aggregate. The first rag_128k cell on the May 2026
+# run completed with n_decode=2 (vLLM truncated 128K prompts to
+# its 32K max_seq_len before --max-model-len was wired through);
+# 6.2s for 2 tokens = 3 sec/token, completely artifactual.
+# 100 is comfortably above truncation cases and well below any
+# real workload (chat_32k = 512 decode/seq, rag = 1024 decode/seq).
+_DECODE_TOKEN_FLOOR_FOR_AGGREGATE: int = 100
+
+
 def aggregate_mode_b_by_workload(
     cells: Sequence[ModeBCell],
 ) -> Dict[str, Dict[str, object]]:
     """Group Mode B cells by workload (collapsing seeds) and
-    compute mean per-token wall + min/max for variance."""
+    compute mean per-token wall + min/max for variance.
+
+    Cells with n_decode_tokens below
+    :data:`_DECODE_TOKEN_FLOOR_FOR_AGGREGATE` are treated as
+    truncated/setup-dominated outliers and excluded; their count
+    is reported under ``excluded_cells_count`` so the reader
+    knows something was filtered."""
     by_workload: Dict[str, List[ModeBCell]] = {}
+    excluded_by_workload: Dict[str, List[ModeBCell]] = {}
     for c in cells:
         if c.policy != "lru":
             continue
         if c.per_token_wall_ms is None:
+            continue
+        if c.n_decode_tokens < _DECODE_TOKEN_FLOOR_FOR_AGGREGATE:
+            excluded_by_workload.setdefault(c.workload, []).append(c)
             continue
         by_workload.setdefault(c.workload, []).append(c)
 
@@ -177,8 +198,16 @@ def aggregate_mode_b_by_workload(
             "per_token_wall_ms_mean": mean(walls_ms),
             "per_token_wall_ms_min": min(walls_ms),
             "per_token_wall_ms_max": max(walls_ms),
-            "counter_sources": sorted({c.counter_source for c in group}),
+            # Drop empty strings (cells written by the harness
+            # before counter_source was a field) so the column
+            # doesn't show ",vllm_0_7_no_swaps_observed".
+            "counter_sources": sorted({
+                c.counter_source for c in group if c.counter_source
+            }),
             "seeds": sorted({c.seed for c in group}),
+            "excluded_cells_count": len(
+                excluded_by_workload.get(workload, [])
+            ),
         }
     return out
 
@@ -230,6 +259,7 @@ def render_report(
             " Per-token wall (min..max) | counter_source |\n"
             "|---|---:|---|---:|---:|---|\n"
         )
+        any_excluded = False
         for workload in sorted(mode_b_by_workload.keys()):
             cell = mode_b_by_workload[workload]
             n_decode = cell["n_decode_tokens_each"]
@@ -237,13 +267,27 @@ def render_report(
             per_token_lo = cell["per_token_wall_ms_min"]
             per_token_hi = cell["per_token_wall_ms_max"]
             counter_sources = cell["counter_sources"]
+            excluded_n = int(cell.get("excluded_cells_count", 0))
+            workload_label = workload
+            if excluded_n > 0:
+                workload_label = f"{workload} (excluded {excluded_n})"
+                any_excluded = True
             lines.append(
-                f"| {workload} "
+                f"| {workload_label} "
                 f"| {cell['n_seeds']} "
                 f"| {n_decode} "
                 f"| {per_token_mean:.2f} ms "
                 f"| {per_token_lo:.2f}..{per_token_hi:.2f} ms "
-                f"| {','.join(counter_sources)} |\n"
+                f"| {','.join(counter_sources) or '(none)'} |\n"
+            )
+        if any_excluded:
+            lines.append(
+                "\n_Cells where `n_decode_tokens` was below "
+                f"{_DECODE_TOKEN_FLOOR_FOR_AGGREGATE} were excluded "
+                "from the aggregate as truncated/setup-dominated "
+                "outliers (e.g. vLLM truncated a long prompt to "
+                "max_seq_len and barely generated). The count is "
+                "shown in parentheses._\n"
             )
         lines.append("\n")
 
@@ -280,6 +324,34 @@ def render_report(
                 "directional cross-check skipped._\n"
             )
         else:
+            # Pick which Mode A field to rank by. avg_access_latency_ns
+            # is the natural choice if populated; fall back to
+            # slow_tier_bytes_per_decode_token if all zeros (older
+            # multi_seed_summary.json files don't include the latency
+            # field — bench_out/round4_multi_seed/multi_seed_summary.json
+            # is one such case as of May 2026).
+            all_zero_latency = all(
+                mode_a_by_workload[w]["avg_access_latency_ns_mean"] == 0.0
+                for w in common
+            )
+            if all_zero_latency:
+                mode_a_signal_name = "slow_tier_bytes_per_decode_token_mean"
+                mode_a_signal_label = "slow-tier B/tok"
+                mode_a_signal_unit = "B/tok"
+                fallback_note = (
+                    " (Fallback: Mode A `avg_access_latency_ns` was "
+                    "zero on all workloads, so we ranked by Mode A's "
+                    "`slow_tier_bytes_per_decode_token` instead. This "
+                    "captures eviction-pressure ordering, which is "
+                    "what Mode A actually models — the simulator does "
+                    "not estimate compute cost.)"
+                )
+            else:
+                mode_a_signal_name = "avg_access_latency_ns_mean"
+                mode_a_signal_label = "avg_access_latency_ns"
+                mode_a_signal_unit = "ns"
+                fallback_note = ""
+
             mode_b_ranked = sorted(
                 common,
                 key=lambda w: float(
@@ -288,15 +360,22 @@ def render_report(
             )
             mode_a_ranked = sorted(
                 common,
-                key=lambda w: mode_a_by_workload[w][
-                    "avg_access_latency_ns_mean"
-                ],
+                key=lambda w: mode_a_by_workload[w][mode_a_signal_name],
             )
             lines.append(
-                "Both rankings are ascending (lowest latency first):\n\n"
+                "Both rankings are ascending (lowest first):\n\n"
             )
-            lines.append(f"* **Mode B order:** {' < '.join(mode_b_ranked)}\n")
-            lines.append(f"* **Mode A order:** {' < '.join(mode_a_ranked)}\n\n")
+            lines.append(
+                f"* **Mode B order** (by per-token wall ms): "
+                f"{' < '.join(mode_b_ranked)}\n"
+            )
+            lines.append(
+                f"* **Mode A order** (by {mode_a_signal_label} "
+                f"in {mode_a_signal_unit}): {' < '.join(mode_a_ranked)}\n\n"
+            )
+            if fallback_note:
+                lines.append(fallback_note + "\n\n")
+
             if mode_b_ranked == mode_a_ranked:
                 lines.append(
                     "**✅ Rankings match.** Mode A's tier model "
@@ -311,14 +390,34 @@ def render_report(
             else:
                 lines.append(
                     "**⚠ Rankings differ.** Mode A and Mode B "
-                    "disagree on which workload is slower. This is a "
-                    "real finding worth investigating — either the "
-                    "Mode A tier model's relative weights are wrong, "
-                    "or the Mode B per-token wall is dominated by "
-                    "compute rather than memory access (so the "
-                    "comparison is invalid for these workloads). "
-                    "Inspect the per-workload numbers above and "
-                    "decide.\n"
+                    "disagree on relative ordering. Two common reasons:\n\n"
+                    "1. **Mode B per-token wall is compute-dominated, "
+                    "not memory-dominated.** Mode A's tier model "
+                    "captures memory access patterns only — it does "
+                    "not estimate compute cost. If a workload's "
+                    "decode latency on a real model is dominated by "
+                    "the cost of attending to a long KV cache (rather "
+                    "than by slow-tier read traffic), Mode A's "
+                    "ranking will not match Mode B's. This is "
+                    "expected for long-context workloads (e.g. RAG "
+                    "at 128K context vs chat at 32K — the 4× longer "
+                    "context attends to 4× more KV per decode step, "
+                    "regardless of where that KV lives).\n"
+                    "2. **Mode A's tier model is mis-calibrated.** "
+                    "If two workloads have similar context lengths "
+                    "but Mode A predicts opposite ordering from Mode "
+                    "B, the simulator's relative weights are wrong "
+                    "and need to be reviewed against the data.\n\n"
+                    "Inspect the per-workload numbers above; a "
+                    "disagreement does not invalidate either side, "
+                    "but it does mean the cross-check is **not** "
+                    "qualitative validation of the tier model on "
+                    "these workloads. To get qualitative validation, "
+                    "run the cross-check on workload pairs with "
+                    "matched context length where Mode A predicts "
+                    "different eviction pressure (so the difference "
+                    "in per-token wall, if any, comes from memory "
+                    "access not compute).\n"
                 )
 
     lines.append("\n## §4 Honest scope statement\n")
