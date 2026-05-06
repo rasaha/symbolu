@@ -1,10 +1,37 @@
 # Mode B Streaming Runner — Design Document (Roadmap #3)
 
-**Status:** design landed (this session). Implementation **not
-started** — estimated 2–3 days of focused vLLM-internals work
-plus per-vLLM-minor-version regression maintenance. This
-document is the architectural plan; implementation is gated on
-the user explicitly authorizing the full effort.
+**Status:** Phase 1 implemented (May 2026). Phase 2 (CTM+ on
+modern vLLM) still gated on partner request or explicit
+multi-day authorization.
+
+**Phase 1 deliverables that landed:**
+
+* `ctm_bench/runner_vllm_streaming.py::AsyncEngineDriver.run`
+  — full implementation. Builds `AsyncEngineArgs` with
+  `preemption_mode="swap"` and `enable_prefix_caching=False`,
+  constructs `AsyncLLMEngine`, drives it with timed
+  `engine.generate(...)` async iterations from the Pareto
+  schedule, and runs a parallel asyncio task for periodic
+  swap-counter sampling.
+* `_read_swap_counters_from_engine` — reads
+  `block_allocator.get_and_reset_swaps()` defensively. Tolerates
+  three return formats (dict / 2-tuple / object with attrs)
+  observed across vLLM minor versions.
+* `ctm_bench/scripts/run_streaming.py` + `scripts/run_streaming.sh`
+  — CLI + shell wrapper for per-cell GPU runs. Includes a
+  Phase 1 pass criterion in the aggregator (swap_out_blocks > 0
+  across cells; warns loudly on zero).
+* 11 new unit tests covering: dict/tuple/object swap-counter
+  formats, missing-attribute defaults, legacy-v0.6
+  `gpu_allocator` path, `preemption_mode="swap"` propagation
+  through `_build_engine_args`, scheduler-config-override
+  precedence, full mocked run loop, max-wall-seconds capping.
+  Total Bench tests: 158 (was 147 + 11 new).
+
+**Phase 1 still requires:** GPU validation. The CPU sandbox
+proves the API contract via mocks; the actual swap-engagement
+question — does `swap_out_blocks > 0` materialise on a real
+vLLM 0.7+ A100 run — can only be answered on a GPU.
 
 **Audience:** the engineer (possibly future-me) who will write
 the code. Conservative framing throughout: every design choice

@@ -3,7 +3,8 @@
 **Audience:** prospective design partner evaluating CTM+ for an
 LLM-inference deployment.
 **Status:** safe to share; conservative framing throughout.
-**Last updated:** 2026-05-06.
+**Last updated:** 2026-05-06 (revised after the May 2026 vLLM
+0.4.0 patch-install verification).
 
 This note states what CTM+ has and has not been validated to
 do today, why a real-stack `vLLM` validation has not yet been
@@ -37,6 +38,31 @@ look like.
   a real GPU through vLLM, runs the workload generators end
   to end, and produces honest wall-clock-per-decode-token
   timing data. The harness execution path is proven.
+* **CTM+ patch installs cleanly on a real vLLM serving
+  stack.** A second RunPod A100 session (May 2026, vLLM 0.4.0
+  + TinyLlama-1.1B-Chat) verified the `patch_vllm_engine`
+  call swaps vLLM's default `LRUEvictor` for `CTMEvictor` in
+  the `CachedBlockAllocator`. Verified by a 30-second
+  allocator probe (documented in `MODE_B_VLLM04_RUNBOOK.md`
+  §1.2): pre-patch reads `LRUEvictor`, post-patch reads
+  `CTMEvictor`. **This is the first time CTM+'s scoring math
+  has been wired into a real serving stack with real
+  attention flowing through it.** What this does **not** do:
+  validate end-to-end CTM+ vs LRU policy-effect under load
+  (that's gated on §4).
+* **Independent simulator cross-confirmation.** Three
+  separate simulators converge on the same workload-
+  conditional shape: Mode A (tier-cost simulator),
+  KVSimulator (continuous-batching simulator, different
+  codebase), and the production-shape replay tool
+  (parametric workload over KVSimulator, multi-seed
+  averaged). All three show: small CTM+ wins on
+  bimodal-chat / bursty-RAG; regression on sustained
+  long-context agentic. The convergence rules out "the
+  simulator is wrong" as an alternative explanation for
+  the headline; what it does **not** rule out is that
+  real-attention behaviour differs from synthetic-attention
+  behaviour. That gap is closed by §4.
 * **Methodology.** Audit-pass discipline — every non-trivial
   change goes through an independent critical-audit pass
   before merge. Two of the five rounds caught and corrected
@@ -47,11 +73,18 @@ look like.
 
 ## §2 What is not yet proven
 
-* **Real-model CTM+ vs LRU head-to-head on a serving
-  stack.** No measurement of CTM+ running through vLLM (or
-  any other inference runtime) against a real model exists
-  today. The Mode B run validated the harness; CTM+ itself
-  was not running.
+* **Real-model CTM+ vs LRU policy-effect numbers.** No
+  measurement of how CTM+'s eviction decisions actually
+  change wall-clock latency, throughput, or hit rates on a
+  real model exists today. The patch is now verified to
+  install (May 2026), but no end-to-end workload sweep has
+  produced apples-to-apples CTM+-vs-LRU numbers — that run
+  was attempted and blocked on a RunPod per-pod volume
+  quota mid-download. The smaller question of "does the
+  CTM+ scoring code actually fire when blocks need to be
+  evicted" is now closed at the install level; the larger
+  question of "and does it produce a better outcome than
+  LRU on real attention" remains open.
 * **Real-silicon swap-byte calibration.** Mode A's
   `avg_access_latency_ns` predictions and slow-tier byte
   counts have not been cross-checked against real swap-byte

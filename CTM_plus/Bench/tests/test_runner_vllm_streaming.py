@@ -325,15 +325,10 @@ def test_swap_counter_sampler_totals_are_a_copy():
 # ------------------------------------------------------------------ #
 
 
-def test_async_engine_driver_construct_then_run_raises_not_implemented():
+def test_async_engine_driver_constructor_stores_config():
     """The driver constructor accepts the configured args and
-    stores them, but run() raises NotImplementedError with a
-    pointer to MODE_B_STREAMING_DESIGN.md."""
-    import asyncio
-    from ctm_bench.runner_vllm_streaming import (
-        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
-        SwapCounterSampler,
-    )
+    stores them on the instance."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
 
     driver = AsyncEngineDriver(
         model="meta-llama/Llama-2-7b-chat-hf",
@@ -343,7 +338,6 @@ def test_async_engine_driver_construct_then_run_raises_not_implemented():
         scheduler_config_overrides={"preemption_mode": "swap"},
         ctm_plus_evictor=False,
     )
-    # Constructor stores config faithfully.
     assert driver.model == "meta-llama/Llama-2-7b-chat-hf"
     assert driver.gpu_memory_utilization == 0.30
     assert driver.swap_space_gb == 8
@@ -351,14 +345,28 @@ def test_async_engine_driver_construct_then_run_raises_not_implemented():
     assert driver.scheduler_config_overrides["preemption_mode"] == "swap"
     assert driver.ctm_plus_evictor is False
 
-    # run() raises with a clear message.
+
+def test_async_engine_driver_run_phase2_raises_not_implemented():
+    """ctm_plus_evictor=True is Phase 2 and not yet implemented;
+    run() must raise NotImplementedError before any vLLM import,
+    with a message pointing at the design doc."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    driver = AsyncEngineDriver(
+        model="dummy",
+        ctm_plus_evictor=True,  # Phase 2
+    )
     sched = ArrivalScheduler(
         seed=42,
         pareto=ParetoArrivalConfig(base_rate_per_sec=1.0, alpha=2.0),
     )
     sampler = SwapCounterSampler()
     with pytest.raises(NotImplementedError) as exc:
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.new_event_loop().run_until_complete(
             driver.run(
                 scheduler=sched, sampler=sampler,
                 max_requests=10, max_wall_seconds=5.0,
@@ -366,8 +374,416 @@ def test_async_engine_driver_construct_then_run_raises_not_implemented():
             )
         )
     msg = str(exc.value)
+    assert "Phase 2" in msg
     assert "MODE_B_STREAMING_DESIGN.md" in msg
-    assert "roadmap #3" in msg
+
+
+def test_async_engine_driver_run_phase1_requires_vllm():
+    """In Phase 1 (LRU) the driver must raise ImportError with a
+    message naming vllm and the streaming runner's vLLM target
+    when vllm isn't installed. NOT NotImplementedError."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    driver = AsyncEngineDriver(model="dummy", ctm_plus_evictor=False)
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=1.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    # Force the import path to fail by passing a vllm_module that
+    # isn't a module — the constructor accepts None and falls back
+    # to import vllm; on this sandbox that import fails.
+    try:
+        import vllm  # type: ignore  # noqa: F401
+        pytest.skip(
+            "vllm is installed in this environment; "
+            "skipping the import-error path"
+        )
+    except ImportError:
+        pass
+
+    with pytest.raises(ImportError, match="vLLM"):
+        asyncio.new_event_loop().run_until_complete(
+            driver.run(
+                scheduler=sched, sampler=sampler,
+                max_requests=10, max_wall_seconds=5.0,
+                workload_name="chat_32k",
+            )
+        )
+
+
+# ------------------------------------------------------------------ #
+# Phase 1 implementation — _read_swap_counters_from_engine
+# ------------------------------------------------------------------ #
+
+
+def test_read_swap_counters_handles_dict_format():
+    """vLLM's get_and_reset_swaps may return a dict with `in`/`out`
+    keys."""
+    from ctm_bench.runner_vllm_streaming import (
+        _read_swap_counters_from_engine,
+    )
+
+    class FakeAllocator:
+        def get_and_reset_swaps(self):
+            return {"in": 5, "out": 3}
+
+    class FakeBM:
+        block_allocator = FakeAllocator()
+
+    class FakeSched:
+        block_manager = FakeBM()
+        num_preemption_events = 7
+
+    class FakeInner:
+        scheduler = FakeSched()
+
+    class FakeEngine:
+        engine = FakeInner()
+
+    inb, outb, preempt = _read_swap_counters_from_engine(FakeEngine())
+    assert inb == 5
+    assert outb == 3
+    assert preempt == 7
+
+
+def test_read_swap_counters_handles_tuple_format():
+    """Some vLLM versions return swaps as a 2-tuple (in, out)."""
+    from ctm_bench.runner_vllm_streaming import (
+        _read_swap_counters_from_engine,
+    )
+
+    class FakeAllocator:
+        def get_and_reset_swaps(self):
+            return (10, 4)
+
+    class FakeBM:
+        block_allocator = FakeAllocator()
+
+    class FakeSched:
+        block_manager = FakeBM()
+
+    class FakeInner:
+        scheduler = [FakeSched()]  # list — pipeline-parallel layout
+
+    class FakeEngine:
+        engine = FakeInner()
+
+    inb, outb, preempt = _read_swap_counters_from_engine(FakeEngine())
+    assert inb == 10
+    assert outb == 4
+    assert preempt == 0  # no preemption attr on FakeSched
+
+
+def test_read_swap_counters_handles_object_format():
+    """Some vLLM versions return swaps as an object with
+    swap_in/swap_out attributes."""
+    from ctm_bench.runner_vllm_streaming import (
+        _read_swap_counters_from_engine,
+    )
+
+    class Swaps:
+        swap_in = 11
+        swap_out = 12
+
+    class FakeAllocator:
+        def get_and_reset_swaps(self):
+            return Swaps()
+
+    class FakeBM:
+        block_allocator = FakeAllocator()
+
+    class FakeSched:
+        block_manager = FakeBM()
+
+    class FakeInner:
+        scheduler = FakeSched()
+
+    class FakeEngine:
+        engine = FakeInner()
+
+    inb, outb, preempt = _read_swap_counters_from_engine(FakeEngine())
+    assert inb == 11
+    assert outb == 12
+
+
+def test_read_swap_counters_returns_zero_on_missing_attrs():
+    """The probe must never raise — engines without the expected
+    attribute path return (0, 0, 0)."""
+    from ctm_bench.runner_vllm_streaming import (
+        _read_swap_counters_from_engine,
+    )
+
+    class Empty:
+        pass
+
+    inb, outb, preempt = _read_swap_counters_from_engine(Empty())
+    assert (inb, outb, preempt) == (0, 0, 0)
+
+
+def test_read_swap_counters_returns_zero_on_legacy_v06_path():
+    """vLLM ≤ 0.6 uses block_manager.gpu_allocator (not
+    block_allocator). The probe should return zero — the
+    streaming runner is targeted at 0.7+."""
+    from ctm_bench.runner_vllm_streaming import (
+        _read_swap_counters_from_engine,
+    )
+
+    class FakeBM:
+        gpu_allocator = object()  # legacy attribute, not block_allocator
+
+    class FakeSched:
+        block_manager = FakeBM()
+
+    class FakeInner:
+        scheduler = FakeSched()
+
+    class FakeEngine:
+        engine = FakeInner()
+
+    inb, outb, preempt = _read_swap_counters_from_engine(FakeEngine())
+    assert (inb, outb, preempt) == (0, 0, 0)
+
+
+# ------------------------------------------------------------------ #
+# Phase 1 implementation — _build_engine_args
+# ------------------------------------------------------------------ #
+
+
+def test_build_engine_args_sets_preemption_mode_swap():
+    """The critical config: preemption_mode='swap' must be passed
+    to vLLM's AsyncEngineArgs. Without it, the swap path doesn't
+    engage even with AsyncLLMEngine + heavy load."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured: dict = {}
+
+    class FakeAsyncEngineArgs:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAsyncEngineArgs
+
+    driver = AsyncEngineDriver(
+        model="dummy", gpu_memory_utilization=0.25,
+        swap_space_gb=16, seed=137,
+        vllm_module=FakeVLLM,
+    )
+    driver._build_engine_args(FakeVLLM)
+    assert captured.get("preemption_mode") == "swap"
+    assert captured.get("model") == "dummy"
+    assert captured.get("gpu_memory_utilization") == 0.25
+    assert captured.get("swap_space") == 16
+    assert captured.get("seed") == 137
+    # Phase 1 disables prefix caching to keep eviction in the
+    # swap decision tree (not the cache-retention path).
+    assert captured.get("enable_prefix_caching") is False
+
+
+def test_build_engine_args_honours_overrides():
+    """scheduler_config_overrides must take precedence over the
+    runner's defaults — needed to test e.g.
+    preemption_mode='recompute' as a baseline."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured: dict = {}
+
+    class FakeAsyncEngineArgs:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAsyncEngineArgs
+
+    driver = AsyncEngineDriver(
+        model="dummy",
+        scheduler_config_overrides={"preemption_mode": "recompute"},
+        vllm_module=FakeVLLM,
+    )
+    driver._build_engine_args(FakeVLLM)
+    assert captured.get("preemption_mode") == "recompute"
+
+
+# ------------------------------------------------------------------ #
+# Phase 1 implementation — full run() with mocked engine
+# ------------------------------------------------------------------ #
+
+
+def test_async_engine_driver_run_full_flow_with_mock(monkeypatch):
+    """End-to-end test of the run() loop with a mocked vLLM
+    AsyncLLMEngine. Verifies:
+      * The arrival scheduler is consulted for both delays and lengths.
+      * Each arrival results in an engine.generate() call.
+      * The sampler is started, fed, and stopped.
+      * The result struct reports the right counts."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    # ---- Build a minimal in-memory mock of vLLM's async API ----
+
+    class FakeOutput:
+        def __init__(self, n_tokens):
+            class _Inner:
+                token_ids = list(range(n_tokens))
+            self.outputs = [_Inner()]
+
+    class FakeEngine:
+        def __init__(self):
+            self.generate_calls = []
+
+            class _Sched:
+                num_preemption_events = 0
+
+                class _BM:
+                    class _Alloc:
+                        def get_and_reset_swaps(self):
+                            return (0, 0)
+                    block_allocator = _Alloc()
+                block_manager = _BM()
+
+            class _Inner:
+                scheduler = _Sched()
+
+            self.engine = _Inner()
+
+        async def generate(self, prompt, sampling_params, request_id):
+            self.generate_calls.append({
+                "prompt": prompt,
+                "sampling_params": sampling_params,
+                "request_id": request_id,
+            })
+            # Simulate streaming: yield two outputs, ending with
+            # 8 tokens generated.
+            yield FakeOutput(4)
+            yield FakeOutput(8)
+
+    class FakeAsyncEngineArgs:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeAsyncLLMEngine:
+        @classmethod
+        def from_engine_args(cls, args):
+            return FakeEngine()
+
+    class FakeSamplingParams:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAsyncEngineArgs
+        AsyncLLMEngine = FakeAsyncLLMEngine
+        SamplingParams = FakeSamplingParams
+
+    # ---- Run ----
+
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42,
+        max_decode_tokens=8,
+        sample_interval_seconds=0.001,
+        vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=100.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    result = asyncio.new_event_loop().run_until_complete(
+        driver.run(
+            scheduler=sched, sampler=sampler,
+            max_requests=3, max_wall_seconds=2.0,
+            workload_name="test_workload",
+        )
+    )
+
+    # Three arrivals admitted.
+    assert result.n_requests_admitted == 3
+    # Each completed with 8 decode tokens.
+    assert result.n_decode_tokens == 24
+    assert result.n_requests_completed == 3
+    # Counter source is the streaming default.
+    assert result.counter_source == "vllm_streaming_async_swap"
+    # No swap engaged in the mock — fine; this test is about flow,
+    # not swap behaviour.
+    assert result.swap_in_blocks == 0
+    assert result.swap_out_blocks == 0
+    # Policy name reports lru since ctm_plus_evictor=False.
+    assert result.policy_name == "lru"
+    assert result.workload_name == "test_workload"
+    assert result.seed == 42
+
+
+def test_async_engine_driver_run_caps_at_max_wall(monkeypatch):
+    """If max_wall_seconds is exceeded, the run terminates even
+    if max_requests has not been reached."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    class FakeOutput:
+        outputs = [type("_", (), {"token_ids": []})()]
+
+    class FakeEngine:
+        engine = type("_", (), {
+            "scheduler": type("_", (), {
+                "block_manager": type("_", (), {
+                    "block_allocator": type("_", (), {
+                        "get_and_reset_swaps": staticmethod(lambda: (0, 0)),
+                    })(),
+                })(),
+            })(),
+        })()
+
+        async def generate(self, prompt, sp, rid):
+            # Slow generate — sleeps longer than the wall budget.
+            await asyncio.sleep(10.0)
+            yield FakeOutput()
+
+    class FakeVLLM:
+        AsyncEngineArgs = type("_", (), {"__init__": lambda self, **k: None})
+        AsyncLLMEngine = type("_", (), {
+            "from_engine_args": staticmethod(lambda args: FakeEngine()),
+        })
+        SamplingParams = type("_", (), {"__init__": lambda self, **k: None})
+
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42,
+        sample_interval_seconds=0.05,
+        vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=1000.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    start = __import__("time").perf_counter()
+    result = asyncio.new_event_loop().run_until_complete(
+        driver.run(
+            scheduler=sched, sampler=sampler,
+            max_requests=1000, max_wall_seconds=0.3,
+            workload_name="cap_test",
+        )
+    )
+    elapsed = __import__("time").perf_counter() - start
+    # Wall budget honoured (with some tolerance for shutdown).
+    assert elapsed < 1.5, f"run took {elapsed:.2f}s; budget was 0.3s"
+    # Some requests admitted, but most won't have completed (the
+    # mocked generate sleeps 10s).
+    assert result.n_requests_admitted >= 1
+    assert result.n_requests_completed == 0
 
 
 def test_patch_vllm_engine_modern_raises_not_implemented():

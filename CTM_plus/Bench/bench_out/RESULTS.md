@@ -771,7 +771,10 @@ authorization to spend ~$3 GPU-spot on a calibration check
 that closes the "we never ran CTM+ on a real model" claim
 risk.
 
-### §13.2 #3 — vLLM 0.5+ streaming runner (design + scaffolding)
+### §13.2 #3 — vLLM 0.5+ streaming runner
+
+**Phase 1 (LRU swap-counter validation): code-complete.**
+Phase 2 (CTM+ on modern vLLM) still stubbed.
 
 * `Bench/scripts/MODE_B_STREAMING_DESIGN.md` — full
   architectural plan. Two problems: (A) CTM+ cannot install
@@ -781,17 +784,33 @@ risk.
   Phase 1 (B alone, LRU-only swap-counter validation) and
   Phase 2 (A + B, real-model CTM+ vs LRU on modern vLLM)
   delivered separately.
-* `ctm_bench/runner_vllm_streaming.py` — scaffolding
-  module. `ArrivalScheduler` (Pareto + replay-CSV modes)
-  and `SwapCounterSampler` (state machine for accumulating
-  periodic swap-counter samples) are implemented and
-  unit-tested. `AsyncEngineDriver.run` and
-  `patch_vllm_engine_modern` raise `NotImplementedError`
-  with a clear pointer to the design doc — that's the
-  contract until the GPU implementation lands.
-* 18 contract tests pin the API surface so the
-  implementation phase can refactor freely without breaking
-  callers.
+* `ctm_bench/runner_vllm_streaming.py::AsyncEngineDriver.run`
+  — **Phase 1 GPU path implemented.** Builds
+  `AsyncEngineArgs(preemption_mode="swap",
+  enable_prefix_caching=False)`, constructs
+  `AsyncLLMEngine`, drives it with timed `engine.generate`
+  async iterations from the Pareto schedule, runs a
+  parallel asyncio task for periodic swap-counter sampling,
+  returns a `StreamingRunCellResult` with swap_in/out and
+  preemption totals.
+* `_read_swap_counters_from_engine` — defensively reads
+  `block_allocator.get_and_reset_swaps()` across vLLM minor
+  versions (tolerates dict / 2-tuple / object-with-attrs
+  return formats). Returns `(0, 0, 0)` on attribute-walk
+  failure.
+* `ctm_bench/scripts/run_streaming.py` + `scripts/run_streaming.sh`
+  — CLI + shell wrapper for per-cell GPU runs. Aggregator
+  checks Phase 1 pass criterion (`swap_out_blocks > 0`
+  across cells) and warns loudly on zero.
+* `patch_vllm_engine_modern` (Phase 2) still stubbed
+  behind `NotImplementedError`.
+* **29 streaming-runner tests pass** (was 18 contract tests
+  + 11 new for Phase 1). Coverage: scheduler determinism,
+  sampler state machine, three swap-counter return-formats,
+  missing-attribute defaults, `preemption_mode="swap"`
+  propagation, scheduler-config-override precedence, full
+  mocked run loop, max-wall-seconds capping, Phase-2
+  NotImplementedError.
 
 **Phase 1 estimated effort:** 1–1.5 days code + ~1 GPU-day
 sweeps. Validates that the swap path engages (counters > 0
