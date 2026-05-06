@@ -97,6 +97,51 @@ def test_run_sim_chat_workload():
     assert result.hbm_hit_rate > 0.3
 
 
+def test_summarize_zero_baseline_yields_none_not_inf():
+    """When LRU baseline has no slow-tier reads, the reduction
+    percentage is undefined. We must emit None (not ±inf) so
+    the JSON output stays well-formed under allow_nan=False."""
+    from ctm_bench.metrics import RunResult, summarize, to_json
+
+    base = RunResult(
+        workload_name="w",
+        policy_name="lru",
+        tier_config_name="x",
+        n_decode_tokens=10,
+        bytes_read={},
+        bytes_written={},
+        accesses_served={},
+        cumulative_latency_ns={},
+        evictions_to_tier={},
+        hbm_hit_rate=1.0,
+        slow_tier_bytes_per_decode_token=0.0,
+        avg_access_latency_ns=200.0,
+        wall_clock_seconds=0.01,
+        seed=42,
+    )
+    other = RunResult(
+        workload_name="w",
+        policy_name="ctm_plus",
+        tier_config_name="x",
+        n_decode_tokens=10,
+        bytes_read={},
+        bytes_written={},
+        accesses_served={},
+        cumulative_latency_ns={},
+        evictions_to_tier={},
+        hbm_hit_rate=0.99,
+        slow_tier_bytes_per_decode_token=1024.0,
+        avg_access_latency_ns=300.0,
+        wall_clock_seconds=0.01,
+        seed=42,
+    )
+    summary = summarize([base, other])
+    assert summary["pairs"][0]["reduction_pct_vs_lru"] is None
+    # JSON serialisation must not raise on the None value.
+    blob = to_json(summary)
+    assert "null" in blob
+
+
 def test_summarize_includes_pairs_when_lru_baseline_present():
     spec = _smoke_spec(AccessPattern.AGENTIC)
     a = run_sim(

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Mapping, Sequence
+from typing import Dict, List, Mapping, Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -77,13 +77,15 @@ def summarize(results: Sequence[RunResult]) -> Dict[str, object]:
             if policy_name == "lru":
                 continue
             base = baseline.slow_tier_bytes_per_decode_token
+            policy_val = r.slow_tier_bytes_per_decode_token
             if base == 0:
-                pct = float("inf") if r.slow_tier_bytes_per_decode_token > 0 else 0.0
+                # LRU had no slow-tier reads on this workload (working
+                # set fit in tier 0). Reduction is undefined when the
+                # baseline is zero; we report None rather than ±inf so
+                # the JSON output is well-formed (allow_nan=False).
+                pct: Optional[float] = None if policy_val > 0 else 0.0
             else:
-                pct = (
-                    (base - r.slow_tier_bytes_per_decode_token)
-                    / base
-                ) * 100.0
+                pct = ((base - policy_val) / base) * 100.0
             pairs.append(
                 {
                     "workload": workload_name,
