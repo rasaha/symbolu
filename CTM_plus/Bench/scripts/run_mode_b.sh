@@ -146,7 +146,10 @@ fi
 
 if ! python3 -c "import kv_policy" 2>/dev/null; then
     echo "WARN: kv_policy not on import path. Attempting to add CTM_plus/KVPolicy."
-    KV_POLICY_DIR="$(cd "$(dirname "$0")/.." && pwd)/KVPolicy"
+    # Script lives at CTM_plus/Bench/scripts/run_mode_b.sh, so
+    # KVPolicy is two levels up + /KVPolicy. The previous "/.."
+    # only reached Bench/ and the lookup failed.
+    KV_POLICY_DIR="$(cd "$(dirname "$0")/../.." && pwd)/KVPolicy"
     if [[ -d "$KV_POLICY_DIR" ]]; then
         export PYTHONPATH="${KV_POLICY_DIR}:${PYTHONPATH:-}"
         if ! python3 -c "import kv_policy" 2>/dev/null; then
