@@ -463,3 +463,132 @@ That's a rare positioning for an inference-optimization team.
 Most teams' benchmarks show the wins; few teams' benchmarks
 show their methodology surfacing and correcting their own
 errors mid-flight.
+
+---
+
+## §11 Independent Simulator Cross-Confirmation
+
+A separate simulator (`CTM_plus/KVSimulator/`, different
+codebase from Bench/Mode A — different scenarios, different
+metrics, written before Bench existed) reproduces the same
+qualitative shape Mode A surfaces. **The headline is not
+"CTM+ beats LRU"; it's that two independent simulators
+converge on the same nuanced finding: CTM+ shows small
+recompute-cost wins in moderate / high / bimodal regimes,
+but regresses under extreme pressure.**
+
+The full stress-test log is at
+`bench_out/independent_simulator_stress_test.txt` (5 seeds ×
+4 policies × 7 scenarios; see `KVSimulator/stress_test.py`
+for the runner).
+
+### §11.1 The recompute-cost table (primary metric)
+
+`recompute_cost` counts decode steps that hit an evicted
+block and force re-computation. It is the most independent
+metric: it depends on the eviction *outcome* (did the policy
+keep the right block?), not on attention or position signals
+that the policy itself uses.
+
+| Workload | CTM+ recompute_cost | LRU recompute_cost | Direction |
+|---|---:|---:|---|
+| 4a Moderate | 211k | 215k | CTM+ ~2% better |
+| 4b High | 147k | 152k | CTM+ ~3% better |
+| 4c Extreme | 213k | 174k | **CTM+ ~22% worse** |
+| 5a Bimodal | 113k | 117k | CTM+ ~3% better |
+
+The 4c "Extreme" cell (64-block cache, 16 max concurrent,
+arrival rate 0.20, completion rate 0.05) also shows an
+**accuracy regression: CTM+ 57.0% vs LRU 62.7% — a 5.7
+percentage-point drop.** Under extreme pressure the policy is
+both slower (more recomputes) and produces lower accuracy.
+
+This is the **same shape Mode A produces.** Mode A's
+agentic_clustered cell at oversub 0.025 shows CTM+ +192%
+slow-tier-bytes-per-token vs LRU (§4.2). KVSimulator's 4c
+cell shows CTM+ +22% recompute-cost and −5.7pp accuracy vs
+LRU. Two independent simulators, same direction, same
+regression at extreme pressure.
+
+### §11.2 Why we are NOT leading with `important_evictions`
+
+The KVSimulator stress-test report includes a column called
+`ImpEv` that counts evictions of blocks classified as
+`SINK` or `ENTITY`. The headline-friendly version of that
+column is "CTM+ has 0, LRU has 16–75 per scenario." We are
+**not** using that as a headline because the metric is
+partially policy-coupled:
+
+* **SINK blocks are structurally pinned for all policies.**
+  `kv_simulator/buffer_pool.py` adds SINK blocks to a
+  framework-level `pinned` set during prefill (line 658) and
+  passes that same set to every policy's `select_victim`
+  (line 783). LRU, FIFO, Random, and CTM+ all see SINK as
+  off-limits. SINK eviction is not a differentiator.
+* **ENTITY classification overlaps with CTM+'s scoring
+  inputs.** A block is classified ENTITY when its
+  `avg_attention` exceeds a threshold
+  (`buffer_pool.py:_classify_block` line 811). CTM+'s
+  scoring formula directly weights `cumulative_attention`
+  and ENTITY position class (`AttentionAwarePolicy._score`
+  line 460: `0.35 * attn + 0.30 * position + ...`). LRU has
+  no attention signal at all. So "CTM+ avoids ENTITY
+  evictions, LRU doesn't" largely measures "the policy that
+  uses attention as a signal vs the policy that doesn't" —
+  not an independent oracle of which evictions hurt.
+* **`recompute_cost` is the more independent metric** because
+  it observes the actual operational consequence (a block
+  was evicted and then needed) rather than predicting
+  importance from the same signals the policy uses.
+
+Reporting `important_evictions` as the headline would have
+given a misleading "CTM+ has 0, LRU has 16-75" story that
+does not survive technical diligence. The metric is retained
+in the captured log as a secondary signal for completeness,
+but it should always be cited with the policy-coupling
+caveat.
+
+### §11.3 What this section does and does not claim
+
+**Does claim:**
+
+* Two independent simulators (Bench/Mode A and KVSimulator)
+  agree on the qualitative shape of the workload-policy
+  matrix: CTM+ small wins on moderate workloads, regression
+  at extreme pressure.
+* The audit-pass discipline applied to Bench was applied to
+  this cross-confirmation: the obvious "0 important
+  evictions" headline was rejected because the metric is
+  policy-coupled. Mode A's tier-cost predictions are the
+  canonical numbers; KVSimulator is corroboration of shape,
+  not magnitude.
+* Same as Mode A's existing finding: a recency-floor
+  extension (Round 6) is the candidate fix for the
+  extreme-pressure regression.
+
+**Does not claim:**
+
+* That CTM+ beat LRU in all regimes. It does not.
+* That CTM+ is generally superior to LRU. It is not — under
+  extreme pressure it regresses on both recompute and
+  accuracy.
+* That this is real-model evidence. KVSimulator is a
+  simulator; Mode A is a simulator. Real-model CTM+ vs LRU
+  validation remains gated (see the §0 banner).
+
+### §11.4 The conclusion that survives technical diligence
+
+> "CTM+ is promising in moderate-pressure regimes — two
+> independent simulators show small recompute-cost wins on
+> moderate, high, and bimodal workloads. CTM+ is **not**
+> robust under extreme pressure — both simulators show a
+> regression (Bench's `agentic_clustered_64k` at oversub
+> 0.025: +192% slow-tier-bytes-per-token; KVSimulator's
+> 4c Extreme: +22% recompute-cost, −5.7pp accuracy).
+> Therefore the correct framing is not 'CTM+ beats LRU,'
+> but 'CTM+ needs a pressure-aware fallback or adaptive
+> gating before being claimed as generally superior.' Round
+> 6 (explicit recency floor) is the named candidate fix."
+
+This is the conservative claim that holds. Stronger framings
+would not survive a partner's technical review.
