@@ -21,6 +21,7 @@ from ctm_bench.runner_sim import run_sim
 from ctm_bench.tier_model import HBM_DDR_NVME_2025, HBM_HBF_NVME_2025
 from ctm_bench.workload import (
     AGENTIC_64K,
+    AGENTIC_CLUSTERED_64K,
     CHAT_32K,
     RAG_128K,
     WorkloadSpec,
@@ -29,6 +30,7 @@ from ctm_bench.workload import (
 
 _WORKLOADS = {
     "agentic_64k": AGENTIC_64K,
+    "agentic_clustered_64k": AGENTIC_CLUSTERED_64K,
     "rag_128k": RAG_128K,
     "chat_32k": CHAT_32K,
 }
@@ -51,7 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--workloads",
         type=str,
-        default="agentic_64k,rag_128k,chat_32k",
+        default="agentic_64k,agentic_clustered_64k,rag_128k,chat_32k",
         help=(
             "Comma-separated list of workload names. "
             f"Available: {sorted(_WORKLOADS.keys())}"

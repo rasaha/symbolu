@@ -30,7 +30,8 @@ from typing import Iterator, Tuple
 
 
 class AccessPattern(Enum):
-    AGENTIC = "agentic"
+    AGENTIC = "agentic"                       # uniform-random tool re-reads (adversarial)
+    AGENTIC_CLUSTERED = "agentic_clustered"   # Markov-dwell tool re-reads (realistic)
     RAG = "rag"
     CHAT = "chat"
 
@@ -108,6 +109,22 @@ CHAT_32K: WorkloadSpec = WorkloadSpec(
     n_concurrent_seqs=8,
     context_length_tokens=32 * 1024,
     duration_decode_tokens=512,
+)
+
+
+# Clustered-agentic variant: real agent traces don't pick re-read
+# positions uniformly at random. They cluster — the model dwells
+# on the most recent tool output for many steps while reasoning
+# about it, then transitions to a different anchor block. Markov
+# dwell with stay-probability ~0.7 per step is a closer match to
+# observed traces than uniform random.
+
+AGENTIC_CLUSTERED_64K: WorkloadSpec = WorkloadSpec(
+    name="agentic_clustered_64k",
+    pattern=AccessPattern.AGENTIC_CLUSTERED,
+    n_concurrent_seqs=4,
+    context_length_tokens=64 * 1024,
+    duration_decode_tokens=2048,
 )
 
 
@@ -208,6 +225,111 @@ def generate_agentic(spec: WorkloadSpec) -> Iterator[TraceEvent]:
                     position=tool_pos,
                     seq_len=current_seq_len,
                     attention_weight=0.25,
+                    is_prefill=False,
+                )
+            # The newly-generated decode token itself.
+            yield TraceEvent(
+                seq_id=seq_id,
+                block_id=current_block,
+                position=current_pos,
+                seq_len=current_seq_len,
+                attention_weight=0.05,
+                is_prefill=False,
+            )
+
+
+def generate_agentic_clustered(spec: WorkloadSpec) -> Iterator[TraceEvent]:
+    """Realistic clustered-agent pattern.
+
+    Differs from :func:`generate_agentic` in one place: tool-block
+    re-reads are *clustered* (Markov dwell) rather than uniform
+    random. Each sequence has K hot tool blocks at deterministic
+    positions; on each decode step we may either stay on the
+    current hot block (prob 0.7) or transition to a different
+    one (prob 0.3). When dwelling on a hot block, we re-read it
+    every step with high attention.
+
+    This matches observed agentic traces: agents tend to fixate
+    on a specific tool output for many decode steps while
+    reasoning about it, then switch focus.
+
+    Sink + recent re-read behaviour matches the base agentic
+    pattern; only the "tool output" component changes.
+    """
+    if spec.pattern is not AccessPattern.AGENTIC_CLUSTERED:
+        raise ValueError(
+            f"generate_agentic_clustered given non-clustered spec: {spec.pattern}"
+        )
+    rng = random.Random(spec.seed)
+    bs = spec.block_size_tokens
+    n_blocks_per_seq = spec.n_blocks_per_sequence()
+    # K hot tool blocks per sequence, evenly spaced through the
+    # context. Skip the first 256 + last 256 tokens (sink +
+    # recent regions handled by their own re-reads).
+    n_hot_blocks = 8
+
+    for seq_id in range(spec.n_concurrent_seqs):
+        yield from _prefill_events(spec, seq_id)
+
+        # Choose hot block positions for this sequence.
+        usable_min = 256
+        usable_max = max(usable_min + bs * n_hot_blocks, spec.context_length_tokens - 256)
+        if usable_max <= usable_min:
+            hot_positions: list = []
+        else:
+            stride = max(bs, (usable_max - usable_min) // n_hot_blocks)
+            hot_positions = [
+                usable_min + i * stride
+                for i in range(n_hot_blocks)
+                if usable_min + i * stride < usable_max
+            ]
+        current_hot_idx = 0
+        stay_prob = 0.7
+
+        for step in range(spec.duration_decode_tokens):
+            current_pos = spec.context_length_tokens + step
+            current_seq_len = current_pos + 1
+            current_block = _block_id_for(seq_id, current_pos, bs, n_blocks_per_seq)
+            # Sink re-reads (high attention).
+            for sink_pos in range(0, min(4, spec.context_length_tokens)):
+                block_id = _block_id_for(
+                    seq_id, sink_pos, bs, n_blocks_per_seq
+                )
+                yield TraceEvent(
+                    seq_id=seq_id,
+                    block_id=block_id,
+                    position=sink_pos,
+                    seq_len=current_seq_len,
+                    attention_weight=0.4,
+                    is_prefill=False,
+                )
+            # Recent ~10 blocks (medium attention).
+            recent_start = max(0, current_pos - 10 * bs)
+            for pos in range(recent_start, current_pos + 1, bs):
+                block_id = _block_id_for(seq_id, pos, bs, n_blocks_per_seq)
+                yield TraceEvent(
+                    seq_id=seq_id,
+                    block_id=block_id,
+                    position=pos,
+                    seq_len=current_seq_len,
+                    attention_weight=0.15,
+                    is_prefill=False,
+                )
+            # Markov-dwell on a hot tool block. With probability
+            # `stay_prob` we re-read the current hot block again
+            # (with HIGH attention, since the model is reasoning
+            # about it). With (1 - stay_prob) we transition.
+            if hot_positions:
+                if rng.random() > stay_prob:
+                    current_hot_idx = rng.randrange(len(hot_positions))
+                hot_pos = hot_positions[current_hot_idx]
+                block_id = _block_id_for(seq_id, hot_pos, bs, n_blocks_per_seq)
+                yield TraceEvent(
+                    seq_id=seq_id,
+                    block_id=block_id,
+                    position=hot_pos,
+                    seq_len=current_seq_len,
+                    attention_weight=0.35,
                     is_prefill=False,
                 )
             # The newly-generated decode token itself.
@@ -337,6 +459,7 @@ def generate_chat(spec: WorkloadSpec) -> Iterator[TraceEvent]:
 
 _DISPATCH = {
     AccessPattern.AGENTIC: generate_agentic,
+    AccessPattern.AGENTIC_CLUSTERED: generate_agentic_clustered,
     AccessPattern.RAG: generate_rag,
     AccessPattern.CHAT: generate_chat,
 }

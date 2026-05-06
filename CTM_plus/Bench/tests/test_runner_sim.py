@@ -83,6 +83,19 @@ def test_run_sim_fifo_runs_to_completion():
     assert result.n_decode_tokens > 0
 
 
+def test_run_sim_clustered_agentic_workload():
+    spec = _smoke_spec(AccessPattern.AGENTIC_CLUSTERED)
+    result = run_sim(
+        spec,
+        "lru",
+        HBM_DDR_NVME_2025,
+        block_bytes=4096,
+        hbm_oversubscription=0.5,
+    )
+    assert result.n_decode_tokens > 0
+    assert sum(result.accesses_served.values()) > 0
+
+
 def test_run_sim_chat_workload():
     spec = _smoke_spec(AccessPattern.CHAT)
     result = run_sim(
