@@ -1,0 +1,256 @@
+{
+  "alphas": [
+    0.1,
+    0.2
+  ],
+  "cells": [
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999925417661097,
+      "n_decode_tokens": 2048,
+      "policy": "lru",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 2048.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 2048,
+      "policy": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 2048,
+      "policy": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999925417661097,
+      "n_decode_tokens": 2048,
+      "policy": "lru",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 2048.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 2048,
+      "policy": "ctm_plus",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 2048,
+      "policy": "ctm_plus",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999925417661097,
+      "n_decode_tokens": 2048,
+      "policy": "lru",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 2048.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 2048,
+      "policy": "ctm_plus",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 2048,
+      "policy": "ctm_plus",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "workload": "rag_128k"
+    },
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999375832223701,
+      "n_decode_tokens": 8192,
+      "policy": "lru",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 6144.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 0.9999037741344874,
+      "n_decode_tokens": 8192,
+      "policy": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 9472.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 0.9999297811251664,
+      "n_decode_tokens": 8192,
+      "policy": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 6912.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999375832223701,
+      "n_decode_tokens": 8192,
+      "policy": "lru",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 6144.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 0.9998933713382158,
+      "n_decode_tokens": 8192,
+      "policy": "ctm_plus",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 10496.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 0.9999193783288948,
+      "n_decode_tokens": 8192,
+      "policy": "ctm_plus",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 7936.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999375832223701,
+      "n_decode_tokens": 8192,
+      "policy": "lru",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 6144.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 0.9998985727363515,
+      "n_decode_tokens": 8192,
+      "policy": "ctm_plus",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 9984.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 0.9999219790279628,
+      "n_decode_tokens": 8192,
+      "policy": "ctm_plus",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 7680.0,
+      "workload": "agentic_clustered_64k"
+    },
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999864586718665,
+      "n_decode_tokens": 4096,
+      "policy": "lru",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 16384.0,
+      "workload": "chat_32k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 0.9999860355053624,
+      "n_decode_tokens": 4096,
+      "policy": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 16896.0,
+      "workload": "chat_32k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 0.9999864586718665,
+      "n_decode_tokens": 4096,
+      "policy": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 16384.0,
+      "workload": "chat_32k"
+    },
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999864586718665,
+      "n_decode_tokens": 4096,
+      "policy": "lru",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 16384.0,
+      "workload": "chat_32k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 0.9999860355053624,
+      "n_decode_tokens": 4096,
+      "policy": "ctm_plus",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 16896.0,
+      "workload": "chat_32k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 0.9999864586718665,
+      "n_decode_tokens": 4096,
+      "policy": "ctm_plus",
+      "seed": 137,
+      "slow_tier_bytes_per_decode_token": 16384.0,
+      "workload": "chat_32k"
+    },
+    {
+      "alpha": null,
+      "hbm_hit_rate": 0.9999864586718665,
+      "n_decode_tokens": 4096,
+      "policy": "lru",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 16384.0,
+      "workload": "chat_32k"
+    },
+    {
+      "alpha": 0.1,
+      "hbm_hit_rate": 0.9999860355053624,
+      "n_decode_tokens": 4096,
+      "policy": "ctm_plus",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 16896.0,
+      "workload": "chat_32k"
+    },
+    {
+      "alpha": 0.2,
+      "hbm_hit_rate": 0.9999864586718665,
+      "n_decode_tokens": 4096,
+      "policy": "ctm_plus",
+      "seed": 271,
+      "slow_tier_bytes_per_decode_token": 16384.0,
+      "workload": "chat_32k"
+    }
+  ],
+  "seeds": [
+    42,
+    137,
+    271
+  ]
+}

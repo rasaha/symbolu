@@ -1,0 +1,378 @@
+{
+  "cells": [
+    {
+      "accesses_served": {
+        "DDR": 0,
+        "HBM": 377960,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 2762.5267230353015,
+      "bytes_read": {
+        "DDR": 0,
+        "HBM": 792639569920,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 21265121280,
+        "HBM": 35433480192,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 310259442.1875,
+        "HBM": 733865158.0509225,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 10140,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 16384,
+      "policy_name": "lru",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 2.360362050000049,
+      "workload_name": "agentic_64k"
+    },
+    {
+      "accesses_served": {
+        "DDR": 0,
+        "HBM": 377960,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 2762.5267230353015,
+      "bytes_read": {
+        "DDR": 0,
+        "HBM": 792639569920,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 21265121280,
+        "HBM": 35433480192,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 310259442.1875,
+        "HBM": 733865158.0509225,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 10140,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 16384,
+      "policy_name": "fifo",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 2.24967897800002,
+      "workload_name": "agentic_64k"
+    },
+    {
+      "accesses_served": {
+        "DDR": 71,
+        "HBM": 377889,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 2773.86035870442,
+      "bytes_read": {
+        "DDR": 148897792,
+        "HBM": 792490672128,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 21409824768,
+        "HBM": 35582377984,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 314543103.125,
+        "HBM": 733865158.0509225,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 10209,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 0.9998121494338025,
+      "n_decode_tokens": 16384,
+      "policy_name": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 9088.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 50.46688041800007,
+      "workload_name": "agentic_64k"
+    },
+    {
+      "accesses_served": {
+        "DDR": 2,
+        "HBM": 268158,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 3104.212144486546,
+      "bytes_read": {
+        "DDR": 4194304,
+        "HBM": 562368086016,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 20786970624,
+        "HBM": 34632368128,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 303344389.53125,
+        "HBM": 529081139.1342622,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 9912,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 0.9999925417661097,
+      "n_decode_tokens": 4096,
+      "policy_name": "lru",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 1024.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 1.761739198999976,
+      "workload_name": "rag_128k"
+    },
+    {
+      "accesses_served": {
+        "DDR": 2,
+        "HBM": 268158,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 3104.212144486546,
+      "bytes_read": {
+        "DDR": 4194304,
+        "HBM": 562368086016,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 20786970624,
+        "HBM": 34632368128,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 303344389.53125,
+        "HBM": 529081139.1342622,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 9912,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 0.9999925417661097,
+      "n_decode_tokens": 4096,
+      "policy_name": "fifo",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 1024.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 1.729955789000087,
+      "workload_name": "rag_128k"
+    },
+    {
+      "accesses_served": {
+        "DDR": 0,
+        "HBM": 268160,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 3103.7557366982855,
+      "bytes_read": {
+        "DDR": 0,
+        "HBM": 562372280320,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 20782776320,
+        "HBM": 34628173824,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 303221999.21875,
+        "HBM": 529081139.1342622,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 9910,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 4096,
+      "policy_name": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 47.303661238999894,
+      "workload_name": "rag_128k"
+    },
+    {
+      "accesses_served": {
+        "DDR": 0,
+        "HBM": 2363136,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 2000.9226256110703,
+      "bytes_read": {
+        "DDR": 0,
+        "HBM": 4955855388672,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 20937965568,
+        "HBM": 34896609280,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 305486220.0,
+        "HBM": 4422966069.796042,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 9984,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 4096,
+      "policy_name": "lru",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 10.421567584000059,
+      "workload_name": "chat_32k"
+    },
+    {
+      "accesses_served": {
+        "DDR": 0,
+        "HBM": 2363136,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 2000.9226256110703,
+      "bytes_read": {
+        "DDR": 0,
+        "HBM": 4955855388672,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 20937965568,
+        "HBM": 34896609280,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 305486220.0,
+        "HBM": 4422966069.796042,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 9984,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 4096,
+      "policy_name": "fifo",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 10.233769751999944,
+      "workload_name": "chat_32k"
+    },
+    {
+      "accesses_served": {
+        "DDR": 0,
+        "HBM": 2363136,
+        "NVMe": 0
+      },
+      "avg_access_latency_ns": 2000.9226256110703,
+      "bytes_read": {
+        "DDR": 0,
+        "HBM": 4955855388672,
+        "NVMe": 0
+      },
+      "bytes_written": {
+        "DDR": 20937965568,
+        "HBM": 34896609280,
+        "NVMe": 0
+      },
+      "cumulative_latency_ns": {
+        "DDR": 305486220.0,
+        "HBM": 4422966069.796042,
+        "NVMe": 0.0
+      },
+      "evictions_to_tier": {
+        "DDR": 9984,
+        "HBM": 0,
+        "NVMe": 0
+      },
+      "hbm_hit_rate": 1.0,
+      "n_decode_tokens": 4096,
+      "policy_name": "ctm_plus",
+      "seed": 42,
+      "slow_tier_bytes_per_decode_token": 0.0,
+      "tier_config_name": "hbm_ddr_nvme",
+      "wall_clock_seconds": 54.46801403199993,
+      "workload_name": "chat_32k"
+    }
+  ],
+  "pairs": [
+    {
+      "baseline": "lru",
+      "lru_slow_tier_bytes_per_token": 0.0,
+      "policy": "fifo",
+      "policy_slow_tier_bytes_per_token": 0.0,
+      "reduction_pct_vs_lru": 0.0,
+      "workload": "agentic_64k"
+    },
+    {
+      "baseline": "lru",
+      "lru_slow_tier_bytes_per_token": 0.0,
+      "policy": "ctm_plus",
+      "policy_slow_tier_bytes_per_token": 9088.0,
+      "reduction_pct_vs_lru": null,
+      "workload": "agentic_64k"
+    },
+    {
+      "baseline": "lru",
+      "lru_slow_tier_bytes_per_token": 1024.0,
+      "policy": "fifo",
+      "policy_slow_tier_bytes_per_token": 1024.0,
+      "reduction_pct_vs_lru": 0.0,
+      "workload": "rag_128k"
+    },
+    {
+      "baseline": "lru",
+      "lru_slow_tier_bytes_per_token": 1024.0,
+      "policy": "ctm_plus",
+      "policy_slow_tier_bytes_per_token": 0.0,
+      "reduction_pct_vs_lru": 100.0,
+      "workload": "rag_128k"
+    },
+    {
+      "baseline": "lru",
+      "lru_slow_tier_bytes_per_token": 0.0,
+      "policy": "fifo",
+      "policy_slow_tier_bytes_per_token": 0.0,
+      "reduction_pct_vs_lru": 0.0,
+      "workload": "chat_32k"
+    },
+    {
+      "baseline": "lru",
+      "lru_slow_tier_bytes_per_token": 0.0,
+      "policy": "ctm_plus",
+      "policy_slow_tier_bytes_per_token": 0.0,
+      "reduction_pct_vs_lru": 0.0,
+      "workload": "chat_32k"
+    }
+  ]
+}
