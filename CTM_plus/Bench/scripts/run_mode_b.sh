@@ -15,13 +15,32 @@
 #   * Free NVMe partition with >= 50GB (for swap_space backing)
 #
 # Usage:
-#   ./scripts/run_mode_b.sh [--quick] [--full] [--rag-only] [--agentic-only]
+#   ./scripts/run_mode_b.sh [--quick] [--full] [--rag-only] \
+#                           [--agentic-only] [--heavy-spillover]
 #
 # Time estimates (single A100):
-#   --quick           ~5 min   (smoke run on small workload)
-#   --rag-only        ~25 min  (1 model × 2 policies × 1 workload × 3 seeds)
-#   --agentic-only    ~25 min  (1 model × 2 policies × 1 workload × 3 seeds)
-#   --full            ~75 min  (1 model × 2 policies × 3 workloads × 3 seeds)
+#   --quick           ~5 min   (1 workload × 2 policies × 1 seed = 2 cells)
+#   --rag-only        ~25 min  (1 workload × 2 policies × 3 seeds = 6 cells)
+#   --agentic-only    ~25 min  (1 workload × 2 policies × 3 seeds = 6 cells)
+#   --full            ~75 min  (3 workloads × 2 policies × 3 seeds = 18 cells)
+#   --heavy-spillover ~25 min  (1 workload × 2 policies × 3 seeds = 6 cells,
+#                               at tighter GPU_MEM_UTIL to engage HBF tier)
+#
+# Mode A's tightest-spillover regime (oversub 0.025) found the 52%
+# latency-cut headline on chat_32k. --heavy-spillover targets the
+# real-model analog by lowering GPU_MEM_UTIL to 0.22 (default for
+# A100-80GB) so vLLM's KV budget squeezes hard enough to engage
+# the CPU-pinned + NVMe-mmap'd swap_space tier on every decode
+# step. This is the cell where HBF would matter most in production;
+# Mode B can't model the HBF tier directly (no HBF on a real GPU
+# yet) but can validate that CTM+'s containment property holds
+# under heavy real-model pressure.
+#
+# NOTE: --heavy-spillover's GPU_MEM_UTIL default of 0.22 assumes
+# A100-80GB. For A100-40GB use GPU_MEM_UTIL_HEAVY=0.42; for
+# H100-80GB use 0.22 unchanged; for RTX 4090 (24GB) try 0.92 and
+# expect partial-only spillover. See MODE_B_RUNBOOK.md §4 for the
+# tuning math.
 #
 # What "winning" looks like in the output:
 #   * RAG  : CTM+ slow_tier_B/tok < LRU slow_tier_B/tok by ≥ 50%
@@ -31,8 +50,14 @@
 #            (Mode A showed +22% gap at α=0.20; if the gap
 #            blows out to >50% on a real model, the production
 #            default change is not safe and should be reverted.)
-#   * CHAT : CTM+ ≤ LRU at parity. Failure here would be a
-#            real-model-specific regression the harness missed.
+#   * CHAT (--full) : CTM+ ≤ LRU at parity. Failure here would
+#            be a real-model-specific regression the harness
+#            missed.
+#   * CHAT (--heavy-spillover) : CTM+ slow_tier_B/tok ≤ 70% of
+#            LRU's. Mode A showed CTM+ at 61% of LRU
+#            (657 MB vs 1.08 GB per token) — the
+#            "containment" effect that delivered the 52% latency
+#            cut when stacked with HBF.
 
 set -euo pipefail
 
@@ -40,8 +65,10 @@ set -euo pipefail
 
 # Defaults — override via env vars before invocation.
 MODEL=${MODEL:-meta-llama/Llama-3.1-8B-Instruct}
-GPU_MEM_UTIL=${GPU_MEM_UTIL:-0.30}     # forces KV-cache spillover
+GPU_MEM_UTIL=${GPU_MEM_UTIL:-0.30}                # forces some KV-cache spillover
+GPU_MEM_UTIL_HEAVY=${GPU_MEM_UTIL_HEAVY:-0.22}    # --heavy-spillover override
 SWAP_SPACE_GB=${SWAP_SPACE_GB:-8}
+SWAP_SPACE_GB_HEAVY=${SWAP_SPACE_GB_HEAVY:-16}    # double swap budget under heavy pressure
 SEEDS=(42 137 271)
 OUT_DIR=${OUT_DIR:-bench_out/mode_b_$(date +%Y%m%d_%H%M%S)}
 
@@ -56,26 +83,46 @@ POLICIES=(lru ctm_plus)
 
 MODE="full"
 case ${1:-} in
-    --quick)        MODE="quick" ;;
-    --rag-only)     MODE="rag_only" ;;
-    --agentic-only) MODE="agentic_only" ;;
-    --full|"")      MODE="full" ;;
+    --quick)            MODE="quick" ;;
+    --rag-only)         MODE="rag_only" ;;
+    --agentic-only)     MODE="agentic_only" ;;
+    --heavy-spillover)  MODE="heavy_spillover" ;;
+    --full|"")          MODE="full" ;;
     -h|--help)
         sed -n '2,/^set -euo/p' "$0" | sed 's/^# \?//'
         exit 0
         ;;
     *)
         echo "ERROR: unknown argument $1" >&2
-        echo "Usage: $0 [--quick|--rag-only|--agentic-only|--full]" >&2
+        echo "Usage: $0 [--quick|--rag-only|--agentic-only|--heavy-spillover|--full]" >&2
         exit 2
         ;;
 esac
 
 case "$MODE" in
-    quick)         WORKLOADS=("${WORKLOADS_RAG[@]}"); SEEDS=(42) ;;
-    rag_only)      WORKLOADS=("${WORKLOADS_RAG[@]}") ;;
-    agentic_only)  WORKLOADS=("${WORKLOADS_AGENTIC[@]}") ;;
-    full)          WORKLOADS=("${WORKLOADS_FULL[@]}") ;;
+    quick)
+        WORKLOADS=("${WORKLOADS_RAG[@]}")
+        SEEDS=(42)
+        ;;
+    rag_only)
+        WORKLOADS=("${WORKLOADS_RAG[@]}")
+        ;;
+    agentic_only)
+        WORKLOADS=("${WORKLOADS_AGENTIC[@]}")
+        ;;
+    heavy_spillover)
+        # Target the Mode A oversub-0.025 regime where the 52%
+        # latency cell lives. Tighten GPU_MEM_UTIL so vLLM's KV
+        # budget engages CPU-pinned + NVMe-mmap'd swap on every
+        # decode step. Bigger swap_space so blocks have room to
+        # land. Workload is chat_32k (where the cell exists).
+        WORKLOADS=("${WORKLOADS_CHAT[@]}")
+        GPU_MEM_UTIL="$GPU_MEM_UTIL_HEAVY"
+        SWAP_SPACE_GB="$SWAP_SPACE_GB_HEAVY"
+        ;;
+    full)
+        WORKLOADS=("${WORKLOADS_FULL[@]}")
+        ;;
 esac
 
 # ----- Pre-flight checks ------------------------------------------- #
@@ -231,11 +278,24 @@ echo "==> Done."
 echo "==> Summary: $OUT_DIR/all_cells.json"
 echo "==> Logs:    $OUT_DIR/*.log"
 echo
-echo "==> Next steps:"
-echo "  1. Verify CTM+ wins on RAG (slow_tier_B/tok much lower than LRU)."
-echo "  2. Verify CTM+ regression on agentic_clustered is < 30% of LRU."
-echo "  3. If both hold, the production default change (alpha=0.20) is"
-echo "     validated against real attention weights. Update RESULTS.md §4"
-echo "     with the Mode B numbers and consider promoting CTM+ to STABLE_API."
-echo "  4. If either fails, capture the failure mode + revert the production"
-echo "     default in a follow-up commit."
+echo "==> Next steps (depending on which mode you ran):"
+echo "  --rag-only        : verify CTM+ slow_tier_B/tok is at least 50%"
+echo "                      below LRU's. Mode A predicted -100%."
+echo "  --agentic-only    : verify CTM+ regression vs LRU is within +30%."
+echo "                      Mode A predicted +12.5% to +29% at oversub 0.10."
+echo "  --heavy-spillover : verify CTM+ slow_tier_B/tok is at most 70% of"
+echo "                      LRU's. Mode A predicted CTM+ at 61% of LRU"
+echo "                      (657 MB vs 1.08 GB per token) — the containment"
+echo "                      effect that delivers the 52% latency cut when"
+echo "                      stacked with HBF in production."
+echo "  --full            : all three workloads at moderate spillover."
+echo
+echo "If predictions hold across the modes you ran, the production default"
+echo "change (attention_ema_alpha=0.2) is validated against real attention"
+echo "weights. Update bench_out/RESULTS.md §0 banner from \"Mode A only\""
+echo "to \"Mode A + Mode B validated\" and append a §11 section with the"
+echo "Mode B numbers. Reproducer-citation template in MODE_B_RUNBOOK.md §5."
+echo
+echo "If predictions break (RAG < 25% reduction OR agentic > +50% regression"
+echo "OR chat regression under heavy spillover), see MODE_B_RUNBOOK.md §3"
+echo "Step 7 for the git revert recipe."

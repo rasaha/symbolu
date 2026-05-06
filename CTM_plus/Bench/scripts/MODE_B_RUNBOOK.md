@@ -167,6 +167,58 @@ to add chat:
 ./scripts/run_mode_b.sh --full 2>&1 | tee mode_b_full.log
 ```
 
+### Step 5.5 — Validate the 52% headline (--heavy-spillover)
+
+`--full` runs at the default `GPU_MEM_UTIL=0.30`, which engages
+spillover but not the *extreme* regime where the 52% latency
+headline lives in Mode A (oversub 0.025). To validate that
+specific cell on real hardware, use `--heavy-spillover`:
+
+```bash
+./scripts/run_mode_b.sh --heavy-spillover 2>&1 | tee mode_b_heavy.log
+```
+
+This runs chat_32k × {LRU, CTM+} × 3 seeds at
+`GPU_MEM_UTIL=0.22` (default for A100-80GB) and 16 GB
+swap_space — the real-model analog of Mode A's tightest tier-0
+budget.
+
+**Validation threshold:**
+
+| Cell | Mode A predicted | Mode B threshold | If breached |
+|---|---:|---:|---|
+| chat_32k @ heavy spillover | CTM+ at 61% of LRU's slow-tier B/tok (657 MB vs 1.08 GB) → containment | CTM+ ≤ 70% of LRU | Containment property doesn't hold under real attention. Round 6 priority + revisit α=0.20 |
+
+The 52% **latency** number from Mode A §2 came from combining
+this containment effect with the HBF tier model. Mode B can't
+model HBF (no HBF on a real GPU yet), so this step validates
+only the eviction-policy half of the stack. The HBF tier half
+remains a Mode A prediction until SanDisk parts are sampling
+or a partner runs CTM+ on their internal HBF prototype.
+
+**GPU-size tuning for `GPU_MEM_UTIL_HEAVY`:** the default 0.22
+assumes A100-80GB. The math: vLLM allocates `GPU_MEM_UTIL ×
+total_VRAM` for itself, then loads the model weights, then
+fills the rest with KV cache. To force chat_32k to spill, the
+KV budget needs to be < ~1 GB. For other GPUs:
+
+| GPU | VRAM | Llama-3.1-8B weights | `GPU_MEM_UTIL_HEAVY` |
+|---|---:|---:|---:|
+| A100-80GB / H100-80GB | 80 GB | ~16 GB | 0.22 (~17.6 GB total → ~1.6 GB KV) |
+| A100-40GB | 40 GB | ~16 GB | 0.42 (~16.8 GB → ~0.8 GB KV) |
+| RTX 4090 | 24 GB | ~16 GB | 0.92 (~22 GB → ~6 GB KV) — partial spillover only |
+| RTX 4090 | 24 GB | Mistral-7B (~14 GB) | 0.85 (~20 GB → ~6 GB KV) — partial spillover only |
+
+24 GB cards struggle to model heavy spillover for an 8B model
+(model weights eat too much of the budget). For a clean heavy-
+spillover validation on a smaller GPU, use a smaller model:
+
+```bash
+MODEL=mistralai/Mistral-7B-Instruct-v0.2 \
+GPU_MEM_UTIL_HEAVY=0.92 \
+./scripts/run_mode_b.sh --heavy-spillover
+```
+
 ### Step 6 — Interpret the output
 
 The script's tail prints something like:
@@ -243,12 +295,13 @@ git push origin claude/safety-state-machine-Rrvj2
 | --quick smoke | 5 min | 0.08 |
 | --rag-only (3 seeds × 2 policies) | 25 min | 0.42 |
 | --agentic-only (3 seeds × 2 policies) | 25 min | 0.42 |
+| --heavy-spillover (chat × 3 seeds × 2 policies) | 25 min | 0.42 |
 | --full (3 workloads × 3 seeds × 2 policies) | 75 min | 1.25 |
-| **Recommended sequence** (smoke → focused → full) | **~110 min** | **~1.83** |
+| **Recommended sequence** (smoke → focused → heavy → full) | **~135 min** | **~2.25** |
 
-At AWS p4d.24xlarge spot rate (~$10/GPU-hour) that's < $20.
+At AWS p4d.24xlarge spot rate (~$10/GPU-hour) that's < $25.
 At RunPod A100 spot rate (~$1.20/hour) that's < $3. RTX 4090
-on Vast.ai (~$0.40/hour) is < $1. The benchmark is genuinely
+on Vast.ai (~$0.40/hour) is < $1.50. The benchmark is genuinely
 cheap to validate; **the cost of NOT validating is shipping
 unverified production-default claims to a partner.**
 
