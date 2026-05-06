@@ -16,36 +16,37 @@ of GPU runtime** for the full sweep.
 > claimed compatibility with vLLM ≥ 0.4.0 — that claim is wrong
 > for any vLLM released after mid-2024.
 >
+> **Additional finding from the May 2026 GPU run** (see §9):
+> vLLM's batch-mode `engine.generate(...)` API does **not**
+> trigger preemption-based swap on **any** vLLM version with
+> the default FCFS scheduler. Every prompt either fits in HBM
+> at submission time (no swap needed) or queues until the
+> active set frees (still no swap). This is a runner-architecture
+> gap, **not** a CTM+ logic gap. To validate CTM+ vs LRU via
+> swap-counter measurements would require an async/preemptive
+> runner — documented as future work in §9.
+>
+> The achievable Mode B path on current code is **latency-based
+> cross-check** (option C in §9): measure real-model
+> per-decode-token wall-clock under vLLM, cross-reference the
+> directional ranking against Mode A predictions. The
+> `latency_cross_check` tool ships in `ctm_bench/scripts/`; see
+> §9.4 for usage.
+>
 > What works on each vLLM line:
 >
 > | vLLM | LRU baseline | CTM+ patch | Counter extraction |
 > |---|---|---|---|
 > | ≤ 0.4.x | untested today | should work | unknown |
-> | 0.5.x - 0.7.x | ✅ runs | ❌ raises NotImplementedError | ✅ via get_and_reset_swaps |
-> | ≥ 0.8.x | likely runs | ❌ same NotImplementedError | unknown — API may have shifted again |
->
-> **Practical implication:** the head-to-head LRU vs CTM+ Mode B
-> validation is **not achievable today** without one of:
->
-> 1. **(Recommended) LRU-only validation against Mode A.** Run
->    LRU-only on the current vLLM and cross-check the real-model
->    LRU slow-tier byte counts against Mode A's LRU predictions.
->    If they match, the tier model is calibrated correctly, and
->    Mode A's CTM+ predictions carry by extension because the
->    policy math is deterministic. See §3.5 for this protocol.
->
-> 2. **(High-effort) vLLM 0.4.x pin** — vllm==0.4.3 targets the
->    BlockSpaceManagerV1 the patch was written for. Comes with
->    CUDA 12.1 wheels (run on CUDA 12.4 driver via backward compat)
->    + older PyTorch. Newer models (Qwen2.5, Llama-3.1) may not
->    be supported on that vLLM. Untested today.
->
-> 3. **(Multi-day rewrite) CTM+ vLLM 0.7+ integration** — see
->    §8 for scope.
+> | 0.5.x - 0.7.x | ✅ runs (no swap counters in batch mode) | ❌ raises NotImplementedError | ✅ but always reads zero |
+> | ≥ 0.8.x | likely runs | ❌ same NotImplementedError | unknown |
 >
 > Mode A's 5-round results are unaffected by any of this. The
 > simulator's CTM+ predictions stand on their own; what's gated
-> is *real-model validation* of those predictions.
+> is *real-model swap-counter validation* of those predictions.
+> The latency cross-check provides **directional validation**
+> (qualitative agreement on workload ordering) without requiring
+> the swap path to engage.
 
 ## §1 What this validates and why it matters
 
@@ -551,3 +552,189 @@ A dry-run takes ~30-60 seconds (model load only, no
 generation). On a vLLM-incompatible host this will fail at
 the patch-install step in seconds rather than after a 5-minute
 generation cell.
+
+## §9 vLLM batch-mode swap-engagement gap (May 2026 finding)
+
+The first GPU run on RunPod surfaced a fundamental architectural
+gap that reframes what Mode B can validate. The conclusions in
+this section are **conservative**: they describe what the
+existing data + harness can defensibly prove, and explicitly
+flag what would require additional work.
+
+### §9.1 The conservative conclusion (six bullets)
+
+1. **The current Mode B harness is valid for real-model
+   execution and timing.** Model weights load, attention runs,
+   wall-clock timings are accurate. `n_decode_tokens` matches
+   workload specs. Counter-extraction reaches the right vLLM
+   APIs (`block_allocator.get_and_reset_swaps()` on vLLM 0.7).
+2. **Swap counters staying zero is a true finding, not a
+   parser failure.** vLLM's `get_and_reset_swaps()` returned
+   an empty mapping; the harness honestly reports
+   `counter_source = vllm_0_7_no_swaps_observed` to
+   distinguish "API works, no swaps happened" from "API path
+   didn't match" or "no measurement attempted."
+3. **vLLM batch-mode FCFS execution does not trigger
+   preemption/swap.** With the default first-come-first-served
+   scheduler and `engine.generate(prompts=[...])` submitting
+   all prompts at once with default priority, vLLM either
+   admits a prompt (it fits) or queues it (waits for active
+   prompts to complete). It does not preempt running prompts
+   to make room.
+4. **Therefore, swap-counter validation is blocked by runner
+   architecture, not CTM+/PCAM logic.** The CTM+ policy code,
+   the simulator's tier-cost model, and Mode A's 5-round
+   results are unaffected. What's blocked is the empirical
+   swap-byte cross-check between Mode A and Mode B.
+5. **Existing data should be used for latency / throughput
+   cross-check.** Mode B does produce reliable per-decode-token
+   wall-clock measurements; Mode A produces predicted
+   `avg_access_latency_ns` per workload. They are not the same
+   quantity, but the **directional ranking** between workloads
+   should agree if Mode A's tier model captures the right
+   relative weights. See §9.4 for the cross-check tool.
+6. **Future swap-counter validation requires an async /
+   preemptive runner.** A runner that uses `AsyncLLMEngine`,
+   submits prompts at controlled rates that exceed the
+   active-set capacity, and configures vLLM's scheduler for
+   preemption would generate real swap traffic that
+   `get_and_reset_swaps()` could measure. Estimated scope:
+   2-3 days. **Not justified by current partner conversations**
+   — this work should be triggered only by a specific request
+   for swap-counter evidence.
+
+### §9.2 What we tested + what we observed
+
+Five Mode B runs on a RunPod A100 80GB with Qwen2.5-7B-Instruct:
+
+| Workload | GPU mem | max_model_len | Outcome |
+|---|---:|---:|---|
+| rag_128k (1 seed) | 0.30 | 32K (default) | Truncated to 32K, 2 decode tokens generated, no spillover |
+| chat_32k (3 seeds) | 0.30 | 32K | 4096 decode tokens each, 17-19s wall, **no swap engaged** |
+| rag_128k (3 seeds) | 0.30 | 131K | 2048 decode tokens each, 22-33s wall, **no swap engaged** |
+| rag_128k (3 attempts) | 0.22 | 131K | vLLM refused to start: KV cache too small to hold one max-length request |
+| (dry-run only) | 0.30 | default | Patch failed loud with `NotImplementedError` (vLLM 0.6.6 has new architecture) |
+
+Cumulative GPU time spent: ~15 minutes wall (~$0.30 at RunPod
+A100 spot rate). The runs produced enough latency data for the
+Mode A vs Mode B directional cross-check.
+
+### §9.3 Why no swap engaged (the architectural detail)
+
+Three independent reasons, any one sufficient:
+
+1. **vLLM's swap is preemption-only.** `swap_space` stores KV
+   for sequences that have been **preempted**, not for any
+   sequence whose KV happens to overflow GPU memory. The
+   docs are explicit on this. Without preemption pressure,
+   swap_space is unused.
+2. **Default scheduler doesn't preempt.** vLLM's default is
+   FCFS — running sequences continue until completion. New
+   sequences queue if KV is full. No preemption events.
+3. **Batch generate doesn't create pressure.** Submitting all
+   prompts at once via `engine.generate(prompts=[...])` is the
+   easy case for the scheduler — it picks however many fit
+   into the active set and runs them; the rest wait. Streaming
+   submission via the async API would create a different
+   pattern, but our runner doesn't use that path.
+
+vLLM's hard invariant ("max_model_len must fit in GPU KV cache")
+prevents the workaround of "make a single request bigger than
+the budget" — vLLM refuses to start that configuration.
+
+### §9.4 Latency cross-check (the canonical Mode B story)
+
+Use the data Mode B *can* produce — wall-clock per decode token
+— and cross-check against Mode A's predicted ranking:
+
+```bash
+# After you have Mode B vllm_summary.json files in some directory:
+python -m ctm_bench.scripts.latency_cross_check \
+    --mode-b-dir /workspace/lru_validation \
+    --mode-a-summary bench_out/round4_multi_seed/multi_seed_summary.json \
+    --output /workspace/lru_validation/cross_check.md
+```
+
+The tool aggregates Mode B per-decode-token wall across seeds,
+loads Mode A's `avg_access_latency_ns` predictions, and renders
+a markdown report comparing **directional rankings** of which
+workloads Mode A says should be slowest vs which Mode B
+actually measures slowest.
+
+Match in directional ranking is **qualitative validation** that
+Mode A's tier-cost model captures the right relative weights.
+Disagreement is informative — flag, don't paper over.
+
+The tool is non-invasive (doesn't need a GPU) and runs in
+under a second on the existing data.
+
+### §9.5 Honest scope of the latency cross-check
+
+**It is** evidence that Mode A's tier model captures the right
+qualitative ordering. If Mode A predicts workload X has higher
+average access latency than workload Y, and Mode B's measured
+per-token wall agrees, the tier model isn't fundamentally
+mis-calibrated.
+
+**It isn't** absolute-magnitude calibration. Mode A's
+`avg_access_latency_ns` is per-cache-block-access in nanoseconds;
+Mode B's per-token wall is total wall-clock per generated token
+in milliseconds. They include different things — Mode B includes
+compute, model forward passes, Python overhead, kernel launch
+costs — so a constant-ratio mapping between them is not
+defensible.
+
+**It isn't** a substitute for swap-byte validation. The
+question "does Mode A correctly predict the magnitude of
+slow-tier traffic on a real model" remains open. A streaming
+runner (§9.6) is the path to answering that question.
+
+### §9.6 Streaming runner — future work, gated on partner request
+
+Specs for the rewrite, **for reference only**:
+
+* Switch from `LLM(...).generate(prompts=[...])` to
+  `AsyncLLMEngine` with `add_request()` calls over time.
+* Implement a request-arrival distribution (Poisson or empirical
+  inter-arrival times) that exceeds the steady-state capacity
+  of the active set.
+* Configure vLLM scheduler with `preemption_mode="swap"` (or
+  the equivalent for the active vLLM version).
+* Capture `block_allocator.get_and_reset_swaps()` periodically
+  during the run rather than only at the end.
+
+Estimated scope: 2-3 days. Not started; not on the roadmap until
+a partner conversation explicitly requires real-vLLM
+swap-counter evidence to close. The Mode A 5-round results +
+the latency cross-check are sufficient evidence for current
+partner-conversation purposes.
+
+### §9.7 Salvaging the data we have
+
+The Mode B runs already done (chat_32k 3 seeds, rag_long 3
+seeds, plus the early single-seed cells) are valid for the
+latency cross-check. Before shutting down a RunPod instance:
+
+```bash
+# On the RunPod, copy the validation directory to a safe
+# location + create the cross-check report.
+mkdir -p /workspace/lru_validation_archive
+cp -r /workspace/lru_validation /workspace/lru_validation_archive/
+
+# Repo paths assume git pull is up to date.
+cd /workspace/symbolu
+git pull origin claude/safety-state-machine-Rrvj2
+cd CTM_plus/Bench
+
+python -m ctm_bench.scripts.latency_cross_check \
+    --mode-b-dir /workspace/lru_validation \
+    --mode-a-summary bench_out/round4_multi_seed/multi_seed_summary.json \
+    --output /workspace/lru_validation_archive/cross_check.md
+
+# Then scp /workspace/lru_validation_archive off the RunPod
+# before shutting it down.
+```
+
+The cross_check.md output is small (~1 KB) and archives the
+key finding. The full /workspace/lru_validation_archive can be
+preserved for later analysis if a streaming runner is built.
