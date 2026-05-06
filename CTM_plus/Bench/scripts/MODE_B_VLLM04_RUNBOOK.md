@@ -1,8 +1,15 @@
 # Mode B on vLLM 0.4 — Validation Roadmap #2
 
-**Status:** code + runbook complete (this session).
-**Execution:** requires GPU; deferred until you have RunPod or
-similar.
+**Status:** code + runbook complete (this session). Patch
+compatibility verified on a RunPod A100 against vLLM 0.4.0 —
+the CTM+ evictor only installs when `enable_prefix_caching=True`
+(see §1.1 below). The runner now passes that flag by default
+(commit landing this fix; 147 tests pass including a regression
+test that pins the flag for both policies).
+**Execution:** the GPU smoke produced a valid CachedBlockAllocator
++ LRUEvictor target on vLLM 0.4.0; full sweep deferred until a
+model that fits the canonical workloads (Mistral-v0.1 with
+rope_scaling fix, or a custom workload spec at smaller context).
 **Audience:** internal. The partner-facing version is the
 `PARTNER_VALIDATION_NOTE.md` §4 Path B specification.
 
@@ -14,7 +21,7 @@ distinct from `MODE_B_RUNBOOK.md`:
 |---|---|---|
 | vLLM version | any | pinned 0.4.x |
 | Policies that run | LRU only on 0.5+ | both LRU and CTM+ |
-| Status | harness validated; CTM+ NOT exercised | CTM+ actually runs through the patch |
+| Status | harness validated; CTM+ NOT exercised | CTM+ patch verified to install on CachedBlockAllocator (vLLM 0.4.0); full sweep on hold pending model-fit fix |
 | Defensible claim | timing/harness | calibration on a historical stack |
 | Production relevance | direct | indirect (vLLM 0.4 is no longer in production use) |
 
@@ -23,6 +30,38 @@ model" as a claim risk** — at the cost of running on a vLLM
 version partners don't deploy. Modern-stack validation
 (roadmap #3 or Path B) remains gated on the allocator-architecture
 rewrite or a partner-specific serving harness.
+
+## §1.1 Prefix-caching dependency (May 2026 GPU finding)
+
+A RunPod A100 probe of vLLM 0.4.0's allocator structure (see
+the `gpu_allocator probe` in this runbook's revision history)
+surfaced a non-obvious dependency the original patch docstring
+did not state:
+
+| `LLM(...)` configuration | Allocator class | Has `evictor`? | CTM+ patch installs? |
+|---|---|---|---|
+| `enable_prefix_caching=False` (default) | `UncachedBlockAllocator` | No | **No (silent no-op)** |
+| `enable_prefix_caching=True` | `CachedBlockAllocator` | Yes (`LRUEvictor`) | **Yes** |
+
+The CTM+ evictor patch was always written for the prefix-caching
+path. With prefix caching off, the patch detects the missing
+attribute, emits a warning (`gpu_allocator has no 'evictor'
+attribute`), and the run silently uses vLLM's default LRU. The
+runner now defaults `enable_prefix_caching=True` for both `lru`
+and `ctm_plus` cells so the comparison is apples-to-apples
+(same allocator class; only the evictor implementation differs).
+
+**What this means for the eviction question.** With prefix
+caching, the evictor decides which **cached-but-unreferenced**
+blocks to release first when the cache fills. That's a
+different operational question than the simulator's tier-cost
+model (which is about which **currently-active** blocks to swap
+to CPU under pressure). It's still a real test of CTM+'s
+scoring math against real attention — just on a different
+decision than the simulator predicts. Honest scope to cite in
+partner conversations: "vLLM 0.4 + prefix caching tests CTM+'s
+scoring on cache-retention decisions; under-pressure swap
+behaviour remains gated on roadmap #3 Phase 1."
 
 ## §1 Scope of evidence #2 produces
 
