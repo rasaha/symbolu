@@ -26,12 +26,21 @@ from typing import Callable, Dict, List, Optional, Protocol
 
 @dataclass(frozen=True)
 class BenchConfig:
-    """Per-run policy configuration. Held by the runner."""
+    """Per-run policy configuration. Held by the runner.
+
+    The ``attention_ema_alpha`` field is the experimental knob
+    used by the Round 3 ema-alpha sweep. It is forwarded only
+    to :class:`CTMPlusPolicyAdapter`; LRU + FIFO ignore it. When
+    ``None`` (the default), the underlying ``KVCachePolicy``
+    uses its own default (currently 0.1) — the production
+    behaviour is preserved unless the caller opts in.
+    """
 
     max_blocks: int                 # tier 0 capacity in blocks
     block_size: int = 16            # tokens per block
     sink_tokens: int = 4
     seed: int = 42
+    attention_ema_alpha: Optional[float] = None  # None = use policy default
 
     def __post_init__(self) -> None:
         if self.max_blocks <= 0:
@@ -46,6 +55,12 @@ class BenchConfig:
             raise ValueError(
                 f"sink_tokens must be non-negative; got {self.sink_tokens}"
             )
+        if self.attention_ema_alpha is not None:
+            if not (0.0 < self.attention_ema_alpha <= 1.0):
+                raise ValueError(
+                    f"attention_ema_alpha must be in (0, 1]; "
+                    f"got {self.attention_ema_alpha}"
+                )
 
 
 @dataclass(frozen=True)
@@ -176,11 +191,18 @@ class CTMPlusPolicyAdapter:
                 "from a directory where kv_policy is importable."
             ) from exc
         self._InferencePhase = InferencePhase
-        self._policy = KVCachePolicy(
+        # Forward the optional ema-alpha knob only when the caller
+        # opted in. Passing it unconditionally would lock us to
+        # whatever value KVCachePolicy currently defaults to and
+        # mask future production-default changes.
+        kvcache_kwargs = dict(
             max_blocks=cfg.max_blocks,
             block_size=cfg.block_size,
             sink_tokens=cfg.sink_tokens,
         )
+        if cfg.attention_ema_alpha is not None:
+            kvcache_kwargs["attention_ema_alpha"] = cfg.attention_ema_alpha
+        self._policy = KVCachePolicy(**kvcache_kwargs)
         self._registered: set = set()
 
     def register_sequence(self, seq_id: int) -> None:

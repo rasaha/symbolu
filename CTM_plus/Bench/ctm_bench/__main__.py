@@ -91,6 +91,17 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--ema-alpha",
+        type=float,
+        default=None,
+        help=(
+            "Override CTM+'s attention_ema_alpha. None (default) "
+            "uses the production default in KVCachePolicy. Used "
+            "for A/B comparisons against the production setting "
+            "(Round 3 ema-alpha sweep)."
+        ),
+    )
+    p.add_argument(
         "--output-dir",
         type=str,
         default="",
@@ -161,6 +172,7 @@ def main(argv: Sequence[str]) -> int:
                     tier_specs,
                     tier_config_name=args.tier_config,
                     hbm_oversubscription=args.hbm_oversubscription,
+                    attention_ema_alpha=args.ema_alpha,
                 )
             except ImportError as exc:
                 print(

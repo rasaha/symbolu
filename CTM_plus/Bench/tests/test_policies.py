@@ -39,6 +39,28 @@ def test_bench_config_validates_sink_tokens_non_negative():
         BenchConfig(max_blocks=8, sink_tokens=-1)
 
 
+def test_bench_config_attention_ema_alpha_defaults_none():
+    cfg = BenchConfig(max_blocks=8)
+    assert cfg.attention_ema_alpha is None
+
+
+def test_bench_config_validates_ema_alpha_range():
+    with pytest.raises(ValueError, match="attention_ema_alpha"):
+        BenchConfig(max_blocks=8, attention_ema_alpha=0.0)
+    with pytest.raises(ValueError, match="attention_ema_alpha"):
+        BenchConfig(max_blocks=8, attention_ema_alpha=1.5)
+    with pytest.raises(ValueError, match="attention_ema_alpha"):
+        BenchConfig(max_blocks=8, attention_ema_alpha=-0.1)
+
+
+def test_bench_config_accepts_valid_ema_alpha():
+    # Boundary values: just-positive and 1.0 inclusive.
+    cfg_low = BenchConfig(max_blocks=8, attention_ema_alpha=0.001)
+    assert cfg_low.attention_ema_alpha == 0.001
+    cfg_high = BenchConfig(max_blocks=8, attention_ema_alpha=1.0)
+    assert cfg_high.attention_ema_alpha == 1.0
+
+
 def test_lru_evicts_oldest_first():
     cfg = BenchConfig(max_blocks=4)
     policy = LRUPolicy(cfg)
@@ -99,6 +121,38 @@ def test_get_policy_unknown_raises():
 def test_get_policy_lru_constructs():
     policy = get_policy("lru", BenchConfig(max_blocks=8))
     assert isinstance(policy, LRUPolicy)
+
+
+def test_ctm_plus_adapter_threads_ema_alpha_through():
+    """When BenchConfig.attention_ema_alpha is set, the adapter
+    should construct KVCachePolicy with that alpha. We verify by
+    inspecting the wrapped policy's ema_alpha attribute."""
+    try:
+        from ctm_bench.policies import CTMPlusPolicyAdapter
+        adapter = CTMPlusPolicyAdapter(
+            BenchConfig(max_blocks=8, attention_ema_alpha=0.05)
+        )
+    except ImportError:
+        # kv_policy not installed; skip — covered by the import-
+        # error contract test below.
+        return
+    # The wrapped KVCachePolicy stores it as `ema_alpha`.
+    assert adapter._policy.ema_alpha == 0.05  # noqa: SLF001
+
+
+def test_ctm_plus_adapter_default_does_not_set_ema_alpha():
+    """When BenchConfig.attention_ema_alpha is None, the adapter
+    must not pass it to KVCachePolicy — the production default
+    should be preserved unchanged."""
+    try:
+        from ctm_bench.policies import CTMPlusPolicyAdapter
+        adapter = CTMPlusPolicyAdapter(BenchConfig(max_blocks=8))
+    except ImportError:
+        return
+    # Production default in KVCachePolicy is currently 0.1.
+    # If this test fails after a production-default change, both
+    # the default and this test should be updated together.
+    assert adapter._policy.ema_alpha == 0.1  # noqa: SLF001
 
 
 def test_ctm_plus_adapter_constructs_or_raises_clear_import_error():

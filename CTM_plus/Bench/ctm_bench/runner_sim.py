@@ -8,7 +8,7 @@ configuration, walk the workload's trace events, drive the
 from __future__ import annotations
 
 import time
-from typing import Tuple
+from typing import Optional, Tuple
 
 from ctm_bench.policies import (
     AccessContext,
@@ -62,6 +62,7 @@ def run_sim(
     block_bytes: int = DEFAULT_BLOCK_BYTES,
     hbm_oversubscription: float = DEFAULT_HBM_OVERSUBSCRIPTION,
     n_victims_per_evict: int = 4,
+    attention_ema_alpha: Optional[float] = None,
 ) -> RunResult:
     """Drive the workload through the policy + cache and return
     a :class:`RunResult`.
@@ -101,6 +102,7 @@ def run_sim(
             max_blocks=tier_0_capacity_blocks,
             block_size=spec.block_size_tokens,
             seed=spec.seed,
+            attention_ema_alpha=attention_ema_alpha,
         ),
     )
     for sid in range(spec.n_concurrent_seqs):
