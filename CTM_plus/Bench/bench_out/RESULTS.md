@@ -646,12 +646,15 @@ not *extreme*.
   trust our synthetic generators on faith.
 * **Pareto-bursty arrival modeling.** The `rag_bursty`
   preset uses a Pareto-gap arrival schedule (α=1.5; mean
-  inter-arrival 3.5 steps, max gap 47 steps for the first
-  seed) — a closer approximation to production heavy-tailed
-  arrival patterns than the uniform Bernoulli the existing
+  inter-arrival 6.5 steps, max gap 70 steps for the first
+  seed at the calibrated rate of 0.2 arrivals/step) — a
+  closer approximation to production heavy-tailed arrival
+  patterns than the uniform Bernoulli the existing
   KVSimulator/Mode A use. The replay tool's
   `build_arrival_schedule` is unit-tested for determinism +
-  burstiness > uniform.
+  burstiness > uniform; the streaming runner reuses the
+  same Pareto math (corrected: the pareto-minus-one mean
+  is 1/(α−1), not α/(α−1)).
 * **Multi-shape coverage.** Three different shapes in one
   artifact — bimodal-length, bursty-arrival, sustained-
   long-context — each with the §11 audit-passed framing
@@ -694,3 +697,116 @@ it needs a pressure-aware fallback or adaptive gating
 claimed as generally superior. **The third path strengthens
 the conclusion's robustness — three different simulators
 agree — but does not change its content.**
+
+---
+
+## §13 Validation Roadmap — Status
+
+A four-step roadmap for converting simulation evidence into
+real-model evidence. Conservative framing throughout: each
+step lists what it does and does not validate.
+
+| Step | What it produces | Cost | Status |
+|---|---|---|---|
+| #1 Production-shape replay | Workload-shape replay with parametric distributions over KVSimulator continuous batching | ~1 day, no GPU | **Done** (§12) |
+| #2 vLLM 0.4 pin | Real-model CTM+ vs LRU on a historical-stack vLLM 0.4.x environment | ~1 day code + ~$3 GPU | **Code + runbook done** (this commit). GPU execution deferred. |
+| #3 vLLM 0.5+ streaming runner | Real-model CTM+ vs LRU on modern vLLM with the swap path actually engaged | 2-3 days code + ~1 GPU-day | **Design + scaffolding done** (this commit). Implementation gated. |
+| #1b Real-attention replay | Replay using GPU-extracted attention from a real model on real prompts | ~2 days + a few GPU-hours | Not started |
+
+### §13.1 #2 — vLLM 0.4 pin (code-only)
+
+* `Bench/scripts/run_mode_b_vllm04.sh` — sibling of
+  `run_mode_b.sh`. Calls `ctm_bench.scripts.vllm_version_check`
+  during pre-flight; aborts with actionable advice if vLLM is
+  not 0.4.x. Defaults model to `mistralai/Mistral-7B-Instruct-v0.1`
+  (vLLM 0.4-compatible; Llama-3 / Qwen2.5 do not load).
+* `Bench/scripts/MODE_B_VLLM04_RUNBOOK.md` — runbook
+  documenting the install (separate venv, `vllm==0.4.3`),
+  step-by-step procedure, validation thresholds (matching
+  `MODE_B_RUNBOOK.md` modulo model), and partner-citation
+  template that REQUIRES the "vLLM 0.4 is historical, not
+  modern serving" caveat.
+* `ctm_bench/scripts/vllm_version_check.py` — pure-Python
+  parser + decision logic; CLI exit 0 on 0.4.x, exit 1 with
+  clear error on 0.5+/pre-0.4/unparseable/not-installed.
+  Unit-tested (13 tests).
+
+**What #2 does not do:** validate any modern vLLM, validate
+non-vLLM stacks, substitute for partner-deployment validation.
+The "vLLM 0.4 is not the version anyone deploys today" caveat
+is required in any partner conversation citing #2 numbers.
+
+**Trigger to run #2 on GPU:** partner request, OR explicit
+authorization to spend ~$3 GPU-spot on a calibration check
+that closes the "we never ran CTM+ on a real model" claim
+risk.
+
+### §13.2 #3 — vLLM 0.5+ streaming runner (design + scaffolding)
+
+* `Bench/scripts/MODE_B_STREAMING_DESIGN.md` — full
+  architectural plan. Two problems: (A) CTM+ cannot install
+  into vLLM 0.5+ because the public `Evictor` hook was
+  removed; (B) batch-mode FCFS doesn't trigger swap so
+  counters always read zero. Plan addresses both, with
+  Phase 1 (B alone, LRU-only swap-counter validation) and
+  Phase 2 (A + B, real-model CTM+ vs LRU on modern vLLM)
+  delivered separately.
+* `ctm_bench/runner_vllm_streaming.py` — scaffolding
+  module. `ArrivalScheduler` (Pareto + replay-CSV modes)
+  and `SwapCounterSampler` (state machine for accumulating
+  periodic swap-counter samples) are implemented and
+  unit-tested. `AsyncEngineDriver.run` and
+  `patch_vllm_engine_modern` raise `NotImplementedError`
+  with a clear pointer to the design doc — that's the
+  contract until the GPU implementation lands.
+* 18 contract tests pin the API surface so the
+  implementation phase can refactor freely without breaking
+  callers.
+
+**Phase 1 estimated effort:** 1–1.5 days code + ~1 GPU-day
+sweeps. Validates that the swap path engages (counters > 0
+under sustained pressure) and that Mode A's LRU tier-cost
+predictions hold on real attention within a calibration band.
+
+**Phase 2 estimated effort:** 1.5–2 days code + ~1 GPU-day
+sweeps + per-vLLM-minor-version regression maintenance
+ongoing. Produces the head-to-head CTM+ vs LRU numbers on
+modern vLLM that no path before this can produce.
+
+**Trigger to start Phase 1:** partner request that names
+modern-vLLM swap-counter evidence or modern-vLLM real-model
+CTM+ vs LRU as the validation gate. **Phase 2** triggers on
+Phase 1 success.
+
+### §13.3 #1b — real-attention replay (not started)
+
+A small GPU pre-run that extracts attention scores from a
+real model on a real prompt set, then replays decisions
+through CTM+ + LRU offline. Stronger than #1 (real attention
+distributions, not synthetic) but partly subsumed by #2 once
+that lands (since #2 runs the actual policies on the actual
+model). Listed here for completeness; not on the critical
+path.
+
+### §13.4 Honest framing for partner conversations
+
+The strongest claim that survives technical diligence
+**today**:
+
+> "We have three independent simulators that converge on the
+> same nuanced shape: CTM+ helps on bimodal-chat and
+> bursty-RAG workloads, regresses on sustained long-context
+> agentic. The audit-pass discipline that produced these
+> numbers also rejected a tempting but tautological 'CTM+ has
+> 0 important evictions' headline. Real-model validation is
+> gated: we have a code-complete vLLM 0.4 pin path that
+> closes that gap on a historical stack for ~$3 of GPU; a
+> design + scaffolding for the modern-vLLM streaming runner
+> that produces real-model CTM+ vs LRU numbers on the stacks
+> partners actually deploy. Both are runnable on partner or
+> internal request."
+
+Stronger claims (CTM+ generally superior, real-model
+validated, etc.) do not survive diligence. The roadmap above
+documents exactly what would change if #2 or #3 actually
+ran.

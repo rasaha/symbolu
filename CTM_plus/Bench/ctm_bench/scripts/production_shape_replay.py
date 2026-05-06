@@ -243,12 +243,13 @@ def build_arrival_schedule(
             f"burstiness_alpha must be > 0; got {burstiness_alpha}"
         )
 
-    # Pareto with shape alpha has mean alpha / (alpha - 1) for alpha > 1.
-    # We scale so that average inter-arrival == 1 / base_rate.
+    # The draw ``U^(-1/alpha) - 1`` has mean ``1 / (alpha - 1)``
+    # for alpha > 1 (integrate u^(-1/alpha) du from 0 to 1, then
+    # subtract 1). Scale so E[gap] = 1 / base_rate.
     target_mean_gap = 1.0 / base_rate
     if burstiness_alpha > 1.0:
-        pareto_mean = burstiness_alpha / (burstiness_alpha - 1.0)
-        scale = target_mean_gap / pareto_mean
+        pareto_minus_one_mean = 1.0 / (burstiness_alpha - 1.0)
+        scale = target_mean_gap / pareto_minus_one_mean
     else:
         # alpha <= 1 has divergent mean; fall back to using
         # target_mean_gap as a scale and accept that the realised

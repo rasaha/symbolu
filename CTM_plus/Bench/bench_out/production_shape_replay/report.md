@@ -81,7 +81,7 @@ _Long-context retrieval-augmented workload with bursty arrivals (Pareto inter-ar
 | arrival_burstiness_alpha | 1.5 |
 | seeds | [42, 137, 271] |
 
-**Arrival shape (first seed):** 87 arrivals, mean gap 3.47 steps, max gap 47 steps. (Reported for the burstiness-aware schedule even when the KVSimulator runner used uniform Bernoulli.)
+**Arrival shape (first seed):** 46 arrivals, mean gap 6.49 steps, max gap 70 steps. (Reported for the burstiness-aware schedule even when the KVSimulator runner used uniform Bernoulli.)
 
 | Policy | recompute_cost | blocks_evicted | accuracy | important_evictions* |
 |---|---:|---:|---:|---:|
