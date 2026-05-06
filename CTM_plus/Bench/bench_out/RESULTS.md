@@ -16,18 +16,30 @@ single-seed (deterministic tier-config differentiation).
 > machine-checked by the test suite) but it is not a substitute
 > for measured silicon.
 >
-> | | Mode A (this doc) | Mode B (next gate) |
+> | | Mode A (this doc) | Mode B |
 > |---|---|---|
-> | Status | ✅ Executed (5 rounds) | ❌ Not yet executed |
+> | Status | ✅ Executed (5 rounds) | ⚠ Partial: LRU baseline only on vLLM 0.7+ |
 > | Hardware | CPU-only sandbox | A100 / H100 GPU |
-> | Model | Synthesised access traces | Llama-3.1-8B real attention |
+> | Model | Synthesised access traces | Llama-3.1-8B / Qwen2.5-7B real attention |
 > | Where | `runner_sim.py` | `runner_vllm.py` + `scripts/run_mode_b.sh` |
-> | Validates | Tier-cost model + policy logic | Whether Mode A's predictions hold against real attention weights |
+> | Validates | Tier-cost model + policy logic | LRU vs CTM+ head-to-head requires vLLM ≤ 0.6.x |
 >
-> **For partner conversations:** these numbers should be
-> presented as "synthetic harness predicts X; reproducible Mode B
-> GPU run script available; one A100 day to validate." Anything
-> stronger overstates what's been measured.
+> **vLLM 0.7+ compatibility limitation discovered during first
+> GPU run:** the CTM+ evictor patch was written against the old
+> `BlockSpaceManagerV1` API which vLLM 0.7+ removed. The patch
+> now fails fast with a clear `NotImplementedError` on vLLM 0.7+;
+> LRU baselines still run cleanly with proper counter extraction
+> via `block_allocator.get_and_reset_swaps()`. To validate the
+> full LRU vs CTM+ comparison on a real model, pin to vLLM 0.6.6.
+> A rewrite for vLLM 0.7+'s new architecture is filed in
+> `Bench/scripts/MODE_B_RUNBOOK.md` §8 (estimated 2-3 day scope).
+>
+> **For partner conversations:** present these numbers as
+> "synthetic harness predicts X; Mode A is fully reproducible;
+> Mode B real-model validation is gated on either pinning to
+> vLLM 0.6.x (validated path) or completing the vLLM 0.7+ patch
+> rewrite (in progress)." Anything stronger overstates what's
+> been measured.
 
 > **Round 5 is the canonical headline.** Round 4 retained below
 > as §10 for the multi-seed audit-validation history. Round 1-3

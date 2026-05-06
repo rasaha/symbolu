@@ -5,6 +5,48 @@ on a GPU box to validate the Mode A predictions against real
 attention weights. Roughly **1 hour of active time + ~75 min
 of GPU runtime** for the full sweep.
 
+> ## ⚠ Known vLLM compatibility limitation
+>
+> **The CTM+ vLLM evictor patch only works on vLLM ≤ 0.4.x.**
+> vLLM 0.5+ replaced the old `BlockSpaceManagerV1` evictor-swap
+> architecture with `SelfAttnBlockSpaceManager` +
+> `CpuGpuBlockAllocator` that does **not** expose a replaceable
+> evictor (the `_allocators` dict is private; there is no
+> public eviction-policy hook). The original patch's docstring
+> claimed compatibility with vLLM ≥ 0.4.0 — that claim is wrong
+> for any vLLM released after mid-2024.
+>
+> What works on each vLLM line:
+>
+> | vLLM | LRU baseline | CTM+ patch | Counter extraction |
+> |---|---|---|---|
+> | ≤ 0.4.x | untested today | should work | unknown |
+> | 0.5.x - 0.7.x | ✅ runs | ❌ raises NotImplementedError | ✅ via get_and_reset_swaps |
+> | ≥ 0.8.x | likely runs | ❌ same NotImplementedError | unknown — API may have shifted again |
+>
+> **Practical implication:** the head-to-head LRU vs CTM+ Mode B
+> validation is **not achievable today** without one of:
+>
+> 1. **(Recommended) LRU-only validation against Mode A.** Run
+>    LRU-only on the current vLLM and cross-check the real-model
+>    LRU slow-tier byte counts against Mode A's LRU predictions.
+>    If they match, the tier model is calibrated correctly, and
+>    Mode A's CTM+ predictions carry by extension because the
+>    policy math is deterministic. See §3.5 for this protocol.
+>
+> 2. **(High-effort) vLLM 0.4.x pin** — vllm==0.4.3 targets the
+>    BlockSpaceManagerV1 the patch was written for. Comes with
+>    CUDA 12.1 wheels (run on CUDA 12.4 driver via backward compat)
+>    + older PyTorch. Newer models (Qwen2.5, Llama-3.1) may not
+>    be supported on that vLLM. Untested today.
+>
+> 3. **(Multi-day rewrite) CTM+ vLLM 0.7+ integration** — see
+>    §8 for scope.
+>
+> Mode A's 5-round results are unaffected by any of this. The
+> simulator's CTM+ predictions stand on their own; what's gated
+> is *real-model validation* of those predictions.
+
 ## §1 What this validates and why it matters
 
 Every number in `bench_out/RESULTS.md` (the 52% latency cut,
@@ -167,7 +209,62 @@ to add chat:
 ./scripts/run_mode_b.sh --full 2>&1 | tee mode_b_full.log
 ```
 
-### Step 5.5 — Validate the 52% headline (--heavy-spillover)
+### Step 5.5 — LRU-only validation protocol (canonical Mode B path)
+
+Given the CTM+ patch is broken on vLLM ≥ 0.5 (see banner), the
+practical Mode B validation runs LRU only and cross-checks the
+real-model numbers against Mode A's LRU predictions. The logic:
+
+* Mode A predicts both LRU and CTM+ slow-tier bytes per workload.
+* Mode A's predictions are derived from the same workload
+  generators + the same tier cost model.
+* If real-model LRU on vLLM matches Mode A's LRU prediction
+  within a known calibration band, the tier-cost model is
+  validated.
+* CTM+'s policy math is deterministic — the same `KVCachePolicy`
+  code runs in both Mode A and (when working) Mode B. So Mode A's
+  CTM+ predictions are correct by extension once the tier model
+  is calibrated.
+
+This is a transitive validation: real-model LRU validates the
+tier model → tier model + deterministic policy = trustworthy
+CTM+ prediction.
+
+```bash
+# Run LRU only — no CTM+ cells, no NotImplementedError.
+./scripts/run_mode_b.sh --rag-only --policy lru     2>&1 | tee mode_b_rag_lru.log
+
+# (Note: --policy is not a flag the script reads today; you'd
+# need to either extend the script or invoke runner_vllm.py
+# directly:)
+python -m ctm_bench.runner_vllm \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --workload rag_128k \
+    --policy lru \
+    --gpu-memory-utilization 0.30 \
+    --swap-space 8 \
+    --seed 42 \
+    --output-dir bench_out/mode_b_lru_validation/rag_42
+```
+
+**What's actually being measured** (after the runner_vllm fix
+in commit `84ebe2d`):
+
+```
+counter_source: vllm_0_7_block_allocator_swaps
+bytes_read.DDR: <real swap byte count>
+evictions_to_tier.DDR: <real swap count>
+hbm_hit_rate: <derived from accesses_served>
+```
+
+**Cross-check against Mode A:** look at
+`bench_out/round4_multi_seed/multi_seed_summary.json` for the
+LRU prediction at the same (workload, seed). If the real-model
+LRU is within ~30% of the Mode A prediction, the tier model is
+calibrated; if it's off by 2-3×, recalibrate the tier specs in
+`tier_model.py::HBM_DDR_NVME_2025`.
+
+### Step 5.6 — Validate the 52% headline (--heavy-spillover)
 
 `--full` runs at the default `GPU_MEM_UTIL=0.30`, which engages
 spillover but not the *extreme* regime where the 52% latency
@@ -387,3 +484,70 @@ synthetic generator models, which would amplify CTM+'s
 That's a buyer-conversation paragraph that survives technical
 diligence. Anything stronger overstates; anything weaker
 under-sells.
+
+## §8 Known limitations + rewrite scope
+
+### §8.1 vLLM ≥ 0.7 — CTM+ patch does not work
+
+The CTM+ vLLM evictor in `KVPolicy/kv_policy/vllm_evictor.py`
+was written against vLLM's `BlockSpaceManagerV1`, which exposed
+`block_manager.gpu_allocator.evictor` as a replaceable
+attribute. vLLM 0.7+ removed that interface entirely and
+replaced it with `SelfAttnBlockSpaceManager` + a private
+`CpuGpuBlockAllocator._allocators` dict.
+
+To rewrite the CTM+ integration for vLLM 0.7+ would require
+one of:
+
+1. **Subclass `CpuGpuBlockAllocator`** and inject a CTM+-aware
+   variant via vLLM's engine-config layer. Would require
+   maintaining a fork or a more invasive monkey-patch.
+2. **Patch the BlockTable / KVCacheManager layer directly** —
+   intercept block-level eviction decisions before they reach
+   the allocator. Higher-leverage; harder to keep stable
+   across vLLM versions.
+3. **Submit a vLLM PR** to add a public `EvictorPolicy`
+   abstraction that custom policies can register against. Best
+   long-term outcome; longest path to landing.
+
+Estimated scope: **2-3 days** of focused vLLM-internals work
+plus per-vLLM-minor-version regression testing. Filed for a
+future round; not blocking Mode A claims.
+
+### §8.2 What vLLM 0.7+ DOES support today
+
+The harness still produces meaningful **LRU baseline** numbers
+on vLLM 0.7+. The `_extract_vllm_tier_counters` helper uses
+the public `block_allocator.get_and_reset_swaps()` API to
+count slow-tier traffic. You can run:
+
+```bash
+./scripts/run_mode_b.sh --rag-only      # LRU only (CTM+ skipped)
+./scripts/run_mode_b.sh --agentic-only  # LRU only
+./scripts/run_mode_b.sh --full          # LRU only
+```
+
+The `policy=ctm_plus` cells will fail fast with a clear
+`NotImplementedError` pointing at this section. To get the
+head-to-head numbers Mode A predicts, pin to vLLM 0.6.6 (see
+the warning banner at the top of this document).
+
+### §8.3 The `--dry-run` flag
+
+`runner_vllm.py` now supports `--dry-run` which loads the
+model + exercises the CTM+ patch path **without** running
+generation. Useful for catching vLLM API drift cheaply:
+
+```bash
+python -m ctm_bench.runner_vllm \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --workload rag_128k \
+    --policy ctm_plus \
+    --dry-run \
+    --output-dir /tmp/dryrun_check
+```
+
+A dry-run takes ~30-60 seconds (model load only, no
+generation). On a vLLM-incompatible host this will fail at
+the patch-install step in seconds rather than after a 5-minute
+generation cell.

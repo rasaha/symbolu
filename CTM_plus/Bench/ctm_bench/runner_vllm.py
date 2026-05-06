@@ -155,6 +155,7 @@ def run_vllm(
     swap_space_gb: int = 8,
     enforce_eager: bool = True,
     seed: int = 42,
+    dry_run: bool = False,
 ) -> RunResult:
     """Run a WorkloadSpec through a real model via vLLM.
 
@@ -191,8 +192,43 @@ def run_vllm(
 
     if policy_name == "ctm_plus":
         patch_vllm_engine = _import_ctm_evictor()
+        # Either succeeds (vLLM <= 0.6) or raises NotImplementedError
+        # with a clear message (vLLM >= 0.7). Either way the user
+        # gets unambiguous signal — no silent "patch installed but
+        # actually doing nothing" behaviour.
         patch_vllm_engine(engine.llm_engine, enable_logging=False)
         logger.info("patched vLLM engine with CTM+ evictor")
+
+    # Compute the bytes-per-block constant for counter conversion.
+    # vLLM exposes block_size (tokens/block) and the model config
+    # gives us the per-token KV size; we estimate the per-block KV
+    # bytes from these. The estimate is rough — bf16 + GQA assumed.
+    block_size_bytes = _estimate_block_bytes(engine, model)
+
+    if dry_run:
+        logger.info(
+            "dry-run: skipping generation; reporting only the "
+            "patch-installation result + counter-source detection"
+        )
+        counters = _extract_vllm_tier_counters(
+            engine.llm_engine, block_size_bytes=block_size_bytes
+        )
+        return RunResult(
+            workload_name=f"{spec.name}_dryrun",
+            policy_name=policy_name,
+            tier_config_name=tier_config_name,
+            n_decode_tokens=0,
+            bytes_read=counters["bytes_read"],
+            bytes_written=counters["bytes_written"],
+            accesses_served=counters["accesses_served"],
+            cumulative_latency_ns=counters["cumulative_latency_ns"],
+            evictions_to_tier=counters["evictions_to_tier"],
+            hbm_hit_rate=0.0,
+            slow_tier_bytes_per_decode_token=0.0,
+            avg_access_latency_ns=0.0,
+            wall_clock_seconds=0.0,
+            seed=seed,
+        )
 
     tokenizer = engine.get_tokenizer()
     requests = workload_to_vllm_requests(spec, tokenizer=tokenizer)
@@ -209,12 +245,14 @@ def run_vllm(
     )
     wall_end = time.perf_counter()
 
-    # Pull per-tier counters from vLLM's stat logger if present.
-    # vLLM exposes some internal counters via the engine's
-    # _scheduler.block_manager; what's actually available varies
-    # by vLLM version. We do the best-effort extraction below
-    # and report 0 / unknown for fields we can't read.
-    counters = _extract_vllm_tier_counters(engine.llm_engine)
+    # Pull per-tier counters from vLLM's actual public API
+    # (CpuGpuBlockAllocator.get_and_reset_swaps for vLLM 0.7+).
+    # See _extract_vllm_tier_counters for the version-detection
+    # logic + the counter_source field that documents what was
+    # actually measured vs. left at zero.
+    counters = _extract_vllm_tier_counters(
+        engine.llm_engine, block_size_bytes=block_size_bytes
+    )
 
     n_decode_tokens = sum(
         len(out.outputs[0].token_ids) for out in outputs
@@ -254,47 +292,146 @@ def run_vllm(
     )
 
 
-def _extract_vllm_tier_counters(llm_engine: Any) -> Dict[str, Dict[str, float]]:
+def _extract_vllm_tier_counters(
+    llm_engine: Any,
+    *,
+    block_size_bytes: int = 0,
+) -> Dict[str, Any]:
     """Best-effort extraction of per-tier counters from vLLM.
 
-    vLLM does not expose first-class HBM-vs-CPU-swap byte
-    counters in its stable API; we read what's available
-    (block swap counts, scheduler stats) and fill in the rest
-    with zeros. The downstream RunResult honestly reports the
-    gaps via 0-valued counters rather than fabricating numbers.
+    vLLM 0.7+ exposes block-swap operations via the
+    ``CpuGpuBlockAllocator.get_and_reset_swaps()`` method on the
+    block manager's ``block_allocator``. We snapshot the count of
+    swaps that occurred during the run and convert to bytes using
+    the engine's configured block size + dtype.
+
+    For vLLM ≤ 0.6.x (older ``BlockSpaceManagerV1``), there is no
+    public swap-counter API and we fall back to zero counters
+    with a documented limitation.
+
+    The downstream :class:`RunResult` honestly reports any gaps
+    via zero-valued counters rather than fabricating numbers, and
+    sets ``mode_b_counter_source`` to a string explaining what
+    was actually measured.
     """
     bytes_read: Dict[str, int] = {"HBM": 0, "DDR": 0, "NVMe": 0}
     bytes_written: Dict[str, int] = {"HBM": 0, "DDR": 0, "NVMe": 0}
     accesses_served: Dict[str, int] = {"HBM": 0, "DDR": 0, "NVMe": 0}
-    cumulative_latency_ns: Dict[str, float] = {"HBM": 0.0, "DDR": 0.0, "NVMe": 0.0}
+    cumulative_latency_ns: Dict[str, float] = {
+        "HBM": 0.0, "DDR": 0.0, "NVMe": 0.0,
+    }
     evictions_to_tier: Dict[str, int] = {"HBM": 0, "DDR": 0, "NVMe": 0}
+    counter_source = "unavailable"
 
-    # Try to read block-swap counters (vLLM tracks swap-in /
-    # swap-out as part of scheduling). Layout differs across
-    # versions; we try a few attribute paths.
     scheduler = getattr(llm_engine, "scheduler", None) or getattr(
         llm_engine, "_scheduler", None
     )
-    if scheduler is not None:
-        block_manager = getattr(scheduler, "block_manager", None)
-        if block_manager is not None:
-            # Some vLLM versions expose .swap_in_blocks_count etc.
-            swap_in = getattr(block_manager, "swap_in_blocks_count", 0) or 0
-            swap_out = getattr(block_manager, "swap_out_blocks_count", 0) or 0
-            block_size_bytes = (
-                getattr(block_manager, "block_size", 16)
-                * 1024  # rough KB-per-block stub
-            )
-            bytes_read["DDR"] = swap_in * block_size_bytes
-            bytes_written["DDR"] = swap_out * block_size_bytes
-            evictions_to_tier["DDR"] = swap_out
+    if scheduler is None:
+        return _wrap_counters(
+            bytes_read, bytes_written, accesses_served,
+            cumulative_latency_ns, evictions_to_tier, counter_source,
+        )
+    if isinstance(scheduler, list) and scheduler:
+        scheduler = scheduler[0]
+    block_manager = getattr(scheduler, "block_manager", None)
+    if block_manager is None:
+        return _wrap_counters(
+            bytes_read, bytes_written, accesses_served,
+            cumulative_latency_ns, evictions_to_tier, counter_source,
+        )
 
+    # vLLM 0.7+: CpuGpuBlockAllocator on block_allocator.
+    block_allocator = getattr(block_manager, "block_allocator", None)
+    if block_allocator is not None and hasattr(
+        block_allocator, "get_and_reset_swaps"
+    ):
+        try:
+            swaps = block_allocator.get_and_reset_swaps()
+        except Exception:
+            swaps = None
+        # swaps is an iterable of (src_block_id, dst_block_id) pairs
+        # where the direction of swap depends on the call context. We
+        # treat each swap as one "block touched at the slow tier" and
+        # use the engine's block_size + dtype to convert to bytes.
+        if swaps is not None:
+            try:
+                n_swaps = len(swaps) if hasattr(swaps, "__len__") else sum(
+                    1 for _ in swaps
+                )
+            except TypeError:
+                n_swaps = 0
+            if block_size_bytes > 0 and n_swaps > 0:
+                # vLLM's swap moves blocks from GPU → CPU on
+                # eviction and CPU → GPU on re-access. We can't tell
+                # the direction from the (src, dst) pair alone
+                # without device-side context, so we attribute all
+                # swaps to "DDR" (CPU pinned memory) for the purpose
+                # of slow-tier traffic accounting. This matches the
+                # Mode A "spill goes to tier 1" convention.
+                slow_bytes = n_swaps * block_size_bytes
+                bytes_read["DDR"] = slow_bytes
+                evictions_to_tier["DDR"] = n_swaps
+                accesses_served["DDR"] = n_swaps
+                counter_source = "vllm_0_7_block_allocator_swaps"
+            elif n_swaps == 0:
+                counter_source = "vllm_0_7_no_swaps_observed"
+
+    # vLLM ≤ 0.6.x fallback: gpu_allocator path. No reliable swap
+    # counter; just record the source as "legacy_no_data".
+    elif hasattr(block_manager, "gpu_allocator"):
+        counter_source = "vllm_0_6_gpu_allocator_no_counter"
+
+    return _wrap_counters(
+        bytes_read, bytes_written, accesses_served,
+        cumulative_latency_ns, evictions_to_tier, counter_source,
+    )
+
+
+def _estimate_block_bytes(engine: Any, model_name: str) -> int:
+    """Estimate KV bytes per block from the engine + model config.
+
+    The estimate is per_token = layers * kv_heads * head_dim * 2
+    (bf16) for one layer's K + one layer's V, then * block_size
+    tokens. Uses vLLM's loaded config when available; falls back
+    to a 256 KiB-per-block default if attributes aren't found
+    (better than 0, won't be far off for 7-13B GQA models).
+    """
+    fallback = 256 * 1024
+    try:
+        cfg = engine.llm_engine.model_config.hf_config
+        layers = getattr(cfg, "num_hidden_layers", 0)
+        kv_heads = getattr(cfg, "num_key_value_heads", None) or getattr(
+            cfg, "num_attention_heads", 0
+        )
+        head_dim = getattr(cfg, "head_dim", 0) or (
+            getattr(cfg, "hidden_size", 0) // max(
+                getattr(cfg, "num_attention_heads", 1), 1
+            )
+        )
+        block_size = (
+            engine.llm_engine.cache_config.block_size
+            if hasattr(engine, "llm_engine")
+            else 16
+        )
+        if layers and kv_heads and head_dim and block_size:
+            # K + V × bf16 × layers × kv_heads × head_dim × block_size
+            return 2 * 2 * layers * kv_heads * head_dim * block_size
+    except (AttributeError, TypeError):
+        pass
+    return fallback
+
+
+def _wrap_counters(
+    bytes_read, bytes_written, accesses_served,
+    cumulative_latency_ns, evictions_to_tier, counter_source,
+) -> Dict[str, Any]:
     return {
         "bytes_read": bytes_read,
         "bytes_written": bytes_written,
         "accesses_served": accesses_served,
         "cumulative_latency_ns": cumulative_latency_ns,
         "evictions_to_tier": evictions_to_tier,
+        "counter_source": counter_source,
     }
 
 
@@ -342,6 +479,18 @@ def _build_parser() -> argparse.ArgumentParser:
         default=True,
         help="Disable CUDA graphs so per-step latency is observable.",
     )
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip generation; only exercise the model load + CTM+ "
+            "patch-install path. Useful for catching vLLM API drift "
+            "(e.g. UnboundLocalError, missing attributes) cheaply "
+            "before a full GPU sweep. Reports the counter_source "
+            "string so you know what would be measured in a real run."
+        ),
+    )
     return p
 
 
@@ -356,6 +505,7 @@ def main(argv: List[str]) -> int:
         swap_space_gb=args.swap_space,
         enforce_eager=args.enforce_eager,
         seed=args.seed,
+        dry_run=args.dry_run,
     )
     print(
         f"workload={spec.name} policy={args.policy} "
