@@ -228,6 +228,7 @@ def run_vllm(
             avg_access_latency_ns=0.0,
             wall_clock_seconds=0.0,
             seed=seed,
+            counter_source=counters.get("counter_source", ""),
         )
 
     tokenizer = engine.get_tokenizer()
@@ -289,6 +290,7 @@ def run_vllm(
         avg_access_latency_ns=avg_latency,
         wall_clock_seconds=wall_end - wall_start,
         seed=seed,
+        counter_source=counters.get("counter_source", ""),
     )
 
 
