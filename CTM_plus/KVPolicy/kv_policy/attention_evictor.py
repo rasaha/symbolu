@@ -197,7 +197,7 @@ class KVCachePolicy:
         sink_tokens: int = 4,
         recent_window: int = 256,
         entity_attention_threshold: float = 0.02,
-        attention_ema_alpha: float = 0.1,
+        attention_ema_alpha: float = 0.2,
     ):
         self.max_blocks = max_blocks
         self.block_size = block_size

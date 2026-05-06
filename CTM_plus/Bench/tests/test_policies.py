@@ -167,10 +167,12 @@ def test_ctm_plus_adapter_default_does_not_set_ema_alpha():
         adapter = CTMPlusPolicyAdapter(BenchConfig(max_blocks=8))
     except ImportError:
         pytest.skip("kv_policy not installed")
-    # Production default in KVCachePolicy is currently 0.1.
-    # If this test fails after a production-default change, both
-    # the default and this test should be updated together.
-    assert adapter._policy.ema_alpha == 0.1  # noqa: SLF001
+    # Production default in KVCachePolicy was changed from 0.1
+    # to 0.2 based on the Round 4 multi-seed validation
+    # (bench_out/RESULTS.md §4). If this test fails after a
+    # future production-default change, both the default and
+    # this test should be updated together.
+    assert adapter._policy.ema_alpha == 0.2  # noqa: SLF001
 
 
 def test_ctm_plus_adapter_constructs_or_raises_clear_import_error():
