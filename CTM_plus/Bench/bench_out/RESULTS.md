@@ -10,54 +10,70 @@ single-seed (deterministic tier-config differentiation).
 > ## ⚠ Mode A vs Mode B status (post-GPU-run, May 2026)
 >
 > **Every number in this document comes from Mode A — a tier-
-> aware cache simulator.** Mode B GPU validation has been run
-> (~15 min wall, ~$0.30 spend on RunPod A100); the **latency
-> cross-check is the canonical Mode B story**, not swap-counter
-> cross-check. The reason is architectural and conservative:
+> aware cache simulator.** Mode B GPU validation was attempted
+> on a RunPod A100 (~15 min wall, ~$0.30 spend) and produced a
+> conservative six-bullet finding:
 >
-> 1. **The Mode B harness is valid for real-model execution
->    and timing.** Model loads, attention runs, wall-clock
->    timings are accurate, `n_decode_tokens` matches workload
->    specs, counter-extraction reaches the right vLLM API.
-> 2. **Swap counters staying zero is a true finding, not
->    a parser failure.** The harness honestly reports
->    `counter_source = vllm_0_7_no_swaps_observed` to
->    distinguish "API works, no swaps happened" from "API
->    didn't match" or "no measurement attempted."
-> 3. **vLLM batch-mode FCFS execution does not trigger
->    preemption/swap.** `engine.generate(prompts=[...])` either
->    admits a prompt or queues it; never preempts. vLLM's
->    `swap_space` is for preemption-only.
-> 4. **Therefore, swap-counter validation is blocked by runner
->    architecture, not CTM+/PCAM logic.** The CTM+ policy code,
->    the simulator's tier model, and Mode A's 5-round results
->    are all valid; what's gated is the empirical swap-byte
->    cross-check.
-> 5. **Existing data is used for latency / throughput
->    cross-check.** Mode B's wall-clock-per-decode-token vs
->    Mode A's `avg_access_latency_ns` rankings, qualitative
->    agreement validates the tier model's relative weights.
-> 6. **Future swap-counter validation requires an async /
->    preemptive runner.** Documented as future work in
->    `Bench/scripts/MODE_B_RUNBOOK.md` §9.6; **not justified
->    by current partner conversations** — should be triggered
->    only by a specific request for swap-counter evidence.
+> 1. **Mode A synthetic validation shows strong CTM+ gains.**
+>    5 rounds + an independent audit pass + multi-seed
+>    confirmation across {42, 137, 271}. Numbers in this
+>    document are reproducible from `runner_sim.py` and the
+>    pinned tier-cost model.
+> 2. **Mode B real-vLLM run validated harness execution and
+>    timing only.** The harness loads Qwen2.5-7B-Instruct on
+>    an A100, runs vLLM, and produces honest wall-clock
+>    measurements per decode token. That part of the path is
+>    proven.
+> 3. **CTM+ was not installed into vLLM** because vLLM 0.5+
+>    no longer exposes the needed eviction-policy integration
+>    point. The original `BlockSpaceManagerV1.evictor` hook was
+>    replaced by a private `CpuGpuBlockAllocator._allocators`
+>    dict in 0.5+; the existing CTM+ patch raises
+>    `NotImplementedError` and there is no public abstraction
+>    to register a custom policy against.
+> 4. **vLLM batch-mode FCFS execution did not trigger
+>    swap/preemption.** `engine.generate(prompts=[...])` with
+>    the default scheduler either admits a prompt or queues
+>    it; it never preempts running sequences. `swap_space`
+>    is engaged only on preemption events. Counter extraction
+>    reached the right API; the API honestly returned zero.
+> 5. **Therefore, Mode B does not validate or invalidate
+>    CTM+.** It does not produce real-model CTM+ vs LRU
+>    head-to-head numbers. It does not exercise the swap path
+>    that the simulator's tier model is designed to predict.
+>    It validates the runner harness, not the policy.
+> 6. **Real-model CTM+ vs LRU validation is deferred** pending
+>    either (a) a vLLM integration rewrite (~2–3 days against
+>    the post-0.5 allocator architecture) or (b) a
+>    partner-specific serving harness with a public
+>    eviction-policy hook. Both paths are documented in
+>    `Bench/scripts/MODE_B_RUNBOOK.md` §9.6 + §10; **neither
+>    is justified by current partner conversations** — they
+>    should be triggered by a specific partner request.
 >
-> | | Mode A | Mode B (achievable today) | Mode B (future, gated) |
+> | | Mode A | Mode B today | Mode B (future, gated) |
 > |---|---|---|---|
-> | Where | `runner_sim.py` | `runner_vllm.py` + latency cross-check | streaming/async runner (~2-3 days) |
-> | Status | ✅ 5 rounds + audit pass | ✅ harness valid; ✅ latency-ranking validation | ❌ not started |
-> | Validates | Tier-cost model + policy logic | Directional / qualitative ranking | Absolute swap-byte calibration |
-> | Reproducer | `python -m ctm_bench --tier-config ... --output-dir ...` | `python -m ctm_bench.scripts.latency_cross_check --mode-b-dir ... --mode-a-summary ...` | (TBD) |
+> | Where | `runner_sim.py` | `runner_vllm.py` (LRU-only smoke) | streaming/async runner OR partner serving stack (~2-3 days) |
+> | Status | ✅ 5 rounds + audit pass | ✅ harness + timing valid; ❌ CTM+ not exercised | ❌ not started |
+> | Validates | Tier-cost model + policy logic in simulation | Harness execution + per-token wall-clock timing | Real-model CTM+ vs LRU head-to-head |
+> | Does **not** validate | Real-silicon behaviour | CTM+ policy on a real model — at all | (TBD by partner-specific requirements) |
 >
-> **For partner conversations:** present these numbers as
-> "Mode A predicts X with full reproducibility across 5 rounds
-> + audit pass; Mode B latency-ranking cross-check
-> qualitatively validates Mode A's tier model on a real
-> 7B model running on an A100; absolute swap-byte calibration
-> requires a streaming-runner extension that's been deferred
-> until a partner explicitly requires it." This is the
-> **conservative** framing that survives technical diligence.
+> The latency cross-check tool
+> (`ctm_bench.scripts.latency_cross_check`) reports per-token
+> wall-clock and tokens/sec from the existing Mode B runs as
+> **harness/timing evidence only — not CTM+ performance
+> evidence**. The two Mode B sweeps were both LRU-only because
+> CTM+ couldn't be installed into vLLM 0.5+, so no real-model
+> CTM+ vs LRU comparison exists today.
+>
+> **For partner conversations:** the honest framing is "Mode A
+> predicts X with full reproducibility across 5 rounds + audit
+> pass; Mode B confirmed the harness runs end-to-end on a real
+> model and produces honest timing data, but did not exercise
+> CTM+ — that integration is gated on either a vLLM rewrite
+> or a partner-specific serving stack." See the partner
+> validation note at `bench_out/PARTNER_VALIDATION_NOTE.md`
+> for the version that's safe to share.
 
 > **Round 5 is the canonical headline.** Round 4 retained below
 > as §10 for the multi-seed audit-validation history. Round 1-3
@@ -134,9 +150,12 @@ score.
 > classes: full elimination on retrieval (RAG), 52% combined
 > latency reduction when stacked with HBF on chat-under-pressure,
 > and a known regression on agentic that we're investigating in
-> Round 6. We have a reproducible Mode A harness behind every
-> number and a one-day GPU script to validate against a real
-> model."
+> Round 6. Every number is reproducible from a Mode A simulator
+> with an audit-passed cost model. Real-model CTM+ vs LRU
+> validation on vLLM is gated — vLLM 0.5+ removed the public
+> eviction-policy hook — so that step is deferred until a
+> partner serving stack provides the integration point or
+> explicitly funds the vLLM rewrite."
 
 Don't lead with RAG alone — that omits the flash-tier story.
 Don't lead with chat alone — that omits the most decisive
@@ -306,9 +325,15 @@ workload specs are pinned by the test suite). Round 4 already
 established α=0.20 isn't seed-locked; tier differentiation is
 deterministic.
 
-**It isn't** a real-model latency benchmark. Mode B GPU script
-in `Bench/scripts/run_mode_b.sh` is the next gate before
-declaring the HBF + CTM+ stack fully validated.
+**It isn't** a real-model CTM+ benchmark. The Mode B GPU run
+attempted in May 2026 validated the harness end-to-end but
+did **not** exercise CTM+ on a real model: vLLM 0.5+ no
+longer exposes the eviction-policy hook the original CTM+
+patch targeted, and batch-mode FCFS scheduling never triggered
+the swap path the tier model predicts. Real-model CTM+ vs LRU
+validation requires either a vLLM integration rewrite or a
+partner-specific serving harness — see the §0 banner and
+`Bench/scripts/MODE_B_RUNBOOK.md` §9.
 
 **It isn't** a complete tour of the workload space. Production
 deployments have idiosyncratic patterns (mixed agentic + chat,
@@ -354,25 +379,24 @@ bench_out/
 
 ## §9 What to do next
 
-In priority order:
+In priority order, all gated on partner request — there is no
+internal trigger for any of these today:
 
-1. **Mode B GPU run** at production default α=0.20 — see
-   `Bench/scripts/run_mode_b.sh`. Single A100/H100 day. The
-   key cells to validate are:
-   - RAG: CTM+ should still show ≥ 50% reduction (Mode A
-     showed −100%; real attention may soften but the sign
-     should hold).
-   - Chat at heavy oversub: CTM+ should still contain
-     spillover to roughly half what LRU produces.
-   - agentic_clustered at heavy oversub: confirm the
-     regression magnitude. If it's worse than the synthetic
-     harness predicts, the production default change should
-     be revisited.
+1. **Real-model CTM+ vs LRU validation (deferred).** Requires
+   either (a) a vLLM 0.5+ integration rewrite — 2–3 days
+   against the post-0.5 `CpuGpuBlockAllocator` architecture,
+   plus per-vLLM-minor-version regression maintenance — or
+   (b) a partner-specific serving harness with a public
+   eviction-policy hook. Both paths sketched in
+   `MODE_B_RUNBOOK.md` §9.6 / §10. **Do not start without an
+   explicit partner trigger.** The May 2026 GPU run validated
+   the harness; it did not validate CTM+.
 2. **Round 6: explicit recency floor.** Add a
    `protect_recent_blocks` parameter to `KVCachePolicy` that
    never evicts a block touched in the last K decode steps.
    Sweep K ∈ {0, 4, 8, 16}; expected to close the
-   agentic_clustered regression at heavy spillover.
+   agentic_clustered regression at heavy spillover. Mode A only;
+   doesn't depend on item 1.
 3. **Block-size sweep.** Currently fixed at 2 MiB. Some
    serving stacks use 16-token blocks at smaller sizes. Worth
    a Round 7 to round out the cost-model coverage.

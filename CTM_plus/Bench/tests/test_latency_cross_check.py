@@ -361,6 +361,128 @@ def test_render_report_falls_back_to_slow_tier_when_latency_zero():
     assert "excluded 1" in report
 
 
+def test_modeb_cell_tokens_per_second_handles_zero():
+    """tokens_per_second must be None for cells with no decode
+    tokens or zero wall, not a divide-by-zero."""
+    from ctm_bench.scripts.latency_cross_check import ModeBCell
+
+    zero_decode = ModeBCell(
+        workload="rag_128k", policy="lru", seed=42,
+        n_decode_tokens=0, wall_clock_seconds=6.21,
+        counter_source="x", slow_tier_bytes_per_decode_token=0.0,
+        source_path="/tmp/x",
+    )
+    zero_wall = ModeBCell(
+        workload="rag_128k", policy="lru", seed=42,
+        n_decode_tokens=2048, wall_clock_seconds=0.0,
+        counter_source="x", slow_tier_bytes_per_decode_token=0.0,
+        source_path="/tmp/x",
+    )
+    assert zero_decode.tokens_per_second is None
+    assert zero_wall.tokens_per_second is None
+
+
+def test_modeb_cell_tokens_per_second_computes_correctly():
+    from ctm_bench.scripts.latency_cross_check import ModeBCell
+
+    cell = ModeBCell(
+        workload="chat_32k", policy="lru", seed=42,
+        n_decode_tokens=4096, wall_clock_seconds=19.24,
+        counter_source="x", slow_tier_bytes_per_decode_token=0.0,
+        source_path="/tmp/y",
+    )
+    # 4096 / 19.24 ≈ 212.89 tokens/sec
+    assert cell.tokens_per_second is not None
+    assert abs(cell.tokens_per_second - 212.89) < 0.05
+
+
+def test_render_report_harness_only_label_in_header():
+    """The §0 header must explicitly say the cross-check is
+    harness/timing evidence — not CTM+ performance evidence —
+    so partners reading the report cannot misread it as a
+    CTM+ vs LRU result."""
+    from ctm_bench.scripts.latency_cross_check import render_report
+
+    report = render_report({}, {})
+    assert "harness/timing evidence only" in report
+    assert "not CTM+ performance evidence" in report
+
+
+def test_render_report_per_seed_section_includes_tokens_per_second():
+    """When raw cells are passed, §1 must render one row per
+    (workload, seed) with tokens/sec and ms/token."""
+    from ctm_bench.scripts.latency_cross_check import (
+        ModeBCell, render_report,
+    )
+
+    cells = [
+        ModeBCell(
+            workload="chat_32k", policy="lru", seed=42,
+            n_decode_tokens=4096, wall_clock_seconds=19.24,
+            counter_source="vllm_0_7_no_swaps_observed",
+            slow_tier_bytes_per_decode_token=0.0,
+            source_path="/tmp/a",
+        ),
+        ModeBCell(
+            workload="chat_32k", policy="lru", seed=137,
+            n_decode_tokens=4096, wall_clock_seconds=17.57,
+            counter_source="vllm_0_7_no_swaps_observed",
+            slow_tier_bytes_per_decode_token=0.0,
+            source_path="/tmp/b",
+        ),
+    ]
+    report = render_report({}, {}, mode_b_cells=cells)
+    # Per-seed section header.
+    assert "§1 Mode B per-seed (LRU) — harness/timing evidence" in report
+    # Both seeds must appear.
+    assert "| 42 |" in report
+    assert "| 137 |" in report
+    # Tokens/sec column present and populated.
+    assert "Tokens/sec" in report
+    # 4096 / 19.24 ≈ 212.89
+    assert "212.89" in report
+    # ms/token column populated. 19.24 * 1000 / 4096 ≈ 4.70
+    assert "4.70" in report
+
+
+def test_render_report_per_seed_skips_non_lru():
+    """Non-LRU cells (CTM+ etc.) must be excluded from the
+    per-seed table — the May 2026 Mode B sweep was LRU only."""
+    from ctm_bench.scripts.latency_cross_check import (
+        ModeBCell, render_report,
+    )
+
+    cells = [
+        ModeBCell(
+            workload="chat_32k", policy="lru", seed=42,
+            n_decode_tokens=4096, wall_clock_seconds=19.24,
+            counter_source="x", slow_tier_bytes_per_decode_token=0.0,
+            source_path="/tmp/a",
+        ),
+        ModeBCell(
+            workload="chat_32k", policy="ctm_plus", seed=42,
+            n_decode_tokens=4096, wall_clock_seconds=19.24,
+            counter_source="x", slow_tier_bytes_per_decode_token=0.0,
+            source_path="/tmp/b",
+        ),
+    ]
+    report = render_report({}, {}, mode_b_cells=cells)
+    # The ctm_plus row must not render — only one row total.
+    # We check the table by counting workload/seed cells.
+    assert report.count("chat_32k") >= 1
+    assert "ctm_plus" not in report
+
+
+def test_render_report_scope_statement_says_harness_evidence():
+    """The §5 scope statement must explicitly state these are
+    harness/timing numbers and not CTM+ performance numbers."""
+    from ctm_bench.scripts.latency_cross_check import render_report
+
+    report = render_report({}, {})
+    assert "harness/timing evidence" in report
+    assert "CTM+ was not installed into vLLM" in report
+
+
 def test_main_cli_runs_end_to_end(tmp_path, capsys):
     """End-to-end CLI invocation: --mode-b-dir alone, no --mode-a,
     output to stdout."""
