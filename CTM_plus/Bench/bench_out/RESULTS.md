@@ -7,6 +7,28 @@
 single-seed (deterministic tier-config differentiation).
 **Commit:** see `git log` at the same SHA as this file.
 
+> ## ⚠ Mode A vs Mode B status
+>
+> **Every number in this document comes from Mode A — a tier-
+> aware cache simulator.** No real model has been run through
+> vLLM yet. The simulator's cost model is realistic (HBM/HBF/
+> DDR/NVMe latency + bandwidth pinned to 2025 vendor specs and
+> machine-checked by the test suite) but it is not a substitute
+> for measured silicon.
+>
+> | | Mode A (this doc) | Mode B (next gate) |
+> |---|---|---|
+> | Status | ✅ Executed (5 rounds) | ❌ Not yet executed |
+> | Hardware | CPU-only sandbox | A100 / H100 GPU |
+> | Model | Synthesised access traces | Llama-3.1-8B real attention |
+> | Where | `runner_sim.py` | `runner_vllm.py` + `scripts/run_mode_b.sh` |
+> | Validates | Tier-cost model + policy logic | Whether Mode A's predictions hold against real attention weights |
+>
+> **For partner conversations:** these numbers should be
+> presented as "synthetic harness predicts X; reproducible Mode B
+> GPU run script available; one A100 day to validate." Anything
+> stronger overstates what's been measured.
+
 > **Round 5 is the canonical headline.** Round 4 retained below
 > as §10 for the multi-seed audit-validation history. Round 1-3
 > directories preserved on disk; **absolute numbers in Round 1-3
@@ -14,17 +36,82 @@ single-seed (deterministic tier-config differentiation).
 > to the decode-count bug fixed in Round 4. Relative comparisons
 > within each round remain valid.
 
-## §1 Headline finding
+## §1 Headline findings (Mode A simulated, all rounds)
 
-> **HBF + CTM+ delivers a 52% average-access-latency reduction
-> vs DDR + LRU on chat-style workloads under heavy KV-cache
-> pressure (HBM oversubscription ≤ 0.025). The CTM+ contribution
-> alone is ~38%; the HBF tier contribution alone is ~24%; the
-> two stack. RAG_128K shows full elimination of slow-tier
-> traffic at every oversubscription. agentic_clustered shows a
-> real CTM+ regression (+12.5% to +192%) that worsens under
-> heavier pressure — flagged honestly, with a candidate Round 6
-> fix.**
+The harness produced three distinct findings across five
+rounds. Each lives on a different workload; partner
+conversations should pick the cell that matches the partner's
+workload mix.
+
+### §1.1 Chat under heavy KV pressure — the 52% latency cell (Round 5)
+
+**The cell that matters most for a NAND-vendor conversation.**
+At oversubscription 0.025, chat_32k spills heavily (HBM hit
+rate drops to 10.4-45.7%). Combining CTM+ with an HBF overflow
+tier reduces average KV access latency by **52%** vs DDR + LRU.
+
+| Tier config | Policy | HBM hit | slow-tier B/tok | avg access latency |
+|---|---|---:|---:|---:|
+| hbm_ddr_nvme | lru | 10.4% | 1.08 GB | **56,913 ns** (baseline) |
+| hbm_ddr_nvme | ctm_plus | 45.7% | 0.66 GB | 35,337 ns (−38%) |
+| hbm_hbf_nvme | lru | 10.4% | 1.08 GB | 43,485 ns (−24%) |
+| **hbm_hbf_nvme** | **ctm_plus** | 45.7% | 0.66 GB | **27,203 ns (−52%)** |
+
+The two effects stack roughly multiplicatively: CTM+ alone
+captures ~38%, HBF alone captures ~24%, together ~52%. See
+§2 for the stacked breakdown and §3 for the bandwidth-
+dominance mechanism that makes HBF win despite higher access
+latency than DDR.
+
+### §1.2 Retrieval-augmented (RAG) — the 100% elimination cell
+
+CTM+'s S3-FIFO admission keeps one-shot prefill chunks out of
+the working set entirely. Slow-tier reads collapse to zero at
+every oversubscription tested:
+
+| Oversub | LRU slow-tier B/tok | CTM+ slow-tier B/tok | CTM+ vs LRU |
+|---:|---:|---:|---:|
+| 0.10 | 2,048 | 0 | **−100%** |
+| 0.05 | 2,048 | 0 | **−100%** |
+| 0.025 | 2,048 | 0 | **−100%** |
+
+This is a workload-property advantage (one-shot reads can be
+identified by frequency); it doesn't scale with tier-0 capacity.
+The cleanest single-number win, but **does not directly engage
+the flash tier** — RAG simply doesn't spill.
+
+### §1.3 Agentic — the honest regression cell
+
+CTM+ is **worse** than LRU on agentic workloads, and the gap
+amplifies under heavier KV pressure:
+
+| Workload + Oversub | LRU B/tok | CTM+ B/tok | Δ vs LRU |
+|---|---:|---:|---:|
+| agentic_clustered @ 0.10 | 6,144 | 6,912 - 7,936 | +12.5% to +29% |
+| agentic_clustered @ 0.05 | 8,192 | 9,216 | +12.5% |
+| **agentic_clustered @ 0.025** | 9,216 | **26,880** | **+192%** |
+| agentic_64k uniform-random (any oversub) | ~388,000 | ~466,000 | ~+18% |
+
+The α=0.20 production default (Round 4) helps in moderate-
+pressure regimes but doesn't scale to extreme pressure. Round 6
+candidate fix: explicit recency floor that never evicts a block
+touched in the last K decode steps regardless of attention
+score.
+
+### §1.4 Putting them together — the honest pitch line
+
+> "CTM+ does three different things on three different workload
+> classes: full elimination on retrieval (RAG), 52% combined
+> latency reduction when stacked with HBF on chat-under-pressure,
+> and a known regression on agentic that we're investigating in
+> Round 6. We have a reproducible Mode A harness behind every
+> number and a one-day GPU script to validate against a real
+> model."
+
+Don't lead with RAG alone — that omits the flash-tier story.
+Don't lead with chat alone — that omits the most decisive
+single-number win. Don't omit agentic — that's the honesty bit
+that lets the rest of the pitch land.
 
 ## §2 The 52% cell — chat_32k @ oversubscription 0.025
 
