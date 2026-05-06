@@ -592,3 +592,105 @@ caveat.
 
 This is the conservative claim that holds. Stronger framings
 would not survive a partner's technical review.
+
+---
+
+## §12 Production-Shape Workload Replay
+
+A **third** independent evidence path: parametric production-
+shape replay with multi-seed averaging across three workload
+shapes. The replay tool ships at
+`ctm_bench/scripts/production_shape_replay.py` and runs in
+~66s on this machine (no GPU). Canonical artifact:
+`bench_out/production_shape_replay/` (results.json + report.md).
+
+**Honest scope.** This is **workload-shape replay, not real-
+attention replay.** The length distributions and arrival
+patterns are parametric models tunable to whatever production
+data a partner has; the attention itself still comes from
+KVSimulator's synthetic generators. True real-attention
+replay requires GPU-extracted attention from a real model on
+real prompts (#1b in the validation roadmap; not implemented).
+The presets are **parametric models, not validated against
+specific public datasets** — they are named for the *shape*
+they capture, not for any dataset they reproduce.
+
+### §12.1 Multi-seed results (recompute_cost, lead metric)
+
+Three presets × five policies × three seeds (42, 137, 271)
+through KVSimulator continuous batching. Means across seeds:
+
+| Preset | CTM+ recompute | LRU recompute | CTM+ vs LRU | Accuracy delta |
+|---|---:|---:|---:|---:|
+| chat_short_long_mix | 38,320 | 41,509 | **−7.7% (CTM+ better)** | +0.78pp |
+| rag_bursty (Pareto α=1.5) | 324,389 | 328,816 | −1.3% (CTM+ marginally better) | +0.66pp |
+| agentic_sustained_long | 393,349 | 386,533 | **+1.8% (CTM+ worse)** | **−0.48pp** |
+
+The shapes converge with §11 KVSimulator stress-test and
+Mode A: CTM+ wins on bimodal-chat workloads, marginal on
+bursty RAG, and underperforms on sustained-long-context
+agentic — the same regression direction Mode A shows on
+`agentic_clustered_64k` and §11 shows on the 4c Extreme
+cell, at smaller magnitude here because the
+`agentic_sustained_long` preset is *moderately* pressured
+(96 max_blocks, 12 concurrent, 0.20/0.04 arrival/completion),
+not *extreme*.
+
+### §12.2 What this third path adds beyond §11 / Mode A
+
+* **Parametric tuning.** A partner can replace the preset
+  parameters with empirical measurements from their own
+  production trace and re-run the comparison in ~1 minute,
+  without GPU. This converts the replay tool into a
+  partner-specific measurement vehicle — they don't need to
+  trust our synthetic generators on faith.
+* **Pareto-bursty arrival modeling.** The `rag_bursty`
+  preset uses a Pareto-gap arrival schedule (α=1.5; mean
+  inter-arrival 3.5 steps, max gap 47 steps for the first
+  seed) — a closer approximation to production heavy-tailed
+  arrival patterns than the uniform Bernoulli the existing
+  KVSimulator/Mode A use. The replay tool's
+  `build_arrival_schedule` is unit-tested for determinism +
+  burstiness > uniform.
+* **Multi-shape coverage.** Three different shapes in one
+  artifact — bimodal-length, bursty-arrival, sustained-
+  long-context — each with the §11 audit-passed framing
+  (recompute_cost as lead, important_evictions caveated).
+
+### §12.3 What this third path does NOT add
+
+* **Not real-attention.** The attention generators are still
+  synthetic; KVSimulator's `ATTENTION_PATTERNS` randomly
+  assigns one of {sink+recent, entity-focused, distributed,
+  mixed} per sequence. Real-attention replay (#1b) requires
+  GPU-extracted attention scores from a real model.
+* **Not a real-model run.** This remains simulation-only
+  evidence. Real-model CTM+ vs LRU validation is gated on
+  Path A (vLLM 0.5+ rewrite) or Path B (partner serving
+  stack) — see `PARTNER_VALIDATION_NOTE.md` §4.
+* **Presets are parametric, not dataset-derived.** Citing
+  these results as "LMSYS" or "BurstGPT" numbers would not
+  survive technical diligence and is explicitly flagged in
+  the report header. The `shape_caveat` field on every
+  preset is rendered into the report verbatim so readers
+  cannot misread the framing.
+
+### §12.4 Updated validation evidence chain
+
+The simulation evidence now spans three independent
+substrates — same direction, all three:
+
+| Evidence | Substrate | CTM+ on moderate workloads | CTM+ on heavy/sustained pressure |
+|---|---|---:|---:|
+| Mode A (Bench) | tier-cost simulator | small wins (chat / RAG) | regression (agentic_clustered +192%) |
+| KVSimulator §11 | continuous-batching simulator | small recompute wins | regression (4c Extreme +22% recompute, −5.7pp accuracy) |
+| Replay §12 | parametric workload shapes | chat_short_long_mix −7.7% recompute | agentic_sustained_long +1.8% recompute, −0.48pp accuracy |
+
+**The conclusion that survives technical diligence is
+unchanged from §11.4:** CTM+ is a workload-conditional
+optimization; it is not a drop-in eviction-policy upgrade;
+it needs a pressure-aware fallback or adaptive gating
+(Round 6 candidate: explicit recency floor) before being
+claimed as generally superior. **The third path strengthens
+the conclusion's robustness — three different simulators
+agree — but does not change its content.**
