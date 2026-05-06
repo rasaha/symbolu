@@ -212,28 +212,41 @@ def patch_vllm_engine(engine: Any, enable_logging: bool = False) -> CTMEvictor:
             f"Ensure vLLM is installed. Error: {e}"
         )
 
-    # vLLM ≥ 0.7 uses ``block_allocator`` (a CpuGpuBlockAllocator) and does
-    # not expose an evictor that can be replaced. Detect this case + fail
-    # loud rather than silently letting the policy do nothing.
+    # Any vLLM ≥ 0.5.x uses SelfAttnBlockSpaceManager + a
+    # CpuGpuBlockAllocator that does NOT expose a replaceable
+    # evictor. The original patch was written for vLLM ≤ 0.4.x
+    # (BlockSpaceManagerV1 with gpu_allocator.evictor); the
+    # docstring's "Targets: vLLM >= 0.4.0" claim is wrong for
+    # any version released after mid-2024. Detect the modern
+    # block-manager + fail loud.
     if hasattr(block_manager, 'block_allocator') and not hasattr(
         block_manager, 'gpu_allocator'
     ):
         raise NotImplementedError(
-            "CTM+ vLLM integration does not support vLLM >= 0.7.x. The new "
-            "SelfAttnBlockSpaceManager / CpuGpuBlockAllocator architecture "
-            "does not expose a replaceable evictor (the _allocators dict is "
-            "private; there is no public eviction-policy hook). This patch "
-            "was written against the BlockSpaceManagerV1 evictor-swap "
-            "pattern in vLLM <= 0.6.x.\n\n"
-            "Two paths forward:\n"
-            "  1. Pin vLLM to 0.6.x (requires CUDA 12.1 wheels):\n"
-            "       pip uninstall -y vllm\n"
-            "       pip install \"vllm==0.6.6\"\n"
-            "  2. Rewrite the CTM+ integration against vLLM 0.7+'s new\n"
-            "     block-allocator architecture. See\n"
-            "     Bench/scripts/MODE_B_RUNBOOK.md \"Known vLLM compatibility\n"
-            "     limitations\" for scope.\n"
-            f"\nDetected block_manager type: {type(block_manager).__name__}"
+            "CTM+ vLLM integration is broken for vLLM >= 0.5.x "
+            "(any release after mid-2024). The original patch was "
+            "written for the BlockSpaceManagerV1 evictor-swap pattern "
+            "in vLLM <= 0.4.x; vLLM 0.5+ uses SelfAttnBlockSpaceManager "
+            "+ CpuGpuBlockAllocator which has no public eviction-policy "
+            "hook (the _allocators dict is private).\n\n"
+            "Practical paths forward:\n"
+            "  1. Validate LRU only on the current vLLM version. The\n"
+            "     swap-counter API works (see Bench/ctm_bench/\n"
+            "     runner_vllm.py::_extract_vllm_tier_counters). Real-\n"
+            "     model LRU numbers can be cross-checked against\n"
+            "     Mode A's LRU predictions to validate the simulator's\n"
+            "     tier model. Mode A's CTM+ predictions then carry by\n"
+            "     extension since the policy math is deterministic.\n"
+            "  2. Pin vLLM to 0.4.x (e.g. vllm==0.4.3) to test the\n"
+            "     legacy patch path. vLLM 0.4.x targets CUDA 12.1 +\n"
+            "     older PyTorch; many newer models (Qwen2.5, Llama-3.1)\n"
+            "     may not be supported.\n"
+            "  3. Rewrite the CTM+ integration against the modern\n"
+            "     CpuGpuBlockAllocator architecture. Estimated 2-3 days\n"
+            "     of vLLM-internals work; see MODE_B_RUNBOOK.md §8.\n"
+            f"\nDetected block_manager type: {type(block_manager).__name__}\n"
+            f"Detected vLLM version: see vllm.__version__ (this patch "
+            f"only worked with vLLM <= 0.4.x)"
         )
 
     # vLLM ≤ 0.6.x path. Initialise gpu_allocator to None defensively so

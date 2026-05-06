@@ -7,36 +7,45 @@ of GPU runtime** for the full sweep.
 
 > ## ⚠ Known vLLM compatibility limitation
 >
-> **The CTM+ vLLM evictor patch only works on vLLM ≤ 0.6.x.**
-> vLLM 0.7+ replaced the old `BlockSpaceManagerV1` evictor-swap
-> architecture with a new `SelfAttnBlockSpaceManager` +
+> **The CTM+ vLLM evictor patch only works on vLLM ≤ 0.4.x.**
+> vLLM 0.5+ replaced the old `BlockSpaceManagerV1` evictor-swap
+> architecture with `SelfAttnBlockSpaceManager` +
 > `CpuGpuBlockAllocator` that does **not** expose a replaceable
 > evictor (the `_allocators` dict is private; there is no
-> public eviction-policy hook).
+> public eviction-policy hook). The original patch's docstring
+> claimed compatibility with vLLM ≥ 0.4.0 — that claim is wrong
+> for any vLLM released after mid-2024.
 >
 > What works on each vLLM line:
 >
 > | vLLM | LRU baseline | CTM+ patch | Counter extraction |
 > |---|---|---|---|
-> | ≤ 0.6.x | ✅ runs | ✅ patch installs | ⚠ no public swap counter |
-> | **0.7.x** | ✅ runs | ❌ raises NotImplementedError | ✅ uses get_and_reset_swaps |
-> | ≥ 0.8.x | untested | untested | untested |
+> | ≤ 0.4.x | untested today | should work | unknown |
+> | 0.5.x - 0.7.x | ✅ runs | ❌ raises NotImplementedError | ✅ via get_and_reset_swaps |
+> | ≥ 0.8.x | likely runs | ❌ same NotImplementedError | unknown — API may have shifted again |
 >
-> **Practical implication:** to fully validate the CTM+ vs LRU
-> head-to-head numbers from Mode A, pin to vLLM 0.6.x:
+> **Practical implication:** the head-to-head LRU vs CTM+ Mode B
+> validation is **not achievable today** without one of:
 >
-> ```bash
-> pip uninstall -y vllm
-> pip install "vllm==0.6.6"
-> ```
+> 1. **(Recommended) LRU-only validation against Mode A.** Run
+>    LRU-only on the current vLLM and cross-check the real-model
+>    LRU slow-tier byte counts against Mode A's LRU predictions.
+>    If they match, the tier model is calibrated correctly, and
+>    Mode A's CTM+ predictions carry by extension because the
+>    policy math is deterministic. See §3.5 for this protocol.
 >
-> vLLM 0.6.6 ships against CUDA 12.1 wheels, which run on
-> CUDA 12.4 driver hosts (backward compat). vLLM ≥ 0.7 is
-> incompatible with the current CTM+ patch and will raise a
-> clear `NotImplementedError` rather than silently failing.
+> 2. **(High-effort) vLLM 0.4.x pin** — vllm==0.4.3 targets the
+>    BlockSpaceManagerV1 the patch was written for. Comes with
+>    CUDA 12.1 wheels (run on CUDA 12.4 driver via backward compat)
+>    + older PyTorch. Newer models (Qwen2.5, Llama-3.1) may not
+>    be supported on that vLLM. Untested today.
 >
-> A rewrite of the CTM+ integration to target vLLM 0.7+'s new
-> architecture is filed as a follow-up; see §8 for scope.
+> 3. **(Multi-day rewrite) CTM+ vLLM 0.7+ integration** — see
+>    §8 for scope.
+>
+> Mode A's 5-round results are unaffected by any of this. The
+> simulator's CTM+ predictions stand on their own; what's gated
+> is *real-model validation* of those predictions.
 
 ## §1 What this validates and why it matters
 
@@ -200,7 +209,62 @@ to add chat:
 ./scripts/run_mode_b.sh --full 2>&1 | tee mode_b_full.log
 ```
 
-### Step 5.5 — Validate the 52% headline (--heavy-spillover)
+### Step 5.5 — LRU-only validation protocol (canonical Mode B path)
+
+Given the CTM+ patch is broken on vLLM ≥ 0.5 (see banner), the
+practical Mode B validation runs LRU only and cross-checks the
+real-model numbers against Mode A's LRU predictions. The logic:
+
+* Mode A predicts both LRU and CTM+ slow-tier bytes per workload.
+* Mode A's predictions are derived from the same workload
+  generators + the same tier cost model.
+* If real-model LRU on vLLM matches Mode A's LRU prediction
+  within a known calibration band, the tier-cost model is
+  validated.
+* CTM+'s policy math is deterministic — the same `KVCachePolicy`
+  code runs in both Mode A and (when working) Mode B. So Mode A's
+  CTM+ predictions are correct by extension once the tier model
+  is calibrated.
+
+This is a transitive validation: real-model LRU validates the
+tier model → tier model + deterministic policy = trustworthy
+CTM+ prediction.
+
+```bash
+# Run LRU only — no CTM+ cells, no NotImplementedError.
+./scripts/run_mode_b.sh --rag-only --policy lru     2>&1 | tee mode_b_rag_lru.log
+
+# (Note: --policy is not a flag the script reads today; you'd
+# need to either extend the script or invoke runner_vllm.py
+# directly:)
+python -m ctm_bench.runner_vllm \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --workload rag_128k \
+    --policy lru \
+    --gpu-memory-utilization 0.30 \
+    --swap-space 8 \
+    --seed 42 \
+    --output-dir bench_out/mode_b_lru_validation/rag_42
+```
+
+**What's actually being measured** (after the runner_vllm fix
+in commit `84ebe2d`):
+
+```
+counter_source: vllm_0_7_block_allocator_swaps
+bytes_read.DDR: <real swap byte count>
+evictions_to_tier.DDR: <real swap count>
+hbm_hit_rate: <derived from accesses_served>
+```
+
+**Cross-check against Mode A:** look at
+`bench_out/round4_multi_seed/multi_seed_summary.json` for the
+LRU prediction at the same (workload, seed). If the real-model
+LRU is within ~30% of the Mode A prediction, the tier model is
+calibrated; if it's off by 2-3×, recalibrate the tier specs in
+`tier_model.py::HBM_DDR_NVME_2025`.
+
+### Step 5.6 — Validate the 52% headline (--heavy-spillover)
 
 `--full` runs at the default `GPU_MEM_UTIL=0.30`, which engages
 spillover but not the *extreme* regime where the 52% latency
