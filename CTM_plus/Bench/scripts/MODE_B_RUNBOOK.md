@@ -5,6 +5,39 @@ on a GPU box to validate the Mode A predictions against real
 attention weights. Roughly **1 hour of active time + ~75 min
 of GPU runtime** for the full sweep.
 
+> ## ⚠ Known vLLM compatibility limitation
+>
+> **The CTM+ vLLM evictor patch only works on vLLM ≤ 0.6.x.**
+> vLLM 0.7+ replaced the old `BlockSpaceManagerV1` evictor-swap
+> architecture with a new `SelfAttnBlockSpaceManager` +
+> `CpuGpuBlockAllocator` that does **not** expose a replaceable
+> evictor (the `_allocators` dict is private; there is no
+> public eviction-policy hook).
+>
+> What works on each vLLM line:
+>
+> | vLLM | LRU baseline | CTM+ patch | Counter extraction |
+> |---|---|---|---|
+> | ≤ 0.6.x | ✅ runs | ✅ patch installs | ⚠ no public swap counter |
+> | **0.7.x** | ✅ runs | ❌ raises NotImplementedError | ✅ uses get_and_reset_swaps |
+> | ≥ 0.8.x | untested | untested | untested |
+>
+> **Practical implication:** to fully validate the CTM+ vs LRU
+> head-to-head numbers from Mode A, pin to vLLM 0.6.x:
+>
+> ```bash
+> pip uninstall -y vllm
+> pip install "vllm==0.6.6"
+> ```
+>
+> vLLM 0.6.6 ships against CUDA 12.1 wheels, which run on
+> CUDA 12.4 driver hosts (backward compat). vLLM ≥ 0.7 is
+> incompatible with the current CTM+ patch and will raise a
+> clear `NotImplementedError` rather than silently failing.
+>
+> A rewrite of the CTM+ integration to target vLLM 0.7+'s new
+> architecture is filed as a follow-up; see §8 for scope.
+
 ## §1 What this validates and why it matters
 
 Every number in `bench_out/RESULTS.md` (the 52% latency cut,
@@ -387,3 +420,70 @@ synthetic generator models, which would amplify CTM+'s
 That's a buyer-conversation paragraph that survives technical
 diligence. Anything stronger overstates; anything weaker
 under-sells.
+
+## §8 Known limitations + rewrite scope
+
+### §8.1 vLLM ≥ 0.7 — CTM+ patch does not work
+
+The CTM+ vLLM evictor in `KVPolicy/kv_policy/vllm_evictor.py`
+was written against vLLM's `BlockSpaceManagerV1`, which exposed
+`block_manager.gpu_allocator.evictor` as a replaceable
+attribute. vLLM 0.7+ removed that interface entirely and
+replaced it with `SelfAttnBlockSpaceManager` + a private
+`CpuGpuBlockAllocator._allocators` dict.
+
+To rewrite the CTM+ integration for vLLM 0.7+ would require
+one of:
+
+1. **Subclass `CpuGpuBlockAllocator`** and inject a CTM+-aware
+   variant via vLLM's engine-config layer. Would require
+   maintaining a fork or a more invasive monkey-patch.
+2. **Patch the BlockTable / KVCacheManager layer directly** —
+   intercept block-level eviction decisions before they reach
+   the allocator. Higher-leverage; harder to keep stable
+   across vLLM versions.
+3. **Submit a vLLM PR** to add a public `EvictorPolicy`
+   abstraction that custom policies can register against. Best
+   long-term outcome; longest path to landing.
+
+Estimated scope: **2-3 days** of focused vLLM-internals work
+plus per-vLLM-minor-version regression testing. Filed for a
+future round; not blocking Mode A claims.
+
+### §8.2 What vLLM 0.7+ DOES support today
+
+The harness still produces meaningful **LRU baseline** numbers
+on vLLM 0.7+. The `_extract_vllm_tier_counters` helper uses
+the public `block_allocator.get_and_reset_swaps()` API to
+count slow-tier traffic. You can run:
+
+```bash
+./scripts/run_mode_b.sh --rag-only      # LRU only (CTM+ skipped)
+./scripts/run_mode_b.sh --agentic-only  # LRU only
+./scripts/run_mode_b.sh --full          # LRU only
+```
+
+The `policy=ctm_plus` cells will fail fast with a clear
+`NotImplementedError` pointing at this section. To get the
+head-to-head numbers Mode A predicts, pin to vLLM 0.6.6 (see
+the warning banner at the top of this document).
+
+### §8.3 The `--dry-run` flag
+
+`runner_vllm.py` now supports `--dry-run` which loads the
+model + exercises the CTM+ patch path **without** running
+generation. Useful for catching vLLM API drift cheaply:
+
+```bash
+python -m ctm_bench.runner_vllm \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --workload rag_128k \
+    --policy ctm_plus \
+    --dry-run \
+    --output-dir /tmp/dryrun_check
+```
+
+A dry-run takes ~30-60 seconds (model load only, no
+generation). On a vLLM-incompatible host this will fail at
+the patch-install step in seconds rather than after a 5-minute
+generation cell.

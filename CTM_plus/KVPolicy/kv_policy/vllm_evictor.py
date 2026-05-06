@@ -186,6 +186,16 @@ def patch_vllm_engine(engine: Any, enable_logging: bool = False) -> CTMEvictor:
     Replaces the evictor inside the engine's block manager with a CTMEvictor.
     The original block allocator and scheduler are untouched.
 
+    **vLLM API compatibility:**
+
+    * vLLM ≤ 0.6.x (``BlockSpaceManagerV1``): block_manager.gpu_allocator
+      exposes a public ``evictor`` attribute the patch can swap. Supported.
+    * vLLM ≥ 0.7.0 (``SelfAttnBlockSpaceManager`` + ``CpuGpuBlockAllocator``):
+      no public evictor hook exists; the patch raises ``NotImplementedError``
+      with a clear message. The CTM+ vLLM integration needs a rewrite to
+      target the new architecture (filed as known limitation in
+      Bench/scripts/MODE_B_RUNBOOK.md).
+
     Args:
         engine: A vllm.LLMEngine instance.
         enable_logging: Enable CTM+ structured event logging.
@@ -199,18 +209,48 @@ def patch_vllm_engine(engine: Any, enable_logging: bool = False) -> CTMEvictor:
     except (AttributeError, IndexError) as e:
         raise RuntimeError(
             f"Cannot access block manager from engine. "
-            f"Ensure vLLM >= 0.4.0 with BlockSpaceManagerV1. Error: {e}"
+            f"Ensure vLLM is installed. Error: {e}"
         )
 
-    # Read block configuration from the existing manager
+    # vLLM ≥ 0.7 uses ``block_allocator`` (a CpuGpuBlockAllocator) and does
+    # not expose an evictor that can be replaced. Detect this case + fail
+    # loud rather than silently letting the policy do nothing.
+    if hasattr(block_manager, 'block_allocator') and not hasattr(
+        block_manager, 'gpu_allocator'
+    ):
+        raise NotImplementedError(
+            "CTM+ vLLM integration does not support vLLM >= 0.7.x. The new "
+            "SelfAttnBlockSpaceManager / CpuGpuBlockAllocator architecture "
+            "does not expose a replaceable evictor (the _allocators dict is "
+            "private; there is no public eviction-policy hook). This patch "
+            "was written against the BlockSpaceManagerV1 evictor-swap "
+            "pattern in vLLM <= 0.6.x.\n\n"
+            "Two paths forward:\n"
+            "  1. Pin vLLM to 0.6.x (requires CUDA 12.1 wheels):\n"
+            "       pip uninstall -y vllm\n"
+            "       pip install \"vllm==0.6.6\"\n"
+            "  2. Rewrite the CTM+ integration against vLLM 0.7+'s new\n"
+            "     block-allocator architecture. See\n"
+            "     Bench/scripts/MODE_B_RUNBOOK.md \"Known vLLM compatibility\n"
+            "     limitations\" for scope.\n"
+            f"\nDetected block_manager type: {type(block_manager).__name__}"
+        )
+
+    # vLLM ≤ 0.6.x path. Initialise gpu_allocator to None defensively so
+    # an AttributeError in the read below (which used to leave the
+    # variable unbound and crash with UnboundLocalError later) now fails
+    # loud with a clear message.
+    gpu_allocator = None
     try:
         gpu_allocator = block_manager.gpu_allocator
         num_blocks = gpu_allocator.num_blocks
         block_size = block_manager.block_size
-    except AttributeError:
-        logger.warning("Could not read block config from manager, using defaults")
-        num_blocks = 1000
-        block_size = 16
+    except AttributeError as e:
+        raise RuntimeError(
+            f"Cannot read GPU allocator config from BlockSpaceManagerV1. "
+            f"This is unexpected on vLLM <= 0.6.x — please file an issue "
+            f"with your vLLM version. Error: {e}"
+        )
 
     evictor = CTMEvictor(
         num_blocks=num_blocks,
