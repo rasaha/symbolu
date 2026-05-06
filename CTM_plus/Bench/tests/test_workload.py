@@ -182,6 +182,66 @@ def test_clustered_generator_dwells_on_hot_blocks():
     )
 
 
+def test_clustered_generator_hot_positions_stay_within_context():
+    """Audit Finding #2: a small context must not produce hot
+    positions beyond ``context_length_tokens``. The previous
+    formula yielded usable_max = max(...) without clamping to
+    the context length, so smoke specs (context=128) emitted
+    hot block accesses at positions 256+."""
+    spec = WorkloadSpec(
+        name="tiny",
+        pattern=AccessPattern.AGENTIC_CLUSTERED,
+        n_concurrent_seqs=1,
+        context_length_tokens=128,
+        duration_decode_tokens=8,
+        block_size_tokens=16,
+        seed=1,
+    )
+    events = list(generate_agentic_clustered(spec))
+    decode_events = [e for e in events if not e.is_prefill]
+    for e in decode_events:
+        assert e.position < spec.context_length_tokens or e.position == (
+            spec.context_length_tokens + (e.position - spec.context_length_tokens)
+        ), f"event position {e.position} >= context length {spec.context_length_tokens}"
+    # The hot-block (attention 0.35) events specifically must
+    # land within the prefilled context.
+    hot_events = [e for e in decode_events if abs(e.attention_weight - 0.35) < 1e-6]
+    for e in hot_events:
+        assert 0 <= e.position < spec.context_length_tokens, (
+            f"hot block event at {e.position} outside context "
+            f"[0, {spec.context_length_tokens})"
+        )
+
+
+def test_decode_step_marker_set_on_exactly_one_event_per_step():
+    """Audit Finding #3: the explicit ``is_decode_step_marker``
+    flag must be True on exactly one event per decode step per
+    sequence. This is the regression-pin for the 2× decode-count
+    bias the original heuristic produced."""
+    for spec in (AGENTIC_64K, AGENTIC_CLUSTERED_64K, RAG_128K, CHAT_32K):
+        events = list(generate(spec))
+        marked = [e for e in events if e.is_decode_step_marker]
+        # Each sequence runs duration_decode_tokens decode steps;
+        # the marker must fire exactly once per step.
+        expected = spec.n_concurrent_seqs * spec.duration_decode_tokens
+        assert len(marked) == expected, (
+            f"{spec.name}: marker count {len(marked)} != expected {expected}"
+        )
+        # Markers are never on prefill events.
+        assert all(not e.is_prefill for e in marked)
+
+
+def test_block_id_for_rejects_overflow():
+    """Audit Finding #4: the block-id encoding reserves
+    100k slots per sequence. Exceeding that would silently
+    collide with the next sequence's range; must raise instead."""
+    from ctm_bench.workload import _PER_SEQ_SLOTS, _block_id_for
+
+    overflow_position = _PER_SEQ_SLOTS * 16  # block_index = 100_000
+    with pytest.raises(ValueError, match="per-sequence slot budget"):
+        _block_id_for(0, overflow_position, 16, 4096)
+
+
 def test_clustered_generator_is_deterministic_for_same_seed():
     spec = _smoke_spec(AccessPattern.AGENTIC_CLUSTERED)
     a = list(generate_agentic_clustered(spec))

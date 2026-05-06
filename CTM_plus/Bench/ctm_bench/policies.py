@@ -17,6 +17,7 @@ LFU-DA, ...), implement the protocol and register it in
 
 from __future__ import annotations
 
+import random
 import sys
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -203,6 +204,13 @@ class CTMPlusPolicyAdapter:
         if cfg.attention_ema_alpha is not None:
             kvcache_kwargs["attention_ema_alpha"] = cfg.attention_ema_alpha
         self._policy = KVCachePolicy(**kvcache_kwargs)
+        # Audit Finding #1: KVCachePolicy hardcodes its internal
+        # RNG to random.Random(42) regardless of what is passed
+        # to the wrapping benchmark. Override here with cfg.seed
+        # so two runs at different seeds actually exercise
+        # different victim-sample sequences. Without this, every
+        # CTM+ benchmark cell silently used seed 42 internally.
+        self._policy.set_rng(random.Random(cfg.seed))
         self._registered: set = set()
 
     def register_sequence(self, seq_id: int) -> None:

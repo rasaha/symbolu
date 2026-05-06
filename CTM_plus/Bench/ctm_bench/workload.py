@@ -75,7 +75,16 @@ class WorkloadSpec:
 
 @dataclass(frozen=True)
 class TraceEvent:
-    """One access event in the trace."""
+    """One access event in the trace.
+
+    ``is_decode_step_marker`` (audit Finding #3) is set True on
+    *exactly one* event per decode step — the "newly-generated
+    decode token" event. The runner counts decode tokens via
+    this flag rather than via the previous heuristic
+    ``position == seq_len - 1``, which over-counted by ~2x
+    because the recent-block re-read loop emits an event at the
+    same position on aligned steps.
+    """
 
     seq_id: int
     block_id: int
@@ -83,6 +92,7 @@ class TraceEvent:
     seq_len: int
     attention_weight: float
     is_prefill: bool
+    is_decode_step_marker: bool = False
 
 
 # Standard pinned workloads — used by the runner CLI by default.
@@ -133,11 +143,31 @@ AGENTIC_CLUSTERED_64K: WorkloadSpec = WorkloadSpec(
 # ---------------------------------------------------------------- #
 
 
+_PER_SEQ_SLOTS = 100_000  # Per-sequence block-id slot budget.
+
+
 def _block_id_for(seq_id: int, position: int, block_size: int, max_blocks_per_seq: int) -> int:
     """Stable block_id encoding: combine seq_id + block index so
-    blocks across sequences never collide. Reserves 1024 sequence
-    slots × max_blocks_per_seq."""
+    blocks across sequences never collide. Reserves
+    :data:`_PER_SEQ_SLOTS` block slots per sequence (prefill +
+    decode-extension blocks).
+
+    Audit Finding #4: explicit guard against the encoding
+    overflowing into the next sequence's range. With 100k slots,
+    the collision boundary is at 1.6M tokens at block_size=16 —
+    well above any pinned workload, but a future workload with
+    longer contexts could trip this silently otherwise.
+    """
     block_index = position // block_size
+    # Decode-extension blocks live above max_blocks_per_seq; the
+    # absolute upper bound is the per-seq slot budget.
+    if block_index >= _PER_SEQ_SLOTS:
+        raise ValueError(
+            f"block_index {block_index} (position {position}, "
+            f"block_size {block_size}) exceeds per-sequence slot "
+            f"budget {_PER_SEQ_SLOTS}; this would collide with "
+            f"sequence {seq_id + 1}'s block-id range"
+        )
     if block_index >= max_blocks_per_seq:
         # Decode-extension blocks live in a higher range.
         return seq_id * 100_000 + max_blocks_per_seq + (block_index - max_blocks_per_seq)
@@ -235,6 +265,7 @@ def generate_agentic(spec: WorkloadSpec) -> Iterator[TraceEvent]:
                 seq_len=current_seq_len,
                 attention_weight=0.05,
                 is_prefill=False,
+                is_decode_step_marker=True,
             )
 
 
@@ -272,9 +303,19 @@ def generate_agentic_clustered(spec: WorkloadSpec) -> Iterator[TraceEvent]:
         yield from _prefill_events(spec, seq_id)
 
         # Choose hot block positions for this sequence.
-        usable_min = 256
-        usable_max = max(usable_min + bs * n_hot_blocks, spec.context_length_tokens - 256)
-        if usable_max <= usable_min:
+        # Audit Finding #2: clamp the position window strictly
+        # inside the prefilled context. The previous formula
+        # `max(usable_min + bs*n_hot_blocks, ctx - 256)` could
+        # exceed `ctx` for small contexts (smoke specs), placing
+        # hot positions on never-prefilled blocks — those then
+        # showed up as cold misses every step, distorting the
+        # dwell test and any small-context smoke run.
+        usable_min = min(256, max(0, spec.context_length_tokens // 4))
+        usable_max = max(usable_min, spec.context_length_tokens - 256)
+        # If the window is too small to host any hot blocks
+        # safely, degrade to no-hot-block dwell rather than
+        # invent positions.
+        if usable_max <= usable_min + bs:
             hot_positions: list = []
         else:
             stride = max(bs, (usable_max - usable_min) // n_hot_blocks)
@@ -282,6 +323,7 @@ def generate_agentic_clustered(spec: WorkloadSpec) -> Iterator[TraceEvent]:
                 usable_min + i * stride
                 for i in range(n_hot_blocks)
                 if usable_min + i * stride < usable_max
+                and usable_min + i * stride < spec.context_length_tokens
             ]
         current_hot_idx = 0
         stay_prob = 0.7
@@ -340,6 +382,7 @@ def generate_agentic_clustered(spec: WorkloadSpec) -> Iterator[TraceEvent]:
                 seq_len=current_seq_len,
                 attention_weight=0.05,
                 is_prefill=False,
+                is_decode_step_marker=True,
             )
 
 
@@ -395,6 +438,7 @@ def generate_rag(spec: WorkloadSpec) -> Iterator[TraceEvent]:
                 seq_len=current_seq_len,
                 attention_weight=0.05,
                 is_prefill=False,
+                is_decode_step_marker=True,
             )
 
 
@@ -454,6 +498,7 @@ def generate_chat(spec: WorkloadSpec) -> Iterator[TraceEvent]:
                 seq_len=current_seq_len,
                 attention_weight=0.05,
                 is_prefill=False,
+                is_decode_step_marker=True,
             )
 
 

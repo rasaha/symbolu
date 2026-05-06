@@ -180,6 +180,12 @@ class TierCounters:
         self.accesses_served: Dict[str, int] = {n: 0 for n in names}
         self.cumulative_latency_ns: Dict[str, float] = {n: 0.0 for n in names}
         self.evictions_to_tier: Dict[str, int] = {n: 0 for n in names}
+        # Audit Finding #5: when every deeper tier is full, an
+        # eviction from tier 0 has nowhere to land and the block
+        # is dropped. Track this count so the runner can assert
+        # it's zero (default) or accept a non-zero value
+        # (deliberately under-provisioned stress tests).
+        self.blocks_dropped: int = 0
 
     def record_read(self, tier: str, n_bytes: int, latency_ns: float) -> None:
         self.bytes_read[tier] += n_bytes
@@ -199,13 +205,14 @@ class TierCounters:
     def total_bytes_written(self) -> int:
         return sum(self.bytes_written.values())
 
-    def to_dict(self) -> Dict[str, Dict[str, float]]:
+    def to_dict(self) -> Dict[str, object]:
         return {
             "bytes_read": dict(self.bytes_read),
             "bytes_written": dict(self.bytes_written),
             "accesses_served": dict(self.accesses_served),
             "cumulative_latency_ns": dict(self.cumulative_latency_ns),
             "evictions_to_tier": dict(self.evictions_to_tier),
+            "blocks_dropped": self.blocks_dropped,
         }
 
 
@@ -268,6 +275,17 @@ class TieredCache:
 
     def n_blocks_in_tier(self, tier_name: str) -> int:
         return len(self._residency[self._tier_index[tier_name]])
+
+    def is_resident_in_tier_0(self, block_id: int) -> bool:
+        """Public probe so the runner doesn't reach into
+        ``_residency``. Audit Finding #10."""
+        return block_id in self._residency[0]
+
+    def tier_0_resident_ids(self) -> Tuple[int, ...]:
+        """Snapshot of tier-0 block ids in cache-insertion order
+        (oldest first). Public counterpart to ``_residency[0]``,
+        used by the runner's victim fallback. Audit Finding #10."""
+        return tuple(self._residency[0].keys())
 
     # -- the access path --
 
@@ -334,10 +352,10 @@ class TieredCache:
                     placed = True
                     break
             if not placed:
-                # Even the deepest tier is full — block is dropped
-                # (modelled as "lost," will need recomputation if
-                # the policy asks for it again).
-                pass
+                # Audit Finding #5: every deeper tier is full,
+                # the block is dropped. Track the drop so the
+                # runner can detect under-provisioned cascades.
+                self.counters.blocks_dropped += 1
 
     # -- internal helpers --
 

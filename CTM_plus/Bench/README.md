@@ -45,7 +45,11 @@ Per (workload, policy, tier-config) cell, the runner reports:
 
 * `bytes_read` per tier — the headline number for the
   NAND/HBF-pitch story.
-* `bytes_written` per tier — eviction traffic.
+* `bytes_written` per tier — total writes per tier including
+  ingestion (cold miss → tier 0 install) + promotion (deeper
+  tier hit → tier 0 install) + eviction (cascade tier 0 →
+  tier 1 → tier 2). Use `evictions_to_tier` for an eviction-
+  only count. Audit Finding #5 / #11.
 * `accesses_served` per tier — hit-counter breakdown.
 * `cumulative_latency_ns` per tier.
 * `evictions_to_tier` — where evicted blocks landed.

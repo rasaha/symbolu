@@ -133,11 +133,29 @@ def test_ctm_plus_adapter_threads_ema_alpha_through():
             BenchConfig(max_blocks=8, attention_ema_alpha=0.05)
         )
     except ImportError:
-        # kv_policy not installed; skip — covered by the import-
-        # error contract test below.
-        return
+        pytest.skip("kv_policy not installed; covered by import-error contract test")
     # The wrapped KVCachePolicy stores it as `ema_alpha`.
     assert adapter._policy.ema_alpha == 0.05  # noqa: SLF001
+
+
+def test_ctm_plus_adapter_propagates_seed_to_internal_rng():
+    """Audit Finding #1: KVCachePolicy hardcodes its internal
+    RNG to ``random.Random(42)``. The adapter must override this
+    with ``cfg.seed`` so two runs at different seeds actually
+    produce different victim sequences. Without this, every CTM+
+    benchmark cell silently used seed 42 internally."""
+    try:
+        from ctm_bench.policies import CTMPlusPolicyAdapter
+        adapter_a = CTMPlusPolicyAdapter(BenchConfig(max_blocks=8, seed=11))
+        adapter_b = CTMPlusPolicyAdapter(BenchConfig(max_blocks=8, seed=99))
+    except ImportError:
+        pytest.skip("kv_policy not installed")
+    # The wrapped policy's RNG state is observable via its first
+    # random sample. Two different seeds must produce different
+    # samples.
+    sample_a = adapter_a._policy._rng.random()  # noqa: SLF001
+    sample_b = adapter_b._policy._rng.random()  # noqa: SLF001
+    assert sample_a != sample_b
 
 
 def test_ctm_plus_adapter_default_does_not_set_ema_alpha():
@@ -148,7 +166,7 @@ def test_ctm_plus_adapter_default_does_not_set_ema_alpha():
         from ctm_bench.policies import CTMPlusPolicyAdapter
         adapter = CTMPlusPolicyAdapter(BenchConfig(max_blocks=8))
     except ImportError:
-        return
+        pytest.skip("kv_policy not installed")
     # Production default in KVCachePolicy is currently 0.1.
     # If this test fails after a production-default change, both
     # the default and this test should be updated together.

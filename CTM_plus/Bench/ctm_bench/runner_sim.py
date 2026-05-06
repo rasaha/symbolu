@@ -124,29 +124,31 @@ def run_sim(
         # If the block isn't in tier 0 we'll need room to install
         # it — evict if full *before* asking the cache to access
         # the block, so the cache install path doesn't raise.
+        # Audit Finding #10: route via public TieredCache methods
+        # so the runner doesn't depend on ``_residency`` layout.
         if (
-            event.block_id not in cache._residency[0]  # noqa: SLF001
+            not cache.is_resident_in_tier_0(event.block_id)
             and cache.tier_full(0)
         ):
             victims = policy.select_victims(n_victims_per_evict)
             if not victims:
                 # The policy has nothing it's willing to evict;
-                # force one out via the LRU-of-residence (cache
-                # insertion order). This is the conservative
-                # fallback that also ensures forward progress.
-                resident = list(cache._residency[0].keys())  # noqa: SLF001
-                victims = resident[:1]
+                # force one out via the cache's insertion order.
+                # This is the conservative fallback that also
+                # ensures forward progress.
+                resident = cache.tier_0_resident_ids()
+                victims = list(resident[:1])
             cache.evict_from_tier_0(victims)
             for v in victims:
                 policy.on_evict(v)
         cache.access(event.block_id)
-        if not event.is_prefill:
-            # Each non-prefill event corresponds to exactly one
-            # decode-step access from the workload's perspective;
-            # we count distinct decode steps via the "newly-
-            # generated token" event (position == seq_len-1).
-            if event.position == event.seq_len - 1:
-                n_decode_tokens += 1
+        # Audit Finding #3: count decode tokens via the explicit
+        # marker on the "newly-generated decode token" event. The
+        # previous heuristic (position == seq_len - 1) over-counted
+        # by ~2× because the recent-block re-read loop also emits
+        # an event at the current position on aligned steps.
+        if event.is_decode_step_marker:
+            n_decode_tokens += 1
     wall_end = time.perf_counter()
 
     # Roll counters into RunResult.

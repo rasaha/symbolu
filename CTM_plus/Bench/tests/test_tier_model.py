@@ -266,6 +266,51 @@ def test_tiered_cache_records_per_tier_bytes():
     assert counters.evictions_to_tier["DDR"] == 1
 
 
+def test_tier_counters_includes_blocks_dropped():
+    """Audit Finding #5: the counters must expose blocks_dropped
+    so the runner can detect under-provisioned cascades."""
+    counters = TierCounters(["A", "B"])
+    assert counters.blocks_dropped == 0
+    counters.blocks_dropped += 1
+    assert counters.to_dict()["blocks_dropped"] == 1
+
+
+def test_tiered_cache_drops_when_all_tiers_full_and_increments_counter():
+    """Audit Finding #5: when every tier is at capacity, an
+    eviction has nowhere to land. The block must drop (already
+    the behaviour) AND the blocks_dropped counter must
+    increment (the new pin)."""
+    cache = _tiny_cache()
+    # Fill tier 0 (4) + tier 1 (16) + tier 2 (64) = 84 blocks.
+    for bid in range(84):
+        if cache.tier_full(0):
+            # Cascade as we fill.
+            resident = cache.tier_0_resident_ids()
+            cache.evict_from_tier_0([resident[0]])
+        cache.access(block_id=bid)
+    # Now everything is full. One more eviction has nowhere.
+    initial_drops = cache.counters.blocks_dropped
+    resident = cache.tier_0_resident_ids()
+    cache.evict_from_tier_0([resident[0]])
+    assert cache.counters.blocks_dropped == initial_drops + 1
+
+
+def test_tiered_cache_public_residency_methods():
+    """Audit Finding #10: the runner reaches into _residency.
+    The public methods must expose the same view so the runner
+    can route through them."""
+    cache = _tiny_cache()
+    assert cache.is_resident_in_tier_0(0) is False
+    cache.access(block_id=42)
+    assert cache.is_resident_in_tier_0(42) is True
+    assert 42 in cache.tier_0_resident_ids()
+    cache.access(block_id=43)
+    ids = cache.tier_0_resident_ids()
+    # Insertion-order preserved (oldest first).
+    assert ids[0] == 42
+    assert ids[-1] == 43
+
+
 def test_tiered_cache_install_at_full_tier_raises():
     cache = _tiny_cache()
     for bid in range(4):

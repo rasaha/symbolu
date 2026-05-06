@@ -110,6 +110,56 @@ def test_run_sim_chat_workload():
     assert result.hbm_hit_rate > 0.3
 
 
+def test_decode_token_count_matches_workload_duration():
+    """Audit Finding #3 regression-pin: ``n_decode_tokens`` in
+    RunResult must equal ``n_concurrent_seqs * duration_decode_tokens``.
+    The pre-fix heuristic over-counted by ~2x."""
+    spec = WorkloadSpec(
+        name="count_check",
+        pattern=AccessPattern.RAG,
+        n_concurrent_seqs=2,
+        context_length_tokens=512,
+        duration_decode_tokens=16,
+        block_size_tokens=16,
+        seed=42,
+    )
+    result = run_sim(
+        spec,
+        "lru",
+        HBM_DDR_NVME_2025,
+        block_bytes=4096,
+        hbm_oversubscription=0.5,
+    )
+    expected = spec.n_concurrent_seqs * spec.duration_decode_tokens
+    assert result.n_decode_tokens == expected
+
+
+def test_runner_uses_public_residency_methods():
+    """Audit Finding #10 regression-pin: the runner must call
+    the public TieredCache methods, not reach into ``_residency``.
+    Tokenise the runner source to skip comments + docstrings so
+    explanatory text mentioning ``_residency`` does not falsely
+    fail the check."""
+    import inspect
+    import io
+    import token
+    import tokenize
+
+    from ctm_bench import runner_sim
+
+    src = inspect.getsource(runner_sim.run_sim)
+    code_tokens = []
+    for tok in tokenize.tokenize(io.BytesIO(src.encode()).readline):
+        if tok.type in (token.COMMENT, token.STRING):
+            continue
+        code_tokens.append(tok.string)
+    code_only = " ".join(code_tokens)
+    assert "_residency" not in code_only, (
+        "runner_sim.run_sim still references TieredCache._residency; "
+        "use cache.is_resident_in_tier_0() / cache.tier_0_resident_ids()"
+    )
+
+
 def test_summarize_zero_baseline_yields_none_not_inf():
     """When LRU baseline has no slow-tier reads, the reduction
     percentage is undefined. We must emit None (not ±inf) so
