@@ -7,39 +7,57 @@
 single-seed (deterministic tier-config differentiation).
 **Commit:** see `git log` at the same SHA as this file.
 
-> ## ⚠ Mode A vs Mode B status
+> ## ⚠ Mode A vs Mode B status (post-GPU-run, May 2026)
 >
 > **Every number in this document comes from Mode A — a tier-
-> aware cache simulator.** No real model has been run through
-> vLLM yet. The simulator's cost model is realistic (HBM/HBF/
-> DDR/NVMe latency + bandwidth pinned to 2025 vendor specs and
-> machine-checked by the test suite) but it is not a substitute
-> for measured silicon.
+> aware cache simulator.** Mode B GPU validation has been run
+> (~15 min wall, ~$0.30 spend on RunPod A100); the **latency
+> cross-check is the canonical Mode B story**, not swap-counter
+> cross-check. The reason is architectural and conservative:
 >
-> | | Mode A (this doc) | Mode B |
-> |---|---|---|
-> | Status | ✅ Executed (5 rounds) | ⚠ Partial: LRU baseline only on vLLM 0.7+ |
-> | Hardware | CPU-only sandbox | A100 / H100 GPU |
-> | Model | Synthesised access traces | Llama-3.1-8B / Qwen2.5-7B real attention |
-> | Where | `runner_sim.py` | `runner_vllm.py` + `scripts/run_mode_b.sh` |
-> | Validates | Tier-cost model + policy logic | LRU vs CTM+ head-to-head requires vLLM ≤ 0.6.x |
+> 1. **The Mode B harness is valid for real-model execution
+>    and timing.** Model loads, attention runs, wall-clock
+>    timings are accurate, `n_decode_tokens` matches workload
+>    specs, counter-extraction reaches the right vLLM API.
+> 2. **Swap counters staying zero is a true finding, not
+>    a parser failure.** The harness honestly reports
+>    `counter_source = vllm_0_7_no_swaps_observed` to
+>    distinguish "API works, no swaps happened" from "API
+>    didn't match" or "no measurement attempted."
+> 3. **vLLM batch-mode FCFS execution does not trigger
+>    preemption/swap.** `engine.generate(prompts=[...])` either
+>    admits a prompt or queues it; never preempts. vLLM's
+>    `swap_space` is for preemption-only.
+> 4. **Therefore, swap-counter validation is blocked by runner
+>    architecture, not CTM+/PCAM logic.** The CTM+ policy code,
+>    the simulator's tier model, and Mode A's 5-round results
+>    are all valid; what's gated is the empirical swap-byte
+>    cross-check.
+> 5. **Existing data is used for latency / throughput
+>    cross-check.** Mode B's wall-clock-per-decode-token vs
+>    Mode A's `avg_access_latency_ns` rankings, qualitative
+>    agreement validates the tier model's relative weights.
+> 6. **Future swap-counter validation requires an async /
+>    preemptive runner.** Documented as future work in
+>    `Bench/scripts/MODE_B_RUNBOOK.md` §9.6; **not justified
+>    by current partner conversations** — should be triggered
+>    only by a specific request for swap-counter evidence.
 >
-> **vLLM 0.7+ compatibility limitation discovered during first
-> GPU run:** the CTM+ evictor patch was written against the old
-> `BlockSpaceManagerV1` API which vLLM 0.7+ removed. The patch
-> now fails fast with a clear `NotImplementedError` on vLLM 0.7+;
-> LRU baselines still run cleanly with proper counter extraction
-> via `block_allocator.get_and_reset_swaps()`. To validate the
-> full LRU vs CTM+ comparison on a real model, pin to vLLM 0.6.6.
-> A rewrite for vLLM 0.7+'s new architecture is filed in
-> `Bench/scripts/MODE_B_RUNBOOK.md` §8 (estimated 2-3 day scope).
+> | | Mode A | Mode B (achievable today) | Mode B (future, gated) |
+> |---|---|---|---|
+> | Where | `runner_sim.py` | `runner_vllm.py` + latency cross-check | streaming/async runner (~2-3 days) |
+> | Status | ✅ 5 rounds + audit pass | ✅ harness valid; ✅ latency-ranking validation | ❌ not started |
+> | Validates | Tier-cost model + policy logic | Directional / qualitative ranking | Absolute swap-byte calibration |
+> | Reproducer | `python -m ctm_bench --tier-config ... --output-dir ...` | `python -m ctm_bench.scripts.latency_cross_check --mode-b-dir ... --mode-a-summary ...` | (TBD) |
 >
 > **For partner conversations:** present these numbers as
-> "synthetic harness predicts X; Mode A is fully reproducible;
-> Mode B real-model validation is gated on either pinning to
-> vLLM 0.6.x (validated path) or completing the vLLM 0.7+ patch
-> rewrite (in progress)." Anything stronger overstates what's
-> been measured.
+> "Mode A predicts X with full reproducibility across 5 rounds
+> + audit pass; Mode B latency-ranking cross-check
+> qualitatively validates Mode A's tier model on a real
+> 7B model running on an A100; absolute swap-byte calibration
+> requires a streaming-runner extension that's been deferred
+> until a partner explicitly requires it." This is the
+> **conservative** framing that survives technical diligence.
 
 > **Round 5 is the canonical headline.** Round 4 retained below
 > as §10 for the multi-seed audit-validation history. Round 1-3

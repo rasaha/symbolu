@@ -160,6 +160,56 @@ def test_runner_uses_public_residency_methods():
     )
 
 
+def test_runresult_counter_source_defaults_empty_and_serialises():
+    """Mode A produces RunResults with no counter_source; the
+    field defaults to empty string and serialises through
+    to_dict() for downstream JSON output. This is the
+    regression-pin for the counter_source field added so a
+    reader of vllm_summary.json can tell whether all-zero
+    counters mean "API mismatch", "no swaps", or "real-data"."""
+    from ctm_bench.metrics import RunResult
+
+    # Mode A construction (no counter_source supplied).
+    r = RunResult(
+        workload_name="x",
+        policy_name="lru",
+        tier_config_name="hbm_ddr_nvme",
+        n_decode_tokens=10,
+        bytes_read={},
+        bytes_written={},
+        accesses_served={},
+        cumulative_latency_ns={},
+        evictions_to_tier={},
+        hbm_hit_rate=1.0,
+        slow_tier_bytes_per_decode_token=0.0,
+        avg_access_latency_ns=200.0,
+        wall_clock_seconds=0.01,
+        seed=42,
+    )
+    assert r.counter_source == ""
+    assert r.to_dict()["counter_source"] == ""
+
+    # Mode B construction (counter_source set).
+    r_b = RunResult(
+        workload_name="x",
+        policy_name="lru",
+        tier_config_name="vllm_real",
+        n_decode_tokens=100,
+        bytes_read={"DDR": 1024},
+        bytes_written={},
+        accesses_served={},
+        cumulative_latency_ns={},
+        evictions_to_tier={},
+        hbm_hit_rate=0.95,
+        slow_tier_bytes_per_decode_token=10.24,
+        avg_access_latency_ns=300.0,
+        wall_clock_seconds=5.0,
+        seed=42,
+        counter_source="vllm_0_7_block_allocator_swaps",
+    )
+    assert r_b.to_dict()["counter_source"] == "vllm_0_7_block_allocator_swaps"
+
+
 def test_summarize_zero_baseline_yields_none_not_inf():
     """When LRU baseline has no slow-tier reads, the reduction
     percentage is undefined. We must emit None (not ±inf) so

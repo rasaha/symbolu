@@ -39,6 +39,16 @@ class RunResult:
     wall_clock_seconds: float
     seed: int
 
+    # Mode B provenance: identifies which counter-extraction
+    # path actually populated the per-tier byte counts. Empty
+    # string for Mode A runs (synthetic — no extraction needed).
+    # Used by the runbook to diagnose when a Mode B cell shows
+    # all-zero counters: "unavailable" → API path didn't match,
+    # "vllm_0_7_no_swaps_observed" → API works but workload
+    # didn't spill, "vllm_0_7_block_allocator_swaps" → real
+    # measurements present.
+    counter_source: str = ""
+
     def to_dict(self) -> Dict[str, object]:
         return {
             "workload_name": self.workload_name,
@@ -55,6 +65,7 @@ class RunResult:
             "avg_access_latency_ns": self.avg_access_latency_ns,
             "wall_clock_seconds": self.wall_clock_seconds,
             "seed": self.seed,
+            "counter_source": self.counter_source,
         }
 
 

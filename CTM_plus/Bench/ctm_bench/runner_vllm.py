@@ -156,6 +156,7 @@ def run_vllm(
     enforce_eager: bool = True,
     seed: int = 42,
     dry_run: bool = False,
+    max_model_len: Optional[int] = None,
 ) -> RunResult:
     """Run a WorkloadSpec through a real model via vLLM.
 
@@ -181,7 +182,7 @@ def run_vllm(
         )
 
     logger.info("instantiating vLLM with model=%s", model)
-    engine = LLM(
+    llm_kwargs = dict(
         model=model,
         gpu_memory_utilization=gpu_memory_utilization,
         swap_space=swap_space_gb,
@@ -189,6 +190,13 @@ def run_vllm(
         enable_prefix_caching=False,  # isolate eviction effect
         seed=seed,
     )
+    if max_model_len is not None:
+        # Forces vLLM to accept prompts up to this length. Critical
+        # for triggering spillover — when single-request KV (e.g.
+        # 128K tokens × ~57 KB = 7.3 GB) exceeds the GPU KV budget,
+        # vLLM has no choice but to swap mid-request.
+        llm_kwargs["max_model_len"] = max_model_len
+    engine = LLM(**llm_kwargs)
 
     if policy_name == "ctm_plus":
         patch_vllm_engine = _import_ctm_evictor()
@@ -228,6 +236,7 @@ def run_vllm(
             avg_access_latency_ns=0.0,
             wall_clock_seconds=0.0,
             seed=seed,
+            counter_source=counters.get("counter_source", ""),
         )
 
     tokenizer = engine.get_tokenizer()
@@ -289,6 +298,7 @@ def run_vllm(
         avg_access_latency_ns=avg_latency,
         wall_clock_seconds=wall_end - wall_start,
         seed=seed,
+        counter_source=counters.get("counter_source", ""),
     )
 
 
@@ -491,6 +501,20 @@ def _build_parser() -> argparse.ArgumentParser:
             "string so you know what would be measured in a real run."
         ),
     )
+    p.add_argument(
+        "--max-model-len",
+        type=int,
+        default=None,
+        help=(
+            "Override vLLM's max_model_len. Required to force "
+            "spillover for single-request workloads where the prompt "
+            "is longer than vLLM's default 32K cap (e.g. set to "
+            "131072 for the rag_128k workload on Qwen2.5-7B). Without "
+            "this, long prompts get silently truncated to 32K and the "
+            "KV budget can hold them — no swap, no measurable "
+            "slow-tier traffic."
+        ),
+    )
     return p
 
 
@@ -506,6 +530,7 @@ def main(argv: List[str]) -> int:
         enforce_eager=args.enforce_eager,
         seed=args.seed,
         dry_run=args.dry_run,
+        max_model_len=args.max_model_len,
     )
     print(
         f"workload={spec.name} policy={args.policy} "
