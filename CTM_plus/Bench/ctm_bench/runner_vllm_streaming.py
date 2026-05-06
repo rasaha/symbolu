@@ -290,7 +290,7 @@ class SwapCounterSampler:
 def _read_swap_counters_from_engine(engine: Any) -> Tuple[int, int, int]:
     """Read swap counter deltas since the last reset.
 
-    Returns ``(swap_in_blocks, swap_out_blocks, preemption_events)``.
+    Returns ``(swap_in_blocks, swap_out_blocks, preemption_total)``.
     Returns ``(0, 0, 0)`` on any attribute-walk failure — the
     sampler treats zero-deltas as "no swap activity," which is
     indistinguishable from "the engine doesn't expose this API,"
@@ -304,6 +304,25 @@ def _read_swap_counters_from_engine(engine: Any) -> Tuple[int, int, int]:
       (post-0.5 path, pipeline-parallel scheduler is a list)
     * ``engine.engine.scheduler.block_manager.block_allocator``
       (older path with a single Scheduler instance)
+
+    **Swap-counter format note (verified against
+    runner_vllm.py:375-404 and its tests):** vLLM 0.7's
+    ``CpuGpuBlockAllocator.get_and_reset_swaps()`` returns a list
+    of ``(src_block_id, dst_block_id)`` tuples — one per swap
+    event since the last reset. The count is ``len(swaps)``; the
+    direction (in vs out) cannot be inferred from the tuple
+    alone without device-side context. We report ``len(swaps)``
+    as ``swap_out_blocks`` (matching the existing
+    ``_extract_vllm_tier_counters`` convention of attributing
+    all swaps to "DDR" / slow-tier traffic), and report
+    ``swap_in_blocks=0`` since we can't distinguish. If a future
+    vLLM version splits the counter, the dict / object branches
+    below pick that up automatically.
+
+    **Preemption attribute (verified against vLLM 0.7
+    scheduler.py):** the running total is
+    ``num_cumulative_preemption`` (singular). We also try a few
+    alternate names for forward compatibility.
     """
     inner = getattr(engine, "engine", engine)
     sched = getattr(inner, "scheduler", None)
@@ -327,33 +346,69 @@ def _read_swap_counters_from_engine(engine: Any) -> Tuple[int, int, int]:
     swap_out = 0
     try:
         swaps = block_allocator.get_and_reset_swaps()
-        # The return format has shifted across vLLM minor versions.
-        # Tolerate a dict (in/out keys), a 2-tuple (in, out), or
-        # an object with ``swap_in`` / ``swap_out`` attrs.
-        if isinstance(swaps, dict):
-            swap_in = int(swaps.get("in", swaps.get("swap_in", 0)))
-            swap_out = int(swaps.get("out", swaps.get("swap_out", 0)))
-        elif isinstance(swaps, (list, tuple)) and len(swaps) >= 2:
-            swap_in = int(swaps[0])
-            swap_out = int(swaps[1])
-        elif hasattr(swaps, "swap_in") and hasattr(swaps, "swap_out"):
-            swap_in = int(swaps.swap_in)
-            swap_out = int(swaps.swap_out)
-    except (AttributeError, TypeError, ValueError):
-        # Counter API exists but returned something we can't parse.
-        # The run continues with zero deltas; the report will show
-        # that swap counters didn't accumulate — same diagnostic
-        # signal as no-swap-engaged.
-        pass
+    except (AttributeError, TypeError):
+        swaps = None
 
+    if swaps is not None:
+        try:
+            # vLLM 0.7's CpuGpuBlockAllocator returns a list of
+            # (src_block_id, dst_block_id) tuples. Count is len(),
+            # direction not distinguishable — attribute all to
+            # swap_out per the existing batch runner's convention.
+            if isinstance(swaps, list):
+                # Distinguish list-of-tuples from list-of-ints:
+                # if any element is itself a tuple/list, we have
+                # the swap-event format.
+                if swaps and isinstance(swaps[0], (tuple, list)):
+                    n = len(swaps)
+                    swap_out = n
+                    swap_in = 0
+                elif swaps and isinstance(swaps[0], int) and len(swaps) >= 2:
+                    # Hypothetical [in, out] flat int list.
+                    swap_in = int(swaps[0])
+                    swap_out = int(swaps[1])
+                else:
+                    # Empty list or unknown format.
+                    swap_in = 0
+                    swap_out = 0
+            elif isinstance(swaps, tuple) and len(swaps) >= 2 and all(
+                isinstance(x, int) for x in swaps[:2]
+            ):
+                # (in, out) 2-tuple of ints.
+                swap_in = int(swaps[0])
+                swap_out = int(swaps[1])
+            elif isinstance(swaps, dict):
+                swap_in = int(swaps.get("in", swaps.get("swap_in", 0)))
+                swap_out = int(swaps.get("out", swaps.get("swap_out", 0)))
+            elif hasattr(swaps, "swap_in") and hasattr(swaps, "swap_out"):
+                swap_in = int(swaps.swap_in)
+                swap_out = int(swaps.swap_out)
+            else:
+                # Fall back to len() if iterable.
+                try:
+                    n = len(swaps)
+                    swap_out = n
+                except TypeError:
+                    pass
+        except (TypeError, ValueError):
+            pass
+
+    # Preemption running total. vLLM 0.7's actual attribute is
+    # ``num_cumulative_preemption`` (singular). Older / newer
+    # versions may use slightly different names; try several.
     preemption = 0
-    # Some vLLM versions expose preemption counters on the scheduler;
-    # others on a stats logger. Try the scheduler first.
-    for attr in ("num_preemption_events", "num_cumulative_preemptions"):
+    for attr in (
+        "num_cumulative_preemption",
+        "num_cumulative_preemptions",
+        "num_preemption_events",
+    ):
         v = getattr(sched, attr, None)
         if v is not None:
-            preemption = int(v)
-            break
+            try:
+                preemption = int(v)
+                break
+            except (TypeError, ValueError):
+                continue
 
     return (swap_in, swap_out, preemption)
 
@@ -629,6 +684,30 @@ class AsyncEngineDriver:
                 await sampler_task
             except asyncio.CancelledError:
                 pass
+            # Shut down vLLM's worker subprocess explicitly. Without
+            # this, a multi-cell sweep can leak GPU memory across
+            # cells because the previous engine's workers stay alive
+            # holding KV-cache allocations. Try several teardown
+            # API names — vLLM has changed the public method across
+            # 0.5 → 0.7. Best-effort; never crash the run.
+            for shutdown_name in (
+                "shutdown_background_loop",
+                "shutdown",
+                "stop",
+            ):
+                shutdown = getattr(engine, shutdown_name, None)
+                if shutdown is None:
+                    continue
+                try:
+                    result = shutdown()
+                    if asyncio.iscoroutine(result):
+                        await result
+                    break
+                except Exception as exc:
+                    logger.warning(
+                        "engine teardown via %s failed: %s",
+                        shutdown_name, exc,
+                    )
 
         wall = time.perf_counter() - start
         totals = sampler.totals()

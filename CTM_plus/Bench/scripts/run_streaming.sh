@@ -57,6 +57,41 @@ MAX_WALL_SECONDS=${MAX_WALL_SECONDS:-180}
 
 WORKLOADS=(chat_32k rag_128k agentic_clustered_64k)
 
+# Per-workload prompt-length distributions. The streaming runner's
+# scheduler samples uniformly from these in Pareto mode. Each list
+# is chosen to roughly match the canonical Mode A workload's
+# context characteristics, so chat_32k ≠ rag_128k ≠ agentic in
+# this sweep (audit fix — see git log d7fccab review).
+prompt_lengths_for_workload() {
+    case "$1" in
+        chat_32k)
+            # Bimodal: short turns (256-2048) + occasional long
+            # context (16384-32000). 32K is just under Mistral-v0.1's
+            # max_position_embeddings (32K).
+            echo "256,512,1024,2048,4096,16384,32000"
+            ;;
+        rag_128k)
+            # Long retrieval-augmented contexts. Capped at 32K
+            # because no canonical vLLM-0.7 model on a single A100
+            # 80GB practically supports 128K with the swap budget;
+            # the rag_128k *label* preserves the workload identity
+            # for cross-reference but the actual lengths are
+            # capped at 32K.
+            echo "8192,16384,24576,32000"
+            ;;
+        agentic_clustered_64k)
+            # Sustained long-context agentic. Heavier mid-range
+            # than chat (the dwell-on-one-anchor characteristic
+            # produces longer effective prompts than chat turns).
+            echo "4096,8192,16384,32000"
+            ;;
+        *)
+            # Unknown workload — fall back to a sensible default.
+            echo "256,512,1024,2048"
+            ;;
+    esac
+}
+
 # ----- Argparse ---------------------------------------------------- #
 
 MODE="full"
@@ -135,12 +170,13 @@ echo "==> Total cells: $CELL_COUNT"
 CELL_IDX=0
 
 for workload in "${WORKLOADS[@]}"; do
+    PROMPT_LENGTHS=$(prompt_lengths_for_workload "$workload")
     for seed in "${SEEDS[@]}"; do
         CELL_IDX=$((CELL_IDX + 1))
         CELL_NAME="${workload}_lru_seed${seed}"
         CELL_OUT="$OUT_DIR/$CELL_NAME"
         mkdir -p "$CELL_OUT"
-        echo "[$CELL_IDX/$CELL_COUNT] Running $CELL_NAME"
+        echo "[$CELL_IDX/$CELL_COUNT] Running $CELL_NAME (lengths=$PROMPT_LENGTHS)"
         python3 -m ctm_bench.scripts.run_streaming \
             --model "$MODEL" \
             --workload "$workload" \
@@ -151,6 +187,7 @@ for workload in "${WORKLOADS[@]}"; do
             --arrival-alpha "$ARRIVAL_ALPHA" \
             --max-requests "$MAX_REQUESTS" \
             --max-wall-seconds "$MAX_WALL_SECONDS" \
+            --prompt-length-choices "$PROMPT_LENGTHS" \
             --output-dir "$CELL_OUT" \
             2>&1 | tee "$CELL_OUT.log"
     done

@@ -33,6 +33,86 @@ proves the API contract via mocks; the actual swap-engagement
 question — does `swap_out_blocks > 0` materialise on a real
 vLLM 0.7+ A100 run — can only be answered on a GPU.
 
+## §1.1 Audit pass — findings + fixes (May 2026)
+
+An independent critical-audit pass on the Phase 1 implementation
+surfaced four findings. Two were **HIGH severity** — would have
+silently invalidated every cell on a real GPU run by reporting
+all-zero swap counters regardless of whether the swap path
+engaged. All four are fixed in this commit.
+
+### HIGH
+
+* **Wrong parser for `block_allocator.get_and_reset_swaps()`
+  return format.** vLLM 0.7's `CpuGpuBlockAllocator` returns a
+  list of `(src_block_id, dst_block_id)` tuples — verified
+  against `runner_vllm.py:_extract_vllm_tier_counters` and its
+  pinned tests. My initial parser only handled dict / 2-tuple /
+  attr-object formats; the list-of-tuples branch crashed at
+  `int(swaps[0])` (treating a tuple as an int) and silently
+  fell through to swap_out=0. Fix: distinguish list-of-tuples
+  from list-of-ints by checking `swaps[0]` type; report
+  `len(swaps)` as `swap_out_blocks` (matches the existing
+  batch runner's "all swaps → DDR" convention).
+* **Wrong attribute names for preemption counter.** I checked
+  `num_preemption_events` and `num_cumulative_preemptions`.
+  vLLM 0.7's actual attribute is `num_cumulative_preemption`
+  (singular). My code never matched → `preemption_events=0`
+  always. Fix: check `num_cumulative_preemption` first, then
+  the alternate plural variants for forward compatibility.
+
+### MEDIUM
+
+* **Workload-name → prompt-length-distribution mapping
+  missing.** The shell driver passed the same default
+  `prompt_length_choices=256,512,1024,2048` for every workload.
+  `chat_32k`, `rag_128k`, and `agentic_clustered_64k` would
+  have run **identical workloads** with only a label
+  difference. Fix: `prompt_lengths_for_workload()` bash
+  function in `run_streaming.sh` maps each canonical workload
+  to a length distribution that roughly matches its Mode A
+  characteristics (chat: bimodal short + long; rag: long
+  retrieval; agentic: sustained long-context).
+* **No explicit engine teardown.** `AsyncLLMEngine` worker
+  subprocess wasn't shut down between cells. Single-cell run
+  fine; multi-cell sweep (which is what `run_streaming.sh`
+  does) could leak GPU memory across cells. Fix: best-effort
+  call to `engine.shutdown_background_loop()` (vLLM 0.7's
+  primary teardown) → `engine.shutdown()` → `engine.stop()`
+  fallback chain in the run loop's `finally` block. Awaits
+  if the teardown method returns a coroutine.
+
+### Tests added for the fixes
+
+* `test_read_swap_counters_handles_vllm_07_list_of_tuples`
+  — pins the actual format `[(1, 100), (2, 101), (3, 102)]`
+  → `swap_out_blocks == 3`, mirrors the batch runner's
+  `test_extract_vllm_tier_counters_uses_block_allocator_swaps`.
+* `test_read_swap_counters_empty_list_means_zero` — pins the
+  Phase 1 pass criterion's "no-swap-engaged" signal: empty
+  list → `(0, 0, 0)`, no crash.
+* `test_read_swap_counters_finds_preemption_via_alternate_attrs`
+  — parametrised over `num_cumulative_preemption` (vLLM 0.7
+  actual), `num_cumulative_preemptions` (plural), and
+  `num_preemption_events` (alternate).
+* `test_async_engine_driver_run_calls_engine_teardown` +
+  `test_async_engine_driver_run_teardown_falls_back_to_shutdown`
+  — verify the teardown chain calls the right method,
+  including the async-coroutine path.
+
+Total streaming-runner tests: 34 (was 29 + 5 audit-pass new).
+Total Bench tests: 163 (was 158 + 5).
+
+### Diagnostic value of the fixes
+
+The HIGH fixes change Phase 1's behaviour on a real GPU from
+"always reports zero swaps regardless of what happened" to
+"reports actual swap activity if the path engages, zero if it
+doesn't." Without these fixes, the Phase 1 pass criterion
+(`swap_out_blocks > 0`) would have always failed silently —
+producing a misleading "the swap path doesn't engage" finding
+when the real story would have been "the parser is broken."
+
 **Audience:** the engineer (possibly future-me) who will write
 the code. Conservative framing throughout: every design choice
 is justified against a known concrete problem from the May 2026

@@ -422,9 +422,47 @@ def test_async_engine_driver_run_phase1_requires_vllm():
 # ------------------------------------------------------------------ #
 
 
+def test_read_swap_counters_handles_vllm_07_list_of_tuples():
+    """vLLM 0.7's CpuGpuBlockAllocator.get_and_reset_swaps()
+    returns a list of (src_block_id, dst_block_id) tuples — the
+    actual format the existing batch runner's
+    _extract_vllm_tier_counters has been validated against
+    (runner_vllm.py:375-404, tests in test_runner_vllm.py).
+
+    The streaming counter probe must report len(swaps) as
+    swap_out_blocks (matching the batch runner's convention of
+    attributing all swaps to slow-tier traffic) — NOT crash
+    trying to int-cast a tuple."""
+    from ctm_bench.runner_vllm_streaming import (
+        _read_swap_counters_from_engine,
+    )
+
+    class FakeAllocator:
+        def get_and_reset_swaps(self):
+            return [(1, 100), (2, 101), (3, 102)]   # 3 swap events
+
+    class FakeBM:
+        block_allocator = FakeAllocator()
+
+    class FakeSched:
+        block_manager = FakeBM()
+        num_cumulative_preemption = 7   # vLLM 0.7's actual attr name
+
+    class FakeInner:
+        scheduler = FakeSched()
+
+    class FakeEngine:
+        engine = FakeInner()
+
+    inb, outb, preempt = _read_swap_counters_from_engine(FakeEngine())
+    assert outb == 3   # len of the swap list
+    assert inb == 0    # direction not distinguishable from this format
+    assert preempt == 7
+
+
 def test_read_swap_counters_handles_dict_format():
-    """vLLM's get_and_reset_swaps may return a dict with `in`/`out`
-    keys."""
+    """A future vLLM version that splits in/out via dict — the
+    parser should pick that up."""
     from ctm_bench.runner_vllm_streaming import (
         _read_swap_counters_from_engine,
     )
@@ -438,7 +476,7 @@ def test_read_swap_counters_handles_dict_format():
 
     class FakeSched:
         block_manager = FakeBM()
-        num_preemption_events = 7
+        num_cumulative_preemption = 7
 
     class FakeInner:
         scheduler = FakeSched()
@@ -452,15 +490,17 @@ def test_read_swap_counters_handles_dict_format():
     assert preempt == 7
 
 
-def test_read_swap_counters_handles_tuple_format():
-    """Some vLLM versions return swaps as a 2-tuple (in, out)."""
+def test_read_swap_counters_handles_tuple_of_ints():
+    """A future vLLM version that returns (in, out) as a flat
+    2-tuple of ints — distinguish from list-of-tuples by checking
+    element type."""
     from ctm_bench.runner_vllm_streaming import (
         _read_swap_counters_from_engine,
     )
 
     class FakeAllocator:
         def get_and_reset_swaps(self):
-            return (10, 4)
+            return (10, 4)   # int tuple, NOT list of pairs
 
     class FakeBM:
         block_allocator = FakeAllocator()
@@ -477,7 +517,72 @@ def test_read_swap_counters_handles_tuple_format():
     inb, outb, preempt = _read_swap_counters_from_engine(FakeEngine())
     assert inb == 10
     assert outb == 4
-    assert preempt == 0  # no preemption attr on FakeSched
+    assert preempt == 0   # no preemption attr on FakeSched
+
+
+def test_read_swap_counters_empty_list_means_zero():
+    """When no swaps engaged, get_and_reset_swaps returns []. The
+    parser must report (0, 0, ...) without crashing — this is the
+    'no swap engaged' signal that Phase 1's pass criterion
+    explicitly tests for."""
+    from ctm_bench.runner_vllm_streaming import (
+        _read_swap_counters_from_engine,
+    )
+
+    class FakeAllocator:
+        def get_and_reset_swaps(self):
+            return []
+
+    class FakeBM:
+        block_allocator = FakeAllocator()
+
+    class FakeSched:
+        block_manager = FakeBM()
+
+    class FakeInner:
+        scheduler = FakeSched()
+
+    class FakeEngine:
+        engine = FakeInner()
+
+    inb, outb, preempt = _read_swap_counters_from_engine(FakeEngine())
+    assert (inb, outb, preempt) == (0, 0, 0)
+
+
+def test_read_swap_counters_finds_preemption_via_alternate_attrs():
+    """The Scheduler's preemption counter has had multiple names
+    across vLLM versions. The probe should find it under any of
+    the candidates."""
+    from ctm_bench.runner_vllm_streaming import (
+        _read_swap_counters_from_engine,
+    )
+
+    for attr_name, expected in [
+        ("num_cumulative_preemption", 11),     # vLLM 0.7 actual
+        ("num_cumulative_preemptions", 12),    # plural variant
+        ("num_preemption_events", 13),         # alternate
+    ]:
+        sched_cls = type(
+            "FakeSched",
+            (),
+            {
+                attr_name: expected,
+                "block_manager": type(
+                    "FakeBM", (),
+                    {"block_allocator": type(
+                        "FakeAllocator", (),
+                        {"get_and_reset_swaps": lambda self: []},
+                    )()},
+                )(),
+            },
+        )
+        engine = type("E", (), {
+            "engine": type("I", (), {"scheduler": sched_cls()})(),
+        })()
+        _, _, preempt = _read_swap_counters_from_engine(engine)
+        assert preempt == expected, (
+            f"failed to read preemption from {attr_name!r}"
+        )
 
 
 def test_read_swap_counters_handles_object_format():
@@ -721,6 +826,128 @@ def test_async_engine_driver_run_full_flow_with_mock(monkeypatch):
     assert result.policy_name == "lru"
     assert result.workload_name == "test_workload"
     assert result.seed == 42
+
+
+def test_async_engine_driver_run_calls_engine_teardown():
+    """Multi-cell sweeps need explicit engine teardown to release
+    GPU memory between cells. The driver should call one of the
+    vLLM teardown methods (shutdown_background_loop / shutdown /
+    stop) before run() returns."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    teardown_called = []
+
+    class FakeOutput:
+        outputs = [type("_", (), {"token_ids": [1, 2, 3]})()]
+
+    class FakeEngine:
+        engine = type("_", (), {
+            "scheduler": type("_", (), {
+                "block_manager": type("_", (), {
+                    "block_allocator": type("_", (), {
+                        "get_and_reset_swaps": staticmethod(lambda: []),
+                    })(),
+                })(),
+            })(),
+        })()
+
+        async def generate(self, prompt, sp, rid):
+            yield FakeOutput()
+
+        def shutdown_background_loop(self):
+            teardown_called.append("shutdown_background_loop")
+
+    class FakeVLLM:
+        AsyncEngineArgs = type("_", (), {"__init__": lambda self, **k: None})
+        AsyncLLMEngine = type("_", (), {
+            "from_engine_args": staticmethod(lambda args: FakeEngine()),
+        })
+        SamplingParams = type("_", (), {"__init__": lambda self, **k: None})
+
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42,
+        sample_interval_seconds=0.001,
+        vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=100.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    asyncio.new_event_loop().run_until_complete(
+        driver.run(
+            scheduler=sched, sampler=sampler,
+            max_requests=2, max_wall_seconds=2.0,
+            workload_name="teardown_test",
+        )
+    )
+    assert teardown_called == ["shutdown_background_loop"]
+
+
+def test_async_engine_driver_run_teardown_falls_back_to_shutdown():
+    """If the engine doesn't have shutdown_background_loop, fall
+    back to shutdown(). If neither, fall back to stop()."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    teardown_called = []
+
+    class FakeOutput:
+        outputs = [type("_", (), {"token_ids": [1]})()]
+
+    class FakeEngine:
+        engine = type("_", (), {
+            "scheduler": type("_", (), {
+                "block_manager": type("_", (), {
+                    "block_allocator": type("_", (), {
+                        "get_and_reset_swaps": staticmethod(lambda: []),
+                    })(),
+                })(),
+            })(),
+        })()
+
+        async def generate(self, prompt, sp, rid):
+            yield FakeOutput()
+
+        # No shutdown_background_loop. Has async shutdown.
+        async def shutdown(self):
+            teardown_called.append("shutdown")
+
+    class FakeVLLM:
+        AsyncEngineArgs = type("_", (), {"__init__": lambda self, **k: None})
+        AsyncLLMEngine = type("_", (), {
+            "from_engine_args": staticmethod(lambda args: FakeEngine()),
+        })
+        SamplingParams = type("_", (), {"__init__": lambda self, **k: None})
+
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42,
+        sample_interval_seconds=0.001,
+        vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=100.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    asyncio.new_event_loop().run_until_complete(
+        driver.run(
+            scheduler=sched, sampler=sampler,
+            max_requests=1, max_wall_seconds=2.0,
+            workload_name="teardown_test_async",
+        )
+    )
+    # The async shutdown was called and awaited.
+    assert teardown_called == ["shutdown"]
 
 
 def test_async_engine_driver_run_caps_at_max_wall(monkeypatch):
