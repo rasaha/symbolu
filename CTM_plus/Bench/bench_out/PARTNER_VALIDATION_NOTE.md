@@ -3,8 +3,8 @@
 **Audience:** prospective design partner evaluating CTM+ for an
 LLM-inference deployment.
 **Status:** safe to share; conservative framing throughout.
-**Last updated:** 2026-05-06 (revised after the May 2026 vLLM
-0.4.0 patch-install verification).
+**Last updated:** 2026-05-07 (revised after the May 2026 vLLM
+0.7.3 streaming-runner GPU validation).
 
 This note states what CTM+ has and has not been validated to
 do today, why a real-stack `vLLM` validation has not yet been
@@ -63,6 +63,21 @@ look like.
   the headline; what it does **not** rule out is that
   real-attention behaviour differs from synthetic-attention
   behaviour. That gap is closed by §4.
+* **Modern-vLLM streaming runner produces real swap
+  counters.** A May 2026 RunPod A100 + vLLM 0.7.3 +
+  Qwen2.5-7B-Instruct run validated the streaming-runner
+  Phase 1 mechanism end-to-end. Single-cell smoke produced
+  **2205 swap_out blocks across 2 preemption events** at
+  `GPU_MEM_UTIL=0.26 + arrival_rate=6.0/sec + max_decode=2048`.
+  vLLM's own scheduler log corroborated:
+  `Sequence group ... is preempted by PreemptionMode.SWAP
+  mode ...`. This closes the architectural gap from the
+  prior batch-mode Mode B run (where FCFS-no-preempt produced
+  zero swap counters). Full artifact at
+  `bench_out/streaming_smoke_v4_proof.json`. **Important
+  caveat:** this is LRU only; Phase 2 (CTM+ on modern vLLM)
+  is the path that produces head-to-head policy numbers,
+  still gated on partner request.
 * **Methodology.** Audit-pass discipline — every non-trivial
   change goes through an independent critical-audit pass
   before merge. Two of the five rounds caught and corrected

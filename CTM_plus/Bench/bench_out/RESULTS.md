@@ -773,8 +773,90 @@ risk.
 
 ### §13.2 #3 — vLLM 0.5+ streaming runner
 
-**Phase 1 (LRU swap-counter validation): code-complete.**
+**Phase 1 (LRU swap-counter validation): code-complete + GPU-validated.**
 Phase 2 (CTM+ on modern vLLM) still stubbed.
+
+**May 2026 GPU validation (single-cell smoke):** the streaming
+runner produced its **first real-model swap counters** on a
+RunPod A100 + vLLM 0.7.3 + Qwen2.5-7B-Instruct.
+
+| Metric | Value |
+|---|---:|
+| `swap_out_blocks` | **2205** |
+| `preemption_events` | **2** |
+| `n_requests_admitted` | 30 |
+| `n_decode_tokens` | 6144 |
+| `wall_clock_seconds` | 120.0 |
+| `counter_source` | `vllm_streaming_async_swap` |
+
+vLLM's own scheduler log corroborated the parser:
+
+> `WARNING scheduler.py:1754] Sequence group streaming_chat_32k_2`
+> `is preempted by PreemptionMode.SWAP mode because there is not`
+> `enough KV cache space. ... total_num_cumulative_preemption=1`
+
+Hyperparameters that engaged swap on Qwen 7B + A100 80GB:
+
+| Knob | Value | Why |
+|---|---:|---|
+| `GPU_MEM_UTIL` | 0.26 | KV budget = 1.91 GiB → max-concurrency at 32K = 1.09x. Single max-length prompt fills the cache. |
+| `arrival_rate` | 6.0/sec | Pareto α=1.5 burstiness piles up arrivals fast |
+| `max_decode_tokens` | 2048 | Long decode → KV grows per step → triggers preemption mid-decode |
+| `prompt-length-choices` | 8000,16000,24000,30000 | Biased heavy toward long prompts (avg ~19K, vs default avg ~7K) |
+| `preemption_mode` | swap | The Phase 1 critical config |
+| `enable_prefix_caching` | false | Keeps eviction in the swap decision tree, not cache-retention |
+
+Earlier knob-tuning iterations (preserved as a learning artifact):
+
+* **v1: `GPU_MEM_UTIL=0.30`, default decoding** → KV usage peaked
+  at 64% → no swap (cache never filled).
+* **v2: `GPU_MEM_UTIL=0.25`** → vLLM refused to start (KV
+  20960 tokens < `max_model_len` 32768).
+* **v3: `GPU_MEM_UTIL=0.26`, `arrival_rate=6.0`,
+  default decode (128 tokens)** → KV hit 98%, but vLLM queued
+  the 13 pending requests rather than preempting the running 7.
+* **v4 (above)** → bumped `max_decode_tokens=2048` so running
+  requests grew their KV mid-decode and exhausted the cache,
+  forcing the scheduler to swap.
+
+The full smoke artifact is at
+`bench_out/streaming_smoke_v4_proof.json` — JSON with run
+config, vLLM-log corroboration, and explicit "what this
+proves / what it does not prove" framing.
+
+### What this single-cell smoke proves
+
+* AsyncLLMEngine + `preemption_mode="swap"` actually engages the
+  swap path under sustained Pareto-bursty load on a real model.
+  This was the failure mode the May 2026 batch-mode Mode B run
+  hit and which Phase 1's whole design addressed.
+* The audit-fix list-of-tuples parser (commit `9ba827a`)
+  correctly counts swap events on vLLM 0.7's
+  `CpuGpuBlockAllocator`. Without that fix the value would be 0
+  — exactly the silent failure the audit pass was meant to catch.
+* The hyperparameter regime that forces preemption is now
+  documented and reproducible for any future GPU run.
+
+### What this smoke does NOT prove
+
+* CTM+ vs LRU policy effect on a real model. Phase 1 is **LRU
+  only**. Phase 2 (the allocator-evictor patch on modern vLLM)
+  is the one that produces the head-to-head numbers.
+* Multi-cell / multi-seed / multi-workload reproducibility.
+  Single cell only — proves the *mechanism*, not a population
+  of measurements.
+* That this swap-engagement regime matches any specific partner
+  workload. It's a synthetic stress pattern designed to force
+  preemption; partner deployments may not produce the same
+  pressure profile.
+
+### Phase 1 status now
+
+The streaming runner's design intent is validated end-to-end on
+real silicon. Phase 2 (CTM+ on modern vLLM) is still gated on
+explicit partner request or multi-day authorization — but the
+"will this even produce data" risk that Phase 2 inherits from
+Phase 1 is now closed.
 
 * `Bench/scripts/MODE_B_STREAMING_DESIGN.md` — full
   architectural plan. Two problems: (A) CTM+ cannot install

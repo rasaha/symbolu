@@ -28,10 +28,20 @@ multi-day authorization.
   precedence, full mocked run loop, max-wall-seconds capping.
   Total Bench tests: 158 (was 147 + 11 new).
 
-**Phase 1 still requires:** GPU validation. The CPU sandbox
-proves the API contract via mocks; the actual swap-engagement
-question — does `swap_out_blocks > 0` materialise on a real
-vLLM 0.7+ A100 run — can only be answered on a GPU.
+**Phase 1 GPU-validated (May 2026):** RunPod A100 + vLLM 0.7.3
++ Qwen2.5-7B-Instruct produced **swap_out=2205 blocks,
+preempt=2 events** on a single-cell smoke. vLLM scheduler log
+corroborated the parser. Hyperparameters that engage swap on
+this hardware: `GPU_MEM_UTIL=0.26`, `arrival_rate=6/sec`,
+`max_decode_tokens=2048`, prompt-length distribution biased to
+8K–30K. Full artifact: `bench_out/streaming_smoke_v4_proof.json`.
+RESULTS.md §13.2 captures the multi-iteration knob-tuning that
+got there (v1 64% KV no swap → v2 vLLM-refused-to-start → v3
+98% KV but queue-not-preempt → v4 success).
+
+The single-cell smoke proves the *mechanism*. Multi-cell sweep
++ Phase 2 (CTM+ allocator-evictor patch) remain gated on
+partner request.
 
 ## §1.1 Audit pass — findings + fixes (May 2026)
 
