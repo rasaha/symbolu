@@ -47,6 +47,62 @@ streaming runner wires `ctm_plus_evictor=True` end-to-end
 (verified by mocked-vLLM tests; GPU validation pending). See
 §1.2 below for what landed and §1.3 for the GPU run procedure.
 
+> ## ⚠ HIGH-severity Phase 2 limitation (audit-pass finding)
+>
+> **Phase 2 as implemented does NOT run the same policy that
+> produced the simulator headlines.** The evictor patch forwards
+> `attention_sum=0.0` on every block update because vLLM's
+> Evictor ABC doesn't expose attention through `update(block_id,
+> last_accessed)`. With `attn ≡ 0`:
+>
+> * The 0.35·attn term in CTM+'s scoring formula zeroes out (35%
+>   of the score gone).
+> * Attention-EMA stays at 0 → no block is classified as ENTITY →
+>   the 0.30·position term collapses to 0.30·0.1 = 0.03 constant.
+> * Effective score = 0.25·recency + 0.10·frequency.
+>
+> That's roughly **LRU + a frequency tiebreaker**, not the CTM+
+> policy that Mode A / KVSimulator / replay measured. The Mode A
+> headlines (52% chat-pressure latency cut, −100% RAG slow-tier
+> bytes, +192% agentic regression) ALL came from runs where
+> `on_block_attention` received non-zero attention_sum.
+>
+> **What this means for any future Phase 2 GPU run:**
+>
+> 1. Expected CTM+ vs LRU delta is **small** — possibly within
+>    measurement noise. A "Phase 2 finds no significant
+>    difference" result would be the expected outcome of this
+>    implementation, NOT evidence that CTM+'s policy doesn't
+>    work on a real model.
+> 2. To produce real CTM+ vs LRU evidence on modern vLLM, we
+>    need a Phase 3 that hooks the model's attention output
+>    path and forwards block-level attention sums to the
+>    evictor. ~3-4 days of vLLM-internals + model-runner work,
+>    materially more invasive than Phase 2.
+> 3. The legacy vLLM 0.4 patch has the same limitation — the
+>    pre-Round-4 0.4 code in `vllm_evictor.py:128-150` also
+>    accepts `attention_sum` with default 0.0 and was not
+>    actually wiring real attention. So **no CTM+ vLLM
+>    integration we have ever shipped, on any vLLM version,
+>    actually runs the simulator's policy** — including the
+>    May 2026 patch-install proof on RunPod (commit `6081148`).
+>    That proof showed the *integration* works; it did not
+>    show that the *policy* runs end-to-end with real attention.
+>
+> **Honest framing for partner conversations:** simulator
+> evidence remains the strongest support for the CTM+ headlines.
+> Real-vLLM patch installs cleanly (verified) but doesn't
+> exercise the attention-aware part of the policy. Phase 3
+> (attention forwarding) is the path to producing real-model
+> evidence of CTM+'s actual scoring math; it is not yet
+> scoped or implemented.
+>
+> Phase 2 still has value — it validates the integration
+> mechanism on modern vLLM and produces a clean baseline ("does
+> the recency+frequency component of CTM+ alone differ from
+> LRU?") — but it must not be cited as "real-model CTM+ vs LRU
+> evidence." That label belongs to Phase 3.
+
 ## §1.2 Phase 2 implementation (May 2026)
 
 What landed in `kv_policy/vllm_evictor.py`:
@@ -114,6 +170,48 @@ What did NOT land (honest scope):
 * (replaces the old `test_async_engine_driver_run_phase2_raises_not_implemented`
   with `test_async_engine_driver_phase2_enables_prefix_caching`)
 
+## §1.2.1 Phase 2 audit-pass — fixes (May 2026)
+
+An independent audit of the Phase 2 implementation surfaced one
+HIGH and three MEDIUM findings. The HIGH finding is documented
+in the §1.1 callout above (no attention forwarding → CTM+ runs
+as recency+frequency only). The three MEDIUM fixes shipped:
+
+* **Engine leak on patch failure (MEDIUM #2 fix).** If
+  `patch_vllm_engine_modern` raises mid-`run()` (e.g.
+  `NotImplementedError` from prefix caching being off, or
+  `RuntimeError` from allocator drift), the engine is now torn
+  down via `shutdown_background_loop` / `shutdown` / `stop`
+  before the exception propagates. Multi-cell sweeps no longer
+  leak GPU memory across cells when the patch fails.
+* **LRU + prefix caching baseline (MEDIUM #3 fix).**
+  `enable_prefix_caching` is now an independent constructor
+  arg on `AsyncEngineDriver` (and `--enable-prefix-caching`
+  on the CLI). Default behaviour preserved (True iff
+  `ctm_plus_evictor=True`). Partners can now run an
+  apples-to-apples LRU baseline cell with prefix caching ON
+  for direct comparison against a Phase 2 CTM+ cell — both
+  cells decide cache retention; only the policy differs.
+  Constructor explicitly rejects the impossible combination
+  `ctm_plus_evictor=True + enable_prefix_caching=False`.
+* **Dead modulo math (MEDIUM #4 fix).** `CTMEvictorModern.add`
+  was computing `num_hashed_tokens % block_size or block_size`
+  to handle a hypothetical partial-block case that vLLM's
+  prefix cache never produces (partial blocks have unstable
+  hashes and aren't cached). Replaced with a constant
+  `block_size`.
+
+Tests added (3 new, total 174):
+
+* `test_async_engine_driver_phase2_patch_failure_tears_down_engine`
+  — verifies the teardown chain fires when the patch raises.
+* `test_async_engine_driver_explicit_prefix_caching_for_lru_baseline`
+  — pins the LRU + prefix caching path for the apples-to-apples
+  baseline.
+* `test_async_engine_driver_rejects_ctm_plus_without_prefix_caching`
+  — pins the constructor's explicit rejection of the impossible
+  combination.
+
 ## §1.3 Phase 2 GPU run procedure
 
 When ready for GPU validation, the smoke command is the same as
@@ -150,11 +248,14 @@ Watch for in the log:
    accumulate (preemption_mode=swap is on). Cache hit/miss
    counters from prefix caching are visible in vLLM's metrics
    line as `GPU prefix cache hit rate`.
-4. The Phase 2 vs Phase 1 difference manifests in **which
-   blocks get evicted from the cache** when full. To compare
-   against LRU, run two cells with the same workload + seed —
-   one with `--ctm-plus`, one without — and compare swap
-   counters and cache hit rates.
+4. The Phase 2 vs LRU difference manifests in **which blocks
+   get evicted from the cache** when full. To compare
+   apples-to-apples, run two cells with the same workload +
+   seed — one `--ctm-plus`, one with `--enable-prefix-caching`
+   (the LRU baseline; audit-pass MEDIUM #3 fix). Both cells use
+   `PrefixCachingBlockAllocator`; only the evictor differs.
+   Without `--enable-prefix-caching` on the LRU cell, the
+   comparison is across two scheduler regimes, NOT policies.
 
 If the patch fails to install:
 

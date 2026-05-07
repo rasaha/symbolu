@@ -784,22 +784,47 @@ from `ctm_bench.runner_vllm_streaming`); 8 new mocked-vLLM tests
 `scripts/MODE_B_STREAMING_DESIGN.md` §1.2–§1.3 for the
 implementation summary and the Phase 2 GPU run procedure.
 
-**Honest scope of the Phase 2 implementation:**
+**Honest scope of the Phase 2 implementation (audit-pass
+findings from the May 2026 audit):**
 
+* **HIGH: Phase 2 does NOT run the same policy that produced
+  the simulator headlines.** Without attention forwarding
+  through vLLM's Evictor ABC, `attention_sum ≡ 0` on every
+  update, attention_ema stays at 0, no block becomes ENTITY,
+  and CTM+'s effective score collapses to
+  `0.25·recency + 0.10·frequency` — roughly LRU + a
+  frequency tiebreaker. The 52% chat / −100% RAG / +192%
+  agentic headlines ALL came from simulator runs with non-zero
+  attention; Phase 2 doesn't reproduce those conditions.
+  Expected CTM+ vs LRU delta on a Phase 2 GPU run is **small,
+  possibly within noise**. A "no significant difference"
+  result would not invalidate CTM+'s simulator findings — it
+  would reflect the limitation of running CTM+ without its
+  attention signal. See `MODE_B_STREAMING_DESIGN.md` §1.1's
+  HIGH-severity callout.
+* The legacy vLLM 0.4 patch shares this limitation. **No
+  CTM+ vLLM integration on any version has ever wired real
+  attention into the policy** — including the May 2026
+  patch-install proof (commit `6081148`). That proof showed
+  the *integration* works; it did not show the *policy* runs
+  end-to-end.
+* **Phase 3** (attention forwarding via a model-runner hook)
+  is the path to producing real-model evidence of CTM+'s
+  actual scoring math. ~3–4 days of vLLM-internals work,
+  not yet scoped or implemented.
 * Operates on the **cache-retention** decision (which
   cached-but-unreferenced block to release first when the
   prefix cache fills) — NOT the under-pressure swap decision
-  that Mode A's tier-cost simulator models.
-* No attention forwarding (option (b) from the design doc):
-  CTM+ scores on position + recency + frequency only.
-  Same as the legacy vLLM 0.4 patch.
+  Mode A models. Different operational question than Phase 1.
 * Sink protection is degraded (vLLM doesn't expose token
-  positions to the evictor); CTM+'s scoring still
-  differentiates ENTITY / RECENT / FILLER classes, but every
-  block is treated as non-sink.
+  positions to the evictor); ENTITY/RECENT/FILLER
+  classification still works at the block-class level but
+  every block is treated as non-sink.
 * Mocked-vLLM tests verify the integration installs cleanly;
-  whether CTM+ vs LRU produces different cache-retention
-  outcomes on real attention is the next-GPU-run question.
+  GPU validation is the next step. With the no-attention
+  caveat, even a successful GPU smoke is "the integration
+  fires and recency+frequency vs pure LRU produces measurable
+  delta X" — not "real CTM+ wins by Y%."
 
 **May 2026 GPU validation (single-cell smoke):** the streaming
 runner produced its **first real-model swap counters** on a

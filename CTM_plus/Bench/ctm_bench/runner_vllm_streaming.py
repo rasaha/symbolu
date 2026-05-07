@@ -448,6 +448,7 @@ class AsyncEngineDriver:
         seed: int = 42,
         scheduler_config_overrides: Optional[Dict[str, object]] = None,
         ctm_plus_evictor: bool = False,
+        enable_prefix_caching: Optional[bool] = None,
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
         vllm_module: Any = None,
@@ -461,6 +462,26 @@ class AsyncEngineDriver:
             if scheduler_config_overrides else {}
         )
         self.ctm_plus_evictor = ctm_plus_evictor
+        # Audit-pass fix: prefix caching is now an explicit knob,
+        # not yoked to ctm_plus_evictor. CTM+ REQUIRES prefix caching
+        # (the patch installs on PrefixCachingBlockAllocator's
+        # evictor slot); LRU works either way. Apples-to-apples
+        # CTM+ vs LRU on the cache-retention question requires
+        # BOTH cells to set enable_prefix_caching=True. The default
+        # (None) preserves the prior behaviour: True iff
+        # ctm_plus_evictor is True.
+        if enable_prefix_caching is None:
+            self.enable_prefix_caching = bool(ctm_plus_evictor)
+        else:
+            if ctm_plus_evictor and not enable_prefix_caching:
+                raise ValueError(
+                    "ctm_plus_evictor=True requires "
+                    "enable_prefix_caching=True (the CTM+ patch "
+                    "installs on PrefixCachingBlockAllocator's "
+                    "evictor slot; without prefix caching there is "
+                    "no evictor to swap)."
+                )
+            self.enable_prefix_caching = bool(enable_prefix_caching)
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -509,9 +530,13 @@ class AsyncEngineDriver:
             "swap_space": self.swap_space_gb,
             "enforce_eager": True,
             "seed": self.seed,
-            # Phase-dependent: prefix caching ON for Phase 2, OFF
-            # for Phase 1.
-            "enable_prefix_caching": bool(self.ctm_plus_evictor),
+            # Audit-pass fix: prefix caching is an independent knob.
+            # Default behaviour preserved (True iff ctm_plus_evictor)
+            # but partners can now set enable_prefix_caching=True
+            # for an LRU baseline cell that's directly comparable to
+            # a Phase 2 ctm_plus_evictor=True cell on the SAME
+            # operational question (cache retention).
+            "enable_prefix_caching": self.enable_prefix_caching,
             # preemption_mode="swap" tells vLLM's scheduler to swap
             # preempted sequences to CPU rather than recomputing
             # them. Kept ON in both phases so swap counters always
@@ -620,19 +645,41 @@ class AsyncEngineDriver:
 
         engine = AsyncLLMEngine.from_engine_args(engine_args)
 
+        # Audit-pass fix: the patch can raise (NotImplementedError
+        # on enable_prefix_caching=False, RuntimeError on
+        # allocator-version drift). If it raises here, before the
+        # main run try/finally starts, the engine leaks GPU memory
+        # and worker subprocesses. Tear down explicitly on failure.
         if self.ctm_plus_evictor:
-            # Install CTM+ evictor on the GPU PrefixCachingBlockAllocator.
-            # Implemented in kv_policy.vllm_evictor.patch_vllm_engine_modern;
-            # raises NotImplementedError if prefix caching is off or
-            # RuntimeError if the allocator path can't be walked.
-            patch_modern = patch_vllm_engine_modern  # local alias for log
-            patch_modern(
-                getattr(engine, "engine", engine),
-                enable_logging=False,
-            )
-            logger.info(
-                "Phase 2: CTM+ evictor patch installed on AsyncLLMEngine"
-            )
+            try:
+                patch_vllm_engine_modern(
+                    getattr(engine, "engine", engine),
+                    enable_logging=False,
+                )
+                logger.info(
+                    "Phase 2: CTM+ evictor patch installed on "
+                    "AsyncLLMEngine"
+                )
+            except BaseException:
+                # Best-effort teardown then re-raise. Same chain
+                # of teardown methods as the run-end finally
+                # block — see comment there.
+                for shutdown_name in (
+                    "shutdown_background_loop",
+                    "shutdown",
+                    "stop",
+                ):
+                    shutdown = getattr(engine, shutdown_name, None)
+                    if shutdown is None:
+                        continue
+                    try:
+                        result = shutdown()
+                        if asyncio.iscoroutine(result):
+                            await result
+                        break
+                    except Exception:
+                        continue
+                raise
         sampling_params = SamplingParams(
             temperature=0.0,
             max_tokens=self.max_decode_tokens,

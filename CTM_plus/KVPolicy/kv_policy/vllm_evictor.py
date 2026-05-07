@@ -736,9 +736,14 @@ class CTMEvictorModern:
         # blocks here; we'd have to track allocation order to detect
         # sinks, which is out of scope for the initial Phase 2 patch.
         # Honest scope: sink-protection is degraded for Phase 2.
+        #
+        # Audit-pass simplification: vLLM only adds *full* blocks to
+        # the prefix cache (partial blocks have unstable hashes), so
+        # block_token_count is always block_size. The earlier modulo
+        # math accounted for a hypothetical partial-block path that
+        # vLLM doesn't actually use.
         sink_offset = self._policy.sink_tokens
-        block_token_count = max(1, num_hashed_tokens % self._block_size or self._block_size)
-        positions = list(range(sink_offset, sink_offset + block_token_count))
+        positions = list(range(sink_offset, sink_offset + self._block_size))
         self._policy.ensure_block(
             block_id=block_id, sequence_id=0,
             positions=positions,

@@ -93,13 +93,21 @@ look like.
   change wall-clock latency, throughput, or hit rates on a
   real model exists today. The patch is now verified to
   install (May 2026), but no end-to-end workload sweep has
-  produced apples-to-apples CTM+-vs-LRU numbers — that run
-  was attempted and blocked on a RunPod per-pod volume
-  quota mid-download. The smaller question of "does the
-  CTM+ scoring code actually fire when blocks need to be
-  evicted" is now closed at the install level; the larger
-  question of "and does it produce a better outcome than
-  LRU on real attention" remains open.
+  produced apples-to-apples CTM+-vs-LRU numbers. **A
+  May 2026 audit pass on the Phase 2 implementation
+  surfaced that vLLM's Evictor ABC does not forward
+  attention to the evictor** — so even with the patch
+  installed, CTM+'s scoring formula's 0.35·attn term is
+  effectively zero. The policy that runs through the
+  patched vLLM is roughly "recency + frequency" (close to
+  LRU + a tiebreaker), NOT the attention-aware policy that
+  produced the simulator headlines. **Real-model evidence
+  of CTM+'s actual scoring math requires a Phase 3
+  attention-forwarding hook** — ~3–4 days of vLLM-internals
+  + model-runner work, not yet scoped. Phase 2 GPU smoke
+  is still defensible as "integration fires end-to-end with
+  no silent failures," but is NOT defensible as "CTM+ vs
+  LRU on a real model."
 * **Real-silicon swap-byte calibration.** Mode A's
   `avg_access_latency_ns` predictions and slow-tier byte
   counts have not been cross-checked against real swap-byte

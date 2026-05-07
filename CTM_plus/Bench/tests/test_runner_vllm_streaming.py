@@ -354,6 +354,50 @@ def test_async_engine_driver_constructor_stores_config():
     assert driver.ctm_plus_evictor is False
 
 
+def test_async_engine_driver_explicit_prefix_caching_for_lru_baseline():
+    """Audit-pass MEDIUM #3 fix: enable_prefix_caching is now an
+    independent knob. Partners need to run an LRU baseline cell
+    with prefix caching ON to make an apples-to-apples comparison
+    against a Phase 2 CTM+ cell (both decide cache retention; only
+    the policy differs)."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured: dict = {}
+
+    class FakeAEAArgs:
+        def __init__(self, **kwargs):
+            captured.clear()
+            captured.update(kwargs)
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAEAArgs
+
+    # LRU baseline with prefix caching ON (the cell we want for
+    # comparing against Phase 2 CTM+).
+    driver = AsyncEngineDriver(
+        model="dummy", ctm_plus_evictor=False,
+        enable_prefix_caching=True, vllm_module=FakeVLLM,
+    )
+    driver._build_engine_args(FakeVLLM)
+    assert captured["enable_prefix_caching"] is True
+    # ctm_plus_evictor stays False — this is an LRU cell.
+    assert driver.ctm_plus_evictor is False
+
+
+def test_async_engine_driver_rejects_ctm_plus_without_prefix_caching():
+    """Audit-pass MEDIUM #3 fix: explicit error if the caller
+    sets ctm_plus_evictor=True but enable_prefix_caching=False —
+    that combination can never install the patch."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    with pytest.raises(ValueError, match="enable_prefix_caching=True"):
+        AsyncEngineDriver(
+            model="dummy",
+            ctm_plus_evictor=True,
+            enable_prefix_caching=False,
+        )
+
+
 def test_async_engine_driver_phase2_enables_prefix_caching():
     """When ctm_plus_evictor=True, _build_engine_args MUST set
     enable_prefix_caching=True. Without it, vLLM uses
@@ -1037,6 +1081,66 @@ def test_async_engine_driver_run_caps_at_max_wall(monkeypatch):
 # ------------------------------------------------------------------ #
 # Phase 2 — CTMEvictorModern + patch_vllm_engine_modern
 # ------------------------------------------------------------------ #
+
+
+def test_async_engine_driver_phase2_patch_failure_tears_down_engine():
+    """Audit-pass MEDIUM #2 fix: if patch_vllm_engine_modern raises
+    (because prefix caching is off, allocator drift, etc.), the
+    engine must be shut down — otherwise multi-cell sweeps leak
+    GPU memory and worker subprocesses."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    teardown_calls = []
+
+    class FakeEngine:
+        engine = type("_", (), {
+            "scheduler": type("_", (), {
+                "block_manager": type("_", (), {
+                    # No block_allocator — guaranteed to make
+                    # patch_vllm_engine_modern raise RuntimeError.
+                })(),
+            })(),
+        })()
+
+        def shutdown_background_loop(self):
+            teardown_calls.append("shutdown_background_loop")
+
+    class FakeVLLM:
+        AsyncEngineArgs = type("_", (), {"__init__": lambda self, **k: None})
+        AsyncLLMEngine = type("_", (), {
+            "from_engine_args": staticmethod(lambda args: FakeEngine()),
+        })
+        SamplingParams = type("_", (), {"__init__": lambda self, **k: None})
+
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42,
+        ctm_plus_evictor=True,
+        enable_prefix_caching=True,
+        sample_interval_seconds=0.001,
+        vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=100.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    with pytest.raises(RuntimeError):
+        asyncio.new_event_loop().run_until_complete(
+            driver.run(
+                scheduler=sched, sampler=sampler,
+                max_requests=2, max_wall_seconds=2.0,
+                workload_name="patch_failure_test",
+            )
+        )
+    # Audit-pass invariant: the engine got torn down before the
+    # exception propagated, even though the main run-loop's
+    # try/finally never started.
+    assert teardown_calls == ["shutdown_background_loop"]
 
 
 def test_ctm_evictor_modern_implements_vllm_07_evictor_abc():

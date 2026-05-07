@@ -69,8 +69,21 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument(
         "--ctm-plus", action="store_true",
         help=(
-            "Enable CTM+ evictor (Phase 2; raises "
-            "NotImplementedError until that lands)."
+            "Enable CTM+ evictor (Phase 2). Forces "
+            "--enable-prefix-caching since CTM+'s patch "
+            "installs on PrefixCachingBlockAllocator's evictor slot."
+        ),
+    )
+    parser.add_argument(
+        "--enable-prefix-caching",
+        action="store_true",
+        default=None,
+        help=(
+            "Force prefix caching on. The default is to enable it "
+            "iff --ctm-plus is set. Set this flag explicitly for "
+            "an apples-to-apples LRU baseline against a Phase 2 "
+            "CTM+ cell (both run with prefix caching → both decide "
+            "cache-retention → policy is the only difference)."
         ),
     )
     parser.add_argument(
@@ -118,6 +131,7 @@ def main(argv: Sequence[str]) -> int:
         swap_space_gb=args.swap_space_gb,
         seed=args.seed,
         ctm_plus_evictor=args.ctm_plus,
+        enable_prefix_caching=args.enable_prefix_caching,
         max_decode_tokens=args.max_decode_tokens,
     )
 
