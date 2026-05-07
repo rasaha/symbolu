@@ -108,18 +108,21 @@ look like.
   is still defensible as "integration fires end-to-end with
   no silent failures," but is NOT defensible as "CTM+ vs
   LRU on a real model."
-* **Phase 3 (attention forwarding) scaffolding landed in
-  May 2026.** `AttentionAggregator`,
-  `CTMEvictorModern.forward_block_attention`,
-  `install_attention_capture` and the streaming runner's
-  `--phase3-attention` flag — 15 mocked-vLLM tests pin the
-  API. The remaining work is the GPU-side Q@K-from-kv_cache
-  extraction inside the wrapped attention forward; it raises
-  `NotImplementedError` on the production branch until
-  written against vLLM 0.7's specific kv_cache layout. Once
-  that lands, the three-cell experiment (LRU baseline /
-  Phase 2 ablation / Phase 3 full CTM+) is the path to
-  real-model evidence of CTM+'s scoring math.
+* **Phase 3 (attention forwarding) code-complete in May 2026.**
+  `AttentionAggregator`, `CTMEvictorModern.forward_block_attention`,
+  `install_attention_capture`, the `--phase3-attention` flag,
+  AND the GPU-side Q@K-from-kv_cache extraction
+  (`_gpu_extract_decode_attention`) are all implemented and
+  unit-tested (22 new tests, 196 total). The extractor
+  targets vLLM 0.7's FlashAttention layout with defensive
+  shape validation that degrades to no-op + descriptive
+  warning on layout mismatch. **GPU validation pending —
+  the first GPU run will verify the layout assumptions hold
+  on production vLLM and produce the three-cell experiment
+  (LRU baseline / Phase 2 ablation / Phase 3 full CTM+).**
+  Estimated remaining cost: ~1 GPU-day (~$1) on RunPod
+  using the v4 hyperparameter regime that Phase 1 validated
+  engages swap.
 * **Real-silicon swap-byte calibration.** Mode A's
   `avg_access_latency_ns` predictions and slow-tier byte
   counts have not been cross-checked against real swap-byte

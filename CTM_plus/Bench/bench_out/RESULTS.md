@@ -775,17 +775,23 @@ risk.
 
 **Phase 1 (LRU swap-counter validation): code-complete + GPU-validated.**
 **Phase 2 (CTM+ on modern vLLM, no attention forwarding): code-complete; mocked-tests pass; GPU smoke not run (would produce ~LRU-equivalent results — see §1.1 audit-pass HIGH callout).**
-**Phase 3 (attention forwarding so CTM+'s real policy runs): scaffolding code-complete; GPU-side Q@K extraction deferred.**
+**Phase 3 (attention forwarding so CTM+'s real policy runs): code-complete; GPU validation pending.**
 
 The streaming runner supports all three phases via flags
 (`--ctm-plus`, `--enable-prefix-caching`, `--phase3-attention`).
 Phase 2 + Phase 3 implementations live at
 `kv_policy.vllm_evictor` (`patch_vllm_engine_modern` +
 `CTMEvictorModern` + `AttentionAggregator` +
-`install_attention_capture`); 23 mocked-vLLM tests (189 total
-in Bench) pin the API contracts. See
+`install_attention_capture` + `_gpu_extract_decode_attention`).
+**The Q@K-from-kv_cache extraction is implemented** against
+vLLM 0.7's documented FlashAttention layout, with defensive
+shape validation that degrades to no-op + descriptive
+warnings on layout mismatch. CPU-side: 30 mocked-vLLM tests
+(196 total in Bench, 7 skipped pending torch — those run
+automatically on a GPU pod). See
 `scripts/MODE_B_STREAMING_DESIGN.md` §1.2–§1.4 for
-implementation summaries and GPU run procedures.
+implementation summaries, tensor-layout assumptions, and GPU
+run procedures.
 
 **Honest scope of the Phase 2 implementation (audit-pass
 findings from the May 2026 audit):**

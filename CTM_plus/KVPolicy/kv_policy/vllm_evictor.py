@@ -1421,17 +1421,217 @@ def _capture_attention_to_aggregator(
     if num_decode_tokens <= 0:
         return
 
-    # GPU-validation deferred path. A complete implementation reads
-    # K from kv_cache via the block_table per query, computes
-    # softmax(Q @ K^T / sqrt(d_k)), aggregates per-block, and
-    # calls aggregator.record_block_batch. The reading-K step
-    # depends on vLLM's internal kv_cache layout (paged storage;
-    # varies by attention backend).
-    raise NotImplementedError(
-        "Real attention extraction from vLLM's kv_cache requires "
-        "GPU validation. Mocked tests use the "
-        "decode_attention_weights side-channel; production runs "
-        "need this branch implemented against vLLM's specific "
-        "kv_cache layout. See MODE_B_STREAMING_DESIGN.md §1.4 "
-        "Phase 3 GPU work."
+    # Real GPU extraction. Computes softmax(Q @ K^T / sqrt(d_k))
+    # for each decode-step query against its sequence's cached keys,
+    # aggregates per-block via the block_table, and pushes per-block
+    # sums to the aggregator.
+    #
+    # Layout assumptions (documented; first GPU run diagnoses
+    # mismatches via the wrapped forward's try/except + warning):
+    #
+    # * query: [num_tokens, num_heads * head_dim] — concat of
+    #   num_prefill_tokens + num_decode_tokens. We slice the
+    #   decode portion.
+    # * kv_cache: [2, num_blocks, block_size, num_kv_heads, head_dim]
+    #   for FlashAttention backend (most common on vLLM 0.7+).
+    #   kv_cache[0] is K, kv_cache[1] is V.
+    #   Backends with different layouts (xformers, ROCmFlash) may
+    #   need fallback handling; we degrade to no-op + warning if
+    #   the layout doesn't match.
+    # * attn_metadata.block_tables:
+    #   [num_seqs, max_blocks_per_seq] — physical block_ids per
+    #   sequence in the decode batch.
+    # * attn_metadata.seq_lens: [num_seqs] — current token count
+    #   per sequence.
+    # * attn_metadata.num_prefill_tokens: int — partition point
+    #   in the batch.
+    _gpu_extract_decode_attention(
+        query=query,
+        kv_cache=kv_cache,
+        attn_metadata=attn_metadata,
+        head_dim=head_dim,
+        aggregator=aggregator,
     )
+
+
+def _gpu_extract_decode_attention(
+    *,
+    query: Any,
+    kv_cache: Any,
+    attn_metadata: Any,
+    head_dim: Optional[int],
+    aggregator: "AttentionAggregator",
+) -> None:
+    """GPU extraction: per decode-step query, compute softmax(Q @ K^T)
+    against the sequence's cached keys, aggregate per-block.
+
+    This function is the GPU-touching path. The wrapped forward in
+    :func:`install_attention_capture` catches any exception this
+    raises and logs a warning — so a layout mismatch on the first
+    GPU run degrades to "no attention captured" rather than
+    crashing the run. Diagnose via the warning message.
+
+    Implementation steps:
+
+    1. Slice query down to just the decode portion using
+       ``num_prefill_tokens`` + ``num_decode_tokens``.
+    2. Reshape query to ``[num_decode_tokens, num_heads, head_dim]``.
+    3. For each decode token, identify its sequence's
+       ``block_table`` row + ``seq_len``.
+    4. Gather K from ``kv_cache`` using the block_table.
+    5. Truncate to actual seq_len.
+    6. Handle GQA (num_kv_heads < num_heads) by repeating K.
+    7. Compute logits = Q @ K^T / sqrt(head_dim).
+    8. Average logits across heads.
+    9. softmax → per-key attention probabilities.
+    10. ``aggregate_attention_to_blocks`` → per-block sums.
+    11. ``aggregator.record_block_batch(...)``.
+    """
+    import torch
+    import torch.nn.functional as F
+    import math
+
+    num_decode_tokens = int(getattr(attn_metadata, "num_decode_tokens", 0))
+    if num_decode_tokens <= 0:
+        return
+
+    num_prefill_tokens = int(
+        getattr(attn_metadata, "num_prefill_tokens", 0)
+    )
+    decode_query = query[
+        num_prefill_tokens : num_prefill_tokens + num_decode_tokens
+    ]
+    if decode_query.numel() == 0:
+        return
+
+    # Reshape to [num_decode_tokens, num_heads, head_dim].
+    if head_dim is None or head_dim <= 0:
+        return
+    total_dim = decode_query.shape[-1]
+    if total_dim % head_dim != 0:
+        # Layout mismatch: query last-dim isn't num_heads*head_dim.
+        # Degrade to no-op; the wrapped forward's try/except will
+        # log this once.
+        raise ValueError(
+            f"query last dim {total_dim} is not a multiple of "
+            f"head_dim {head_dim}; layout assumption mismatch."
+        )
+    num_heads = total_dim // head_dim
+    decode_query = decode_query.view(
+        num_decode_tokens, num_heads, head_dim,
+    )
+
+    # Resolve the K cache. vLLM 0.7 FlashAttention layout:
+    # kv_cache[0] -> K, kv_cache[1] -> V. Some backends pass K and V
+    # as separate args, in which case kv_cache itself is the K cache.
+    # We try [0] indexing first; if shapes don't fit, fall back to
+    # treating kv_cache as K directly.
+    k_cache = kv_cache
+    try:
+        if hasattr(kv_cache, "shape") and len(kv_cache.shape) >= 4 and kv_cache.shape[0] == 2:
+            k_cache = kv_cache[0]
+    except (IndexError, RuntimeError):
+        k_cache = kv_cache
+
+    if not hasattr(k_cache, "shape") or len(k_cache.shape) < 4:
+        raise ValueError(
+            f"k_cache has unexpected shape "
+            f"{getattr(k_cache, 'shape', None)}; expected "
+            "[num_blocks, block_size, num_kv_heads, head_dim]."
+        )
+
+    num_total_blocks, block_size_runtime, num_kv_heads, k_head_dim = (
+        k_cache.shape[0], k_cache.shape[1], k_cache.shape[2], k_cache.shape[3],
+    )
+    if k_head_dim != head_dim:
+        raise ValueError(
+            f"head_dim mismatch: query={head_dim}, k_cache={k_head_dim}"
+        )
+    if num_heads % num_kv_heads != 0:
+        raise ValueError(
+            f"GQA group factor non-integer: num_heads={num_heads}, "
+            f"num_kv_heads={num_kv_heads}"
+        )
+    gqa_factor = num_heads // num_kv_heads
+
+    block_tables = attn_metadata.block_tables
+    seq_lens = getattr(attn_metadata, "seq_lens", None)
+    if seq_lens is None:
+        # Fallback: assume seq_len = max_blocks * block_size.
+        seq_lens_list = [
+            block_tables[i].shape[0] * block_size_runtime
+            for i in range(num_decode_tokens)
+        ]
+    else:
+        seq_lens_list = [int(seq_lens[i]) for i in range(num_decode_tokens)]
+
+    inv_sqrt_d = 1.0 / math.sqrt(head_dim)
+
+    # Process each decode query.
+    for i in range(num_decode_tokens):
+        seq_len = seq_lens_list[i]
+        if seq_len <= 0:
+            continue
+
+        # block_tables[i]: [max_blocks_per_seq] of physical block_ids.
+        # vLLM 0.7's block_tables can be a torch.Tensor or list.
+        try:
+            row = block_tables[i]
+            if hasattr(row, "tolist"):
+                block_ids = row.tolist()
+            else:
+                block_ids = list(row)
+        except (IndexError, AttributeError):
+            continue
+
+        blocks_used = (seq_len + block_size_runtime - 1) // block_size_runtime
+        block_ids_used = block_ids[:blocks_used]
+        if not block_ids_used:
+            continue
+
+        # Gather K for this sequence:
+        # k_cache[block_ids_used]: [blocks_used, block_size, num_kv_heads, head_dim]
+        try:
+            k_indices = torch.tensor(
+                block_ids_used, dtype=torch.long, device=k_cache.device,
+            )
+            K_blocks = k_cache.index_select(0, k_indices)
+        except (RuntimeError, IndexError) as exc:
+            # Stale block_id or device mismatch — skip this query.
+            continue
+
+        # Reshape: [blocks_used * block_size, num_kv_heads, head_dim]
+        K_seq = K_blocks.reshape(-1, num_kv_heads, head_dim)
+        # Truncate to actual seq_len:
+        K_seq = K_seq[:seq_len]
+        if K_seq.shape[0] == 0:
+            continue
+
+        # Repeat K along heads for GQA: [seq_len, num_heads, head_dim]
+        if gqa_factor > 1:
+            K_full = K_seq.repeat_interleave(gqa_factor, dim=1)
+        else:
+            K_full = K_seq
+
+        # Q for this decode token: [num_heads, head_dim]
+        Q = decode_query[i]
+
+        # logits = Q @ K^T / sqrt(d): [num_heads, seq_len]
+        # einsum: "hd,shd->hs"
+        logits = torch.einsum("hd,shd->hs", Q, K_full) * inv_sqrt_d
+
+        # Average across heads → [seq_len], then softmax.
+        logits_avg = logits.mean(dim=0)
+        attn_probs = F.softmax(logits_avg, dim=-1)
+
+        # Move to CPU + Python list for the pure-Python aggregator.
+        weights_list = attn_probs.detach().to("cpu", non_blocking=True).tolist()
+
+        # aggregate_attention_to_blocks expects len(weights) <=
+        # len(block_table) * block_size; truncate to seq_len.
+        per_block_sums = aggregate_attention_to_blocks(
+            weights=weights_list[:seq_len],
+            block_table=block_ids_used,
+            block_size=block_size_runtime,
+        )
+        aggregator.record_block_batch(per_block_sums)

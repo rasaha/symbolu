@@ -1685,6 +1685,273 @@ def test_async_engine_driver_phase3_constructor_stores_flag():
     assert driver.enable_prefix_caching is True   # forced by ctm_plus
 
 
+def _torch_or_skip():
+    """Return torch module or skip the test if torch isn't installed."""
+    try:
+        import torch  # noqa: F401
+        return __import__("torch")
+    except ImportError:
+        pytest.skip("torch not installed; GPU-extraction math test skipped")
+
+
+def test_gpu_extract_no_decode_tokens_is_noop():
+    """If attn_metadata.num_decode_tokens == 0, the extraction
+    should be a clean no-op — prefill batches don't have decode
+    queries to attribute to blocks."""
+    torch = _torch_or_skip()
+    from kv_policy.vllm_evictor import (
+        AttentionAggregator, _gpu_extract_decode_attention,
+    )
+
+    class FakeMeta:
+        num_decode_tokens = 0
+        num_prefill_tokens = 4
+        block_tables = []
+
+    agg = AttentionAggregator()
+    _gpu_extract_decode_attention(
+        query=torch.zeros((4, 64)),
+        kv_cache=torch.zeros((1, 4, 1, 64)),
+        attn_metadata=FakeMeta(),
+        head_dim=64,
+        aggregator=agg,
+    )
+    assert agg.buffered_blocks == 0
+
+
+def test_gpu_extract_one_decode_token_aggregates_per_block():
+    """End-to-end: one decode-step query, kv_cache with two
+    blocks, verify softmax(Q @ K^T) is aggregated per-block and
+    the sums approximately match a manual computation."""
+    torch = _torch_or_skip()
+    import math
+    import torch.nn.functional as F
+    from kv_policy.vllm_evictor import (
+        AttentionAggregator, _gpu_extract_decode_attention,
+    )
+
+    head_dim = 4
+    num_heads = 2
+    num_kv_heads = 2          # no GQA — simplest case
+    block_size = 4
+    num_blocks = 2
+    seq_len = 6               # 1.5 blocks; tests partial-last-block
+
+    # Build deterministic K cache.
+    torch.manual_seed(0)
+    k_cache = torch.randn(
+        (num_blocks, block_size, num_kv_heads, head_dim),
+    )
+    # vLLM 0.7 FlashAttention layout: kv_cache[0] is K. Wrap in
+    # a [2, ...] tensor so the extractor's auto-detection picks
+    # K out of index [0].
+    kv_cache = torch.stack([k_cache, torch.zeros_like(k_cache)], dim=0)
+
+    # Build a decode query: 1 token, num_heads * head_dim wide.
+    query = torch.randn((1, num_heads * head_dim))
+
+    class FakeMeta:
+        num_decode_tokens = 1
+        num_prefill_tokens = 0
+        block_tables = [[0, 1]]
+        seq_lens = [seq_len]
+
+    agg = AttentionAggregator()
+    _gpu_extract_decode_attention(
+        query=query,
+        kv_cache=kv_cache,
+        attn_metadata=FakeMeta(),
+        head_dim=head_dim,
+        aggregator=agg,
+    )
+
+    # Expected: one entry per block_id (0 and 1) since both blocks
+    # are referenced in this sequence's block_table.
+    assert agg.buffered_blocks == 2
+
+    # Verify total mass ≈ 1.0 (softmax probabilities sum to 1 over
+    # the seq_len dimension, then aggregated by block; total
+    # should equal 1.0 within float tolerance).
+    captured = []
+
+    class FakeEvictor:
+        def forward_block_attention(self, block_id, attention_sum):
+            captured.append((block_id, attention_sum))
+
+    agg.flush_to_evictor(FakeEvictor())
+    total = sum(s for _, s in captured)
+    assert abs(total - 1.0) < 1e-4, (
+        f"softmax probabilities aggregated per-block should sum "
+        f"to ~1.0; got {total}"
+    )
+
+
+def test_gpu_extract_handles_gqa():
+    """GQA: num_heads > num_kv_heads. K must be repeated to match
+    Q's head count. Verify the extraction doesn't crash and
+    produces reasonable per-block sums."""
+    torch = _torch_or_skip()
+    from kv_policy.vllm_evictor import (
+        AttentionAggregator, _gpu_extract_decode_attention,
+    )
+
+    head_dim = 4
+    num_heads = 4              # 4 query heads
+    num_kv_heads = 2           # 2 KV heads -> GQA factor 2
+    block_size = 4
+    num_blocks = 2
+    seq_len = 8                # exactly 2 blocks
+
+    torch.manual_seed(7)
+    k_cache = torch.randn((num_blocks, block_size, num_kv_heads, head_dim))
+    kv_cache = torch.stack([k_cache, torch.zeros_like(k_cache)], dim=0)
+
+    query = torch.randn((1, num_heads * head_dim))
+
+    class FakeMeta:
+        num_decode_tokens = 1
+        num_prefill_tokens = 0
+        block_tables = [[0, 1]]
+        seq_lens = [seq_len]
+
+    agg = AttentionAggregator()
+    _gpu_extract_decode_attention(
+        query=query,
+        kv_cache=kv_cache,
+        attn_metadata=FakeMeta(),
+        head_dim=head_dim,
+        aggregator=agg,
+    )
+
+    assert agg.buffered_blocks == 2
+
+
+def test_gpu_extract_partial_last_block():
+    """A sequence whose seq_len isn't a multiple of block_size:
+    the last block is partially filled. Aggregation must truncate
+    correctly."""
+    torch = _torch_or_skip()
+    from kv_policy.vllm_evictor import (
+        AttentionAggregator, _gpu_extract_decode_attention,
+    )
+
+    head_dim = 4
+    num_heads = 2
+    num_kv_heads = 2
+    block_size = 4
+    seq_len = 7                # 1 full block + 3 tokens of next
+
+    torch.manual_seed(1)
+    k_cache = torch.randn((2, block_size, num_kv_heads, head_dim))
+    kv_cache = torch.stack([k_cache, torch.zeros_like(k_cache)], dim=0)
+    query = torch.randn((1, num_heads * head_dim))
+
+    class FakeMeta:
+        num_decode_tokens = 1
+        num_prefill_tokens = 0
+        block_tables = [[0, 1]]
+        seq_lens = [seq_len]
+
+    agg = AttentionAggregator()
+    _gpu_extract_decode_attention(
+        query=query,
+        kv_cache=kv_cache,
+        attn_metadata=FakeMeta(),
+        head_dim=head_dim,
+        aggregator=agg,
+    )
+    # Both blocks referenced.
+    assert agg.buffered_blocks == 2
+
+
+def test_gpu_extract_raises_on_bad_head_dim_alignment():
+    """If query.shape[-1] is not a multiple of head_dim, the
+    extractor raises ValueError — caught by the wrapped-forward
+    try/except in production, surfacing as a "layout mismatch"
+    warning."""
+    torch = _torch_or_skip()
+    from kv_policy.vllm_evictor import (
+        AttentionAggregator, _gpu_extract_decode_attention,
+    )
+
+    class FakeMeta:
+        num_decode_tokens = 1
+        num_prefill_tokens = 0
+        block_tables = [[0]]
+        seq_lens = [4]
+
+    # query last dim = 33, head_dim = 4 -> not a multiple.
+    query = torch.zeros((1, 33))
+    kv_cache = torch.zeros((1, 4, 1, 4))
+
+    with pytest.raises(ValueError, match="not a multiple"):
+        _gpu_extract_decode_attention(
+            query=query,
+            kv_cache=kv_cache,
+            attn_metadata=FakeMeta(),
+            head_dim=4,
+            aggregator=AttentionAggregator(),
+        )
+
+
+def test_gpu_extract_raises_on_kv_cache_head_dim_mismatch():
+    """If the kv_cache's head_dim differs from the query's,
+    raise ValueError."""
+    torch = _torch_or_skip()
+    from kv_policy.vllm_evictor import (
+        AttentionAggregator, _gpu_extract_decode_attention,
+    )
+
+    class FakeMeta:
+        num_decode_tokens = 1
+        num_prefill_tokens = 0
+        block_tables = [[0]]
+        seq_lens = [4]
+
+    query = torch.zeros((1, 8))           # head_dim 4 implied
+    kv_cache = torch.zeros((1, 4, 1, 8))  # head_dim 8 — mismatch
+
+    with pytest.raises(ValueError, match="head_dim mismatch"):
+        _gpu_extract_decode_attention(
+            query=query,
+            kv_cache=kv_cache,
+            attn_metadata=FakeMeta(),
+            head_dim=4,
+            aggregator=AttentionAggregator(),
+        )
+
+
+def test_gpu_extract_raises_on_non_integer_gqa_factor():
+    """If num_heads isn't divisible by num_kv_heads, the GQA
+    repeat-interleave doesn't work — raise ValueError."""
+    torch = _torch_or_skip()
+    from kv_policy.vllm_evictor import (
+        AttentionAggregator, _gpu_extract_decode_attention,
+    )
+
+    head_dim = 4
+    num_heads = 3      # 3 query heads
+    num_kv_heads = 2   # 2 KV heads -> 1.5 GQA factor (invalid)
+
+    class FakeMeta:
+        num_decode_tokens = 1
+        num_prefill_tokens = 0
+        block_tables = [[0]]
+        seq_lens = [4]
+
+    query = torch.zeros((1, num_heads * head_dim))
+    kv_cache = torch.zeros((1, 4, num_kv_heads, head_dim))
+
+    with pytest.raises(ValueError, match="GQA"):
+        _gpu_extract_decode_attention(
+            query=query,
+            kv_cache=kv_cache,
+            attn_metadata=FakeMeta(),
+            head_dim=head_dim,
+            aggregator=AttentionAggregator(),
+        )
+
+
 def test_extract_model_from_engine_walks_documented_paths():
     """The model-extraction helper finds the underlying torch
     model along several alternate paths that vLLM has used

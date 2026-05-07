@@ -285,9 +285,9 @@ EMA + ENTITY classification + the 0.35·attn term ALL come
 alive — the policy that produced the simulator headlines now
 runs end-to-end.
 
-### §1.4.2 Honest scope of what landed in this session
+### §1.4.2 Honest scope — what's CPU-testable vs GPU-only
 
-**CPU-tested (✓):**
+**CPU-tested without torch (✓):**
 
 * `aggregate_attention_to_blocks` math — synthetic vectors,
   partial-last-block edge case, input validation.
@@ -303,22 +303,72 @@ runs end-to-end.
   validation, `_extract_model_from_engine` multi-path walker,
   flusher task lifecycle.
 
-**Deferred to GPU validation (✗):**
+**CPU-tested with torch (✓ when torch installed; skipped here):**
 
-* The actual Q@K computation inside the wrapped forward. The
-  current implementation has a `NotImplementedError` on the
-  real-extraction branch — only the test side-channel
-  (`decode_attention_weights` attribute pre-computed) flows
-  through CPU-side. Real-vLLM-tensor extraction is the next
-  GPU-day's work; once written, it'll exercise the same
-  aggregator + evictor APIs that CPU tests already pin.
+* `_gpu_extract_decode_attention` — the actual Q@K math.
+  Tests verify: empty-decode no-op, single-decode-token
+  per-block aggregation matches manual softmax, GQA path,
+  partial-last-block, head-dim-alignment validation,
+  head-dim-mismatch validation, non-integer-GQA-factor
+  validation. Skip-if-no-torch guard means these run
+  whenever torch is available (e.g. on a GPU pod), giving
+  fast pre-GPU-run confidence.
 
-This is the same staging discipline Phase 1 used: ship the
-CPU-testable scaffolding + integration plumbing first, mark
-the GPU-only branch with `NotImplementedError`, validate on
-real silicon when GPU access is available.
+**GPU-only (✗ — first GPU run validates):**
 
-### §1.4.3 Tests added (15 new, total 189)
+* Whether the documented vLLM 0.7 tensor layouts actually
+  match what production vLLM returns. The extractor handles
+  the FlashAttention layout (`kv_cache: [2, num_blocks,
+  block_size, num_kv_heads, head_dim]`) and degrades
+  gracefully on mismatch (raises ValueError → wrapped-forward
+  try/except → warning + Phase 2 fallback). First GPU run
+  will surface any layout drift; the extractor's defensive
+  error messages name what didn't match.
+* Performance overhead (~10–15% per-token expected; not
+  measured).
+* Whether the real attention values produce a meaningful
+  CTM+ vs LRU delta. That's the experimental question;
+  Phase 3 makes it answerable.
+
+### §1.4.2.1 Tensor-layout assumptions for the first GPU run
+
+The extractor assumes vLLM 0.7's FlashAttention backend layout:
+
+| Tensor | Expected shape | Source |
+|---|---|---|
+| `query` | `[num_tokens, num_heads × head_dim]` | `Attention.forward(query, ...)` |
+| `kv_cache` | `[2, num_blocks, block_size, num_kv_heads, head_dim]` | vLLM 0.7 FlashAttention; index 0 is K, 1 is V |
+| `attn_metadata.block_tables` | `[num_seqs, max_blocks_per_seq]` (Tensor or list-of-list) | vLLM 0.7 metadata |
+| `attn_metadata.seq_lens` | `[num_seqs]` (Tensor or list) | vLLM 0.7 metadata |
+| `attn_metadata.num_decode_tokens` | int | vLLM 0.7 metadata |
+| `attn_metadata.num_prefill_tokens` | int | vLLM 0.7 metadata |
+
+**Defensive degradation:** the extractor raises `ValueError`
+with a descriptive message on layout mismatch:
+
+* `"query last dim X is not a multiple of head_dim Y"` →
+  query reshape failed; check head_dim detection on the
+  Attention module.
+* `"k_cache has unexpected shape ..."` → kv_cache layout
+  doesn't match the assumed `[*, *, *, *]` (4 dims minimum)
+  pattern. May indicate a non-FlashAttention backend.
+* `"head_dim mismatch: query=X, k_cache=Y"` → same model
+  config but different head_dim values reaching the
+  extractor. Investigate the Attention module's
+  `head_size` / `head_dim` attribute.
+* `"GQA group factor non-integer ..."` → num_heads not
+  divisible by num_kv_heads. Should be impossible for any
+  trained model; if it fires, the head-detection code is
+  reading the wrong attribute.
+
+The wrapped forward's outer try/except converts these to
+warnings (with `enable_logging=True`) and continues with
+Phase 2 fallback (no attention captured). The first GPU run
+should expect to see a few of these warnings as the layout
+assumptions get validated; iterate by adjusting the
+layout-detection heuristics.
+
+### §1.4.3 Tests added (22 new, total 196)
 
 * `test_aggregate_attention_to_blocks_basic`
 * `test_aggregate_attention_to_blocks_partial_last_block`
@@ -335,6 +385,17 @@ real silicon when GPU access is available.
 * `test_async_engine_driver_phase3_requires_phase2`
 * `test_async_engine_driver_phase3_constructor_stores_flag`
 * `test_extract_model_from_engine_walks_documented_paths`
+
+GPU-extraction tests (skipped without torch):
+
+* `test_gpu_extract_no_decode_tokens_is_noop`
+* `test_gpu_extract_one_decode_token_aggregates_per_block`
+  (verifies softmax sums to 1.0 across blocks)
+* `test_gpu_extract_handles_gqa`
+* `test_gpu_extract_partial_last_block`
+* `test_gpu_extract_raises_on_bad_head_dim_alignment`
+* `test_gpu_extract_raises_on_kv_cache_head_dim_mismatch`
+* `test_gpu_extract_raises_on_non_integer_gqa_factor`
 
 ### §1.4.4 Phase 3 GPU run (next session)
 
@@ -373,16 +434,26 @@ for name, module in inner.model_executor.driver_worker.worker.model_runner.model
         print(name, type(module).__name__)
 ```
 
-The actual Q@K-from-kv_cache extraction in
-`_capture_attention_to_aggregator` is currently a
-`NotImplementedError` — a Phase 3 GPU run will hit that on the
-first decode step. The next session's work is filling in that
-extraction against vLLM 0.7's specific kv_cache layout.
+**Update (May 2026):** the Q@K-from-kv_cache extraction in
+`_capture_attention_to_aggregator` is now **implemented**
+(`_gpu_extract_decode_attention`). It works against vLLM 0.7's
+documented FlashAttention layout. The first GPU run should:
+
+1. Verify `Phase 3: attention capture installed on N Attention layers`
+   (N = the model's transformer-layer count).
+2. Watch for `attention capture failed in <layer>` warnings — those
+   indicate a layout-assumption mismatch; the descriptive error
+   message names what's off. Iterate by adjusting the layout
+   detection in `_gpu_extract_decode_attention`.
+3. Confirm the aggregator's flush task is firing (CTM+'s
+   block scoring should diverge from pure LRU's once attention
+   sums propagate).
 
 The three-cell experiment partners want to see (LRU baseline /
 Phase 2 ablation / Phase 3 full CTM+) is achievable on the
-same RunPod session in one ~$1 sweep once the GPU-side
-extraction lands.
+same RunPod session in one ~$1 sweep. The extractor handles
+the typical FlashAttention layout out of the box; the first
+GPU run will validate or surface specific drift.
 
 ## §1.3 Phase 2 GPU run procedure
 
