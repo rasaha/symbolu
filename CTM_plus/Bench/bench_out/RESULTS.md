@@ -774,7 +774,32 @@ risk.
 ### §13.2 #3 — vLLM 0.5+ streaming runner
 
 **Phase 1 (LRU swap-counter validation): code-complete + GPU-validated.**
-Phase 2 (CTM+ on modern vLLM) still stubbed.
+**Phase 2 (CTM+ on modern vLLM): code-complete; GPU validation pending.**
+
+The streaming runner now supports both phases via the
+`ctm_plus_evictor` flag. Phase 2 implementation lives at
+`kv_policy.vllm_evictor.patch_vllm_engine_modern` (re-exported
+from `ctm_bench.runner_vllm_streaming`); 8 new mocked-vLLM tests
+(171 total) pin the API contract. See
+`scripts/MODE_B_STREAMING_DESIGN.md` §1.2–§1.3 for the
+implementation summary and the Phase 2 GPU run procedure.
+
+**Honest scope of the Phase 2 implementation:**
+
+* Operates on the **cache-retention** decision (which
+  cached-but-unreferenced block to release first when the
+  prefix cache fills) — NOT the under-pressure swap decision
+  that Mode A's tier-cost simulator models.
+* No attention forwarding (option (b) from the design doc):
+  CTM+ scores on position + recency + frequency only.
+  Same as the legacy vLLM 0.4 patch.
+* Sink protection is degraded (vLLM doesn't expose token
+  positions to the evictor); CTM+'s scoring still
+  differentiates ENTITY / RECENT / FILLER classes, but every
+  block is treated as non-sink.
+* Mocked-vLLM tests verify the integration installs cleanly;
+  whether CTM+ vs LRU produces different cache-retention
+  outcomes on real attention is the next-GPU-run question.
 
 **May 2026 GPU validation (single-cell smoke):** the streaming
 runner produced its **first real-model swap counters** on a

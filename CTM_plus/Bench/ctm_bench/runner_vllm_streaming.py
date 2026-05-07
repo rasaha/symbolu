@@ -487,21 +487,37 @@ class AsyncEngineDriver:
     def _build_engine_args(self, vllm: Any) -> Any:
         """Build the engine args dict. Broken out so tests can
         verify the critical config (preemption_mode=swap, etc.)
-        without spinning up vLLM."""
+        without spinning up vLLM.
+
+        Two distinct config regimes:
+
+        * **Phase 1 (LRU + swap path).** ``ctm_plus_evictor=False``.
+          ``enable_prefix_caching=False`` to keep eviction in the
+          swap decision tree (under-pressure swap, the simulator's
+          question).
+        * **Phase 2 (CTM+ on cache retention).** ``ctm_plus_evictor=
+          True``. ``enable_prefix_caching=True`` REQUIRED so vLLM's
+          ``PrefixCachingBlockAllocator`` exists with an evictor
+          slot the patch can swap. With prefix caching on, the
+          evictor decides cache-retention, not under-pressure swap
+          — different operational question; honest scope per
+          MODE_B_STREAMING_DESIGN.md §4.4.
+        """
         kwargs: Dict[str, Any] = {
             "model": self.model,
             "gpu_memory_utilization": self.gpu_memory_utilization,
             "swap_space": self.swap_space_gb,
             "enforce_eager": True,
             "seed": self.seed,
-            # Phase 1 wants the swap path, not the cache-retention
-            # path. Prefix caching off keeps eviction in the swap
-            # decision tree.
-            "enable_prefix_caching": False,
-            # The critical bit. preemption_mode="swap" tells vLLM's
-            # scheduler to swap preempted sequences to CPU rather
-            # than recomputing them. Without this, swap counters
-            # stay zero even with AsyncLLMEngine + heavy load.
+            # Phase-dependent: prefix caching ON for Phase 2, OFF
+            # for Phase 1.
+            "enable_prefix_caching": bool(self.ctm_plus_evictor),
+            # preemption_mode="swap" tells vLLM's scheduler to swap
+            # preempted sequences to CPU rather than recomputing
+            # them. Kept ON in both phases so swap counters always
+            # accumulate; the difference between phases is which
+            # decision the evictor controls (cache retention with
+            # prefix caching, vs no evictor without).
             "preemption_mode": "swap",
         }
         # Allow the caller to override or extend the args, e.g. to
@@ -587,21 +603,36 @@ class AsyncEngineDriver:
         """Run the streaming workload to completion or budget.
 
         Returns the cell result with swap-counter totals.
-        """
-        if self.ctm_plus_evictor:
-            raise NotImplementedError(
-                "ctm_plus_evictor=True is roadmap #3 Phase 2 and "
-                "not yet implemented. Use ctm_plus_evictor=False "
-                "for Phase 1 (LRU swap-counter validation). See "
-                "Bench/scripts/MODE_B_STREAMING_DESIGN.md §4.4."
-            )
 
+        When ``ctm_plus_evictor=True`` (Phase 2), the run also
+        installs ``CTMEvictorModern`` on the engine's
+        ``PrefixCachingBlockAllocator`` after construction. This
+        path requires ``enable_prefix_caching=True`` (set by
+        ``_build_engine_args``); if the patch can't install (e.g.
+        prefix caching off, vLLM minor version mismatch), the
+        underlying ``patch_vllm_engine_modern`` raises with a
+        clear message.
+        """
         vllm = self._import_vllm()
         engine_args = self._build_engine_args(vllm)
         AsyncLLMEngine = vllm.AsyncLLMEngine
         SamplingParams = vllm.SamplingParams
 
         engine = AsyncLLMEngine.from_engine_args(engine_args)
+
+        if self.ctm_plus_evictor:
+            # Install CTM+ evictor on the GPU PrefixCachingBlockAllocator.
+            # Implemented in kv_policy.vllm_evictor.patch_vllm_engine_modern;
+            # raises NotImplementedError if prefix caching is off or
+            # RuntimeError if the allocator path can't be walked.
+            patch_modern = patch_vllm_engine_modern  # local alias for log
+            patch_modern(
+                getattr(engine, "engine", engine),
+                enable_logging=False,
+            )
+            logger.info(
+                "Phase 2: CTM+ evictor patch installed on AsyncLLMEngine"
+            )
         sampling_params = SamplingParams(
             temperature=0.0,
             max_tokens=self.max_decode_tokens,
@@ -727,7 +758,8 @@ class AsyncEngineDriver:
 
 
 # ---------------------------------------------------------------- #
-# CTMAwarePrefixCachingAllocator — Phase 2 stub. Unimplemented.
+# Phase 2 — CTM+ evictor patch on modern vLLM (re-export from
+# kv_policy.vllm_evictor where the implementation lives).
 # ---------------------------------------------------------------- #
 
 
@@ -735,23 +767,29 @@ def patch_vllm_engine_modern(engine, *, enable_logging: bool = False):
     """Patch a modern vLLM (0.5+) engine to use CTM+ for KV-cache
     eviction.
 
-    **NOT IMPLEMENTED.** This is roadmap #3 Phase 2. Calling it
-    raises :class:`NotImplementedError`. The Phase-2 plan is to
-    subclass the GPU allocator's evictor (not the whole
-    ``CpuGpuBlockAllocator``) and inject a CTM+-aware
-    implementation that scores blocks by position + recency +
-    frequency (option (b) in the design doc); attention
-    forwarding (option (a)) is a follow-up.
+    Re-exported from :mod:`kv_policy.vllm_evictor` where the real
+    implementation lives. Kept here as a convenience for callers
+    who already import from :mod:`ctm_bench.runner_vllm_streaming`.
 
-    The existing ``kv_policy.vllm_evictor.patch_vllm_engine``
-    handles vLLM ≤ 0.4.x. Together they cover the full vLLM
-    version range, with the modern path explicitly behind a
-    NotImplementedError until Phase 2 is authorised.
+    See :func:`kv_policy.vllm_evictor.patch_vllm_engine_modern`
+    for the full docstring and contract. Raises
+    ``NotImplementedError`` if prefix caching is off (no evictor
+    to swap) and ``RuntimeError`` if the allocator path can't be
+    walked.
     """
-    raise NotImplementedError(
-        "patch_vllm_engine_modern is roadmap #3 Phase 2 and is not "
-        "implemented yet. Use kv_policy.vllm_evictor.patch_vllm_engine "
-        "with vLLM 0.4.x (roadmap #2) until this lands. See "
-        "Bench/scripts/MODE_B_STREAMING_DESIGN.md §4.4 for the "
-        "subclass-evictor plan."
-    )
+    # Lazy import — kv_policy is in a sibling package; importing
+    # at module top would require it on sys.path even when this
+    # module is just being loaded for its pure-Python helpers.
+    try:
+        from kv_policy.vllm_evictor import (  # type: ignore
+            patch_vllm_engine_modern as _real_patch,
+        )
+    except ImportError:
+        # Try the path-injected import that the existing
+        # runner_vllm.py uses.
+        from ctm_bench.policies import _add_kv_policy_to_path
+        _add_kv_policy_to_path()
+        from kv_policy.vllm_evictor import (  # type: ignore
+            patch_vllm_engine_modern as _real_patch,
+        )
+    return _real_patch(engine, enable_logging=enable_logging)

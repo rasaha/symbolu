@@ -4,7 +4,7 @@
 LLM-inference deployment.
 **Status:** safe to share; conservative framing throughout.
 **Last updated:** 2026-05-07 (revised after the May 2026 vLLM
-0.7.3 streaming-runner GPU validation).
+0.7.3 streaming-runner GPU validation + Phase 2 implementation).
 
 This note states what CTM+ has and has not been validated to
 do today, why a real-stack `vLLM` validation has not yet been

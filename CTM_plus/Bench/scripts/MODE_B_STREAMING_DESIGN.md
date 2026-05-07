@@ -39,9 +39,137 @@ RESULTS.md §13.2 captures the multi-iteration knob-tuning that
 got there (v1 64% KV no swap → v2 vLLM-refused-to-start → v3
 98% KV but queue-not-preempt → v4 success).
 
+**Phase 2 implemented (May 2026):** the CTM+ evictor patch for
+modern vLLM (0.5+) lives at
+`kv_policy.vllm_evictor.patch_vllm_engine_modern` and is
+re-exported from `ctm_bench.runner_vllm_streaming`. The
+streaming runner wires `ctm_plus_evictor=True` end-to-end
+(verified by mocked-vLLM tests; GPU validation pending). See
+§1.2 below for what landed and §1.3 for the GPU run procedure.
+
+## §1.2 Phase 2 implementation (May 2026)
+
+What landed in `kv_policy/vllm_evictor.py`:
+
+* **`CTMEvictorModern`** — vLLM 0.7+ Evictor ABC implementation.
+  Adapts the ABC's six methods (`__contains__`, `add`, `update`,
+  `remove`, `evict`, `num_blocks`) to a `KVCachePolicy` instance.
+  Block-content hashes are tracked in a side dict so `evict()`
+  returns the right `(block_id, content_hash)` pair. The
+  KVCachePolicy uses `attention_ema_alpha=0.2` (Round 4
+  production default), NOT CTMvLLMConfig's pre-Round-4 0.1.
+* **`patch_vllm_engine_modern(engine)`** — walks
+  `engine.engine.scheduler[0].block_manager.block_allocator
+  ._allocators[GPU_DEVICE].evictor` and replaces with
+  `CTMEvictorModern`. Tolerates async engines (peels `.engine`
+  if needed). Raises `NotImplementedError` if the GPU allocator
+  is `NaiveBlockAllocator` (i.e., `enable_prefix_caching=False`)
+  with a message naming the fix; raises `RuntimeError` if the
+  allocator path can't be walked (vLLM minor-version
+  incompatibility).
+
+What landed in `ctm_bench/runner_vllm_streaming.py`:
+
+* **Phase-dependent `enable_prefix_caching`** in
+  `_build_engine_args`: `False` for Phase 1 (LRU + swap path),
+  `True` for Phase 2 (CTM+ + cache retention). Both phases
+  keep `preemption_mode="swap"` so swap counters always
+  accumulate.
+* **`run()` calls `patch_vllm_engine_modern`** after engine
+  construction when `ctm_plus_evictor=True`. Patch failure
+  surfaces as a clear exception, not a silent no-op.
+
+What did NOT land (honest scope):
+
+* **Attention forwarding** (option (a) from §4.4). CTM+ scores
+  on position + recency + frequency only; the 0.35 attention
+  weight is effectively zero through this path. This is what
+  the legacy vLLM 0.4 patch did too (the `update()` API didn't
+  forward attention either) — see `vllm_evictor.py:128-150` —
+  so Phase 2 matches the legacy behaviour.
+* **Sink protection** is degraded. We can't tell from vLLM's
+  evictor API which block holds positions 0-3 (the conventional
+  sink). Synthetic position offsets in `add()` deliberately
+  start at `sink_tokens` so CTM+ doesn't auto-pin every block;
+  the trade-off is no real sink protection. Acceptable starter;
+  worth revisiting if the GPU validation surfaces sink-eviction
+  regressions.
+* **GPU validation.** The CPU sandbox proves the API contract
+  via mocks (8 new Phase-2 tests covering Evictor ABC
+  conformance, allocator walker, prefix-caching gate,
+  legacy-path rejection, re-export). The actual question
+  "does CTM+ vs LRU produce different cache-retention
+  outcomes on real attention" needs a GPU.
+
+### Tests added (8 new, total 171)
+
+* `test_ctm_evictor_modern_implements_vllm_07_evictor_abc`
+* `test_ctm_evictor_modern_evict_raises_on_empty_cache`
+* `test_ctm_evictor_modern_update_before_add_is_silent`
+* `test_ctm_evictor_modern_remove_untracked_is_silent`
+* `test_patch_vllm_engine_modern_walks_to_prefix_caching_allocator`
+* `test_patch_vllm_engine_modern_raises_when_prefix_caching_off`
+* `test_patch_vllm_engine_modern_handles_legacy_v06_path`
+* `test_patch_vllm_engine_modern_re_exports_from_kv_policy`
+* (replaces the old `test_async_engine_driver_run_phase2_raises_not_implemented`
+  with `test_async_engine_driver_phase2_enables_prefix_caching`)
+
+## §1.3 Phase 2 GPU run procedure
+
+When ready for GPU validation, the smoke command is the same as
+Phase 1 with `--ctm-plus` added (and the prompt-length /
+hyperparameter regime that worked for Phase 1 v4):
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+python3 -m ctm_bench.scripts.run_streaming \
+    --model /workspace/.hf_cache/qwen2.5-7b \
+    --workload chat_32k \
+    --seed 42 \
+    --gpu-memory-utilization 0.26 \
+    --swap-space-gb 16 \
+    --arrival-rate 6.0 \
+    --arrival-alpha 1.5 \
+    --max-requests 30 \
+    --max-wall-seconds 120 \
+    --max-decode-tokens 2048 \
+    --prompt-length-choices "8000,16000,24000,30000" \
+    --ctm-plus \
+    --output-dir bench_out/streaming_phase2_smoke \
+    2>&1 | tee mode_b_phase2_smoke.log
+```
+
+Watch for in the log:
+
+1. vLLM engine init line should include `enable_prefix_caching=True`
+   (vs Phase 1's `False`).
+2. After engine init, the line:
+   `Phase 2: CTM+ evictor patch installed on AsyncLLMEngine`
+   (from runner_vllm_streaming logger) — confirms the patch fired.
+3. During the run: `swap_out` and `preempt` should still
+   accumulate (preemption_mode=swap is on). Cache hit/miss
+   counters from prefix caching are visible in vLLM's metrics
+   line as `GPU prefix cache hit rate`.
+4. The Phase 2 vs Phase 1 difference manifests in **which
+   blocks get evicted from the cache** when full. To compare
+   against LRU, run two cells with the same workload + seed —
+   one with `--ctm-plus`, one without — and compare swap
+   counters and cache hit rates.
+
+If the patch fails to install:
+
+* `NotImplementedError: ... requires enable_prefix_caching=True`
+  → the runner is not propagating the flag. Verify
+  `--ctm-plus` is set; check `_build_engine_args` output.
+* `RuntimeError: Cannot find _allocators dict` → vLLM minor
+  version's allocator layout differs from 0.7.3. Inspect with
+  `python3 -c "import vllm; print(vllm.__version__)"` and
+  `pip show vllm` to confirm the install. Run the allocator
+  probe from MODE_B_VLLM04_RUNBOOK.md §1.2 (adapted for
+  modern vLLM) to inspect the actual structure.
+
 The single-cell smoke proves the *mechanism*. Multi-cell sweep
-+ Phase 2 (CTM+ allocator-evictor patch) remain gated on
-partner request.
+gated on partner request.
 
 ## §1.1 Audit pass — findings + fixes (May 2026)
 

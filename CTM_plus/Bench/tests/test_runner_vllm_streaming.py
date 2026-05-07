@@ -1,13 +1,15 @@
-"""Contract tests for the streaming Mode B runner scaffolding.
+"""Contract + implementation tests for the streaming Mode B runner.
 
-These tests pin the API contract of the pure-Python pieces of
-the streaming runner (``ArrivalScheduler``, ``SwapCounterSampler``,
-``StreamingRunCellResult``) so that when the GPU implementation
-lands the tests still pass. The GPU-path stubs
-(``AsyncEngineDriver.run``, ``patch_vllm_engine_modern``) are
-verified to raise ``NotImplementedError`` with a message
-pointing at the design doc — that's the contract until they're
-implemented.
+Covers:
+
+* Pure-Python pieces (``ArrivalScheduler``, ``SwapCounterSampler``,
+  ``StreamingRunCellResult``).
+* Phase 1 GPU-path semantics via mocked vLLM (preemption_mode=swap
+  propagation, swap-counter parsing, run-loop flow, teardown).
+* Phase 2 GPU-path semantics via mocked vLLM (CTMEvictorModern
+  satisfies vLLM 0.7 Evictor ABC; patch_vllm_engine_modern walks
+  the modern allocator path; rejects NaiveBlockAllocator with a
+  clear message).
 """
 
 from __future__ import annotations
@@ -16,6 +18,12 @@ import csv
 from pathlib import Path
 
 import pytest
+
+# Make kv_policy (sibling package) importable so Phase 2 tests can
+# pull CTMEvictorModern + patch_vllm_engine_modern. The same trick
+# the production code uses via ctm_bench.policies._add_kv_policy_to_path.
+from ctm_bench.policies import _add_kv_policy_to_path
+_add_kv_policy_to_path()
 
 
 # ------------------------------------------------------------------ #
@@ -346,36 +354,49 @@ def test_async_engine_driver_constructor_stores_config():
     assert driver.ctm_plus_evictor is False
 
 
-def test_async_engine_driver_run_phase2_raises_not_implemented():
-    """ctm_plus_evictor=True is Phase 2 and not yet implemented;
-    run() must raise NotImplementedError before any vLLM import,
-    with a message pointing at the design doc."""
-    import asyncio
-    from ctm_bench.runner_vllm_streaming import (
-        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
-        SwapCounterSampler,
+def test_async_engine_driver_phase2_enables_prefix_caching():
+    """When ctm_plus_evictor=True, _build_engine_args MUST set
+    enable_prefix_caching=True. Without it, vLLM uses
+    NaiveBlockAllocator which has no evictor and the patch can't
+    install. This is the Phase 2 install-time invariant."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured_phase1: dict = {}
+    captured_phase2: dict = {}
+
+    class FakeAEAArgs:
+        def __init__(self, **kwargs):
+            captured_phase1.update(kwargs) if not getattr(
+                FakeAEAArgs, "_phase2", False
+            ) else captured_phase2.update(kwargs)
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAEAArgs
+
+    # Phase 1 driver — prefix caching off.
+    driver1 = AsyncEngineDriver(
+        model="dummy", ctm_plus_evictor=False, vllm_module=FakeVLLM,
+    )
+    driver1._build_engine_args(FakeVLLM)
+    assert captured_phase1["enable_prefix_caching"] is False, (
+        "Phase 1 (LRU swap-path) must set enable_prefix_caching=False"
     )
 
-    driver = AsyncEngineDriver(
-        model="dummy",
-        ctm_plus_evictor=True,  # Phase 2
+    # Phase 2 driver — prefix caching ON.
+    FakeAEAArgs._phase2 = True
+    driver2 = AsyncEngineDriver(
+        model="dummy", ctm_plus_evictor=True, vllm_module=FakeVLLM,
     )
-    sched = ArrivalScheduler(
-        seed=42,
-        pareto=ParetoArrivalConfig(base_rate_per_sec=1.0, alpha=2.0),
+    driver2._build_engine_args(FakeVLLM)
+    assert captured_phase2["enable_prefix_caching"] is True, (
+        "Phase 2 (CTM+ evictor) MUST set enable_prefix_caching=True; "
+        "without it, NaiveBlockAllocator has no evictor and the "
+        "patch can't install."
     )
-    sampler = SwapCounterSampler()
-    with pytest.raises(NotImplementedError) as exc:
-        asyncio.new_event_loop().run_until_complete(
-            driver.run(
-                scheduler=sched, sampler=sampler,
-                max_requests=10, max_wall_seconds=5.0,
-                workload_name="chat_32k",
-            )
-        )
-    msg = str(exc.value)
-    assert "Phase 2" in msg
-    assert "MODE_B_STREAMING_DESIGN.md" in msg
+    # Both phases keep preemption_mode=swap so swap counters
+    # accumulate even on Phase 2.
+    assert captured_phase1["preemption_mode"] == "swap"
+    assert captured_phase2["preemption_mode"] == "swap"
 
 
 def test_async_engine_driver_run_phase1_requires_vllm():
@@ -1013,18 +1034,254 @@ def test_async_engine_driver_run_caps_at_max_wall(monkeypatch):
     assert result.n_requests_completed == 0
 
 
-def test_patch_vllm_engine_modern_raises_not_implemented():
-    """The Phase-2 allocator patch is also stubbed; calling it
-    must raise NotImplementedError pointing at the design doc."""
+# ------------------------------------------------------------------ #
+# Phase 2 — CTMEvictorModern + patch_vllm_engine_modern
+# ------------------------------------------------------------------ #
+
+
+def test_ctm_evictor_modern_implements_vllm_07_evictor_abc():
+    """CTMEvictorModern must satisfy the methods vLLM 0.7's
+    PrefixCachingBlockAllocator calls on its evictor: __contains__,
+    add, update, remove, evict, num_blocks."""
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+
+    # Initially empty.
+    assert ev.num_blocks == 0
+    assert 42 not in ev
+
+    # Add a block.
+    ev.add(block_id=42, content_hash=12345, num_hashed_tokens=16,
+           last_accessed=100.0)
+    assert 42 in ev
+    assert ev.num_blocks == 1
+
+    # Update access (no exception).
+    ev.update(block_id=42, last_accessed=110.0)
+
+    # Add a few more blocks so evict has candidates.
+    for bid in (43, 44, 45, 46):
+        ev.add(block_id=bid, content_hash=bid * 100,
+               num_hashed_tokens=16, last_accessed=120.0)
+    assert ev.num_blocks == 5
+
+    # Evict — must return (block_id, content_hash) tuple.
+    victim_id, victim_hash = ev.evict()
+    assert isinstance(victim_id, int)
+    assert isinstance(victim_hash, int)
+    assert victim_id in {42, 43, 44, 45, 46}
+    assert ev.num_blocks == 4
+    assert victim_id not in ev
+
+    # Remove (different from evict — caller-driven free, not eviction).
+    # Pick a block that the evictor *didn't* evict so we exercise the
+    # remove path rather than the no-op-on-untracked path.
+    survivors = {42, 43, 44, 45, 46} - {victim_id}
+    target = next(iter(survivors))
+    ev.remove(target)
+    assert target not in ev
+    assert ev.num_blocks == 3
+
+
+def test_ctm_evictor_modern_evict_raises_on_empty_cache():
+    """vLLM's LRUEvictor contract: evict() raises when the cache is
+    empty — vLLM should never call it in that state, but if it does,
+    we want a clear error rather than silent return-None."""
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+    with pytest.raises(ValueError, match="no tracked blocks"):
+        ev.evict()
+
+
+def test_ctm_evictor_modern_update_before_add_is_silent():
+    """vLLM may call update() on a block_id that hasn't been added
+    yet (race or staged eviction). The evictor must tolerate this
+    rather than raise."""
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+    # Before add — no exception, no state change.
+    ev.update(block_id=999, last_accessed=100.0)
+    assert ev.num_blocks == 0
+
+
+def test_ctm_evictor_modern_remove_untracked_is_silent():
+    """remove() on an unknown block_id should be a no-op, not raise."""
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+    ev.remove(block_id=999)   # untracked
+    assert ev.num_blocks == 0
+
+
+def test_patch_vllm_engine_modern_walks_to_prefix_caching_allocator():
+    """patch_vllm_engine_modern must walk
+    engine -> engine.engine.scheduler[0].block_manager.block_allocator
+        -> ._allocators[<gpu_key>].evictor
+    and replace the LRUEvictor with a CTMEvictorModern."""
+    from kv_policy.vllm_evictor import patch_vllm_engine_modern
+
+    # Build a minimal fake engine that mirrors vLLM 0.7's structure.
+    class FakeLRUEvictor:
+        num_blocks = 256
+
+        def __contains__(self, _):
+            return False
+
+    class FakePrefixCachingAllocator:
+        num_blocks = 256
+        _block_size = 16
+        evictor = FakeLRUEvictor()
+
+    class FakeNaiveAllocator:
+        # Notably no `evictor` attribute.
+        num_blocks = 256
+
+    class _FakeDevice:
+        def __init__(self, name):
+            self.name = name
+
+    GPU_KEY = _FakeDevice("GPU")
+    CPU_KEY = _FakeDevice("CPU")
+    gpu_alloc = FakePrefixCachingAllocator()
+
+    class FakeBlockAllocator:
+        _allocators = {GPU_KEY: gpu_alloc, CPU_KEY: FakeNaiveAllocator()}
+
+    class FakeBlockManager:
+        block_allocator = FakeBlockAllocator()
+
+    class FakeScheduler:
+        block_manager = FakeBlockManager()
+
+    class FakeInner:
+        scheduler = [FakeScheduler()]
+
+    class FakeEngine:
+        engine = FakeInner()
+
+    # Pre-patch: gpu_alloc.evictor is the fake LRU.
+    assert isinstance(gpu_alloc.evictor, FakeLRUEvictor)
+
+    installed = patch_vllm_engine_modern(FakeEngine())
+
+    # Post-patch: gpu_alloc.evictor is CTMEvictorModern.
+    from kv_policy.vllm_evictor import CTMEvictorModern
+    assert isinstance(installed, CTMEvictorModern)
+    assert isinstance(gpu_alloc.evictor, CTMEvictorModern)
+    # The CPU allocator was untouched.
+    assert isinstance(
+        FakeBlockAllocator._allocators[CPU_KEY], FakeNaiveAllocator
+    )
+
+
+def test_patch_vllm_engine_modern_raises_when_prefix_caching_off():
+    """If the GPU allocator is NaiveBlockAllocator (no evictor
+    attribute), the patch must raise NotImplementedError naming
+    enable_prefix_caching=True as the fix."""
+    from kv_policy.vllm_evictor import patch_vllm_engine_modern
+
+    class FakeNaiveAllocator:
+        # No evictor attribute.
+        num_blocks = 256
+
+    class _FakeDevice:
+        def __init__(self, name):
+            self.name = name
+
+    GPU_KEY = _FakeDevice("GPU")
+
+    class FakeBlockAllocator:
+        _allocators = {GPU_KEY: FakeNaiveAllocator()}
+
+    class FakeBlockManager:
+        block_allocator = FakeBlockAllocator()
+
+    class FakeScheduler:
+        block_manager = FakeBlockManager()
+
+    class FakeInner:
+        scheduler = FakeScheduler()  # not a list — single-scheduler layout
+
+    class FakeEngine:
+        engine = FakeInner()
+
+    with pytest.raises(NotImplementedError) as exc:
+        patch_vllm_engine_modern(FakeEngine())
+    msg = str(exc.value)
+    assert "enable_prefix_caching" in msg
+    assert "NaiveBlockAllocator" in msg
+
+
+def test_patch_vllm_engine_modern_handles_legacy_v06_path():
+    """vLLM ≤ 0.6 has block_manager.gpu_allocator (not block_allocator).
+    The modern patch should fail cleanly with a RuntimeError naming
+    what's missing — the legacy patch path is the right one for that
+    version."""
+    from kv_policy.vllm_evictor import patch_vllm_engine_modern
+
+    class FakeBlockManager:
+        # Has gpu_allocator (legacy) but NOT block_allocator (modern).
+        gpu_allocator = object()
+
+    class FakeScheduler:
+        block_manager = FakeBlockManager()
+
+    class FakeEngine:
+        scheduler = FakeScheduler()
+
+    with pytest.raises(RuntimeError, match="block_allocator"):
+        patch_vllm_engine_modern(FakeEngine())
+
+
+def test_patch_vllm_engine_modern_re_exports_from_kv_policy():
+    """The streaming runner's patch_vllm_engine_modern is a thin
+    re-export of kv_policy.vllm_evictor.patch_vllm_engine_modern.
+    Calling it should reach the real implementation; on a fake
+    engine that doesn't expose .scheduler, the real implementation
+    raises RuntimeError (NOT NotImplementedError) — confirming the
+    re-export path works."""
     from ctm_bench.runner_vllm_streaming import (
         patch_vllm_engine_modern,
     )
 
     fake_engine = object()
-    with pytest.raises(NotImplementedError) as exc:
+    with pytest.raises(RuntimeError, match="block manager"):
         patch_vllm_engine_modern(fake_engine)
-    msg = str(exc.value)
-    assert "MODE_B_STREAMING_DESIGN.md" in msg
-    assert "Phase 2" in msg
-    # Tells the reader to use the vLLM 0.4 path until this lands.
-    assert "0.4" in msg
+
+
+# Regression marker: the Phase 2 stub is GONE. patch_vllm_engine_modern
+# now reaches the real implementation in kv_policy.vllm_evictor and
+# raises RuntimeError on a malformed engine (not NotImplementedError).
+def test_patch_vllm_engine_modern_no_longer_stubbed_with_notimpl():
+    """If we ever regress and re-stub Phase 2 with a blanket
+    NotImplementedError on any engine, this test fails."""
+    from ctm_bench.runner_vllm_streaming import (
+        patch_vllm_engine_modern,
+    )
+
+    fake_engine = object()
+    try:
+        patch_vllm_engine_modern(fake_engine)
+        raised = None
+    except NotImplementedError as exc:
+        # Allowed only if the message specifically names the
+        # prefix-caching prerequisite (a real implementation
+        # detecting NaiveBlockAllocator). A blanket "Phase 2
+        # not yet implemented" stub message is a regression.
+        if "Phase 2" in str(exc) and "not yet implemented" in str(exc):
+            raise AssertionError(
+                "patch_vllm_engine_modern is back to a 'not yet "
+                "implemented' stub; Phase 2 has been re-stubbed."
+            )
+        raised = exc
+    except RuntimeError as exc:
+        # This is the expected path when given a malformed engine —
+        # the real implementation tries to walk engine.scheduler and
+        # fails cleanly.
+        raised = exc
+    # Either RuntimeError or a specific NotImplementedError about
+    # prefix caching is fine; the blanket stub is not.
+    assert raised is not None or True

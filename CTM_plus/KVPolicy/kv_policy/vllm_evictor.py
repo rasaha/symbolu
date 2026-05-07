@@ -597,3 +597,373 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# =============================================================================
+# Phase 2 — modern vLLM (0.5+) integration
+# =============================================================================
+#
+# The legacy `patch_vllm_engine` above targets vLLM ≤ 0.4.x's
+# BlockSpaceManagerV1.gpu_allocator.evictor (verified end-to-end on
+# RunPod, May 2026, commit 6081148: `LRUEvictor` -> `CTMEvictor`).
+#
+# Modern vLLM (0.5+) replaced that with SelfAttnBlockSpaceManager +
+# CpuGpuBlockAllocator, which is itself a wrapper around per-device
+# allocators. The eviction-policy hook moved one layer deeper:
+#
+#   block_manager.block_allocator                       (CpuGpuBlockAllocator)
+#       ._allocators[Device.GPU]                        (PrefixCachingBlockAllocator
+#                                                        OR NaiveBlockAllocator)
+#           .evictor                                    (LRUEvictor —
+#                                                        only on PrefixCachingBlockAllocator)
+#
+# Two requirements for Phase 2 to install cleanly on 0.5+:
+#
+# 1. ``enable_prefix_caching=True`` must be set on engine init —
+#    otherwise the GPU allocator is NaiveBlockAllocator, which has
+#    no evictor at all (manages a free list directly). NaiveBlockAllocator
+#    -> patch silently no-ops, same failure mode as vLLM 0.4.
+#
+# 2. We replace ``allocator.evictor`` with a CTMEvictorModern that
+#    implements vLLM 0.7's Evictor ABC:
+#
+#       __contains__(block_id) -> bool
+#       evict() -> Tuple[int, int]                # (block_id, content_hash)
+#       add(block_id, content_hash, num_hashed_tokens, last_accessed)
+#       update(block_id, last_accessed)
+#       remove(block_id)
+#       num_blocks (property) -> int
+#
+# The interface differs from vLLM 0.4's `(gpu_dict, cpu_dict)`-returning
+# evictor (the legacy CTMEvictor above). The two are kept side-by-side
+# rather than unified — the version-detection in patch_vllm_engine
+# decides which to install.
+#
+# Operational note: with prefix caching on, the evictor decides which
+# *cached-but-unreferenced* blocks to release first when the cache fills,
+# NOT which active blocks to swap to CPU under preemption. That's a
+# different operational question than Mode A's tier-cost simulator
+# models (which is about under-pressure swap). The Phase 2 evidence is
+# valid for "is CTM+ scoring useful for cache-retention decisions" —
+# not for "does CTM+ change swap behaviour." Honest scope.
+
+
+class CTMEvictorModern:
+    """vLLM 0.7+ Evictor ABC implementation backed by CTM+ scoring.
+
+    Implements the interface vLLM's PrefixCachingBlockAllocator expects
+    on its ``evictor`` slot. The class wraps a
+    :class:`kv_policy.attention_evictor.KVCachePolicy` and adapts:
+
+    * ``add(block_id, content_hash, num_hashed_tokens, last_accessed)``
+      → ``policy.ensure_block(block_id, sequence_id=0, positions=[])``
+    * ``update(block_id, last_accessed)``
+      → ``policy.on_block_attention(block_id, attention_sum=0.0, ...)``
+      (note: attention_sum=0 because vLLM doesn't forward attention
+      through the evictor; this is option (b) from the design doc —
+      score on position + recency + frequency only)
+    * ``evict()``
+      → ``policy.select_victims(count=1)`` and returns
+      ``(block_id, content_hash)`` per vLLM's Evictor ABC contract.
+    * ``remove(block_id)`` → ``policy.evict_block(block_id)``.
+
+    Block-content hashes (vLLM's prefix-cache identifier for a chunk
+    of tokens) are tracked in a side dict so ``evict()`` can return
+    the right hash when it returns a victim.
+    """
+
+    def __init__(
+        self,
+        num_blocks_capacity: int,
+        block_size: int = 16,
+        ctm_config: Optional[CTMvLLMConfig] = None,
+        enable_logging: bool = False,
+    ) -> None:
+        # Lazy import — kv_policy.attention_evictor is in this
+        # package; this class is what we want to use directly
+        # (not the heavier CTMBlockSpaceManager that the legacy
+        # CTMEvictor wraps).
+        from .attention_evictor import KVCachePolicy
+
+        if ctm_config is None:
+            # Use KVCachePolicy's defaults — including
+            # attention_ema_alpha=0.2 from the Round 4 production
+            # default (NOT CTMvLLMConfig's 0.1, which predates Round 4
+            # and would silently regress the policy).
+            self._policy = KVCachePolicy(
+                max_blocks=num_blocks_capacity,
+                block_size=block_size,
+            )
+        else:
+            self._policy = KVCachePolicy(
+                max_blocks=num_blocks_capacity,
+                block_size=block_size,
+                sink_tokens=ctm_config.sink_tokens,
+                recent_window=ctm_config.recent_window,
+                attention_ema_alpha=ctm_config.attention_ema_alpha,
+            )
+        self._policy.register_sequence(0)
+        self._block_size = block_size
+        self._content_hash: Dict[int, int] = {}
+        self._num_hashed_tokens: Dict[int, int] = {}
+        self._last_accessed: Dict[int, float] = {}
+        self._tracked: Set[int] = set()
+        self._enable_logging = enable_logging
+
+    # ---- vLLM 0.7 Evictor ABC ----
+
+    def __contains__(self, block_id: int) -> bool:
+        return block_id in self._tracked
+
+    def add(
+        self,
+        block_id: int,
+        content_hash: int,
+        num_hashed_tokens: int,
+        last_accessed: float,
+    ) -> None:
+        """Track a block that's been admitted to the cache."""
+        self._tracked.add(block_id)
+        self._content_hash[block_id] = content_hash
+        self._num_hashed_tokens[block_id] = num_hashed_tokens
+        self._last_accessed[block_id] = last_accessed
+        # CTM+ tracks blocks by id. We don't have per-block token
+        # positions from vLLM at the evictor layer, so we synthesise
+        # positions that are deliberately *outside* the sink window
+        # (which is sink_tokens=4 by default) — that way CTM+ doesn't
+        # auto-pin every block as a sink. The FIRST block per sequence
+        # is in fact the prefix-sink, but vLLM hashes all admitted
+        # blocks here; we'd have to track allocation order to detect
+        # sinks, which is out of scope for the initial Phase 2 patch.
+        # Honest scope: sink-protection is degraded for Phase 2.
+        sink_offset = self._policy.sink_tokens
+        block_token_count = max(1, num_hashed_tokens % self._block_size or self._block_size)
+        positions = list(range(sink_offset, sink_offset + block_token_count))
+        self._policy.ensure_block(
+            block_id=block_id, sequence_id=0,
+            positions=positions,
+        )
+
+    def update(self, block_id: int, last_accessed: float) -> None:
+        """Record an access to a tracked block."""
+        if block_id not in self._tracked:
+            # vLLM may call update() before add() in edge cases; tolerate.
+            return
+        self._last_accessed[block_id] = last_accessed
+        # Forward as a zero-attention access. CTM+ uses
+        # last_accessed (via its internal step counter) for recency
+        # and frequency; attention is unavailable through this path.
+        self._policy.on_block_attention(
+            block_id=block_id, attention_sum=0.0,
+            sequence_id=0,
+            seq_len=self._num_hashed_tokens.get(block_id, self._block_size),
+        )
+
+    def remove(self, block_id: int) -> None:
+        """Drop tracking for a block (e.g. cache eviction by hash dedup)."""
+        if block_id not in self._tracked:
+            return
+        self._tracked.discard(block_id)
+        self._content_hash.pop(block_id, None)
+        self._num_hashed_tokens.pop(block_id, None)
+        self._last_accessed.pop(block_id, None)
+        self._policy.evict_block(block_id)
+
+    def evict(self) -> Tuple[int, int]:
+        """Pick a victim using CTM+ scoring. Returns (block_id, content_hash).
+
+        Raises ValueError if there are no tracked blocks (matches
+        vLLM's LRUEvictor contract — vLLM expects this to raise rather
+        than return None when the cache is empty).
+        """
+        victims = self._policy.select_victims(count=1)
+        if not victims:
+            raise ValueError(
+                "CTMEvictorModern.evict() called with no tracked blocks. "
+                "vLLM should not call evict on an empty cache; this is "
+                "either a vLLM bug or a tracking-state divergence."
+            )
+        victim_id = victims[0]
+        content_hash = self._content_hash.pop(victim_id, 0)
+        self._num_hashed_tokens.pop(victim_id, None)
+        self._last_accessed.pop(victim_id, None)
+        self._tracked.discard(victim_id)
+        # Note: select_victims removed the block from the policy's
+        # internal `available` set already; we don't need to call
+        # evict_block again.
+        if self._enable_logging:
+            logger.debug(
+                "CTMEvictorModern: evicted block_id=%d content_hash=%d",
+                victim_id, content_hash,
+            )
+        return (victim_id, content_hash)
+
+    @property
+    def num_blocks(self) -> int:
+        return len(self._tracked)
+
+    # ---- Optional debug ----
+
+    def get_stats(self) -> Dict:
+        return self._policy.stats
+
+
+def _walk_modern_gpu_allocator(engine: Any) -> Any:
+    """Walk a modern vLLM (0.5+) engine's allocator path and return
+    the per-device GPU allocator.
+
+    Returns the inner allocator object (a ``PrefixCachingBlockAllocator``
+    when prefix caching is enabled, ``NaiveBlockAllocator`` otherwise).
+    Raises ``RuntimeError`` if the path can't be resolved or
+    ``NotImplementedError`` if prefix caching is off (no evictor exists
+    on the naive path).
+
+    Accepts either the inner ``LLMEngine`` directly or an
+    ``AsyncLLMEngine`` wrapper that exposes the inner engine via
+    ``.engine``. Tries both.
+    """
+    # Async engines wrap an inner engine; if the outer doesn't expose
+    # .scheduler, peel one layer.
+    inner = engine
+    if not hasattr(inner, "scheduler") and hasattr(inner, "engine"):
+        inner = inner.engine
+    try:
+        scheduler = inner.scheduler[0] if isinstance(inner.scheduler, list) else inner.scheduler
+        block_manager = scheduler.block_manager
+    except (AttributeError, IndexError) as e:
+        raise RuntimeError(
+            f"Cannot access block manager from engine. Error: {e}"
+        )
+
+    block_allocator = getattr(block_manager, "block_allocator", None)
+    if block_allocator is None:
+        raise RuntimeError(
+            "block_manager.block_allocator missing. This patch targets "
+            "vLLM 0.5+ (SelfAttnBlockSpaceManager + CpuGpuBlockAllocator). "
+            f"Got block_manager type: {type(block_manager).__name__}"
+        )
+
+    # vLLM 0.5+ stores per-device allocators in a private dict.
+    # Try a few names — vLLM has touched this between minor versions.
+    inner_dict = (
+        getattr(block_allocator, "_allocators", None)
+        or getattr(block_allocator, "allocators", None)
+    )
+    if inner_dict is None:
+        raise RuntimeError(
+            f"Cannot find _allocators dict on {type(block_allocator).__name__}. "
+            "This vLLM minor version may have changed the internal layout."
+        )
+
+    # Find the GPU allocator. vLLM's Device enum is at
+    # vllm.utils.Device on 0.7; on other versions the import path
+    # may differ. We don't import it directly — we identify the GPU
+    # allocator by its capacity dwarfing the CPU one (real GPUs have
+    # KV cache of single-digit GiB; CPU swap_space defaults to 4-16 GiB
+    # but in the inner-dict allocator the "cpu" allocator's capacity
+    # reflects the CPU swap_space block count, which is comparable).
+    # A safer route: look for the key whose .name is 'GPU'.
+    gpu_allocator = None
+    for key, alloc in inner_dict.items():
+        # Try the enum-name approach.
+        key_name = getattr(key, "name", str(key)).upper()
+        if key_name == "GPU":
+            gpu_allocator = alloc
+            break
+    if gpu_allocator is None:
+        raise RuntimeError(
+            f"Cannot find GPU allocator in {list(inner_dict.keys())}. "
+            "vLLM's Device enum may have shifted; please file an issue."
+        )
+
+    return gpu_allocator
+
+
+def patch_vllm_engine_modern(
+    engine: Any,
+    enable_logging: bool = False,
+) -> CTMEvictorModern:
+    """Install CTMEvictorModern on a modern vLLM (0.5+) engine.
+
+    **Requirements:**
+
+    * ``enable_prefix_caching=True`` was set on the engine. Without
+      it, the GPU allocator is ``NaiveBlockAllocator`` which has no
+      ``evictor`` attribute — the patch raises ``NotImplementedError``
+      with a clear message. (Same failure mode as vLLM 0.4 without
+      prefix caching; documented in
+      ``Bench/scripts/MODE_B_VLLM04_RUNBOOK.md`` §1.1.)
+    * vLLM 0.5+ allocator architecture (verified against 0.7.3).
+      Earlier minor versions (0.5.x, 0.6.x) may have slightly
+      different internal layouts; the walker tries multiple
+      attribute names but may fail on a specific minor — the
+      ``RuntimeError`` then names what's missing.
+
+    **Operational scope (honest):** with prefix caching enabled, the
+    evictor decides which *cached-but-unreferenced* blocks to release
+    when the cache fills. Phase 2 measurements are about that
+    decision, NOT about under-pressure swap (Mode A's tier model).
+
+    Args:
+        engine: A vLLM AsyncLLMEngine or LLMEngine.
+        enable_logging: Pass through to the CTM+ policy for
+            structured event logging.
+
+    Returns:
+        The installed ``CTMEvictorModern`` (for inspection / stats).
+
+    Raises:
+        NotImplementedError: prefix caching is off and the GPU
+            allocator is ``NaiveBlockAllocator``.
+        RuntimeError: allocator path can't be walked on this
+            vLLM minor version.
+    """
+    gpu_allocator = _walk_modern_gpu_allocator(engine)
+
+    # Detect prefix-caching path. The PrefixCachingBlockAllocator has
+    # an `evictor` attribute (LRUEvictor by default); the
+    # NaiveBlockAllocator does not.
+    if not hasattr(gpu_allocator, "evictor"):
+        raise NotImplementedError(
+            "CTM+ Phase 2 patch requires enable_prefix_caching=True on "
+            "engine init. Without it, vLLM uses NaiveBlockAllocator "
+            "which has no evictor to swap. Modern-vLLM CTM+ runs only "
+            "test cache-retention decisions; under-pressure swap is the "
+            "Phase 1 LRU-only path (see MODE_B_STREAMING_DESIGN.md §4.4 "
+            "and RESULTS.md §13).\n\n"
+            f"Detected GPU allocator: {type(gpu_allocator).__name__}\n"
+            "Fix: re-initialise the engine with "
+            "AsyncEngineArgs(..., enable_prefix_caching=True)."
+        )
+
+    # Read the LRUEvictor's capacity to size the CTM+ policy's GPU
+    # block tracking. vLLM's Evictor ABC doesn't require this size,
+    # but CTMEvictorModern's KVCachePolicy needs a num_gpu_blocks
+    # value at init (used for capacity-bounded data structures).
+    num_blocks = getattr(gpu_allocator, "num_blocks", None)
+    if num_blocks is None:
+        # PrefixCachingBlockAllocator may expose capacity differently
+        # across versions; fall back to a conservative default that
+        # KVCachePolicy can grow into.
+        num_blocks = 4096
+
+    block_size = getattr(gpu_allocator, "_block_size", None)
+    if block_size is None:
+        block_size = getattr(gpu_allocator, "block_size", 16)
+
+    ctm_evictor = CTMEvictorModern(
+        num_blocks_capacity=int(num_blocks),
+        block_size=int(block_size),
+        enable_logging=enable_logging,
+    )
+
+    # The replacement. After this, vLLM's
+    # PrefixCachingBlockAllocator routes all .add / .evict / .update /
+    # .remove calls through CTMEvictorModern.
+    original_evictor_type = type(gpu_allocator.evictor).__name__
+    gpu_allocator.evictor = ctm_evictor
+    logger.info(
+        "CTM+ Phase 2 patch installed: %s -> CTMEvictorModern",
+        original_evictor_type,
+    )
+    return ctm_evictor
