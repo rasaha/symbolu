@@ -87,6 +87,17 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--phase3-attention",
+        action="store_true",
+        help=(
+            "Phase 3: install the attention-capture hook so real "
+            "attention sums reach CTM+'s scoring (the 0.35*attn "
+            "term). Requires --ctm-plus. The actual GPU-side "
+            "attention extraction is gated on the next GPU run; "
+            "the install path itself is CPU-tested."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -132,6 +143,7 @@ def main(argv: Sequence[str]) -> int:
         seed=args.seed,
         ctm_plus_evictor=args.ctm_plus,
         enable_prefix_caching=args.enable_prefix_caching,
+        phase3_attention_capture=args.phase3_attention,
         max_decode_tokens=args.max_decode_tokens,
     )
 

@@ -449,6 +449,7 @@ class AsyncEngineDriver:
         scheduler_config_overrides: Optional[Dict[str, object]] = None,
         ctm_plus_evictor: bool = False,
         enable_prefix_caching: Optional[bool] = None,
+        phase3_attention_capture: bool = False,
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
         vllm_module: Any = None,
@@ -482,6 +483,14 @@ class AsyncEngineDriver:
                     "no evictor to swap)."
                 )
             self.enable_prefix_caching = bool(enable_prefix_caching)
+        if phase3_attention_capture and not ctm_plus_evictor:
+            raise ValueError(
+                "phase3_attention_capture=True requires "
+                "ctm_plus_evictor=True. The capture hook pushes "
+                "attention to a CTMEvictorModern; without the evictor, "
+                "there's nowhere to push the attention to."
+            )
+        self.phase3_attention_capture = bool(phase3_attention_capture)
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -489,6 +498,38 @@ class AsyncEngineDriver:
             else self.DEFAULT_SAMPLE_INTERVAL_SECONDS
         )
         self._vllm_module = vllm_module
+
+    @staticmethod
+    def _extract_model_from_engine(inner_engine: Any) -> Any:
+        """Walk an LLMEngine to find the underlying torch model
+        whose Attention layers we want to monkey-patch.
+
+        vLLM 0.7+ path:
+          engine -> model_executor -> driver_worker.worker
+              -> model_runner.model
+        Try a few alternate names per vLLM minor version.
+        """
+        # Try the documented path first.
+        for path in (
+            ("model_executor", "driver_worker", "worker", "model_runner", "model"),
+            ("model_executor", "driver_worker", "model_runner", "model"),
+            ("model_executor", "model_runner", "model"),
+            ("worker", "model_runner", "model"),
+            ("model_runner", "model"),
+            ("model",),
+        ):
+            cur = inner_engine
+            ok = True
+            for attr in path:
+                cur = getattr(cur, attr, None)
+                if cur is None:
+                    ok = False
+                    break
+            if ok and cur is not None:
+                return cur
+        # Best-effort fallback: return the inner engine; the
+        # walker in install_attention_capture will descend.
+        return inner_engine
 
     def _import_vllm(self) -> Any:
         if self._vllm_module is not None:
@@ -585,6 +626,33 @@ class AsyncEngineDriver:
             )
         return n_tokens
 
+    async def _run_attention_flusher(
+        self,
+        aggregator: Any,
+        evictor: Any,
+    ) -> None:
+        """Phase 3: periodically flush the attention aggregator to
+        the evictor. Running as a separate asyncio task lets the
+        attention-capture hook record samples eagerly while we
+        deliver them to CTM+'s scoring on a controlled cadence
+        (matches the swap-counter sampler interval)."""
+        try:
+            while True:
+                await asyncio.sleep(self.sample_interval_seconds)
+                try:
+                    aggregator.flush_to_evictor(evictor)
+                except Exception as exc:
+                    logger.warning(
+                        "attention flush to evictor failed: %s", exc,
+                    )
+        except asyncio.CancelledError:
+            # Final flush before exiting so anything captured in
+            # the last interval still reaches the evictor.
+            try:
+                aggregator.flush_to_evictor(evictor)
+            except Exception:
+                pass
+
     async def _run_sampler(
         self,
         engine: Any,
@@ -650,9 +718,11 @@ class AsyncEngineDriver:
         # allocator-version drift). If it raises here, before the
         # main run try/finally starts, the engine leaks GPU memory
         # and worker subprocesses. Tear down explicitly on failure.
+        installed_evictor = None
+        attention_aggregator = None
         if self.ctm_plus_evictor:
             try:
-                patch_vllm_engine_modern(
+                installed_evictor = patch_vllm_engine_modern(
                     getattr(engine, "engine", engine),
                     enable_logging=False,
                 )
@@ -660,6 +730,29 @@ class AsyncEngineDriver:
                     "Phase 2: CTM+ evictor patch installed on "
                     "AsyncLLMEngine"
                 )
+                if self.phase3_attention_capture:
+                    # Phase 3: install the attention-capture hook
+                    # on the model's Attention layers. The hook
+                    # pushes per-block attention sums to the
+                    # aggregator; the run loop flushes the aggregator
+                    # to the evictor periodically (after each
+                    # decode-step batch).
+                    from kv_policy.vllm_evictor import (  # type: ignore
+                        AttentionAggregator,
+                        install_attention_capture,
+                    )
+                    inner_engine = getattr(engine, "engine", engine)
+                    model = self._extract_model_from_engine(inner_engine)
+                    attention_aggregator = AttentionAggregator()
+                    n_patched = install_attention_capture(
+                        model=model,
+                        aggregator=attention_aggregator,
+                        evictor=installed_evictor,
+                    )
+                    logger.info(
+                        "Phase 3: attention capture installed on "
+                        "%d Attention layers", n_patched,
+                    )
             except BaseException:
                 # Best-effort teardown then re-raise. Same chain
                 # of teardown methods as the run-end finally
@@ -680,6 +773,10 @@ class AsyncEngineDriver:
                     except Exception:
                         continue
                 raise
+
+        # Stash so the run loop can flush after each decode batch.
+        self._attention_aggregator = attention_aggregator
+        self._installed_evictor = installed_evictor
         sampling_params = SamplingParams(
             temperature=0.0,
             max_tokens=self.max_decode_tokens,
@@ -689,6 +786,20 @@ class AsyncEngineDriver:
         sampler_task = asyncio.create_task(
             self._run_sampler(engine, sampler)
         )
+
+        # Phase 3: a parallel flusher that periodically pushes
+        # accumulated per-block attention from the aggregator into
+        # the evictor. The flush cadence matches the swap-counter
+        # sampler — they're both polling-style; running them on
+        # the same heartbeat keeps the state machines simple.
+        attention_flush_task = None
+        if self._attention_aggregator is not None and self._installed_evictor is not None:
+            attention_flush_task = asyncio.create_task(
+                self._run_attention_flusher(
+                    self._attention_aggregator,
+                    self._installed_evictor,
+                )
+            )
 
         n_admitted = 0
         n_completed = 0
@@ -762,6 +873,12 @@ class AsyncEngineDriver:
                 await sampler_task
             except asyncio.CancelledError:
                 pass
+            if attention_flush_task is not None:
+                attention_flush_task.cancel()
+                try:
+                    await attention_flush_task
+                except asyncio.CancelledError:
+                    pass
             # Shut down vLLM's worker subprocess explicitly. Without
             # this, a multi-cell sweep can leak GPU memory across
             # cells because the previous engine's workers stay alive

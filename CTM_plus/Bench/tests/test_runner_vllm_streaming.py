@@ -1389,3 +1389,348 @@ def test_patch_vllm_engine_modern_no_longer_stubbed_with_notimpl():
     # Either RuntimeError or a specific NotImplementedError about
     # prefix caching is fine; the blanket stub is not.
     assert raised is not None or True
+
+
+# ------------------------------------------------------------------ #
+# Phase 3 — attention forwarding (real attention into CTM+)
+# ------------------------------------------------------------------ #
+
+
+def test_aggregate_attention_to_blocks_basic():
+    """Pure-Python aggregation: per-key attention vector +
+    block_table -> per-block sums."""
+    from kv_policy.vllm_evictor import aggregate_attention_to_blocks
+
+    # block_size=4 tokens. Three blocks: [B0|B1|B2] mapped to
+    # block_ids [42, 43, 44].
+    weights = [
+        0.10, 0.05, 0.20, 0.15,    # B0 sums to 0.50
+        0.02, 0.03, 0.05, 0.10,    # B1 sums to 0.20
+        0.10, 0.10, 0.05, 0.05,    # B2 sums to 0.30
+    ]
+    block_table = [42, 43, 44]
+    out = aggregate_attention_to_blocks(weights, block_table, block_size=4)
+    assert out == {42: pytest.approx(0.50), 43: pytest.approx(0.20),
+                   44: pytest.approx(0.30)}
+
+
+def test_aggregate_attention_to_blocks_partial_last_block():
+    """Last block may be partially filled (sequence length not a
+    multiple of block_size). The function should sum only the
+    available weights and not crash."""
+    from kv_policy.vllm_evictor import aggregate_attention_to_blocks
+
+    weights = [0.5, 0.5, 0.3]   # 3 keys, would fit in 1 full block of 4
+    block_table = [99]
+    out = aggregate_attention_to_blocks(weights, block_table, block_size=4)
+    assert out == {99: pytest.approx(1.3)}
+
+
+def test_aggregate_attention_to_blocks_rejects_too_many_weights():
+    from kv_policy.vllm_evictor import aggregate_attention_to_blocks
+
+    # 5 weights but only 1 block of 4 → mismatch.
+    with pytest.raises(ValueError, match="block_table"):
+        aggregate_attention_to_blocks(
+            [0.1] * 5, block_table=[10], block_size=4,
+        )
+
+
+def test_aggregate_attention_to_blocks_rejects_bad_block_size():
+    from kv_policy.vllm_evictor import aggregate_attention_to_blocks
+
+    with pytest.raises(ValueError, match="block_size must be > 0"):
+        aggregate_attention_to_blocks([0.1], block_table=[1], block_size=0)
+
+
+def test_attention_aggregator_buffer_and_flush():
+    """AttentionAggregator: record per-block weights, flush to a
+    fake evictor, verify forward_block_attention was called with
+    the cumulative sums."""
+    from kv_policy.vllm_evictor import AttentionAggregator
+
+    captured: List[tuple] = []
+
+    class FakeEvictor:
+        def forward_block_attention(self, block_id, attention_sum):
+            captured.append((block_id, attention_sum))
+
+    agg = AttentionAggregator()
+    agg.record_block_attention(42, 0.10)
+    agg.record_block_attention(43, 0.05)
+    # Same block_id again — should accumulate.
+    agg.record_block_attention(42, 0.20)
+    assert agg.buffered_blocks == 2
+
+    n = agg.flush_to_evictor(FakeEvictor())
+    assert n == 2
+    captured.sort()
+    assert captured[0][0] == 42 and captured[0][1] == pytest.approx(0.30)
+    assert captured[1][0] == 43 and captured[1][1] == pytest.approx(0.05)
+    # Buffer cleared after flush.
+    assert agg.buffered_blocks == 0
+    # Stats updated.
+    assert agg.stats["samples_recorded"] == 3
+    assert agg.stats["blocks_flushed"] == 2
+    assert agg.stats["flushes"] == 1
+
+
+def test_attention_aggregator_record_block_batch():
+    """Bulk-record path: aggregator.record_block_batch({block: weight})."""
+    from kv_policy.vllm_evictor import AttentionAggregator
+
+    captured: List[tuple] = []
+
+    class FakeEvictor:
+        def forward_block_attention(self, block_id, attention_sum):
+            captured.append((block_id, attention_sum))
+
+    agg = AttentionAggregator()
+    # Layer 0 emits per-block sums.
+    agg.record_block_batch({1: 0.4, 2: 0.3})
+    # Layer 1 emits more — should accumulate.
+    agg.record_block_batch({1: 0.1, 2: 0.2, 3: 0.5})
+    agg.flush_to_evictor(FakeEvictor())
+    captured.sort()
+    assert captured[0] == (1, pytest.approx(0.5))
+    assert captured[1] == (2, pytest.approx(0.5))
+    assert captured[2] == (3, pytest.approx(0.5))
+
+
+def test_attention_aggregator_flush_empty_returns_zero():
+    from kv_policy.vllm_evictor import AttentionAggregator
+
+    class FakeEvictor:
+        def forward_block_attention(self, block_id, attention_sum):
+            raise AssertionError("should not be called on empty flush")
+
+    agg = AttentionAggregator()
+    assert agg.flush_to_evictor(FakeEvictor()) == 0
+
+
+def test_attention_aggregator_tolerates_evictor_errors():
+    """A stale block_id (one that's been evicted between capture
+    and flush) is dropped; the rest still flush."""
+    from kv_policy.vllm_evictor import AttentionAggregator
+
+    captured: List[int] = []
+
+    class FlakyEvictor:
+        def forward_block_attention(self, block_id, attention_sum):
+            if block_id == 999:
+                raise KeyError(block_id)
+            captured.append(block_id)
+
+    agg = AttentionAggregator()
+    agg.record_block_attention(42, 0.5)
+    agg.record_block_attention(999, 0.5)   # this one will raise
+    agg.record_block_attention(43, 0.5)
+    n = agg.flush_to_evictor(FlakyEvictor())
+    # 2 flushed, 1 dropped (the one that raised).
+    assert n == 2
+    assert sorted(captured) == [42, 43]
+
+
+def test_ctm_evictor_modern_forward_block_attention_changes_score():
+    """Forwarding non-zero attention should differentiate the
+    block's score from a zero-attention block. Without this, all
+    blocks have the same attention=0 and score on recency only."""
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+    # Add three blocks at the same logical time.
+    for bid in (10, 20, 30):
+        ev.add(block_id=bid, content_hash=bid * 7,
+               num_hashed_tokens=16, last_accessed=100.0)
+    # Push real attention only to block 20 — make it the most
+    # important block.
+    ev.forward_block_attention(20, attention_sum=5.0)
+
+    # Score 10 (no attention) vs 20 (high attention). 20's score
+    # MUST be higher (less likely to evict).
+    score_10 = ev._policy.score_block(10)
+    score_20 = ev._policy.score_block(20)
+    assert score_20 > score_10, (
+        f"Block with high attention (score={score_20}) "
+        f"should outrank block with no attention (score={score_10})"
+    )
+
+
+def test_ctm_evictor_modern_forward_block_attention_silent_on_untracked():
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+    # No add(). forward_block_attention on an untracked block
+    # should be silent, not raise.
+    ev.forward_block_attention(999, attention_sum=10.0)
+
+
+def test_install_attention_capture_finds_attention_modules():
+    """install_attention_capture walks the model tree, identifies
+    Attention layers by class name, and patches their forward."""
+    from kv_policy.vllm_evictor import (
+        install_attention_capture, AttentionAggregator,
+    )
+
+    # Build a fake model with two "Attention" modules + non-attention.
+    class FakeAttention:
+        def __init__(self, name):
+            self._name = name
+            self.head_size = 64
+            self.num_heads = 8
+            self.original_forward_called = 0
+
+        def forward(self, query, key, value, kv_cache, attn_metadata):
+            self.original_forward_called += 1
+            return query  # dummy
+
+    class FakeMLP:
+        # Looks like an nn.Module but isn't an Attention.
+        def forward(self, x):
+            return x
+
+    class FakeModel:
+        def __init__(self):
+            self.layer0 = FakeAttention("layer0")
+            self.layer1 = FakeAttention("layer1")
+            self.mlp = FakeMLP()
+
+    model = FakeModel()
+    aggregator = AttentionAggregator()
+    captured = []
+
+    class FakeEvictor:
+        def forward_block_attention(self, block_id, attention_sum):
+            captured.append((block_id, attention_sum))
+
+    n = install_attention_capture(
+        model=model, aggregator=aggregator, evictor=FakeEvictor(),
+    )
+    # Two Attention layers found and patched. MLP not patched.
+    assert n == 2
+
+    # The patched forwards should still call the original (correctness
+    # invariant). Use plain Python objects in lieu of torch tensors —
+    # the test-mode capture branch uses the side-channel
+    # `decode_attention_weights` and never touches torch.
+    class FakeAttnMeta:
+        num_decode_tokens = 1
+        num_prefill_tokens = 0
+        block_size = 4
+        block_tables = [[42, 43]]
+        # Test-mode side channel: pre-computed per-block weights.
+        decode_attention_weights = {42: 0.7, 43: 0.3}
+
+    # Inputs can be any opaque values — the real arithmetic happens
+    # only on the GPU-validation path which the test-mode side
+    # channel skips entirely.
+    sentinel_q = object()
+    sentinel_k = object()
+    sentinel_v = object()
+    sentinel_kv_cache = object()
+
+    model.layer0.forward(
+        sentinel_q, sentinel_k, sentinel_v, sentinel_kv_cache, FakeAttnMeta(),
+    )
+    # Original forward was called (correctness preserved).
+    assert model.layer0.original_forward_called == 1
+    # Aggregator buffered the per-block weights from the side channel.
+    assert aggregator.buffered_blocks == 2
+
+
+def test_install_attention_capture_returns_zero_on_empty_model(caplog):
+    """If no Attention modules are found, the installer logs a
+    warning and returns 0 — does NOT crash."""
+    from kv_policy.vllm_evictor import (
+        install_attention_capture, AttentionAggregator,
+    )
+
+    class EmptyModel:
+        # No attention modules anywhere.
+        pass
+
+    aggregator = AttentionAggregator()
+    n = install_attention_capture(
+        model=EmptyModel(), aggregator=aggregator, evictor=object(),
+    )
+    assert n == 0
+
+
+def test_async_engine_driver_phase3_requires_phase2():
+    """phase3_attention_capture=True requires ctm_plus_evictor=True
+    (you need an evictor to push attention to). Constructor
+    rejects the invalid combination."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    with pytest.raises(ValueError, match="ctm_plus_evictor=True"):
+        AsyncEngineDriver(
+            model="dummy",
+            ctm_plus_evictor=False,
+            phase3_attention_capture=True,
+        )
+
+
+def test_async_engine_driver_phase3_constructor_stores_flag():
+    """When ctm_plus_evictor=True + phase3_attention_capture=True,
+    the driver stores the flag for the run loop to act on."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver = AsyncEngineDriver(
+        model="dummy",
+        ctm_plus_evictor=True,
+        phase3_attention_capture=True,
+    )
+    assert driver.phase3_attention_capture is True
+    assert driver.ctm_plus_evictor is True
+    assert driver.enable_prefix_caching is True   # forced by ctm_plus
+
+
+def test_extract_model_from_engine_walks_documented_paths():
+    """The model-extraction helper finds the underlying torch
+    model along several alternate paths that vLLM has used
+    across minor versions."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    # Path 1: model_executor.driver_worker.worker.model_runner.model
+    model = object()
+
+    class _MR:
+        pass
+
+    class _W:
+        pass
+
+    class _DW:
+        pass
+
+    class _ME:
+        pass
+
+    me = _ME()
+    me.driver_worker = _DW()
+    me.driver_worker.worker = _W()
+    me.driver_worker.worker.model_runner = _MR()
+    me.driver_worker.worker.model_runner.model = model
+
+    class _Engine:
+        pass
+
+    eng = _Engine()
+    eng.model_executor = me
+
+    found = AsyncEngineDriver._extract_model_from_engine(eng)
+    assert found is model
+
+    # Path 2: model_runner.model directly.
+    eng2 = _Engine()
+    mr2 = _MR()
+    mr2.model = model
+    eng2.model_runner = mr2
+    found2 = AsyncEngineDriver._extract_model_from_engine(eng2)
+    assert found2 is model
+
+    # Fallback: nothing matches; returns the engine itself so
+    # the walker in install_attention_capture can descend.
+    eng3 = _Engine()
+    found3 = AsyncEngineDriver._extract_model_from_engine(eng3)
+    assert found3 is eng3

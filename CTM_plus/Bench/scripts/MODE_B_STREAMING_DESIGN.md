@@ -212,6 +212,178 @@ Tests added (3 new, total 174):
   — pins the constructor's explicit rejection of the impossible
   combination.
 
+## §1.4 Phase 3 — attention forwarding (real attention into CTM+)
+
+The Phase 2 audit surfaced that vLLM's Evictor ABC carries zero
+attention through `update(block_id, last_accessed)`, so CTM+'s
+0.35·attn term zeroes out and the policy collapses to ~LRU.
+Phase 3 plumbs real attention through a separate channel.
+
+**Three components landed in `kv_policy.vllm_evictor`:**
+
+1. **`CTMEvictorModern.forward_block_attention(block_id,
+   attention_sum)`** — out-of-band API on the evictor. Pushes
+   real attention magnitude into the policy's
+   `on_block_attention(...)`, separate from the Evictor ABC's
+   `update()`.
+2. **`AttentionAggregator`** — pure-Python state machine that
+   buffers per-block attention across layers within a decode
+   step, then flushes cumulative sums to the evictor on a
+   controlled cadence (matches the swap-counter sampler interval).
+3. **`install_attention_capture(model, aggregator, evictor)`**
+   — walks the model's modules, identifies vLLM Attention layers
+   by class name (`Attention` / `PagedAttention`) or duck-typing
+   (`head_size` + `num_heads`), monkey-patches each layer's
+   `forward` to also call the capture function. Returns the
+   number of layers patched; logs a warning + returns 0 if no
+   attention modules found.
+
+Plus a pure helper:
+
+* **`aggregate_attention_to_blocks(weights, block_table, block_size)`**
+  — given a per-key attention vector + the sequence's block_table,
+  returns `{block_id: attention_sum}`. Tested with synthetic
+  tensors; this is the math the GPU-side capture path will
+  use after the real Q@K computation.
+
+**Streaming runner wiring:**
+
+* `AsyncEngineDriver(phase3_attention_capture=True)` and
+  `--phase3-attention` CLI flag.
+* Constructor rejects `phase3_attention_capture=True` without
+  `ctm_plus_evictor=True` (no evictor → nowhere to push
+  attention).
+* `run()` extracts the model from the engine via a
+  multi-path walker (vLLM 0.5+ has the path
+  `model_executor → driver_worker → worker → model_runner →
+  model`; older paths tried as fallbacks), installs the
+  capture hooks, and starts a parallel asyncio task that
+  flushes the aggregator to the evictor on the same cadence
+  as the swap-counter sampler.
+* Engine teardown on patch failure preserved (audit-pass
+  MEDIUM #2 fix); attention-flusher task cancellation in the
+  same `finally` block.
+
+### §1.4.1 What the GPU-side capture actually does
+
+Per decode step, for each Attention layer:
+
+1. Original `forward(query, key, value, kv_cache, attn_metadata)`
+   runs unchanged → output correctness preserved.
+2. Wrapper extracts the new query token's Q, identifies the
+   sequence's block_table from `attn_metadata`, computes
+   `softmax(Q @ K^T / √d_k)` against the cached keys.
+3. `aggregate_attention_to_blocks` groups per-key weights into
+   per-block sums.
+4. `aggregator.record_block_batch({block_id: sum})`.
+
+After all layers fire in a decode step, the parallel flusher
+delivers cumulative per-block sums to
+`CTMEvictorModern.forward_block_attention`, which forwards to
+`KVCachePolicy.on_block_attention(attention_sum=...)`. CTM+'s
+EMA + ENTITY classification + the 0.35·attn term ALL come
+alive — the policy that produced the simulator headlines now
+runs end-to-end.
+
+### §1.4.2 Honest scope of what landed in this session
+
+**CPU-tested (✓):**
+
+* `aggregate_attention_to_blocks` math — synthetic vectors,
+  partial-last-block edge case, input validation.
+* `AttentionAggregator` — record / record_batch / flush /
+  empty-flush / stale-evictor-error tolerance.
+* `CTMEvictorModern.forward_block_attention` — non-zero
+  attention demonstrably changes a block's score; untracked
+  block_id is a silent no-op.
+* `install_attention_capture` — finds Attention modules by
+  class name, returns 0 cleanly on a model with none, fires
+  the side-channel test path through the wrapped forward.
+* Streaming runner constructor/argparse — `phase3_attention_capture`
+  validation, `_extract_model_from_engine` multi-path walker,
+  flusher task lifecycle.
+
+**Deferred to GPU validation (✗):**
+
+* The actual Q@K computation inside the wrapped forward. The
+  current implementation has a `NotImplementedError` on the
+  real-extraction branch — only the test side-channel
+  (`decode_attention_weights` attribute pre-computed) flows
+  through CPU-side. Real-vLLM-tensor extraction is the next
+  GPU-day's work; once written, it'll exercise the same
+  aggregator + evictor APIs that CPU tests already pin.
+
+This is the same staging discipline Phase 1 used: ship the
+CPU-testable scaffolding + integration plumbing first, mark
+the GPU-only branch with `NotImplementedError`, validate on
+real silicon when GPU access is available.
+
+### §1.4.3 Tests added (15 new, total 189)
+
+* `test_aggregate_attention_to_blocks_basic`
+* `test_aggregate_attention_to_blocks_partial_last_block`
+* `test_aggregate_attention_to_blocks_rejects_too_many_weights`
+* `test_aggregate_attention_to_blocks_rejects_bad_block_size`
+* `test_attention_aggregator_buffer_and_flush`
+* `test_attention_aggregator_record_block_batch`
+* `test_attention_aggregator_flush_empty_returns_zero`
+* `test_attention_aggregator_tolerates_evictor_errors`
+* `test_ctm_evictor_modern_forward_block_attention_changes_score`
+* `test_ctm_evictor_modern_forward_block_attention_silent_on_untracked`
+* `test_install_attention_capture_finds_attention_modules`
+* `test_install_attention_capture_returns_zero_on_empty_model`
+* `test_async_engine_driver_phase3_requires_phase2`
+* `test_async_engine_driver_phase3_constructor_stores_flag`
+* `test_extract_model_from_engine_walks_documented_paths`
+
+### §1.4.4 Phase 3 GPU run (next session)
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+python3 -m ctm_bench.scripts.run_streaming \
+    --model /workspace/.hf_cache/qwen2.5-7b \
+    --workload chat_32k --seed 42 \
+    --gpu-memory-utilization 0.26 --swap-space-gb 16 \
+    --arrival-rate 6.0 --arrival-alpha 1.5 \
+    --max-requests 30 --max-wall-seconds 120 \
+    --max-decode-tokens 2048 \
+    --prompt-length-choices "8000,16000,24000,30000" \
+    --ctm-plus --phase3-attention \
+    --output-dir bench_out/streaming_phase3_smoke
+```
+
+Expected log signals if the install succeeds:
+
+* `Phase 2: CTM+ evictor patch installed on AsyncLLMEngine`
+* `Phase 3: attention capture installed on N Attention layers`
+  (N should equal the model's transformer-layer count — 32 for
+  Qwen 7B).
+* During run: `swap_out` and `preempt` accumulate (Phase 1's
+  swap path stays active under the same `preemption_mode=swap`
+  config).
+
+If `Phase 3: attention capture installed on 0 Attention layers`
+fires: the model-walker can't see vLLM's attention modules.
+Diagnose with:
+
+```python
+inner = engine.engine
+for name, module in inner.model_executor.driver_worker.worker.model_runner.model.named_modules():
+    if "ttn" in type(module).__name__.lower():
+        print(name, type(module).__name__)
+```
+
+The actual Q@K-from-kv_cache extraction in
+`_capture_attention_to_aggregator` is currently a
+`NotImplementedError` — a Phase 3 GPU run will hit that on the
+first decode step. The next session's work is filling in that
+extraction against vLLM 0.7's specific kv_cache layout.
+
+The three-cell experiment partners want to see (LRU baseline /
+Phase 2 ablation / Phase 3 full CTM+) is achievable on the
+same RunPod session in one ~$1 sweep once the GPU-side
+extraction lands.
+
 ## §1.3 Phase 2 GPU run procedure
 
 When ready for GPU validation, the smoke command is the same as
