@@ -82,6 +82,10 @@ class StreamingRunCellResult:
     # phase3_attention_capture=True.
     attention_capture_call_count: int = 0
     attention_capture_total_seconds: float = 0.0
+    # Phase 4 — trigonometric scoring. Populated only when
+    # phase4_trig_calibration_path is set.
+    phase4_window_pruning_invocations: int = 0
+    phase4_blocks_captured_with_pre_rope_keys: int = 0
 
 
 # ---------------------------------------------------------------- #
@@ -469,6 +473,9 @@ class AsyncEngineDriver:
         ctm_plus_evictor: bool = False,
         enable_prefix_caching: Optional[bool] = None,
         phase3_attention_capture: bool = False,
+        phase4_trig_calibration_path: Optional[Path] = None,
+        phase4_window_interval: int = 128,
+        phase4_future_offsets: Optional[Sequence[int]] = None,
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
         vllm_module: Any = None,
@@ -510,6 +517,36 @@ class AsyncEngineDriver:
                 "there's nowhere to push the attention to."
             )
         self.phase3_attention_capture = bool(phase3_attention_capture)
+
+        # ---- Phase 4 wiring ----
+        if phase4_trig_calibration_path is not None and not ctm_plus_evictor:
+            raise ValueError(
+                "phase4_trig_calibration_path requires "
+                "ctm_plus_evictor=True. The trig score is consumed "
+                "by CTMEvictorModern; without the evictor, the "
+                "calibration data is unused."
+            )
+        if (
+            phase4_trig_calibration_path is not None
+            and phase3_attention_capture
+        ):
+            # Phase 3 and Phase 4 are competing hypotheses; running
+            # both in one cell entangles their effects. Surface the
+            # conflict as an explicit ValueError rather than letting
+            # the cell quietly produce uninterpretable results.
+            raise ValueError(
+                "Phase 3 (attention forwarding) and Phase 4 "
+                "(trig scoring) are competing hypotheses. Run them "
+                "in separate cells of the four-cell experiment so "
+                "their effects can be isolated. Got both flags set."
+            )
+        self.phase4_trig_calibration_path = phase4_trig_calibration_path
+        self.phase4_window_interval = int(phase4_window_interval)
+        self.phase4_future_offsets = (
+            list(phase4_future_offsets)
+            if phase4_future_offsets is not None
+            else None
+        )
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -741,9 +778,35 @@ class AsyncEngineDriver:
         attention_aggregator = None
         if self.ctm_plus_evictor:
             try:
+                # Phase 4: load calibration before installing the
+                # evictor so the patch can hand the scorer to
+                # CTMEvictorModern at construction time.
+                trig_scorer = None
+                if self.phase4_trig_calibration_path is not None:
+                    from kv_policy.triattention import (  # type: ignore
+                        QCenterStats, TrigScorer,
+                    )
+                    stats = QCenterStats.load(
+                        self.phase4_trig_calibration_path
+                    )
+                    trig_scorer = TrigScorer(
+                        stats=stats,
+                        future_offsets=self.phase4_future_offsets,
+                    )
+                    logger.info(
+                        "Phase 4: loaded calibration for %s "
+                        "(%d layers, %d heads, %d bands; %d tokens, "
+                        "corpus=%s)",
+                        stats.model_name, stats.num_layers,
+                        stats.num_heads, stats.num_bands,
+                        stats.calibration_token_count,
+                        stats.calibration_corpus,
+                    )
                 installed_evictor = patch_vllm_engine_modern(
                     getattr(engine, "engine", engine),
                     enable_logging=False,
+                    trig_scorer=trig_scorer,
+                    window_pruning_interval=self.phase4_window_interval,
                 )
                 logger.info(
                     "Phase 2: CTM+ evictor patch installed on "
@@ -961,6 +1024,29 @@ class AsyncEngineDriver:
         attention_capture_total_seconds = sum(capture_timings)
         attention_capture_call_count = len(capture_timings)
 
+        # Phase 4 metrics (populated when phase4_trig_calibration_path
+        # was set; zeros otherwise).
+        phase4_window_invocations = 0
+        phase4_blocks_with_keys = 0
+        if (
+            self.phase4_trig_calibration_path is not None
+            and self._installed_evictor is not None
+        ):
+            phase4_window_invocations = int(
+                getattr(
+                    self._installed_evictor,
+                    "window_pruning_invocations",
+                    0,
+                )
+            )
+            phase4_blocks_with_keys = len(
+                getattr(
+                    self._installed_evictor,
+                    "_block_pre_rope_keys",
+                    {},
+                )
+            )
+
         # Throughput.
         if wall > 0 and n_decode_tokens > 0:
             tokens_per_second = n_decode_tokens / wall
@@ -985,6 +1071,8 @@ class AsyncEngineDriver:
             evict_p99_microseconds=evict_p99_us,
             attention_capture_call_count=attention_capture_call_count,
             attention_capture_total_seconds=attention_capture_total_seconds,
+            phase4_window_pruning_invocations=phase4_window_invocations,
+            phase4_blocks_captured_with_pre_rope_keys=phase4_blocks_with_keys,
         )
 
     @staticmethod
@@ -1021,13 +1109,19 @@ class AsyncEngineDriver:
 # ---------------------------------------------------------------- #
 
 
-def patch_vllm_engine_modern(engine, *, enable_logging: bool = False):
+def patch_vllm_engine_modern(
+    engine, *,
+    enable_logging: bool = False,
+    trig_scorer: Any = None,
+    window_pruning_interval: int = 128,
+):
     """Patch a modern vLLM (0.5+) engine to use CTM+ for KV-cache
     eviction.
 
     Re-exported from :mod:`kv_policy.vllm_evictor` where the real
-    implementation lives. Kept here as a convenience for callers
-    who already import from :mod:`ctm_bench.runner_vllm_streaming`.
+    implementation lives. ``trig_scorer`` and
+    ``window_pruning_interval`` are forwarded for Phase 4 setup;
+    leave them at defaults for Phase 2 / 3.
 
     See :func:`kv_policy.vllm_evictor.patch_vllm_engine_modern`
     for the full docstring and contract. Raises
@@ -1050,4 +1144,9 @@ def patch_vllm_engine_modern(engine, *, enable_logging: bool = False):
         from kv_policy.vllm_evictor import (  # type: ignore
             patch_vllm_engine_modern as _real_patch,
         )
-    return _real_patch(engine, enable_logging=enable_logging)
+    return _real_patch(
+        engine,
+        enable_logging=enable_logging,
+        trig_scorer=trig_scorer,
+        window_pruning_interval=window_pruning_interval,
+    )

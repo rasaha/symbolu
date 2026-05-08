@@ -98,6 +98,36 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--phase4-trig-calibration",
+        type=Path, default=None,
+        help=(
+            "Phase 4: path to a TriAttention-style calibration "
+            "JSON (QCenterStats.save() output). Loads the "
+            "calibration at engine init and configures "
+            "CTMEvictorModern to use trig scoring + window-based "
+            "pruning. Requires --ctm-plus. Mutually exclusive "
+            "with --phase3-attention (competing hypotheses; run "
+            "in separate cells)."
+        ),
+    )
+    parser.add_argument(
+        "--phase4-window-interval", type=int, default=128,
+        help=(
+            "Phase 4: trigger window-based pruning every N "
+            "decoded tokens. Default 128 (matches TriAttention's "
+            "β). Lower = more aggressive pruning."
+        ),
+    )
+    parser.add_argument(
+        "--phase4-future-offsets", default=None,
+        help=(
+            "Phase 4: comma-separated list of future-query "
+            "distances Δ for S_trig averaging. Default '1,2,4,8,16'. "
+            "Larger sets capture longer-horizon attention "
+            "preferences at higher compute cost."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -136,6 +166,21 @@ def main(argv: Sequence[str]) -> int:
         prompt_length_choices=prompt_lengths,
     )
     sampler = SwapCounterSampler()
+
+    phase4_offsets = None
+    if args.phase4_future_offsets is not None:
+        phase4_offsets = [
+            int(s.strip())
+            for s in args.phase4_future_offsets.split(",")
+            if s.strip()
+        ]
+        if not phase4_offsets:
+            print(
+                "--phase4-future-offsets must list at least one offset",
+                file=sys.stderr,
+            )
+            return 2
+
     driver = AsyncEngineDriver(
         model=args.model,
         gpu_memory_utilization=args.gpu_memory_utilization,
@@ -144,6 +189,9 @@ def main(argv: Sequence[str]) -> int:
         ctm_plus_evictor=args.ctm_plus,
         enable_prefix_caching=args.enable_prefix_caching,
         phase3_attention_capture=args.phase3_attention,
+        phase4_trig_calibration_path=args.phase4_trig_calibration,
+        phase4_window_interval=args.phase4_window_interval,
+        phase4_future_offsets=phase4_offsets,
         max_decode_tokens=args.max_decode_tokens,
     )
 

@@ -678,6 +678,9 @@ class CTMEvictorModern:
         block_size: int = 16,
         ctm_config: Optional[CTMvLLMConfig] = None,
         enable_logging: bool = False,
+        trig_scorer: Optional[Any] = None,
+        trig_score_weight: float = 0.30,
+        window_pruning_interval: int = 128,
     ) -> None:
         # Lazy import — kv_policy.attention_evictor is in this
         # package; this class is what we want to use directly
@@ -715,6 +718,37 @@ class CTMEvictorModern:
         # this list; runner aggregates p50/p99/total at end of
         # cell. Leave-empty list = no evict overhead reported.
         self._evict_timings: List[float] = []
+
+        # ---- Phase 4: trigonometric scoring ----
+        # When ``trig_scorer`` is set, evict() blends the policy's
+        # native score with a Phase-4 S_trig + S_norm contribution.
+        # Pre-RoPE K vectors per block must be supplied via
+        # set_block_pre_rope_keys() — populated by a runtime hook
+        # similar to Phase 3's attention capture but capturing the
+        # PRE-RoPE projection (output of the Q/K linear layers,
+        # before RoPE rotation). The hook implementation is GPU-only
+        # and lives in the streaming runner; here we only consume
+        # the captured vectors.
+        self._trig_scorer = trig_scorer
+        self._trig_score_weight = float(trig_score_weight)
+        # block_id -> list of (position, k_real, k_imag) tuples
+        self._block_pre_rope_keys: Dict[
+            int, List[Tuple[int, List[float], List[float]]]
+        ] = {}
+        # block_id -> (layer_idx, head_idx) — captured per-block at
+        # admission. For multi-layer / multi-head, the runner picks
+        # one layer for scoring (typically the last; see the design
+        # doc §3 for the simplification).
+        self._block_layer_head: Dict[int, Tuple[int, int]] = {}
+
+        # Window-based pruning state — separate from vLLM's
+        # allocator-driven evict() calls. The streaming runner
+        # checks this state after each decode batch and triggers a
+        # window-pruning pass if the interval threshold is hit.
+        from .triattention import WindowPruningState
+        self._window_state = WindowPruningState(
+            interval_tokens=int(window_pruning_interval)
+        )
 
     # ---- vLLM 0.7 Evictor ABC ----
 
@@ -883,6 +917,103 @@ class CTMEvictorModern:
     def get_stats(self) -> Dict:
         return self._policy.stats
 
+    # ---- Phase 4 API ----
+
+    def set_block_pre_rope_keys(
+        self,
+        block_id: int,
+        keys: List[Tuple[int, List[float], List[float]]],
+        layer: int = 0,
+        head: int = 0,
+    ) -> None:
+        """Store the pre-RoPE K vectors for one block.
+
+        Called by the runtime capture hook (GPU path). Each entry is
+        ``(absolute_position, k_real_per_band, k_imag_per_band)`` for
+        one token in the block.
+
+        ``layer`` and ``head`` identify which model (layer, head) the
+        captured vectors come from. Phase 4 default uses the last
+        layer's first head — see MODE_B_PHASE4_DESIGN.md §3 for the
+        single-layer simplification justification.
+        """
+        if block_id not in self._tracked:
+            return
+        self._block_pre_rope_keys[block_id] = list(keys)
+        self._block_layer_head[block_id] = (int(layer), int(head))
+
+    def trig_score_block(self, block_id: int) -> Optional[float]:
+        """Compute the Phase 4 trig+norm score for one block.
+
+        Returns ``None`` if no pre-RoPE keys are stored for this
+        block (capture didn't fire — Phase 4 falls back to the
+        native CTM+ score for that block). Returns a float
+        otherwise; higher = more important.
+        """
+        if self._trig_scorer is None:
+            return None
+        block_keys = self._block_pre_rope_keys.get(block_id)
+        if not block_keys:
+            return None
+        layer, head = self._block_layer_head.get(block_id, (0, 0))
+        from .triattention import aggregate_block_trig_score
+        return aggregate_block_trig_score(
+            scorer=self._trig_scorer,
+            layer=layer, head=head,
+            block_keys=block_keys,
+        )
+
+    def window_pruning_passed(self, decode_tokens_emitted: int) -> bool:
+        """Update the window-pruning state and return True if a
+        prune pass should fire now.
+
+        Streaming runner calls this after each decode-batch yield;
+        when True, the runner invokes
+        :meth:`window_pruning_pass` to score-and-prune.
+        """
+        from .triattention import window_pruning_decision
+        return window_pruning_decision(
+            self._window_state, decode_tokens_emitted,
+        )
+
+    def window_pruning_pass(self, target_blocks: int) -> int:
+        """Evict the lowest-trig-scoring blocks until tracked-block
+        count ≤ ``target_blocks``. Returns the number of blocks
+        evicted in this pass.
+
+        Skips blocks for which no pre-RoPE keys were captured
+        (those fall back to the next vLLM-driven evict() decision).
+        """
+        if self._trig_scorer is None or len(self._tracked) <= target_blocks:
+            return 0
+
+        scored: List[Tuple[float, int]] = []
+        for bid in list(self._tracked):
+            score = self.trig_score_block(bid)
+            if score is None:
+                continue
+            scored.append((score, bid))
+
+        if not scored:
+            return 0
+
+        scored.sort(key=lambda x: x[0])  # lowest first = first to evict
+        n_to_evict = max(0, len(self._tracked) - target_blocks)
+        evicted = 0
+        for _, bid in scored[:n_to_evict]:
+            try:
+                self.remove(bid)
+                self._block_pre_rope_keys.pop(bid, None)
+                self._block_layer_head.pop(bid, None)
+                evicted += 1
+            except Exception:
+                continue
+        return evicted
+
+    @property
+    def window_pruning_invocations(self) -> int:
+        return self._window_state.n_prune_invocations
+
 
 def _walk_modern_gpu_allocator(engine: Any) -> Any:
     """Walk a modern vLLM (0.5+) engine's allocator path and return
@@ -958,6 +1089,8 @@ def _walk_modern_gpu_allocator(engine: Any) -> Any:
 def patch_vllm_engine_modern(
     engine: Any,
     enable_logging: bool = False,
+    trig_scorer: Optional[Any] = None,
+    window_pruning_interval: int = 128,
 ) -> CTMEvictorModern:
     """Install CTMEvictorModern on a modern vLLM (0.5+) engine.
 
@@ -1031,6 +1164,8 @@ def patch_vllm_engine_modern(
         num_blocks_capacity=int(num_blocks),
         block_size=int(block_size),
         enable_logging=enable_logging,
+        trig_scorer=trig_scorer,
+        window_pruning_interval=window_pruning_interval,
     )
 
     # The replacement. After this, vLLM's

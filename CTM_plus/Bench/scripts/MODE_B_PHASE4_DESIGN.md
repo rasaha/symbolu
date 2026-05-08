@@ -1,9 +1,14 @@
 # Mode B Phase 4 — Trigonometric Position Scoring
 
-**Status:** design landed (May 2026). Implementation **not
-started** — estimated 5 days of code + 1 GPU-day for
-calibration + validation. Authorization required to start
-implementation.
+**Status:** **design + pure-Python implementation landed (May 2026).**
+The math, save/load, aggregation helpers, evictor integration,
+streaming-runner wiring, and CLI flags are all code-complete and
+CPU-tested (37 new tests, 237 total in Bench, 7 still skipped
+without torch). The GPU-only pieces — actual offline calibration
+(`calibrate_q_centers`) and the runtime pre-RoPE K capture hook
+inside vLLM — raise `NotImplementedError` with clear pointers.
+First GPU-day's work fills those in + runs the four-cell
+experiment.
 
 **Audience:** the engineer (possibly future-me) who will
 write the code. Conservative framing throughout: every
