@@ -775,7 +775,8 @@ risk.
 
 **Phase 1 (LRU swap-counter validation): code-complete + GPU-validated.**
 **Phase 2 (CTM+ on modern vLLM, no attention forwarding): code-complete; mocked-tests pass; GPU smoke not run (would produce ~LRU-equivalent results — see §1.1 audit-pass HIGH callout).**
-**Phase 3 (attention forwarding so CTM+'s real policy runs): code-complete; GPU validation pending.**
+**Phase 3 (attention forwarding so CTM+'s real policy runs): code-complete; GPU validation deferred pending Phase 4.**
+**Phase 4 (TriAttention-inspired trigonometric position scoring): design complete; implementation gated on authorization.**
 
 The streaming runner supports all three phases via flags
 (`--ctm-plus`, `--enable-prefix-caching`, `--phase3-attention`).

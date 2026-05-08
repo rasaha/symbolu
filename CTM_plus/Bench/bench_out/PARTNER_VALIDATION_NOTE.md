@@ -3,8 +3,9 @@
 **Audience:** prospective design partner evaluating CTM+ for an
 LLM-inference deployment.
 **Status:** safe to share; conservative framing throughout.
-**Last updated:** 2026-05-07 (revised after Phase 2 audit pass +
-Phase 3 attention-forwarding scaffolding).
+**Last updated:** 2026-05-08 (revised after Phase 2 audit pass +
+Phase 3 attention-forwarding scaffolding + TriAttention paper
+review + Phase 4 design).
 
 This note states what CTM+ has and has not been validated to
 do today, why a real-stack `vLLM` validation has not yet been
@@ -108,21 +109,59 @@ look like.
   is still defensible as "integration fires end-to-end with
   no silent failures," but is NOT defensible as "CTM+ vs
   LRU on a real model."
-* **Phase 3 (attention forwarding) code-complete in May 2026.**
-  `AttentionAggregator`, `CTMEvictorModern.forward_block_attention`,
-  `install_attention_capture`, the `--phase3-attention` flag,
-  AND the GPU-side Q@K-from-kv_cache extraction
-  (`_gpu_extract_decode_attention`) are all implemented and
-  unit-tested (22 new tests, 196 total). The extractor
-  targets vLLM 0.7's FlashAttention layout with defensive
-  shape validation that degrades to no-op + descriptive
-  warning on layout mismatch. **GPU validation pending —
-  the first GPU run will verify the layout assumptions hold
-  on production vLLM and produce the three-cell experiment
-  (LRU baseline / Phase 2 ablation / Phase 3 full CTM+).**
-  Estimated remaining cost: ~1 GPU-day (~$1) on RunPod
-  using the v4 hyperparameter regime that Phase 1 validated
-  engages swap.
+* **Phase 3 (attention forwarding) code-complete; GPU
+  validation deferred pending Phase 4 evaluation.**
+  Code-complete as of May 2026 (commit `b5e7f14` for the
+  Q@K extraction; `7b5df3f` for the timing instrumentation).
+  However, after reviewing the TriAttention paper
+  (arXiv:2604.04921, April 2026), the premise of Phase 3
+  is contested: TriAttention shows that pre-RoPE Q/K
+  geometry (not real attention scores) can drive eviction
+  decisions that beat attention-based methods on both
+  reasoning (AIME25) and general long-context (LongBench)
+  workloads, at much lower runtime cost. Running Phase 3's
+  GPU validation before evaluating the trig-based
+  alternative would commit to the wrong direction.
+* **Phase 4 (trigonometric position scoring) — design
+  complete.** A May 2026 design at
+  `scripts/MODE_B_PHASE4_DESIGN.md` adopts TriAttention's
+  pre-RoPE Q-center-based scoring as a new component in
+  CTM+'s scoring formula, while keeping CTM+'s structural
+  advantages (S3-FIFO admission for scan resistance,
+  online recency tracking, block-level vLLM integration).
+  Estimated implementation: ~5–6 days code + 1 GPU-day for
+  calibration + four-cell experiment (LRU baseline / Phase
+  2 ablation / Phase 4 trig / optional Phase 3 ablation).
+  Authorization required to start Phase 4 implementation.
+
+* **Acknowledged related work — TriAttention.** The
+  TriAttention paper (Mao et al., MIT/NVIDIA/ZJU, arXiv:
+  2604.04921) presents a pre-RoPE Q/K-concentration
+  observation that yields a static scoring signal
+  outperforming attention-based methods (SnapKV, R-KV,
+  H2O, LazyEviction) on AIME25, MATH 500, and LongBench.
+  Headline: 10.7× KV memory reduction, 2.5× throughput at
+  matched accuracy. CTM+'s differentiation in light of
+  this:
+  - **Admission policy.** S3-FIFO for scan resistance —
+    TriAttention has no admission policy; RAG one-shot
+    reads still pollute the cache without it. CTM+'s
+    Mode A −100% slow-tier-reads on RAG is admission-
+    driven, structurally orthogonal to TriAttention.
+  - **Online recency + access-frequency tracking.**
+    TriAttention's score is essentially static. CTM+
+    captures temporal access patterns (Markov-dwell on
+    agentic hot blocks).
+  - **Workload-conditional behavior validated on three
+    independent simulators** — Mode A, KVSimulator,
+    production-shape replay. TriAttention's headline
+    benchmarks are reasoning-task-heavy; CTM+'s
+    canonical workloads (chat/RAG/agentic) are partner-
+    relevant.
+  Phase 4 incorporates TriAttention's core insight (the
+  trigonometric distance-preference signal) into CTM+'s
+  scoring formula. See `papers/triattention_notes.md` for
+  paper notes + Phase 4 design rationale.
 * **Real-silicon swap-byte calibration.** Mode A's
   `avg_access_latency_ns` predictions and slow-tier byte
   counts have not been cross-checked against real swap-byte

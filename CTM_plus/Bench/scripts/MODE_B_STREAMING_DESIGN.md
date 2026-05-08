@@ -214,6 +214,21 @@ Tests added (3 new, total 174):
 
 ## §1.4 Phase 3 — attention forwarding (real attention into CTM+)
 
+> **DEFERRED (May 2026, post-TriAttention review).** Phase 3
+> code is complete (commits `b5e7f14`, `7b5df3f`). However,
+> after reviewing the TriAttention paper (arXiv:2604.04921),
+> the premise of Phase 3 — that we need real attention to
+> score correctly — is contested by stronger published results.
+> TriAttention shows that pre-RoPE Q/K geometry alone
+> outperforms attention-based scoring (SnapKV, R-KV, H2O) on
+> reasoning AND general long-context benchmarks, at much lower
+> runtime cost. Phase 4 (`MODE_B_PHASE4_DESIGN.md`)
+> incorporates the trig signal into CTM+. Phase 3 GPU
+> validation is paused pending the Phase 4 four-cell experiment;
+> if Phase 4 ≈ Phase 3 in outcomes, Phase 3 is dropped (cheaper).
+> If Phase 4 < Phase 3, Phase 3 GPU validation resumes as the
+> "real attention is irreplaceable for our workloads" finding.
+
 The Phase 2 audit surfaced that vLLM's Evictor ABC carries zero
 attention through `update(block_id, last_accessed)`, so CTM+'s
 0.35·attn term zeroes out and the policy collapses to ~LRU.
