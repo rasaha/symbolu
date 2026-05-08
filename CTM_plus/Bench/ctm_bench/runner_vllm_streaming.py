@@ -63,6 +63,25 @@ class StreamingRunCellResult:
     swap_out_blocks: int
     preemption_events: int
     counter_source: str = "vllm_streaming_async_swap"
+    # Derived throughput. ``tokens_per_second`` is
+    # ``n_decode_tokens / wall_clock_seconds`` when both are
+    # positive; 0.0 otherwise. Computed by the runner at end of
+    # cell so partner-facing comparisons can use it directly.
+    tokens_per_second: float = 0.0
+    # Per-evict timing — populated only for cells running through
+    # CTMEvictorModern (Phase 2 + Phase 3). LRU baseline cells
+    # leave these at zero (vLLM's native evictor is not in our
+    # control to time without further patches; aggregate
+    # tokens_per_second is the apples-to-apples runtime metric
+    # for those cells).
+    evict_call_count: int = 0
+    evict_total_seconds: float = 0.0
+    evict_p50_microseconds: float = 0.0
+    evict_p99_microseconds: float = 0.0
+    # Phase 3 attention-capture timing — populated only when
+    # phase3_attention_capture=True.
+    attention_capture_call_count: int = 0
+    attention_capture_total_seconds: float = 0.0
 
 
 # ---------------------------------------------------------------- #
@@ -907,6 +926,47 @@ class AsyncEngineDriver:
         wall = time.perf_counter() - start
         totals = sampler.totals()
 
+        # Per-evict timing (Phase 2/3 only — Phase 1 LRU baseline
+        # leaves these at zero since vLLM's native LRUEvictor is
+        # not in our control to time).
+        evict_timings: List[float] = []
+        if self._installed_evictor is not None:
+            evict_timings_method = getattr(
+                self._installed_evictor, "evict_timings_seconds", None,
+            )
+            if callable(evict_timings_method):
+                try:
+                    evict_timings = list(evict_timings_method())
+                except Exception:
+                    evict_timings = []
+
+        evict_p50_us, evict_p99_us = self._compute_p50_p99_microseconds(
+            evict_timings
+        )
+        evict_total_seconds = sum(evict_timings)
+        evict_call_count = len(evict_timings)
+
+        # Phase 3 attention-capture timing.
+        capture_timings: List[float] = []
+        if self._attention_aggregator is not None:
+            getter = getattr(
+                self._attention_aggregator, "capture_timings_seconds", None,
+            )
+            if callable(getter):
+                try:
+                    capture_timings = list(getter())
+                except Exception:
+                    capture_timings = []
+
+        attention_capture_total_seconds = sum(capture_timings)
+        attention_capture_call_count = len(capture_timings)
+
+        # Throughput.
+        if wall > 0 and n_decode_tokens > 0:
+            tokens_per_second = n_decode_tokens / wall
+        else:
+            tokens_per_second = 0.0
+
         return StreamingRunCellResult(
             workload_name=workload_name,
             policy_name=("ctm_plus" if self.ctm_plus_evictor else "lru"),
@@ -918,7 +978,41 @@ class AsyncEngineDriver:
             swap_in_blocks=int(totals["swap_in_blocks"]),
             swap_out_blocks=int(totals["swap_out_blocks"]),
             preemption_events=int(totals["preemption_events"]),
+            tokens_per_second=tokens_per_second,
+            evict_call_count=evict_call_count,
+            evict_total_seconds=evict_total_seconds,
+            evict_p50_microseconds=evict_p50_us,
+            evict_p99_microseconds=evict_p99_us,
+            attention_capture_call_count=attention_capture_call_count,
+            attention_capture_total_seconds=attention_capture_total_seconds,
         )
+
+    @staticmethod
+    def _compute_p50_p99_microseconds(
+        timings_seconds: List[float],
+    ) -> Tuple[float, float]:
+        """Compute (p50, p99) of a list of seconds, return as
+        microseconds. Uses linear interpolation between sorted
+        samples (no numpy dependency).
+
+        Returns (0.0, 0.0) for an empty list.
+        """
+        if not timings_seconds:
+            return (0.0, 0.0)
+        sorted_us = sorted(t * 1e6 for t in timings_seconds)
+        n = len(sorted_us)
+
+        def _percentile(p: float) -> float:
+            if n == 1:
+                return sorted_us[0]
+            # Linear interpolation, type-7 (R/numpy default).
+            rank = p * (n - 1)
+            lo = int(rank)
+            hi = min(lo + 1, n - 1)
+            frac = rank - lo
+            return sorted_us[lo] * (1 - frac) + sorted_us[hi] * frac
+
+        return (_percentile(0.50), _percentile(0.99))
 
 
 # ---------------------------------------------------------------- #

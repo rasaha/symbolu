@@ -709,6 +709,12 @@ class CTMEvictorModern:
         self._last_accessed: Dict[int, float] = {}
         self._tracked: Set[int] = set()
         self._enable_logging = enable_logging
+        # Per-evict timing — used by the streaming runner to
+        # diagnose CTM+'s runtime overhead vs LRU. Each call to
+        # evict() appends its wall-clock duration (seconds) to
+        # this list; runner aggregates p50/p99/total at end of
+        # cell. Leave-empty list = no evict overhead reported.
+        self._evict_timings: List[float] = []
 
     # ---- vLLM 0.7 Evictor ABC ----
 
@@ -823,28 +829,50 @@ class CTMEvictorModern:
         Raises ValueError if there are no tracked blocks (matches
         vLLM's LRUEvictor contract — vLLM expects this to raise rather
         than return None when the cache is empty).
+
+        Times each call (wall-clock seconds) into ``self._evict_timings``
+        so the streaming runner can report p50/p99 evict overhead at
+        end of cell.
         """
-        victims = self._policy.select_victims(count=1)
-        if not victims:
-            raise ValueError(
-                "CTMEvictorModern.evict() called with no tracked blocks. "
-                "vLLM should not call evict on an empty cache; this is "
-                "either a vLLM bug or a tracking-state divergence."
-            )
-        victim_id = victims[0]
-        content_hash = self._content_hash.pop(victim_id, 0)
-        self._num_hashed_tokens.pop(victim_id, None)
-        self._last_accessed.pop(victim_id, None)
-        self._tracked.discard(victim_id)
-        # Note: select_victims removed the block from the policy's
-        # internal `available` set already; we don't need to call
-        # evict_block again.
-        if self._enable_logging:
-            logger.debug(
-                "CTMEvictorModern: evicted block_id=%d content_hash=%d",
-                victim_id, content_hash,
-            )
-        return (victim_id, content_hash)
+        import time as _time
+        _t0 = _time.perf_counter()
+        try:
+            victims = self._policy.select_victims(count=1)
+            if not victims:
+                raise ValueError(
+                    "CTMEvictorModern.evict() called with no tracked blocks. "
+                    "vLLM should not call evict on an empty cache; this is "
+                    "either a vLLM bug or a tracking-state divergence."
+                )
+            victim_id = victims[0]
+            content_hash = self._content_hash.pop(victim_id, 0)
+            self._num_hashed_tokens.pop(victim_id, None)
+            self._last_accessed.pop(victim_id, None)
+            self._tracked.discard(victim_id)
+            # Note: select_victims removed the block from the policy's
+            # internal `available` set already; we don't need to call
+            # evict_block again.
+            if self._enable_logging:
+                logger.debug(
+                    "CTMEvictorModern: evicted block_id=%d content_hash=%d",
+                    victim_id, content_hash,
+                )
+            return (victim_id, content_hash)
+        finally:
+            self._evict_timings.append(_time.perf_counter() - _t0)
+
+    def evict_timings_seconds(self) -> List[float]:
+        """Return a snapshot of all per-evict durations recorded
+        so far (wall-clock seconds). Snapshot is a copy; callers
+        can sort/percentile without disturbing the live buffer.
+        """
+        return list(self._evict_timings)
+
+    def reset_evict_timings(self) -> None:
+        """Clear the per-evict timing buffer. Used by the runner
+        between cells when reusing an evictor across runs (not
+        the current pattern but supported)."""
+        self._evict_timings.clear()
 
     @property
     def num_blocks(self) -> int:
@@ -1106,6 +1134,12 @@ class AttentionAggregator:
             "blocks_flushed": 0,
             "flushes": 0,
         }
+        # Attention-capture timing. Each call to
+        # ``record_capture_time(seconds)`` appends here; the runner
+        # aggregates total + count at end of cell. Used to
+        # quantify Phase 3's per-token overhead independently of
+        # the swap-counter outcome.
+        self._capture_timings_seconds: List[float] = []
 
     def record_block_attention(
         self, block_id: int, weight: float,
@@ -1161,6 +1195,17 @@ class AttentionAggregator:
     @property
     def stats(self) -> Dict[str, int]:
         return dict(self._stats)
+
+    def record_capture_time(self, seconds: float) -> None:
+        """Record the wall-clock duration of one capture call
+        (one Attention.forward wrapped invocation)."""
+        if seconds < 0:
+            raise ValueError(f"capture time must be >= 0; got {seconds}")
+        self._capture_timings_seconds.append(float(seconds))
+
+    def capture_timings_seconds(self) -> List[float]:
+        """Snapshot of recorded capture durations."""
+        return list(self._capture_timings_seconds)
 
 
 def aggregate_attention_to_blocks(
@@ -1267,20 +1312,35 @@ def install_attention_capture(
             head_size = getattr(module, "head_dim", None)
 
         def make_wrapper(orig, head_dim, layer_name):
+            import time as _time
+
             def wrapped_forward(*args, **kwargs):
                 output = orig(*args, **kwargs)
+                _t0 = _time.perf_counter()
+                captured = False
                 try:
                     _capture_attention_to_aggregator(
                         args=args, kwargs=kwargs,
                         head_dim=head_dim,
                         aggregator=aggregator,
                     )
+                    captured = True
                 except Exception as exc:
                     if enable_logging:
                         logger.warning(
                             "attention capture failed in %s: %s",
                             layer_name, exc,
                         )
+                finally:
+                    # Always record timing — even failed captures
+                    # took some time; partner-facing diligence wants
+                    # the total Phase-3 overhead, not just successful
+                    # captures.
+                    _dt = _time.perf_counter() - _t0
+                    try:
+                        aggregator.record_capture_time(_dt)
+                    except Exception:
+                        pass
                 return output
             return wrapped_forward
 

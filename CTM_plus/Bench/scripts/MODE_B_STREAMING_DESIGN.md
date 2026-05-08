@@ -455,6 +455,52 @@ same RunPod session in one ~$1 sweep. The extractor handles
 the typical FlashAttention layout out of the box; the first
 GPU run will validate or surface specific drift.
 
+## §1.5 Timing instrumentation (May 2026)
+
+`StreamingRunCellResult` carries per-component timing so the
+three-cell experiment can answer: "does CTM+ slow eviction?
+does Phase 3 attention capture cost too much per token?"
+
+| Field | Populated by | LRU baseline | Phase 2 | Phase 3 |
+|---|---|:---:|:---:|:---:|
+| `tokens_per_second` | runner end-of-cell | ✓ | ✓ | ✓ |
+| `evict_call_count` | `CTMEvictorModern.evict()` per-call timestamp | 0 | ✓ | ✓ |
+| `evict_total_seconds` | sum of per-evict timings | 0.0 | ✓ | ✓ |
+| `evict_p50_microseconds` | type-7 percentile interpolation | 0.0 | ✓ | ✓ |
+| `evict_p99_microseconds` | type-7 percentile interpolation | 0.0 | ✓ | ✓ |
+| `attention_capture_call_count` | wrapped `Attention.forward` per-call timestamp | 0 | 0 | ✓ |
+| `attention_capture_total_seconds` | sum of capture timings | 0.0 | 0.0 | ✓ |
+
+**LRU baseline cell timing is intentionally zero.** vLLM's
+native `LRUEvictor.evict()` isn't in our control to time without
+further patches; aggregate `tokens_per_second` is the apples-to-
+apples runtime metric for those cells. To compare per-evict
+overhead specifically, look at the Phase 2 vs Phase 3 cells —
+both run through `CTMEvictorModern` so their per-evict timings
+are directly comparable, and the delta between them isolates
+the attention-aware-scoring overhead from the
+recency+frequency-only path.
+
+**What the partner-grade comparison table looks like:**
+
+| Cell | tokens/sec | evict p99 (μs) | attn capture (s) | swap_out blocks |
+|---|---:|---:|---:|---:|
+| LRU baseline | (high) | n/a | 0 | (high) |
+| Phase 2 ablation | ? | ? | 0 | ? |
+| Phase 3 full CTM+ | ? | ? | ? | (lowest) |
+
+A successful Phase 3 GPU run produces this table; partners
+read three things at once — does CTM+ help cache outcomes
+(`swap_out`), does it cost throughput (`tokens/sec`), where
+does the cost live (`evict p99` vs `attn capture`).
+
+Tests added (11 new): per-evict timing capture, even on
+failure-path; aggregator capture-time recording with
+input-validation; install_attention_capture timing-on-every-call
+invariant; p50/p99 percentile math (basic, empty, single-value
+edge cases); `StreamingRunCellResult` field defaults; Phase 2
+end-to-end run populates `tokens_per_second`.
+
 ## §1.3 Phase 2 GPU run procedure
 
 When ready for GPU validation, the smoke command is the same as
