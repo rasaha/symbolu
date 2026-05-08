@@ -546,54 +546,729 @@ def window_pruning_decision(
 # --------------------------------------------------------------------- #
 
 
+# --------------------------------------------------------------------- #
+# GPU-side calibration + runtime pre-RoPE K capture
+# --------------------------------------------------------------------- #
+
+
+def _walk_rotary_emb_modules(model: Any):
+    """Yield (layer_index, rotary_emb_module) pairs for every
+    rotary positional-embedding module in the model.
+
+    Identification heuristics (avoids importing vllm here so the
+    function is CPU-importable):
+
+    * Class name contains "Rotary" / "RoPE" / "RotaryEmbedding".
+    * Has a callable ``forward`` taking at least 3 args
+      (positions, query, key).
+
+    Layer indexing is by document-order traversal of the model's
+    ``named_modules()`` — the n-th rotary module found maps to
+    layer index n. This works for transformer stacks where each
+    layer has one rotary_emb. Models with nested or multi-rotary
+    structures (rare) may need a model-specific override.
+    """
+    layer_idx = 0
+    if hasattr(model, "named_modules"):
+        modules_iter = model.named_modules()
+    else:
+        # Fallback for tests with simple objects (no nn.Module).
+        # Walk attributes shallowly — no recursion.
+        modules_iter = (
+            (name, getattr(model, name))
+            for name in dir(model)
+            if not name.startswith("_")
+        )
+    for name, module in modules_iter:
+        cls = type(module).__name__
+        if any(k in cls for k in ("Rotary", "RoPE")):
+            yield layer_idx, name, module
+            layer_idx += 1
+
+
+@dataclass
+class _RunningQStats:
+    """Per-(head, band) running statistics. Internal helper."""
+
+    sum_real: List[List[float]]   # [head][band]
+    sum_imag: List[List[float]]
+    sum_norm: List[List[float]]
+    count: List[List[int]]
+
+    @classmethod
+    def empty(cls, num_heads: int, num_bands: int) -> "_RunningQStats":
+        return cls(
+            sum_real=[[0.0] * num_bands for _ in range(num_heads)],
+            sum_imag=[[0.0] * num_bands for _ in range(num_heads)],
+            sum_norm=[[0.0] * num_bands for _ in range(num_heads)],
+            count=[[0] * num_bands for _ in range(num_heads)],
+        )
+
+    def add_batch(
+        self,
+        q_real: Any,
+        q_imag: Any,
+        q_norm: Any,
+    ) -> None:
+        """Accumulate a [num_tokens, num_heads, num_bands] batch.
+        ``q_*`` are torch.Tensor or numpy arrays on CPU."""
+        # Sum across the token dimension into per-(head, band) totals.
+        # Tolerates either torch tensors or python lists.
+        try:
+            sums_real = q_real.sum(dim=0).tolist()
+            sums_imag = q_imag.sum(dim=0).tolist()
+            sums_norm = q_norm.sum(dim=0).tolist()
+            n_tokens = q_real.shape[0]
+        except AttributeError:
+            # numpy fallback
+            sums_real = q_real.sum(axis=0).tolist()
+            sums_imag = q_imag.sum(axis=0).tolist()
+            sums_norm = q_norm.sum(axis=0).tolist()
+            n_tokens = q_real.shape[0]
+
+        num_heads = len(self.sum_real)
+        num_bands = len(self.sum_real[0]) if num_heads else 0
+        for h in range(num_heads):
+            for f in range(num_bands):
+                self.sum_real[h][f] += float(sums_real[h][f])
+                self.sum_imag[h][f] += float(sums_imag[h][f])
+                self.sum_norm[h][f] += float(sums_norm[h][f])
+                self.count[h][f] += int(n_tokens)
+
+    def finalise(self) -> Tuple[
+        List[List[float]], List[List[float]], List[List[float]],
+    ]:
+        """Return (e_q_real, e_q_imag, e_q_norm) means."""
+        num_heads = len(self.sum_real)
+        num_bands = len(self.sum_real[0]) if num_heads else 0
+        e_real: List[List[float]] = []
+        e_imag: List[List[float]] = []
+        e_norm: List[List[float]] = []
+        for h in range(num_heads):
+            row_re: List[float] = []
+            row_im: List[float] = []
+            row_no: List[float] = []
+            for f in range(num_bands):
+                n = max(1, self.count[h][f])
+                row_re.append(self.sum_real[h][f] / n)
+                row_im.append(self.sum_imag[h][f] / n)
+                row_no.append(self.sum_norm[h][f] / n)
+            e_real.append(row_re)
+            e_imag.append(row_im)
+            e_norm.append(row_no)
+        return e_real, e_imag, e_norm
+
+
+def _split_q_into_complex_pairs(
+    q_tensor: Any,
+    num_heads: int,
+    head_dim: int,
+) -> Tuple[Any, Any, Any]:
+    """Convert a Q tensor [num_tokens, num_heads * head_dim] to
+    (q_real, q_imag, q_norm) shaped [num_tokens, num_heads, num_bands]
+    where num_bands = head_dim // 2.
+
+    RoPE pairs adjacent dimensions: dim 2f is the real part, dim
+    2f+1 is the imaginary part of frequency band f. Returns
+    detached CPU tensors (caller may convert to numpy / lists for
+    the running aggregator).
+    """
+    import torch  # type: ignore
+
+    if not isinstance(q_tensor, torch.Tensor):
+        raise TypeError(
+            f"_split_q_into_complex_pairs expects torch.Tensor; "
+            f"got {type(q_tensor).__name__}"
+        )
+    if q_tensor.dim() != 2:
+        raise ValueError(
+            f"q_tensor must be 2D [num_tokens, num_heads*head_dim]; "
+            f"got shape {tuple(q_tensor.shape)}"
+        )
+    total_dim = q_tensor.shape[-1]
+    if total_dim != num_heads * head_dim:
+        raise ValueError(
+            f"q_tensor last dim {total_dim} != num_heads*head_dim "
+            f"({num_heads}*{head_dim} = {num_heads * head_dim})"
+        )
+    if head_dim % 2 != 0:
+        raise ValueError(
+            f"head_dim must be even (RoPE pairs adjacent dims); "
+            f"got {head_dim}"
+        )
+    num_tokens = q_tensor.shape[0]
+    num_bands = head_dim // 2
+    # Reshape: [tokens, heads, head_dim] -> [tokens, heads, bands, 2]
+    reshaped = q_tensor.detach().to("cpu").float().view(
+        num_tokens, num_heads, num_bands, 2,
+    )
+    q_real = reshaped[..., 0]   # [tokens, heads, bands]
+    q_imag = reshaped[..., 1]
+    q_norm = (q_real * q_real + q_imag * q_imag).sqrt()
+    return q_real, q_imag, q_norm
+
+
 def calibrate_q_centers(
     *,
     model: Any,
-    calibration_token_ids: Any,
+    forward_callable: Any,
     model_name: str,
+    num_heads: int,
+    head_dim: int,
     rope_theta: float = 10000.0,
     corpus_label: str = "unspecified",
     max_tokens: int = 100_000,
+    num_kv_heads: Optional[int] = None,
 ) -> QCenterStats:
     """Offline calibration: collect per-(layer, head, band) Q
     statistics from the model.
 
-    **GPU + torch + a real model required.** On a CPU-only sandbox
-    this raises NotImplementedError pointing at the GPU runbook.
-    The algorithm:
+    **GPU + torch + a real model required.** On hosts without
+    torch, this function will fail at the ``import torch`` line
+    inside its helpers.
 
-    1. Hook every Attention layer's pre-RoPE Q projection. Capture
-       Q tensors after the linear projection but BEFORE RoPE
-       rotation.
-    2. Run forward passes on ``calibration_token_ids`` until
-       ``max_tokens`` accumulated. Per (layer, head, band), maintain
-       running E[q_f] (complex mean) and E[‖q_f‖] (scalar mean).
-    3. Pack into a :class:`QCenterStats` and return.
+    Algorithm (per the design doc §4):
+
+    1. Walk ``model.named_modules()`` for rotary-positional-
+       embedding modules (identified by class name containing
+       "Rotary" or "RoPE"). The n-th such module is layer n.
+    2. Register a ``forward_pre_hook`` on each rotary_emb. The
+       pre-hook receives ``(positions, q, k)`` BEFORE rotation
+       — exactly the pre-RoPE Q vectors we need.
+    3. Run forward passes via ``forward_callable(model)`` —
+       caller supplies a closure that drives the model with
+       calibration data. Every hook firing accumulates
+       per-(layer, head, band) running sums of (real, imag, norm).
+    4. Stop when total observed tokens ≥ ``max_tokens``. Per
+       paper Table F, 50K-200K tokens is plenty for stable
+       statistics.
+    5. Finalise to mean E[q_f] (complex) and E[‖q_f‖] (scalar)
+       per (layer, head, band). Pack into QCenterStats.
 
     Args:
-        model: a torch.nn.Module — the model whose layers will be
-            hooked. Must expose ``Attention`` modules with the
-            standard Q linear projection.
-        calibration_token_ids: a tensor or iterable of token id
-            sequences to feed through the model.
-        model_name: identifier saved in the stats; used at engine
-            init to verify the cache matches the model.
+        model: ``torch.nn.Module`` — the model to hook. Must
+            expose RotaryEmbedding-like modules.
+        forward_callable: a function ``f(model)`` that drives
+            the model on calibration data. Caller's
+            responsibility (e.g., iterate over a calibration
+            corpus, calling ``model.forward(input_ids)`` for
+            each batch).
+        model_name: identifier saved in the stats; verified at
+            engine init.
+        num_heads, head_dim: model architecture parameters
+            (used to reshape Q correctly). num_bands = head_dim/2.
         rope_theta: RoPE θ; usually 10000.
-        corpus_label: free-form label saved with the stats for
-            audit-trail.
-        max_tokens: stop after seeing this many tokens. Per the
-            paper (Table F), 50K is plenty for stable statistics.
+        corpus_label: free-form label saved with the stats.
+        max_tokens: stop after this many tokens accumulated.
+        num_kv_heads: GQA / MLA — KV heads per layer. Defaults
+            to num_heads (vanilla MHA).
 
     Returns:
         QCenterStats ready to pass to a TrigScorer.
+
+    First-GPU-run diagnostic notes:
+
+    * If 0 rotary modules are found, the model's class names may
+      not contain "Rotary" / "RoPE". Inspect with
+      ``[type(m).__name__ for _, m in model.named_modules()]``
+      and either rename or extend ``_walk_rotary_emb_modules``.
+    * If hook firings yield Q tensors with unexpected shapes,
+      the rotary_emb's forward signature differs from
+      ``(positions, q, k)`` — check the wrapping layer's source.
+    * If statistics look uniform (R near 0 across all bands),
+      the calibration data may be too small or biased. Per
+      paper Table F, even Google homepage HTML works as
+      calibration data; if HTML doesn't produce stable stats,
+      the hook isn't seeing real Q vectors.
     """
-    raise NotImplementedError(
-        "calibrate_q_centers requires torch + a real model + a real "
-        "GPU. The pure-Python pieces of Phase 4 (TrigScorer, "
-        "QCenterStats, aggregate_block_trig_score, "
-        "gqa_normalize_then_max, window_pruning_decision) are "
-        "implemented and CPU-tested; this function is the GPU-only "
-        "offline calibration step. See "
-        "MODE_B_PHASE4_DESIGN.md §4 for the full pipeline spec and "
-        "the GPU runbook for the calibration command."
+    import torch  # type: ignore  # noqa
+
+    if num_kv_heads is None:
+        num_kv_heads = num_heads
+    num_bands = head_dim // 2
+    if num_bands * 2 != head_dim:
+        raise ValueError(
+            f"head_dim must be even; got {head_dim}"
+        )
+
+    rotary_modules: List[Tuple[int, str, Any]] = list(
+        _walk_rotary_emb_modules(model)
     )
+    if not rotary_modules:
+        raise RuntimeError(
+            "calibrate_q_centers found 0 rotary_emb modules in "
+            "the model. The walker matches class names containing "
+            "'Rotary' or 'RoPE'; if your model uses a different "
+            "naming convention, extend _walk_rotary_emb_modules. "
+            "See MODE_B_PHASE4_DESIGN.md §4 for diagnostics."
+        )
+
+    num_layers = len(rotary_modules)
+    logger.info(
+        "calibrate_q_centers: found %d rotary_emb modules", num_layers,
+    )
+
+    per_layer_stats: List[_RunningQStats] = [
+        _RunningQStats.empty(num_heads, num_bands)
+        for _ in range(num_layers)
+    ]
+    tokens_seen = 0
+    handles = []
+
+    def make_hook(layer_idx: int):
+        def pre_hook(module, inputs):
+            nonlocal tokens_seen
+            if tokens_seen >= max_tokens:
+                return  # stop accumulating
+            # Standard rotary_emb forward signature:
+            #   forward(positions, query, key) -> (rotated_q, rotated_k)
+            # The pre-hook receives (positions, query, key) as inputs.
+            if len(inputs) < 3:
+                return
+            _positions, query, _key = inputs[:3]
+            try:
+                q_real, q_imag, q_norm = _split_q_into_complex_pairs(
+                    query, num_heads=num_heads, head_dim=head_dim,
+                )
+            except (ValueError, TypeError) as exc:
+                logger.warning(
+                    "layer %d Q reshape failed: %s", layer_idx, exc,
+                )
+                return
+            per_layer_stats[layer_idx].add_batch(q_real, q_imag, q_norm)
+            tokens_seen += int(query.shape[0])
+        return pre_hook
+
+    for layer_idx, _name, module in rotary_modules:
+        h = module.register_forward_pre_hook(make_hook(layer_idx))
+        handles.append(h)
+
+    try:
+        forward_callable(model)
+    finally:
+        for h in handles:
+            h.remove()
+
+    # Finalise: per-layer means.
+    e_q_real: List[List[List[float]]] = []
+    e_q_imag: List[List[List[float]]] = []
+    e_q_norm: List[List[List[float]]] = []
+    for stats in per_layer_stats:
+        re_layer, im_layer, no_layer = stats.finalise()
+        e_q_real.append(re_layer)
+        e_q_imag.append(im_layer)
+        e_q_norm.append(no_layer)
+
+    return QCenterStats.from_lists(
+        model_name=model_name,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        num_kv_heads=num_kv_heads,
+        head_dim=head_dim,
+        e_q_real=e_q_real,
+        e_q_imag=e_q_imag,
+        e_q_norm=e_q_norm,
+        rope_theta=rope_theta,
+        calibration_token_count=tokens_seen,
+        calibration_corpus=corpus_label,
+    )
+
+
+def install_pre_rope_capture(
+    *,
+    model: Any,
+    evictor: Any,
+    layer_for_scoring: Optional[int] = None,
+    head_for_scoring: int = 0,
+    enable_logging: bool = False,
+) -> int:
+    """Install runtime hooks that capture pre-RoPE K vectors per
+    block and push them to the evictor.
+
+    Hooks every rotary_emb's ``forward_pre_hook``. The pre-hook
+    receives ``(positions, query, key)`` BEFORE rotation; we read
+    K (untouched), reshape to per-band complex pairs, identify
+    which decode tokens belong to which blocks via
+    ``attn_metadata.slot_mapping`` (carried alongside the
+    forward), and call
+    ``evictor.set_block_pre_rope_keys(block_id, keys, layer, head)``.
+
+    Returns the number of layers patched. 0 + a warning if no
+    rotary modules found.
+
+    Args:
+        model: torch.nn.Module — the model whose layers are
+            hooked.
+        evictor: a CTMEvictorModern instance with
+            ``set_block_pre_rope_keys`` available.
+        layer_for_scoring: which layer's K vectors to push to
+            the evictor. Phase 4's design uses one layer
+            (typically last) for scoring; default ``None``
+            captures from EVERY layer (the evictor will overwrite
+            per-block as later layers fire). For deterministic
+            behaviour, pass an explicit layer index — typically
+            ``num_layers - 1``.
+        head_for_scoring: which (KV-head-aligned) head to use.
+            Default 0.
+        enable_logging: log per-firing diagnostics on warnings.
+
+    The runtime hook is intentionally lightweight: per call,
+    O(num_decode_tokens × num_bands) Python work. The slot_mapping
+    walk is the only allocation hot-path; we use plain Python for
+    portability. If profiling shows it as a bottleneck, switch to
+    numpy-vectorised aggregation here.
+
+    Layout assumptions (defensive — first GPU run validates):
+
+    * ``key`` argument is shape
+      ``[num_tokens, num_kv_heads * head_dim]``.
+    * ``attn_metadata`` is reachable from the same forward call
+      OR via a captured closure variable. If we can't find
+      ``slot_mapping``, we degrade to "no per-block capture"
+      and Phase 4 falls back to Phase 2 scoring on a per-block
+      basis (untracked blocks score None, get skipped by
+      ``window_pruning_pass``).
+
+    See MODE_B_PHASE4_DESIGN.md §5 for the GPU validation
+    procedure.
+    """
+    import torch  # type: ignore  # noqa: F401
+
+    rotary_modules: List[Tuple[int, str, Any]] = list(
+        _walk_rotary_emb_modules(model)
+    )
+    if not rotary_modules:
+        logger.warning(
+            "install_pre_rope_capture: no rotary_emb modules "
+            "found. Phase 4 K capture will be a no-op; Phase 4 "
+            "scoring will fall back to per-block None (skipped "
+            "by window_pruning_pass). Inspect model module "
+            "names; see MODE_B_PHASE4_DESIGN.md §5."
+        )
+        return 0
+
+    num_layers = len(rotary_modules)
+    target_layer = (
+        num_layers - 1 if layer_for_scoring is None
+        else int(layer_for_scoring)
+    )
+
+    # Attempt to locate the model's KV head dim from one of the
+    # attention layers. Best-effort; if we can't find it, the
+    # hook will derive it from the K tensor's shape.
+    inferred_kv_head_dim: Optional[int] = None
+    if hasattr(model, "named_modules"):
+        for name, module in model.named_modules():
+            cls = type(module).__name__
+            if "Attention" in cls or "Attn" in cls:
+                hd = (
+                    getattr(module, "head_size", None)
+                    or getattr(module, "head_dim", None)
+                )
+                if hd:
+                    inferred_kv_head_dim = int(hd)
+                    break
+
+    def make_hook(layer_idx: int):
+        def pre_hook(module, inputs):
+            if layer_idx != target_layer:
+                return
+            try:
+                _capture_pre_rope_k_to_evictor(
+                    inputs=inputs,
+                    evictor=evictor,
+                    layer=layer_idx,
+                    head=head_for_scoring,
+                    inferred_head_dim=inferred_kv_head_dim,
+                )
+            except Exception as exc:
+                if enable_logging:
+                    logger.warning(
+                        "pre-RoPE K capture failed at layer %d: %s",
+                        layer_idx, exc,
+                    )
+        return pre_hook
+
+    n_patched = 0
+    for layer_idx, _name, module in rotary_modules:
+        module.register_forward_pre_hook(make_hook(layer_idx))
+        n_patched += 1
+
+    logger.info(
+        "install_pre_rope_capture: hooked %d layers (scoring layer=%d, "
+        "head=%d)",
+        n_patched, target_layer, head_for_scoring,
+    )
+    return n_patched
+
+
+def install_attn_metadata_side_channel(
+    *,
+    model: Any,
+    evictor: Any,
+    enable_logging: bool = False,
+) -> int:
+    """Install hooks on every Attention layer that stash
+    ``attn_metadata.slot_mapping`` + ``num_decode_tokens`` on the
+    evictor BEFORE each rotary_emb pre-hook fires.
+
+    The pre-RoPE K capture hook (:func:`install_pre_rope_capture`)
+    needs to know which decode token writes to which block. That
+    information lives on ``attn_metadata`` which the rotary_emb
+    pre-hook does not directly see. This function installs a
+    sibling hook on ``Attention.forward`` that captures
+    attn_metadata and stashes the relevant fields on the
+    evictor as ``_phase4_pending_*`` side-channel attributes.
+
+    Order of operations within one ``Attention.forward`` call:
+
+    1. The Attention pre-hook fires first (registered here).
+       Stashes slot_mapping + num_decode_tokens on the evictor.
+    2. Inside Attention.forward, q_proj + k_proj run.
+    3. rotary_emb.forward is invoked → its pre-hook fires
+       (registered by :func:`install_pre_rope_capture`). Reads
+       the stashed side-channel + the K tensor; calls
+       ``evictor.set_block_pre_rope_keys``.
+    4. Side-channel is cleared at the END of Attention.forward
+       (post-hook) so stale state doesn't leak across layers.
+
+    Returns the number of Attention layers patched. 0 with a
+    warning if no Attention modules found.
+    """
+    try:
+        import torch  # type: ignore  # noqa: F401
+    except ImportError:
+        logger.warning(
+            "install_attn_metadata_side_channel needs torch; not "
+            "installed."
+        )
+        return 0
+
+    n_patched = 0
+    for name, module in _walk_attention_modules(model):
+        h_pre = module.register_forward_pre_hook(
+            _make_attn_metadata_pre_hook(evictor, name, enable_logging)
+        )
+        h_post = module.register_forward_hook(
+            _make_attn_metadata_post_hook(evictor)
+        )
+        # Hold the handles on the evictor itself so they aren't
+        # garbage collected.
+        existing = getattr(evictor, "_phase4_handles", None)
+        if existing is None:
+            existing = []
+            evictor._phase4_handles = existing
+        existing.append(h_pre)
+        existing.append(h_post)
+        n_patched += 1
+
+    if n_patched == 0:
+        logger.warning(
+            "install_attn_metadata_side_channel: no Attention "
+            "modules found. Phase 4 K capture will be a no-op; "
+            "Phase 4 scoring falls back to per-block None "
+            "(skipped by window_pruning_pass)."
+        )
+    return n_patched
+
+
+def _walk_attention_modules(model: Any):
+    """Yield (name, module) for every vLLM Attention layer.
+    Same identification heuristic as
+    install_attention_capture (Phase 3) — class name 'Attention'
+    or 'PagedAttention'."""
+    if hasattr(model, "named_modules"):
+        for name, module in model.named_modules():
+            cls = type(module).__name__
+            if cls in ("Attention", "PagedAttention"):
+                yield name, module
+            elif (
+                hasattr(module, "head_size") or hasattr(module, "head_dim")
+            ) and hasattr(module, "num_heads") and hasattr(module, "forward"):
+                yield name, module
+
+
+def _make_attn_metadata_pre_hook(evictor, name, enable_logging):
+    def pre_hook(module, args, kwargs=None):
+        # Attention.forward signatures vary across vLLM versions:
+        #   forward(query, key, value, kv_cache, attn_metadata)
+        #   forward(query, key, value, attn_metadata, ...)
+        # We try positional first, then kwargs. attn_metadata is
+        # identified by having a ``slot_mapping`` attribute.
+        attn_metadata = None
+        for candidate in args:
+            if hasattr(candidate, "slot_mapping"):
+                attn_metadata = candidate
+                break
+        if attn_metadata is None and kwargs:
+            for candidate in kwargs.values():
+                if hasattr(candidate, "slot_mapping"):
+                    attn_metadata = candidate
+                    break
+        if attn_metadata is None:
+            if enable_logging:
+                logger.warning(
+                    "phase4 side-channel: no attn_metadata in %s "
+                    "forward args", name,
+                )
+            return
+        try:
+            evictor._phase4_pending_slot_mapping = (
+                attn_metadata.slot_mapping
+            )
+            evictor._phase4_pending_num_decode_tokens = int(
+                getattr(attn_metadata, "num_decode_tokens", 0)
+            )
+        except Exception as exc:
+            if enable_logging:
+                logger.warning(
+                    "phase4 side-channel stash failed: %s", exc,
+                )
+    return pre_hook
+
+
+def _make_attn_metadata_post_hook(evictor):
+    def post_hook(module, inputs, output):
+        # Clear side-channel after the layer so stale state from
+        # one layer doesn't leak to the next.
+        try:
+            evictor._phase4_pending_slot_mapping = None
+            evictor._phase4_pending_num_decode_tokens = 0
+        except Exception:
+            pass
+    return post_hook
+
+
+def _capture_pre_rope_k_to_evictor(
+    *,
+    inputs: tuple,
+    evictor: Any,
+    layer: int,
+    head: int,
+    inferred_head_dim: Optional[int],
+) -> None:
+    """Per-call work for the runtime pre-RoPE K capture hook.
+
+    Inputs are the rotary_emb forward_pre_hook's args:
+    ``(positions, query, key, ...)``. We ignore query (only K
+    matters for the evictor's score-block API).
+
+    Block identification: vLLM threads ``attn_metadata`` through
+    via module-attached state OR via the hook's closure (we don't
+    have direct access to attn_metadata from the rotary_emb hook).
+    Best-effort: read ``module.attn_metadata`` if vLLM stashes
+    it there; otherwise look for a side-channel attribute on the
+    evictor itself (set by a separate hook that DOES see
+    attn_metadata).
+
+    Production GPU run will likely need to combine this hook
+    with a second hook on the Attention layer that stashes
+    attn_metadata for the rotary_emb hook to read. The first
+    GPU validation will surface this; the design accommodates
+    a follow-up that wires the connection.
+
+    For the initial implementation we accept that without
+    attn_metadata access, K capture is a no-op (no block_id
+    mapping). The defensive try/except in install_pre_rope_capture
+    surfaces this as a "no per-block capture" warning.
+    """
+    import torch  # type: ignore
+
+    if len(inputs) < 3:
+        raise ValueError(
+            f"rotary_emb forward expects (positions, q, k); got "
+            f"{len(inputs)} args"
+        )
+    positions, _query, key = inputs[:3]
+    if not isinstance(key, torch.Tensor):
+        raise TypeError(
+            f"key must be torch.Tensor; got {type(key).__name__}"
+        )
+    if key.dim() != 2:
+        raise ValueError(
+            f"key must be 2D [num_tokens, num_kv_heads*head_dim]; "
+            f"got shape {tuple(key.shape)}"
+        )
+
+    # Look for slot_mapping side-channel. The streaming runner
+    # patches Attention.forward to stash attn_metadata where this
+    # hook can find it (see runner_vllm_streaming.py).
+    slot_mapping = getattr(evictor, "_phase4_pending_slot_mapping", None)
+    block_size = getattr(evictor, "_block_size", 16)
+    if slot_mapping is None:
+        # No attn_metadata side-channel. Skip silently — the
+        # outer hook's try/except logs once if enable_logging.
+        return
+
+    # Number of decode tokens to capture. The runner's outer hook
+    # also stashes the count.
+    num_decode_tokens = getattr(
+        evictor, "_phase4_pending_num_decode_tokens", 0,
+    )
+    if num_decode_tokens <= 0:
+        return
+
+    # Determine head_dim from the K tensor.
+    total_dim = key.shape[-1]
+    if inferred_head_dim is not None:
+        head_dim = inferred_head_dim
+    else:
+        # Best-effort: assume a single KV head for derivation.
+        head_dim = total_dim
+    if head_dim % 2 != 0:
+        raise ValueError(
+            f"head_dim must be even (RoPE pairs adjacent dims); "
+            f"got {head_dim}"
+        )
+    num_kv_heads = max(1, total_dim // head_dim)
+    num_bands = head_dim // 2
+
+    # Slice the decode portion of K.
+    num_tokens = key.shape[0]
+    decode_start = num_tokens - num_decode_tokens
+    if decode_start < 0:
+        return
+    decode_key = key[decode_start:].detach().to("cpu").float()
+    # Reshape: [decode_tokens, num_kv_heads, num_bands, 2]
+    decode_key = decode_key.view(
+        num_decode_tokens, num_kv_heads, num_bands, 2,
+    )
+    # Slice to head 0 (TriAttention's KV-head-aligned simplification).
+    head_k = decode_key[:, 0, :, :]   # [decode_tokens, num_bands, 2]
+    k_real_per_token = head_k[..., 0].tolist()
+    k_imag_per_token = head_k[..., 1].tolist()
+
+    # slot_mapping is shape [num_tokens] of slot indices (block_id *
+    # block_size + offset). Slice the decode portion.
+    if hasattr(slot_mapping, "tolist"):
+        slot_list = slot_mapping[decode_start:].tolist()
+    else:
+        slot_list = list(slot_mapping)[decode_start:]
+
+    if hasattr(positions, "tolist"):
+        pos_list = positions[decode_start:].tolist()
+    else:
+        pos_list = list(positions)[decode_start:]
+
+    # Group per block.
+    per_block: Dict[int, List[Tuple[int, List[float], List[float]]]] = {}
+    for tok_idx in range(num_decode_tokens):
+        slot = int(slot_list[tok_idx])
+        if slot < 0:
+            continue
+        block_id = slot // block_size
+        position = int(pos_list[tok_idx])
+        per_block.setdefault(block_id, []).append(
+            (position, list(k_real_per_token[tok_idx]),
+             list(k_imag_per_token[tok_idx])),
+        )
+
+    for block_id, keys in per_block.items():
+        try:
+            evictor.set_block_pre_rope_keys(
+                block_id=block_id, keys=keys,
+                layer=layer, head=head,
+            )
+        except Exception:
+            # Block may already have been evicted; skip silently.
+            continue

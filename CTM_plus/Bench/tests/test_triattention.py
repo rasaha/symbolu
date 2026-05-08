@@ -461,20 +461,406 @@ def test_window_pruning_decision_counts_invocations():
 # ------------------------------------------------------------------ #
 
 
-def test_calibrate_q_centers_raises_not_implemented():
-    """The calibration entry-point is GPU-only. CPU-only hosts get a
-    clear NotImplementedError pointing at the design doc / runbook."""
+def _torch_or_skip():
+    """Return torch module or skip the test if torch isn't installed."""
+    try:
+        import torch  # noqa: F401
+        return __import__("torch")
+    except ImportError:
+        pytest.skip("torch not installed; Phase 4 GPU-path test skipped")
+
+
+def test_calibrate_q_centers_raises_when_no_rotary_modules():
+    """If the model has no rotary_emb modules, calibration fails
+    fast with a diagnostic RuntimeError naming
+    MODE_B_PHASE4_DESIGN.md §4. (Replaces the prior
+    NotImplementedError stub test now that calibration is
+    implemented.)"""
+    _torch_or_skip()
     from kv_policy.triattention import calibrate_q_centers
 
-    with pytest.raises(NotImplementedError) as exc:
+    class EmptyModel:
+        # No rotary modules anywhere.
+        def named_modules(self):
+            yield from []
+
+    def fake_forward(model):
+        pass
+
+    with pytest.raises(RuntimeError) as exc:
         calibrate_q_centers(
-            model=None,
-            calibration_token_ids=None,
-            model_name="dummy",
+            model=EmptyModel(),
+            forward_callable=fake_forward,
+            model_name="empty_test",
+            num_heads=2, head_dim=4,
         )
     msg = str(exc.value)
-    assert "GPU" in msg
+    assert "rotary_emb" in msg
     assert "MODE_B_PHASE4_DESIGN.md" in msg
+
+
+def test_walk_rotary_emb_modules_finds_by_class_name():
+    """Class-name heuristic: modules with 'Rotary' or 'RoPE' in
+    their type name are picked up. Other modules ignored."""
+    from kv_policy.triattention import _walk_rotary_emb_modules
+
+    class RotaryEmbedding:
+        def forward(self, positions, q, k):
+            return q, k
+
+    class Rotary:
+        # Also matches.
+        def forward(self, positions, q, k):
+            return q, k
+
+    class RoPEModule:
+        def forward(self, positions, q, k):
+            return q, k
+
+    class MLP:
+        def forward(self, x):
+            return x
+
+    class Model:
+        def named_modules(self):
+            yield "layer0.rotary", RotaryEmbedding()
+            yield "layer0.mlp", MLP()
+            yield "layer1.rotary", Rotary()
+            yield "layer2.rotary", RoPEModule()
+            yield "layer2.mlp", MLP()
+
+    found = list(_walk_rotary_emb_modules(Model()))
+    assert len(found) == 3
+    # Layer indexing is by document order.
+    assert [layer for layer, _, _ in found] == [0, 1, 2]
+
+
+def test_split_q_into_complex_pairs_basic():
+    """Q tensor [num_tokens, num_heads*head_dim] → (real, imag, norm)
+    of shape [num_tokens, num_heads, num_bands]."""
+    torch = _torch_or_skip()
+    from kv_policy.triattention import _split_q_into_complex_pairs
+
+    # 2 tokens, 2 heads, head_dim=4 → num_bands=2.
+    # Q layout: [t, h*d] = [t, h0_d0, h0_d1, h0_d2, h0_d3, h1_d0, ...]
+    # band 0 = (d0, d1), band 1 = (d2, d3).
+    q = torch.tensor([
+        [1.0, 2.0, 3.0, 4.0,  5.0, 6.0, 7.0, 8.0],   # token 0
+        [0.5, 0.6, 0.7, 0.8,  0.1, 0.2, 0.3, 0.4],   # token 1
+    ])
+    q_real, q_imag, q_norm = _split_q_into_complex_pairs(
+        q, num_heads=2, head_dim=4,
+    )
+    # Shape [2 tokens, 2 heads, 2 bands].
+    assert tuple(q_real.shape) == (2, 2, 2)
+    # token 0, head 0, band 0: real=1, imag=2, norm=sqrt(5)
+    assert q_real[0, 0, 0].item() == pytest.approx(1.0)
+    assert q_imag[0, 0, 0].item() == pytest.approx(2.0)
+    assert q_norm[0, 0, 0].item() == pytest.approx((5.0) ** 0.5)
+    # token 0, head 1, band 1: real=7, imag=8, norm=sqrt(113)
+    assert q_real[0, 1, 1].item() == pytest.approx(7.0)
+    assert q_imag[0, 1, 1].item() == pytest.approx(8.0)
+
+
+def test_split_q_into_complex_pairs_rejects_odd_head_dim():
+    torch = _torch_or_skip()
+    from kv_policy.triattention import _split_q_into_complex_pairs
+
+    q = torch.zeros((1, 6))  # head_dim must be even
+    with pytest.raises(ValueError, match="even"):
+        _split_q_into_complex_pairs(q, num_heads=2, head_dim=3)
+
+
+def test_split_q_into_complex_pairs_rejects_dim_mismatch():
+    torch = _torch_or_skip()
+    from kv_policy.triattention import _split_q_into_complex_pairs
+
+    q = torch.zeros((1, 9))  # 9 != 2 * 4
+    with pytest.raises(ValueError, match="last dim"):
+        _split_q_into_complex_pairs(q, num_heads=2, head_dim=4)
+
+
+def test_calibrate_q_centers_end_to_end_with_mock_model():
+    """End-to-end calibration on a fake torch model with one
+    rotary_emb. Verifies the pre-hook fires, accumulates Q
+    statistics, and produces a valid QCenterStats."""
+    torch = _torch_or_skip()
+    from kv_policy.triattention import calibrate_q_centers
+
+    class FakeRotary(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.rotary = FakeRotary()
+
+        def my_forward(self, q, k):
+            return self.rotary(torch.tensor([0]), q, k)
+
+    model = FakeModel()
+    # Caller's forward_callable: drives the model through some
+    # calibration data.
+    def driver(m):
+        for _ in range(3):
+            q = torch.randn(8, 4 * 4)   # 8 tokens, 4 heads, head_dim=4
+            k = torch.randn(8, 4 * 4)
+            m.my_forward(q, k)
+
+    stats = calibrate_q_centers(
+        model=model,
+        forward_callable=driver,
+        model_name="fake_test",
+        num_heads=4, head_dim=4,
+    )
+    assert stats.model_name == "fake_test"
+    assert stats.num_layers == 1
+    assert stats.num_heads == 4
+    assert stats.head_dim == 4
+    assert stats.num_bands == 2
+    assert stats.calibration_token_count == 24   # 3 batches × 8 tokens
+    # Statistics are real-valued floats.
+    assert all(
+        isinstance(stats.e_q_real[0][h][f], float)
+        for h in range(4) for f in range(2)
+    )
+
+
+def test_calibrate_q_centers_respects_max_tokens():
+    """When max_tokens is reached mid-calibration, further forward
+    passes don't accumulate."""
+    torch = _torch_or_skip()
+    from kv_policy.triattention import calibrate_q_centers
+
+    class FakeRotary(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.rotary = FakeRotary()
+
+        def my_forward(self, q, k):
+            return self.rotary(torch.tensor([0]), q, k)
+
+    model = FakeModel()
+    def driver(m):
+        for _ in range(100):
+            q = torch.randn(10, 8)
+            k = torch.randn(10, 8)
+            m.my_forward(q, k)
+
+    stats = calibrate_q_centers(
+        model=model, forward_callable=driver,
+        model_name="capped", num_heads=2, head_dim=4,
+        max_tokens=50,   # first 5 batches hit cap
+    )
+    # tokens_seen will overshoot to next-batch boundary (50 -> 60
+    # since the cap-check fires AFTER the batch starts).
+    assert stats.calibration_token_count >= 50
+    assert stats.calibration_token_count <= 60
+
+
+def test_install_pre_rope_capture_finds_rotary_modules():
+    """install_pre_rope_capture walks the model and registers
+    pre-hooks on every rotary_emb."""
+    torch = _torch_or_skip()
+    from kv_policy.triattention import install_pre_rope_capture
+    from kv_policy.vllm_evictor import CTMEvictorModern
+    from kv_policy.triattention import TrigScorer, QCenterStats
+
+    class FakeRotary(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layer0_rotary = FakeRotary()
+            self.layer1_rotary = FakeRotary()
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=2, num_heads=2, num_kv_heads=2,
+        head_dim=4,
+        e_q_real=[[[0.5, 0.5], [0.5, 0.5]]] * 2,
+        e_q_imag=[[[0.5, 0.5], [0.5, 0.5]]] * 2,
+        e_q_norm=[[[1.0, 1.0], [1.0, 1.0]]] * 2,
+    )
+    evictor = CTMEvictorModern(
+        num_blocks_capacity=64, block_size=4,
+        trig_scorer=TrigScorer(stats=stats),
+    )
+
+    n = install_pre_rope_capture(
+        model=FakeModel(), evictor=evictor,
+        layer_for_scoring=1, head_for_scoring=0,
+    )
+    assert n == 2
+
+
+def test_install_pre_rope_capture_returns_zero_on_empty_model():
+    torch = _torch_or_skip()
+    from kv_policy.triattention import install_pre_rope_capture
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class EmptyModel(torch.nn.Module):
+        def named_modules(self):
+            yield from []
+
+    ev = CTMEvictorModern(num_blocks_capacity=4, block_size=4)
+    n = install_pre_rope_capture(model=EmptyModel(), evictor=ev)
+    assert n == 0
+
+
+def test_install_attn_metadata_side_channel_finds_attention_modules():
+    """The side-channel installer registers pre+post hooks on
+    every Attention layer."""
+    torch = _torch_or_skip()
+    from kv_policy.triattention import (
+        install_attn_metadata_side_channel,
+    )
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class Attention(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.head_size = 4
+            self.num_heads = 2
+
+        def forward(self, q, k, v, kv_cache, attn_metadata):
+            return q
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layer0_attn = Attention()
+            self.layer1_attn = Attention()
+
+    ev = CTMEvictorModern(num_blocks_capacity=64, block_size=4)
+    n = install_attn_metadata_side_channel(
+        model=FakeModel(), evictor=ev,
+    )
+    assert n == 2
+    assert hasattr(ev, "_phase4_handles")
+    # Pre + post per layer = 4 handles.
+    assert len(ev._phase4_handles) == 4
+
+
+def test_attn_metadata_side_channel_stashes_then_clears():
+    """Pre-hook stashes slot_mapping; post-hook clears it."""
+    torch = _torch_or_skip()
+    from kv_policy.triattention import (
+        install_attn_metadata_side_channel,
+    )
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class Attention(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.head_size = 4
+            self.num_heads = 2
+
+        def forward(self, q, k, v, kv_cache, attn_metadata):
+            return q
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.attn = Attention()
+
+    class FakeMeta:
+        slot_mapping = torch.tensor([0, 16, 32])
+        num_decode_tokens = 3
+
+    ev = CTMEvictorModern(num_blocks_capacity=64, block_size=4)
+    install_attn_metadata_side_channel(model=FakeModel(), evictor=ev)
+    model = FakeModel()
+    install_attn_metadata_side_channel(model=model, evictor=ev)
+
+    # Before any forward — side-channel is None.
+    assert getattr(ev, "_phase4_pending_slot_mapping", None) is None
+
+    # Trigger forward — pre-hook fires (stashes), post-hook fires
+    # (clears at the end). After the forward completes, side-channel
+    # is back to None.
+    q = torch.zeros((3, 8))
+    k = torch.zeros((3, 8))
+    v = torch.zeros((3, 8))
+    model.attn.forward(q, k, v, None, FakeMeta())
+    assert ev._phase4_pending_slot_mapping is None
+    assert ev._phase4_pending_num_decode_tokens == 0
+
+
+def test_capture_pre_rope_k_to_evictor_with_side_channel():
+    """End-to-end: with attn_metadata stashed via the side channel,
+    a rotary_emb pre-hook fires and pushes per-block keys to the
+    evictor."""
+    torch = _torch_or_skip()
+    from kv_policy.triattention import _capture_pre_rope_k_to_evictor
+    from kv_policy.vllm_evictor import CTMEvictorModern
+    from kv_policy.triattention import TrigScorer, QCenterStats
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=1, num_heads=1, num_kv_heads=1,
+        head_dim=4,
+        e_q_real=[[[0.5, 0.5]]],
+        e_q_imag=[[[0.5, 0.5]]],
+        e_q_norm=[[[1.0, 1.0]]],
+    )
+    ev = CTMEvictorModern(
+        num_blocks_capacity=64, block_size=4,
+        trig_scorer=TrigScorer(stats=stats),
+    )
+    # Track three blocks; admit them.
+    for bid in (0, 4, 8):
+        ev.add(block_id=bid, content_hash=bid * 2,
+               num_hashed_tokens=4, last_accessed=0.0)
+
+    # Stash the side-channel as the side_channel installer would.
+    # 3 decode tokens writing to slots [0, 16, 32] -> blocks [0, 4, 8].
+    ev._phase4_pending_slot_mapping = torch.tensor([0, 16, 32])
+    ev._phase4_pending_num_decode_tokens = 3
+
+    # Build a K tensor: 3 tokens, 1 KV head, head_dim=4.
+    positions = torch.tensor([0, 16, 32])
+    query = torch.zeros((3, 4))
+    key = torch.tensor([
+        [1.0, 2.0, 3.0, 4.0],
+        [0.5, 0.5, 0.5, 0.5],
+        [0.1, 0.2, 0.3, 0.4],
+    ])
+    _capture_pre_rope_k_to_evictor(
+        inputs=(positions, query, key),
+        evictor=ev, layer=0, head=0,
+        inferred_head_dim=4,
+    )
+    # All three blocks should have pre-RoPE keys captured.
+    assert ev.trig_score_block(0) is not None
+    assert ev.trig_score_block(4) is not None
+    assert ev.trig_score_block(8) is not None
+
+
+def test_capture_pre_rope_k_no_side_channel_is_silent():
+    """Without the side-channel populated, K capture is a silent
+    no-op (Phase 4 falls back to per-block None scoring)."""
+    torch = _torch_or_skip()
+    from kv_policy.triattention import _capture_pre_rope_k_to_evictor
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=64, block_size=4)
+    ev.add(block_id=0, content_hash=0, num_hashed_tokens=4,
+           last_accessed=0.0)
+    # No side channel — pending_slot_mapping is None.
+    _capture_pre_rope_k_to_evictor(
+        inputs=(torch.tensor([0]), torch.zeros((1, 4)),
+                torch.zeros((1, 4))),
+        evictor=ev, layer=0, head=0,
+        inferred_head_dim=4,
+    )
+    # Still no captured keys.
+    assert ev.trig_score_block(0) is None
 
 
 # ------------------------------------------------------------------ #

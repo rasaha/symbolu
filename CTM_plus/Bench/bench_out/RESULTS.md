@@ -776,18 +776,21 @@ risk.
 **Phase 1 (LRU swap-counter validation): code-complete + GPU-validated.**
 **Phase 2 (CTM+ on modern vLLM, no attention forwarding): code-complete; mocked-tests pass; GPU smoke not run (would produce ~LRU-equivalent results — see §1.1 audit-pass HIGH callout).**
 **Phase 3 (attention forwarding so CTM+'s real policy runs): code-complete; GPU validation deferred pending Phase 4.**
-**Phase 4 (TriAttention-inspired trigonometric position scoring): pure-Python implementation code-complete; offline calibration + runtime pre-RoPE K capture deferred to GPU.**
+**Phase 4 (TriAttention-inspired trigonometric position scoring): all code complete; GPU validation pending.**
 
-The streaming runner now supports a fourth path:
+The streaming runner supports a fourth path:
 `--ctm-plus --phase4-trig-calibration <stats.json>` loads
-calibrated Q-centre statistics and configures
-`CTMEvictorModern` to use the trig + norm scoring with
-window-based pruning. 37 new tests cover the math,
-save/load, GQA aggregation, window-pruning state machine,
-and end-to-end driver integration. The remaining work is
-the GPU-only `calibrate_q_centers` pipeline (one-time
-~1 GPU-hour per model) and the runtime pre-RoPE K capture
-hook (~0.5 GPU-day).
+calibrated Q-centre statistics, installs runtime hooks
+(side-channel for `attn_metadata.slot_mapping` + pre-RoPE K
+capture on every `rotary_emb`), and configures
+`CTMEvictorModern` to use trig + norm scoring with window-
+based pruning. **All GPU-side code lands in this commit**
+(`calibrate_q_centers`, `install_pre_rope_capture`,
+`install_attn_metadata_side_channel`); 49 Phase 4 tests pass
+on CPU including 12 new torch-mocked tests for the GPU
+paths. The runbook for the four-cell experiment is at
+`scripts/MODE_B_PHASE4_GPU_RUNBOOK.md`. Estimated cost:
+~$0.60–1.00 GPU spot for calibration + four cells.
 
 The streaming runner supports all three phases via flags
 (`--ctm-plus`, `--enable-prefix-caching`, `--phase3-attention`).

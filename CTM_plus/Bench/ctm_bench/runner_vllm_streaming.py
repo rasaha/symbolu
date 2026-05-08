@@ -812,6 +812,31 @@ class AsyncEngineDriver:
                     "Phase 2: CTM+ evictor patch installed on "
                     "AsyncLLMEngine"
                 )
+                # Phase 4 GPU hooks: install_pre_rope_capture +
+                # install_attn_metadata_side_channel, both pointing
+                # at the same evictor. The capture hook reads the
+                # side-channel during each rotary_emb pre-hook
+                # firing.
+                if self.phase4_trig_calibration_path is not None:
+                    from kv_policy.triattention import (  # type: ignore
+                        install_pre_rope_capture,
+                        install_attn_metadata_side_channel,
+                    )
+                    inner_engine = getattr(engine, "engine", engine)
+                    model = self._extract_model_from_engine(inner_engine)
+                    n_attn = install_attn_metadata_side_channel(
+                        model=model, evictor=installed_evictor,
+                    )
+                    n_rotary = install_pre_rope_capture(
+                        model=model, evictor=installed_evictor,
+                    )
+                    logger.info(
+                        "Phase 4: hooks installed (attn_metadata "
+                        "side-channel on %d Attention layers, "
+                        "pre-RoPE K capture on %d rotary_emb "
+                        "modules).",
+                        n_attn, n_rotary,
+                    )
                 if self.phase3_attention_capture:
                     # Phase 3: install the attention-capture hook
                     # on the model's Attention layers. The hook

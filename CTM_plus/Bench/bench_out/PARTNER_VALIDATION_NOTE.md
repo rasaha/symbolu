@@ -129,10 +129,15 @@ look like.
   CTM+'s scoring formula, while keeping CTM+'s structural
   advantages (S3-FIFO admission for scan resistance,
   online recency tracking, block-level vLLM integration).
-  Estimated implementation: ~5–6 days code + 1 GPU-day for
-  calibration + four-cell experiment (LRU baseline / Phase
-  2 ablation / Phase 4 trig / optional Phase 3 ablation).
-  Authorization required to start Phase 4 implementation.
+  Implementation **code-complete as of May 2026** (49
+  tests, 237 total in Bench). All GPU-side hooks are
+  written: offline `calibrate_q_centers`, runtime
+  `install_pre_rope_capture`, sibling
+  `install_attn_metadata_side_channel`. The four-cell GPU
+  experiment runbook is at
+  `scripts/MODE_B_PHASE4_GPU_RUNBOOK.md`. Estimated
+  validation cost: ~$0.60–1.00 GPU spot (RunPod A100,
+  ~25–30 minutes wall).
 
 * **Acknowledged related work — TriAttention.** The
   TriAttention paper (Mao et al., MIT/NVIDIA/ZJU, arXiv:

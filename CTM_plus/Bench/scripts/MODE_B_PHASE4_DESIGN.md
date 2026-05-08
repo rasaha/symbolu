@@ -1,14 +1,11 @@
 # Mode B Phase 4 — Trigonometric Position Scoring
 
-**Status:** **design + pure-Python implementation landed (May 2026).**
-The math, save/load, aggregation helpers, evictor integration,
-streaming-runner wiring, and CLI flags are all code-complete and
-CPU-tested (37 new tests, 237 total in Bench, 7 still skipped
-without torch). The GPU-only pieces — actual offline calibration
-(`calibrate_q_centers`) and the runtime pre-RoPE K capture hook
-inside vLLM — raise `NotImplementedError` with clear pointers.
-First GPU-day's work fills those in + runs the four-cell
-experiment.
+**Status:** **all code complete (May 2026).** Pure-Python pieces
++ GPU-side calibration + GPU-side runtime pre-RoPE K capture
+all landed. 49 Phase 4 tests in Bench (237 total + 19 skipped
+without torch). The GPU validation runbook is at
+`MODE_B_PHASE4_GPU_RUNBOOK.md`. Authorization to run:
+runbook procedure + ~$0.60–1.00 GPU spot.
 
 **Audience:** the engineer (possibly future-me) who will
 write the code. Conservative framing throughout: every
