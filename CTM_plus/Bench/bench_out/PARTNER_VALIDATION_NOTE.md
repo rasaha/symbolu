@@ -326,6 +326,38 @@ into partner-specific predictions and a 2–3 day Path A or
 Path B validation plan. Without them, any cost or latency
 quote is a synthetic-workload extrapolation.
 
+## §5a Roadmap beyond Phase 4
+
+What is laid out in §4 (Path A / Path B real-stack integration)
+is one slice of a longer roadmap. The full plan — covering
+Phase 4 GPU validation, quality-preservation measurement,
+multi-model sweeps, the TurboQuant CUDA v4 kernel, the combined
+TurboQuant + CTM+ + CTXL stack measurement, head-to-head
+comparison vs vLLM-FP8 / KIVI / H2O, and a partner production
+deployment — is documented at
+`CTM_plus/Bench/scripts/POST_PHASE4_ROADMAP.md`.
+
+The roadmap is structured so that **each step earns a single
+narrow honest claim**:
+
+| After step | Honest claim |
+|---|---|
+| 1 (~$1 GPU) | "TriAttention-inspired trig scoring works on real Llama-3 KV cache." |
+| 2 (~1 day) | "…without measurable quality loss on MMLU." |
+| 3 (~$5–10) | "…across multiple modern open-weight models and production traffic shapes." |
+| 4 (~1 wk eng + 1 GPU-day) | "TurboQuant 3-bit polar quant runs on GPU at v3-equivalent compression." |
+| 5 (~3 days eng + 1 GPU-day) | "Combined CTM+ + TurboQuant + CTXL stack delivers ≥5× effective serving capacity over bf16+LRU at matched quality." |
+| 6 (~1 GPU-day) | "…and beats every off-the-shelf vLLM KV-quant or eviction policy on the Pareto frontier." |
+| 7 (months) | Partner-validated production case study. |
+
+The roadmap explicitly distinguishes algorithm-layer evidence
+(steps 1–3, what CTM+ Phase 4 produces) from system-layer
+evidence (steps 4–6, the TurboQuant + CTM+ + CTXL stack the
+architecture documents project an 8.8× capacity claim for) from
+product-market evidence (step 7). Any "game-changer" framing
+is reserved for after step 6 with step 7 in flight; everything
+earlier stays inside the narrower per-step claims above.
+
 ## §6 Reproducer for everything in §1
 
 ```

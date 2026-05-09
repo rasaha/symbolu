@@ -993,6 +993,28 @@ that lands (since #2 runs the actual policies on the actual
 model). Listed here for completeness; not on the critical
 path.
 
+### §13.3a Post-Phase-4 roadmap — pointer
+
+The full step-by-step plan from Phase 4 GPU validation through
+partner deployment is documented at
+`Bench/scripts/POST_PHASE4_ROADMAP.md`. It enumerates seven
+concrete steps with cost estimates, what each step validates
+(and does not validate), and the gating decisions that move
+the project from "code-complete" to "demonstrated":
+
+1. Phase 4 GPU validation (~$1, this week)
+2. Quality measurement integrated as a 5th metric (~1 day, no GPU)
+3. Multi-workload + multi-model Phase 4 sweep (~$5–10)
+4. TurboQuant CUDA v4 kernel end-to-end measurement (~1 week eng + 1 GPU-day)
+5. Combined-stack measurement (TurboQuant × CTM+ × CTXL, ~3 days eng + 1 GPU-day)
+6. Comparison vs vLLM-FP8 + KIVI + H2O (~1 GPU-day)
+7. Partner running it in production (months — the only step that earns "game-changer")
+
+Each step ships its own audit-pass artifact. The "game-changer"
+claim is reserved for after step 6 with step 7 in flight; every
+earlier milestone has a narrower honest claim documented in the
+roadmap's decision matrix.
+
 ### §13.4 Honest framing for partner conversations
 
 The strongest claim that survives technical diligence
