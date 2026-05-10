@@ -719,6 +719,7 @@ def calibrate_q_centers(
     corpus_label: str = "unspecified",
     max_tokens: int = 100_000,
     num_kv_heads: Optional[int] = None,
+    num_layers: Optional[int] = None,
 ) -> QCenterStats:
     """Offline calibration: collect per-(layer, head, band) Q
     statistics from the model.
@@ -803,9 +804,29 @@ def calibrate_q_centers(
             "See MODE_B_PHASE4_DESIGN.md §4 for diagnostics."
         )
 
-    num_layers = len(rotary_modules)
+    n_modules = len(rotary_modules)
+    # If num_layers is provided AND > n_modules, use call-count
+    # indexing on the shared rotary_emb module(s). vLLM's Llama/Qwen
+    # models share ONE RotaryEmbedding instance across all
+    # transformer layers; the pre-hook fires N times per
+    # model.forward (once per layer, in call order). We assign
+    # layer_idx = call_count % num_layers so each firing is
+    # attributed to the correct layer. The counter is reset at the
+    # start of every model.forward via a top-level pre-hook.
+    if num_layers is None:
+        num_layers = n_modules
+    use_call_count_indexing = num_layers > n_modules
+    if use_call_count_indexing and n_modules != 1:
+        raise ValueError(
+            f"call-count layer indexing requires exactly one shared "
+            f"rotary_emb module; got {n_modules}. Pass "
+            f"num_layers={n_modules} to use module-indexing instead."
+        )
     logger.info(
-        "calibrate_q_centers: found %d rotary_emb modules", num_layers,
+        "calibrate_q_centers: found %d rotary_emb modules; "
+        "num_layers=%d (indexing=%s)",
+        n_modules, num_layers,
+        "call-count" if use_call_count_indexing else "per-module",
     )
 
     per_layer_stats: List[_RunningQStats] = [
@@ -815,11 +836,30 @@ def calibrate_q_centers(
     tokens_seen = 0
     handles = []
 
-    def make_hook(layer_idx: int):
+    # Mutable counter wrapper (closures can't rebind ints).
+    call_counter = [0]
+
+    def model_forward_pre_hook(module, args, kwargs=None):
+        call_counter[0] = 0
+
+    if use_call_count_indexing and hasattr(
+        model, "register_forward_pre_hook"
+    ):
+        h = model.register_forward_pre_hook(
+            model_forward_pre_hook, with_kwargs=True,
+        )
+        handles.append(h)
+
+    def make_hook(module_layer_idx: int):
         def pre_hook(module, inputs):
             nonlocal tokens_seen
             if tokens_seen >= max_tokens:
                 return  # stop accumulating
+            if use_call_count_indexing:
+                layer_idx = call_counter[0] % num_layers
+                call_counter[0] += 1
+            else:
+                layer_idx = module_layer_idx
             # Standard rotary_emb forward signature:
             #   forward(positions, query, key) -> (rotated_q, rotated_k)
             # The pre-hook receives (positions, query, key) as inputs.
