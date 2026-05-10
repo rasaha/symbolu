@@ -130,7 +130,10 @@ look like.
   advantages (S3-FIFO admission for scan resistance,
   online recency tracking, block-level vLLM integration).
   Implementation **code-complete as of May 2026** (49
-  tests, 237 total in Bench). All GPU-side hooks are
+  tests, 239 total in Bench after a +2 audit-pass repair —
+  see RESULTS.md §13.2.1 for the first-GPU-run findings
+  and the two HIGH-severity fixes that closed before the
+  next attempt). All GPU-side hooks are
   written: offline `calibrate_q_centers`, runtime
   `install_pre_rope_capture`, sibling
   `install_attn_metadata_side_channel`. The four-cell GPU

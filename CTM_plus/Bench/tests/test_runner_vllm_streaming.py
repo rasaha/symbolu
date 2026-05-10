@@ -1220,6 +1220,90 @@ def test_ctm_evictor_modern_remove_untracked_is_silent():
     assert ev.num_blocks == 0
 
 
+def test_ctm_evictor_modern_evict_drains_policy_gpu_blocks():
+    """Regression for the vLLM 0.7.3 GPU crash: evict() must remove
+    the victim from the underlying KVCachePolicy's gpu_blocks set, or
+    select_victims will keep returning the same block_id on subsequent
+    evict() calls — at which point self._content_hash.pop returns 0,
+    we hand vLLM a fake hash, and PrefixCachingBlockAllocator's
+    `assert content_hash in self._cached_blocks` fires.
+
+    Audit-pass miss: the prior tests pinned (block_id, content_hash)
+    return shape but not the cross-call invariant that an evicted
+    block stays evicted. This test would have caught the
+    May 2026 RunPod A100 + Qwen2.5-7B Phase 2 cell crash.
+    """
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+    for bid in (10, 11, 12):
+        ev.add(block_id=bid, content_hash=bid * 1000,
+               num_hashed_tokens=16, last_accessed=float(bid))
+
+    assert ev.num_blocks == 3
+    assert ev._policy.gpu_blocks == {10, 11, 12}
+
+    seen = set()
+    while ev.num_blocks > 0:
+        victim_id, content_hash = ev.evict()
+        # Each victim must be tracked at the moment of eviction —
+        # i.e., its content_hash must match what we admitted.
+        assert content_hash == victim_id * 1000, (
+            f"evict() returned (block_id={victim_id}, "
+            f"content_hash={content_hash}); expected {victim_id * 1000}. "
+            "This indicates self._content_hash.pop fell through to its "
+            "default — the same divergence that crashes vLLM 0.7.3."
+        )
+        assert victim_id not in seen, (
+            f"evict() returned block_id={victim_id} twice; "
+            "select_victims is picking already-evicted blocks because "
+            "the policy's gpu_blocks isn't being drained."
+        )
+        seen.add(victim_id)
+        # Policy's gpu_blocks must be drained in lockstep.
+        assert victim_id not in ev._policy.gpu_blocks
+        # Tracked state coherent.
+        assert victim_id not in ev
+        assert victim_id not in ev._content_hash
+
+    assert seen == {10, 11, 12}
+    assert ev._policy.gpu_blocks == set()
+
+
+def test_ctm_evictor_modern_evict_then_readd_then_evict():
+    """A more realistic vLLM 0.7.3 sequence: admit, evict (block goes
+    back to free pool), re-admit (with potentially new content_hash),
+    evict again. Mirrors what happens during sustained streaming
+    pressure — the bug above triggers on the second evict."""
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+    ev.add(block_id=42, content_hash=111, num_hashed_tokens=16,
+           last_accessed=1.0)
+    ev.add(block_id=43, content_hash=222, num_hashed_tokens=16,
+           last_accessed=2.0)
+
+    victim_id, victim_hash = ev.evict()
+    # vLLM treats the victim's slot as freshly allocated; it will
+    # later re-admit with a NEW content_hash for whatever new content
+    # filled the block.
+    new_hash = 9999
+    ev.add(block_id=victim_id, content_hash=new_hash,
+           num_hashed_tokens=16, last_accessed=10.0)
+
+    # Second evict — must pick from {survivor, victim_id} and return
+    # the correct content_hash for whichever it picks.
+    victim2_id, victim2_hash = ev.evict()
+    if victim2_id == victim_id:
+        assert victim2_hash == new_hash
+    else:
+        # The other block — content_hash must be 111 or 222, never 0.
+        assert victim2_hash in {111, 222}, (
+            f"second evict returned content_hash={victim2_hash}; "
+            "this is the divergence that crashes vLLM."
+        )
+
+
 def test_patch_vllm_engine_modern_walks_to_prefix_caching_allocator():
     """patch_vllm_engine_modern must walk
     engine -> engine.engine.scheduler[0].block_manager.block_allocator

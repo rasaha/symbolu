@@ -776,7 +776,83 @@ risk.
 **Phase 1 (LRU swap-counter validation): code-complete + GPU-validated.**
 **Phase 2 (CTM+ on modern vLLM, no attention forwarding): code-complete; mocked-tests pass; GPU smoke not run (would produce ~LRU-equivalent results — see §1.1 audit-pass HIGH callout).**
 **Phase 3 (attention forwarding so CTM+'s real policy runs): code-complete; GPU validation deferred pending Phase 4.**
-**Phase 4 (TriAttention-inspired trigonometric position scoring): all code complete; GPU validation pending.**
+**Phase 4 (TriAttention-inspired trigonometric position scoring): all code complete; first GPU run partially failed; bugs fixed in CTMEvictorModern + harness, GPU re-run pending.**
+
+> ### §13.2.1 First Phase 4 GPU run findings (May 2026 — partial)
+>
+> The first end-to-end Phase 4 GPU validation on RunPod A100 + vLLM
+> 0.7.3 + Qwen2.5-7B-Instruct surfaced two HIGH-severity issues that
+> the audit-pass discipline had not caught. Both are now fixed in
+> source; a re-run is the next gating step.
+>
+> **Spend so far:** ~$0.40 (calibration + Cell 1 LRU + Cell 2 CTM+ Phase 2).
+> Cell 3 (Phase 4) was aborted because it inherits the Cell 2 crash.
+>
+> **Finding 1 — `CTMEvictorModern.evict()` violated vLLM's
+> `_cached_blocks` invariant.** vLLM 0.7.3's
+> `PrefixCachingBlockAllocator._maybe_allocate_evicted_block_id`
+> asserts `content_hash_to_evict in self._cached_blocks` after the
+> evictor returns. Our implementation popped the chosen victim from
+> our internal `_content_hash` dict + `_tracked` set but did **not**
+> call `KVCachePolicy.evict_block(victim_id)` to drain the policy's
+> `gpu_blocks` set. A code comment claimed `select_victims` already
+> did this; reading
+> `attention_evictor.py::KVCachePolicy.select_victims` shows it
+> takes a temporary set difference and does not mutate `gpu_blocks`.
+>
+> Sustained allocation pressure exercised the divergence within
+> seconds: `select_victims` re-picked the already-evicted block,
+> `self._content_hash.pop(victim_id, 0)` returned `0` (already
+> popped), we returned `(victim_id, 0)`, and vLLM's
+> `assert 0 in self._cached_blocks` fired with
+> `AsyncEngineDeadError`.
+>
+> **Audit-pass miss.** The mocked tests in
+> `tests/test_runner_vllm_streaming.py::test_ctm_evictor_modern_implements_vllm_07_evictor_abc`
+> exercised `(block_id, content_hash)` return shape but not the
+> cross-call invariant that an evicted block stays evicted. The
+> test fixture mocked vLLM's allocator without replicating the
+> `_cached_blocks ↔ evictor` invariant. Two new regression tests
+> (`test_ctm_evictor_modern_evict_drains_policy_gpu_blocks`,
+> `test_ctm_evictor_modern_evict_then_readd_then_evict`) now pin
+> the cross-call contract; both fail without the fix.
+>
+> **Finding 2 — synthetic prompts collapsed memory pressure under
+> prefix caching.** The streaming runner generated every prompt as
+> `[100] * length` — identical token ids across all 30 requests.
+> With `--enable-prefix-caching` on, vLLM achieved a 77%
+> prefix-cache hit rate and GPU KV usage peaked at ~57%, never
+> high enough to force preemption. Cells reported
+> `swap_out=0, preempt=0` regardless of policy.
+>
+> The previous (Phase 1) v4 smoke produced 2205 swap_outs at the
+> same hyperparameters because `enable_prefix_caching=False` was
+> set there — that smoke wasn't testing prefix-cache eviction.
+> Phase 4 requires prefix caching on (`CTMEvictorModern` only
+> patches `PrefixCachingBlockAllocator.evictor`), so the workload
+> generator now injects a per-request unique head token (id
+> `200 + counter % 4096`) at position 0. This breaks the content-
+> hash chain across requests and forces real per-request KV
+> allocation while still allowing intra-request reuse.
+>
+> **What still has to land before declaring Phase 4 GPU-validated:**
+> - Re-run the four-cell experiment with the fixes (~$0.60–1.00
+>   GPU spot). Both findings have to clear: Phase 2 cell completes
+>   without `AsyncEngineDeadError`, and all cells report
+>   `swap_out > 0` or measurable per-block eviction activity.
+> - Phase 4 cell additionally must show
+>   `phase4_blocks_captured_with_pre_rope_keys > 0` and beat LRU
+>   on whichever metric the run produces (hit rate or eviction
+>   count at fixed budget).
+>
+> **What this episode taught us about audit-pass discipline.** Every
+> mocked-vLLM contract test going forward must replicate not just
+> the per-call API shape but the cross-call invariants the real
+> allocator relies on. For `evict()` specifically, that means
+> "after evict() returns, the same block_id must not be returned
+> again until vLLM re-`add()`'s it." This is now a baseline
+> expectation; the same lens needs applying to
+> `add` / `remove` / `update` as Phase 5 work expands the contract.
 
 The streaming runner supports a fourth path:
 `--ctm-plus --phase4-trig-calibration <stats.json>` loads

@@ -871,21 +871,45 @@ class CTMEvictorModern:
         import time as _time
         _t0 = _time.perf_counter()
         try:
-            victims = self._policy.select_victims(count=1)
-            if not victims:
+            # Re-pick until we find a victim that is in our tracked
+            # state. select_victims operates on the underlying policy's
+            # gpu_blocks set; if a prior evict() forgot to clear it,
+            # we'd otherwise return a (block_id, 0) tuple that fails
+            # vLLM's `content_hash in _cached_blocks` assertion. Loop
+            # to drain any stale entries.
+            for _ in range(8):
+                victims = self._policy.select_victims(count=1)
+                if not victims:
+                    raise ValueError(
+                        "CTMEvictorModern.evict() called with no tracked "
+                        "blocks. vLLM should not call evict on an empty "
+                        "cache; this is either a vLLM bug or a "
+                        "tracking-state divergence."
+                    )
+                victim_id = victims[0]
+                if victim_id in self._tracked:
+                    break
+                # Stale entry in the policy's gpu_blocks; drop it and
+                # try again. (Defensive — should not happen now that
+                # evict() calls evict_block below, but kept as a guard
+                # against future regressions.)
+                self._policy.evict_block(victim_id)
+            else:
                 raise ValueError(
-                    "CTMEvictorModern.evict() called with no tracked blocks. "
-                    "vLLM should not call evict on an empty cache; this is "
-                    "either a vLLM bug or a tracking-state divergence."
+                    "CTMEvictorModern.evict(): exhausted retries trying "
+                    "to find a victim that is tracked. policy gpu_blocks "
+                    "and self._tracked have diverged."
                 )
-            victim_id = victims[0]
-            content_hash = self._content_hash.pop(victim_id, 0)
+            content_hash = self._content_hash.pop(victim_id)
             self._num_hashed_tokens.pop(victim_id, None)
             self._last_accessed.pop(victim_id, None)
             self._tracked.discard(victim_id)
-            # Note: select_victims removed the block from the policy's
-            # internal `available` set already; we don't need to call
-            # evict_block again.
+            # Mirror vLLM's LRUEvictor: on evict, the block is fully
+            # removed from the evictor's pool. The CTM+ policy's
+            # gpu_blocks set is the parallel "evictor pool" — keep it
+            # in lockstep so future select_victims doesn't keep
+            # picking the same already-evicted block.
+            self._policy.evict_block(victim_id)
             if self._enable_logging:
                 logger.debug(
                     "CTMEvictorModern: evicted block_id=%d content_hash=%d",

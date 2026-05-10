@@ -942,7 +942,19 @@ class AsyncEngineDriver:
                 # decodes to a valid string for any tokenizer. The
                 # bench question is about KV-cache pressure, not
                 # output quality; content doesn't matter.
-                prompt_token_ids = [100] * length
+                #
+                # Important: inject a per-request unique token at
+                # position 0 so prefix caching cannot dedupe the
+                # entire prompt across requests. With prefix caching
+                # ON and identical [100]*length prompts, vLLM achieves
+                # ~77% prefix-cache hit rate and the KV cache never
+                # fills enough to engage swap or eviction. The unique
+                # first token forces a different content_hash chain
+                # per request and makes memory pressure observable.
+                # 4096 mod range gives a wide enough id space for
+                # most tokenizer vocabularies.
+                head_tok = 200 + (request_id_counter % 4096)
+                prompt_token_ids = [head_tok] + [100] * (length - 1)
                 request_id = f"streaming_{workload_name}_{request_id_counter}"
                 request_id_counter += 1
 
