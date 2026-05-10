@@ -921,6 +921,8 @@ def install_pre_rope_capture(
     layer_for_scoring: Optional[int] = None,
     head_for_scoring: int = 0,
     enable_logging: bool = False,
+    num_layers: Optional[int] = None,
+    capture_every_n: int = 1,
 ) -> int:
     """Install runtime hooks that capture pre-RoPE K vectors per
     block and push them to the evictor.
@@ -987,11 +989,47 @@ def install_pre_rope_capture(
         )
         return 0
 
-    num_layers = len(rotary_modules)
+    n_modules = len(rotary_modules)
+    if num_layers is None:
+        num_layers = n_modules
+    use_call_count_indexing = num_layers > n_modules
+    if use_call_count_indexing and n_modules != 1:
+        raise ValueError(
+            f"call-count layer indexing requires exactly one shared "
+            f"rotary_emb module; got {n_modules}. Pass "
+            f"num_layers={n_modules} to use module-indexing instead."
+        )
     target_layer = (
         num_layers - 1 if layer_for_scoring is None
         else int(layer_for_scoring)
     )
+    if capture_every_n < 1:
+        raise ValueError(
+            f"capture_every_n must be >= 1; got {capture_every_n}"
+        )
+
+    # Per-forward layer counter, reset on each model.forward via the
+    # side-channel pre-hook installed by
+    # install_attn_metadata_side_channel. We piggyback on that
+    # reset rather than installing a separate one — the side-channel
+    # already runs first per call.
+    layer_counter = [0]
+    capture_counter = [0]
+
+    if use_call_count_indexing and hasattr(
+        model, "register_forward_pre_hook"
+    ):
+        def reset_layer_counter(module, args, kwargs=None):
+            layer_counter[0] = 0
+
+        h_reset = model.register_forward_pre_hook(
+            reset_layer_counter, with_kwargs=True,
+        )
+        existing = getattr(evictor, "_phase4_handles", None)
+        if existing is None:
+            existing = []
+            evictor._phase4_handles = existing
+        existing.append(h_reset)
 
     # Attempt to locate the model's KV head dim from one of the
     # attention layers. Best-effort; if we can't find it, the
@@ -1009,12 +1047,29 @@ def install_pre_rope_capture(
                     inferred_kv_head_dim = int(hd)
                     break
 
-    def make_hook(layer_idx: int):
+    def make_hook(module_layer_idx: int):
         def pre_hook(module, inputs):
             evictor._phase4_rotary_pre_hook_calls = (
                 getattr(evictor, "_phase4_rotary_pre_hook_calls", 0) + 1
             )
+            if use_call_count_indexing:
+                layer_idx = layer_counter[0] % num_layers
+                layer_counter[0] += 1
+            else:
+                layer_idx = module_layer_idx
             if layer_idx != target_layer:
+                return
+            # Subsample at the target layer: only run capture every Nth
+            # firing. The trig signal evolves slowly relative to a
+            # single decode step, so subsampling lets us cut overhead
+            # without measurably degrading scoring quality.
+            capture_counter[0] += 1
+            if capture_counter[0] % capture_every_n != 0:
+                evictor._phase4_capture_subsample_skips = (
+                    getattr(
+                        evictor, "_phase4_capture_subsample_skips", 0,
+                    ) + 1
+                )
                 return
             try:
                 _capture_pre_rope_k_to_evictor(
@@ -1041,9 +1096,12 @@ def install_pre_rope_capture(
         n_patched += 1
 
     logger.info(
-        "install_pre_rope_capture: hooked %d layers (scoring layer=%d, "
-        "head=%d)",
-        n_patched, target_layer, head_for_scoring,
+        "install_pre_rope_capture: hooked %d rotary modules "
+        "(num_layers=%d, indexing=%s, scoring layer=%d, head=%d, "
+        "capture_every_n=%d)",
+        n_patched, num_layers,
+        "call-count" if use_call_count_indexing else "per-module",
+        target_layer, head_for_scoring, capture_every_n,
     )
     return n_patched
 

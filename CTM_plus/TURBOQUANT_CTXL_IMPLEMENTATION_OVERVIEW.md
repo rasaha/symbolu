@@ -1,5 +1,45 @@
 # TurboQuant + CTXL Integration: Cross-Layer Implementation Overview
 
+> ## ⚠ Validation status (May 2026 — read first)
+>
+> **This document describes the architecture and the design intent.
+> Most of the headline numbers in it are projections, not measured
+> end-to-end results.** Reading the doc as-if-validated would
+> overstate what's currently demonstrable. Use this table as the
+> single source of truth for what's measured vs projected:
+>
+> | Component | Doc claims | Actual validation status |
+> |---|---|---|
+> | TurboQuant 3-bit polar quantization | 5.3× compression, 96% information retention | **CPU-simulated** 7.15× ratio at 0.965 cosine similarity (`CTM_plus/DeepSpeed/TURBOQUANT_BENCHMARK.md`, dated 2026-04-02). v4 GPU kernel is "pending"/"target"; not measured. |
+> | TurboQuant ↔ vLLM KV cache integration | implied by §1 / §3 | **No code path exists.** Neither the Bench nor KVPolicy nor CUDA layers wire TurboQuant into vLLM's KV cache write path. |
+> | CTM+ Phase 1 simulator | Mode A predicts e.g. −52% latency on chat_32k | Validated end-to-end in 5 simulator rounds + audit pass + multi-seed (`Bench/bench_out/RESULTS.md`). |
+> | CTM+ Phase 2/4 on real model in vLLM 0.7+ | implied by "smart eviction" section | **Validated with NEGATIVE RESULT in May 2026.** ~$1.60 GPU spend on RunPod A100 + Qwen2.5-7B + vLLM 0.7.3. Phase 4 with pooled-layer calibration did NOT beat Phase 2 or LRU on streaming chat. Throughput dropped ~20%. See `CTM_plus/Bench/bench_out/PHASE4_GPU_FINDINGS.md` for the synthetic↔real reconciliation in five points and a corrected gate definition. Three follow-up improvements landed (per-layer calibration + trig in main evict + capture subsample); next GPU run pending. |
+> | CTXL (HBM → CXL → NVMe tiering) | implied by §3 | **Designed only.** No runtime measurement anywhere in the repo. |
+> | Combined-stack measurement | "**8.8× effective capacity increase**" (§"Plain English") | **Not attempted.** No combined-stack run exists in any artifact. The 8.8× number is a forward projection of all three layers stacking; the algorithm-layer (CTM+) component is the only one validated end-to-end on GPU and produced a negative result. |
+> | Quality preservation (MMLU / perplexity) | "preserving over 96% of the original information" | **Not measured at any layer** of this stack on real downstream benchmarks. The 96% figure is cosine similarity on synthetic vectors. |
+>
+> **What's safe to say to a partner today:**
+> - "We have the architecture and four-layer implementation framework."
+> - "TurboQuant compression ratio reproduces in CPU simulation at the
+>   numbers we publish."
+> - "CTM+'s simulator predicts measurable wins on certain workloads;
+>   on real Qwen2.5-7B in vLLM 0.7.3 those predictions did not
+>   transfer in the May 2026 GPU validation, for documented reasons.
+>   The next iteration is sized at ~$0.20 of GPU."
+>
+> **What's NOT safe to say today:**
+> - "TurboQuant + CTM+ + CTXL delivers 8.8× capacity." (No
+>   combined measurement.)
+> - "Our trig scoring beats LRU on real models." (It didn't, in
+>   the May 2026 run.)
+> - "We preserve 96% of information at 5× compression on real model
+>   gradients / KV." (Cosine similarity on synthetic vectors is
+>   not the same metric; v4 GPU measurement is pending.)
+>
+> Any partner-pitch citing numbers from the body of this document
+> should route through `Bench/bench_out/PHASE4_GPU_FINDINGS.md` §8
+> for the safe-vs-unsafe claims by milestone.
+
 ## What This Project Does (Plain English)
 
 Modern AI models (like ChatGPT, Claude, and similar large language models) have
@@ -55,9 +95,19 @@ computer has fast RAM and a slower hard drive. Our 3-tier hierarchy is:
 attach additional DRAM via a PCIe-like bus. It is slower than HBM but much
 faster than NVMe, making it perfect for a warm compression tier.
 
-The combined system delivers an **8.8x effective capacity increase** — meaning
-a GPU that previously handled 4K tokens can now serve 35K+ tokens without
-losing important context.
+The combined system is **projected** to deliver an 8.8× effective capacity
+increase — meaning a GPU that previously handled 4K tokens can now serve 35K+
+tokens without losing important context.
+
+> **⚠ Status note:** the 8.8× number is a forward projection of the
+> three layers (TurboQuant compression × CTM+ retention × CTXL
+> tiering) stacking. **No combined-stack end-to-end measurement
+> exists.** TurboQuant has CPU-simulated benchmarks (~7× compression
+> ratio at 0.965 cosine; v4 GPU kernel pending). CTM+ Phase 4 was
+> GPU-validated against real Qwen2.5-7B in May 2026 with a negative
+> result — see `Bench/bench_out/PHASE4_GPU_FINDINGS.md`. CTXL has
+> design only. Treat 8.8× as the architecture's design target, not
+> as measured throughput.
 
 ### Why Four Implementations?
 

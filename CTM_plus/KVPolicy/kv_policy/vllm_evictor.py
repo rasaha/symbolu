@@ -731,6 +731,12 @@ class CTMEvictorModern:
         # the captured vectors.
         self._trig_scorer = trig_scorer
         self._trig_score_weight = float(trig_score_weight)
+        # Alias used by evict() — same value, name reflects the
+        # semantic ("blend trig into per-call eviction scoring").
+        # Kept as a separate attribute so future tuning experiments
+        # can decouple per-evict trig weight from window-pruning weight
+        # without an API break.
+        self._trig_blend_weight = float(trig_score_weight)
         # block_id -> list of (position, k_real, k_imag) tuples
         self._block_pre_rope_keys: Dict[
             int, List[Tuple[int, List[float], List[float]]]
@@ -880,18 +886,47 @@ class CTMEvictorModern:
         Times each call (wall-clock seconds) into ``self._evict_timings``
         so the streaming runner can report p50/p99 evict overhead at
         end of cell.
+
+        **Phase 4 enhancement (May 2026 follow-up):** when
+        ``self._trig_scorer`` is set AND ``self._trig_blend_weight > 0``,
+        the per-call eviction decision is re-ranked using the trig
+        score. We over-sample candidates from the policy (8 victims
+        instead of 1), compute ``final_score = base_score -
+        trig_blend_weight * trig_score`` for each, and pick the
+        lowest. Blocks without captured pre-RoPE keys are scored at
+        their base value (trig contribution = 0), so this is
+        backwards-compatible: with no calibration the behaviour is
+        identical to pre-Phase-4.
+
+        Why this matters: in the May 2026 GPU run, the trig signal
+        only fed window_pruning_pass (~45 invocations / 60s), while
+        the main evict() ran ~3000× / 60s. Wiring trig into the main
+        path means the signal influences ~70× more decisions per
+        unit time and is the highest-ROI lever for moving Phase 4
+        from "fires but doesn't change outcomes" to
+        "fires and shifts the eviction sequence."
         """
         import time as _time
         _t0 = _time.perf_counter()
         try:
+            # Decide candidate-pool size: oversample when trig
+            # re-ranking is active so the trig signal has room to
+            # change the pick.
+            trig_active = (
+                self._trig_scorer is not None
+                and self._trig_blend_weight > 0
+            )
+            candidate_count = 8 if trig_active else 1
+
             # Re-pick until we find a victim that is in our tracked
             # state. select_victims operates on the underlying policy's
             # gpu_blocks set; if a prior evict() forgot to clear it,
             # we'd otherwise return a (block_id, 0) tuple that fails
             # vLLM's `content_hash in _cached_blocks` assertion. Loop
             # to drain any stale entries.
+            victim_id = None
             for _ in range(8):
-                victims = self._policy.select_victims(count=1)
+                victims = self._policy.select_victims(count=candidate_count)
                 if not victims:
                     raise ValueError(
                         "CTMEvictorModern.evict() called with no tracked "
@@ -899,20 +934,84 @@ class CTMEvictorModern:
                         "cache; this is either a vLLM bug or a "
                         "tracking-state divergence."
                     )
-                victim_id = victims[0]
-                if victim_id in self._tracked:
-                    break
-                # Stale entry in the policy's gpu_blocks; drop it and
-                # try again. (Defensive — should not happen now that
-                # evict() calls evict_block below, but kept as a guard
-                # against future regressions.)
-                self._policy.evict_block(victim_id)
+                # Filter to candidates we still track; drop stale ones.
+                tracked_candidates = [
+                    bid for bid in victims if bid in self._tracked
+                ]
+                stale = [
+                    bid for bid in victims if bid not in self._tracked
+                ]
+                for bid in stale:
+                    self._policy.evict_block(bid)
+                if not tracked_candidates:
+                    continue
+
+                if trig_active and len(tracked_candidates) > 1:
+                    # Re-rank by base_score - trig_blend_weight * trig_score.
+                    # Lower final score = better eviction candidate.
+                    # Blocks without captured K score 0 on trig, so
+                    # their final score is the base score (no penalty,
+                    # no boost). Tracked blocks WITH captured K that
+                    # show low trig (low importance) get a NEGATIVE
+                    # adjustment that nudges them toward eviction.
+                    self._phase4_trig_blend_evict_calls = (
+                        getattr(
+                            self,
+                            "_phase4_trig_blend_evict_calls",
+                            0,
+                        ) + 1
+                    )
+                    blended: List[Tuple[float, int]] = []
+                    for bid in tracked_candidates:
+                        base = self._policy.score_block(bid)
+                        trig = self.trig_score_block(bid)
+                        if trig is None:
+                            final = float(base)
+                        else:
+                            # Higher trig = more important = LESS
+                            # evictable, so SUBTRACT from final score.
+                            # Wait — score_block convention: lower =
+                            # evict first. So we want LOW trig
+                            # (unimportant) to push final LOWER.
+                            # Therefore: final = base - w * (-trig)
+                            #         = base + w * trig
+                            # ... actually the cleanest interpretation:
+                            # if trig is high (block is important),
+                            # we want final to be HIGH (don't evict).
+                            # So add trig with positive weight.
+                            final = float(base) + (
+                                self._trig_blend_weight * float(trig)
+                            )
+                        blended.append((final, bid))
+                    blended.sort(key=lambda x: x[0])
+                    victim_id = blended[0][1]
+                    self._phase4_trig_blend_picks = (
+                        getattr(self, "_phase4_trig_blend_picks", 0) + 1
+                    )
+                    # Track when trig actually changed the pick (vs
+                    # base-only ordering) so we can verify the signal
+                    # is doing meaningful work.
+                    base_only = sorted(
+                        tracked_candidates,
+                        key=lambda bid: self._policy.score_block(bid),
+                    )
+                    if base_only and base_only[0] != victim_id:
+                        self._phase4_trig_changed_pick = (
+                            getattr(
+                                self, "_phase4_trig_changed_pick", 0,
+                            ) + 1
+                        )
+                else:
+                    # Single-candidate or trig-inactive path.
+                    victim_id = tracked_candidates[0]
+                break
             else:
                 raise ValueError(
                     "CTMEvictorModern.evict(): exhausted retries trying "
                     "to find a victim that is tracked. policy gpu_blocks "
                     "and self._tracked have diverged."
                 )
+            assert victim_id is not None
             content_hash = self._content_hash.pop(victim_id)
             self._num_hashed_tokens.pop(victim_id, None)
             self._last_accessed.pop(victim_id, None)

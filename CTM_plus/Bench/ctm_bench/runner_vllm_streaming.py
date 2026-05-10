@@ -505,6 +505,8 @@ class AsyncEngineDriver:
         phase4_trig_calibration_path: Optional[Path] = None,
         phase4_window_interval: int = 128,
         phase4_future_offsets: Optional[Sequence[int]] = None,
+        phase4_num_layers: int = 0,
+        phase4_capture_every_n: int = 1,
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
         vllm_module: Any = None,
@@ -576,6 +578,8 @@ class AsyncEngineDriver:
             if phase4_future_offsets is not None
             else None
         )
+        self.phase4_num_layers = int(phase4_num_layers)
+        self.phase4_capture_every_n = max(1, int(phase4_capture_every_n))
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -883,15 +887,30 @@ class AsyncEngineDriver:
                     n_attn = install_attn_metadata_side_channel(
                         model=model, evictor=installed_evictor,
                     )
+                    # Pull num_layers from the model config so
+                    # call-counter indexing kicks in for shared-rotary
+                    # models (Qwen2.5 / Llama / Mistral). Matches what
+                    # the calibration script writes into the JSON.
+                    config = getattr(model, "config", None)
+                    runtime_num_layers = (
+                        self.phase4_num_layers if self.phase4_num_layers
+                        else int(getattr(
+                            config, "num_hidden_layers",
+                            getattr(config, "n_layers", 1),
+                        )) if config is not None else 1
+                    )
                     n_rotary = install_pre_rope_capture(
                         model=model, evictor=installed_evictor,
+                        num_layers=runtime_num_layers,
+                        capture_every_n=self.phase4_capture_every_n,
                     )
                     logger.info(
                         "Phase 4: hooks installed (attn_metadata "
                         "side-channel on top-level model: %d, "
                         "pre-RoPE K capture on %d rotary_emb "
-                        "modules).",
-                        n_attn, n_rotary,
+                        "modules; num_layers=%d, capture_every_n=%d).",
+                        n_attn, n_rotary, runtime_num_layers,
+                        self.phase4_capture_every_n,
                     )
                 if self.phase3_attention_capture:
                     # Phase 3: install the attention-capture hook

@@ -378,6 +378,64 @@ $0.20 GPU spend — it directly addresses the "MRL=0.221 below paper's
 0.3 bar" hypothesis and either confirms or rejects "calibration
 quality is the bottleneck."
 
+### §9.3a. Three follow-up improvements landed (post-findings)
+
+After this findings doc was first written, three additional code
+changes shipped to address what the analysis identified as the
+mechanism gaps. The next GPU run should exercise all three.
+
+**§9.3a.i — Per-layer calibration + runtime capture.** Both
+`calibrate_q_centers` and `install_pre_rope_capture` now accept a
+`num_layers` parameter. When `num_layers > n_rotary_modules` (the
+common case for shared-rotary models like Qwen2.5 / Llama / Mistral),
+both use call-counter indexing on the shared rotary_emb so each
+firing is attributed to the correct layer. The calibration driver
+script `calibrate_qcenters_vllm.py` auto-pulls the layer count from
+the model's `config.num_hidden_layers`. CPU regression tests pin
+the indexing semantics for both shared-rotary and per-layer-rotary
+patterns.
+
+**§9.3a.ii — Trig signal blended into the main evict() path.** The
+biggest mechanism gap the diag3 run revealed was that trig only fed
+window_pruning_pass (~45 invocations / 60s) while the main evict()
+fired ~3000× / 60s. `CTMEvictorModern.evict()` now over-samples
+victim candidates from the policy (8 instead of 1) and re-ranks them
+by `final_score = base_score + trig_blend_weight * trig_score`,
+picking the lowest blended final. Blocks without captured K
+contribute trig=0 (backwards compatible). Diagnostic counters
+(`_phase4_trig_blend_evict_calls`, `_phase4_trig_changed_pick`)
+let the next run measure how often trig actually changes the pick.
+
+**§9.3a.iii — Capture subsample knob (`capture_every_n`).** The 20%
+throughput overhead in diag3 came largely from 159K speculative-
+storage calls / 60s. `install_pre_rope_capture(capture_every_n=N)`
+now subsamples capture at the target layer, cutting the work by N×
+without measurably degrading the trig signal (it evolves slowly
+relative to single decode steps). Default `N=1` preserves prior
+behavior; the runner's CLI exposes `--phase4-capture-every-n` (with
+4 as the recommended production trade-off).
+
+**Expected effect of (i)+(ii)+(iii) on the next GPU run:**
+
+* Calibration MRL should rise from 0.221 (pooled) toward 0.3+
+  (per-layer) on Qwen2.5 — closes finding #1.
+* Trig signal influences every eviction, not just window pruning —
+  closes finding "Phase 4 ≡ Phase 2 to the bit."
+* `capture_every_n=4` recovers ~75% of the speculative-storage
+  overhead (the dominant cost in diag3) — should cut the 20%
+  throughput regression to ≤ 5%.
+
+If after running with all three improvements Phase 4 still doesn't
+beat LRU at matched regime, the negative result becomes durable
+evidence that the integration approach (patching the evictor while
+prefix caching is on) is structurally insufficient — at which point
+the next experiment is Phase 3 (real attention forwarding) or a
+different integration point.
+
+The seven-bug-pattern lesson still applies: the CPU fixture catches
+new bugs in this class at $0 GPU. Add a regression test for any new
+behavior before the GPU run that exercises it.
+
 ### §9.4. The roadmap's +3pp hit-rate gate is wrong
 
 The gate was set against the assumption that LRU and CTM+ see the same

@@ -129,6 +129,19 @@ def main(argv=None) -> int:
         head_dim = int(config.hidden_size) // num_heads
     head_dim = int(head_dim)
     rope_theta = float(getattr(config, "rope_theta", 10000.0))
+    # vLLM's Qwen2 / Llama / Mistral models share ONE RotaryEmbedding
+    # instance across all transformer layers. The calibrator's
+    # default per-module layer indexing therefore pools all 28 layers'
+    # Q distributions into one — yielding low MRL (the May 2026 GPU
+    # run measured 0.221, below the paper's 0.3 healthy bar). Pass
+    # the model's actual layer count so the calibrator uses
+    # call-counter indexing and produces per-layer stats.
+    num_hidden_layers = int(
+        getattr(
+            config, "num_hidden_layers",
+            getattr(config, "n_layers", num_heads),
+        )
+    )
 
     sampling = SamplingParams(
         temperature=0.0,
@@ -146,6 +159,7 @@ def main(argv=None) -> int:
         num_heads=num_heads,
         num_kv_heads=num_kv_heads,
         head_dim=head_dim,
+        num_layers=num_hidden_layers,
         rope_theta=rope_theta,
         corpus_label=args.corpus_label,
         max_tokens=args.max_tokens,

@@ -128,6 +128,28 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--phase4-num-layers", type=int, default=0,
+        help=(
+            "Phase 4: number of transformer layers in the model. "
+            "When > number of rotary_emb modules (e.g., on Qwen2.5 "
+            "where 28 layers share a single rotary_emb), enables "
+            "call-counter layer indexing during pre-RoPE capture so "
+            "scoring uses per-layer Q-center stats. Default 0 means "
+            "auto-detect from the model's config.num_hidden_layers."
+        ),
+    )
+    parser.add_argument(
+        "--phase4-capture-every-n", type=int, default=1,
+        help=(
+            "Phase 4: only run pre-RoPE K capture every N rotary "
+            "firings (at the target layer). Cuts the speculative-"
+            "storage overhead (the May 2026 GPU run measured 159K "
+            "captures / 60s; N=4 reduces that to ~40K). Default 1 "
+            "= no subsample. Use 4 for the production-default "
+            "trade-off."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -192,6 +214,8 @@ def main(argv: Sequence[str]) -> int:
         phase4_trig_calibration_path=args.phase4_trig_calibration,
         phase4_window_interval=args.phase4_window_interval,
         phase4_future_offsets=phase4_offsets,
+        phase4_num_layers=args.phase4_num_layers,
+        phase4_capture_every_n=args.phase4_capture_every_n,
         max_decode_tokens=args.max_decode_tokens,
     )
 

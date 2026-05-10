@@ -681,3 +681,415 @@ def test_fixture_actually_catches_a_broken_evictor():
     # MUST fire.
     with pytest.raises(AssertionError, match="not in self._cached_blocks"):
         alloc._evict_one()
+
+
+# --------------------------------------------------------------------- #
+# Phase 4 outcome-improvement follow-up tests (post May-2026 negative
+# result). These pin three changes intended to turn Phase 4 from
+# "fires but doesn't change outcomes" into "fires and shifts the
+# eviction sequence":
+#
+#   1. trig_score is blended into the main evict() path, not just
+#      window_pruning_pass.
+#   2. Per-layer call-counter indexing in install_pre_rope_capture
+#      so shared-rotary models (Qwen2.5 / Llama / Mistral) get
+#      per-layer stats instead of layer-pooled.
+#   3. capture_every_n subsamples the speculative-storage work to
+#      cut overhead.
+# --------------------------------------------------------------------- #
+
+
+def _build_phase4_evictor_with_two_distinct_trig_scores(
+    trig_score_weight: float,
+):
+    """Helper: admit three blocks where the empirically-measured
+    trig scores (under this Q-center setup + future-offsets default)
+    split into "more-important" and "less-important" groups. We
+    measure scores via trig_score_block before constructing the
+    test scenario rather than assuming a sign convention — the
+    paper's score formula combines s_trig (signed) and s_norm
+    (positive), and the sign of the result depends on the (ω_f,
+    delta) interaction in s_trig.
+    """
+    from kv_policy.triattention import TrigScorer, QCenterStats
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=1, num_heads=1, num_kv_heads=1,
+        head_dim=4,
+        e_q_real=[[[1.0, 0.0]]],
+        e_q_imag=[[[0.0, 0.0]]],
+        e_q_norm=[[[1.0, 1.0]]],
+    )
+    evictor = CTMEvictorModern(
+        num_blocks_capacity=128, block_size=16,
+        trig_scorer=TrigScorer(stats=stats),
+        trig_score_weight=trig_score_weight,
+    )
+    for bid in (1, 2, 3):
+        evictor.add(
+            block_id=bid, content_hash=bid * 100,
+            num_hashed_tokens=16, last_accessed=0.0,
+        )
+    evictor.set_block_pre_rope_keys(
+        1, keys=[(0, [1.0, 0.0], [0.0, 0.0])], layer=0, head=0,
+    )
+    evictor.set_block_pre_rope_keys(
+        2, keys=[(0, [-1.0, 0.0], [0.0, 0.0])], layer=0, head=0,
+    )
+    evictor.set_block_pre_rope_keys(
+        3, keys=[(0, [-1.0, 0.0], [0.0, 0.0])], layer=0, head=0,
+    )
+    s1 = evictor.trig_score_block(1)
+    s2 = evictor.trig_score_block(2)
+    s3 = evictor.trig_score_block(3)
+    return evictor, {1: s1, 2: s2, 3: s3}
+
+
+def test_trig_blend_in_evict_picks_lowest_blended_score():
+    """The May 2026 GPU run had trig firing but only via window
+    pruning (~45 calls / 60s) — the main evict() ran ~3000× and
+    was untouched. This test pins the new behavior: trig signal
+    feeds the per-call evict() decision via blended scoring.
+    Convention (empirical from the trig formula): higher trig
+    score = more important, so we want the LOWEST blended score
+    (base + w*trig) evicted first. Verify by computing the
+    expected blended ranking and asserting evict() agrees.
+    """
+    evictor, scores = (
+        _build_phase4_evictor_with_two_distinct_trig_scores(10.0)
+    )
+    # All blocks have the same base (no recency differentiation),
+    # so blend ordering is determined entirely by trig: lowest
+    # trig → first to evict.
+    expected_victim = min(scores, key=lambda bid: scores[bid])
+
+    victim_id, _ = evictor.evict()
+    assert victim_id == expected_victim, (
+        f"blend picked block {victim_id} (trig={scores[victim_id]}); "
+        f"expected block {expected_victim} (trig={scores[expected_victim]}). "
+        "All blocks tied on base score, so the lowest trig should win."
+    )
+    assert evictor._phase4_trig_blend_evict_calls >= 1
+
+
+def test_trig_blend_can_override_base_ordering_with_strong_weight():
+    """Stronger property: a high enough trig_score_weight forces
+    the blend to follow trig ordering even when base ordering
+    points the other way. We bump recency on the
+    minimum-trig block to make base want to keep it; trig should
+    still drive the eviction decision.
+    """
+    evictor, scores = (
+        _build_phase4_evictor_with_two_distinct_trig_scores(100.0)
+    )
+    min_trig_block = min(scores, key=lambda bid: scores[bid])
+
+    # Bump recency on the min-trig block so base-only would prefer
+    # to KEEP it. Many updates → high last_access_step → high
+    # recency contribution → high base score → last to be evicted
+    # under base-only.
+    for _ in range(100):
+        evictor.update(block_id=min_trig_block, last_accessed=1.0)
+
+    # With dominant trig_score_weight, the blend must still pick
+    # the min-trig block (low importance overrides high recency).
+    victim_id, _ = evictor.evict()
+    assert victim_id == min_trig_block, (
+        f"strong-trig blend picked {victim_id}; expected "
+        f"{min_trig_block} (lowest trig). The trig signal must be "
+        "strong enough to override base ordering."
+    )
+
+
+def test_trig_blend_falls_back_when_no_keys_captured():
+    """When no blocks have captured K (cold start, or
+    capture_every_n misses, or an early eviction before any
+    capture), trig contribution = 0 and the evict() pick is
+    determined solely by base scoring. Pinned via the diagnostic
+    counter — without trig info, the blend code MUST count zero
+    trig-driven pick changes."""
+    from kv_policy.triattention import TrigScorer, QCenterStats
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=1, num_heads=1, num_kv_heads=1,
+        head_dim=4,
+        e_q_real=[[[1.0, 0.0]]],
+        e_q_imag=[[[0.0, 0.0]]],
+        e_q_norm=[[[1.0, 1.0]]],
+    )
+    evictor = CTMEvictorModern(
+        num_blocks_capacity=64, block_size=16,
+        trig_scorer=TrigScorer(stats=stats),
+        trig_score_weight=10.0,
+    )
+    # No set_block_pre_rope_keys calls — no captured K anywhere.
+    for bid in (1, 2, 3):
+        evictor.add(
+            block_id=bid, content_hash=bid * 100,
+            num_hashed_tokens=16, last_accessed=0.0,
+        )
+    # Multiple evicts — trig must never change the pick.
+    while evictor.num_blocks > 0:
+        evictor.evict()
+    # The blend ran (counter ticked) but with all trig scores
+    # None it must have kept the base-only ordering throughout.
+    assert getattr(evictor, "_phase4_trig_changed_pick", 0) == 0
+    assert evictor._phase4_trig_blend_evict_calls > 0
+
+
+def test_install_pre_rope_capture_call_counter_indexing():
+    """Per-layer indexing on a shared-rotary model: one rotary_emb
+    module fires N times per model.forward (once per layer); the
+    pre-hook uses a counter to attribute each firing to the correct
+    layer. Pinned via a snapshot of the layer_idx the capture
+    function sees on each call.
+    """
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import (
+        install_attn_metadata_side_channel,
+        install_pre_rope_capture,
+    )
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    seen_layers: List[int] = []
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeLlamaModel(torch.nn.Module):
+        """Mimics Qwen2/Llama: ONE shared rotary_emb, fired N times
+        per model.forward."""
+
+        def __init__(self, n_layers: int):
+            super().__init__()
+            self.rotary_emb = RotaryEmb()
+            self.n_layers = n_layers
+
+        def forward(self, input_ids, positions, kv_caches, attn_metadata):
+            q = torch.zeros((1, 4))
+            k = torch.zeros((1, 4))
+            for _ in range(self.n_layers):
+                self.rotary_emb(positions, q, k)
+            return input_ids
+
+    class FakeMeta:
+        slot_mapping = torch.tensor([0])
+        num_decode_tokens = 1
+
+    evictor = CTMEvictorModern(num_blocks_capacity=64, block_size=16)
+    model = FakeLlamaModel(n_layers=4)
+    install_attn_metadata_side_channel(model=model, evictor=evictor)
+    n_hooked = install_pre_rope_capture(
+        model=model, evictor=evictor,
+        num_layers=4,
+        layer_for_scoring=2,  # capture from layer 2 specifically
+    )
+    assert n_hooked == 1  # one rotary_emb module hooked
+
+    # Snapshot which layer_idx the capture sees on each firing.
+    original_capture = None
+    from kv_policy import triattention as ta_mod
+    original_capture = ta_mod._capture_pre_rope_k_to_evictor
+
+    def spy(*, inputs, evictor, layer, head, inferred_head_dim):
+        seen_layers.append(layer)
+
+    ta_mod._capture_pre_rope_k_to_evictor = spy
+    try:
+        model(
+            torch.zeros((1,), dtype=torch.long),
+            torch.zeros((1,), dtype=torch.long),
+            None,
+            FakeMeta(),
+        )
+    finally:
+        ta_mod._capture_pre_rope_k_to_evictor = original_capture
+
+    # Capture only fires on the target layer; with layer_for_scoring=2
+    # and call-counter indexing across 4 layers per forward, exactly
+    # one capture call should land on layer 2.
+    assert seen_layers == [2]
+
+
+def test_install_pre_rope_capture_per_module_indexing_unchanged():
+    """Backwards compat: when num_layers == n_rotary_modules (or
+    None), behavior matches the original per-module indexing.
+    Pinned because the call-counter path is opt-in.
+    """
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import install_pre_rope_capture
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeMultiRotaryModel(torch.nn.Module):
+        """Mimics an unusual model where each layer has its OWN
+        rotary_emb. Per-module indexing must apply here."""
+
+        def __init__(self, n_layers: int):
+            super().__init__()
+            self.rotaries = torch.nn.ModuleList(
+                [RotaryEmb() for _ in range(n_layers)]
+            )
+
+    evictor = CTMEvictorModern(num_blocks_capacity=64, block_size=16)
+    model = FakeMultiRotaryModel(n_layers=3)
+    n = install_pre_rope_capture(
+        model=model, evictor=evictor,
+        num_layers=None,  # auto = n_modules = 3
+    )
+    assert n == 3
+
+
+def test_install_pre_rope_capture_subsample_knob():
+    """capture_every_n subsamples the speculative-storage work.
+    With N=4, only every 4th rotary firing at the target layer
+    runs capture. The other 3 are skipped (counted in
+    _phase4_capture_subsample_skips).
+    """
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import (
+        install_attn_metadata_side_channel,
+        install_pre_rope_capture,
+    )
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self, n_layers: int):
+            super().__init__()
+            self.rotary_emb = RotaryEmb()
+            self.n_layers = n_layers
+
+        def forward(self, input_ids, positions, kv_caches, attn_metadata):
+            q = torch.zeros((1, 4))
+            k = torch.zeros((1, 4))
+            for _ in range(self.n_layers):
+                self.rotary_emb(positions, q, k)
+            return input_ids
+
+    class FakeMeta:
+        slot_mapping = torch.tensor([0])
+        num_decode_tokens = 1
+
+    evictor = CTMEvictorModern(num_blocks_capacity=64, block_size=16)
+    model = FakeModel(n_layers=2)
+    install_attn_metadata_side_channel(model=model, evictor=evictor)
+    install_pre_rope_capture(
+        model=model, evictor=evictor,
+        num_layers=2, layer_for_scoring=1,  # target layer = 1
+        capture_every_n=4,
+    )
+
+    # Drive 8 forwards. Each forward fires rotary 2× (layers 0 and 1).
+    # Capture only runs at layer 1 (4 attempts across 8 forwards).
+    # With capture_every_n=4, the first 3 of those 4 are skipped;
+    # only the 4th invokes the capture function.
+    for _ in range(8):
+        model(
+            torch.zeros((1,), dtype=torch.long),
+            torch.zeros((1,), dtype=torch.long),
+            None,
+            FakeMeta(),
+        )
+    # 8 forwards × 2 layers = 16 rotary calls. 8 hit the target
+    # layer (layer 1). Of those 8, capture_every_n=4 means only 2
+    # actually run (the 4th and 8th).
+    skips = getattr(evictor, "_phase4_capture_subsample_skips", 0)
+    assert skips == 6, (
+        f"expected 6 subsample skips (8 target-layer firings - 2 "
+        f"actual captures); got {skips}"
+    )
+
+
+def test_calibrate_q_centers_uses_call_counter_indexing_when_num_layers_set():
+    """Calibration sister of the runtime per-layer test: pass
+    num_layers > n_rotary_modules to opt into call-counter
+    indexing during calibration. The resulting QCenterStats has
+    the requested num_layers, not n_modules.
+    """
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import calibrate_q_centers
+
+    captures: List[int] = []
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self, n_layers: int):
+            super().__init__()
+            self.rotary_emb = RotaryEmb()
+            self.n_layers = n_layers
+
+        def forward(self, input_ids=None):
+            positions = torch.zeros((1,), dtype=torch.long)
+            for _ in range(self.n_layers):
+                q = torch.zeros((1, 4))
+                k = torch.zeros((1, 4))
+                self.rotary_emb(positions, q, k)
+            return torch.zeros(1)
+
+    model = FakeModel(n_layers=4)
+
+    def driver(m):
+        for _ in range(2):
+            m()  # 2 forwards × 4 layers = 8 rotary calls
+
+    stats = calibrate_q_centers(
+        model=model, forward_callable=driver,
+        model_name="fake-llama-style",
+        num_heads=1, head_dim=4, num_kv_heads=1,
+        num_layers=4,
+        max_tokens=10_000,
+    )
+    assert stats.num_layers == 4
+    # All four per-layer stats slots populated (each layer should
+    # have absorbed 2 firings). Assert non-empty arrays.
+    assert len(stats.e_q_real) == 4
+    for layer_idx in range(4):
+        assert len(stats.e_q_real[layer_idx]) == 1  # num_heads
+
+
+def test_calibrate_q_centers_rejects_call_counter_with_multiple_modules():
+    """Sanity guard: call-counter indexing only makes sense on
+    shared-rotary models. If we asked for num_layers > n_modules
+    AND there are multiple modules, that's a configuration error;
+    raise rather than silently mis-attribute."""
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import calibrate_q_centers
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self, n_modules: int):
+            super().__init__()
+            self.rotaries = torch.nn.ModuleList(
+                [RotaryEmb() for _ in range(n_modules)]
+            )
+
+    with pytest.raises(ValueError, match="exactly one shared"):
+        calibrate_q_centers(
+            model=FakeModel(n_modules=3),
+            forward_callable=lambda m: None,
+            model_name="x",
+            num_heads=1, head_dim=4, num_kv_heads=1,
+            num_layers=10,  # > 3, but n_modules=3, so error
+            max_tokens=1000,
+        )
