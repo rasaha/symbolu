@@ -153,7 +153,7 @@ def main(argv=None) -> int:
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    stats.save_json(str(out_path))
+    stats.save(out_path)
     print(
         f"Wrote {out_path} | layers={stats.num_layers} "
         f"kv_heads={stats.num_kv_heads} bands={stats.num_bands} "
