@@ -853,6 +853,35 @@ risk.
 > again until vLLM re-`add()`'s it." This is now a baseline
 > expectation; the same lens needs applying to
 > `add` / `remove` / `update` as Phase 5 work expands the contract.
+>
+> **Finding 3 — re-admission divergence (uncovered on the second
+> GPU re-run).** With Findings 1 and 2 fixed, both Phase 2 and
+> Phase 4 cells produced real signal — `swap_out=1134, preempt=1`,
+> 0% prefix-cache hit, 99.4% GPU KV usage — confirming the
+> pressure-collapse fix and the first evictor fix landed correctly.
+> But after ~5 of 30 requests completed, vLLM crashed with
+> `ValueError: CTMEvictorModern.evict() called with no tracked
+> blocks`. Diagnosis: vLLM's `PrefixCachingBlockAllocator` re-admits
+> evicted blocks routinely (the slot is freshly allocated, gets
+> filled with new content, gets re-hashed, gets re-`add()`'d).
+> CTMEvictorModern's `add()` called `KVCachePolicy.ensure_block()`,
+> which early-returns when `block_id in self.blocks` — and our
+> `evict_block` path discards from `gpu_blocks` but never pops from
+> `self.blocks`. After enough re-admissions, `gpu_blocks` shrank to
+> empty even though `_tracked` was full; `select_victims` returned
+> `[]` and we raised. Fix: explicitly add to `gpu_blocks` after
+> `ensure_block` in the wrapper's `add()` path. Regression test
+> `test_ctm_evictor_modern_sustained_evict_readmit_many_cycles`
+> exercises 50 evict/readmit cycles and pins the `_tracked ==
+> gpu_blocks` invariant.
+>
+> Three audit-pass misses in the same family — all involving
+> single-shot mocked tests that did not replicate vLLM's
+> cross-call behavior under sustained pressure. The lesson holds:
+> for any wrapper around a vLLM-internal data structure, the
+> contract test must drive it through repeated, mixed-operation
+> sequences that mirror real allocation pressure, not just one
+> call per ABC method.
 
 The streaming runner supports a fourth path:
 `--ctm-plus --phase4-trig-calibration <stats.json>` loads

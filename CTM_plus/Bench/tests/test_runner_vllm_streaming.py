@@ -1270,6 +1270,73 @@ def test_ctm_evictor_modern_evict_drains_policy_gpu_blocks():
     assert ev._policy.gpu_blocks == set()
 
 
+def test_ctm_evictor_modern_sustained_evict_readmit_many_cycles():
+    """Regression for the second vLLM 0.7.3 GPU crash: under sustained
+    streaming pressure vLLM repeatedly evicts then re-admits the same
+    block_ids. CTMEvictorModern must keep _tracked and the underlying
+    policy's gpu_blocks set in lockstep across these cycles, or
+    select_victims eventually returns [] (because gpu_blocks empties
+    while _tracked refills) and evict() raises
+    'CTMEvictorModern.evict() called with no tracked blocks'.
+
+    This is the third audit-pass miss in the same family: the
+    wrapper's earlier add() relied on KVCachePolicy.ensure_block
+    populating gpu_blocks, but ensure_block early-returns for blocks
+    that already have a BlockState — and our evict_block path never
+    pops self.blocks. After enough re-admissions, gpu_blocks shrinks
+    to empty even though _tracked is full.
+    """
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    ev = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+
+    # Mirror what vLLM's PrefixCachingBlockAllocator does under
+    # sustained pressure: the same block_ids cycle through admit /
+    # evict / re-admit many times.
+    block_pool = list(range(20))
+    next_hash = {bid: bid * 1_000 for bid in block_pool}
+
+    for bid in block_pool:
+        ev.add(block_id=bid, content_hash=next_hash[bid],
+               num_hashed_tokens=16, last_accessed=0.0)
+
+    for cycle in range(50):
+        # Evict one — vLLM treats the slot as freshly allocated.
+        victim_id, _ = ev.evict()
+
+        # vLLM's path: the slot fills with new content, gets a new
+        # hash, gets re-admitted with that hash.
+        next_hash[victim_id] += 1
+        ev.add(
+            block_id=victim_id,
+            content_hash=next_hash[victim_id],
+            num_hashed_tokens=16,
+            last_accessed=float(cycle),
+        )
+
+        # Cross-call invariant: after every cycle the wrapper's
+        # _tracked, the policy's gpu_blocks, and num_blocks must
+        # match. Without the fix, gpu_blocks would shrink toward 0
+        # while _tracked stays at 20.
+        assert ev.num_blocks == len(ev._tracked)
+        assert ev._tracked == ev._policy.gpu_blocks, (
+            f"cycle {cycle}: _tracked={sorted(ev._tracked)} "
+            f"gpu_blocks={sorted(ev._policy.gpu_blocks)} — divergence "
+            "is the bug that crashed the May 2026 GPU run."
+        )
+
+    # And: after all cycles, select_victims must still produce
+    # candidates whenever num_blocks > 0.
+    while ev.num_blocks > 0:
+        victims = ev._policy.select_victims(count=1)
+        assert victims, (
+            "select_victims returned empty even though "
+            f"num_blocks={ev.num_blocks}; this is the AsyncEngineDeadError"
+            " trigger."
+        )
+        ev.evict()
+
+
 def test_ctm_evictor_modern_evict_then_readd_then_evict():
     """A more realistic vLLM 0.7.3 sequence: admit, evict (block goes
     back to free pool), re-admit (with potentially new content_hash),

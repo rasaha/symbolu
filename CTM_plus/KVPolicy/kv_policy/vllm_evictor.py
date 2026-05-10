@@ -788,6 +788,15 @@ class CTMEvictorModern:
             block_id=block_id, sequence_id=0,
             positions=positions,
         )
+        # ensure_block early-returns when block_id is already in
+        # self.blocks (which happens on re-admission of an evicted
+        # block — vLLM frees the slot via evictor.evict() and may
+        # later re-admit the same block_id with a new content_hash).
+        # In that path the early-return skips re-adding to gpu_blocks,
+        # so _tracked grows while gpu_blocks stays drained, and
+        # select_victims eventually returns []. Force the membership
+        # here to keep the two sets in lockstep on every add().
+        self._policy.gpu_blocks.add(block_id)
 
     def update(self, block_id: int, last_accessed: float) -> None:
         """Record an access to a tracked block.
