@@ -864,6 +864,10 @@ class CTMEvictorModern:
         self._content_hash.pop(block_id, None)
         self._num_hashed_tokens.pop(block_id, None)
         self._last_accessed.pop(block_id, None)
+        # Phase 4: drop speculatively-stored pre-RoPE keys when the
+        # block is freed so the dict stays bounded.
+        self._block_pre_rope_keys.pop(block_id, None)
+        self._block_layer_head.pop(block_id, None)
         self._policy.evict_block(block_id)
 
     def evict(self) -> Tuple[int, int]:
@@ -913,6 +917,10 @@ class CTMEvictorModern:
             self._num_hashed_tokens.pop(victim_id, None)
             self._last_accessed.pop(victim_id, None)
             self._tracked.discard(victim_id)
+            # Phase 4: drop speculatively-stored pre-RoPE keys for
+            # the evicted block so the dict stays bounded.
+            self._block_pre_rope_keys.pop(victim_id, None)
+            self._block_layer_head.pop(victim_id, None)
             # Mirror vLLM's LRUEvictor: on evict, the block is fully
             # removed from the evictor's pool. The CTM+ policy's
             # gpu_blocks set is the parallel "evictor pool" — keep it
@@ -969,9 +977,24 @@ class CTMEvictorModern:
         captured vectors come from. Phase 4 default uses the last
         layer's first head — see MODE_B_PHASE4_DESIGN.md §3 for the
         single-layer simplification justification.
+
+        **Speculative storage:** does NOT gate on ``self._tracked``.
+        The first GPU run (May 2026) showed every decode token writes
+        to a block_id that vLLM has not yet promoted to immutable —
+        so it isn't in the evictor's pool yet, and gating here was
+        the silent wall that produced
+        ``phase4_blocks_captured_with_pre_rope_keys=0``. We store
+        speculatively; ``remove()`` and ``evict()`` pop the keys when
+        the block is freed, so the dict stays bounded by the live
+        cache footprint.
         """
+        self._phase4_set_pre_rope_keys_calls = (
+            getattr(self, "_phase4_set_pre_rope_keys_calls", 0) + 1
+        )
         if block_id not in self._tracked:
-            return
+            self._phase4_set_pre_rope_keys_speculative = (
+                getattr(self, "_phase4_set_pre_rope_keys_speculative", 0) + 1
+            )
         self._block_pre_rope_keys[block_id] = list(keys)
         self._block_layer_head[block_id] = (int(layer), int(head))
 

@@ -109,6 +109,12 @@ class StreamingRunCellResult:
     phase4_capture_aborts_no_slot_mapping: int = 0
     phase4_capture_aborts_no_decode_tokens: int = 0
     phase4_capture_exceptions: int = 0
+    # Set inside set_block_pre_rope_keys; the second tracks how many
+    # of those calls landed on a block that wasn't yet in the evictor's
+    # _tracked set (the "speculative storage" path that the May 2026
+    # GPU run revealed was needed).
+    phase4_set_pre_rope_keys_calls: int = 0
+    phase4_set_pre_rope_keys_speculative: int = 0
 
 
 # ---------------------------------------------------------------- #
@@ -1179,6 +1185,18 @@ class AsyncEngineDriver:
                 getattr(
                     self._installed_evictor or _DummyZero(),
                     "_phase4_capture_exceptions", 0,
+                )
+            ),
+            phase4_set_pre_rope_keys_calls=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_set_pre_rope_keys_calls", 0,
+                )
+            ),
+            phase4_set_pre_rope_keys_speculative=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_set_pre_rope_keys_speculative", 0,
                 )
             ),
         )

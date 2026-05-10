@@ -956,7 +956,18 @@ def test_ctm_evictor_modern_phase4_constructor_accepts_trig_scorer():
     assert ev.window_pruning_invocations == 0
 
 
-def test_ctm_evictor_modern_set_block_pre_rope_keys_silent_on_untracked():
+def test_ctm_evictor_modern_set_block_pre_rope_keys_speculative_when_untracked():
+    """Regression for the May 2026 GPU run: every decode token writes
+    to a block that vLLM has not yet promoted to immutable, so it
+    isn't in the evictor's _tracked set yet. The original code gated
+    set_block_pre_rope_keys on _tracked and silently no-op'd, which
+    produced phase4_blocks_captured_with_pre_rope_keys=0 in
+    production. Speculative storage fixes that: the keys are
+    accepted, and the speculative-store counter ticks. trig_score
+    still returns None for genuinely-untracked blocks because the
+    scoring path needs the block to be live in the evictor's pool —
+    but the K data is preserved for when the block gets promoted.
+    """
     from kv_policy.vllm_evictor import CTMEvictorModern
     from kv_policy.triattention import TrigScorer
 
@@ -965,9 +976,22 @@ def test_ctm_evictor_modern_set_block_pre_rope_keys_silent_on_untracked():
         num_blocks_capacity=128, block_size=16,
         trig_scorer=scorer,
     )
-    # Block 999 isn't tracked; should silently no-op.
+    # Block 999 isn't tracked; the call now speculates rather than
+    # silently no-op'ing.
     ev.set_block_pre_rope_keys(999, keys=[(0, [0.0, 0.0], [0.0, 0.0])])
-    assert ev.trig_score_block(999) is None
+    assert ev._phase4_set_pre_rope_keys_calls == 1
+    assert ev._phase4_set_pre_rope_keys_speculative == 1
+    assert 999 in ev._block_pre_rope_keys
+
+    # When the block gets later admitted, its keys are already
+    # available — captures don't need to re-run.
+    ev.add(block_id=999, content_hash=42, num_hashed_tokens=16,
+           last_accessed=0.0)
+    assert 999 in ev._block_pre_rope_keys
+
+    # And on remove, the speculative entry is GC'd.
+    ev.remove(999)
+    assert 999 not in ev._block_pre_rope_keys
 
 
 def test_ctm_evictor_modern_trig_score_block_returns_none_without_keys():
