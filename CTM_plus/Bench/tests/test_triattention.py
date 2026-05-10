@@ -782,13 +782,14 @@ def test_attn_metadata_side_channel_stashes_then_clears():
     # Before any forward — side-channel is None.
     assert getattr(ev, "_phase4_pending_slot_mapping", None) is None
 
-    # Trigger forward — pre-hook fires (stashes), post-hook fires
-    # (clears at the end). After the forward completes, side-channel
-    # is back to None.
+    # Trigger forward via __call__ so PyTorch's hook dispatcher runs
+    # (calling .forward() directly bypasses register_forward_*_hook).
+    # Pre-hook fires (stashes), post-hook fires (clears). After the
+    # forward completes, side-channel is back to None.
     q = torch.zeros((3, 8))
     k = torch.zeros((3, 8))
     v = torch.zeros((3, 8))
-    model.attn.forward(q, k, v, None, FakeMeta())
+    model.attn(q, k, v, None, FakeMeta())
     assert ev._phase4_pending_slot_mapping is None
     assert ev._phase4_pending_num_decode_tokens == 0
 

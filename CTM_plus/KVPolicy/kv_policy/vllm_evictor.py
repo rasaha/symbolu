@@ -1825,7 +1825,7 @@ def _gpu_extract_decode_attention(
         # aggregate_attention_to_blocks expects len(weights) <=
         # len(block_table) * block_size; truncate to seq_len.
         per_block_sums = aggregate_attention_to_blocks(
-            weights=weights_list[:seq_len],
+            attention_weights=weights_list[:seq_len],
             block_table=block_ids_used,
             block_size=block_size_runtime,
         )
