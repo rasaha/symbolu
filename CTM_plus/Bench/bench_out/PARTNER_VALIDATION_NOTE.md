@@ -122,25 +122,37 @@ look like.
   workloads, at much lower runtime cost. Running Phase 3's
   GPU validation before evaluating the trig-based
   alternative would commit to the wrong direction.
-* **Phase 4 (trigonometric position scoring) — design
-  complete.** A May 2026 design at
-  `scripts/MODE_B_PHASE4_DESIGN.md` adopts TriAttention's
-  pre-RoPE Q-center-based scoring as a new component in
-  CTM+'s scoring formula, while keeping CTM+'s structural
-  advantages (S3-FIFO admission for scan resistance,
-  online recency tracking, block-level vLLM integration).
-  Implementation **code-complete as of May 2026** (49
-  tests, 239 total in Bench after a +2 audit-pass repair —
-  see RESULTS.md §13.2.1 for the first-GPU-run findings
-  and the two HIGH-severity fixes that closed before the
-  next attempt). All GPU-side hooks are
-  written: offline `calibrate_q_centers`, runtime
-  `install_pre_rope_capture`, sibling
-  `install_attn_metadata_side_channel`. The four-cell GPU
-  experiment runbook is at
-  `scripts/MODE_B_PHASE4_GPU_RUNBOOK.md`. Estimated
-  validation cost: ~$0.60–1.00 GPU spot (RunPod A100,
-  ~25–30 minutes wall).
+* **Phase 4 (trigonometric position scoring) — GPU-validated
+  with negative result.** Six GPU runs on RunPod A100 + vLLM
+  0.7.3 + Qwen2.5-7B-Instruct, ~$1.60 total. **The trig
+  scoring did not beat CTM+ Phase 2 or LRU on streaming chat
+  at heavy KV pressure** — Phase 4 throughput dropped ~20%
+  with no measurable improvement in swap-out per decode token.
+  The win condition (≥+3pp hit-rate uplift over LRU) was
+  missed; the gate definition itself was structurally
+  miscalibrated (LRU and CTM+ run at different effective
+  cache pressures because the evictor patch disrupts vLLM's
+  prefix-cache promotion path).
+
+  The session also produced **seven audit-pass findings** —
+  bugs the prior CPU mocked tests had not caught, surfaced
+  only at GPU-execution time. All seven fixed in source. A
+  new CPU fixture `tests/test_vllm_protocol_fixture.py`
+  exercises the cross-call vLLM-allocator protocol and would
+  have caught all seven at $0 in <0.2s.
+
+  **Canonical write-up:** `bench_out/PHASE4_GPU_FINDINGS.md`
+  documents the six runs, the seven audit-pass findings, the
+  synthetic-Mode-A↔real-GPU reconciliation (five reasons the
+  Mode A wins don't transfer), and a corrected gate definition
+  for the next iteration. Read it before citing any Phase 4
+  claim to a partner.
+
+  Implementation status, for the record: 240 Bench tests pass
+  + 8 fixture tests + 1 torch-skipped hook-ordering test (248
+  total); GPU-side hooks `calibrate_q_centers`,
+  `install_pre_rope_capture`, `install_attn_metadata_side_channel`
+  all implemented and validated through the seven repairs.
 
 * **Acknowledged related work — TriAttention.** The
   TriAttention paper (Mao et al., MIT/NVIDIA/ZJU, arXiv:

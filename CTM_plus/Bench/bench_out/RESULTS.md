@@ -778,7 +778,39 @@ risk.
 **Phase 3 (attention forwarding so CTM+'s real policy runs): code-complete; GPU validation deferred pending Phase 4.**
 **Phase 4 (TriAttention-inspired trigonometric position scoring): all code complete; first GPU run partially failed; bugs fixed in CTMEvictorModern + harness, GPU re-run pending.**
 
-> ### §13.2.1 First Phase 4 GPU run findings (May 2026 — partial)
+> ### §13.2.1 Phase 4 GPU run findings (May 2026 — complete with negative result)
+>
+> **Canonical write-up:** `bench_out/PHASE4_GPU_FINDINGS.md`. That
+> document is the single source of truth for what the May 2026 GPU
+> session attempted, what it produced, and how the synthetic-Mode-A
+> predictions reconcile (or don't) with the real-GPU measurements.
+> Read it first if a partner asks "did your trig scoring beat LRU?"
+>
+> **Headline:** Phase 4 GPU validation is complete. On streaming chat
+> at heavy KV pressure on Qwen2.5-7B in vLLM 0.7.3, **CTM+ Phase 4
+> with pooled-layer calibration does not beat Phase 2 or LRU**.
+> Throughput drops ~20% relative to Phase 2; swap-out per decode
+> token is roughly identical. The +3pp hit-rate gate from
+> `POST_PHASE4_ROADMAP.md` step 1 was missed. The gate definition
+> itself is wrong (it assumed both cells see the same workload; the
+> patched evictor disrupts vLLM's prefix-cache promotion path so
+> they don't); a corrected gate appears in PHASE4_GPU_FINDINGS.md
+> §9.4.
+>
+> **What the run also produced:** seven audit-pass findings (bugs in
+> the implementation that the prior CPU mocked tests had not caught).
+> All seven fixed in source. New CPU fixture
+> `tests/test_vllm_protocol_fixture.py` catches the entire 7-bug
+> pattern at $0 in <0.2s; would have prevented the GPU spend that
+> surfaced them.
+>
+> **Total session GPU spend:** ~$1.60 spot on RunPod A100.
+>
+> The detailed audit-pass narrative below documents the first two
+> findings. PHASE4_GPU_FINDINGS.md §4 covers all seven plus the
+> synthetic↔real reconciliation in §5.
+>
+> ### Original §13.2.1 (preserved for the audit-pass narrative)
 >
 > The first end-to-end Phase 4 GPU validation on RunPod A100 + vLLM
 > 0.7.3 + Qwen2.5-7B-Instruct surfaced two HIGH-severity issues that

@@ -36,43 +36,76 @@ on paper" to "demonstrated on hardware."
 
 ---
 
-## Step 1 — Phase 4 GPU validation (this week)
+## Step 1 — Phase 4 GPU validation (executed May 2026, negative result)
 
-**Goal:** prove that TriAttention-inspired trig scoring on real pre-RoPE Q/K
+> **STATUS UPDATE — May 2026:** Step 1 was executed end-to-end on
+> RunPod A100 + Qwen2.5-7B-Instruct + vLLM 0.7.3 over six GPU runs
+> (~$1.60 total spot). The original gate ("Phase 4 hit-rate uplift
+> over LRU ≥ +3pp") was **missed**. The full session record is
+> `bench_out/PHASE4_GPU_FINDINGS.md`; this section retains the
+> original framing for historical reference but the gate definition
+> below is now superseded — see "Corrected Step 1 gate" further down.
+
+**Goal (original):** prove that TriAttention-inspired trig scoring on real pre-RoPE Q/K
 geometry, plugged into vLLM 0.7+ via the CTM+ evictor, beats LRU on streaming
 hit-rate at fixed cache budget.
 
-**Effort:** ~1 GPU-day on a single A100 / H100, **~$1** at spot pricing.
+**Effort (actual):** 6 GPU runs over one session, ~$1.60 spot. Six audit-pass
+findings landed during the session; a seventh closed the comparison-validity
+issue surfaced by the data.
 
-**Procedure:** follow `MODE_B_PHASE4_GPU_RUNBOOK.md` end-to-end:
+**Procedure (executed):** see `MODE_B_PHASE4_GPU_RUNBOOK.md` for what was
+attempted and `PHASE4_GPU_FINDINGS.md` for what actually happened.
 
-1. §2 — calibrate Q-centers on Llama-3-8B (~5 min, ~$0.05).
-2. §3 — four-cell experiment: LRU baseline / Phase 2 ablation / Phase 4 trig /
-   Phase 3 ablation.
-3. §4 — run results-reading script, file artifacts under
-   `bench_out/phase4_gpu/`.
-4. §6 — first-GPU-run validation list (sanity: capture rate ≥ 95%, calibration
-   MRL > 0.3, evict latency < 50µs/call).
+**What Step 1 validated:**
+- Calibrator runs end-to-end on Qwen2.5-7B (with documented pooled-layer caveat).
+- CTM+ Phase 2 evictor patch installs cleanly on vLLM 0.7.3.
+- Phase 4 hooks fire end-to-end after seven repairs: side-channel,
+  rotary capture, speculative storage, window pruning.
+- The audit-pass discipline produces real fixable findings during
+  GPU validation.
 
-**Validates:**
-- Pre-RoPE K capture works in production vLLM.
-- Trig predictor reproduces TriAttention's near-attention quality on a real
-  decoder.
-- CTM+'s structural advantage (S3-FIFO + window pruning) survives swapping the
-  scorer.
+**What Step 1 did NOT validate (the negative result):**
+- **Phase 4 with pooled-layer calibration does not beat Phase 2 or
+  LRU on streaming chat at heavy KV pressure on Qwen2.5-7B.**
+  Throughput drops ~20% relative to Phase 2; swap-out per decode
+  token is roughly identical (Phase 4: 0.28, Phase 2: 0.31).
 
-**Does NOT validate:**
-- Quality on downstream tasks (MMLU, perplexity).
-- Performance under multi-tenant or long-tail traffic.
-- Anything about TurboQuant or CTXL.
+**Why the original gate was wrong:** the +3pp hit-rate target assumed
+LRU and CTM+ would see the same workload regime. They don't.
+Patching `PrefixCachingBlockAllocator.evictor` with CTM+'s wrapper
+disrupts vLLM's prefix-cache promotion path: LRU runs at 12.5%
+prefix-cache hit rate / 57% peak KV / 0 swaps, while CTM+ runs at 0%
+hit / 99% peak KV / 3188 swaps on the same prompts. Comparing raw
+swap_out counts across the two regimes is comparing apples to oranges.
 
-**Gate to step 2:** Phase 4 hit-rate uplift over LRU ≥ **+3 percentage points**
-at the 50% cache-budget setting on at least one workload, with capture rate
-≥ 95% and no perf regressions > 10%.
+### Corrected Step 1 gate (supersedes the original)
 
-If the gate misses: investigate per `MODE_B_PHASE4_GPU_RUNBOOK.md` §5
-(diagnostics) before re-running. Do **not** widen scope until the algorithm
-clears its single-cell bar.
+Phase 4 wins iff **all three** of the following hold:
+
+1. **Calibration quality:** mean `mean_resultant_length` ≥ 0.3 across
+   (layer, head, band) triples on the model's calibration corpus
+   (per the TriAttention paper's healthy-stat threshold). This
+   requires per-layer indexing on shared-rotary models like Qwen2.5;
+   pooled-layer calibration on shared-rotary models reliably
+   under-shoots.
+2. **Latency at matched p99:** CTM+ Phase 4 reduces decode latency
+   at matched p99 by ≥ 5% on chat_32k workload, comparing CTM+ vs
+   LRU at **matched `enable_prefix_caching` setting** (both off,
+   since CTM+'s patch is only meaningful when the eviction decision
+   actually controls cache state).
+3. **Quality:** MMLU subset score within ±0.5 points of LRU baseline
+   at the same cache budget.
+
+If any of the three misses: write the result up; do not iterate on
+GPU before fixing the failed criterion in code or rejecting the
+experimental design.
+
+### Original gate (preserved for reference; do not use)
+
+> Phase 4 hit-rate uplift over LRU ≥ +3 percentage points at the 50%
+> cache-budget setting on at least one workload, with capture rate
+> ≥ 95% and no perf regressions > 10%.
 
 ---
 
