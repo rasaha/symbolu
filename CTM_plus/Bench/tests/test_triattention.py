@@ -749,49 +749,121 @@ def test_install_attn_metadata_side_channel_finds_attention_modules():
 
 
 def test_attn_metadata_side_channel_stashes_then_clears():
-    """Pre-hook stashes slot_mapping; post-hook clears it."""
+    """Pre-hook stashes slot_mapping; post-hook clears it.
+
+    The fix that landed after the May 2026 GPU run: hook the
+    top-level model (which receives attn_metadata as a forward
+    arg) rather than each Attention layer (which fires AFTER
+    rotary_emb in vLLM 0.7.3's Qwen2.5 path). This test exercises
+    the new design.
+    """
     torch = _torch_or_skip()
     from kv_policy.triattention import (
         install_attn_metadata_side_channel,
     )
     from kv_policy.vllm_evictor import CTMEvictorModern
 
-    class Attention(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.head_size = 4
-            self.num_heads = 2
-
-        def forward(self, q, k, v, kv_cache, attn_metadata):
-            return q
-
     class FakeModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.attn = Attention()
+
+        def forward(self, input_ids, positions, kv_caches, attn_metadata):
+            return input_ids
 
     class FakeMeta:
         slot_mapping = torch.tensor([0, 16, 32])
         num_decode_tokens = 3
 
     ev = CTMEvictorModern(num_blocks_capacity=64, block_size=4)
-    install_attn_metadata_side_channel(model=FakeModel(), evictor=ev)
     model = FakeModel()
-    install_attn_metadata_side_channel(model=model, evictor=ev)
+    n_hooks = install_attn_metadata_side_channel(model=model, evictor=ev)
+    assert n_hooks == 1, "expected one pair of hooks on the top-level model"
 
     # Before any forward — side-channel is None.
     assert getattr(ev, "_phase4_pending_slot_mapping", None) is None
 
-    # Trigger forward via __call__ so PyTorch's hook dispatcher runs
-    # (calling .forward() directly bypasses register_forward_*_hook).
-    # Pre-hook fires (stashes), post-hook fires (clears). After the
-    # forward completes, side-channel is back to None.
-    q = torch.zeros((3, 8))
-    k = torch.zeros((3, 8))
-    v = torch.zeros((3, 8))
-    model.attn(q, k, v, None, FakeMeta())
+    # Trigger forward via __call__ so PyTorch's hook dispatcher runs.
+    # Pre-hook fires (stashes), post-hook fires (clears).
+    input_ids = torch.zeros((3,), dtype=torch.long)
+    positions = torch.zeros((3,), dtype=torch.long)
+    model(input_ids, positions, None, FakeMeta())
     assert ev._phase4_pending_slot_mapping is None
     assert ev._phase4_pending_num_decode_tokens == 0
+
+
+def test_attn_metadata_side_channel_set_when_rotary_emb_fires():
+    """Real-call-order regression: in Qwen2.5 vLLM, rotary_emb fires
+    BEFORE Attention.forward inside each decoder layer. The first GPU
+    run (May 2026) had the side-channel hook on Attention.forward, so
+    it set the side-channel AFTER rotary_emb had already run — which
+    meant the pre-RoPE capture pre-hook always saw side-channel=None
+    and aborted. This test simulates the real call order:
+
+        model.forward(input_ids, positions, kv_caches, attn_metadata)
+            -> rotary_emb(positions, q, k)   <-- must see side-channel set
+            -> Attention.forward(q, k, v, ...)
+
+    With the fix that hooks the top-level model, the side-channel is
+    set when the model.forward begins and is still set throughout
+    the call — so any submodule firing inside (rotary_emb included)
+    sees a valid stash. Without the fix this test fails: the
+    side-channel would only be set when Attention fires, which is
+    after rotary_emb.
+    """
+    torch = _torch_or_skip()
+    from kv_policy.triattention import (
+        install_attn_metadata_side_channel,
+    )
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    captured_at_rotary_call = {}
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.rotary_emb = RotaryEmb()
+
+        def forward(self, input_ids, positions, kv_caches, attn_metadata):
+            q = torch.zeros((3, 8))
+            k = torch.zeros((3, 8))
+            self.rotary_emb(positions, q, k)
+            return input_ids
+
+    class FakeMeta:
+        slot_mapping = torch.tensor([0, 16, 32])
+        num_decode_tokens = 3
+
+    ev = CTMEvictorModern(num_blocks_capacity=64, block_size=4)
+    model = FakeModel()
+    install_attn_metadata_side_channel(model=model, evictor=ev)
+
+    def snapshot_pre_hook(module, args):
+        captured_at_rotary_call["slot_mapping"] = (
+            ev._phase4_pending_slot_mapping
+        )
+        captured_at_rotary_call["num_decode_tokens"] = (
+            ev._phase4_pending_num_decode_tokens
+        )
+
+    model.rotary_emb.register_forward_pre_hook(snapshot_pre_hook)
+
+    model(
+        torch.zeros((3,), dtype=torch.long),
+        torch.zeros((3,), dtype=torch.long),
+        None,
+        FakeMeta(),
+    )
+
+    assert captured_at_rotary_call.get("slot_mapping") is not None, (
+        "side-channel was NOT set when rotary_emb fired — this is "
+        "the May 2026 GPU bug that produced "
+        "phase4_blocks_captured_with_pre_rope_keys=0."
+    )
+    assert captured_at_rotary_call["num_decode_tokens"] == 3
 
 
 def test_capture_pre_rope_k_to_evictor_with_side_channel():

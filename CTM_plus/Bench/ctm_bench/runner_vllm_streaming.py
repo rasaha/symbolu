@@ -832,7 +832,7 @@ class AsyncEngineDriver:
                     )
                     logger.info(
                         "Phase 4: hooks installed (attn_metadata "
-                        "side-channel on %d Attention layers, "
+                        "side-channel on top-level model: %d, "
                         "pre-RoPE K capture on %d rotary_emb "
                         "modules).",
                         n_attn, n_rotary,

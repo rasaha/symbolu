@@ -1008,32 +1008,40 @@ def install_attn_metadata_side_channel(
     evictor: Any,
     enable_logging: bool = False,
 ) -> int:
-    """Install hooks on every Attention layer that stash
-    ``attn_metadata.slot_mapping`` + ``num_decode_tokens`` on the
-    evictor BEFORE each rotary_emb pre-hook fires.
+    """Install hooks that stash ``attn_metadata.slot_mapping`` +
+    ``num_decode_tokens`` on the evictor BEFORE any rotary_emb
+    pre-hook fires.
 
     The pre-RoPE K capture hook (:func:`install_pre_rope_capture`)
     needs to know which decode token writes to which block. That
     information lives on ``attn_metadata`` which the rotary_emb
-    pre-hook does not directly see. This function installs a
-    sibling hook on ``Attention.forward`` that captures
-    attn_metadata and stashes the relevant fields on the
-    evictor as ``_phase4_pending_*`` side-channel attributes.
+    pre-hook does not directly see.
 
-    Order of operations within one ``Attention.forward`` call:
+    **Design (revised after the May 2026 GPU run):** the original
+    design hooked each ``Attention`` layer's ``forward_pre_hook``,
+    on the assumption that ``Attention.forward`` fires before
+    ``rotary_emb``. In vLLM 0.7.3's Qwen2.5 implementation the
+    actual order inside a decoder layer is:
 
-    1. The Attention pre-hook fires first (registered here).
-       Stashes slot_mapping + num_decode_tokens on the evictor.
-    2. Inside Attention.forward, q_proj + k_proj run.
-    3. rotary_emb.forward is invoked → its pre-hook fires
-       (registered by :func:`install_pre_rope_capture`). Reads
-       the stashed side-channel + the K tensor; calls
-       ``evictor.set_block_pre_rope_keys``.
-    4. Side-channel is cleared at the END of Attention.forward
-       (post-hook) so stale state doesn't leak across layers.
+    1. ``qkv_proj.forward(hidden_states)`` -> Q, K, V (pre-RoPE)
+    2. ``rotary_emb(positions, Q, K)`` -> Q, K (post-RoPE)
+       <-- our pre-RoPE capture pre-hook fires HERE
+    3. ``Attention.forward(Q, K, V, kv_cache, attn_metadata)``
+       <-- the OLD side-channel hook fired HERE (too late)
 
-    Returns the number of Attention layers patched. 0 with a
-    warning if no Attention modules found.
+    So the side-channel was never set when capture ran, and
+    ``phase4_blocks_captured_with_pre_rope_keys`` stayed at 0
+    for the entire run.
+
+    The fix: hook the **top-level model.forward**, which receives
+    ``attn_metadata`` as a forward kwarg and fires before any
+    submodule. The pre-hook stashes the side-channel for the
+    duration of one forward pass; the post-hook clears it at the
+    end. By construction the side-channel is set before any
+    rotary_emb fires anywhere in the model.
+
+    Returns the number of hooks installed (1 if ``model.forward``
+    was hooked successfully; 0 with a warning otherwise).
     """
     try:
         import torch  # type: ignore  # noqa: F401
@@ -1044,32 +1052,33 @@ def install_attn_metadata_side_channel(
         )
         return 0
 
-    n_patched = 0
-    for name, module in _walk_attention_modules(model):
-        h_pre = module.register_forward_pre_hook(
-            _make_attn_metadata_pre_hook(evictor, name, enable_logging)
-        )
-        h_post = module.register_forward_hook(
-            _make_attn_metadata_post_hook(evictor)
-        )
-        # Hold the handles on the evictor itself so they aren't
-        # garbage collected.
-        existing = getattr(evictor, "_phase4_handles", None)
-        if existing is None:
-            existing = []
-            evictor._phase4_handles = existing
-        existing.append(h_pre)
-        existing.append(h_post)
-        n_patched += 1
-
-    if n_patched == 0:
+    if not hasattr(model, "register_forward_pre_hook") or not hasattr(
+        model, "register_forward_hook"
+    ):
         logger.warning(
-            "install_attn_metadata_side_channel: no Attention "
-            "modules found. Phase 4 K capture will be a no-op; "
-            "Phase 4 scoring falls back to per-block None "
-            "(skipped by window_pruning_pass)."
+            "install_attn_metadata_side_channel: model is not a "
+            "torch.nn.Module (no register_forward_*_hook). Phase 4 "
+            "capture cannot be wired up."
         )
-    return n_patched
+        return 0
+
+    h_pre = model.register_forward_pre_hook(
+        _make_attn_metadata_pre_hook(
+            evictor, name="model_forward",
+            enable_logging=enable_logging,
+        ),
+        with_kwargs=True,
+    )
+    h_post = model.register_forward_hook(
+        _make_attn_metadata_post_hook(evictor)
+    )
+    existing = getattr(evictor, "_phase4_handles", None)
+    if existing is None:
+        existing = []
+        evictor._phase4_handles = existing
+    existing.append(h_pre)
+    existing.append(h_post)
+    return 1
 
 
 def _walk_attention_modules(model: Any):
