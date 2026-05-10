@@ -971,6 +971,9 @@ def install_pre_rope_capture(
 
     def make_hook(layer_idx: int):
         def pre_hook(module, inputs):
+            evictor._phase4_rotary_pre_hook_calls = (
+                getattr(evictor, "_phase4_rotary_pre_hook_calls", 0) + 1
+            )
             if layer_idx != target_layer:
                 return
             try:
@@ -982,6 +985,9 @@ def install_pre_rope_capture(
                     inferred_head_dim=inferred_kv_head_dim,
                 )
             except Exception as exc:
+                evictor._phase4_capture_exceptions = (
+                    getattr(evictor, "_phase4_capture_exceptions", 0) + 1
+                )
                 if enable_logging:
                     logger.warning(
                         "pre-RoPE K capture failed at layer %d: %s",
@@ -1099,6 +1105,14 @@ def _walk_attention_modules(model: Any):
 
 def _make_attn_metadata_pre_hook(evictor, name, enable_logging):
     def pre_hook(module, args, kwargs=None):
+        # Unconditional firing-counter so the streaming runner can
+        # surface "did this hook actually run?" without having to
+        # enable per-call logging. Diagnoses the silent-no-op case
+        # (hook attached to wrong module, or PyTorch not invoking
+        # __call__ on this object during inference).
+        evictor._phase4_side_channel_pre_hook_calls = (
+            getattr(evictor, "_phase4_side_channel_pre_hook_calls", 0) + 1
+        )
         # Attention.forward signatures vary across vLLM versions:
         #   forward(query, key, value, kv_cache, attn_metadata)
         #   forward(query, key, value, attn_metadata, ...)
@@ -1115,12 +1129,19 @@ def _make_attn_metadata_pre_hook(evictor, name, enable_logging):
                     attn_metadata = candidate
                     break
         if attn_metadata is None:
+            evictor._phase4_side_channel_metadata_missing = (
+                getattr(evictor, "_phase4_side_channel_metadata_missing", 0)
+                + 1
+            )
             if enable_logging:
                 logger.warning(
                     "phase4 side-channel: no attn_metadata in %s "
                     "forward args", name,
                 )
             return
+        evictor._phase4_side_channel_metadata_found = (
+            getattr(evictor, "_phase4_side_channel_metadata_found", 0) + 1
+        )
         try:
             evictor._phase4_pending_slot_mapping = (
                 attn_metadata.slot_mapping
@@ -1199,14 +1220,20 @@ def _capture_pre_rope_k_to_evictor(
             f"got shape {tuple(key.shape)}"
         )
 
+    evictor._phase4_capture_attempts = (
+        getattr(evictor, "_phase4_capture_attempts", 0) + 1
+    )
+
     # Look for slot_mapping side-channel. The streaming runner
-    # patches Attention.forward to stash attn_metadata where this
+    # patches model.forward to stash attn_metadata where this
     # hook can find it (see runner_vllm_streaming.py).
     slot_mapping = getattr(evictor, "_phase4_pending_slot_mapping", None)
     block_size = getattr(evictor, "_block_size", 16)
     if slot_mapping is None:
-        # No attn_metadata side-channel. Skip silently — the
-        # outer hook's try/except logs once if enable_logging.
+        evictor._phase4_capture_aborts_no_slot_mapping = (
+            getattr(evictor, "_phase4_capture_aborts_no_slot_mapping", 0)
+            + 1
+        )
         return
 
     # Number of decode tokens to capture. The runner's outer hook
@@ -1215,6 +1242,10 @@ def _capture_pre_rope_k_to_evictor(
         evictor, "_phase4_pending_num_decode_tokens", 0,
     )
     if num_decode_tokens <= 0:
+        evictor._phase4_capture_aborts_no_decode_tokens = (
+            getattr(evictor, "_phase4_capture_aborts_no_decode_tokens", 0)
+            + 1
+        )
         return
 
     # Determine head_dim from the K tensor.

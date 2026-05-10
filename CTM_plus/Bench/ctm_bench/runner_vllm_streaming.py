@@ -48,6 +48,15 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------- #
 
 
+class _DummyZero:
+    """Minimal sentinel used by the result builder when there's no
+    installed evictor to read counters off of (e.g., LRU baseline
+    cells). Returns 0 for any getattr."""
+
+    def __getattr__(self, name):
+        return 0
+
+
 @dataclass(frozen=True)
 class StreamingRunCellResult:
     """Outcome of one (workload, policy, seed) streaming run."""
@@ -86,6 +95,20 @@ class StreamingRunCellResult:
     # phase4_trig_calibration_path is set.
     phase4_window_pruning_invocations: int = 0
     phase4_blocks_captured_with_pre_rope_keys: int = 0
+    # Diagnostic counters added after the May 2026 GPU run produced
+    # phase4_blocks_captured_with_pre_rope_keys=0 with no log signal
+    # to distinguish "hooks didn't fire" from "hooks fired but the
+    # side-channel wasn't found" from "side-channel found but capture
+    # function aborted". Populated whenever Phase 4 hooks are
+    # installed, regardless of whether captures succeed.
+    phase4_side_channel_pre_hook_calls: int = 0
+    phase4_side_channel_metadata_found: int = 0
+    phase4_side_channel_metadata_missing: int = 0
+    phase4_rotary_pre_hook_calls: int = 0
+    phase4_capture_attempts: int = 0
+    phase4_capture_aborts_no_slot_mapping: int = 0
+    phase4_capture_aborts_no_decode_tokens: int = 0
+    phase4_capture_exceptions: int = 0
 
 
 # ---------------------------------------------------------------- #
@@ -1110,6 +1133,54 @@ class AsyncEngineDriver:
             attention_capture_total_seconds=attention_capture_total_seconds,
             phase4_window_pruning_invocations=phase4_window_invocations,
             phase4_blocks_captured_with_pre_rope_keys=phase4_blocks_with_keys,
+            phase4_side_channel_pre_hook_calls=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_side_channel_pre_hook_calls", 0,
+                )
+            ),
+            phase4_side_channel_metadata_found=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_side_channel_metadata_found", 0,
+                )
+            ),
+            phase4_side_channel_metadata_missing=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_side_channel_metadata_missing", 0,
+                )
+            ),
+            phase4_rotary_pre_hook_calls=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_rotary_pre_hook_calls", 0,
+                )
+            ),
+            phase4_capture_attempts=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_capture_attempts", 0,
+                )
+            ),
+            phase4_capture_aborts_no_slot_mapping=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_capture_aborts_no_slot_mapping", 0,
+                )
+            ),
+            phase4_capture_aborts_no_decode_tokens=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_capture_aborts_no_decode_tokens", 0,
+                )
+            ),
+            phase4_capture_exceptions=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_capture_exceptions", 0,
+                )
+            ),
         )
 
     @staticmethod
