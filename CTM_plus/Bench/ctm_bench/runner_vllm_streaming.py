@@ -693,6 +693,8 @@ class AsyncEngineDriver:
         We use the iterator API since it's stable across 0.5 → 0.7.
         """
         n_tokens = 0
+        last_seen = 0
+        evictor = self._installed_evictor
         try:
             async for output in engine.generate(
                 {"prompt_token_ids": prompt_token_ids},
@@ -704,6 +706,31 @@ class AsyncEngineDriver:
                     # generation proceeds; final value is the
                     # total decode count for this request.
                     n_tokens = len(output.outputs[0].token_ids)
+                    # Phase 4: tick the window-pruning state with
+                    # tokens emitted since last yield. When the
+                    # counter crosses the interval, prune the 4
+                    # lowest-trig-scoring blocks. This is the only
+                    # path by which Phase 4's captured K influences
+                    # eviction decisions; without it, the trig
+                    # signal is captured-but-unused.
+                    if evictor is not None and hasattr(
+                        evictor, "window_pruning_passed"
+                    ):
+                        delta = n_tokens - last_seen
+                        last_seen = n_tokens
+                        if delta > 0 and evictor.window_pruning_passed(delta):
+                            try:
+                                target = max(
+                                    0, len(evictor._tracked) - 4
+                                )
+                                evictor.window_pruning_pass(
+                                    target_blocks=target,
+                                )
+                            except Exception as exc:
+                                logger.warning(
+                                    "window_pruning_pass failed: %s",
+                                    exc,
+                                )
         except Exception as exc:
             # Don't let one failed request kill the whole sweep.
             logger.warning(
