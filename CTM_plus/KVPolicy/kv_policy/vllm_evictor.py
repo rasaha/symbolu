@@ -43,6 +43,23 @@ from .vllm_adapter import CTMBlockSpaceManager, CTMvLLMConfig
 logger = logging.getLogger("ctm_plus.vllm_evictor")
 
 
+# Cython-compiled drop-in for ``CTMEvictorModern``. See
+# ``Bench/bench_out/PHASE4_GPU_FINDINGS.md`` §11–§12 for the engineering
+# motivation. When the compiled extension is not present (fresh
+# checkout with no C toolchain, or the package was installed without
+# the ``ext`` extra), fall back to aliasing the pure-Python class so
+# downstream imports of ``CTMEvictorModernC`` still resolve and the
+# behavioural contract is preserved at the cost of the integration
+# tax this port exists to remove. The parametrized protocol fixture
+# (`Bench/tests/test_vllm_protocol_fixture.py`) skips its C-variant
+# leg in that case.
+try:
+    from ._ctm_evictor import CTMEvictorModernC  # noqa: F401
+    _CYTHON_EVICTOR_AVAILABLE = True
+except ImportError:
+    _CYTHON_EVICTOR_AVAILABLE = False
+
+
 # =============================================================================
 # Evictor shim (vLLM interface)
 # =============================================================================
@@ -1269,6 +1286,14 @@ class CTMEvictorModern:
     @property
     def window_pruning_invocations(self) -> int:
         return self._window_state.n_prune_invocations
+
+
+if not _CYTHON_EVICTOR_AVAILABLE:
+    # Pure-Python fallback so callers that import ``CTMEvictorModernC``
+    # don't fail when the Cython extension wasn't compiled. Semantically
+    # equivalent at the cost of the Python-dispatch overhead the C port
+    # exists to remove.
+    CTMEvictorModernC = CTMEvictorModern  # type: ignore[misc,assignment]
 
 
 def _walk_modern_gpu_allocator(engine: Any) -> Any:

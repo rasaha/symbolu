@@ -34,6 +34,42 @@ _add_kv_policy_to_path()
 
 
 # --------------------------------------------------------------------- #
+# Parametrize every test in this module across the Python and Cython
+# variants of ``CTMEvictorModern``. The Cython variant is the one this
+# file exists to validate end-to-end: same protocol contract, same
+# diagnostic counter shape, same cross-call invariants. See
+# ``Bench/bench_out/PHASE4_GPU_FINDINGS.md`` §11–§12 for motivation.
+#
+# Mechanism: tests import ``CTMEvictorModern`` from
+# ``kv_policy.vllm_evictor`` directly inside their function bodies; the
+# autouse fixture monkeypatches that attribute to the C variant on the
+# "c" parametrisation pass. Tests don't need to know which variant
+# they're running against.
+#
+# When the Cython extension isn't compiled (no toolchain at install
+# time), ``CTMEvictorModernC`` is aliased to ``CTMEvictorModern`` in
+# the module itself, so the "c" pass becomes a no-op identical to the
+# "py" pass — the parametrisation column still appears in the test
+# output, making the missing-extension state visible.
+# --------------------------------------------------------------------- #
+
+
+@pytest.fixture(autouse=True, params=["py", "c"])
+def _ctm_evictor_modern_variant(request, monkeypatch):
+    from kv_policy import vllm_evictor as _mod
+    if request.param == "c":
+        try:
+            from kv_policy._ctm_evictor import CTMEvictorModernC
+        except ImportError:
+            pytest.skip(
+                "Cython ext kv_policy._ctm_evictor not built; run "
+                "`python3 setup.py build_ext --inplace` in CTM_plus/KVPolicy"
+            )
+        monkeypatch.setattr(_mod, "CTMEvictorModern", CTMEvictorModernC)
+    yield request.param
+
+
+# --------------------------------------------------------------------- #
 # MockPrefixCachingBlockAllocator
 # --------------------------------------------------------------------- #
 
