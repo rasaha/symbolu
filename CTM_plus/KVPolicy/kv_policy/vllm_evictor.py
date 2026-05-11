@@ -747,6 +747,17 @@ class CTMEvictorModern:
         # doc §3 for the simplification).
         self._block_layer_head: Dict[int, Tuple[int, int]] = {}
 
+        # Per-block trig-score cache. Captured K vectors don't change
+        # between captures, so the trig score for a block is a pure
+        # function of (captured K, calibration stats). We compute it
+        # ONCE at set_block_pre_rope_keys() time and reuse it on every
+        # subsequent trig_score_block() call. Before this cache the
+        # May 2026 GPU run was paying ~3.3M math.cos calls per 60s
+        # (2560 ops/evict × 1300 evicts) — the dominant Python
+        # overhead in the 20% throughput regression. With the cache,
+        # an evict() lookup is O(1).
+        self._block_trig_score: Dict[int, float] = {}
+
         # Window-based pruning state — separate from vLLM's
         # allocator-driven evict() calls. The streaming runner
         # checks this state after each decode batch and triggers a
@@ -870,10 +881,12 @@ class CTMEvictorModern:
         self._content_hash.pop(block_id, None)
         self._num_hashed_tokens.pop(block_id, None)
         self._last_accessed.pop(block_id, None)
-        # Phase 4: drop speculatively-stored pre-RoPE keys when the
-        # block is freed so the dict stays bounded.
+        # Phase 4: drop speculatively-stored pre-RoPE keys and the
+        # cached trig score when the block is freed so the dicts
+        # stay bounded by the live cache footprint.
         self._block_pre_rope_keys.pop(block_id, None)
         self._block_layer_head.pop(block_id, None)
+        self._block_trig_score.pop(block_id, None)
         self._policy.evict_block(block_id)
 
     def evict(self) -> Tuple[int, int]:
@@ -1016,10 +1029,12 @@ class CTMEvictorModern:
             self._num_hashed_tokens.pop(victim_id, None)
             self._last_accessed.pop(victim_id, None)
             self._tracked.discard(victim_id)
-            # Phase 4: drop speculatively-stored pre-RoPE keys for
-            # the evicted block so the dict stays bounded.
+            # Phase 4: drop speculatively-stored pre-RoPE keys + the
+            # cached trig score for the evicted block so the dicts
+            # stay bounded by the live cache footprint.
             self._block_pre_rope_keys.pop(victim_id, None)
             self._block_layer_head.pop(victim_id, None)
+            self._block_trig_score.pop(victim_id, None)
             # Mirror vLLM's LRUEvictor: on evict, the block is fully
             # removed from the evictor's pool. The CTM+ policy's
             # gpu_blocks set is the parallel "evictor pool" — keep it
@@ -1094,19 +1109,65 @@ class CTMEvictorModern:
             self._phase4_set_pre_rope_keys_speculative = (
                 getattr(self, "_phase4_set_pre_rope_keys_speculative", 0) + 1
             )
-        self._block_pre_rope_keys[block_id] = list(keys)
+        keys_list = list(keys)
+        self._block_pre_rope_keys[block_id] = keys_list
         self._block_layer_head[block_id] = (int(layer), int(head))
+        # Compute the trig score eagerly so subsequent evict() calls
+        # are O(1) lookups instead of O(num_bands * num_future_offsets)
+        # Python cosine math. This is the I1 optimization from the
+        # May 2026 audit — the dominant cost in the 20% throughput
+        # regression. Failures here must not break capture (we just
+        # leave the cache entry stale).
+        if self._trig_scorer is not None:
+            self._phase4_trig_score_computes = (
+                getattr(self, "_phase4_trig_score_computes", 0) + 1
+            )
+            try:
+                from .triattention import aggregate_block_trig_score
+                self._block_trig_score[block_id] = (
+                    aggregate_block_trig_score(
+                        scorer=self._trig_scorer,
+                        layer=int(layer), head=int(head),
+                        block_keys=keys_list,
+                    )
+                )
+            except Exception:
+                # Cache miss — leave any prior entry alone and let
+                # trig_score_block return None via the not-in-cache
+                # path. Don't crash the capture hook.
+                self._phase4_trig_score_compute_exceptions = (
+                    getattr(
+                        self,
+                        "_phase4_trig_score_compute_exceptions",
+                        0,
+                    ) + 1
+                )
 
     def trig_score_block(self, block_id: int) -> Optional[float]:
-        """Compute the Phase 4 trig+norm score for one block.
+        """Return the Phase 4 trig+norm score for one block.
 
-        Returns ``None`` if no pre-RoPE keys are stored for this
+        Reads the cached score populated by ``set_block_pre_rope_keys``.
+        Returns ``None`` if no pre-RoPE keys were captured for this
         block (capture didn't fire — Phase 4 falls back to the
-        native CTM+ score for that block). Returns a float
-        otherwise; higher = more important.
+        native CTM+ score for that block). Otherwise returns a float
+        where higher = more important.
         """
         if self._trig_scorer is None:
             return None
+        self._phase4_trig_score_lookups = (
+            getattr(self, "_phase4_trig_score_lookups", 0) + 1
+        )
+        # Cache hit path (the I1 optimization, May 2026 audit).
+        cached = self._block_trig_score.get(block_id)
+        if cached is not None:
+            return cached
+        # Cache miss — block had no K captured, OR
+        # set_block_pre_rope_keys raised during the eager compute.
+        # In either case fall back to compute-on-demand so behavior
+        # is identical to pre-cache. This path is rare in production.
+        self._phase4_trig_score_cache_misses = (
+            getattr(self, "_phase4_trig_score_cache_misses", 0) + 1
+        )
         block_keys = self._block_pre_rope_keys.get(block_id)
         if not block_keys:
             return None
@@ -1158,8 +1219,12 @@ class CTMEvictorModern:
         for _, bid in scored[:n_to_evict]:
             try:
                 self.remove(bid)
+                # remove() already pops these dicts; redundant pops
+                # kept as belt-and-braces for the case where this
+                # path runs against a block that wasn't in _tracked.
                 self._block_pre_rope_keys.pop(bid, None)
                 self._block_layer_head.pop(bid, None)
+                self._block_trig_score.pop(bid, None)
                 evicted += 1
             except Exception:
                 continue

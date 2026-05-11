@@ -124,6 +124,15 @@ class StreamingRunCellResult:
     phase4_trig_blend_evict_calls: int = 0
     phase4_trig_changed_pick: int = 0
     phase4_capture_subsample_skips: int = 0
+    # I1 trig-score-cache counters — every set_block_pre_rope_keys
+    # computes the score once (computes); every trig_score_block
+    # call is a cache lookup (lookups). Cache misses (recomputes)
+    # should be near-zero in steady state; if they aren't, the
+    # cache is being invalidated too aggressively.
+    phase4_trig_score_computes: int = 0
+    phase4_trig_score_lookups: int = 0
+    phase4_trig_score_cache_misses: int = 0
+    phase4_trig_score_compute_exceptions: int = 0
 
 
 # ---------------------------------------------------------------- #
@@ -1270,6 +1279,30 @@ class AsyncEngineDriver:
                 getattr(
                     self._installed_evictor or _DummyZero(),
                     "_phase4_capture_subsample_skips", 0,
+                )
+            ),
+            phase4_trig_score_computes=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_trig_score_computes", 0,
+                )
+            ),
+            phase4_trig_score_lookups=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_trig_score_lookups", 0,
+                )
+            ),
+            phase4_trig_score_cache_misses=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_trig_score_cache_misses", 0,
+                )
+            ),
+            phase4_trig_score_compute_exceptions=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_trig_score_compute_exceptions", 0,
                 )
             ),
         )

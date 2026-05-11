@@ -42,6 +42,10 @@ def _show(label: str, r: dict) -> None:
         "phase4_capture_attempts",
         "phase4_trig_blend_evict_calls",
         "phase4_trig_changed_pick",
+        "phase4_trig_score_computes",
+        "phase4_trig_score_lookups",
+        "phase4_trig_score_cache_misses",
+        "phase4_trig_score_compute_exceptions",
     )
     for k in counters:
         if k in r:
@@ -54,6 +58,15 @@ def _show(label: str, r: dict) -> None:
         print(
             f"  trig_changed_pick / blend_calls: "
             f"{cp / bec * 100:.1f}% (= how often trig overrode base ordering)"
+        )
+    lookups = r.get("phase4_trig_score_lookups", 0)
+    misses = r.get("phase4_trig_score_cache_misses", 0)
+    if lookups > 0:
+        hit_rate = (lookups - misses) / lookups * 100
+        print(
+            f"  trig_score cache hit rate: "
+            f"{hit_rate:.1f}% ({lookups - misses}/{lookups} lookups, "
+            f"{misses} misses) -- I1 optimization"
         )
 
 
