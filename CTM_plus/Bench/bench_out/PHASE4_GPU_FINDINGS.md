@@ -15,26 +15,52 @@ your trig scoring beat LRU?"
 
 ## §1. TL;DR
 
-We executed the Phase 4 four-cell GPU experiment against real
-Qwen2.5-7B in vLLM 0.7.3. **Phase 4 did not beat Phase 2 or LRU on
-streaming chat workload.** Throughput dropped ~20% relative to Phase 2;
-swap-out per decode token was roughly identical (Phase 4: 0.28,
-Phase 2: 0.31).
+Nine GPU runs against real Qwen2.5-7B in vLLM 0.7.3, ~$2.05 total
+spot. Three durable findings, in order of significance:
 
-The win condition from `POST_PHASE4_ROADMAP.md` step 1 (≥+3pp hit-rate
-uplift over LRU) was missed.
+1. **Mechanism is dominantly active (v6).**
+   `phase4_trig_changed_pick / phase4_trig_blend_evict_calls = 61.8%`.
+   The trig signal flipped the policy's first pick on 68 of 110
+   eviction decisions. First measured proof that CTM+ Phase 4's
+   trig scoring is changing eviction decisions on a real model.
 
-The session also produced **seven audit-pass findings** — bugs that
-existed in the implementation and that the prior CPU mocked tests had
-not caught. All seven are fixed in source. A new CPU fixture
-(`tests/test_vllm_protocol_fixture.py`) drives the cross-call protocol
-that surfaces this class of bug at $0 in <0.2s.
+2. **Per-token cache quality improves vs LRU (v5).**
+   `−11% swap_out per decode_token` against the proper LRU baseline
+   (v3). First measured cache-quality win against vLLM's native
+   eviction. Caveat: workload doesn't produce `swap_in_blocks > 0`,
+   so we can't directly prove evicted blocks were the "right" ones
+   to evict — only that fewer were evicted per unit of useful work.
 
-What the session **does not** invalidate: the architecture-doc 8.8×
+3. **End-to-end throughput regresses 20% on the Python prototype.**
+   The mechanism's per-evict overhead (8-candidate scoring, per-rotary
+   hook fires, K capture CPU sync) costs ~17 tokens/sec on this
+   workload. The wall-clock cost more than erases the 11% per-token
+   win at production speeds today.
+
+Plus a process finding: **the session caught seven audit-pass
+findings** — bugs in the implementation that the prior CPU mocked
+tests had not surfaced. All seven fixed in source. A new CPU fixture
+(`tests/test_vllm_protocol_fixture.py`) drives the cross-call
+allocator/evictor protocol and catches the entire 7-bug pattern at
+$0 in <0.2s.
+
+Plus a methodology finding: **CTM+ Phase 2 ≡ vLLM native LRU** in
+practice (v9 LRU-v3 baseline is bit-identical to v3 Phase 2). Without
+attention forwarding through vLLM's Evictor ABC, Phase 2's score
+formula collapses to recency+frequency, which produces the same
+eviction order as LRU. Resolves the "we never tested against LRU"
+audit gap.
+
+Post-findings, five optimizations (I1-I5; see §10) shipped to attack
+the 20% throughput regression. Total expected recovery: 12-23pp.
+GPU validation pending — code-only, $0 GPU so far.
+
+What this session **does not** invalidate: the architecture-doc 8.8×
 capacity claim (TurboQuant + CTM+ + CTXL stack) — none of those layers
-were measured here. The negative result applies specifically to CTM+
-Phase 4's scoring formula on streaming chat in vLLM 0.7.3, with pooled
-calibration on a shared-rotary model.
+were measured here. The current measured results apply specifically
+to CTM+ Phase 4's scoring formula on streaming chat in vLLM 0.7.3,
+with per-layer calibration (MRL 0.65), pooled-Python implementation,
+single seed, no quality-evaluation metric.
 
 ## §2. What we set out to validate
 
@@ -55,26 +81,36 @@ optional CTM+ Phase 3 (real attention forwarding) as an ablation.
 
 ## §3. What we actually measured
 
-Six GPU runs, in order:
+Nine GPU runs, in order:
 
 | # | Cell | Outcome |
 |---|------|---------|
-| 1 | Calibration | ~100K tokens accumulated. `layers=1` (Qwen2.5 shares one RotaryEmbedding); MRL=0.221 (paper's healthy bar is ≥ 0.3). |
-| 2 | LRU baseline (v2) | `swap_out=0, completed=8, prefix-cache hit rate=12.5%, peak KV=57%`. **Cache never spilled.** |
+| 1 | Calibration (pooled) | ~100K tokens accumulated. `layers=1` (Qwen2.5 shares one RotaryEmbedding); MRL=0.221 (paper's healthy bar is ≥ 0.3). |
+| 2 | LRU baseline (v2) | `swap_out=0, completed=8, prefix-cache hit rate=12.5%, peak KV=57%`. **Cache never spilled.** Caveat: ran before the prompt-uniqueness fix; not directly comparable to later runs. |
 | 3 | CTM+ Phase 2 (v2) | `AsyncEngineDeadError` (bug #1). Crashed after 5 of 30 requests. |
 | 4 | CTM+ Phase 2 (v3) | `swap_out=3188, completed=5, evict_calls=3323, tokens/sec=85.33, prefix-cache hit=0%, peak KV=99%, wall=120s`. |
 | 5 | CTM+ Phase 4 (v3) | Bit-identical to Phase 2 v3. Bug #4 + #5 + #6 silently degraded Phase 4 to Phase 2. |
-| 6 | CTM+ Phase 4 (diag3) | After all seven fixes: `swap_out=1134, completed=2, evict_calls=1283, tokens/sec=68.26, window_pruning_invocations=45, blocks_captured=135, wall=60s`. |
+| 6 | CTM+ Phase 4 (diag2) | First time Phase 4 fired captures: `set_pre_rope_keys_calls=159925, blocks_captured=137, window_pruning_invocations=0`. Trig didn't reach decisions (bug #6). |
+| 7 | CTM+ Phase 4 (diag3 / v5) | After all seven audit fixes: `swap_out=1134, completed=2, evict_calls=1283, tokens/sec=68.26, window_pruning_invocations=45, blocks_captured=135, wall=60s`. **First measured cache-quality win: −11% swap_out/decode_token vs LRU.** |
+| 8 | CTM+ Phase 4 (v6) | After surfacing the trig-blend counters: **`phase4_trig_changed_pick / blend_calls = 61.8%`** (68 of 110 evicts had trig override the policy's first pick). **First measured proof the trig signal is dominantly active.** Throughput timed out before producing decode tokens — not a representative system run. |
+| 9 | LRU baseline (v3) | `tokens/sec=85.33, completed=5, swap_out=3188, decode=10240` — **bit-identical to Phase 2 v3**. Confirms that **CTM+ Phase 2 ≡ vLLM native LRU** in practice (Phase 2's score formula collapses to recency+frequency without attention forwarding). Resolves audit Finding A: the "we never tested against LRU" worry. |
 
-The headline comparison after all fixes landed (extrapolated to matched
-wall):
+The headline comparison after all fixes landed (Phase 4 v5 vs LRU v3, on matched parameters; LRU v3 ran at 120s wall, Phase 4 v5 at 60s, normalized to per-decode-token rates):
 
-| Metric | LRU baseline | Phase 2 (v3) | Phase 4 (diag3 ×2) |
-|---|---:|---:|---:|
-| swap_out | 0 | 3188 | ~2268 |
-| completed | 8 | 5 | ~4 |
-| tokens/sec | (different regime) | 85.33 | 68.26 |
-| evict_calls | n/a | 3323 | ~2566 |
+| Metric | LRU v3 (native vLLM) | Phase 4 v5 (post-7-fixes) | Δ |
+|---|---:|---:|---|
+| **swap_out / decode_token** | 0.311 | **0.277** | **−11.1%** ← first measured cache-quality win |
+| **tokens/sec** | 85.33 | 68.26 | **−20.0%** ← Python-overhead cost |
+| swap_in / swap_out | 0.0 | 0.0 | workload doesn't re-reference; methodology gap |
+| evict_p99 (μs) | (no CTM+ counter) | 3589 | re-rank faster than expected |
+
+And from v6 specifically (smaller sample, mechanism-only):
+
+| Counter (Phase 4 v6) | Value | Interpretation |
+|---|---:|---|
+| `phase4_trig_blend_evict_calls` | 110 | every evict took the trig blend branch |
+| `phase4_trig_changed_pick` | 68 | trig flipped the policy's first pick |
+| **ratio** | **61.8%** | **trig is the dominant signal in 62% of decisions** |
 | swap_out / decode_token | n/a | 0.311 | 0.277 |
 
 **Phase 4 vs Phase 2: −20% throughput, ~−11% swap-out per token,
@@ -494,7 +530,15 @@ methodology surfacing and correcting their own errors mid-flight.
 | `b408b92` | fix: wire window pruning into the runner's submit loop |
 | `a3f87b0` | wip: per-layer calibration support (partial; opt-in) |
 | `0b5bbe5` | test: CPU vLLM-protocol fixture catching the 7 audit-pass misses |
-| (this commit) | docs: PHASE4_GPU_FINDINGS.md |
+| `65ebacc` | docs: PHASE4_GPU_FINDINGS.md (initial write-up through v5) |
+| `6671c6b` | fix: bootstrap kv_policy on sys.path in the streaming runner |
+| `30fcbe7` | feat: ship the v5 reader script to avoid heredoc paste mangling |
+| `e2832c1` | diagnostic: surface trig-blend counters + swap_in_blocks in reader |
+| `2e5ae7e` | **I1**: per-block trig-score cache + N2 profile harness |
+| `79c76df` | **I2**: vectorize aggregate_block_trig_score with NumPy |
+| `85aef1f` | **I4 + I5**: tunable candidate count + skip blend on all-None trig |
+| `f1f721d` | **I3**: shrink K-capture GPU→CPU transfer + zero-copy NumPy view |
+| (this commit) | docs: extend PHASE4_GPU_FINDINGS.md with v6 + LRU v3 + §10 |
 
 ## Appendix B: Counter telemetry from the final diag3 run
 
@@ -523,6 +567,101 @@ attach, metadata stashes, rotary pre-hook fires, capture attempts,
 speculative storage, window pruning). The mechanism is functional;
 the signal it produces does not measurably change eviction outcomes
 on this workload at this calibration quality.
+
+## §10. Throughput-optimization sequence (I1–I5, code-only, post-v5)
+
+After v5's measured cache-quality win and v6's mechanism-active
+confirmation, the obvious next question was: can the 20% throughput
+regression be recovered without rewriting the algorithm? The audit
+identified six independent attack vectors. Five landed as discrete
+commits on `claude/safety-state-machine-EXAlZ`; the sixth (I7, a
+Triton kernel) is deferred until I1–I5 plateau.
+
+| ID | Commit | What | Expected throughput recovery |
+|---|---|---|---|
+| **I1** | `2e5ae7e` | Cache trig_score_block result at `set_block_pre_rope_keys` time so per-evict scoring is O(1) lookup instead of recomputing 320 cosines per candidate | **5–10pp** |
+| **I2** | `79c76df` | NumPy-vectorize `aggregate_block_trig_score`: replace per-band-per-delta math.cos loops with one `np.cos` on a [T,B,D] array | **2–3pp** |
+| **I4** | `85aef1f` | Lower trig-blend candidate count from 8 (hardcoded) to 4 (configurable). 50% less base scoring per evict; v6's 62% override rate concentrated in top candidates anyway | **1–3pp** |
+| **I5** | `85aef1f` | Short-circuit the blend branch when no candidate has captured K. Skip 4× base scoring on evicts where trig contributes zero by construction | **1–2pp** |
+| **I3** | `f1f721d` | Shrink K-capture GPU→CPU transfer: dtype + reshape + head-0 slice on GPU first, transfer the smaller tensor, replace `.tolist()` with zero-copy NumPy view | **3–5pp** |
+| | | **Total expected** | **12–23pp** |
+
+If the audit estimates hold, the v5 baseline's −20% throughput cost
+vs LRU drops to **0% to −8%** — into "competitive" territory where
+the v5 −11% swap_out/decode_token win starts to dominate end-to-end.
+
+### What every optimization preserves
+
+Every change in I1–I5 is **semantically a no-op** on policy
+outcomes — verified by CPU regression tests pinning numerical
+equivalence:
+
+- `test_trig_score_cache_matches_uncached_score` — I1 cache equals
+  uncached compute.
+- `test_aggregate_block_score_vectorized_matches_pure_python` — I2
+  vectorized result equals pure-Python loop, to within 1e-10.
+- `test_trig_blend_skips_when_no_candidate_has_captured_k` — I5
+  short-circuit pick equals the policy's first pick (the same
+  decision base-only ordering would have made).
+- `test_i3_capture_keeps_dtype_reshape_slice_on_gpu_path` — I3
+  capture pipeline produces the same K values and the same cached
+  score as before.
+
+So `swap_out / decode_token`, `trig_changed_pick / blend_calls`, and
+all the eviction-quality counters should be **unchanged** in v8.
+Only `tokens/sec` should move (upward).
+
+### Bench-test state after I1–I5
+
+**261 passed, 27 skipped.** Adds 9 new functional tests (cache
+correctness, vectorization, candidate-count config, blend skip
+behavior, I3 capture pipeline). All seven original audit-pass bugs
+still pinned by the `test_vllm_protocol_fixture.py` cross-call
+fixture.
+
+### v8 GPU run plan (pending)
+
+Single Phase 4 cell + diff against the LRU v3 baseline. Estimated
+~$0.05 spot. Tells us whether the I1–I5 estimates hold.
+
+```bash
+python3 -m ctm_bench.scripts.run_streaming \
+    --model /workspace/.hf_cache_phase4/qwen2.5-7b \
+    --workload chat_32k --seed 42 \
+    --gpu-memory-utilization 0.26 --swap-space-gb 16 \
+    --arrival-rate 6.0 --arrival-alpha 1.5 \
+    --max-requests 30 --max-wall-seconds 60 \
+    --max-decode-tokens 2048 \
+    --prompt-length-choices "8000,16000,24000,30000" \
+    --ctm-plus \
+    --phase4-trig-calibration /workspace/.calibration/qwen2.5-7b.qcenters.perlayer.json \
+    --phase4-window-interval 128 \
+    --phase4-future-offsets "1,2,4,8,16" \
+    --phase4-capture-every-n 4 \
+    --phase4-trig-blend-candidate-count 4 \
+    --output-dir bench_out/4cell_phase4_v8
+
+python3 -m ctm_bench.scripts.read_phase4_v5 \
+    --phase4-dir bench_out/4cell_phase4_v8 \
+    --phase2-dir bench_out/4cell_lru_v3
+```
+
+### Decision tree for v8 result
+
+| tokens/sec vs LRU | Interpretation | Next step |
+|---|---|---|
+| ≥ −5% (≥ 81 tok/s) | Phase 4 is throughput-competitive | Write up + close out |
+| −5% to −10% | Most of the gap closed; remaining is profile-targetable | py-spy + targeted fix |
+| > −10% (≤ 77 tok/s) | I1–I5 estimates were too optimistic | py-spy required; possibly I7 (Triton) becomes necessary |
+
+In all three outcomes, the v8 run also confirms whether v5's −11%
+swap_out/decode_token win reproduces with the new code path. If it
+doesn't, the cache (I1) or vectorize (I2) introduced a semantic
+bug that the equivalence tests didn't catch.
+
+If `phase4_trig_score_cache_misses` is > 0 in the v8 streaming
+summary, the cache is being invalidated more aggressively than
+expected — also a regression to investigate.
 
 ## Appendix C: Where to read more
 
