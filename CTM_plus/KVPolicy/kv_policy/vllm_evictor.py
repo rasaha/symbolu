@@ -1373,6 +1373,7 @@ def patch_vllm_engine_modern(
     trig_scorer: Optional[Any] = None,
     window_pruning_interval: int = 128,
     trig_blend_candidate_count: int = 4,
+    use_cython_evictor: bool = False,
 ) -> CTMEvictorModern:
     """Install CTMEvictorModern on a modern vLLM (0.5+) engine.
 
@@ -1442,7 +1443,7 @@ def patch_vllm_engine_modern(
     if block_size is None:
         block_size = getattr(gpu_allocator, "block_size", 16)
 
-    ctm_evictor = CTMEvictorModern(
+    ctm_evictor = (CTMEvictorModernC if use_cython_evictor else CTMEvictorModern)(
         num_blocks_capacity=int(num_blocks),
         block_size=int(block_size),
         enable_logging=enable_logging,

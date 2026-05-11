@@ -530,6 +530,7 @@ class AsyncEngineDriver:
         phase4_num_layers: int = 0,
         phase4_capture_every_n: int = 1,
         phase4_trig_blend_candidate_count: int = 4,
+        phase4_use_cython_evictor: bool = False,
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
         vllm_module: Any = None,
@@ -606,6 +607,7 @@ class AsyncEngineDriver:
         self.phase4_trig_blend_candidate_count = max(
             1, int(phase4_trig_blend_candidate_count),
         )
+        self.phase4_use_cython_evictor = bool(phase4_use_cython_evictor)
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -894,6 +896,7 @@ class AsyncEngineDriver:
                     trig_scorer=trig_scorer,
                     window_pruning_interval=self.phase4_window_interval,
                     trig_blend_candidate_count=self.phase4_trig_blend_candidate_count,
+                    use_cython_evictor=self.phase4_use_cython_evictor,
                 )
                 logger.info(
                     "Phase 2: CTM+ evictor patch installed on "
@@ -1362,6 +1365,7 @@ def patch_vllm_engine_modern(
     trig_scorer: Any = None,
     window_pruning_interval: int = 128,
     trig_blend_candidate_count: int = 4,
+    use_cython_evictor: bool = False,
 ):
     """Patch a modern vLLM (0.5+) engine to use CTM+ for KV-cache
     eviction.
@@ -1398,4 +1402,5 @@ def patch_vllm_engine_modern(
         trig_scorer=trig_scorer,
         window_pruning_interval=window_pruning_interval,
         trig_blend_candidate_count=trig_blend_candidate_count,
+        use_cython_evictor=use_cython_evictor,
     )

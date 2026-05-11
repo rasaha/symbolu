@@ -173,6 +173,22 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--phase4-cython-evictor",
+        action="store_true",
+        help=(
+            "Phase 4: install CTMEvictorModernC (Cython port) "
+            "instead of CTMEvictorModern (pure Python). Semantically "
+            "identical at the algorithm layer; closes the per-call "
+            "Python dispatch overhead the v8 py-spy profile "
+            "(PHASE4_GPU_FINDINGS §11) attributed the 20% throughput "
+            "regression to. Requires the compiled .so at "
+            "kv_policy/_ctm_evictor.cpython-*.so; build with "
+            "`cd CTM_plus/KVPolicy && python3 setup.py build_ext "
+            "--inplace`. When the .so is absent this flag is a "
+            "silent no-op (Python class)."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -240,6 +256,7 @@ def main(argv: Sequence[str]) -> int:
         phase4_num_layers=args.phase4_num_layers,
         phase4_capture_every_n=args.phase4_capture_every_n,
         phase4_trig_blend_candidate_count=args.phase4_trig_blend_candidate_count,
+        phase4_use_cython_evictor=args.phase4_cython_evictor,
         max_decode_tokens=args.max_decode_tokens,
     )
 
