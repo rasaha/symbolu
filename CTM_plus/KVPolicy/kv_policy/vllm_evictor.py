@@ -681,6 +681,7 @@ class CTMEvictorModern:
         trig_scorer: Optional[Any] = None,
         trig_score_weight: float = 0.30,
         window_pruning_interval: int = 128,
+        trig_blend_candidate_count: int = 4,
     ) -> None:
         # Lazy import — kv_policy.attention_evictor is in this
         # package; this class is what we want to use directly
@@ -737,6 +738,19 @@ class CTMEvictorModern:
         # can decouple per-evict trig weight from window-pruning weight
         # without an API break.
         self._trig_blend_weight = float(trig_score_weight)
+        # I4 optimization (May 2026 audit): the v5 GPU run used
+        # candidate_count=8 hardcoded — 8× more base scoring per
+        # evict than LRU's count=1. Empirically the 62% trig
+        # changed_pick rate was concentrated in the top few candidates.
+        # Lower default to 4; the constructor param lets us sweep.
+        # Set to 1 to effectively disable trig blending (trig_score
+        # only affects window_pruning_pass then).
+        if trig_blend_candidate_count < 1:
+            raise ValueError(
+                f"trig_blend_candidate_count must be >= 1; got "
+                f"{trig_blend_candidate_count}"
+            )
+        self._trig_blend_candidate_count = int(trig_blend_candidate_count)
         # block_id -> list of (position, k_real, k_imag) tuples
         self._block_pre_rope_keys: Dict[
             int, List[Tuple[int, List[float], List[float]]]
@@ -929,7 +943,9 @@ class CTMEvictorModern:
                 self._trig_scorer is not None
                 and self._trig_blend_weight > 0
             )
-            candidate_count = 8 if trig_active else 1
+            candidate_count = (
+                self._trig_blend_candidate_count if trig_active else 1
+            )
 
             # Re-pick until we find a victim that is in our tracked
             # state. select_victims operates on the underlying policy's
@@ -960,13 +976,36 @@ class CTMEvictorModern:
                     continue
 
                 if trig_active and len(tracked_candidates) > 1:
-                    # Re-rank by base_score - trig_blend_weight * trig_score.
+                    # I5 optimization (May 2026 audit): short-circuit
+                    # when NO candidate has captured K — the blend
+                    # would contribute exactly zero, so we can just
+                    # take the policy's first pick and skip 4× the
+                    # base-scoring work. Ticks _phase4_trig_blend_skips
+                    # so we can monitor how often this fires (high =
+                    # capture isn't keeping up with eviction pace).
+                    have_any_trig = any(
+                        bid in self._block_trig_score
+                        for bid in tracked_candidates
+                    )
+                    if not have_any_trig:
+                        self._phase4_trig_blend_skips = (
+                            getattr(
+                                self,
+                                "_phase4_trig_blend_skips",
+                                0,
+                            ) + 1
+                        )
+                        victim_id = tracked_candidates[0]
+                        break
+
+                    # Re-rank by base_score + trig_blend_weight * trig_score.
                     # Lower final score = better eviction candidate.
                     # Blocks without captured K score 0 on trig, so
                     # their final score is the base score (no penalty,
-                    # no boost). Tracked blocks WITH captured K that
-                    # show low trig (low importance) get a NEGATIVE
-                    # adjustment that nudges them toward eviction.
+                    # no boost). Tracked blocks WITH captured K and
+                    # LOW trig (unimportant) get a smaller positive
+                    # adjustment, dropping below blocks with HIGH trig
+                    # (important) and getting picked first.
                     self._phase4_trig_blend_evict_calls = (
                         getattr(
                             self,
@@ -974,24 +1013,21 @@ class CTMEvictorModern:
                             0,
                         ) + 1
                     )
+                    # Compute base scores once and reuse for both the
+                    # blended ranking AND the base-only "would the
+                    # pick have differed?" check. This avoids the
+                    # redundant second sort that the v6 code did.
+                    base_scores = {
+                        bid: self._policy.score_block(bid)
+                        for bid in tracked_candidates
+                    }
                     blended: List[Tuple[float, int]] = []
                     for bid in tracked_candidates:
-                        base = self._policy.score_block(bid)
+                        base = base_scores[bid]
                         trig = self.trig_score_block(bid)
                         if trig is None:
                             final = float(base)
                         else:
-                            # Higher trig = more important = LESS
-                            # evictable, so SUBTRACT from final score.
-                            # Wait — score_block convention: lower =
-                            # evict first. So we want LOW trig
-                            # (unimportant) to push final LOWER.
-                            # Therefore: final = base - w * (-trig)
-                            #         = base + w * trig
-                            # ... actually the cleanest interpretation:
-                            # if trig is high (block is important),
-                            # we want final to be HIGH (don't evict).
-                            # So add trig with positive weight.
                             final = float(base) + (
                                 self._trig_blend_weight * float(trig)
                             )
@@ -1002,13 +1038,13 @@ class CTMEvictorModern:
                         getattr(self, "_phase4_trig_blend_picks", 0) + 1
                     )
                     # Track when trig actually changed the pick (vs
-                    # base-only ordering) so we can verify the signal
-                    # is doing meaningful work.
-                    base_only = sorted(
-                        tracked_candidates,
-                        key=lambda bid: self._policy.score_block(bid),
+                    # base-only ordering). Reuses base_scores from
+                    # above (I5 cleanup: no second policy.score_block
+                    # call).
+                    base_only_winner = min(
+                        tracked_candidates, key=lambda bid: base_scores[bid],
                     )
-                    if base_only and base_only[0] != victim_id:
+                    if base_only_winner != victim_id:
                         self._phase4_trig_changed_pick = (
                             getattr(
                                 self, "_phase4_trig_changed_pick", 0,
@@ -1311,6 +1347,7 @@ def patch_vllm_engine_modern(
     enable_logging: bool = False,
     trig_scorer: Optional[Any] = None,
     window_pruning_interval: int = 128,
+    trig_blend_candidate_count: int = 4,
 ) -> CTMEvictorModern:
     """Install CTMEvictorModern on a modern vLLM (0.5+) engine.
 
@@ -1386,6 +1423,7 @@ def patch_vllm_engine_modern(
         enable_logging=enable_logging,
         trig_scorer=trig_scorer,
         window_pruning_interval=window_pruning_interval,
+        trig_blend_candidate_count=int(trig_blend_candidate_count),
     )
 
     # The replacement. After this, vLLM's

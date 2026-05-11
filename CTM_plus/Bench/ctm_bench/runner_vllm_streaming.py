@@ -123,6 +123,10 @@ class StreamingRunCellResult:
     # ordering would have chosen.
     phase4_trig_blend_evict_calls: int = 0
     phase4_trig_changed_pick: int = 0
+    # I5 optimization counter — short-circuit on evicts where no
+    # candidate has captured K. High values mean capture isn't keeping
+    # up with eviction pace (typical at run start / heavy preemption).
+    phase4_trig_blend_skips: int = 0
     phase4_capture_subsample_skips: int = 0
     # I1 trig-score-cache counters — every set_block_pre_rope_keys
     # computes the score once (computes); every trig_score_block
@@ -525,6 +529,7 @@ class AsyncEngineDriver:
         phase4_future_offsets: Optional[Sequence[int]] = None,
         phase4_num_layers: int = 0,
         phase4_capture_every_n: int = 1,
+        phase4_trig_blend_candidate_count: int = 4,
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
         vllm_module: Any = None,
@@ -598,6 +603,9 @@ class AsyncEngineDriver:
         )
         self.phase4_num_layers = int(phase4_num_layers)
         self.phase4_capture_every_n = max(1, int(phase4_capture_every_n))
+        self.phase4_trig_blend_candidate_count = max(
+            1, int(phase4_trig_blend_candidate_count),
+        )
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -885,6 +893,7 @@ class AsyncEngineDriver:
                     enable_logging=False,
                     trig_scorer=trig_scorer,
                     window_pruning_interval=self.phase4_window_interval,
+                    trig_blend_candidate_count=self.phase4_trig_blend_candidate_count,
                 )
                 logger.info(
                     "Phase 2: CTM+ evictor patch installed on "
@@ -1275,6 +1284,12 @@ class AsyncEngineDriver:
                     "_phase4_trig_changed_pick", 0,
                 )
             ),
+            phase4_trig_blend_skips=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_trig_blend_skips", 0,
+                )
+            ),
             phase4_capture_subsample_skips=int(
                 getattr(
                     self._installed_evictor or _DummyZero(),
@@ -1346,6 +1361,7 @@ def patch_vllm_engine_modern(
     enable_logging: bool = False,
     trig_scorer: Any = None,
     window_pruning_interval: int = 128,
+    trig_blend_candidate_count: int = 4,
 ):
     """Patch a modern vLLM (0.5+) engine to use CTM+ for KV-cache
     eviction.
@@ -1381,4 +1397,5 @@ def patch_vllm_engine_modern(
         enable_logging=enable_logging,
         trig_scorer=trig_scorer,
         window_pruning_interval=window_pruning_interval,
+        trig_blend_candidate_count=trig_blend_candidate_count,
     )

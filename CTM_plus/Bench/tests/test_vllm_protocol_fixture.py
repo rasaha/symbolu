@@ -833,10 +833,17 @@ def test_trig_blend_falls_back_when_no_keys_captured():
     # Multiple evicts — trig must never change the pick.
     while evictor.num_blocks > 0:
         evictor.evict()
-    # The blend ran (counter ticked) but with all trig scores
-    # None it must have kept the base-only ordering throughout.
+    # After I5: when no candidate has captured K, the blend
+    # branch short-circuits and tick _phase4_trig_blend_skips
+    # instead of _phase4_trig_blend_evict_calls. Either way,
+    # _phase4_trig_changed_pick must stay 0 (trig had no info).
     assert getattr(evictor, "_phase4_trig_changed_pick", 0) == 0
-    assert evictor._phase4_trig_blend_evict_calls > 0
+    skips = getattr(evictor, "_phase4_trig_blend_skips", 0)
+    blend_calls = getattr(evictor, "_phase4_trig_blend_evict_calls", 0)
+    assert (skips + blend_calls) > 0, (
+        "neither skip nor blend counter ticked — evict didn't "
+        "enter the trig-active path at all"
+    )
 
 
 def test_install_pre_rope_capture_call_counter_indexing():
@@ -1354,6 +1361,114 @@ def test_trig_score_cache_lookup_counter_ticks():
     assert getattr(evictor, "_phase4_trig_score_cache_misses", 0) == 0
     # Compute was triggered exactly once at set_block_pre_rope_keys.
     assert evictor._phase4_trig_score_computes == 1
+
+
+def test_trig_blend_candidate_count_constructor_param():
+    """I4: trig_blend_candidate_count drives how many victims the
+    policy is asked to score per evict. Default is 4 (down from the
+    v5 GPU run's hardcoded 8). Constructor must validate >= 1."""
+    from kv_policy.vllm_evictor import CTMEvictorModern
+    from kv_policy.triattention import TrigScorer, QCenterStats
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=1, num_heads=1, num_kv_heads=1,
+        head_dim=4,
+        e_q_real=[[[1.0, 0.0]]],
+        e_q_imag=[[[0.0, 0.0]]],
+        e_q_norm=[[[1.0, 1.0]]],
+    )
+
+    # Default = 4.
+    ev = CTMEvictorModern(
+        num_blocks_capacity=64, block_size=16,
+        trig_scorer=TrigScorer(stats=stats),
+    )
+    assert ev._trig_blend_candidate_count == 4
+
+    # Constructor overrides.
+    ev2 = CTMEvictorModern(
+        num_blocks_capacity=64, block_size=16,
+        trig_scorer=TrigScorer(stats=stats),
+        trig_blend_candidate_count=2,
+    )
+    assert ev2._trig_blend_candidate_count == 2
+
+    # Reject zero / negative.
+    with pytest.raises(ValueError, match="must be >= 1"):
+        CTMEvictorModern(
+            num_blocks_capacity=64, block_size=16,
+            trig_blend_candidate_count=0,
+        )
+
+
+def test_trig_blend_skips_when_no_candidate_has_captured_k():
+    """I5: when none of the trig-blend candidates have captured K,
+    the blend math contributes exactly zero. Short-circuit to the
+    base-only pick and tick _phase4_trig_blend_skips. Without this
+    optimization the May 2026 v5 GPU run paid 4-8 base_score calls
+    per evict for evictions where trig couldn't influence anything.
+    """
+    from kv_policy.vllm_evictor import CTMEvictorModern
+    from kv_policy.triattention import TrigScorer, QCenterStats
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=1, num_heads=1, num_kv_heads=1,
+        head_dim=4,
+        e_q_real=[[[1.0, 0.0]]],
+        e_q_imag=[[[0.0, 0.0]]],
+        e_q_norm=[[[1.0, 1.0]]],
+    )
+    evictor = CTMEvictorModern(
+        num_blocks_capacity=64, block_size=16,
+        trig_scorer=TrigScorer(stats=stats),
+        trig_blend_candidate_count=4,
+    )
+
+    # Admit 3 blocks WITHOUT capturing K for any of them.
+    for bid in (10, 20, 30):
+        evictor.add(
+            block_id=bid, content_hash=bid * 100,
+            num_hashed_tokens=16, last_accessed=float(bid),
+        )
+
+    evictor.evict()
+    # Skip counter ticks; blend evict_calls counter does NOT tick.
+    assert evictor._phase4_trig_blend_skips == 1
+    assert getattr(evictor, "_phase4_trig_blend_evict_calls", 0) == 0
+
+
+def test_trig_blend_does_not_skip_when_one_candidate_has_captured_k():
+    """Symmetric to the skip test: if AT LEAST ONE candidate has
+    captured K, the blend runs as normal (no skip)."""
+    from kv_policy.vllm_evictor import CTMEvictorModern
+    from kv_policy.triattention import TrigScorer, QCenterStats
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=1, num_heads=1, num_kv_heads=1,
+        head_dim=4,
+        e_q_real=[[[1.0, 0.0]]],
+        e_q_imag=[[[0.0, 0.0]]],
+        e_q_norm=[[[1.0, 1.0]]],
+    )
+    evictor = CTMEvictorModern(
+        num_blocks_capacity=64, block_size=16,
+        trig_scorer=TrigScorer(stats=stats),
+        trig_blend_candidate_count=4,
+    )
+
+    # Admit 3 blocks; capture K only for one of them.
+    for bid in (10, 20, 30):
+        evictor.add(
+            block_id=bid, content_hash=bid * 100,
+            num_hashed_tokens=16, last_accessed=float(bid),
+        )
+    evictor.set_block_pre_rope_keys(
+        20, keys=[(0, [1.0, 0.0], [0.0, 0.0])], layer=0, head=0,
+    )
+
+    evictor.evict()
+    assert getattr(evictor, "_phase4_trig_blend_skips", 0) == 0
+    assert evictor._phase4_trig_blend_evict_calls == 1
 
 
 def test_calibrate_q_centers_rejects_call_counter_with_multiple_modules():

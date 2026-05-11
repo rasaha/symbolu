@@ -42,6 +42,7 @@ def _show(label: str, r: dict) -> None:
         "phase4_capture_attempts",
         "phase4_trig_blend_evict_calls",
         "phase4_trig_changed_pick",
+        "phase4_trig_blend_skips",
         "phase4_trig_score_computes",
         "phase4_trig_score_lookups",
         "phase4_trig_score_cache_misses",

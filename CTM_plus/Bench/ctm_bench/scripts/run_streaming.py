@@ -161,6 +161,18 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--phase4-trig-blend-candidate-count", type=int, default=4,
+        help=(
+            "Phase 4: oversample factor for the trig-blend re-rank "
+            "in evict(). The v5 GPU run used 8 (hardcoded); 8x base "
+            "scoring per evict accounts for some of the 20% Python "
+            "throughput regression. Default 4 keeps most of the "
+            "62% trig_changed_pick rate at half the cost. Set to "
+            "1 to disable trig blending in evict() (trig still "
+            "affects window_pruning_pass)."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -227,6 +239,7 @@ def main(argv: Sequence[str]) -> int:
         phase4_future_offsets=phase4_offsets,
         phase4_num_layers=args.phase4_num_layers,
         phase4_capture_every_n=args.phase4_capture_every_n,
+        phase4_trig_blend_candidate_count=args.phase4_trig_blend_candidate_count,
         max_decode_tokens=args.max_decode_tokens,
     )
 
