@@ -1437,6 +1437,116 @@ def test_trig_blend_skips_when_no_candidate_has_captured_k():
     assert getattr(evictor, "_phase4_trig_blend_evict_calls", 0) == 0
 
 
+def test_i3_capture_keeps_dtype_reshape_slice_on_gpu_path():
+    """I3 (May 2026 audit): the GPU->CPU transfer in the K capture
+    hot path is the suspected dominant remaining overhead. After this
+    change, dtype conversion + reshape + head-0 slicing happen on the
+    same device as the input K (i.e., GPU at runtime, CPU here in the
+    test), the transfer payload is num_kv_heads× smaller, and the
+    CPU side uses a zero-copy NumPy view instead of per-element
+    .tolist().
+
+    This test drives _capture_pre_rope_k_to_evictor end-to-end with a
+    deterministic K tensor and confirms:
+      (a) capture still produces the correct cached trig score
+          (numerically equal to what the pure-Python fallback would
+          have computed), AND
+      (b) the per-block tuples accept NumPy 1-D arrays directly —
+          no list() conversion needed at the per_block grouping step.
+    """
+    torch = pytest.importorskip("torch")
+    pytest.importorskip("numpy")
+    import math
+    import numpy as np
+    from kv_policy.triattention import (
+        TrigScorer, QCenterStats, _capture_pre_rope_k_to_evictor,
+    )
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    # Compact model: 1 layer, 2 KV heads, head_dim=4, num_bands=2.
+    stats = QCenterStats.from_lists(
+        model_name="i3_test", num_layers=1, num_heads=2,
+        num_kv_heads=2, head_dim=4,
+        e_q_real=[[[0.7, -0.3], [0.1, 0.4]]],
+        e_q_imag=[[[0.2, 0.8], [-0.5, 0.6]]],
+        e_q_norm=[[[1.0, 1.0], [1.0, 1.0]]],
+    )
+    scorer = TrigScorer(stats=stats, future_offsets=[1, 2, 4])
+    evictor = CTMEvictorModern(
+        num_blocks_capacity=64, block_size=4,
+        trig_scorer=scorer,
+    )
+
+    # Pre-track block_id 3 so the I1 cache populates on capture.
+    evictor.add(
+        block_id=3, content_hash=999, num_hashed_tokens=4,
+        last_accessed=0.0,
+    )
+
+    # Build K: 1 decode token, 2 KV heads, head_dim=4 -> last dim
+    # is num_kv_heads * head_dim = 8.
+    key = torch.tensor(
+        [[1.0, 0.5, -0.3, 0.2, 0.8, -0.1, 0.4, 0.6]],
+        dtype=torch.float32,
+    )
+    positions = torch.tensor([12])
+    inputs = (positions, torch.zeros_like(key), key)
+
+    # slot_mapping pointing to block 3 (block_id * block_size + offset
+    # = 3*4 + 0 = 12, but block_id is derived as slot // block_size).
+    # Set on the side-channel (the way the production hook does it).
+    evictor._phase4_pending_slot_mapping = torch.tensor([12])
+    evictor._phase4_pending_num_decode_tokens = 1
+
+    # Capture.
+    _capture_pre_rope_k_to_evictor(
+        inputs=inputs,
+        evictor=evictor,
+        layer=0, head=0,
+        inferred_head_dim=4,
+    )
+
+    # Block 3 must now have captured pre-RoPE K, a cached trig score,
+    # and (layer, head) = (0, 0).
+    assert 3 in evictor._block_pre_rope_keys
+    assert evictor._block_layer_head[3] == (0, 0)
+    assert 3 in evictor._block_trig_score
+    cached_score = evictor._block_trig_score[3]
+    assert math.isfinite(cached_score)
+
+    # The captured K, when fed back through the pure-Python score path,
+    # must match the cached value to ~1e-10.
+    block_keys = evictor._block_pre_rope_keys[3]
+    assert len(block_keys) == 1  # one decode token captured
+    pos, k_real_arr, k_imag_arr = block_keys[0]
+    assert pos == 12
+    # The capture stored numpy 1-D arrays (no list() conversion).
+    # Confirm they're numpy arrays of the right shape.
+    assert isinstance(k_real_arr, np.ndarray)
+    assert k_real_arr.shape == (2,)  # num_bands
+    assert isinstance(k_imag_arr, np.ndarray)
+    assert k_imag_arr.shape == (2,)
+    # Match expected K values from the input tensor: head 0 of the
+    # 4-dim head, reshaped as [num_bands=2, 2] -> indices 0..3 of
+    # head 0 (which is the first 4 entries of the last dim).
+    # head_dim layout: [(re0, im0), (re1, im1)]
+    np.testing.assert_allclose(
+        k_real_arr, np.array([1.0, -0.3], dtype=np.float32),
+    )
+    np.testing.assert_allclose(
+        k_imag_arr, np.array([0.5, 0.2], dtype=np.float32),
+    )
+
+    # Score recomputed from the captured K via the pure-Python path
+    # must equal the cached value.
+    recomputed = scorer.score_token(
+        layer=0, head=0,
+        k_real=k_real_arr.tolist(),
+        k_imag=k_imag_arr.tolist(),
+    )
+    assert abs(recomputed - cached_score) < 1e-10
+
+
 def test_trig_blend_does_not_skip_when_one_candidate_has_captured_k():
     """Symmetric to the skip test: if AT LEAST ONE candidate has
     captured K, the blend runs as normal (no skip)."""

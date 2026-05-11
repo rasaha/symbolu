@@ -1496,18 +1496,52 @@ def _capture_pre_rope_k_to_evictor(
     decode_start = num_tokens - num_decode_tokens
     if decode_start < 0:
         return
-    decode_key = key[decode_start:].detach().to("cpu").float()
-    # Reshape: [decode_tokens, num_kv_heads, num_bands, 2]
-    decode_key = decode_key.view(
+
+    # I3 optimization (May 2026 audit): shrink the GPU->CPU transfer
+    # by doing dtype conversion + reshape + head-0 slicing ON THE GPU,
+    # then transferring only the [num_decode, num_bands, 2] tensor
+    # (4-8x smaller than the original [num_decode, num_kv_heads *
+    # head_dim] tensor) and converting it directly to NumPy via
+    # zero-copy .numpy() instead of the per-element .tolist().
+    #
+    # Old code path:
+    #   decode_key = key[decode_start:].detach().to("cpu").float()
+    #     -> blocking CPU sync of FULL slice (e.g., 1024 floats)
+    #   .view(...)[:, 0, :, :]
+    #     -> CPU reshape + slice (cheap but on CPU)
+    #   .tolist()
+    #     -> per-element Python-object conversion (expensive: ~128
+    #        floats * 2 components per decode token)
+    #
+    # New code path (this commit):
+    #   gpu_slice = key[decode_start:].detach()             # on GPU
+    #   .to(float32) if needed (cheap dtype cast on GPU)
+    #   .view(...)[:, 0, :, :].contiguous()                 # on GPU
+    #   .to("cpu")                                          # ONE sync, smaller payload
+    #   .numpy()                                            # zero-copy view
+    gpu_slice = key[decode_start:].detach()
+    if gpu_slice.dtype != torch.float32:
+        gpu_slice = gpu_slice.to(torch.float32)
+    # Reshape: [decode_tokens, num_kv_heads, num_bands, 2] (GPU view).
+    gpu_slice = gpu_slice.view(
         num_decode_tokens, num_kv_heads, num_bands, 2,
     )
-    # Slice to head 0 (TriAttention's KV-head-aligned simplification).
-    head_k = decode_key[:, 0, :, :]   # [decode_tokens, num_bands, 2]
-    k_real_per_token = head_k[..., 0].tolist()
-    k_imag_per_token = head_k[..., 1].tolist()
+    # Head 0 slice, contiguous so the .to("cpu") + .numpy() path is
+    # truly zero-copy on the CPU side.
+    head_k_gpu = gpu_slice[:, 0, :, :].contiguous()
+    # Single blocking transfer of the smaller [num_decode, num_bands, 2]
+    # tensor. Roughly num_kv_heads* less data than the old path.
+    head_k_cpu = head_k_gpu.to("cpu")
+    # Zero-copy NumPy view. Tracks the same memory; no per-element
+    # Python-object construction.
+    head_k_np = head_k_cpu.numpy()
+    k_real_per_token = head_k_np[..., 0]   # np.ndarray [num_decode, num_bands]
+    k_imag_per_token = head_k_np[..., 1]   # np.ndarray [num_decode, num_bands]
 
-    # slot_mapping is shape [num_tokens] of slot indices (block_id *
-    # block_size + offset). Slice the decode portion.
+    # slot_mapping / positions: these are typically small int tensors
+    # (one per decode token) so the sync is cheap. Keep the existing
+    # .tolist() path; for num_decode_tokens=8 (typical), that's 8
+    # integers — negligible.
     if hasattr(slot_mapping, "tolist"):
         slot_list = slot_mapping[decode_start:].tolist()
     else:
@@ -1518,8 +1552,14 @@ def _capture_pre_rope_k_to_evictor(
     else:
         pos_list = list(positions)[decode_start:]
 
-    # Group per block.
-    per_block: Dict[int, List[Tuple[int, List[float], List[float]]]] = {}
+    # Group per block. Per-token K is now a NumPy 1-D view of length
+    # num_bands; aggregate_block_score_vectorized iterates via len(kr)
+    # / k_real[i] = kr assignment which both work on NumPy 1-D.
+    # Skipping the list() conversion saves ~num_bands worth of Python
+    # object construction per token.
+    per_block: Dict[
+        int, List[Tuple[int, "Any", "Any"]],
+    ] = {}
     for tok_idx in range(num_decode_tokens):
         slot = int(slot_list[tok_idx])
         if slot < 0:
@@ -1527,8 +1567,7 @@ def _capture_pre_rope_k_to_evictor(
         block_id = slot // block_size
         position = int(pos_list[tok_idx])
         per_block.setdefault(block_id, []).append(
-            (position, list(k_real_per_token[tok_idx]),
-             list(k_imag_per_token[tok_idx])),
+            (position, k_real_per_token[tok_idx], k_imag_per_token[tok_idx]),
         )
 
     for block_id, keys in per_block.items():
