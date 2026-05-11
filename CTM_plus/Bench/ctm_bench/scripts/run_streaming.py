@@ -9,6 +9,17 @@ Phase 1 is LRU-only; the CTM+ path remains gated on Phase 2.
 
 from __future__ import annotations
 
+# Self-bootstrap: when launched as `python -m ctm_bench.scripts.run_streaming`
+# from a venv that doesn't have kv_policy on PYTHONPATH (the common case
+# on a fresh pod), our runtime imports of `kv_policy.triattention`
+# would fail at the first call into the Phase 4 hooks. The helper
+# walks up to CTM_plus/KVPolicy and prepends it to sys.path; safe to
+# call repeatedly. Catch ImportError because conftest tests already
+# expose this helper via a relative import; here we go through the
+# ctm_bench package.
+from ctm_bench.policies import _add_kv_policy_to_path
+_add_kv_policy_to_path()
+
 import argparse
 import asyncio
 import json
