@@ -52,8 +52,15 @@ eviction order as LRU. Resolves the "we never tested against LRU"
 audit gap.
 
 Post-findings, five optimizations (I1-I5; see §10) shipped to attack
-the 20% throughput regression. Total expected recovery: 12-23pp.
-GPU validation pending — code-only, $0 GPU so far.
+the 20% throughput regression. Audit estimate: 12-23pp recovery.
+**v8 GPU validation: 0pp recovered.** The optimizations were
+semantically correct (eviction quality preserved at 0.277 swap_out
+per decode token) but the wall-clock was unchanged. py-spy profile
+(§11) revealed why: **our CTM+ code is ~1.1% of wall time. The 20%
+gap is integration tax** — Python objects in vLLM scheduler hot
+paths that expect C-level performance — not algorithm complexity.
+The next throughput win is a Cython / pybind11 port of
+`CTMEvictorModern` (1-2 weeks, ~5-10pp), not more algorithm tuning.
 
 What this session **does not** invalidate: the architecture-doc 8.8×
 capacity claim (TurboQuant + CTM+ + CTXL stack) — none of those layers
@@ -662,6 +669,92 @@ bug that the equivalence tests didn't catch.
 If `phase4_trig_score_cache_misses` is > 0 in the v8 streaming
 summary, the cache is being invalidated more aggressively than
 expected — also a regression to investigate.
+
+### §10.1 v8 ACTUAL RESULT — I1–I5 recovered 0pp on this workload
+
+The v8 GPU run executed `2026-05-11`. Result:
+
+| Metric | v5 (5 fixes only) | v8 (all I1–I5) | Δ |
+|---|---:|---:|---|
+| **tokens/sec** | 68.26 | **68.26** | **0%** |
+| swap_out / decode_token | 0.277 | 0.277 | unchanged ✓ |
+| evict_call_count | 1307 | 1253 | similar |
+| **trig_changed_pick / blend_calls** | (v6: 61.8%) | **98.7%** | mechanism more dominant than ever |
+| trig_score cache hit rate (I1) | n/a | 19.3% | structurally low — window pruning iterates ALL tracked blocks, most without K |
+
+**The audit estimates were wrong.** All five optimizations targeted compute (trig math, candidate scoring, capture sync) — but the v8 measurement landed at exactly the same wall-clock as v5. Total recovery: 0pp out of an estimated 12–23pp.
+
+What DID happen:
+- The trig signal's dominance jumped from 62% (v6) to **98.7%** (v8). Per-layer calibration (MRL 0.65) plus the candidate-count reduction made the algorithm more discriminating than ever — but that doesn't move wall-clock if the algorithm isn't the bottleneck.
+- The semantic guarantees held: swap_out / decode_token stayed at 0.277, exactly matching v5. The optimizations were correctness-preserving but throughput-neutral.
+
+This forced the next step: **profile to find where the 20% actually lives.** See §11.
+
+## §11. py-spy profile (post-v8) — the corrected diagnosis
+
+After v8's I1–I5 recovered 0pp of throughput, py-spy sampled the
+streaming runner for ~180s of actual decode at 25Hz, capturing
+88,143 samples. The categorization is decisive: **the 20%
+throughput regression is not in code CTM+ owns.**
+
+### §11.1 What the profile shows
+
+Categorized samples (workload phase only, excluding startup imports):
+
+| Category | % | Frames |
+|---|---:|---|
+| **OTHER** (vLLM scheduler / block allocator / model forward) | **79.9%** | spread across hundreds of small frames; the largest single one is 1% |
+| **TORCH** (`_call_impl`, `_wrapped_call_impl`) | **15.0%** | torch's `nn.Module` dispatcher firing on every layer × every forward |
+| **POLICY SCORING** (`KVCachePolicy.score_block` family) | 3.1% | called by `select_victims` per eviction |
+| **VLLM CORE** | 0.9% | scheduler / engine internals |
+| **CTM+ EVICTOR** | **0.9%** | our `evict()`, `add()`, `remove()`, `__contains__`, etc. |
+| **PHASE 4 HOOKS** | **0.2%** | side-channel, rotary capture, window pruning, trig math |
+
+### §11.2 What this means
+
+**Our entire CTM+ codebase is ~1.1% of wall time** (CTM+ EVICTOR + PHASE 4 HOOKS combined). Even the trig math we spent days optimizing (I1–I5) is < 0.2% of total samples. The 20% throughput gap vs LRU lives in:
+
+- **Torch's per-Module dispatcher** (5.6% — `_wrapped_call_impl` + `_call_impl`): fires on every layer-forward, regardless of our hooks
+- **vLLM scheduler + block-allocator infrastructure** (1.5% from `engine_step` / `schedule` / `_schedule`, 1.2% from `allocate_*_block` / `_maybe_allocate_evicted_block_id`): pays slightly more per call because our patched `CTMEvictorModern` is a Python object, not vLLM's native C-optimised `LRUEvictor`
+- **Long-tail vLLM model-forward frames** (Qwen2 layer forwards, attention layer, linear `.apply()`): each 0.3–1%, none individually expensive
+
+No single fixable hotspot. The 20% is **integration tax** — the cost of patching a Python class into hot vLLM paths that expect C-level performance — distributed across thousands of small per-call costs.
+
+### §11.3 What WOULD recover the 20%
+
+Now that the diagnosis is correct:
+
+| Approach | Expected recovery | Effort |
+|---|---|---|
+| **Reimplement `CTMEvictorModern` as a C extension** (Cython / pybind11). Drop-in same Evictor ABC. No Python overhead for `__contains__/add/update/remove/evict`. | **5–10pp** | 1–2 weeks |
+| **Replace `register_forward_pre_hook` with monkey-patched `forward`**. Skip torch dispatcher's hook walk. | 2–5pp | half a day |
+| **Move hooks from per-rotary to single model-level pre-hook**. One dispatcher fire per forward instead of 28. | 1–3pp | half a day |
+| **Accept the rest as integration tax of the chosen patching strategy** | — | $0 |
+
+What would NOT help (despite earlier audit guesses):
+
+- **CUDA kernel for trig math** — would optimise 0.2% of wall time
+- **More algorithm tuning** (different formulas, weights) — orthogonal to the cost
+- **More NumPy / Python optimization** — < 2% headroom remains
+
+### §11.4 The corrected engineering position
+
+The algorithm is essentially free in compute. The 11% per-token swap-rate improvement vs LRU is real and durable. The 20% throughput cost is integration tax of a Python-object evictor in a hot vLLM path, not algorithm complexity.
+
+**Closing the gap is a code-shape problem (C extension port), not an algorithm problem.** That changes which engineering work to prioritise and which partner conversations are credible:
+
+- Credible: "We have a working KV-eviction algorithm that's measurably smarter than LRU at near-zero compute cost. Production deployment needs a C-extension drop-in for vLLM's Evictor ABC; that's ~1–2 weeks of engineering."
+- NOT credible (per pre-profile guesses): "Phase 4 is slow because of trig math; we need a CUDA kernel."
+
+### §11.5 Practical limit on what's measurable from here
+
+A C-extension port + the two hook-level fixes is the natural path to a defensible "Phase 4 throughput-competitive with LRU" result. After that, the remaining attack surface for capacity gains shifts from CTM+ Phase 4 (which has plateaued at 11%-per-token-swap) to:
+
+- **Phase 3 attention forwarding** (lets CTM+'s 0.35·attn term actually contribute — currently the formula collapses to LRU + a tiebreaker)
+- **TurboQuant ↔ vLLM integration** (the 5–7× compression layer of the architecture-doc 8.8× stack — not yet built)
+- **Different workload** (`agentic_clustered_64k`, multi-turn chat with re-reference) where swap_in_blocks > 0 lets us measure decision quality directly, not just decision count
+
+None of these depend on more Python-level optimisation of the trig math. The current code is fast enough; the integration shape is what's limiting.
 
 ## Appendix C: Where to read more
 
