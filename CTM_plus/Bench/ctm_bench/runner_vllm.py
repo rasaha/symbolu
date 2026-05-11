@@ -182,12 +182,32 @@ def run_vllm(
         )
 
     logger.info("instantiating vLLM with model=%s", model)
+    # enable_prefix_caching=True is required for the CTM+ evictor
+    # patch to install. vLLM ≤ 0.6.x routes block management through
+    # two allocator classes:
+    #   * UncachedBlockAllocator (default) — manages a free-list
+    #     directly; has no `evictor` attribute. The CTM+ patch falls
+    #     through to a no-op on this path.
+    #   * CachedBlockAllocator (only when enable_prefix_caching=True)
+    #     — has an `evictor` attribute the patch can swap.
+    # We turn caching on for BOTH lru and ctm_plus so the two cells
+    # share an allocator class and the comparison is apples-to-apples;
+    # the only difference between cells is which evictor implementation
+    # the CachedBlockAllocator uses.
+    #
+    # Trade-off this surfaces honestly: with prefix caching, eviction
+    # decisions are about *which cached-but-unreferenced blocks to
+    # release first*, not *which currently-active blocks to swap to
+    # CPU under pressure*. That's a different question than the
+    # simulator's tier-cost model — but it's the question the existing
+    # CTM+ vLLM patch can actually answer on real attention, and it's
+    # still a real test of CTM+'s scoring math.
     llm_kwargs = dict(
         model=model,
         gpu_memory_utilization=gpu_memory_utilization,
         swap_space=swap_space_gb,
         enforce_eager=enforce_eager,
-        enable_prefix_caching=False,  # isolate eviction effect
+        enable_prefix_caching=True,
         seed=seed,
     )
     if max_model_len is not None:

@@ -1,0 +1,53 @@
+{
+  "_metadata": {
+    "description": "Roadmap #3 Phase 1 — first real-model swap-counter validation",
+    "captured_at": "2026-05-07T05:42:14Z",
+    "hardware": "RunPod A100 80GB PCIe (NVIDIA driver via runpod/pytorch)",
+    "vllm_version": "0.7.3",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "branch": "claude/safety-state-machine-EXAlZ",
+    "commit_at_run": "9ba827a (audit fixes applied — list-of-tuples parser correct)",
+    "config": {
+      "gpu_memory_utilization": 0.26,
+      "swap_space_gb": 16,
+      "arrival_rate_per_sec": 6.0,
+      "arrival_alpha": 1.5,
+      "max_decode_tokens": 2048,
+      "prompt_length_choices": [8000, 16000, 24000, 30000],
+      "max_requests": 30,
+      "max_wall_seconds": 120,
+      "preemption_mode": "swap",
+      "enable_prefix_caching": false
+    },
+    "vllm_log_corroboration": "Sequence group streaming_chat_32k_2 is preempted by PreemptionMode.SWAP mode because there is not enough KV cache space. ... total_num_cumulative_preemption=1",
+    "what_this_proves": [
+      "AsyncLLMEngine + preemption_mode='swap' actually engages the swap path under sustained Pareto-bursty load on a real model.",
+      "The audit-fix list-of-tuples parser (commit 9ba827a) correctly counts swap events on vLLM 0.7's CpuGpuBlockAllocator. Without that fix the value would be 0.",
+      "Roadmap #3 Phase 1's design is sound: streaming async submission + tuned KV budget produces real swap counters.",
+      "The hyperparameters that engage swap on Qwen 7B + A100 80GB: GPU_MEM_UTIL=0.26 (KV ~1.91 GiB; concurrency at 32K = 1.09x), arrival_rate=6/sec, max_decode_tokens=2048, prompt-length distribution biased to 8K-30K."
+    ],
+    "what_this_does_not_prove": [
+      "CTM+ vs LRU policy effect on a real model — this is LRU only (Phase 1).",
+      "That CTM+ would beat LRU under these conditions — Phase 2 is gated on the modern-vLLM allocator-evictor patch.",
+      "Multi-cell / multi-seed / multi-workload reproducibility — single cell only.",
+      "That this swap-engagement regime matches any specific partner workload — it is a synthetic stress pattern designed to force preemption."
+    ],
+    "next_steps_gated_on_partner_request": [
+      "Multi-cell sweep (3 workloads x 3 seeds with these tuned params, ~30 min, ~$0.60 GPU spot).",
+      "Phase 2 implementation: CTM+ allocator-evictor patch on modern vLLM, ~2 days code + GPU validation."
+    ]
+  },
+  "result": {
+    "counter_source": "vllm_streaming_async_swap",
+    "n_decode_tokens": 6144,
+    "n_requests_admitted": 30,
+    "n_requests_completed": 3,
+    "policy_name": "lru",
+    "preemption_events": 2,
+    "seed": 42,
+    "swap_in_blocks": 0,
+    "swap_out_blocks": 2205,
+    "wall_clock_seconds": 120.00245608761907,
+    "workload_name": "chat_32k"
+  }
+}

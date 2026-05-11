@@ -1,27 +1,34 @@
-"""Latency-based Mode B cross-check (option C from Mode B disposition).
+"""Latency-based Mode B cross-check — harness/timing evidence only.
 
 Takes a directory of Mode B ``vllm_summary.json`` files (produced
-by :mod:`ctm_bench.runner_vllm`) and cross-references their
-wall-clock timings against Mode A's per-workload predictions.
+by :mod:`ctm_bench.runner_vllm`) and renders a markdown report
+of per-seed and per-workload tokens/sec + ms/token, plus an
+optional directional cross-check against Mode A's per-workload
+predictions.
 
-**Why latency rather than swap counts.** vLLM's swap mechanism
-only engages under preemption pressure, which our batch-mode
-runner does not create (default FCFS scheduler, no priority
-mix, all prompts submitted at once via ``engine.generate(...)``).
-See ``MODE_B_RUNBOOK.md`` §9 "vLLM batch-mode swap-engagement
-gap" for the architectural details. Direct swap-byte cross-check
-is therefore not achievable today; **per-decode-token wall-clock
-latency** is the data Mode B *can* produce under batch mode and
-is what this tool cross-references.
+**This tool reports harness/timing evidence only — not CTM+
+performance evidence.** The Mode B runs that fed this tool ran
+LRU only, because vLLM 0.5+ removed the public eviction-policy
+hook that the CTM+ patch targeted; CTM+ was never installed.
+Additionally, batch-mode FCFS execution did not trigger swap, so
+the tier-cost path the simulator predicts was not exercised. See
+``MODE_B_RUNBOOK.md`` §9 for the architectural details.
 
-The cross-check is **indirect**: Mode A predicts
-``avg_access_latency_ns`` per cache access; Mode B reports
-wall-clock seconds per decode token. They are not the same
-quantity. What we *can* compare is the **directional ranking**
-between workloads: if Mode A predicts workload X has higher
-average access latency than workload Y, Mode B should also show
-higher per-token wall time for X than Y. Match in directional
-ranking validates the tier model qualitatively.
+What this tool *does* show:
+
+* The harness loaded a real model on a real GPU and produced
+  honest wall-clock-per-decode-token data.
+* The directional ordering of per-token wall across workloads
+  (chat vs RAG, etc.) under real-model LRU.
+
+What this tool does **not** show:
+
+* CTM+ vs LRU on a real model (CTM+ was not running).
+* Swap-byte traffic (no preemption, no swap).
+* Validation of the simulator's tier-cost model — Mode A
+  predicts memory-access cost, Mode B's per-token wall is
+  compute-dominated on long contexts. Disagreement in the
+  directional ranking is expected and is reported honestly.
 
 Usage:
 
@@ -65,6 +72,14 @@ class ModeBCell:
         if self.n_decode_tokens <= 0:
             return None
         return (self.wall_clock_seconds * 1000.0) / self.n_decode_tokens
+
+    @property
+    def tokens_per_second(self) -> Optional[float]:
+        """Decode tokens per wall-clock second. ``None`` if the
+        cell produced no decode tokens or had zero wall-clock."""
+        if self.n_decode_tokens <= 0 or self.wall_clock_seconds <= 0:
+            return None
+        return self.n_decode_tokens / self.wall_clock_seconds
 
 
 @dataclass(frozen=True)
@@ -239,18 +254,38 @@ def aggregate_mode_a_by_workload(
 def render_report(
     mode_b_by_workload: Mapping[str, Mapping[str, object]],
     mode_a_by_workload: Mapping[str, Mapping[str, float]],
+    mode_b_cells: Sequence[ModeBCell] = (),
 ) -> str:
-    """Render the cross-check report as markdown."""
+    """Render the cross-check report as markdown.
+
+    ``mode_b_cells`` is optional and used only for the §1
+    per-seed table. If omitted, the per-seed table is skipped
+    and the report starts with the workload aggregate. Existing
+    callers that don't pass it remain valid.
+    """
     lines: List[str] = []
     lines.append("# Mode B Latency Cross-Check\n")
     lines.append(
-        "Indirect cross-check: Mode B's wall-clock-per-decode-token "
-        "(measurable) against Mode A's `avg_access_latency_ns` "
-        "(predicted). Same metric this is *not*; what we cross-check "
-        "is **directional ranking** — does Mode B's per-token wall "
-        "rank workloads in the same order Mode A predicts?\n"
+        "**Scope: harness/timing evidence only — not CTM+ "
+        "performance evidence.** The Mode B runs feeding this "
+        "report ran LRU only, because vLLM 0.5+ removed the "
+        "public eviction-policy hook the CTM+ patch targeted, "
+        "and batch-mode FCFS execution did not trigger swap. "
+        "See `MODE_B_RUNBOOK.md` §9 for the architectural "
+        "details. The numbers below show that the harness ran "
+        "end-to-end on a real model and produced honest "
+        "wall-clock data; they do **not** show CTM+ vs LRU on "
+        "a real model.\n\n"
+        "Indirect cross-check (§3, when Mode A summary supplied): "
+        "Mode B's wall-clock-per-decode-token against Mode A's "
+        "`avg_access_latency_ns`. They are not the same metric; "
+        "what we compare is **directional ranking**.\n"
     )
-    lines.append("## §1 Mode B per-token wall (LRU)\n")
+
+    if mode_b_cells:
+        lines.append(_render_per_seed_section(mode_b_cells))
+
+    lines.append("## §2 Mode B per-token wall — workload aggregate (LRU)\n")
     if not mode_b_by_workload:
         lines.append("_No Mode B cells found in the input directory._\n")
     else:
@@ -291,7 +326,7 @@ def render_report(
             )
         lines.append("\n")
 
-    lines.append("## §2 Mode A predicted access latency (LRU)\n")
+    lines.append("## §3 Mode A predicted access latency (LRU)\n")
     if not mode_a_by_workload:
         lines.append(
             "_No Mode A predictions loaded — pass `--mode-a-summary`._\n"
@@ -314,7 +349,7 @@ def render_report(
 
     # Directional cross-check (only if we have both).
     if mode_a_by_workload and mode_b_by_workload:
-        lines.append("## §3 Directional cross-check\n")
+        lines.append("## §4 Directional cross-check\n")
         common = sorted(
             set(mode_a_by_workload.keys()) & set(mode_b_by_workload.keys())
         )
@@ -420,21 +455,72 @@ def render_report(
                     "access not compute).\n"
                 )
 
-    lines.append("\n## §4 Honest scope statement\n")
+    lines.append("\n## §5 Honest scope statement\n")
     lines.append(
-        "* This cross-check is **indirect** — wall-clock latency "
-        "includes compute, model forward passes, and Python overhead "
-        "in addition to memory access. Direct swap-counter "
-        "cross-check is blocked by vLLM's batch-mode preemption gap "
-        "(see MODE_B_RUNBOOK.md §9).\n"
-        "* Match in **directional ranking** validates that Mode A's "
-        "tier model captures the right qualitative ordering. "
-        "Disagreement is informative — flag, don't paper over.\n"
+        "* The numbers above are **harness/timing evidence**: they "
+        "show the Mode B harness ran end-to-end on a real GPU and "
+        "produced honest per-decode-token wall-clock data on LRU. "
+        "They are **not** CTM+ performance evidence: CTM+ was not "
+        "installed into vLLM (vLLM 0.5+ removed the public "
+        "eviction-policy hook), so no real-model CTM+ vs LRU "
+        "comparison exists.\n"
+        "* Direct swap-counter cross-check is blocked by vLLM's "
+        "batch-mode preemption gap — `engine.generate(prompts=[...])` "
+        "with FCFS never preempts, so swap stays at zero. See "
+        "MODE_B_RUNBOOK.md §9.\n"
+        "* The directional cross-check (§4) is **indirect** — "
+        "wall-clock per token includes compute, model forward "
+        "passes, and Python overhead in addition to memory access. "
+        "Match in directional ranking is qualitative agreement on "
+        "ordering; disagreement is expected on long-context "
+        "compute-dominated workloads and is reported, not papered "
+        "over.\n"
         "* Absolute magnitude calibration (Mode A's "
         "`avg_access_latency_ns` → Mode B's wall-clock-ms-per-token "
         "in some constant ratio) is **not** a valid claim from this "
         "cross-check; the units differ.\n"
     )
+    return "".join(lines)
+
+
+def _render_per_seed_section(cells: Sequence[ModeBCell]) -> str:
+    """Render the §1 per-seed table: one row per (workload, seed)
+    cell with tokens/sec and ms/token. LRU only — non-LRU cells
+    are skipped (CTM+ was never running in the May 2026 sweep)."""
+    rows: List[ModeBCell] = sorted(
+        (c for c in cells if c.policy == "lru"),
+        key=lambda c: (c.workload, c.seed),
+    )
+    if not rows:
+        return (
+            "## §1 Mode B per-seed (LRU)\n\n"
+            "_No LRU cells found._\n\n"
+        )
+    lines: List[str] = []
+    lines.append("## §1 Mode B per-seed (LRU) — harness/timing evidence\n\n")
+    lines.append(
+        "One row per (workload, seed). Tokens/sec is the inverse of "
+        "the per-token wall and may be dominated by compute on long "
+        "contexts; this is real-model timing, not a CTM+ comparison.\n\n"
+    )
+    lines.append(
+        "| Workload | Seed | n_decode | Wall (s) | Per-token (ms) | "
+        "Tokens/sec | counter_source |\n"
+        "|---|---:|---:|---:|---:|---:|---|\n"
+    )
+    for c in rows:
+        per_token = c.per_token_wall_ms
+        tps = c.tokens_per_second
+        per_token_str = (
+            f"{per_token:.2f}" if per_token is not None else "—"
+        )
+        tps_str = f"{tps:.2f}" if tps is not None else "—"
+        lines.append(
+            f"| {c.workload} | {c.seed} | {c.n_decode_tokens} "
+            f"| {c.wall_clock_seconds:.2f} | {per_token_str} "
+            f"| {tps_str} | {c.counter_source or '(none)'} |\n"
+        )
+    lines.append("\n")
     return "".join(lines)
 
 
@@ -489,6 +575,7 @@ def main(argv: Sequence[str]) -> int:
     report = render_report(
         aggregate_mode_b_by_workload(cells),
         aggregate_mode_a_by_workload(predictions),
+        mode_b_cells=cells,
     )
 
     if args.output is not None:

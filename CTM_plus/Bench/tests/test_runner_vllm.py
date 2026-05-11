@@ -104,6 +104,51 @@ def test_run_vllm_rejects_unsupported_policy():
         mod._import_vllm = original  # type: ignore
 
 
+def test_run_vllm_enables_prefix_caching():
+    """The CTM+ vLLM evictor patch installs into vLLM's
+    CachedBlockAllocator (via the LRUEvictor it owns). On vLLM
+    ≤ 0.6.x, that allocator is only used when
+    enable_prefix_caching=True; the default UncachedBlockAllocator
+    has no `evictor` attribute and the patch silently falls
+    through to a no-op.
+
+    To make CTM+ actually run on real attention, runner_vllm must
+    pass enable_prefix_caching=True to the LLM constructor — for
+    BOTH lru and ctm_plus, so the comparison is apples-to-apples
+    (same allocator class; only the evictor implementation
+    differs)."""
+    from ctm_bench.runner_vllm import run_vllm
+    from ctm_bench.workload import RAG_128K
+    import ctm_bench.runner_vllm as mod
+
+    captured: dict = {}
+
+    class FakeLLM:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            # Stop run_vllm before it tries to do anything else.
+            raise RuntimeError("captured kwargs; aborting run_vllm")
+
+    class FakeSamplingParams:
+        def __init__(self, **kwargs):
+            pass
+
+    original = mod._import_vllm
+    mod._import_vllm = lambda: (FakeLLM, FakeSamplingParams)  # type: ignore
+    try:
+        for policy in ("lru", "ctm_plus"):
+            captured.clear()
+            with pytest.raises(RuntimeError, match="captured kwargs"):
+                run_vllm(RAG_128K, policy, model="dummy")
+            assert captured.get("enable_prefix_caching") is True, (
+                f"policy={policy} did not pass "
+                "enable_prefix_caching=True; the CTM+ patch only "
+                "installs on the CachedBlockAllocator path."
+            )
+    finally:
+        mod._import_vllm = original  # type: ignore
+
+
 def test_extract_vllm_tier_counters_handles_missing_attributes():
     """The counter-extraction helper must return zero-filled
     counters when vLLM doesn't expose the expected attribute

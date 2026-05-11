@@ -563,45 +563,52 @@ flag what would require additional work.
 
 ### §9.1 The conservative conclusion (six bullets)
 
-1. **The current Mode B harness is valid for real-model
-   execution and timing.** Model weights load, attention runs,
-   wall-clock timings are accurate. `n_decode_tokens` matches
-   workload specs. Counter-extraction reaches the right vLLM
-   APIs (`block_allocator.get_and_reset_swaps()` on vLLM 0.7).
-2. **Swap counters staying zero is a true finding, not a
-   parser failure.** vLLM's `get_and_reset_swaps()` returned
-   an empty mapping; the harness honestly reports
-   `counter_source = vllm_0_7_no_swaps_observed` to
-   distinguish "API works, no swaps happened" from "API path
-   didn't match" or "no measurement attempted."
-3. **vLLM batch-mode FCFS execution does not trigger
-   preemption/swap.** With the default first-come-first-served
-   scheduler and `engine.generate(prompts=[...])` submitting
-   all prompts at once with default priority, vLLM either
-   admits a prompt (it fits) or queues it (waits for active
-   prompts to complete). It does not preempt running prompts
-   to make room.
-4. **Therefore, swap-counter validation is blocked by runner
-   architecture, not CTM+/PCAM logic.** The CTM+ policy code,
-   the simulator's tier-cost model, and Mode A's 5-round
-   results are unaffected. What's blocked is the empirical
-   swap-byte cross-check between Mode A and Mode B.
-5. **Existing data should be used for latency / throughput
-   cross-check.** Mode B does produce reliable per-decode-token
-   wall-clock measurements; Mode A produces predicted
-   `avg_access_latency_ns` per workload. They are not the same
-   quantity, but the **directional ranking** between workloads
-   should agree if Mode A's tier model captures the right
-   relative weights. See §9.4 for the cross-check tool.
-6. **Future swap-counter validation requires an async /
-   preemptive runner.** A runner that uses `AsyncLLMEngine`,
-   submits prompts at controlled rates that exceed the
-   active-set capacity, and configures vLLM's scheduler for
-   preemption would generate real swap traffic that
-   `get_and_reset_swaps()` could measure. Estimated scope:
-   2-3 days. **Not justified by current partner conversations**
-   — this work should be triggered only by a specific request
-   for swap-counter evidence.
+1. **Mode A synthetic validation shows strong CTM+ gains.**
+   5 rounds + audit pass + multi-seed confirmation; numbers
+   in `bench_out/RESULTS.md` are reproducible from
+   `runner_sim.py`. Mode A is unaffected by anything in this
+   section.
+2. **Mode B real-vLLM run validated harness execution and
+   timing only.** Model weights load, attention runs,
+   wall-clock timings per decode token are accurate,
+   `n_decode_tokens` matches workload specs, and
+   counter-extraction reaches the right vLLM APIs
+   (`block_allocator.get_and_reset_swaps()` on vLLM 0.7).
+   Honest fact: timing data is real; everything else is gated.
+3. **CTM+ was not installed into vLLM** because vLLM 0.5+
+   no longer exposes the eviction-policy integration point.
+   The original CTM+ patch targeted
+   `BlockSpaceManagerV1.gpu_allocator.evictor` (replaceable
+   attribute on vLLM ≤ 0.4); 0.5+ replaced it with
+   `SelfAttnBlockSpaceManager` + a private
+   `CpuGpuBlockAllocator._allocators` dict with no public
+   abstraction. Both Mode B sweeps in May 2026 ran LRU only;
+   `policy=ctm_plus` cells fail fast with `NotImplementedError`.
+4. **vLLM batch-mode FCFS execution did not trigger
+   swap/preemption.** With the default scheduler and
+   `engine.generate(prompts=[...])` submitting all prompts at
+   once, vLLM either admits a prompt or queues it; it does
+   not preempt running sequences. `swap_space` engages only on
+   preemption events. `get_and_reset_swaps()` honestly
+   returned zero; `counter_source = vllm_0_7_no_swaps_observed`
+   distinguishes "API works, no swaps happened" from "API
+   path didn't match."
+5. **Therefore, Mode B does not validate or invalidate CTM+.**
+   It produces no real-model CTM+ vs LRU head-to-head numbers
+   (CTM+ wasn't running). It does not exercise the swap path
+   the simulator's tier model is designed to predict (no
+   preemption, hence no swap). It validates the harness, not
+   the policy. The latency cross-check tool below reports
+   timing data as **harness/timing evidence only — not CTM+
+   performance evidence**.
+6. **Real-model CTM+ vs LRU validation is deferred** pending
+   either (a) a vLLM integration rewrite — 2–3 days against
+   the post-0.5 `CpuGpuBlockAllocator` architecture (specs in
+   §9.6) — or (b) a partner-specific serving harness with a
+   public eviction-policy hook (specs in §10). **Neither is
+   justified by current partner conversations**; both should
+   be triggered only by a specific partner request that
+   names CTM+ vs LRU as the validation gate.
 
 ### §9.2 What we tested + what we observed
 
