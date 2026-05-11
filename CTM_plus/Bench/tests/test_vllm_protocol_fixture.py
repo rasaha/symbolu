@@ -1064,6 +1064,139 @@ def test_calibrate_q_centers_uses_call_counter_indexing_when_num_layers_set():
         assert len(stats.e_q_real[layer_idx]) == 1  # num_heads
 
 
+def test_aggregate_block_score_vectorized_matches_pure_python():
+    """I2 optimization (May 2026 audit): the NumPy-vectorized
+    aggregate path must produce numerically-equivalent results to
+    the pure-Python loop. Drive both paths against the same scorer
+    and the same block, assert agreement to ~1e-10. If this drifts,
+    the vectorized path's broadcast / mask / phi-difference algebra
+    has diverged from s_trig_at_distance + s_norm.
+    """
+    import math
+    import random
+
+    pytest.importorskip("numpy")
+    from kv_policy.triattention import (
+        TrigScorer, QCenterStats, aggregate_block_trig_score,
+    )
+
+    rng = random.Random(137)
+    # Non-trivial stats: vary across layers, heads, bands so masking
+    # branches are exercised. head_dim=8 → num_bands=4.
+    num_layers = 3
+    num_heads = 2
+    num_kv_heads = 2
+    head_dim = 8
+    num_bands = head_dim // 2
+
+    def randmat():
+        return [
+            [[rng.uniform(-1, 1) for _ in range(num_bands)]
+             for _ in range(num_heads)]
+            for _ in range(num_layers)
+        ]
+
+    e_q_real = randmat()
+    e_q_imag = randmat()
+    # Norms must be >= sqrt(re^2 + im^2) by physical meaning, but
+    # mean_resultant_length() handles denom <= 0 too. Mix in a zero
+    # to exercise that path.
+    e_q_norm = [
+        [
+            [
+                max(1e-9, math.hypot(
+                    e_q_real[layer][head][band],
+                    e_q_imag[layer][head][band],
+                )) * rng.uniform(1.0, 2.0)
+                if (layer + head + band) % 7 != 0 else 0.0
+                for band in range(num_bands)
+            ]
+            for head in range(num_heads)
+        ]
+        for layer in range(num_layers)
+    ]
+
+    stats = QCenterStats.from_lists(
+        model_name="vec_test",
+        num_layers=num_layers, num_heads=num_heads,
+        num_kv_heads=num_kv_heads, head_dim=head_dim,
+        e_q_real=e_q_real, e_q_imag=e_q_imag, e_q_norm=e_q_norm,
+    )
+    scorer = TrigScorer(stats=stats, future_offsets=[1, 2, 4, 8, 16])
+    assert scorer._np_ready, "NumPy cache should be ready when numpy is installed"
+
+    # Block of 5 tokens with varied K values, including some zeros
+    # to test the active-band masking.
+    block_keys = []
+    for tok_idx in range(5):
+        k_real = [
+            rng.uniform(-1, 1) if (tok_idx + b) % 4 != 0 else 0.0
+            for b in range(num_bands)
+        ]
+        k_imag = [rng.uniform(-1, 1) for _ in range(num_bands)]
+        block_keys.append((tok_idx, k_real, k_imag))
+
+    # Pure-Python path: bypass the vectorized fast-path by computing
+    # via score_token directly.
+    pure_python_total = 0.0
+    for position, k_real, k_imag in block_keys:
+        pure_python_total += scorer.score_token(
+            layer=1, head=0, k_real=k_real, k_imag=k_imag,
+            position=position,
+        )
+
+    # Vectorized path: aggregate_block_trig_score routes here.
+    vectorized_total = aggregate_block_trig_score(
+        scorer=scorer, layer=1, head=0, block_keys=block_keys,
+    )
+
+    # Both should be finite floats agreeing to within float64 precision.
+    assert math.isfinite(pure_python_total)
+    assert math.isfinite(vectorized_total)
+    assert abs(pure_python_total - vectorized_total) < 1e-10, (
+        f"pure-Python={pure_python_total} vs "
+        f"vectorized={vectorized_total} differ by "
+        f"{abs(pure_python_total - vectorized_total)}"
+    )
+
+
+def test_aggregate_block_score_vectorized_handles_empty_block():
+    """Vectorized path must return 0.0 on an empty block,
+    matching pure-Python semantics."""
+    pytest.importorskip("numpy")
+    from kv_policy.triattention import TrigScorer, QCenterStats
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=1, num_heads=1, num_kv_heads=1,
+        head_dim=4,
+        e_q_real=[[[0.5, 0.5]]],
+        e_q_imag=[[[0.5, 0.5]]],
+        e_q_norm=[[[1.0, 1.0]]],
+    )
+    scorer = TrigScorer(stats=stats)
+    assert scorer.aggregate_block_score_vectorized(0, 0, []) == 0.0
+
+
+def test_aggregate_block_score_vectorized_validates_band_count():
+    """k_real / k_imag must match num_bands; otherwise ValueError
+    matching the pure-Python s_trig_at_distance contract."""
+    pytest.importorskip("numpy")
+    from kv_policy.triattention import TrigScorer, QCenterStats
+
+    stats = QCenterStats.from_lists(
+        model_name="x", num_layers=1, num_heads=1, num_kv_heads=1,
+        head_dim=4,
+        e_q_real=[[[0.5, 0.5]]],
+        e_q_imag=[[[0.5, 0.5]]],
+        e_q_norm=[[[1.0, 1.0]]],
+    )
+    scorer = TrigScorer(stats=stats)
+    with pytest.raises(ValueError, match="num_bands"):
+        scorer.aggregate_block_score_vectorized(
+            0, 0, [(0, [0.1, 0.2, 0.3], [0.0, 0.0, 0.0])],
+        )
+
+
 def test_trig_score_cache_matches_uncached_score():
     """I1 optimization (May 2026 audit): trig_score_block now reads
     a cached value populated at set_block_pre_rope_keys time. Pin

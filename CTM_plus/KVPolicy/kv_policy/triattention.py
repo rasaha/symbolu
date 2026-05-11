@@ -287,6 +287,127 @@ class TrigScorer:
                     "future_offsets must all be > 0; got "
                     f"{self._future_offsets}"
                 )
+        # I2 optimization (May 2026 audit): precompute per-(layer,
+        # head, band) NumPy arrays so aggregate_block_trig_score can
+        # vectorize the inner per-band per-delta loop. The math is
+        # identical to s_trig_at_distance + s_norm; verified
+        # numerically against the pure-Python path in
+        # tests/test_vllm_protocol_fixture.py.
+        self._np_ready = False
+        self._build_np_cache()
+
+    def _build_np_cache(self) -> None:
+        """Precompute the constant per-(layer, head, band) arrays used
+        by ``aggregate_block_score_vectorized``. Silently no-ops if
+        NumPy isn't available (pure-Python fallback still works).
+        """
+        try:
+            import numpy as np
+        except ImportError:
+            return
+        stats = self._stats
+        e_q_real = np.asarray(stats.e_q_real, dtype=np.float64)
+        e_q_imag = np.asarray(stats.e_q_imag, dtype=np.float64)
+        e_q_norm_arr = np.asarray(stats.e_q_norm, dtype=np.float64)
+
+        eq_mag = np.sqrt(e_q_real * e_q_real + e_q_imag * e_q_imag)
+        phi_eq = np.arctan2(e_q_imag, e_q_real)
+
+        # MRL_f matches mean_resultant_length() — returns 0 if denom<=0.
+        denom_safe = np.where(e_q_norm_arr > 0, e_q_norm_arr, 1.0)
+        mrl = np.where(
+            e_q_norm_arr > 0, eq_mag / denom_safe, 0.0,
+        )
+        one_minus_r = 1.0 - mrl
+
+        omegas = np.asarray(
+            [stats.omega_f(f) for f in range(stats.num_bands)],
+            dtype=np.float64,
+        )
+        deltas = np.asarray(self._future_offsets, dtype=np.float64)
+
+        self._np = np
+        self._np_eq_mag = eq_mag                  # [L, H, B]
+        self._np_phi_eq = phi_eq                  # [L, H, B]
+        self._np_e_q_norm = e_q_norm_arr          # [L, H, B]
+        self._np_one_minus_r = one_minus_r        # [L, H, B]
+        self._np_omegas = omegas                  # [B]
+        self._np_deltas = deltas                  # [D]
+        self._np_ready = True
+
+    def aggregate_block_score_vectorized(
+        self,
+        layer: int,
+        head: int,
+        block_keys: Sequence[Tuple[int, Sequence[float], Sequence[float]]],
+    ) -> Optional[float]:
+        """Vectorized batch scoring across all tokens in a block.
+
+        Mathematically equivalent to
+        ``sum(scorer.score_token(...) for token in block_keys)`` —
+        verified numerically to ~1e-10 in the test fixture.
+
+        Returns ``None`` if NumPy isn't available; the public-facing
+        ``aggregate_block_trig_score`` falls back to pure Python in
+        that case. Returns 0.0 on an empty block.
+        """
+        if not self._np_ready:
+            return None
+        np = self._np
+        if not block_keys:
+            return 0.0
+        stats = self._stats
+        n_tokens = len(block_keys)
+        n_bands = stats.num_bands
+
+        k_real = np.empty((n_tokens, n_bands), dtype=np.float64)
+        k_imag = np.empty((n_tokens, n_bands), dtype=np.float64)
+        for i, (_pos, kr, ki) in enumerate(block_keys):
+            if len(kr) != n_bands or len(ki) != n_bands:
+                raise ValueError(
+                    f"k_real / k_imag must have num_bands={n_bands} "
+                    f"entries; got {len(kr)}, {len(ki)}"
+                )
+            k_real[i] = kr
+            k_imag[i] = ki
+
+        kf_mag = np.sqrt(k_real * k_real + k_imag * k_imag)   # [T, B]
+        phi_kf = np.arctan2(k_imag, k_real)                    # [T, B]
+
+        eq_mag = self._np_eq_mag[layer, head]                  # [B]
+        phi_eq = self._np_phi_eq[layer, head]                  # [B]
+
+        # Match the "if eq_mag == 0 or kf_mag == 0: continue" branch
+        # in pure-Python s_trig_at_distance.
+        active = (
+            (eq_mag[np.newaxis, :] > 0) & (kf_mag > 0)
+        ).astype(np.float64)                                   # [T, B]
+
+        # s_trig per (token, delta): sum over band of
+        #   eq_mag · kf_mag · cos(omega·delta + phi_eq - phi_kf),
+        # zeroed on inactive bands.
+        phi_star = phi_eq[np.newaxis, :] - phi_kf              # [T, B]
+        angles = (
+            self._np_omegas[np.newaxis, :, np.newaxis]
+            * self._np_deltas[np.newaxis, np.newaxis, :]
+            + phi_star[:, :, np.newaxis]
+        )                                                      # [T, B, D]
+        cos_vals = np.cos(angles)
+        weight = (eq_mag[np.newaxis, :] * kf_mag) * active     # [T, B]
+        per_token_per_delta = (
+            weight[:, :, np.newaxis] * cos_vals
+        ).sum(axis=1)                                          # [T, D]
+        s_trig_per_token = per_token_per_delta.mean(axis=1)    # [T]
+
+        # s_norm per token: sum_b (1 - R_f)·E[‖q_f‖]·‖k_f‖
+        one_minus_r = self._np_one_minus_r[layer, head]        # [B]
+        eqn = self._np_e_q_norm[layer, head]                   # [B]
+        s_norm_weight = one_minus_r * eqn                      # [B]
+        s_norm_per_token = (
+            kf_mag * s_norm_weight[np.newaxis, :]
+        ).sum(axis=1)                                          # [T]
+
+        return float((s_trig_per_token + s_norm_per_token).sum())
 
     @property
     def future_offsets(self) -> List[int]:
@@ -434,6 +555,15 @@ def aggregate_block_trig_score(
     """
     if not block_keys:
         return 0.0
+    # I2 optimization (May 2026 audit): use the NumPy-vectorized path
+    # when available. Mathematically equivalent to the pure-Python
+    # loop below; verified to ~1e-10 in
+    # tests/test_vllm_protocol_fixture.py.
+    vectorized = scorer.aggregate_block_score_vectorized(
+        layer=layer, head=head, block_keys=block_keys,
+    )
+    if vectorized is not None:
+        return vectorized
     total = 0.0
     for position, k_real, k_imag in block_keys:
         total += scorer.score_token(
