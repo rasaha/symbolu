@@ -25,6 +25,10 @@ def _show(label: str, r: dict) -> None:
     )
     print(f"  decode tokens:               {r['n_decode_tokens']}")
     print(f"  swap_out blocks:             {r['swap_out_blocks']}")
+    print(f"  swap_in  blocks:             {r.get('swap_in_blocks', 0)}")
+    so = max(r.get("swap_out_blocks", 0), 1)
+    si = r.get("swap_in_blocks", 0)
+    print(f"  swap_in / swap_out:          {si / so:.3f}  (lower = better cache decisions)")
     print(f"  evict_call_count:            {r['evict_call_count']}")
     print(f"  evict_p99 (us):              {r['evict_p99_microseconds']:.1f}")
     counters = (
@@ -42,6 +46,15 @@ def _show(label: str, r: dict) -> None:
     for k in counters:
         if k in r:
             print(f"  {k}: {r[k]}")
+    # Derived ratio: of all evict() calls that ran the trig blend,
+    # how often did the trig signal actually flip the pick?
+    bec = r.get("phase4_trig_blend_evict_calls", 0)
+    cp = r.get("phase4_trig_changed_pick", 0)
+    if bec > 0:
+        print(
+            f"  trig_changed_pick / blend_calls: "
+            f"{cp / bec * 100:.1f}% (= how often trig overrode base ordering)"
+        )
 
 
 def main(argv=None) -> int:

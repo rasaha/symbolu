@@ -115,6 +115,15 @@ class StreamingRunCellResult:
     # GPU run revealed was needed).
     phase4_set_pre_rope_keys_calls: int = 0
     phase4_set_pre_rope_keys_speculative: int = 0
+    # Trig-blend-in-evict counters — added after the v5 GPU run
+    # showed we measured the outcome (-11% swap_out/token) but not
+    # the mechanism. _evict_calls is incremented every time evict()
+    # entered the trig-blend branch; _changed_pick ticks only when
+    # the trig signal flipped the pick away from what base-only
+    # ordering would have chosen.
+    phase4_trig_blend_evict_calls: int = 0
+    phase4_trig_changed_pick: int = 0
+    phase4_capture_subsample_skips: int = 0
 
 
 # ---------------------------------------------------------------- #
@@ -1243,6 +1252,24 @@ class AsyncEngineDriver:
                 getattr(
                     self._installed_evictor or _DummyZero(),
                     "_phase4_set_pre_rope_keys_speculative", 0,
+                )
+            ),
+            phase4_trig_blend_evict_calls=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_trig_blend_evict_calls", 0,
+                )
+            ),
+            phase4_trig_changed_pick=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_trig_changed_pick", 0,
+                )
+            ),
+            phase4_capture_subsample_skips=int(
+                getattr(
+                    self._installed_evictor or _DummyZero(),
+                    "_phase4_capture_subsample_skips", 0,
                 )
             ),
         )
