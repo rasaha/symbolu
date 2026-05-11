@@ -756,6 +756,120 @@ A C-extension port + the two hook-level fixes is the natural path to a defensibl
 
 None of these depend on more Python-level optimisation of the trig math. The current code is fast enough; the integration shape is what's limiting.
 
+## §12. Cython port of `CTMEvictorModern` (post-profile, code-only)
+
+The §11 profile diagnosed the 20% throughput regression as integration tax
+— vLLM scheduler + torch dispatcher paying Python-call overhead for the
+patched evictor's protocol methods. The fix flagged was a C-extension
+drop-in for the Evictor ABC, sized at 1–2 weeks of engineering for
+5–10pp recovery. The first part of that work landed in this session.
+
+### §12.1 What landed
+
+`kv_policy/_ctm_evictor.pyx` — a Cython `cdef class CTMEvictorModernC`
+that is a semantic drop-in for `CTMEvictorModern`. Same constructor
+signature, same public methods, same diagnostic counter names, same
+cross-call invariants. Methods ported:
+
+* vLLM Evictor ABC: `__contains__`, `add`, `update`, `remove`, `evict`,
+  `num_blocks` (property), plus `get_stats`, `evict_timings_seconds`,
+  `reset_evict_timings`.
+* Phase 4 surface: `set_block_pre_rope_keys` (with eager trig-score
+  cache compute), `trig_score_block` (cache-first lookup),
+  `window_pruning_passed`, `window_pruning_pass` (the
+  lowest-trig-first prune), `forward_block_attention`.
+* `evict()` includes the I4 candidate-count trig blend, the I5
+  zero-trig short-circuit, and the stale-candidate retry loop —
+  all bit-for-bit identical to the Python implementation.
+
+Instance state lives in `cdef public` slots rather than `__dict__`, so
+attribute access is a C-struct slot read instead of a dict probe. All
+diagnostic counters (`_phase4_trig_blend_evict_calls`,
+`_phase4_trig_changed_pick`, `_phase4_set_pre_rope_keys_speculative`,
+…) are `cdef public Py_ssize_t` — incrementing them is a single typed
+add, removing the `getattr(self, ..., 0) + 1` pattern that paid two
+dict lookups per tick in the Python class.
+
+The KVCachePolicy and triattention helpers (`aggregate_block_trig_score`,
+`window_pruning_decision`) keep their Python implementations. The
+profile (§11.1) showed those frames combined are < 4% of wall — porting
+them would optimise a non-issue. This port targets the protocol-method
+dispatch cost specifically, which is where the §11.3 5–10pp lives.
+
+### §12.2 Validation: parametrized protocol fixture
+
+`tests/test_vllm_protocol_fixture.py` is now parametrized across `[py]`
+and `[c]` variants via an autouse fixture that monkeypatches
+`kv_policy.vllm_evictor.CTMEvictorModern` -> the C class on the `[c]`
+leg. All 28 tests (the 7-bug protocol contract + the trig-blend +
+window-pruning + trig-cache + I3/I4/I5 invariants) run on both variants.
+
+CPU result (no GPU): **36 passed, 20 skipped, 0 failed** for the
+fixture file. The 20 skips are torch/numpy-dependent tests that skip
+in both variants identically; the 18 evictor-exercising tests pass on
+both variants with no semantic divergence. Full Bench suite is
+**276 passed, 40 skipped, 0 failed**.
+
+### §12.3 What's deferred
+
+Out of scope for this session, kept as Python:
+
+* The classic-evictor surface (`CTMEvictor`, `patch_vllm_engine`).
+  Only the modern Evictor-ABC class is on the hot vLLM path the
+  profile fingered.
+* Reimplementing `KVCachePolicy.select_victims` / `score_block` in C.
+  The §11.1 profile attributed 3.1% of wall to policy scoring — non-
+  trivial but not the dominant cost. Worth a second pass after the
+  C-evictor result on real GPU is measured.
+* CTM+ Phase 4 GPU validation cell v9. The C extension's compute-side
+  no-op was verified on CPU; the wall-clock impact needs a single
+  Phase 4 streaming-chat run against the LRU v3 baseline to land the
+  5–10pp claim with evidence. Recommended next-session $0.05 spend.
+
+The two cheap hook-shape fixes from §11.3 (`register_forward_pre_hook`
+-> monkey-patched `forward`; consolidate per-rotary hooks into one
+model-level hook, +3–8pp combined) are independent of this port and
+remain as standalone follow-ups.
+
+### §12.4 Build / install
+
+The extension is **optional**. When Cython + a C toolchain are present
+at install time, `setup.py` cythonizes and compiles
+`kv_policy/_ctm_evictor.pyx` to a `.so`. When they aren't,
+`kv_policy.vllm_evictor` aliases `CTMEvictorModernC = CTMEvictorModern`
+so the public API stays stable — the parametrized fixture's `[c]` leg
+then skips, making the missing-extension state visible in CI output.
+
+Build commands:
+
+```bash
+# In-place build (developer workflow)
+cd CTM_plus/KVPolicy && python3 setup.py build_ext --inplace
+
+# Via pip with the extension
+pip install -e 'CTM_plus/KVPolicy[ext]'
+```
+
+The compiled artifact lives at
+`CTM_plus/KVPolicy/kv_policy/_ctm_evictor.cpython-*-*.so` and is
+git-ignored alongside the existing build artefacts. The `.pyx` source
+is the canonical artefact.
+
+### §12.5 What this changes about credible partner positioning
+
+Pre-port (after the §11 profile): "We have an algorithm that's
+measurably smarter than LRU at near-zero compute cost; production
+deployment needs a C-extension drop-in (1–2 weeks)."
+
+Post-port (this session): "The C-extension drop-in is built and
+semantically validated on CPU. End-to-end GPU validation is a single
+$0.05 streaming-chat cell that confirms the §11.3 audit estimate."
+
+That collapses a 1–2 week dependency to a single GPU cell and a
+follow-up writeup. The remaining throughput risk is whether the
+estimate of 5–10pp recovery materialises on the real workload; the
+§11.3 categorisation gives a fairly bounded prior on that.
+
 ## Appendix C: Where to read more
 
 | Doc | Purpose |

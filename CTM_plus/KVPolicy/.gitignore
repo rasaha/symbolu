@@ -1,0 +1,4 @@
+# Cython-generated C source (regenerable from the .pyx). The .pyx is
+# the canonical artefact; the .c file changes with the Cython compiler
+# version and would churn the diff for every contributor.
+kv_policy/_ctm_evictor.c
