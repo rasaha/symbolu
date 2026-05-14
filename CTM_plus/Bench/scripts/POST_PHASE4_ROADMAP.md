@@ -220,7 +220,23 @@ to "streaming chat / production traffic" until long-context is addressed.
 
 ---
 
-## Step 4 — TurboQuant CUDA v4 kernel end-to-end measurement (~1 week eng + 1 GPU-day)
+## Step 4 — TurboQuant CUDA v4 kernel end-to-end measurement (~1 week eng + 1 GPU-day) [BLOCKED]
+
+> **Blocked (post §17, executed 2026-05-14):** the route-B perplexity
+> result (`bench_out/PHASE4_GPU_FINDINGS.md` §17.2) shows the
+> architecture-doc default (3-bit polar + 128 segment_dim + QJL)
+> produces **3052× perplexity blow-up** on Qwen2.5-7B-Instruct. 4-bit
+> is also catastrophic (301×). Block-level cosine 0.965 (which the
+> v4 kernel would preserve) **does not translate to generation
+> quality** because softmax-attention exponentially amplifies K
+> outlier-channel errors that uniform-grid PolarQuant destroys.
+>
+> Building the CUDA v4 kernel before fixing the algorithm would
+> deliver fast catastrophic compression. §17.7 lists three algorithm
+> directions (per-channel scale normalisation, sink-token skip,
+> mixed bit depth) to investigate first. Step 4 remains scoped but is
+> gated on a TurboQuant algorithm config that preserves quality on a
+> real model.
 
 **Goal:** replace the CPU-simulated v3 benchmark with real GPU-measured numbers
 for the v4 polar-quant kernel.

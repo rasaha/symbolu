@@ -9,6 +9,21 @@ without requiring a vLLM `cache_kv` monkey-patch.
 All scripts in this runbook were dry-run-tested on CPU before
 publication. Pin the dry-run-passing commit before running on GPU.
 
+> **Result (executed 2026-05-14, ~$0.45 spot, ~25 min wall):**
+> Track D passed (cosine K mean 0.9657 on real Qwen2.5-7B
+> activations — matches synthetic baseline). Track E perplexity
+> **failed catastrophically at the architecture-doc default** (3-bit
+> + QJL → 3052× perplexity blow-up). 4-bit also catastrophic (301×).
+> 8-bit no-QJL within noise (0.94×, plumbing-correct). MMLU skipped.
+> See `bench_out/PHASE4_GPU_FINDINGS.md` §17 for the full writeup.
+> **Tier 2's ``cache_kv`` hook is on hold** until the algorithm is
+> revisited (§17.7 lists three engineering directions).
+>
+> Lessons re-applied to this runbook: pre-create output directories
+> before `tee`; redirect HF caches to a large volume *before*
+> downloading; upgrade torch to ≥ 2.5 to avoid the transformers MoE
+> `custom_op` import crash. All folded into the steps below.
+
 ---
 
 ## 1. Pod spec
