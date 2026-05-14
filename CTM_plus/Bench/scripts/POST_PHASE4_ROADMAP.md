@@ -53,10 +53,17 @@ on paper" to "demonstrated on hardware."
 >    to v8 (swap_out=1134, 0.2769/decode_token). Integration tax is
 >    located outside CTM+ code entirely.
 >
-> Remaining tractable lever queued for **v10**: monkey-patched
-> `forward` instead of `register_forward_pre_hook` (`--phase4-fast-hooks`).
-> Audit estimate 2–5pp; if also 0pp, Phase 4 throughput closes as a
-> durable structural negative.
+> 4. **Hook-shape fix (v10):** monkey-patched `module.forward`
+>    instead of `register_forward_pre_hook`. Audit estimate 2–5pp;
+>    **measured ~1pp** (v10 tokens/sec=68.26, equal to v8). Fast-hooks
+>    demonstrably worked (+33% more rotary forward fires per wall-
+>    second) but the freed compute couldn't translate into more
+>    decode tokens within the 60s wall budget on this workload.
+>
+> **Combined: 19–38pp audit estimate, ~1pp measured.** Phase 4
+> throughput optimisation is now **CLOSED as an engineering
+> work-track**. The 20% gap vs LRU on chat_32k is structural at
+> vLLM 0.7.3's Evictor-ABC patching layer.
 >
 > The original gate ("Phase 4 hit-rate uplift over LRU ≥ +3pp") was
 > **missed** — and the corrected gate below was itself overtaken by

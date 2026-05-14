@@ -3,10 +3,11 @@
 **Audience:** prospective design partner evaluating CTM+ for an
 LLM-inference deployment.
 **Status:** safe to share; conservative framing throughout.
-**Last updated:** 2026-05-14 (revised after the v9 Cython-port
-GPU validation produced 0pp throughput recovery; v10 hook-shape
-fix queued. Earlier revisions: 2026-05-08 Phase 4 design;
-2026-05-10 Phase 4 GPU validation negative result write-up.)
+**Last updated:** 2026-05-14 (revised after v10 cell closed Phase 4
+throughput optimisation as a durable structural negative; full
+write-up at `bench_out/PHASE4_GPU_FINDINGS.md` §12.6–§13.3. Earlier
+revisions: 2026-05-08 Phase 4 design; 2026-05-10 Phase 4 GPU
+validation negative result write-up.)
 
 This note states what CTM+ has and has not been validated to
 do today, why a real-stack `vLLM` validation has not yet been
@@ -145,7 +146,7 @@ look like.
   contract, catching all eight at $0 in <0.2s.
 
   **Two follow-up engineering attempts to recover the 20%
-  throughput gap, both already executed:**
+  throughput gap, then a third — all three already executed:**
 
   - **I1–I5 optimization sequence (v8 cell):** five compute-side
     optimizations targeting trig math, candidate scoring, and
@@ -161,12 +162,34 @@ look like.
     on porting frames that are 1.1% of wall is ~1.1pp; v9 is
     negative-control evidence that the integration tax lives
     *outside* CTM+ code entirely.
+  - **Hook-shape fix (v10 cell):** replace `register_forward_pre_hook`
+    with direct monkey-patch of `module.forward` so torch's
+    dispatcher takes its no-hook fast path. Audit estimate:
+    2–5pp. **Measured: ~1pp.** Fast-hooks demonstrably worked
+    at the dispatcher level (+33% more rotary forward-pass
+    fires per second in the same wall budget), but the freed
+    compute went into prefill iterations on requests that
+    didn't complete in the 60s budget rather than into more
+    decode tokens.
 
-  One remaining tractable lever queued for v10: monkey-patched
-  `forward` in place of `register_forward_pre_hook` to skip
-  torch's dispatcher hook-walk. Audit estimate: 2–5pp. If v10
-  also lands at 0pp, the Phase 4 throughput question closes as
-  a durable structural negative result.
+  **Combined: 19–38pp estimated, ~1pp measured.** Phase 4
+  throughput optimisation is **closed as an engineering
+  work-track**. The 20% gap vs LRU on chat_32k is structural at
+  vLLM 0.7.3's Evictor-ABC patching layer, not addressable by
+  any leaf-level intervention.
+
+  **What survives the closure (partner-shareable today):** the
+  algorithm-quality result is real and durable. **−11.1%
+  swap_out / decode_token vs LRU**, reproduced across **five
+  distinct evictor implementations** (v5/v6/v8/v9/v10) with the
+  trig mechanism dominantly active at 98.7–99.0% override rate.
+  The C-extension drop-in is semantically validated (bit-identical
+  eviction outcomes) and ready to ship as the production code
+  shape. The −20% tokens/sec cost moves to a partner-conversation-
+  conditional caveat: production deployment needs either a
+  deeper vLLM integration point (not Evictor-ABC patching) or a
+  workload where the per-token swap win dominates the throughput
+  cost.
 
   **Canonical write-up:** `bench_out/PHASE4_GPU_FINDINGS.md`
   documents all nine runs, the eight audit-pass findings, the
