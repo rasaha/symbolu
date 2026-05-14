@@ -150,6 +150,7 @@ class TurboQuantCache(DynamicCache if DynamicCache is not None else object):
         enable_qjl: bool = True,
         backend: str = "torch",
         torch_device: Optional[Any] = None,
+        per_channel_scale: bool = False,
     ) -> None:
         if DynamicCache is None:
             raise ImportError(
@@ -171,12 +172,14 @@ class TurboQuantCache(DynamicCache if DynamicCache is not None else object):
             segment_dim=segment_dim,
             backend=backend,
             torch_device=torch_device,
+            per_channel_scale=per_channel_scale,
         )
         self._tq_cfg = dict(
             angle_bits=angle_bits,
             segment_dim=segment_dim,
             enable_qjl=enable_qjl,
             backend=backend,
+            per_channel_scale=per_channel_scale,
         )
         # Counters for the eval JSON.
         self._tq_updates = 0

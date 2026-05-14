@@ -233,7 +233,10 @@ def _baseline_cache_factory() -> Callable[[], Any]:
     return lambda: DynamicCache()
 
 
-def _turboquant_cache_factory(*, angle_bits: int, segment_dim: int, enable_qjl: bool, backend: str) -> Callable[[], Any]:
+def _turboquant_cache_factory(
+    *, angle_bits: int, segment_dim: int, enable_qjl: bool, backend: str,
+    per_channel_scale: bool = False,
+) -> Callable[[], Any]:
     from kv_policy.turboquant_hf_cache import TurboQuantCache
 
     def factory():
@@ -242,6 +245,7 @@ def _turboquant_cache_factory(*, angle_bits: int, segment_dim: int, enable_qjl: 
             segment_dim=segment_dim,
             enable_qjl=enable_qjl,
             backend=backend,
+            per_channel_scale=per_channel_scale,
         )
     return factory
 
@@ -523,6 +527,17 @@ def main(argv: Sequence[str]) -> int:
         "--turboquant-backend", default="torch",
         choices=["numpy", "torch"],
     )
+    parser.add_argument(
+        "--per-channel-scale", action="store_true",
+        help=(
+            "KIVI-style per-channel pre-quantisation normalisation: "
+            "divide K and V by their per-(head, head_dim) magnitude "
+            "before PolarQuant, multiply back on decompress. Targets "
+            "the K-outlier-channel failure mode that produced the 3052x "
+            "perplexity blow-up at 3-bit (PHASE4_GPU_FINDINGS.md §17). "
+            "Adds 2 KB of scale storage per K (or V) block (~6%% overhead)."
+        ),
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -603,6 +618,7 @@ def main(argv: Sequence[str]) -> int:
         segment_dim=args.segment_dim,
         enable_qjl=enable_qjl,
         backend=args.turboquant_backend,
+        per_channel_scale=args.per_channel_scale,
     )
 
     summary = TrackESummary(
@@ -614,6 +630,7 @@ def main(argv: Sequence[str]) -> int:
             segment_dim=args.segment_dim,
             enable_qjl=enable_qjl,
             backend=args.turboquant_backend,
+            per_channel_scale=args.per_channel_scale,
         ),
     )
 

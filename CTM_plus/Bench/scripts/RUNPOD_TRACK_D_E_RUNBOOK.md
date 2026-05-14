@@ -248,6 +248,57 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 
 ---
 
+## 5b. (Algorithm fix attempt) Per-channel scale (KIVI trick) — re-run Track E perplexity
+
+After the initial Track E result showed catastrophic regression at the
+architecture-doc default (§17), per-channel pre-quantisation
+normalisation was added to test whether the K-outlier-channel failure
+mode can be rescued (§17.7 direction 1). CPU smoke test on synthetic
+outlier-channel data showed per-channel minimum cosine rising from
+**−0.36** (sign-flipped channels!) to **+0.93** at 3-bit polar. If
+the same mechanism rescues real-model perplexity, this is the path
+to a partner-shareable combined-stack result.
+
+Re-run cost: ~5 min, ~$0.07 spot per config.
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+git pull origin claude/safety-state-machine-continued-Lr6oT   # picks up --per-channel-scale flag
+
+# 3-bit + per-channel scale (most ambitious — was 3052× baseline)
+mkdir -p /tmp/track_e_perplexity_3bit_pcs
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --angle-bits 3 \
+    --per-channel-scale \
+    --turboquant-backend torch \
+    --output-dir /tmp/track_e_perplexity_3bit_pcs/ 2>&1 | tee /tmp/track_e_perplexity_3bit_pcs/run.log
+
+# 4-bit + per-channel scale (most likely to be partner-shareable — was 301× baseline)
+mkdir -p /tmp/track_e_perplexity_4bit_pcs
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --angle-bits 4 \
+    --per-channel-scale \
+    --turboquant-backend torch \
+    --output-dir /tmp/track_e_perplexity_4bit_pcs/ 2>&1 | tee /tmp/track_e_perplexity_4bit_pcs/run.log
+```
+
+**Interpretation**:
+
+| Result | What it means | Next step |
+|---|---|---|
+| 4-bit + PCS ratio ≤ 1.05 | KIVI mechanism works; 2.69× compression at quality parity is partner-shareable | Run MMLU 200 to harden the number, then plan cache_kv hook |
+| 4-bit + PCS ratio 1.05–1.5 | Mechanism partial; might need sink-token skip on top | Try sink-skip (§17.7 direction 2) next |
+| 4-bit + PCS ratio > 2 | Per-channel alone isn't enough | Investigate mixed-bit-depth or pause |
+| 3-bit + PCS ratio ≤ 1.10 | Bonus win — 3.58× compression at quality parity | Strongest possible result |
+
+Paste the bottom summary block from both runs. We decide next steps from there.
+
 ## 6. (Optional) Run sweep — bigger MMLU subset for partner artefact (~30 min, ~$0.60)
 
 If Track E was green and you want a stronger partner-shareable number,
