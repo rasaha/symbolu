@@ -333,8 +333,52 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 | Ratio | Interpretation | Next step |
 |---|---|---|
 | ≤ 1.05 | ✅ **Partner-shareable.** ~3.8× compression at quality parity. | Run MMLU 200 to harden. |
-| 1.05–1.5 | Helps but not full quality. | Try INT4 + sink-size 4 combination (cheap test). |
+| 1.05–1.5 | Helps but not full quality. | Try INT4 + group quantization (see §5d). |
 | > 2 | Unexpected — KIVI's published numbers on Qwen-family are within 1.02×. | Investigate; likely an implementation bug. |
+
+## 5d. INT4 per-channel + group quantization (KIVI proper, group_size=32)
+
+Plain `--quant int4-per-channel` uses one scale per (head, head_dim)
+channel covering all S sequence positions. The first 4 positions of
+context have huge K magnitudes (attention sinks) which inflate the
+per-channel scale, hurting reconstruction of the remaining ~280
+non-sink positions. Group quantization splits the seq axis into
+chunks of 32 and gives each chunk its own scale — sinks contained
+in group 0, groups 1+ get appropriate scales for their actual
+magnitudes.
+
+This matches KIVI's published configuration on Qwen-family models.
+
+Re-run cost: ~5 min, ~$0.07.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int4_grp32
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --quant int4-per-channel \
+    --k-group-size 32 \
+    --v-group-size 32 \
+    --output-dir /tmp/track_e_int4_grp32/ 2>&1 | tee /tmp/track_e_int4_grp32/run.log
+```
+
+CPU smoke test on synthetic outlier-position data: clean-group cosine
+0.98+ (vs plain per-channel 0.85-0.93). Predicts perplexity ratio
+close to baseline.
+
+**Decision tree**:
+
+| Ratio | Interpretation |
+|---|---|
+| ≤ 1.05 | ✅ **Partner-shareable.** ~3.5× compression at quality parity. Ship. |
+| 1.05–1.20 | YELLOW — meaningful but with an asterisk. Try `--k-group-size 16` for finer scale. |
+| > 1.30 | Group quant alone insufficient. Investigate asymmetric quant or accept INT5. |
 
 ## 6. (Optional) Run sweep — bigger MMLU subset for partner artefact (~30 min, ~$0.60)
 

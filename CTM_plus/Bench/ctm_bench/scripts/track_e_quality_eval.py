@@ -253,12 +253,16 @@ def _turboquant_cache_factory(
 
 
 def _int4_per_channel_cache_factory(
-    *, sink_size: int = 0,
+    *, sink_size: int = 0, k_group_size: int = 0, v_group_size: int = 0,
 ) -> Callable[[], Any]:
     from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
 
     def factory():
-        return INT4PerChannelCache(sink_size=sink_size)
+        return INT4PerChannelCache(
+            sink_size=sink_size,
+            k_group_size=k_group_size,
+            v_group_size=v_group_size,
+        )
     return factory
 
 
@@ -556,6 +560,26 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--k-group-size", type=int, default=0,
+        help=(
+            "INT4 K quantization group size along the seq axis. "
+            "0 = plain per-channel (one scale per (head, head_dim) "
+            "covering all seq positions). Recommended for KIVI-style "
+            "operation: 32 (smaller groups improve outlier-position "
+            "resolution at marginal scale-storage cost). KIVI's "
+            "published Qwen-family numbers use group_size=32 or 128."
+        ),
+    )
+    parser.add_argument(
+        "--v-group-size", type=int, default=0,
+        help=(
+            "INT4 V quantization group size along the head_dim axis. "
+            "0 = plain per-token. For Qwen2.5-7B (head_dim=128) and "
+            "group_size=32: each (seq, head) gets 4 scales (one per "
+            "32 head_dim elements) instead of one."
+        ),
+    )
+    parser.add_argument(
         "--per-channel-scale", action="store_true",
         help=(
             "KIVI-style per-channel pre-quantisation normalisation: "
@@ -676,10 +700,16 @@ def main(argv: Sequence[str]) -> int:
             sink_size=args.sink_size,
         )
     elif args.quant == "int4-per-channel":
-        tq_factory = _int4_per_channel_cache_factory(sink_size=args.sink_size)
+        tq_factory = _int4_per_channel_cache_factory(
+            sink_size=args.sink_size,
+            k_group_size=args.k_group_size,
+            v_group_size=args.v_group_size,
+        )
         config_dict = dict(
             quant="int4-per-channel",
             sink_size=args.sink_size,
+            k_group_size=args.k_group_size,
+            v_group_size=args.v_group_size,
             scheme="K=per-channel INT4, V=per-token INT4",
         )
     else:

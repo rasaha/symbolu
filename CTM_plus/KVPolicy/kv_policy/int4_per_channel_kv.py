@@ -65,77 +65,194 @@ except ImportError:  # pragma: no cover - guarded at the caller
 
 
 def quantize_per_channel_int4(
-    tensor: "torch.Tensor",
+    tensor: "torch.Tensor", *, group_size: int = 0,
 ) -> "Tuple[torch.Tensor, torch.Tensor]":
-    """Per-channel symmetric INT4 quantization.
+    """Per-channel symmetric INT4 quantization, optionally with
+    group-wise scaling along the seq axis.
 
     Args:
         tensor: ``(S, H, D)`` — seq × num_kv_heads × head_dim. The seq
-            axis is the one being aggregated over (each (H, D) channel
-            gets its own scale across S positions).
+            axis is the one being aggregated over.
+        group_size: when > 0, split the seq axis into chunks of
+            ``group_size`` and compute a separate scale for each chunk.
+            ``0`` (the default) means "one scale per channel covering
+            all S positions" — equivalent to plain per-channel. KIVI's
+            published quality numbers on Qwen-family use group_size=32
+            or 128; smaller groups improve outlier-position resolution
+            at a cost of more scale storage.
 
     Returns:
         ``(quantized, scale)``:
           * ``quantized``: ``(S, H, D) int8`` with values in [−8, +7].
-          * ``scale``: ``(1, H, D) float32`` — the per-channel scale
-            such that ``quantized * scale ≈ tensor``.
+          * ``scale``: ``(n_groups, H, D) float32`` where
+            ``n_groups == ceil(S / max(group_size, S))`` — i.e., 1 for
+            plain per-channel, ``ceil(S / group_size)`` when grouped.
+            ``quantized * scale[group_idx_per_position] ≈ tensor``.
     """
     if tensor.ndim != 3:
         raise ValueError(
             f"quantize_per_channel_int4 expected 3-D (S, H, D) tensor; "
             f"got shape {tuple(tensor.shape)}"
         )
-    t_f32 = tensor.to(torch.float32)
-    # Per-channel scale: max(|x|) over the seq axis, divided by 7 so the
-    # quantization range [−7, +7] maps to the channel's full magnitude.
-    # (We use 7 rather than 8 to keep symmetric quantization symmetric;
-    # the unused -8 bin handles round-half-away-from-zero edge cases.)
-    max_abs = t_f32.abs().amax(dim=0, keepdim=True)  # (1, H, D)
+    s, h, d = tensor.shape
+    if group_size <= 0 or group_size >= s:
+        # Plain per-channel (one scale per (h, d) covering all S positions)
+        t_f32 = tensor.to(torch.float32)
+        max_abs = t_f32.abs().amax(dim=0, keepdim=True)  # (1, H, D)
+        scale = (max_abs / 7.0).clamp(min=1e-8)
+        quantized = (t_f32 / scale).round().clamp(min=-8, max=7).to(torch.int8)
+        return quantized, scale
+
+    # Group-wise: pad S to a multiple of group_size, reshape, scale per
+    # group, quantize, then trim back to (S, H, D).
+    pad = (-s) % group_size
+    if pad:
+        zeros = torch.zeros(pad, h, d, dtype=tensor.dtype, device=tensor.device)
+        tensor_padded = torch.cat([tensor, zeros], dim=0)
+    else:
+        tensor_padded = tensor
+    s_padded = tensor_padded.shape[0]
+    n_groups = s_padded // group_size
+
+    # Reshape to (n_groups, group_size, H, D)
+    t_f32 = tensor_padded.to(torch.float32).view(n_groups, group_size, h, d)
+    # Per-group scale: max(|x|) over the group_size axis
+    max_abs = t_f32.abs().amax(dim=1, keepdim=True)  # (n_groups, 1, H, D)
     scale = (max_abs / 7.0).clamp(min=1e-8)
-    quantized = (t_f32 / scale).round().clamp(min=-8, max=7).to(torch.int8)
-    return quantized, scale
+    quantized_grouped = (t_f32 / scale).round().clamp(min=-8, max=7).to(torch.int8)
+    # Flatten back to (S_padded, H, D), trim padding
+    quantized_flat = quantized_grouped.view(s_padded, h, d)[:s].contiguous()
+    return quantized_flat, scale.squeeze(1)  # (n_groups, H, D)
 
 
 def dequantize_per_channel_int4(
-    quantized: "torch.Tensor", scale: "torch.Tensor", *, dtype: Any
+    quantized: "torch.Tensor",
+    scale: "torch.Tensor",
+    *,
+    dtype: Any,
+    group_size: int = 0,
 ) -> "torch.Tensor":
     """Inverse of ``quantize_per_channel_int4``.
 
+    ``scale`` shape is ``(1, H, D)`` for plain per-channel or
+    ``(n_groups, H, D)`` when grouped. The ``group_size`` argument
+    must match what was passed at quantization time so the per-group
+    scale broadcast back to per-position is correct.
+
     Returns a tensor of shape ``(S, H, D)`` and dtype ``dtype``.
     """
-    return (quantized.to(scale.dtype) * scale).to(dtype)
+    n_groups = scale.shape[0]
+    if n_groups == 1:
+        # Plain per-channel — scale broadcasts directly over seq axis.
+        return (quantized.to(scale.dtype) * scale).to(dtype)
+
+    if group_size <= 0:
+        raise ValueError(
+            "group_size must be > 0 when scale has >1 group rows "
+            f"(scale.shape={tuple(scale.shape)}, group_size={group_size})"
+        )
+
+    s, h, d = quantized.shape
+    pad = n_groups * group_size - s
+    if pad < 0:
+        raise ValueError(
+            f"n_groups*group_size={n_groups * group_size} < S={s}; "
+            "scale doesn't cover the full seq axis"
+        )
+    if pad:
+        zeros = torch.zeros(pad, h, d, dtype=quantized.dtype, device=quantized.device)
+        quantized_padded = torch.cat([quantized, zeros], dim=0)
+    else:
+        quantized_padded = quantized
+    grouped = quantized_padded.view(n_groups, group_size, h, d)
+    # scale: (n_groups, H, D); unsqueeze(1) → (n_groups, 1, H, D) broadcasts over group_size
+    dequant_grouped = grouped.to(scale.dtype) * scale.unsqueeze(1)
+    flat = dequant_grouped.view(n_groups * group_size, h, d)[:s].contiguous()
+    return flat.to(dtype)
 
 
 def quantize_per_token_int4(
-    tensor: "torch.Tensor",
+    tensor: "torch.Tensor", *, group_size: int = 0,
 ) -> "Tuple[torch.Tensor, torch.Tensor]":
-    """Per-token symmetric INT4 quantization.
+    """Per-token symmetric INT4 quantization, optionally with
+    group-wise scaling along the head_dim axis.
 
-    Aggregates over the head_dim (last) axis so each (seq, head) pair
-    gets its own scale. Matches KIVI's V-axis choice.
+    Aggregates over the head_dim (last) axis. KIVI's V choice; with
+    group_size > 0 each (seq, head) pair gets ``ceil(D/group_size)``
+    scales instead of one.
 
     Args:
         tensor: ``(S, H, D)``.
+        group_size: 0 = one scale per (S, H) covering all D dims
+            (plain per-token). > 0 = scale per group of head_dim
+            elements within each (S, H).
 
     Returns:
-        ``(quantized (S, H, D) int8, scale (S, H, 1) float32)``.
+        ``(quantized (S, H, D) int8, scale (S, H, n_groups) float32)``.
     """
     if tensor.ndim != 3:
         raise ValueError(
             f"quantize_per_token_int4 expected 3-D (S, H, D) tensor; "
             f"got shape {tuple(tensor.shape)}"
         )
-    t_f32 = tensor.to(torch.float32)
-    max_abs = t_f32.abs().amax(dim=2, keepdim=True)  # (S, H, 1)
+    s, h, d = tensor.shape
+    if group_size <= 0 or group_size >= d:
+        t_f32 = tensor.to(torch.float32)
+        max_abs = t_f32.abs().amax(dim=2, keepdim=True)  # (S, H, 1)
+        scale = (max_abs / 7.0).clamp(min=1e-8)
+        quantized = (t_f32 / scale).round().clamp(min=-8, max=7).to(torch.int8)
+        return quantized, scale
+
+    pad = (-d) % group_size
+    if pad:
+        zeros = torch.zeros(s, h, pad, dtype=tensor.dtype, device=tensor.device)
+        tensor_padded = torch.cat([tensor, zeros], dim=2)
+    else:
+        tensor_padded = tensor
+    d_padded = tensor_padded.shape[2]
+    n_groups = d_padded // group_size
+
+    t_f32 = tensor_padded.to(torch.float32).view(s, h, n_groups, group_size)
+    max_abs = t_f32.abs().amax(dim=3, keepdim=True)  # (S, H, n_groups, 1)
     scale = (max_abs / 7.0).clamp(min=1e-8)
-    quantized = (t_f32 / scale).round().clamp(min=-8, max=7).to(torch.int8)
-    return quantized, scale
+    quantized_grouped = (t_f32 / scale).round().clamp(min=-8, max=7).to(torch.int8)
+    quantized_flat = quantized_grouped.view(s, h, d_padded)[:, :, :d].contiguous()
+    return quantized_flat, scale.squeeze(3)  # (S, H, n_groups)
 
 
 def dequantize_per_token_int4(
-    quantized: "torch.Tensor", scale: "torch.Tensor", *, dtype: Any
+    quantized: "torch.Tensor",
+    scale: "torch.Tensor",
+    *,
+    dtype: Any,
+    group_size: int = 0,
 ) -> "torch.Tensor":
-    return (quantized.to(scale.dtype) * scale).to(dtype)
+    n_groups = scale.shape[2]
+    if n_groups == 1:
+        return (quantized.to(scale.dtype) * scale).to(dtype)
+
+    if group_size <= 0:
+        raise ValueError(
+            "group_size must be > 0 when scale has >1 group columns "
+            f"(scale.shape={tuple(scale.shape)}, group_size={group_size})"
+        )
+
+    s, h, d = quantized.shape
+    pad = n_groups * group_size - d
+    if pad < 0:
+        raise ValueError(
+            f"n_groups*group_size={n_groups * group_size} < D={d}; "
+            "scale doesn't cover the full head_dim axis"
+        )
+    if pad:
+        zeros = torch.zeros(s, h, pad, dtype=quantized.dtype, device=quantized.device)
+        quantized_padded = torch.cat([quantized, zeros], dim=2)
+    else:
+        quantized_padded = quantized
+    grouped = quantized_padded.view(s, h, n_groups, group_size)
+    dequant_grouped = grouped.to(scale.dtype) * scale.unsqueeze(3)
+    flat = dequant_grouped.view(s, h, n_groups * group_size)[:, :, :d].contiguous()
+    return flat.to(dtype)
 
 
 # --------------------------------------------------------------------------- #
@@ -150,23 +267,27 @@ class INT4Block:
     so the same Track E artefact format works for either."""
 
     k_quantized: "torch.Tensor"   # (S, H, D) int8
-    k_scale: "torch.Tensor"        # (1, H, D) float32
+    k_scale: "torch.Tensor"        # (n_groups_s, H, D) float32; n_groups_s=1 for plain per-channel
     v_quantized: "torch.Tensor"   # (S, H, D) int8
-    v_scale: "torch.Tensor"        # (S, H, 1) float32
+    v_scale: "torch.Tensor"        # (S, H, n_groups_d) float32; n_groups_d=1 for plain per-token
     original_shape: Tuple[int, ...]
     original_dtype: Any
+    k_group_size: int = 0          # 0 means plain per-channel
+    v_group_size: int = 0          # 0 means plain per-token
 
     @property
     def theoretical_packed_bytes(self) -> int:
         """Theoretical bit-packed storage:
-          * K: 4 bits/elem * S*H*D + 16 bits * H*D (per-channel scale)
-          * V: 4 bits/elem * S*H*D + 16 bits * S*H (per-token scale)
-        Identical formula to PolarQuant's metric so the kvstore's
+          * K: 4 bits/elem * S*H*D + 16 bits * n_groups_s * H*D
+          * V: 4 bits/elem * S*H*D + 16 bits * S*H * n_groups_d
+        Identical formula shape to PolarQuant's metric so the kvstore's
         ``compression_ratio`` is backend-agnostic.
         """
         s, h, d = self.original_shape
-        k_bits = 4 * s * h * d + 16 * h * d
-        v_bits = 4 * s * h * d + 16 * s * h
+        n_groups_s = int(self.k_scale.shape[0])
+        n_groups_d = int(self.v_scale.shape[2])
+        k_bits = 4 * s * h * d + 16 * n_groups_s * h * d
+        v_bits = 4 * s * h * d + 16 * s * h * n_groups_d
         return max(1, (k_bits + v_bits + 7) // 8)
 
 
@@ -191,10 +312,22 @@ class INT4PerChannelKVStore:
     quantization runs on the input tensor's device).
     """
 
-    def __init__(self, *, torch_device: Optional[Any] = None) -> None:
+    def __init__(
+        self,
+        *,
+        torch_device: Optional[Any] = None,
+        k_group_size: int = 0,
+        v_group_size: int = 0,
+    ) -> None:
         if torch is None:
             raise ImportError("INT4PerChannelKVStore requires PyTorch.")
+        if k_group_size < 0 or v_group_size < 0:
+            raise ValueError(
+                f"group sizes must be >= 0; got k={k_group_size}, v={v_group_size}"
+            )
         self._torch_device = torch_device
+        self._k_group_size = int(k_group_size)
+        self._v_group_size = int(v_group_size)
         self._blocks: Dict[int, INT4Block] = {}
         self._stats: Dict[str, Any] = {
             "writes": 0,
@@ -228,8 +361,12 @@ class INT4PerChannelKVStore:
         k_in = k_array if self._torch_device is None else k_array.to(self._torch_device)
         v_in = v_array if self._torch_device is None else v_array.to(self._torch_device)
 
-        k_q, k_scale = quantize_per_channel_int4(k_in)
-        v_q, v_scale = quantize_per_token_int4(v_in)
+        k_q, k_scale = quantize_per_channel_int4(
+            k_in, group_size=self._k_group_size,
+        )
+        v_q, v_scale = quantize_per_token_int4(
+            v_in, group_size=self._v_group_size,
+        )
 
         block = INT4Block(
             k_quantized=k_q,
@@ -238,6 +375,8 @@ class INT4PerChannelKVStore:
             v_scale=v_scale,
             original_shape=tuple(int(s) for s in k_array.shape),
             original_dtype=original_dtype,
+            k_group_size=self._k_group_size,
+            v_group_size=self._v_group_size,
         )
         self._blocks[block_id] = block
         self._stats["writes"] += 1
@@ -252,9 +391,11 @@ class INT4PerChannelKVStore:
         b = self._blocks[block_id]
         k = dequantize_per_channel_int4(
             b.k_quantized, b.k_scale, dtype=b.original_dtype,
+            group_size=b.k_group_size,
         )
         v = dequantize_per_token_int4(
             b.v_quantized, b.v_scale, dtype=b.original_dtype,
+            group_size=b.v_group_size,
         )
         self._stats["reads"] += 1
         self._stats["read_us_sum"] += (time.perf_counter() - t0) * 1e6
@@ -300,5 +441,7 @@ class INT4PerChannelKVStore:
         s["backend"] = self.backend
         s["k_quantization"] = "per_channel"
         s["v_quantization"] = "per_token"
+        s["k_group_size"] = self._k_group_size
+        s["v_group_size"] = self._v_group_size
         s["bits_per_element"] = 4
         return s

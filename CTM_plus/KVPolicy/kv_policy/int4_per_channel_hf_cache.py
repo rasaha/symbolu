@@ -87,6 +87,8 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         *,
         torch_device: Optional[Any] = None,
         sink_size: int = 0,
+        k_group_size: int = 0,
+        v_group_size: int = 0,
     ) -> None:
         if DynamicCache is None:
             raise ImportError(
@@ -96,10 +98,16 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             raise ImportError("INT4PerChannelCache requires PyTorch.")
         super().__init__()
         from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
-        self._int4_store = INT4PerChannelKVStore(torch_device=torch_device)
+        self._int4_store = INT4PerChannelKVStore(
+            torch_device=torch_device,
+            k_group_size=k_group_size,
+            v_group_size=v_group_size,
+        )
         self._cfg = dict(
             torch_device=str(torch_device),
             sink_size=int(sink_size),
+            k_group_size=int(k_group_size),
+            v_group_size=int(v_group_size),
             scheme="int4_per_channel_k_per_token_v",
         )
         self._sink_size = int(sink_size)

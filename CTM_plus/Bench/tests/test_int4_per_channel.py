@@ -265,6 +265,169 @@ def test_int4_cache_sink_size_passes_through(torch_module, transformers_module):
 # --------------------------------------------------------------------- #
 
 
+def test_group_quant_round_trip_preserves_shape(torch_module):
+    """K with group_size=32 and V with group_size=32 round-trip
+    through quantize+dequantize to the original shape (lossy values,
+    lossless shape). Tests both the seq-axis grouping (K) and the
+    head_dim-axis grouping (V).
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+        quantize_per_token_int4, dequantize_per_token_int4,
+    )
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(80, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+    v = torch.randn(80, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+
+    # K: group along seq axis, group_size=32 → 3 groups (32, 32, 16)
+    k_q, k_scale = quantize_per_channel_int4(k, group_size=32)
+    assert k_q.shape == k.shape
+    assert k_scale.shape == (3, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM), (
+        f"expected scale shape (3, H, D); got {tuple(k_scale.shape)}"
+    )
+    k_back = dequantize_per_channel_int4(k_q, k_scale, dtype=k.dtype, group_size=32)
+    assert k_back.shape == k.shape
+
+    # V: group along head_dim, group_size=32 → 4 groups
+    v_q, v_scale = quantize_per_token_int4(v, group_size=32)
+    assert v_q.shape == v.shape
+    assert v_scale.shape == (80, QWEN_NUM_KV_HEADS, 4), (
+        f"expected scale shape (S, H, 4); got {tuple(v_scale.shape)}"
+    )
+    v_back = dequantize_per_token_int4(v_q, v_scale, dtype=v.dtype, group_size=32)
+    assert v_back.shape == v.shape
+
+
+def test_group_quant_outlier_position_resolved_better_than_plain(torch_module):
+    """The motivation for group quant: an outlier position (e.g.
+    attention sink) inflates the per-channel scale, hurting non-sink
+    reconstruction. Group quant isolates the outlier to its own group
+    so other groups get appropriate scales.
+
+    Synthetic: 4 outlier positions at the start (100×), rest standard
+    Gaussian. Measure cosine on the non-sink positions.
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+    )
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+    t[:4] *= 100.0  # attention-sink-like outlier positions
+
+    # Plain per-channel (one scale per (h, d), dominated by sinks)
+    q_plain, s_plain = quantize_per_channel_int4(t, group_size=0)
+    back_plain = dequantize_per_channel_int4(
+        q_plain, s_plain, dtype=torch.float32, group_size=0,
+    )
+
+    # Group quant (group_size=32 — sinks isolated to first group)
+    q_grp, s_grp = quantize_per_channel_int4(t, group_size=32)
+    back_grp = dequantize_per_channel_int4(
+        q_grp, s_grp, dtype=torch.float32, group_size=32,
+    )
+
+    # Cosine on the CLEAN GROUP (positions 32-63, in group 1 which has
+    # no sink contamination). With group_size=32 and sinks at 0-3,
+    # only group 1 (positions [32:64]) is sink-free. Positions 4-31
+    # share group 0 with the sinks and are expected to remain
+    # poorly-resolved.
+    cos_plain_clean = torch.nn.functional.cosine_similarity(
+        t[32:].flatten(), back_plain[32:].flatten(), dim=0,
+    ).item()
+    cos_grp_clean = torch.nn.functional.cosine_similarity(
+        t[32:].flatten(), back_grp[32:].flatten(), dim=0,
+    ).item()
+
+    # Plain has ONE scale per channel, dominated by sinks even for
+    # positions 32-63 → poor reconstruction. Group quant gives the
+    # second group its own clean scale → great reconstruction.
+    assert cos_grp_clean > cos_plain_clean + 0.03, (
+        f"group quant should improve clean-group cosine vs plain by ≥3pp; "
+        f"plain={cos_plain_clean:.4f}, group={cos_grp_clean:.4f}"
+    )
+    assert cos_grp_clean >= 0.98, (
+        f"group quant clean-group cosine {cos_grp_clean:.4f} below 0.98 — "
+        f"the rescue mechanism isn't doing its job on the sink-isolated group"
+    )
+
+
+def test_group_quant_kvstore_round_trip_meets_cosine(
+    torch_module, transformers_module,
+):
+    """End-to-end via the kvstore with group_size=32 on K and V."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(k_group_size=32, v_group_size=32)
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g,
+                    dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    store.write_block(0, k, v)
+    k_back, v_back = store.read_block(0)
+    cos_k = _cosine(k, k_back)
+    cos_v = _cosine(v, v_back)
+    assert cos_k >= 0.995, f"K cosine {cos_k:.4f} below 0.995 (group quant target)"
+    assert cos_v >= 0.995, f"V cosine {cos_v:.4f} below 0.995 (group quant target)"
+
+
+def test_group_quant_kvstore_compression_ratio(torch_module, transformers_module):
+    """Group quantisation adds modest scale overhead but the ratio
+    should still beat INT8 KV cache (2x vs FP16). For Qwen-shape with
+    group_size=32 on both axes, expect ~7-8x vs FP32 source."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(k_group_size=32, v_group_size=32)
+    k = torch.randn(64, 4, 128)
+    v = torch.randn(64, 4, 128)
+    store.write_block(0, k, v)
+    ratio = store.compression_ratio
+    # Group overhead reduces the effective ratio slightly vs plain
+    # per-channel/per-token. For S=64 K group=32: 2 groups instead of
+    # 1 = 2× scale overhead. Expected ratio still 5-8x vs FP32.
+    assert 5.0 <= ratio <= 9.0, (
+        f"compression ratio {ratio:.2f}× outside expected range [5, 9]"
+    )
+
+
+def test_group_quant_zero_group_size_is_plain_per_channel(torch_module):
+    """group_size=0 must be equivalent to the original plain per-channel
+    behaviour (one scale per channel, no grouping). Pin so a future
+    refactor doesn't accidentally change the default."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import quantize_per_channel_int4
+
+    t = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    q0, s0 = quantize_per_channel_int4(t, group_size=0)
+    q_default, s_default = quantize_per_channel_int4(t)
+    assert torch.equal(q0, q_default)
+    assert torch.equal(s0, s_default)
+    assert s0.shape == (1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+
+
+def test_group_quant_handles_non_divisible_seq_length(torch_module):
+    """S=80 with group_size=32 produces 3 groups of size (32, 32, 16).
+    Padding + trim must round-trip correctly."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+    )
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(80, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+    q, scale = quantize_per_channel_int4(t, group_size=32)
+    assert scale.shape == (3, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    back = dequantize_per_channel_int4(q, scale, dtype=t.dtype, group_size=32)
+    assert back.shape == t.shape
+    # The last partial group (16 elements) should also reconstruct well
+    cos_last = torch.nn.functional.cosine_similarity(
+        t[64:].flatten(), back[64:].flatten(), dim=0,
+    ).item()
+    assert cos_last >= 0.98
+
+
 def test_int4_per_channel_beats_polar_quant_on_outlier_channel_data(torch_module):
     """The whole motivation: INT4 per-channel should resolve outlier-
     channel data with min per-channel cosine ≥ 0.99 (much better than
