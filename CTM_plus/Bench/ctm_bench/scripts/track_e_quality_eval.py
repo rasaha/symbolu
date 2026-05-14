@@ -252,6 +252,16 @@ def _turboquant_cache_factory(
     return factory
 
 
+def _int4_per_channel_cache_factory(
+    *, sink_size: int = 0,
+) -> Callable[[], Any]:
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    def factory():
+        return INT4PerChannelCache(sink_size=sink_size)
+    return factory
+
+
 # --------------------------------------------------------------------------- #
 # Perplexity                                                                  #
 # --------------------------------------------------------------------------- #
@@ -530,6 +540,22 @@ def main(argv: Sequence[str]) -> int:
         choices=["numpy", "torch"],
     )
     parser.add_argument(
+        "--quant", default="turboquant",
+        choices=["turboquant", "int4-per-channel"],
+        help=(
+            "Which KV compression algorithm to test. "
+            "'turboquant' = PolarQuant + optional QJL (the architecture-"
+            "doc default; documented to fail at 3-4 bit on Qwen2.5-7B in "
+            "PHASE4_GPU_FINDINGS.md §17). "
+            "'int4-per-channel' = KIVI-style INT4 with per-channel K + "
+            "per-token V scales; no rotation step, no polar "
+            "decomposition. Recommended after the §17 PolarQuant negative "
+            "result. The TurboQuant-specific flags (--angle-bits, "
+            "--segment-dim, --no-qjl, --per-channel-scale) are silently "
+            "ignored when --quant is int4-per-channel."
+        ),
+    )
+    parser.add_argument(
         "--per-channel-scale", action="store_true",
         help=(
             "KIVI-style per-channel pre-quantisation normalisation: "
@@ -630,27 +656,40 @@ def main(argv: Sequence[str]) -> int:
             mmlu_questions = MMLU_SAMPLE
 
     baseline_factory = _baseline_cache_factory()
-    tq_factory = _turboquant_cache_factory(
-        angle_bits=args.angle_bits,
-        segment_dim=args.segment_dim,
-        enable_qjl=enable_qjl,
-        backend=args.turboquant_backend,
-        per_channel_scale=args.per_channel_scale,
-        sink_size=args.sink_size,
-    )
-
-    summary = TrackESummary(
-        model_id=model_id_for_summary,
-        dtype=args.dtype,
-        eval_kinds=eval_kinds,
-        turboquant_config=dict(
+    # Pick the right cache factory based on --quant
+    if args.quant == "turboquant":
+        tq_factory = _turboquant_cache_factory(
             angle_bits=args.angle_bits,
             segment_dim=args.segment_dim,
             enable_qjl=enable_qjl,
             backend=args.turboquant_backend,
             per_channel_scale=args.per_channel_scale,
             sink_size=args.sink_size,
-        ),
+        )
+        config_dict = dict(
+            quant="turboquant",
+            angle_bits=args.angle_bits,
+            segment_dim=args.segment_dim,
+            enable_qjl=enable_qjl,
+            backend=args.turboquant_backend,
+            per_channel_scale=args.per_channel_scale,
+            sink_size=args.sink_size,
+        )
+    elif args.quant == "int4-per-channel":
+        tq_factory = _int4_per_channel_cache_factory(sink_size=args.sink_size)
+        config_dict = dict(
+            quant="int4-per-channel",
+            sink_size=args.sink_size,
+            scheme="K=per-channel INT4, V=per-token INT4",
+        )
+    else:
+        raise SystemExit(f"unknown --quant {args.quant!r}")
+
+    summary = TrackESummary(
+        model_id=model_id_for_summary,
+        dtype=args.dtype,
+        eval_kinds=eval_kinds,
+        turboquant_config=config_dict,
     )
 
     if "perplexity" in eval_kinds:

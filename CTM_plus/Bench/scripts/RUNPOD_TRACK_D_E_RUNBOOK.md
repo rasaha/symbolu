@@ -299,6 +299,43 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 
 Paste the bottom summary block from both runs. We decide next steps from there.
 
+## 5c. INT4 per-channel KV cache (KIVI-style replacement for PolarQuant)
+
+After both TurboQuant algorithm-fix attempts failed on Qwen2.5-7B
+(per-channel scale: 7321× at 4-bit, sink-skip: 220× at 4-bit), the
+forward path is to abandon PolarQuant's rotation-based approach
+entirely and use the literature-validated alternative: INT4 with
+per-channel K + per-token V (KIVI). No rotation. Each channel
+quantized independently with its own scale.
+
+**Expected**: perplexity ratio ≤ 1.05 (partner-shareable) at ~3.8×
+compression vs FP16. Matches published KIVI results on Qwen-family.
+
+Re-run cost: ~5 min, ~$0.07 spot.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int4
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --quant int4-per-channel \
+    --output-dir /tmp/track_e_int4/ 2>&1 | tee /tmp/track_e_int4/run.log
+```
+
+**Decision tree**:
+
+| Ratio | Interpretation | Next step |
+|---|---|---|
+| ≤ 1.05 | ✅ **Partner-shareable.** ~3.8× compression at quality parity. | Run MMLU 200 to harden. |
+| 1.05–1.5 | Helps but not full quality. | Try INT4 + sink-size 4 combination (cheap test). |
+| > 2 | Unexpected — KIVI's published numbers on Qwen-family are within 1.02×. | Investigate; likely an implementation bug. |
+
 ## 6. (Optional) Run sweep — bigger MMLU subset for partner artefact (~30 min, ~$0.60)
 
 If Track E was green and you want a stronger partner-shareable number,
