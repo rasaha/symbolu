@@ -722,23 +722,30 @@ def main(argv: Sequence[str]) -> int:
         turboquant_config=config_dict,
     )
 
+    # Label used in the row.cache_type field and summary output for the
+    # compressed-cache leg. Reflects what --quant was actually selected
+    # so a multi-algorithm artefact archive doesn't ambiguously say
+    # "turboquant" for an INT4 run.
+    quant_label = args.quant
+
     if "perplexity" in eval_kinds:
         LOG.info("Perplexity: baseline...")
         base = compute_perplexity(
             model=model, tokenizer=tokenizer, text=PERPLEXITY_TEXT,
             cache_factory=baseline_factory, cache_type="baseline",
         )
-        LOG.info("Perplexity: turboquant...")
+        LOG.info("Perplexity: %s...", quant_label)
         tq = compute_perplexity(
             model=model, tokenizer=tokenizer, text=PERPLEXITY_TEXT,
-            cache_factory=tq_factory, cache_type="turboquant",
+            cache_factory=tq_factory, cache_type=quant_label,
         )
         summary.perplexity = [base, tq]
         summary.deltas["perplexity_ratio"] = tq.perplexity / base.perplexity
         summary.deltas["nll_delta"] = tq.nll_per_token - base.nll_per_token
         LOG.info(
-            "  baseline ppl=%.4f  turboquant ppl=%.4f  ratio=%.4f",
-            base.perplexity, tq.perplexity, summary.deltas["perplexity_ratio"],
+            "  baseline ppl=%.4f  %s ppl=%.4f  ratio=%.4f",
+            base.perplexity, quant_label, tq.perplexity,
+            summary.deltas["perplexity_ratio"],
         )
 
     if "mmlu" in eval_kinds:
@@ -747,16 +754,17 @@ def main(argv: Sequence[str]) -> int:
             model=model, tokenizer=tokenizer, questions=mmlu_questions,
             cache_factory=baseline_factory, cache_type="baseline",
         )
-        LOG.info("MMLU: turboquant...")
+        LOG.info("MMLU: %s...", quant_label)
         tq = compute_mmlu_accuracy(
             model=model, tokenizer=tokenizer, questions=mmlu_questions,
-            cache_factory=tq_factory, cache_type="turboquant",
+            cache_factory=tq_factory, cache_type=quant_label,
         )
         summary.mmlu = [base, tq]
         summary.deltas["mmlu_accuracy_delta_pt"] = (tq.accuracy - base.accuracy) * 100.0
         LOG.info(
-            "  baseline acc=%.4f  turboquant acc=%.4f  delta=%.2fpt",
-            base.accuracy, tq.accuracy, summary.deltas["mmlu_accuracy_delta_pt"],
+            "  baseline acc=%.4f  %s acc=%.4f  delta=%.2fpt",
+            base.accuracy, quant_label, tq.accuracy,
+            summary.deltas["mmlu_accuracy_delta_pt"],
         )
 
     out_path = args.output_dir / "results.json"
@@ -768,22 +776,25 @@ def main(argv: Sequence[str]) -> int:
     print("=" * 60)
     print(f"Track E summary — {summary.model_id}")
     print("=" * 60)
+    # Width to right-align the compressed-cache label so it doesn't
+    # offset the numbers vs the baseline row.
+    label_w = max(len("baseline"), len(quant_label))
     if summary.perplexity:
         b, t = summary.perplexity
         print(f"  Perplexity:")
-        print(f"    baseline:    {b.perplexity:.4f}  (NLL/tok {b.nll_per_token:.4f})")
-        print(f"    turboquant:  {t.perplexity:.4f}  (NLL/tok {t.nll_per_token:.4f})")
-        print(f"    ratio:       {summary.deltas['perplexity_ratio']:.4f}  (gate ≤ 1.05)")
+        print(f"    {'baseline'.ljust(label_w)}:  {b.perplexity:.4f}  (NLL/tok {b.nll_per_token:.4f})")
+        print(f"    {quant_label.ljust(label_w)}:  {t.perplexity:.4f}  (NLL/tok {t.nll_per_token:.4f})")
+        print(f"    {'ratio'.ljust(label_w)}:  {summary.deltas['perplexity_ratio']:.4f}  (gate ≤ 1.05)")
     if summary.mmlu:
         b, t = summary.mmlu
         print(f"  MMLU:")
-        print(f"    baseline:    {b.accuracy * 100:.2f}%   ({b.correct}/{b.num_questions})")
-        print(f"    turboquant:  {t.accuracy * 100:.2f}%   ({t.correct}/{t.num_questions})")
+        print(f"    {'baseline'.ljust(label_w)}:  {b.accuracy * 100:.2f}%   ({b.correct}/{b.num_questions})")
+        print(f"    {quant_label.ljust(label_w)}:  {t.accuracy * 100:.2f}%   ({t.correct}/{t.num_questions})")
         delta = summary.deltas['mmlu_accuracy_delta_pt']
         gate = "PASS (within ±0.5pt)" if abs(delta) <= 0.5 else (
             "PARTIAL (within ±1.0pt)" if abs(delta) <= 1.0 else "REGRESSION (> 1.0pt)"
         )
-        print(f"    delta:       {delta:+.2f}pt  → {gate}")
+        print(f"    {'delta'.ljust(label_w)}:  {delta:+.2f}pt  → {gate}")
     print()
     print(f"  Full results: {out_path}")
     return 0
