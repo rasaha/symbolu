@@ -1155,6 +1155,135 @@ See `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_offload.py` for
 the existing ~1900-line CPU/Numba implementation that's the reuse
 target.
 
+## §14. TurboQuant ↔ vLLM integration — Tier 1 CPU prototype
+
+After Phase 4 throughput closed at the §13.3 durable negative, the
+next layer of the architecture-doc stack opened: TurboQuant 3-bit polar
+quantisation of the KV cache. The math has been CPU-benchmarked since
+April 2026 (`CTM_plus/DeepSpeed/TURBOQUANT_BENCHMARK.md`) — the gap was
+the vLLM-side wiring, which had never been built.
+
+Tier 1 (this section) is the CPU prototype: a wrapper that drives the
+existing `TurboQuantCompressor` (PolarQuant + QJL, ~1900 LOC in
+`CTM_plus/DeepSpeed`) against Qwen2.5-7B-shape KV block tensors. By
+design, Tier 1 doesn't go on the real vLLM cache_kv path (latency would
+be catastrophic — CPU transit on every K/V block). It produces the
+**integration shape**, the **measured compression / quality numbers**
+on real-shape data, and the **documented hook coordinates** for Tier 2.
+
+### §14.1 What landed
+
+`kv_policy/turboquant_kvstore.py` — `TurboQuantKVStore` wrapping the
+existing `TurboQuantCompressor`. Public surface:
+
+* `write_block(block_id, k_array, v_array)` — compress and store a
+  per-slot K/V pair.
+* `read_block(block_id) -> (k, v)` — decompress, restore original
+  shape + dtype.
+* `remove_block(block_id)` — drop compressed state (mirrors vLLM's
+  block-eviction lifecycle).
+* `compression_ratio` (property) — theoretical ratio = source bytes /
+  bit-packed compressed bytes.
+* `get_stats()` — including `avg_write_us`, `avg_read_us`,
+  `blocks_held`, raw byte counters.
+
+Plus `install_turboquant_kvstore(*, model=None, **config)` — Tier 1
+returns the wrapper without patching; the kwarg signature is set up so
+Tier 2 can swap in a real `cache_kv` monkey-patch without a CLI break.
+
+`run_streaming.py` exposes `--turboquant-kv` (off by default). At Tier
+1 it constructs the store but does NOT install a vLLM hook —
+deliberate scope discipline.
+
+`Bench/tests/test_turboquant_kvstore.py` — 6 CPU regression tests
+pinning: shape + dtype round-trip; cosine similarity ≥ 0.95 on
+Qwen-shape data; compression ratio ≥ 5× (against FP32 source);
+remove-block lifecycle; latency counters; BF16/FP16 dtype round-trip.
+Suite: **290 passed, 38 skipped, 0 failed.**
+
+### §14.2 Measured numbers on Qwen2.5-7B-shape KV-block tensors
+
+100 blocks of shape `(block_size=16, num_kv_heads=4, head_dim=128)` —
+one block's worth of K (or V) for one layer in Qwen2.5-7B's GQA-4
+config — driven through the round-trip:
+
+| Metric | FP32 source | **FP16 source** (vLLM's actual dtype) |
+|---|---:|---:|
+| Compression ratio | 7.15× | **3.58×** |
+| Cosine similarity (K) | 0.965 | 0.965 |
+| Cosine similarity (V) | 0.964 | 0.964 |
+| Avg write latency / block | — | 2144 μs |
+| Avg read latency / block | — | 803 μs |
+
+The 7.15× FP32 ratio matches the existing CPU benchmark; the **3.58×
+FP16 ratio** is the more partner-relevant number because vLLM 0.7.3
+stores KV at BF16 or FP16. The architecture-doc's 7× was implicitly
+against FP32; against the actual KV dtype, the meaningful ratio is
+~3.5×. **Quality (cosine ≥ 0.96) is preserved at both dtypes** — the
+polar-quantisation noise dominates the dtype-cast noise, so FP16 round-
+trip costs almost nothing on top of the polar pass.
+
+Catastrophic latency confirmed: ~2.1ms write + 0.8ms read per block.
+Qwen2.5-7B at vLLM block_size=16 holds ~2000 blocks per layer × 28
+layers = 56K blocks in the cache; a full sweep through CPU at 3ms /
+block would take ~3 minutes per layer pass. This is **exactly why
+Tier 2 exists** — the integration shape works, the math works, but
+CPU transit is unviable on a real workload.
+
+### §14.3 Documented hook coordinates (for Tier 2)
+
+The intended cache_kv hook point in vLLM 0.7.3:
+
+* File: `vllm/attention/backends/flash_attn.py`
+* Function: `FlashAttentionImpl.forward`
+* Call site: the `cache_kv` invocation (writes the new K/V into the
+  paged KV-cache tensor)
+* Cache tensor layout at that site:
+  `[2, num_blocks, block_size, num_kv_heads, head_dim]` BF16/FP16 on
+  GPU. Slice 0 is K, slice 1 is V.
+* Natural unit of compression: one block's K (or V) at shape
+  `(block_size, num_kv_heads, head_dim)` per `write_block` call.
+  block_id comes from vLLM's allocator (the same identifier CTM+'s
+  evictor receives).
+
+Tier 2 wraps this call site with a monkey-patched `cache_kv` that
+diverts writes to the `TurboQuantKVStore` and reads from it on
+subsequent decode steps. Tier 2's reimplementation is in PyTorch ops
+(`torch.atan2`, `torch.cos`, `torch.sin`, `torch.bucketize`) so it
+runs on GPU — closes the catastrophic-CPU-latency caveat. Tier 3 is
+the Triton or CUDA kernel (`turboquant_cuda_ext.py` is a stub today).
+
+### §14.4 What this DOES NOT claim
+
+* No end-to-end throughput cost measurement (Tier 2's job).
+* No combined-stack 8.8× capacity claim. CTM+ Phase 4 algorithm
+  (algorithm-quality layer) and TurboQuant compression (storage layer)
+  are now each independently measured; CTXL tiering (HBM → CXL → NVMe)
+  remains projection-only. Combined-stack measurement requires all
+  three together.
+* No measured quality regression on a downstream metric (MMLU,
+  perplexity). Cosine 0.965 is the architecture-doc's quality target
+  but is a *proxy* — the partner-relevant question is whether
+  generation quality degrades, and that's a separate evaluation cell
+  (sized at ~half a GPU-day).
+
+### §14.5 Next session (Tier 2 — PyTorch-ops GPU port)
+
+Sized ~3–5 days code + ~$0.20 GPU. Re-implement PolarQuant's
+`compress_batch` / `decompress_batch` in pure PyTorch ops (no
+CUDA, no Numba). Wire into the documented `cache_kv` hook. Measure:
+
+* On-GPU compression ratio (should match Tier 1's 3.5× / 7×).
+* On-GPU cosine similarity (should match 0.96).
+* End-to-end tokens/sec cost on Qwen2.5-7B + chat_32k.
+* Combined-with-CTM+-Phase-4 stack measurement (CTM+ algorithm × TurboQuant
+  compression — first time the two are run together).
+
+That gives the first honest "TurboQuant × CTM+: X× memory at Y%
+throughput cost on Qwen2.5-7B" claim. The remaining 8.8× gap to the
+architecture doc would still be CTXL (HBM → CXL → NVMe tiering),
+which is a separate work-track.
+
 ## Appendix C: Where to read more
 
 | Doc | Purpose |

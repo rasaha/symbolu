@@ -208,6 +208,19 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--turboquant-kv",
+        action="store_true",
+        help=(
+            "Track B Tier 1: construct a TurboQuantKVStore alongside "
+            "the CTM+ evictor. **Tier 1 does NOT install a real "
+            "vLLM hook** — it constructs the wrapper so its stats "
+            "are visible in the streaming summary, and reserves the "
+            "CLI surface for Tier 2's actual cache_kv monkey-patch. "
+            "See kv_policy.turboquant_kvstore module docstring and "
+            "PHASE4_GPU_FINDINGS §14 for the integration plan."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
