@@ -1284,6 +1284,131 @@ throughput cost on Qwen2.5-7B" claim. The remaining 8.8× gap to the
 architecture doc would still be CTXL (HBM → CXL → NVMe tiering),
 which is a separate work-track.
 
+## §15. Tier 2 CPU-correctness landing (PyTorch-ops port)
+
+Following §14, the Tier 2 PyTorch port landed *as CPU-correct, GPU-
+ready code* in a no-GPU session. The compression math is now in two
+implementations — the existing ~1900-LOC numpy reference in
+`CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_offload.py`, and a
+~400-LOC PyTorch-ops port in
+`CTM_plus/KVPolicy/kv_policy/turboquant_torch.py`. They are pinned to
+agree by a parametrised cross-implementation test suite. The `cache_kv`
+monkey-patch and the GPU measurement cells remain deferred — they
+require the next GPU session.
+
+### §15.1 What landed
+
+`kv_policy/turboquant_torch.py` (new):
+* `PolarQuantTorch.compress_batch` / `decompress_batch` — same shapes,
+  same constants, same seeded rotation matrix as the numpy reference,
+  written so every op (`torch.atan2`, `torch.sqrt`, `torch.floor`,
+  `torch.clamp`, integer gather, two contiguous matmul rotations) maps
+  to a CUDA kernel without a CPU sync.
+* `QJLTorch.compress_residuals_batch` — Rademacher sign projection in
+  pure torch matmul + `torch.sign` + `torch.mean`.
+* `TurboQuantTorchCompressor.compress` / `decompress` — orchestrates
+  flatten / pad / segment around the polar + QJL stages. Returns a
+  `CompressedTensorBufferTorch` dataclass with the same
+  `theoretical_packed_bytes` formula as the numpy reference, so the
+  partner-relevant compression-ratio number is backend-agnostic.
+
+`kv_policy/turboquant_kvstore.py` (modified):
+* New `backend="numpy"` (default) / `backend="torch"` kwarg on
+  `TurboQuantKVStore`. The numpy path is the existing Tier 1 surface,
+  unchanged. The torch path routes through the new PyTorch
+  compressor.
+* `write_block` / `read_block` enforce input-type matching: numpy
+  backend requires `numpy.ndarray`, torch backend requires
+  `torch.Tensor`. Mixed-type calls raise `TypeError` — deliberate, so
+  GPU tensors are never silently moved to host.
+* `get_stats()["backend"]` so a single bench artefact can carry runs
+  from both backends.
+
+`Bench/tests/test_turboquant_kvstore_torch.py` (new):
+* 10 regression tests pinning the torch backend: shape + dtype round-
+  trip, cosine ≥ 0.95 on Qwen-shape Gaussian, compression ratio ≥ 5×,
+  remove-block lifecycle, stats with `backend="torch"` reporting,
+  BF16/FP16 round-trip without numpy fallback, both cross-type
+  rejections, **cross-implementation reconstruction agreement
+  (cosine ≥ 0.999 every block)**, and **cross-implementation angle-
+  index agreement ≥ 99%**.
+
+Test suite after this landing: **304 passed, 31 skipped, 3 failed.**
+The 14-test growth vs §14's 290/38/0 baseline breaks down as:
+* +10 new torch tests (this section).
+* +4 numpy tests that were previously skipped on environments without
+  numpy but now run with numpy available.
+* 3 failing tests (`test_install_attn_metadata_side_channel_finds_attention_modules`,
+  `test_install_pre_rope_capture_per_module_indexing_unchanged[py]`,
+  `test_i3_capture_keeps_dtype_reshape_slice_on_gpu_path[py]`) are
+  pre-existing, unrelated to TurboQuant — they reach for vLLM
+  attention metadata / a `position` kwarg on `TrigScorer.score_token`
+  that doesn't exist in the current snapshot. Confirmed by running
+  the same three tests against the pre-Tier-2 HEAD; identical failures.
+
+### §15.2 Measured cross-implementation agreement
+
+Numbers from `tests/test_turboquant_kvstore_torch.py` on CPU
+(Python 3.11, torch 2.12, numpy 2.4) at Qwen-shape
+`(block_size=16, num_kv_heads=4, head_dim=128)` Gaussian inputs:
+
+| Property | Value | Gate |
+|---|---:|---|
+| Reconstructed-tensor cosine (numpy ↔ torch) | ≥ 0.999 per block | ≥ 0.999 |
+| Discrete angle-index agreement | ≥ 99% (64 segments × 127 indices) | ≥ 99% |
+| Per-block radii max diff | ≤ 1e-3 (typically 1e-6) | < 1e-3 |
+| Cosine vs original (numpy) | 0.964 | ≥ 0.95 |
+| Cosine vs original (torch) | 0.964 | ≥ 0.95 |
+| FP32 compression ratio | 7.15× both backends | ≥ 5.0× |
+| BF16 compression ratio (torch only — numpy has no BF16) | 3.57× | ≥ 5.0× / 2 |
+
+Quality vs original is identical to four decimal places between the
+two implementations; the matmul-roundoff drift between them is at the
+ULP of float32. This is the bar the Tier 2 PR commits to.
+
+### §15.3 What §15 does NOT claim
+
+* No GPU measurement — the cross-impl agreement is CPU-CPU (torch CPU
+  vs numpy). The same code paths run unmodified on a CUDA tensor;
+  GPU-CPU drift may exceed the CPU-CPU drift by another ULP-class
+  factor, but no quality regression is expected (the kernels are
+  identical; the matmul backend differs only in numeric ordering).
+  The next GPU session will pin a GPU-vs-CPU agreement test cell.
+* No real-value verification. The Qwen-shape inputs are Gaussian, not
+  actual Qwen2.5-7B activations. Real-value cosine is part of the
+  Track E (MMLU/perplexity) work block — sized at ~half a GPU-day,
+  carries the partner-relevant generation-quality claim.
+* No combined-stack measurement (CTM+ Phase 4 × TurboQuant). Still
+  the next GPU session's deliverable, now de-risked by the §15.2
+  agreement gates.
+* No `cache_kv` monkey-patch installed. `install_turboquant_kvstore`
+  still returns the wrapper without patching vLLM; the hook
+  coordinates in §14.3 are unchanged and the kwarg signature is
+  backend-agnostic so the next session can swap in a real patch
+  without a CLI break.
+
+### §15.4 Next GPU session (carry-forward)
+
+Order of cells, with §15 in the bank:
+
+1. **Track E + GPU agreement (one cell, ~$0.10–0.15).** Run the
+   `test_turboquant_kvstore_torch.py` suite with `torch_device='cuda'`
+   on a GPU pod — confirms the CPU-correctness ratchet survives a
+   real CUDA backend. Then run MMLU or a small perplexity sweep on
+   Qwen2.5-7B comparing FP16 baseline ↔ TurboQuant-compressed KV
+   (offline, no `cache_kv` hook needed — just compress / decompress
+   the KV-cache tensors and feed the decompressed result back to the
+   forward pass).
+2. **Tier 2 `cache_kv` hook install (~$0.20).** Land the monkey-patch
+   at the §14.3 coordinates; run streaming bench with
+   `--turboquant-kv` enabled on chat_32k Qwen2.5-7B. First combined
+   "CTM+ × TurboQuant" measurement.
+
+If Track E shows MMLU within ±0.5pt of baseline, Tier 2 ships the
+throughput cost too. If > 1pt regression, Tier 2 pauses and
+investigates — the synthetic-Gaussian quality numbers in §15.2 do
+not transfer automatically.
+
 ## Appendix C: Where to read more
 
 | Doc | Purpose |
