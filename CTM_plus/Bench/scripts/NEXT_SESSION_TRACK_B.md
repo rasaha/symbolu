@@ -1,121 +1,207 @@
-# Continue CTM+ development — session N+2 prompt
+# Continue Track B development — session N+3 prompt
 
 **Repository:** `rasaha/symbolu`
 **Branch:** `claude/safety-state-machine-EXAlZ`
-**Latest commit:** `ae94bf0` (docs(phase4): v10 result + Phase 4 throughput closure + Track B handoff)
+**Latest commit:** `045e041` (feat(track-b): TurboQuant↔vLLM integration — Tier 1 CPU prototype)
 
 ## Current state — read this before suggesting code
 
-Read **`CTM_plus/Bench/bench_out/PHASE4_GPU_FINDINGS.md`** end-to-end first, paying attention to §12.6–§13.3 (the Cython-port + hook-shape-fix arc and the durable-negative closure). It captures the full **ten-run** GPU experiment record now, the **eight** audit-pass bug fixes (one added in v9 — `_phase4_handles` missing on the cdef class), the I1–I5 + Cython + fast-hooks engineering sequence, and the §11 py-spy diagnosis.
+Read **`CTM_plus/Bench/bench_out/PHASE4_GPU_FINDINGS.md`** end-to-end, paying particular attention to:
+
+* **§13.3** — Phase 4 throughput closure (durable structural negative). The
+  algorithm-quality win survives across five evictor implementations; the
+  −20% throughput cost is structural at vLLM 0.7.3's Evictor-ABC patching
+  layer.
+* **§14** — Track B Tier 1 CPU prototype landed: integration shape validated,
+  compression numbers measured on real-shape Qwen2.5-7B KV-block tensors,
+  Tier 2 hook coordinates documented.
 
 Key measured findings to preserve:
 
-- **98.7–99.0% trig-override rate** across v6/v8/v9/v10: algorithm dominantly active.
-- **−11.1% swap_out per decode token vs LRU** — reproduced across **five distinct evictor implementations** (v5/v6/v8/v9/v10) with bit-identical eviction outcomes. Durable algorithm result.
-- **−20% tokens/sec vs LRU — structural.** Three engineering generations (I1–I5 + Cython port + monkey-patched-forward fast hooks) audit-summed at 19–38pp recovery; measured ~1pp total. The gap lives in vLLM 0.7.3 scheduler + allocator paths around an Evictor-ABC patch point, NOT in CTM+ code (py-spy: CTM+ = 1.1% of wall).
-- **Cython `CTMEvictorModernC` is semantically validated** on real-model GPU (v9: swap_out / decode_token = 0.2769 bit-identical to v8). Production-ready code shape.
-- **Bench tests: 278 passed, 44 skipped.** Parametrized over `[py]` and `[c]` evictor variants. All eight audit-pass bugs pinned by `tests/test_vllm_protocol_fixture.py` + the new `test_phase4_external_attr_writes_succeed_on_cdef_class` + the monkey-patch regression pair.
+* **CTM+ Phase 4 algorithm:** **−11.1% swap_out / decode_token** vs LRU,
+  reproduced across five evictor implementations (v5/v6/v8/v9/v10) with
+  trig mechanism dominantly active (98.7–99.0%). Durable; partner-shareable.
+* **Phase 4 throughput:** **−20% tokens/sec vs LRU on chat_32k** —
+  structural at the patching layer. Three engineering generations
+  (audit-summed 19–38pp recovery) collectively moved it by ~1pp. CLOSED.
+* **TurboQuant Tier 1 CPU on Qwen2.5-7B shape:** **3.58× compression at
+  cosine 0.965** against the FP16 source that vLLM 0.7.3 actually uses
+  (7.15× against FP32 if that's the partner-relevant reference dtype).
+  CPU write latency ~2.1ms/block — catastrophic on full cache by design.
+* **Bench tests:** 290 passed, 38 skipped, 0 failed. `tests/
+  test_turboquant_kvstore.py` pins the round-trip contract.
 
-**Phase 4 throughput optimization is CLOSED as an engineering work-track.** Cumulative GPU spend ~$2.10. Don't iterate further on chat_32k throughput without new evidence (different vLLM version, different integration point, or partner-specific workload). See §13.3 for what survives partner-shareable, what moves with caveat, and what stops.
+The `TurboQuantKVStore` wrapper, the Cython evictor, the fast-hooks path,
+and the Phase 4 algorithm are all production-ready code shapes. The gaps
+are: real GPU compression path (Tier 2), and combined-stack measurement.
 
 ## Three tracks for this session
 
-All are sized. Track B is the strongly recommended primary; C and D are alternates with specific triggers.
+### Track B Tier 2 — PyTorch-ops GPU port of TurboQuant + real `cache_kv` hook (Recommended primary)
 
-### Track B — TurboQuant ↔ vLLM integration, Tier 1 CPU prototype (Recommended)
+**Why:** Tier 1 closed the integration-shape question on CPU. Tier 2 is
+what makes TurboQuant actually usable on a real workload — re-implement
+PolarQuant's `compress_batch`/`decompress_batch` in pure PyTorch ops so
+it runs on GPU without writing CUDA, then monkey-patch the documented
+`cache_kv` site so every KV write goes through it.
 
-**Why:** the architecture-doc 8.8× claim assumes TurboQuant × CTM+ × CTXL stacking. CTM+ Phase 4's algorithm layer is validated (−11% per-token swap, mechanism dominantly active); the throughput cost is now bounded and understood. TurboQuant is the next layer of the stack. It's CPU-simulated only (`CTM_plus/DeepSpeed/TURBOQUANT_BENCHMARK.md`) — the vLLM-side integration **has never been built**.
+**Sized:** ~3–5 days code + ~$0.20 GPU validation. Output:
 
-**Sized:** ~1 day code + ~$0.05 GPU. Expected output: measured compression ratio + cosine similarity on real Qwen2.5-7B KV blocks, exact hook points named, throughput cost characterised (will be catastrophic by design at Tier 1 — that's expected).
+1. **`CTM_plus/KVPolicy/kv_policy/turboquant_gpu.py`** — PyTorch-ops
+   re-implementation of the polar transform. Operations needed:
+   - `torch.atan2` / `torch.cos` / `torch.sin` for the recursive polar
+     decomposition.
+   - `torch.bucketize` for angle-index quantisation.
+   - `torch.bitwise_or` + `torch.bitwise_left_shift` for bit-packing
+     to `angle_bits`-width.
+   - QJL residual sign encoding via `torch.sign` + `torch.packbits`.
+   Numerical-equivalence test against the NumPy implementation in
+   `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_offload.py` (cosine
+   ≥ 0.999 vs the CPU result on the same input, NOT against the original
+   tensor — the polar pass introduces the same quantisation noise either
+   way; we're checking the PyTorch port is bit-equivalent to the
+   reference).
 
-**Existing code to reuse (~1900 lines, math is correct):**
+2. **`cache_kv` monkey-patch** at the coordinates documented in
+   `PHASE4_GPU_FINDINGS.md` §14.3:
+   - File: `vllm/attention/backends/flash_attn.py`
+   - Function: `FlashAttentionImpl.forward`
+   - Tensor layout: `[2, num_blocks, block_size, num_kv_heads, head_dim]`
+     BF16/FP16 on GPU.
+   - Per-block compression on write; per-block decompression on read.
+   Patch installs via the `install_turboquant_kvstore(model=..., ...)`
+   stub in `kv_policy/turboquant_kvstore.py` (signature already reserved
+   for this purpose; just needs the body filled in).
 
-- `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_offload.py` — `PolarQuant`, `QJL`, `TurboQuantCompressor`, `TurboQuantOffloadManager`
-- `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_numba.py` — JIT polar transform kernels
-- `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_cuda_ext.py` — CUDA stub (NOT functional; Tier 3 target)
+3. **CPU regression tests** (no torch needed):
+   - PyTorch path equivalence test (against the NumPy reference, gated
+     on `pytest.importorskip("torch")`).
+   - Round-trip preserves shape + dtype across BF16/FP16/FP32 inputs.
 
-**Integration shape (the gap):**
+4. **One GPU validation cell** (Qwen2.5-7B + chat_32k + `--ctm-plus
+   --phase4-cython-evictor --phase4-fast-hooks --turboquant-kv`).
+   Headline measurements:
+   - Tokens/sec with Tier-2 TurboQuant ON vs OFF (both with CTM+ Phase 4).
+   - Effective KV-cache capacity expansion (peak_kv_blocks_used /
+     real_blocks_allocated).
+   - Compression ratio + cosine ≥ 0.95 reproduced on real-model KV.
+   - Combined-stack effect: **first time CTM+ × TurboQuant are measured
+     together**.
 
-- vLLM's `Attention.forward` in `vllm/attention/layer.py` calls `cache_kv` (FlashAttention backend) on write
-- KV cache layout: `[2, num_blocks, block_size, num_kv_heads, head_dim]` BF16/FP16 on GPU
-- Tier 1 routes K/V tensors through CPU compression → decompression on read
-- Latency will slow inference 10–100× by design
+5. **`PHASE4_GPU_FINDINGS.md` §15** with the Tier-2 result table + the
+   honest combined-stack framing.
 
-**Start here:**
+**Validation criterion (the headline that lands a partner pitch):**
 
-1. Read the `PolarQuant` + `TurboQuantCompressor` round-trip in `turboquant_offload.py` (focus on `compress`/`decompress` signatures + tensor-shape expectations).
-2. Read `vllm/attention/layer.py` `Attention.forward` to identify the cache-write hook point. The flash-attn backend's `cache_kv` call is the natural insertion point.
-3. New module: `CTM_plus/KVPolicy/kv_policy/turboquant_kvstore.py` implementing the vLLM-side wrapper that compresses on write, decompresses on read, and tracks per-call compression metrics.
-4. New CLI flag: `--turboquant-kv` in `run_streaming.py`. Off by default. When on, installs the wrapper alongside (or in place of) the CTM+ evictor patch.
-5. CPU regression tests pinning: round-trip preserves shape + dtype; decompression cosine similarity ≥ 0.95 on synthetic + a real Qwen2.5-7B KV slice; per-call latency reported in the streaming summary as `compression_us_per_block` / `decompression_us_per_block`.
-6. One Tier-1 measurement cell on Qwen2.5-7B + chat_32k (or shorter; doesn't need to complete — just needs to emit a round-trip on real tensors). Artefact in `bench_out/turboquant_cpu_prototype/`.
-7. New `PHASE4_GPU_FINDINGS.md` §14 (or a fresh `TURBOQUANT_INTEGRATION_FINDINGS.md`) with the integration-shape result, measured compression ratio, cosine similarity, and the exact hook points.
+> "TurboQuant × CTM+ Phase 4 combined: X× effective KV capacity at Y%
+> throughput cost on Qwen2.5-7B + chat_32k. Cosine 0.96 on per-block
+> round-trip; quality on downstream metrics not yet measured."
 
-**Validation criterion:** measured compression ratio ≥ 5× at cosine similarity ≥ 0.95 on real Qwen2.5-7B KV blocks, with the exact vLLM hook points documented. **Honest framing post-Tier 1:** "TurboQuant compresses real Qwen2.5-7B KV blocks at X× ratio / Y cosine similarity through a working vLLM-integration shape. End-to-end inference cost is structurally bounded by CPU transit (Tier 2 is the GPU port)."
+**Critical NOT-to-overclaim discipline:** the combined-stack result is
+TurboQuant × CTM+ algorithm, NOT × CTXL. CTXL tiering remains
+projection-only. The architecture doc's 8.8× claim still has the third
+layer unmeasured. Refresh the §7-style honest-scope table in §15.
 
-**Tier 2 (next session after Tier 1, ~3–5 days code + ~$0.20 GPU):** re-implement TurboQuant's polar transform in pure PyTorch ops (`torch.atan2`, `torch.cos`, `torch.sin`, `torch.bucketize` for bit-packing). Runs on GPU without CUDA. 5–10× slower than a hand-rolled kernel but real GPU code, deployable shape.
+### Track E — Downstream-quality measurement (MMLU / perplexity)
 
-**Tier 3 (future, ~2–4 weeks):** Triton or CUDA kernel. What `turboquant_cuda_ext.py` stub was meant to be. Production-ready. NOT for this session.
+**Why:** Tier 1 measured **cosine** as the quality proxy. Cosine 0.965 is
+the architecture-doc's target, but it's a proxy — the partner-relevant
+question is "does generation quality degrade?" Before Tier 2 commits 3–5
+days of engineering on a compressed-KV path, half a day on a quality
+sanity check de-risks the whole work-track.
 
-**Do NOT, even after Tier 2, claim 8.8× combined-stack capacity.** That requires CTM+ × TurboQuant × CTXL together. CTXL has zero runtime measurement. Honest framing post-Tier-2: "TurboQuant × CTM+ combined: measured X× memory at Y% throughput cost on Qwen2.5-7B. CTXL tiering layer remains projection only."
+**Sized:** ~half a GPU-day + ~$0.05–0.10 spot. Could run *before* Tier 2
+as a gate (Recommended if no Tier 2 has been started), or *after* Tier 2
+as part of the partner-pitch evidence.
 
-### Track C — Decision-quality measurement on `agentic_clustered_64k` or `rag_128k`
+**Setup:**
 
-**Why:** v5/v9/v10 all ran chat_32k and produced `swap_in_blocks = 0` — no re-references to evicted blocks within the 60s budget. This means our −11% swap_out / decode_token result proves we evict *fewer* blocks per useful token, but does NOT directly prove we evict the *right* blocks. A workload where `swap_in > 0` lets us measure decision quality directly (re-reference miss rate, hit rate, etc.).
+1. MMLU subset (the standard 5-shot eval over ~10 subjects from the
+   MMLU validation split — ~500 questions; fast on Qwen2.5-7B).
+2. Run twice: baseline (no TurboQuant, no CTM+) vs `--turboquant-kv
+   --ctm-plus --phase4-cython-evictor`.
+3. Compare per-subject scores. Target: within ±0.5 absolute points of
+   baseline. If TurboQuant alone degrades > 1 pt, that changes Tier 2's
+   priority entirely.
 
-**Sized:** ~$0.10 GPU + ~half-day plumbing (the workload generators exist in Mode A; the harness flag exists in `run_streaming.py`). Output: a `agentic_clustered_64k` or `rag_128k` cell with measured `swap_in` counters + a decision-quality metric (e.g. wrong-evictions / total-evictions, or swap_in_blocks-not-from-evictor / swap_in_blocks-total).
+**Trigger:** prefer this over Tier 2 if a partner conversation is close
+and they'll ask "but what about quality?" — that's an answerable
+question with this cell and unanswerable without it.
 
-**Trigger:** prefer this over Track B if a partner specifically asks "but did you evict the RIGHT blocks?" or if the partner workload is agentic/RAG-heavy. Otherwise Track B is more strategic (closes the next-layer validation gap).
+### Track C — Decision-quality on `agentic_clustered_64k` / `rag_128k` (carry-forward alternate)
 
-**Validation criterion:** report the swap_in_blocks distribution split between "from CTM+ evictor's pool" and "from native LRU + prefix-cache promotion" on a workload where `swap_in > 0`. If CTM+'s evictor underperforms LRU on decision quality at re-reference, that's a more damaging result than the current −20% throughput. If it outperforms, that strengthens the algorithm pitch independent of throughput.
+Still relevant from the prior session's handoff: chat_32k has
+`swap_in_blocks = 0` so the Phase 4 −11.1% swap_out/decode_token result
+proves "fewer evicts per token" but not "evicts the RIGHT blocks." A
+workload where `swap_in > 0` lets us measure decision quality directly.
 
-### Track D — Re-architect the integration point (deferred)
+**Sized:** ~$0.05–0.10 + half-day plumbing. Single GPU cell.
 
-**Why:** §13.3 names the structural ceiling: vLLM 0.7.3's `PrefixCachingBlockAllocator.evictor` patching disrupts the prefix-cache promotion path. A deeper integration that doesn't go through evictor patching could close the 20% throughput cost. Three candidates: subclass `CpuGpuBlockAllocator`, intercept at `BlockTable` / `KVCacheManager`, or land an upstream vLLM PR adding a public `EvictorPolicy` abstraction.
-
-**Sized:** 2–3 weeks of engineering + meaningful GPU spend. High effort, uncertain payoff. **Defer unless a partner specifically requests chat-throughput parity AND commits to scoping** — otherwise it's research-grade engineering without a clear customer.
+**Trigger:** prefer over Tier 2 only if a partner specifically wants
+agentic / RAG decision-quality evidence. Otherwise Tier 2 is more
+strategic.
 
 ## Recommended starting point
 
-**Start with Track B (TurboQuant Tier 1 CPU prototype).** Reasons:
+**Start with Track E (MMLU quality check), THEN Track B Tier 2.**
 
-1. Phase 4 throughput is closed; iterating further wastes time. Track B opens the next-layer validation gap on the architecture-doc stack.
-2. Tier 1 is contained: math already works (CPU benchmark exists), gap is purely the vLLM-side wiring. ~1 day of focused work.
-3. After Tier 1 + Tier 2 (next session), we have "TurboQuant × CTM+ combined: X× memory at Y% throughput cost on Qwen2.5-7B." That's a real two-layer-validated stack claim.
-4. Track C is a single-workload-pivot move that doesn't structurally change the engineering picture. Useful if a partner asks; not a first-mover.
-5. Track D is deferred by default.
+Reasons for that order:
 
-**Switch to Track C if:** partner conversation is agentic / RAG-heavy and they specifically want decision-quality evidence.
-**Switch to Track D if:** partner specifically wants chat-throughput parity and commits to scoping the integration rewrite.
+1. **Track E is half a day. Tier 2 is 3–5 days.** If TurboQuant's cosine
+   0.96 quality doesn't translate to acceptable downstream quality on
+   Qwen2.5-7B, Tier 2 is a 3-day waste. The half-day Track E cell
+   de-risks the 3-day commitment.
+2. Track E's output is *itself* partner-shareable: "TurboQuant compresses
+   the KV cache 3.5× at zero MMLU regression." That's a concrete claim
+   you can ship without Tier 2 at all.
+3. After Track E confirms the quality story, Tier 2 has a clean
+   pre-committed gate: "if MMLU was within ±0.5pt, Tier 2 ships the
+   throughput cost too. If MMLU degrades > 1pt, Tier 2 pauses and we
+   investigate why before integrating."
+
+**Switch to Tier 2 first if:** a partner specifically wants the
+combined-stack throughput / capacity claim and is willing to accept
+quality measurement as a follow-on. Or if you want the harder engineering
+work first and trust the cosine-0.965 proxy enough to defer the eval.
+
+**Switch to Track C if:** partner conversation is agentic/RAG-heavy.
 
 ## What to NOT do
 
-- **Don't iterate on Phase 4 throughput.** Three engineering generations are closed. New work requires new evidence (different vLLM version, different integration point, different workload class), not more leaf-level optimization.
-- **Don't update the architecture-doc 8.8× claim** without measured combined-stack data. The downgrade banner in `CTM_plus/TURBOQUANT_CTXL_IMPLEMENTATION_OVERVIEW.md` is the current honest framing.
-- **Don't claim TurboQuant × CTM+ stack effects** after Tier 1 alone. Tier 1 is CPU shim, can't show real combined-stack throughput. Honest framing: "integration shape works; compression ratio measured; throughput cost characterised but expected to be catastrophic at Tier 1."
-- **Don't re-run another chat_32k cell** without a hypothesis that distinguishes from v5/v6/v8/v9/v10. We have enough data on that workload.
-- **Don't add a CUDA kernel** for TurboQuant (Tier 3). Tier 2 PyTorch-ops first is the right intermediate.
-- **Don't extend the Cython port** to `KVCachePolicy.select_victims` / `score_block` etc. unless v10 results are revisited under a different workload. The current Cython surface is at the boundary the §11 profile justifies.
+* **Don't iterate on Phase 4 throughput.** Closed at §13.3. New work
+  there requires new evidence (different vLLM version, different
+  integration point, different workload class).
+* **Don't claim combined 8.8× capacity** even after Tier 2 lands. The
+  third layer (CTXL tiering HBM→CXL→NVMe) has zero runtime measurement.
+  Honest framing after Tier 2: "CTM+ × TurboQuant: X× capacity at Y%
+  throughput cost. CTXL projection remains separate."
+* **Don't skip Track E.** Even if Tier 2 lands a beautiful combined
+  result, a partner will ask "does generation quality hold up?" — and
+  the only honest answer without Track E is "we measured cosine, not
+  downstream quality." That's a weak landing.
+* **Don't write a CUDA kernel** for TurboQuant. Tier 2 is intentionally
+  PyTorch-ops only. The Triton/CUDA kernel is Tier 3, weeks of work,
+  not for this session.
+* **Don't tune TurboQuant config parameters** (angle_bits / segment_dim /
+  enable_qjl) in this session. The 3-bit + 128-segment + QJL-on default
+  is the architecture-doc target; sweep is a Tier-2.5 ablation if
+  the headline isn't sharp enough.
 
 ## File pointers for fast onboarding
 
 | Path | Purpose |
 |---|---|
-| `CTM_plus/Bench/bench_out/PHASE4_GPU_FINDINGS.md` | Canonical session record §1 TL;DR + §11 profile + §12.6/§12.7/§12.8/§13.3 (the Cython + fast-hooks + closure arc) |
-| `CTM_plus/Bench/bench_out/PARTNER_VALIDATION_NOTE.md` | Partner-shareable framing with Phase 4 v3–v10 + closure |
-| `CTM_plus/Bench/scripts/POST_PHASE4_ROADMAP.md` | 7-step roadmap; Step 1 now marked closed; Steps 2–6 reference the unmeasured layers |
-| `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_offload.py` | **Track B reuse target** — PolarQuant + QJL + offload manager |
-| `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_numba.py` | Track B reuse — Numba JIT polar kernels |
-| `CTM_plus/DeepSpeed/TURBOQUANT_BENCHMARK.md` | Existing CPU-only TurboQuant benchmark (7.15× / 0.965 cosine on synthetic) |
-| `CTM_plus/TURBOQUANT_CTXL_IMPLEMENTATION_OVERVIEW.md` | Architecture-doc with the 8.8× claim + the honest-scope downgrade banner |
-| `CTM_plus/KVPolicy/kv_policy/vllm_evictor.py` | `CTMEvictorModern` / `CTMEvictorModernC` — production-ready code shape (NOT a Track B target; Phase 4 is closed) |
-| `CTM_plus/KVPolicy/kv_policy/_ctm_evictor.pyx` | Cython source for the C variant. Build: `cd CTM_plus/KVPolicy && python3 setup.py build_ext --inplace` |
-| `CTM_plus/KVPolicy/kv_policy/triattention.py` | Phase 4 hooks + `_wrap_module_forward` helper (fast-hooks path). Production-ready. |
-| `CTM_plus/Bench/tests/test_vllm_protocol_fixture.py` | CPU fixture pinning Evictor ABC + cdef-class attr-set contract + monkey-patch contract — must keep green |
-| `CTM_plus/Bench/scripts/run_v9.sh`, `run_v10.sh` | Reference GPU batch entry points; mirror their shape if a Track B GPU cell is needed |
+| `CTM_plus/Bench/bench_out/PHASE4_GPU_FINDINGS.md` §13.3 + §14 | Phase 4 closure + Track B Tier 1 result; the canonical context entering this session |
+| `CTM_plus/KVPolicy/kv_policy/turboquant_kvstore.py` | **Tier 2 target** — wrapper to extend with GPU compression path + real `cache_kv` install |
+| `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_offload.py` | NumPy reference for the polar transform (~1900 LOC); Tier 2's `turboquant_gpu.py` must produce bit-equivalent output |
+| `CTM_plus/Bench/tests/test_turboquant_kvstore.py` | CPU test contract Tier 2 must keep green + extend with PyTorch-ops equivalence tests |
+| `CTM_plus/Bench/ctm_bench/scripts/run_streaming.py` | `--turboquant-kv` already wired (Tier 1 stub); Tier 2 replaces the no-op install with a real one |
+| `CTM_plus/TURBOQUANT_CTXL_IMPLEMENTATION_OVERVIEW.md` | Architecture doc with the 8.8× claim + the honest-scope downgrade banner |
+| `CTM_plus/Bench/bench_out/PARTNER_VALIDATION_NOTE.md` | Partner-facing framing; needs a §-Track-B update after Tier 2 lands (or after Track E lands, whichever first) |
+| `vllm/attention/backends/flash_attn.py` (in the vLLM install on the GPU pod) | The Tier 2 hook target. Inspect `FlashAttentionImpl.forward` for the `cache_kv` call site shape; the monkey-patch hangs off that. |
 
 ## Open the session by asking the user
 
-1. "Which track — B (TurboQuant Tier 1 CPU prototype, recommended), C (decision-quality on agentic/RAG), or D (integration re-architecture)?"
-2. "GPU spend budget? Track B Tier 1 needs ~$0.05 for one Qwen2.5-7B round-trip cell; code-only is fine if you want to defer the cell to Tier 2."
-3. "Any partner-specific input that should redirect — workload class, model class, vLLM version constraint, deployment timeline?"
+1. "Which track — E (MMLU quality, recommended first), B Tier 2 (GPU port + real hook), or C (decision-quality on agentic/RAG)?"
+2. "GPU spend budget? E is ~$0.05–0.10; B Tier 2 is ~$0.20 for one validation cell after the code lands; C is ~$0.05–0.10."
+3. "Any partner-specific direction — particular workload class, model architecture, vLLM version constraint, or a deployment timeline pushing toward a specific evidence type?"
