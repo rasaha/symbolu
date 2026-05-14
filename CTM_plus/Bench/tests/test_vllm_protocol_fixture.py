@@ -603,6 +603,86 @@ def test_bug7_phase4_picks_different_victim_than_phase2_under_meaningful_trig():
 
 
 # --------------------------------------------------------------------- #
+# Cython port — external attribute-set contract
+#
+# Bug surfaced on the v9 GPU run: ``CTMEvictorModernC`` is a ``cdef
+# class`` and cannot accept attributes that weren't declared at class
+# level, but ``triattention.install_pre_rope_capture`` and
+# ``install_attn_metadata_side_channel`` set ~10 ``_phase4_*`` counters
+# directly on the evictor via ``getattr(...)+1`` and ``setattr``. The
+# previous CPU-side fixture exercised only the side-channel pair (lines
+# 374-419 of this file) and was gated behind ``pytest.importorskip
+# ("torch")``, so CPU CI missed every other attribute on the surface
+# until the GPU run threw AttributeError mid-decode.
+#
+# This regression test enumerates the full set explicitly so any
+# future cdef class refactor that drops one fails locally at $0 GPU.
+# --------------------------------------------------------------------- #
+
+
+# Authoritative list of every ``_phase4_*`` attribute that
+# ``kv_policy.triattention``'s install_* hooks write to the evictor
+# object from outside. Grep for ``evictor._phase4_`` in triattention.py
+# before changing this list — adding a new write site without adding
+# the name here is exactly the bug pattern this regression catches.
+_EVICTOR_EXTERNAL_PHASE4_COUNTERS = (
+    "_phase4_rotary_pre_hook_calls",
+    "_phase4_capture_subsample_skips",
+    "_phase4_capture_exceptions",
+    "_phase4_capture_attempts",
+    "_phase4_capture_aborts_no_slot_mapping",
+    "_phase4_capture_aborts_no_decode_tokens",
+    "_phase4_side_channel_pre_hook_calls",
+    "_phase4_side_channel_metadata_missing",
+    "_phase4_side_channel_metadata_found",
+)
+
+_EVICTOR_EXTERNAL_PHASE4_OBJECTS = (
+    ("_phase4_handles", []),
+    ("_phase4_pending_slot_mapping", object()),
+    ("_phase4_pending_num_decode_tokens", 3),
+)
+
+
+def test_phase4_external_attr_writes_succeed_on_cdef_class():
+    """Every attribute the triattention install_* hooks set on the
+    evictor from outside must be settable on the parametrised class.
+    Failure mode caught: cdef class without the slot declared raises
+    AttributeError mid-decode, killing the engine.
+
+    This test is the CPU-side closer for the v9 audit-pass finding —
+    same "single-call mocks pin the per-call API but miss the
+    cross-module attribute-set contract" pattern as the original
+    seven bugs.
+    """
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    evictor = CTMEvictorModern(num_blocks_capacity=8, block_size=16)
+
+    # Counter pattern from triattention: getattr default 0, then write.
+    for name in _EVICTOR_EXTERNAL_PHASE4_COUNTERS:
+        # Initial read with default — must not raise (matches the
+        # getattr(..., 0) in triattention.py).
+        before = getattr(evictor, name, 0)
+        assert isinstance(before, int)
+        # The write — this is the AttributeError trigger on an
+        # under-declared cdef class.
+        setattr(evictor, name, before + 1)
+        # Read-back must hit the same slot, not a stale __dict__ entry.
+        assert getattr(evictor, name) == before + 1, (
+            f"attribute {name} did not round-trip on "
+            f"{type(evictor).__name__}; cdef public slot likely missing."
+        )
+
+    for name, value in _EVICTOR_EXTERNAL_PHASE4_OBJECTS:
+        setattr(evictor, name, value)
+        assert getattr(evictor, name) is value, (
+            f"attribute {name} did not round-trip as object on "
+            f"{type(evictor).__name__}; cdef public slot likely missing."
+        )
+
+
+# --------------------------------------------------------------------- #
 # Bug 2 — workload-level: identical prompts collapse memory pressure
 # under prefix caching
 # --------------------------------------------------------------------- #

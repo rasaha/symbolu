@@ -1458,8 +1458,8 @@ def patch_vllm_engine_modern(
     original_evictor_type = type(gpu_allocator.evictor).__name__
     gpu_allocator.evictor = ctm_evictor
     logger.info(
-        "CTM+ Phase 2 patch installed: %s -> CTMEvictorModern",
-        original_evictor_type,
+        "CTM+ Phase 2 patch installed: %s -> %s",
+        original_evictor_type, type(ctm_evictor).__name__,
     )
     return ctm_evictor
 
