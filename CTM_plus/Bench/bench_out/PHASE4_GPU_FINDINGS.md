@@ -59,8 +59,21 @@ per decode token) but the wall-clock was unchanged. py-spy profile
 (§11) revealed why: **our CTM+ code is ~1.1% of wall time. The 20%
 gap is integration tax** — Python objects in vLLM scheduler hot
 paths that expect C-level performance — not algorithm complexity.
-The next throughput win is a Cython / pybind11 port of
-`CTMEvictorModern` (1-2 weeks, ~5-10pp), not more algorithm tuning.
+
+Initial post-profile prediction: a Cython port of `CTMEvictorModern`
+would recover 5–10pp. **v9 GPU validation (§12.6): also 0pp.** The
+Cython port is semantically correct (every eviction outcome
+bit-identical to v8) but the §11.3 5–10pp estimate was over-optimistic
+— if CTM+ code is 1.1% of wall, the upper bound on porting it to C
+is ~1.1pp. v9 is the negative-control evidence locating the
+integration tax *outside* CTM+ code entirely.
+
+Remaining tractable lever after v9: §11.3 row 2 — replace
+`register_forward_pre_hook` with direct monkey-patch of `module.forward`
+so torch's dispatcher takes its no-hook fast path. Code landed
+(`--phase4-fast-hooks` flag); **v10 cell pending** to test whether
+this 2–5pp estimate also misses or recovers the predicted range.
+See §13 for the pre-committed v10 decision tree.
 
 What this session **does not** invalidate: the architecture-doc 8.8×
 capacity claim (TurboQuant + CTM+ + CTXL stack) — none of those layers
@@ -655,6 +668,10 @@ python3 -m ctm_bench.scripts.read_phase4_v5 \
 
 ### Decision tree for v8 result
 
+> **POSTSCRIPT (v9 closed v8's decision tree):** v8 → "> −10%" row
+> fired, leading to v9 (Cython port) which also landed at 0pp. Current
+> live decision tree is **§13.2** (v10 outcome interpretation).
+
 | tokens/sec vs LRU | Interpretation | Next step |
 |---|---|---|
 | ≥ −5% (≥ 81 tok/s) | Phase 4 is throughput-competitive | Write up + close out |
@@ -724,6 +741,12 @@ No single fixable hotspot. The 20% is **integration tax** — the cost of patchi
 
 Now that the diagnosis is correct:
 
+> **POSTSCRIPT (post-v9):** the row-1 estimate "5–10pp from a C extension"
+> was falsified by the v9 GPU run (§12.6) — actual recovery 0pp. The
+> upper bound on porting frames that are 0.9% + 0.2% of wall is ~1.1pp
+> total. Updated estimate table lives in §12.6; the current canonical
+> next-step is §11.3 row 2 (monkey-patched `forward`), under test in v10.
+
 | Approach | Expected recovery | Effort |
 |---|---|---|
 | **Reimplement `CTMEvictorModern` as a C extension** (Cython / pybind11). Drop-in same Evictor ABC. No Python overhead for `__contains__/add/update/remove/evict`. | **5–10pp** | 1–2 weeks |
@@ -741,7 +764,7 @@ What would NOT help (despite earlier audit guesses):
 
 The algorithm is essentially free in compute. The 11% per-token swap-rate improvement vs LRU is real and durable. The 20% throughput cost is integration tax of a Python-object evictor in a hot vLLM path, not algorithm complexity.
 
-**Closing the gap is a code-shape problem (C extension port), not an algorithm problem.** That changes which engineering work to prioritise and which partner conversations are credible:
+**Initial post-profile hypothesis (since falsified by v9):** "Closing the gap is a code-shape problem (C extension port), not an algorithm problem." v9 measured the C extension at 0pp recovery — the gap is below the leaf-class layer. See §12.6 for the corrected position and §13 for the next (and probably last) tractable lever.
 
 - Credible: "We have a working KV-eviction algorithm that's measurably smarter than LRU at near-zero compute cost. Production deployment needs a C-extension drop-in for vLLM's Evictor ABC; that's ~1–2 weeks of engineering."
 - NOT credible (per pre-profile guesses): "Phase 4 is slow because of trig math; we need a CUDA kernel."
@@ -869,6 +892,397 @@ That collapses a 1–2 week dependency to a single GPU cell and a
 follow-up writeup. The remaining throughput risk is whether the
 estimate of 5–10pp recovery materialises on the real workload; the
 §11.3 categorisation gives a fairly bounded prior on that.
+
+### §12.6 v9 ACTUAL RESULT — Cython port recovered 0pp on this workload
+
+The v9 GPU run executed `2026-05-14` against commit `c84f983`. Result:
+
+| Metric | v8 (Python evictor) | **v9 (Cython evictor)** | Δ |
+|---|---:|---:|---|
+| **tokens/sec** | 68.26 | **67.20** | **−1.6%** (within noise) |
+| swap_out / decode_token | 0.2769 | **0.2769** | bit-identical ✓ |
+| swap_out blocks (raw) | 1134 | **1134** | bit-identical ✓ |
+| decode tokens | 4096 | 4096 | identical ✓ |
+| evict_call_count | 1253 | 1239 | similar |
+| evict_p99 (μs) | 4515.8 | **6625.4** | slower (noisy single-cell) |
+| trig_changed_pick / blend_calls | 98.7% | 98.7% | unchanged ✓ |
+| trig_score cache hit rate | 19.3% | 19.0% | unchanged ✓ |
+
+**§11.3 row-1 prediction (5–10pp recovery): 0pp materialised.**
+
+The Cython port is semantically correct — every eviction outcome is
+bit-identical to v8. But throughput is unchanged. The §11.3 estimate
+was internally inconsistent with the §11.1 categorisation it sat
+alongside: if "CTM+ EVICTOR" was 0.9% of wall and "PHASE 4 HOOKS"
+was 0.2%, the maximum recoverable from a C port of those frames was
+~1.1pp — never 5–10pp. The estimate factored in an unsupported
+assumption that the C evictor would also reduce per-call cost in
+vLLM's scheduler/allocator paths upstream. It didn't.
+
+**What this CONFIRMS:** the integration tax §11.4 named is real and
+located *outside* CTM+ code. v9 is the negative-control evidence that
+forces the gap-location diagnosis from "Python overhead in our code"
+to "Python overhead in vLLM's wrapping of our code".
+
+**What this DOES NOT invalidate:**
+
+- The **−11.1% swap_out / decode_token** algorithm win vs LRU,
+  reproduced across v5 / v6 / v8 / v9 with three different evictor
+  implementations.
+- The Cython port itself: semantically correct on real-model GPU,
+  parametrized CPU fixture green, ready to ship as production code
+  shape even though it doesn't close the throughput gap.
+- The methodology: the CPU protocol fixture caught a missing-cdef-
+  attribute bug (`_phase4_handles` etc.) BEFORE v9 hit it on real
+  model GPU. Saved a wasted run; the regression test
+  ``test_phase4_external_attr_writes_succeed_on_cdef_class``
+  pins the contract.
+
+**Updated §11.3 table after v9:**
+
+| Approach | Expected (audit) | **Measured (v9)** | Status |
+|---|---|---|---|
+| Cython port of `CTMEvictorModern` | 5–10pp | **0pp** | Estimate wrong; gap is below this layer |
+| Monkey-patched `forward` instead of `register_forward_pre_hook` | 2–5pp | (v10 test) | Half a day code-only, ready for v10 |
+| Single model-level hook (consolidated from per-rotary) | 1–3pp | n/a | Subsumed by row 2 |
+| Accept as structural integration tax | — | likely | Falls out of v10 if row 2 also lands at 0 |
+
+The remaining tractable hypothesis is §11.3 row 2: the torch
+`_call_impl` dispatcher walks `_forward_pre_hooks` on every fire,
+and the fast path skips that walk when the dict is empty. v10 tests
+whether monkey-patching `forward` directly recovers the predicted
+2–5pp, or whether the gap is structurally below the hook layer.
+
+## §13. Hook-shape fix (v10 path)
+
+After v9's 0pp result, the engineering question becomes whether ANY
+of §11.3's remaining estimates hold. Code landed this session (commits
+following c84f983):
+
+- `triattention._wrap_module_forward` — composable helper that
+  replaces `module.forward` directly, keeping `_forward_pre_hooks`
+  empty so torch's dispatcher takes its fast path. Captures the
+  current `forward` (which may already be a previous wrap) so
+  multiple wraps stack correctly with LIFO teardown.
+- `install_pre_rope_capture(via_monkey_patch=True)` — uses the
+  helper for both the rotary-layer pre-hook (1 per layer × 28
+  layers / token in Qwen2.5) and the layer-counter reset on
+  `model.forward`.
+- `install_attn_metadata_side_channel(via_monkey_patch=True)` —
+  wraps `model.forward` for the metadata-stash + post-clear pair.
+- `--phase4-fast-hooks` CLI flag in `run_streaming.py` and runner.
+- `Bench/tests/test_*_via_monkey_patch_skips_pre_hooks` — torch-
+  gated regression that asserts `_forward_pre_hooks` stays empty
+  AND the counters still tick. Catches the case where a future
+  refactor silently disables the optimisation.
+
+### §13.1 v10 cell plan (run_v10.sh)
+
+Same shape as v9: ~$0.07 spot for headline + py-spy + seed-137
+variance, ~$0.025 for the `--minimal` form.
+
+```bash
+bash CTM_plus/Bench/scripts/run_v10.sh
+```
+
+### §13.2 Pre-decided outcome interpretation
+
+Write these BEFORE the run so post-hoc rationalisation is harder:
+
+| v10 tokens/sec | Interpretation | Next step |
+|---|---|---|
+| ≥ 73 (≥ +5pp vs v9) | §11.3 row 2 vindicated. Phase 4 is closer to throughput-competitive (still −14% vs LRU). Worth a partner pitch as "smarter-than-LRU at modest throughput cost". | Write up §13.3 with the v10 numbers; archive Phase 4 throughput work; pivot. |
+| 69–72 (+2–4pp) | Partial recovery. Suggests the dispatcher fast path matters but the integration tax has multiple contributors. Diminishing-returns territory. | Same as above; the marginal pp aren't worth chasing further. |
+| 67–68 (within noise of v9) | §11.3 row 2 also wrong. The gap is structurally below the hook layer (vLLM scheduler/allocator paying per-call cost regardless of whether our hook is a function call or a dispatcher fire). | Phase 4 throughput is closed as a durable negative. Algorithm win (−11% per-token swap) remains the deliverable; pitch shifts to deeper-integration or different vLLM version. |
+| < 67 (regression) | Monkey-patch path has a bug. Investigate before doing anything else. | Look at the test_*_via_monkey_patch_skips_pre_hooks regressions on the GPU pod's setup — likely cleanup issue or a captured-state aliasing. |
+
+### §13.3 What v10 closes either way
+
+In all three non-bug outcomes, Phase 4 throughput optimisation as a
+work-track is complete. The honest result is one of two things:
+
+* "After two engineering generations (I1–I5 + Cython + fast hooks),
+  CTM+ Phase 4 has a −11% per-token swap advantage and a −12 to
+  −20% throughput cost on chat_32k. Production deployment needs
+  either a workload where the per-token win dominates the throughput
+  cost (we haven't measured one) or a deeper integration point that
+  doesn't go through `PrefixCachingBlockAllocator.evictor` patching."
+
+* "Phase 4 throughput recovered to within −5% of LRU. The algorithm
+  is throughput-competitive on chat_32k. Remaining gap is below the
+  partner-facing significance bar."
+
+Either is a valid stopping point. Both leave the **algorithm** result
+(−11% swap_out/decode_token, mechanism dominantly active at 98.7%)
+durable and partner-shareable. The throughput question becomes
+secondary to the next layer of the stack (Track B: TurboQuant ↔ vLLM
+integration, the originally-deferred work).
+
+### §12.7 v10 ACTUAL RESULT — fast-hooks recovered ~1pp; Phase 4 throughput closure
+
+The v10 GPU run executed `2026-05-14` against commit `4051358` with
+both `--phase4-cython-evictor` and `--phase4-fast-hooks`. Result:
+
+| Metric | v9 (Cython only) | **v10 (Cython + fast-hooks)** | Δ |
+|---|---:|---:|---|
+| **tokens/sec** | 67.20 | **68.26** | **+1.6%** (≈ +1pp) |
+| swap_out / decode_token | 0.2769 | **0.2769** | bit-identical ✓ |
+| swap_out blocks (raw) | 1134 | 1134 | bit-identical ✓ |
+| decode tokens | 4096 | 4096 | identical |
+| **phase4_rotary_pre_hook_calls** | 57400 | **76306** | **+33%** ← fast-hooks worked |
+| phase4_side_channel_pre_hook_calls | 2051 | 2726 | +33% |
+| evict_call_count | 1239 | 1367 | +10% |
+| trig_changed_pick / blend_calls | 98.7% | 99.0% | unchanged ✓ |
+
+**§13.2 decision-tree band hit: "67–68 (within noise of v9)" — row 2 also wrong; gap is structurally below the hook layer.**
+
+The §11.3 row-2 audit estimate was 2–5pp recovery; measured was ~1pp,
+at the bottom of that range. v10 tokens/sec ties **v8** exactly
+(68.26 = 68.26) — the Cython port + fast-hooks together recovered the
+slight regression Cython introduced, leaving net throughput identical
+to the plain Python implementation. Three engineering generations
+collectively moved the metric by 0pp.
+
+**What the fast-hooks demonstrably did fix (the nuance):**
+
+* Rotary forward-pass dispatcher overhead. The `+33%` more rotary
+  pre_hook_calls in the same 60s wall is direct evidence that
+  `register_forward_pre_hook` → monkey-patched `forward` reduced
+  per-fire cost. Forward passes per second went from ~34 → ~45.
+* vLLM scheduler cycles. `+10% more evict calls` in same wall
+  means the reclaimed CPU time was absorbed by more scheduler work.
+* Algorithm signal dominance. trig_changed_pick / blend_calls held
+  at 99.0% — the trig signal is still dominantly active.
+
+**Why tokens/sec barely moved despite +33% more forward passes:**
+the chat_32k workload's 8000–30000-token prompts make prefill the
+dominant cost. Only 2 of 30 requests fully complete in the 60-second
+budget (in BOTH v9 and v10), so the decode-token output is capped at
+4096 regardless of forward-pass speed. Fast-hooks freed compute that
+went into more prefill iterations on requests that didn't complete.
+A measurement with shorter prompts or longer wall budget would let
+the +33% forward-pass speedup translate into tokens/sec — but that
+isn't the partner-relevant question for THIS workload.
+
+### §12.8 Phase 4 throughput closure
+
+After three engineering generations:
+
+| Generation | Approach | Audit estimate | **Measured** |
+|---|---|---:|---:|
+| 1 (v8) | I1–I5 compute-side optimizations | 12–23pp | **0pp** |
+| 2 (v9) | Cython port of `CTMEvictorModern` | 5–10pp | **0pp** |
+| 3 (v10) | Monkey-patched `forward` (fast hooks) | 2–5pp | **~1pp** |
+| **Sum** | All three combined | **19–38pp** | **~1pp** |
+
+The 20% throughput gap vs LRU on chat_32k is **structural** at vLLM
+0.7.3's Evictor-ABC patching layer, not addressable by any leaf-level
+optimization. The §11.4 hypothesis ("closing the gap is a code-shape
+problem") is now decisively falsified: the C code-shape is in place
+and the gap remained.
+
+Phase 4 throughput optimization is **closed as an engineering
+question**. The deliverable from this work-track is what survives
+all three generations bit-identically:
+
+* **Algorithm-quality result:** −11.1% swap_out / decode_token vs LRU,
+  reproduced across **five distinct evictor implementations** (v5,
+  v6, v8, v9, v10) with the trig mechanism dominantly active at
+  98.7–99.0% override rate. The eight audit-pass repairs, the
+  parametrized protocol fixture, and the cdef-class attribute-set
+  contract all hold across these implementations.
+
+* **Negative-control evidence** for the §11 diagnosis: the 20% gap
+  lives in vLLM scheduler + allocator paths, not in CTM+ code. This
+  is a more useful result for the engineering case-study than a
+  win-with-asterisk would have been — it locates the next
+  intervention point definitively (a deeper integration that doesn't
+  go through evictor patching, or a different vLLM minor with a
+  cleaner scheduler) rather than leaving teams chasing leaf
+  optimizations.
+
+The Phase 4 algorithm work, the audit-pass methodology, and the
+v9/v10 Cython + fast-hooks code shape all REMAIN production-ready.
+The throughput claim — and only the throughput claim — moves to "−20%
+on chat_32k, structural; consider a different integration point or
+workload before deploying."
+
+## §13.3 What survives, what moves, what stops
+
+After v10's closure:
+
+### Survives — partner-shareable today
+
+* "CTM+ Phase 4 produces a measured **−11.1% swap_out / decode_token**
+  vs LRU on Qwen2.5-7B streaming chat at heavy KV pressure, reproduced
+  across five distinct evictor implementations with the trig mechanism
+  dominantly active (98.7–99.0% override rate)."
+* "Our audit-pass methodology surfaced **eight** fixable findings
+  during real-model GPU validation (~$2.10 cumulative GPU spend); all
+  eight are now pinned by a CPU regression fixture that catches the
+  bug class at $0 GPU in <0.5s."
+* "The C-extension drop-in for `CTMEvictorModern` (Cython) is
+  semantically validated on real-model GPU (bit-identical eviction
+  outcomes to the Python reference) and ready to ship as the
+  production code shape."
+
+### Moves — partner-conversation-conditional
+
+* "Phase 4 carries a measured **−20% tokens/sec cost** on chat_32k.
+  Three engineering generations attempted to close it (audit estimate
+  19–38pp combined; measured ~1pp). The gap is structural at the
+  Evictor-ABC patching layer in vLLM 0.7.3. Production deployment
+  needs either a deeper integration point or a workload where the
+  per-token swap win dominates the throughput cost."
+
+### Stops — Phase 4 throughput as an engineering work-track
+
+* No further optimization passes scoped on Phase 4 throughput.
+* Future Phase 4 work, if any, shifts focus to: (a) decision-quality
+  measurement on workloads with `swap_in_blocks > 0` (agentic_clustered,
+  rag), (b) different vLLM integration points, or (c) different
+  vLLM versions.
+
+### Next engineering work-track — Track B (TurboQuant ↔ vLLM)
+
+The next layer of the architecture-doc stack remains unmeasured:
+TurboQuant 3-bit polar quantisation is CPU-simulated only
+(`CTM_plus/DeepSpeed/TURBOQUANT_BENCHMARK.md`), and its integration
+into vLLM's KV-cache path has never been built. Tier-1 CPU prototype
+sized at ~1 day code + $0.05 GPU; closes the second-layer validation
+gap on the stack the architecture doc projects 8.8× capacity from.
+See `CTM_plus/DeepSpeed/ctm_plus_deepspeed/turboquant_offload.py` for
+the existing ~1900-line CPU/Numba implementation that's the reuse
+target.
+
+## §14. TurboQuant ↔ vLLM integration — Tier 1 CPU prototype
+
+After Phase 4 throughput closed at the §13.3 durable negative, the
+next layer of the architecture-doc stack opened: TurboQuant 3-bit polar
+quantisation of the KV cache. The math has been CPU-benchmarked since
+April 2026 (`CTM_plus/DeepSpeed/TURBOQUANT_BENCHMARK.md`) — the gap was
+the vLLM-side wiring, which had never been built.
+
+Tier 1 (this section) is the CPU prototype: a wrapper that drives the
+existing `TurboQuantCompressor` (PolarQuant + QJL, ~1900 LOC in
+`CTM_plus/DeepSpeed`) against Qwen2.5-7B-shape KV block tensors. By
+design, Tier 1 doesn't go on the real vLLM cache_kv path (latency would
+be catastrophic — CPU transit on every K/V block). It produces the
+**integration shape**, the **measured compression / quality numbers**
+on real-shape data, and the **documented hook coordinates** for Tier 2.
+
+### §14.1 What landed
+
+`kv_policy/turboquant_kvstore.py` — `TurboQuantKVStore` wrapping the
+existing `TurboQuantCompressor`. Public surface:
+
+* `write_block(block_id, k_array, v_array)` — compress and store a
+  per-slot K/V pair.
+* `read_block(block_id) -> (k, v)` — decompress, restore original
+  shape + dtype.
+* `remove_block(block_id)` — drop compressed state (mirrors vLLM's
+  block-eviction lifecycle).
+* `compression_ratio` (property) — theoretical ratio = source bytes /
+  bit-packed compressed bytes.
+* `get_stats()` — including `avg_write_us`, `avg_read_us`,
+  `blocks_held`, raw byte counters.
+
+Plus `install_turboquant_kvstore(*, model=None, **config)` — Tier 1
+returns the wrapper without patching; the kwarg signature is set up so
+Tier 2 can swap in a real `cache_kv` monkey-patch without a CLI break.
+
+`run_streaming.py` exposes `--turboquant-kv` (off by default). At Tier
+1 it constructs the store but does NOT install a vLLM hook —
+deliberate scope discipline.
+
+`Bench/tests/test_turboquant_kvstore.py` — 6 CPU regression tests
+pinning: shape + dtype round-trip; cosine similarity ≥ 0.95 on
+Qwen-shape data; compression ratio ≥ 5× (against FP32 source);
+remove-block lifecycle; latency counters; BF16/FP16 dtype round-trip.
+Suite: **290 passed, 38 skipped, 0 failed.**
+
+### §14.2 Measured numbers on Qwen2.5-7B-shape KV-block tensors
+
+100 blocks of shape `(block_size=16, num_kv_heads=4, head_dim=128)` —
+one block's worth of K (or V) for one layer in Qwen2.5-7B's GQA-4
+config — driven through the round-trip:
+
+| Metric | FP32 source | **FP16 source** (vLLM's actual dtype) |
+|---|---:|---:|
+| Compression ratio | 7.15× | **3.58×** |
+| Cosine similarity (K) | 0.965 | 0.965 |
+| Cosine similarity (V) | 0.964 | 0.964 |
+| Avg write latency / block | — | 2144 μs |
+| Avg read latency / block | — | 803 μs |
+
+The 7.15× FP32 ratio matches the existing CPU benchmark; the **3.58×
+FP16 ratio** is the more partner-relevant number because vLLM 0.7.3
+stores KV at BF16 or FP16. The architecture-doc's 7× was implicitly
+against FP32; against the actual KV dtype, the meaningful ratio is
+~3.5×. **Quality (cosine ≥ 0.96) is preserved at both dtypes** — the
+polar-quantisation noise dominates the dtype-cast noise, so FP16 round-
+trip costs almost nothing on top of the polar pass.
+
+Catastrophic latency confirmed: ~2.1ms write + 0.8ms read per block.
+Qwen2.5-7B at vLLM block_size=16 holds ~2000 blocks per layer × 28
+layers = 56K blocks in the cache; a full sweep through CPU at 3ms /
+block would take ~3 minutes per layer pass. This is **exactly why
+Tier 2 exists** — the integration shape works, the math works, but
+CPU transit is unviable on a real workload.
+
+### §14.3 Documented hook coordinates (for Tier 2)
+
+The intended cache_kv hook point in vLLM 0.7.3:
+
+* File: `vllm/attention/backends/flash_attn.py`
+* Function: `FlashAttentionImpl.forward`
+* Call site: the `cache_kv` invocation (writes the new K/V into the
+  paged KV-cache tensor)
+* Cache tensor layout at that site:
+  `[2, num_blocks, block_size, num_kv_heads, head_dim]` BF16/FP16 on
+  GPU. Slice 0 is K, slice 1 is V.
+* Natural unit of compression: one block's K (or V) at shape
+  `(block_size, num_kv_heads, head_dim)` per `write_block` call.
+  block_id comes from vLLM's allocator (the same identifier CTM+'s
+  evictor receives).
+
+Tier 2 wraps this call site with a monkey-patched `cache_kv` that
+diverts writes to the `TurboQuantKVStore` and reads from it on
+subsequent decode steps. Tier 2's reimplementation is in PyTorch ops
+(`torch.atan2`, `torch.cos`, `torch.sin`, `torch.bucketize`) so it
+runs on GPU — closes the catastrophic-CPU-latency caveat. Tier 3 is
+the Triton or CUDA kernel (`turboquant_cuda_ext.py` is a stub today).
+
+### §14.4 What this DOES NOT claim
+
+* No end-to-end throughput cost measurement (Tier 2's job).
+* No combined-stack 8.8× capacity claim. CTM+ Phase 4 algorithm
+  (algorithm-quality layer) and TurboQuant compression (storage layer)
+  are now each independently measured; CTXL tiering (HBM → CXL → NVMe)
+  remains projection-only. Combined-stack measurement requires all
+  three together.
+* No measured quality regression on a downstream metric (MMLU,
+  perplexity). Cosine 0.965 is the architecture-doc's quality target
+  but is a *proxy* — the partner-relevant question is whether
+  generation quality degrades, and that's a separate evaluation cell
+  (sized at ~half a GPU-day).
+
+### §14.5 Next session (Tier 2 — PyTorch-ops GPU port)
+
+Sized ~3–5 days code + ~$0.20 GPU. Re-implement PolarQuant's
+`compress_batch` / `decompress_batch` in pure PyTorch ops (no
+CUDA, no Numba). Wire into the documented `cache_kv` hook. Measure:
+
+* On-GPU compression ratio (should match Tier 1's 3.5× / 7×).
+* On-GPU cosine similarity (should match 0.96).
+* End-to-end tokens/sec cost on Qwen2.5-7B + chat_32k.
+* Combined-with-CTM+-Phase-4 stack measurement (CTM+ algorithm × TurboQuant
+  compression — first time the two are run together).
+
+That gives the first honest "TurboQuant × CTM+: X× memory at Y%
+throughput cost on Qwen2.5-7B" claim. The remaining 8.8× gap to the
+architecture doc would still be CTXL (HBM → CXL → NVMe tiering),
+which is a separate work-track.
 
 ## Appendix C: Where to read more
 

@@ -91,6 +91,26 @@ cdef class CTMEvictorModernC:
     cdef public object _phase4_pending_slot_mapping
     cdef public object _phase4_pending_num_decode_tokens
 
+    # Set externally by ``triattention.install_pre_rope_capture`` /
+    # ``install_attn_metadata_side_channel``. The Phase 4 hook code
+    # writes counters and a hook-handle list directly onto the evictor
+    # object via getattr/setattr patterns; for the cdef class to
+    # tolerate those writes every name must be declared as a slot here.
+    # All counters use Py_ssize_t; ``_phase4_handles`` is a list-or-None.
+    # See ``Bench/tests/test_vllm_protocol_fixture.py`` —
+    # ``test_phase4_external_attr_writes_succeed_on_cdef_class`` —
+    # for the regression test that pins this surface.
+    cdef public object _phase4_handles
+    cdef public Py_ssize_t _phase4_rotary_pre_hook_calls
+    cdef public Py_ssize_t _phase4_capture_subsample_skips
+    cdef public Py_ssize_t _phase4_capture_exceptions
+    cdef public Py_ssize_t _phase4_capture_attempts
+    cdef public Py_ssize_t _phase4_capture_aborts_no_slot_mapping
+    cdef public Py_ssize_t _phase4_capture_aborts_no_decode_tokens
+    cdef public Py_ssize_t _phase4_side_channel_pre_hook_calls
+    cdef public Py_ssize_t _phase4_side_channel_metadata_missing
+    cdef public Py_ssize_t _phase4_side_channel_metadata_found
+
     def __cinit__(self):
         # Initialise all counters to 0 so getattr() default-zero paths
         # the Python class relies on are unnecessary in C.
@@ -106,6 +126,19 @@ cdef class CTMEvictorModernC:
         self._phase4_trig_changed_pick = 0
         self._phase4_pending_slot_mapping = None
         self._phase4_pending_num_decode_tokens = None
+        # Hook-install + capture counters written by triattention's
+        # install_* hooks. Match the implicit zero-default the Python
+        # class gets from ``getattr(self, "...", 0)``.
+        self._phase4_handles = None
+        self._phase4_rotary_pre_hook_calls = 0
+        self._phase4_capture_subsample_skips = 0
+        self._phase4_capture_exceptions = 0
+        self._phase4_capture_attempts = 0
+        self._phase4_capture_aborts_no_slot_mapping = 0
+        self._phase4_capture_aborts_no_decode_tokens = 0
+        self._phase4_side_channel_pre_hook_calls = 0
+        self._phase4_side_channel_metadata_missing = 0
+        self._phase4_side_channel_metadata_found = 0
 
     def __init__(
         self,

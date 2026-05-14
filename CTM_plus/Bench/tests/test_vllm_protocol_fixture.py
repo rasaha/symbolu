@@ -471,6 +471,134 @@ def test_bug4_side_channel_set_before_rotary_fires_in_real_call_order():
 
 
 # --------------------------------------------------------------------- #
+# §11.3 row 2 — hook-shape fix: via_monkey_patch=True replaces
+# module.forward directly instead of register_forward_pre_hook, so
+# torch's _call_impl skips the _forward_pre_hooks walk. The semantic
+# contract (counters tick, side-channel populated, capture fires) must
+# stay identical to the hook path.
+# --------------------------------------------------------------------- #
+
+
+def test_attn_metadata_side_channel_via_monkey_patch_skips_pre_hooks():
+    """When ``via_monkey_patch=True`` the install function must NOT
+    register a forward_pre_hook on the model, but must still fire the
+    counter + populate the side-channel attributes on every call.
+
+    Regression: catches the case where a future refactor accidentally
+    re-introduces the register_forward_pre_hook path under the flag,
+    silently nullifying the §11.3 row-2 optimization.
+    """
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import install_attn_metadata_side_channel
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class Attention(torch.nn.Module):
+        def forward(self, q, k, v, kv_cache, attn_metadata):
+            return q
+
+    class FakeQwen2Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.rotary_emb = RotaryEmb()
+            self.attn = Attention()
+
+        def forward(self, input_ids, positions, kv_caches, attn_metadata):
+            q = torch.zeros((3, 8))
+            k = torch.zeros((3, 8))
+            v = torch.zeros((3, 8))
+            q, k = self.rotary_emb(positions, q, k)
+            self.attn(q, k, v, None, attn_metadata)
+            return input_ids
+
+    class FakeMeta:
+        slot_mapping = torch.tensor([0, 16, 32])
+        num_decode_tokens = 3
+
+    evictor = CTMEvictorModern(num_blocks_capacity=64, block_size=16)
+    model = FakeQwen2Model()
+    n = install_attn_metadata_side_channel(
+        model=model, evictor=evictor, via_monkey_patch=True,
+    )
+    assert n == 1
+
+    # Critical assertion: no forward_pre_hook was installed. This is
+    # WHAT differentiates the two paths — the dispatcher takes its
+    # fast path when _forward_pre_hooks is empty.
+    pre_hooks = getattr(model, "_forward_pre_hooks", None)
+    post_hooks = getattr(model, "_forward_hooks", None)
+    assert pre_hooks is None or len(pre_hooks) == 0, (
+        f"register_forward_pre_hook was still used "
+        f"({len(pre_hooks)} hooks) under via_monkey_patch=True; the "
+        "§11.3 row-2 optimization is silently disabled."
+    )
+    assert post_hooks is None or len(post_hooks) == 0, (
+        f"register_forward_hook was still used ({len(post_hooks)} "
+        "hooks) under via_monkey_patch=True."
+    )
+
+    # And the work still happens: side-channel fires + counter ticks.
+    input_ids = torch.zeros((3,), dtype=torch.long)
+    positions = torch.zeros((3,), dtype=torch.long)
+    model(input_ids, positions, None, FakeMeta())
+
+    assert evictor._phase4_side_channel_pre_hook_calls == 1
+    assert evictor._phase4_side_channel_metadata_found == 1
+    # Post-hook clears state; pending_slot_mapping should be None after.
+    assert evictor._phase4_pending_slot_mapping is None
+
+
+def test_pre_rope_capture_via_monkey_patch_skips_pre_hooks():
+    """``install_pre_rope_capture(via_monkey_patch=True)`` must not
+    register a pre-hook on the rotary_emb module. Same regression
+    shape as the side-channel test."""
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import install_pre_rope_capture
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.rotary_emb = RotaryEmb()
+
+        def forward(self, x):
+            return x
+
+    evictor = CTMEvictorModern(num_blocks_capacity=64, block_size=16)
+    model = FakeModel()
+    n = install_pre_rope_capture(
+        model=model, evictor=evictor,
+        num_layers=1, capture_every_n=1,
+        via_monkey_patch=True,
+    )
+    assert n == 1
+
+    rotary_pre = getattr(model.rotary_emb, "_forward_pre_hooks", None)
+    assert rotary_pre is None or len(rotary_pre) == 0, (
+        f"rotary_emb.register_forward_pre_hook was still used "
+        f"({len(rotary_pre)} hooks) under via_monkey_patch=True."
+    )
+
+    # And calling rotary_emb directly still ticks the rotary-fire
+    # counter (the capture happens inside the patched forward, not
+    # via the dispatcher).
+    positions = torch.zeros((3,), dtype=torch.long)
+    q = torch.zeros((3, 8))
+    k = torch.zeros((3, 8))
+    model.rotary_emb(positions, q, k)
+    assert evictor._phase4_rotary_pre_hook_calls == 1
+
+
+# --------------------------------------------------------------------- #
 # Bug 6 — window pruning integration with the runner
 # --------------------------------------------------------------------- #
 
@@ -600,6 +728,86 @@ def test_bug7_phase4_picks_different_victim_than_phase2_under_meaningful_trig():
         f"{min(scores.values())}. Pruning isn't ordered by trig "
         "score — Phase 4's mechanism is broken."
     )
+
+
+# --------------------------------------------------------------------- #
+# Cython port — external attribute-set contract
+#
+# Bug surfaced on the v9 GPU run: ``CTMEvictorModernC`` is a ``cdef
+# class`` and cannot accept attributes that weren't declared at class
+# level, but ``triattention.install_pre_rope_capture`` and
+# ``install_attn_metadata_side_channel`` set ~10 ``_phase4_*`` counters
+# directly on the evictor via ``getattr(...)+1`` and ``setattr``. The
+# previous CPU-side fixture exercised only the side-channel pair (lines
+# 374-419 of this file) and was gated behind ``pytest.importorskip
+# ("torch")``, so CPU CI missed every other attribute on the surface
+# until the GPU run threw AttributeError mid-decode.
+#
+# This regression test enumerates the full set explicitly so any
+# future cdef class refactor that drops one fails locally at $0 GPU.
+# --------------------------------------------------------------------- #
+
+
+# Authoritative list of every ``_phase4_*`` attribute that
+# ``kv_policy.triattention``'s install_* hooks write to the evictor
+# object from outside. Grep for ``evictor._phase4_`` in triattention.py
+# before changing this list — adding a new write site without adding
+# the name here is exactly the bug pattern this regression catches.
+_EVICTOR_EXTERNAL_PHASE4_COUNTERS = (
+    "_phase4_rotary_pre_hook_calls",
+    "_phase4_capture_subsample_skips",
+    "_phase4_capture_exceptions",
+    "_phase4_capture_attempts",
+    "_phase4_capture_aborts_no_slot_mapping",
+    "_phase4_capture_aborts_no_decode_tokens",
+    "_phase4_side_channel_pre_hook_calls",
+    "_phase4_side_channel_metadata_missing",
+    "_phase4_side_channel_metadata_found",
+)
+
+_EVICTOR_EXTERNAL_PHASE4_OBJECTS = (
+    ("_phase4_handles", []),
+    ("_phase4_pending_slot_mapping", object()),
+    ("_phase4_pending_num_decode_tokens", 3),
+)
+
+
+def test_phase4_external_attr_writes_succeed_on_cdef_class():
+    """Every attribute the triattention install_* hooks set on the
+    evictor from outside must be settable on the parametrised class.
+    Failure mode caught: cdef class without the slot declared raises
+    AttributeError mid-decode, killing the engine.
+
+    This test is the CPU-side closer for the v9 audit-pass finding —
+    same "single-call mocks pin the per-call API but miss the
+    cross-module attribute-set contract" pattern as the original
+    seven bugs.
+    """
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    evictor = CTMEvictorModern(num_blocks_capacity=8, block_size=16)
+
+    # Counter pattern from triattention: getattr default 0, then write.
+    for name in _EVICTOR_EXTERNAL_PHASE4_COUNTERS:
+        # Initial read with default — must not raise (matches the
+        # getattr(..., 0) in triattention.py).
+        before = getattr(evictor, name, 0)
+        assert isinstance(before, int)
+        # The write — this is the AttributeError trigger on an
+        # under-declared cdef class.
+        setattr(evictor, name, before + 1)
+        # Read-back must hit the same slot, not a stale __dict__ entry.
+        assert getattr(evictor, name) == before + 1, (
+            f"attribute {name} did not round-trip on "
+            f"{type(evictor).__name__}; cdef public slot likely missing."
+        )
+
+    for name, value in _EVICTOR_EXTERNAL_PHASE4_OBJECTS:
+        setattr(evictor, name, value)
+        assert getattr(evictor, name) is value, (
+            f"attribute {name} did not round-trip as object on "
+            f"{type(evictor).__name__}; cdef public slot likely missing."
+        )
 
 
 # --------------------------------------------------------------------- #

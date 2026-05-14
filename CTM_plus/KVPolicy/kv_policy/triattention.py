@@ -681,6 +681,73 @@ def window_pruning_decision(
 # --------------------------------------------------------------------- #
 
 
+def _wrap_module_forward(
+    module: Any,
+    *,
+    before: Optional[Any] = None,
+    after: Optional[Any] = None,
+    teardown_list: Optional[list] = None,
+) -> None:
+    """Replace ``module.forward`` so it inline-fires ``before`` and
+    ``after`` callables around the original implementation.
+
+    This is the §11.3 row-2 alternative to ``register_forward_pre_hook``:
+    the torch dispatcher's ``_call_impl`` walks ``_forward_pre_hooks``
+    on every forward, paying per-call overhead even when the hook
+    body is cheap. When ``_forward_pre_hooks`` stays empty (because
+    we patched ``forward`` directly), ``_call_impl`` takes its
+    fast-path and our work is done inline inside ``forward`` itself.
+
+    Composition: every wrap captures the CURRENT ``forward`` (which
+    may already be a previous wrap). So calling this twice on the
+    same module stacks the wrappers correctly, with the second one
+    firing first. Teardown reverts in LIFO order via
+    ``teardown_list``.
+
+    Signatures:
+
+    * ``before(module, args, kwargs)`` — called before the original.
+      Matches the kwargs-aware ``register_forward_pre_hook
+      (with_kwargs=True)`` shape; pass it args as a tuple even when
+      forward was called positionally.
+    * ``after(module, args, kwargs, output)`` — called after the
+      original returns. The result is forwarded to the caller
+      unmodified.
+
+    ``before`` / ``after`` exceptions are swallowed (logged via the
+    module-level logger) so a faulty hook doesn't crash the engine
+    mid-decode. Matches the silent-tolerance posture of
+    ``_capture_pre_rope_k_to_evictor``.
+    """
+    original_forward = module.forward
+
+    def wrapped_forward(*args, **kwargs):
+        if before is not None:
+            try:
+                before(module, args, kwargs)
+            except Exception:
+                logger.exception(
+                    "monkey-patched before-hook raised on %s; continuing",
+                    type(module).__name__,
+                )
+        result = original_forward(*args, **kwargs)
+        if after is not None:
+            try:
+                after(module, args, kwargs, result)
+            except Exception:
+                logger.exception(
+                    "monkey-patched after-hook raised on %s; continuing",
+                    type(module).__name__,
+                )
+        return result
+
+    module.forward = wrapped_forward
+    if teardown_list is not None:
+        teardown_list.append(
+            lambda: setattr(module, "forward", original_forward)
+        )
+
+
 def _walk_rotary_emb_modules(model: Any):
     """Yield (layer_index, rotary_emb_module) pairs for every
     rotary positional-embedding module in the model.
@@ -1053,6 +1120,7 @@ def install_pre_rope_capture(
     enable_logging: bool = False,
     num_layers: Optional[int] = None,
     capture_every_n: int = 1,
+    via_monkey_patch: bool = False,
 ) -> int:
     """Install runtime hooks that capture pre-RoPE K vectors per
     block and push them to the evictor.
@@ -1152,14 +1220,23 @@ def install_pre_rope_capture(
         def reset_layer_counter(module, args, kwargs=None):
             layer_counter[0] = 0
 
-        h_reset = model.register_forward_pre_hook(
-            reset_layer_counter, with_kwargs=True,
-        )
         existing = getattr(evictor, "_phase4_handles", None)
         if existing is None:
             existing = []
             evictor._phase4_handles = existing
-        existing.append(h_reset)
+
+        if via_monkey_patch:
+            # §11.3 row 2: avoid torch's _forward_pre_hooks dispatcher
+            # walk on every model.forward.
+            _wrap_module_forward(
+                model, before=reset_layer_counter,
+                teardown_list=existing,
+            )
+        else:
+            h_reset = model.register_forward_pre_hook(
+                reset_layer_counter, with_kwargs=True,
+            )
+            existing.append(h_reset)
 
     # Attempt to locate the model's KV head dim from one of the
     # attention layers. Best-effort; if we can't find it, the
@@ -1220,18 +1297,36 @@ def install_pre_rope_capture(
                     )
         return pre_hook
 
+    existing = getattr(evictor, "_phase4_handles", None)
+    if existing is None:
+        existing = []
+        evictor._phase4_handles = existing
+
     n_patched = 0
     for layer_idx, _name, module in rotary_modules:
-        module.register_forward_pre_hook(make_hook(layer_idx))
+        rotary_pre = make_hook(layer_idx)
+        if via_monkey_patch:
+            # pre_hook signature is ``(module, inputs)``; the
+            # monkey-patch wrapper's ``before`` is ``(module, args,
+            # kwargs)`` — ``args`` IS the positional inputs tuple, so
+            # we just discard kwargs (rotary_emb is positional-only).
+            _wrap_module_forward(
+                module,
+                before=lambda m, args, kwargs, _h=rotary_pre: _h(m, args),
+                teardown_list=existing,
+            )
+        else:
+            module.register_forward_pre_hook(rotary_pre)
         n_patched += 1
 
     logger.info(
         "install_pre_rope_capture: hooked %d rotary modules "
         "(num_layers=%d, indexing=%s, scoring layer=%d, head=%d, "
-        "capture_every_n=%d)",
+        "capture_every_n=%d, via_monkey_patch=%s)",
         n_patched, num_layers,
         "call-count" if use_call_count_indexing else "per-module",
         target_layer, head_for_scoring, capture_every_n,
+        via_monkey_patch,
     )
     return n_patched
 
@@ -1241,6 +1336,7 @@ def install_attn_metadata_side_channel(
     model: Any,
     evictor: Any,
     enable_logging: bool = False,
+    via_monkey_patch: bool = False,
 ) -> int:
     """Install hooks that stash ``attn_metadata.slot_mapping`` +
     ``num_decode_tokens`` on the evictor BEFORE any rotary_emb
@@ -1296,22 +1392,41 @@ def install_attn_metadata_side_channel(
         )
         return 0
 
-    h_pre = model.register_forward_pre_hook(
-        _make_attn_metadata_pre_hook(
-            evictor, name="model_forward",
-            enable_logging=enable_logging,
-        ),
-        with_kwargs=True,
-    )
-    h_post = model.register_forward_hook(
-        _make_attn_metadata_post_hook(evictor)
-    )
     existing = getattr(evictor, "_phase4_handles", None)
     if existing is None:
         existing = []
         evictor._phase4_handles = existing
-    existing.append(h_pre)
-    existing.append(h_post)
+
+    if via_monkey_patch:
+        # §11.3 row 2: replace ``model.forward`` directly so torch's
+        # ``_call_impl`` skips the ``_forward_pre_hooks`` walk on
+        # every decode step. pre_hook signature is
+        # ``(module, args, kwargs)``; post_hook is
+        # ``(module, inputs, output)``.
+        pre = _make_attn_metadata_pre_hook(
+            evictor, name="model_forward",
+            enable_logging=enable_logging,
+        )
+        post = _make_attn_metadata_post_hook(evictor)
+        _wrap_module_forward(
+            model,
+            before=pre,
+            after=lambda m, args, kwargs, output: post(m, args, output),
+            teardown_list=existing,
+        )
+    else:
+        h_pre = model.register_forward_pre_hook(
+            _make_attn_metadata_pre_hook(
+                evictor, name="model_forward",
+                enable_logging=enable_logging,
+            ),
+            with_kwargs=True,
+        )
+        h_post = model.register_forward_hook(
+            _make_attn_metadata_post_hook(evictor)
+        )
+        existing.append(h_pre)
+        existing.append(h_post)
     return 1
 
 
