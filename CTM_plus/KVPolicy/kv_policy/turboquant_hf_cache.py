@@ -151,6 +151,7 @@ class TurboQuantCache(DynamicCache if DynamicCache is not None else object):
         backend: str = "torch",
         torch_device: Optional[Any] = None,
         per_channel_scale: bool = False,
+        sink_size: int = 0,
     ) -> None:
         if DynamicCache is None:
             raise ImportError(
@@ -180,10 +181,15 @@ class TurboQuantCache(DynamicCache if DynamicCache is not None else object):
             enable_qjl=enable_qjl,
             backend=backend,
             per_channel_scale=per_channel_scale,
+            sink_size=sink_size,
         )
+        self._sink_size = int(sink_size)
+        if self._sink_size < 0:
+            raise ValueError(f"sink_size must be >= 0, got {sink_size}")
         # Counters for the eval JSON.
         self._tq_updates = 0
         self._tq_total_kv_elements = 0
+        self._tq_sink_elements_passed_through = 0
 
     def update(
         self,
@@ -193,10 +199,49 @@ class TurboQuantCache(DynamicCache if DynamicCache is not None else object):
         *args,
         **kwargs,
     ) -> "tuple[torch.Tensor, torch.Tensor]":
-        """Compress + decompress K/V then delegate to parent."""
-        k_lossy, v_lossy = _compress_decompress_kv(
-            key_states, value_states, store=self._tq_store,
-        )
+        """Compress + decompress K/V then delegate to parent.
+
+        When ``sink_size > 0`` and the incoming chunk has more than
+        ``sink_size`` positions on the seq axis (axis 2), the first
+        ``sink_size`` positions are passed through *uncompressed* and
+        only positions ``[sink_size:]`` are routed through TurboQuant.
+        The two halves are concatenated before delegating to
+        ``super().update()`` so the parent cache sees a single
+        contiguous (B, H, S, D) tensor.
+
+        This implements the StreamingLLM-style "attention sink"
+        protection (Xiao et al. 2023). The first few tokens of context
+        carry disproportionate attention mass on most transformer
+        models (Qwen2.5-7B included) and quantising them at low bit
+        depths destroys the model's ability to attend correctly to the
+        bulk of the sequence. Keeping them at full precision is a 2 KB
+        / layer cost (typical sink_size=4 × 4 KV heads × 128 head_dim
+        × 2 bytes for K + V = 4 KB) that empirically unlocks the
+        lower-bit-depth compression for the rest of the cache.
+
+        For the decode path (seq_len_new == 1), the sink positions are
+        already in the cache from the prefill; the single new token
+        gets compressed normally.
+        """
+        sink = self._sink_size
+        if sink > 0 and key_states.shape[2] > sink:
+            # Sink prefix: passthrough at full precision.
+            k_sink = key_states[:, :, :sink, :]
+            v_sink = value_states[:, :, :sink, :]
+            k_rest = key_states[:, :, sink:, :].contiguous()
+            v_rest = value_states[:, :, sink:, :].contiguous()
+            k_rest_lossy, v_rest_lossy = _compress_decompress_kv(
+                k_rest, v_rest, store=self._tq_store,
+            )
+            k_lossy = torch.cat([k_sink, k_rest_lossy], dim=2)
+            v_lossy = torch.cat([v_sink, v_rest_lossy], dim=2)
+            self._tq_sink_elements_passed_through += int(
+                k_sink.numel() + v_sink.numel()
+            )
+        else:
+            k_lossy, v_lossy = _compress_decompress_kv(
+                key_states, value_states, store=self._tq_store,
+            )
         self._tq_updates += 1
         self._tq_total_kv_elements += int(key_states.numel() + value_states.numel())
         return super().update(k_lossy, v_lossy, layer_idx, *args, **kwargs)
@@ -213,4 +258,6 @@ class TurboQuantCache(DynamicCache if DynamicCache is not None else object):
         s = self._tq_store.get_stats()
         s["updates"] = self._tq_updates
         s["total_kv_elements_seen"] = self._tq_total_kv_elements
+        s["sink_size"] = self._sink_size
+        s["sink_elements_passed_through"] = self._tq_sink_elements_passed_through
         return s

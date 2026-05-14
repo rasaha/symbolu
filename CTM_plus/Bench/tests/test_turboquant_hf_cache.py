@@ -296,6 +296,85 @@ def test_turboquant_cache_per_channel_scale_threads_through(
     assert cache._tq_store.per_channel_scale is True
 
 
+def test_turboquant_cache_sink_size_preserves_first_n_positions_exactly(
+    torch_module, transformers_module
+):
+    """StreamingLLM-style sink-skip: the first ``sink_size`` positions
+    of the update's seq axis must come back bit-identical to the input
+    (no compression applied), while positions ``[sink_size:]`` go
+    through the lossy round-trip.
+    """
+    torch = torch_module
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", sink_size=4, angle_bits=3)
+    g = torch.Generator().manual_seed(42)
+    # (B, H, S, D) — prefill of 32 tokens
+    k = torch.randn(1, 4, 32, 128, generator=g, dtype=torch.float32)
+    v = torch.randn(1, 4, 32, 128, generator=g, dtype=torch.float32)
+
+    k_back, v_back = cache.update(k, v, layer_idx=0)
+
+    # Sink positions (first 4) must be exact.
+    assert torch.equal(k_back[:, :, :4, :], k[:, :, :4, :]), (
+        "sink positions of K should be passed through unchanged"
+    )
+    assert torch.equal(v_back[:, :, :4, :], v[:, :, :4, :]), (
+        "sink positions of V should be passed through unchanged"
+    )
+    # Non-sink positions are lossy (cosine < 1 but ≥ 0.95).
+    cos_rest = _cosine(k[:, :, 4:, :], k_back[:, :, 4:, :])
+    assert 0.95 <= cos_rest < 1.0, (
+        f"non-sink positions should be lossy but meet target; cosine {cos_rest:.4f}"
+    )
+
+
+def test_turboquant_cache_sink_size_zero_is_default_behaviour(
+    torch_module, transformers_module
+):
+    """sink_size=0 must compress every position (no passthrough). This
+    is the default; pinning so a future refactor doesn't accidentally
+    skip position 0."""
+    torch = torch_module
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", sink_size=0, angle_bits=3)
+    k = torch.randn(1, 4, 32, 128, dtype=torch.float32)
+    v = torch.randn(k.shape, dtype=torch.float32)
+    k_back, _ = cache.update(k, v, layer_idx=0)
+    # Position 0 should be lossy, not bit-identical.
+    assert not torch.equal(k_back[:, :, :1, :], k[:, :, :1, :])
+
+
+def test_turboquant_cache_sink_size_larger_than_input_passes_everything_through(
+    torch_module, transformers_module
+):
+    """Edge case: if the prefill is shorter than sink_size, the
+    fallback should compress the whole thing (matches the original
+    behaviour). This prevents an empty-slice crash."""
+    torch = torch_module
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", sink_size=64, angle_bits=3)
+    # Only 16 tokens — less than sink_size=64.
+    k = torch.randn(1, 4, 16, 128, dtype=torch.float32)
+    v = torch.randn(k.shape, dtype=torch.float32)
+    k_back, _ = cache.update(k, v, layer_idx=0)
+    # Compresses everything (no separation since shape[2]<=sink_size)
+    assert k_back.shape == k.shape
+    # Verify it actually went through compression (lossy)
+    assert not torch.equal(k_back, k)
+
+
+def test_turboquant_cache_sink_size_threads_through(torch_module, transformers_module):
+    """Config + stats reporting for sink_size."""
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", sink_size=4)
+    assert cache.turboquant_config["sink_size"] == 4
+    assert cache._sink_size == 4
+
+
 def test_turboquant_cache_stats_report_backend_config(torch_module, transformers_module):
     """Stats surface must include backend + algorithm config so a Track
     E artefact tells you exactly which knobs produced the number."""

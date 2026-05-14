@@ -236,6 +236,7 @@ def _baseline_cache_factory() -> Callable[[], Any]:
 def _turboquant_cache_factory(
     *, angle_bits: int, segment_dim: int, enable_qjl: bool, backend: str,
     per_channel_scale: bool = False,
+    sink_size: int = 0,
 ) -> Callable[[], Any]:
     from kv_policy.turboquant_hf_cache import TurboQuantCache
 
@@ -246,6 +247,7 @@ def _turboquant_cache_factory(
             enable_qjl=enable_qjl,
             backend=backend,
             per_channel_scale=per_channel_scale,
+            sink_size=sink_size,
         )
     return factory
 
@@ -538,6 +540,21 @@ def main(argv: Sequence[str]) -> int:
             "Adds 2 KB of scale storage per K (or V) block (~6%% overhead)."
         ),
     )
+    parser.add_argument(
+        "--sink-size", type=int, default=0,
+        help=(
+            "StreamingLLM-style attention-sink passthrough: keep the "
+            "first N positions of context at full precision; compress "
+            "only positions [N:]. Targets the position-outlier failure "
+            "mode where the first 1-4 tokens carry disproportionate "
+            "attention mass and quantising them destroys generation "
+            "quality. Reasonable values: 4 (StreamingLLM default), 8, "
+            "16. Cost: ~4 KB per layer per K+V at sink_size=4 (2 bytes "
+            "* 4 sink positions * 4 KV heads * 128 head_dim * 2 for K+V); "
+            "negligible against the model's tens-of-GB weights. Default "
+            "0 means no sink-skip."
+        ),
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -619,6 +636,7 @@ def main(argv: Sequence[str]) -> int:
         enable_qjl=enable_qjl,
         backend=args.turboquant_backend,
         per_channel_scale=args.per_channel_scale,
+        sink_size=args.sink_size,
     )
 
     summary = TrackESummary(
@@ -631,6 +649,7 @@ def main(argv: Sequence[str]) -> int:
             enable_qjl=enable_qjl,
             backend=args.turboquant_backend,
             per_channel_scale=args.per_channel_scale,
+            sink_size=args.sink_size,
         ),
     )
 
