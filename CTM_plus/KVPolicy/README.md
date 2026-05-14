@@ -75,3 +75,43 @@ A thin adapter would wrap `KVCachePolicy.select_victims()` to return
 
 `kv_cache_simulator.py` provides a standalone cache simulator with
 LRU/FIFO/Random baselines and realistic LLM attention workloads.
+
+## Optional C extension (`kv_policy._ctm_evictor`)
+
+`CTMEvictorModern` has a Cython drop-in (`CTMEvictorModernC`)
+backed by `_ctm_evictor.pyx`. It exists to close the per-call
+Python-dispatch overhead the May 2026 GPU profiling identified in
+`PHASE4_GPU_FINDINGS.md` §11. Semantically identical to the Python
+class; selected at runtime via `--phase4-cython-evictor` in the
+streaming runner.
+
+**Build:**
+
+```bash
+cd CTM_plus/KVPolicy
+python3 setup.py build_ext --inplace
+# Verify:
+python3 -c "from kv_policy._ctm_evictor import CTMEvictorModernC; print('ok')"
+```
+
+The `.so` lands next to the `.pyx`. With `setup.py build_ext
+--inplace` (or `pip install -e .[ext]`) the runtime picks up the
+compiled extension automatically. When the `.so` is absent
+`CTMEvictorModernC` aliases to `CTMEvictorModern` — public API
+stays stable, but the `--phase4-cython-evictor` flag becomes a
+silent no-op (the runner logs a WARNING if so).
+
+**Status:** the C port is semantically validated on real-model
+GPU (v9 cell, May 2026) — every eviction outcome bit-identical to
+the Python class. Throughput recovery from the port alone measured
+at 0pp; the integration tax lives outside the leaf evictor.
+See `Bench/bench_out/PHASE4_GPU_FINDINGS.md` §12.6 for the full
+write-up.
+
+**Regression tests:** `Bench/tests/test_vllm_protocol_fixture.py`
+parametrizes every protocol test over both `[py]` and `[c]`
+variants. An additional test
+(`test_phase4_external_attr_writes_succeed_on_cdef_class`)
+pins the authoritative list of `_phase4_*` attributes the
+`triattention` install hooks set externally — adding a new write
+site without updating that list will fail locally at $0 GPU.

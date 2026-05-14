@@ -1443,6 +1443,23 @@ def patch_vllm_engine_modern(
     if block_size is None:
         block_size = getattr(gpu_allocator, "block_size", 16)
 
+    # UX guard: when the caller asks for the Cython variant but the
+    # compiled extension wasn't built, ``CTMEvictorModernC`` is aliased
+    # to ``CTMEvictorModern`` (see top-of-file fallback). Silently
+    # picking the Python class then would waste a partner-facing GPU
+    # cell — log loudly so the operator sees the fallback in real time
+    # and can rebuild before retrying. This is the v9 PHASE4_GPU_FINDINGS
+    # §12.3 lesson: silent fallbacks are the bug class that costs hours.
+    if use_cython_evictor and not _CYTHON_EVICTOR_AVAILABLE:
+        logger.warning(
+            "patch_vllm_engine_modern: use_cython_evictor=True but the "
+            "Cython extension kv_policy._ctm_evictor is not importable. "
+            "Falling back to the pure-Python CTMEvictorModern. The "
+            "throughput-tax fix this flag was meant to apply WILL NOT "
+            "be in effect for this run. Rebuild with: "
+            "`cd CTM_plus/KVPolicy && python3 setup.py build_ext --inplace`."
+        )
+
     ctm_evictor = (CTMEvictorModernC if use_cython_evictor else CTMEvictorModern)(
         num_blocks_capacity=int(num_blocks),
         block_size=int(block_size),

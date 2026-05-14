@@ -39,12 +39,36 @@ on paper" to "demonstrated on hardware."
 ## Step 1 — Phase 4 GPU validation (executed May 2026, negative result)
 
 > **STATUS UPDATE — May 2026:** Step 1 was executed end-to-end on
-> RunPod A100 + Qwen2.5-7B-Instruct + vLLM 0.7.3 over six GPU runs
-> (~$1.60 total spot). The original gate ("Phase 4 hit-rate uplift
-> over LRU ≥ +3pp") was **missed**. The full session record is
-> `bench_out/PHASE4_GPU_FINDINGS.md`; this section retains the
-> original framing for historical reference but the gate definition
-> below is now superseded — see "Corrected Step 1 gate" further down.
+> RunPod A100 + Qwen2.5-7B-Instruct + vLLM 0.7.3. **Nine GPU runs
+> total (~$2.10 spot)** across three engineering generations:
+>
+> 1. **Algorithm (v3–v6):** Phase 4 trig scoring. Mechanism dominantly
+>    active (98.7% of evict decisions); −11.1% swap_out/decode_token
+>    vs LRU. Throughput regression: −20%.
+> 2. **Optimization sequence I1–I5 (v8):** five compute-side fixes
+>    targeting trig math + capture sync. Audit estimate 12–23pp;
+>    **measured 0pp**. py-spy revealed CTM+ code is 1.1% of wall.
+> 3. **Cython port (v9):** drop-in C-extension for `CTMEvictorModern`.
+>    Audit estimate 5–10pp; **measured 0pp**. Semantically bit-identical
+>    to v8 (swap_out=1134, 0.2769/decode_token). Integration tax is
+>    located outside CTM+ code entirely.
+>
+> Remaining tractable lever queued for **v10**: monkey-patched
+> `forward` instead of `register_forward_pre_hook` (`--phase4-fast-hooks`).
+> Audit estimate 2–5pp; if also 0pp, Phase 4 throughput closes as a
+> durable structural negative.
+>
+> The original gate ("Phase 4 hit-rate uplift over LRU ≥ +3pp") was
+> **missed** — and the corrected gate below was itself overtaken by
+> the engineering arc. The current canonical decision tree is
+> `bench_out/PHASE4_GPU_FINDINGS.md` §13.2 (v10 pre-committed
+> interpretation). Read `PHASE4_GPU_FINDINGS.md` §1 (TL;DR), §12.6
+> (v9), §13 (v10 path) before citing any Step 1 claim to a partner.
+>
+> Net of throughput negatives: the **algorithm-quality result**
+> (−11.1% swap_out per decoded token vs LRU, mechanism active in
+> 98.7% of evict decisions) is durable and reproduced across FIVE
+> distinct evictor implementations (v5/v6/v8/v9/parametrized fixture).
 
 **Goal (original):** prove that TriAttention-inspired trig scoring on real pre-RoPE Q/K
 geometry, plugged into vLLM 0.7+ via the CTM+ evictor, beats LRU on streaming

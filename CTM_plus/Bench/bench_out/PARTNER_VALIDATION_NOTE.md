@@ -3,9 +3,10 @@
 **Audience:** prospective design partner evaluating CTM+ for an
 LLM-inference deployment.
 **Status:** safe to share; conservative framing throughout.
-**Last updated:** 2026-05-08 (revised after Phase 2 audit pass +
-Phase 3 attention-forwarding scaffolding + TriAttention paper
-review + Phase 4 design).
+**Last updated:** 2026-05-14 (revised after the v9 Cython-port
+GPU validation produced 0pp throughput recovery; v10 hook-shape
+fix queued. Earlier revisions: 2026-05-08 Phase 4 design;
+2026-05-10 Phase 4 GPU validation negative result write-up.)
 
 This note states what CTM+ has and has not been validated to
 do today, why a real-stack `vLLM` validation has not yet been
@@ -123,36 +124,65 @@ look like.
   GPU validation before evaluating the trig-based
   alternative would commit to the wrong direction.
 * **Phase 4 (trigonometric position scoring) — GPU-validated
-  with negative result.** Six GPU runs on RunPod A100 + vLLM
-  0.7.3 + Qwen2.5-7B-Instruct, ~$1.60 total. **The trig
-  scoring did not beat CTM+ Phase 2 or LRU on streaming chat
-  at heavy KV pressure** — Phase 4 throughput dropped ~20%
-  with no measurable improvement in swap-out per decode token.
-  The win condition (≥+3pp hit-rate uplift over LRU) was
-  missed; the gate definition itself was structurally
-  miscalibrated (LRU and CTM+ run at different effective
-  cache pressures because the evictor patch disrupts vLLM's
-  prefix-cache promotion path).
+  with negative result; two follow-up engineering attempts also
+  negative.** Nine GPU runs on RunPod A100 + vLLM 0.7.3 +
+  Qwen2.5-7B-Instruct, ~$2.10 total spot. **The trig scoring
+  did not beat CTM+ Phase 2 or LRU on streaming chat at heavy
+  KV pressure** in throughput — Phase 4 dropped ~20% tokens/sec
+  vs LRU. *However* the algorithm produced a **−11.1%
+  swap_out / decode_token** advantage vs LRU, reproduced across
+  five distinct evictor implementations (v5 through v9). The
+  algorithm signal is real and durable; the integration overhead
+  is what costs throughput.
 
-  The session also produced **seven audit-pass findings** —
-  bugs the prior CPU mocked tests had not caught, surfaced
-  only at GPU-execution time. All seven fixed in source. A
-  new CPU fixture `tests/test_vllm_protocol_fixture.py`
-  exercises the cross-call vLLM-allocator protocol and would
-  have caught all seven at $0 in <0.2s.
+  The session produced **seven audit-pass findings** — bugs the
+  prior CPU mocked tests had not caught, surfaced only at
+  GPU-execution time — plus an 8th caught later by the GPU run
+  itself (`_phase4_handles` attribute write to a cdef class).
+  All eight fixed in source. The CPU fixture
+  `tests/test_vllm_protocol_fixture.py` now drives the
+  cross-call vLLM-allocator protocol + the external-attribute-set
+  contract, catching all eight at $0 in <0.2s.
+
+  **Two follow-up engineering attempts to recover the 20%
+  throughput gap, both already executed:**
+
+  - **I1–I5 optimization sequence (v8 cell):** five compute-side
+    optimizations targeting trig math, candidate scoring, and
+    CPU↔GPU capture sync. Audit estimate: 12–23pp recovery.
+    **Measured: 0pp.** A py-spy profile revealed why: CTM+ code
+    is only ~1.1% of wall time. The remaining 18.9% is
+    integration tax in vLLM's scheduler + torch's dispatcher.
+  - **Cython / pybind11 port of `CTMEvictorModern` (v9 cell):**
+    drop-in C-extension same Evictor ABC. Audit estimate (post
+    py-spy): 5–10pp recovery. **Measured: 0pp.** Semantically
+    bit-identical (swap_out/decode_token = 0.2769 matches v8 to
+    the bit). The estimate was over-optimistic: the upper bound
+    on porting frames that are 1.1% of wall is ~1.1pp; v9 is
+    negative-control evidence that the integration tax lives
+    *outside* CTM+ code entirely.
+
+  One remaining tractable lever queued for v10: monkey-patched
+  `forward` in place of `register_forward_pre_hook` to skip
+  torch's dispatcher hook-walk. Audit estimate: 2–5pp. If v10
+  also lands at 0pp, the Phase 4 throughput question closes as
+  a durable structural negative result.
 
   **Canonical write-up:** `bench_out/PHASE4_GPU_FINDINGS.md`
-  documents the six runs, the seven audit-pass findings, the
+  documents all nine runs, the eight audit-pass findings, the
   synthetic-Mode-A↔real-GPU reconciliation (five reasons the
-  Mode A wins don't transfer), and a corrected gate definition
-  for the next iteration. Read it before citing any Phase 4
-  claim to a partner.
+  Mode A wins don't transfer), the py-spy profile that
+  relocated the diagnosis, and the corrected gate definitions
+  including the v10 pre-committed decision tree. Read it before
+  citing any Phase 4 claim to a partner.
 
-  Implementation status, for the record: 240 Bench tests pass
-  + 8 fixture tests + 1 torch-skipped hook-ordering test (248
-  total); GPU-side hooks `calibrate_q_centers`,
-  `install_pre_rope_capture`, `install_attn_metadata_side_channel`
-  all implemented and validated through the seven repairs.
+  Implementation status, for the record: **278 Bench tests pass,
+  44 skipped, 0 failed** (CPU; torch-gated tests skip locally).
+  GPU-side hooks `calibrate_q_centers`, `install_pre_rope_capture`,
+  `install_attn_metadata_side_channel` all implemented and
+  validated through the eight repairs; both Python and Cython
+  evictor implementations parametrized across the protocol
+  fixture.
 
 * **Acknowledged related work — TriAttention.** The
   TriAttention paper (Mao et al., MIT/NVIDIA/ZJU, arXiv:
@@ -377,7 +407,9 @@ earlier stays inside the narrower per-step claims above.
 
 ```
 Repository:  github.com/rasaha/symbolu
-Branch:      claude/safety-state-machine-Rrvj2 (canonical)
+Branch:      claude/safety-state-machine-EXAlZ (canonical, supersedes
+             …-Rrvj2; carries Phase 4 GPU runs v3–v9 + Cython port +
+             hook-shape-fix scaffolding for v10)
 Mode A:      cd CTM_plus/Bench && python -m ctm_bench \
                  --tier-config hbm_hbf_nvme \
                  --output-dir bench_out/round5_hbf_stress

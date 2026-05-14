@@ -59,8 +59,21 @@ per decode token) but the wall-clock was unchanged. py-spy profile
 (§11) revealed why: **our CTM+ code is ~1.1% of wall time. The 20%
 gap is integration tax** — Python objects in vLLM scheduler hot
 paths that expect C-level performance — not algorithm complexity.
-The next throughput win is a Cython / pybind11 port of
-`CTMEvictorModern` (1-2 weeks, ~5-10pp), not more algorithm tuning.
+
+Initial post-profile prediction: a Cython port of `CTMEvictorModern`
+would recover 5–10pp. **v9 GPU validation (§12.6): also 0pp.** The
+Cython port is semantically correct (every eviction outcome
+bit-identical to v8) but the §11.3 5–10pp estimate was over-optimistic
+— if CTM+ code is 1.1% of wall, the upper bound on porting it to C
+is ~1.1pp. v9 is the negative-control evidence locating the
+integration tax *outside* CTM+ code entirely.
+
+Remaining tractable lever after v9: §11.3 row 2 — replace
+`register_forward_pre_hook` with direct monkey-patch of `module.forward`
+so torch's dispatcher takes its no-hook fast path. Code landed
+(`--phase4-fast-hooks` flag); **v10 cell pending** to test whether
+this 2–5pp estimate also misses or recovers the predicted range.
+See §13 for the pre-committed v10 decision tree.
 
 What this session **does not** invalidate: the architecture-doc 8.8×
 capacity claim (TurboQuant + CTM+ + CTXL stack) — none of those layers
@@ -655,6 +668,10 @@ python3 -m ctm_bench.scripts.read_phase4_v5 \
 
 ### Decision tree for v8 result
 
+> **POSTSCRIPT (v9 closed v8's decision tree):** v8 → "> −10%" row
+> fired, leading to v9 (Cython port) which also landed at 0pp. Current
+> live decision tree is **§13.2** (v10 outcome interpretation).
+
 | tokens/sec vs LRU | Interpretation | Next step |
 |---|---|---|
 | ≥ −5% (≥ 81 tok/s) | Phase 4 is throughput-competitive | Write up + close out |
@@ -724,6 +741,12 @@ No single fixable hotspot. The 20% is **integration tax** — the cost of patchi
 
 Now that the diagnosis is correct:
 
+> **POSTSCRIPT (post-v9):** the row-1 estimate "5–10pp from a C extension"
+> was falsified by the v9 GPU run (§12.6) — actual recovery 0pp. The
+> upper bound on porting frames that are 0.9% + 0.2% of wall is ~1.1pp
+> total. Updated estimate table lives in §12.6; the current canonical
+> next-step is §11.3 row 2 (monkey-patched `forward`), under test in v10.
+
 | Approach | Expected recovery | Effort |
 |---|---|---|
 | **Reimplement `CTMEvictorModern` as a C extension** (Cython / pybind11). Drop-in same Evictor ABC. No Python overhead for `__contains__/add/update/remove/evict`. | **5–10pp** | 1–2 weeks |
@@ -741,7 +764,7 @@ What would NOT help (despite earlier audit guesses):
 
 The algorithm is essentially free in compute. The 11% per-token swap-rate improvement vs LRU is real and durable. The 20% throughput cost is integration tax of a Python-object evictor in a hot vLLM path, not algorithm complexity.
 
-**Closing the gap is a code-shape problem (C extension port), not an algorithm problem.** That changes which engineering work to prioritise and which partner conversations are credible:
+**Initial post-profile hypothesis (since falsified by v9):** "Closing the gap is a code-shape problem (C extension port), not an algorithm problem." v9 measured the C extension at 0pp recovery — the gap is below the leaf-class layer. See §12.6 for the corrected position and §13 for the next (and probably last) tractable lever.
 
 - Credible: "We have a working KV-eviction algorithm that's measurably smarter than LRU at near-zero compute cost. Production deployment needs a C-extension drop-in for vLLM's Evictor ABC; that's ~1–2 weeks of engineering."
 - NOT credible (per pre-profile guesses): "Phase 4 is slow because of trig math; we need a CUDA kernel."
