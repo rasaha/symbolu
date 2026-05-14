@@ -61,7 +61,7 @@ def test_per_channel_quant_roundtrip_preserves_shape_and_dtype(torch_module):
     for dtype in (torch.float32, torch.float16):
         t = torch.randn(QWEN_BLOCK_SIZE, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
                         dtype=dtype)
-        q, scale = quantize_per_channel_int4(t)
+        q, scale, _ = quantize_per_channel_int4(t)
         assert q.dtype == torch.int8
         assert q.shape == t.shape
         assert scale.shape == (1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
@@ -88,7 +88,7 @@ def test_per_channel_quant_outlier_channel_resolved_at_its_scale(torch_module):
     g = torch.Generator().manual_seed(42)
     t = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
     t[:, 0, 7] *= 100.0  # outlier channel
-    q, scale = quantize_per_channel_int4(t)
+    q, scale, _ = quantize_per_channel_int4(t)
     back = dequantize_per_channel_int4(q, scale, dtype=torch.float32)
 
     per_ch_cos = torch.nn.functional.cosine_similarity(t, back, dim=0).flatten()
@@ -117,7 +117,7 @@ def test_per_token_quant_position_outlier_resolved(torch_module):
     g = torch.Generator().manual_seed(42)
     t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
     t[0, :, :] *= 100.0  # outlier position (attention sink)
-    q, scale = quantize_per_token_int4(t)
+    q, scale, _ = quantize_per_token_int4(t)
     back = dequantize_per_token_int4(q, scale, dtype=torch.float32)
 
     # Per-token cosine — same 16-level INT4 noise floor as the K test
@@ -138,7 +138,7 @@ def test_per_channel_quant_handles_dead_channels(torch_module):
     )
     t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
     t[:, 1, 5] = 0.0  # dead channel
-    q, scale = quantize_per_channel_int4(t)
+    q, scale, _ = quantize_per_channel_int4(t)
     back = dequantize_per_channel_int4(q, scale, dtype=torch.float32)
     assert not torch.isnan(back).any()
     assert not torch.isinf(back).any()
@@ -281,7 +281,7 @@ def test_group_quant_round_trip_preserves_shape(torch_module):
     v = torch.randn(80, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
 
     # K: group along seq axis, group_size=32 → 3 groups (32, 32, 16)
-    k_q, k_scale = quantize_per_channel_int4(k, group_size=32)
+    k_q, k_scale, _ = quantize_per_channel_int4(k, group_size=32)
     assert k_q.shape == k.shape
     assert k_scale.shape == (3, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM), (
         f"expected scale shape (3, H, D); got {tuple(k_scale.shape)}"
@@ -290,7 +290,7 @@ def test_group_quant_round_trip_preserves_shape(torch_module):
     assert k_back.shape == k.shape
 
     # V: group along head_dim, group_size=32 → 4 groups
-    v_q, v_scale = quantize_per_token_int4(v, group_size=32)
+    v_q, v_scale, _ = quantize_per_token_int4(v, group_size=32)
     assert v_q.shape == v.shape
     assert v_scale.shape == (80, QWEN_NUM_KV_HEADS, 4), (
         f"expected scale shape (S, H, 4); got {tuple(v_scale.shape)}"
@@ -317,13 +317,13 @@ def test_group_quant_outlier_position_resolved_better_than_plain(torch_module):
     t[:4] *= 100.0  # attention-sink-like outlier positions
 
     # Plain per-channel (one scale per (h, d), dominated by sinks)
-    q_plain, s_plain = quantize_per_channel_int4(t, group_size=0)
+    q_plain, s_plain, _ = quantize_per_channel_int4(t, group_size=0)
     back_plain = dequantize_per_channel_int4(
         q_plain, s_plain, dtype=torch.float32, group_size=0,
     )
 
     # Group quant (group_size=32 — sinks isolated to first group)
-    q_grp, s_grp = quantize_per_channel_int4(t, group_size=32)
+    q_grp, s_grp, _ = quantize_per_channel_int4(t, group_size=32)
     back_grp = dequantize_per_channel_int4(
         q_grp, s_grp, dtype=torch.float32, group_size=32,
     )
@@ -401,8 +401,8 @@ def test_group_quant_zero_group_size_is_plain_per_channel(torch_module):
     from kv_policy.int4_per_channel_kv import quantize_per_channel_int4
 
     t = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
-    q0, s0 = quantize_per_channel_int4(t, group_size=0)
-    q_default, s_default = quantize_per_channel_int4(t)
+    q0, s0, _ = quantize_per_channel_int4(t, group_size=0)
+    q_default, s_default, _ = quantize_per_channel_int4(t)
     assert torch.equal(q0, q_default)
     assert torch.equal(s0, s_default)
     assert s0.shape == (1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
@@ -417,7 +417,7 @@ def test_group_quant_handles_non_divisible_seq_length(torch_module):
     )
     g = torch.Generator().manual_seed(42)
     t = torch.randn(80, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
-    q, scale = quantize_per_channel_int4(t, group_size=32)
+    q, scale, _ = quantize_per_channel_int4(t, group_size=32)
     assert scale.shape == (3, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
     back = dequantize_per_channel_int4(q, scale, dtype=t.dtype, group_size=32)
     assert back.shape == t.shape
@@ -426,6 +426,134 @@ def test_group_quant_handles_non_divisible_seq_length(torch_module):
         t[64:].flatten(), back[64:].flatten(), dim=0,
     ).item()
     assert cos_last >= 0.98
+
+
+# --------------------------------------------------------------------- #
+# Asymmetric quantization (KIVI's actual config)                        #
+# --------------------------------------------------------------------- #
+
+
+def test_asymmetric_quant_round_trip_preserves_shape_and_dtype(torch_module):
+    """Asymmetric INT4 quantize+dequantize preserves shape and dtype
+    just like the symmetric path. Verifies the offset-bearing 3-tuple
+    works end-to-end."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+        quantize_per_token_int4, dequantize_per_token_int4,
+    )
+    for dtype in (torch.float32, torch.float16):
+        t = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, dtype=dtype)
+
+        q_k, scale_k, offset_k = quantize_per_channel_int4(t, asymmetric=True)
+        assert offset_k is not None
+        assert offset_k.shape == scale_k.shape
+        back_k = dequantize_per_channel_int4(q_k, scale_k, dtype=dtype, offset=offset_k)
+        assert back_k.shape == t.shape and back_k.dtype == dtype
+
+        q_v, scale_v, offset_v = quantize_per_token_int4(t, asymmetric=True)
+        assert offset_v is not None
+        assert offset_v.shape == scale_v.shape
+        back_v = dequantize_per_token_int4(q_v, scale_v, dtype=dtype, offset=offset_v)
+        assert back_v.shape == t.shape and back_v.dtype == dtype
+
+
+def test_asymmetric_beats_symmetric_on_asymmetric_distribution(torch_module):
+    """The motivation for asymmetric: data not centred on zero. We
+    construct a synthetic distribution skewed positive (e.g.
+    exponential-like). Asymmetric INT4 should reconstruct it
+    measurably better than symmetric INT4 because it uses all 16 bins
+    on [min, max] rather than wasting 8 of them on the unused negative
+    range.
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+    )
+    g = torch.Generator().manual_seed(42)
+    # Skewed input: half-normal + small constant offset. All positive.
+    t = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g).abs() + 0.1
+
+    q_sym, scale_sym, _ = quantize_per_channel_int4(t, asymmetric=False)
+    back_sym = dequantize_per_channel_int4(q_sym, scale_sym, dtype=torch.float32)
+    cos_sym = _cosine(t, back_sym)
+
+    q_asym, scale_asym, offset_asym = quantize_per_channel_int4(t, asymmetric=True)
+    back_asym = dequantize_per_channel_int4(
+        q_asym, scale_asym, dtype=torch.float32, offset=offset_asym,
+    )
+    cos_asym = _cosine(t, back_asym)
+
+    # Cosine deltas are small in the near-1 regime; compare
+    # reconstruction error (1 - cosine) which is more sensitive.
+    # Asymmetric should give ≥ 2× lower error on asymmetric input.
+    err_sym = 1.0 - cos_sym
+    err_asym = 1.0 - cos_asym
+    assert err_asym <= err_sym / 2.0, (
+        f"asymmetric quant should give ≤ 1/2 the reconstruction error of "
+        f"symmetric on asymmetric input; "
+        f"symmetric cos={cos_sym:.4f} (err {err_sym:.4f}), "
+        f"asymmetric cos={cos_asym:.4f} (err {err_asym:.4f})"
+    )
+
+
+def test_asymmetric_group_quant_round_trip(torch_module):
+    """Asymmetric + group quantization combo (KIVI's actual config).
+    Round-trip must preserve shape + offset must be shape-compatible
+    with the grouped scale."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+    )
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(80, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+
+    q, scale, offset = quantize_per_channel_int4(t, group_size=32, asymmetric=True)
+    # With S=80, group=32 → 3 groups (32, 32, 16)
+    assert scale.shape == (3, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    assert offset is not None and offset.shape == scale.shape
+
+    back = dequantize_per_channel_int4(
+        q, scale, dtype=torch.float32, group_size=32, offset=offset,
+    )
+    assert back.shape == t.shape
+    # Quality should be high — every group resolves its own [min, max]
+    cos = _cosine(t, back)
+    assert cos >= 0.99, f"asymmetric + group cosine {cos:.4f} below 0.99"
+
+
+def test_asymmetric_kvstore_end_to_end(torch_module, transformers_module):
+    """Asymmetric INT4 routed through the kvstore + HF cache wrapper.
+    Stats must surface asymmetric=True."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(
+        k_group_size=32, v_group_size=32, asymmetric=True,
+    )
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, dtype=torch.float32)
+    v = torch.randn(k.shape, dtype=torch.float32)
+    store.write_block(0, k, v)
+    k_back, v_back = store.read_block(0)
+    cos_k = _cosine(k, k_back)
+    cos_v = _cosine(v, v_back)
+    assert cos_k >= 0.99, f"asymmetric K cosine {cos_k:.4f} below 0.99"
+    assert cos_v >= 0.99, f"asymmetric V cosine {cos_v:.4f} below 0.99"
+
+    stats = store.get_stats()
+    assert stats["asymmetric"] is True
+    # Compression ratio with asymmetric overhead is slightly lower
+    # than symmetric (extra FP16 offset per scale).
+    assert 5.0 <= stats["compression_ratio"] <= 9.0
+
+
+def test_asymmetric_threads_through_hf_cache(torch_module, transformers_module):
+    """HF cache wrapper plumbs asymmetric kwarg to the kvstore."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    cache = INT4PerChannelCache(asymmetric=True, k_group_size=32, v_group_size=32)
+    cfg = cache.int4_config
+    assert cfg["asymmetric"] is True
+    assert "asymmetric" in cfg["scheme"]
 
 
 def test_int4_per_channel_beats_polar_quant_on_outlier_channel_data(torch_module):
@@ -441,7 +569,7 @@ def test_int4_per_channel_beats_polar_quant_on_outlier_channel_data(torch_module
     g = torch.Generator().manual_seed(42)
     t = torch.randn(16, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
     t[:, 0, 7] *= 100.0
-    q, scale = quantize_per_channel_int4(t)
+    q, scale, _ = quantize_per_channel_int4(t)
     back = dequantize_per_channel_int4(q, scale, dtype=torch.float32)
     per_ch = torch.nn.functional.cosine_similarity(t, back, dim=0).flatten()
     min_int4 = per_ch.min().item()

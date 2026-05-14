@@ -336,6 +336,45 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 | 1.05–1.5 | Helps but not full quality. | Try INT4 + group quantization (see §5d). |
 | > 2 | Unexpected — KIVI's published numbers on Qwen-family are within 1.02×. | Investigate; likely an implementation bug. |
 
+## 5e. INT4 + group + asymmetric (full KIVI config)
+
+Symmetric INT4 wastes ~half its 16 bins when the distribution is not
+centred on zero — and real K-after-RoPE typically isn't. KIVI's
+published quality numbers use **asymmetric** (affine) quantization:
+maps [x_min, x_max] → [−8, +7] with all 16 bins effectively used.
+One extra FP16 offset per scale (~6% extra storage).
+
+CPU smoke test on asymmetric synthetic data: asymmetric reduces
+reconstruction error by ≥ 2× vs symmetric at the same bit depth.
+
+Re-run cost: ~5 min, ~$0.07.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int4_grp32_asym
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --quant int4-per-channel \
+    --k-group-size 32 \
+    --v-group-size 32 \
+    --asymmetric-int4 \
+    --output-dir /tmp/track_e_int4_grp32_asym/ 2>&1 | tee /tmp/track_e_int4_grp32_asym/run.log
+```
+
+**Decision tree**:
+
+| Ratio | Interpretation |
+|---|---|
+| ≤ 1.05 | ✅ **Partner-shareable. Ship.** Full KIVI config working on Qwen2.5-7B. |
+| 1.05–1.15 | YELLOW — run MMLU to see if accuracy is acceptable. |
+| > 1.20 | KIVI config not enough; investigate INT5 or pause. |
+
 ## 5d. INT4 per-channel + group quantization (KIVI proper, group_size=32)
 
 Plain `--quant int4-per-channel` uses one scale per (head, head_dim)

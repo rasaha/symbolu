@@ -254,6 +254,7 @@ def _turboquant_cache_factory(
 
 def _int4_per_channel_cache_factory(
     *, sink_size: int = 0, k_group_size: int = 0, v_group_size: int = 0,
+    asymmetric: bool = False,
 ) -> Callable[[], Any]:
     from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
 
@@ -262,6 +263,7 @@ def _int4_per_channel_cache_factory(
             sink_size=sink_size,
             k_group_size=k_group_size,
             v_group_size=v_group_size,
+            asymmetric=asymmetric,
         )
     return factory
 
@@ -580,6 +582,19 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--asymmetric-int4", action="store_true",
+        help=(
+            "Use asymmetric (affine) INT4 quantization with scale + "
+            "zero-point/offset. Maps [x_min, x_max] → [-8, +7] using "
+            "all 16 bins. Symmetric (default) uses max(|x|)/7, "
+            "wasting bins for asymmetric distributions. Real K-after-"
+            "RoPE is typically not centred on zero — asymmetric is "
+            "what KIVI's published quality numbers use. Adds one FP16 "
+            "offset per scale (~6%% storage overhead). Recommended "
+            "with --quant int4-per-channel; ignored otherwise."
+        ),
+    )
+    parser.add_argument(
         "--per-channel-scale", action="store_true",
         help=(
             "KIVI-style per-channel pre-quantisation normalisation: "
@@ -704,13 +719,16 @@ def main(argv: Sequence[str]) -> int:
             sink_size=args.sink_size,
             k_group_size=args.k_group_size,
             v_group_size=args.v_group_size,
+            asymmetric=args.asymmetric_int4,
         )
         config_dict = dict(
             quant="int4-per-channel",
             sink_size=args.sink_size,
             k_group_size=args.k_group_size,
             v_group_size=args.v_group_size,
-            scheme="K=per-channel INT4, V=per-token INT4",
+            asymmetric=args.asymmetric_int4,
+            scheme="K=per-channel INT4, V=per-token INT4"
+                   + (", asymmetric" if args.asymmetric_int4 else ", symmetric"),
         )
     else:
         raise SystemExit(f"unknown --quant {args.quant!r}")

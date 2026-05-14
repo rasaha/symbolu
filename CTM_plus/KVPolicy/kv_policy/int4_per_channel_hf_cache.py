@@ -89,6 +89,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         sink_size: int = 0,
         k_group_size: int = 0,
         v_group_size: int = 0,
+        asymmetric: bool = False,
     ) -> None:
         if DynamicCache is None:
             raise ImportError(
@@ -102,13 +103,15 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             torch_device=torch_device,
             k_group_size=k_group_size,
             v_group_size=v_group_size,
+            asymmetric=asymmetric,
         )
         self._cfg = dict(
             torch_device=str(torch_device),
             sink_size=int(sink_size),
             k_group_size=int(k_group_size),
             v_group_size=int(v_group_size),
-            scheme="int4_per_channel_k_per_token_v",
+            asymmetric=bool(asymmetric),
+            scheme="int4_per_channel_k_per_token_v" + ("_asymmetric" if asymmetric else "_symmetric"),
         )
         self._sink_size = int(sink_size)
         if self._sink_size < 0:
