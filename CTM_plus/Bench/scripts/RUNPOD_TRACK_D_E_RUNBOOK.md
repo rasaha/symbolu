@@ -15,13 +15,13 @@ publication. Pin the dry-run-passing commit before running on GPU.
 
 | Knob | Value | Why |
 |---|---|---|
-| GPU | A100 80 GB | Fits Qwen2.5-7B FP16 (~14 GB) plus KV cache + headroom |
+| GPU | **A100 40 GB** (sufficient) or A100 80 GB / H100 | Qwen2.5-7B FP16 = 14 GB weights + ~7 MB KV cache per question. 40 GB has ample headroom for the default 200-question MMLU. Upgrade to 80 GB only if you bump `--mmlu-num-questions` to 1000+ and want extra margin. |
 | RAM | ≥ 32 GB | Tokenizer + datasets + Python overhead |
 | Disk | ≥ 50 GB | ~14 GB model weights + ~5 GB caches |
 | Image | `runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04` (or any image with CUDA + torch ≥ 2.0) | |
-| Pricing | Spot (~$1.20/hr) | This run is interruption-tolerant |
+| Pricing | Spot (A100 40 GB ~$0.80/hr, A100 80 GB ~$1.20/hr) | This run is interruption-tolerant |
 
-If A100 80 GB isn't available, an A100 40 GB or H100 also work; H100 is faster per dollar but harder to spot.
+A100 40 GB is the cost-optimal pick. H100 is fastest per dollar in absolute terms but harder to spot. A6000 48 GB also works.
 
 ---
 
@@ -39,7 +39,10 @@ git checkout claude/safety-state-machine-continued-Lr6oT
 git log --oneline -1
 
 pip install --upgrade pip
-pip install transformers accelerate datasets huggingface_hub
+# transformers >= 5.0 is REQUIRED — the scripts use the DynamicCache.layers[i].keys
+# 5.x API. The version check will hard-fail in dry-run if the pod ships
+# transformers 4.x, so a stale image upgrades automatically here.
+pip install --upgrade 'transformers>=5.0' accelerate datasets huggingface_hub
 
 # HF model auth (Qwen models are gated only for some variants; the
 # 7B-Instruct usually doesn't require a token, but set one if your
@@ -48,14 +51,21 @@ pip install transformers accelerate datasets huggingface_hub
 # OR:
 # export HF_TOKEN=hf_xxx
 
-# Sanity: tooling installed
-python -c "import torch, transformers; print('torch', torch.__version__, '/ transformers', transformers.__version__); print('CUDA available:', torch.cuda.is_available())"
+# Sanity: tooling installed, versions match
+python -c "
+import torch, transformers
+print('torch', torch.__version__, '/ transformers', transformers.__version__)
+print('CUDA available:', torch.cuda.is_available())
+assert int(transformers.__version__.split('.')[0]) >= 5, 'transformers >= 5.0 required'
+print('Version gate: OK')
+"
 ```
 
 Expected output:
 ```
 torch 2.x.x / transformers 5.x.x
 CUDA available: True
+Version gate: OK
 ```
 
 ---
@@ -276,6 +286,31 @@ Cost summary for this run: actual spend / wall time.
 * **Track E hangs on first MMLU question:** `--device auto` may have placed weights on CPU. Force `--device cuda`.
 
 ---
+
+## Scope note — what Tracks D and E actually compress
+
+Two compression scopes appear in the documentation; they're related
+but not identical.
+
+| Where | Compression scope | Cosine number |
+|---|---|---|
+| `PHASE4_GPU_FINDINGS.md` §14.2 | One vLLM-style 16-token block: `(16, 4, 128)` per K and V | 0.964 (synthetic Gaussian) |
+| `PHASE4_GPU_FINDINGS.md` §15.2 | Same as §14.2 — single 16-token block | 0.964–0.965 (cross-impl) |
+| **Track D (this runbook)** | Same as §14.2 — script slices a 16-token block out of the prefill before compressing | comparable apples-to-apples to §14.2 |
+| **Track E (this runbook)** | The **entire prefill** as one block. K is `(1, num_kv_heads, prefill_len, head_dim)` — typically 50–250 tokens. The kvstore treats the flattened tensor as one input. | should be similar to Track D (PolarQuant is segment-local at 128 elements, oblivious to block boundaries) but *measures a different scope* |
+
+The Track E cosine is implicit (not reported as a number — what's
+reported is the downstream MMLU / perplexity impact). If you want a
+direct Track-E-scope cosine number for comparison to §14.2, run Track
+D with `--block-size 100` and a long prompt.
+
+This distinction matters for partner conversations: §14.2's "3.58×
+compression at 0.965 cosine" applies to the production block-aligned
+case. Track E's quality numbers apply to whole-prefill compression,
+which is what a `cache_kv` hook would actually do at prefill time. A
+production deployment with the route-A hook installed (next-session
+work) would see the §14.2 per-block compression on decode tokens
+specifically.
 
 ## What's deferred to a later session
 

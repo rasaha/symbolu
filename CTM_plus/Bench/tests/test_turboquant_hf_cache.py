@@ -161,6 +161,45 @@ def test_turboquant_cache_multilayer_independent(torch_module, transformers_modu
     assert stats["compression_ratio"] >= 5.0
 
 
+def test_choice_token_ids_returns_lists_per_letter():
+    """Bug-1 regression: ``_choice_token_ids`` must return a list of
+    candidate token ids per letter (not a single id), to cover both
+    'A' and ' A' tokenizer variants. A tokenizer that produces
+    different ids for the two variants must be reflected in the
+    returned mapping; one that collapses them must produce a list of
+    length one.
+    """
+    from ctm_bench.scripts.track_e_quality_eval import _choice_token_ids
+
+    class _DistinctSpaceTok:
+        """Tokenizer where 'A' and ' A' tokenize to different ids."""
+        def encode(self, text, add_special_tokens=False, **kwargs):
+            # Map "A"/"B"/"C"/"D" → 0/1/2/3; " A"/" B"/... → 100/101/...
+            if text.startswith(" "):
+                return [100 + (ord(text[-1]) - ord("A"))]
+            return [ord(text[-1]) - ord("A")]
+
+    class _MergedSpaceTok:
+        """Tokenizer where 'A' and ' A' collapse to the same id."""
+        def encode(self, text, add_special_tokens=False, **kwargs):
+            return [50 + (ord(text[-1]) - ord("A"))]
+
+    distinct = _choice_token_ids(_DistinctSpaceTok())
+    for letter, expected_ids in [("A", {0, 100}), ("B", {1, 101}),
+                                  ("C", {2, 102}), ("D", {3, 103})]:
+        assert set(distinct[letter]) == expected_ids, (
+            f"Distinct-space tokenizer: expected both variants for "
+            f"{letter}, got {distinct[letter]}"
+        )
+
+    merged = _choice_token_ids(_MergedSpaceTok())
+    for letter, expected_id in [("A", 50), ("B", 51), ("C", 52), ("D", 53)]:
+        assert merged[letter] == [expected_id], (
+            f"Merged-space tokenizer: expected single id for {letter}, "
+            f"got {merged[letter]}"
+        )
+
+
 def test_turboquant_cache_stats_report_backend_config(torch_module, transformers_module):
     """Stats surface must include backend + algorithm config so a Track
     E artefact tells you exactly which knobs produced the number."""

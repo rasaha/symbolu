@@ -16,15 +16,15 @@
       "cache_type": "baseline",
       "text_chars": 1411,
       "text_tokens": 1411,
-      "perplexity": 237.82139411504997,
-      "nll_per_token": 5.471519947052002
+      "perplexity": 250.26564314974988,
+      "nll_per_token": 5.522522926330566
     },
     {
       "cache_type": "turboquant",
       "text_chars": 1411,
       "text_tokens": 1411,
-      "perplexity": 237.82139411504997,
-      "nll_per_token": 5.471519947052002
+      "perplexity": 250.26564314974988,
+      "nll_per_token": 5.522522926330566
     }
   ],
   "mmlu": [

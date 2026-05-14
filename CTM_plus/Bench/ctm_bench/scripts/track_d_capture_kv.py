@@ -60,6 +60,30 @@ _add_kv_policy_to_path()
 LOG = logging.getLogger("track_d")
 
 
+def _check_transformers_version() -> None:
+    """Hard-fail early if transformers < 5.0.
+
+    Track D reads ``past_key_values.layers[li].keys`` which is the 5.x
+    cache layer surface. On 4.x ``past_key_values`` is a tuple of
+    ``(K, V)`` per layer; the script's ``hasattr(past, "layers")``
+    fallback handles that, BUT the rest of the route-B integration
+    (TurboQuantCache(DynamicCache) in Track E) hard-requires 5.x. To
+    keep the two scripts in lockstep, we hard-fail on 4.x in both.
+    """
+    try:
+        import transformers  # type: ignore
+    except ImportError:
+        raise SystemExit(
+            "transformers not installed. Run: pip install --upgrade 'transformers>=5.0'"
+        )
+    major = int(transformers.__version__.split(".")[0])
+    if major < 5:
+        raise SystemExit(
+            f"transformers {transformers.__version__} detected; this script "
+            f"requires >= 5.0. Run: pip install --upgrade 'transformers>=5.0'"
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Default prompts — diverse to exercise the activation-distribution variance  #
 # that real KV cache sees in production. Tuned to be ~64-128 tokens each so   #
@@ -349,11 +373,13 @@ def main(argv: Sequence[str]) -> int:
     backends = [s.strip() for s in args.backends.split(",") if s.strip()]
 
     if args.dry_run:
+        _check_transformers_version()
         LOG.info("DRY RUN: using fake Qwen-shape Gaussian KV (no HF download)")
         model = None
         tokenizer = None
         dry_run_kv = _fake_kv(target_layers, seq=64)
     else:
+        _check_transformers_version()
         LOG.info("Loading %s (dtype=%s, device=%s)", args.model, args.dtype, args.device)
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer

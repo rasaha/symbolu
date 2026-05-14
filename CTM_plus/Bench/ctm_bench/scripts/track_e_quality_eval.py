@@ -65,6 +65,30 @@ _add_kv_policy_to_path()
 LOG = logging.getLogger("track_e")
 
 
+def _check_transformers_version() -> None:
+    """Hard-fail early if transformers < 5.0.
+
+    The cache layer surface (``DynamicCache.layers[i].keys``) used by
+    Track D's capture step and the ``TurboQuantCache(DynamicCache)``
+    subclass both depend on the 5.x ``CacheLayer`` refactor. On 4.x
+    these wouldn't fail until mid-eval, after the model has loaded and
+    GPU time has been spent.
+    """
+    try:
+        import transformers  # type: ignore
+    except ImportError:
+        raise SystemExit(
+            "transformers not installed. Run: pip install --upgrade 'transformers>=5.0'"
+        )
+    major = int(transformers.__version__.split(".")[0])
+    if major < 5:
+        raise SystemExit(
+            f"transformers {transformers.__version__} detected; this script "
+            f"requires >= 5.0 for the DynamicCache.layers[i].keys API. "
+            f"Run: pip install --upgrade 'transformers>=5.0'"
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Inline dataset for perplexity                                               #
 #                                                                             #
@@ -247,16 +271,36 @@ def _format_mmlu_prompt(q: dict) -> str:
 
 
 def _choice_token_ids(tokenizer) -> dict:
-    """Map 'A','B','C','D' → leading-space token id."""
+    """Map 'A'/'B'/'C'/'D' → list of candidate token ids.
+
+    Different tokenizers split the leading space differently and the
+    model's next-token logits after ``"Answer:"`` may favour either
+    ``"A"`` (no leading space) or ``" A"`` (with leading space)
+    depending on prompt-end whitespace. We collect *both* variants per
+    letter; the scorer takes ``max`` across all candidate tokens to
+    avoid silently dropping the high-probability answer to a tokenizer
+    quirk.
+
+    Returns ``{'A': [tok_id_1, tok_id_2, ...], ...}`` — list of one or
+    two ints per letter (two if the no-space and with-space variants
+    differ, one if they collapse to the same token).
+    """
     out = {}
     for letter in "ABCD":
-        # Some tokenizers split the leading space differently; pick
-        # the last token of the encoded ' X' string, which is the
-        # actual letter token in BPE/SentencePiece.
-        ids = tokenizer.encode(f" {letter}", add_special_tokens=False)
-        if not ids:
-            raise RuntimeError(f"tokenizer produced no tokens for ' {letter}'")
-        out[letter] = ids[-1]
+        candidates = set()
+        for variant in (letter, f" {letter}"):
+            ids = tokenizer.encode(variant, add_special_tokens=False)
+            if not ids:
+                continue
+            # Last token is the letter (BPE/SentencePiece may emit a
+            # leading-space sub-token first).
+            candidates.add(int(ids[-1]))
+        if not candidates:
+            raise RuntimeError(
+                f"tokenizer produced no usable tokens for letter {letter!r}; "
+                f"both 'A' and ' A' encodings returned empty"
+            )
+        out[letter] = sorted(candidates)
     return out
 
 
@@ -276,15 +320,21 @@ def compute_mmlu_accuracy(
     for q in questions:
         prompt = _format_mmlu_prompt(q)
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        cache = cache_factory()
         with torch.no_grad():
             out = model(
                 input_ids=inputs["input_ids"],
                 use_cache=True,
-                past_key_values=cache_factory(),
+                past_key_values=cache,
             )
         next_logits = out.logits[0, -1, :]
-        scores = {letter: float(next_logits[choice_ids[letter]].item())
-                  for letter in "ABCD"}
+        # For each letter, take the max log-prob across all candidate
+        # tokens — handles "A" vs " A" tokenizer variants (see
+        # _choice_token_ids docstring).
+        scores = {
+            letter: max(float(next_logits[tid].item()) for tid in choice_ids[letter])
+            for letter in "ABCD"
+        }
         pred = max(scores, key=scores.get)
         is_correct = (pred == q["answer"])
         correct += int(is_correct)
@@ -293,6 +343,14 @@ def compute_mmlu_accuracy(
             per_subject[subj] = {"correct": 0, "total": 0}
         per_subject[subj]["correct"] += int(is_correct)
         per_subject[subj]["total"] += 1
+        # Bug 3 fix: explicit per-iteration cleanup. Each ``cache`` and
+        # ``out`` holds a few MB of GPU tensors; Python ref-counting
+        # frees them on loop end but PyTorch's caching allocator may
+        # hold the underlying buffers. ``empty_cache()`` returns them
+        # to the OS so a 200-question loop doesn't drift toward OOM.
+        del out, cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     return MMLURow(
         cache_type=cache_type,
         num_questions=len(questions),
@@ -310,16 +368,22 @@ def compute_mmlu_accuracy(
 
 def _build_fake_model(*, vocab_size: int = 200, hidden: int = 64,
                       num_kv_heads: int = 4, head_dim: int = 128,
-                      num_layers: int = 4):
+                      num_layers: int = 4, seed: int = 42):
     """Tiny fake model that exercises cache.update() in its forward
     path. Logits are deterministic-but-arbitrary (a learned linear
     projection of the embedding); attention isn't actually computed
     from the cache, which means dry-run "perplexity" and "MMLU
     accuracy" are placeholder numbers — what matters is that the
     cache.update() path is exercised end-to-end.
+
+    The ``seed`` argument pins module init so the committed dry-run
+    JSONs at ``Bench/bench_out/track_e_dryrun/`` are reproducible.
+    Without it, two ``--dry-run`` invocations produce different
+    perplexity numbers from the same input.
     """
     import torch
     import torch.nn as nn
+    torch.manual_seed(seed)
 
     class FakeLM(nn.Module):
         def __init__(self):
@@ -415,6 +479,14 @@ def main(argv: Sequence[str]) -> int:
         "--mmlu-num-questions", type=int, default=200,
         help="MMLU subset size (real run only; dry-run uses inline 5).",
     )
+    parser.add_argument(
+        "--mmlu-seed", type=int, default=2026,
+        help=(
+            "Seed for shuffling cais/mmlu before subsetting. Default "
+            "2026 so two runs report against the same questions. "
+            "Change only for std-error estimation across seeds."
+        ),
+    )
     parser.add_argument("--angle-bits", type=int, default=3)
     parser.add_argument("--segment-dim", type=int, default=128)
     parser.add_argument(
@@ -444,10 +516,14 @@ def main(argv: Sequence[str]) -> int:
     # ----- Load model -----
     if args.dry_run:
         LOG.info("DRY RUN: building fake tiny model")
+        # Still version-check so a 4.x pod fails loud in dry-run, not
+        # mid-Qwen-load 5 minutes later.
+        _check_transformers_version()
         model, tokenizer = _build_fake_model()
         model_id_for_summary = "fake-tiny-model (DRY-RUN)"
         mmlu_questions = MMLU_SAMPLE
     else:
+        _check_transformers_version()
         LOG.info("Loading %s (dtype=%s, device=%s)", args.model, args.dtype, args.device)
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -465,7 +541,13 @@ def main(argv: Sequence[str]) -> int:
             try:
                 from datasets import load_dataset
                 ds = load_dataset("cais/mmlu", "all", split="test")
-                # Take first N questions across all subjects.
+                # Bug 2 fix: ``cais/mmlu`` orders its test split by
+                # subject, so taking the first N puts all questions in
+                # one subject (typically ``abstract_algebra`` for small
+                # N). Shuffle with a fixed seed before subsetting so
+                # the sample is representative across the 57 MMLU
+                # subjects.
+                ds = ds.shuffle(seed=args.mmlu_seed)
                 mmlu_questions = []
                 for row in ds.select(range(min(args.mmlu_num_questions, len(ds)))):
                     mmlu_questions.append({
@@ -474,7 +556,12 @@ def main(argv: Sequence[str]) -> int:
                         "choices": row["choices"],
                         "answer": "ABCD"[int(row["answer"])],
                     })
-                LOG.info("Loaded %d MMLU questions from cais/mmlu", len(mmlu_questions))
+                subjects_seen = sorted({q["subject"] for q in mmlu_questions})
+                LOG.info(
+                    "Loaded %d MMLU questions from cais/mmlu across %d subjects "
+                    "(seed=%d)",
+                    len(mmlu_questions), len(subjects_seen), args.mmlu_seed,
+                )
             except Exception as exc:
                 LOG.warning(
                     "MMLU dataset load failed (%s); falling back to inline sample (5 questions)",

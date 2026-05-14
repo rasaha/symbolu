@@ -21,6 +21,21 @@ this measures is purely the *information-loss* impact of compression
 on attention output and downstream generation — exactly the question
 Track E exists to answer. Real memory savings need the
 ``cache_kv`` hook + bit-packed storage (Tier 3 work).
+
+Scope note
+----------
+
+Each HF ``DynamicCache.update()`` call passes a tensor of shape
+``(batch, num_kv_heads, seq_len_new, head_dim)`` where ``seq_len_new``
+is the entire prefill on the first call (typically 50-250 tokens for
+MMLU prompts) and 1 on each subsequent decode step. This cache wrapper
+compresses the *whole chunk* as one TurboQuant block per call. The
+§14.2 / §15.2 partner-shareable cosine numbers were measured on a
+single vLLM-style 16-token block. PolarQuant is segment-local at 128
+elements, so the per-segment math is identical — but the *scope* of
+what gets compressed in one ``write_block`` call differs. See
+``Bench/scripts/RUNPOD_TRACK_D_E_RUNBOOK.md`` § "Scope note" for the
+partner-conversation framing.
 """
 
 from __future__ import annotations
