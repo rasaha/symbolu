@@ -140,7 +140,18 @@ experimental design.
 
 ---
 
-## Step 2 — Quality measurement integrated as a 5th metric (~1 day, no GPU)
+## Step 2 — Quality measurement integrated as a 5th metric (~2–3 days CPU eng + $0.50–$3.00 GPU run)
+
+> **Sizing correction (post-Tier-2 audit, see PHASE4_GPU_FINDINGS §16):**
+> the previous "~1 day, no GPU" estimate counted only the
+> harness-scaffolding work and assumed the underlying eval would
+> piggyback on the existing streaming runner. In practice the eval has
+> to drive a real model forward pass with a chosen evictor (and, for
+> the TurboQuant variant, with a real `cache_kv` hook installed). That
+> requires either finishing Tier 2's hook install (route A in §16.2),
+> building an HF-transformers attention-hook bypass (route B), and a
+> GPU run to actually measure. CPU-only scaffolding still fits in
+> ~1 day; the *measurement* is the larger ask.
 
 **Goal:** stop reporting hit-rate alone; every cell now reports a quality
 number alongside the cache stat.
@@ -154,6 +165,15 @@ number alongside the cache stat.
    results-reading script.
 3. Add a regression test that pins the harness contract (input shape, score
    range, output schema).
+4. **(post-Tier-2)** For the TurboQuant cell variant, ensure the
+   `cache_kv` monkey-patch is installed (`PHASE4_GPU_FINDINGS.md` §14.3
+   coordinates) before the quality eval — otherwise the lossy KV path
+   isn't actually exercised and the eval reports the baseline number
+   under a "compressed" label.
+5. **(recommended, cheap)** Land Track D first (real-value KV cosine
+   on captured Qwen2.5-7B fixtures, see `PHASE4_GPU_FINDINGS.md`
+   §16.5). A real-value cosine ≪ 0.95 would explain a Step-2 quality
+   regression cheaply, before spending the GPU dollar on a full eval.
 
 **Validates:** that CTM+ does not silently degrade generation quality at the
 cache budgets where it claims hit-rate wins.

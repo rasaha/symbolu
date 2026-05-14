@@ -1409,6 +1409,136 @@ throughput cost too. If > 1pt regression, Tier 2 pauses and
 investigates — the synthetic-Gaussian quality numbers in §15.2 do
 not transfer automatically.
 
+## §16. Track E audit (no implementation this session)
+
+After §15 landed, the recommended next move was Track E (MMLU /
+perplexity quality measurement of TurboQuant-compressed KV) to
+de-risk the deferred ``cache_kv`` install. An audit before
+implementing surfaced two structural problems with the original
+Track E framing.
+
+### §16.1 Track E was sized wrong by 10–30×
+
+The pre-§15 session prompt sized Track E at "half a GPU-day,
+~$0.05–$0.10." That estimate assumed the ``cache_kv`` hook was
+already installed and the only remaining work was running the eval.
+The hook is **not** installed (deferred as conscious scope discipline
+in §15.1). So Track E inherits the engineering investment that §15
+deferred. Honest sizing:
+
+| Cost item | Original prompt | Audited |
+|---|---:|---:|
+| CPU engineering before any GPU run | implicit zero | **2–3 days** (build hook + eval harness) |
+| Cold model load (Qwen2.5-7B on A100) | not counted | ~5 min |
+| MMLU subset, 2 runs (baseline + compressed) | implicit | ~60–90 min A100 |
+| Wikitext perplexity, 2 runs | implicit | ~20–30 min A100 |
+| Spot A100 80GB | not counted | $1.20–$1.50/hr |
+| **Total** | **$0.05–$0.10** | **2–3 days CPU + $0.50–$3.00 GPU** |
+
+Still cheap relative to engineering investment elsewhere, but a
+qualitatively different ask than "half a day."
+
+### §16.2 Four Track-E shapes considered
+
+To measure quality of TurboQuant-compressed KV against a baseline,
+something has to inject lossy KV into a real forward pass. There is
+no such pathway in the codebase today. Four routes considered:
+
+* **A. Finish Tier 2's ``cache_kv`` hook + extend ``run_streaming.py``
+  per ``POST_PHASE4_ROADMAP.md`` Step 2.** ~2–3 days CPU + $0.50–
+  $1.50 GPU. Production-path measurement, partner-shareable. Hook
+  install is non-optional — it's the structural gap, not an
+  optimisation.
+* **B. Bypass vLLM via a HuggingFace-transformers attention hook.**
+  ~1–2 days CPU + $0.50–$1.50 GPU. Isolates quality measurement from
+  vLLM-version risk; introduces a parallel code path that may drift
+  from the production ``cache_kv`` install.
+* **C. KL-divergence smoke test on synthetic prompts.** ~half-day CPU
+  + $0.20–$0.50 GPU. "Baseline forward vs compressed-KV forward;
+  compare logit distributions per token." Cheap signal of "did
+  compression destroy the model" — does NOT tell you "what's the MMLU
+  delta." Useful as a gate before A or B; not a deliverable on its
+  own.
+* **D. Real-value KV cosine on captured Qwen2.5-7B fixtures
+  (no GPU).** ~1 day CPU + ~1–2 hours of CPU model forward-pass to
+  capture KV blocks. Closes the §15.3 caveat ("is cosine 0.965 on
+  Gaussian real?") with a measured number on real activations.
+  **Doesn't answer MMLU**, but kills the most-likely partner objection
+  to the §14.2 number. Cheapest meaningful step.
+
+### §16.3 Track D execution blocked on this pod
+
+This (CPU-only) session attempted Track D and hit two pod-level
+blockers:
+
+1. **HuggingFace is firewalled.** ``HTTP 403 / x-deny-reason:
+   host_not_allowed`` from ``huggingface.co`` and
+   ``download.pytorch.org``. The ``transformers`` library *is*
+   installable from pip (verified: ``transformers 5.8.1`` installed),
+   but model weights cannot be downloaded — the request is denied at
+   the network layer, not by HF auth.
+2. **15 GB RAM total.** Qwen2.5-7B at FP16 occupies ~14 GB of weights
+   alone; even if HF were reachable, there would be no headroom for
+   activations, and the smaller Qwen2.5-0.5B (~1 GB) would fit but
+   still requires the firewalled download.
+
+Track D is therefore deferred to a session that has either:
+
+* A pod with outbound HF access **and** ≥ 32 GB RAM (for Qwen2.5-7B
+  CPU inference) **or** GPU access (for Qwen2.5-7B in HBM), or
+* Pre-captured KV-block fixtures shipped via repository assets (a few
+  MB per layer per token; partner-provided would also work).
+
+The Track D harness (``capture_qwen_kv.py`` + the cosine-measurement
+script) was not built this session because it would only have been
+testable against a fake tiny model — and a fake-model-only test is
+already covered by ``test_turboquant_kvstore_torch.py``'s synthetic
+Gaussian path. Building it without a real-model integration test
+risks shipping a harness that breaks on the first real run.
+
+### §16.4 What this audit changes
+
+* The recommended next-GPU-session sequencing in §15.4 step 1 is
+  preserved, but its sizing is corrected: it is the work of step 1
+  *plus* hooking into a real forward pass (route A or B above), not a
+  bolt-on flag flip.
+* The "if MMLU within ±0.5pt" gate language in §15.4 stands, but the
+  decision criteria need a prior step: a real-value cosine number
+  (Track D) before going to MMLU, because cosine ≪ 0.95 on real
+  activations would explain a Track-E regression cheaply, while
+  cosine ≥ 0.95 on real activations would isolate a Track-E
+  regression to attention dynamics specifically.
+* ``POST_PHASE4_ROADMAP.md`` Step 2 (the planned ``--quality-eval``
+  flag) is unchanged structurally but its "no GPU" descriptor in the
+  step heading is misleading — Step 2 cannot be measured without GPU
+  forward passes through a real model. The roadmap's "no GPU" applies
+  to the *eval-harness scaffolding*, not to *running the eval*.
+
+### §16.5 Concrete Track D prerequisites (for a future session)
+
+If a future session wants to run Track D end-to-end:
+
+1. Pod with HF access (test with
+   ``curl -sI https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/resolve/main/config.json``)
+   and either ≥ 32 GB RAM (for CPU inference) or A100/H100 (for GPU).
+2. Install ``transformers``, ``accelerate``, and ``huggingface_hub``.
+3. Capture script: load ``Qwen/Qwen2.5-7B-Instruct``, hook
+   ``Qwen2Attention.forward`` to dump K and V tensors at chosen layers
+   (suggest layers 0, 7, 14, 21, 27 — covers shallow, middle, deep
+   strata of the 28-layer model) for the first decode step on a fixed
+   prompt (suggest 32-token chat prompt for reproducibility). Save as
+   ``Bench/tests/fixtures/qwen25_7b_kv/<layer>.pt``.
+4. Run captured tensors through ``TurboQuantKVStore.write_block`` /
+   ``read_block`` (both backends), record cosine vs original.
+5. New regression test ``test_turboquant_kvstore_realvalue.py`` that
+   loads the fixtures and asserts cosine ≥ 0.95 (architecture-doc
+   target) or, if the measured number is lower, updates the doc with
+   the honest real-value number.
+
+The fixture files themselves are partner-shareable artefacts (small,
+self-contained, allow re-running the entire validation chain offline)
+and should land alongside the test code.
+
 ## Appendix C: Where to read more
 
 | Doc | Purpose |
