@@ -36,6 +36,26 @@ elements, so the per-segment math is identical — but the *scope* of
 what gets compressed in one ``write_block`` call differs. See
 ``Bench/scripts/RUNPOD_TRACK_D_E_RUNBOOK.md`` § "Scope note" for the
 partner-conversation framing.
+
+Track E result (Qwen2.5-7B-Instruct)
+------------------------------------
+
+See ``Bench/bench_out/PHASE4_GPU_FINDINGS.md`` §17 for the full
+writeup. Headline:
+
+| angle_bits | compression vs FP16 | PPL ratio | verdict |
+|---:|---:|---:|---|
+| 3 (arch-doc default) | 3.58× | 3052× | catastrophic |
+| 4 | 2.69× | 301× | catastrophic |
+| 8 (no QJL, ~lossless) | 1.96× | 0.94× | within noise |
+
+The 8-bit lossless result validates this cache wrapper's plumbing.
+The 3-bit and 4-bit failures reflect the PolarQuant algorithm at low
+bit depths on Qwen2.5-7B, not the integration. Softmax-attention's
+exponential amplification of K errors means cosine 0.965 (block-
+level) does not imply preserved generation quality. Do not deploy
+TurboQuant-compressed KV at the current algorithm config without
+revisiting §17.7's recommended algorithm modifications.
 """
 
 from __future__ import annotations

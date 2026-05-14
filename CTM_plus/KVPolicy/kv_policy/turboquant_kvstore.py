@@ -57,6 +57,20 @@ compression — one independent ``write_block`` call per slot.
 Neither tier installs a real vLLM hook. The wrapper class is exposed to
 be driven by tests (and, when the next GPU session lands the
 ``cache_kv`` monkey-patch, by real KV-cache traffic).
+
+.. warning::
+
+   Track E result (``Bench/bench_out/PHASE4_GPU_FINDINGS.md`` §17):
+   the architecture-doc default (3-bit polar + 128 segment_dim + QJL)
+   produces **3052× perplexity blow-up** on Qwen2.5-7B-Instruct via
+   the route-B HF-transformers integration. The §14.2 cosine 0.965
+   number is real (Track D confirmed on real activations: 0.9657
+   mean) but does NOT translate to generation-quality preservation
+   because softmax-attention exponentially amplifies the K-outlier-
+   channel errors that PolarQuant's uniform-grid quantisation
+   destroys. **Do not install the ``cache_kv`` hook at the current
+   default config without revisiting the algorithm** (see §17.7 for
+   per-channel-normalisation / sink-skip / mixed-bit options).
 """
 
 from __future__ import annotations

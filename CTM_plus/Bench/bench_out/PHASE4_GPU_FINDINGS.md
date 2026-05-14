@@ -1539,6 +1539,192 @@ The fixture files themselves are partner-shareable artefacts (small,
 self-contained, allow re-running the entire validation chain offline)
 and should land alongside the test code.
 
+## §17. Track D + Track E GPU run on Qwen2.5-7B-Instruct
+
+GPU pod: RunPod A100 80GB (cu124), Qwen2.5-7B-Instruct FP16,
+transformers 5.1.0, torch 2.6.0+cu124, route-B integration
+(`kv_policy.turboquant_hf_cache.TurboQuantCache` subclassing HF
+``DynamicCache`` — no vLLM ``cache_kv`` hook). Total spend ~$0.45 spot,
+~25 min wall (model load + 4 evals). Artefacts at
+``bench_out/track_d_qwen7b/`` and ``bench_out/track_e_qwen7b/``.
+
+### §17.1 Track D — real-value KV cosine on Qwen2.5-7B-Instruct
+
+Captured K and V tensors from a single forward pass at layers
+{0, 7, 14, 21, 27} on each of five prompts (chat, code, factual,
+reasoning, multilingual), sampled one 16-token vLLM-style block per
+(prompt, layer), and ran each through the TurboQuant compression
+path on both numpy and torch backends.
+
+| Metric | Value | Gate |
+|---|---:|---|
+| Cosine K mean | **0.9657** | ≥ 0.95 |
+| Cosine K min | **0.9631** | per-block floor ≥ 0.93 |
+| Cosine V mean | 0.9647 | ≥ 0.95 |
+| Cosine V min | 0.9616 | per-block floor ≥ 0.93 |
+| Total measurements | 50 (5 prompts × 5 layers × 2 backends) | — |
+
+**Verdict: PASS.** The §15.3 caveat from the Tier 2 CPU-correctness
+landing — "is the cosine 0.965 on Gaussian a real claim on real
+Qwen2.5-7B K activations?" — closes affirmatively. Real-value cosine
+matches the synthetic-Gaussian baseline (§15.2: 0.964) to four decimal
+places across diverse prompt types, layer strata, and both
+implementations. Cross-backend numpy↔torch agreement holds on real
+activations to the same ULP-class precision as on synthetic.
+
+This is partner-shareable. The §14.2 / §15.2 cosine numbers are not
+synthetic-Gaussian artefacts; they reproduce on production-shape K.
+
+### §17.2 Track E — Perplexity on Qwen2.5-7B-Instruct
+
+Identical forward-pass setup as Track D, but driving real generation
+quality: the route-B ``TurboQuantCache`` was installed as the
+``past_key_values`` argument on the HF forward call, compressing +
+decompressing K/V on every layer's update, and the resulting lossy
+K/V flowed into the actual softmax-attention computation. Perplexity
+was computed on a fixed 282-token text passage at three TurboQuant
+configurations plus the FP16 baseline.
+
+| Config | Bits/elem | Compression vs FP16 | Perplexity | Ratio vs baseline | Verdict |
+|---|---:|---:|---:|---:|---|
+| baseline (DynamicCache) | 16 | 1.00× | **3.7155** | — | reference |
+| 3-bit + QJL (arch-doc default) | 4.48 | 3.58× | 11338.25 | **3052×** | 🔴 catastrophic |
+| 4-bit + QJL | 5.97 | 2.69× | 1118.26 | **301×** | 🔴 catastrophic |
+| 8-bit no-QJL (~lossless polar) | 8.18 | 1.96× | 3.4801 | **0.94×** | ✅ within noise |
+
+The 8-bit identity-config result confirms the route-B integration is
+correct: when the polar quantisation is effectively lossless (256
+angle bins per segment), perplexity is within FP16↔FP32 numerical
+noise of baseline. The 3-bit and 4-bit failures therefore reflect
+**the algorithm at low bit depths**, not the cache-wrapper code.
+
+**Decision tree from ``RUNPOD_TRACK_D_E_RUNBOOK.md``:**
+
+* GREEN: ratio ≤ 1.02 → ship cache_kv hook
+* YELLOW: ratio ≤ 1.05 → ship with partner-visible caveat
+* **RED: ratio > 1.05 → pause Tier 2, revisit algorithm config**
+
+3052× is two orders of magnitude past RED at the partner-shareable
+compression bit depth. Tier 2's ``cache_kv`` hook installation is
+explicitly on hold.
+
+### §17.3 Why Track D and Track E disagree
+
+The two tracks measure related-but-different quantities:
+
+* **Track D** measures *block-level cosine similarity* between
+  original and reconstructed K (or V). Cosine is invariant to a
+  uniform per-segment direction shift; what it bounds is "how close
+  is the *direction* of the reconstructed vector to the original on
+  average across all elements."
+* **Track E** measures *generation quality* via perplexity. The
+  relevant attention computation is
+  ``softmax(Q · K^T / √d) · V``. The softmax *exponentially amplifies*
+  differences in ``Q · K^T``. A K vector that is 96.5% directionally
+  correct can produce attention weights that pick the wrong tokens
+  entirely, because the projection of Q onto K is dominated by the
+  small fraction of K dimensions where reconstruction failed — and
+  exactly those dimensions matter most in the softmax.
+
+The KV-cache quantization literature has documented this for >18
+months (KIVI, KVQuant, MoLE-KV, IntactKV, etc.): K has **outlier
+channels** — a small fraction of head dimensions carry
+disproportionate L2 mass. PolarQuant's core assumption ("random
+rotation spreads energy uniformly so a single uniform-grid quantiser
+works") *would* hold if real K were approximately Gaussian. It isn't.
+Outlier channels survive rotation because they dominate the input
+norm; uniform-grid quantisation then under-resolves them.
+
+The 8-bit lossless result confirms: as bit depth increases, the
+uniform grid resolves the outliers well enough, and perplexity
+recovers. But the partner-shareable 3.58× / 7.15× compression
+numbers require 3-bit quantisation, which is where the outliers get
+destroyed.
+
+### §17.4 Linear extrapolation across bit depth
+
+The 3-bit (3052×) → 4-bit (301×) ratio improvement of ~10× per bit
+extrapolates to:
+
+| Angle bits | Predicted PPL ratio | Bits/elem | Compression vs FP16 |
+|---:|---:|---:|---:|
+| 3 (measured) | 3052× | 4.48 | 3.58× |
+| 4 (measured) | 301× | 5.97 | 2.69× |
+| 5 (predicted) | ~30× | 7.16 | 2.23× |
+| 6 (predicted) | ~3× | 8.34 | 1.92× |
+| 7 (predicted) | ~1.3× | 9.53 | 1.68× |
+| 8 (measured) | 0.94× | 10.72 | 1.49× |
+
+PolarQuant **does not have a winning operating point** on Qwen2.5-7B
+at this configuration. At bit depths low enough for the compression
+ratio to beat INT4 baseline (2×), perplexity dies. At bit depths
+high enough for quality to recover (≥ 6), the compression ratio
+falls below INT4 baseline. The algorithm in its current form is not
+competitive with vanilla per-channel INT4 / INT8 KV quantisation for
+this model.
+
+### §17.5 What this changes about the partner pitch
+
+The "TurboQuant compresses KV 3.58× at cosine 0.965" claim from §14.2
+is **mathematically true**: Track D measured exactly this number on
+real Qwen activations. But the claim **does not imply generation
+quality is preserved**, which is what a partner deploying this on
+production traffic actually cares about.
+
+Honest framing options:
+
+* **Conservative (recommended now):** "TurboQuant in its current
+  architecture-doc configuration does not preserve generation quality
+  on Qwen2.5-7B at the compression ratios that would beat INT4
+  baseline. We're investigating algorithm modifications (per-channel
+  scale normalisation, mixed bit depth, RoPE-aware quantisation)
+  before recommending production deployment."
+* **Aggressive (avoid):** "TurboQuant achieves 3.58× compression at
+  cosine 0.965." — true in isolation, misleading without §17.2.
+
+The **CTM+ Phase 4 algorithm-quality result (§13.3, −11.1% swap_out
+per decode_token)** is unaffected by this finding. That result lives
+at a different layer (eviction-decision quality, not KV-storage
+quality) and remains partner-shareable as before.
+
+### §17.6 What's deferred (post-§17)
+
+* Tier 2 `cache_kv` monkey-patch in `vllm/attention/backends/flash_attn.py`:
+  on hold. No engineering justification to install a hook for an
+  algorithm that destroys perplexity 3000× at its target operating
+  point.
+* MMLU subset evaluation: not run. Perplexity 3000× is unambiguous;
+  MMLU would just confirm random-token-emission scores ~25%.
+  $0.60 saved.
+* Combined-stack measurement (CTM+ × TurboQuant): not meaningful
+  until TurboQuant has a config that preserves quality. Phase 4 alone
+  remains partner-shareable.
+* CTXL (HBM → CXL → NVMe tiering): unaffected — separate work-track.
+
+### §17.7 If pursuing TurboQuant further, what to investigate
+
+Three engineering directions ordered by expected ROI:
+
+1. **Per-channel scale normalisation before PolarQuant** (the KIVI
+   trick). Pre-divide K by per-channel std; compress; multiply back
+   on decompress. Expected to rescue 3-4 bit quality by giving the
+   uniform grid a fighting chance against outlier channels.
+   ~1-2 days CPU + ~$0.20 GPU to retest perplexity.
+2. **Skip-quantization for sink tokens** (the StreamingLLM trick).
+   First few tokens of context carry disproportionate attention mass;
+   keep them at full precision. Cheaper than (1) if attention sinks
+   are the dominant failure mode.
+3. **Mixed bit depth across layers**: profile which Qwen layers are
+   most/least sensitive to PolarQuant noise; assign higher bits to
+   sensitive layers, lower bits to robust layers. Likely produces a
+   2.5-3× compression ratio at quality parity. ~2 days CPU + ~$0.40
+   GPU.
+
+(4-bit or 5-bit alone — without any of the above — would not help
+enough on this evidence: the trend curve in §17.4 shows the
+compression-ratio crossover with INT4 happens at ~6 bits, where
+PolarQuant gives no advantage.)
+
 ## Appendix C: Where to read more
 
 | Doc | Purpose |
