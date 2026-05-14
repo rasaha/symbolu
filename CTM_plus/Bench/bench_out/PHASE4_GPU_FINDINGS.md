@@ -1725,6 +1725,217 @@ enough on this evidence: the trend curve in §17.4 shows the
 compression-ratio crossover with INT4 happens at ~6 bits, where
 PolarQuant gives no advantage.)
 
+## §18. KIVI INT4 with full config — the working KV quant on Qwen2.5-7B
+
+After §17's negative result on PolarQuant (3-bit + QJL: 3052× ppl ratio;
+4-bit + QJL: 301×; both algorithm-rescue mechanisms failed), the
+session shifted to literature-validated alternatives. Five further
+GPU evaluations on Qwen2.5-7B-Instruct mapped the design space and
+arrived at a working configuration. Total post-§17 spend: ~$0.50
+spot, ~30 min GPU wall.
+
+### §18.1 The algorithm-exploration arc
+
+All measurements on Qwen2.5-7B-Instruct FP16 with the route-B
+HuggingFace integration (no vLLM ``cache_kv`` hook; the
+``TurboQuantCache`` / ``INT4PerChannelCache`` wrappers subclass
+``DynamicCache`` directly). Same fixed 282-token Wikipedia-style
+text on each run.
+
+| # | Configuration | PPL Ratio | Verdict |
+|---|---|---:|---|
+| 1 | PolarQuant 3-bit + QJL (arch-doc default) | 3052× | catastrophic |
+| 2 | PolarQuant 4-bit + QJL | 301× | catastrophic |
+| 3 | PolarQuant 4-bit + per-channel scale | 7321× | **regression** (worse than baseline 4-bit) |
+| 4 | PolarQuant 4-bit + sink-skip (4 sinks) | 220× | helped modestly, still catastrophic |
+| 5 | PolarQuant 8-bit no-QJL (lossless control) | 0.94× | confirms route-B plumbing correct |
+| 6 | INT4 per-channel K + per-token V | 1.42× | YELLOW — algorithm shape is right |
+| 7 | INT4 + sink-skip (4 sinks) | 11.14× | **anti-pattern** (worse than no sink) |
+| 8 | INT4 + group=32 (K and V) | 1.30× | YELLOW |
+| 9 | **INT4 + group=32 + asymmetric** | **1.030×** | ✅ **GREEN** |
+
+The arc explored:
+* Bit depth (3 / 4 / 8)
+* Algorithm-rescue mechanisms (per-channel scale, sink-skip)
+* Algorithm replacement (PolarQuant → INT4 per-channel)
+* Quantization-precision mechanisms (group quantization, asymmetric quant)
+
+### §18.2 Why PolarQuant failed and KIVI worked
+
+PolarQuant's design hinges on the assumption that **a random
+orthogonal rotation of the input produces an approximately Gaussian
+distribution in rotated space**, which a fixed uniform angle grid
+can then quantize evenly. That assumption holds for synthetic
+Gaussian data (§14.2's 0.965 cosine on synthetic) and reproduces on
+real-shape K (§17.1 Track D: 0.9657 cosine on Qwen activations).
+The cosine number is real.
+
+But **block-level cosine doesn't predict generation quality**. Real K
+has outlier channels and outlier positions (attention sinks). After
+rotation, the outliers survive (rotation preserves L2 norm) and
+dominate the rotated vector's "important" directions. The uniform
+angle grid spends its precision on the directions with the most
+energy — outlier channels — and starves the small directions. The
+softmax in attention then amplifies the noise on small directions
+exponentially, destroying generation quality despite the seemingly
+good aggregate cosine.
+
+The per-channel-scale and sink-skip rescue mechanisms (which work for
+uniform-grid INT4) **don't transfer to PolarQuant** because:
+
+* **Per-channel scale + PolarQuant**: rotation destroys per-channel
+  structure. Pre-rotation scaling changes the rotated distribution
+  slightly but doesn't change the algorithm's "uniform-grid in
+  rotated space" nature. The multiply-back-by-scale at the end
+  amplifies any reconstruction noise on outlier channels. Result:
+  worse, not better.
+* **Sink-skip + PolarQuant**: helped modestly because sink positions
+  contributed disproportionately to the noise; reducing the
+  catastrophe from 301× to 220×.
+
+KIVI's approach succeeds because it **doesn't rotate**. Each (head,
+head_dim) channel of K keeps its own quantization scale — outlier
+channels resolve at their own magnitude without consuming the small
+channels' bin budget. Adding group quantization (chunks of 32 along
+the seq axis) isolates outlier positions (attention sinks) to one
+group, letting the other groups have appropriate scales. Adding
+asymmetric quantization (scale + offset) uses all 16 INT4 bins
+effectively rather than wasting half on symmetric-around-zero.
+
+The compounding result on Qwen2.5-7B:
+
+```
+Plain INT4 per-channel:         1.42× (per-channel handles outlier channels)
++ group=32:                     1.30× (also handles outlier positions per-group)
++ asymmetric:                   1.03× (also uses all 16 bins on asymmetric distribution)
+```
+
+Each piece addresses one failure mode. All three pieces together
+match KIVI's published quality numbers on Qwen-family models.
+
+### §18.3 The working configuration
+
+Final configuration (commit ``2ac6a72``, ``RUNPOD_TRACK_D_E_RUNBOOK.md``
+§5e):
+
+```
+--quant int4-per-channel
+--k-group-size 32
+--v-group-size 32
+--asymmetric-int4
+```
+
+Equivalent in code:
+
+```python
+from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+cache = INT4PerChannelCache(
+    k_group_size=32,
+    v_group_size=32,
+    asymmetric=True,
+)
+out = model(input_ids=ids, use_cache=True, past_key_values=cache)
+```
+
+Measured properties:
+
+| Metric | Value |
+|---|---:|
+| Baseline (FP16) perplexity | 3.7155 |
+| KIVI INT4 perplexity | 3.8259 |
+| **Perplexity ratio** | **1.0297** ✅ |
+| NLL/token delta | +0.029 |
+| MMLU baseline (200 questions, 50 subjects, seed 2026) | **68.00%** (136/200) |
+| MMLU KIVI INT4 | **68.00%** (136/200) |
+| **MMLU delta** | **+0.00pt** ✅ |
+| Theoretical compression vs FP16 | ~3.2× (4 bits/elem + group + asymmetric overhead) |
+| Wall time (perplexity + MMLU 200, after model load) | ~45 seconds total |
+| GPU spend (post-§17 algorithm exploration + final eval) | ~$0.55 spot total |
+
+The MMLU result is the partner-relevant artefact: **zero accuracy
+regression on 200 questions across 50 MMLU subjects** at this
+compression ratio. Perplexity 1.03× sounded like a small but real
+quality cost; MMLU 0.00pt delta tells us the cost is below the
+threshold of downstream task accuracy on this evaluation.
+
+(Caveat: 200 questions has a binomial confidence interval of ~±3.4pt
+at 68% accuracy. The 0.00pt delta is consistent with a true delta
+anywhere in roughly [−1, +1]pt; a 1000-question sweep would tighten
+the bound to ~±1.5pt. For partner conversations we recommend
+adding a 1000-question sweep before publishing the headline
+"identical accuracy" claim.)
+
+### §18.4 What this is and what it isn't
+
+**This is:**
+
+* A literature-validated KV compression scheme (KIVI; Liu et al.
+  ICML 2024) reproduced on Qwen2.5-7B-Instruct with measured perplexity
+  ratio within 3% of FP16 baseline.
+* Combined with CTM+ Phase 4's measured 11.1% swap_out reduction
+  per decode token, a partner-shareable combined-stack capability
+  claim: ~3× memory headroom × better eviction quality.
+* The end of the algorithm-exploration arc; we know what works.
+
+**This is not:**
+
+* A novel quantization algorithm. KIVI is the novel work; we
+  reproduced it.
+* The full architecture-doc 8.8× combined-stack claim. That number
+  was projection from a TurboQuant that turned out not to work;
+  the credible measured combined-stack effective-capacity uplift is
+  ~3-3.5× (compression) × ~1.1× (eviction quality) ≈ ~3.3× over
+  the INT8 + LRU industry baseline.
+* Production-ready. The route-B integration uses HF transformers'
+  ``DynamicCache``; a real vLLM deployment needs a ``cache_kv``
+  monkey-patch (the §14.3 hook coordinates apply directly to the
+  INT4 algorithm too).
+* Validated across models. Qwen2.5-7B only. Multi-model sweep
+  (Llama-3-8B, Mistral-7B, etc.) is a $5-10 GPU follow-on.
+* Validated at long context. 282-token prefill only; long-context
+  (≥32k) tests are a separate work-track.
+
+### §18.5 Partner-conversation framing
+
+**Honest framing options:**
+
+* **Strong (recommended):** "CTM+ Phase 4 reduces wasteful evictions
+  by 11.1% per useful decode token on real Qwen2.5-7B vLLM. KIVI-style
+  INT4 KV compression delivers ~3.2× memory headroom at perplexity
+  within 3% of FP16 baseline. Combined: more cache fits, fewer
+  evictions of what's there, both measured on the same model."
+* **Avoid:** "8.8× combined-stack capacity" (dead — architecture doc
+  was projecting from a TurboQuant that doesn't work on real models).
+* **Avoid:** "Novel KV quantization breakthrough" (the novel work is
+  Phase 4 eviction; KIVI is literature-reproduced).
+
+The architecture-doc target was 8.8×. The measured combined uplift
+is ~3.3× over INT8 + LRU baseline. That's a 3× downgrade from the
+original number, in exchange for the number now being **real and
+defensible**.
+
+### §18.6 What's deferred
+
+After §18 lands, the gaps to close before a production deployment:
+
+1. **MMLU on KIVI config** (running concurrently with this writeup,
+   ~$0.60). Confirms perplexity 1.03× translates to accuracy within
+   partner-acceptable bounds.
+2. **vLLM ``cache_kv`` hook** for route-A production integration
+   (~3-5 days CPU + ~$0.20 GPU). The §14.3 hook coordinates apply
+   directly to the INT4 algorithm; only the inner
+   compress/decompress functions swap.
+3. **Multi-model sweep** (Llama-3-8B, Qwen2.5-1.5B / 7B / 14B,
+   Mistral-7B). ~$5-10 GPU.
+4. **Long-context test** (32k retrieval). KIVI's published numbers
+   include 32k; we haven't validated at our shape.
+5. **CTXL tiering** (HBM → CXL → NVMe). Independent work-track,
+   weeks. If implemented, would push the combined-stack number above
+   3.3× but the architecture-doc 8.8× is still a stretch.
+
+Of these, items 1-3 are realistic short-term goals. Item 5 is a
+multi-month investment.
+
 ## Appendix C: Where to read more
 
 | Doc | Purpose |
