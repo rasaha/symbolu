@@ -363,11 +363,18 @@ class TurboQuantKVStore:
             if k_scale is not None:
                 # Multiply back: the compressed payload reconstructs to
                 # the *normalised* tensor; the per-channel scale carries
-                # the magnitude info. The scale is in float32; cast back
-                # to k's dtype for the multiply so we don't accidentally
-                # upcast the cache to FP32 in the hot path.
-                k = k * k_scale.to(k.dtype)
-                v = v * v_scale.to(v.dtype)
+                # the magnitude info. The scale is in float32; cast to
+                # the same dtype AND device as the decompressed tensor.
+                # Device matters because the compressor's working device
+                # (typically CPU here, as TurboQuantTorchCompressor
+                # defaults to ``torch.device("cpu")``) may differ from
+                # where the input tensor lived (GPU in a real route-B
+                # forward pass). The implicit-copy slice assignment in
+                # ``_compress_decompress_kv`` handles the recon→input
+                # device transfer; the explicit ``k * k_scale`` multiply
+                # here would otherwise raise a cross-device error.
+                k = k * k_scale.to(device=k.device, dtype=k.dtype)
+                v = v * v_scale.to(device=v.device, dtype=v.dtype)
         else:
             k = k.reshape(k_shape).astype(original_dtype, copy=False)
             v = v.reshape(v_shape).astype(original_dtype, copy=False)
