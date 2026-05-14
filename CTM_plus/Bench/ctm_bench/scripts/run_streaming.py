@@ -185,7 +185,26 @@ def main(argv: Sequence[str]) -> int:
             "kv_policy/_ctm_evictor.cpython-*.so; build with "
             "`cd CTM_plus/KVPolicy && python3 setup.py build_ext "
             "--inplace`. When the .so is absent this flag is a "
-            "silent no-op (Python class)."
+            "silent no-op (Python class). v9 GPU result: 0pp "
+            "throughput recovery; see PHASE4_GPU_FINDINGS §12.6."
+        ),
+    )
+    parser.add_argument(
+        "--phase4-fast-hooks",
+        action="store_true",
+        help=(
+            "Phase 4: install hooks via direct monkey-patch of "
+            "module.forward instead of register_forward_pre_hook. "
+            "Skips torch's _call_impl _forward_pre_hooks walk on "
+            "every fire — that walk is a slice of the 15% "
+            "_call_impl share in PHASE4_GPU_FINDINGS §11.1, §11.3 "
+            "row 2 estimate is 2-5pp recovery (combined with the "
+            "implicit row-3 model-level consolidation here, 3-8pp). "
+            "Semantically identical to the hook path; same counters, "
+            "same firing order. v9 (Cython only) landed at 0pp "
+            "recovery; v10 (Cython + fast hooks) is the test of "
+            "whether the gap is fixable at the hook-shape layer or "
+            "is structurally below it."
         ),
     )
     parser.add_argument(
@@ -257,6 +276,7 @@ def main(argv: Sequence[str]) -> int:
         phase4_capture_every_n=args.phase4_capture_every_n,
         phase4_trig_blend_candidate_count=args.phase4_trig_blend_candidate_count,
         phase4_use_cython_evictor=args.phase4_cython_evictor,
+        phase4_fast_hooks=args.phase4_fast_hooks,
         max_decode_tokens=args.max_decode_tokens,
     )
 

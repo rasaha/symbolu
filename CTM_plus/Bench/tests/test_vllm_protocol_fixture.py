@@ -471,6 +471,134 @@ def test_bug4_side_channel_set_before_rotary_fires_in_real_call_order():
 
 
 # --------------------------------------------------------------------- #
+# §11.3 row 2 — hook-shape fix: via_monkey_patch=True replaces
+# module.forward directly instead of register_forward_pre_hook, so
+# torch's _call_impl skips the _forward_pre_hooks walk. The semantic
+# contract (counters tick, side-channel populated, capture fires) must
+# stay identical to the hook path.
+# --------------------------------------------------------------------- #
+
+
+def test_attn_metadata_side_channel_via_monkey_patch_skips_pre_hooks():
+    """When ``via_monkey_patch=True`` the install function must NOT
+    register a forward_pre_hook on the model, but must still fire the
+    counter + populate the side-channel attributes on every call.
+
+    Regression: catches the case where a future refactor accidentally
+    re-introduces the register_forward_pre_hook path under the flag,
+    silently nullifying the §11.3 row-2 optimization.
+    """
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import install_attn_metadata_side_channel
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class Attention(torch.nn.Module):
+        def forward(self, q, k, v, kv_cache, attn_metadata):
+            return q
+
+    class FakeQwen2Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.rotary_emb = RotaryEmb()
+            self.attn = Attention()
+
+        def forward(self, input_ids, positions, kv_caches, attn_metadata):
+            q = torch.zeros((3, 8))
+            k = torch.zeros((3, 8))
+            v = torch.zeros((3, 8))
+            q, k = self.rotary_emb(positions, q, k)
+            self.attn(q, k, v, None, attn_metadata)
+            return input_ids
+
+    class FakeMeta:
+        slot_mapping = torch.tensor([0, 16, 32])
+        num_decode_tokens = 3
+
+    evictor = CTMEvictorModern(num_blocks_capacity=64, block_size=16)
+    model = FakeQwen2Model()
+    n = install_attn_metadata_side_channel(
+        model=model, evictor=evictor, via_monkey_patch=True,
+    )
+    assert n == 1
+
+    # Critical assertion: no forward_pre_hook was installed. This is
+    # WHAT differentiates the two paths — the dispatcher takes its
+    # fast path when _forward_pre_hooks is empty.
+    pre_hooks = getattr(model, "_forward_pre_hooks", None)
+    post_hooks = getattr(model, "_forward_hooks", None)
+    assert pre_hooks is None or len(pre_hooks) == 0, (
+        f"register_forward_pre_hook was still used "
+        f"({len(pre_hooks)} hooks) under via_monkey_patch=True; the "
+        "§11.3 row-2 optimization is silently disabled."
+    )
+    assert post_hooks is None or len(post_hooks) == 0, (
+        f"register_forward_hook was still used ({len(post_hooks)} "
+        "hooks) under via_monkey_patch=True."
+    )
+
+    # And the work still happens: side-channel fires + counter ticks.
+    input_ids = torch.zeros((3,), dtype=torch.long)
+    positions = torch.zeros((3,), dtype=torch.long)
+    model(input_ids, positions, None, FakeMeta())
+
+    assert evictor._phase4_side_channel_pre_hook_calls == 1
+    assert evictor._phase4_side_channel_metadata_found == 1
+    # Post-hook clears state; pending_slot_mapping should be None after.
+    assert evictor._phase4_pending_slot_mapping is None
+
+
+def test_pre_rope_capture_via_monkey_patch_skips_pre_hooks():
+    """``install_pre_rope_capture(via_monkey_patch=True)`` must not
+    register a pre-hook on the rotary_emb module. Same regression
+    shape as the side-channel test."""
+    pytest.importorskip("torch")
+    import torch
+    from kv_policy.triattention import install_pre_rope_capture
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    class RotaryEmb(torch.nn.Module):
+        def forward(self, positions, q, k):
+            return q, k
+
+    class FakeModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.rotary_emb = RotaryEmb()
+
+        def forward(self, x):
+            return x
+
+    evictor = CTMEvictorModern(num_blocks_capacity=64, block_size=16)
+    model = FakeModel()
+    n = install_pre_rope_capture(
+        model=model, evictor=evictor,
+        num_layers=1, capture_every_n=1,
+        via_monkey_patch=True,
+    )
+    assert n == 1
+
+    rotary_pre = getattr(model.rotary_emb, "_forward_pre_hooks", None)
+    assert rotary_pre is None or len(rotary_pre) == 0, (
+        f"rotary_emb.register_forward_pre_hook was still used "
+        f"({len(rotary_pre)} hooks) under via_monkey_patch=True."
+    )
+
+    # And calling rotary_emb directly still ticks the rotary-fire
+    # counter (the capture happens inside the patched forward, not
+    # via the dispatcher).
+    positions = torch.zeros((3,), dtype=torch.long)
+    q = torch.zeros((3, 8))
+    k = torch.zeros((3, 8))
+    model.rotary_emb(positions, q, k)
+    assert evictor._phase4_rotary_pre_hook_calls == 1
+
+
+# --------------------------------------------------------------------- #
 # Bug 6 — window pruning integration with the runner
 # --------------------------------------------------------------------- #
 

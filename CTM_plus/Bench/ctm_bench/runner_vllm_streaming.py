@@ -531,6 +531,7 @@ class AsyncEngineDriver:
         phase4_capture_every_n: int = 1,
         phase4_trig_blend_candidate_count: int = 4,
         phase4_use_cython_evictor: bool = False,
+        phase4_fast_hooks: bool = False,
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
         vllm_module: Any = None,
@@ -608,6 +609,7 @@ class AsyncEngineDriver:
             1, int(phase4_trig_blend_candidate_count),
         )
         self.phase4_use_cython_evictor = bool(phase4_use_cython_evictor)
+        self.phase4_fast_hooks = bool(phase4_fast_hooks)
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -916,6 +918,7 @@ class AsyncEngineDriver:
                     model = self._extract_model_from_engine(inner_engine)
                     n_attn = install_attn_metadata_side_channel(
                         model=model, evictor=installed_evictor,
+                        via_monkey_patch=self.phase4_fast_hooks,
                     )
                     # Pull num_layers from the model config so
                     # call-counter indexing kicks in for shared-rotary
@@ -933,6 +936,7 @@ class AsyncEngineDriver:
                         model=model, evictor=installed_evictor,
                         num_layers=runtime_num_layers,
                         capture_every_n=self.phase4_capture_every_n,
+                        via_monkey_patch=self.phase4_fast_hooks,
                     )
                     logger.info(
                         "Phase 4: hooks installed (attn_metadata "
