@@ -1,0 +1,103 @@
+{
+  "model_id": "fake-tiny-model (DRY-RUN)",
+  "dtype": "float16",
+  "eval_kinds": [
+    "perplexity",
+    "mmlu"
+  ],
+  "turboquant_config": {
+    "angle_bits": 3,
+    "segment_dim": 128,
+    "enable_qjl": true,
+    "backend": "torch"
+  },
+  "perplexity": [
+    {
+      "cache_type": "baseline",
+      "text_chars": 1411,
+      "text_tokens": 1411,
+      "perplexity": 237.82139411504997,
+      "nll_per_token": 5.471519947052002
+    },
+    {
+      "cache_type": "turboquant",
+      "text_chars": 1411,
+      "text_tokens": 1411,
+      "perplexity": 237.82139411504997,
+      "nll_per_token": 5.471519947052002
+    }
+  ],
+  "mmlu": [
+    {
+      "cache_type": "baseline",
+      "num_questions": 5,
+      "correct": 0,
+      "accuracy": 0.0,
+      "per_subject": {
+        "high_school_physics": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        },
+        "elementary_mathematics": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        },
+        "world_history": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        },
+        "chemistry": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        },
+        "computer_science": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        }
+      }
+    },
+    {
+      "cache_type": "turboquant",
+      "num_questions": 5,
+      "correct": 0,
+      "accuracy": 0.0,
+      "per_subject": {
+        "high_school_physics": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        },
+        "elementary_mathematics": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        },
+        "world_history": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        },
+        "chemistry": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        },
+        "computer_science": {
+          "correct": 0,
+          "total": 1,
+          "accuracy": 0.0
+        }
+      }
+    }
+  ],
+  "deltas": {
+    "perplexity_ratio": 1.0,
+    "nll_delta": 0.0,
+    "mmlu_accuracy_delta_pt": 0.0
+  }
+}
