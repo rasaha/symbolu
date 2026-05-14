@@ -99,7 +99,10 @@ echo "==> [1/5] Building Cython extension"
     cd "${KVPOLICY_DIR}"
     python3 setup.py build_ext --inplace
 )
-python3 -c "
+# Smoke-test with PYTHONPATH prepend so kv_policy resolves regardless
+# of cwd (the runner injects this path itself via
+# ctm_bench.policies._add_kv_policy_to_path).
+PYTHONPATH="${KVPOLICY_DIR}:${PYTHONPATH:-}" python3 -c "
 from kv_policy._ctm_evictor import CTMEvictorModernC
 ev = CTMEvictorModernC(num_blocks_capacity=8, block_size=16)
 assert type(ev).__module__ == 'kv_policy._ctm_evictor', 'wrong module'

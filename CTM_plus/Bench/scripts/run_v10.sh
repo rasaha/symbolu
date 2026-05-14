@@ -74,7 +74,11 @@ mkdir -p "${OUT_SEED42}" "${OUT_SEED137}"
 
 echo "==> [1/5] Build Cython .so"
 (cd "${KVPOLICY_DIR}" && python3 setup.py build_ext --inplace) > /dev/null
-python3 -c "from kv_policy._ctm_evictor import CTMEvictorModernC; print('cython ok')"
+# Smoke-test from inside KVPolicy so kv_policy is on sys.path without
+# needing pip install -e. The real runner injects the path via
+# ctm_bench.policies._add_kv_policy_to_path(); we mirror that with a
+# PYTHONPATH prepend for this one-off check.
+PYTHONPATH="${KVPOLICY_DIR}:${PYTHONPATH:-}" python3 -c "from kv_policy._ctm_evictor import CTMEvictorModernC; print('cython ok')"
 
 echo "==> [2/5] Record build provenance"
 {
