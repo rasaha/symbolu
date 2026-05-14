@@ -66,13 +66,23 @@ LOG = logging.getLogger("track_e")
 
 
 def _check_transformers_version() -> None:
-    """Hard-fail early if transformers < 5.0.
+    """Hard-fail early if transformers < 5.0 OR torch < 2.5.
 
-    The cache layer surface (``DynamicCache.layers[i].keys``) used by
-    Track D's capture step and the ``TurboQuantCache(DynamicCache)``
-    subclass both depend on the 5.x ``CacheLayer`` refactor. On 4.x
-    these wouldn't fail until mid-eval, after the model has loaded and
-    GPU time has been spent.
+    Two hard requirements for the route-B path:
+
+    * ``transformers >= 5.0`` — uses ``DynamicCache.layers[i].keys`` /
+      ``.values`` which is the 5.x ``CacheLayer`` refactor's surface.
+    * ``torch >= 2.5`` — transformers 5.x's ``integrations/moe.py``
+      calls ``torch.library.custom_op`` with PEP-563-style string type
+      annotations on tensor parameters. ``torch.library.infer_schema``
+      on torch < 2.5 doesn't resolve those string annotations and
+      raises ``ValueError: Parameter input has unsupported type
+      torch.Tensor`` at *import* time (the MoE module imports eagerly
+      via the AutoModel registry, even for non-MoE models like Qwen).
+
+    Both failures would otherwise surface mid-eval after the model has
+    started loading; checking here keeps GPU dollars from being burned
+    on a version-mismatch crash.
     """
     try:
         import transformers  # type: ignore
@@ -80,12 +90,28 @@ def _check_transformers_version() -> None:
         raise SystemExit(
             "transformers not installed. Run: pip install --upgrade 'transformers>=5.0'"
         )
-    major = int(transformers.__version__.split(".")[0])
-    if major < 5:
+    try:
+        import torch  # type: ignore
+    except ImportError:
+        raise SystemExit(
+            "torch not installed. Run: pip install --upgrade torch"
+        )
+    t_major = int(transformers.__version__.split(".")[0])
+    if t_major < 5:
         raise SystemExit(
             f"transformers {transformers.__version__} detected; this script "
             f"requires >= 5.0 for the DynamicCache.layers[i].keys API. "
             f"Run: pip install --upgrade 'transformers>=5.0'"
+        )
+    torch_parts = torch.__version__.split(".")
+    pt_major, pt_minor = int(torch_parts[0]), int(torch_parts[1])
+    if (pt_major, pt_minor) < (2, 5):
+        raise SystemExit(
+            f"torch {torch.__version__} detected; transformers 5.x requires "
+            f"torch >= 2.5 (the MoE integration uses torch.library.custom_op "
+            f"with string-annotated tensor params, which torch < 2.5 can't "
+            f"resolve at import time). Run: "
+            f"pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu121"
         )
 
 

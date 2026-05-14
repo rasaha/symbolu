@@ -44,6 +44,23 @@ pip install --upgrade pip
 # transformers 4.x, so a stale image upgrades automatically here.
 pip install --upgrade 'transformers>=5.0' accelerate datasets huggingface_hub
 
+# IMPORTANT: torch >= 2.5 is also required. transformers 5.x's
+# integrations/moe.py calls torch.library.custom_op with string-typed
+# tensor annotations, and torch < 2.5 fails to resolve those at import
+# time (the MoE module imports eagerly even for non-MoE models). If
+# the pod ships torch 2.4 or older, upgrade now:
+python -c "
+import torch
+major, minor = torch.__version__.split('.')[:2]
+need = (int(major), int(minor)) < (2, 5)
+print('torch', torch.__version__, '— upgrade required' if need else '— OK')
+"
+# If upgrade required:
+# pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu121
+
+# Install ctm_bench as an editable package (one-time)
+pip install -e CTM_plus/Bench
+
 # HF model auth (Qwen models are gated only for some variants; the
 # 7B-Instruct usually doesn't require a token, but set one if your
 # pod's HF account asks for it).
@@ -56,6 +73,8 @@ python -c "
 import torch, transformers
 print('torch', torch.__version__, '/ transformers', transformers.__version__)
 print('CUDA available:', torch.cuda.is_available())
+tmajor, tminor = (int(s) for s in torch.__version__.split('.')[:2])
+assert (tmajor, tminor) >= (2, 5), 'torch >= 2.5 required'
 assert int(transformers.__version__.split('.')[0]) >= 5, 'transformers >= 5.0 required'
 print('Version gate: OK')
 "
@@ -63,7 +82,7 @@ print('Version gate: OK')
 
 Expected output:
 ```
-torch 2.x.x / transformers 5.x.x
+torch 2.5.x or later / transformers 5.x.x
 CUDA available: True
 Version gate: OK
 ```
@@ -97,6 +116,10 @@ for the GPU runs.
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench
+
+# tee opens the log file before the script runs, so create the dir first.
+mkdir -p bench_out/track_d bench_out/track_e_perplexity \
+         bench_out/track_e_mmlu bench_out/track_e_mmlu_1k
 
 python -m ctm_bench.scripts.track_d_capture_kv \
     --model Qwen/Qwen2.5-7B-Instruct \

@@ -61,14 +61,15 @@ LOG = logging.getLogger("track_d")
 
 
 def _check_transformers_version() -> None:
-    """Hard-fail early if transformers < 5.0.
+    """Hard-fail early if transformers < 5.0 OR torch < 2.5.
 
-    Track D reads ``past_key_values.layers[li].keys`` which is the 5.x
-    cache layer surface. On 4.x ``past_key_values`` is a tuple of
-    ``(K, V)`` per layer; the script's ``hasattr(past, "layers")``
-    fallback handles that, BUT the rest of the route-B integration
-    (TurboQuantCache(DynamicCache) in Track E) hard-requires 5.x. To
-    keep the two scripts in lockstep, we hard-fail on 4.x in both.
+    Track D reads ``past_key_values.layers[li].keys`` (the 5.x cache
+    layer surface) and goes through ``AutoModelForCausalLM`` which
+    eagerly imports transformers' MoE integration. transformers 5.x's
+    ``integrations/moe.py`` calls ``torch.library.custom_op`` with
+    PEP-563-style string annotations on Tensor params; torch < 2.5
+    can't resolve those and crashes at import. Pin both versions so
+    a mismatch fails before model load (not mid-capture).
     """
     try:
         import transformers  # type: ignore
@@ -76,11 +77,23 @@ def _check_transformers_version() -> None:
         raise SystemExit(
             "transformers not installed. Run: pip install --upgrade 'transformers>=5.0'"
         )
-    major = int(transformers.__version__.split(".")[0])
-    if major < 5:
+    try:
+        import torch  # type: ignore
+    except ImportError:
+        raise SystemExit("torch not installed. Run: pip install --upgrade torch")
+    t_major = int(transformers.__version__.split(".")[0])
+    if t_major < 5:
         raise SystemExit(
             f"transformers {transformers.__version__} detected; this script "
             f"requires >= 5.0. Run: pip install --upgrade 'transformers>=5.0'"
+        )
+    torch_parts = torch.__version__.split(".")
+    pt_major, pt_minor = int(torch_parts[0]), int(torch_parts[1])
+    if (pt_major, pt_minor) < (2, 5):
+        raise SystemExit(
+            f"torch {torch.__version__} detected; transformers 5.x requires "
+            f"torch >= 2.5. Run: "
+            f"pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu121"
         )
 
 
