@@ -2465,6 +2465,56 @@ six regression tests in `Bench/tests/test_sink_fp16_sweep.py`.
 attention mass; quantizing them is dangerous) is well-attested and the
 hypothesis is concrete; the test is calibrated to confirm or refute it.
 
+#### §20.2 measured outcomes (GPU run, 2026-05-15) — INCONCLUSIVE
+
+Sweep ran on Qwen2.5-7B-Instruct, 1000-question MMLU, 80 GB A100.
+Artefacts: `bench_out/track_e_audit_followups/sink_fp16_sweep.json`,
+`sink_fp16_summary.json`.
+
+| sink | INT4 MMLU | Δ vs FP16 | INT4 ppl (282-tok) | MMLU correct/1000 |
+|---:|---:|---:|---:|---:|
+| 0 (control) | 69.30% | −0.90pt | 3.8036 | 693 |
+| 4 | 68.90% | −1.30pt | 3.5801 | 689 |
+| 16 | 70.20% | +0.00pt | 3.6329 | 702 |
+| 64 | 69.90% | −0.30pt | 3.7998 | 699 |
+
+**The composer's mechanical verdict is GREEN** (best non-zero sink =
+16 at +0.00pt, clears the −0.3pt threshold). **The honest verdict is
+INCONCLUSIVE** — and the §20.2 hypothesis is *not* demonstrated:
+
+1. **Non-monotonic.** sink=4 (−1.30pt) is *worse* than the no-sink
+   control (−0.90pt). If sink-FP16 genuinely recovered the gap, more
+   sink protection could not make things worse. The sweep has no
+   trend — it is 69.30 → 68.90 → 70.20 → 69.90%.
+2. **Within measurement noise.** At 1000 questions / ~70% accuracy
+   the binomial 1σ is **±1.45pt**. The full spread (689–702 correct
+   = 1.3pt) sits inside 1σ. All four sink configs — and the −0.9pt
+   §19.4 control — are **statistically indistinguishable from each
+   other and from zero**.
+3. **Perplexity confirms the noise.** The 282-token perplexity is
+   non-monotonic and two INT4 variants (sink=4 at 3.58, sink=16 at
+   3.63) score *below* the FP16 baseline (3.72) — INT4 quantization
+   cannot genuinely beat the unquantized model; this is short-text
+   sampling noise.
+
+**Defensible claim (the weaker, noise-aware one):** INT4 KV-cache
+MMLU — with or without sink-FP16, at any sink size tested — is within
+~1.3pt of FP16, and the differences are noise. The §19.4 −0.9pt gap
+is itself within noise of zero at this eval size. So the INT4 quality
+axis is *plausibly* FP8-competitive — but **not because of
+sink-FP16**; no sink-FP16 recovery mechanism is resolved by this run.
+
+**What it would take to resolve it:** the effect being tested
+(−0.9pt → ≤−0.3pt, a ~0.6pt shift) is below the ±1.45pt CI. A
+decisive test needs the CI under ~0.3pt → roughly **4–5× more
+questions (~5000)**, a ~2-3 hour run. Not a 2026-H1 priority; the
+honest "within-noise" result is sufficient for partner conversations.
+
+**Bucket:** tested, **inconclusive** — neither a clean win (would be
+"measured") nor a clean failure ("tested-and-failed"). The
+partner-shareable line is the noise-aware one above; the §20.2
+hypothesis stays open.
+
 ### §20.3 Multi-model replication — Llama-3-8B + Mistral-7B
 
 **What's measured today:** Qwen2.5-7B-Instruct only. The VC brief's

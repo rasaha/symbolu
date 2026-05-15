@@ -21,9 +21,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 
 # Pre-decided decision-tree bands (matches PHASE4_GPU_FINDINGS §20.2
@@ -103,6 +104,91 @@ def _find_best_sink(per_sink_deltas: dict) -> tuple[Optional[int], Optional[floa
             best_delta = delta
             best_sink = sink
     return best_sink, best_delta
+
+
+def _sweep_is_noise_dominated(sweep: dict) -> Tuple[bool, str]:
+    """True when the per-sink MMLU deltas all sit inside the binomial
+    measurement-noise band — i.e. the sweep cannot resolve a real
+    sink-FP16 effect, so a GREEN/YELLOW/RED verdict would be a noise
+    artefact.
+
+    Rationale: MMLU accuracy on N questions is a binomial proportion;
+    the difference of two such measurements has 1σ ≈
+    100·sqrt(2·p(1−p)/N) percentage points. If the full spread of
+    per-sink deltas is below the 2σ band, the sink configurations are
+    statistically indistinguishable from each other (and from the
+    control) — the honest verdict is INCONCLUSIVE, not GREEN.
+
+    Returns ``(is_noise_dominated, reason)``.
+    """
+    rows = sweep.get("rows", [])
+    n = max((r.get("mmlu_total") or 0) for r in rows) if rows else 0
+    deltas = sweep.get("deltas", {}).get("per_sink_vs_fp16", {})
+    pts = [
+        b.get("mmlu_delta_pt") for b in deltas.values()
+        if b.get("mmlu_delta_pt") is not None
+    ]
+    if n <= 0 or len(pts) < 2:
+        return False, "insufficient MMLU data to assess measurement noise"
+    spread = max(pts) - min(pts)
+    # Pairwise-difference 1σ at a representative MMLU accuracy. The
+    # band is insensitive to p over the 0.6-0.8 range.
+    p = 0.70
+    sigma_diff = 100.0 * math.sqrt(2.0 * p * (1.0 - p) / n)
+    band = 2.0 * sigma_diff
+    # Corroborating signal: a non-zero sink WORSE than the no-sink
+    # control means the sweep is non-monotonic (no clean recovery).
+    sink0 = deltas.get("sink=0", {}).get("mmlu_delta_pt")
+    non_monotonic = False
+    if sink0 is not None:
+        for key, b in deltas.items():
+            if key == "sink=0":
+                continue
+            d = b.get("mmlu_delta_pt")
+            if d is not None and d < sink0:
+                non_monotonic = True
+                break
+    if spread < band:
+        reason = (
+            f"MMLU-delta spread {spread:.2f}pt across sinks is within "
+            f"the 2σ binomial noise band (±{band:.2f}pt at {n} "
+            f"questions) — the sink configurations are statistically "
+            f"indistinguishable"
+        )
+        if non_monotonic:
+            reason += (
+                "; and the sweep is non-monotonic (a non-zero sink "
+                "scores worse than the no-sink control), confirming "
+                "no clean recovery mechanism"
+            )
+        return True, reason
+    return False, (
+        f"MMLU-delta spread {spread:.2f}pt exceeds the 2σ noise band "
+        f"(±{band:.2f}pt at {n} questions) — the sink effect is "
+        f"statistically resolved"
+    )
+
+
+def _overall_verdict(
+    sweep: dict,
+    best_delta: Optional[float],
+    sink0_delta: Optional[float],
+) -> str:
+    """The verdict string. Noise check runs FIRST: a noise-dominated
+    sweep is INCONCLUSIVE regardless of which sink numerically 'won' —
+    a GREEN stamp on a within-noise result would overclaim."""
+    noise, reason = _sweep_is_noise_dominated(sweep)
+    if noise:
+        return (
+            f"**INCONCLUSIVE.** {reason}. The §20.2 hypothesis "
+            f"(sink-FP16 recovers the −0.9pt gap) is neither confirmed "
+            f"nor refuted — INT4 KV quality is within measurement noise "
+            f"of FP16, and no sink-FP16 recovery mechanism is resolved. "
+            f"A decisive test needs ~4-5× more questions (~5000) to "
+            f"shrink the CI below the effect size. Report as "
+            f"tested-inconclusive, not as a quality win."
+        )
+    return _verdict_best_sink(best_delta, sink0_delta)
 
 
 def _fmt_delta_pt(v: Optional[float]) -> str:
@@ -188,7 +274,7 @@ def render_markdown(sweep: dict) -> str:
             f"* Best sink = **{best_sink}** at Δ_MMLU vs FP16 = "
             f"**{best_delta:+.2f}pt**{improvement_str}."
         )
-        lines.append(f"* {_verdict_best_sink(best_delta, sink0_delta)}")
+        lines.append(f"* {_overall_verdict(sweep, best_delta, sink0_delta)}")
     else:
         lines.append("* No non-zero sink in the sweep produced a usable delta.")
     lines.append("")
@@ -220,7 +306,7 @@ def build_json_summary(sweep: dict) -> dict:
             "sink_size": best_sink,
             "mmlu_delta_pt_vs_fp16": best_delta,
         },
-        "verdict": _verdict_best_sink(best_delta, sink0_delta),
+        "verdict": _overall_verdict(sweep, best_delta, sink0_delta),
         "decision_tree_thresholds_pt": {
             "green": GREEN_THRESHOLD_PT,
             "yellow": YELLOW_THRESHOLD_PT,

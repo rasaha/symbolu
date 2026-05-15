@@ -258,6 +258,7 @@ should be able to tell which is which.
 | INT4 KIVI: **96.4% teacher-forced next-token agreement, mean KL 0.006** | `Bench/bench_out/track_e_audit_followups/int4_generation_teacher_forced.json` |
 | INT3 KIVI variant: **−0.7pt MMLU @ 1000q at ~4.5× theoretical compression** (memory-bound option) | `Bench/bench_out/track_e_audit_followups/int3_mmlu_1000.json` |
 | FP8 vs INT4 throughput (§20.1, four-cell): **vLLM FP8 KV = 1.18× FP16** (FlashInfer); **route-B INT4 = 0.47× FP16 in HF** | `Bench/bench_out/track_e_audit_followups/fp8_int4_comparison.json` |
+| INT4 KV quality within measurement noise of FP16 (§20.2, sink-FP16 sweep, 1000q): INT4 MMLU 68.9–70.2% vs FP16 70.2% — 1.3pt spread inside the ±1.45pt CI | `Bench/bench_out/track_e_audit_followups/sink_fp16_sweep.json` |
 
 The §20.1 four-cell result is the honest answer to "can we close the
 FP8-KV throughput gap": FP8 KV is a small throughput *gain* on its
@@ -266,6 +267,14 @@ pure-PyTorch quantize/unpack cost. The HF↔vLLM stack gap (25×) closes
 with a route-A `cache_kv` integration, but the INT4-algorithm gap (2×)
 needs the Marlin-style fused unpack-attend kernel. **Route-A is
 necessary but not sufficient — the kernel is the gating work item.**
+
+§20.2 (sink-FP16 quality sweep) is reported **tested-inconclusive**,
+not as a win: across sink ∈ {0, 4, 16, 64} the INT4 MMLU spread (1.3pt)
+sits entirely inside the ±1.45pt 1000-question CI, and the sweep is
+non-monotonic — sink=4 scores *worse* than no-sink. The honest read:
+INT4 KV quality is within noise of FP16, but the hypothesis that
+sink-FP16 *recovers* a gap is not demonstrated. A decisive test needs
+~5000 questions.
 
 ### Tested-and-failed (documented as negatives — partner-shareable)
 
@@ -300,7 +309,6 @@ in measured numbers is ~$3.50.
 
 | Item | Status | GPU cost | Reference |
 |---|---|---|---|
-| Sink-FP16 + body-INT4 mixed precision (sink ∈ {0, 4, 16, 64}) | Recipe landed; tests the StreamingLLM-style quality-recovery hypothesis for the −0.9pt MMLU gap | ~$0.50 | §20.2 |
 | Llama-3-8B + Mistral-7B multi-model replication | Runbook recipe landed; removes the "one-model demo" caveat | ~$2-3 | §20.3 |
 | Long-context perplexity at 16k/32k/50k | `--perplexity-text-path` flag landed; validates at the context length where KV compression's headline value appears | ~$0.50 | §20.4 |
 | Route-A vLLM `cache_kv` engineering plan | Day-by-day breakdown; same hook closes the −20% tokens/sec gap | 3-5 engineer-days + ~$0.30 GPU | §20.5 + `ROUTE_A_VLLM_CACHE_KV_PLAN.md` |

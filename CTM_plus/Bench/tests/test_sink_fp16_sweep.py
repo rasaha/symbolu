@@ -63,10 +63,16 @@ def test_sink_sweep_dry_run_writes_v1_schema(tmp_path: Path):
     assert "sink=4" in deltas["per_sink_vs_fp16"]
 
 
-def test_compose_renders_green_band_when_best_sink_recovers(tmp_path: Path):
-    """Synthetic sweep JSON where sink=4 recovers MMLU to within
-    -0.3pt of FP16. The composer should map this to GREEN and write
-    a §20.2.v1 merged JSON identifying sink=4 as the best.
+def test_compose_inconclusive_when_within_noise_band(tmp_path: Path):
+    """A realistic 1000-question sweep where the per-sink MMLU deltas
+    (-0.90 / -0.20 / -0.30 pt) span only 0.70pt — well inside the 2σ
+    binomial noise band (±4.10pt at 1000q). The composer must NOT
+    stamp GREEN on this; the honest verdict is INCONCLUSIVE.
+
+    This is the actual §20.2 GPU-run situation: at 1000 questions the
+    sink configurations are statistically indistinguishable, so a
+    GREEN ("algorithm axis closed") verdict would overclaim. The
+    composer's noise gate (`_sweep_is_noise_dominated`) catches it.
     """
     from ctm_bench.scripts import compose_sink_fp16_summary as comp
 
@@ -116,11 +122,64 @@ def test_compose_renders_green_band_when_best_sink_recovers(tmp_path: Path):
     assert rc == 0
     summary = json.loads(out_path.read_text())
     assert summary["schema_version"] == "§20.2.v1"
-    # Best non-zero sink = 4 (delta -0.20pt is the closest to 0).
+    # best_non_zero_sink is still computed (sink=4 at -0.20pt) — the
+    # noise gate doesn't change the arithmetic, only the verdict.
     assert summary["best_non_zero_sink"]["sink_size"] == 4
-    assert summary["best_non_zero_sink"]["mmlu_delta_pt_vs_fp16"] == pytest.approx(-0.20)
-    # -0.20 >= -0.3 → GREEN
-    assert "GREEN" in summary["verdict"]
+    # The verdict must be INCONCLUSIVE, NOT GREEN.
+    assert "INCONCLUSIVE" in summary["verdict"]
+    assert "GREEN" not in summary["verdict"]
+
+
+def test_sweep_noise_gate_flags_small_spread_at_1000q():
+    """`_sweep_is_noise_dominated`: a 1000q sweep whose per-sink MMLU
+    deltas span < the 2σ band (~4.1pt) is noise-dominated."""
+    from ctm_bench.scripts.compose_sink_fp16_summary import (
+        _sweep_is_noise_dominated,
+    )
+    sweep = {
+        "rows": [{"mmlu_total": 1000}],
+        "deltas": {"per_sink_vs_fp16": {
+            "sink=0": {"mmlu_delta_pt": -0.90},
+            "sink=4": {"mmlu_delta_pt": -1.30},
+            "sink=16": {"mmlu_delta_pt": 0.0},
+            "sink=64": {"mmlu_delta_pt": -0.30},
+        }},
+    }
+    noise, reason = _sweep_is_noise_dominated(sweep)
+    assert noise is True
+    assert "noise band" in reason
+    # The §20.2 GPU run is non-monotonic (sink=4 worse than sink=0) —
+    # the reason should call that out as corroborating evidence.
+    assert "non-monotonic" in reason
+
+
+def test_sweep_noise_gate_passes_large_resolved_spread():
+    """A spread exceeding the 2σ band → NOT noise-dominated; the
+    GREEN/YELLOW/RED verdict path is reachable."""
+    from ctm_bench.scripts.compose_sink_fp16_summary import (
+        _sweep_is_noise_dominated,
+    )
+    sweep = {
+        "rows": [{"mmlu_total": 1000}],
+        "deltas": {"per_sink_vs_fp16": {
+            "sink=0": {"mmlu_delta_pt": -6.0},
+            "sink=16": {"mmlu_delta_pt": 0.0},
+        }},
+    }
+    noise, reason = _sweep_is_noise_dominated(sweep)
+    assert noise is False
+    assert "resolved" in reason
+
+
+def test_sweep_noise_gate_skips_when_no_mmlu_data():
+    """No MMLU rows / no question count → the gate cannot assess
+    noise and returns False (the band-mapping verdict then applies)."""
+    from ctm_bench.scripts.compose_sink_fp16_summary import (
+        _sweep_is_noise_dominated,
+    )
+    noise, reason = _sweep_is_noise_dominated({"rows": [], "deltas": {}})
+    assert noise is False
+    assert "insufficient" in reason
 
 
 def test_compose_yellow_band_at_minus_0p4(tmp_path: Path):

@@ -312,6 +312,11 @@ so partners can tell which is which.
 - INT3 memory-bound variant: −0.7 pt MMLU @ 1000q at ~4.5× theoretical compression
 - FSCS-derived signals: 100% of eviction rounds make different choices on real Mistral-7B trace
 - **FP8-vs-INT4 throughput (§20.1, four-cell GPU run, Qwen2.5-7B):** vLLM FP8 KV = **1.18× FP16** on the FlashInfer backend (FP8 is a small throughput *gain*, not a cost). Route-B INT4 KIVI = **0.47× FP16 in HF transformers** — the pure-PyTorch quantize/unpack round-trip is a ~2× decode cost. Decomposition: the HF↔vLLM stack gap (25×) is what a route-A `cache_kv` integration removes; the INT4-algorithm gap (2×) travels with it and needs the Marlin-style fused unpack-attend kernel (§20.6). **Honest verdict: route-A is necessary but not sufficient — the kernel is the gating item for FP8-competitive throughput.**
+- **INT4 KV quality is within measurement noise of FP16 (§20.2, sink-FP16 sweep, 1000q):** across sink ∈ {0, 4, 16, 64}, INT4 MMLU spans 68.9–70.2% vs FP16's 70.2% — a 1.3pt spread that sits entirely inside the ±1.45pt binomial CI at 1000 questions. The −0.9pt §19.4 gap is itself within noise of zero.
+
+**Tested, inconclusive (honest — neither a win nor a failure):**
+
+- Sink-FP16 + body-INT4 mixed precision (§20.2): the hypothesis "the −0.9pt MMLU gap is carried by attention-sink tokens and sink-FP16 recovers it" is **not demonstrated**. The sweep is non-monotonic (sink=4 = −1.30pt, *worse* than the no-sink control) and noise-dominated at 1000q. No sink-FP16 recovery mechanism is resolved; a decisive test needs ~5000 questions. Documented in `PHASE4_GPU_FINDINGS.md` §20.2.
 
 **Tested-and-failed (documented as negatives — partner-shareable):**
 
@@ -325,9 +330,6 @@ Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §17.8 + §19.2.
 
 **Harness-landed, GPU-run-pending (FP8-KV competitive gap closure track):**
 
-- Sink-FP16 + body-INT4 mixed precision — sweep recipe landed for
-  sink ∈ {0, 4, 16, 64} at the full KIVI rescue stack; ~$0.50 GPU to
-  test the StreamingLLM-style quality-recovery hypothesis (§20.2)
 - Multi-model replication on Llama-3-8B + Mistral-7B — runbook recipe
   landed; ~$2-3 GPU to remove the "one-model demo" caveat (§20.3)
 - Long-context perplexity sweep at 16k/32k/50k — `--perplexity-text-path`
