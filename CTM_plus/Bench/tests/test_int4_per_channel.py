@@ -1151,8 +1151,8 @@ def test_sink_fp16_helps_body_reconstruction_on_outlier_sinks(torch_module):
 
     # The mechanism predicts cos_a >= cos_b (with the first chunk's
     # scale tuned to the non-outlier range). On 50x outlier sinks the
-    # gap should be visible — at least 0.005 cosine units, often
-    # much more depending on the scale dynamics.
+    # gap should be visible — on the seed=2026 fixture empirically
+    # ~0.041 cosine units (cos_a ≈ 0.997, cos_b ≈ 0.956).
     assert cos_a >= cos_b, (
         f"§20.2 hypothesis failed on synthetic outlier-sink data: "
         f"sink-FP16 body cosine {cos_a:.6f} should be >= no-sink "
@@ -1162,15 +1162,16 @@ def test_sink_fp16_helps_body_reconstruction_on_outlier_sinks(torch_module):
         f"check whether group_size or asymmetric is doing something "
         f"unexpected here."
     )
-    # The CPU evidence: on 50x outlier sinks at the synthetic scale,
-    # the gap should be at least 0.001 cosine units — small but
-    # measurable. The GPU run measures the real-model effect at the
-    # downstream MMLU axis.
-    assert (cos_a - cos_b) >= 0.001 or cos_b >= 0.99, (
-        f"Gap (cos_a - cos_b)={cos_a - cos_b:.6f} is below 0.001 and "
-        f"cos_b={cos_b:.6f} hasn't already saturated. Synthetic data "
-        f"may not have made the mechanism visible — but on the real "
-        f"GPU run the MMLU axis is the partner-relevant signal."
+    # Tightened threshold: empirically the gap is ~0.04 on this
+    # fixture; require at least 0.01 cosine units so a future regression
+    # that silently halves the mechanism's effect (e.g., a sign error
+    # in the per-group scale path) is caught by this test rather than
+    # only surfacing at the GPU MMLU axis.
+    assert (cos_a - cos_b) >= 0.01, (
+        f"Gap (cos_a - cos_b)={cos_a - cos_b:.6f} is below the 0.01 "
+        f"floor; on seed=2026 the expected gap is ~0.04. A regression "
+        f"that compressed the mechanism's effect (cos_a={cos_a:.6f}, "
+        f"cos_b={cos_b:.6f}) is the most likely cause."
     )
 
 

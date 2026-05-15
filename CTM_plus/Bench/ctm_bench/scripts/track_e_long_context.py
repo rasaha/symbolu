@@ -83,6 +83,12 @@ from typing import Any, Callable, List, Optional, Sequence
 from ctm_bench.policies import _add_kv_policy_to_path
 _add_kv_policy_to_path()
 
+from ctm_bench.sweep_utils import (
+    check_context_window,
+    cleanup_cuda_after_trial,
+    save_partial_json,
+)
+
 
 LOG = logging.getLogger("long_context")
 
@@ -241,6 +247,8 @@ class LongContextSummary:
     perplexity_rows: List[PerplexityAtLengthRow] = field(default_factory=list)
     needle_rows: List[NeedleRow] = field(default_factory=list)
     deltas: dict = field(default_factory=dict)
+    skipped_context_lengths_over_max_pos: List[int] = field(default_factory=list)
+    model_max_position_embeddings: Optional[int] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -341,7 +349,14 @@ def _run_needle_trial(
         next_logits = out.logits[0, -1, :]
 
     generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
-    correct = expected in generated_text
+    # Whitespace-tolerant match: the model may emit "AB C 123" instead
+    # of "ABC123" if the tokenizer split the code across tokens with
+    # interior spaces. Compare on whitespace-stripped strings so a
+    # tokenizer-induced split doesn't get scored as a wrong answer.
+    correct = (
+        expected in generated_text
+        or "".join(expected.split()) in "".join(generated_text.split())
+    )
 
     return NeedleRow(
         cache_type=cache_type,
@@ -580,6 +595,43 @@ def main(argv: Sequence[str]) -> int:
         needle_depths=needle_depths,
     )
 
+    # H3: estimate token count for the largest requested context-chars
+    # window and compare to the model's max_position_embeddings. The
+    # char-based context lengths only translate to tokens after the
+    # tokenizer runs — but `max_position_embeddings` is in tokens, so
+    # we tokenize a probe to convert. Drop over-window cells with a
+    # WARNING.
+    sample_chars = reference_text[: max(context_lengths)]
+    sample_tokens = len(tokenizer(sample_chars)["input_ids"]) if not args.dry_run else max(context_lengths)
+    chars_per_token = (
+        max(context_lengths) / max(sample_tokens, 1) if sample_tokens > 0 else 1.0
+    )
+    # For each ctx_chars, estimate the token count from the empirical
+    # ratio and check against max_pos.
+    estimated_token_lengths = [
+        int(c / max(chars_per_token, 1e-6)) for c in context_lengths
+    ]
+    allowed_tokens, skipped_tokens, max_pos = check_context_window(
+        model=model, requested_tokens=estimated_token_lengths,
+    )
+    allowed_set = set(allowed_tokens)
+    new_context_lengths = []
+    skipped_context_lengths = []
+    for c, tok_est in zip(context_lengths, estimated_token_lengths):
+        if tok_est in allowed_set:
+            new_context_lengths.append(c)
+        else:
+            skipped_context_lengths.append(c)
+            LOG.warning(
+                "Skipping context_length=%d chars (~%d tokens) — exceeds "
+                "model.config.max_position_embeddings=%d",
+                c, tok_est, max_pos,
+            )
+    context_lengths = new_context_lengths
+    summary.context_lengths = context_lengths
+    summary.skipped_context_lengths_over_max_pos = skipped_context_lengths
+    summary.model_max_position_embeddings = max_pos
+
     baseline_factory = qe._baseline_cache_factory()
     int4_factory = qe._int4_per_channel_cache_factory(
         sink_size=args.sink_size,
@@ -588,6 +640,11 @@ def main(argv: Sequence[str]) -> int:
         asymmetric=args.asymmetric_int4,
         bits=args.bits,
     )
+
+    # H1: write the partial JSON before any trial so the model-config
+    # metadata + skipped-cells info survives a crash before the first
+    # measurement.
+    save_partial_json(summary, args.output)
 
     # ---- Perplexity sweep ----
     if not args.skip_perplexity:
@@ -608,6 +665,12 @@ def main(argv: Sequence[str]) -> int:
                     ctx_chars, row.context_length_tokens, cache_label,
                     row.perplexity,
                 )
+                # H2: free GPU memory between trials so the caching
+                # allocator doesn't drift toward OOM across the sweep.
+                cleanup_cuda_after_trial()
+                # H1: persist after each perplexity measurement.
+                summary.deltas = _compute_deltas(summary)
+                save_partial_json(summary, args.output)
 
     # ---- Needle-in-haystack ----
     if not args.skip_needle:
@@ -642,9 +705,16 @@ def main(argv: Sequence[str]) -> int:
                             "  correct=%s generated=%r",
                             row.correct, row.generated_text[:60],
                         )
+                        # H2: free GPU memory between trials. Each
+                        # needle trial holds a fresh cache of up to
+                        # 16 GB at 32k FP16 — critical.
+                        cleanup_cuda_after_trial()
+                        # H1: persist after each trial.
+                        summary.deltas = _compute_deltas(summary)
+                        save_partial_json(summary, args.output)
 
     summary.deltas = _compute_deltas(summary)
-    args.output.write_text(json.dumps(asdict(summary), indent=2))
+    save_partial_json(summary, args.output)
     print(f"Wrote {args.output}")
 
     # Reader-friendly stdout summary.

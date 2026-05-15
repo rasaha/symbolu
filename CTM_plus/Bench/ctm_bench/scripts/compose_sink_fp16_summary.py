@@ -32,32 +32,52 @@ GREEN_THRESHOLD_PT = -0.3   # MMLU delta <= -0.3pt → GREEN (FP8-competitive)
 YELLOW_THRESHOLD_PT = -0.5  # MMLU delta in [-0.5, -0.3) → YELLOW
 
 
-def _verdict_best_sink(best_mmlu_delta_pt: Optional[float]) -> str:
+def _verdict_best_sink(
+    best_mmlu_delta_pt: Optional[float],
+    sink0_mmlu_delta_pt: Optional[float] = None,
+) -> str:
     """Map the BEST per-sink MMLU delta vs FP16 baseline to the
     runbook's GREEN/YELLOW/RED bands. The thresholds are pre-decided
-    in PHASE4_GPU_FINDINGS §20.2."""
+    in PHASE4_GPU_FINDINGS §20.2.
+
+    `sink0_mmlu_delta_pt` is the control measurement (the §19.4 ship
+    config's MMLU gap, which on Qwen2.5-7B was −0.9pt at 1000q). When
+    provided, the verdict text reports the actual measured control
+    instead of hardcoding −0.9pt — important when the GPU run lands a
+    different control number (statistical noise can push the §19.4
+    reproduction to −0.7pt or −1.1pt depending on seed / question
+    subset).
+    """
     if best_mmlu_delta_pt is None:
         return "MEASUREMENT MISSING — sweep didn't produce MMLU deltas"
+
+    def _fmt_control() -> str:
+        if sink0_mmlu_delta_pt is None:
+            return "the §19.4 reproduction (−0.9pt baseline expected)"
+        return f"the sink=0 control ({sink0_mmlu_delta_pt:+.2f}pt @1000q)"
+
     # Note: MMLU delta vs FP16 is typically negative (quantization
     # hurts). "Better" means closer to 0 (less hurt).
     if best_mmlu_delta_pt >= GREEN_THRESHOLD_PT:
         return (
-            "**GREEN.** Quality is competitive with FP8 KV. "
-            "**Algorithm axis closed.** Update the VC brief's 'Measured' "
-            "table; the −0.9pt @1000q gap is recovered by sink-FP16 + "
-            "body-INT4."
+            f"**GREEN.** Quality is competitive with FP8 KV. "
+            f"**Algorithm axis closed.** Update the VC brief's "
+            f"'Measured' table; {_fmt_control()} is recovered by "
+            f"sink-FP16 + body-INT4."
         )
     if best_mmlu_delta_pt >= YELLOW_THRESHOLD_PT:
         return (
-            "**YELLOW.** Materially better than −0.9pt but still trails "
-            "FP8. Partner-shareable; consider AWQ-style sink-specific "
-            "calibration for the remaining gap (~3-5 engineer-days)."
+            f"**YELLOW.** Materially better than {_fmt_control()} but "
+            f"still trails FP8. Partner-shareable; consider AWQ-style "
+            f"sink-specific calibration for the remaining gap "
+            f"(~3-5 engineer-days)."
         )
     return (
-        "**RED.** Sink-FP16 doesn't recover the gap. The −0.9pt MMLU "
-        "delta is distributed across positions, not concentrated on "
-        "sinks. Investigate per-layer bit allocation or per-head "
-        "dynamic quant before further sink-axis work."
+        f"**RED.** Sink-FP16 doesn't recover the gap relative to "
+        f"{_fmt_control()}. The MMLU delta is distributed across "
+        f"positions, not concentrated on sinks. Investigate "
+        f"per-layer bit allocation or per-head dynamic quant before "
+        f"further sink-axis work."
     )
 
 
@@ -168,7 +188,7 @@ def render_markdown(sweep: dict) -> str:
             f"* Best sink = **{best_sink}** at Δ_MMLU vs FP16 = "
             f"**{best_delta:+.2f}pt**{improvement_str}."
         )
-        lines.append(f"* {_verdict_best_sink(best_delta)}")
+        lines.append(f"* {_verdict_best_sink(best_delta, sink0_delta)}")
     else:
         lines.append("* No non-zero sink in the sweep produced a usable delta.")
     lines.append("")
@@ -180,6 +200,7 @@ def build_json_summary(sweep: dict) -> dict:
     deltas = sweep.get("deltas", {})
     per_sink_vs_fp16 = deltas.get("per_sink_vs_fp16", {})
     best_sink, best_delta = _find_best_sink(per_sink_vs_fp16)
+    sink0_delta = per_sink_vs_fp16.get("sink=0", {}).get("mmlu_delta_pt")
     return {
         "schema_version": "§20.2.v1",
         "source_sweep": sweep.get("schema_version"),
@@ -192,16 +213,14 @@ def build_json_summary(sweep: dict) -> dict:
         "control_int4_at_sink_0": {
             "mmlu_accuracy": deltas.get("sink0_mmlu_accuracy"),
             "perplexity": deltas.get("sink0_perplexity"),
-            "mmlu_delta_pt_vs_fp16": per_sink_vs_fp16.get(
-                "sink=0", {},
-            ).get("mmlu_delta_pt"),
+            "mmlu_delta_pt_vs_fp16": sink0_delta,
         },
         "per_sink_vs_fp16": per_sink_vs_fp16,
         "best_non_zero_sink": {
             "sink_size": best_sink,
             "mmlu_delta_pt_vs_fp16": best_delta,
         },
-        "verdict": _verdict_best_sink(best_delta),
+        "verdict": _verdict_best_sink(best_delta, sink0_delta),
         "decision_tree_thresholds_pt": {
             "green": GREEN_THRESHOLD_PT,
             "yellow": YELLOW_THRESHOLD_PT,

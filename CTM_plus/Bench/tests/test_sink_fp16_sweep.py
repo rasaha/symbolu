@@ -236,6 +236,35 @@ def test_compose_find_best_sink_excludes_zero():
     assert delta == pytest.approx(-0.2)
 
 
+def test_compose_verdict_uses_measured_control_not_hardcoded():
+    """M2 fix: the verdict text must reference the ACTUAL measured
+    sink=0 control delta, not hardcode `−0.9pt`. If the GPU run
+    produces a different control (e.g., −1.1pt or −0.7pt due to
+    statistical noise on a different question subset), the verdict
+    should reflect that number.
+    """
+    from ctm_bench.scripts.compose_sink_fp16_summary import _verdict_best_sink
+
+    # GREEN case with control = -0.75pt (different from the
+    # historical -0.9pt).
+    v = _verdict_best_sink(-0.20, sink0_mmlu_delta_pt=-0.75)
+    assert "-0.75" in v or "−0.75" in v, (
+        f"verdict text must include the measured control -0.75 pt; "
+        f"got: {v!r}"
+    )
+    # YELLOW case with control = -1.10pt.
+    v = _verdict_best_sink(-0.40, sink0_mmlu_delta_pt=-1.10)
+    assert "-1.10" in v or "−1.10" in v
+    # RED case with control = -0.85pt.
+    v = _verdict_best_sink(-0.60, sink0_mmlu_delta_pt=-0.85)
+    assert "-0.85" in v or "−0.85" in v
+
+    # When control is None (composer called against a partial sweep
+    # without sink=0), fall back to the historical reference language.
+    v = _verdict_best_sink(-0.20, sink0_mmlu_delta_pt=None)
+    assert "§19.4" in v or "−0.9pt" in v or "-0.9pt" in v
+
+
 def test_compose_handles_missing_mmlu_gracefully(tmp_path: Path):
     """If the sweep ran without MMLU (only perplexity), composer should
     return verdict="MEASUREMENT MISSING" rather than crash."""

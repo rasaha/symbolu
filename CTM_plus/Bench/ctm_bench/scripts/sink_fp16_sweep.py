@@ -56,6 +56,11 @@ from typing import Any, List, Optional, Sequence
 from ctm_bench.policies import _add_kv_policy_to_path
 _add_kv_policy_to_path()
 
+from ctm_bench.sweep_utils import (
+    cleanup_cuda_after_trial,
+    save_partial_json,
+)
+
 
 LOG = logging.getLogger("sink_fp16_sweep")
 
@@ -293,6 +298,10 @@ def main(argv: Sequence[str]) -> int:
 
     baseline_factory = qe._baseline_cache_factory()
 
+    # H1: persist a partial JSON before the first cell so the operator
+    # always sees a valid file even if the FP16 baseline crashes.
+    save_partial_json(summary, args.output)
+
     # --- Baseline (FP16) row at sink_size=0 — measured once, applies
     # to all sink values for the "vs FP16" delta block. We DON'T
     # re-run baseline per sink_size; FP16 has no sink_size axis. ---
@@ -307,6 +316,8 @@ def main(argv: Sequence[str]) -> int:
             perplexity=base_p.perplexity,
             nll_per_token=base_p.nll_per_token,
         ))
+        cleanup_cuda_after_trial()
+        save_partial_json(summary, args.output)
     if "mmlu" in eval_kinds:
         LOG.info("Baseline FP16: MMLU (%d questions)", len(mmlu_questions))
         base_m = qe.compute_mmlu_accuracy(
@@ -331,6 +342,8 @@ def main(argv: Sequence[str]) -> int:
             existing.mmlu_correct = base_m.correct
             existing.mmlu_total = base_m.num_questions
             existing.mmlu_accuracy = base_m.accuracy
+        cleanup_cuda_after_trial()
+        save_partial_json(summary, args.output)
 
     # --- Per-sink INT4 cells ---
     for sink in sink_values:
@@ -353,6 +366,7 @@ def main(argv: Sequence[str]) -> int:
             )
             row.perplexity = p.perplexity
             row.nll_per_token = p.nll_per_token
+            cleanup_cuda_after_trial()
         if "mmlu" in eval_kinds:
             m = qe.compute_mmlu_accuracy(
                 model=model, tokenizer=tokenizer, questions=mmlu_questions,
@@ -361,6 +375,7 @@ def main(argv: Sequence[str]) -> int:
             row.mmlu_correct = m.correct
             row.mmlu_total = m.num_questions
             row.mmlu_accuracy = m.accuracy
+            cleanup_cuda_after_trial()
         summary.rows.append(row)
         LOG.info(
             "  sink=%d: ppl=%s mmlu=%s",
@@ -368,10 +383,13 @@ def main(argv: Sequence[str]) -> int:
             f"{row.perplexity:.4f}" if row.perplexity is not None else "n/a",
             f"{row.mmlu_accuracy:.4f}" if row.mmlu_accuracy is not None else "n/a",
         )
+        # H1: update deltas + persist after each sink cell so a crash
+        # in a later sink doesn't lose the earlier measurements.
+        summary.deltas = _compute_deltas_vs_sink_zero(summary.rows)
+        save_partial_json(summary, args.output)
 
     summary.deltas = _compute_deltas_vs_sink_zero(summary.rows)
-
-    args.output.write_text(json.dumps(asdict(summary), indent=2))
+    save_partial_json(summary, args.output)
     print(f"Wrote {args.output}")
 
     # Reader-friendly stdout summary.

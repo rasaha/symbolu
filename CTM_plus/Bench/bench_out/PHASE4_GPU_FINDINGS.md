@@ -2551,7 +2551,11 @@ the route-B INT4PerChannelCache.
   same composer entry), haystack/needle builders, and the band
   boundaries.
 
-**Runbook recipe (TBD: GPU run, ~$0.50, ~30 min wall on A100 40GB):**
+**Runbook recipe (TBD: GPU run, ~$0.50-$1.50, ~30-90 min wall on
+A100 40 GB):** the wide range reflects INT4 prefill at 32k being 2-5×
+slower than FP16 in the pure-PyTorch unpack path (the §20.6 fused
+kernel would close most of that gap). Char-level needle depth — see
+`RUNPOD_TRACK_D_E_RUNBOOK.md` §5k for the literature-comparability note.
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench

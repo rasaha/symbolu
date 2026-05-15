@@ -613,7 +613,22 @@ heavy compression. The brief's §20.4 explicitly says RULER /
 Needle-in-Haystack is the preferred pattern if available; this is
 that.
 
-Re-run cost: ~$0.50 (~30 min wall on A100 40 GB).
+Re-run cost: **~$0.50 - $1.50 (~30 - 90 min wall on A100 40 GB)**.
+The wide range reflects: INT4 prefill at 32k is 2-5× slower than FP16
+in pure-PyTorch unpack mode (the harness's path; a fused kernel —
+§20.6 — would close most of that). Real cost depends on (a) how much
+of the sweep lands at 32k vs 4k/16k cells, (b) how many trials per
+context length the operator chose. Use `--context-lengths 4096,16384`
+on a 40 GB card if 32k baseline OOMs.
+
+**Char-vs-token depth note:** the needle insertion uses char-level
+depth (insert at `int(len(haystack) * depth_percent)` chars). The
+literature (RULER, Anthropic Claude 2 100k post) typically uses
+token-level depth. Our internal baseline-vs-INT4 comparisons are
+apples-to-apples (both caches see the same haystack at the same char
+position), but if a partner runs RULER for direct comparison, expect
+some position drift due to tokenizer compression varying with text
+density.
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench
