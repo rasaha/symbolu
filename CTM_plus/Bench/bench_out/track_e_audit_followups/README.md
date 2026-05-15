@@ -27,7 +27,8 @@ on which axes you fill in).
 | `sink_fp16_sweep.json` | `python -m ctm_bench.scripts.sink_fp16_sweep --output ...` (single-load sweep over sink ∈ {0, 4, 16, 64}) | §20.2 |
 | `sink_fp16_summary.json` | `python -m ctm_bench.scripts.compose_sink_fp16_summary --json-output ...` (composed `§20.2.v1` artefact with GREEN/YELLOW/RED verdict) | §20.2 |
 | `llama3_8b_mmlu_1000.json` / `mistral_7b_mmlu_1000.json` | `track_e_quality_eval --model ...` | §20.3 |
-| `int4_perplexity_32k.json` | `track_e_quality_eval --perplexity-text-path ...` | §20.4 |
+| `long_context.json` | `python -m ctm_bench.scripts.track_e_long_context --output ...` (perplexity sweep + needle-in-haystack in one model load) | §20.4 |
+| `long_context_summary.json` | `python -m ctm_bench.scripts.compose_long_context_summary --json-output ...` (composed `§20.4.v1` artefact with combined GREEN/YELLOW/RED verdict) | §20.4 |
 
 The two vLLM cells (A, B) produce `streaming_summary.json` under
 `bench_out/fp8_int4_throughput/{vllm_fp16, vllm_fp8}/` per the

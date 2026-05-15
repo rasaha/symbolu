@@ -600,23 +600,30 @@ done
 | −2.0pt+ | Model-specific failure. Investigate per-layer; consider per-model bits config. |
 | −0.2pt or better | Bonus — Qwen result is conservative. |
 
-## 5k. Long-context perplexity at 32k (§20.4)
+## 5k. Long-context validation at 32k (§20.4) — perplexity + needle-in-haystack
 
 KV compression's headline value is long-context. Qwen2.5-7B at 32k:
 weights ~14 GB, KV at FP16 ~16 GB. Compression payoff is here.
 
-Re-run cost: ~$0.50 (~30 min wall). Requires a long passage —
-download a 35k-char Wikipedia chapter on the GPU pod first:
+Uses the single-load `track_e_long_context.py` harness — perplexity
+sweep AND needle-in-haystack retrieval in one model load, one JSON.
+The needle eval is the partner-relevant signal: a model can have
+similar perplexity but fail to retrieve specific information under
+heavy compression. The brief's §20.4 explicitly says RULER /
+Needle-in-Haystack is the preferred pattern if available; this is
+that.
+
+Re-run cost: ~$0.50 (~30 min wall on A100 40 GB).
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench
 
-# Fetch a long passage (~50k chars) for the 32k cell. Pick any
-# topic; the script tokenizes it and truncates if needed.
+# Fetch a long passage (~60k chars) for the haystack base text.
+# Pick any topic; the harness truncates to each requested context
+# length.
 python -c "
 from datasets import load_dataset
 ds = load_dataset('wikitext', 'wikitext-103-raw-v1', split='test')
-# Pick a chunk of contiguous articles; aim for >50k chars after join.
 text = ''
 for row in ds:
     text += row['text']
@@ -626,30 +633,38 @@ open('/tmp/wikitext_long.txt', 'w').write(text[:60000])
 print('Wrote', len(text[:60000]), 'chars to /tmp/wikitext_long.txt')
 "
 
-# Run perplexity at three context lengths to map the quality curve.
-for MAX_CHARS in 16000 32000 50000; do
-  mkdir -p /tmp/longctx_${MAX_CHARS}
-  python -m ctm_bench.scripts.track_e_quality_eval \
-      --model Qwen/Qwen2.5-7B-Instruct \
-      --dtype float16 --device cuda \
-      --eval perplexity \
-      --quant int4-per-channel \
-      --k-group-size 32 --v-group-size 32 \
-      --asymmetric-int4 \
-      --perplexity-text-path /tmp/wikitext_long.txt \
-      --perplexity-text-max-chars ${MAX_CHARS} \
-      --output-dir /tmp/longctx_${MAX_CHARS} \
-      2>&1 | tee /tmp/longctx_${MAX_CHARS}/run.log
-done
+# Combined perplexity + needle sweep at 4k/16k/32k chars (4k char
+# ≈ 1k tokens for Qwen; 32k char ≈ 8k tokens; tune per model).
+python -m ctm_bench.scripts.track_e_long_context \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --device cuda --dtype float16 \
+    --perplexity-text-path /tmp/wikitext_long.txt \
+    --context-lengths 4096,16384,32768 \
+    --needle-depths 0.1,0.5,0.9 \
+    --needle-samples 3 \
+    --output bench_out/track_e_audit_followups/long_context.json
+
+# Compose the §20.4 markdown table + merged §20.4.v1 JSON:
+python -m ctm_bench.scripts.compose_long_context_summary \
+    --input bench_out/track_e_audit_followups/long_context.json \
+    --json-output bench_out/track_e_audit_followups/long_context_summary.json \
+    > /tmp/section_20_4_table.md
+cat /tmp/section_20_4_table.md
 ```
 
-**Decision tree (32k INT4 perplexity ratio):**
+**Decision tree (combined verdict at the largest context length):**
 
-| Ratio | Verdict |
-|---|---|
-| ≤ 1.05 | ✅ Long-context quality holds. Partner-shareable. |
-| 1.05–1.15 | YELLOW — degrades at 32k. Consider per-layer bits. |
-| > 1.20 | Long-context failure. Major issue; investigate before further long-context partner conversations. |
+| Ppl ratio | Needle Δ | Combined verdict |
+|---|---|---|
+| ≤ 1.05 AND | ≥ −5pt | ✅ **GREEN.** Long-context quality holds. Partner-shareable. |
+| ≤ 1.15 AND | ≥ −10pt | **YELLOW.** Quality degrades but materially better than RED. |
+| Either axis worse | — | **RED.** Long-context failure. Major issue; investigate before further long-context partner conversations. |
+
+If 32k OOMs at FP16 baseline (~30 GB combined: 14 GB weights + 16 GB
+KV), drop to `--context-lengths 4096,16384` or use bfloat16. INT4
+should still fit at 32k since the KV is 3.2× smaller. The harness
+also supports `--skip-needle` (perplexity-only) and `--skip-perplexity`
+(needle-only) for partial sweeps when GPU memory is tight.
 
 If 32k OOMs at FP16 baseline (~30 GB combined: 14 GB weights + 16 GB
 KV), drop to MAX_CHARS=24000 for the baseline cell. INT4 should still

@@ -2512,26 +2512,80 @@ The §18 + §19 results are at 282 prefill tokens. **We have not
 validated at the context length where the compression actually pays
 off.** The VC brief's "Honest Validation Status" flags this.
 
-**Two-axis sweep (TBD: GPU run, ~$0.50):**
+**Two-axis eval (one harness, one model load):**
 
-1. **Perplexity at 32k.** Use a long passage (Wikipedia or arXiv
-   chapter ≥ 35k chars). The `track_e_quality_eval.py` perplexity
-   path already supports a single chunk; extend `PERPLEXITY_TEXT`
-   to load from a file path via a new `--perplexity-text-path` flag
-   (CPU-side patch in the same commit as this section). Run both
-   FP16 baseline and INT4 KIVI; report ratio.
-2. **Throughput at 32k.** Already in §20.1's `track_e_throughput.py`
-   — add `32768` to `--prefill-lengths` (the script accepts it). The
-   prefill takes longer than the decode at 32k, so the prefill-cost
-   axis (where FP8 has a hardware advantage) becomes visible.
+1. **Perplexity sweep** at multiple context lengths. The §19.4
+   result (1.024×) was at 282 tokens; this measures whether quality
+   holds at the context length where compression actually pays off.
+2. **Needle-in-haystack** retrieval at multiple (depth %, context
+   length) pairs. Inserts a unique fact ("the secret code is X")
+   at depth N% of a filler passage and asks the model to retrieve
+   it. Tests **functional capability**, not just average loss — a
+   model can have similar perplexity but fail to retrieve specific
+   information under heavy compression. This is the partner-relevant
+   signal for long-context applications.
 
-**Decision tree (32k perplexity ratio at INT4):**
+The repo's existing needle-haystack harness
+(`/test_needle_haystack.py`) targets the in-house `phase_transformer`
+model and isn't directly reusable. We lift its haystack texts /
+needle templates and reimplement the scoring for HF transformers +
+the route-B INT4PerChannelCache.
 
-| Ratio | Verdict |
-|---|---|
-| ≤ 1.05 | ✅ Long-context quality holds at our shape (KIVI's published claim reproduces). Partner-shareable. |
-| 1.05–1.15 | YELLOW — quality degrades at 32k. Investigate per-layer behaviour; possibly use higher bits on selected layers. |
-| > 1.20 | Long-context-specific failure. The 282-token result is a short-context artifact. **Major issue** — investigate before further partner conversations on long-context use cases. |
+**Code (landed this session, CPU-side):**
+
+* `ctm_bench/scripts/track_e_long_context.py` — single-load harness.
+  Perplexity at N context lengths × 2 caches; needle at N lengths ×
+  M depths × K samples × 2 caches. Dry-runnable with the fake tiny
+  model. Output JSON pinned at `§20.4.v1` schema.
+* `ctm_bench/scripts/compose_long_context_summary.py` — composer.
+  Maps perplexity ratio + needle delta to GREEN/YELLOW/RED bands at
+  pre-decided thresholds (ppl ratio ≤ 1.05 / ≤ 1.15; needle delta
+  ≥ −5pt / ≥ −10pt). Combined verdict = worst of the two axes:
+  perplexity-holds-but-needle-fails still reads as a long-context
+  failure, which is the whole point of running needle in addition
+  to perplexity.
+* `tests/test_long_context.py` — 11 CPU regression tests covering
+  dry-run schema, perplexity-only / needle-only modes, the
+  context-length-key JOIN invariant (perplexity rows and needle rows
+  share the same `context_length_chars` so they appear under the
+  same composer entry), haystack/needle builders, and the band
+  boundaries.
+
+**Runbook recipe (TBD: GPU run, ~$0.50, ~30 min wall on A100 40GB):**
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+
+# Fetch a long reference passage (one-off; reused across the sweep).
+# See RUNPOD_TRACK_D_E_RUNBOOK §5k for the wikitext fetch recipe.
+
+python -m ctm_bench.scripts.track_e_long_context \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --device cuda --dtype float16 \
+    --perplexity-text-path /tmp/wikitext_long.txt \
+    --context-lengths 4096,16384,32768 \
+    --needle-depths 0.1,0.5,0.9 \
+    --needle-samples 3 \
+    --output bench_out/track_e_audit_followups/long_context.json
+
+# Compose the §20.4 markdown table + merged §20.4.v1 JSON:
+python -m ctm_bench.scripts.compose_long_context_summary \
+    --input bench_out/track_e_audit_followups/long_context.json \
+    --json-output bench_out/track_e_audit_followups/long_context_summary.json \
+    > /tmp/section_20_4_table.md
+cat /tmp/section_20_4_table.md
+```
+
+**Decision tree (combined verdict at the largest context length):**
+
+| Ppl ratio | Needle Δ | Combined verdict |
+|---|---|---|
+| ≤ 1.05 | ≥ −5pt | ✅ **GREEN.** Long-context quality holds. Partner-shareable. |
+| ≤ 1.15 | ≥ −10pt | **YELLOW.** Quality degrades but materially better than RED. |
+| Either axis worse | — | **RED.** Long-context failure. Major issue; investigate before further long-context partner conversations. |
+
+The thresholds are pinned by
+`Bench/tests/test_long_context.py::test_composer_decision_tree_boundaries`.
 
 ### §20.5 Route-A vLLM `cache_kv` hook — engineering plan
 
