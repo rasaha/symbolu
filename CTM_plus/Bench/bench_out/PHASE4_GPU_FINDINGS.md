@@ -2471,9 +2471,29 @@ scale computation works on any (S, H, D) shape. Group_size=32 along
 the seq axis is also shape-agnostic. There is no Qwen-specific code
 in the INT4 path.
 
-**Runbook recipe (TBD: GPU run, ~$2-3 total for the two models):**
+**Code (landed this session, CPU-side):**
+
+* `ctm_bench/scripts/compose_multi_model_summary.py` — composer.
+  Reads N per-model `track_e_quality_eval` JSONs (one per model from
+  the bash-loop recipe below), extracts each model's MMLU + ppl
+  deltas vs its OWN FP16 baseline, maps each to a per-model
+  GREEN/YELLOW/RED band, and emits a cross-model verdict that is
+  the **worst** of the per-model verdicts (one failing model means
+  INT4 doesn't generalize, even if the others pass). Decision-tree
+  thresholds pre-decided: MMLU GREEN ≥ −1.5pt (matches KIVI literature
+  range), YELLOW ≥ −3.0pt. Output JSON pinned at `§20.3.v1` schema.
+* `tests/test_compose_multi_model_summary.py` — 10 CPU regression
+  tests covering: 3-model happy path, worst-of-models verdict
+  semantics, YELLOW intermediate band, decision-tree boundaries,
+  missing-file graceful handling, MMLU-missing falls back to
+  perplexity-only verdict, label parsing (`label=path`).
+
+**Runbook recipe (TBD: GPU run, ~$2-3 total for the two models, ~45 min
+wall each on A100 40 GB):**
 
 ```bash
+cd /workspace/symbolu/CTM_plus/Bench
+
 for MODEL in meta-llama/Meta-Llama-3-8B-Instruct mistralai/Mistral-7B-Instruct-v0.3; do
   TAG=$(echo $MODEL | tr '/' '_')
   mkdir -p /tmp/multi_model/$TAG
@@ -2488,18 +2508,36 @@ for MODEL in meta-llama/Meta-Llama-3-8B-Instruct mistralai/Mistral-7B-Instruct-v
       --output-dir /tmp/multi_model/$TAG \
       2>&1 | tee /tmp/multi_model/$TAG/run.log
 done
+
+# Compose the §20.3 markdown table + merged §20.3.v1 JSON
+# (Qwen-7B path uses the existing §19.4 measured artefact):
+python -m ctm_bench.scripts.compose_multi_model_summary \
+    --inputs \
+        Qwen-7B=bench_out/track_e_audit_followups/int4_mmlu_1000.json \
+        Llama-3-8B=/tmp/multi_model/meta-llama_Meta-Llama-3-8B-Instruct/results.json \
+        Mistral-7B=/tmp/multi_model/mistralai_Mistral-7B-Instruct-v0.3/results.json \
+    --json-output bench_out/track_e_audit_followups/multi_model_summary.json \
+    > /tmp/section_20_3_table.md
+cat /tmp/section_20_3_table.md
 ```
 
-**Decision tree:**
+Note the Qwen-7B entry reuses the existing §19.4 measured 1000q
+artefact — no need to re-run Qwen.
 
-| Llama-3-8B / Mistral-7B MMLU delta | Verdict |
+**Decision tree (cross-model verdict — the worst of per-model verdicts):**
+
+| Worst per-model MMLU delta | Verdict |
 |---|---|
-| Within ±0.5pt of Qwen's −0.9pt | ✅ Cross-model generalization holds. "Multi-model demo" caveat removed. |
-| Materially worse (e.g., −2.0pt+) on one model | Model-specific failure. Investigate which layers; consider per-model bit allocation. |
-| Materially better (e.g., −0.2pt) on one model | The Qwen result is conservative. Bonus. |
+| ≥ −1.5pt (matches KIVI literature) | ✅ **GREEN.** Cross-model generalization holds. "Multi-model demo" caveat removed. |
+| ≥ −3.0pt (one model trails) | **YELLOW.** Partner-shareable with per-model caveat; investigate the trailing model's per-subject MMLU breakdown. |
+| Worse than −3.0pt | **RED.** Model-specific INT4 failure. Investigate per-layer behavior; consider per-model bit allocation. |
 
-**Expected outcome:** within ±0.5pt of Qwen for both models. KIVI's
-published numbers support this.
+Thresholds pinned by `Bench/tests/test_compose_multi_model_summary.py::test_decision_tree_band_boundaries`.
+
+**Expected outcome:** GREEN across all three models. KIVI's published
+cross-model numbers (Llama-2 / Gemma family) all land in the same
+−1pt MMLU range; we expect Llama-3 + Mistral to behave similarly on
+the same algorithm (group=32 + asymmetric, no model-specific tuning).
 
 ### §20.4 Long-context validation at 32k
 

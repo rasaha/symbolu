@@ -26,7 +26,8 @@ on which axes you fill in).
 | `fp8_int4_comparison.json` | `python -m ctm_bench.scripts.compose_throughput_comparison --json-output ...` (composed from cells A/B/C/D) | §20.1 |
 | `sink_fp16_sweep.json` | `python -m ctm_bench.scripts.sink_fp16_sweep --output ...` (single-load sweep over sink ∈ {0, 4, 16, 64}) | §20.2 |
 | `sink_fp16_summary.json` | `python -m ctm_bench.scripts.compose_sink_fp16_summary --json-output ...` (composed `§20.2.v1` artefact with GREEN/YELLOW/RED verdict) | §20.2 |
-| `llama3_8b_mmlu_1000.json` / `mistral_7b_mmlu_1000.json` | `track_e_quality_eval --model ...` | §20.3 |
+| per-model `results.json` under `bench_out/multi_model/<model_tag>/` | `track_e_quality_eval --model ... --output-dir ...` (one bash-loop invocation per model — Llama-3-8B + Mistral-7B) | §20.3 |
+| `multi_model_summary.json` | `python -m ctm_bench.scripts.compose_multi_model_summary --json-output ...` (composed `§20.3.v1` artefact with cross-model GREEN/YELLOW/RED verdict) | §20.3 |
 | `long_context.json` | `python -m ctm_bench.scripts.track_e_long_context --output ...` (perplexity sweep + needle-in-haystack in one model load) | §20.4 |
 | `long_context_summary.json` | `python -m ctm_bench.scripts.compose_long_context_summary --json-output ...` (composed `§20.4.v1` artefact with combined GREEN/YELLOW/RED verdict) | §20.4 |
 

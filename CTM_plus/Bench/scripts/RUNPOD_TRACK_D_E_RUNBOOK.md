@@ -571,7 +571,8 @@ Removes the "one-model demo" caveat. The route-B cache wrapper is
 model-agnostic: dynamic per-block scales work on any (S, H, D) shape,
 and the group_size=32 along the seq axis is shape-agnostic.
 
-Re-run cost: ~$2-3 (one run per model, ~30-45 min wall each on A100 40GB).
+Re-run cost: ~$2-3 (one run per model, ~30-45 min wall each on A100 40 GB).
+Each model is its own ~14 GB load — no shared-load sweep possible.
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench
@@ -590,15 +591,30 @@ for MODEL in meta-llama/Meta-Llama-3-8B-Instruct mistralai/Mistral-7B-Instruct-v
       --output-dir /tmp/multi_model/$TAG \
       2>&1 | tee /tmp/multi_model/$TAG/run.log
 done
+
+# Compose the §20.3 markdown + merged §20.3.v1 JSON. Reuses the §19.4
+# measured Qwen artefact so we don't pay GPU spend for the Qwen leg.
+python -m ctm_bench.scripts.compose_multi_model_summary \
+    --inputs \
+        Qwen-7B=bench_out/track_e_audit_followups/int4_mmlu_1000.json \
+        Llama-3-8B=/tmp/multi_model/meta-llama_Meta-Llama-3-8B-Instruct/results.json \
+        Mistral-7B=/tmp/multi_model/mistralai_Mistral-7B-Instruct-v0.3/results.json \
+    --json-output bench_out/track_e_audit_followups/multi_model_summary.json \
+    > /tmp/section_20_3_table.md
+cat /tmp/section_20_3_table.md
 ```
 
-**Decision tree per model:**
+**Decision tree (cross-model verdict = worst per-model verdict):**
 
-| MMLU delta | Verdict |
+| Worst per-model MMLU delta | Verdict |
 |---|---|
-| Within ±0.5pt of Qwen's −0.9pt | ✅ Generalizes. Caveat removed. |
-| −2.0pt+ | Model-specific failure. Investigate per-layer; consider per-model bits config. |
-| −0.2pt or better | Bonus — Qwen result is conservative. |
+| ≥ −1.5pt (matches KIVI literature) | ✅ **GREEN.** Cross-model generalization holds. Caveat removed. |
+| ≥ −3.0pt | **YELLOW.** Partner-shareable with per-model caveat; check the trailing model's per-subject breakdown. |
+| Worse than −3.0pt | **RED.** Model-specific failure. Investigate per-layer; consider per-model bits config. |
+
+One failing model is enough to flip cross-model to RED — the partner-
+relevant signal is "does INT4 work on every model we tested", not
+"average across models". Pinned by composer regression tests.
 
 ## 5k. Long-context validation at 32k (§20.4) — perplexity + needle-in-haystack
 
