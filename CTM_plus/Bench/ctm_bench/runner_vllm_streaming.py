@@ -534,6 +534,7 @@ class AsyncEngineDriver:
         phase4_fast_hooks: bool = False,
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
+        kv_cache_dtype: Optional[str] = None,
         vllm_module: Any = None,
     ) -> None:
         self.model = model
@@ -610,6 +611,23 @@ class AsyncEngineDriver:
         )
         self.phase4_use_cython_evictor = bool(phase4_use_cython_evictor)
         self.phase4_fast_hooks = bool(phase4_fast_hooks)
+        # FP8 KV cache lane (the competitor for the route-B INT4 work).
+        # When set, the value is forwarded to vLLM's AsyncEngineArgs as
+        # ``kv_cache_dtype`` — "fp8" / "fp8_e4m3" / "fp8_e5m2" / "auto".
+        # vLLM 0.7+ supports "fp8" on H100/A100 via the hardware tensor
+        # cores. The runner's other measurement plumbing (swap counters,
+        # tokens/sec) is unaffected by the KV dtype choice, so the same
+        # cell shape covers FP16 baseline vs FP8 in two runs.
+        # See ``Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md`` for the
+        # cell composition.
+        if kv_cache_dtype is not None and kv_cache_dtype not in (
+            "auto", "fp8", "fp8_e4m3", "fp8_e5m2", "fp16", "bf16",
+        ):
+            raise ValueError(
+                f"kv_cache_dtype={kv_cache_dtype!r}; expected one of "
+                f"'auto', 'fp8', 'fp8_e4m3', 'fp8_e5m2', 'fp16', 'bf16'"
+            )
+        self.kv_cache_dtype = kv_cache_dtype
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -705,6 +723,13 @@ class AsyncEngineDriver:
             # prefix caching, vs no evictor without).
             "preemption_mode": "swap",
         }
+        # FP8 KV cache lane. Only set the field when the caller asked
+        # for an override — leave the AsyncEngineArgs default in place
+        # otherwise so vLLM picks "auto" (= weight dtype). Setting
+        # kv_cache_dtype="fp8" on an A100/H100 routes K/V storage
+        # through the hardware tensor cores at 2x compression.
+        if self.kv_cache_dtype is not None:
+            kwargs["kv_cache_dtype"] = self.kv_cache_dtype
         # Allow the caller to override or extend the args, e.g. to
         # test with preemption_mode="recompute" for comparison.
         kwargs.update(self.scheduler_config_overrides)

@@ -933,6 +933,31 @@ def main(argv: Sequence[str]) -> int:
             "0 means no sink-skip."
         ),
     )
+    parser.add_argument(
+        "--perplexity-text-path",
+        type=Path, default=None,
+        help=(
+            "Path to a plain-text file with the perplexity-eval input. "
+            "When unset (default), the inline 282-token PERPLEXITY_TEXT "
+            "(Wikipedia-style AI history) is used. Pass a long passage "
+            "(e.g., a 32k-character arXiv chapter) to validate the §20.4 "
+            "long-context cell — KV compression's headline value is at "
+            "long contexts where KV memory dominates over weights. The "
+            "input is fed as a single forward pass; check your model's "
+            "max_position_embeddings before passing anything > 32k. "
+            "Ignored when --eval doesn't include 'perplexity'."
+        ),
+    )
+    parser.add_argument(
+        "--perplexity-text-max-chars",
+        type=int, default=None,
+        help=(
+            "When --perplexity-text-path is set and the file is larger "
+            "than this many characters, truncate to the first N chars. "
+            "Useful for sweep cells (run the same passage at different "
+            "context lengths). Default: no truncation."
+        ),
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -1065,14 +1090,26 @@ def main(argv: Sequence[str]) -> int:
     quant_label = args.quant
 
     if "perplexity" in eval_kinds:
+        # Choose the perplexity input. Default = inline 282-token text;
+        # override = file path (used by the §20.4 long-context cell).
+        if args.perplexity_text_path is not None:
+            perplexity_text = args.perplexity_text_path.read_text()
+            if args.perplexity_text_max_chars is not None:
+                perplexity_text = perplexity_text[: args.perplexity_text_max_chars]
+            LOG.info(
+                "Perplexity text loaded from %s (%d chars)",
+                args.perplexity_text_path, len(perplexity_text),
+            )
+        else:
+            perplexity_text = PERPLEXITY_TEXT
         LOG.info("Perplexity: baseline...")
         base = compute_perplexity(
-            model=model, tokenizer=tokenizer, text=PERPLEXITY_TEXT,
+            model=model, tokenizer=tokenizer, text=perplexity_text,
             cache_factory=baseline_factory, cache_type="baseline",
         )
         LOG.info("Perplexity: %s...", quant_label)
         tq = compute_perplexity(
-            model=model, tokenizer=tokenizer, text=PERPLEXITY_TEXT,
+            model=model, tokenizer=tokenizer, text=perplexity_text,
             cache_factory=tq_factory, cache_type=quant_label,
         )
         summary.perplexity = [base, tq]

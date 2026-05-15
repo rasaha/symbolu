@@ -513,6 +513,168 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 | 1.10–1.30 | YELLOW. Run MMLU 200 to see if accuracy drop is partner-acceptable. |
 | > 1.30 | Quality cliff. INT3 is too aggressive for Qwen2.5-7B with current rescue config. Ship INT4. |
 
+## 5i. Sink-FP16 + body-INT4 mixed precision (§20.2)
+
+KIVI's −0.9pt MMLU gap above FP8 may be concentrated on attention
+sinks (first few positions of context) per the StreamingLLM
+literature. Test: keep positions [0, sink) at FP16 and quantize
+positions [sink:) with the full KIVI rescue stack.
+
+**Important:** this is NOT the §18.1 row 7 anti-pattern. Row 7 was
+`INT4 plain per-channel + sink-skip 4`, which made INT4 worse because
+plain per-channel already failed and sink-skip narrowed the
+quantization range to be even more inflated. The §20.2 test
+combines sink-FP16 with the WORKING `group=32 + asymmetric`
+configuration — different mechanism.
+
+Re-run cost: ~$0.50 for the full 4-cell sweep (~30 min wall).
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/fp8-kv-competitive-gap-iXKRM
+
+cd CTM_plus/Bench
+mkdir -p /tmp/sink_fp16_sweep
+
+for SINK in 0 4 16 64; do
+  mkdir -p /tmp/sink_fp16_sweep/sink${SINK}
+  python -m ctm_bench.scripts.track_e_quality_eval \
+      --model Qwen/Qwen2.5-7B-Instruct \
+      --dtype float16 --device cuda \
+      --eval perplexity,mmlu \
+      --mmlu-num-questions 1000 \
+      --quant int4-per-channel \
+      --k-group-size 32 --v-group-size 32 \
+      --asymmetric-int4 \
+      --sink-size ${SINK} \
+      --output-dir /tmp/sink_fp16_sweep/sink${SINK} \
+      2>&1 | tee /tmp/sink_fp16_sweep/sink${SINK}/run.log
+done
+```
+
+**Decision tree (best sink_size MMLU delta vs sink_size=0):**
+
+| MMLU delta | Verdict |
+|---|---|
+| ≤ −0.3pt | ✅ Quality competitive with FP8. **Algorithm-axis closed.** Update VC brief's "Measured" table. |
+| −0.3 to −0.5pt | YELLOW. Better than −0.9pt; partner-shareable but trails FP8. Consider AWQ-style sink calibration. |
+| > −0.5pt | Sink-FP16 doesn't recover the gap. Need a different intervention (per-layer bit allocation). |
+
+Sink=0 is the control (reproduces §19.4: −0.9pt). Sink=4 tests the
+StreamingLLM hypothesis. Sink=16 tests for plateau. Sink=64 tests
+"first-chunk" alternative hypothesis (if sink=64 ≫ sink=16, the issue
+isn't sinks specifically; it's the entire first chunk).
+
+## 5j. Multi-model replication on Llama-3-8B + Mistral-7B (§20.3)
+
+Removes the "one-model demo" caveat. The route-B cache wrapper is
+model-agnostic: dynamic per-block scales work on any (S, H, D) shape,
+and the group_size=32 along the seq axis is shape-agnostic.
+
+Re-run cost: ~$2-3 (one run per model, ~30-45 min wall each on A100 40GB).
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+
+for MODEL in meta-llama/Meta-Llama-3-8B-Instruct mistralai/Mistral-7B-Instruct-v0.3; do
+  TAG=$(echo $MODEL | tr '/' '_')
+  mkdir -p /tmp/multi_model/$TAG
+  python -m ctm_bench.scripts.track_e_quality_eval \
+      --model $MODEL \
+      --dtype float16 --device cuda \
+      --eval perplexity,mmlu \
+      --mmlu-num-questions 1000 \
+      --quant int4-per-channel \
+      --k-group-size 32 --v-group-size 32 \
+      --asymmetric-int4 \
+      --output-dir /tmp/multi_model/$TAG \
+      2>&1 | tee /tmp/multi_model/$TAG/run.log
+done
+```
+
+**Decision tree per model:**
+
+| MMLU delta | Verdict |
+|---|---|
+| Within ±0.5pt of Qwen's −0.9pt | ✅ Generalizes. Caveat removed. |
+| −2.0pt+ | Model-specific failure. Investigate per-layer; consider per-model bits config. |
+| −0.2pt or better | Bonus — Qwen result is conservative. |
+
+## 5k. Long-context perplexity at 32k (§20.4)
+
+KV compression's headline value is long-context. Qwen2.5-7B at 32k:
+weights ~14 GB, KV at FP16 ~16 GB. Compression payoff is here.
+
+Re-run cost: ~$0.50 (~30 min wall). Requires a long passage —
+download a 35k-char Wikipedia chapter on the GPU pod first:
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+
+# Fetch a long passage (~50k chars) for the 32k cell. Pick any
+# topic; the script tokenizes it and truncates if needed.
+python -c "
+from datasets import load_dataset
+ds = load_dataset('wikitext', 'wikitext-103-raw-v1', split='test')
+# Pick a chunk of contiguous articles; aim for >50k chars after join.
+text = ''
+for row in ds:
+    text += row['text']
+    if len(text) > 60000:
+        break
+open('/tmp/wikitext_long.txt', 'w').write(text[:60000])
+print('Wrote', len(text[:60000]), 'chars to /tmp/wikitext_long.txt')
+"
+
+# Run perplexity at three context lengths to map the quality curve.
+for MAX_CHARS in 16000 32000 50000; do
+  mkdir -p /tmp/longctx_${MAX_CHARS}
+  python -m ctm_bench.scripts.track_e_quality_eval \
+      --model Qwen/Qwen2.5-7B-Instruct \
+      --dtype float16 --device cuda \
+      --eval perplexity \
+      --quant int4-per-channel \
+      --k-group-size 32 --v-group-size 32 \
+      --asymmetric-int4 \
+      --perplexity-text-path /tmp/wikitext_long.txt \
+      --perplexity-text-max-chars ${MAX_CHARS} \
+      --output-dir /tmp/longctx_${MAX_CHARS} \
+      2>&1 | tee /tmp/longctx_${MAX_CHARS}/run.log
+done
+```
+
+**Decision tree (32k INT4 perplexity ratio):**
+
+| Ratio | Verdict |
+|---|---|
+| ≤ 1.05 | ✅ Long-context quality holds. Partner-shareable. |
+| 1.05–1.15 | YELLOW — degrades at 32k. Consider per-layer bits. |
+| > 1.20 | Long-context failure. Major issue; investigate before further long-context partner conversations. |
+
+If 32k OOMs at FP16 baseline (~30 GB combined: 14 GB weights + 16 GB
+KV), drop to MAX_CHARS=24000 for the baseline cell. INT4 should still
+fit at 32k since the KV is 3.2× smaller.
+
+## 5l. FP8 KV throughput comparison (§20.1)
+
+The four-cell composition for the FP8-vs-INT4 throughput comparison.
+See ``Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md`` for the full
+recipe; in summary: two `run_streaming` cells (vLLM FP16 baseline +
+vLLM FP8 KV) plus one `track_e_throughput` run (HF FP16 + INT4
+together). Total: ~$0.15, ~10 min wall.
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+bash scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md  # NOT a script — see the runbook
+```
+
+Sequence:
+1. Cell A — `run_streaming.py` baseline (no --kv-cache-dtype): vLLM FP16.
+2. Cell B — `run_streaming.py --kv-cache-dtype fp8`: vLLM FP8.
+3. Cells C+D — `track_e_throughput.py` with default settings: HF FP16 vs INT4 KIVI in one run.
+
+After: jq the four `tokens_per_second` values into the §20.1 template.
+
 ## 5e. INT4 + group + asymmetric (full KIVI config)
 
 Symmetric INT4 wastes ~half its 16 bins when the distribution is not

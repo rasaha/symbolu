@@ -270,6 +270,22 @@ should be able to tell which is which.
 Documented in `PHASE4_GPU_FINDINGS.md` §17 + §19.2. Telling negatives
 strengthens partner trust in the positives.
 
+### Harness-landed, GPU-run-pending (FP8-KV competitive gap closure)
+
+The six measurement axes in `PHASE4_GPU_FINDINGS.md` §20 land the
+comparison vs vLLM's production FP8 KV path. All harnesses are
+CPU-tested + dry-runnable; total GPU spend to fill in measured
+numbers is ~$3.50.
+
+| Item | Status | GPU cost | Reference |
+|---|---|---|---|
+| Four-cell FP8/INT4 throughput comparison (vLLM-FP16, vLLM-FP8, HF-FP16, HF-INT4) | Harness landed; `--kv-cache-dtype` flag + `track_e_throughput.py` script committed | ~$0.15 | §20.1 + `FP8_INT4_THROUGHPUT_RUNBOOK.md` |
+| Sink-FP16 + body-INT4 mixed precision (sink ∈ {0, 4, 16, 64}) | Recipe landed; tests the StreamingLLM-style quality-recovery hypothesis for the −0.9pt MMLU gap | ~$0.50 | §20.2 |
+| Llama-3-8B + Mistral-7B multi-model replication | Runbook recipe landed; removes the "one-model demo" caveat | ~$2-3 | §20.3 |
+| Long-context perplexity at 16k/32k/50k | `--perplexity-text-path` flag landed; validates at the context length where KV compression's headline value appears | ~$0.50 | §20.4 |
+| Route-A vLLM `cache_kv` engineering plan | Day-by-day breakdown; same hook closes the −20% tokens/sec gap | 3-5 engineer-days + ~$0.30 GPU | §20.5 + `ROUTE_A_VLLM_CACHE_KV_PLAN.md` |
+| Marlin-style fused unpack-attend kernel | PyTorch reference + HBM-traffic counter showing 3.56× ceiling speedup | 1-2 weeks GPU-kernel work | §20.6 + `kv_policy/int4_fused_attention_sketch.py` |
+
 ### Projected (not yet measured)
 
 | Item | Status |
