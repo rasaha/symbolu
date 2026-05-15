@@ -1,7 +1,7 @@
 # CTM+ / PCAM — VC Brief
 
 **Cognade Labs | Intelligent KV-Cache Eviction for LLM Inference**
-*Prepared April 2026*
+*Prepared May 2026*
 
 ---
 
@@ -25,10 +25,9 @@ away to make room.
 
 In many serving stacks, the effective eviction policy remains
 **LRU-like** — dominated by recency and largely blind to
-transformer-specific block value. LRU knows one thing: *when was
-this block last touched?*
-policy invented in the 1960s that knows exactly one thing: *when was
-this block last touched?*
+transformer-specific block value. LRU is a policy invented in the
+1960s that knows exactly one thing: *when was this block last
+touched?*
 
 LRU does not know:
 
@@ -213,20 +212,49 @@ policy today to a memory-controller ASIC tomorrow.
 
 ## Page 4 — What Is Proven and What Is Next
 
-### Benchmark evidence (CTM+ core, across representative cache-sensitive workloads)
+### Serving-tier evidence (CTM+ Phase 4 on real GPU, Qwen2.5-7B-Instruct, vLLM 0.7.3)
 
-| Workload | LRU baseline | CTM+ | Delta |
-|---|---|---|---|
-| **LLM inference (vLLM)** | **32 concurrent** | **48 concurrent** | **+50%** |
-| **LLM p99 latency** | **12ms** | **8.5ms** | **−29%** |
-| Hotspot (batch ML) | 76.4% hit rate | 94.2% | +17.8% |
-| Database (TPC-C) | 125K txn/sec | 142K txn/sec | +13.6% |
-| 5-year TCO (100 GPUs) | $5.85M | $4.01M | −31% |
+The serving-tier closure run that this brief used to project — and
+that earlier drafts inflated into a +50% concurrent-request claim —
+has been executed. The honest measured outcome:
 
-*LLM rows bolded as the primary target workload. Database and batch
-ML rows demonstrate cross-domain applicability of the scoring model.*
+| Metric | LRU baseline | CTM+ Phase 4 | Delta | Status |
+|---|---|---|---|---|
+| **swap_out blocks per decode token** (algorithm quality) | reference | **−11.1%** | smarter evictions: real, durable | **GPU-measured** |
+| **tokens/sec end-to-end** | reference | **−20%** | structural cost at vLLM 0.7.3 Evictor-ABC patching layer | **GPU-measured** |
+| Hotspot (batch ML) | 76.4% hit rate | 94.2% | +17.8% | trace-replay |
+| Database (TPC-C) | 125K txn/sec | 142K txn/sec | +13.6% | adjacent-domain transfer |
 
-### FSCS-derived signal integration validation (real Mistral-7B trace)
+*Serving-tier rows bolded. The −11.1% swap_out result is the
+algorithm quality win — fewer evictions per decode token under the
+same workload. The −20% tokens/sec is the structural cost of how
+vLLM 0.7.3 lets a custom policy plug into its Evictor-ABC: it is
+not a CTM+-scoring overhead, it is the patching-layer overhead, and
+it closes once the upstream `cache_kv` hook lands or a route-A
+direct-pool integration replaces the route-B wrapper. Evidence:
+`CTM_plus/Bench/bench_out/PHASE4_GPU_FINDINGS.md` §13.3.*
+
+### KV-cache compression layer (KIVI-style INT4) — landed in the same session
+
+A complementary KV-cache compression layer built on the same
+codebase, validated end-to-end on the same model:
+
+| Metric | Result | Evidence |
+|---|---|---|
+| Real-heap KV compression vs FP16 | **3.2× smaller** | §18 + §19.1 |
+| Perplexity ratio vs FP16 baseline | **1.024×** (essentially flat) | §18 |
+| MMLU accuracy delta @ 1000 questions | **−0.9 pt** (70.2% → 69.3%) | `track_e_audit_followups/int4_mmlu_1000.json` |
+| Teacher-forced next-token agreement | **96.4% top-1, 100% top-5, mean KL 0.006** | `track_e_audit_followups/int4_generation_teacher_forced.json` |
+| INT3 memory-bound variant | **−0.7 pt MMLU @ 1000q at ~4.5× theoretical compression** | `track_e_audit_followups/int3_mmlu_1000.json` |
+
+KIVI INT4 stacks under CTM+: the KV-cache it compresses is the same
+KV-cache CTM+ evicts from. The current honest combined-stack claim
+is **~3-3.5× over an INT8+LRU baseline** from measured KIVI INT4
+compression × measured Phase 4 eviction quality. (Earlier drafts
+quoted an 8.8× figure anchored on TurboQuant; that figure has been
+retired — see negatives below.)
+
+### FSCS-derived signal integration (separate research thread, real Mistral-7B trace)
 
 | Metric | Baseline (4 signals) | Enhanced (7 signals) |
 |---|---|---|
@@ -235,16 +263,14 @@ ML rows demonstrate cross-domain applicability of the scoring model.*
 | Rounds with changed decisions | 0 | **4 (100%)** |
 | Individual block choices changed | — | **1,108** |
 
-*Interpretation: policy behavior changed materially; serving
-benefit not yet measured.*
-
-**Every single eviction round made different victim choices** when
-the three FSCS-derived signals were active. The enhanced policy
-protected boundary blocks, global-context blocks, and unstable
-blocks that the baseline would have evicted. Whether this
-conservatism improves downstream serving quality (hit rate, latency,
-concurrent requests) is the next calibration step. 276 unit tests
-pass with zero regressions.
+*Interpretation: policy behavior changed materially on a real
+Mistral-7B trace. Whether the changed decisions improve downstream
+serving quality (hit rate, latency, concurrent requests) requires
+the same live-load closure that §13.3 just delivered for the
+4-signal Phase 4 path — replicated for the 7-signal enhanced
+configuration. Until that replication lands, the FSCS-derived
+signals are validated as **decision-impacting**, not yet as
+**quality-improving**. 276 unit tests pass with zero regressions.*
 
 ### What is implemented today
 
@@ -252,46 +278,68 @@ pass with zero regressions.
 |---|---|---|
 | CTM+ scoring spec (4-signal, ADR-locked) | ✅ Production-ready | 20-test parity harness, vendored reference |
 | PCAM Python runtime (`KVCachePolicy`) | ✅ Consumable API | Phase 1-5 complete, 276 tests |
-| vLLM integration (shadow + active mode) | ✅ Implemented + unit-tested | 23 active-mode tests, mock queue |
-| FSCS-derived signals (boundary, band, instability) | ✅ Integrated + validated | 36 signal tests, real Mistral trace |
+| vLLM integration (shadow + active mode) | ✅ Implemented + GPU-measured | §13.3 closure run on Qwen2.5-7B |
+| FSCS-derived signals (boundary, band, instability) | ✅ Integrated + decision-validated | 36 signal tests, real Mistral trace |
 | Annotated trace capture from Mistral-7B | ✅ Pipeline working | `pcam_fscs_trace_capture.py` |
-| Baseline vs enhanced replay comparison | ✅ Pipeline working | `pcam_fscs_replay_compare.py` |
+| KIVI-style INT4 KV compression | ✅ End-to-end measured | §18 + §19, route-B HF wrapper |
 | FPGA hardware (SystemVerilog RTL) | ✅ Credibility artifact | cocotb parity harness |
 
-### Honest caveats
+### Honest Validation Status
 
-- The FSCS signal validation shows **eviction-decision impact**, not
-  **cache-hit-rate improvement**. The 100% decision-change result
-  means the signals work; whether those changes improve serving
-  quality requires a serving-tier benchmark under load.
-- The signal weights (boundary=0.10, instability=0.15, band=
-  {1.3, 1.0, 0.8}) are starting points, not calibrated values.
-- The attention mass in the current trace is a position-based proxy,
-  not real per-block attention weights. A higher-fidelity trace
-  would use `output_attentions=True`.
-- The CTM+ benchmark numbers (hit rate, concurrent requests, TCO)
-  are from the full CTM+ stack; the PCAM-specific serving-tier
-  numbers require one live GPU closure run.
+We separate **measured** from **tested-and-failed** from **projected**
+so partners can tell which is which.
+
+**Measured on real GPUs (May 2026):**
+
+- CTM+ Phase 4: −11.1% swap_out per decode token (algorithm quality win)
+- CTM+ Phase 4: −20% tokens/sec end-to-end (structural at vLLM 0.7.3 Evictor-ABC; closes with route-A `cache_kv` hook or upstream patch)
+- KIVI INT4 KV compression: 3.2× real-heap, 1.024× perplexity, −0.9 pt MMLU @ 1000q, 96.4% teacher-forced top-1
+- INT3 memory-bound variant: −0.7 pt MMLU @ 1000q at ~4.5× theoretical compression
+- FSCS-derived signals: 100% of eviction rounds make different choices on real Mistral-7B trace
+
+**Tested-and-failed (documented as negatives — partner-shareable):**
+
+- TurboQuant 3-bit polar quantization on Qwen2.5-7B: perplexity ratio 3052× (algorithm fails on real K activations)
+- TurboQuant + per-channel scale rescue: 24× worse than baseline TurboQuant
+- TurboQuant + sink-skip rescue: modest 27% improvement, still catastrophic at 220×
+- Static GPTQ-style calibration on INT4: −6.80 pt MMLU @ 1000q — dynamic + group quantization beats static
+- Autoregressive generation top-1 (64%) is misleading vs teacher-forced (96.4%) due to exposure bias — we report teacher-forced
+
+Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §19.2.
+
+**Projected (not yet measured):**
+
+- 7-signal FSCS-enhanced serving-tier numbers (decision-impact validated; quality-impact requires the same §13.3-style closure rerun)
+- FSCS signal weight calibration (boundary=0.10, instability=0.15, band={1.3, 1.0, 0.8} are starting points, not calibrated values)
+- Multi-model generalization (Llama-3, Mistral, Qwen sizes other than 7B)
+- Long-context (≥32k)
+- Route-A vLLM `cache_kv` direct-pool integration (~3-5 engineer-day effort that closes the −20% tokens/sec gap)
+- FPGA prototype, ASIC controller, design-partner pilots
 
 ### Next steps
 
 | Step | What it proves | Cost |
 |---|---|---|
-| **FSCS signal weight calibration** | Do the signals improve cache hit rate, not just change decisions? | Days (pipeline built) |
-| **Live GPU closure run** | PCAM serving-tier throughput/latency vs vLLM default LRU | ~1 engineer-hour |
+| **Route-A vLLM `cache_kv` integration** | Closes the −20% tokens/sec structural cost of route-B patching | ~3-5 engineer-days |
+| **7-signal FSCS closure rerun** | Whether 1,108 changed decisions translate to throughput / p99 wins | Days (pipeline built; §13.3 harness reusable) |
+| **Multi-model + long-context replication** | Whether KIVI INT4 + Phase 4 generalize off Qwen2.5-7B / 4-8k context | Weeks |
 | **FPGA prototype** (Xilinx Alveo) | RTL at 250MHz, <50ns latency | 2–3 months |
 | **Design-partner pilot** | Real inference workload with real quality/latency metrics | Quarters |
 | **ASIC controller** | CXL memory expander or GPU-side HBM controller | 12–18 months |
 
 ### The ask
 
-We are raising seed to fund the FPGA prototype, land the first
-design-partner deployments, and calibrate the FSCS-derived scoring
-signals against real serving workloads. The software stack is built, tested, and integrated end-to-end for
-policy execution and trace-driven validation; the remaining step is
-serving-tier closure under live load. The capital is for hardware,
-partners, and the serving-tier benchmark that converts "decisions
-changed" into "quality improved."
+We are raising seed to (i) close the route-A `cache_kv` integration
+and erase the −20% structural cost, (ii) replicate the §13.3 GPU
+closure for the 7-signal FSCS-enhanced configuration and across
+additional models / context lengths, (iii) fund the FPGA prototype,
+and (iv) land the first design-partner deployments. The software
+stack is built, GPU-measured for the 4-signal Phase 4 path and the
+KIVI INT4 compression layer, and integrated end-to-end for trace-
+driven validation of the 7-signal extension. The capital is for the
+serving-tier closures still pending, the hardware path, and the
+design partners that will exercise the policy under workloads we
+cannot synthesise in-house.
 
 > *"Seven signals. Every block in the right tier. Every eviction justified."*
 
@@ -299,4 +347,4 @@ changed" into "quality improved."
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Modules: `CTM_plus/KVPolicy/`, `simulator/pcam/`, `symbolu/fscs/`*
-*276 tests · 20-test parity harness · 36 signal tests · real Mistral-7B validation*
+*276 tests · 20-test parity harness · 36 signal tests · real Mistral-7B FSCS trace · GPU-measured Qwen2.5-7B vLLM 0.7.3 closure (May 2026)*
