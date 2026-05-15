@@ -320,6 +320,7 @@ so partners can tell which is which.
 
 **Tested-and-failed (documented as negatives — partner-shareable):**
 
+- **INT4 KV long-context decode (§20.4, needle-in-haystack):** route-B INT4 KIVI is **not safe for long-context generation**. At 4k–32k-char contexts, perplexity holds (1.007×) but autoregressive decode collapses into token stuttering — needle retrieval drops from 100% (FP16) to 11–22% (INT4). The needle *characters* still reach the decode; the failure is decode coherence, not retrieval. **Mitigation found:** sink-FP16 (keep the first 16 positions FP16) recovers retrieval to 56% at 16k — the attention-sink tokens carry ~half the damage — but residual degradation remains. Key caveat: the §19.4 short-context quality numbers do **not** generalise to long-context autoregressive decode. Documented in `PHASE4_GPU_FINDINGS.md` §20.4.
 - TurboQuant *baseline* (random rotation, 3-bit, KV-only) on Qwen2.5-7B: perplexity ratio 3052×. Our implementation diverges from Google's published method on four axes (random vs learned rotation, 3-bit vs the paper's 4-bit headline, KV-only vs W4A4, Qwen2.5 vs Llama-2/Gemma). The negative rules out the baseline configuration as a drop-in KV-only compressor; it does **not** refute Google's published TurboQuant W4A4 result on Llama-2 / Gemma. Reproducing the full method is deferred follow-on work.
 - TurboQuant baseline + per-channel scale rescue: 24× worse than baseline (KIVI's per-channel trick does not transfer to rotation-based designs)
 - TurboQuant baseline + sink-skip rescue: modest 27% improvement, still catastrophic at 220×
@@ -332,9 +333,6 @@ Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §17.8 + §19.2.
 
 - Multi-model replication on Llama-3-8B + Mistral-7B — runbook recipe
   landed; ~$2-3 GPU to remove the "one-model demo" caveat (§20.3)
-- Long-context perplexity sweep at 16k/32k/50k — `--perplexity-text-path`
-  flag landed; ~$0.50 GPU to validate at the context length where KV
-  compression matters most (§20.4)
 - Route-A vLLM `cache_kv` integration plan — engineer-day breakdown in
   `Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md`; same hook closes the
   −20% tokens/sec gap (§20.5)

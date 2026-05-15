@@ -280,6 +280,7 @@ sink-FP16 *recovers* a gap is not demonstrated. A decisive test needs
 
 | Item | Result |
 |---|---|
+| INT4 KV long-context decode (§20.4, needle-in-haystack) | Route-B INT4 KIVI is **not safe for long-context generation**. Perplexity holds at 4k–32k-char contexts (1.007×) but autoregressive decode collapses into token stuttering — needle retrieval 100% (FP16) → 11–22% (INT4). The needle characters reach the decode; the failure is decode coherence, not retrieval. sink-FP16 (first 16 positions exact) is a partial mitigation — recovers retrieval to 56% at 16k — but residual degradation remains. The §19.4 short-context quality numbers do NOT generalise to long-context decode; that caveat travels with every INT4 quality claim. |
 | TurboQuant *baseline* (random rotation, 3-bit, KV-only) on Qwen2.5-7B | Perplexity ratio 3052×. Our config diverges from Google's published TurboQuant on four axes (random vs learned rotation; 3-bit vs the paper's 4-bit headline; KV-only vs W4A4; Qwen2.5 vs Llama-2/Gemma). The negative rules out the baseline as a drop-in KV-only compressor — it does **not** refute Google's published W4A4 result on Llama-2 / Gemma. Reproducing the full method is deferred follow-on. |
 | TurboQuant baseline + per-channel scale rescue | Made things 24× worse than the random-rotation baseline (KIVI's per-channel trick does not transfer to rotation-based designs) |
 | TurboQuant baseline + sink-skip rescue | Modest 27% improvement, still catastrophic at 220× |
@@ -310,7 +311,6 @@ in measured numbers is ~$3.50.
 | Item | Status | GPU cost | Reference |
 |---|---|---|---|
 | Llama-3-8B + Mistral-7B multi-model replication | Runbook recipe landed; removes the "one-model demo" caveat | ~$2-3 | §20.3 |
-| Long-context perplexity at 16k/32k/50k | `--perplexity-text-path` flag landed; validates at the context length where KV compression's headline value appears | ~$0.50 | §20.4 |
 | Route-A vLLM `cache_kv` engineering plan | Day-by-day breakdown; same hook closes the −20% tokens/sec gap | 3-5 engineer-days + ~$0.30 GPU | §20.5 + `ROUTE_A_VLLM_CACHE_KV_PLAN.md` |
 | Marlin-style fused unpack-attend kernel | PyTorch reference + HBM-traffic counter showing 3.56× ceiling speedup | 1-2 weeks GPU-kernel work | §20.6 + `kv_policy/int4_fused_attention_sketch.py` |
 

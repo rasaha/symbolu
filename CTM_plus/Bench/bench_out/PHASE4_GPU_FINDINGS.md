@@ -2515,6 +2515,15 @@ honest "within-noise" result is sufficient for partner conversations.
 partner-shareable line is the noise-aware one above; the §20.2
 hypothesis stays open.
 
+**Update from §20.4 — sink-FP16 IS a real lever, at long context.**
+This short-context MMLU sweep was the wrong instrument. §20.4's
+long-context needle test found sink-FP16 (sink=16) recovers
+retrieval from 22% → 56% at 16k context — a large effect, far outside
+any noise band. Short-context MMLU prompts simply do not accumulate
+enough INT4 KV noise for sink protection to register; §20.2 is
+"inconclusive" because the regime, not the lever, was wrong. The
+sink-FP16 mechanism is validated in §20.4.
+
 ### §20.3 Multi-model replication — Llama-3-8B + Mistral-7B
 
 **What's measured today:** Qwen2.5-7B-Instruct only. The VC brief's
@@ -2693,6 +2702,81 @@ cat /tmp/section_20_4_table.md
 
 The thresholds are pinned by
 `Bench/tests/test_long_context.py::test_composer_decision_tree_boundaries`.
+
+#### §20.4 measured outcomes (GPU run, 2026-05-15) — RED, characterized
+
+Qwen2.5-7B-Instruct, wikitext-2 reference text, 80 GB A100. Context
+lengths in CHARS (≈ ¼ that in Qwen tokens). Artefacts:
+`bench_out/track_e_audit_followups/long_context.json`,
+`long_context_summary.json`, `long_context_sink16.json`.
+
+| ctx (chars) | perplexity ratio | baseline needle | INT4 needle | needle Δ |
+|---:|---:|---:|---:|---:|
+| 4096 | 1.007 | 100% | 11% | −89% |
+| 16384 | 1.007 | 100% | 22% | −78% |
+| 32768 | 1.008 | 89% | 22% | −67% |
+
+**Combined verdict: RED.** Perplexity holds (1.007× — GREEN on that
+axis) but INT4 long-context needle retrieval collapses. This is
+precisely the failure the needle eval was built to expose: average
+next-token loss is robust to KV-quant noise; sharp single-token
+retrieval is not.
+
+**The mechanism — characterized from the generated text, not just
+the score.** Dumping the per-trial `generated_text` showed INT4 is
+**not failing to retrieve** — it is failing to *cleanly emit*. The
+needle characters reach the decode but come out garbled by heavy
+**token-level stuttering**:
+
+```
+want 90952P → INT4 emitted "...the vault is vault vault is is 9 9 9 5 2"
+want AFHSG2 → INT4 emitted "...magic number number = AFHHSS2G22"
+want 165Z7Q → INT4 emitted "...magic number number 1166Z7QQ"
+```
+
+Every output shows systematic token doubling ("The The", "number
+number", "is is", "code code code"). The "11–22% retrieval" score
+therefore **understates raw retrieval** — it measures *clean exact
+output*; the real failure is **decode-coherence collapse**. This is
+consistent with §19.3.1's autoregressive 64% top-1 (vs 96.4%
+teacher-forced) — INT4 autoregressive decode was already degraded at
+short context; at long context the degradation compounds into
+stuttering. Perplexity is immune because it is non-autoregressive
+(one teacher-forced pass).
+
+**Confirmation — it is real, not a route-B bug.** A sink-FP16
+re-run (`--sink-size 16`, ctx=16384) recovered needle retrieval from
+**22% → 56%**. A bug would not respond cleanly to sink protection.
+The attention-sink tokens carry roughly half the damage: quantizing
+the first ~16 positions' K/V is a large part of what degrades decode.
+Sink-FP16 is a **partial mitigation** — 56% still trails the 100%
+baseline, so residual damage beyond the sinks remains.
+
+**This retroactively explains §20.2.** Sink-FP16 looked inconclusive
+on short-context MMLU because short prompts do not accumulate enough
+INT4 KV noise for sink protection to matter. §20.4 shows sink-FP16 is
+a **long-context lever** (22→56% is far outside any noise band) — the
+§20.2 instrument (short MMLU) was simply blind to the regime where it
+works. §20.2 and §20.4 are consistent.
+
+**Honest status — RED, partner-shareable negative.** Route-B INT4
+KIVI as configured (group=32, asymmetric, no sink protection) is
+**not safe for long-context generation** — decode degrades into
+repetition. With sink-FP16 the failure is roughly halved but not
+closed. The §19.4 short-context quality numbers (1.024× ppl, −0.9pt
+MMLU, 96.4% teacher-forced) **do not generalise to long-context
+autoregressive decode**; that caveat must travel with every INT4
+quality claim.
+
+**What would close it (open work, not 2026-H1):** (a) sink-FP16 as a
+mandatory long-context default — recovers ~half; (b) higher bit-width
+(INT5/INT6) or per-layer bit allocation for the residual; (c) a
+proper long-context KV-quant scheme — KIVI's published long-context
+numbers use INT2/INT4 *with* their own residual/outlier handling that
+our route-B reproduction may not fully capture. The needle harness
+could also add a "lenient" metric (needle chars present in order,
+ignoring stutter) to separate raw-retrieval from clean-output — a
+~1-day follow-on.
 
 ### §20.5 Route-A vLLM INT4 KV-cache integration — Days 1-3 landed
 
