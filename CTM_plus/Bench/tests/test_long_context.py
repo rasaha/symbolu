@@ -39,16 +39,17 @@ pytest.importorskip("torch")
 pytest.importorskip("transformers")
 
 
-def test_long_context_dry_run_writes_v1_schema(tmp_path: Path):
-    """End-to-end dry-run writes a JSON with the §20.4.v1 schema.
+def test_long_context_dry_run_writes_v2_schema(tmp_path: Path):
+    """End-to-end dry-run writes a JSON with the §20.4.v2 schema.
 
     Verifies that:
-      * schema_version == "§20.4.v1"
+      * schema_version == "§20.4.v2"
       * int4_config reflects the §18.3 ship defaults
       * One perplexity_row per (context_length, cache_type)
       * One needle_row per (context_length, depth, sample, cache_type)
       * The deltas block joins perplexity AND needle on
         the SAME context_length_chars key (not split).
+      * Needle rows carry the §20.4 diagnostic-sprint fields.
     """
     from ctm_bench.scripts import track_e_long_context as lc
 
@@ -64,7 +65,7 @@ def test_long_context_dry_run_writes_v1_schema(tmp_path: Path):
     assert rc == 0
 
     data = json.loads(out.read_text())
-    assert data["schema_version"] == "§20.4.v1"
+    assert data["schema_version"] == "§20.4.v2"
     assert data["int4_config"]["k_group_size"] == 32
     assert data["int4_config"]["v_group_size"] == 32
     assert data["int4_config"]["asymmetric"] is True
@@ -81,6 +82,17 @@ def test_long_context_dry_run_writes_v1_schema(tmp_path: Path):
     # Needle: 2 ctx × 2 depths × 1 sample × 2 caches = 8 rows.
     n_rows = data["needle_rows"]
     assert len(n_rows) == 8
+
+    # §20.4 diagnostic-sprint fields are present on every needle row.
+    for r in n_rows:
+        for field_name in (
+            "first_stutter_position", "repeated_token_rate",
+            "decode_entropy_mean", "decode_entropy_min",
+            "decode_entropy_collapsed", "cache_fp16_bytes",
+            "cache_compressed_bytes", "cache_compression_ratio",
+            "decode_tokens_per_s",
+        ):
+            assert field_name in r, f"needle row missing {field_name!r}"
 
     # CRITICAL: deltas keys must match on context length. If perplexity
     # rows use 100 and needle rows use 127 (post-needle), the deltas

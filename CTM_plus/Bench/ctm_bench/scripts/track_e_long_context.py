@@ -225,6 +225,32 @@ class NeedleRow:
 
     `correct` is True when the expected `answer_code` appears in the
     first `decode_tokens` greedy-decoded outputs after the prompt.
+
+    The §20.4 diagnostic-sprint fields below are populated on every
+    trial so the sink-sweep / K-V-ablation / INT5 runs all surface the
+    same decode-stability signal:
+
+      * ``first_stutter_position`` — token index where the decode first
+        starts to loop (consecutive-token repeat or an immediately
+        repeating bigram). -1 means no stutter detected in the decoded
+        window. The earliest stutter is the headline degradation
+        signal — a needle can still be "correct" yet stutter right
+        after emitting the code.
+      * ``repeated_token_rate`` — 1 − (unique tokens / total tokens)
+        over the decoded window. Catches AB-AB loops that a
+        consecutive-only check misses.
+      * ``decode_entropy_mean`` / ``decode_entropy_min`` — entropy
+        (nats) of the next-token distribution at each decode step.
+      * ``decode_entropy_collapsed`` — heuristic: mean decode entropy
+        below ``_ENTROPY_COLLAPSE_NATS``. A collapsed distribution is
+        the signature of a degenerate greedy loop.
+      * ``cache_fp16_bytes`` / ``cache_compressed_bytes`` /
+        ``cache_compression_ratio`` — memory footprint. For the INT4
+        cache these come from the kvstore's measured byte counters;
+        for the baseline DynamicCache they are the summed FP16 tensor
+        bytes (ratio 1.0).
+      * ``decode_tokens_per_s`` — secondary throughput signal: decoded
+        tokens divided by the wall time of the greedy-decode loop.
     """
     cache_type: str
     context_length_chars: int
@@ -234,11 +260,90 @@ class NeedleRow:
     answer_code: str
     generated_text: str
     correct: bool
+    first_stutter_position: int = -1
+    repeated_token_rate: float = 0.0
+    decode_entropy_mean: float = 0.0
+    decode_entropy_min: float = 0.0
+    decode_entropy_collapsed: bool = False
+    cache_fp16_bytes: int = 0
+    cache_compressed_bytes: int = 0
+    cache_compression_ratio: float = 0.0
+    decode_tokens_per_s: float = 0.0
+
+
+# Heuristic threshold (nats) below which a greedy decode's mean
+# next-token entropy is flagged as "collapsed" — the distribution has
+# become a near-deterministic spike, the signature of a degenerate
+# repeat loop. Documented as heuristic; tune against observed runs.
+_ENTROPY_COLLAPSE_NATS = 0.30
+
+
+def _detect_first_stutter(ids: List[int]) -> int:
+    """Return the token index where the decode first starts to loop.
+
+    Two cheap, interpretable detectors:
+      1. consecutive-token repeat: ``ids[i] == ids[i-1]``.
+      2. immediately repeating bigram: ``(ids[i-1], ids[i])`` equals
+         ``(ids[i-3], ids[i-2])`` — catches AB-AB loops.
+
+    Returns the earliest index either fires at, or -1 if neither does.
+    """
+    first = -1
+    for i in range(1, len(ids)):
+        if ids[i] == ids[i - 1]:
+            first = i
+            break
+    for i in range(3, len(ids)):
+        if ids[i] == ids[i - 2] and ids[i - 1] == ids[i - 3]:
+            if first < 0 or i < first:
+                first = i
+            break
+    return first
+
+
+def _repeated_token_rate(ids: List[int]) -> float:
+    """Fraction of decoded tokens that are non-novel: 1 − unique/total.
+
+    A healthy decode of N tokens is mostly distinct, so this stays
+    low; a degenerate loop drives it toward 1.0."""
+    if not ids:
+        return 0.0
+    return 1.0 - (len(set(ids)) / len(ids))
+
+
+def _cache_memory_stats(cache: Any) -> tuple[int, int, float]:
+    """Return ``(fp16_bytes, compressed_bytes, compression_ratio)``.
+
+    The INT4 route-B cache exposes ``int4_stats`` with measured byte
+    counters from the kvstore. The baseline DynamicCache has no such
+    counters, so we sum its key/value tensor bytes (ratio 1.0).
+    """
+    stats = getattr(cache, "int4_stats", None)
+    if isinstance(stats, dict) and "bytes_in" in stats:
+        fp16 = int(stats.get("bytes_in", 0))
+        comp = int(stats.get("bytes_out_actual", 0))
+        ratio = float(stats.get("compression_ratio", 0.0))
+        return fp16, comp, ratio
+    total = 0
+    layers = getattr(cache, "layers", None)
+    if layers is not None:
+        for layer in layers:
+            for name in ("keys", "values"):
+                t = getattr(layer, name, None)
+                if t is not None and hasattr(t, "numel"):
+                    total += int(t.element_size() * t.numel())
+    else:
+        for name in ("key_cache", "value_cache"):
+            seq = getattr(cache, name, None) or []
+            for t in seq:
+                if hasattr(t, "numel"):
+                    total += int(t.element_size() * t.numel())
+    return total, total, 1.0
 
 
 @dataclass
 class LongContextSummary:
-    schema_version: str = "§20.4.v1"
+    schema_version: str = "§20.4.v2"
     model_id: str = ""
     dtype: str = ""
     int4_config: dict = field(default_factory=dict)
@@ -316,7 +421,10 @@ def _run_needle_trial(
     composer joins needle rows with perplexity rows on this key —
     they need to share the same value for the same window.
     """
+    import time
+
     import torch
+    import torch.nn.functional as F
     needle_text = needle_template[0].format(code=code)
     question = needle_template[1]
     expected = needle_template[2].format(code=code)
@@ -337,7 +445,15 @@ def _run_needle_trial(
         out = model(input_ids=input_ids, use_cache=True, past_key_values=cache)
     next_logits = out.logits[0, -1, :]
 
+    def _entropy_nats(logits: "torch.Tensor") -> float:
+        # Entropy of the next-token distribution, in nats. Computed in
+        # float32 so a float16 logit tensor doesn't bias the sum.
+        logp = F.log_softmax(logits.to(torch.float32), dim=-1)
+        return float(-(logp.exp() * logp).sum().item())
+
     generated_ids: List[int] = []
+    step_entropies: List[float] = [_entropy_nats(next_logits)]
+    decode_t0 = time.perf_counter()
     for _ in range(decode_tokens):
         tok = int(next_logits.argmax().item())
         generated_ids.append(tok)
@@ -347,6 +463,8 @@ def _run_needle_trial(
                 use_cache=True, past_key_values=cache,
             )
         next_logits = out.logits[0, -1, :]
+        step_entropies.append(_entropy_nats(next_logits))
+    decode_seconds = time.perf_counter() - decode_t0
 
     generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
     # Whitespace-tolerant match: the model may emit "AB C 123" instead
@@ -358,6 +476,12 @@ def _run_needle_trial(
         or "".join(expected.split()) in "".join(generated_text.split())
     )
 
+    entropy_mean = (
+        sum(step_entropies) / len(step_entropies) if step_entropies else 0.0
+    )
+    entropy_min = min(step_entropies) if step_entropies else 0.0
+    fp16_bytes, comp_bytes, comp_ratio = _cache_memory_stats(cache)
+
     return NeedleRow(
         cache_type=cache_type,
         context_length_chars=requested_context_length_chars,
@@ -367,6 +491,17 @@ def _run_needle_trial(
         answer_code=expected,
         generated_text=generated_text[:200],  # truncate for JSON size
         correct=correct,
+        first_stutter_position=_detect_first_stutter(generated_ids),
+        repeated_token_rate=_repeated_token_rate(generated_ids),
+        decode_entropy_mean=entropy_mean,
+        decode_entropy_min=entropy_min,
+        decode_entropy_collapsed=bool(entropy_mean < _ENTROPY_COLLAPSE_NATS),
+        cache_fp16_bytes=fp16_bytes,
+        cache_compressed_bytes=comp_bytes,
+        cache_compression_ratio=comp_ratio,
+        decode_tokens_per_s=(
+            len(generated_ids) / decode_seconds if decode_seconds > 0 else 0.0
+        ),
     )
 
 
@@ -416,6 +551,44 @@ def _compute_deltas(summary: LongContextSummary) -> dict:
             block["needle_accuracy_delta_pct"] = (
                 (by_cache["int4-per-channel"] - by_cache["baseline"]) * 100.0
             )
+
+    # §20.4 diagnostic-sprint aggregates: per-context-length decode
+    # stability for the INT4 cache. These are the headline signals the
+    # sink-sweep / K-V-ablation / INT5 runs are read on.
+    for ctx, by_cache in n_by_ctx_cache.items():
+        ctx_chars, cache_label = ctx
+        if cache_label != "int4-per-channel":
+            continue
+        rows = by_cache
+        if not rows:
+            continue
+        block = out["per_context_length"].setdefault(
+            f"chars={ctx_chars}", {"context_length_chars": ctx_chars},
+        )
+        stutters = [
+            r.first_stutter_position for r in rows
+            if r.first_stutter_position >= 0
+        ]
+        block["int4_repeated_token_rate_mean"] = (
+            sum(r.repeated_token_rate for r in rows) / len(rows)
+        )
+        block["int4_first_stutter_earliest"] = (
+            min(stutters) if stutters else -1
+        )
+        block["int4_stutter_trial_rate"] = len(stutters) / len(rows)
+        block["int4_decode_entropy_mean"] = (
+            sum(r.decode_entropy_mean for r in rows) / len(rows)
+        )
+        block["int4_entropy_collapse_rate"] = (
+            sum(1 for r in rows if r.decode_entropy_collapsed) / len(rows)
+        )
+        block["int4_decode_tokens_per_s_mean"] = (
+            sum(r.decode_tokens_per_s for r in rows) / len(rows)
+        )
+        ratios = [r.cache_compression_ratio for r in rows if r.cache_compression_ratio > 0]
+        block["int4_cache_compression_ratio"] = (
+            sum(ratios) / len(ratios) if ratios else 0.0
+        )
     return out
 
 
@@ -494,6 +667,17 @@ def main(argv: Sequence[str]) -> int:
                         dest="asymmetric_int4")
     parser.add_argument("--bits", type=int, default=4)
     parser.add_argument("--sink-size", type=int, default=0)
+    # §20.4 diagnostic-sprint K/V ablation toggles. Default: quantize
+    # both (the §18.3 ship config). --no-quantize-k passes K through at
+    # FP16 (V-only INT4); --no-quantize-v passes V through at FP16
+    # (K-only INT4). Used to isolate which channel drives the
+    # long-context decode degradation.
+    parser.add_argument("--no-quantize-k", action="store_false",
+                        dest="quantize_k", default=True,
+                        help="Pass K through at FP16 (V-only INT4 ablation).")
+    parser.add_argument("--no-quantize-v", action="store_false",
+                        dest="quantize_v", default=True,
+                        help="Pass V through at FP16 (K-only INT4 ablation).")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -581,10 +765,14 @@ def main(argv: Sequence[str]) -> int:
         "asymmetric": args.asymmetric_int4,
         "bits": args.bits,
         "sink_size": args.sink_size,
+        "quantize_k": bool(args.quantize_k),
+        "quantize_v": bool(args.quantize_v),
         "scheme": (
-            f"K=per-channel INT{args.bits}, V=per-token INT{args.bits}, "
+            f"K={'per-channel INT' + str(args.bits) if args.quantize_k else 'FP16'}, "
+            f"V={'per-token INT' + str(args.bits) if args.quantize_v else 'FP16'}, "
             f"{'asymmetric' if args.asymmetric_int4 else 'symmetric'}, "
-            f"k_group={args.k_group_size}, v_group={args.v_group_size}"
+            f"k_group={args.k_group_size}, v_group={args.v_group_size}, "
+            f"sink={args.sink_size}"
         ),
     }
     summary = LongContextSummary(
@@ -639,6 +827,8 @@ def main(argv: Sequence[str]) -> int:
         v_group_size=args.v_group_size,
         asymmetric=args.asymmetric_int4,
         bits=args.bits,
+        quantize_k=args.quantize_k,
+        quantize_v=args.quantize_v,
     )
 
     # H1: write the partial JSON before any trial so the model-config
@@ -739,6 +929,18 @@ def main(argv: Sequence[str]) -> int:
                 f"Δ={needle_delta:+.0f}%"
             )
         print("  " + "  ".join(parts))
+        # §20.4 diagnostic-sprint decode-stability line.
+        stutter = block.get("int4_first_stutter_earliest")
+        rep = block.get("int4_repeated_token_rate_mean")
+        ent = block.get("int4_decode_entropy_mean")
+        coll = block.get("int4_entropy_collapse_rate")
+        if stutter is not None:
+            print(
+                "    int4 decode: "
+                f"first_stutter={'none' if stutter < 0 else stutter}  "
+                f"repeat_rate={rep:.2f}  entropy={ent:.2f}nats  "
+                f"collapse_rate={coll*100:.0f}%"
+            )
     print()
     print(f"Full per-cell detail in {args.output}.")
     print(

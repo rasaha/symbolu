@@ -39,6 +39,8 @@ def _compress_decompress_kv_int4(
     static_k_offset: "Optional[torch.Tensor]" = None,
     static_v_scale: "Optional[torch.Tensor]" = None,
     static_v_offset: "Optional[torch.Tensor]" = None,
+    quantize_k: bool = True,
+    quantize_v: bool = True,
 ) -> "Tuple[torch.Tensor, torch.Tensor]":
     """Round-trip ``(B, H, S, D)`` K/V through the INT4 kvstore.
 
@@ -50,6 +52,16 @@ def _compress_decompress_kv_int4(
     Optional ``static_*_scale`` / ``static_*_offset`` tensors come from
     a calibration file and short-circuit the dynamic max-based scale
     computation inside the kvstore.
+
+    ``quantize_k`` / ``quantize_v`` are the §20.4 diagnostic ablation
+    toggles. When ``quantize_k`` is False the original FP16 K is
+    returned unchanged (K passes through at full precision); same for
+    ``quantize_v``. This isolates which channel — K or V — is
+    responsible for the long-context decode degradation. The store
+    still round-trips both internally; only the returned tensor for
+    the disabled channel is swapped back to the FP16 source. Keeping
+    the store call uniform is intentional: it is the minimal patch and
+    avoids a second code path through the kvstore.
     """
     if k.ndim != 4 or v.ndim != 4:
         raise ValueError(
@@ -76,7 +88,10 @@ def _compress_decompress_kv_int4(
         store.remove_block(0)
         k_out[batch_idx] = k_back.transpose(0, 1)
         v_out[batch_idx] = v_back.transpose(0, 1)
-    return k_out, v_out
+    return (
+        k_out if quantize_k else k,
+        v_out if quantize_v else v,
+    )
 
 
 class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
@@ -106,6 +121,8 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         asymmetric: bool = False,
         bits: int = 4,
         calibration_path: Optional[str] = None,
+        quantize_k: bool = True,
+        quantize_v: bool = True,
     ) -> None:
         if DynamicCache is None:
             raise ImportError(
@@ -161,6 +178,8 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
                     for key, val in list(entry.items()):
                         if hasattr(val, "to"):
                             entry[key] = val.to(torch_device)
+        self._quantize_k = bool(quantize_k)
+        self._quantize_v = bool(quantize_v)
         self._cfg = dict(
             torch_device=str(torch_device),
             sink_size=int(sink_size),
@@ -169,9 +188,16 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             asymmetric=bool(asymmetric),
             bits=int(bits),
             calibration_path=calibration_path,
+            quantize_k=self._quantize_k,
+            quantize_v=self._quantize_v,
             scheme=f"int{bits}_per_channel_k_per_token_v" + (
                 "_asymmetric" if asymmetric else "_symmetric"
-            ) + ("_calibrated" if calibration_path is not None else ""),
+            ) + ("_calibrated" if calibration_path is not None else "") + (
+                ""
+                if (self._quantize_k and self._quantize_v)
+                else f"_ablation(K={'int' if self._quantize_k else 'fp16'},"
+                     f"V={'int' if self._quantize_v else 'fp16'})"
+            ),
         )
         self._sink_size = int(sink_size)
         if self._sink_size < 0:
@@ -211,6 +237,9 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         **kwargs,
     ) -> "Tuple[torch.Tensor, torch.Tensor]":
         static = self._resolve_static_scales(layer_idx)
+        toggles = dict(
+            quantize_k=self._quantize_k, quantize_v=self._quantize_v,
+        )
         sink = self._sink_size
         if sink > 0 and key_states.shape[2] > sink:
             k_sink = key_states[:, :, :sink, :]
@@ -218,7 +247,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             k_rest = key_states[:, :, sink:, :].contiguous()
             v_rest = value_states[:, :, sink:, :].contiguous()
             k_rest_lossy, v_rest_lossy = _compress_decompress_kv_int4(
-                k_rest, v_rest, store=self._int4_store, **static,
+                k_rest, v_rest, store=self._int4_store, **static, **toggles,
             )
             k_lossy = torch.cat([k_sink, k_rest_lossy], dim=2)
             v_lossy = torch.cat([v_sink, v_rest_lossy], dim=2)
@@ -227,7 +256,8 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             )
         else:
             k_lossy, v_lossy = _compress_decompress_kv_int4(
-                key_states, value_states, store=self._int4_store, **static,
+                key_states, value_states, store=self._int4_store,
+                **static, **toggles,
             )
         self._updates += 1
         self._total_kv_elements += int(key_states.numel() + value_states.numel())

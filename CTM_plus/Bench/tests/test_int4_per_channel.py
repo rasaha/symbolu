@@ -259,6 +259,41 @@ def test_int4_cache_sink_size_passes_through(torch_module, transformers_module):
     assert 0.99 <= cos_rest < 1.0
 
 
+def test_int4_cache_kv_ablation_toggles(torch_module, transformers_module):
+    """§20.4 diagnostic toggle: quantize_k / quantize_v select which
+    channel is INT4 and which passes through at FP16.
+
+      * quantize_v=False (K-only): V is bit-identical, K is lossy.
+      * quantize_k=False (V-only): K is bit-identical, V is lossy.
+      * both False: both bit-identical (degenerate = baseline).
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    g = torch.Generator().manual_seed(7)
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 32, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+
+    # K-only: V passes through untouched, K is lossy.
+    k_only = INT4PerChannelCache(quantize_v=False)
+    k_back, v_back = k_only.update(k, v, layer_idx=0)
+    assert torch.equal(v_back, v), "quantize_v=False must leave V bit-identical"
+    assert not torch.equal(k_back, k), "quantize_v=False must still quantize K"
+    assert 0.99 <= _cosine(k, k_back) < 1.0
+
+    # V-only: K passes through untouched, V is lossy.
+    v_only = INT4PerChannelCache(quantize_k=False)
+    k_back, v_back = v_only.update(k, v, layer_idx=0)
+    assert torch.equal(k_back, k), "quantize_k=False must leave K bit-identical"
+    assert not torch.equal(v_back, v), "quantize_k=False must still quantize V"
+
+    # Both off: degenerate baseline — nothing is quantized.
+    neither = INT4PerChannelCache(quantize_k=False, quantize_v=False)
+    k_back, v_back = neither.update(k, v, layer_idx=0)
+    assert torch.equal(k_back, k) and torch.equal(v_back, v)
+
+
 # --------------------------------------------------------------------- #
 # Cross-algorithm comparison (sanity check the INT4 approach beats     #
 # PolarQuant's per-channel-cosine performance on outlier-channel data) #
