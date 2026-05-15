@@ -443,6 +443,104 @@ def test_async_engine_driver_phase2_enables_prefix_caching():
     assert captured_phase2["preemption_mode"] == "swap"
 
 
+def test_async_engine_driver_default_omits_kv_cache_dtype():
+    """When kv_cache_dtype is not set, _build_engine_args must NOT
+    include the kwarg — vLLM picks "auto" (= weight dtype). Otherwise
+    we'd override the user's intent on every plain cell.
+    """
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured: dict = {}
+
+    class FakeAEAArgs:
+        def __init__(self, **kwargs):
+            captured.clear()
+            captured.update(kwargs)
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAEAArgs
+
+    driver = AsyncEngineDriver(
+        model="dummy", ctm_plus_evictor=False, vllm_module=FakeVLLM,
+    )
+    driver._build_engine_args(FakeVLLM)
+    assert "kv_cache_dtype" not in captured, (
+        "Default (kv_cache_dtype=None) must not set the field in "
+        "AsyncEngineArgs; vLLM should pick auto."
+    )
+
+
+def test_async_engine_driver_fp8_threads_into_engine_args():
+    """When kv_cache_dtype='fp8' the driver forwards it to vLLM's
+    AsyncEngineArgs. Tested via mocked vllm module — no GPU needed.
+
+    This is the install-time invariant for the FP8 KV throughput
+    comparison cell in FP8_INT4_THROUGHPUT_RUNBOOK.md.
+    """
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured: dict = {}
+
+    class FakeAEAArgs:
+        def __init__(self, **kwargs):
+            captured.clear()
+            captured.update(kwargs)
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAEAArgs
+
+    driver = AsyncEngineDriver(
+        model="dummy",
+        ctm_plus_evictor=False,
+        kv_cache_dtype="fp8",
+        vllm_module=FakeVLLM,
+    )
+    driver._build_engine_args(FakeVLLM)
+    assert captured["kv_cache_dtype"] == "fp8"
+    # Doesn't conflict with the other engine args.
+    assert captured["preemption_mode"] == "swap"
+    assert captured["enable_prefix_caching"] is False
+
+
+def test_async_engine_driver_rejects_unknown_kv_cache_dtype():
+    """Typos like 'fp8_e4' shouldn't silently land in AsyncEngineArgs
+    where they'd cause an opaque crash at engine init. The driver
+    rejects them at construction time with the valid set listed.
+    """
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    with pytest.raises(ValueError, match="kv_cache_dtype"):
+        AsyncEngineDriver(model="dummy", kv_cache_dtype="fp8_e4")
+
+
+def test_async_engine_driver_fp8_works_with_ctm_plus():
+    """FP8 KV is orthogonal to the CTM+ evictor — both must be
+    composable in the same cell so the combined (CTM+ Phase 4 + FP8)
+    operating point is also measurable.
+    """
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured: dict = {}
+
+    class FakeAEAArgs:
+        def __init__(self, **kwargs):
+            captured.clear()
+            captured.update(kwargs)
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAEAArgs
+
+    driver = AsyncEngineDriver(
+        model="dummy",
+        ctm_plus_evictor=True,
+        kv_cache_dtype="fp8",
+        vllm_module=FakeVLLM,
+    )
+    driver._build_engine_args(FakeVLLM)
+    assert captured["kv_cache_dtype"] == "fp8"
+    assert captured["enable_prefix_caching"] is True
+
+
 def test_async_engine_driver_run_phase1_requires_vllm():
     """In Phase 1 (LRU) the driver must raise ImportError with a
     message naming vllm and the streaming runner's vLLM target

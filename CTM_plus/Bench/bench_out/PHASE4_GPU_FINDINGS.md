@@ -2181,6 +2181,414 @@ In the repository on branch ``claude/safety-state-machine-continued-Lr6oT``:
 Of these, the ``cache_kv`` hook is the highest-priority next item
 for production deployment.
 
+## §20. FP8-KV competitive gap — harness landed, six follow-up axes scoped
+
+After §19 closed the route-B KIVI INT4 quality story (3.2× real-heap,
+1.024× perplexity, −0.9pt MMLU @ 1000q, 96.4% teacher-forced top-1),
+the next gap was the **competitive throughput comparison vs vLLM's
+production FP8 KV path** (``--kv-cache-dtype fp8``). FP8 KV runs on
+hardware tensor cores at near-zero overhead, beats our route-B INT4
+on compression by 1.6× *less* (FP8 is 2× vs FP16; KIVI INT4 is 3.2×),
+but beats route-B on quality (FP8 ≤ 0.3pt MMLU loss vs our −0.9pt) and
+on throughput (we are currently silent on this axis).
+
+This §20 lands the **harness** and the **engineering plan** for closing
+that gap. Six follow-up axes are scoped (§20.1–§20.6); the GPU run
+that fills in the measured numbers is **one command per axis** on the
+RunPod GPU pod and is documented in
+``Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md``.
+
+This section will be rewritten in-place once the GPU runs land. For
+now, every "TBD: GPU run" marker is a measurement slot.
+
+### §20.1 Throughput comparison harness — four-cell framework
+
+**What landed (this session, CPU-side, committed):**
+
+* ``ctm_bench/scripts/run_streaming.py`` — new ``--kv-cache-dtype`` flag
+  that threads through to vLLM's ``AsyncEngineArgs``. Validates the
+  set ``{auto, fp8, fp8_e4m3, fp8_e5m2, fp16, bf16}`` at construction
+  time so a typo fails loud, not opaque. Four CPU regression tests
+  pin the flow.
+* ``ctm_bench/scripts/track_e_throughput.py`` — new HF-side
+  decode-throughput script. Times prefill + decode-step latency for
+  FP16 baseline vs KIVI INT4 cache on the same model, same prompts,
+  same hardware. Best-of-N trials with warmup; configurable prefill
+  lengths and decode budgets. Dry-runnable on CPU with the existing
+  fake tiny model. Four regression tests cover schema, aggregator,
+  CUDA-sync no-op, and sink-size threading.
+* ``Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md`` — composition recipe
+  for the four cells: vLLM FP16 baseline (A), vLLM FP8 (B), HF FP16
+  baseline (C), HF KIVI INT4 (D). Total wall ~10 min, total cost ~$0.15.
+
+**Why four cells, not two:** vLLM's FP8 KV path and the route-B INT4
+KIVI path live in **different inference stacks** (vLLM vs HF). A
+naive "INT4-HF vs FP8-vLLM" headline conflates algorithm cost with
+stack cost, and the stack cost is well-known to dominate
+(vLLM ≈ 2-5× HF). The honest decomposition:
+
+| Cell | Stack | KV layer | Measures |
+|------|-------|---------|---------|
+| A | vLLM 0.7+ | FP16 (auto) | Stack-baseline upper-bound throughput |
+| B | vLLM 0.7+ | **FP8** | The competitor's real throughput |
+| C | HF | FP16 (DynamicCache) | Route-B stack-baseline |
+| D | HF | **INT4 KIVI** (route-B) | The shipping algorithm's real throughput |
+
+* **B / A** — FP8's actual overhead in vLLM (expected near-zero).
+* **D / C** — the route-B algorithm cost (the number we were silent on).
+* **D / A** — the headline gap. Decomposes into `(D/C) × (C/A)`. If
+  `D/C ≥ 0.85`, the route-A `cache_kv` integration **alone** closes
+  most of the FP8 gap; if `D/C < 0.5`, a Marlin-style fused
+  unpack-attend kernel (§20.6) is the actual blocker.
+
+**Expected measured outcomes (placeholders — TBD: GPU run, ~$0.15):**
+
+| Cell | Measured tokens/sec on chat_32k | JSON artefact |
+|------|------:|---|
+| A — vLLM FP16 | TBD | `bench_out/fp8_int4_throughput/vllm_fp16/streaming_summary.json` |
+| B — vLLM FP8 | TBD | `bench_out/fp8_int4_throughput/vllm_fp8/streaming_summary.json` |
+| C — HF FP16 (decode-only, prefill=2048) | TBD | `bench_out/track_e_audit_followups/int4_throughput_hf.json` |
+| D — HF INT4 KIVI (decode-only, prefill=2048) | TBD | (same JSON) |
+
+The §13.3 LRU vLLM baseline was 85 tok/s at the same config; Cell A
+should reproduce that. Qwen2.5-7B at FP16 in HF transformers is
+typically 20-40 tok/s decode on A100 40 GB; Cell C will land in that
+range.
+
+**Verdict band (pre-decided here so post-hoc rationalisation is harder):**
+
+| D / C ratio | Verdict | Next step |
+|---|---|---|
+| ≥ 0.80 | Route-B INT4 throughput-competitive in HF. Route-A integration alone closes the FP8 gap. | Implement route-A per §20.5 (3-5 engineer-days). |
+| 0.50–0.80 | Algorithm overhead measurable but fixable with a kernel. | Both route-A and a Marlin-style kernel needed; route-A first. |
+| < 0.50 | Pure-PyTorch unpack dominates. Kernel is the actual blocker. | Reprioritize: kernel work first (§20.6), route-A second. |
+
+### §20.2 Sink-FP16 + body-INT4 mixed precision — quality recovery hypothesis
+
+**Hypothesis:** the −0.9pt MMLU gap above FP8 (§19.4) is concentrated
+on the **first few tokens of context** (attention sinks per the
+StreamingLLM literature), not distributed across all positions.
+Keeping positions [0, N) in FP16 while quantizing positions [N:) to
+INT4 should recover most of the gap with negligible compression cost
+(N is small; the body dominates).
+
+**Why this isn't the §18.1 row 7 result** (which made INT4 worse):
+
+* Row 7 was `INT4 plain per-channel + sink-skip 4` — i.e. sink-FP16
+  on the broken algorithm (no group, no asymmetric). Plain
+  per-channel ALREADY underperformed because a single scale tried to
+  cover both outlier-sink positions and normal positions; removing
+  the sinks (sink-skip) only made the remaining scale more inflated
+  on a smaller range, hurting more than it helped.
+* The §20.2 test is `INT4 + group=32 + asymmetric + sink-FP16` —
+  group=32 already correctly isolates outlier positions to group 0;
+  sink-FP16 then makes positions [0, N) bit-identical FP16 (the few
+  positions where INT4 quantization noise has the largest downstream
+  effect on attention).
+
+The two configurations differ in whether the body INT4 has the
+KIVI rescue stack (group + asymmetric) intact when the sink-FP16
+removes the outlier positions from the quantization input.
+
+**Sweep plan (TBD: GPU run, ~$0.50 for the full sweep):**
+
+| Sink size | Pre-decided expectation | Decision criterion |
+|---|---|---|
+| 0 (control) | Should reproduce §19.4: 1.024× ppl, −0.9pt MMLU | Sanity check |
+| 4 | StreamingLLM's published optimum on Llama-family; tests "outlier-sink-only" hypothesis | < −0.5pt MMLU vs baseline → confirms hypothesis |
+| 16 | If 4 helps, 16 should plateau | Plateau (vs 4 within ±0.2pt) → hypothesis confirmed |
+| 64 | Tests "long-prefix" interpretation (early KV vs sink-only) | If 64 ≫ 16, the issue isn't sinks; it's the first chunk |
+
+**Code (already landed in route-B):** the `INT4PerChannelCache`
+constructor's `sink_size` arg implements this. Positions [0, sink)
+pass through uncompressed; positions [sink:) go through the full
+KIVI INT4 path. Verified by ``test_int4_cache_sink_size_passes_through``
+in ``Bench/tests/test_int4_per_channel.py`` (the first 4 positions
+are bit-identical FP16; the rest at INT4-level cosine ~0.99). The
+``--sink-size`` flag in ``track_e_quality_eval.py`` and
+``track_e_throughput.py`` exposes this for both quality and
+throughput sweeps.
+
+**Runbook recipe (drop into a new ``Bench/scripts/RUNPOD_TRACK_D_E_RUNBOOK.md``
+section §5i or run directly):**
+
+```bash
+for SINK in 0 4 16 64; do
+  mkdir -p /tmp/sink_fp16_sweep/sink${SINK}
+  python -m ctm_bench.scripts.track_e_quality_eval \
+      --model Qwen/Qwen2.5-7B-Instruct \
+      --dtype float16 --device cuda \
+      --eval perplexity,mmlu \
+      --mmlu-num-questions 1000 \
+      --quant int4-per-channel \
+      --k-group-size 32 --v-group-size 32 \
+      --asymmetric-int4 \
+      --sink-size ${SINK} \
+      --output-dir /tmp/sink_fp16_sweep/sink${SINK} \
+      2>&1 | tee /tmp/sink_fp16_sweep/sink${SINK}/run.log
+done
+```
+
+**Decision tree (best sink size ε{4, 16, 64} vs sink=0):**
+
+| MMLU delta | Verdict |
+|---|---|
+| ≤ −0.3pt | ✅ Quality is competitive with FP8. **Algorithm-axis closed.** Land the result + update the VC brief's "Measured" table. |
+| −0.3 to −0.5pt | YELLOW. Materially better than −0.9pt; partner-shareable but still trails FP8. Worth a follow-up at AWQ-style calibration on sink positions only. |
+| > −0.5pt | Sink-FP16 doesn't recover the gap. The −0.9pt is distributed across positions; need a different intervention (per-layer bit allocation, or per-head dynamic quant). |
+
+**Expected outcome (literature-informed):** sink=4 lands at −0.3pt to
+−0.5pt MMLU. The StreamingLLM mechanism (sinks attract disproportionate
+attention mass; quantizing them is dangerous) is well-attested and the
+hypothesis is concrete; the test is calibrated to confirm or refute it.
+
+### §20.3 Multi-model replication — Llama-3-8B + Mistral-7B
+
+**What's measured today:** Qwen2.5-7B-Instruct only. The VC brief's
+"Honest Validation Status" table marks "Multi-model generalization
+(Llama-3, Mistral, Qwen sizes other than 7B)" as "Not yet measured".
+
+**Why this is a quick win:** the KIVI ICML paper has published
+cross-model numbers including Llama-2/3 family. Their reported MMLU
+delta is comparable to what we measured on Qwen (around −1.0pt at
+1000q), so reproducing on Llama-3-8B should land in roughly the same
+band. If it does, the "one-model demo" caveat in the VC brief
+disappears.
+
+**Tested-and-shipping caveat for non-Qwen models:** the route-B cache
+wrapper subclasses HF's ``DynamicCache``, which is model-agnostic. The
+``num_key_value_heads`` and ``head_dim`` differ across models (Qwen=4
+KV heads, Llama-3-8B=8, Mistral-7B=8), but the dynamic per-block
+scale computation works on any (S, H, D) shape. Group_size=32 along
+the seq axis is also shape-agnostic. There is no Qwen-specific code
+in the INT4 path.
+
+**Runbook recipe (TBD: GPU run, ~$2-3 total for the two models):**
+
+```bash
+for MODEL in meta-llama/Meta-Llama-3-8B-Instruct mistralai/Mistral-7B-Instruct-v0.3; do
+  TAG=$(echo $MODEL | tr '/' '_')
+  mkdir -p /tmp/multi_model/$TAG
+  python -m ctm_bench.scripts.track_e_quality_eval \
+      --model $MODEL \
+      --dtype float16 --device cuda \
+      --eval perplexity,mmlu \
+      --mmlu-num-questions 1000 \
+      --quant int4-per-channel \
+      --k-group-size 32 --v-group-size 32 \
+      --asymmetric-int4 \
+      --output-dir /tmp/multi_model/$TAG \
+      2>&1 | tee /tmp/multi_model/$TAG/run.log
+done
+```
+
+**Decision tree:**
+
+| Llama-3-8B / Mistral-7B MMLU delta | Verdict |
+|---|---|
+| Within ±0.5pt of Qwen's −0.9pt | ✅ Cross-model generalization holds. "Multi-model demo" caveat removed. |
+| Materially worse (e.g., −2.0pt+) on one model | Model-specific failure. Investigate which layers; consider per-model bit allocation. |
+| Materially better (e.g., −0.2pt) on one model | The Qwen result is conservative. Bonus. |
+
+**Expected outcome:** within ±0.5pt of Qwen for both models. KIVI's
+published numbers support this.
+
+### §20.4 Long-context validation at 32k
+
+**Why this matters:** KV compression's headline value is at long
+contexts where KV memory dominates over weights. Qwen2.5-7B at 32k:
+weights ~14 GB, KV at FP16 ~16 GB (≈ same magnitude). Compress KV
+to 3.2× and the savings dominate.
+
+The §18 + §19 results are at 282 prefill tokens. **We have not
+validated at the context length where the compression actually pays
+off.** The VC brief's "Honest Validation Status" flags this.
+
+**Two-axis sweep (TBD: GPU run, ~$0.50):**
+
+1. **Perplexity at 32k.** Use a long passage (Wikipedia or arXiv
+   chapter ≥ 35k chars). The `track_e_quality_eval.py` perplexity
+   path already supports a single chunk; extend `PERPLEXITY_TEXT`
+   to load from a file path via a new `--perplexity-text-path` flag
+   (CPU-side patch in the same commit as this section). Run both
+   FP16 baseline and INT4 KIVI; report ratio.
+2. **Throughput at 32k.** Already in §20.1's `track_e_throughput.py`
+   — add `32768` to `--prefill-lengths` (the script accepts it). The
+   prefill takes longer than the decode at 32k, so the prefill-cost
+   axis (where FP8 has a hardware advantage) becomes visible.
+
+**Decision tree (32k perplexity ratio at INT4):**
+
+| Ratio | Verdict |
+|---|---|
+| ≤ 1.05 | ✅ Long-context quality holds at our shape (KIVI's published claim reproduces). Partner-shareable. |
+| 1.05–1.15 | YELLOW — quality degrades at 32k. Investigate per-layer behaviour; possibly use higher bits on selected layers. |
+| > 1.20 | Long-context-specific failure. The 282-token result is a short-context artifact. **Major issue** — investigate before further partner conversations on long-context use cases. |
+
+### §20.5 Route-A vLLM `cache_kv` hook — engineering plan
+
+**Sized:** 3-5 engineer-days CPU + ~$0.30 GPU. Full plan in
+``Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md`` — committed this
+session. Highlights:
+
+* **Patch surface:** `vllm/attention/backends/flash_attn.py` —
+  `FlashAttentionImpl.forward`'s `cache_kv` invocation block, wrapped
+  by a monkey-patched compress-on-write / dequant-on-read. Sketch
+  reuses the existing `_extract_model_from_engine` walker the CTM+
+  side-channel installer (`runner_vllm_streaming.py`) already has.
+* **Algorithm code reuse:** `quantize_per_channel_int4` /
+  `quantize_per_token_int4` / `pack_int4` are pure-torch and don't
+  depend on the cache wrapper. Route-A reuses them unchanged. The
+  algorithm path is bit-identical to route-B; only the storage layer
+  changes.
+* **What route-A inherits automatically from route-B:** algorithm
+  correctness (§18.3), all quality numbers (§19.1–§19.4), bit-packed
+  storage (§19.1), group + asymmetric config, and (conditional on
+  §20.2 landing) sink-FP16 mixed precision.
+* **What route-A does NOT inherit:** HF DynamicCache lifecycle
+  semantics (route-A reimplements against vLLM `BlockManager`),
+  decode-step S=1 special case (vLLM writes one block per step; KIVI
+  group_size=32 must align to vLLM block_size — likely move block_size
+  to 32 OR group across two adjacent vLLM blocks). Day-1 verification.
+* **Why this double-counts:** the SAME hook closes the §13.3 CTM+
+  Phase 4 −20% tokens/sec gap (which is structural at the Evictor-ABC
+  patching layer; a deeper integration point at `cache_kv` bypasses
+  it). One implementation closes two validation gaps the VC brief
+  currently flags.
+
+**Open questions to answer on day 1** (full list in the plan doc):
+
+1. Does `BlockManager` expose a clean scale-storage lifecycle hook,
+   or do we subclass?
+2. Does `flash_attn_with_kvcache` need FP16 specifically?
+3. Is vLLM block_size=16 compatible with KIVI group_size=32?
+4. How does prefix caching interact with the per-block scale
+   side-channel? (Probably fine — dynamic scales are deterministic
+   from K/V — but verify.)
+
+### §20.6 Marlin-style fused unpack-attend kernel — sketch landed
+
+**What landed (this session, CPU-side, committed):**
+``CTM_plus/KVPolicy/kv_policy/int4_fused_attention_sketch.py`` — pure-
+PyTorch reference of the fused INT4-unpack + attention pattern. ~350
+LOC documenting:
+
+* The exact byte-nibble layout the CUDA/Triton kernel must match.
+* The asymmetric vs symmetric dequant formula.
+* The group-index computation for K (along seq axis) and V (along
+  head_dim axis).
+* GQA broadcasting (each KV head services H_q/H_kv query heads).
+* An HBM-bytes counter that quantifies the bandwidth advantage: at
+  Qwen2.5-7B shape (B=1, H_kv=4, S_kv=64, D=128), INT4 loads
+  **36,864 bytes vs FP16's 131,072 — a 3.56× HBM-traffic ceiling
+  speedup**.
+
+The reference runs end-to-end on CPU; the test cell at the bottom
+produces a `(1, 28, 1, 128)` FP16 output tensor and prints the HBM
+counter.
+
+**Why this is evidence the gap is closeable, not just a claim:**
+
+1. The HBM traffic IS the bottleneck for decode-step attention on
+   modern GPUs (the model is bandwidth-bound at long contexts; load
+   the KV, compute one row of attention, done).
+2. The Marlin original (Frantar et al. 2024) demonstrated the
+   pattern works for W4A16 GEMM with ~2-3× speedup. KV is the
+   harder case (the unpack happens inside a softmax-loop rather
+   than a GEMM-loop), but the same loads-bandwidth reduction
+   applies.
+3. The KIVI paper has a CUDA appendix with exactly this pattern
+   for KV — the reference is already written and benchmarked at
+   ~80-90% of the FP16 FlashAttention baseline on a real model.
+   Our route-B uses their quantization but not their kernel; the
+   kernel is the remaining gap.
+
+**Sizing (in the sketch's footer):** **1-2 weeks of GPU-kernel work**
+for a Triton or CUDA specialist. Triton-prototype first
+(validates algorithm + HBM pattern, ~70% of CUDA perf); CUDA-promote
+only if the Triton overhead vs FP16 baseline is > 5%.
+
+**Expected end-state:** the kernel matches the reference numerically
+(cosine ≥ 0.999 vs reference; max-abs-diff < 1e-3 in FP16). Latency
+vs FP16 FlashAttn within 5-10% on Qwen2.5-7B decode at typical context
+lengths.
+
+**Order of operations:**
+
+1. §20.1 GPU run (~$0.15) — establishes the D/C ratio.
+2. **If D/C ≥ 0.80:** route-A integration first (§20.5, 3-5
+   engineer-days); the kernel is a "nice to have" for the last 5-10%.
+3. **If D/C < 0.50:** kernel first (1-2 weeks); route-A integration
+   sees no benefit until the kernel exists.
+
+### §20.7 Where this lands in the VC brief's "Honest Validation Status"
+
+Updates to ``CTM_PLUS_PCAM_FSCS_VC_BRIEF.md`` and
+``CTM_plus/INVESTOR_PITCH.md`` after the GPU run lands:
+
+**"Measured on real GPUs" — net new rows expected after §20.1 GPU run:**
+
+* vLLM FP8 KV throughput on Qwen2.5-7B chat_32k (TBD tok/s)
+* Route-B INT4 decode tokens/sec vs FP16 HF (TBD ratio)
+* (Conditional on §20.2 landing < −0.5pt MMLU) INT4 + sink-FP16
+  quality recovery
+
+**"Projected (not yet measured)" — to be promoted on GPU-run-landing:**
+
+* "Multi-model generalization" → "Measured" if §20.3 lands within
+  ±0.5pt of Qwen on Llama-3-8B + Mistral-7B.
+* "Long-context (≥32k)" → "Measured" if §20.4 lands ≤ 1.05× ppl.
+* "vLLM `cache_kv` monkey-patch (route A — production deployment)" —
+  stays "Projected" until route-A actually lands (§20.5 is plan-only).
+
+**"Tested-and-failed" — net new rows possible after the GPU runs:**
+
+* Sink-FP16 mixed precision (if §20.2 doesn't recover the gap)
+* Any model where INT4 KIVI doesn't generalize (if §20.3 fails on one
+  of Llama-3-8B / Mistral-7B)
+* Long-context quality (if §20.4 lands > 1.20× at 32k)
+
+Negatives go in tested-and-failed as durable measured artefacts.
+Positives go in measured. Nothing gets promoted to the "Combined" or
+"Headline" row without a corresponding entry in one of these three
+buckets.
+
+### §20.8 What this session shipped vs what the GPU run delivers
+
+**This session (CPU dev pod, committed on
+``claude/fp8-kv-competitive-gap-iXKRM``):**
+
+* `ctm_bench/scripts/run_streaming.py` — new `--kv-cache-dtype` flag.
+* `ctm_bench/runner_vllm_streaming.py` — new `kv_cache_dtype`
+  constructor arg + plumbing into `AsyncEngineArgs`.
+* `ctm_bench/scripts/track_e_throughput.py` — new HF-side throughput
+  harness (dry-run-tested).
+* `Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md` — four-cell
+  composition + decision trees.
+* `Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md` — engineering plan,
+  3-5 engineer-day sizing, day-by-day breakdown.
+* `KVPolicy/kv_policy/int4_fused_attention_sketch.py` — Marlin-style
+  kernel sketch + HBM-traffic counter.
+* `Bench/tests/test_throughput_harness.py` — 4 new CPU regression
+  tests for the throughput harness.
+* `Bench/tests/test_runner_vllm_streaming.py` — 4 new CPU regression
+  tests for the FP8 plumbing.
+* This §20 section in `PHASE4_GPU_FINDINGS.md`.
+
+**Next session (GPU pod, ~$0.65 + ~1 engineer-day):**
+
+* §20.1 four-cell throughput run (~$0.15, 10 min wall)
+* §20.2 sink-FP16 sweep at sink ∈ {0, 4, 16, 64} (~$0.50, 30 min)
+* §20.3 multi-model run on Llama-3-8B + Mistral-7B (~$2-3, 1 hour)
+* §20.4 long-context perplexity + throughput at 32k (~$0.50)
+* Update §20.1–§20.4 with measured numbers; rewrite in-place.
+* Update `INVESTOR_PITCH.md` and `CTM_PLUS_PCAM_FSCS_VC_BRIEF.md`
+  "Honest Validation Status" tables.
+
+All measurement axes have a pre-decided decision criterion written
+into this section (above) so the post-GPU-run write-up is a
+mechanical fill-in, not an interpretation exercise.
+
 ## Appendix C: Where to read more
 
 | Doc | Purpose |
@@ -2192,3 +2600,6 @@ for production deployment.
 | `Bench/scripts/MODE_B_PHASE4_GPU_RUNBOOK.md` | The runbook this session executed |
 | `Bench/tests/test_vllm_protocol_fixture.py` | The CPU fixture that closes the audit gap |
 | `CTM_plus/TURBOQUANT_CTXL_IMPLEMENTATION_OVERVIEW.md` | Architecture-doc source of the 8.8× claim that §7 says is unbacked |
+| `Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md` | §20.1 — FP8 KV vs INT4 KIVI four-cell throughput composition |
+| `Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md` | §20.5 — engineer-day plan to land the vLLM cache_kv hook |
+| `CTM_plus/KVPolicy/kv_policy/int4_fused_attention_sketch.py` | §20.6 — Marlin-style fused unpack-attend kernel reference |

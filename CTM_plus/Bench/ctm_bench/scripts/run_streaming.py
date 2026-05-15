@@ -208,6 +208,19 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--kv-cache-dtype",
+        default=None,
+        choices=["auto", "fp8", "fp8_e4m3", "fp8_e5m2", "fp16", "bf16"],
+        help=(
+            "Override vLLM's KV-cache storage dtype. When unset the "
+            "engine picks 'auto' (= model weight dtype). 'fp8' enables "
+            "vLLM's hardware-tensor-core FP8 KV path on A100/H100 — "
+            "the production competitor to the route-B INT4 KIVI work. "
+            "Used by FP8_INT4_THROUGHPUT_RUNBOOK.md to compose the "
+            "FP16 baseline vs FP8 KV throughput comparison."
+        ),
+    )
+    parser.add_argument(
         "--turboquant-kv",
         action="store_true",
         help=(
@@ -290,6 +303,7 @@ def main(argv: Sequence[str]) -> int:
         phase4_trig_blend_candidate_count=args.phase4_trig_blend_candidate_count,
         phase4_use_cython_evictor=args.phase4_cython_evictor,
         phase4_fast_hooks=args.phase4_fast_hooks,
+        kv_cache_dtype=args.kv_cache_dtype,
         max_decode_tokens=args.max_decode_tokens,
     )
 

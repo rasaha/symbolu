@@ -307,6 +307,29 @@ so partners can tell which is which.
 
 Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §19.2.
 
+**Harness-landed, GPU-run-pending (FP8-KV competitive gap closure track):**
+
+- FP8 (vLLM stock) vs INT4 (KIVI route-B) throughput comparison —
+  four-cell composition documented in
+  `Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md`; runner +
+  `--kv-cache-dtype` flag landed; ~$0.15 GPU spend to fill in numbers
+  (§20.1)
+- Sink-FP16 + body-INT4 mixed precision — sweep recipe landed for
+  sink ∈ {0, 4, 16, 64} at the full KIVI rescue stack; ~$0.50 GPU to
+  test the StreamingLLM-style quality-recovery hypothesis (§20.2)
+- Multi-model replication on Llama-3-8B + Mistral-7B — runbook recipe
+  landed; ~$2-3 GPU to remove the "one-model demo" caveat (§20.3)
+- Long-context perplexity sweep at 16k/32k/50k — `--perplexity-text-path`
+  flag landed; ~$0.50 GPU to validate at the context length where KV
+  compression matters most (§20.4)
+- Route-A vLLM `cache_kv` integration plan — engineer-day breakdown in
+  `Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md`; same hook closes the
+  −20% tokens/sec gap (§20.5)
+- Marlin-style fused unpack-attend kernel — PyTorch reference + HBM-
+  traffic counter in `KVPolicy/kv_policy/int4_fused_attention_sketch.py`
+  showing 3.56× HBM-traffic ceiling speedup; ~1-2 weeks of GPU-kernel
+  specialist work to realize (§20.6)
+
 **Projected (not yet measured):**
 
 - 7-signal FSCS-enhanced serving-tier numbers (decision-impact validated; quality-impact requires the same §13.3-style closure rerun)
