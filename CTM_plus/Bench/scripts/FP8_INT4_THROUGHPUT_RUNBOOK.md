@@ -36,40 +36,46 @@ python -c "import vllm; print('vllm', vllm.__version__)"
 
 ## 1. Cells A and B — vLLM FP16 baseline + FP8
 
-Both reuse the §13.3 `run_streaming.py` harness with the new `--kv-cache-dtype` flag. No CTM+ flags (we're measuring KV-quantization, not eviction; the §13.3 CTM+ run is a separate axis).
+Use `vllm_throughput_cell.py`. **Do NOT use `run_streaming.py` for
+cells A/B** — that is the §13.3 *swap-event* harness; on the chat_32k
+workload it is prefill-bound and its synthetic prompts trigger early
+EOS, so `decode_tokens` collapses to single digits and the derived
+tokens/sec is noise. `vllm_throughput_cell.py` uses fixed-length
+prompts + `ignore_eos=True` so the decode path is actually measured.
+
+Requires the venv-vllm environment with **vLLM 0.7.3** (`pip install
+'vllm==0.7.3'`) and **transformers 4.x** (`pip install
+'transformers==4.48.3'` — vLLM 0.7.3's tokenizer API breaks on
+transformers 5.x). See §0 Prerequisites.
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench
-
 mkdir -p bench_out/fp8_int4_throughput/{vllm_fp16,vllm_fp8,hf_fp16,hf_int4}
 
 # Cell A — vLLM with stock FP16 KV (the upper-bound throughput).
-python -m ctm_bench.scripts.run_streaming \
-    --model Qwen/Qwen2.5-7B-Instruct \
-    --workload chat_32k --seed 42 \
-    --gpu-memory-utilization 0.26 --swap-space-gb 16 \
-    --arrival-rate 6.0 --arrival-alpha 1.5 \
-    --max-requests 30 --max-wall-seconds 60 \
-    --max-decode-tokens 2048 \
-    --prompt-length-choices "8000,16000,24000,30000" \
-    --output-dir bench_out/fp8_int4_throughput/vllm_fp16 \
-    2>&1 | tee bench_out/fp8_int4_throughput/vllm_fp16/run.log
+python -m ctm_bench.scripts.vllm_throughput_cell \
+    --kv-cache-dtype auto \
+    --output bench_out/fp8_int4_throughput/vllm_fp16/streaming_summary.json
 
 # Cell B — vLLM with FP8 KV (the competitor).
-python -m ctm_bench.scripts.run_streaming \
-    --model Qwen/Qwen2.5-7B-Instruct \
-    --workload chat_32k --seed 42 \
-    --gpu-memory-utilization 0.26 --swap-space-gb 16 \
-    --arrival-rate 6.0 --arrival-alpha 1.5 \
-    --max-requests 30 --max-wall-seconds 60 \
-    --max-decode-tokens 2048 \
-    --prompt-length-choices "8000,16000,24000,30000" \
+python -m ctm_bench.scripts.vllm_throughput_cell \
     --kv-cache-dtype fp8 \
-    --output-dir bench_out/fp8_int4_throughput/vllm_fp8 \
-    2>&1 | tee bench_out/fp8_int4_throughput/vllm_fp8/run.log
+    --output bench_out/fp8_int4_throughput/vllm_fp8/streaming_summary.json
 ```
 
-Read `tokens_per_second` out of each cell's `streaming_summary.json`. Expected: B is within ~5% of A (FP8 runs on tensor cores; overhead is dispatch only).
+Each cell is ~2 min (model load + warmup + a 32-prompt × 256-token
+timed batch). The script writes a `tokens_per_second` field at the
+exact path the composer reads. On an 80 GB A100 raise
+`--gpu-memory-utilization` if you want a bigger KV cache; the default
+0.5 is fine.
+
+Note: with FP8 KV, vLLM 0.7.3 logs `Cannot use FlashAttention-2
+backend for FP8 KV cache` and falls back to XFormers — that is
+expected and fine for the comparison (set `VLLM_ATTENTION_BACKEND=
+FLASHINFER` only if you want FP8's best-case path).
+
+Read `tokens_per_second` out of each cell's JSON. Expected: B is
+within ~5% of A (FP8 runs on tensor cores; overhead is dispatch only).
 
 **Decision tree (B / A ratio):**
 
